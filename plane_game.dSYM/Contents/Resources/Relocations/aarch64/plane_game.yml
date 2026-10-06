@@ -1,0 +1,11 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/bcrowe/Documents/Git/plane_game/plane_game'
+relocations:
+  - { offset: 0x1F, size: 0x8, addend: 0x0, symName: '_runtime::[heap_allocator_unix.odin]::_heap_alloc', symObjAddr: 0x0, symBinAddr: 0x100002F00, symSize: 0x80 }
+  - { offset: 0x30, size: 0x8, addend: 0x0, symName: '_runtime::[heap_allocator_unix.odin]::_heap_alloc', symObjAddr: 0x0, symBinAddr: 0x100002F00, symSize: 0x80 }
+  - { offset: 0x38, size: 0x8, addend: 0x0, symName: '_runtime::[heap_allocator_unix.odin]::_heap_resize', symObjAddr: 0x80, symBinAddr: 0x100002F80, symSize: 0x38 }
+  - { offset: 0x70, size: 0x8, addend: 0x0, symName: '_runtime::[heap_allocator_unix.odin]::_heap_resize', symObjAddr: 0x80, symBinAddr: 0x100002F80, symSize: 0x38 }
+  - { offset: 0x78, size: 0x8, addend: 0x0, symName: '_runtime::[heap_allocator_unix.odin]::_heap_free', symObjAddr: 0xB8, symBinAddr: 0x100002FB8, symSize: 0x2C }
+  - { offset: 0xB0, size: 0x8, addend: 0x0, symName: '_runtime::[heap_allocator_unix.odin]::_heap_free', symObjAddr: 0xB8, symBinAddr: 0x100002FB8, symSize: 0x2C }
+...
