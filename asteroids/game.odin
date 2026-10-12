@@ -23,8 +23,8 @@ GameSetup :: proc(game: ^e.Game) {
 	scene := game->createScene("main", true)
 
 	// CreateSpaceShip(scene, game)
-	CreatePlayer(scene, game, {100,100})
-	CreatePlayer(scene, game, {200,200})
+	// CreatePlayer(scene, game, {200,200})
+	CreateSpaceShip(scene, game)
 	game.state = .Ready
 	game.drawBounds = true
 

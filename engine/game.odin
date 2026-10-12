@@ -3,6 +3,7 @@ package engine
 import vmem "core:mem/virtual"
 import "core:fmt"
 import "core:log"
+import rl "vendor:raylib"
 
 GameState :: enum {
 	None,
@@ -23,6 +24,7 @@ Game :: struct {
 	arena: vmem.Arena,
 	state:      GameState,
 	sceneManager: SceneManager,
+	backgroundColor: rl.Color,
 	resourceManager: ResourceManager,
 	gameContext: GameContext,
 	drawBounds: bool,
@@ -41,6 +43,7 @@ InitializeGame :: proc(game: ^Game) {
 	if err != nil {
 		log.error("Error initializing game growing arena: ", err)
 	}
+	game.backgroundColor = rl.BLACK
 	game.run = GameRun
 	game.terminate = GameTerminate
 	game.createScene = GameCreateScene

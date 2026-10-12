@@ -16,9 +16,11 @@ Scene :: struct {
 	removeChild: proc(scene: ^Scene, parent, child: ^Node),
 }
 
-CreateNodeScene :: proc(scene: ^Scene, $T: typeid) -> (node: ^T) {
+CreateNodeScene :: proc(scene: ^Scene, $T: typeid, addToScene: bool = false) -> (node: ^T) {
 	allocator := vmem.arena_allocator(&scene.manager.arena)
 	node = new(T, allocator)
+	InitializeNode(cast(^Node)node)
+	if addToScene do SceneAddNode(scene, node)
 	return node
 }
 

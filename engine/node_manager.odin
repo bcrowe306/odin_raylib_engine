@@ -153,6 +153,9 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 
 				// This can be used to clean up resources on any custom node
 				if node.onDestroy != nil do node->onDestroy(gameContext)
+
+				// Frees node's arena and any resources allocated on it. This is important to avoid memory leaks.
+				Node_Terminate(node)
 				manager.nodes[index] = nil
 				queue.push_back(&manager.free, index)
 			}
@@ -187,7 +190,7 @@ Node_SetGlobalPositions :: proc(manager: ^NodeManager, node: ^Node, positionOffs
 	children := GetChildren(manager, node)
 	defer delete(children)
 	for child in children {
-		Node_SetGlobalPositions(manager, child, node.globalPosition)
+		Node_SetGlobalPositions(manager, child, node.globalPosition, node.globalScale, node.globalRotation)
 	}
 }
 
@@ -253,9 +256,6 @@ GetNodeByPath :: proc(scene: ^Scene, currentNode: ^Node, path: string) -> (node:
 		return nil, false
 	}
 
-	if parts[1] == "" {
-
-	}
 
 	startState : PathStartState
 	startingIndex := 0
@@ -290,6 +290,7 @@ GetNodeByPath :: proc(scene: ^Scene, currentNode: ^Node, path: string) -> (node:
 			}
 	}
 
+	foundNode := startingNode
 	for part, i in parts[startingIndex:] {
 		if part == "" || part == "." || part == ".." {
 			log.error("Path part is empty, relative, or parent. Cannot get node by path")
@@ -302,8 +303,9 @@ GetNodeByPath :: proc(scene: ^Scene, currentNode: ^Node, path: string) -> (node:
 			return nil, false
 		}
 		startingNode = child
+		foundNode = child
 	}
 
 
-	return currentNode, true
+	return foundNode, true
 }

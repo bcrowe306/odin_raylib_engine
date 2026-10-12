@@ -50,9 +50,13 @@ AnimationPlayerNode_RemoveAnimation :: proc(animationPlayer: ^AnimationPlayerNod
 }
 
 
-AnimationPlayerNode_Create :: proc(scene: ^Scene) -> ^AnimationPlayerNode {
+AnimationPlayerNode_Create :: proc(scene: ^Scene, name: string = "") -> ^AnimationPlayerNode {
+
 	apn := CreateNode(scene.manager, AnimationPlayerNode)
 	AnimationPlayerNode_Init(apn)
+	if name != "" {
+		apn.name = name
+	}
 	return apn
 }
 
@@ -128,4 +132,37 @@ AnimationPlayerNode_SetFPS :: proc(apn: ^AnimationPlayerNode, fps: f32) {
 AnimationPlayerNode_SetAnimationIndex :: proc(apn: ^AnimationPlayerNode, index: int) {
 	index := clamp(index, 0, len(apn.animations))
 	apn.animationIndex = index
+}
+
+AnimationPlayerNode_SetAnimationByName :: proc(apn: ^AnimationPlayerNode, name: string) {
+	index := -1
+	for animation, i in apn.animations {
+
+		if animation.name == name {
+			index = i
+			return
+		}
+	}
+	if index != -1 {
+		AnimationPlayerNode_SetAnimationIndex(apn, index)
+	}
+	else {
+		log.warnf("Animation with name '%s' not found in AnimationPlayerNode", name)
+	}
+}
+
+
+AnimationPlayerNode_GetAnimation :: proc(apn: ^AnimationPlayerNode) -> ^Animation {
+	if len(apn.animations) == 0 {
+		return nil
+	}
+	return apn.animations[apn.animationIndex]
+}
+
+AnimationPlayerNode_GetAnimationName :: proc(apn: ^AnimationPlayerNode) -> string {
+	animation := AnimationPlayerNode_GetAnimation(apn)
+	if animation == nil {
+		return ""
+	}
+	return animation.name
 }

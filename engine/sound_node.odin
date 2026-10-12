@@ -13,17 +13,18 @@ SoundNode_Init :: proc(soundNode: ^SoundNode) {
 	InitializeNode(soundNode)
 }
 
-SoundNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, filePath: string) -> ^SoundNode {
+SoundNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, filePath: string, name: string) -> ^SoundNode {
 	soundNode := CreateNode(scene.manager, SoundNode)
 	SoundNode_Init(soundNode)
+	soundNode.name = name
 	sound, ok := resource_manager->loadAudioSound(filePath)
 	if ok {
+		log.info("Loaded sound: ", filePath)
 		soundNode.audio = sound
 	}
 	else {
 		log.error("Failed to load sound: ", filePath)
 	}
-	scene->addNode(soundNode)
 	return soundNode
 }
 

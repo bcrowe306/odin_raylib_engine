@@ -1,5 +1,7 @@
 package engine
 
+import "core:log"
+import "core:mem"
 import "core:crypto"
 import "core:encoding/uuid"
 import vmem "core:mem/virtual"
@@ -7,7 +9,10 @@ import rl "vendor:raylib"
 
 Node :: struct {
 	id: uuid.Identifier,
-	name: string,
+	arena: vmem.Arena,
+	allocator: mem.Allocator,
+	resource: rawptr, // Pointer to the resource associated with this node. Used to give data to the node. Resoruce is stored on node's arena, and dealloc'd when node terminates.
+	name: string, // Name of the node
 	position: [2]f32,
 	scale: [2]f32,
 	rotation: f32,
@@ -31,6 +36,8 @@ Node :: struct {
 }
 
 CreateNode :: proc(manager: ^NodeManager, $T: typeid) -> (node: ^T) {
+
+	// Create allocator from the arena used to allocate the node
 	allocator := vmem.arena_allocator(&manager.arena)
 	node = new(T, allocator)
 	genNode := cast(^Node)node
@@ -40,6 +47,10 @@ CreateNode :: proc(manager: ^NodeManager, $T: typeid) -> (node: ^T) {
 }
 
 InitializeNode :: proc(node: ^Node) {
+	if err := vmem.arena_init_growing(&node.arena); err != nil {
+		log.panic("Error allocating node's arena", err)
+	}
+	node.allocator = vmem.arena_allocator(&node.arena)
 	context.random_generator = crypto.random_generator()
 	node.id = uuid.generate_v4()
 	node.position = {0, 0}
@@ -53,4 +64,22 @@ InitializeNode :: proc(node: ^Node) {
 	InitializeSubject(&node.onParentAdded)
 	InitializeSubject(&node.onParentRemoved)
 	node.renderable = true
+}
+
+Node_AddResource :: proc(node: ^Node, $T: typeid) -> ^T {
+	resource, err := new(T, node.allocator)
+	if err != nil {
+		log.panic("Error allocating resource for node", err)
+	}
+	node.resource = cast(rawptr)resource
+	return resource
+}
+
+
+Node_Terminate :: proc(node: ^Node) {
+	if node.onDestroy != nil {
+		node.onDestroy(node, node.gameContext)
+	}
+	// Terminate the arena used to allocate any resources on the node.
+	vmem.arena_free_all(&node.arena)
 }

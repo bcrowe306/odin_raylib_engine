@@ -119,6 +119,7 @@ ResourceManager_LoadAudioSound :: proc(rm: ^ResourceManager, filePath: string) -
 	for &audio in rm.audioSounds {
 		if audio.filePath == filePath {
 			audio.refCount += 1
+			log.warn("AudioSound already loaded. returning loaded audio")
 			return &audio, true
 		}
 	}
@@ -126,13 +127,13 @@ ResourceManager_LoadAudioSound :: proc(rm: ^ResourceManager, filePath: string) -
 	if os.exists(filePath) {
 		if os.is_file(filePath) {
 			if rm.audioCount < MAX_AUDIOSOUNDS {
+				rm.audioCount += 1
 				rm.audioSounds[rm.audioCount] = AudioSound {
 					fileName = filepath.base(filePath),
 					filePath = filePath,
 					sound = rl.LoadSound(fmt.ctprint(filePath)),
 					refCount = 1
 				}
-				rm.audioCount += 1
 				return &rm.audioSounds[rm.audioCount], true
 			}
 
