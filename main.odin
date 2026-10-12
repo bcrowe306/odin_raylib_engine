@@ -34,6 +34,17 @@ main :: proc() {
 		deltaTime := rl.GetFrameTime()
 		game->run(deltaTime)
 
+		particleEmitter.emitTimer += deltaTime
+		if particleEmitter.emitTimer >= 1.0 / particleEmitter.rate {
+			particleEmitter.emitTimer = 0
+			p := &particleEmitter.particles[particleEmitter.head]
+			particleEmitter.head = (particleEmitter.head + 1) % len(particleEmitter.particles)
+			p.position = {f32(WINDOW_SIZE[0] / 2), f32(WINDOW_SIZE[1] / 2)}
+			p.velocity = {math.cos(particleEmitter.) * particleEmitter.velocity, math.sin(0) * particleEmitter.velocity}
+			p.lifetime = particleEmitter.lifetime
+			p.size = particleEmitter.particleSize
+			p.color = particleEmitter.particleColor
+			p.alive = true
 
 
 		// Stats
