@@ -1,0 +1,17 @@
+# Build executables
+main
+plane_game
+asteroids/asteroids
+!*.odin
+*.exe
+*.bin
+*.out
+
+# Debug symbols / crash info
+*.dSYM/
+*.pdb
+*.dwarf
+
+# OS / editor cruft
+.DS_Store
+.zed/
