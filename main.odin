@@ -22,366 +22,370 @@ WINDOW_SIZE :[2]i32: {1280, 720}
 
 DEFAULT_BULLET_VELOCITY : [2]f32 : {0, -500}
 
-ParticleShape :: enum {
-	Circle,
-	Ellipse,
-	Rectangle,
-	Pixel,
-	Line,
-	Texture,
-	Custom,
-}
-
-ParticleEmitter :: struct {
-	amount: int `gui:"true" min:"1" max:"500"`,
-	lifetime: f32 `gui:"true" min:".01" max:"5"`,
-	position: [2]f32 `gui:"true" min:"0" max:"1280"`,
-	burst: f32 `gui:"true" min:"0" max:"1"`,
-	size: f32 `gui:"true" min:".01" max:"100"`,
-	sizeVariance: f32 `gui:"true" min:"0" max:"1"`, // 0-1
-	sizeSpread: f32 `gui:"true" min:"0" max:"50"`,
-	scaleStart: [2]f32 `gui:"true" min:"0" max:"1"`,
-	scaleEnd: [2]f32 `gui:"true" min:"0" max:"1"`,
-	rotation: f32 `gui:"true" min:"0" max:"359"`,
-	rotationVariance: f32 `gui:"true" min:"0" max:"1"`, // 0-1
-	rotationSpread: f32 `gui:"true" min:"0" max:"359"`,
-	torque: f32 `gui:"true" min:"-2000" max:"2000"`,
-	torqueVariance: f32 `gui:"true" min:"0" max:"1"`, // 0-1
-	torqueSpread: f32 `gui:"true" min:"0" max:"2000"`,
-	torqueAcceleration: f32 `gui:"true" min:"-2000" max:"2000"`,
-	particleColor: rl.Color `gui:"true"`,
-	spread: [2]f32 `gui:"true" min:"0" max:"1280"`,
-	velocity: f32 `gui:"true" min:"0" max:"2000"`,
-	velocityVariance: f32 `gui:"true" min:"0" max:"1"`, // 0-1
-	velocitySpread: f32 `gui:"true" min:"0" max:"2000"`,
-	velocityScale: f32 `gui:"true" min:"0" max:"10"`,
-	acceleration: f32 `gui:"true" min:"-2000" max:"2000"`,
-	angle: f32 `gui:"true" min:"0" max:"359"`,
-	angleVariance: f32 `gui:"true" min:"0" max:"1"`, // 0-1
-	angleSpread: f32 `gui:"true" min:"0" max:"360"`,
-	shape: ParticleShape `gui:"true" min:"0" max:"2000"`,
-	lifetimer: f32,
-	particles: [1000]Particle,
-	timer: f32,
-	head: int,
-	count: int,
-	texture: ^rl.Texture2D,
-	customShapeProc: proc(p: ^Particle, deltaTime: f32),
-}
-
-ParticleEmitter_Init :: proc(emitter: ^ParticleEmitter) {
-	emitter.amount = 1
-	emitter.lifetime = 2
-	emitter.size = 5
-	emitter.particleColor = rl.WHITE
-	emitter.velocity = 100
-	emitter.scaleStart = 1
-	emitter.scaleEnd = 1
-	emitter.velocityScale = 1
-}
-
-Particle :: struct {
-	position: [2]f32,
-	scaleStart: [2]f32,
-	scaleEnd: [2]f32,
-	scale: [2]f32,
-	rotation: f32,
-	torque: f32,
-	torqueAcceleration: f32,
-	velocity: [2]f32,
-	acceleration: [2]f32,
-	lifetime: f32,
-	age: f32,
-	agePercent: f32,
-	size: f32,
-	color: rl.Color,
-	alive: bool,
-	shape: ParticleShape,
-	texture: ^rl.Texture2D,
-	customShapeProc: proc(p: ^Particle, deltaTime: f32),
-}
-
-ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
-	context.random_generator = crypto.random_generator()
-
-	p := &emitter.particles[emitter.head]
-	emitter.head = (emitter.head + 1) % len(emitter.particles)
-
-	// Position
-	xpos := rand.float32_range(emitter.position[0] - emitter.spread[0], emitter.position[0] + emitter.spread[0])
-	ypos := rand.float32_range(emitter.position[1] - emitter.spread[1], emitter.position[1] + emitter.spread[1])
-	p.position = {xpos, ypos}
-	p.shape = emitter.shape
-
-	// Size
-	sizeSpread := emitter.sizeSpread * emitter.sizeVariance
-	p.size = emitter.size + rand.float32_range(-sizeSpread, sizeSpread)
-
-	// Scale
-	p.scaleStart = emitter.scaleStart
-	p.scaleEnd = emitter.scaleEnd
-
-	// Rotation
-	rotationSpread := emitter.rotationSpread * emitter.rotationVariance
-	p.rotation = emitter.rotation + rand.float32_range(-rotationSpread, rotationSpread)
-
-	// Angle
-	spread := emitter.angleSpread * emitter.angleVariance
-	angle := emitter.angle + rand.float32_range(-spread, spread)
-	angle_rad := math.to_radians(angle)
-
-	// Torque
-	torqueSpread := emitter.torqueSpread * emitter.torqueVariance
-	p.torque = emitter.torque + rand.float32_range(-torqueSpread, torqueSpread)
-	p.torqueAcceleration = emitter.torqueAcceleration
-
-	// Velocity
-	velSpread := emitter.velocitySpread * emitter.velocityVariance
-	velocity := emitter.velocity + rand.float32_range(-velSpread, velSpread)
-	p.velocity = {math.cos(angle_rad) * velocity, math.sin(angle_rad) * velocity}
-
-	// Texture
-	p.texture = emitter.texture
-
-	p.acceleration = {math.cos(angle_rad) * emitter.acceleration, math.sin(angle_rad) * emitter.acceleration}
-	p.lifetime = emitter.lifetime
-	p.age = 0
-	p.agePercent = 0
-	p.color = emitter.particleColor
-	p.alive = true
-}
-
-Particle_Update :: proc(emitter: ^ParticleEmitter, particle: ^Particle, deltaTime: f32) {
-	if particle.alive {
-		particle.velocity += particle.acceleration * deltaTime
-		particle.torque += particle.torqueAcceleration * deltaTime
-		particle.rotation += particle.torque * deltaTime
-		particle.position += particle.velocity * deltaTime * emitter.velocityScale
-		particle.age += deltaTime
-		particle.agePercent = particle.age / particle.lifetime
-		xScale := math.lerp(particle.scaleStart[0], particle.scaleEnd[0], particle.agePercent)
-		yScale := math.lerp(particle.scaleStart[1], particle.scaleEnd[1], particle.agePercent)
-		particle.scale = {xScale, yScale}
-		if particle.age >= particle.lifetime {
-			particle.alive = false
-			particle.agePercent = 1.0
-		}
-	}
-}
-
-ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
-	// how many particles should i emit this frame based on the amount and deltaTime and lifetime
-	emitter.timer += deltaTime
-	emitter.lifetimer += deltaTime
-	rate := 1 / f32(emitter.amount) * (emitter.lifetime * (1 - emitter.burst))
-	if emitter.timer >= rate {
-		emitter.timer = 0
-		if emitter.count <= emitter.amount {
-			ParticleEmitter_Emit(emitter)
-			emitter.count += 1
-		}
-	}
-
-
-	if emitter.lifetimer >= emitter.lifetime {
-		emitter.lifetimer = 0
-		emitter.count = 0
-	}
-
-	for &p in emitter.particles {
-		Particle_Update(emitter, &p, deltaTime)
-		if p.alive {
-			switch p.shape {
-				case ParticleShape.Circle:
-					rl.DrawCircleV(p.position, p.size * p.scale[0], p.color)
-				case .Rectangle:
-					rl.DrawRectangleV(p.position, p.scale, p.color)
-					rl.DrawRectanglePro({p.position[0], p.position[1], p.size * p.scale[0], p.size * p.scale[1]}, {p.size * p.scale[0] / 2, p.size * p.scale[1] / 2}, p.rotation, p.color)
-				case .Ellipse:
-					rl.DrawEllipse(i32(p.position[0]), i32(p.position[1]), p.size * p.scale[0], p.size * p.scale[1], p.color)
-				case .Pixel:
-					rl.DrawPixelV(p.position, p.color)
-				case .Line:
-					// calculate line points from position size scale and rotation
-
-					xStart := p.position[0] - (p.size * p.scale[0] / 2) * math.cos(math.to_radians(p.rotation))
-					yStart := p.position[1] - (p.size * p.scale[1]/ 2) * math.sin(math.to_radians(p.rotation))
-					xEnd := p.position[0] + (p.size * p.scale[0] / 2) * math.cos(math.to_radians(p.rotation))
-					yEnd := p.position[1] + (p.size * p.scale[1] / 2) * math.sin(math.to_radians(p.rotation))
-					rl.DrawLineEx({xStart, yStart}, {xEnd, yEnd}, 1 * p.scale[1], p.color)
-				case .Custom:
-					if p.customShapeProc != nil {
-						p.customShapeProc(&p, deltaTime)
-					}
-				case .Texture:
-					if p.texture != nil {
-						rl.DrawTexturePro(
-							p.texture^,
-							{0, 0, f32(p.texture^.width), f32(p.texture^.height)},
-							{p.position[0], p.position[1], p.size * p.scale[0], p.size * p.scale[1]},
-							{p.size * p.scale[0] / 2, p.size * p.scale[1] / 2},
-							p.rotation,
-							p.color
-						)
-					}
-			}
-		}
-	}
-}
 dropdownEdit: bool
 
 main :: proc() {
 
-	logger := log.create_console_logger( .Info)
+
+	logger := log.create_console_logger(.Info)
 	context.logger = logger
 
+	isTest := UITest_Init()
+	if isTest {
+		rl.SetConfigFlags({.WINDOW_HIDDEN})
+	}
+
 	rl.SetTraceLogLevel(.WARNING)
-	rl.InitWindow(WINDOW_SIZE[0], WINDOW_SIZE[1], "Plane Game")
+	rl.InitWindow(WINDOW_SIZE[0], WINDOW_SIZE[1], "Odin Raylib Engine")
 	defer rl.CloseWindow()
-	// rl.SetTargetFPS(120)
+
+	// Load Open Sans font and apply Google Material Flat Dark Grey styling
+	guiFont := rl.LoadFontEx("engine/Open_Sans/static/OpenSans-Regular.ttf", 15, nil, 0)
+	defer rl.UnloadFont(guiFont)
+	ApplyMaterialDarkTheme(guiFont)
 
 	rl.InitAudioDevice()
+
+	// Virtual Viewport Render Texture (1280x720 internal resolution)
+	viewportTex := rl.LoadRenderTexture(WINDOW_SIZE[0], WINDOW_SIZE[1])
+	defer rl.UnloadRenderTexture(viewportTex)
 
 	game := asteroids.CreateGame()
 	defer game->terminate()
 	game->setup()
+	e.ProcessSceneChange(&game.sceneManager)
 
-	emitter := ParticleEmitter {
-		amount = 1,
-		lifetime = 2,
-		position = {f32(WINDOW_SIZE[0] / 2), f32(WINDOW_SIZE[1] / 2)},
-	}
-	ParticleEmitter_Init(&emitter)
+	// Create Particle Emitter Node in the Scene
+	scene := game.sceneManager.currentScene
+	particleNode := ParticleEmitterNode_Create(scene, "Particle Emitter")
+	particleNode.position = {f32(WINDOW_SIZE[0]) / 2, f32(WINDOW_SIZE[1]) / 2}
 	ast := rl.LoadTexture("assets/graphics/Space Pack/Asteroids/Asteroid_1.png")
-	emitter.texture = &ast
+	particleNode.emitter.texture = &ast
+
+	// Docking and Layout State
+	dockSide := DockSide.Right
+	inspectorWidth: f32 = 400
+	hierarchyWidth: f32 = 200
+	inspectorScroll := rl.Vector2{0, 0}
+	inspectorContentHeight: f32 = 1400
+
+	selectedTargetIndex := 0
+	selectedColorStop := 0
+	draggingColorStop := false
+
+	targetNames := [3]cstring{
+		"Particle Emitter",
+		"Spaceship Node",
+		"Spaceship Data",
+	}
 
 	// Game loop
 	for !rl.WindowShouldClose() {
-		rl.BeginDrawing()
-		rl.ClearBackground(game.backgroundColor)
 		deltaTime := rl.GetFrameTime()
-		game->run(deltaTime)
 
-		ParticleEmitter_Update(&emitter, deltaTime)
+		sw := f32(rl.GetScreenWidth())
+		sh := f32(rl.GetScreenHeight())
 
+		// -------------------------------------------------------------
+		// Compute Docked Layout (Viewport in middle, Inspector on either side)
+		// -------------------------------------------------------------
+		hierarchyRect: rl.Rectangle
+		viewportRect: rl.Rectangle
+		inspectorRect: rl.Rectangle
 
-		xWindow: f32 = 5
-		yWindow: f32 = 0
-		width:f32 = 250
-		height:f32 = 20
-		am : f32 = f32(emitter.amount)
-
-		nextY :f32 = yWindow
-		yPadding :f32 = 2
-		xPadding: f32 = 2
-		sliderHeight :f32= 16
-		x :f32= xWindow + xPadding + 100
-		nextY += xWindow
-		for i in 0..<reflect.struct_field_count(ParticleEmitter, .Top_Level) {
-			field := reflect.struct_field_at(ParticleEmitter, i)
-			if reflect.struct_tag_get(field.tag, "gui") == "" {
-				continue
-			}
-			minStr := reflect.struct_tag_get(field.tag, "min")
-			maxStr := reflect.struct_tag_get(field.tag, "max")
-			fieldPtr := uintptr(&emitter) + field.offset
-
-			#partial switch v in field.type.variant {
-			case runtime.Type_Info_Float:
-
-				valuef := cast(^f32)fieldPtr
-				minf:f32 = 0
-				maxf:f32 = 1
-
-				if minStr != "" {
-					if m, ok := strconv.parse_f32(minStr); ok {
-						minf = m
-					}
-				}
-				if maxStr != "" {
-					if m, ok := strconv.parse_f32(maxStr); ok {
-						maxf = m
-					}
-				}
-				rl.GuiSlider({x, f32(nextY), width, sliderHeight}, fmt.ctprint(field.name), fmt.ctprint(valuef^), valuef, minf, maxf)
-				nextY += sliderHeight + yPadding
-
-			case runtime.Type_Info_Integer:
-				valueI := cast(^int)fieldPtr
-				valueFloat := cast(f32)valueI^
-				min:int = 0
-				max:int = 100
-
-				if minStr != "" {
-					if m, ok := strconv.parse_int(minStr); ok {
-						min = m
-					}
-				}
-				if maxStr != "" {
-					if m, ok := strconv.parse_int(maxStr); ok {
-						max = m
-					}
-				}
-				rl.GuiSlider({x, nextY, width, sliderHeight}, fmt.ctprint(field.name), fmt.ctprint(valueI^), &valueFloat, f32(min), f32(max))
-				valueI^ = int(valueFloat)
-				nextY += sliderHeight + yPadding
-
-			case runtime.Type_Info_Array:
-				for i in 0..<v.count {
-					elemPtr := uintptr(&emitter) + field.offset + uintptr(i) * uintptr(v.elem_size)
-					#partial switch var in v.elem.variant {
-					case runtime.Type_Info_Float:
-						valuef := cast(^f32)elemPtr
-						minf:f32 = 0
-						maxf:f32 = 1
-
-						if minStr != "" {
-							if m, ok := strconv.parse_f32(minStr); ok {
-								minf = m
-							}
-						}
-						if maxStr != "" {
-							if m, ok := strconv.parse_f32(maxStr); ok {
-								maxf = m
-							}
-						}
-						rl.GuiSlider({x, f32(nextY), width, sliderHeight}, fmt.ctprint(field.name, "[", i, "]"), fmt.ctprint(valuef^), valuef, minf, maxf)
-						nextY += sliderHeight + yPadding
-					}
-				}
-			case runtime.Type_Info_Named:
-				base_info := reflect.type_info_base(v.base)
-				#partial switch vv in base_info.variant {
-					case runtime.Type_Info_Enum:
-						valueI := cast(^int)fieldPtr
-						active:i32 = i32(valueI^)
-
-						if rl.GuiDropdownBox({x, nextY, width, sliderHeight}, fmt.ctprint(strings.join(vv.names, ";")), &active, dropdownEdit) {
-							dropdownEdit = !dropdownEdit
-						}
-						valueI^ = int(active)
-						nextY += sliderHeight + yPadding
-					case runtime.Type_Info_Array:
-						if field.type.id == rl.Color{
-							c := cast(^rl.Color)fieldPtr
-							alpha := f32(c^.a) / 255.0
-							colorBoxHeight :f32 = 50
-							rl.GuiColorPicker({x, nextY, width, colorBoxHeight}, "Color", c)
-							nextY += colorBoxHeight + yPadding
-							rl.GuiColorBarAlpha({x, nextY, width, sliderHeight}, "Alpha", &alpha)
-							c.a = u8(alpha * 255.0)
-							nextY += sliderHeight + yPadding
-						}
-				}
-			}
-
+		if dockSide == .Right {
+			// [ Hierarchy (Left) ] [ Viewport (Middle) ] [ Inspector (Right) ]
+			hierarchyRect = {0, 0, hierarchyWidth, sh}
+			viewportRect  = {hierarchyWidth, 0, sw - hierarchyWidth - inspectorWidth, sh}
+			inspectorRect = {sw - inspectorWidth, 0, inspectorWidth, sh}
+		} else {
+			// [ Inspector (Left) ] [ Viewport (Middle) ] [ Hierarchy (Right) ]
+			inspectorRect = {0, 0, inspectorWidth, sh}
+			viewportRect  = {inspectorWidth, 0, sw - inspectorWidth - hierarchyWidth, sh}
+			hierarchyRect = {sw - hierarchyWidth, 0, hierarchyWidth, sh}
 		}
 
-		// Stats
-		// stats := e.NodeManager_GetStats(game.sceneManager.currentScene.manager)
-		// rl.DrawText(fmt.ctprintf("Capacity: %d", stats.capacity), 20, 20, 20, rl.WHITE)
-		// rl.DrawText(fmt.ctprintf("Count: %d", stats.count), 20, 40, 20, rl.WHITE)
-		// rl.DrawText(fmt.ctprintf("Free: %d", stats.free), 20, 60, 20, rl.WHITE)
+		// Automated testing step
+		if UITest_Step(&dockSide, &selectedTargetIndex, inspectorRect, viewportRect, hierarchyRect, &particleNode.emitter) {
+			break
+		}
+
+		// Interactive F1 key to trigger test in window mode
+		if rl.IsKeyPressed(.F1) {
+			uiTestState.enabled = true
+			uiTestState.currentFrame = 0
+		}
+
+		// -------------------------------------------------------------
+		// 1. Update & Render Game into Virtual Viewport Texture
+		// -------------------------------------------------------------
+		// Note: The Particle Emitter is now a Node in the scene, so
+		// Note: game->run handles all nodes
+		rl.BeginTextureMode(viewportTex)
+		rl.ClearBackground(game.backgroundColor)
+
+		game->run(deltaTime)
+
+		rl.EndTextureMode()
+
+		// -------------------------------------------------------------
+		// 2. Render Main Window GUI
+		// -------------------------------------------------------------
+		rl.BeginDrawing()
+		rl.ClearBackground(rl.Color{20, 21, 23, 255}) // Surface container lowest
+
+		// -------------------------------------------------------------
+		// A. Center Viewport (Game Display)
+		// -------------------------------------------------------------
+		rl.BeginScissorMode(i32(viewportRect.x), i32(viewportRect.y), i32(viewportRect.width), i32(viewportRect.height))
+		rl.DrawRectangleRec(viewportRect, rl.Color{14, 15, 17, 255})
+
+		// Fit virtual canvas (1280x720) inside viewportRect preserving aspect ratio
+		aspect := f32(WINDOW_SIZE[0]) / f32(WINDOW_SIZE[1])
+		vW: f32
+		vH: f32
+		vX: f32
+		vY: f32
+		if (viewportRect.width / viewportRect.height) > aspect {
+			vH = viewportRect.height
+			vW = vH * aspect
+			vX = viewportRect.x + (viewportRect.width - vW) / 2
+			vY = viewportRect.y
+		} else {
+			vW = viewportRect.width
+			vH = vW / aspect
+			vX = viewportRect.x
+			vY = viewportRect.y + (viewportRect.height - vH) / 2
+		}
+		canvasRect := rl.Rectangle{vX, vY, vW, vH}
+
+		// Draw flipped OpenGL render texture
+		srcRect := rl.Rectangle{0, 0, f32(viewportTex.texture.width), -f32(viewportTex.texture.height)}
+		rl.DrawTexturePro(viewportTex.texture, srcRect, canvasRect, {0, 0}, 0, rl.WHITE)
+
+		// Viewport Header Label
+		DrawEngineText("VIEWPORT", viewportRect.x + 14, 13, 14, rl.Color{138, 142, 153, 255})
+
+		// Interactive repositioning of particle emitter node on click inside canvas
+		if rl.IsMouseButtonDown(.LEFT) && rl.CheckCollisionPointRec(rl.GetMousePosition(), canvasRect) {
+			mp := rl.GetMousePosition()
+			particleNode.position = {
+				(mp.x - canvasRect.x) * (f32(WINDOW_SIZE[0]) / canvasRect.width),
+				(mp.y - canvasRect.y) * (f32(WINDOW_SIZE[1]) / canvasRect.height),
+			}
+		}
+
+		rl.EndScissorMode()
+
+		// Outer viewport borders
+		rl.DrawRectangleLinesEx(viewportRect, 1, rl.Color{55, 57, 63, 255})
+
+		// -------------------------------------------------------------
+		// B. Scene Hierarchy Panel
+		// -------------------------------------------------------------
+		rl.DrawRectangleRec(hierarchyRect, rl.Color{24, 25, 28, 255})
+		headerH: f32 = 42
+
+		// Hierarchy Header
+		rl.DrawRectangleRec({hierarchyRect.x, 0, hierarchyRect.width, headerH}, rl.Color{30, 31, 35, 255})
+		rl.DrawLineEx({hierarchyRect.x, headerH}, {hierarchyRect.x + hierarchyRect.width, headerH}, 1, rl.Color{55, 57, 63, 255})
+		DrawEngineText("SCENE HIERARCHY", hierarchyRect.x + 14, 13, 15, rl.Color{226, 226, 233, 255})
+
+		// Hierarchy Tree Items (clickable nodes)
+		itemH: f32 = 30
+		itemY := headerH + 10
+		itemW := hierarchyRect.width - 24
+
+		itemIcons := [3]cstring{"* ", "> ", "$ "}
+		for idx in 0..<3 {
+			btnBounds := rl.Rectangle{hierarchyRect.x + 12, itemY, itemW, itemH}
+
+			// Highlight active selected node
+			if idx == selectedTargetIndex {
+				rl.DrawRectangleRec(btnBounds, rl.Color{37, 99, 235, 60})
+				rl.DrawRectangleLinesEx(btnBounds, 1, rl.Color{110, 168, 254, 255})
+			}
+
+			fullLabel := fmt.ctprintf("%s%s", itemIcons[idx], targetNames[idx])
+			if rl.GuiButton(btnBounds, fullLabel) {
+				selectedTargetIndex = idx
+			}
+
+			itemY += itemH + 6
+		}
+
+		// Border between hierarchy and center
+		hBorderX := hierarchyRect.x + hierarchyRect.width if dockSide == .Right else hierarchyRect.x
+		rl.DrawLineEx({hBorderX, 0}, {hBorderX, sh}, 1, rl.Color{55, 57, 63, 255})
+
+		// -------------------------------------------------------------
+		// C. Docked Inspector Panel (Left or Right)
+		// -------------------------------------------------------------
+		rl.DrawRectangleRec(inspectorRect, rl.Color{24, 25, 28, 255})
+
+		// Inspector Header Bar
+		rl.DrawRectangleRec({inspectorRect.x, 0, inspectorRect.width, headerH}, rl.Color{30, 31, 35, 255})
+		rl.DrawLineEx({inspectorRect.x, headerH}, {inspectorRect.x + inspectorRect.width, headerH}, 1, rl.Color{55, 57, 63, 255})
+		DrawEngineText("INSPECTOR", inspectorRect.x + 16, 13, 16, rl.Color{226, 226, 233, 255})
+
+		// Dock Side Switch Button
+		dockBtnText: cstring = "< Dock Left" if dockSide == .Right else "Dock Right >"
+		dockBtnRect := rl.Rectangle{inspectorRect.x + inspectorRect.width - 105, 10, 95, 22}
+		if rl.GuiButton(dockBtnRect, dockBtnText) {
+			dockSide = .Left if dockSide == .Right else .Right
+		}
+
+		// Target Selection Tabs inside Inspector
+		selectorY := headerH + 6
+		selectorH: f32 = 28
+		targetBtnW := (inspectorRect.width - 24) / 3
+		for tIdx in 0..<3 {
+			tBtnX := inspectorRect.x + 12 + f32(tIdx) * targetBtnW
+			label := targetNames[tIdx]
+			if rl.GuiButton({tBtnX, selectorY, targetBtnW - 2, 22}, label) {
+				selectedTargetIndex = tIdx
+			}
+		}
+		rl.DrawLineEx({inspectorRect.x, selectorY + selectorH}, {inspectorRect.x + inspectorRect.width, selectorY + selectorH}, 1, rl.Color{45, 47, 53, 255})
+
+		// Inspector Scroll Panel
+		panelY := selectorY + selectorH + 4
+		panelBounds := rl.Rectangle{
+			inspectorRect.x,
+			panelY,
+			inspectorRect.width,
+			inspectorRect.height - panelY,
+		}
+
+		content := rl.Rectangle{
+			0,
+			0,
+			panelBounds.width - 5,
+			inspectorContentHeight,
+		}
+
+		view := rl.Rectangle{}
+		rl.GuiScrollPanel(panelBounds, nil, content, &inspectorScroll, &view)
+
+		rl.BeginScissorMode(i32(view.x), i32(view.y), i32(view.width), i32(view.height))
+
+		nextY := view.y + inspectorScroll.y + 8
+		startY := nextY
+		x := view.x + inspectorScroll.x + 10
+		itemWidth := panelBounds.width - 70
+		labelWidth: f32 = 130
+		sliderHeight: f32 = 18
+		yPadding: f32 = 4
+
+		// Selected Target Rendering
+		switch selectedTargetIndex {
+		case 0:
+			// Target: Particle Emitter Node & Emitter
+			DrawEngineText("Particle Emitter Node", x, nextY, 16, rl.Color{110, 168, 254, 255})
+			nextY += 24
+
+			// Node transform & state reflection editor
+			DrawGenericStructGui(cast(^e.Node)particleNode, x, &nextY, itemWidth, labelWidth, sliderHeight, yPadding)
+			nextY += 16
+
+			DrawEngineText("Emitter Settings & FX", x, nextY, 16, rl.Color{110, 168, 254, 255})
+			nextY += 24
+
+			// Color Ramp / Gradient Editor
+			ParticleEmitter_DrawColorRampGui(&particleNode.emitter, x, &nextY, itemWidth, &selectedColorStop, &draggingColorStop, view)
+			nextY += 12
+
+			// Emitter Actions: Start, Stop
+			btnW := (itemWidth - labelWidth - 4) / 2
+			if rl.GuiButton({x + labelWidth, nextY, btnW, sliderHeight + 4}, "Start") {
+				if particleNode.emitter.start != nil {
+					particleNode.emitter->start()
+				} else {
+					ParticleEmitter_Start(&particleNode.emitter)
+				}
+			}
+			if rl.GuiButton({x + labelWidth + btnW + 4, nextY, btnW, sliderHeight + 4}, "Stop") {
+				if particleNode.emitter.stop != nil {
+					particleNode.emitter->stop()
+				} else {
+					ParticleEmitter_Stop(&particleNode.emitter)
+				}
+			}
+			nextY += sliderHeight + yPadding + 8
+
+			// Generic struct reflection editor for ParticleEmitter
+			DrawGenericStructGui(&particleNode.emitter, x, &nextY, itemWidth, labelWidth, sliderHeight, yPadding)
+
+		case 1:
+			// Target: Ship Node
+			DrawEngineText("Ship Node Transform & State", x, nextY, 16, rl.Color{110, 168, 254, 255})
+			nextY += 24
+
+			if game.sceneManager.currentScene != nil && game.sceneManager.currentScene.manager != nil {
+				scene := game.sceneManager.currentScene
+				shipNode: ^e.Node = nil
+				for n in scene.manager.nodes {
+					if n != nil && n.name == "Spaceship" {
+						shipNode = n
+						break
+					}
+				}
+				if shipNode == nil {
+					for n in scene.manager.nodes {
+						if n != nil && n != scene.rootNode {
+							shipNode = n
+							break
+						}
+					}
+				}
+				if shipNode != nil {
+					DrawGenericStructGui(shipNode, x, &nextY, itemWidth, labelWidth, sliderHeight, yPadding)
+				}
+			}
+
+		case 2:
+			// Target: Spaceship Data
+			DrawEngineText("Spaceship Physics & Input", x, nextY, 16, rl.Color{110, 168, 254, 255})
+			nextY += 24
+
+			if game.sceneManager.currentScene != nil && game.sceneManager.currentScene.manager != nil {
+				scene := game.sceneManager.currentScene
+				shipNode: ^e.Node = nil
+				for n in scene.manager.nodes {
+					if n != nil && n.name == "Spaceship" {
+						shipNode = n
+						break
+					}
+				}
+				if shipNode == nil {
+					for n in scene.manager.nodes {
+						if n != nil && n != scene.rootNode {
+							shipNode = n
+							break
+						}
+					}
+				}
+				if shipNode != nil && shipNode.resource != nil {
+					shipData := cast(^asteroids.Spaceship)shipNode.resource
+					DrawGenericStructGui(shipData, x, &nextY, itemWidth, labelWidth, sliderHeight, yPadding)
+				} else {
+					DrawEngineText("Spaceship resource data not active", x, nextY, 14, rl.GRAY)
+					nextY += 20
+				}
+			}
+		}
+
+		calculatedHeight := (nextY - startY) + 60
+		if calculatedHeight > inspectorContentHeight || inspectorContentHeight == 0 {
+			inspectorContentHeight = calculatedHeight
+		}
+
+		rl.EndScissorMode()
+
+		// Border between inspector and center
+		iBorderX := inspectorRect.x if dockSide == .Right else inspectorRect.x + inspectorRect.width
+		rl.DrawLineEx({iBorderX, 0}, {iBorderX, sh}, 1, rl.Color{55, 57, 63, 255})
+
 		rl.EndDrawing()
 	}
 }

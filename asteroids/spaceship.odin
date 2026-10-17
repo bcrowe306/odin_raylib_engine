@@ -10,17 +10,18 @@ SPACESHIP_DEFAULT_SIZE: [2]f32: {50, 100}
 SPACESHIP_DEFAULT_VELOCITY :: 300
 
 Spaceship :: struct {
-	maxSpeed: f32,
-	velocity: [2]f32,
-	acceleration: f32,
-	deceleration: f32,
-	axis: [2]f32,
+	maxSpeed: f32 `gui:"true" min:"10" max:"2000"`,
+	velocity: [2]f32 `gui:"true" min:"-1000" max:"1000"`,
+	acceleration: f32 `gui:"true" min:"10" max:"5000"`,
+	deceleration: f32 `gui:"true" min:"10" max:"5000"`,
+	axis: [2]f32 `gui:"true" min:"-1" max:"1"`,
 	oldAxis: [2]f32,
-	maxRotation: f32,
+	maxRotation: f32 `gui:"true" min:"0" max:"360"`,
 }
 
 CreateSpaceShip :: proc(scene: ^e.Scene, game: ^e.Game) {
 	ship := e.CreateNodeScene(scene, e.Node, true)
+	ship.name = "Spaceship"
 	spaceship_data := e.Node_AddResource(ship, Spaceship)
 	spaceship_data.maxSpeed = 800
 	spaceship_data.acceleration = 2700

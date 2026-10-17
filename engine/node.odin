@@ -13,9 +13,9 @@ Node :: struct {
 	allocator: mem.Allocator,
 	resource: rawptr, // Pointer to the resource associated with this node. Used to give data to the node. Resoruce is stored on node's arena, and dealloc'd when node terminates.
 	name: string, // Name of the node
-	position: [2]f32,
-	scale: [2]f32,
-	rotation: f32,
+	position: [2]f32 `gui:"true" min:"0" max:"1280"`,
+	scale: [2]f32 `gui:"true" min:"0.01" max:"10"`,
+	rotation: f32 `gui:"true" min:"0" max:"360"`,
 	globalPosition: [2]f32,
 	globalScale: [2]f32,
 	globalRotation: f32,
@@ -27,8 +27,8 @@ Node :: struct {
 	onChildRemoved: EventSubject,
 	onParentAdded: EventSubject,
 	onParentRemoved: EventSubject,
-	renderable: bool,
-	enabled: bool,
+	renderable: bool `gui:"true"`,
+	enabled: bool `gui:"true"`,
 	update: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
 	render: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
 	onDestroy: proc(node: ^Node, gameContext: ^GameContext),
