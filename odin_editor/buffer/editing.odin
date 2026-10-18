@@ -199,6 +199,7 @@ buffer_undo :: proc(b: ^Buffer) -> bool {
 		return false
 	}
 	group_id := b.undo_stack[len(b.undo_stack) - 1].group_id
+	carets := make([dynamic]Edit_Caret, context.temp_allocator)
 	for len(b.undo_stack) > 0 {
 		top := b.undo_stack[len(b.undo_stack) - 1]
 		if group_id != -1 && top.group_id != group_id {
@@ -210,15 +211,55 @@ buffer_undo :: proc(b: ^Buffer) -> bool {
 			discarded := buffer_raw_delete(b, top.start, top.end)
 			delete(discarded, b.allocator)
 			append(&b.redo_stack, top)
+			add_caret(&carets, top.start, top.start)
 		case .Delete:
-			buffer_raw_insert(b, top.start, top.text)
+			end := buffer_raw_insert(b, top.start, top.text)
 			append(&b.redo_stack, top)
+			add_caret(&carets, top.start, end)
 		}
 		if group_id == -1 {
 			break
 		}
 	}
+	place_carets(b, carets[:], descending = false)
 	return true
+}
+
+// Edit_Caret is where a cursor should land after undoing/redoing one edit;
+// `key` (the edit's start) merges the delete+insert pair a single cursor
+// produces when typing over a selection.
+@(private)
+Edit_Caret :: struct {
+	key, pos: Position,
+}
+
+@(private)
+add_caret :: proc(carets: ^[dynamic]Edit_Caret, key, pos: Position) {
+	for &c in carets {
+		if c.key == key {
+			c.pos = pos
+			return
+		}
+	}
+	append(carets, Edit_Caret{key, pos})
+}
+
+// place_carets moves the cursors to where the undone/redone edits
+// happened (one cursor per edit site), like VSCode — so undoing a
+// multi-cursor edit restores the multi-cursor state at the right columns.
+// Cursors are listed in ascending document order; `carets` arrive
+// ascending from undo (which pops the earliest-in-document edit first,
+// since edits are recorded in descending order) and descending from redo.
+@(private)
+place_carets :: proc(b: ^Buffer, carets: []Edit_Caret, descending: bool) {
+	if len(carets) == 0 {
+		return
+	}
+	clear(&b.cursors)
+	for i in 0 ..< len(carets) {
+		c := carets[len(carets) - 1 - i] if descending else carets[i]
+		append(&b.cursors, Cursor{pos = buffer_clamp_position(b, c.pos)})
+	}
 }
 
 // buffer_redo re-applies the most recently undone edit (or group). Returns
@@ -228,6 +269,7 @@ buffer_redo :: proc(b: ^Buffer) -> bool {
 		return false
 	}
 	group_id := b.redo_stack[len(b.redo_stack) - 1].group_id
+	carets := make([dynamic]Edit_Caret, context.temp_allocator)
 	for len(b.redo_stack) > 0 {
 		top := b.redo_stack[len(b.redo_stack) - 1]
 		if group_id != -1 && top.group_id != group_id {
@@ -236,16 +278,19 @@ buffer_redo :: proc(b: ^Buffer) -> bool {
 		pop(&b.redo_stack)
 		switch top.kind {
 		case .Insert:
-			buffer_raw_insert(b, top.start, top.text)
+			end := buffer_raw_insert(b, top.start, top.text)
 			append(&b.undo_stack, top)
+			add_caret(&carets, top.start, end)
 		case .Delete:
 			discarded := buffer_raw_delete(b, top.start, top.end)
 			delete(discarded, b.allocator)
 			append(&b.undo_stack, top)
+			add_caret(&carets, top.start, top.start)
 		}
 		if group_id == -1 {
 			break
 		}
 	}
+	place_carets(b, carets[:], descending = true)
 	return true
 }

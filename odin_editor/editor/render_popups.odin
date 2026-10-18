@@ -47,13 +47,15 @@ text_cols :: proc(s: string) -> int {
 // editor_cursor_screen_pos returns the top-left pixel of the primary
 // cursor's cell, using the origin recorded by the last editor_render.
 editor_cursor_screen_pos :: proc(ed: ^Editor) -> (x, y: f32) {
-	c := editor_primary_cursor(ed)
-	line := buf.buffer_line_str(&ed.buf, c.pos.line)
-	// Columns are byte offsets; convert to on-screen cells.
-	col_cells := text_cols(line[:min(c.pos.col, len(line))])
-	scroll_cells := text_cols(line[:min(ed.scroll_col, len(line))])
-	x = ed.origin_x + GUTTER_WIDTH + f32(col_cells - scroll_cells) * ed.char_w
-	y = ed.origin_y + f32(c.pos.line - ed.scroll_line) * ed.char_h
+	return editor_position_to_screen(ed, editor_primary_cursor(ed).pos)
+}
+
+// editor_position_to_screen returns the top-left pixel of the cell at a
+// buffer position (the caret's x for that position), using the origin
+// recorded by the last editor_render.
+editor_position_to_screen :: proc(ed: ^Editor, pos: buf.Position) -> (x, y: f32) {
+	x = ed.origin_x + GUTTER_WIDTH + f32(editor_visual_col(ed, pos) - ed.scroll_col) * ed.char_w
+	y = ed.origin_y + f32(pos.line - ed.scroll_line) * ed.char_h
 	return
 }
 
@@ -112,8 +114,8 @@ editor_popup_layout :: proc(ed: ^Editor) -> (layout: Popup_Layout) {
 			}
 		}
 		// Align the list's label column under the start of the word.
-		anchor_dx := f32(ed.completion.anchor.col - editor_primary_cursor(ed).pos.col) * ed.char_w
-		x := cx + anchor_dx - f32(COMPLETION_KIND_COLS) * ed.char_w - POPUP_PAD
+		ax, _ := editor_position_to_screen(ed, ed.completion.anchor)
+		x := ax - f32(COMPLETION_KIND_COLS) * ed.char_w - POPUP_PAD
 		x = clamp(x, ed.origin_x + GUTTER_WIDTH, max(ed.origin_x + GUTTER_WIDTH, view_right - w))
 		layout.completion = {x, y, w, h}
 		layout.completion_visible = true

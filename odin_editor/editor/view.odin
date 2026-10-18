@@ -13,9 +13,8 @@ editor_clamp_scroll :: proc(ed: ^Editor) {
 	if ed.scroll_line > max_line {
 		ed.scroll_line = max_line
 	}
-	if ed.scroll_col < 0 {
-		ed.scroll_col = 0
-	}
+	max_col := max(0, editor_max_visual_width(ed) - max(1, ed.visible_cols) + 1)
+	ed.scroll_col = clamp(ed.scroll_col, 0, max(max_col, 0))
 }
 
 editor_clamp_to_buffer :: proc(ed: ^Editor, line, col: int) -> buf.Position {
@@ -36,12 +35,13 @@ editor_ensure_cursor_visible :: proc(ed: ^Editor) {
 		ed.scroll_line = c.pos.line - rows + 1
 	}
 
-	if c.pos.col < ed.scroll_col {
-		ed.scroll_col = c.pos.col
+	vcol := editor_visual_col(ed, c.pos)
+	if vcol < ed.scroll_col {
+		ed.scroll_col = vcol
 	}
 	cols := max(1, ed.visible_cols)
-	if c.pos.col >= ed.scroll_col + cols {
-		ed.scroll_col = c.pos.col - cols + 1
+	if vcol >= ed.scroll_col + cols {
+		ed.scroll_col = vcol - cols + 1
 	}
 
 	editor_clamp_scroll(ed)

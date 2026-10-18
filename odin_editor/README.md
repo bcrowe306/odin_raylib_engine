@@ -135,6 +135,11 @@ task build build:edctl
 ./tools/edctl/edctl --port 7777 < tools/lsp_smoke.edctl   # or a script file
 ```
 
+A `<where>` is either window pixels (`x y`) or a target resolved against the
+live editor, so scripts don't depend on font size or scrolling: `@line:col`
+(caret position, 0-based), `@gutter:line`, or `@completion:row`. Targets
+scrolled out of view are rejected with `err` rather than clicking elsewhere.
+
 Protocol: one command per line, exactly one reply line per command (`ok …`,
 `err <reason>`, `fail expected … got …`, `timeout <cond>`, or JSON for
 `state`). A client's commands run in order; a command that pushes events
@@ -144,15 +149,20 @@ always observe the result of the input before them.
 | command | effect |
 |---|---|
 | `key <chord> [n]` | press a key `n` times. Chords: `primary+space`, `shift+end`, `down`, `cmd+s`, `.`; `primary` = Cmd on macOS, Ctrl elsewhere |
+| `click <where> [clicks=N] [mods=…] [button=…]` | click (N=2/3 sends a real double/triple-click sequence); `mods=shift+alt` holds those keys around it |
+| `mousedown`/`mouseup <where> [opts]`, `move <where>` | individual button / motion events |
+| `drag <from> <to> [steps=N] [mods=…] [clicks=N]` | press, N interpolated motions, release (`clicks=2` = word drag) |
+| `wheel <dy> [dx=N] [at=<where>] [mods=…]` | scroll at a position (`mods=shift` = horizontal) |
+| `locate <where>` | print the pixel a target resolves to |
+| `lsp-kill` | SIGKILL the language server (crash-recovery testing) |
 | `type <text>` | one TEXT_INPUT event per character (like real typing, so `.`/`(` triggers fire) |
 | `text <text>` | a single TEXT_INPUT event with the whole string. Escapes: `\n` `\t` `\\` |
-| `click <x> <y>` / `wheel <dy>` | mouse button press / wheel scroll at window pixels |
 | `cursor <line> <col>` | place the cursor directly (0-based) |
 | `open <path>` | `editor_load_file` |
 | `state` | JSON: text, cursor, LSP status, completion items/selection/rect, signature label/active parameter/rect |
-| `wait <cond> [ms]` | block until `completion`, `no-completion`, `signature`, `no-signature`, `lsp-ready` or `lsp-idle` (default 5000 ms) |
+| `wait <cond> [ms]` | block until `completion`, `no-completion`, `signature`, `no-signature`, `lsp-ready`, `lsp-idle` or `lsp-down` (default 5000 ms) |
 | `wait frames <n>` | block for `n` frames |
-| `expect <field> <value>` | assert `line`, `cursor`, `text-contains`, `completion-selected`, `completion-has`, `signature` (label contains) or `signature-param` |
+| `expect <field> <value>` | assert `line`, `cursor`, `text-contains`, `completion-selected`, `completion-has`, `signature` (label contains), `signature-param`, `selection` (`l1 c1 l2 c2` or `none`), `selected-text`, `cursors`, `mouse-cursor` (`text`/`default`), `scroll` (`line col`) or `lsp-status` |
 | `screenshot <file.png>` | save the next rendered frame |
 | `quit` | push SDL_EVENT_QUIT |
 
@@ -162,6 +172,27 @@ is created non-focusable and real keyboard/mouse events are dropped
 disturbed by — or steal — the user's typing. `task test:remote` uses it.
 The hook is opt-in and listens on loopback only; don't enable it in builds
 you ship.
+
+## Mouse
+
+`editor_handle_event` handles the full set of mouse gestures (pass it every
+mouse, key-up and window event — key-ups are how it tracks held modifiers):
+
+- click to place the caret; drag to select (auto-scrolls past the edges)
+- double-click selects a word, triple-click a line; dragging after either
+  extends by whole words/lines
+- Shift+click extends the selection; Alt+click adds a cursor (Alt+click an
+  existing cursor removes it)
+- click/drag in the line-number gutter selects whole lines
+- wheel scrolls vertically; horizontal wheel or Shift+wheel scrolls
+  sideways; the wheel over the completion list scrolls the list
+- click a completion item to accept it
+
+Hit-testing uses visual columns (tabs expand to `ed.tab_width`, default 4),
+and clicks outside the editor's area return `false` so hosts can route them
+elsewhere. `editor_mouse_cursor(ed)` says which pointer to show (I-beam over
+text, arrow over the gutter and popups); the host owns the SDL cursor
+objects — see `example/main.odin`.
 
 ## Standalone demo app
 
@@ -200,6 +231,16 @@ Then attach it to an editor instance:
 ```odin
 ed.editor_attach_lsp(&editor, []string{"odin_editor/third_party/ols/ols"}, project_root)
 ```
+
+**Crash isolation.** OLS runs as a child process so a crash in it can't take
+the editor down. The client ignores SIGPIPE (otherwise writing to a dead
+server's stdin would kill the editor), detects a dead server (EOF, broken
+pipe, failed write, or process exit), and the editor's supervisor
+(`editor/lsp_supervisor.odin`) closes any open popups, restarts the server
+with backoff (250 ms, 500 ms, 1 s), and re-opens the document. After
+`LSP_MAX_RESTARTS` (3) crashes within a minute it gives up
+(`editor_lsp_status` = `.Failed`) and the editor carries on as a plain text
+editor. `task test:remote` kills OLS mid-session to verify this.
 
 Once attached, `editor_update` each frame polls for responses, sends the
 deferred `didOpen` once `initialize` has completed, pushes a full-text

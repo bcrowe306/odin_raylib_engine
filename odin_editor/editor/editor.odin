@@ -26,13 +26,16 @@ Editor :: struct {
 	lsp_doc_open: bool,
 	// buf.version last pushed to the server via didOpen/didChange.
 	lsp_synced_version: int,
+	lsp_supervisor: Lsp_Supervisor,
 
 	completion: Completion_State,
 	signature:  Signature_State,
 
-	// Viewport / scrolling (in cells, not pixels).
+	// Viewport / scrolling (in cells, not pixels). scroll_col is a visual
+	// column (tabs expanded), not a byte offset.
 	scroll_line: int,
 	scroll_col:  int,
+	tab_width:   int,
 	visible_rows: int,
 	visible_cols: int,
 
@@ -46,6 +49,12 @@ Editor :: struct {
 	// editor at an offset.
 	origin_x: f32,
 	origin_y: f32,
+
+	mouse: Mouse_State,
+	// Modifier keys currently held, tracked from the KEY_DOWN/KEY_UP
+	// events the editor receives (so injected modifier presses work for
+	// mouse gestures like Shift+click, which SDL mouse events don't carry).
+	key_mods: km.Modifiers,
 
 	injected_events: [dynamic]sdl.Event,
 }
@@ -63,6 +72,7 @@ editor_init :: proc(
 		char_h   = 16,
 		visible_rows = 32,
 		visible_cols = 80,
+		tab_width    = DEFAULT_TAB_WIDTH,
 	}
 	if ed.language.tokenize == nil {
 		ed.language = syn.odin_language()
@@ -78,6 +88,7 @@ editor_destroy :: proc(ed: ^Editor) {
 	if ed.lsp_enabled {
 		lspc.client_destroy(&ed.lsp)
 	}
+	lsp_supervisor_end(&ed.lsp_supervisor)
 	if len(ed.document_uri) > 0 {
 		delete(ed.document_uri)
 	}

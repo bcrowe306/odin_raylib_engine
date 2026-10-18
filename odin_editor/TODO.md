@@ -6,23 +6,23 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 84 tests across 6 packages, all
+2. **Unit tests for every feature** — 104 tests across 6 packages, all
    passing with zero tracked memory leaks:
-   - `buffer`: 22 tests (editing, undo/redo, cursors, selection, multi-cursor,
-     file IO, change-version tracking).
+   - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
+     cursors, selection, multi-cursor, file IO, change-version tracking).
    - `keymap`: 6 tests (bind/resolve/unbind, default bindings per platform).
    - `syntax`: 8 tests (Odin tokenizer: keywords, strings, numbers, comments,
      operators, multi-line block comments).
-   - `lsp`: 14 tests (JSON-RPC framing, request encoding, dispatch of
+   - `lsp`: 16 tests (JSON-RPC framing, request encoding, dispatch of
      diagnostics/completion/signature-help, textEdit/insertText and
      activeParameter parsing, null results, stale-response dropping,
-     partial-message handling).
-   - `editor`: 29 tests (SDL key/mod translation, action dispatch, undo/redo,
-     multi-cursor add, event injection round-trip, viewport scroll math,
-     clipboard text extraction, file load/save round-trip, completion
-     trigger/filter/navigate/accept/dismiss, signature help active-parameter
-     tracking and closing, LSP sync ordering, popup layout, mouse hit-test).
-   - `control`: 5 tests (chord/command parsing, escapes, errors, state JSON).
+     partial-message handling, dead-server detection without SIGPIPE).
+   - `editor`: 44 tests (input translation, actions, injection, viewport,
+     clipboard, file IO, completion/signature-help UI, LSP sync ordering,
+     popup layout, LSP crash supervisor, visual columns/tabs, every mouse
+     gesture, wheel, auto-scroll, pointer shape, popup clicks).
+   - `control`: 6 tests (chord/command/mouse-target parsing, escapes,
+     errors, state JSON).
 3. **OLS integration** — `lsp` package implements the JSON-RPC/LSP subset
    needed (initialize, didOpen/didChange/didClose/didSave, completion,
    signatureHelp, publishDiagnostics, hover types). Verified against a real
@@ -77,6 +77,18 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     `--control-only` drops real input and keeps the window unfocusable for
     undisturbed scripted runs. `tools/lsp_smoke.edctl` (55 commands) is the
     scripted OLS completion/signature-help regression.
+11. **OLS crash isolation** — SIGPIPE ignored, dead server detected (EOF /
+    broken pipe / failed write / exit), popups closed, server restarted with
+    backoff and the document re-opened; gives up after 3 crashes/minute and
+    keeps editing. Verified by unit tests and `tools/lsp_crash.edctl`.
+12. **Mouse & cursor integration** — click/drag select with auto-scroll,
+    double/triple-click word/line (+ word/line drag), Shift+click extend,
+    Alt+click add/remove cursor, gutter line selection, vertical/horizontal
+    wheel, completion-list click and wheel, I-beam/arrow pointer, clicks
+    outside the editor left to the host. Tabs now expand to tab stops in
+    rendering, hit-testing, scrolling and popup placement (`scroll_col` is a
+    visual column). Undo/redo put cursors back at the edit sites. Verified
+    by unit tests and `tools/mouse_smoke.edctl` (67 commands).
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -86,14 +98,22 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 - **Diagnostics UI** — diagnostics are received and stored
   (`client_diagnostics_for`) but not yet drawn as gutter markers/squiggles.
-- **Completion polish** — no mouse selection of popup items, no
-  documentation side panel, snippets aren't requested (no
+- **Completion polish** — no documentation side panel, snippets aren't requested (no
   `snippetSupport`), and `isIncomplete` lists aren't re-queried as you type
   (filtering is purely local after the first response). Signature help shows
   only the active overload (no overload cycling).
-- **Tab rendering** — a literal `\t` is drawn as a single cell, so
-  tab-indented lines render one column wide and cursor/popup placement uses
-  the same 1-cell width. Needs tab-stop expansion in render + hit-testing.
+- **Undo coalescing** — every TEXT_INPUT event is its own undo step, so
+  undoing typed text goes back one character at a time (VSCode merges runs
+  of typing). Needs time/word-boundary based grouping in `buffer`.
+- **Up/Down keep the byte column, not the visual column** — moving between
+  tab- and space-indented lines drifts horizontally. Needs a sticky
+  "preferred visual column" on the cursor.
+- **Mouse leftovers** — no right-click context menu, no drag-and-drop of
+  selected text, no hover tooltips (LSP hover), and horizontal auto-scroll
+  only applies to character drags.
+- **Horizontal scroll clamp is O(lines)** — `editor_clamp_scroll` scans
+  every line for the widest one on each scroll/cursor move; fine for normal
+  files, should be cached for very large ones.
 - **OLS + directory names** — OLS derives package paths from directory
   names; files in a directory whose name contains a `.` get no completions.
   Worth surfacing to users (or opening such files with a symlinked root).
@@ -115,7 +135,3 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
   against this project's installed Odin version, but upgrading the Odin
   compiler will likely require re-pinning OLS to a newer commit (bisect
   forward from `OLS_REF` until it builds again).
-- **Horizontal scrolling** is implemented in the view-math (`scroll_col`)
-  but nothing currently drives it from input (no explicit "scroll right"
-  hotkey/mouse-drag-to-edge support yet) — long lines rely on the viewport
-  clamp following the cursor during horizontal cursor movement only.

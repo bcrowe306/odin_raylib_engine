@@ -250,7 +250,8 @@ main :: proc() {
 	}
 	editor.char_w = char_w
 	editor.char_h = char_h
-	editor.visible_cols = int(WINDOW_W / char_w)
+	// The text area is the window minus the line-number gutter.
+	editor.visible_cols = int((WINDOW_W - ed.GUTTER_WIDTH) / char_w)
 	editor.visible_rows = int(WINDOW_H / char_h)
 
 	_ = sdl.StartTextInput(window)
@@ -272,6 +273,19 @@ main :: proc() {
 	}
 	defer control.server_stop(&srv)
 
+	// The editor reports which pointer shape it wants (I-beam over text,
+	// arrow over the gutter/popups); the host owns the SDL cursors.
+	cursor_shapes := [ed.Mouse_Cursor]^sdl.Cursor{
+		.Default = sdl.CreateSystemCursor(.DEFAULT),
+		.Text    = sdl.CreateSystemCursor(.TEXT),
+	}
+	defer for c in cursor_shapes {
+		if c != nil {
+			sdl.DestroyCursor(c)
+		}
+	}
+	current_shape := ed.Mouse_Cursor.Default
+
 	running := true
 	for running {
 		// Remote-control commands push real SDL events, which the
@@ -289,7 +303,7 @@ main :: proc() {
 			case .WINDOW_RESIZED:
 				w, h: i32
 				sdl.GetWindowSize(window, &w, &h)
-				editor.visible_cols = int(f32(w) / char_w)
+				editor.visible_cols = int((f32(w) - ed.GUTTER_WIDTH) / char_w)
 				editor.visible_rows = int(f32(h) / char_h)
 			}
 			handled := ed.editor_handle_event(&editor, event)
@@ -299,6 +313,11 @@ main :: proc() {
 		}
 
 		ed.editor_update(&editor)
+
+		if shape := ed.editor_mouse_cursor(&editor); shape != current_shape {
+			current_shape = shape
+			_ = sdl.SetCursor(cursor_shapes[shape])
+		}
 
 		sdl.SetRenderDrawColor(renderer, 30, 30, 30, 255)
 		sdl.RenderClear(renderer)

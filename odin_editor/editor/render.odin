@@ -101,6 +101,21 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 		state = next_state
 	}
 
+	// Clip text to the text area so horizontally scrolled lines never
+	// spill into the gutter; restore the host's clip state afterwards.
+	prev_clip: sdl.Rect
+	had_clip := sdl.RenderClipEnabled(renderer)
+	if had_clip {
+		sdl.GetRenderClipRect(renderer, &prev_clip)
+	}
+	text_clip := sdl.Rect{
+		i32(origin_x + GUTTER_WIDTH), i32(origin_y),
+		i32(ed.char_w * f32(ed.visible_cols) + 1), i32(ed.char_h * f32(ed.visible_rows)),
+	}
+	if had_clip {
+		_ = sdl.GetRectIntersection(prev_clip, text_clip, &text_clip)
+	}
+
 	for row := 0; row < ed.visible_rows; row += 1 {
 		ln := ed.scroll_line + row
 		if ln >= line_count {
@@ -118,9 +133,11 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 
 		line := buf.buffer_line_str(&ed.buf, ln)
 		tokens, next_state := ed.language.tokenize(line, state, context.temp_allocator)
+		sdl.SetRenderClipRect(renderer, &text_clip)
 		render_selection(ed, renderer, ln, origin_x + GUTTER_WIDTH, y, theme)
-		render_line_tokens(renderer, font, line, tokens, ed.scroll_col, origin_x + GUTTER_WIDTH, y, ed.char_w, theme)
+		render_line_tokens(ed, renderer, font, line, tokens, origin_x + GUTTER_WIDTH, y, theme)
 		render_cursors_on_line(ed, renderer, ln, origin_x + GUTTER_WIDTH, y, theme)
+		sdl.SetRenderClipRect(renderer, &prev_clip if had_clip else nil)
 		delete(tokens, context.temp_allocator)
 		state = next_state
 	}
@@ -138,41 +155,61 @@ render_line_number :: proc(renderer: ^sdl.Renderer, font: ^ttf.Font, number: int
 	draw_text(renderer, font, text, x, y, theme.gutter_text)
 }
 
+// render_line_tokens draws each token at its visual column. Tokens are
+// split at tab characters, which are skipped (they only advance to the
+// next tab stop), so tab-indented code lines up with the caret.
 @(private)
-render_line_tokens :: proc(renderer: ^sdl.Renderer, font: ^ttf.Font, line: string, tokens: []syn.Token, scroll_col: int, x, y, char_w: f32, theme: Theme) {
+render_line_tokens :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, line: string, tokens: []syn.Token, x, y: f32, theme: Theme) {
 	if font == nil {
 		return
 	}
+	last_visible := ed.scroll_col + ed.visible_cols
 	for tok in tokens {
-		start := max(tok.start, scroll_col)
-		if start >= tok.end {
-			continue
+		run_start := tok.start
+		for i := tok.start; i <= tok.end; i += 1 {
+			if i < tok.end && line[i] != '\t' {
+				continue
+			}
+			if i > run_start {
+				vcol := visual_col_of(line, run_start, ed.tab_width)
+				if vcol > last_visible {
+					return
+				}
+				// Runs starting left of the viewport still draw; the
+				// clip rect trims the part over the gutter.
+				if vcol + (i - run_start) >= ed.scroll_col {
+					draw_text(renderer, font, line[run_start:i], x + f32(vcol - ed.scroll_col) * ed.char_w, y, token_color(theme, tok.kind))
+				}
+			}
+			run_start = i + 1
 		}
-		segment := line[start:tok.end]
-		if len(segment) == 0 {
-			continue
-		}
-		col_offset := f32(start - scroll_col)
-		draw_text(renderer, font, segment, x + col_offset * char_w, y, token_color(theme, tok.kind))
 	}
 }
 
 @(private)
 render_selection :: proc(ed: ^Editor, renderer: ^sdl.Renderer, line: int, x, y: f32, theme: Theme) {
+	text := buf.buffer_line_str(&ed.buf, line)
 	for c in ed.buf.cursors {
 		start, end, ok := buf.selection_range(c)
 		if !ok || line < start.line || line > end.line {
 			continue
 		}
 		col_start := line == start.line ? start.col : 0
-		col_end := line == end.line ? end.col : buf.buffer_line_len(&ed.buf, line)
-		if col_end <= col_start {
+		col_end := line == end.line ? end.col : len(text)
+		v_start := visual_col_of(text, col_start, ed.tab_width)
+		v_end := visual_col_of(text, col_end, ed.tab_width)
+		// A selection that continues onto the next line shows one extra
+		// cell for the newline, like VSCode.
+		if line != end.line {
+			v_end += 1
+		}
+		if v_end <= v_start {
 			continue
 		}
 		rect := sdl.FRect{
-			x + f32(col_start - ed.scroll_col) * ed.char_w,
+			x + f32(v_start - ed.scroll_col) * ed.char_w,
 			y,
-			f32(col_end - col_start) * ed.char_w,
+			f32(v_end - v_start) * ed.char_w,
 			ed.char_h,
 		}
 		sdl.SetRenderDrawColor(renderer, theme.selection.r, theme.selection.g, theme.selection.b, theme.selection.a)
@@ -187,7 +224,7 @@ render_cursors_on_line :: proc(ed: ^Editor, renderer: ^sdl.Renderer, line: int, 
 			continue
 		}
 		rect := sdl.FRect{
-			x + f32(c.pos.col - ed.scroll_col) * ed.char_w,
+			x + f32(editor_visual_col(ed, c.pos) - ed.scroll_col) * ed.char_w,
 			y,
 			2,
 			ed.char_h,

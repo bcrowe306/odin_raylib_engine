@@ -71,10 +71,11 @@ tasks:
 
   test:remote:
     desc: >-
-      Launch the demo with the remote-control hook (--control-only) on a
-      scratch copy of example/assets/lsp_fixture.odin.txt and drive it with
-      tools/lsp_smoke.edctl: real SDL events in, OLS completion and
-      signature help verified out. Needs `task ols:build` first.
+      Launch the demo with the remote-control hook (--control-only) and
+      replay each tools/*.edctl script against a scratch fixture: OLS
+      completion + signature help (lsp_smoke), OLS crash recovery
+      (lsp_crash), and mouse/cursor gestures (mouse_smoke). Real SDL events
+      in, editor state verified out. Needs `task ols:build` first.
     deps: [build, build:edctl]
     cmds:
       - ./tools/lsp_smoke.sh

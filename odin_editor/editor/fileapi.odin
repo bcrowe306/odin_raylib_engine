@@ -22,16 +22,16 @@ editor_attach_lsp :: proc(ed: ^Editor, command: []string, working_dir := "") -> 
 		cmd[0] = absolute_path(cmd[0], context.temp_allocator)
 	}
 
+	root := absolute_path(working_dir if len(working_dir) > 0 else ".", context.temp_allocator)
 	ed.lsp = lspc.client_init()
-	if !lspc.client_start(&ed.lsp, cmd, working_dir) {
+	if !lspc.client_start(&ed.lsp, cmd, root) {
 		lspc.client_destroy(&ed.lsp)
 		return false
 	}
 	ed.lsp_enabled = true
 	ed.lsp_doc_open = false
-	root := absolute_path(working_dir if len(working_dir) > 0 else ".", context.temp_allocator)
-	root_uri := lspc.file_uri(root, context.temp_allocator)
-	lspc.client_initialize(&ed.lsp, root_uri)
+	lsp_supervisor_begin(&ed.lsp_supervisor, cmd, root)
+	lspc.client_initialize(&ed.lsp, lspc.file_uri(root, context.temp_allocator))
 	return true
 }
 
@@ -48,6 +48,7 @@ absolute_path :: proc(path: string, allocator := context.allocator) -> string {
 }
 
 editor_detach_lsp :: proc(ed: ^Editor) {
+	lsp_supervisor_end(&ed.lsp_supervisor)
 	if !ed.lsp_enabled {
 		return
 	}

@@ -24,6 +24,7 @@ Wait_Condition :: enum {
 	No_Signature,   // signature-help tooltip closed
 	Lsp_Ready,      // server initialized and document opened
 	Lsp_Idle,       // no LSP requests in flight
+	Lsp_Down,       // server not running (crashed/restarting/failed)
 	Frames,         // a fixed number of frames has elapsed
 }
 
@@ -40,12 +41,6 @@ Cmd_Text :: struct {
 // so per-character triggers (e.g. '.' -> completion) fire.
 Cmd_Type :: struct {
 	text: string,
-}
-Cmd_Click :: struct {
-	x, y: f32,
-}
-Cmd_Wheel :: struct {
-	dy: f32,
 }
 Cmd_State :: struct {}
 Cmd_Wait :: struct {
@@ -64,6 +59,8 @@ Cmd_Cursor :: struct {
 }
 Cmd_Quit :: struct {}
 Cmd_Help :: struct {}
+// Cmd_Lsp_Kill SIGKILLs the language server (crash-recovery testing).
+Cmd_Lsp_Kill :: struct {}
 
 Expect_Field :: enum {
 	Line,                // current line text equals
@@ -73,6 +70,12 @@ Expect_Field :: enum {
 	Completion_Has,      // some listed completion label equals
 	Signature,           // signature label contains substring
 	Signature_Param,     // active parameter label equals
+	Selection,           // primary selection "l1 c1 l2 c2" (normalized) or "none"
+	Selected_Text,       // primary selection's text equals
+	Cursors,             // number of cursors
+	Mouse_Cursor,        // pointer shape: "text" or "default"
+	Scroll,              // "line col"
+	Lsp_Status,          // off|starting|running|restarting|failed
 }
 
 // Cmd_Expect asserts on editor state; replies `ok` or
@@ -96,14 +99,24 @@ Command :: union {
 	Cmd_Quit,
 	Cmd_Help,
 	Cmd_Expect,
+	Cmd_Mouse_Down,
+	Cmd_Mouse_Up,
+	Cmd_Move,
+	Cmd_Drag,
+	Cmd_Locate,
+	Cmd_Lsp_Kill,
 }
 
 DEFAULT_WAIT_TIMEOUT_MS :: 5000
 
-HELP_TEXT :: "commands: key <chord> [count] | type <text> | text <text> | click <x> <y> | wheel <dy> | " +
-	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle> [timeout_ms] | " +
+HELP_TEXT :: "commands: key <chord> [count] | type <text> | text <text> | " +
+	"click|mousedown|mouseup <where> [clicks=N] [mods=shift+alt] [button=left|middle|right] | move <where> | " +
+	"drag <from> <to> [steps=N] [mods=..] [clicks=N] | wheel <dy> [dx=N] [at=<where>] [mods=..] | locate <where> | " +
+	"where = <x> <y> | @line:col | @gutter:line | @completion:row | lsp-kill | " +
+	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle|lsp-down> [timeout_ms] | " +
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
-	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param> <value>. " +
+	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +
+	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status> <value>. " +
 	"chords: [primary+|cmd+|ctrl+|alt+|shift+]<key>, e.g. primary+space, shift+end, down. " +
 	"text escapes: \\n \\t \\\\"
 
@@ -113,6 +126,9 @@ HELP_TEXT :: "commands: key <chord> [count] | type <text> | text <text> | click 
 parse_command :: proc(line: string, platform: km.Platform, allocator := context.allocator) -> (cmd: Command, err: string) {
 	trimmed := strings.trim_right(line, "\r\n")
 	verb, rest := split_verb(trimmed)
+	if mcmd, merr, handled := parse_mouse_command(verb, rest, platform); handled {
+		return mcmd, merr
+	}
 	switch verb {
 	case "key":
 		parts := strings.fields(rest, context.temp_allocator)
@@ -140,23 +156,6 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 			return Cmd_Text{text}, ""
 		}
 		return Cmd_Type{text}, ""
-	case "click":
-		parts := strings.fields(rest, context.temp_allocator)
-		if len(parts) != 2 {
-			return nil, "usage: click <x> <y>"
-		}
-		x, okx := strconv.parse_f32(parts[0])
-		y, oky := strconv.parse_f32(parts[1])
-		if !okx || !oky {
-			return nil, "click coordinates must be numbers"
-		}
-		return Cmd_Click{x, y}, ""
-	case "wheel":
-		dy, ok := strconv.parse_f32(strings.trim_space(rest))
-		if !ok {
-			return nil, "usage: wheel <dy>"
-		}
-		return Cmd_Wheel{dy}, ""
 	case "state":
 		return Cmd_State{}, ""
 	case "wait":
@@ -184,6 +183,8 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 			return nil, "cursor line/col must be integers"
 		}
 		return Cmd_Cursor{l, c}, ""
+	case "lsp-kill":
+		return Cmd_Lsp_Kill{}, ""
 	case "quit":
 		return Cmd_Quit{}, ""
 	case "help":
@@ -199,6 +200,12 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		case "completion-has": field = .Completion_Has
 		case "signature": field = .Signature
 		case "signature-param": field = .Signature_Param
+		case "selection": field = .Selection
+		case "selected-text": field = .Selected_Text
+		case "cursors": field = .Cursors
+		case "mouse-cursor": field = .Mouse_Cursor
+		case "scroll": field = .Scroll
+		case "lsp-status": field = .Lsp_Status
 		case:
 			return nil, strings.concatenate({"unknown expect field: ", name}, context.temp_allocator)
 		}
@@ -244,6 +251,7 @@ parse_wait :: proc(rest: string) -> (cmd: Command, err: string) {
 	case "no-signature": cond = .No_Signature
 	case "lsp-ready": cond = .Lsp_Ready
 	case "lsp-idle": cond = .Lsp_Idle
+	case "lsp-down": cond = .Lsp_Down
 	case "frames": cond = .Frames
 	case:
 		return nil, strings.concatenate({"unknown wait condition: ", parts[0]}, context.temp_allocator)

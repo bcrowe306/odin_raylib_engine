@@ -8,6 +8,8 @@ import buf "../buffer"
 import ed "../editor"
 import lspc "../lsp"
 import "core:encoding/json"
+import "core:fmt"
+import "core:strings"
 import sdl "vendor:sdl3"
 
 STATE_MAX_ITEMS :: 25
@@ -19,6 +21,17 @@ State_Lsp :: struct {
 	synced:           bool `json:"synced"`,
 	pending_requests: int  `json:"pending_requests"`,
 	diagnostics:      int  `json:"diagnostics"`,
+	status:           string `json:"status"`,
+	crashes:          int    `json:"crashes"`,
+	restarts:         int    `json:"restarts"`,
+}
+
+State_Mouse :: struct {
+	x:      f32    `json:"x"`,
+	y:      f32    `json:"y"`,
+	zone:   string `json:"zone"`,
+	cursor: string `json:"cursor"`,
+	drag:   string `json:"drag"`,
 }
 
 State_Completion :: struct {
@@ -50,6 +63,12 @@ State :: struct {
 	cursor:       [2]int           `json:"cursor"`,
 	cursors:      int              `json:"cursors"`,
 	selection:    bool             `json:"selection"`,
+	// Every cursor as [anchor_line, anchor_col, line, col] (anchor ==
+	// position when there's no selection); index 0 is the primary.
+	selections:    [][4]int        `json:"selections"`,
+	selected_text: string          `json:"selected_text"`,
+	tab_width:     int             `json:"tab_width"`,
+	mouse:         State_Mouse     `json:"mouse"`,
 	current_line: string           `json:"current_line"`,
 	scroll:       [2]int           `json:"scroll"`,
 	lsp:          State_Lsp        `json:"lsp"`,
@@ -76,8 +95,32 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 		text         = ed.editor_to_string(e, context.temp_allocator),
 	}
 
+	sels := make([][4]int, len(e.buf.cursors), context.temp_allocator)
+	for cur, i in e.buf.cursors {
+		anchor := cur.sel.anchor if cur.sel.active else cur.pos
+		sels[i] = {anchor.line, anchor.col, cur.pos.line, cur.pos.col}
+	}
+	s.selections = sels
+	if lo, hi, ok := buf.selection_range(c^); ok {
+		s.selected_text = selection_text(e, lo, hi)
+	}
+	s.tab_width = e.tab_width
+	s.mouse = State_Mouse{
+		x      = e.mouse.x,
+		y      = e.mouse.y,
+		zone   = fmt.tprint(e.mouse.zone),
+		cursor = "text" if ed.editor_mouse_cursor(e) == .Text else "default",
+		drag   = fmt.tprint(e.mouse.drag),
+	}
+
+	s.lsp.status = strings.to_lower(fmt.tprint(ed.editor_lsp_status(e)), context.temp_allocator)
+	s.lsp.crashes = e.lsp_supervisor.total_crashes
+	s.lsp.restarts = e.lsp_supervisor.restarts
 	if e.lsp_enabled {
 		s.lsp = State_Lsp{
+			status           = s.lsp.status,
+			crashes          = s.lsp.crashes,
+			restarts         = s.lsp.restarts,
 			enabled          = true,
 			initialized      = e.lsp.initialized,
 			doc_open         = e.lsp_doc_open,
@@ -121,6 +164,22 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 		s.signature.label, _, s.signature.active_param, _ = ed.editor_signature_active_parts(e)
 	}
 	return s
+}
+
+// selection_text extracts the buffer text in [lo, hi).
+@(private)
+selection_text :: proc(e: ^ed.Editor, lo, hi: buf.Position) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	for ln in lo.line ..= hi.line {
+		line := buf.buffer_line_str(&e.buf, ln)
+		a := lo.col if ln == lo.line else 0
+		b := hi.col if ln == hi.line else len(line)
+		strings.write_string(&sb, line[min(a, len(line)):min(b, len(line))])
+		if ln != hi.line {
+			strings.write_byte(&sb, '\n')
+		}
+	}
+	return strings.to_string(sb)
 }
 
 @(private)

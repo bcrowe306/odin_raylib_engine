@@ -93,7 +93,8 @@ test_parse_command_variants :: proc(t: ^testing.T) {
 
 		cmd, err = parse_command("click 10.5 20", .Other)
 		cl, is_click := cmd.(Cmd_Click)
-		testing.expect(t, is_click && cl.x == 10.5 && cl.y == 20, err)
+		testing.expect(t, is_click && cl.target.kind == .Pixels && cl.target.x == 10.5 && cl.target.y == 20, err)
+		testing.expect(t, cl.opts.clicks == 1 && cl.opts.button == 1, "click defaults to one left click")
 
 		cmd, err = parse_command("cursor 4 2\r\n", .Other)
 		cu, is_cursor := cmd.(Cmd_Cursor)
@@ -158,5 +159,46 @@ test_state_json_reports_editor_and_popups :: proc(t: ^testing.T) {
 		lsp, _ := obj["lsp"].(json.Object)
 		enabled, has_enabled := lsp["enabled"].(json.Boolean)
 		testing.expect(t, has_enabled && !enabled, "lsp.enabled is false")
+	})
+}
+
+@(test)
+test_parse_mouse_commands :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		cmd, err := parse_command("click @3:5 clicks=2 mods=shift+alt", .Other)
+		cl, ok := cmd.(Cmd_Click)
+		testing.expect(t, ok, err)
+		testing.expect(t, cl.target.kind == .Text && cl.target.line == 3 && cl.target.col == 5, "text target")
+		testing.expect_value(t, cl.opts.clicks, 2)
+		testing.expect_value(t, cl.opts.mod, sdl.KMOD_LSHIFT | sdl.KMOD_LALT)
+
+		cmd, err = parse_command("drag @gutter:1 400 900.5 steps=3", .Other)
+		dr, okd := cmd.(Cmd_Drag)
+		testing.expect(t, okd, err)
+		testing.expect(t, dr.from.kind == .Gutter && dr.from.line == 1, "gutter source")
+		testing.expect(t, dr.to.kind == .Pixels && dr.to.x == 400 && dr.to.y == 900.5, "pixel destination")
+		testing.expect_value(t, dr.opts.steps, 3)
+
+		cmd, err = parse_command("wheel -2 dx=1 at=@completion:4 mods=primary", .MacOS)
+		wh, okw := cmd.(Cmd_Wheel)
+		testing.expect(t, okw, err)
+		testing.expect(t, wh.dy == -2 && wh.opts.dx == 1, "wheel amounts")
+		testing.expect(t, wh.opts.has_at && wh.opts.at.kind == .Completion && wh.opts.at.line == 4, "wheel position")
+		testing.expect_value(t, wh.opts.mod, sdl.KMOD_LGUI)
+
+		cmd, err = parse_command("click @2:0 button=right", .Other)
+		cl, _ = cmd.(Cmd_Click)
+		testing.expect_value(t, cl.opts.button, 3)
+
+		cmd, err = parse_command("expect selection 0 1 2 3", .Other)
+		ex, _ := cmd.(Cmd_Expect)
+		testing.expect(t, ex.field == .Selection, err)
+		command_destroy(cmd)
+
+		bad := []string{"click", "click @x", "click @1:2 clicks=0", "click 1 2 frob=1", "drag @1:1", "wheel", "move @gutter:", "click @1:2 mods=hyper"}
+		for line in bad {
+			c, e := parse_command(line, .Other)
+			testing.expectf(t, c == nil && len(e) > 0, "expected %q to be rejected", line)
+		}
 	})
 }

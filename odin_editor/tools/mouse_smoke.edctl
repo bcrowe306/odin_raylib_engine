@@ -1,0 +1,91 @@
+# Mouse / cursor integration smoke test, driven through the control hook
+# against example/assets/mouse_fixture.odin.txt (tab-indented). Every
+# gesture is real SDL mouse/key events; targets like @line:col resolve to
+# pixels via the editor's own geometry.
+wait frames 2
+
+# --- click-to-place (tabs expand to 4 cells) ------------------------------
+click @5:1
+expect cursor 5 1
+click @5:9
+expect cursor 5 9
+expect selection none
+
+# --- drag select ------------------------------------------------------------
+drag @5:1 @5:9
+expect selection 5 1 5 9
+expect selected-text greeting
+drag @6:12 @5:1
+expect selection 5 1 6 12
+expect cursor 5 1
+
+# --- double / triple click ----------------------------------------------
+click @6:7 clicks=2
+expect selected-text println
+click @6:3 clicks=3
+expect selection 6 0 7 0
+drag @6:7 @5:3 clicks=2
+expect selection 5 1 6 12
+
+# --- shift+click extends ------------------------------------------------
+click @5:1
+click @6:4 mods=shift
+expect selection 5 1 6 4
+click @6:8 mods=shift
+expect selection 5 1 6 8
+
+# --- gutter selects whole lines -----------------------------------------
+click @gutter:7
+expect selection 7 0 8 0
+drag @gutter:5 @gutter:7
+expect selection 5 0 8 0
+
+# --- alt+click adds cursors; typing hits all of them ---------------------
+click @5:1
+click @6:1 mods=alt
+click @7:1 mods=alt
+expect cursors 3
+text // 
+expect text-contains \t// greeting := "hello world"\n\t// fmt.println(greeting)\n\t// if len
+key primary+z
+expect text-contains \tgreeting := "hello world"\n\tfmt.println(greeting)\n\tif len
+# alt+click on an existing cursor removes it
+click @7:1 mods=alt
+expect cursors 2
+key esc
+expect cursors 1
+
+# --- pointer shape --------------------------------------------------------
+move @5:3
+expect mouse-cursor text
+move @gutter:5
+expect mouse-cursor default
+
+# --- wheel: horizontal + vertical scrolling --------------------------------
+# (positions scrolled out of view are rejected, so wheel over the gutter)
+wheel 0 dx=5 at=@gutter:5
+expect scroll 0 15
+wheel 0 dx=-10 at=@gutter:5
+expect scroll 0 0
+wheel -1 at=@gutter:5 mods=shift
+expect scroll 0 3
+wheel 1 at=@gutter:5 mods=shift
+wheel -1 at=@5:3
+expect scroll 3 0
+wheel 1 at=@5:3
+expect scroll 0 0
+screenshot /tmp/odin_editor_mouse_smoke.png
+
+# --- completion popup: click an item to accept it (live OLS) ---------------
+wait lsp-ready 15000
+click @6:22
+key enter
+type fmt.pri
+wait completion 5000
+expect completion-has println
+move @completion:3
+expect mouse-cursor default
+screenshot /tmp/odin_editor_mouse_completion.png
+click @completion:3
+wait no-completion 2000
+expect line \tfmt.println

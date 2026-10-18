@@ -28,6 +28,7 @@ import km "../keymap"
 import "core:c/libc"
 import "core:fmt"
 import "core:net"
+import "core:os"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
@@ -279,14 +280,20 @@ run_command :: proc(srv: ^Server, c: ^Conn, e: ^ed.Editor, line: string) {
 		}
 		c.resume_frame = srv.frame + 1
 		reply(c, "ok")
-	case Cmd_Click:
-		push_click(srv, v.x, v.y)
-		c.resume_frame = srv.frame + 1
-		reply(c, "ok")
-	case Cmd_Wheel:
-		push_wheel(srv, v.dy)
-		c.resume_frame = srv.frame + 1
-		reply(c, "ok")
+	case Cmd_Click, Cmd_Mouse_Down, Cmd_Mouse_Up, Cmd_Move, Cmd_Drag, Cmd_Wheel, Cmd_Locate:
+		msg := run_mouse_command(srv, e, cmd)
+		if strings.has_prefix(msg, "ok") {
+			c.resume_frame = srv.frame + 1
+		}
+		reply(c, msg)
+	case Cmd_Lsp_Kill:
+		if !e.lsp_enabled || !e.lsp.has_process {
+			reply(c, "err no language server process")
+		} else {
+			pid := e.lsp.process.pid
+			_ = os.process_kill(e.lsp.process)
+			reply(c, fmt.tprintf("ok killed pid %d", pid))
+		}
 	case Cmd_State:
 		reply(c, state_json(e, srv.frame))
 	case Cmd_Wait:
@@ -352,6 +359,32 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 	case .Signature_Param:
 		actual = s.signature.active_param
 		pass = s.signature.visible && actual == x.want
+	case .Selection:
+		actual = "none"
+		if len(s.selections) > 0 && s.selection {
+			r := s.selections[0]
+			lo, hi := [2]int{r[0], r[1]}, [2]int{r[2], r[3]}
+			if hi[0] < lo[0] || (hi[0] == lo[0] && hi[1] < lo[1]) {
+				lo, hi = hi, lo
+			}
+			actual = fmt.tprintf("%d %d %d %d", lo[0], lo[1], hi[0], hi[1])
+		}
+		pass = actual == strings.join(strings.fields(x.want, context.temp_allocator), " ", context.temp_allocator)
+	case .Selected_Text:
+		actual = s.selected_text
+		pass = s.selection && actual == x.want
+	case .Cursors:
+		actual = fmt.tprint(s.cursors)
+		pass = actual == strings.trim_space(x.want)
+	case .Mouse_Cursor:
+		actual = s.mouse.cursor
+		pass = actual == strings.trim_space(x.want)
+	case .Scroll:
+		actual = fmt.tprintf("%d %d", s.scroll[0], s.scroll[1])
+		pass = actual == strings.join(strings.fields(x.want, context.temp_allocator), " ", context.temp_allocator)
+	case .Lsp_Status:
+		actual = s.lsp.status
+		pass = actual == strings.trim_space(x.want)
 	}
 	if pass {
 		return "ok"
@@ -385,6 +418,7 @@ wait_check :: proc(srv: ^Server, c: ^Conn, e: ^ed.Editor) -> bool {
 		case .No_Signature: met = !ed.editor_signature_visible(e)
 		case .Lsp_Ready: met = e.lsp_enabled && e.lsp.initialized && e.lsp_doc_open
 		case .Lsp_Idle: met = e.lsp_enabled && len(e.lsp.pending_kind) == 0
+		case .Lsp_Down: met = ed.editor_lsp_status(e) != .Running
 		case .Frames:
 		}
 	}
@@ -412,6 +446,7 @@ wait_name :: proc(cond: Wait_Condition) -> string {
 	case .No_Signature: return "no-signature"
 	case .Lsp_Ready: return "lsp-ready"
 	case .Lsp_Idle: return "lsp-idle"
+	case .Lsp_Down: return "lsp-down"
 	case .Frames: return "frames"
 	}
 	return "?"
@@ -476,6 +511,8 @@ event_is_injected :: proc(srv: ^Server, ev: sdl.Event) -> bool {
 		return ev.button.which == INJECTED_DEVICE_ID
 	case .MOUSE_WHEEL:
 		return ev.wheel.which == INJECTED_DEVICE_ID
+	case .MOUSE_MOTION:
+		return ev.motion.which == INJECTED_DEVICE_ID
 	case .TEXT_INPUT:
 		// Text events carry no device id; match the payload pointer
 		// against the strings this server pushed.
@@ -528,31 +565,189 @@ push_text :: proc(srv: ^Server, text: string) {
 	_ = sdl.PushEvent(&ev)
 }
 
-push_click :: proc(srv: ^Server, x, y: f32) {
+// --- mouse commands ----------------------------------------------------------
+
+// resolve_where turns a <where> into window pixels using the live editor
+// geometry. Text positions resolve to the caret boundary (+1px) at the
+// vertical center of the line.
+resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
+	switch w.kind {
+	case .Pixels:
+		return w.x, w.y, ""
+	case .Text:
+		pos := ed.editor_clamp_to_buffer(e, w.line, w.col)
+		if pos.line < e.scroll_line || pos.line >= e.scroll_line + e.visible_rows {
+			return 0, 0, fmt.tprintf("line %d is not visible (scroll_line=%d)", pos.line, e.scroll_line)
+		}
+		if vcol := ed.editor_visual_col(e, pos); vcol < e.scroll_col || vcol > e.scroll_col + e.visible_cols {
+			return 0, 0, fmt.tprintf("column %d of line %d is scrolled out of view (scroll_col=%d)", pos.col, pos.line, e.scroll_col)
+		}
+		px, py := ed.editor_position_to_screen(e, pos)
+		return px + 1, py + e.char_h / 2, ""
+	case .Gutter:
+		if w.line < e.scroll_line || w.line >= e.scroll_line + e.visible_rows {
+			return 0, 0, fmt.tprintf("line %d is not visible", w.line)
+		}
+		return e.origin_x + ed.GUTTER_WIDTH / 2, e.origin_y + f32(w.line - e.scroll_line) * e.char_h + e.char_h / 2, ""
+	case .Completion:
+		layout := ed.editor_popup_layout(e)
+		cs := &e.completion
+		if !layout.completion_visible {
+			return 0, 0, "completion popup is not visible"
+		}
+		if w.line < cs.scroll || w.line >= min(cs.scroll + ed.COMPLETION_MAX_VISIBLE, len(cs.filtered)) {
+			return 0, 0, fmt.tprintf("completion row %d is not on screen (first visible row %d)", w.line, cs.scroll)
+		}
+		row := w.line - cs.scroll
+		return layout.completion.x + layout.completion.w / 2,
+			layout.completion.y + ed.POPUP_PAD + f32(row) * e.char_h + e.char_h / 2, ""
+	}
+	return 0, 0, "bad target"
+}
+
+@(private)
+run_mouse_command :: proc(srv: ^Server, e: ^ed.Editor, cmd: Command) -> string {
+	#partial switch v in cmd {
+	case Cmd_Locate:
+		x, y, err := resolve_where(e, v.target)
+		if err != "" {
+			return strings.concatenate({"err ", err}, context.temp_allocator)
+		}
+		return fmt.tprintf("ok %.1f %.1f", x, y)
+	case Cmd_Move:
+		x, y, err := resolve_where(e, v.target)
+		if err != "" {
+			return strings.concatenate({"err ", err}, context.temp_allocator)
+		}
+		push_motion(srv, x, y, 0)
+	case Cmd_Click:
+		x, y, err := resolve_where(e, v.target)
+		if err != "" {
+			return strings.concatenate({"err ", err}, context.temp_allocator)
+		}
+		push_mods(srv, v.opts.mod, true)
+		push_motion(srv, x, y, 0)
+		// A double/triple click arrives as successive presses with a
+		// rising click count, exactly as SDL reports real ones.
+		for n in 1 ..= v.opts.clicks {
+			push_button(srv, x, y, v.opts.button, u8(n), true)
+			push_button(srv, x, y, v.opts.button, u8(n), false)
+		}
+		push_mods(srv, v.opts.mod, false)
+	case Cmd_Mouse_Down:
+		x, y, err := resolve_where(e, v.target)
+		if err != "" {
+			return strings.concatenate({"err ", err}, context.temp_allocator)
+		}
+		push_mods(srv, v.opts.mod, true)
+		push_motion(srv, x, y, 0)
+		push_button(srv, x, y, v.opts.button, u8(v.opts.clicks), true)
+		push_mods(srv, v.opts.mod, false)
+	case Cmd_Mouse_Up:
+		x, y, err := resolve_where(e, v.target)
+		if err != "" {
+			return strings.concatenate({"err ", err}, context.temp_allocator)
+		}
+		push_button(srv, x, y, v.opts.button, u8(v.opts.clicks), false)
+	case Cmd_Drag:
+		x0, y0, err0 := resolve_where(e, v.from)
+		if err0 != "" {
+			return strings.concatenate({"err ", err0}, context.temp_allocator)
+		}
+		x1, y1, err1 := resolve_where(e, v.to)
+		if err1 != "" {
+			return strings.concatenate({"err ", err1}, context.temp_allocator)
+		}
+		push_mods(srv, v.opts.mod, true)
+		push_motion(srv, x0, y0, 0)
+		for n in 1 ..< v.opts.clicks {
+			push_button(srv, x0, y0, 1, u8(n), true)
+			push_button(srv, x0, y0, 1, u8(n), false)
+		}
+		push_button(srv, x0, y0, 1, u8(v.opts.clicks), true)
+		for i in 1 ..= v.opts.steps {
+			t := f32(i) / f32(v.opts.steps)
+			push_motion(srv, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 1)
+		}
+		push_button(srv, x1, y1, 1, u8(v.opts.clicks), false)
+		push_mods(srv, v.opts.mod, false)
+	case Cmd_Wheel:
+		x, y := e.mouse.x, e.mouse.y
+		if v.opts.has_at {
+			err: string
+			x, y, err = resolve_where(e, v.opts.at)
+			if err != "" {
+				return strings.concatenate({"err ", err}, context.temp_allocator)
+			}
+		}
+		push_mods(srv, v.opts.mod, true)
+		push_wheel(srv, x, y, v.opts.dx, v.dy)
+		push_mods(srv, v.opts.mod, false)
+	}
+	return "ok"
+}
+
+// push_mods presses (or releases) the modifier keys in `mod`, so the
+// gesture between them sees them held — SDL mouse events carry no
+// modifier state of their own.
+push_mods :: proc(srv: ^Server, mod: sdl.Keymod, down: bool) {
+	keys := [4]struct {
+		m: sdl.Keymod,
+		k: sdl.Keycode,
+	}{{sdl.KMOD_LSHIFT, sdl.K_LSHIFT}, {sdl.KMOD_LCTRL, sdl.K_LCTRL}, {sdl.KMOD_LALT, sdl.K_LALT}, {sdl.KMOD_LGUI, sdl.K_LGUI}}
+	for entry in keys {
+		if entry.m <= mod && entry.m != {} {
+			ev: sdl.Event
+			ev.type = .KEY_DOWN if down else .KEY_UP
+			ev.key.windowID = window_id(srv)
+			ev.key.which = INJECTED_DEVICE_ID
+			ev.key.key = entry.k
+			ev.key.scancode = sdl.GetScancodeFromKey(entry.k, nil)
+			ev.key.mod = mod if down else {}
+			ev.key.down = down
+			ev.key.timestamp = sdl.GetTicksNS()
+			_ = sdl.PushEvent(&ev)
+		}
+	}
+}
+
+push_button :: proc(srv: ^Server, x, y: f32, button: u8, clicks: u8, down: bool) {
 	ev: sdl.Event
-	ev.type = .MOUSE_BUTTON_DOWN
+	ev.type = .MOUSE_BUTTON_DOWN if down else .MOUSE_BUTTON_UP
 	ev.button.windowID = window_id(srv)
 	ev.button.which = INJECTED_DEVICE_ID
-	ev.button.button = 1 // SDL_BUTTON_LEFT
-	ev.button.down = true
-	ev.button.clicks = 1
+	ev.button.button = button
+	ev.button.down = down
+	ev.button.clicks = clicks
 	ev.button.x = x
 	ev.button.y = y
 	ev.button.timestamp = sdl.GetTicksNS()
 	_ = sdl.PushEvent(&ev)
+}
 
-	ev.type = .MOUSE_BUTTON_UP
-	ev.button.down = false
+push_motion :: proc(srv: ^Server, x, y: f32, buttons: u32) {
+	ev: sdl.Event
+	ev.type = .MOUSE_MOTION
+	ev.motion.windowID = window_id(srv)
+	ev.motion.which = INJECTED_DEVICE_ID
+	ev.motion.state = transmute(sdl.MouseButtonFlags)buttons
+	ev.motion.x = x
+	ev.motion.y = y
+	ev.motion.timestamp = sdl.GetTicksNS()
 	_ = sdl.PushEvent(&ev)
 }
 
-push_wheel :: proc(srv: ^Server, dy: f32) {
+push_wheel :: proc(srv: ^Server, x, y, dx, dy: f32) {
 	ev: sdl.Event
 	ev.type = .MOUSE_WHEEL
 	ev.wheel.windowID = window_id(srv)
 	ev.wheel.which = INJECTED_DEVICE_ID
+	ev.wheel.x = dx
 	ev.wheel.y = dy
+	ev.wheel.integer_x = i32(dx)
 	ev.wheel.integer_y = i32(dy)
+	ev.wheel.mouse_x = x
+	ev.wheel.mouse_y = y
 	ev.wheel.timestamp = sdl.GetTicksNS()
 	_ = sdl.PushEvent(&ev)
 }

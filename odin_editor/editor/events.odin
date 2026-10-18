@@ -22,18 +22,29 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 			editor_after_text_input(ed, text)
 			return true
 		}
+	case .KEY_UP:
+		editor_track_modifier_key(ed, ev.key)
 	case .MOUSE_WHEEL:
-		editor_handle_mouse_wheel(ed, ev.wheel)
-		return true
+		return editor_handle_mouse_wheel(ed, ev.wheel)
 	case .MOUSE_BUTTON_DOWN:
-		editor_handle_mouse_down(ed, ev.button)
-		return true
+		return editor_handle_mouse_down(ed, ev.button)
+	case .MOUSE_BUTTON_UP:
+		return editor_handle_mouse_up(ed, ev.button)
+	case .MOUSE_MOTION:
+		return editor_handle_mouse_motion(ed, ev.motion)
+	case .WINDOW_MOUSE_LEAVE:
+		ed.mouse.zone = .Outside
+	case .WINDOW_FOCUS_LOST:
+		// Key-ups for held modifiers go to whichever window has focus now.
+		ed.key_mods = {}
+		ed.mouse.drag = .None
 	}
 	return false
 }
 
 @(private)
 editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
+	editor_track_modifier_key(ed, key)
 	chord := sdl_event_to_chord(key)
 	if editor_handle_popup_key(ed, chord) {
 		return true
@@ -98,32 +109,4 @@ editor_handle_popup_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
 		return true
 	}
 	return false
-}
-
-@(private)
-editor_handle_mouse_wheel :: proc(ed: ^Editor, wheel: sdl.MouseWheelEvent) {
-	SCROLL_LINES :: 3
-	delta := int(wheel.y)
-	ed.scroll_line -= delta * SCROLL_LINES
-	editor_clamp_scroll(ed)
-}
-
-@(private)
-editor_handle_mouse_down :: proc(ed: ^Editor, button: sdl.MouseButtonEvent) {
-	if ed.char_w <= 0 || ed.char_h <= 0 {
-		return
-	}
-	// Clicks are in window pixels; translate past the editor origin and
-	// the line-number gutter, rounding to the nearest column boundary.
-	local_x := button.x - ed.origin_x - GUTTER_WIDTH
-	local_y := button.y - ed.origin_y
-	if local_y < 0 {
-		return
-	}
-	line := ed.scroll_line + int(local_y / ed.char_h)
-	col := ed.scroll_col + int(max(local_x, 0) / ed.char_w + 0.5)
-	pos := editor_clamp_to_buffer(ed, line, col)
-	resize(&ed.buf.cursors, 1)
-	ed.buf.cursors[0].pos = pos
-	ed.buf.cursors[0].sel.active = false
 }

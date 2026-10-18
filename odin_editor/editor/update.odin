@@ -8,8 +8,10 @@ import lspc "../lsp"
 
 editor_update :: proc(ed: ^Editor) {
 	editor_pump_injected_events(ed)
+	editor_update_mouse(ed)
 	if ed.lsp_enabled {
 		lspc.client_poll(&ed.lsp)
+		editor_supervise_lsp(ed)
 		editor_sync_lsp(ed)
 		editor_update_lsp_ui(ed)
 	}

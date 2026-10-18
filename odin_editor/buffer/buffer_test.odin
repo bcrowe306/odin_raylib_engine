@@ -410,3 +410,45 @@ test_version_bumps_on_every_content_change :: proc(t: ^testing.T) {
 		testing.expect_value(t, b.version, v4) // empty insert is a no-op
 	})
 }
+
+@(test)
+test_undo_redo_restore_cursors_to_edit_sites :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		buffer_set_text(&b, "aaa\nbbb\nccc")
+		b.cursors[0].pos = {0, 1}
+		append(&b.cursors, Cursor{pos = {2, 1}})
+
+		buffer_type_text(&b, "//")
+		testing.expect_value(t, buffer_line_str(&b, 0), "a//aa")
+		// Wander off with a single cursor before undoing.
+		resize(&b.cursors, 1)
+		b.cursors[0].pos = {1, 3}
+
+		buffer_undo(&b)
+		testing.expect_value(t, len(b.cursors), 2)
+		testing.expect_value(t, b.cursors[0].pos, Position{0, 1})
+		testing.expect_value(t, b.cursors[1].pos, Position{2, 1})
+
+		buffer_redo(&b)
+		testing.expect_value(t, len(b.cursors), 2)
+		testing.expect_value(t, b.cursors[0].pos, Position{0, 3})
+		testing.expect_value(t, b.cursors[1].pos, Position{2, 3})
+	})
+}
+
+@(test)
+test_undo_backspace_puts_cursor_after_restored_text :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		buffer_set_text(&b, "hello")
+		b.cursors[0].pos = {0, 5}
+		buffer_backspace(&b)
+		b.cursors[0].pos = {0, 0}
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_line_str(&b, 0), "hello")
+		testing.expect_value(t, b.cursors[0].pos, Position{0, 5})
+	})
+}
