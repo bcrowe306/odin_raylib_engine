@@ -1,11 +1,11 @@
-package main
+package engine
 
-import "base:runtime"
 import "core:math/rand"
 import "core:crypto"
 import "core:math"
 import "core:fmt"
 import rl "vendor:raylib"
+import ui "../ui"
 
 MAX_COLOR_STOPS :: 8
 
@@ -478,197 +478,70 @@ ParticleEmitter_HandleCollisions :: proc(emitter: ^ParticleEmitter) {
 
 ParticleEmitter_DrawColorRampGui :: proc(emitter: ^ParticleEmitter, x: f32, nextY: ^f32, width: f32, selectedStop: ^int, draggingStop: ^bool, view: rl.Rectangle) {
 	ramp := &emitter.colorRamp
-	mousePos := rl.GetMousePosition()
-	inView := rl.CheckCollisionPointRec(mousePos, view)
 
-	rl.GuiCheckBox({x, nextY^, 16, 16}, "Enable Color Ramp (Gradient)", &emitter.useColorRamp)
-	nextY^ += 22
+	ui.GuiToggleSwitch({x, nextY^, width, 22}, "Enable Color Ramp (Gradient)", &emitter.useColorRamp)
+	nextY^ += 26
 
 	if !emitter.useColorRamp do return
 
-	// 1. X/Y Gradient Plot (X is lifetime 0..1, Y is alpha/intensity 0..1)
-	plotH: f32 = 80
-	plotRect := rl.Rectangle{x, nextY^, width, plotH}
-	rl.DrawRectangleRec(plotRect, rl.Color{20, 20, 25, 255})
-	rl.DrawRectangleLinesEx(plotRect, 1, rl.Color{60, 60, 70, 255})
-
-	// Grid lines
-	for step in 1..<4 {
-		gy := plotRect.y + f32(step) * (plotH / 4)
-		rl.DrawLineEx({plotRect.x, gy}, {plotRect.x + plotRect.width, gy}, 1, rl.Color{35, 35, 45, 255})
-		gx := plotRect.x + f32(step) * (width / 4)
-		rl.DrawLineEx({gx, plotRect.y}, {gx, plotRect.y + plotH}, 1, rl.Color{35, 35, 45, 255})
-	}
-	DrawEngineText("Alpha 1.0", plotRect.x + 4, plotRect.y + 4, 10, rl.GRAY)
-	DrawEngineText("0.0", plotRect.x + 4, plotRect.y + plotH - 12, 10, rl.GRAY)
-	DrawEngineText("0% Lifetime", plotRect.x + 4, plotRect.y + plotH + 2, 10, rl.GRAY)
-	DrawEngineText("100% Lifetime", plotRect.x + width - 75, plotRect.y + plotH + 2, 10, rl.GRAY)
-
-	// Plot alpha & color curve across lifetime
-	prevPt := rl.Vector2{plotRect.x, plotRect.y + plotH - (f32(ColorRamp_Evaluate(ramp, 0.0).a) / 255.0) * plotH}
-	for px in 1..=i32(width) {
-		t := f32(px) / width
-		col := ColorRamp_Evaluate(ramp, t)
-		currY := plotRect.y + plotH - (f32(col.a) / 255.0) * plotH
-		currPt := rl.Vector2{plotRect.x + f32(px), currY}
-		rl.DrawLineEx(prevPt, currPt, 2, col)
-		prevPt = currPt
-	}
-
-	// Stop nodes on plot
+	// Convert fixed stops array to dynamic array for GuiGradientEditor
+	stopsDyn := make([dynamic]ui.ColorStop, context.temp_allocator)
 	for i in 0..<ramp.count {
-		stop := ramp.stops[i]
-		sx := plotRect.x + stop.position * width
-		sy := plotRect.y + plotH - (f32(stop.color.a) / 255.0) * plotH
-		rl.DrawCircle(i32(sx), i32(sy), 4, stop.color)
-		if i == selectedStop^ {
-			rl.DrawCircleLines(i32(sx), i32(sy), 6, rl.GOLD)
-		}
+		append(&stopsDyn, ui.ColorStop{position = ramp.stops[i].position, color = ramp.stops[i].color})
 	}
 
-	nextY^ += plotH + 16
+	gradRect := rl.Rectangle{x, nextY^, width, 120}
+	changed := ui.GuiGradientEditor(gradRect, &stopsDyn, selectedStop, draggingStop, true)
+	nextY^ += 130
 
-	// 2. Continuous Gradient Bar
-	barH: f32 = 22
-	barRect := rl.Rectangle{x, nextY^, width, barH}
-
-	// Draw checkered transparency background
-	checkSize: f32 = 6
-	for cy := barRect.y; cy < barRect.y + barH; cy += checkSize {
-		for cx := barRect.x; cx < barRect.x + width; cx += checkSize {
-            isWhite := (i32((cx - barRect.x) / checkSize) + i32((cy - barRect.y) / checkSize)) % 2 == 0
-			checkCol := rl.Color{180, 180, 180, 255} if isWhite else rl.Color{130, 130, 130, 255}
-			rl.DrawRectangleRec({cx, cy, math.min(checkSize, barRect.x + width - cx), math.min(checkSize, barRect.y + barH - cy)}, checkCol)
-		}
-	}
-
-	// Draw gradient strip
-	for px in 0..<i32(width) {
-		t := f32(px) / width
-		col := ColorRamp_Evaluate(ramp, t)
-		rl.DrawLineV({x + f32(px), barRect.y}, {x + f32(px), barRect.y + barH}, col)
-	}
-	rl.DrawRectangleLinesEx(barRect, 1, rl.LIGHTGRAY)
-
-	// Stop markers below gradient bar
-	markerH: f32 = 14
-	markerW: f32 = 10
-	markerY := barRect.y + barH + 2
-
-	// Check adding a stop by clicking on the gradient bar
-	if inView && rl.IsMouseButtonPressed(.LEFT) && rl.CheckCollisionPointRec(mousePos, barRect) {
-		clickedStop := false
+	if changed {
+		ramp.count = min(len(stopsDyn), MAX_COLOR_STOPS)
 		for i in 0..<ramp.count {
-			mx := barRect.x + ramp.stops[i].position * width
-			if math.abs(mousePos.x - mx) <= (markerW * 0.75) {
-				clickedStop = true
-				selectedStop^ = i
-				draggingStop^ = true
-				break
-			}
+			ramp.stops[i] = ColorStop{position = stopsDyn[i].position, color = stopsDyn[i].color}
 		}
-		if !clickedStop {
-			newT := math.clamp((mousePos.x - barRect.x) / width, 0.0, 1.0)
-			newCol := ColorRamp_Evaluate(ramp, newT)
-			idx := ColorRamp_AddStop(ramp, newT, newCol)
-			if idx >= 0 {
-				selectedStop^ = idx
-				draggingStop^ = true
-			}
-		}
+		ColorRamp_Sort(ramp, selectedStop)
 	}
 
-	// Check clicking on marker handles
-	if inView && rl.IsMouseButtonPressed(.LEFT) && !draggingStop^ {
-		for i in 0..<ramp.count {
-			mx := barRect.x + ramp.stops[i].position * width
-			mRect := rl.Rectangle{mx - markerW/2, markerY, markerW, markerH + 4}
-			if rl.CheckCollisionPointRec(mousePos, mRect) {
-				selectedStop^ = i
-				draggingStop^ = true
-				break
-			}
-		}
-	}
-
-	// Dragging stop marker
-	if draggingStop^ {
-		if rl.IsMouseButtonDown(.LEFT) {
-			newPos := math.clamp((mousePos.x - barRect.x) / width, 0.0, 1.0)
-			ramp.stops[selectedStop^].position = newPos
-			ColorRamp_Sort(ramp, selectedStop)
-		} else {
-			draggingStop^ = false
-		}
-	}
-
-	// Draw stop markers
-	for i in 0..<ramp.count {
-		stop := ramp.stops[i]
-		mx := barRect.x + stop.position * width
-
-		// Triangle arrow pointing up
-		p1 := rl.Vector2{mx, markerY}
-		p2 := rl.Vector2{mx - markerW/2, markerY + 5}
-		p3 := rl.Vector2{mx + markerW/2, markerY + 5}
-		rl.DrawTriangle(p1, p2, p3, rl.WHITE)
-
-		// Color box
-		cRect := rl.Rectangle{mx - markerW/2, markerY + 5, markerW, markerH - 5}
-		rl.DrawRectangleRec(cRect, stop.color)
-		if i == selectedStop^ {
-			rl.DrawRectangleLinesEx({cRect.x - 1, cRect.y - 1, cRect.width + 2, cRect.height + 2}, 2, rl.GOLD)
-		} else {
-			rl.DrawRectangleLinesEx(cRect, 1, rl.BLACK)
-		}
-	}
-
-	nextY^ += barH + markerH + 10
-
-	// 3. Selected Stop Controls (Color Picker, Position, Add/Delete)
+	// Selected Stop Controls (Color Picker, Alpha, Position, Add/Del)
 	if selectedStop^ < 0 do selectedStop^ = 0
 	if selectedStop^ >= ramp.count do selectedStop^ = ramp.count - 1
 
 	ctrlY := nextY^
-	DrawEngineText(fmt.ctprintf("Stop %d / %d", selectedStop^ + 1, ramp.count), x, ctrlY, 16, rl.WHITE)
+	DrawEngineText(fmt.ctprintf("Stop %d / %d", selectedStop^ + 1, ramp.count), x, ctrlY, 14, rl.WHITE)
 
-	// Position slider
 	posVal := ramp.stops[selectedStop^].position
 	sliderW := width - 180
-	rl.GuiSlider({x + 70, ctrlY, sliderW, 18}, "Position", fmt.ctprintf("%.2f", posVal), &posVal, 0.0, 1.0)
+	ui.GuiSlider({x + 70, ctrlY, sliderW, 18}, "", fmt.ctprintf("%.2f", posVal), &posVal, 0.0, 1.0)
 	if posVal != ramp.stops[selectedStop^].position {
 		ramp.stops[selectedStop^].position = posVal
 		ColorRamp_Sort(ramp, selectedStop)
 	}
 
-	// Add / Delete buttons
 	btnX := x + 70 + sliderW + 10
 	if ramp.count < MAX_COLOR_STOPS {
-		if rl.GuiButton({btnX, ctrlY, 40, 18}, "Add") {
+		if ui.GuiButton({btnX, ctrlY, 40, 18}, "Add") {
 			midT: f32 = 0.5
 			idx := ColorRamp_AddStop(ramp, midT, ColorRamp_Evaluate(ramp, midT))
 			if idx >= 0 do selectedStop^ = idx
 		}
 	}
 	if ramp.count > 2 {
-		if rl.GuiButton({btnX + 45, ctrlY, 40, 18}, "Del") {
+		if ui.GuiButton({btnX + 45, ctrlY, 40, 18}, "Del") {
 			ColorRamp_RemoveStop(ramp, selectedStop^)
 			if selectedStop^ >= ramp.count do selectedStop^ = ramp.count - 1
 		}
 	}
 
 	ctrlY += 24
-	// Color Picker & Alpha
 	c := &ramp.stops[selectedStop^].color
 	alpha := f32(c.a) / 255.0
 	pickerW := width - 70
-	rl.GuiColorPicker({x + 70, ctrlY, pickerW, 55}, "Stop Color", c)
+	ui.GuiColorPicker({x + 70, ctrlY, pickerW, 55}, "Stop Color", c)
 	ctrlY += 60
-	rl.GuiColorBarAlpha({x + 70, ctrlY, pickerW, 18}, "Alpha", &alpha)
-	c.a = u8(alpha * 255.0)
-	ctrlY += 24
+	ui.GuiColorBarAlpha({x + 70, ctrlY, pickerW, 18}, "Stop Alpha", &alpha)
+	c.a = u8(math.round(alpha * 255.0))
 
-	nextY^ = ctrlY
+	nextY^ = ctrlY + 26
 }
 
 ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
@@ -682,7 +555,6 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
 		// Lifecycle start or loop (when continuous and lifetimer reaches lifetime)
 		if !emitter.cycleStarted || (emitter.continuous && emitter.lifetimer >= emitter.lifetime) {
 			emitter.lifetimer = 0
-			// Pre-fill timer to interval so the first particle is emitted at the very beginning of the cycle
 			emitter.timer = interval
 			emitter.emittedInCycle = 0
 			emitter.cycleStarted = true
@@ -692,13 +564,11 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
 
 		if emitter.emittedInCycle < targetAmount {
 			if burstVal >= 1.0 || emissionDuration <= 0.0001 {
-				// Full burst (1.0): all particles are emitted at the same time
 				for emitter.emittedInCycle < targetAmount {
 					ParticleEmitter_Emit(emitter)
 					emitter.emittedInCycle += 1
 				}
 			} else if interval > 0.00001 {
-				// Burst < 1.0: particles are emitted across emissionDuration
 				emitter.timer += deltaTime
 				for emitter.timer >= interval && emitter.emittedInCycle < targetAmount {
 					ParticleEmitter_Emit(emitter)
@@ -709,14 +579,12 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
 		}
 		emitter.count = emitter.emittedInCycle
 
-		// Check if non-continuous emitter has completed its single lifecycle
 		if !emitter.continuous && emitter.lifetimer >= emitter.lifetime {
 			emitter.emitting = false
 			emitter.cycleStarted = false
 		}
 	}
 
-	// Update all active particles in flight regardless of emission state
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles.alive[i] do continue
 		Particle_Update(emitter, i, deltaTime)

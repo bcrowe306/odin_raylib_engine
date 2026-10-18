@@ -13,6 +13,7 @@ EventValue :: union {
 	bool,
 	u32,
 	u64,
+	string,
 }
 
 EventSubscription :: struct {
@@ -34,6 +35,12 @@ InitializeSubject :: proc(subject: ^EventSubject) {
 	subject.notify = Notify
 	subject.subscribe = Subscribe
 	subject.unsubscribe = UnSubscribe
+}
+
+DestroySubject :: proc(subject: ^EventSubject) {
+	if subject == nil do return
+	delete(subject.listeners)
+	subject.listeners = nil
 }
 
 

@@ -1,8 +1,6 @@
 package engine
 
-import "core:fmt"
 import "core:log"
-import rl "vendor:raylib"
 
 
 
@@ -61,6 +59,7 @@ AnimationPlayerNode_Create :: proc(scene: ^Scene, name: string = "") -> ^Animati
 }
 
 AnimationPlayerNode_Init :: proc(apn: ^AnimationPlayerNode) {
+	apn.animations = make([dynamic]^Animation, apn.allocator)
 	Ticker_Init(&apn.ticker, false)
 	apn.update = AnimationPlayerNode_Update
 	apn.render = AnimationPlayerNode_Render
@@ -73,6 +72,7 @@ AnimationPlayerNode_Init :: proc(apn: ^AnimationPlayerNode) {
 
 
 AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
+	if len(apn.animations) == 0 do return
 	a := apn.animations[apn.animationIndex]
 	if apn.reverse {
 		if apn.currentFrame <= auto_cast a.startFrame {
@@ -103,8 +103,11 @@ AnimationPlayerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, delta
 
 AnimationPlayerNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	apn := cast(^AnimationPlayerNode)node
+	if len(apn.animations) == 0 do return
 	animation := apn.animations[apn.animationIndex]
-	animation->renderFrame(apn.currentFrame, node)
+	if animation != nil && animation.renderFrame != nil {
+		animation->renderFrame(apn.currentFrame, node)
+	}
 }
 
 AnimationPlayerNode_Start :: proc(apn: ^AnimationPlayerNode) {
@@ -130,7 +133,8 @@ AnimationPlayerNode_SetFPS :: proc(apn: ^AnimationPlayerNode, fps: f32) {
 }
 
 AnimationPlayerNode_SetAnimationIndex :: proc(apn: ^AnimationPlayerNode, index: int) {
-	index := clamp(index, 0, len(apn.animations))
+	if len(apn.animations) == 0 do return
+	index := clamp(index, 0, len(apn.animations) - 1)
 	apn.animationIndex = index
 }
 
@@ -140,7 +144,7 @@ AnimationPlayerNode_SetAnimationByName :: proc(apn: ^AnimationPlayerNode, name: 
 
 		if animation.name == name {
 			index = i
-			return
+			break
 		}
 	}
 	if index != -1 {

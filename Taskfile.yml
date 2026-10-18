@@ -7,5 +7,34 @@ vars:
 
 tasks:
     run:
+        desc: Run the game engine application
         cmds:
             - odin run .
+    test:
+        desc: Run all tests (engine lifecycle, UI unit tests, and UI showcase E2E automation)
+        cmds:
+            - odin test engine -define:ODIN_TEST_THREADS=1
+            - odin test ui -define:ODIN_TEST_THREADS=1
+            - ./scripts/test_ui_showcase.sh
+    test:engine:
+        desc: Run engine package unit & memory leak tests
+        cmds:
+            - odin test engine -define:ODIN_TEST_THREADS=1
+    test:ui:
+        desc: Run standalone ui package unit tests
+        cmds:
+            - odin test ui -define:ODIN_TEST_THREADS=1
+    ui:e2e:
+        desc: Run automated UI showcase test with event injection & screenshot capture
+        cmds:
+            - ./scripts/test_ui_showcase.sh
+    ui:showcase:
+        desc: Launch interactive standalone UI showcase app
+        cmds:
+            - odin run ui
+    check:
+        desc: Run type-checking on root and ui packages, then run all tests
+        cmds:
+            - odin check .
+            - odin check ui
+            - task: test

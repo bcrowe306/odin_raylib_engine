@@ -1,15 +1,15 @@
-package main
+package engine
 
-import "core:fmt"
-import e "engine"
 import rl "vendor:raylib"
 
+
 ParticleEmitterNode :: struct {
-	using node: e.Node,
+	using node: Node,
 	emitter: ParticleEmitter,
 }
 
 ParticleEmitterNode_Init :: proc(pen: ^ParticleEmitterNode) {
+	InitializeNode(pen)
 	pen.update = ParticleEmitterNode_Update
 	pen.render = ParticleEmitterNode_Render
 	pen.resource = &pen.emitter
@@ -25,8 +25,8 @@ ParticleEmitterNode_Init :: proc(pen: ^ParticleEmitterNode) {
 	pen.emitter.continuous = true
 }
 
-ParticleEmitterNode_Create :: proc(scene: ^e.Scene, name: string = "Particle Emitter") -> ^ParticleEmitterNode {
-	pen := e.CreateNode(scene.manager, ParticleEmitterNode)
+ParticleEmitterNode_Create :: proc(scene: ^Scene, name: string = "Particle Emitter") -> ^ParticleEmitterNode {
+	pen := CreateNode(scene.manager, ParticleEmitterNode)
 	ParticleEmitterNode_Init(pen)
 	if name != "" {
 		pen.name = name
@@ -51,7 +51,7 @@ ParticleEmitterNode_Stop :: proc(pen: ^ParticleEmitterNode) {
 	}
 }
 
-ParticleEmitterNode_Update :: proc(node: ^e.Node, gameContext: ^e.GameContext, deltaTime: f32) {
+ParticleEmitterNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	pen := cast(^ParticleEmitterNode)node
 	if !pen.enabled do return
 
@@ -61,7 +61,8 @@ ParticleEmitterNode_Update :: proc(node: ^e.Node, gameContext: ^e.GameContext, d
 	ParticleEmitter_Update(&pen.emitter, deltaTime)
 }
 
-ParticleEmitterNode_Render :: proc(node: ^e.Node, gameContext: ^e.GameContext, deltaTime: f32) {
+ParticleEmitterNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
+	if !rl.IsWindowReady() do return
 	pen := cast(^ParticleEmitterNode)node
 	if !pen.renderable do return
 

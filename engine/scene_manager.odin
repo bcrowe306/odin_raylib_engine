@@ -6,7 +6,7 @@ import vmem "core:mem/virtual"
 SceneManager :: struct {
 	scenes: map[string]Scene,
 	currentScene: ^Scene,
-	nextScene: ^Scene
+	nextScene: ^Scene,
 }
 
 
@@ -14,6 +14,16 @@ SceneManager_Init :: proc(manager: ^SceneManager, arena: ^vmem.Arena) {
 
 	arena_allocator := vmem.arena_allocator(arena)
 	manager.scenes = make( map[string]Scene, allocator = arena_allocator )
+	manager.currentScene = nil
+	manager.nextScene = nil
+}
+
+SceneManager_Terminate :: proc(manager: ^SceneManager) {
+	if manager == nil do return
+	for _, &scene in manager.scenes {
+		TerminateScene(&scene)
+	}
+	clear(&manager.scenes)
 	manager.currentScene = nil
 	manager.nextScene = nil
 }
@@ -40,9 +50,41 @@ ChangeScene_ByPtr :: proc(manager: ^SceneManager, scene: ^Scene) {
 }
 
 
-ProcessSceneChange :: proc(manager: ^SceneManager) {
+ProcessSceneChange :: proc(manager: ^SceneManager, gameContext: ^GameContext = nil) {
 	if manager.nextScene != nil {
-		manager.currentScene = manager.nextScene
+		oldScene := manager.currentScene
+		newScene := manager.nextScene
+
+		if oldScene != nil && oldScene != newScene {
+			if oldScene.onExit != nil {
+				oldScene->onExit(gameContext)
+			}
+			// When scenes switch, destroy all objects in exiting scene and reset its state!
+			Scene_Unload(oldScene, gameContext)
+		}
+
+		manager.currentScene = newScene
 		manager.nextScene = nil
+
+		if gameContext != nil {
+			gameContext.scene = newScene
+			if gameContext.game != nil {
+				gameContext.game.activeDropdown = nil
+			}
+		}
+
+		// Disable physics bodies in inactive scenes and enable physics bodies in the active scene
+		for _, &scene in manager.scenes {
+			Scene_SetPhysicsEnabled(&scene, &scene == manager.currentScene)
+		}
+
+		// Load the new scene fresh: instantiate initial nodes & call ready on all initial nodes
+		if !newScene.isLoaded {
+			Scene_Load(newScene, gameContext)
+		}
+
+		if newScene.onEnter != nil {
+			newScene->onEnter(gameContext)
+		}
 	}
 }

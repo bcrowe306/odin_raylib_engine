@@ -1,6 +1,5 @@
 package engine
 
-import "core:fmt"
 import "core:log"
 import rl "vendor:raylib"
 
@@ -34,6 +33,12 @@ FrameAnimation_Init :: proc(frameAnimation: ^FrameAnimation, name: string = "") 
 	frameAnimation.addFrame = FrameAnimation_AddFrame
 }
 
+FrameAnimation_Destroy :: proc(frameAnimation: ^FrameAnimation) {
+	if frameAnimation == nil do return
+	delete(frameAnimation.frames)
+	frameAnimation.frames = nil
+}
+
 FrameAnimation_AddFrame :: proc(
 	frameAnimation: ^FrameAnimation,
 	rm: ^ResourceManager,
@@ -56,6 +61,7 @@ FA_FrameCount :: proc(animation: ^Animation) -> int {
 
 FA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	animation := cast(^FrameAnimation)animation
+	if len(animation.frames) == 0 || frame < 0 || frame >= len(animation.frames) do return
 	texture := animation.frames[frame]
 	animation.source = rl.Rectangle {
 		x      = 0,
@@ -72,7 +78,9 @@ FA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	}
 
 	RectangleFlipAxis(&animation.source, animation.flipX, animation.flipY)
-	rl.DrawTexturePro(texture.texture, animation.source, animation.dest, {0, 0}, node.globalRotation, rl.WHITE)
+	if rl.IsWindowReady() && texture.texture.id > 0 {
+		rl.DrawTexturePro(texture.texture, animation.source, animation.dest, {0, 0}, node.globalRotation, rl.WHITE)
+	}
 }
 
 
@@ -120,6 +128,7 @@ SSA_FrameCount :: proc(animation: ^Animation) -> int {
 
 SSA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	animation := cast(^SpriteSheetAnimation)animation
+	if animation.spriteSheet == nil do return
 	tex := animation.spriteSheet.texture
 	grid := animation.grid
 	frameSize: [2]f32 = {f32(tex.width) / f32(grid.x), f32(tex.height) / f32(grid.y)}
@@ -139,13 +148,14 @@ SSA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 		height = frameSize.y * node.globalScale.y,
 	}
 	RectangleFlipAxis(&animation.source, animation.flipX, animation.flipY)
-	rl.DrawTexturePro(
-		animation.spriteSheet.texture,
-		animation.source,
-		animation.dest,
-		{0, 0},
-		node.globalRotation,
-		rl.WHITE,
-	)
-
+	if rl.IsWindowReady() && tex.id > 0 {
+		rl.DrawTexturePro(
+			animation.spriteSheet.texture,
+			animation.source,
+			animation.dest,
+			{0, 0},
+			node.globalRotation,
+			rl.WHITE,
+		)
+	}
 }

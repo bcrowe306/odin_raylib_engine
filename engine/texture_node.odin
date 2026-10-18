@@ -33,7 +33,9 @@ TextureNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, fi
 }
 
 TextureNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
+	if !rl.IsWindowReady() do return
 	textureNode := cast(^TextureNode)node
+	if textureNode.texture == nil do return
 	source := rl.Rectangle{
 		x = 0,
 		y = 0,

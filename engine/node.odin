@@ -5,7 +5,6 @@ import "core:mem"
 import "core:crypto"
 import "core:encoding/uuid"
 import vmem "core:mem/virtual"
-import rl "vendor:raylib"
 
 Node :: struct {
 	id: uuid.Identifier,
@@ -29,6 +28,8 @@ Node :: struct {
 	onParentRemoved: EventSubject,
 	renderable: bool `gui:"true"`,
 	enabled: bool `gui:"true"`,
+	isReady: bool,
+	ready: proc(node: ^Node, gameContext: ^GameContext),
 	update: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
 	render: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
 	onDestroy: proc(node: ^Node, gameContext: ^GameContext),
@@ -47,8 +48,10 @@ CreateNode :: proc(manager: ^NodeManager, $T: typeid) -> (node: ^T) {
 }
 
 InitializeNode :: proc(node: ^Node) {
-	if err := vmem.arena_init_growing(&node.arena); err != nil {
-		log.panic("Error allocating node's arena", err)
+	if node.arena.total_reserved == 0 {
+		if err := vmem.arena_init_growing(&node.arena); err != nil {
+			log.panic("Error allocating node's arena", err)
+		}
 	}
 	node.allocator = vmem.arena_allocator(&node.arena)
 	context.random_generator = crypto.random_generator()
@@ -64,6 +67,8 @@ InitializeNode :: proc(node: ^Node) {
 	InitializeSubject(&node.onParentAdded)
 	InitializeSubject(&node.onParentRemoved)
 	node.renderable = true
+	node.isReady = false
+	node.ready = nil
 }
 
 Node_AddResource :: proc(node: ^Node, $T: typeid) -> ^T {
@@ -77,9 +82,18 @@ Node_AddResource :: proc(node: ^Node, $T: typeid) -> ^T {
 
 
 Node_Terminate :: proc(node: ^Node) {
+	if node == nil do return
 	if node.onDestroy != nil {
-		node.onDestroy(node, node.gameContext)
+		destroyProc := node.onDestroy
+		node.onDestroy = nil
+		destroyProc(node, node.gameContext)
 	}
-	// Terminate the arena used to allocate any resources on the node.
-	vmem.arena_free_all(&node.arena)
+	DestroySubject(&node.onEnter)
+	DestroySubject(&node.onExit)
+	DestroySubject(&node.onChildAdded)
+	DestroySubject(&node.onChildRemoved)
+	DestroySubject(&node.onParentAdded)
+	DestroySubject(&node.onParentRemoved)
+	// Destroy the arena used to allocate any resources on the node.
+	vmem.arena_destroy(&node.arena)
 }

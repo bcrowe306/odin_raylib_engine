@@ -3,7 +3,6 @@ package engine
 import "core:log"
 import "core:container/queue"
 import vmem "core:mem/virtual"
-import rl "vendor:raylib"
 import "core:strings"
 
 NodeManager :: struct {
@@ -34,18 +33,52 @@ NodeManager_GetStats :: proc(manager: ^NodeManager) -> NodeManagerStats {
 }
 
 NodeManager_Init :: proc(manager: ^NodeManager) {
+	manager.nodes = nil
+	manager.addition = nil
+	manager.removal = nil
+	manager.relationships = nil
 	err := vmem.arena_init_growing(&manager.arena)
 	if err != nil {
 		log.error(err)
 	}
+	queue.init(&manager.free)
 }
 
 NodeManager_Terminate :: proc(manager: ^NodeManager) {
+	if manager == nil do return
+
+	// Terminate any nodes still active or queued
+	for node in manager.nodes {
+		if node != nil {
+			Node_Terminate(node)
+		}
+	}
+	for addNode in manager.addition {
+		if addNode != nil {
+			alreadyInNodes := false
+			for n in manager.nodes {
+				if n == addNode {
+					alreadyInNodes = true
+					break
+				}
+			}
+			if !alreadyInNodes {
+				Node_Terminate(addNode)
+			}
+		}
+	}
+
 	delete(manager.addition)
 	delete(manager.removal)
 	delete(manager.nodes)
-	free(&manager.free)
-	free(&manager.arena)
+	delete(manager.relationships)
+	queue.destroy(&manager.free)
+	vmem.arena_destroy(&manager.arena)
+
+	manager.addition = nil
+	manager.removal = nil
+	manager.nodes = nil
+	manager.relationships = nil
 }
 
 // This allocates. Need to clean up when done
@@ -108,6 +141,10 @@ HasParent :: proc(manager: ^NodeManager, node: ^Node) -> bool {
 
 
 RemoveNode :: proc(manager: ^NodeManager, node: ^Node) {
+	if node == nil do return
+	for existing in manager.removal {
+		if existing == node do return
+	}
 	children := GetChildren(manager, node)
 	defer delete(children)
 	if len(children) > 0 {
@@ -126,7 +163,7 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 		// Remove Relationships
 		rRels :[dynamic][2]^Node
 
-		for rel, relIndex in manager.relationships{
+		for rel in manager.relationships{
 			if rel[0] == removingNode || rel[1] == removingNode {
 				append(&rRels, rel)
 			}
@@ -149,12 +186,10 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 		for node, index in manager.nodes {
 			if removingNode == node {
 				log.debug("Removing node from tree: ", node)
+				node.gameContext = gameContext
 				node.onExit->notify(node, false, gameContext)
 
-				// This can be used to clean up resources on any custom node
-				if node.onDestroy != nil do node->onDestroy(gameContext)
-
-				// Frees node's arena and any resources allocated on it. This is important to avoid memory leaks.
+				// Frees node's arena, subjects, and any custom onDestroy resources.
 				Node_Terminate(node)
 				manager.nodes[index] = nil
 				queue.push_back(&manager.free, index)
@@ -166,6 +201,9 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 
 	// Addition
 	for addNode in manager.addition {
+		if addNode != nil {
+			addNode.gameContext = gameContext
+		}
 		index, ok := queue.pop_back_safe(&manager.free)
 		if ok {
 			log.debug("Adding node using free list")
@@ -288,10 +326,11 @@ GetNodeByPath :: proc(scene: ^Scene, currentNode: ^Node, path: string) -> (node:
 				log.error("Current node has no parent. Cannot get node by path")
 				return nil, false
 			}
+			startingNode = parent
 	}
 
 	foundNode := startingNode
-	for part, i in parts[startingIndex:] {
+	for part in parts[startingIndex:] {
 		if part == "" || part == "." || part == ".." {
 			log.error("Path part is empty, relative, or parent. Cannot get node by path")
 			return nil, false

@@ -1,7 +1,5 @@
 package engine
 
-import "core:terminal"
-import "core:fmt"
 import rl "vendor:raylib"
 import "core:log"
 
@@ -25,6 +23,7 @@ FrameAnimationNode_Create :: proc(scene: ^Scene) -> ^FrameAnimationNode {
 }
 
 FrameAnimationNode_Init :: proc(fan: ^FrameAnimationNode) {
+	fan.frames = make([dynamic]^Texture, fan.allocator)
 	Ticker_Init(&fan.ticker, false)
 	fan.update = FrameAnimationNode_Update
 	fan.render = FrameAnimationNode_Render
@@ -80,8 +79,8 @@ FrameAnimationNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 
 FrameAnimationNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	fan := cast(^FrameAnimationNode)node
-	if fan.currentFrame < 0 && fan.currentFrame >= auto_cast len(fan.frames) {
-		log.errorf("fan.currentFrame: %d is out of bounds with fan.frames: &d", fan.currentFrame, len(fan.frames))
+	if len(fan.frames) == 0 || fan.currentFrame >= auto_cast len(fan.frames) {
+		log.errorf("fan.currentFrame: %d is out of bounds with fan.frames: %d", fan.currentFrame, len(fan.frames))
 		return
 	}
 	if !fan.enabled {
@@ -102,7 +101,9 @@ FrameAnimationNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 		width = f32(texture.texture.width) * fan.globalScale.x,
 		height = f32(texture.texture.height) * fan.globalScale.y
 	}
-	rl.DrawTexturePro(texture.texture, source, destination, fan.origin, fan.rotation, rl.WHITE)
+	if rl.IsWindowReady() && texture.texture.id > 0 {
+		rl.DrawTexturePro(texture.texture, source, destination, fan.origin, fan.rotation, rl.WHITE)
+	}
 }
 
 FrameAnimationNode_Start :: proc(fan: ^FrameAnimationNode) {

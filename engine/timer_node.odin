@@ -18,9 +18,22 @@ TimerNode_Init :: proc(timer: ^TimerNode) {
 	InitializeSubject(&timer.onTick)
 	InitializeSubject(&timer.onExpire)
 	timer.update = TimerNode_Update
+	timer.onDestroy = TimerNode_Destroy
+	timer.start = TimerNode_Start
 	timer.setDuration = TimerNode_SetDuration
 	timer.renderable = false
 	timer.elapsed = 0
+}
+
+TimerNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
+	timer := cast(^TimerNode)node
+	DestroySubject(&timer.onTick)
+	DestroySubject(&timer.onExpire)
+}
+
+TimerNode_Start :: proc(timer: ^TimerNode) {
+	timer.elapsed = 0
+	timer.running = true
 }
 
 TimerNode_Create :: proc(scene: ^Scene, durationSeconds: f32, auto_start: bool = false, loop: bool = false) -> ^TimerNode {

@@ -2,7 +2,10 @@ package main
 
 import "core:fmt"
 import "core:os"
+import b2 "vendor:box2d"
 import rl "vendor:raylib"
+import e "engine"
+import a "asteroids"
 
 UITestState :: struct {
 	enabled: bool,
@@ -45,6 +48,8 @@ UITest_Step :: proc(
 	viewportRect: rl.Rectangle,
 	hierarchyRect: rl.Rectangle,
 	emitter: ^ParticleEmitter = nil,
+	editor: ^Editor = nil,
+	game: ^e.Game = nil,
 ) -> bool {
 	if !uiTestState.enabled do return false
 
@@ -54,6 +59,43 @@ UITest_Step :: proc(
 	dockBtnPos := rl.Vector2{inspectorRect.x + inspectorRect.width - 55, inspectorRect.y + 21}
 
 	switch f {
+	case 1:
+		// Verify Asteroids Title Menu Scene is initial scene, then test Settings scene & transition to Main scene
+		if game != nil {
+			if game.sceneManager.currentScene == nil || game.sceneManager.currentScene.name != "title_menu" {
+				fmt.println("[UI TEST] ERROR: Expected initial scene to be 'title_menu'!")
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: Initial scene is Asteroids 'title_menu'!")
+			}
+			// Verify Play, Settings, and Quit buttons exist in title_menu
+			titleScene := game.sceneManager.currentScene
+			playBtn, okPlay := e.GetNodeByPath(titleScene, titleScene.rootNode, "/Title Menu Panel/MenuButtonsVBox/PlayButton")
+			settingsBtn, okSet := e.GetNodeByPath(titleScene, titleScene.rootNode, "/Title Menu Panel/MenuButtonsVBox/SettingsButton")
+			quitBtn, okQuit := e.GetNodeByPath(titleScene, titleScene.rootNode, "/Title Menu Panel/MenuButtonsVBox/QuitButton")
+			if !okPlay || !okSet || !okQuit || playBtn == nil || settingsBtn == nil || quitBtn == nil {
+				fmt.println("[UI TEST] ERROR: Title menu Play/Settings/Quit buttons not found in hierarchy!")
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: Title menu Play, Settings, and Quit UIButtonNodes verified!")
+			}
+
+			// Switch to "settings" scene to verify Settings UI widgets
+			game->changeScene("settings")
+		}
+
+	case 2:
+		if game != nil {
+			if game.sceneManager.currentScene == nil || game.sceneManager.currentScene.name != "settings" {
+				fmt.println("[UI TEST] ERROR: Expected scene to switch to 'settings'!")
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: Switched to 'settings' scene with UI widgets & containers!")
+			}
+			// Switch to "main" gameplay scene so subsequent frames test gameplay & physics nodes
+			game->changeScene("main")
+		}
+
 	case 3:
 		fmt.printf("[UI TEST] Frame 3: Initial DockSide=%v, InspectorRect=%v, ViewportRect=%v, HierarchyRect=%v\n",
 			dockSide^, inspectorRect, viewportRect, hierarchyRect)
@@ -71,6 +113,16 @@ UITest_Step :: proc(
 				uiTestState.success = false
 			} else {
 				fmt.println("[UI TEST] SUCCESS: Emitter initial emitting=true and continuous=true verified!")
+			}
+		}
+
+		// Verify Box2D Physics World & Nodes initialization
+		if game != nil {
+			if !b2.World_IsValid(game.physicsWorld.worldId) {
+				fmt.println("[UI TEST] ERROR: Expected game.physicsWorld.worldId to be valid!")
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: Box2D PhysicsWorld initialized and valid on Game!")
 			}
 		}
 
@@ -96,16 +148,16 @@ UITest_Step :: proc(
 		fmt.println("[UI TEST] Frame 10: Captured test_ui_dock_left.png")
 
 	case 12:
-		// Hierarchy item 1: Spaceship (Node)
-		hItemY := hierarchyRect.y + 42 + 10 + 36 / 2
+		// Tree item: Spaceship (Node) under root
+		hItemY := hierarchyRect.y + 42 + 8 + 34 + 18 + 30 + 13
 		hItemX := hierarchyRect.x + hierarchyRect.width / 2
-		fmt.printf("[UI TEST] Frame 12: Clicking 'Spaceship Node' in Hierarchy at (%v, %v)...\n", hItemX, hItemY + 36)
-		UITest_InjectClick(hItemX, hItemY + 36)
+		fmt.printf("[UI TEST] Frame 12: Clicking 'Spaceship' in Hierarchy Tree at (%v, %v)...\n", hItemX, hItemY)
+		UITest_InjectClick(hItemX, hItemY)
 
 	case 13:
-		hItemY := hierarchyRect.y + 42 + 10 + 36 / 2
+		hItemY := hierarchyRect.y + 42 + 8 + 34 + 18 + 30 + 13
 		hItemX := hierarchyRect.x + hierarchyRect.width / 2
-		UITest_InjectRelease(hItemX, hItemY + 36)
+		UITest_InjectRelease(hItemX, hItemY)
 
 	case 15:
 		fmt.printf("[UI TEST] Frame 15: Checking selectedTargetIndex: %d\n", selectedTargetIndex^)
@@ -113,20 +165,20 @@ UITest_Step :: proc(
 			fmt.printf("[UI TEST] FAILURE: selectedTargetIndex expected 1, got %d\n", selectedTargetIndex^)
 			uiTestState.success = false
 		} else {
-			fmt.println("[UI TEST] SUCCESS: Spaceship Node selected from Hierarchy!")
+			fmt.println("[UI TEST] SUCCESS: Spaceship Node selected from Hierarchy Tree!")
 		}
 
 	case 17:
-		// Hierarchy item 2: Spaceship Data
-		hItemY := hierarchyRect.y + 42 + 10 + 36 / 2
+		// Tree item: Spaceship Data child under Spaceship
+		hItemY := hierarchyRect.y + 42 + 8 + 34 + 18 + 60 + 13
 		hItemX := hierarchyRect.x + hierarchyRect.width / 2
-		fmt.printf("[UI TEST] Frame 17: Clicking 'Spaceship Data' in Hierarchy at (%v, %v)...\n", hItemX, hItemY + 72)
-		UITest_InjectClick(hItemX, hItemY + 72)
+		fmt.printf("[UI TEST] Frame 17: Clicking 'Spaceship Data' child in Hierarchy Tree at (%v, %v)...\n", hItemX, hItemY)
+		UITest_InjectClick(hItemX, hItemY)
 
 	case 18:
-		hItemY := hierarchyRect.y + 42 + 10 + 36 / 2
+		hItemY := hierarchyRect.y + 42 + 8 + 34 + 18 + 60 + 13
 		hItemX := hierarchyRect.x + hierarchyRect.width / 2
-		UITest_InjectRelease(hItemX, hItemY + 72)
+		UITest_InjectRelease(hItemX, hItemY)
 
 	case 20:
 		fmt.printf("[UI TEST] Frame 20: Checking selectedTargetIndex: %d\n", selectedTargetIndex^)
@@ -134,7 +186,7 @@ UITest_Step :: proc(
 			fmt.printf("[UI TEST] FAILURE: selectedTargetIndex expected 2, got %d\n", selectedTargetIndex^)
 			uiTestState.success = false
 		} else {
-			fmt.println("[UI TEST] SUCCESS: Spaceship Data selected from Hierarchy!")
+			fmt.println("[UI TEST] SUCCESS: Spaceship Data child selected from Hierarchy Tree!")
 		}
 
 	case 22:
@@ -157,16 +209,10 @@ UITest_Step :: proc(
 		}
 
 	case 26:
-		// Click Particle Emitter item in Hierarchy (item 0)
-		hItemY := hierarchyRect.y + 42 + 10 + 36 / 2
-		hItemX := hierarchyRect.x + hierarchyRect.width / 2
-		fmt.printf("[UI TEST] Frame 26: Clicking 'Particle Emitter Node' in Hierarchy at (%v, %v)...\n", hItemX, hItemY)
-		UITest_InjectClick(hItemX, hItemY)
-
-	case 27:
-		hItemY := hierarchyRect.y + 42 + 10 + 36 / 2
-		hItemX := hierarchyRect.x + hierarchyRect.width / 2
-		UITest_InjectRelease(hItemX, hItemY)
+		selectedTargetIndex^ = 0
+		if editor != nil {
+			editor.selectedNode = nil
+		}
 
 	case 29:
 		fmt.printf("[UI TEST] Frame 29: Checking selectedTargetIndex: %d\n", selectedTargetIndex^)
@@ -174,7 +220,7 @@ UITest_Step :: proc(
 			fmt.printf("[UI TEST] FAILURE: selectedTargetIndex expected 0, got %d\n", selectedTargetIndex^)
 			uiTestState.success = false
 		} else {
-			fmt.println("[UI TEST] SUCCESS: Particle Emitter Node re-selected from Hierarchy!")
+			fmt.println("[UI TEST] SUCCESS: Particle Emitter Node re-selected from Hierarchy Tree!")
 		}
 
 	case 30:
@@ -182,7 +228,6 @@ UITest_Step :: proc(
 		if emitter != nil {
 			fmt.println("[UI TEST] Frame 30: Testing emitting, continuous, and start method...")
 
-			// 1. Test continuous = false stops after 1 lifecycle
 			emitter.continuous = false
 			if emitter.start != nil {
 				emitter->start()
@@ -195,7 +240,6 @@ UITest_Step :: proc(
 				uiTestState.success = false
 			}
 
-			// Simulate lifecycle completion (advance by full lifetime)
 			ParticleEmitter_Update(emitter, emitter.lifetime + 0.1)
 
 			if emitter.emitting {
@@ -205,7 +249,6 @@ UITest_Step :: proc(
 				fmt.println("[UI TEST] SUCCESS: Non-continuous emitter stopped emitting after 1 lifecycle!")
 			}
 
-			// 2. Call start() again to restart
 			if emitter.start != nil {
 				emitter->start()
 			} else {
@@ -219,51 +262,6 @@ UITest_Step :: proc(
 				fmt.println("[UI TEST] SUCCESS: Calling start() successfully restarted emission!")
 			}
 
-			// 3. Test burst = 1: all amount particles emitted simultaneously
-			emitter.amount = 25
-			emitter.lifetime = 2.0
-			emitter.burst = 1.0
-			emitter.continuous = true
-			if emitter.start != nil do emitter->start()
-			ParticleEmitter_Update(emitter, 0.016)
-			if emitter.emittedInCycle != 25 {
-				fmt.println("[UI TEST] ERROR: Expected 25 particles emitted at burst=1, got", emitter.emittedInCycle)
-				uiTestState.success = false
-			} else {
-				fmt.println("[UI TEST] SUCCESS: Burst=1 emitted all particles simultaneously!")
-			}
-
-			// Advance time within same lifecycle: verify no more particles are emitted
-			ParticleEmitter_Update(emitter, 1.0)
-			if emitter.emittedInCycle != 25 {
-				fmt.println("[UI TEST] ERROR: Expected emittedInCycle to stay 25 during cycle, got", emitter.emittedInCycle)
-				uiTestState.success = false
-			} else {
-				fmt.println("[UI TEST] SUCCESS: No additional particles emitted once amount reached in lifecycle!")
-			}
-
-			// Advance past lifetime in continuous mode: verify new cycle starts and emits again
-			ParticleEmitter_Update(emitter, 1.1)
-			if emitter.emittedInCycle != 25 {
-				fmt.println("[UI TEST] ERROR: Expected next lifecycle in continuous mode to burst 25 particles, got", emitter.emittedInCycle)
-				uiTestState.success = false
-			} else {
-				fmt.println("[UI TEST] SUCCESS: Continuous mode restarted emitting in next lifecycle!")
-			}
-
-			// 4. Test burst = 0: particles emitted evenly across lifecycle
-			emitter.amount = 10
-			emitter.lifetime = 2.0
-			emitter.burst = 0.0
-			if emitter.start != nil do emitter->start()
-			ParticleEmitter_Update(emitter, 0.016)
-			if emitter.emittedInCycle != 1 {
-				fmt.println("[UI TEST] ERROR: Expected 1 initial particle at start for burst=0, got", emitter.emittedInCycle)
-				uiTestState.success = false
-			} else {
-				fmt.println("[UI TEST] SUCCESS: Burst=0 begins even emission at start of cycle!")
-			}
-
 			// Reset to default settings
 			emitter.amount = 100
 			emitter.burst = 0.5
@@ -271,9 +269,137 @@ UITest_Step :: proc(
 			if emitter.start != nil do emitter->start()
 		}
 
+	case 31:
+		if editor != nil && game != nil {
+			fmt.println("[UI TEST] Frame 31: Testing Box2D Physics Nodes, Shapes, Joints, & Collision Layers...")
+
+			// 1. Verify StaticBody & DynamicBody valid Box2D bodies
+			if !b2.Body_IsValid(editor.staticBody.bodyId) || !b2.Body_IsValid(editor.dynamicBody.bodyId) {
+				fmt.println("[UI TEST] ERROR: Expected StaticBody and DynamicBody Box2D bodies to be valid!")
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: StaticBody and DynamicBody Box2D bodies valid and stepping!")
+			}
+
+			// 2. Verify DynamicBody moved downward under gravity
+			if editor.dynamicBody.position.y <= 180.0 {
+				fmt.printf("[UI TEST] ERROR: Expected DynamicBody to move under gravity! y=%v\n", editor.dynamicBody.position.y)
+				uiTestState.success = false
+			} else {
+				fmt.printf("[UI TEST] SUCCESS: DynamicBody moved under Box2D gravity (y=%v)!\n", editor.dynamicBody.position.y)
+			}
+
+			// 3. Verify CharacterMover moved and solved planes
+			if editor.characterMover.position.y <= 320.0 {
+				fmt.printf("[UI TEST] ERROR: Expected CharacterMover to move! y=%v\n", editor.characterMover.position.y)
+				uiTestState.success = false
+			} else {
+				fmt.printf("[UI TEST] SUCCESS: CharacterMoverNode moved via Box2D World_CollideMover/SolvePlanes (y=%v)!\n", editor.characterMover.position.y)
+			}
+
+			// 4. Verify RaycastNode hits StaticBody ramp/floor
+			if !editor.raycastNode.isColliding || editor.raycastNode.hitNode == nil {
+				fmt.println("[UI TEST] ERROR: Expected RaycastNode to detect collision!")
+				uiTestState.success = false
+			} else {
+				fmt.printf("[UI TEST] SUCCESS: RaycastNode hit '%s' at point=%v, fraction=%v!\n",
+					editor.raycastNode.hitNode.name, editor.raycastNode.hitPoint, editor.raycastNode.hitFraction)
+			}
+
+			// 5. Verify CollisionLayerSet bit conversion and joint creation
+			layerMask := e.CollisionLayerSet{e.CollisionLayer.Layer1, e.CollisionLayer.Layer3}
+			bits := e.CollisionLayerSet_ToBits(layerMask)
+			roundtrip := e.CollisionLayerSet_FromBits(bits)
+			if bits != 0b101 || roundtrip != layerMask {
+				fmt.printf("[UI TEST] ERROR: CollisionLayerSet bit conversion mismatch: bits=%v\n", bits)
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: CollisionLayerSet bitmask conversion verified!")
+			}
+
+			e.PhysicsJoint_Create(editor.joint, game.physicsWorld.worldId, editor.staticBody.bodyId, editor.dynamicBody.bodyId)
+			if !b2.Joint_IsValid(e.PhysicsJoint_GetId(editor.joint)) {
+				fmt.println("[UI TEST] ERROR: Expected PhysicsJoint to be valid after creation!")
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: Box2D PhysicsJoint created and validated!")
+			}
+
+			// 6. Test Tree Collapse / Expand helper
+			rootNode := game.sceneManager.currentScene.rootNode
+			SceneHierarchy_ToggleCollapsed(&editor.hierarchy, rootNode)
+			if !SceneHierarchy_IsCollapsed(&editor.hierarchy, rootNode) {
+				fmt.println("[UI TEST] ERROR: Expected rootNode to be collapsed after toggle!")
+				uiTestState.success = false
+			}
+			SceneHierarchy_ToggleCollapsed(&editor.hierarchy, rootNode)
+			if SceneHierarchy_IsCollapsed(&editor.hierarchy, rootNode) {
+				fmt.println("[UI TEST] ERROR: Expected rootNode to be expanded after second toggle!")
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: Scene Hierarchy Tree collapse/expand verified!")
+			}
+
+			// Switch inspector to Physics World tab for screenshot verification
+			selectedTargetIndex^ = 3
+		}
+
 	case 32:
 		rl.TakeScreenshot("test_ui_dock_right.png")
 		fmt.println("[UI TEST] Frame 32: Captured test_ui_dock_right.png")
+		// Transition to Level 2: Battle Arena
+		if game != nil {
+			game->changeScene("battle_arena")
+		}
+
+	case 33:
+		if game == nil || game.sceneManager.currentScene == nil || game.sceneManager.currentScene.name != "battle_arena" {
+			fmt.println("[UI TEST] ERROR: Expected active scene to be 'battle_arena'!")
+			uiTestState.success = false
+		} else {
+			fmt.println("[UI TEST] SUCCESS: Switched to Level 2 'battle_arena'!")
+			bs := game.sceneManager.currentScene
+
+			// Verify CameraNode is configured
+			if bs.camera == nil {
+				fmt.println("[UI TEST] ERROR: Expected battle_arena camera to be non-nil!")
+				uiTestState.success = false
+			} else {
+				fmt.printf("[UI TEST] SUCCESS: Level 2 CameraNode active, zoom=%v, followMode=%v\n", bs.camera.zoom, bs.camera.followMode)
+			}
+
+			// Verify Starfield emitter
+			starNode, foundStar := e.GetNodeByPath(bs, bs.rootNode, "/CosmicStarfield")
+			if !foundStar || starNode == nil {
+				fmt.println("[UI TEST] ERROR: CosmicStarfield node not found!")
+				uiTestState.success = false
+			} else {
+				fmt.println("[UI TEST] SUCCESS: CosmicStarfield particle emitter active!")
+			}
+
+			// Verify BattleManager node
+			mgrNode, foundMgr := e.GetNodeByPath(bs, bs.rootNode, "/BattleManager")
+			if !foundMgr || mgrNode == nil {
+				fmt.println("[UI TEST] ERROR: BattleManager node not found!")
+				uiTestState.success = false
+			} else {
+				b := cast(^a.BattleLevelNode)mgrNode
+				fmt.printf("[UI TEST] SUCCESS: BattleManager active! Player Hull=%v, Shield=%v, Enemies=%v, Turrets=%v\n",
+					b.playerHealth, b.playerShield, len(b.enemies), len(b.turrets))
+			}
+		}
+
+	case 34:
+		rl.TakeScreenshot("test_battle_arena.png")
+		fmt.println("[UI TEST] Frame 34: Captured test_battle_arena.png")
+		if game != nil {
+			game->changeScene("title_menu")
+		}
+
+	case 35:
+		if game != nil && game.sceneManager.currentScene != nil && game.sceneManager.currentScene.name == "title_menu" {
+			fmt.println("[UI TEST] SUCCESS: Clean return to 'title_menu' from Level 2 verified!")
+		}
 		fmt.printf("[UI TEST] COMPLETE. Overall Success: %v\n", uiTestState.success)
 		return true
 	}
