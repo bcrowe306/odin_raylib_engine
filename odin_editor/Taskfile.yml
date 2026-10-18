@@ -148,7 +148,23 @@ tasks:
     desc: Build the OLS binary from the vendored source
     deps: [ols:fetch]
     cmds:
-      - odin build {{.OLS_DIR}}/src -collection:src={{.OLS_DIR}}/src -out:{{.OLS_DIR}}/ols
+      - |
+        odin build {{.OLS_DIR}}/src -collection:src={{.OLS_DIR}}/src -out:{{.OLS_DIR}}/ols || {
+          echo "OLS ${OLS_REF:-{{.OLS_REF}}} does not build with $(odin version) -- run 'task ols:repin' to find a compatible commit" >&2
+          exit 1
+        }
+
+  ols:check:
+    desc: Check that OLS_REF still builds with the installed Odin and takes patches/ols
+    cmds:
+      - ./tools/ols_repin.sh --check
+
+  ols:repin:
+    desc: >-
+      Re-pin OLS_REF to a commit that builds with the installed Odin compiler
+      (and applies patches/ols); NEWEST=1 moves to the newest compatible commit
+    cmds:
+      - ./tools/ols_repin.sh {{if .NEWEST}}--newest{{end}}
 
   clean:
     desc: Remove build artifacts

@@ -178,6 +178,14 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     caret); horizontal auto-scroll for word drags and drag-and-drop too.
     Fixed a hover-parsing bug (`||=` short-circuit dropped later parts).
     Verified by unit tests and `tools/mouse_extras.edctl`.
+25. **OLS re-pinning automated** — `task ols:check` verifies OLS_REF still
+    builds with the installed compiler and takes `patches/ols`;
+    `task ols:repin` (or a failing `ols:build`'s hint) searches OLS master
+    newest-first, bounded by the compiler's release month, in a scratch
+    worktree (~2 s/candidate), treats patches already merged upstream as
+    satisfied, updates OLS_REF, and reports when only stale patches block a
+    newer pin. Verified by simulating a broken pin (found a compatible
+    commit in 58 candidates / 3 s).
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -185,8 +193,3 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-- **OLS version pinning is brittle** — OLS tracks Odin's development branch
-  very closely; `Taskfile.yml`'s `OLS_REF` pins a commit verified to build
-  against this project's installed Odin version, but upgrading the Odin
-  compiler will likely require re-pinning OLS to a newer commit (bisect
-  forward from `OLS_REF` until it builds again).

@@ -302,12 +302,16 @@ OLS tracks Odin's development branch closely, so an arbitrary "latest" OLS
 checkout frequently fails to compile against whatever Odin compiler version
 is actually installed. `Taskfile.yml`'s `OLS_REF` pins a specific OLS commit
 known to build cleanly against this project's target Odin version; override
-it (`task ols:build OLS_REF=<sha>`) if you're on a different Odin version and
-need a different pin.
+it (`task ols:build OLS_REF=<sha>`) if you're on a different Odin version, or
+let `task ols:repin` find one: after a compiler upgrade it searches OLS
+history for the newest commit that builds and still takes `patches/ols`,
+and rewrites `OLS_REF`.
 
 ```sh
 task ols:fetch   # clone third_party/ols, checkout OLS_REF, apply patches/ols/*.patch
 task ols:build   # odin build -collection:src=third_party/ols/src -> third_party/ols/ols
+task ols:check   # does OLS_REF still build with this compiler (+ patches)?
+task ols:repin   # find a compatible commit and update OLS_REF (NEWEST=1: newest compatible)
 ```
 
 `patches/ols/` holds local fixes for upstream OLS bugs this editor runs into,
