@@ -40,6 +40,10 @@ Theme :: struct {
 	diag_warning: sdl.Color,
 	diag_info:    sdl.Color,
 	diag_hint:    sdl.Color,
+
+	// Find highlights.
+	find_match:   sdl.Color,
+	find_current: sdl.Color,
 }
 
 default_theme :: proc() -> Theme {
@@ -70,6 +74,9 @@ default_theme :: proc() -> Theme {
 		diag_warning = {205, 173, 0, 255},
 		diag_info    = {55, 148, 255, 255},
 		diag_hint    = {150, 150, 150, 255},
+
+		find_match   = {234, 92, 0, 70},
+		find_current = {81, 92, 106, 210},
 	}
 }
 
@@ -150,6 +157,7 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 		line := buf.buffer_line_str(&ed.buf, ln)
 		tokens, next_state := ed.language.tokenize(line, state, context.temp_allocator)
 		sdl.SetRenderClipRect(renderer, &text_clip)
+		render_find_highlights(ed, renderer, ln, origin_x + GUTTER_WIDTH, y, theme)
 		render_selection(ed, renderer, ln, origin_x + GUTTER_WIDTH, y, theme)
 		render_line_tokens(ed, renderer, font, line, tokens, origin_x + GUTTER_WIDTH, y, theme)
 		render_squiggles(ed, renderer, diags, ln, origin_x + GUTTER_WIDTH, y, theme)
@@ -161,6 +169,7 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 
 	// Popups draw last so they sit on top of the text.
 	render_problems_panel(ed, renderer, font, theme, origin_x, origin_y)
+	render_find_bar(ed, renderer, font, theme)
 	render_popups(ed, renderer, font, theme, origin_x, origin_y)
 	render_diag_tooltip(ed, renderer, font, theme)
 	render_code_actions(ed, renderer, font, theme)

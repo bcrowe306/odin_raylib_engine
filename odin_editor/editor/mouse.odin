@@ -23,6 +23,7 @@ Mouse_Zone :: enum {
 	Signature,
 	Problems, // the problems panel (row = problem index, -1 = header)
 	Code_Actions, // the quick-fix menu (row = action index)
+	Find,         // the find/replace bar
 }
 
 Drag_Mode :: enum {
@@ -88,6 +89,10 @@ editor_screen_to_position :: proc(ed: ^Editor, x, y: f32) -> buf.Position {
 // editor_hit_test classifies a window-pixel point.
 editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 	hit := Hit{pos = editor_screen_to_position(ed, x, y)}
+	if l, ok := editor_find_layout(ed); ok && in_rect(l.rect, x, y) {
+		hit.zone = .Find
+		return hit
+	}
 	if rect, ok := editor_code_actions_layout(ed); ok && in_rect(rect, x, y) {
 		hit.zone = .Code_Actions
 		hit.row = int((y - rect.y - POPUP_PAD) / ed.char_h)
@@ -191,8 +196,14 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 
 	b := &ed.buf
 	mods := editor_current_mods(ed)
+	if hit.zone != .Find {
+		// Clicking anywhere else gives focus back to the text.
+		ed.find.focused = false
+	}
 	switch hit.zone {
 	case .Outside:
+	case .Find:
+		editor_find_click(ed, ev.x, ev.y)
 	case .Code_Actions:
 		if hit.row >= 0 && hit.row < len(ed.lsp.last_code_actions) {
 			editor_apply_code_action(ed, hit.row)

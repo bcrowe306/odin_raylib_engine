@@ -100,6 +100,22 @@ State_Code_Actions :: struct {
 	last_skipped: int  `json:"last_skipped"`,
 }
 
+State_Find :: struct {
+	open:           bool   `json:"open"`,
+	focused:        bool   `json:"focused"`,
+	replace_mode:   bool   `json:"replace_mode"`,
+	field:          string `json:"field"`,
+	query:          string `json:"query"`,
+	replacement:    string `json:"replacement"`,
+	case_sensitive: bool   `json:"case_sensitive"`,
+	whole_word:     bool   `json:"whole_word"`,
+	regex:          bool   `json:"regex"`,
+	matches:        int    `json:"matches"`,
+	current:        int    `json:"current"`,
+	status:         string `json:"status"`,
+	rect:           [4]f32 `json:"rect"`,
+}
+
 State :: struct {
 	frame:        int              `json:"frame"`,
 	file:         string           `json:"file"`,
@@ -123,6 +139,7 @@ State :: struct {
 	tooltip:           State_Tooltip      `json:"tooltip"`,
 	problems:          State_Problems     `json:"problems"`,
 	code_actions:      State_Code_Actions `json:"code_actions"`,
+	find:              State_Find         `json:"find"`,
 	text:         string           `json:"text"`,
 }
 
@@ -257,6 +274,20 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 	s.code_actions = {
 		active = e.actions.active, visible = ed.editor_code_actions_visible(e), selected = e.actions.selected,
 		titles = titles, last_applied = e.actions.last_applied, last_skipped = e.actions.last_skipped,
+	}
+
+	{
+		f := &e.find
+		ed.editor_find_refresh(e)
+		l, _ := ed.editor_find_layout(e)
+		s.find = {
+			open = f.open, focused = f.focused, replace_mode = f.replace_mode,
+			field = "replace" if f.field == .Replace else "query",
+			query = strings.to_string(f.query), replacement = strings.to_string(f.replacement),
+			case_sensitive = f.opts.case_sensitive, whole_word = f.opts.whole_word, regex = f.opts.regex,
+			matches = len(f.matches), current = f.current, status = ed.editor_find_status(e),
+			rect = rect_array(l.rect),
+		}
 	}
 
 	s.signature = State_Signature{

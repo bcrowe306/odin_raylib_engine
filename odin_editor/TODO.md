@@ -6,7 +6,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 132 tests across 6 packages, all
+2. **Unit tests for every feature** — 142 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
@@ -125,6 +125,15 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     no longer drifts between tab- and space-indented lines and never lands
     inside a multi-byte character. Verified by unit tests and
     `tools/editing_smoke.edctl`.
+18. **Find/replace + occurrence selection** — find bar (Ctrl/Cmd+F;
+    replace: Ctrl+H / Cmd+Alt+F) with incremental search from the caret,
+    all-match highlighting, "N of M", case / whole-word / regex toggles
+    (Alt+C/W/R or click; regex via `core:text/regex` with `$0`-`$9` in
+    replacements), Enter/Shift+Enter/F3/Ctrl+G navigation, replace and
+    replace-all as single undo steps; Ctrl/Cmd+D adds the next occurrence
+    (whole-word when started from a caret), Ctrl/Cmd+Shift+L selects all.
+    Control hook gained `key @<action>` (press the platform's binding for an
+    action). Verified by unit tests and `tools/find_smoke.edctl`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -148,11 +157,6 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 - **Incremental document sync** — `didChange` currently sends the full
   document text on every change rather than incremental edits. Simpler and
   correct, but less efficient for very large files/high edit frequency.
-- **Find/replace** — noted as a stretch goal in requirement #4, not
-  implemented.
-- **Ctrl/Cmd+D "select next occurrence"** — noted as a stretch goal in
-  requirement #6, not implemented (Ctrl/Cmd+Alt+Up/Down add-cursor-
-  above/below *is* implemented).
 - **No font fallback** — glyphs missing from the monospace font (emoji,
   many symbols) render as blank cells. Needs a fallback font chain
   (SDL_ttf `TTF_AddFallbackFont`) plus wide-glyph (2-cell) column math.

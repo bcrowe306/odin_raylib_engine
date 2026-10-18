@@ -37,6 +37,7 @@ Editor :: struct {
 	diag_overlay: Diag_Overlay,
 	problems:     Problems_Panel,
 	actions:      Code_Action_Menu,
+	find:         Find_State,
 
 	// Viewport / scrolling (in cells, not pixels). scroll_col is a visual
 	// column (tabs expanded), not a byte offset.
@@ -87,6 +88,7 @@ editor_init :: proc(
 	ed.injected_events = make([dynamic]sdl.Event, allocator)
 	ed.completion.filtered = make([dynamic]int, allocator)
 	ed.diag_overlay.built_seq = -1
+	find_init(&ed.find)
 	// Diagnostics follow edits between server publishes (see Diag_Overlay).
 	ed.buf.track_changes = true
 	return ed
@@ -106,6 +108,7 @@ editor_destroy :: proc(ed: ^Editor) {
 	delete(ed.injected_events)
 	diag_overlay_destroy(&ed.diag_overlay)
 	problems_destroy(&ed.problems)
+	find_destroy(&ed.find)
 	delete(ed.completion.filtered)
 }
 

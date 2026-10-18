@@ -71,6 +71,7 @@ sdl_keycode_to_key :: proc(code: sdl.Keycode) -> km.Key {
 	case sdl.K_PERIOD: return .Period
 	case sdl.K_GRAVE: return .Grave
 	case sdl.K_F8: return .F8
+	case sdl.K_F3: return .F3
 	}
 	return .Unknown
 }

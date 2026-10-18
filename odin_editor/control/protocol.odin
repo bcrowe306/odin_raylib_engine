@@ -36,6 +36,10 @@ Cmd_Key :: struct {
 	key:   sdl.Keycode,
 	mod:   sdl.Keymod,
 	count: int,
+	// `key @<action>` (e.g. `key @replace`): press whatever chord the
+	// editor's keymap binds to that action on this platform. Resolved by
+	// the server against the live keymap; empty for ordinary chords.
+	action: string,
 }
 // Cmd_Text pushes one TEXT_INPUT event carrying the whole string.
 Cmd_Text :: struct {
@@ -89,6 +93,8 @@ Expect_Field :: enum {
 	Problems_Has,        // some problems-panel row ("file:line:col message") contains substring
 	Actions_Has,         // some quick-fix title contains substring
 	Diag_Range,          // some diagnostic spans exactly "l1 c1 l2 c2" (bytes)
+	Find_Status,         // find bar status text equals ("2 of 5", "No results", ...)
+	Find_Open,           // "true" / "false"
 }
 
 // Cmd_Expect asserts on editor state; replies `ok` or
@@ -122,15 +128,15 @@ Command :: union {
 
 DEFAULT_WAIT_TIMEOUT_MS :: 5000
 
-HELP_TEXT :: "commands: key <chord> [count] | type <text> | text <text> | " +
+HELP_TEXT :: "commands: key <chord>|@<action> [count] | type <text> | text <text> | " +
 	"click|mousedown|mouseup <where> [clicks=N] [mods=shift+alt] [button=left|middle|right] | move <where> | " +
 	"drag <from> <to> [steps=N] [mods=..] [clicks=N] | wheel <dy> [dx=N] [at=<where>] [mods=..] | locate <where> | " +
-	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | lsp-kill | " +
+	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @find:query|replace|case|word|regex | lsp-kill | " +
 	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle|lsp-down|diagnostics|no-diagnostics|tooltip|code-actions> [timeout_ms] | " +
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
 	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +
 	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status|errors|warnings|diagnostics-has|line-severity|tooltip|" +
-	"problems-open|problems-has|actions-has|diag-range> <value>. " +
+	"problems-open|problems-has|actions-has|diag-range|find-status|find-open> <value>. " +
 	"chords: [primary+|cmd+|ctrl+|alt+|shift+]<key>, e.g. primary+space, shift+end, down. " +
 	"text escapes: \\n \\t \\\\"
 
@@ -149,6 +155,17 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		if len(parts) < 1 || len(parts) > 2 {
 			return nil, "usage: key <chord> [count]"
 		}
+		if strings.has_prefix(parts[0], "@") {
+			count := 1
+			if len(parts) == 2 {
+				n, ok := strconv.parse_int(parts[1])
+				if !ok || n < 1 {
+					return nil, "key count must be a positive integer"
+				}
+				count = n
+			}
+			return Cmd_Key{count = count, action = strings.clone(parts[0][1:], allocator)}, ""
+		}
 		key, mod, ok := parse_chord(parts[0], platform)
 		if !ok {
 			return nil, strings.concatenate({"unknown key chord: ", parts[0]}, context.temp_allocator)
@@ -160,7 +177,7 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 				return nil, "key count must be a positive integer"
 			}
 		}
-		return Cmd_Key{key, mod, count}, ""
+		return Cmd_Key{key = key, mod = mod, count = count}, ""
 	case "text", "type":
 		if len(rest) == 0 {
 			return nil, "usage: text|type <text>"
@@ -229,6 +246,8 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		case "problems-has": field = .Problems_Has
 		case "actions-has": field = .Actions_Has
 		case "diag-range": field = .Diag_Range
+		case "find-status": field = .Find_Status
+		case "find-open": field = .Find_Open
 		case:
 			return nil, strings.concatenate({"unknown expect field: ", name}, context.temp_allocator)
 		}
@@ -240,6 +259,7 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 // command_destroy frees strings owned by a parsed command.
 command_destroy :: proc(cmd: Command, allocator := context.allocator) {
 	#partial switch c in cmd {
+	case Cmd_Key: delete(c.action, allocator)
 	case Cmd_Text: delete(c.text, allocator)
 	case Cmd_Type: delete(c.text, allocator)
 	case Cmd_Screenshot: delete(c.path, allocator)

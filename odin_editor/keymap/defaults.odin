@@ -52,7 +52,8 @@ keymap_default :: proc(platform: Platform, allocator := context.allocator) -> Ke
 	keymap_bind(&km, Chord{.End, primary | {.Shift}}, .ExtendDocEnd)
 	keymap_bind(&km, Chord{.A, primary}, .SelectAll)
 	keymap_bind(&km, Chord{.L, primary}, .SelectLine)
-	keymap_bind(&km, Chord{.D, primary}, .SelectWord)
+	keymap_bind(&km, Chord{.D, primary}, .SelectNextOccurrence)
+	keymap_bind(&km, Chord{.L, primary | {.Shift}}, .SelectAllOccurrences)
 
 	// Editing.
 	keymap_bind(&km, Chord{.Backspace, {}}, .Backspace)
@@ -89,6 +90,18 @@ keymap_default :: proc(platform: Platform, allocator := context.allocator) -> Ke
 	keymap_bind(&km, Chord{.F8, {.Shift}}, .PrevDiagnostic)
 	keymap_bind(&km, Chord{.Period, primary}, .QuickFix)
 	keymap_bind(&km, Chord{.M, primary | {.Shift}}, .ToggleProblems)
+
+	// Search (VSCode: replace is Ctrl+H, or Cmd+Alt+F on macOS).
+	keymap_bind(&km, Chord{.F, primary}, .Find)
+	if platform == .MacOS {
+		keymap_bind(&km, Chord{.F, primary | {.Alt}}, .Replace)
+	} else {
+		keymap_bind(&km, Chord{.H, primary}, .Replace)
+	}
+	keymap_bind(&km, Chord{.F3, {}}, .FindNext)
+	keymap_bind(&km, Chord{.F3, {.Shift}}, .FindPrev)
+	keymap_bind(&km, Chord{.G, primary}, .FindNext)
+	keymap_bind(&km, Chord{.G, primary | {.Shift}}, .FindPrev)
 
 	keymap_bind(&km, Chord{.Escape, {}}, .Escape)
 

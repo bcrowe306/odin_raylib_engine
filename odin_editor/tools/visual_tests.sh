@@ -23,6 +23,7 @@ SUITES=(
 	"mouse_smoke:example/assets/mouse_fixture.odin.txt:Mouse and cursor gestures, scrolling, tab stops"
 	"diagnostics_smoke:example/assets/diag_fixture.odin.txt:Diagnostics: squiggles, gutter markers, tooltips, F8"
 	"editing_smoke:example/assets/editing_fixture.odin.txt:Sticky visual column for Up/Down, word-sized undo of typing"
+	"find_smoke:example/assets/mouse_fixture.odin.txt:Find/replace bar (case, whole word, regex), Ctrl/Cmd+D and select-all occurrences"
 	"diagnostics_extras:example/assets/problems_fixture:Diagnostic tags, quick fixes, edit-tracking squiggles, problems panel"
 )
 

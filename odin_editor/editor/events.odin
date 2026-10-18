@@ -16,6 +16,10 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 		return editor_handle_key_down(ed, ev.key)
 	case .TEXT_INPUT:
 		text := string(ev.text.text)
+		if len(text) > 0 && ed.find.focused {
+			editor_find_text_input(ed, text)
+			return true
+		}
 		if len(text) > 0 {
 			editor_insert_text(ed, text)
 			editor_ensure_cursor_visible(ed)
@@ -46,6 +50,9 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
 	editor_track_modifier_key(ed, key)
 	chord := sdl_event_to_chord(key)
+	if ed.find.focused && editor_find_handle_key(ed, chord) {
+		return true
+	}
 	if editor_handle_popup_key(ed, chord) {
 		return true
 	}

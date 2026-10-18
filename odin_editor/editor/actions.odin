@@ -111,6 +111,25 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 		editor_toggle_problems(ed)
 		return true
 
+	case .Find:
+		editor_open_find(ed)
+		return true
+	case .Replace:
+		editor_open_find(ed, replace = true)
+		return true
+	case .FindNext:
+		editor_find_step(ed, 1)
+		return true
+	case .FindPrev:
+		editor_find_step(ed, -1)
+		return true
+	case .SelectNextOccurrence:
+		editor_select_next_occurrence(ed)
+		return true
+	case .SelectAllOccurrences:
+		editor_select_all_occurrences(ed)
+		return true
+
 	case .Escape:
 		for &c in b.cursors {
 			c.sel.active = false

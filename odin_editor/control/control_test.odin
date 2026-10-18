@@ -202,3 +202,25 @@ test_parse_mouse_commands :: proc(t: ^testing.T) {
 		}
 	})
 }
+
+@(test)
+test_key_action_reference_resolves_per_platform :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		cmd, err := parse_command("key @Replace 2", .MacOS)
+		k, ok := cmd.(Cmd_Key)
+		testing.expect(t, ok && k.action == "Replace" && k.count == 2, err)
+		command_destroy(cmd)
+
+		mac := ed.editor_init(.MacOS)
+		defer ed.editor_destroy(&mac)
+		key, mod, found := chord_for_action(&mac, "replace")
+		testing.expect(t, found && key == sdl.K_F && mod == sdl.KMOD_LALT | sdl.KMOD_LGUI, "Cmd+Alt+F on macOS")
+
+		other := ed.editor_init(.Other)
+		defer ed.editor_destroy(&other)
+		key, mod, found = chord_for_action(&other, "Replace")
+		testing.expect(t, found && key == sdl.K_H && mod == sdl.KMOD_LCTRL, "Ctrl+H elsewhere")
+		_, _, found = chord_for_action(&other, "no_such_action")
+		testing.expect(t, !found, "unknown action")
+	})
+}

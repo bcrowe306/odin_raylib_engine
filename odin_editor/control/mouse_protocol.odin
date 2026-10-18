@@ -20,6 +20,7 @@ Where_Kind :: enum {
 	Gutter,
 	Completion,
 	Problem,
+	Find_Part, // line: 0 query, 1 replace, 2 case, 3 word, 4 regex
 }
 
 Where :: struct {
@@ -90,6 +91,17 @@ parse_where :: proc(parts: []string) -> (w: Where, used: int, ok: bool) {
 		case "problem":
 			w.kind = .Problem
 			w.line, ok = strconv.parse_int(tail)
+		case "find":
+			w.kind = .Find_Part
+			ok = true
+			switch tail {
+			case "query": w.line = 0
+			case "replace": w.line = 1
+			case "case": w.line = 2
+			case "word": w.line = 3
+			case "regex": w.line = 4
+			case: ok = false
+			}
 		case:
 			w.kind = .Text
 			l, okl := strconv.parse_int(head)

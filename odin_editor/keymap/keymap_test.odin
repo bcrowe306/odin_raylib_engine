@@ -114,3 +114,19 @@ test_quick_fix_and_problems_bindings :: proc(t: ^testing.T) {
 	action, ok = keymap_resolve(&km, Chord{.M, {.Ctrl, .Shift}})
 	testing.expect(t, ok && action == .ToggleProblems, "Ctrl+Shift+M = problems")
 }
+
+@(test)
+test_search_bindings_per_platform :: proc(t: ^testing.T) {
+	mac := keymap_default(.MacOS)
+	defer keymap_destroy(&mac)
+	other := keymap_default(.Other)
+	defer keymap_destroy(&other)
+	a, ok := keymap_resolve(&mac, Chord{.F, {.Super, .Alt}})
+	testing.expect(t, ok && a == .Replace, "Cmd+Alt+F replaces on macOS")
+	a, ok = keymap_resolve(&other, Chord{.H, {.Ctrl}})
+	testing.expect(t, ok && a == .Replace, "Ctrl+H replaces elsewhere")
+	a, ok = keymap_resolve(&other, Chord{.D, {.Ctrl}})
+	testing.expect(t, ok && a == .SelectNextOccurrence, "Ctrl+D = next occurrence")
+	a, ok = keymap_resolve(&other, Chord{.F3, {.Shift}})
+	testing.expect(t, ok && a == .FindPrev, "Shift+F3 = previous match")
+}

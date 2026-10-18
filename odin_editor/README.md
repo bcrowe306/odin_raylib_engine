@@ -138,7 +138,7 @@ task build build:edctl
 
 A `<where>` is either window pixels (`x y`) or a target resolved against the
 live editor, so scripts don't depend on font size or scrolling: `@line:col`
-(caret position, 0-based), `@gutter:line`, `@completion:row`, or `@problem:index`. Targets
+(caret position, 0-based), `@gutter:line`, `@completion:row`, `@problem:index`, or `@find:query|replace|case|word|regex`. Targets
 scrolled out of view are rejected with `err` rather than clicking elsewhere.
 
 Protocol: one command per line, exactly one reply line per command (`ok …`,
@@ -150,6 +150,7 @@ always observe the result of the input before them.
 | command | effect |
 |---|---|
 | `key <chord> [n]` | press a key `n` times. Chords: `primary+space`, `shift+end`, `down`, `cmd+s`, `.`; `primary` = Cmd on macOS, Ctrl elsewhere |
+| `key @<action> [n]` | press whatever chord the editor's keymap binds to an action on this platform (`key @replace`, `key @SelectNextOccurrence`) — keeps scripts portable |
 | `click <where> [clicks=N] [mods=…] [button=…]` | click (N=2/3 sends a real double/triple-click sequence); `mods=shift+alt` holds those keys around it |
 | `mousedown`/`mouseup <where> [opts]`, `move <where>` | individual button / motion events |
 | `drag <from> <to> [steps=N] [mods=…] [clicks=N]` | press, N interpolated motions, release (`clicks=2` = word drag) |
@@ -211,7 +212,7 @@ under the compiler's resolved path (`/private/tmp/...` for a file opened as
 `task test:visual` is the end-to-end check every feature ships with. It
 launches `example/editor_demo --control-only` once per script in `tools/`
 (`lsp_smoke`, `lsp_crash`, `mouse_smoke`, `diagnostics_smoke`,
-`diagnostics_extras`, `editing_smoke`) on a scratch copy of a fixture from `example/assets/`
+`diagnostics_extras`, `editing_smoke`, `find_smoke`) on a scratch copy of a fixture from `example/assets/`
 (a single `.odin.txt` file, or a directory of them for multi-file cases), replays the script through
 `edctl` — real SDL keyboard/mouse events, live OLS — and fails on any
 `expect`/`wait` that doesn't hold. Along the way each script saves
@@ -228,6 +229,21 @@ Add a script (and a line in `tools/visual_tests.sh`) for each new feature,
 with `screenshot $SHOTS/NN_<what_it_shows>.png` at the moments worth seeing;
 `tools/run_smoke.sh` fills in `$SHOTS`. `tools/contact_sheet` (SDL-only)
 builds the sheets.
+
+## Search
+
+- **Ctrl/Cmd+F** opens the find bar (seeded from a single-line selection);
+  typing searches incrementally from the caret and highlights every match,
+  with an "N of M" count. **Enter / Shift+Enter** (or **F3 / Shift+F3**,
+  **Ctrl/Cmd+G / +Shift**) step through matches; **Escape** closes.
+- **Alt+C / Alt+W / Alt+R** (or click `Aa` / `W` / `.*`) toggle case
+  sensitivity, whole word, and regular expressions (`core:text/regex`;
+  replacements may use `$0`-`$9`).
+- **Ctrl+H** (**Cmd+Alt+F** on macOS) adds a replace field: **Tab** switches
+  fields, **Enter** replaces the current match, **Ctrl/Cmd+Alt+Enter**
+  replaces all — each a single undo step.
+- **Ctrl/Cmd+D** selects the word at the caret, then adds a cursor at each
+  next occurrence; **Ctrl/Cmd+Shift+L** selects every occurrence.
 
 ## Mouse
 

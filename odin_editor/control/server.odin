@@ -265,8 +265,17 @@ run_command :: proc(srv: ^Server, c: ^Conn, e: ^ed.Editor, line: string) {
 
 	switch v in cmd {
 	case Cmd_Key:
+		key, mod := v.key, v.mod
+		if v.action != "" {
+			ok: bool
+			key, mod, ok = chord_for_action(e, v.action)
+			if !ok {
+				reply(c, fmt.tprintf("err no key bound to action %q", v.action))
+				return
+			}
+		}
 		for _ in 0 ..< v.count {
-			push_key(srv, v.key, v.mod)
+			push_key(srv, key, mod)
 		}
 		c.resume_frame = srv.frame + 1
 		reply(c, "ok")
@@ -423,6 +432,12 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 		for title in s.code_actions.titles {
 			pass ||= s.code_actions.visible && strings.contains(title, x.want)
 		}
+	case .Find_Status:
+		actual = s.find.status
+		pass = actual == strings.trim_space(x.want)
+	case .Find_Open:
+		actual = "true" if s.find.open else "false"
+		pass = actual == strings.trim_space(x.want)
 	case .Diag_Range:
 		want := strings.join(strings.fields(x.want, context.temp_allocator), " ", context.temp_allocator)
 		ranges := make([dynamic]string, context.temp_allocator)
@@ -624,6 +639,47 @@ push_text :: proc(srv: ^Server, text: string) {
 	_ = sdl.PushEvent(&ev)
 }
 
+// chord_for_action finds the chord the editor's keymap binds to the named
+// action (case-insensitive, e.g. "replace", "SelectNextOccurrence") and
+// converts it to an SDL keycode + modifiers. With several bindings, the
+// one with the fewest modifiers wins (ties: the lowest key).
+chord_for_action :: proc(e: ^ed.Editor, name: string) -> (key: sdl.Keycode, mod: sdl.Keymod, ok: bool) {
+	best: km.Chord
+	found := false
+	for chord, action in e.keymap.bindings {
+		if !strings.equal_fold(fmt.tprint(action), name) {
+			continue
+		}
+		if !found || card(chord.mods) < card(best.mods) || (card(chord.mods) == card(best.mods) && chord.key < best.key) {
+			best, found = chord, true
+		}
+	}
+	if !found {
+		return
+	}
+	// Reverse of editor.sdl_keycode_to_key over the keys it knows.
+	candidates := [?]sdl.Keycode{
+		sdl.K_A, sdl.K_B, sdl.K_C, sdl.K_D, sdl.K_E, sdl.K_F, sdl.K_G, sdl.K_H, sdl.K_I, sdl.K_J, sdl.K_K, sdl.K_L, sdl.K_M,
+		sdl.K_N, sdl.K_O, sdl.K_P, sdl.K_Q, sdl.K_R, sdl.K_S, sdl.K_T, sdl.K_U, sdl.K_V, sdl.K_W, sdl.K_X, sdl.K_Y, sdl.K_Z,
+		sdl.K_0, sdl.K_1, sdl.K_2, sdl.K_3, sdl.K_4, sdl.K_5, sdl.K_6, sdl.K_7, sdl.K_8, sdl.K_9,
+		sdl.K_LEFT, sdl.K_RIGHT, sdl.K_UP, sdl.K_DOWN, sdl.K_HOME, sdl.K_END, sdl.K_PAGEUP, sdl.K_PAGEDOWN,
+		sdl.K_BACKSPACE, sdl.K_DELETE, sdl.K_RETURN, sdl.K_TAB, sdl.K_ESCAPE, sdl.K_SPACE,
+		sdl.K_SLASH, sdl.K_BACKSLASH, sdl.K_MINUS, sdl.K_EQUALS, sdl.K_LEFTBRACKET, sdl.K_RIGHTBRACKET,
+		sdl.K_SEMICOLON, sdl.K_APOSTROPHE, sdl.K_COMMA, sdl.K_PERIOD, sdl.K_GRAVE, sdl.K_F3, sdl.K_F8,
+	}
+	for code in candidates {
+		if ed.sdl_keycode_to_key(code) == best.key {
+			key, ok = code, true
+			break
+		}
+	}
+	if .Shift in best.mods {mod |= sdl.KMOD_LSHIFT}
+	if .Ctrl in best.mods {mod |= sdl.KMOD_LCTRL}
+	if .Alt in best.mods {mod |= sdl.KMOD_LALT}
+	if .Super in best.mods {mod |= sdl.KMOD_LGUI}
+	return
+}
+
 // --- mouse commands ----------------------------------------------------------
 
 // resolve_where turns a <where> into window pixels using the live editor
@@ -648,6 +704,26 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 			return 0, 0, fmt.tprintf("line %d is not visible", w.line)
 		}
 		return e.origin_x + ed.GUTTER_WIDTH / 2, e.origin_y + f32(w.line - e.scroll_line) * e.char_h + e.char_h / 2, ""
+	case .Find_Part:
+		l, ok := ed.editor_find_layout(e)
+		if !ok {
+			return 0, 0, "find bar is not open"
+		}
+		r: sdl.FRect
+		switch w.line {
+		case 0: r = l.query
+		case 1: r = l.replace
+		case 2: r = l.opt_case
+		case 3: r = l.opt_word
+		case 4: r = l.opt_regex
+		}
+		if r.w == 0 {
+			return 0, 0, "that part of the find bar is not shown"
+		}
+		if w.line <= 1 {
+			return r.x + 40, r.y + r.h / 2, ""
+		}
+		return r.x + r.w / 2, r.y + r.h / 2, ""
 	case .Problem:
 		if !e.problems.open {
 			return 0, 0, "problems panel is not open"
