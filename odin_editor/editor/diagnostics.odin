@@ -305,7 +305,7 @@ editor_track_diag_hover :: proc(ed: ^Editor, hit: Hit, x, y: f32) {
 		}
 	case .Gutter:
 		line_only, valid = true, true
-	case .Outside, .Completion, .Signature, .Problems, .Code_Actions, .Find, .Context_Menu, .Scrollbar, .Palette:
+	case .Outside, .Completion, .Signature, .Problems, .Code_Actions, .Find, .Context_Menu, .Scrollbar, .Palette, .References, .Peek:
 	}
 	if !valid || (tip.hover_valid && (pos != tip.hover_pos || line_only != tip.hover_line_only)) || !tip.hover_valid {
 		tip.hover_since = time.tick_now()

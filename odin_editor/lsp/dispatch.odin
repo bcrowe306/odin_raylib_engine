@@ -100,6 +100,11 @@ client_handle_message_body :: proc(c: ^Client, body: []u8) {
 			return
 		}
 		client_store_code_actions(c, result)
+	case .Definition, .References:
+		if id != c.latest_location_id {
+			return
+		}
+		client_store_locations(c, kind, result)
 	case .Hover:
 		if id != c.latest_hover_id {
 			return
@@ -344,6 +349,47 @@ client_store_signature_help :: proc(c: ^Client, result: json.Value) {
 			}
 		}
 		append(&c.last_signatures, si)
+	}
+}
+
+client_clear_locations :: proc(c: ^Client) {
+	for l in c.last_locations {
+		delete(l.uri, c.allocator)
+		delete(l.key, c.allocator)
+	}
+	clear(&c.last_locations)
+}
+
+// client_store_locations accepts Location, Location[] and LocationLink[]
+// (targetUri + targetSelectionRange).
+@(private)
+client_store_locations :: proc(c: ^Client, kind: RequestKind, result: json.Value) {
+	client_clear_locations(c)
+	c.locations_kind = kind
+	c.location_seq += 1
+	add :: proc(c: ^Client, v: json.Value) {
+		uri_v, has_uri := json_object_get(v, "uri")
+		range_v, _ := json_object_get(v, "range")
+		if !has_uri {
+			uri_v, has_uri = json_object_get(v, "targetUri")
+			range_v, _ = json_object_get(v, "targetSelectionRange")
+		}
+		uri, ok := json_as_string(uri_v)
+		if !has_uri || !ok {
+			return
+		}
+		append(&c.last_locations, Location{
+			uri   = strings.clone(uri, c.allocator),
+			key   = uri_key(uri, c.allocator),
+			range = parse_range(range_v),
+		})
+	}
+	if arr, is_arr := result.(json.Array); is_arr {
+		for v in arr {
+			add(c, v)
+		}
+	} else if _, is_obj := result.(json.Object); is_obj {
+		add(c, result)
 	}
 }
 

@@ -197,6 +197,23 @@ Diagnostic :: struct {
 	deprecated:  bool `json:"-"`,
 }
 
+// --- definition / references ---
+
+// Location is a range in a document; `key` is its uri_key (path).
+Location :: struct {
+	uri:   string,
+	key:   string,
+	range: Range,
+}
+
+ReferenceParams :: struct {
+	textDocument: TextDocumentIdentifier `json:"textDocument"`,
+	position:     Position               `json:"position"`,
+	context_:     struct {
+		includeDeclaration: bool `json:"includeDeclaration"`,
+	} `json:"context"`,
+}
+
 // --- codeAction ---
 
 CodeActionContext :: struct {

@@ -54,6 +54,7 @@ Editor :: struct {
 	menu:         Context_Menu,
 	palette:      Palette_State,
 	window:       Editor_Window,
+	nav:          Navigation,
 	hover:        Hover_Info,
 
 	// Viewport / scrolling (in cells, not pixels). scroll_col is a visual
@@ -151,6 +152,7 @@ editor_destroy :: proc(ed: ^Editor) {
 	problems_destroy(&ed.problems)
 	find_destroy(&ed.find)
 	palette_destroy(&ed.palette)
+	navigation_destroy(&ed.nav)
 	delete(ed.snippet.stops)
 	delete(ed.completion.filtered)
 }

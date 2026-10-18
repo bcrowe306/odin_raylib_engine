@@ -436,6 +436,15 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 		actual = s.hover.text if s.hover.visible else "none"
 		want := strings.trim_space(x.want)
 		pass = want == "none" ? !s.hover.visible : s.hover.visible && strings.contains(actual, want)
+	case .Peek_Open:
+		actual = "true" if e.nav.peek.open else "false"
+		pass = actual == strings.trim_space(x.want)
+	case .Refs_Count:
+		actual = fmt.tprint(len(e.nav.refs.items) if e.nav.refs.open else -1)
+		pass = actual == strings.trim_space(x.want)
+	case .Status:
+		actual = ed.editor_status_text(e)
+		pass = strings.contains(actual, x.want)
 	case .Palette_Open:
 		actual = "true" if s.palette.open else "false"
 		pass = actual == strings.trim_space(x.want)
@@ -515,6 +524,8 @@ wait_check :: proc(srv: ^Server, c: ^Conn, e: ^ed.Editor) -> bool {
 		case .Tooltip: met = len(ed.editor_diag_tooltip_items(e)) > 0
 		case .Code_Actions: met = ed.editor_code_actions_visible(e)
 		case .Hover: met = e.hover.visible
+		case .Peek: met = e.nav.peek.open
+		case .References: met = e.nav.refs.open
 		case .Frames:
 		}
 	}
@@ -548,6 +559,8 @@ wait_name :: proc(cond: Wait_Condition) -> string {
 	case .Tooltip: return "tooltip"
 	case .Code_Actions: return "code-actions"
 	case .Hover: return "hover"
+	case .Peek: return "peek"
+	case .References: return "references"
 	case .Frames: return "frames"
 	}
 	return "?"

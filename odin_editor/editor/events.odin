@@ -139,6 +139,14 @@ editor_handle_popup_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
 	if chord.mods != {} {
 		return false
 	}
+	if ed.nav.peek.open && (chord.key == .Escape || chord.key == .Enter) {
+		if chord.key == .Enter {
+			p := &ed.nav.peek
+			editor_jump_to(ed, p.key, p.target_line, p.target_char, record = true)
+		}
+		editor_close_peek(ed)
+		return true
+	}
 	// Up/Down cycle overloads while signature help shows several.
 	if editor_signature_visible(ed) && !editor_completion_visible(ed) && len(ed.lsp.last_signatures) > 1 &&
 	   (chord.key == .Up || chord.key == .Down) {
@@ -189,6 +197,10 @@ editor_handle_popup_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
 			editor_close_completion(ed)
 			return true
 		}
+	}
+	if chord.key == .Escape && ed.nav.refs.open && !ed.completion.active && !ed.signature.active && ed.diag_tip.source == .None {
+		editor_close_references(ed)
+		return true
 	}
 	if chord.key == .Escape && (ed.completion.active || ed.signature.active || ed.diag_tip.source != .None) {
 		editor_close_completion(ed)

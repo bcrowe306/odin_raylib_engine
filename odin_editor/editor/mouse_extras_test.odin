@@ -29,7 +29,8 @@ test_context_menu_opens_moves_caret_and_runs_actions :: proc(t: ^testing.T) {
 		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{1, 2}) // caret moved there
 
 		items := editor_context_menu_items(&ed)
-		testing.expect(t, !items[0].enabled && !items[1].enabled, "Cut/Copy disabled without a selection")
+		cut := 4 // after Go to Definition / Peek / Find References / separator
+		testing.expect(t, !items[cut].enabled && !items[cut + 1].enabled, "Cut/Copy disabled without a selection")
 		testing.expect_value(t, chord_label(&ed, .SelectAll), "Ctrl+A")
 
 		// Keyboard: Down skips disabled items -> Paste, Select All.
@@ -44,9 +45,9 @@ test_context_menu_opens_moves_caret_and_runs_actions :: proc(t: ^testing.T) {
 
 		// Right-click inside the selection keeps it; click an item.
 		right_click(&ed, x, y)
-		testing.expect(t, editor_context_menu_items(&ed)[1].enabled, "Copy enabled with a selection")
+		testing.expect(t, editor_context_menu_items(&ed)[cut + 1].enabled, "Copy enabled with a selection")
 		rect, _ := editor_context_menu_layout(&ed)
-		find_row := 8 // "Find"
+		find_row := cut + 8 // "Find"
 		mouse_click(&ed, rect.x + 10, rect.y + POPUP_PAD + f32(find_row) * ed.char_h + 5)
 		testing.expect(t, ed.find.open, "clicking Find opened the find bar")
 

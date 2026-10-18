@@ -17,6 +17,8 @@ RequestKind :: enum {
 	SignatureHelp,
 	Hover,
 	CodeAction,
+	Definition,
+	References,
 	Other,
 }
 
@@ -60,6 +62,12 @@ Client :: struct {
 	hover_seq:           int,
 	latest_hover_id:     int,
 
+	// Last textDocument/definition or /references answer.
+	last_locations:     [dynamic]Location,
+	locations_kind:     RequestKind, // .Definition or .References
+	location_seq:       int,
+	latest_location_id: int,
+
 	last_code_actions:     [dynamic]Code_Action,
 	code_action_seq:       int,
 	latest_code_action_id: int,
@@ -91,6 +99,7 @@ client_init :: proc(allocator := context.allocator) -> Client {
 		last_completion  = make([dynamic]CompletionItem, allocator),
 		last_signatures  = make([dynamic]SignatureInformation, allocator),
 		last_code_actions = make([dynamic]Code_Action, allocator),
+		last_locations   = make([dynamic]Location, allocator),
 		sync_kind        = 1,
 	}
 }
@@ -114,6 +123,8 @@ client_destroy :: proc(c: ^Client) {
 	client_clear_code_actions(c)
 	delete(c.last_code_actions)
 	delete(c.last_hover, c.allocator)
+	client_clear_locations(c)
+	delete(c.last_locations)
 }
 
 // client_start launches `command` (e.g. `{"ols"}`) as a child process and

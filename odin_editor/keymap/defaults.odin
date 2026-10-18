@@ -89,6 +89,19 @@ keymap_default :: proc(platform: Platform, allocator := context.allocator) -> Ke
 	keymap_bind(&km, Chord{.F8, {}}, .NextDiagnostic)
 	keymap_bind(&km, Chord{.F8, {.Shift}}, .PrevDiagnostic)
 	keymap_bind(&km, Chord{.Period, primary}, .QuickFix)
+	keymap_bind(&km, Chord{.F12, {}}, .GotoDefinition)
+	keymap_bind(&km, Chord{.F12, {.Alt}}, .PeekDefinition)
+	keymap_bind(&km, Chord{.F12, {.Shift}}, .FindReferences)
+	keymap_bind(&km, Chord{.F4, {}}, .NextReference)
+	keymap_bind(&km, Chord{.F4, {.Shift}}, .PrevReference)
+	// Back/forward: VSCode uses Ctrl+- on macOS, Alt+Left elsewhere.
+	if platform == .MacOS {
+		keymap_bind(&km, Chord{.Minus, {.Ctrl}}, .NavigateBack)
+		keymap_bind(&km, Chord{.Minus, {.Ctrl, .Shift}}, .NavigateForward)
+	} else {
+		keymap_bind(&km, Chord{.Left, {.Alt}}, .NavigateBack)
+		keymap_bind(&km, Chord{.Right, {.Alt}}, .NavigateForward)
+	}
 	keymap_bind(&km, Chord{.M, primary | {.Shift}}, .ToggleProblems)
 
 	// Search (VSCode: replace is Ctrl+H, or Cmd+Alt+F on macOS).

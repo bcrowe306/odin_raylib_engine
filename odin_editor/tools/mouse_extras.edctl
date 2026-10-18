@@ -19,7 +19,7 @@ click @9:3 button=right
 expect menu-open true
 expect cursor 9 3
 screenshot $SHOTS/02_context_menu.png
-click @menu:4
+click @menu:8
 expect menu-open false
 expect selection 0 0 11 0
 

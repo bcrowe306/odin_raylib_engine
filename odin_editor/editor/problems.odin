@@ -39,7 +39,7 @@ Problem :: struct {
 // editor_text_rows is the number of rows available for text (the visible
 // rows minus the problems panel when it's open).
 editor_text_rows :: proc(ed: ^Editor) -> int {
-	if ed.problems.open {
+	if ed.problems.open || ed.nav.refs.open {
 		return max(1, ed.visible_rows - PROBLEMS_PANEL_ROWS)
 	}
 	return ed.visible_rows
@@ -48,6 +48,9 @@ editor_text_rows :: proc(ed: ^Editor) -> int {
 editor_toggle_problems :: proc(ed: ^Editor) {
 	ed.problems.open = !ed.problems.open
 	ed.problems.scroll = 0
+	if ed.problems.open {
+		ed.nav.refs.open = false // they share the bottom panel
+	}
 	editor_ensure_cursor_visible(ed)
 }
 

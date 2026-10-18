@@ -30,6 +30,8 @@ Wait_Condition :: enum {
 	Tooltip,        // the diagnostic tooltip is showing
 	Code_Actions,   // the quick-fix menu has the server's answer
 	Hover,          // the LSP hover tooltip is showing
+	Peek,           // the peek-definition window is open
+	References,     // the references panel is open
 	Frames,         // a fixed number of frames has elapsed
 }
 
@@ -104,6 +106,9 @@ Expect_Field :: enum {
 	Font_Size,           // requested editor font size (zoom), integer points
 	Palette_Open,        // "true" / "false"
 	Palette_Selected,    // label of the highlighted palette entry
+	Peek_Open,           // "true" / "false"
+	Refs_Count,          // number of references in the panel
+	Status,              // header status message contains substring
 }
 
 // Cmd_Expect asserts on editor state; replies `ok` or
@@ -145,7 +150,7 @@ HELP_TEXT :: "commands: key <chord>|@<action> [count] | type <text> | text <text
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
 	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +
 	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status|errors|warnings|diagnostics-has|line-severity|tooltip|" +
-	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop|hover|menu-open|font-size|palette-open|palette-selected> <value>. " +
+	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop|hover|menu-open|font-size|palette-open|palette-selected|peek-open|refs-count|status> <value>. " +
 	"chords: [primary+|cmd+|ctrl+|alt+|shift+]<key>, e.g. primary+space, shift+end, down. " +
 	"text escapes: \\n \\t \\\\"
 
@@ -265,6 +270,9 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		case "font-size": field = .Font_Size
 		case "palette-open": field = .Palette_Open
 		case "palette-selected": field = .Palette_Selected
+		case "peek-open": field = .Peek_Open
+		case "refs-count": field = .Refs_Count
+		case "status": field = .Status
 		case:
 			return nil, strings.concatenate({"unknown expect field: ", name}, context.temp_allocator)
 		}
@@ -317,6 +325,8 @@ parse_wait :: proc(rest: string) -> (cmd: Command, err: string) {
 	case "tooltip": cond = .Tooltip
 	case "code-actions": cond = .Code_Actions
 	case "hover": cond = .Hover
+	case "peek": cond = .Peek
+	case "references": cond = .References
 	case "frames": cond = .Frames
 	case:
 		return nil, strings.concatenate({"unknown wait condition: ", parts[0]}, context.temp_allocator)

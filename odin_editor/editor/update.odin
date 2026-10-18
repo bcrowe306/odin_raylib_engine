@@ -19,6 +19,7 @@ editor_update :: proc(ed: ^Editor) {
 		editor_sync_lsp(ed)
 		editor_update_lsp_ui(ed)
 		editor_update_code_actions(ed)
+		editor_update_navigation(ed)
 	}
 }
 

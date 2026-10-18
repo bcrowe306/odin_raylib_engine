@@ -32,6 +32,11 @@ Menu_Item :: struct {
 editor_context_menu_items :: proc(ed: ^Editor) -> []Menu_Item {
 	_, _, has_sel := buf.selection_range(editor_primary_cursor(ed)^)
 	items := make([dynamic]Menu_Item, context.temp_allocator)
+	ready := editor_lsp_ready(ed)
+	append(&items, Menu_Item{"Go to Definition", .GotoDefinition, ready})
+	append(&items, Menu_Item{"Peek Definition", .PeekDefinition, ready})
+	append(&items, Menu_Item{"Find All References", .FindReferences, ready})
+	append(&items, Menu_Item{"", .None, false})
 	append(&items, Menu_Item{"Cut", .Cut, has_sel})
 	append(&items, Menu_Item{"Copy", .Copy, has_sel})
 	append(&items, Menu_Item{"Paste", .Paste, true})

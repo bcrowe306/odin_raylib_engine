@@ -9,6 +9,7 @@ package editor
 
 import buf "../buffer"
 import km "../keymap"
+import "core:strings"
 import "core:time"
 import sdl "vendor:sdl3"
 
@@ -27,6 +28,8 @@ Mouse_Zone :: enum {
 	Context_Menu, // the right-click menu (row = item index)
 	Scrollbar,    // a scrollbar track/thumb
 	Palette,      // the command palette (row = match index, -1 = input)
+	References,   // the references panel (row = item index, -1 = header)
+	Peek,         // the peek-definition window (row = source line index)
 }
 
 Drag_Mode :: enum {
@@ -109,6 +112,11 @@ editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 		hit.row = editor_palette_row_at(ed, y)
 		return hit
 	}
+	if rect, ok := editor_peek_layout(ed); ok && in_rect(rect, x, y) {
+		hit.zone = .Peek
+		hit.row = int((y - rect.y - POPUP_PAD) / ed.char_h) - 1
+		return hit
+	}
 	if rect, ok := editor_context_menu_layout(ed); ok && in_rect(rect, x, y) {
 		hit.zone = .Context_Menu
 		hit.row = int((y - rect.y - POPUP_PAD) / ed.char_h)
@@ -146,7 +154,7 @@ editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 	case x < ed.origin_x || x >= right || y < ed.origin_y || y >= panel_bottom:
 		hit.zone = .Outside
 	case y >= bottom:
-		hit.zone = .Problems
+		hit.zone = .References if ed.nav.refs.open else .Problems
 		hit.row = problems_row_at(ed, y)
 	case x < ed.origin_x + editor_gutter_width(ed):
 		hit.zone = .Gutter
@@ -222,6 +230,20 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		return false
 	}
 	editor_hide_hover(ed)
+	if hit.zone == .Peek {
+		p := &ed.nav.peek
+		if ev.button == 1 && hit.row >= 0 && hit.row < len(p.lines) {
+			// Open the clicked line of the definition's file.
+			editor_jump_to(ed, strings.clone(p.key, context.temp_allocator), p.first_line + hit.row, 0, record = true)
+		}
+		return true
+	}
+	if hit.zone == .References {
+		if ev.button == 1 {
+			editor_open_reference(ed, hit.row)
+		}
+		return true
+	}
 	if hit.zone == .Palette {
 		if ev.button == 1 && hit.row >= 0 {
 			editor_palette_run(ed, hit.row)
@@ -266,7 +288,7 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		ed.find.focused = false
 	}
 	switch hit.zone {
-	case .Outside, .Context_Menu, .Scrollbar, .Palette:
+	case .Outside, .Context_Menu, .Scrollbar, .Palette, .References, .Peek:
 	case .Find:
 		editor_find_click(ed, ev.x, ev.y)
 	case .Code_Actions:
@@ -291,6 +313,14 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		editor_close_completion(ed)
 		if .Alt in mods && .Shift not_in mods {
 			editor_toggle_cursor_at(ed, hit.pos)
+			return true
+		}
+		// Cmd+click (macOS) / Ctrl+click: go to definition.
+		primary: km.Modifiers = {.Super} if ed.platform == .MacOS else {.Ctrl}
+		if mods == primary {
+			resize(&b.cursors, 1)
+			b.cursors[0] = {pos = hit.pos}
+			editor_request_navigation(ed, .Goto)
 			return true
 		}
 		if ev.clicks == 1 && mods == {} && editor_press_in_selection(ed, hit.pos) {
@@ -459,6 +489,11 @@ editor_handle_mouse_wheel :: proc(ed: ^Editor, ev: sdl.MouseWheelEvent) -> bool 
 
 	if hit.zone == .Problems {
 		problems_scroll_by(ed, -int(dy))
+		return true
+	}
+	if hit.zone == .References {
+		r := &ed.nav.refs
+		r.scroll = clamp(r.scroll - int(dy), 0, max(0, len(r.items) - (PROBLEMS_PANEL_ROWS - 1)))
 		return true
 	}
 	if hit.zone == .Completion {

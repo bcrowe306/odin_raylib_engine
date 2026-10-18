@@ -29,6 +29,7 @@ SUITES=(
 	"mouse_extras:example/assets/lsp_fixture.odin.txt:LSP hover info, right-click context menu, drag-and-drop move/copy"
 	"ui_tweaks:example/assets/ui_fixture.odin.txt:Ayu Dark syntax colours, scrollbars (drag/click), Ctrl/Cmd +/- zoom"
 	"palette_smoke:example/assets/mouse_fixture.odin.txt:Command palette (Cmd/Ctrl+P): fuzzy search, shortcuts, MRU, run by key or click"
+	"nav_smoke:example/assets/nav_fixture:Go to Definition, Peek, Find References, Cmd/Ctrl+click across files, Back"
 	"diagnostics_extras:example/assets/problems_fixture:Diagnostic tags, quick fixes, edit-tracking squiggles, problems panel"
 )
 

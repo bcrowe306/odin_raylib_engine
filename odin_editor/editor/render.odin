@@ -239,6 +239,8 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 	// Popups draw last so they sit on top of the text.
 	render_scrollbars(ed, renderer, theme)
 	render_problems_panel(ed, renderer, font, theme, origin_x, origin_y)
+	render_references_panel(ed, renderer, font, theme, origin_x, origin_y)
+	render_peek(ed, renderer, font, theme)
 	render_find_bar(ed, renderer, font, theme)
 	render_drop_caret(ed, renderer, theme)
 	render_popups(ed, renderer, font, theme, origin_x, origin_y)
@@ -286,9 +288,13 @@ render_header :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 		draw_text(renderer, font, marker, tx, y, theme.header_text, h)
 		tx += 2 * ed.char_w
 	}
+	status := editor_status_text(ed)
 	if len(dir) > 0 {
-		room := int((x + w - tx) / ed.char_w) - 3
+		room := int((x + w - tx) / ed.char_w) - 3 - text_cols(status)
 		draw_text(renderer, font, truncate_cols(dir, room), tx + 2 * ed.char_w, y, theme.popup_text_dim, h)
+	}
+	if len(status) > 0 {
+		draw_text(renderer, font, status, x + w - f32(text_cols(status) + 2) * ed.char_w, y, theme.diag_warning, h)
 	}
 }
 

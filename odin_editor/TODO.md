@@ -201,6 +201,14 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     `editor_run_action` path now serves keys, the context menu and the
     palette. Entries are generic so windows can be listed too. Verified by
     unit tests and `tools/palette_smoke.edctl`.
+28. **Go to Definition / Peek / Find References** — F12 and
+    Cmd/Ctrl+click jump to the definition (other files via the host's
+    open-file request); Alt+F12 opens an inline peek window with the
+    definition's source (Enter opens, Esc closes); Shift+F12 lists every
+    reference with line previews in a bottom panel (click / F4 /
+    Shift+F4); Back / Forward through jumps (Ctrl+- on macOS, Alt+Left
+    elsewhere); also in the context menu and palette. Verified by unit
+    tests and `tools/nav_smoke.edctl` (live OLS, two-file package).
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -210,5 +218,4 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 **Import key commands from zed/vscode** 
 **Make theme colors editable in ui**
-**Implement Goto Definition / Peek Definition / Find References**
 **Command Pallet switches between windows** Command Pallet should be able to switch between windows, keymap editor, find, theme editor, utitlity page(maybe funcitons around managing ols).

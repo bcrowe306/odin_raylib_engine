@@ -238,6 +238,17 @@ with `screenshot $SHOTS/NN_<what_it_shows>.png` at the moments worth seeing;
 `tools/run_smoke.sh` fills in `$SHOTS`. `tools/contact_sheet` (SDL-only)
 builds the sheets.
 
+## Code navigation
+
+- **F12** or **Cmd/Ctrl+click**: Go to Definition (other files open via the
+  host's `editor_take_open_request`).
+- **Alt+F12**: Peek Definition — the definition's source in an inline window
+  (Enter opens it, Escape closes).
+- **Shift+F12**: Find All References — a panel with every use and its line;
+  click a row, or **F4 / Shift+F4** to step through them.
+- **Back / Forward**: Ctrl+- / Ctrl+Shift+- on macOS, Alt+Left / Alt+Right
+  elsewhere.
+
 ## Look & feel
 
 - The default theme is **Ayu Dark** (`default_theme()`; the earlier

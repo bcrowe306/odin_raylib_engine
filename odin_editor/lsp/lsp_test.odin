@@ -545,3 +545,25 @@ test_hover_contents_shapes :: proc(t: ^testing.T) {
 		testing.expect_value(t, c.hover_seq, 3)
 	})
 }
+
+@(test)
+test_definition_and_reference_results :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+		id := client_request_definition(&c, "file:///a.odin", 1, 2)
+		body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":{{"uri":"file:///b.odin","range":{{"start":{{"line":4,"character":1}},"end":{{"line":4,"character":5}}}}}}}}`, id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect(t, len(c.last_locations) == 1 && c.last_locations[0].key == "/b.odin" && c.last_locations[0].range.start == {4, 1}, "single Location")
+		testing.expect_value(t, c.locations_kind, RequestKind.Definition)
+
+		id = client_request_references(&c, "file:///a.odin", 1, 2)
+		msg := encode_request(id, "textDocument/references", ReferenceParams{}, context.temp_allocator)
+		testing.expect(t, strings.contains(msg, `"context":{"includeDeclaration":false}`), msg) // shape check
+		body = fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":[{{"uri":"file:///a.odin","range":{{"start":{{"line":0,"character":0}},"end":{{"line":0,"character":1}}}}}},{{"uri":"file:///c.odin","range":{{"start":{{"line":2,"character":3}},"end":{{"line":2,"character":4}}}}}}]}}`, id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect_value(t, len(c.last_locations), 2)
+		testing.expect_value(t, c.locations_kind, RequestKind.References)
+		testing.expect_value(t, c.location_seq, 2)
+	})
+}

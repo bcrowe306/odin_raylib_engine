@@ -110,6 +110,27 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 	case .ToggleProblems:
 		editor_toggle_problems(ed)
 		return true
+	case .GotoDefinition:
+		editor_request_navigation(ed, .Goto)
+		return true
+	case .PeekDefinition:
+		editor_request_navigation(ed, .Peek)
+		return true
+	case .FindReferences:
+		editor_request_navigation(ed, .References)
+		return true
+	case .NextReference:
+		editor_step_reference(ed, 1)
+		return true
+	case .PrevReference:
+		editor_step_reference(ed, -1)
+		return true
+	case .NavigateBack:
+		editor_navigate_back(ed)
+		return true
+	case .NavigateForward:
+		editor_navigate_forward(ed)
+		return true
 
 	case .Find:
 		editor_open_find(ed)
