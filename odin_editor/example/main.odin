@@ -10,6 +10,8 @@
 //   example                 launch interactively, loading assets/sample.odin.txt
 //   example --script        run the injected-event script, then continue interactively
 //   example --script-only   run the injected-event script, print the result, and exit
+//   example --e2e           run the full automated end-to-end test suite and exit
+//                           (exit code 0 on success, 1 if any check failed)
 package main
 
 import ed "../editor"
@@ -73,6 +75,7 @@ run_demo_script :: proc(e: ^ed.Editor, primary_mod: sdl.Keymod) {
 main :: proc() {
 	run_script := false
 	script_only := false
+	run_e2e := false
 	for arg in os.args[1:] {
 		switch arg {
 		case "--script":
@@ -80,14 +83,18 @@ main :: proc() {
 		case "--script-only":
 			run_script = true
 			script_only = true
+		case "--e2e":
+			run_e2e = true
 		}
 	}
 
 	platform := km.Platform.Other
 	primary_mod := sdl.KMOD_CTRL
+	word_mod := sdl.KMOD_CTRL
 	when ODIN_OS == .Darwin {
 		platform = km.Platform.MacOS
 		primary_mod = sdl.KMOD_GUI
+		word_mod = sdl.KMOD_ALT
 	}
 
 	editor := ed.editor_init(platform)
@@ -160,6 +167,11 @@ main :: proc() {
 	defer _ = sdl.StopTextInput(window)
 
 	theme := ed.default_theme()
+
+	if run_e2e {
+		all_pass := run_e2e_suite(&editor, renderer, font, theme, primary_mod, word_mod)
+		os.exit(all_pass ? 0 : 1)
+	}
 
 	running := true
 	for running {

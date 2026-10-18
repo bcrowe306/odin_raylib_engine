@@ -71,6 +71,15 @@ tasks:
     cmds:
       - odin run example -out:example/editor_demo
 
+  test:e2e:
+    desc: >-
+      Build the demo app and run the full automated end-to-end suite via the
+      SDL event-injection hook (opens a real window/renderer; use
+      `task ols:build` first to also exercise the live-LSP checks).
+    cmds:
+      - odin build example -out:example/editor_demo
+      - ./example/editor_demo --e2e
+
   fmt:
     desc: Format all Odin source files in this folder
     cmds:
