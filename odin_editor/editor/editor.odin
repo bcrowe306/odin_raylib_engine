@@ -20,6 +20,9 @@ Editor :: struct {
 	lsp:          lspc.Client,
 	lsp_enabled:  bool,
 	document_uri: string,
+	// uri_key of document_uri (decoded + symlink-resolved), used to look up
+	// diagnostics the server may publish under a different spelling.
+	document_key: string,
 	lsp_version:  int,
 	// didOpen has been sent for document_uri (deferred until the server
 	// has answered `initialize`, as the spec requires).
@@ -30,6 +33,7 @@ Editor :: struct {
 
 	completion: Completion_State,
 	signature:  Signature_State,
+	diag_tip:   Diagnostic_Tooltip,
 
 	// Viewport / scrolling (in cells, not pixels). scroll_col is a visual
 	// column (tabs expanded), not a byte offset.
@@ -92,6 +96,7 @@ editor_destroy :: proc(ed: ^Editor) {
 	if len(ed.document_uri) > 0 {
 		delete(ed.document_uri)
 	}
+	delete(ed.document_key)
 	delete(ed.injected_events)
 	delete(ed.completion.filtered)
 }

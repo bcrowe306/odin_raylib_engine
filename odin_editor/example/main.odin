@@ -285,6 +285,8 @@ main :: proc() {
 		}
 	}
 	current_shape := ed.Mouse_Cursor.Default
+	last_title := ""
+	defer delete(last_title)
 
 	running := true
 	for running {
@@ -313,6 +315,21 @@ main :: proc() {
 		}
 
 		ed.editor_update(&editor)
+
+		// Problems summary in the title bar (a real host would show this
+		// in its status bar).
+		{
+			counts := ed.editor_diagnostic_counts(&editor)
+			title := "odin_editor demo"
+			if counts[.Error] + counts[.Warning] > 0 {
+				title = fmt.tprintf("odin_editor demo — %d error(s), %d warning(s)", counts[.Error], counts[.Warning])
+			}
+			if title != last_title {
+				delete(last_title)
+				last_title = strings.clone(title)
+				_ = sdl.SetWindowTitle(window, strings.clone_to_cstring(title, context.temp_allocator))
+			}
+		}
 
 		if shape := ed.editor_mouse_cursor(&editor); shape != current_shape {
 			current_shape = shape

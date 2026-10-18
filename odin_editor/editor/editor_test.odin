@@ -32,6 +32,7 @@ test_sdl_key_translation :: proc(t: ^testing.T) {
 	testing.expect_value(t, sdl_keycode_to_key(sdl.K_LEFT), km.Key.Left)
 	testing.expect_value(t, sdl_keycode_to_key(sdl.K_RETURN), km.Key.Enter)
 	testing.expect_value(t, sdl_keycode_to_key(sdl.K_F1), km.Key.Unknown)
+	testing.expect_value(t, sdl_keycode_to_key(sdl.K_F8), km.Key.F8)
 }
 
 @(test)

@@ -34,6 +34,12 @@ Theme :: struct {
 	popup_text_dim:     sdl.Color,
 	popup_match:        sdl.Color,
 	popup_active_param: sdl.Color,
+
+	// Diagnostics (squiggles, gutter markers, tooltip labels).
+	diag_error:   sdl.Color,
+	diag_warning: sdl.Color,
+	diag_info:    sdl.Color,
+	diag_hint:    sdl.Color,
 }
 
 default_theme :: proc() -> Theme {
@@ -59,6 +65,11 @@ default_theme :: proc() -> Theme {
 		popup_text_dim     = {140, 140, 140, 255},
 		popup_match        = {24, 163, 255, 255},
 		popup_active_param = {255, 215, 0, 255},
+
+		diag_error   = {244, 71, 71, 255},
+		diag_warning = {205, 173, 0, 255},
+		diag_info    = {55, 148, 255, 255},
+		diag_hint    = {150, 150, 150, 255},
 	}
 }
 
@@ -116,6 +127,8 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 		_ = sdl.GetRectIntersection(prev_clip, text_clip, &text_clip)
 	}
 
+	diags := editor_diagnostics(ed)
+
 	for row := 0; row < ed.visible_rows; row += 1 {
 		ln := ed.scroll_line + row
 		if ln >= line_count {
@@ -130,12 +143,14 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 		}
 
 		render_line_number(renderer, font, ln + 1, origin_x, y, theme)
+		render_gutter_marker(ed, renderer, diags, ln, origin_x, y, theme)
 
 		line := buf.buffer_line_str(&ed.buf, ln)
 		tokens, next_state := ed.language.tokenize(line, state, context.temp_allocator)
 		sdl.SetRenderClipRect(renderer, &text_clip)
 		render_selection(ed, renderer, ln, origin_x + GUTTER_WIDTH, y, theme)
 		render_line_tokens(ed, renderer, font, line, tokens, origin_x + GUTTER_WIDTH, y, theme)
+		render_squiggles(ed, renderer, diags, ln, origin_x + GUTTER_WIDTH, y, theme)
 		render_cursors_on_line(ed, renderer, ln, origin_x + GUTTER_WIDTH, y, theme)
 		sdl.SetRenderClipRect(renderer, &prev_clip if had_clip else nil)
 		delete(tokens, context.temp_allocator)
@@ -144,6 +159,7 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 
 	// Popups draw last so they sit on top of the text.
 	render_popups(ed, renderer, font, theme, origin_x, origin_y)
+	render_diag_tooltip(ed, renderer, font, theme)
 }
 
 @(private)

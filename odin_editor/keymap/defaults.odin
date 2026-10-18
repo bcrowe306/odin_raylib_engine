@@ -85,6 +85,8 @@ keymap_default :: proc(platform: Platform, allocator := context.allocator) -> Ke
 	// Language features.
 	keymap_bind(&km, Chord{.Space, primary}, .TriggerCompletion)
 	keymap_bind(&km, Chord{.Space, primary | {.Shift}}, .TriggerSignatureHelp)
+	keymap_bind(&km, Chord{.F8, {}}, .NextDiagnostic)
+	keymap_bind(&km, Chord{.F8, {.Shift}}, .PrevDiagnostic)
 
 	keymap_bind(&km, Chord{.Escape, {}}, .Escape)
 

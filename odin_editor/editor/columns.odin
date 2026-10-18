@@ -69,3 +69,25 @@ editor_max_visual_width :: proc(ed: ^Editor) -> int {
 	}
 	return widest
 }
+
+// byte_col_at_cell returns the byte offset of the character drawn in cell
+// `vcol` (floored), for hover hit-testing. The one cell just past the end
+// of the line maps to len(line) — where LSP servers put "missing token"
+// diagnostics — and `inside` is false any further right.
+byte_col_at_cell :: proc(line: string, vcol: f32, tab_width: int) -> (col: int, inside: bool) {
+	tw := max(tab_width, 1)
+	if vcol < 0 {
+		return 0, false
+	}
+	cell := 0
+	for i := 0; i < len(line); {
+		r, size := utf8.decode_rune_in_string(line[i:])
+		w := tw - cell % tw if r == '\t' else 1
+		if vcol < f32(cell + w) {
+			return i, true
+		}
+		cell += w
+		i += size
+	}
+	return len(line), vcol < f32(cell + 1)
+}

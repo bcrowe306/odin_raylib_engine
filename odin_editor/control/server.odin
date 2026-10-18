@@ -29,6 +29,7 @@ import "core:c/libc"
 import "core:fmt"
 import "core:net"
 import "core:os"
+import "core:strconv"
 import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
@@ -385,6 +386,34 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 	case .Lsp_Status:
 		actual = s.lsp.status
 		pass = actual == strings.trim_space(x.want)
+	case .Errors:
+		actual = fmt.tprint(s.diagnostic_counts.errors)
+		pass = actual == strings.trim_space(x.want)
+	case .Warnings:
+		actual = fmt.tprint(s.diagnostic_counts.warnings)
+		pass = actual == strings.trim_space(x.want)
+	case .Diagnostics_Has:
+		msgs := make([dynamic]string, context.temp_allocator)
+		for d in s.diagnostics {
+			append(&msgs, d.message)
+			pass ||= strings.contains(d.message, x.want)
+		}
+		actual = strings.join(msgs[:], " | ", context.temp_allocator)
+	case .Line_Severity:
+		parts := strings.fields(x.want, context.temp_allocator)
+		if len(parts) != 2 {
+			return "err usage: expect line-severity <line> <error|warning|info|hint|none>"
+		}
+		line, _ := strconv.parse_int(parts[0])
+		actual = "none"
+		if sev, ok := ed.line_severity(ed.editor_diagnostics(e), line); ok {
+			actual = ed.severity_label(sev)
+		}
+		pass = actual == parts[1]
+	case .Tooltip:
+		actual = s.tooltip.text if s.tooltip.visible else "none"
+		want := strings.trim_space(x.want)
+		pass = want == "none" ? !s.tooltip.visible : s.tooltip.visible && strings.contains(actual, want)
 	}
 	if pass {
 		return "ok"
@@ -419,6 +448,9 @@ wait_check :: proc(srv: ^Server, c: ^Conn, e: ^ed.Editor) -> bool {
 		case .Lsp_Ready: met = e.lsp_enabled && e.lsp.initialized && e.lsp_doc_open
 		case .Lsp_Idle: met = e.lsp_enabled && len(e.lsp.pending_kind) == 0
 		case .Lsp_Down: met = ed.editor_lsp_status(e) != .Running
+		case .Diagnostics: met = len(ed.editor_diagnostics(e)) > 0
+		case .No_Diagnostics: met = len(ed.editor_diagnostics(e)) == 0
+		case .Tooltip: met = len(ed.editor_diag_tooltip_items(e)) > 0
 		case .Frames:
 		}
 	}
@@ -447,6 +479,9 @@ wait_name :: proc(cond: Wait_Condition) -> string {
 	case .Lsp_Ready: return "lsp-ready"
 	case .Lsp_Idle: return "lsp-idle"
 	case .Lsp_Down: return "lsp-down"
+	case .Diagnostics: return "diagnostics"
+	case .No_Diagnostics: return "no-diagnostics"
+	case .Tooltip: return "tooltip"
 	case .Frames: return "frames"
 	}
 	return "?"

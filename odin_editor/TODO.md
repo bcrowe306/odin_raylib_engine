@@ -6,21 +6,22 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 104 tests across 6 packages, all
+2. **Unit tests for every feature** — 115 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
-   - `keymap`: 6 tests (bind/resolve/unbind, default bindings per platform).
+   - `keymap`: 7 tests (bind/resolve/unbind, default bindings per platform,
+     F8 navigation).
    - `syntax`: 8 tests (Odin tokenizer: keywords, strings, numbers, comments,
      operators, multi-line block comments).
-   - `lsp`: 16 tests (JSON-RPC framing, request encoding, dispatch of
-     diagnostics/completion/signature-help, textEdit/insertText and
-     activeParameter parsing, null results, stale-response dropping,
-     partial-message handling, dead-server detection without SIGPIPE).
-   - `editor`: 44 tests (input translation, actions, injection, viewport,
-     clipboard, file IO, completion/signature-help UI, LSP sync ordering,
-     popup layout, LSP crash supervisor, visual columns/tabs, every mouse
-     gesture, wheel, auto-scroll, pointer shape, popup clicks).
+   - `lsp`: 20 tests (JSON-RPC framing, request encoding, dispatch,
+     textEdit/activeParameter parsing, stale-response dropping, dead-server
+     detection, URI percent-encoding, symlink-resolved diagnostic keys,
+     UTF-16 column conversion).
+   - `editor`: 50 tests (input, actions, injection, viewport, clipboard,
+     file IO, completion/signature UI, LSP sync, popup layout, crash
+     supervisor, visual columns, mouse gestures, diagnostics conversion /
+     gutter severity / F8 / hover dwell / tooltip layout + wrapping).
    - `control`: 6 tests (chord/command/mouse-target parsing, escapes,
      errors, state JSON).
 3. **OLS integration** — `lsp` package implements the JSON-RPC/LSP subset
@@ -50,9 +51,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
    against real OLS three ways: unit tests with synthetic responses
    (`editor/lsp_ui_test.odin`), the in-process e2e suite (`task test:e2e`,
    61 checks), and the remote-control smoke test (`task test:remote`).
-   Diagnostics are received and stored per-document
-   (`client_diagnostics_for`); gutter/squiggle rendering of diagnostics is
-   not yet implemented (see Backlog).
+   Diagnostics are rendered too (see 13).
 6. **VSCode/Zed hotkeys** — `keymap.keymap_default(platform)` covers
    navigation, selection/extend, editing, clipboard, undo/redo (+Ctrl+Y on
    non-mac), save/open, multi-cursor add, completion/signature-help
@@ -89,6 +88,15 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     rendering, hit-testing, scrolling and popup placement (`scroll_col` is a
     visual column). Undo/redo put cursors back at the edit sites. Verified
     by unit tests and `tools/mouse_smoke.edctl` (67 commands).
+13. **Diagnostics UI** — gutter severity markers, wavy underlines by
+    severity (dotted hints), hover tooltip after a 350 ms dwell (text or
+    gutter), F8/Shift+F8 next/previous problem, Escape to dismiss,
+    per-severity counts (demo window title). UTF-16 columns converted both
+    ways (requests, completion textEdits, diagnostics); URIs percent-encoded
+    and matched by resolved path; didSave carries the text (OLS re-indexes
+    from it). Found and patched an OLS use-after-free that kept fixed errors
+    on screen (`patches/ols/`). Verified by unit tests and
+    `tools/diagnostics_smoke.edctl` (46 commands, live OLS).
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -96,8 +104,15 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-- **Diagnostics UI** — diagnostics are received and stored
-  (`client_diagnostics_for`) but not yet drawn as gutter markers/squiggles.
+- **Diagnostics leftovers** — no problems panel/list, no quick fixes
+  (codeAction), `tags` (unnecessary/deprecated → faded/strikethrough) are
+  ignored, and ranges aren't shifted locally while typing (they're
+  replaced on the server's next publish, which for parse errors is
+  immediate but for `odin check` errors is the next save).
+- **OLS reports `odin check` columns in code points, not UTF-16** — for a
+  line with an astral character (e.g. an emoji) before the error, the
+  squiggle lands one cell early per such character. Upstream issue; BMP
+  text (é, ü, CJK) is exact.
 - **Completion polish** — no documentation side panel, snippets aren't requested (no
   `snippetSupport`), and `isIncomplete` lists aren't re-queried as you type
   (filtering is purely local after the first response). Signature help shows
@@ -117,11 +132,6 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 - **OLS + directory names** — OLS derives package paths from directory
   names; files in a directory whose name contains a `.` get no completions.
   Worth surfacing to users (or opening such files with a symlinked root).
-- **LSP UTF-16 position encoding** — the LSP spec's `character` offset is a
-  UTF-16 code-unit count; this client currently treats it as a raw byte
-  offset. Correct and sufficient for ASCII-heavy Odin source, but wrong for
-  non-ASCII identifiers/strings/comments. Would need a UTF-16-aware
-  conversion in `lsp/protocol.odin`/`client_did_change` to fully fix.
 - **Incremental document sync** — `didChange` currently sends the full
   document text on every change rather than incremental edits. Simpler and
   correct, but less efficient for very large files/high edit frequency.

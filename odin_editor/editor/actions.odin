@@ -94,6 +94,11 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 	case .TriggerCompletion, .TriggerSignatureHelp:
 		return false
 
+	case .NextDiagnostic:
+		return editor_goto_diagnostic(ed, 1)
+	case .PrevDiagnostic:
+		return editor_goto_diagnostic(ed, -1)
+
 	case .Escape:
 		for &c in b.cursors {
 			c.sel.active = false

@@ -10,6 +10,7 @@ import lspc "../lsp"
 import "core:encoding/json"
 import "core:fmt"
 import "core:strings"
+import "core:time"
 import sdl "vendor:sdl3"
 
 STATE_MAX_ITEMS :: 25
@@ -56,6 +57,31 @@ State_Signature :: struct {
 	rect:         [4]f32 `json:"rect"`,
 }
 
+State_Diagnostic :: struct {
+	range:    [4]int `json:"range"` /* start line, col, end line, col (bytes) */,
+	severity: string `json:"severity"`,
+	message:  string `json:"message"`,
+	source:   string `json:"source"`,
+}
+
+State_Diag_Counts :: struct {
+	errors:   int `json:"errors"`,
+	warnings: int `json:"warnings"`,
+	infos:    int `json:"infos"`,
+	hints:    int `json:"hints"`,
+}
+
+State_Tooltip :: struct {
+	// Pending hover (what the pointer rests on, and for how long).
+	hover_armed: bool   `json:"hover_armed"`,
+	hover_cell:  [2]int `json:"hover_cell"`,
+	hover_ms:    f64    `json:"hover_ms"`,
+	visible: bool   `json:"visible"`,
+	source:  string `json:"source"`,
+	text:    string `json:"text"`,
+	rect:    [4]f32 `json:"rect"`,
+}
+
 State :: struct {
 	frame:        int              `json:"frame"`,
 	file:         string           `json:"file"`,
@@ -74,6 +100,9 @@ State :: struct {
 	lsp:          State_Lsp        `json:"lsp"`,
 	completion:   State_Completion `json:"completion"`,
 	signature:    State_Signature  `json:"signature"`,
+	diagnostics:       []State_Diagnostic `json:"diagnostics"`,
+	diagnostic_counts: State_Diag_Counts  `json:"diagnostic_counts"`,
+	tooltip:           State_Tooltip      `json:"tooltip"`,
 	text:         string           `json:"text"`,
 }
 
@@ -153,6 +182,39 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 		items[i] = e.lsp.last_completion[cs.filtered[i]].label
 	}
 	s.completion.items = items
+
+	diags := ed.editor_diagnostics(e)
+	sd := make([]State_Diagnostic, len(diags), context.temp_allocator)
+	for d, i in diags {
+		sd[i] = {{d.start.line, d.start.col, d.end.line, d.end.col}, ed.severity_label(d.severity), d.message, d.source}
+		switch d.severity {
+		case .Error: s.diagnostic_counts.errors += 1
+		case .Warning: s.diagnostic_counts.warnings += 1
+		case .Information: s.diagnostic_counts.infos += 1
+		case .Hint: s.diagnostic_counts.hints += 1
+		}
+	}
+	s.diagnostics = sd
+	s.tooltip.hover_armed = e.diag_tip.hover_valid
+	s.tooltip.hover_cell = {e.diag_tip.hover_pos.line, e.diag_tip.hover_pos.col}
+	if e.diag_tip.hover_valid {
+		s.tooltip.hover_ms = time.duration_milliseconds(time.tick_since(e.diag_tip.hover_since))
+	}
+	if tip, ok := ed.editor_diag_tooltip_layout(e); ok {
+		lines := make([dynamic]string, context.temp_allocator)
+		for l in tip.lines {
+			append(&lines, l.text)
+		}
+		s.tooltip = State_Tooltip{
+			hover_armed = s.tooltip.hover_armed,
+			hover_cell  = s.tooltip.hover_cell,
+			hover_ms    = s.tooltip.hover_ms,
+			visible = true,
+			source  = strings.to_lower(fmt.tprint(e.diag_tip.source), context.temp_allocator),
+			text    = strings.join(lines[:], "\n", context.temp_allocator),
+			rect    = rect_array(tip.rect),
+		}
+	}
 
 	s.signature = State_Signature{
 		active  = e.signature.active,

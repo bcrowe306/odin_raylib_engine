@@ -103,9 +103,11 @@ editor_handle_popup_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
 			return true
 		}
 	}
-	if chord.key == .Escape && (ed.completion.active || ed.signature.active) {
+	if chord.key == .Escape && (ed.completion.active || ed.signature.active || ed.diag_tip.source != .None) {
 		editor_close_completion(ed)
 		editor_close_signature_help(ed)
+		ed.diag_tip.source = .None
+		ed.diag_tip.hover_valid = false
 		return true
 	}
 	return false

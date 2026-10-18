@@ -155,6 +155,7 @@ always observe the result of the input before them.
 | `wheel <dy> [dx=N] [at=<where>] [mods=…]` | scroll at a position (`mods=shift` = horizontal) |
 | `locate <where>` | print the pixel a target resolves to |
 | `lsp-kill` | SIGKILL the language server (crash-recovery testing) |
+| `wait diagnostics` / `wait no-diagnostics` / `wait tooltip` | block until the document has (no) diagnostics / the diagnostic tooltip shows |
 | `type <text>` | one TEXT_INPUT event per character (like real typing, so `.`/`(` triggers fire) |
 | `text <text>` | a single TEXT_INPUT event with the whole string. Escapes: `\n` `\t` `\\` |
 | `cursor <line> <col>` | place the cursor directly (0-based) |
@@ -162,7 +163,7 @@ always observe the result of the input before them.
 | `state` | JSON: text, cursor, LSP status, completion items/selection/rect, signature label/active parameter/rect |
 | `wait <cond> [ms]` | block until `completion`, `no-completion`, `signature`, `no-signature`, `lsp-ready`, `lsp-idle` or `lsp-down` (default 5000 ms) |
 | `wait frames <n>` | block for `n` frames |
-| `expect <field> <value>` | assert `line`, `cursor`, `text-contains`, `completion-selected`, `completion-has`, `signature` (label contains), `signature-param`, `selection` (`l1 c1 l2 c2` or `none`), `selected-text`, `cursors`, `mouse-cursor` (`text`/`default`), `scroll` (`line col`) or `lsp-status` |
+| `expect <field> <value>` | assert `line`, `cursor`, `text-contains`, `completion-selected`, `completion-has`, `signature` (label contains), `signature-param`, `selection` (`l1 c1 l2 c2` or `none`), `selected-text`, `cursors`, `mouse-cursor` (`text`/`default`), `scroll` (`line col`), `lsp-status`, `errors`, `warnings`, `diagnostics-has`, `line-severity` (`<line> error\|warning\|info\|hint\|none`) or `tooltip` (contains, or `none`) |
 | `screenshot <file.png>` | save the next rendered frame |
 | `quit` | push SDL_EVENT_QUIT |
 
@@ -172,6 +173,25 @@ is created non-focusable and real keyboard/mouse events are dropped
 disturbed by — or steal — the user's typing. `task test:remote` uses it.
 The hook is opt-in and listens on loopback only; don't enable it in builds
 you ship.
+
+## Diagnostics
+
+Errors and warnings from `textDocument/publishDiagnostics` are drawn as a
+severity marker in the gutter and a wavy underline under each range (red
+error, yellow warning, blue info, dotted grey hint). Resting the mouse on an
+underlined character or a gutter marker for 350 ms shows the message(s) in a
+tooltip; **F8 / Shift+F8** jump to the next/previous problem and show it
+(Escape or moving the caret dismisses). `editor_diagnostic_counts(ed)` gives
+per-severity totals for a host's status bar — the demo puts them in the
+window title.
+
+OLS reports parse errors as you type; type-check errors come from
+`odin check`, which OLS runs when the file is saved. Ranges arrive in UTF-16
+columns and are converted to byte columns against the current text. Server
+URIs are matched by their decoded, symlink-resolved path (`lsp.uri_key`),
+and the editor sends OLS resolved paths, because OLS reports check results
+under the compiler's resolved path (`/private/tmp/...` for a file opened as
+`/tmp/...` on macOS).
 
 ## Mouse
 
@@ -222,9 +242,16 @@ it (`task ols:build OLS_REF=<sha>`) if you're on a different Odin version and
 need a different pin.
 
 ```sh
-task ols:fetch   # clone third_party/ols, checkout OLS_REF
+task ols:fetch   # clone third_party/ols, checkout OLS_REF, apply patches/ols/*.patch
 task ols:build   # odin build -collection:src=third_party/ols/src -> third_party/ols/ols
 ```
+
+`patches/ols/` holds local fixes for upstream OLS bugs this editor runs into,
+reapplied on a clean checkout by every `ols:fetch`. Currently one:
+`0001-check-request-uri-lifetime.patch` — OLS hands the save-triggered
+`odin check` request a temp-allocated URI that is freed before the check
+thread reads it, so errors fixed since the previous save are never cleared.
+Drop the patch once upstream fixes it.
 
 Then attach it to an editor instance:
 

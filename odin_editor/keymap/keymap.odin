@@ -26,6 +26,7 @@ Key :: enum {
 	Backspace, Delete, Enter, Tab, Escape, Space,
 	Slash, Backslash, Minus, Equals, LeftBracket, RightBracket,
 	Semicolon, Quote, Comma, Period, Grave,
+	F8,
 }
 
 Chord :: struct {
@@ -69,6 +70,7 @@ Action :: enum {
 
 	// Language features.
 	TriggerCompletion, TriggerSignatureHelp,
+	NextDiagnostic, PrevDiagnostic,
 
 	// Misc.
 	Escape,

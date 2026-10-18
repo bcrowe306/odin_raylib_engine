@@ -9,6 +9,7 @@ import lspc "../lsp"
 editor_update :: proc(ed: ^Editor) {
 	editor_pump_injected_events(ed)
 	editor_update_mouse(ed)
+	editor_update_diagnostics(ed)
 	if ed.lsp_enabled {
 		lspc.client_poll(&ed.lsp)
 		editor_supervise_lsp(ed)

@@ -13,4 +13,5 @@ failed=0
 ./tools/run_smoke.sh tools/lsp_smoke.edctl example/assets/lsp_fixture.odin.txt || failed=1
 ./tools/run_smoke.sh tools/lsp_crash.edctl example/assets/lsp_fixture.odin.txt || failed=1
 ./tools/run_smoke.sh tools/mouse_smoke.edctl example/assets/mouse_fixture.odin.txt || failed=1
+./tools/run_smoke.sh tools/diagnostics_smoke.edctl example/assets/diag_fixture.odin.txt || failed=1
 exit "$failed"

@@ -267,6 +267,7 @@ editor_handle_mouse_motion :: proc(ed: ^Editor, ev: sdl.MouseMotionEvent) -> boo
 	ed.mouse.x, ed.mouse.y = ev.x, ev.y
 	hit := editor_hit_test(ed, ev.x, ev.y)
 	ed.mouse.zone = hit.zone
+	editor_track_diag_hover(ed, hit, ev.x, ev.y)
 	if ed.mouse.drag != .None {
 		editor_drag_to(ed, hit.pos)
 		return true

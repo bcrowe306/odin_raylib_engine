@@ -94,3 +94,13 @@ test_default_keymap_macos_uses_super_and_alt :: proc(t: ^testing.T) {
 	_, ok4 := keymap_resolve(&km, Chord{.Y, {.Super}})
 	testing.expect(t, !ok4, "expected Cmd+Y to be unbound on macOS")
 }
+
+@(test)
+test_f8_navigates_diagnostics :: proc(t: ^testing.T) {
+	km := keymap_default(.MacOS)
+	defer keymap_destroy(&km)
+	action, ok := keymap_resolve(&km, Chord{.F8, {}})
+	testing.expect(t, ok && action == .NextDiagnostic, "F8 = next problem")
+	action, ok = keymap_resolve(&km, Chord{.F8, {.Shift}})
+	testing.expect(t, ok && action == .PrevDiagnostic, "Shift+F8 = previous problem")
+}

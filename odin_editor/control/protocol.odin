@@ -25,6 +25,9 @@ Wait_Condition :: enum {
 	Lsp_Ready,      // server initialized and document opened
 	Lsp_Idle,       // no LSP requests in flight
 	Lsp_Down,       // server not running (crashed/restarting/failed)
+	Diagnostics,    // the document has at least one diagnostic
+	No_Diagnostics, // the document has none
+	Tooltip,        // the diagnostic tooltip is showing
 	Frames,         // a fixed number of frames has elapsed
 }
 
@@ -76,6 +79,11 @@ Expect_Field :: enum {
 	Mouse_Cursor,        // pointer shape: "text" or "default"
 	Scroll,              // "line col"
 	Lsp_Status,          // off|starting|running|restarting|failed
+	Errors,              // number of error diagnostics
+	Warnings,            // number of warning diagnostics
+	Diagnostics_Has,     // some diagnostic message contains substring
+	Line_Severity,       // "<line> error|warning|info|hint|none" (gutter marker)
+	Tooltip,             // tooltip text contains substring, or "none"
 }
 
 // Cmd_Expect asserts on editor state; replies `ok` or
@@ -113,10 +121,10 @@ HELP_TEXT :: "commands: key <chord> [count] | type <text> | text <text> | " +
 	"click|mousedown|mouseup <where> [clicks=N] [mods=shift+alt] [button=left|middle|right] | move <where> | " +
 	"drag <from> <to> [steps=N] [mods=..] [clicks=N] | wheel <dy> [dx=N] [at=<where>] [mods=..] | locate <where> | " +
 	"where = <x> <y> | @line:col | @gutter:line | @completion:row | lsp-kill | " +
-	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle|lsp-down> [timeout_ms] | " +
+	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle|lsp-down|diagnostics|no-diagnostics|tooltip> [timeout_ms] | " +
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
 	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +
-	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status> <value>. " +
+	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status|errors|warnings|diagnostics-has|line-severity|tooltip> <value>. " +
 	"chords: [primary+|cmd+|ctrl+|alt+|shift+]<key>, e.g. primary+space, shift+end, down. " +
 	"text escapes: \\n \\t \\\\"
 
@@ -206,6 +214,11 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		case "mouse-cursor": field = .Mouse_Cursor
 		case "scroll": field = .Scroll
 		case "lsp-status": field = .Lsp_Status
+		case "errors": field = .Errors
+		case "warnings": field = .Warnings
+		case "diagnostics-has": field = .Diagnostics_Has
+		case "line-severity": field = .Line_Severity
+		case "tooltip": field = .Tooltip
 		case:
 			return nil, strings.concatenate({"unknown expect field: ", name}, context.temp_allocator)
 		}
@@ -252,6 +265,9 @@ parse_wait :: proc(rest: string) -> (cmd: Command, err: string) {
 	case "lsp-ready": cond = .Lsp_Ready
 	case "lsp-idle": cond = .Lsp_Idle
 	case "lsp-down": cond = .Lsp_Down
+	case "diagnostics": cond = .Diagnostics
+	case "no-diagnostics": cond = .No_Diagnostics
+	case "tooltip": cond = .Tooltip
 	case "frames": cond = .Frames
 	case:
 		return nil, strings.concatenate({"unknown wait condition: ", parts[0]}, context.temp_allocator)
