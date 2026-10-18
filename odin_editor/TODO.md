@@ -202,4 +202,8 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-Nothing open — every backlog item above has been completed (see Done).
+**Import key commands from zed/vscode** 
+**Make theme colors editable in ui**
+**Command Pallet via CMD+p**
+**Implement Goto Definition / Peek Definition / Find References**
+**Command Pallet switches between windows** Command Pallet should be able to switch between windows, keymap editor, find, theme editor, utitlity page(maybe funcitons around managing ols).
