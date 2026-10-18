@@ -149,6 +149,8 @@ State :: struct {
 	selections:    [][4]int        `json:"selections"`,
 	selected_text: string          `json:"selected_text"`,
 	tab_width:     int             `json:"tab_width"`,
+	font_size:     f32             `json:"font_size"`,
+	char_size:     [2]f32          `json:"char_size"`,
 	mouse:         State_Mouse     `json:"mouse"`,
 	current_line: string           `json:"current_line"`,
 	scroll:       [2]int           `json:"scroll"`,
@@ -195,6 +197,8 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 		s.selected_text = selection_text(e, lo, hi)
 	}
 	s.tab_width = e.tab_width
+	s.font_size = e.font_size
+	s.char_size = {e.char_w, e.char_h}
 	s.mouse = State_Mouse{
 		x      = e.mouse.x,
 		y      = e.mouse.y,

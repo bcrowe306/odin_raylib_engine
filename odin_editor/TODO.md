@@ -6,7 +6,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 166 tests across 6 packages, all
+2. **Unit tests for every feature** — 170 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
@@ -186,6 +186,15 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     satisfied, updates OLS_REF, and reports when only stale patches block a
     newer pin. Verified by simulating a broken pin (found a compatible
     commit in 58 candidates / 3 s).
+26. **UI tweaks** — Ayu Dark theme (the palette of Zed's "Ayu Dark") as
+    the default with richer highlighting: the Odin tokenizer now tells
+    apart procedures (declarations, calls, builtin procs), types (Ada_Case,
+    `:: struct/enum/union`), constants (SCREAMING_CASE, true/false/nil),
+    fields after `.`, `#directives` and `@(attributes)`; vertical and
+    horizontal scrollbars (drag thumb, click track to jump; overview marks
+    for diagnostics, find matches and the caret); Ctrl/Cmd `+`/`-`/`0` zoom
+    (`editor_set_font_size` + `editor_take_font_size_change`, demo resizes
+    its fonts). Verified by unit tests and `tools/ui_tweaks.edctl`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -193,3 +202,4 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
+Nothing open — every backlog item above has been completed (see Done).

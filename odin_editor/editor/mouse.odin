@@ -25,6 +25,7 @@ Mouse_Zone :: enum {
 	Code_Actions, // the quick-fix menu (row = action index)
 	Find,         // the find/replace bar
 	Context_Menu, // the right-click menu (row = item index)
+	Scrollbar,    // a scrollbar track/thumb
 }
 
 Drag_Mode :: enum {
@@ -62,6 +63,10 @@ Mouse_State :: struct {
 	press_x, press_y: f32,
 	press_pos:        buf.Position,
 	drop_pos:         buf.Position,
+
+	// Scrollbar thumb drag and the pointer's offset into the thumb.
+	scroll_drag: Scroll_Drag,
+	scroll_grab: f32,
 }
 
 Hit :: struct {
@@ -121,6 +126,11 @@ editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 	}
 	if layout.signature_visible && in_rect(layout.signature, x, y) {
 		hit.zone = .Signature
+		return hit
+	}
+	sb := editor_scrollbar_layout(ed)
+	if (sb.v_shown && in_rect(sb.v_track, x, y)) || (sb.h_shown && in_rect(sb.h_track, x, y)) {
+		hit.zone = .Scrollbar
 		return hit
 	}
 	right := ed.origin_x + editor_gutter_width(ed) + f32(ed.visible_cols) * ed.char_w
@@ -206,6 +216,13 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		return false
 	}
 	editor_hide_hover(ed)
+	if hit.zone == .Scrollbar {
+		editor_close_context_menu(ed)
+		if ev.button == 1 {
+			editor_scrollbar_press(ed, ev.x, ev.y)
+		}
+		return true
+	}
 	if hit.zone == .Context_Menu {
 		if ev.button == 1 {
 			editor_context_menu_activate(ed, hit.row)
@@ -234,7 +251,7 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		ed.find.focused = false
 	}
 	switch hit.zone {
-	case .Outside, .Context_Menu:
+	case .Outside, .Context_Menu, .Scrollbar:
 	case .Find:
 		editor_find_click(ed, ev.x, ev.y)
 	case .Code_Actions:
@@ -323,6 +340,10 @@ editor_toggle_cursor_at :: proc(ed: ^Editor, pos: buf.Position) {
 editor_handle_mouse_up :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool {
 	ed.mouse.x, ed.mouse.y = ev.x, ev.y
 	m := &ed.mouse
+	if ev.button == 1 && m.scroll_drag != .None {
+		m.scroll_drag = .None
+		return true
+	}
 	if ev.button == 1 && m.drag == .Move {
 		m.drop_pos = editor_screen_to_position(ed, ev.x, ev.y)
 		mods := editor_current_mods(ed)
@@ -355,6 +376,10 @@ editor_handle_mouse_motion :: proc(ed: ^Editor, ev: sdl.MouseMotionEvent) -> boo
 	ed.mouse.zone = hit.zone
 	editor_track_diag_hover(ed, hit, ev.x, ev.y)
 	m := &ed.mouse
+	if m.scroll_drag != .None {
+		editor_scroll_to_track_pos(ed, m.scroll_drag, ev.x, ev.y, m.scroll_grab)
+		return true
+	}
 	if m.move_pending && abs(ev.x - m.press_x) + abs(ev.y - m.press_y) > DRAG_MOVE_THRESHOLD {
 		m.move_pending = false
 		m.drag = .Move

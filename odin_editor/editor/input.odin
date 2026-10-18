@@ -61,8 +61,8 @@ sdl_keycode_to_key :: proc(code: sdl.Keycode) -> km.Key {
 	case sdl.K_SPACE: return .Space
 	case sdl.K_SLASH: return .Slash
 	case sdl.K_BACKSLASH: return .Backslash
-	case sdl.K_MINUS: return .Minus
-	case sdl.K_EQUALS: return .Equals
+	case sdl.K_MINUS, sdl.K_KP_MINUS: return .Minus
+	case sdl.K_EQUALS, sdl.K_PLUS, sdl.K_KP_PLUS: return .Equals
 	case sdl.K_LEFTBRACKET: return .LeftBracket
 	case sdl.K_RIGHTBRACKET: return .RightBracket
 	case sdl.K_SEMICOLON: return .Semicolon

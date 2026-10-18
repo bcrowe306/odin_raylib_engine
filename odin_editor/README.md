@@ -238,6 +238,19 @@ with `screenshot $SHOTS/NN_<what_it_shows>.png` at the moments worth seeing;
 `tools/run_smoke.sh` fills in `$SHOTS`. `tools/contact_sheet` (SDL-only)
 builds the sheets.
 
+## Look & feel
+
+- The default theme is **Ayu Dark** (`default_theme()`; the earlier
+  palette is `vscode_dark_theme()`). Highlighting distinguishes keywords,
+  procedures (declarations, calls, builtins), types, constants, fields,
+  strings, numbers, comments, operators, `#directives` and `@attributes`.
+- **Scrollbars** on the right and bottom: drag the thumb or click the
+  track; the vertical track marks diagnostics, find matches and the caret.
+- **Zoom** with **Ctrl/Cmd + / − / 0**. The host owns the fonts: call
+  `editor_set_font_size` once, then on `editor_take_font_size_change`
+  resize them (`TTF_SetFontSize`) and call `editor_set_font` (see
+  `example/main.odin`).
+
 ## Search
 
 - **Ctrl/Cmd+F** opens the find bar (seeded from a single-line selection);

@@ -126,3 +126,30 @@ test_operators :: proc(t: ^testing.T) {
 		testing.expect_value(t, line[assign_tok.start:assign_tok.end], ":=")
 	})
 }
+
+@(private)
+kind_of :: proc(line: string, word: string) -> TokenKind {
+	toks, _ := tokenize_odin_line(line, ODIN_STATE_NORMAL, context.temp_allocator)
+	for t in toks {
+		if line[t.start:t.end] == word {
+			return t.kind
+		}
+	}
+	return .Default
+}
+
+@(test)
+test_identifier_classification :: proc(t: ^testing.T) {
+	testing.expect_value(t, kind_of("add :: proc(a: int) -> int {", "add"), TokenKind.Function)
+	testing.expect_value(t, kind_of("\tfmt.println(x)", "println"), TokenKind.Function)
+	testing.expect_value(t, kind_of("\tn := len(items)", "len"), TokenKind.Function)
+	testing.expect_value(t, kind_of("Vec2 :: struct {", "Vec2"), TokenKind.Type)
+	testing.expect_value(t, kind_of("p: Player_State", "Player_State"), TokenKind.Type)
+	testing.expect_value(t, kind_of("MAX_COUNT :: 10", "MAX_COUNT"), TokenKind.Constant)
+	testing.expect_value(t, kind_of("ok := true", "true"), TokenKind.Constant)
+	testing.expect_value(t, kind_of("p.health -= 1", "health"), TokenKind.Property)
+	testing.expect_value(t, kind_of("context.allocator", "allocator"), TokenKind.Property)
+	testing.expect_value(t, kind_of("#partial switch v {", "#partial"), TokenKind.Directive)
+	testing.expect_value(t, kind_of("@(private)", "private"), TokenKind.Attribute)
+	testing.expect_value(t, kind_of("x := y", "y"), TokenKind.Identifier)
+}

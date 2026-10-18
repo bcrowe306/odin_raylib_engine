@@ -25,6 +25,13 @@ Theme :: struct {
 	text_comment:   sdl.Color,
 	text_type:      sdl.Color,
 	text_builtin:   sdl.Color,
+	text_function:  sdl.Color,
+	text_constant:  sdl.Color,
+	text_property:  sdl.Color,
+	text_operator:  sdl.Color,
+	text_punct:     sdl.Color,
+	text_directive: sdl.Color,
+	text_attribute: sdl.Color,
 	gutter_text:    sdl.Color,
 
 	// Completion / signature-help popups.
@@ -49,43 +56,83 @@ Theme :: struct {
 	// Find highlights.
 	find_match:   sdl.Color,
 	find_current: sdl.Color,
+
+	// Scrollbars (thumb; hover/drag state is brighter) and the overview
+	// marks drawn in the vertical track.
+	scrollbar_thumb:       sdl.Color,
+	scrollbar_thumb_hover: sdl.Color,
+	scrollbar_track:       sdl.Color,
 }
 
+// default_theme is Ayu Dark (the palette Zed's built-in "Ayu Dark" uses):
+// procedures yellow, keywords orange, types blue, strings green,
+// numbers/constants purple, fields coral, operators orange-pink.
 default_theme :: proc() -> Theme {
+	return ayu_dark_theme()
+}
+
+ayu_dark_theme :: proc() -> Theme {
 	return Theme{
-		background   = {30, 30, 30, 255},
-		gutter_bg    = {24, 24, 24, 255},
-		current_line = {45, 45, 45, 255},
-		selection    = {60, 90, 130, 140},
-		cursor       = {255, 255, 255, 255},
-		text_default = {212, 212, 212, 255},
-		text_keyword = {197, 134, 192, 255},
-		text_string  = {206, 145, 120, 255},
-		text_number  = {181, 206, 168, 255},
-		text_comment = {106, 153, 85, 255},
-		text_type    = {78, 201, 176, 255},
-		text_builtin = {220, 220, 170, 255},
-		gutter_text  = {133, 133, 133, 255},
+		background     = {13, 16, 22, 255},
+		gutter_bg      = {13, 16, 22, 255},
+		current_line   = {20, 24, 33, 255},
+		selection      = {64, 159, 255, 70},
+		cursor         = {230, 180, 80, 255},
+		text_default   = {191, 189, 182, 255},
+		text_keyword   = {255, 143, 64, 255},
+		text_string    = {170, 217, 76, 255},
+		text_number    = {210, 166, 255, 255},
+		text_comment   = {98, 106, 115, 255},
+		text_type      = {89, 194, 255, 255},
+		text_builtin   = {255, 180, 84, 255},
+		text_function  = {255, 180, 84, 255},
+		text_constant  = {210, 166, 255, 255},
+		text_property  = {240, 113, 120, 255},
+		text_operator  = {242, 150, 104, 255},
+		text_punct     = {150, 149, 143, 255},
+		text_directive = {255, 143, 64, 255},
+		text_attribute = {230, 192, 138, 255},
+		gutter_text    = {85, 92, 104, 255},
 
-		popup_bg           = {37, 37, 38, 255},
-		popup_border       = {69, 69, 69, 255},
-		popup_selected     = {4, 57, 94, 255},
-		popup_text         = {204, 204, 204, 255},
-		popup_text_dim     = {140, 140, 140, 255},
-		popup_match        = {24, 163, 255, 255},
-		popup_active_param = {255, 215, 0, 255},
+		popup_bg           = {18, 22, 30, 255},
+		popup_border       = {40, 46, 58, 255},
+		popup_selected     = {35, 46, 64, 255},
+		popup_text         = {191, 189, 182, 255},
+		popup_text_dim     = {110, 116, 126, 255},
+		popup_match        = {255, 180, 84, 255},
+		popup_active_param = {230, 180, 80, 255},
 
-		header_bg   = {37, 37, 38, 255},
-		header_text = {230, 230, 230, 255},
+		header_bg   = {11, 14, 20, 255},
+		header_text = {191, 189, 182, 255},
 
-		diag_error   = {244, 71, 71, 255},
-		diag_warning = {205, 173, 0, 255},
-		diag_info    = {55, 148, 255, 255},
-		diag_hint    = {150, 150, 150, 255},
+		diag_error   = {217, 87, 87, 255},
+		diag_warning = {230, 180, 80, 255},
+		diag_info    = {89, 194, 255, 255},
+		diag_hint    = {110, 116, 126, 255},
 
-		find_match   = {234, 92, 0, 70},
-		find_current = {81, 92, 106, 210},
+		find_match   = {230, 180, 80, 60},
+		find_current = {89, 194, 255, 90},
+
+		scrollbar_thumb       = {90, 100, 115, 90},
+		scrollbar_thumb_hover = {120, 130, 145, 150},
+		scrollbar_track       = {255, 255, 255, 6},
 	}
+}
+
+// vscode_dark_theme is the original "Dark+"-like palette.
+vscode_dark_theme :: proc() -> Theme {
+	t := ayu_dark_theme()
+	t.background, t.gutter_bg, t.current_line = {30, 30, 30, 255}, {24, 24, 24, 255}, {45, 45, 45, 255}
+	t.selection, t.cursor, t.text_default = {60, 90, 130, 140}, {255, 255, 255, 255}, {212, 212, 212, 255}
+	t.text_keyword, t.text_string, t.text_number = {197, 134, 192, 255}, {206, 145, 120, 255}, {181, 206, 168, 255}
+	t.text_comment, t.text_type = {106, 153, 85, 255}, {78, 201, 176, 255}
+	t.text_builtin, t.text_function = {220, 220, 170, 255}, {220, 220, 170, 255}
+	t.text_constant, t.text_property = {86, 156, 214, 255}, {156, 220, 254, 255}
+	t.text_operator, t.text_punct = {212, 212, 212, 255}, {212, 212, 212, 255}
+	t.text_directive, t.text_attribute = {197, 134, 192, 255}, {220, 220, 170, 255}
+	t.gutter_text, t.header_bg = {133, 133, 133, 255}, {37, 37, 38, 255}
+	t.popup_bg, t.popup_border, t.popup_selected = {37, 37, 38, 255}, {69, 69, 69, 255}, {4, 57, 94, 255}
+	return t
 }
 
 @(private)
@@ -97,7 +144,14 @@ token_color :: proc(theme: Theme, kind: syn.TokenKind) -> sdl.Color {
 	case .Comment: return theme.text_comment
 	case .Type: return theme.text_type
 	case .Builtin: return theme.text_builtin
-	case .Identifier, .Operator, .Punctuation, .Default: return theme.text_default
+	case .Function: return theme.text_function
+	case .Constant: return theme.text_constant
+	case .Property: return theme.text_property
+	case .Operator: return theme.text_operator
+	case .Punctuation: return theme.text_punct
+	case .Directive: return theme.text_directive
+	case .Attribute: return theme.text_attribute
+	case .Identifier, .Default: return theme.text_default
 	}
 	return theme.text_default
 }
@@ -183,6 +237,7 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 	}
 
 	// Popups draw last so they sit on top of the text.
+	render_scrollbars(ed, renderer, theme)
 	render_problems_panel(ed, renderer, font, theme, origin_x, origin_y)
 	render_find_bar(ed, renderer, font, theme)
 	render_drop_caret(ed, renderer, theme)

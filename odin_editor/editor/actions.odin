@@ -130,6 +130,16 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 		editor_select_all_occurrences(ed)
 		return true
 
+	case .ZoomIn:
+		editor_zoom(ed, 1)
+		return true
+	case .ZoomOut:
+		editor_zoom(ed, -1)
+		return true
+	case .ZoomReset:
+		editor_zoom(ed, 0)
+		return true
+
 	case .Escape:
 		for &c in b.cursors {
 			c.sel.active = false

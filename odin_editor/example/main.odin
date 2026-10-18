@@ -253,6 +253,7 @@ main :: proc() {
 	}
 	// Cell width + glyph height; the editor applies its line spacing.
 	ed.editor_set_font(&editor, char_w, char_h)
+	ed.editor_set_font_size(&editor, FONT_SIZE) // enables Ctrl/Cmd +/-/0 zoom
 	// The text area is the window minus the line-number gutter.
 	ed.editor_set_viewport(&editor, WINDOW_W, WINDOW_H)
 
@@ -316,6 +317,19 @@ main :: proc() {
 		}
 
 		ed.editor_update(&editor)
+
+		// Zoom: the editor asks for a new size; resize our fonts and
+		// re-measure the cell.
+		if size, ok := ed.editor_take_font_size_change(&editor); ok && font != nil {
+			_ = ttf.SetFontSize(font, size)
+			for fb in fallbacks.fonts {
+				_ = ttf.SetFontSize(fb, size)
+			}
+			w, h: i32
+			if ttf.GetStringSize(font, "M", 1, &w, &h) {
+				ed.editor_set_font(&editor, f32(w), f32(h))
+			}
+		}
 
 		// The problems panel asks the host to open other files.
 		if path, line, character, ok := ed.editor_take_open_request(&editor); ok {

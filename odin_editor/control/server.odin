@@ -436,6 +436,9 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 		actual = s.hover.text if s.hover.visible else "none"
 		want := strings.trim_space(x.want)
 		pass = want == "none" ? !s.hover.visible : s.hover.visible && strings.contains(actual, want)
+	case .Font_Size:
+		actual = fmt.tprint(int(e.font_size))
+		pass = actual == strings.trim_space(x.want)
 	case .Menu_Open:
 		actual = "true" if s.menu.open else "false"
 		pass = actual == strings.trim_space(x.want)
@@ -722,6 +725,27 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 			return 0, 0, fmt.tprintf("line %d is not visible", w.line)
 		}
 		return e.origin_x + ed.editor_gutter_width(e) / 2, e.origin_y + f32(w.line - e.scroll_line) * e.char_h + e.char_h / 2, ""
+	case .Scrollbar:
+		l := ed.editor_scrollbar_layout(e)
+		f := f32(w.col) / 100
+		switch w.line {
+		case 0, 2:
+			if !l.v_shown {
+				return 0, 0, "vertical scrollbar is not shown"
+			}
+			if w.line == 0 {
+				return l.v_thumb.x + l.v_thumb.w / 2, l.v_thumb.y + l.v_thumb.h / 2, ""
+			}
+			return l.v_track.x + l.v_track.w / 2, l.v_track.y + l.v_track.h * f, ""
+		case:
+			if !l.h_shown {
+				return 0, 0, "horizontal scrollbar is not shown"
+			}
+			if w.line == 1 {
+				return l.h_thumb.x + l.h_thumb.w / 2, l.h_thumb.y + l.h_thumb.h / 2, ""
+			}
+			return l.h_track.x + l.h_track.w * f, l.h_track.y + l.h_track.h / 2, ""
+		}
 	case .Menu_Item:
 		rect, ok := ed.editor_context_menu_layout(e)
 		if !ok {

@@ -77,6 +77,9 @@ Action :: enum {
 	Find, Replace, FindNext, FindPrev,
 	SelectNextOccurrence, SelectAllOccurrences,
 
+	// View.
+	ZoomIn, ZoomOut, ZoomReset,
+
 	// Misc.
 	Escape,
 }

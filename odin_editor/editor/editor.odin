@@ -74,6 +74,14 @@ Editor :: struct {
 	line_spacing: f32,
 	show_header:  bool,
 
+	// Zoom (Ctrl/Cmd +/-/0): the font size the user asked for. The host
+	// owns the fonts, so it picks changes up with
+	// editor_take_font_size_change, resizes its font(s) and calls
+	// editor_set_font + editor_set_viewport.
+	font_size:         f32,
+	base_font_size:    f32,
+	font_size_changed: bool,
+
 	// Top-left of the editor in window pixels as of the last
 	// editor_render, so mouse hit-testing works for hosts that draw the
 	// editor at an offset.
@@ -155,6 +163,38 @@ editor_set_font :: proc(ed: ^Editor, char_w, glyph_h: f32) {
 	ed.char_h = f32(int(glyph_h * max(ed.line_spacing, 1) + 0.5))
 }
 
+MIN_FONT_SIZE :: 8
+MAX_FONT_SIZE :: 48
+
+// editor_set_font_size records the host's starting font size (the zoom
+// reset target).
+editor_set_font_size :: proc(ed: ^Editor, size: f32) {
+	ed.font_size = size
+	ed.base_font_size = size
+}
+
+// editor_zoom changes the requested font size by `delta` points (0 = back
+// to the base size).
+editor_zoom :: proc(ed: ^Editor, delta: f32) {
+	if ed.base_font_size <= 0 {
+		return // host hasn't opted in
+	}
+	size := ed.base_font_size if delta == 0 else clamp(ed.font_size + delta, MIN_FONT_SIZE, MAX_FONT_SIZE)
+	if size != ed.font_size {
+		ed.font_size = size
+		ed.font_size_changed = true
+	}
+}
+
+// editor_take_font_size_change returns a pending zoom request (once).
+editor_take_font_size_change :: proc(ed: ^Editor) -> (size: f32, ok: bool) {
+	if !ed.font_size_changed {
+		return
+	}
+	ed.font_size_changed = false
+	return ed.font_size, true
+}
+
 // editor_glyph_height is the font's glyph height (falls back to the row
 // height for hosts that only set char_h).
 editor_glyph_height :: proc(ed: ^Editor) -> f32 {
@@ -185,8 +225,9 @@ editor_set_viewport :: proc(ed: ^Editor, w, h: f32) {
 	if ed.char_w <= 0 || ed.char_h <= 0 {
 		return
 	}
-	ed.visible_cols = max(1, int((w - editor_gutter_width(ed)) / ed.char_w))
-	ed.visible_rows = max(1, int((h - editor_header_height(ed)) / ed.char_h))
+	// Room is kept for the scrollbars at the right and bottom.
+	ed.visible_cols = max(1, int((w - editor_gutter_width(ed) - SCROLLBAR_SIZE) / ed.char_w))
+	ed.visible_rows = max(1, int((h - editor_header_height(ed) - SCROLLBAR_SIZE) / ed.char_h))
 }
 
 // editor_display_name returns the open file's base name and directory

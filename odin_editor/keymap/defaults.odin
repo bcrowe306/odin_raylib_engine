@@ -103,6 +103,12 @@ keymap_default :: proc(platform: Platform, allocator := context.allocator) -> Ke
 	keymap_bind(&km, Chord{.G, primary}, .FindNext)
 	keymap_bind(&km, Chord{.G, primary | {.Shift}}, .FindPrev)
 
+	// Zoom: '+' is Shift+'=' on most layouts, so bind both.
+	keymap_bind(&km, Chord{.Equals, primary}, .ZoomIn)
+	keymap_bind(&km, Chord{.Equals, primary | {.Shift}}, .ZoomIn)
+	keymap_bind(&km, Chord{.Minus, primary}, .ZoomOut)
+	keymap_bind(&km, Chord{.Num0, primary}, .ZoomReset)
+
 	keymap_bind(&km, Chord{.Escape, {}}, .Escape)
 
 	return km

@@ -22,6 +22,7 @@ Where_Kind :: enum {
 	Problem,
 	Find_Part, // line: 0 query, 1 replace, 2 case, 3 word, 4 regex
 	Menu_Item, // line = context menu item index
+	Scrollbar, // line: 0 vthumb, 1 hthumb, 2 vtrack, 3 htrack; col = percent along the track
 }
 
 Where :: struct {
@@ -77,6 +78,10 @@ parse_where :: proc(parts: []string) -> (w: Where, used: int, ok: bool) {
 	tok := parts[0]
 	if strings.has_prefix(tok, "@") {
 		body := tok[1:]
+		switch body {
+		case "vthumb": return Where{kind = .Scrollbar, line = 0}, 1, true
+		case "hthumb": return Where{kind = .Scrollbar, line = 1}, 1, true
+		}
 		colon := strings.index_byte(body, ':')
 		if colon < 0 {
 			return
@@ -95,6 +100,11 @@ parse_where :: proc(parts: []string) -> (w: Where, used: int, ok: bool) {
 		case "menu":
 			w.kind = .Menu_Item
 			w.line, ok = strconv.parse_int(tail)
+		case "vtrack", "htrack":
+			w.kind = .Scrollbar
+			w.line = 2 if head == "vtrack" else 3
+			w.col, ok = strconv.parse_int(tail)
+			ok &&= w.col <= 100
 		case "find":
 			w.kind = .Find_Part
 			ok = true

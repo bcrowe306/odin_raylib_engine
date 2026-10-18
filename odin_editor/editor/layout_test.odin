@@ -27,13 +27,13 @@ test_viewport_accounts_for_header_and_gutter :: proc(t: ^testing.T) {
 		editor_set_viewport(&ed, 1000, 700)
 		header := editor_header_height(&ed)
 		testing.expect(t, header > 0, "header shown by default")
-		testing.expect_value(t, ed.visible_rows, int((700 - header) / 28))
-		testing.expect_value(t, ed.visible_cols, int((1000 - editor_gutter_width(&ed)) / 10))
+		testing.expect_value(t, ed.visible_rows, int((700 - header - SCROLLBAR_SIZE) / 28))
+		testing.expect_value(t, ed.visible_cols, int((1000 - editor_gutter_width(&ed) - SCROLLBAR_SIZE) / 10))
 
 		ed.show_header = false
 		editor_set_viewport(&ed, 1000, 700)
 		testing.expect_value(t, editor_header_height(&ed), 0)
-		testing.expect_value(t, ed.visible_rows, 700 / 28)
+		testing.expect_value(t, ed.visible_rows, int((700 - SCROLLBAR_SIZE) / 28))
 	})
 }
 

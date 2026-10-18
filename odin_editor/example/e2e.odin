@@ -336,7 +336,7 @@ e2e_test_syntax_highlighting :: proc(ctx: ^E2E_Ctx) {
 		case .Keyword: has_keyword = true
 		case .Number: has_number = true
 		case .Comment: has_comment = true
-		case .Identifier, .String, .Operator, .Punctuation, .Type, .Builtin, .Default:
+		case .Identifier, .String, .Operator, .Punctuation, .Type, .Builtin, .Default, .Function, .Constant, .Property, .Directive, .Attribute:
 		}
 	}
 	e2e_check(ctx, "tokenizer finds keyword tokens ('if'/'return')", has_keyword)

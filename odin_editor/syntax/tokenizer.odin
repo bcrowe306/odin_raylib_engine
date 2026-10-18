@@ -17,6 +17,11 @@ TokenKind :: enum {
 	Comment,
 	Operator,
 	Punctuation,
+	Function,  // procedure names: declarations, calls, builtin procs
+	Constant,  // true/false/nil, SCREAMING_CASE constants
+	Property,  // field / member after '.'
+	Directive, // #partial, #force_inline, #load ...
+	Attribute, // @(private), @require_results ...
 }
 
 // Token spans [start, end) byte offsets within the line that was tokenized.
