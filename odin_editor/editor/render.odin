@@ -158,7 +158,8 @@ token_color :: proc(theme: Theme, kind: syn.TokenKind) -> sdl.Color {
 
 MIN_GUTTER_WIDTH :: 56
 
-editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, theme: Theme, x, y: f32) {
+editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, x, y: f32) {
+	theme := ed.theme
 	// Translucent overlays (selection, faded "unnecessary" code) blend.
 	sdl.SetRenderDrawBlendMode(renderer, sdl.BLENDMODE_BLEND)
 	sdl.SetRenderDrawColor(renderer, theme.background.r, theme.background.g, theme.background.b, theme.background.a)

@@ -402,7 +402,7 @@ main :: proc() {
 
 		sdl.SetRenderDrawColor(renderer, 30, 30, 30, 255)
 		sdl.RenderClear(renderer)
-		ed.editor_render(&editor, renderer, font, theme, 0, 0)
+		ed.editor_render(&editor, renderer, font, 0, 0)
 		control.server_after_render(&srv, &editor, renderer)
 		sdl.RenderPresent(renderer)
 

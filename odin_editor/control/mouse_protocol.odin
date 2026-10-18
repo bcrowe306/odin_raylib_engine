@@ -25,6 +25,8 @@ Where_Kind :: enum {
 	Scrollbar, // line: 0 vthumb, 1 hthumb, 2 vtrack, 3 htrack; col = percent along the track
 	Palette_Row, // line = result row (display order)
 	Keymap_Row,  // line = keymap editor row (display order)
+	Theme_Row,   // line = theme colour index
+	Theme_Slider, // line = channel 0..3, col = percent
 }
 
 Where :: struct {
@@ -108,6 +110,14 @@ parse_where :: proc(parts: []string) -> (w: Where, used: int, ok: bool) {
 		case "keymap":
 			w.kind = .Keymap_Row
 			w.line, ok = strconv.parse_int(tail)
+		case "theme":
+			w.kind = .Theme_Row
+			w.line, ok = strconv.parse_int(tail)
+		case "slider-r", "slider-g", "slider-b", "slider-a":
+			w.kind = .Theme_Slider
+			w.line = strings.index_byte("rgba", head[7])
+			w.col, ok = strconv.parse_int(tail)
+			ok &&= w.col >= 0 && w.col <= 100
 		case "vtrack", "htrack":
 			w.kind = .Scrollbar
 			w.line = 2 if head == "vtrack" else 3

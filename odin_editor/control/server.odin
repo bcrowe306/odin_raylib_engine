@@ -459,6 +459,14 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 	case .Last_Import:
 		actual = e.config.last_import
 		pass = strings.contains(actual, x.want)
+	case .Theme_Color:
+		pass, actual = expect_theme_color(e, strings.trim_space(x.want))
+	case .Theme_Selected:
+		actual = ed.theme_field_names()[e.theme_editor.selected]
+		pass = s.window == "theme" && actual == strings.trim_space(x.want)
+	case .Theme_Base:
+		actual = ed.preset_name(e.theme_editor.base)
+		pass = actual == strings.trim_space(x.want)
 	case .Palette_Open:
 		actual = "true" if s.palette.open else "false"
 		pass = actual == strings.trim_space(x.want)
@@ -779,6 +787,23 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 			}
 			return l.h_track.x + l.h_track.w * f, l.h_track.y + l.h_track.h / 2, ""
 		}
+	case .Theme_Row:
+		if e.window != .Theme {
+			return 0, 0, "theme editor is not open"
+		}
+		top, rows := ed.editor_theme_layout(e)
+		r := w.line - e.theme_editor.scroll
+		if r < 0 || r >= rows {
+			return 0, 0, fmt.tprintf("theme row %d is not on screen", w.line)
+		}
+		area := ed.editor_area_rect(e)
+		return area.x + area.w / 5, top + f32(r) * e.char_h + e.char_h / 2, ""
+	case .Theme_Slider:
+		if e.window != .Theme {
+			return 0, 0, "theme editor is not open"
+		}
+		r := ed.editor_theme_slider_rect(e, w.line)
+		return r.x + r.w * f32(w.col) / 100, r.y + r.h / 2, ""
 	case .Keymap_Row:
 		if e.window != .Keymap {
 			return 0, 0, "keymap editor is not open"
@@ -1031,4 +1056,21 @@ expect_binding :: proc(e: ^ed.Editor, want: string) -> (pass: bool, actual: stri
 	}
 	bound, bok := km.keymap_resolve(&e.keymap, chord)
 	return bok && bound == action, actual
+}
+
+// expect_theme_color checks "<field>=<#hex>" against the editor's theme.
+@(private)
+expect_theme_color :: proc(e: ^ed.Editor, want: string) -> (pass: bool, actual: string) {
+	eq := strings.index_byte(want, '=')
+	if eq < 0 {
+		return false, "want <field>=<#hex>"
+	}
+	i := ed.theme_field_index(strings.trim_space(want[:eq]))
+	if i < 0 {
+		return false, fmt.tprintf("unknown theme field %q", want[:eq])
+	}
+	c := ed.theme_color_ptr(&e.theme, i)^
+	actual = ed.color_hex(c)
+	wc, ok := ed.parse_color_hex(want[eq + 1:])
+	return ok && wc == c, actual
 }

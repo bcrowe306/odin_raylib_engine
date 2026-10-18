@@ -8,6 +8,7 @@
 package editor
 
 import km "../keymap"
+import "core:fmt"
 import "core:slice"
 import "core:strings"
 import "core:unicode/utf8"
@@ -21,6 +22,7 @@ PALETTE_MRU :: 8
 Palette_Entry_Kind :: enum {
 	Command,
 	Window, // switch to an editor window (keymap editor, theme editor, ...)
+	Preset, // switch the colour theme
 }
 
 Palette_Entry :: struct {
@@ -29,6 +31,7 @@ Palette_Entry :: struct {
 	detail: string, // shortcut (commands) or description
 	action: km.Action,
 	window: Editor_Window,
+	preset: Theme_Preset,
 }
 
 Palette_Match :: struct {
@@ -155,6 +158,10 @@ editor_palette_entries :: proc(ed: ^Editor) -> []Palette_Entry {
 		if label := window_label(w); len(label) > 0 {
 			append(&out, Palette_Entry{kind = .Window, label = label, detail = window_detail(w), window = w})
 		}
+	}
+	for p in Theme_Preset {
+		label := fmt.tprintf("Color Theme: %s", preset_name(p))
+		append(&out, Palette_Entry{kind = .Preset, label = label, detail = "current" if p == ed.theme_editor.base else "theme", preset = p})
 	}
 	return out[:]
 }
@@ -283,6 +290,8 @@ editor_palette_run :: proc(ed: ^Editor, row: int) {
 		}
 	case .Window:
 		editor_show_window(ed, e.window)
+	case .Preset:
+		editor_apply_preset(ed, e.preset)
 	}
 }
 

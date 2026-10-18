@@ -56,6 +56,8 @@ Editor :: struct {
 	palette:      Palette_State,
 	window:       Editor_Window,
 	keymap_editor: Keymap_Editor,
+	theme_editor: Theme_Editor,
+	theme:        Theme,
 	config:       Config,
 	nav:          Navigation,
 	hover:        Hover_Info,
@@ -133,6 +135,8 @@ editor_init :: proc(
 	find_init(&ed.find)
 	palette_init(&ed.palette)
 	ed.keymap_editor.filter = strings.builder_make(allocator)
+	ed.theme = default_theme()
+	theme_editor_init(&ed.theme_editor, allocator)
 	// Diagnostics follow edits between server publishes (see Diag_Overlay).
 	ed.buf.track_changes = true
 	return ed
@@ -157,6 +161,7 @@ editor_destroy :: proc(ed: ^Editor) {
 	find_destroy(&ed.find)
 	palette_destroy(&ed.palette)
 	keymap_editor_destroy(&ed.keymap_editor)
+	theme_editor_destroy(&ed.theme_editor)
 	config_destroy(&ed.config)
 	navigation_destroy(&ed.nav)
 	delete(ed.snippet.stops)

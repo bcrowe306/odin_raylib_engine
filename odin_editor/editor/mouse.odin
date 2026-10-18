@@ -393,6 +393,12 @@ editor_toggle_cursor_at :: proc(ed: ^Editor, pos: buf.Position) {
 @(private)
 editor_handle_mouse_up :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool {
 	ed.mouse.x, ed.mouse.y = ev.x, ev.y
+	if ed.window != .Text {
+		if ev.button == 1 {
+			editor_window_release(ed)
+		}
+		return true
+	}
 	m := &ed.mouse
 	if ev.button == 1 && m.scroll_drag != .None {
 		m.scroll_drag = .None
@@ -428,8 +434,9 @@ editor_handle_mouse_motion :: proc(ed: ^Editor, ev: sdl.MouseMotionEvent) -> boo
 	ed.mouse.x, ed.mouse.y = ev.x, ev.y
 	hit := editor_hit_test(ed, ev.x, ev.y)
 	ed.mouse.zone = hit.zone
-	if hit.zone == .Tool_Window {
-		return true
+	if ed.window != .Text {
+		editor_window_motion(ed, ev.x, ev.y)
+		return hit.zone == .Tool_Window
 	}
 	editor_track_diag_hover(ed, hit, ev.x, ev.y)
 	m := &ed.mouse

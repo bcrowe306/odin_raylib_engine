@@ -226,6 +226,14 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     The editor now has a tool-window framework (`windows.odin`) the theme
     editor and utilities page will use. Verified by unit tests and
     `tools/keymap_smoke.edctl` (fixture keymaps, never the user's).
+30. **Theme editor** — the editor owns its theme (`editor_render` no
+    longer takes one; `editor_set_theme`). A **Theme Editor** window
+    (palette) lists every colour with a swatch and hex; R/G/B/A sliders
+    (mouse or keys), hex entry with live preview, a syntax-highlighted
+    preview pane, reset-to-preset, and preset cycling. Presets Ayu Dark,
+    Ayu Light (new) and Dark+ are also palette entries. Edits persist in
+    `<config dir>/theme.json` as the preset plus changed colours. Verified
+    by unit tests and `tools/theme_smoke.edctl`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -233,5 +241,4 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-**Make theme colors editable in ui**
 **Command Pallet switches between windows** Command Pallet should be able to switch between windows, keymap editor, find, theme editor, utitlity page(maybe funcitons around managing ols).

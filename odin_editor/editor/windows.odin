@@ -11,6 +11,7 @@ import ttf "vendor:sdl3/ttf"
 Editor_Window :: enum {
 	Text,
 	Keymap,
+	Theme,
 }
 
 // window_label is the palette name of a window ("" = not listed).
@@ -18,6 +19,7 @@ window_label :: proc(w: Editor_Window) -> string {
 	switch w {
 	case .Text: return "Editor"
 	case .Keymap: return "Keymap Editor"
+	case .Theme: return "Theme Editor"
 	}
 	return ""
 }
@@ -39,6 +41,9 @@ editor_show_window :: proc(ed: ^Editor, w: Editor_Window) {
 	case .Keymap:
 		ed.keymap_editor.capturing = false
 		keymap_editor_clamp_scroll(ed)
+	case .Theme:
+		ed.theme_editor.editing = false
+		theme_editor_clamp_scroll(ed)
 	}
 }
 
@@ -63,7 +68,7 @@ window_passthrough :: proc(a: km.Action) -> bool {
 
 @(private)
 editor_window_handle_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
-	capturing := ed.window == .Keymap && ed.keymap_editor.capturing
+	capturing := (ed.window == .Keymap && ed.keymap_editor.capturing) || (ed.window == .Theme && ed.theme_editor.editing)
 	if !capturing {
 		if a, ok := km.keymap_resolve(&ed.keymap, chord); ok && window_passthrough(a) {
 			if a == .OpenKeymapEditor && ed.window == .Keymap {
@@ -77,6 +82,8 @@ editor_window_handle_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
 	case .Text:
 	case .Keymap:
 		return editor_keymap_handle_key(ed, chord)
+	case .Theme:
+		return editor_theme_handle_key(ed, chord)
 	}
 	return false
 }
@@ -87,6 +94,8 @@ editor_window_text_input :: proc(ed: ^Editor, text: string) {
 	case .Text:
 	case .Keymap:
 		editor_keymap_text_input(ed, text)
+	case .Theme:
+		editor_theme_text_input(ed, text)
 	}
 }
 
@@ -98,6 +107,26 @@ editor_window_click :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) {
 		if ev.button == 1 {
 			editor_keymap_click(ed, ev)
 		}
+	case .Theme:
+		if ev.button == 1 {
+			editor_theme_click(ed, ev.x, ev.y)
+		}
+	}
+}
+
+// editor_window_motion / editor_window_release: drags inside a tool
+// window (theme sliders) follow the pointer even outside it.
+@(private)
+editor_window_motion :: proc(ed: ^Editor, x, y: f32) {
+	if ed.window == .Theme {
+		editor_theme_drag(ed, x, y)
+	}
+}
+
+@(private)
+editor_window_release :: proc(ed: ^Editor) {
+	if ed.window == .Theme {
+		editor_theme_release(ed)
 	}
 }
 
@@ -107,6 +136,8 @@ editor_window_scroll :: proc(ed: ^Editor, lines: int) {
 	case .Text:
 	case .Keymap:
 		editor_keymap_scroll(ed, lines)
+	case .Theme:
+		editor_theme_scroll(ed, lines)
 	}
 }
 
@@ -120,6 +151,8 @@ render_tool_window :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font
 	case .Text:
 	case .Keymap:
 		render_keymap_editor(ed, renderer, font, theme)
+	case .Theme:
+		render_theme_editor(ed, renderer, font, theme)
 	}
 }
 
