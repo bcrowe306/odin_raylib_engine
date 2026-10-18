@@ -17,6 +17,7 @@ import "core:fmt"
 import "core:os"
 import "core:strings"
 import "core:time"
+import "core:unicode/utf8"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
 
@@ -394,7 +395,7 @@ e2e_test_render_smoke :: proc(e: ^ed.Editor, ctx: ^E2E_Ctx, renderer: ^sdl.Rende
 // ---------------------------------------------------------------------
 // 14. LSP integration (real `ols` binary, skipped if not built)
 // ---------------------------------------------------------------------
-e2e_test_lsp :: proc(e: ^ed.Editor, ctx: ^E2E_Ctx, primary_mod: sdl.Keymod) {
+e2e_test_lsp :: proc(e: ^ed.Editor, ctx: ^E2E_Ctx, primary_mod: sdl.Keymod, renderer: ^sdl.Renderer, font: ^ttf.Font, theme: ed.Theme) {
 	ctx.group = "lsp"
 	ols_path := "third_party/ols/ols"
 	if !os.exists(ols_path) {
@@ -430,22 +431,94 @@ e2e_test_lsp :: proc(e: ^ed.Editor, ctx: ^E2E_Ctx, primary_mod: sdl.Keymod) {
 	defer os.remove(sample_path)
 
 	ed.editor_load_file(e, sample_path)
+	e2e_pump_until(e, proc(e: ^ed.Editor) -> bool {return e.lsp_doc_open}, 3000)
+	e2e_check(ctx, "didOpen sent once the server is initialized", e.lsp_doc_open)
 	e.buf.cursors[0].pos = buf.Position{5, 8} // end of "fmt.pri"
 
+	// --- completion popup ---
 	ed.editor_inject_key(e, sdl.K_SPACE, primary_mod)
-	ed.editor_pump_injected_events(e)
-
-	got_completion := false
-	for _ in 0 ..< 50 {
-		lspc.client_poll(&e.lsp)
-		if len(e.lsp.last_completion) > 0 {
-			got_completion = true
-			break
-		}
-		time.sleep(100 * time.Millisecond)
-	}
+	got_completion := e2e_pump_until(e, ed.editor_completion_visible, 5000)
 	e2e_check(ctx, "completion request (Ctrl/Cmd+Space) returns items from ols",
 		got_completion, fmt.tprintf("got %d items", len(e.lsp.last_completion)))
+	e2e_check(ctx, "completion popup is visible", ed.editor_completion_visible(e))
+
+	println_row := -1
+	for idx, row in e.completion.filtered {
+		if e.lsp.last_completion[idx].label == "println" {
+			println_row = row
+		}
+	}
+	e2e_check(ctx, "popup lists 'println' for prefix 'pri'", println_row >= 0,
+		fmt.tprintf("%d filtered items", len(e.completion.filtered)))
+	all_match := true
+	for idx in e.completion.filtered {
+		label := e.lsp.last_completion[idx].label
+		all_match &&= len(label) >= 3 && strings.equal_fold(label[:3], "pri")
+	}
+	e2e_check(ctx, "every listed item matches the typed prefix", all_match)
+
+	e2e_render_frames(e, renderer, font, theme, 2)
+	e2e_check(ctx, "renders with completion popup open", true)
+
+	for _ in 0 ..< max(println_row, 0) {
+		ed.editor_inject_key(e, sdl.K_DOWN)
+	}
+	ed.editor_update(e)
+	selected, _ := ed.editor_completion_selected_item(e)
+	e2e_check(ctx, "Down arrows move the selection to 'println'", selected.label == "println",
+		fmt.tprintf("selected %q", selected.label))
+
+	ed.editor_inject_key(e, sdl.K_RETURN)
+	ed.editor_update(e)
+	e2e_check(ctx, "Enter accepts the completion", buf.buffer_line_str(&e.buf, 5) == "\tfmt.println",
+		fmt.tprintf("line 5 = %q", buf.buffer_line_str(&e.buf, 5)))
+	e2e_check(ctx, "accepting closes the popup", !e.completion.active)
+
+	// --- signature help ---
+	ed.editor_inject_text(e, "(")
+	got_sig := e2e_pump_until(e, ed.editor_signature_visible, 5000)
+	e2e_check(ctx, "typing '(' shows signature help from ols", got_sig)
+	label, _, active, _ := ed.editor_signature_active_parts(e)
+	// Copy: `label` borrows LSP storage that later responses free.
+	e2e_check(ctx, "signature label is fmt.println's", strings.contains(label, "println :: proc("), fmt.tprint(label))
+	e2e_check(ctx, "first parameter is active", active == "args: ..any", fmt.tprintf("active=%q", active))
+
+	e2e_render_frames(e, renderer, font, theme, 2)
+	e2e_check(ctx, "renders with signature help open", true)
+
+	for ch in "\"hi\")" {
+		bytes, n := utf8.encode_rune(ch)
+		ed.editor_inject_text(e, string(bytes[:n]))
+		ed.editor_update(e)
+	}
+	closed := e2e_pump_until(e, proc(e: ^ed.Editor) -> bool {return !e.signature.active}, 3000)
+	e2e_check(ctx, "closing ')' dismisses signature help", closed)
+	e2e_check(ctx, "edits reached ols (document synced)", e.lsp_synced_version == e.buf.version)
+}
+
+// e2e_pump_until runs editor updates (event pump + LSP poll + popup
+// refresh) until `cond` holds or `timeout_ms` elapses.
+e2e_pump_until :: proc(e: ^ed.Editor, cond: proc(e: ^ed.Editor) -> bool, timeout_ms: int) -> bool {
+	start := time.tick_now()
+	for {
+		ed.editor_update(e)
+		if cond(e) {
+			return true
+		}
+		if time.duration_milliseconds(time.tick_since(start)) > f64(timeout_ms) {
+			return false
+		}
+		time.sleep(10 * time.Millisecond)
+	}
+}
+
+e2e_render_frames :: proc(e: ^ed.Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, theme: ed.Theme, n: int) {
+	for _ in 0 ..< n {
+		sdl.SetRenderDrawColor(renderer, 0, 0, 0, 255)
+		sdl.RenderClear(renderer)
+		ed.editor_render(e, renderer, font, theme, 0, 0)
+		sdl.RenderPresent(renderer)
+	}
 }
 
 // ---------------------------------------------------------------------
@@ -469,7 +542,7 @@ run_e2e_suite :: proc(e: ^ed.Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, t
 	e2e_test_syntax_highlighting(&ctx)
 	e2e_test_scroll_viewport(e, &ctx)
 	e2e_test_render_smoke(e, &ctx, renderer, font, theme)
-	e2e_test_lsp(e, &ctx, primary_mod)
+	e2e_test_lsp(e, &ctx, primary_mod, renderer, font, theme)
 
 	return e2e_print_report(&ctx)
 }

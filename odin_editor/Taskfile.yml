@@ -25,7 +25,9 @@ tasks:
       - odin check syntax -no-entry-point
       - odin check lsp -no-entry-point
       - odin check editor -no-entry-point
+      - odin check control -no-entry-point
       - odin check example
+      - odin check tools/edctl
 
   test:
     desc: Run unit tests for every package
@@ -35,6 +37,7 @@ tasks:
       - odin test syntax -define:ODIN_TEST_THREADS=1
       - odin test lsp -define:ODIN_TEST_THREADS=1
       - odin test editor -define:ODIN_TEST_THREADS=1
+      - odin test control -define:ODIN_TEST_THREADS=1
 
   test:buffer:
     desc: Run unit tests for the buffer package only
@@ -61,6 +64,26 @@ tasks:
     cmds:
       - odin test editor -define:ODIN_TEST_THREADS=1
 
+  test:control:
+    desc: Run unit tests for the control (remote hook) package only
+    cmds:
+      - odin test control -define:ODIN_TEST_THREADS=1
+
+  test:remote:
+    desc: >-
+      Launch the demo with the remote-control hook (--control-only) on a
+      scratch copy of example/assets/lsp_fixture.odin.txt and drive it with
+      tools/lsp_smoke.edctl: real SDL events in, OLS completion and
+      signature help verified out. Needs `task ols:build` first.
+    deps: [build, build:edctl]
+    cmds:
+      - ./tools/lsp_smoke.sh
+
+  build:edctl:
+    desc: Build the remote-control CLI client (tools/edctl/edctl)
+    cmds:
+      - odin build tools/edctl -out:tools/edctl/edctl
+
   build:
     desc: Build the standalone demo application
     cmds:
@@ -83,7 +106,7 @@ tasks:
   fmt:
     desc: Format all Odin source files in this folder
     cmds:
-      - odinfmt -w buffer keymap syntax lsp editor example
+      - odinfmt -w buffer keymap syntax lsp editor control example tools
     ignore_error: true
 
   ols:fetch:
@@ -106,5 +129,5 @@ tasks:
   clean:
     desc: Remove build artifacts
     cmds:
-      - rm -f example/editor_demo
+      - rm -f example/editor_demo tools/edctl/edctl
       - rm -rf example/editor_demo.dSYM

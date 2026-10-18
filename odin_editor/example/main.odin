@@ -12,12 +12,24 @@
 //   example --script-only   run the injected-event script, print the result, and exit
 //   example --e2e           run the full automated end-to-end test suite and exit
 //                           (exit code 0 on success, 1 if any check failed)
+//   example <file>          open <file> instead of the bundled sample
+//   example --control 7777  enable the remote-control hook on 127.0.0.1:7777
+//                           (drive the running GUI with tools/edctl; see README)
+//   example --control-only  with --control: accept input *only* from the hook —
+//                           real keyboard/mouse events are dropped and the window
+//                           never takes focus, so scripted runs can't be disturbed
+//                           by (or steal) the user's typing
+//   example --no-lsp        don't attach the OLS language server even if built
+//   example --ols <path>    use a specific `ols` binary
 package main
 
+import "../control"
 import ed "../editor"
 import km "../keymap"
 import "core:fmt"
 import "core:os"
+import "core:path/filepath"
+import "core:strconv"
 import "core:strings"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
@@ -72,12 +84,37 @@ run_demo_script :: proc(e: ^ed.Editor, primary_mod: sdl.Keymod) {
 	fmt.println("--- end demo script result ---")
 }
 
+// find_ols_binary looks for the `ols` built by `task ols:build`, relative
+// to the working directory (task runs from odin_editor/, the repo root is
+// one level up) and to the demo binary itself.
+find_ols_binary :: proc() -> string {
+	exe_dir := filepath.dir(os.args[0], context.temp_allocator)
+	next_to_exe, _ := filepath.join({exe_dir, "..", "third_party", "ols", "ols"}, context.temp_allocator)
+	candidates := []string{
+		"third_party/ols/ols",
+		"odin_editor/third_party/ols/ols",
+		next_to_exe,
+	}
+	for c in candidates {
+		if os.exists(c) {
+			return c
+		}
+	}
+	return ""
+}
+
 main :: proc() {
 	run_script := false
 	script_only := false
 	run_e2e := false
-	for arg in os.args[1:] {
-		switch arg {
+	use_lsp := true
+	control_port := 0
+	control_only := false
+	ols_path := ""
+	file_arg := ""
+	args := os.args[1:]
+	for i := 0; i < len(args); i += 1 {
+		switch args[i] {
 		case "--script":
 			run_script = true
 		case "--script-only":
@@ -85,6 +122,31 @@ main :: proc() {
 			script_only = true
 		case "--e2e":
 			run_e2e = true
+		case "--no-lsp":
+			use_lsp = false
+		case "--control":
+			i += 1
+			ok := false
+			if i < len(args) {
+				control_port, ok = strconv.parse_int(args[i])
+			}
+			if !ok {
+				fmt.eprintln("--control needs a port number, e.g. --control 7777")
+				os.exit(2)
+			}
+		case "--control-only":
+			control_only = true
+		case "--ols":
+			i += 1
+			if i < len(args) {
+				ols_path = args[i]
+			}
+		case:
+			if strings.has_prefix(args[i], "--") {
+				fmt.eprintln("unknown option:", args[i])
+				os.exit(2)
+			}
+			file_arg = args[i]
 		}
 	}
 
@@ -100,11 +162,35 @@ main :: proc() {
 	editor := ed.editor_init(platform)
 	defer ed.editor_destroy(&editor)
 
-	sample_path := "odin_editor/example/assets/sample.odin.txt"
-	if os.exists(sample_path) {
-		_ = ed.editor_load_file(&editor, sample_path)
-	} else if os.exists("assets/sample.odin.txt") {
-		_ = ed.editor_load_file(&editor, "assets/sample.odin.txt")
+	// The e2e suite manages its own LSP session and documents.
+	if use_lsp && !run_e2e && !script_only {
+		if ols_path == "" {
+			ols_path = find_ols_binary()
+		}
+		if ols_path == "" {
+			fmt.println("note: ols not found (run `task ols:build`); completion/signature help disabled")
+		} else {
+			root := filepath.dir(file_arg, context.temp_allocator) if file_arg != "" else "."
+			if ed.editor_attach_lsp(&editor, []string{ols_path}, root) {
+				fmt.println("attached language server:", ols_path)
+			} else {
+				fmt.eprintln("warning: failed to start", ols_path)
+			}
+		}
+	}
+
+	if file_arg != "" {
+		if !ed.editor_load_file(&editor, file_arg) {
+			fmt.eprintln("cannot open", file_arg)
+			os.exit(1)
+		}
+	} else {
+		for sample_path in ([]string{"example/assets/sample.odin.txt", "odin_editor/example/assets/sample.odin.txt", "assets/sample.odin.txt"}) {
+			if os.exists(sample_path) {
+				_ = ed.editor_load_file(&editor, sample_path)
+				break
+			}
+		}
 	}
 
 	// SDL must be initialized before the demo script runs: clipboard
@@ -131,7 +217,11 @@ main :: proc() {
 
 	window: ^sdl.Window
 	renderer: ^sdl.Renderer
-	if !sdl.CreateWindowAndRenderer("odin_editor demo", WINDOW_W, WINDOW_H, sdl.WINDOW_RESIZABLE, &window, &renderer) {
+	window_flags := sdl.WINDOW_RESIZABLE
+	if control_only {
+		window_flags |= sdl.WINDOW_NOT_FOCUSABLE
+	}
+	if !sdl.CreateWindowAndRenderer("odin_editor demo", WINDOW_W, WINDOW_H, window_flags, &window, &renderer) {
 		fmt.eprintln("CreateWindowAndRenderer failed:", sdl.GetError())
 		os.exit(1)
 	}
@@ -173,10 +263,26 @@ main :: proc() {
 		os.exit(all_pass ? 0 : 1)
 	}
 
+	srv: control.Server
+	if control_port > 0 {
+		if !control.server_start(&srv, control_port, window, platform) {
+			os.exit(1)
+		}
+		fmt.printfln("remote control listening on 127.0.0.1:%d", control_port)
+	}
+	defer control.server_stop(&srv)
+
 	running := true
 	for running {
+		// Remote-control commands push real SDL events, which the
+		// PollEvent loop below then delivers like any other input.
+		control.server_poll(&srv, &editor)
+
 		event: sdl.Event
 		for sdl.PollEvent(&event) {
+			if control_only && control.event_is_user_input(event) && !control.event_is_injected(&srv, event) {
+				continue
+			}
 			#partial switch event.type {
 			case .QUIT:
 				running = false
@@ -197,8 +303,10 @@ main :: proc() {
 		sdl.SetRenderDrawColor(renderer, 30, 30, 30, 255)
 		sdl.RenderClear(renderer)
 		ed.editor_render(&editor, renderer, font, theme, 0, 0)
+		control.server_after_render(&srv, &editor, renderer)
 		sdl.RenderPresent(renderer)
 
+		free_all(context.temp_allocator)
 		sdl.Delay(8)
 	}
 }

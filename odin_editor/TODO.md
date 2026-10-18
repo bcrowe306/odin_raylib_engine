@@ -1,23 +1,28 @@
 # odin_editor — Status / Backlog
 
-Tracks progress against `REQUIREMENTS.md`'s 9 numbered requirements.
+Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Done
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 57 tests across 5 packages, all
+2. **Unit tests for every feature** — 84 tests across 6 packages, all
    passing with zero tracked memory leaks:
-   - `buffer`: 20 tests (editing, undo/redo, cursors, selection, multi-cursor,
-     file IO).
+   - `buffer`: 22 tests (editing, undo/redo, cursors, selection, multi-cursor,
+     file IO, change-version tracking).
    - `keymap`: 6 tests (bind/resolve/unbind, default bindings per platform).
    - `syntax`: 8 tests (Odin tokenizer: keywords, strings, numbers, comments,
      operators, multi-line block comments).
-   - `lsp`: 10 tests (JSON-RPC framing, request encoding, dispatch of
-     diagnostics/completion/signature-help, partial-message handling).
-   - `editor`: 13 tests (SDL key/mod translation, action dispatch, undo/redo,
+   - `lsp`: 14 tests (JSON-RPC framing, request encoding, dispatch of
+     diagnostics/completion/signature-help, textEdit/insertText and
+     activeParameter parsing, null results, stale-response dropping,
+     partial-message handling).
+   - `editor`: 29 tests (SDL key/mod translation, action dispatch, undo/redo,
      multi-cursor add, event injection round-trip, viewport scroll math,
-     clipboard text extraction, file load/save round-trip).
+     clipboard text extraction, file load/save round-trip, completion
+     trigger/filter/navigate/accept/dismiss, signature help active-parameter
+     tracking and closing, LSP sync ordering, popup layout, mouse hit-test).
+   - `control`: 5 tests (chord/command parsing, escapes, errors, state JSON).
 3. **OLS integration** — `lsp` package implements the JSON-RPC/LSP subset
    needed (initialize, didOpen/didChange/didClose/didSave, completion,
    signatureHelp, publishDiagnostics, hover types). Verified against a real
@@ -32,9 +37,19 @@ Tracks progress against `REQUIREMENTS.md`'s 9 numbered requirements.
    with viewport clamping, mouse click-to-position, mouse wheel scroll.
 5. **Syntax highlighting & LSP features** — pluggable tokenizer
    (`syntax.Language`/`LineTokenizer`) with an Odin highlighter shipped by
-   default; `editor_render` colors tokens by kind. Completion and signature
-   help are wired end-to-end (keymap triggers -> LSP request -> response
-   stored on `Client` -> available for host/UI to render as a popup).
+   default; `editor_render` colors tokens by kind. **Completion popup** and
+   **signature-help tooltip** are rendered (`editor/render_popups.odin`) and
+   driven by `editor/lsp_ui.odin`: auto-trigger on `.`/identifier typing and
+   `(`/`,`, manual Ctrl/Cmd+Space and Ctrl/Cmd+Shift+Space, local prefix +
+   fuzzy filtering, Up/Down/PageUp/PageDown/Enter/Tab/Escape, accept via
+   `textEdit`/`insertText` as one undo step, active-parameter highlight,
+   close when the cursor leaves the word / call parens. LSP lifecycle fixed
+   along the way: `initialized` notification, `didOpen` deferred until
+   initialize completes, automatic full-text `didChange` before every
+   request, absolute `file://` URIs, stale responses dropped. Verified
+   against real OLS three ways: unit tests with synthetic responses
+   (`editor/lsp_ui_test.odin`), the in-process e2e suite (`task test:e2e`,
+   61 checks), and the remote-control smoke test (`task test:remote`).
    Diagnostics are received and stored per-document
    (`client_diagnostics_for`); gutter/squiggle rendering of diagnostics is
    not yet implemented (see Backlog).
@@ -54,6 +69,14 @@ Tracks progress against `REQUIREMENTS.md`'s 9 numbered requirements.
    `editor_pump_injected_events` let a host or test script drive the editor
    without real SDL input; demonstrated in `example/main.odin` via
    `--script`/`--script-only`.
+10. **Remote control hook** — `control/` package + `tools/edctl` CLI: a
+    loopback TCP line protocol that pushes real SDL events into a running
+    host (`sdl.PushEvent`, so they flow through the host's own PollEvent
+    loop), reports JSON state, waits on conditions (popup visible, LSP
+    ready/idle, N frames), asserts (`expect`), and saves PNG screenshots.
+    `--control-only` drops real input and keeps the window unfocusable for
+    undisturbed scripted runs. `tools/lsp_smoke.edctl` (55 commands) is the
+    scripted OLS completion/signature-help regression.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -61,12 +84,19 @@ Tracks progress against `REQUIREMENTS.md`'s 9 numbered requirements.
 
 ## Backlog / known limitations
 
-- **Completion/signature-help/diagnostics UI** — the LSP client fully
-  receives and stores these, but `editor_render` doesn't yet draw a
-  completion popup, signature-help tooltip, or diagnostic
-  gutter markers/squiggles. The data (`ed.lsp.last_completion`,
-  `last_signatures`, `client_diagnostics_for`) is available for a host to
-  render; wiring it into `editor/render.odin` is the next natural step.
+- **Diagnostics UI** — diagnostics are received and stored
+  (`client_diagnostics_for`) but not yet drawn as gutter markers/squiggles.
+- **Completion polish** — no mouse selection of popup items, no
+  documentation side panel, snippets aren't requested (no
+  `snippetSupport`), and `isIncomplete` lists aren't re-queried as you type
+  (filtering is purely local after the first response). Signature help shows
+  only the active overload (no overload cycling).
+- **Tab rendering** — a literal `\t` is drawn as a single cell, so
+  tab-indented lines render one column wide and cursor/popup placement uses
+  the same 1-cell width. Needs tab-stop expansion in render + hit-testing.
+- **OLS + directory names** — OLS derives package paths from directory
+  names; files in a directory whose name contains a `.` get no completions.
+  Worth surfacing to users (or opening such files with a symlinked root).
 - **LSP UTF-16 position encoding** — the LSP spec's `character` offset is a
   UTF-16 code-unit count; this client currently treats it as a raw byte
   offset. Correct and sufficient for ASCII-heavy Odin source, but wrong for
