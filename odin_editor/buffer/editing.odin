@@ -47,11 +47,14 @@ buffer_raw_insert :: proc(b: ^Buffer, pos: Position, text: string) -> Position {
 	// Multi-line insert: first segment stays on the original line, middle
 	// segments become new lines, last segment + `after` becomes the final
 	// new line.
+	//
+	// IMPORTANT: `before`/`after` are string views into the *old*
+	// `b.lines[p.line]` builder's backing array (via buffer_line_str), so
+	// every read of them must happen before that builder is destroyed
+	// below -- otherwise `after` would be read from freed memory.
 	first_line := strings.builder_make(b.allocator)
 	strings.write_string(&first_line, before)
 	strings.write_string(&first_line, segments[0])
-	strings.builder_destroy(&b.lines[p.line])
-	b.lines[p.line] = first_line
 
 	new_lines := make([dynamic]strings.Builder, 0, len(segments) - 1, context.temp_allocator)
 	for i := 1; i < len(segments) - 1; i += 1 {
@@ -63,6 +66,9 @@ buffer_raw_insert :: proc(b: ^Buffer, pos: Position, text: string) -> Position {
 	strings.write_string(&last_line, segments[len(segments) - 1])
 	strings.write_string(&last_line, after)
 	append(&new_lines, last_line)
+
+	strings.builder_destroy(&b.lines[p.line])
+	b.lines[p.line] = first_line
 
 	// Shift existing lines down and insert new_lines after p.line.
 	insert_at := p.line + 1

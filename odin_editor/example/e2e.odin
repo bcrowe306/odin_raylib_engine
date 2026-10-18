@@ -265,6 +265,18 @@ e2e_test_newline_autoindent :: proc(e: ^ed.Editor, ctx: ^E2E_Ctx) {
 	e2e_check(ctx, "Enter creates a new line", buf.buffer_line_count(&e.buf) == 2)
 	e2e_check(ctx, "new line copies leading indentation", buf.buffer_line_str(&e.buf, 1) == "    ",
 		fmt.tprintf("got %q", buf.buffer_line_str(&e.buf, 1)))
+
+	// Regression: pressing Enter between a pair of brackets must split the
+	// line cleanly, not corrupt/drop the trailing character (a prior bug
+	// read the old line's backing memory after it had been freed).
+	e2e_reset(e, "()")
+	e.buf.cursors[0].pos = buf.Position{0, 1}
+	ed.editor_inject_key(e, sdl.K_RETURN)
+	ed.editor_pump_injected_events(e)
+	e2e_check(ctx, "Enter between brackets keeps the opening bracket on line 0",
+		buf.buffer_line_str(&e.buf, 0) == "(", fmt.tprintf("got %q", buf.buffer_line_str(&e.buf, 0)))
+	e2e_check(ctx, "Enter between brackets preserves the closing bracket on line 1",
+		buf.buffer_line_str(&e.buf, 1) == ")", fmt.tprintf("got %q", buf.buffer_line_str(&e.buf, 1)))
 }
 
 // ---------------------------------------------------------------------

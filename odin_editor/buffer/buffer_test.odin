@@ -304,6 +304,26 @@ test_newline_auto_indent :: proc(t: ^testing.T) {
 	})
 }
 
+// Regression test for a use-after-free in buffer_raw_insert's multi-line
+// path: `after` (the text following the cursor on the original line) was
+// read from the old line builder's backing array *after* that builder had
+// already been destroyed, corrupting bytes like `)` into garbage/`\x00`
+// when splitting a line via newline (e.g. pressing Enter between matching
+// brackets: "(|)" -> "(" / ")").
+@(test)
+test_newline_between_characters_preserves_trailing_text :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		buffer_set_text(&b, "()")
+		b.cursors[0] = Cursor{pos = Position{0, 1}}
+		buffer_newline(&b)
+		testing.expect_value(t, buffer_line_count(&b), 2)
+		testing.expect_value(t, buffer_line_str(&b, 0), "(")
+		testing.expect_value(t, buffer_line_str(&b, 1), ")")
+	})
+}
+
 @(test)
 test_indent_and_outdent_selection :: proc(t: ^testing.T) {
 	run_leak_free(t, proc(t: ^testing.T) {
