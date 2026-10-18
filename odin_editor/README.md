@@ -77,13 +77,15 @@ ed.editor_set_font(&editor, char_w, glyph_h)
 ed.editor_set_viewport(&editor, width, height)
 
 ed.editor_load_file(&editor, "some/file.odin")
+// Optional: persist keymap/theme edits there (loads them now).
+ed.editor_set_config_dir(&editor, "~/.config/my_app/editor")
 
 // per frame:
 for sdl.PollEvent(&event) {
     ed.editor_handle_event(&editor, event)
 }
 ed.editor_update(&editor)           // polls LSP responses, drains injected events
-ed.editor_render(&editor, renderer, font, ed.default_theme(), x, y)
+ed.editor_render(&editor, renderer, font, x, y) // uses editor.theme (editor_set_theme)
 ```
 
 Save/load is a plain API the host drives explicitly — there is no global
@@ -251,10 +253,18 @@ builds the sheets.
 
 ## Look & feel
 
-- The default theme is **Ayu Dark** (`default_theme()`; the earlier
-  palette is `vscode_dark_theme()`). Highlighting distinguishes keywords,
-  procedures (declarations, calls, builtins), types, constants, fields,
-  strings, numbers, comments, operators, `#directives` and `@attributes`.
+- The default theme is **Ayu Dark**; **Ayu Light** and **Dark+** are the
+  other presets (palette: "Color Theme: ..."). Highlighting distinguishes
+  keywords, procedures (declarations, calls, builtins), types, constants,
+  fields, strings, numbers, comments, operators, `#directives` and
+  `@attributes`. The editor owns its theme (`editor.theme`,
+  `editor_set_theme`).
+- **Theme Editor** (palette → "Theme Editor"): every theme colour with a
+  swatch. Edit the selected one with the R/G/B/A sliders (drag, or
+  Tab + Left/Right, Shift for steps of 16) or Enter to type a hex value;
+  a live preview shows the result. Del resets a colour to the preset's,
+  P / Shift+P cycles presets. Edits persist in `<config dir>/theme.json`
+  (the preset plus changed colours).
 - **Scrollbars** on the right and bottom: drag the thumb or click the
   track; the vertical track marks diagnostics, find matches and the caret.
 - **Zoom** with **Ctrl/Cmd + / − / 0**. The host owns the fonts: call

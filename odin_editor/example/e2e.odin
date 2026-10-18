@@ -384,7 +384,7 @@ e2e_test_render_smoke :: proc(e: ^ed.Editor, ctx: ^E2E_Ctx, renderer: ^sdl.Rende
 	for _ in 0 ..< 5 {
 		sdl.SetRenderDrawColor(renderer, 0, 0, 0, 255)
 		sdl.RenderClear(renderer)
-		ed.editor_render(e, renderer, font, theme, 0, 0)
+		ed.editor_render(e, renderer, font, 0, 0)
 		sdl.RenderPresent(renderer)
 	}
 	// If we reach this line, 5 render passes (with an active selection,
@@ -522,7 +522,7 @@ e2e_render_frames :: proc(e: ^ed.Editor, renderer: ^sdl.Renderer, font: ^ttf.Fon
 	for _ in 0 ..< n {
 		sdl.SetRenderDrawColor(renderer, 0, 0, 0, 255)
 		sdl.RenderClear(renderer)
-		ed.editor_render(e, renderer, font, theme, 0, 0)
+		ed.editor_render(e, renderer, font, 0, 0)
 		sdl.RenderPresent(renderer)
 	}
 }

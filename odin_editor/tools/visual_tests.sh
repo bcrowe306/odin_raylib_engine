@@ -30,6 +30,7 @@ SUITES=(
 	"ui_tweaks:example/assets/ui_fixture.odin.txt:Ayu Dark syntax colours, scrollbars (drag/click), Ctrl/Cmd +/- zoom"
 	"palette_smoke:example/assets/mouse_fixture.odin.txt:Command palette (Cmd/Ctrl+P): fuzzy search, shortcuts, MRU, run by key or click"
 	"nav_smoke:example/assets/nav_fixture:Go to Definition, Peek, Find References, Cmd/Ctrl+click across files, Back"
+	"theme_smoke:example/assets/ui_fixture.odin.txt:Theme editor window: colour list, hex entry, RGBA sliders, live preview, presets"
 	"keymap_smoke:example/assets/mouse_fixture.odin.txt:Line commands, Keymap Editor (filter, rebind, persist), import from Zed/VSCode"
 	"diagnostics_extras:example/assets/problems_fixture:Diagnostic tags, quick fixes, edit-tracking squiggles, problems panel"
 )

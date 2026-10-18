@@ -48,6 +48,7 @@ editor_set_config_dir :: proc(ed: ^Editor, dir: string) {
 	}
 	_ = os.make_directory_all(dir)
 	editor_load_keymap(ed)
+	editor_load_theme(ed)
 }
 
 // editor_set_import_path overrides where an import reads from.

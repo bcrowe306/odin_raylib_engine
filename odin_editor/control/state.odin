@@ -74,6 +74,15 @@ State_Keymap_Editor :: struct {
 	items:          []string `json:"items"`, // visible rows, "title = chord, chord"
 }
 
+State_Theme_Editor :: struct {
+	base:     string `json:"base"`,
+	selected: string `json:"selected"`,
+	color:    string `json:"color"`,
+	channel:  int    `json:"channel"`,
+	editing:  bool   `json:"editing"`,
+	hex:      string `json:"hex"`,
+}
+
 State_Palette :: struct {
 	open:           bool     `json:"open"`,
 	query:          string   `json:"query"`,
@@ -187,6 +196,7 @@ State :: struct {
 	palette:           State_Palette      `json:"palette"`,
 	window:            string             `json:"window"`,
 	keymap_editor:     State_Keymap_Editor `json:"keymap_editor"`,
+	theme_editor:      State_Theme_Editor  `json:"theme_editor"`,
 	text:         string           `json:"text"`,
 }
 
@@ -355,6 +365,17 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 		s.hover = {visible = true, text = strings.join(texts[:], "\n", context.temp_allocator), rect = rect_array(rect)}
 	}
 	s.window = strings.to_lower(fmt.tprint(e.window), context.temp_allocator)
+	{
+		t := &e.theme_editor
+		s.theme_editor = {
+			base     = ed.preset_name(t.base),
+			selected = ed.theme_field_names()[t.selected],
+			color    = ed.color_hex(ed.theme_color_ptr(&e.theme, t.selected)^),
+			channel  = t.channel,
+			editing  = t.editing,
+			hex      = strings.to_string(t.hex),
+		}
+	}
 	if e.window == .Keymap {
 		k := &e.keymap_editor
 		rows := ed.editor_keymap_rows(e)

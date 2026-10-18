@@ -114,6 +114,9 @@ Expect_Field :: enum {
 	Keymap_Capturing,    // keymap editor is recording a chord: "true" / "false"
 	Binding,             // "<action>=<chord>": chord is bound to action ("<action>=none": unbound)
 	Last_Import,         // last keymap import summary contains substring
+	Theme_Color,         // "<field>=<#hex>": a theme colour (#rgb / #rrggbb / #rrggbbaa)
+	Theme_Selected,      // theme editor's selected field name ("text_keyword")
+	Theme_Base,          // theme preset name ("Ayu Dark")
 }
 
 // Cmd_Expect asserts on editor state; replies `ok` or
@@ -150,12 +153,12 @@ DEFAULT_WAIT_TIMEOUT_MS :: 5000
 HELP_TEXT :: "commands: key <chord>|@<action> [count] | type <text> | text <text> | " +
 	"click|mousedown|mouseup <where> [clicks=N] [mods=shift+alt] [button=left|middle|right] | move <where> | " +
 	"drag <from> <to> [steps=N] [mods=..] [clicks=N] | wheel <dy> [dx=N] [at=<where>] [mods=..] | locate <where> | " +
-	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @menu:index | @palette:row | @keymap:row | @vthumb | @hthumb | @vtrack:pct | @htrack:pct | @find:query|replace|case|word|regex | lsp-kill | " +
+	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @menu:index | @palette:row | @keymap:row | @theme:row | @slider-r|g|b|a:pct | @vthumb | @hthumb | @vtrack:pct | @htrack:pct | @find:query|replace|case|word|regex | lsp-kill | " +
 	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle|lsp-down|diagnostics|no-diagnostics|tooltip|code-actions> [timeout_ms] | " +
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
 	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +
 	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status|errors|warnings|diagnostics-has|line-severity|tooltip|" +
-	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop|hover|menu-open|font-size|palette-open|palette-selected|peek-open|refs-count|status|window|keymap-selected|keymap-capturing|binding|last-import> <value>. " +
+	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop|hover|menu-open|font-size|palette-open|palette-selected|peek-open|refs-count|status|window|keymap-selected|keymap-capturing|binding|last-import|theme-color|theme-selected|theme-base> <value>. " +
 	"chords: [primary+|cmd+|ctrl+|alt+|shift+]<key>, e.g. primary+space, shift+end, down. " +
 	"text escapes: \\n \\t \\\\"
 
@@ -283,6 +286,9 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		case "keymap-capturing": field = .Keymap_Capturing
 		case "binding": field = .Binding
 		case "last-import": field = .Last_Import
+		case "theme-color": field = .Theme_Color
+		case "theme-selected": field = .Theme_Selected
+		case "theme-base": field = .Theme_Base
 		case:
 			return nil, strings.concatenate({"unknown expect field: ", name}, context.temp_allocator)
 		}
