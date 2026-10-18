@@ -31,47 +31,44 @@ tasks:
       - odin check tools/contact_sheet
 
   test:
-    desc: Run unit tests for every package
-    cmds:
-      - odin test buffer -define:ODIN_TEST_THREADS=1
-      - odin test keymap -define:ODIN_TEST_THREADS=1
-      - odin test syntax -define:ODIN_TEST_THREADS=1
-      - odin test lsp -define:ODIN_TEST_THREADS=1
-      - odin test editor -define:ODIN_TEST_THREADS=1
-      - odin test control -define:ODIN_TEST_THREADS=1
+    desc: >-
+      Run unit tests for every package (packages in parallel, tests
+      multithreaded; a 60s guard kills a wedged test runner)
+    deps: [test:buffer, test:keymap, test:syntax, test:lsp, test:editor, test:control]
 
   test:buffer:
     desc: Run unit tests for the buffer package only
     cmds:
-      - odin test buffer -define:ODIN_TEST_THREADS=1
+      - perl -e 'alarm 60; exec @ARGV' odin test buffer
 
   test:keymap:
     desc: Run unit tests for the keymap package only
     cmds:
-      - odin test keymap -define:ODIN_TEST_THREADS=1
+      - perl -e 'alarm 60; exec @ARGV' odin test keymap
 
   test:syntax:
     desc: Run unit tests for the syntax package only
     cmds:
-      - odin test syntax -define:ODIN_TEST_THREADS=1
+      - perl -e 'alarm 60; exec @ARGV' odin test syntax
 
   test:lsp:
     desc: Run unit tests for the lsp package only
     cmds:
-      - odin test lsp -define:ODIN_TEST_THREADS=1
+      - perl -e 'alarm 60; exec @ARGV' odin test lsp
 
   test:editor:
     desc: Run unit tests for the editor package only
     cmds:
-      - odin test editor -define:ODIN_TEST_THREADS=1
+      - perl -e 'alarm 60; exec @ARGV' odin test editor
 
   test:control:
     desc: Run unit tests for the control (remote hook) package only
     cmds:
-      - odin test control -define:ODIN_TEST_THREADS=1
+      - perl -e 'alarm 60; exec @ARGV' odin test control
 
   test:visual:
     desc: >-
+      SUITE=<name> runs a single script (e.g. task test:visual SUITE=find_smoke).
       Visual UI tests: launch the demo with the remote-control hook
       (--control-only) and replay every tools/*.edctl script against a
       scratch fixture -- completion + signature help, OLS crash recovery,
@@ -80,7 +77,15 @@ tasks:
       every feature. Needs `task ols:build` first.
     deps: [build, build:edctl, build:contact-sheet]
     cmds:
-      - ./tools/visual_tests.sh
+      - SUITE={{.SUITE}} ./tools/visual_tests.sh
+
+  test:all:
+    desc: Everything, as run before merging to main (check, unit, e2e, full visual suite)
+    cmds:
+      - task: check
+      - task: test
+      - task: test:e2e
+      - task: test:visual
 
   test:remote:
     desc: Alias for test:visual

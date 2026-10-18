@@ -27,6 +27,19 @@ SUITES=(
 	"diagnostics_extras:example/assets/problems_fixture:Diagnostic tags, quick fixes, edit-tracking squiggles, problems panel"
 )
 
+# SUITE=<name> runs just that script (the gallery then lists only it).
+if [ -n "${SUITE:-}" ]; then
+	filtered=()
+	for entry in "${SUITES[@]}"; do
+		[ "${entry%%:*}" = "$SUITE" ] && filtered+=("$entry")
+	done
+	if [ ${#filtered[@]} -eq 0 ]; then
+		echo "visual tests: no suite named '$SUITE'" >&2
+		exit 2
+	fi
+	SUITES=("${filtered[@]}")
+fi
+
 failed=0
 results=()
 for entry in "${SUITES[@]}"; do

@@ -38,10 +38,12 @@ see their install docs). From inside `odin_editor/`:
 
 ```sh
 task check          # odin check every package (fast type-check)
-task test           # odin test every package (buffer/keymap/syntax/lsp/editor/control)
+task test           # unit tests, all packages in parallel (~4 s)
+task test:all       # check + unit + e2e + full visual suite (before merging)
 task test:e2e       # in-process end-to-end suite (real window, real OLS if built)
 task test:visual    # visual UI tests: drive the running demo via the control hook,
-                    # verify state, save screenshots + gallery (needs OLS)
+                    # verify state, save screenshots + gallery (needs OLS);
+                    # SUITE=find_smoke runs one script (~2 s)
 task build          # build the standalone example app
 task build:edctl    # build the control-hook CLI client (tools/edctl/edctl)
 task run            # build & launch the standalone example app
