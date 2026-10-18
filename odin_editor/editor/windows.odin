@@ -12,6 +12,7 @@ Editor_Window :: enum {
 	Text,
 	Keymap,
 	Theme,
+	Utilities,
 }
 
 // window_label is the palette name of a window ("" = not listed).
@@ -20,6 +21,7 @@ window_label :: proc(w: Editor_Window) -> string {
 	case .Text: return "Editor"
 	case .Keymap: return "Keymap Editor"
 	case .Theme: return "Theme Editor"
+	case .Utilities: return "Utilities (Language Server, Settings)"
 	}
 	return ""
 }
@@ -44,6 +46,7 @@ editor_show_window :: proc(ed: ^Editor, w: Editor_Window) {
 	case .Theme:
 		ed.theme_editor.editing = false
 		theme_editor_clamp_scroll(ed)
+	case .Utilities:
 	}
 }
 
@@ -84,6 +87,8 @@ editor_window_handle_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
 		return editor_keymap_handle_key(ed, chord)
 	case .Theme:
 		return editor_theme_handle_key(ed, chord)
+	case .Utilities:
+		return editor_utilities_handle_key(ed, chord)
 	}
 	return false
 }
@@ -96,6 +101,7 @@ editor_window_text_input :: proc(ed: ^Editor, text: string) {
 		editor_keymap_text_input(ed, text)
 	case .Theme:
 		editor_theme_text_input(ed, text)
+	case .Utilities:
 	}
 }
 
@@ -110,6 +116,10 @@ editor_window_click :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) {
 	case .Theme:
 		if ev.button == 1 {
 			editor_theme_click(ed, ev.x, ev.y)
+		}
+	case .Utilities:
+		if ev.button == 1 {
+			editor_utilities_click(ed, ev.y)
 		}
 	}
 }
@@ -138,6 +148,7 @@ editor_window_scroll :: proc(ed: ^Editor, lines: int) {
 		editor_keymap_scroll(ed, lines)
 	case .Theme:
 		editor_theme_scroll(ed, lines)
+	case .Utilities:
 	}
 }
 
@@ -153,6 +164,8 @@ render_tool_window :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font
 		render_keymap_editor(ed, renderer, font, theme)
 	case .Theme:
 		render_theme_editor(ed, renderer, font, theme)
+	case .Utilities:
+		render_utilities(ed, renderer, font, theme)
 	}
 }
 

@@ -153,7 +153,7 @@ DEFAULT_WAIT_TIMEOUT_MS :: 5000
 HELP_TEXT :: "commands: key <chord>|@<action> [count] | type <text> | text <text> | " +
 	"click|mousedown|mouseup <where> [clicks=N] [mods=shift+alt] [button=left|middle|right] | move <where> | " +
 	"drag <from> <to> [steps=N] [mods=..] [clicks=N] | wheel <dy> [dx=N] [at=<where>] [mods=..] | locate <where> | " +
-	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @menu:index | @palette:row | @keymap:row | @theme:row | @slider-r|g|b|a:pct | @vthumb | @hthumb | @vtrack:pct | @htrack:pct | @find:query|replace|case|word|regex | lsp-kill | " +
+	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @menu:index | @palette:row | @keymap:row | @theme:row | @slider-r|g|b|a:pct | @utility:row | @vthumb | @hthumb | @vtrack:pct | @htrack:pct | @find:query|replace|case|word|regex | lsp-kill | " +
 	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle|lsp-down|diagnostics|no-diagnostics|tooltip|code-actions> [timeout_ms] | " +
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
 	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +

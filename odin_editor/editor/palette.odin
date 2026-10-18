@@ -23,6 +23,7 @@ Palette_Entry_Kind :: enum {
 	Command,
 	Window, // switch to an editor window (keymap editor, theme editor, ...)
 	Preset, // switch the colour theme
+	Utility, // a utilities-window action (language server, settings)
 }
 
 Palette_Entry :: struct {
@@ -32,6 +33,7 @@ Palette_Entry :: struct {
 	action: km.Action,
 	window: Editor_Window,
 	preset: Theme_Preset,
+	utility: Utility,
 }
 
 Palette_Match :: struct {
@@ -159,6 +161,11 @@ editor_palette_entries :: proc(ed: ^Editor) -> []Palette_Entry {
 			append(&out, Palette_Entry{kind = .Window, label = label, detail = window_detail(w), window = w})
 		}
 	}
+	// The find bar is listed with the windows too.
+	append(&out, Palette_Entry{kind = .Window, label = "Find / Replace", detail = "window", window = .Text, action = .Find})
+	for u in Utility {
+		append(&out, Palette_Entry{kind = .Utility, label = utility_label(ed, u), detail = "utility", utility = u})
+	}
 	for p in Theme_Preset {
 		label := fmt.tprintf("Color Theme: %s", preset_name(p))
 		append(&out, Palette_Entry{kind = .Preset, label = label, detail = "current" if p == ed.theme_editor.base else "theme", preset = p})
@@ -215,7 +222,8 @@ editor_palette_matches :: proc(ed: ^Editor) -> (entries: []Palette_Entry, matche
 			m.entry = i
 			if len(q) == 0 {
 				// MRU rank, then alphabetical.
-				m.score = 0
+				// Windows come right after the recently used commands.
+				m.score = 500 if e.kind == .Window else 0
 				for a, r in ed.palette.mru {
 					if e.kind == .Command && e.action == a {
 						m.score = 1000 - r
@@ -290,6 +298,11 @@ editor_palette_run :: proc(ed: ^Editor, row: int) {
 		}
 	case .Window:
 		editor_show_window(ed, e.window)
+		if e.action != .None {
+			editor_run_action(ed, e.action)
+		}
+	case .Utility:
+		editor_run_utility(ed, e.utility)
 	case .Preset:
 		editor_apply_preset(ed, e.preset)
 	}

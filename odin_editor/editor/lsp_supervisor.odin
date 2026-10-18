@@ -106,17 +106,9 @@ editor_supervise_lsp :: proc(ed: ^Editor) {
 	s.restart_due = false
 	s.restarts += 1
 
-	// Fresh client; the old one only holds closed pipes now.
-	lspc.client_destroy(&ed.lsp)
-	ed.lsp = lspc.client_init()
-	ed.lsp.init_options = strings.clone(s.init_options, ed.lsp.allocator)
-	if !lspc.client_start(&ed.lsp, s.command, s.root) {
-		// Couldn't even spawn: treat as another crash next update.
-		ed.lsp.dead = true
-		return
-	}
-	lspc.client_initialize(&ed.lsp, lspc.file_uri(s.root, context.temp_allocator))
-	// didOpen is re-sent by editor_sync_lsp once initialize completes.
+	// Fresh client; the old one only holds closed pipes now. If it can't
+	// even spawn, that counts as another crash next update.
+	editor_lsp_respawn(ed)
 }
 
 @(private)
