@@ -248,11 +248,10 @@ main :: proc() {
 			char_w, char_h = f32(w), f32(h)
 		}
 	}
-	editor.char_w = char_w
-	editor.char_h = char_h
+	// Cell width + glyph height; the editor applies its line spacing.
+	ed.editor_set_font(&editor, char_w, char_h)
 	// The text area is the window minus the line-number gutter.
-	editor.visible_cols = int((WINDOW_W - ed.GUTTER_WIDTH) / char_w)
-	editor.visible_rows = int(WINDOW_H / char_h)
+	ed.editor_set_viewport(&editor, WINDOW_W, WINDOW_H)
 
 	_ = sdl.StartTextInput(window)
 	defer _ = sdl.StopTextInput(window)
@@ -305,8 +304,7 @@ main :: proc() {
 			case .WINDOW_RESIZED:
 				w, h: i32
 				sdl.GetWindowSize(window, &w, &h)
-				editor.visible_cols = int((f32(w) - ed.GUTTER_WIDTH) / char_w)
-				editor.visible_rows = int(f32(h) / char_h)
+				ed.editor_set_viewport(&editor, f32(w), f32(h))
 			}
 			handled := ed.editor_handle_event(&editor, event)
 			if !handled && event.type == .KEY_DOWN {
@@ -325,13 +323,22 @@ main :: proc() {
 			}
 		}
 
-		// Problems summary in the title bar (a real host would show this
-		// in its status bar).
+		// The gutter widens as the line count grows; keep the text area
+		// fitted to the window.
+		{
+			w, h: i32
+			sdl.GetWindowSize(window, &w, &h)
+			ed.editor_set_viewport(&editor, f32(w), f32(h))
+		}
+
+		// Window title: file name (+ unsaved marker) and a problems summary
+		// (a real host would show the latter in its status bar).
 		{
 			counts := ed.editor_diagnostic_counts(&editor)
-			title := "odin_editor demo"
+			name, _ := ed.editor_display_name(&editor)
+			title := fmt.tprintf("%s%s — odin_editor demo", name, " ●" if editor.buf.dirty else "")
 			if counts[.Error] + counts[.Warning] > 0 {
-				title = fmt.tprintf("odin_editor demo — %d error(s), %d warning(s)", counts[.Error], counts[.Warning])
+				title = fmt.tprintf("%s — %d error(s), %d warning(s)", title, counts[.Error], counts[.Warning])
 			}
 			if title != last_title {
 				delete(last_title)

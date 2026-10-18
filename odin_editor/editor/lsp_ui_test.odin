@@ -381,7 +381,7 @@ test_mouse_click_accounts_for_gutter_and_origin :: proc(t: ^testing.T) {
 		ev.type = .MOUSE_BUTTON_DOWN
 		ev.button.button = 1
 		ev.button.clicks = 1
-		ev.button.x = 100 + GUTTER_WIDTH + 3 * ed.char_w
+		ev.button.x = 100 + editor_gutter_width(&ed) + 3 * ed.char_w
 		ev.button.y = 50 + 1.5 * ed.char_h
 		editor_handle_event(&ed, ev)
 		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{1, 3})

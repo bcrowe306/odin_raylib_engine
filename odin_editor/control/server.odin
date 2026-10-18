@@ -703,7 +703,7 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 		if w.line < e.scroll_line || w.line >= e.scroll_line + ed.editor_text_rows(e) {
 			return 0, 0, fmt.tprintf("line %d is not visible", w.line)
 		}
-		return e.origin_x + ed.GUTTER_WIDTH / 2, e.origin_y + f32(w.line - e.scroll_line) * e.char_h + e.char_h / 2, ""
+		return e.origin_x + ed.editor_gutter_width(e) / 2, e.origin_y + f32(w.line - e.scroll_line) * e.char_h + e.char_h / 2, ""
 	case .Find_Part:
 		l, ok := ed.editor_find_layout(e)
 		if !ok {

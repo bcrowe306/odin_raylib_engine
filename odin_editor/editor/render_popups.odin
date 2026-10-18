@@ -54,7 +54,7 @@ editor_cursor_screen_pos :: proc(ed: ^Editor) -> (x, y: f32) {
 // buffer position (the caret's x for that position), using the origin
 // recorded by the last editor_render.
 editor_position_to_screen :: proc(ed: ^Editor, pos: buf.Position) -> (x, y: f32) {
-	x = ed.origin_x + GUTTER_WIDTH + f32(editor_visual_col(ed, pos) - ed.scroll_col) * ed.char_w
+	x = ed.origin_x + editor_gutter_width(ed) + f32(editor_visual_col(ed, pos) - ed.scroll_col) * ed.char_w
 	y = ed.origin_y + f32(pos.line - ed.scroll_line) * ed.char_h
 	return
 }
@@ -83,7 +83,7 @@ editor_popup_layout :: proc(ed: ^Editor) -> (layout: Popup_Layout) {
 	cx, cy := editor_cursor_screen_pos(ed)
 	view_top := ed.origin_y
 	view_bottom := ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h
-	view_right := ed.origin_x + GUTTER_WIDTH + f32(ed.visible_cols) * ed.char_w
+	view_right := ed.origin_x + editor_gutter_width(ed) + f32(ed.visible_cols) * ed.char_w
 
 	below_y := cy + ed.char_h + 2
 
@@ -96,7 +96,7 @@ editor_popup_layout :: proc(ed: ^Editor) -> (layout: Popup_Layout) {
 			y = below_y
 			below_y += h + 2
 		}
-		x := min(cx, max(ed.origin_x + GUTTER_WIDTH, view_right - w))
+		x := min(cx, max(ed.origin_x + editor_gutter_width(ed), view_right - w))
 		layout.signature = {x, y, w, h}
 		layout.signature_visible = true
 	}
@@ -116,7 +116,7 @@ editor_popup_layout :: proc(ed: ^Editor) -> (layout: Popup_Layout) {
 		// Align the list's label column under the start of the word.
 		ax, _ := editor_position_to_screen(ed, ed.completion.anchor)
 		x := ax - f32(COMPLETION_KIND_COLS) * ed.char_w - POPUP_PAD
-		x = clamp(x, ed.origin_x + GUTTER_WIDTH, max(ed.origin_x + GUTTER_WIDTH, view_right - w))
+		x = clamp(x, ed.origin_x + editor_gutter_width(ed), max(ed.origin_x + editor_gutter_width(ed), view_right - w))
 		layout.completion = {x, y, w, h}
 		layout.completion_visible = true
 	}
@@ -196,7 +196,7 @@ render_completion_popup :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf
 			fill_rect(renderer, {rect.x + 1, y, rect.w - 2, ed.char_h}, theme.popup_selected)
 		}
 
-		draw_text(renderer, font, completion_kind_tag(item.kind), x, y, theme.text_type)
+		draw_text(renderer, font, completion_kind_tag(item.kind), x, y, theme.text_type, ed.char_h)
 		x += f32(COMPLETION_KIND_COLS) * ed.char_w
 
 		label_cols := min(text_cols(item.label), total_cols - COMPLETION_KIND_COLS)
@@ -206,14 +206,14 @@ render_completion_popup :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf
 		if completion_match(label, prefix) == 2 && len(prefix) <= len(label) {
 			match_len = len(prefix)
 		}
-		draw_text(renderer, font, label[:match_len], x, y, theme.popup_match)
-		draw_text(renderer, font, label[match_len:], x + f32(text_cols(label[:match_len])) * ed.char_w, y, theme.popup_text)
+		draw_text(renderer, font, label[:match_len], x, y, theme.popup_match, ed.char_h)
+		draw_text(renderer, font, label[match_len:], x + f32(text_cols(label[:match_len])) * ed.char_w, y, theme.popup_text, ed.char_h)
 
 		detail_cols := total_cols - COMPLETION_KIND_COLS - label_cols - 2
 		if len(item.detail) > 0 && detail_cols > 3 {
 			detail := truncate_cols(item.detail, min(detail_cols, COMPLETION_DETAIL_MAX_COLS))
 			dx := rect.x + rect.w - POPUP_PAD - f32(text_cols(detail)) * ed.char_w
-			draw_text(renderer, font, detail, dx, y, theme.popup_text_dim)
+			draw_text(renderer, font, detail, dx, y, theme.popup_text_dim, ed.char_h)
 		}
 	}
 
@@ -232,13 +232,13 @@ render_signature_popup :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.
 	_, before, active, after := editor_signature_active_parts(ed)
 	x := rect.x + POPUP_PAD
 	y := rect.y + POPUP_PAD
-	draw_text(renderer, font, before, x, y, theme.popup_text)
+	draw_text(renderer, font, before, x, y, theme.popup_text, ed.char_h)
 	x += f32(text_cols(before)) * ed.char_w
-	draw_text(renderer, font, active, x, y, theme.popup_active_param)
+	draw_text(renderer, font, active, x, y, theme.popup_active_param, ed.char_h)
 	if len(active) > 0 {
 		// Underline the active parameter so it reads even without color.
 		fill_rect(renderer, {x, y + ed.char_h - 2, f32(text_cols(active)) * ed.char_w, 1}, theme.popup_active_param)
 	}
 	x += f32(text_cols(active)) * ed.char_w
-	draw_text(renderer, font, after, x, y, theme.popup_text)
+	draw_text(renderer, font, after, x, y, theme.popup_text, ed.char_h)
 }

@@ -546,8 +546,8 @@ editor_find_layout :: proc(ed: ^Editor) -> (l: Find_Bar_Layout, ok: bool) {
 	rows := 2 if ed.find.replace_mode else 1
 	w := f32(FIND_BAR_COLS) * ed.char_w + 2 * POPUP_PAD
 	h := f32(rows) * ed.char_h + 2 * POPUP_PAD
-	right := ed.origin_x + GUTTER_WIDTH + f32(ed.visible_cols) * ed.char_w
-	x := max(ed.origin_x + GUTTER_WIDTH, right - w - 12)
+	right := ed.origin_x + editor_gutter_width(ed) + f32(ed.visible_cols) * ed.char_w
+	x := max(ed.origin_x + editor_gutter_width(ed), right - w - 12)
 	y := ed.origin_y + 2
 	l.rect = {x, y, w, h}
 	l.query = {x, y + POPUP_PAD, w, ed.char_h}
@@ -606,10 +606,10 @@ render_find_bar :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, t
 	draw_popup_box(renderer, l.rect, theme)
 	draw_field :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, theme: Theme, row: sdl.FRect, label, value: string, active: bool) {
 		x := row.x + POPUP_PAD
-		draw_text(renderer, font, label, x, row.y, theme.popup_text_dim)
+		draw_text(renderer, font, label, x, row.y, theme.popup_text_dim, ed.char_h)
 		x += f32(text_cols(label)) * ed.char_w
 		shown := truncate_cols(value, 22)
-		draw_text(renderer, font, shown, x, row.y, theme.popup_text)
+		draw_text(renderer, font, shown, x, row.y, theme.popup_text, ed.char_h)
 		if active {
 			cx := x + f32(text_cols(shown)) * ed.char_w
 			fill_rect(renderer, {cx, row.y + 2, 2, ed.char_h - 4}, theme.cursor)
@@ -618,12 +618,12 @@ render_find_bar :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, t
 	draw_field(ed, renderer, font, theme, l.query, "Find:    ", strings.to_string(f.query), f.focused && f.field == .Query)
 	status := editor_find_status(ed)
 	status_color := theme.diag_error if f.regex_error || status == "No results" else theme.popup_text_dim
-	draw_text(renderer, font, status, l.opt_case.x - f32(text_cols(status) + 2) * ed.char_w, l.query.y, status_color)
+	draw_text(renderer, font, status, l.opt_case.x - f32(text_cols(status) + 2) * ed.char_w, l.query.y, status_color, ed.char_h)
 	toggle :: proc(renderer: ^sdl.Renderer, font: ^ttf.Font, theme: Theme, r: sdl.FRect, label: string, on: bool) {
 		if on {
 			fill_rect(renderer, r, theme.popup_selected)
 		}
-		draw_text(renderer, font, label, r.x, r.y, theme.popup_match if on else theme.popup_text_dim)
+		draw_text(renderer, font, label, r.x, r.y, theme.popup_match if on else theme.popup_text_dim, r.h)
 	}
 	toggle(renderer, font, theme, l.opt_case, "Aa", f.opts.case_sensitive)
 	toggle(renderer, font, theme, l.opt_word, "W", f.opts.whole_word)

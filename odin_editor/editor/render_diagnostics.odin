@@ -41,7 +41,7 @@ render_gutter_marker :: proc(ed: ^Editor, renderer: ^sdl.Renderer, diags: []Diag
 		return
 	}
 	size := max(ed.char_h * 0.35, 4)
-	fill_rect(renderer, {origin_x + GUTTER_WIDTH - size - 3, y + (ed.char_h - size) / 2, size, size}, severity_color(theme, sev))
+	fill_rect(renderer, {origin_x + editor_gutter_width(ed) - size - 3, y + (ed.char_h - size) / 2, size, size}, severity_color(theme, sev))
 }
 
 // render_squiggles decorates the parts of `line` covered by diagnostics:
@@ -76,7 +76,9 @@ render_squiggles :: proc(ed: ^Editor, renderer: ^sdl.Renderer, diags: []Diag, li
 				fill_rect(renderer, {x0, y + ed.char_h / 2, x1 - x0, 1}, {c.r, c.g, c.b, 200})
 			}
 			if !(d.unnecessary && sev == .Hint) {
-				draw_squiggle(renderer, x0, x1, y + ed.char_h - 1, severity_color(theme, sev), sev == .Hint)
+				// Just under the glyphs, not at the bottom of a spaced-out row.
+			base := y + (ed.char_h + editor_glyph_height(ed)) / 2 + 1
+			draw_squiggle(renderer, x0, x1, base, severity_color(theme, sev), sev == .Hint)
 			}
 		}
 	}
@@ -188,7 +190,7 @@ editor_diag_tooltip_layout :: proc(ed: ^Editor) -> (layout: Diag_Tooltip_Layout,
 	ax, ay := editor_position_to_screen(ed, anchor)
 	view_top := ed.origin_y
 	view_bottom := ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h
-	view_left := ed.origin_x + GUTTER_WIDTH
+	view_left := ed.origin_x + editor_gutter_width(ed)
 	view_right := view_left + f32(ed.visible_cols) * ed.char_w
 
 	y := ay - h - 2
@@ -216,10 +218,10 @@ render_diag_tooltip :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Fon
 		if line.label {
 			// Colour the "error:" / "warning:" prefix.
 			label_len := len(severity_label(line.color_of)) + 1
-			draw_text(renderer, font, text[:label_len], x, y, severity_color(theme, line.color_of))
-			draw_text(renderer, font, text[label_len:], x + f32(text_cols(text[:label_len])) * ed.char_w, y, theme.popup_text)
+			draw_text(renderer, font, text[:label_len], x, y, severity_color(theme, line.color_of), ed.char_h)
+			draw_text(renderer, font, text[label_len:], x + f32(text_cols(text[:label_len])) * ed.char_w, y, theme.popup_text, ed.char_h)
 		} else {
-			draw_text(renderer, font, text, x, y, theme.popup_text)
+			draw_text(renderer, font, text, x, y, theme.popup_text, ed.char_h)
 		}
 	}
 }

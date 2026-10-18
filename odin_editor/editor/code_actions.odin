@@ -167,7 +167,7 @@ editor_code_actions_layout :: proc(ed: ^Editor) -> (rect: sdl.FRect, ok: bool) {
 	if y + h > ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h {
 		y = max(ed.origin_y, cy - h - 2)
 	}
-	left := ed.origin_x + GUTTER_WIDTH
+	left := ed.origin_x + editor_gutter_width(ed)
 	right := left + f32(ed.visible_cols) * ed.char_w
 	return {clamp(cx, left, max(left, right - w)), y, w, h}, true
 }
@@ -181,7 +181,7 @@ render_code_actions :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Fon
 	draw_popup_box(renderer, rect, theme)
 	actions := ed.lsp.last_code_actions[:]
 	if len(actions) == 0 {
-		draw_text(renderer, font, "No code actions available", rect.x + POPUP_PAD, rect.y + POPUP_PAD, theme.popup_text_dim)
+		draw_text(renderer, font, "No code actions available", rect.x + POPUP_PAD, rect.y + POPUP_PAD, theme.popup_text_dim, ed.char_h)
 		return
 	}
 	for a, i in actions[:min(len(actions), CODE_ACTION_MAX_VISIBLE)] {
@@ -190,7 +190,7 @@ render_code_actions :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Fon
 			fill_rect(renderer, {rect.x + 1, y, rect.w - 2, ed.char_h}, theme.popup_selected)
 		}
 		marker := "* " if a.preferred else "  "
-		draw_text(renderer, font, marker, rect.x + POPUP_PAD, y, theme.popup_active_param)
-		draw_text(renderer, font, a.title, rect.x + POPUP_PAD + 2 * ed.char_w, y, theme.popup_text)
+		draw_text(renderer, font, marker, rect.x + POPUP_PAD, y, theme.popup_active_param, ed.char_h)
+		draw_text(renderer, font, a.title, rect.x + POPUP_PAD + 2 * ed.char_w, y, theme.popup_text, ed.char_h)
 	}
 }

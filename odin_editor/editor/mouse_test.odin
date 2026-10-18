@@ -106,17 +106,17 @@ test_click_places_caret_respecting_tabs :: proc(t: ^testing.T) {
 		defer editor_destroy(&ed)
 
 		// Visual col 5 on line 0 is between 'f' and 'o' (tab = 4 cells).
-		mouse_click(&ed, GUTTER_WIDTH + 5 * 10 + 1, 10)
+		mouse_click(&ed, editor_gutter_width(&ed) + 5 * 10 + 1, 10)
 		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{0, 2})
 
 		// Clicking in the right half of the tab lands after it.
-		mouse_click(&ed, GUTTER_WIDTH + 3 * 10, 10)
+		mouse_click(&ed, editor_gutter_width(&ed) + 3 * 10, 10)
 		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{0, 1})
 
 		// Past the end of a line clamps to its end; below the doc -> end.
-		mouse_click(&ed, GUTTER_WIDTH + 30 * 10, 30)
+		mouse_click(&ed, editor_gutter_width(&ed) + 30 * 10, 30)
 		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{1, 3})
-		mouse_click(&ed, GUTTER_WIDTH + 10, 9 * 20 + 5)
+		mouse_click(&ed, editor_gutter_width(&ed) + 10, 9 * 20 + 5)
 		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{1, 3})
 	})
 }
@@ -337,7 +337,7 @@ test_mouse_cursor_shape_and_zones :: proc(t: ^testing.T) {
 		ed := make_mouse_test_editor("text")
 		defer editor_destroy(&ed)
 
-		mouse_move(&ed, GUTTER_WIDTH + 15, 10)
+		mouse_move(&ed, editor_gutter_width(&ed) + 15, 10)
 		testing.expect(t, ed.mouse.zone == .Text, "over text")
 		testing.expect(t, editor_mouse_cursor(&ed) == .Text, "I-beam over text")
 		mouse_move(&ed, 10, 10)

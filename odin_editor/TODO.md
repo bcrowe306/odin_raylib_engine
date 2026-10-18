@@ -6,7 +6,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 147 tests across 6 packages, all
+2. **Unit tests for every feature** — 151 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
@@ -142,6 +142,13 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     horizontal scroll clamp skips measuring when not scrolled sideways and
     caches the widest line per buffer version. Verified by unit tests and
     the full visual suite against live OLS.
+20. **Header, line spacing, gutter** — file-name header strip (name,
+    dimmed directory, unsaved marker; `show_header` to hide) and the file
+    name in the demo's window title; rows are glyph height x
+    `line_spacing` (default 1.4) with text centred; line numbers without
+    zero padding, right-aligned, current line brighter; gutter widens with
+    the digit count. Hosts size the editor with `editor_set_font` +
+    `editor_set_viewport`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the

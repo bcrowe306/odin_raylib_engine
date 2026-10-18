@@ -118,7 +118,7 @@ test_hover_shows_tooltip_after_dwell :: proc(t: ^testing.T) {
 		publish(&ed, {{0, 5, 0, 8, 1, "bad is bad"}, {1, 0, 1, 4, 2, "warn two"}})
 
 		// Over 'a' of "bad".
-		mouse_move(&ed, GUTTER_WIDTH + 6 * 10 + 5, 10)
+		mouse_move(&ed, editor_gutter_width(&ed) + 6 * 10 + 5, 10)
 		editor_update(&ed)
 		testing.expect(t, len(editor_diag_tooltip_items(&ed)) == 0, "no tooltip before the dwell time")
 		ed.diag_tip.hover_since = time.tick_add(time.tick_now(), -DIAG_HOVER_DELAY)
@@ -133,7 +133,7 @@ test_hover_shows_tooltip_after_dwell :: proc(t: ^testing.T) {
 		testing.expect(t, len(editor_diag_tooltip_items(&ed)) == 1, "pointer over the tooltip keeps it")
 
 		// ...moving to clean text hides it.
-		mouse_move(&ed, GUTTER_WIDTH + 1 * 10 + 5, 10)
+		mouse_move(&ed, editor_gutter_width(&ed) + 1 * 10 + 5, 10)
 		testing.expect(t, len(editor_diag_tooltip_items(&ed)) == 0, "clean text hides the tooltip")
 
 		// Hovering the gutter shows every diagnostic on that line.

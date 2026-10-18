@@ -82,7 +82,7 @@ editor_screen_to_position :: proc(ed: ^Editor, x, y: f32) -> buf.Position {
 	if line >= count {
 		return buf.buffer_end_position(&ed.buf)
 	}
-	vcol := f32(ed.scroll_col) + (x - ed.origin_x - GUTTER_WIDTH) / ed.char_w
+	vcol := f32(ed.scroll_col) + (x - ed.origin_x - editor_gutter_width(ed)) / ed.char_w
 	return {line, byte_col_at_visual(buf.buffer_line_str(&ed.buf, line), vcol, ed.tab_width)}
 }
 
@@ -109,7 +109,7 @@ editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 		hit.zone = .Signature
 		return hit
 	}
-	right := ed.origin_x + GUTTER_WIDTH + f32(ed.visible_cols) * ed.char_w
+	right := ed.origin_x + editor_gutter_width(ed) + f32(ed.visible_cols) * ed.char_w
 	bottom := ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h
 	panel_bottom := ed.origin_y + f32(ed.visible_rows) * ed.char_h
 	switch {
@@ -118,7 +118,7 @@ editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 	case y >= bottom:
 		hit.zone = .Problems
 		hit.row = problems_row_at(ed, y)
-	case x < ed.origin_x + GUTTER_WIDTH:
+	case x < ed.origin_x + editor_gutter_width(ed):
 		hit.zone = .Gutter
 	case:
 		hit.zone = .Text
@@ -389,7 +389,7 @@ editor_update_mouse :: proc(ed: ^Editor) {
 	}
 	top := ed.origin_y
 	bottom := ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h
-	left := ed.origin_x + GUTTER_WIDTH
+	left := ed.origin_x + editor_gutter_width(ed)
 	right := left + f32(ed.visible_cols) * ed.char_w
 
 	dl, dc := 0, 0

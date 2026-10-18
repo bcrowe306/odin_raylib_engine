@@ -161,7 +161,7 @@ render_problems_panel :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.F
 		return
 	}
 	top := origin_y + f32(editor_text_rows(ed)) * ed.char_h
-	width := GUTTER_WIDTH + f32(ed.visible_cols) * ed.char_w
+	width := editor_gutter_width(ed) + f32(ed.visible_cols) * ed.char_w
 	fill_rect(renderer, {origin_x, top, width, f32(PROBLEMS_PANEL_ROWS) * ed.char_h}, theme.popup_bg)
 	fill_rect(renderer, {origin_x, top, width, 1}, theme.popup_border)
 
@@ -172,9 +172,9 @@ render_problems_panel :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.F
 	}
 	header := fmt.tprintf("PROBLEMS  %d errors  %d warnings  %d info  %d hints",
 		counts[.Error], counts[.Warning], counts[.Information], counts[.Hint])
-	draw_text(renderer, font, header, origin_x + POPUP_PAD, top + 1, theme.popup_text_dim)
+	draw_text(renderer, font, header, origin_x + POPUP_PAD, top + 1, theme.popup_text_dim, ed.char_h)
 	if len(problems) == 0 {
-		draw_text(renderer, font, "No problems have been detected.", origin_x + 2 * POPUP_PAD, top + ed.char_h, theme.popup_text_dim)
+		draw_text(renderer, font, "No problems have been detected.", origin_x + 2 * POPUP_PAD, top + ed.char_h, theme.popup_text_dim, ed.char_h)
 		return
 	}
 
@@ -187,16 +187,16 @@ render_problems_panel :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.F
 			fill_rect(renderer, {origin_x, y, width, ed.char_h}, theme.popup_selected)
 		}
 		label := severity_label(p.severity)
-		draw_text(renderer, font, label, x, y, severity_color(theme, p.severity))
+		draw_text(renderer, font, label, x, y, severity_color(theme, p.severity), ed.char_h)
 		x += 8 * ed.char_w
 		loc := fmt.tprintf("%s:%d:%d", filepath.base(p.path), p.pos.line + 1, p.pos.col + 1)
-		draw_text(renderer, font, loc, x, y, theme.popup_text_dim)
+		draw_text(renderer, font, loc, x, y, theme.popup_text_dim, ed.char_h)
 		x += f32(max(text_cols(loc) + 2, 20)) * ed.char_w
 		first_line := p.message
 		if nl := strings.index_byte(first_line, '\n'); nl >= 0 {
 			first_line = first_line[:nl]
 		}
 		room := int((origin_x + width - x) / ed.char_w) - 1
-		draw_text(renderer, font, truncate_cols(first_line, room), x, y, theme.popup_text)
+		draw_text(renderer, font, truncate_cols(first_line, room), x, y, theme.popup_text, ed.char_h)
 	}
 }

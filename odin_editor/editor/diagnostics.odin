@@ -326,7 +326,7 @@ editor_screen_to_cell :: proc(ed: ^Editor, x, y: f32) -> (pos: buf.Position, ins
 	if line >= buf.buffer_line_count(&ed.buf) {
 		return {}, false
 	}
-	vcol := f32(ed.scroll_col) + (x - ed.origin_x - GUTTER_WIDTH) / ed.char_w
+	vcol := f32(ed.scroll_col) + (x - ed.origin_x - editor_gutter_width(ed)) / ed.char_w
 	col, ok := byte_col_at_cell(buf.buffer_line_str(&ed.buf, line), vcol, ed.tab_width)
 	return {line, col}, ok
 }

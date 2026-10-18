@@ -90,7 +90,7 @@ test_find_options_toggle_by_alt_keys_and_click :: proc(t: ^testing.T) {
 		testing.expect_value(t, len(ed.find.matches), 2)
 
 		// Clicking the text gives focus back to the document.
-		mouse_click(&ed, GUTTER_WIDTH + 5, 10)
+		mouse_click(&ed, editor_gutter_width(&ed) + 5, 10)
 		testing.expect(t, ed.find.open && !ed.find.focused, "bar stays open, loses focus")
 	})
 }

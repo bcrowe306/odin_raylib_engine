@@ -68,6 +68,12 @@ import km "odin_editor/keymap"
 editor := ed.editor_init(km.Platform.MacOS) // or .Other for Win/Linux
 defer ed.editor_destroy(&editor)
 
+// Cell width + font line height; rows get editor.line_spacing (1.4).
+ed.editor_set_font(&editor, char_w, glyph_h)
+// Pixel size of the editor area (header + gutter accounted for); call
+// again on resize.
+ed.editor_set_viewport(&editor, width, height)
+
 ed.editor_load_file(&editor, "some/file.odin")
 
 // per frame:
