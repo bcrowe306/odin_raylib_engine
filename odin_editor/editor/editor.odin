@@ -49,6 +49,7 @@ Editor :: struct {
 	problems:     Problems_Panel,
 	actions:      Code_Action_Menu,
 	find:         Find_State,
+	snippet:      Snippet_Session,
 
 	// Viewport / scrolling (in cells, not pixels). scroll_col is a visual
 	// column (tabs expanded), not a byte offset.
@@ -107,6 +108,7 @@ editor_init :: proc(
 	}
 	ed.injected_events = make([dynamic]sdl.Event, allocator)
 	ed.completion.filtered = make([dynamic]int, allocator)
+	ed.signature.selected = -1
 	ed.diag_overlay.built_seq = -1
 	ed.width_cache_version = -1
 	ed.lsp_pending = make([dynamic]lspc.Incremental_Change, allocator)
@@ -133,6 +135,7 @@ editor_destroy :: proc(ed: ^Editor) {
 	delete(ed.lsp_pending)
 	problems_destroy(&ed.problems)
 	find_destroy(&ed.find)
+	delete(ed.snippet.stops)
 	delete(ed.completion.filtered)
 }
 

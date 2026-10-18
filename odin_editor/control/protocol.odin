@@ -95,6 +95,9 @@ Expect_Field :: enum {
 	Diag_Range,          // some diagnostic spans exactly "l1 c1 l2 c2" (bytes)
 	Find_Status,         // find bar status text equals ("2 of 5", "No results", ...)
 	Find_Open,           // "true" / "false"
+	Completion_Doc,      // the completion docs panel contains substring
+	Snippet_Active,      // "true" / "false"
+	Snippet_Stop,        // index of the current snippet tab stop ($N)
 }
 
 // Cmd_Expect asserts on editor state; replies `ok` or
@@ -136,7 +139,7 @@ HELP_TEXT :: "commands: key <chord>|@<action> [count] | type <text> | text <text
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
 	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +
 	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status|errors|warnings|diagnostics-has|line-severity|tooltip|" +
-	"problems-open|problems-has|actions-has|diag-range|find-status|find-open> <value>. " +
+	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop> <value>. " +
 	"chords: [primary+|cmd+|ctrl+|alt+|shift+]<key>, e.g. primary+space, shift+end, down. " +
 	"text escapes: \\n \\t \\\\"
 
@@ -248,6 +251,9 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		case "diag-range": field = .Diag_Range
 		case "find-status": field = .Find_Status
 		case "find-open": field = .Find_Open
+		case "completion-doc": field = .Completion_Doc
+		case "snippet-active": field = .Snippet_Active
+		case "snippet-stop": field = .Snippet_Stop
 		case:
 			return nil, strings.concatenate({"unknown expect field: ", name}, context.temp_allocator)
 		}

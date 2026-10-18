@@ -6,7 +6,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 153 tests across 6 packages, all
+2. **Unit tests for every feature** — 162 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
@@ -161,6 +161,14 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     was the `/tmp` → `/private/tmp` symlink mismatch fixed in 13 (resolved
     paths sent to OLS). Re-verified with dotted directories; the visual
     runner now always uses a dotted scratch directory as regression cover.
+23. **Completion polish** — documentation panel beside the list
+    (markdown: fenced code syntax-highlighted, prose wrapped); snippet
+    support (advertised + OLS `enable_snippets` via initializationOptions):
+    `$N` / `${N:placeholder}` / choices / variables expanded, re-indented
+    to the insertion line, Tab/Shift+Tab across stops as one undo step;
+    procedure snippets trigger parameter hints; `isIncomplete` lists are
+    re-queried as the prefix changes; Up/Down cycle signature overloads
+    ("1/2"). Verified by unit tests and `tools/completion_polish.edctl`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -168,10 +176,6 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-- **Completion polish** — no documentation side panel, snippets aren't requested (no
-  `snippetSupport`), and `isIncomplete` lists aren't re-queried as you type
-  (filtering is purely local after the first response). Signature help shows
-  only the active overload (no overload cycling).
 - **Mouse leftovers** — no right-click context menu, no drag-and-drop of
   selected text, no hover tooltips (LSP hover), and horizontal auto-scroll
   only applies to character drags.

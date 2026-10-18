@@ -86,8 +86,31 @@ editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
 // accept it, and Escape dismisses the topmost popup.
 @(private)
 editor_handle_popup_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
+	// An active snippet owns Tab / Shift+Tab (unless the completion list
+	// is up, where Tab accepts).
+	if ed.snippet.active && !editor_completion_visible(ed) {
+		switch {
+		case chord.key == .Tab && chord.mods == {}:
+			editor_snippet_step(ed, 1)
+			return true
+		case chord.key == .Tab && chord.mods == {.Shift}:
+			editor_snippet_step(ed, -1)
+			return true
+		case chord.key == .Escape && chord.mods == {} && !ed.signature.active && !ed.completion.active:
+			editor_end_snippet(ed)
+			return true
+		}
+	}
 	if chord.mods != {} {
 		return false
+	}
+	// Up/Down cycle overloads while signature help shows several.
+	if editor_signature_visible(ed) && !editor_completion_visible(ed) && len(ed.lsp.last_signatures) > 1 &&
+	   (chord.key == .Up || chord.key == .Down) {
+		n := len(ed.lsp.last_signatures)
+		cur := editor_signature_index(ed)
+		ed.signature.selected = (cur + (1 if chord.key == .Down else -1) + n) % n
+		return true
 	}
 	if ed.actions.active {
 		#partial switch chord.key {

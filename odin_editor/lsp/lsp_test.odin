@@ -502,3 +502,25 @@ test_initialize_result_sets_sync_kind :: proc(t: ^testing.T) {
 		testing.expect(t, strings.contains(msg, `"contentChanges":[{"range":{"start":{"line":1,"character":2},"end":{"line":1,"character":4}},"text":"ab"}]`), msg)
 	})
 }
+
+@(test)
+test_completion_item_docs_snippet_command_and_incomplete :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+		c.init_options = strings.clone(`{"enable_snippets": true}`)
+		params := InitializeParams{capabilities = default_client_capabilities()}
+		testing.expect(t, strings.contains(encode_request(1, "initialize", params, context.temp_allocator), `"snippetSupport":true`), "snippet capability")
+
+		id := client_request_completion(&c, "file:///x", 0, 0)
+		body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":{{"isIncomplete":true,"items":[` +
+			`{{"label":"a","insertTextFormat":2,"insertText":"a($0)","documentation":{{"kind":"markdown","value":"**doc**"}},"command":{{"title":"","command":"editor.action.triggerParameterHints"}}}},` +
+			`{{"label":"b","documentation":"plain"}}]}}}}`, id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect(t, c.completion_incomplete, "isIncomplete parsed")
+		a := c.last_completion[0]
+		testing.expect(t, a.is_snippet && a.doc_markdown && a.documentation == "**doc**" && a.command == "editor.action.triggerParameterHints", "first item fields")
+		b := c.last_completion[1]
+		testing.expect(t, !b.is_snippet && !b.doc_markdown && b.documentation == "plain", "plain string documentation")
+	})
+}

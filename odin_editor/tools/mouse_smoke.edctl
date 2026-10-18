@@ -97,5 +97,5 @@ expect mouse-cursor default
 screenshot $SHOTS/11_completion_hover_popup.png
 click @completion:3
 wait no-completion 2000
-expect line \tfmt.println
+expect line \tfmt.println()
 screenshot $SHOTS/12_completion_clicked.png

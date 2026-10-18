@@ -68,6 +68,12 @@ Client :: struct {
 	// textDocumentSync kind from the initialize result: 1 = full text,
 	// 2 = incremental ranges (0 = none). Defaults to full until known.
 	sync_kind: int,
+
+	// isIncomplete of the last completion list: typing further should
+	// re-query rather than only filter locally.
+	completion_incomplete: bool,
+	// initializationOptions JSON sent with `initialize` (owned; "" = null).
+	init_options: string,
 }
 
 client_init :: proc(allocator := context.allocator) -> Client {
@@ -88,6 +94,7 @@ client_destroy :: proc(c: ^Client) {
 		client_stop(c)
 	}
 	delete(c.recv_buf)
+	delete(c.init_options, c.allocator)
 	delete(c.pending_kind)
 	for uri, list in c.diagnostics {
 		free_diagnostics(c, list)

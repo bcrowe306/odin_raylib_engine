@@ -4,12 +4,19 @@
 // can be routed back to the right storage slot when it arrives.
 package lsp
 
+import "core:encoding/json"
+
 client_initialize :: proc(c: ^Client, root_uri: string) -> int {
 	id := client_next_id(c)
 	params := InitializeParams{
 		processId    = nil,
 		rootUri      = root_uri,
 		capabilities = default_client_capabilities(),
+	}
+	if len(c.init_options) > 0 {
+		if v, err := json.parse_string(c.init_options, allocator = context.temp_allocator); err == nil {
+			params.initializationOptions = v
+		}
 	}
 	msg := encode_request(id, "initialize", params, context.temp_allocator)
 	c.pending_kind[id] = .Initialize

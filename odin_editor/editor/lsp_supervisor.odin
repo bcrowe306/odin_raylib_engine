@@ -27,6 +27,7 @@ Lsp_Status :: enum {
 Lsp_Supervisor :: struct {
 	command:       []string, // owned copy, for restarts
 	root:          string,
+	init_options:  string,
 	restarts:      int,       // restarts within the current window
 	window_start:  time.Tick,
 	restart_at:    time.Tick,
@@ -36,13 +37,14 @@ Lsp_Supervisor :: struct {
 }
 
 @(private)
-lsp_supervisor_begin :: proc(s: ^Lsp_Supervisor, command: []string, root: string) {
+lsp_supervisor_begin :: proc(s: ^Lsp_Supervisor, command: []string, root: string, init_options := "") {
 	lsp_supervisor_end(s)
 	s.command = make([]string, len(command))
 	for arg, i in command {
 		s.command[i] = strings.clone(arg)
 	}
 	s.root = strings.clone(root)
+	s.init_options = strings.clone(init_options)
 	s.window_start = time.tick_now()
 }
 
@@ -53,6 +55,7 @@ lsp_supervisor_end :: proc(s: ^Lsp_Supervisor) {
 	}
 	delete(s.command)
 	delete(s.root)
+	delete(s.init_options)
 	s^ = {}
 }
 
@@ -106,6 +109,7 @@ editor_supervise_lsp :: proc(ed: ^Editor) {
 	// Fresh client; the old one only holds closed pipes now.
 	lspc.client_destroy(&ed.lsp)
 	ed.lsp = lspc.client_init()
+	ed.lsp.init_options = strings.clone(s.init_options, ed.lsp.allocator)
 	if !lspc.client_start(&ed.lsp, s.command, s.root) {
 		// Couldn't even spawn: treat as another crash next update.
 		ed.lsp.dead = true

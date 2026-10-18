@@ -432,6 +432,15 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 		for title in s.code_actions.titles {
 			pass ||= s.code_actions.visible && strings.contains(title, x.want)
 		}
+	case .Completion_Doc:
+		actual = s.completion.doc
+		pass = strings.contains(actual, x.want)
+	case .Snippet_Active:
+		actual = "true" if s.snippet.active else "false"
+		pass = actual == strings.trim_space(x.want)
+	case .Snippet_Stop:
+		actual = fmt.tprint(s.snippet.stop_index)
+		pass = s.snippet.active && actual == strings.trim_space(x.want)
 	case .Find_Status:
 		actual = s.find.status
 		pass = actual == strings.trim_space(x.want)

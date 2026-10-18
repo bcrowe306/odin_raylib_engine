@@ -9,7 +9,11 @@ import "core:os"
 import "core:path/filepath"
 import "core:strings"
 
-editor_attach_lsp :: proc(ed: ^Editor, command: []string, working_dir := "") -> bool {
+// DEFAULT_LSP_INIT_OPTIONS is sent as initializationOptions: OLS reads its
+// ols.json settings from it (snippets are off in OLS unless enabled).
+DEFAULT_LSP_INIT_OPTIONS :: `{"enable_snippets": true, "enable_procedure_snippet": true}`
+
+editor_attach_lsp :: proc(ed: ^Editor, command: []string, working_dir := "", init_options := DEFAULT_LSP_INIT_OPTIONS) -> bool {
 	if len(command) == 0 {
 		return false
 	}
@@ -28,9 +32,10 @@ editor_attach_lsp :: proc(ed: ^Editor, command: []string, working_dir := "") -> 
 		lspc.client_destroy(&ed.lsp)
 		return false
 	}
+	ed.lsp.init_options = strings.clone(init_options, ed.lsp.allocator)
 	ed.lsp_enabled = true
 	ed.lsp_doc_open = false
-	lsp_supervisor_begin(&ed.lsp_supervisor, cmd, root)
+	lsp_supervisor_begin(&ed.lsp_supervisor, cmd, root, init_options)
 	lspc.client_initialize(&ed.lsp, lspc.file_uri(root, context.temp_allocator))
 	return true
 }

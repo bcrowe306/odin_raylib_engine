@@ -33,10 +33,17 @@ Completion_State :: struct {
 	// Cursor position / buffer version the filter was last computed for.
 	last_pos:     buf.Position,
 	last_version: int,
+	// Typed-prefix length when the request went out; with an incomplete
+	// list, a different prefix triggers a re-query.
+	request_prefix_len: int,
 }
 
 Signature_State :: struct {
 	active:   bool,
+	// Overload chosen with Up/Down (-1: the server's activeSignature);
+	// kept across re-queries while the overload count stays the same.
+	selected:   int,
+	last_count: int,
 	waiting:  bool,
 	seen_seq: int,
 	// Cursor position / buffer version at the last request. While active,
@@ -87,6 +94,7 @@ editor_request_completion :: proc(ed: ^Editor) {
 	cs.selected = 0
 	cs.scroll = 0
 	clear(&cs.filtered)
+	cs.request_prefix_len = c.pos.col - cs.anchor.col
 	lspc.client_request_completion(&ed.lsp, ed.document_uri, c.pos.line, editor_lsp_col(ed, c.pos))
 	cs.seen_seq = ed.lsp.completion_seq
 }
@@ -165,6 +173,13 @@ editor_update_lsp_ui :: proc(ed: ^Editor) {
 		}
 		if fresh || c.pos != cs.last_pos || ed.buf.version != cs.last_version {
 			editor_refilter_completion(ed)
+			// isIncomplete: the server only sent part of the list, so a
+			// longer/shorter prefix needs a fresh query, not just filtering.
+			if cs.active && !cs.waiting && ed.lsp.completion_incomplete {
+				if prefix, ok := editor_completion_prefix(ed); ok && len(prefix) != cs.request_prefix_len {
+					editor_request_completion(ed)
+				}
+			}
 		}
 	}
 
@@ -179,6 +194,10 @@ editor_update_lsp_ui :: proc(ed: ^Editor) {
 		if ss.waiting && ed.lsp.signature_seq != ss.seen_seq {
 			ss.waiting = false
 			ss.seen_seq = ed.lsp.signature_seq
+			if len(ed.lsp.last_signatures) != ss.last_count {
+				ss.selected = -1
+				ss.last_count = len(ed.lsp.last_signatures)
+			}
 			if len(ed.lsp.last_signatures) == 0 {
 				editor_close_signature_help(ed)
 			}
@@ -387,14 +406,23 @@ editor_accept_completion :: proc(ed: ^Editor) -> bool {
 	}
 
 	b := &ed.buf
-	group := buf.buffer_next_group(b)
 	c.sel.active = false
-	if start.col < c.pos.col {
-		buf.buffer_delete_range(b, start, c.pos, group)
-	}
-	c.pos = buf.buffer_insert_text(b, start, text, group)
+	end := c.pos
 	editor_close_completion(ed)
-	editor_ensure_cursor_visible(ed)
+	if item.is_snippet {
+		editor_insert_snippet(ed, start, end, text)
+	} else {
+		group := buf.buffer_next_group(b)
+		if start.col < end.col {
+			buf.buffer_delete_range(b, start, end, group)
+		}
+		editor_primary_cursor(ed).pos = buf.buffer_insert_text(b, start, text, group)
+		editor_ensure_cursor_visible(ed)
+	}
+	// e.g. OLS inserts `name($0)` and asks for parameter hints.
+	if item.command == "editor.action.triggerParameterHints" {
+		editor_request_signature_help(ed)
+	}
 	return true
 }
 
@@ -406,7 +434,7 @@ editor_signature_active_parts :: proc(ed: ^Editor) -> (label, before, active, af
 	if len(sigs) == 0 {
 		return
 	}
-	sig := sigs[clamp(ed.lsp.active_signature, 0, len(sigs) - 1)]
+	sig := sigs[editor_signature_index(ed)]
 	label = sig.label
 	param_index := sig.active_parameter if sig.active_parameter >= 0 else ed.lsp.active_parameter
 	if param_index < 0 || param_index >= len(sig.parameters) {
@@ -433,6 +461,19 @@ editor_signature_active_parts :: proc(ed: ^Editor) -> (label, before, active, af
 		search_from = end
 	}
 	return label, label, "", ""
+}
+
+// editor_signature_index is the overload being shown: the user's Up/Down
+// choice, else the server's activeSignature.
+editor_signature_index :: proc(ed: ^Editor) -> int {
+	n := len(ed.lsp.last_signatures)
+	if n == 0 {
+		return 0
+	}
+	if ed.signature.selected >= 0 && ed.signature.selected < n {
+		return ed.signature.selected
+	}
+	return clamp(ed.lsp.active_signature, 0, n - 1)
 }
 
 // editor_signature_active_param returns the label of the parameter the

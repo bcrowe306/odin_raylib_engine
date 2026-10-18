@@ -201,6 +201,8 @@ client_clear_completion :: proc(c: ^Client) {
 		delete(item.detail, c.allocator)
 		delete(item.insert_text, c.allocator)
 		delete(item.filter_text, c.allocator)
+		delete(item.documentation, c.allocator)
+		delete(item.command, c.allocator)
 	}
 	clear(&c.last_completion)
 }
@@ -235,6 +237,7 @@ client_store_completion :: proc(c: ^Client, result: json.Value) {
 	c.completion_seq += 1
 
 	items: json.Array
+	c.completion_incomplete = false
 	#partial switch v in result {
 	case json.Array:
 		items = v
@@ -242,6 +245,9 @@ client_store_completion :: proc(c: ^Client, result: json.Value) {
 		// CompletionList shape: { isIncomplete, items: [...] }
 		if list_val, ok := json_object_get(result, "items"); ok {
 			items, _ = list_val.(json.Array)
+		}
+		if inc, ok := json_object_get(result, "isIncomplete"); ok {
+			c.completion_incomplete, _ = inc.(json.Boolean)
 		}
 	}
 
@@ -253,6 +259,25 @@ client_store_completion :: proc(c: ^Client, result: json.Value) {
 		ci.filter_text = json_clone_string_field(c, item, "filterText")
 		if kind_val, ok := json_object_get(item, "kind"); ok {
 			ci.kind, _ = json_as_int(kind_val)
+		}
+		if fmt_val, ok := json_object_get(item, "insertTextFormat"); ok {
+			f, _ := json_as_int(fmt_val)
+			ci.is_snippet = f == 2
+		}
+		if doc, ok := json_object_get(item, "documentation"); ok {
+			// Either a plain string or MarkupContent {kind, value}.
+			if s, is_str := json_as_string(doc); is_str {
+				ci.documentation = strings.clone(s, c.allocator)
+			} else {
+				ci.documentation = json_clone_string_field(c, doc, "value")
+				if k, has_kind := json_object_get(doc, "kind"); has_kind {
+					ks, _ := json_as_string(k)
+					ci.doc_markdown = ks == "markdown"
+				}
+			}
+		}
+		if cmd, ok := json_object_get(item, "command"); ok {
+			ci.command = json_clone_string_field(c, cmd, "command")
 		}
 		// A textEdit (plain TextEdit or InsertReplaceEdit) overrides
 		// insertText per the spec.

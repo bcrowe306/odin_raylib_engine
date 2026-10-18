@@ -11,6 +11,8 @@ editor_update :: proc(ed: ^Editor) {
 	editor_pump_injected_events(ed)
 	editor_update_mouse(ed)
 	editor_update_diagnostics(ed)
+	editor_consume_buffer_changes(ed)
+	editor_update_snippet(ed)
 	if ed.lsp_enabled {
 		lspc.client_poll(&ed.lsp)
 		editor_supervise_lsp(ed)
@@ -73,6 +75,7 @@ editor_consume_buffer_changes :: proc(ed: ^Editor) {
 		ed.lsp_need_full = true
 	}
 	for ch in changes {
+		snippet_shift_stops(ed, ch)
 		for &d in ed.diag_overlay.items {
 			d.start = buf.position_after_change(d.start, ch)
 			d.end = buf.position_after_change(d.end, ch)

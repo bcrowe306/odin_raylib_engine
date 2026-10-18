@@ -470,14 +470,16 @@ e2e_test_lsp :: proc(e: ^ed.Editor, ctx: ^E2E_Ctx, primary_mod: sdl.Keymod, rend
 
 	ed.editor_inject_key(e, sdl.K_RETURN)
 	ed.editor_update(e)
-	e2e_check(ctx, "Enter accepts the completion", buf.buffer_line_str(&e.buf, 5) == "\tfmt.println",
+	// OLS (snippets enabled via initializationOptions) inserts `println($0)`
+	// and asks for parameter hints.
+	e2e_check(ctx, "Enter accepts the completion as a snippet", buf.buffer_line_str(&e.buf, 5) == "\tfmt.println()",
 		fmt.tprintf("line 5 = %q", buf.buffer_line_str(&e.buf, 5)))
+	e2e_check(ctx, "caret lands inside the parentheses", e.buf.cursors[0].pos == buf.Position{5, 13})
 	e2e_check(ctx, "accepting closes the popup", !e.completion.active)
 
 	// --- signature help ---
-	ed.editor_inject_text(e, "(")
 	got_sig := e2e_pump_until(e, ed.editor_signature_visible, 5000)
-	e2e_check(ctx, "typing '(' shows signature help from ols", got_sig)
+	e2e_check(ctx, "accepting a procedure opens signature help", got_sig)
 	label, _, active, _ := ed.editor_signature_active_parts(e)
 	// Copy: `label` borrows LSP storage that later responses free.
 	e2e_check(ctx, "signature label is fmt.println's", strings.contains(label, "println :: proc("), fmt.tprint(label))
@@ -486,13 +488,17 @@ e2e_test_lsp :: proc(e: ^ed.Editor, ctx: ^E2E_Ctx, primary_mod: sdl.Keymod, rend
 	e2e_render_frames(e, renderer, font, theme, 2)
 	e2e_check(ctx, "renders with signature help open", true)
 
-	for ch in "\"hi\")" {
+	for ch in "\"hi\"" {
 		bytes, n := utf8.encode_rune(ch)
 		ed.editor_inject_text(e, string(bytes[:n]))
 		ed.editor_update(e)
 	}
+	ed.editor_inject_key(e, sdl.K_RIGHT) // step past the closing ')'
+	ed.editor_update(e)
 	closed := e2e_pump_until(e, proc(e: ^ed.Editor) -> bool {return !e.signature.active}, 3000)
-	e2e_check(ctx, "closing ')' dismisses signature help", closed)
+	e2e_check(ctx, "leaving the call's parentheses dismisses signature help", closed)
+	e2e_check(ctx, "argument typed inside the snippet's parens", buf.buffer_line_str(&e.buf, 5) == "\tfmt.println(\"hi\")",
+		fmt.tprintf("line 5 = %q", buf.buffer_line_str(&e.buf, 5)))
 	e2e_check(ctx, "edits reached ols (document synced)", e.lsp_synced_version == e.buf.version)
 }
 

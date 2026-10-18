@@ -2,6 +2,8 @@
 // use `json` tags to match the protocol's camelCase wire format.
 package lsp
 
+import "core:encoding/json"
+
 Position :: struct {
 	line:      int `json:"line"`,
 	character: int `json:"character"`,
@@ -39,6 +41,8 @@ InitializeParams :: struct {
 	processId:             Maybe(int)   `json:"processId"`,
 	rootUri:               Maybe(string) `json:"rootUri"`,
 	capabilities:          ClientCapabilities `json:"capabilities"`,
+	// Server-specific settings (OLS reads its ols.json options from here).
+	initializationOptions: json.Value `json:"initializationOptions"`,
 }
 
 // ClientCapabilities advertises what this client can render, which changes
@@ -48,6 +52,12 @@ ClientCapabilities :: struct {
 }
 
 TextDocumentClientCapabilities :: struct {
+	completion: struct {
+		completionItem: struct {
+			snippetSupport:      bool     `json:"snippetSupport"`,
+			documentationFormat: []string `json:"documentationFormat"`,
+		} `json:"completionItem"`,
+	} `json:"completion"`,
 	publishDiagnostics: struct {
 		tagSupport: struct {
 			valueSet: []int `json:"valueSet"`,
@@ -66,11 +76,15 @@ default_client_capabilities :: proc() -> ClientCapabilities {
 	caps: ClientCapabilities
 	caps.textDocument.publishDiagnostics.tagSupport.valueSet = DIAGNOSTIC_TAGS[:]
 	caps.textDocument.codeAction.codeActionLiteralSupport.codeActionKind.valueSet = CODE_ACTION_KINDS[:]
+	caps.textDocument.completion.completionItem.snippetSupport = true
+	caps.textDocument.completion.completionItem.documentationFormat = DOC_FORMATS[:]
 	return caps
 }
 
 @(private)
 DIAGNOSTIC_TAGS := [2]int{1, 2}
+@(private)
+DOC_FORMATS := [2]string{"markdown", "plaintext"}
 @(private)
 CODE_ACTION_KINDS := [6]string{"", "quickfix", "refactor", "refactor.rewrite", "source", "source.organizeImports"}
 
@@ -131,6 +145,14 @@ CompletionItem :: struct {
 	// editor replaces [text_edit_range.start, cursor) with insert_text.
 	has_text_edit:   bool  `json:"-"`,
 	text_edit_range: Range `json:"-"`,
+	// insertTextFormat 2: insert_text is a snippet ($1, ${1:x}, $0).
+	is_snippet:      bool   `json:"-"`,
+	// Documentation (plain text or markdown; see doc_markdown).
+	documentation:   string `json:"-"`,
+	doc_markdown:    bool   `json:"-"`,
+	// command.command to run after accepting (e.g. OLS asks for
+	// "editor.action.triggerParameterHints" after inserting `name($0)`).
+	command:         string `json:"-"`,
 }
 
 // CompletionItemKind values from the LSP spec (the subset worth labeling).

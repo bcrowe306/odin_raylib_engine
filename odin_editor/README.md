@@ -344,7 +344,14 @@ deferred `didOpen` once `initialize` has completed, pushes a full-text
   matches first, then fuzzy), Up/Down/PageUp/PageDown select, Enter/Tab
   accept (honoring the item's `textEdit`/`insertText`, as one undo step),
   Escape dismisses, and moving the cursor out of the word closes it.
-- **Signature help** opens on `(` / `,` or Ctrl/Cmd+Shift+Space, re-queries
+- The selected item's **documentation** shows in a panel beside the list.
+  **Snippets** are supported (the editor enables OLS's via
+  `initializationOptions`, see `DEFAULT_LSP_INIT_OPTIONS`): placeholders
+  are selected in turn with **Tab / Shift+Tab**, and accepting a procedure
+  inserts `name()` with parameter hints open. Lists the server marks
+  `isIncomplete` are re-queried as you type.
+- **Signature help** opens on `(` / `,` or Ctrl/Cmd+Shift+Space; with
+  several overloads (proc groups) **Up / Down** cycle them ("1/2"), re-queries
   as the cursor moves so the active parameter is highlighted, and closes once
   the cursor leaves the call's parentheses (OLS keeps answering just past the
   closing `)`, so the client checks paren depth itself) or on Escape.

@@ -47,6 +47,14 @@ State_Completion :: struct {
 	count:          int      `json:"count"`,
 	items:          []string `json:"items"`,
 	rect:           [4]f32   `json:"rect"`,
+	doc:            string   `json:"doc"`, // docs panel text, lines joined by \n
+	incomplete:     bool     `json:"incomplete"`,
+}
+
+State_Snippet :: struct {
+	active:     bool `json:"active"`,
+	stop_index: int  `json:"stop_index"`,
+	stops:      int  `json:"stops"`,
 }
 
 State_Signature :: struct {
@@ -140,6 +148,7 @@ State :: struct {
 	problems:          State_Problems     `json:"problems"`,
 	code_actions:      State_Code_Actions `json:"code_actions"`,
 	find:              State_Find         `json:"find"`,
+	snippet:           State_Snippet      `json:"snippet"`,
 	text:         string           `json:"text"`,
 }
 
@@ -288,6 +297,18 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 			matches = len(f.matches), current = f.current, status = ed.editor_find_status(e),
 			rect = rect_array(l.rect),
 		}
+	}
+
+	if _, lines, ok := ed.editor_completion_doc_layout(e); ok {
+		texts := make([dynamic]string, context.temp_allocator)
+		for l in lines {
+			append(&texts, l.text)
+		}
+		s.completion.doc = strings.join(texts[:], "\n", context.temp_allocator)
+	}
+	s.completion.incomplete = e.lsp_enabled && e.lsp.completion_incomplete
+	if e.snippet.active {
+		s.snippet = {active = true, stop_index = e.snippet.stops[e.snippet.current].index, stops = len(e.snippet.stops)}
 	}
 
 	s.signature = State_Signature{

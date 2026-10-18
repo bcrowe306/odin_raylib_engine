@@ -5,6 +5,10 @@
 package editor
 
 import buf "../buffer"
+import "core:strings"
+import "core:fmt"
+import syn "../syntax"
+import lspc "../lsp"
 import "core:unicode/utf8"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
@@ -89,7 +93,7 @@ editor_popup_layout :: proc(ed: ^Editor) -> (layout: Popup_Layout) {
 
 	if editor_signature_visible(ed) {
 		label, _, _, _ := editor_signature_active_parts(ed)
-		w := f32(text_cols(label)) * ed.char_w + 2 * POPUP_PAD
+		w := f32(text_cols(signature_counter(ed)) + text_cols(label)) * ed.char_w + 2 * POPUP_PAD
 		h := ed.char_h + 2 * POPUP_PAD
 		y := cy - h - 2
 		if y < view_top {
@@ -134,6 +138,7 @@ render_popups :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 	}
 	if layout.completion_visible {
 		render_completion_popup(ed, renderer, font, theme, layout.completion)
+		render_completion_docs(ed, renderer, font, theme)
 	}
 }
 
@@ -232,6 +237,10 @@ render_signature_popup :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.
 	_, before, active, after := editor_signature_active_parts(ed)
 	x := rect.x + POPUP_PAD
 	y := rect.y + POPUP_PAD
+	if counter := signature_counter(ed); len(counter) > 0 {
+		draw_text(renderer, font, counter, x, y, theme.popup_text_dim, ed.char_h)
+		x += f32(text_cols(counter)) * ed.char_w
+	}
 	draw_text(renderer, font, before, x, y, theme.popup_text, ed.char_h)
 	x += f32(text_cols(before)) * ed.char_w
 	draw_text(renderer, font, active, x, y, theme.popup_active_param, ed.char_h)
@@ -241,4 +250,125 @@ render_signature_popup :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.
 	}
 	x += f32(text_cols(active)) * ed.char_w
 	draw_text(renderer, font, after, x, y, theme.popup_text, ed.char_h)
+}
+
+// signature_counter is the "2/3 " overload indicator (empty for one).
+signature_counter :: proc(ed: ^Editor) -> string {
+	n := len(ed.lsp.last_signatures)
+	if n < 2 {
+		return ""
+	}
+	return fmt.tprintf("%d/%d  ", editor_signature_index(ed) + 1, n)
+}
+
+COMPLETION_DOC_COLS :: 56
+COMPLETION_DOC_MAX_LINES :: 16
+
+Doc_Line :: struct {
+	text: string,
+	code: bool, // render with syntax highlighting
+}
+
+// completion_doc_lines turns the selected item's detail + documentation
+// into display lines: markdown fences become highlighted code lines,
+// headings/emphasis markers are stripped, prose is wrapped.
+completion_doc_lines :: proc(item: lspc.CompletionItem) -> []Doc_Line {
+	out := make([dynamic]Doc_Line, context.temp_allocator)
+	if len(item.detail) > 0 {
+		for w in wrap_text(item.detail, COMPLETION_DOC_COLS) {
+			append(&out, Doc_Line{w, true})
+		}
+	}
+	doc := strings.trim_space(item.documentation)
+	if len(doc) > 0 {
+		if len(out) > 0 {
+			append(&out, Doc_Line{"", false})
+		}
+		in_code := false
+		rest := doc
+		for line in strings.split_lines_iterator(&rest) {
+			if item.doc_markdown && strings.has_prefix(strings.trim_space(line), "```") {
+				in_code = !in_code
+				continue
+			}
+			if in_code {
+				append(&out, Doc_Line{line, true})
+				continue
+			}
+			if item.doc_markdown && strings.trim_space(line) == "---" {
+				continue // horizontal rule
+			}
+			l := line
+			if item.doc_markdown {
+				l = strings.trim_left(l, "# ")
+				l, _ = strings.remove_all(l, "`", context.temp_allocator)
+				l, _ = strings.remove_all(l, "**", context.temp_allocator)
+			}
+			for w in wrap_text(l, COMPLETION_DOC_COLS) {
+				append(&out, Doc_Line{w, false})
+			}
+		}
+	}
+	// Trim trailing blank lines and cap the height.
+	for len(out) > 0 && len(strings.trim_space(out[len(out) - 1].text)) == 0 {
+		pop(&out)
+	}
+	if len(out) > COMPLETION_DOC_MAX_LINES {
+		resize(&out, COMPLETION_DOC_MAX_LINES)
+		out[COMPLETION_DOC_MAX_LINES - 1] = Doc_Line{"…", false}
+	}
+	return out[:]
+}
+
+// editor_completion_doc_layout places the docs panel beside the completion
+// list (right side, else left, else below it).
+editor_completion_doc_layout :: proc(ed: ^Editor) -> (rect: sdl.FRect, lines: []Doc_Line, ok: bool) {
+	layout := editor_popup_layout(ed)
+	item, has := editor_completion_selected_item(ed)
+	if !layout.completion_visible || !has {
+		return
+	}
+	lines = completion_doc_lines(item)
+	if len(lines) == 0 {
+		return
+	}
+	widest := 0
+	for l in lines {
+		widest = max(widest, text_cols(l.text))
+	}
+	w := f32(widest) * ed.char_w + 2 * POPUP_PAD
+	h := f32(len(lines)) * ed.char_h + 2 * POPUP_PAD
+	c := layout.completion
+	left := ed.origin_x + editor_gutter_width(ed)
+	right := left + f32(ed.visible_cols) * ed.char_w
+	switch {
+	case c.x + c.w + 2 + w <= right: rect = {c.x + c.w + 2, c.y, w, h}
+	case c.x - 2 - w >= left: rect = {c.x - 2 - w, c.y, w, h}
+	case: rect = {c.x, c.y + c.h + 2, w, h}
+	}
+	return rect, lines, true
+}
+
+@(private)
+render_completion_docs :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, theme: Theme) {
+	rect, lines, ok := editor_completion_doc_layout(ed)
+	if !ok || font == nil {
+		return
+	}
+	draw_popup_box(renderer, rect, theme)
+	for l, i in lines {
+		x := rect.x + POPUP_PAD
+		y := rect.y + POPUP_PAD + f32(i) * ed.char_h
+		if !l.code {
+			draw_text(renderer, font, l.text, x, y, theme.popup_text, ed.char_h)
+			continue
+		}
+		// Code lines get the editor's own syntax colours.
+		tokens, _ := ed.language.tokenize(l.text, syn.LINE_STATE_NORMAL, context.temp_allocator)
+		for tok in tokens {
+			if tok.end > tok.start {
+				draw_text(renderer, font, l.text[tok.start:tok.end], x + f32(text_cols(l.text[:tok.start])) * ed.char_w, y, token_color(theme, tok.kind), ed.char_h)
+			}
+		}
+	}
 }

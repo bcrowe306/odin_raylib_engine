@@ -25,16 +25,16 @@ expect completion-selected printfln
 key down
 key enter
 wait no-completion 2000
-expect line \tfmt.println
+expect line \tfmt.println()
 screenshot $SHOTS/04_completion_accepted.png
 
-# --- signature help: '(' trigger, active parameter, close on ')' ----------
-type (
+# --- signature help: opened by the procedure snippet; close past ')' ------
 wait signature 5000
 expect signature fmt.println :: proc(
 expect signature-param args: ..any
-screenshot $SHOTS/05_signature_help_on_paren.png
-type "hi")
+screenshot $SHOTS/05_signature_help_after_accept.png
+type "hi"
+key right
 wait no-signature 3000
 expect line \tfmt.println("hi")
 
