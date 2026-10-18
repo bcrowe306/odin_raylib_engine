@@ -17,6 +17,7 @@ buffer_raw_insert :: proc(b: ^Buffer, pos: Position, text: string) -> Position {
 	line_str := buffer_line_str(b, p.line)
 	before := line_str[:p.col]
 	after := line_str[p.col:]
+	p_u16 := utf16_len(before) if b.track_changes else 0
 
 	// Split incoming text on '\n'.
 	segments := make([dynamic]string, 0, 4, context.temp_allocator)
@@ -42,7 +43,7 @@ buffer_raw_insert :: proc(b: ^Buffer, pos: Position, text: string) -> Position {
 		b.lines[p.line] = new_line
 		end := Position{line = p.line, col = len(before) + len(segments[0])}
 		b.dirty = true
-		buffer_record_change(b, {p, p, end})
+		buffer_record_change(b, {start = p, old_end = p, new_end = end, start_u16 = p_u16, old_end_u16 = p_u16, text = segments[0]})
 		return end
 	}
 
@@ -83,7 +84,10 @@ buffer_raw_insert :: proc(b: ^Buffer, pos: Position, text: string) -> Position {
 		col  = len(segments[len(segments) - 1]),
 	}
 	b.dirty = true
-	buffer_record_change(b, {p, p, end})
+	if b.track_changes {
+		joined := strings.join(segments[:], "\n", context.temp_allocator)
+		buffer_record_change(b, {start = p, old_end = p, new_end = end, start_u16 = p_u16, old_end_u16 = p_u16, text = joined})
+	}
 	return end
 }
 
@@ -100,6 +104,11 @@ buffer_raw_delete :: proc(b: ^Buffer, start, end: Position) -> string {
 	if position_less(e, s) {
 		s, e = e, s
 	}
+	s_u16, e_u16: int
+	if b.track_changes {
+		s_u16 = utf16_len(buffer_line_str(b, s.line)[:s.col])
+		e_u16 = utf16_len(buffer_line_str(b, e.line)[:e.col])
+	}
 
 	if s.line == e.line {
 		line_str := buffer_line_str(b, s.line)
@@ -110,7 +119,7 @@ buffer_raw_delete :: proc(b: ^Buffer, start, end: Position) -> string {
 		strings.builder_destroy(&b.lines[s.line])
 		b.lines[s.line] = new_line
 		b.dirty = true
-		buffer_record_change(b, {s, e, s})
+		buffer_record_change(b, {start = s, old_end = e, new_end = s, start_u16 = s_u16, old_end_u16 = e_u16})
 		return removed
 	}
 
@@ -143,7 +152,7 @@ buffer_raw_delete :: proc(b: ^Buffer, start, end: Position) -> string {
 	}
 
 	b.dirty = true
-	buffer_record_change(b, {s, e, s})
+	buffer_record_change(b, {start = s, old_end = e, new_end = s, start_u16 = s_u16, old_end_u16 = e_u16})
 	return removed
 }
 

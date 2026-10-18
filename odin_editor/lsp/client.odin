@@ -64,6 +64,10 @@ Client :: struct {
 	// `dead`/`exit_code` and restart (see editor's LSP supervisor).
 	dead:      bool,
 	exit_code: int,
+
+	// textDocumentSync kind from the initialize result: 1 = full text,
+	// 2 = incremental ranges (0 = none). Defaults to full until known.
+	sync_kind: int,
 }
 
 client_init :: proc(allocator := context.allocator) -> Client {
@@ -75,6 +79,7 @@ client_init :: proc(allocator := context.allocator) -> Client {
 		last_completion  = make([dynamic]CompletionItem, allocator),
 		last_signatures  = make([dynamic]SignatureInformation, allocator),
 		last_code_actions = make([dynamic]Code_Action, allocator),
+		sync_kind        = 1,
 	}
 }
 

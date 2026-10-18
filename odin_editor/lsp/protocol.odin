@@ -84,6 +84,18 @@ TextDocumentContentChangeEvent :: struct {
 	text: string `json:"text"`,
 }
 
+// Incremental_Change replaces [range.start, range.end) (UTF-16 columns,
+// in the document as left by the previous change) with `text`.
+Incremental_Change :: struct {
+	range: Range  `json:"range"`,
+	text:  string `json:"text"`,
+}
+
+DidChangeIncrementalParams :: struct {
+	textDocument:   VersionedTextDocumentIdentifier `json:"textDocument"`,
+	contentChanges: []Incremental_Change             `json:"contentChanges"`,
+}
+
 DidChangeTextDocumentParams :: struct {
 	textDocument:   VersionedTextDocumentIdentifier    `json:"textDocument"`,
 	contentChanges: []TextDocumentContentChangeEvent    `json:"contentChanges"`,

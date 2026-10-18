@@ -47,6 +47,17 @@ client_did_change :: proc(c: ^Client, uri: string, full_text: string, version: i
 	client_send_raw(c, msg)
 }
 
+// client_did_change_incremental sends ordered range edits (servers whose
+// sync_kind is 2 apply them in sequence).
+client_did_change_incremental :: proc(c: ^Client, uri: string, changes: []Incremental_Change, version: int) {
+	params := DidChangeIncrementalParams{
+		textDocument   = VersionedTextDocumentIdentifier{uri = uri, version = version},
+		contentChanges = changes,
+	}
+	msg := encode_notification("textDocument/didChange", params, context.temp_allocator)
+	client_send_raw(c, msg)
+}
+
 client_did_close :: proc(c: ^Client, uri: string) {
 	params := DidCloseTextDocumentParams{textDocument = TextDocumentIdentifier{uri = uri}}
 	msg := encode_notification("textDocument/didClose", params, context.temp_allocator)

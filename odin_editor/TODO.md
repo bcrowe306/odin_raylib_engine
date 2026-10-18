@@ -6,7 +6,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 142 tests across 6 packages, all
+2. **Unit tests for every feature** — 147 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
@@ -134,6 +134,14 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     (whole-word when started from a caret), Ctrl/Cmd+Shift+L selects all.
     Control hook gained `key @<action>` (press the platform's binding for an
     action). Verified by unit tests and `tools/find_smoke.edctl`.
+19. **Incremental sync + scroll clamp cache** — `didChange` sends only
+    the edited ranges when the server offers incremental sync (OLS does;
+    full text otherwise, and after resets/overflow). The buffer change log
+    records UTF-16 columns and inserted text at edit time and is drained by
+    one consumer feeding both the diagnostic overlay and the LSP queue. The
+    horizontal scroll clamp skips measuring when not scrolled sideways and
+    caches the widest line per buffer version. Verified by unit tests and
+    the full visual suite against live OLS.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -148,15 +156,9 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 - **Mouse leftovers** — no right-click context menu, no drag-and-drop of
   selected text, no hover tooltips (LSP hover), and horizontal auto-scroll
   only applies to character drags.
-- **Horizontal scroll clamp is O(lines)** — `editor_clamp_scroll` scans
-  every line for the widest one on each scroll/cursor move; fine for normal
-  files, should be cached for very large ones.
 - **OLS + directory names** — OLS derives package paths from directory
   names; files in a directory whose name contains a `.` get no completions.
   Worth surfacing to users (or opening such files with a symlinked root).
-- **Incremental document sync** — `didChange` currently sends the full
-  document text on every change rather than incremental edits. Simpler and
-  correct, but less efficient for very large files/high edit frequency.
 - **No font fallback** — glyphs missing from the monospace font (emoji,
   many symbols) render as blank cells. Needs a fallback font chain
   (SDL_ttf `TTF_AddFallbackFont`) plus wide-glyph (2-cell) column math.

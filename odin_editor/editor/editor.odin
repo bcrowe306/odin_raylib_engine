@@ -30,6 +30,17 @@ Editor :: struct {
 	// buf.version last pushed to the server via didOpen/didChange.
 	lsp_synced_version: int,
 	lsp_supervisor: Lsp_Supervisor,
+	// Edits since the last didChange, as LSP incremental changes (texts
+	// owned); lsp_need_full forces a full-text sync instead (after a reset
+	// or if the queue grows too long).
+	lsp_pending:   [dynamic]lspc.Incremental_Change,
+	lsp_need_full: bool,
+
+	// Widest line (visual columns), cached per buffer version + tab width
+	// for the horizontal scroll clamp.
+	width_cache:         int,
+	width_cache_version: int,
+	width_cache_tab:     int,
 
 	completion: Completion_State,
 	signature:  Signature_State,
@@ -88,6 +99,8 @@ editor_init :: proc(
 	ed.injected_events = make([dynamic]sdl.Event, allocator)
 	ed.completion.filtered = make([dynamic]int, allocator)
 	ed.diag_overlay.built_seq = -1
+	ed.width_cache_version = -1
+	ed.lsp_pending = make([dynamic]lspc.Incremental_Change, allocator)
 	find_init(&ed.find)
 	// Diagnostics follow edits between server publishes (see Diag_Overlay).
 	ed.buf.track_changes = true
@@ -107,6 +120,8 @@ editor_destroy :: proc(ed: ^Editor) {
 	delete(ed.document_key)
 	delete(ed.injected_events)
 	diag_overlay_destroy(&ed.diag_overlay)
+	editor_clear_lsp_pending(ed)
+	delete(ed.lsp_pending)
 	problems_destroy(&ed.problems)
 	find_destroy(&ed.find)
 	delete(ed.completion.filtered)

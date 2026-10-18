@@ -63,10 +63,16 @@ editor_visual_col :: proc(ed: ^Editor, pos: buf.Position) -> int {
 // editor_max_visual_width returns the widest line's width in cells
 // (used to clamp horizontal scrolling).
 editor_max_visual_width :: proc(ed: ^Editor) -> int {
+	if ed.width_cache_version == ed.buf.version && ed.width_cache_tab == ed.tab_width {
+		return ed.width_cache
+	}
 	widest := 0
 	for ln in 0 ..< buf.buffer_line_count(&ed.buf) {
 		widest = max(widest, line_visual_width(buf.buffer_line_str(&ed.buf, ln), ed.tab_width))
 	}
+	ed.width_cache = widest
+	ed.width_cache_version = ed.buf.version
+	ed.width_cache_tab = ed.tab_width
 	return widest
 }
 

@@ -86,6 +86,13 @@ Edit :: struct {
 // diagnostic overlay) use it to shift positions they hold.
 Change :: struct {
 	start, old_end, new_end: Position,
+	// start/old_end columns in UTF-16 code units, measured on the text as
+	// it was *before* this change (what an LSP incremental didChange needs;
+	// later edits can change the line, so it must be captured here).
+	start_u16, old_end_u16: int,
+	// The inserted text ("" for deletions). Owned by the log; valid until
+	// the next buffer_take_changes or mutation.
+	text: string,
 }
 
 MAX_TRACKED_CHANGES :: 4096
@@ -109,6 +116,7 @@ Buffer :: struct {
 	track_changes: bool,
 	changes:       [dynamic]Change,
 	changes_reset: bool,
+	changes_taken: bool, // the current batch was handed out; free on next use
 
 	// Typing coalescing: consecutive single-line insertions at the caret(s)
 	// share one undo group until the caret moves, another kind of edit
@@ -142,6 +150,7 @@ buffer_destroy :: proc(b: ^Buffer) {
 	buffer_clear_undo_history(b)
 	delete(b.undo_stack)
 	delete(b.redo_stack)
+	buffer_free_changes(b)
 	delete(b.changes)
 	delete(b.typing_ends)
 	if len(b.file_path) > 0 {
@@ -234,35 +243,67 @@ buffer_set_text :: proc(b: ^Buffer, text: string) {
 	buffer_record_reset(b)
 }
 
+// buffer_free_changes drops every recorded change (and its text).
+@(private)
+buffer_free_changes :: proc(b: ^Buffer) {
+	for ch in b.changes {
+		delete(ch.text, b.allocator)
+	}
+	clear(&b.changes)
+	b.changes_taken = false
+}
+
+// buffer_record_change appends one change; `text` is cloned.
 @(private)
 buffer_record_change :: proc(b: ^Buffer, ch: Change) {
-	if !b.track_changes || b.changes_reset {
+	if !b.track_changes {
+		return
+	}
+	if b.changes_taken {
+		buffer_free_changes(b)
+	}
+	if b.changes_reset {
 		return
 	}
 	if len(b.changes) >= MAX_TRACKED_CHANGES {
 		buffer_record_reset(b)
 		return
 	}
-	append(&b.changes, ch)
+	c := ch
+	c.text = strings.clone(ch.text, b.allocator)
+	append(&b.changes, c)
 }
 
 @(private)
 buffer_record_reset :: proc(b: ^Buffer) {
 	if b.track_changes {
-		clear(&b.changes)
+		buffer_free_changes(b)
 		b.changes_reset = true
 	}
 }
 
 // buffer_take_changes returns the changes recorded since the last call
-// (oldest first; valid until the next mutation) and whether a reset
-// happened, then clears the log.
+// (oldest first) and whether a reset happened (whole text replaced or log
+// overflow: positions can't be mapped, re-read everything). The slice and
+// its texts stay valid until the next take or mutation.
 buffer_take_changes :: proc(b: ^Buffer) -> (changes: []Change, reset: bool) {
+	if b.changes_taken {
+		buffer_free_changes(b)
+	}
 	changes = b.changes[:]
 	reset = b.changes_reset
-	clear(&b.changes) // keeps capacity; the returned slice stays readable
 	b.changes_reset = false
+	b.changes_taken = true
 	return
+}
+
+// utf16_len counts UTF-16 code units in `s`.
+utf16_len :: proc(s: string) -> int {
+	n := 0
+	for r in s {
+		n += 2 if r > 0xFFFF else 1
+	}
+	return n
 }
 
 // position_after_change maps a position through one change: positions

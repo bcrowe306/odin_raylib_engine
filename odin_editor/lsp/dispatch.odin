@@ -61,6 +61,17 @@ client_handle_message_body :: proc(c: ^Client, body: []u8) {
 
 	if kind == .Initialize {
 		c.initialized = true
+		// textDocumentSync is either a kind number or {change: kind}.
+		if res, ok := json_object_get(value, "result"); ok {
+			caps, _ := json_object_get(res, "capabilities")
+			if sync, has := json_object_get(caps, "textDocumentSync"); has {
+				if n, is_num := json_as_int(sync); is_num {
+					c.sync_kind = n
+				} else if change, has_change := json_object_get(sync, "change"); has_change {
+					c.sync_kind, _ = json_as_int(change)
+				}
+			}
+		}
 		// The spec requires the client to acknowledge the initialize
 		// result before the server will treat the session as live.
 		client_notify_initialized(c)

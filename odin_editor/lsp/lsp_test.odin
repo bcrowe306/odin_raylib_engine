@@ -482,3 +482,23 @@ test_code_actions_parse_both_edit_shapes_and_skip_commands :: proc(t: ^testing.T
 		testing.expect_value(t, b.edits[0].new_text, "import \"core:strings\"\n")
 	})
 }
+
+@(test)
+test_initialize_result_sets_sync_kind :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+		testing.expect_value(t, c.sync_kind, 1) // full until told otherwise
+		id := client_next_id(&c)
+		c.pending_kind[id] = .Initialize
+		body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":{{"capabilities":{{"textDocumentSync":{{"openClose":true,"change":2}}}}}}}}`, id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect_value(t, c.sync_kind, 2)
+
+		msg := encode_notification("textDocument/didChange", DidChangeIncrementalParams{
+			textDocument = {uri = "file:///x", version = 3},
+			contentChanges = {{range = {{1, 2}, {1, 4}}, text = "ab"}},
+		}, context.temp_allocator)
+		testing.expect(t, strings.contains(msg, `"contentChanges":[{"range":{"start":{"line":1,"character":2},"end":{"line":1,"character":4}},"text":"ab"}]`), msg)
+	})
+}

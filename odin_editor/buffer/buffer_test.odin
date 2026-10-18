@@ -464,8 +464,10 @@ test_change_log_records_edits_when_tracking :: proc(t: ^testing.T) {
 		ch, reset = buffer_take_changes(&b)
 		testing.expect(t, !reset, "no reset")
 		testing.expect_value(t, len(ch), 2)
-		testing.expect_value(t, ch[0], Change{{0, 0}, {0, 0}, {1, 1}})
-		testing.expect_value(t, ch[1], Change{{1, 1}, {1, 3}, {1, 1}})
+		testing.expect(t, ch[0].start == {0, 0} && ch[0].old_end == {0, 0} && ch[0].new_end == {1, 1}, "insert change")
+		testing.expect_value(t, ch[0].text, "1\n2")
+		testing.expect(t, ch[1].start == {1, 1} && ch[1].old_end == {1, 3} && ch[1].new_end == {1, 1}, "delete change")
+		testing.expect_value(t, ch[1].text, "")
 
 		buffer_set_text(&b, "fresh")
 		_, reset = buffer_take_changes(&b)
@@ -554,5 +556,25 @@ test_multi_cursor_typing_coalesces_per_caret :: proc(t: ^testing.T) {
 		testing.expect_value(t, len(b.cursors), 2)
 		testing.expect_value(t, b.cursors[0].pos, Position{0, 0})
 		testing.expect_value(t, b.cursors[1].pos, Position{1, 0})
+	})
+}
+
+@(test)
+test_change_log_records_utf16_columns_before_the_edit :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		buffer_set_text(&b, "é😀x")
+		b.track_changes = true
+		buffer_take_changes(&b) // drop the reset
+		buffer_insert_text(&b, {0, 6}, "Y") // after the emoji: byte 6, UTF-16 3
+		buffer_delete_range(&b, {0, 2}, {0, 6}) // remove the emoji
+		ch, _ := buffer_take_changes(&b)
+		testing.expect_value(t, len(ch), 2)
+		testing.expect(t, ch[0].start_u16 == 3 && ch[0].old_end_u16 == 3 && ch[0].text == "Y", "insert columns")
+		testing.expect(t, ch[1].start_u16 == 1 && ch[1].old_end_u16 == 3, "delete measured before deletion")
+		// Taking again frees the previous batch and returns nothing new.
+		again, _ := buffer_take_changes(&b)
+		testing.expect_value(t, len(again), 0)
 	})
 }

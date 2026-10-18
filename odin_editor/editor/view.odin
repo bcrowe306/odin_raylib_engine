@@ -13,8 +13,15 @@ editor_clamp_scroll :: proc(ed: ^Editor) {
 	if ed.scroll_line > max_line {
 		ed.scroll_line = max_line
 	}
+	if ed.scroll_col <= 0 {
+		// Common case: no horizontal scroll, nothing to measure.
+		ed.scroll_col = 0
+		return
+	}
+	// Widest line is cached per buffer version, so this scan happens at
+	// most once per edit and only while horizontally scrolled.
 	max_col := max(0, editor_max_visual_width(ed) - max(1, ed.visible_cols) + 1)
-	ed.scroll_col = clamp(ed.scroll_col, 0, max(max_col, 0))
+	ed.scroll_col = clamp(ed.scroll_col, 0, max_col)
 }
 
 editor_clamp_to_buffer :: proc(ed: ^Editor, line, col: int) -> buf.Position {

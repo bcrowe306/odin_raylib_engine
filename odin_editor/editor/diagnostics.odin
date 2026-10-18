@@ -48,6 +48,9 @@ Diag_Overlay :: struct {
 	built_seq:    int, // lsp.diagnostics_seq the items came from (-1: never)
 	built_server: int, // supervisor crash count at build time
 	built_key:    string,
+	// The buffer was reset (text replaced) since the last refresh: shifted
+	// positions are meaningless, rebuild from scratch.
+	reset_pending: bool,
 }
 
 @(private)
@@ -99,7 +102,9 @@ editor_diagnostics :: proc(ed: ^Editor) -> []Diag {
 // and rebuilds it if the server published since it was built.
 editor_refresh_diag_overlay :: proc(ed: ^Editor) {
 	o := &ed.diag_overlay
-	changes, reset := buf.buffer_take_changes(&ed.buf)
+	editor_consume_buffer_changes(ed)
+	reset := o.reset_pending
+	o.reset_pending = false
 	if !ed.lsp_enabled || len(ed.document_key) == 0 {
 		diag_overlay_clear(o)
 		o.built_seq = -1
@@ -108,13 +113,7 @@ editor_refresh_diag_overlay :: proc(ed: ^Editor) {
 	stale := reset || o.built_seq != ed.lsp.diagnostics_seq ||
 		o.built_server != ed.lsp_supervisor.total_crashes || o.built_key != ed.document_key
 	if !stale {
-		for ch in changes {
-			for &d in o.items {
-				d.start = buf.position_after_change(d.start, ch)
-				d.end = buf.position_after_change(d.end, ch)
-			}
-		}
-		return
+		return // edits were already applied by editor_consume_buffer_changes
 	}
 
 	// Servers often republish diagnostics they haven't recomputed (OLS
@@ -131,15 +130,6 @@ editor_refresh_diag_overlay :: proc(ed: ^Editor) {
 		delete(old)
 	}
 	keep_old := !reset && o.built_key == ed.document_key && o.built_server == ed.lsp_supervisor.total_crashes
-	if keep_old {
-		// Bring the old positions up to date with edits since last refresh.
-		for ch in changes {
-			for &d in old {
-				d.start = buf.position_after_change(d.start, ch)
-				d.end = buf.position_after_change(d.end, ch)
-			}
-		}
-	}
 	o.built_seq = ed.lsp.diagnostics_seq
 	o.built_server = ed.lsp_supervisor.total_crashes
 	if o.built_key != ed.document_key {
