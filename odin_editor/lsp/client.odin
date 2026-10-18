@@ -54,6 +54,12 @@ Client :: struct {
 	latest_completion_id: int,
 	latest_signature_id:  int,
 
+	// Last textDocument/hover answer (markdown or plain), "" if none.
+	last_hover:          string,
+	last_hover_markdown: bool,
+	hover_seq:           int,
+	latest_hover_id:     int,
+
 	last_code_actions:     [dynamic]Code_Action,
 	code_action_seq:       int,
 	latest_code_action_id: int,
@@ -107,6 +113,7 @@ client_destroy :: proc(c: ^Client) {
 	delete(c.last_signatures)
 	client_clear_code_actions(c)
 	delete(c.last_code_actions)
+	delete(c.last_hover, c.allocator)
 }
 
 // client_start launches `command` (e.g. `{"ols"}`) as a child process and

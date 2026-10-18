@@ -16,6 +16,8 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 		return editor_handle_key_down(ed, ev.key)
 	case .TEXT_INPUT:
 		text := string(ev.text.text)
+		editor_hide_hover(ed)
+		editor_close_context_menu(ed)
 		if len(text) > 0 && ed.find.focused {
 			editor_find_text_input(ed, text)
 			return true
@@ -50,6 +52,11 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
 	editor_track_modifier_key(ed, key)
 	chord := sdl_event_to_chord(key)
+	if ed.menu.open && chord.key != .Unknown {
+		// An open context menu owns the keyboard, even over the find bar.
+		editor_handle_menu_key(ed, chord)
+		return true
+	}
 	if ed.find.focused && editor_find_handle_key(ed, chord) {
 		return true
 	}
@@ -81,6 +88,22 @@ editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
 	return handled
 }
 
+// editor_handle_menu_key: Up/Down move, Enter activates, anything else
+// closes the context menu.
+@(private)
+editor_handle_menu_key :: proc(ed: ^Editor, chord: km.Chord) {
+	#partial switch chord.key {
+	case .Up:
+		editor_context_menu_move(ed, -1)
+	case .Down:
+		editor_context_menu_move(ed, 1)
+	case .Enter:
+		editor_context_menu_activate(ed, ed.menu.selected)
+	case:
+		editor_close_context_menu(ed)
+	}
+}
+
 // editor_handle_popup_key gives open popups first claim on navigation
 // keys: Up/Down/PageUp/PageDown move the completion selection, Enter/Tab
 // accept it, and Escape dismisses the topmost popup.
@@ -110,6 +133,10 @@ editor_handle_popup_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
 		n := len(ed.lsp.last_signatures)
 		cur := editor_signature_index(ed)
 		ed.signature.selected = (cur + (1 if chord.key == .Down else -1) + n) % n
+		return true
+	}
+	if ed.hover.visible && chord.key == .Escape {
+		editor_hide_hover(ed)
 		return true
 	}
 	if ed.actions.active {

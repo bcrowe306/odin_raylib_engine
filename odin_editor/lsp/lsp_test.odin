@@ -524,3 +524,24 @@ test_completion_item_docs_snippet_command_and_incomplete :: proc(t: ^testing.T) 
 		testing.expect(t, !b.is_snippet && !b.doc_markdown && b.documentation == "plain", "plain string documentation")
 	})
 }
+
+@(test)
+test_hover_contents_shapes :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+		send :: proc(c: ^Client, result: string) {
+			id := client_request_hover(c, "file:///x", 0, 0)
+			body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":%s}}`, id, result)
+			client_feed_bytes(c, transmute([]u8)frame_message(body, context.temp_allocator))
+		}
+		send(&c, `{"contents":{"kind":"plaintext","value":"plain"}}`)
+		testing.expect(t, c.last_hover == "plain" && !c.last_hover_markdown, "MarkupContent plaintext")
+		send(&c, `{"contents":[{"language":"odin","value":"x: int"},"note"]}`)
+		testing.expect_value(t, c.last_hover, "```odin\nx: int\n```\n\nnote")
+		testing.expect(t, c.last_hover_markdown, "MarkedString array is markdown")
+		send(&c, `null`)
+		testing.expect_value(t, c.last_hover, "")
+		testing.expect_value(t, c.hover_seq, 3)
+	})
+}

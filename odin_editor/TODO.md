@@ -6,7 +6,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 162 tests across 6 packages, all
+2. **Unit tests for every feature** — 166 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
@@ -169,6 +169,15 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     procedure snippets trigger parameter hints; `isIncomplete` lists are
     re-queried as the prefix changes; Up/Down cycle signature overloads
     ("1/2"). Verified by unit tests and `tools/completion_polish.edctl`.
+24. **Mouse leftovers** — LSP hover info (`textDocument/hover`) after
+    resting on code without diagnostics (markdown, highlighted code);
+    right-click context menu (Cut/Copy/Paste, Select All, Select All
+    Occurrences, Quick Fix, Find, Next Problem; per-platform shortcut
+    labels, keyboard + mouse); drag-and-drop of the selection (move, or copy
+    with Alt/Option or Ctrl; a click without dragging just places the
+    caret); horizontal auto-scroll for word drags and drag-and-drop too.
+    Fixed a hover-parsing bug (`||=` short-circuit dropped later parts).
+    Verified by unit tests and `tools/mouse_extras.edctl`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -176,9 +185,6 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-- **Mouse leftovers** — no right-click context menu, no drag-and-drop of
-  selected text, no hover tooltips (LSP hover), and horizontal auto-scroll
-  only applies to character drags.
 - **OLS version pinning is brittle** — OLS tracks Odin's development branch
   very closely; `Taskfile.yml`'s `OLS_REF` pins a commit verified to build
   against this project's installed Odin version, but upgrading the Odin

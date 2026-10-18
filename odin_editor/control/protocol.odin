@@ -29,6 +29,7 @@ Wait_Condition :: enum {
 	No_Diagnostics, // the document has none
 	Tooltip,        // the diagnostic tooltip is showing
 	Code_Actions,   // the quick-fix menu has the server's answer
+	Hover,          // the LSP hover tooltip is showing
 	Frames,         // a fixed number of frames has elapsed
 }
 
@@ -98,6 +99,8 @@ Expect_Field :: enum {
 	Completion_Doc,      // the completion docs panel contains substring
 	Snippet_Active,      // "true" / "false"
 	Snippet_Stop,        // index of the current snippet tab stop ($N)
+	Hover,               // hover tooltip text contains substring, or "none"
+	Menu_Open,           // context menu "true" / "false"
 }
 
 // Cmd_Expect asserts on editor state; replies `ok` or
@@ -134,12 +137,12 @@ DEFAULT_WAIT_TIMEOUT_MS :: 5000
 HELP_TEXT :: "commands: key <chord>|@<action> [count] | type <text> | text <text> | " +
 	"click|mousedown|mouseup <where> [clicks=N] [mods=shift+alt] [button=left|middle|right] | move <where> | " +
 	"drag <from> <to> [steps=N] [mods=..] [clicks=N] | wheel <dy> [dx=N] [at=<where>] [mods=..] | locate <where> | " +
-	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @find:query|replace|case|word|regex | lsp-kill | " +
+	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @menu:index | @find:query|replace|case|word|regex | lsp-kill | " +
 	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle|lsp-down|diagnostics|no-diagnostics|tooltip|code-actions> [timeout_ms] | " +
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
 	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +
 	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status|errors|warnings|diagnostics-has|line-severity|tooltip|" +
-	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop> <value>. " +
+	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop|hover|menu-open> <value>. " +
 	"chords: [primary+|cmd+|ctrl+|alt+|shift+]<key>, e.g. primary+space, shift+end, down. " +
 	"text escapes: \\n \\t \\\\"
 
@@ -254,6 +257,8 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		case "completion-doc": field = .Completion_Doc
 		case "snippet-active": field = .Snippet_Active
 		case "snippet-stop": field = .Snippet_Stop
+		case "hover": field = .Hover
+		case "menu-open": field = .Menu_Open
 		case:
 			return nil, strings.concatenate({"unknown expect field: ", name}, context.temp_allocator)
 		}
@@ -305,6 +310,7 @@ parse_wait :: proc(rest: string) -> (cmd: Command, err: string) {
 	case "no-diagnostics": cond = .No_Diagnostics
 	case "tooltip": cond = .Tooltip
 	case "code-actions": cond = .Code_Actions
+	case "hover": cond = .Hover
 	case "frames": cond = .Frames
 	case:
 		return nil, strings.concatenate({"unknown wait condition: ", parts[0]}, context.temp_allocator)

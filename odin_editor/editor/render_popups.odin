@@ -363,12 +363,17 @@ render_completion_docs :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.
 			draw_text(renderer, font, l.text, x, y, theme.popup_text, ed.char_h)
 			continue
 		}
-		// Code lines get the editor's own syntax colours.
-		tokens, _ := ed.language.tokenize(l.text, syn.LINE_STATE_NORMAL, context.temp_allocator)
-		for tok in tokens {
-			if tok.end > tok.start {
-				draw_text(renderer, font, l.text[tok.start:tok.end], x + f32(text_cols(l.text[:tok.start])) * ed.char_w, y, token_color(theme, tok.kind), ed.char_h)
-			}
+		draw_code_line(ed, renderer, font, theme, l.text, x, y)
+	}
+}
+
+// draw_code_line draws one line of code with the editor's syntax colours.
+@(private)
+draw_code_line :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, theme: Theme, text: string, x, y: f32) {
+	tokens, _ := ed.language.tokenize(text, syn.LINE_STATE_NORMAL, context.temp_allocator)
+	for tok in tokens {
+		if tok.end > tok.start {
+			draw_text(renderer, font, text[tok.start:tok.end], x + f32(text_cols(text[:tok.start])) * ed.char_w, y, token_color(theme, tok.kind), ed.char_h)
 		}
 	}
 }

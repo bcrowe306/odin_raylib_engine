@@ -26,6 +26,7 @@ SUITES=(
 	"find_smoke:example/assets/mouse_fixture.odin.txt:Find/replace bar (case, whole word, regex), Ctrl/Cmd+D and select-all occurrences"
 	"fonts_smoke:example/assets/fonts_fixture.odin.txt:Fallback fonts for emoji/CJK/symbols; wide characters on the cell grid"
 	"completion_polish:example/assets/polish_fixture.odin.txt:Completion docs panel, snippets with tab stops, parameter hints, overload cycling"
+	"mouse_extras:example/assets/lsp_fixture.odin.txt:LSP hover info, right-click context menu, drag-and-drop move/copy"
 	"diagnostics_extras:example/assets/problems_fixture:Diagnostic tags, quick fixes, edit-tracking squiggles, problems panel"
 )
 

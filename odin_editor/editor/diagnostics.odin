@@ -292,6 +292,9 @@ editor_track_diag_hover :: proc(ed: ^Editor, hit: Hit, x, y: f32) {
 		tip.hover_valid = false
 		return
 	}
+	if rect, _, ok := editor_hover_layout(ed); ok && in_rect(rect, x, y) {
+		return // reading the hover tooltip
+	}
 	pos := hit.pos
 	line_only := false
 	valid := false
@@ -302,7 +305,7 @@ editor_track_diag_hover :: proc(ed: ^Editor, hit: Hit, x, y: f32) {
 		}
 	case .Gutter:
 		line_only, valid = true, true
-	case .Outside, .Completion, .Signature, .Problems, .Code_Actions, .Find:
+	case .Outside, .Completion, .Signature, .Problems, .Code_Actions, .Find, .Context_Menu:
 	}
 	if !valid || (tip.hover_valid && (pos != tip.hover_pos || line_only != tip.hover_line_only)) || !tip.hover_valid {
 		tip.hover_since = time.tick_now()
@@ -310,6 +313,9 @@ editor_track_diag_hover :: proc(ed: ^Editor, hit: Hit, x, y: f32) {
 	tip.hover_valid = valid
 	tip.hover_pos = pos
 	tip.hover_line_only = line_only
+	if ed.hover.visible && (!valid || line_only || pos != ed.hover.pos) {
+		editor_hide_hover(ed)
+	}
 	if tip.source == .Mouse && (!valid || len(editor_diagnostics_at(ed, pos, line_only)) == 0) {
 		tip.source = .None
 	}
@@ -333,6 +339,7 @@ editor_screen_to_cell :: proc(ed: ^Editor, x, y: f32) -> (pos: buf.Position, ins
 
 // editor_update_diagnostics advances the tooltip state each frame.
 editor_update_diagnostics :: proc(ed: ^Editor) {
+	editor_update_hover(ed)
 	tip := &ed.diag_tip
 	switch tip.source {
 	case .Keyboard:

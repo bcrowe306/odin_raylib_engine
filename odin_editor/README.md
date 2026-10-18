@@ -267,6 +267,10 @@ mouse, key-up and window event — key-ups are how it tracks held modifiers):
 - wheel scrolls vertically; horizontal wheel or Shift+wheel scrolls
   sideways; the wheel over the completion list scrolls the list
 - click a completion item to accept it
+- rest on code to see **hover info** from the server (type, docs)
+- **right-click** for a context menu (Cut/Copy/Paste, Select All, Quick
+  Fix, Find, Next Problem)
+- **drag a selection** to move it; hold Alt/Option or Ctrl to copy
 
 Hit-testing uses visual columns (tabs expand to `ed.tab_width`, default 4),
 and clicks outside the editor's area return `false` so hosts can route them

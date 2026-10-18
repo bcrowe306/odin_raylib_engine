@@ -51,6 +51,19 @@ State_Completion :: struct {
 	incomplete:     bool     `json:"incomplete"`,
 }
 
+State_Hover :: struct {
+	visible: bool   `json:"visible"`,
+	text:    string `json:"text"`,
+	rect:    [4]f32 `json:"rect"`,
+}
+
+State_Menu :: struct {
+	open:     bool     `json:"open"`,
+	selected: int      `json:"selected"`,
+	items:    []string `json:"items"`,
+	rect:     [4]f32   `json:"rect"`,
+}
+
 State_Snippet :: struct {
 	active:     bool `json:"active"`,
 	stop_index: int  `json:"stop_index"`,
@@ -149,6 +162,8 @@ State :: struct {
 	code_actions:      State_Code_Actions `json:"code_actions"`,
 	find:              State_Find         `json:"find"`,
 	snippet:           State_Snippet      `json:"snippet"`,
+	hover:             State_Hover        `json:"hover"`,
+	menu:              State_Menu         `json:"menu"`,
 	text:         string           `json:"text"`,
 }
 
@@ -307,6 +322,21 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 		s.completion.doc = strings.join(texts[:], "\n", context.temp_allocator)
 	}
 	s.completion.incomplete = e.lsp_enabled && e.lsp.completion_incomplete
+	if rect, lines, ok := ed.editor_hover_layout(e); ok {
+		texts := make([dynamic]string, context.temp_allocator)
+		for l in lines {
+			append(&texts, l.text)
+		}
+		s.hover = {visible = true, text = strings.join(texts[:], "\n", context.temp_allocator), rect = rect_array(rect)}
+	}
+	if rect, ok := ed.editor_context_menu_layout(e); ok {
+		items := ed.editor_context_menu_items(e)
+		labels := make([]string, len(items), context.temp_allocator)
+		for it, i in items {
+			labels[i] = it.label if it.enabled || it.label == "" else fmt.tprintf("(%s)", it.label)
+		}
+		s.menu = {open = true, selected = e.menu.selected, items = labels, rect = rect_array(rect)}
+	}
 	if e.snippet.active {
 		s.snippet = {active = true, stop_index = e.snippet.stops[e.snippet.current].index, stops = len(e.snippet.stops)}
 	}

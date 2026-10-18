@@ -432,6 +432,13 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 		for title in s.code_actions.titles {
 			pass ||= s.code_actions.visible && strings.contains(title, x.want)
 		}
+	case .Hover:
+		actual = s.hover.text if s.hover.visible else "none"
+		want := strings.trim_space(x.want)
+		pass = want == "none" ? !s.hover.visible : s.hover.visible && strings.contains(actual, want)
+	case .Menu_Open:
+		actual = "true" if s.menu.open else "false"
+		pass = actual == strings.trim_space(x.want)
 	case .Completion_Doc:
 		actual = s.completion.doc
 		pass = strings.contains(actual, x.want)
@@ -498,6 +505,7 @@ wait_check :: proc(srv: ^Server, c: ^Conn, e: ^ed.Editor) -> bool {
 		case .No_Diagnostics: met = len(ed.editor_diagnostics(e)) == 0
 		case .Tooltip: met = len(ed.editor_diag_tooltip_items(e)) > 0
 		case .Code_Actions: met = ed.editor_code_actions_visible(e)
+		case .Hover: met = e.hover.visible
 		case .Frames:
 		}
 	}
@@ -530,6 +538,7 @@ wait_name :: proc(cond: Wait_Condition) -> string {
 	case .No_Diagnostics: return "no-diagnostics"
 	case .Tooltip: return "tooltip"
 	case .Code_Actions: return "code-actions"
+	case .Hover: return "hover"
 	case .Frames: return "frames"
 	}
 	return "?"
@@ -713,6 +722,12 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 			return 0, 0, fmt.tprintf("line %d is not visible", w.line)
 		}
 		return e.origin_x + ed.editor_gutter_width(e) / 2, e.origin_y + f32(w.line - e.scroll_line) * e.char_h + e.char_h / 2, ""
+	case .Menu_Item:
+		rect, ok := ed.editor_context_menu_layout(e)
+		if !ok {
+			return 0, 0, "context menu is not open"
+		}
+		return rect.x + rect.w / 2, rect.y + ed.POPUP_PAD + f32(w.line) * e.char_h + e.char_h / 2, ""
 	case .Find_Part:
 		l, ok := ed.editor_find_layout(e)
 		if !ok {
@@ -812,13 +827,15 @@ run_mouse_command :: proc(srv: ^Server, e: ^ed.Editor, cmd: Command) -> string {
 		if err1 != "" {
 			return strings.concatenate({"err ", err1}, context.temp_allocator)
 		}
-		push_mods(srv, v.opts.mod, true)
 		push_motion(srv, x0, y0, 0)
 		for n in 1 ..< v.opts.clicks {
 			push_button(srv, x0, y0, 1, u8(n), true)
 			push_button(srv, x0, y0, 1, u8(n), false)
 		}
 		push_button(srv, x0, y0, 1, u8(v.opts.clicks), true)
+		// Modifiers go down after the press, like a person starting a
+		// drag and then holding Alt/Ctrl to copy.
+		push_mods(srv, v.opts.mod, true)
 		for i in 1 ..= v.opts.steps {
 			t := f32(i) / f32(v.opts.steps)
 			push_motion(srv, x0 + (x1 - x0) * t, y0 + (y1 - y0) * t, 1)

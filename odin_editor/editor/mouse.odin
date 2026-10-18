@@ -24,6 +24,7 @@ Mouse_Zone :: enum {
 	Problems, // the problems panel (row = problem index, -1 = header)
 	Code_Actions, // the quick-fix menu (row = action index)
 	Find,         // the find/replace bar
+	Context_Menu, // the right-click menu (row = item index)
 }
 
 Drag_Mode :: enum {
@@ -31,6 +32,7 @@ Drag_Mode :: enum {
 	Chars,
 	Words,
 	Lines,
+	Move, // dragging the selection to move/copy it (drop_pos = target)
 }
 
 // Mouse_Cursor is the pointer shape the host should display (the editor
@@ -53,6 +55,13 @@ Mouse_State :: struct {
 	last_autoscroll: time.Tick,
 	// Fractional wheel deltas (trackpads) carried between events.
 	wheel_acc_x, wheel_acc_y: f32,
+
+	// Press inside the selection: becomes a drag-move after
+	// DRAG_MOVE_THRESHOLD px, else a plain click on release.
+	move_pending:     bool,
+	press_x, press_y: f32,
+	press_pos:        buf.Position,
+	drop_pos:         buf.Position,
 }
 
 Hit :: struct {
@@ -89,6 +98,11 @@ editor_screen_to_position :: proc(ed: ^Editor, x, y: f32) -> buf.Position {
 // editor_hit_test classifies a window-pixel point.
 editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 	hit := Hit{pos = editor_screen_to_position(ed, x, y)}
+	if rect, ok := editor_context_menu_layout(ed); ok && in_rect(rect, x, y) {
+		hit.zone = .Context_Menu
+		hit.row = int((y - rect.y - POPUP_PAD) / ed.char_h)
+		return hit
+	}
 	if l, ok := editor_find_layout(ed); ok && in_rect(l.rect, x, y) {
 		hit.zone = .Find
 		return hit
@@ -188,9 +202,28 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 	hit := editor_hit_test(ed, ev.x, ev.y)
 	ed.mouse.zone = hit.zone
 	if hit.zone == .Outside {
+		editor_close_context_menu(ed)
 		return false
 	}
-	if ev.button != 1 { // only the left button does anything (yet)
+	editor_hide_hover(ed)
+	if hit.zone == .Context_Menu {
+		if ev.button == 1 {
+			editor_context_menu_activate(ed, hit.row)
+		}
+		return true
+	}
+	editor_close_context_menu(ed)
+	if ev.button == 3 && (hit.zone == .Text || hit.zone == .Gutter) {
+		// Right-click: move the caret there unless it's inside the
+		// selection (so Cut/Copy act on it), then open the menu.
+		if !editor_press_in_selection(ed, hit.pos) {
+			resize(&ed.buf.cursors, 1)
+			ed.buf.cursors[0] = {pos = hit.pos}
+		}
+		editor_open_context_menu(ed, ev.x, ev.y)
+		return true
+	}
+	if ev.button != 1 {
 		return true
 	}
 
@@ -201,7 +234,7 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		ed.find.focused = false
 	}
 	switch hit.zone {
-	case .Outside:
+	case .Outside, .Context_Menu:
 	case .Find:
 		editor_find_click(ed, ev.x, ev.y)
 	case .Code_Actions:
@@ -226,6 +259,13 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		editor_close_completion(ed)
 		if .Alt in mods && .Shift not_in mods {
 			editor_toggle_cursor_at(ed, hit.pos)
+			return true
+		}
+		if ev.clicks == 1 && mods == {} && editor_press_in_selection(ed, hit.pos) {
+			// Maybe the start of a drag-and-drop; decided on motion.
+			ed.mouse.move_pending = true
+			ed.mouse.press_x, ed.mouse.press_y = ev.x, ev.y
+			ed.mouse.press_pos = hit.pos
 			return true
 		}
 		if .Shift in mods {
@@ -282,9 +322,27 @@ editor_toggle_cursor_at :: proc(ed: ^Editor, pos: buf.Position) {
 @(private)
 editor_handle_mouse_up :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool {
 	ed.mouse.x, ed.mouse.y = ev.x, ev.y
-	if ev.button == 1 && ed.mouse.drag != .None {
+	m := &ed.mouse
+	if ev.button == 1 && m.drag == .Move {
+		m.drop_pos = editor_screen_to_position(ed, ev.x, ev.y)
+		mods := editor_current_mods(ed)
+		// Copy instead of move with Alt/Option (VSCode on macOS) or Ctrl
+		// (VSCode elsewhere) — either works on every platform.
+		copy := .Alt in mods || .Ctrl in mods
+		editor_finish_drag_move(ed, copy)
+		m.drag = .None
+		return true
+	}
+	if ev.button == 1 && m.move_pending {
+		// Pressed inside the selection but never dragged: a plain click.
+		m.move_pending = false
+		resize(&ed.buf.cursors, 1)
+		ed.buf.cursors[0] = {pos = m.press_pos}
+		return true
+	}
+	if ev.button == 1 && m.drag != .None {
 		editor_drag_to(ed, editor_screen_to_position(ed, ev.x, ev.y))
-		ed.mouse.drag = .None
+		m.drag = .None
 		return true
 	}
 	return editor_hit_test(ed, ev.x, ev.y).zone != .Outside
@@ -296,6 +354,11 @@ editor_handle_mouse_motion :: proc(ed: ^Editor, ev: sdl.MouseMotionEvent) -> boo
 	hit := editor_hit_test(ed, ev.x, ev.y)
 	ed.mouse.zone = hit.zone
 	editor_track_diag_hover(ed, hit, ev.x, ev.y)
+	m := &ed.mouse
+	if m.move_pending && abs(ev.x - m.press_x) + abs(ev.y - m.press_y) > DRAG_MOVE_THRESHOLD {
+		m.move_pending = false
+		m.drag = .Move
+	}
 	if ed.mouse.drag != .None {
 		editor_drag_to(ed, hit.pos)
 		return true
@@ -313,6 +376,9 @@ editor_drag_to :: proc(ed: ^Editor, pos: buf.Position) {
 	c := &ed.buf.cursors[m.drag_cursor]
 	switch m.drag {
 	case .None:
+	case .Move:
+		m.drop_pos = pos
+		return
 	case .Chars:
 		c.pos = pos
 	case .Words, .Lines:
@@ -397,7 +463,7 @@ editor_update_mouse :: proc(ed: ^Editor) {
 	case m.y < top: dl = -(1 + int((top - m.y) / ed.char_h))
 	case m.y >= bottom: dl = 1 + int((m.y - bottom) / ed.char_h)
 	}
-	if m.drag == .Chars {
+	if m.drag == .Chars || m.drag == .Words || m.drag == .Move {
 		switch {
 		case m.x < left && ed.scroll_col > 0: dc = -(1 + int((left - m.x) / ed.char_w))
 		case m.x >= right: dc = 1 + int((m.x - right) / ed.char_w)

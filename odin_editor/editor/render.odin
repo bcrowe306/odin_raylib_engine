@@ -185,9 +185,12 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 	// Popups draw last so they sit on top of the text.
 	render_problems_panel(ed, renderer, font, theme, origin_x, origin_y)
 	render_find_bar(ed, renderer, font, theme)
+	render_drop_caret(ed, renderer, theme)
 	render_popups(ed, renderer, font, theme, origin_x, origin_y)
 	render_diag_tooltip(ed, renderer, font, theme)
 	render_code_actions(ed, renderer, font, theme)
+	render_hover(ed, renderer, font, theme)
+	render_context_menu(ed, renderer, font, theme)
 }
 
 @(private)

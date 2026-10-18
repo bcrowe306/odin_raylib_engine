@@ -15,6 +15,7 @@ import sdl "vendor:sdl3"
 Editor :: struct {
 	buf:       buf.Buffer,
 	keymap:    km.Keymap,
+	platform:  km.Platform,
 	language:  syn.Language,
 
 	lsp:          lspc.Client,
@@ -50,6 +51,8 @@ Editor :: struct {
 	actions:      Code_Action_Menu,
 	find:         Find_State,
 	snippet:      Snippet_Session,
+	menu:         Context_Menu,
+	hover:        Hover_Info,
 
 	// Viewport / scrolling (in cells, not pixels). scroll_col is a visual
 	// column (tabs expanded), not a byte offset.
@@ -94,6 +97,7 @@ editor_init :: proc(
 	ed := Editor{
 		buf      = buf.buffer_init(allocator),
 		keymap   = km.keymap_default(platform, allocator),
+		platform = platform,
 		language = language,
 		char_w   = 8,
 		char_h   = 16,

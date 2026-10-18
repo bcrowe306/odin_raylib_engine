@@ -103,6 +103,20 @@ client_request_signature_help :: proc(c: ^Client, uri: string, line, character: 
 	return id
 }
 
+// client_request_hover asks for hover info (type, docs) at a position.
+client_request_hover :: proc(c: ^Client, uri: string, line, character: int) -> int {
+	id := client_next_id(c)
+	params := HoverParams{
+		textDocument = TextDocumentIdentifier{uri = uri},
+		position     = Position{line = line, character = character},
+	}
+	msg := encode_request(id, "textDocument/hover", params, context.temp_allocator)
+	c.pending_kind[id] = .Hover
+	c.latest_hover_id = id
+	client_send_raw(c, msg)
+	return id
+}
+
 // client_request_code_action asks for code actions (quick fixes,
 // refactors) over `range`, passing the diagnostics that overlap it.
 client_request_code_action :: proc(c: ^Client, uri: string, range: Range, diagnostics: []Diagnostic) -> int {

@@ -6,6 +6,7 @@
 package lsp
 
 import "core:encoding/json"
+import "core:fmt"
 import "core:strings"
 
 // client_feed_bytes appends `data` to the client's receive buffer and
@@ -99,7 +100,12 @@ client_handle_message_body :: proc(c: ^Client, body: []u8) {
 			return
 		}
 		client_store_code_actions(c, result)
-	case .Initialize, .Hover, .Other:
+	case .Hover:
+		if id != c.latest_hover_id {
+			return
+		}
+		client_store_hover(c, result)
+	case .Initialize, .Other:
 		// No persistent storage needed for these yet.
 	}
 }
@@ -339,6 +345,54 @@ client_store_signature_help :: proc(c: ^Client, result: json.Value) {
 		}
 		append(&c.last_signatures, si)
 	}
+}
+
+// client_store_hover keeps the hover contents: MarkupContent, a
+// MarkedString, or an array of MarkedStrings (joined).
+@(private)
+client_store_hover :: proc(c: ^Client, result: json.Value) {
+	delete(c.last_hover, c.allocator)
+	c.last_hover = ""
+	c.last_hover_markdown = false
+	c.hover_seq += 1
+	contents, ok := json_object_get(result, "contents")
+	if !ok {
+		return
+	}
+	sb := strings.builder_make(context.temp_allocator)
+	marked :: proc(sb: ^strings.Builder, v: json.Value) -> (markdown: bool) {
+		if s, is_str := json_as_string(v); is_str {
+			strings.write_string(sb, s)
+			return true // MarkedString strings are markdown
+		}
+		if val, has := json_object_get(v, "value"); has {
+			s, _ := json_as_string(val)
+			if lang, has_lang := json_object_get(v, "language"); has_lang {
+				l, _ := json_as_string(lang)
+				fmt.sbprintf(sb, "```%s\n%s\n```", l, s)
+				return true
+			}
+			strings.write_string(sb, s)
+			if kind, has_kind := json_object_get(v, "kind"); has_kind {
+				k, _ := json_as_string(kind)
+				return k == "markdown"
+			}
+		}
+		return false
+	}
+	if arr, is_arr := contents.(json.Array); is_arr {
+		for v, i in arr {
+			if i > 0 {
+				strings.write_string(&sb, "\n\n")
+			}
+			// Evaluate marked() for every part: `||=` would short-circuit.
+			md := marked(&sb, v)
+			c.last_hover_markdown ||= md
+		}
+	} else {
+		c.last_hover_markdown = marked(&sb, contents)
+	}
+	c.last_hover = strings.clone(strings.to_string(sb), c.allocator)
 }
 
 // client_clear_code_actions frees and empties `last_code_actions`.

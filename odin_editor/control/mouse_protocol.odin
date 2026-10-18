@@ -21,6 +21,7 @@ Where_Kind :: enum {
 	Completion,
 	Problem,
 	Find_Part, // line: 0 query, 1 replace, 2 case, 3 word, 4 regex
+	Menu_Item, // line = context menu item index
 }
 
 Where :: struct {
@@ -90,6 +91,9 @@ parse_where :: proc(parts: []string) -> (w: Where, used: int, ok: bool) {
 			w.line, ok = strconv.parse_int(tail)
 		case "problem":
 			w.kind = .Problem
+			w.line, ok = strconv.parse_int(tail)
+		case "menu":
+			w.kind = .Menu_Item
 			w.line, ok = strconv.parse_int(tail)
 		case "find":
 			w.kind = .Find_Part
