@@ -26,6 +26,7 @@ Mouse_Zone :: enum {
 	Find,         // the find/replace bar
 	Context_Menu, // the right-click menu (row = item index)
 	Scrollbar,    // a scrollbar track/thumb
+	Palette,      // the command palette (row = match index, -1 = input)
 }
 
 Drag_Mode :: enum {
@@ -103,6 +104,11 @@ editor_screen_to_position :: proc(ed: ^Editor, x, y: f32) -> buf.Position {
 // editor_hit_test classifies a window-pixel point.
 editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 	hit := Hit{pos = editor_screen_to_position(ed, x, y)}
+	if rect, _, ok := editor_palette_layout(ed); ok && in_rect(rect, x, y) {
+		hit.zone = .Palette
+		hit.row = editor_palette_row_at(ed, y)
+		return hit
+	}
 	if rect, ok := editor_context_menu_layout(ed); ok && in_rect(rect, x, y) {
 		hit.zone = .Context_Menu
 		hit.row = int((y - rect.y - POPUP_PAD) / ed.char_h)
@@ -216,6 +222,15 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		return false
 	}
 	editor_hide_hover(ed)
+	if hit.zone == .Palette {
+		if ev.button == 1 && hit.row >= 0 {
+			editor_palette_run(ed, hit.row)
+		}
+		return true
+	}
+	if ed.palette.open {
+		editor_close_palette(ed) // clicking elsewhere dismisses it
+	}
 	if hit.zone == .Scrollbar {
 		editor_close_context_menu(ed)
 		if ev.button == 1 {
@@ -251,7 +266,7 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		ed.find.focused = false
 	}
 	switch hit.zone {
-	case .Outside, .Context_Menu, .Scrollbar:
+	case .Outside, .Context_Menu, .Scrollbar, .Palette:
 	case .Find:
 		editor_find_click(ed, ev.x, ev.y)
 	case .Code_Actions:

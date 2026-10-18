@@ -65,6 +65,16 @@ chord_label :: proc(ed: ^Editor, action: km.Action) -> string {
 	name := fmt.tprint(best.key)
 	#partial switch best.key {
 	case .Period: name = "."
+	case .Comma: name = ","
+	case .Equals: name = "="
+	case .Minus: name = "-"
+	case .Slash: name = "/"
+	case .Backslash: name = "\\"
+	case .LeftBracket: name = "["
+	case .RightBracket: name = "]"
+	case .Semicolon: name = ";"
+	case .Quote: name = "'"
+	case .Grave: name = "`"
 	case .Num0 ..= .Num9: name = name[3:]
 	}
 	strings.write_string(&sb, name)
@@ -111,13 +121,7 @@ editor_context_menu_activate :: proc(ed: ^Editor, index: int) {
 	if index < 0 || index >= len(items) || !items[index].enabled {
 		return
 	}
-	#partial switch a := items[index].action; a {
-	case .Cut, .Copy, .Paste:
-		editor_handle_clipboard_action(ed, a)
-	case:
-		editor_apply_action(ed, a)
-	}
-	editor_ensure_cursor_visible(ed)
+	editor_run_action(ed, items[index].action)
 }
 
 // editor_context_menu_move steps the highlight, skipping separators and

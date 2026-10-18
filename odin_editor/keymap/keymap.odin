@@ -26,7 +26,7 @@ Key :: enum {
 	Backspace, Delete, Enter, Tab, Escape, Space,
 	Slash, Backslash, Minus, Equals, LeftBracket, RightBracket,
 	Semicolon, Quote, Comma, Period, Grave,
-	F8, F3,
+	F8, F3, F1,
 }
 
 Chord :: struct {
@@ -79,6 +79,7 @@ Action :: enum {
 
 	// View.
 	ZoomIn, ZoomOut, ZoomReset,
+	CommandPalette,
 
 	// Misc.
 	Escape,

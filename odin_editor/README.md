@@ -251,6 +251,13 @@ builds the sheets.
   resize them (`TTF_SetFontSize`) and call `editor_set_font` (see
   `example/main.odin`).
 
+## Command palette
+
+**Cmd/Ctrl+P** (also Cmd/Ctrl+Shift+P and F1) opens a searchable list of
+every command with its shortcut. Type to fuzzy-filter (matched letters are
+highlighted), Up/Down to choose, Enter or click to run, Escape to close.
+Recently used commands are listed first.
+
 ## Search
 
 - **Ctrl/Cmd+F** opens the find bar (seeded from a single-line selection);

@@ -195,6 +195,12 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     for diagnostics, find matches and the caret); Ctrl/Cmd `+`/`-`/`0` zoom
     (`editor_set_font_size` + `editor_take_font_size_change`, demo resizes
     its fonts). Verified by unit tests and `tools/ui_tweaks.edctl`.
+27. **Command palette** — Cmd/Ctrl+P (also Cmd/Ctrl+Shift+P, F1): every
+    editor command with its shortcut, fuzzy search with highlighted
+    matches, recently used first, Enter/click to run; one
+    `editor_run_action` path now serves keys, the context menu and the
+    palette. Entries are generic so windows can be listed too. Verified by
+    unit tests and `tools/palette_smoke.edctl`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -204,6 +210,5 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 **Import key commands from zed/vscode** 
 **Make theme colors editable in ui**
-**Command Pallet via CMD+p**
 **Implement Goto Definition / Peek Definition / Find References**
 **Command Pallet switches between windows** Command Pallet should be able to switch between windows, keymap editor, find, theme editor, utitlity page(maybe funcitons around managing ols).

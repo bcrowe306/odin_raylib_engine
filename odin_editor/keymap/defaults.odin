@@ -109,6 +109,11 @@ keymap_default :: proc(platform: Platform, allocator := context.allocator) -> Ke
 	keymap_bind(&km, Chord{.Minus, primary}, .ZoomOut)
 	keymap_bind(&km, Chord{.Num0, primary}, .ZoomReset)
 
+	// Command palette: Cmd/Ctrl+P, plus VSCode's Cmd/Ctrl+Shift+P and F1.
+	keymap_bind(&km, Chord{.P, primary}, .CommandPalette)
+	keymap_bind(&km, Chord{.P, primary | {.Shift}}, .CommandPalette)
+	keymap_bind(&km, Chord{.F1, {}}, .CommandPalette)
+
 	keymap_bind(&km, Chord{.Escape, {}}, .Escape)
 
 	return km

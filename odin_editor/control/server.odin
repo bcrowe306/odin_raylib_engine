@@ -436,6 +436,12 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 		actual = s.hover.text if s.hover.visible else "none"
 		want := strings.trim_space(x.want)
 		pass = want == "none" ? !s.hover.visible : s.hover.visible && strings.contains(actual, want)
+	case .Palette_Open:
+		actual = "true" if s.palette.open else "false"
+		pass = actual == strings.trim_space(x.want)
+	case .Palette_Selected:
+		actual = s.palette.selected_label
+		pass = s.palette.open && actual == strings.trim_space(x.want)
 	case .Font_Size:
 		actual = fmt.tprint(int(e.font_size))
 		pass = actual == strings.trim_space(x.want)
@@ -686,7 +692,7 @@ chord_for_action :: proc(e: ^ed.Editor, name: string) -> (key: sdl.Keycode, mod:
 		sdl.K_LEFT, sdl.K_RIGHT, sdl.K_UP, sdl.K_DOWN, sdl.K_HOME, sdl.K_END, sdl.K_PAGEUP, sdl.K_PAGEDOWN,
 		sdl.K_BACKSPACE, sdl.K_DELETE, sdl.K_RETURN, sdl.K_TAB, sdl.K_ESCAPE, sdl.K_SPACE,
 		sdl.K_SLASH, sdl.K_BACKSLASH, sdl.K_MINUS, sdl.K_EQUALS, sdl.K_LEFTBRACKET, sdl.K_RIGHTBRACKET,
-		sdl.K_SEMICOLON, sdl.K_APOSTROPHE, sdl.K_COMMA, sdl.K_PERIOD, sdl.K_GRAVE, sdl.K_F3, sdl.K_F8,
+		sdl.K_SEMICOLON, sdl.K_APOSTROPHE, sdl.K_COMMA, sdl.K_PERIOD, sdl.K_GRAVE, sdl.K_F1, sdl.K_F3, sdl.K_F8,
 	}
 	for code in candidates {
 		if ed.sdl_keycode_to_key(code) == best.key {
@@ -746,6 +752,16 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 			}
 			return l.h_track.x + l.h_track.w * f, l.h_track.y + l.h_track.h / 2, ""
 		}
+	case .Palette_Row:
+		rect, rows, ok := ed.editor_palette_layout(e)
+		if !ok {
+			return 0, 0, "command palette is not open"
+		}
+		r := w.line - e.palette.scroll
+		if r < 0 || r >= rows {
+			return 0, 0, fmt.tprintf("palette row %d is not on screen", w.line)
+		}
+		return rect.x + rect.w / 2, rect.y + ed.POPUP_PAD + e.char_h + 4 + f32(r) * e.char_h + e.char_h / 2, ""
 	case .Menu_Item:
 		rect, ok := ed.editor_context_menu_layout(e)
 		if !ok {

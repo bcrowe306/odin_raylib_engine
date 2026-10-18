@@ -52,6 +52,8 @@ Editor :: struct {
 	find:         Find_State,
 	snippet:      Snippet_Session,
 	menu:         Context_Menu,
+	palette:      Palette_State,
+	window:       Editor_Window,
 	hover:        Hover_Info,
 
 	// Viewport / scrolling (in cells, not pixels). scroll_col is a visual
@@ -125,6 +127,7 @@ editor_init :: proc(
 	ed.width_cache_version = -1
 	ed.lsp_pending = make([dynamic]lspc.Incremental_Change, allocator)
 	find_init(&ed.find)
+	palette_init(&ed.palette)
 	// Diagnostics follow edits between server publishes (see Diag_Overlay).
 	ed.buf.track_changes = true
 	return ed
@@ -147,6 +150,7 @@ editor_destroy :: proc(ed: ^Editor) {
 	delete(ed.lsp_pending)
 	problems_destroy(&ed.problems)
 	find_destroy(&ed.find)
+	palette_destroy(&ed.palette)
 	delete(ed.snippet.stops)
 	delete(ed.completion.filtered)
 }

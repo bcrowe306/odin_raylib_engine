@@ -64,6 +64,14 @@ State_Menu :: struct {
 	rect:     [4]f32   `json:"rect"`,
 }
 
+State_Palette :: struct {
+	open:           bool     `json:"open"`,
+	query:          string   `json:"query"`,
+	selected:       int      `json:"selected"`,
+	selected_label: string   `json:"selected_label"`,
+	items:          []string `json:"items"`, // first rows, "label  [detail]"
+}
+
 State_Snippet :: struct {
 	active:     bool `json:"active"`,
 	stop_index: int  `json:"stop_index"`,
@@ -166,6 +174,8 @@ State :: struct {
 	snippet:           State_Snippet      `json:"snippet"`,
 	hover:             State_Hover        `json:"hover"`,
 	menu:              State_Menu         `json:"menu"`,
+	palette:           State_Palette      `json:"palette"`,
+	window:            string             `json:"window"`,
 	text:         string           `json:"text"`,
 }
 
@@ -332,6 +342,20 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 			append(&texts, l.text)
 		}
 		s.hover = {visible = true, text = strings.join(texts[:], "\n", context.temp_allocator), rect = rect_array(rect)}
+	}
+	s.window = strings.to_lower(fmt.tprint(e.window), context.temp_allocator)
+	if e.palette.open {
+		entries, matches := ed.editor_palette_matches(e)
+		n := min(len(matches), 12)
+		items := make([]string, n, context.temp_allocator)
+		for i in 0 ..< n {
+			en := entries[matches[i].entry]
+			items[i] = fmt.tprintf("%s  [%s]", en.label, en.detail)
+		}
+		s.palette = {open = true, query = strings.to_string(e.palette.query), selected = e.palette.selected, items = items}
+		if e.palette.selected < len(matches) {
+			s.palette.selected_label = entries[matches[e.palette.selected].entry].label
+		}
 	}
 	if rect, ok := ed.editor_context_menu_layout(e); ok {
 		items := ed.editor_context_menu_items(e)

@@ -18,6 +18,10 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 		text := string(ev.text.text)
 		editor_hide_hover(ed)
 		editor_close_context_menu(ed)
+		if len(text) > 0 && ed.palette.open {
+			editor_palette_text_input(ed, text)
+			return true
+		}
 		if len(text) > 0 && ed.find.focused {
 			editor_find_text_input(ed, text)
 			return true
@@ -52,6 +56,10 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
 	editor_track_modifier_key(ed, key)
 	chord := sdl_event_to_chord(key)
+	if ed.palette.open && chord.key != .Unknown {
+		// The palette owns the keyboard while open.
+		return editor_palette_handle_key(ed, chord)
+	}
 	if ed.menu.open && chord.key != .Unknown {
 		// An open context menu owns the keyboard, even over the find bar.
 		editor_handle_menu_key(ed, chord)
@@ -67,20 +75,24 @@ editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
 	if !bound {
 		return false
 	}
+	return editor_run_action(ed, action)
+}
 
-	if action == .Copy || action == .Cut || action == .Paste {
+// editor_run_action performs an action however it was invoked (key,
+// context menu, command palette). Returns false for host-level actions the
+// editor can't do itself (Save As / Open need the host's file dialogs).
+editor_run_action :: proc(ed: ^Editor, action: km.Action) -> bool {
+	#partial switch action {
+	case .Copy, .Cut, .Paste:
 		editor_handle_clipboard_action(ed, action)
 		return true
-	}
-	if action == .TriggerCompletion {
+	case .TriggerCompletion:
 		editor_request_completion(ed)
 		return true
-	}
-	if action == .TriggerSignatureHelp {
+	case .TriggerSignatureHelp:
 		editor_request_signature_help(ed)
 		return true
 	}
-
 	handled := editor_apply_action(ed, action)
 	if handled {
 		editor_ensure_cursor_visible(ed)

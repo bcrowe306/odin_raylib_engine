@@ -246,6 +246,7 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 	render_code_actions(ed, renderer, font, theme)
 	render_hover(ed, renderer, font, theme)
 	render_context_menu(ed, renderer, font, theme)
+	render_palette(ed, renderer, font, theme)
 }
 
 @(private)

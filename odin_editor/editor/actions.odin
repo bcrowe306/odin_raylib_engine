@@ -139,6 +139,9 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 	case .ZoomReset:
 		editor_zoom(ed, 0)
 		return true
+	case .CommandPalette:
+		editor_open_palette(ed)
+		return true
 
 	case .Escape:
 		for &c in b.cursors {

@@ -28,6 +28,7 @@ SUITES=(
 	"completion_polish:example/assets/polish_fixture.odin.txt:Completion docs panel, snippets with tab stops, parameter hints, overload cycling"
 	"mouse_extras:example/assets/lsp_fixture.odin.txt:LSP hover info, right-click context menu, drag-and-drop move/copy"
 	"ui_tweaks:example/assets/ui_fixture.odin.txt:Ayu Dark syntax colours, scrollbars (drag/click), Ctrl/Cmd +/- zoom"
+	"palette_smoke:example/assets/mouse_fixture.odin.txt:Command palette (Cmd/Ctrl+P): fuzzy search, shortcuts, MRU, run by key or click"
 	"diagnostics_extras:example/assets/problems_fixture:Diagnostic tags, quick fixes, edit-tracking squiggles, problems panel"
 )
 

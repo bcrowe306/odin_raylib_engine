@@ -130,3 +130,13 @@ test_search_bindings_per_platform :: proc(t: ^testing.T) {
 	a, ok = keymap_resolve(&other, Chord{.F3, {.Shift}})
 	testing.expect(t, ok && a == .FindPrev, "Shift+F3 = previous match")
 }
+
+@(test)
+test_palette_bindings :: proc(t: ^testing.T) {
+	mac := keymap_default(.MacOS)
+	defer keymap_destroy(&mac)
+	for chord in ([]Chord{{.P, {.Super}}, {.P, {.Super, .Shift}}, {.F1, {}}}) {
+		a, ok := keymap_resolve(&mac, chord)
+		testing.expectf(t, ok && a == .CommandPalette, "%v opens the palette", chord)
+	}
+}

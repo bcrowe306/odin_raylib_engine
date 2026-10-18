@@ -23,6 +23,7 @@ Where_Kind :: enum {
 	Find_Part, // line: 0 query, 1 replace, 2 case, 3 word, 4 regex
 	Menu_Item, // line = context menu item index
 	Scrollbar, // line: 0 vthumb, 1 hthumb, 2 vtrack, 3 htrack; col = percent along the track
+	Palette_Row, // line = result row (display order)
 }
 
 Where :: struct {
@@ -99,6 +100,9 @@ parse_where :: proc(parts: []string) -> (w: Where, used: int, ok: bool) {
 			w.line, ok = strconv.parse_int(tail)
 		case "menu":
 			w.kind = .Menu_Item
+			w.line, ok = strconv.parse_int(tail)
+		case "palette":
+			w.kind = .Palette_Row
 			w.line, ok = strconv.parse_int(tail)
 		case "vtrack", "htrack":
 			w.kind = .Scrollbar
