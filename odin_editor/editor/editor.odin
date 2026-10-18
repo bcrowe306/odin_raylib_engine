@@ -10,6 +10,7 @@ import buf "../buffer"
 import km "../keymap"
 import lspc "../lsp"
 import syn "../syntax"
+import "core:strings"
 import sdl "vendor:sdl3"
 
 Editor :: struct {
@@ -54,6 +55,8 @@ Editor :: struct {
 	menu:         Context_Menu,
 	palette:      Palette_State,
 	window:       Editor_Window,
+	keymap_editor: Keymap_Editor,
+	config:       Config,
 	nav:          Navigation,
 	hover:        Hover_Info,
 
@@ -129,6 +132,7 @@ editor_init :: proc(
 	ed.lsp_pending = make([dynamic]lspc.Incremental_Change, allocator)
 	find_init(&ed.find)
 	palette_init(&ed.palette)
+	ed.keymap_editor.filter = strings.builder_make(allocator)
 	// Diagnostics follow edits between server publishes (see Diag_Overlay).
 	ed.buf.track_changes = true
 	return ed
@@ -152,6 +156,8 @@ editor_destroy :: proc(ed: ^Editor) {
 	problems_destroy(&ed.problems)
 	find_destroy(&ed.find)
 	palette_destroy(&ed.palette)
+	keymap_editor_destroy(&ed.keymap_editor)
+	config_destroy(&ed.config)
 	navigation_destroy(&ed.nav)
 	delete(ed.snippet.stops)
 	delete(ed.completion.filtered)

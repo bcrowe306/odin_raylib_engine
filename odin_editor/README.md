@@ -269,6 +269,25 @@ every command with its shortcut. Type to fuzzy-filter (matched letters are
 highlighted), Up/Down to choose, Enter or click to run, Escape to close.
 Recently used commands are listed first.
 
+## Key bindings
+
+- **Keymap Editor** (palette → "Keymap Editor"): every command and its
+  keys. Type to filter by name or by key ("cmd+shift"); **Enter** records a
+  new chord (replacing the old ones), **Shift+Enter** adds one, **Del**
+  removes, **Cmd/Ctrl+R** resets to the default, **Escape** closes.
+- **Import Keybindings from Zed / VSCode** (palette): merges
+  `~/.config/zed/keymap.json` or VSCode's `keybindings.json` into the
+  keymap. Commands without an equivalent and multi-key sequences
+  (`cmd+k cmd+c`) are skipped and counted in the status message.
+- Changes persist in `<config dir>/keymap.json` as overrides of the
+  defaults. The host picks the directory with `editor_set_config_dir`
+  (the demo: `~/.config/odin_editor`, or `--config-dir`; none with
+  `--control-only`); `editor_set_import_path` overrides where imports read.
+- Line commands: **Alt+Up/Down** move line, **Shift+Alt+Up/Down**
+  duplicate, **Cmd/Ctrl+/** toggle comment, **Cmd/Ctrl+Shift+K** delete
+  line, **Cmd/Ctrl+Enter** / **Cmd/Ctrl+Shift+Enter** insert line
+  below / above.
+
 ## Search
 
 - **Ctrl/Cmd+F** opens the find bar (seeded from a single-line selection);

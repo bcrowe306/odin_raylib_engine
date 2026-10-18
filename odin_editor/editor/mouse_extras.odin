@@ -62,6 +62,11 @@ chord_label :: proc(ed: ^Editor, action: km.Action) -> string {
 	if !found {
 		return ""
 	}
+	return chord_text(best)
+}
+
+// chord_text renders a chord for display ("Cmd+Shift+/").
+chord_text :: proc(best: km.Chord) -> string {
 	sb := strings.builder_make(context.temp_allocator)
 	if .Ctrl in best.mods {strings.write_string(&sb, "Ctrl+")}
 	if .Super in best.mods {strings.write_string(&sb, "Cmd+")}

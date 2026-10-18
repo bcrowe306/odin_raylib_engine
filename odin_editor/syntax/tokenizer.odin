@@ -39,8 +39,9 @@ LineTokenizer :: proc(line: string, state_in: int, allocator: mem.Allocator) -> 
 // Language bundles a display name with its tokenizer so hosts can register
 // multiple languages and pick one per buffer/file-extension.
 Language :: struct {
-	name:     string,
-	tokenize: LineTokenizer,
+	name:         string,
+	tokenize:     LineTokenizer,
+	line_comment: string, // e.g. "//" (Toggle Line Comment)
 }
 
 LINE_STATE_NORMAL :: 0

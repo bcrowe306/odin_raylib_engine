@@ -63,6 +63,14 @@ keymap_default :: proc(platform: Platform, allocator := context.allocator) -> Ke
 	keymap_bind(&km, Chord{.Enter, {}}, .Newline)
 	keymap_bind(&km, Chord{.Tab, {}}, .IndentOrTab)
 	keymap_bind(&km, Chord{.Tab, {.Shift}}, .Outdent)
+	keymap_bind(&km, Chord{.Up, {.Alt}}, .MoveLineUp)
+	keymap_bind(&km, Chord{.Down, {.Alt}}, .MoveLineDown)
+	keymap_bind(&km, Chord{.Up, {.Alt, .Shift}}, .DuplicateLineUp)
+	keymap_bind(&km, Chord{.Down, {.Alt, .Shift}}, .DuplicateLineDown)
+	keymap_bind(&km, Chord{.Slash, primary}, .ToggleLineComment)
+	keymap_bind(&km, Chord{.K, primary | {.Shift}}, .DeleteLine)
+	keymap_bind(&km, Chord{.Enter, primary}, .InsertLineBelow)
+	keymap_bind(&km, Chord{.Enter, primary | {.Shift}}, .InsertLineAbove)
 
 	// Clipboard & history.
 	keymap_bind(&km, Chord{.C, primary}, .Copy)

@@ -578,3 +578,75 @@ test_change_log_records_utf16_columns_before_the_edit :: proc(t: ^testing.T) {
 		testing.expect_value(t, len(again), 0)
 	})
 }
+
+@(test)
+test_duplicate_and_move_lines :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		buffer_set_text(&b, "a\nb\nc")
+		b.cursors[0].pos = {1, 1}
+		buffer_duplicate_lines(&b, down = false)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "a\nb\nb\nc")
+		testing.expect_value(t, b.cursors[0].pos, Position{1, 1}) // up: stays on the upper copy
+		buffer_duplicate_lines(&b, down = true)
+		testing.expect_value(t, b.cursors[0].pos, Position{2, 1}) // down: moves to the copy
+		buffer_undo(&b)
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "a\nb\nc")
+
+		b.cursors[0] = {pos = {1, 0}}
+		testing.expect(t, buffer_move_lines(&b, -1), "moved up")
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "b\na\nc")
+		testing.expect_value(t, b.cursors[0].pos.line, 0)
+		testing.expect(t, !buffer_move_lines(&b, -1), "already at the top")
+		buffer_move_lines(&b, 1)
+		buffer_move_lines(&b, 1)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "a\nc\nb")
+		testing.expect(t, !buffer_move_lines(&b, 1), "already at the bottom")
+		buffer_move_lines(&b, -1) // last line moving up
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "a\nb\nc")
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "a\nc\nb") // one step per move
+
+		// A two-line selection moves as a block.
+		buffer_set_text(&b, "1\n2\n3\n4")
+		b.cursors[0] = {pos = {2, 1}, sel = {anchor = {1, 0}, active = true}}
+		buffer_move_lines(&b, 1)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "1\n4\n2\n3")
+		s, e, _ := selection_range(b.cursors[0])
+		testing.expect(t, s == {2, 0} && e == {3, 1}, "selection moved with the block")
+	})
+}
+
+@(test)
+test_toggle_comment_delete_and_insert_lines :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		buffer_set_text(&b, "\tx := 1\n\n\t\ty := 2")
+		b.cursors[0] = {pos = {2, 3}, sel = {anchor = {0, 1}, active = true}}
+		buffer_toggle_line_comment(&b, "//")
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "\t// x := 1\n\n\t// \ty := 2")
+		testing.expect_value(t, b.cursors[0].sel.anchor, Position{0, 1}) // anchor before the insert point stays
+		buffer_toggle_line_comment(&b, "//")
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "\tx := 1\n\n\t\ty := 2")
+
+		buffer_set_text(&b, "a\nb\nc\nd")
+		b.cursors[0].pos = {1, 0}
+		append(&b.cursors, Cursor{pos = {2, 0}})
+		buffer_delete_lines(&b)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "a\nd")
+		testing.expect_value(t, len(b.cursors), 1)
+		testing.expect_value(t, b.cursors[0].pos, Position{1, 0})
+
+		buffer_set_text(&b, "\tfoo()")
+		b.cursors[0].pos = {0, 2}
+		buffer_insert_line(&b, false)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "\tfoo()\n\t")
+		testing.expect_value(t, b.cursors[0].pos, Position{1, 1})
+		buffer_insert_line(&b, true)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "\tfoo()\n\t\n\t")
+		testing.expect_value(t, b.cursors[0].pos, Position{1, 1})
+	})
+}

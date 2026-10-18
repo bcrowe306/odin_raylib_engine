@@ -6,6 +6,7 @@ package control
 
 import buf "../buffer"
 import ed "../editor"
+import km "../keymap"
 import lspc "../lsp"
 import "core:encoding/json"
 import "core:fmt"
@@ -62,6 +63,15 @@ State_Menu :: struct {
 	selected: int      `json:"selected"`,
 	items:    []string `json:"items"`,
 	rect:     [4]f32   `json:"rect"`,
+}
+
+State_Keymap_Editor :: struct {
+	filter:         string   `json:"filter"`,
+	selected:       int      `json:"selected"`,
+	selected_title: string   `json:"selected_title"`,
+	capturing:      bool     `json:"capturing"`,
+	rows:           int      `json:"rows"`,
+	items:          []string `json:"items"`, // visible rows, "title = chord, chord"
 }
 
 State_Palette :: struct {
@@ -176,6 +186,7 @@ State :: struct {
 	menu:              State_Menu         `json:"menu"`,
 	palette:           State_Palette      `json:"palette"`,
 	window:            string             `json:"window"`,
+	keymap_editor:     State_Keymap_Editor `json:"keymap_editor"`,
 	text:         string           `json:"text"`,
 }
 
@@ -344,6 +355,23 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 		s.hover = {visible = true, text = strings.join(texts[:], "\n", context.temp_allocator), rect = rect_array(rect)}
 	}
 	s.window = strings.to_lower(fmt.tprint(e.window), context.temp_allocator)
+	if e.window == .Keymap {
+		k := &e.keymap_editor
+		rows := ed.editor_keymap_rows(e)
+		_, page := ed.editor_keymap_layout(e)
+		items := make([dynamic]string, context.temp_allocator)
+		for i in k.scroll ..< min(len(rows), k.scroll + page) {
+			chords := make([dynamic]string, context.temp_allocator)
+			for c in rows[i].chords {
+				append(&chords, km.chord_format(c))
+			}
+			append(&items, fmt.tprintf("%s = %s", rows[i].title, strings.join(chords[:], ", ", context.temp_allocator)))
+		}
+		s.keymap_editor = {filter = strings.to_string(k.filter), selected = k.selected, capturing = k.capturing, rows = len(rows), items = items[:]}
+		if k.selected < len(rows) {
+			s.keymap_editor.selected_title = rows[k.selected].title
+		}
+	}
 	if e.palette.open {
 		entries, matches := ed.editor_palette_matches(e)
 		n := min(len(matches), 12)
