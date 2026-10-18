@@ -283,11 +283,17 @@ task ols:build   # odin build -collection:src=third_party/ols/src -> third_party
 ```
 
 `patches/ols/` holds local fixes for upstream OLS bugs this editor runs into,
-reapplied on a clean checkout by every `ols:fetch`. Currently one:
-`0001-check-request-uri-lifetime.patch` — OLS hands the save-triggered
-`odin check` request a temp-allocated URI that is freed before the check
-thread reads it, so errors fixed since the previous save are never cleared.
-Drop the patch once upstream fixes it.
+reapplied in order on a clean checkout by every `ols:fetch`:
+
+- `0001-check-request-uri-lifetime.patch` — OLS hands the save-triggered
+  `odin check` request a temp-allocated URI that is freed before the check
+  thread reads it, so errors fixed since the previous save are never
+  cleared.
+- `0002-check-columns-utf16.patch` — the compiler reports code-point
+  columns; OLS forwarded them as LSP (UTF-16) characters, so squiggles after
+  an emoji landed early.
+
+Drop a patch once upstream fixes the bug.
 
 Then attach it to an editor instance:
 

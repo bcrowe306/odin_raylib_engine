@@ -112,6 +112,11 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     Problems panel (Ctrl/Cmd+Shift+M) listing every file's problems with
     click-to-jump and an open-file request for the host. Verified by unit
     tests and `tools/diagnostics_extras.edctl` (live OLS, 2-file fixture).
+16. **Exact diagnostic columns after astral characters** — OLS passed the
+    compiler's code-point columns through as LSP (UTF-16) characters, so
+    squiggles after an emoji landed early; fixed in OLS by
+    `patches/ols/0002-check-columns-utf16.patch`. Verified by the emoji case
+    in `tools/diagnostics_smoke.edctl`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -119,10 +124,6 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-- **OLS reports `odin check` columns in code points, not UTF-16** — for a
-  line with an astral character (e.g. an emoji) before the error, the
-  squiggle lands one cell early per such character. Upstream issue; BMP
-  text (é, ü, CJK) is exact.
 - **Completion polish** — no documentation side panel, snippets aren't requested (no
   `snippetSupport`), and `isIncomplete` lists aren't re-queried as you type
   (filtering is purely local after the first response). Signature help shows
