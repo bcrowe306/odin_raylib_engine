@@ -81,6 +81,10 @@ Buffer :: struct {
 	file_path:  string,
 	allocator:  mem.Allocator,
 	group_seq:  int,
+	// version increments on every content mutation (insert, delete,
+	// set_text). Hosts compare it against a saved value to detect changes
+	// without diffing, e.g. to know when to push LSP didChange.
+	version:    int,
 }
 
 buffer_init :: proc(allocator := context.allocator) -> Buffer {
@@ -190,6 +194,7 @@ buffer_set_text :: proc(b: ^Buffer, text: string) {
 	append(&b.cursors, Cursor{})
 	buffer_clear_undo_history(b)
 	b.dirty = false
+	b.version += 1
 }
 
 // buffer_to_string concatenates all lines with '\n' separators. Caller owns

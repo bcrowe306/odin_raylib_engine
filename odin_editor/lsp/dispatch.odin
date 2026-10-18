@@ -61,18 +61,27 @@ client_handle_message_body :: proc(c: ^Client, body: []u8) {
 
 	if kind == .Initialize {
 		c.initialized = true
+		// The spec requires the client to acknowledge the initialize
+		// result before the server will treat the session as live.
+		client_notify_initialized(c)
 		return
 	}
 
-	result, has_result := json_object_get(value, "result")
-	if !has_result {
-		return
-	}
+	// An error response (or a missing result) still counts as "the server
+	// answered", so it's stored as an empty result rather than ignored —
+	// otherwise a UI waiting on the seq counter would wait forever.
+	result, _ := json_object_get(value, "result")
 
 	switch kind {
 	case .Completion:
+		if id != c.latest_completion_id {
+			return
+		}
 		client_store_completion(c, result)
 	case .SignatureHelp:
+		if id != c.latest_signature_id {
+			return
+		}
 		client_store_signature_help(c, result)
 	case .Initialize, .Hover, .Other:
 		// No persistent storage needed for these yet.
@@ -145,13 +154,45 @@ parse_position :: proc(v: json.Value) -> Position {
 	return p
 }
 
-@(private)
-client_store_completion :: proc(c: ^Client, result: json.Value) {
+// client_clear_completion frees and empties `last_completion`.
+client_clear_completion :: proc(c: ^Client) {
 	for item in c.last_completion {
 		delete(item.label, c.allocator)
 		delete(item.detail, c.allocator)
+		delete(item.insert_text, c.allocator)
+		delete(item.filter_text, c.allocator)
 	}
 	clear(&c.last_completion)
+}
+
+// client_clear_signatures frees and empties `last_signatures`.
+client_clear_signatures :: proc(c: ^Client) {
+	for sig in c.last_signatures {
+		delete(sig.label, c.allocator)
+		for p in sig.parameters {
+			delete(p.label, c.allocator)
+		}
+		delete(sig.parameters, c.allocator)
+	}
+	clear(&c.last_signatures)
+	c.active_signature = 0
+	c.active_parameter = 0
+}
+
+@(private)
+json_clone_string_field :: proc(c: ^Client, v: json.Value, key: string) -> string {
+	if field, ok := json_object_get(v, key); ok {
+		if s, is_str := json_as_string(field); is_str {
+			return strings.clone(s, c.allocator)
+		}
+	}
+	return ""
+}
+
+@(private)
+client_store_completion :: proc(c: ^Client, result: json.Value) {
+	client_clear_completion(c)
+	c.completion_seq += 1
 
 	items: json.Array
 	#partial switch v in result {
@@ -166,16 +207,30 @@ client_store_completion :: proc(c: ^Client, result: json.Value) {
 
 	for item in items {
 		ci: CompletionItem
-		if label_val, ok := json_object_get(item, "label"); ok {
-			label, _ := json_as_string(label_val)
-			ci.label = strings.clone(label, c.allocator)
-		}
+		ci.label = json_clone_string_field(c, item, "label")
+		ci.detail = json_clone_string_field(c, item, "detail")
+		ci.insert_text = json_clone_string_field(c, item, "insertText")
+		ci.filter_text = json_clone_string_field(c, item, "filterText")
 		if kind_val, ok := json_object_get(item, "kind"); ok {
 			ci.kind, _ = json_as_int(kind_val)
 		}
-		if detail_val, ok := json_object_get(item, "detail"); ok {
-			detail, _ := json_as_string(detail_val)
-			ci.detail = strings.clone(detail, c.allocator)
+		// A textEdit (plain TextEdit or InsertReplaceEdit) overrides
+		// insertText per the spec.
+		if edit_val, ok := json_object_get(item, "textEdit"); ok {
+			range_val, has_range := json_object_get(edit_val, "range")
+			if !has_range {
+				range_val, has_range = json_object_get(edit_val, "insert")
+			}
+			if has_range {
+				ci.has_text_edit = true
+				ci.text_edit_range = parse_range(range_val)
+			}
+			if new_text_val, ok2 := json_object_get(edit_val, "newText"); ok2 {
+				if new_text, is_str := json_as_string(new_text_val); is_str {
+					delete(ci.insert_text, c.allocator)
+					ci.insert_text = strings.clone(new_text, c.allocator)
+				}
+			}
 		}
 		append(&c.last_completion, ci)
 	}
@@ -183,14 +238,15 @@ client_store_completion :: proc(c: ^Client, result: json.Value) {
 
 @(private)
 client_store_signature_help :: proc(c: ^Client, result: json.Value) {
-	for sig in c.last_signatures {
-		delete(sig.label, c.allocator)
-		for p in sig.parameters {
-			delete(p.label, c.allocator)
-		}
-		delete(sig.parameters)
+	client_clear_signatures(c)
+	c.signature_seq += 1
+
+	if v, ok := json_object_get(result, "activeSignature"); ok {
+		c.active_signature, _ = json_as_int(v)
 	}
-	clear(&c.last_signatures)
+	if v, ok := json_object_get(result, "activeParameter"); ok {
+		c.active_parameter, _ = json_as_int(v)
+	}
 
 	sigs_val, has_sigs := json_object_get(result, "signatures")
 	if !has_sigs {
@@ -202,25 +258,34 @@ client_store_signature_help :: proc(c: ^Client, result: json.Value) {
 	}
 
 	for sig_v in sigs {
-		si: SignatureInformation
-		if label_val, ok := json_object_get(sig_v, "label"); ok {
-			label, _ := json_as_string(label_val)
-			si.label = strings.clone(label, c.allocator)
+		si := SignatureInformation{active_parameter = -1}
+		si.label = json_clone_string_field(c, sig_v, "label")
+		if v, ok := json_object_get(sig_v, "activeParameter"); ok {
+			si.active_parameter, _ = json_as_int(v)
 		}
 		if params_val, ok := json_object_get(sig_v, "parameters"); ok {
 			if params_arr, is_parr := params_val.(json.Array); is_parr {
 				params_list := make([]ParameterInformation, len(params_arr), c.allocator)
 				for p_v, i in params_arr {
-					if plabel_val, ok2 := json_object_get(p_v, "label"); ok2 {
-						plabel, _ := json_as_string(plabel_val)
-						params_list[i] = ParameterInformation{label = strings.clone(plabel, c.allocator)}
-					}
+					params_list[i].label = json_clone_string_field(c, p_v, "label")
 				}
 				si.parameters = params_list
 			}
 		}
 		append(&c.last_signatures, si)
 	}
+}
+
+@(private)
+parse_range :: proc(v: json.Value) -> Range {
+	r: Range
+	if start_val, ok := json_object_get(v, "start"); ok {
+		r.start = parse_position(start_val)
+	}
+	if end_val, ok := json_object_get(v, "end"); ok {
+		r.end = parse_position(end_val)
+	}
+	return r
 }
 
 // client_diagnostics_for returns the last-known diagnostics for a file URI

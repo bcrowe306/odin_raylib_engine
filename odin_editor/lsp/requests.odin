@@ -75,6 +75,7 @@ client_request_completion :: proc(c: ^Client, uri: string, line, character: int)
 	}
 	msg := encode_request(id, "textDocument/completion", params, context.temp_allocator)
 	c.pending_kind[id] = .Completion
+	c.latest_completion_id = id
 	client_send_raw(c, msg)
 	return id
 }
@@ -87,6 +88,7 @@ client_request_signature_help :: proc(c: ^Client, uri: string, line, character: 
 	}
 	msg := encode_request(id, "textDocument/signatureHelp", params, context.temp_allocator)
 	c.pending_kind[id] = .SignatureHelp
+	c.latest_signature_id = id
 	client_send_raw(c, msg)
 	return id
 }

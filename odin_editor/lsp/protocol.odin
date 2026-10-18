@@ -74,9 +74,26 @@ CompletionParams :: struct {
 }
 
 CompletionItem :: struct {
-	label:  string `json:"label"`,
-	kind:   int    `json:"kind"`,
-	detail: string `json:"detail"`,
+	label:       string `json:"label"`,
+	kind:        int    `json:"kind"`,
+	detail:      string `json:"detail"`,
+	// Text to insert on accept (falls back to `label` when empty).
+	insert_text: string `json:"insertText"`,
+	// Text to match the typed prefix against (falls back to `label`).
+	filter_text: string `json:"filterText"`,
+	// If the server supplied a `textEdit`, its replacement range; the
+	// editor replaces [text_edit_range.start, cursor) with insert_text.
+	has_text_edit:   bool  `json:"-"`,
+	text_edit_range: Range `json:"-"`,
+}
+
+// CompletionItemKind values from the LSP spec (the subset worth labeling).
+CompletionKind :: enum int {
+	Text = 1, Method = 2, Function = 3, Constructor = 4, Field = 5,
+	Variable = 6, Class = 7, Interface = 8, Module = 9, Property = 10,
+	Unit = 11, Value = 12, Enum = 13, Keyword = 14, Snippet = 15,
+	Color = 16, File = 17, Reference = 18, Folder = 19, EnumMember = 20,
+	Constant = 21, Struct = 22, Event = 23, Operator = 24, TypeParameter = 25,
 }
 
 // --- signatureHelp ---
@@ -93,6 +110,9 @@ ParameterInformation :: struct {
 SignatureInformation :: struct {
 	label:      string                  `json:"label"`,
 	parameters: []ParameterInformation  `json:"parameters"`,
+	// Per-signature active parameter (LSP 3.16+); -1 when the server
+	// didn't send one, in which case the response-level value applies.
+	active_parameter: int `json:"-"`,
 }
 
 // --- diagnostics ---

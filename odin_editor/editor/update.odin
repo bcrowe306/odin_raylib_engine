@@ -1,30 +1,43 @@
-// Per-frame update: drains injected/synthetic events and polls the LSP
-// client (if attached) for responses/diagnostics.
+// Per-frame update: drains injected/synthetic events, polls the LSP client
+// (if attached) for responses/diagnostics, keeps the server's copy of the
+// document in sync, and refreshes the completion/signature-help popups.
 package editor
 
+import buf "../buffer"
 import lspc "../lsp"
 
 editor_update :: proc(ed: ^Editor) {
 	editor_pump_injected_events(ed)
 	if ed.lsp_enabled {
 		lspc.client_poll(&ed.lsp)
+		editor_sync_lsp(ed)
+		editor_update_lsp_ui(ed)
 	}
 }
 
-// editor_request_completion asks the attached LSP for completions at the
-// primary cursor's position. No-op if no LSP client is attached.
-editor_request_completion :: proc(ed: ^Editor) {
-	if !ed.lsp_enabled || len(ed.document_uri) == 0 {
-		return
-	}
-	c := editor_primary_cursor(ed)
-	lspc.client_request_completion(&ed.lsp, ed.document_uri, c.pos.line, c.pos.col)
+// editor_lsp_ready reports whether requests about the current document can
+// be sent: a server is attached and initialized and there's a document URI
+// (requests call editor_sync_lsp first, which sends the deferred didOpen).
+editor_lsp_ready :: proc(ed: ^Editor) -> bool {
+	return ed.lsp_enabled && len(ed.document_uri) > 0 && ed.lsp.initialized
 }
 
-editor_request_signature_help :: proc(ed: ^Editor) {
-	if !ed.lsp_enabled || len(ed.document_uri) == 0 {
+// editor_sync_lsp sends the deferred didOpen once the server is
+// initialized, then a full-document didChange whenever the buffer has
+// changed since the last sync. Called every update and before every
+// request, so the server always sees the text the request refers to.
+editor_sync_lsp :: proc(ed: ^Editor) {
+	if !ed.lsp_enabled || len(ed.document_uri) == 0 || !ed.lsp.initialized {
 		return
 	}
-	c := editor_primary_cursor(ed)
-	lspc.client_request_signature_help(&ed.lsp, ed.document_uri, c.pos.line, c.pos.col)
+	if !ed.lsp_doc_open {
+		text := buf.buffer_to_string(&ed.buf, context.temp_allocator)
+		lspc.client_did_open(&ed.lsp, ed.document_uri, "odin", text, ed.lsp_version)
+		ed.lsp_doc_open = true
+		ed.lsp_synced_version = ed.buf.version
+		return
+	}
+	if ed.buf.version != ed.lsp_synced_version {
+		editor_notify_lsp_changed(ed)
+	}
 }

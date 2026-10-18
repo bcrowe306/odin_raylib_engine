@@ -31,7 +31,22 @@ Client :: struct {
 	diagnostics:     map[string][dynamic]Diagnostic,
 	last_completion: [dynamic]CompletionItem,
 	last_signatures: [dynamic]SignatureInformation,
+	// Response-level activeSignature/activeParameter of the last
+	// signatureHelp reply.
+	active_signature: int,
+	active_parameter: int,
 	initialized:     bool,
+
+	// Bumped every time a completion/signatureHelp response is stored
+	// (including empty/null results), so a UI can tell "a new answer
+	// arrived" apart from "still waiting" by comparing against the value
+	// it last saw.
+	completion_seq: int,
+	signature_seq:  int,
+	// Id of the most recent request of each kind. Responses to older
+	// requests are dropped so a slow reply can't overwrite a newer one.
+	latest_completion_id: int,
+	latest_signature_id:  int,
 }
 
 client_init :: proc(allocator := context.allocator) -> Client {
@@ -59,18 +74,9 @@ client_destroy :: proc(c: ^Client) {
 		delete(uri, c.allocator)
 	}
 	delete(c.diagnostics)
-	for item in c.last_completion {
-		delete(item.label, c.allocator)
-		delete(item.detail, c.allocator)
-	}
+	client_clear_completion(c)
 	delete(c.last_completion)
-	for sig in c.last_signatures {
-		delete(sig.label, c.allocator)
-		for p in sig.parameters {
-			delete(p.label, c.allocator)
-		}
-		delete(sig.parameters)
-	}
+	client_clear_signatures(c)
 	delete(c.last_signatures)
 }
 

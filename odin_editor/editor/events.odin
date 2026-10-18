@@ -18,6 +18,8 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 		text := string(ev.text.text)
 		if len(text) > 0 {
 			editor_insert_text(ed, text)
+			editor_ensure_cursor_visible(ed)
+			editor_after_text_input(ed, text)
 			return true
 		}
 	case .MOUSE_WHEEL:
@@ -33,6 +35,9 @@ editor_handle_event :: proc(ed: ^Editor, ev: sdl.Event) -> bool {
 @(private)
 editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
 	chord := sdl_event_to_chord(key)
+	if editor_handle_popup_key(ed, chord) {
+		return true
+	}
 	action, bound := km.keymap_resolve(&ed.keymap, chord)
 	if !bound {
 		return false
@@ -58,6 +63,43 @@ editor_handle_key_down :: proc(ed: ^Editor, key: sdl.KeyboardEvent) -> bool {
 	return handled
 }
 
+// editor_handle_popup_key gives open popups first claim on navigation
+// keys: Up/Down/PageUp/PageDown move the completion selection, Enter/Tab
+// accept it, and Escape dismisses the topmost popup.
+@(private)
+editor_handle_popup_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
+	if chord.mods != {} {
+		return false
+	}
+	if editor_completion_visible(ed) {
+		#partial switch chord.key {
+		case .Up:
+			editor_completion_move(ed, -1)
+			return true
+		case .Down:
+			editor_completion_move(ed, 1)
+			return true
+		case .PageUp:
+			editor_completion_move(ed, -COMPLETION_MAX_VISIBLE)
+			return true
+		case .PageDown:
+			editor_completion_move(ed, COMPLETION_MAX_VISIBLE)
+			return true
+		case .Enter, .Tab:
+			return editor_accept_completion(ed)
+		case .Escape:
+			editor_close_completion(ed)
+			return true
+		}
+	}
+	if chord.key == .Escape && (ed.completion.active || ed.signature.active) {
+		editor_close_completion(ed)
+		editor_close_signature_help(ed)
+		return true
+	}
+	return false
+}
+
 @(private)
 editor_handle_mouse_wheel :: proc(ed: ^Editor, wheel: sdl.MouseWheelEvent) {
 	SCROLL_LINES :: 3
@@ -71,8 +113,15 @@ editor_handle_mouse_down :: proc(ed: ^Editor, button: sdl.MouseButtonEvent) {
 	if ed.char_w <= 0 || ed.char_h <= 0 {
 		return
 	}
-	line := ed.scroll_line + int(button.y / ed.char_h)
-	col := ed.scroll_col + int(button.x / ed.char_w)
+	// Clicks are in window pixels; translate past the editor origin and
+	// the line-number gutter, rounding to the nearest column boundary.
+	local_x := button.x - ed.origin_x - GUTTER_WIDTH
+	local_y := button.y - ed.origin_y
+	if local_y < 0 {
+		return
+	}
+	line := ed.scroll_line + int(local_y / ed.char_h)
+	col := ed.scroll_col + int(max(local_x, 0) / ed.char_w + 0.5)
 	pos := editor_clamp_to_buffer(ed, line, col)
 	resize(&ed.buf.cursors, 1)
 	ed.buf.cursors[0].pos = pos

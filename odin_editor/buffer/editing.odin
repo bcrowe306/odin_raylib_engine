@@ -12,6 +12,7 @@ buffer_raw_insert :: proc(b: ^Buffer, pos: Position, text: string) -> Position {
 	if len(text) == 0 {
 		return pos
 	}
+	b.version += 1
 	p := buffer_clamp_position(b, pos)
 	line_str := buffer_line_str(b, p.line)
 	before := line_str[:p.col]
@@ -93,6 +94,7 @@ buffer_raw_delete :: proc(b: ^Buffer, start, end: Position) -> string {
 	if position_eq(s, e) {
 		return ""
 	}
+	b.version += 1
 	if position_less(e, s) {
 		s, e = e, s
 	}

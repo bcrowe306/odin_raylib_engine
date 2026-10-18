@@ -21,6 +21,14 @@ Editor :: struct {
 	lsp_enabled:  bool,
 	document_uri: string,
 	lsp_version:  int,
+	// didOpen has been sent for document_uri (deferred until the server
+	// has answered `initialize`, as the spec requires).
+	lsp_doc_open: bool,
+	// buf.version last pushed to the server via didOpen/didChange.
+	lsp_synced_version: int,
+
+	completion: Completion_State,
+	signature:  Signature_State,
 
 	// Viewport / scrolling (in cells, not pixels).
 	scroll_line: int,
@@ -32,6 +40,12 @@ Editor :: struct {
 	// testing; set by the host once a font is loaded.
 	char_w: f32,
 	char_h: f32,
+
+	// Top-left of the editor in window pixels as of the last
+	// editor_render, so mouse hit-testing works for hosts that draw the
+	// editor at an offset.
+	origin_x: f32,
+	origin_y: f32,
 
 	injected_events: [dynamic]sdl.Event,
 }
@@ -54,6 +68,7 @@ editor_init :: proc(
 		ed.language = syn.odin_language()
 	}
 	ed.injected_events = make([dynamic]sdl.Event, allocator)
+	ed.completion.filtered = make([dynamic]int, allocator)
 	return ed
 }
 
@@ -67,6 +82,7 @@ editor_destroy :: proc(ed: ^Editor) {
 		delete(ed.document_uri)
 	}
 	delete(ed.injected_events)
+	delete(ed.completion.filtered)
 }
 
 // editor_primary_cursor returns a pointer to the first (primary) cursor.

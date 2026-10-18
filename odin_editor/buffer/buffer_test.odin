@@ -379,3 +379,34 @@ test_file_save_and_load_roundtrip :: proc(t: ^testing.T) {
 		testing.expect_value(t, buffer_to_string(&b2, context.temp_allocator), "line one\nline two\n")
 	})
 }
+
+@(test)
+test_version_bumps_on_every_content_change :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+
+		v0 := b.version
+		buffer_set_text(&b, "abc")
+		testing.expect(t, b.version > v0, "set_text bumps version")
+
+		v1 := b.version
+		cursor_move_right(&b, &b.cursors[0], false)
+		testing.expect_value(t, b.version, v1) // movement is not a content change
+
+		buffer_type_text(&b, "X")
+		testing.expect(t, b.version > v1, "insert bumps version")
+
+		v2 := b.version
+		buffer_backspace(&b)
+		testing.expect(t, b.version > v2, "delete bumps version")
+
+		v3 := b.version
+		buffer_undo(&b)
+		testing.expect(t, b.version > v3, "undo bumps version")
+
+		v4 := b.version
+		buffer_insert_text(&b, {0, 0}, "")
+		testing.expect_value(t, b.version, v4) // empty insert is a no-op
+	})
+}

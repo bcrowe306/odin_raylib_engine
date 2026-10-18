@@ -5,17 +5,46 @@ package editor
 
 import buf "../buffer"
 import lspc "../lsp"
+import "core:os"
+import "core:path/filepath"
+import "core:strings"
 
 editor_attach_lsp :: proc(ed: ^Editor, command: []string, working_dir := "") -> bool {
+	if len(command) == 0 {
+		return false
+	}
+	// The server runs in `working_dir`, so a relative executable path
+	// (e.g. "third_party/ols/ols") must be resolved against *our* current
+	// directory first. Bare names ("ols") are left for PATH lookup.
+	cmd := make([]string, len(command), context.temp_allocator)
+	copy(cmd, command)
+	if strings.contains_rune(cmd[0], '/') && !filepath.is_abs(cmd[0]) {
+		cmd[0] = absolute_path(cmd[0], context.temp_allocator)
+	}
+
 	ed.lsp = lspc.client_init()
-	if !lspc.client_start(&ed.lsp, command, working_dir) {
+	if !lspc.client_start(&ed.lsp, cmd, working_dir) {
 		lspc.client_destroy(&ed.lsp)
 		return false
 	}
 	ed.lsp_enabled = true
-	root_uri := lspc.file_uri(working_dir, context.temp_allocator)
+	ed.lsp_doc_open = false
+	root := absolute_path(working_dir if len(working_dir) > 0 else ".", context.temp_allocator)
+	root_uri := lspc.file_uri(root, context.temp_allocator)
 	lspc.client_initialize(&ed.lsp, root_uri)
 	return true
+}
+
+// absolute_path resolves `path` against the current directory. LSP
+// requires absolute `file://` URIs; a relative one silently breaks
+// completion because the server can't match it to a file.
+@(private)
+absolute_path :: proc(path: string, allocator := context.allocator) -> string {
+	abs, err := os.get_absolute_path(path, allocator)
+	if err != nil {
+		return path
+	}
+	return abs
 }
 
 editor_detach_lsp :: proc(ed: ^Editor) {
@@ -24,6 +53,9 @@ editor_detach_lsp :: proc(ed: ^Editor) {
 	}
 	lspc.client_destroy(&ed.lsp)
 	ed.lsp_enabled = false
+	ed.lsp_doc_open = false
+	editor_close_completion(ed)
+	editor_close_signature_help(ed)
 }
 
 // editor_load_file loads `path` into the buffer and (re)associates the LSP
@@ -32,15 +64,20 @@ editor_load_file :: proc(ed: ^Editor, path: string) -> bool {
 	if !buf.buffer_load_file(&ed.buf, path) {
 		return false
 	}
+	if ed.lsp_enabled && ed.lsp_doc_open && len(ed.document_uri) > 0 {
+		lspc.client_did_close(&ed.lsp, ed.document_uri)
+	}
 	if len(ed.document_uri) > 0 {
 		delete(ed.document_uri)
 	}
-	ed.document_uri = lspc.file_uri(path)
+	ed.document_uri = lspc.file_uri(absolute_path(path, context.temp_allocator))
 	ed.lsp_version = 1
-	if ed.lsp_enabled {
-		text := buf.buffer_to_string(&ed.buf, context.temp_allocator)
-		lspc.client_did_open(&ed.lsp, ed.document_uri, "odin", text, ed.lsp_version)
-	}
+	ed.lsp_doc_open = false
+	editor_close_completion(ed)
+	editor_close_signature_help(ed)
+	// didOpen is sent by editor_sync_lsp as soon as the server is
+	// initialized (immediately, if it already is).
+	editor_sync_lsp(ed)
 	return true
 }
 
@@ -84,6 +121,7 @@ editor_notify_lsp_changed :: proc(ed: ^Editor) {
 		return
 	}
 	ed.lsp_version += 1
+	ed.lsp_synced_version = ed.buf.version
 	text := buf.buffer_to_string(&ed.buf, context.temp_allocator)
 	lspc.client_did_change(&ed.lsp, ed.document_uri, text, ed.lsp_version)
 }

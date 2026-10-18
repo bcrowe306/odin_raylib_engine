@@ -106,6 +106,7 @@ test_feed_bytes_dispatches_completion_response :: proc(t: ^testing.T) {
 
 		id := client_next_id(&c)
 		c.pending_kind[id] = .Completion
+		c.latest_completion_id = id
 
 		body := fmt.tprintf(
 			`{{"jsonrpc":"2.0","id":%d,"result":[{{"label":"foo","kind":3,"detail":"proc()"}},{{"label":"bar","kind":6,"detail":""}}]}}`,
@@ -131,6 +132,7 @@ test_feed_bytes_dispatches_signature_help_response :: proc(t: ^testing.T) {
 
 		id := client_next_id(&c)
 		c.pending_kind[id] = .SignatureHelp
+		c.latest_signature_id = id
 
 		body := fmt.tprintf(
 			`{{"jsonrpc":"2.0","id":%d,"result":{{"signatures":[{{"label":"foo(a: int) -> int","parameters":[{{"label":"a: int"}}]}}]}}}}`,
@@ -154,6 +156,7 @@ test_feed_bytes_handles_split_across_two_calls :: proc(t: ^testing.T) {
 
 		id := client_next_id(&c)
 		c.pending_kind[id] = .Completion
+		c.latest_completion_id = id
 		body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":[{{"label":"x","kind":1,"detail":""}}]}}`, id)
 		framed := frame_message(body, context.temp_allocator)
 
@@ -188,5 +191,105 @@ test_file_uri_formats_path :: proc(t: ^testing.T) {
 		uri := file_uri("/tmp/foo.odin", context.allocator)
 		defer delete(uri)
 		testing.expect_value(t, uri, "file:///tmp/foo.odin")
+	})
+}
+
+@(test)
+test_completion_parses_insert_text_and_text_edit :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+
+		id := client_next_id(&c)
+		c.pending_kind[id] = .Completion
+		c.latest_completion_id = id
+		body := fmt.tprintf(
+			`{{"jsonrpc":"2.0","id":%d,"result":{{"isIncomplete":false,"items":[` +
+			`{{"label":"println","kind":3,"insertText":"println","filterText":"println"}},` +
+			`{{"label":"printf","kind":3,"textEdit":{{"newText":"printf","range":{{"start":{{"line":5,"character":5}},"end":{{"line":5,"character":8}}}}}}}}` +
+			`]}}}}`,
+			id,
+		)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+
+		testing.expect_value(t, len(c.last_completion), 2)
+		testing.expect_value(t, c.last_completion[0].insert_text, "println")
+		testing.expect_value(t, c.last_completion[0].filter_text, "println")
+		testing.expect(t, !c.last_completion[0].has_text_edit, "first item has no textEdit")
+		testing.expect(t, c.last_completion[1].has_text_edit, "second item has a textEdit")
+		testing.expect_value(t, c.last_completion[1].insert_text, "printf")
+		testing.expect_value(t, c.last_completion[1].text_edit_range.start, Position{5, 5})
+		testing.expect_value(t, c.completion_seq, 1)
+	})
+}
+
+@(test)
+test_signature_help_parses_active_parameter :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+
+		id := client_next_id(&c)
+		c.pending_kind[id] = .SignatureHelp
+		c.latest_signature_id = id
+		body := fmt.tprintf(
+			`{{"jsonrpc":"2.0","id":%d,"result":{{"activeSignature":0,"activeParameter":1,"signatures":[` +
+			`{{"label":"add(a: int, b: int) -> int","parameters":[{{"label":"a: int"}},{{"label":"b: int"}}]}}]}}}}`,
+			id,
+		)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+
+		testing.expect_value(t, len(c.last_signatures), 1)
+		testing.expect_value(t, c.active_parameter, 1)
+		testing.expect_value(t, c.last_signatures[0].active_parameter, -1)
+		testing.expect_value(t, c.signature_seq, 1)
+	})
+}
+
+@(test)
+test_null_result_clears_and_bumps_seq :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+
+		id := client_next_id(&c)
+		c.pending_kind[id] = .SignatureHelp
+		c.latest_signature_id = id
+		ok_body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":{{"signatures":[{{"label":"f()"}}]}}}}`, id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(ok_body, context.temp_allocator))
+		testing.expect_value(t, len(c.last_signatures), 1)
+
+		id2 := client_next_id(&c)
+		c.pending_kind[id2] = .SignatureHelp
+		c.latest_signature_id = id2
+		null_body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":null}}`, id2)
+		client_feed_bytes(&c, transmute([]u8)frame_message(null_body, context.temp_allocator))
+		testing.expect_value(t, len(c.last_signatures), 0)
+		testing.expect_value(t, c.signature_seq, 2)
+	})
+}
+
+@(test)
+test_stale_completion_response_is_dropped :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+
+		old_id := client_next_id(&c)
+		c.pending_kind[old_id] = .Completion
+		new_id := client_next_id(&c)
+		c.pending_kind[new_id] = .Completion
+		c.latest_completion_id = new_id
+
+		new_body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":[{{"label":"fresh"}}]}}`, new_id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(new_body, context.temp_allocator))
+		old_body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":[{{"label":"stale"}}]}}`, old_id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(old_body, context.temp_allocator))
+
+		testing.expect_value(t, len(c.last_completion), 1)
+		testing.expect_value(t, c.last_completion[0].label, "fresh")
+		testing.expect_value(t, c.completion_seq, 1)
+		_, still_pending := c.pending_kind[old_id]
+		testing.expect(t, !still_pending, "stale request should still be removed from pending")
 	})
 }

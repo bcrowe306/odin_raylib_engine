@@ -25,6 +25,15 @@ Theme :: struct {
 	text_type:      sdl.Color,
 	text_builtin:   sdl.Color,
 	gutter_text:    sdl.Color,
+
+	// Completion / signature-help popups.
+	popup_bg:           sdl.Color,
+	popup_border:       sdl.Color,
+	popup_selected:     sdl.Color,
+	popup_text:         sdl.Color,
+	popup_text_dim:     sdl.Color,
+	popup_match:        sdl.Color,
+	popup_active_param: sdl.Color,
 }
 
 default_theme :: proc() -> Theme {
@@ -42,6 +51,14 @@ default_theme :: proc() -> Theme {
 		text_type    = {78, 201, 176, 255},
 		text_builtin = {220, 220, 170, 255},
 		gutter_text  = {133, 133, 133, 255},
+
+		popup_bg           = {37, 37, 38, 255},
+		popup_border       = {69, 69, 69, 255},
+		popup_selected     = {4, 57, 94, 255},
+		popup_text         = {204, 204, 204, 255},
+		popup_text_dim     = {140, 140, 140, 255},
+		popup_match        = {24, 163, 255, 255},
+		popup_active_param = {255, 215, 0, 255},
 	}
 }
 
@@ -62,6 +79,8 @@ token_color :: proc(theme: Theme, kind: syn.TokenKind) -> sdl.Color {
 GUTTER_WIDTH :: 56
 
 editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, theme: Theme, origin_x, origin_y: f32) {
+	ed.origin_x = origin_x
+	ed.origin_y = origin_y
 	sdl.SetRenderDrawColor(renderer, theme.background.r, theme.background.g, theme.background.b, theme.background.a)
 	sdl.RenderFillRect(renderer, nil)
 
@@ -105,6 +124,9 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 		delete(tokens, context.temp_allocator)
 		state = next_state
 	}
+
+	// Popups draw last so they sit on top of the text.
+	render_popups(ed, renderer, font, theme, origin_x, origin_y)
 }
 
 @(private)
