@@ -316,6 +316,15 @@ main :: proc() {
 
 		ed.editor_update(&editor)
 
+		// The problems panel asks the host to open other files.
+		if path, line, character, ok := ed.editor_take_open_request(&editor); ok {
+			if ed.editor_load_file(&editor, path) {
+				ed.editor_goto_lsp_position(&editor, line, character)
+			} else {
+				fmt.eprintln("cannot open", path)
+			}
+		}
+
 		// Problems summary in the title bar (a real host would show this
 		// in its status bar).
 		{

@@ -92,10 +92,12 @@ GUTTER_WIDTH :: 56
 editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, theme: Theme, origin_x, origin_y: f32) {
 	ed.origin_x = origin_x
 	ed.origin_y = origin_y
+	// Translucent overlays (selection, faded "unnecessary" code) blend.
+	sdl.SetRenderDrawBlendMode(renderer, sdl.BLENDMODE_BLEND)
 	sdl.SetRenderDrawColor(renderer, theme.background.r, theme.background.g, theme.background.b, theme.background.a)
 	sdl.RenderFillRect(renderer, nil)
 
-	gutter_rect := sdl.FRect{origin_x, origin_y, GUTTER_WIDTH, ed.char_h * f32(ed.visible_rows)}
+	gutter_rect := sdl.FRect{origin_x, origin_y, GUTTER_WIDTH, ed.char_h * f32(editor_text_rows(ed))}
 	sdl.SetRenderDrawColor(renderer, theme.gutter_bg.r, theme.gutter_bg.g, theme.gutter_bg.b, theme.gutter_bg.a)
 	sdl.RenderFillRect(renderer, &gutter_rect)
 
@@ -121,7 +123,7 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 	}
 	text_clip := sdl.Rect{
 		i32(origin_x + GUTTER_WIDTH), i32(origin_y),
-		i32(ed.char_w * f32(ed.visible_cols) + 1), i32(ed.char_h * f32(ed.visible_rows)),
+		i32(ed.char_w * f32(ed.visible_cols) + 1), i32(ed.char_h * f32(editor_text_rows(ed))),
 	}
 	if had_clip {
 		_ = sdl.GetRectIntersection(prev_clip, text_clip, &text_clip)
@@ -129,7 +131,7 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 
 	diags := editor_diagnostics(ed)
 
-	for row := 0; row < ed.visible_rows; row += 1 {
+	for row := 0; row < editor_text_rows(ed); row += 1 {
 		ln := ed.scroll_line + row
 		if ln >= line_count {
 			break
@@ -158,8 +160,10 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 	}
 
 	// Popups draw last so they sit on top of the text.
+	render_problems_panel(ed, renderer, font, theme, origin_x, origin_y)
 	render_popups(ed, renderer, font, theme, origin_x, origin_y)
 	render_diag_tooltip(ed, renderer, font, theme)
+	render_code_actions(ed, renderer, font, theme)
 }
 
 @(private)

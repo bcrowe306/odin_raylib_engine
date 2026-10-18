@@ -98,6 +98,12 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 		return editor_goto_diagnostic(ed, 1)
 	case .PrevDiagnostic:
 		return editor_goto_diagnostic(ed, -1)
+	case .QuickFix:
+		editor_request_code_actions(ed)
+		return true
+	case .ToggleProblems:
+		editor_toggle_problems(ed)
+		return true
 
 	case .Escape:
 		for &c in b.cursors {

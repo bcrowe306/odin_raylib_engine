@@ -3,11 +3,13 @@
 //
 //   contact_sheet <dir> [--crop-height N] [--scale F] [--cols N]
 //
-// Writes <dir>/contact_sheet.png. Each cell is the top `crop-height`
-// pixels of a screenshot (default 340 — the fixtures are short, so the
-// interesting part is near the top), scaled by `scale` (default 0.5),
-// captioned with the file name minus its NN_ prefix. Uses only SDL3 +
-// SDL_ttf, which the editor already depends on.
+// Writes <dir>/contact_sheet.png. Each cell is the top part of a
+// screenshot, scaled by `scale` (default 0.5) and captioned with the file
+// name minus its NN_ prefix. The crop height is the lowest row with
+// content (anything that isn't the editor background, right of the
+// gutter) across the suite's screenshots, at least 340 px — so docked UI
+// like the problems panel stays in frame while short fixtures don't waste
+// space. `--crop-height N` forces a height. Uses only SDL3 + SDL_ttf.
 package main
 
 import "core:fmt"
@@ -28,7 +30,7 @@ main :: proc() {
 		os.exit(2)
 	}
 	dir := os.args[1]
-	crop_h := 340
+	crop_h := -1 // auto
 	scale: f32 = 0.5
 	cols := 2
 	for i := 2; i + 1 < len(os.args); i += 2 {
@@ -65,9 +67,15 @@ main :: proc() {
 		fmt.eprintln("contact_sheet: cannot load", files[0], sdl.GetError())
 		os.exit(1)
 	}
-	src_w := int(first.w)
-	crop_h = min(crop_h, int(first.h))
+	src_w, src_h := int(first.w), int(first.h)
 	sdl.DestroySurface(first)
+	if crop_h < 0 {
+		crop_h = 340
+		for path in files {
+			crop_h = max(crop_h, content_bottom(path) + 8)
+		}
+	}
+	crop_h = min(crop_h, src_h)
 
 	cell_w := int(f32(src_w) * scale)
 	cell_h := int(f32(crop_h) * scale)
@@ -114,4 +122,35 @@ main :: proc() {
 		os.exit(1)
 	}
 	fmt.println(out)
+}
+
+// content_bottom returns the last row (y) of `path` that has a pixel,
+// right of the gutter, differing noticeably from the editor background
+// colour sampled near the top-right corner.
+content_bottom :: proc(path: string) -> int {
+	img := sdl.LoadPNG(strings.clone_to_cstring(path, context.temp_allocator))
+	if img == nil {
+		return 0
+	}
+	defer sdl.DestroySurface(img)
+	rgba := sdl.ConvertSurface(img, .RGBA32)
+	if rgba == nil {
+		return int(img.h)
+	}
+	defer sdl.DestroySurface(rgba)
+	pixels := ([^]u8)(rgba.pixels)
+	pitch := int(rgba.pitch)
+	w, h := int(rgba.w), int(rgba.h)
+	bg := pixels[2 * pitch + (w - 3) * 4:][:3]
+	for y := h - 1; y >= 0; y -= 1 {
+		row := pixels[y * pitch:]
+		for x := 64; x < w - 8; x += 2 {
+			p := row[x * 4:]
+			d := abs(int(p[0]) - int(bg[0])) + abs(int(p[1]) - int(bg[1])) + abs(int(p[2]) - int(bg[2]))
+			if d > 40 {
+				return y
+			}
+		}
+	}
+	return 0
 }

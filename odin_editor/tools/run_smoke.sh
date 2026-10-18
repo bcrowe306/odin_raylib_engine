@@ -19,7 +19,14 @@ NAME="$(basename "$SCRIPT" .edctl)"
 
 # No dots in the directory name: OLS derives the package path from it.
 WORK="$(mktemp -d "/tmp/odin_editor_${NAME}_XXXXXX")"
-cp "$FIXTURE" "$WORK/main.odin"
+if [ -d "$FIXTURE" ]; then
+	# Multi-file fixture: every NAME.odin.txt becomes NAME.odin; main.odin opens.
+	for f in "$FIXTURE"/*.odin.txt; do
+		cp "$f" "$WORK/$(basename "$f" .txt)"
+	done
+else
+	cp "$FIXTURE" "$WORK/main.odin"
+fi
 
 SHOTS="$PWD/${VISUAL_DIR:-test_output/visual}/$NAME"
 rm -rf "$SHOTS"

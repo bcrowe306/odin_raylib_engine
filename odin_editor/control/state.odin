@@ -9,6 +9,7 @@ import ed "../editor"
 import lspc "../lsp"
 import "core:encoding/json"
 import "core:fmt"
+import "core:path/filepath"
 import "core:strings"
 import "core:time"
 import sdl "vendor:sdl3"
@@ -60,6 +61,8 @@ State_Signature :: struct {
 State_Diagnostic :: struct {
 	range:    [4]int `json:"range"` /* start line, col, end line, col (bytes) */,
 	severity: string `json:"severity"`,
+	unnecessary: bool `json:"unnecessary"`,
+	deprecated:  bool `json:"deprecated"`,
 	message:  string `json:"message"`,
 	source:   string `json:"source"`,
 }
@@ -80,6 +83,21 @@ State_Tooltip :: struct {
 	source:  string `json:"source"`,
 	text:    string `json:"text"`,
 	rect:    [4]f32 `json:"rect"`,
+}
+
+State_Problems :: struct {
+	open:  bool     `json:"open"`,
+	count: int      `json:"count"`,
+	rows:  []string `json:"rows"`, // "file:line:col severity: message"
+}
+
+State_Code_Actions :: struct {
+	active:   bool     `json:"active"`,
+	visible:  bool     `json:"visible"`,
+	selected: int      `json:"selected"`,
+	titles:   []string `json:"titles"`,
+	last_applied: int  `json:"last_applied"`,
+	last_skipped: int  `json:"last_skipped"`,
 }
 
 State :: struct {
@@ -103,6 +121,8 @@ State :: struct {
 	diagnostics:       []State_Diagnostic `json:"diagnostics"`,
 	diagnostic_counts: State_Diag_Counts  `json:"diagnostic_counts"`,
 	tooltip:           State_Tooltip      `json:"tooltip"`,
+	problems:          State_Problems     `json:"problems"`,
+	code_actions:      State_Code_Actions `json:"code_actions"`,
 	text:         string           `json:"text"`,
 }
 
@@ -186,7 +206,14 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 	diags := ed.editor_diagnostics(e)
 	sd := make([]State_Diagnostic, len(diags), context.temp_allocator)
 	for d, i in diags {
-		sd[i] = {{d.start.line, d.start.col, d.end.line, d.end.col}, ed.severity_label(d.severity), d.message, d.source}
+		sd[i] = {
+			range = {d.start.line, d.start.col, d.end.line, d.end.col},
+			severity = ed.severity_label(d.severity),
+			unnecessary = d.unnecessary,
+			deprecated = d.deprecated,
+			message = d.message,
+			source = d.source,
+		}
 		switch d.severity {
 		case .Error: s.diagnostic_counts.errors += 1
 		case .Warning: s.diagnostic_counts.warnings += 1
@@ -214,6 +241,22 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 			text    = strings.join(lines[:], "\n", context.temp_allocator),
 			rect    = rect_array(tip.rect),
 		}
+	}
+
+	problems := ed.editor_problems(e)
+	prow := make([]string, len(problems), context.temp_allocator)
+	for p, i in problems {
+		prow[i] = fmt.tprintf("%s:%d:%d %s: %s", filepath.base(p.path), p.pos.line + 1, p.pos.col + 1, ed.severity_label(p.severity), p.message)
+	}
+	s.problems = {open = e.problems.open, count = len(problems), rows = prow}
+
+	titles := make([]string, len(e.lsp.last_code_actions) if e.lsp_enabled else 0, context.temp_allocator)
+	for &title, i in titles {
+		title = e.lsp.last_code_actions[i].title
+	}
+	s.code_actions = {
+		active = e.actions.active, visible = ed.editor_code_actions_visible(e), selected = e.actions.selected,
+		titles = titles, last_applied = e.actions.last_applied, last_skipped = e.actions.last_skipped,
 	}
 
 	s.signature = State_Signature{

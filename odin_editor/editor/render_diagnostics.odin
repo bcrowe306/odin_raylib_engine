@@ -44,8 +44,11 @@ render_gutter_marker :: proc(ed: ^Editor, renderer: ^sdl.Renderer, diags: []Diag
 	fill_rect(renderer, {origin_x + GUTTER_WIDTH - size - 3, y + (ed.char_h - size) / 2, size, size}, severity_color(theme, sev))
 }
 
-// render_squiggles underlines the parts of `line` covered by diagnostics.
-// Less severe diagnostics draw first so errors end up on top.
+// render_squiggles decorates the parts of `line` covered by diagnostics:
+// a wavy underline by severity (dotted for hints), plus the tag styles —
+// faded text for `unnecessary` (e.g. an unused import; a tagged hint gets
+// only the fade, like VSCode) and a strikethrough for `deprecated`. Less
+// severe diagnostics draw first so errors end up on top.
 @(private)
 render_squiggles :: proc(ed: ^Editor, renderer: ^sdl.Renderer, diags: []Diag, line: int, x, y: f32, theme: Theme) {
 	text := buf.buffer_line_str(&ed.buf, line)
@@ -54,8 +57,9 @@ render_squiggles :: proc(ed: ^Editor, renderer: ^sdl.Renderer, diags: []Diag, li
 			if d.severity != sev || !diag_covers_line(d, line) {
 				continue
 			}
-			a := d.start.col if d.start.line == line else 0
-			b := d.end.col if d.end.line == line else len(text)
+			ds, de := diag_extent(ed, d)
+			a := ds.col if ds.line == line else 0
+			b := de.col if de.line == line else len(text)
 			va := visual_col_of(text, a, ed.tab_width)
 			vb := visual_col_of(text, min(b, len(text)), ed.tab_width) + max(0, b - len(text)) // phantom EOL cell
 			if vb <= va {
@@ -63,7 +67,17 @@ render_squiggles :: proc(ed: ^Editor, renderer: ^sdl.Renderer, diags: []Diag, li
 			}
 			x0 := x + f32(va - ed.scroll_col) * ed.char_w
 			x1 := x + f32(vb - ed.scroll_col) * ed.char_w
-			draw_squiggle(renderer, x0, x1, y + ed.char_h - 1, severity_color(theme, sev), sev == .Hint)
+			if d.unnecessary {
+				bg := theme.background
+				fill_rect(renderer, {x0, y, x1 - x0, ed.char_h}, {bg.r, bg.g, bg.b, 150})
+			}
+			if d.deprecated {
+				c := theme.text_default
+				fill_rect(renderer, {x0, y + ed.char_h / 2, x1 - x0, 1}, {c.r, c.g, c.b, 200})
+			}
+			if !(d.unnecessary && sev == .Hint) {
+				draw_squiggle(renderer, x0, x1, y + ed.char_h - 1, severity_color(theme, sev), sev == .Hint)
+			}
 		}
 	}
 }
@@ -173,7 +187,7 @@ editor_diag_tooltip_layout :: proc(ed: ^Editor) -> (layout: Diag_Tooltip_Layout,
 	}
 	ax, ay := editor_position_to_screen(ed, anchor)
 	view_top := ed.origin_y
-	view_bottom := ed.origin_y + f32(ed.visible_rows) * ed.char_h
+	view_bottom := ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h
 	view_left := ed.origin_x + GUTTER_WIDTH
 	view_right := view_left + f32(ed.visible_cols) * ed.char_w
 

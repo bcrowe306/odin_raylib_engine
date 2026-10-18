@@ -9,6 +9,7 @@ package editor
 import buf "../buffer"
 import lspc "../lsp"
 import "core:slice"
+import "core:strings"
 import "core:time"
 import "core:unicode/utf8"
 
@@ -25,10 +26,44 @@ Diagnostic_Severity :: enum {
 // always > `start` on the same line for empty server ranges (widened to
 // one character, or the phantom cell past the end of the line).
 Diag :: struct {
-	start, end: buf.Position,
-	severity:   Diagnostic_Severity,
-	message:    string, // borrowed from the LSP client
-	source:     string,
+	start, end:  buf.Position,
+	severity:    Diagnostic_Severity,
+	message:     string, // owned by the overlay
+	source:      string,
+	unnecessary: bool,   // tag 1: render faded
+	deprecated:  bool,   // tag 2: render struck through
+	// The range as the server sent it (UTF-16, server's text version),
+	// used to recognise the same diagnostic when it's republished.
+	raw:         lspc.Range,
+}
+
+// Diag_Overlay is the editor's own copy of the current document's
+// diagnostics in buffer coordinates. It's rebuilt whenever the server
+// publishes (or restarts), and between publishes every buffer edit is
+// applied to it, so squiggles follow the text as you type instead of
+// sitting at stale positions until the next publish (which for
+// `odin check` results is the next save).
+Diag_Overlay :: struct {
+	items:        [dynamic]Diag,
+	built_seq:    int, // lsp.diagnostics_seq the items came from (-1: never)
+	built_server: int, // supervisor crash count at build time
+	built_key:    string,
+}
+
+@(private)
+diag_overlay_clear :: proc(o: ^Diag_Overlay) {
+	for d in o.items {
+		delete(d.message)
+		delete(d.source)
+	}
+	clear(&o.items)
+}
+
+@(private)
+diag_overlay_destroy :: proc(o: ^Diag_Overlay) {
+	diag_overlay_clear(o)
+	delete(o.items)
+	delete(o.built_key)
 }
 
 Tip_Source :: enum {
@@ -53,39 +88,110 @@ Diagnostic_Tooltip :: struct {
 }
 
 // editor_diagnostics returns the current document's diagnostics in buffer
-// coordinates, sorted by start position (temp-allocated).
+// coordinates, sorted by start position. The slice is owned by the editor
+// and valid until the next edit or publish.
 editor_diagnostics :: proc(ed: ^Editor) -> []Diag {
+	editor_refresh_diag_overlay(ed)
+	return ed.diag_overlay.items[:]
+}
+
+// editor_refresh_diag_overlay applies pending buffer edits to the overlay
+// and rebuilds it if the server published since it was built.
+editor_refresh_diag_overlay :: proc(ed: ^Editor) {
+	o := &ed.diag_overlay
+	changes, reset := buf.buffer_take_changes(&ed.buf)
 	if !ed.lsp_enabled || len(ed.document_key) == 0 {
-		return nil
+		diag_overlay_clear(o)
+		o.built_seq = -1
+		return
+	}
+	stale := reset || o.built_seq != ed.lsp.diagnostics_seq ||
+		o.built_server != ed.lsp_supervisor.total_crashes || o.built_key != ed.document_key
+	if !stale {
+		for ch in changes {
+			for &d in o.items {
+				d.start = buf.position_after_change(d.start, ch)
+				d.end = buf.position_after_change(d.end, ch)
+			}
+		}
+		return
+	}
+
+	// Servers often republish diagnostics they haven't recomputed (OLS
+	// re-sends the last `odin check` results with every parse-only
+	// update). An identical republished entry is the same diagnostic, so
+	// it keeps the position we've been shifting instead of snapping back.
+	old := o.items
+	o.items = make([dynamic]Diag, 0, len(old))
+	defer {
+		for d in old {
+			delete(d.message)
+			delete(d.source)
+		}
+		delete(old)
+	}
+	keep_old := !reset && o.built_key == ed.document_key && o.built_server == ed.lsp_supervisor.total_crashes
+	if keep_old {
+		// Bring the old positions up to date with edits since last refresh.
+		for ch in changes {
+			for &d in old {
+				d.start = buf.position_after_change(d.start, ch)
+				d.end = buf.position_after_change(d.end, ch)
+			}
+		}
+	}
+	o.built_seq = ed.lsp.diagnostics_seq
+	o.built_server = ed.lsp_supervisor.total_crashes
+	if o.built_key != ed.document_key {
+		delete(o.built_key)
+		o.built_key = strings.clone(ed.document_key)
 	}
 	raw := lspc.client_diagnostics_for_key(&ed.lsp, ed.document_key)
-	if len(raw) == 0 {
-		return nil
-	}
 	count := buf.buffer_line_count(&ed.buf)
-	out := make([dynamic]Diag, 0, len(raw), context.temp_allocator)
 	for d in raw {
 		start := to_buffer_pos(ed, d.range.start, count)
 		end := to_buffer_pos(ed, d.range.end, count)
 		if buf.position_less(end, start) {
 			start, end = end, start
 		}
-		if end == start {
-			// Zero-width (e.g. "expected ';'"): cover the next character,
-			// or the cell just past the end of the line.
-			end.col = start.col + 1
-			line := buf.buffer_line_str(&ed.buf, start.line)
-			if start.col < len(line) {
-				_, size := utf8.decode_rune_in_string(line[start.col:])
-				end.col = start.col + size
+		if keep_old {
+			for prev in old {
+				if prev.raw == d.range && prev.message == d.message && int(prev.severity) == clamp(d.severity, 1, 4) {
+					start, end = prev.start, prev.end
+					break
+				}
 			}
 		}
-		append(&out, Diag{start, end, Diagnostic_Severity(clamp(d.severity, 1, 4)), d.message, d.source})
+		append(&o.items, Diag{
+			raw         = d.range,
+			start       = start,
+			end         = end,
+			severity    = Diagnostic_Severity(clamp(d.severity, 1, 4)),
+			message     = strings.clone(d.message),
+			source      = strings.clone(d.source),
+			unnecessary = d.unnecessary,
+			deprecated  = d.deprecated,
+		})
 	}
-	slice.sort_by(out[:], proc(a, b: Diag) -> bool {
+	slice.sort_by(o.items[:], proc(a, b: Diag) -> bool {
 		return buf.position_less(a.start, b.start)
 	})
-	return out[:]
+}
+
+// diag_extent returns the range to draw/hit-test for `d`: zero-width
+// ranges (e.g. "expected ';'") cover the next character, or the phantom
+// cell just past the end of the line.
+diag_extent :: proc(ed: ^Editor, d: Diag) -> (start, end: buf.Position) {
+	start, end = d.start, d.end
+	if end == start {
+		end.col = start.col + 1
+		line := buf.buffer_line_str(&ed.buf, start.line)
+		if start.col < len(line) {
+			_, size := utf8.decode_rune_in_string(line[start.col:])
+			end.col = start.col + size
+		}
+	}
+	return
 }
 
 @(private)
@@ -110,9 +216,11 @@ diag_covers_line :: proc(d: Diag, line: int) -> bool {
 	return d.start.line <= line && line <= d.end.line
 }
 
-// diag_contains reports whether the character at `pos` is inside `d`.
-diag_contains :: proc(d: Diag, pos: buf.Position) -> bool {
-	return !buf.position_less(pos, d.start) && buf.position_less(pos, d.end)
+// diag_contains reports whether the character at `pos` is inside `d`
+// (with zero-width ranges widened by diag_extent).
+diag_contains :: proc(ed: ^Editor, d: Diag, pos: buf.Position) -> bool {
+	start, end := diag_extent(ed, d)
+	return !buf.position_less(pos, start) && buf.position_less(pos, end)
 }
 
 // line_severity returns the most severe diagnostic on `line` (ok=false if
@@ -132,7 +240,7 @@ line_severity :: proc(diags: []Diag, line: int) -> (sev: Diagnostic_Severity, ok
 editor_diagnostics_at :: proc(ed: ^Editor, pos: buf.Position, line_only := false) -> []Diag {
 	hits := make([dynamic]Diag, context.temp_allocator)
 	for d in editor_diagnostics(ed) {
-		if line_only ? diag_covers_line(d, pos.line) : diag_contains(d, pos) {
+		if line_only ? diag_covers_line(d, pos.line) : diag_contains(ed, d, pos) {
 			append(&hits, d)
 		}
 	}
@@ -204,7 +312,7 @@ editor_track_diag_hover :: proc(ed: ^Editor, hit: Hit, x, y: f32) {
 		}
 	case .Gutter:
 		line_only, valid = true, true
-	case .Outside, .Completion, .Signature:
+	case .Outside, .Completion, .Signature, .Problems, .Code_Actions:
 	}
 	if !valid || (tip.hover_valid && (pos != tip.hover_pos || line_only != tip.hover_line_only)) || !tip.hover_valid {
 		tip.hover_since = time.tick_now()

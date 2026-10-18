@@ -22,6 +22,7 @@ SUITES=(
 	"lsp_crash:example/assets/lsp_fixture.odin.txt:OLS is killed mid-session; the editor keeps working and restarts it"
 	"mouse_smoke:example/assets/mouse_fixture.odin.txt:Mouse and cursor gestures, scrolling, tab stops"
 	"diagnostics_smoke:example/assets/diag_fixture.odin.txt:Diagnostics: squiggles, gutter markers, tooltips, F8"
+	"diagnostics_extras:example/assets/problems_fixture:Diagnostic tags, quick fixes, edit-tracking squiggles, problems panel"
 )
 
 failed=0

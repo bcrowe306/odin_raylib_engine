@@ -30,7 +30,7 @@ editor_ensure_cursor_visible :: proc(ed: ^Editor) {
 	if c.pos.line < ed.scroll_line {
 		ed.scroll_line = c.pos.line
 	}
-	rows := max(1, ed.visible_rows)
+	rows := max(1, editor_text_rows(ed))
 	if c.pos.line >= ed.scroll_line + rows {
 		ed.scroll_line = c.pos.line - rows + 1
 	}

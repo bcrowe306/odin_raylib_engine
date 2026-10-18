@@ -19,6 +19,7 @@ Where_Kind :: enum {
 	Text,
 	Gutter,
 	Completion,
+	Problem,
 }
 
 Where :: struct {
@@ -85,6 +86,9 @@ parse_where :: proc(parts: []string) -> (w: Where, used: int, ok: bool) {
 			w.line, ok = strconv.parse_int(tail)
 		case "completion":
 			w.kind = .Completion
+			w.line, ok = strconv.parse_int(tail)
+		case "problem":
+			w.kind = .Problem
 			w.line, ok = strconv.parse_int(tail)
 		case:
 			w.kind = .Text

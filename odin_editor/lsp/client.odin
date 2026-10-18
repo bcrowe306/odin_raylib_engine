@@ -16,6 +16,7 @@ RequestKind :: enum {
 	Completion,
 	SignatureHelp,
 	Hover,
+	CodeAction,
 	Other,
 }
 
@@ -53,6 +54,10 @@ Client :: struct {
 	latest_completion_id: int,
 	latest_signature_id:  int,
 
+	last_code_actions:     [dynamic]Code_Action,
+	code_action_seq:       int,
+	latest_code_action_id: int,
+
 	// Set once the server process has gone away (crashed, killed, or
 	// closed its pipes). The client never takes the host down with it:
 	// writes to a dead server fail quietly and the host can inspect
@@ -69,6 +74,7 @@ client_init :: proc(allocator := context.allocator) -> Client {
 		diagnostics      = make(map[string][dynamic]Diagnostic, allocator),
 		last_completion  = make([dynamic]CompletionItem, allocator),
 		last_signatures  = make([dynamic]SignatureInformation, allocator),
+		last_code_actions = make([dynamic]Code_Action, allocator),
 	}
 }
 
@@ -87,6 +93,8 @@ client_destroy :: proc(c: ^Client) {
 	delete(c.last_completion)
 	client_clear_signatures(c)
 	delete(c.last_signatures)
+	client_clear_code_actions(c)
+	delete(c.last_code_actions)
 }
 
 // client_start launches `command` (e.g. `{"ols"}`) as a child process and

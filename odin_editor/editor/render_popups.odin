@@ -82,7 +82,7 @@ editor_popup_layout :: proc(ed: ^Editor) -> (layout: Popup_Layout) {
 	}
 	cx, cy := editor_cursor_screen_pos(ed)
 	view_top := ed.origin_y
-	view_bottom := ed.origin_y + f32(ed.visible_rows) * ed.char_h
+	view_bottom := ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h
 	view_right := ed.origin_x + GUTTER_WIDTH + f32(ed.visible_cols) * ed.char_w
 
 	below_y := cy + ed.char_h + 2

@@ -410,6 +410,28 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 			actual = ed.severity_label(sev)
 		}
 		pass = actual == parts[1]
+	case .Problems_Open:
+		actual = "true" if s.problems.open else "false"
+		pass = actual == strings.trim_space(x.want)
+	case .Problems_Has:
+		actual = strings.join(s.problems.rows, " | ", context.temp_allocator)
+		for r in s.problems.rows {
+			pass ||= strings.contains(r, x.want)
+		}
+	case .Actions_Has:
+		actual = strings.join(s.code_actions.titles, " | ", context.temp_allocator)
+		for title in s.code_actions.titles {
+			pass ||= s.code_actions.visible && strings.contains(title, x.want)
+		}
+	case .Diag_Range:
+		want := strings.join(strings.fields(x.want, context.temp_allocator), " ", context.temp_allocator)
+		ranges := make([dynamic]string, context.temp_allocator)
+		for d in s.diagnostics {
+			r := fmt.tprintf("%d %d %d %d", d.range[0], d.range[1], d.range[2], d.range[3])
+			append(&ranges, r)
+			pass ||= r == want
+		}
+		actual = strings.join(ranges[:], " | ", context.temp_allocator)
 	case .Tooltip:
 		actual = s.tooltip.text if s.tooltip.visible else "none"
 		want := strings.trim_space(x.want)
@@ -451,6 +473,7 @@ wait_check :: proc(srv: ^Server, c: ^Conn, e: ^ed.Editor) -> bool {
 		case .Diagnostics: met = len(ed.editor_diagnostics(e)) > 0
 		case .No_Diagnostics: met = len(ed.editor_diagnostics(e)) == 0
 		case .Tooltip: met = len(ed.editor_diag_tooltip_items(e)) > 0
+		case .Code_Actions: met = ed.editor_code_actions_visible(e)
 		case .Frames:
 		}
 	}
@@ -482,6 +505,7 @@ wait_name :: proc(cond: Wait_Condition) -> string {
 	case .Diagnostics: return "diagnostics"
 	case .No_Diagnostics: return "no-diagnostics"
 	case .Tooltip: return "tooltip"
+	case .Code_Actions: return "code-actions"
 	case .Frames: return "frames"
 	}
 	return "?"
@@ -611,7 +635,7 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 		return w.x, w.y, ""
 	case .Text:
 		pos := ed.editor_clamp_to_buffer(e, w.line, w.col)
-		if pos.line < e.scroll_line || pos.line >= e.scroll_line + e.visible_rows {
+		if pos.line < e.scroll_line || pos.line >= e.scroll_line + ed.editor_text_rows(e) {
 			return 0, 0, fmt.tprintf("line %d is not visible (scroll_line=%d)", pos.line, e.scroll_line)
 		}
 		if vcol := ed.editor_visual_col(e, pos); vcol < e.scroll_col || vcol > e.scroll_col + e.visible_cols {
@@ -620,10 +644,20 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 		px, py := ed.editor_position_to_screen(e, pos)
 		return px + 1, py + e.char_h / 2, ""
 	case .Gutter:
-		if w.line < e.scroll_line || w.line >= e.scroll_line + e.visible_rows {
+		if w.line < e.scroll_line || w.line >= e.scroll_line + ed.editor_text_rows(e) {
 			return 0, 0, fmt.tprintf("line %d is not visible", w.line)
 		}
 		return e.origin_x + ed.GUTTER_WIDTH / 2, e.origin_y + f32(w.line - e.scroll_line) * e.char_h + e.char_h / 2, ""
+	case .Problem:
+		if !e.problems.open {
+			return 0, 0, "problems panel is not open"
+		}
+		row := w.line - e.problems.scroll
+		if row < 0 || row >= ed.PROBLEMS_PANEL_ROWS - 1 || w.line >= len(ed.editor_problems(e)) {
+			return 0, 0, fmt.tprintf("problem %d is not on screen", w.line)
+		}
+		top := e.origin_y + f32(ed.editor_text_rows(e)) * e.char_h
+		return e.origin_x + 200, top + f32(row + 1) * e.char_h + e.char_h / 2, ""
 	case .Completion:
 		layout := ed.editor_popup_layout(e)
 		cs := &e.completion

@@ -41,7 +41,38 @@ InitializeParams :: struct {
 	capabilities:          ClientCapabilities `json:"capabilities"`,
 }
 
-ClientCapabilities :: struct {}
+// ClientCapabilities advertises what this client can render, which changes
+// what servers send (e.g. diagnostic tags, code-action literals).
+ClientCapabilities :: struct {
+	textDocument: TextDocumentClientCapabilities `json:"textDocument"`,
+}
+
+TextDocumentClientCapabilities :: struct {
+	publishDiagnostics: struct {
+		tagSupport: struct {
+			valueSet: []int `json:"valueSet"`,
+		} `json:"tagSupport"`,
+	} `json:"publishDiagnostics"`,
+	codeAction: struct {
+		codeActionLiteralSupport: struct {
+			codeActionKind: struct {
+				valueSet: []string `json:"valueSet"`,
+			} `json:"codeActionKind"`,
+		} `json:"codeActionLiteralSupport"`,
+	} `json:"codeAction"`,
+}
+
+default_client_capabilities :: proc() -> ClientCapabilities {
+	caps: ClientCapabilities
+	caps.textDocument.publishDiagnostics.tagSupport.valueSet = DIAGNOSTIC_TAGS[:]
+	caps.textDocument.codeAction.codeActionLiteralSupport.codeActionKind.valueSet = CODE_ACTION_KINDS[:]
+	return caps
+}
+
+@(private)
+DIAGNOSTIC_TAGS := [2]int{1, 2}
+@(private)
+CODE_ACTION_KINDS := [6]string{"", "quickfix", "refactor", "refactor.rewrite", "source", "source.organizeImports"}
 
 // --- textDocument/didOpen, didChange, didClose, didSave ---
 
@@ -126,6 +157,37 @@ Diagnostic :: struct {
 	severity: int    `json:"severity"`,
 	message:  string `json:"message"`,
 	source:   string `json:"source"`,
+	// From `tags`: 1 = Unnecessary (render faded), 2 = Deprecated
+	// (render struck through).
+	unnecessary: bool `json:"-"`,
+	deprecated:  bool `json:"-"`,
+}
+
+// --- codeAction ---
+
+CodeActionContext :: struct {
+	diagnostics: []Diagnostic `json:"diagnostics"`,
+}
+
+CodeActionParams :: struct {
+	textDocument: TextDocumentIdentifier `json:"textDocument"`,
+	range:        Range                  `json:"range"`,
+	context_:     CodeActionContext      `json:"context"`,
+}
+
+// Code_Action_Edit is one TextEdit of a code action's WorkspaceEdit.
+// `key` is the target document's uri_key; ranges are in UTF-16 columns.
+Code_Action_Edit :: struct {
+	key:      string,
+	range:    Range,
+	new_text: string,
+}
+
+Code_Action :: struct {
+	title:     string,
+	kind:      string,
+	preferred: bool,
+	edits:     []Code_Action_Edit,
 }
 
 // --- hover ---

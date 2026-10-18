@@ -87,6 +87,8 @@ keymap_default :: proc(platform: Platform, allocator := context.allocator) -> Ke
 	keymap_bind(&km, Chord{.Space, primary | {.Shift}}, .TriggerSignatureHelp)
 	keymap_bind(&km, Chord{.F8, {}}, .NextDiagnostic)
 	keymap_bind(&km, Chord{.F8, {.Shift}}, .PrevDiagnostic)
+	keymap_bind(&km, Chord{.Period, primary}, .QuickFix)
+	keymap_bind(&km, Chord{.M, primary | {.Shift}}, .ToggleProblems)
 
 	keymap_bind(&km, Chord{.Escape, {}}, .Escape)
 

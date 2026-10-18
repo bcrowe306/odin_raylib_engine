@@ -54,7 +54,9 @@ test_diagnostics_convert_utf16_and_widen_empty_ranges :: proc(t: ^testing.T) {
 		testing.expect_value(t, diags[1].severity, Diagnostic_Severity.Information)
 		// Zero-width at end of line 2 ("x") covers the phantom EOL cell.
 		testing.expect_value(t, diags[2].start, buf.Position{2, 1})
-		testing.expect_value(t, diags[2].end, buf.Position{2, 2})
+		testing.expect_value(t, diags[2].end, buf.Position{2, 1}) // stored as sent
+		_, wide_end := diag_extent(&ed, diags[2])
+		testing.expect_value(t, wide_end, buf.Position{2, 2}) // drawn one cell wide
 
 		counts := editor_diagnostic_counts(&ed)
 		testing.expect_value(t, counts[.Error], 1)

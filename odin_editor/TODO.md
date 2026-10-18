@@ -6,7 +6,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 115 tests across 6 packages, all
+2. **Unit tests for every feature** — 127 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
@@ -102,6 +102,16 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     and saves 26 feature screenshots, per-suite contact sheets
     (`tools/contact_sheet`) and an `index.md` gallery under
     `test_output/visual/`. Run (and look at) after every feature.
+15. **Diagnostics leftovers** — diagnostic `tags` (Unnecessary → faded
+    text, e.g. unused imports; Deprecated → strikethrough) with the client
+    capabilities advertised; quick fixes via `textDocument/codeAction`
+    (Ctrl/Cmd+. menu, preferred first, applied as one undo step, other-file
+    edits skipped); diagnostics follow edits between publishes (buffer
+    change log + overlay, and identical republished entries keep their
+    shifted position since OLS re-sends stale `odin check` results); a
+    Problems panel (Ctrl/Cmd+Shift+M) listing every file's problems with
+    click-to-jump and an open-file request for the host. Verified by unit
+    tests and `tools/diagnostics_extras.edctl` (live OLS, 2-file fixture).
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -109,11 +119,6 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-- **Diagnostics leftovers** — no problems panel/list, no quick fixes
-  (codeAction), `tags` (unnecessary/deprecated → faded/strikethrough) are
-  ignored, and ranges aren't shifted locally while typing (they're
-  replaced on the server's next publish, which for parse errors is
-  immediate but for `odin check` errors is the next save).
 - **OLS reports `odin check` columns in code points, not UTF-16** — for a
   line with an astral character (e.g. an emoji) before the error, the
   squiggle lands one cell early per such character. Upstream issue; BMP

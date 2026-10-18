@@ -138,7 +138,7 @@ task build build:edctl
 
 A `<where>` is either window pixels (`x y`) or a target resolved against the
 live editor, so scripts don't depend on font size or scrolling: `@line:col`
-(caret position, 0-based), `@gutter:line`, or `@completion:row`. Targets
+(caret position, 0-based), `@gutter:line`, `@completion:row`, or `@problem:index`. Targets
 scrolled out of view are rejected with `err` rather than clicking elsewhere.
 
 Protocol: one command per line, exactly one reply line per command (`ok …`,
@@ -156,7 +156,7 @@ always observe the result of the input before them.
 | `wheel <dy> [dx=N] [at=<where>] [mods=…]` | scroll at a position (`mods=shift` = horizontal) |
 | `locate <where>` | print the pixel a target resolves to |
 | `lsp-kill` | SIGKILL the language server (crash-recovery testing) |
-| `wait diagnostics` / `wait no-diagnostics` / `wait tooltip` | block until the document has (no) diagnostics / the diagnostic tooltip shows |
+| `wait diagnostics` / `wait no-diagnostics` / `wait tooltip` / `wait code-actions` | block until the document has (no) diagnostics / the diagnostic tooltip shows / the quick-fix menu has the server's answer |
 | `type <text>` | one TEXT_INPUT event per character (like real typing, so `.`/`(` triggers fire) |
 | `text <text>` | a single TEXT_INPUT event with the whole string. Escapes: `\n` `\t` `\\` |
 | `cursor <line> <col>` | place the cursor directly (0-based) |
@@ -164,7 +164,7 @@ always observe the result of the input before them.
 | `state` | JSON: text, cursor, LSP status, completion items/selection/rect, signature label/active parameter/rect |
 | `wait <cond> [ms]` | block until `completion`, `no-completion`, `signature`, `no-signature`, `lsp-ready`, `lsp-idle` or `lsp-down` (default 5000 ms) |
 | `wait frames <n>` | block for `n` frames |
-| `expect <field> <value>` | assert `line`, `cursor`, `text-contains`, `completion-selected`, `completion-has`, `signature` (label contains), `signature-param`, `selection` (`l1 c1 l2 c2` or `none`), `selected-text`, `cursors`, `mouse-cursor` (`text`/`default`), `scroll` (`line col`), `lsp-status`, `errors`, `warnings`, `diagnostics-has`, `line-severity` (`<line> error\|warning\|info\|hint\|none`) or `tooltip` (contains, or `none`) |
+| `expect <field> <value>` | assert `line`, `cursor`, `text-contains`, `completion-selected`, `completion-has`, `signature` (label contains), `signature-param`, `selection` (`l1 c1 l2 c2` or `none`), `selected-text`, `cursors`, `mouse-cursor` (`text`/`default`), `scroll` (`line col`), `lsp-status`, `errors`, `warnings`, `diagnostics-has`, `line-severity` (`<line> error\|warning\|info\|hint\|none`), `tooltip` (contains, or `none`), `problems-open`, `problems-has`, `actions-has` or `diag-range` (`l1 c1 l2 c2`) |
 | `screenshot <file.png>` | save the next rendered frame |
 | `quit` | push SDL_EVENT_QUIT |
 
@@ -186,6 +186,18 @@ tooltip; **F8 / Shift+F8** jump to the next/previous problem and show it
 per-severity totals for a host's status bar — the demo puts them in the
 window title.
 
+Diagnostic tags are honoured: *unnecessary* code (e.g. an unused import)
+is drawn faded, *deprecated* code struck through. **Ctrl/Cmd+.** asks the
+server for quick fixes (`textDocument/codeAction`) at the caret and shows
+them in a menu (preferred first; Enter/click applies the edit as one undo
+step). **Ctrl/Cmd+Shift+M** toggles a Problems panel docked at the bottom
+listing every file's problems; clicking one jumps there — for another file
+the editor raises a request the host services
+(`editor_take_open_request` + `editor_load_file` +
+`editor_goto_lsp_position`; see `example/main.odin`). Between server
+publishes, diagnostics move with your edits (the buffer keeps an opt-in
+change log), so squiggles stay on the code they describe.
+
 OLS reports parse errors as you type; type-check errors come from
 `odin check`, which OLS runs when the file is saved. Ranges arrive in UTF-16
 columns and are converted to byte columns against the current text. Server
@@ -198,8 +210,9 @@ under the compiler's resolved path (`/private/tmp/...` for a file opened as
 
 `task test:visual` is the end-to-end check every feature ships with. It
 launches `example/editor_demo --control-only` once per script in `tools/`
-(`lsp_smoke`, `lsp_crash`, `mouse_smoke`, `diagnostics_smoke`) on a scratch
-copy of a fixture from `example/assets/`, replays the script through
+(`lsp_smoke`, `lsp_crash`, `mouse_smoke`, `diagnostics_smoke`,
+`diagnostics_extras`) on a scratch copy of a fixture from `example/assets/`
+(a single `.odin.txt` file, or a directory of them for multi-file cases), replays the script through
 `edctl` — real SDL keyboard/mouse events, live OLS — and fails on any
 `expect`/`wait` that doesn't hold. Along the way each script saves
 screenshots of the features it demonstrates:

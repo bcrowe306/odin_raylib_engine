@@ -72,6 +72,15 @@ Edit :: struct {
 	group_id: int,
 }
 
+// Change records one content mutation: the text in [start, old_end) was
+// replaced and now spans [start, new_end). Consumers (e.g. the editor's
+// diagnostic overlay) use it to shift positions they hold.
+Change :: struct {
+	start, old_end, new_end: Position,
+}
+
+MAX_TRACKED_CHANGES :: 4096
+
 Buffer :: struct {
 	lines:      [dynamic]strings.Builder,
 	cursors:    [dynamic]Cursor,
@@ -85,6 +94,12 @@ Buffer :: struct {
 	// set_text). Hosts compare it against a saved value to detect changes
 	// without diffing, e.g. to know when to push LSP didChange.
 	version:    int,
+	// Opt-in change log (see buffer_take_changes). If it overflows or the
+	// whole text is replaced, `changes_reset` is set instead: positions
+	// can't be shifted and must be recomputed.
+	track_changes: bool,
+	changes:       [dynamic]Change,
+	changes_reset: bool,
 }
 
 buffer_init :: proc(allocator := context.allocator) -> Buffer {
@@ -97,6 +112,7 @@ buffer_init :: proc(allocator := context.allocator) -> Buffer {
 	append(&b.cursors, Cursor{})
 	b.undo_stack = make([dynamic]Edit, allocator)
 	b.redo_stack = make([dynamic]Edit, allocator)
+	b.changes = make([dynamic]Change, allocator)
 	return b
 }
 
@@ -109,6 +125,7 @@ buffer_destroy :: proc(b: ^Buffer) {
 	buffer_clear_undo_history(b)
 	delete(b.undo_stack)
 	delete(b.redo_stack)
+	delete(b.changes)
 	if len(b.file_path) > 0 {
 		delete(b.file_path, b.allocator)
 	}
@@ -195,6 +212,54 @@ buffer_set_text :: proc(b: ^Buffer, text: string) {
 	buffer_clear_undo_history(b)
 	b.dirty = false
 	b.version += 1
+	buffer_record_reset(b)
+}
+
+@(private)
+buffer_record_change :: proc(b: ^Buffer, ch: Change) {
+	if !b.track_changes || b.changes_reset {
+		return
+	}
+	if len(b.changes) >= MAX_TRACKED_CHANGES {
+		buffer_record_reset(b)
+		return
+	}
+	append(&b.changes, ch)
+}
+
+@(private)
+buffer_record_reset :: proc(b: ^Buffer) {
+	if b.track_changes {
+		clear(&b.changes)
+		b.changes_reset = true
+	}
+}
+
+// buffer_take_changes returns the changes recorded since the last call
+// (oldest first; valid until the next mutation) and whether a reset
+// happened, then clears the log.
+buffer_take_changes :: proc(b: ^Buffer) -> (changes: []Change, reset: bool) {
+	changes = b.changes[:]
+	reset = b.changes_reset
+	clear(&b.changes) // keeps capacity; the returned slice stays readable
+	b.changes_reset = false
+	return
+}
+
+// position_after_change maps a position through one change: positions
+// before the edit stay, positions after it move with the text, and
+// positions inside replaced text collapse to the end of the new text.
+position_after_change :: proc(p: Position, ch: Change) -> Position {
+	if position_less(p, ch.start) {
+		return p
+	}
+	if position_less(p, ch.old_end) {
+		return ch.new_end
+	}
+	if p.line == ch.old_end.line {
+		return {ch.new_end.line, ch.new_end.col + (p.col - ch.old_end.col)}
+	}
+	return {p.line + (ch.new_end.line - ch.old_end.line), p.col}
 }
 
 // buffer_to_string concatenates all lines with '\n' separators. Caller owns

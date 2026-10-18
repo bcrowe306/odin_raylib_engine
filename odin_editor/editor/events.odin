@@ -82,6 +82,24 @@ editor_handle_popup_key :: proc(ed: ^Editor, chord: km.Chord) -> bool {
 	if chord.mods != {} {
 		return false
 	}
+	if ed.actions.active {
+		#partial switch chord.key {
+		case .Up:
+			editor_code_actions_move(ed, -1)
+			return true
+		case .Down:
+			editor_code_actions_move(ed, 1)
+			return true
+		case .Enter, .Tab:
+			if editor_code_actions_visible(ed) {
+				editor_apply_code_action(ed, ed.actions.selected)
+			}
+			return true
+		case .Escape:
+			editor_close_code_actions(ed)
+			return true
+		}
+	}
 	if editor_completion_visible(ed) {
 		#partial switch chord.key {
 		case .Up:

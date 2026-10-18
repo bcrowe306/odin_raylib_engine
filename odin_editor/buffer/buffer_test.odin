@@ -452,3 +452,42 @@ test_undo_backspace_puts_cursor_after_restored_text :: proc(t: ^testing.T) {
 		testing.expect_value(t, b.cursors[0].pos, Position{0, 5})
 	})
 }
+
+@(test)
+test_change_log_records_edits_when_tracking :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		buffer_set_text(&b, "abc\ndef")
+		buffer_insert_text(&b, {0, 1}, "XY") // not tracked yet
+		ch, reset := buffer_take_changes(&b)
+		testing.expect(t, len(ch) == 0 && !reset, "nothing recorded while tracking is off")
+
+		b.track_changes = true
+		buffer_insert_text(&b, {0, 0}, "1\n2")
+		buffer_delete_range(&b, {1, 1}, {1, 3})
+		ch, reset = buffer_take_changes(&b)
+		testing.expect(t, !reset, "no reset")
+		testing.expect_value(t, len(ch), 2)
+		testing.expect_value(t, ch[0], Change{{0, 0}, {0, 0}, {1, 1}})
+		testing.expect_value(t, ch[1], Change{{1, 1}, {1, 3}, {1, 1}})
+
+		buffer_set_text(&b, "fresh")
+		_, reset = buffer_take_changes(&b)
+		testing.expect(t, reset, "set_text reports a reset")
+	})
+}
+
+@(test)
+test_position_after_change :: proc(t: ^testing.T) {
+	ins := Change{start = {2, 4}, old_end = {2, 4}, new_end = {3, 1}} // inserted "..\n."
+	testing.expect_value(t, position_after_change({2, 3}, ins), Position{2, 3}) // before
+	testing.expect_value(t, position_after_change({2, 4}, ins), Position{3, 1}) // at insert point: pushed
+	testing.expect_value(t, position_after_change({2, 9}, ins), Position{3, 6}) // same line after
+	testing.expect_value(t, position_after_change({5, 2}, ins), Position{6, 2}) // later line
+
+	del := Change{start = {1, 2}, old_end = {3, 5}, new_end = {1, 2}}
+	testing.expect_value(t, position_after_change({2, 0}, del), Position{1, 2}) // inside -> collapses
+	testing.expect_value(t, position_after_change({3, 8}, del), Position{1, 5}) // after on end line
+	testing.expect_value(t, position_after_change({7, 1}, del), Position{5, 1})
+}

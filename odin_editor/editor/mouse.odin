@@ -21,6 +21,8 @@ Mouse_Zone :: enum {
 	Text,
 	Completion,
 	Signature,
+	Problems, // the problems panel (row = problem index, -1 = header)
+	Code_Actions, // the quick-fix menu (row = action index)
 }
 
 Drag_Mode :: enum {
@@ -86,6 +88,11 @@ editor_screen_to_position :: proc(ed: ^Editor, x, y: f32) -> buf.Position {
 // editor_hit_test classifies a window-pixel point.
 editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 	hit := Hit{pos = editor_screen_to_position(ed, x, y)}
+	if rect, ok := editor_code_actions_layout(ed); ok && in_rect(rect, x, y) {
+		hit.zone = .Code_Actions
+		hit.row = int((y - rect.y - POPUP_PAD) / ed.char_h)
+		return hit
+	}
 	layout := editor_popup_layout(ed)
 	if layout.completion_visible && in_rect(layout.completion, x, y) {
 		row := ed.completion.scroll + int((y - layout.completion.y - POPUP_PAD) / ed.char_h)
@@ -98,10 +105,14 @@ editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 		return hit
 	}
 	right := ed.origin_x + GUTTER_WIDTH + f32(ed.visible_cols) * ed.char_w
-	bottom := ed.origin_y + f32(ed.visible_rows) * ed.char_h
+	bottom := ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h
+	panel_bottom := ed.origin_y + f32(ed.visible_rows) * ed.char_h
 	switch {
-	case x < ed.origin_x || x >= right || y < ed.origin_y || y >= bottom:
+	case x < ed.origin_x || x >= right || y < ed.origin_y || y >= panel_bottom:
 		hit.zone = .Outside
+	case y >= bottom:
+		hit.zone = .Problems
+		hit.row = problems_row_at(ed, y)
 	case x < ed.origin_x + GUTTER_WIDTH:
 		hit.zone = .Gutter
 	case:
@@ -182,6 +193,12 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 	mods := editor_current_mods(ed)
 	switch hit.zone {
 	case .Outside:
+	case .Code_Actions:
+		if hit.row >= 0 && hit.row < len(ed.lsp.last_code_actions) {
+			editor_apply_code_action(ed, hit.row)
+		}
+	case .Problems:
+		editor_open_problem(ed, hit.row)
 	case .Completion:
 		ed.completion.selected = hit.row
 		editor_accept_completion(ed)
@@ -323,6 +340,10 @@ editor_handle_mouse_wheel :: proc(ed: ^Editor, ev: sdl.MouseWheelEvent) -> bool 
 		dx, dy = -dy, 0
 	}
 
+	if hit.zone == .Problems {
+		problems_scroll_by(ed, -int(dy))
+		return true
+	}
 	if hit.zone == .Completion {
 		cs := &ed.completion
 		cs.scroll = clamp(cs.scroll - int(dy), 0, max(0, len(cs.filtered) - COMPLETION_MAX_VISIBLE))
@@ -356,7 +377,7 @@ editor_update_mouse :: proc(ed: ^Editor) {
 		return
 	}
 	top := ed.origin_y
-	bottom := ed.origin_y + f32(ed.visible_rows) * ed.char_h
+	bottom := ed.origin_y + f32(editor_text_rows(ed)) * ed.char_h
 	left := ed.origin_x + GUTTER_WIDTH
 	right := left + f32(ed.visible_cols) * ed.char_w
 

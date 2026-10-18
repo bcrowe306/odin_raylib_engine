@@ -431,3 +431,54 @@ test_utf16_column_conversion :: proc(t: ^testing.T) {
 	testing.expect_value(t, utf16_col_to_byte(line, 4), 7)
 	testing.expect_value(t, utf16_col_to_byte(line, 99), 7) // clamped
 }
+
+@(test)
+test_initialize_advertises_tags_and_code_action_literals :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		params := InitializeParams{capabilities = default_client_capabilities()}
+		msg := encode_request(1, "initialize", params, context.temp_allocator)
+		testing.expect(t, strings.contains(msg, `"tagSupport":{"valueSet":[1,2]}`), msg)
+		testing.expect(t, strings.contains(msg, `"codeActionLiteralSupport"`), msg)
+		testing.expect(t, strings.contains(msg, `"quickfix"`), msg)
+	})
+}
+
+@(test)
+test_diagnostic_tags_are_parsed :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+		body := `{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":"file:///t.odin","diagnostics":[` +
+			`{"range":{"start":{"line":0,"character":0},"end":{"line":0,"character":3}},"severity":4,"message":"unused import","tags":[1]},` +
+			`{"range":{"start":{"line":1,"character":0},"end":{"line":1,"character":3}},"severity":2,"message":"old","tags":[2]}]}}`
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		d := client_diagnostics_for(&c, "file:///t.odin")
+		testing.expect_value(t, len(d), 2)
+		testing.expect(t, d[0].unnecessary && !d[0].deprecated, "first is unnecessary")
+		testing.expect(t, d[1].deprecated && !d[1].unnecessary, "second is deprecated")
+	})
+}
+
+@(test)
+test_code_actions_parse_both_edit_shapes_and_skip_commands :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+		id := client_request_code_action(&c, "file:///t.odin", {}, nil)
+		body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":[` +
+			`{{"title":"Remove unused imports","kind":"quickfix","isPreferred":true,"edit":{{"changes":{{"file:///t.odin":[{{"range":{{"start":{{"line":2,"character":0}},"end":{{"line":3,"character":0}}}},"newText":""}}]}}}}}},` +
+			`{{"title":"Run something","command":"x.y"}},` +
+			`{{"title":"Add import","kind":"quickfix","edit":{{"documentChanges":[{{"textDocument":{{"uri":"file:///t.odin","version":3}},"edits":[{{"range":{{"start":{{"line":1,"character":0}},"end":{{"line":1,"character":0}}}},"newText":"import \"core:strings\"\n"}}]}}]}}}}` +
+			`]}}`, id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect_value(t, c.code_action_seq, 1)
+		testing.expect_value(t, len(c.last_code_actions), 2)
+		a := c.last_code_actions[0]
+		testing.expect(t, a.title == "Remove unused imports" && a.preferred && a.kind == "quickfix", "first action")
+		testing.expect_value(t, len(a.edits), 1)
+		testing.expect_value(t, a.edits[0].key, "/t.odin")
+		testing.expect_value(t, a.edits[0].range.end, Position{3, 0})
+		b := c.last_code_actions[1]
+		testing.expect_value(t, b.edits[0].new_text, "import \"core:strings\"\n")
+	})
+}

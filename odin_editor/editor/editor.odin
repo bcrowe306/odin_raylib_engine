@@ -33,7 +33,10 @@ Editor :: struct {
 
 	completion: Completion_State,
 	signature:  Signature_State,
-	diag_tip:   Diagnostic_Tooltip,
+	diag_tip:     Diagnostic_Tooltip,
+	diag_overlay: Diag_Overlay,
+	problems:     Problems_Panel,
+	actions:      Code_Action_Menu,
 
 	// Viewport / scrolling (in cells, not pixels). scroll_col is a visual
 	// column (tabs expanded), not a byte offset.
@@ -83,6 +86,9 @@ editor_init :: proc(
 	}
 	ed.injected_events = make([dynamic]sdl.Event, allocator)
 	ed.completion.filtered = make([dynamic]int, allocator)
+	ed.diag_overlay.built_seq = -1
+	// Diagnostics follow edits between server publishes (see Diag_Overlay).
+	ed.buf.track_changes = true
 	return ed
 }
 
@@ -98,6 +104,8 @@ editor_destroy :: proc(ed: ^Editor) {
 	}
 	delete(ed.document_key)
 	delete(ed.injected_events)
+	diag_overlay_destroy(&ed.diag_overlay)
+	problems_destroy(&ed.problems)
 	delete(ed.completion.filtered)
 }
 

@@ -42,6 +42,7 @@ buffer_raw_insert :: proc(b: ^Buffer, pos: Position, text: string) -> Position {
 		b.lines[p.line] = new_line
 		end := Position{line = p.line, col = len(before) + len(segments[0])}
 		b.dirty = true
+		buffer_record_change(b, {p, p, end})
 		return end
 	}
 
@@ -82,6 +83,7 @@ buffer_raw_insert :: proc(b: ^Buffer, pos: Position, text: string) -> Position {
 		col  = len(segments[len(segments) - 1]),
 	}
 	b.dirty = true
+	buffer_record_change(b, {p, p, end})
 	return end
 }
 
@@ -108,6 +110,7 @@ buffer_raw_delete :: proc(b: ^Buffer, start, end: Position) -> string {
 		strings.builder_destroy(&b.lines[s.line])
 		b.lines[s.line] = new_line
 		b.dirty = true
+		buffer_record_change(b, {s, e, s})
 		return removed
 	}
 
@@ -140,6 +143,7 @@ buffer_raw_delete :: proc(b: ^Buffer, start, end: Position) -> string {
 	}
 
 	b.dirty = true
+	buffer_record_change(b, {s, e, s})
 	return removed
 }
 

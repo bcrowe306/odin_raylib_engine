@@ -104,3 +104,13 @@ test_f8_navigates_diagnostics :: proc(t: ^testing.T) {
 	action, ok = keymap_resolve(&km, Chord{.F8, {.Shift}})
 	testing.expect(t, ok && action == .PrevDiagnostic, "Shift+F8 = previous problem")
 }
+
+@(test)
+test_quick_fix_and_problems_bindings :: proc(t: ^testing.T) {
+	km := keymap_default(.Other)
+	defer keymap_destroy(&km)
+	action, ok := keymap_resolve(&km, Chord{.Period, {.Ctrl}})
+	testing.expect(t, ok && action == .QuickFix, "Ctrl+. = quick fix")
+	action, ok = keymap_resolve(&km, Chord{.M, {.Ctrl, .Shift}})
+	testing.expect(t, ok && action == .ToggleProblems, "Ctrl+Shift+M = problems")
+}

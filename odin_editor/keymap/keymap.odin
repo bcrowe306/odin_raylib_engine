@@ -71,6 +71,7 @@ Action :: enum {
 	// Language features.
 	TriggerCompletion, TriggerSignatureHelp,
 	NextDiagnostic, PrevDiagnostic,
+	QuickFix, ToggleProblems,
 
 	// Misc.
 	Escape,

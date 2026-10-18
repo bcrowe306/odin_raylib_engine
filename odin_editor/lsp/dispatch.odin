@@ -83,6 +83,11 @@ client_handle_message_body :: proc(c: ^Client, body: []u8) {
 			return
 		}
 		client_store_signature_help(c, result)
+	case .CodeAction:
+		if id != c.latest_code_action_id {
+			return
+		}
+		client_store_code_actions(c, result)
 	case .Initialize, .Hover, .Other:
 		// No persistent storage needed for these yet.
 	}
@@ -127,6 +132,16 @@ client_store_diagnostics :: proc(c: ^Client, params: json.Value) {
 			d.severity = 1
 		}
 		d.source = json_clone_string_field(c, item, "source")
+		if tags_val, ok := json_object_get(item, "tags"); ok {
+			if tags, is_arr := tags_val.(json.Array); is_arr {
+				for tag in tags {
+					switch v, _ := json_as_int(tag); v {
+					case 1: d.unnecessary = true
+					case 2: d.deprecated = true
+					}
+				}
+			}
+		}
 		if range_val, ok := json_object_get(item, "range"); ok {
 			if start_val, ok2 := json_object_get(range_val, "start"); ok2 {
 				d.range.start = parse_position(start_val)
@@ -287,6 +302,88 @@ client_store_signature_help :: proc(c: ^Client, result: json.Value) {
 			}
 		}
 		append(&c.last_signatures, si)
+	}
+}
+
+// client_clear_code_actions frees and empties `last_code_actions`.
+client_clear_code_actions :: proc(c: ^Client) {
+	for a in c.last_code_actions {
+		delete(a.title, c.allocator)
+		delete(a.kind, c.allocator)
+		for e in a.edits {
+			delete(e.key, c.allocator)
+			delete(e.new_text, c.allocator)
+		}
+		delete(a.edits, c.allocator)
+	}
+	clear(&c.last_code_actions)
+}
+
+// client_store_code_actions keeps the CodeAction literals that carry an
+// edit (bare Commands would need workspace/executeCommand, which this
+// client doesn't implement). Both WorkspaceEdit shapes are accepted:
+// `changes` (uri -> TextEdit[]) and `documentChanges` (TextDocumentEdit[]).
+@(private)
+client_store_code_actions :: proc(c: ^Client, result: json.Value) {
+	client_clear_code_actions(c)
+	c.code_action_seq += 1
+	items, _ := result.(json.Array)
+	for item in items {
+		edit_val, has_edit := json_object_get(item, "edit")
+		if !has_edit {
+			continue
+		}
+		edits := make([dynamic]Code_Action_Edit, c.allocator)
+		if changes, ok := json_object_get(edit_val, "changes"); ok {
+			if obj, is_obj := changes.(json.Object); is_obj {
+				for uri, list in obj {
+					append_text_edits(c, &edits, uri, list)
+				}
+			}
+		}
+		if doc_changes, ok := json_object_get(edit_val, "documentChanges"); ok {
+			if arr, is_arr := doc_changes.(json.Array); is_arr {
+				for dc in arr {
+					td, _ := json_object_get(dc, "textDocument")
+					uri_val, _ := json_object_get(td, "uri")
+					uri, _ := json_as_string(uri_val)
+					list, _ := json_object_get(dc, "edits")
+					append_text_edits(c, &edits, uri, list)
+				}
+			}
+		}
+		if len(edits) == 0 {
+			delete(edits)
+			continue
+		}
+		a := Code_Action{
+			title = json_clone_string_field(c, item, "title"),
+			kind  = json_clone_string_field(c, item, "kind"),
+			edits = edits[:],
+		}
+		if p, ok := json_object_get(item, "isPreferred"); ok {
+			a.preferred, _ = p.(json.Boolean)
+		}
+		append(&c.last_code_actions, a)
+	}
+}
+
+@(private)
+append_text_edits :: proc(c: ^Client, edits: ^[dynamic]Code_Action_Edit, uri: string, list: json.Value) {
+	arr, ok := list.(json.Array)
+	if !ok {
+		return
+	}
+	for e in arr {
+		r, has_range := json_object_get(e, "range")
+		if !has_range {
+			continue
+		}
+		append(edits, Code_Action_Edit{
+			key      = uri_key(uri, c.allocator),
+			range    = parse_range(r),
+			new_text = json_clone_string_field(c, e, "newText"),
+		})
 	}
 }
 

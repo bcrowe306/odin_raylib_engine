@@ -9,7 +9,7 @@ client_initialize :: proc(c: ^Client, root_uri: string) -> int {
 	params := InitializeParams{
 		processId    = nil,
 		rootUri      = root_uri,
-		capabilities = ClientCapabilities{},
+		capabilities = default_client_capabilities(),
 	}
 	msg := encode_request(id, "initialize", params, context.temp_allocator)
 	c.pending_kind[id] = .Initialize
@@ -81,6 +81,22 @@ client_request_signature_help :: proc(c: ^Client, uri: string, line, character: 
 	msg := encode_request(id, "textDocument/signatureHelp", params, context.temp_allocator)
 	c.pending_kind[id] = .SignatureHelp
 	c.latest_signature_id = id
+	client_send_raw(c, msg)
+	return id
+}
+
+// client_request_code_action asks for code actions (quick fixes,
+// refactors) over `range`, passing the diagnostics that overlap it.
+client_request_code_action :: proc(c: ^Client, uri: string, range: Range, diagnostics: []Diagnostic) -> int {
+	id := client_next_id(c)
+	params := CodeActionParams{
+		textDocument = TextDocumentIdentifier{uri = uri},
+		range        = range,
+		context_     = CodeActionContext{diagnostics = diagnostics},
+	}
+	msg := encode_request(id, "textDocument/codeAction", params, context.temp_allocator)
+	c.pending_kind[id] = .CodeAction
+	c.latest_code_action_id = id
 	client_send_raw(c, msg)
 	return id
 }
