@@ -24,6 +24,7 @@ SUITES=(
 	"diagnostics_smoke:example/assets/diag_fixture.odin.txt:Diagnostics: squiggles, gutter markers, tooltips, F8"
 	"editing_smoke:example/assets/editing_fixture.odin.txt:Sticky visual column for Up/Down, word-sized undo of typing"
 	"find_smoke:example/assets/mouse_fixture.odin.txt:Find/replace bar (case, whole word, regex), Ctrl/Cmd+D and select-all occurrences"
+	"fonts_smoke:example/assets/fonts_fixture.odin.txt:Fallback fonts for emoji/CJK/symbols; wide characters on the cell grid"
 	"diagnostics_extras:example/assets/problems_fixture:Diagnostic tags, quick fixes, edit-tracking squiggles, problems panel"
 )
 

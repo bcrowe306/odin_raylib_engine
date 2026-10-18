@@ -1,12 +1,25 @@
 // Visual columns: the mapping between a line's byte offsets (what the
 // buffer stores) and on-screen cells (what rendering, mouse hit-testing
-// and horizontal scrolling deal in). Each rune is one cell except '\t',
-// which advances to the next multiple of the tab width. Pure functions —
-// unit tested in columns_test.odin.
+// and horizontal scrolling deal in). '\t' advances to the next multiple
+// of the tab width; other runes take rune_cells cells — 2 for East Asian
+// wide characters and emoji, 0 for combining marks, 1 otherwise. Pure
+// functions — unit tested in mouse_test.odin.
 package editor
 
 import buf "../buffer"
+import "core:unicode"
 import "core:unicode/utf8"
+
+// rune_cells is the number of monospace cells a (non-tab) rune occupies.
+rune_cells :: proc(r: rune) -> int {
+	if r < 0x80 {
+		return 1 // fast path; control chars are drawn as one cell too
+	}
+	if unicode.is_nonspacing_mark(r) || unicode.is_enclosing_mark(r) {
+		return 0 // combining marks draw over the previous character
+	}
+	return unicode.normalized_east_asian_width(r)
+}
 
 DEFAULT_TAB_WIDTH :: 4
 
@@ -21,7 +34,7 @@ visual_col_of :: proc(line: string, byte_col: int, tab_width: int) -> int {
 		if r == '\t' {
 			vcol += tw - vcol % tw
 		} else {
-			vcol += 1
+			vcol += rune_cells(r)
 		}
 		i += size
 	}
@@ -44,9 +57,9 @@ byte_col_at_visual :: proc(line: string, vcol: f32, tab_width: int) -> int {
 	cell := 0
 	for i := 0; i < len(line); {
 		r, size := utf8.decode_rune_in_string(line[i:])
-		w := tw - cell % tw if r == '\t' else 1
+		w := tw - cell % tw if r == '\t' else rune_cells(r)
 		// Inside this character: snap to whichever edge is closer.
-		if vcol < f32(cell + w) {
+		if w > 0 && vcol < f32(cell + w) {
 			return i if vcol - f32(cell) < f32(w) / 2 else i + size
 		}
 		cell += w
@@ -88,8 +101,8 @@ byte_col_at_cell :: proc(line: string, vcol: f32, tab_width: int) -> (col: int, 
 	cell := 0
 	for i := 0; i < len(line); {
 		r, size := utf8.decode_rune_in_string(line[i:])
-		w := tw - cell % tw if r == '\t' else 1
-		if vcol < f32(cell + w) {
+		w := tw - cell % tw if r == '\t' else rune_cells(r)
+		if w > 0 && vcol < f32(cell + w) {
 			return i, true
 		}
 		cell += w

@@ -240,6 +240,9 @@ main :: proc() {
 	defer if font != nil {
 		ttf.CloseFont(font)
 	}
+	// Emoji / CJK / symbol glyphs come from system fallback fonts.
+	fallbacks := ed.font_add_system_fallbacks(font, FONT_SIZE)
+	defer ed.font_fallbacks_destroy(&fallbacks, font)
 
 	char_w, char_h: f32 = 9, 18
 	if font != nil {

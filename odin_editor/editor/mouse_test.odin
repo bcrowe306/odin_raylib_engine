@@ -455,3 +455,36 @@ test_vertical_move_never_splits_a_multibyte_char :: proc(t: ^testing.T) {
 		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{1, 6})
 	})
 }
+
+@(test)
+test_wide_characters_take_two_cells :: proc(t: ^testing.T) {
+	testing.expect_value(t, rune_cells('a'), 1)
+	testing.expect_value(t, rune_cells('é'), 1)
+	testing.expect_value(t, rune_cells('漢'), 2)
+	testing.expect_value(t, rune_cells('😀'), 2)
+	testing.expect_value(t, rune_cells(0x0301), 0) // combining acute
+
+	line := "a漢😀b" // bytes: a=1, 漢=3, 😀=4, b=1
+	testing.expect_value(t, visual_col_of(line, 1, 4), 1)
+	testing.expect_value(t, visual_col_of(line, 4, 4), 3)
+	testing.expect_value(t, visual_col_of(line, 8, 4), 5)
+	testing.expect_value(t, line_visual_width(line, 4), 6)
+	// Clicks: the left half of 漢 (cells 1-2) snaps before it, the right half after.
+	testing.expect_value(t, byte_col_at_visual(line, 1.5, 4), 1)
+	testing.expect_value(t, byte_col_at_visual(line, 2.5, 4), 4)
+	col, inside := byte_col_at_cell(line, 3.5, 4) // a cell of 😀
+	testing.expect(t, inside && col == 4, "hover cell maps to the emoji's start")
+}
+
+@(test)
+test_click_after_emoji_places_caret_correctly :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		ed := make_mouse_test_editor("x := \"😀\" + y")
+		defer editor_destroy(&ed)
+		// 'y' is at byte 14, visual col 12 (emoji = 2 cells, 4 bytes).
+		mouse_click(&ed, editor_gutter_width(&ed) + 12 * 10 + 1, 10)
+		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{0, 14})
+		x, _ := editor_position_to_screen(&ed, {0, 14})
+		testing.expect_value(t, x, editor_gutter_width(&ed) + 120)
+	})
+}

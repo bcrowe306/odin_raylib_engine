@@ -8,6 +8,7 @@ import buf "../buffer"
 import syn "../syntax"
 import "core:fmt"
 import "core:strings"
+import "core:unicode/utf8"
 import sdl "vendor:sdl3"
 import ttf "vendor:sdl3/ttf"
 
@@ -242,9 +243,17 @@ render_line_tokens :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font
 	}
 	last_visible := ed.scroll_col + ed.visible_cols
 	for tok in tokens {
+		color := token_color(theme, tok.kind)
 		run_start := tok.start
-		for i := tok.start; i <= tok.end; i += 1 {
-			if i < tok.end && line[i] != '\t' {
+		i := tok.start
+		for i <= tok.end {
+			// ASCII runs are drawn as one surface; tabs only advance; any
+			// other rune is drawn on its own, centred in its cell(s), so
+			// glyphs from fallback fonts (emoji, CJK, symbols) — whose
+			// advance needn't match the grid — can't shift later text.
+			special := i < tok.end && (line[i] == '\t' || line[i] >= 0x80)
+			if i < tok.end && !special {
+				i += 1
 				continue
 			}
 			if i > run_start {
@@ -255,10 +264,24 @@ render_line_tokens :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font
 				// Runs starting left of the viewport still draw; the
 				// clip rect trims the part over the gutter.
 				if vcol + (i - run_start) >= ed.scroll_col {
-					draw_text(renderer, font, line[run_start:i], x + f32(vcol - ed.scroll_col) * ed.char_w, y, token_color(theme, tok.kind), ed.char_h)
+					draw_text(renderer, font, line[run_start:i], x + f32(vcol - ed.scroll_col) * ed.char_w, y, color, ed.char_h)
 				}
 			}
-			run_start = i + 1
+			if i == tok.end {
+				break
+			}
+			r, size := utf8.decode_rune_in_string(line[i:])
+			if r != '\t' {
+				if cells := rune_cells(r); cells > 0 {
+					vcol := visual_col_of(line, i, ed.tab_width)
+					if vcol > last_visible {
+						return
+					}
+					draw_glyph_centered(renderer, font, line[i:i + size], x + f32(vcol - ed.scroll_col) * ed.char_w, y, f32(cells) * ed.char_w, ed.char_h, color)
+				}
+			}
+			i += size
+			run_start = i
 		}
 	}
 }
@@ -312,6 +335,30 @@ render_cursors_on_line :: proc(ed: ^Editor, renderer: ^sdl.Renderer, line: int, 
 		sdl.SetRenderDrawColor(renderer, theme.cursor.r, theme.cursor.g, theme.cursor.b, theme.cursor.a)
 		sdl.RenderFillRect(renderer, &rect)
 	}
+}
+
+// draw_glyph_centered draws one character centred in a box of cell_w x
+// row_h (scaled down if a fallback font's glyph is wider than the box).
+@(private)
+draw_glyph_centered :: proc(renderer: ^sdl.Renderer, font: ^ttf.Font, text: string, x, y, cell_w, row_h: f32, color: sdl.Color) {
+	cstr := strings.clone_to_cstring(text, context.temp_allocator)
+	surface := ttf.RenderText_Blended(font, cstr, len(text), color)
+	if surface == nil {
+		return
+	}
+	defer sdl.DestroySurface(surface)
+	texture := sdl.CreateTextureFromSurface(renderer, surface)
+	if texture == nil {
+		return
+	}
+	defer sdl.DestroyTexture(texture)
+	w, h := f32(surface.w), f32(surface.h)
+	if w > cell_w + 1 || h > row_h {
+		k := min(cell_w / w, row_h / h)
+		w, h = w * k, h * k
+	}
+	dst := sdl.FRect{x + f32(int((cell_w - w) / 2)), y + f32(int((row_h - h) / 2)), w, h}
+	sdl.RenderTexture(renderer, texture, nil, &dst)
 }
 
 @(private)

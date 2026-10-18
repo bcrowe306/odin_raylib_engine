@@ -19,3 +19,4 @@ main :: proc() {
 	c := vec2_add(a, b)
 	fmt.println("sum:", c)
 }
+
