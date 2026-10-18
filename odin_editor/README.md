@@ -352,9 +352,6 @@ deferred `didOpen` once `initialize` has completed, pushes a full-text
 Responses to superseded requests are dropped, so a slow reply can't
 overwrite a newer one.
 
-Note: OLS derives package paths from directory names, so keep the opened
-file in a directory whose name is a valid identifier (no dots) or
-completion silently returns nothing.
 
 ## Git workflow
 

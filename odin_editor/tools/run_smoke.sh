@@ -17,8 +17,9 @@ shift 2
 PORT="${PORT:-7799}"
 NAME="$(basename "$SCRIPT" .edctl)"
 
-# No dots in the directory name: OLS derives the package path from it.
-WORK="$(mktemp -d "/tmp/odin_editor_${NAME}_XXXXXX")"
+# A dot in the directory name on purpose: regression cover for paths OLS
+# once appeared to choke on (the real culprit was the /tmp symlink).
+WORK="$(mktemp -d "/tmp/odin_editor_${NAME}.XXXXXX")"
 if [ -d "$FIXTURE" ]; then
 	# Multi-file fixture: every NAME.odin.txt becomes NAME.odin; main.odin opens.
 	for f in "$FIXTURE"/*.odin.txt; do

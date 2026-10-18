@@ -156,6 +156,11 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     scrolling); non-ASCII glyphs are drawn individually, centred in their
     cells, so fallback glyph advances can't shift the grid. Verified by
     unit tests and `tools/fonts_smoke.edctl`.
+22. **"OLS + directory names" was a misdiagnosis** — completion failing
+    in `/tmp/odin_editor_smoke.XXXXXX` was blamed on the dot, but the cause
+    was the `/tmp` → `/private/tmp` symlink mismatch fixed in 13 (resolved
+    paths sent to OLS). Re-verified with dotted directories; the visual
+    runner now always uses a dotted scratch directory as regression cover.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -170,9 +175,6 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 - **Mouse leftovers** — no right-click context menu, no drag-and-drop of
   selected text, no hover tooltips (LSP hover), and horizontal auto-scroll
   only applies to character drags.
-- **OLS + directory names** — OLS derives package paths from directory
-  names; files in a directory whose name contains a `.` get no completions.
-  Worth surfacing to users (or opening such files with a symlinked root).
 - **OLS version pinning is brittle** — OLS tracks Odin's development branch
   very closely; `Taskfile.yml`'s `OLS_REF` pins a commit verified to build
   against this project's installed Odin version, but upgrading the Odin
