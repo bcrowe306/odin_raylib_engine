@@ -1,0 +1,11 @@
+# OLS is fetched/built on demand via `task ols:fetch` / `task ols:build`
+# (see Taskfile.yml + README.md). It is a separate upstream project with
+# its own large git history, so it is not vendored into this repo.
+third_party/ols/
+
+# Build outputs
+example/example
+example/example.bin
+bin/
+*.bin
+*.dSYM/

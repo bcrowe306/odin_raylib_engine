@@ -4,6 +4,12 @@ version: '3'
 vars:
   OLS_DIR: third_party/ols
   OLS_REPO: https://github.com/DanielGavin/ols.git
+  # OLS tracks Odin's bleeding-edge main branch closely, so a given OLS
+  # commit only builds against a narrow range of Odin compiler versions.
+  # This commit is confirmed to build cleanly against the Odin version
+  # this project targets (see README.md "Odin Language Server" section).
+  # Override with `task ols:build OLS_REF=<sha>` to try a different pin.
+  OLS_REF: ad264df0f2292bd988ce00135eaf3c95f030e3f8
 
 tasks:
   default:
@@ -72,20 +78,21 @@ tasks:
     ignore_error: true
 
   ols:fetch:
-    desc: Clone or update the OLS (Odin Language Server) source
+    desc: Clone (or update) OLS and check out the pinned compatible commit
     cmds:
       - |
         if [ -d "{{.OLS_DIR}}/.git" ]; then
-          git -C {{.OLS_DIR}} pull --ff-only
+          git -C {{.OLS_DIR}} fetch --quiet origin
         else
-          git clone {{.OLS_REPO}} {{.OLS_DIR}}
+          git clone --quiet {{.OLS_REPO}} {{.OLS_DIR}}
         fi
+        git -C {{.OLS_DIR}} checkout --quiet {{.OLS_REF}}
 
   ols:build:
     desc: Build the OLS binary from the vendored source
     deps: [ols:fetch]
     cmds:
-      - cd {{.OLS_DIR}} && ./build.sh || odin build src -out:ols
+      - odin build {{.OLS_DIR}}/src -collection:src={{.OLS_DIR}}/src -out:{{.OLS_DIR}}/ols
 
   clean:
     desc: Remove build artifacts
