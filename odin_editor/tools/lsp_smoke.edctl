@@ -12,25 +12,28 @@ text \t
 type fmt.
 wait completion 5000
 expect completion-has println
+screenshot $SHOTS/01_completion_on_dot.png
 type pri
 wait frames 2
 expect completion-selected print
+screenshot $SHOTS/02_completion_filtered_as_you_type.png
 key down 3
 expect completion-selected println
+screenshot $SHOTS/03_completion_keyboard_selection.png
 key up
 expect completion-selected printfln
 key down
 key enter
 wait no-completion 2000
 expect line \tfmt.println
-screenshot /tmp/odin_editor_smoke_after_accept.png
+screenshot $SHOTS/04_completion_accepted.png
 
 # --- signature help: '(' trigger, active parameter, close on ')' ----------
 type (
 wait signature 5000
 expect signature fmt.println :: proc(
 expect signature-param args: ..any
-screenshot /tmp/odin_editor_smoke_signature.png
+screenshot $SHOTS/05_signature_help_on_paren.png
 type "hi")
 wait no-signature 3000
 expect line \tfmt.println("hi")
@@ -45,6 +48,7 @@ type 1,
 wait lsp-idle 3000
 wait frames 3
 expect signature-param b: int
+screenshot $SHOTS/06_signature_active_parameter.png
 type 2)
 wait no-signature 3000
 

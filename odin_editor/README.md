@@ -40,7 +40,8 @@ see their install docs). From inside `odin_editor/`:
 task check          # odin check every package (fast type-check)
 task test           # odin test every package (buffer/keymap/syntax/lsp/editor/control)
 task test:e2e       # in-process end-to-end suite (real window, real OLS if built)
-task test:remote    # drive the running demo via the control hook (needs OLS)
+task test:visual    # visual UI tests: drive the running demo via the control hook,
+                    # verify state, save screenshots + gallery (needs OLS)
 task build          # build the standalone example app
 task build:edctl    # build the control-hook CLI client (tools/edctl/edctl)
 task run            # build & launch the standalone example app
@@ -170,7 +171,7 @@ always observe the result of the input before them.
 `--control-only` makes the demo accept input *only* from the hook: the window
 is created non-focusable and real keyboard/mouse events are dropped
 (`control.event_is_injected` tells them apart), so a scripted run can't be
-disturbed by — or steal — the user's typing. `task test:remote` uses it.
+disturbed by — or steal — the user's typing. `task test:visual` uses it.
 The hook is opt-in and listens on loopback only; don't enable it in builds
 you ship.
 
@@ -192,6 +193,28 @@ URIs are matched by their decoded, symlink-resolved path (`lsp.uri_key`),
 and the editor sends OLS resolved paths, because OLS reports check results
 under the compiler's resolved path (`/private/tmp/...` for a file opened as
 `/tmp/...` on macOS).
+
+## Visual UI tests
+
+`task test:visual` is the end-to-end check every feature ships with. It
+launches `example/editor_demo --control-only` once per script in `tools/`
+(`lsp_smoke`, `lsp_crash`, `mouse_smoke`, `diagnostics_smoke`) on a scratch
+copy of a fixture from `example/assets/`, replays the script through
+`edctl` — real SDL keyboard/mouse events, live OLS — and fails on any
+`expect`/`wait` that doesn't hold. Along the way each script saves
+screenshots of the features it demonstrates:
+
+```
+test_output/visual/
+  index.md                      gallery: every suite, PASS/FAIL, captioned shots
+  <suite>/NN_<feature>.png      the real window at that moment
+  <suite>/contact_sheet.png     all of a suite's shots tiled and labelled
+```
+
+Add a script (and a line in `tools/visual_tests.sh`) for each new feature,
+with `screenshot $SHOTS/NN_<what_it_shows>.png` at the moments worth seeing;
+`tools/run_smoke.sh` fills in `$SHOTS`. `tools/contact_sheet` (SDL-only)
+builds the sheets.
 
 ## Mouse
 
@@ -267,7 +290,7 @@ pipe, failed write, or process exit), and the editor's supervisor
 with backoff (250 ms, 500 ms, 1 s), and re-opens the document. After
 `LSP_MAX_RESTARTS` (3) crashes within a minute it gives up
 (`editor_lsp_status` = `.Failed`) and the editor carries on as a plain text
-editor. `task test:remote` kills OLS mid-session to verify this.
+editor. `task test:visual` kills OLS mid-session to verify this.
 
 Once attached, `editor_update` each frame polls for responses, sends the
 deferred `didOpen` once `initialize` has completed, pushes a full-text

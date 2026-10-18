@@ -28,6 +28,7 @@ tasks:
       - odin check control -no-entry-point
       - odin check example
       - odin check tools/edctl
+      - odin check tools/contact_sheet
 
   test:
     desc: Run unit tests for every package
@@ -69,16 +70,27 @@ tasks:
     cmds:
       - odin test control -define:ODIN_TEST_THREADS=1
 
-  test:remote:
+  test:visual:
     desc: >-
-      Launch the demo with the remote-control hook (--control-only) and
-      replay each tools/*.edctl script against a scratch fixture: OLS
-      completion + signature help (lsp_smoke), OLS crash recovery
-      (lsp_crash), and mouse/cursor gestures (mouse_smoke). Real SDL events
-      in, editor state verified out. Needs `task ols:build` first.
-    deps: [build, build:edctl]
+      Visual UI tests: launch the demo with the remote-control hook
+      (--control-only) and replay every tools/*.edctl script against a
+      scratch fixture -- completion + signature help, OLS crash recovery,
+      mouse/cursor, diagnostics. Real SDL events in, editor state verified
+      out, screenshots + index.md gallery in test_output/visual/. Run after
+      every feature. Needs `task ols:build` first.
+    deps: [build, build:edctl, build:contact-sheet]
     cmds:
-      - ./tools/lsp_smoke.sh
+      - ./tools/visual_tests.sh
+
+  test:remote:
+    desc: Alias for test:visual
+    cmds:
+      - task: test:visual
+
+  build:contact-sheet:
+    desc: Build the screenshot contact-sheet tool (tools/contact_sheet)
+    cmds:
+      - odin build tools/contact_sheet -out:tools/contact_sheet/contact_sheet
 
   build:edctl:
     desc: Build the remote-control CLI client (tools/edctl/edctl)
@@ -136,5 +148,6 @@ tasks:
   clean:
     desc: Remove build artifacts
     cmds:
-      - rm -f example/editor_demo tools/edctl/edctl
+      - rm -f example/editor_demo tools/edctl/edctl tools/contact_sheet/contact_sheet
+      - rm -rf test_output
       - rm -rf example/editor_demo.dSYM

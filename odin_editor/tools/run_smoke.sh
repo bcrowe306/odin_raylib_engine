@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Runs one remote-control smoke script against a fresh editor_demo:
 #   tools/run_smoke.sh <script.edctl> <fixture> [extra demo flags...]
+# `$SHOTS` in the script is replaced with the screenshot directory
+# ($VISUAL_DIR/<script name>, default test_output/visual/<script name>).
 # The fixture is copied to a scratch main.odin (repo files are never
 # edited), the demo is launched with the control hook in --control-only
 # mode (real keyboard/mouse ignored, window never takes focus), the script
@@ -19,12 +21,16 @@ NAME="$(basename "$SCRIPT" .edctl)"
 WORK="$(mktemp -d "/tmp/odin_editor_${NAME}_XXXXXX")"
 cp "$FIXTURE" "$WORK/main.odin"
 
+SHOTS="$PWD/${VISUAL_DIR:-test_output/visual}/$NAME"
+rm -rf "$SHOTS"
+mkdir -p "$SHOTS"
+
 ./example/editor_demo --control "$PORT" --control-only "$@" "$WORK/main.odin" >"$WORK/demo.log" 2>&1 &
 APP=$!
 trap 'kill "$APP" 2>/dev/null || true' EXIT
 
 status=0
-./tools/edctl/edctl --port "$PORT" --retry 15 -q <"$SCRIPT" || status=$?
+sed "s|\$SHOTS|$SHOTS|g" "$SCRIPT" | ./tools/edctl/edctl --port "$PORT" --retry 15 -q || status=$?
 ./tools/edctl/edctl --port "$PORT" -q quit >/dev/null 2>&1 || true
 wait "$APP" 2>/dev/null || true
 

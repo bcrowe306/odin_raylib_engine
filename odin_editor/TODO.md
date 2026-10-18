@@ -50,7 +50,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
    request, absolute `file://` URIs, stale responses dropped. Verified
    against real OLS three ways: unit tests with synthetic responses
    (`editor/lsp_ui_test.odin`), the in-process e2e suite (`task test:e2e`,
-   61 checks), and the remote-control smoke test (`task test:remote`).
+   61 checks), and the visual UI tests (`task test:visual`).
    Diagnostics are rendered too (see 13).
 6. **VSCode/Zed hotkeys** — `keymap.keymap_default(platform)` covers
    navigation, selection/extend, editing, clipboard, undo/redo (+Ctrl+Y on
@@ -97,6 +97,11 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     from it). Found and patched an OLS use-after-free that kept fixed errors
     on screen (`patches/ols/`). Verified by unit tests and
     `tools/diagnostics_smoke.edctl` (46 commands, live OLS).
+14. **Visual UI test suite** — `task test:visual` runs every `tools/*.edctl`
+    script against the live demo (+ OLS), fails on any unmet expectation,
+    and saves 26 feature screenshots, per-suite contact sheets
+    (`tools/contact_sheet`) and an `index.md` gallery under
+    `test_output/visual/`. Run (and look at) after every feature.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -140,6 +145,9 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 - **Ctrl/Cmd+D "select next occurrence"** — noted as a stretch goal in
   requirement #6, not implemented (Ctrl/Cmd+Alt+Up/Down add-cursor-
   above/below *is* implemented).
+- **No font fallback** — glyphs missing from the monospace font (emoji,
+  many symbols) render as blank cells. Needs a fallback font chain
+  (SDL_ttf `TTF_AddFallbackFont`) plus wide-glyph (2-cell) column math.
 - **OLS version pinning is brittle** — OLS tracks Odin's development branch
   very closely; `Taskfile.yml`'s `OLS_REF` pins a commit verified to build
   against this project's installed Odin version, but upgrading the Odin
