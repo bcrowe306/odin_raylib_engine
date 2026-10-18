@@ -27,6 +27,7 @@ Where_Kind :: enum {
 	Keymap_Row,  // line = keymap editor row (display order)
 	Theme_Row,   // line = theme colour index
 	Theme_Slider, // line = channel 0..3, col = percent
+	Utility_Row,  // line = utilities action index
 }
 
 Where :: struct {
@@ -109,6 +110,9 @@ parse_where :: proc(parts: []string) -> (w: Where, used: int, ok: bool) {
 			w.line, ok = strconv.parse_int(tail)
 		case "keymap":
 			w.kind = .Keymap_Row
+			w.line, ok = strconv.parse_int(tail)
+		case "utility":
+			w.kind = .Utility_Row
 			w.line, ok = strconv.parse_int(tail)
 		case "theme":
 			w.kind = .Theme_Row

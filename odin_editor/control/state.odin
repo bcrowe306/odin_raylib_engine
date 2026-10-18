@@ -83,6 +83,12 @@ State_Theme_Editor :: struct {
 	hex:      string `json:"hex"`,
 }
 
+State_Utilities :: struct {
+	selected: int      `json:"selected"`,
+	actions:  []string `json:"actions"`,
+	info:     []string `json:"info"`, // "Status: Running (pid 123)", ...
+}
+
 State_Palette :: struct {
 	open:           bool     `json:"open"`,
 	query:          string   `json:"query"`,
@@ -197,6 +203,7 @@ State :: struct {
 	window:            string             `json:"window"`,
 	keymap_editor:     State_Keymap_Editor `json:"keymap_editor"`,
 	theme_editor:      State_Theme_Editor  `json:"theme_editor"`,
+	utilities:         State_Utilities     `json:"utilities"`,
 	text:         string           `json:"text"`,
 }
 
@@ -375,6 +382,13 @@ snapshot_state :: proc(e: ^ed.Editor, frame: int) -> State {
 			editing  = t.editing,
 			hex      = strings.to_string(t.hex),
 		}
+	}
+	if e.window == .Utilities {
+		actions := make([dynamic]string, context.temp_allocator)
+		for u in ed.Utility {
+			append(&actions, ed.utility_label(e, u))
+		}
+		s.utilities = {selected = e.utilities.selected, actions = actions[:], info = ed.editor_lsp_info(e)}
 	}
 	if e.window == .Keymap {
 		k := &e.keymap_editor

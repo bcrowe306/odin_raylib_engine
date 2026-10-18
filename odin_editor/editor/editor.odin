@@ -58,6 +58,7 @@ Editor :: struct {
 	keymap_editor: Keymap_Editor,
 	theme_editor: Theme_Editor,
 	theme:        Theme,
+	utilities:    Utilities_State,
 	config:       Config,
 	nav:          Navigation,
 	hover:        Hover_Info,

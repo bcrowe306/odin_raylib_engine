@@ -234,6 +234,15 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     Ayu Light (new) and Dark+ are also palette entries. Edits persist in
     `<config dir>/theme.json` as the preset plus changed colours. Verified
     by unit tests and `tools/theme_smoke.edctl`.
+31. **Palette switches windows + Utilities** — the palette lists the
+    windows (Editor, Find / Replace, Keymap Editor, Theme Editor,
+    Utilities) right after the recent commands and works from inside any
+    tool window. The **Utilities** window shows OLS status (pid, command,
+    root, document sync, diagnostics, crashes) and its actions — restart
+    (also after the supervisor gave up), stop/start, resync document, copy
+    status info, reset key bindings / theme, reload settings — which are
+    palette commands too. Verified by unit tests and
+    `tools/windows_smoke.edctl` (live OLS stopped, started, restarted).
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -241,4 +250,4 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-**Command Pallet switches between windows** Command Pallet should be able to switch between windows, keymap editor, find, theme editor, utitlity page(maybe funcitons around managing ols).
+(empty — all backlog items are done)

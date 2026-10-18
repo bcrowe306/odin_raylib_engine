@@ -787,6 +787,12 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 			}
 			return l.h_track.x + l.h_track.w * f, l.h_track.y + l.h_track.h / 2, ""
 		}
+	case .Utility_Row:
+		if e.window != .Utilities {
+			return 0, 0, "utilities window is not open"
+		}
+		area := ed.editor_area_rect(e)
+		return area.x + area.w / 4, ed.editor_utilities_layout(e) + f32(w.line) * e.char_h + e.char_h / 2, ""
 	case .Theme_Row:
 		if e.window != .Theme {
 			return 0, 0, "theme editor is not open"

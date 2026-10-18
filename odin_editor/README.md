@@ -277,7 +277,20 @@ builds the sheets.
 **Cmd/Ctrl+P** (also Cmd/Ctrl+Shift+P and F1) opens a searchable list of
 every command with its shortcut. Type to fuzzy-filter (matched letters are
 highlighted), Up/Down to choose, Enter or click to run, Escape to close.
-Recently used commands are listed first.
+Recently used commands are listed first, then the windows.
+
+The palette also **switches windows**: *Editor* (the text), *Find /
+Replace*, *Keymap Editor*, *Theme Editor* and *Utilities* — and it works
+from inside any of them. Tool windows cover the editor area and own the
+keyboard (the palette and zoom shortcuts still work); Escape goes back to
+the text.
+
+**Utilities** shows the language server's state (status and pid,
+command, root, document sync, diagnostics, crash count) and runs
+maintenance actions — also available directly as palette commands:
+*Language Server: Restart / Stop / Start / Resync Document / Copy Status
+Info*, *Preferences: Reset Key Bindings to Defaults / Reset Theme / Reload
+Settings from Disk*. Restart works even after the crash supervisor gave up.
 
 ## Key bindings
 
