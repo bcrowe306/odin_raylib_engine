@@ -5,7 +5,6 @@ package editor
 
 import buf "../buffer"
 import km "../keymap"
-import "core:strings"
 
 // editor_apply_action executes a non-text-insertion action (navigation,
 // selection, editing commands, clipboard, undo/redo) against every cursor

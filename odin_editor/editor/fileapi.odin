@@ -5,7 +5,6 @@ package editor
 
 import buf "../buffer"
 import lspc "../lsp"
-import "core:strings"
 
 editor_attach_lsp :: proc(ed: ^Editor, command: []string, working_dir := "") -> bool {
 	ed.lsp = lspc.client_init()

@@ -53,7 +53,7 @@ editor_copy :: proc(ed: ^Editor) {
 		return
 	}
 	cstr := strings.clone_to_cstring(text, context.temp_allocator)
-	sdl.SetClipboardText(cstr)
+	_ = sdl.SetClipboardText(cstr)
 }
 
 editor_cut :: proc(ed: ^Editor) {
