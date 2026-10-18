@@ -101,7 +101,8 @@ client_store_diagnostics :: proc(c: ^Client, params: json.Value) {
 	if !has_uri {
 		return
 	}
-	uri, _ := json_as_string(uri_val)
+	uri_raw, _ := json_as_string(uri_val)
+	uri := uri_key(uri_raw, context.temp_allocator)
 	diags_val, has_diags := json_object_get(params, "diagnostics")
 	if !has_diags {
 		return
@@ -122,6 +123,10 @@ client_store_diagnostics :: proc(c: ^Client, params: json.Value) {
 			sev, _ := json_as_int(sev_val)
 			d.severity = sev
 		}
+		if d.severity < 1 || d.severity > 4 {
+			d.severity = 1
+		}
+		d.source = json_clone_string_field(c, item, "source")
 		if range_val, ok := json_object_get(item, "range"); ok {
 			if start_val, ok2 := json_object_get(range_val, "start"); ok2 {
 				d.range.start = parse_position(start_val)
@@ -133,13 +138,22 @@ client_store_diagnostics :: proc(c: ^Client, params: json.Value) {
 		append(&list, d)
 	}
 
-	if old, existed := c.diagnostics[uri]; existed {
-		for d in old {
-			delete(d.message, c.allocator)
-		}
-		delete(old)
+	if uri in c.diagnostics {
+		old_key, old := delete_key(&c.diagnostics, uri)
+		free_diagnostics(c, old)
+		delete(old_key, c.allocator)
 	}
 	c.diagnostics[strings.clone(uri, c.allocator)] = list
+	c.diagnostics_seq += 1
+}
+
+@(private)
+free_diagnostics :: proc(c: ^Client, list: [dynamic]Diagnostic) {
+	for d in list {
+		delete(d.message, c.allocator)
+		delete(d.source, c.allocator)
+	}
+	delete(list)
 }
 
 @(private)
@@ -289,9 +303,15 @@ parse_range :: proc(v: json.Value) -> Range {
 }
 
 // client_diagnostics_for returns the last-known diagnostics for a file URI
-// (empty slice if none/unknown).
+// (empty slice if none/unknown). The URI is normalized with uri_key, so it
+// matches whatever spelling the server used; hosts calling this every
+// frame can precompute the key and use client_diagnostics_for_key.
 client_diagnostics_for :: proc(c: ^Client, uri: string) -> []Diagnostic {
-	list, ok := c.diagnostics[uri]
+	return client_diagnostics_for_key(c, uri_key(uri, context.temp_allocator))
+}
+
+client_diagnostics_for_key :: proc(c: ^Client, key: string) -> []Diagnostic {
+	list, ok := c.diagnostics[key]
 	if !ok {
 		return nil
 	}

@@ -65,6 +65,12 @@ editor_word_start_before :: proc(ed: ^Editor, pos: buf.Position) -> int {
 
 // --- requests -------------------------------------------------------------
 
+// editor_lsp_col converts a buffer position's byte column to the UTF-16
+// `character` offset LSP expects.
+editor_lsp_col :: proc(ed: ^Editor, pos: buf.Position) -> int {
+	return lspc.byte_col_to_utf16(buf.buffer_line_str(&ed.buf, pos.line), pos.col)
+}
+
 // editor_request_completion opens the completion popup for the word at the
 // primary cursor and asks the attached LSP for candidates. No-op without an
 // LSP client or an open document.
@@ -81,7 +87,7 @@ editor_request_completion :: proc(ed: ^Editor) {
 	cs.selected = 0
 	cs.scroll = 0
 	clear(&cs.filtered)
-	lspc.client_request_completion(&ed.lsp, ed.document_uri, c.pos.line, c.pos.col)
+	lspc.client_request_completion(&ed.lsp, ed.document_uri, c.pos.line, editor_lsp_col(ed, c.pos))
 	cs.seen_seq = ed.lsp.completion_seq
 }
 
@@ -98,7 +104,7 @@ editor_request_signature_help :: proc(ed: ^Editor) {
 	ss.waiting = true
 	ss.last_pos = c.pos
 	ss.last_version = ed.buf.version
-	lspc.client_request_signature_help(&ed.lsp, ed.document_uri, c.pos.line, c.pos.col)
+	lspc.client_request_signature_help(&ed.lsp, ed.document_uri, c.pos.line, editor_lsp_col(ed, c.pos))
 	ss.seen_seq = ed.lsp.signature_seq
 }
 
@@ -376,7 +382,8 @@ editor_accept_completion :: proc(ed: ^Editor) -> bool {
 
 	start := ed.completion.anchor
 	if item.has_text_edit && item.text_edit_range.start.line == c.pos.line {
-		start.col = clamp(item.text_edit_range.start.character, 0, c.pos.col)
+		line := buf.buffer_line_str(&ed.buf, c.pos.line)
+		start.col = clamp(lspc.utf16_col_to_byte(line, item.text_edit_range.start.character), 0, c.pos.col)
 	}
 
 	b := &ed.buf

@@ -64,6 +64,9 @@ DidCloseTextDocumentParams :: struct {
 
 DidSaveTextDocumentParams :: struct {
 	textDocument: TextDocumentIdentifier `json:"textDocument"`,
+	// Servers that register `save: {includeText: true}` (OLS does) re-index
+	// the file from this; omitting it makes OLS index an empty file.
+	text:         string                 `json:"text"`,
 }
 
 // --- completion ---
@@ -119,8 +122,10 @@ SignatureInformation :: struct {
 
 Diagnostic :: struct {
 	range:    Range  `json:"range"`,
+	// 1 error, 2 warning, 3 information, 4 hint (0/absent -> error).
 	severity: int    `json:"severity"`,
 	message:  string `json:"message"`,
+	source:   string `json:"source"`,
 }
 
 // --- hover ---

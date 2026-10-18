@@ -19,6 +19,7 @@ make_lsp_test_editor :: proc(text: string) -> Editor {
 	ed.lsp.initialized = true
 	editor_set_text(&ed, text)
 	ed.document_uri = strings.clone("file:///tmp/lsp_ui_test.odin")
+	ed.document_key = lspc.uri_key(ed.document_uri)
 	return ed
 }
 

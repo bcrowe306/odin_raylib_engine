@@ -1,6 +1,7 @@
 package lsp
 
 import "core:fmt"
+import "core:os"
 import "core:mem"
 import "core:strings"
 import "core:testing"
@@ -348,4 +349,85 @@ test_write_to_crashed_server_marks_dead :: proc(t: ^testing.T) {
 		testing.expect(t, c.dead, "a failed write marks the server dead")
 		testing.expect(t, !c.has_process, "process was killed and reaped")
 	})
+}
+
+@(test)
+test_file_uri_percent_encoding_round_trips :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		path := "/Users/me/My Project/naïve#1.odin"
+		uri := file_uri(path, context.temp_allocator)
+		testing.expect_value(t, uri, "file:///Users/me/My%20Project/na%C3%AFve%231.odin")
+		testing.expect_value(t, uri_to_path(uri, context.temp_allocator), path)
+		// Lower-case hex from other clients decodes too.
+		testing.expect_value(t, uri_to_path("file:///a%2fb%20c", context.temp_allocator), "/a/b c")
+	})
+}
+
+@(test)
+test_uri_key_resolves_symlinks :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		return
+	}
+	run_leak_free(t, proc(t: ^testing.T) {
+		real_dir :: "/tmp/odin_editor_urikey_real"
+		link_dir :: "/tmp/odin_editor_urikey_link"
+		os.remove_all(real_dir)
+		os.remove(link_dir)
+		os.make_directory(real_dir)
+		defer os.remove_all(real_dir)
+		_ = os.write_entire_file(real_dir + "/a.odin", transmute([]u8)string("package a"))
+		testing.expect(t, os.symlink(real_dir, link_dir) == nil, "created symlink")
+		defer os.remove(link_dir)
+
+		via_link := uri_key(file_uri(link_dir + "/a.odin", context.temp_allocator), context.temp_allocator)
+		via_real := uri_key(file_uri(real_dir + "/a.odin", context.temp_allocator), context.temp_allocator)
+		testing.expect_value(t, via_link, via_real)
+	})
+}
+
+@(test)
+test_diagnostics_match_across_uri_spellings :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		return
+	}
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+		// Like OLS: the compiler reports the resolved /private/tmp path
+		// (on macOS /tmp is a symlink; elsewhere both spell the same file).
+		os.make_directory("/tmp/odin_editor_diag_key")
+		defer os.remove_all("/tmp/odin_editor_diag_key")
+		_ = os.write_entire_file("/tmp/odin_editor_diag_key/m.odin", transmute([]u8)string("package m"))
+		resolved := resolve_path("/tmp/odin_editor_diag_key/m.odin", context.temp_allocator)
+
+		body := fmt.tprintf(
+			`{{"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{{"uri":"%s","diagnostics":[{{"range":{{"start":{{"line":0,"character":0}},"end":{{"line":0,"character":1}}}},"message":"m","source":"odin"}}]}}}}`,
+			file_uri(resolved, context.temp_allocator))
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+
+		diags := client_diagnostics_for(&c, "file:///tmp/odin_editor_diag_key/m.odin")
+		testing.expect_value(t, len(diags), 1)
+		if len(diags) == 1 {
+			testing.expect_value(t, diags[0].severity, 1) // absent -> error
+			testing.expect_value(t, diags[0].source, "odin")
+		}
+		testing.expect_value(t, c.diagnostics_seq, 1)
+
+		// A new publish replaces (and frees) the old list.
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect_value(t, len(client_diagnostics_for(&c, "file:///tmp/odin_editor_diag_key/m.odin")), 1)
+	})
+}
+
+@(test)
+test_utf16_column_conversion :: proc(t: ^testing.T) {
+	line := "é😀x" // é = 2 bytes/1 unit, 😀 = 4 bytes/2 units
+	testing.expect_value(t, byte_col_to_utf16(line, 0), 0)
+	testing.expect_value(t, byte_col_to_utf16(line, 2), 1)
+	testing.expect_value(t, byte_col_to_utf16(line, 6), 3)
+	testing.expect_value(t, byte_col_to_utf16(line, 7), 4)
+	testing.expect_value(t, utf16_col_to_byte(line, 1), 2)
+	testing.expect_value(t, utf16_col_to_byte(line, 3), 6)
+	testing.expect_value(t, utf16_col_to_byte(line, 4), 7)
+	testing.expect_value(t, utf16_col_to_byte(line, 99), 7) // clamped
 }

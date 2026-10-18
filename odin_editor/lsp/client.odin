@@ -30,7 +30,10 @@ Client :: struct {
 	recv_buf:     [dynamic]u8,
 	pending_kind: map[int]RequestKind,
 
+	// Keyed by uri_key (decoded, symlink-resolved path).
 	diagnostics:     map[string][dynamic]Diagnostic,
+	// Bumped on every publishDiagnostics.
+	diagnostics_seq: int,
 	last_completion: [dynamic]CompletionItem,
 	last_signatures: [dynamic]SignatureInformation,
 	// Response-level activeSignature/activeParameter of the last
@@ -75,11 +78,8 @@ client_destroy :: proc(c: ^Client) {
 	}
 	delete(c.recv_buf)
 	delete(c.pending_kind)
-	for uri, &list in c.diagnostics {
-		for d in list {
-			delete(d.message, c.allocator)
-		}
-		delete(list)
+	for uri, list in c.diagnostics {
+		free_diagnostics(c, list)
 		delete(uri, c.allocator)
 	}
 	delete(c.diagnostics)

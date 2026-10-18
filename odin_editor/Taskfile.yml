@@ -111,7 +111,7 @@ tasks:
     ignore_error: true
 
   ols:fetch:
-    desc: Clone (or update) OLS and check out the pinned compatible commit
+    desc: Clone (or update) OLS, check out the pinned commit, apply patches/ols
     cmds:
       - |
         if [ -d "{{.OLS_DIR}}/.git" ]; then
@@ -119,7 +119,13 @@ tasks:
         else
           git clone --quiet {{.OLS_REPO}} {{.OLS_DIR}}
         fi
-        git -C {{.OLS_DIR}} checkout --quiet {{.OLS_REF}}
+        git -C {{.OLS_DIR}} checkout --quiet --force {{.OLS_REF}}
+        # Local fixes for upstream bugs we depend on (see patches/ols/*.patch
+        # headers); reapplied on a clean checkout every time.
+        for p in patches/ols/*.patch; do
+          [ -e "$p" ] || continue
+          git -C {{.OLS_DIR}} apply "$PWD/$p"
+        done
 
   ols:build:
     desc: Build the OLS binary from the vendored source

@@ -22,7 +22,7 @@ editor_attach_lsp :: proc(ed: ^Editor, command: []string, working_dir := "") -> 
 		cmd[0] = absolute_path(cmd[0], context.temp_allocator)
 	}
 
-	root := absolute_path(working_dir if len(working_dir) > 0 else ".", context.temp_allocator)
+	root := lspc.resolve_path(absolute_path(working_dir if len(working_dir) > 0 else ".", context.temp_allocator), context.temp_allocator)
 	ed.lsp = lspc.client_init()
 	if !lspc.client_start(&ed.lsp, cmd, root) {
 		lspc.client_destroy(&ed.lsp)
@@ -71,7 +71,14 @@ editor_load_file :: proc(ed: ^Editor, path: string) -> bool {
 	if len(ed.document_uri) > 0 {
 		delete(ed.document_uri)
 	}
-	ed.document_uri = lspc.file_uri(absolute_path(path, context.temp_allocator))
+	delete(ed.document_key)
+	// Use the symlink-resolved path: OLS matches the compiler's (resolved)
+	// paths against ours when clearing old `odin check` results, so a
+	// symlinked spelling (e.g. /tmp on macOS) would leave fixed errors
+	// on screen forever.
+	ed.document_uri = lspc.file_uri(lspc.resolve_path(absolute_path(path, context.temp_allocator), context.temp_allocator))
+	ed.document_key = lspc.uri_key(ed.document_uri)
+	ed.diag_tip = {}
 	ed.lsp_version = 1
 	ed.lsp_doc_open = false
 	editor_close_completion(ed)
@@ -85,7 +92,8 @@ editor_load_file :: proc(ed: ^Editor, path: string) -> bool {
 editor_save_file :: proc(ed: ^Editor, path: string) -> bool {
 	ok := buf.buffer_save_file(&ed.buf, path)
 	if ok && ed.lsp_enabled && len(ed.document_uri) > 0 {
-		lspc.client_did_save(&ed.lsp, ed.document_uri)
+		editor_sync_lsp(ed)
+		lspc.client_did_save(&ed.lsp, ed.document_uri, buf.buffer_to_string(&ed.buf, context.temp_allocator))
 	}
 	return ok
 }
@@ -97,7 +105,8 @@ editor_save_file_as :: proc(ed: ^Editor, path: string) -> bool {
 editor_save :: proc(ed: ^Editor) -> bool {
 	ok := buf.buffer_save(&ed.buf)
 	if ok && ed.lsp_enabled && len(ed.document_uri) > 0 {
-		lspc.client_did_save(&ed.lsp, ed.document_uri)
+		editor_sync_lsp(ed)
+		lspc.client_did_save(&ed.lsp, ed.document_uri, buf.buffer_to_string(&ed.buf, context.temp_allocator))
 	}
 	return ok
 }

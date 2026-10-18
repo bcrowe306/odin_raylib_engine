@@ -4,14 +4,6 @@
 // can be routed back to the right storage slot when it arrives.
 package lsp
 
-file_uri :: proc(path: string, allocator := context.allocator) -> string {
-	sb_len := len("file://") + len(path)
-	buf := make([]u8, sb_len, allocator)
-	copy(buf, "file://")
-	copy(buf[len("file://"):], path)
-	return string(buf)
-}
-
 client_initialize :: proc(c: ^Client, root_uri: string) -> int {
 	id := client_next_id(c)
 	params := InitializeParams{
@@ -61,8 +53,8 @@ client_did_close :: proc(c: ^Client, uri: string) {
 	client_send_raw(c, msg)
 }
 
-client_did_save :: proc(c: ^Client, uri: string) {
-	params := DidSaveTextDocumentParams{textDocument = TextDocumentIdentifier{uri = uri}}
+client_did_save :: proc(c: ^Client, uri: string, text: string) {
+	params := DidSaveTextDocumentParams{textDocument = TextDocumentIdentifier{uri = uri}, text = text}
 	msg := encode_notification("textDocument/didSave", params, context.temp_allocator)
 	client_send_raw(c, msg)
 }
