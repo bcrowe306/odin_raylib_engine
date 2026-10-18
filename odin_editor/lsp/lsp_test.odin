@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:mem"
 import "core:strings"
 import "core:testing"
+import "core:time"
 
 run_leak_free :: proc(t: ^testing.T, body: proc(t: ^testing.T)) {
 	track: mem.Tracking_Allocator
@@ -291,5 +292,60 @@ test_stale_completion_response_is_dropped :: proc(t: ^testing.T) {
 		testing.expect_value(t, c.completion_seq, 1)
 		_, still_pending := c.pending_kind[old_id]
 		testing.expect(t, !still_pending, "stale request should still be removed from pending")
+	})
+}
+
+@(test)
+test_dead_server_is_detected_and_writes_dont_crash :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		return
+	}
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+
+		// A "server" that exits immediately with status 3.
+		ok := client_start(&c, []string{"/bin/sh", "-c", "exit 3"})
+		testing.expect(t, ok, "spawned the fake server")
+		c.initialized = true
+		c.pending_kind[client_next_id(&c)] = .Completion
+
+		for i := 0; i < 200 && !c.dead; i += 1 {
+			client_poll(&c)
+			time.sleep(5 * time.Millisecond)
+		}
+		testing.expect(t, c.dead, "poll notices the server exited")
+		testing.expect_value(t, c.exit_code, 3)
+		testing.expect(t, !c.initialized, "a dead server is no longer initialized")
+		testing.expect_value(t, len(c.pending_kind), 0)
+
+		// Writing to it must fail quietly, not raise SIGPIPE.
+		testing.expect(t, !client_send_raw(&c, frame_message("{}", context.temp_allocator)), "send to dead server fails")
+		client_request_completion(&c, "file:///x.odin", 0, 0)
+		client_poll(&c)
+	})
+}
+
+@(test)
+test_write_to_crashed_server_marks_dead :: proc(t: ^testing.T) {
+	when ODIN_OS == .Windows {
+		return
+	}
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+
+		// Closes stdin right away, then lingers: our writes hit EPIPE
+		// while the process itself is still alive.
+		ok := client_start(&c, []string{"/bin/sh", "-c", "exec 0<&-; sleep 5"})
+		testing.expect(t, ok, "spawned the fake server")
+		time.sleep(100 * time.Millisecond)
+
+		body := strings.repeat("x", 1 << 16, context.temp_allocator)
+		for i := 0; i < 10 && !c.dead; i += 1 {
+			client_send_raw(&c, frame_message(body, context.temp_allocator))
+		}
+		testing.expect(t, c.dead, "a failed write marks the server dead")
+		testing.expect(t, !c.has_process, "process was killed and reaped")
 	})
 }

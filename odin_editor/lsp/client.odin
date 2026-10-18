@@ -6,8 +6,10 @@
 // without ever spawning a real `ols` process.
 package lsp
 
+import "core:c/libc"
 import "core:mem"
 import "core:os"
+import "core:time"
 
 RequestKind :: enum {
 	Initialize,
@@ -47,6 +49,13 @@ Client :: struct {
 	// requests are dropped so a slow reply can't overwrite a newer one.
 	latest_completion_id: int,
 	latest_signature_id:  int,
+
+	// Set once the server process has gone away (crashed, killed, or
+	// closed its pipes). The client never takes the host down with it:
+	// writes to a dead server fail quietly and the host can inspect
+	// `dead`/`exit_code` and restart (see editor's LSP supervisor).
+	dead:      bool,
+	exit_code: int,
 }
 
 client_init :: proc(allocator := context.allocator) -> Client {
@@ -84,6 +93,14 @@ client_destroy :: proc(c: ^Client) {
 // wires up its stdin/stdout as pipes. Returns false if the process could
 // not be spawned (e.g. `ols` is not installed/built yet).
 client_start :: proc(c: ^Client, command: []string, working_dir := "") -> bool {
+	// Writing to the stdin pipe of a server that has died raises SIGPIPE,
+	// whose default action kills *this* process. Ignore it so a crashed
+	// server surfaces as a write error instead. (Process-wide, but
+	// SIGPIPE-on-write is never what an interactive app wants.)
+	when ODIN_OS != .Windows {
+		libc.signal(13 /* SIGPIPE */, auto_cast libc.SIG_IGN)
+	}
+
 	in_r, in_w, err1 := os.pipe()
 	if err1 != nil {
 		return false
@@ -116,7 +133,38 @@ client_start :: proc(c: ^Client, command: []string, working_dir := "") -> bool {
 	c.has_process = true
 	c.stdin = in_w
 	c.stdout = out_r
+	c.dead = false
 	return true
+}
+
+// client_mark_dead tears down the pipes of a server that has exited (or
+// stopped responding to writes), reaps the process, and drops all
+// in-flight requests. Safe to call more than once.
+client_mark_dead :: proc(c: ^Client) {
+	if c.dead {
+		return
+	}
+	c.dead = true
+	c.initialized = false
+	clear(&c.pending_kind)
+	if c.stdin != nil {
+		os.close(c.stdin)
+		c.stdin = nil
+	}
+	if c.stdout != nil {
+		os.close(c.stdout)
+		c.stdout = nil
+	}
+	if c.has_process {
+		// Still unreaped: make sure it's gone, then collect its status so
+		// it doesn't linger as a zombie.
+		_ = os.process_kill(c.process)
+		state, err := os.process_wait(c.process, 500 * time.Millisecond)
+		if err == nil && state.exited {
+			c.exit_code = state.exit_code
+		}
+		c.has_process = false
+	}
 }
 
 client_stop :: proc(c: ^Client) {
@@ -146,7 +194,11 @@ client_send_raw :: proc(c: ^Client, framed: string) -> bool {
 		return false
 	}
 	_, err := os.write(c.stdin, transmute([]u8)framed)
-	return err == nil
+	if err != nil {
+		client_mark_dead(c)
+		return false
+	}
+	return true
 }
 
 // client_poll drains any currently-available bytes from the subprocess's
@@ -158,17 +210,34 @@ client_poll :: proc(c: ^Client) {
 	}
 	for {
 		has_data, err := os.pipe_has_data(c.stdout)
-		if err != nil || !has_data {
+		if err != nil {
+			// Broken_Pipe: the server closed stdout (exited/crashed).
+			client_mark_dead(c)
 			return
+		}
+		if !has_data {
+			break
 		}
 		chunk: [4096]u8
 		n, rerr := os.read(c.stdout, chunk[:])
 		if n <= 0 {
+			// Readable but zero bytes = EOF.
+			client_mark_dead(c)
 			return
 		}
 		client_feed_bytes(c, chunk[:n])
 		if rerr != nil {
+			client_mark_dead(c)
 			return
 		}
+	}
+	// Also catch a server that exited without closing its pipes yet
+	// (e.g. a grandchild still holds them). Non-blocking; reaps the zombie.
+	state, err := os.process_wait(c.process, 0)
+	if err == nil && state.exited {
+		// Already reaped: never signal this pid again (it may be reused).
+		c.has_process = false
+		c.exit_code = state.exit_code
+		client_mark_dead(c)
 	}
 }
