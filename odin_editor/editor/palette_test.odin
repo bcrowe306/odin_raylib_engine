@@ -64,7 +64,7 @@ test_palette_filters_and_runs_commands :: proc(t: ^testing.T) {
 
 @(test)
 test_every_user_action_has_a_palette_label :: proc(t: ^testing.T) {
-	hidden := []km.Action{.None, .Escape, .SaveAs, .Open, .CommandPalette}
+	hidden := []km.Action{.None, .Escape, .SaveAs, .Open, .CommandPalette, .OpenKeymapEditor} // OpenKeymapEditor: listed as a window
 	outer: for a in km.Action {
 		for h in hidden {
 			if a == h {

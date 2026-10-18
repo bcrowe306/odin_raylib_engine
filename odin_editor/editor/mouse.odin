@@ -30,6 +30,7 @@ Mouse_Zone :: enum {
 	Palette,      // the command palette (row = match index, -1 = input)
 	References,   // the references panel (row = item index, -1 = header)
 	Peek,         // the peek-definition window (row = source line index)
+	Tool_Window,  // a full-area tool window (keymap editor, ...)
 }
 
 Drag_Mode :: enum {
@@ -110,6 +111,10 @@ editor_hit_test :: proc(ed: ^Editor, x, y: f32) -> Hit {
 	if rect, _, ok := editor_palette_layout(ed); ok && in_rect(rect, x, y) {
 		hit.zone = .Palette
 		hit.row = editor_palette_row_at(ed, y)
+		return hit
+	}
+	if ed.window != .Text {
+		hit.zone = .Tool_Window if in_rect(editor_area_rect(ed), x, y) else .Outside
 		return hit
 	}
 	if rect, ok := editor_peek_layout(ed); ok && in_rect(rect, x, y) {
@@ -253,6 +258,10 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 	if ed.palette.open {
 		editor_close_palette(ed) // clicking elsewhere dismisses it
 	}
+	if hit.zone == .Tool_Window {
+		editor_window_click(ed, ev)
+		return true
+	}
 	if hit.zone == .Scrollbar {
 		editor_close_context_menu(ed)
 		if ev.button == 1 {
@@ -288,7 +297,7 @@ editor_handle_mouse_down :: proc(ed: ^Editor, ev: sdl.MouseButtonEvent) -> bool 
 		ed.find.focused = false
 	}
 	switch hit.zone {
-	case .Outside, .Context_Menu, .Scrollbar, .Palette, .References, .Peek:
+	case .Outside, .Context_Menu, .Scrollbar, .Palette, .References, .Peek, .Tool_Window:
 	case .Find:
 		editor_find_click(ed, ev.x, ev.y)
 	case .Code_Actions:
@@ -419,6 +428,9 @@ editor_handle_mouse_motion :: proc(ed: ^Editor, ev: sdl.MouseMotionEvent) -> boo
 	ed.mouse.x, ed.mouse.y = ev.x, ev.y
 	hit := editor_hit_test(ed, ev.x, ev.y)
 	ed.mouse.zone = hit.zone
+	if hit.zone == .Tool_Window {
+		return true
+	}
 	editor_track_diag_hover(ed, hit, ev.x, ev.y)
 	m := &ed.mouse
 	if m.scroll_drag != .None {
@@ -487,6 +499,10 @@ editor_handle_mouse_wheel :: proc(ed: ^Editor, ev: sdl.MouseWheelEvent) -> bool 
 		dx, dy = -dy, 0
 	}
 
+	if hit.zone == .Tool_Window {
+		editor_window_scroll(ed, -int(dy * WHEEL_LINES))
+		return true
+	}
 	if hit.zone == .Problems {
 		problems_scroll_by(ed, -int(dy))
 		return true

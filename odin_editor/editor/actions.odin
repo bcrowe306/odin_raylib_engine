@@ -73,6 +73,31 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 	case .IndentOrTab:
 		buf.buffer_indent(b)
 		return true
+	case .DuplicateLineUp, .DuplicateLineDown:
+		buf.buffer_duplicate_lines(b, down = action == .DuplicateLineDown)
+		return true
+	case .MoveLineUp, .MoveLineDown:
+		buf.buffer_move_lines(b, -1 if action == .MoveLineUp else 1)
+		return true
+	case .ToggleLineComment:
+		prefix := ed.language.line_comment if len(ed.language.line_comment) > 0 else "//"
+		buf.buffer_toggle_line_comment(b, prefix)
+		return true
+	case .DeleteLine:
+		buf.buffer_delete_lines(b)
+		return true
+	case .InsertLineBelow, .InsertLineAbove:
+		buf.buffer_insert_line(b, above = action == .InsertLineAbove)
+		return true
+	case .OpenKeymapEditor:
+		editor_show_window(ed, .Keymap)
+		return true
+	case .ImportZedKeymap:
+		editor_import_keymap(ed, .Zed)
+		return true
+	case .ImportVSCodeKeymap:
+		editor_import_keymap(ed, .VSCode)
+		return true
 	case .Outdent:
 		buf.buffer_outdent(b)
 		return true

@@ -33,7 +33,13 @@ SHOTS="$PWD/${VISUAL_DIR:-test_output/visual}/$NAME"
 rm -rf "$SHOTS"
 mkdir -p "$SHOTS"
 
-./example/editor_demo --control "$PORT" --control-only "$@" "$WORK/main.odin" >"$WORK/demo.log" 2>&1 &
+# Settings go to a scratch config dir, and keymap imports read fixtures —
+# never the user's real config or Zed/VSCode keymaps.
+./example/editor_demo --control "$PORT" --control-only \
+	--config-dir "$WORK/config" \
+	--zed-keymap example/assets/keymaps/zed_keymap.json \
+	--vscode-keymap example/assets/keymaps/vscode_keybindings.json \
+	"$@" "$WORK/main.odin" >"$WORK/demo.log" 2>&1 &
 APP=$!
 trap 'kill "$APP" 2>/dev/null || true' EXIT
 

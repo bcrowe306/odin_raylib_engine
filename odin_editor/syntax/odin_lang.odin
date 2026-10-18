@@ -345,5 +345,5 @@ is_ada_case :: proc(w: string) -> bool {
 }
 
 odin_language :: proc() -> Language {
-	return Language{name = "odin", tokenize = tokenize_odin_line}
+	return Language{name = "odin", tokenize = tokenize_odin_line, line_comment = "//"}
 }

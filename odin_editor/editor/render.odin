@@ -172,6 +172,11 @@ editor_render :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 	origin_y := y + editor_header_height(ed)
 	ed.origin_x = origin_x
 	ed.origin_y = origin_y
+	if ed.window != .Text {
+		render_tool_window(ed, renderer, font, theme)
+		render_palette(ed, renderer, font, theme)
+		return
+	}
 
 	gutter_rect := sdl.FRect{origin_x, origin_y, editor_gutter_width(ed), ed.char_h * f32(editor_text_rows(ed))}
 	sdl.SetRenderDrawColor(renderer, theme.gutter_bg.r, theme.gutter_bg.g, theme.gutter_bg.b, theme.gutter_bg.a)
@@ -289,6 +294,8 @@ render_header :: proc(ed: ^Editor, renderer: ^sdl.Renderer, font: ^ttf.Font, the
 		tx += 2 * ed.char_w
 	}
 	status := editor_status_text(ed)
+	// A long status keeps clear of the file name (truncated).
+	status = truncate_cols(status, max(0, int((x + w - tx) / ed.char_w) - 4))
 	if len(dir) > 0 {
 		room := int((x + w - tx) / ed.char_w) - 3 - text_cols(status)
 		draw_text(renderer, font, truncate_cols(dir, room), tx + 2 * ed.char_w, y, theme.popup_text_dim, h)

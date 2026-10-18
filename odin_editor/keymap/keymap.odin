@@ -57,6 +57,10 @@ Action :: enum {
 	DeleteForward, DeleteForwardWord,
 	Newline,
 	IndentOrTab, Outdent,
+	DuplicateLineUp, DuplicateLineDown,
+	MoveLineUp, MoveLineDown,
+	ToggleLineComment, DeleteLine,
+	InsertLineBelow, InsertLineAbove,
 
 	// Clipboard & history.
 	Cut, Copy, Paste,
@@ -83,6 +87,9 @@ Action :: enum {
 	// View.
 	ZoomIn, ZoomOut, ZoomReset,
 	CommandPalette,
+
+	// Preferences.
+	OpenKeymapEditor, ImportZedKeymap, ImportVSCodeKeymap,
 
 	// Misc.
 	Escape,

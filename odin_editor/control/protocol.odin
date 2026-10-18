@@ -109,6 +109,11 @@ Expect_Field :: enum {
 	Peek_Open,           // "true" / "false"
 	Refs_Count,          // number of references in the panel
 	Status,              // header status message contains substring
+	Window,              // current editor window ("text", "keymap", ...)
+	Keymap_Selected,     // title of the keymap editor's selected row
+	Keymap_Capturing,    // keymap editor is recording a chord: "true" / "false"
+	Binding,             // "<action>=<chord>": chord is bound to action ("<action>=none": unbound)
+	Last_Import,         // last keymap import summary contains substring
 }
 
 // Cmd_Expect asserts on editor state; replies `ok` or
@@ -145,12 +150,12 @@ DEFAULT_WAIT_TIMEOUT_MS :: 5000
 HELP_TEXT :: "commands: key <chord>|@<action> [count] | type <text> | text <text> | " +
 	"click|mousedown|mouseup <where> [clicks=N] [mods=shift+alt] [button=left|middle|right] | move <where> | " +
 	"drag <from> <to> [steps=N] [mods=..] [clicks=N] | wheel <dy> [dx=N] [at=<where>] [mods=..] | locate <where> | " +
-	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @menu:index | @palette:row | @vthumb | @hthumb | @vtrack:pct | @htrack:pct | @find:query|replace|case|word|regex | lsp-kill | " +
+	"where = <x> <y> | @line:col | @gutter:line | @completion:row | @problem:index | @menu:index | @palette:row | @keymap:row | @vthumb | @hthumb | @vtrack:pct | @htrack:pct | @find:query|replace|case|word|regex | lsp-kill | " +
 	"state | wait <completion|no-completion|signature|no-signature|lsp-ready|lsp-idle|lsp-down|diagnostics|no-diagnostics|tooltip|code-actions> [timeout_ms] | " +
 	"wait frames <n> | screenshot <path.png> | open <path> | cursor <line> <col> | quit | help | " +
 	"expect <line|cursor|text-contains|completion-selected|completion-has|signature|signature-param|" +
 	"selection|selected-text|cursors|mouse-cursor|scroll|lsp-status|errors|warnings|diagnostics-has|line-severity|tooltip|" +
-	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop|hover|menu-open|font-size|palette-open|palette-selected|peek-open|refs-count|status> <value>. " +
+	"problems-open|problems-has|actions-has|diag-range|find-status|find-open|completion-doc|snippet-active|snippet-stop|hover|menu-open|font-size|palette-open|palette-selected|peek-open|refs-count|status|window|keymap-selected|keymap-capturing|binding|last-import> <value>. " +
 	"chords: [primary+|cmd+|ctrl+|alt+|shift+]<key>, e.g. primary+space, shift+end, down. " +
 	"text escapes: \\n \\t \\\\"
 
@@ -273,6 +278,11 @@ parse_command :: proc(line: string, platform: km.Platform, allocator := context.
 		case "peek-open": field = .Peek_Open
 		case "refs-count": field = .Refs_Count
 		case "status": field = .Status
+		case "window": field = .Window
+		case "keymap-selected": field = .Keymap_Selected
+		case "keymap-capturing": field = .Keymap_Capturing
+		case "binding": field = .Binding
+		case "last-import": field = .Last_Import
 		case:
 			return nil, strings.concatenate({"unknown expect field: ", name}, context.temp_allocator)
 		}

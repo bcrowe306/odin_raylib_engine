@@ -445,6 +445,20 @@ check_expect :: proc(e: ^ed.Editor, x: Cmd_Expect) -> string {
 	case .Status:
 		actual = ed.editor_status_text(e)
 		pass = strings.contains(actual, x.want)
+	case .Window:
+		actual = s.window
+		pass = actual == strings.trim_space(x.want)
+	case .Keymap_Selected:
+		actual = s.keymap_editor.selected_title
+		pass = s.window == "keymap" && actual == strings.trim_space(x.want)
+	case .Keymap_Capturing:
+		actual = "true" if s.keymap_editor.capturing else "false"
+		pass = actual == strings.trim_space(x.want)
+	case .Binding:
+		pass, actual = expect_binding(e, strings.trim_space(x.want))
+	case .Last_Import:
+		actual = e.config.last_import
+		pass = strings.contains(actual, x.want)
 	case .Palette_Open:
 		actual = "true" if s.palette.open else "false"
 		pass = actual == strings.trim_space(x.want)
@@ -705,7 +719,7 @@ chord_for_action :: proc(e: ^ed.Editor, name: string) -> (key: sdl.Keycode, mod:
 		sdl.K_LEFT, sdl.K_RIGHT, sdl.K_UP, sdl.K_DOWN, sdl.K_HOME, sdl.K_END, sdl.K_PAGEUP, sdl.K_PAGEDOWN,
 		sdl.K_BACKSPACE, sdl.K_DELETE, sdl.K_RETURN, sdl.K_TAB, sdl.K_ESCAPE, sdl.K_SPACE,
 		sdl.K_SLASH, sdl.K_BACKSLASH, sdl.K_MINUS, sdl.K_EQUALS, sdl.K_LEFTBRACKET, sdl.K_RIGHTBRACKET,
-		sdl.K_SEMICOLON, sdl.K_APOSTROPHE, sdl.K_COMMA, sdl.K_PERIOD, sdl.K_GRAVE, sdl.K_F1, sdl.K_F3, sdl.K_F8,
+		sdl.K_SEMICOLON, sdl.K_APOSTROPHE, sdl.K_COMMA, sdl.K_PERIOD, sdl.K_GRAVE, sdl.K_F1, sdl.K_F3, sdl.K_F8, sdl.K_F4, sdl.K_F12,
 	}
 	for code in candidates {
 		if ed.sdl_keycode_to_key(code) == best.key {
@@ -765,6 +779,17 @@ resolve_where :: proc(e: ^ed.Editor, w: Where) -> (x, y: f32, err: string) {
 			}
 			return l.h_track.x + l.h_track.w * f, l.h_track.y + l.h_track.h / 2, ""
 		}
+	case .Keymap_Row:
+		if e.window != .Keymap {
+			return 0, 0, "keymap editor is not open"
+		}
+		top, rows := ed.editor_keymap_layout(e)
+		r := w.line - e.keymap_editor.scroll
+		if r < 0 || r >= rows {
+			return 0, 0, fmt.tprintf("keymap row %d is not on screen", w.line)
+		}
+		area := ed.editor_area_rect(e)
+		return area.x + area.w / 3, top + f32(r) * e.char_h + e.char_h / 2, ""
 	case .Palette_Row:
 		rect, rows, ok := ed.editor_palette_layout(e)
 		if !ok {
@@ -974,4 +999,36 @@ push_wheel :: proc(srv: ^Server, x, y, dx, dy: f32) {
 	ev.wheel.mouse_y = y
 	ev.wheel.timestamp = sdl.GetTicksNS()
 	_ = sdl.PushEvent(&ev)
+}
+
+// expect_binding checks "<action>=<chord>" (chord bound to action) or
+// "<action>=none" (action has no bindings).
+@(private)
+expect_binding :: proc(e: ^ed.Editor, want: string) -> (pass: bool, actual: string) {
+	eq := strings.index_byte(want, '=')
+	if eq < 0 {
+		return false, "want <action>=<chord>"
+	}
+	action, ok := km.action_from_name(strings.trim_space(want[:eq]))
+	if !ok {
+		return false, fmt.tprintf("unknown action %q", want[:eq])
+	}
+	chords := make([dynamic]string, context.temp_allocator)
+	for c in km.keymap_chords_for(&e.keymap, action) {
+		append(&chords, km.chord_format(c))
+	}
+	actual = strings.join(chords[:], ", ", context.temp_allocator)
+	if len(chords) == 0 {
+		actual = "none"
+	}
+	chord_text := strings.trim_space(want[eq + 1:])
+	if chord_text == "none" {
+		return len(chords) == 0, actual
+	}
+	chord, cok := km.chord_parse(chord_text)
+	if !cok {
+		return false, fmt.tprintf("bad chord %q", chord_text)
+	}
+	bound, bok := km.keymap_resolve(&e.keymap, chord)
+	return bok && bound == action, actual
 }

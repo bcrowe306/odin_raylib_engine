@@ -209,6 +209,23 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     Shift+F4); Back / Forward through jumps (Ctrl+- on macOS, Alt+Left
     elsewhere); also in the context menu and palette. Verified by unit
     tests and `tools/nav_smoke.edctl` (live OLS, two-file package).
+29. **Key bindings: import from Zed/VSCode + Keymap Editor** — palette
+    commands "Import Keybindings from Zed/VSCode" read
+    `~/.config/zed/keymap.json` / VSCode's `keybindings.json` (JSON with
+    comments), map known commands onto editor actions (Zed contexts and
+    VSCode `when` clauses for other UI are skipped; `null`/`-command`
+    unbind) and report bound / unsupported / multi-key-sequence counts.
+    A **Keymap Editor** window (palette → "Keymap Editor") lists every
+    command with its bindings: type to filter by name or key, Enter to
+    record a new chord, Shift+Enter to add one, Del to remove, Cmd/Ctrl+R
+    to reset. Bindings persist as overrides in `<config dir>/keymap.json`
+    (`editor_set_config_dir`; the demo uses `~/.config/odin_editor`). New
+    line commands to bind: duplicate / move line up/down (Shift+Alt /
+    Alt+Up/Down), toggle line comment (Cmd/Ctrl+/), delete line
+    (Cmd/Ctrl+Shift+K), insert line below/above (Cmd/Ctrl+[Shift+]Enter).
+    The editor now has a tool-window framework (`windows.odin`) the theme
+    editor and utilities page will use. Verified by unit tests and
+    `tools/keymap_smoke.edctl` (fixture keymaps, never the user's).
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -216,6 +233,5 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 ## Backlog / known limitations
 
-**Import key commands from zed/vscode** 
 **Make theme colors editable in ui**
 **Command Pallet switches between windows** Command Pallet should be able to switch between windows, keymap editor, find, theme editor, utitlity page(maybe funcitons around managing ols).

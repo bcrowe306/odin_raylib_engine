@@ -21,6 +21,10 @@
 //                           by (or steal) the user's typing
 //   example --no-lsp        don't attach the OLS language server even if built
 //   example --ols <path>    use a specific `ols` binary
+//   example --config-dir <dir>  keep settings (keymap.json) in <dir>
+//                           (default ~/.config/odin_editor; none with --control-only)
+//   example --zed-keymap <path> / --vscode-keymap <path>
+//                           where "Import Keybindings from Zed/VSCode" reads
 package main
 
 import "../control"
@@ -112,6 +116,9 @@ main :: proc() {
 	control_only := false
 	ols_path := ""
 	file_arg := ""
+	config_dir := ""
+	config_dir_set := false
+	import_paths: [ed.Keymap_Source]string
 	args := os.args[1:]
 	for i := 0; i < len(args); i += 1 {
 		switch args[i] {
@@ -141,6 +148,17 @@ main :: proc() {
 			if i < len(args) {
 				ols_path = args[i]
 			}
+		case "--config-dir":
+			i += 1
+			if i < len(args) {
+				config_dir, config_dir_set = args[i], true
+			}
+		case "--zed-keymap", "--vscode-keymap":
+			src := ed.Keymap_Source.Zed if args[i] == "--zed-keymap" else ed.Keymap_Source.VSCode
+			i += 1
+			if i < len(args) {
+				import_paths[src] = args[i]
+			}
 		case:
 			if strings.has_prefix(args[i], "--") {
 				fmt.eprintln("unknown option:", args[i])
@@ -161,6 +179,19 @@ main :: proc() {
 
 	editor := ed.editor_init(platform)
 	defer ed.editor_destroy(&editor)
+	for p, src in import_paths {
+		if len(p) > 0 {
+			ed.editor_set_import_path(&editor, src, p)
+		}
+	}
+	if !config_dir_set && !control_only {
+		if home, err := os.user_home_dir(context.temp_allocator); err == nil {
+			config_dir, _ = filepath.join({home, ".config", "odin_editor"}, context.temp_allocator)
+		}
+	}
+	if len(config_dir) > 0 {
+		ed.editor_set_config_dir(&editor, config_dir)
+	}
 
 	// The e2e suite manages its own LSP session and documents.
 	if use_lsp && !run_e2e && !script_only {
