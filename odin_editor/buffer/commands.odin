@@ -46,7 +46,12 @@ buffer_delete_selection_for_cursor :: proc(b: ^Buffer, c: ^Cursor, group_id: int
 // selections, and advances each cursor past the inserted text. All
 // resulting edits share one undo group.
 buffer_type_text :: proc(b: ^Buffer, text: string) {
-	group := buffer_next_group(b)
+	group: int
+	if buffer_can_coalesce_typing(b, text) {
+		group = b.typing_group
+	} else {
+		group = buffer_next_group(b)
+	}
 	order := buffer_sorted_cursor_indices(b)
 	for i in order {
 		c := &b.cursors[i]
@@ -55,6 +60,46 @@ buffer_type_text :: proc(b: ^Buffer, text: string) {
 		c.pos = end
 		c.sel.active = false
 	}
+
+	// Remember where this run of typing ended so the next keystroke can
+	// join the same undo step. Text containing a newline never coalesces.
+	b.typing_group = 0
+	if len(text) > 0 && strings.index_byte(text, '\n') < 0 {
+		b.typing_group = group
+		clear(&b.typing_ends)
+		for c in b.cursors {
+			append(&b.typing_ends, c.pos)
+		}
+		b.typing_last_char = text[len(text) - 1]
+	}
+}
+
+// buffer_can_coalesce_typing reports whether typing `text` now continues
+// the previous run: same undo group still on top, every caret exactly
+// where the run left it with no selection, no newline, and not the first
+// character of a new word (VSCode-style word granularity: "hello world"
+// undoes as "world", then "hello ").
+@(private)
+buffer_can_coalesce_typing :: proc(b: ^Buffer, text: string) -> bool {
+	if b.typing_group == 0 || len(text) == 0 || strings.index_byte(text, '\n') >= 0 {
+		return false
+	}
+	if len(b.undo_stack) == 0 || b.undo_stack[len(b.undo_stack) - 1].group_id != b.typing_group {
+		return false
+	}
+	if len(b.cursors) != len(b.typing_ends) {
+		return false
+	}
+	for c, i in b.cursors {
+		if c.sel.active || c.pos != b.typing_ends[i] {
+			return false
+		}
+	}
+	is_space :: proc(ch: u8) -> bool {return ch == ' ' || ch == '\t'}
+	if is_space(b.typing_last_char) && !is_space(text[0]) {
+		return false
+	}
+	return true
 }
 
 // buffer_backspace deletes the selection, or one rune to the left of the

@@ -6,7 +6,7 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
 
 1. **Taskfile** — `Taskfile.yml` with `check`, `test` (+ per-package
    variants), `build`, `run`, `fmt`, `ols:fetch`, `ols:build`, `clean`.
-2. **Unit tests for every feature** — 127 tests across 6 packages, all
+2. **Unit tests for every feature** — 132 tests across 6 packages, all
    passing with zero tracked memory leaks:
    - `buffer`: 24 tests (editing, undo/redo incl. cursor restoration,
      cursors, selection, multi-cursor, file IO, change-version tracking).
@@ -117,6 +117,14 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
     squiggles after an emoji landed early; fixed in OLS by
     `patches/ols/0002-check-columns-utf16.patch`. Verified by the emoji case
     in `tools/diagnostics_smoke.edctl`.
+17. **Undo coalescing + sticky visual column** — consecutive keystrokes at
+    the caret(s) share one undo step, broken by caret moves, other edits, or
+    the start of a new word ("hello world" undoes as "world", then
+    "hello "); undo/redo restore one caret per run, not per character.
+    Up/Down/PageUp/PageDown aim for a sticky *visual* column, so the caret
+    no longer drifts between tab- and space-indented lines and never lands
+    inside a multi-byte character. Verified by unit tests and
+    `tools/editing_smoke.edctl`.
 9. **Standalone demo app** — `example/main.odin` creates a real SDL3 window
    + SDL_ttf-rendered editor, loads a sample `.odin` file, supports
    Ctrl/Cmd+S save, window resize, and launches via `task run`. Verified the
@@ -128,12 +136,6 @@ Tracks progress against `REQUIREMENTS.md`'s numbered requirements.
   `snippetSupport`), and `isIncomplete` lists aren't re-queried as you type
   (filtering is purely local after the first response). Signature help shows
   only the active overload (no overload cycling).
-- **Undo coalescing** — every TEXT_INPUT event is its own undo step, so
-  undoing typed text goes back one character at a time (VSCode merges runs
-  of typing). Needs time/word-boundary based grouping in `buffer`.
-- **Up/Down keep the byte column, not the visual column** — moving between
-  tab- and space-indented lines drifts horizontally. Needs a sticky
-  "preferred visual column" on the cursor.
 - **Mouse leftovers** — no right-click context menu, no drag-and-drop of
   selected text, no hover tooltips (LSP hover), and horizontal auto-scroll
   only applies to character drags.

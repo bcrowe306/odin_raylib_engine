@@ -211,7 +211,7 @@ under the compiler's resolved path (`/private/tmp/...` for a file opened as
 `task test:visual` is the end-to-end check every feature ships with. It
 launches `example/editor_demo --control-only` once per script in `tools/`
 (`lsp_smoke`, `lsp_crash`, `mouse_smoke`, `diagnostics_smoke`,
-`diagnostics_extras`) on a scratch copy of a fixture from `example/assets/`
+`diagnostics_extras`, `editing_smoke`) on a scratch copy of a fixture from `example/assets/`
 (a single `.odin.txt` file, or a directory of them for multi-file cases), replays the script through
 `edctl` — real SDL keyboard/mouse events, live OLS — and fails on any
 `expect`/`wait` that doesn't hold. Along the way each script saves

@@ -44,6 +44,15 @@ Selection :: struct {
 Cursor :: struct {
 	pos: Position,
 	sel: Selection,
+	// Sticky column for vertical movement, in whatever unit the host
+	// uses (the editor stores a visual column): Up/Down aim for it so
+	// the caret doesn't drift across short or differently-indented lines.
+	has_goal: bool,
+	goal:     int,
+	// Where the last vertical move left the caret; the goal only applies
+	// while the caret is still there (any other move/edit invalidates it
+	// without every caller having to clear it).
+	goal_at:  Position,
 }
 
 // selection_range returns the normalized (start, end) range of a cursor's
@@ -100,6 +109,13 @@ Buffer :: struct {
 	track_changes: bool,
 	changes:       [dynamic]Change,
 	changes_reset: bool,
+
+	// Typing coalescing: consecutive single-line insertions at the caret(s)
+	// share one undo group until the caret moves, another kind of edit
+	// happens, or a new word starts (see buffer_type_text).
+	typing_group:     int,
+	typing_ends:      [dynamic]Position,
+	typing_last_char: u8,
 }
 
 buffer_init :: proc(allocator := context.allocator) -> Buffer {
@@ -113,6 +129,7 @@ buffer_init :: proc(allocator := context.allocator) -> Buffer {
 	b.undo_stack = make([dynamic]Edit, allocator)
 	b.redo_stack = make([dynamic]Edit, allocator)
 	b.changes = make([dynamic]Change, allocator)
+	b.typing_ends = make([dynamic]Position, allocator)
 	return b
 }
 
@@ -126,6 +143,7 @@ buffer_destroy :: proc(b: ^Buffer) {
 	delete(b.undo_stack)
 	delete(b.redo_stack)
 	delete(b.changes)
+	delete(b.typing_ends)
 	if len(b.file_path) > 0 {
 		delete(b.file_path, b.allocator)
 	}
@@ -212,6 +230,7 @@ buffer_set_text :: proc(b: ^Buffer, text: string) {
 	buffer_clear_undo_history(b)
 	b.dirty = false
 	b.version += 1
+	b.typing_group = 0
 	buffer_record_reset(b)
 }
 

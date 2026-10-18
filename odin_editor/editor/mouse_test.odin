@@ -417,3 +417,41 @@ digits :: proc(i: int) -> string {
 strings_concat :: proc(parts: []string) -> string {
 	return strings.concatenate(parts, context.temp_allocator)
 }
+
+@(test)
+test_vertical_moves_keep_visual_goal_column :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		ed := editor_init(.Other)
+		defer editor_destroy(&ed)
+		// Line 0 tab-indented, line 1 short, line 2 space-indented.
+		editor_set_text(&ed, "\tvalue := 1\nx\n    other := 2")
+		ed.buf.cursors[0].pos = {0, 3} // after "\tva" = visual col 6
+
+		key_and_update(&ed, sdl.K_DOWN)
+		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{1, 1}) // clamped on the short line
+		key_and_update(&ed, sdl.K_DOWN)
+		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{2, 6}) // back to visual col 6
+		key_and_update(&ed, sdl.K_UP)
+		key_and_update(&ed, sdl.K_UP)
+		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{0, 3})
+
+		// Moving horizontally resets the goal.
+		key_and_update(&ed, sdl.K_RIGHT) // col 4 -> visual 7
+		key_and_update(&ed, sdl.K_DOWN)
+		key_and_update(&ed, sdl.K_DOWN)
+		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{2, 7})
+	})
+}
+
+@(test)
+test_vertical_move_never_splits_a_multibyte_char :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		ed := editor_init(.Other)
+		defer editor_destroy(&ed)
+		editor_set_text(&ed, "abcd\nééé")
+		ed.buf.cursors[0].pos = {0, 3}
+		key_and_update(&ed, sdl.K_DOWN)
+		// Visual col 3 on "ééé" is byte 6, never byte 3 (inside 'é').
+		testing.expect_value(t, ed.buf.cursors[0].pos, buf.Position{1, 6})
+	})
+}

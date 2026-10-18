@@ -140,12 +140,7 @@ test_undo_group_batches_edits :: proc(t: ^testing.T) {
 		buffer_type_text(&b, "c")
 		testing.expect_value(t, buffer_line_str(&b, 0), "abc")
 
-		// Each buffer_type_text call is its own undo group, so three undos
-		// are required to fully revert three separate typed characters.
-		buffer_undo(&b)
-		testing.expect_value(t, buffer_line_str(&b, 0), "ab")
-		buffer_undo(&b)
-		testing.expect_value(t, buffer_line_str(&b, 0), "a")
+		// Consecutive keystrokes at the caret coalesce into one undo step.
 		buffer_undo(&b)
 		testing.expect_value(t, buffer_line_str(&b, 0), "")
 	})
@@ -490,4 +485,74 @@ test_position_after_change :: proc(t: ^testing.T) {
 	testing.expect_value(t, position_after_change({2, 0}, del), Position{1, 2}) // inside -> collapses
 	testing.expect_value(t, position_after_change({3, 8}, del), Position{1, 5}) // after on end line
 	testing.expect_value(t, position_after_change({7, 1}, del), Position{5, 1})
+}
+
+@(private)
+type_chars :: proc(b: ^Buffer, s: string) {
+	for ch in s {
+		buf: [4]u8
+		buf[0] = u8(ch)
+		buffer_type_text(b, string(buf[:1]))
+	}
+}
+
+@(test)
+test_typing_coalesces_into_word_sized_undo_steps :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		type_chars(&b, "hello world")
+		testing.expect_value(t, buffer_line_str(&b, 0), "hello world")
+
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_line_str(&b, 0), "hello ")
+		testing.expect_value(t, len(b.cursors), 1)
+		testing.expect_value(t, b.cursors[0].pos, Position{0, 6})
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_line_str(&b, 0), "")
+		testing.expect_value(t, b.cursors[0].pos, Position{0, 0})
+
+		buffer_redo(&b)
+		testing.expect_value(t, buffer_line_str(&b, 0), "hello ")
+		testing.expect_value(t, b.cursors[0].pos, Position{0, 6})
+	})
+}
+
+@(test)
+test_typing_run_breaks_on_caret_move_and_other_edits :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		type_chars(&b, "ab")
+		cursor_move_left(&b, &b.cursors[0], false)
+		type_chars(&b, "X") // caret moved: new step
+		buffer_backspace(&b)
+		type_chars(&b, "Y") // after a backspace: new step
+		testing.expect_value(t, buffer_line_str(&b, 0), "aYb")
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_line_str(&b, 0), "ab")
+		buffer_undo(&b) // the backspace
+		testing.expect_value(t, buffer_line_str(&b, 0), "aXb")
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_line_str(&b, 0), "ab")
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_line_str(&b, 0), "")
+	})
+}
+
+@(test)
+test_multi_cursor_typing_coalesces_per_caret :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		b := buffer_init()
+		defer buffer_destroy(&b)
+		buffer_set_text(&b, "x\ny")
+		append(&b.cursors, Cursor{pos = {1, 0}})
+		type_chars(&b, "ab")
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "abx\naby")
+		buffer_undo(&b)
+		testing.expect_value(t, buffer_to_string(&b, context.temp_allocator), "x\ny")
+		testing.expect_value(t, len(b.cursors), 2)
+		testing.expect_value(t, b.cursors[0].pos, Position{0, 0})
+		testing.expect_value(t, b.cursors[1].pos, Position{1, 0})
+	})
 }

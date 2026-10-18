@@ -27,7 +27,13 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 	     .ExtendDocStart, .ExtendDocEnd,
 	     .ExtendPageUp, .ExtendPageDown:
 		for &c in b.cursors {
-			apply_movement(b, &c, action)
+			#partial switch action {
+			case .MoveUp, .MoveDown, .MovePageUp, .MovePageDown,
+			     .ExtendUp, .ExtendDown, .ExtendPageUp, .ExtendPageDown:
+				vertical_move(ed, &c, action)
+			case:
+				apply_movement(b, &c, action)
+			}
 		}
 		return true
 
@@ -115,6 +121,26 @@ editor_apply_action :: proc(ed: ^Editor, action: km.Action) -> bool {
 		return true
 	}
 	return false
+}
+
+// vertical_move moves a caret up/down (by line or page) aiming for its
+// sticky visual column, so moving across short lines or between tab- and
+// space-indented lines doesn't drift, and the caret always lands on a
+// character boundary.
+@(private)
+vertical_move :: proc(ed: ^Editor, c: ^buf.Cursor, action: km.Action) {
+	b := &ed.buf
+	if !c.has_goal || c.pos != c.goal_at {
+		c.goal = editor_visual_col(ed, c.pos)
+		c.has_goal = true
+	}
+	from_line := c.pos.line
+	apply_movement(b, c, action)
+	if c.pos.line != from_line {
+		line := buf.buffer_line_str(b, c.pos.line)
+		c.pos.col = byte_col_at_visual(line, f32(c.goal), ed.tab_width)
+	}
+	c.goal_at = c.pos
 }
 
 @(private)

@@ -192,6 +192,8 @@ buffer_clear_redo :: proc(b: ^Buffer) {
 // that should undo/redo together as a single user action (e.g. multi-cursor
 // edits or autocomplete expansions).
 buffer_next_group :: proc(b: ^Buffer) -> int {
+	// Any other kind of edit ends the current run of typing.
+	b.typing_group = 0
 	b.group_seq += 1
 	return b.group_seq
 }
@@ -199,6 +201,7 @@ buffer_next_group :: proc(b: ^Buffer) -> int {
 // buffer_undo reverts the most recent edit (or group of edits sharing a
 // group_id). Returns true if an edit was undone.
 buffer_undo :: proc(b: ^Buffer) -> bool {
+	b.typing_group = 0
 	if len(b.undo_stack) == 0 {
 		return false
 	}
@@ -215,11 +218,11 @@ buffer_undo :: proc(b: ^Buffer) -> bool {
 			discarded := buffer_raw_delete(b, top.start, top.end)
 			delete(discarded, b.allocator)
 			append(&b.redo_stack, top)
-			add_caret(&carets, top.start, top.start)
+			add_caret(&carets, top.start, top.start, chain = top.end)
 		case .Delete:
 			end := buffer_raw_insert(b, top.start, top.text)
 			append(&b.redo_stack, top)
-			add_caret(&carets, top.start, end)
+			add_caret(&carets, top.start, end, chain = top.start)
 		}
 		if group_id == -1 {
 			break
@@ -238,9 +241,13 @@ Edit_Caret :: struct {
 }
 
 @(private)
-add_caret :: proc(carets: ^[dynamic]Edit_Caret, key, pos: Position) {
+add_caret :: proc(carets: ^[dynamic]Edit_Caret, key, pos: Position, chain: Position) {
 	for &c in carets {
-		if c.key == key {
+		// Same site (delete+insert of one typed-over selection), or a
+		// caret this edit continues (coalesced typing: undoing "abc" walks
+		// one caret back from after 'c' to before 'a').
+		if c.key == key || c.pos == chain {
+			c.key = key
 			c.pos = pos
 			return
 		}
@@ -269,6 +276,7 @@ place_carets :: proc(b: ^Buffer, carets: []Edit_Caret, descending: bool) {
 // buffer_redo re-applies the most recently undone edit (or group). Returns
 // true if an edit was redone.
 buffer_redo :: proc(b: ^Buffer) -> bool {
+	b.typing_group = 0
 	if len(b.redo_stack) == 0 {
 		return false
 	}
@@ -284,12 +292,12 @@ buffer_redo :: proc(b: ^Buffer) -> bool {
 		case .Insert:
 			end := buffer_raw_insert(b, top.start, top.text)
 			append(&b.undo_stack, top)
-			add_caret(&carets, top.start, end)
+			add_caret(&carets, top.start, end, chain = top.start)
 		case .Delete:
 			discarded := buffer_raw_delete(b, top.start, top.end)
 			delete(discarded, b.allocator)
 			append(&b.undo_stack, top)
-			add_caret(&carets, top.start, top.start)
+			add_caret(&carets, top.start, top.start, chain = top.end)
 		}
 		if group_id == -1 {
 			break
