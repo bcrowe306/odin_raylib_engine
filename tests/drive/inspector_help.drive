@@ -1,0 +1,31 @@
+# Inspector help: hovering a property shows its doc in a tooltip and in the
+# help pane (with type, range, default); the pane falls back to the node
+# type's description; View > Inspector Help hides it.
+wait 5
+click @asset.new-scene
+key escape
+expect item:insp.help.title == visible
+click @hier.add
+type light
+click @addnode.create
+expect node:Light.type == LightNode
+hover @insp.prop:energy
+wait 60
+expect insp-help contains Energy: Brightness multiplier
+screenshot energy_tooltip
+hover @insp.prop:falloff
+wait 5
+expect insp-help contains Falloff: Fade towards the edge
+# Hovering the label works too.
+hover @insp.prop:radius+-120,0
+wait 5
+expect insp-help contains Radius: Reach of the light
+screenshot help_pane
+click @menu:View
+click @menu:View/Inspector Help
+wait 3
+expect item:insp.help.title == missing
+click @menu:View
+click @menu:View/Inspector Help
+wait 3
+expect item:insp.help.title == visible

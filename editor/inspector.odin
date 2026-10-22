@@ -33,7 +33,14 @@ undo_on_activate :: proc(state: ^EditorState, label: string) {
 PropertyInspector_RenderWindow :: proc(state: ^EditorState) {
 	defer imgui.End()
 	if !imgui.Begin("Inspector###InspectorWindow") do return
+	helpH: f32 = INSPECTOR_HELP_HEIGHT if state.showInspectorHelp else 0
+	if imgui.BeginChild("##inspbody", {0, -helpH}, {}, {}) do inspector_body(state)
+	imgui.EndChild()
+	if state.showInspectorHelp do Inspector_HelpPane(state)
+}
 
+@(private = "file")
+inspector_body :: proc(state: ^EditorState) {
 	node := state.selectedNode
 	if node == nil || state.activeScene == nil {
 		imgui.Dummy({0, 24})
@@ -324,6 +331,13 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 	def, hasDef := prop_default(node, p)
 	defer if !readonly && p.kind != .Vec2 {
 		if field_reset(id, hasDef && !prop_is_default(p, def)) do prop_reset(state, node, p, def)
+	}
+	// The label (the item just before) or the field: tooltip and help pane.
+	TIP :: imgui.HoveredFlags_DelayNormal | imgui.HoveredFlags_Stationary
+	labelHovered, labelTip := imgui.IsItemHovered(), imgui.IsItemHovered(TIP)
+	defer {
+		hovered := labelHovered || imgui.IsItemHovered(imgui.HoveredFlags_AllowWhenDisabled)
+		prop_help(state, node, p, hovered, labelTip || imgui.IsItemHovered(TIP | imgui.HoveredFlags_AllowWhenDisabled))
 	}
 	imgui.SetNextItemWidth(field_width())
 

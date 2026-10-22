@@ -697,6 +697,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		if a == nil do return "none", true
 		return fmt.tprintf("%s:%d/%d:%d", a.name, apn.currentFrame - a.startFrame + 1, e.Animation_Length(a), len(a.tracks)), true
 	case "shortcuts-open": return "true" if showShortcutsWindow else "false", true
+	case "insp-help": return fmt.tprintf("%s: %s", inspectorHelp.title, inspectorHelp.doc), true
 	}
 	switch q {
 	case "selected":

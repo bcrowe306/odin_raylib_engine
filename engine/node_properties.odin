@@ -41,6 +41,7 @@ Node_Property :: struct {
 	min, max:  f32,
 	has_range: bool,
 	runtime:   bool, // save:"false"
+	owner:     string, // the struct declaring the field ("CameraNode"), for Property_Doc
 }
 
 // Node_CollectProperties lists the reflected properties of a node's concrete
@@ -89,7 +90,7 @@ collect_struct_props :: proc(out: ^[dynamic]Node_Property, tid: typeid, base: ra
 			}
 			continue
 		}
-		p := Node_Property{name = name, kind = kind, ptr = ptr, type = f.type}
+		p := Node_Property{name = name, kind = kind, ptr = ptr, type = f.type, owner = struct_name(tid)}
 		if mn, has_min := reflect.struct_tag_lookup(f.tag, "min"); has_min {
 			if v, vok := strconv.parse_f32(mn); vok {p.min = v; p.has_range = true}
 		}
@@ -101,6 +102,12 @@ collect_struct_props :: proc(out: ^[dynamic]Node_Property, tid: typeid, base: ra
 		}
 		append(out, p)
 	}
+}
+
+@(private = "file")
+struct_name :: proc(tid: typeid) -> string {
+	if named, ok := type_info_of(tid).variant.(reflect.Type_Info_Named); ok do return named.name
+	return ""
 }
 
 @(private = "file")

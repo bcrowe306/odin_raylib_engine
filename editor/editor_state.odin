@@ -170,6 +170,7 @@ EditorState :: struct {
 	snapGrid:         bool,
 	gridSize:         f32,
 	snapRotation:     bool,
+	showInspectorHelp: bool, // the Inspector's help pane (View menu)
 	rotationSnapStep: f32,
 	showBounds:       bool,
 	showGrid:         bool,
@@ -248,6 +249,7 @@ Editor_Init :: proc(state: ^EditorState) {
 	state.snapGrid = true
 	state.gridSize = 32.0
 	state.snapRotation = false
+	state.showInspectorHelp = true
 	state.rotationSnapStep = 15.0
 	state.showBounds = false
 	state.showGrid = true

@@ -36,6 +36,7 @@ exits non-zero if any check fails.
 | `animation.drive` | Animation tab: frames from dropped textures, scrubbing, rotation track with keys, preview restore, save. |
 | `tilemap.drive` | Tile map: tileset, palette, paint stroke (undo/redo), flood fill, erase, save. |
 | `ui_ux.drive` | Settings (keymap record, input action + key, video, export), linked X/Y and reset, Save As / Revert / Open Project, asset copy/paste/rename/delete, paste as child, LDtk level asset, instance add child + apply to component, particle editor, viewport fit. |
+| `inspector_help.drive` | Hovering a property fills the tooltip and the Inspector help pane (field or label); View > Inspector Help hides the pane. |
 | `code_editor.drive` | Open a script in the Code tab; lua-language-server completion of the engine API, signature help, diagnostics, go to definition; save; unsaved-changes prompt; New Script from the Inspector. |
 
 ## Script language
@@ -91,6 +92,7 @@ Queries:
   `code.dirty`, `code.focused`, `code.lsp` (off/starting/ready/failed), `code.completion` (visible items,
   comma-separated), `code.signature`, `code.errors`, `code.diagnostics`, `code.diagnostic-messages`, `code.hover`
 - `code.cursors`, `code.selection`, `code.find` (match count), `code.font`, `code.completion-doc`
+- `insp-help` (the Inspector help pane: `<Title>: <doc>`)
 - `palette.open`, `shortcuts-open`, `quit-prompt`, `selection`, `selection-count`, `clipboard-nodes`
 - `import.imported`, `import.skipped`, `import.failed` (counts from the last import), `import.report`
   (Import Results open), `import.messages` (one `<file>: <status> <path> <message>` line each), `import.dialog`

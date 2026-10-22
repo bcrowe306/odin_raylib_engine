@@ -162,6 +162,7 @@ Actions_Init :: proc() {
 	add({id = "view.grid", category = "View", label = "Show Grid", chords = k(ch(.G, SH)), scope = .Scene, run = proc(s: ^EditorState) {s.showGrid = !s.showGrid}, checked = proc(s: ^EditorState) -> bool {return s.showGrid}})
 	add({id = "view.bounds", category = "View", label = "Show Bounds & Colliders", scope = .Scene, run = proc(s: ^EditorState) {s.showBounds = !s.showBounds}, checked = proc(s: ^EditorState) -> bool {return s.showBounds}})
 	add({id = "view.camera_frames", category = "View", label = "Show Camera Frames", scope = .Scene, run = proc(s: ^EditorState) {s.showCameraBounds = !s.showCameraBounds}, checked = proc(s: ^EditorState) -> bool {return s.showCameraBounds}})
+	add({id = "view.inspector_help", category = "View", label = "Inspector Help", run = proc(s: ^EditorState) {s.showInspectorHelp = !s.showInspectorHelp}, checked = proc(s: ^EditorState) -> bool {return s.showInspectorHelp}})
 	add({id = "view.snap_grid", category = "View", label = "Snap to Grid", chords = k(ch(.S, SH)), scope = .Scene, run = proc(s: ^EditorState) {s.snapGrid = !s.snapGrid}, checked = proc(s: ^EditorState) -> bool {return s.snapGrid}})
 	add({id = "view.snap_rotation", category = "View", label = "Snap Rotation", scope = .Scene, run = proc(s: ^EditorState) {s.snapRotation = !s.snapRotation}, checked = proc(s: ^EditorState) -> bool {return s.snapRotation}})
 

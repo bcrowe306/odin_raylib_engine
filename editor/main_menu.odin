@@ -118,6 +118,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "view.grid", "Grid")
 		menu_action(state, "view.bounds", "Bounds & Colliders")
 		menu_action(state, "view.camera_frames", "Camera Frames")
+		menu_action(state, "view.inspector_help")
 		imgui.Separator()
 		menu_action(state, "view.snap_grid")
 		menu_action(state, "view.snap_rotation")

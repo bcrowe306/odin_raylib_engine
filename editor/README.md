@@ -114,6 +114,14 @@ Motion, Size & Rotation, Color (gradient over the particle's life with
 draggable stops, plus a red/green/blue/alpha plot whose alpha points you
 drag) and Collision, with a live preview in the viewport.
 
+Hover any property (its label or field) for help: a tooltip with what it
+does, its type, range, default and the name scripts use with
+`get_property` / `set_property`. The **help pane** at the bottom of the
+Inspector keeps the last hovered property's help, or describes the selected
+node type; **View > Inspector Help** hides it. The help text lives in
+`engine/property_docs.odin` (`test_property_docs` fails when a property has
+none).
+
 ### Context menus
 
 Every asset, folder, scene-tree node, code tab, the code text and console
