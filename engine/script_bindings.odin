@@ -3402,6 +3402,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "set_draw_bounds")
 	lua.setglobal(L, "Scene")
 	Script_RegisterTweenModule(L)
+	Script_RegisterSaveModule(L)
 
 	// 8. Global "Log" table
 	lua.newtable(L)

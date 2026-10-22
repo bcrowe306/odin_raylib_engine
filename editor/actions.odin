@@ -110,6 +110,8 @@ Actions_Init :: proc() {
 		if s.isSimulating do Toolbar_StopSimulation(s)
 		else do Toolbar_StartSimulation(s)
 	}, checked = proc(s: ^EditorState) -> bool {return s.isSimulating}})
+	add({id = "game.save_folder", category = "Game", label = "Open Save Data Folder", scope = .Global, run = Editor_OpenSaveDataFolder})
+	add({id = "game.delete_save", category = "Game", label = "Delete Save Data", scope = .Global, run = Editor_DeleteSaveData})
 	add({id = "view.viewport", category = "View", label = "Focus Viewport", chords = k(ch(._1, P)), scope = .Global, run = proc(s: ^EditorState) {imgui.SetWindowFocusStr("Viewport###ViewportWindow")}})
 	add({id = "view.code", category = "View", label = "Focus Code Editor", chords = k(ch(._2, P)), scope = .Global, run = proc(s: ^EditorState) {GlobalCode.focusRequest = true}, enabled = has_code})
 	add({id = "view.console", category = "View", label = "Focus Console", chords = k(ch(.J, P)), scope = .Global, run = proc(s: ^EditorState) {imgui.SetWindowFocusStr("Console###BottomPanelWindow")}})

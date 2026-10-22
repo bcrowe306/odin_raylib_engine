@@ -52,6 +52,7 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "hit_started":        return "other", "The ray started hitting a node"
 	case "hit_ended":          return "other", "The ray stopped hitting a node"
 	case "animation_finished": return "name", "A non-looping animation ended"
+	case "state_changed":      return "state", "The state machine entered a state"
 	case "finished":           return "", "Playback ended"
 	case "clicked":            return "", "The button was clicked"
 	case "value_changed":      return "value", "The value changed"

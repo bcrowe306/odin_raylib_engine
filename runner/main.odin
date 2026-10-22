@@ -8,7 +8,8 @@
 //     fonts/OpenSans-Regular.ttf
 //
 // Usage: runner [project-dir | game.ore] [--scene <file>] [--frames N]
-//        [--screenshot out.png] [--hidden]
+//        [--screenshot out.png] [--dump-scene out.json] [--hidden]
+//        [--user-data <dir>]  (Save data folder instead of the platform's)
 // With no project argument it looks for game.ore (or any .ore, or a
 // project/ directory) next to the executable.
 package main

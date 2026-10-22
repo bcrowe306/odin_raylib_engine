@@ -157,6 +157,12 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "game.stop", "Stop")
 		imgui.Separator()
 		menu_action(state, "game.simulate")
+		imgui.Separator()
+		if imgui.BeginMenu("Save Data") {
+			menu_action(state, "game.save_folder", "Open Folder")
+			menu_action(state, "game.delete_save", "Delete Save Files")
+			imgui.EndMenu()
+		}
 		imgui.EndMenu()
 	}
 

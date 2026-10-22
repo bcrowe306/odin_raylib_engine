@@ -1,5 +1,6 @@
 package engine
 
+import "base:runtime"
 import "core:fmt"
 import "core:os"
 import "core:strconv"
@@ -238,6 +239,8 @@ Shader_ParseUniforms :: proc(source: string, allocator := context.allocator) -> 
 @(private = "file")
 shader_entry :: proc(path: string, ctx: ^GameContext) -> ^Shader_Entry {
 	if path == "" do return nil
+	// The cache is global (also used from Lua callbacks): always the heap.
+	context.allocator = runtime.heap_allocator()
 	if shaderCache == nil do shaderCache = make(map[string]^Shader_Entry)
 	if en, ok := shaderCache[path]; ok do return en
 	en := new(Shader_Entry)
@@ -298,6 +301,7 @@ shader_ensure_loaded :: proc(en: ^Shader_Entry) -> bool {
 
 @(private = "file")
 shader_release :: proc(en: ^Shader_Entry) {
+	context.allocator = runtime.heap_allocator()
 	if en.loaded && rl.IsWindowReady() do rl.UnloadShader(en.shader)
 	delete(en.source)
 	for u in en.uniforms do delete(u.name)
@@ -310,6 +314,7 @@ shader_release :: proc(en: ^Shader_Entry) {
 // Shader_CheckForChanges reloads project shaders saved since they were
 // loaded (polled at most twice a second). Returns how many reloaded.
 Shader_CheckForChanges :: proc() -> int {
+	context.allocator = runtime.heap_allocator()
 	if time.tick_since(lastShaderCheck) < 500 * time.Millisecond do return 0
 	lastShaderCheck = time.tick_now()
 	n := 0
@@ -327,6 +332,7 @@ Shader_CheckForChanges :: proc() -> int {
 
 // Shader_UnloadAll releases every cached shader.
 Shader_UnloadAll :: proc() {
+	context.allocator = runtime.heap_allocator()
 	for path, en in shaderCache {
 		shader_release(en)
 		delete(path)

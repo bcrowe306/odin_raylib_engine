@@ -413,6 +413,45 @@ self.node:animation_play("run", 0.15)  -- crossfade from the current pose over 0
 Crossfading blends the previous animation's property tracks into the new
 one's (frames switch immediately).
 
+#### Save data (`Save`)
+
+Persistent key/value data for progress, settings and high scores: plain Lua
+values (booleans, numbers, strings, and tables of those) saved as JSON in
+the player's user-data folder - macOS `~/Library/Application Support/<game>/`,
+Windows `%APPDATA%\<game>\`, Linux `~/.local/share/<game>/` (`<game>` is the
+project name). The file is read on first use and written by `Save.flush()`
+and when the game quits.
+
+```lua
+local best = Save.get("best_score", 0)
+if score > best then Save.set("best_score", score) end
+
+local settings = Save.get("settings", {music = 0.8, fullscreen = false})
+settings.music = 0.5            -- tables are stored by reference
+Save.set("settings", settings)
+Save.flush()                    -- write now (e.g. at a checkpoint)
+
+Save.slot("slot_2")             -- another file (slot_2.json); "save" by default
+for _, key in ipairs(Save.keys()) do Log.info(key) end
+```
+
+| Function | Description |
+|---|---|
+| `Save.set(key, value)` | Stores a value (`nil` removes the key). |
+| `Save.get(key [, default])` | The value, or `default` when unset. |
+| `Save.has(key)` / `Save.delete(key)` | Test / remove a key. |
+| `Save.keys()` | Sorted list of keys. |
+| `Save.clear()` | Removes every key. |
+| `Save.flush()` | Writes the file now; returns `true` on success. |
+| `Save.slot([name])` | Switches save file (writing the current one first); returns the current slot. |
+| `Save.path()` | The current save file's path. |
+
+Functions and nodes can't be saved (they're written as `null`). A damaged
+file is ignored (logged) and the game starts with empty data. The runner's
+`--user-data <dir>` puts save files in another folder (portable builds,
+tests); in the editor, **Game > Save Data** opens the folder or deletes the
+save files.
+
 #### State machines (StateMachineNode)
 
 A **StateMachine** node holds named states, each optionally playing an

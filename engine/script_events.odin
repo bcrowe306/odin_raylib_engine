@@ -147,7 +147,7 @@ connection_index :: proc(mgr: ^ScriptManager, id: int) -> int {
 release_connection :: proc(mgr: ^ScriptManager, i: int) {
 	conn := mgr.connections[i]
 	if mgr.L != nil && conn.fnRef != 0 do lua.L_unref(mgr.L, lua.REGISTRYINDEX, conn.fnRef)
-	delete(conn.event)
+	delete(conn.event, runtime.heap_allocator())
 	ordered_remove(&mgr.connections, i)
 }
 
@@ -198,7 +198,7 @@ lua_node_connect :: proc "c" (L: ^lua.State) -> c.int {
 	append(&mgr.connections, Lua_Connection{
 		id     = mgr.nextConnectionId,
 		source = node,
-		event  = strings.clone(string(lua.tostring(L, 2))),
+		event  = strings.clone(string(lua.tostring(L, 2)), runtime.heap_allocator()), // made in a Lua callback
 		fnRef  = ref,
 		owner  = mgr.currentInstance,
 	})

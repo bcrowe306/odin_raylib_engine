@@ -172,6 +172,7 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 GameTerminate :: proc(game: ^Game) {
 	if game == nil do return
 	Tween_Destroy(&game.tweens, game.scriptManager.L) // releases Lua callbacks: before the Lua state goes
+	if game.scriptManager.isReady do Save_Flush(game.scriptManager.L) // Save data is written on quit
 	ScriptManager_Destroy(&game.scriptManager)
 	SceneManager_Terminate(&game.sceneManager)
 	AssetManager_Destroy(&game.assetManager)

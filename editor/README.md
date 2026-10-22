@@ -211,6 +211,14 @@ Scene settings when nothing is selected (presets: Dusk, Night, Dark). Lights
 cast shadows from physics shapes. The toolbar's sun toggles the lighting
 preview in the viewport; selected lights show their radius or cone.
 
+### Save data
+
+Scripts persist progress with the `Save` module (`Save.set`, `Save.get`,
+`Save.flush`; see `engine/SCRIPTING.md`), stored as JSON in the platform
+user-data folder under the project's name. **Game > Save Data > Open
+Folder** shows it; **Delete Save Files** removes them so the next run
+starts fresh.
+
 ### Camera follow
 
 Select a Camera and pick its **Follow Target** in the Inspector (or drop a

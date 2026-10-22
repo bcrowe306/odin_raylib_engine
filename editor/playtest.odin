@@ -366,6 +366,32 @@ Editor_OpenExternally :: proc(state: ^EditorState, path: string) {
 	}
 }
 
+// Editor_OpenSaveDataFolder opens the folder the game's Save data goes in
+// (created if needed).
+Editor_OpenSaveDataFolder :: proc(state: ^EditorState) {
+	dir := e.Save_UserDataDir(state.projectConfig.name)
+	_ = os.make_directory_all(dir)
+	Editor_OpenExternally(state, dir)
+}
+
+// Editor_DeleteSaveData removes the game's save files (*.json) so the next
+// run starts fresh.
+Editor_DeleteSaveData :: proc(state: ^EditorState) {
+	dir := e.Save_UserDataDir(state.projectConfig.name)
+	files, err := os.read_all_directory_by_path(dir, context.temp_allocator)
+	if err != nil {
+		Editor_Log(state, .Info, "No save data in %s", dir)
+		return
+	}
+	n := 0
+	for f in files {
+		if f.type != .Regular || !strings.has_suffix(f.name, ".json") do continue
+		if os.remove(f.fullpath) == nil do n += 1
+	}
+	if state.game != nil && state.game.scriptManager.isReady do e.Save_Forget(state.game.scriptManager.L)
+	Editor_Log(state, .Info, "Deleted %d save file(s) in %s", n, dir)
+}
+
 // Editor_RunPackage plays an exported .ore with the game runner.
 Editor_RunPackage :: proc(state: ^EditorState, pkgPath: string) {
 	if state.gameProcessRunning do return

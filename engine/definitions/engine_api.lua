@@ -145,6 +145,7 @@ function Node:destroy() end
 ---| "hit_started"        # RaycastNode: value: the Node the ray started hitting
 ---| "hit_ended"          # RaycastNode: value: the Node it stopped hitting
 ---| "animation_finished" # FrameAnimationNode / AnimationPlayerNode (non-looping); value: animation name
+---| "state_changed"      # StateMachineNode: value: the state entered
 ---| "finished"           # SoundNode / MusicNode: playback ended
 ---| "clicked"            # UIButtonNode
 ---| "value_changed"      # UI slider/checkbox/text input/dropdown/radio/knob/fader; value: new value
@@ -1069,6 +1070,55 @@ function TweenModule.ease(ease, t) end
 
 -- ============================================================================
 
+---@alias SaveValue nil|boolean|number|string|table
+
+---@class SaveModule
+---Persistent save data: plain values (booleans, numbers, strings, tables of
+---those) stored as JSON in the player's user-data folder
+---(macOS ~/Library/Application Support/<game>, Windows %APPDATA%\<game>,
+---Linux ~/.local/share/<game>). Read on first use; written by Save.flush()
+---and when the game quits.
+local SaveModule = {}
+
+---Stores a value (nil removes the key). Tables are stored by reference:
+---changes to a table you got from Save.get are saved too.
+---@param key string
+---@param value SaveValue
+function SaveModule.set(key, value) end
+
+---@param key string
+---@param default? SaveValue Returned when the key isn't set
+---@return SaveValue
+function SaveModule.get(key, default) end
+
+---@param key string
+---@return boolean
+function SaveModule.has(key) end
+
+---@param key string
+function SaveModule.delete(key) end
+
+---@return string[] keys Sorted
+function SaveModule.keys() end
+
+---Removes every key (the file is rewritten on the next flush).
+function SaveModule.clear() end
+
+---Writes the save file now.
+---@return boolean ok
+function SaveModule.flush() end
+
+---Switches to another save file (<name>.json; default "save"), writing the
+---current one first. Returns the current slot.
+---@param name? string
+---@return string slot
+function SaveModule.slot(name) end
+
+---@return string path The current save file
+function SaveModule.path() end
+
+-- ============================================================================
+
 ---@class EngineModule
 ---Core engine statistics, frame timing, and display information.
 local EngineModule = {}
@@ -1457,6 +1507,9 @@ Physics = PhysicsModule
 Scene = SceneModule
 Tween = TweenModule
 
+---@type SaveModule
+Save = SaveModule
+
 ---@type LogModule
 Log = LogModule
 
@@ -1512,6 +1565,7 @@ Project = ProjectModule
 ---@field on_hit_started? fun(self: self, other: Node) Event (RaycastNode): the ray hit a node.
 ---@field on_hit_ended? fun(self: self, other: Node) Event (RaycastNode): the ray stopped hitting it.
 ---@field on_animation_finished? fun(self: self, name: string?) Event: a non-looping animation ended.
+---@field on_state_changed? fun(self: self, state: string) Event (StateMachineNode): entered a state.
 ---@field on_finished? fun(self: self) Event (Sound/Music): playback ended.
 ---@field on_clicked? fun(self: self) Event (UIButtonNode): clicked.
 ---@field on_value_changed? fun(self: self, value: any) Event (UI inputs): the value changed.

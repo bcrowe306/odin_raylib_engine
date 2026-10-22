@@ -259,6 +259,8 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		cfg.virtualWidth = json_get_float(winObj, "virtual_width", cfg.virtualWidth)
 		cfg.virtualHeight = json_get_float(winObj, "virtual_height", cfg.virtualHeight)
 		cfg.targetFPS = json_get_int(winObj, "target_fps", cfg.targetFPS)
+	} else {
+		cfg.windowTitle = strings.clone(cfg.windowTitle, allocator) // owned like the rest (ProjectConfig_Destroy frees it)
 	}
 
 	if videoObj, ok := json_get_obj(rootObj, "video"); ok {
@@ -425,6 +427,7 @@ Project_SaveConfigToFile :: proc(projectDir: string, cfg: ^ProjectConfig) -> boo
 
 Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := true) -> bool {
 	if game == nil || cfg == nil do return false
+	Save_SetGameName(cfg.name) // Save data folder
 
 	if cfg.virtualWidth > 0 && cfg.virtualHeight > 0 {
 		game.virtualSize = {cfg.virtualWidth, cfg.virtualHeight}

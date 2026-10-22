@@ -22,10 +22,11 @@ Run_Options :: struct {
 	hidden:         bool,
 	startScene:     string, // project-relative scene file to start in
 	dumpScenePath:  string, // write the running scene's JSON (tests)
+	userDataDir:    string, // Save data folder instead of the platform's
 }
 
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
-// --hidden and --dump-scene. A bare argument is taken as the project.
+// --hidden, --dump-scene and --user-data. A bare argument is taken as the project.
 Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
@@ -47,6 +48,8 @@ Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 			opts.startScene = next; i += 1
 		case arg == "--dump-scene" && next != "":
 			opts.dumpScenePath = next; i += 1
+		case arg == "--user-data" && next != "":
+			opts.userDataDir = next; i += 1
 		case !strings.has_prefix(arg, "-") && opts.projectPath == "":
 			opts.projectPath = arg
 		}
@@ -103,6 +106,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	game := new(Game)
 	InitializeGame(game)
 	defer game->terminate()
+	if opts.userDataDir != "" do Save_SetDirectory(opts.userDataDir)
 
 	winW := i32(1280)
 	winH := i32(720)
