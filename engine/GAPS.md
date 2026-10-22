@@ -145,6 +145,13 @@ Causes: every child lookup scanned one flat relationship array (O(n²) per frame
 | Shape sync fixes | polygons and chains now update after creation; chain points keep their authored values (they were freed on attach) and use the shape's offset and rotation |
 | Viewport shape editing | Edit Shapes: move / rotate / resize handles, polygon/chain/segment points (add, drag, remove), snapping, undo; type changes keep the footprint; selection outlines cover every shape |
 
+### TODO_NOW pass
+
+| Item | Change |
+|---|---|
+| Editor rendering | the viewport draws every layer from one traversal (it walked the tree once per layer) |
+| Culling | world layers skip nodes whose bounds are outside the camera view (`engine/culling.odin`: sprites and tile maps have bounds; unknown nodes always draw); tile maps draw only the visible cell range, LDtk only visible tiles; the editor culls to its own view. Profiler tab: drawn / culled counts. `test_view_culling` |
+
 ## 2. Open gaps (prioritized)
 
 ### P2 — features

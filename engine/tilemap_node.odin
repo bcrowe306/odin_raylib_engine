@@ -153,8 +153,18 @@ TileMapNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
 	sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
 	sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
-	for y in 0 ..< tm.mapSize.y {
-		for x in 0 ..< tm.mapSize.x {
+	// Only the cells in view (unrotated maps; rotated ones draw all).
+	x0, y0, x1, y1 := 0, 0, tm.mapSize.x, tm.mapSize.y
+	if renderView.active && tm.globalRotation == 0 && sx > 0 && sy > 0 {
+		o := TileMapNode_CellCorner(tm, {0, 0})
+		v := renderView.rect
+		x0 = clamp(int(math.floor((v.x - o.x) / (tw * sx))), 0, tm.mapSize.x)
+		y0 = clamp(int(math.floor((v.y - o.y) / (th * sy))), 0, tm.mapSize.y)
+		x1 = clamp(int(math.ceil((v.x + v.width - o.x) / (tw * sx))), 0, tm.mapSize.x)
+		y1 = clamp(int(math.ceil((v.y + v.height - o.y) / (th * sy))), 0, tm.mapSize.y)
+	}
+	for y in y0 ..< y1 {
+		for x in x0 ..< x1 {
 			t := tm.tiles[y * tm.mapSize.x + x]
 			if t < 0 do continue
 			src := rl.Rectangle{f32(int(t) % cols) * tw, f32(int(t) / cols) * th, tw, th}

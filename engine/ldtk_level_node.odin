@@ -981,6 +981,7 @@ LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 					for t in tiles {
 						if t.alpha <= 0.001 do continue
 						dest := rl.Rectangle{origin.x + t.px.x * scale.x, origin.y + t.px.y * scale.y, t.size.x * scale.x, t.size.y * scale.y}
+						if !Render_IsVisible({min(dest.x, dest.x + dest.width), min(dest.y, dest.y + dest.height), abs(dest.width), abs(dest.height)}) do continue
 						src := rl.Rectangle{t.src.x, t.src.y, t.size.x, t.size.y}
 						if t.flipX do src.width = -src.width
 						if t.flipY do src.height = -src.height

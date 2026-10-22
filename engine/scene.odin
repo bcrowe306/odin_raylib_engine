@@ -253,6 +253,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	// One traversal buckets renderable nodes by layer (hierarchy order is
 	// kept within a layer) instead of walking the whole tree per layer.
 	buckets := Scene_CollectRenderables(scene)
+	renderStats = {}
 	for layer in RenderLayer {
 		isWorldLayer := scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent && (layer in scene.camera.targetLayers)
 		if isWorldLayer && rl.IsWindowReady() {
@@ -263,14 +264,13 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 				vh = gameContext.game.virtualSize.y
 			}
 			CameraNode_Begin(scene.camera, vw, vh)
+			Render_SetView(Camera2D_ViewRect(CameraNode_GetCamera2D(scene.camera, vw, vh), vw, vh))
 		}
 
-		for node in buckets[layer] {
-			if node.render != nil do node->render(gameContext, deltaTime)
-			if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
-		}
+		render_bucket(scene, buckets[layer][:], gameContext, deltaTime)
 
 		if isWorldLayer && rl.IsWindowReady() {
+			Render_ClearView()
 			CameraNode_End()
 		}
 	}
@@ -347,15 +347,30 @@ Scene_FindNodeByType :: proc(scene: ^Scene, t: typeid) -> ^Node {
 }
 
 // Scene_RenderAllLayers draws every layer in order from one traversal, with
-// whatever 2D camera is active (the editor viewport's). The game uses
-// RunScene, which also switches to the scene camera per world layer.
-Scene_RenderAllLayers :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
+// whatever 2D camera is active (the editor viewport's), culled to `view`
+// when given. The game uses RunScene, which also switches to the scene
+// camera per world layer.
+Scene_RenderAllLayers :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32, view: Maybe(rl.Rectangle) = nil) {
 	buckets := Scene_CollectRenderables(scene)
-	for layer in RenderLayer {
-		for node in buckets[layer] {
-			if node.render != nil do node->render(gameContext, deltaTime)
-			if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
+	renderStats = {}
+	if v, ok := view.?; ok do Render_SetView(v)
+	defer Render_ClearView()
+	for layer in RenderLayer do render_bucket(scene, buckets[layer][:], gameContext, deltaTime)
+}
+
+// render_bucket draws one layer's nodes, skipping those outside the view.
+@(private = "file")
+render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, deltaTime: f32) {
+	for node in nodes {
+		if renderView.active {
+			if r, ok := Node_RenderBounds(node); ok && !Render_IsVisible(r) {
+				renderStats.culled += 1
+				continue
+			}
 		}
+		renderStats.drawn += 1
+		if node.render != nil do node->render(gameContext, deltaTime)
+		if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
 	}
 }
 

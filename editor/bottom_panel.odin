@@ -218,6 +218,7 @@ BottomPanel_RenderProfiler :: proc(state: ^EditorState) {
 			}
 		}
 		UI_DimText(fmt.tprintf("Scene nodes  %d", nodeCount))
+		UI_DimText(fmt.tprintf("Viewport  %d drawn · %d culled (off screen)", e.renderStats.drawn, e.renderStats.culled))
 		for name, count in byType {
 			imgui.TextUnformatted(fmt.ctprintf("%s  %d", name, count))
 		}

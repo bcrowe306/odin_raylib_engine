@@ -144,7 +144,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 		}
 
 		// One traversal for all layers (not one walk per layer).
-		e.Scene_RenderAllLayers(state.activeScene, ctx, 0.0)
+		e.Scene_RenderAllLayers(state.activeScene, ctx, 0.0, e.Camera2D_ViewRect(cam, state.viewportSize.x, state.viewportSize.y))
 
 		// Draw bounding boxes / physics colliders (when enabled or node selected)
 		Viewport_DrawSceneBounds(state)
