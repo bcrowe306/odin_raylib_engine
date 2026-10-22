@@ -17,8 +17,12 @@ import rl "vendor:raylib"
 // Scene_InstantiateFromJSON reads back, so a load -> save -> load round trip
 // keeps every node, property, resource, script value and the hierarchy.
 //
+// Scene object: "name", "draw_bounds", "background", "ambient", "guides"
+// (editor guide lines: [{"x": 100}, {"y": 50}]), "root".
+//
 // Node object:
 //   "type", "name", "position", "scale", "rotation", "enabled", "visible", "layer"
+//   optional: "pause_mode", "paused", "editor_locked", "editor_hidden" (editor only)
 //   "properties": { <reflected gui:"true" fields> }        (see node_properties.odin)
 //   resources by type: "texture"/"origin" (TextureNode), "frames"/"fps"/"loop"/"origin"
 //   (FrameAnimationNode), "audio" (Sound/Music), "timer" {duration, auto_start, loop},
@@ -50,6 +54,18 @@ Scene_SerializeToJSON :: proc(scene: ^Scene, allocator := context.allocator) -> 
 		c := scene.ambient
 		Json_Key(&w, "ambient", &first)
 		fmt.sbprintf(&w.sb, "[%d, %d, %d, %d]", c.r, c.g, c.b, c.a)
+	}
+	if scene.guideCount > 0 {
+		// Editor guides: {"x": 100} is a vertical line, {"y": 50} a horizontal one.
+		Json_Key(&w, "guides", &first)
+		strings.write_byte(&w.sb, '[')
+		for g, i in scene.guides[:scene.guideCount] {
+			if i > 0 do strings.write_string(&w.sb, ", ")
+			fmt.sbprintf(&w.sb, "{{\"%s\": ", "x" if g.vertical else "y")
+			Json_Float(&w, g.pos)
+			strings.write_byte(&w.sb, '}')
+		}
+		strings.write_byte(&w.sb, ']')
 	}
 	Json_Key(&w, "root", &first)
 	if scene.rootNode != nil {
@@ -138,6 +154,8 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	Json_Key(w, "layer", &first); fmt.sbprintf(&w.sb, "%d", int(node.layer))
 	if node.pauseMode != .Inherit {Json_Key(w, "pause_mode", &first); Json_String(w, Pause_ModeName(node.pauseMode))}
 	if node.paused {Json_Key(w, "paused", &first); write_bool(w, true)}
+	if node.editorLocked {Json_Key(w, "editor_locked", &first); write_bool(w, true)}
+	if node.editorHidden {Json_Key(w, "editor_hidden", &first); write_bool(w, true)}
 
 	// A linked component instance saves only its link: everything below the
 	// instance root comes from the component file.
@@ -613,6 +631,19 @@ Scene_InstantiateFromJSON :: proc(scene: ^Scene, jsonBytes: []u8, gameContext: ^
 			scene.ambient[i] = u8(clamp(n, 0, 255))
 		}
 	}
+	scene.guideCount = 0
+	if gs, ok := sj_arr(rootObj, "guides"); ok {
+		for v in gs {
+			g, isObj := v.(json.Object)
+			if !isObj || scene.guideCount >= SCENE_MAX_GUIDES do continue
+			if "x" in g {
+				scene.guides[scene.guideCount] = {true, sj_float(g, "x", 0)}
+			} else if "y" in g {
+				scene.guides[scene.guideCount] = {false, sj_float(g, "y", 0)}
+			} else do continue
+			scene.guideCount += 1
+		}
+	}
 	if scene.rootNode != nil && gameContext != nil {
 		scene.rootNode.gameContext = gameContext
 	}
@@ -726,6 +757,8 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.layer = RenderLayer(math.clamp(sj_int(obj, "layer", int(node.layer)), 0, len(RenderLayer) - 1))
 	node.pauseMode = Pause_ModeParse(sj_string(obj, "pause_mode", ""))
 	node.paused = sj_bool(obj, "paused", false)
+	node.editorLocked = sj_bool(obj, "editor_locked", false)
+	node.editorHidden = sj_bool(obj, "editor_hidden", false)
 
 	read_legacy_blocks(node, obj, ctx)
 
@@ -1236,6 +1269,10 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.enabled = sj_bool(inst, "enabled", node.enabled)
 	node.renderable = sj_bool(inst, "visible", node.renderable)
 	node.layer = RenderLayer(math.clamp(sj_int(inst, "layer", int(node.layer)), 0, len(RenderLayer) - 1))
+	node.pauseMode = Pause_ModeParse(sj_string(inst, "pause_mode", ""))
+	node.paused = sj_bool(inst, "paused", false)
+	node.editorLocked = sj_bool(inst, "editor_locked", false)
+	node.editorHidden = sj_bool(inst, "editor_hidden", false)
 	if sj_obj_has(inst, "connections") do read_connections(node, inst)
 	return node
 }

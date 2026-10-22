@@ -19,6 +19,9 @@ Scene :: struct {
 	// Clear colour while this scene runs (alpha 0 = the game's default).
 	backgroundColor: rl.Color,
 	ambient: rl.Color, // light map base colour when the scene uses lighting ({} = white)
+	// Editor guide lines (saved with the scene; the game ignores them).
+	guides:     [SCENE_MAX_GUIDES]Scene_Guide,
+	guideCount: int,
 	rootNode: ^Node,
 	camera: ^CameraNode,
 	setup: SceneSetupProc,
@@ -31,6 +34,17 @@ Scene :: struct {
 	removeChild: proc(scene: ^Scene, parent, child: ^Node),
 	isLoaded: bool,
 }
+
+SCENE_MAX_GUIDES :: 64
+
+Scene_Guide :: struct {
+	vertical: bool, // a vertical line at x = pos (else horizontal at y = pos)
+	pos:      f32,
+}
+
+// Render_HideEditorHidden: the editor's viewport skips nodes marked
+// editorHidden (and their children); the game never sets it.
+Render_HideEditorHidden: bool
 
 CreateNodeScene :: proc(scene: ^Scene, $T: typeid, addToScene: bool = false) -> (node: ^T) {
 	allocator := vmem.arena_allocator(&scene.manager.arena)
@@ -428,6 +442,7 @@ Scene_CollectRenderables :: proc(scene: ^Scene) -> (buckets: [RenderLayer][dynam
 	for &b in buckets do b = make([dynamic]^Node, context.temp_allocator)
 	walk :: proc(m: ^NodeManager, node: ^Node, buckets: ^[RenderLayer][dynamic]^Node) {
 		if node == nil || !node.enabled do return
+		if Render_HideEditorHidden && node.editorHidden do return
 		if node.renderable && (node.render != nil || node.drawBounds != nil) {
 			append(&buckets[node.layer], node)
 		}

@@ -163,7 +163,7 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 	if filter != "" do imgui.SetNextItemOpen(true)
 	if Editor_IsSelected(state, node) || node == state.selectedNode do flags += {.Selected}
 
-	dim := !node.enabled || !node.renderable
+	dim := !node.enabled || !node.renderable || node.editorHidden
 	rowColor := UI_TEXT_FAINT if dim else UI_TEXT
 	if node.componentPath != "" do rowColor = {0.75, 0.62, 1.0, 1} // component instance
 	else if Editor_NodeLocked(state, node) do rowColor = {0.75, 0.62, 1.0, 0.55}
@@ -230,9 +230,31 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 		Editor_RecordUndo(state, "Toggle visibility")
 		node.renderable = !node.renderable
 	}
+	Drive_Item(fmt.tprintf("hier.vis:%s", path))
+	// Viewport lock / hidden-in-editor markers (click to clear), left of it.
+	x := imgui.GetWindowContentRegionMax().x - 22
+	if node.editorHidden {
+		x -= 22
+		imgui.SameLine(x)
+		if imgui.SmallButton(fmt.ctprintf("%s##ehid%p", ICON_FA_EYE_LOW_VISION, node)) {
+			Editor_RecordUndo(state, "Show in editor")
+			node.editorHidden = false
+		}
+		UI_Tooltip("Hidden in the editor (the game shows it). Click to show")
+		Drive_Item(fmt.tprintf("hier.ehidden:%s", path))
+	}
+	if node.editorLocked {
+		x -= 22
+		imgui.SameLine(x)
+		if imgui.SmallButton(fmt.ctprintf("%s##lock%p", ICON_FA_LOCK, node)) {
+			Editor_RecordUndo(state, "Unlock")
+			node.editorLocked = false
+		}
+		UI_Tooltip("Locked: can't be picked or moved in the viewport. Click to unlock")
+		Drive_Item(fmt.tprintf("hier.lock:%s", path))
+	}
 	imgui.PopStyleVar()
 	imgui.PopStyleColor(3)
-	Drive_Item(fmt.tprintf("hier.vis:%s", path))
 	_ = rowMax
 
 	if open && len(children) > 0 {
@@ -354,6 +376,8 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 		on := !node.renderable
 		for n in Editor_SelectionRoots(state) do n.renderable = on
 	}
+	if hier_menu(ICON_FA_LOCK_OPEN if node.editorLocked else ICON_FA_LOCK, "Unlock in Viewport" if node.editorLocked else "Lock in Viewport", "toggle-lock", !isRoot) do Editor_ToggleViewLock(state)
+	if hier_menu(ICON_FA_EYE_LOW_VISION, "Show in Editor" if node.editorHidden else "Hide in Editor", "toggle-editor-hidden", !isRoot) do Editor_ToggleViewHidden(state)
 	if hier_menu(ICON_FA_CROSSHAIRS, "Frame in Viewport", "frame", true, "F") do state.cameraPos = node.globalPosition
 	imgui.Separator()
 	// Script.

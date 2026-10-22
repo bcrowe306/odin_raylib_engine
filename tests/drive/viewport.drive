@@ -7,7 +7,10 @@ click @node:PatrolDroneAlpha
 expect selected == PatrolDroneAlpha
 screenshot selected_in_viewport
 
-# Move tool (W): drag the centre handle ~64px; it snaps to the 32px grid.
+# Move tool (W): drag the centre handle ~64px; it snaps to the 32px grid
+# (smart snapping to other nodes off; viewport_tools.drive covers it).
+click @menu:View
+click @menu:View/Smart Snapping
 key w
 expect tool == translate
 drag @node:PatrolDroneAlpha @node:PatrolDroneAlpha+64,0 8

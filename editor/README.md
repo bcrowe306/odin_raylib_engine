@@ -61,6 +61,9 @@ that works. On macOS "Cmd" is the Command key; elsewhere it is Ctrl.
 | **Q / W / E / R / T** | Select / Move / Rotate / Scale / Pan tool (gizmos work in world space and snap to the grid) |
 | **Middle mouse / wheel** | Pan / zoom around the cursor (Cmd+= / Cmd+- / Cmd+0 too) |
 | **F** | Frame the selection |
+| **Alt + drag the move handle** | Move the pivot (what the node shows stays in place) |
+| **Cmd+L / Cmd+Shift+H** | Lock in viewport / hide in editor |
+| **Cmd+Shift+R** | Rulers & guides (drag from a ruler to add a guide) |
 | **Cmd+A** | Add Node (under the selected node) |
 | **Cmd/Shift+click, drag a box** | Multi-select (tree and viewport); the gizmo moves the whole selection |
 | **Cmd+C / X / V, Cmd+D, Del** | Copy / cut / paste / duplicate / delete the selection |
@@ -165,6 +168,31 @@ references (into `textures/`, with the paths in the level rewritten).
 **Fit** (Home) zooms to the whole scene; the zoom menu also has Fit Game
 View (Shift+Home: the camera's frame at the project resolution), Fit
 Selection (Shift+F) and fixed zoom levels.
+
+**Rulers & guides** (View, Cmd+Shift+R): rulers along the top and left edge
+show world coordinates and the mouse position. Drag from the left ruler for
+a vertical guide, from the top one for a horizontal guide; drag a guide to
+move it, back onto a ruler to remove it (View > Clear Guides removes all).
+Guides are saved with the scene and ignored by the game.
+
+**Smart snapping** (View, on by default): a moved selection's edges and
+centre snap to other nodes' edges / centres and to guides within a few
+pixels (a magenta line shows the match); otherwise grid snapping applies.
+
+**Pivot**: Alt + drag the move handle moves the node's pivot without moving
+what it shows - a sprite's or animation's origin, its children, a line's
+points and collision shapes stay where they are (it snaps to the node's own
+edges and centre).
+
+**Lock / hide**: Edit > Lock in Viewport (Cmd+L) makes a node and its
+children unpickable and unmovable in the viewport (still editable in the
+tree and Inspector); Hide in Editor (Cmd+Shift+H) hides them in the
+viewport only - the game still shows them. Both are on the scene tree's
+right-click menu and shown as icons on the row (click to clear), and saved
+with the scene.
+
+**Show All Colliders** (View) draws every collision shape even when the
+project turns physics debug drawing off.
 
 ### Signals
 

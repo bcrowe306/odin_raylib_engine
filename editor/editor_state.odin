@@ -171,6 +171,9 @@ EditorState :: struct {
 	gridSize:         f32,
 	snapRotation:     bool,
 	showInspectorHelp: bool, // the Inspector's help pane (View menu)
+	showRulers:       bool, // rulers and guides (viewport_tools.odin)
+	smartSnap:        bool, // snap moves to other nodes' edges / centres and guides
+	showAllColliders: bool, // every collision shape, even with physics debug drawing off
 	rotationSnapStep: f32,
 	showBounds:       bool,
 	showGrid:         bool,
@@ -250,6 +253,8 @@ Editor_Init :: proc(state: ^EditorState) {
 	state.gridSize = 32.0
 	state.snapRotation = false
 	state.showInspectorHelp = true
+	state.showRulers = true
+	state.smartSnap = true
 	state.rotationSnapStep = 15.0
 	state.showBounds = false
 	state.showGrid = true

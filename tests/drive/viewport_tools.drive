@@ -1,0 +1,75 @@
+# Viewport tools: rulers and a guide dragged from the ruler, Alt-drag moves a
+# sprite's pivot (the image and its child stay), a move snaps the sprite's
+# edge to the guide (grid snapping would land elsewhere), viewport lock and
+# hide in editor, Show All Colliders; guides and flags saved with the scene.
+wait 5
+click @asset.new-scene
+click @hier.add
+type sprite
+click @addnode.create
+click @insp.texture
+click @pick:textures/Asteroid_5.png
+dblclick @insp.position.x
+key ctrl+a
+type 416
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type 288
+key enter
+click @hier.add
+type empty
+click @addnode.create
+expect node:TextureSprite/EmptyNode.type == Node
+dblclick @insp.position.x
+key ctrl+a
+type 0
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type 0
+key enter
+expect node:TextureSprite/EmptyNode.global ~= 416,288
+screenshot rulers
+
+# Pivot: Alt + drag the move handle 64 px right.
+click @hier:TextureSprite
+key w
+hold alt
+drag @node:TextureSprite @node:TextureSprite+64,0 8
+release
+expect node:TextureSprite.position ~= 480,288
+expect node:TextureSprite/EmptyNode.global ~= 416,288
+screenshot pivot_moved
+
+# A vertical guide from the left ruler (grid-snapped to x = 704).
+drag @viewport.ruler.left @world:700,300 8
+expect guides == x=704
+# Move 6 px: the image's right edge (696 + 6) snaps to the guide -> 488
+# (grid snapping alone would give 480).
+drag @node:TextureSprite @node:TextureSprite+6,0 6
+expect node:TextureSprite.position ~= 488,288
+screenshot snapped_to_guide
+
+# Lock: not pickable in the viewport; the tree shows the lock.
+key cmd+l
+expect node:TextureSprite.locked == true
+expect item:hier.lock:TextureSprite == visible
+key escape
+click @node:TextureSprite+100,0
+expect selected ==
+click @hier.lock:TextureSprite
+expect node:TextureSprite.locked == false
+
+# Hidden in the editor (the game still shows it).
+click @hier:TextureSprite
+key cmd+shift+h
+expect node:TextureSprite.editor-hidden == true
+expect item:hier.ehidden:TextureSprite == visible
+screenshot hidden_in_editor
+click @menu:View
+click @menu:View/Show All Colliders
+key ctrl+s
+expect file:scenes/new_scene.scene.json contains "guides": [{"x": 704}]
+expect file:scenes/new_scene.scene.json contains "editor_hidden": true
+expect file:scenes/new_scene.scene.json contains "origin": [344, 273]

@@ -55,6 +55,11 @@ Node :: struct {
 	// decides whether the node stops when its parent / the game pauses.
 	pauseMode: Pause_Mode,
 	paused: bool,
+	// Editor-only (saved with the scene, ignored by the game): a locked node
+	// and its children can't be picked or moved in the viewport; a hidden
+	// one isn't drawn there (Render_HideEditorHidden).
+	editorLocked: bool,
+	editorHidden: bool,
 	pausedNow: bool,  // paused this frame (set by the update pass)
 	bodyPaused: bool, // its physics body was disabled by a pause
 	removing: bool, // queued for removal (RemoveNode)

@@ -36,6 +36,7 @@ exits non-zero if any check fails.
 | `animation.drive` | Animation tab: frames from dropped textures, scrubbing, rotation track with keys, preview restore, save. |
 | `tilemap.drive` | Tile map: tileset, palette, paint stroke (undo/redo), flood fill, erase, save. |
 | `ui_ux.drive` | Settings (keymap record, input action + key, video, export), linked X/Y and reset, Save As / Revert / Open Project, asset copy/paste/rename/delete, paste as child, LDtk level asset, instance add child + apply to component, particle editor, viewport fit. |
+| `viewport_tools.drive` | Rulers, a guide dragged from the ruler, Alt-drag pivot (image and child stay), smart snap of an edge to the guide, viewport lock (not pickable) and hide in editor, Show All Colliders, saved. |
 | `multi_edit.drive` | Two lights selected: mixed value marked, a number / one axis of the position / a checkbox / a combo applied to both, undo. |
 | `inspector_help.drive` | Hovering a property fills the tooltip and the Inspector help pane (field or label); View > Inspector Help hides the pane. |
 | `code_editor.drive` | Open a script in the Code tab; lua-language-server completion of the engine API, signature help, diagnostics, go to definition; save; unsaved-changes prompt; New Script from the Inspector. |
@@ -93,7 +94,7 @@ Queries:
   `code.dirty`, `code.focused`, `code.lsp` (off/starting/ready/failed), `code.completion` (visible items,
   comma-separated), `code.signature`, `code.errors`, `code.diagnostics`, `code.diagnostic-messages`, `code.hover`
 - `code.cursors`, `code.selection`, `code.find` (match count), `code.font`, `code.completion-doc`
-- `insp-help` (the Inspector help pane: `<Title>: <doc>`)
+- `insp-help` (the Inspector help pane: `<Title>: <doc>`), `guides` (`x=704,y=50`)
 - `palette.open`, `shortcuts-open`, `quit-prompt`, `selection`, `selection-count`, `clipboard-nodes`
 - `import.imported`, `import.skipped`, `import.failed` (counts from the last import), `import.report`
   (Import Results open), `import.messages` (one `<file>: <status> <path> <message>` line each), `import.dialog`
@@ -105,7 +106,7 @@ Queries:
   vertices points count`; shape handles are items `shape<i>.<Kind><n>` (Move, Rotate, Radius, Edge 0-3,
   Corner 0-3, CapEnd 0-1, Point n, AddPoint n)
 - `node-delta:A,B` (global position of B minus A), `anim` (`<animation>:<frame>/<length>:<tracks>` of the selected AnimationPlayer)
-- `node:<Name>.<field>`, where field is one of `exists type parent position global rotation scale visible enabled children script prop.<path> script.<prop> connections overrides tiles material state` (`state`: a StateMachine's `<current>/<state count>`)
+- `node:<Name>.<field>`, where field is one of `exists type parent position global locked editor-hidden rotation scale visible enabled children script prop.<path> script.<prop> connections overrides tiles material state` (`state`: a StateMachine's `<current>/<state count>`)
 
 Widgets register themselves with `Drive_Item("<id>")` right after they are drawn
 (see `editor/test_drive.odin` and `UI_IconButton`/`UI_Button` in `ui_style.odin`).

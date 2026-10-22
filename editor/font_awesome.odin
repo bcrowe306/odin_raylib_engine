@@ -99,3 +99,7 @@ ICON_FA_MOUNTAIN                  :: "\uF6FC" // Parallax
 ICON_FA_VECTOR_SQUARE             :: "\uF5CB" // Nine-slice
 ICON_FA_WIND                      :: "\uF72E" // Trail
 ICON_FA_FILTER                    :: "\uF0B0" // Post effect
+ICON_FA_LOCK                      :: "" // Viewport lock
+ICON_FA_LOCK_OPEN                 :: ""
+ICON_FA_RULER_COMBINED            :: "" // Rulers & guides
+ICON_FA_EYE_LOW_VISION            :: "" // Hidden in the editor

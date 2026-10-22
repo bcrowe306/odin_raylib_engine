@@ -697,6 +697,11 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		if a == nil do return "none", true
 		return fmt.tprintf("%s:%d/%d:%d", a.name, apn.currentFrame - a.startFrame + 1, e.Animation_Length(a), len(a.tracks)), true
 	case "shortcuts-open": return "true" if showShortcutsWindow else "false", true
+	case "guides":
+		if state.activeScene == nil do return "", true
+		parts := make([dynamic]string, context.temp_allocator)
+		for g in state.activeScene.guides[:state.activeScene.guideCount] do append(&parts, fmt.tprintf("%s=%v", "x" if g.vertical else "y", g.pos))
+		return strings.join(parts[:], ",", context.temp_allocator), true
 	case "insp-help": return fmt.tprintf("%s: %s", inspectorHelp.title, inspectorHelp.doc), true
 	}
 	switch q {
@@ -779,6 +784,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 			p := e.GetParent(state.activeScene.manager, n)
 			return p.name if p != nil else "", true
 		case "position": return fmt_vec(n.position), true
+		case "locked": return "true" if n.editorLocked else "false", true
+		case "editor-hidden": return "true" if n.editorHidden else "false", true
 		case "global": return fmt_vec(n.globalPosition), true
 		case "rotation": return fmt.tprintf("%.1f", n.rotation), true
 		case "scale": return fmt.tprintf("%.2f,%.2f", n.scale.x, n.scale.y), true

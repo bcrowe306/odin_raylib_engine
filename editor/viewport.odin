@@ -189,7 +189,9 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 	// Active scene rendering
 	if state.activeScene != nil && state.activeScene.rootNode != nil {
 		// One traversal for all layers (not one walk per layer).
+		e.Render_HideEditorHidden = true // nodes hidden in the editor
 		e.Scene_RenderAllLayers(state.activeScene, ctx, 0.0, e.Camera2D_ViewRect(cam, state.viewportSize.x, state.viewportSize.y))
+		e.Render_HideEditorHidden = false
 		if lit {
 			// Lights multiply over the scene (screen space), before editor overlays.
 			rl.EndMode2D()
@@ -200,6 +202,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 
 		// Draw bounding boxes / physics colliders (when enabled or node selected)
 		Viewport_DrawSceneBounds(state)
+		Viewport_DrawAllColliders(state)
 		Viewport_DrawLdtkEntities(state)
 		Viewport_DrawCameraFollow(state)
 	}
@@ -362,6 +365,7 @@ Viewport_DrawSceneBounds :: proc(state: ^EditorState) {
 		if node == nil || node == state.activeScene.rootNode || node.typeId == e.CameraNode do continue
 		isSelected := node == state.selectedNode || Editor_IsSelected(state, node)
 		if !state.showBounds && !isSelected do continue
+		if Editor_ViewHidden(state, node) do continue
 		q, isHandle := Node_Bounds(state, node)
 		col := rl.Color{92, 141, 255, 255} if isSelected else rl.Color{140, 150, 170, 90}
 		th := (2.0 if isSelected else 1.0) / state.cameraZoom
@@ -594,8 +598,11 @@ Viewport_HandleInputAndGizmos :: proc(state: ^EditorState) {
 	// Collision-shape handles (replace the gizmo while editing shapes).
 	shapeOwnsMouse := Viewport_ShapeEdit(state, drawList, mouseScreen, mouseWorld)
 
-	// 3. Transform Gizmos for Selected Node
-	if state.selectedNode != nil && !ShapeEdit_IsActive(state) {
+	// Rulers and guides (and their mouse handling).
+	guidesOwn := shapeOwnsMouse ? false : Viewport_Guides(state, drawList, mouseScreen, mouseWorld)
+
+	// 3. Transform Gizmos for Selected Node (not for nodes locked in the viewport)
+	if state.selectedNode != nil && !ShapeEdit_IsActive(state) && !guidesOwn && !Editor_ViewLocked(state, state.selectedNode) {
 		Viewport_RenderAndInteractGizmo(state, drawList, mouseScreen, mouseWorld)
 	} else {
 		state.activeHandle = .None
@@ -606,7 +613,7 @@ Viewport_HandleInputAndGizmos :: proc(state: ^EditorState) {
 	// Shift/Cmd/Ctrl-click adds to the selection; dragging on empty space
 	// with the Select tool draws a selection box.
 	additive := io.KeyShift || io.KeyCtrl || io.KeySuper
-	if state.viewportHovered && imgui.IsMouseClicked(.Left) && !state.isDraggingGizmo && !shapeOwnsMouse && state.toolMode != .Pan {
+	if state.viewportHovered && imgui.IsMouseClicked(.Left) && !state.isDraggingGizmo && !shapeOwnsMouse && !guidesOwn && state.toolMode != .Pan {
 		if state.activeHandle == .None {
 			picked := Viewport_PickNode(state, mouseWorld)
 			if picked != nil || !additive do Editor_SelectNode(state, picked, additive)
@@ -639,7 +646,7 @@ Viewport_BoxSelect :: proc(state: ^EditorState, mn, mx: [2]f32, additive: bool) 
 	if !additive do Editor_ClearSelection(state)
 	for node in state.activeScene.manager.nodes {
 		if node == nil || node == state.activeScene.rootNode || !node.enabled || !node.renderable || node.transient do continue
-		if Editor_NodeLocked(state, node) do continue
+		if Editor_NodeLocked(state, node) || Editor_ViewLocked(state, node) || Editor_ViewHidden(state, node) do continue
 		q, _ := Node_Bounds(state, node)
 		bmn, bmx := q[0], q[0]
 		for p in q {
@@ -716,12 +723,17 @@ Viewport_RenderAndInteractGizmo :: proc(state: ^EditorState, drawList: ^imgui.Dr
 			state.dragStartPos = node.globalPosition // world space
 			state.dragStartRot = node.rotation
 			state.dragStartScale = node.scale
+			// Alt + the move handle: moves the pivot, not the node.
+			pivotDrag = state.activeHandle == .TranslateCenter && imgui.GetIO().KeyAlt
 			// Other selected nodes move/rotate/scale along.
 			clear(&state.dragOthers)
-			for other in Editor_SelectionRoots(state) {
-				if other == node do continue
-				append(&state.dragOthers, Drag_Start{other, other.globalPosition, other.rotation, other.scale})
+			if !pivotDrag {
+				for other in Editor_SelectionRoots(state) {
+					if other == node || Editor_ViewLocked(state, other) do continue
+					append(&state.dragOthers, Drag_Start{other, other.globalPosition, other.rotation, other.scale})
+				}
 			}
+			SmartSnap_Begin(state, pivotDrag)
 		}
 	}
 
@@ -733,22 +745,29 @@ Viewport_RenderAndInteractGizmo :: proc(state: ^EditorState, drawList: ^imgui.Dr
 			case .TranslateCenter:
 				// Snap in world space, so snapped nodes line up with the grid.
 				newWorld := state.dragStartPos + deltaWorld
+				snapped := SmartSnap_Apply(state, state.dragStartPos, &newWorld, {true, true})
 				if state.snapGrid && state.gridSize > 0 {
-					newWorld.x = math.round(newWorld.x / state.gridSize) * state.gridSize
-					newWorld.y = math.round(newWorld.y / state.gridSize) * state.gridSize
+					if !snapped.x do newWorld.x = math.round(newWorld.x / state.gridSize) * state.gridSize
+					if !snapped.y do newWorld.y = math.round(newWorld.y / state.gridSize) * state.gridSize
 				}
-				node.position = e.Node_WorldToParent(mgr, node, newWorld)
+				if pivotDrag {
+					Pivot_MoveTo(state, node, newWorld)
+				} else {
+					node.position = e.Node_WorldToParent(mgr, node, newWorld)
+				}
 
 			case .TranslateX:
 				newWorld := [2]f32{state.dragStartPos.x + deltaWorld.x, state.dragStartPos.y}
-				if state.snapGrid && state.gridSize > 0 {
+				snapped := SmartSnap_Apply(state, state.dragStartPos, &newWorld, {true, false})
+				if state.snapGrid && state.gridSize > 0 && !snapped.x {
 					newWorld.x = math.round(newWorld.x / state.gridSize) * state.gridSize
 				}
 				node.position = e.Node_WorldToParent(mgr, node, newWorld)
 
 			case .TranslateY:
 				newWorld := [2]f32{state.dragStartPos.x, state.dragStartPos.y + deltaWorld.y}
-				if state.snapGrid && state.gridSize > 0 {
+				snapped := SmartSnap_Apply(state, state.dragStartPos, &newWorld, {false, true})
+				if state.snapGrid && state.gridSize > 0 && !snapped.y {
 					newWorld.y = math.round(newWorld.y / state.gridSize) * state.gridSize
 				}
 				node.position = e.Node_WorldToParent(mgr, node, newWorld)
@@ -799,7 +818,7 @@ Viewport_RenderAndInteractGizmo :: proc(state: ^EditorState, drawList: ^imgui.Dr
 			imgui.BeginTooltip()
 			#partial switch state.activeHandle {
 			case .TranslateCenter, .TranslateX, .TranslateY:
-				imgui.Text(fmt.ctprintf("Position: (%.1f, %.1f)", node.position.x, node.position.y))
+				imgui.Text(fmt.ctprintf("%s: (%.1f, %.1f)", "Pivot" if pivotDrag else "Position", node.position.x, node.position.y))
 			case .RotateRing:
 				imgui.Text(fmt.ctprintf("Rotation: %.1f deg", node.rotation))
 			case .ScaleCorner, .ScaleX, .ScaleY:
@@ -811,6 +830,8 @@ Viewport_RenderAndInteractGizmo :: proc(state: ^EditorState, drawList: ^imgui.Dr
 		} else {
 			state.isDraggingGizmo = false
 			state.activeHandle = .None
+			pivotDrag = false
+			smartSnap.has = {}
 		}
 	}
 
@@ -901,6 +922,7 @@ Viewport_PickNode :: proc(state: ^EditorState, worldPos: [2]f32) -> ^e.Node {
 	bestLayer := -1
 	for node in state.activeScene.manager.nodes {
 		if node == nil || node == state.activeScene.rootNode || !node.enabled || !node.renderable do continue
+		if Editor_ViewLocked(state, node) || Editor_ViewHidden(state, node) do continue
 		q, _ := Node_Bounds(state, node)
 		if !point_in_quad(worldPos, q) do continue
 		// A level covers everything: picked only when nothing else is there.
