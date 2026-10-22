@@ -349,6 +349,18 @@ Developer ID, the app is then notarized and stapled in the background
 `scripts/build_runners.sh` finds the x86_64 builds of raylib, Box2D and
 Lua; otherwise it's built for the Mac's own architecture.
 
+**Windows** exports are a folder with `<Name>.exe`, `lua54.dll`, `game.ore`
+and the font. Release runners have no console window
+(`-subsystem:windows`). The exe gets the project icon (16-256 px) and
+version info (product name, description, version from Project > General) -
+written with the Win32 resource API, so this happens when exporting on
+Windows; exports made elsewhere keep the runner's own.
+
+**Linux** exports are an AppDir, `<output>/linux/<Name>.AppDir` (`AppRun`,
+`<Name>.desktop`, the icon, `usr/bin/` with the runner, `game.ore` and the
+font); on Linux with `appimagetool` on `PATH` it's also packed into
+`<Name>-<arch>.AppImage`.
+
 The engine's open gaps and everything fixed in this pass are listed in [`engine/GAPS.md`](../engine/GAPS.md).
 
 ---

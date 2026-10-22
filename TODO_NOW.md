@@ -25,7 +25,7 @@ out of scope here.
 
 - [x] 3.1 Prebuilt runners per platform shipped with the editor; export copies the runner + `.ore` (no compiler needed), name and icon
 - [x] 3.2 macOS `.app` bundle (Info.plist, icon, `.ore` in Resources, universal binary); optional codesign/notarize step
-- [ ] 3.3 Windows packaging (icon, version info, no console in release); Linux AppImage
+- [x] 3.3 Windows packaging (icon, version info, no console in release); Linux AppImage
 - [ ] 3.4 Web (emscripten): raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio
 - [ ] 3.5 Export presets per target (icon, version, window, include/exclude, debug/release) in `project.json`
 

@@ -1,12 +1,10 @@
 package editor
 
-import "core:c"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
 import e "../engine"
-import rl "vendor:raylib"
 
 // ============================================================================
 // macOS export: <output>/macos/<Name>.app
@@ -70,33 +68,16 @@ Export_InfoPlist :: proc(cfg: ^e.ProjectConfig, exeName: string, hasIcon: bool) 
 // Export_WriteIcns writes an .icns from a PNG (PNG-encoded entries,
 // 16..1024 px; macOS 10.7+).
 Export_WriteIcns :: proc(pngPath, dst: string) -> bool {
-	src := rl.LoadImage(strings.clone_to_cstring(pngPath, context.temp_allocator))
-	if src.data == nil do return false
-	defer rl.UnloadImage(src)
-	rl.ImageFormat(&src, .UNCOMPRESSED_R8G8B8A8)
-	// Square (centred, transparent padding) so a non-square image isn't stretched.
-	if src.width != src.height {
-		side := max(src.width, src.height)
-		rl.ImageResizeCanvas(&src, side, side, (side - src.width) / 2, (side - src.height) / 2, {0, 0, 0, 0})
-	}
-	Entry :: struct {type: string, size: c.int}
-	entries := []Entry{
-		{"icp4", 16}, {"icp5", 32}, {"icp6", 64}, {"ic07", 128}, {"ic08", 256}, {"ic09", 512}, {"ic10", 1024},
-		{"ic11", 32}, {"ic12", 64}, {"ic13", 256}, {"ic14", 512},
-	}
-	body := make([dynamic]u8, context.temp_allocator)
+	types := []string{"icp4", "icp5", "icp6", "ic07", "ic08", "ic09", "ic10", "ic11", "ic12", "ic13", "ic14"}
+	sizes := []int{16, 32, 64, 128, 256, 512, 1024, 32, 64, 256, 512}
+	images := e.Icon_Images(pngPath, sizes, context.temp_allocator)
+	if len(images) != len(sizes) do return false
 	be32 :: proc(buf: ^[dynamic]u8, v: int) {append(buf, u8(v >> 24), u8(v >> 16), u8(v >> 8), u8(v))}
-	for en in entries {
-		img := rl.ImageCopy(src)
-		rl.ImageResize(&img, en.size, en.size)
-		n: c.int
-		png := rl.ExportImageToMemory(img, ".png", &n)
-		rl.UnloadImage(img)
-		if png == nil || n <= 0 do return false
-		append(&body, ..transmute([]u8)en.type)
-		be32(&body, int(n) + 8)
-		append(&body, ..([^]u8)(png)[:n])
-		rl.MemFree(png)
+	body := make([dynamic]u8, context.temp_allocator)
+	for im, i in images {
+		append(&body, ..transmute([]u8)types[i])
+		be32(&body, len(im.png) + 8)
+		append(&body, ..im.png)
 	}
 	out := make([dynamic]u8, context.temp_allocator)
 	append(&out, 'i', 'c', 'n', 's')
@@ -105,7 +86,7 @@ Export_WriteIcns :: proc(pngPath, dst: string) -> bool {
 	return os.write_entire_file(dst, out[:]) == nil
 }
 
-@(private = "file")
+// run_tool runs a command to completion; false (logged) when it fails.
 run_tool :: proc(state: ^EditorState, cmd: []string) -> bool {
 	st, _, stderr, err := os.process_exec({command = cmd}, context.temp_allocator)
 	if err != nil {

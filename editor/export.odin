@@ -4,6 +4,7 @@ import "core:os"
 import "core:path/filepath"
 import "core:strings"
 import e "../engine"
+import "winres"
 
 // ============================================================================
 // Standalone export: for each target platform, a folder with a prebuilt
@@ -17,6 +18,11 @@ import e "../engine"
 //   <output>/<platform>/game.ore
 //   <output>/<platform>/fonts/OpenSans-Regular.ttf
 //   <output>/macos/<Name>.app                (export_macos.odin)
+//   <output>/linux/<Name>.AppDir             (+ <Name>-<arch>.AppImage with appimagetool)
+//
+// Windows: the exe gets the project icon and version info (written with
+// the Win32 resource API, so when exporting on Windows); release runners
+// have no console window (scripts/build_runners.sh).
 // ============================================================================
 
 RUNNER_FONT :: "OpenSans-Regular.ttf"
@@ -126,8 +132,11 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false) {
 		}
 		dir: string
 		ok: bool
-		if t == .MacOS do dir, ok = Export_MacApp(state, runner, ore, outDir, name)
-		else do dir, ok = export_target(state, t, runner, ore, outDir, name)
+		switch t {
+		case .MacOS:   dir, ok = Export_MacApp(state, runner, ore, outDir, name)
+		case .Linux:   dir, ok = export_linux(state, runner, ore, outDir, name)
+		case .Windows: dir, ok = export_target(state, t, runner, ore, outDir, name)
+		}
 		if ok {
 			Editor_Log(state, .Info, "Exported %s: %s", e.export_target_name(t), dir)
 			exported += 1
@@ -166,5 +175,65 @@ export_target :: proc(state: ^EditorState, t: e.Export_Target, runner, ore, outD
 			_ = os.copy_file(dst, font)
 		}
 	}
+	if t == .Windows do windows_resources(state, exe, name)
 	return strings.clone(dir, context.temp_allocator), true
+}
+
+// windows_resources writes the project icon and version info into the exe.
+@(private = "file")
+windows_resources :: proc(state: ^EditorState, exe, name: string) {
+	cfg := &state.projectConfig
+	if !winres.AVAILABLE {
+		Editor_Log(state, .Info, "%s keeps the runner's icon and version info: they're written when exporting on Windows", filepath.base(exe))
+		return
+	}
+	icons: [][]u8
+	group: []u8
+	if cfg.icon != "" {
+		src, _ := filepath.join({state.projectPath, cfg.icon}, context.temp_allocator)
+		images := e.Icon_Images(src, {16, 24, 32, 48, 64, 128, 256}, context.temp_allocator)
+		if len(images) > 0 {
+			pngs := make([][]u8, len(images), context.temp_allocator)
+			for im, i in images do pngs[i] = im.png
+			icons = pngs
+			group = e.Ico_GroupDirectory(images, 1, context.temp_allocator)
+		} else {
+			Editor_Log(state, .Warn, "Could not read the icon %s", cfg.icon)
+		}
+	}
+	description := cfg.windowTitle if cfg.windowTitle != "" else cfg.name
+	version := e.VersionInfo_Resource(cfg.name, description, cfg.version, name, context.temp_allocator)
+	if winres.Update(exe, icons, group, version) {
+		Editor_Log(state, .Info, "Wrote the icon and version %s into %s", cfg.version, filepath.base(exe))
+	} else {
+		Editor_Log(state, .Warn, "Could not write resources into %s", exe)
+	}
+}
+
+// export_linux writes <output>/linux/<Name>.AppDir and, with appimagetool
+// on PATH (Linux), <Name>-<arch>.AppImage next to it.
+@(private = "file")
+export_linux :: proc(state: ^EditorState, runner, ore, outDir, name: string) -> (string, bool) {
+	cfg := &state.projectConfig
+	dir, _ := filepath.join({outDir, "linux"}, context.temp_allocator)
+	_ = os.make_directory_all(dir)
+	icon := ""
+	if cfg.icon != "" do icon, _ = filepath.join({state.projectPath, cfg.icon}, context.temp_allocator)
+	font := runner_font(runner) if cfg.export.includeFont else ""
+	appDir, ok := e.Export_LinuxAppDir(dir, name, cfg, runner, runner_libraries(runner), ore, font, icon)
+	if !ok {
+		Editor_Log(state, .Error, "Could not write the AppDir in %s", dir)
+		return "", false
+	}
+	when ODIN_OS == .Linux {
+		arch := "aarch64" if ODIN_ARCH == .arm64 else "x86_64"
+		image, _ := filepath.join({dir, strings.concatenate({name, "-", arch, ".AppImage"}, context.temp_allocator)}, context.temp_allocator)
+		if run_tool(state, {"env", strings.concatenate({"ARCH=", arch}, context.temp_allocator), "appimagetool", appDir, image}) {
+			return strings.clone(image, context.temp_allocator), true
+		}
+		Editor_Log(state, .Info, "No AppImage (install appimagetool); the AppDir runs with its AppRun")
+	} else {
+		Editor_Log(state, .Info, "Linux: %s (make an .AppImage from it with appimagetool on Linux)", filepath.base(appDir))
+	}
+	return appDir, true
 }
