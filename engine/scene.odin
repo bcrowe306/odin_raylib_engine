@@ -346,6 +346,19 @@ Scene_FindNodeByType :: proc(scene: ^Scene, t: typeid) -> ^Node {
 	return nil
 }
 
+// Scene_RenderAllLayers draws every layer in order from one traversal, with
+// whatever 2D camera is active (the editor viewport's). The game uses
+// RunScene, which also switches to the scene camera per world layer.
+Scene_RenderAllLayers :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
+	buckets := Scene_CollectRenderables(scene)
+	for layer in RenderLayer {
+		for node in buckets[layer] {
+			if node.render != nil do node->render(gameContext, deltaTime)
+			if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
+		}
+	}
+}
+
 // Scene_CollectRenderables walks the enabled hierarchy once and returns the
 // renderable nodes of each layer in draw order (temp-allocated).
 Scene_CollectRenderables :: proc(scene: ^Scene) -> (buckets: [RenderLayer][dynamic]^Node) {

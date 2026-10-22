@@ -143,9 +143,8 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 			e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
 		}
 
-		for layer in e.RenderLayer {
-			e.Scene_RenderNodeHirearchy(state.activeScene, state.activeScene.rootNode, ctx, 0.0, layer)
-		}
+		// One traversal for all layers (not one walk per layer).
+		e.Scene_RenderAllLayers(state.activeScene, ctx, 0.0)
 
 		// Draw bounding boxes / physics colliders (when enabled or node selected)
 		Viewport_DrawSceneBounds(state)
