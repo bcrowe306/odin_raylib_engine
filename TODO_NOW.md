@@ -36,7 +36,7 @@ out of scope here.
 - [x] 4.2 Batching: sort draws by texture per layer, texture atlases, cache static LDtk/tile layers in render textures
 - [x] 4.3 `#soa` + SIMD for particles and tile layers (verify the `#soa` compiler issue first)
 - [x] 4.4 Editor: incremental undo/modified tracking (change counters, not whole-scene JSON); cache per-frame inspector/LDtk work
-- [ ] 4.5 Extend `bench_scene_hot_paths` to rendering and scripts; record baselines in GAPS.md
+- [x] 4.5 Extend `bench_scene_hot_paths` to rendering and scripts; record baselines in GAPS.md
 
 ## Phase 5 — Engine features (rest)
 

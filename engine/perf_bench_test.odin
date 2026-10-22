@@ -93,3 +93,39 @@ bench_particles :: proc(t: ^testing.T) {
 	for i in 0 ..< len(emitter.particles) do if emitter.particles[i].alive do alive += 1
 	fmt.printfln("[bench] particles: %d alive, %d emitted/frame: update %.3f ms/frame", alive, 5000 / 60, time.duration_milliseconds(per))
 }
+
+// Lua scripts: 1000 nodes whose script moves them every frame (update(dt)
+// calls, property access, a node method), and emitting an event each
+// frame to a Lua connection.
+@(test)
+bench_scripts :: proc(t: ^testing.T) {
+	ScriptVFS_RegisterEmbedded("bench_mover.lua", `
+local M = {}
+M.properties = { speed = { type = "float", default = 40 } }
+function M:ready() self.t = 0 end
+function M:update(dt)
+	self.t = self.t + dt
+	local x, y = self.node:get_position()
+	self.node:set_position(x + self.speed * dt, y + math.sin(self.t) * dt)
+end
+return M
+`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("bench_scripts", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	count :: 1000
+	for i in 0 ..< count {
+		n := Node_CreateByTypeName(scene, "Node")
+		n.gameContext = &game.gameContext
+		Script_AttachToNode(n, "bench_mover.lua", nil, &game.scriptManager)
+	}
+	for _ in 0 ..< 10 do game->run(1.0 / 60) // ready() and warm-up
+	frames :: 120
+	start := time.tick_now()
+	for _ in 0 ..< frames do game->run(1.0 / 60)
+	per := time.tick_since(start) / frames
+	fmt.printfln("[bench] scripts: %d nodes with update(dt): %.3f ms/frame (%.2f us per script)", count, time.duration_milliseconds(per), time.duration_microseconds(per) / count)
+}

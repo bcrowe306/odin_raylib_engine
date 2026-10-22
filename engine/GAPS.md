@@ -194,3 +194,43 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 ./scripts/editor_drive.sh                      # all UI test-drives (or: task editor:drive)
 ```
 
+
+## Performance baselines
+
+`scripts/bench.sh` runs every benchmark (engine: `bench_scene_hot_paths`,
+`bench_particles`, `bench_scripts`; rendering: the runner's `--bench 300`
+on the scenes of `scripts/make_bench_project.py`, with and without the
+render caches). Recorded 2026-10-22 on an Apple M2 Pro, `-o:speed`, after
+Phase 4. Rendering is CPU time per frame (update + draw submission); the
+whole frame is vsync-bound at ~16.8 ms.
+
+| Engine (no window) | 500 nodes | 2000 nodes | 5000 nodes |
+|---|---|---|---|
+| Create plain nodes | 0.32 ms | 1.10 ms | 2.73 ms |
+| Create TextureNodes (registry) | 0.51 ms | 1.90 ms | 4.62 ms |
+| Destroy all | 0.12 ms | 0.53 ms | 1.61 ms |
+| Global transform pass | 0.003 ms | 0.013 ms | 0.036 ms |
+| RunScene frame (no window) | 0.026 ms | 0.080 ms | 0.207 ms |
+
+| Scene JSON | 1000 nodes | 4000 nodes | 10000 nodes |
+|---|---|---|---|
+| Size | 237 KB | 950 KB | 2377 KB |
+| Serialize (save, undo snapshot) | 2.1 ms | 8.4 ms | 20.8 ms |
+| Load (open, undo restore) | 4.0 ms | 15.8 ms | 40.7 ms |
+
+| Simulation | Per frame |
+|---|---|
+| 5000 particles (83 emitted/frame) | 0.076 ms |
+| 1000 Lua scripts `update(dt)` (get/set position) | 0.33 ms (0.33 us each) |
+
+| Rendering (runner `--bench`) | Cached | `--no-render-cache` |
+|---|---|---|
+| 5000 sprites, 4 textures, separate | 0.93 ms | 7.90 ms |
+| 5000 sprites, 4 textures, overlapping | 3.94 ms | 8.51 ms |
+| 400x400 tile map at zoom 0.25 | 0.12 ms | 4.89 ms |
+| 5000 rectangle particles | 0.42 ms | 0.42 ms |
+| 5000 circle particles | 1.34 ms | 1.92 ms |
+| Demo main scene | 0.09 ms | 0.77 ms |
+
+(`--no-render-cache` turns off draw reordering, tile chunks and multi-buffered
+batches - the pre-4.2 renderer, with the 4.3 particle fixes.)
