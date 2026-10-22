@@ -353,6 +353,21 @@ function Node:dialogue_close() end
 ---@return boolean
 function Node:dialogue_is_open() end
 
+---LineNode: replaces its points (local to the node).
+---@param points number[][] { {x, y}, ... }
+function Node:line_set_points(points) end
+
+---LineNode: appends a point (local to the node).
+---@param x number
+---@param y number
+function Node:line_add_point(x, y) end
+
+---LineNode: removes every point.
+function Node:line_clear() end
+
+---TrailNode: drops the recorded ribbon (e.g. after a teleport).
+function Node:trail_clear() end
+
 ---@class NavOptions
 ---@field diagonal? boolean 8 directions (default true); no cutting past blocked corners
 ---@field smooth? boolean Straighten where the line of sight is clear (default true)

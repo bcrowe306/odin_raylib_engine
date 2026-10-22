@@ -228,6 +228,14 @@ key, SDF and typewriter speed. **Dialogue Box** (UI) is a box scripts fill
 with lines (`dialogue_show`). Localization tables are `locale/*.csv`; the
 starting language is set in Project Settings > General.
 
+### Visual extras
+
+**Nine Slice Sprite**, **Parallax Background**, **Line** and **Post Effect**
+(Graphics & Rendering) and **Trail** (Animation & Effects) nodes. A Line's
+points are edited in the Inspector's **Points** section (**Add Point**, the
+x removes one). Post effects show in the viewport while the lighting
+preview (toolbar) is on; pick the shader in the **Material** section.
+
 ### Physics: joints, one-way, layers
 
 Add a **Joint** (Physics & Collision) and pick **Body A** / **Body B** in

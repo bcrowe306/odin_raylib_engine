@@ -1,0 +1,51 @@
+# Visual extras from Add Node: a parallax background with a picked texture,
+# a nine-slice sprite, a line with an added point, a trail and a post effect
+# (vignette, previewed with the lighting toggle), saved.
+wait 5
+key escape
+key ctrl+a
+type parallax
+click @addnode.create
+expect node:ParallaxBackground.type == ParallaxNode
+click @insp.texture-path
+click @pick:textures/Background.png
+expect node:ParallaxBackground.prop.texturePath == textures/Background.png
+key escape
+key ctrl+a
+key ctrl+a
+type nine
+click @addnode.create
+expect node:NineSliceSprite.type == NineSliceNode
+key escape
+key ctrl+a
+key ctrl+a
+type line
+click @addnode:Line
+click @addnode.create
+expect node:Line.type == LineNode
+screenshot line_before
+click @insp.line.add
+screenshot line_after
+key escape
+key ctrl+a
+key ctrl+a
+type trail
+click @addnode.create
+expect node:Trail.type == TrailNode
+key escape
+key ctrl+a
+key ctrl+a
+type post effect
+click @addnode.create
+expect node:PostEffect.type == PostEffectNode
+expect node:PostEffect.material == builtin:vignette alpha
+click @toolbar.lighting
+screenshot extras_with_vignette
+click @toolbar.lighting
+click @toolbar.save
+expect file:scenes/main.scene.json contains "type": "ParallaxNode"
+expect file:scenes/main.scene.json contains "texturePath": "textures/Background.png"
+expect file:scenes/main.scene.json contains "type": "NineSliceNode"
+expect file:scenes/main.scene.json contains "points": [[-60, 0], [60, 0], [100, 0]]
+expect file:scenes/main.scene.json contains "type": "TrailNode"
+expect file:scenes/main.scene.json contains "shader": "builtin:vignette"

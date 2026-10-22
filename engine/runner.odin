@@ -174,6 +174,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	defer rl.CloseWindow()
 	if !opts.noRenderCache do Render_InitBatching()
 	defer Render_ReleaseBatching()
+	defer Post_Unload()
 
 	rl.SetTargetFPS(0 if opts.benchFrames > 0 else targetFPS)
 	rl.InitAudioDevice()
@@ -230,11 +231,28 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 		game.viewportCanvasRect = {0, 0, sw, sh}
 
 		frameStart := time.tick_now()
-		rl.BeginDrawing()
-		rl.ClearBackground(Game_ClearColor(game))
-
-		game->run(dt)
-		runTime := time.tick_since(frameStart)
+		effects := Scene_PostEffects(game.sceneManager.currentScene)
+		runTime: time.Duration
+		if len(effects) > 0 && Post_EnsureTargets(rl.GetScreenWidth(), rl.GetScreenHeight()) {
+			// Post effects: the frame into a texture, then through each effect.
+			frame := Post_Target(0)
+			Render_SetFrameTarget(frame)
+			rl.BeginTextureMode(frame^)
+			rl.ClearBackground(Game_ClearColor(game))
+			game->run(dt)
+			rl.EndTextureMode()
+			Render_SetFrameTarget(nil)
+			last := Post_Apply(effects, frame.texture, &game.gameContext)
+			runTime = time.tick_since(frameStart)
+			rl.BeginDrawing()
+			rl.ClearBackground(rl.BLACK)
+			Post_DrawWith(effects[len(effects) - 1], last, &game.gameContext)
+		} else {
+			rl.BeginDrawing()
+			rl.ClearBackground(Game_ClearColor(game))
+			game->run(dt)
+			runTime = time.tick_since(frameStart)
+		}
 
 		rl.EndDrawing()
 

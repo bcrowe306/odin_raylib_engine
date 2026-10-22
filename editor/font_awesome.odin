@@ -95,3 +95,7 @@ ICON_FA_DIAGRAM_PROJECT           :: "\uF542" // State machine
 ICON_FA_ARROW_RIGHT               :: "\uF061"
 ICON_FA_FONT                      :: "\uF031" // Text
 ICON_FA_COMMENT                   :: "\uF075" // Dialogue
+ICON_FA_MOUNTAIN                  :: "\uF6FC" // Parallax
+ICON_FA_VECTOR_SQUARE             :: "\uF5CB" // Nine-slice
+ICON_FA_WIND                      :: "\uF72E" // Trail
+ICON_FA_FILTER                    :: "\uF0B0" // Post effect

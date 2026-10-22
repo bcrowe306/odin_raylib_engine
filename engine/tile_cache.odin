@@ -89,6 +89,7 @@ TileCache_Prepare :: proc(scene: ^Scene, view: rl.Rectangle, ctx: ^GameContext) 
 		case LdtkLevelNode: LdtkLevelNode_PrepareChunks(cast(^LdtkLevelNode)n, view, ctx)
 		}
 	}
+	Render_RestoreFrameTarget() // post effects: back to the frame's target
 }
 
 // TileCache_Ensure makes sure a chunk exists and matches `version`,

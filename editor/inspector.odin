@@ -263,6 +263,8 @@ inspector_properties :: proc(state: ^EditorState, node: ^e.Node) {
 // (a Script-mode CharacterMover ignores the built-in movement settings).
 @(private = "file")
 prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
+	// Textures are picked in the Texture section.
+	if (node.typeId == e.NineSliceNode || node.typeId == e.ParallaxNode) && name == "texturePath" do return false
 	// Fonts are picked in the Font section.
 	if (node.typeId == e.TextNode || node.typeId == e.DialogueNode) && name == "font" do return false
 	// A joint shows only its type's parameters.
@@ -570,6 +572,10 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_joint(state, cast(^e.JointNode)node)
 	case e.TextNode, e.DialogueNode:
 		inspector_font(state, node)
+	case e.NineSliceNode, e.ParallaxNode:
+		inspector_texture_path(state, node)
+	case e.LineNode:
+		inspector_line(state, cast(^e.LineNode)node)
 	case e.StateMachineNode:
 		inspector_state_machine(state, cast(^e.StateMachineNode)node)
 	case e.LdtkLevelNode:
@@ -930,6 +936,11 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.JointNode: return ICON_FA_LINK
 	case e.TextNode: return ICON_FA_FONT
 	case e.DialogueNode: return ICON_FA_COMMENT
+	case e.NineSliceNode: return ICON_FA_VECTOR_SQUARE
+	case e.ParallaxNode: return ICON_FA_MOUNTAIN
+	case e.LineNode: return ICON_FA_DRAW_POLYGON
+	case e.TrailNode: return ICON_FA_WIND
+	case e.PostEffectNode: return ICON_FA_FILTER
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS
 	case e.ScriptNode: return ICON_FA_CODE
 	}
@@ -1184,4 +1195,52 @@ inspector_font :: proc(state: ^EditorState, node: ^e.Node) {
 		font^ = strings.clone(path, node.allocator)
 	}
 	UI_Tooltip("None: the engine font. .ttf / .otf (any size; SDF for scaling), .fnt (BMFont)")
+}
+
+// inspector_texture_path: the texture of a NineSlice / Parallax node.
+@(private = "file")
+inspector_texture_path :: proc(state: ^EditorState, node: ^e.Node) {
+	if !UI_SectionHeader("Texture") do return
+	if !UI_BeginProps("##texpath") do return
+	defer UI_EndProps()
+	path := &(cast(^e.NineSliceNode)node).texturePath if node.typeId == e.NineSliceNode else &(cast(^e.ParallaxNode)node).texturePath
+	UI_PropLabel("Texture")
+	imgui.SetNextItemWidth(field_width())
+	if picked, ok := asset_picker("insp.texture-path", path^, Editor_ListProjectFiles(state, "", TEXTURE_EXTS)); ok {
+		Editor_RecordUndo(state, "Texture")
+		path^ = strings.clone(picked, node.allocator)
+	}
+	if node.typeId == e.NineSliceNode {
+		UI_Tooltip("The borders (Margins) keep their size; the middle stretches")
+	} else {
+		UI_Tooltip("Factor 1 moves with the world, 0 stays on screen; repeat to tile it")
+	}
+}
+
+// inspector_line: a LineNode's points (local to the node).
+@(private = "file")
+inspector_line :: proc(state: ^EditorState, l: ^e.LineNode) {
+	if !UI_SectionHeader("Points") do return
+	remove := -1
+	for &p, i in l.points {
+		imgui.PushIDInt(i32(i))
+		imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 34)
+		imgui.DragFloat2("##pt", &p, 1, 0, 0, "%.0f")
+		undo_on_activate(state, "Line point")
+		Drive_Item(fmt.tprintf("insp.line.point:%d", i))
+		if len(l.points) > 2 {
+			imgui.SameLine()
+			if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("insp.line.remove:%d", i), "Remove point", size = 24) do remove = i
+		}
+		imgui.PopID()
+	}
+	if remove >= 0 {
+		Editor_RecordUndo(state, "Remove point")
+		ordered_remove(&l.points, remove)
+	}
+	if UI_Button(fmt.tprintf("%s  Add Point", ICON_FA_PLUS), "insp.line.add") {
+		Editor_RecordUndo(state, "Add point")
+		last := l.points[len(l.points) - 1] if len(l.points) > 0 else [2]f32{}
+		append(&l.points, last + {40, 0})
+	}
 }

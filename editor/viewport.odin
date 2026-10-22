@@ -107,9 +107,18 @@ Viewport_UpdateAndRender :: proc(state: ^EditorState) {
 		// Render the Raylib scene into renderTexture
 		Viewport_RenderOffscreen(state)
 
+		// Post effects (PostEffectNodes), previewed with lighting.
+		@(static) shown: rl.Texture2D
+		shown = state.renderTexture.texture
+		if viewportLighting && state.activeScene != nil {
+			if effects := e.Scene_PostEffects(state.activeScene); len(effects) > 0 {
+				shown = e.Post_Process(effects, shown, &state.game.gameContext)
+			}
+		}
+
 		// Render texture image into ImGui
 		imgui.Image(
-			transmute(imgui.TextureID)&state.renderTexture.texture,
+			transmute(imgui.TextureID)&shown,
 			imgui.Vec2{f32(reqW), f32(reqH)},
 			imgui.Vec2{0, 1},
 			imgui.Vec2{1, 0},
@@ -269,6 +278,22 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 			if fan.origin == {0, 0} do origin = size * 0.5
 			lo, hi, have = -origin, size - origin, true
 		}
+	case e.NineSliceNode:
+		n := cast(^e.NineSliceNode)node
+		s := n.size * scl
+		lo, hi, have = {0, 0}, s, true
+		if n.centered do lo, hi = -s * 0.5, s * 0.5
+	case e.LineNode:
+		l := cast(^e.LineNode)node
+		for p, i in l.points {
+			q := p * scl
+			if i == 0 do lo, hi, have = q, q, true
+			lo = {min(lo.x, q.x), min(lo.y, q.y)}
+			hi = {max(hi.x, q.x), max(hi.y, q.y)}
+		}
+		pad := l.width * 0.5 * max(abs(scl.x), abs(scl.y))
+		lo -= pad
+		hi += pad
 	case e.TextNode:
 		t := cast(^e.TextNode)node
 		_, size, _ := e.TextNode_Layout(t, &state.game.gameContext)

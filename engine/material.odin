@@ -87,7 +87,9 @@ shaderCache: map[string]^Shader_Entry
 @(private = "file")
 lastShaderCheck: time.Tick
 
-BUILTIN_SHADERS :: []string{"builtin:flash", "builtin:outline", "builtin:dissolve", "builtin:grayscale", "builtin:wave"}
+BUILTIN_SHADERS :: []string{"builtin:flash", "builtin:outline", "builtin:dissolve", "builtin:grayscale", "builtin:wave",
+	// For PostEffectNodes (the whole screen):
+	"builtin:vignette", "builtin:crt", "builtin:pixelate", "builtin:chromatic"}
 
 @(private = "file")
 SHADER_HEADER :: `#version 330
@@ -166,6 +168,59 @@ void main() {
     finalColor = texture(texture0, uv) * colDiffuse * fragColor;
 }
 `
+	case "builtin:vignette":
+		return SHADER_HEADER + `
+uniform float strength; // range 0 2 default 0.8
+uniform float radius; // range 0.2 1.5 default 0.75
+uniform vec4 tint; // color default 0 0 0 1
+void main() {
+    vec4 c = texture(texture0, fragTexCoord) * colDiffuse * fragColor;
+    float d = distance(fragTexCoord, vec2(0.5)) * 1.414;
+    float v = smoothstep(radius, radius - 0.45, d);
+    finalColor = vec4(mix(tint.rgb, c.rgb, mix(1.0, v, clamp(strength, 0.0, 1.0))), c.a);
+}
+`
+	case "builtin:crt":
+		return SHADER_HEADER + `
+uniform float time;
+uniform vec2 resolution;
+uniform float curvature; // range 0 0.3 default 0.08
+uniform float scanlines; // range 0 1 default 0.35
+uniform float noise; // range 0 0.2 default 0.03
+void main() {
+    vec2 uv = fragTexCoord * 2.0 - 1.0;
+    uv *= 1.0 + curvature * dot(uv, uv) * 0.5;
+    uv = uv * 0.5 + 0.5;
+    if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) { finalColor = vec4(0.0, 0.0, 0.0, 1.0); return; }
+    vec4 c = texture(texture0, uv) * colDiffuse * fragColor;
+    float line = 0.5 + 0.5 * sin(uv.y * resolution.y * 3.14159);
+    c.rgb *= 1.0 - scanlines * (1.0 - line);
+    float n = fract(sin(dot(uv * resolution + time, vec2(12.9898, 78.233))) * 43758.5453);
+    c.rgb += (n - 0.5) * noise;
+    finalColor = vec4(c.rgb, 1.0);
+}
+`
+	case "builtin:pixelate":
+		return SHADER_HEADER + `
+uniform vec2 resolution;
+uniform float pixel_size; // range 1 32 default 4
+void main() {
+    vec2 cell = pixel_size / resolution;
+    vec2 uv = (floor(fragTexCoord / cell) + 0.5) * cell;
+    finalColor = texture(texture0, uv) * colDiffuse * fragColor;
+}
+`
+	case "builtin:chromatic":
+		return SHADER_HEADER + `
+uniform float amount; // range 0 0.02 default 0.004
+void main() {
+    vec2 dir = fragTexCoord - vec2(0.5);
+    float r = texture(texture0, fragTexCoord + dir * amount).r;
+    vec4 g = texture(texture0, fragTexCoord);
+    float b = texture(texture0, fragTexCoord - dir * amount).b;
+    finalColor = vec4(r, g.g, b, g.a) * colDiffuse * fragColor;
+}
+`
 	case "builtin:passthrough":
 		return SHADER_HEADER + `
 void main() { finalColor = texture(texture0, fragTexCoord) * colDiffuse * fragColor; }
@@ -206,6 +261,7 @@ Shader_ParseUniforms :: proc(source: string, allocator := context.allocator) -> 
 		case: continue
 		}
 		if name == "time" && u.kind == .Float do u.auto = true
+		if name == "resolution" && u.kind == .Vec2 do u.auto = true // the target's size (post effects)
 		// Hints: "color", "range a b", "default x y z w".
 		words := strings.fields(comment, context.temp_allocator)
 		for i := 0; i < len(words); i += 1 {
@@ -333,6 +389,9 @@ Shader_CheckForChanges :: proc() -> int {
 // Shader_UnloadAll releases every cached shader.
 Shader_UnloadAll :: proc() {
 	context.allocator = runtime.heap_allocator()
+	for k in materialTextures do delete(k)
+	delete(materialTextures)
+	materialTextures = nil
 	for path, en in shaderCache {
 		shader_release(en)
 		delete(path)
@@ -400,6 +459,23 @@ blend_mode :: proc(b: Material_Blend) -> rl.BlendMode {
 	return .ALPHA
 }
 
+// Textures used by material parameters: loaded once (one reference kept for
+// the run) - not a new reference every frame.
+@(private = "file")
+materialTextures: map[string]^Texture
+
+@(private = "file")
+material_texture :: proc(path: string, ctx: ^GameContext) -> ^Texture {
+	if path == "" || ctx == nil || ctx.game == nil do return nil
+	if t, ok := materialTextures[path]; ok do return t
+	rm := &ctx.game.resourceManager
+	t, ok := rm.loadTexture(rm, Project_ResolveAssetPath(ctx, path))
+	if !ok do return nil
+	if materialTextures == nil do materialTextures = make(map[string]^Texture, allocator = runtime.heap_allocator())
+	materialTextures[strings.clone(path, runtime.heap_allocator())] = t
+	return t
+}
+
 // Material_Begin applies a node's material (returns false if nothing to do).
 Material_Begin :: proc(node: ^Node, ctx: ^GameContext) -> bool {
 	m := node.material
@@ -414,7 +490,8 @@ Material_Begin :: proc(node: ^Node, ctx: ^GameContext) -> bool {
 				v := u.default_
 				tex := ""
 				if u.auto {
-					v.x = f32(rl.GetTime())
+					if u.name == "resolution" do v.xy = {f32(rl.GetRenderWidth()), f32(rl.GetRenderHeight())}
+					else do v.x = f32(rl.GetTime())
 				} else {
 					for p in m.params do if p.name == u.name {v, tex = p.value, p.texture; break}
 				}
@@ -427,10 +504,7 @@ Material_Begin :: proc(node: ^Node, ctx: ^GameContext) -> bool {
 					iv := i32(v.x)
 					rl.SetShaderValue(en.shader, loc, &iv, .INT)
 				case .Texture:
-					if tex != "" && ctx != nil && ctx.game != nil {
-						rm := &ctx.game.resourceManager
-						if t, ok := rm.loadTexture(rm, Project_ResolveAssetPath(ctx, tex)); ok do rl.SetShaderValueTexture(en.shader, loc, t.texture)
-					}
+					if t := material_texture(tex, ctx); t != nil do rl.SetShaderValueTexture(en.shader, loc, t.texture)
 				}
 			}
 			active = true

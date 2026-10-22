@@ -45,6 +45,11 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"JointNode", JointNode, factory_joint, {"joint", "physicsjoint"}},
 	{"TextNode", TextNode, factory_text, {"text", "label2d", "textlabel"}},
 	{"DialogueNode", DialogueNode, factory_dialogue, {"dialogue", "dialoguebox"}},
+	{"NineSliceNode", NineSliceNode, factory_nine_slice, {"nineslice", "ninepatch"}},
+	{"ParallaxNode", ParallaxNode, factory_parallax, {"parallax", "parallaxlayer"}},
+	{"LineNode", LineNode, factory_line, {"line", "line2d"}},
+	{"TrailNode", TrailNode, factory_trail, {"trail"}},
+	{"PostEffectNode", PostEffectNode, factory_post_effect, {"posteffect", "post_effect"}},
 	{"UIContainerNode", UIContainerNode, factory_ui_container, {"uicontainer", "uipanel", "uipanelnode"}},
 	{"UILabelNode", UILabelNode, factory_ui_label, {"uilabel"}},
 	{"UIButtonNode", UIButtonNode, factory_ui_button, {"uibutton"}},
@@ -144,6 +149,17 @@ factory_node :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 factory_camera :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return CameraNode_Create(scene, "Camera", true, parent)
 }
+
+@(private = "file")
+factory_nine_slice :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return NineSliceNode_Create(scene, "NineSlice", parent)}
+@(private = "file")
+factory_parallax :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return ParallaxNode_Create(scene, "Parallax", parent)}
+@(private = "file")
+factory_line :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return LineNode_Create(scene, "Line", parent)}
+@(private = "file")
+factory_trail :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return TrailNode_Create(scene, "Trail", parent)}
+@(private = "file")
+factory_post_effect :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PostEffectNode_Create(scene, "PostEffect", parent)}
 
 @(private = "file")
 factory_text :: proc(scene: ^Scene, parent: ^Node) -> ^Node {

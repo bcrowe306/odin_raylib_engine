@@ -86,6 +86,11 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case JointNode: typeName = "JointNode"
 	case TextNode: typeName = "TextNode"
 	case DialogueNode: typeName = "DialogueNode"
+	case NineSliceNode: typeName = "NineSliceNode"
+	case ParallaxNode: typeName = "ParallaxNode"
+	case LineNode: typeName = "LineNode"
+	case TrailNode: typeName = "TrailNode"
+	case PostEffectNode: typeName = "PostEffectNode"
 	case TileMapNode: typeName = "TileMapNode"
 	}
 	nameC := strings.clone_to_cstring(typeName, context.temp_allocator)
@@ -3144,6 +3149,49 @@ lua_locale_languages :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// --- Line and trail -----------------------------------------------------------------
+
+// line:line_set_points({ {x, y}, ... }) (local to the node)
+@(private="file")
+lua_node_line_set_points :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != LineNode || lua.type(L, 2) != .TABLE do return 0
+	ln := cast(^LineNode)node
+	clear(&ln.points)
+	n := c.int(lua.rawlen(L, 2))
+	for i in 1 ..= n {
+		lua.rawgeti(L, 2, lua.Integer(i))
+		lua.rawgeti(L, -1, 1)
+		x := f32(lua.tonumber(L, -1))
+		lua.rawgeti(L, -2, 2)
+		y := f32(lua.tonumber(L, -1))
+		lua.pop(L, 3)
+		append(&ln.points, [2]f32{x, y})
+	}
+	return 0
+}
+
+// line:line_add_point(x, y)
+@(private="file")
+lua_node_line_add_point :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if ok && node.typeId == LineNode do append(&(cast(^LineNode)node).points, [2]f32{f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3))})
+	return 0
+}
+
+// line:line_clear() / trail:trail_clear()
+@(private="file")
+lua_node_line_clear :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	if node.typeId == LineNode do clear(&(cast(^LineNode)node).points)
+	if node.typeId == TrailNode do TrailNode_Clear(cast(^TrailNode)node)
+	return 0
+}
+
 @(private="file")
 lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -3647,6 +3695,14 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "light_set_radius")
 		lua.pushcfunction(L, lua_node_set_property)
 		lua.setfield(L, -2, "set_property")
+		lua.pushcfunction(L, lua_node_line_set_points)
+		lua.setfield(L, -2, "line_set_points")
+		lua.pushcfunction(L, lua_node_line_add_point)
+		lua.setfield(L, -2, "line_add_point")
+		lua.pushcfunction(L, lua_node_line_clear)
+		lua.setfield(L, -2, "line_clear")
+		lua.pushcfunction(L, lua_node_line_clear)
+		lua.setfield(L, -2, "trail_clear")
 		lua.pushcfunction(L, lua_node_set_paused)
 		lua.setfield(L, -2, "set_paused")
 		lua.pushcfunction(L, lua_node_is_paused)

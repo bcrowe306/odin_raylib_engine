@@ -247,6 +247,7 @@ Lighting_Prepare :: proc(scene: ^Scene, cam: rl.Camera2D, w, h: i32) -> bool {
 		rl.EndTextureMode()
 	}
 	lighting.ready = true
+	Render_RestoreFrameTarget() // post effects: back to the frame's target
 	return true
 }
 

@@ -506,6 +506,28 @@ print(tr("greeting", {name = player_name}))  -- "Bonjour, {name} !"
 TextNodes and dialogue boxes marked **Localized** treat their text as keys.
 The project's starting language is Project Settings > General > Language.
 
+#### Visual extras
+
+**Nine Slice Sprite** stretches a texture to **Size** keeping its borders
+(**Margins LT / RB** in texture pixels) - panels and buttons.
+**Parallax Background** moves with the camera at **Factor** (0 = fixed on
+screen, 1 = with the world), repeating on X / Y and drifting at **Scroll
+Speed**. **Line** draws a polyline (width, colour, closed, rounded joints);
+**Trail**, as a child of a moving node, leaves a fading, tapering ribbon.
+**Post Effect** applies its Material shader to the whole screen
+(`builtin:vignette`, `builtin:crt`, `builtin:pixelate`,
+`builtin:chromatic`, or a project shader; several chain in tree order; a
+`resolution` uniform is set automatically).
+
+```lua
+local laser = Scene.find_node("Laser")
+laser:line_set_points({ {0, 0}, {200, 0} })     -- local to the node
+laser:line_add_point(200, 40)
+laser:line_clear()
+Scene.find_node("Trail"):trail_clear()          -- after a teleport
+Scene.find_node("Crt"):set_enabled(false)       -- turn an effect off
+```
+
 #### Navigation (A* on tile maps and LDtk levels)
 
 ```lua
