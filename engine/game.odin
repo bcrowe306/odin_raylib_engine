@@ -176,6 +176,7 @@ GameTerminate :: proc(game: ^Game) {
 	ResourceManager_Terminate(&game.resourceManager)
 	PhysicsWorld_Destroy(&game.physicsWorld)
 	Shader_UnloadAll()
+	Lighting_Unload()
 	InputSystem_Destroy(&game.input)
 	Node_ReleaseArenaPool()
 	Component_ClearCaches()

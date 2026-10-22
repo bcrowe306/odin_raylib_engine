@@ -71,6 +71,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "LdtkLevelNode",
 	},
 	{
+		name        = "Light",
+		category    = "Graphics & Rendering",
+		icon        = ICON_FA_LIGHTBULB,
+		description = "2D point or spot light with colour, energy, radius and falloff; casts shadows from physics shapes. Set the scene's Ambient to darken unlit areas.",
+		typeName    = "LightNode",
+	},
+	{
 		name        = "Tile Map",
 		category    = "Graphics & Rendering",
 		icon        = ICON_FA_TABLE_CELLS,

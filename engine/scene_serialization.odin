@@ -46,6 +46,11 @@ Scene_SerializeToJSON :: proc(scene: ^Scene, allocator := context.allocator) -> 
 		Json_Key(&w, "background", &first)
 		fmt.sbprintf(&w.sb, "[%d, %d, %d, %d]", c.r, c.g, c.b, c.a)
 	}
+	if scene.ambient != {} && scene.ambient != {255, 255, 255, 255} {
+		c := scene.ambient
+		Json_Key(&w, "ambient", &first)
+		fmt.sbprintf(&w.sb, "[%d, %d, %d, %d]", c.r, c.g, c.b, c.a)
+	}
 	Json_Key(&w, "root", &first)
 	if scene.rootNode != nil {
 		write_node(&w, scene.rootNode, scene.manager)
@@ -559,6 +564,17 @@ Scene_InstantiateFromJSON :: proc(scene: ^Scene, jsonBytes: []u8, gameContext: ^
 			case json.Float:   n = f64(x)
 			}
 			scene.backgroundColor[i] = u8(clamp(n, 0, 255))
+		}
+	}
+	scene.ambient = {}
+	if am, ok := sj_arr(rootObj, "ambient"); ok && len(am) == 4 {
+		for v, i in am {
+			n: f64
+			#partial switch x in v {
+			case json.Integer: n = f64(x)
+			case json.Float:   n = f64(x)
+			}
+			scene.ambient[i] = u8(clamp(n, 0, 255))
 		}
 	}
 	if scene.rootNode != nil && gameContext != nil {

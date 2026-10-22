@@ -1,0 +1,46 @@
+# 2D lighting: a dark ambient for the scene (Inspector with nothing
+# selected), a point light and a spot light from Add Node, shadows from
+# physics shapes, the viewport preview toggle, and saving.
+wait 5
+click @asset.new-scene
+key escape
+expect item:insp.scene-ambient == visible
+click @hier.add
+type light
+click @addnode.create
+expect node:Light.type == LightNode
+screenshot light_unlit_ambient_white
+key escape
+click @insp.scene-ambient-preset
+click @pick:Night
+screenshot dark_with_light
+
+# A box that casts a shadow, next to the light.
+click @hier.add
+key ctrl+a
+type static platform
+click @addnode.create
+expect selected == StaticPlatform
+dblclick @insp.position.y
+key ctrl+a
+type 300
+key enter
+# A bigger, brighter light so the shadow above the platform shows.
+click @hier:Light
+dblclick @insp.prop:radius
+key ctrl+a
+type 700
+key enter
+dblclick @insp.prop:falloff
+key ctrl+a
+type 1
+key enter
+key escape
+screenshot shadow
+click @toolbar.lighting
+screenshot preview_off
+click @toolbar.lighting
+
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "ambient": [
+expect file:scenes/new_scene.scene.json contains "type": "LightNode"

@@ -81,6 +81,8 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case AreaNode: typeName = "AreaNode"
 	case RaycastNode: typeName = "RaycastNode"
 	case LdtkLevelNode: typeName = "LdtkLevelNode"
+	case LightNode: typeName = "LightNode"
+	case TileMapNode: typeName = "TileMapNode"
 	}
 	nameC := strings.clone_to_cstring(typeName, context.temp_allocator)
 	lua.pushstring(L, nameC)
@@ -2465,6 +2467,70 @@ lua_audio_set_master_volume :: proc "c" (L: ^lua.State) -> c.int {
 // Scene Bindings (Engine.Scene)
 // ----------------------------------------------------------------------------
 
+// Scene.set_ambient(r, g, b [, a]) (0..1): the light map's base colour.
+@(private="file")
+lua_scene_set_ambient :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil do return 0
+	a := f32(lua.tonumber(L, 4)) if lua.type(L, 4) == .NUMBER else 1
+	ch :: proc(v: f32) -> u8 {return u8(clamp(v, 0, 1) * 255 + 0.5)}
+	sm.game.sceneManager.currentScene.ambient = {ch(f32(lua.tonumber(L, 1))), ch(f32(lua.tonumber(L, 2))), ch(f32(lua.tonumber(L, 3))), ch(a)}
+	return 0
+}
+
+@(private="file")
+lua_scene_get_ambient :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	c := rl.Color{255, 255, 255, 255}
+	if sm != nil && sm.game != nil && sm.game.sceneManager.currentScene != nil && sm.game.sceneManager.currentScene.ambient != {} {
+		c = sm.game.sceneManager.currentScene.ambient
+	}
+	for v in ([4]u8{c.r, c.g, c.b, c.a}) do lua.pushnumber(L, lua.Number(f32(v) / 255))
+	return 4
+}
+
+@(private="file")
+light_arg :: proc(L: ^lua.State) -> ^LightNode {
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != LightNode do return nil
+	return cast(^LightNode)node
+}
+
+// light:light_set_color(r, g, b) (0..1)
+@(private="file")
+lua_light_set_color :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if l := light_arg(L); l != nil {
+		ch :: proc(v: f32) -> u8 {return u8(clamp(v, 0, 1) * 255 + 0.5)}
+		l.color = {ch(f32(lua.tonumber(L, 2))), ch(f32(lua.tonumber(L, 3))), ch(f32(lua.tonumber(L, 4))), 255}
+	}
+	return 0
+}
+
+@(private="file")
+lua_light_set_energy :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if l := light_arg(L); l != nil do l.energy = max(f32(lua.tonumber(L, 2)), 0)
+	return 0
+}
+
+@(private="file")
+lua_light_set_radius :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if l := light_arg(L); l != nil do l.radius = max(f32(lua.tonumber(L, 2)), 0)
+	return 0
+}
+
+@(private="file")
+lua_light_get_energy :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	l := light_arg(L)
+	lua.pushnumber(L, lua.Number(l.energy if l != nil else 0))
+	return 1
+}
+
 @(private="file")
 lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -2856,6 +2922,14 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "get_shader_param")
 		lua.pushcfunction(L, lua_node_set_blend_mode)
 		lua.setfield(L, -2, "set_blend_mode")
+		lua.pushcfunction(L, lua_light_set_color)
+		lua.setfield(L, -2, "light_set_color")
+		lua.pushcfunction(L, lua_light_set_energy)
+		lua.setfield(L, -2, "light_set_energy")
+		lua.pushcfunction(L, lua_light_get_energy)
+		lua.setfield(L, -2, "light_get_energy")
+		lua.pushcfunction(L, lua_light_set_radius)
+		lua.setfield(L, -2, "light_set_radius")
 		Script_RegisterEventBindings(L) // connect / disconnect / emit
 		Script_RegisterLdtkBindings(L)
 
@@ -3188,6 +3262,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.newtable(L)
 	lua.pushcfunction(L, lua_scene_find_node)
 	lua.setfield(L, -2, "find_node")
+	lua.pushcfunction(L, lua_scene_set_ambient)
+	lua.setfield(L, -2, "set_ambient")
+	lua.pushcfunction(L, lua_scene_get_ambient)
+	lua.setfield(L, -2, "get_ambient")
 	lua.pushcfunction(L, lua_scene_get_name)
 	lua.setfield(L, -2, "get_name")
 	lua.pushcfunction(L, lua_scene_change_scene)

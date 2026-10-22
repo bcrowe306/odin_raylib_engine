@@ -280,6 +280,27 @@ function Node:get_shader_param(name) end
 function Node:set_blend_mode(mode) end
 
 -- ----------------------------------------------------------------------------
+-- LightNode Methods (2D lights; Scene.set_ambient darkens unlit areas)
+-- ----------------------------------------------------------------------------
+
+---Sets the light's colour (0..1).
+---@param r number
+---@param g number
+---@param b number
+function Node:light_set_color(r, g, b) end
+
+---Sets the light's energy (brightness multiplier, 0..8).
+---@param energy number
+function Node:light_set_energy(energy) end
+
+---@return number energy
+function Node:light_get_energy() end
+
+---Sets the light's radius (world units).
+---@param radius number
+function Node:light_set_radius(radius) end
+
+-- ----------------------------------------------------------------------------
 -- CharacterMoverNode Methods
 --
 -- Two control modes (Inspector: Control Mode):
@@ -1258,6 +1279,21 @@ local SceneModule = {}
 ---@param name NodeName|string Name of node to find
 ---@return Node? node Found node or nil
 function SceneModule.find_node(name) end
+
+---Sets the scene's ambient light (0..1): the colour where no light reaches.
+---White = an unlit scene. With LightNodes, the scene is lit by them on top.
+---@param r number
+---@param g number
+---@param b number
+---@param a? number
+function SceneModule.set_ambient(r, g, b, a) end
+
+---Gets the scene's ambient light (0..1).
+---@return number r
+---@return number g
+---@return number b
+---@return number a
+function SceneModule.get_ambient() end
 
 ---Gets the name of the currently active scene.
 ---@return string

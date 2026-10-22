@@ -128,6 +128,7 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	toggle(&state.showGrid, ICON_FA_BORDER_ALL, "toolbar.grid", "Show grid")
 	toggle(&state.showBounds, ICON_FA_EYE, "toolbar.bounds", "Show bounds & colliders")
 	toggle(&state.showCameraBounds, ICON_FA_VIDEO, "toolbar.camera", "Show camera frames")
+	toggle(&viewportLighting, ICON_FA_SUN, "toolbar.lighting", "Preview lighting (lights and the scene's ambient)")
 	UI_VerticalDivider()
 	if UI_IconButton(ICON_FA_EXPAND, "toolbar.fit", "Fit the scene to the view (Home)") do Viewport_FitScene(state)
 	imgui.SameLine()

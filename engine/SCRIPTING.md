@@ -368,6 +368,28 @@ end
 | `get_shader_param(name)` | `name` | up to 4 numbers / path | Current value (or the shader's default). |
 | `set_blend_mode(mode)` | `"alpha"`, `"additive"`, `"multiply"`, `"add_colors"`, `"subtract_colors"`, `"premultiplied"` | - | Blending. |
 
+#### Lighting (LightNode, scene ambient)
+
+Add **Light** nodes (point, or spot: the node's rotation is the direction)
+and set the scene's **Ambient** (Inspector with nothing selected, or
+`Scene.set_ambient`) to darken what the lights don't reach. Lights with
+*shadows* on are blocked by physics shapes (static/dynamic bodies,
+character movers, LDtk and tile map colliders).
+
+```lua
+Scene.set_ambient(0.1, 0.1, 0.18)          -- night
+local lamp = Scene.find_node("Lamp")
+lamp:light_set_color(1, 0.8, 0.5)
+lamp:light_set_energy(1.5 + math.sin(t * 20) * 0.2)   -- flicker
+```
+
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `light_set_color(r, g, b)` | 0..1 | - | Light colour. |
+| `light_set_energy(e)` / `light_get_energy()` | `number` | `number` | Brightness. |
+| `light_set_radius(r)` | world units | - | Reach. |
+| `Scene.set_ambient(r, g, b [, a])` / `Scene.get_ambient()` | 0..1 | r, g, b, a | Unlit colour of the scene. |
+
 #### CharacterMoverNode
 
 A CharacterMover has two **control modes** (Inspector: *Control Mode*):

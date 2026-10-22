@@ -182,6 +182,14 @@ Shader...** (here or Assets **+**) writes a documented template; drop a
 shader from Assets on a node to apply it; saving a shader reloads it in the
 viewport. Lua: `node:set_shader`, `set_shader_param`, `set_blend_mode`.
 
+### Lighting
+
+Add a **Light** (point or spot cone; colour, energy, radius, falloff,
+shadows) and darken the scene with **Ambient** - the Inspector shows the
+Scene settings when nothing is selected (presets: Dusk, Night, Dark). Lights
+cast shadows from physics shapes. The toolbar's sun toggles the lighting
+preview in the viewport; selected lights show their radius or cone.
+
 ### Camera follow
 
 Select a Camera and pick its **Follow Target** in the Inspector (or drop a

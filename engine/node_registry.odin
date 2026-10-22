@@ -40,6 +40,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
 	{"LdtkLevelNode", LdtkLevelNode, factory_ldtk, {"ldtk", "ldtklevel"}},
 	{"TileMapNode", TileMapNode, factory_tilemap, {"tilemap"}},
+	{"LightNode", LightNode, factory_light, {"light", "pointlight", "spotlight"}},
 	{"UIContainerNode", UIContainerNode, factory_ui_container, {"uicontainer", "uipanel", "uipanelnode"}},
 	{"UILabelNode", UILabelNode, factory_ui_label, {"uilabel"}},
 	{"UIButtonNode", UIButtonNode, factory_ui_button, {"uibutton"}},
@@ -150,6 +151,10 @@ factory_camera :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 }
 
 @(private = "file")
+factory_light :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return LightNode_Create(scene, "Light", parent)
+}
+
 factory_timer :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return TimerNode_Create(scene, 1.0, false, false)
 }

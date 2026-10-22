@@ -41,6 +41,11 @@ PropertyInspector_RenderWindow :: proc(state: ^EditorState) {
 		imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)
 		imgui.TextWrapped("Select a node in the viewport or the scene tree to edit it.")
 		imgui.PopStyleColor()
+		// With nothing selected, the scene's own settings.
+		if state.activeScene != nil {
+			imgui.Dummy({0, 8})
+			inspector_scene_settings(state, state.activeScene)
+		}
 		return
 	}
 	isRoot := node == state.activeScene.rootNode
@@ -917,6 +922,7 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	switch node.typeId {
 	case e.CameraNode: return ICON_FA_VIDEO
+	case e.LightNode: return ICON_FA_LIGHTBULB
 	case e.TextureNode, e.FrameAnimationNode, e.AnimationPlayerNode: return ICON_FA_IMAGE
 	case e.SoundNode, e.MusicNode: return ICON_FA_MUSIC
 	case e.StaticBodyNode, e.DynamicBodyNode, e.CharacterMoverNode, e.AreaNode, e.RaycastNode: return ICON_FA_CUBES
@@ -1065,6 +1071,28 @@ inspector_scene_settings :: proc(state: ^EditorState, scene: ^e.Scene) {
 		}
 		undo_on_activate(state, "Scene background")
 		Drive_Item("insp.scene-background")
+	}
+	UI_PropLabel("Ambient")
+	amb := scene.ambient if scene.ambient != {} else rl.Color{255, 255, 255, 255}
+	acol := [3]f32{f32(amb.r) / 255, f32(amb.g) / 255, f32(amb.b) / 255}
+	imgui.SetNextItemWidth(field_width())
+	if imgui.ColorEdit3("##scene_ambient", &acol, {}) {
+		scene.ambient = {u8(acol[0] * 255 + 0.5), u8(acol[1] * 255 + 0.5), u8(acol[2] * 255 + 0.5), 255}
+	}
+	undo_on_activate(state, "Scene ambient")
+	Drive_Item("insp.scene-ambient")
+	UI_Tooltip("Light where no light reaches (white = unlit scene). Add Light nodes to light it.")
+	if field_reset("insp.scene-ambient", scene.ambient != {} && scene.ambient != {255, 255, 255, 255}) {
+		Editor_RecordUndo(state, "Scene ambient")
+		scene.ambient = {}
+	}
+	UI_PropLabel("")
+	presets := []string{"Presets...", "Day (unlit)", "Dusk", "Night", "Dark"}
+	values := []rl.Color{{}, {}, {150, 110, 120, 255}, {40, 46, 70, 255}, {8, 8, 12, 255}}
+	imgui.SetNextItemWidth(field_width())
+	if v, changed := UI_Combo("insp.scene-ambient-preset", 0, presets); changed && v > 0 {
+		Editor_RecordUndo(state, "Scene ambient")
+		scene.ambient = values[v]
 	}
 	UI_PropLabel("Draw Bounds")
 	bounds := scene.drawBounds

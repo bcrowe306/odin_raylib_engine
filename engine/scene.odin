@@ -17,6 +17,7 @@ Scene :: struct {
 	drawBounds: bool,
 	// Clear colour while this scene runs (alpha 0 = the game's default).
 	backgroundColor: rl.Color,
+	ambient: rl.Color, // light map base colour when the scene uses lighting ({} = white)
 	rootNode: ^Node,
 	camera: ^CameraNode,
 	setup: SceneSetupProc,
@@ -254,6 +255,17 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	// kept within a layer) instead of walking the whole tree per layer.
 	buckets := Scene_CollectRenderables(scene)
 	renderStats = {}
+	// Lighting: the light map is built before the world layers draw and
+	// multiplied over them after the last one.
+	lightVW, lightVH: f32 = 1280, 720
+	if gameContext != nil && gameContext.game != nil && gameContext.game.virtualSize.x > 0 {
+		lightVW, lightVH = gameContext.game.virtualSize.x, gameContext.game.virtualSize.y
+	}
+	lastWorld := -1
+	if scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent && rl.IsWindowReady() {
+		for l in RenderLayer do if l in scene.camera.targetLayers do lastWorld = int(l)
+		if lastWorld >= 0 do Lighting_Prepare(scene, CameraNode_GetCamera2D(scene.camera, lightVW, lightVH), i32(lightVW), i32(lightVH))
+	}
 	for layer in RenderLayer {
 		isWorldLayer := scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent && (layer in scene.camera.targetLayers)
 		if isWorldLayer && rl.IsWindowReady() {
@@ -273,6 +285,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 			Render_ClearView()
 			CameraNode_End()
 		}
+		if int(layer) == lastWorld do Lighting_Composite()
 	}
 
 	// Render any active UI popups/dropdowns on top of all layers

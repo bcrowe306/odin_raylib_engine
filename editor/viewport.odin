@@ -42,6 +42,36 @@ point_in_rect :: proc(p, min, max: [2]f32) -> bool {
 	return p.x >= min.x && p.x <= max.x && p.y >= min.y && p.y <= max.y
 }
 
+// Lighting preview in the viewport (toolbar sun).
+viewportLighting := true
+
+// Viewport_DrawLights: a marker for every light (they're invisible
+// otherwise) and the radius / cone of the selected ones.
+Viewport_DrawLights :: proc(state: ^EditorState) {
+	if state.activeScene == nil do return
+	z := state.cameraZoom
+	for n in state.activeScene.manager.nodes {
+		if n == nil || n.typeId != e.LightNode || !n.enabled do continue
+		l := cast(^e.LightNode)n
+		c := l.globalPosition
+		col := l.color
+		col.a = 255
+		rl.DrawCircleV(c, 6 / z, col)
+		rl.DrawCircleLinesV(c, 9 / z, rl.Color{255, 255, 255, 200})
+		if !Editor_IsSelected(state, n) && n != state.selectedNode do continue
+		r := l.radius * max(abs(l.globalScale.x), abs(l.globalScale.y))
+		ring := col
+		ring.a = 160
+		if l.kind == .Spot {
+			a0 := l.globalRotation - l.spread
+			a1 := l.globalRotation + l.spread
+			rl.DrawCircleSectorLines(c, r, a0, a1, 32, ring)
+		} else {
+			rl.DrawCircleLinesV(c, r, ring)
+		}
+	}
+}
+
 // Frame the viewport was last drawn (dropped files land in it only if visible).
 viewportShownFrame: i32
 
@@ -108,18 +138,35 @@ Viewport_UpdateAndRender :: proc(state: ^EditorState) {
 Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 	if state.renderTexture.id == 0 do return
 
-	rl.BeginTextureMode(state.renderTexture)
-	// Dark neutral editor canvas background (matches GitKraken child bg #171A21)
-	clear := rl.Color{23, 26, 33, 255}
-	if state.activeScene != nil && state.activeScene.backgroundColor.a > 0 do clear = state.activeScene.backgroundColor
-	rl.ClearBackground(clear)
-
 	cam := rl.Camera2D{
 		offset   = {state.viewportSize.x * 0.5, state.viewportSize.y * 0.5},
 		target   = {state.cameraPos.x, state.cameraPos.y},
 		rotation = 0.0,
 		zoom     = state.cameraZoom,
 	}
+
+	// Update first (simulation, transforms): the light map is rendered into
+	// its own texture before the viewport's texture is bound.
+	ctx := &state.game.gameContext
+	lit := false
+	if state.activeScene != nil && state.activeScene.rootNode != nil {
+		e.ProcessNodeQueues(state.activeScene.manager, ctx)
+		e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
+		Ldtk_EditorSync(state)
+		if state.isSimulating && !state.isPaused {
+			dt := rl.GetFrameTime()
+			e.PhysicsWorld_Step(&state.game.physicsWorld, dt, ctx)
+			e.Scene_UpdateNodeHirearchy(state.activeScene, state.activeScene.rootNode, ctx, dt)
+			e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
+		}
+		if viewportLighting do lit = e.Lighting_Prepare(state.activeScene, cam, i32(state.viewportSize.x), i32(state.viewportSize.y))
+	}
+
+	rl.BeginTextureMode(state.renderTexture)
+	// Dark neutral editor canvas background (matches GitKraken child bg #171A21)
+	clear := rl.Color{23, 26, 33, 255}
+	if state.activeScene != nil && state.activeScene.backgroundColor.a > 0 do clear = state.activeScene.backgroundColor
+	rl.ClearBackground(clear)
 
 	rl.BeginMode2D(cam)
 
@@ -130,21 +177,15 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 
 	// Active scene rendering
 	if state.activeScene != nil && state.activeScene.rootNode != nil {
-		ctx := &state.game.gameContext
-
-		e.ProcessNodeQueues(state.activeScene.manager, ctx)
-		e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
-		Ldtk_EditorSync(state)
-
-		if state.isSimulating && !state.isPaused {
-			dt := rl.GetFrameTime()
-			e.PhysicsWorld_Step(&state.game.physicsWorld, dt, ctx)
-			e.Scene_UpdateNodeHirearchy(state.activeScene, state.activeScene.rootNode, ctx, dt)
-			e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
-		}
-
 		// One traversal for all layers (not one walk per layer).
 		e.Scene_RenderAllLayers(state.activeScene, ctx, 0.0, e.Camera2D_ViewRect(cam, state.viewportSize.x, state.viewportSize.y))
+		if lit {
+			// Lights multiply over the scene (screen space), before editor overlays.
+			rl.EndMode2D()
+			e.Lighting_Composite()
+			rl.BeginMode2D(cam)
+		}
+		Viewport_DrawLights(state)
 
 		// Draw bounding boxes / physics colliders (when enabled or node selected)
 		Viewport_DrawSceneBounds(state)
