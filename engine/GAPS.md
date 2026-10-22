@@ -195,6 +195,7 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 ```
 | Audio | One-shot voices (sound aliases sharing samples, up to 8; `Audio.play_sound` overlaps 4, SoundNode **Voices**), positional SoundNodes (distance falloff + pan from the camera or `Audio.set_listener`; `Audio.play_sound_at`), bus volumes applied live (`Audio.set_bus_volume`), a master low-pass and Freeverb-style reverb (a mixed-audio processor: raylib's per-stream callbacks carry no user data, so effects can't keep separate state per bus), MusicNode fades and `Audio.crossfade` (`test_audio_mixing` checks the DSP, `test_music_fades_and_buses`; runner smoke test with the effects on). Not listened to on speakers in testing |
 | Physics extras | JointNode (revolute, distance, prismatic, weld, wheel, motor between two body nodes; Body A/B pickers, only the active type's parameters in the Inspector, live parameter changes wake the bodies, defaults sized for pixel-scale masses), One Way StaticBody (engine-wide one-way registry + pre-solve callback, moved out of LDtk, "top" follows rotation), named collision layers (project.json `physics.layers`, shown in shape layer lists, `set_collision_layer` / `set_collision_mask` / `Physics.layer_name`; scenes keep stable `LayerN` names), `node:set_property` / `get_property` for any Inspector property (`test_one_way_platform`, `test_joint_node`, `test_collision_layer_names`, `physics_extras` drive) |
+| Navigation | A* on TileMap / LDtk grids (engine/navigation.odin): walls from painted tiles (solid maps) or Solid IntGrid rules, 8-way without corner cutting (or 4-way), exact grid line-of-sight smoothing, cached grids rebuilt on map changes; Lua `map:nav_find_path`, `map:nav_is_walkable`, `Navigation.find_path` (`test_navigation_tilemap`, `test_navigation_ldtk`; `bench_navigation`: 256x256, 20% walls, 3.8 ms per corner-to-corner path) |
 
 ## Performance baselines
 
@@ -223,6 +224,7 @@ whole frame is vsync-bound at ~16.8 ms.
 |---|---|
 | 5000 particles (83 emitted/frame) | 0.076 ms |
 | 1000 Lua scripts `update(dt)` (get/set position) | 0.33 ms (0.33 us each) |
+| A* path, 256x256 grid, 20% walls, corner to corner | 3.8 ms per path |
 
 | Rendering (runner `--bench`) | Cached | `--no-render-cache` |
 |---|---|---|

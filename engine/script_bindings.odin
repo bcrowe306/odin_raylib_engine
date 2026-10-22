@@ -2898,6 +2898,75 @@ lua_physics_layer_name :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// --- Navigation -------------------------------------------------------------------
+
+@(private="file")
+nav_opts :: proc(L: ^lua.State, idx: c.int) -> Nav_Options {
+	o := Nav_DefaultOptions()
+	if lua.type(L, idx) != .TABLE do return o
+	lua.getfield(L, idx, "diagonal")
+	if lua.type(L, -1) == .BOOLEAN do o.diagonal = bool(lua.toboolean(L, -1))
+	lua.pop(L, 1)
+	lua.getfield(L, idx, "smooth")
+	if lua.type(L, -1) == .BOOLEAN do o.smooth = bool(lua.toboolean(L, -1))
+	lua.pop(L, 1)
+	lua.getfield(L, idx, "walkable_painted")
+	if lua.type(L, -1) == .BOOLEAN do o.walkablePainted = bool(lua.toboolean(L, -1))
+	lua.pop(L, 1)
+	return o
+}
+
+// find_path(map, x1, y1, x2, y2 [, opts]) at stack index `mapIdx`.
+@(private="file")
+nav_find :: proc(L: ^lua.State, mapIdx: c.int) -> c.int {
+	node, ok := to_node_userdata(L, mapIdx)
+	if !ok {lua.pushnil(L); return 1}
+	opts := nav_opts(L, mapIdx + 5)
+	g := Nav_GridFor(node, opts)
+	from := [2]f32{f32(lua.tonumber(L, mapIdx + 1)), f32(lua.tonumber(L, mapIdx + 2))}
+	to := [2]f32{f32(lua.tonumber(L, mapIdx + 3)), f32(lua.tonumber(L, mapIdx + 4))}
+	path := Nav_FindPath(g, from, to, opts)
+	if path == nil {lua.pushnil(L); return 1}
+	lua.createtable(L, c.int(len(path)), 0)
+	for p, i in path {
+		lua.createtable(L, 2, 0)
+		lua.pushnumber(L, lua.Number(p.x)); lua.rawseti(L, -2, 1)
+		lua.pushnumber(L, lua.Number(p.y)); lua.rawseti(L, -2, 2)
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
+// map:nav_find_path(x1, y1, x2, y2 [, {diagonal, smooth, walkable_painted}])
+// -> { {x, y}, ... } or nil (TileMap / LDtk level nodes)
+@(private="file")
+lua_node_nav_find_path :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	return nav_find(L, 1)
+}
+
+// Navigation.find_path(map, x1, y1, x2, y2 [, opts])
+@(private="file")
+lua_navigation_find_path :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	return nav_find(L, 1)
+}
+
+// map:nav_is_walkable(x, y) -> bool
+@(private="file")
+lua_node_nav_is_walkable :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	walk := false
+	if ok {
+		if g := Nav_GridFor(node, nav_opts(L, 4)); g != nil {
+			walk = Nav_Walkable(g, Nav_CellAt(g, {f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3))}))
+		}
+	}
+	lua.pushboolean(L, b32(walk))
+	return 1
+}
+
 @(private="file")
 lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -3299,6 +3368,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "light_set_radius")
 		lua.pushcfunction(L, lua_node_set_property)
 		lua.setfield(L, -2, "set_property")
+		lua.pushcfunction(L, lua_node_nav_find_path)
+		lua.setfield(L, -2, "nav_find_path")
+		lua.pushcfunction(L, lua_node_nav_is_walkable)
+		lua.setfield(L, -2, "nav_is_walkable")
 		lua.pushcfunction(L, lua_node_get_property)
 		lua.setfield(L, -2, "get_property")
 		lua.pushcfunction(L, lua_node_set_collision_layer)
@@ -3694,6 +3767,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setglobal(L, "Scene")
 	Script_RegisterTweenModule(L)
 	Script_RegisterSaveModule(L)
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_navigation_find_path)
+	lua.setfield(L, -2, "find_path")
+	lua.setglobal(L, "Navigation")
 
 	// 8. Global "Log" table
 	lua.newtable(L)

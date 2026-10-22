@@ -1141,6 +1141,7 @@ LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 LdtkLevelNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 	ln := cast(^LdtkLevelNode)node
 	TileCache_Evict(ln)
+	Nav_Forget(ln)
 	DestroySubject(&ln.onLevelLoaded)
 	DestroySubject(&ln.onEntitySpawned)
 	delete(ln.spawnedEntities)

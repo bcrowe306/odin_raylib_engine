@@ -311,6 +311,7 @@ TileMapNode_Ready :: proc(node: ^Node, ctx: ^GameContext) {
 TileMapNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 	tm := cast(^TileMapNode)node
 	TileCache_Evict(tm)
+	Nav_Forget(tm)
 	if tm.tileset != nil {
 		if rm := Node_ResourceManager(tm); rm != nil do ResourceManager_ReleaseTexture(rm, tm.tileset)
 		tm.tileset = nil

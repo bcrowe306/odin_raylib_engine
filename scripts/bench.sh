@@ -11,7 +11,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 echo "== engine"
 odin build engine -build-mode:test -o:speed -define:ODIN_TEST_THREADS=1 \
-	-define:ODIN_TEST_NAMES=engine.bench_scene_hot_paths,engine.bench_particles,engine.bench_scripts \
+	-define:ODIN_TEST_NAMES=engine.bench_scene_hot_paths,engine.bench_particles,engine.bench_scripts,engine.bench_navigation \
 	-out:/tmp/ore_bench_engine > /dev/null || exit 1
 /tmp/ore_bench_engine 2>&1 | grep '\[bench\]' | sed 's/^.*\[bench\]/[bench]/'
 

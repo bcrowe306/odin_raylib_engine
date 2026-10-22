@@ -313,6 +313,29 @@ function Node:light_set_radius(radius) end
 ---@param y? number
 function Node:set_property(path, value, y) end
 
+---@class NavOptions
+---@field diagonal? boolean 8 directions (default true); no cutting past blocked corners
+---@field smooth? boolean Straighten where the line of sight is clear (default true)
+---@field walkable_painted? boolean TileMap: painted tiles are the floor (default: not `solid`)
+
+---A* path on this TileMap's or LDtk level's grid (TileMap: painted tiles
+---are walls when the map is solid; LDtk: IntGrid cells whose collision rule
+---is Solid). Waypoints from the start to the end, or nil when unreachable.
+---@param x1 number
+---@param y1 number
+---@param x2 number
+---@param y2 number
+---@param opts? NavOptions
+---@return number[][]? path { {x, y}, ... }
+function Node:nav_find_path(x1, y1, x2, y2, opts) end
+
+---Whether the grid cell at a world position is walkable.
+---@param x number
+---@param y number
+---@param opts? NavOptions
+---@return boolean
+function Node:nav_is_walkable(x, y, opts) end
+
 ---Reads an Inspector property by its path (vectors and colours as tables).
 ---@param path string
 ---@return any
@@ -1588,6 +1611,22 @@ Tween = TweenModule
 
 ---@type SaveModule
 Save = SaveModule
+
+---@class NavigationModule
+local NavigationModule = {}
+
+---Same as map:nav_find_path(x1, y1, x2, y2, opts).
+---@param map Node TileMapNode or LdtkLevelNode
+---@param x1 number
+---@param y1 number
+---@param x2 number
+---@param y2 number
+---@param opts? NavOptions
+---@return number[][]? path
+function NavigationModule.find_path(map, x1, y1, x2, y2, opts) end
+
+---@type NavigationModule
+Navigation = NavigationModule
 
 ---@type LogModule
 Log = LogModule

@@ -452,6 +452,28 @@ file is ignored (logged) and the game starts with empty data. The runner's
 tests); in the editor, **Game > Save Data** opens the folder or deletes the
 save files.
 
+#### Navigation (A* on tile maps and LDtk levels)
+
+```lua
+local level = Scene.find_node("Level")          -- a TileMap or LDtk level node
+local x, y = self.node:get_position()
+local path = level:nav_find_path(x, y, target_x, target_y)   -- nil: no way
+if path then
+    self.path, self.next = path, 2               -- path[1] is the start
+end
+-- Navigation.find_path(level, x1, y1, x2, y2, {diagonal = false, smooth = false})
+-- level:nav_is_walkable(x, y)
+```
+
+TileMaps: painted tiles are walls when the map is **solid**, else the
+painted tiles are the floor (`walkable_painted` overrides). LDtk levels:
+IntGrid cells whose collision rule is **Solid** are walls, on the finest
+such layer's grid (the current level). Paths move in 8 directions without
+cutting corners and are straightened where the line of sight is clear.
+Grids are cached and rebuilt when the map changes. A search over a
+256x256 grid takes about 4 ms (`bench_navigation`), so cache paths
+rather than re-pathing every frame.
+
 #### Physics: joints, one-way platforms, collision layers
 
 - **Joint** nodes connect two bodies (Body A defaults to the joint's

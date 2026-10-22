@@ -129,3 +129,26 @@ return M
 	per := time.tick_since(start) / frames
 	fmt.printfln("[bench] scripts: %d nodes with update(dt): %.3f ms/frame (%.2f us per script)", count, time.duration_milliseconds(per), time.duration_microseconds(per) / count)
 }
+
+// A* on a 256x256 grid with ~20% random walls, corner to corner.
+@(test)
+bench_navigation :: proc(t: ^testing.T) {
+	g := Nav_Grid{w = 256, h = 256, cell = {16, 16}}
+	g.blocked = make([]bool, g.w * g.h, context.temp_allocator)
+	seed: u32 = 12345
+	for &b in g.blocked {
+		seed = seed * 1664525 + 1013904223
+		b = (seed >> 24) % 5 == 0
+	}
+	// Open 4x4 corners so the ends aren't walled in.
+	for y in 0 ..< 4 do for x in 0 ..< 4 {
+		g.blocked[y * g.w + x] = false
+		g.blocked[(g.h - 1 - y) * g.w + (g.w - 1 - x)] = false
+	}
+	start := time.tick_now()
+	runs :: 20
+	found := 0
+	for _ in 0 ..< runs do if Nav_FindPath(&g, {8, 8}, {256 * 16 - 8, 256 * 16 - 8}) != nil do found += 1
+	per := time.tick_since(start) / runs
+	fmt.printfln("[bench] navigation: 256x256 grid, 20%% walls, corner to corner: %.3f ms per path (%d/%d found)", time.duration_milliseconds(per), found, runs)
+}
