@@ -30,6 +30,7 @@ ProjectConfig :: struct {
 	targetFPS:     int,
 	gravity:       [2]f32,
 	scenes:        [dynamic]string,
+	icon:          string, // project-relative PNG: the game window's icon (and the exported app's)
 
 	// Video
 	fullscreen:    bool,
@@ -67,6 +68,7 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg.version != "" do delete(cfg.version, allocator)
 	if cfg.initialScene != "" do delete(cfg.initialScene, allocator)
 	if cfg.windowTitle != "" do delete(cfg.windowTitle, allocator)
+	if cfg.icon != "" do delete(cfg.icon, allocator)
 	for s in cfg.scenes {
 		delete(s, allocator)
 	}
@@ -83,6 +85,7 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c.version = strings.clone(src.version, allocator)
 	c.initialScene = strings.clone(src.initialScene, allocator)
 	c.windowTitle = strings.clone(src.windowTitle, allocator)
+	c.icon = strings.clone(src.icon, allocator)
 	c.scenes = make([dynamic]string, allocator)
 	for s in src.scenes do append(&c.scenes, strings.clone(s, allocator))
 	c.actions = make([dynamic]Input_Action_Config, allocator)
@@ -250,6 +253,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 	cfg.name = strings.clone(json_get_string(rootObj, "name", cfg.name), allocator)
 	cfg.version = strings.clone(json_get_string(rootObj, "version", cfg.version), allocator)
 	cfg.initialScene = strings.clone(json_get_string(rootObj, "initial_scene", cfg.initialScene), allocator)
+	cfg.icon = strings.clone(json_get_string(rootObj, "icon", ""), allocator)
 
 	// Window settings
 	if winObj, ok := json_get_obj(rootObj, "window"); ok {
@@ -353,6 +357,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	strings.write_string(&sb, "{\n  \"name\": "); jstr(&sb, cfg.name)
 	strings.write_string(&sb, ",\n  \"version\": "); jstr(&sb, cfg.version)
 	strings.write_string(&sb, ",\n  \"initial_scene\": "); jstr(&sb, cfg.initialScene)
+	if cfg.icon != "" {strings.write_string(&sb, ",\n  \"icon\": "); jstr(&sb, cfg.icon)}
 	strings.write_string(&sb, ",\n  \"window\": {\n    \"title\": "); jstr(&sb, cfg.windowTitle)
 	fmt.sbprintf(&sb, ",\n    \"width\": %d,\n", cfg.windowWidth)
 	fmt.sbprintf(&sb, "    \"height\": %d,\n", cfg.windowHeight)

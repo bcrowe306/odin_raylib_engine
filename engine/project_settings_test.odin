@@ -51,3 +51,21 @@ test_project_input_actions_video_audio_export :: proc(t: ^testing.T) {
 	jump, _ = Input_ActionStateByName(&input, "jump")
 	testing.expect(t, !jump.down, "old SPACE binding replaced")
 }
+
+@(test)
+test_project_icon_and_runner_args :: proc(t: ^testing.T) {
+	cfg, ok := Project_ParseConfig(transmute([]u8)string(`{"name": "Game", "icon": "textures/icon.png"}`))
+	defer ProjectConfig_Destroy(&cfg)
+	testing.expect(t, ok, "parsed")
+	testing.expect_value(t, cfg.icon, "textures/icon.png")
+	text := Project_SerializeToJSON(&cfg, context.temp_allocator)
+	testing.expect(t, strings.contains(text, `"icon": "textures/icon.png"`), "icon saved")
+	c2 := ProjectConfig_Clone(&cfg)
+	defer ProjectConfig_Destroy(&c2)
+	testing.expect_value(t, c2.icon, "textures/icon.png")
+
+	opts := Engine_ParseRunArgs({"game.ore", "--user-data", "/tmp/saves", "--frames", "5"})
+	testing.expect_value(t, opts.projectPath, "game.ore")
+	testing.expect_value(t, opts.userDataDir, "/tmp/saves")
+	testing.expect_value(t, opts.maxFrames, 5)
+}

@@ -127,7 +127,7 @@ Editor_UpdatePlaytest :: proc(state: ^EditorState) {
 				Editor_Log(state, .Info, "Build succeeded in %.1fs", secs)
 				switch state.buildKind {
 				case .Game:       Editor_LaunchGame(state)
-				case .Standalone: Editor_Log(state, .Info, "Standalone game ready: %s", state.exportDir)
+				case .Standalone: Editor_ExportStandalone(state, afterBuild = true) // the runner exists now
 				}
 			} else {
 				Editor_Log(state, .Error, "Build failed (exit %d) - see errors above; not launching", pstate.exit_code)

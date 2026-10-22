@@ -217,53 +217,6 @@ Editor_OrePath :: proc(state: ^EditorState) -> string {
 	return strings.concatenate({clean, ".ore"}, context.temp_allocator)
 }
 
-// Editor_ExportStandalone writes a playable folder next to the project:
-// the generic runner (built from runner/), game.ore and the UI font.
-Editor_ExportStandalone :: proc(state: ^EditorState) {
-	if state.buildRunning {
-		Editor_Log(state, .Warn, "A build is already running")
-		return
-	}
-	Editor_SaveAllScenes(state)
-	Code_SaveAll(state)
-	cfg := &state.projectConfig
-	x := &cfg.export
-	clean := strings.trim_suffix(state.projectPath, "/")
-	name := x.executableName if x.executableName != "" else export_default_name(cfg)
-	outDir := x.outputDir if x.outputDir != "" else strings.concatenate({clean, "_standalone"}, context.temp_allocator)
-	_ = os.make_directory_all(outDir)
-	ore, _ := filepath.join({outDir, "game.ore"}, context.temp_allocator)
-	if !e.OrePackage_CreateFromDirectory(state.projectPath, ore, x.compress) {
-		Editor_Log(state, .Error, "Failed to package the project into %s", ore)
-		return
-	}
-	if x.includeFont {
-		fonts, _ := filepath.join({outDir, "fonts"}, context.temp_allocator)
-		_ = os.make_directory_all(fonts)
-		if data, err := os.read_entire_file("engine/Open_Sans/static/OpenSans-Regular.ttf", context.temp_allocator); err == nil {
-			dst, _ := filepath.join({fonts, "OpenSans-Regular.ttf"}, context.temp_allocator)
-			_ = os.write_entire_file(dst, data)
-		}
-	}
-	for t in x.targets {
-		if t != e.native_export_target() {
-			Editor_Log(state, .Warn, "Skipping the %s runner: build it on %s (the package %s works there)", e.export_target_name(t), e.export_target_name(t), ore)
-		}
-	}
-	if e.native_export_target() not_in x.targets && x.targets != {} {
-		Editor_Log(state, .Info, "Exported %s (no runner for this platform selected)", ore)
-		return
-	}
-	exe, _ := filepath.join({outDir, name}, context.temp_allocator)
-	if state.exportDir != "" do delete(state.exportDir)
-	state.exportDir = strings.clone(outDir)
-	if !Editor_StartBuild(state, {"odin", "build", "runner", strings.concatenate({"-out:", exe}, context.temp_allocator)}, .Standalone) {
-		Editor_Log(state, .Error, "Could not start the runner build (is `odin` on PATH?)")
-		return
-	}
-	Editor_Log(state, .Info, "Exporting standalone game to %s (building the runner)...", outDir)
-}
-
 Toolbar_ExportOre :: proc(state: ^EditorState) {
 	Editor_SaveAllScenes(state)
 	outPath := Editor_OrePath(state)

@@ -171,6 +171,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 		log.errorf("Failed to load project: %s", projectPath)
 		return 1
 	}
+	if video.icon != "" do Runner_SetWindowIcon(game, video.icon)
 
 	// --scene <file>: start in that scene instead of the project's initial
 	// scene (the editor's "Play Current Scene").
@@ -232,4 +233,24 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 		}
 	}
 	return 0
+}
+
+// Runner_SetWindowIcon uses a project PNG (project.json "icon") as the
+// window's icon.
+Runner_SetWindowIcon :: proc(game: ^Game, path: string) -> bool {
+	data, ok := AssetManager_ReadFileBytes(&game.assetManager, path, context.temp_allocator)
+	if !ok || len(data) == 0 {
+		log.warnf("[Game] Icon not found: %s", path)
+		return false
+	}
+	ext := strings.clone_to_cstring(strings.to_lower(filepath.ext(path), context.temp_allocator), context.temp_allocator)
+	img := rl.LoadImageFromMemory(ext, raw_data(data), i32(len(data)))
+	if img.data == nil {
+		log.warnf("[Game] Icon is not a readable image: %s", path)
+		return false
+	}
+	defer rl.UnloadImage(img)
+	rl.ImageFormat(&img, .UNCOMPRESSED_R8G8B8A8) // what SetWindowIcon expects
+	rl.SetWindowIcon(img)
+	return true
 }

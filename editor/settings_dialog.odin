@@ -412,6 +412,13 @@ project_general :: proc(state: ^EditorState) {
 			d.initialScene = strings.clone(state.activeScenePath)
 			ensure_scene_listed(d, state.activeScenePath)
 		}
+		UI_PropLabel("Icon")
+		imgui.SetNextItemWidth(-1)
+		if path, ok := asset_picker("settings.icon", d.icon, Editor_ListProjectFiles(state, "", {".png"})); ok {
+			delete(d.icon)
+			d.icon = strings.clone(path)
+		}
+		UI_Tooltip("PNG used as the game window's icon and the exported app's (512x512 or 1024x1024 works best)")
 		UI_EndProps()
 	}
 	if UI_SectionHeader("Physics") && UI_BeginProps("##physics") {
@@ -684,6 +691,18 @@ project_export :: proc(state: ^EditorState) {
 		imgui.SameLine()
 	}
 	imgui.NewLine()
+	UI_PropLabel("Runners")
+	{
+		sb := strings.builder_make(context.temp_allocator)
+		for t in e.Export_Target {
+			if strings.builder_len(sb) > 0 do strings.write_string(&sb, "   ")
+			found := Editor_FindRunner(t) != ""
+			fmt.sbprintf(&sb, "%s %s", e.export_target_name(t), "ready" if found else ("built on export" if t == e.native_export_target() else "missing"))
+		}
+		UI_DimText(strings.to_string(sb))
+		Drive_Item("settings.runners")
+		UI_Tooltip("Prebuilt game runners (runners/<platform>/ next to the editor, or bin/runners/). Build one per platform with scripts/build_runners.sh")
+	}
 	check("settings.compress", "Compress Package", &x.compress)
 	check("settings.include-font", "Include UI Font", &x.includeFont)
 	UI_PropLabel("")

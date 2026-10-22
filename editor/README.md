@@ -94,12 +94,12 @@ standalone game), **Settings** (Cmd+,) and Quit.
   clear it or reset it (conflicts are flagged).
 - **Code Editor** — font size, tab width, spaces vs tabs, auto-closing
   brackets, format on save, the language server and its path.
-- **Project** — General (name, version, startup scene, physics, scenes),
+- **Project** — General (name, version, startup scene, icon, physics, scenes),
   **Input** (named actions and their key/mouse/gamepad bindings — scripts
   call `Input.is_action_down("jump")`), **Video** (window, virtual
   resolution, FPS, fullscreen, vsync, resizable, MSAA, high-DPI), **Audio**
   (master, music and sound-effect volumes) and **Export** (executable name,
-  output folder, targets, compression, font).
+  output folder, targets, compression, font, which prebuilt runners exist).
 
 Editor settings are per user (`~/.config/ore_editor/settings.json`); project
 settings live in the project's `project.json`.
@@ -324,8 +324,17 @@ a number). It is rewritten half a second after saves, imports, renames and
 settings changes, and the language server is told.
 
 
-**File > Export Standalone Game** packages the project as `game.ore` and builds
-the generic runner (`runner/`) next to it: a folder you can ship.
+**File > Export Standalone Game** (or Project Settings > Export > **Save and
+Export**) writes, for each target platform, `<output>/<platform>/` with the
+game runner renamed to the executable name, `game.ore` and the UI font: a
+folder you can ship. The runner is **prebuilt** - no compiler is needed to
+export: runners are looked up in `runners/<platform>/` next to the editor
+(or `bin/runners/` in a source checkout). `scripts/build_runners.sh` builds
+the current platform's; run it on each platform you ship for and copy its
+`runners/<platform>/` folder next to the editor. The Export page shows which
+runners are ready; without one for this platform the editor builds it once
+(needs `odin`). The project's **Icon** (Project > General, a PNG) becomes
+the game window's icon.
 
 The engine's open gaps and everything fixed in this pass are listed in [`engine/GAPS.md`](../engine/GAPS.md).
 
