@@ -67,7 +67,7 @@ function Node:set_scale(sx, sy) end
 ---Shows another image on a TextureNode (project-relative path, e.g. a
 ---`texture` script property). Returns false if it isn't a TextureNode or
 ---the file can't be loaded.
----@param path string Project-relative texture path
+---@param path TexturePath|string Project-relative texture path
 ---@return boolean ok
 function Node:set_texture(path) end
 
@@ -105,7 +105,7 @@ function Node:get_parent() end
 function Node:get_children() end
 
 ---Finds a direct child node by its exact name.
----@param name string
+---@param name NodeName|string
 ---@return Node?
 function Node:get_child(name) end
 
@@ -701,7 +701,7 @@ function Node:ldtk_get_level_identifier() end
 function Node:ldtk_get_levels(world) end
 
 ---Switches to another level (identifier or iid); colliders and entities are rebuilt.
----@param identifier string
+---@param identifier LdtkLevel|string
 ---@return boolean ok
 function Node:ldtk_load_level(identifier) end
 
@@ -764,11 +764,11 @@ function Node:ldtk_is_world_mode() end
 function Node:ldtk_get_layers(level) end
 
 ---Shows or hides a layer (in every loaded level).
----@param name string
+---@param name LdtkLayer|string
 ---@param visible boolean
 function Node:ldtk_set_layer_visible(name, visible) end
 
----@param name string
+---@param name LdtkLayer|string
 ---@return boolean
 function Node:ldtk_is_layer_visible(name) end
 
@@ -844,7 +844,7 @@ function Node:ldtk_get_tile(layer, x, y) end
 function Node:ldtk_get_tile_enums(layer, x, y) end
 
 ---Gets an enum's values (colour, tile, index).
----@param name string
+---@param name LdtkEnumName
 ---@return LdtkEnumValue[]?
 function Node:ldtk_get_enum(name) end
 
@@ -853,7 +853,7 @@ function Node:ldtk_get_enum(name) end
 function Node:ldtk_get_enums() end
 
 ---Lists the loaded levels' entities, optionally only those with an identifier.
----@param identifier? string
+---@param identifier? LdtkEntity
 ---@return LdtkEntity[]
 function Node:ldtk_get_entities(identifier) end
 
@@ -951,31 +951,31 @@ function EngineModule.get_virtual_size() end
 local InputModule = {}
 
 ---Checks if an action was pressed this frame (just triggered).
----@param action string Action name from the project's Input settings (e.g. "move_up", "fire", "jump", "dash")
+---@param action InputAction Action name from the project's Input settings (e.g. "move_up", "fire", "jump", "dash")
 ---@return boolean
 function InputModule.is_action_pressed(action) end
 
 ---Checks if an action is currently held down.
----@param action string
+---@param action InputAction
 ---@return boolean
 function InputModule.is_action_down(action) end
 
 ---Checks if an action was released this frame.
----@param action string
+---@param action InputAction
 ---@return boolean
 function InputModule.is_action_released(action) end
 
 ---Calculates a 1D axis value between -1.0 and 1.0 from negative and positive action names.
----@param neg_action string Action name representing negative direction (e.g. "move_left")
----@param pos_action string Action name representing positive direction (e.g. "move_right")
+---@param neg_action InputAction Action name representing negative direction (e.g. "move_left")
+---@param pos_action InputAction Action name representing positive direction (e.g. "move_right")
 ---@return number axis Value from -1.0 to 1.0
 function InputModule.get_axis(neg_action, pos_action) end
 
 ---Calculates a normalized 2D direction vector from 4 directional action inputs.
----@param left? string
----@param right? string
----@param up? string
----@param down? string
+---@param left? InputAction
+---@param right? InputAction
+---@param up? InputAction
+---@param down? InputAction
 ---@return number x Normalized X axis
 ---@return number y Normalized Y axis
 function InputModule.get_vector(left, right, up, down) end
@@ -1025,33 +1025,33 @@ function InputModule.get_mouse_wheel_move() end
 local AudioModule = {}
 
 ---Plays a sound effect from the given file path.
----@param path string File path, e.g. "assets/audio/laser.wav"
+---@param path AudioPath|string File path, e.g. "assets/audio/laser.wav"
 function AudioModule.play_sound(path) end
 
 ---Streams a music track from the given file path.
----@param path string File path, e.g. "assets/audio/theme.ogg"
+---@param path AudioPath|string File path, e.g. "assets/audio/theme.ogg"
 ---@param loop? boolean Whether to loop playback (default true)
 function AudioModule.play_music(path, loop) end
 
 ---Stops playing the specified music stream.
----@param path string
+---@param path AudioPath|string
 function AudioModule.stop_music(path) end
 
 ---Pauses playback of the specified music stream.
----@param path string
+---@param path AudioPath|string
 function AudioModule.pause_music(path) end
 
 ---Resumes playback of the specified paused music stream.
----@param path string
+---@param path AudioPath|string
 function AudioModule.resume_music(path) end
 
 ---Checks if the specified music stream is currently playing.
----@param path string
+---@param path AudioPath|string
 ---@return boolean
 function AudioModule.is_music_playing(path) end
 
 ---Sets volume for a specific music stream.
----@param path string
+---@param path AudioPath|string
 ---@param volume number Volume between 0.0 and 1.0
 function AudioModule.set_music_volume(path, volume) end
 
@@ -1216,7 +1216,7 @@ function PhysicsModule.raycast(startX, startY, endX, endY) end
 local SceneModule = {}
 
 ---Finds any node in the active scene hierarchy by name.
----@param name string Name of node to find
+---@param name NodeName|string Name of node to find
 ---@return Node? node Found node or nil
 function SceneModule.find_node(name) end
 
@@ -1225,7 +1225,7 @@ function SceneModule.find_node(name) end
 function SceneModule.get_name() end
 
 ---Requests a transition to another scene by name.
----@param name string Name of registered scene
+---@param name SceneName Name of registered scene
 function SceneModule.change_scene(name) end
 
 ---Reloads the currently active scene.

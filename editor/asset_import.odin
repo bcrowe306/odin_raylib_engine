@@ -76,6 +76,7 @@ Asset_ImportDir :: proc(name: string) -> (dir: string, ok: bool) {
 // Asset_ImportFiles imports files and folders (absolute or cwd-relative
 // paths); returns the project-relative paths now in the project, in order.
 Asset_ImportFiles :: proc(state: ^EditorState, paths: []string) -> []string {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	report_clear()
 	out := make([dynamic]string, context.temp_allocator)
 	for p in paths {

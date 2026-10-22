@@ -1,0 +1,42 @@
+# Generated project types: .ore/definitions/project_types.lua lists the
+# project's input actions, scenes, node names, assets and script classes;
+# lua-language-server flags a misspelled action, completes action names and
+# types `self.<property>`; the file follows project changes.
+wait 5
+expect file:.ore/definitions/project_types.lua contains ---@alias InputAction
+expect file:.ore/definitions/project_types.lua contains ---| "move_left"
+expect file:.ore/definitions/project_types.lua contains ---@alias SceneName
+expect file:.ore/definitions/project_types.lua contains ---| "main"
+expect file:.ore/definitions/project_types.lua contains ---| "PlayerShip"
+expect file:.ore/definitions/project_types.lua contains ---| "textures/Spaceship_1.png"
+expect file:.ore/definitions/project_types.lua contains ---@class Drone
+expect file:.ore/definitions/project_types.lua contains ---@field orbit_radius number Orbit Radius
+
+dblclick @asset:scripts/orbiting_drone.lua
+wait-until code.lsp == ready timeout=600
+key enter
+key up
+# A misspelled action is an error.
+type local a = Input.is_action_pressed("jupm")
+wait-until code.diagnostic-messages contains "boost"|"cancel" timeout=900
+screenshot misspelled_action
+key ctrl+z
+key ctrl+z
+# Action names complete inside the quotes.
+type local b = Input.is_action_pressed("mov
+key ctrl+space
+wait-until code.completion contains move_left timeout=900
+screenshot action_completion
+key esc
+key ctrl+z
+key ctrl+z
+
+# A new action in Project Settings shows up in the types.
+click @toolbar.settings
+click @settings.page:Input
+click @settings.new-action
+type warp_drive
+click @settings.add-action
+click @settings.save
+wait 60
+expect file:.ore/definitions/project_types.lua contains ---| "warp_drive"

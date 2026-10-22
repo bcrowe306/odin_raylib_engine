@@ -415,6 +415,7 @@ Code_CmdSelectAllOccurrences :: proc(state: ^EditorState) {
 // --- editing -----------------------------------------------------------------------
 
 Code_CmdSave :: proc(state: ^EditorState) {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	doc := code_active_doc()
 	if doc == nil do return
 	// Format on save: format first, save when the edits arrive.

@@ -201,6 +201,7 @@ unique_copy_name :: proc(state: ^EditorState, dir, base: string) -> string {
 }
 
 Asset_Duplicate :: proc(state: ^EditorState, rel, toDir: string) -> string {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	src, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	data, err := os.read_entire_file(src, context.temp_allocator)
 	if err != nil {
@@ -228,6 +229,7 @@ Asset_Paste :: proc(state: ^EditorState, toDir: string) {
 }
 
 Asset_Rename :: proc(state: ^EditorState, rel, newName: string) -> bool {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	dst, _ := filepath.join({filepath.dir(rel, context.temp_allocator), newName}, context.temp_allocator)
 	if dst == rel do return false
 	src, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
@@ -263,6 +265,7 @@ Asset_Rename :: proc(state: ^EditorState, rel, newName: string) -> bool {
 }
 
 Asset_Delete :: proc(state: ^EditorState, rel: string) -> bool {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	if os.remove(full) != nil {
 		Editor_Log(state, .Error, "Could not delete %s", rel)

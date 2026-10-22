@@ -65,5 +65,6 @@ Lua_ProjectSetup :: proc(state: ^EditorState) -> string {
 	if err != nil || strings.contains(string(existing), LUA_DEFINITIONS_DIR) {
 		write_if_changed(luarc, luarc_text())
 	}
+	Lua_WriteProjectTypes(state)
 	return strings.clone(defs, context.temp_allocator)
 }

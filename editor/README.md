@@ -266,6 +266,15 @@ files and folders (`.ore/`, `.luarc.json`, ...) are never packaged into
 games. The language server is looked up next to the editor, then in the
 engine checkout (or set its path in Settings > Code Editor).
 
+**Project types.** Next to the engine API the editor generates
+`.ore/definitions/project_types.lua` from the project: `InputAction` (the
+input actions - a misspelled action is an error and names complete inside
+the quotes), `SceneName`, `NodeName`, `ScenePath`/`TexturePath`/`AudioPath`/
+`ComponentPath`/`LevelPath`/`ScriptPath`, LDtk entity/level/layer/enum names,
+and a class per script with its exported properties (`self.orbit_radius` is
+a number). It is rewritten half a second after saves, imports, renames and
+settings changes, and the language server is told.
+
 
 **File > Export Standalone Game** packages the project as `game.ore` and builds
 the generic runner (`runner/`) next to it: a folder you can ship.

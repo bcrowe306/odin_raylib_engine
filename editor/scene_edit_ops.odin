@@ -296,6 +296,7 @@ Editor_ComponentsDir :: proc(state: ^EditorState) -> string {
 // (name "" = the node's name) and links the node to it. An instance is
 // saved with its overrides baked in (Save as New Component).
 Editor_SaveComponent :: proc(state: ^EditorState, node: ^e.Node, name: string = "") -> (string, bool) {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	if node == nil || state.activeScene == nil do return "", false
 	mgr := state.activeScene.manager
 	dir := Editor_ComponentsDir(state)

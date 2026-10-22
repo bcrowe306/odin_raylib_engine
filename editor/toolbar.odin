@@ -205,6 +205,7 @@ Toolbar_NewScene :: proc(state: ^EditorState) {
 }
 
 Toolbar_SaveScene :: proc(state: ^EditorState) {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	if state.activeScene == nil do return
 	Editor_SaveSceneDocument(state, state.activeScene)
 }

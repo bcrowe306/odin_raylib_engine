@@ -171,6 +171,7 @@ ProjectSettingsDialog_Render :: proc(state: ^EditorState) {
 
 @(private = "file")
 settings_save :: proc(state: ^EditorState) {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	d := &st.project
 	if !e.Project_SaveConfigToFile(state.projectPath, d) {
 		Editor_Log(state, .Error, "Failed to write %s/project.json", state.projectPath)

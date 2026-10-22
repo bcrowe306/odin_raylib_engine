@@ -1429,6 +1429,7 @@ return $CLASS$
 // Editor_NewScript creates scripts/<name>.lua from a template (unique
 // name) and opens it. Returns the project-relative path.
 Editor_NewScript :: proc(state: ^EditorState, baseName := "new_script", template := CODE_SCRIPT_TEMPLATE) -> string {
+	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	dir, _ := filepath.join({state.projectPath, "scripts"}, context.temp_allocator)
 	os.make_directory(dir)
 	name := baseName
