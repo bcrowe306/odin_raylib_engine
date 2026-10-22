@@ -269,6 +269,14 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 			if fan.origin == {0, 0} do origin = size * 0.5
 			lo, hi, have = -origin, size - origin, true
 		}
+	case e.TextNode:
+		t := cast(^e.TextNode)node
+		_, size, _ := e.TextNode_Layout(t, &state.game.gameContext)
+		s := size * scl.x
+		if s.x > 0 && s.y > 0 {
+			lo, hi, have = {0, 0}, s, true
+			if t.centered do lo, hi = -s * 0.5, s * 0.5
+		}
 	case e.LdtkLevelNode:
 		// The active levels (in world mode, the whole world).
 		ln := cast(^e.LdtkLevelNode)node

@@ -97,6 +97,9 @@ Node_RenderBounds :: proc(node: ^Node) -> (rect: rl.Rectangle, ok: bool) {
 		origin := tn.origin * tn.globalScale
 		if tn.origin == {0, 0} do origin = size * 0.5
 		return rect_aabb(tn.globalPosition, {abs(size.x), abs(size.y)}, {abs(origin.x), abs(origin.y)}, tn.globalRotation), true
+	case TextNode:
+		if !rl.IsWindowReady() do return {}, false
+		return TextNode_Bounds(cast(^TextNode)node, nil), true
 	case TileMapNode:
 		tm := cast(^TileMapNode)node
 		a := TileMapNode_CellCorner(tm, {0, 0})

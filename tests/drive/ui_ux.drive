@@ -103,7 +103,8 @@ expect node:PlayerShip.children == 1
 # --- LDtk levels in Assets ---
 exec mkdir -p $PROJECT/levels
 exec cp assets/levels/deep_space_station.ldtk $PROJECT/levels/station.ldtk
-wait 70
+# Files added outside the editor show up within a second (project_files.odin).
+wait 90
 expect item:asset:levels/station.ldtk == visible
 rclick @asset:levels/station.ldtk
 click @ctx:add-level

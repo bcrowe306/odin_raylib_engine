@@ -84,6 +84,8 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case LightNode: typeName = "LightNode"
 	case StateMachineNode: typeName = "StateMachineNode"
 	case JointNode: typeName = "JointNode"
+	case TextNode: typeName = "TextNode"
+	case DialogueNode: typeName = "DialogueNode"
 	case TileMapNode: typeName = "TileMapNode"
 	}
 	nameC := strings.clone_to_cstring(typeName, context.temp_allocator)
@@ -2967,6 +2969,181 @@ lua_node_nav_is_walkable :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// --- Text, dialogue, localization ------------------------------------------------
+
+// node:set_text(text): a TextNode (restarts its typewriter), UI label or button.
+@(private="file")
+lua_node_set_text :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	s := lua.tostring(L, 2)
+	if !ok || s == nil do return 0
+	switch node.typeId {
+	case TextNode:     TextNode_SetText(cast(^TextNode)node, string(s))
+	case UILabelNode:  (cast(^UILabelNode)node).text = strings.clone(string(s), node.allocator)
+	case UIButtonNode: (cast(^UIButtonNode)node).text = strings.clone(string(s), node.allocator)
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_get_text :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	text := ""
+	if ok {
+		switch node.typeId {
+		case TextNode:     text = (cast(^TextNode)node).text
+		case UILabelNode:  text = (cast(^UILabelNode)node).text
+		case UIButtonNode: text = (cast(^UIButtonNode)node).text
+		}
+	}
+	lua.pushstring(L, strings.clone_to_cstring(text, context.temp_allocator))
+	return 1
+}
+
+// text:text_restart(): types the text out again.
+@(private="file")
+lua_node_text_restart :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if ok && node.typeId == TextNode {
+		t := cast(^TextNode)node
+		t.revealed = 0
+		t.revealDone = false
+	}
+	return 0
+}
+
+@(private="file")
+dialogue_arg :: proc(L: ^lua.State) -> ^DialogueNode {
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != DialogueNode do return nil
+	return cast(^DialogueNode)node
+}
+
+// box:dialogue_show({ {speaker = "Ada", text = "..."}, "plain line", ... })
+// or box:dialogue_show(text [, speaker])
+@(private="file")
+lua_node_dialogue_show :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	d := dialogue_arg(L)
+	if d == nil do return 0
+	lines := make([dynamic]Dialogue_Line, context.temp_allocator)
+	str :: proc(L: ^lua.State, idx: c.int) -> string {
+		s := lua.tostring(L, idx)
+		return strings.clone(string(s), context.temp_allocator) if s != nil else ""
+	}
+	if lua.type(L, 2) == .TABLE {
+		n := c.int(lua.rawlen(L, 2))
+		for i in 1 ..= n {
+			lua.rawgeti(L, 2, lua.Integer(i))
+			if lua.type(L, -1) == .TABLE {
+				lua.getfield(L, -1, "speaker")
+				speaker := str(L, -1)
+				lua.pop(L, 1)
+				lua.getfield(L, -1, "text")
+				text := str(L, -1)
+				lua.pop(L, 1)
+				append(&lines, Dialogue_Line{speaker, text})
+			} else {
+				append(&lines, Dialogue_Line{"", str(L, -1)})
+			}
+			lua.pop(L, 1)
+		}
+	} else {
+		append(&lines, Dialogue_Line{str(L, 3) if lua.gettop(L) >= 3 else "", str(L, 2)})
+	}
+	DialogueNode_Show(d, lines[:])
+	return 0
+}
+
+@(private="file")
+lua_node_dialogue_next :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if d := dialogue_arg(L); d != nil do DialogueNode_Advance(d, sm_game_ctx(L))
+	return 0
+}
+
+@(private="file")
+lua_node_dialogue_close :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if d := dialogue_arg(L); d != nil do DialogueNode_Close(d, sm_game_ctx(L))
+	return 0
+}
+
+@(private="file")
+lua_node_dialogue_is_open :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	d := dialogue_arg(L)
+	lua.pushboolean(L, b32(d != nil && DialogueNode_IsOpen(d)))
+	return 1
+}
+
+@(private="file")
+sm_game_ctx :: proc(L: ^lua.State) -> ^GameContext {
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil do return nil
+	return &sm.game.gameContext
+}
+
+// tr(key [, {name = value, ...}]) -> the text in the current language.
+@(private="file")
+lua_tr :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	key := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if key == nil {lua.pushstring(L, ""); return 1}
+	args := make(map[string]string, context.temp_allocator)
+	if lua.type(L, 2) == .TABLE {
+		lua.pushnil(L)
+		for lua.next(L, 2) != 0 {
+			if lua.type(L, -2) == .STRING {
+				k := strings.clone(string(lua.tostring(L, -2)), context.temp_allocator)
+				// tostring() without converting the key in place.
+				lua.pushvalue(L, -1)
+				v := lua.L_tostring(L, -1) // pushes the string
+				args[k] = strings.clone(string(v), context.temp_allocator)
+				lua.pop(L, 2)
+			}
+			lua.pop(L, 1)
+		}
+	}
+	game := sm.game if sm != nil else nil
+	lua.pushstring(L, strings.clone_to_cstring(Locale_Get(game, string(key), args), context.temp_allocator))
+	return 1
+}
+
+@(private="file")
+lua_locale_set :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if s := lua.tostring(L, 1); s != nil do Locale_SetLanguage(string(s))
+	return 0
+}
+
+@(private="file")
+lua_locale_get :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil do Locale_Languages(sm.game) // loads the tables
+	lua.pushstring(L, strings.clone_to_cstring(Locale_Language(), context.temp_allocator))
+	return 1
+}
+
+@(private="file")
+lua_locale_languages :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	langs: []string
+	if sm != nil && sm.game != nil do langs = Locale_Languages(sm.game)
+	lua.createtable(L, c.int(len(langs)), 0)
+	for l, i in langs {
+		lua.pushstring(L, strings.clone_to_cstring(l, context.temp_allocator))
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
 @(private="file")
 lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -3368,6 +3545,20 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "light_set_radius")
 		lua.pushcfunction(L, lua_node_set_property)
 		lua.setfield(L, -2, "set_property")
+		lua.pushcfunction(L, lua_node_set_text)
+		lua.setfield(L, -2, "set_text")
+		lua.pushcfunction(L, lua_node_get_text)
+		lua.setfield(L, -2, "get_text")
+		lua.pushcfunction(L, lua_node_text_restart)
+		lua.setfield(L, -2, "text_restart")
+		lua.pushcfunction(L, lua_node_dialogue_show)
+		lua.setfield(L, -2, "dialogue_show")
+		lua.pushcfunction(L, lua_node_dialogue_next)
+		lua.setfield(L, -2, "dialogue_next")
+		lua.pushcfunction(L, lua_node_dialogue_close)
+		lua.setfield(L, -2, "dialogue_close")
+		lua.pushcfunction(L, lua_node_dialogue_is_open)
+		lua.setfield(L, -2, "dialogue_is_open")
 		lua.pushcfunction(L, lua_node_nav_find_path)
 		lua.setfield(L, -2, "nav_find_path")
 		lua.pushcfunction(L, lua_node_nav_is_walkable)
@@ -3771,6 +3962,16 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.pushcfunction(L, lua_navigation_find_path)
 	lua.setfield(L, -2, "find_path")
 	lua.setglobal(L, "Navigation")
+	lua.pushcfunction(L, lua_tr)
+	lua.setglobal(L, "tr")
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_locale_set)
+	lua.setfield(L, -2, "set")
+	lua.pushcfunction(L, lua_locale_get)
+	lua.setfield(L, -2, "get")
+	lua.pushcfunction(L, lua_locale_languages)
+	lua.setfield(L, -2, "languages")
+	lua.setglobal(L, "Locale")
 
 	// 8. Global "Log" table
 	lua.newtable(L)

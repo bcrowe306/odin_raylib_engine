@@ -393,6 +393,9 @@ project_general :: proc(state: ^EditorState) {
 		text_field("settings.name", &d.name)
 		UI_PropLabel("Version")
 		text_field("settings.version", &d.version)
+		UI_PropLabel("Language")
+		text_field("settings.language", &d.language, "the first in locale/*.csv")
+		UI_Tooltip("Starting language for texts from the locale/ tables (scripts: Locale.set)")
 		UI_PropLabel("Startup Scene")
 		avail := imgui.GetContentRegionAvail().x
 		imgui.SetNextItemWidth(avail - 110)

@@ -313,6 +313,36 @@ function Node:light_set_radius(radius) end
 ---@param y? number
 function Node:set_property(path, value, y) end
 
+---Sets the text of a TextNode (restarting its typewriter), UI label or button.
+---@param text string
+function Node:set_text(text) end
+
+---@return string
+function Node:get_text() end
+
+---TextNode: types the text out again (revealSpeed > 0).
+function Node:text_restart() end
+
+---@class DialogueLine
+---@field speaker? string
+---@field text string Rich text ([color=..] [size=..] [wave] [shake]), or a locale key when the box is localized
+
+---DialogueNode: opens the box with these lines (strings or {speaker, text}),
+---or one line: box:dialogue_show(text, speaker). Each line types out; the
+---advance action (default "confirm") shows the rest, then the next line.
+---Events: "line_shown"(index), "finished".
+---@param lines string|(string|DialogueLine)[]
+---@param speaker? string
+function Node:dialogue_show(lines, speaker) end
+
+---Shows the rest of the line, else the next one.
+function Node:dialogue_next() end
+
+function Node:dialogue_close() end
+
+---@return boolean
+function Node:dialogue_is_open() end
+
 ---@class NavOptions
 ---@field diagonal? boolean 8 directions (default true); no cutting past blocked corners
 ---@field smooth? boolean Straighten where the line of sight is clear (default true)
@@ -1627,6 +1657,29 @@ function NavigationModule.find_path(map, x1, y1, x2, y2, opts) end
 
 ---@type NavigationModule
 Navigation = NavigationModule
+
+---The text for a key in the current language (locale/*.csv), with {name}
+---placeholders filled from `args`; falls back to another language, then the key.
+---@param key string
+---@param args? table<string, any>
+---@return string
+function tr(key, args) end
+
+---@class LocaleModule
+local LocaleModule = {}
+
+---Switches the language texts are shown in (a column of the locale tables).
+---@param language string e.g. "fr"
+function LocaleModule.set(language) end
+
+---@return string language
+function LocaleModule.get() end
+
+---@return string[] languages The languages the tables have
+function LocaleModule.languages() end
+
+---@type LocaleModule
+Locale = LocaleModule
 
 ---@type LogModule
 Log = LogModule

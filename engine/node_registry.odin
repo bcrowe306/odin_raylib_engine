@@ -43,6 +43,8 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"TileMapNode", TileMapNode, factory_tilemap, {"tilemap"}},
 	{"LightNode", LightNode, factory_light, {"light", "pointlight", "spotlight"}},
 	{"JointNode", JointNode, factory_joint, {"joint", "physicsjoint"}},
+	{"TextNode", TextNode, factory_text, {"text", "label2d", "textlabel"}},
+	{"DialogueNode", DialogueNode, factory_dialogue, {"dialogue", "dialoguebox"}},
 	{"UIContainerNode", UIContainerNode, factory_ui_container, {"uicontainer", "uipanel", "uipanelnode"}},
 	{"UILabelNode", UILabelNode, factory_ui_label, {"uilabel"}},
 	{"UIButtonNode", UIButtonNode, factory_ui_button, {"uibutton"}},
@@ -141,6 +143,16 @@ factory_node :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 @(private = "file")
 factory_camera :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return CameraNode_Create(scene, "Camera", true, parent)
+}
+
+@(private = "file")
+factory_text :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return TextNode_Create(scene, "Text", parent)
+}
+
+@(private = "file")
+factory_dialogue :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return DialogueNode_Create(scene, "Dialogue", parent)
 }
 
 @(private = "file")

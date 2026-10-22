@@ -93,3 +93,5 @@ ICON_FA_SUN                       :: ""
 ICON_FA_WAVE_SQUARE               :: ""
 ICON_FA_DIAGRAM_PROJECT           :: "\uF542" // State machine
 ICON_FA_ARROW_RIGHT               :: "\uF061"
+ICON_FA_FONT                      :: "\uF031" // Text
+ICON_FA_COMMENT                   :: "\uF075" // Dialogue

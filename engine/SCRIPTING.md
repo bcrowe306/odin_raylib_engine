@@ -452,6 +452,40 @@ file is ignored (logged) and the game starts with empty data. The runner's
 tests); in the editor, **Game > Save Data** opens the folder or deletes the
 save files.
 
+#### Text, dialogue and localization
+
+**TextNode** draws text in the world: a project font (`.ttf` / `.otf` at
+any size, **SDF** to stay sharp when scaled, or a `.fnt` BMFont), wrapping
+(**Max Width**), alignment, **Rich Text** markup, a **Localized** key and a
+typewriter (**Reveal Speed** characters per second; event `revealed`).
+
+```text
+[color=#ff8800]orange[/color]  [color=red]  [size=40]big[/size]
+[wave]wavy[/wave]  [shake]shaky[/shake]  [[ for a literal [
+```
+
+```lua
+self.node:set_text("[color=yellow]+100[/color]")    -- restarts the typewriter
+local box = Scene.find_node("DialogueBox")
+box:dialogue_show({
+    {speaker = "Ada", text = "Welcome to the [wave]station[/wave]."},
+    "Follow me.",
+})
+function Player:on_finished() ... end               -- (connect the box's "finished")
+```
+
+**Localization**: CSV tables in `locale/` - `key,en,fr,...` (several files
+merge; edits are picked up while running):
+
+```lua
+Locale.set("fr")
+self.title:set_text(tr("menu.start"))
+print(tr("greeting", {name = player_name}))  -- "Bonjour, {name} !"
+```
+
+TextNodes and dialogue boxes marked **Localized** treat their text as keys.
+The project's starting language is Project Settings > General > Language.
+
 #### Navigation (A* on tile maps and LDtk levels)
 
 ```lua

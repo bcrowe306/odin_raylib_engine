@@ -12,11 +12,11 @@ import "core:time"
 // each time was a large share of the editor's frame. The project is
 // scanned once and re-scanned when the editor changes files
 // (Editor_InvalidateProjectFiles, called with Lua_MarkProjectTypesDirty)
-// or every PROJECT_FILES_TTL for changes made outside the editor.
+// or every second (PROJECT_FILES_TTL) for changes made outside the editor.
 // Hidden files and folders (.ore/, .luarc.json, ...) aren't listed.
 // ============================================================================
 
-PROJECT_FILES_TTL :: 2 * time.Second
+PROJECT_FILES_TTL :: time.Second
 
 @(private = "file")
 projectFiles: struct {

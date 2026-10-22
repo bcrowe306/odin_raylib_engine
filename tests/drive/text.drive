@@ -1,0 +1,34 @@
+# Text: a TextNode with rich text and a project font (picker) and a
+# Dialogue Box, saved. (Localization: engine test_localization_and_text_nodes.)
+exec mkdir -p $PROJECT/fonts
+exec cp engine/Open_Sans/static/OpenSans-Regular.ttf $PROJECT/fonts/
+# Files added outside the editor show up within a second (project_files.odin).
+wait 90
+key escape
+key ctrl+a
+type text
+click @addnode:Text
+click @addnode.create
+expect node:Text.type == TextNode
+click @insp.prop:text
+key cmd+a
+type [color=yellow]Hello[/color] [wave]world[/wave]
+key enter
+click @insp.font
+click @pick:fonts/OpenSans-Regular.ttf
+expect node:Text.prop.font == fonts/OpenSans-Regular.ttf
+dblclick @insp.prop:fontSize
+key ctrl+a
+type 48
+key enter
+screenshot text_node
+key escape
+key ctrl+a
+key ctrl+a
+type dialogue
+click @addnode.create
+expect node:DialogueBox.type == DialogueNode
+click @toolbar.save
+expect file:scenes/main.scene.json contains "type": "TextNode"
+expect file:scenes/main.scene.json contains "font": "fonts/OpenSans-Regular.ttf"
+expect file:scenes/main.scene.json contains "type": "DialogueNode"

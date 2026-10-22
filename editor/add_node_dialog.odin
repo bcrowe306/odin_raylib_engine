@@ -64,6 +64,20 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "TextureNode",
 	},
 	{
+		name        = "Text",
+		category    = "Graphics & Rendering",
+		icon        = ICON_FA_FONT,
+		description = "Text in the world: any project font (or SDF for crisp scaling), wrapping, alignment, rich text ([color=..] [size=..] [wave] [shake]), localization keys and a typewriter reveal.",
+		typeName    = "TextNode",
+	},
+	{
+		name        = "Dialogue Box",
+		category    = "UI & Interface",
+		icon        = ICON_FA_COMMENT,
+		description = "A dialogue box: lines with a speaker type out and advance with the confirm action. Scripts: box:dialogue_show({...}); events line_shown / finished.",
+		typeName    = "DialogueNode",
+	},
+	{
 		name        = "LDtk Tilemap Level",
 		category    = "Graphics & Rendering",
 		icon        = ICON_FA_TABLE_CELLS,

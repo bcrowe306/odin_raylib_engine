@@ -176,6 +176,8 @@ GameTerminate :: proc(game: ^Game) {
 	Tween_Destroy(&game.tweens, game.scriptManager.L) // releases Lua callbacks: before the Lua state goes
 	if game.scriptManager.isReady do Save_Flush(game.scriptManager.L) // Save data is written on quit
 	Audio_ResetEffects()
+	Text_UnloadFonts()
+	Locale_Reset()
 	Audio_SetListener(nil)
 	ScriptManager_Destroy(&game.scriptManager)
 	SceneManager_Terminate(&game.sceneManager)

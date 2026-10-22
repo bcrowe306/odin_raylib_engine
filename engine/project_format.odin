@@ -32,6 +32,7 @@ ProjectConfig :: struct {
 	collisionLayers: [16]string, // collision layer names ("" = unnamed; physics_extras.odin)
 	scenes:        [dynamic]string,
 	icon:          string, // project-relative PNG: the game window's icon (and the exported app's)
+	language:      string, // starting language of the locale/ tables ("" = their first)
 
 	// Video
 	fullscreen:    bool,
@@ -75,6 +76,7 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg.initialScene != "" do delete(cfg.initialScene, allocator)
 	if cfg.windowTitle != "" do delete(cfg.windowTitle, allocator)
 	if cfg.icon != "" do delete(cfg.icon, allocator)
+	if cfg.language != "" do delete(cfg.language, allocator)
 	for n in cfg.collisionLayers do if n != "" do delete(n, allocator)
 	for s in cfg.scenes {
 		delete(s, allocator)
@@ -98,6 +100,7 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c.initialScene = strings.clone(src.initialScene, allocator)
 	c.windowTitle = strings.clone(src.windowTitle, allocator)
 	c.icon = strings.clone(src.icon, allocator)
+	c.language = strings.clone(src.language, allocator)
 	for n, i in src.collisionLayers do c.collisionLayers[i] = strings.clone(n, allocator) if n != "" else ""
 	c.scenes = make([dynamic]string, allocator)
 	for s in src.scenes do append(&c.scenes, strings.clone(s, allocator))
@@ -272,6 +275,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 	cfg.version = strings.clone(json_get_string(rootObj, "version", cfg.version), allocator)
 	cfg.initialScene = strings.clone(json_get_string(rootObj, "initial_scene", cfg.initialScene), allocator)
 	cfg.icon = strings.clone(json_get_string(rootObj, "icon", ""), allocator)
+	cfg.language = strings.clone(json_get_string(rootObj, "language", ""), allocator)
 
 	// Window settings
 	if winObj, ok := json_get_obj(rootObj, "window"); ok {
@@ -386,6 +390,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	strings.write_string(&sb, ",\n  \"version\": "); jstr(&sb, cfg.version)
 	strings.write_string(&sb, ",\n  \"initial_scene\": "); jstr(&sb, cfg.initialScene)
 	if cfg.icon != "" {strings.write_string(&sb, ",\n  \"icon\": "); jstr(&sb, cfg.icon)}
+	if cfg.language != "" {strings.write_string(&sb, ",\n  \"language\": "); jstr(&sb, cfg.language)}
 	strings.write_string(&sb, ",\n  \"window\": {\n    \"title\": "); jstr(&sb, cfg.windowTitle)
 	fmt.sbprintf(&sb, ",\n    \"width\": %d,\n", cfg.windowWidth)
 	fmt.sbprintf(&sb, "    \"height\": %d,\n", cfg.windowHeight)
@@ -477,6 +482,8 @@ Project_SaveConfigToFile :: proc(projectDir: string, cfg: ^ProjectConfig) -> boo
 Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := true) -> bool {
 	if game == nil || cfg == nil do return false
 	Save_SetGameName(cfg.name) // Save data folder
+	Locale_Reset()
+	Locale_SetLanguage(cfg.language)
 
 	if cfg.virtualWidth > 0 && cfg.virtualHeight > 0 {
 		game.virtualSize = {cfg.virtualWidth, cfg.virtualHeight}

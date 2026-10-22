@@ -251,6 +251,8 @@ inspector_properties :: proc(state: ^EditorState, node: ^e.Node) {
 // (a Script-mode CharacterMover ignores the built-in movement settings).
 @(private = "file")
 prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
+	// Fonts are picked in the Font section.
+	if (node.typeId == e.TextNode || node.typeId == e.DialogueNode) && name == "font" do return false
 	// A joint shows only its type's parameters.
 	if node.typeId == e.JointNode && strings.has_prefix(name, "joint.") && name != "joint.type" {
 		jt := e.JointType_FieldName((cast(^e.JointNode)node).joint.type)
@@ -554,6 +556,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_camera_follow(state, cast(^e.CameraNode)node)
 	case e.JointNode:
 		inspector_joint(state, cast(^e.JointNode)node)
+	case e.TextNode, e.DialogueNode:
+		inspector_font(state, node)
 	case e.StateMachineNode:
 		inspector_state_machine(state, cast(^e.StateMachineNode)node)
 	case e.LdtkLevelNode:
@@ -912,6 +916,8 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.TimerNode: return ICON_FA_CLOCK
 	case e.StateMachineNode: return ICON_FA_DIAGRAM_PROJECT
 	case e.JointNode: return ICON_FA_LINK
+	case e.TextNode: return ICON_FA_FONT
+	case e.DialogueNode: return ICON_FA_COMMENT
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS
 	case e.ScriptNode: return ICON_FA_CODE
 	}
@@ -1148,4 +1154,22 @@ inspector_joint :: proc(state: ^EditorState, j: ^e.JointNode) {
 		imgui.TextWrapped(fmt.ctprintf("%s  Pick two bodies; the joint is made when both exist (while simulating or playing).", ICON_FA_TRIANGLE_EXCLAMATION))
 		imgui.PopStyleColor()
 	}
+}
+
+FONT_EXTS := []string{".ttf", ".otf", ".fnt"}
+
+// inspector_font: the font of a TextNode / DialogueNode (project fonts).
+@(private = "file")
+inspector_font :: proc(state: ^EditorState, node: ^e.Node) {
+	if !UI_SectionHeader("Font") do return
+	if !UI_BeginProps("##font") do return
+	defer UI_EndProps()
+	font := &(cast(^e.TextNode)node).font if node.typeId == e.TextNode else &(cast(^e.DialogueNode)node).font
+	UI_PropLabel("Font")
+	imgui.SetNextItemWidth(field_width())
+	if path, ok := asset_picker("insp.font", font^, Editor_ListProjectFiles(state, "", FONT_EXTS)); ok {
+		Editor_RecordUndo(state, "Font")
+		font^ = strings.clone(path, node.allocator)
+	}
+	UI_Tooltip("None: the engine font. .ttf / .otf (any size; SDF for scaling), .fnt (BMFont)")
 }

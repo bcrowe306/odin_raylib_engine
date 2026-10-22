@@ -219,6 +219,15 @@ user-data folder under the project's name. **Game > Save Data > Open
 Folder** shows it; **Delete Save Files** removes them so the next run
 starts fresh.
 
+### Text & dialogue
+
+**Text** (Graphics & Rendering) places text in the scene: pick a project
+font in the **Font** section (`.ttf`, `.otf`, `.fnt`; none = the engine
+font), size, colour, wrapping width, alignment, rich text, localization
+key, SDF and typewriter speed. **Dialogue Box** (UI) is a box scripts fill
+with lines (`dialogue_show`). Localization tables are `locale/*.csv`; the
+starting language is set in Project Settings > General.
+
 ### Physics: joints, one-way, layers
 
 Add a **Joint** (Physics & Collision) and pick **Body A** / **Body B** in
