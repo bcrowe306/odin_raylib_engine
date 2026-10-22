@@ -610,6 +610,13 @@ function Node:music_pause() end
 ---Resumes paused background music on this MusicNode.
 function Node:music_resume() end
 
+---Fades this MusicNode's volume to `volume` (0..1) over `seconds`, starting
+---it if it isn't playing.
+---@param volume number
+---@param seconds number
+---@param stop_at_end? boolean Stop when the fade reaches 0
+function Node:music_fade(volume, seconds, stop_at_end) end
+
 -- ----------------------------------------------------------------------------
 -- CameraNode (Node-invoked) Methods
 -- ----------------------------------------------------------------------------
@@ -1228,9 +1235,50 @@ function InputModule.get_mouse_wheel_move() end
 ---Engine audio playback and volume control.
 local AudioModule = {}
 
----Plays a sound effect from the given file path.
+---Plays a sound effect from the given file path. Calls in quick succession
+---overlap (up to 4 voices per sound) instead of restarting it.
 ---@param path AudioPath|string File path, e.g. "assets/audio/laser.wav"
-function AudioModule.play_sound(path) end
+---@param volume? number 0..1 (default 1), times the sfx bus
+---@param pitch? number Default 1
+function AudioModule.play_sound(path, volume, pitch) end
+
+---Plays a one-shot heard from a world position: quieter with distance from
+---the listener (the camera, or Audio.set_listener) and panned to its side.
+---@param path AudioPath|string
+---@param x number
+---@param y number
+---@param volume? number
+function AudioModule.play_sound_at(path, x, y, volume) end
+
+---@alias AudioBus "master"|"music"|"sfx"
+
+---Sets a bus volume (0..1) and applies it to what's playing.
+---@param bus AudioBus
+---@param volume number
+function AudioModule.set_bus_volume(bus, volume) end
+
+---@param bus AudioBus
+---@return number volume
+function AudioModule.get_bus_volume(bus) end
+
+---A low-pass filter on the whole mix (e.g. underwater, a pause menu).
+---@param hz number Cutoff in Hz; 0 turns it off
+function AudioModule.set_lowpass(hz) end
+
+---Reverb on the whole mix.
+---@param mix number 0..1 (0 turns it off)
+---@param size? number Room size 0..1 (default 0.5)
+function AudioModule.set_reverb(mix, size) end
+
+---Where positional sounds are heard from (nil: the current camera).
+---@param node Node?
+function AudioModule.set_listener(node) end
+
+---Fades one MusicNode out (stopping it) while another fades in.
+---@param from Node? MusicNode playing now
+---@param to Node MusicNode to fade in (started if needed)
+---@param seconds number
+function AudioModule.crossfade(from, to, seconds) end
 
 ---Streams a music track from the given file path.
 ---@param path AudioPath|string File path, e.g. "assets/audio/theme.ogg"

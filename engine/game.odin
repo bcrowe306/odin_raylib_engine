@@ -44,6 +44,7 @@ Game :: struct {
 	// Audio buses (project Audio settings): multiply node volumes.
 	musicVolume:        f32,
 	sfxVolume:          f32,
+	masterVolume:       f32,
 	viewportCanvasRect: rl.Rectangle,
 	activeDropdown:     rawptr,
 	uiMouseConsumed:    bool,
@@ -93,6 +94,7 @@ InitializeGame :: proc(game: ^Game) {
 	game.virtualSize = {1280, 720}
 	game.musicVolume = 1
 	game.sfxVolume = 1
+	game.masterVolume = 1
 	game.viewportCanvasRect = {0, 0, 1280, 720}
 	game.activeDropdown = nil
 	game.uiMouseConsumed = false
@@ -173,6 +175,8 @@ GameTerminate :: proc(game: ^Game) {
 	if game == nil do return
 	Tween_Destroy(&game.tweens, game.scriptManager.L) // releases Lua callbacks: before the Lua state goes
 	if game.scriptManager.isReady do Save_Flush(game.scriptManager.L) // Save data is written on quit
+	Audio_ResetEffects()
+	Audio_SetListener(nil)
 	ScriptManager_Destroy(&game.scriptManager)
 	SceneManager_Terminate(&game.sceneManager)
 	AssetManager_Destroy(&game.assetManager)
@@ -227,6 +231,44 @@ Game_ClearColor :: proc(game: ^Game) -> rl.Color {
 }
 
 // Game_BusVolume: the music or sound-effects bus volume (1 without a game).
+Audio_Bus :: enum {
+	Master,
+	Music,
+	Sfx,
+}
+
+// Game_SetBusVolume changes a bus volume and applies it to what's playing.
+Game_SetBusVolume :: proc(game: ^Game, bus: Audio_Bus, v: f32) {
+	v := clamp(v, 0, 1)
+	switch bus {
+	case .Master:
+		game.masterVolume = v
+		if rl.IsAudioDeviceReady() do rl.SetMasterVolume(v)
+	case .Music:
+		game.musicVolume = v
+	case .Sfx:
+		game.sfxVolume = v
+	}
+	scene := game.sceneManager.currentScene
+	if scene == nil || scene.manager == nil do return
+	for n in scene.manager.nodes {
+		if n == nil do continue
+		#partial switch bus {
+		case .Music:
+			if n.typeId == MusicNode do MusicNode_ApplyVolume(cast(^MusicNode)n)
+		case .Sfx:
+			if n.typeId == SoundNode {
+				sn := cast(^SoundNode)n
+				if sn.audio != nil && rl.IsAudioDeviceReady() {
+					vol, _ := SoundNode_Mix(sn, &game.gameContext)
+					rl.SetSoundVolume(sn.audio.sound, vol)
+					for s in sn.audio.aliases do rl.SetSoundVolume(s, vol)
+				}
+			}
+		}
+	}
+}
+
 Game_BusVolume :: proc(ctx: ^GameContext, music: bool) -> f32 {
 	if ctx == nil || ctx.game == nil do return 1
 	return ctx.game.musicVolume if music else ctx.game.sfxVolume

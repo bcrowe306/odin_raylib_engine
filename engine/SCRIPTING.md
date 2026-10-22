@@ -696,7 +696,27 @@ Audio.resume_music("assets/audio/theme.ogg")
 Audio.set_music_volume("assets/audio/theme.ogg", 0.5)
 Audio.stop_music("assets/audio/theme.ogg")
 Audio.set_master_volume(0.8)
+
+-- One-shots overlap (4 voices per sound); optional volume and pitch.
+Audio.play_sound("audio/hit.wav", 0.8, 1.2)
+Audio.play_sound_at("audio/boom.wav", x, y)   -- distance + pan from the listener
+Audio.set_listener(self.node)                  -- default: the current camera
+
+-- Buses (also in Project Settings > Audio) and effects on the whole mix.
+Audio.set_bus_volume("music", 0.4)             -- "master" | "music" | "sfx"
+Audio.set_lowpass(800)                         -- muffled (0 = off)
+Audio.set_reverb(0.35, 0.7)                    -- mix, room size (0 = off)
+
+-- MusicNodes: fades and crossfades.
+Audio.crossfade(Scene.find_node("CalmTheme"), Scene.find_node("BossTheme"), 2.0)
+Scene.find_node("BossTheme"):music_fade(0, 1.5, true) -- fade out and stop
 ```
+
+SoundNodes have **Voices** (how many times they can play over themselves;
+1 restarts the sound) and **Positional** with **Min / Max Distance**: the
+sound follows the node and the listener while it plays. The low-pass and
+reverb process the whole mix (raylib's per-stream processors carry no
+state per bus).
 
 ---
 

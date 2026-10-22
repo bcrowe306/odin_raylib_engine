@@ -193,7 +193,7 @@ Causes: every child lookup scanned one flat relationship array (O(n²) per frame
 odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benchmark tests
 ./scripts/editor_drive.sh                      # all UI test-drives (or: task editor:drive)
 ```
-
+| Audio | One-shot voices (sound aliases sharing samples, up to 8; `Audio.play_sound` overlaps 4, SoundNode **Voices**), positional SoundNodes (distance falloff + pan from the camera or `Audio.set_listener`; `Audio.play_sound_at`), bus volumes applied live (`Audio.set_bus_volume`), a master low-pass and Freeverb-style reverb (a mixed-audio processor: raylib's per-stream callbacks carry no user data, so effects can't keep separate state per bus), MusicNode fades and `Audio.crossfade` (`test_audio_mixing` checks the DSP, `test_music_fades_and_buses`; runner smoke test with the effects on). Not listened to on speakers in testing |
 
 ## Performance baselines
 

@@ -16,6 +16,14 @@ MusicNode :: struct {
 	isPaused:   bool `gui:"true" save:"false"`,
 	timeLength: f32,
 	timePlayed: f32,
+	// Fades (MusicNode_FadeTo, Audio.crossfade): a volume factor on top of
+	// `volume`, moving to fadeTarget; fadeStop stops the track at 0.
+	fadeVolume: f32,
+	fadeStart:  f32,
+	fadeTarget: f32,
+	fadeTime:   f32,
+	fadeElapsed: f32,
+	fadeStop:   bool,
 	onFinished: EventSubject, // "finished": a non-looping track ended
 }
 
@@ -30,6 +38,8 @@ MusicNode_Init :: proc(musicNode: ^MusicNode) {
 	musicNode.isPaused = false
 	musicNode.timeLength = 0
 	musicNode.timePlayed = 0
+	musicNode.fadeVolume = 1
+	musicNode.fadeTarget = 1
 	musicNode.ready = MusicNode_Ready
 	musicNode.update = MusicNode_Update
 	musicNode.onDestroy = MusicNode_Destroy
@@ -80,7 +90,9 @@ MusicNode_Ready :: proc(node: ^Node, gameContext: ^GameContext) {
 
 MusicNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	musicNode := cast(^MusicNode)node
-	if musicNode == nil || musicNode.music == nil do return
+	if musicNode == nil do return
+	if musicNode.isPlaying && musicNode.fadeTime > 0 do music_fade_step(musicNode, deltaTime)
+	if musicNode.music == nil do return
 
 	// When music is actively streaming, we must feed Raylib's audio stream buffer every frame!
 	if musicNode.isPlaying && !musicNode.isPaused {
@@ -138,7 +150,7 @@ MusicNode_Play :: proc(musicNode: ^MusicNode) {
 
 	if rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
 		musicNode.music.music.looping = musicNode.looping
-		rl.SetMusicVolume(musicNode.music.music, musicNode.volume * Game_BusVolume(musicNode.gameContext, music = true))
+		rl.SetMusicVolume(musicNode.music.music, MusicNode_EffectiveVolume(musicNode))
 		rl.SetMusicPitch(musicNode.music.music, musicNode.pitch)
 		rl.SetMusicPan(musicNode.music.music, musicNode.pan)
 
@@ -256,4 +268,55 @@ MusicNode_GetTimePlayed :: proc(musicNode: ^MusicNode) -> f32 {
 MusicNode_GetProgress :: proc(musicNode: ^MusicNode) -> f32 {
 	if musicNode == nil || musicNode.timeLength <= 0 do return 0
 	return math.clamp(musicNode.timePlayed / musicNode.timeLength, 0.0, 1.0)
+}
+
+// MusicNode_EffectiveVolume: volume x fade x the music bus.
+MusicNode_EffectiveVolume :: proc(m: ^MusicNode) -> f32 {
+	return m.volume * m.fadeVolume * Game_BusVolume(m.gameContext, music = true)
+}
+
+// MusicNode_ApplyVolume pushes the effective volume to the stream.
+MusicNode_ApplyVolume :: proc(m: ^MusicNode) {
+	if m.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(m.music.music) {
+		rl.SetMusicVolume(m.music.music, MusicNode_EffectiveVolume(m))
+	}
+}
+
+// MusicNode_FadeTo fades the track's volume factor to `target` (0..1) over
+// `seconds` (starting it if needed); stopAtEnd stops it when the fade ends.
+MusicNode_FadeTo :: proc(m: ^MusicNode, target, seconds: f32, stopAtEnd := false) {
+	if m == nil do return
+	if !m.isPlaying || m.isPaused {
+		if target <= 0 do return
+		m.fadeVolume = 0
+		MusicNode_Play(m)
+	}
+	m.fadeStart = m.fadeVolume
+	m.fadeTarget = clamp(target, 0, 1)
+	m.fadeTime = max(seconds, 0.0001)
+	m.fadeElapsed = 0
+	m.fadeStop = stopAtEnd
+	MusicNode_ApplyVolume(m)
+}
+
+// MusicNode_Crossfade fades `from` out (and stops it) while `to` fades in.
+MusicNode_Crossfade :: proc(from, to: ^MusicNode, seconds: f32) {
+	if from != nil && from != to do MusicNode_FadeTo(from, 0, seconds, stopAtEnd = true)
+	if to != nil do MusicNode_FadeTo(to, 1, seconds)
+}
+
+@(private = "file")
+music_fade_step :: proc(m: ^MusicNode, dt: f32) {
+	m.fadeElapsed += dt
+	t := clamp(m.fadeElapsed / m.fadeTime, 0, 1)
+	m.fadeVolume = m.fadeStart + (m.fadeTarget - m.fadeStart) * t
+	MusicNode_ApplyVolume(m)
+	if t >= 1 {
+		m.fadeTime = 0
+		if m.fadeStop && m.fadeTarget <= 0 {
+			MusicNode_Stop(m)
+			m.fadeVolume = 1 // a later play starts at full volume
+			m.fadeTarget = 1
+		}
+	}
 }

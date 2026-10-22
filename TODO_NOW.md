@@ -40,7 +40,7 @@ out of scope here.
 
 ## Phase 5 — Engine features (rest)
 
-- [ ] 5.1 Audio: positional audio, bus mixer (volume, low-pass/reverb), music crossfade, one-shot pooling
+- [x] 5.1 Audio: positional audio, bus mixer (volume, low-pass/reverb), music crossfade, one-shot pooling
 - [ ] 5.2 Physics: joints as editor nodes, one-way platforms for StaticBody, named collision layers
 - [ ] 5.3 Navigation: A* on tile maps / LDtk grids
 - [ ] 5.4 Text: bitmap/SDF fonts, rich text, dialogue box; localization string tables

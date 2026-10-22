@@ -464,6 +464,7 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	game.physicsWorld.gravity = cfg.gravity
 	game.musicVolume = cfg.musicVolume
 	game.sfxVolume = cfg.sfxVolume
+	game.masterVolume = cfg.masterVolume
 	if rl.IsAudioDeviceReady() do rl.SetMasterVolume(cfg.masterVolume)
 	Input_ApplyActionConfigs(&game.input, cfg.actions[:])
 

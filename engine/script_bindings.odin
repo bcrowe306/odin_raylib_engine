@@ -2337,13 +2337,123 @@ lua_audio_play_sound :: proc "c" (L: ^lua.State) -> c.int {
 	if pathC == nil || sm == nil || sm.game == nil do return 0
 
 	path := string(pathC)
-	if rl.IsWindowReady() {
+	if rl.IsAudioDeviceReady() {
 		sound, ok := sm.game.resourceManager->loadAudioSound(path)
 		if ok && sound != nil {
-			rl.SetSoundVolume(sound.sound, sm.game.sfxVolume)
-			rl.PlaySound(sound.sound)
+			// Audio.play_sound(path [, volume [, pitch]]): one-shots overlap (4 voices).
+			vol := f32(lua.tonumber(L, 2)) if lua.gettop(L) >= 2 else 1
+			pitch := f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else 1
+			Audio_PlayVoice(sound, 4, vol * sm.game.sfxVolume, pitch)
 		}
 	}
+	return 0
+}
+
+// Audio.play_sound_at(path, x, y [, volume]): a one-shot heard from where it
+// happens (distance and pan from the listener).
+@(private="file")
+lua_audio_play_sound_at :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil || !rl.IsAudioDeviceReady() do return 0
+	sound, ok := sm.game.resourceManager->loadAudioSound(string(pathC))
+	if !ok || sound == nil do return 0
+	pos := [2]f32{f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3))}
+	vol := f32(lua.tonumber(L, 4)) if lua.gettop(L) >= 4 else 1
+	pan: f32 = 0.5
+	if listener, has := Audio_ListenerPosition(&sm.game.gameContext); has {
+		v, p := Audio_Spatialize(pos, listener, 100, 900, 450)
+		vol *= v
+		pan = p
+	}
+	Audio_PlayVoice(sound, 4, vol * sm.game.sfxVolume, 1, pan)
+	return 0
+}
+
+@(private="file")
+bus_arg :: proc(L: ^lua.State, idx: c.int) -> (Audio_Bus, bool) {
+	s := lua.tostring(L, idx)
+	if s == nil do return .Master, false
+	switch string(s) {
+	case "master": return .Master, true
+	case "music":  return .Music, true
+	case "sfx":    return .Sfx, true
+	}
+	return .Master, false
+}
+
+// Audio.set_bus_volume("master"|"music"|"sfx", v)
+@(private="file")
+lua_audio_set_bus_volume :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	bus, ok := bus_arg(L, 1)
+	if ok && sm != nil && sm.game != nil do Game_SetBusVolume(sm.game, bus, f32(lua.tonumber(L, 2)))
+	return 0
+}
+
+@(private="file")
+lua_audio_get_bus_volume :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	bus, ok := bus_arg(L, 1)
+	v: f32 = 1
+	if ok && sm != nil && sm.game != nil {
+		switch bus {
+		case .Master: v = sm.game.masterVolume
+		case .Music:  v = sm.game.musicVolume
+		case .Sfx:    v = sm.game.sfxVolume
+		}
+	}
+	lua.pushnumber(L, lua.Number(v))
+	return 1
+}
+
+// Audio.set_lowpass(hz): a low-pass on the whole mix (0 = off).
+@(private="file")
+lua_audio_set_lowpass :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	Audio_SetLowpass(f32(lua.tonumber(L, 1)))
+	return 0
+}
+
+// Audio.set_reverb(mix [, size]): reverb on the whole mix (mix 0 = off).
+@(private="file")
+lua_audio_set_reverb :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	Audio_SetReverb(f32(lua.tonumber(L, 1)), f32(lua.tonumber(L, 2)) if lua.gettop(L) >= 2 else 0.5)
+	return 0
+}
+
+// Audio.set_listener(node | nil): where positional sounds are heard from.
+@(private="file")
+lua_audio_set_listener :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	Audio_SetListener(node if ok else nil)
+	return 0
+}
+
+// Audio.crossfade(fromMusicNode, toMusicNode, seconds)
+@(private="file")
+lua_audio_crossfade :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	from, fok := to_node_userdata(L, 1)
+	to, tok := to_node_userdata(L, 2)
+	a := cast(^MusicNode)from if fok && from.typeId == MusicNode else nil
+	b := cast(^MusicNode)to if tok && to.typeId == MusicNode else nil
+	MusicNode_Crossfade(a, b, f32(lua.tonumber(L, 3)))
+	return 0
+}
+
+// node:music_fade(volume, seconds [, stop_at_end])
+@(private="file")
+lua_node_music_fade :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != MusicNode do return 0
+	MusicNode_FadeTo(cast(^MusicNode)node, f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3)), bool(lua.toboolean(L, 4)))
 	return 0
 }
 
@@ -3211,6 +3321,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "music_pause")
 		lua.pushcfunction(L, lua_node_music_resume)
 		lua.setfield(L, -2, "music_resume")
+		lua.pushcfunction(L, lua_node_music_fade)
+		lua.setfield(L, -2, "music_fade")
 
 		// CameraNode (Invoked on node)
 		lua.pushcfunction(L, lua_node_camera_set_zoom)
@@ -3310,6 +3422,20 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "resume_music")
 	lua.pushcfunction(L, lua_audio_is_music_playing)
 	lua.setfield(L, -2, "is_music_playing")
+	lua.pushcfunction(L, lua_audio_play_sound_at)
+	lua.setfield(L, -2, "play_sound_at")
+	lua.pushcfunction(L, lua_audio_set_bus_volume)
+	lua.setfield(L, -2, "set_bus_volume")
+	lua.pushcfunction(L, lua_audio_get_bus_volume)
+	lua.setfield(L, -2, "get_bus_volume")
+	lua.pushcfunction(L, lua_audio_set_lowpass)
+	lua.setfield(L, -2, "set_lowpass")
+	lua.pushcfunction(L, lua_audio_set_reverb)
+	lua.setfield(L, -2, "set_reverb")
+	lua.pushcfunction(L, lua_audio_set_listener)
+	lua.setfield(L, -2, "set_listener")
+	lua.pushcfunction(L, lua_audio_crossfade)
+	lua.setfield(L, -2, "crossfade")
 	lua.pushcfunction(L, lua_audio_set_music_volume)
 	lua.setfield(L, -2, "set_music_volume")
 	lua.pushcfunction(L, lua_audio_set_master_volume)

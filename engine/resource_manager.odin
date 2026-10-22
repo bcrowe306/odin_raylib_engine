@@ -24,6 +24,8 @@ AudioSound :: struct {
 	fileName: string,
 	sound: rl.Sound,
 	refCount: int,
+	aliases: [dynamic]rl.Sound, // extra voices sharing the samples (audio.odin)
+	nextVoice: int,
 }
 
 AudioMusic :: struct {
@@ -87,6 +89,7 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 
 	for i in 0..<rm.audioCount {
 		audio := &rm.audioSounds[i]
+		Audio_ReleaseVoices(audio)
 		if audio.sound.frameCount > 0 && rl.IsAudioDeviceReady() {
 			rl.UnloadSound(audio.sound)
 		}
@@ -255,6 +258,7 @@ ResourceManager_ReleaseSound :: proc(rm: ^ResourceManager, audio: ^AudioSound) {
 	if rm == nil || audio == nil || audio.filePath == "" do return
 	audio.refCount -= 1
 	if audio.refCount > 0 do return
+	Audio_ReleaseVoices(audio)
 	if audio.sound.frameCount > 0 && rl.IsAudioDeviceReady() do rl.UnloadSound(audio.sound)
 	delete(audio.filePath)
 	audio^ = {}
