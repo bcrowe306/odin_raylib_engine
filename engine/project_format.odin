@@ -64,6 +64,7 @@ Export_Settings :: struct {
 	bundleId:       string,           // "" = com.ore.<executable, lower case>
 	macSign:        string,           // codesign identity: "" = ad-hoc, "none" = don't sign
 	macNotaryProfile: string,         // notarytool keychain profile ("" = don't notarize)
+	presets:        [dynamic]Export_Preset, // export_presets.odin (empty = one per target)
 }
 
 ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocator) {
@@ -83,6 +84,8 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg.export.bundleId != "" do delete(cfg.export.bundleId, allocator)
 	if cfg.export.macSign != "" do delete(cfg.export.macSign, allocator)
 	if cfg.export.macNotaryProfile != "" do delete(cfg.export.macNotaryProfile, allocator)
+	for &pr in cfg.export.presets do Export_Preset_Destroy(&pr, allocator)
+	delete(cfg.export.presets)
 }
 
 // ProjectConfig_Clone deep-copies a config.
@@ -106,6 +109,8 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c.export.bundleId = strings.clone(src.export.bundleId, allocator)
 	c.export.macSign = strings.clone(src.export.macSign, allocator)
 	c.export.macNotaryProfile = strings.clone(src.export.macNotaryProfile, allocator)
+	c.export.presets = make([dynamic]Export_Preset, allocator)
+	for &pr in src.export.presets do append(&c.export.presets, Export_Preset_Clone(&pr, allocator))
 	return c
 }
 
@@ -317,6 +322,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		cfg.export.macNotaryProfile = strings.clone(json_get_string(exportObj, "macos_notary_profile", ""), allocator)
 		cfg.export.compress = json_get_bool(exportObj, "compress", cfg.export.compress)
 		cfg.export.includeFont = json_get_bool(exportObj, "include_font", cfg.export.includeFont)
+		Export_PresetsParse(exportObj, &cfg.export, allocator)
 		if arr, has := json_get_arr(exportObj, "targets"); has {
 			cfg.export.targets = {}
 			for v in arr {
@@ -411,6 +417,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	if cfg.export.bundleId != "" {strings.write_string(&sb, ", \"bundle_id\": "); jstr(&sb, cfg.export.bundleId)}
 	if cfg.export.macSign != "" {strings.write_string(&sb, ", \"macos_sign\": "); jstr(&sb, cfg.export.macSign)}
 	if cfg.export.macNotaryProfile != "" {strings.write_string(&sb, ", \"macos_notary_profile\": "); jstr(&sb, cfg.export.macNotaryProfile)}
+	Export_PresetsWrite(&sb, &cfg.export)
 	strings.write_string(&sb, "},\n")
 	strings.write_string(&sb, "  \"scenes\": [\n")
 	for sc, i in cfg.scenes {

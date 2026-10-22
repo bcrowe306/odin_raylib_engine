@@ -327,7 +327,18 @@ settings changes, and the language server is told.
 **File > Export Standalone Game** (or Project Settings > Export > **Save and
 Export**) writes, for each target platform, `<output>/<platform>/` with the
 game runner renamed to the executable name, `game.ore` and the UI font: a
-folder you can ship. The runner is **prebuilt** - no compiler is needed to
+folder you can ship.
+
+**Export presets** (Project Settings > Export > **Use Presets**) give each
+export its own settings: platform, executable name, output folder (default
+`<output>/<preset name>`), version, icon, window title / size, fullscreen,
+**Include** / **Exclude** file patterns (one per line: `audio/` a folder,
+`*.psd` a file name anywhere, `levels/*.ldtk` a path), and **Debug** (the
+debug runner: debug info, a console on Windows). Add several per platform
+(a demo, a debug build); **Save and Export This Preset** exports one, **Save
+and Export All** every preset. The packaged `project.json` carries the
+preset's overrides. Presets are saved in `project.json` under
+`"export": {"presets": [...]}`. The runner is **prebuilt** - no compiler is needed to
 export: runners are looked up in `runners/<platform>/` next to the editor
 (or `bin/runners/` in a source checkout). `scripts/build_runners.sh` builds
 the current platform's; run it on each platform you ship for and copy its

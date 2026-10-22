@@ -7,28 +7,31 @@ import e "../engine"
 import "winres"
 
 // ============================================================================
-// Standalone export: for each target platform, a folder with a prebuilt
+// Standalone export: each export preset (Project Settings > Export; one per
+// selected platform when there are none) writes a folder with a prebuilt
 // runner (renamed to the game), game.ore and the UI font - no compiler
 // needed. Runners come with the editor in runners/<platform>/ (next to the
 // editor, or bin/runners/ in a source checkout; scripts/build_runners.sh
-// builds the current platform's). Without one for this platform the editor
-// builds it once (needs `odin`) into bin/runners/ and then exports.
+// builds the current platform's, release and debug). Without one for this
+// platform the editor builds it once (needs `odin`) and then exports.
 //
-//   <output>/<platform>/<Name>[.exe]        (+ the runner's libraries)
-//   <output>/<platform>/game.ore
-//   <output>/<platform>/fonts/OpenSans-Regular.ttf
-//   <output>/macos/<Name>.app                (export_macos.odin)
-//   <output>/linux/<Name>.AppDir             (+ <Name>-<arch>.AppImage with appimagetool)
+// A preset's folder (<output>/<preset name> unless it sets one):
+//   Windows  <Name>.exe (+ the runner's libraries), game.ore, fonts/
+//   macOS    <Name>.app                (export_macos.odin)
+//   Linux    <Name>.AppDir             (+ <Name>-<arch>.AppImage with appimagetool)
 //
-// Windows: the exe gets the project icon and version info (written with
-// the Win32 resource API, so when exporting on Windows); release runners
-// have no console window (scripts/build_runners.sh).
+// The packaged project.json carries the preset's overrides (version, icon,
+// window), and only the files the preset includes go into game.ore.
+// Windows: the exe gets the icon and version info (written with the Win32
+// resource API, so when exporting on Windows); release runners have no
+// console window.
 // ============================================================================
 
 RUNNER_FONT :: "OpenSans-Regular.ttf"
 
-runner_file_name :: proc(t: e.Export_Target) -> string {
-	return "runner.exe" if t == .Windows else "runner"
+runner_file_name :: proc(t: e.Export_Target, debug := false) -> string {
+	base := "runner-debug" if debug else "runner"
+	return strings.concatenate({base, ".exe"}, context.temp_allocator) if t == .Windows else base
 }
 
 // Editor_RunnersDirs: where prebuilt runners are looked for, in order.
@@ -51,22 +54,22 @@ Editor_RunnersDirs :: proc() -> []string {
 }
 
 // Editor_FindRunner: the prebuilt runner for a platform ("" = none).
-Editor_FindRunner :: proc(t: e.Export_Target) -> string {
+Editor_FindRunner :: proc(t: e.Export_Target, debug := false) -> string {
 	for dir in Editor_RunnersDirs() {
-		p, _ := filepath.join({dir, e.export_target_name(t), runner_file_name(t)}, context.temp_allocator)
+		p, _ := filepath.join({dir, e.export_target_name(t), runner_file_name(t, debug)}, context.temp_allocator)
 		if os.is_file(p) do return p
 	}
 	return ""
 }
 
-// runner_libraries: the shared libraries shipped with a runner (every other
-// file in its folder).
+// runner_libraries: the shared libraries shipped with a runner (the other
+// files in its folder, not the runners themselves).
 runner_libraries :: proc(runner: string) -> []string {
 	out := make([dynamic]string, context.temp_allocator)
 	infos, err := os.read_all_directory_by_path(filepath.dir(runner, context.temp_allocator), context.temp_allocator)
 	if err != nil do return out[:]
 	for f in infos {
-		if f.type != .Regular || strings.has_prefix(f.name, ".") || f.fullpath == runner || f.name == filepath.base(runner) do continue
+		if f.type != .Regular || strings.has_prefix(f.name, ".") || strings.has_prefix(f.name, "runner") do continue
 		append(&out, f.fullpath)
 	}
 	return out[:]
@@ -81,9 +84,20 @@ runner_font :: proc(runner: string) -> string {
 	return ""
 }
 
-// Editor_ExportStandalone exports every selected target that has a runner
-// (afterBuild: called back once this platform's runner was built).
-Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false) {
+// export_safe_name: a preset name as a folder name.
+export_safe_name :: proc(name: string) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	for r in strings.trim_space(name) {
+		ok := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.'
+		strings.write_rune(&sb, r if ok else '_')
+	}
+	s := strings.to_string(sb)
+	return s if s != "" else "export"
+}
+
+// Editor_ExportStandalone exports every preset (or one: `only` >= 0);
+// afterBuild: called back once this platform's runner was built.
+Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false, only := -1) {
 	if state.buildRunning {
 		Editor_Log(state, .Warn, "A build is already running")
 		return
@@ -93,20 +107,24 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false) {
 	cfg := &state.projectConfig
 	x := &cfg.export
 	clean := strings.trim_suffix(state.projectPath, "/")
-	name := x.executableName if x.executableName != "" else export_default_name(cfg)
 	outDir := x.outputDir if x.outputDir != "" else strings.concatenate({clean, "_standalone"}, context.temp_allocator)
-	targets := x.targets if x.targets != {} else {e.native_export_target()}
+	presets := e.Export_EffectivePresets(x)
+	if only >= 0 && only < len(presets) do presets = presets[only:only + 1]
+	state.exportOnly = only
 
 	// This platform's runner is built once when it isn't there yet.
 	native := e.native_export_target()
-	if native in targets && Editor_FindRunner(native) == "" {
+	needsNative := false
+	for &p in presets do if p.target == native && Editor_FindRunner(native) == "" do needsNative = true
+	if needsNative {
 		if afterBuild {
 			Editor_Log(state, .Error, "The runner was built but isn't in any of: %s", strings.join(Editor_RunnersDirs(), ", ", context.temp_allocator))
 			return
 		}
 		dst, _ := filepath.join({"bin", "runners", e.export_target_name(native), runner_file_name(native)}, context.temp_allocator)
 		_ = os.make_directory_all(filepath.dir(dst, context.temp_allocator))
-		// The script also ships the runner's libraries (Lua on macOS / Windows).
+		// The script also builds the debug runner and ships the runner's
+		// libraries (Lua on macOS / Windows).
 		cmd := []string{"bash", "scripts/build_runners.sh"} if os.is_file("scripts/build_runners.sh") else []string{"odin", "build", "runner", "-o:speed", strings.concatenate({"-out:", dst}, context.temp_allocator)}
 		if !Editor_StartBuild(state, cmd, .Standalone) {
 			Editor_Log(state, .Error, "No prebuilt %s runner, and it couldn't be built (is `odin` on PATH?)", e.export_target_name(native))
@@ -116,44 +134,59 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false) {
 		return // Editor_UpdatePlaytest calls back when the build succeeds
 	}
 
-	_ = os.make_directory_all(outDir)
-	ore, _ := filepath.join({outDir, "game.ore"}, context.temp_allocator)
-	if !e.OrePackage_CreateFromDirectory(state.projectPath, ore, x.compress) {
-		Editor_Log(state, .Error, "Failed to package the project into %s", ore)
-		return
-	}
 	exported := 0
-	for t in e.Export_Target {
-		if t not_in targets do continue
-		runner := Editor_FindRunner(t)
-		if runner == "" {
-			Editor_Log(state, .Warn, "No %s runner: build one on %s (scripts/build_runners.sh) and put it in runners/%s/ next to the editor", e.export_target_name(t), e.export_target_name(t), e.export_target_name(t))
-			continue
-		}
-		dir: string
-		ok: bool
-		switch t {
-		case .MacOS:   dir, ok = Export_MacApp(state, runner, ore, outDir, name)
-		case .Linux:   dir, ok = export_linux(state, runner, ore, outDir, name)
-		case .Windows: dir, ok = export_target(state, t, runner, ore, outDir, name)
-		}
-		if ok {
-			Editor_Log(state, .Info, "Exported %s: %s", e.export_target_name(t), dir)
+	for &p in presets {
+		if dir, ok := export_preset(state, &p, outDir); ok {
+			Editor_Log(state, .Info, "Exported %s (%s%s): %s", p.name, e.export_target_name(p.target), ", debug" if p.debug else "", dir)
 			exported += 1
 		}
 	}
-	_ = os.remove(ore) // copied into each target's folder
 	if state.exportDir != "" do delete(state.exportDir)
 	state.exportDir = strings.clone(outDir)
-	if exported > 0 do Editor_Log(state, .Info, "Standalone game ready: %s (%d platform(s))", outDir, exported)
+	if exported > 0 do Editor_Log(state, .Info, "Standalone game ready: %s (%d preset(s))", outDir, exported)
 }
 
 @(private = "file")
-export_target :: proc(state: ^EditorState, t: e.Export_Target, runner, ore, outDir, name: string) -> (string, bool) {
-	dir, _ := filepath.join({outDir, e.export_target_name(t)}, context.temp_allocator)
+export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) -> (string, bool) {
+	cfg := &state.projectConfig
+	t := p.target
+	runner := Editor_FindRunner(t, p.debug)
+	if runner == "" && p.debug {
+		runner = Editor_FindRunner(t)
+		if runner != "" do Editor_Log(state, .Warn, "%s: no debug runner for %s, using the release one", p.name, e.export_target_name(t))
+	}
+	if runner == "" {
+		Editor_Log(state, .Warn, "%s: no %s runner - build one on %s (scripts/build_runners.sh) and put it in runners/%s/ next to the editor", p.name, e.export_target_name(t), e.export_target_name(t), e.export_target_name(t))
+		return "", false
+	}
+	name := p.executableName if p.executableName != "" else (cfg.export.executableName if cfg.export.executableName != "" else export_default_name(cfg))
+	dir := p.outputDir
+	if dir == "" do dir, _ = filepath.join({outDir, export_safe_name(p.name)}, context.temp_allocator)
 	_ = os.make_directory_all(dir)
-	exeName := strings.concatenate({name, ".exe"}, context.temp_allocator) if t == .Windows else name
-	exe, _ := filepath.join({dir, exeName}, context.temp_allocator)
+
+	// The preset's package: its files and its project.json.
+	pc := e.Export_PresetConfig(cfg, p)
+	overrides := make(map[string][]u8, context.temp_allocator)
+	overrides["project.json"] = transmute([]u8)e.Project_SerializeToJSON(&pc, context.temp_allocator)
+	ore, _ := filepath.join({dir, ".game.ore.tmp"}, context.temp_allocator)
+	filter :: proc(path: string, data: rawptr) -> bool {return e.Export_PresetIncludes(cast(^e.Export_Preset)data, path)}
+	if !e.OrePackage_CreateFromDirectory(state.projectPath, ore, cfg.export.compress, filter, p, overrides) {
+		Editor_Log(state, .Error, "Failed to package the project into %s", ore)
+		return "", false
+	}
+	defer os.remove(ore)
+
+	switch t {
+	case .MacOS:   return Export_MacApp(state, &pc, runner, ore, dir, name)
+	case .Linux:   return export_linux(state, &pc, runner, ore, dir, name)
+	case .Windows: return export_windows(state, &pc, runner, ore, dir, name)
+	}
+	return "", false
+}
+
+@(private = "file")
+export_windows :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, dir, name: string) -> (string, bool) {
+	exe, _ := filepath.join({dir, strings.concatenate({name, ".exe"}, context.temp_allocator)}, context.temp_allocator)
 	if err := os.copy_file(exe, runner); err != nil {
 		Editor_Log(state, .Error, "Could not copy the runner to %s: %v", exe, err)
 		return "", false
@@ -167,7 +200,7 @@ export_target :: proc(state: ^EditorState, t: e.Export_Target, runner, ore, outD
 		Editor_Log(state, .Error, "Could not write %s: %v", dstOre, err)
 		return "", false
 	}
-	if state.projectConfig.export.includeFont {
+	if cfg.export.includeFont {
 		if font := runner_font(runner); font != "" {
 			fonts, _ := filepath.join({dir, "fonts"}, context.temp_allocator)
 			_ = os.make_directory_all(fonts)
@@ -175,14 +208,13 @@ export_target :: proc(state: ^EditorState, t: e.Export_Target, runner, ore, outD
 			_ = os.copy_file(dst, font)
 		}
 	}
-	if t == .Windows do windows_resources(state, exe, name)
+	windows_resources(state, cfg, exe, name)
 	return strings.clone(dir, context.temp_allocator), true
 }
 
-// windows_resources writes the project icon and version info into the exe.
+// windows_resources writes the icon and version info into the exe.
 @(private = "file")
-windows_resources :: proc(state: ^EditorState, exe, name: string) {
-	cfg := &state.projectConfig
+windows_resources :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, exe, name: string) {
 	if !winres.AVAILABLE {
 		Editor_Log(state, .Info, "%s keeps the runner's icon and version info: they're written when exporting on Windows", filepath.base(exe))
 		return
@@ -210,13 +242,10 @@ windows_resources :: proc(state: ^EditorState, exe, name: string) {
 	}
 }
 
-// export_linux writes <output>/linux/<Name>.AppDir and, with appimagetool
-// on PATH (Linux), <Name>-<arch>.AppImage next to it.
+// export_linux writes <dir>/<Name>.AppDir and, with appimagetool on PATH
+// (Linux), <Name>-<arch>.AppImage next to it.
 @(private = "file")
-export_linux :: proc(state: ^EditorState, runner, ore, outDir, name: string) -> (string, bool) {
-	cfg := &state.projectConfig
-	dir, _ := filepath.join({outDir, "linux"}, context.temp_allocator)
-	_ = os.make_directory_all(dir)
+export_linux :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, dir, name: string) -> (string, bool) {
 	icon := ""
 	if cfg.icon != "" do icon, _ = filepath.join({state.projectPath, cfg.icon}, context.temp_allocator)
 	font := runner_font(runner) if cfg.export.includeFont else ""

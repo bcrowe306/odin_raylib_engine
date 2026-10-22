@@ -185,7 +185,9 @@ OrePackage_CreateFromFiles :: proc(sources: []OreFileSource, outPath: string, co
 }
 
 // Scans a directory recursively and packs all files into a single .ore file
-OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compress: bool = true) -> bool {
+// filter: which project files go in (nil = all); overrides: archive paths
+// whose content is replaced (or added), e.g. a preset's project.json.
+OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compress: bool = true, filter: proc(path: string, data: rawptr) -> bool = nil, filterData: rawptr = nil, overrides: map[string][]u8 = nil) -> bool {
 	context = runtime.default_context()
 	sources := make([dynamic]OreFileSource, context.temp_allocator)
 
@@ -205,6 +207,8 @@ OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compres
 			for part in strings.split(unixRel, "/", context.temp_allocator) do if strings.has_prefix(part, ".") do hidden = true
 			if err == nil && !hidden {
 				norm := strings.join(strings.split(relPath, "\\", context.temp_allocator), "/", context.temp_allocator)
+				if filter != nil && !filter(norm, filterData) do continue
+				if norm in overrides do continue
 				append(&sources, OreFileSource{
 					archivePath = strings.clone(norm, context.temp_allocator),
 					diskPath    = strings.clone(info.fullpath, context.temp_allocator),
@@ -215,6 +219,9 @@ OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compres
 		}
 	}
 
+	for path, data in overrides {
+		append(&sources, OreFileSource{archivePath = path, data = data, owned = false})
+	}
 	return OrePackage_CreateFromFiles(sources[:], outPath, compress)
 }
 

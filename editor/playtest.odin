@@ -127,7 +127,7 @@ Editor_UpdatePlaytest :: proc(state: ^EditorState) {
 				Editor_Log(state, .Info, "Build succeeded in %.1fs", secs)
 				switch state.buildKind {
 				case .Game:       Editor_LaunchGame(state)
-				case .Standalone: Editor_ExportStandalone(state, afterBuild = true) // the runner exists now
+				case .Standalone: Editor_ExportStandalone(state, afterBuild = true, only = state.exportOnly) // the runner exists now
 				case .Notarize:   Editor_Log(state, .Info, "Notarized and stapled: the app is ready to distribute")
 				}
 			} else {

@@ -673,55 +673,201 @@ project_audio :: proc(state: ^EditorState) {
 project_export :: proc(state: ^EditorState) {
 	d := &st.project
 	x := &d.export
-	if !UI_BeginProps("##export") do return
-	UI_PropLabel("Executable Name")
-	text_field("settings.export-name", &x.executableName, strings.clone_to_cstring(export_default_name(d), context.temp_allocator))
-	UI_PropLabel("Output Folder")
-	text_field("settings.export-dir", &x.outputDir, strings.clone_to_cstring(fmt.tprintf("%s_standalone", strings.trim_suffix(state.projectPath, "/")), context.temp_allocator))
-	UI_PropLabel("Targets")
-	for t in e.Export_Target {
-		on := t in x.targets
-		label := fmt.ctprintf("%s##tgt%v", e.export_target_name(t), t)
-		if imgui.Checkbox(label, &on) {
-			if on do x.targets += {t}
-			else do x.targets -= {t}
+	if UI_BeginProps("##export") {
+		UI_PropLabel("Executable Name")
+		text_field("settings.export-name", &x.executableName, strings.clone_to_cstring(export_default_name(d), context.temp_allocator))
+		UI_PropLabel("Output Folder")
+		text_field("settings.export-dir", &x.outputDir, strings.clone_to_cstring(fmt.tprintf("%s_standalone", strings.trim_suffix(state.projectPath, "/")), context.temp_allocator))
+		if len(x.presets) == 0 {
+			UI_PropLabel("Targets")
+			for t in e.Export_Target {
+				on := t in x.targets
+				label := fmt.ctprintf("%s##tgt%v", e.export_target_name(t), t)
+				if imgui.Checkbox(label, &on) {
+					if on do x.targets += {t}
+					else do x.targets -= {t}
+				}
+				Drive_Item(fmt.tprintf("settings.target:%s", e.export_target_name(t)))
+				imgui.SameLine()
+			}
+			imgui.NewLine()
 		}
-		Drive_Item(fmt.tprintf("settings.target:%s", e.export_target_name(t)))
-		if t != e.native_export_target() do UI_Tooltip("Build on that platform (cross-compiling the runner needs its system libraries)")
-		imgui.SameLine()
-	}
-	imgui.NewLine()
-	UI_PropLabel("Runners")
-	{
-		sb := strings.builder_make(context.temp_allocator)
-		for t in e.Export_Target {
-			if strings.builder_len(sb) > 0 do strings.write_string(&sb, "   ")
-			found := Editor_FindRunner(t) != ""
-			fmt.sbprintf(&sb, "%s %s", e.export_target_name(t), "ready" if found else ("built on export" if t == e.native_export_target() else "missing"))
+		UI_PropLabel("Runners")
+		{
+			sb := strings.builder_make(context.temp_allocator)
+			for t in e.Export_Target {
+				if strings.builder_len(sb) > 0 do strings.write_string(&sb, "   ")
+				found := Editor_FindRunner(t) != ""
+				fmt.sbprintf(&sb, "%s %s", e.export_target_name(t), "ready" if found else ("built on export" if t == e.native_export_target() else "missing"))
+			}
+			UI_DimText(strings.to_string(sb))
+			Drive_Item("settings.runners")
+			UI_Tooltip("Prebuilt game runners (runners/<platform>/ next to the editor, or bin/runners/). Build one per platform with scripts/build_runners.sh")
 		}
-		UI_DimText(strings.to_string(sb))
-		Drive_Item("settings.runners")
-		UI_Tooltip("Prebuilt game runners (runners/<platform>/ next to the editor, or bin/runners/). Build one per platform with scripts/build_runners.sh")
+		check("settings.compress", "Compress Package", &x.compress)
+		check("settings.include-font", "Include UI Font", &x.includeFont)
+		hasMac := false
+		for &p in e.Export_EffectivePresets(x) do if p.target == .MacOS do hasMac = true
+		if hasMac {
+			exeName := x.executableName if x.executableName != "" else export_default_name(d)
+			UI_PropLabel("macOS Bundle ID")
+			text_field("settings.bundle-id", &x.bundleId, strings.clone_to_cstring(Export_BundleId(d, exeName), context.temp_allocator))
+			UI_PropLabel("Signing Identity")
+			text_field("settings.mac-sign", &x.macSign, "ad-hoc (or \"Developer ID Application: ...\", or none)")
+			UI_Tooltip("codesign identity for the .app. Ad-hoc runs on this Mac; a Developer ID is needed to distribute (and to notarize)")
+			UI_PropLabel("Notary Profile")
+			text_field("settings.mac-notary", &x.macNotaryProfile, "keychain profile (xcrun notarytool store-credentials)")
+			UI_Tooltip("With a Developer ID identity: the app is notarized and stapled after export")
+		}
+		UI_EndProps()
 	}
-	check("settings.compress", "Compress Package", &x.compress)
-	check("settings.include-font", "Include UI Font", &x.includeFont)
-	if .MacOS in x.targets {
-		exeName := x.executableName if x.executableName != "" else export_default_name(d)
-		UI_PropLabel("macOS Bundle ID")
-		text_field("settings.bundle-id", &x.bundleId, strings.clone_to_cstring(Export_BundleId(d, exeName), context.temp_allocator))
-		UI_PropLabel("Signing Identity")
-		text_field("settings.mac-sign", &x.macSign, "ad-hoc (or \"Developer ID Application: ...\", or none)")
-		UI_Tooltip("codesign identity for the .app. Ad-hoc runs on this Mac; a Developer ID is needed to distribute (and to notarize)")
-		UI_PropLabel("Notary Profile")
-		text_field("settings.mac-notary", &x.macNotaryProfile, "keychain profile (xcrun notarytool store-credentials)")
-		UI_Tooltip("With a Developer ID identity: the app is notarized and stapled after export")
-	}
-	UI_PropLabel("")
-	if UI_PrimaryButton(fmt.tprintf("%s  Save and Export", ICON_FA_FLOPPY_DISK), "settings.export-now") {
+	export_presets_section(state)
+	imgui.Spacing()
+	if UI_PrimaryButton(fmt.tprintf("%s  Save and Export%s", ICON_FA_FLOPPY_DISK, " All" if len(x.presets) > 1 else ""), "settings.export-now") {
 		settings_save(state)
 		Editor_ExportStandalone(state)
 	}
-	UI_EndProps()
+}
+
+@(private = "file")
+presetSel: int
+
+@(private = "file")
+export_presets_section :: proc(state: ^EditorState) {
+	d := &st.project
+	x := &d.export
+	imgui.SeparatorText("Presets")
+	platforms := []string{"macos", "windows", "linux"}
+	if len(x.presets) == 0 {
+		UI_DimText("One export per target above. Presets give each platform (or a demo / debug build) its own settings.")
+		if UI_Button(fmt.tprintf("%s  Use Presets", ICON_FA_PLUS), "settings.preset-convert") {
+			for &p in e.Export_EffectivePresets(x) do append(&x.presets, e.Export_Preset{name = strings.clone(p.name), target = p.target})
+			presetSel = 0
+		}
+		return
+	}
+	presetSel = clamp(presetSel, 0, len(x.presets) - 1)
+	// The list.
+	for &p, i in x.presets {
+		label := fmt.ctprintf("%s  (%s%s)##preset%d", p.name, e.export_target_name(p.target), ", debug" if p.debug else "", i)
+		if imgui.Selectable(label, presetSel == i) do presetSel = i
+		Drive_Item(fmt.tprintf("settings.preset:%s", p.name))
+	}
+	if imgui.BeginCombo("##addpreset", fmt.ctprintf("%s  Add Preset", ICON_FA_PLUS), {.NoArrowButton}) {
+		for name, k in platforms {
+			if imgui.Selectable(strings.clone_to_cstring(name, context.temp_allocator)) {
+				n := name
+				for j := 2; ; j += 1 {
+					taken := false
+					for q in x.presets do if q.name == n do taken = true
+					if !taken do break
+					n = fmt.tprintf("%s %d", name, j)
+				}
+				append(&x.presets, e.Export_Preset{name = strings.clone(n), target = e.Export_Target(k)})
+				presetSel = len(x.presets) - 1
+			}
+			Drive_Item(fmt.tprintf("pick:%s", name))
+		}
+		imgui.EndCombo()
+	}
+	Drive_Item("settings.preset-add")
+	imgui.SameLine()
+	if UI_Button(fmt.tprintf("%s  Duplicate", ICON_FA_COPY), "settings.preset-dup") {
+		c := e.Export_Preset_Clone(&x.presets[presetSel])
+		delete(c.name)
+		c.name = strings.clone(fmt.tprintf("%s copy", x.presets[presetSel].name))
+		append(&x.presets, c)
+		presetSel = len(x.presets) - 1
+	}
+	imgui.SameLine()
+	if UI_Button(fmt.tprintf("%s  Remove", ICON_FA_TRASH), "settings.preset-remove") {
+		e.Export_Preset_Destroy(&x.presets[presetSel])
+		ordered_remove(&x.presets, presetSel)
+		if len(x.presets) == 0 do return
+		presetSel = clamp(presetSel, 0, len(x.presets) - 1)
+	}
+
+	// The selected preset.
+	p := &x.presets[presetSel]
+	imgui.PushIDInt(i32(presetSel))
+	defer imgui.PopID()
+	if !UI_BeginProps("##preset") do return
+	defer UI_EndProps()
+	UI_PropLabel("Name")
+	text_field("settings.preset-name", &p.name)
+	UI_PropLabel("Platform")
+	imgui.SetNextItemWidth(-1)
+	if k, changed := UI_Combo("settings.preset-platform", int(p.target), platforms); changed do p.target = e.Export_Target(k)
+	exeDefault := x.executableName if x.executableName != "" else export_default_name(d)
+	UI_PropLabel("Executable Name")
+	text_field("settings.preset-exe", &p.executableName, strings.clone_to_cstring(exeDefault, context.temp_allocator))
+	outDefault := fmt.tprintf("%s/%s", x.outputDir if x.outputDir != "" else fmt.tprintf("%s_standalone", strings.trim_suffix(state.projectPath, "/")), export_safe_name(p.name))
+	UI_PropLabel("Output Folder")
+	text_field("settings.preset-dir", &p.outputDir, strings.clone_to_cstring(outDefault, context.temp_allocator))
+	UI_PropLabel("Version")
+	text_field("settings.preset-version", &p.version, strings.clone_to_cstring(fmt.tprintf("project: %s", d.version), context.temp_allocator))
+	UI_PropLabel("Icon")
+	imgui.SetNextItemWidth(-1)
+	if path, ok := asset_picker("settings.preset-icon", p.icon, Editor_ListProjectFiles(state, "", {".png"})); ok {
+		delete(p.icon)
+		p.icon = strings.clone(path)
+	}
+	UI_Tooltip("None = the project's icon")
+	UI_PropLabel("Window Title")
+	text_field("settings.preset-title", &p.windowTitle, strings.clone_to_cstring(fmt.tprintf("project: %s", d.windowTitle), context.temp_allocator))
+	UI_PropLabel("Window Size")
+	size := [2]i32{i32(p.windowWidth), i32(p.windowHeight)}
+	imgui.SetNextItemWidth(-1)
+	if imgui.DragInt2("##presetsize", &size, 1, 0, 8192, "%d") {
+		p.windowWidth, p.windowHeight = int(max(size.x, 0)), int(max(size.y, 0))
+	}
+	Drive_Item("settings.preset-size")
+	UI_Tooltip("0 x 0 = the project's window size")
+	UI_PropLabel("Fullscreen")
+	imgui.SetNextItemWidth(-1)
+	if k, changed := UI_Combo("settings.preset-fullscreen", int(p.fullscreen), {"Project setting", "On", "Off"}); changed do p.fullscreen = e.Export_Toggle(k)
+	UI_PropLabel("Include")
+	pattern_list("settings.preset-include", &p.include, "everything (or one pattern per line: scenes, textures/*.png)")
+	UI_PropLabel("Exclude")
+	pattern_list("settings.preset-exclude", &p.exclude, "one pattern per line: *.psd, raw/, levels/test_*")
+	UI_PropLabel("Debug")
+	imgui.Checkbox("##presetdebug", &p.debug)
+	Drive_Item("settings.preset-debug")
+	UI_Tooltip("Use the debug runner (debug info; a console window on Windows)")
+	UI_PropLabel("")
+	if UI_Button(fmt.tprintf("%s  Save and Export This Preset", ICON_FA_BOX_ARCHIVE), "settings.export-preset") {
+		settings_save(state)
+		Editor_ExportStandalone(state, only = presetSel)
+	}
+}
+
+// pattern_list edits a list of patterns as lines of text.
+@(private = "file")
+pattern_list :: proc(id: string, list: ^[dynamic]string, hint: string) {
+	@(static) buf: [2048]u8
+	@(static) editing: string
+	if editing != id {
+		joined := strings.join(list[:], "\n", context.temp_allocator)
+		buf = {}
+		copy(buf[:len(buf) - 1], joined)
+	}
+	if imgui.InputTextMultiline(fmt.ctprintf("##%s", id), cstring(raw_data(buf[:])), len(buf), {-1, 54}) {
+		for s in list do delete(s)
+		clear(list)
+		for line in strings.split_lines(string(cstring(raw_data(buf[:]))), context.temp_allocator) {
+			if t := strings.trim_space(line); t != "" do append(list, strings.clone(t))
+		}
+	}
+	if imgui.IsItemActivated() {
+		delete(editing)
+		editing = strings.clone(id)
+	}
+	if imgui.IsItemDeactivated() {
+		delete(editing)
+		editing = ""
+	}
+	Drive_Item(id)
+	if len(list) == 0 do UI_Tooltip(hint)
 }
 
 export_default_name :: proc(d: ^e.ProjectConfig) -> string {

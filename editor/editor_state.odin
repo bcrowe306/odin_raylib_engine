@@ -110,6 +110,7 @@ EditorState :: struct {
 	buildRunning:       bool,
 	buildKind:          Build_Kind, // what to do when the build succeeds
 	exportDir:          string,     // standalone export folder (owned)
+	exportOnly:         int,        // the preset being exported (-1 = all), for after the runner build
 	buildStarted:       time.Tick,
 	skipGameBuild:      bool,             // --no-build: never rebuild before Play
 	extraGameArgs:      [dynamic]string,  // appended to the game command line (tests)

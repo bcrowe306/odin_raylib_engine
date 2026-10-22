@@ -1,0 +1,37 @@
+# Export presets: turn the targets into presets, add a debug demo preset
+# with its own name, version, window title and excluded files, export only
+# that preset, and check what it wrote.
+exec scripts/build_runners.sh --if-missing
+wait 5
+click @toolbar.settings
+click @settings.page:Export
+click @settings.preset-convert
+expect item:settings.preset:macos == visible
+click @settings.preset-add
+click @pick:macos
+click @settings.preset-name
+key cmd+a
+type Mac Demo
+key enter
+click @settings.preset-version
+type 0.5.0
+key enter
+click @settings.preset-title
+type Space Demo
+key enter
+click @settings.preset-exclude
+type audio/
+click @settings.preset-debug
+screenshot presets
+click @settings.export-preset
+wait 10
+expect log contains Exported Mac Demo (macos, debug):
+expect log !contains using the release one
+expect log !contains Exported macos (macos):
+expect log contains (1 preset(s))
+expect file:project.json contains "presets": [
+expect file:project.json contains "name": "Mac Demo", "target": "macos", "version": "0.5.0", "window_title": "Space Demo", "exclude": ["audio/"], "debug": true
+expect abs-file:$PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatore.app/Contents/Info.plist contains <string>0.5.0</string>
+expect abs-file:$PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatore.app/Contents/Info.plist contains <string>Space Demo</string>
+exec $PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatore.app/Contents/MacOS/AsteroidsSpaceCombatore --frames 20 --dump-scene $SHOTS/demo_scene.json
+expect abs-file:$SHOTS/demo_scene.json contains "PlayerShip"

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Builds the standalone game runner for this platform (release) into
-# bin/runners/<platform>/, with the UI font in bin/runners/. The editor's
+# Builds the standalone game runner for this platform into
+# bin/runners/<platform>/ - runner (release) and runner-debug (debug info,
+# a console on Windows; export presets with "Debug" use it) - with the UI
+# font in bin/runners/. The editor's
 # Export Standalone Game copies it next to the game's .ore - no compiler
 # needed when exporting. Run it on each platform you ship for and copy the
 # runners/<platform>/ folders next to the editor (or into bin/runners/).
@@ -39,30 +41,44 @@ if [ "$platform" = macos ]; then
 	odin build runner -o:speed "$rpath" -out:"$out/runner-$native" "$@"
 	other=x86_64; target=darwin_amd64
 	[ "$native" = x86_64 ] && other=arm64 && target=darwin_arm64
-	if odin build runner -o:speed "$rpath" -target:$target -out:"$out/runner-$other" "$@" > "$out/.other.log" 2>&1; then
+	# Only with the other architecture's libraries (else the build can't link).
+	built_other=0
+	if ls "$(odin root)"/vendor/box2d/lib/box2d_${target}*.a > /dev/null 2>&1; then
+		if perl -e 'alarm 600; exec @ARGV' odin build runner -o:speed "$rpath" -target:$target -out:"$out/runner-$other" "$@" > "$out/.other.log" 2>&1; then
+			built_other=1
+		fi
+	else
+		echo "Box2D for $other isn't built (vendor/box2d/build_box2d.sh)" > "$out/.other.log"
+	fi
+	if [ $built_other = 1 ]; then
 		lipo -create -output "$out/$exe" "$out/runner-$native" "$out/runner-$other"
 		echo "Universal runner ($native + $other)"
 	else
-		echo "Note: no $other build ($(grep -m1 -o 'Could not find[^,]*\|Error:.*' "$out/.other.log" || echo 'see the log')); the runner is $native only."
+		echo "Note: no $other build ($(grep -m1 -o "Could not find[^,]*\|Error:.*\|Box2D.*" "$out/.other.log" || echo 'see the log')); the runner is $native only."
 		mv "$out/runner-$native" "$out/$exe"
 	fi
 	rm -f "$out/runner-$native" "$out/runner-$other" "$out/.other.log"
+	odin build runner -debug "$rpath" -out:"$out/runner-debug" "$@"
 
-	# Ship Lua's shared library with the runner.
+	# Ship Lua's shared library with the runners.
 	lualib=$(otool -L "$out/$exe" | awk '/liblua/ {print $1; exit}')
 	if [ -n "$lualib" ] && [ "${lualib#@rpath}" = "$lualib" ]; then
 		cp "$lualib" "$out/liblua.dylib"
 		chmod u+w "$out/liblua.dylib"
 		install_name_tool -id @rpath/liblua.dylib "$out/liblua.dylib"
-		install_name_tool -change "$lualib" @rpath/liblua.dylib "$out/$exe"
+		for r in "$out/$exe" "$out/runner-debug"; do install_name_tool -change "$lualib" @rpath/liblua.dylib "$r"; done
 		# install_name_tool invalidates the (ad-hoc) signatures.
-		codesign --force -s - "$out/liblua.dylib" "$out/$exe" 2>/dev/null
+		codesign --force -s - "$out/liblua.dylib" "$out/$exe" "$out/runner-debug" 2>/dev/null
 	fi
+	rm -rf "$out"/*.dSYM
 elif [ "$platform" = windows ]; then
 	odin build runner -o:speed -subsystem:windows -out:"$out/$exe" "$@"
+	odin build runner -debug -out:"$out/runner-debug.exe" "$@"
+	rm -f "$out"/*.pdb
 	cp "$(odin root)/vendor/lua/5.4/windows/lua54.dll" "$out/"
 else
 	odin build runner -o:speed -out:"$out/$exe" "$@"
+	odin build runner -debug -out:"$out/runner-debug" "$@"
 fi
 cp engine/Open_Sans/static/OpenSans-Regular.ttf bin/runners/
 echo "Built $out/$exe"

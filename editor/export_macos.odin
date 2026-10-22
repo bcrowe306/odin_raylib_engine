@@ -7,7 +7,7 @@ import "core:strings"
 import e "../engine"
 
 // ============================================================================
-// macOS export: <output>/macos/<Name>.app
+// macOS export: <preset folder>/<Name>.app
 //
 //   Contents/Info.plist
 //   Contents/MacOS/<Name>              the runner
@@ -100,11 +100,11 @@ run_tool :: proc(state: ^EditorState, cmd: []string) -> bool {
 	return true
 }
 
-// Export_MacApp builds <outDir>/macos/<name>.app from a runner folder.
-Export_MacApp :: proc(state: ^EditorState, runner, ore, outDir, name: string) -> (string, bool) {
-	cfg := &state.projectConfig
-	app, _ := filepath.join({outDir, "macos", strings.concatenate({name, ".app"}, context.temp_allocator)}, context.temp_allocator)
-	_ = os.remove_all(app) // a fresh bundle (it's ours: <output>/macos/<name>.app)
+// Export_MacApp builds <dir>/<name>.app from a runner (cfg: the project
+// settings with the preset's overrides).
+Export_MacApp :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, dir, name: string) -> (string, bool) {
+	app, _ := filepath.join({dir, strings.concatenate({name, ".app"}, context.temp_allocator)}, context.temp_allocator)
+	_ = os.remove_all(app) // a fresh bundle (it's ours: <preset folder>/<name>.app)
 	contents, _ := filepath.join({app, "Contents"}, context.temp_allocator)
 	macos, _ := filepath.join({contents, "MacOS"}, context.temp_allocator)
 	frameworks, _ := filepath.join({contents, "Frameworks"}, context.temp_allocator)
