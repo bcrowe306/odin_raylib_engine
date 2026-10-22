@@ -1,0 +1,68 @@
+# Assets panel, Folders view: a new folder, a texture used by the main scene
+# dragged into it (the scene's reference follows), Find Usages, the folder
+# renamed (references follow again), the thumbnail grid, a texture's import
+# settings saved in project.json, a folder deleted.
+wait 5
+click @asset.view-folders
+expect item:folder:textures == visible
+rclick @folder:textures
+click @ctx:new-folder
+expect item:prompt.input == visible
+type drive_art_zz
+key enter
+wait 3
+expect item:folder:textures/drive_art_zz == visible
+screenshot new_folder
+
+# Move a texture the scene uses into it.
+drag @asset:textures/Asteroid_1.png @folder:textures/drive_art_zz 12
+wait 3
+expect folder-open:textures/drive_art_zz == true
+expect file:scenes/main.scene.json contains "textures/drive_art_zz/Asteroid_1.png"
+expect file:scenes/main.scene.json !contains "textures/Asteroid_1.png"
+expect node:Asteroid_Alpha.exists == true
+screenshot moved
+
+# Find Usages.
+rclick @asset:textures/drive_art_zz/Asteroid_1.png
+click @ctx:find-usages
+expect usages >= 1
+expect item:usage:scenes/main.scene.json == visible
+screenshot usages
+
+# Rename the folder: references follow.
+rclick @folder:textures/drive_art_zz
+click @ctx:rename-folder
+key cmd+a
+type drive_art_yy
+key enter
+wait 3
+expect file:scenes/main.scene.json contains "textures/drive_art_yy/Asteroid_1.png"
+expect item:folder:textures/drive_art_yy == visible
+screenshot folders_list
+
+# The grid, with thumbnails.
+click @asset.view-grid
+wait 20
+screenshot grid
+
+# Import settings: bilinear filtering for this texture, saved in project.json.
+click @asset:textures/drive_art_yy/Asteroid_1.png
+click @preview.import.filter
+click @pick:Bilinear
+expect file:project.json contains "texture_import"
+expect file:project.json contains "textures/drive_art_yy/Asteroid_1.png": {"filter": "bilinear"
+screenshot import_settings
+
+# Delete an (empty) folder.
+click @asset.view-grid
+rclick @folder:textures
+click @ctx:new-folder
+key enter
+wait 3
+expect item:folder:textures/New Folder == visible
+rclick @folder:textures/New Folder
+click @ctx:delete-folder
+click @delete.ok
+wait 3
+expect item:folder:textures/New Folder == missing

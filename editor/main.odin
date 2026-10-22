@@ -211,6 +211,7 @@ editor_main :: proc() -> int {
 		QuitPrompt_Render(&GlobalEditor)
 		Prompt_Render(&GlobalEditor)
 		AssetDelete_Render(&GlobalEditor)
+		AssetUsages_Render(&GlobalEditor)
 		OpenProject_Render(&GlobalEditor)
 		Signals_Render(&GlobalEditor)
 		AssetImport_Render(&GlobalEditor)

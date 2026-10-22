@@ -155,6 +155,7 @@ LoadTexture_FilePath :: proc(rm: ^ResourceManager, filePath: string) -> (texture
 	tex.fileName = filepath.base(tex.filePath)
 	tex.texture = texture2d
 	tex.refCount = 1
+	Texture_ApplyImport(&tex.texture, Texture_ImportFor(rm, filePath)) // project.json "texture_import"
 	append(&rm.textures, tex)
 	return tex, true
 }

@@ -48,6 +48,8 @@ ProjectConfig :: struct {
 	actions:       [dynamic]Input_Action_Config,
 	// Export
 	export:        Export_Settings,
+	// Per-texture filtering / wrap / mipmaps (asset_paths.odin)
+	textureImport: [dynamic]Texture_Import,
 }
 
 Export_Target :: enum {
@@ -90,6 +92,8 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg.export.macNotaryProfile != "" do delete(cfg.export.macNotaryProfile, allocator)
 	for &pr in cfg.export.presets do Export_Preset_Destroy(&pr, allocator)
 	delete(cfg.export.presets)
+	for t in cfg.textureImport do delete(t.path, allocator)
+	delete(cfg.textureImport)
 }
 
 // ProjectConfig_Clone deep-copies a config.
@@ -117,6 +121,12 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c.export.macNotaryProfile = strings.clone(src.export.macNotaryProfile, allocator)
 	c.export.presets = make([dynamic]Export_Preset, allocator)
 	for &pr in src.export.presets do append(&c.export.presets, Export_Preset_Clone(&pr, allocator))
+	c.textureImport = make([dynamic]Texture_Import, allocator)
+	for t in src.textureImport {
+		ct := t
+		ct.path = strings.clone(t.path, allocator)
+		append(&c.textureImport, ct)
+	}
 	return c
 }
 
@@ -276,6 +286,8 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 	cfg.initialScene = strings.clone(json_get_string(rootObj, "initial_scene", cfg.initialScene), allocator)
 	cfg.icon = strings.clone(json_get_string(rootObj, "icon", ""), allocator)
 	cfg.language = strings.clone(json_get_string(rootObj, "language", ""), allocator)
+	cfg.textureImport = make([dynamic]Texture_Import, allocator)
+	texture_imports_read(rootObj, &cfg.textureImport, allocator)
 
 	// Window settings
 	if winObj, ok := json_get_obj(rootObj, "window"); ok {
@@ -444,6 +456,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	if cfg.export.macNotaryProfile != "" {strings.write_string(&sb, ", \"macos_notary_profile\": "); jstr(&sb, cfg.export.macNotaryProfile)}
 	Export_PresetsWrite(&sb, &cfg.export)
 	strings.write_string(&sb, "},\n")
+	texture_imports_write(&sb, cfg.textureImport[:])
 	strings.write_string(&sb, "  \"scenes\": [\n")
 	for sc, i in cfg.scenes {
 		strings.write_string(&sb, "    "); jstr(&sb, sc)
@@ -495,6 +508,7 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	game.masterVolume = cfg.masterVolume
 	if rl.IsAudioDeviceReady() do rl.SetMasterVolume(cfg.masterVolume)
 	Input_ApplyActionConfigs(&game.input, cfg.actions[:])
+	Texture_ImportsSet(cfg.textureImport[:])
 
 	if rl.IsWindowReady() {
 		if cfg.windowTitle != "" {

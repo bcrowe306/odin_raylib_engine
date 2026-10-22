@@ -341,6 +341,7 @@ PreviewPanel_RenderTexture :: proc(state: ^EditorState) {
 
 	imgui.SameLine()
 	imgui.Checkbox("Fit", &state.previewTextureFit)
+	preview_texture_import(state)
 
 	imgui.Separator()
 
@@ -1115,5 +1116,44 @@ find_script_refs_in_json_node :: proc(
 				find_script_refs_in_json_node(childObj, sourceName, sourceType, scriptBaseName, refs)
 			}
 		}
+	}
+}
+
+// preview_texture_import: the previewed project texture's import settings
+// (project.json "texture_import"), applied to every loaded copy at once.
+@(private = "file")
+preview_texture_import :: proc(state: ^EditorState) {
+	root := strings.concatenate({state.projectPath, "/"}, context.temp_allocator)
+	if state.projectPath == "" || !strings.has_prefix(state.previewTexturePath, root) do return
+	rel := state.previewTexturePath[len(root):]
+	imp := e.Texture_ImportFor(nil, rel)
+	changed := false
+	UI_DimText("Import")
+	imgui.SameLine()
+	imgui.SetNextItemWidth(96)
+	if f, ok := UI_Combo("preview.import.filter", int(imp.filter), {"Point", "Bilinear", "Trilinear"}); ok {
+		imp.filter = e.Texture_Filter(f)
+		changed = true
+	}
+	UI_Tooltip("Filtering: Point keeps pixel art crisp; Bilinear / Trilinear smooth scaled images (Trilinear uses mipmaps)")
+	imgui.SameLine()
+	imgui.SetNextItemWidth(84)
+	if w, ok := UI_Combo("preview.import.wrap", int(imp.wrap), {"Repeat", "Clamp"}); ok {
+		imp.wrap = e.Texture_Wrap(w)
+		changed = true
+	}
+	UI_Tooltip("Wrap: Repeat tiles the texture past its edges (parallax, shaders); Clamp stretches the edge pixels")
+	imgui.SameLine()
+	if imgui.Checkbox("Mipmaps##imp", &imp.mipmaps) do changed = true
+	Drive_Item("preview.import.mipmaps")
+	UI_Tooltip("Smaller copies for drawing the texture far smaller than its size")
+	if changed {
+		imp.path = rel
+		e.ProjectConfig_SetTextureImport(&state.projectConfig, imp)
+		e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
+		e.Texture_ImportsSet(state.projectConfig.textureImport[:])
+		e.ResourceManager_ReapplyImports(&state.game.resourceManager)
+		e.Texture_ApplyImport(&state.previewTexture, imp)
+		Editor_Log(state, .Info, "Import settings of %s: %v filter, %v wrap%s", rel, imp.filter, imp.wrap, ", mipmaps" if imp.mipmaps else "")
 	}
 }

@@ -22,6 +22,21 @@ pendingDelete: string
 @(private = "file")
 pendingRename: string
 
+// Asset_BeginRename / Asset_BeginDelete: ask for a new name / confirm
+// (files and folders).
+Asset_BeginRename :: proc(rel: string) {
+	delete(pendingRename)
+	pendingRename = strings.clone(rel)
+	Prompt_Open(.RenameAsset, filepath.base(rel))
+}
+
+Asset_BeginDelete :: proc(rel: string) {
+	delete(pendingDelete)
+	pendingDelete = strings.clone(rel)
+}
+
+Asset_HasClipboard :: proc() -> bool {return assetClipboard != ""}
+
 @(private = "file")
 menu :: proc(icon, label: string, id: string, enabled := true, shortcut: cstring = nil) -> bool {
 	clicked := imgui.MenuItem(fmt.ctprintf("%s  %s", icon, label), shortcut, false, enabled)
@@ -147,15 +162,9 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		Asset_Paste(state, filepath.dir(rel, context.temp_allocator))
 	}
 	if menu(ICON_FA_CLONE, "Duplicate", "duplicate-asset") do Asset_Duplicate(state, rel, filepath.dir(rel, context.temp_allocator))
-	if menu(ICON_FA_PEN, "Rename...", "rename-asset") {
-		delete(pendingRename)
-		pendingRename = strings.clone(rel)
-		Prompt_Open(.RenameAsset, filepath.base(rel))
-	}
-	if menu(ICON_FA_TRASH, "Delete...", "delete-asset") {
-		delete(pendingDelete)
-		pendingDelete = strings.clone(rel)
-	}
+	if menu(ICON_FA_PEN, "Rename...", "rename-asset") do Asset_BeginRename(rel)
+	if menu(ICON_FA_MAGNIFYING_GLASS, "Find Usages", "find-usages") do Asset_ShowUsages(state, rel, false)
+	if menu(ICON_FA_TRASH, "Delete...", "delete-asset") do Asset_BeginDelete(rel)
 	imgui.Separator()
 	if menu(ICON_FA_LINK, "Copy Path", "copy-path") do imgui.SetClipboardText(strings.clone_to_cstring(rel, context.temp_allocator))
 	if menu(ICON_FA_FOLDER_OPEN, "Reveal in Finder" when ODIN_OS == .Darwin else "Show in Folder", "reveal") do Editor_OpenExternally(state, filepath.dir(full, context.temp_allocator))
@@ -235,58 +244,31 @@ Asset_Paste :: proc(state: ^EditorState, toDir: string) {
 }
 
 Asset_Rename :: proc(state: ^EditorState, rel, newName: string) -> bool {
-	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	dst, _ := filepath.join({filepath.dir(rel, context.temp_allocator), newName}, context.temp_allocator)
-	if dst == rel do return false
-	src, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
-	full, _ := filepath.join({state.projectPath, dst}, context.temp_allocator)
-	if os.exists(full) {
-		Editor_Log(state, .Error, "%s already exists", dst)
-		return false
-	}
-	if os.rename(src, full) != nil {
-		Editor_Log(state, .Error, "Could not rename %s", rel)
-		return false
-	}
-	// Keep the project's scene list in step.
-	if Asset_KindOf(rel) == .Scene {
-		for &s in state.projectConfig.scenes {
-			if s == rel {delete(s); s = strings.clone(dst)}
-		}
-		if state.projectConfig.initialScene == rel {
-			delete(state.projectConfig.initialScene)
-			state.projectConfig.initialScene = strings.clone(dst)
-		}
-		e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
-		if scene := e.Game_FindSceneByFile(state.game, rel); scene != nil {
-			scene.filePath = strings.clone(dst, state.game.sceneManager.allocator)
-			if state.activeScenePath == rel {
-				delete(state.activeScenePath)
-				state.activeScenePath = strings.clone(dst)
-			}
-		}
-	}
-	Editor_Log(state, .Info, "Renamed %s to %s (references in other files are not updated)", rel, dst)
-	return true
+	return Asset_Move(state, rel, dst) // references follow (asset_refs.odin)
 }
 
 Asset_Delete :: proc(state: ^EditorState, rel: string) -> bool {
 	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
-	if os.remove(full) != nil {
+	isDir := os.is_dir(full)
+	if (os.remove_all(full) if isDir else os.remove(full)) != nil {
 		Editor_Log(state, .Error, "Could not delete %s", rel)
 		return false
 	}
-	if Asset_KindOf(rel) == .Scene {
-		for s, i in state.projectConfig.scenes {
-			if s == rel {
-				delete(s)
-				ordered_remove(&state.projectConfig.scenes, i)
-				break
-			}
+	Editor_InvalidateProjectFiles()
+	// Deleted scenes leave the project's scene list.
+	prefix := strings.concatenate({rel, "/"}, context.temp_allocator)
+	removed := false
+	for i := len(state.projectConfig.scenes) - 1; i >= 0; i -= 1 {
+		s := state.projectConfig.scenes[i]
+		if s == rel || (isDir && strings.has_prefix(s, prefix)) {
+			delete(s)
+			ordered_remove(&state.projectConfig.scenes, i)
+			removed = true
 		}
-		e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
 	}
+	if removed do e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
 	Editor_Log(state, .Info, "Deleted %s", rel)
 	return true
 }
@@ -320,7 +302,14 @@ AssetDelete_Render :: proc(state: ^EditorState) {
 	if !imgui.BeginPopupModal("Delete Asset###DeleteAsset", nil, {.NoTitleBar, .AlwaysAutoResize}) do return
 	UI_PanelTitle(ICON_FA_TRASH, "Delete asset?")
 	imgui.Dummy({0, 4})
-	imgui.TextUnformatted(fmt.ctprintf("%s will be deleted from the project folder.", pendingDelete))
+	full, _ := filepath.join({state.projectPath, pendingDelete}, context.temp_allocator)
+	if os.is_dir(full) {
+		n := 0
+		for f in Editor_ProjectFiles(state) do if strings.has_prefix(f, strings.concatenate({pendingDelete, "/"}, context.temp_allocator)) do n += 1
+		imgui.TextUnformatted(fmt.ctprintf("The folder %s and the %d file(s) in it will be deleted.", pendingDelete, n))
+	} else {
+		imgui.TextUnformatted(fmt.ctprintf("%s will be deleted from the project folder.", pendingDelete))
+	}
 	UI_DimText("Scenes, scripts or components that use it will show it as missing.")
 	imgui.Dummy({0, 6})
 	if UI_PrimaryButton("Delete", "delete.ok", {96, 0}) {

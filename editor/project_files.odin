@@ -5,6 +5,7 @@ import "core:path/filepath"
 import "core:slice"
 import "core:strings"
 import "core:time"
+import imgui "lib/imgui"
 
 // ============================================================================
 // Project file list, cached. Asset lists and pickers ask for project files
@@ -22,8 +23,13 @@ PROJECT_FILES_TTL :: time.Second
 projectFiles: struct {
 	root:    string,          // heap
 	files:   [dynamic]string, // heap, project-relative, sorted
+	dirs:    [dynamic]string, // heap, project-relative folders (empty ones too), sorted
 	scanned: time.Tick,
 	valid:   bool,
+	// Strings of earlier scans, freed a frame later: callers iterate the
+	// lists while an edit (a move, a save) makes the next call re-scan.
+	retired:      [dynamic]string,
+	retiredFrame: i32,
 	// .ore packages next to the project folder (exports).
 	packages:        [dynamic]string,
 	packagesScanned: time.Tick,
@@ -31,6 +37,7 @@ projectFiles: struct {
 }
 
 Editor_InvalidateProjectFiles :: proc() {
+	assetThumbsStale = true // grid thumbnails reload
 	projectFiles.valid = false
 	projectFiles.packagesValid = false
 }
@@ -54,8 +61,15 @@ Editor_ParentPackages :: proc(state: ^EditorState) -> []string {
 
 @(private = "file")
 scan_project :: proc(root: string) {
-	for f in projectFiles.files do delete(f)
+	if frame := imgui.GetFrameCount(); frame != projectFiles.retiredFrame {
+		for r in projectFiles.retired do delete(r)
+		clear(&projectFiles.retired)
+		projectFiles.retiredFrame = frame
+	}
+	append(&projectFiles.retired, ..projectFiles.files[:])
+	append(&projectFiles.retired, ..projectFiles.dirs[:])
 	clear(&projectFiles.files)
+	clear(&projectFiles.dirs)
 	walk :: proc(root, rel: string, depth: int) {
 		if depth > 8 do return
 		full, _ := filepath.join({root, rel}, context.temp_allocator)
@@ -65,6 +79,7 @@ scan_project :: proc(root: string) {
 			if strings.has_prefix(fi.name, ".") do continue
 			child, _ := filepath.join({rel, fi.name}, context.temp_allocator)
 			if fi.type == .Directory {
+				append(&projectFiles.dirs, strings.clone(child))
 				walk(root, child, depth + 1)
 			} else {
 				append(&projectFiles.files, strings.clone(child))
@@ -73,6 +88,7 @@ scan_project :: proc(root: string) {
 	}
 	walk(root, "", 0)
 	slice.sort(projectFiles.files[:])
+	slice.sort(projectFiles.dirs[:])
 	if projectFiles.root != root {
 		delete(projectFiles.root)
 		projectFiles.root = strings.clone(root)
@@ -89,6 +105,13 @@ Editor_ProjectFiles :: proc(state: ^EditorState) -> []string {
 		scan_project(state.projectPath)
 	}
 	return projectFiles.files[:]
+}
+
+// Editor_ProjectDirs: every (non-hidden) project folder, project-relative,
+// sorted.
+Editor_ProjectDirs :: proc(state: ^EditorState) -> []string {
+	_ = Editor_ProjectFiles(state) // (re)scans
+	return projectFiles.dirs[:]
 }
 
 // Editor_ListProjectFiles lists project files under `subdir` (recursive;

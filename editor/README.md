@@ -144,6 +144,26 @@ component actions; for assets: open/add/use on the selection, copy/paste,
 duplicate, rename, delete, copy path, reveal. LDtk projects (`.ldtk`) are
 listed under **Levels** (double-click or drag to add a level).
 
+### Asset folders, grid and usages
+
+The buttons left of **+** switch Assets between the by-type sections and the
+project's real **folders** (a tree, the project folder at the top), and
+between a list and a **grid** of thumbnails. In the folders view, drag an
+asset or folder onto a folder to move it; right-click a folder for **New
+Folder**, **Rename**, **Find Usages**, **Delete** (with what it contains)
+and **Paste Here**. Moving or renaming updates every reference - in scenes
+and components (also the ones open with unsaved edits, and their undo
+history), scripts and `project.json` (startup scene, scene list, icon,
+import settings); open scripts that move are reopened. **Find Usages** (on
+any asset's menu) lists the files that reference it; double-click one to
+open it.
+
+**Import settings** for a texture are in the preview panel's Texture tab:
+**Filter** (Point keeps pixel art crisp; Bilinear / Trilinear smooth
+scaled images), **Wrap** (Repeat / Clamp) and **Mipmaps**. They're saved in
+`project.json` (`texture_import`), applied at once in the editor and when
+the game loads the texture.
+
 ### Importing assets
 
 The **+** at the top right of Assets imports with the system file dialog

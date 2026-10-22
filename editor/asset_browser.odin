@@ -12,9 +12,20 @@ import imgui "lib/imgui"
 // Assets panel: scenes, components, scripts, textures, audio and exported
 // packages of the open project. Double-click opens a scene / instantiates a
 // component; drag textures, components, audio or scripts into the viewport.
+// Two views - by type, or the project's real folders (asset_folders.odin:
+// create, rename, move by drag with references updated) - each as a list
+// or a grid of thumbnails.
 // ============================================================================
 
 assetFilterBuf: [64]u8
+
+Asset_View :: enum {
+	Types,
+	Folders,
+}
+
+assetView: Asset_View
+assetGrid: bool
 
 ASSET_PAYLOAD :: "ORE_ASSET"
 
@@ -73,9 +84,16 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 	defer imgui.End()
 	if !imgui.Begin("Assets###AssetBrowserWindow") do return
 	UI_PanelTitle(ICON_FA_FOLDER_OPEN, "Assets")
-	// "+" at the right: import (system file dialog) or create.
-	imgui.SameLine(imgui.GetWindowContentRegionMax().x - 26)
+	// View toggles and "+" at the right: import (system file dialog) or create.
+	imgui.SameLine(imgui.GetWindowContentRegionMax().x - 26 * 3 - 4)
 	imgui.SetCursorPosY(imgui.GetCursorPosY() - 3)
+	if UI_IconButton(ICON_FA_FOLDER_TREE, "asset.view-folders", "Folders view (else by type)", assetView == .Folders, size = 26) {
+		assetView = .Types if assetView == .Folders else .Folders
+	}
+	imgui.SameLine(0, 2)
+	imgui.SetCursorPosY(imgui.GetCursorPosY())
+	if UI_IconButton(ICON_FA_TABLE_CELLS, "asset.view-grid", "Thumbnail grid (else a list)", assetGrid, size = 26) do assetGrid = !assetGrid
+	imgui.SameLine(0, 2)
 	if UI_IconButton(ICON_FA_PLUS, "asset.add", "Import assets or create new", active = imgui.IsPopupOpen("##asset_add"), size = 26) do imgui.OpenPopup("##asset_add")
 	if imgui.BeginPopup("##asset_add") {
 		Asset_AddMenu(state)
@@ -93,6 +111,9 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 	imgui.PushStyleVarImVec2(.ItemSpacing, {6, 2})
 	defer imgui.PopStyleVar()
 	if imgui.BeginChild("##assets", {0, 0}, {}, {}) {
+		if assetView == .Folders {
+			Asset_FoldersView(state, filter)
+		} else {
 		section_files(state, "Scenes", Editor_ListProjectFiles(state, "scenes", {".scene.json"}), filter)
 		section_components(state, filter)
 		section_files(state, "Scripts", Editor_ListProjectFiles(state, "scripts", {".lua"}), filter)
@@ -101,6 +122,7 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 		section_files(state, "Levels", Editor_ListProjectFiles(state, "", {".ldtk"}), filter)
 		section_files(state, "Shaders", Editor_ListProjectFiles(state, "", SHADER_EXTS), filter)
 		section_packages(state, filter)
+		}
 		imgui.Dummy({0, 8})
 		UI_DimText(fmt.tprintf("%s  Drop files or folders here to import", ICON_FA_FILE_IMPORT))
 	}
@@ -119,9 +141,22 @@ section_files :: proc(state: ^EditorState, title: string, files: []string, filte
 	if filter != "" && n == 0 do return
 	open := asset_folder_header(title, n, add_scene = title == "Scenes", add_script = title == "Scripts", state = state)
 	if !open do return
-	for f in files {
-		if !matches(f, filter) do continue
-		asset_row(state, f)
+	shown := make([dynamic]string, context.temp_allocator)
+	for f in files do if matches(f, filter) do append(&shown, f)
+	Asset_Items(state, shown[:])
+}
+
+// Asset_Items draws files as rows, or as a grid of tiles (assetGrid).
+Asset_Items :: proc(state: ^EditorState, files: []string, labelBase := false) {
+	if !assetGrid {
+		for f in files do asset_row(state, f, filepath.base(f) if labelBase else "")
+		return
+	}
+	TILE :: 76
+	perRow := max(1, int((imgui.GetContentRegionAvail().x + 6) / (TILE + 6)))
+	for f, i in files {
+		if i % perRow != 0 do imgui.SameLine(0, 6)
+		asset_tile(state, f)
 	}
 }
 
@@ -145,9 +180,23 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 	}
 	if kind == .Script && Code_IsDirty(state, rel) do suffix = "  " + ICON_FA_CIRCLE
 
+	x0 := imgui.GetCursorPosX() // indented in the Folders view
 	imgui.PushStyleColorImVec4(.Text, col)
 	clicked := imgui.Selectable(fmt.ctprintf("%s##a_%s", icon, rel), selected || isActive, {.AllowDoubleClick}, {0, 24})
 	imgui.PopStyleColor()
+	dbl := asset_events(state, rel, kind, full, name, icon, clicked)
+	imgui.SameLine(x0 + 32)
+	imgui.PushStyleColorImVec4(.Text, UI_ACCENT if isActive else UI_TEXT)
+	imgui.TextUnformatted(fmt.ctprintf("%s%s", name, suffix))
+	imgui.PopStyleColor()
+	return dbl
+}
+
+// asset_events: what an asset row / tile does (call right after its item):
+// select, double-click to open, context menu, drag (into the viewport or
+// onto a folder), tooltip, import highlight.
+@(private = "file")
+asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, name, icon: string, clicked: bool) -> bool {
 	Drive_Item(fmt.tprintf("asset:%s", rel))
 	rowMin, rowMax := imgui.GetItemRectMin(), imgui.GetItemRectMax()
 	dbl := imgui.IsItemHovered() && imgui.IsMouseDoubleClicked(.Left)
@@ -155,20 +204,14 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 		Asset_ContextMenu(state, rel)
 		imgui.EndPopup()
 	}
-
-	// Drag into the viewport.
-	if kind != .Scene && kind != .Package && imgui.BeginDragDropSource({}) {
+	// Drag into the viewport, or onto a folder (Folders view).
+	if kind != .Package && imgui.BeginDragDropSource({}) {
 		p: Asset_Payload
 		p.len = copy(p.path[:], rel)
 		imgui.SetDragDropPayload(ASSET_PAYLOAD, &p, size_of(Asset_Payload))
 		imgui.TextUnformatted(fmt.ctprintf("%s  %s", icon, name))
 		imgui.EndDragDropSource()
 	}
-	imgui.SameLine(32)
-	imgui.PushStyleColorImVec4(.Text, UI_ACCENT if isActive else UI_TEXT)
-	imgui.TextUnformatted(fmt.ctprintf("%s%s", name, suffix))
-	imgui.PopStyleColor()
-
 	if clicked do Editor_SelectAsset(state, full)
 	if Asset_IsHighlighted(rel) {
 		imgui.DrawList_AddRectFilled(imgui.GetWindowDrawList(), rowMin, rowMax, col_u32(UI_ACCENT_SOFT), 4)
@@ -188,6 +231,38 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 	}
 	UI_Tooltip(asset_tooltip(kind, rel))
 	return dbl
+}
+
+// asset_tile: one grid cell - a thumbnail (images) or a large icon, and
+// the name.
+@(private = "file")
+asset_tile :: proc(state: ^EditorState, rel: string) {
+	TILE :: 76
+	kind := Asset_KindOf(rel)
+	icon, col := kind_icon(kind)
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	isActive := kind == .Scene && state.activeScenePath == rel
+	name := filepath.base(rel)
+	clicked := imgui.Selectable(fmt.ctprintf("##t_%s", rel), state.selectedAssetPath == full || isActive, {.AllowDoubleClick}, {TILE, TILE + 18})
+	mn, mx := imgui.GetItemRectMin(), imgui.GetItemRectMax()
+	asset_events(state, rel, kind, full, name, icon, clicked)
+	dl := imgui.GetWindowDrawList()
+	box := [2]f32{TILE - 12, TILE - 12}
+	origin := [2]f32{mn.x + 6, mn.y + 4}
+	if tex := Asset_Thumbnail(full) if kind == .Texture else nil; tex != nil {
+		s := min(box.x / f32(tex.width), box.y / f32(tex.height))
+		size := [2]f32{f32(tex.width), f32(tex.height)} * s
+		p0 := origin + (box - size) * 0.5
+		imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)tex, p0, p0 + size)
+	} else {
+		fs: f32 = 30
+		w := imgui.CalcTextSize(strings.clone_to_cstring(icon, context.temp_allocator)).x * fs / imgui.GetFontSize()
+		imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.regular, fs, {origin.x + (box.x - w) * 0.5, origin.y + (box.y - fs) * 0.5}, col_u32(col), strings.clone_to_cstring(icon, context.temp_allocator))
+	}
+	clip := imgui.Vec4{mn.x + 2, mn.y, mx.x - 2, mx.y}
+	label := strings.clone_to_cstring(name, context.temp_allocator)
+	lw := imgui.CalcTextSize(label).x * 0.8
+	imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12, {mn.x + max(2, (TILE - lw) * 0.5), mx.y - 16}, col_u32(UI_ACCENT if isActive else UI_TEXT), label, nil, 0, &clip)
 }
 
 @(private = "file")
