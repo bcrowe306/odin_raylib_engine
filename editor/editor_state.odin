@@ -47,6 +47,7 @@ ViewportTab :: enum {
 Build_Kind :: enum {
 	Game,       // the game binary for Play (launches it)
 	Standalone, // the runner for an exported standalone game
+	Notarize,   // notarizing an exported macOS app
 }
 
 Drag_Start :: struct {

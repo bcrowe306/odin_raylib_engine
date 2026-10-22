@@ -1,7 +1,8 @@
 # Standalone export with a prebuilt runner (no compiler at export time):
 # a project icon, the executable name, Save and Export, then the exported
-# game runs from its folder.
-exec scripts/build_runners.sh
+# macOS app (bundle, Info.plist, icon, bundled Lua library, signature)
+# runs and finds its game in Resources.
+exec scripts/build_runners.sh --if-missing
 wait 5
 click @toolbar.settings
 click @settings.page:General
@@ -11,14 +12,22 @@ click @settings.page:Export
 click @settings.export-name
 key ctrl+a
 type SpaceGame
+expect item:settings.bundle-id == visible
 screenshot export_settings
 click @settings.export-now
 wait 10
 expect log contains Exported macos:
+expect log contains Signed SpaceGame.app (ad-hoc)
 expect log contains Standalone game ready
 expect log !contains building it once
 expect file:project.json contains "icon": "textures/Spaceship_1.png"
-expect abs-file:$PROJECT_standalone/macos/game.ore !=
-expect abs-file:$PROJECT_standalone/macos/fonts/OpenSans-Regular.ttf !=
-exec $PROJECT_standalone/macos/SpaceGame --frames 20 --dump-scene $SHOTS/standalone_scene.json
+exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/game.ore
+exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/AppIcon.icns
+exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/fonts/OpenSans-Regular.ttf
+exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Frameworks/liblua.dylib
+exec plutil -lint $PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist
+expect abs-file:$PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist contains <string>SpaceGame</string>
+expect abs-file:$PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist contains com.ore.spacegame
+exec codesign --verify --deep --strict $PROJECT_standalone/macos/SpaceGame.app
+exec $PROJECT_standalone/macos/SpaceGame.app/Contents/MacOS/SpaceGame --frames 20 --dump-scene $SHOTS/standalone_scene.json
 expect abs-file:$SHOTS/standalone_scene.json contains "PlayerShip"

@@ -61,7 +61,10 @@ Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 // game.ore, any other .ore, or a project/ directory (exe dir, then cwd).
 Engine_FindBundledProject :: proc(exePath: string, allocator := context.allocator) -> string {
 	dirs := make([dynamic]string, context.temp_allocator)
-	append(&dirs, filepath.dir(exePath, context.temp_allocator))
+	exeDir := filepath.dir(exePath, context.temp_allocator)
+	// macOS .app: Contents/MacOS/<exe> with the game in Contents/Resources.
+	if res, _ := filepath.join({exeDir, "..", "Resources"}, context.temp_allocator); os.is_dir(res) do append(&dirs, res)
+	append(&dirs, exeDir)
 	if cwd, err := os.get_working_directory(context.temp_allocator); err == nil do append(&dirs, cwd)
 	for dir in dirs {
 		game, _ := filepath.join({dir, "game.ore"}, context.temp_allocator)
@@ -83,14 +86,15 @@ Engine_FindBundledProject :: proc(exePath: string, allocator := context.allocato
 }
 
 // runner_font_path: the UI font from the engine checkout, or fonts/ next
-// to the executable (exported games).
+// to the executable / in a macOS .app's Resources (exported games).
 @(private = "file")
 runner_font_path :: proc() -> cstring {
 	dev :: "engine/Open_Sans/static/OpenSans-Regular.ttf"
 	if os.is_file(dev) do return dev
 	exeDir := filepath.dir(os.args[0], context.temp_allocator)
-	p, _ := filepath.join({exeDir, "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
-	if os.is_file(p) do return strings.clone_to_cstring(p, context.temp_allocator)
+	nextTo, _ := filepath.join({exeDir, "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
+	inApp, _ := filepath.join({exeDir, "..", "Resources", "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
+	for f in ([]string{nextTo, inApp}) do if os.is_file(f) do return strings.clone_to_cstring(f, context.temp_allocator)
 	return dev
 }
 

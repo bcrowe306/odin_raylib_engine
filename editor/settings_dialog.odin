@@ -705,6 +705,17 @@ project_export :: proc(state: ^EditorState) {
 	}
 	check("settings.compress", "Compress Package", &x.compress)
 	check("settings.include-font", "Include UI Font", &x.includeFont)
+	if .MacOS in x.targets {
+		exeName := x.executableName if x.executableName != "" else export_default_name(d)
+		UI_PropLabel("macOS Bundle ID")
+		text_field("settings.bundle-id", &x.bundleId, strings.clone_to_cstring(Export_BundleId(d, exeName), context.temp_allocator))
+		UI_PropLabel("Signing Identity")
+		text_field("settings.mac-sign", &x.macSign, "ad-hoc (or \"Developer ID Application: ...\", or none)")
+		UI_Tooltip("codesign identity for the .app. Ad-hoc runs on this Mac; a Developer ID is needed to distribute (and to notarize)")
+		UI_PropLabel("Notary Profile")
+		text_field("settings.mac-notary", &x.macNotaryProfile, "keychain profile (xcrun notarytool store-credentials)")
+		UI_Tooltip("With a Developer ID identity: the app is notarized and stapled after export")
+	}
 	UI_PropLabel("")
 	if UI_PrimaryButton(fmt.tprintf("%s  Save and Export", ICON_FA_FLOPPY_DISK), "settings.export-now") {
 		settings_save(state)

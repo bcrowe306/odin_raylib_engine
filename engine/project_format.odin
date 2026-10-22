@@ -60,6 +60,10 @@ Export_Settings :: struct {
 	targets:        bit_set[Export_Target],
 	compress:       bool,             // compress the .ore package
 	includeFont:    bool,             // ship the UI font next to the runner
+	// macOS .app
+	bundleId:       string,           // "" = com.ore.<executable, lower case>
+	macSign:        string,           // codesign identity: "" = ad-hoc, "none" = don't sign
+	macNotaryProfile: string,         // notarytool keychain profile ("" = don't notarize)
 }
 
 ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocator) {
@@ -76,6 +80,9 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	Input_ActionConfigs_Destroy(&cfg.actions, allocator)
 	if cfg.export.executableName != "" do delete(cfg.export.executableName, allocator)
 	if cfg.export.outputDir != "" do delete(cfg.export.outputDir, allocator)
+	if cfg.export.bundleId != "" do delete(cfg.export.bundleId, allocator)
+	if cfg.export.macSign != "" do delete(cfg.export.macSign, allocator)
+	if cfg.export.macNotaryProfile != "" do delete(cfg.export.macNotaryProfile, allocator)
 }
 
 // ProjectConfig_Clone deep-copies a config.
@@ -96,6 +103,9 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	}
 	c.export.executableName = strings.clone(src.export.executableName, allocator)
 	c.export.outputDir = strings.clone(src.export.outputDir, allocator)
+	c.export.bundleId = strings.clone(src.export.bundleId, allocator)
+	c.export.macSign = strings.clone(src.export.macSign, allocator)
+	c.export.macNotaryProfile = strings.clone(src.export.macNotaryProfile, allocator)
 	return c
 }
 
@@ -302,6 +312,9 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 	if exportObj, ok := json_get_obj(rootObj, "export"); ok {
 		cfg.export.executableName = strings.clone(json_get_string(exportObj, "executable", ""), allocator)
 		cfg.export.outputDir = strings.clone(json_get_string(exportObj, "output_dir", ""), allocator)
+		cfg.export.bundleId = strings.clone(json_get_string(exportObj, "bundle_id", ""), allocator)
+		cfg.export.macSign = strings.clone(json_get_string(exportObj, "macos_sign", ""), allocator)
+		cfg.export.macNotaryProfile = strings.clone(json_get_string(exportObj, "macos_notary_profile", ""), allocator)
 		cfg.export.compress = json_get_bool(exportObj, "compress", cfg.export.compress)
 		cfg.export.includeFont = json_get_bool(exportObj, "include_font", cfg.export.includeFont)
 		if arr, has := json_get_arr(exportObj, "targets"); has {
@@ -394,7 +407,11 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 		fmt.sbprintf(&sb, "\"%s\"", export_target_name(t))
 		n += 1
 	}
-	fmt.sbprintf(&sb, "], \"compress\": %t, \"include_font\": %t}},\n", cfg.export.compress, cfg.export.includeFont)
+	fmt.sbprintf(&sb, "], \"compress\": %t, \"include_font\": %t", cfg.export.compress, cfg.export.includeFont)
+	if cfg.export.bundleId != "" {strings.write_string(&sb, ", \"bundle_id\": "); jstr(&sb, cfg.export.bundleId)}
+	if cfg.export.macSign != "" {strings.write_string(&sb, ", \"macos_sign\": "); jstr(&sb, cfg.export.macSign)}
+	if cfg.export.macNotaryProfile != "" {strings.write_string(&sb, ", \"macos_notary_profile\": "); jstr(&sb, cfg.export.macNotaryProfile)}
+	strings.write_string(&sb, "},\n")
 	strings.write_string(&sb, "  \"scenes\": [\n")
 	for sc, i in cfg.scenes {
 		strings.write_string(&sb, "    "); jstr(&sb, sc)

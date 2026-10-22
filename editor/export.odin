@@ -13,9 +13,10 @@ import e "../engine"
 // builds the current platform's). Without one for this platform the editor
 // builds it once (needs `odin`) into bin/runners/ and then exports.
 //
-//   <output>/<platform>/<Name>[.exe]
+//   <output>/<platform>/<Name>[.exe]        (+ the runner's libraries)
 //   <output>/<platform>/game.ore
 //   <output>/<platform>/fonts/OpenSans-Regular.ttf
+//   <output>/macos/<Name>.app                (export_macos.odin)
 // ============================================================================
 
 RUNNER_FONT :: "OpenSans-Regular.ttf"
@@ -52,8 +53,20 @@ Editor_FindRunner :: proc(t: e.Export_Target) -> string {
 	return ""
 }
 
+// runner_libraries: the shared libraries shipped with a runner (every other
+// file in its folder).
+runner_libraries :: proc(runner: string) -> []string {
+	out := make([dynamic]string, context.temp_allocator)
+	infos, err := os.read_all_directory_by_path(filepath.dir(runner, context.temp_allocator), context.temp_allocator)
+	if err != nil do return out[:]
+	for f in infos {
+		if f.type != .Regular || strings.has_prefix(f.name, ".") || f.fullpath == runner || f.name == filepath.base(runner) do continue
+		append(&out, f.fullpath)
+	}
+	return out[:]
+}
+
 // runner_font: the UI font shipped with runners (or the engine's copy).
-@(private = "file")
 runner_font :: proc(runner: string) -> string {
 	p, _ := filepath.join({filepath.dir(filepath.dir(runner, context.temp_allocator), context.temp_allocator), RUNNER_FONT}, context.temp_allocator)
 	if os.is_file(p) do return p
@@ -87,7 +100,9 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false) {
 		}
 		dst, _ := filepath.join({"bin", "runners", e.export_target_name(native), runner_file_name(native)}, context.temp_allocator)
 		_ = os.make_directory_all(filepath.dir(dst, context.temp_allocator))
-		if !Editor_StartBuild(state, {"odin", "build", "runner", "-o:speed", strings.concatenate({"-out:", dst}, context.temp_allocator)}, .Standalone) {
+		// The script also ships the runner's libraries (Lua on macOS / Windows).
+		cmd := []string{"bash", "scripts/build_runners.sh"} if os.is_file("scripts/build_runners.sh") else []string{"odin", "build", "runner", "-o:speed", strings.concatenate({"-out:", dst}, context.temp_allocator)}
+		if !Editor_StartBuild(state, cmd, .Standalone) {
 			Editor_Log(state, .Error, "No prebuilt %s runner, and it couldn't be built (is `odin` on PATH?)", e.export_target_name(native))
 			return
 		}
@@ -109,7 +124,11 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false) {
 			Editor_Log(state, .Warn, "No %s runner: build one on %s (scripts/build_runners.sh) and put it in runners/%s/ next to the editor", e.export_target_name(t), e.export_target_name(t), e.export_target_name(t))
 			continue
 		}
-		if dir, ok := export_target(state, t, runner, ore, outDir, name); ok {
+		dir: string
+		ok: bool
+		if t == .MacOS do dir, ok = Export_MacApp(state, runner, ore, outDir, name)
+		else do dir, ok = export_target(state, t, runner, ore, outDir, name)
+		if ok {
 			Editor_Log(state, .Info, "Exported %s: %s", e.export_target_name(t), dir)
 			exported += 1
 		}
@@ -129,6 +148,10 @@ export_target :: proc(state: ^EditorState, t: e.Export_Target, runner, ore, outD
 	if err := os.copy_file(exe, runner); err != nil {
 		Editor_Log(state, .Error, "Could not copy the runner to %s: %v", exe, err)
 		return "", false
+	}
+	for lib in runner_libraries(runner) {
+		dst, _ := filepath.join({dir, filepath.base(lib)}, context.temp_allocator)
+		_ = os.copy_file(dst, lib)
 	}
 	dstOre, _ := filepath.join({dir, "game.ore"}, context.temp_allocator)
 	if err := os.copy_file(dstOre, ore); err != nil {

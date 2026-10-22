@@ -128,6 +128,7 @@ Editor_UpdatePlaytest :: proc(state: ^EditorState) {
 				switch state.buildKind {
 				case .Game:       Editor_LaunchGame(state)
 				case .Standalone: Editor_ExportStandalone(state, afterBuild = true) // the runner exists now
+				case .Notarize:   Editor_Log(state, .Info, "Notarized and stapled: the app is ready to distribute")
 				}
 			} else {
 				Editor_Log(state, .Error, "Build failed (exit %d) - see errors above; not launching", pstate.exit_code)

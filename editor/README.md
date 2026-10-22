@@ -336,6 +336,19 @@ runners are ready; without one for this platform the editor builds it once
 (needs `odin`). The project's **Icon** (Project > General, a PNG) becomes
 the game window's icon.
 
+**macOS** exports are an app bundle, `<output>/macos/<Name>.app`:
+`Info.plist` (name, version, bundle ID - Export > macOS Bundle ID, default
+`com.ore.<name>`), the runner in `Contents/MacOS`, its libraries (Lua) in
+`Contents/Frameworks`, and `game.ore`, the font and `AppIcon.icns` (made
+from the project icon) in `Contents/Resources`. The app is signed with
+`codesign` - ad-hoc by default (runs on this Mac), or with the **Signing
+Identity** you set (a Developer ID to distribute; `none` skips signing).
+With a **Notary Profile** (`xcrun notarytool store-credentials`) and a
+Developer ID, the app is then notarized and stapled in the background
+(progress in the console). The runner is universal (arm64 + x86_64) when
+`scripts/build_runners.sh` finds the x86_64 builds of raylib, Box2D and
+Lua; otherwise it's built for the Mac's own architecture.
+
 The engine's open gaps and everything fixed in this pass are listed in [`engine/GAPS.md`](../engine/GAPS.md).
 
 ---
