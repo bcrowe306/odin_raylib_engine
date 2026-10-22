@@ -241,14 +241,8 @@ section_components :: proc(state: ^EditorState, filter: string) {
 @(private = "file")
 section_packages :: proc(state: ^EditorState, filter: string) {
 	dir := filepath.dir(strings.trim_suffix(state.projectPath, "/"), context.temp_allocator)
-	h, err := os.open(dir)
-	if err != nil do return
-	infos, _ := os.read_dir(h, -1, context.temp_allocator)
-	os.close(h)
 	pkgs := make([dynamic]string, context.temp_allocator)
-	for fi in infos {
-		if fi.type != .Directory && strings.has_suffix(fi.name, ".ore") && matches(fi.name, filter) do append(&pkgs, fi.name)
-	}
+	for name in Editor_ParentPackages(state) do if matches(name, filter) do append(&pkgs, name)
 	if len(pkgs) == 0 do return
 	if !asset_folder_header("Packages", len(pkgs), default_open = false) do return
 	for p in pkgs {

@@ -70,9 +70,7 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 	if imgui.BeginChild("##tree", {0, 0}, {}, {}) {
 		root := state.activeScene.rootNode
 		if root != nil {
-			children := e.GetChildren(state.activeScene.manager, root)
-			defer delete(children)
-			for child in children do SceneHierarchy_RenderNodeTree(state, child, "", filter)
+			render_rows(state, e.GetChildrenTemp(state.activeScene.manager, root), "", filter)
 			// Drop on empty space: move to the root.
 			imgui.Dummy({imgui.GetContentRegionAvail().x, max(imgui.GetContentRegionAvail().y, 40)})
 			Drive_Item("hier.empty")
@@ -101,10 +99,49 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 @(private = "file")
 subtree_matches :: proc(state: ^EditorState, node: ^e.Node, filter: string) -> bool {
 	if filter == "" || strings.contains(strings.to_lower(node.name, context.temp_allocator), filter) do return true
-	children := e.GetChildren(state.activeScene.manager, node)
-	defer delete(children)
-	for c in children do if subtree_matches(state, c, filter) do return true
+	for c in e.GetChildrenView(state.activeScene.manager, node) do if subtree_matches(state, c, filter) do return true
 	return false
+}
+
+// render_rows draws sibling rows. Runs of leaf rows outside the visible
+// part of the panel are skipped as one spacer (rows have a fixed height):
+// a flat list of thousands of nodes costs only the rows on screen. Skipped
+// rows still register for test drives (and scroll into view).
+@(private = "file")
+render_rows :: proc(state: ^EditorState, children: []^e.Node, parentPath: string, filter: string) {
+	mgr := state.activeScene.manager
+	step := imgui.GetFrameHeight() + imgui.GetStyle().ItemSpacing.y
+	top := imgui.GetScrollY() - step
+	bottom := imgui.GetScrollY() + imgui.GetWindowHeight()
+	skippable :: proc(mgr: ^e.NodeManager, n: ^e.Node, filter: string) -> bool {
+		return filter == "" && len(e.GetChildrenView(mgr, n)) == 0 && n != hierarchyPendingFocus
+	}
+	i := 0
+	for i < len(children) {
+		y := imgui.GetCursorPosY()
+		if skippable(mgr, children[i], filter) && (y + step < top || y > bottom) {
+			// A run of off-screen leaves.
+			start := imgui.GetCursorScreenPos()
+			width := imgui.GetContentRegionAvail().x
+			count := 0
+			for i + count < len(children) && skippable(mgr, children[i + count], filter) {
+				ry := y + f32(count) * step
+				if !(ry + step < top || ry > bottom) do break
+				if GlobalDrive.enabled {
+					n := children[i + count]
+					path := n.name if parentPath == "" else fmt.tprintf("%s/%s", parentPath, n.name)
+					mn := [2]f32{start.x, start.y + f32(count) * step}
+					Drive_ItemRect(fmt.tprintf("hier:%s", path), mn, mn + {width, step - imgui.GetStyle().ItemSpacing.y}, inWindow = true)
+				}
+				count += 1
+			}
+			imgui.Dummy({1, f32(count) * step - imgui.GetStyle().ItemSpacing.y})
+			i += count
+			continue
+		}
+		SceneHierarchy_RenderNodeTree(state, children[i], parentPath, filter)
+		i += 1
+	}
 }
 
 // The row pressed (selected on release unless it was dragged).
@@ -118,8 +155,7 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 	if node == nil || !subtree_matches(state, node, filter) do return
 	mgr := state.activeScene.manager
 	path := node.name if parentPath == "" else fmt.tprintf("%s/%s", parentPath, node.name)
-	children := e.GetChildren(mgr, node)
-	defer delete(children)
+	children := e.GetChildrenTemp(mgr, node)
 
 	flags: imgui.TreeNodeFlags = {.SpanAvailWidth, .OpenOnArrow, .OpenOnDoubleClick, .FramePadding}
 	if len(children) == 0 do flags += {.Leaf, .NoTreePushOnOpen}
@@ -200,7 +236,7 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 	_ = rowMax
 
 	if open && len(children) > 0 {
-		for child in children do SceneHierarchy_RenderNodeTree(state, child, path, filter)
+		render_rows(state, children, path, filter)
 		imgui.TreePop()
 	}
 }

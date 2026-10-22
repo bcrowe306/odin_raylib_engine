@@ -654,6 +654,7 @@ Ldtk_CreateEntityComponent :: proc(state: ^EditorState, def: ^e.LdtkEntityDef) -
 		strings.write_string(&sb, "end\n\n---@param dt number\n")
 		fmt.sbprintf(&sb, "function %s:update(dt)\nend\n\nreturn %s\n", cls, cls)
 		_ = os.make_directory_all(filepath.dir(scriptFull, context.temp_allocator))
+		Editor_InvalidateProjectFiles() // the asset lists rescan
 		if os.write_entire_file(scriptFull, transmute([]u8)strings.to_string(sb)) != nil {
 			Editor_Log(state, .Error, "Could not write %s", scriptRel)
 			return ""
@@ -662,6 +663,7 @@ Ldtk_CreateEntityComponent :: proc(state: ^EditorState, def: ^e.LdtkEntityDef) -
 	}
 	comp := fmt.tprintf("{{\n  \"name\": \"%s\",\n  \"component\": true,\n  \"type\": \"Node\",\n  \"script\": {{\"path\": \"%s\"}}\n}}\n", ident, scriptRel)
 	_ = os.make_directory_all(filepath.dir(compFull, context.temp_allocator))
+	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(compFull, transmute([]u8)comp) != nil {
 		Editor_Log(state, .Error, "Could not write %s", compRel)
 		return ""

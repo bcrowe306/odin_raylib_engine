@@ -87,6 +87,7 @@ Editor_SaveComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 	}
 	json := e.Node_SerializeToJSON(children[0], scene.manager, context.temp_allocator)
 	disk, _ := filepath.join({state.projectPath, scene.filePath}, context.temp_allocator)
+	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(disk, transmute([]u8)json) != nil {
 		Editor_Log(state, .Error, "Failed to write %s", disk)
 		return false

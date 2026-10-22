@@ -141,8 +141,16 @@ Drive_Item :: proc(id: string) {
 }
 
 // Drive_ItemRect registers an explicit rectangle under `id`.
-Drive_ItemRect :: proc(id: string, mn, mx: [2]f32) {
+// Drive_ItemRect registers a rect that isn't the last item; inWindow:
+// it's inside the current window (scrolled into view like other items).
+Drive_ItemRect :: proc(id: string, mn, mx: [2]f32, inWindow := false) {
 	if !GlobalDrive.enabled do return
+	if inWindow {
+		wp := imgui.GetWindowPos()
+		ws := imgui.GetWindowSize()
+		GlobalDrive.items[strings.clone(id, context.temp_allocator)] = {min = mn, max = mx, clipMin = {wp.x, wp.y}, clipMax = {wp.x + ws.x, wp.y + ws.y}, hasClip = true}
+		return
+	}
 	GlobalDrive.items[strings.clone(id, context.temp_allocator)] = {min = mn, max = mx}
 }
 
@@ -699,6 +707,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return strings.to_lower(fmt.tprint(state.toolMode), context.temp_allocator), true
 	case "zoom":
 		return fmt.tprintf("%.2f", state.cameraZoom), true
+	case "undo-bytes":
+		return fmt.tprint(Undo_StoreBytes()), true
 	case "tile-chunks":
 		return fmt.tprint(e.TileCache_Stats()), true
 	case "camera":

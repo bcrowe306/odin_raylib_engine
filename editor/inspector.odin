@@ -376,36 +376,6 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 
 // --- resources ----------------------------------------------------------------------
 
-// Editor_ListProjectFiles lists project files under `subdir` (recursive)
-// with one of `exts`, as project-relative paths, sorted.
-Editor_ListProjectFiles :: proc(state: ^EditorState, subdir: string, exts: []string) -> []string {
-	out := make([dynamic]string, context.temp_allocator)
-	walk :: proc(state: ^EditorState, rel: string, exts: []string, out: ^[dynamic]string, depth: int) {
-		if depth > 4 do return
-		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
-		h, err := os.open(full)
-		if err != nil do return
-		infos, _ := os.read_dir(h, -1, context.temp_allocator)
-		os.close(h)
-		for fi in infos {
-			child, _ := filepath.join({rel, fi.name}, context.temp_allocator)
-			if fi.type == .Directory {
-				walk(state, child, exts, out, depth + 1)
-				continue
-			}
-			for ext in exts {
-				if strings.has_suffix(strings.to_lower(fi.name, context.temp_allocator), ext) {
-					append(out, child)
-					break
-				}
-			}
-		}
-	}
-	walk(state, subdir, exts, &out, 0)
-	slice.sort(out[:])
-	return out[:]
-}
-
 // asset_picker shows a combo of project files; returns the chosen path.
 asset_picker :: proc(id: string, current: string, files: []string, allowNone := true) -> (chosen: string, picked: bool) {
 	preview := filepath.base(current) if current != "" else "None"

@@ -144,6 +144,7 @@ Editor_SaveSceneAs :: proc(state: ^EditorState, rel: string) -> bool {
 	}
 	json := e.Scene_SerializeToJSON(scene, context.temp_allocator)
 	_ = os.make_directory_all(filepath.dir(disk, context.temp_allocator))
+	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(disk, transmute([]u8)json) != nil {
 		Editor_Log(state, .Error, "Could not write %s", disk)
 		return false
@@ -166,6 +167,7 @@ Editor_SaveScriptAs :: proc(state: ^EditorState, rel: string) -> bool {
 	}
 	_ = os.make_directory_all(filepath.dir(disk, context.temp_allocator))
 	text := Code_DocText(doc)
+	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(disk, transmute([]u8)text) != nil {
 		Editor_Log(state, .Error, "Could not write %s", disk)
 		return false
@@ -191,6 +193,7 @@ Editor_SaveComponentAs :: proc(state: ^EditorState, node: ^e.Node, name: string)
 		rel := fmt.tprintf("components/%s.component.json", name)
 		disk, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 		_ = os.make_directory_all(filepath.dir(disk, context.temp_allocator))
+		Editor_InvalidateProjectFiles() // the asset lists rescan
 		if os.write_entire_file(disk, transmute([]u8)json) != nil do return false
 		Editor_Log(state, .Info, "Saved component as %s", rel)
 		return Editor_OpenComponent(state, rel)

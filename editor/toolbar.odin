@@ -219,6 +219,7 @@ Editor_OrePath :: proc(state: ^EditorState) -> string {
 
 Toolbar_ExportOre :: proc(state: ^EditorState) {
 	Editor_SaveAllScenes(state)
+	defer Editor_InvalidateProjectFiles() // the package appears next to the project
 	outPath := Editor_OrePath(state)
 	ok := e.OrePackage_CreateFromDirectory(state.projectPath, outPath, true)
 	if ok {

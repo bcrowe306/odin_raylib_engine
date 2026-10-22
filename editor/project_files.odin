@@ -1,0 +1,113 @@
+package editor
+
+import "core:os"
+import "core:path/filepath"
+import "core:slice"
+import "core:strings"
+import "core:time"
+
+// ============================================================================
+// Project file list, cached. Asset lists and pickers ask for project files
+// every frame (the asset browser alone several times); walking the project
+// each time was a large share of the editor's frame. The project is
+// scanned once and re-scanned when the editor changes files
+// (Editor_InvalidateProjectFiles, called with Lua_MarkProjectTypesDirty)
+// or every PROJECT_FILES_TTL for changes made outside the editor.
+// Hidden files and folders (.ore/, .luarc.json, ...) aren't listed.
+// ============================================================================
+
+PROJECT_FILES_TTL :: 2 * time.Second
+
+@(private = "file")
+projectFiles: struct {
+	root:    string,          // heap
+	files:   [dynamic]string, // heap, project-relative, sorted
+	scanned: time.Tick,
+	valid:   bool,
+	// .ore packages next to the project folder (exports).
+	packages:        [dynamic]string,
+	packagesScanned: time.Tick,
+	packagesValid:   bool,
+}
+
+Editor_InvalidateProjectFiles :: proc() {
+	projectFiles.valid = false
+	projectFiles.packagesValid = false
+}
+
+// Editor_ParentPackages: the .ore files in the project's parent folder.
+Editor_ParentPackages :: proc(state: ^EditorState) -> []string {
+	if state.projectPath == "" do return nil
+	if !projectFiles.packagesValid || time.tick_since(projectFiles.packagesScanned) > PROJECT_FILES_TTL {
+		for p in projectFiles.packages do delete(p)
+		clear(&projectFiles.packages)
+		dir := filepath.dir(strings.trim_suffix(state.projectPath, "/"), context.temp_allocator)
+		if infos, err := os.read_all_directory_by_path(dir, context.temp_allocator); err == nil {
+			for fi in infos do if fi.type != .Directory && strings.has_suffix(fi.name, ".ore") do append(&projectFiles.packages, strings.clone(fi.name))
+		}
+		slice.sort(projectFiles.packages[:])
+		projectFiles.packagesScanned = time.tick_now()
+		projectFiles.packagesValid = true
+	}
+	return projectFiles.packages[:]
+}
+
+@(private = "file")
+scan_project :: proc(root: string) {
+	for f in projectFiles.files do delete(f)
+	clear(&projectFiles.files)
+	walk :: proc(root, rel: string, depth: int) {
+		if depth > 8 do return
+		full, _ := filepath.join({root, rel}, context.temp_allocator)
+		infos, err := os.read_all_directory_by_path(full, context.temp_allocator)
+		if err != nil do return
+		for fi in infos {
+			if strings.has_prefix(fi.name, ".") do continue
+			child, _ := filepath.join({rel, fi.name}, context.temp_allocator)
+			if fi.type == .Directory {
+				walk(root, child, depth + 1)
+			} else {
+				append(&projectFiles.files, strings.clone(child))
+			}
+		}
+	}
+	walk(root, "", 0)
+	slice.sort(projectFiles.files[:])
+	if projectFiles.root != root {
+		delete(projectFiles.root)
+		projectFiles.root = strings.clone(root)
+	}
+	projectFiles.scanned = time.tick_now()
+	projectFiles.valid = true
+}
+
+// Editor_ProjectFiles: every (non-hidden) project file, project-relative,
+// sorted.
+Editor_ProjectFiles :: proc(state: ^EditorState) -> []string {
+	if state.projectPath == "" do return nil
+	if !projectFiles.valid || projectFiles.root != state.projectPath || time.tick_since(projectFiles.scanned) > PROJECT_FILES_TTL {
+		scan_project(state.projectPath)
+	}
+	return projectFiles.files[:]
+}
+
+// Editor_ListProjectFiles lists project files under `subdir` (recursive;
+// "" or "." = everything) with one of `exts`, as project-relative paths,
+// sorted (temp-allocated).
+Editor_ListProjectFiles :: proc(state: ^EditorState, subdir: string, exts: []string) -> []string {
+	out := make([dynamic]string, context.temp_allocator)
+	dir := strings.trim_suffix(strings.trim_prefix(subdir, "./"), "/")
+	if dir == "." do dir = ""
+	prefix := strings.concatenate({dir, "/"}, context.temp_allocator) if dir != "" else ""
+	for f in Editor_ProjectFiles(state) {
+		if prefix != "" && !strings.has_prefix(f, prefix) do continue
+		lower := strings.to_lower(f, context.temp_allocator)
+		for ext in exts {
+			if strings.has_suffix(lower, ext) {
+				append(&out, f)
+				break
+			}
+		}
+	}
+	return out[:]
+}

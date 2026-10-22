@@ -276,6 +276,7 @@ Editor_SaveSceneDocument :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 	defer delete(jsonStr)
 	diskPath, _ := filepath.join({state.projectPath, scene.filePath}, context.temp_allocator)
 	_ = os.make_directory_all(filepath.dir(diskPath, context.temp_allocator))
+	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(diskPath, transmute([]u8)jsonStr) != nil {
 		Editor_Log(state, .Error, "Failed to write scene file: %s", diskPath)
 		return false
@@ -322,6 +323,7 @@ Editor_NewScene :: proc(state: ^EditorState, baseName: string = "new_scene") -> 
 		stem, state.projectConfig.virtualWidth * 0.5, state.projectConfig.virtualHeight * 0.5)
 	disk, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	_ = os.make_directory_all(filepath.dir(disk, context.temp_allocator))
+	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(disk, transmute([]u8)contents) != nil {
 		Editor_Log(state, .Error, "Could not create %s", disk)
 		return false

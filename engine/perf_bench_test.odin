@@ -52,6 +52,17 @@ bench_scene_hot_paths :: proc(t: ^testing.T) {
 		ProcessNodeQueues(scene.manager, &game.gameContext)
 		typed := time.tick_since(start)
 
+		// Scene JSON (the editor's undo snapshots and saves) and loading it.
+		start = time.tick_now()
+		text := Scene_SerializeToJSON(scene, context.temp_allocator)
+		serialize := time.tick_since(start)
+		copyScene := game->createScene("bench_copy", false)
+		start = time.tick_now()
+		Scene_InstantiateFromJSON(copyScene, transmute([]u8)text, &game.gameContext)
+		ProcessNodeQueues(copyScene.manager, &game.gameContext)
+		instantiate := time.tick_since(start)
+		fmt.printfln("[bench] %5d nodes: scene JSON %d KB, serialize %8.2f ms, load %8.2f ms", count * 2, len(text) / 1024, time.duration_milliseconds(serialize), time.duration_milliseconds(instantiate))
+
 		fmt.printfln("[bench] %5d nodes: create %8.2f ms | destroy all %8.2f ms | respawn %8.2f ms | create TextureNodes %8.2f ms | global transforms %8.3f ms | RunScene frame %8.3f ms",
 			count, time.duration_milliseconds(create), time.duration_milliseconds(destroy), time.duration_milliseconds(respawn), time.duration_milliseconds(typed), time.duration_milliseconds(globals), time.duration_milliseconds(frame))
 		game->terminate()

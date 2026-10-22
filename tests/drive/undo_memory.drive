@@ -1,0 +1,75 @@
+# Undo snapshots share unchanged parts of the scene (undo_store.odin): ten
+# edits to one node keep under half of ten copies (~6 KB scene: ~23 KB, not
+# 60 KB), and undo /
+# redo still restore exactly. (`wait 30` between edits: two double-clicks
+# in a row on one spot would count as one multi-click.)
+wait 5
+click @hier:PlayerShip
+dblclick @insp.position.x
+key ctrl+a
+type 100
+key enter
+wait 30
+dblclick @insp.position.x
+key ctrl+a
+type 110
+key enter
+wait 30
+dblclick @insp.position.x
+key ctrl+a
+type 120
+key enter
+wait 30
+dblclick @insp.position.x
+key ctrl+a
+type 130
+key enter
+wait 30
+dblclick @insp.position.x
+key ctrl+a
+type 140
+key enter
+wait 30
+dblclick @insp.rotation
+key ctrl+a
+type 15
+key enter
+wait 30
+dblclick @insp.rotation
+key ctrl+a
+type 25
+key enter
+wait 30
+dblclick @insp.rotation
+key ctrl+a
+type 35
+key enter
+wait 30
+dblclick @insp.rotation
+key ctrl+a
+type 45
+key enter
+wait 30
+dblclick @insp.rotation
+key ctrl+a
+type 55
+key enter
+expect undo >= 10
+expect undo-bytes <= 30000
+expect node:PlayerShip.position ~= 140,360
+expect node:PlayerShip.rotation ~= 55
+key cmd+z
+key cmd+z
+key cmd+z
+key cmd+z
+key cmd+z
+expect node:PlayerShip.rotation ~= 0
+expect node:PlayerShip.position ~= 140,360
+key cmd+z
+key cmd+z
+key cmd+z
+key cmd+z
+key cmd+z
+expect node:PlayerShip.position ~= 640,360
+key cmd+shift+z
+expect node:PlayerShip.position ~= 100,360

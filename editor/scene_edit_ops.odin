@@ -19,7 +19,7 @@ UNDO_LIMIT :: 100
 
 Undo_Entry :: struct {
 	scene:    ^e.Scene,
-	json:     string,
+	json:     Undo_Snapshot, // the scene's JSON, in shared chunks (undo_store.odin)
 	label:    string,
 	selected: string, // child-index path of the selected node ("2/0"), "" = none
 	version:  int,    // the scene's edit version this entry restores
@@ -30,9 +30,19 @@ Editor_RecordUndo :: proc(state: ^EditorState, label: string) {
 	if state.activeScene == nil || state.isSimulating do return
 	state.modifiedCacheFrames = 0
 	state.modifiedCountFrames = 0
+	snap := Undo_Pack(e.Scene_SerializeToJSON(state.activeScene, context.temp_allocator))
+	// Nothing changed since the last snapshot (e.g. a double-click
+	// activating a field twice): one undo step, not two.
+	if n := len(state.undoStack); n > 0 && state.undoStack[n - 1].scene == state.activeScene && Undo_Same(state.undoStack[n - 1].json, snap) {
+		Undo_Release(snap)
+		// A change follows: what was undone can't be redone over it.
+		for &r in state.redoStack do undo_entry_destroy(&r)
+		clear(&state.redoStack)
+		return
+	}
 	append(&state.undoStack, Undo_Entry{
 		scene    = state.activeScene,
-		json     = e.Scene_SerializeToJSON(state.activeScene),
+		json     = snap,
 		label    = strings.clone(label),
 		selected = Editor_NodePath(state, state.selectedNode),
 		version  = state.sceneVersion[state.activeScene],
@@ -50,7 +60,7 @@ Editor_RecordUndo :: proc(state: ^EditorState, label: string) {
 
 @(private = "file")
 undo_entry_destroy :: proc(u: ^Undo_Entry) {
-	delete(u.json)
+	Undo_Release(u.json)
 	delete(u.label)
 	delete(u.selected)
 }
@@ -72,12 +82,12 @@ undo_redo :: proc(state: ^EditorState, from, to: ^[dynamic]Undo_Entry, verb: str
 		ordered_remove(from, i)
 		append(to, Undo_Entry{
 			scene    = state.activeScene,
-			json     = e.Scene_SerializeToJSON(state.activeScene),
+			json     = Undo_Pack(e.Scene_SerializeToJSON(state.activeScene, context.temp_allocator)),
 			label    = strings.clone(entry.label),
 			selected = Editor_NodePath(state, state.selectedNode),
 			version  = state.sceneVersion[state.activeScene],
 		})
-		Editor_RestoreSceneJSON(state, state.activeScene, entry.json)
+		Editor_RestoreSceneJSON(state, state.activeScene, Undo_Unpack(entry.json))
 		state.sceneVersion[state.activeScene] = entry.version
 		state.selectedNode = Editor_NodeAtPath(state, entry.selected)
 		Editor_Log(state, .Info, "%s: %s", verb, entry.label)
@@ -306,6 +316,7 @@ Editor_SaveComponent :: proc(state: ^EditorState, node: ^e.Node, name: string = 
 	path, _ := filepath.join({dir, fmt.tprintf("%s.component.json", safe)}, context.temp_allocator)
 	// The file holds the full subtree (not a link to itself).
 	json := e.Component_InstanceJSON(node, mgr, context.temp_allocator)
+	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(path, transmute([]u8)json) != nil {
 		Editor_Log(state, .Error, "Failed to save component to %s", path)
 		return path, false
@@ -329,6 +340,7 @@ Editor_ApplyInstanceToComponent :: proc(state: ^EditorState, inst: ^e.Node) -> b
 	rel := strings.clone(inst.componentPath, context.temp_allocator)
 	json := e.Component_InstanceJSON(inst, state.activeScene.manager, context.temp_allocator)
 	disk, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(disk, transmute([]u8)json) != nil {
 		Editor_Log(state, .Error, "Failed to write %s", disk)
 		return false
