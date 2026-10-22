@@ -14,6 +14,8 @@ StaticBodyNode :: struct {
 	debugColor: rl.Color `gui:"true"`,
 	lastSyncedPos: [2]f32,
 	lastSyncedRot: f32,
+	onCollisionStarted: EventSubject, // "collision_started"(other node)
+	onCollisionEnded: EventSubject,   // "collision_ended"(other node)
 }
 
 StaticBody :: StaticBodyNode
@@ -27,6 +29,8 @@ StaticBodyNode_Create :: proc(scene: ^Scene, name: string = "StaticBody", parent
 	sb.update = StaticBodyNode_Update
 	sb.render = StaticBodyNode_Render
 	sb.onDestroy = StaticBodyNode_Destroy
+	InitializeSubject(&sb.onCollisionStarted, "collision_started", sb)
+	InitializeSubject(&sb.onCollisionEnded, "collision_ended", sb)
 	scene->addNode(sb, parent)
 	return sb
 }
@@ -39,15 +43,15 @@ StaticBodyNode_EnsureBody :: proc(sb: ^StaticBodyNode, gameContext: ^GameContext
 
 	def := b2.DefaultBodyDef()
 	def.type = .staticBody
-	def.position = sb.position
-	def.rotation = DegreesToRot(sb.rotation)
+	def.position = sb.globalPosition
+	def.rotation = DegreesToRot(sb.globalRotation)
 	def.userData = cast(rawptr)(cast(^Node)sb)
 	sb.bodyId = b2.CreateBody(worldId, def)
-	sb.lastSyncedPos = sb.position
-	sb.lastSyncedRot = sb.rotation
+	sb.lastSyncedPos = sb.globalPosition
+	sb.lastSyncedRot = sb.globalRotation
 
 	for &shape in sb.shapes {
-		PhysicsShape_AttachToBody(&shape, sb.bodyId, cast(rawptr)(cast(^Node)sb))
+		PhysicsShape_AttachToBody(&shape, sb.bodyId, cast(rawptr)(cast(^Node)sb), sb.globalScale)
 	}
 }
 
@@ -58,7 +62,7 @@ StaticBodyNode_AddShape :: proc(sb: ^StaticBodyNode, shape: PhysicsShape, gameCo
 		StaticBodyNode_EnsureBody(sb, gameContext)
 	}
 	if b2.Body_IsValid(sb.bodyId) {
-		PhysicsShape_AttachToBody(ptr, sb.bodyId, cast(rawptr)(cast(^Node)sb))
+		PhysicsShape_AttachToBody(ptr, sb.bodyId, cast(rawptr)(cast(^Node)sb), sb.globalScale)
 	}
 	return ptr
 }
@@ -84,15 +88,16 @@ StaticBodyNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 		b2.Body_Enable(sb.bodyId)
 	}
 
-	// Sync transform if edited in Inspector
-	if b2.Distance(sb.position, sb.lastSyncedPos) > 0.01 || abs(sb.rotation - sb.lastSyncedRot) > 0.01 {
-		b2.Body_SetTransform(sb.bodyId, sb.position, DegreesToRot(sb.rotation))
-		sb.lastSyncedPos = sb.position
-		sb.lastSyncedRot = sb.rotation
+	// Follow the node's world transform (moved directly, by a script, or by
+	// a moving parent).
+	if b2.Distance(sb.globalPosition, sb.lastSyncedPos) > 0.01 || abs(sb.globalRotation - sb.lastSyncedRot) > 0.01 {
+		b2.Body_SetTransform(sb.bodyId, sb.globalPosition, DegreesToRot(sb.globalRotation))
+		sb.lastSyncedPos = sb.globalPosition
+		sb.lastSyncedRot = sb.globalRotation
 	}
 
 	for &shape in sb.shapes {
-		PhysicsShape_SyncToBox2D(&shape, sb.bodyId, cast(rawptr)node)
+		PhysicsShape_SyncToBox2D(&shape, sb.bodyId, cast(rawptr)node, sb.globalScale)
 	}
 }
 
@@ -102,12 +107,14 @@ StaticBodyNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 		return
 	}
 	for &shape in sb.shapes {
-		PhysicsShape_DrawDebug(&shape, sb.position, sb.rotation, sb.debugColor)
+		PhysicsShape_DrawDebug(&shape, sb.globalPosition, sb.globalRotation, sb.debugColor, sb.globalScale)
 	}
 }
 
 StaticBodyNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	sb := cast(^StaticBodyNode)node
+	DestroySubject(&sb.onCollisionStarted)
+	DestroySubject(&sb.onCollisionEnded)
 	if b2.Body_IsValid(sb.bodyId) {
 		b2.DestroyBody(sb.bodyId)
 		sb.bodyId = b2.nullBodyId
@@ -137,6 +144,10 @@ DynamicBodyNode :: struct {
 	lastSyncedRot: f32,
 	lastSyncedVel: [2]f32,
 	lastSyncedAngVel: f32,
+	syncedParams:     [5]f32, // damping, angular damping, gravity scale, sleep threshold, sleep enabled
+	paramsSynced:     bool,
+	onCollisionStarted: EventSubject, // "collision_started"(other node)
+	onCollisionEnded: EventSubject,   // "collision_ended"(other node)
 }
 
 DynamicBody :: DynamicBodyNode
@@ -161,6 +172,8 @@ DynamicBodyNode_Create :: proc(scene: ^Scene, name: string = "DynamicBody", pare
 	db.update = DynamicBodyNode_Update
 	db.render = DynamicBodyNode_Render
 	db.onDestroy = DynamicBodyNode_Destroy
+	InitializeSubject(&db.onCollisionStarted, "collision_started", db)
+	InitializeSubject(&db.onCollisionEnded, "collision_ended", db)
 	scene->addNode(db, parent)
 	return db
 }
@@ -173,8 +186,8 @@ DynamicBodyNode_EnsureBody :: proc(db: ^DynamicBodyNode, gameContext: ^GameConte
 
 	def := b2.DefaultBodyDef()
 	def.type = .dynamicBody
-	def.position = db.position
-	def.rotation = DegreesToRot(db.rotation)
+	def.position = db.globalPosition
+	def.rotation = DegreesToRot(db.globalRotation)
 	def.linearVelocity = db.linearVelocity
 	def.angularVelocity = math.to_radians(db.angularVelocity)
 	def.linearDamping = db.linearDamping
@@ -189,13 +202,14 @@ DynamicBodyNode_EnsureBody :: proc(db: ^DynamicBodyNode, gameContext: ^GameConte
 	def.userData = cast(rawptr)(cast(^Node)db)
 
 	db.bodyId = b2.CreateBody(worldId, def)
-	db.lastSyncedPos = db.position
-	db.lastSyncedRot = db.rotation
+	db.paramsSynced = false
+	db.lastSyncedPos = db.globalPosition
+	db.lastSyncedRot = db.globalRotation
 	db.lastSyncedVel = db.linearVelocity
 	db.lastSyncedAngVel = db.angularVelocity
 
 	for &shape in db.shapes {
-		PhysicsShape_AttachToBody(&shape, db.bodyId, cast(rawptr)(cast(^Node)db))
+		PhysicsShape_AttachToBody(&shape, db.bodyId, cast(rawptr)(cast(^Node)db), db.globalScale)
 	}
 }
 
@@ -206,7 +220,7 @@ DynamicBodyNode_AddShape :: proc(db: ^DynamicBodyNode, shape: PhysicsShape, game
 		DynamicBodyNode_EnsureBody(db, gameContext)
 	}
 	if b2.Body_IsValid(db.bodyId) {
-		PhysicsShape_AttachToBody(ptr, db.bodyId, cast(rawptr)(cast(^Node)db))
+		PhysicsShape_AttachToBody(ptr, db.bodyId, cast(rawptr)(cast(^Node)db), db.globalScale)
 	}
 	return ptr
 }
@@ -245,8 +259,8 @@ DynamicBodyNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime
 	}
 
 	// If user manually moved node position/rotation via Inspector slider, teleport Box2D body
-	if b2.Distance(db.position, db.lastSyncedPos) > 0.5 || abs(db.rotation - db.lastSyncedRot) > 0.5 {
-		b2.Body_SetTransform(db.bodyId, db.position, DegreesToRot(db.rotation))
+	if b2.Distance(db.globalPosition, db.lastSyncedPos) > 0.5 || abs(db.globalRotation - db.lastSyncedRot) > 0.5 {
+		b2.Body_SetTransform(db.bodyId, db.globalPosition, DegreesToRot(db.globalRotation))
 		b2.Body_SetAwake(db.bodyId, true)
 	}
 
@@ -260,12 +274,17 @@ DynamicBodyNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime
 		b2.Body_SetAwake(db.bodyId, true)
 	}
 
-	// Sync dynamic parameters
-	b2.Body_SetLinearDamping(db.bodyId, db.linearDamping)
-	b2.Body_SetAngularDamping(db.bodyId, db.angularDamping)
-	b2.Body_SetGravityScale(db.bodyId, db.gravityScale)
-	b2.Body_SetSleepThreshold(db.bodyId, db.sleepThreshold)
-	b2.Body_EnableSleep(db.bodyId, db.enableSleep)
+	// Sync dynamic parameters (only when they changed).
+	params := [5]f32{db.linearDamping, db.angularDamping, db.gravityScale, db.sleepThreshold, 1 if db.enableSleep else 0}
+	if !db.paramsSynced || params != db.syncedParams {
+		b2.Body_SetLinearDamping(db.bodyId, db.linearDamping)
+		b2.Body_SetAngularDamping(db.bodyId, db.angularDamping)
+		b2.Body_SetGravityScale(db.bodyId, db.gravityScale)
+		b2.Body_SetSleepThreshold(db.bodyId, db.sleepThreshold)
+		b2.Body_EnableSleep(db.bodyId, db.enableSleep)
+		db.syncedParams = params
+		db.paramsSynced = true
+	}
 	if b2.Body_IsFixedRotation(db.bodyId) != db.fixedRotation {
 		b2.Body_SetFixedRotation(db.bodyId, db.fixedRotation)
 	}
@@ -274,18 +293,17 @@ DynamicBodyNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime
 	}
 
 	for &shape in db.shapes {
-		PhysicsShape_SyncToBox2D(&shape, db.bodyId, cast(rawptr)node)
+		PhysicsShape_SyncToBox2D(&shape, db.bodyId, cast(rawptr)node, db.globalScale)
 	}
 
-	// Read back simulated state from Box2D
-	db.position = b2.Body_GetPosition(db.bodyId)
-	db.rotation = RotToDegrees(b2.Body_GetRotation(db.bodyId))
+	// Read back simulated state from Box2D (world space -> parent space)
+	Physics_SetWorldTransform(db, b2.Body_GetPosition(db.bodyId), RotToDegrees(b2.Body_GetRotation(db.bodyId)))
 	db.linearVelocity = b2.Body_GetLinearVelocity(db.bodyId)
 	db.angularVelocity = math.to_degrees(b2.Body_GetAngularVelocity(db.bodyId))
 	db.isAwake = b2.Body_IsAwake(db.bodyId)
 
-	db.lastSyncedPos = db.position
-	db.lastSyncedRot = db.rotation
+	db.lastSyncedPos = db.globalPosition
+	db.lastSyncedRot = db.globalRotation
 	db.lastSyncedVel = db.linearVelocity
 	db.lastSyncedAngVel = db.angularVelocity
 }
@@ -296,12 +314,14 @@ DynamicBodyNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime
 		return
 	}
 	for &shape in db.shapes {
-		PhysicsShape_DrawDebug(&shape, db.position, db.rotation, db.debugColor)
+		PhysicsShape_DrawDebug(&shape, db.globalPosition, db.globalRotation, db.debugColor, db.globalScale)
 	}
 }
 
 DynamicBodyNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	db := cast(^DynamicBodyNode)node
+	DestroySubject(&db.onCollisionStarted)
+	DestroySubject(&db.onCollisionEnded)
 	if b2.Body_IsValid(db.bodyId) {
 		b2.DestroyBody(db.bodyId)
 		db.bodyId = b2.nullBodyId
@@ -319,8 +339,8 @@ CharacterMoverNode :: struct {
 	shapes: [dynamic]PhysicsShape,
 	radius: f32 `gui:"true" min:"2" max:"200"`,
 	height: f32 `gui:"true" min:"2" max:"400"`,
-	velocity: [2]f32 `gui:"true" min:"-1000" max:"1000"`,
-	targetSpeedX: f32 `gui:"true" min:"-600" max:"600"`,
+	velocity: [2]f32 `gui:"true" min:"-1000" max:"1000" save:"false"`,
+	targetSpeedX: f32 `gui:"true" min:"-600" max:"600" save:"false"`,
 	maxSpeed: f32 `gui:"true" min:"10" max:"1000"`,
 	acceleration: f32 `gui:"true" min:"10" max:"5000"`,
 	jumpSpeed: f32 `gui:"true" min:"10" max:"1200"`,
@@ -328,12 +348,30 @@ CharacterMoverNode :: struct {
 	pushLimit: f32 `gui:"true" min:"0" max:"1000"`,
 	clipVelocity: bool `gui:"true"`,
 	enableKeyboardInput: bool `gui:"true"`,
-	isGrounded: bool `gui:"true"`,
+	isGrounded: bool `gui:"true" save:"false"`,
 	categoryLayers: CollisionLayerSet `gui:"true"`,
 	maskLayers: CollisionLayerSet `gui:"true"`,
 	debugColor: rl.Color `gui:"true"`,
+	// Built-in: the node moves itself (maxSpeed, acceleration, jumpSpeed,
+	// gravity, optional keyboard input). Script: like Godot's CharacterBody2D,
+	// the script sets the velocity and calls character_move_and_slide().
+	controlMode: CharacterMoverMode `gui:"true"`,
+	isOnFloor: bool `save:"false"`,
+	isOnWall: bool `save:"false"`,
+	isOnCeiling: bool `save:"false"`,
+	floorNormal: [2]f32 `save:"false"`,
+	wallNormal: [2]f32 `save:"false"`,
+	lastMotion: [2]f32 `save:"false"`,
+	frameDelta: f32 `save:"false"`, // delta of the current frame (move_and_slide's default)
 	collisionPlanes: [MAX_MOVER_PLANES]b2.CollisionPlane,
 	planeCount: int,
+	onCollisionStarted: EventSubject, // "collision_started"(other node)
+	onCollisionEnded: EventSubject,   // "collision_ended"(other node)
+}
+
+CharacterMoverMode :: enum {
+	BuiltIn, // moves itself each frame
+	Script,  // moves only when the script calls character_move_and_slide()
 }
 
 CharacterMover :: CharacterMoverNode
@@ -366,6 +404,8 @@ CharacterMoverNode_Create :: proc(scene: ^Scene, name: string = "CharacterMover"
 	cm.update = CharacterMoverNode_Update
 	cm.render = CharacterMoverNode_Render
 	cm.onDestroy = CharacterMoverNode_Destroy
+	InitializeSubject(&cm.onCollisionStarted, "collision_started", cm)
+	InitializeSubject(&cm.onCollisionEnded, "collision_ended", cm)
 	scene->addNode(cm, parent)
 	return cm
 }
@@ -384,10 +424,16 @@ CharacterMoverNode_GetWorldCapsule :: proc(cm: ^CharacterMoverNode) -> b2.Capsul
 			cm.height = h
 		}
 	}
+	// Scaled like its collider: radius by x, length by y.
+	sc := cm.globalScale
+	if sc.x == 0 && sc.y == 0 do sc = {1, 1}
+	r *= abs(sc.x)
+	h *= abs(sc.y)
+	offset *= sc
 	halfLen := h * 0.5
-	rot := DegreesToRot(cm.rotation)
+	rot := DegreesToRot(cm.globalRotation)
 	dir := b2.RotateVector(rot, b2.Vec2{0, halfLen})
-	center := cm.position + b2.RotateVector(rot, offset)
+	center := cm.globalPosition + b2.RotateVector(rot, offset)
 	return b2.Capsule{
 		center1 = center - dir,
 		center2 = center + dir,
@@ -430,15 +476,15 @@ CharacterMoverNode_EnsureProxyBody :: proc(cm: ^CharacterMoverNode, worldId: b2.
 
 	def := b2.DefaultBodyDef()
 	def.type = .kinematicBody
-	def.position = cm.position
-	def.rotation = DegreesToRot(cm.rotation)
+	def.position = cm.globalPosition
+	def.rotation = DegreesToRot(cm.globalRotation)
 	def.userData = cast(rawptr)(cast(^Node)cm)
 	cm.bodyId = b2.CreateBody(worldId, def)
 
 	for &shape in cm.shapes {
 		shape.categoryLayers = cm.categoryLayers
 		shape.maskLayers = cm.maskLayers
-		PhysicsShape_AttachToBody(&shape, cm.bodyId, cast(rawptr)(cast(^Node)cm))
+		PhysicsShape_AttachToBody(&shape, cm.bodyId, cast(rawptr)(cast(^Node)cm), cm.globalScale)
 	}
 }
 
@@ -446,7 +492,7 @@ CharacterMoverNode_AddShape :: proc(cm: ^CharacterMoverNode, shape: PhysicsShape
 	append(&cm.shapes, shape)
 	ptr := &cm.shapes[len(cm.shapes) - 1]
 	if b2.Body_IsValid(cm.bodyId) {
-		PhysicsShape_AttachToBody(ptr, cm.bodyId, cast(rawptr)(cast(^Node)cm))
+		PhysicsShape_AttachToBody(ptr, cm.bodyId, cast(rawptr)(cast(^Node)cm), cm.globalScale)
 	}
 	return ptr
 }
@@ -476,6 +522,10 @@ CharacterMoverNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 		b2.Body_Enable(cm.bodyId)
 	}
 
+	cm.frameDelta = deltaTime
+	// Script mode: the script moves the node (character_move_and_slide).
+	if cm.controlMode == .Script do return
+
 	// Query Logical Actions via the Two-Tier Input System (MoveLeft, MoveRight, Jump)
 	desiredVX := cm.targetSpeedX
 	if cm.enableKeyboardInput {
@@ -501,6 +551,25 @@ CharacterMoverNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 	// Apply world gravity
 	cm.velocity += pw.gravity * cm.gravityScale * deltaTime
 
+	CharacterMoverNode_MoveAndSlide(cm, gameContext, deltaTime)
+}
+
+// CharacterMoverNode_Gravity: the world's gravity scaled by gravityScale.
+CharacterMoverNode_Gravity :: proc(cm: ^CharacterMoverNode, gameContext: ^GameContext) -> [2]f32 {
+	if gameContext == nil || gameContext.game == nil do return {}
+	return gameContext.game.physicsWorld.gravity * cm.gravityScale
+}
+
+// CharacterMoverNode_MoveAndSlide moves the capsule by velocity * dt,
+// sliding along whatever it touches (the velocity loses the part going into
+// surfaces when clipVelocity is on), and updates the floor / wall / ceiling
+// state. Returns true if it touched anything.
+CharacterMoverNode_MoveAndSlide :: proc(cm: ^CharacterMoverNode, gameContext: ^GameContext, deltaTime: f32) -> bool {
+	if gameContext == nil || gameContext.game == nil || deltaTime <= 0.00001 do return false
+	pw := &gameContext.game.physicsWorld
+	if !b2.World_IsValid(pw.worldId) || pw.paused do return false
+	CharacterMoverNode_EnsureProxyBody(cm, pw.worldId)
+
 	// Build query filter from CharacterMover's collision layers
 	qFilter := b2.QueryFilter{
 		categoryBits = CollisionLayerSet_ToBits(cm.categoryLayers),
@@ -517,32 +586,44 @@ CharacterMoverNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 	planesSlice := cm.collisionPlanes[:cm.planeCount]
 	solverResult := b2.SolvePlanes(targetDelta, planesSlice)
 
-	// 3. Clip velocity against active collision planes using Box2D v3 ClipVector
-	cm.isGrounded = false
+	// 3. Contact state from the plane normals (screen coordinates, +Y down:
+	// a floor's normal points up, y < -0.5) and velocity clipping.
+	cm.isOnFloor, cm.isOnWall, cm.isOnCeiling = false, false, false
+	cm.floorNormal, cm.wallNormal = {}, {}
 	for i in 0..<cm.planeCount {
-		// In screen coordinates (+Y down), an upward floor normal has normal.y < -0.5
-		if cm.collisionPlanes[i].plane.normal.y < -0.5 {
-			cm.isGrounded = true
+		n := cm.collisionPlanes[i].plane.normal
+		switch {
+		case n.y < -0.5:
+			cm.isOnFloor = true
+			cm.floorNormal = n
+		case n.y > 0.5:
+			cm.isOnCeiling = true
+		case:
+			cm.isOnWall = true
+			cm.wallNormal = n
 		}
 	}
-	if cm.planeCount > 0 {
+	cm.isGrounded = cm.isOnFloor
+	if cm.planeCount > 0 && cm.clipVelocity {
 		cm.velocity = b2.ClipVector(cm.velocity, planesSlice)
 	}
 
 	// 4. Cast mover along solved translation to prevent tunneling (World_CastMover)
 	fraction := b2.World_CastMover(pw.worldId, moverCapsule, solverResult.translation, qFilter)
 	delta := solverResult.translation * fraction
-	cm.position += delta
+	cm.lastMotion = delta
+	Physics_SetWorldTransform(cm, cm.globalPosition + delta, cm.globalRotation)
 
 	// Sync kinematic proxy body so sensors (AreaNode) and dynamic bodies interact with the mover
 	if b2.Body_IsValid(cm.bodyId) {
-		b2.Body_SetTargetTransform(cm.bodyId, b2.Transform{p = cm.position, q = DegreesToRot(cm.rotation)}, deltaTime)
+		b2.Body_SetTargetTransform(cm.bodyId, b2.Transform{p = cm.globalPosition, q = DegreesToRot(cm.globalRotation)}, deltaTime)
 		for &shape in cm.shapes {
 			shape.categoryLayers = cm.categoryLayers
 			shape.maskLayers = cm.maskLayers
-			PhysicsShape_SyncToBox2D(&shape, cm.bodyId, cast(rawptr)node)
+			PhysicsShape_SyncToBox2D(&shape, cm.bodyId, cast(rawptr)(cast(^Node)cm), cm.globalScale)
 		}
 	}
+	return cm.planeCount > 0
 }
 
 CharacterMoverNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
@@ -566,6 +647,8 @@ CharacterMoverNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 
 CharacterMoverNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	cm := cast(^CharacterMoverNode)node
+	DestroySubject(&cm.onCollisionStarted)
+	DestroySubject(&cm.onCollisionEnded)
 	if b2.Body_IsValid(cm.bodyId) {
 		b2.DestroyBody(cm.bodyId)
 		cm.bodyId = b2.nullBodyId
@@ -580,8 +663,8 @@ AreaNode :: struct {
 	bodyId: b2.BodyId,
 	shapes: [dynamic]PhysicsShape,
 	overlappingNodes: [dynamic]^Node,
-	overlapCount: int `gui:"true" min:"0" max:"100"`,
-	hasOverlaps: bool `gui:"true"`,
+	overlapCount: int `gui:"true" min:"0" max:"100" save:"false"`,
+	hasOverlaps: bool `gui:"true" save:"false"`,
 	onBodyEntered: EventSubject,
 	onBodyExited: EventSubject,
 	debugColor: rl.Color `gui:"true"`,
@@ -600,8 +683,8 @@ AreaNode_Create :: proc(scene: ^Scene, name: string = "Area", parent: ^Node = ni
 	area.activeColor = rl.Color{236, 72, 153, 255} // Pink when overlapping
 	area.shapes = make([dynamic]PhysicsShape, area.allocator)
 	area.overlappingNodes = make([dynamic]^Node, area.allocator)
-	InitializeSubject(&area.onBodyEntered)
-	InitializeSubject(&area.onBodyExited)
+	InitializeSubject(&area.onBodyEntered, "body_entered", area)
+	InitializeSubject(&area.onBodyExited, "body_exited", area)
 	area.update = AreaNode_Update
 	area.render = AreaNode_Render
 	area.onDestroy = AreaNode_Destroy
@@ -617,17 +700,17 @@ AreaNode_EnsureBody :: proc(area: ^AreaNode, gameContext: ^GameContext) {
 
 	def := b2.DefaultBodyDef()
 	def.type = .staticBody
-	def.position = area.position
-	def.rotation = DegreesToRot(area.rotation)
+	def.position = area.globalPosition
+	def.rotation = DegreesToRot(area.globalRotation)
 	def.userData = cast(rawptr)(cast(^Node)area)
 	area.bodyId = b2.CreateBody(worldId, def)
-	area.lastSyncedPos = area.position
-	area.lastSyncedRot = area.rotation
+	area.lastSyncedPos = area.globalPosition
+	area.lastSyncedRot = area.globalRotation
 
 	for &shape in area.shapes {
 		shape.isSensor = true
 		shape.enableSensorEvents = true
-		PhysicsShape_AttachToBody(&shape, area.bodyId, cast(rawptr)(cast(^Node)area))
+		PhysicsShape_AttachToBody(&shape, area.bodyId, cast(rawptr)(cast(^Node)area), area.globalScale)
 	}
 }
 
@@ -641,7 +724,7 @@ AreaNode_AddShape :: proc(area: ^AreaNode, shape: PhysicsShape, gameContext: ^Ga
 		AreaNode_EnsureBody(area, gameContext)
 	}
 	if b2.Body_IsValid(area.bodyId) {
-		PhysicsShape_AttachToBody(ptr, area.bodyId, cast(rawptr)(cast(^Node)area))
+		PhysicsShape_AttachToBody(ptr, area.bodyId, cast(rawptr)(cast(^Node)area), area.globalScale)
 	}
 	return ptr
 }
@@ -652,9 +735,9 @@ AreaNode_RemoveShape :: proc(area: ^AreaNode, index: int) {
 	ordered_remove(&area.shapes, index)
 }
 
-AreaNode_HandleEnter :: proc(sensorNode: ^Node, visitorNode: ^Node, gameContext: ^GameContext) {
-	if sensorNode == nil do return
-	sensorNode.onEnter->notify(visitorNode, true, gameContext)
+AreaNode_HandleEnter :: proc(sensorNode: ^Node, visitorNode_in: ^Node, gameContext: ^GameContext) {
+	if sensorNode == nil || !Node_IsAlive(sensorNode) do return
+	visitorNode := visitorNode_in if Node_IsAlive(visitorNode_in) else nil
 
 	// Update AreaNode overlap state
 	area := cast(^AreaNode)sensorNode
@@ -672,12 +755,12 @@ AreaNode_HandleEnter :: proc(sensorNode: ^Node, visitorNode: ^Node, gameContext:
 	}
 	area.overlapCount = len(area.overlappingNodes)
 	area.hasOverlaps = area.overlapCount > 0
-	area.onBodyEntered->notify(visitorNode, true, gameContext)
+	area.onBodyEntered->notify(area, visitorNode, gameContext)
 }
 
-AreaNode_HandleExit :: proc(sensorNode: ^Node, visitorNode: ^Node, gameContext: ^GameContext) {
-	if sensorNode == nil do return
-	sensorNode.onExit->notify(visitorNode, false, gameContext)
+AreaNode_HandleExit :: proc(sensorNode: ^Node, visitorNode_in: ^Node, gameContext: ^GameContext) {
+	if sensorNode == nil || !Node_IsAlive(sensorNode) do return
+	visitorNode := visitorNode_in if Node_IsAlive(visitorNode_in) else nil
 
 	area := cast(^AreaNode)sensorNode
 	if visitorNode != nil {
@@ -690,11 +773,20 @@ AreaNode_HandleExit :: proc(sensorNode: ^Node, visitorNode: ^Node, gameContext: 
 	}
 	area.overlapCount = len(area.overlappingNodes)
 	area.hasOverlaps = area.overlapCount > 0
-	area.onBodyExited->notify(visitorNode, false, gameContext)
+	area.onBodyExited->notify(area, visitorNode, gameContext)
 }
 
 AreaNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	area := cast(^AreaNode)node
+	// Visitors destroyed while overlapping leave the list (and report exit).
+	for i := len(area.overlappingNodes) - 1; i >= 0; i -= 1 {
+		if !Node_IsAlive(area.overlappingNodes[i]) {
+			unordered_remove(&area.overlappingNodes, i)
+			area.onBodyExited->notify(area, nil, gameContext)
+		}
+	}
+	area.overlapCount = len(area.overlappingNodes)
+	area.hasOverlaps = area.overlapCount > 0
 	if !area.enabled {
 		if b2.Body_IsValid(area.bodyId) && b2.Body_IsEnabled(area.bodyId) {
 			b2.Body_Disable(area.bodyId)
@@ -708,16 +800,16 @@ AreaNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) 
 		b2.Body_Enable(area.bodyId)
 	}
 
-	if b2.Distance(area.position, area.lastSyncedPos) > 0.01 || abs(area.rotation - area.lastSyncedRot) > 0.01 {
-		b2.Body_SetTransform(area.bodyId, area.position, DegreesToRot(area.rotation))
-		area.lastSyncedPos = area.position
-		area.lastSyncedRot = area.rotation
+	if b2.Distance(area.globalPosition, area.lastSyncedPos) > 0.01 || abs(area.globalRotation - area.lastSyncedRot) > 0.01 {
+		b2.Body_SetTransform(area.bodyId, area.globalPosition, DegreesToRot(area.globalRotation))
+		area.lastSyncedPos = area.globalPosition
+		area.lastSyncedRot = area.globalRotation
 	}
 
 	for &shape in area.shapes {
 		shape.isSensor = true
 		shape.enableSensorEvents = true
-		PhysicsShape_SyncToBox2D(&shape, area.bodyId, cast(rawptr)node)
+		PhysicsShape_SyncToBox2D(&shape, area.bodyId, cast(rawptr)node, area.globalScale)
 	}
 
 	area.overlapCount = len(area.overlappingNodes)
@@ -731,7 +823,7 @@ AreaNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) 
 	}
 	color := area.activeColor if area.hasOverlaps else area.debugColor
 	for &shape in area.shapes {
-		PhysicsShape_DrawDebug(&shape, area.position, area.rotation, color)
+		PhysicsShape_DrawDebug(&shape, area.globalPosition, area.globalRotation, color, area.globalScale)
 	}
 }
 
@@ -755,15 +847,17 @@ RaycastNode :: struct {
 	collideWithSensors: bool `gui:"true"`,
 	categoryLayers: CollisionLayerSet `gui:"true"`,
 	maskLayers: CollisionLayerSet `gui:"true"`,
-	isColliding: bool `gui:"true"`,
-	hitFraction: f32 `gui:"true" min:"0" max:"1"`,
-	hitPoint: [2]f32 `gui:"true" min:"0" max:"1280"`,
-	hitNormal: [2]f32 `gui:"true" min:"-1" max:"1"`,
+	isColliding: bool `gui:"true" save:"false"`,
+	hitFraction: f32 `gui:"true" min:"0" max:"1" save:"false"`,
+	hitPoint: [2]f32 `gui:"true" min:"0" max:"1280" save:"false"`,
+	hitNormal: [2]f32 `gui:"true" min:"-1" max:"1" save:"false"`,
 	hitShapeId: b2.ShapeId,
 	hitNode: ^Node,
 	excludeNode: ^Node,
 	rayColor: rl.Color `gui:"true"`,
 	hitColor: rl.Color `gui:"true"`,
+	onHitStarted: EventSubject, // "hit_started"(node): the ray started hitting a node
+	onHitEnded: EventSubject,   // "hit_ended"(node): the ray stopped hitting it
 }
 
 Raycast :: RaycastNode
@@ -781,6 +875,9 @@ RaycastNode_Create :: proc(scene: ^Scene, name: string = "Raycast", parent: ^Nod
 	rc.hitColor = rl.Color{248, 113, 113, 255} // Red
 	rc.update = RaycastNode_Update
 	rc.render = RaycastNode_Render
+	rc.onDestroy = RaycastNode_Destroy
+	InitializeSubject(&rc.onHitStarted, "hit_started", rc)
+	InitializeSubject(&rc.onHitEnded, "hit_ended", rc)
 	scene->addNode(rc, parent)
 	return rc
 }
@@ -850,7 +947,19 @@ RaycastNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 	if !rc.enabled do return
 	if gameContext == nil || gameContext.game == nil do return
 
+	prevHit := rc.hitNode if rc.isColliding else nil
 	RaycastNode_CastNow(rc, gameContext.game.physicsWorld.worldId)
+	curHit := rc.hitNode if rc.isColliding else nil
+	if prevHit != curHit {
+		if prevHit != nil && Node_IsAlive(prevHit) do rc.onHitEnded->notify(rc, prevHit, gameContext)
+		if curHit != nil do rc.onHitStarted->notify(rc, curHit, gameContext)
+	}
+}
+
+RaycastNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
+	rc := cast(^RaycastNode)node
+	DestroySubject(&rc.onHitStarted)
+	DestroySubject(&rc.onHitEnded)
 }
 
 RaycastNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
@@ -915,4 +1024,19 @@ Scene_SetPhysicsEnabled :: proc(scene: ^Scene, enabled: bool) {
 			Node_SetPhysicsEnabled(addNode, enabled)
 		}
 	}
+}
+
+// Physics_SetWorldTransform writes a world-space transform from Box2D back to
+// a node: local position/rotation are expressed in the parent's space, so
+// bodies parented under moved/rotated nodes stay where physics put them.
+Physics_SetWorldTransform :: proc(node: ^Node, worldPos: [2]f32, worldRot: f32) {
+	parentRot := node.globalRotation - node.rotation
+	if node.gameContext != nil && node.gameContext.scene != nil && node.gameContext.scene.manager != nil {
+		node.position = Node_WorldToParent(node.gameContext.scene.manager, node, worldPos)
+	} else {
+		node.position = worldPos - (node.globalPosition - node.position)
+	}
+	node.rotation = worldRot - parentRot
+	node.globalPosition = worldPos
+	node.globalRotation = worldRot
 }

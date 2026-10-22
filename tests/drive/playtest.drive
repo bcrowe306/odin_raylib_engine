@@ -1,0 +1,47 @@
+# Playtesting runs what you edited: change the scene in the editor, press
+# Play, and the game (a separate process) must run the edited scene.
+wait 5
+screenshot editor_opened
+expect scene == scenes/main.scene.json
+expect modified == false
+
+# Select a node in the scene tree.
+click @hier:PlayerShip
+expect selected == PlayerShip
+screenshot node_selected
+
+# Rename it and move it through the inspector, like a user would.
+dblclick @insp.name
+key ctrl+a
+type HeroShip
+key enter
+expect selected == HeroShip
+dblclick @insp.position.x
+key ctrl+a
+type 200
+key enter
+expect node:HeroShip.position ~= 200,360
+expect modified == true
+screenshot edited_unsaved
+
+# Play: the editor saves the change, then launches the game.
+game-args --frames 30 --screenshot $SHOTS/game_frame.png --dump-scene $SHOTS/game_scene.json
+click @toolbar.play
+wait-until game == running timeout=600
+expect modified == false
+expect file:scenes/main.scene.json contains "HeroShip"
+wait-until game == stopped timeout=900
+expect abs-file:$SHOTS/game_scene.json contains "HeroShip"
+expect abs-file:$SHOTS/game_scene.json !contains "PlayerShip"
+expect abs-file:$SHOTS/game_scene.json contains "position": [200, 360]
+expect log contains Playing project
+
+# Play Current Scene runs the scene open in the editor, even when it isn't
+# the project's initial scene.
+dblclick @asset:scenes/battle_arena.scene.json
+expect scene == scenes/battle_arena.scene.json
+game-args --frames 20 --dump-scene $SHOTS/game_scene2.json
+click @toolbar.play-scene
+wait-until game == stopped timeout=900
+expect abs-file:$SHOTS/game_scene2.json contains "battle_arena"
+screenshot after_play

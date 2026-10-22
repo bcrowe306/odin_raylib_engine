@@ -1,0 +1,35 @@
+# Tile map painting: add a TileMap, pick a tileset and a tile, paint and
+# erase in the viewport, flood fill, undo, save.
+wait 5
+key escape
+key ctrl+a
+type tile map
+key enter
+expect selected == TileMap
+expect node:TileMap.tiles == 0
+click @tile.tileset
+click @pick:textures/Asteroid_1.png
+click @tile.palette:6
+expect item:tile.paint == visible
+screenshot palette
+# Paint a stroke (one undo step).
+drag @world:660,380 @world:820,380
+expect node:TileMap.tiles >= 5
+screenshot painted
+key ctrl+z
+expect node:TileMap.tiles == 0
+key ctrl+y
+expect node:TileMap.tiles >= 5
+# Flood fill the rest of the map.
+click @tile.fill
+click @world:700,520
+expect node:TileMap.tiles == 240
+screenshot filled
+# Erase with the right button... and with the eraser tool.
+click @tile.erase
+drag @world:660,380 @world:820,380
+expect node:TileMap.tiles <= 235
+click @tile.erase
+key ctrl+s
+expect file:scenes/main.scene.json contains "type": "TileMapNode"
+expect file:scenes/main.scene.json contains "tileset": "textures/Asteroid_1.png"

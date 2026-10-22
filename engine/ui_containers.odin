@@ -14,7 +14,7 @@ UITabDirection :: uilib.TabDirection
 
 UIContainerNode :: struct {
 	using ui: UIElement,
-	title: string,
+	title: string `gui:"true"`,
 	direction: UILayoutDirection `gui:"true"`,
 	alignment: UIAlignment `gui:"true"`,
 	spacing: f32 `gui:"true" min:"0" max:"64"`,
@@ -326,7 +326,7 @@ UIContainerNode_LayoutChildren :: proc(c: ^UIContainerNode, manager: ^NodeManage
 	uiChildren := make([dynamic]^UIElement)
 	defer delete(uiChildren)
 	for child in children {
-		if child != nil && child.enabled {
+		if child != nil && child.enabled && child.isUI {
 			elem := cast(^UIElement)child
 			if elem.widgetType != .None {
 				append(&uiChildren, elem)

@@ -1,0 +1,150 @@
+# Code editor features and Zed-style shortcuts: auto-closing pairs, multi-
+# cursor, line operations, find/replace, go to line, rename (F2), format,
+# file finder, reopen closed tab, font size, and the command palette.
+wait 5
+dblclick @asset:scripts/orbiting_drone.lua
+wait-until code.lsp == ready timeout=600
+key enter
+key up
+expect code.line ==
+
+# Auto-closing pairs: insert, step over, delete together, quotes, wrap.
+type x =\s
+type (
+expect code.line == x = ()
+type 1
+type )
+expect code.line == x = (1)
+expect code.cursor == 1:8
+type [
+expect code.line == x = (1)[]
+key backspace
+expect code.line == x = (1)
+type "
+type a
+type "
+expect code.line == x = (1)"a"
+key home
+key shift+end
+type {
+expect code.line == {x = (1)"a"}
+screenshot auto_pairs
+
+# Line operations.
+key ctrl+shift+d
+expect code.text contains {x = (1)"a"}\n{x = (1)"a"}
+key ctrl+shift+k
+expect code.text !contains {x = (1)"a"}\n{x = (1)"a"}
+key up
+key ctrl+slash
+expect code.line == -- {x = (1)"a"}
+key ctrl+slash
+expect code.line == {x = (1)"a"}
+key ctrl+rbracket
+expect code.line == \s\s\s\s{x = (1)"a"}
+key ctrl+lbracket
+expect code.line == {x = (1)"a"}
+key ctrl+enter
+expect code.cursor == 2:1
+type local a = 1
+key enter
+type local b = a + a
+key alt+up
+expect code.line == local b = a + a
+expect code.cursor contains 2:
+key alt+down
+expect code.cursor contains 3:
+
+# Multi-cursor: select all occurrences of the word, type over them.
+key end
+key ctrl+shift+l
+expect code.cursors == 4
+type z
+expect code.text contains local z = 1\nlocal b = z + z
+screenshot multi_cursor
+key escape
+key escape
+expect code.cursors == 1
+key ctrl+home
+key ctrl+shift+k
+key ctrl+shift+k
+key ctrl+shift+k
+expect code.line == -- Orbiting Drone Behavior Script (Odin Raylib Engine)
+
+# Find and replace.
+key ctrl+f
+expect item:code.find-input == visible
+type Drone
+expect code.find >= 5
+key enter
+screenshot find
+key escape
+key ctrl+h
+click @code.replace-input
+type Probe
+click @code.replace-all
+expect code.text contains local Probe = {}
+expect code.text !contains Drone
+key escape
+expect item:code.find-input == missing
+key ctrl+z
+expect code.text contains local Drone = {}
+
+# Go to line (palette ":" mode).
+key ctrl+g
+expect palette.open == true
+type 18
+key enter
+expect code.cursor contains 18:
+
+# Rename a symbol with the language server (F2).
+key ctrl+g
+type 5:7
+key enter
+key f2
+expect item:code.rename-input == visible
+type Probe
+key enter
+wait-until code.text contains function Probe:update timeout=600
+expect code.text !contains function Drone:
+screenshot renamed
+
+# Format document (lua-language-server's formatter).
+key ctrl+end
+key enter
+type local   q=1
+key ctrl+shift+i
+wait-until code.text contains local q = 1 timeout=600
+
+# Font size.
+key ctrl+equal
+expect code.font == 15
+key ctrl+0
+expect code.font == 14
+
+# Go to File, close and reopen tabs.
+key ctrl+p
+type asteroid.lua
+key enter
+expect code.file == scripts/asteroid.lua
+key ctrl+w
+expect code.file == scripts/orbiting_drone.lua
+key ctrl+shift+t
+expect code.file == scripts/asteroid.lua
+
+# The command palette runs any action.
+key ctrl+shift+p
+expect palette.open == true
+type move tool
+screenshot palette
+key enter
+expect palette.open == false
+expect tool == translate
+
+# Keyboard Shortcuts window lists every binding.
+key ctrl+shift+k
+key ctrl+shift+p
+type keyboard shortcuts
+key enter
+expect shortcuts-open == true
+screenshot shortcuts

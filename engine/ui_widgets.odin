@@ -22,6 +22,9 @@ UIListItem :: uilib.ListItem
 UITableColumn :: uilib.TableColumn
 UITableRow :: uilib.TableRow
 UITableCell :: uilib.TableCell
+Icon :: uilib.Icon
+ToolbarItem :: uilib.ToolbarItem
+ToolbarItemType :: uilib.ToolbarItemType
 
 UIElement :: struct {
 	using node: Node,
@@ -33,6 +36,7 @@ UIElement :: struct {
 }
 
 UIElement_Init :: proc(elem: ^UIElement, widgetType: UIWidgetType, size: [2]f32) {
+	elem.isUI = true
 	elem.widgetType = widgetType
 	elem.size = size
 	elem.layer = .Layer7
@@ -244,9 +248,11 @@ UI_IsFocusable :: proc(elem: ^UIElement) -> bool {
 
 UI_CollectFocusableElementsRec :: proc(scene: ^Scene, node: ^Node, outList: ^[dynamic]^UIElement) {
 	if node == nil || !node.enabled do return
-	elem := cast(^UIElement)node
-	if elem.widgetType != .None && UI_IsFocusable(elem) {
-		append(outList, elem)
+	if node.isUI {
+		elem := cast(^UIElement)node
+		if elem.widgetType != .None && UI_IsFocusable(elem) {
+			append(outList, elem)
+		}
 	}
 	children := GetChildren(scene.manager, node)
 	defer delete(children)
@@ -263,7 +269,7 @@ UI_CollectFocusableElements :: proc(scene: ^Scene, outList: ^[dynamic]^UIElement
 UI_SetFocus :: proc(scene: ^Scene, target: ^UIElement) {
 	if scene == nil || scene.manager == nil do return
 	for n in scene.manager.nodes {
-		if n == nil do continue
+		if n == nil || !n.isUI do continue
 		elem := cast(^UIElement)n
 		if elem.widgetType != .None {
 			wasFocused := elem.focused
@@ -278,7 +284,7 @@ UI_SetFocus :: proc(scene: ^Scene, target: ^UIElement) {
 UI_GetFocusedElement :: proc(scene: ^Scene) -> ^UIElement {
 	if scene == nil || scene.manager == nil do return nil
 	for n in scene.manager.nodes {
-		if n == nil do continue
+		if n == nil || !n.isUI do continue
 		elem := cast(^UIElement)n
 		if elem.widgetType != .None && elem.focused {
 			return elem
@@ -290,7 +296,7 @@ UI_GetFocusedElement :: proc(scene: ^Scene) -> ^UIElement {
 UI_ClearFocus :: proc(scene: ^Scene) {
 	if scene == nil || scene.manager == nil do return
 	for n in scene.manager.nodes {
-		if n == nil do continue
+		if n == nil || !n.isUI do continue
 		elem := cast(^UIElement)n
 		if elem.widgetType != .None {
 			elem.focused = false
@@ -338,7 +344,7 @@ UI_UpdateFocusNavigation :: proc(scene: ^Scene, gameContext: ^GameContext) {
 
 	// Reset justFocused flags from previous frame
 	for n in scene.manager.nodes {
-		if n == nil do continue
+		if n == nil || !n.isUI do continue
 		elem := cast(^UIElement)n
 		if elem.widgetType != .None {
 			elem.justFocused = false
@@ -449,7 +455,7 @@ UI_UpdateFocusNavigation :: proc(scene: ^Scene, gameContext: ^GameContext) {
 // ============================================================================
 UILabelNode :: struct {
 	using ui: UIElement,
-	text: string,
+	text: string `gui:"true"`,
 	fontSize: f32 `gui:"true" min:"8" max:"72"`,
 	textColor: rl.Color `gui:"true"`,
 	align: UITextAlign `gui:"true"`,
@@ -463,7 +469,7 @@ UILabelNode_Create :: proc(
 	scene: ^Scene,
 	name: string = "Label",
 	text: string = "Label",
-	fontSize: f32 = 14,
+	fontSize: f32 = uilib.DEFAULT_FONT_SIZE,
 	parent: ^Node = nil,
 	textColor: rl.Color = {238, 240, 246, 255},
 ) -> ^UILabelNode {
@@ -492,8 +498,10 @@ UILabelNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 // ============================================================================
 UIButtonNode :: struct {
 	using ui: UIElement,
-	text: string,
+	text: string `gui:"true"`,
 	fontSize: f32 `gui:"true" min:"8" max:"48"`,
+	icon: Icon `gui:"true"`,
+	iconSize: f32 `gui:"true" min:"0" max:"64"`,
 	normalColor: rl.Color `gui:"true"`,
 	hoverColor: rl.Color `gui:"true"`,
 	pressedColor: rl.Color `gui:"true"`,
@@ -514,13 +522,17 @@ UIButtonNode_Create :: proc(
 	text: string = "Button",
 	size: [2]f32 = {200, 36},
 	parent: ^Node = nil,
-	fontSize: f32 = 14,
+	fontSize: f32 = uilib.DEFAULT_FONT_SIZE,
+	icon: Icon = .None,
+	iconSize: f32 = 0,
 ) -> ^UIButtonNode {
 	btn := CreateNode(scene.manager, UIButtonNode)
 	btn.name = name
 	UIElement_Init(&btn.ui, .Button, size)
 	btn.text = text
 	btn.fontSize = fontSize
+	btn.icon = icon
+	btn.iconSize = iconSize
 	btn.normalColor = {35, 39, 49, 255}
 	btn.hoverColor = {50, 56, 72, 255}
 	btn.pressedColor = {37, 99, 235, 255}
@@ -529,7 +541,7 @@ UIButtonNode_Create :: proc(
 	btn.align = .Center
 	btn.isPressed = false
 	btn.wasClicked = false
-	InitializeSubject(&btn.onClick)
+	InitializeSubject(&btn.onClick, "clicked", btn)
 	btn.update = UIButtonNode_Update
 	btn.render = UIButtonNode_Render
 	btn.onDestroy = UIButtonNode_Destroy
@@ -591,20 +603,39 @@ UIButtonNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f
 UIButtonNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	btn := cast(^UIButtonNode)node
 	rect := UI_GetElementRect(&btn.ui)
-	uilib.RenderButton(
-		rect,
-		btn.text,
-		btn.fontSize,
-		btn.hovered,
-		btn.isPressed,
-		btn.normalColor,
-		btn.hoverColor,
-		btn.pressedColor,
-		btn.borderColor,
-		btn.textColor,
-		align = btn.align,
-		focused = btn.focused,
-	)
+	if btn.icon != .None {
+		uilib.RenderIconButton(
+			rect,
+			btn.icon,
+			btn.text,
+			btn.iconSize,
+			btn.hovered,
+			btn.isPressed,
+			btn.focused,
+			false,
+			btn.normalColor,
+			btn.hoverColor,
+			btn.pressedColor,
+			btn.borderColor,
+			btn.textColor,
+			btn.align,
+		)
+	} else {
+		uilib.RenderButton(
+			rect,
+			btn.text,
+			btn.fontSize,
+			btn.hovered,
+			btn.isPressed,
+			btn.normalColor,
+			btn.hoverColor,
+			btn.pressedColor,
+			btn.borderColor,
+			btn.textColor,
+			align = btn.align,
+			focused = btn.focused,
+		)
+	}
 }
 
 UIButtonNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
@@ -617,7 +648,7 @@ UIButtonNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UISliderNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	value: f32 `gui:"true" min:"-1000" max:"1000"`,
 	minValue: f32 `gui:"true" min:"-10000" max:"10000"`,
 	maxValue: f32 `gui:"true" min:"-10000" max:"10000"`,
@@ -666,7 +697,7 @@ UISliderNode_Create :: proc(
 	s.isEditingText = false
 	s.fineModeActive = false
 	s.editLen = 0
-	InitializeSubject(&s.onChanged)
+	InitializeSubject(&s.onChanged, "value_changed", s)
 	s.update = UISliderNode_Update
 	s.render = UISliderNode_Render
 	s.onDestroy = UISliderNode_Destroy
@@ -868,7 +899,7 @@ UISliderNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UICheckboxNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	checked: bool `gui:"true"`,
 	defaultChecked: bool `gui:"true"`,
 	accentColor: rl.Color `gui:"true"`,
@@ -893,8 +924,8 @@ UICheckboxNode_Create :: proc(
 	cb.checked = checked
 	cb.defaultChecked = checked
 	cb.accentColor = {59, 130, 246, 255}
-	cb.boxSize = 18
-	InitializeSubject(&cb.onChanged)
+	cb.boxSize = 14
+	InitializeSubject(&cb.onChanged, "value_changed", cb)
 	cb.update = UICheckboxNode_Update
 	cb.render = UICheckboxNode_Render
 	cb.onDestroy = UICheckboxNode_Destroy
@@ -959,7 +990,7 @@ UICheckboxNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UITextInputNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	placeholder: string,
 	labelWidth: f32 `gui:"true" min:"0" max:"300"`,
 	maxLength: int `gui:"true" min:"1" max:"255"`,
@@ -987,8 +1018,8 @@ UITextInputNode_Create :: proc(
 	ti.placeholder = placeholder
 	ti.labelWidth = 130
 	ti.maxLength = 64
-	InitializeSubject(&ti.onChanged)
-	InitializeSubject(&ti.onSubmit)
+	InitializeSubject(&ti.onChanged, "value_changed", ti)
+	InitializeSubject(&ti.onSubmit, "submitted", ti)
 	UITextInputNode_SetText(ti, defaultText)
 	ti.update = UITextInputNode_Update
 	ti.render = UITextInputNode_Render
@@ -1104,7 +1135,7 @@ UITextInputNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UIDropdownNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	items: [dynamic]string,
 	selectedIndex: int `gui:"true" min:"0" max:"32"`,
 	defaultIndex: int `gui:"true" min:"0" max:"32"`,
@@ -1139,7 +1170,7 @@ UIDropdownNode_Create :: proc(
 	dd.labelWidth = 130
 	dd.isOpen = false
 	dd.hoveredItemIndex = -1
-	InitializeSubject(&dd.onChanged)
+	InitializeSubject(&dd.onChanged, "value_changed", dd)
 	dd.update = UIDropdownNode_Update
 	dd.render = UIDropdownNode_Render
 	dd.onDestroy = UIDropdownNode_Destroy
@@ -1306,7 +1337,7 @@ UIDropdownNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UIRadioGroupNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	labelWidth: f32 `gui:"true" min:"0" max:"300"`,
 	options: [dynamic]string,
 	selectedIndex: int `gui:"true" min:"0" max:"16"`,
@@ -1342,7 +1373,7 @@ UIRadioGroupNode_Create :: proc(
 	rg.defaultIndex = selectedIndex
 	rg.hoveredOption = -1
 	rg.horizontal = horizontal
-	InitializeSubject(&rg.onChanged)
+	InitializeSubject(&rg.onChanged, "value_changed", rg)
 	rg.update = UIRadioGroupNode_Update
 	rg.render = UIRadioGroupNode_Render
 	rg.onDestroy = UIRadioGroupNode_Destroy
@@ -1586,7 +1617,7 @@ UIXYPlotNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UISeparatorNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	lineColor: rl.Color `gui:"true"`,
 }
 
@@ -1616,7 +1647,7 @@ UISeparatorNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime
 
 UIProgressBarNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	value: f32 `gui:"true" min:"0" max:"100"`,
 	minValue: f32 `gui:"true" min:"0" max:"100"`,
 	maxValue: f32 `gui:"true" min:"1" max:"1000"`,
@@ -1664,7 +1695,7 @@ UIProgressBarNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTi
 // ============================================================================
 UIToggleSwitchNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	active: bool `gui:"true"`,
 	userData: rawptr,
 	onChange: proc(node: ^UIToggleSwitchNode, active: bool),
@@ -1736,7 +1767,7 @@ UIToggleSwitchNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 // ============================================================================
 UIKnobNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	value: f32 `gui:"true" min:"0" max:"100"`,
 	minValue: f32 `gui:"true" min:"0" max:"100"`,
 	maxValue: f32 `gui:"true" min:"1" max:"1000"`,
@@ -1772,7 +1803,7 @@ UIKnobNode_Create :: proc(
 	knob.maxValue = maxValue
 	knob.defaultValue = defaultValue
 	knob.format = format
-	InitializeSubject(&knob.onChanged)
+	InitializeSubject(&knob.onChanged, "value_changed", knob)
 	knob.update = UIKnobNode_Update
 	knob.render = UIKnobNode_Render
 	knob.onDestroy = UIKnobNode_Destroy
@@ -2064,7 +2095,7 @@ UITreeViewNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 // ============================================================================
 UIVolumeFaderNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	valueDb: f32 `gui:"true" min:"-60" max:"6"`,
 	minDb: f32 `gui:"true" min:"-100" max:"0"`,
 	maxDb: f32 `gui:"true" min:"0" max:"24"`,
@@ -2098,7 +2129,7 @@ UIVolumeFaderNode_Create :: proc(
 	fader.minDb = minDb
 	fader.maxDb = maxDb
 	fader.defaultDb = defaultDb
-	InitializeSubject(&fader.onChanged)
+	InitializeSubject(&fader.onChanged, "value_changed", fader)
 	fader.update = UIVolumeFaderNode_Update
 	fader.render = UIVolumeFaderNode_Render
 	fader.onDestroy = UIVolumeFaderNode_Destroy
@@ -2203,7 +2234,7 @@ UIVolumeFaderNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UIVolumeMeterNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	levelL: f32 `gui:"true" min:"-60" max:"3"`,
 	levelR: f32 `gui:"true" min:"-120" max:"3"`,
 	minDb: f32 `gui:"true" min:"-100" max:"0"`,
@@ -2296,7 +2327,7 @@ UIVolumeMeterNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UINotchedSliderNode :: struct {
 	using ui: UIElement,
-	label: string,
+	label: string `gui:"true"`,
 	value: f32 `gui:"true"`,
 	minValue: f32 `gui:"true"`,
 	maxValue: f32 `gui:"true"`,
@@ -2342,7 +2373,7 @@ UINotchedSliderNode_Create :: proc(
 	for l in notchLabels {
 		append(&ns.notchLabels, l)
 	}
-	InitializeSubject(&ns.onChanged)
+	InitializeSubject(&ns.onChanged, "value_changed", ns)
 	ns.update = UINotchedSliderNode_Update
 	ns.render = UINotchedSliderNode_Render
 	ns.onDestroy = UINotchedSliderNode_Destroy
@@ -2497,7 +2528,7 @@ UIUnorderedListNode_Create :: proc(
 	for it in items {
 		append(&ul.items, it)
 	}
-	InitializeSubject(&ul.onSelect)
+	InitializeSubject(&ul.onSelect, "selected", ul)
 	ul.update = UIUnorderedListNode_Update
 	ul.render = UIUnorderedListNode_Render
 	ul.onDestroy = UIUnorderedListNode_Destroy
@@ -2616,7 +2647,7 @@ UIOrderedListNode_Create :: proc(
 	for it in items {
 		append(&ol.items, it)
 	}
-	InitializeSubject(&ol.onSelect)
+	InitializeSubject(&ol.onSelect, "selected", ol)
 	ol.update = UIOrderedListNode_Update
 	ol.render = UIOrderedListNode_Render
 	ol.onDestroy = UIOrderedListNode_Destroy
@@ -2742,8 +2773,8 @@ UITableNode_Create :: proc(
 	for r in rows {
 		append(&tbl.rows, r)
 	}
-	InitializeSubject(&tbl.onSelectRow)
-	InitializeSubject(&tbl.onSort)
+	InitializeSubject(&tbl.onSelectRow, "row_selected", tbl)
+	InitializeSubject(&tbl.onSort, "sorted", tbl)
 	tbl.update = UITableNode_Update
 	tbl.render = UITableNode_Render
 	tbl.onDestroy = UITableNode_Destroy
@@ -2824,4 +2855,178 @@ UITableNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	delete(tbl.rows)
 	DestroySubject(&tbl.onSelectRow)
 	DestroySubject(&tbl.onSort)
+}
+
+// ============================================================================
+// 17. UIIconNode (Font Awesome Vector Icon)
+// ============================================================================
+UIIconNode :: struct {
+	using ui: UIElement,
+	icon: Icon `gui:"true"`,
+	iconSize: f32 `gui:"true" min:"8" max:"128"`,
+	color: rl.Color `gui:"true"`,
+	align: UITextAlign `gui:"true"`,
+}
+
+UIIcon :: UIIconNode
+
+UIIconNode_Create :: proc(
+	scene: ^Scene,
+	name: string = "Icon",
+	icon: Icon = .None,
+	size: [2]f32 = {28, 28},
+	iconSize: f32 = 0,
+	parent: ^Node = nil,
+	color: rl.Color = {238, 240, 246, 255},
+	align: UITextAlign = .Center,
+) -> ^UIIconNode {
+	node := CreateNode(scene.manager, UIIconNode)
+	node.name = name
+	UIElement_Init(&node.ui, .Icon, size)
+	node.icon = icon
+	node.iconSize = iconSize
+	node.color = color
+	node.align = align
+	node.render = UIIconNode_Render
+	scene->addNode(node, parent)
+	return node
+}
+
+UIIconNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
+	ic := cast(^UIIconNode)node
+	rect := UI_GetElementRect(&ic.ui)
+	uilib.RenderIcon(rect, ic.icon, ic.iconSize, ic.color, ic.align)
+}
+
+// ============================================================================
+// 18. UIToolbarNode (Interactive Application Toolbar with Font Awesome Icons)
+// ============================================================================
+UIToolbarNode :: struct {
+	using ui: UIElement,
+	items: [dynamic]ToolbarItem,
+	activeToggleId: int `gui:"true"`,
+	buttonSize: [2]f32 `gui:"true"`,
+	spacing: f32 `gui:"true" min:"0" max:"32"`,
+	hoveredItemId: int,
+	onItemClick: EventSubject,
+	onItemClickCallback: proc(tb: ^UIToolbarNode, itemId: int, gameContext: ^GameContext),
+}
+
+UIToolbar :: UIToolbarNode
+
+UIToolbarNode_Create :: proc(
+	scene: ^Scene,
+	name: string = "Toolbar",
+	size: [2]f32 = {600, 42},
+	parent: ^Node = nil,
+	buttonSize: [2]f32 = {34, 32},
+	spacing: f32 = 4.0,
+) -> ^UIToolbarNode {
+	tb := CreateNode(scene.manager, UIToolbarNode)
+	tb.name = name
+	UIElement_Init(&tb.ui, .Toolbar, size)
+	tb.items = make([dynamic]ToolbarItem, tb.allocator)
+	tb.activeToggleId = -1
+	tb.buttonSize = buttonSize
+	tb.spacing = spacing
+	tb.hoveredItemId = -1
+	InitializeSubject(&tb.onItemClick, "item_clicked", tb)
+	tb.update = UIToolbarNode_Update
+	tb.render = UIToolbarNode_Render
+	tb.onDestroy = UIToolbarNode_Destroy
+	scene->addNode(tb, parent)
+	return tb
+}
+
+UIToolbarNode_AddItem :: proc(
+	tb: ^UIToolbarNode,
+	id: int,
+	icon: Icon,
+	label: string = "",
+	tooltip: string = "",
+	itemType: ToolbarItemType = .Button,
+	isSelected: bool = false,
+) {
+	append(&tb.items, ToolbarItem{
+		id = id,
+		icon = icon,
+		label = label,
+		tooltip = tooltip,
+		itemType = itemType,
+		isSelected = isSelected,
+		disabled = false,
+	})
+}
+
+UIToolbarNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
+	tb := cast(^UIToolbarNode)node
+	if !tb.enabled do return
+	rect := UI_GetElementRect(&tb.ui)
+	mp := UI_GetMousePos(gameContext)
+	inViewport := UI_IsMouseInViewport(gameContext)
+
+	curX := rect.x + 8.0
+	centerY := rect.y + rect.height * 0.5
+	tb.hoveredItemId = -1
+
+	for &item in tb.items {
+		#partial switch item.itemType {
+		case .Separator:
+			curX += 8.0
+		case .Spacer:
+			curX += 16.0
+		case .Button, .Toggle:
+			btnW := tb.buttonSize.x
+			if item.label != "" {
+				labelW := uilib.MeasureTextStr(item.label, uilib.DEFAULT_FONT_SIZE_SM).x
+				iconW: f32 = 18.0 if item.icon != .None else 0.0
+				gap: f32 = 6.0 if (item.icon != .None && item.label != "") else 0.0
+				btnW = max(btnW, iconW + gap + labelW + 16.0)
+			}
+			btnH := tb.buttonSize.y
+			btnY := math.round(centerY - btnH * 0.5)
+			btnRect := rl.Rectangle{curX, btnY, btnW, btnH}
+
+			if inViewport && UI_PointInRect(mp, btnRect) {
+				tb.hoveredItemId = item.id
+				if UI_IsMousePressed(gameContext) && !item.disabled {
+					if item.itemType == .Toggle {
+						item.isSelected = !item.isSelected
+						tb.activeToggleId = item.id if item.isSelected else -1
+					}
+					if tb.onItemClick.notify != nil {
+						tb.onItemClick->notify(tb, item.id, gameContext)
+					}
+					if tb.onItemClickCallback != nil {
+						tb.onItemClickCallback(tb, item.id, gameContext)
+					}
+				}
+			}
+			curX += btnW + tb.spacing
+		}
+	}
+}
+
+UIToolbarNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
+	tb := cast(^UIToolbarNode)node
+	rect := UI_GetElementRect(&tb.ui)
+	selectedId := tb.activeToggleId
+	tooltip, tooltipPos := uilib.RenderToolbar(
+		rect,
+		tb.items[:],
+		tb.hoveredItemId,
+		selectedId,
+		-1,
+		tb.buttonSize,
+		tb.spacing,
+	)
+	if tooltip != "" {
+		uilib.RenderTooltip(tooltipPos, tooltip)
+	}
+}
+
+UIToolbarNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
+	tb := cast(^UIToolbarNode)node
+	delete(tb.items)
+	DestroySubject(&tb.onItemClick)
 }

@@ -1,27 +1,32 @@
 package engine
 
 import "core:log"
+import "core:mem"
 import vmem "core:mem/virtual"
 
+// Scenes are heap-allocated and stored by pointer so `currentScene`,
+// `nextScene` and `gameContext.scene` stay valid when the map grows.
 SceneManager :: struct {
-	scenes: map[string]Scene,
+	scenes: map[string]^Scene,
 	currentScene: ^Scene,
 	nextScene: ^Scene,
+	allocator: mem.Allocator,
 }
 
 
 SceneManager_Init :: proc(manager: ^SceneManager, arena: ^vmem.Arena) {
 
 	arena_allocator := vmem.arena_allocator(arena)
-	manager.scenes = make( map[string]Scene, allocator = arena_allocator )
+	manager.allocator = arena_allocator
+	manager.scenes = make( map[string]^Scene, allocator = arena_allocator )
 	manager.currentScene = nil
 	manager.nextScene = nil
 }
 
 SceneManager_Terminate :: proc(manager: ^SceneManager) {
 	if manager == nil do return
-	for _, &scene in manager.scenes {
-		TerminateScene(&scene)
+	for _, scene in manager.scenes {
+		TerminateScene(scene)
 	}
 	clear(&manager.scenes)
 	manager.currentScene = nil
@@ -30,9 +35,8 @@ SceneManager_Terminate :: proc(manager: ^SceneManager) {
 
 
 ChangeScene_ByName :: proc(manager: ^SceneManager, name: string) {
-	_, ok := manager.scenes[name]
+	scene, ok := manager.scenes[name]
 	if ok {
-		scene := &manager.scenes[name]
 		manager.nextScene = scene
 	}
 	else {
@@ -74,8 +78,8 @@ ProcessSceneChange :: proc(manager: ^SceneManager, gameContext: ^GameContext = n
 		}
 
 		// Disable physics bodies in inactive scenes and enable physics bodies in the active scene
-		for _, &scene in manager.scenes {
-			Scene_SetPhysicsEnabled(&scene, &scene == manager.currentScene)
+		for _, scene in manager.scenes {
+			Scene_SetPhysicsEnabled(scene, scene == manager.currentScene)
 		}
 
 		// Load the new scene fresh: instantiate initial nodes & call ready on all initial nodes

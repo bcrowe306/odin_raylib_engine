@@ -1,0 +1,43 @@
+# Animation timeline (bottom panel): frames from dropped textures, scrubbing,
+# property tracks with keyframes, preview playback and restore, save.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+expect node:AnimationPlayer.type == AnimationPlayerNode
+click @bottom:animation
+click @anim.new
+expect anim == anim_1:1/1:0
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+expect anim == anim_1:1/3:0
+click @anim.frame:3
+expect anim == anim_1:3/3:0
+screenshot frames
+
+# A rotation track keyed at frame 1 and frame 3.
+click @anim.frame:1
+click @anim.add-track
+click @anim.track-prop:rotation
+expect anim == anim_1:1/3:1
+click @anim.frame:3
+dblclick @insp.rotation
+key ctrl+a
+type 90
+key enter
+click @anim.key:rotation
+expect item:anim.keyframe:rotation:3 == visible
+screenshot keyframes
+# Scrubbing interpolates; Stop restores the pre-preview value.
+click @anim.frame:2
+expect node:AnimationPlayer.rotation == 45.0
+click @anim.stop
+expect node:AnimationPlayer.rotation == 90.0
+click @anim.play
+wait 20
+click @anim.stop
+key ctrl+s
+expect file:scenes/main.scene.json contains "tracks": [{"target": ".", "property": "rotation", "keys": [[0, 0, 0, 0, 0], [2, 90, 0, 0, 0]]}]
+expect file:scenes/main.scene.json contains textures/Asteroid_3.png

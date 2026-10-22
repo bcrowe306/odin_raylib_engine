@@ -5,7 +5,7 @@ import rl "vendor:raylib"
 
 ParticleEmitterNode :: struct {
 	using node: Node,
-	emitter: ParticleEmitter,
+	emitter: ParticleEmitter `gui:"true"`,
 }
 
 ParticleEmitterNode_Init :: proc(pen: ^ParticleEmitterNode) {
@@ -15,6 +15,7 @@ ParticleEmitterNode_Init :: proc(pen: ^ParticleEmitterNode) {
 	pen.resource = &pen.emitter
 
 	ParticleEmitter_Init(&pen.emitter)
+	pen.emitter.allocator = pen.allocator
 	pen.emitter.amount = 100
 	pen.emitter.lifetime = 2
 	pen.emitter.burst = 0.5

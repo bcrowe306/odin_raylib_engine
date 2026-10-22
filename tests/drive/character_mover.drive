@@ -1,0 +1,35 @@
+# CharacterMover scripts: New Script on a Character Mover writes the
+# documented platformer template and switches the node to Script mode (the
+# script moves it with character_move_and_slide); the built-in movement
+# settings are hidden in the Inspector; simulating runs it without errors.
+wait 5
+click @asset.new-scene
+expect scene == scenes/new_scene.scene.json
+click @hier.add
+type character mover
+click @addnode.create
+expect node:CharacterMover.type == CharacterMoverNode
+expect node:CharacterMover.prop.controlMode == BuiltIn
+dblclick @insp.name
+key ctrl+a
+type DriveHero
+key enter
+expect selected == DriveHero
+click @insp.script-new
+expect node:DriveHero.script contains drive_hero.lua
+expect node:DriveHero.prop.controlMode == Script
+expect file:scripts/drive_hero.lua contains node:character_move_and_slide()
+expect file:scripts/drive_hero.lua contains character_is_on_floor()
+expect file:scripts/drive_hero.lua contains coyote_time
+expect code.file == scripts/drive_hero.lua
+expect node:DriveHero.script.jump_velocity == 420
+screenshot platformer_template
+# (Cmd+S would save the focused script: save the scene from the toolbar.)
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "controlMode": "Script"
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+expect log !contains Error in scripts/drive_hero.lua
+click @menu:Game
+click @menu:Game/Simulate in Editor

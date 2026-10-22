@@ -1,0 +1,60 @@
+# Project workflow: new scene, add content, startup scene + gravity in
+# Project Settings, play it; switching scenes keeps unsaved edits.
+wait 5
+key ctrl+n
+expect scene == scenes/new_scene.scene.json
+expect node:Camera.exists == true
+screenshot new_scene
+
+# A falling crate: dynamic body + static floor.
+key escape
+key ctrl+a
+type dynamic
+key enter
+expect selected == DynamicPhysicsBox
+key escape
+key ctrl+a
+type static
+key enter
+expect selected == StaticPlatform
+dblclick @insp.position.y
+key ctrl+a
+type 600
+key enter
+
+# Unsaved edits survive switching to another scene and back.
+dblclick @asset:scenes/main.scene.json
+expect scene == scenes/main.scene.json
+expect modified-count == 1
+dblclick @asset:scenes/new_scene.scene.json
+expect node:StaticPlatform.position ~= 640,600
+key ctrl+s
+expect modified-count == 0
+
+# Project Settings: Earth gravity and this scene as the startup scene.
+click @toolbar.settings
+expect project-settings-open == true
+click @settings.earth-g
+click @settings.use-current
+screenshot project_settings
+click @settings.save
+expect project-settings-open == false
+expect file:project.json contains "initial_scene": "scenes/new_scene.scene.json"
+expect file:project.json contains "gravity": [0.00, 980.00]
+
+# Simulate: the crate falls onto the platform.
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 90
+expect node:DynamicPhysicsBox.position !contains 352.0
+screenshot crate_fell
+click @menu:Game
+click @menu:Game/Simulate in Editor
+expect node:DynamicPhysicsBox.position ~= 640,352
+
+# Play (F5) now starts in the new scene.
+game-args --frames 40 --dump-scene $SHOTS/game_scene.json
+key f5
+wait-until game == stopped timeout=900
+expect abs-file:$SHOTS/game_scene.json contains "StaticPlatform"
+expect abs-file:$SHOTS/game_scene.json contains "DynamicPhysicsBox"

@@ -1,0 +1,74 @@
+# Signals (Godot-style): connect a node's event to a script method from the
+# Inspector; the handler is written into the target script and the
+# connection is saved with the scene; disconnecting removes both. Also:
+# dragging an asset into a script inserts its path, or (holding Cmd) an
+# exported asset property that the Inspector edits with a picker.
+wait 5
+click @hier:PatrolDroneAlpha
+click @insp.script-new
+wait 2
+expect code.file == scripts/patrol_drone_alpha.lua
+
+# A timer under the ship, connected to the drone's script.
+click @hier:PlayerShip
+key ctrl+a
+type timer
+key enter
+expect node:Timer.parent == PlayerShip
+wait 2
+expect item:insp.signal-connect:timeout == visible
+screenshot signals_section
+click @insp.signal-connect:timeout
+expect item:signal.connect == visible
+click @signal.target:PatrolDroneAlpha
+screenshot connect_dialog
+click @signal.connect
+expect node:Timer.connections == timeout->../../PatrolDroneAlpha:on_timer_timeout
+expect code.file == scripts/patrol_drone_alpha.lua
+expect code.text contains function PatrolDroneAlpha:on_timer_timeout(_, source)
+expect code.text contains ---Signal: Timer.timeout
+expect file:scripts/patrol_drone_alpha.lua contains on_timer_timeout
+expect item:insp.signal:timeout:on_timer_timeout == visible
+screenshot handler_written
+
+# Saved with the scene.
+click @hier:PlayerShip/Timer
+key ctrl+s
+expect file:scenes/main.scene.json contains "connections": [{"signal": "timeout", "target": "../../PatrolDroneAlpha", "method": "on_timer_timeout"}]
+
+# Disconnect: connection and generated handler go away.
+click @insp.signal-disconnect:timeout:on_timer_timeout
+expect node:Timer.connections ==
+expect code.text !contains on_timer_timeout
+expect file:scripts/patrol_drone_alpha.lua !contains on_timer_timeout
+
+# A handler with code asks before deleting it.
+click @insp.signal-connect:timeout
+click @signal.target:PatrolDroneAlpha
+click @signal.connect
+type self.hits = (self.hits or 0) + 1
+key ctrl+s
+click @hier:PlayerShip/Timer
+click @insp.signal-disconnect:timeout:on_timer_timeout
+expect item:signal.keep-code == visible
+click @signal.keep-code
+expect code.text contains on_timer_timeout
+
+# Drag a texture into the script: its path...
+click @code.tab:scripts/patrol_drone_alpha.lua
+drag @asset:textures/Spaceship_1.png @code.area
+expect code.text contains "textures/Spaceship_1.png"
+key ctrl+z
+expect code.text !contains "textures/Spaceship_1.png"
+# ...or, holding Cmd, an exported asset property.
+hold cmd
+drag @asset:textures/Spaceship_1.png @code.area
+release
+expect code.text contains spaceship_1 = { type = "texture", default = "textures/Spaceship_1.png" },
+screenshot asset_property
+key ctrl+s
+wait 3
+expect node:PatrolDroneAlpha.script.spaceship_1 == textures/Spaceship_1.png
+click @hier:PatrolDroneAlpha
+expect item:insp.script:spaceship_1 == visible
+screenshot asset_picker

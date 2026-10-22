@@ -1,0 +1,15 @@
+# Export a portable .ore package and run the game from it.
+wait 5
+click @hier:PlayerShip
+dblclick @insp.name
+key ctrl+a
+type ExportedShip
+key enter
+click @toolbar.export
+wait 10
+expect log contains Exported portable .ore archive
+expect modified == false
+screenshot exported
+exec bin/odin_raylib_engine --project $PROJECT.ore --frames 20 --dump-scene $SHOTS/ore_scene.json
+expect abs-file:$SHOTS/ore_scene.json contains "ExportedShip"
+expect abs-file:$SHOTS/ore_scene.json contains "textures/Spaceship_1.png"

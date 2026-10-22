@@ -2,6 +2,7 @@ package engine
 
 import vmem "core:mem/virtual"
 import "core:log"
+import "core:strings"
 import rl "vendor:raylib"
 
 SceneSetupProc :: proc(scene: ^Scene, gameContext: ^GameContext)
@@ -11,7 +12,11 @@ SceneLifecycleProc :: proc(scene: ^Scene, gameContext: ^GameContext)
 Scene :: struct {
 	manager: ^NodeManager,
 	name: string,
+	filePath: string,   // project-relative scene file ("scenes/main.scene.json"), "" for code scenes
+	sourceJson: string, // scene file contents; rebuilt from on every (re)load
 	drawBounds: bool,
+	// Clear colour while this scene runs (alpha 0 = the game's default).
+	backgroundColor: rl.Color,
 	rootNode: ^Node,
 	camera: ^CameraNode,
 	setup: SceneSetupProc,
@@ -28,6 +33,7 @@ Scene :: struct {
 CreateNodeScene :: proc(scene: ^Scene, $T: typeid, addToScene: bool = false) -> (node: ^T) {
 	allocator := vmem.arena_allocator(&scene.manager.arena)
 	node = new(T, allocator)
+	(cast(^Node)node).typeId = T
 	InitializeNode(cast(^Node)node)
 	if addToScene do SceneAddNode(scene, node)
 	return node
@@ -58,20 +64,26 @@ SceneRemoveChild :: proc(scene: ^Scene, parent, child: ^Node) {
 	RemoveChild(scene.manager, parent, child)
 }
 
+// CreateScene registers a new scene under `name` (cloned). A scene with the
+// same name is replaced: it is terminated and any current/next pointer to it
+// is cleared, so nothing keeps pointing at the destroyed scene.
 CreateScene :: proc(manager: ^SceneManager, name: string, next_scene: bool, setup: SceneSetupProc = nil) -> ^Scene {
-	if existing, exists := &manager.scenes[name]; exists {
+	allocator := manager.allocator if manager.allocator.procedure != nil else context.allocator
+	if existing, exists := manager.scenes[name]; exists && existing != nil {
+		if manager.currentScene == existing do manager.currentScene = nil
+		if manager.nextScene == existing do manager.nextScene = nil
 		TerminateScene(existing)
 	}
 
-	manager.scenes[name] = Scene{
-		name = name,
-		setup = setup,
-	}
+	newScene := new(Scene, allocator)
+	ownedName := strings.clone(name, allocator)
+	newScene.name = ownedName
+	newScene.setup = setup
+	manager.scenes[ownedName] = newScene
 
-	newScene := &manager.scenes[name]
 	InitializeScene(newScene)
 	if next_scene do manager.nextScene = newScene
-	return &manager.scenes[name]
+	return newScene
 }
 
 InitializeScene :: proc(scene: ^Scene) {
@@ -100,7 +112,7 @@ Scene_Unload :: proc(scene: ^Scene, gameContext: ^GameContext = nil) {
 		for node in scene.manager.nodes {
 			if node != nil {
 				node.gameContext = gameContext
-				node.onExit->notify(node, false, gameContext)
+				node.onExit->notify(node, nil, gameContext)
 			}
 		}
 	}
@@ -154,18 +166,32 @@ Scene_Load :: proc(scene: ^Scene, gameContext: ^GameContext) {
 Scene_CallReady :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext) {
 	if node == nil || !node.enabled do return
 
+	if gameContext != nil {
+		node.gameContext = gameContext
+	}
+
 	if !node.isReady {
 		node.isReady = true
 		if node.ready != nil {
 			node->ready(gameContext)
 		}
+		if node.scriptInstance != nil {
+			sm := gameContext.scriptManager if gameContext != nil else nil
+			ScriptInstance_CallReady(cast(^ScriptInstance)node.scriptInstance, sm)
+		}
 	}
 
-	children := GetChildren(scene.manager, node)
-	defer delete(children)
-	for child in children {
+	for child in GetChildrenTemp(scene.manager, node) {
 		Scene_CallReady(scene, child, gameContext)
 	}
+}
+
+// Scene_JsonSetup is the setup proc of data-driven scenes: it rebuilds the
+// scene from its stored JSON each time the scene is loaded, so leaving and
+// re-entering a scene restores it instead of leaving it empty.
+Scene_JsonSetup :: proc(scene: ^Scene, gameContext: ^GameContext) {
+	if scene.sourceJson == "" do return
+	Scene_InstantiateFromJSON(scene, transmute([]u8)scene.sourceJson, gameContext)
 }
 
 TerminateScene :: proc(scene: ^Scene) {
@@ -224,6 +250,9 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	// Update global positions after node updates & container layout
 	Node_SetGlobalPositions(nodeManager, scene.rootNode)
 
+	// One traversal buckets renderable nodes by layer (hierarchy order is
+	// kept within a layer) instead of walking the whole tree per layer.
+	buckets := Scene_CollectRenderables(scene)
 	for layer in RenderLayer {
 		isWorldLayer := scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent && (layer in scene.camera.targetLayers)
 		if isWorldLayer && rl.IsWindowReady() {
@@ -236,7 +265,10 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 			CameraNode_Begin(scene.camera, vw, vh)
 		}
 
-		Scene_RenderNodeHirearchy(scene, scene.rootNode, gameContext, deltaTime, layer)
+		for node in buckets[layer] {
+			if node.render != nil do node->render(gameContext, deltaTime)
+			if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
+		}
 
 		if isWorldLayer && rl.IsWindowReady() {
 			CameraNode_End()
@@ -250,15 +282,27 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 Scene_UpdateNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	if node == nil || !node.enabled do return
 
+	if gameContext != nil {
+		node.gameContext = gameContext
+	}
+
 	if !node.isReady {
 		node.isReady = true
 		if node.ready != nil do node->ready(gameContext)
+		if node.scriptInstance != nil {
+			sm := gameContext.scriptManager if gameContext != nil else nil
+			ScriptInstance_CallReady(cast(^ScriptInstance)node.scriptInstance, sm)
+		}
 	}
 
-	children := GetChildren(scene.manager, node)
-	defer delete(children)
+	// Copy: updates may add or remove children while we iterate.
+	children := GetChildrenTemp(scene.manager, node)
 
 	if node.update != nil do node->update(gameContext, deltaTime)
+	if node.scriptInstance != nil {
+		sm := gameContext.scriptManager if gameContext != nil else nil
+		ScriptInstance_CallUpdate(cast(^ScriptInstance)node.scriptInstance, deltaTime, sm)
+	}
 
 	for child in children {
 		Scene_UpdateNodeHirearchy(scene, child, gameContext, deltaTime)
@@ -267,9 +311,7 @@ Scene_UpdateNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^Game
 
 Scene_RenderNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext, deltaTime: f32, layer: RenderLayer) {
 	if node == nil || !node.enabled do return
-	children := GetChildren(scene.manager, node)
-
-	defer delete(children)
+	children := GetChildrenView(scene.manager, node)
 	if node.renderable && node.layer == layer {
 		if node.render != nil do node->render(gameContext, deltaTime)
 
@@ -279,4 +321,42 @@ Scene_RenderNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^Game
 	for child in children {
 		Scene_RenderNodeHirearchy(scene, child, gameContext, deltaTime, layer)
 	}
+}
+
+Scene_FindNodeByName :: proc(scene: ^Scene, name: string) -> ^Node {
+	if scene == nil || scene.manager == nil do return nil
+	for node in scene.manager.nodes {
+		if node != nil && node.name == name do return node
+	}
+	for node in scene.manager.addition {
+		if node != nil && node.name == name do return node
+	}
+	return nil
+}
+
+// Scene_FindNodeByType returns the first node of the given concrete type.
+Scene_FindNodeByType :: proc(scene: ^Scene, t: typeid) -> ^Node {
+	if scene == nil || scene.manager == nil do return nil
+	for node in scene.manager.nodes {
+		if node != nil && node.typeId == t do return node
+	}
+	for node in scene.manager.addition {
+		if node != nil && node.typeId == t do return node
+	}
+	return nil
+}
+
+// Scene_CollectRenderables walks the enabled hierarchy once and returns the
+// renderable nodes of each layer in draw order (temp-allocated).
+Scene_CollectRenderables :: proc(scene: ^Scene) -> (buckets: [RenderLayer][dynamic]^Node) {
+	for &b in buckets do b = make([dynamic]^Node, context.temp_allocator)
+	walk :: proc(m: ^NodeManager, node: ^Node, buckets: ^[RenderLayer][dynamic]^Node) {
+		if node == nil || !node.enabled do return
+		if node.renderable && (node.render != nil || node.drawBounds != nil) {
+			append(&buckets[node.layer], node)
+		}
+		for child in GetChildrenView(m, node) do walk(m, child, buckets)
+	}
+	if scene != nil && scene.manager != nil do walk(scene.manager, scene.rootNode, &buckets)
+	return
 }

@@ -1,5 +1,9 @@
 package engine
 
+import "core:mem"
+
+import "core:hash"
+
 import b2 "vendor:box2d"
 import rl "vendor:raylib"
 
@@ -49,6 +53,42 @@ PhysicsShape :: struct {
 	categoryLayers: CollisionLayerSet `gui:"true"`,
 	maskLayers: CollisionLayerSet `gui:"true"`,
 	groupIndex: int `gui:"true" min:"-100" max:"100"`,
+
+	// Hash of the parameters last pushed to Box2D (0 = never): the sync
+	// skips unchanged shapes instead of resetting them every frame.
+	syncedHash: u64,
+}
+
+// physics_shape_hash: hash of everything PhysicsShape_SyncToBox2D applies.
+@(private = "file")
+physics_shape_hash :: proc(shape: ^PhysicsShape, scale: [2]f32 = {1, 1}) -> u64 {
+	Params :: struct {
+		scale: [2]f32,
+		vertexCount: int,
+		vertices: [b2.MAX_POLYGON_VERTICES][2]f32,
+		chainLen: int,
+		isLoop: bool,
+		type: PhysicsShapeType,
+		offset: [2]f32,
+		rotation, radius: f32,
+		size: [2]f32,
+		cornerRadius: f32,
+		point1, point2: [2]f32,
+		density, friction, restitution: f32,
+		sensorEv, contactEv, hitEv, preSolveEv: bool,
+		category, mask: u64,
+		group: int,
+	}
+	p := Params{
+		scale, shape.vertexCount, shape.vertices, len(shape.chainPoints), shape.isLoop,
+		shape.type, shape.offset, shape.rotation, shape.radius, shape.size, shape.cornerRadius,
+		shape.point1, shape.point2, shape.density, shape.friction, shape.restitution,
+		shape.enableSensorEvents, shape.enableContactEvents, shape.enableHitEvents, shape.enablePreSolveEvents,
+		CollisionLayerSet_ToBits(shape.categoryLayers), CollisionLayerSet_ToBits(shape.maskLayers), shape.groupIndex,
+	}
+	h := hash.fnv64a(mem.ptr_to_bytes(&p))
+	if len(shape.chainPoints) > 0 do h ~= hash.fnv64a(mem.slice_to_bytes(shape.chainPoints[:]))
+	return h if h != 0 else 1
 }
 
 PhysicsShape_InitDefault :: proc(shape: ^PhysicsShape, type: PhysicsShapeType = .Box) {
@@ -107,88 +147,130 @@ PhysicsShape_BuildDef :: proc(shape: ^PhysicsShape, userData: rawptr = nil) -> b
 	return def
 }
 
-PhysicsShape_AttachToBody :: proc(shape: ^PhysicsShape, bodyId: b2.BodyId, userData: rawptr = nil) {
+// PhysicsShape_Scaled: the shape's geometry with a node's scale applied.
+// Shapes are authored in the node's local units; the body gets them scaled
+// by the node's world scale. Boxes, segments, polygons and chains scale per
+// axis; a circle takes the larger axis; a capsule its radius from x and its
+// length from y; a mirrored scale (one negative axis) mirrors the rotation.
+// The result's chainPoints live in the temp allocator.
+PhysicsShape_Scaled :: proc(shape: ^PhysicsShape, scale: [2]f32) -> PhysicsShape {
+	g := shape^
+	sc := scale
+	if sc.x == 0 && sc.y == 0 do sc = {1, 1}
+	ax, ay := abs(sc.x), abs(sc.y)
+	g.offset = shape.offset * sc
+	g.size = shape.size * [2]f32{ax, ay}
+	g.cornerRadius = shape.cornerRadius * min(ax, ay)
+	if sc.x * sc.y < 0 do g.rotation = -shape.rotation
+	#partial switch shape.type {
+	case .Circle:  g.radius = shape.radius * max(ax, ay)
+	case .Capsule: g.radius = shape.radius * ax
+	case:          g.radius = shape.radius * max(ax, ay)
+	}
+	g.point1 = shape.point1 * sc
+	g.point2 = shape.point2 * sc
+	for i in 0 ..< clamp(shape.vertexCount, 0, int(b2.MAX_POLYGON_VERTICES)) do g.vertices[i] = shape.vertices[i] * sc
+	g.chainPoints = nil
+	if len(shape.chainPoints) > 0 {
+		g.chainPoints = make([dynamic][2]f32, len(shape.chainPoints), context.temp_allocator)
+		for p, i in shape.chainPoints do g.chainPoints[i] = p * sc
+	}
+	return g
+}
+
+// polygon_of: the Box2D polygon of a (scaled) Box / RoundedBox / Polygon.
+@(private = "file")
+polygon_of :: proc(g: ^PhysicsShape) -> b2.Polygon {
+	rot := DegreesToRot(g.rotation)
+	hw := max(g.size[0] * 0.5, 0.5)
+	hh := max(g.size[1] * 0.5, 0.5)
+	#partial switch g.type {
+	case .RoundedBox:
+		return b2.MakeOffsetRoundedBox(hw, hh, g.offset, rot, max(g.cornerRadius, 0.0))
+	case .Polygon:
+		count := clamp(g.vertexCount, 3, int(b2.MAX_POLYGON_VERTICES))
+		hull := b2.ComputeHull(g.vertices[:count])
+		if b2.ValidateHull(hull) do return b2.MakeOffsetPolygon(hull, g.offset, rot)
+	}
+	return b2.MakeOffsetBox(hw, hh, g.offset, rot)
+}
+
+@(private = "file")
+capsule_of :: proc(g: ^PhysicsShape) -> b2.Capsule {
+	halfLen := max(g.size[1] * 0.5, 0.5)
+	dir := b2.RotateVector(DegreesToRot(g.rotation), b2.Vec2{0, halfLen})
+	return b2.Capsule{center1 = g.offset - dir, center2 = g.offset + dir, radius = max(g.radius, 0.5)}
+}
+
+@(private = "file")
+segment_of :: proc(g: ^PhysicsShape) -> b2.Segment {
+	rot := DegreesToRot(g.rotation)
+	return b2.Segment{point1 = g.offset + b2.RotateVector(rot, g.point1), point2 = g.offset + b2.RotateVector(rot, g.point2)}
+}
+
+PhysicsShape_AttachToBody :: proc(shape: ^PhysicsShape, bodyId: b2.BodyId, userData: rawptr = nil, scale: [2]f32 = {1, 1}) {
 	if !b2.Body_IsValid(bodyId) do return
 
+	// Keep the authored chain points (PhysicsShape_Destroy frees them).
+	points := shape.chainPoints
+	shape.chainPoints = nil
 	PhysicsShape_Destroy(shape)
+	shape.chainPoints = points
 
 	def := PhysicsShape_BuildDef(shape, userData)
-	rot := DegreesToRot(shape.rotation)
+	shape.syncedHash = physics_shape_hash(shape, scale) // built from these values
+	g := PhysicsShape_Scaled(shape, scale)
 
 	switch shape.type {
 	case .Circle:
-		circle := b2.Circle{
-			center = shape.offset,
-			radius = max(shape.radius, 0.5),
-		}
-		shape.shapeId = b2.CreateCircleShape(bodyId, def, circle)
-
+		shape.shapeId = b2.CreateCircleShape(bodyId, def, b2.Circle{center = g.offset, radius = max(g.radius, 0.5)})
 	case .Capsule:
-		halfLen := max(shape.size[1] * 0.5, 0.5)
-		dir := b2.RotateVector(rot, b2.Vec2{0, halfLen})
-		capsule := b2.Capsule{
-			center1 = shape.offset - dir,
-			center2 = shape.offset + dir,
-			radius  = max(shape.radius, 0.5),
-		}
-		shape.shapeId = b2.CreateCapsuleShape(bodyId, def, capsule)
-
-	case .Box:
-		hw := max(shape.size[0] * 0.5, 0.5)
-		hh := max(shape.size[1] * 0.5, 0.5)
-		poly := b2.MakeOffsetBox(hw, hh, shape.offset, rot)
-		shape.shapeId = b2.CreatePolygonShape(bodyId, def, poly)
-
-	case .RoundedBox:
-		hw := max(shape.size[0] * 0.5, 0.5)
-		hh := max(shape.size[1] * 0.5, 0.5)
-		r := max(shape.cornerRadius, 0.0)
-		poly := b2.MakeOffsetRoundedBox(hw, hh, shape.offset, rot, r)
-		shape.shapeId = b2.CreatePolygonShape(bodyId, def, poly)
-
-	case .Polygon:
-		count := clamp(shape.vertexCount, 3, int(b2.MAX_POLYGON_VERTICES))
-		hull := b2.ComputeHull(shape.vertices[:count])
-		if b2.ValidateHull(hull) {
-			poly := b2.MakeOffsetPolygon(hull, shape.offset, rot)
-			shape.shapeId = b2.CreatePolygonShape(bodyId, def, poly)
-		} else {
-			hw := max(shape.size[0] * 0.5, 0.5)
-			hh := max(shape.size[1] * 0.5, 0.5)
-			poly := b2.MakeOffsetBox(hw, hh, shape.offset, rot)
-			shape.shapeId = b2.CreatePolygonShape(bodyId, def, poly)
-		}
-
+		shape.shapeId = b2.CreateCapsuleShape(bodyId, def, capsule_of(&g))
+	case .Box, .RoundedBox, .Polygon:
+		shape.shapeId = b2.CreatePolygonShape(bodyId, def, polygon_of(&g))
 	case .Segment:
-		seg := b2.Segment{
-			point1 = shape.offset + b2.RotateVector(rot, shape.point1),
-			point2 = shape.offset + b2.RotateVector(rot, shape.point2),
-		}
-		shape.shapeId = b2.CreateSegmentShape(bodyId, def, seg)
-
+		shape.shapeId = b2.CreateSegmentShape(bodyId, def, segment_of(&g))
 	case .Chain:
-		if len(shape.chainPoints) >= 4 {
+		if len(g.chainPoints) >= 4 {
+			// Chain points are in shape space: apply the offset and rotation.
+			rot := DegreesToRot(g.rotation)
+			for &p in g.chainPoints do p = g.offset + b2.RotateVector(rot, p)
 			cdef := b2.DefaultChainDef()
 			cdef.userData = userData
-			cdef.points = raw_data(shape.chainPoints)
-			cdef.count = i32(len(shape.chainPoints))
+			cdef.points = raw_data(g.chainPoints)
+			cdef.count = i32(len(g.chainPoints))
 			cdef.isLoop = shape.isLoop
 			cdef.enableSensorEvents = shape.enableSensorEvents
 			cdef.filter = def.filter
 			shape.chainId = b2.CreateChain(bodyId, cdef)
 		} else {
 			// Fallback to segment if fewer than 4 chain points
-			seg := b2.Segment{
-				point1 = shape.offset + shape.point1,
-				point2 = shape.offset + shape.point2,
-			}
-			shape.shapeId = b2.CreateSegmentShape(bodyId, def, seg)
+			shape.shapeId = b2.CreateSegmentShape(bodyId, def, segment_of(&g))
 		}
 	}
 }
 
-PhysicsShape_SyncToBox2D :: proc(shape: ^PhysicsShape, bodyId: b2.BodyId, userData: rawptr = nil) {
-	if b2.Shape_IsValid(shape.shapeId) {
+// PhysicsShape_SyncToBox2D pushes changed parameters (and the node's
+// current scale) to Box2D; unchanged shapes are skipped.
+PhysicsShape_SyncToBox2D :: proc(shape: ^PhysicsShape, bodyId: b2.BodyId, userData: rawptr = nil, scale: [2]f32 = {1, 1}) {
+	if b2.Shape_IsValid(shape.shapeId) || b2.Chain_IsValid(shape.chainId) {
+		h := physics_shape_hash(shape, scale)
+		if h == shape.syncedHash do return
+		// A different kind of geometry, or a chain: recreate.
+		kindOk := true
+		if b2.Shape_IsValid(shape.shapeId) {
+			#partial switch b2.Shape_GetType(shape.shapeId) {
+			case .circleShape:  kindOk = shape.type == .Circle
+			case .capsuleShape: kindOk = shape.type == .Capsule
+			case .polygonShape: kindOk = shape.type == .Box || shape.type == .RoundedBox || shape.type == .Polygon
+			case .segmentShape: kindOk = shape.type == .Segment
+			}
+		}
+		if !kindOk || shape.type == .Chain || b2.Chain_IsValid(shape.chainId) {
+			PhysicsShape_AttachToBody(shape, bodyId, userData, scale)
+			return
+		}
+		shape.syncedHash = h
 		b2.Shape_SetDensity(shape.shapeId, shape.density, true)
 		b2.Shape_SetFriction(shape.shapeId, shape.friction)
 		b2.Shape_SetRestitution(shape.shapeId, shape.restitution)
@@ -202,37 +284,21 @@ PhysicsShape_SyncToBox2D :: proc(shape: ^PhysicsShape, bodyId: b2.BodyId, userDa
 		b2.Shape_EnableHitEvents(shape.shapeId, shape.enableHitEvents)
 		b2.Shape_EnablePreSolveEvents(shape.shapeId, shape.enablePreSolveEvents)
 
-		rot := DegreesToRot(shape.rotation)
+		g := PhysicsShape_Scaled(shape, scale)
 		#partial switch shape.type {
 		case .Circle:
-			b2.Shape_SetCircle(shape.shapeId, b2.Circle{
-				center = shape.offset,
-				radius = max(shape.radius, 0.5),
-			})
+			b2.Shape_SetCircle(shape.shapeId, b2.Circle{center = g.offset, radius = max(g.radius, 0.5)})
 		case .Capsule:
-			halfLen := max(shape.size[1] * 0.5, 0.5)
-			dir := b2.RotateVector(rot, b2.Vec2{0, halfLen})
-			b2.Shape_SetCapsule(shape.shapeId, b2.Capsule{
-				center1 = shape.offset - dir,
-				center2 = shape.offset + dir,
-				radius  = max(shape.radius, 0.5),
-			})
-		case .Box:
-			hw := max(shape.size[0] * 0.5, 0.5)
-			hh := max(shape.size[1] * 0.5, 0.5)
-			b2.Shape_SetPolygon(shape.shapeId, b2.MakeOffsetBox(hw, hh, shape.offset, rot))
-		case .RoundedBox:
-			hw := max(shape.size[0] * 0.5, 0.5)
-			hh := max(shape.size[1] * 0.5, 0.5)
-			b2.Shape_SetPolygon(shape.shapeId, b2.MakeOffsetRoundedBox(hw, hh, shape.offset, rot, max(shape.cornerRadius, 0.0)))
+			b2.Shape_SetCapsule(shape.shapeId, capsule_of(&g))
+		case .Box, .RoundedBox, .Polygon:
+			b2.Shape_SetPolygon(shape.shapeId, polygon_of(&g))
 		case .Segment:
-			b2.Shape_SetSegment(shape.shapeId, b2.Segment{
-				point1 = shape.offset + b2.RotateVector(rot, shape.point1),
-				point2 = shape.offset + b2.RotateVector(rot, shape.point2),
-			})
+			b2.Shape_SetSegment(shape.shapeId, segment_of(&g))
 		}
+		// New geometry (e.g. a scaled node): recompute the body's mass.
+		b2.Body_ApplyMassFromShapes(b2.Shape_GetBody(shape.shapeId))
 	} else if b2.Body_IsValid(bodyId) {
-		PhysicsShape_AttachToBody(shape, bodyId, userData)
+		PhysicsShape_AttachToBody(shape, bodyId, userData, scale)
 	}
 }
 
@@ -251,40 +317,43 @@ PhysicsShape_Destroy :: proc(shape: ^PhysicsShape) {
 	}
 }
 
-PhysicsShape_DrawDebug :: proc(shape: ^PhysicsShape, bodyPos: [2]f32, bodyRotDeg: f32, color: rl.Color) {
+// PhysicsShape_DrawDebug draws a shape of a body at bodyPos / bodyRotDeg,
+// scaled like its collider.
+PhysicsShape_DrawDebug :: proc(shape: ^PhysicsShape, bodyPos: [2]f32, bodyRotDeg: f32, color: rl.Color, scale: [2]f32 = {1, 1}) {
 	if !rl.IsWindowReady() do return
+	g := PhysicsShape_Scaled(shape, scale)
 	bodyRot := DegreesToRot(bodyRotDeg)
-	shapeRot := DegreesToRot(bodyRotDeg + shape.rotation)
-	worldCenter := bodyPos + b2.RotateVector(bodyRot, shape.offset)
+	shapeRot := DegreesToRot(bodyRotDeg + g.rotation)
+	worldCenter := bodyPos + b2.RotateVector(bodyRot, g.offset)
 
 	fillColor := rl.Color{color.r, color.g, color.b, 55}
 
-	switch shape.type {
+	switch g.type {
 	case .Circle:
-		rl.DrawCircleV(worldCenter, shape.radius, fillColor)
-		rl.DrawCircleLinesV(worldCenter, shape.radius, color)
-		dir := b2.RotateVector(shapeRot, b2.Vec2{shape.radius, 0})
+		rl.DrawCircleV(worldCenter, g.radius, fillColor)
+		rl.DrawCircleLinesV(worldCenter, g.radius, color)
+		dir := b2.RotateVector(shapeRot, b2.Vec2{g.radius, 0})
 		rl.DrawLineV(worldCenter, worldCenter + dir, color)
 
 	case .Capsule:
-		halfLen := shape.size[1] * 0.5
+		halfLen := g.size[1] * 0.5
 		dir := b2.RotateVector(shapeRot, b2.Vec2{0, halfLen})
 		p1 := worldCenter - dir
 		p2 := worldCenter + dir
-		rl.DrawCircleV(p1, shape.radius, fillColor)
-		rl.DrawCircleV(p2, shape.radius, fillColor)
-		rl.DrawCircleLinesV(p1, shape.radius, color)
-		rl.DrawCircleLinesV(p2, shape.radius, color)
-		rl.DrawLineEx(p1, p2, shape.radius * 2.0, fillColor)
-		perp := b2.RotateVector(shapeRot, b2.Vec2{shape.radius, 0})
+		rl.DrawCircleV(p1, g.radius, fillColor)
+		rl.DrawCircleV(p2, g.radius, fillColor)
+		rl.DrawCircleLinesV(p1, g.radius, color)
+		rl.DrawCircleLinesV(p2, g.radius, color)
+		rl.DrawLineEx(p1, p2, g.radius * 2.0, fillColor)
+		perp := b2.RotateVector(shapeRot, b2.Vec2{g.radius, 0})
 		rl.DrawLineV(p1 + perp, p2 + perp, color)
 		rl.DrawLineV(p1 - perp, p2 - perp, color)
 
 	case .Box, .RoundedBox:
-		w := shape.size[0]
-		h := shape.size[1]
+		w := g.size[0]
+		h := g.size[1]
 		rect := rl.Rectangle{worldCenter.x, worldCenter.y, w, h}
-		rl.DrawRectanglePro(rect, {w * 0.5, h * 0.5}, bodyRotDeg + shape.rotation, fillColor)
+		rl.DrawRectanglePro(rect, {w * 0.5, h * 0.5}, bodyRotDeg + g.rotation, fillColor)
 		hw := w * 0.5
 		hh := h * 0.5
 		c0 := worldCenter + b2.RotateVector(shapeRot, {-hw, -hh})
@@ -297,30 +366,30 @@ PhysicsShape_DrawDebug :: proc(shape: ^PhysicsShape, bodyPos: [2]f32, bodyRotDeg
 		rl.DrawLineV(c3, c0, color)
 
 	case .Polygon:
-		count := clamp(shape.vertexCount, 3, int(b2.MAX_POLYGON_VERTICES))
+		count := clamp(g.vertexCount, 3, int(b2.MAX_POLYGON_VERTICES))
 		for i in 0..<count {
 			next := (i + 1) % count
-			v0 := worldCenter + b2.RotateVector(shapeRot, shape.vertices[i])
-			v1 := worldCenter + b2.RotateVector(shapeRot, shape.vertices[next])
+			v0 := worldCenter + b2.RotateVector(shapeRot, g.vertices[i])
+			v1 := worldCenter + b2.RotateVector(shapeRot, g.vertices[next])
 			rl.DrawLineV(v0, v1, color)
 		}
 
 	case .Segment:
-		p1 := worldCenter + b2.RotateVector(shapeRot, shape.point1)
-		p2 := worldCenter + b2.RotateVector(shapeRot, shape.point2)
+		p1 := worldCenter + b2.RotateVector(shapeRot, g.point1)
+		p2 := worldCenter + b2.RotateVector(shapeRot, g.point2)
 		rl.DrawLineEx(p1, p2, 2.0, color)
 
 	case .Chain:
-		n := len(shape.chainPoints)
+		n := len(g.chainPoints)
 		if n >= 2 {
 			for i in 0..<(n - 1) {
-				p1 := worldCenter + b2.RotateVector(shapeRot, shape.chainPoints[i])
-				p2 := worldCenter + b2.RotateVector(shapeRot, shape.chainPoints[i + 1])
+				p1 := worldCenter + b2.RotateVector(shapeRot, g.chainPoints[i])
+				p2 := worldCenter + b2.RotateVector(shapeRot, g.chainPoints[i + 1])
 				rl.DrawLineEx(p1, p2, 2.0, color)
 			}
-			if shape.isLoop {
-				p1 := worldCenter + b2.RotateVector(shapeRot, shape.chainPoints[n - 1])
-				p2 := worldCenter + b2.RotateVector(shapeRot, shape.chainPoints[0])
+			if g.isLoop {
+				p1 := worldCenter + b2.RotateVector(shapeRot, g.chainPoints[n - 1])
+				p2 := worldCenter + b2.RotateVector(shapeRot, g.chainPoints[0])
 				rl.DrawLineEx(p1, p2, 2.0, color)
 			}
 		}

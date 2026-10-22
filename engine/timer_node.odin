@@ -15,8 +15,8 @@ TimerNode :: struct {
 
 TimerNode_Init :: proc(timer: ^TimerNode) {
 	InitializeNode(timer)
-	InitializeSubject(&timer.onTick)
-	InitializeSubject(&timer.onExpire)
+	InitializeSubject(&timer.onTick, "tick", timer)       // every update while running (elapsed seconds)
+	InitializeSubject(&timer.onExpire, "timeout", timer)  // the duration elapsed
 	timer.update = TimerNode_Update
 	timer.onDestroy = TimerNode_Destroy
 	timer.start = TimerNode_Start
@@ -48,22 +48,17 @@ TimerNode_Create :: proc(scene: ^Scene, durationSeconds: f32, auto_start: bool =
 
 TimerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	timer := cast(^TimerNode)node
-	if timer.running {
-		timer.elapsed += time.Duration(deltaTime * f32(time.Second))
-	}
+	if !timer.running do return
+	timer.elapsed += time.Duration(f64(deltaTime) * f64(time.Second))
+	timer.onTick->notify(timer, f32(time.duration_seconds(timer.elapsed)), gameContext)
 	if timer.elapsed >= timer.duration {
-		timer.onExpire->notify(timer, f32(0), gameContext)
-		if timer.loop {
-			timer.elapsed = 0
-			timer.running = true
-		}
-		else {
-			timer.elapsed = 0
-			timer.running = false
-		}
+		// Reset first so a "timeout" handler can restart or reconfigure it.
+		timer.elapsed = 0
+		timer.running = timer.loop
+		timer.onExpire->notify(timer, nil, gameContext)
 	}
 }
 
 TimerNode_SetDuration :: proc(timer: ^TimerNode, durationSec: f32) {
-	timer.duration = time.Duration(durationSec * f32(time.Second))
+	timer.duration = time.Duration(f64(durationSec) * f64(time.Second)) // f32 overflows past ~2.1s
 }

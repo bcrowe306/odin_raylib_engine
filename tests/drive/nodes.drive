@@ -1,0 +1,70 @@
+# Building a scene from the UI: Add Node dialog, texture picker, reflected
+# properties, duplicate, delete, undo/redo, re-parenting by drag & drop,
+# visibility toggle, and saving.
+wait 5
+key escape
+expect selected ==
+
+# --- Add a sprite through the toolbar button + dialog search ---
+click @hier.add
+expect add-node-open == true
+type sprite
+screenshot add_node_dialog
+click @addnode.create
+expect add-node-open == false
+expect selected == TextureSprite
+expect node:TextureSprite.type == TextureNode
+expect node:TextureSprite.parent == root
+
+# Pick its texture from the project's textures.
+click @insp.texture
+click @pick:textures/Asteroid_5.png
+expect node:TextureSprite.prop.size !=
+expect file:scenes/main.scene.json !contains TextureSprite
+screenshot sprite_with_texture
+
+# --- A physics body with a reflected property edit ---
+key escape
+key ctrl+a
+type dynamic
+key enter
+expect selected == DynamicPhysicsBox
+expect node:DynamicPhysicsBox.type == DynamicBodyNode
+dblclick @insp.prop:gravityScale
+key ctrl+a
+type 0.25
+key enter
+expect node:DynamicPhysicsBox.prop.gravityScale == 0.25
+screenshot physics_body
+
+# --- Duplicate, delete, undo, redo ---
+key ctrl+d
+expect selected == DynamicPhysicsBox2
+expect node:DynamicPhysicsBox2.prop.gravityScale == 0.25
+key delete
+expect node:DynamicPhysicsBox2.exists == false
+key ctrl+z
+expect node:DynamicPhysicsBox2.exists == true
+key ctrl+shift+z
+expect node:DynamicPhysicsBox2.exists == false
+
+# --- Re-parent by dragging the box onto the sprite in the scene tree ---
+drag @hier:DynamicPhysicsBox @hier:TextureSprite 12
+expect node:DynamicPhysicsBox.parent == TextureSprite
+screenshot reparented
+
+# --- Visibility toggle in the tree ---
+click @hier.vis:TextureSprite
+expect node:TextureSprite.visible == false
+click @hier.vis:TextureSprite
+expect node:TextureSprite.visible == true
+
+# --- Save: everything lands in the scene file ---
+expect modified == true
+key ctrl+s
+expect modified == false
+expect file:scenes/main.scene.json contains "TextureSprite"
+expect file:scenes/main.scene.json contains "textures/Asteroid_5.png"
+expect file:scenes/main.scene.json contains "gravityScale": 0.25
+expect file:scenes/main.scene.json contains "DynamicPhysicsBox"
+screenshot saved

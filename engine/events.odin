@@ -1,8 +1,20 @@
 package engine
 
-import "core:log"
-import "core:crypto"
+import "base:runtime"
 import "core:encoding/uuid"
+import "core:log"
+
+// ============================================================================
+// Events
+//
+// An EventSubject is a named event owned by a node ("timeout" on a TimerNode,
+// "body_entered" on an AreaNode, ...). Odin code subscribes callbacks; Lua
+// scripts receive the same events (see script_events.odin):
+//   * a method on the owner's script named `on_<event>` (e.g. on_timeout), and
+//   * functions connected from any script with node:connect("<event>", fn).
+// Notify is re-entrancy safe: listeners may subscribe/unsubscribe, emit other
+// events or destroy nodes while being notified.
+// ============================================================================
 
 ListenerId :: uuid.Identifier
 
@@ -14,6 +26,7 @@ EventValue :: union {
 	u32,
 	u64,
 	string,
+	^Node, // the other node of a collision / overlap / child event
 }
 
 EventSubscription :: struct {
@@ -23,18 +36,20 @@ EventSubscription :: struct {
 }
 
 EventSubject :: struct {
-	name: string,
+	name: string, // Lua-facing event name, e.g. "timeout"
+	owner: ^Node, // node the event belongs to (nil for non-node subjects)
 	listeners: [dynamic]EventSubscription,
 	subscribe: proc(subject: ^EventSubject, callback: proc(source: rawptr, value: EventValue,  gameContext: ^GameContext, user_data: rawptr), user_data: rawptr ) -> ListenerId,
 	unsubscribe: proc(subject: ^EventSubject, id: ListenerId),
 	notify: proc(subject: ^EventSubject, source: rawptr, value: EventValue, gameContext: ^GameContext),
 }
 
-
-InitializeSubject :: proc(subject: ^EventSubject) {
+InitializeSubject :: proc(subject: ^EventSubject, name: string = "", owner: ^Node = nil) {
 	subject.notify = Notify
 	subject.subscribe = Subscribe
 	subject.unsubscribe = UnSubscribe
+	subject.name = name
+	subject.owner = owner
 }
 
 DestroySubject :: proc(subject: ^EventSubject) {
@@ -43,16 +58,16 @@ DestroySubject :: proc(subject: ^EventSubject) {
 	subject.listeners = nil
 }
 
+@(private = "file")
+nextListenerId: u64
 
 Subscribe :: proc(subject: ^EventSubject, callback: proc(source: rawptr, value: EventValue,  gameContext: ^GameContext, user_data: rawptr), user_data: rawptr ) -> ListenerId {
-	context.random_generator = crypto.random_generator()
-	id := uuid.generate_v4()
-	subscription := EventSubscription{
-		id = id,
-		userData = user_data,
-		callback = callback
-	}
-	_, err := append(&subject.listeners, subscription)
+	// A counter is enough to identify a subscription (the crypto RNG UUID
+	// cost a syscall per subscribe).
+	nextListenerId += 1
+	id: ListenerId
+	(^u64)(&id[0])^ = nextListenerId
+	_, err := append(&subject.listeners, EventSubscription{id = id, userData = user_data, callback = callback})
 	if err != nil {
 		log.error(err)
 	}
@@ -60,30 +75,76 @@ Subscribe :: proc(subject: ^EventSubject, callback: proc(source: rawptr, value: 
 }
 
 Notify :: proc(subject: ^EventSubject, source: rawptr, value: EventValue, gameContext: ^GameContext) {
-	if subject != nil {
-		for listener in subject.listeners {
+	if subject == nil do return
+	if len(subject.listeners) > 0 {
+		// Iterate a copy: callbacks may (un)subscribe while we notify.
+		snapshot := make([]EventSubscription, len(subject.listeners), context.temp_allocator)
+		copy(snapshot, subject.listeners[:])
+		for listener in snapshot {
 			if listener.callback != nil {
 				listener.callback(source, value, gameContext, listener.userData)
 			}
-			else {
-				log.errorf("Listener callback is nil")
-			}
 		}
+	}
+	if subject.owner != nil && subject.name != "" {
+		Script_DispatchEvent(subject.owner, subject.name, value, gameContext)
 	}
 }
 
 UnSubscribe :: proc(subject: ^EventSubject, id: ListenerId) {
-	index := -1
 	for listener, i in subject.listeners {
 		if listener.id == id {
-			index = i
-			break
+			ordered_remove(&subject.listeners, i) // keep notification order
+			return
 		}
 	}
-	if index != -1 {
-		unordered_remove(&subject.listeners, index)
+	log.debugf("Cannot unsubscribe: listener %v not found", id)
+}
+
+// ============================================================================
+// Live node registry: Lua holds node references by id; looking the id up
+// here (instead of dereferencing a pointer that may have been freed) turns a
+// destroyed node into nil.
+// ============================================================================
+
+@(private = "file")
+liveNodes: map[uuid.Identifier]^Node
+@(private = "file")
+livePtrs: map[^Node]bool
+
+Node_Register :: proc(node: ^Node) {
+	if liveNodes == nil {
+		// Process-lifetime registry: not owned by whatever allocator the
+		// caller happens to use.
+		liveNodes = make(map[uuid.Identifier]^Node, allocator = runtime.heap_allocator())
+		livePtrs = make(map[^Node]bool, allocator = runtime.heap_allocator())
 	}
-	else {
-		log.error("Cannot unsubscribe. ListenerId not found. ", id )
+	liveNodes[node.id] = node
+	livePtrs[node] = true
+}
+
+Node_Unregister :: proc(node: ^Node) {
+	if liveNodes == nil do return
+	if p, ok := liveNodes[node.id]; ok && p == node {
+		delete_key(&liveNodes, node.id)
 	}
+	delete_key(&livePtrs, node)
+	if len(liveNodes) == 0 && len(livePtrs) == 0 {
+		delete(liveNodes)
+		delete(livePtrs)
+		liveNodes = nil
+		livePtrs = nil
+	}
+}
+
+// Node_FromId returns the live node with that id (nil once destroyed).
+Node_FromId :: proc(id: uuid.Identifier) -> ^Node {
+	if liveNodes == nil do return nil
+	return liveNodes[id]
+}
+
+// Node_IsAlive reports whether a pointer still refers to a live node.
+Node_IsAlive :: proc(node: ^Node) -> bool {
+	if node == nil || livePtrs == nil do return false
+	return livePtrs[node]
 }

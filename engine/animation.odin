@@ -14,6 +14,8 @@ Animation :: struct {
 	source:      rl.Rectangle,
 	dest:        rl.Rectangle,
 	frameCount:  proc(animation: ^Animation) -> int,
+	// Keyframed property tracks (animation_tracks.odin).
+	tracks:      [dynamic]Property_Track,
 	renderFrame: proc(animation: ^Animation, frame: int, node: ^Node),
 }
 

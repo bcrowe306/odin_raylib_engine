@@ -1,0 +1,79 @@
+# Asset importer: the Assets panel's + menu with the system file dialog
+# (answered by `dialog-files`), multi-file and folder drops from the OS, bad
+# and unsupported files failing on their own, and LDtk projects bringing the
+# tileset images they reference.
+wait 5
+
+# + menu > Import Assets... with three files picked in the dialog.
+click @asset.add
+screenshot add_menu
+dialog-files tests/drive/fixtures/import/crate.png tests/drive/fixtures/import/blip.wav tests/drive/fixtures/import/hello.lua
+click @ctx:add-import
+wait 3
+expect import.imported == 3
+expect import.failed == 0
+expect import.report == false
+expect item:asset:textures/crate.png == visible
+expect item:asset:audio/blip.wav == visible
+expect item:asset:scripts/hello.lua == visible
+expect log contains Imported 3 asset(s)
+screenshot imported_from_dialog
+
+# Cancelling the dialog imports nothing.
+click @asset.add
+dialog-files
+click @ctx:add-import
+wait 3
+expect import.dialog == false
+
+# Drop several files on the Assets panel: the bad and unsupported ones fail,
+# the rest import; the same crate again is "already in the project".
+drop-files @asset.search tests/drive/fixtures/import/crate.png tests/drive/fixtures/import/broken.png tests/drive/fixtures/import/notes.txt tests/drive/fixtures/import/levels/tiny.ldtk
+wait 3
+expect import.failed == 2
+expect import.skipped == 1
+expect import.report == true
+expect import.messages contains broken.png: Failed  not a readable image
+expect import.messages contains notes.txt: Failed  unsupported file type (.txt)
+expect log contains Import notes.txt: unsupported file type
+# The level is in levels/, its tileset image in textures/ and the level's
+# path to it rewritten.
+expect item:asset:levels/tiny.ldtk == visible
+expect item:asset:textures/drive_tiles.png == visible
+expect file:levels/tiny.ldtk contains "relPath": "../textures/drive_tiles.png"
+screenshot import_results
+click @import.close
+expect import.report == false
+
+# A changed file with a taken name is imported beside it.
+exec cp tests/drive/fixtures/import/Pack/gem.png $PROJECT/textures/gem.png
+drop-files @asset.search tests/drive/fixtures/import/Pack/gem.png
+wait 3
+expect import.skipped == 1
+exec cp tests/drive/fixtures/import/crate.png $PROJECT/textures/gem.png
+drop-files @asset.search tests/drive/fixtures/import/Pack/gem.png
+wait 3
+expect import.imported == 1
+expect item:asset:textures/gem_2.png == visible
+
+# A dropped folder keeps its layout; its unsupported files fail.
+drop-files @asset.search tests/drive/fixtures/import/Pack
+wait 3
+expect import.imported == 2
+expect import.failed == 1
+expect item:asset:textures/Pack/gem.png == visible
+expect item:asset:textures/Pack/Effects/spark.png == visible
+click @import.close
+
+# Dropped on the viewport: imported and added to the scene there.
+drop-files @viewport tests/drive/fixtures/import/art/drive_tiles.png
+wait 3
+expect import.skipped == 1
+expect selected == drive_tiles
+expect node:drive_tiles.exists == true
+screenshot dropped_on_viewport
+
+# Folder menus import with their own filter.
+rclick @section:Textures
+expect item:ctx:import-here == visible
+key escape

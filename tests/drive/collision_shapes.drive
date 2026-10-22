@@ -1,0 +1,61 @@
+# Collision shapes edited in the viewport: the Edit Shapes toggle replaces
+# the gizmo with handles - resize a box edge (one side moves), move and
+# rotate a shape, turn it into a polygon and add / drag / remove points;
+# every drag is one undo step; Esc leaves the mode before deselecting.
+wait 5
+click @asset.new-scene
+click @hier.add
+type static platform
+click @addnode.create
+expect selected == StaticPlatform
+expect shape:StaticPlatform:0:size == 256.0,32.0
+expect item:viewport.edit-shapes == visible
+click @viewport.edit-shapes
+expect shape.edit == true
+expect item:shape0.Edge0 == visible
+screenshot box_handles
+
+# Right edge: wider, and the shape's centre moves right (left edge stays).
+drag @shape0.Edge0 @shape0.Edge0+64,0 8
+expect shape:StaticPlatform:0:size !contains 256.0,
+expect shape:StaticPlatform:0:offset !contains 0.0,0.0
+# Undo restores it in one step.
+key ctrl+z
+expect shape:StaticPlatform:0:size == 256.0,32.0
+expect shape:StaticPlatform:0:offset == 0.0,0.0
+# Shift: around the centre (the offset stays).
+hold shift
+drag @shape0.Edge1 @shape0.Edge1+0,48 8
+release
+expect shape:StaticPlatform:0:offset == 0.0,0.0
+expect shape:StaticPlatform:0:size !contains ,32.0
+
+# Move and rotate.
+drag @shape0.Move0 @shape0.Move0+96,-64 8
+expect shape:StaticPlatform:0:offset !contains 0.0,0.0
+drag @shape0.Rotate0 @shape0.Rotate0+200,0 8
+expect shape:StaticPlatform:0:rotation != 0.0
+screenshot moved_rotated
+
+# Polygon: add a point, drag it out, remove another.
+click @insp.shape0.type
+click @pick:Polygon
+expect shape:StaticPlatform:0:type == Polygon
+expect shape:StaticPlatform:0:vertices == 4
+click @shape0.AddPoint0
+expect shape:StaticPlatform:0:vertices == 5
+drag @shape0.Point1 @shape0.Point1+0,-60 8
+screenshot polygon_points
+rclick @shape0.Point3
+expect shape:StaticPlatform:0:vertices == 4
+
+# Saved with the scene.
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "vertices": [
+
+# Esc leaves shape editing first, then deselects.
+key escape
+expect shape.edit == false
+expect selected == StaticPlatform
+key escape
+expect selected ==

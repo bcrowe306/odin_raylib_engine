@@ -1,0 +1,355 @@
+package engine
+
+import "core:strings"
+
+// ============================================================================
+// Node Type Registry
+//
+// One table maps a node type's name (as written in scene JSON) to its typeid
+// and a factory that builds a fully initialised, working node of that type
+// (update/render procs set, physics body created, ...). The scene loader and
+// the editor's "Add Node" both create nodes through it, so a node created in
+// the editor behaves exactly like one loaded from a file.
+// ============================================================================
+
+Node_Factory :: proc(scene: ^Scene, parent: ^Node) -> ^Node
+
+Node_Type_Info :: struct {
+	name:     string,   // canonical JSON "type"
+	type:     typeid,
+	create:   Node_Factory,
+	aliases:  []string, // accepted (lower-case) legacy names
+}
+
+// The canonical list. Order is also the editor's display order.
+NODE_TYPES := [?]Node_Type_Info{
+	{"Node", Node, factory_node, {"node", "empty"}},
+	{"CameraNode", CameraNode, factory_camera, {"camera"}},
+	{"TimerNode", TimerNode, factory_timer, {"timer"}},
+	{"ScriptNode", ScriptNode, factory_script, {"script"}},
+	{"TextureNode", TextureNode, factory_texture, {"texture", "sprite"}},
+	{"FrameAnimationNode", FrameAnimationNode, factory_frame_animation, {"animationnode", "frameanimation", "animation"}},
+	{"AnimationPlayerNode", AnimationPlayerNode, factory_animation_player, {"animationplayer"}},
+	{"ParticleEmitterNode", ParticleEmitterNode, factory_particles, {"particle", "particles", "particleemitter"}},
+	{"SoundNode", SoundNode, factory_sound, {"sound"}},
+	{"MusicNode", MusicNode, factory_music, {"music"}},
+	{"StaticBodyNode", StaticBodyNode, factory_static_body, {"staticbody", "static_body"}},
+	{"DynamicBodyNode", DynamicBodyNode, factory_dynamic_body, {"dynamicbody", "dynamic_body"}},
+	{"CharacterMoverNode", CharacterMoverNode, factory_character, {"charactermover", "character_mover"}},
+	{"AreaNode", AreaNode, factory_area, {"area"}},
+	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
+	{"LdtkLevelNode", LdtkLevelNode, factory_ldtk, {"ldtk", "ldtklevel"}},
+	{"TileMapNode", TileMapNode, factory_tilemap, {"tilemap"}},
+	{"UIContainerNode", UIContainerNode, factory_ui_container, {"uicontainer", "uipanel", "uipanelnode"}},
+	{"UILabelNode", UILabelNode, factory_ui_label, {"uilabel"}},
+	{"UIButtonNode", UIButtonNode, factory_ui_button, {"uibutton"}},
+	{"UISliderNode", UISliderNode, factory_ui_slider, {"uislider"}},
+	{"UICheckboxNode", UICheckboxNode, factory_ui_checkbox, {"uicheckbox"}},
+	{"UIProgressBarNode", UIProgressBarNode, factory_ui_progress, {"uiprogressbar"}},
+	{"UITextInputNode", UITextInputNode, factory_textinput, {"uitextinput"}},
+	{"UIDropdownNode", UIDropdownNode, factory_dropdown, {"uidropdown"}},
+	{"UIRadioGroupNode", UIRadioGroupNode, factory_radiogroup, {"uiradiogroup"}},
+	{"UIToggleSwitchNode", UIToggleSwitchNode, factory_toggleswitch, {"uitoggleswitch"}},
+	{"UIKnobNode", UIKnobNode, factory_knob, {"uiknob"}},
+	{"UINotchedSliderNode", UINotchedSliderNode, factory_notchedslider, {"uinotchedslider"}},
+	{"UIVolumeFaderNode", UIVolumeFaderNode, factory_volumefader, {"uivolumefader"}},
+	{"UIVolumeMeterNode", UIVolumeMeterNode, factory_volumemeter, {"uivolumemeter"}},
+	{"UISeparatorNode", UISeparatorNode, factory_separator, {"uiseparator"}},
+	{"UIXYPlotNode", UIXYPlotNode, factory_xyplot, {"uixyplot"}},
+	{"UIListViewNode", UIListViewNode, factory_listview, {"uilistview"}},
+	{"UITreeViewNode", UITreeViewNode, factory_treeview, {"uitreeview"}},
+	{"UIUnorderedListNode", UIUnorderedListNode, factory_unorderedlist, {"uiunorderedlist"}},
+	{"UIOrderedListNode", UIOrderedListNode, factory_orderedlist, {"uiorderedlist"}},
+	{"UITableNode", UITableNode, factory_table, {"uitable"}},
+	{"UIIconNode", UIIconNode, factory_icon, {"uiicon"}},
+	{"UIToolbarNode", UIToolbarNode, factory_toolbar, {"uitoolbar"}},
+	{"UITabContainerNode", UITabContainerNode, factory_tabcontainer, {"uitabcontainer"}},
+}
+
+// Node_TypeInfoByName finds a type by canonical name or alias (any case).
+Node_TypeInfoByName :: proc(name: string) -> (^Node_Type_Info, bool) {
+	for &info in NODE_TYPES {
+		if strings.equal_fold(info.name, name) do return &info, true
+		for a in info.aliases {
+			if strings.equal_fold(a, name) do return &info, true
+		}
+	}
+	return nil, false
+}
+
+Node_TypeInfoById :: proc(t: typeid) -> (^Node_Type_Info, bool) {
+	for &info in NODE_TYPES {
+		if info.type == t do return &info, true
+	}
+	return nil, false
+}
+
+// Node_TypeName is the JSON "type" of a node ("Node" for unknown types).
+Node_TypeName :: proc(node: ^Node) -> string {
+	if node == nil do return "Node"
+	if info, ok := Node_TypeInfoById(node.typeId); ok do return info.name
+	return "Node"
+}
+
+// Node_CreateByTypeName builds a node of the named type under `parent`
+// (the scene root when nil). Unknown names create a plain Node.
+Node_CreateByTypeName :: proc(scene: ^Scene, typeName: string, parent: ^Node = nil) -> ^Node {
+	if scene == nil || scene.manager == nil do return nil
+	target := parent if parent != nil else scene.rootNode
+	info, ok := Node_TypeInfoByName(typeName)
+	node: ^Node
+	if ok {
+		node = info.create(scene, target)
+	} else {
+		node = factory_node(scene, target)
+	}
+	if node == nil do return nil
+	if node.typeId == nil || (ok && node.typeId != info.type) {
+		node.typeId = info.type if ok else typeid_of(Node)
+	}
+	place_under(scene, node, target)
+	if scene.rootNode != nil && scene.rootNode.gameContext != nil && node.gameContext == nil {
+		node.gameContext = scene.rootNode.gameContext
+	}
+	return node
+}
+
+// place_under makes `parent` the node's (only) parent, whatever the type's
+// constructor did: some add to the root, some take a parent, some add nothing.
+@(private = "file")
+place_under :: proc(scene: ^Scene, node, parent: ^Node) {
+	queued := false
+	for q in scene.manager.addition {
+		if q == node {queued = true; break}
+	}
+	if !queued {
+		for n in scene.manager.nodes {
+			if n == node {queued = true; break}
+		}
+	}
+	if !queued {
+		SceneAddNode(scene, node, parent)
+		return
+	}
+	current := GetParent(scene.manager, node)
+	if current == parent do return
+	if current != nil do RemoveChild(scene.manager, current, node)
+	if parent != nil && parent != node do AddChild(scene.manager, parent, node)
+}
+
+// --- factories ---------------------------------------------------------------------
+
+@(private = "file")
+factory_node :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return CreateNode(scene.manager, Node)
+}
+
+@(private = "file")
+factory_camera :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return CameraNode_Create(scene, "Camera", true, parent)
+}
+
+@(private = "file")
+factory_timer :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return TimerNode_Create(scene, 1.0, false, false)
+}
+
+@(private = "file")
+factory_script :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	sn := CreateNode(scene.manager, ScriptNode)
+	ScriptNode_Init(sn)
+	return sn
+}
+
+@(private = "file")
+factory_texture :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	tn := CreateNode(scene.manager, TextureNode)
+	TextureNode_Init(tn)
+	return tn
+}
+
+@(private = "file")
+factory_frame_animation :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return FrameAnimationNode_Create(scene)
+}
+
+@(private = "file")
+factory_animation_player :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return AnimationPlayerNode_Create(scene, "AnimationPlayer")
+}
+
+@(private = "file")
+factory_particles :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return ParticleEmitterNode_Create(scene, "Particles")
+}
+
+@(private = "file")
+factory_sound :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	sn := CreateNode(scene.manager, SoundNode)
+	SoundNode_Init(sn)
+	return sn
+}
+
+@(private = "file")
+factory_music :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return MusicNode_Create(scene, nil, "", "Music", false, true, parent)
+}
+
+@(private = "file")
+factory_static_body :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return StaticBodyNode_Create(scene, "StaticBody", parent)
+}
+
+@(private = "file")
+factory_dynamic_body :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return DynamicBodyNode_Create(scene, "DynamicBody", parent)
+}
+
+@(private = "file")
+factory_character :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return CharacterMoverNode_Create(scene, "CharacterMover", parent)
+}
+
+@(private = "file")
+factory_area :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return AreaNode_Create(scene, "Area", parent)
+}
+
+@(private = "file")
+factory_raycast :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return RaycastNode_Create(scene, "Raycast", parent)
+}
+
+@(private = "file")
+factory_ldtk :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return LdtkLevelNode_Create(scene, "LdtkLevel", "", "", parent)
+}
+
+@(private = "file")
+factory_ui_container :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIPanelNode_Create(scene, "Panel", "Panel", {0, 0}, {320, 240}, .Vertical, parent)
+}
+
+@(private = "file")
+factory_ui_label :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UILabelNode_Create(scene, "Label", "Label", parent = parent)
+}
+
+@(private = "file")
+factory_ui_button :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIButtonNode_Create(scene, "Button", "Button", parent = parent)
+}
+
+@(private = "file")
+factory_ui_slider :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UISliderNode_Create(scene, "Slider", "Value", parent = parent)
+}
+
+@(private = "file")
+factory_ui_checkbox :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UICheckboxNode_Create(scene, "Checkbox", "Checkbox", parent = parent)
+}
+
+@(private = "file")
+factory_ui_progress :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIProgressBarNode_Create(scene, "ProgressBar", "Progress", parent = parent)
+}
+
+// Default content for list-like widgets created from the editor.
+UI_DEFAULT_OPTIONS := [?]string{"Option A", "Option B", "Option C"}
+UI_DEFAULT_TABS := [?]string{"Tab 1", "Tab 2"}
+
+@(private = "file")
+factory_textinput :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UITextInputNode_Create(scene, "TextInput", "Input", parent = parent)
+}
+
+@(private = "file")
+factory_dropdown :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIDropdownNode_Create(scene, "Dropdown", "Select", UI_DEFAULT_OPTIONS[:], parent = parent)
+}
+
+@(private = "file")
+factory_radiogroup :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIRadioGroupNode_Create(scene, "RadioGroup", "Option", UI_DEFAULT_OPTIONS[:], parent = parent)
+}
+
+@(private = "file")
+factory_toggleswitch :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIToggleSwitchNode_Create(scene, "ToggleSwitch", "Toggle", parent = parent)
+}
+
+@(private = "file")
+factory_knob :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIKnobNode_Create(scene, "Knob", "Volume", parent = parent)
+}
+
+@(private = "file")
+factory_notchedslider :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UINotchedSliderNode_Create(scene, "NotchedSlider", "Detents", parent = parent)
+}
+
+@(private = "file")
+factory_volumefader :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIVolumeFaderNode_Create(scene, "VolumeFader", "Master", parent = parent)
+}
+
+@(private = "file")
+factory_volumemeter :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIVolumeMeterNode_Create(scene, "VolumeMeter", "VU", parent = parent)
+}
+
+@(private = "file")
+factory_separator :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UISeparatorNode_Create(scene, "Separator", "", parent = parent)
+}
+
+@(private = "file")
+factory_xyplot :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIXYPlotNode_Create(scene, "Plot", "Signal vs Time", parent = parent)
+}
+
+@(private = "file")
+factory_listview :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIListViewNode_Create(scene, "ListView", UI_DEFAULT_OPTIONS[:], parent = parent)
+}
+
+@(private = "file")
+factory_treeview :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UITreeViewNode_Create(scene, "TreeView", parent = parent)
+}
+
+@(private = "file")
+factory_unorderedlist :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIUnorderedListNode_Create(scene, "UnorderedList", parent = parent)
+}
+
+@(private = "file")
+factory_orderedlist :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIOrderedListNode_Create(scene, "OrderedList", parent = parent)
+}
+
+@(private = "file")
+factory_table :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UITableNode_Create(scene, "Table", parent = parent)
+}
+
+@(private = "file")
+factory_icon :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIIconNode_Create(scene, "Icon", parent = parent)
+}
+
+@(private = "file")
+factory_toolbar :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UIToolbarNode_Create(scene, "Toolbar", parent = parent)
+}
+
+@(private = "file")
+factory_tabcontainer :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return UITabContainerNode_Create(scene, "TabContainer", UI_DEFAULT_TABS[:], parent = parent)
+}
+
+@(private = "file")
+factory_tilemap :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return TileMapNode_Create(scene, "TileMap", parent)
+}

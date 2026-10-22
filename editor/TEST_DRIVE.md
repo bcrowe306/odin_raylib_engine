@@ -1,0 +1,112 @@
+# Editor test-drives
+
+Test-drives operate the editor the way a user does. A script moves the mouse,
+clicks, drags, scrolls, presses keys and types. Each action is injected as a
+real ImGui input event, and the real mouse and keyboard are ignored meanwhile.
+After each step the script checks the editor's state, the files it wrote, and
+the game process it launched, and it captures screenshots along the way.
+
+```bash
+./scripts/editor_drive.sh                 # every tests/drive/*.drive
+./scripts/editor_drive.sh playtest nodes  # selected drives
+task editor:drive                         # same as the first line
+```
+
+Each drive runs against a **fresh copy** of `assets/demo_project` in `/tmp`, so the
+real project is never modified. Results go to `editor_screenshots/drive/<name>/`:
+numbered screenshots plus an `index.md` report listing every check. The script
+exits non-zero if any check fails.
+
+## Suites
+
+| Drive | Covers |
+|---|---|
+| `playtest.drive` | Rename and move a node, press Play: the editor saves, the game process starts, and the game's own scene dump contains the edit. Play Current Scene (F6) runs a non-initial scene. |
+| `nodes.drive` | Add Node dialog (toolbar and Ctrl+A, search, Create), texture picker, reflected property edit, duplicate, delete, undo/redo, drag-and-drop re-parenting, visibility toggle, save. |
+| `viewport.drive` | Click-select, move/rotate/scale gizmos with world-space grid snapping, undo of gizmo edits, pan tool, wheel zoom. |
+| `scripts.drive` | Attach a Lua script from the inspector, edit an exported property, save, simulate in the editor (and restore), Play: the game runs with the edited value. |
+| `project.drive` | New scene, physics bodies, unsaved edits survive scene switches, Project Settings (gravity, startup scene), simulate a falling crate, Play starts in the new scene. |
+| `components.drive` | Save a subtree as a component from the context menu, instantiate it from Assets, built-in templates. |
+| `export.drive` | Export `.ore`, then run the game from the package (textures load from inside it). |
+| `assets.drive` | Asset folders collapse/expand (folder icons); the Scenes folder's + creates a scene. |
+| `code_shortcuts.drive` | Zed-style code editing: auto-closing pairs, line operations, multi-cursor, find/replace, go to line, LSP rename and format, font size, Go to File, reopen tab, command palette, Keyboard Shortcuts window. |
+| `scene_editing.drive` | Multi-select (tree, box), align, nudge, copy/paste, multi-delete, F2 rename, select all, quit prompt. |
+| `signals.drive` | Connect an event to a script method (handler generated, connection saved), disconnect (handler removed; asks when it has code), drag assets into a script (path / asset property). |
+| `prefab_overrides.drive` | Edit a child of a linked instance: saved as an override, other instances unaffected, Revert. |
+| `animation.drive` | Animation tab: frames from dropped textures, scrubbing, rotation track with keys, preview restore, save. |
+| `tilemap.drive` | Tile map: tileset, palette, paint stroke (undo/redo), flood fill, erase, save. |
+| `ui_ux.drive` | Settings (keymap record, input action + key, video, export), linked X/Y and reset, Save As / Revert / Open Project, asset copy/paste/rename/delete, paste as child, LDtk level asset, instance add child + apply to component, particle editor, viewport fit. |
+| `code_editor.drive` | Open a script in the Code tab; lua-language-server completion of the engine API, signature help, diagnostics, go to definition; save; unsaved-changes prompt; New Script from the Inspector. |
+
+## Script language
+
+One command per line; `#` starts a comment.
+
+```
+wait <frames>
+wait-until <expr> [timeout=<frames>]
+move|hover <target>
+click|rclick|dblclick <target>
+drag <from> <to> [steps]
+scroll <target> <dy>
+key <chord>                    # w, delete, f5, escape, ctrl+s, ctrl+shift+z, ctrl+slash, ctrl+rbracket
+hold <mods> / release          # keep shift / cmd / alt held for the following clicks/keys
+type <text>                    # "\s" types a space (command text is trimmed)
+expect <expr>
+screenshot <name>
+game-args <args...>            # extra args for the game the editor launches
+exec <command...>              # run a command to completion
+drop-files <target> <path...>  # files/folders dropped from the OS file manager at <target>
+dialog-files [<path...>]       # answer for the next system file dialog (none = Cancel)
+log <text> | quit
+```
+
+**Targets**
+- `@<id>`: a widget registered by the UI (`@toolbar.play`, `@hier:PlayerShip`,
+  `@insp.position.x`, `@insp.prop:gravityScale`, `@addnode:Texture Sprite`,
+  `@asset:scenes/main.scene.json`, `@menu:Game/Simulate in Editor`, `@pick:<value>`,
+  `@ctx:duplicate`, `@settings.save`, `@code.area`, `@code.tab:<file>`, `@code.completion:<label>`, ...).
+- `@node:<Name>`: a node's position on screen.
+- `@world:x,y`: a world position.
+- `x,y`: raw window pixels.
+- Any target accepts a `+dx,dy` pixel offset.
+
+Clicks scroll the target's panel into view first, like a user would.
+
+**Expressions** have the form `<query> <op> <value>`, where `op` is one of
+`== != contains !contains ~= >= <=`. Expected values may use `\n`, `\t`
+and `\s` (space). On macOS, Dear ImGui swaps Cmd and Ctrl: `ctrl+` in a
+drive is the physical Control key, `cmd+` the Command key; editor shortcuts
+accept either (Ctrl-specific bindings such as Ctrl+G win when Ctrl is held),
+and `hold cmd` (not ctrl, which macOS turns into a right-click) adds to a
+selection. `~=` compares numbers or `x,y` pairs within 0.5.
+
+Queries:
+- `selected`, `scene`, `tool`, `zoom`, `camera`, `nodes`
+- `modified`, `modified-count`, `undo`, `redo`
+- `game` (running/stopped), `build`, `log`, `last-log`
+- `add-node-open`, `project-settings-open`, `item:<id>`
+- `file:<project path>`, `abs-file:<path>`
+- `code.open` (tab count), `code.file`, `code.text`, `code.line` (caret line), `code.cursor` (`line:col`),
+  `code.dirty`, `code.focused`, `code.lsp` (off/starting/ready/failed), `code.completion` (visible items,
+  comma-separated), `code.signature`, `code.errors`, `code.diagnostics`, `code.diagnostic-messages`, `code.hover`
+- `code.cursors`, `code.selection`, `code.find` (match count), `code.font`, `code.completion-doc`
+- `palette.open`, `shortcuts-open`, `quit-prompt`, `selection`, `selection-count`, `clipboard-nodes`
+- `import.imported`, `import.skipped`, `import.failed` (counts from the last import), `import.report`
+  (Import Results open), `import.messages` (one `<file>: <status> <path> <message>` line each), `import.dialog`
+- `ldtk.node`, `ldtk.level`, `ldtk.world`, `ldtk.world-mode`, `ldtk.active-levels`, `ldtk.page`, `ldtk.rules`,
+  `ldtk.link-rules`, `ldtk.mapping:<Entity>` (`auto` / `component <path>` / `node` / `none`),
+  `ldtk.collision:<Layer>:<value>`, `ldtk.layer-visible:<Layer>`, `ldtk.focus`, `ldtk.spawned`, `ldtk.links` (of the
+  LDtk tab's level)
+- `shape.edit` (shape editing on), `shape:<Node>:<index>:<field>` with field `type offset size radius rotation
+  vertices points count`; shape handles are items `shape<i>.<Kind><n>` (Move, Rotate, Radius, Edge 0-3,
+  Corner 0-3, CapEnd 0-1, Point n, AddPoint n)
+- `node-delta:A,B` (global position of B minus A), `anim` (`<animation>:<frame>/<length>:<tracks>` of the selected AnimationPlayer)
+- `node:<Name>.<field>`, where field is one of `exists type parent position global rotation scale visible enabled children script prop.<path> script.<prop> connections overrides tiles`
+
+Widgets register themselves with `Drive_Item("<id>")` right after they are drawn
+(see `editor/test_drive.odin` and `UI_IconButton`/`UI_Button` in `ui_style.odin`).
+
+**macOS display:** raylib can't create a window while the display sleeps
+(the editor hangs or crashes in `InitWindow`). For long runs keep it awake:
+`caffeinate -d -i scripts/editor_drive.sh`.

@@ -12,10 +12,11 @@ MusicNode :: struct {
 	pan:        f32 `gui:"true" min:"0" max:"1"`,
 	looping:    bool `gui:"true"`,
 	autoplay:   bool `gui:"true"`,
-	isPlaying:  bool `gui:"true"`,
-	isPaused:   bool `gui:"true"`,
+	isPlaying:  bool `gui:"true" save:"false"`,
+	isPaused:   bool `gui:"true" save:"false"`,
 	timeLength: f32,
 	timePlayed: f32,
+	onFinished: EventSubject, // "finished": a non-looping track ended
 }
 
 MusicNode_Init :: proc(musicNode: ^MusicNode) {
@@ -32,6 +33,7 @@ MusicNode_Init :: proc(musicNode: ^MusicNode) {
 	musicNode.ready = MusicNode_Ready
 	musicNode.update = MusicNode_Update
 	musicNode.onDestroy = MusicNode_Destroy
+	InitializeSubject(&musicNode.onFinished, "finished", musicNode)
 }
 
 MusicNode_Create :: proc(
@@ -91,6 +93,7 @@ MusicNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32)
 			if !musicNode.looping && !rl.IsMusicStreamPlaying(musicNode.music.music) {
 				musicNode.isPlaying = false
 				musicNode.timePlayed = musicNode.timeLength
+				musicNode.onFinished->notify(musicNode, nil, gameContext)
 			}
 		} else {
 			// Headless / simulated advance for testing
@@ -101,6 +104,7 @@ MusicNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32)
 				} else {
 					musicNode.timePlayed = musicNode.timeLength
 					musicNode.isPlaying = false
+					musicNode.onFinished->notify(musicNode, nil, gameContext)
 				}
 			}
 		}
@@ -110,8 +114,13 @@ MusicNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32)
 MusicNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	musicNode := cast(^MusicNode)node
 	if musicNode == nil do return
+	DestroySubject(&musicNode.onFinished)
 	if musicNode.isPlaying {
 		MusicNode_Stop(musicNode)
+	}
+	if musicNode.music != nil {
+		ResourceManager_ReleaseMusic(Node_ResourceManager(musicNode), musicNode.music)
+		musicNode.music = nil
 	}
 }
 
@@ -129,7 +138,7 @@ MusicNode_Play :: proc(musicNode: ^MusicNode) {
 
 	if rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
 		musicNode.music.music.looping = musicNode.looping
-		rl.SetMusicVolume(musicNode.music.music, musicNode.volume)
+		rl.SetMusicVolume(musicNode.music.music, musicNode.volume * Game_BusVolume(musicNode.gameContext, music = true))
 		rl.SetMusicPitch(musicNode.music.music, musicNode.pitch)
 		rl.SetMusicPan(musicNode.music.music, musicNode.pan)
 
@@ -201,7 +210,7 @@ MusicNode_SetVolume :: proc(musicNode: ^MusicNode, volume: f32) {
 	if musicNode == nil do return
 	musicNode.volume = math.clamp(volume, 0.0, 1.0)
 	if musicNode.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-		rl.SetMusicVolume(musicNode.music.music, musicNode.volume)
+		rl.SetMusicVolume(musicNode.music.music, musicNode.volume * Game_BusVolume(musicNode.gameContext, music = true))
 	}
 }
 

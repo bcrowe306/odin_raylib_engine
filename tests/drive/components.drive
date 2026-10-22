@@ -1,0 +1,57 @@
+# Components (prefabs) are links: save a subtree as a component (the node
+# becomes an instance), add more instances from Assets, edit the component
+# file as its own document, and saving it updates every instance.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+expect node:ParticleEmitter.parent == PlayerShip
+click @hier:PlayerShip
+rclick @hier:PlayerShip
+click @ctx:save-component
+expect file:components/PlayerShip.component.json contains "ParticleEmitter"
+expect file:components/PlayerShip.component.json contains "textures/Spaceship_1.png"
+key ctrl+s
+expect file:scenes/main.scene.json contains "component": "components/PlayerShip.component.json"
+expect file:scenes/main.scene.json !contains "ParticleEmitter"
+screenshot component_saved
+
+# A second, linked instance from the Assets panel.
+key escape
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip2
+expect node:PlayerShip2.children == 1
+screenshot linked_instance
+
+# Deleting a child of an instance is an override of that instance only.
+click @hier:PlayerShip2/ParticleEmitter
+expect selected == ParticleEmitter
+key delete
+expect node:PlayerShip2/ParticleEmitter.exists == false
+expect node:PlayerShip/ParticleEmitter.exists == true
+key ctrl+z
+expect node:PlayerShip2/ParticleEmitter.exists == true
+
+# Edit the component: add a child, save; both instances get it.
+rclick @asset:components/PlayerShip.component.json
+click @ctx:edit-component
+expect scene == components/PlayerShip.component.json
+click @hier:PlayerShip
+key ctrl+a
+type timer
+key enter
+expect node:Timer.parent == PlayerShip
+screenshot editing_component
+key ctrl+s
+expect file:components/PlayerShip.component.json contains "Timer"
+dblclick @asset:scenes/main.scene.json
+expect node:PlayerShip.children == 2
+expect node:PlayerShip2.children == 2
+screenshot instances_updated
+
+# Built-in templates are copies.
+key escape
+dblclick @asset:component:Physics Crate
+expect selected == PhysicsCrate
+expect node:PhysicsCrate.type == DynamicBodyNode

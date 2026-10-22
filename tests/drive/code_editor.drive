@@ -1,0 +1,80 @@
+# Code editor: scripts open in a Code tab next to the Viewport; the Lua
+# language server (with the engine API definitions) completes engine calls,
+# shows signature help and diagnostics, and jumps to definitions; saving
+# writes the file. Also: New Script from the Inspector, and the
+# unsaved-changes prompt when closing a tab.
+wait 5
+dblclick @asset:scripts/orbiting_drone.lua
+wait 3
+expect code.file == scripts/orbiting_drone.lua
+expect item:code.tab:scripts/orbiting_drone.lua == visible
+expect code.focused == true
+expect code.cursor == 1:1
+wait-until code.lsp == ready timeout=600
+screenshot code_tab_open
+
+# Completion for the engine's Input API.
+key enter
+key up
+type local axis = Input.get_a
+wait-until code.completion contains get_axis timeout=600
+wait-until code.completion-doc != timeout=600
+screenshot completion
+key enter
+expect code.line contains Input.get_axis(neg_action
+wait-until code.signature contains neg_action timeout=600
+screenshot signature_help
+type "move_left"
+key tab
+expect code.selection == pos_action
+type "move_right"
+key esc
+expect code.line contains Input.get_axis("move_left", "move_right")
+expect code.dirty == true
+
+# Diagnostics: a syntax error is reported, and goes away when undone.
+key end
+key enter
+type local broken = = 1
+wait-until code.errors >= 1 timeout=600
+screenshot diagnostics
+key ctrl+z
+key ctrl+z
+wait-until code.errors == 0 timeout=600
+
+# Go to definition (F12) opens the engine API definitions.
+key end
+key enter
+type Log
+key left
+key f12
+wait-until code.file contains engine_api.lua timeout=600
+screenshot goto_definition
+key ctrl+w
+expect code.file == scripts/orbiting_drone.lua
+key ctrl+z
+key ctrl+z
+
+# Save writes the file.
+key ctrl+s
+expect code.dirty == false
+expect file:scripts/orbiting_drone.lua contains local axis = Input.get_axis("move_left", "move_right")
+expect log contains Saved scripts/orbiting_drone.lua
+
+# Unsaved changes prompt when closing.
+type x
+key ctrl+w
+expect item:code.close-discard == visible
+screenshot close_prompt
+click @code.close-discard
+expect code.open == 0
+
+# New Script from the Inspector creates, attaches and opens it.
+click @hier:PatrolDroneAlpha
+click @insp.script-new
+wait 2
+expect code.file == scripts/patrol_drone_alpha.lua
+expect node:PatrolDroneAlpha.script contains patrol_drone_alpha.lua
+expect file:scripts/patrol_drone_alpha.lua contains ScriptInstanceBase
+expect node:PatrolDroneAlpha.script.speed == 100
+screenshot new_script

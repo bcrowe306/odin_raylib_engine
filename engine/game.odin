@@ -14,11 +14,13 @@ GameState :: enum {
 }
 
 GameContext :: struct {
-	game:         ^Game,
-	sceneManager: ^SceneManager,
-	scene:        ^Scene,
-	input:        ^InputSystem,
-	camera:       ^CameraNode,
+	game:          ^Game,
+	sceneManager:  ^SceneManager,
+	scene:         ^Scene,
+	input:         ^InputSystem,
+	camera:        ^CameraNode,
+	scriptManager: ^ScriptManager,
+	assetManager:  ^AssetManager,
 }
 
 
@@ -28,6 +30,8 @@ Game :: struct {
 	sceneManager:    SceneManager,
 	physicsWorld:    PhysicsWorld,
 	input:           InputSystem,
+	scriptManager:   ScriptManager,
+	assetManager:    AssetManager,
 	backgroundColor: rl.Color `gui:"true"`,
 	resourceManager: ResourceManager,
 	gameContext:     GameContext,
@@ -36,6 +40,9 @@ Game :: struct {
 
 	// Viewport mapping & UI interaction state
 	virtualSize:        [2]f32,
+	// Audio buses (project Audio settings): multiply node volumes.
+	musicVolume:        f32,
+	sfxVolume:          f32,
 	viewportCanvasRect: rl.Rectangle,
 	activeDropdown:     rawptr,
 	uiMouseConsumed:    bool,
@@ -67,10 +74,14 @@ Game :: struct {
 	quit:        proc(game: ^Game),
 	createScene: proc(game: ^Game, name: string, next_scene: bool, setup: SceneSetupProc = nil) -> ^Scene,
 	changeScene: proc(game: ^Game, name: string),
+	loadProject: proc(game: ^Game, pathOrDir: string) -> bool,
+	exportOre:   proc(projectDir: string, outOrePath: string) -> bool,
 }
 
 
 InitializeGame :: proc(game: ^Game) {
+	game.scriptManager.hotReload = true // turned off for .ore packages
+
 	log.info("Initializing game")
 	err := vmem.arena_init_growing(&game.arena)
 	if err != nil {
@@ -79,23 +90,34 @@ InitializeGame :: proc(game: ^Game) {
 	game.backgroundColor = rl.BLACK
 	game.shouldQuit = false
 	game.virtualSize = {1280, 720}
+	game.musicVolume = 1
+	game.sfxVolume = 1
 	game.viewportCanvasRect = {0, 0, 1280, 720}
 	game.activeDropdown = nil
 	game.uiMouseConsumed = false
+
+	// Lua hot reload: edited script files take effect while the game runs.
+	if game.scriptManager.hotReload do ScriptManager_CheckForChanges(&game.scriptManager)
 	game.run = GameRun
 	game.terminate = GameTerminate
 	game.quit = GameQuit
 	game.createScene = GameCreateScene
 	game.changeScene = GameChangeScene
+	game.loadProject = Game_LoadProject
+	game.exportOre = Game_ExportOrePackage
 
 	InputSystem_Init(&game.input)
 	PhysicsWorld_Init(&game.physicsWorld)
 	ResourceManager_Init(&game.resourceManager)
+	AssetManager_Init(&game.assetManager)
 	SceneManager_Init(&game.sceneManager, &game.arena)
+	ScriptManager_Init(&game.scriptManager, game)
 	game.gameContext.game = game
 	game.gameContext.sceneManager = &game.sceneManager
 	game.gameContext.input = &game.input
 	game.gameContext.camera = nil
+	game.gameContext.scriptManager = &game.scriptManager
+	game.gameContext.assetManager = &game.assetManager
 	game.state = .Initialized
 }
 
@@ -147,10 +169,14 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 
 GameTerminate :: proc(game: ^Game) {
 	if game == nil do return
+	ScriptManager_Destroy(&game.scriptManager)
 	SceneManager_Terminate(&game.sceneManager)
+	AssetManager_Destroy(&game.assetManager)
 	ResourceManager_Terminate(&game.resourceManager)
 	PhysicsWorld_Destroy(&game.physicsWorld)
 	InputSystem_Destroy(&game.input)
+	Node_ReleaseArenaPool()
+	Component_ClearCaches()
 	vmem.arena_destroy(&game.arena)
 	free(game)
 }
@@ -161,6 +187,10 @@ GameCreateScene :: proc(game: ^Game, name: string, next_scene: bool, setup: Scen
 
 GameChangeScene :: proc(game: ^Game, name: string) {
 	ChangeScene_ByName(&game.sceneManager, name)
+}
+
+Game_ExportOrePackage :: proc(projectDir: string, outOrePath: string) -> bool {
+	return OrePackage_CreateFromDirectory(projectDir, outOrePath, true)
 }
 
 // Use this to allocate resources that should share lifetime with the game
@@ -182,4 +212,16 @@ Game_Alloc :: proc(game: ^Game, size: int) -> rawptr {
 		return nil
 	}
 	return raw_data(ptr)
+}
+
+// Game_ClearColor: the current scene's background colour, else the game's.
+Game_ClearColor :: proc(game: ^Game) -> rl.Color {
+	if s := game.sceneManager.currentScene; s != nil && s.backgroundColor.a > 0 do return s.backgroundColor
+	return game.backgroundColor
+}
+
+// Game_BusVolume: the music or sound-effects bus volume (1 without a game).
+Game_BusVolume :: proc(ctx: ^GameContext, music: bool) -> f32 {
+	if ctx == nil || ctx.game == nil do return 1
+	return ctx.game.musicVolume if music else ctx.game.sfxVolume
 }

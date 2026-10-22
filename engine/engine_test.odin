@@ -318,7 +318,7 @@ test_particle_emitter_burst_and_continuous :: proc(t: ^testing.T) {
 		game->run(0.05)
 		continuousAlive := 0
 		for i in 0..<len(emitter.particles) {
-			if emitter.particles.alive[i] do continuousAlive += 1
+			if emitter.particles[i].alive do continuousAlive += 1
 		}
 		testing.expect(t, continuousAlive > 0, "Continuous emitter should spawn active particles")
 
@@ -334,7 +334,7 @@ test_particle_emitter_burst_and_continuous :: proc(t: ^testing.T) {
 		game->run(0.016)
 		burstAlive := 0
 		for i in 0..<len(burstEmitter.particles) {
-			if burstEmitter.particles.alive[i] do burstAlive += 1
+			if burstEmitter.particles[i].alive do burstAlive += 1
 		}
 		testing.expect(t, burstAlive > 0, "Burst emitter should create particles on start")
 
@@ -344,7 +344,7 @@ test_particle_emitter_burst_and_continuous :: proc(t: ^testing.T) {
 		}
 		expiredAlive := 0
 		for i in 0..<len(burstEmitter.particles) {
-			if burstEmitter.particles.alive[i] do expiredAlive += 1
+			if burstEmitter.particles[i].alive do expiredAlive += 1
 		}
 		testing.expect_value(t, expiredAlive, 0)
 
@@ -644,6 +644,91 @@ test_synchronized_ui_nodes_lifecycle_and_events :: proc(t: ^testing.T) {
 		game->run(0.016)
 
 		// Clean termination and verify tracking allocator catches any memory leaks
+		game->terminate()
+	})
+}
+
+// ============================================================================
+// 5c. Test LDtk Project Parsing, Layer Extraction, IntGrid Colliders, & Entities
+// ============================================================================
+@(test)
+test_ldtk_level_integration_and_collision_lifecycle :: proc(t: ^testing.T) {
+	RunWithLeakTracking(t, proc(t: ^testing.T) {
+		game := new(Game)
+		InitializeGame(game)
+
+		// 1. Direct project loading and validation
+		proj, loadOk := Ldtk_LoadProjectFromFile("assets/levels/deep_space_station.ldtk")
+		testing.expect(t, loadOk && proj != nil, "Ldtk project should load successfully")
+		if proj != nil {
+			testing.expect_value(t, proj.jsonVersion, "1.5.3")
+			testing.expect_value(t, len(proj.tilesets), 1)
+			testing.expect_value(t, proj.tilesets[0].identifier, "StationTileset")
+			testing.expect_value(t, len(proj.levels), 1)
+
+			lvl := Ldtk_GetLevel(proj, "Deep_Space_Station")
+			testing.expect(t, lvl != nil, "Level Deep_Space_Station should exist")
+			if lvl != nil {
+				testing.expect_value(t, lvl.pxWid, 1920)
+				testing.expect_value(t, lvl.pxHei, 1088)
+
+				// Test IntGrid querying
+				colLayer := Ldtk_GetLayer(lvl, "Collisions")
+				testing.expect(t, colLayer != nil, "Collisions layer should exist")
+				if colLayer != nil {
+					testing.expect_value(t, Ldtk_GetIntGridValue(colLayer, 0, 0), 1)
+					testing.expect_value(t, Ldtk_GetIntGridValue(colLayer, 7, 17), 0)
+					testing.expect_value(t, Ldtk_GetIntGridValue(colLayer, 35, 15), 2)
+				}
+
+				// Test Entity extraction
+				playerEnt := Ldtk_GetEntity(lvl, "PlayerStart")
+				testing.expect(t, playerEnt != nil, "PlayerStart entity should exist")
+				if playerEnt != nil {
+					testing.expect_value(t, playerEnt.px.x, f32(240.0))
+					testing.expect_value(t, playerEnt.px.y, f32(544.0))
+					testing.expect_value(t, Ldtk_GetFieldFloat(playerEnt, "shield"), f32(100.0))
+					testing.expect_value(t, Ldtk_GetFieldString(playerEnt, "callsign"), "VIPER-ONE")
+				}
+
+				turrets := Ldtk_GetEntities(lvl, "Turret")
+				testing.expect_value(t, len(turrets), 3)
+			}
+
+			Ldtk_DestroyProject(proj)
+		}
+
+		// 2. Scene Graph Node lifecycle, physics colliders generation, and entity spawning
+		scene := game->createScene("ldtk_test_scene", true)
+		ldtkNode := LdtkLevelNode_Create(scene, "StationLevel", "assets/levels/deep_space_station.ldtk", "Deep_Space_Station")
+		testing.expect(t, ldtkNode != nil && ldtkNode.level != nil, "LdtkLevelNode should initialize level")
+
+		// Spawner callback
+		spawnerCalled := false
+		ldtkNode.entitySpawner = proc(levelNode: ^LdtkLevelNode, entity: ^LdtkEntityInstance, s: ^Scene, ctx: ^GameContext) -> ^Node {
+			child := CreateNodeScene(s, Node)
+			child.name = entity.identifier
+			child.position = entity.px
+			(cast(^bool)levelNode.resource)^ = true
+			return child
+		}
+		ldtkNode.resource = &spawnerCalled
+
+		// Build physics colliders from IntGrid
+		LdtkLevelNode_BuildCollisionBodies(ldtkNode, "Collisions", []int{1}, &game.gameContext)
+		testing.expect(t, ldtkNode.staticBody != nil, "StaticBodyNode should be created for level colliders")
+		if ldtkNode.staticBody != nil {
+			testing.expect(t, len(ldtkNode.staticBody.shapes) > 0, "Shapes should be generated from solid walls")
+		}
+
+		// Spawn entities
+		LdtkLevelNode_SpawnEntities(ldtkNode, &game.gameContext)
+		testing.expect(t, spawnerCalled, "Entity spawner callback should have fired")
+		testing.expect(t, len(ldtkNode.spawnedEntities) >= 10, "Entities should be spawned into level")
+
+		// Run frame update
+		game->run(0.016)
+
 		game->terminate()
 	})
 }
@@ -1291,6 +1376,45 @@ test_ui_keyboard_navigation_tab_arrows_enter_space :: proc(t: ^testing.T) {
 		game->run(0.016)
 		game.uiTestKeyLeft = false
 		testing.expect_value(t, tabs.activeTab, 0)
+
+		game->terminate()
+	})
+}
+
+@(test)
+test_ui_icon_and_toolbar_nodes :: proc(t: ^testing.T) {
+	RunWithLeakTracking(t, proc(t: ^testing.T) {
+		game := new(Game)
+		InitializeGame(game)
+		game.uiTestInputEnabled = true
+
+		scene := game->createScene("ui_icon_toolbar_scene", true)
+
+		// 1. Create UIIconNode
+		iconNode := UIIconNode_Create(scene, "RocketIcon", icon = .Rocket, size = {32, 32}, iconSize = 24)
+		testing.expect_value(t, iconNode.icon, Icon.Rocket)
+		testing.expect_value(t, iconNode.iconSize, f32(24))
+
+		// 2. Create UIButtonNode with Icon
+		btnWithIcon := UIButtonNode_Create(scene, "SaveBtn", "Save", {120, 36}, icon = .FloppyDisk, iconSize = 18)
+		testing.expect_value(t, btnWithIcon.icon, Icon.FloppyDisk)
+
+		// 3. Create UIToolbarNode
+		toolbar := UIToolbarNode_Create(scene, "AppToolbar", size = {500, 38})
+		UIToolbarNode_AddItem(toolbar, 1, .File, "New", "Create File", .Button)
+		UIToolbarNode_AddItem(toolbar, 2, .FolderOpen, "Open", "Open File", .Button)
+		UIToolbarNode_AddItem(toolbar, 3, .FloppyDisk, "Save", "Save File", .Button)
+		UIToolbarNode_AddItem(toolbar, 4, .None, itemType = .Separator)
+		UIToolbarNode_AddItem(toolbar, 5, .Play, "Run", "Run scene", .Toggle, isSelected = true)
+
+		testing.expect_value(t, len(toolbar.items), 5)
+		testing.expect_value(t, toolbar.items[0].icon, Icon.File)
+		testing.expect_value(t, toolbar.items[2].icon, Icon.FloppyDisk)
+		testing.expect_value(t, toolbar.items[4].itemType, ToolbarItemType.Toggle)
+		testing.expect_value(t, toolbar.items[4].isSelected, true)
+
+		// Frame: compute layout & update
+		game->run(0.016)
 
 		game->terminate()
 	})

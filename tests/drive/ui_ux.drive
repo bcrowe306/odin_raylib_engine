@@ -1,0 +1,147 @@
+# UI/UX batch: Settings (General / Code Editor / Project: Input, Video,
+# Audio, Export), File menu (Save As, Revert, Open Project), linked X/Y and
+# reset buttons, the particle editor, LDtk level assets, context menus with
+# copy/paste, component instances with added/removed children, viewport fit.
+wait 5
+
+# --- Settings ---
+key ctrl+comma
+expect project-settings-open == true
+expect item:settings.tab:general == visible
+click @settings.page:Keymap
+click @settings.key-record:tool.pan
+key y
+expect item:settings.key-reset:tool.pan == visible
+screenshot settings_keymap
+click @settings.tab:code
+click @settings.tab:project
+click @settings.page:Input
+click @settings.new-action
+type dash
+click @settings.add-action
+expect item:settings.action:dash == visible
+click @settings.listen-key
+key k
+screenshot settings_input
+click @settings.page:Video
+click @settings.fullscreen
+click @settings.page:Audio
+click @settings.page:Export
+screenshot settings_export
+click @settings.save
+expect project-settings-open == false
+expect file:project.json contains {"name": "dash", "bindings": [{"key": "K"}]}
+expect file:project.json contains "fullscreen": true
+expect abs-file:$PROJECT/.editor_settings.json contains "tool.pan": ["Y"]
+key y
+expect tool == pan
+
+# --- linked X/Y and reset ---
+click @hier:Asteroid_Alpha
+dblclick @insp.scale.x
+key ctrl+a
+type 1.4
+key enter
+expect node:Asteroid_Alpha.scale == 1.40,1.40
+click @insp.scale.reset
+expect node:Asteroid_Alpha.scale == 1.00,1.00
+dblclick @insp.rotation
+key ctrl+a
+type 30
+key enter
+expect node:Asteroid_Alpha.rotation == 30.0
+screenshot link_reset
+click @insp.rotation.reset
+expect node:Asteroid_Alpha.rotation == 0.0
+
+# --- File > Save As / Revert ---
+click @menu:File
+click @menu:File/Save As...
+key ctrl+a
+type scenes/copy_of_main
+key enter
+expect scene == scenes/copy_of_main.scene.json
+expect file:project.json contains scenes/copy_of_main.scene.json
+click @hier:Asteroid_Beta
+key delete
+expect modified == true
+click @menu:File
+click @menu:File/Revert Scene
+expect modified == false
+expect node:Asteroid_Beta.exists == true
+click @menu:File
+click @menu:File/Open Project...
+expect item:open.ok == visible
+screenshot open_project
+click @open.cancel
+
+# --- context menus: assets copy / paste / rename / delete ---
+rclick @asset:scripts/asteroid.lua
+click @ctx:copy-asset
+rclick @asset:scripts/asteroid.lua
+click @ctx:paste-asset
+expect item:asset:scripts/asteroid_copy.lua == visible
+rclick @asset:scripts/asteroid_copy.lua
+click @ctx:rename-asset
+key ctrl+a
+type rock.lua
+key enter
+expect item:asset:scripts/rock.lua == visible
+rclick @asset:scripts/rock.lua
+click @ctx:delete-asset
+click @delete.ok
+expect item:asset:scripts/rock.lua == missing
+
+# --- context menus: scene tree copy / paste as child ---
+rclick @hier:Asteroid_Gamma
+click @ctx:copy
+rclick @hier:PlayerShip
+screenshot node_menu
+click @ctx:paste-child
+expect node:PlayerShip.children == 1
+
+# --- LDtk levels in Assets ---
+exec mkdir -p $PROJECT/levels
+exec cp assets/levels/deep_space_station.ldtk $PROJECT/levels/station.ldtk
+wait 70
+expect item:asset:levels/station.ldtk == visible
+rclick @asset:levels/station.ldtk
+click @ctx:add-level
+expect node:station.type == LdtkLevelNode
+
+# --- component instance: add a child, apply to the component ---
+key escape
+dblclick @asset:components/OrbitingDrone.component.json
+expect selected contains OrbitingDrone
+rclick @hier:OrbitingDrone
+click @ctx:add-child
+type timer
+key enter
+expect node:Timer.parent contains OrbitingDrone
+key ctrl+s
+expect file:scenes/copy_of_main.scene.json contains "$added"
+rclick @hier:OrbitingDrone
+click @ctx:apply-component
+expect file:components/OrbitingDrone.component.json contains "Timer"
+click @hier:OrbitingDrone
+key ctrl+s
+expect file:scenes/copy_of_main.scene.json !contains "$added"
+
+# --- particle editor ---
+click @hier:StarfieldEmitter
+click @insp.particle-editor
+click @particles.tab:color
+expect item:particles.gradient == visible
+dblclick @particles.gradient
+screenshot particles_color
+click @particles.preview
+wait 20
+screenshot particles_preview
+click @particles.preview
+
+# --- viewport fit ---
+click @toolbar.zoom
+click @pick:Fit Game View
+expect zoom <= 0.95
+click @toolbar.fit
+screenshot fit_scene

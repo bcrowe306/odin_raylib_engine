@@ -1,0 +1,378 @@
+package editor
+
+import "core:fmt"
+import "core:os"
+import "core:path/filepath"
+import "core:strings"
+import "core:time"
+import e "../engine"
+
+// ============================================================================
+// Playtesting: run the project (or just the scene being edited) as a
+// separate game process.
+//
+// Play always runs what is in the editor:
+//   1. every modified scene is saved first (the game reads scene files);
+//   2. if any engine/game source is newer than the game binary, the binary is
+//      rebuilt first (`odin build .`), asynchronously, with progress in the
+//      console - so code changes are never silently ignored either;
+//   3. the game starts with `--project <dir>` (+ `--scene <file>` for Play
+//      Current Scene); its stdout/stderr stream into the editor console.
+// ============================================================================
+
+GAME_BINARY :: "bin/odin_raylib_engine"
+GAME_SOURCE_DIRS :: [?]string{".", "engine", "asteroids"}
+
+Play_Mode :: enum {
+	Project,      // the project's initial scene
+	CurrentScene, // the scene open in the editor
+}
+
+Editor_PlayRequest :: proc(state: ^EditorState, mode: Play_Mode) {
+	if state.gameProcessRunning {
+		Editor_StopGameProcess(state)
+	}
+	if state.buildRunning {
+		Editor_Log(state, .Warn, "Build already in progress...")
+		return
+	}
+
+	// 1. Save every modified scene so the game sees the editor's state.
+	saved := Editor_SaveAllScenes(state)
+	if saved > 0 {
+		Editor_Log(state, .Info, "Saved %d modified scene(s) before playing", saved)
+	}
+
+	state.pendingPlayMode = mode
+	state.pendingPlayScene = state.activeScenePath if mode == .CurrentScene else ""
+
+	// 2. Rebuild the game binary if sources changed since it was built.
+	if reason, stale := Editor_GameBinaryIsStale(); stale && !state.skipGameBuild {
+		Editor_Log(state, .Info, "Building game (%s)...", reason)
+		if !Editor_StartGameBuild(state) {
+			Editor_Log(state, .Error, "Could not start the build; launching the existing binary")
+			Editor_LaunchGame(state)
+		}
+		return
+	}
+	Editor_LaunchGame(state)
+}
+
+// Editor_GameBinaryIsStale reports whether the game binary is missing or
+// older than any .odin source it is built from.
+Editor_GameBinaryIsStale :: proc() -> (reason: string, stale: bool) {
+	binInfo, err := os.stat(GAME_BINARY, context.temp_allocator)
+	if err != nil do return "binary missing", true
+	binTime := binInfo.modification_time
+	for dir in GAME_SOURCE_DIRS {
+		h, oerr := os.open(dir)
+		if oerr != nil do continue
+		infos, _ := os.read_dir(h, -1, context.temp_allocator)
+		os.close(h)
+		for fi in infos {
+			if fi.type == .Directory || !strings.has_suffix(fi.name, ".odin") || strings.has_suffix(fi.name, "_test.odin") do continue
+			if time.diff(binTime, fi.modification_time) > 0 {
+				return fmt.tprintf("%s changed", fi.name), true
+			}
+		}
+	}
+	return "", false
+}
+
+Editor_StartGameBuild :: proc(state: ^EditorState) -> bool {
+	_ = os.make_directory("bin")
+	return Editor_StartBuild(state, {"odin", "build", ".", "-out:" + GAME_BINARY}, .Game)
+}
+
+// Editor_StartBuild runs a build command in the background; its output
+// streams into the console and `kind` decides what happens on success.
+Editor_StartBuild :: proc(state: ^EditorState, command: []string, kind: Build_Kind) -> bool {
+	if state.buildRunning do return false
+	r, w, perr := os.pipe()
+	if perr != nil do return false
+	desc := os.Process_Desc{
+		command = command,
+		stdout  = w,
+		stderr  = w,
+	}
+	p, err := os.process_start(desc)
+	os.close(w)
+	if err != nil {
+		os.close(r)
+		return false
+	}
+	state.buildProcess = p
+	state.buildOutput = r
+	state.buildRunning = true
+	state.buildKind = kind
+	state.buildStarted = time.tick_now()
+	return true
+}
+
+// Editor_UpdatePlaytest runs once per frame: streams build/game output into
+// the console, finishes builds, and notices the game exiting.
+Editor_UpdatePlaytest :: proc(state: ^EditorState) {
+	if state.buildRunning {
+		drain_pipe(state, &state.buildOutput, &state.buildLineBuf, "build")
+		pstate, err := os.process_wait(state.buildProcess, 0)
+		if err != .Timeout {
+			drain_pipe(state, &state.buildOutput, &state.buildLineBuf, "build")
+			if state.buildOutput != nil {
+				os.close(state.buildOutput)
+				state.buildOutput = nil
+			}
+			state.buildRunning = false
+			secs := time.duration_seconds(time.tick_since(state.buildStarted))
+			if err == nil && pstate.exit_code == 0 {
+				Editor_Log(state, .Info, "Build succeeded in %.1fs", secs)
+				switch state.buildKind {
+				case .Game:       Editor_LaunchGame(state)
+				case .Standalone: Editor_Log(state, .Info, "Standalone game ready: %s", state.exportDir)
+				}
+			} else {
+				Editor_Log(state, .Error, "Build failed (exit %d) - see errors above; not launching", pstate.exit_code)
+			}
+		}
+	}
+
+	if state.gameOutput != nil {
+		drain_pipe(state, &state.gameOutput, &state.gameLineBuf, "game")
+	}
+	Editor_CheckGameProcess(state)
+}
+
+Editor_LaunchGame :: proc(state: ^EditorState) {
+	exePath := GAME_BINARY
+	if !os.exists(exePath) && os.exists("./odin_raylib_engine") {
+		exePath = "./odin_raylib_engine"
+	}
+	cmd := make([dynamic]string, context.temp_allocator)
+	append(&cmd, exePath, "--project", state.projectPath)
+	if state.pendingPlayScene != "" {
+		append(&cmd, "--scene", state.pendingPlayScene)
+	}
+	for extra in state.extraGameArgs {
+		append(&cmd, extra)
+	}
+
+	r, w, perr := os.pipe()
+	desc := os.Process_Desc{command = cmd[:]}
+	if perr == nil {
+		desc.stdout = w
+		desc.stderr = w
+	}
+	procHandle, err := os.process_start(desc)
+	if perr == nil do os.close(w)
+	if err != nil {
+		if perr == nil do os.close(r)
+		Editor_Log(state, .Error, "Failed to launch game process: %v", err)
+		return
+	}
+	if perr == nil do state.gameOutput = r
+
+	state.gameProcess = procHandle
+	state.gameProcessRunning = true
+	state.lastPlayedScene = strings.clone(state.pendingPlayScene)
+	what := state.pendingPlayScene if state.pendingPlayScene != "" else fmt.tprintf("project (initial scene %s)", state.projectConfig.initialScene)
+	Editor_Log(state, .Info, "Playing %s - PID %d", what, procHandle.pid)
+}
+
+// drain_pipe moves whatever the process wrote into console lines.
+@(private = "file")
+drain_pipe :: proc(state: ^EditorState, f: ^^os.File, lineBuf: ^[dynamic]u8, source: string) {
+	if f^ == nil do return
+	for {
+		has, err := os.pipe_has_data(f^)
+		if err != nil || !has do break
+		chunk: [4096]u8
+		n, rerr := os.read(f^, chunk[:])
+		if n <= 0 || rerr != nil {
+			os.close(f^)
+			f^ = nil
+			break
+		}
+		append(lineBuf, ..chunk[:n])
+	}
+	// Emit complete lines.
+	for {
+		idx := -1
+		for b, i in lineBuf {
+			if b == '\n' {idx = i; break}
+		}
+		if idx < 0 do break
+		line := strings.trim_right_space(string(lineBuf[:idx]))
+		if line != "" {
+			level := LogLevel.Info
+			lower := strings.to_lower(line, context.temp_allocator)
+			if strings.contains(lower, "error") do level = .Error
+			else if strings.contains(lower, "warn") do level = .Warn
+			Editor_Log(state, level, "[%s] %s", source, line)
+		}
+		remove_range(lineBuf, 0, idx + 1)
+	}
+	if f^ == nil && len(lineBuf) > 0 {
+		Editor_Log(state, .Info, "[%s] %s", source, string(lineBuf[:]))
+		clear(lineBuf)
+	}
+}
+
+// ============================================================================
+// Scene documents: open, modified tracking, save, save all.
+// ============================================================================
+
+// Editor_SetSceneBaseline marks the scene's current edit version as saved
+// (after loading/saving). Modified = edited since (change tracking: no
+// re-serializing; undoing back to the saved version is unmodified again).
+Editor_SetSceneBaseline :: proc(state: ^EditorState, scene: ^e.Scene) {
+	if scene == nil do return
+	if old, ok := state.sceneBaselines[scene]; ok do delete(old)
+	state.modifiedCacheFrames = 0
+	state.modifiedCountFrames = 0
+	state.sceneBaselines[scene] = ""
+	state.savedVersion[scene] = state.sceneVersion[scene]
+}
+
+Editor_SceneIsModified :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
+	if scene == nil || !scene.isLoaded do return false
+	if _, ok := state.sceneBaselines[scene]; !ok do return true // never saved (new scene)
+	return state.sceneVersion[scene] != state.savedVersion[scene]
+}
+
+// Editor_OpenScene makes a project scene file the active scene, loading it
+// for editing the first time (later switches keep unsaved edits in memory).
+Editor_OpenScene :: proc(state: ^EditorState, relPath: string) -> bool {
+	game := state.game
+	scene := e.Game_FindSceneByFile(game, relPath)
+	if scene == nil {
+		scene = e.Game_RegisterSceneFile(game, relPath)
+	}
+	if scene == nil {
+		Editor_Log(state, .Error, "Scene file not found: %s", relPath)
+		return false
+	}
+	if !scene.isLoaded {
+		e.Scene_LoadForEditing(scene, &game.gameContext)
+		Editor_SetSceneBaseline(state, scene)
+	}
+	Editor_SwitchView(state, scene)
+	state.activeScene = scene
+	game.sceneManager.currentScene = scene
+	game.gameContext.scene = scene
+	if state.activeScenePath != relPath {
+		delete(state.activeScenePath)
+		state.activeScenePath = strings.clone(relPath)
+	}
+	state.selectedNode = nil
+	Editor_Log(state, .Info, "Opened scene %s", relPath)
+	return true
+}
+
+// Editor_SaveSceneDocument writes one scene to its file.
+Editor_SaveSceneDocument :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
+	if scene == nil || scene.filePath == "" do return false
+	if Editor_IsComponentDoc(state, scene) do return Editor_SaveComponentDoc(state, scene)
+	jsonStr := e.Scene_SerializeToJSON(scene)
+	defer delete(jsonStr)
+	diskPath, _ := filepath.join({state.projectPath, scene.filePath}, context.temp_allocator)
+	_ = os.make_directory_all(filepath.dir(diskPath, context.temp_allocator))
+	if os.write_entire_file(diskPath, transmute([]u8)jsonStr) != nil {
+		Editor_Log(state, .Error, "Failed to write scene file: %s", diskPath)
+		return false
+	}
+	// The scene's stored source becomes the saved file, so the game and any
+	// reload see the same thing.
+	scene.sourceJson = strings.clone(jsonStr, state.game.sceneManager.allocator)
+	Editor_SetSceneBaseline(state, scene)
+	Editor_Log(state, .Info, "Saved %s", scene.filePath)
+	return true
+}
+
+// Editor_SaveAllScenes saves every loaded scene with unsaved changes.
+Editor_SaveAllScenes :: proc(state: ^EditorState) -> int {
+	n := 0
+	for _, scene in state.game.sceneManager.scenes {
+		if scene != nil && scene.filePath != "" && Editor_SceneIsModified(state, scene) {
+			if Editor_SaveSceneDocument(state, scene) do n += 1
+		}
+	}
+	return n
+}
+
+Editor_ModifiedSceneCount :: proc(state: ^EditorState) -> int {
+	n := 0
+	for _, scene in state.game.sceneManager.scenes {
+		if scene != nil && scene.filePath != "" && Editor_SceneIsModified(state, scene) do n += 1
+	}
+	return n
+}
+
+// Editor_NewScene creates scenes/<name>.scene.json (unique), adds it to
+// project.json and opens it.
+Editor_NewScene :: proc(state: ^EditorState, baseName: string = "new_scene") -> bool {
+	rel := ""
+	for i := 0; ; i += 1 {
+		name := baseName if i == 0 else fmt.tprintf("%s_%d", baseName, i + 1)
+		rel = fmt.tprintf("scenes/%s.scene.json", name)
+		disk, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if !os.exists(disk) && e.Game_FindSceneByFile(state.game, rel) == nil do break
+	}
+	stem := filepath.stem(filepath.stem(rel))
+	contents := fmt.tprintf(`{{"name": "%s", "root": {{"type": "Node", "name": "root", "children": [{{"type": "CameraNode", "name": "Camera", "position": [%v, %v]}}]}}}}`,
+		stem, state.projectConfig.virtualWidth * 0.5, state.projectConfig.virtualHeight * 0.5)
+	disk, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	_ = os.make_directory_all(filepath.dir(disk, context.temp_allocator))
+	if os.write_entire_file(disk, transmute([]u8)contents) != nil {
+		Editor_Log(state, .Error, "Could not create %s", disk)
+		return false
+	}
+	append(&state.projectConfig.scenes, strings.clone(rel))
+	e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
+	return Editor_OpenScene(state, rel)
+}
+
+// (Version checks are cheap; the Cached variants remain for callers.)
+Editor_SceneIsModifiedCached :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
+	return Editor_SceneIsModified(state, scene)
+}
+
+Editor_ModifiedSceneCountCached :: proc(state: ^EditorState) -> int {
+	return Editor_ModifiedSceneCount(state)
+}
+
+// Editor_SwitchView remembers the camera of the current document and
+// restores the one of `next` (first visit: keep the current view).
+Editor_SwitchView :: proc(state: ^EditorState, next: ^e.Scene) {
+	if state.activeScene != nil && state.activeScene != next {
+		state.sceneViews[state.activeScene] = {state.cameraPos.x, state.cameraPos.y, state.cameraZoom}
+	}
+	if v, ok := state.sceneViews[next]; ok {
+		state.cameraPos = {v[0], v[1]}
+		state.cameraZoom = v[2]
+	}
+}
+
+// Editor_OpenExternally opens a file with its default application (LDtk for
+// .ldtk files, the OS image viewer, ...).
+Editor_OpenExternally :: proc(state: ^EditorState, path: string) {
+	when ODIN_OS == .Darwin {
+		cmd := []string{"open", path}
+	} else when ODIN_OS == .Windows {
+		cmd := []string{"cmd", "/c", "start", "", path}
+	} else {
+		cmd := []string{"xdg-open", path}
+	}
+	if _, err := os.process_start({command = cmd}); err != nil {
+		Editor_Log(state, .Error, "Could not open %s: %v", path, err)
+	}
+}
+
+// Editor_RunPackage plays an exported .ore with the game runner.
+Editor_RunPackage :: proc(state: ^EditorState, pkgPath: string) {
+	if state.gameProcessRunning do return
+	saved := state.projectPath
+	state.projectPath = pkgPath
+	delete(state.pendingPlayScene)
+	state.pendingPlayScene = ""
+	Editor_LaunchGame(state)
+	state.projectPath = saved
+}

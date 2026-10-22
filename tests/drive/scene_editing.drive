@@ -1,0 +1,91 @@
+# Scene editing: multi-selection (tree and viewport box), copy/paste,
+# align and distribute, arrow-key nudging, F2 rename, select all, and the
+# unsaved-changes prompt on quit.
+wait 5
+click @hier:Asteroid_Alpha
+hold cmd
+click @hier:Asteroid_Beta
+release
+expect selection-count == 2
+expect selection == Asteroid_Alpha,Asteroid_Beta
+screenshot multi_select
+
+# Align horizontal centers (one undo step), then undo.
+click @menu:Edit
+click @menu:Edit/Align
+click @menu:Align/Align Horizontal Centers
+expect node-delta:Asteroid_Alpha,Asteroid_Beta contains ,40.0
+expect node-delta:Asteroid_Alpha,Asteroid_Beta !contains 800
+screenshot aligned
+key ctrl+z
+expect node:Asteroid_Beta.position ~= 1040,220
+
+# Nudge: arrows move the whole selection by one pixel, Shift by a grid step.
+click @hier:Asteroid_Alpha
+hold cmd
+click @hier:Asteroid_Beta
+release
+key right
+expect node:Asteroid_Alpha.position ~= 241,180
+expect node:Asteroid_Beta.position ~= 1041,220
+key shift+down
+expect node:Asteroid_Alpha.position ~= 241,212
+
+# Copy / paste: two new nodes, selected.
+expect nodes == 9
+key ctrl+c
+expect clipboard-nodes == true
+key ctrl+v
+expect nodes == 11
+expect selection-count == 2
+expect selection contains Asteroid_Alpha2
+screenshot pasted
+key ctrl+z
+expect nodes == 9
+
+# Delete a multi-selection in one step.
+click @hier:Asteroid_Alpha
+hold shift
+click @hier:Asteroid_Gamma
+release
+key delete
+expect nodes == 7
+key ctrl+z
+expect nodes == 9
+
+# Box select in the viewport (Select tool, drag over empty space).
+key q
+click @hier:MainCamera
+key escape
+expect selection-count == 0
+key ctrl+minus
+key ctrl+minus
+expect zoom == 0.64
+drag @world:150,100 @world:420,640
+expect selection contains Asteroid_Alpha
+expect selection contains Asteroid_Gamma
+expect selection !contains PlayerShip
+screenshot box_select
+
+# F2 renames the selected node.
+click @hier:Asteroid_Gamma
+key f2
+expect item:rename.input == visible
+key ctrl+a
+type Rock
+key enter
+expect node:Rock.exists == true
+
+# Select all.
+key ctrl+shift+a
+expect selection-count >= 8
+
+# Quit with unsaved changes asks first.
+key escape
+key ctrl+shift+p
+type quit
+key enter
+expect quit-prompt == true
+screenshot quit_prompt
+click @quit.cancel
+expect quit-prompt == false

@@ -14,6 +14,23 @@ TextureNode :: struct {
 TextureNode_Init :: proc(texture: ^TextureNode) {
 	InitializeNode(texture)
 	texture.render = TextureNode_Render
+	texture.onDestroy = TextureNode_Destroy
+}
+
+// TextureNode_SetTexture swaps the node's texture, releasing the old one.
+TextureNode_SetTexture :: proc(tn: ^TextureNode, tex: ^Texture) {
+	if tn.texture == tex do return
+	if tn.texture != nil do ResourceManager_ReleaseTexture(Node_ResourceManager(tn), tn.texture)
+	tn.texture = tex
+}
+
+TextureNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
+	tn := cast(^TextureNode)node
+	if tn.texture != nil {
+		rm := &gameContext.game.resourceManager if gameContext != nil && gameContext.game != nil else Node_ResourceManager(tn)
+		ResourceManager_ReleaseTexture(rm, tn.texture)
+		tn.texture = nil
+	}
 }
 
 TextureNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, filePath: string) -> ^TextureNode {
@@ -24,9 +41,9 @@ TextureNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, fi
 		textureNode.texture = tex
 		textureNode.size.x = auto_cast tex.texture.width
 		textureNode.size.y = auto_cast tex.texture.height
-	}
-	else {
-		log.error("Failed to load teture from file: ", filePath)
+		textureNode.origin = {textureNode.size.x * 0.5, textureNode.size.y * 0.5}
+	} else {
+		log.error("Failed to load texture from file: ", filePath)
 	}
 	scene->addNode(textureNode)
 	return textureNode
@@ -35,7 +52,8 @@ TextureNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, fi
 TextureNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	if !rl.IsWindowReady() do return
 	textureNode := cast(^TextureNode)node
-	if textureNode.texture == nil do return
+	if textureNode.texture == nil || textureNode.texture.texture.id == 0 do return
+
 	source := rl.Rectangle{
 		x = 0,
 		y = 0,
@@ -43,16 +61,23 @@ TextureNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 		height = auto_cast textureNode.texture.texture.height,
 	}
 
-	destination := rl.Rectangle{
-		x = textureNode.position.x,
-		y = textureNode.position.y,
-		width = textureNode.size.x * textureNode.scale.x,
-		height = textureNode.size.y * textureNode.scale.y
+	pos := textureNode.globalPosition
+	scl := textureNode.globalScale
+	rot := textureNode.globalRotation
+
+	destW := textureNode.size.x * scl.x
+	destH := textureNode.size.y * scl.y
+
+	origin := rl.Vector2{ textureNode.origin.x * scl.x, textureNode.origin.y * scl.y }
+	if textureNode.origin.x == 0 && textureNode.origin.y == 0 {
+		origin = {destW * 0.5, destH * 0.5}
 	}
-	rl.DrawTexturePro(textureNode.texture.texture, source, destination, textureNode.origin, textureNode.rotation, rl.WHITE)
+
+	destination := rl.Rectangle{
+		x = pos.x,
+		y = pos.y,
+		width = destW,
+		height = destH,
+	}
+	rl.DrawTexturePro(textureNode.texture.texture, source, destination, origin, rot, rl.WHITE)
 }
-/*
-* Inputs:
-* textureNode: ^TextureNode
-* sizePercentage: f32: Decimal percentage to scale texture node
-*/

@@ -1,6 +1,7 @@
 package engine
 
 import "core:math"
+import "core:strings"
 import "core:math/noise"
 import "core:math/rand"
 import rl "vendor:raylib"
@@ -129,10 +130,15 @@ CameraNode :: struct {
 	dragType:   CameraDragType `gui:"true"`,
 
 	// Target tracking
+	// followTarget: the node to follow, as a path relative to the camera
+	// ("../Player"), saved with the scene ("follow") and resolved when the
+	// camera becomes ready (retried until the node exists, e.g. spawned).
+	followTarget:    string,
+	followResolved:  bool,
 	target:          ^Node,
 	targets:         [dynamic]CameraTarget,
 	targetPosition:  [2]f32 `gui:"true"`,
-	currentPosition: [2]f32 `gui:"true"`,
+	currentPosition: [2]f32 `gui:"true" save:"false"`,
 	currentVelocity: [2]f32,
 	targetVelocity:  [2]f32,
 	prevTargetPos:   [2]f32,
@@ -155,7 +161,7 @@ CameraNode :: struct {
 	customScreenOffset:    bool,
 
 	// Rotation
-	currentRotation:         f32 `gui:"true" min:"-360" max:"360"`,
+	currentRotation:         f32 `gui:"true" min:"-360" max:"360" save:"false"`,
 	targetRotation:          f32 `gui:"true" min:"-360" max:"360"`,
 	allowRotation:           bool `gui:"true"`,
 	smoothRotation:          bool `gui:"true"`,
@@ -197,7 +203,7 @@ CameraNode :: struct {
 	// Screen Shake
 	shakePreset:    CameraShakePreset `gui:"true"`,
 	shakeTypes:     bit_set[CameraShakeType] `gui:"true"`,
-	isShaking:      bool `gui:"true"`,
+	isShaking:      bool `gui:"true" save:"false"`,
 	shakeSpeed:     f32 `gui:"true"`,
 	shakeIntensity: f32 `gui:"true"`,
 	shakeTrauma:    f32 `gui:"true"`,
@@ -434,11 +440,23 @@ CameraNode_Ready :: proc(node: ^Node, gameContext: ^GameContext) {
 		gameContext.scene.camera = cameraNode
 	}
 
+	CameraNode_ResolveFollowTarget(cameraNode, gameContext)
+
+	// A camera with no follow target and no explicit target position looks at
+	// its own node position — so placing the camera in the editor is what
+	// the game shows (CameraNode_ViewCenter is the same rule).
+	if cameraNode.target == nil && len(cameraNode.targets) == 0 && cameraNode.targetPosition == {0, 0} {
+		cameraNode.targetPosition = cameraNode.globalPosition
+		cameraNode.currentPosition = cameraNode.globalPosition
+	}
+
 	// Snap initial position to target if available
 	if cameraNode.target != nil {
-		cameraNode.targetPosition = cameraNode.target.globalPosition + cameraNode.offset
+		world := cameraNode.target.globalPosition
+		if gameContext != nil && gameContext.scene != nil do world = Node_ComputeWorldPosition(gameContext.scene.manager, cameraNode.target)
+		cameraNode.targetPosition = world + cameraNode.offset
 		cameraNode.currentPosition = cameraNode.targetPosition
-		cameraNode.prevTargetPos = cameraNode.target.globalPosition
+		cameraNode.prevTargetPos = world
 	}
 	cameraNode.currentOffset = cameraNode.offset
 	cameraNode.currentRotation = cameraNode.targetRotation
@@ -468,6 +486,13 @@ CameraNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	cameraNode.cinematics = nil
 }
 
+// CameraNode_ViewCenter is where the camera looks when the game starts.
+CameraNode_ViewCenter :: proc(camera: ^CameraNode) -> [2]f32 {
+	if camera.target != nil do return camera.target.globalPosition + camera.offset
+	if camera.targetPosition != {0, 0} do return camera.targetPosition
+	return camera.globalPosition
+}
+
 CameraNode_MakeCurrent :: proc(camera: ^CameraNode, scene: ^Scene = nil) {
 	if camera == nil do return
 	camera.isCurrent = true
@@ -480,8 +505,40 @@ CameraNode_MakeCurrent :: proc(camera: ^CameraNode, scene: ^Scene = nil) {
 // Target & Follow Controls
 // ============================================================================
 
+// CameraNode_ResolveFollowTarget finds the saved follow target (once).
+CameraNode_ResolveFollowTarget :: proc(camera: ^CameraNode, gameContext: ^GameContext) {
+	if camera.followResolved || camera.followTarget == "" do return
+	ctx := gameContext if gameContext != nil else camera.gameContext
+	if ctx == nil || ctx.scene == nil || ctx.scene.manager == nil do return
+	if n := Node_ResolvePath(ctx.scene.manager, camera, camera.followTarget); n != nil && n != camera {
+		camera.followResolved = true
+		CameraNode_SetTarget(camera, n)
+		// Start on it (its globalPosition may not be computed yet).
+		world := Node_ComputeWorldPosition(ctx.scene.manager, n)
+		camera.targetPosition = world + camera.offset
+		camera.currentPosition = camera.targetPosition
+		camera.prevTargetPos = world
+	}
+}
+
+// CameraNode_SetFollowTarget saves `target` as the camera's follow target
+// (a path relative to the camera) and follows it; nil clears it.
+CameraNode_SetFollowTarget :: proc(camera: ^CameraNode, manager: ^NodeManager, target: ^Node) {
+	if camera == nil do return
+	if target == nil || manager == nil {
+		camera.followTarget = ""
+		CameraNode_SetTarget(camera, nil)
+		if camera.followMode == .SingleTarget do camera.followMode = .Static
+		return
+	}
+	camera.followTarget = strings.clone(Node_RelativePath(manager, camera, target), camera.allocator)
+	camera.followResolved = true
+	CameraNode_SetTarget(camera, target)
+}
+
 CameraNode_SetTarget :: proc(camera: ^CameraNode, target: ^Node) {
 	if camera == nil do return
+	camera.followResolved = true // an explicit target wins over the saved one
 	camera.target = target
 	if target != nil {
 		camera.followMode = .SingleTarget
@@ -498,12 +555,41 @@ CameraNode_SetTargetPosition :: proc(camera: ^CameraNode, position: [2]f32) {
 	}
 }
 
+// CameraNode_AddTarget adds a target to the group the camera frames (their
+// weighted centre; with autoZoom, zoomed to fit them). A single follow
+// target joins the group first.
 CameraNode_AddTarget :: proc(camera: ^CameraNode, target: CameraTarget) {
 	if camera == nil do return
-	append(&camera.targets, target)
-	if len(camera.targets) > 1 {
-		camera.followMode = .MultiTarget
+	if camera.target != nil && Node_IsAlive(camera.target) && target.node != camera.target {
+		already := false
+		for t in camera.targets do if t.node == camera.target do already = true
+		if !already {
+			p := camera.target.globalPosition
+			append(&camera.targets, CameraTarget{node = camera.target, position = p, influence = {1, 1}, radius = 50, enabled = true, prevPosition = p})
+		}
 	}
+	for &t in camera.targets {
+		if t.node != nil && t.node == target.node {
+			t = target // already in the group: update it
+			camera.followMode = .MultiTarget
+			return
+		}
+	}
+	append(&camera.targets, target)
+	camera.followMode = .MultiTarget
+}
+
+// CameraNode_RemoveTarget takes a node out of the group.
+CameraNode_RemoveTarget :: proc(camera: ^CameraNode, node: ^Node) {
+	if camera == nil do return
+	for t, i in camera.targets {
+		if t.node == node {
+			ordered_remove(&camera.targets, i)
+			break
+		}
+	}
+	if camera.target == node do camera.target = nil
+	if len(camera.targets) == 0 && camera.followMode == .MultiTarget do camera.followMode = .Static
 }
 
 CameraNode_AddTargetNode :: proc(
@@ -759,6 +845,14 @@ CameraNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32
 	if camera == nil || !camera.enabled do return
 
 	dt := max(0.0001, deltaTime)
+
+	// Saved follow target spawned after the camera was ready.
+	if !camera.followResolved && camera.followTarget != "" do CameraNode_ResolveFollowTarget(camera, gameContext)
+	// Followed nodes that were destroyed.
+	if camera.target != nil && !Node_IsAlive(camera.target) do camera.target = nil
+	for i := len(camera.targets) - 1; i >= 0; i -= 1 {
+		if n := camera.targets[i].node; n != nil && !Node_IsAlive(n) do ordered_remove(&camera.targets, i)
+	}
 
 	// Cache viewport size
 	if gameContext != nil && gameContext.game != nil && gameContext.game.virtualSize.x > 0 {

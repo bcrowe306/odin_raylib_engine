@@ -13,7 +13,9 @@ FrameAnimationNode :: struct {
 	loop: bool,
 	origin: [2]f32,
 	frames: [dynamic]^Texture,
-
+	// "animation_finished": a non-looping animation reached its last frame.
+	onFinished: EventSubject,
+	finishedNotified: bool,
 }
 
 FrameAnimationNode_Create :: proc(scene: ^Scene) -> ^FrameAnimationNode {
@@ -27,6 +29,8 @@ FrameAnimationNode_Init :: proc(fan: ^FrameAnimationNode) {
 	Ticker_Init(&fan.ticker, false)
 	fan.update = FrameAnimationNode_Update
 	fan.render = FrameAnimationNode_Render
+	fan.onDestroy = FrameAnimationNode_Destroy
+	InitializeSubject(&fan.onFinished, "animation_finished", fan)
 	fan.ticker->setFPS(12)
 	fan.ticker->setCallback(proc(ticker: ^Ticker, currentTick: int, user_data: rawptr) {
 		fan := cast(^FrameAnimationNode)user_data
@@ -34,60 +38,78 @@ FrameAnimationNode_Init :: proc(fan: ^FrameAnimationNode) {
 	}, fan)
 }
 
-
 FrameAnimationNode_AddFrame :: proc(fan: ^FrameAnimationNode, rm: ^ResourceManager, filePath: string) {
 	texture, ok := rm->loadTexture(filePath)
 	if ok && texture != nil {
 		append(&fan.frames, texture)
 		fan.end = auto_cast len(fan.frames) - 1
-
-	}
-	else {
-		log.error("Error adding frame. Texture file loading error.")
+		if fan.origin.x == 0 && fan.origin.y == 0 {
+			fan.origin = {f32(texture.texture.width) * 0.5, f32(texture.texture.height) * 0.5}
+		}
+	} else {
+		log.error("Error adding frame. Texture file loading error: ", filePath)
 	}
 }
 
-
 FrameAnimationNode_AdvanceFrame :: proc(fan: ^FrameAnimationNode) {
+	if len(fan.frames) == 0 do return
 	if fan.reverse {
 		if fan.currentFrame <= auto_cast fan.start {
 			if fan.loop {
 				fan.currentFrame = fan.end
 			}
-		}
-		else {
+		} else {
 			fan.currentFrame -= 1
 		}
-	}
-	else {
+	} else {
 		if fan.currentFrame >= auto_cast fan.end {
 			if fan.loop {
 				fan.currentFrame = fan.start
 			}
-		}
-		else {
+		} else {
 			fan.currentFrame += 1
 		}
 	}
+	atEnd := fan.currentFrame <= fan.start if fan.reverse else fan.currentFrame >= fan.end
+	if !fan.loop && atEnd && !fan.finishedNotified {
+		fan.finishedNotified = true
+		fan.ticker->stop()
+		fan.onFinished->notify(fan, nil, fan.gameContext)
+	}
+}
+
+FrameAnimationNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
+	fan := cast(^FrameAnimationNode)node
+	DestroySubject(&fan.onFinished)
+	FrameAnimationNode_ClearFrames(fan)
+}
+
+// FrameAnimationNode_ClearFrames removes all frames, releasing their textures.
+FrameAnimationNode_ClearFrames :: proc(fan: ^FrameAnimationNode) {
+	rm := Node_ResourceManager(fan)
+	for f in fan.frames do ResourceManager_ReleaseTexture(rm, f)
+	clear(&fan.frames)
+	fan.currentFrame = 0
+	fan.end = 0
 }
 
 FrameAnimationNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	fan := cast(^FrameAnimationNode)node
-
 	fan.ticker->process()
 }
 
 FrameAnimationNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	fan := cast(^FrameAnimationNode)node
-	if len(fan.frames) == 0 || fan.currentFrame >= auto_cast len(fan.frames) {
-		log.errorf("fan.currentFrame: %d is out of bounds with fan.frames: %d", fan.currentFrame, len(fan.frames))
-		return
-	}
-	if !fan.enabled {
-		log.warn("Node is disabled. Not rendering")
-		return
-	}
-	texture := fan.frames[fan.currentFrame]
+	if len(fan.frames) == 0 do return
+	if !fan.enabled do return
+
+	// Process ticker so animation cycles in both editor viewport and game
+	fan.ticker->process()
+
+	idx := int(fan.currentFrame) % len(fan.frames)
+	texture := fan.frames[idx]
+	if texture == nil || texture.texture.id == 0 do return
+
 	source := rl.Rectangle{
 		x = 0,
 		y = 0,
@@ -95,18 +117,31 @@ FrameAnimationNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 		height = auto_cast texture.texture.height,
 	}
 
+	pos := fan.globalPosition
+	scl := fan.globalScale
+	rot := fan.globalRotation
+
+	destW := f32(texture.texture.width) * scl.x
+	destH := f32(texture.texture.height) * scl.y
+
+	origin := rl.Vector2{ fan.origin.x * scl.x, fan.origin.y * scl.y }
+	if fan.origin.x == 0 && fan.origin.y == 0 {
+		origin = {destW * 0.5, destH * 0.5}
+	}
+
 	destination := rl.Rectangle{
-		x = fan.globalPosition.x,
-		y = fan.globalPosition.y,
-		width = f32(texture.texture.width) * fan.globalScale.x,
-		height = f32(texture.texture.height) * fan.globalScale.y
+		x = pos.x,
+		y = pos.y,
+		width = destW,
+		height = destH,
 	}
 	if rl.IsWindowReady() && texture.texture.id > 0 {
-		rl.DrawTexturePro(texture.texture, source, destination, fan.origin, fan.rotation, rl.WHITE)
+		rl.DrawTexturePro(texture.texture, source, destination, origin, rot, rl.WHITE)
 	}
 }
 
 FrameAnimationNode_Start :: proc(fan: ^FrameAnimationNode) {
+	fan.finishedNotified = false
 	fan.ticker->start(true)
 }
 FrameAnimationNode_Stop :: proc(fan: ^FrameAnimationNode) {
@@ -117,11 +152,4 @@ FrameAnimationNode_Reset :: proc(fan: ^FrameAnimationNode) {
 }
 FrameAnimationNode_Pause :: proc(fan: ^FrameAnimationNode) {
 	fan.ticker->pause()
-}
-FrameAnimationNode_Resume :: proc(fan: ^FrameAnimationNode) {
-	fan.ticker->resume()
-}
-
-FrameAnimationNode_SetFPS :: proc(fan: ^FrameAnimationNode, fps: f32) {
-	fan.ticker->setFPS(fps)
 }

@@ -1,0 +1,41 @@
+# Camera follow target from the editor: pick it in the Inspector (saved as a
+# path relative to the camera), clear it, drop a node from the Scene panel on
+# the field, and toggle it from a node's context menu.
+wait 5
+click @asset.new-scene
+click @hier.add
+type sprite
+click @addnode.create
+expect selected == TextureSprite
+click @hier:Camera
+expect selected == Camera
+expect item:insp.camera.follow == visible
+click @insp.camera.follow
+click @pick:TextureSprite
+expect log contains Camera follows TextureSprite
+screenshot follow_picked
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "follow": "../TextureSprite"
+
+# Reset clears it; dropping a node from the Scene panel sets it again.
+click @insp.camera.follow.reset
+click @toolbar.save
+expect file:scenes/new_scene.scene.json !contains "follow"
+drag @hier:TextureSprite @insp.camera.follow 12
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "follow": "../TextureSprite"
+
+# Context menu on a node: the camera stops / starts following it.
+rclick @hier:TextureSprite
+click @ctx:camera-follow
+click @toolbar.save
+expect file:scenes/new_scene.scene.json !contains "follow"
+rclick @hier:TextureSprite
+click @ctx:camera-follow
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "follow": "../TextureSprite"
+
+# Undo restores the previous state.
+key ctrl+z
+click @toolbar.save
+expect file:scenes/new_scene.scene.json !contains "follow"

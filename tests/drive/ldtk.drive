@@ -1,0 +1,123 @@
+# LDtk: import a project (its tileset comes along), add a level, and use the
+# LDtk tab - layers (editor visibility, solo, IntGrid overlay), entities
+# (mapping, Create Component, framing an instance), collision per IntGrid
+# value, link rules for EntityRef fields, level fields, enums, the world
+# mini-map and world mode - then save and simulate.
+wait 5
+click @asset.new-scene
+expect scene == scenes/new_scene.scene.json
+
+# Import the LDtk project (the tileset image is copied to textures/).
+drop-files @asset.search tests/drive/fixtures/ldtk/topdown.ldtk
+wait 3
+expect import.failed == 0
+expect file:levels/topdown.ldtk contains "relPath": "../textures/TopDown_by_deepnight.png"
+dblclick @asset:levels/topdown.ldtk
+expect selected == topdown
+expect node:topdown.type == LdtkLevelNode
+click @insp.ldtk.panel
+wait 2
+# A taller bottom panel (drag the splitter above it).
+drag 640,519 640,330 12
+wait 2
+expect ldtk.node == topdown
+expect ldtk.level == World_Level_0
+click @ldtk.fit
+screenshot ldtk_layers
+
+# Layers: hide one in the editor, solo another with the IntGrid overlay.
+click @ldtk.layer.eye:Wall_tops
+expect ldtk.layer-visible:Wall_tops == false
+click @ldtk.layer.solo:Collisions
+click @ldtk.intgrid
+expect ldtk.layer-visible:Default_floor == false
+click @ldtk.layer:Collisions
+screenshot ldtk_solo_intgrid
+click @ldtk.layer.solo:Collisions
+click @ldtk.intgrid
+click @ldtk.layers.reset
+expect ldtk.layer-visible:Wall_tops == true
+
+# Entities: Items spawn as a new component generated from their fields.
+click @ldtk.page:Entities
+click @ldtk.entity:Item
+screenshot ldtk_entities
+click @ldtk.create-component
+expect ldtk.mapping:Item == component components/Item.component.json
+expect file:components/Item.component.json contains scripts/item.lua
+expect file:scripts/item.lua contains type = { type = "string", default = "" }, -- enum Item
+# Doors are not spawned; clicking an instance frames it.
+click @ldtk.entity:Door
+click @ldtk.spawn-mode
+click @pick:Don't spawn
+expect ldtk.mapping:Door == none
+click @ldtk.spawn-mode
+click @pick:Auto (component by name)
+expect ldtk.mapping:Door == auto
+click @ldtk.entity:Player
+click @ldtk.instance:9faf4260-c640-11ed-8430-2b1c51694f4d
+expect ldtk.focus == 9faf4260-c640-11ed-8430-2b1c51694f4d
+screenshot ldtk_entity_player
+
+# Collision: walls become one-way platforms.
+click @ldtk.page:Collision
+expect ldtk.collision:Collisions:1 == solid
+click @ldtk.coll:Collisions:1
+click @pick:One-way
+expect ldtk.collision:Collisions:1 == one_way
+expect ldtk.rules == 1
+screenshot ldtk_collision
+
+# Links: Button.targets -> connect "pressed" to open().
+click @ldtk.page:Links
+click @ldtk.link.add:Button.targets
+expect ldtk.link-rules == 1
+click @ldtk.link.signal:0
+type pressed
+click @ldtk.link.method:0
+type open
+key enter
+screenshot ldtk_links
+
+# Level fields and enums.
+click @ldtk.page:Level Fields
+screenshot ldtk_level_fields
+click @ldtk.page:Enums
+expect item:ldtk.enum:Item == visible
+expect item:ldtk.enum:Biome == visible
+screenshot ldtk_enums
+
+# World: the mini-map opens a level; world mode shows them all.
+click @ldtk.page:World
+click @ldtk.map:World_Level_2
+expect ldtk.level == World_Level_2
+click @ldtk.map:World_Level_0
+expect ldtk.level == World_Level_0
+screenshot ldtk_world_map
+click @ldtk.world-mode
+expect ldtk.world-mode == true
+expect ldtk.active-levels == 3
+click @ldtk.fit
+screenshot ldtk_world_mode
+
+# Saved with the scene.
+key ctrl+s
+expect file:scenes/new_scene.scene.json contains "world_mode": true
+expect file:scenes/new_scene.scene.json contains "type": "one_way"
+expect file:scenes/new_scene.scene.json contains "Item": {"mode": "component", "component": "components/Item.component.json"}
+expect file:scenes/new_scene.scene.json contains "action": "signal", "signal": "pressed", "method": "open"
+
+# Simulate: entities spawn (across levels) and their references resolve.
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 10
+expect ldtk.spawned >= 10
+expect ldtk.links >= 3
+screenshot ldtk_simulating
+click @menu:Game
+click @menu:Game/Simulate in Editor
+expect ldtk.spawned == 0
+
+# Undo restores the single-level view.
+key ctrl+z
+expect ldtk.world-mode == false

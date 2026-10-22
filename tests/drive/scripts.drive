@@ -1,0 +1,37 @@
+# Scripting: attach a Lua script from the inspector, edit an exported
+# property, check it is saved and that the game runs it with that value;
+# simulate in the editor and restore.
+wait 5
+click @hier:PatrolDroneAlpha
+expect node:PatrolDroneAlpha.script ==
+click @insp.script-attach
+click @pick:scripts/orbiting_drone.lua
+expect node:PatrolDroneAlpha.script contains orbiting_drone.lua
+expect node:PatrolDroneAlpha.script.orbit_radius == 130
+screenshot script_attached
+dblclick @insp.script:orbit_radius
+key ctrl+a
+type 222
+key enter
+expect node:PatrolDroneAlpha.script.orbit_radius == 222
+key ctrl+s
+expect file:scenes/main.scene.json contains "orbit_radius": 222
+expect file:scenes/main.scene.json contains scripts/orbiting_drone.lua
+
+# Simulate in the editor (Game menu): the script moves the drone.
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 30
+expect node:PatrolDroneAlpha.position !contains 840.0,360.0
+screenshot simulating
+click @menu:Game
+click @menu:Game/Simulate in Editor
+expect node:PatrolDroneAlpha.position ~= 840,360
+expect node:PatrolDroneAlpha.script.orbit_radius == 222
+
+# The game runs the script with the edited value.
+game-args --frames 30 --dump-scene $SHOTS/game_scene.json
+key f5
+wait-until game == stopped timeout=900
+expect abs-file:$SHOTS/game_scene.json contains "orbit_radius": 222
+expect abs-file:$SHOTS/game_scene.json contains scripts/orbiting_drone.lua

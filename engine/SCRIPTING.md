@@ -1,0 +1,657 @@
+# Lua 5.4 Scripting Subsystem
+
+The **Odin Raylib Engine** features a fast, memory-safe, embeddable Lua 5.4 scripting architecture. Game designers and developers can write high-level gameplay logic, enemy AI, scripted cutscenes, and reactive behaviors directly in Lua, attached directly to engine nodes with zero friction.
+
+---
+
+> [!IMPORTANT]
+> ### Engine Development Standard: Mandatory Lua Bindings, Documentation & LSP Integration
+> Going forward, **any functionality, node type, subsystem, or gameplay feature added to the engine MUST include**:
+> 1. **Lua Bindings**: Full adjacent Lua bindings implemented in [`engine/script_bindings.odin`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/script_bindings.odin).
+> 2. **LSP Integration**: Complete EmmyLua / LuaCATS type definitions and documentation annotations in [`engine/definitions/engine_api.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/definitions/engine_api.lua) and verified in [`.luarc.json`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/.luarc.json).
+> 3. **Documentation**: Clear architectural guidance, lifecycle details, and API reference updated here in [`engine/SCRIPTING.md`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/SCRIPTING.md).
+> 4. **Automated Verification**: End-to-end unit tests in [`engine/script_test.odin`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/script_test.odin) with `mem.Tracking_Allocator` asserting zero memory leaks and zero bad frees.
+
+---
+
+## Table of Contents
+1. [Architecture & Lifecycle](#architecture--lifecycle)
+2. [Script Format & Exported Properties](#script-format--exported-properties)
+3. [Events](#events)
+4. [Hot Reload](#hot-reload)
+5. [Editing Scripts in the Editor](#editing-scripts-in-the-editor)
+6. [Language Server (LSP) & EmmyLua Support](#language-server-lsp--emmylua-support)
+7. [Engine Lua API Reference](#engine-lua-api-reference)
+   - [Node Methods](#1-node-methods-selfnode)
+   - [Engine Module](#2-engine-module-engine)
+   - [Input Module](#3-input-module-input)
+   - [Audio Module](#4-audio-module-audio)
+   - [Camera Module](#5-camera-module-camera)
+   - [Physics Module](#6-physics-module-physics)
+   - [Scene Module](#7-scene-module-scene)
+   - [Log Module](#8-log-module-log--print)
+   - [Project Module](#9-project-module-project)
+8. [Release Packaging & Virtual File System (VFS)](#release-packaging--virtual-file-system-vfs)
+9. [Demo Game Integration](#demo-game-integration)
+
+---
+
+## Architecture & Lifecycle
+
+### Node-Attached Scripts
+Scripts can be attached to any existing `Node` subclass (e.g. `TextureNode`, `DynamicBodyNode`, `CameraNode`, `CharacterMoverNode`) or instantiated via the dedicated `ScriptNode` type:
+
+```odin
+// Attach script to an existing node
+inst := e.Script_AttachToNode(node, "assets/scripts/orbiting_drone.lua", overrides, &game.scriptManager)
+
+// Or create a dedicated ScriptNode in a scene
+scriptNode := e.ScriptNode_Create(scene, "assets/scripts/orbiting_drone.lua", "ReconDrone")
+```
+
+### Script Execution Lifecycle
+Each attached script has a private instance table (`self`) with `self.node` pointing to the underlying engine node. The engine dispatches the following lifecycle callbacks:
+
+| Callback | Signature | Description |
+|---|---|---|
+| `ready` | `function M:ready(self)` | Invoked once when the node enters the active scene and becomes ready. |
+| `update` | `function M:update(self, dt)` | Invoked each frame with delta time in seconds. |
+| `on_destroy` | `function M:on_destroy(self)` | Invoked just before the node or script instance is destroyed. |
+
+```lua
+local Drone = {}
+
+Drone.properties = {
+    speed = { type = "float", default = 120.0, min = 0.0, max = 500.0, label = "Speed" }
+}
+
+function Drone:ready()
+    Log.info("Drone ready:", self.node:get_name())
+end
+
+function Drone:update(dt)
+    self.node:translate(self.speed * dt, 0.0)
+end
+
+function Drone:on_destroy()
+    Log.info("Drone destroyed")
+end
+
+return Drone
+```
+
+---
+
+## Script Format & Exported Properties
+
+Scripts declare exposed properties in a `properties` table. These properties are automatically parsed by the engine at load time, allowing the visual scene editor and inspector to render custom UI controls with min/max bounds and reactive editing.
+
+### Supported Property Types
+- `texture`, `audio`, `scene`, `script`, `component`, `level`, `file`:
+  an **asset reference** (a project-relative path string). The Inspector
+  shows an asset picker; e.g. `self.node:set_texture(self.skin)`,
+  `Audio.play_sound(self.hit_sound)`. Dropping an asset onto the code with
+  Cmd/Ctrl held adds one of these to the `properties` table.
+- `float` / `number`: 32-bit floating point number. Supports `min` and `max`.
+- `int` / `integer`: 64-bit integer. Supports `min` and `max`.
+- `string`: Text string.
+- `bool` / `boolean`: Boolean toggle.
+- `color`: RGBA color array `{ r, g, b, a }` with values `0.0` - `1.0` or `0` - `255`.
+- `vector2` / `vec2`: 2D vector `{ x, y }`.
+
+### Example Declaration
+```lua
+local Enemy = {}
+
+Enemy.properties = {
+    moveSpeed     = { type = "float",   default = 175.0, min = 10.0, max = 600.0, label = "Movement Speed" },
+    maxHealth     = { type = "int",     default = 100, min = 1, max = 1000, label = "Max Health" },
+    enemyTag      = { type = "string",  default = "Scout", label = "Enemy Tag" },
+    canAggro      = { type = "bool",    default = true, label = "Aggressive AI" },
+    shieldTint    = { type = "color",   default = { 0.2, 0.6, 1.0, 1.0 }, label = "Shield Glow" },
+    spawnOffset   = { type = "vector2", default = { 0.0, -25.0 }, label = "Spawn Offset" },
+}
+
+return Enemy
+```
+
+---
+
+## Events
+
+Every node raises named events (`EventSubject`s on the Odin side). A script
+receives the events of **its own node** as methods called `on_<event>`, and
+can subscribe to **any node's** events with `node:connect`.
+
+| Event | Raised by | Value |
+|---|---|---|
+| `entered_tree` / `exited_tree` | every node | - |
+| `child_added` / `child_removed` | every node | the child `Node` |
+| `parent_added` / `parent_removed` | every node | the parent `Node` |
+| `timeout` | TimerNode (duration elapsed) | - |
+| `tick` | TimerNode (each frame while running) | elapsed seconds |
+| `body_entered` / `body_exited` | AreaNode | the other `Node` (`nil` if it was destroyed) |
+| `collision_started` / `collision_ended` | Static/Dynamic bodies, CharacterMover | the other `Node` |
+| `hit_started` / `hit_ended` | RaycastNode | the `Node` hit |
+| `animation_finished` | FrameAnimationNode, AnimationPlayerNode (non-looping) | animation name |
+| `finished` | SoundNode, MusicNode | - |
+| `clicked`, `value_changed`, `submitted`, `selected`, `row_selected`, `sorted`, `item_clicked` | UI widgets | widget-specific |
+| `level_loaded` / `entity_spawned` | LdtkLevelNode | level identifier / spawned `Node` |
+
+```lua
+---@class Door : ScriptInstanceBase
+local Door = {}
+
+-- Events of this script's own node (an AreaNode here).
+function Door:on_body_entered(other)
+    if other:get_name() == "Player" then self.node:emit("opened") end
+end
+
+function Door:ready()
+    -- Any node's events; returns an id for disconnect.
+    local timer = Scene.find_node("DoorTimer")
+    self.timerConn = timer:connect("timeout", function(value, source)
+        Log.info("timer fired on", source:get_name())
+    end)
+end
+
+return Door
+```
+
+- `node:emit(name, value)` raises a custom event (`on_<name>` on the node's
+  script plus every `connect`ed handler).
+- `on_<event>` methods are only called once the script is ready (after `ready`).
+- Connections are released automatically when the connecting script or the
+  source node is destroyed, so handlers never run against freed nodes; a
+  `Node` value whose node is gone becomes `nil`. `node:disconnect(id)` removes
+  one early.
+- The editor doesn't dispatch events to scripts while editing; they run in
+  *Simulate* and in the game.
+
+### Connections made in the editor (signals)
+
+The Inspector's **Signals** section connects an event of a node to a method
+of another node's script, like Godot's signals. The editor writes the
+handler into the target script:
+
+```lua
+---Signal: Timer.timeout - The timer's duration elapsed
+---@param source Node
+function Spawner:on_timer_timeout(_, source)
+end
+```
+
+and saves the connection on the *source* node:
+
+```json
+"connections": [{"signal": "timeout", "target": "../Spawner", "method": "on_timer_timeout"}]
+```
+
+`target` is a path relative to the source (`.`, `..`, `../Spawner`,
+`Gun/Muzzle`), so connections inside components keep working in every
+instance. When the event fires, the engine calls
+`Target:method(value, source)` after the source's own `on_<event>`.
+Disconnecting in the Inspector removes both the connection and the
+generated handler (it asks first if the handler contains code).
+
+---
+
+## Input actions
+
+Scripts ask for **actions**, not keys. Actions are defined per project in
+**Settings > Project > Input** (saved in `project.json` under `"input"`):
+each has a name and up to four bindings (keys, mouse buttons, gamepad
+buttons or gamepad axes). The built-in names (`move_up`, `move_down`,
+`move_left`, `move_right`, `jump`, `fire`, `secondary`, `boost`, `interact`,
+`pause`, `confirm`, `cancel`, `custom1`..`custom4`) can be rebound, and any
+other name adds an action:
+
+```lua
+if Input.is_action_pressed("dash") then self:dash() end
+local x = Input.get_axis("move_left", "move_right")
+local vx, vy = Input.get_vector()   -- move_left/right/up/down by default
+```
+
+## Simulate and Lua state
+
+*Simulate* (F7) runs scripts in the editor's Lua state. Starting it
+snapshots the Lua globals; stopping it restores them and re-runs every
+module, so module-level variables start fresh and nothing a simulation did
+leaks into the next run or into the saved scene.
+
+## Hot Reload
+
+Saving a `.lua` file reloads it in the running game (development builds) and
+in the editor's *Simulate* mode. The module table is updated in place, so
+running instances keep their state (`self.*` fields and property values) and
+immediately run the new functions. Newly declared properties appear with
+their defaults; removed ones disappear. If the new file has a syntax or
+runtime error, the error is logged and the previous code keeps running.
+Files are checked twice a second (`ScriptManager_CheckForChanges`); exported
+`.ore` games don't hot-reload.
+
+---
+
+## Editing Scripts in the Editor
+
+Scripts open in a **Code** tab next to the Viewport:
+
+- double-click a script in *Assets* (or right-click → *Edit Script*),
+- the edit button next to the script in the *Inspector*,
+- *Open Script* in a node's context menu in the scene tree,
+- double-click a console message containing `file.lua:LINE`,
+- *New Script* (Inspector) or the **+** on the *Scripts* folder: creates a
+  script from a template (`---@class Name : ScriptInstanceBase`) and opens it.
+
+The editor uses `lua-language-server` (built in `lua-language-server/`) with
+the engine definitions as its library: completion for every engine module and
+`self.node` method, signature help, hover documentation, diagnostics
+(squiggles, gutter markers, counts in the status line) and go to definition
+(F12 or Ctrl/Cmd-click). Ctrl/Cmd+S saves (and hot-reloads), Ctrl+Space
+completes, Ctrl/Cmd+/ toggles comments, Ctrl/Cmd+W closes the tab.
+
+Annotate the module table with `---@class Name : ScriptInstanceBase` so the
+language server knows `self.node`, the property table and the `on_*`
+callbacks.
+
+---
+
+## Language Server (LSP) & EmmyLua Support
+
+The engine provides full IntelliSense, autocomplete, parameter hints, and type diagnostics for `lua-language-server` (VS Code, Neovim, Helix, Sublime Text).
+
+- **Stubs definition file**: [`engine/definitions/engine_api.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/definitions/engine_api.lua)
+- **Root configuration**: [`.luarc.json`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/.luarc.json)
+
+```json
+{
+  "$schema": "https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json",
+  "runtime": { "version": "Lua 5.4" },
+  "workspace": {
+    "library": ["engine/definitions"],
+    "checkThirdParty": false
+  },
+  "diagnostics": {
+    "globals": ["Engine", "Input", "Audio", "Camera", "Physics", "Scene", "Log"]
+  }
+}
+```
+
+---
+
+## Engine Lua API Reference
+
+### 1. Node Methods (`self.node`)
+
+#### Identity & Hierarchy
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `get_type()` | - | `string` | Returns concrete type (e.g. `"TextureNode"`, `"CameraNode"`, `"DynamicBodyNode"`). |
+| `get_name()` | - | `string` | Returns node display name. |
+| `set_name(name)` | `name: string` | - | Renames node. |
+| `is_enabled()` | - | `boolean` | Checks if node receives updates. |
+| `set_enabled(enabled)` | `enabled: boolean` | - | Enables/disables node updates. |
+| `is_visible()` | - | `boolean` | Checks if node is rendered. |
+| `set_visible(visible)` | `visible: boolean` | - | Enables/disables node rendering. |
+| `get_parent()` | - | `Node?` | Gets parent node in scene hierarchy. |
+| `get_children()` | - | `Node[]` | Gets array of child nodes. |
+| `get_child(name)` | `name: string` | `Node?` | Finds child node by name. |
+| `add_child(child)` | `child: Node` | - | Reparents node as child. |
+| `remove_child(child)` | `child: Node` | - | Detaches child node. |
+| `destroy()` | - | - | Queues node for scene removal. |
+
+#### Lookup & textures
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `get_node(path)` | `string` | `Node?` | A node by path relative to this one (`"Gun"`, `"../Player"`, `"."`). Dragging a node from the scene tree onto a script inserts this call. |
+| `set_texture(path)` | `string` | `boolean` | Shows another image on a TextureNode (e.g. a `texture` property). |
+
+#### Transforms
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `get_position()` | - | `x, y` | Gets local (x, y) coordinates. |
+| `set_position(x, y)` | `x, y: number` | - | Sets local (x, y) coordinates. |
+| `translate(dx, dy)` | `dx, dy: number` | - | Moves node by delta offset. |
+| `get_rotation()` | - | `degrees` | Gets local rotation in degrees. |
+| `set_rotation(deg)` | `deg: number` | - | Sets local rotation in degrees. |
+| `rotate(dDeg)` | `dDeg: number` | - | Rotates node by delta degrees. |
+| `get_scale()` | - | `sx, sy` | Gets local scale factors. |
+| `set_scale(sx, [sy])` | `sx, sy` | - | Sets local scale factors. |
+| `get_global_position()`| - | `x, y` | Computes world-space position. |
+| `get_global_rotation()`| - | `degrees` | Computes world-space rotation. |
+
+#### DynamicBodyNode (Box2D Physics)
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `apply_force(fx, fy)` | `fx, fy: number` | - | Applies continuous Box2D force in Newtons. |
+| `apply_impulse(ix, iy)`| `ix, iy: number` | - | Applies instantaneous Box2D impulse. |
+| `get_linear_velocity()`| - | `vx, vy` | Gets physics linear velocity. |
+| `set_linear_velocity(vx, vy)`| `vx, vy` | - | Directly sets physics linear velocity. |
+| `get_angular_velocity()`| - | `deg/s` | Gets angular velocity in degrees per second. |
+| `set_angular_velocity(w)`| `w: number` | - | Sets angular velocity in degrees per second. |
+| `get_gravity_scale()` | - | `number` | Gets gravity scale multiplier. |
+| `set_gravity_scale(scale)` | `scale: number` | - | Sets gravity scale multiplier. |
+| `is_fixed_rotation()` | - | `boolean` | Checks if rotation is locked. |
+| `set_fixed_rotation(fixed)` | `fixed: boolean` | - | Locks or unlocks rotation. |
+| `set_linear_damping(damping)` | `damping: number` | - | Sets linear drag coefficient. |
+| `set_angular_damping(damping)` | `damping: number` | - | Sets angular drag coefficient. |
+| `is_awake()` | - | `boolean` | Checks if body is actively simulating. |
+| `set_awake(awake)` | `awake: boolean` | - | Wakes body up or puts to sleep. |
+
+#### CharacterMoverNode
+
+A CharacterMover has two **control modes** (Inspector: *Control Mode*):
+
+- **Script** (Godot's `CharacterBody2D` style): the script owns the velocity
+  and calls `character_move_and_slide()` every frame. **New Script** on a
+  CharacterMover writes a documented **platformer template** (gravity, run
+  with acceleration/friction, jump with coyote time, buffering and variable
+  height, optional wall slide/jump, `jumped`/`landed` events) and switches
+  the node to Script mode; delete what you don't need.
+- **BuiltIn**: the node moves itself from its own settings (max speed,
+  acceleration, jump speed, gravity scale, optional keyboard input);
+  `character_move(dirX, jump)` steers it.
+
+```lua
+function Player:update(dt)
+    local vx, vy = self.node:character_get_velocity()
+    local gx, gy = self.node:character_get_gravity()
+    vy = vy + gy * dt
+    if Input.is_action_pressed("jump") and self.node:character_is_on_floor() then vy = -420 end
+    vx = Input.get_axis("move_left", "move_right") * 240
+    self.node:character_set_velocity(vx, vy)
+    self.node:character_move_and_slide()
+end
+```
+
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `character_move_and_slide([dt])` | `dt: number` (default: frame delta) | `boolean` collided | Moves by the velocity and slides along surfaces; updates floor/wall/ceiling. Switches to Script mode. |
+| `character_get_velocity()` | - | `vx, vy` | Velocity in px/s (+y down). |
+| `character_set_velocity(vx, vy)` | `vx, vy: number` | - | Sets the velocity. |
+| `character_get_gravity()` | - | `gx, gy` | World gravity x the node's gravity scale. |
+| `character_set_gravity_scale(scale)` | `scale: number` | - | Gravity multiplier. |
+| `character_is_on_floor()` / `character_is_on_wall()` / `character_is_on_ceiling()` | - | `boolean` | Contact state from the last move. |
+| `character_get_floor_normal()` / `character_get_wall_normal()` | - | `nx, ny` | Normal of the floor / wall touched. |
+| `character_get_last_motion()` | - | `dx, dy` | How far the last move went. |
+| `character_set_control_mode(mode)` | `"script"` / `"builtin"` | - | Switches control mode. |
+| `character_move(dirX, jump)` | `dirX: number, jump: bool` | - | BuiltIn mode: steer (dirX x max speed) and jump if grounded. |
+| `character_is_grounded()` | - | `boolean` | Same as `character_is_on_floor()`. |
+| `character_set_speed(speed)` / `character_set_jump_speed(speed)` | `number` | - | BuiltIn mode: max run speed / jump speed. |
+
+#### AreaNode (Sensors)
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `area_is_overlapping()` | - | `boolean` | Checks if any bodies are inside sensor area. |
+| `area_get_overlap_count()` | - | `integer` | Count of currently overlapping bodies. |
+| `area_get_overlapping_nodes()` | - | `Node[]` | Array of currently overlapping nodes. |
+
+#### RaycastNode
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `raycast_cast()` | - | - | Executes immediate ray query. |
+| `raycast_is_colliding()` | - | `boolean` | Checks if ray hit an obstacle. |
+| `raycast_get_hit_point()` | - | `x, y` | World hit point coordinates. |
+| `raycast_get_hit_normal()` | - | `nx, ny` | Hit surface normal vector. |
+| `raycast_get_hit_fraction()` | - | `number` | 0.0 to 1.0 fraction along ray. |
+| `raycast_get_hit_node()` | - | `Node?` | Node attached to struck body. |
+| `raycast_set_direction(dx, dy)` | `dx, dy: number` | - | Sets local cast direction vector. |
+| `raycast_set_length(length)` | `length: number` | - | Sets ray length in pixels. |
+
+#### ParticleEmitterNode
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `particle_start()` | - | - | Starts emitting particles. |
+| `particle_stop()` | - | - | Stops emitting particles. |
+| `particle_is_emitting()` | - | `boolean` | Checks if emission is active. |
+| `particle_set_amount(count)` | `count: integer` | - | Sets max particles in pool. |
+| `particle_set_lifetime(sec)` | `sec: number` | - | Sets particle lifespan in seconds. |
+
+#### TextureNode
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `texture_get_size()` | - | `w, h` | Returns raw pixel dimensions. |
+| `texture_set_origin(ox, oy)` | `ox, oy: number` | - | Sets rotation/scaling pivot offset. |
+| `texture_get_path()` | - | `string` | File path of loaded texture. |
+
+#### AnimationPlayerNode
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `animation_play([name])` | `name?: string` | - | Starts or switches animation track. |
+| `animation_stop()` | - | - | Stops animation and freezes frame. |
+| `animation_pause()` | - | - | Pauses animation playback. |
+| `animation_resume()` | - | - | Resumes paused animation. |
+| `animation_reset()` | - | - | Resets track to initial frame. |
+| `animation_set_fps(fps)` | `fps: number` | - | Sets frames per second speed. |
+| `animation_get_current()` | - | `string` | Gets name of active animation. |
+
+#### TimerNode
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `timer_start()` | - | - | Starts/restarts timer from zero. |
+| `timer_stop()` | - | - | Halts timer. |
+| `timer_is_running()` | - | `boolean` | Checks if timer is active. |
+| `timer_get_elapsed()` | - | `number` | Seconds elapsed since start. |
+| `timer_set_duration(sec)` | `sec: number` | - | Sets countdown target duration. |
+| `timer_set_loop(loop)` | `loop: boolean` | - | Enables automatic restart. |
+
+#### SoundNode & MusicNode
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `sound_play()` / `sound_stop()` | - | - | Plays / stops sound effect. |
+| `sound_pause()` / `sound_resume()` | - | - | Pauses / resumes sound effect. |
+| `music_play()` / `music_stop()` | - | - | Plays / stops music stream. |
+| `music_pause()` / `music_resume()` | - | - | Pauses / resumes music stream. |
+
+#### CameraNode (Node-invoked)
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `camera_set_zoom(zoom)` / `camera_get_zoom()` | `zoom: number` | `number` | Sets / gets camera zoom. |
+| `camera_set_target(targetNode)` | `node: Node?` | - | Follows target node smoothly. |
+| `camera_add_target(node, [opts])` | `opts: {weight, weight_x, weight_y, radius, offset_x, offset_y, priority}` | - | Adds a node to the group the camera frames (weighted centre; Auto Zoom fits them). |
+| `camera_remove_target(node)` / `camera_clear_targets()` | `node: Node` | - | Removes one / stops following. |
+| `camera_get_target()` / `camera_get_targets()` | - | `Node?` / `Node[]` | The followed node / every followed node. |
+| `camera_set_target_position(x, y)` | `x, y: number` | - | Sets fixed target coordinates. |
+| `camera_shake(trauma, [duration])` | `trauma, dur` | - | Triggers screen shake. |
+| `camera_stop_shake()` / `camera_is_shaking()`| - | `boolean` | Controls / queries shake state. |
+| `camera_set_limits(l, r, t, b)` | `l, r, t, b` | - | Sets viewport boundary limits. |
+| `camera_clear_limits()` | - | - | Removes boundary limits. |
+
+#### LDtk Node
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `ldtk_get_level_identifier()` | - | `string` | Active LDtk level identifier. |
+| `ldtk_get_levels()` | - | `string[]` | All level identifiers in the project. |
+| `ldtk_load_level(identifier)` | `string` | `boolean` | Switches level (rebuilds colliders and entities). |
+| `ldtk_get_level_size()` | - | `number, number` | Level width and height in pixels. |
+| `ldtk_get_level_field(name)` | `string` | `any` | A level custom field (arrays → tables, points → `{cx, cy}`). |
+| `ldtk_get_entities([identifier])` | `string?` | `table[]` | Entities (`identifier, iid, x, y, width, height, tags, fields`). |
+| `ldtk_get_entity_node(iid)` | `string` | `Node?` | The node spawned for an entity. |
+| `ldtk_get_int_grid(layer, x, y)` | `string, number, number` | `integer` | IntGrid value at a world position (0 = empty). |
+
+See `engine/LDTK.md` for the full LDtk integration.
+
+---
+
+### 2. Engine Module (`Engine`)
+
+```lua
+local fps = Engine.get_fps()
+local dt = Engine.get_delta_time()
+local elapsed = Engine.get_time()
+local screen_w, screen_h = Engine.get_window_size()
+local virtual_w, virtual_h = Engine.get_virtual_size()
+```
+
+---
+
+### 3. Input Module (`Input`)
+
+```lua
+-- Check mapped actions
+if Input.is_action_pressed("fire") then
+    self:fire_laser()
+end
+
+if Input.is_action_down("boost") then
+    self.speed = 350.0
+end
+
+-- 2D direction vectors (-1.0 to 1.0)
+local move_x, move_y = Input.get_vector("move_left", "move_right", "move_up", "move_down")
+self.node:translate(move_x * self.speed * dt, move_y * self.speed * dt)
+
+-- Raw keyboard / mouse queries
+if Input.is_key_pressed("SPACE") then ... end
+if Input.is_mouse_button_pressed("LEFT") then ... end
+local mouse_x, mouse_y = Input.get_mouse_position()
+local wheel = Input.get_mouse_wheel_move()
+```
+
+---
+
+### 4. Audio Module (`Audio`)
+
+```lua
+Audio.play_sound("assets/audio/laser.wav")
+Audio.play_music("assets/audio/theme.ogg", true)
+Audio.pause_music("assets/audio/theme.ogg")
+Audio.resume_music("assets/audio/theme.ogg")
+Audio.set_music_volume("assets/audio/theme.ogg", 0.5)
+Audio.stop_music("assets/audio/theme.ogg")
+Audio.set_master_volume(0.8)
+```
+
+---
+
+### 5. Camera Module (`Camera`)
+
+```lua
+-- Global operations on the active scene's main camera.
+-- Usually no script is needed to follow the player: pick the camera's
+-- Follow Target in the Inspector (saved with the scene).
+Camera.set_target(self.node)
+
+-- Frame several nodes (e.g. two players): weighted centre, and with the
+-- camera's Auto Zoom on, zoomed to keep them all in view.
+Camera.add_target(player1)
+Camera.add_target(player2, { weight = 1, radius = 80 })
+Camera.remove_target(player2)
+Camera.clear_targets()
+Camera.set_zoom(1.8)
+Camera.shake(0.6, 0.3)
+
+local wx, wy = Camera.screen_to_world(mouse_x, mouse_y)
+local sx, sy = Camera.world_to_screen(player_x, player_y)
+local cx, cy, cw, ch = Camera.get_visible_world_bounds()
+```
+
+---
+
+### 6. Physics Module (`Physics`)
+
+```lua
+Physics.set_gravity(0.0, 500.0)
+local gx, gy = Physics.get_gravity()
+Physics.set_paused(false)
+
+-- Cast ray across world coordinates
+local hit = Physics.raycast(100.0, 100.0, 100.0, 600.0)
+if hit then
+    Log.info("Struck obstacle at:", hit.point_x, hit.point_y, "Normal:", hit.normal_x, hit.normal_y)
+    if hit.node then
+        Log.info("Struck node:", hit.node:get_name())
+    end
+end
+```
+
+---
+
+### 7. Scene Module (`Scene`)
+
+```lua
+local player = Scene.find_node("SpaceShip")
+local sceneName = Scene.get_name()
+local allNodes = Scene.get_nodes()
+
+-- Dynamically instantiate and parent new nodes at runtime
+local sprite = Scene.create_node("TextureNode", "SpawnedExplosion", self.node)
+sprite:set_position(0.0, 0.0)
+
+-- Scene transitions
+Scene.change_scene("battle_arena")
+Scene.reload()
+```
+
+---
+
+### 8. Log Module (`Log` / `print`)
+
+```lua
+Log.info("Player spawned at coordinates:", x, y)
+Log.warn("Shield depleted!")
+Log.error("Missing expected target node")
+print("Standard Lua print works as Log.info")
+```
+
+---
+
+---
+
+### 9. Project Module (`Project`)
+
+The `Project` global table allows scripts, editor tools, and runtime launchers to inspect, load, serialize, and package portable `.ore` game archives directly from Lua:
+
+```lua
+-- Load a complete project from loose directory or .ore file
+local success = Project.load("assets/demo_project.ore")
+
+-- Check if an asset exists in mounted .ore or project directory
+if Project.has_file("assets/scripts/enemy.lua") then
+    local content = Project.read_file("assets/scripts/enemy.lua")
+end
+
+-- Serialize currently active scene to JSON string
+local sceneJson = Project.serialize_scene()
+
+-- Export loose directory to standalone compressed .ore package
+Project.export_ore("my_project", "exports/release_game.ore")
+```
+
+## Release Packaging & Virtual File System (VFS)
+
+The engine features a transparent Virtual File System (**ScriptVFS**) that prioritizes embedded script bytecode in release builds while falling back to disk files during live development.
+
+### Compile-Time Asset Embedding
+Use Odin's `#load` compile-time directive to embed Lua scripts directly into the release executable:
+
+```odin
+// Register embedded script in game setup
+e.ScriptVFS_RegisterEmbedded("assets/scripts/orbiting_drone.lua", #load("../assets/scripts/orbiting_drone.lua", string))
+```
+
+### Lua `require()` Support
+The VFS registers a custom searcher in Lua's `package.searchers`. When a script calls:
+```lua
+local Helper = require("utils.math_helper")
+```
+The VFS automatically resolves the module from embedded memory or disk search paths (`assets/scripts/`, `scripts/`, `./`).
+
+---
+
+## Demo Game Integration
+
+An autonomous Recon Drone behavior is integrated into the Asteroids demo game ([`asteroids/game.odin`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/asteroids/game.odin)) using [`assets/scripts/orbiting_drone.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/assets/scripts/orbiting_drone.lua):
+
+1. **Embedded at compile-time**:
+   ```odin
+   e.ScriptVFS_RegisterEmbedded("assets/scripts/orbiting_drone.lua", #load("../assets/scripts/orbiting_drone.lua", string))
+   ```
+2. **Spawned in the main game scene**:
+   ```odin
+   droneNode := e.TextureNode_Create(scene, &game.resourceManager, "assets/graphics/Space Pack/Ships/Ship_2.png")
+   droneNode.name = "ReconDrone"
+   droneNode.origin = {droneNode.size.x * 0.5, droneNode.size.y * 0.5}
+   e.Script_AttachToNode(droneNode, "assets/scripts/orbiting_drone.lua", nil, &game.scriptManager)
+   ```
+3. **Smooth runtime execution**: The drone calculates its elliptical orbital trajectory around the scene center, aligns its rotation along its velocity tangent, and dynamically pulses its scale using the Lua scripting API.

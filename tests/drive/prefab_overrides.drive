@@ -1,0 +1,37 @@
+# Linked component instances keep per-child overrides: edit a child of an
+# instance, the change is saved as an override (not a copy), survives the
+# component changing, and can be reverted.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip2
+
+# Edit a child of the instance.
+click @hier:PlayerShip2/ParticleEmitter
+expect node:PlayerShip2/ParticleEmitter.overrides ==
+dblclick @insp.position.x
+key ctrl+a
+type 25
+key enter
+expect node:PlayerShip2/ParticleEmitter.position contains 25.0,
+expect node:PlayerShip2/ParticleEmitter.overrides == position
+expect item:insp.overrides == visible
+screenshot child_override
+key ctrl+s
+expect file:scenes/main.scene.json contains "overrides": {"ParticleEmitter": {"position": [25,
+expect file:scenes/main.scene.json !contains "name": "ParticleEmitter"
+
+# The other instance is unaffected.
+expect node:PlayerShip/ParticleEmitter.position !contains 25.0,
+
+# Revert the override.
+click @insp.revert-overrides
+expect node:PlayerShip2/ParticleEmitter.position !contains 25.0,
+expect node:PlayerShip2/ParticleEmitter.overrides ==
+screenshot reverted

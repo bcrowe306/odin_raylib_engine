@@ -1,6 +1,7 @@
 package engine
 
 import "core:log"
+import "core:strings"
 
 
 
@@ -11,7 +12,14 @@ AnimationPlayerNode :: struct {
 	animationIndex: int,
 	currentFrame: int,
 	ticker: Ticker,
-	reverse: bool,
+	reverse: bool `gui:"true"`,
+	autoplay: bool `gui:"true"`, // start playing when the node becomes ready
+	// "animation_finished"(name): a non-looping animation reached its end.
+	onFinished: EventSubject,
+	finishedNotified: bool,
+	// Animations added with AddFrameAnimation/AddSheetAnimation are owned
+	// (freed with the node); AddAnimation keeps caller-owned ones as is.
+	owned: [dynamic]^Animation,
 }
 
 AnimationPlayerNode_AddAnimation :: proc(animationPlayer: ^AnimationPlayerNode, animation: ^Animation) {
@@ -63,6 +71,10 @@ AnimationPlayerNode_Init :: proc(apn: ^AnimationPlayerNode) {
 	Ticker_Init(&apn.ticker, false)
 	apn.update = AnimationPlayerNode_Update
 	apn.render = AnimationPlayerNode_Render
+	apn.ready = AnimationPlayerNode_Ready
+	apn.onDestroy = AnimationPlayerNode_Destroy
+	apn.owned = make([dynamic]^Animation, apn.allocator)
+	InitializeSubject(&apn.onFinished, "animation_finished", apn)
 	apn.ticker->setFPS(12)
 	apn.ticker->setCallback(proc(ticker: ^Ticker, currentTick: int, user_data: rawptr) {
 		apn := cast(^AnimationPlayerNode)user_data
@@ -94,11 +106,73 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 			apn.currentFrame += 1
 		}
 	}
+	// A non-looping animation that reached its last frame finishes once.
+	atEnd := apn.currentFrame <= a.startFrame if apn.reverse else apn.currentFrame >= a.endFrame
+	if !a.loop && atEnd && !apn.finishedNotified {
+		apn.finishedNotified = true
+		apn.ticker->stop()
+		apn.onFinished->notify(apn, a.name, apn.gameContext)
+	}
+}
+
+AnimationPlayerNode_Ready :: proc(node: ^Node, gameContext: ^GameContext) {
+	apn := cast(^AnimationPlayerNode)node
+	if apn.autoplay && len(apn.animations) > 0 do AnimationPlayerNode_Start(apn)
+}
+
+AnimationPlayerNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
+	apn := cast(^AnimationPlayerNode)node
+	DestroySubject(&apn.onFinished)
+	rm := &gameContext.game.resourceManager if gameContext != nil && gameContext.game != nil else Node_ResourceManager(apn)
+	for a in apn.owned {
+		if a.renderFrame == FA_RenderFrame {
+			fa := cast(^FrameAnimation)a
+			for f in fa.frames do ResourceManager_ReleaseTexture(rm, f)
+			FrameAnimation_Destroy(fa)
+		} else if a.renderFrame == SSA_RenderFrame {
+			ssa := cast(^SpriteSheetAnimation)a
+			if ssa.spriteSheet != nil do ResourceManager_ReleaseTexture(rm, ssa.spriteSheet)
+		}
+	}
+	clear(&apn.owned)
+	clear(&apn.animations)
+}
+
+// AnimationPlayerNode_AddFrameAnimation adds an owned animation that plays
+// a list of image files.
+AnimationPlayerNode_AddFrameAnimation :: proc(apn: ^AnimationPlayerNode, rm: ^ResourceManager, name: string, framePaths: []string, loop := true) -> ^FrameAnimation {
+	fa := new(FrameAnimation, apn.allocator)
+	fa.frames = make([dynamic]^Texture, apn.allocator)
+	FrameAnimation_Init(fa, strings.clone(name, apn.allocator))
+	fa.loop = loop
+	if rm != nil {
+		for p in framePaths do FrameAnimation_AddFrame(fa, rm, p)
+	}
+	append(&apn.owned, cast(^Animation)fa)
+	AnimationPlayerNode_AddAnimation(apn, fa)
+	return fa
+}
+
+// AnimationPlayerNode_AddSheetAnimation adds an owned sprite-sheet animation
+// (grid columns x rows, frames start..end in reading order).
+AnimationPlayerNode_AddSheetAnimation :: proc(apn: ^AnimationPlayerNode, rm: ^ResourceManager, name: string, sheetPath: string, grid: [2]int, start, end: int, loop := true) -> ^SpriteSheetAnimation {
+	ssa := new(SpriteSheetAnimation, apn.allocator)
+	SpriteSheetAnimation_Init(ssa, strings.clone(name, apn.allocator))
+	ssa.grid = {max(grid.x, 1), max(grid.y, 1)}
+	ssa.startFrame, ssa.endFrame = start, end
+	ssa.loop = loop
+	if rm != nil && sheetPath != "" do SpriteSheetAnimation_LoadSpirteSheet(ssa, rm, sheetPath)
+	append(&apn.owned, cast(^Animation)ssa)
+	AnimationPlayerNode_AddAnimation(apn, ssa)
+	return ssa
 }
 
 AnimationPlayerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	apn := cast(^AnimationPlayerNode)node
 	apn.ticker->process()
+	if a := AnimationPlayerNode_GetAnimation(apn); a != nil && len(a.tracks) > 0 {
+		AnimationPlayerNode_ApplyTracks(apn, f32(apn.currentFrame - a.startFrame))
+	}
 }
 
 AnimationPlayerNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
@@ -111,6 +185,10 @@ AnimationPlayerNode_Render :: proc(node: ^Node, gameContext: ^GameContext, delta
 }
 
 AnimationPlayerNode_Start :: proc(apn: ^AnimationPlayerNode) {
+	apn.finishedNotified = false
+	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
+		apn.currentFrame = a.endFrame if apn.reverse else a.startFrame
+	}
 	apn.ticker->start(true)
 }
 AnimationPlayerNode_Stop :: proc(apn: ^AnimationPlayerNode) {

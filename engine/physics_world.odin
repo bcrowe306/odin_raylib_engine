@@ -110,39 +110,50 @@ PhysicsWorld_Step :: proc(pw: ^PhysicsWorld, deltaTime: f32, gameContext: ^GameC
 		}
 	}
 
-	// Dispatch Contact Begin/End Events to Node onEnter / onExit subjects
+	// Contact begin/end -> "collision_started"/"collision_ended" on both bodies.
 	contactEvents := b2.World_GetContactEvents(pw.worldId)
 	for i in 0..<contactEvents.beginCount {
 		ev := contactEvents.beginEvents[i]
-		if b2.Shape_IsValid(ev.shapeIdA) && b2.Shape_IsValid(ev.shapeIdB) {
-			bodyA := b2.Shape_GetBody(ev.shapeIdA)
-			bodyB := b2.Shape_GetBody(ev.shapeIdB)
-			nodeA := cast(^Node)b2.Body_GetUserData(bodyA) if b2.Body_IsValid(bodyA) else nil
-			nodeB := cast(^Node)b2.Body_GetUserData(bodyB) if b2.Body_IsValid(bodyB) else nil
-			if nodeA != nil {
-				nodeA.onEnter->notify(nodeB, true, gameContext)
-			}
-			if nodeB != nil {
-				nodeB.onEnter->notify(nodeA, true, gameContext)
-			}
-		}
+		nodeA, nodeB := contact_nodes(ev.shapeIdA, ev.shapeIdB)
+		Node_NotifyCollision(nodeA, nodeB, true, gameContext)
+		Node_NotifyCollision(nodeB, nodeA, true, gameContext)
 	}
-
 	for i in 0..<contactEvents.endCount {
 		ev := contactEvents.endEvents[i]
-		if b2.Shape_IsValid(ev.shapeIdA) && b2.Shape_IsValid(ev.shapeIdB) {
-			bodyA := b2.Shape_GetBody(ev.shapeIdA)
-			bodyB := b2.Shape_GetBody(ev.shapeIdB)
-			nodeA := cast(^Node)b2.Body_GetUserData(bodyA) if b2.Body_IsValid(bodyA) else nil
-			nodeB := cast(^Node)b2.Body_GetUserData(bodyB) if b2.Body_IsValid(bodyB) else nil
-			if nodeA != nil {
-				nodeA.onExit->notify(nodeB, false, gameContext)
-			}
-			if nodeB != nil {
-				nodeB.onExit->notify(nodeA, false, gameContext)
-			}
-		}
+		nodeA, nodeB := contact_nodes(ev.shapeIdA, ev.shapeIdB)
+		Node_NotifyCollision(nodeA, nodeB, false, gameContext)
+		Node_NotifyCollision(nodeB, nodeA, false, gameContext)
 	}
+}
+
+@(private = "file")
+contact_nodes :: proc(a, b: b2.ShapeId) -> (^Node, ^Node) {
+	node_of :: proc(s: b2.ShapeId) -> ^Node {
+		if !b2.Shape_IsValid(s) do return nil
+		body := b2.Shape_GetBody(s)
+		if !b2.Body_IsValid(body) do return nil
+		n := cast(^Node)b2.Body_GetUserData(body)
+		return n if Node_IsAlive(n) else nil
+	}
+	return node_of(a), node_of(b)
+}
+
+// Node_NotifyCollision raises collision_started/collision_ended on a body.
+Node_NotifyCollision :: proc(node, other: ^Node, started: bool, gameContext: ^GameContext) {
+	if node == nil do return
+	subject: ^EventSubject
+	switch node.typeId {
+	case DynamicBodyNode:
+		db := cast(^DynamicBodyNode)node
+		subject = &db.onCollisionStarted if started else &db.onCollisionEnded
+	case StaticBodyNode:
+		sb := cast(^StaticBodyNode)node
+		subject = &sb.onCollisionStarted if started else &sb.onCollisionEnded
+	case CharacterMoverNode:
+		cm := cast(^CharacterMoverNode)node
+		subject = &cm.onCollisionStarted if started else &cm.onCollisionEnded
+	}
+	if subject != nil do subject->notify(node, other, gameContext)
 }
 
 PhysicsWorld_Destroy :: proc(pw: ^PhysicsWorld) {

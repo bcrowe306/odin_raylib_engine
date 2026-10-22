@@ -1,0 +1,14 @@
+# Assets panel: folders collapse/expand (closed/open folder icons) and the
+# Scenes folder's + button creates a new scene.
+wait 5
+screenshot folders_open
+expect item:asset:scenes/main.scene.json == visible
+click @section:Scenes
+expect item:asset:scenes/main.scene.json == missing
+screenshot scenes_collapsed
+click @section:Scenes
+expect item:asset:scenes/main.scene.json == visible
+click @asset.new-scene
+expect scene == scenes/new_scene.scene.json
+expect item:asset:scenes/new_scene.scene.json == visible
+screenshot new_scene_added

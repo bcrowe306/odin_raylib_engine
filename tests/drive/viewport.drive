@@ -1,0 +1,54 @@
+# Viewport tools: click-select, move/rotate/scale gizmos (grid snapping in
+# world space), undo of gizmo edits, panning and zooming.
+wait 5
+key escape
+# Click a node in the viewport to select it.
+click @node:PatrolDroneAlpha
+expect selected == PatrolDroneAlpha
+screenshot selected_in_viewport
+
+# Move tool (W): drag the centre handle ~64px; it snaps to the 32px grid.
+key w
+expect tool == translate
+drag @node:PatrolDroneAlpha @node:PatrolDroneAlpha+64,0 8
+expect node:PatrolDroneAlpha.position ~= 896,352
+screenshot moved_with_gizmo
+key ctrl+z
+expect node:PatrolDroneAlpha.position ~= 840,360
+
+# Rotate tool (E): drag along the ring.
+key e
+expect tool == rotate
+drag @node:PatrolDroneAlpha+80,0 @node:PatrolDroneAlpha+0,80 10
+expect node:PatrolDroneAlpha.rotation >= 60
+screenshot rotated
+key ctrl+z
+expect node:PatrolDroneAlpha.rotation == 0.0
+
+# Scale tool (R): drag the X handle outwards.
+key r
+drag @node:PatrolDroneAlpha+80,0 @node:PatrolDroneAlpha+130,0 8
+expect node:PatrolDroneAlpha.scale !contains 0.35,
+screenshot scaled
+key ctrl+z
+expect node:PatrolDroneAlpha.scale == 0.35,0.35
+
+# Pan tool (T): dragging moves the view, not the node.
+key t
+expect tool == pan
+drag @viewport @viewport+-100,-50 6
+expect camera ~= 740,410
+expect node:PatrolDroneAlpha.position ~= 840,360
+
+# Mouse wheel zooms around the cursor.
+expect zoom == 1.00
+scroll @viewport 2
+expect zoom >= 1.2
+scroll @viewport -4
+expect zoom <= 0.9
+screenshot zoomed_out
+
+# Escape deselects.
+key q
+key escape
+expect selected ==

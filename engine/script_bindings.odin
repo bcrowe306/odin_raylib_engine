@@ -1,0 +1,3154 @@
+package engine
+
+import "base:runtime"
+import "core:c"
+import "core:log"
+import "core:math"
+import "core:os"
+import "core:strings"
+import "core:time"
+import "core:encoding/uuid"
+import lua "vendor:lua/5.4"
+import rl "vendor:raylib"
+import b2 "vendor:box2d"
+
+// ============================================================================
+// Lua Engine API Bindings (Node, Input, Audio, Physics, Camera, Scene, Log, Engine)
+// ============================================================================
+
+NodeUserData :: struct {
+	node:   ^Node,
+	nodeId: uuid.Identifier,
+}
+
+push_node_userdata :: proc(L: ^lua.State, node: ^Node) {
+	if node == nil || !Node_IsAlive(node) {
+		lua.pushnil(L)
+		return
+	}
+	ud := cast(^NodeUserData)lua.newuserdatauv(L, size_of(NodeUserData), 0)
+	ud.node = node
+	ud.nodeId = node.id
+
+	lua.L_getmetatable(L, "Engine.Node")
+	lua.setmetatable(L, -2)
+}
+
+// to_node_userdata resolves a Lua node reference through the live-node
+// registry by id, so references to destroyed nodes yield (nil, false)
+// instead of reading freed memory.
+to_node_userdata :: proc(L: ^lua.State, idx: c.int) -> (^Node, bool) {
+	ud := cast(^NodeUserData)lua.L_testudata(L, idx, "Engine.Node")
+	if ud == nil do return nil, false
+	node := Node_FromId(ud.nodeId)
+	if node == nil do return nil, false
+	return node, true
+}
+
+get_script_manager :: proc(L: ^lua.State) -> ^ScriptManager {
+	lua.getfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
+	mgr := cast(^ScriptManager)lua.touserdata(L, -1)
+	lua.pop(L, 1)
+	return mgr
+}
+
+// ----------------------------------------------------------------------------
+// Node Core & Hierarchy Bindings
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushstring(L, "Unknown")
+		return 1
+	}
+	typeName := "Node"
+	switch node.typeId {
+	case Node: typeName = "Node"
+	case TextureNode: typeName = "TextureNode"
+	case ScriptNode: typeName = "ScriptNode"
+	case CameraNode: typeName = "CameraNode"
+	case ParticleEmitterNode: typeName = "ParticleEmitterNode"
+	case AnimationPlayerNode: typeName = "AnimationPlayerNode"
+	case TimerNode: typeName = "TimerNode"
+	case SoundNode: typeName = "SoundNode"
+	case MusicNode: typeName = "MusicNode"
+	case DynamicBodyNode: typeName = "DynamicBodyNode"
+	case StaticBodyNode: typeName = "StaticBodyNode"
+	case CharacterMoverNode: typeName = "CharacterMoverNode"
+	case AreaNode: typeName = "AreaNode"
+	case RaycastNode: typeName = "RaycastNode"
+	case LdtkLevelNode: typeName = "LdtkLevelNode"
+	}
+	nameC := strings.clone_to_cstring(typeName, context.temp_allocator)
+	lua.pushstring(L, nameC)
+	return 1
+}
+
+@(private="file")
+lua_node_get_name :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnil(L)
+		return 1
+	}
+	nameC := strings.clone_to_cstring(node.name, context.temp_allocator)
+	lua.pushstring(L, nameC)
+	return 1
+}
+
+@(private="file")
+lua_node_set_name :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	nameC := lua.tostring(L, 2)
+	if nameC != nil {
+		node.name = strings.clone(string(nameC), node.allocator)
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_get_position :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	lua.pushnumber(L, lua.Number(node.position.x))
+	lua.pushnumber(L, lua.Number(node.position.y))
+	return 2
+}
+
+@(private="file")
+lua_node_set_position :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	x := f32(lua.tonumber(L, 2))
+	y := f32(lua.tonumber(L, 3))
+	node.position = {x, y}
+	return 0
+}
+
+@(private="file")
+lua_node_translate :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	dx := f32(lua.tonumber(L, 2))
+	dy := f32(lua.tonumber(L, 3))
+	node.position.x += dx
+	node.position.y += dy
+	return 0
+}
+
+@(private="file")
+lua_node_get_rotation :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnumber(L, 0)
+		return 1
+	}
+	lua.pushnumber(L, lua.Number(node.rotation))
+	return 1
+}
+
+@(private="file")
+lua_node_set_rotation :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	rot := f32(lua.tonumber(L, 2))
+	node.rotation = rot
+	return 0
+}
+
+@(private="file")
+lua_node_rotate :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	dRot := f32(lua.tonumber(L, 2))
+	node.rotation += dRot
+	return 0
+}
+
+@(private="file")
+lua_node_get_scale :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnumber(L, 1)
+		lua.pushnumber(L, 1)
+		return 2
+	}
+	lua.pushnumber(L, lua.Number(node.scale.x))
+	lua.pushnumber(L, lua.Number(node.scale.y))
+	return 2
+}
+
+@(private="file")
+lua_node_set_scale :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	sx := f32(lua.tonumber(L, 2))
+	sy := f32(lua.tonumber(L, 3))
+	if lua.gettop(L) == 2 {
+		sy = sx
+	}
+	node.scale = {sx, sy}
+	return 0
+}
+
+// node:get_node(path): a node by path relative to this one ("Gun",
+// "../Player", "." self); nil if missing.
+@(private="file")
+lua_node_get_node :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.gameContext == nil || node.gameContext.scene == nil || lua.type(L, 2) != .STRING {
+		lua.pushnil(L)
+		return 1
+	}
+	push_node_userdata(L, Node_ResolvePath(node.gameContext.scene.manager, node, string(lua.tostring(L, 2))))
+	return 1
+}
+
+// node:set_texture(path): a TextureNode shows another image (project path).
+@(private="file")
+lua_node_set_texture :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TextureNode || lua.type(L, 2) != .STRING {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	tn := cast(^TextureNode)node
+	rm := Node_ResourceManager(node)
+	path := string(lua.tostring(L, 2))
+	if rm == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	tex, loaded := rm.loadTexture(rm, Project_ResolveAssetPath(node.gameContext, path))
+	if loaded && tex != nil {
+		TextureNode_SetTexture(tn, tex)
+		tn.filePath = strings.clone(path, tn.allocator)
+		tn.size = {f32(tex.texture.width), f32(tex.texture.height)}
+	}
+	lua.pushboolean(L, b32(loaded))
+	return 1
+}
+
+@(private="file")
+lua_node_get_global_position :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	lua.pushnumber(L, lua.Number(node.globalPosition.x))
+	lua.pushnumber(L, lua.Number(node.globalPosition.y))
+	return 2
+}
+
+@(private="file")
+lua_node_get_global_rotation :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnumber(L, 0)
+		return 1
+	}
+	lua.pushnumber(L, lua.Number(node.globalRotation))
+	return 1
+}
+
+@(private="file")
+lua_node_is_enabled :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(node.enabled))
+	return 1
+}
+
+@(private="file")
+lua_node_set_enabled :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	enabled := lua.toboolean(L, 2)
+	node.enabled = bool(enabled)
+	return 0
+}
+
+@(private="file")
+lua_node_is_visible :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(node.renderable))
+	return 1
+}
+
+@(private="file")
+lua_node_set_visible :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	visible := lua.toboolean(L, 2)
+	node.renderable = bool(visible)
+	return 0
+}
+
+@(private="file")
+lua_node_get_parent :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.gameContext == nil || node.gameContext.scene == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	parent := GetParent(node.gameContext.scene.manager, node)
+	push_node_userdata(L, parent)
+	return 1
+}
+
+@(private="file")
+lua_node_get_children :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.gameContext == nil || node.gameContext.scene == nil {
+		lua.newtable(L)
+		return 1
+	}
+	children := GetChildren(node.gameContext.scene.manager, node)
+	defer delete(children)
+
+	lua.createtable(L, c.int(len(children)), 0)
+	for child, i in children {
+		push_node_userdata(L, child)
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
+@(private="file")
+lua_node_get_child :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.gameContext == nil || node.gameContext.scene == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	nameC := lua.tostring(L, 2)
+	if nameC == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	targetName := string(nameC)
+	children := GetChildren(node.gameContext.scene.manager, node)
+	defer delete(children)
+
+	for child in children {
+		if child.name == targetName {
+			push_node_userdata(L, child)
+			return 1
+		}
+	}
+	lua.pushnil(L)
+	return 1
+}
+
+@(private="file")
+lua_node_add_child :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	parent, okP := to_node_userdata(L, 1)
+	child, okC := to_node_userdata(L, 2)
+	if okP && okC && parent.gameContext != nil && parent.gameContext.scene != nil {
+		SceneAddChild(parent.gameContext.scene, parent, child)
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_remove_child :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	parent, okP := to_node_userdata(L, 1)
+	child, okC := to_node_userdata(L, 2)
+	if okP && okC && parent.gameContext != nil && parent.gameContext.scene != nil {
+		SceneRemoveChild(parent.gameContext.scene, parent, child)
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_destroy :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if ok && node.gameContext != nil && node.gameContext.scene != nil {
+		SceneRemoveNode(node.gameContext.scene, node)
+	}
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// Physics: DynamicBodyNode Methods
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_apply_force :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	fx := f32(lua.tonumber(L, 2))
+	fy := f32(lua.tonumber(L, 3))
+
+	if node.typeId == DynamicBodyNode {
+		dynBody := cast(^DynamicBodyNode)node
+		if dynBody.bodyId.index1 != 0 {
+			DynamicBodyNode_ApplyForce(dynBody, [2]f32{fx, fy})
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_apply_impulse :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	ix := f32(lua.tonumber(L, 2))
+	iy := f32(lua.tonumber(L, 3))
+
+	if node.typeId == DynamicBodyNode {
+		dynBody := cast(^DynamicBodyNode)node
+		if dynBody.bodyId.index1 != 0 {
+			DynamicBodyNode_ApplyImpulse(dynBody, [2]f32{ix, iy})
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_get_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	if node.typeId == DynamicBodyNode {
+		dynBody := cast(^DynamicBodyNode)node
+		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
+			vel := b2.Body_GetLinearVelocity(dynBody.bodyId)
+			lua.pushnumber(L, lua.Number(vel.x))
+			lua.pushnumber(L, lua.Number(vel.y))
+			return 2
+		}
+	} else if node.typeId == CharacterMoverNode {
+		cm := cast(^CharacterMoverNode)node
+		lua.pushnumber(L, lua.Number(cm.velocity.x))
+		lua.pushnumber(L, lua.Number(cm.velocity.y))
+		return 2
+	}
+	lua.pushnumber(L, 0)
+	lua.pushnumber(L, 0)
+	return 2
+}
+
+@(private="file")
+lua_node_set_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	vx := f32(lua.tonumber(L, 2))
+	vy := f32(lua.tonumber(L, 3))
+	if node.typeId == DynamicBodyNode {
+		dynBody := cast(^DynamicBodyNode)node
+		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
+			b2.Body_SetLinearVelocity(dynBody.bodyId, [2]f32{vx, vy})
+			b2.Body_SetAwake(dynBody.bodyId, true)
+		}
+	} else if node.typeId == CharacterMoverNode {
+		cm := cast(^CharacterMoverNode)node
+		cm.velocity = {vx, vy}
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_get_angular_velocity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnumber(L, 0)
+		return 1
+	}
+	if node.typeId == DynamicBodyNode {
+		dynBody := cast(^DynamicBodyNode)node
+		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
+			w := math.to_degrees(b2.Body_GetAngularVelocity(dynBody.bodyId))
+			lua.pushnumber(L, lua.Number(w))
+			return 1
+		}
+	}
+	lua.pushnumber(L, 0)
+	return 1
+}
+
+@(private="file")
+lua_node_set_angular_velocity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	w := f32(lua.tonumber(L, 2))
+	if node.typeId == DynamicBodyNode {
+		dynBody := cast(^DynamicBodyNode)node
+		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
+			b2.Body_SetAngularVelocity(dynBody.bodyId, math.to_radians(w))
+			b2.Body_SetAwake(dynBody.bodyId, true)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_get_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushnumber(L, 1)
+		return 1
+	}
+	if node.typeId == DynamicBodyNode {
+		db := cast(^DynamicBodyNode)node
+		lua.pushnumber(L, lua.Number(db.gravityScale))
+		return 1
+	} else if node.typeId == CharacterMoverNode {
+		cm := cast(^CharacterMoverNode)node
+		lua.pushnumber(L, lua.Number(cm.gravityScale))
+		return 1
+	}
+	lua.pushnumber(L, 1)
+	return 1
+}
+
+@(private="file")
+lua_node_set_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	scale := f32(lua.tonumber(L, 2))
+	if node.typeId == DynamicBodyNode {
+		db := cast(^DynamicBodyNode)node
+		db.gravityScale = scale
+		if b2.Body_IsValid(db.bodyId) {
+			b2.Body_SetGravityScale(db.bodyId, scale)
+		}
+	} else if node.typeId == CharacterMoverNode {
+		cm := cast(^CharacterMoverNode)node
+		cm.gravityScale = scale
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_is_fixed_rotation :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	if node.typeId == DynamicBodyNode {
+		db := cast(^DynamicBodyNode)node
+		lua.pushboolean(L, b32(db.fixedRotation))
+		return 1
+	}
+	lua.pushboolean(L, false)
+	return 1
+}
+
+@(private="file")
+lua_node_set_fixed_rotation :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	fixed := lua.toboolean(L, 2)
+	if node.typeId == DynamicBodyNode {
+		db := cast(^DynamicBodyNode)node
+		db.fixedRotation = bool(fixed)
+		if b2.Body_IsValid(db.bodyId) {
+			b2.Body_SetFixedRotation(db.bodyId, bool(fixed))
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_set_linear_damping :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	damping := f32(lua.tonumber(L, 2))
+	if node.typeId == DynamicBodyNode {
+		db := cast(^DynamicBodyNode)node
+		db.linearDamping = damping
+		if b2.Body_IsValid(db.bodyId) {
+			b2.Body_SetLinearDamping(db.bodyId, damping)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_set_angular_damping :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	damping := f32(lua.tonumber(L, 2))
+	if node.typeId == DynamicBodyNode {
+		db := cast(^DynamicBodyNode)node
+		db.angularDamping = damping
+		if b2.Body_IsValid(db.bodyId) {
+			b2.Body_SetAngularDamping(db.bodyId, damping)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_is_awake :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	if node.typeId == DynamicBodyNode {
+		db := cast(^DynamicBodyNode)node
+		if b2.Body_IsValid(db.bodyId) {
+			lua.pushboolean(L, b32(b2.Body_IsAwake(db.bodyId)))
+			return 1
+		}
+	}
+	lua.pushboolean(L, false)
+	return 1
+}
+
+@(private="file")
+lua_node_set_awake :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	awake := lua.toboolean(L, 2)
+	if node.typeId == DynamicBodyNode {
+		db := cast(^DynamicBodyNode)node
+		if b2.Body_IsValid(db.bodyId) {
+			b2.Body_SetAwake(db.bodyId, bool(awake))
+		}
+	}
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// Physics: CharacterMoverNode Methods
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_character_move :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode do return 0
+	dirX := f32(lua.tonumber(L, 2))
+	jump := lua.toboolean(L, 3)
+
+	cm := cast(^CharacterMoverNode)node
+	cm.targetSpeedX = dirX * cm.maxSpeed
+	if jump && cm.isGrounded {
+		cm.velocity.y = -cm.jumpSpeed
+		cm.isGrounded = false
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_character_is_grounded :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	cm := cast(^CharacterMoverNode)node
+	lua.pushboolean(L, b32(cm.isGrounded))
+	return 1
+}
+
+@(private="file")
+lua_node_character_get_velocity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	cm := cast(^CharacterMoverNode)node
+	lua.pushnumber(L, lua.Number(cm.velocity.x))
+	lua.pushnumber(L, lua.Number(cm.velocity.y))
+	return 2
+}
+
+@(private="file")
+lua_node_character_set_velocity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode do return 0
+	vx := f32(lua.tonumber(L, 2))
+	vy := f32(lua.tonumber(L, 3))
+	cm := cast(^CharacterMoverNode)node
+	cm.velocity = {vx, vy}
+	return 0
+}
+
+@(private="file")
+lua_node_character_set_speed :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode do return 0
+	spd := f32(lua.tonumber(L, 2))
+	cm := cast(^CharacterMoverNode)node
+	cm.maxSpeed = spd
+	return 0
+}
+
+@(private="file")
+lua_node_character_set_jump_speed :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode do return 0
+	jspd := f32(lua.tonumber(L, 2))
+	cm := cast(^CharacterMoverNode)node
+	cm.jumpSpeed = jspd
+	return 0
+}
+
+@(private="file")
+mover_arg :: proc(L: ^lua.State) -> ^CharacterMoverNode {
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode do return nil
+	return cast(^CharacterMoverNode)node
+}
+
+// character_move_and_slide([dt]) -> collided: moves by the velocity, sliding
+// along surfaces (Godot's move_and_slide). The node switches to Script mode.
+@(private="file")
+lua_node_character_move_and_slide :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cm := mover_arg(L)
+	if cm == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	cm.controlMode = .Script
+	dt := f32(lua.tonumber(L, 2)) if lua.type(L, 2) == .NUMBER else cm.frameDelta
+	ctx := cm.gameContext
+	lua.pushboolean(L, b32(CharacterMoverNode_MoveAndSlide(cm, ctx, dt)))
+	return 1
+}
+
+@(private="file")
+lua_node_character_contact :: proc(L: ^lua.State, which: int) -> c.int {
+	cm := mover_arg(L)
+	v := false
+	if cm != nil {
+		switch which {
+		case 0: v = cm.isOnFloor
+		case 1: v = cm.isOnWall
+		case 2: v = cm.isOnCeiling
+		}
+	}
+	lua.pushboolean(L, b32(v))
+	return 1
+}
+
+@(private="file")
+lua_node_character_is_on_floor :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	return lua_node_character_contact(L, 0)
+}
+
+@(private="file")
+lua_node_character_is_on_wall :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	return lua_node_character_contact(L, 1)
+}
+
+@(private="file")
+lua_node_character_is_on_ceiling :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	return lua_node_character_contact(L, 2)
+}
+
+@(private="file")
+push_vec :: proc(L: ^lua.State, v: [2]f32) -> c.int {
+	lua.pushnumber(L, lua.Number(v.x))
+	lua.pushnumber(L, lua.Number(v.y))
+	return 2
+}
+
+@(private="file")
+lua_node_character_get_floor_normal :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cm := mover_arg(L)
+	return push_vec(L, cm.floorNormal if cm != nil else {})
+}
+
+@(private="file")
+lua_node_character_get_wall_normal :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cm := mover_arg(L)
+	return push_vec(L, cm.wallNormal if cm != nil else {})
+}
+
+@(private="file")
+lua_node_character_get_last_motion :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cm := mover_arg(L)
+	return push_vec(L, cm.lastMotion if cm != nil else {})
+}
+
+@(private="file")
+lua_node_character_get_gravity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cm := mover_arg(L)
+	return push_vec(L, CharacterMoverNode_Gravity(cm, cm.gameContext) if cm != nil else {})
+}
+
+@(private="file")
+lua_node_character_set_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if cm := mover_arg(L); cm != nil do cm.gravityScale = f32(lua.tonumber(L, 2))
+	return 0
+}
+
+// character_set_control_mode("script" | "builtin")
+@(private="file")
+lua_node_character_set_control_mode :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if cm := mover_arg(L); cm != nil && lua.type(L, 2) == .STRING {
+		cm.controlMode = .BuiltIn if string(lua.tostring(L, 2)) == "builtin" else .Script
+	}
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// Physics: AreaNode (Sensors)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_area_is_overlapping :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AreaNode {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	area := cast(^AreaNode)node
+	lua.pushboolean(L, b32(area.hasOverlaps))
+	return 1
+}
+
+@(private="file")
+lua_node_area_get_overlap_count :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AreaNode {
+		lua.pushinteger(L, 0)
+		return 1
+	}
+	area := cast(^AreaNode)node
+	lua.pushinteger(L, lua.Integer(area.overlapCount))
+	return 1
+}
+
+@(private="file")
+lua_node_area_get_overlapping_nodes :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AreaNode {
+		lua.newtable(L)
+		return 1
+	}
+	area := cast(^AreaNode)node
+	lua.createtable(L, c.int(len(area.overlappingNodes)), 0)
+	for other, i in area.overlappingNodes {
+		push_node_userdata(L, other)
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
+// ----------------------------------------------------------------------------
+// Physics: RaycastNode
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_raycast_cast :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	sm := get_script_manager(L)
+	if !ok || node.typeId != RaycastNode || sm == nil || sm.game == nil do return 0
+	rc := cast(^RaycastNode)node
+	RaycastNode_CastNow(rc, sm.game.physicsWorld.worldId)
+	return 0
+}
+
+@(private="file")
+lua_node_raycast_is_colliding :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	rc := cast(^RaycastNode)node
+	lua.pushboolean(L, b32(rc.isColliding))
+	return 1
+}
+
+@(private="file")
+lua_node_raycast_get_hit_point :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	rc := cast(^RaycastNode)node
+	lua.pushnumber(L, lua.Number(rc.hitPoint.x))
+	lua.pushnumber(L, lua.Number(rc.hitPoint.y))
+	return 2
+}
+
+@(private="file")
+lua_node_raycast_get_hit_normal :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	rc := cast(^RaycastNode)node
+	lua.pushnumber(L, lua.Number(rc.hitNormal.x))
+	lua.pushnumber(L, lua.Number(rc.hitNormal.y))
+	return 2
+}
+
+@(private="file")
+lua_node_raycast_get_hit_fraction :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode {
+		lua.pushnumber(L, 1)
+		return 1
+	}
+	rc := cast(^RaycastNode)node
+	lua.pushnumber(L, lua.Number(rc.hitFraction))
+	return 1
+}
+
+@(private="file")
+lua_node_raycast_get_hit_node :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode {
+		lua.pushnil(L)
+		return 1
+	}
+	rc := cast(^RaycastNode)node
+	push_node_userdata(L, rc.hitNode)
+	return 1
+}
+
+@(private="file")
+lua_node_raycast_set_direction :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode do return 0
+	dx := f32(lua.tonumber(L, 2))
+	dy := f32(lua.tonumber(L, 3))
+	rc := cast(^RaycastNode)node
+	rc.direction = {dx, dy}
+	return 0
+}
+
+@(private="file")
+lua_node_raycast_set_length :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode do return 0
+	lenVal := f32(lua.tonumber(L, 2))
+	rc := cast(^RaycastNode)node
+	rc.length = lenVal
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// Particle Emitter Methods
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_particle_start :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	pen := cast(^ParticleEmitterNode)node
+	ParticleEmitterNode_Start(pen)
+	return 0
+}
+
+@(private="file")
+lua_node_particle_stop :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	pen := cast(^ParticleEmitterNode)node
+	ParticleEmitterNode_Stop(pen)
+	return 0
+}
+
+@(private="file")
+lua_node_particle_is_emitting :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	pen := cast(^ParticleEmitterNode)node
+	lua.pushboolean(L, b32(pen.emitter.emitting))
+	return 1
+}
+
+@(private="file")
+lua_node_particle_set_amount :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	amount := int(lua.tointeger(L, 2))
+	pen := cast(^ParticleEmitterNode)node
+	pen.emitter.amount = amount
+	return 0
+}
+
+@(private="file")
+lua_node_particle_set_lifetime :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	lifetime := f32(lua.tonumber(L, 2))
+	pen := cast(^ParticleEmitterNode)node
+	pen.emitter.lifetime = lifetime
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// TextureNode Methods
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_texture_get_size :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TextureNode {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	tex := cast(^TextureNode)node
+	lua.pushnumber(L, lua.Number(tex.size.x))
+	lua.pushnumber(L, lua.Number(tex.size.y))
+	return 2
+}
+
+@(private="file")
+lua_node_texture_set_origin :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TextureNode do return 0
+	ox := f32(lua.tonumber(L, 2))
+	oy := f32(lua.tonumber(L, 3))
+	tex := cast(^TextureNode)node
+	tex.origin = {ox, oy}
+	return 0
+}
+
+@(private="file")
+lua_node_texture_get_path :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TextureNode {
+		lua.pushstring(L, "")
+		return 1
+	}
+	tex := cast(^TextureNode)node
+	pathC := strings.clone_to_cstring(tex.filePath, context.temp_allocator)
+	lua.pushstring(L, pathC)
+	return 1
+}
+
+// ----------------------------------------------------------------------------
+// AnimationPlayerNode Methods
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_animation_play :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AnimationPlayerNode do return 0
+	apn := cast(^AnimationPlayerNode)node
+	if lua.gettop(L) >= 2 {
+		nameC := lua.tostring(L, 2)
+		if nameC != nil {
+			AnimationPlayerNode_SetAnimationByName(apn, string(nameC))
+		}
+	}
+	AnimationPlayerNode_Start(apn)
+	return 0
+}
+
+@(private="file")
+lua_node_animation_stop :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AnimationPlayerNode do return 0
+	apn := cast(^AnimationPlayerNode)node
+	AnimationPlayerNode_Stop(apn)
+	return 0
+}
+
+@(private="file")
+lua_node_animation_pause :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AnimationPlayerNode do return 0
+	apn := cast(^AnimationPlayerNode)node
+	AnimationPlayerNode_Pause(apn)
+	return 0
+}
+
+@(private="file")
+lua_node_animation_resume :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AnimationPlayerNode do return 0
+	apn := cast(^AnimationPlayerNode)node
+	AnimationPlayerNode_Resume(apn)
+	return 0
+}
+
+@(private="file")
+lua_node_animation_reset :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AnimationPlayerNode do return 0
+	apn := cast(^AnimationPlayerNode)node
+	AnimationPlayerNode_Reset(apn)
+	return 0
+}
+
+@(private="file")
+lua_node_animation_set_fps :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AnimationPlayerNode do return 0
+	fps := f32(lua.tonumber(L, 2))
+	apn := cast(^AnimationPlayerNode)node
+	AnimationPlayerNode_SetFPS(apn, fps)
+	return 0
+}
+
+@(private="file")
+lua_node_animation_get_current :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AnimationPlayerNode {
+		lua.pushstring(L, "")
+		return 1
+	}
+	apn := cast(^AnimationPlayerNode)node
+	nameStr := AnimationPlayerNode_GetAnimationName(apn)
+	nameC := strings.clone_to_cstring(nameStr, context.temp_allocator)
+	lua.pushstring(L, nameC)
+	return 1
+}
+
+// ----------------------------------------------------------------------------
+// TimerNode Methods
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_timer_start :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TimerNode do return 0
+	timer := cast(^TimerNode)node
+	TimerNode_Start(timer)
+	return 0
+}
+
+@(private="file")
+lua_node_timer_stop :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TimerNode do return 0
+	timer := cast(^TimerNode)node
+	timer.running = false
+	return 0
+}
+
+@(private="file")
+lua_node_timer_is_running :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TimerNode {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	timer := cast(^TimerNode)node
+	lua.pushboolean(L, b32(timer.running))
+	return 1
+}
+
+@(private="file")
+lua_node_timer_get_elapsed :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TimerNode {
+		lua.pushnumber(L, 0)
+		return 1
+	}
+	timer := cast(^TimerNode)node
+	lua.pushnumber(L, lua.Number(time.duration_seconds(timer.elapsed)))
+	return 1
+}
+
+@(private="file")
+lua_node_timer_set_duration :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TimerNode do return 0
+	sec := f32(lua.tonumber(L, 2))
+	timer := cast(^TimerNode)node
+	if timer.setDuration != nil {
+		timer->setDuration(sec)
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_timer_set_loop :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != TimerNode do return 0
+	loop := lua.toboolean(L, 2)
+	timer := cast(^TimerNode)node
+	timer.loop = bool(loop)
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// Sound & Music Node Methods
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_sound_play :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != SoundNode do return 0
+	soundNode := cast(^SoundNode)node
+	SoundNode_Play(soundNode)
+	return 0
+}
+
+@(private="file")
+lua_node_sound_stop :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != SoundNode do return 0
+	soundNode := cast(^SoundNode)node
+	SoundNode_Stop(soundNode)
+	return 0
+}
+
+@(private="file")
+lua_node_sound_pause :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != SoundNode do return 0
+	soundNode := cast(^SoundNode)node
+	SoundNode_Pause(soundNode)
+	return 0
+}
+
+@(private="file")
+lua_node_sound_resume :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != SoundNode do return 0
+	soundNode := cast(^SoundNode)node
+	SoundNode_Resume(soundNode)
+	return 0
+}
+
+@(private="file")
+lua_node_music_play :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != MusicNode do return 0
+	musicNode := cast(^MusicNode)node
+	MusicNode_Play(musicNode)
+	return 0
+}
+
+@(private="file")
+lua_node_music_stop :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != MusicNode do return 0
+	musicNode := cast(^MusicNode)node
+	MusicNode_Stop(musicNode)
+	return 0
+}
+
+@(private="file")
+lua_node_music_pause :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != MusicNode do return 0
+	musicNode := cast(^MusicNode)node
+	MusicNode_Pause(musicNode)
+	return 0
+}
+
+@(private="file")
+lua_node_music_resume :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != MusicNode do return 0
+	musicNode := cast(^MusicNode)node
+	MusicNode_Resume(musicNode)
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// LDtk Node Methods
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_ldtk_get_level_identifier :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != LdtkLevelNode {
+		lua.pushstring(L, "")
+		return 1
+	}
+	ldtkNode := cast(^LdtkLevelNode)node
+	idC := strings.clone_to_cstring(ldtkNode.levelIdentifier, context.temp_allocator)
+	lua.pushstring(L, idC)
+	return 1
+}
+
+// ----------------------------------------------------------------------------
+// Camera Node Methods (when invoked on CameraNode userdata)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_camera_set_zoom :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode do return 0
+	zoom := f32(lua.tonumber(L, 2))
+	CameraNode_SetZoom(cast(^CameraNode)node, zoom)
+	return 0
+}
+
+@(private="file")
+lua_node_camera_get_zoom :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode {
+		lua.pushnumber(L, 1)
+		return 1
+	}
+	cam := cast(^CameraNode)node
+	lua.pushnumber(L, lua.Number(cam.targetZoom))
+	return 1
+}
+
+@(private="file")
+lua_node_camera_set_target :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	target, _ := to_node_userdata(L, 2)
+	if !ok || node.typeId != CameraNode do return 0
+	CameraNode_SetTarget(cast(^CameraNode)node, target)
+	return 0
+}
+
+// --- camera targets (node methods take the camera at 1; Camera.* use the
+// scene's current camera, args shifted by one) ---
+
+// camera_target_opts reads { weight = n | weight_x, weight_y, radius,
+// offset_x, offset_y, priority } at idx (absent = defaults).
+@(private="file")
+camera_target_opts :: proc(L: ^lua.State, node: ^Node, idx: c.int) -> CameraTarget {
+	t := CameraTarget{node = node, position = node.globalPosition, influence = {1, 1}, radius = 50, enabled = true, prevPosition = node.globalPosition}
+	if lua.type(L, idx) != .TABLE do return t
+	num :: proc(L: ^lua.State, idx: c.int, key: cstring, def: f32) -> f32 {
+		lua.getfield(L, idx, key)
+		defer lua.pop(L, 1)
+		return f32(lua.tonumber(L, -1)) if lua.type(L, -1) == .NUMBER else def
+	}
+	w := num(L, idx, "weight", 1)
+	t.influence = {num(L, idx, "weight_x", w), num(L, idx, "weight_y", w)}
+	t.radius = num(L, idx, "radius", 50)
+	t.offset = {num(L, idx, "offset_x", 0), num(L, idx, "offset_y", 0)}
+	t.priority = int(num(L, idx, "priority", 0))
+	return t
+}
+
+@(private="file")
+camera_arg :: proc(L: ^lua.State, isModule: bool) -> (^CameraNode, c.int) {
+	if isModule do return get_current_camera(L), 1
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode do return nil, 2
+	return cast(^CameraNode)node, 2
+}
+
+@(private="file")
+camera_add_target_impl :: proc(L: ^lua.State, isModule: bool) -> c.int {
+	cam, a := camera_arg(L, isModule)
+	target, ok := to_node_userdata(L, a)
+	if cam != nil && ok do CameraNode_AddTarget(cam, camera_target_opts(L, target, a + 1))
+	return 0
+}
+
+@(private="file")
+camera_remove_target_impl :: proc(L: ^lua.State, isModule: bool) -> c.int {
+	cam, a := camera_arg(L, isModule)
+	target, ok := to_node_userdata(L, a)
+	if cam != nil && ok do CameraNode_RemoveTarget(cam, target)
+	return 0
+}
+
+@(private="file")
+camera_clear_targets_impl :: proc(L: ^lua.State, isModule: bool) -> c.int {
+	if cam, _ := camera_arg(L, isModule); cam != nil {
+		CameraNode_ClearTargets(cam)
+		cam.followTarget = ""
+	}
+	return 0
+}
+
+@(private="file")
+camera_get_target_impl :: proc(L: ^lua.State, isModule: bool) -> c.int {
+	cam, _ := camera_arg(L, isModule)
+	push_node_userdata(L, cam.target if cam != nil else nil)
+	return 1
+}
+
+@(private="file")
+camera_get_targets_impl :: proc(L: ^lua.State, isModule: bool) -> c.int {
+	cam, _ := camera_arg(L, isModule)
+	lua.newtable(L)
+	if cam == nil do return 1
+	n := 0
+	if cam.followMode != .MultiTarget && cam.target != nil {
+		push_node_userdata(L, cam.target)
+		lua.rawseti(L, -2, 1)
+		return 1
+	}
+	for t in cam.targets {
+		if t.node == nil || !Node_IsAlive(t.node) do continue
+		n += 1
+		push_node_userdata(L, t.node)
+		lua.rawseti(L, -2, lua.Integer(n))
+	}
+	return 1
+}
+
+@(private="file")
+lua_node_camera_add_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_add_target_impl(L, false)}
+@(private="file")
+lua_node_camera_remove_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_remove_target_impl(L, false)}
+@(private="file")
+lua_node_camera_clear_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_clear_targets_impl(L, false)}
+@(private="file")
+lua_node_camera_get_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_target_impl(L, false)}
+@(private="file")
+lua_node_camera_get_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_targets_impl(L, false)}
+@(private="file")
+lua_camera_add_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_add_target_impl(L, true)}
+@(private="file")
+lua_camera_remove_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_remove_target_impl(L, true)}
+@(private="file")
+lua_camera_clear_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_clear_targets_impl(L, true)}
+@(private="file")
+lua_camera_get_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_target_impl(L, true)}
+@(private="file")
+lua_camera_get_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_targets_impl(L, true)}
+
+@(private="file")
+lua_node_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode do return 0
+	tx := f32(lua.tonumber(L, 2))
+	ty := f32(lua.tonumber(L, 3))
+	CameraNode_SetTargetPosition(cast(^CameraNode)node, {tx, ty})
+	return 0
+}
+
+@(private="file")
+lua_node_camera_shake :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode do return 0
+	strength := f32(lua.tonumber(L, 2))
+	dur := f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else 0.5
+	CameraNode_Shake(cast(^CameraNode)node, strength, dur)
+	return 0
+}
+
+@(private="file")
+lua_node_camera_stop_shake :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode do return 0
+	CameraNode_StopShake(cast(^CameraNode)node)
+	return 0
+}
+
+@(private="file")
+lua_node_camera_is_shaking :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(CameraNode_IsShaking(cast(^CameraNode)node)))
+	return 1
+}
+
+@(private="file")
+lua_node_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode do return 0
+	l := f32(lua.tonumber(L, 2))
+	r := f32(lua.tonumber(L, 3))
+	t := f32(lua.tonumber(L, 4))
+	b := f32(lua.tonumber(L, 5))
+	CameraNode_SetLimits(cast(^CameraNode)node, l, r, t, b)
+	return 0
+}
+
+@(private="file")
+lua_node_camera_clear_limits :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CameraNode do return 0
+	CameraNode_ClearLimits(cast(^CameraNode)node)
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// Global Camera Table (Engine.Camera)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+get_current_camera :: proc(L: ^lua.State) -> ^CameraNode {
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil do return nil
+	return sm.game.sceneManager.currentScene.camera
+}
+
+@(private="file")
+lua_camera_get_target_position :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam == nil {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	lua.pushnumber(L, lua.Number(cam.targetPosition.x))
+	lua.pushnumber(L, lua.Number(cam.targetPosition.y))
+	return 2
+}
+
+@(private="file")
+lua_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam == nil do return 0
+	x := f32(lua.tonumber(L, 1))
+	y := f32(lua.tonumber(L, 2))
+	CameraNode_SetTargetPosition(cam, {x, y})
+	return 0
+}
+
+@(private="file")
+lua_camera_set_target :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	target, _ := to_node_userdata(L, 1)
+	if cam != nil {
+		CameraNode_SetTarget(cam, target)
+	}
+	return 0
+}
+
+@(private="file")
+lua_camera_get_zoom :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam == nil {
+		lua.pushnumber(L, 1)
+		return 1
+	}
+	lua.pushnumber(L, lua.Number(cam.targetZoom))
+	return 1
+}
+
+@(private="file")
+lua_camera_set_zoom :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam != nil {
+		zoom := f32(lua.tonumber(L, 1))
+		CameraNode_SetZoom(cam, zoom)
+	}
+	return 0
+}
+
+@(private="file")
+lua_camera_get_offset :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam == nil {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	lua.pushnumber(L, lua.Number(cam.offset.x))
+	lua.pushnumber(L, lua.Number(cam.offset.y))
+	return 2
+}
+
+@(private="file")
+lua_camera_set_offset :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam != nil {
+		ox := f32(lua.tonumber(L, 1))
+		oy := f32(lua.tonumber(L, 2))
+		CameraNode_SetOffset(cam, {ox, oy})
+	}
+	return 0
+}
+
+@(private="file")
+lua_camera_get_rotation :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam == nil {
+		lua.pushnumber(L, 0)
+		return 1
+	}
+	lua.pushnumber(L, lua.Number(cam.rotation))
+	return 1
+}
+
+@(private="file")
+lua_camera_set_rotation :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam != nil {
+		deg := f32(lua.tonumber(L, 1))
+		CameraNode_SetRotation(cam, deg)
+	}
+	return 0
+}
+
+@(private="file")
+lua_camera_shake :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam != nil {
+		strength := f32(lua.tonumber(L, 1))
+		dur := f32(lua.tonumber(L, 2)) if lua.gettop(L) >= 2 else 0.5
+		CameraNode_Shake(cam, strength, dur)
+	}
+	return 0
+}
+
+@(private="file")
+lua_camera_stop_shake :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam != nil {
+		CameraNode_StopShake(cam)
+	}
+	return 0
+}
+
+@(private="file")
+lua_camera_is_shaking :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(CameraNode_IsShaking(cam)))
+	return 1
+}
+
+@(private="file")
+lua_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam != nil {
+		l := f32(lua.tonumber(L, 1))
+		r := f32(lua.tonumber(L, 2))
+		t := f32(lua.tonumber(L, 3))
+		b := f32(lua.tonumber(L, 4))
+		CameraNode_SetLimits(cam, l, r, t, b)
+	}
+	return 0
+}
+
+@(private="file")
+lua_camera_clear_limits :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam != nil {
+		CameraNode_ClearLimits(cam)
+	}
+	return 0
+}
+
+@(private="file")
+lua_camera_screen_to_world :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	sx := f32(lua.tonumber(L, 1))
+	sy := f32(lua.tonumber(L, 2))
+	if cam == nil {
+		lua.pushnumber(L, lua.Number(sx))
+		lua.pushnumber(L, lua.Number(sy))
+		return 2
+	}
+	wPos := CameraNode_ScreenToWorld(cam, {sx, sy})
+	lua.pushnumber(L, lua.Number(wPos.x))
+	lua.pushnumber(L, lua.Number(wPos.y))
+	return 2
+}
+
+@(private="file")
+lua_camera_world_to_screen :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	wx := f32(lua.tonumber(L, 1))
+	wy := f32(lua.tonumber(L, 2))
+	if cam == nil {
+		lua.pushnumber(L, lua.Number(wx))
+		lua.pushnumber(L, lua.Number(wy))
+		return 2
+	}
+	sPos := CameraNode_WorldToScreen(cam, {wx, wy})
+	lua.pushnumber(L, lua.Number(sPos.x))
+	lua.pushnumber(L, lua.Number(sPos.y))
+	return 2
+}
+
+@(private="file")
+lua_camera_get_visible_world_bounds :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	cam := get_current_camera(L)
+	if cam == nil {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 1280)
+		lua.pushnumber(L, 720)
+		return 4
+	}
+	bounds := CameraNode_GetVisibleWorldBounds(cam)
+	lua.pushnumber(L, lua.Number(bounds.x))
+	lua.pushnumber(L, lua.Number(bounds.y))
+	lua.pushnumber(L, lua.Number(bounds.width))
+	lua.pushnumber(L, lua.Number(bounds.height))
+	return 4
+}
+
+// ----------------------------------------------------------------------------
+// Global Physics Table (Engine.Physics)
+// ----------------------------------------------------------------------------
+
+WorldRaycastQuery :: struct {
+	hit:      bool,
+	point:    [2]f32,
+	normal:   [2]f32,
+	fraction: f32,
+	hitNode:  ^Node,
+}
+
+@(private="file")
+world_raycast_callback :: proc "c" (shapeId: b2.ShapeId, point: b2.Vec2, normal: b2.Vec2, fraction: f32, ctx: rawptr) -> f32 {
+	if ctx == nil || !b2.Shape_IsValid(shapeId) do return 1.0
+	res := cast(^WorldRaycastQuery)ctx
+	if b2.Shape_IsSensor(shapeId) do return -1.0
+
+	bodyId := b2.Shape_GetBody(shapeId)
+	hitNode: ^Node = nil
+	if b2.Body_IsValid(bodyId) {
+		hitNode = cast(^Node)b2.Body_GetUserData(bodyId)
+	}
+
+	res.hit = true
+	res.point = point
+	res.normal = normal
+	res.fraction = fraction
+	res.hitNode = hitNode
+	return fraction
+}
+
+@(private="file")
+lua_physics_get_gravity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	lua.pushnumber(L, lua.Number(sm.game.physicsWorld.gravity.x))
+	lua.pushnumber(L, lua.Number(sm.game.physicsWorld.gravity.y))
+	return 2
+}
+
+@(private="file")
+lua_physics_set_gravity :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil do return 0
+	gx := f32(lua.tonumber(L, 1))
+	gy := f32(lua.tonumber(L, 2))
+	sm.game.physicsWorld.gravity = {gx, gy}
+	PhysicsWorld_SyncSettings(&sm.game.physicsWorld)
+	return 0
+}
+
+@(private="file")
+lua_physics_is_paused :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(sm.game.physicsWorld.paused))
+	return 1
+}
+
+@(private="file")
+lua_physics_set_paused :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil do return 0
+	paused := lua.toboolean(L, 1)
+	sm.game.physicsWorld.paused = bool(paused)
+	return 0
+}
+
+@(private="file")
+lua_physics_raycast :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || !b2.World_IsValid(sm.game.physicsWorld.worldId) {
+		lua.pushnil(L)
+		return 1
+	}
+
+	startX := f32(lua.tonumber(L, 1))
+	startY := f32(lua.tonumber(L, 2))
+	endX := f32(lua.tonumber(L, 3))
+	endY := f32(lua.tonumber(L, 4))
+
+	origin := [2]f32{startX, startY}
+	translation := [2]f32{endX - startX, endY - startY}
+
+	query := WorldRaycastQuery{hit = false, fraction = 1.0}
+	filter := b2.DefaultQueryFilter()
+	_ = b2.World_CastRay(sm.game.physicsWorld.worldId, origin, translation, filter, world_raycast_callback, &query)
+
+	if !query.hit {
+		lua.pushnil(L)
+		return 1
+	}
+
+	lua.newtable(L)
+	lua.pushboolean(L, true)
+	lua.setfield(L, -2, "hit")
+	lua.pushnumber(L, lua.Number(query.point.x))
+	lua.setfield(L, -2, "point_x")
+	lua.pushnumber(L, lua.Number(query.point.y))
+	lua.setfield(L, -2, "point_y")
+	lua.pushnumber(L, lua.Number(query.normal.x))
+	lua.setfield(L, -2, "normal_x")
+	lua.pushnumber(L, lua.Number(query.normal.y))
+	lua.setfield(L, -2, "normal_y")
+	lua.pushnumber(L, lua.Number(query.fraction))
+	lua.setfield(L, -2, "fraction")
+	if query.hitNode != nil {
+		push_node_userdata(L, query.hitNode)
+		lua.setfield(L, -2, "node")
+	}
+	return 1
+}
+
+// ----------------------------------------------------------------------------
+// Global Engine Table (Engine)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_engine_get_fps :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	fps := rl.GetFPS() if rl.IsWindowReady() else 60
+	lua.pushnumber(L, lua.Number(fps))
+	return 1
+}
+
+@(private="file")
+lua_engine_get_delta_time :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	dt := rl.GetFrameTime() if rl.IsWindowReady() else 0.01667
+	lua.pushnumber(L, lua.Number(dt))
+	return 1
+}
+
+@(private="file")
+lua_engine_get_time :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	t := rl.GetTime() if rl.IsWindowReady() else 0
+	lua.pushnumber(L, lua.Number(t))
+	return 1
+}
+
+@(private="file")
+lua_engine_get_window_size :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	w := rl.GetScreenWidth() if rl.IsWindowReady() else 1280
+	h := rl.GetScreenHeight() if rl.IsWindowReady() else 720
+	lua.pushnumber(L, lua.Number(w))
+	lua.pushnumber(L, lua.Number(h))
+	return 2
+}
+
+@(private="file")
+lua_engine_get_virtual_size :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	vw: f32 = 1280
+	vh: f32 = 720
+	if sm != nil && sm.game != nil && sm.game.virtualSize.x > 0 {
+		vw = sm.game.virtualSize.x
+		vh = sm.game.virtualSize.y
+	}
+	lua.pushnumber(L, lua.Number(vw))
+	lua.pushnumber(L, lua.Number(vh))
+	return 2
+}
+
+// ----------------------------------------------------------------------------
+// Input Bindings (Engine.Input)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+parse_keyboard_key :: proc(name: string) -> (rl.KeyboardKey, bool) {
+	upper := strings.to_upper(name, context.temp_allocator)
+	switch upper {
+	case "SPACE": return .SPACE, true
+	case "ENTER", "RETURN": return .ENTER, true
+	case "ESCAPE", "ESC": return .ESCAPE, true
+	case "UP": return .UP, true
+	case "DOWN": return .DOWN, true
+	case "LEFT": return .LEFT, true
+	case "RIGHT": return .RIGHT, true
+	case "W": return .W, true
+	case "A": return .A, true
+	case "S": return .S, true
+	case "D": return .D, true
+	case "E": return .E, true
+	case "Q": return .Q, true
+	case "R": return .R, true
+	case "F": return .F, true
+	case "TAB": return .TAB, true
+	case "LEFT_SHIFT", "SHIFT": return .LEFT_SHIFT, true
+	case "LEFT_CONTROL", "CTRL": return .LEFT_CONTROL, true
+	}
+	return .KEY_NULL, false
+}
+
+@(private="file")
+parse_mouse_button :: proc(name: string) -> (rl.MouseButton, bool) {
+	upper := strings.to_upper(name, context.temp_allocator)
+	switch upper {
+	case "LEFT", "0": return .LEFT, true
+	case "RIGHT", "1": return .RIGHT, true
+	case "MIDDLE", "2": return .MIDDLE, true
+	case "SIDE", "3": return .SIDE, true
+	case "EXTRA", "4": return .EXTRA, true
+	case "FORWARD", "5": return .FORWARD, true
+	case "BACK", "6": return .BACK, true
+	}
+	return .LEFT, false
+}
+
+@(private="file")
+lua_input_is_action_pressed :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	actStr := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if actStr == nil || sm == nil || sm.game == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	st, _ := Input_ActionStateByName(&sm.game.input, string(actStr))
+	lua.pushboolean(L, b32(st.pressed))
+	return 1
+}
+
+@(private="file")
+lua_input_is_action_down :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	actStr := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if actStr == nil || sm == nil || sm.game == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	st, _ := Input_ActionStateByName(&sm.game.input, string(actStr))
+	lua.pushboolean(L, b32(st.down))
+	return 1
+}
+
+@(private="file")
+lua_input_is_action_released :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	actStr := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if actStr == nil || sm == nil || sm.game == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	st, _ := Input_ActionStateByName(&sm.game.input, string(actStr))
+	lua.pushboolean(L, b32(st.released))
+	return 1
+}
+
+@(private="file")
+lua_input_get_axis :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	negStr := lua.tostring(L, 1)
+	posStr := lua.tostring(L, 2)
+	sm := get_script_manager(L)
+	if negStr == nil || posStr == nil || sm == nil || sm.game == nil {
+		lua.pushnumber(L, 0)
+		return 1
+	}
+	neg, _ := Input_ActionStateByName(&sm.game.input, string(negStr))
+	pos, _ := Input_ActionStateByName(&sm.game.input, string(posStr))
+	lua.pushnumber(L, lua.Number(pos.value - neg.value))
+	return 1
+}
+
+@(private="file")
+lua_input_get_vector :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 2
+	}
+	lStr := lua.tostring(L, 1)
+	rStr := lua.tostring(L, 2)
+	uStr := lua.tostring(L, 3)
+	dStr := lua.tostring(L, 4)
+
+	inp := &sm.game.input
+	l, _ := Input_ActionStateByName(inp, string(lStr) if lStr != nil else "move_left")
+	r, _ := Input_ActionStateByName(inp, string(rStr) if rStr != nil else "move_right")
+	u, _ := Input_ActionStateByName(inp, string(uStr) if uStr != nil else "move_up")
+	d, _ := Input_ActionStateByName(inp, string(dStr) if dStr != nil else "move_down")
+	vec := [2]f32{r.value - l.value, d.value - u.value}
+	if l2 := vec.x * vec.x + vec.y * vec.y; l2 > 1 {
+		inv := 1 / math.sqrt(l2)
+		vec *= inv
+	}
+	lua.pushnumber(L, lua.Number(vec.x))
+	lua.pushnumber(L, lua.Number(vec.y))
+	return 2
+}
+
+@(private="file")
+lua_input_is_key_down :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	keyStr := lua.tostring(L, 1)
+	if keyStr == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	key, ok := parse_keyboard_key(string(keyStr))
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil && sm.game.input.useSimulatedInput {
+		isDown := sm.game.input.simulatedKeysDown[key]
+		lua.pushboolean(L, b32(isDown))
+		return 1
+	}
+	isDown := rl.IsWindowReady() && rl.IsKeyDown(key)
+	lua.pushboolean(L, b32(isDown))
+	return 1
+}
+
+@(private="file")
+lua_input_is_key_pressed :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	keyStr := lua.tostring(L, 1)
+	if keyStr == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	key, ok := parse_keyboard_key(string(keyStr))
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	isPressed := rl.IsWindowReady() && rl.IsKeyPressed(key)
+	lua.pushboolean(L, b32(isPressed))
+	return 1
+}
+
+@(private="file")
+lua_input_is_key_released :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	keyStr := lua.tostring(L, 1)
+	if keyStr == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	key, ok := parse_keyboard_key(string(keyStr))
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	isRel := rl.IsWindowReady() && rl.IsKeyReleased(key)
+	lua.pushboolean(L, b32(isRel))
+	return 1
+}
+
+@(private="file")
+lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	btnStr := lua.tostring(L, 1)
+	btn, ok := parse_mouse_button(string(btnStr) if btnStr != nil else "LEFT")
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	isPressed := rl.IsWindowReady() && rl.IsMouseButtonPressed(btn)
+	lua.pushboolean(L, b32(isPressed))
+	return 1
+}
+
+@(private="file")
+lua_input_is_mouse_button_down :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	btnStr := lua.tostring(L, 1)
+	btn, ok := parse_mouse_button(string(btnStr) if btnStr != nil else "LEFT")
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	isDown := rl.IsWindowReady() && rl.IsMouseButtonDown(btn)
+	lua.pushboolean(L, b32(isDown))
+	return 1
+}
+
+@(private="file")
+lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	btnStr := lua.tostring(L, 1)
+	btn, ok := parse_mouse_button(string(btnStr) if btnStr != nil else "LEFT")
+	if !ok {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	isRel := rl.IsWindowReady() && rl.IsMouseButtonReleased(btn)
+	lua.pushboolean(L, b32(isRel))
+	return 1
+}
+
+@(private="file")
+lua_input_get_mouse_position :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if rl.IsWindowReady() {
+		mPos := rl.GetMousePosition()
+		lua.pushnumber(L, lua.Number(mPos.x))
+		lua.pushnumber(L, lua.Number(mPos.y))
+		return 2
+	}
+	lua.pushnumber(L, 0)
+	lua.pushnumber(L, 0)
+	return 2
+}
+
+@(private="file")
+lua_input_get_mouse_wheel_move :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	move := rl.GetMouseWheelMove() if rl.IsWindowReady() else 0
+	lua.pushnumber(L, lua.Number(move))
+	return 1
+}
+
+// ----------------------------------------------------------------------------
+// Audio Bindings (Engine.Audio)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_audio_play_sound :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil do return 0
+
+	path := string(pathC)
+	if rl.IsWindowReady() {
+		sound, ok := sm.game.resourceManager->loadAudioSound(path)
+		if ok && sound != nil {
+			rl.SetSoundVolume(sound.sound, sm.game.sfxVolume)
+			rl.PlaySound(sound.sound)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_audio_play_music :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil do return 0
+
+	path := string(pathC)
+	if rl.IsWindowReady() {
+		music, ok := sm.game.resourceManager->loadAudioMusic(path)
+		if ok && music != nil {
+			rl.PlayMusicStream(music.music)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_audio_stop_music :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil do return 0
+	path := string(pathC)
+	if rl.IsWindowReady() {
+		music, ok := sm.game.resourceManager->loadAudioMusic(path)
+		if ok && music != nil {
+			rl.StopMusicStream(music.music)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_audio_pause_music :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil do return 0
+	path := string(pathC)
+	if rl.IsWindowReady() {
+		music, ok := sm.game.resourceManager->loadAudioMusic(path)
+		if ok && music != nil {
+			rl.PauseMusicStream(music.music)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_audio_resume_music :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil do return 0
+	path := string(pathC)
+	if rl.IsWindowReady() {
+		music, ok := sm.game.resourceManager->loadAudioMusic(path)
+		if ok && music != nil {
+			rl.ResumeMusicStream(music.music)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_audio_is_music_playing :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	path := string(pathC)
+	if rl.IsWindowReady() {
+		music, ok := sm.game.resourceManager->loadAudioMusic(path)
+		if ok && music != nil {
+			isPlaying := rl.IsMusicStreamPlaying(music.music)
+			lua.pushboolean(L, b32(isPlaying))
+			return 1
+		}
+	}
+	lua.pushboolean(L, false)
+	return 1
+}
+
+@(private="file")
+lua_audio_set_music_volume :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	vol := f32(lua.tonumber(L, 2))
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil do return 0
+	path := string(pathC)
+	if rl.IsWindowReady() {
+		music, ok := sm.game.resourceManager->loadAudioMusic(path)
+		if ok && music != nil {
+			rl.SetMusicVolume(music.music, vol * sm.game.musicVolume)
+		}
+	}
+	return 0
+}
+
+@(private="file")
+lua_audio_set_master_volume :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	vol := f32(lua.tonumber(L, 1))
+	if rl.IsWindowReady() {
+		rl.SetMasterVolume(vol)
+	}
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// Scene Bindings (Engine.Scene)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	nameC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if nameC == nil || sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	targetNode := Scene_FindNodeByName(sm.game.sceneManager.currentScene, string(nameC))
+	push_node_userdata(L, targetNode)
+	return 1
+}
+
+@(private="file")
+lua_scene_get_name :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
+		lua.pushstring(L, "")
+		return 1
+	}
+	nameC := strings.clone_to_cstring(sm.game.sceneManager.currentScene.name, context.temp_allocator)
+	lua.pushstring(L, nameC)
+	return 1
+}
+
+@(private="file")
+lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	nameC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if nameC != nil && sm != nil && sm.game != nil {
+		ChangeScene_ByName(&sm.game.sceneManager, string(nameC))
+	}
+	return 0
+}
+
+@(private="file")
+lua_scene_reload :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil && sm.game.sceneManager.currentScene != nil {
+		ChangeScene_ByName(&sm.game.sceneManager, sm.game.sceneManager.currentScene.name)
+	}
+	return 0
+}
+
+@(private="file")
+lua_scene_get_nodes :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil || sm.game.sceneManager.currentScene.manager == nil {
+		lua.newtable(L)
+		return 1
+	}
+	mgr := sm.game.sceneManager.currentScene.manager
+	lua.createtable(L, c.int(len(mgr.nodes)), 0)
+	idx := 1
+	for node in mgr.nodes {
+		if node != nil {
+			push_node_userdata(L, node)
+			lua.rawseti(L, -2, lua.Integer(idx))
+			idx += 1
+		}
+	}
+	return 1
+}
+
+@(private="file")
+lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	scene := sm.game.sceneManager.currentScene
+	typeStrC := lua.tostring(L, 1)
+	nameC := lua.tostring(L, 2)
+	parent, pOk := to_node_userdata(L, 3)
+	log.infof("[lua_scene_create_node] type=%s, name=%s, parent=%v, pOk=%v, top=%d", typeStrC, nameC, parent, pOk, lua.gettop(L))
+
+	typeStr := string(typeStrC) if typeStrC != nil else "Node"
+	nodeName := string(nameC) if nameC != nil else ""
+
+	createdNode: ^Node = nil
+	switch strings.to_lower(typeStr, context.temp_allocator) {
+	case "texturenode", "texture", "sprite":
+		tn := CreateNode(scene.manager, TextureNode)
+		TextureNode_Init(tn)
+		if nodeName != "" do tn.name = strings.clone(nodeName, tn.allocator)
+		createdNode = tn
+	case "scriptnode", "script":
+		sn := CreateNode(scene.manager, ScriptNode)
+		ScriptNode_Init(sn)
+		if nodeName != "" do sn.name = strings.clone(nodeName, sn.allocator)
+		createdNode = sn
+	case "cameranode", "camera":
+		cn := CreateNode(scene.manager, CameraNode)
+		CameraNode_Init(cn)
+		if nodeName != "" do cn.name = strings.clone(nodeName, cn.allocator)
+		createdNode = cn
+	case "particleemitternode", "particle", "particles":
+		pn := CreateNode(scene.manager, ParticleEmitterNode)
+		ParticleEmitterNode_Init(pn)
+		if nodeName != "" do pn.name = strings.clone(nodeName, pn.allocator)
+		createdNode = pn
+	case "timernode", "timer":
+		tm := CreateNode(scene.manager, TimerNode)
+		TimerNode_Init(tm)
+		if nodeName != "" do tm.name = strings.clone(nodeName, tm.allocator)
+		createdNode = tm
+	case "dynamicbodynode", "dynamicbody", "dynamic_body":
+		db := DynamicBodyNode_Create(scene, nodeName, parent)
+		createdNode = db
+	case "staticbodynode", "staticbody", "static_body":
+		sb := StaticBodyNode_Create(scene, nodeName, parent)
+		createdNode = sb
+	case "charactermovernode", "charactermover", "character_mover":
+		cm := CharacterMoverNode_Create(scene, nodeName, parent)
+		createdNode = cm
+	case "areanode", "area":
+		ar := AreaNode_Create(scene, nodeName, parent)
+		createdNode = ar
+	case "raycastnode", "raycast":
+		rc := RaycastNode_Create(scene, nodeName, parent)
+		createdNode = rc
+	case:
+		nd := CreateNode(scene.manager, Node)
+		if nodeName != "" do nd.name = strings.clone(nodeName, nd.allocator)
+		createdNode = nd
+	}
+
+	if createdNode != nil {
+		SceneAddNode(scene, createdNode, parent)
+		push_node_userdata(L, createdNode)
+		return 1
+	}
+
+	lua.pushnil(L)
+	return 1
+}
+
+@(private="file")
+lua_scene_get_draw_bounds :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(sm.game.sceneManager.currentScene.drawBounds))
+	return 1
+}
+
+@(private="file")
+lua_scene_set_draw_bounds :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil && sm.game.sceneManager.currentScene != nil {
+		draw := lua.toboolean(L, 1)
+		sm.game.sceneManager.currentScene.drawBounds = bool(draw)
+	}
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+// Log Bindings (Engine.Log & print)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_log_info :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	nargs := lua.gettop(L)
+	sb: strings.Builder
+	strings.builder_init(&sb, context.temp_allocator)
+
+	for i in 1..=nargs {
+		strC := lua.tostring(L, i)
+		if strC != nil {
+			strings.write_string(&sb, string(strC))
+		} else {
+			strings.write_string(&sb, "[non-string]")
+		}
+		if i < nargs do strings.write_string(&sb, "\t")
+	}
+	log.infof("[Lua] %s", strings.to_string(sb))
+	return 0
+}
+
+@(private="file")
+lua_log_warn :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	nargs := lua.gettop(L)
+	sb: strings.Builder
+	strings.builder_init(&sb, context.temp_allocator)
+
+	for i in 1..=nargs {
+		strC := lua.tostring(L, i)
+		if strC != nil {
+			strings.write_string(&sb, string(strC))
+		}
+		if i < nargs do strings.write_string(&sb, "\t")
+	}
+	log.warnf("[Lua WARN] %s", strings.to_string(sb))
+	return 0
+}
+
+@(private="file")
+lua_log_error :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	nargs := lua.gettop(L)
+	sb: strings.Builder
+	strings.builder_init(&sb, context.temp_allocator)
+
+	for i in 1..=nargs {
+		strC := lua.tostring(L, i)
+		if strC != nil {
+			strings.write_string(&sb, string(strC))
+		}
+		if i < nargs do strings.write_string(&sb, "\t")
+	}
+	log.errorf("[Lua ERROR] %s", strings.to_string(sb))
+	return 0
+}
+
+// ----------------------------------------------------------------------------
+
+// ----------------------------------------------------------------------------
+// Global Project Table (Engine.Project)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_project_load :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	ok := sm.game->loadProject(string(pathC))
+	lua.pushboolean(L, b32(ok))
+	return 1
+}
+
+@(private="file")
+lua_project_export_ore :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	dirC := lua.tostring(L, 1)
+	outC := lua.tostring(L, 2)
+	sm := get_script_manager(L)
+	if dirC == nil || outC == nil || sm == nil || sm.game == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	ok := sm.game.exportOre(string(dirC), string(outC))
+	lua.pushboolean(L, b32(ok))
+	return 1
+}
+
+@(private="file")
+lua_project_serialize_scene :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
+		lua.pushstring(L, "{}")
+		return 1
+	}
+	jsonStr := Scene_SerializeToJSON(sm.game.sceneManager.currentScene, context.temp_allocator)
+	jsonC := strings.clone_to_cstring(jsonStr, context.temp_allocator)
+	lua.pushstring(L, jsonC)
+	return 1
+}
+
+@(private="file")
+lua_project_read_file :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	txt, ok := AssetManager_ReadFileString(&sm.game.assetManager, string(pathC), context.temp_allocator)
+	if !ok {
+		lua.pushnil(L)
+		return 1
+	}
+	txtC := strings.clone_to_cstring(txt, context.temp_allocator)
+	lua.pushstring(L, txtC)
+	return 1
+}
+
+@(private="file")
+lua_project_has_file :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	if sm.game.assetManager.package_ != nil {
+		lua.pushboolean(L, b32(OrePackage_HasFile(sm.game.assetManager.package_, string(pathC))))
+		return 1
+	}
+	resolved := AssetManager_ResolveDiskPath(&sm.game.assetManager, string(pathC), context.temp_allocator)
+	lua.pushboolean(L, b32(os.exists(resolved) || os.exists(string(pathC))))
+	return 1
+}
+
+// Registration of all Metatables and Global Tables
+// ----------------------------------------------------------------------------
+
+RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
+	// Store ScriptManager in Lua registry for thread-safe access
+	lua.pushlightuserdata(L, sm)
+	lua.setfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
+
+	// 1. "Engine.Node" Metatable
+	if lua.L_newmetatable(L, "Engine.Node") != 0 {
+		// Type & Identity
+		lua.pushcfunction(L, lua_node_get_type)
+		lua.setfield(L, -2, "get_type")
+		lua.pushcfunction(L, lua_node_get_name)
+		lua.setfield(L, -2, "get_name")
+		lua.pushcfunction(L, lua_node_set_name)
+		lua.setfield(L, -2, "set_name")
+
+		// Transforms
+		lua.pushcfunction(L, lua_node_get_position)
+		lua.setfield(L, -2, "get_position")
+		lua.pushcfunction(L, lua_node_set_position)
+		lua.setfield(L, -2, "set_position")
+		lua.pushcfunction(L, lua_node_translate)
+		lua.setfield(L, -2, "translate")
+
+		lua.pushcfunction(L, lua_node_get_rotation)
+		lua.setfield(L, -2, "get_rotation")
+		lua.pushcfunction(L, lua_node_set_rotation)
+		lua.setfield(L, -2, "set_rotation")
+		lua.pushcfunction(L, lua_node_rotate)
+		lua.setfield(L, -2, "rotate")
+
+		lua.pushcfunction(L, lua_node_get_scale)
+		lua.setfield(L, -2, "get_scale")
+		lua.pushcfunction(L, lua_node_set_scale)
+		lua.setfield(L, -2, "set_scale")
+		lua.pushcfunction(L, lua_node_set_texture)
+		lua.setfield(L, -2, "set_texture")
+		lua.pushcfunction(L, lua_node_get_node)
+		lua.setfield(L, -2, "get_node")
+
+		lua.pushcfunction(L, lua_node_get_global_position)
+		lua.setfield(L, -2, "get_global_position")
+		lua.pushcfunction(L, lua_node_get_global_rotation)
+		lua.setfield(L, -2, "get_global_rotation")
+
+		// Lifecycle & Visibility
+		lua.pushcfunction(L, lua_node_is_enabled)
+		lua.setfield(L, -2, "is_enabled")
+		lua.pushcfunction(L, lua_node_set_enabled)
+		lua.setfield(L, -2, "set_enabled")
+		lua.pushcfunction(L, lua_node_is_visible)
+		lua.setfield(L, -2, "is_visible")
+		lua.pushcfunction(L, lua_node_set_visible)
+		lua.setfield(L, -2, "set_visible")
+
+		// Hierarchy
+		lua.pushcfunction(L, lua_node_get_parent)
+		lua.setfield(L, -2, "get_parent")
+		lua.pushcfunction(L, lua_node_get_children)
+		lua.setfield(L, -2, "get_children")
+		lua.pushcfunction(L, lua_node_get_child)
+		lua.setfield(L, -2, "get_child")
+		lua.pushcfunction(L, lua_node_add_child)
+		lua.setfield(L, -2, "add_child")
+		lua.pushcfunction(L, lua_node_remove_child)
+		lua.setfield(L, -2, "remove_child")
+		lua.pushcfunction(L, lua_node_destroy)
+		lua.setfield(L, -2, "destroy")
+		Script_RegisterEventBindings(L) // connect / disconnect / emit
+		Script_RegisterLdtkBindings(L)
+
+		// DynamicBodyNode Physics
+		lua.pushcfunction(L, lua_node_apply_force)
+		lua.setfield(L, -2, "apply_force")
+		lua.pushcfunction(L, lua_node_apply_impulse)
+		lua.setfield(L, -2, "apply_impulse")
+		lua.pushcfunction(L, lua_node_get_linear_velocity)
+		lua.setfield(L, -2, "get_linear_velocity")
+		lua.pushcfunction(L, lua_node_set_linear_velocity)
+		lua.setfield(L, -2, "set_linear_velocity")
+		lua.pushcfunction(L, lua_node_get_angular_velocity)
+		lua.setfield(L, -2, "get_angular_velocity")
+		lua.pushcfunction(L, lua_node_set_angular_velocity)
+		lua.setfield(L, -2, "set_angular_velocity")
+		lua.pushcfunction(L, lua_node_get_gravity_scale)
+		lua.setfield(L, -2, "get_gravity_scale")
+		lua.pushcfunction(L, lua_node_set_gravity_scale)
+		lua.setfield(L, -2, "set_gravity_scale")
+		lua.pushcfunction(L, lua_node_is_fixed_rotation)
+		lua.setfield(L, -2, "is_fixed_rotation")
+		lua.pushcfunction(L, lua_node_set_fixed_rotation)
+		lua.setfield(L, -2, "set_fixed_rotation")
+		lua.pushcfunction(L, lua_node_set_linear_damping)
+		lua.setfield(L, -2, "set_linear_damping")
+		lua.pushcfunction(L, lua_node_set_angular_damping)
+		lua.setfield(L, -2, "set_angular_damping")
+		lua.pushcfunction(L, lua_node_is_awake)
+		lua.setfield(L, -2, "is_awake")
+		lua.pushcfunction(L, lua_node_set_awake)
+		lua.setfield(L, -2, "set_awake")
+
+		// CharacterMoverNode
+		lua.pushcfunction(L, lua_node_character_move)
+		lua.setfield(L, -2, "character_move")
+		lua.pushcfunction(L, lua_node_character_is_grounded)
+		lua.setfield(L, -2, "character_is_grounded")
+		lua.pushcfunction(L, lua_node_character_get_velocity)
+		lua.setfield(L, -2, "character_get_velocity")
+		lua.pushcfunction(L, lua_node_character_set_velocity)
+		lua.setfield(L, -2, "character_set_velocity")
+		lua.pushcfunction(L, lua_node_character_set_speed)
+		lua.setfield(L, -2, "character_set_speed")
+		lua.pushcfunction(L, lua_node_character_set_jump_speed)
+		lua.setfield(L, -2, "character_set_jump_speed")
+		lua.pushcfunction(L, lua_node_character_move_and_slide)
+		lua.setfield(L, -2, "character_move_and_slide")
+		lua.pushcfunction(L, lua_node_character_is_on_floor)
+		lua.setfield(L, -2, "character_is_on_floor")
+		lua.pushcfunction(L, lua_node_character_is_on_wall)
+		lua.setfield(L, -2, "character_is_on_wall")
+		lua.pushcfunction(L, lua_node_character_is_on_ceiling)
+		lua.setfield(L, -2, "character_is_on_ceiling")
+		lua.pushcfunction(L, lua_node_character_get_floor_normal)
+		lua.setfield(L, -2, "character_get_floor_normal")
+		lua.pushcfunction(L, lua_node_character_get_wall_normal)
+		lua.setfield(L, -2, "character_get_wall_normal")
+		lua.pushcfunction(L, lua_node_character_get_last_motion)
+		lua.setfield(L, -2, "character_get_last_motion")
+		lua.pushcfunction(L, lua_node_character_get_gravity)
+		lua.setfield(L, -2, "character_get_gravity")
+		lua.pushcfunction(L, lua_node_character_set_gravity_scale)
+		lua.setfield(L, -2, "character_set_gravity_scale")
+		lua.pushcfunction(L, lua_node_character_set_control_mode)
+		lua.setfield(L, -2, "character_set_control_mode")
+
+		// AreaNode
+		lua.pushcfunction(L, lua_node_area_is_overlapping)
+		lua.setfield(L, -2, "area_is_overlapping")
+		lua.pushcfunction(L, lua_node_area_get_overlap_count)
+		lua.setfield(L, -2, "area_get_overlap_count")
+		lua.pushcfunction(L, lua_node_area_get_overlapping_nodes)
+		lua.setfield(L, -2, "area_get_overlapping_nodes")
+
+		// RaycastNode
+		lua.pushcfunction(L, lua_node_raycast_cast)
+		lua.setfield(L, -2, "raycast_cast")
+		lua.pushcfunction(L, lua_node_raycast_is_colliding)
+		lua.setfield(L, -2, "raycast_is_colliding")
+		lua.pushcfunction(L, lua_node_raycast_get_hit_point)
+		lua.setfield(L, -2, "raycast_get_hit_point")
+		lua.pushcfunction(L, lua_node_raycast_get_hit_normal)
+		lua.setfield(L, -2, "raycast_get_hit_normal")
+		lua.pushcfunction(L, lua_node_raycast_get_hit_fraction)
+		lua.setfield(L, -2, "raycast_get_hit_fraction")
+		lua.pushcfunction(L, lua_node_raycast_get_hit_node)
+		lua.setfield(L, -2, "raycast_get_hit_node")
+		lua.pushcfunction(L, lua_node_raycast_set_direction)
+		lua.setfield(L, -2, "raycast_set_direction")
+		lua.pushcfunction(L, lua_node_raycast_set_length)
+		lua.setfield(L, -2, "raycast_set_length")
+
+		// ParticleEmitterNode
+		lua.pushcfunction(L, lua_node_particle_start)
+		lua.setfield(L, -2, "particle_start")
+		lua.pushcfunction(L, lua_node_particle_stop)
+		lua.setfield(L, -2, "particle_stop")
+		lua.pushcfunction(L, lua_node_particle_is_emitting)
+		lua.setfield(L, -2, "particle_is_emitting")
+		lua.pushcfunction(L, lua_node_particle_set_amount)
+		lua.setfield(L, -2, "particle_set_amount")
+		lua.pushcfunction(L, lua_node_particle_set_lifetime)
+		lua.setfield(L, -2, "particle_set_lifetime")
+
+		// TextureNode
+		lua.pushcfunction(L, lua_node_texture_get_size)
+		lua.setfield(L, -2, "texture_get_size")
+		lua.pushcfunction(L, lua_node_texture_set_origin)
+		lua.setfield(L, -2, "texture_set_origin")
+		lua.pushcfunction(L, lua_node_texture_get_path)
+		lua.setfield(L, -2, "texture_get_path")
+
+		// AnimationPlayerNode
+		lua.pushcfunction(L, lua_node_animation_play)
+		lua.setfield(L, -2, "animation_play")
+		lua.pushcfunction(L, lua_node_animation_stop)
+		lua.setfield(L, -2, "animation_stop")
+		lua.pushcfunction(L, lua_node_animation_pause)
+		lua.setfield(L, -2, "animation_pause")
+		lua.pushcfunction(L, lua_node_animation_resume)
+		lua.setfield(L, -2, "animation_resume")
+		lua.pushcfunction(L, lua_node_animation_reset)
+		lua.setfield(L, -2, "animation_reset")
+		lua.pushcfunction(L, lua_node_animation_set_fps)
+		lua.setfield(L, -2, "animation_set_fps")
+		lua.pushcfunction(L, lua_node_animation_get_current)
+		lua.setfield(L, -2, "animation_get_current")
+
+		// TimerNode
+		lua.pushcfunction(L, lua_node_timer_start)
+		lua.setfield(L, -2, "timer_start")
+		lua.pushcfunction(L, lua_node_timer_stop)
+		lua.setfield(L, -2, "timer_stop")
+		lua.pushcfunction(L, lua_node_timer_is_running)
+		lua.setfield(L, -2, "timer_is_running")
+		lua.pushcfunction(L, lua_node_timer_get_elapsed)
+		lua.setfield(L, -2, "timer_get_elapsed")
+		lua.pushcfunction(L, lua_node_timer_set_duration)
+		lua.setfield(L, -2, "timer_set_duration")
+		lua.pushcfunction(L, lua_node_timer_set_loop)
+		lua.setfield(L, -2, "timer_set_loop")
+
+		// Sound & Music Node
+		lua.pushcfunction(L, lua_node_sound_play)
+		lua.setfield(L, -2, "sound_play")
+		lua.pushcfunction(L, lua_node_sound_stop)
+		lua.setfield(L, -2, "sound_stop")
+		lua.pushcfunction(L, lua_node_sound_pause)
+		lua.setfield(L, -2, "sound_pause")
+		lua.pushcfunction(L, lua_node_sound_resume)
+		lua.setfield(L, -2, "sound_resume")
+
+		lua.pushcfunction(L, lua_node_music_play)
+		lua.setfield(L, -2, "music_play")
+		lua.pushcfunction(L, lua_node_music_stop)
+		lua.setfield(L, -2, "music_stop")
+		lua.pushcfunction(L, lua_node_music_pause)
+		lua.setfield(L, -2, "music_pause")
+		lua.pushcfunction(L, lua_node_music_resume)
+		lua.setfield(L, -2, "music_resume")
+
+		// CameraNode (Invoked on node)
+		lua.pushcfunction(L, lua_node_camera_set_zoom)
+		lua.setfield(L, -2, "camera_set_zoom")
+		lua.pushcfunction(L, lua_node_camera_get_zoom)
+		lua.setfield(L, -2, "camera_get_zoom")
+		lua.pushcfunction(L, lua_node_camera_set_target)
+		lua.setfield(L, -2, "camera_set_target")
+		lua.pushcfunction(L, lua_node_camera_add_target)
+		lua.setfield(L, -2, "camera_add_target")
+		lua.pushcfunction(L, lua_node_camera_remove_target)
+		lua.setfield(L, -2, "camera_remove_target")
+		lua.pushcfunction(L, lua_node_camera_clear_targets)
+		lua.setfield(L, -2, "camera_clear_targets")
+		lua.pushcfunction(L, lua_node_camera_get_target)
+		lua.setfield(L, -2, "camera_get_target")
+		lua.pushcfunction(L, lua_node_camera_get_targets)
+		lua.setfield(L, -2, "camera_get_targets")
+		lua.pushcfunction(L, lua_node_camera_set_target_position)
+		lua.setfield(L, -2, "camera_set_target_position")
+		lua.pushcfunction(L, lua_node_camera_shake)
+		lua.setfield(L, -2, "camera_shake")
+		lua.pushcfunction(L, lua_node_camera_stop_shake)
+		lua.setfield(L, -2, "camera_stop_shake")
+		lua.pushcfunction(L, lua_node_camera_is_shaking)
+		lua.setfield(L, -2, "camera_is_shaking")
+		lua.pushcfunction(L, lua_node_camera_set_limits)
+		lua.setfield(L, -2, "camera_set_limits")
+		lua.pushcfunction(L, lua_node_camera_clear_limits)
+		lua.setfield(L, -2, "camera_clear_limits")
+
+		// LDtk Node
+		lua.pushcfunction(L, lua_node_ldtk_get_level_identifier)
+		lua.setfield(L, -2, "ldtk_get_level_identifier")
+
+		// __index points to itself
+		lua.pushvalue(L, -1)
+		lua.setfield(L, -2, "__index")
+	}
+	lua.pop(L, 1)
+
+	// 2. Global "Engine" table
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_engine_get_fps)
+	lua.setfield(L, -2, "get_fps")
+	lua.pushcfunction(L, lua_engine_get_delta_time)
+	lua.setfield(L, -2, "get_delta_time")
+	lua.pushcfunction(L, lua_engine_get_time)
+	lua.setfield(L, -2, "get_time")
+	lua.pushcfunction(L, lua_engine_get_window_size)
+	lua.setfield(L, -2, "get_window_size")
+	lua.pushcfunction(L, lua_engine_get_virtual_size)
+	lua.setfield(L, -2, "get_virtual_size")
+	lua.setglobal(L, "Engine")
+
+	// 3. Global "Input" table
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_input_is_action_pressed)
+	lua.setfield(L, -2, "is_action_pressed")
+	lua.pushcfunction(L, lua_input_is_action_down)
+	lua.setfield(L, -2, "is_action_down")
+	lua.pushcfunction(L, lua_input_is_action_released)
+	lua.setfield(L, -2, "is_action_released")
+	lua.pushcfunction(L, lua_input_get_axis)
+	lua.setfield(L, -2, "get_axis")
+	lua.pushcfunction(L, lua_input_get_vector)
+	lua.setfield(L, -2, "get_vector")
+	lua.pushcfunction(L, lua_input_is_key_pressed)
+	lua.setfield(L, -2, "is_key_pressed")
+	lua.pushcfunction(L, lua_input_is_key_down)
+	lua.setfield(L, -2, "is_key_down")
+	lua.pushcfunction(L, lua_input_is_key_released)
+	lua.setfield(L, -2, "is_key_released")
+	lua.pushcfunction(L, lua_input_is_mouse_button_pressed)
+	lua.setfield(L, -2, "is_mouse_button_pressed")
+	lua.pushcfunction(L, lua_input_is_mouse_button_down)
+	lua.setfield(L, -2, "is_mouse_button_down")
+	lua.pushcfunction(L, lua_input_is_mouse_button_released)
+	lua.setfield(L, -2, "is_mouse_button_released")
+	lua.pushcfunction(L, lua_input_get_mouse_position)
+	lua.setfield(L, -2, "get_mouse_position")
+	lua.pushcfunction(L, lua_input_get_mouse_wheel_move)
+	lua.setfield(L, -2, "get_mouse_wheel_move")
+	lua.setglobal(L, "Input")
+
+	// 4. Global "Audio" table
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_audio_play_sound)
+	lua.setfield(L, -2, "play_sound")
+	lua.pushcfunction(L, lua_audio_play_music)
+	lua.setfield(L, -2, "play_music")
+	lua.pushcfunction(L, lua_audio_stop_music)
+	lua.setfield(L, -2, "stop_music")
+	lua.pushcfunction(L, lua_audio_pause_music)
+	lua.setfield(L, -2, "pause_music")
+	lua.pushcfunction(L, lua_audio_resume_music)
+	lua.setfield(L, -2, "resume_music")
+	lua.pushcfunction(L, lua_audio_is_music_playing)
+	lua.setfield(L, -2, "is_music_playing")
+	lua.pushcfunction(L, lua_audio_set_music_volume)
+	lua.setfield(L, -2, "set_music_volume")
+	lua.pushcfunction(L, lua_audio_set_master_volume)
+	lua.setfield(L, -2, "set_master_volume")
+	lua.setglobal(L, "Audio")
+
+	// 5. Global "Camera" table
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_camera_get_target_position)
+	lua.setfield(L, -2, "get_target_position")
+	lua.pushcfunction(L, lua_camera_set_target_position)
+	lua.setfield(L, -2, "set_target_position")
+	lua.pushcfunction(L, lua_camera_set_target)
+	lua.setfield(L, -2, "set_target")
+	lua.pushcfunction(L, lua_camera_add_target)
+	lua.setfield(L, -2, "add_target")
+	lua.pushcfunction(L, lua_camera_remove_target)
+	lua.setfield(L, -2, "remove_target")
+	lua.pushcfunction(L, lua_camera_clear_targets)
+	lua.setfield(L, -2, "clear_targets")
+	lua.pushcfunction(L, lua_camera_get_target)
+	lua.setfield(L, -2, "get_target")
+	lua.pushcfunction(L, lua_camera_get_targets)
+	lua.setfield(L, -2, "get_targets")
+	lua.pushcfunction(L, lua_camera_get_zoom)
+	lua.setfield(L, -2, "get_zoom")
+	lua.pushcfunction(L, lua_camera_set_zoom)
+	lua.setfield(L, -2, "set_zoom")
+	lua.pushcfunction(L, lua_camera_get_offset)
+	lua.setfield(L, -2, "get_offset")
+	lua.pushcfunction(L, lua_camera_set_offset)
+	lua.setfield(L, -2, "set_offset")
+	lua.pushcfunction(L, lua_camera_get_rotation)
+	lua.setfield(L, -2, "get_rotation")
+	lua.pushcfunction(L, lua_camera_set_rotation)
+	lua.setfield(L, -2, "set_rotation")
+	lua.pushcfunction(L, lua_camera_shake)
+	lua.setfield(L, -2, "shake")
+	lua.pushcfunction(L, lua_camera_stop_shake)
+	lua.setfield(L, -2, "stop_shake")
+	lua.pushcfunction(L, lua_camera_is_shaking)
+	lua.setfield(L, -2, "is_shaking")
+	lua.pushcfunction(L, lua_camera_set_limits)
+	lua.setfield(L, -2, "set_limits")
+	lua.pushcfunction(L, lua_camera_clear_limits)
+	lua.setfield(L, -2, "clear_limits")
+	lua.pushcfunction(L, lua_camera_screen_to_world)
+	lua.setfield(L, -2, "screen_to_world")
+	lua.pushcfunction(L, lua_camera_world_to_screen)
+	lua.setfield(L, -2, "world_to_screen")
+	lua.pushcfunction(L, lua_camera_get_visible_world_bounds)
+	lua.setfield(L, -2, "get_visible_world_bounds")
+	lua.setglobal(L, "Camera")
+
+	// 6. Global "Physics" table
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_physics_get_gravity)
+	lua.setfield(L, -2, "get_gravity")
+	lua.pushcfunction(L, lua_physics_set_gravity)
+	lua.setfield(L, -2, "set_gravity")
+	lua.pushcfunction(L, lua_physics_is_paused)
+	lua.setfield(L, -2, "is_paused")
+	lua.pushcfunction(L, lua_physics_set_paused)
+	lua.setfield(L, -2, "set_paused")
+	lua.pushcfunction(L, lua_physics_raycast)
+	lua.setfield(L, -2, "raycast")
+	lua.setglobal(L, "Physics")
+
+	// 7. Global "Scene" table
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_scene_find_node)
+	lua.setfield(L, -2, "find_node")
+	lua.pushcfunction(L, lua_scene_get_name)
+	lua.setfield(L, -2, "get_name")
+	lua.pushcfunction(L, lua_scene_change_scene)
+	lua.setfield(L, -2, "change_scene")
+	lua.pushcfunction(L, lua_scene_reload)
+	lua.setfield(L, -2, "reload")
+	lua.pushcfunction(L, lua_scene_get_nodes)
+	lua.setfield(L, -2, "get_nodes")
+	lua.pushcfunction(L, lua_scene_create_node)
+	lua.setfield(L, -2, "create_node")
+	lua.pushcfunction(L, lua_scene_get_draw_bounds)
+	lua.setfield(L, -2, "get_draw_bounds")
+	lua.pushcfunction(L, lua_scene_set_draw_bounds)
+	lua.setfield(L, -2, "set_draw_bounds")
+	lua.setglobal(L, "Scene")
+
+	// 8. Global "Log" table
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_log_info)
+	lua.setfield(L, -2, "info")
+	lua.pushcfunction(L, lua_log_warn)
+	lua.setfield(L, -2, "warn")
+	lua.pushcfunction(L, lua_log_error)
+	lua.setfield(L, -2, "error")
+	lua.setglobal(L, "Log")
+
+	// 9. Global "Project" table
+	lua.newtable(L)
+	lua.pushcfunction(L, lua_project_load)
+	lua.setfield(L, -2, "load")
+	lua.pushcfunction(L, lua_project_export_ore)
+	lua.setfield(L, -2, "export_ore")
+	lua.pushcfunction(L, lua_project_serialize_scene)
+	lua.setfield(L, -2, "serialize_scene")
+	lua.pushcfunction(L, lua_project_read_file)
+	lua.setfield(L, -2, "read_file")
+	lua.pushcfunction(L, lua_project_has_file)
+	lua.setfield(L, -2, "has_file")
+	lua.setglobal(L, "Project")
+
+	// 10. Override standard Lua "print" to use Log.info
+	lua.pushcfunction(L, lua_log_info)
+	lua.setglobal(L, "print")
+}

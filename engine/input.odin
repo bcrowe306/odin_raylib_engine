@@ -78,6 +78,9 @@ InputSystem :: struct {
 	simulatedActionVals:  [InputAction]f32,
 	useSimulatedInput:    bool,
 
+	// Project-defined actions (input_actions.odin).
+	named: [dynamic]Named_Action,
+
 	// Optional interactive rebinding state for UI menus
 	isListeningForRebind: bool,
 	rebindTargetAction:   InputAction,
@@ -98,6 +101,9 @@ InputSystem_Init :: proc(input: ^InputSystem) {
 
 InputSystem_Destroy :: proc(input: ^InputSystem) {
 	if input == nil do return
+	Input_ClearNamed(input)
+	delete(input.named)
+	input.named = nil
 	if input.simulatedKeysDown != nil {
 		delete(input.simulatedKeysDown)
 		input.simulatedKeysDown = nil
@@ -458,6 +464,7 @@ InputSystem_Update :: proc(input: ^InputSystem, deltaTime: f32) {
 		}
 		input.states[action] = newState
 	}
+	Input_UpdateNamed(input, deltaTime)
 }
 
 // ============================================================================

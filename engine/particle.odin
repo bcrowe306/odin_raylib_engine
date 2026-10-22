@@ -1,5 +1,7 @@
 package engine
 
+import "core:mem"
+
 import "core:math/rand"
 import "core:crypto"
 import "core:math"
@@ -104,9 +106,9 @@ ParticleShape :: enum {
 }
 
 ParticleEmitter :: struct {
-	amount: int `gui:"true" min:"1" max:"500"`,
+	amount: int `gui:"true" min:"1" max:"5000"`,
 	lifetime: f32 `gui:"true" min:".01" max:"5"`,
-	position: [2]f32 `gui:"true" min:"0" max:"1280"`,
+	position: [2]f32 `gui:"true" min:"0" max:"1280" save:"false"`,
 	burst: f32 `gui:"true" min:"0" max:"1"`,
 	size: [2]f32 `gui:"true" min:".01" max:"100"`,
 	sizeVariance: f32 `gui:"true" min:"0" max:"1"`, // 0-1
@@ -120,10 +122,10 @@ ParticleEmitter :: struct {
 	torqueVariance: f32 `gui:"true" min:"0" max:"1"`, // 0-1
 	torqueSpread: f32 `gui:"true" min:"0" max:"2000"`,
 	torqueAcceleration: f32 `gui:"true" min:"-2000" max:"2000"`,
-	useColorRamp: bool,
-	colorRamp: ColorRamp,
-	particleColor: rl.Color,
-	colorEnd: rl.Color,
+	useColorRamp: bool `gui:"true"`,    // colour over lifetime from colorRamp (else particleColor -> colorEnd)
+	colorRamp: ColorRamp,              // saved as "color_ramp" (scene_serialization.odin)
+	particleColor: rl.Color `gui:"true"`,
+	colorEnd: rl.Color `gui:"true"`,
 	colorVariance: f32 `gui:"true" min:"0" max:"1"`,
 	spread: [2]f32 `gui:"true" min:"0" max:"1280"`,
 	velocity: f32 `gui:"true" min:"0" max:"2000"`,
@@ -145,7 +147,10 @@ ParticleEmitter :: struct {
 	start: proc(emitter: ^ParticleEmitter),
 	stop: proc(emitter: ^ParticleEmitter),
 	lifetimer: f32,
-	particles: #soa[1000]Particle,
+	// Ring buffer of particles, grown on demand to about twice `amount`
+	// (allocated from `allocator`: the owning node's arena).
+	particles: [dynamic]Particle,
+	allocator: mem.Allocator,
 	timer: f32,
 	head: int,
 	count: int,
@@ -153,6 +158,27 @@ ParticleEmitter :: struct {
 	cycleStarted: bool,
 	texture: ^rl.Texture2D,
 	customShapeProc: proc(p: ^Particle, deltaTime: f32),
+}
+
+PARTICLE_MAX :: 20000
+
+// ParticleEmitter_Reserve grows the particle ring to `n` slots (keeps the
+// live particles).
+ParticleEmitter_Reserve :: proc(emitter: ^ParticleEmitter, n: int) {
+	if len(emitter.particles) >= n do return
+	if emitter.particles == nil {
+		alloc := emitter.allocator if emitter.allocator.procedure != nil else context.allocator
+		emitter.particles = make([dynamic]Particle, n, n, alloc)
+		return
+	}
+	resize(&emitter.particles, n)
+}
+
+// ParticleEmitter_Destroy frees the particles (only needed when the
+// emitter isn't owned by a node, whose arena frees them).
+ParticleEmitter_Destroy :: proc(emitter: ^ParticleEmitter) {
+	if emitter.particles != nil && emitter.allocator.procedure == nil do delete(emitter.particles)
+	emitter.particles = nil
 }
 
 ParticleEmitter_Start :: proc(emitter: ^ParticleEmitter) {
@@ -227,6 +253,9 @@ Particle :: struct {
 ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	context.random_generator = crypto.random_generator()
 
+	ParticleEmitter_Reserve(emitter, clamp(emitter.amount * 2 + 4, 16, PARTICLE_MAX))
+	if len(emitter.particles) == 0 do return
+	emitter.head %= len(emitter.particles)
 	p := &emitter.particles[emitter.head]
 	emitter.head = (emitter.head + 1) % len(emitter.particles)
 
@@ -411,21 +440,21 @@ ParticleEmitter_HandleCollisions :: proc(emitter: ^ParticleEmitter) {
 
 	// Particle vs Particle collision (fast point/size circle-circle using 1st dimension index)
 	for i in 0..<count {
-		if !emitter.particles.alive[i] do continue
+		if !emitter.particles[i].alive do continue
 
-		scale_xi := emitter.particles.scale[i][0]
-		r_i := (emitter.particles.size[i][0] * (scale_xi if scale_xi > 0 else 1.0)) * 0.5
+		scale_xi := emitter.particles[i].scale[0]
+		r_i := (emitter.particles[i].size[0] * (scale_xi if scale_xi > 0 else 1.0)) * 0.5
 		if r_i <= 0.01 do r_i = 1.0
 
 		for j in (i + 1)..<count {
-			if !emitter.particles.alive[j] do continue
+			if !emitter.particles[j].alive do continue
 
-			scale_xj := emitter.particles.scale[j][0]
-			r_j := (emitter.particles.size[j][0] * (scale_xj if scale_xj > 0 else 1.0)) * 0.5
+			scale_xj := emitter.particles[j].scale[0]
+			r_j := (emitter.particles[j].size[0] * (scale_xj if scale_xj > 0 else 1.0)) * 0.5
 			if r_j <= 0.01 do r_j = 1.0
 
 			min_dist := r_i + r_j
-			delta := emitter.particles.position[j] - emitter.particles.position[i]
+			delta := emitter.particles[j].position - emitter.particles[i].position
 			dist_sq := delta.x * delta.x + delta.y * delta.y
 
 			if dist_sq < min_dist * min_dist && dist_sq > 0.0001 {
@@ -434,18 +463,18 @@ ParticleEmitter_HandleCollisions :: proc(emitter: ^ParticleEmitter) {
 				overlap := min_dist - dist
 
 				// Separate particles to resolve penetration
-				emitter.particles.position[i] -= normal * (overlap * 0.5)
-				emitter.particles.position[j] += normal * (overlap * 0.5)
+				emitter.particles[i].position -= normal * (overlap * 0.5)
+				emitter.particles[j].position += normal * (overlap * 0.5)
 
 				// Elastic collision response
-				rel_vel := emitter.particles.velocity[j] - emitter.particles.velocity[i]
+				rel_vel := emitter.particles[j].velocity - emitter.particles[i].velocity
 				vel_along_normal := rel_vel.x * normal.x + rel_vel.y * normal.y
 
 				if vel_along_normal < 0 {
 					elasticity := emitter.elasticity
 					impulse := -(1.0 + elasticity) * vel_along_normal * 0.5
-					emitter.particles.velocity[i] -= normal * impulse
-					emitter.particles.velocity[j] += normal * impulse
+					emitter.particles[i].velocity -= normal * impulse
+					emitter.particles[j].velocity += normal * impulse
 				}
 			}
 		}
@@ -454,8 +483,8 @@ ParticleEmitter_HandleCollisions :: proc(emitter: ^ParticleEmitter) {
 		if rl.IsWindowReady() {
 			screen_w := f32(rl.GetScreenWidth())
 			screen_h := f32(rl.GetScreenHeight())
-			pos := &emitter.particles.position[i]
-			vel := &emitter.particles.velocity[i]
+			pos := &emitter.particles[i].position
+			vel := &emitter.particles[i].velocity
 
 			if pos.x - r_i < 0 {
 				pos.x = r_i
@@ -586,7 +615,7 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
 	}
 
 	for i in 0..<len(emitter.particles) {
-		if !emitter.particles.alive[i] do continue
+		if !emitter.particles[i].alive do continue
 		Particle_Update(emitter, i, deltaTime)
 	}
 
@@ -597,7 +626,7 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
 
 ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
 	for i in 0..<len(emitter.particles) {
-		if !emitter.particles.alive[i] do continue
+		if !emitter.particles[i].alive do continue
 		p := emitter.particles[i]
 		switch p.shape {
 			case ParticleShape.Circle:
