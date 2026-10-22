@@ -574,6 +574,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		Inspector_TileMap(state, cast(^e.TileMapNode)node)
 	case e.CameraNode:
 		inspector_camera_follow(state, cast(^e.CameraNode)node)
+	case e.StateMachineNode:
+		inspector_state_machine(state, cast(^e.StateMachineNode)node)
 	case e.LdtkLevelNode:
 		ln := cast(^e.LdtkLevelNode)node
 		if UI_SectionHeader("LDtk Level") {
@@ -928,6 +930,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.StaticBodyNode, e.DynamicBodyNode, e.CharacterMoverNode, e.AreaNode, e.RaycastNode: return ICON_FA_CUBES
 	case e.ParticleEmitterNode: return ICON_FA_WAND_MAGIC_SPARKLES
 	case e.TimerNode: return ICON_FA_CLOCK
+	case e.StateMachineNode: return ICON_FA_DIAGRAM_PROJECT
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS
 	case e.ScriptNode: return ICON_FA_CODE
 	}

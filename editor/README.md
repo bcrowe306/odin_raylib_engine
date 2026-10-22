@@ -180,6 +180,18 @@ field) or a **Play Sounds** track (pick an audio file per key). Event keys
 are drawn as squares (methods) or circles (sounds); hover one for its method or sound. Scripts
 crossfade between animations with `node:animation_play(name, blend)`.
 
+### State machines
+
+Add a **State Machine** (Animation & Effects) next to an AnimationPlayer.
+The Inspector edits its **Player** (Auto finds a sibling or child),
+**Initial State** and **Autostart**; **States** (name + the animation it
+plays; **From Animations** adds one per animation); **Parameters** (name
+and starting value); and **Transitions** (from / any state -> to, crossfade
+**blend**, and conditions: parameter compared with a value, trigger,
+animation finished, after N seconds). While simulating, the current state
+is marked with a play icon. Scripts: `sm_set`, `sm_trigger`, `sm_travel`,
+`on_enter_<state>` / `on_exit_<state>` (see `engine/SCRIPTING.md`).
+
 ### Materials & shaders
 
 Every drawable node has a **Material** section (collapsed until used): a

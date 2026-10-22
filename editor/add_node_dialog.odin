@@ -110,6 +110,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "AnimationPlayerNode",
 	},
 	{
+		name        = "State Machine",
+		category    = "Animation & Effects",
+		icon        = ICON_FA_DIAGRAM_PROJECT,
+		description = "States, transitions and conditions on parameters; each state can play an animation on an AnimationPlayer. Scripts get on_enter_<state> / on_exit_<state>.",
+		typeName    = "StateMachineNode",
+	},
+	{
 		name        = "Frame Animator",
 		category    = "Animation & Effects",
 		icon        = ICON_FA_FILM,

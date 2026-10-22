@@ -1,0 +1,60 @@
+# State machine: a StateMachine next to an AnimationPlayer, states made
+# from its animations, a parameter, a transition with a condition, saving,
+# and simulating in the editor (the parameter edited live switches state).
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+expect node:AnimationPlayer.type == AnimationPlayerNode
+click @bottom:animation
+click @anim.new
+click @anim.new
+expect anim == anim_2:1/1:0
+
+click @hier:PlayerShip
+key ctrl+a
+key ctrl+a
+type state machine
+key enter
+expect node:StateMachine.type == StateMachineNode
+expect node:StateMachine.parent == PlayerShip
+expect node:StateMachine.state == /0
+click @insp.sm.from-anims
+expect node:StateMachine.state == /2
+expect item:insp.sm.state-name:1 == visible
+
+# speed > 5: anim_1 -> anim_2.
+click @insp.sm.add-param
+click @insp.sm.param-name:0
+type speed
+key enter
+click @insp.sm.add-transition
+click @insp.sm.add-cond:0
+click @insp.sm.cond-op:0.0
+click @pick:>
+dblclick @insp.sm.cond-value:0.0
+key ctrl+a
+type 5
+key enter
+screenshot inspector
+click @toolbar.save
+expect file:scenes/main.scene.json contains "type": "StateMachineNode"
+expect file:scenes/main.scene.json contains "params": [["speed", 0]]
+expect file:scenes/main.scene.json contains {"from": "anim_1", "to": "anim_2", "when": [[">", "speed", 5]]}
+
+# Simulate: starts in the initial state; raising speed switches.
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 10
+expect node:StateMachine.state == anim_1/2
+dblclick @insp.sm.param-value:0
+key ctrl+a
+type 10
+key enter
+wait 5
+expect node:StateMachine.state == anim_2/2
+screenshot simulating
+click @menu:Game
+click @menu:Game/Simulate in Editor
+expect node:StateMachine.state == /2

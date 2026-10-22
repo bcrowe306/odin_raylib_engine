@@ -775,6 +775,11 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 			if n.material == nil do return "", true
 			return fmt.tprintf("%s %s", n.material.shader, e.Material_BlendName(n.material.blend)), true
 		case "enabled": return "true" if n.enabled else "false", true
+		case "state":
+			// A StateMachineNode's current state ("" until it runs) and state count.
+			if n.typeId != e.StateMachineNode do return "<not a state machine>", true
+			sm := cast(^e.StateMachineNode)n
+			return fmt.tprintf("%s/%d", e.StateMachine_CurrentName(sm), len(sm.states)), true
 		case "children":
 			c := e.GetChildren(state.activeScene.manager, n)
 			defer delete(c)

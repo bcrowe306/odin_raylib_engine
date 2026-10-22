@@ -91,3 +91,5 @@ ICON_FA_DRAW_POLYGON              :: ""
 ICON_FA_LIGHTBULB                 :: ""
 ICON_FA_SUN                       :: ""
 ICON_FA_WAVE_SQUARE               :: ""
+ICON_FA_DIAGRAM_PROJECT           :: "\uF542" // State machine
+ICON_FA_ARROW_RIGHT               :: "\uF061"

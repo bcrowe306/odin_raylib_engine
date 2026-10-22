@@ -413,6 +413,46 @@ self.node:animation_play("run", 0.15)  -- crossfade from the current pose over 0
 Crossfading blends the previous animation's property tracks into the new
 one's (frames switch immediately).
 
+#### State machines (StateMachineNode)
+
+A **StateMachine** node holds named states, each optionally playing an
+animation on an AnimationPlayer (a sibling or child unless one is picked),
+and transitions between them. A transition goes from a state (or *any
+state*) to another when all its conditions hold; it can crossfade (`blend`).
+Conditions: a parameter `is true` / `is false` / `==` / `!=` / `>` / `<` a
+value, a `trigger`, the state's animation `finished`, or `after` N seconds
+in the state. No conditions = at once. Transitions are checked in order, one
+per frame. Build it in the Inspector (**From Animations** makes a state per
+animation); scripts feed it parameters:
+
+```lua
+function Player:update(dt)
+    local sm = self.node:get_child("StateMachine")
+    local vx, vy = self.node:character_get_velocity()
+    sm:sm_set("speed", math.abs(vx))
+    sm:sm_set("on_floor", self.node:character_is_on_floor())
+    if Input.is_action_pressed("jump") then sm:sm_trigger("jump") end
+end
+
+-- Called on the machine's script and on its parent's (when defined).
+function Player:on_enter_jump(previous) self.node:get_child("JumpSound"):sound_play() end
+function Player:on_exit_attack(next) self.node:get_child("Hitbox"):set_enabled(false) end
+```
+
+| Method | Arguments | Returns | Description |
+|---|---|---|---|
+| `sm_set(name, value)` | number or boolean | - | Sets a parameter. |
+| `sm_get(name)` | `name` | number | A parameter's value. |
+| `sm_trigger(name)` | `name` | - | Sets a trigger; reset when the transition testing it fires. |
+| `sm_travel(state [, blend])` | state name | boolean | Switches now, ignoring conditions. |
+| `sm_state()` / `sm_previous()` | - | string | Current / previous state. |
+| `sm_time()` | - | number | Seconds in the current state. |
+| `sm_start([state])` / `sm_stop()` | - | - | Start (initial state by default) / stop checking transitions. |
+
+The machine emits `state_changed`(state) for signal connections. Saved in
+the scene as `"state_machine": {"initial", "player", "autostart", "params",
+"states", "transitions"}`.
+
 #### Lighting (LightNode, scene ambient)
 
 Add **Light** nodes (point, or spot: the node's rotation is the direction)

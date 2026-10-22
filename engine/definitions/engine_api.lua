@@ -301,6 +301,50 @@ function Node:light_get_energy() end
 function Node:light_set_radius(radius) end
 
 -- ----------------------------------------------------------------------------
+-- StateMachineNode Methods
+--
+-- States, transitions and conditions are set up in the Inspector. Entering a
+-- state plays its animation on the AnimationPlayer; the machine's and its
+-- parent's scripts get on_enter_<state>(previous) / on_exit_<state>(next),
+-- and the machine emits "state_changed"(state).
+-- ----------------------------------------------------------------------------
+
+---Sets a parameter that transition conditions test (booleans become 1 / 0).
+---@param name string
+---@param value number|boolean
+function Node:sm_set(name, value) end
+
+---@param name string
+---@return number value
+function Node:sm_get(name) end
+
+---Sets a trigger: it stays set until a transition that tests it fires.
+---@param name string
+function Node:sm_trigger(name) end
+
+---Switches to a state now, ignoring conditions.
+---@param state string
+---@param blend? number Crossfade seconds for the state's animation
+---@return boolean ok false when there is no such state
+function Node:sm_travel(state, blend) end
+
+---@return string state The current state ("" before it starts)
+function Node:sm_state() end
+
+---@return string state The state before the current one
+function Node:sm_previous() end
+
+---@return number seconds Time spent in the current state
+function Node:sm_time() end
+
+---Starts (or restarts) in a state, or in the initial state.
+---@param state? string
+function Node:sm_start(state) end
+
+---Stops checking transitions (the current state stays).
+function Node:sm_stop() end
+
+-- ----------------------------------------------------------------------------
 -- CharacterMoverNode Methods
 --
 -- Two control modes (Inspector: Control Mode):

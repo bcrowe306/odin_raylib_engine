@@ -82,6 +82,7 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case RaycastNode: typeName = "RaycastNode"
 	case LdtkLevelNode: typeName = "LdtkLevelNode"
 	case LightNode: typeName = "LightNode"
+	case StateMachineNode: typeName = "StateMachineNode"
 	case TileMapNode: typeName = "TileMapNode"
 	}
 	nameC := strings.clone_to_cstring(typeName, context.temp_allocator)
@@ -2528,6 +2529,110 @@ lua_light_get_energy :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// --- StateMachineNode: sm_set / sm_get / sm_trigger / sm_travel / sm_state / sm_previous / sm_time / sm_start / sm_stop
+
+@(private="file")
+sm_arg :: proc(L: ^lua.State) -> ^StateMachineNode {
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != StateMachineNode do return nil
+	return cast(^StateMachineNode)node
+}
+
+@(private="file")
+sm_ctx :: proc(L: ^lua.State) -> ^GameContext {
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil do return nil
+	return &sm.game.gameContext
+}
+
+// machine:sm_set(param, value) (number or boolean)
+@(private="file")
+lua_sm_set :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	name := lua.tostring(L, 2)
+	if sm == nil || name == nil do return 0
+	v: f32
+	if lua.type(L, 3) == .BOOLEAN do v = 1 if lua.toboolean(L, 3) else 0
+	else do v = f32(lua.tonumber(L, 3))
+	StateMachine_SetParam(sm, string(name), v)
+	return 0
+}
+
+// machine:sm_get(param) -> number
+@(private="file")
+lua_sm_get :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	name := lua.tostring(L, 2)
+	lua.pushnumber(L, lua.Number(StateMachine_GetParam(sm, string(name)) if sm != nil && name != nil else 0))
+	return 1
+}
+
+// machine:sm_trigger(name): sets a trigger, consumed by the transition it fires
+@(private="file")
+lua_sm_trigger :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	name := lua.tostring(L, 2)
+	if sm != nil && name != nil do StateMachine_SetParam(sm, string(name), 1)
+	return 0
+}
+
+// machine:sm_travel(state [, blend]) -> bool: switch now, no conditions
+@(private="file")
+lua_sm_travel :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	name := lua.tostring(L, 2)
+	ok := false
+	if sm != nil && name != nil do ok = StateMachine_Travel(sm, string(name), f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else 0, sm_ctx(L))
+	lua.pushboolean(L, b32(ok))
+	return 1
+}
+
+@(private="file")
+lua_sm_state :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	lua.pushstring(L, strings.clone_to_cstring(StateMachine_CurrentName(sm) if sm != nil else "", context.temp_allocator))
+	return 1
+}
+
+@(private="file")
+lua_sm_previous :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	lua.pushstring(L, strings.clone_to_cstring(StateMachine_PreviousName(sm) if sm != nil else "", context.temp_allocator))
+	return 1
+}
+
+@(private="file")
+lua_sm_time :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	lua.pushnumber(L, lua.Number(sm.timeInState if sm != nil else 0))
+	return 1
+}
+
+// machine:sm_start([state])
+@(private="file")
+lua_sm_start :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	if sm == nil do return 0
+	name := lua.tostring(L, 2) if lua.gettop(L) >= 2 else nil
+	StateMachine_Start(sm, string(name) if name != nil else "", sm_ctx(L))
+	return 0
+}
+
+@(private="file")
+lua_sm_stop :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if sm := sm_arg(L); sm != nil do StateMachine_Stop(sm)
+	return 0
+}
+
 @(private="file")
 lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -2927,6 +3032,24 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "light_get_energy")
 		lua.pushcfunction(L, lua_light_set_radius)
 		lua.setfield(L, -2, "light_set_radius")
+		lua.pushcfunction(L, lua_sm_set)
+		lua.setfield(L, -2, "sm_set")
+		lua.pushcfunction(L, lua_sm_get)
+		lua.setfield(L, -2, "sm_get")
+		lua.pushcfunction(L, lua_sm_trigger)
+		lua.setfield(L, -2, "sm_trigger")
+		lua.pushcfunction(L, lua_sm_travel)
+		lua.setfield(L, -2, "sm_travel")
+		lua.pushcfunction(L, lua_sm_state)
+		lua.setfield(L, -2, "sm_state")
+		lua.pushcfunction(L, lua_sm_previous)
+		lua.setfield(L, -2, "sm_previous")
+		lua.pushcfunction(L, lua_sm_time)
+		lua.setfield(L, -2, "sm_time")
+		lua.pushcfunction(L, lua_sm_start)
+		lua.setfield(L, -2, "sm_start")
+		lua.pushcfunction(L, lua_sm_stop)
+		lua.setfield(L, -2, "sm_stop")
 		Script_RegisterEventBindings(L) // connect / disconnect / emit
 		Script_RegisterLdtkBindings(L)
 

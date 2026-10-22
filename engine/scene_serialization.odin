@@ -188,6 +188,9 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		if mn.music != nil && mn.music.filePath != "" {
 			Json_Key(w, "audio", &first); Json_String(w, asset_rel(node, mn.music.filePath))
 		}
+	case StateMachineNode:
+		Json_Key(w, "state_machine", &first)
+		write_state_machine(w, cast(^StateMachineNode)node)
 	case TimerNode:
 		tm := cast(^TimerNode)node
 		Json_Key(w, "timer", &first)
@@ -753,6 +756,8 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 				}
 			}
 		}
+	case StateMachineNode:
+		if smObj, ok := sj_obj(obj, "state_machine"); ok do read_state_machine(cast(^StateMachineNode)node, smObj)
 	case TimerNode:
 		tm := cast(^TimerNode)node
 		if timerObj, ok := sj_obj(obj, "timer"); ok {
@@ -1245,4 +1250,132 @@ Node_ComponentRoot :: proc(manager: ^NodeManager, node: ^Node) -> ^Node {
 		if n.componentPath != "" do return n
 	}
 	return nil
+}
+
+// --- StateMachineNode ------------------------------------------------------------
+// "state_machine": {"initial", "player", "autostart",
+//   "params": [[name, value], ...],
+//   "states": [{"name", "animation"}, ...],
+//   "transitions": [{"from", "to", "blend", "when": [[op, param, value], ...]}, ...]}
+// Conditions: ["true"|"false"|"trigger", param], ["=="|"!="|">"|"<", param, value],
+// ["finished"], ["after", seconds].
+
+@(private = "file")
+write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
+	strings.write_byte(&w.sb, '{')
+	w.indent += 1
+	Json_NewLine(w); strings.write_string(&w.sb, "\"initial\": "); Json_String(w, sm.initial)
+	strings.write_string(&w.sb, ", \"player\": "); Json_String(w, sm.player)
+	fmt.sbprintf(&w.sb, ", \"autostart\": %t,", sm.autostart)
+	Json_NewLine(w); strings.write_string(&w.sb, "\"params\": [")
+	for p, i in sm.params {
+		if i > 0 do strings.write_string(&w.sb, ", ")
+		strings.write_byte(&w.sb, '[')
+		Json_String(w, p.name)
+		strings.write_string(&w.sb, ", ")
+		Json_Float(w, p.value)
+		strings.write_byte(&w.sb, ']')
+	}
+	strings.write_string(&w.sb, "],")
+	Json_NewLine(w); strings.write_string(&w.sb, "\"states\": [")
+	w.indent += 1
+	for s, i in sm.states {
+		if i > 0 do strings.write_byte(&w.sb, ',')
+		Json_NewLine(w)
+		strings.write_string(&w.sb, "{\"name\": "); Json_String(w, s.name)
+		if s.animation != "" {strings.write_string(&w.sb, ", \"animation\": "); Json_String(w, s.animation)}
+		strings.write_byte(&w.sb, '}')
+	}
+	w.indent -= 1
+	if len(sm.states) > 0 do Json_NewLine(w)
+	strings.write_string(&w.sb, "],")
+	Json_NewLine(w); strings.write_string(&w.sb, "\"transitions\": [")
+	w.indent += 1
+	for t, i in sm.transitions {
+		if i > 0 do strings.write_byte(&w.sb, ',')
+		Json_NewLine(w)
+		strings.write_string(&w.sb, "{\"from\": "); Json_String(w, t.from)
+		strings.write_string(&w.sb, ", \"to\": "); Json_String(w, t.to)
+		if t.blend > 0 {strings.write_string(&w.sb, ", \"blend\": "); Json_Float(w, t.blend)}
+		strings.write_string(&w.sb, ", \"when\": [")
+		for c, j in t.conditions {
+			if j > 0 do strings.write_string(&w.sb, ", ")
+			strings.write_byte(&w.sb, '[')
+			Json_String(w, SM_OP_NAMES[c.op])
+			if SM_Op_UsesParam(c.op) {strings.write_string(&w.sb, ", "); Json_String(w, c.param)}
+			if SM_Op_UsesValue(c.op) {strings.write_string(&w.sb, ", "); Json_Float(w, c.value)}
+			strings.write_byte(&w.sb, ']')
+		}
+		strings.write_string(&w.sb, "]}")
+	}
+	w.indent -= 1
+	if len(sm.transitions) > 0 do Json_NewLine(w)
+	strings.write_byte(&w.sb, ']')
+	w.indent -= 1
+	Json_NewLine(w)
+	strings.write_byte(&w.sb, '}')
+}
+
+@(private = "file")
+read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
+	clear(&sm.states)
+	clear(&sm.transitions)
+	clear(&sm.params)
+	sm.autostart = sj_bool(obj, "autostart", true)
+	sm.player = strings.clone(sj_string(obj, "player", ""), sm.allocator)
+	sm.playerNode = nil
+	if arr, ok := sj_arr(obj, "params"); ok {
+		for v in arr {
+			p, pok := v.(json.Array)
+			if !pok || len(p) < 1 do continue
+			name, nok := p[0].(json.String)
+			if !nok do continue
+			val: f32
+			if len(p) > 1 {
+				if f, fok := json_number(p[1]); fok do val = f
+				else if b, bok := p[1].(json.Boolean); bok do val = 1 if b else 0
+			}
+			StateMachine_SetParam(sm, name, val)
+		}
+	}
+	if arr, ok := sj_arr(obj, "states"); ok {
+		for v in arr {
+			so, sok := v.(json.Object)
+			if !sok do continue
+			if name := sj_string(so, "name", ""); name != "" do StateMachine_AddState(sm, name, sj_string(so, "animation", ""))
+		}
+	}
+	if arr, ok := sj_arr(obj, "transitions"); ok {
+		for v in arr {
+			to, tok := v.(json.Object)
+			if !tok do continue
+			t := StateMachine_AddTransition(sm, sj_string(to, "from", SM_ANY), sj_string(to, "to", ""), sj_float(to, "blend", 0))
+			when_arr, _ := sj_arr(to, "when")
+			for cv in when_arr {
+				ca, cok := cv.(json.Array)
+				if !cok || len(ca) < 1 do continue
+				opName, _ := ca[0].(json.String)
+				op, opok := SM_Op_Parse(opName)
+				if !opok do continue
+				c := SM_Condition{op = op}
+				k := 1
+				if SM_Op_UsesParam(op) && k < len(ca) {
+					if s, sok := ca[k].(json.String); sok do c.param = strings.clone(s, sm.allocator)
+					k += 1
+				}
+				if SM_Op_UsesValue(op) && k < len(ca) {
+					if f, fok := json_number(ca[k]); fok do c.value = f
+				}
+				append(&t.conditions, c)
+			}
+		}
+	}
+	sm.initial = ""
+	if init := sj_string(obj, "initial", ""); init != "" {
+		if i := StateMachine_FindState(sm, init); i >= 0 do sm.initial = sm.states[i].name
+	}
+	if sm.initial == "" && len(sm.states) > 0 do sm.initial = sm.states[0].name
+	sm.current = -1
+	sm.previous = -1
+	sm.running = false
 }

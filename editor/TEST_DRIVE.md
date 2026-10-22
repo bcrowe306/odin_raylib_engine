@@ -102,7 +102,7 @@ Queries:
   vertices points count`; shape handles are items `shape<i>.<Kind><n>` (Move, Rotate, Radius, Edge 0-3,
   Corner 0-3, CapEnd 0-1, Point n, AddPoint n)
 - `node-delta:A,B` (global position of B minus A), `anim` (`<animation>:<frame>/<length>:<tracks>` of the selected AnimationPlayer)
-- `node:<Name>.<field>`, where field is one of `exists type parent position global rotation scale visible enabled children script prop.<path> script.<prop> connections overrides tiles`
+- `node:<Name>.<field>`, where field is one of `exists type parent position global rotation scale visible enabled children script prop.<path> script.<prop> connections overrides tiles material state` (`state`: a StateMachine's `<current>/<state count>`)
 
 Widgets register themselves with `Drive_Item("<id>")` right after they are drawn
 (see `editor/test_drive.odin` and `UI_IconButton`/`UI_Button` in `ui_style.odin`).

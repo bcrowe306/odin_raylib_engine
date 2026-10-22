@@ -30,6 +30,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"TextureNode", TextureNode, factory_texture, {"texture", "sprite"}},
 	{"FrameAnimationNode", FrameAnimationNode, factory_frame_animation, {"animationnode", "frameanimation", "animation"}},
 	{"AnimationPlayerNode", AnimationPlayerNode, factory_animation_player, {"animationplayer"}},
+	{"StateMachineNode", StateMachineNode, factory_state_machine, {"statemachine", "state_machine"}},
 	{"ParticleEmitterNode", ParticleEmitterNode, factory_particles, {"particle", "particles", "particleemitter"}},
 	{"SoundNode", SoundNode, factory_sound, {"sound"}},
 	{"MusicNode", MusicNode, factory_music, {"music"}},
@@ -181,6 +182,11 @@ factory_frame_animation :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 @(private = "file")
 factory_animation_player :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return AnimationPlayerNode_Create(scene, "AnimationPlayer")
+}
+
+@(private = "file")
+factory_state_machine :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return StateMachineNode_Create(scene, "StateMachine", parent)
 }
 
 @(private = "file")

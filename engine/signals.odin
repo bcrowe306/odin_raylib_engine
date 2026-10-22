@@ -180,7 +180,7 @@ Node_RemoveConnection :: proc(source: ^Node, signal, targetPath, method: string)
 // script_call_method calls `Target:method(value, source)` if the target's
 // script is ready and defines it.
 @(private = "file")
-script_call_method :: proc(mgr: ^ScriptManager, target: ^Node, method: string, value: EventValue, source: ^Node) {
+script_call_method :: proc(mgr: ^ScriptManager, target: ^Node, method: string, value: EventValue, source: ^Node, quiet := false) {
 	if target.scriptInstance == nil do return
 	inst := cast(^ScriptInstance)target.scriptInstance
 	if !inst.isReady do return
@@ -202,16 +202,17 @@ script_call_method :: proc(mgr: ^ScriptManager, target: ^Node, method: string, v
 		mgr.currentInstance = prev
 	} else {
 		lua.pop(L, 1)
-		log.warnf("[Signals] %s has no method %s (connected from %s)", inst.modulePath, method, source.name)
+		if !quiet do log.warnf("[Signals] %s has no method %s (connected from %s)", inst.modulePath, method, source.name)
 	}
 	lua.pop(L, 2) // self, errHandler
 }
 
 // Script_CallMethod calls `Target:method(value, target)` on a node's script
-// if it's ready and defines it (animation method tracks, ...).
-Script_CallMethod :: proc(mgr: ^ScriptManager, target: ^Node, method: string, value: EventValue) {
+// if it's ready and defines it (animation method tracks, ...); quiet: no
+// warning when it doesn't (optional callbacks like on_enter_<state>).
+Script_CallMethod :: proc(mgr: ^ScriptManager, target: ^Node, method: string, value: EventValue, quiet := false) {
 	if mgr == nil || target == nil || !Node_IsAlive(target) do return
-	script_call_method(mgr, target, method, value, target)
+	script_call_method(mgr, target, method, value, target, quiet)
 }
 
 // Signals_Dispatch runs a source node's saved connections for an event.
