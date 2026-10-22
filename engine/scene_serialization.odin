@@ -241,6 +241,7 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 							strings.write_string(&w.sb, ", ")
 							Json_Float(w, v)
 						}
+						if k.ease != .Linear do fmt.sbprintf(&w.sb, ", \"%s\"", Ease_Name(k.ease))
 						strings.write_byte(&w.sb, ']')
 					}
 					strings.write_string(&w.sb, "]}")
@@ -806,6 +807,9 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 							}
 							key := Track_Key{frame = num(ka[0])}
 							for i in 1 ..< min(len(ka), 5) do key.value[i - 1] = num(ka[i])
+							if len(ka) >= 6 {
+								if name, isStr := ka[5].(json.String); isStr do key.ease, _ = Ease_Parse(string(name))
+							}
 							append(&track.keys, key)
 						}
 					}

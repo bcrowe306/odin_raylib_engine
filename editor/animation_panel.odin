@@ -134,6 +134,33 @@ draw_frame_thumb :: proc(dl: ^imgui.DrawList, anim: ^e.Animation, frame: int, mn
 	imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)tex, p, {p.x + dw, p.y + dh}, uv0, uv1)
 }
 
+// The key whose context menu is open.
+@(private = "file")
+keyMenu: struct {
+	track: int,
+	frame: f32,
+} = {track = -1}
+
+// ease_preview: a tooltip with the curve's shape.
+@(private = "file")
+ease_preview :: proc(ease: e.Ease) {
+	if !imgui.BeginTooltip() do return
+	defer imgui.EndTooltip()
+	size := imgui.Vec2{120, 70}
+	o := imgui.GetCursorScreenPos()
+	imgui.Dummy(size)
+	dl := imgui.GetWindowDrawList()
+	imgui.DrawList_AddRectFilled(dl, o, o + size, col_u32(UI_BG_APP), 3)
+	prev: imgui.Vec2
+	for i in 0 ..= 40 {
+		t := f32(i) / 40
+		v := e.Ease_Apply(ease, t)
+		p := imgui.Vec2{o.x + 6 + t * (size.x - 12), o.y + size.y - 10 - v * (size.y - 20)}
+		if i > 0 do imgui.DrawList_AddLine(dl, prev, p, col_u32(UI_ACCENT), 2)
+		prev = p
+	}
+}
+
 AnimationPanel_Render :: proc(state: ^EditorState) {
 	node := state.selectedNode
 	apn: ^e.AnimationPlayerNode
@@ -399,8 +426,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		}
 		imgui.SameLine(0, 2)
 		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("anim.remove-track:%s", tr.property), "Remove track", size = 24) do removeTrack = ti
-		// Keys.
-		removeKey := f32(-1)
+		// Keys (right-click: easing to the next key, delete).
 		for k in tr.keys {
 			cx := x0 + k.frame * CELL_W + CELL_W * 0.5
 			cy := y + ROW_H * 0.5 - 1
@@ -409,16 +435,42 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			hot := point_in_rect(mouse, {cx - r, cy - r}, {cx + r, cy + r})
 			col := col_u32(UI_WARNING if !hot else {1, 0.85, 0.5, 1})
 			imgui.DrawList_AddQuadFilled(dl, pts[0], pts[1], pts[2], pts[3], col)
+			if k.ease != .Linear do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
 			Drive_ItemRect(fmt.tprintf("anim.keyframe:%s:%d", tr.property, int(k.frame) + 1), {cx - r, cy - r}, {cx + r, cy + r})
 			if hot {
-				imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %.2f %.2f %.2f %.2f  (right-click: delete)", int(k.frame) + 1, k.value[0], k.value[1], k.value[2], k.value[3]))
+				imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %.2f %.2f %.2f %.2f\nEasing to the next key: %s  (right-click: easing, delete)", int(k.frame) + 1, k.value[0], k.value[1], k.value[2], k.value[3], e.Ease_Name(k.ease)))
 				if imgui.IsMouseClicked(.Left) do scrub(state, apn, anim, int(k.frame))
-				if imgui.IsMouseClicked(.Right) do removeKey = k.frame
+				if imgui.IsMouseClicked(.Right) {
+					keyMenu = {ti, k.frame}
+					imgui.OpenPopup("##key_ctx")
+				}
 			}
 		}
-		if removeKey >= 0 {
-			Editor_RecordUndo(state, "Delete key")
-			e.Track_RemoveKey(&tr, removeKey)
+		if keyMenu.track == ti && imgui.BeginPopup("##key_ctx") {
+			key: ^e.Track_Key
+			for &k in tr.keys do if abs(k.frame - keyMenu.frame) < 0.001 do key = &k
+			if key != nil {
+				UI_DimText(fmt.tprintf("Key at frame %d", int(key.frame) + 1))
+				imgui.Separator()
+				if imgui.BeginMenu(fmt.ctprintf("%s  Easing: %s", ICON_FA_WAVE_SQUARE, e.Ease_Name(key.ease))) {
+					for ease in e.Ease {
+						if imgui.MenuItem(strings.clone_to_cstring(e.Ease_Name(ease), context.temp_allocator), nil, ease == key.ease) {
+							Editor_RecordUndo(state, "Key easing")
+							key.ease = ease
+						}
+						Drive_Item(fmt.tprintf("anim.ease:%s", e.Ease_Name(ease)))
+						if imgui.IsItemHovered() do ease_preview(ease)
+					}
+					imgui.EndMenu()
+				}
+				Drive_Item("anim.key-easing")
+				if imgui.MenuItem(fmt.ctprintf("%s  Delete Key", ICON_FA_TRASH)) {
+					Editor_RecordUndo(state, "Delete key")
+					e.Track_RemoveKey(&tr, keyMenu.frame)
+				}
+				Drive_Item("anim.key-delete")
+			}
+			imgui.EndPopup()
 		}
 		imgui.PopID()
 	}

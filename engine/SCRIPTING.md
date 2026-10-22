@@ -368,6 +368,30 @@ end
 | `get_shader_param(name)` | `name` | up to 4 numbers / path | Current value (or the shader's default). |
 | `set_blend_mode(mode)` | `"alpha"`, `"additive"`, `"multiply"`, `"add_colors"`, `"subtract_colors"`, `"premultiplied"` | - | Blending. |
 
+#### Tweens (`Tween`)
+
+Animate a property to a value over time with an easing curve - any
+reflected property (`position`, `scale`, `rotation`, `tint`, ...), or a
+material parameter (`"shader:amount"`). Colours are `{r, g, b[, a]}` in
+0..1. A tween starts from the property's value when its delay ends, and ends
+with its node.
+
+```lua
+Tween.to(self.node, "position", {400, 200}, 0.5, "out_back")
+Tween.to(self.node, "scale", {1.2, 1.2}, 0.15, "out_quad", {loops = -1, yoyo = true})
+Tween.to(self.node, "tint", {1, 1, 1, 0}, 0.3, "linear", {
+    delay = 1.0,
+    on_complete = function(node) node:destroy() end,
+})
+local id = Tween.to(self.node, "shader:amount", 0, 0.25, "out_quad")
+Tween.cancel(id)                  -- or Tween.cancel_all(self.node [, "position"])
+local k = Tween.ease("in_out_sine", t)   -- 0..1 -> eased 0..1
+```
+
+Easing names: `linear`, `constant`, and `in_` / `out_` / `in_out_` + `sine`,
+`quad`, `cubic`, `quart`, `expo`, `back`, `elastic`, `bounce`. Animation
+track keys use the same curves (Animation tab: right-click a key > Easing).
+
 #### Lighting (LightNode, scene ambient)
 
 Add **Light** nodes (point, or spot: the node's rotation is the direction)

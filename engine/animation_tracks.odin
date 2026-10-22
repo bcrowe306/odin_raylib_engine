@@ -16,12 +16,14 @@ import rl "vendor:raylib"
 // vectors and colours can be animated.
 //
 // Saved with the animation: "tracks": [{"target", "property",
-// "keys": [[frame, a, b, c, d], ...]}].
+// "keys": [[frame, a, b, c, d], ...]}] - a 6th element names the easing
+// from that key to the next ("out_quad"; linear when absent).
 // ============================================================================
 
 Track_Key :: struct {
 	frame: f32,
 	value: [4]f32, // float: [0]; vec2: [0..1]; colour: rgba 0..255
+	ease:  Ease,   // curve from this key to the next (saved as a 6th element)
 }
 
 Property_Track :: struct {
@@ -54,7 +56,7 @@ Track_SetKey :: proc(track: ^Property_Track, frame: f32, value: [4]f32) {
 			return
 		}
 	}
-	append(&track.keys, Track_Key{frame, value})
+	append(&track.keys, Track_Key{frame = frame, value = value})
 	slice.sort_by(track.keys[:], proc(a, b: Track_Key) -> bool {return a.frame < b.frame})
 }
 
@@ -77,7 +79,7 @@ Track_Sample :: proc(track: ^Property_Track, frame: f32) -> (value: [4]f32, ok: 
 	for i in 0 ..< n - 1 {
 		a, b := track.keys[i], track.keys[i + 1]
 		if frame >= a.frame && frame <= b.frame {
-			t := (frame - a.frame) / max(b.frame - a.frame, 0.0001)
+			t := Ease_Apply(a.ease, (frame - a.frame) / max(b.frame - a.frame, 0.0001))
 			return a.value + (b.value - a.value) * t, true
 		}
 	}

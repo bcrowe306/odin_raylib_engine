@@ -21,7 +21,7 @@ import imgui "lib/imgui"
 // Settings are passed through workspace/configuration (Client.settings).
 // ============================================================================
 
-CODE_LUA_GLOBALS :: []string{"Engine", "Input", "Audio", "Camera", "Physics", "Scene", "Log", "Project"}
+CODE_LUA_GLOBALS :: []string{"Engine", "Input", "Audio", "Camera", "Physics", "Scene", "Log", "Project", "Tween"}
 
 // code_repo_root finds the engine checkout (lua-language-server/ and
 // engine/definitions/ live there): the working directory, or the

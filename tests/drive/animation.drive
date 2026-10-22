@@ -41,3 +41,15 @@ click @anim.stop
 key ctrl+s
 expect file:scenes/main.scene.json contains "tracks": [{"target": ".", "property": "rotation", "keys": [[0, 0, 0, 0, 0], [2, 90, 0, 0, 0]]}]
 expect file:scenes/main.scene.json contains textures/Asteroid_3.png
+
+# Easing on a key: out_quad from frame 1 to 3 puts frame 2 at 75%.
+rclick @anim.keyframe:rotation:1
+hover @anim.key-easing
+wait 3
+click @anim.ease:out_quad
+click @anim.frame:2
+expect node:AnimationPlayer.rotation == 67.5
+screenshot key_easing
+click @anim.stop
+key ctrl+s
+expect file:scenes/main.scene.json contains "keys": [[0, 0, 0, 0, 0, "out_quad"], [2, 90, 0, 0, 0]]

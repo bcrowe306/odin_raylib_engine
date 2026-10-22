@@ -16,7 +16,7 @@ out of scope here.
 
 - [x] 2.1 Shaders & materials: per-node material (shader + uniforms), blend modes, Inspector editing, Lua `set_shader_param`
 - [x] 2.2 2D lighting: light map render target, point/spot lights, ambient colour, occluder shadows from collision shapes; normal maps later
-- [ ] 2.3 Tweens & easing: `Tween.to(node, "position", {x, y}, 0.3, "out_quad")`, easing curves on animation tracks
+- [x] 2.3 Tweens & easing: `Tween.to(node, "position", {x, y}, 0.3, "out_quad")`, easing curves on animation tracks
 - [ ] 2.4 Animation tracks: method-call and audio tracks, blending/crossfade between animations
 - [ ] 2.5 State machine node: states, transitions, conditions, Lua `on_enter_<state>`/`on_exit_<state>`, drives the AnimationPlayer
 - [ ] 2.6 Save/load: `Save.set/get/flush` JSON in the platform user-data folder

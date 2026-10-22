@@ -157,6 +157,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 			dt := rl.GetFrameTime()
 			e.PhysicsWorld_Step(&state.game.physicsWorld, dt, ctx)
 			e.Scene_UpdateNodeHirearchy(state.activeScene, state.activeScene.rootNode, ctx, dt)
+			e.Tween_Update(&state.game.tweens, dt, &state.game.scriptManager)
 			e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
 		}
 		if viewportLighting do lit = e.Lighting_Prepare(state.activeScene, cam, i32(state.viewportSize.x), i32(state.viewportSize.y))

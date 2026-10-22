@@ -973,6 +973,52 @@ function Node:ldtk_referenced_by(field) end
 
 -- ============================================================================
 -- Global Modules
+
+---@alias EaseName "linear"|"constant"|"in_sine"|"out_sine"|"in_out_sine"|"in_quad"|"out_quad"|"in_out_quad"|"in_cubic"|"out_cubic"|"in_out_cubic"|"in_quart"|"out_quart"|"in_out_quart"|"in_expo"|"out_expo"|"in_out_expo"|"in_back"|"out_back"|"in_out_back"|"in_elastic"|"out_elastic"|"in_out_elastic"|"in_bounce"|"out_bounce"|"in_out_bounce"
+
+---@class TweenOptions
+---@field delay? number Seconds before it starts (it starts from the value at that time)
+---@field loops? integer Extra runs (-1 = forever)
+---@field yoyo? boolean Every other run goes back
+---@field on_complete? fun(node: Node) Called when it finishes
+
+---@class TweenModule
+---Animates node properties over time with easing.
+local TweenModule = {}
+
+---Tweens a property to a value: "position", "scale", "rotation", any numeric
+---or colour property ("tint", "emitter.amount", ...; colours as {r, g, b[, a]} 0..1),
+---or a material parameter ("shader:amount"). Returns the tween's id.
+---@param node Node
+---@param property string
+---@param value number|number[]
+---@param duration number Seconds
+---@param ease? EaseName Default "out_quad"
+---@param options? TweenOptions
+---@return integer id
+function TweenModule.to(node, property, value, duration, ease, options) end
+
+---Stops a tween (it stays where it is).
+---@param id integer
+---@return boolean found
+function TweenModule.cancel(id) end
+
+---Stops a node's tweens (all, or one property's).
+---@param node Node
+---@param property? string
+---@return integer count
+function TweenModule.cancel_all(node, property) end
+
+---@param id integer
+---@return boolean
+function TweenModule.is_running(id) end
+
+---Maps progress 0..1 through an easing curve (for your own animation).
+---@param ease EaseName
+---@param t number
+---@return number
+function TweenModule.ease(ease, t) end
+
 -- ============================================================================
 
 ---@class EngineModule
@@ -1361,6 +1407,7 @@ Physics = PhysicsModule
 
 ---@type SceneModule
 Scene = SceneModule
+Tween = TweenModule
 
 ---@type LogModule
 Log = LogModule

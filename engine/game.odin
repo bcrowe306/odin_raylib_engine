@@ -34,6 +34,7 @@ Game :: struct {
 	assetManager:    AssetManager,
 	backgroundColor: rl.Color `gui:"true"`,
 	resourceManager: ResourceManager,
+	tweens:          Tween_State,
 	gameContext:     GameContext,
 	drawBounds:      bool `gui:"true"`,
 	shouldQuit:      bool,
@@ -170,6 +171,7 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 
 GameTerminate :: proc(game: ^Game) {
 	if game == nil do return
+	Tween_Destroy(&game.tweens, game.scriptManager.L) // releases Lua callbacks: before the Lua state goes
 	ScriptManager_Destroy(&game.scriptManager)
 	SceneManager_Terminate(&game.sceneManager)
 	AssetManager_Destroy(&game.assetManager)

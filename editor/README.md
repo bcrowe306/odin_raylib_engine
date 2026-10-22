@@ -170,6 +170,10 @@ keyframed **property tracks**: **Add Track** picks the player or a child and
 a property (position, rotation, scale, colours, any numeric property); the
 yellow dot keys the current value at the playhead; right-click a key to
 delete it.
+Right-click a key for its **Easing** to the next key (linear, sine, quad,
+cubic, quart, expo, back, elastic, bounce, constant; hover one to see its
+curve) or to delete it. Eased keys show a dot. Scripts can animate any
+property at runtime with `Tween.to` (see `engine/SCRIPTING.md`).
 
 ### Materials & shaders
 

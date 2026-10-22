@@ -9,11 +9,13 @@ TextureNode :: struct {
 	size: [2]f32,
 	texture: ^Texture,
 	origin: rl.Vector2,
+	tint: rl.Color `gui:"true"`, // multiplies the texture ({} = white)
 }
 
 TextureNode_Init :: proc(texture: ^TextureNode) {
 	InitializeNode(texture)
 	texture.render = TextureNode_Render
+	texture.tint = rl.WHITE
 	texture.onDestroy = TextureNode_Destroy
 }
 
@@ -79,5 +81,6 @@ TextureNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 		width = destW,
 		height = destH,
 	}
-	rl.DrawTexturePro(textureNode.texture.texture, source, destination, origin, rot, rl.WHITE)
+	tint := textureNode.tint if textureNode.tint != {} else rl.WHITE
+	rl.DrawTexturePro(textureNode.texture.texture, source, destination, origin, rot, tint)
 }

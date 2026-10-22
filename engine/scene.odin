@@ -247,6 +247,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 
 	// Update hierarchy (calls update on each node)
 	Scene_UpdateNodeHirearchy(scene, scene.rootNode, gameContext, deltaTime)
+	if gameContext != nil && gameContext.game != nil do Tween_Update(&gameContext.game.tweens, deltaTime, &gameContext.game.scriptManager)
 
 	// Update global positions after node updates & container layout
 	Node_SetGlobalPositions(nodeManager, scene.rootNode)
