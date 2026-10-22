@@ -50,6 +50,9 @@ Code_Doc :: struct {
 	lineStates:    [dynamic]int,
 	statesVersion: int,
 	tokens:        Token_Cache, // per-line tokens (code_token_cache.odin)
+	maxCols:       int, // widest line (columns), for widthVersion
+	widthVersion:  int,
+	widthValid:    bool,
 	scrollToCursor: bool,
 }
 
@@ -689,16 +692,28 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 
 	winPos := imgui.GetWindowPos()
 	winSize := imgui.GetWindowSize()
+	// The wheel over an overlay scrolls the overlay, not the code.
+	@(static) lastScroll: [2]f32
+	defer lastScroll = {imgui.GetScrollX(), imgui.GetScrollY()}
+	if Code_OverlayHovered() && imgui.GetIO().MouseWheel != 0 {
+		imgui.SetScrollX(lastScroll.x)
+		imgui.SetScrollY(lastScroll.y)
+	}
 	scrollX := imgui.GetScrollX()
 	scrollY := imgui.GetScrollY()
 	pad := f32(6)
 
-	// Content size (for the scrollbars).
-	maxCols := 0
-	for i in 0 ..< lineCount {
-		l := buf.buffer_line_str(b, i)
-		maxCols = max(maxCols, code_visual_col(l, len(l)))
+	// Content size (for the scrollbars): the widest line, once per edit.
+	if !doc.widthValid || doc.widthVersion != b.version {
+		doc.maxCols = 0
+		for i in 0 ..< lineCount {
+			l := buf.buffer_line_str(b, i)
+			doc.maxCols = max(doc.maxCols, code_visual_col(l, len(l)))
+		}
+		doc.widthVersion = b.version
+		doc.widthValid = true
 	}
+	maxCols := doc.maxCols
 	imgui.SetCursorPos({0, 0})
 	imgui.Dummy({gutterW + f32(maxCols + 4) * cm.charW, f32(lineCount) * cm.lineH + winSize.y * 0.5})
 
@@ -722,10 +737,11 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	io := imgui.GetIO()
 	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
 	inPopup := cm.completion.open && point_in_rect(mouse, cm.popupMin, cm.popupMax)
+	overOverlay := Code_OverlayHovered() // hover / signature / docs box: no clicks through
 
 	// Mouse: click places the caret (Shift extends), double-click selects a
 	// word, triple-click the line, drag selects.
-	if hovered && !inPopup {
+	if hovered && !inPopup && !overOverlay {
 		imgui.SetMouseCursor(.TextInput)
 		if imgui.IsMouseClicked(.Left) {
 			p := code_pos_at(b, mouse)
@@ -872,6 +888,10 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 	}
 
 	// Carets (blink while idle).
+	if len(b.cursors) > 0 {
+		cp := code_screen_pos(b, b.cursors[0].pos)
+		Drive_ItemRect("code.caret", {cp.x, cp.y}, {cp.x + cm.charW, cp.y + cm.lineH}, inWindow = true)
+	}
 	if focused {
 		blink := time.duration_seconds(time.tick_since(cm.cursorMoved))
 		if blink < 0.6 || int(blink * 1.8) % 2 == 0 {
@@ -1288,9 +1308,15 @@ code_hover :: proc(doc: ^Code_Doc, hovered: bool, mouse: [2]f32) {
 	}
 	p := code_pos_at(b, mouse)
 	line := buf.buffer_line_str(b, p.line)
+	// The mouse moved onto the hover box (to scroll it): keep it.
+	keep := cm.hoverValid && Code_OverlayHovered("hover")
+	if keep {
+		p = cm.hoverPos
+		line = buf.buffer_line_str(b, p.line)
+	}
 	// Only over actual text.
 	endX := cm.textOrigin.x + f32(code_visual_col(line, len(line))) * cm.charW
-	if mouse.x > endX || mouse.x < cm.textOrigin.x {
+	if !keep && (mouse.x > endX || mouse.x < cm.textOrigin.x) {
 		cm.hoverValid = false
 		return
 	}
@@ -1321,20 +1347,16 @@ code_hover :: proc(doc: ^Code_Doc, hovered: bool, mouse: [2]f32) {
 	}
 	hover := code_lsp_hover_text()
 	if len(msgs) == 0 && hover == "" do return
-	if imgui.BeginTooltip() {
-		imgui.PushTextWrapPos(520)
-		for d in msgs {
-			imgui.PushStyleColorImVec4(.Text, imgui.ColorConvertU32ToFloat4(code_severity_color(d.severity)))
-			imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_CIRCLE_XMARK if d.severity <= 1 else ICON_FA_TRIANGLE_EXCLAMATION, d.message))
-			imgui.PopStyleColor()
-		}
-		if hover != "" {
-			if len(msgs) > 0 do imgui.Separator()
-			code_markdown(hover)
-		}
-		imgui.PopTextWrapPos()
-		imgui.EndTooltip()
+	// Diagnostics, then the language server's docs: a bounded, scrollable
+	// box under (or over) the word, inside the Code area.
+	blocks := make([dynamic]Overlay_Block, context.temp_allocator)
+	for d in msgs {
+		append(&blocks, Overlay_Block{fmt.tprintf("%s  %s", ICON_FA_CIRCLE_XMARK if d.severity <= 1 else ICON_FA_TRIANGLE_EXCLAMATION, d.message), false, imgui.ColorConvertU32ToFloat4(code_severity_color(d.severity))})
 	}
+	if hover != "" do markdown_blocks(hover, &blocks)
+	ws := code_word_start(b, p)
+	anchor := code_screen_pos(b, ws)
+	Code_Overlay_Draw("hover", anchor, cm.lineH, blocks[:])
 }
 
 // code_markdown renders LSP markdown simply: code fences in the mono font,
@@ -1549,6 +1571,7 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 		doc.statesVersion = -1
 		code_update_line_states(doc)
 		return fmt.tprintf("%.1f", full / max(doc.tokens.lastUpdateMs, 0.001)), true
+	case "code.overlays": return Code_OverlaysInside(), true // "ok <n>" when all inside the Code area
 	case "code.update-ms": // the last line-state pass after an edit
 		doc := code_active_doc()
 		if doc == nil do return "", true

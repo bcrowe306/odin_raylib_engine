@@ -64,5 +64,5 @@ out of scope here.
 - [x] 7.1 Node subtypes in definitions (`TextureNode`, `CameraNode`, …) so methods complete per type
 - [x] 7.2 Definitions checked against the registered Lua bindings (test fails on drift)
 - [x] 7.3 Per-line token cache keyed on buffer version; measure with a 10k-line file
-- [ ] 7.4 Overlays: hover / signature / completion docs as bounded, wrapped, scrollable popups clamped to the editor
+- [x] 7.4 Overlays: hover / signature / completion docs as bounded, wrapped, scrollable popups clamped to the editor
 - [ ] 7.5 Lua debugger: breakpoints, stepping, locals (debug hooks)

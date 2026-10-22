@@ -1,0 +1,32 @@
+# Code tab overlays stay inside the Code area, wrapped and bounded:
+# completion docs (next to the list), signature help (above the call),
+# hover docs (under the word, kept while the mouse is on them).
+wait 5
+dblclick @asset:scripts/orbiting_drone.lua
+wait-until code.lsp == ready timeout=600
+key enter
+key up
+type local axis = Input.get_a
+wait-until code.completion contains get_axis timeout=600
+wait-until item:code.overlay:completion-doc == visible timeout=600
+expect code.overlays contains ok
+screenshot completion_doc
+key enter
+wait-until item:code.overlay:signature == visible timeout=600
+expect code.overlays contains ok
+screenshot signature
+key esc
+key ctrl+z
+key ctrl+z
+key ctrl+z
+# Hover: the mouse resting on `set_position`.
+key ctrl+g
+type 19:20
+key enter
+hover @code.caret
+wait-until item:code.overlay:hover == visible timeout=600
+expect code.overlays contains ok
+screenshot hover
+hover @code.overlay:hover
+wait 10
+expect item:code.overlay:hover == visible

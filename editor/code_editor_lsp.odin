@@ -531,20 +531,14 @@ code_completion_popup :: proc(state: ^EditorState, doc: ^Code_Doc) {
 		lsp.client_request_resolve(&cm.client, cm.resolveIndex)
 	}
 	doc_text := sel.documentation
-	if len(doc_text) > 600 do doc_text = doc_text[:600]
-	docH: f32 = 0
-	if doc_text != "" {
-		docH = imgui.CalcTextSize(strings.clone_to_cstring(doc_text, context.temp_allocator), nil, false, w - 16).y + 12
-		docH = min(docH, 160)
-	}
 
 	anchor := code_screen_pos(b, comp.anchor)
 	pos := [2]f32{anchor.x - tagW, anchor.y + cm.lineH + 2}
 	display := io.DisplaySize
-	if pos.y + h + docH > display.y - 8 do pos.y = anchor.y - h - docH - 2 // flip above
+	if pos.y + h > display.y - 8 do pos.y = anchor.y - h - 2 // flip above
 	pos.x = clamp(pos.x, 4, max(display.x - w - 4, 4))
 	cm.popupMin = pos
-	cm.popupMax = {pos.x + w, pos.y + h + docH}
+	cm.popupMax = {pos.x + w, pos.y + h}
 
 	// Scroll the list to keep the selection visible.
 	@(static) top := 0
@@ -601,10 +595,15 @@ code_completion_popup :: proc(state: ^EditorState, doc: ^Code_Doc) {
 		imgui.DrawList_AddRectFilled(dl, {pos.x + w - 4, barY + 2}, {pos.x + w - 1, barY + barH - 2}, col_u32({1, 1, 1, 0.18}), 2)
 	}
 	if doc_text != "" {
-		y := pos.y + h
-		imgui.DrawList_AddLine(dl, {pos.x + 8, y}, {pos.x + w - 8, y}, col_u32({1, 1, 1, 0.06}), 1)
-		clip := imgui.Vec4{pos.x, y, pos.x + w, y + docH}
-		imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.regular, imgui.GetFontSize(), {pos.x + 8, y + 6}, col_u32(UI_TEXT_DIM), strings.clone_to_cstring(doc_text, context.temp_allocator), nil, w - 16, &clip)
+		// The selected item's docs: next to the list when there's room,
+		// else under it (wrapped, scrollable, inside the Code area).
+		blocks := make([dynamic]Overlay_Block, context.temp_allocator)
+		markdown_blocks(doc_text, &blocks, UI_TEXT_DIM)
+		if cm.areaMax.x - cm.popupMax.x >= 260 {
+			Code_Overlay_Draw("completion-doc", {cm.popupMax.x + 6, pos.y}, cm.lineH, blocks[:], maxSize = {min(460, cm.areaMax.x - cm.popupMax.x - 12), CODE_OVERLAY_MAX.y}, at = true)
+		} else {
+			Code_Overlay_Draw("completion-doc", {pos.x, cm.popupMax.y + 4}, cm.lineH, blocks[:], at = true)
+		}
 	}
 	if clicked >= 0 {
 		comp.selected = clicked
@@ -659,35 +658,13 @@ code_signature_popup :: proc(doc: ^Code_Doc) {
 			hiEnd = hiStart + len(pl)
 		}
 	}
-	font := code_font()
-	dl := imgui.GetForegroundDrawList()
-	measure :: proc(font: ^imgui.Font, s: string) -> f32 {
-		return imgui.Font_CalcTextSizeA(font, code_font_size(), max(f32), 0, strings.clone_to_cstring(s, context.temp_allocator)).x
-	}
-	w := measure(font, label) + 20
-	h := cm.lineH + 10
+	// The signature (wrapped when long) and the parameter being typed.
+	blocks := make([dynamic]Overlay_Block, context.temp_allocator)
+	append(&blocks, Overlay_Block{label, true, UI_TEXT_DIM})
+	if hiStart >= 0 do append(&blocks, Overlay_Block{fmt.tprintf("%s  %s", ICON_FA_CARET_RIGHT, label[hiStart:hiEnd]), true, UI_ACCENT})
 	caret := code_screen_pos(&doc.buffer, doc.buffer.cursors[0].pos)
-	pos := [2]f32{caret.x - 12, caret.y - h - 4}
-	if pos.y < cm.areaMin.y do pos.y = caret.y + cm.lineH + 4
-	if cm.completion.open && pos.y > caret.y do pos.y = caret.y - h - 4
-	pos.x = clamp(pos.x, 4, max(imgui.GetIO().DisplaySize.x - w - 4, 4))
-	imgui.DrawList_AddRectFilled(dl, pos, {pos.x + w, pos.y + h}, col_u32(UI_BG_RAISED), 6)
-	imgui.DrawList_AddRect(dl, pos, {pos.x + w, pos.y + h}, col_u32({1, 1, 1, 0.08}), 6)
-	x := pos.x + 10
-	y := pos.y + (h - code_font_size()) * 0.5
-	draw :: proc(dl: ^imgui.DrawList, font: ^imgui.Font, x: ^f32, y: f32, s: string, col: u32) {
-		if s == "" do return
-		cs := strings.clone_to_cstring(s, context.temp_allocator)
-		imgui.DrawList_AddTextImFontPtr(dl, font, code_font_size(), {x^, y}, col, cs)
-		x^ += imgui.Font_CalcTextSizeA(font, code_font_size(), max(f32), 0, cs).x
-	}
-	if hiStart >= 0 {
-		draw(dl, font, &x, y, label[:hiStart], col_u32(UI_TEXT_DIM))
-		draw(dl, font, &x, y, label[hiStart:hiEnd], col_u32(UI_ACCENT))
-		draw(dl, font, &x, y, label[hiEnd:], col_u32(UI_TEXT_DIM))
-	} else {
-		draw(dl, font, &x, y, label, col_u32(UI_TEXT_DIM))
-	}
+	anchor := [2]f32{caret.x - 12, caret.y}
+	Code_Overlay_Draw("signature", anchor, cm.lineH, blocks[:], preferAbove = true, maxSize = {CODE_OVERLAY_MAX.x, 120})
 }
 
 // --- hover / definition ------------------------------------------------------------

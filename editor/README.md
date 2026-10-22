@@ -429,7 +429,9 @@ edit button beside a node's script in the Inspector, *Open Script* in the scene 
 menu, or double-click a console message with `file.lua:LINE`. *New Script* (Inspector, or the
 **+** on the Scripts folder) creates one from a template. Completion, signature help, hover,
 diagnostics and go to definition (F12 / Ctrl-click) come from `lua-language-server` with the
-engine API definitions (`engine/definitions`). **Ctrl/Cmd+S** saves and hot-reloads the
+engine API definitions (`engine/definitions`). Hover docs, signature help and the selected
+completion's docs show in boxes that stay inside the Code area, wrap, and scroll with the
+mouse wheel when long (move the mouse onto a hover box to scroll it). **Ctrl/Cmd+S** saves and hot-reloads the
 script in a running Simulate session; Ctrl+Space completes; Ctrl/Cmd+/ comments; Ctrl/Cmd+W
 closes the tab. Zed-style editing: auto-closing brackets and quotes,
 find/replace (Cmd+F / Cmd+Alt+F, Cmd+G), multi-cursor (Cmd+D, Cmd+Shift+L,
