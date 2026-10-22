@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:os"
 import "core:strconv"
 import "core:strings"
+import "core:time"
 import rl "vendor:raylib"
 
 // ============================================================================
@@ -17,6 +18,9 @@ import rl "vendor:raylib"
 //   inspect <path>              -> @ore:node {"path", "props": [[name, value], ...]}
 //   set <path> <prop> <value>   change a property ("position" "10,20", "rotation", any reflected one)
 //   reload-scene <file>         re-read a scene file; restart it when it's the current scene
+//   break-set <file> <l,l,...>  breakpoints in a script (break-clear: none); a hit
+//                               pauses the game in the script (lua_debugger.odin):
+//                               -> @ore:stopped {...}, then continue / step-* / locals
 //
 // Paths are node names from the scene root, '/'-separated ("Player/Gun").
 // Scripts and textures reload by themselves when their files change.
@@ -31,9 +35,39 @@ Editor_Link :: struct {
 
 editorLink: Editor_Link
 
-EditorLink_Enable :: proc() {
+EditorLink_Enable :: proc(game: ^Game) {
 	editorLink.enabled = true
+	// Breakpoints: the debugger waits for commands on stdin while stopped.
+	LuaDebugger_Attach(game.scriptManager.L, link_wait_command, proc(kind, json: string) {fmt.printfln("@ore:%s %s", kind, json)})
+	luaDebugger.projectDir = game.assetManager.projectDir
 	fmt.println("@ore:hello")
+}
+
+// link_wait_command blocks until the editor sends a line (the game is
+// paused in a script); window events keep being handled meanwhile.
+@(private = "file")
+link_wait_command :: proc() -> string {
+	for {
+		for b, i in editorLink.inBuf {
+			if b != '\n' do continue
+			line := strings.clone(strings.trim_space(string(editorLink.inBuf[:i])), context.temp_allocator)
+			remove_range(&editorLink.inBuf, 0, i + 1)
+			if line != "" do return line
+			break
+		}
+		has, err := os.pipe_has_data(os.stdin)
+		if err != nil do return ""
+		if has {
+			chunk: [1024]u8
+			n, rerr := os.read(os.stdin, chunk[:])
+			if n <= 0 || rerr != nil do return "" // the editor went away
+			append(&editorLink.inBuf, ..chunk[:n])
+			continue
+		}
+		if rl.IsWindowReady() do rl.PollInputEvents()
+		if rl.IsWindowReady() && rl.WindowShouldClose() do return ""
+		time.sleep(10 * time.Millisecond)
+	}
 }
 
 // EditorLink_BeginFrame reads pending commands and decides whether this
@@ -97,6 +131,10 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 			ok := EditorLink_Set(game, parts[0], parts[1], value)
 			fmt.printfln("@ore:set %s %s %t", parts[0], parts[1], ok)
 		}
+	case "break-set":
+		LuaDebugger_Command(rest)
+	case "break-clear":
+		LuaDebugger_ClearBreakpoints()
 	case "reload-scene":
 		fmt.printfln("@ore:reloaded %s %t", rest, Game_ReloadSceneFile(game, rest))
 	}

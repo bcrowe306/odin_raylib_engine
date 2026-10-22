@@ -212,6 +212,7 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 | Lua definitions in sync | `test_lua_definitions_match_bindings`: every node method and module function registered in Lua is declared in `definitions/engine_api.lua` and every declared one is registered (fails on drift either way) |
 | Code tab token cache | Per-line tokens cached by (text hash, start state): an edit re-tokenizes only changed lines (shifted lines still hit), drawing reuses tokens; 10k-line file 20.4 ms -> 1.8 ms per edit (`code_big_file` drive, `scripts/gen_big_lua.py`) |
 | Code tab overlays | Hover, signature help and completion docs drawn as bounded boxes (max 560 x 260) inside the Code area, markdown (code fences in the code font) wrapped, mouse-wheel scrolling with a scroll bar, hover kept while the mouse is on it, no clicks / wheel through to the code; widest-line width cached per edit (was every frame) (`code_overlays` drive) |
+| Lua debugger | Breakpoints from the Code tab gutter, sent over the editor link; a line hook (only while debugging) pauses the game in the script and reports file, line, call stack (names from the definition line for engine-called functions) and locals (tables one level, nodes as Type(Name)); continue / step over / into / out (F8, F10, F11, Shift+F11), locals per frame, breakpoints changed while running; the paused game keeps handling window events (`test_lua_debugger`, `lua_debugger` drive) |
 
 ## Performance baselines
 

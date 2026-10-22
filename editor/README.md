@@ -413,6 +413,15 @@ binary (`bin/odin_raylib_engine`) if any engine/game source changed, then starts
 `--project <dir>` (plus `--scene <file>` for F6). The game's output streams into the
 Console. **Game → Simulate in Editor** runs the scene inside the editor and restores it when stopped.
 
+**Debugging Lua**: click a line number in the Code tab to set a breakpoint
+(a red dot; click again to remove it) and Play. When a script reaches it,
+the game pauses there: the script opens at the line (marked), and the Game
+tab shows the call stack (click a frame for its locals) and the locals -
+tables one level deep, nodes as `Type(Name)`. **Continue** (F8), **Step
+Over** (F10), **Step Into** (F11), **Step Out** (Shift+F11). Breakpoints can
+be added or removed while the game runs. (Debugging works in the game
+started with Play, not in Simulate in Editor.)
+
 While the game runs, the bottom panel's **Game** tab is linked to it
 (`--editor-link`): the running game's scene tree (refreshed twice a
 second), the selected node's live properties - type a value and press Enter

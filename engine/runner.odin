@@ -220,7 +220,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 
 	// The editor's Play: it drives the game over stdin/stdout. (Read from the
 	// command line too: front ends pass on only the options they know.)
-	if opts.editorLink || slice.contains(os.args, "--editor-link") do EditorLink_Enable()
+	if opts.editorLink || slice.contains(os.args, "--editor-link") do EditorLink_Enable(game)
 
 	frameCount := 0
 	targetCaptureFrame := max(25, maxFrames) if maxFrames > 0 else 30

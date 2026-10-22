@@ -910,12 +910,27 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		if old, ok := worst[d.range.start.line]; !ok || sev < old do worst[d.range.start.line] = sev
 	}
 	font := code_font()
+	gutterMouse := [2]f32{imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y}
 	for ln in first ..= last {
 		y := cm.textOrigin.y + f32(ln) * cm.lineH + textY
 		num := fmt.ctprintf("%d", ln + 1)
 		w := imgui.Font_CalcTextSizeA(font, code_font_size(), max(f32), 0, num).x
 		color := col_u32(UI_TEXT_DIM if ln == c.pos.line else UI_TEXT_FAINT)
 		imgui.DrawList_AddTextImFontPtr(dl, font, code_font_size(), {winPos.x + gutterW - 10 - w, y}, color, num)
+		// Breakpoints (click the gutter) and where the game is paused.
+		rowMin := [2]f32{winPos.x, cm.textOrigin.y + f32(ln) * cm.lineH}
+		rowMax := [2]f32{winPos.x + gutterW, rowMin.y + cm.lineH}
+		Drive_ItemRect(fmt.tprintf("code.gutter:%d", ln + 1), rowMin, rowMax, inWindow = true)
+		if doc.isLua && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && imgui.IsMouseClicked(.Left) && point_in_rect(gutterMouse, rowMin, rowMax) {
+			Debug_ToggleBreakpoint(doc.rel, ln + 1)
+		}
+		if Debug_HasBreakpoint(doc.rel, ln + 1) {
+			imgui.DrawList_AddCircleFilled(dl, {winPos.x + 9, y + code_font_size() * 0.5}, 5, col_u32({0.92, 0.30, 0.29, 1}))
+		}
+		if Debug_CurrentLine(doc.rel) == ln + 1 {
+			imgui.DrawList_AddRectFilled(dl, {winPos.x + gutterW, rowMin.y}, {winPos.x + winSize.x, rowMax.y}, col_u32({0.96, 0.72, 0.30, 0.16}))
+			imgui.DrawList_AddTriangleFilled(dl, {winPos.x + 3, y + 2}, {winPos.x + 3, y + code_font_size() - 2}, {winPos.x + 13, y + code_font_size() * 0.5}, col_u32(UI_WARNING))
+		}
 		if sev, ok := worst[ln]; ok {
 			imgui.DrawList_AddCircleFilled(dl, {winPos.x + 8, y + code_font_size() * 0.5}, 3.5, code_severity_color(sev))
 		}

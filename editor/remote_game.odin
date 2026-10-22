@@ -58,6 +58,7 @@ RemoteGame_Attach :: proc(input: ^os.File) {
 }
 
 RemoteGame_Detach :: proc() {
+	Debug_Reset()
 	if remote.input != nil do os.close(remote.input)
 	remote.input = nil
 	remote.connected = false
@@ -99,7 +100,10 @@ RemoteGame_HandleLine :: proc(state: ^EditorState, line: string) -> bool {
 	kind, rest := msg, ""
 	if i := strings.index_byte(msg, ' '); i >= 0 do kind, rest = msg[:i], msg[i + 1:]
 	switch kind {
-	case "hello": remote.connected = true
+	case "hello":
+		remote.connected = true
+		Debug_SendAll() // breakpoints set before Play
+	case "stopped", "locals", "running": Debug_HandleReply(state, kind, rest)
 	case "paused": remote.paused = true
 	case "resumed": remote.paused = false
 	case "stepped": remote.steps += 1
@@ -168,7 +172,7 @@ RemoteGame_Update :: proc(state: ^EditorState) {
 		if remote.input != nil do RemoteGame_Detach()
 		return
 	}
-	if remote.input == nil do return
+	if remote.input == nil || Debug_IsStopped() do return // paused in a script: it only reads debugger commands
 	if time.tick_since(remote.treeAt) > 500 * time.Millisecond {
 		remote.treeAt = time.tick_now()
 		RemoteGame_Send("tree")
@@ -211,6 +215,7 @@ GamePanel_Render :: proc(state: ^EditorState) {
 		UI_DimText("Connecting to the game...")
 		return
 	}
+	Debug_Panel(state)
 	// Toolbar.
 	if remote.paused {
 		if UI_PrimaryButton(fmt.tprintf("%s  Resume", ICON_FA_PLAY), "remote.resume") do RemoteGame_Send("resume")

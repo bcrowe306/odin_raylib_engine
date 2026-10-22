@@ -1,0 +1,33 @@
+# Lua debugger while playing: a breakpoint from the Code tab's gutter; Play
+# This Scene stops the game there (locals and call stack in the Game tab,
+# the line marked); step over; the breakpoint removed and Continue lets the
+# game run on; stop.
+wait 5
+dblclick @asset:scenes/battle_arena.scene.json
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 32
+key enter
+wait 3
+click @code.gutter:32
+click @toolbar.play-scene
+wait-until game == running timeout=600
+wait-until debug-stopped == true timeout=600
+expect debug-line == scripts/player_ship.lua:32
+expect debug-local:dt contains 0.
+expect debug-local:self contains rotation
+expect debug-stack contains update
+click @bottom:game
+screenshot paused_at_breakpoint
+click @debug.step-over
+wait-until debug-line == scripts/player_ship.lua:35 timeout=300
+screenshot stepped
+click @code.gutter:32
+click @debug.continue
+wait-until debug-stopped == false timeout=300
+wait 60
+expect debug-stopped == false
+expect game == running
+click @toolbar.stop
+wait-until game == stopped timeout=300

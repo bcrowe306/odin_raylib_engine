@@ -766,6 +766,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return fmt_vec(b.globalPosition - a.globalPosition), true
 	}
 	if strings.has_prefix(q, "remote-prop:") do return RemoteGame_Query(q)
+	if strings.has_prefix(q, "debug-") do return Debug_Query(q)
 	if strings.has_prefix(q, "window-h:") {
 		// Height of the window an item is in ("window-h:bottom:console").
 		r, ok := GlobalDrive.prevItems[q[len("window-h:"):]]

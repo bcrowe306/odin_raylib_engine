@@ -219,6 +219,15 @@ snapshots the Lua globals; stopping it restores them and re-runs every
 module, so module-level variables start fresh and nothing a simulation did
 leaks into the next run or into the saved scene.
 
+## Debugging
+
+Set breakpoints by clicking line numbers in the editor's Code tab, then
+Play: the game stops in the script at a breakpoint, with the call stack
+and locals in the Game tab, and steps with F8 (continue), F10 (over), F11
+(into) and Shift+F11 (out). The engine side is `engine/lua_debugger.odin`
+(a line hook installed only while there are breakpoints or a step pending,
+so scripts run at full speed otherwise).
+
 ## Hot Reload
 
 Saving a `.lua` file reloads it in the running game (development builds) and

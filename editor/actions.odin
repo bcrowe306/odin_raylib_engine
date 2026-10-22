@@ -115,6 +115,10 @@ Actions_Init :: proc() {
 	add({id = "view.viewport", category = "View", label = "Focus Viewport", chords = k(ch(._1, P)), scope = .Global, run = proc(s: ^EditorState) {imgui.SetWindowFocusStr("Viewport###ViewportWindow")}})
 	add({id = "view.code", category = "View", label = "Focus Code Editor", chords = k(ch(._2, P)), scope = .Global, run = proc(s: ^EditorState) {GlobalCode.focusRequest = true}, enabled = has_code})
 	add({id = "view.console", category = "View", label = "Focus Console", chords = k(ch(.J, P)), scope = .Global, run = proc(s: ^EditorState) {imgui.SetWindowFocusStr("Console###BottomPanelWindow")}})
+	add({id = "debug.continue", category = "Debug", label = "Continue", chords = k(ch(.F8)), scope = .Global, run = proc(s: ^EditorState) {Debug_Command("continue")}, enabled = proc(s: ^EditorState) -> bool {return Debug_IsStopped()}})
+	add({id = "debug.step_over", category = "Debug", label = "Step Over", chords = k(ch(.F10)), scope = .Global, run = proc(s: ^EditorState) {Debug_Command("step-over")}, enabled = proc(s: ^EditorState) -> bool {return Debug_IsStopped()}})
+	add({id = "debug.step_in", category = "Debug", label = "Step Into", chords = k(ch(.F11)), scope = .Global, run = proc(s: ^EditorState) {Debug_Command("step-in")}, enabled = proc(s: ^EditorState) -> bool {return Debug_IsStopped()}})
+	add({id = "debug.step_out", category = "Debug", label = "Step Out", chords = k(ch(.F11, SH)), scope = .Global, run = proc(s: ^EditorState) {Debug_Command("step-out")}, enabled = proc(s: ^EditorState) -> bool {return Debug_IsStopped()}})
 	add({id = "help.welcome", category = "Help", label = "Welcome", scope = .Global, run = Welcome_Open})
 	add({id = "help.shortcuts", category = "Help", label = "Keyboard Shortcuts", chords = k(ch(.K, PS)), scope = .Global, run = proc(s: ^EditorState) {showShortcutsWindow = true}})
 
