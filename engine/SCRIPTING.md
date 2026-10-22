@@ -392,6 +392,27 @@ Easing names: `linear`, `constant`, and `in_` / `out_` / `in_out_` + `sine`,
 `quad`, `cubic`, `quart`, `expo`, `back`, `elastic`, `bounce`. Animation
 track keys use the same curves (Animation tab: right-click a key > Easing).
 
+#### Animation events & crossfade
+
+An AnimationPlayer's timeline can hold **event tracks** next to its property
+tracks (Animation tab > Add Track > Events):
+
+- **Call Script Methods** - each key names a method; when the playhead
+  reaches the key's frame the target node's script runs `self:<method>(frame)`.
+- **Play Sounds** - each key names an audio file, played on that frame at
+  the SFX bus volume.
+
+```lua
+function Player:on_footstep(frame)   -- keyed on a "walk" method track
+    self.node:emit("footstep")
+end
+
+self.node:animation_play("run", 0.15)  -- crossfade from the current pose over 0.15 s
+```
+
+Crossfading blends the previous animation's property tracks into the new
+one's (frames switch immediately).
+
 #### Lighting (LightNode, scene ambient)
 
 Add **Light** nodes (point, or spot: the node's rotation is the direction)
@@ -493,7 +514,7 @@ end
 #### AnimationPlayerNode
 | Method | Parameters | Return | Description |
 |---|---|---|---|
-| `animation_play([name])` | `name?: string` | - | Starts or switches animation track. |
+| `animation_play([name [, blend]])` | `name?: string, blend?: number` | - | Starts or switches animation; `blend` crossfades from the current pose over that many seconds. |
 | `animation_stop()` | - | - | Stops animation and freezes frame. |
 | `animation_pause()` | - | - | Pauses animation playback. |
 | `animation_resume()` | - | - | Resumes paused animation. |

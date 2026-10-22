@@ -53,3 +53,20 @@ screenshot key_easing
 click @anim.stop
 key ctrl+s
 expect file:scenes/main.scene.json contains "keys": [[0, 0, 0, 0, 0, "out_quad"], [2, 90, 0, 0, 0]]
+
+# A method track: a key calls a script method when playback reaches it.
+click @anim.add-track
+click @anim.track-node:AnimationPlayer
+click @anim.track-methods
+expect item:anim.key:@call == visible
+click @anim.frame:2
+click @anim.key:@call
+expect item:anim.keyframe:@call:2 == visible
+rclick @anim.keyframe:@call:2
+click @anim.event-method
+key ctrl+a
+type on_footstep
+screenshot method_track
+click @anim.frame:1
+click @toolbar.save
+expect file:scenes/main.scene.json contains "property": "@call", "kind": "method", "keys": [[1, "on_footstep"]]

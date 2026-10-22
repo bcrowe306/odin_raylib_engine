@@ -207,6 +207,13 @@ script_call_method :: proc(mgr: ^ScriptManager, target: ^Node, method: string, v
 	lua.pop(L, 2) // self, errHandler
 }
 
+// Script_CallMethod calls `Target:method(value, target)` on a node's script
+// if it's ready and defines it (animation method tracks, ...).
+Script_CallMethod :: proc(mgr: ^ScriptManager, target: ^Node, method: string, value: EventValue) {
+	if mgr == nil || target == nil || !Node_IsAlive(target) do return
+	script_call_method(mgr, target, method, value, target)
+}
+
 // Signals_Dispatch runs a source node's saved connections for an event.
 Signals_Dispatch :: proc(mgr: ^ScriptManager, owner: ^Node, name: string, value: EventValue, ctx: ^GameContext) {
 	if len(owner.signalConnections) == 0 do return

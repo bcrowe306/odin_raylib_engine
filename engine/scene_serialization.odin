@@ -232,11 +232,20 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 					Json_String(w, tr.target)
 					strings.write_string(&w.sb, ", \"property\": ")
 					Json_String(w, tr.property)
+					if tr.kind == .Method do strings.write_string(&w.sb, ", \"kind\": \"method\"")
+					if tr.kind == .Audio do strings.write_string(&w.sb, ", \"kind\": \"audio\"")
 					strings.write_string(&w.sb, ", \"keys\": [")
 					for k, ki in tr.keys {
 						if ki > 0 do strings.write_string(&w.sb, ", ")
 						strings.write_byte(&w.sb, '[')
 						Json_Float(w, k.frame)
+						if tr.kind != .Property {
+							// Event keys: [frame, "method or sound"]
+							strings.write_string(&w.sb, ", ")
+							Json_String(w, k.text)
+							strings.write_byte(&w.sb, ']')
+							continue
+						}
 						for v in k.value {
 							strings.write_string(&w.sb, ", ")
 							Json_Float(w, v)
@@ -794,6 +803,10 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 						to, isObj := tv.(json.Object)
 						if !isObj do continue
 						track := Animation_AddTrack(apn, anim, sj_string(to, "target", "."), sj_string(to, "property", ""))
+						switch sj_string(to, "kind", "") {
+						case "method": track.kind = .Method
+						case "audio":  track.kind = .Audio
+						}
 						keys, _ := sj_arr(to, "keys")
 						for kv in keys {
 							ka, isArr := kv.(json.Array)
@@ -806,6 +819,11 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 								return 0
 							}
 							key := Track_Key{frame = num(ka[0])}
+							if text, isStr := ka[1].(json.String); isStr {
+								key.text = strings.clone(string(text), apn.allocator)
+								append(&track.keys, key)
+								continue
+							}
 							for i in 1 ..< min(len(ka), 5) do key.value[i - 1] = num(ka[i])
 							if len(ka) >= 6 {
 								if name, isStr := ka[5].(json.String); isStr do key.ease, _ = Ease_Parse(string(name))

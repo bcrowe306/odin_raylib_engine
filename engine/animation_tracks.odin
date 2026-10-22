@@ -24,11 +24,25 @@ Track_Key :: struct {
 	frame: f32,
 	value: [4]f32, // float: [0]; vec2: [0..1]; colour: rgba 0..255
 	ease:  Ease,   // curve from this key to the next (saved as a 6th element)
+	text:  string, // Method tracks: the method; Audio tracks: the sound path
 }
+
+// Property tracks interpolate values; Method and Audio tracks fire their
+// keys when playback reaches the key's frame (a script method on the
+// target, or a sound).
+Track_Kind :: enum {
+	Property,
+	Method,
+	Audio,
+}
+
+TRACK_METHOD_PROPERTY :: "@call"
+TRACK_AUDIO_PROPERTY :: "@audio"
 
 Property_Track :: struct {
 	target:   string, // relative node path ("." = the player)
-	property: string, // reflected property path
+	property: string, // reflected property path ("@call" / "@audio" for event tracks)
+	kind:     Track_Kind,
 	keys:     [dynamic]Track_Key,
 }
 
@@ -42,6 +56,26 @@ Animation_AddTrack :: proc(apn: ^AnimationPlayerNode, anim: ^Animation, target, 
 		keys     = make([dynamic]Track_Key, apn.allocator),
 	})
 	return &anim.tracks[len(anim.tracks) - 1]
+}
+
+// Animation_AddEventTrack adds (or finds) a Method or Audio track for target.
+Animation_AddEventTrack :: proc(apn: ^AnimationPlayerNode, anim: ^Animation, target: string, kind: Track_Kind) -> ^Property_Track {
+	prop := TRACK_METHOD_PROPERTY if kind == .Method else TRACK_AUDIO_PROPERTY
+	tr := Animation_AddTrack(apn, anim, target, prop)
+	tr.kind = kind
+	return tr
+}
+
+// Track_SetEventKey sets (or adds) an event key's text at `frame`.
+Track_SetEventKey :: proc(track: ^Property_Track, frame: f32, text: string, allocator := context.allocator) {
+	for &k in track.keys {
+		if math.abs(k.frame - frame) < 0.001 {
+			k.text = strings.clone(text, allocator)
+			return
+		}
+	}
+	append(&track.keys, Track_Key{frame = frame, text = strings.clone(text, allocator)})
+	slice.sort_by(track.keys[:], proc(a, b: Track_Key) -> bool {return a.frame < b.frame})
 }
 
 Animation_RemoveTrack :: proc(anim: ^Animation, index: int) {
@@ -139,23 +173,68 @@ Track_IsAnimatable :: proc(p: Node_Property) -> bool {
 	return false
 }
 
-// AnimationPlayerNode_ApplyTracks writes the current animation's track
-// values for `frame` into their target nodes (called while playing, and by
-// the editor when scrubbing).
+@(private = "file")
+track_target :: proc(apn: ^AnimationPlayerNode, track: ^Property_Track) -> ^Node {
+	if track.target == "" || track.target == "." do return apn
+	mgr: ^NodeManager
+	if apn.gameContext != nil && apn.gameContext.scene != nil do mgr = apn.gameContext.scene.manager
+	return Node_ResolvePath(mgr, apn, track.target) if mgr != nil else nil
+}
+
+// AnimationPlayerNode_ApplyTracks writes the current animation's property
+// track values for `frame` into their target nodes (called while playing,
+// and by the editor when scrubbing). While crossfading (Play with a blend
+// time), tracks the previous animation also has are blended from it.
 AnimationPlayerNode_ApplyTracks :: proc(apn: ^AnimationPlayerNode, frame: f32) {
 	anim := AnimationPlayerNode_GetAnimation(apn)
 	if anim == nil || len(anim.tracks) == 0 do return
-	mgr: ^NodeManager
-	if apn.gameContext != nil && apn.gameContext.scene != nil do mgr = apn.gameContext.scene.manager
+	blendW: f32 = 1
+	from := apn.blendFrom
+	if from != nil && apn.blendTime > 0 do blendW = clamp(apn.blendElapsed / apn.blendTime, 0, 1)
 	for &track in anim.tracks {
-		target: ^Node = apn
-		if track.target != "" && track.target != "." {
-			target = Node_ResolvePath(mgr, apn, track.target) if mgr != nil else nil
-		}
+		if track.kind != .Property do continue
+		target := track_target(apn, &track)
 		if target == nil do continue
 		p, found := Track_FindProperty(target, track.property)
 		if !found do continue
-		if v, ok := Track_Sample(&track, frame); ok do Property_SetTrackValue(p, v)
+		v, ok := Track_Sample(&track, frame)
+		if !ok do continue
+		if from != nil && blendW < 1 {
+			for &old in from.tracks {
+				if old.kind != .Property || old.target != track.target || old.property != track.property do continue
+				if ov, ook := Track_Sample(&old, apn.blendFromFrame); ook do v = ov + (v - ov) * blendW
+				break
+			}
+		}
+		Property_SetTrackValue(p, v)
+	}
+}
+
+// AnimationPlayerNode_FireEvents runs the Method and Audio keys on `frame`
+// (playback reached it; scrubbing in the editor doesn't fire them).
+AnimationPlayerNode_FireEvents :: proc(apn: ^AnimationPlayerNode, frame: int) {
+	anim := AnimationPlayerNode_GetAnimation(apn)
+	if anim == nil do return
+	ctx := apn.gameContext
+	for &track in anim.tracks {
+		if track.kind == .Property do continue
+		for &k in track.keys {
+			if int(k.frame) != frame || k.text == "" do continue
+			switch track.kind {
+			case .Property:
+			case .Method:
+				target := track_target(apn, &track)
+				if target == nil || ctx == nil || ctx.scriptManager == nil do continue
+				Script_CallMethod(ctx.scriptManager, target, k.text, frame)
+			case .Audio:
+				if ctx == nil || ctx.game == nil || !rl.IsAudioDeviceReady() do continue
+				rm := &ctx.game.resourceManager
+				if s, ok := rm.loadAudioSound(rm, Project_ResolveAssetPath(ctx, k.text)); ok {
+					rl.SetSoundVolume(s.sound, Game_BusVolume(ctx, false))
+					rl.PlaySound(s.sound)
+				}
+			}
+		}
 	}
 }
 

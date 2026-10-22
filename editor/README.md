@@ -174,6 +174,11 @@ Right-click a key for its **Easing** to the next key (linear, sine, quad,
 cubic, quart, expo, back, elastic, bounce, constant; hover one to see its
 curve) or to delete it. Eased keys show a dot. Scripts can animate any
 property at runtime with `Tween.to` (see `engine/SCRIPTING.md`).
+**Add Track > Events** adds a **Call Script Methods** track (the key's
+method runs on the target's script on that frame; type the name in the key
+field) or a **Play Sounds** track (pick an audio file per key). Event keys
+are drawn as squares (methods) or circles (sounds); hover one for its method or sound. Scripts
+crossfade between animations with `node:animation_play(name, blend)`.
 
 ### Materials & shaders
 

@@ -1133,13 +1133,10 @@ lua_node_animation_play :: proc "c" (L: ^lua.State) -> c.int {
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AnimationPlayerNode do return 0
 	apn := cast(^AnimationPlayerNode)node
-	if lua.gettop(L) >= 2 {
-		nameC := lua.tostring(L, 2)
-		if nameC != nil {
-			AnimationPlayerNode_SetAnimationByName(apn, string(nameC))
-		}
-	}
-	AnimationPlayerNode_Start(apn)
+	// animation_play([name [, blend_seconds]]): blend crossfades property tracks.
+	name := string(lua.tostring(L, 2)) if lua.type(L, 2) == .STRING else ""
+	blend := f32(lua.tonumber(L, 3)) if lua.type(L, 3) == .NUMBER else 0
+	AnimationPlayerNode_Play(apn, name, blend)
 	return 0
 }
 

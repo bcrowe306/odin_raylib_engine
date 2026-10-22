@@ -261,6 +261,19 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				}
 				Drive_Item(fmt.tprintf("anim.track-prop:%s", pname))
 			}
+			imgui.SeparatorText("Events")
+			target := e.Node_RelativePath(mgr, apn, panel.trackNode)
+			if imgui.MenuItem(fmt.ctprintf("%s  Call Script Methods", ICON_FA_CODE)) {
+				Editor_RecordUndo(state, "Add track")
+				e.Animation_AddEventTrack(apn, anim, target, .Method)
+			}
+			Drive_Item("anim.track-methods")
+			UI_Tooltip("Keys call a method on this node's script when playback reaches them")
+			if imgui.MenuItem(fmt.ctprintf("%s  Play Sounds", ICON_FA_MUSIC)) {
+				Editor_RecordUndo(state, "Add track")
+				e.Animation_AddEventTrack(apn, anim, target, .Audio)
+			}
+			Drive_Item("anim.track-sounds")
 		}
 		imgui.EndPopup()
 	}
@@ -409,12 +422,29 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, y}, {x0 + f32(length) * CELL_W, y + ROW_H - 2}, col_u32({1, 1, 1, 0.025}), 3)
 		target: ^e.Node = apn
 		if tr.target != "." && tr.target != "" do target = e.Node_ResolvePath(mgr, apn, tr.target)
-		name := tr.property if tr.target == "." else fmt.tprintf("%s.%s", tr.target, tr.property)
+		prop := tr.property
+		if tr.kind == .Method do prop = "calls()"
+		if tr.kind == .Audio do prop = "sounds"
+		name := prop if tr.target == "." else fmt.tprintf("%s.%s", tr.target, prop)
 		label(dl, origin.x + scrollX, y + 6, name, UI_TEXT if target != nil else UI_DANGER)
 		imgui.PushIDInt(c.int(ti) + 1000)
 		// Row buttons (fixed at the left).
 		imgui.SetCursorScreenPos({origin.x + scrollX + LABEL_W - 56, y + 2})
-		if UI_IconButton(ICON_FA_CIRCLE, fmt.tprintf("anim.key:%s", tr.property), "Key the current value at the playhead", size = 24, tint = UI_WARNING) && target != nil {
+		keyTip := "Key the current value at the playhead"
+		if tr.kind == .Method do keyTip = "Call a method at the playhead (right-click the key to name it)"
+		if tr.kind == .Audio do keyTip = "Play a sound at the playhead (right-click the key to pick it)"
+		keyClicked := UI_IconButton(ICON_FA_CIRCLE, fmt.tprintf("anim.key:%s", tr.property), keyTip, size = 24, tint = UI_WARNING)
+		if keyClicked && tr.kind != .Property {
+			Editor_RecordUndo(state, "Add event key")
+			text := "on_animation_event"
+			if tr.kind == .Audio {
+				audio := Editor_ListProjectFiles(state, "", AUDIO_EXTS)
+				text = audio[0] if len(audio) > 0 else ""
+			}
+			// The previous key's text is the likely next one.
+			for k in tr.keys do if k.frame < f32(rel) && k.text != "" do text = k.text
+			e.Track_SetEventKey(&tr, f32(rel), text, apn.allocator)
+		} else if keyClicked && target != nil {
 			if p, ok := e.Track_FindProperty(target, tr.property); ok {
 				if v, vok := e.Property_GetTrackValue(p); vok {
 					Editor_RecordUndo(state, "Set key")
@@ -434,11 +464,22 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			pts := [4][2]f32{{cx, cy - r}, {cx + r, cy}, {cx, cy + r}, {cx - r, cy}}
 			hot := point_in_rect(mouse, {cx - r, cy - r}, {cx + r, cy + r})
 			col := col_u32(UI_WARNING if !hot else {1, 0.85, 0.5, 1})
-			imgui.DrawList_AddQuadFilled(dl, pts[0], pts[1], pts[2], pts[3], col)
+			if tr.kind == .Property {
+				imgui.DrawList_AddQuadFilled(dl, pts[0], pts[1], pts[2], pts[3], col)
+			} else {
+				// Event keys: a square (method) or a circle (sound).
+				ec := col_u32({0.55, 0.75, 1, 1} if !hot else {0.75, 0.88, 1, 1})
+				if tr.kind == .Method do imgui.DrawList_AddRectFilled(dl, {cx - r + 1, cy - r + 1}, {cx + r - 1, cy + r - 1}, ec, 2)
+				else do imgui.DrawList_AddCircleFilled(dl, {cx, cy}, r - 1, ec)
+			}
 			if k.ease != .Linear do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
 			Drive_ItemRect(fmt.tprintf("anim.keyframe:%s:%d", tr.property, int(k.frame) + 1), {cx - r, cy - r}, {cx + r, cy + r})
 			if hot {
-				imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %.2f %.2f %.2f %.2f\nEasing to the next key: %s  (right-click: easing, delete)", int(k.frame) + 1, k.value[0], k.value[1], k.value[2], k.value[3], e.Ease_Name(k.ease)))
+				switch tr.kind {
+				case .Property: imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %.2f %.2f %.2f %.2f\nEasing to the next key: %s  (right-click: easing, delete)", int(k.frame) + 1, k.value[0], k.value[1], k.value[2], k.value[3], e.Ease_Name(k.ease)))
+				case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: calls %s:%s(frame)  (right-click: edit, delete)", int(k.frame) + 1, tr.target, k.text))
+				case .Audio:    imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: plays %s  (right-click: edit, delete)", int(k.frame) + 1, k.text))
+				}
 				if imgui.IsMouseClicked(.Left) do scrub(state, apn, anim, int(k.frame))
 				if imgui.IsMouseClicked(.Right) {
 					keyMenu = {ti, k.frame}
@@ -452,7 +493,23 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			if key != nil {
 				UI_DimText(fmt.tprintf("Key at frame %d", int(key.frame) + 1))
 				imgui.Separator()
-				if imgui.BeginMenu(fmt.ctprintf("%s  Easing: %s", ICON_FA_WAVE_SQUARE, e.Ease_Name(key.ease))) {
+				if tr.kind == .Method {
+					buf: [128]u8
+					copy(buf[:len(buf) - 1], key.text)
+					imgui.SetNextItemWidth(220)
+					if imgui.InputTextWithHint("##method", "method name", cstring(raw_data(buf[:])), len(buf), {.AutoSelectAll}) {
+						key.text = strings.clone(string(cstring(raw_data(buf[:]))), apn.allocator)
+					}
+					if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
+					Drive_Item("anim.event-method")
+					UI_DimText("Called on the target's script: method(frame)")
+				} else if tr.kind == .Audio {
+					if path, ok := asset_picker("anim.event-sound", key.text, Editor_ListProjectFiles(state, "", AUDIO_EXTS), allowNone = false); ok {
+						Editor_RecordUndo(state, "Event key")
+						key.text = strings.clone(path, apn.allocator)
+					}
+				}
+				if tr.kind == .Property && imgui.BeginMenu(fmt.ctprintf("%s  Easing: %s", ICON_FA_WAVE_SQUARE, e.Ease_Name(key.ease))) {
 					for ease in e.Ease {
 						if imgui.MenuItem(strings.clone_to_cstring(e.Ease_Name(ease), context.temp_allocator), nil, ease == key.ease) {
 							Editor_RecordUndo(state, "Key easing")

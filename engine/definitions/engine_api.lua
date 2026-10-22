@@ -484,8 +484,12 @@ function Node:texture_get_path() end
 -- ----------------------------------------------------------------------------
 
 ---Plays an animation, optionally switching to the specified animation name first.
+---With `blend` > 0 the previous pose crossfades into the new animation over that many seconds.
+---Event tracks fire while playing: method tracks call `self:<method>(frame)` on the
+---track's target node script; sound tracks play their audio file on the key's frame.
 ---@param name? string Animation name
-function Node:animation_play(name) end
+---@param blend? number Crossfade time in seconds (default 0)
+function Node:animation_play(name, blend) end
 
 ---Stops animation playback and freezes at current frame.
 function Node:animation_stop() end

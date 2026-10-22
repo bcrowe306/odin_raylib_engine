@@ -20,6 +20,12 @@ AnimationPlayerNode :: struct {
 	// Animations added with AddFrameAnimation/AddSheetAnimation are owned
 	// (freed with the node); AddAnimation keeps caller-owned ones as is.
 	owned: [dynamic]^Animation,
+	// Crossfade (AnimationPlayerNode_Play with a blend time): property tracks
+	// shared with the previous animation blend from it.
+	blendFrom:      ^Animation,
+	blendFromFrame: f32,
+	blendTime:      f32,
+	blendElapsed:   f32,
 }
 
 AnimationPlayerNode_AddAnimation :: proc(animationPlayer: ^AnimationPlayerNode, animation: ^Animation) {
@@ -106,6 +112,7 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 			apn.currentFrame += 1
 		}
 	}
+	if a.tracks != nil do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
 	// A non-looping animation that reached its last frame finishes once.
 	atEnd := apn.currentFrame <= a.startFrame if apn.reverse else apn.currentFrame >= a.endFrame
 	if !a.loop && atEnd && !apn.finishedNotified {
@@ -170,6 +177,10 @@ AnimationPlayerNode_AddSheetAnimation :: proc(apn: ^AnimationPlayerNode, rm: ^Re
 AnimationPlayerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	apn := cast(^AnimationPlayerNode)node
 	apn.ticker->process()
+	if apn.blendFrom != nil {
+		apn.blendElapsed += deltaTime
+		if apn.blendElapsed >= apn.blendTime do apn.blendFrom = nil
+	}
 	if a := AnimationPlayerNode_GetAnimation(apn); a != nil && len(a.tracks) > 0 {
 		AnimationPlayerNode_ApplyTracks(apn, f32(apn.currentFrame - a.startFrame))
 	}
@@ -188,8 +199,27 @@ AnimationPlayerNode_Start :: proc(apn: ^AnimationPlayerNode) {
 	apn.finishedNotified = false
 	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
 		apn.currentFrame = a.endFrame if apn.reverse else a.startFrame
+		if a.tracks != nil do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
 	}
 	apn.ticker->start(true)
+}
+
+// AnimationPlayerNode_Play switches to an animation (by name) and starts
+// it; with blend > 0 its property tracks crossfade from the current
+// animation's values over `blend` seconds.
+AnimationPlayerNode_Play :: proc(apn: ^AnimationPlayerNode, name: string, blend: f32 = 0) {
+	prev := AnimationPlayerNode_GetAnimation(apn)
+	prevFrame := f32(apn.currentFrame - prev.startFrame) if prev != nil else 0
+	if name != "" do AnimationPlayerNode_SetAnimationByName(apn, name)
+	next := AnimationPlayerNode_GetAnimation(apn)
+	apn.blendFrom = nil
+	if blend > 0 && prev != nil && prev != next && len(prev.tracks) > 0 {
+		apn.blendFrom = prev
+		apn.blendFromFrame = prevFrame
+		apn.blendTime = blend
+		apn.blendElapsed = 0
+	}
+	AnimationPlayerNode_Start(apn)
 }
 AnimationPlayerNode_Stop :: proc(apn: ^AnimationPlayerNode) {
 	apn.ticker->stop()
