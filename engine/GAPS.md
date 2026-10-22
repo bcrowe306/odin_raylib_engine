@@ -208,6 +208,7 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 | Play-in-editor | Editor link (`--editor-link`, stdin commands / `@ore:` replies: tree, inspect, set, pause, resume, step, reload-scene), Game tab with the running game's tree, live editable properties, pause / one-frame step (frozen frames still draw); saved scenes reload in the game; images hot reload (game and editor), scripts already did; `Scene.reload` / changing to the current scene restarts it (it used to do nothing) (`test_editor_link`, `remote_game` drive) |
 | Workspaces | Layout presets built with the dock builder (Default, Level Design, Scripting, Animation), user workspaces saved / loaded as ImGui layout text, Reset Layout (`workspaces` drive) |
 | Welcome & templates | Welcome window (recent projects, open, first steps, show at startup), new projects from Empty / Platformer / Top-down / Menu templates with generated placeholder images (each verified to play), a distinct icon per node type, empty-state hints (scene tree, viewport, console) (`welcome` drive) |
+| Typed Lua nodes | A definitions class per node type (`---@class CameraNode : Node`, mixins `TextHolder` / `NavGrid`) holding its own methods; generated overloads of `Scene.find_node` / `Node:get_child` per project node name returning its type; `self.node` typed per script by the nodes it is attached to (`lua_node_types` drive) |
 
 ## Performance baselines
 

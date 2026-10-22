@@ -5,4 +5,4 @@ wait 5
 expect file:.luarc.json contains "workspace.library": [".ore/definitions"]
 expect file:.luarc.json contains "Lua 5.4"
 expect file:.ore/definitions/engine_api.lua contains ---@class CameraModule
-expect file:.ore/definitions/engine_api.lua contains function Node:character_move_and_slide
+expect file:.ore/definitions/engine_api.lua contains function CharacterMoverNode:character_move_and_slide

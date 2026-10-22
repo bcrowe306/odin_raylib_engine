@@ -20,6 +20,10 @@ import lsp "../odin_editor/lsp"
 //   ScenePath, TexturePath, AudioPath, ComponentPath, LevelPath, ScriptPath
 //   NodeName      node names in the project's scenes and components
 //   NodeTag       tags used on those nodes (node:add_tag, Scene.find_by_tag)
+//   overloads of Scene.find_node / node:get_child per node
+//   name, returning that node's type (TextureNode, CameraNode...), so its
+//   own methods complete; a script's `self.node` has the type of the nodes
+//   it is attached to
 //   NodeEvent     (engine) + the project's custom events aren't known
 //   LdtkEntity, LdtkLevel, LdtkLayer, LdtkEnumName, LdtkEnum_<Name>
 //   one class per script with its exported properties, so `self.speed` is
@@ -73,16 +77,42 @@ sorted_unique :: proc(list: ^[dynamic]string) -> []string {
 	return out[:]
 }
 
-// node_names collects the "name" (and "tags") of every node of a
+// Node types seen per node name and per attached script ("" once two
+// differ: plain Node).
+@(private = "file")
+Node_Types_Seen :: struct {
+	byName:   map[string]string,
+	byScript: map[string]string,
+}
+
+@(private = "file")
+note_type :: proc(m: ^map[string]string, key, type: string) {
+	if old, seen := m[key]; seen {
+		if old != type do m[key] = ""
+	} else {
+		m[key] = type
+	}
+}
+
+// node_names collects the "name" (and "tags", types) of every node of a
 // scene/component JSON.
 @(private = "file")
-node_names :: proc(v: json.Value, out: ^[dynamic]string, tags: ^[dynamic]string) {
+node_names :: proc(v: json.Value, out: ^[dynamic]string, tags: ^[dynamic]string, types: ^Node_Types_Seen = nil) {
 	obj, ok := v.(json.Object)
 	if !ok do return
-	if n, isStr := obj["name"].(json.String); isStr do append(out, string(n))
+	name, hasName := obj["name"].(json.String)
+	if hasName do append(out, string(name))
+	if types != nil {
+		t := string(obj["type"].(json.String) or_else "Node")
+		if info, found := e.Node_TypeInfoByName(t); found do t = info.name
+		if hasName do note_type(&types.byName, string(name), t)
+		if sc, isObj := obj["script"].(json.Object); isObj {
+			if path, isStr := sc["path"].(json.String); isStr do note_type(&types.byScript, string(path), t)
+		}
+	}
 	if ts, has := obj["tags"].(json.Array); has do for t in ts do if s, isStr := t.(json.String); isStr do append(tags, string(s))
-	if kids, has := obj["children"].(json.Array); has do for k in kids do node_names(k, out, tags)
-	if inner, has := obj["node"].(json.Object); has do node_names(inner, out, tags)
+	if kids, has := obj["children"].(json.Array); has do for k in kids do node_names(k, out, tags, types)
+	if inner, has := obj["node"].(json.Object); has do node_names(inner, out, tags, types)
 }
 
 // script_class: the class a script declares (---@class X, else the table
@@ -154,6 +184,9 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	sceneNames := make([dynamic]string, context.temp_allocator)
 	nodeNames := make([dynamic]string, context.temp_allocator)
 	nodeTags := make([dynamic]string, context.temp_allocator)
+	types: Node_Types_Seen
+	types.byName = make(map[string]string, allocator = context.temp_allocator)
+	types.byScript = make(map[string]string, allocator = context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "", {".scene.json"}) {
 		append(&scenePaths, rel)
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
@@ -165,7 +198,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		if n, ok := root["name"].(json.String); ok do append(&sceneNames, string(n))
 		if r, ok := root["root"]; ok {
 			if ro, isObj := r.(json.Object); isObj {
-				if kids, has := ro["children"].(json.Array); has do for k in kids do node_names(k, &nodeNames, &nodeTags)
+				if kids, has := ro["children"].(json.Array); has do for k in kids do node_names(k, &nodeNames, &nodeTags, &types)
 			}
 		}
 	}
@@ -174,7 +207,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		append(&components, rel)
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
-			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None do node_names(val, &nodeNames, &nodeTags)
+			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None do node_names(val, &nodeNames, &nodeTags, &types)
 		}
 	}
 	alias(&sb, "SceneName", "Scene names (Scene.change_scene)", sorted_unique(&sceneNames))
@@ -182,6 +215,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	alias(&sb, "NodeName", "Node names in the project's scenes and components", sorted_unique(&nodeNames))
 	alias(&sb, "NodeTag", "Tags used in the project's scenes and components", sorted_unique(&nodeTags))
 	alias(&sb, "ComponentPath", "Component files", sorted_unique(&components))
+	typed_lookups(&sb, &types.byName)
 	list :: proc(state: ^EditorState, exts: []string) -> []string {
 		l := make([dynamic]string, context.temp_allocator)
 		for f in Editor_ListProjectFiles(state, "", exts) do append(&l, f)
@@ -234,8 +268,11 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		cls := script_class(string(data))
 		if cls == "" do continue
 		mod, ok := e.ScriptManager_LoadModule(rel, sm)
-		if !ok || mod == nil || len(mod.properties) == 0 do continue
+		nodeType := types.byScript[rel] or_else ""
+		if (!ok || mod == nil || len(mod.properties) == 0) && nodeType == "" do continue
 		fmt.sbprintf(&sb, "\n-- %s\n---@class %s\n", rel, cls)
+		if nodeType != "" do fmt.sbprintf(&sb, "---@field node %s The node this script is attached to.\n", nodeType)
+		if !ok || mod == nil do continue
 		for p in mod.properties {
 			t := lua_type_of(p)
 			doc := p.label if p.label != "" else ""
@@ -271,4 +308,23 @@ Lua_WriteProjectTypes :: proc(state: ^EditorState) {
 		msg := lsp.encode_notification("workspace/didChangeWatchedFiles", Params{changes = events}, context.temp_allocator)
 		lsp.client_send_raw(&cm.client, msg)
 	}
+}
+
+// typed_lookups: overloads returning each named node's type (names whose
+// nodes all have the same, non-plain type).
+@(private = "file")
+typed_lookups :: proc(sb: ^strings.Builder, byName: ^map[string]string) {
+	names := make([dynamic]string, context.temp_allocator)
+	for n, t in byName do if t != "" && t != "Node" do append(&names, n)
+	if len(names) == 0 do return
+	slice.sort(names[:])
+	overloads :: proc(sb: ^strings.Builder, names: []string, byName: ^map[string]string, param: string) {
+		for n in names do fmt.sbprintf(sb, "---@overload fun(%s: %q): %s\n", param, n, byName[n])
+	}
+	strings.write_string(sb, "\n-- Nodes by name: these return the node's own type, so its methods complete.\n---@class SceneModule\nlocal SceneModule = {}\n")
+	overloads(sb, names[:], byName, "name")
+	strings.write_string(sb, "---@param name NodeName|string\n---@return Node?\nfunction SceneModule.find_node(name) end\n")
+	strings.write_string(sb, "\n---@class Node\nlocal Node = {}\n")
+	for n in names do fmt.sbprintf(sb, "---@overload fun(self: Node, name: %q): %s\n", n, byName[n])
+	strings.write_string(sb, "---@param name NodeName|string\n---@return Node?\nfunction Node:get_child(name) end\n")
 }

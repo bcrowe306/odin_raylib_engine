@@ -15,6 +15,153 @@
 ---Represents an engine scene hierarchy node with transform, lifecycle, and optional physics.
 local Node = {}
 
+-- --- Node types: each has the Node methods plus its own --------------------------
+
+---Nodes that show text (TextNode, UILabelNode, UIButtonNode).
+---@class TextHolder
+local TextHolder = {}
+
+---Nodes with a walkable grid (TileMapNode, LdtkLevelNode).
+---@class NavGrid
+local NavGrid = {}
+
+---The camera the scene is seen through (follow, zoom, shake, limits).
+---@class CameraNode : Node
+local CameraNode = {}
+
+---Counts down and raises "timeout".
+---@class TimerNode : Node
+local TimerNode = {}
+
+---@class ScriptNode : Node
+
+---A sprite: draws an image.
+---@class TextureNode : Node
+local TextureNode = {}
+
+---@class FrameAnimationNode : Node
+
+---Plays frame / sprite-sheet animations with property tracks.
+---@class AnimationPlayerNode : Node
+local AnimationPlayerNode = {}
+
+---A finite state machine.
+---@class StateMachineNode : Node
+local StateMachineNode = {}
+
+---A particle effect.
+---@class ParticleEmitterNode : Node
+local ParticleEmitterNode = {}
+
+---A sound effect.
+---@class SoundNode : Node
+local SoundNode = {}
+
+---Streamed music.
+---@class MusicNode : Node
+local MusicNode = {}
+
+---@class StaticBodyNode : Node
+
+---A physics body moved by forces and collisions.
+---@class DynamicBodyNode : Node
+local DynamicBodyNode = {}
+
+---A character controller (move and slide, floors, walls).
+---@class CharacterMoverNode : Node
+local CharacterMoverNode = {}
+
+---A sensor: reports bodies that overlap it.
+---@class AreaNode : Node
+local AreaNode = {}
+
+---A ray that reports what it hits.
+---@class RaycastNode : Node
+local RaycastNode = {}
+
+---An LDtk level (layers, entities, IntGrid).
+---@class LdtkLevelNode : Node, NavGrid
+local LdtkLevelNode = {}
+
+---A painted tile map.
+---@class TileMapNode : Node, NavGrid
+
+---A 2D point or spot light.
+---@class LightNode : Node
+local LightNode = {}
+
+---@class JointNode : Node
+
+---Text in the world (fonts, rich text, typewriter).
+---@class TextNode : Node, TextHolder
+local TextNode = {}
+
+---A dialogue box that types out lines.
+---@class DialogueNode : Node
+local DialogueNode = {}
+
+---@class NineSliceNode : Node
+
+---@class ParallaxNode : Node
+
+---A polyline.
+---@class LineNode : Node
+local LineNode = {}
+
+---A fading ribbon behind a moving node.
+---@class TrailNode : Node
+local TrailNode = {}
+
+---@class PostEffectNode : Node
+
+---@class UIContainerNode : Node
+
+---@class UILabelNode : Node, TextHolder
+
+---@class UIButtonNode : Node, TextHolder
+
+---@class UISliderNode : Node
+
+---@class UICheckboxNode : Node
+
+---@class UIProgressBarNode : Node
+
+---@class UITextInputNode : Node
+
+---@class UIDropdownNode : Node
+
+---@class UIRadioGroupNode : Node
+
+---@class UIToggleSwitchNode : Node
+
+---@class UIKnobNode : Node
+
+---@class UINotchedSliderNode : Node
+
+---@class UIVolumeFaderNode : Node
+
+---@class UIVolumeMeterNode : Node
+
+---@class UISeparatorNode : Node
+
+---@class UIXYPlotNode : Node
+
+---@class UIListViewNode : Node
+
+---@class UITreeViewNode : Node
+
+---@class UIUnorderedListNode : Node
+
+---@class UIOrderedListNode : Node
+
+---@class UITableNode : Node
+
+---@class UIIconNode : Node
+
+---@class UIToolbarNode : Node
+
+---@class UITabContainerNode : Node
+
 ---Gets the concrete runtime type of the node (e.g. "Node", "TextureNode", "DynamicBodyNode", "CameraNode").
 ---@return string
 function Node:get_type() end
@@ -69,7 +216,7 @@ function Node:set_scale(sx, sy) end
 ---the file can't be loaded.
 ---@param path TexturePath|string Project-relative texture path
 ---@return boolean ok
-function Node:set_texture(path) end
+function TextureNode:set_texture(path) end
 
 ---Gets the world-space global position of the node calculated from parent transforms.
 ---@return number x Global world X position
@@ -200,62 +347,62 @@ function Node:emit(event, value) end
 ---Applies a continuous force to this node (requires DynamicBodyNode).
 ---@param fx number Force X in Newtons
 ---@param fy number Force Y in Newtons
-function Node:apply_force(fx, fy) end
+function DynamicBodyNode:apply_force(fx, fy) end
 
 ---Applies an instantaneous impulse to this node (requires DynamicBodyNode).
 ---@param ix number Impulse X
 ---@param iy number Impulse Y
-function Node:apply_impulse(ix, iy) end
+function DynamicBodyNode:apply_impulse(ix, iy) end
 
 ---Gets the linear velocity of the physics body or character mover in world units per second.
 ---@return number vx Linear velocity X
 ---@return number vy Linear velocity Y
-function Node:get_linear_velocity() end
+function DynamicBodyNode:get_linear_velocity() end
 
 ---Sets the linear velocity of the physics body or character mover directly.
 ---@param vx number Linear velocity X
 ---@param vy number Linear velocity Y
-function Node:set_linear_velocity(vx, vy) end
+function DynamicBodyNode:set_linear_velocity(vx, vy) end
 
 ---Gets the angular velocity of the physics body in degrees per second.
 ---@return number omega Angular velocity in degrees/sec
-function Node:get_angular_velocity() end
+function DynamicBodyNode:get_angular_velocity() end
 
 ---Sets the angular velocity of the physics body in degrees per second.
 ---@param omega number Angular velocity in degrees/sec
-function Node:set_angular_velocity(omega) end
+function DynamicBodyNode:set_angular_velocity(omega) end
 
 ---Gets the gravity scale multiplier for this physics body.
 ---@return number
-function Node:get_gravity_scale() end
+function DynamicBodyNode:get_gravity_scale() end
 
 ---Sets the gravity scale multiplier for this physics body.
 ---@param scale number
-function Node:set_gravity_scale(scale) end
+function DynamicBodyNode:set_gravity_scale(scale) end
 
 ---Checks whether rotation is locked on this body.
 ---@return boolean
-function Node:is_fixed_rotation() end
+function DynamicBodyNode:is_fixed_rotation() end
 
 ---Locks or unlocks rotation on this physics body.
 ---@param fixed boolean
-function Node:set_fixed_rotation(fixed) end
+function DynamicBodyNode:set_fixed_rotation(fixed) end
 
 ---Sets the linear drag/damping coefficient.
 ---@param damping number
-function Node:set_linear_damping(damping) end
+function DynamicBodyNode:set_linear_damping(damping) end
 
 ---Sets the angular drag/damping coefficient.
 ---@param damping number
-function Node:set_angular_damping(damping) end
+function DynamicBodyNode:set_angular_damping(damping) end
 
 ---Checks if the physics body is awake and participating in simulation.
 ---@return boolean
-function Node:is_awake() end
+function DynamicBodyNode:is_awake() end
 
 ---Wakes up or puts the body to sleep.
 ---@param awake boolean
-function Node:set_awake(awake) end
+function DynamicBodyNode:set_awake(awake) end
 
 -- ----------------------------------------------------------------------------
 -- Materials (any node): shader, blend mode, shader parameters
@@ -304,18 +451,18 @@ function Node:set_blend_mode(mode) end
 ---@param r number
 ---@param g number
 ---@param b number
-function Node:light_set_color(r, g, b) end
+function LightNode:light_set_color(r, g, b) end
 
 ---Sets the light's energy (brightness multiplier, 0..8).
 ---@param energy number
-function Node:light_set_energy(energy) end
+function LightNode:light_set_energy(energy) end
 
 ---@return number energy
-function Node:light_get_energy() end
+function LightNode:light_get_energy() end
 
 ---Sets the light's radius (world units).
 ---@param radius number
-function Node:light_set_radius(radius) end
+function LightNode:light_set_radius(radius) end
 
 -- ----------------------------------------------------------------------------
 -- Properties (any node) and collision layers (body nodes)
@@ -341,13 +488,13 @@ function Node:set_pause_mode(mode) end
 
 ---Sets the text of a TextNode (restarting its typewriter), UI label or button.
 ---@param text string
-function Node:set_text(text) end
+function TextHolder:set_text(text) end
 
 ---@return string
-function Node:get_text() end
+function TextHolder:get_text() end
 
 ---TextNode: types the text out again (revealSpeed > 0).
-function Node:text_restart() end
+function TextNode:text_restart() end
 
 ---@class DialogueLine
 ---@field speaker? string
@@ -359,30 +506,30 @@ function Node:text_restart() end
 ---Events: "line_shown"(index), "finished".
 ---@param lines string|(string|DialogueLine)[]
 ---@param speaker? string
-function Node:dialogue_show(lines, speaker) end
+function DialogueNode:dialogue_show(lines, speaker) end
 
 ---Shows the rest of the line, else the next one.
-function Node:dialogue_next() end
+function DialogueNode:dialogue_next() end
 
-function Node:dialogue_close() end
+function DialogueNode:dialogue_close() end
 
 ---@return boolean
-function Node:dialogue_is_open() end
+function DialogueNode:dialogue_is_open() end
 
 ---LineNode: replaces its points (local to the node).
 ---@param points number[][] { {x, y}, ... }
-function Node:line_set_points(points) end
+function LineNode:line_set_points(points) end
 
 ---LineNode: appends a point (local to the node).
 ---@param x number
 ---@param y number
-function Node:line_add_point(x, y) end
+function LineNode:line_add_point(x, y) end
 
 ---LineNode: removes every point.
-function Node:line_clear() end
+function LineNode:line_clear() end
 
 ---TrailNode: drops the recorded ribbon (e.g. after a teleport).
-function Node:trail_clear() end
+function TrailNode:trail_clear() end
 
 ---@class NavOptions
 ---@field diagonal? boolean 8 directions (default true); no cutting past blocked corners
@@ -398,14 +545,14 @@ function Node:trail_clear() end
 ---@param y2 number
 ---@param opts? NavOptions
 ---@return number[][]? path { {x, y}, ... }
-function Node:nav_find_path(x1, y1, x2, y2, opts) end
+function NavGrid:nav_find_path(x1, y1, x2, y2, opts) end
 
 ---Whether the grid cell at a world position is walkable.
 ---@param x number
 ---@param y number
 ---@param opts? NavOptions
 ---@return boolean
-function Node:nav_is_walkable(x, y, opts) end
+function NavGrid:nav_is_walkable(x, y, opts) end
 
 ---Reads an Inspector property by its path (vectors and colours as tables).
 ---@param path string
@@ -433,37 +580,37 @@ function Node:set_collision_mask(...) end
 ---Sets a parameter that transition conditions test (booleans become 1 / 0).
 ---@param name string
 ---@param value number|boolean
-function Node:sm_set(name, value) end
+function StateMachineNode:sm_set(name, value) end
 
 ---@param name string
 ---@return number value
-function Node:sm_get(name) end
+function StateMachineNode:sm_get(name) end
 
 ---Sets a trigger: it stays set until a transition that tests it fires.
 ---@param name string
-function Node:sm_trigger(name) end
+function StateMachineNode:sm_trigger(name) end
 
 ---Switches to a state now, ignoring conditions.
 ---@param state string
 ---@param blend? number Crossfade seconds for the state's animation
 ---@return boolean ok false when there is no such state
-function Node:sm_travel(state, blend) end
+function StateMachineNode:sm_travel(state, blend) end
 
 ---@return string state The current state ("" before it starts)
-function Node:sm_state() end
+function StateMachineNode:sm_state() end
 
 ---@return string state The state before the current one
-function Node:sm_previous() end
+function StateMachineNode:sm_previous() end
 
 ---@return number seconds Time spent in the current state
-function Node:sm_time() end
+function StateMachineNode:sm_time() end
 
 ---Starts (or restarts) in a state, or in the initial state.
 ---@param state? string
-function Node:sm_start(state) end
+function StateMachineNode:sm_start(state) end
 
 ---Stops checking transitions (the current state stays).
-function Node:sm_stop() end
+function StateMachineNode:sm_stop() end
 
 -- ----------------------------------------------------------------------------
 -- CharacterMoverNode Methods
@@ -481,74 +628,74 @@ function Node:sm_stop() end
 ---Switches the node to Script mode.
 ---@param dt? number Defaults to the frame's delta time
 ---@return boolean collided
-function Node:character_move_and_slide(dt) end
+function CharacterMoverNode:character_move_and_slide(dt) end
 
 ---Gets the velocity in pixels per second (+y is down).
 ---@return number vx
 ---@return number vy
-function Node:character_get_velocity() end
+function CharacterMoverNode:character_get_velocity() end
 
 ---Sets the velocity in pixels per second (+y is down).
 ---@param vx number
 ---@param vy number
-function Node:character_set_velocity(vx, vy) end
+function CharacterMoverNode:character_set_velocity(vx, vy) end
 
 ---Gets the gravity acting on the character: world gravity x its gravity scale.
 ---@return number gx
 ---@return number gy
-function Node:character_get_gravity() end
+function CharacterMoverNode:character_get_gravity() end
 
 ---Sets the multiplier of the world gravity for this character.
 ---@param scale number
-function Node:character_set_gravity_scale(scale) end
+function CharacterMoverNode:character_set_gravity_scale(scale) end
 
 ---Was the character standing on a floor after the last move?
 ---@return boolean
-function Node:character_is_on_floor() end
+function CharacterMoverNode:character_is_on_floor() end
 
 ---Was the character touching a wall after the last move?
 ---@return boolean
-function Node:character_is_on_wall() end
+function CharacterMoverNode:character_is_on_wall() end
 
 ---Was the character touching a ceiling after the last move?
 ---@return boolean
-function Node:character_is_on_ceiling() end
+function CharacterMoverNode:character_is_on_ceiling() end
 
 ---The floor's normal (0, -1 on flat ground; tilted on slopes).
 ---@return number nx
 ---@return number ny
-function Node:character_get_floor_normal() end
+function CharacterMoverNode:character_get_floor_normal() end
 
 ---The wall's normal (points away from the wall).
 ---@return number nx
 ---@return number ny
-function Node:character_get_wall_normal() end
+function CharacterMoverNode:character_get_wall_normal() end
 
 ---How far the last move actually went.
 ---@return number dx
 ---@return number dy
-function Node:character_get_last_motion() end
+function CharacterMoverNode:character_get_last_motion() end
 
 ---"script": the script moves it with character_move_and_slide; "builtin": it moves itself.
 ---@param mode "script"|"builtin"
-function Node:character_set_control_mode(mode) end
+function CharacterMoverNode:character_set_control_mode(mode) end
 
 ---BuiltIn mode: steers the character horizontally and jumps if grounded.
 ---@param dirX number Horizontal direction (-1.0 to 1.0), times the node's max speed
 ---@param jump? boolean Whether to jump if grounded
-function Node:character_move(dirX, jump) end
+function CharacterMoverNode:character_move(dirX, jump) end
 
 ---Same as character_is_on_floor().
 ---@return boolean
-function Node:character_is_grounded() end
+function CharacterMoverNode:character_is_grounded() end
 
 ---BuiltIn mode: sets the maximum horizontal run speed.
 ---@param speed number
-function Node:character_set_speed(speed) end
+function CharacterMoverNode:character_set_speed(speed) end
 
 ---BuiltIn mode: sets the jump speed.
 ---@param speed number
-function Node:character_set_jump_speed(speed) end
+function CharacterMoverNode:character_set_jump_speed(speed) end
 
 -- ----------------------------------------------------------------------------
 -- AreaNode (Sensor Trigger) Methods
@@ -556,75 +703,75 @@ function Node:character_set_jump_speed(speed) end
 
 ---Checks whether any physics nodes are currently inside this sensor area.
 ---@return boolean
-function Node:area_is_overlapping() end
+function AreaNode:area_is_overlapping() end
 
 ---Returns the number of bodies currently overlapping this sensor area.
 ---@return number
-function Node:area_get_overlap_count() end
+function AreaNode:area_get_overlap_count() end
 
 ---Returns an array of all nodes currently overlapping this sensor area.
 ---@return Node[]
-function Node:area_get_overlapping_nodes() end
+function AreaNode:area_get_overlapping_nodes() end
 
 -- ----------------------------------------------------------------------------
 -- RaycastNode Methods
 -- ----------------------------------------------------------------------------
 
 ---Executes the raycast immediately against the physics world.
-function Node:raycast_cast() end
+function RaycastNode:raycast_cast() end
 
 ---Checks whether the raycast is currently intersecting a physics obstacle.
 ---@return boolean
-function Node:raycast_is_colliding() end
+function RaycastNode:raycast_is_colliding() end
 
 ---Gets the world-space intersection point of the raycast hit.
 ---@return number x
 ---@return number y
-function Node:raycast_get_hit_point() end
+function RaycastNode:raycast_get_hit_point() end
 
 ---Gets the world-space surface normal at the raycast intersection.
 ---@return number nx
 ---@return number ny
-function Node:raycast_get_hit_normal() end
+function RaycastNode:raycast_get_hit_normal() end
 
 ---Gets the fraction from 0.0 to 1.0 along the ray length where the hit occurred.
 ---@return number fraction
-function Node:raycast_get_hit_fraction() end
+function RaycastNode:raycast_get_hit_fraction() end
 
 ---Gets the Node struck by the raycast, or nil if none.
 ---@return Node?
-function Node:raycast_get_hit_node() end
+function RaycastNode:raycast_get_hit_node() end
 
 ---Sets the local direction vector for the raycast node.
 ---@param dx number
 ---@param dy number
-function Node:raycast_set_direction(dx, dy) end
+function RaycastNode:raycast_set_direction(dx, dy) end
 
 ---Sets the maximum reach length in pixels for the raycast node.
 ---@param length number
-function Node:raycast_set_length(length) end
+function RaycastNode:raycast_set_length(length) end
 
 -- ----------------------------------------------------------------------------
 -- ParticleEmitterNode Methods
 -- ----------------------------------------------------------------------------
 
 ---Starts continuous or burst particle emission.
-function Node:particle_start() end
+function ParticleEmitterNode:particle_start() end
 
 ---Stops particle emission.
-function Node:particle_stop() end
+function ParticleEmitterNode:particle_stop() end
 
 ---Checks if particles are actively being emitted.
 ---@return boolean
-function Node:particle_is_emitting() end
+function ParticleEmitterNode:particle_is_emitting() end
 
 ---Sets the maximum particle pool count for this emitter.
 ---@param amount integer
-function Node:particle_set_amount(amount) end
+function ParticleEmitterNode:particle_set_amount(amount) end
 
 ---Sets the base lifetime in seconds for newly spawned particles.
 ---@param lifetime number
-function Node:particle_set_lifetime(lifetime) end
+function ParticleEmitterNode:particle_set_lifetime(lifetime) end
 
 -- ----------------------------------------------------------------------------
 -- TextureNode Methods
@@ -633,16 +780,16 @@ function Node:particle_set_lifetime(lifetime) end
 ---Gets the base unscaled pixel width and height of the texture.
 ---@return number width
 ---@return number height
-function Node:texture_get_size() end
+function TextureNode:texture_get_size() end
 
 ---Sets the local pivot origin for texture rotation and scaling.
 ---@param ox number Origin X in pixels
 ---@param oy number Origin Y in pixels
-function Node:texture_set_origin(ox, oy) end
+function TextureNode:texture_set_origin(ox, oy) end
 
 ---Gets the file path string from which this texture was loaded.
 ---@return string
-function Node:texture_get_path() end
+function TextureNode:texture_get_path() end
 
 -- ----------------------------------------------------------------------------
 -- AnimationPlayerNode Methods
@@ -654,88 +801,88 @@ function Node:texture_get_path() end
 ---track's target node script; sound tracks play their audio file on the key's frame.
 ---@param name? string Animation name
 ---@param blend? number Crossfade time in seconds (default 0)
-function Node:animation_play(name, blend) end
+function AnimationPlayerNode:animation_play(name, blend) end
 
 ---Stops animation playback and freezes at current frame.
-function Node:animation_stop() end
+function AnimationPlayerNode:animation_stop() end
 
 ---Pauses animation playback.
-function Node:animation_pause() end
+function AnimationPlayerNode:animation_pause() end
 
 ---Resumes animation playback from the current frame.
-function Node:animation_resume() end
+function AnimationPlayerNode:animation_resume() end
 
 ---Resets the animation to the first frame.
-function Node:animation_reset() end
+function AnimationPlayerNode:animation_reset() end
 
 ---Sets playback speed in frames per second.
 ---@param fps number
-function Node:animation_set_fps(fps) end
+function AnimationPlayerNode:animation_set_fps(fps) end
 
 ---Gets the name of the currently active animation track.
 ---@return string
-function Node:animation_get_current() end
+function AnimationPlayerNode:animation_get_current() end
 
 -- ----------------------------------------------------------------------------
 -- TimerNode Methods
 -- ----------------------------------------------------------------------------
 
 ---Starts or restarts the timer from zero.
-function Node:timer_start() end
+function TimerNode:timer_start() end
 
 ---Stops the timer.
-function Node:timer_stop() end
+function TimerNode:timer_stop() end
 
 ---Checks if the timer is actively running.
 ---@return boolean
-function Node:timer_is_running() end
+function TimerNode:timer_is_running() end
 
 ---Gets the elapsed time in seconds since start.
 ---@return number
-function Node:timer_get_elapsed() end
+function TimerNode:timer_get_elapsed() end
 
 ---Sets the timer expiration duration in seconds.
 ---@param durationSec number
-function Node:timer_set_duration(durationSec) end
+function TimerNode:timer_set_duration(durationSec) end
 
 ---Sets whether the timer automatically restarts upon expiring.
 ---@param loop boolean
-function Node:timer_set_loop(loop) end
+function TimerNode:timer_set_loop(loop) end
 
 -- ----------------------------------------------------------------------------
 -- SoundNode & MusicNode Methods
 -- ----------------------------------------------------------------------------
 
 ---Plays the sound effect associated with this SoundNode.
-function Node:sound_play() end
+function SoundNode:sound_play() end
 
 ---Stops playing the sound effect.
-function Node:sound_stop() end
+function SoundNode:sound_stop() end
 
 ---Pauses the sound effect.
-function Node:sound_pause() end
+function SoundNode:sound_pause() end
 
 ---Resumes the paused sound effect.
-function Node:sound_resume() end
+function SoundNode:sound_resume() end
 
 ---Plays or resumes the background music on this MusicNode.
-function Node:music_play() end
+function MusicNode:music_play() end
 
 ---Stops background music on this MusicNode.
-function Node:music_stop() end
+function MusicNode:music_stop() end
 
 ---Pauses background music on this MusicNode.
-function Node:music_pause() end
+function MusicNode:music_pause() end
 
 ---Resumes paused background music on this MusicNode.
-function Node:music_resume() end
+function MusicNode:music_resume() end
 
 ---Fades this MusicNode's volume to `volume` (0..1) over `seconds`, starting
 ---it if it isn't playing.
 ---@param volume number
 ---@param seconds number
 ---@param stop_at_end? boolean Stop when the fade reaches 0
-function Node:music_fade(volume, seconds, stop_at_end) end
+function MusicNode:music_fade(volume, seconds, stop_at_end) end
 
 -- ----------------------------------------------------------------------------
 -- CameraNode (Node-invoked) Methods
@@ -743,62 +890,62 @@ function Node:music_fade(volume, seconds, stop_at_end) end
 
 ---Sets the zoom level on this CameraNode.
 ---@param zoom number
-function Node:camera_set_zoom(zoom) end
+function CameraNode:camera_set_zoom(zoom) end
 
 ---Gets the configured zoom level on this CameraNode.
 ---@return number
-function Node:camera_get_zoom() end
+function CameraNode:camera_get_zoom() end
 
 ---Sets the target Node to follow.
 ---@param target Node?
-function Node:camera_set_target(target) end
+function CameraNode:camera_set_target(target) end
 
 ---Adds a node to the group this camera frames (see Camera.add_target).
 ---@param target Node
 ---@param options? CameraTargetOptions
-function Node:camera_add_target(target, options) end
+function CameraNode:camera_add_target(target, options) end
 
 ---Takes a node out of this camera's group.
 ---@param target Node
-function Node:camera_remove_target(target) end
+function CameraNode:camera_remove_target(target) end
 
 ---Stops this camera following anything.
-function Node:camera_clear_targets() end
+function CameraNode:camera_clear_targets() end
 
 ---The node this camera follows (single target), or nil.
 ---@return Node?
-function Node:camera_get_target() end
+function CameraNode:camera_get_target() end
 
 ---Every node this camera follows.
 ---@return Node[]
-function Node:camera_get_targets() end
+function CameraNode:camera_get_targets() end
 
 ---Sets the fixed world position for the camera target.
 ---@param x number
 ---@param y number
-function Node:camera_set_target_position(x, y) end
+function CameraNode:camera_set_target_position(x, y) end
 
 ---Triggers trauma screen shake on this CameraNode.
 ---@param strength number Shake intensity (0.0 to 1.0)
 ---@param duration? number Duration in seconds (default 0.5)
-function Node:camera_shake(strength, duration) end
+function CameraNode:camera_shake(strength, duration) end
 
 ---Immediately cancels any active screen shake.
-function Node:camera_stop_shake() end
+function CameraNode:camera_stop_shake() end
 
 ---Checks if screen shake is currently active.
 ---@return boolean
-function Node:camera_is_shaking() end
+function CameraNode:camera_is_shaking() end
 
 ---Constrains camera movement within bounding rectangle limits.
 ---@param left number
 ---@param right number
 ---@param top number
 ---@param bottom number
-function Node:camera_set_limits(left, right, top, bottom) end
+function CameraNode:camera_set_limits(left, right, top, bottom) end
 
 ---Clears all bounding rectangle limits.
-function Node:camera_clear_limits() end
+function CameraNode:camera_clear_limits() end
 
 -- ----------------------------------------------------------------------------
 -- LDtk Node Methods (on an LdtkLevelNode; see engine/LDTK.md)
@@ -929,98 +1076,98 @@ function Node:camera_clear_limits() end
 
 ---Gets the current level identifier.
 ---@return string
-function Node:ldtk_get_level_identifier() end
+function LdtkLevelNode:ldtk_get_level_identifier() end
 
 ---Lists level identifiers (every level, or one world's).
 ---@param world? string
 ---@return string[]
-function Node:ldtk_get_levels(world) end
+function LdtkLevelNode:ldtk_get_levels(world) end
 
 ---Switches to another level (identifier or iid); colliders and entities are rebuilt.
 ---@param identifier LdtkLevel|string
 ---@return boolean ok
-function Node:ldtk_load_level(identifier) end
+function LdtkLevelNode:ldtk_load_level(identifier) end
 
 ---Gets a level's details (the current level by default).
 ---@param level? string
 ---@return LdtkLevel?
-function Node:ldtk_get_level(level) end
+function LdtkLevelNode:ldtk_get_level(level) end
 
 ---Gets the current level size in pixels.
 ---@return number width
 ---@return number height
-function Node:ldtk_get_level_size() end
+function LdtkLevelNode:ldtk_get_level_size() end
 
 ---Gets a level field value (nil if absent or null).
 ---@param name string
 ---@param level? string Another level (default: the current one)
 ---@return any
-function Node:ldtk_get_level_field(name, level) end
+function LdtkLevelNode:ldtk_get_level_field(name, level) end
 
 ---Gets every field of a level.
 ---@param level? string
 ---@return table<string, any>
-function Node:ldtk_get_level_fields(level) end
+function LdtkLevelNode:ldtk_get_level_fields(level) end
 
 ---Lists a level's neighbours.
 ---@param level? string
 ---@return LdtkNeighbour[]
-function Node:ldtk_get_neighbours(level) end
+function LdtkLevelNode:ldtk_get_neighbours(level) end
 
 ---The level at a world position (world mode: any loaded level; otherwise looked up in the world layout).
 ---@param x number
 ---@param y number
 ---@return string?
-function Node:ldtk_level_at(x, y) end
+function LdtkLevelNode:ldtk_level_at(x, y) end
 
 ---Lists the project's worlds.
 ---@return LdtkWorld[]
-function Node:ldtk_get_worlds() end
+function LdtkLevelNode:ldtk_get_worlds() end
 
 ---Gets the current world identifier.
 ---@return string
-function Node:ldtk_get_world() end
+function LdtkLevelNode:ldtk_get_world() end
 
 ---Switches world (its first level, or `level`).
 ---@param world string
 ---@param level? string
 ---@return boolean ok
-function Node:ldtk_set_world(world, level) end
+function LdtkLevelNode:ldtk_set_world(world, level) end
 
 ---World mode: every level of the world at its world position (rebuilds).
 ---@param on boolean
-function Node:ldtk_set_world_mode(on) end
+function LdtkLevelNode:ldtk_set_world_mode(on) end
 
 ---@return boolean
-function Node:ldtk_is_world_mode() end
+function LdtkLevelNode:ldtk_is_world_mode() end
 
 ---Lists a level's layers (top first).
 ---@param level? string
 ---@return LdtkLayer[]
-function Node:ldtk_get_layers(level) end
+function LdtkLevelNode:ldtk_get_layers(level) end
 
 ---Shows or hides a layer (in every loaded level).
 ---@param name LdtkLayer|string
 ---@param visible boolean
-function Node:ldtk_set_layer_visible(name, visible) end
+function LdtkLevelNode:ldtk_set_layer_visible(name, visible) end
 
 ---@param name LdtkLayer|string
 ---@return boolean
-function Node:ldtk_is_layer_visible(name) end
+function LdtkLevelNode:ldtk_is_layer_visible(name) end
 
 ---Gets the IntGrid value at a world position (0 = empty).
 ---@param layer string IntGrid layer identifier, e.g. "Collisions"
 ---@param x number World X
 ---@param y number World Y
 ---@return integer
-function Node:ldtk_get_int_grid(layer, x, y) end
+function LdtkLevelNode:ldtk_get_int_grid(layer, x, y) end
 
 ---Gets the identifier of the IntGrid value at a world position ("" if none / unnamed).
 ---@param layer string
 ---@param x number
 ---@param y number
 ---@return string
-function Node:ldtk_get_int_grid_name(layer, x, y) end
+function LdtkLevelNode:ldtk_get_int_grid_name(layer, x, y) end
 
 ---Gets the IntGrid value of a cell.
 ---@param layer string
@@ -1028,12 +1175,12 @@ function Node:ldtk_get_int_grid_name(layer, x, y) end
 ---@param cy integer
 ---@param level? string
 ---@return integer
-function Node:ldtk_get_int_grid_cell(layer, cx, cy, level) end
+function LdtkLevelNode:ldtk_get_int_grid_cell(layer, cx, cy, level) end
 
 ---Lists an IntGrid layer's values (name, colour, collision).
 ---@param layer string
 ---@return LdtkIntGridValue[]
-function Node:ldtk_get_int_grid_values(layer) end
+function LdtkLevelNode:ldtk_get_int_grid_values(layer) end
 
 ---World position -> layer cell.
 ---@param layer string
@@ -1041,7 +1188,7 @@ function Node:ldtk_get_int_grid_values(layer) end
 ---@param y number
 ---@return integer cx
 ---@return integer cy
-function Node:ldtk_world_to_cell(layer, x, y) end
+function LdtkLevelNode:ldtk_world_to_cell(layer, x, y) end
 
 ---Layer cell -> world position of its centre.
 ---@param layer string
@@ -1050,7 +1197,7 @@ function Node:ldtk_world_to_cell(layer, x, y) end
 ---@param level? string
 ---@return number x
 ---@return number y
-function Node:ldtk_cell_to_world(layer, cx, cy, level) end
+function LdtkLevelNode:ldtk_cell_to_world(layer, cx, cy, level) end
 
 ---Collision at a world position: "solid", "one_way", "trigger" or "none", plus the layer and value name.
 ---@param x number
@@ -1058,93 +1205,93 @@ function Node:ldtk_cell_to_world(layer, cx, cy, level) end
 ---@return string type
 ---@return string? layer
 ---@return string|integer|nil value
-function Node:ldtk_get_collision(x, y) end
+function LdtkLevelNode:ldtk_get_collision(x, y) end
 
 ---The trigger areas built from IntGrid values set to Trigger ("<Layer>_<value>" -> AreaNode).
 ---Connect to their "body_entered" / "body_exited" events.
 ---@return table<string, Node>
-function Node:ldtk_get_triggers() end
+function LdtkLevelNode:ldtk_get_triggers() end
 
 ---Gets the tile of a Tiles/AutoLayer layer at a world position.
 ---@param layer string
 ---@param x number
 ---@param y number
 ---@return LdtkTile?
-function Node:ldtk_get_tile(layer, x, y) end
+function LdtkLevelNode:ldtk_get_tile(layer, x, y) end
 
 ---Gets the enum values tagging the tile at a world position (tileset enum tags).
 ---@param layer string
 ---@param x number
 ---@param y number
 ---@return string[]
-function Node:ldtk_get_tile_enums(layer, x, y) end
+function LdtkLevelNode:ldtk_get_tile_enums(layer, x, y) end
 
 ---Gets an enum's values (colour, tile, index).
 ---@param name LdtkEnumName
 ---@return LdtkEnumValue[]?
-function Node:ldtk_get_enum(name) end
+function LdtkLevelNode:ldtk_get_enum(name) end
 
 ---Every enum: name -> value ids.
 ---@return table<string, string[]>
-function Node:ldtk_get_enums() end
+function LdtkLevelNode:ldtk_get_enums() end
 
 ---Lists the loaded levels' entities, optionally only those with an identifier.
 ---@param identifier? LdtkEntity
 ---@return LdtkEntity[]
-function Node:ldtk_get_entities(identifier) end
+function LdtkLevelNode:ldtk_get_entities(identifier) end
 
 ---Lists the loaded levels' entities with a tag.
 ---@param tag string
 ---@return LdtkEntity[]
-function Node:ldtk_get_entities_by_tag(tag) end
+function LdtkLevelNode:ldtk_get_entities_by_tag(tag) end
 
 ---Gets an entity anywhere in the project by iid.
 ---@param iid string
 ---@return LdtkEntity?
-function Node:ldtk_get_entity(iid) end
+function LdtkLevelNode:ldtk_get_entity(iid) end
 
 ---Gets the node spawned for an entity (by iid).
 ---@param iid string
 ---@return Node?
-function Node:ldtk_get_entity_node(iid) end
+function LdtkLevelNode:ldtk_get_entity_node(iid) end
 
 ---Lists the project's entity definitions.
 ---@return LdtkEntityDef[]
-function Node:ldtk_get_entity_defs() end
+function LdtkLevelNode:ldtk_get_entity_defs() end
 
 ---Lists the resolved EntityRef links between spawned entities.
 ---@return LdtkLink[]
-function Node:ldtk_get_links() end
+function LdtkLevelNode:ldtk_get_links() end
 
 -- On any node spawned from an LDtk entity:
 
 ---The LDtk entity this node was spawned from (nil otherwise).
 ---@return LdtkEntity?
-function Node:ldtk_entity() end
+function LdtkLevelNode:ldtk_entity() end
 
 ---The LdtkLevelNode that spawned this node.
 ---@return Node?
-function Node:ldtk_level_node() end
+function LdtkLevelNode:ldtk_level_node() end
 
 ---A field of this node's entity.
 ---@param name string
 ---@return any
-function Node:ldtk_field(name) end
+function LdtkLevelNode:ldtk_field(name) end
 
 ---The node an EntityRef field points to (the first one for arrays).
 ---@param field string
 ---@return Node?
-function Node:ldtk_ref(field) end
+function LdtkLevelNode:ldtk_ref(field) end
 
 ---Nodes referenced by a field, or every reference ({field, iid, node}) without one.
 ---@param field? string
 ---@return Node[]|{field: string, iid: string, node: Node?}[]
-function Node:ldtk_refs(field) end
+function LdtkLevelNode:ldtk_refs(field) end
 
 ---Entities whose EntityRef fields point at this one.
 ---@param field? string
 ---@return {node: Node, field: string}[]
-function Node:ldtk_referenced_by(field) end
+function LdtkLevelNode:ldtk_referenced_by(field) end
 
 
 -- ============================================================================

@@ -279,6 +279,27 @@ The engine provides full IntelliSense, autocomplete, parameter hints, and type d
 
 ---
 
+### Typed nodes
+
+The definitions have a class per node type (`CameraNode`, `TextureNode`,
+`CharacterMoverNode`, ...): each has the `Node` methods plus its own
+(`camera_*`, `texture_*`, `character_*`...), so completion only offers what
+the node can do. The editor's generated `project_types.lua` makes
+`Scene.find_node("Player")` and `node:get_child("Gun")` return the type of
+the node with that name in your scenes, and gives a script's `self.node`
+the type of the nodes it is attached to. Elsewhere (a node from
+`get_children()`, a script not attached yet) the type is `Node`; say what it
+is with an annotation:
+
+```lua
+---@type CharacterMoverNode
+local body = self.node:get_node("Body")
+
+---@class Enemy : ScriptInstanceBase
+---@field node DynamicBodyNode
+local Enemy = {}
+```
+
 ## Engine Lua API Reference
 
 ### 1. Node Methods (`self.node`)

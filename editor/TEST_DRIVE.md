@@ -36,6 +36,7 @@ exits non-zero if any check fails.
 | `animation.drive` | Animation tab: frames from dropped textures, scrubbing, rotation track with keys, preview restore, save. |
 | `tilemap.drive` | Tile map: tileset, palette, paint stroke (undo/redo), flood fill, erase, save. |
 | `ui_ux.drive` | Settings (keymap record, input action + key, video, export), linked X/Y and reset, Save As / Revert / Open Project, asset copy/paste/rename/delete, paste as child, LDtk level asset, instance add child + apply to component, particle editor, viewport fit. |
+| `lua_node_types.drive` | Typed nodes in Lua: `find_node` overloads per node name, `self.node` typed by where the script is attached, camera methods only on cameras (language-server completion). |
 | `welcome.drive` | One icon per node type; Help > Welcome; Platformer, Top-down and Menu projects from templates, each played headless by the game binary; the empty-scene hint. |
 | `workspaces.drive` | Animation and Level Design presets (bottom panel height), a saved workspace loaded back, Reset Layout. |
 | `remote_game.drive` | Play with the editor link: the Game tab's live tree, pause, one-frame step, inspect and change a node's rotation in the running game, resume, a saved scene reloading in the game, stop. |
