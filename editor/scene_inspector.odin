@@ -70,7 +70,18 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 	if imgui.BeginChild("##tree", {0, 0}, {}, {}) {
 		root := state.activeScene.rootNode
 		if root != nil {
-			render_rows(state, e.GetChildrenTemp(state.activeScene.manager, root), "", filter)
+			kids := e.GetChildrenTemp(state.activeScene.manager, root)
+			render_rows(state, kids, "", filter)
+			if len(kids) == 0 && filter == "" {
+				// An empty scene: what to do first.
+				imgui.Dummy({0, 6})
+				imgui.PushTextWrapPos(0)
+				imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)
+				imgui.TextWrapped("%s", fmt.ctprintf("This scene is empty. Add a node with %s (Cmd+A), or drag an image, component or level from Assets into the viewport.", ICON_FA_PLUS))
+				imgui.PopStyleColor()
+				imgui.PopTextWrapPos()
+				Drive_Item("hier.empty-hint")
+			}
 			// Drop on empty space: move to the root.
 			imgui.Dummy({imgui.GetContentRegionAvail().x, max(imgui.GetContentRegionAvail().y, 40)})
 			Drive_Item("hier.empty")

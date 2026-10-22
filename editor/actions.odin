@@ -115,6 +115,7 @@ Actions_Init :: proc() {
 	add({id = "view.viewport", category = "View", label = "Focus Viewport", chords = k(ch(._1, P)), scope = .Global, run = proc(s: ^EditorState) {imgui.SetWindowFocusStr("Viewport###ViewportWindow")}})
 	add({id = "view.code", category = "View", label = "Focus Code Editor", chords = k(ch(._2, P)), scope = .Global, run = proc(s: ^EditorState) {GlobalCode.focusRequest = true}, enabled = has_code})
 	add({id = "view.console", category = "View", label = "Focus Console", chords = k(ch(.J, P)), scope = .Global, run = proc(s: ^EditorState) {imgui.SetWindowFocusStr("Console###BottomPanelWindow")}})
+	add({id = "help.welcome", category = "Help", label = "Welcome", scope = .Global, run = Welcome_Open})
 	add({id = "help.shortcuts", category = "Help", label = "Keyboard Shortcuts", chords = k(ch(.K, PS)), scope = .Global, run = proc(s: ^EditorState) {showShortcutsWindow = true}})
 
 	// --- Scene editing ---

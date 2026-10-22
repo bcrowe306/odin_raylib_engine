@@ -699,6 +699,11 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	case "shortcuts-open": return "true" if showShortcutsWindow else "false", true
 	case "usages": return fmt.tprint(AssetUsages_Count()), true
 	case "workspace": return currentWorkspace, true
+	case "node-icons":
+		// "<distinct icons>/<node types>" in the Add Node catalogue.
+		seen := make(map[string]bool, allocator = context.temp_allocator)
+		for entry in NODE_CATALOG do seen[entry.icon] = true
+		return fmt.tprintf("%d/%d", len(seen), len(NODE_CATALOG)), true
 	case "remote-connected", "remote-paused", "remote-frame", "remote-steps", "remote-reloads", "remote-nodes", "remote-names": return RemoteGame_Query(q)
 	case "guides":
 		if state.activeScene == nil do return "", true

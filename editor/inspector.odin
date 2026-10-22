@@ -970,6 +970,16 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 
 // Editor_NodeIcon picks an icon for a node type.
 Editor_NodeIcon :: proc(node: ^e.Node) -> string {
+	// Each node type's icon from the Add Node catalogue (one per type).
+	@(static) byType: map[typeid]string
+	if byType == nil {
+		for entry in NODE_CATALOG {
+			if info, ok := e.Node_TypeInfoByName(entry.typeName); ok do byType[info.type] = entry.icon
+		}
+	}
+	if node.typeId != e.Node || node.scriptInstance == nil {
+		if icon, ok := byType[node.typeId]; ok do return icon
+	}
 	switch node.typeId {
 	case e.CameraNode: return ICON_FA_VIDEO
 	case e.LightNode: return ICON_FA_LIGHTBULB

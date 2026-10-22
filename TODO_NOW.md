@@ -57,7 +57,7 @@ out of scope here.
 - [x] 6.6 Sprite-sheet slicer → frame animations
 - [x] 6.7 Play-in-editor: remote scene tree of the running game, frame step, hot reload while playing
 - [x] 6.8 Layout presets / workspaces and reset layout
-- [ ] 6.9 Welcome / new-project window with templates; icons for every node type; empty-state guidance
+- [x] 6.9 Welcome / new-project window with templates; icons for every node type; empty-state guidance
 
 ## Phase 7 — Code editor & Lua
 

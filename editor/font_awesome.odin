@@ -108,3 +108,25 @@ ICON_FA_BARS                      :: "" // Slicer: one animation per row
 ICON_FA_CARET_RIGHT               :: "" // Tree: closed
 ICON_FA_CARET_DOWN                :: "" // Tree: open
 ICON_FA_GAMEPAD                   :: "" // Game tab (connected)
+// Node types (one icon each: Add Node, scene tree, Inspector)
+ICON_FA_TAG                       :: ""
+ICON_FA_ICONS                     :: ""
+ICON_FA_MAP                       :: ""
+ICON_FA_LIST                      :: ""
+ICON_FA_LIST_UL                   :: ""
+ICON_FA_LIST_OL                   :: ""
+ICON_FA_TABLE                     :: ""
+ICON_FA_TABLE_COLUMNS             :: ""
+ICON_FA_VOLUME_HIGH               :: ""
+ICON_FA_VOLUME_LOW                :: ""
+ICON_FA_PHOTO_FILM                :: ""
+ICON_FA_BARS_PROGRESS             :: ""
+ICON_FA_SIGNAL                    :: ""
+ICON_FA_CUBE                      :: ""
+ICON_FA_SQUARE_CHECK              :: ""
+ICON_FA_TOGGLE_ON                 :: ""
+ICON_FA_TOOLBOX                   :: ""
+ICON_FA_PERSON_RUNNING            :: ""
+ICON_FA_RULER_HORIZONTAL          :: ""
+ICON_FA_ARROW_RIGHT_LONG          :: ""
+ICON_FA_HAND_POINTER              :: ""

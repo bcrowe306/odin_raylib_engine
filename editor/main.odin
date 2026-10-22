@@ -182,6 +182,7 @@ editor_main :: proc() -> int {
 		AssetDelete_Render(&GlobalEditor)
 		AssetUsages_Render(&GlobalEditor)
 		Slicer_Render(&GlobalEditor)
+		Welcome_Render(&GlobalEditor)
 		OpenProject_Render(&GlobalEditor)
 		Signals_Render(&GlobalEditor)
 		AssetImport_Render(&GlobalEditor)

@@ -21,6 +21,7 @@ Editor_Settings :: struct {
 	snapToGrid:       bool,
 	showGrid:         bool,
 	confirmQuit:      bool,
+	showWelcome:      bool, // the Welcome window at startup
 	// Code Editor
 	codeFontSize:     f32,
 	tabWidth:         int,
@@ -42,6 +43,7 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 	snapToGrid      = true,
 	showGrid        = true,
 	confirmQuit     = true,
+	showWelcome     = true,
 	codeFontSize    = CODE_FONT_SIZE,
 	tabWidth        = 4,
 	insertSpaces    = true,
@@ -138,6 +140,7 @@ Editor_LoadSettings :: proc(state: ^EditorState) {
 			s.snapToGrid = jb(obj, "snap_to_grid", s.snapToGrid)
 			s.showGrid = jb(obj, "show_grid", s.showGrid)
 			s.confirmQuit = jb(obj, "confirm_quit", s.confirmQuit)
+			s.showWelcome = jb(obj, "show_welcome", s.showWelcome)
 			s.codeFontSize = jf(obj, "code_font_size", s.codeFontSize)
 			s.tabWidth = int(jf(obj, "tab_width", f32(s.tabWidth)))
 			s.insertSpaces = jb(obj, "insert_spaces", s.insertSpaces)
@@ -211,7 +214,7 @@ Editor_SaveSettings :: proc() -> bool {
 	s := &GlobalSettings
 	sb := strings.builder_make(context.temp_allocator)
 	fmt.sbprintf(&sb, "{{\n  \"ui_scale\": %.2f,\n  \"autosave_minutes\": %d,\n  \"grid_size\": %.0f,\n", s.uiScale, s.autosaveMinutes, s.gridSize)
-	fmt.sbprintf(&sb, "  \"snap_to_grid\": %t,\n  \"show_grid\": %t,\n  \"confirm_quit\": %t,\n", s.snapToGrid, s.showGrid, s.confirmQuit)
+	fmt.sbprintf(&sb, "  \"snap_to_grid\": %t,\n  \"show_grid\": %t,\n  \"confirm_quit\": %t,\n  \"show_welcome\": %t,\n", s.snapToGrid, s.showGrid, s.confirmQuit, s.showWelcome)
 	fmt.sbprintf(&sb, "  \"code_font_size\": %.0f,\n  \"tab_width\": %d,\n  \"insert_spaces\": %t,\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
 	fmt.sbprintf(&sb, "  \"auto_close_pairs\": %t,\n  \"format_on_save\": %t,\n  \"lsp_enabled\": %t,\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)
 	fmt.sbprintf(&sb, "  \"lua_server_path\": %q,\n  \"recent_projects\": [", s.luaServerPath)

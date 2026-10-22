@@ -83,6 +83,20 @@ Filter the tree by name, `#tag` or `t:type` (`t:sprite`, `type:CameraNode`); ter
 Tags (groups) are edited in the Inspector's **Tags** section (type one and press Enter, or pick one used in the scene; click a tag to remove it); scripts use `has_tag` / `Scene.find_by_tag`, and the generated Lua types list the project's tags (`NodeTag`).
 Assets: drag textures, audio, components or scripts into the viewport.
 
+### Welcome and new projects
+
+The **Welcome** window opens at startup (untick *Show at startup* to stop
+it; **Help > Welcome** brings it back): recent projects, **Open
+Project...**, a few first steps, and **New Project** from a template -
+**Empty** (a camera), **Platformer** (a player that runs and jumps with the
+built-in character controller, ground, one-way platforms, a following
+camera), **Top-down** (a player moved by a short Lua script with the
+`move_*` actions) or **Menu** (a title screen whose Play button opens the
+game scene). Templates come with placeholder images, so they play right
+away. Every node type has its own icon (Add Node, scene tree, Inspector),
+and empty places say what to do (an empty scene in the tree and viewport,
+the console).
+
 ### Workspaces
 
 **View > Workspaces** switches the panel layout: **Default**, **Level

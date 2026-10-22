@@ -267,6 +267,10 @@ Editor_SwitchProject :: proc(state: ^EditorState, path: string) {
 		Editor_Log(state, .Error, "%s is not a project (no project.json)", path)
 		return
 	}
+	if GlobalDrive.enabled {
+		Editor_Log(state, .Info, "Would open project %s", path) // drives keep running
+		return
+	}
 	if state.pendingProject != "" do delete(state.pendingProject)
 	state.pendingProject = strings.clone(path)
 	Editor_RequestQuit(state)
@@ -299,22 +303,10 @@ Editor_NewProject :: proc(state: ^EditorState, path: string) {
 		Editor_Log(state, .Error, "%s already has a project", dir)
 		return
 	}
-	for sub in ([]string{"scenes", "scripts", "textures", "audio", "components", "levels"}) {
-		p, _ := filepath.join({dir, sub}, context.temp_allocator)
-		_ = os.make_directory_all(p)
-	}
-	cfg, _ := e.Project_ParseConfig(transmute([]u8)string("{}"), context.temp_allocator)
-	cfg.name = filepath.base(dir)
-	cfg.windowTitle = cfg.name
-	cfg.initialScene = "scenes/main.scene.json"
-	cfg.gravity = {0, 980}
-	append(&cfg.scenes, "scenes/main.scene.json")
-	if !e.Project_SaveConfigToFile(dir, &cfg) {
+	if !Project_CreateFromTemplate(dir, filepath.base(dir), .Empty) {
 		Editor_Log(state, .Error, "Could not create %s", dir)
 		return
 	}
-	main, _ := filepath.join({dir, "scenes", "main.scene.json"}, context.temp_allocator)
-	_ = os.write_entire_file(main, transmute([]u8)string(`{"name": "main", "root": {"type": "Node", "name": "root", "children": [{"type": "CameraNode", "name": "Camera", "position": [640, 360], "properties": {"isCurrent": true}}]}}`))
 	Editor_Log(state, .Info, "Created project %s", dir)
 	Editor_SwitchProject(state, dir)
 }

@@ -139,6 +139,13 @@ Viewport_UpdateAndRender :: proc(state: ^EditorState) {
 
 		// Interactive Gizmo overlays & mouse controls
 		Viewport_HandleInputAndGizmos(state)
+		// An empty scene: a hint in the middle.
+		if state.activeScene != nil && state.activeScene.rootNode != nil && len(e.GetChildrenView(state.activeScene.manager, state.activeScene.rootNode)) == 0 {
+			msg := fmt.ctprintf("%s  Empty scene: Cmd+A adds a node, or drop images, components and levels here", ICON_FA_WAND_MAGIC_SPARKLES)
+			w := imgui.CalcTextSize(msg).x
+			c := state.viewportPos + state.viewportSize * 0.5
+			imgui.DrawList_AddText(imgui.GetWindowDrawList(), {c.x - w * 0.5, c.y - 8}, col_u32(UI_TEXT_DIM), msg)
+		}
 	}
 	imgui.End()
 }

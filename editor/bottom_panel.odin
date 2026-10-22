@@ -125,6 +125,11 @@ BottomPanel_RenderConsole :: proc(state: ^EditorState, counts: [LogLevel]int) {
 	imgui.PushStyleVarImVec2(.ItemSpacing, {8, 3})
 	if imgui.BeginChild("##ConsoleLogScroll", {0, 0}, {}, {.HorizontalScrollbar}) {
 		imgui.Dummy({0, 2})
+		if len(state.logs) == 0 {
+			imgui.Indent(6)
+			UI_DimText("No messages. Editor, build and game output appear here.")
+			imgui.Unindent(6)
+		}
 		for log in state.logs {
 			if !consoleShow[log.level] do continue
 			if filter != "" && !strings.contains(strings.to_lower(log.message, context.temp_allocator), filter) do continue
