@@ -1,0 +1,20 @@
+# Code tab on a 10,000-line script: line states come from the per-line
+# token cache, so typing re-tokenizes only the edited line (the full pass
+# it replaced is timed for comparison); scrolling far down still highlights.
+wait 5
+exec python3 scripts/gen_big_lua.py $PROJECT/scripts/drive_big_zz.lua 10000
+wait 90
+dblclick @asset:scripts/drive_big_zz.lua
+wait 5
+expect code.file == scripts/drive_big_zz.lua
+key ctrl+g
+type 5000
+key enter
+type x
+wait 2
+expect code.update-ms <= 8
+expect code.token-speedup >= 5
+expect code.token-bench contains lines=10001
+expect code.token-bench contains tokenized=0
+screenshot big_file
+key ctrl+z

@@ -210,6 +210,7 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 | Welcome & templates | Welcome window (recent projects, open, first steps, show at startup), new projects from Empty / Platformer / Top-down / Menu templates with generated placeholder images (each verified to play), a distinct icon per node type, empty-state hints (scene tree, viewport, console) (`welcome` drive) |
 | Typed Lua nodes | A definitions class per node type (`---@class CameraNode : Node`, mixins `TextHolder` / `NavGrid`) holding its own methods; generated overloads of `Scene.find_node` / `Node:get_child` per project node name returning its type; `self.node` typed per script by the nodes it is attached to (`lua_node_types` drive) |
 | Lua definitions in sync | `test_lua_definitions_match_bindings`: every node method and module function registered in Lua is declared in `definitions/engine_api.lua` and every declared one is registered (fails on drift either way) |
+| Code tab token cache | Per-line tokens cached by (text hash, start state): an edit re-tokenizes only changed lines (shifted lines still hit), drawing reuses tokens; 10k-line file 20.4 ms -> 1.8 ms per edit (`code_big_file` drive, `scripts/gen_big_lua.py`) |
 
 ## Performance baselines
 
@@ -251,3 +252,8 @@ whole frame is vsync-bound at ~16.8 ms.
 
 (`--no-render-cache` turns off draw reordering, tile chunks and multi-buffered
 batches - the pre-4.2 renderer, with the 4.3 particle fixes.)
+
+| Code tab, 10,000-line Lua file (`code_big_file` drive, debug editor) | Per edit |
+|---|---|
+| Line states, re-tokenizing every line (before 7.3) | 20.4 ms |
+| Line states from the per-line token cache (7.3) | 1.8 ms (0 lines re-tokenized after warm-up; 11x) |

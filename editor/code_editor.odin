@@ -49,6 +49,7 @@ Code_Doc :: struct {
 	// Tokenizer state at the start of each line, valid for statesVersion.
 	lineStates:    [dynamic]int,
 	statesVersion: int,
+	tokens:        Token_Cache, // per-line tokens (code_token_cache.odin)
 	scrollToCursor: bool,
 }
 
@@ -293,6 +294,7 @@ code_close_doc :: proc(idx: int) {
 	code_lsp_did_close(doc)
 	buf.buffer_destroy(&doc.buffer)
 	delete(doc.lineStates)
+	Token_CacheDestroy(&doc.tokens)
 	delete(doc.path)
 	delete(doc.rel)
 	delete(doc.uri)
@@ -504,13 +506,17 @@ code_update_line_states :: proc(doc: ^Code_Doc) {
 	b := &doc.buffer
 	n := buf.buffer_line_count(b)
 	if doc.statesVersion == b.version && len(doc.lineStates) == n do return
+	// Unchanged lines (also shifted ones) come from the token cache.
+	start := Token_CacheTimeStart(&doc.tokens)
 	resize(&doc.lineStates, n)
 	state := syn.LINE_STATE_NORMAL
 	for i in 0 ..< n {
 		doc.lineStates[i] = state
-		_, state = doc.lang.tokenize(buf.buffer_line_str(b, i), state, context.temp_allocator)
+		_, state = Token_CacheGet(&doc.tokens, doc.lang, buf.buffer_line_str(b, i), state, b.version)
 	}
 	doc.statesVersion = b.version
+	Token_CachePrune(&doc.tokens, n, b.version)
+	Token_CacheTimeEnd(&doc.tokens, start)
 }
 
 Code_Render :: proc(state: ^EditorState) {
@@ -836,7 +842,7 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		}
 
 		// Syntax-colored text.
-		tokens, _ := doc.lang.tokenize(text, doc.lineStates[ln], context.temp_allocator)
+		tokens, _ := Token_CacheGet(&doc.tokens, doc.lang, text, doc.lineStates[ln], b.version)
 		v := 0
 		at := 0
 		for t in tokens {
@@ -1209,7 +1215,7 @@ code_auto_pair :: proc(doc: ^Code_Doc, ch: u8) -> bool {
 code_in_string_or_comment :: proc(doc: ^Code_Doc, p: buf.Position) -> bool {
 	code_update_line_states(doc)
 	line := buf.buffer_line_str(&doc.buffer, p.line)
-	tokens, _ := doc.lang.tokenize(line, doc.lineStates[p.line] if p.line < len(doc.lineStates) else 0, context.temp_allocator)
+	tokens, _ := Token_CacheGet(&doc.tokens, doc.lang, line, doc.lineStates[p.line] if p.line < len(doc.lineStates) else 0, doc.buffer.version)
 	for t in tokens {
 		if (t.kind == .String || t.kind == .Comment) && p.col > t.start && p.col < t.end do return true
 		if t.kind == .Comment && p.col >= t.end && t.end == len(line) && p.col > t.start do return true
@@ -1519,6 +1525,34 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 			strings.write_string(&sb, code_completion_label(&cm.client.last_completion[i]))
 		}
 		return strings.to_string(sb), true
+	case "code.token-bench":
+		// "full=<ms> cached=<ms> tokenized=<lines>": re-tokenizing every line
+		// (as before the cache) vs. the cached line-state pass.
+		doc := code_active_doc()
+		if doc == nil do return "", true
+		b := &doc.buffer
+		t0 := time.tick_now()
+		state := syn.LINE_STATE_NORMAL
+		for i in 0 ..< buf.buffer_line_count(b) do _, state = doc.lang.tokenize(buf.buffer_line_str(b, i), state, context.temp_allocator)
+		full := time.duration_milliseconds(time.tick_since(t0))
+		doc.statesVersion = -1
+		code_update_line_states(doc)
+		return fmt.tprintf("full=%.2f cached=%.2f tokenized=%d lines=%d", full, doc.tokens.lastUpdateMs, doc.tokens.tokenized, buf.buffer_line_count(b)), true
+	case "code.token-speedup": // full re-tokenize time / cached pass time
+		doc := code_active_doc()
+		if doc == nil do return "0", true
+		b := &doc.buffer
+		t0 := time.tick_now()
+		state := syn.LINE_STATE_NORMAL
+		for i in 0 ..< buf.buffer_line_count(b) do _, state = doc.lang.tokenize(buf.buffer_line_str(b, i), state, context.temp_allocator)
+		full := time.duration_milliseconds(time.tick_since(t0))
+		doc.statesVersion = -1
+		code_update_line_states(doc)
+		return fmt.tprintf("%.1f", full / max(doc.tokens.lastUpdateMs, 0.001)), true
+	case "code.update-ms": // the last line-state pass after an edit
+		doc := code_active_doc()
+		if doc == nil do return "", true
+		return fmt.tprintf("%.2f", doc.tokens.lastUpdateMs), true
 	case "code.completion-doc":
 		if !cm.completion.open || cm.completion.selected >= len(cm.completion.filtered) do return "", true
 		return cm.client.last_completion[cm.completion.filtered[cm.completion.selected]].documentation, true
