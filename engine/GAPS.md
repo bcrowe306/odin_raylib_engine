@@ -209,6 +209,7 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 | Workspaces | Layout presets built with the dock builder (Default, Level Design, Scripting, Animation), user workspaces saved / loaded as ImGui layout text, Reset Layout (`workspaces` drive) |
 | Welcome & templates | Welcome window (recent projects, open, first steps, show at startup), new projects from Empty / Platformer / Top-down / Menu templates with generated placeholder images (each verified to play), a distinct icon per node type, empty-state hints (scene tree, viewport, console) (`welcome` drive) |
 | Typed Lua nodes | A definitions class per node type (`---@class CameraNode : Node`, mixins `TextHolder` / `NavGrid`) holding its own methods; generated overloads of `Scene.find_node` / `Node:get_child` per project node name returning its type; `self.node` typed per script by the nodes it is attached to (`lua_node_types` drive) |
+| Lua definitions in sync | `test_lua_definitions_match_bindings`: every node method and module function registered in Lua is declared in `definitions/engine_api.lua` and every declared one is registered (fails on drift either way) |
 
 ## Performance baselines
 

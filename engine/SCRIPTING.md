@@ -279,6 +279,10 @@ The engine provides full IntelliSense, autocomplete, parameter hints, and type d
 
 ---
 
+The definitions are checked against what the engine registers
+(`test_lua_definitions_match_bindings`): a binding added without a
+declaration - or a declaration without a binding - fails the engine tests.
+
 ### Typed nodes
 
 The definitions have a class per node type (`CameraNode`, `TextureNode`,
