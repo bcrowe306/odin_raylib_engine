@@ -48,7 +48,7 @@ key enter
 type Log
 key left
 key f12
-wait-until code.file contains engine_api.lua timeout=600
+wait-until code.file contains .ore/definitions/engine_api.lua timeout=600
 screenshot goto_definition
 key ctrl+w
 expect code.file == scripts/orbiting_drone.lua

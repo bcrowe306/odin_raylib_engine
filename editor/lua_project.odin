@@ -1,0 +1,69 @@
+package editor
+
+import "core:os"
+import "core:path/filepath"
+import "core:strings"
+
+// ============================================================================
+// Lua tooling files in the project.
+//
+// The engine's API definitions are compiled into the editor and written to
+// <project>/.ore/definitions/ (rewritten when the editor's copy changes),
+// and <project>/.luarc.json points lua-language-server at them - so the
+// built-in code editor, and VS Code or any LuaLS editor opening the project
+// folder, get the same completion and hover. Hidden files and folders
+// (.ore/, .luarc.json, ...) are not packaged into games.
+// ============================================================================
+
+ENGINE_API_LUA :: #load("../engine/definitions/engine_api.lua", string)
+
+LUA_DEFINITIONS_DIR :: ".ore/definitions"
+
+// write_if_changed writes a file unless it already has exactly this content.
+@(private = "file")
+write_if_changed :: proc(path, text: string) -> bool {
+	if old, err := os.read_entire_file(path, context.temp_allocator); err == nil && string(old) == text do return true
+	_ = os.make_directory_all(filepath.dir(path, context.temp_allocator))
+	return os.write_entire_file(path, transmute([]u8)text) == nil
+}
+
+@(private = "file")
+luarc_text :: proc() -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, "{\n")
+	strings.write_string(&sb, "  \"$schema\": \"https://raw.githubusercontent.com/LuaLS/vscode-lua/master/setting/schema.json\",\n")
+	strings.write_string(&sb, "  \"runtime.version\": \"Lua 5.4\",\n")
+	strings.write_string(&sb, "  \"workspace.library\": [\"" + LUA_DEFINITIONS_DIR + "\"],\n")
+	strings.write_string(&sb, "  \"workspace.checkThirdParty\": false,\n")
+	strings.write_string(&sb, "  \"completion.callSnippet\": \"Replace\",\n")
+	strings.write_string(&sb, "  \"diagnostics.globals\": [")
+	for g, i in CODE_LUA_GLOBALS {
+		if i > 0 do strings.write_string(&sb, ", ")
+		strings.write_byte(&sb, '"')
+		strings.write_string(&sb, g)
+		strings.write_byte(&sb, '"')
+	}
+	strings.write_string(&sb, "]\n}\n")
+	return strings.to_string(sb)
+}
+
+// Lua_ProjectSetup writes the definitions and .luarc.json into the project;
+// returns the absolute definitions directory ("" without a project).
+Lua_ProjectSetup :: proc(state: ^EditorState) -> string {
+	if state.projectPath == "" || !os.is_dir(state.projectPath) do return ""
+	root := state.projectPath
+	if !filepath.is_abs(root) {
+		if abs, err := os.get_absolute_path(root, context.temp_allocator); err == nil do root = abs
+	}
+	defs, _ := filepath.join({root, LUA_DEFINITIONS_DIR}, context.temp_allocator)
+	api, _ := filepath.join({defs, "engine_api.lua"}, context.temp_allocator)
+	write_if_changed(api, ENGINE_API_LUA)
+	// .luarc.json: created, or refreshed when it's ours (points at our
+	// definitions); a hand-written one is left alone.
+	luarc, _ := filepath.join({root, ".luarc.json"}, context.temp_allocator)
+	existing, err := os.read_entire_file(luarc, context.temp_allocator)
+	if err != nil || strings.contains(string(existing), LUA_DEFINITIONS_DIR) {
+		write_if_changed(luarc, luarc_text())
+	}
+	return strings.clone(defs, context.temp_allocator)
+}

@@ -198,7 +198,12 @@ OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compres
 	for info in filepath.walker_walk(&w) {
 		if info.type == .Regular {
 			relPath, err := filepath.rel(absDir, info.fullpath, context.temp_allocator)
-			if err == nil {
+			// Hidden files and folders (.ore/ tooling, .luarc.json, editor
+			// settings, .DS_Store) aren't part of the game.
+			hidden := false
+			unixRel, _ := strings.replace_all(relPath, "\\", "/", context.temp_allocator)
+			for part in strings.split(unixRel, "/", context.temp_allocator) do if strings.has_prefix(part, ".") do hidden = true
+			if err == nil && !hidden {
 				norm := strings.join(strings.split(relPath, "\\", context.temp_allocator), "/", context.temp_allocator)
 				append(&sources, OreFileSource{
 					archivePath = strings.clone(norm, context.temp_allocator),

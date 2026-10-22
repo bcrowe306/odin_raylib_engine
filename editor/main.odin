@@ -70,6 +70,7 @@ editor_main :: proc() -> int {
 	Editor_Init(&GlobalEditor)
 	Actions_Init()
 	Editor_LoadSettings(&GlobalEditor)
+	Lua_ProjectSetup(&GlobalEditor) // .ore/definitions + .luarc.json for Lua tooling
 	defer Editor_Shutdown(&GlobalEditor)
 
 

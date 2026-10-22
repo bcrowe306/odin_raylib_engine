@@ -9,7 +9,7 @@ out of scope here.
 
 - [x] 1.1 Editor viewport renders in one tree pass (`Scene_CollectRenderables`), not one walk per layer
 - [x] 1.2 Culling: skip nodes whose bounds are outside the camera view (game and editor); tile maps and LDtk draw only visible tiles
-- [ ] 1.3 Lua language server: ship engine definitions with the editor (not the repo checkout); write `.luarc.json` into each project
+- [x] 1.3 Lua language server: ship engine definitions with the editor (not the repo checkout); write `.luarc.json` into each project
 - [ ] 1.4 Generated project types (`.ore/project_types.lua`): input action names, scene/asset paths, node names per scene, script classes with their properties, signals, LDtk entities/enums/levels, components
 
 ## Phase 2 — Core engine features

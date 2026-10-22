@@ -148,9 +148,18 @@ code_abs_path :: proc(state: ^EditorState, path: string) -> string {
 }
 
 code_rel_path :: proc(state: ^EditorState, abs: string) -> string {
-	root := strings.trim_suffix(state.projectPath, "/")
-	if root != "" && strings.has_prefix(abs, root) && len(abs) > len(root) && abs[len(root)] == '/' {
-		return abs[len(root) + 1:]
+	// macOS: /tmp, /var and /etc are links into /private; tools (the
+	// language server) may report either form.
+	canon :: proc(p: string) -> string {
+		when ODIN_OS == .Darwin {
+			if strings.has_prefix(p, "/private/") do return p[len("/private"):]
+		}
+		return p
+	}
+	root := canon(strings.trim_suffix(state.projectPath, "/"))
+	a := canon(abs)
+	if root != "" && strings.has_prefix(a, root) && len(a) > len(root) && a[len(root)] == '/' {
+		return a[len(root) + 1:]
 	}
 	return filepath.base(abs)
 }

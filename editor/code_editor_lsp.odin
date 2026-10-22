@@ -14,7 +14,8 @@ import imgui "lib/imgui"
 // Code editor <-> lua-language-server (LuaLS, built in lua-language-server/).
 //
 // The server runs with the project as its workspace and the engine's API
-// definitions (engine/definitions/*.lua) as a library, so completion, hover
+// definitions as a library (compiled into the editor and written to
+// <project>/.ore/definitions, see lua_project.odin), so completion, hover
 // and signature help know every engine global (Input, Scene, ...), the Node
 // methods, and the ScriptInstanceBase callbacks (ready, update, on_*).
 // Settings are passed through workspace/configuration (Client.settings).
@@ -35,15 +36,16 @@ code_repo_root :: proc() -> string {
 			exeDir, _ = filepath.join({cwd, exeDir}, context.temp_allocator)
 		}
 	}
-	append(&candidates, filepath.dir(exeDir, context.temp_allocator))
+	append(&candidates, exeDir, filepath.dir(exeDir, context.temp_allocator))
 	for c in candidates {
-		p, _ := filepath.join({c, "engine", "definitions"}, context.temp_allocator)
-		if os.is_dir(p) do return c
+		p, _ := filepath.join({c, "lua-language-server", "bin", "lua-language-server"}, context.temp_allocator)
+		if os.is_file(p) do return c
 	}
 	return ""
 }
 
-// Code_LuaServerPath is the lua-language-server binary ("" if not built).
+// Code_LuaServerPath is the lua-language-server binary ("" if not found):
+// next to the editor (a shipped editor), or in the engine checkout.
 Code_LuaServerPath :: proc() -> string {
 	root := code_repo_root()
 	if root == "" do return ""
@@ -95,7 +97,7 @@ code_lsp_start :: proc(state: ^EditorState) {
 		Editor_Log(state, .Warn, "lua-language-server not found; build it in lua-language-server/ for Lua completion")
 		return
 	}
-	defs, _ := filepath.join({code_repo_root(), "engine", "definitions"}, context.temp_allocator)
+	defs := Lua_ProjectSetup(state)
 	cm.client.settings = strings.clone(code_lua_settings(defs))
 	root := state.projectPath
 	if !filepath.is_abs(root) {

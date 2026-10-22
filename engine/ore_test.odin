@@ -381,3 +381,26 @@ test_pack_demo_project_ore :: proc(t: ^testing.T) {
 		testing.expect(t, OrePackage_HasFile(pkg, "scripts/asteroid.lua"), "Archive should contain asteroid.lua")
 	}
 }
+
+// Hidden files and folders (.ore/ tooling, .luarc.json, editor settings)
+// aren't packaged.
+@(test)
+test_pack_skips_hidden_files :: proc(t: ^testing.T) {
+	dir := "test_pack_hidden"
+	defer os.remove_all(dir)
+	_ = os.make_directory_all("test_pack_hidden/.ore/definitions")
+	_ = os.make_directory_all("test_pack_hidden/scripts")
+	_ = os.write_entire_file("test_pack_hidden/project.json", transmute([]u8)string(`{"name": "x"}`))
+	_ = os.write_entire_file("test_pack_hidden/scripts/a.lua", transmute([]u8)string(`return {}`))
+	_ = os.write_entire_file("test_pack_hidden/.luarc.json", transmute([]u8)string(`{}`))
+	_ = os.write_entire_file("test_pack_hidden/.ore/definitions/engine_api.lua", transmute([]u8)string(`-- api`))
+	_ = os.write_entire_file("test_pack_hidden/scripts/.DS_Store", transmute([]u8)string(`x`))
+	testing.expect(t, OrePackage_CreateFromDirectory(dir, "test_pack_hidden.ore", true), "packed")
+	defer os.remove("test_pack_hidden.ore")
+	pkg, ok := OrePackage_Open("test_pack_hidden.ore")
+	testing.expect(t, ok, "opens")
+	if !ok do return
+	defer OrePackage_Close(pkg)
+	testing.expect(t, OrePackage_HasFile(pkg, "project.json") && OrePackage_HasFile(pkg, "scripts/a.lua"), "game files packed")
+	testing.expect(t, !OrePackage_HasFile(pkg, ".luarc.json") && !OrePackage_HasFile(pkg, ".ore/definitions/engine_api.lua") && !OrePackage_HasFile(pkg, "scripts/.DS_Store"), "hidden files skipped")
+}

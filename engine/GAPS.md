@@ -150,6 +150,7 @@ Causes: every child lookup scanned one flat relationship array (O(n²) per frame
 | Item | Change |
 |---|---|
 | Editor rendering | the viewport draws every layer from one traversal (it walked the tree once per layer) |
+| Lua tooling | engine definitions compiled into the editor and written to `<project>/.ore/definitions`, plus `.luarc.json` (works outside the engine checkout and in VS Code); the language server is found next to the editor too; `/private` paths on macOS map to project paths; hidden files aren't packaged (`test_pack_skips_hidden_files`, `lua_tooling` drive) |
 | Culling | world layers skip nodes whose bounds are outside the camera view (`engine/culling.odin`: sprites and tile maps have bounds; unknown nodes always draw); tile maps draw only the visible cell range, LDtk only visible tiles; the editor culls to its own view. Profiler tab: drawn / culled counts. `test_view_culling` |
 
 ## 2. Open gaps (prioritized)

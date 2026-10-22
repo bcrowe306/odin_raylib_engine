@@ -257,6 +257,16 @@ onto the code to insert its path, or hold Cmd to add it as an exported asset
 property. Text editing uses the `odin_editor` packages (`buffer`, `syntax`, `lsp`); see
 `code_editor.odin` and `code_editor_lsp.odin`.
 
+**Lua tooling files.** The editor writes the engine API definitions to
+`<project>/.ore/definitions/` (compiled into the editor, refreshed when it
+updates) and a `.luarc.json` pointing at them, so lua-language-server - in
+the Code tab or in VS Code / any LuaLS editor opening the project folder -
+knows every engine type. A hand-written `.luarc.json` is left alone. Hidden
+files and folders (`.ore/`, `.luarc.json`, ...) are never packaged into
+games. The language server is looked up next to the editor, then in the
+engine checkout (or set its path in Settings > Code Editor).
+
+
 **File > Export Standalone Game** packages the project as `game.ore` and builds
 the generic runner (`runner/`) next to it: a folder you can ship.
 
