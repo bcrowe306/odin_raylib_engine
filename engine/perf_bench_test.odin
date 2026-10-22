@@ -57,3 +57,28 @@ bench_scene_hot_paths :: proc(t: ^testing.T) {
 		game->terminate()
 	}
 }
+
+// Particle simulation (emit + update, no drawing): 5000 live particles.
+@(test)
+bench_particles :: proc(t: ^testing.T) {
+	emitter: ParticleEmitter
+	ParticleEmitter_Init(&emitter)
+	defer ParticleEmitter_Destroy(&emitter)
+	emitter.amount = 5000
+	emitter.lifetime = 1
+	emitter.continuous = true
+	emitter.velocity = 100
+	emitter.velocitySpread = 50
+	emitter.velocityVariance = 1
+	emitter.colorVariance = 0.2
+	emitter.spread = {100, 100}
+	ParticleEmitter_Start(&emitter)
+	for _ in 0 ..< 60 do ParticleEmitter_Update(&emitter, 1.0 / 60) // warm up: steady state
+	frames :: 300
+	start := time.tick_now()
+	for _ in 0 ..< frames do ParticleEmitter_Update(&emitter, 1.0 / 60)
+	per := time.tick_since(start) / frames
+	alive := 0
+	for i in 0 ..< len(emitter.particles) do if emitter.particles[i].alive do alive += 1
+	fmt.printfln("[bench] particles: %d alive, %d emitted/frame: update %.3f ms/frame", alive, 5000 / 60, time.duration_milliseconds(per))
+}

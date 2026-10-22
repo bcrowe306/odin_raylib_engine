@@ -2,7 +2,8 @@
 """Writes a rendering benchmark project: a copy of the demo project with
 scenes/bench_tiles.scene.json (a 400x400 tile map seen zoomed out) and
 scenes/bench_sprites.scene.json (5000 separate sprites, 4 textures
-interleaved) and bench_sprites_overlap.scene.json (the same, overlapping).
+interleaved) and bench_sprites_overlap.scene.json (the same, overlapping),
+bench_particles / bench_particles_circles (5000 live particles).
 
   scripts/make_bench_project.py /tmp/ore_bench
   bin/runners/macos/runner /tmp/ore_bench --scene scenes/bench_tiles.scene.json --bench 300
@@ -47,4 +48,12 @@ for name, step in (("bench_sprites", 50), ("bench_sprites_overlap", 26)):
         sprites.append(node("TextureNode", f"S{k}", pos=((k % 100) * step - 640, (k // 100) * step - 360), scale=(0.08, 0.08), layer=1,
                             texture_path=f"textures/Asteroid_{k % 4 + 1}.png"))
     (out / "scenes" / f"{name}.scene.json").write_text(json.dumps(scene(name, sprites)))
+# 5000 live particles (rectangles; circles).
+for name, shape in (("bench_particles", "Rectangle"), ("bench_particles_circles", "Circle")):
+    emitter = node("ParticleEmitterNode", "Emitter", pos=(640, 360), layer=1,
+                   particles={"amount": 5000, "lifetime": 1.0, "emitting": True, "continuous": True, "velocity": 150},
+                   properties={"emitter.shape": shape, "emitter.size": [4, 4], "emitter.spread": [300, 200],
+                               "emitter.velocitySpread": 100, "emitter.velocityVariance": 1, "emitter.angleSpread": 180,
+                               "emitter.angleVariance": 1, "emitter.colorVariance": 0.2})
+    (out / "scenes" / f"{name}.scene.json").write_text(json.dumps(scene(name, [node("CameraNode", "Cam", pos=(640, 360)), emitter])))
 print(f"Wrote {out}")

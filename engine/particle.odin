@@ -1,5 +1,6 @@
 package engine
 
+import "base:runtime"
 import "core:mem"
 
 import "core:math/rand"
@@ -250,8 +251,27 @@ Particle :: struct {
 	customShapeProc: proc(p: ^Particle, deltaTime: f32),
 }
 
+// Particles use a fast generator seeded once from the OS (they need
+// variety, not unpredictability; the OS generator cost per number).
+@(private = "file")
+particleRandom: struct {
+	state:  rand.Default_Random_State,
+	seeded: bool,
+}
+
+@(private = "file")
+particle_rng :: proc() -> runtime.Random_Generator {
+	if !particleRandom.seeded {
+		seed: [8]u8
+		crypto.rand_bytes(seed[:])
+		particleRandom.state = rand.create((^u64)(&seed[0])^)
+		particleRandom.seeded = true
+	}
+	return runtime.default_random_generator(&particleRandom.state)
+}
+
 ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
-	context.random_generator = crypto.random_generator()
+	context.random_generator = particle_rng()
 
 	ParticleEmitter_Reserve(emitter, clamp(emitter.amount * 2 + 4, 16, PARTICLE_MAX))
 	if len(emitter.particles) == 0 do return
@@ -627,14 +647,15 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
 ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles[i].alive do continue
-		p := emitter.particles[i]
+		p := &emitter.particles[i]
 		switch p.shape {
 			case ParticleShape.Circle:
-				rl.DrawCircleV(p.position, p.size[0] * p.scale[0], p.color)
+				// Segments from the radius (0.5 px error): small particles
+				// need ~8 triangles, not DrawCircleV's fixed 36.
+				rl.DrawCircleSector(p.position, p.size[0] * p.scale[0], 0, 360, 0, p.color)
 			case .Rectangle:
 				w := p.size[0] * p.scale[0]
 				h := p.size[1] * p.scale[1]
-				rl.DrawRectangleV(p.position, {w, h}, p.color)
 				rl.DrawRectanglePro({p.position[0], p.position[1], w, h}, {w / 2, h / 2}, p.rotation, p.color)
 			case .Ellipse:
 				rl.DrawEllipse(i32(p.position[0]), i32(p.position[1]), p.size[0] * p.scale[0], p.size[1] * p.scale[1], p.color)
@@ -651,7 +672,7 @@ ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
 				rl.DrawLineEx({xStart, yStart}, {xEnd, yEnd}, 1 * p.scale[1], p.color)
 			case .Custom:
 				if p.customShapeProc != nil {
-					p_copy := p
+					p_copy := p^
 					p.customShapeProc(&p_copy, deltaTime)
 				}
 			case .Texture:
