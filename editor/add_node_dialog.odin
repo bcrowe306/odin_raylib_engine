@@ -433,7 +433,21 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 	Drive_Item("addnode.search")
 	filter := strings.to_lower(string(cstring(raw_data(nodeSearchBuf[:]))), context.temp_allocator)
 
-	// Keep the selection on a visible entry.
+	// Keep the selection on a visible entry; when the search changes, prefer
+	// one whose name matches ("joint" picks Joint, not Line's "round joints").
+	@(static) lastFilter: [64]u8
+	if string(cstring(raw_data(lastFilter[:]))) != filter {
+		lastFilter = {}
+		copy(lastFilter[:len(lastFilter) - 1], filter)
+		best := -1
+		for item, i in NODE_CATALOG {
+			if filter != "" && (strings.contains(strings.to_lower(item.name, context.temp_allocator), filter) || strings.contains(strings.to_lower(item.typeName, context.temp_allocator), filter)) {
+				best = i
+				break
+			}
+		}
+		if best >= 0 do selectedCatalogIdx = best
+	}
 	if selectedCatalogIdx < 0 || selectedCatalogIdx >= len(NODE_CATALOG) || !catalog_matches(NODE_CATALOG[selectedCatalogIdx], filter) {
 		for item, i in NODE_CATALOG {
 			if catalog_matches(item, filter) {selectedCatalogIdx = i; break}

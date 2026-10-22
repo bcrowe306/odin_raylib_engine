@@ -42,13 +42,15 @@ UI_Fonts :: struct {
 GlobalFonts: UI_Fonts
 
 ui_fa_ranges: [3]imgui.Wchar = {0xE000, 0xF8FF, 0}
+// Latin-1 plus punctuation (– — · … “ ”) and arrows.
+ui_text_ranges: [7]imgui.Wchar = {0x0020, 0x00FF, 0x2000, 0x206F, 0x2190, 0x21FF, 0}
 
 // UI_LoadFonts loads Open Sans (regular/semibold/small) with Font Awesome
 // icons merged into each.
 UI_LoadFonts :: proc() {
 	io := imgui.GetIO()
 	add :: proc(io: ^imgui.IO, path: cstring, size: f32) -> ^imgui.Font {
-		font := imgui.FontAtlas_AddFontFromFileTTF(io.Fonts, path, size)
+		font := imgui.FontAtlas_AddFontFromFileTTF(io.Fonts, path, size, nil, &ui_text_ranges[0])
 		cfg: imgui.FontConfig
 		cfg.FontDataOwnedByAtlas = true
 		cfg.OversampleH = 2
@@ -284,13 +286,13 @@ UI_PanelTitle :: proc(icon, title: string, detail: string = "") {
 }
 
 // UI_Combo: a combo over `names`; returns the new index when changed.
-UI_Combo :: proc(id: string, current: int, names: []string) -> (int, bool) {
-	preview := names[current] if current >= 0 && current < len(names) else ""
+UI_Combo :: proc(id: string, current: int, names: []string, mixed := false) -> (int, bool) {
+	preview := MIXED_TEXT if mixed else names[current] if current >= 0 && current < len(names) else ""
 	result, changed := current, false
 	if imgui.BeginCombo(fmt.ctprintf("##%s", id), strings.clone_to_cstring(preview, context.temp_allocator)) {
 		for n, i in names {
 			if imgui.Selectable(strings.clone_to_cstring(n, context.temp_allocator), i == current) {
-				result, changed = i, i != current
+				result, changed = i, i != current || mixed
 			}
 			Drive_Item(fmt.tprintf("pick:%s", n))
 		}
@@ -298,4 +300,38 @@ UI_Combo :: proc(id: string, current: int, names: []string) -> (int, bool) {
 	}
 	Drive_Item(id)
 	return result, changed
+}
+
+// UI_BeginBanner / UI_EndBanner: a tinted, full-width block around the items
+// between them. A group, not a child window, so its items exist (for
+// keyboard focus and drives) even when scrolled out of view.
+@(private = "file")
+banner: struct {
+	left, right: f32,
+}
+
+UI_BeginBanner :: proc() {
+	PAD :: 6
+	pos := imgui.GetCursorScreenPos()
+	banner = {pos.x, pos.x + imgui.GetContentRegionAvail().x}
+	dl := imgui.GetWindowDrawList()
+	imgui.DrawList_ChannelsSplit(dl, 2)
+	imgui.DrawList_ChannelsSetCurrent(dl, 1)
+	imgui.BeginGroup()
+	imgui.Dummy({0, PAD - imgui.GetStyle().ItemSpacing.y})
+	imgui.Indent(PAD)
+	imgui.PushTextWrapPos(banner.right - PAD - imgui.GetWindowPos().x)
+}
+
+UI_EndBanner :: proc(color: imgui.Vec4) {
+	PAD :: 6
+	imgui.PopTextWrapPos()
+	imgui.Unindent(PAD)
+	imgui.EndGroup()
+	mn, mx := imgui.GetItemRectMin(), imgui.GetItemRectMax()
+	dl := imgui.GetWindowDrawList()
+	imgui.DrawList_ChannelsSetCurrent(dl, 0)
+	imgui.DrawList_AddRectFilled(dl, {banner.left, mn.y}, {banner.right, mx.y + PAD}, col_u32(color), 4, {})
+	imgui.DrawList_ChannelsMerge(dl)
+	imgui.Dummy({0, PAD - imgui.GetStyle().ItemSpacing.y})
 }

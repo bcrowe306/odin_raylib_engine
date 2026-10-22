@@ -76,7 +76,7 @@ field_reset :: proc(id: string, modified: bool) -> bool {
 
 // vec2_edit: X/Y drag fields with coloured markers, a link toggle and a
 // reset button (to `def`). Returns true when the value changed.
-vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoLabel: string, def: [2]f32 = {0, 0}) -> bool {
+vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoLabel: string, def: [2]f32 = {0, 0}, mixed := [2]bool{}) -> bool {
 	if id not_in linkedFields do linkedFields[strings.clone(id)] = strings.contains(id, "scale")
 	linked := linkedFields[id]
 	avail := imgui.GetContentRegionAvail().x
@@ -91,7 +91,7 @@ vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoL
 	changed := false
 	axis(UI_DANGER)
 	imgui.SetNextItemWidth(w)
-	if imgui.DragFloat(fmt.ctprintf("##%s.x", id), &v.x, speed, 0, 0, "%.2f") {
+	if imgui.DragFloat(fmt.ctprintf("##%s.x", id), &v.x, speed, 0, 0, MIXED_TEXT if mixed.x else "%.2f") {
 		changed = true
 		if linked do v.y = old.y * (v.x / old.x) if old.x != 0 else v.y + (v.x - old.x)
 	}
@@ -100,7 +100,7 @@ vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoL
 	imgui.SameLine(0, UI_SPACE)
 	axis(UI_SUCCESS)
 	imgui.SetNextItemWidth(w)
-	if imgui.DragFloat(fmt.ctprintf("##%s.y", id), &v.y, speed, 0, 0, "%.2f") {
+	if imgui.DragFloat(fmt.ctprintf("##%s.y", id), &v.y, speed, 0, 0, MIXED_TEXT if mixed.y else "%.2f") {
 		changed = true
 		if linked do v.x = old.x * (v.y / old.y) if old.y != 0 else v.x + (v.y - old.y)
 	}

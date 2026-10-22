@@ -50,7 +50,7 @@ out of scope here.
 ## Phase 6 — Editor workflows & UX
 
 - [x] 6.1 Tooltips & docs on every Inspector property (type, range, doc from tags); Inspector help pane
-- [ ] 6.2 Multi-edit (mixed values shown as —)
+- [x] 6.2 Multi-edit (mixed values shown as —)
 - [ ] 6.3 Viewport: rulers/guides, smart snapping to node edges/centres, pivot editing, per-node lock/hide, show-all-colliders
 - [ ] 6.4 Scene tree: search by type/tag, groups/tags, reorder by drag, cross-scene copy/paste
 - [ ] 6.5 Asset browser: thumbnail grid, real folders (create/move/rename with reference updates), find usages, per-asset import settings

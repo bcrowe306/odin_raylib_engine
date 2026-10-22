@@ -1,0 +1,58 @@
+# Multi-edit: two lights with different energies selected together; the
+# Inspector marks the mixed value, an edit applies to both, a position edit
+# changes only that axis, a checkbox and a combo apply to both, undo.
+wait 5
+click @asset.new-scene
+click @hier.add
+type light
+click @addnode.create
+expect node:Light.type == LightNode
+dblclick @insp.prop:energy
+key ctrl+a
+type 3
+key enter
+dblclick @insp.position.x
+key ctrl+a
+type 100
+key enter
+key escape
+click @hier.add
+type light
+click @addnode.create
+expect node:Light2.type == LightNode
+dblclick @insp.position.x
+key ctrl+a
+type 300
+key enter
+hold cmd
+click @hier:Light
+release
+expect selection-count == 2
+expect item:insp.multi == visible
+screenshot mixed_energy
+# Energy: 3 and 1 -> 5 on both.
+dblclick @insp.prop:energy
+key ctrl+a
+type 5
+key enter
+expect node:Light.prop.energy ~= 5
+expect node:Light2.prop.energy ~= 5
+# Y only: the different X positions stay.
+dblclick @insp.position.y
+key ctrl+a
+type 200
+key enter
+expect node:Light.position ~= 100,200
+expect node:Light2.position ~= 300,200
+# A checkbox and a combo.
+click @insp.prop:shadows
+expect node:Light.prop.shadows == false
+expect node:Light2.prop.shadows == false
+click @insp.prop:kind
+click @pick:Spot
+expect node:Light.prop.kind == Spot
+expect node:Light2.prop.kind == Spot
+screenshot both_spot
+key cmd+z
+expect node:Light.prop.kind == Point
+expect node:Light2.prop.kind == Point

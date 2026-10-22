@@ -84,24 +84,29 @@ inspector_body :: proc(state: ^EditorState) {
 		imgui.SameLine(0, 2)
 		if UI_IconButton(ICON_FA_POWER_OFF, "insp.enabled", "Enabled: updates and collides" if node.enabled else "Disabled", node.enabled) {
 			Editor_RecordUndo(state, "Toggle enabled")
-			node.enabled = !node.enabled
+			on := !node.enabled
+			for n in multi_selection(state) do n.enabled = on
+			node.enabled = on
 		}
 		imgui.SameLine(0, 2)
 		if UI_IconButton(ICON_FA_EYE if node.renderable else ICON_FA_EYE_SLASH, "insp.visible", "Visible" if node.renderable else "Hidden", node.renderable) {
 			Editor_RecordUndo(state, "Toggle visible")
-			node.renderable = !node.renderable
+			on := !node.renderable
+			for n in multi_selection(state) do n.renderable = on
+			node.renderable = on
 		}
 	}
 	imgui.PushFont(GlobalFonts.small)
 	UI_DimText(e.Node_TypeName(node))
 	imgui.PopFont()
+	Inspector_MultiBanner(state)
 
 	// Component (prefab) instances: link banner; their insides are read-only.
 	locked := Editor_NodeLocked(state, node)
 	if node.componentPath != "" || locked {
 		compRoot := e.Node_ComponentRoot(state.activeScene.manager, node)
-		imgui.PushStyleColorImVec4(.ChildBg, {0.70, 0.52, 1.0, 0.10})
-		if imgui.BeginChild("##compbanner", {0, 0}, {.AutoResizeY}, {}) {
+		UI_BeginBanner()
+		{
 			imgui.PushStyleColorImVec4(.Text, {0.75, 0.62, 1.0, 1})
 			imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_CUBES, compRoot.componentPath))
 			imgui.PopStyleColor()
@@ -154,33 +159,41 @@ inspector_body :: proc(state: ^EditorState) {
 				UI_Tooltip("Turn this instance into ordinary nodes (saved in full in this scene)")
 			}
 		}
-		imgui.EndChild()
-		imgui.PopStyleColor()
+		UI_EndBanner({0.70, 0.52, 1.0, 0.10})
 	}
 
 	imgui.Dummy({0, 4})
 	if isRoot do inspector_scene_settings(state, state.activeScene)
 	if !isRoot && UI_SectionHeader("Transform") {
 		if UI_BeginProps("##transform") {
+			// Each field edits every selected node (mixed values show "—").
 			UI_PropLabel("Position")
-			vec2_edit(state, "insp.position", &node.position, 1, "Move")
+			mp := multi_begin(state, node, node_field(node, &node.position, "position", .Vec2, [2]f32))
+			vec2_edit(state, "insp.position", &node.position, 1, "Move", mixed = mp.mixed)
+			multi_end(&mp)
 			UI_PropLabel("Rotation")
+			mr := multi_begin(state, node, node_field(node, &node.rotation, "rotation", .Float, f32))
 			imgui.SetNextItemWidth(field_width())
-			imgui.DragFloat("##rot", &node.rotation, 0.5, -36000, 36000, "%.1f°")
+			imgui.DragFloat("##rot", &node.rotation, 0.5, -36000, 36000, MIXED_TEXT if mr.mixed[0] else "%.1f°")
 			undo_on_activate(state, "Rotate")
 			Drive_Item("insp.rotation")
 			if field_reset("insp.rotation", node.rotation != 0) {
 				Editor_RecordUndo(state, "Reset rotation")
 				node.rotation = 0
 			}
+			multi_end(&mr)
 			UI_PropLabel("Scale")
-			vec2_edit(state, "insp.scale", &node.scale, 0.01, "Scale", {1, 1})
+			ms := multi_begin(state, node, node_field(node, &node.scale, "scale", .Vec2, [2]f32))
+			vec2_edit(state, "insp.scale", &node.scale, 0.01, "Scale", {1, 1}, ms.mixed)
+			multi_end(&ms)
 			UI_PropLabel("Layer")
 			names := []string{"Layer 1 (back)", "Layer 2", "Layer 3", "Layer 4", "Layer 5", "Layer 6", "Layer 7", "Layer 8 (UI)"}
 			defLayer := e.RenderLayer.Layer1
 			if d := Editor_DefaultNode(node); d != nil do defLayer = d.layer
+			ml := multi_begin(state, node, node_field(node, &node.layer, "layer", .Enum, e.RenderLayer))
+			defer multi_end(&ml)
 			imgui.SetNextItemWidth(field_width())
-			if layer, changed := UI_Combo("insp.layer", int(node.layer), names); changed {
+			if layer, changed := UI_Combo("insp.layer", int(node.layer), names, ml.mixed[0]); changed {
 				Editor_RecordUndo(state, "Change layer")
 				node.layer = e.RenderLayer(layer)
 			}
@@ -189,14 +202,20 @@ inspector_body :: proc(state: ^EditorState) {
 				node.layer = defLayer
 			}
 			UI_PropLabel("Pause Mode")
+			mpm := multi_begin(state, node, node_field(node, &node.pauseMode, "pauseMode", .Enum, e.Pause_Mode))
+			defer multi_end(&mpm)
 			imgui.SetNextItemWidth(field_width())
-			if mode, changed := UI_Combo("insp.pause-mode", int(node.pauseMode), {"Inherit", "Pausable", "Always"}); changed {
+			if mode, changed := UI_Combo("insp.pause-mode", int(node.pauseMode), {"Inherit", "Pausable", "Always"}, mpm.mixed[0]); changed {
 				Editor_RecordUndo(state, "Pause mode")
 				node.pauseMode = e.Pause_Mode(mode)
 			}
 			UI_Tooltip("Pausable: stops when its parent or the game pauses (Engine.set_paused). Always: keeps running (pause menus)")
 			UI_PropLabel("Paused")
+			mpa := multi_begin(state, node, node_field(node, &node.paused, "paused", .Bool, bool))
+			defer multi_end(&mpa)
+			mixed_push(mpa.mixed[0])
 			imgui.Checkbox("##paused", &node.paused)
+			mixed_pop(mpa.mixed[0])
 			undo_on_activate(state, "Toggle paused")
 			Drive_Item("insp.paused")
 			UI_Tooltip("Pauses this node and its children (except Always ones) while the game runs")
@@ -244,6 +263,7 @@ inspector_properties :: proc(state: ^EditorState, node: ^e.Node) {
 		if UI_BeginProps("##props") {
 			for p in props {
 				if p.runtime || !prop_relevant(node, p.name) do continue
+				if len(state.selection) > 1 && !multi_shared(state, node, p) do continue
 				UI_PropLabel(pretty_name(p.name))
 				property_widget(state, node, p, false)
 			}
@@ -328,6 +348,11 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 	if readonly do imgui.BeginDisabled(true)
 	defer if readonly do imgui.EndDisabled()
 	undoLabel := fmt.tprintf("Edit %s", pretty_name(p.name))
+	// Several nodes selected: shows mixed values, applies the edit (or a
+	// reset) to all; deferred first, so it runs last.
+	m := multi_begin(state, node, p)
+	defer multi_end(&m)
+	mixed := m.mixed[0]
 	def, hasDef := prop_default(node, p)
 	defer if !readonly && p.kind != .Vec2 {
 		if field_reset(id, hasDef && !prop_is_default(p, def)) do prop_reset(state, node, p, def)
@@ -346,34 +371,40 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 		v := e.Property_GetFloat(p)
 		speed: f32 = 0.1
 		if p.has_range && p.max - p.min > 0 do speed = (p.max - p.min) / 400
-		if imgui.DragFloat(label, &v, speed, p.min if p.has_range else 0, p.max if p.has_range else 0, float_format(v)) {
+		if imgui.DragFloat(label, &v, speed, p.min if p.has_range else 0, p.max if p.has_range else 0, MIXED_TEXT if mixed else float_format(v)) {
 			e.Property_SetFloat(p, v)
 		}
 		undo_on_activate(state, undoLabel)
 	case .Int:
 		v := c.int(e.Property_GetInt(p))
-		if imgui.DragInt(label, &v, 0.2, c.int(p.min) if p.has_range else 0, c.int(p.max) if p.has_range else 0) {
+		if imgui.DragInt(label, &v, 0.2, c.int(p.min) if p.has_range else 0, c.int(p.max) if p.has_range else 0, MIXED_TEXT if mixed else "%d") {
 			e.Property_SetInt(p, i64(v))
 		}
 		undo_on_activate(state, undoLabel)
 	case .Bool:
+		mixed_push(mixed)
 		imgui.Checkbox(label, (^bool)(p.ptr))
+		mixed_pop(mixed)
 		undo_on_activate(state, undoLabel)
 	case .Vec2:
 		dv := (^[2]f32)(def.ptr)^ if hasDef else [2]f32{}
-		vec2_edit(state, id, (^[2]f32)(p.ptr), 0.5, undoLabel, dv)
+		vec2_edit(state, id, (^[2]f32)(p.ptr), 0.5, undoLabel, dv, m.mixed)
 		return
 	case .Color:
 		col := (^rl.Color)(p.ptr)
 		f := [4]f32{f32(col.r) / 255, f32(col.g) / 255, f32(col.b) / 255, f32(col.a) / 255}
-		if imgui.ColorEdit4(label, &f, {.AlphaBar, .AlphaPreviewHalf}) {
+		if imgui.ColorEdit4(label, &f, {.AlphaBar, .AlphaPreviewHalf, .NoInputs} if mixed else {.AlphaBar, .AlphaPreviewHalf}) {
 			col^ = {u8(f.r * 255 + 0.5), u8(f.g * 255 + 0.5), u8(f.b * 255 + 0.5), u8(f.a * 255 + 0.5)}
 		}
 		undo_on_activate(state, undoLabel)
+		if mixed {
+			imgui.SameLine()
+			UI_DimText(MIXED_TEXT)
+		}
 	case .Enum:
 		names := e.Property_EnumNames(p)
 		cur := e.Property_GetEnumIndex(p)
-		preview := names[cur] if cur < len(names) else ""
+		preview := MIXED_TEXT if mixed else names[cur] if cur < len(names) else ""
 		if imgui.BeginCombo(label, strings.clone_to_cstring(preview, context.temp_allocator)) {
 			for n, i in names {
 				if imgui.Selectable(strings.clone_to_cstring(n, context.temp_allocator), i == cur) {
@@ -390,7 +421,7 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 		isLayers := p.type.id == typeid_of(e.CollisionLayerSet)
 		count := 0
 		for _, i in names do if e.Property_BitSetHas(p, i) do count += 1
-		if imgui.BeginCombo(label, fmt.ctprintf("%d selected", count)) {
+		if imgui.BeginCombo(label, MIXED_TEXT if mixed else fmt.ctprintf("%d selected", count)) {
 			for n, i in names {
 				on := e.Property_BitSetHas(p, i)
 				shown := e.CollisionLayer_DisplayName(e.CollisionLayer(i)) if isLayers && i < 16 else n
@@ -403,8 +434,8 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 		}
 	case .String:
 		buf: [512]u8
-		copy(buf[:len(buf) - 1], (^string)(p.ptr)^)
-		if imgui.InputText(label, cstring(raw_data(buf[:])), len(buf), {}) {
+		if !mixed do copy(buf[:len(buf) - 1], (^string)(p.ptr)^)
+		if imgui.InputTextWithHint(label, MIXED_TEXT if mixed else "", cstring(raw_data(buf[:])), len(buf), {}) {
 			e.Property_SetString(node, p, string(cstring(raw_data(buf[:]))))
 		}
 		undo_on_activate(state, undoLabel)

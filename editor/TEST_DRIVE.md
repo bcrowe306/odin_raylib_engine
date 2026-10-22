@@ -36,6 +36,7 @@ exits non-zero if any check fails.
 | `animation.drive` | Animation tab: frames from dropped textures, scrubbing, rotation track with keys, preview restore, save. |
 | `tilemap.drive` | Tile map: tileset, palette, paint stroke (undo/redo), flood fill, erase, save. |
 | `ui_ux.drive` | Settings (keymap record, input action + key, video, export), linked X/Y and reset, Save As / Revert / Open Project, asset copy/paste/rename/delete, paste as child, LDtk level asset, instance add child + apply to component, particle editor, viewport fit. |
+| `multi_edit.drive` | Two lights selected: mixed value marked, a number / one axis of the position / a checkbox / a combo applied to both, undo. |
 | `inspector_help.drive` | Hovering a property fills the tooltip and the Inspector help pane (field or label); View > Inspector Help hides the pane. |
 | `code_editor.drive` | Open a script in the Code tab; lua-language-server completion of the engine API, signature help, diagnostics, go to definition; save; unsaved-changes prompt; New Script from the Inspector. |
 

@@ -114,6 +114,13 @@ Motion, Size & Rotation, Color (gradient over the particle's life with
 draggable stops, plus a red/green/blue/alpha plot whose alpha points you
 drag) and Collision, with a live preview in the viewport.
 
+With several nodes selected, the Inspector shows the primary one under a
+"N nodes selected" banner and only the properties they all have; values
+that differ show **—**, and an edit (or reset) applies to every selected
+node - for X/Y pairs only the axis you changed, so differing positions keep
+their other coordinate. Enable / visible toggles apply to all; the other
+sections (script, material, signals) edit the primary node.
+
 Hover any property (its label or field) for help: a tooltip with what it
 does, its type, range, default and the name scripts use with
 `get_property` / `set_property`. The **help pane** at the bottom of the
