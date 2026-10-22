@@ -101,6 +101,7 @@ editor_main :: proc() -> int {
 		imgui_rl.process_events()
 		imgui_rl.new_frame()
 		if TestDrive_BeginFrame(&GlobalDrive, &GlobalEditor) do break
+		Workspace_BeforeFrame() // a saved workspace picked last frame
 		imgui.NewFrame()
 
 		displayW := f32(rl.GetScreenWidth())
@@ -154,41 +155,8 @@ editor_main :: proc() -> int {
 
 		dockspaceID := imgui.GetID("EditorMainDockSpace_v4")
 
-		if DockBuilderGetNode(dockspaceID) == nil {
-			DockBuilderRemoveNode(dockspaceID)
-			DockBuilderAddNode(dockspaceID, 0)
-			DockBuilderSetNodePos(dockspaceID, dockAreaPos)
-			DockBuilderSetNodeSize(dockspaceID, dockAreaSize)
-
-			dockMain := dockspaceID
-			dockBottom: imgui.ID
-			dockLeft: imgui.ID
-			dockRight: imgui.ID
-
-			// Left column: Assets over Preview. Right column: Scene over
-			// Inspector. Bottom (under the viewport): Console.
-			DockBuilderSplitNode(dockMain, .Left, 0.20, &dockLeft, &dockMain)
-			dockLeftPreview: imgui.ID
-			DockBuilderSplitNode(dockLeft, .Down, 0.36, &dockLeftPreview, &dockLeft)
-			DockBuilderDockWindow("Assets###AssetBrowserWindow", dockLeft)
-			DockBuilderDockWindow("Preview###PreviewPanelWindow", dockLeftPreview)
-
-			DockBuilderSplitNode(dockMain, .Right, 0.25, &dockRight, &dockMain)
-			DockBuilderSplitNode(dockMain, .Down, 0.28, &dockBottom, &dockMain)
-			DockBuilderDockWindow("Console###BottomPanelWindow", dockBottom)
-
-
-			dockInspector: imgui.ID
-			dockHierarchy: imgui.ID
-			DockBuilderSplitNode(dockRight, .Down, 0.50, &dockInspector, &dockHierarchy)
-			DockBuilderDockWindow("Scene###SceneHierarchyWindow", dockHierarchy)
-			DockBuilderDockWindow("Inspector###InspectorWindow", dockInspector)
-
-			// 4. Center remaining space -> Viewport
-			DockBuilderDockWindow("Viewport###ViewportWindow", dockMain)
-
-			DockBuilderFinish(dockspaceID)
-		}
+		// The dock layout: built the first time, or for a picked workspace preset.
+		Workspace_BuildIfNeeded(&GlobalEditor, dockspaceID, dockAreaPos, dockAreaSize)
 
 		imgui.DockSpace(dockspaceID, imgui.Vec2{0, 0}, {.PassthruCentralNode, .AutoHideTabBar}) // panels draw their own headers
 		imgui.End()

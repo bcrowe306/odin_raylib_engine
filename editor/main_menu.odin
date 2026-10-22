@@ -141,9 +141,32 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "view.code")
 		menu_action(state, "view.console")
 		imgui.Separator()
+		wsOpen := imgui.BeginMenu(fmt.ctprintf("Workspaces (%s)", currentWorkspace))
+		Drive_Item("menu:View/Workspaces")
+		if wsOpen {
+			for p in Layout_Preset {
+				if imgui.MenuItem(fmt.ctprintf("%s", LAYOUT_PRESET_NAMES[p]), nil, currentWorkspace == LAYOUT_PRESET_NAMES[p]) do Workspace_RequestPreset(p)
+				Drive_Item(fmt.tprintf("menu:Workspaces/%s", LAYOUT_PRESET_NAMES[p]))
+			}
+			saved := Workspace_List(state)
+			if len(saved) > 0 do imgui.Separator()
+			for name in saved {
+				if imgui.MenuItem(fmt.ctprintf("%s", name), nil, currentWorkspace == name) do Workspace_Load(state, name)
+				Drive_Item(fmt.tprintf("menu:Workspaces/%s", name))
+			}
+			imgui.Separator()
+			if imgui.MenuItem("Save Workspace As...") do Prompt_Open(.SaveWorkspace, currentWorkspace)
+			Drive_Item("menu:Workspaces/Save Workspace As...")
+			if len(saved) > 0 && imgui.BeginMenu("Delete Workspace") {
+				for name in saved {
+					if imgui.MenuItem(fmt.ctprintf("%s", name)) do Workspace_Delete(state, name)
+				}
+				imgui.EndMenu()
+			}
+			imgui.EndMenu()
+		}
 		if menu_item("Reset Layout") {
-			dockspaceID := imgui.GetID("EditorMainDockSpace_v4")
-			DockBuilderRemoveNode(dockspaceID)
+			Workspace_RequestPreset(.Default)
 			Editor_Log(state, .Info, "Layout reset")
 		}
 		imgui.EndMenu()

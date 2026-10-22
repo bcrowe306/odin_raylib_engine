@@ -25,6 +25,7 @@ Prompt_Kind :: enum {
 	SaveComponentAs,  // a component document or instance -> new component file
 	NewProject,
 	RenameAsset,
+	SaveWorkspace,
 }
 
 @(private = "file")
@@ -54,6 +55,7 @@ prompt_title :: proc(kind: Prompt_Kind) -> (title, hint: string) {
 	case .SaveComponentAs: return "Save as New Component", "Component name"
 	case .NewProject:      return "New Project", "Folder for the new project"
 	case .RenameAsset:     return "Rename Asset", "New file name"
+	case .SaveWorkspace:   return "Save Workspace", "Workspace name"
 	case .None:
 	}
 	return "", ""
@@ -101,6 +103,7 @@ prompt_apply :: proc(state: ^EditorState, kind: Prompt_Kind, text: string) {
 	case .SaveComponentAs: Editor_SaveComponentAs(state, prompt.node, text)
 	case .NewProject:      Editor_NewProject(state, text)
 	case .RenameAsset: Asset_PromptApply(state, kind, text)
+	case .SaveWorkspace: Workspace_Save(state, text)
 	case .None:
 	}
 }

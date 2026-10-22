@@ -36,6 +36,7 @@ exits non-zero if any check fails.
 | `animation.drive` | Animation tab: frames from dropped textures, scrubbing, rotation track with keys, preview restore, save. |
 | `tilemap.drive` | Tile map: tileset, palette, paint stroke (undo/redo), flood fill, erase, save. |
 | `ui_ux.drive` | Settings (keymap record, input action + key, video, export), linked X/Y and reset, Save As / Revert / Open Project, asset copy/paste/rename/delete, paste as child, LDtk level asset, instance add child + apply to component, particle editor, viewport fit. |
+| `workspaces.drive` | Animation and Level Design presets (bottom panel height), a saved workspace loaded back, Reset Layout. |
 | `remote_game.drive` | Play with the editor link: the Game tab's live tree, pause, one-frame step, inspect and change a node's rotation in the running game, resume, a saved scene reloading in the game, stop. |
 | `sprite_slicer.drive` | Slicer: a texture cut 4 x 2, cells picked (click, Shift+click range) as an animation, one per row, a new AnimationPlayer; picked cells saved. |
 | `asset_folders.drive` | Folders view: new folder, a texture the scene uses dragged into it (reference updated), Find Usages, folder renamed (references updated), thumbnail grid, texture import settings in project.json, folder deleted. |
@@ -99,6 +100,7 @@ Queries:
   comma-separated), `code.signature`, `code.errors`, `code.diagnostics`, `code.diagnostic-messages`, `code.hover`
 - `code.cursors`, `code.selection`, `code.find` (match count), `code.font`, `code.completion-doc`
 - `insp-help` (the Inspector help pane: `<Title>: <doc>`), `guides` (`x=704,y=50`), `usages` (files in the Find Usages window, -1 = closed), `folder-open:<dir>`
+- `workspace` (the current workspace), `window-h:<item>` (height of the window an item is in)
 - `remote-connected`, `remote-paused`, `remote-frame`, `remote-steps`, `remote-reloads`, `remote-nodes`, `remote-names`, `remote-prop:<name>` (the Game tab's link to the running game)
 - `palette.open`, `shortcuts-open`, `quit-prompt`, `selection`, `selection-count`, `clipboard-nodes`
 - `import.imported`, `import.skipped`, `import.failed` (counts from the last import), `import.report`

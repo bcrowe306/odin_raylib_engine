@@ -1,0 +1,45 @@
+# Workspaces: the Animation preset (tall bottom panel), Level Design (short
+# one), saving the current layout as a workspace and loading it back, Reset
+# Layout.
+wait 5
+expect workspace == Default
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+expect workspace == Animation
+expect window-h:bottom:console >= 250
+screenshot animation
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Level Design
+wait 5
+expect window-h:bottom:console <= 140
+screenshot level_design
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Save Workspace As...
+expect item:prompt.input == visible
+key cmd+a
+type DriveShortBottom
+key enter
+expect workspace == DriveShortBottom
+expect abs-file:$PROJECT/.editor_workspaces/DriveShortBottom.ini contains [Docking]
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+expect window-h:bottom:console >= 250
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/DriveShortBottom
+wait 5
+expect workspace == DriveShortBottom
+expect window-h:bottom:console <= 140
+screenshot loaded
+click @menu:View
+click @menu:View/Reset Layout
+wait 5
+expect workspace == Default
+expect window-h:bottom:console >= 150
+expect window-h:bottom:console <= 220

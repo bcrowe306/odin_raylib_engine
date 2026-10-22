@@ -83,6 +83,15 @@ Filter the tree by name, `#tag` or `t:type` (`t:sprite`, `type:CameraNode`); ter
 Tags (groups) are edited in the Inspector's **Tags** section (type one and press Enter, or pick one used in the scene; click a tag to remove it); scripts use `has_tag` / `Scene.find_by_tag`, and the generated Lua types list the project's tags (`NodeTag`).
 Assets: drag textures, audio, components or scripts into the viewport.
 
+### Workspaces
+
+**View > Workspaces** switches the panel layout: **Default**, **Level
+Design** (a larger viewport), **Scripting** (the Code tab in the middle,
+in front), **Animation** (a tall bottom panel on the Animation tab) - or a
+layout of your own: arrange the panels, **Save Workspace As...**, and pick
+it from the same menu later (saved in `~/.config/ore_editor/workspaces/`;
+**Delete Workspace** removes one). **Reset Layout** returns to Default.
+
 ### File menu
 
 New Scene / Script / Project, **Open Project** (recent projects and a
