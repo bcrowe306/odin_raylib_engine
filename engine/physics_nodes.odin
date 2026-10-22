@@ -12,6 +12,10 @@ StaticBodyNode :: struct {
 	bodyId: b2.BodyId,
 	shapes: [dynamic]PhysicsShape,
 	debugColor: rl.Color `gui:"true"`,
+	// One way: bodies pass through from below and land on top (the
+	// node's rotation turns "top"); e.g. jump-through platforms.
+	oneWay: bool `gui:"true"`,
+	oneWayApplied: bool,
 	lastSyncedPos: [2]f32,
 	lastSyncedRot: f32,
 	onCollisionStarted: EventSubject, // "collision_started"(other node)
@@ -56,6 +60,8 @@ StaticBodyNode_EnsureBody :: proc(sb: ^StaticBodyNode, gameContext: ^GameContext
 }
 
 StaticBodyNode_AddShape :: proc(sb: ^StaticBodyNode, shape: PhysicsShape, gameContext: ^GameContext = nil) -> ^PhysicsShape {
+	shape := shape
+	if sb.oneWay do shape.enablePreSolveEvents = true
 	append(&sb.shapes, shape)
 	ptr := &sb.shapes[len(sb.shapes) - 1]
 	if gameContext != nil {
@@ -90,10 +96,18 @@ StaticBodyNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 
 	// Follow the node's world transform (moved directly, by a script, or by
 	// a moving parent).
-	if b2.Distance(sb.globalPosition, sb.lastSyncedPos) > 0.01 || abs(sb.globalRotation - sb.lastSyncedRot) > 0.01 {
+	moved := b2.Distance(sb.globalPosition, sb.lastSyncedPos) > 0.01 || abs(sb.globalRotation - sb.lastSyncedRot) > 0.01
+	if moved {
 		b2.Body_SetTransform(sb.bodyId, sb.globalPosition, DegreesToRot(sb.globalRotation))
 		sb.lastSyncedPos = sb.globalPosition
 		sb.lastSyncedRot = sb.globalRotation
+	}
+	if sb.oneWay != sb.oneWayApplied || (sb.oneWay && moved) {
+		// Pre-solve events on its shapes; "top" turns with the node.
+		for &shape in sb.shapes do shape.enablePreSolveEvents = sb.oneWay
+		worldId := gameContext.game.physicsWorld.worldId if gameContext != nil && gameContext.game != nil else b2.WorldId{}
+		Physics_SetOneWay(sb, sb.oneWay, rotate_vec({0, -1}, sb.globalRotation), worldId)
+		sb.oneWayApplied = sb.oneWay
 	}
 
 	for &shape in sb.shapes {
@@ -113,6 +127,7 @@ StaticBodyNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 
 StaticBodyNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	sb := cast(^StaticBodyNode)node
+	Physics_SetOneWay(sb, false)
 	DestroySubject(&sb.onCollisionStarted)
 	DestroySubject(&sb.onCollisionEnded)
 	if b2.Body_IsValid(sb.bodyId) {

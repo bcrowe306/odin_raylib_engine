@@ -452,6 +452,32 @@ file is ignored (logged) and the game starts with empty data. The runner's
 tests); in the editor, **Game > Save Data** opens the folder or deletes the
 save files.
 
+#### Physics: joints, one-way platforms, collision layers
+
+- **Joint** nodes connect two bodies (Body A defaults to the joint's
+  parent): revolute (hinge), distance, prismatic (slider), weld, wheel or
+  motor, with motors, springs and limits. The joint is made when both
+  bodies exist; parameters apply live:
+  ```lua
+  local hinge = self.node:get_child("Hinge")
+  hinge:set_property("joint.revolute.enableMotor", true)
+  hinge:set_property("joint.revolute.motorSpeed", 4)   -- radians/s
+  ```
+  Bodies are pixel-scale (a 40 px box has a mass of 1600), so motor torques
+  are large: new joints default to 5,000,000.
+- **One Way** on a StaticBody: bodies pass through from below and land on
+  top ("top" turns with the node). LDtk one-way colliders use the same.
+- **Collision layers** can be named in Project Settings > Physics; shapes
+  list them by name, and scripts use them:
+  ```lua
+  self.node:set_collision_layer("Player")
+  self.node:set_collision_mask("World", "Enemies", "Pickups")
+  print(Physics.layer_name(2))   --> "Enemies"
+  ```
+- `node:set_property(path, value)` / `node:get_property(path)` read and
+  write any Inspector property by its path (as shown in the Inspector's
+  tooltips and saved scenes).
+
 #### State machines (StateMachineNode)
 
 A **StateMachine** node holds named states, each optionally playing an

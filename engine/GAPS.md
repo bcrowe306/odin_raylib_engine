@@ -194,6 +194,7 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 ./scripts/editor_drive.sh                      # all UI test-drives (or: task editor:drive)
 ```
 | Audio | One-shot voices (sound aliases sharing samples, up to 8; `Audio.play_sound` overlaps 4, SoundNode **Voices**), positional SoundNodes (distance falloff + pan from the camera or `Audio.set_listener`; `Audio.play_sound_at`), bus volumes applied live (`Audio.set_bus_volume`), a master low-pass and Freeverb-style reverb (a mixed-audio processor: raylib's per-stream callbacks carry no user data, so effects can't keep separate state per bus), MusicNode fades and `Audio.crossfade` (`test_audio_mixing` checks the DSP, `test_music_fades_and_buses`; runner smoke test with the effects on). Not listened to on speakers in testing |
+| Physics extras | JointNode (revolute, distance, prismatic, weld, wheel, motor between two body nodes; Body A/B pickers, only the active type's parameters in the Inspector, live parameter changes wake the bodies, defaults sized for pixel-scale masses), One Way StaticBody (engine-wide one-way registry + pre-solve callback, moved out of LDtk, "top" follows rotation), named collision layers (project.json `physics.layers`, shown in shape layer lists, `set_collision_layer` / `set_collision_mask` / `Physics.layer_name`; scenes keep stable `LayerN` names), `node:set_property` / `get_property` for any Inspector property (`test_one_way_platform`, `test_joint_node`, `test_collision_layer_names`, `physics_extras` drive) |
 
 ## Performance baselines
 

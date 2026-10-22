@@ -188,6 +188,14 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		if mn.music != nil && mn.music.filePath != "" {
 			Json_Key(w, "audio", &first); Json_String(w, asset_rel(node, mn.music.filePath))
 		}
+	case JointNode:
+		jn := cast(^JointNode)node
+		Json_Key(w, "joint", &first)
+		strings.write_string(&w.sb, "{\"a\": ")
+		Json_String(w, jn.bodyA)
+		strings.write_string(&w.sb, ", \"b\": ")
+		Json_String(w, jn.bodyB)
+		strings.write_byte(&w.sb, '}')
 	case StateMachineNode:
 		Json_Key(w, "state_machine", &first)
 		write_state_machine(w, cast(^StateMachineNode)node)
@@ -758,6 +766,8 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		}
 	case StateMachineNode:
 		if smObj, ok := sj_obj(obj, "state_machine"); ok do read_state_machine(cast(^StateMachineNode)node, smObj)
+	case JointNode:
+		if jo, ok := sj_obj(obj, "joint"); ok do JointNode_SetBodies(cast(^JointNode)node, sj_string(jo, "a", ""), sj_string(jo, "b", ""))
 	case TimerNode:
 		tm := cast(^TimerNode)node
 		if timerObj, ok := sj_obj(obj, "timer"); ok {

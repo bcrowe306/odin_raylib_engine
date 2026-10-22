@@ -167,6 +167,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		description = "Directional line-of-sight raycaster detecting intersection points, surface normals, and hit fractions.",
 		typeName    = "RaycastNode",
 	},
+	{
+		name        = "Joint",
+		category    = "Physics & Collision",
+		icon        = ICON_FA_LINK,
+		description = "Connects two bodies: hinge (revolute), distance, slider (prismatic), weld, wheel or motor; motors, springs and limits. Pick Body A (default: parent) and Body B.",
+		typeName    = "JointNode",
+	},
 
 	// 6. UI & Interface
 	{

@@ -83,6 +83,7 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case LdtkLevelNode: typeName = "LdtkLevelNode"
 	case LightNode: typeName = "LightNode"
 	case StateMachineNode: typeName = "StateMachineNode"
+	case JointNode: typeName = "JointNode"
 	case TileMapNode: typeName = "TileMapNode"
 	}
 	nameC := strings.clone_to_cstring(typeName, context.temp_allocator)
@@ -2743,6 +2744,160 @@ lua_sm_stop :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// --- node:set_property / get_property: any Inspector property by path -------
+
+// node:set_property(path, value...): numbers, booleans, {x, y} / x, y,
+// {r, g, b[, a]} colours (0..1), enum names, strings.
+@(private="file")
+lua_node_set_property :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	name := lua.tostring(L, 2)
+	if !ok || name == nil do return 0
+	p, found := Node_FindProperty(node, string(name))
+	if !found {
+		lua.L_error(L, "set_property: %s has no property '%s'", strings.clone_to_cstring(node.name, context.temp_allocator), name)
+		return 0
+	}
+	num :: proc(L: ^lua.State, i: c.int) -> f32 {return f32(lua.tonumber(L, i))}
+	tbl :: proc(L: ^lua.State, k: lua.Integer) -> f32 {
+		lua.rawgeti(L, 3, k)
+		defer lua.pop(L, 1)
+		return f32(lua.tonumber(L, -1))
+	}
+	switch p.kind {
+	case .Float: Property_SetFloat(p, num(L, 3))
+	case .Int:   Property_SetInt(p, i64(lua.tointeger(L, 3)))
+	case .Bool:  (^bool)(p.ptr)^ = bool(lua.toboolean(L, 3))
+	case .Vec2:
+		v: [2]f32
+		if lua.type(L, 3) == .TABLE do v = {tbl(L, 1), tbl(L, 2)}
+		else do v = {num(L, 3), num(L, 4)}
+		(^[2]f32)(p.ptr)^ = v
+	case .Color:
+		ch :: proc(v: f32) -> u8 {return u8(clamp(v, 0, 1) * 255 + 0.5)}
+		if lua.type(L, 3) == .TABLE {
+			a: f32 = 1
+			lua.rawgeti(L, 3, 4)
+			if lua.type(L, -1) == .NUMBER do a = f32(lua.tonumber(L, -1))
+			lua.pop(L, 1)
+			(^rl.Color)(p.ptr)^ = {ch(tbl(L, 1)), ch(tbl(L, 2)), ch(tbl(L, 3)), ch(a)}
+		}
+	case .Enum:
+		if s := lua.tostring(L, 3); s != nil {
+			for n, i in Property_EnumNames(p) do if strings.equal_fold(n, string(s)) do Property_SetEnumIndex(p, i)
+		}
+	case .Bit_Set:
+	case .String:
+		if s := lua.tostring(L, 3); s != nil do Property_SetString(node, p, string(s))
+	}
+	return 0
+}
+
+// node:get_property(path) -> value (vectors and colours as tables)
+@(private="file")
+lua_node_get_property :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	name := lua.tostring(L, 2)
+	if !ok || name == nil {lua.pushnil(L); return 1}
+	p, found := Node_FindProperty(node, string(name))
+	if !found {lua.pushnil(L); return 1}
+	switch p.kind {
+	case .Float: lua.pushnumber(L, lua.Number(Property_GetFloat(p)))
+	case .Int:   lua.pushinteger(L, lua.Integer(Property_GetInt(p)))
+	case .Bool:  lua.pushboolean(L, b32((^bool)(p.ptr)^))
+	case .Vec2:
+		v := (^[2]f32)(p.ptr)^
+		lua.createtable(L, 2, 0)
+		lua.pushnumber(L, lua.Number(v.x)); lua.rawseti(L, -2, 1)
+		lua.pushnumber(L, lua.Number(v.y)); lua.rawseti(L, -2, 2)
+	case .Color:
+		col := (^rl.Color)(p.ptr)^
+		lua.createtable(L, 4, 0)
+		for v, i in ([4]u8{col.r, col.g, col.b, col.a}) {
+			lua.pushnumber(L, lua.Number(f32(v) / 255))
+			lua.rawseti(L, -2, lua.Integer(i + 1))
+		}
+	case .Enum:
+		names := Property_EnumNames(p)
+		i := Property_GetEnumIndex(p)
+		lua.pushstring(L, strings.clone_to_cstring(names[i] if i < len(names) else "", context.temp_allocator))
+	case .Bit_Set: lua.pushnil(L)
+	case .String: lua.pushstring(L, strings.clone_to_cstring((^string)(p.ptr)^, context.temp_allocator))
+	}
+	return 1
+}
+
+// --- collision layers by name -------------------------------------------------
+
+@(private="file")
+layers_arg :: proc(L: ^lua.State, from: c.int) -> (set: CollisionLayerSet, ok: bool) {
+	ok = true
+	add :: proc(L: ^lua.State, i: c.int, set: ^CollisionLayerSet) -> bool {
+		if lua.type(L, i) == .NUMBER {
+			n := int(lua.tointeger(L, i))
+			if n < 1 || n > 16 do return false
+			set^ += {CollisionLayer(n - 1)}
+			return true
+		}
+		s := lua.tostring(L, i)
+		if s == nil do return false
+		l, found := CollisionLayer_Parse(string(s))
+		if found do set^ += {l}
+		return found
+	}
+	for i in from ..= lua.gettop(L) {
+		if lua.type(L, i) == .TABLE {
+			n := c.int(lua.rawlen(L, i))
+			for k in 1 ..= n {
+				lua.rawgeti(L, i, lua.Integer(k))
+				if !add(L, lua.gettop(L), &set) do ok = false
+				lua.pop(L, 1)
+			}
+		} else if !add(L, i, &set) {
+			ok = false
+		}
+	}
+	return
+}
+
+@(private="file")
+set_layers :: proc(L: ^lua.State, mask: bool) -> c.int {
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	set, valid := layers_arg(L, 2)
+	if !valid do lua.L_error(L, "unknown collision layer (names from Project Settings > Physics, or 1-16)")
+	for &s in Physics_BodyShapes(node) {
+		if mask do s.maskLayers = set
+		else do s.categoryLayers = set
+	}
+	return 0
+}
+
+// body:set_collision_layer("Player"[, ...]): the layers its shapes are on.
+@(private="file")
+lua_node_set_collision_layer :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	return set_layers(L, false)
+}
+
+// body:set_collision_mask("World", "Enemies"[, ...]): the layers it collides with.
+@(private="file")
+lua_node_set_collision_mask :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	return set_layers(L, true)
+}
+
+// Physics.layer_name(n) -> the project's name for layer n (1-16), or "".
+@(private="file")
+lua_physics_layer_name :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	n := int(lua.tointeger(L, 1))
+	lua.pushstring(L, strings.clone_to_cstring(collisionLayerNames[n - 1] if n >= 1 && n <= 16 else "", context.temp_allocator))
+	return 1
+}
+
 @(private="file")
 lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -3142,6 +3297,14 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "light_get_energy")
 		lua.pushcfunction(L, lua_light_set_radius)
 		lua.setfield(L, -2, "light_set_radius")
+		lua.pushcfunction(L, lua_node_set_property)
+		lua.setfield(L, -2, "set_property")
+		lua.pushcfunction(L, lua_node_get_property)
+		lua.setfield(L, -2, "get_property")
+		lua.pushcfunction(L, lua_node_set_collision_layer)
+		lua.setfield(L, -2, "set_collision_layer")
+		lua.pushcfunction(L, lua_node_set_collision_mask)
+		lua.setfield(L, -2, "set_collision_mask")
 		lua.pushcfunction(L, lua_sm_set)
 		lua.setfield(L, -2, "sm_set")
 		lua.pushcfunction(L, lua_sm_get)
@@ -3502,6 +3665,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "set_paused")
 	lua.pushcfunction(L, lua_physics_raycast)
 	lua.setfield(L, -2, "raycast")
+	lua.pushcfunction(L, lua_physics_layer_name)
+	lua.setfield(L, -2, "layer_name")
 	lua.setglobal(L, "Physics")
 
 	// 7. Global "Scene" table

@@ -30,7 +30,7 @@ DistanceJoint :: struct {
 	minLength: f32 `gui:"true" min:"0" max:"1000"`,
 	maxLength: f32 `gui:"true" min:"1" max:"1000"`,
 	enableMotor: bool `gui:"true"`,
-	maxMotorForce: f32 `gui:"true" min:"0" max:"10000"`,
+	maxMotorForce: f32 `gui:"true" min:"0" max:"100000000"`, // pixel-scale bodies are heavy (mass ~ area in px²)
 	motorSpeed: f32 `gui:"true" min:"-500" max:"500"`,
 	collideConnected: bool `gui:"true"`,
 }
@@ -119,8 +119,8 @@ MotorJoint :: struct {
 	bodyIdB: b2.BodyId,
 	linearOffset: [2]f32 `gui:"true" min:"-500" max:"500"`,
 	angularOffset: f32 `gui:"true" min:"0" max:"360"`,
-	maxForce: f32 `gui:"true" min:"0" max:"10000"`,
-	maxTorque: f32 `gui:"true" min:"0" max:"10000"`,
+	maxForce: f32 `gui:"true" min:"0" max:"100000000"`, // pixel-scale bodies are heavy (mass ~ area in px²)
+	maxTorque: f32 `gui:"true" min:"0" max:"100000000"`, // pixel-scale bodies are heavy (mass ~ area in px²)
 	correctionFactor: f32 `gui:"true" min:"0" max:"1"`,
 	collideConnected: bool `gui:"true"`,
 }
@@ -225,7 +225,7 @@ PrismaticJoint :: struct {
 	lowerTranslation: f32 `gui:"true" min:"-500" max:"500"`,
 	upperTranslation: f32 `gui:"true" min:"-500" max:"500"`,
 	enableMotor: bool `gui:"true"`,
-	maxMotorForce: f32 `gui:"true" min:"0" max:"10000"`,
+	maxMotorForce: f32 `gui:"true" min:"0" max:"100000000"`, // pixel-scale bodies are heavy (mass ~ area in px²)
 	motorSpeed: f32 `gui:"true" min:"-500" max:"500"`,
 	collideConnected: bool `gui:"true"`,
 }
@@ -310,7 +310,7 @@ RevoluteJoint :: struct {
 	lowerAngle: f32 `gui:"true" min:"-360" max:"360"`,
 	upperAngle: f32 `gui:"true" min:"-360" max:"360"`,
 	enableMotor: bool `gui:"true"`,
-	maxMotorTorque: f32 `gui:"true" min:"0" max:"10000"`,
+	maxMotorTorque: f32 `gui:"true" min:"0" max:"100000000"`, // pixel-scale bodies are heavy (mass ~ area in px²)
 	motorSpeed: f32 `gui:"true" min:"-50" max:"50"`,
 	collideConnected: bool `gui:"true"`,
 }
@@ -448,7 +448,7 @@ WheelJoint :: struct {
 	lowerTranslation: f32 `gui:"true" min:"-500" max:"500"`,
 	upperTranslation: f32 `gui:"true" min:"-500" max:"500"`,
 	enableMotor: bool `gui:"true"`,
-	maxMotorTorque: f32 `gui:"true" min:"0" max:"10000"`,
+	maxMotorTorque: f32 `gui:"true" min:"0" max:"100000000"`, // pixel-scale bodies are heavy (mass ~ area in px²)
 	motorSpeed: f32 `gui:"true" min:"-50" max:"50"`,
 	collideConnected: bool `gui:"true"`,
 }
@@ -514,14 +514,15 @@ WheelJoint_Sync :: proc(j: ^WheelJoint) {
 // Unified Joint Wrapper for Inspector & Scene use
 PhysicsJoint :: struct {
 	type: PhysicsJointType `gui:"true"`,
-	distance: DistanceJoint,
+	// Each type's parameters (reflected: "joint.revolute.motorSpeed", ...).
+	distance: DistanceJoint `gui:"true"`,
 	filter: FilterJoint,
-	motor: MotorJoint,
-	mouse: MouseJoint,
-	prismatic: PrismaticJoint,
-	revolute: RevoluteJoint,
-	weld: WeldJoint,
-	wheel: WheelJoint,
+	motor: MotorJoint `gui:"true"`,
+	mouse: MouseJoint `gui:"true"`,
+	prismatic: PrismaticJoint `gui:"true"`,
+	revolute: RevoluteJoint `gui:"true"`,
+	weld: WeldJoint `gui:"true"`,
+	wheel: WheelJoint `gui:"true"`,
 }
 
 PhysicsJoint_Init :: proc(pj: ^PhysicsJoint, type: PhysicsJointType = .Distance) {

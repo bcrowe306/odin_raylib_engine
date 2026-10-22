@@ -1,0 +1,47 @@
+# Physics extras: a named collision layer (Project Settings > Physics) shown
+# in a shape's layer list, a one-way static body, and a Joint between two
+# bodies (pickers, only the active type's parameters), saved.
+wait 5
+click @toolbar.settings
+click @settings.page:General
+click @section:Collision Layers
+click @settings.layer:2
+type Enemies
+key enter
+click @settings.save
+expect file:project.json contains "layers": ["", "Enemies"]
+
+click @hier.add
+key ctrl+a
+type static platform
+click @addnode.create
+expect selected == StaticPlatform
+expect item:insp.prop:oneWay == visible
+click @insp.prop:oneWay
+expect node:StaticPlatform.prop.oneWay == true
+
+# Nothing selected: new nodes go to the root (siblings).
+key escape
+click @hier.add
+key ctrl+a
+type dynamic physics box
+click @addnode.create
+expect node:DynamicPhysicsBox.type == DynamicBodyNode
+
+key escape
+click @hier.add
+key ctrl+a
+type joint
+click @addnode.create
+expect node:Joint.type == JointNode
+click @insp.joint.a
+click @pick:StaticPlatform
+click @insp.joint.b
+click @pick:DynamicPhysicsBox
+expect item:insp.prop:joint.revolute.motorSpeed == visible
+expect item:insp.prop:joint.distance.length == missing
+screenshot joint_inspector
+click @toolbar.save
+expect file:scenes/main.scene.json contains "type": "JointNode"
+expect file:scenes/main.scene.json contains "joint": {"a": "../StaticPlatform", "b": "../DynamicPhysicsBox"}
+expect file:scenes/main.scene.json contains "oneWay": true

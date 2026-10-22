@@ -179,6 +179,7 @@ settings_save :: proc(state: ^EditorState) {
 	}
 	e.ProjectConfig_Destroy(&state.projectConfig)
 	state.projectConfig = e.ProjectConfig_Clone(d)
+	e.Physics_SetLayerNames(state.projectConfig.collisionLayers[:])
 	state.game.physicsWorld.gravity = d.gravity
 	if d.virtualWidth > 0 do state.game.virtualSize = {d.virtualWidth, d.virtualHeight}
 	state.game.musicVolume = d.musicVolume
@@ -429,6 +430,15 @@ project_general :: proc(state: ^EditorState) {
 		if UI_Button("Zero-G", "settings.zero-g") do d.gravity = {0, 0}
 		imgui.SameLine()
 		if UI_Button("Earth (0, 980)", "settings.earth-g") do d.gravity = {0, 980}
+		UI_EndProps()
+	}
+	if UI_SectionHeader("Collision Layers", false) && UI_BeginProps("##layers") {
+		// Names for the 16 collision layers (shown in body shapes' layer lists;
+		// scripts use them: body:set_collision_layer("Player")).
+		for i in 0 ..< 16 {
+			UI_PropLabel(fmt.tprintf("Layer %d", i + 1))
+			text_field(fmt.tprintf("settings.layer:%d", i + 1), &d.collisionLayers[i], "unnamed")
+		}
 		UI_EndProps()
 	}
 	if UI_SectionHeader("Scenes") {

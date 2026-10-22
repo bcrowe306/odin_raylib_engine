@@ -302,6 +302,32 @@ function Node:light_get_energy() end
 function Node:light_set_radius(radius) end
 
 -- ----------------------------------------------------------------------------
+-- Properties (any node) and collision layers (body nodes)
+-- ----------------------------------------------------------------------------
+
+---Sets any Inspector property by its path ("gravityScale", "emitter.amount",
+---"joint.revolute.motorSpeed", "tint", ...). Vectors as {x, y} or x, y;
+---colours as {r, g, b[, a]} 0..1; enums by name.
+---@param path string
+---@param value any
+---@param y? number
+function Node:set_property(path, value, y) end
+
+---Reads an Inspector property by its path (vectors and colours as tables).
+---@param path string
+---@return any
+function Node:get_property(path) end
+
+---The collision layers this body's shapes are on: project layer names
+---(Project Settings > Physics), "LayerN" or numbers 1-16; several or a table.
+---@param ... string|integer|table
+function Node:set_collision_layer(...) end
+
+---The collision layers this body's shapes collide with.
+---@param ... string|integer|table
+function Node:set_collision_mask(...) end
+
+-- ----------------------------------------------------------------------------
 -- StateMachineNode Methods
 --
 -- States, transitions and conditions are set up in the Inspector. Entering a
@@ -1461,6 +1487,11 @@ function PhysicsModule.set_paused(paused) end
 ---@param endY number
 ---@return RaycastHit? hit Raycast hit details or nil if no obstacle was struck
 function PhysicsModule.raycast(startX, startY, endX, endY) end
+
+---The project's name for collision layer n (Project Settings > Physics), or "".
+---@param n integer 1-16
+---@return string name
+function PhysicsModule.layer_name(n) end
 
 
 ---@class SceneModule

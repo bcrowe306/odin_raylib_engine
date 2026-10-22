@@ -373,7 +373,6 @@ LdtkLevelNode_ClearBuilt :: proc(ln: ^LdtkLevelNode) {
 		for a in ln.triggers do if Node_IsAlive(a) do RemoveNode(scene.manager, a)
 		for n in ln.spawnedEntities do if Node_IsAlive(n) do RemoveNode(scene.manager, n)
 	}
-	ldtk_unregister_one_way(ln.oneWayBody)
 	ln.staticBody = nil
 	ln.oneWayBody = nil
 	clear(&ln.triggers)
@@ -454,42 +453,6 @@ LdtkLevelNode_SetCollisionRule :: proc(ln: ^LdtkLevelNode, rule: LdtkCollisionRu
 		}
 	}
 	append(&ln.collisionRules, LdtkCollisionRule{strings.clone(rule.layer, ln.allocator), rule.value, rule.type, rule.friction, rule.restitution})
-}
-
-// The one-way platform bodies (checked by the pre-solve callback).
-@(private = "file")
-oneWayNodes: [dynamic]rawptr
-
-@(private = "file")
-ldtk_unregister_one_way :: proc(n: ^StaticBodyNode) {
-	if n == nil do return
-	for p, i in oneWayNodes {
-		if p == rawptr(n) {
-			unordered_remove(&oneWayNodes, i)
-			break
-		}
-	}
-	if len(oneWayNodes) == 0 {
-		delete(oneWayNodes)
-		oneWayNodes = nil
-	}
-}
-
-// One-way platforms: contacts only count while the other body is above the
-// platform (y grows downwards). Runs on Box2D's worker threads: read-only.
-@(private = "file")
-ldtk_pre_solve :: proc "c" (shapeA, shapeB: b2.ShapeId, manifold: ^b2.Manifold, ctx: rawptr) -> bool {
-	is_one_way :: proc "contextless" (s: b2.ShapeId) -> bool {
-		body := b2.Shape_GetBody(s)
-		ud := b2.Body_GetUserData(body)
-		for p in oneWayNodes do if p == ud do return true
-		return false
-	}
-	sign: f32
-	if is_one_way(shapeA) do sign = -1
-	else if is_one_way(shapeB) do sign = 1
-	else do return true
-	return sign * manifold.normal.y > 0.5
 }
 
 @(private = "file")
@@ -609,12 +572,8 @@ LdtkLevelNode_BuildColliders :: proc(ln: ^LdtkLevelNode, ctx: ^GameContext, only
 						ln.oneWayBody.position = {0, 0}
 						ln.oneWayBody.transient = true
 						ln.oneWayBody.gameContext = gc
-						append(&oneWayNodes, rawptr(cast(^Node)ln.oneWayBody))
-						if gc != nil && gc.game != nil && b2.World_IsValid(gc.game.physicsWorld.worldId) {
-							b2.World_SetPreSolveCallback(gc.game.physicsWorld.worldId, ldtk_pre_solve, nil)
-						}
+						ln.oneWayBody.oneWay = true // jump-through (physics_extras.odin)
 					}
-					shape.enablePreSolveEvents = true
 					StaticBodyNode_AddShape(ln.oneWayBody, shape, gc)
 				case .Trigger:
 					area := ldtk_trigger_area(ln, scene, gc, m.layer, m.value)
@@ -1182,7 +1141,6 @@ LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 LdtkLevelNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 	ln := cast(^LdtkLevelNode)node
 	TileCache_Evict(ln)
-	ldtk_unregister_one_way(ln.oneWayBody)
 	DestroySubject(&ln.onLevelLoaded)
 	DestroySubject(&ln.onEntitySpawned)
 	delete(ln.spawnedEntities)

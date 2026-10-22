@@ -42,6 +42,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"LdtkLevelNode", LdtkLevelNode, factory_ldtk, {"ldtk", "ldtklevel"}},
 	{"TileMapNode", TileMapNode, factory_tilemap, {"tilemap"}},
 	{"LightNode", LightNode, factory_light, {"light", "pointlight", "spotlight"}},
+	{"JointNode", JointNode, factory_joint, {"joint", "physicsjoint"}},
 	{"UIContainerNode", UIContainerNode, factory_ui_container, {"uicontainer", "uipanel", "uipanelnode"}},
 	{"UILabelNode", UILabelNode, factory_ui_label, {"uilabel"}},
 	{"UIButtonNode", UIButtonNode, factory_ui_button, {"uibutton"}},
@@ -140,6 +141,11 @@ factory_node :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 @(private = "file")
 factory_camera :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return CameraNode_Create(scene, "Camera", true, parent)
+}
+
+@(private = "file")
+factory_joint :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return JointNode_Create(scene, "Joint", parent)
 }
 
 @(private = "file")

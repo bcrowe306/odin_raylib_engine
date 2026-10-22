@@ -219,6 +219,15 @@ user-data folder under the project's name. **Game > Save Data > Open
 Folder** shows it; **Delete Save Files** removes them so the next run
 starts fresh.
 
+### Physics: joints, one-way, layers
+
+Add a **Joint** (Physics & Collision) and pick **Body A** / **Body B** in
+the Inspector (static, dynamic or character bodies; A defaults to the
+parent); choose its **Type** - only that type's parameters are shown. The
+viewport draws a line between the anchors. A StaticBody's **One Way** makes
+a jump-through platform. **Project Settings > Physics > Collision Layers**
+names the 16 layers; shapes' layer lists show the names.
+
 ### Camera follow
 
 Select a Camera and pick its **Follow Target** in the Inspector (or drop a

@@ -29,6 +29,7 @@ ProjectConfig :: struct {
 	virtualHeight: f32,
 	targetFPS:     int,
 	gravity:       [2]f32,
+	collisionLayers: [16]string, // collision layer names ("" = unnamed; physics_extras.odin)
 	scenes:        [dynamic]string,
 	icon:          string, // project-relative PNG: the game window's icon (and the exported app's)
 
@@ -74,6 +75,7 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg.initialScene != "" do delete(cfg.initialScene, allocator)
 	if cfg.windowTitle != "" do delete(cfg.windowTitle, allocator)
 	if cfg.icon != "" do delete(cfg.icon, allocator)
+	for n in cfg.collisionLayers do if n != "" do delete(n, allocator)
 	for s in cfg.scenes {
 		delete(s, allocator)
 	}
@@ -96,6 +98,7 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c.initialScene = strings.clone(src.initialScene, allocator)
 	c.windowTitle = strings.clone(src.windowTitle, allocator)
 	c.icon = strings.clone(src.icon, allocator)
+	for n, i in src.collisionLayers do c.collisionLayers[i] = strings.clone(n, allocator) if n != "" else ""
 	c.scenes = make([dynamic]string, allocator)
 	for s in src.scenes do append(&c.scenes, strings.clone(s, allocator))
 	c.actions = make([dynamic]Input_Action_Config, allocator)
@@ -340,6 +343,12 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 	// Physics settings
 	if physObj, ok := json_get_obj(rootObj, "physics"); ok {
 		cfg.gravity = json_get_vec2(physObj, "gravity", cfg.gravity)
+		if arr, has := json_get_arr(physObj, "layers"); has {
+			for v, i in arr {
+				if i >= 16 do break
+				if s, isStr := v.(json.String); isStr && s != "" do cfg.collisionLayers[i] = strings.clone(s, allocator)
+			}
+		}
 	}
 
 	// Scenes
@@ -387,7 +396,18 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	fmt.sbprintf(&sb, "  \"video\": {{\"fullscreen\": %t, \"vsync\": %t, \"resizable\": %t, \"msaa\": %t, \"high_dpi\": %t}},\n", cfg.fullscreen, cfg.vsync, cfg.resizable, cfg.msaa, cfg.highDPI)
 	fmt.sbprintf(&sb, "  \"audio\": {{\"master_volume\": %.2f, \"music_volume\": %.2f, \"sfx_volume\": %.2f}},\n", cfg.masterVolume, cfg.musicVolume, cfg.sfxVolume)
 	strings.write_string(&sb, "  \"physics\": {\n")
-	fmt.sbprintf(&sb, "    \"gravity\": [%.2f, %.2f]\n", cfg.gravity.x, cfg.gravity.y)
+	fmt.sbprintf(&sb, "    \"gravity\": [%.2f, %.2f]", cfg.gravity.x, cfg.gravity.y)
+	last := -1
+	for n, i in cfg.collisionLayers do if n != "" do last = i
+	if last >= 0 {
+		strings.write_string(&sb, ",\n    \"layers\": [")
+		for i in 0 ..= last {
+			if i > 0 do strings.write_string(&sb, ", ")
+			jstr(&sb, cfg.collisionLayers[i])
+		}
+		strings.write_byte(&sb, ']')
+	}
+	strings.write_byte(&sb, '\n')
 	strings.write_string(&sb, "  },\n")
 	if len(cfg.actions) > 0 {
 		strings.write_string(&sb, "  \"input\": {\"actions\": [\n")
@@ -462,6 +482,7 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 		game.virtualSize = {cfg.virtualWidth, cfg.virtualHeight}
 	}
 	game.physicsWorld.gravity = cfg.gravity
+	Physics_SetLayerNames(cfg.collisionLayers[:])
 	game.musicVolume = cfg.musicVolume
 	game.sfxVolume = cfg.sfxVolume
 	game.masterVolume = cfg.masterVolume

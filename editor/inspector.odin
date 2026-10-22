@@ -251,6 +251,11 @@ inspector_properties :: proc(state: ^EditorState, node: ^e.Node) {
 // (a Script-mode CharacterMover ignores the built-in movement settings).
 @(private = "file")
 prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
+	// A joint shows only its type's parameters.
+	if node.typeId == e.JointNode && strings.has_prefix(name, "joint.") && name != "joint.type" {
+		jt := e.JointType_FieldName((cast(^e.JointNode)node).joint.type)
+		return strings.has_prefix(name, strings.concatenate({"joint.", jt, "."}, context.temp_allocator))
+	}
 	if node.typeId == e.CharacterMoverNode && (cast(^e.CharacterMoverNode)node).controlMode == .Script {
 		switch name {
 		case "targetSpeedX", "maxSpeed", "acceleration", "jumpSpeed", "enableKeyboardInput": return false
@@ -351,12 +356,15 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 		}
 	case .Bit_Set:
 		names := e.Property_EnumNames(p)
+		// Collision layers show the project's names (Project Settings > Physics).
+		isLayers := p.type.id == typeid_of(e.CollisionLayerSet)
 		count := 0
 		for _, i in names do if e.Property_BitSetHas(p, i) do count += 1
 		if imgui.BeginCombo(label, fmt.ctprintf("%d selected", count)) {
 			for n, i in names {
 				on := e.Property_BitSetHas(p, i)
-				if imgui.Checkbox(strings.clone_to_cstring(n, context.temp_allocator), &on) {
+				shown := e.CollisionLayer_DisplayName(e.CollisionLayer(i)) if isLayers && i < 16 else n
+				if imgui.Checkbox(fmt.ctprintf("%s##%s", shown, n), &on) {
 					Editor_RecordUndo(state, undoLabel)
 					e.Property_BitSetSet(p, i, on)
 				}
@@ -544,6 +552,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		Inspector_TileMap(state, cast(^e.TileMapNode)node)
 	case e.CameraNode:
 		inspector_camera_follow(state, cast(^e.CameraNode)node)
+	case e.JointNode:
+		inspector_joint(state, cast(^e.JointNode)node)
 	case e.StateMachineNode:
 		inspector_state_machine(state, cast(^e.StateMachineNode)node)
 	case e.LdtkLevelNode:
@@ -901,6 +911,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.ParticleEmitterNode: return ICON_FA_WAND_MAGIC_SPARKLES
 	case e.TimerNode: return ICON_FA_CLOCK
 	case e.StateMachineNode: return ICON_FA_DIAGRAM_PROJECT
+	case e.JointNode: return ICON_FA_LINK
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS
 	case e.ScriptNode: return ICON_FA_CODE
 	}
@@ -1096,4 +1107,45 @@ script_value_equal :: proc(a, b: e.ScriptValue) -> bool {
 	case .Color:   return a.valColor == b.valColor
 	}
 	return true
+}
+
+// inspector_joint: the two bodies a JointNode connects.
+@(private = "file")
+inspector_joint :: proc(state: ^EditorState, j: ^e.JointNode) {
+	if !UI_SectionHeader("Joint Bodies") do return
+	if !UI_BeginProps("##jointbodies") do return
+	defer UI_EndProps()
+	mgr := state.activeScene.manager
+	a, b := e.JointNode_Bodies(j, mgr)
+	pick :: proc(state: ^EditorState, j: ^e.JointNode, which: int, cur: ^e.Node, id: string) {
+		mgr := state.activeScene.manager
+		path := j.bodyA if which == 0 else j.bodyB
+		preview := cur.name if cur != nil else ("Parent" if which == 0 && path == "" else (fmt.tprintf("missing: %s", path) if path != "" else "None"))
+		imgui.SetNextItemWidth(field_width())
+		if imgui.BeginCombo(fmt.ctprintf("##%s", id), strings.clone_to_cstring(preview, context.temp_allocator)) {
+			for n in mgr.nodes {
+				if n == nil || n.transient || !e.b2_is_body_node(n) do continue
+				if imgui.Selectable(fmt.ctprintf("%s  %s##%p", Editor_NodeIcon(n), n.name, n), n == cur) {
+					Editor_RecordUndo(state, "Joint body")
+					rel := e.Node_RelativePath(mgr, j, n)
+					if which == 0 do e.JointNode_SetBodies(j, rel, j.bodyB)
+					else do e.JointNode_SetBodies(j, j.bodyA, rel)
+				}
+				Drive_Item(fmt.tprintf("pick:%s", n.name))
+			}
+			imgui.EndCombo()
+		}
+		Drive_Item(id)
+	}
+	UI_PropLabel("Body A")
+	pick(state, j, 0, a, "insp.joint.a")
+	UI_Tooltip("Static, dynamic or character body (default: the joint's parent)")
+	UI_PropLabel("Body B")
+	pick(state, j, 1, b, "insp.joint.b")
+	if a == nil || b == nil {
+		UI_PropLabel("")
+		imgui.PushStyleColorImVec4(.Text, UI_WARNING)
+		imgui.TextWrapped(fmt.ctprintf("%s  Pick two bodies; the joint is made when both exist (while simulating or playing).", ICON_FA_TRIANGLE_EXCLAMATION))
+		imgui.PopStyleColor()
+	}
 }
