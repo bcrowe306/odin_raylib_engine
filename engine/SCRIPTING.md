@@ -452,6 +452,26 @@ file is ignored (logged) and the game starts with empty data. The runner's
 tests); in the editor, **Game > Save Data** opens the folder or deletes the
 save files.
 
+#### Scene flow: transitions, preloading, pausing
+
+```lua
+Scene.change_scene("level2", {transition = "circle", duration = 0.5})  -- or "fade", "wipe_left", ...
+Scene.preload("level3")                       -- load its assets a little each frame
+if Scene.preload_progress("level3") >= 1 then ... end
+
+Engine.set_paused(true)                        -- pause the game (physics too)
+pauseMenu:set_pause_mode("always")             -- ... but keep the menu running
+self.node:set_paused(true)                     -- pause just this node and its children
+```
+
+During a transition the scene switches once its assets are loaded (the
+screen stays covered until then). Preloading loads textures, sounds, music
+and fonts - also those of the components the scene uses - within about 4
+ms a frame, and hands them to the scene when it loads. Paused nodes skip
+`update` (scripts, animations, timers, particles, tweens) and their
+physics bodies are disabled; set **Pause Mode** and **Paused** in the
+Inspector too.
+
 #### Text, dialogue and localization
 
 **TextNode** draws text in the world: a project font (`.ttf` / `.otf` at

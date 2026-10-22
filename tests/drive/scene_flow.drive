@@ -1,0 +1,12 @@
+# Scene flow: a node's Pause Mode and Paused flag in the Inspector, saved.
+# (Transitions, preloading and pausing at runtime: engine test_pausing /
+# test_scene_transitions_and_preload.)
+wait 5
+click @hier:PlayerShip
+click @insp.pause-mode
+click @pick:Always
+click @insp.paused
+screenshot pause_fields
+click @toolbar.save
+expect file:scenes/main.scene.json contains "pause_mode": "always"
+expect file:scenes/main.scene.json contains "paused": true

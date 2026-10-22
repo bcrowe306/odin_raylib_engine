@@ -181,6 +181,18 @@ PropertyInspector_RenderWindow :: proc(state: ^EditorState) {
 				Editor_RecordUndo(state, "Reset layer")
 				node.layer = defLayer
 			}
+			UI_PropLabel("Pause Mode")
+			imgui.SetNextItemWidth(field_width())
+			if mode, changed := UI_Combo("insp.pause-mode", int(node.pauseMode), {"Inherit", "Pausable", "Always"}); changed {
+				Editor_RecordUndo(state, "Pause mode")
+				node.pauseMode = e.Pause_Mode(mode)
+			}
+			UI_Tooltip("Pausable: stops when its parent or the game pauses (Engine.set_paused). Always: keeps running (pause menus)")
+			UI_PropLabel("Paused")
+			imgui.Checkbox("##paused", &node.paused)
+			undo_on_activate(state, "Toggle paused")
+			Drive_Item("insp.paused")
+			UI_Tooltip("Pauses this node and its children (except Always ones) while the game runs")
 			UI_EndProps()
 		}
 	}

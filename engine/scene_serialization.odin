@@ -136,6 +136,8 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	Json_Key(w, "enabled", &first); write_bool(w, node.enabled)
 	Json_Key(w, "visible", &first); write_bool(w, node.renderable)
 	Json_Key(w, "layer", &first); fmt.sbprintf(&w.sb, "%d", int(node.layer))
+	if node.pauseMode != .Inherit {Json_Key(w, "pause_mode", &first); Json_String(w, Pause_ModeName(node.pauseMode))}
+	if node.paused {Json_Key(w, "paused", &first); write_bool(w, true)}
 
 	// A linked component instance saves only its link: everything below the
 	// instance root comes from the component file.
@@ -709,6 +711,8 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.enabled = sj_bool(obj, "enabled", true)
 	node.renderable = sj_bool(obj, "visible", node.renderable)
 	node.layer = RenderLayer(math.clamp(sj_int(obj, "layer", int(node.layer)), 0, len(RenderLayer) - 1))
+	node.pauseMode = Pause_ModeParse(sj_string(obj, "pause_mode", ""))
+	node.paused = sj_bool(obj, "paused", false)
 
 	read_legacy_blocks(node, obj, ctx)
 

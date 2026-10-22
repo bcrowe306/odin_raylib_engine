@@ -3,6 +3,7 @@ package engine
 import vmem "core:mem/virtual"
 import "core:log"
 import "core:strings"
+import b2 "vendor:box2d"
 import rl "vendor:raylib"
 
 SceneSetupProc :: proc(scene: ^Scene, gameContext: ^GameContext)
@@ -296,8 +297,29 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	UI_RenderActiveDropdownOverlay(gameContext)
 }
 
+// Scene_UpdateNodeHirearchy updates a subtree (ready() first time, update,
+// scripts), skipping paused nodes: a node's own `paused` flag pauses its
+// subtree, the game's pause (Engine.set_paused) pauses everything, and
+// nodes with pauseMode Always keep running through either.
 Scene_UpdateNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
+	gamePaused := gameContext != nil && gameContext.game != nil && gameContext.game.treePaused
+	update_tree(scene, node, gameContext, deltaTime, gamePaused, .Pausable)
+}
+
+@(private = "file")
+update_tree :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext, deltaTime: f32, parentPaused: bool, parentMode: Pause_Mode) {
 	if node == nil || !node.enabled do return
+	mode := node.pauseMode if node.pauseMode != .Inherit else parentMode
+	paused := node.paused || (mode == .Pausable && parentPaused)
+	node.pausedNow = paused
+	if paused != node.bodyPaused {
+		// Freeze / release its physics body with it.
+		if body := Physics_BodyOf(node); b2.Body_IsValid(body) {
+			if paused do b2.Body_Disable(body)
+			else do b2.Body_Enable(body)
+		}
+		node.bodyPaused = paused
+	}
 
 	if gameContext != nil {
 		node.gameContext = gameContext
@@ -315,14 +337,16 @@ Scene_UpdateNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^Game
 	// Copy: updates may add or remove children while we iterate.
 	children := GetChildrenTemp(scene.manager, node)
 
-	if node.update != nil do node->update(gameContext, deltaTime)
-	if node.scriptInstance != nil {
-		sm := gameContext.scriptManager if gameContext != nil else nil
-		ScriptInstance_CallUpdate(cast(^ScriptInstance)node.scriptInstance, deltaTime, sm)
+	if !paused {
+		if node.update != nil do node->update(gameContext, deltaTime)
+		if node.scriptInstance != nil {
+			sm := gameContext.scriptManager if gameContext != nil else nil
+			ScriptInstance_CallUpdate(cast(^ScriptInstance)node.scriptInstance, deltaTime, sm)
+		}
 	}
 
 	for child in children {
-		Scene_UpdateNodeHirearchy(scene, child, gameContext, deltaTime)
+		update_tree(scene, child, gameContext, deltaTime, paused, mode)
 	}
 }
 

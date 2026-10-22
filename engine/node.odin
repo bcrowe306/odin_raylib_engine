@@ -51,6 +51,12 @@ Node :: struct {
 	isReady: bool,
 	isUI: bool,
 	inTree: bool, // queued for (or in) a scene's node list (SceneAddNode)
+	// Pausing (scene_flow.odin): `paused` pauses this subtree; pauseMode
+	// decides whether the node stops when its parent / the game pauses.
+	pauseMode: Pause_Mode,
+	paused: bool,
+	pausedNow: bool,  // paused this frame (set by the update pass)
+	bodyPaused: bool, // its physics body was disabled by a pause
 	removing: bool, // queued for removal (RemoveNode)
 	managerIndex: int, // slot in the manager's node list (+1; 0 = not in it)
 	ready: proc(node: ^Node, gameContext: ^GameContext),

@@ -38,6 +38,9 @@ Game :: struct {
 	gameContext:     GameContext,
 	drawBounds:      bool `gui:"true"`,
 	shouldQuit:      bool,
+	treePaused:      bool, // Engine.set_paused: Pausable nodes stop (scene_flow.odin)
+	transition:      Scene_Transition,
+	preloads:        map[^Scene]^Scene_Preload,
 
 	// Viewport mapping & UI interaction state
 	virtualSize:        [2]f32,
@@ -147,12 +150,14 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 	InputSystem_Update(&game.input, deltaTime)
 	if game.scriptManager.hotReload do Shader_CheckForChanges() // edited .fs files
 
-	// 2. Process Scene Transitions
+	// 2. Process Scene Transitions (and load scenes' assets in the background)
+	Scene_FlowUpdate(game, deltaTime)
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	Scene_FlowAfterChange(game)
 	game.gameContext.scene = game.sceneManager.currentScene
 
-	// 3. Step Box2D Physics World
-	PhysicsWorld_Step(&game.physicsWorld, deltaTime, &game.gameContext)
+	// 3. Step Box2D Physics World (not while the game is paused)
+	if !game.treePaused do PhysicsWorld_Step(&game.physicsWorld, deltaTime, &game.gameContext)
 
 	// 4. Run game update proc if defined
 	if game.update != nil {
@@ -165,15 +170,18 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 
 	// Process any scene change requested during game.update
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	Scene_FlowAfterChange(game)
 	game.gameContext.scene = game.sceneManager.currentScene
 
 	// 5. Update and render active scene nodes
 	RunScene(game.sceneManager.currentScene, &game.gameContext, deltaTime)
+	Scene_DrawTransition(game)
 }
 
 GameTerminate :: proc(game: ^Game) {
 	if game == nil do return
 	Tween_Destroy(&game.tweens, game.scriptManager.L) // releases Lua callbacks: before the Lua state goes
+	Scene_FlowShutdown(game)
 	if game.scriptManager.isReady do Save_Flush(game.scriptManager.L) // Save data is written on quit
 	Audio_ResetEffects()
 	Text_UnloadFonts()

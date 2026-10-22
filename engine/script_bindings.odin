@@ -3176,9 +3176,111 @@ lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	nameC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
-	if nameC != nil && sm != nil && sm.game != nil {
-		ChangeScene_ByName(&sm.game.sceneManager, string(nameC))
+	if nameC == nil || sm == nil || sm.game == nil do return 0
+	// Scene.change_scene(name [, {transition = "fade"|"wipe_left"|..|"circle", duration = 0.4, color = {r, g, b}}])
+	if lua.type(L, 2) == .TABLE {
+		scene, ok := sm.game.sceneManager.scenes[string(nameC)]
+		if !ok {
+			log.errorf("Scene: %s, not found", nameC)
+			return 0
+		}
+		lua.getfield(L, 2, "transition")
+		kind := Transition_KindParse(string(lua.tostring(L, -1)) if lua.type(L, -1) == .STRING else "fade")
+		lua.pop(L, 1)
+		lua.getfield(L, 2, "duration")
+		duration := f32(lua.tonumber(L, -1)) if lua.type(L, -1) == .NUMBER else 0.4
+		lua.pop(L, 1)
+		color := rl.BLACK
+		lua.getfield(L, 2, "color")
+		if lua.type(L, -1) == .TABLE {
+			ch :: proc(L: ^lua.State, k: lua.Integer) -> u8 {
+				lua.rawgeti(L, -1, k)
+				defer lua.pop(L, 1)
+				return u8(clamp(f32(lua.tonumber(L, -1)), 0, 1) * 255)
+			}
+			color = {ch(L, 1), ch(L, 2), ch(L, 3), 255}
+		}
+		lua.pop(L, 1)
+		Game_ChangeSceneWith(sm.game, scene, kind, duration, color)
+		return 0
 	}
+	ChangeScene_ByName(&sm.game.sceneManager, string(nameC))
+	return 0
+}
+
+// Scene.preload(name): load its assets in the background (a little each frame).
+@(private="file")
+lua_scene_preload :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	nameC := lua.tostring(L, 1)
+	if nameC == nil || sm == nil || sm.game == nil do return 0
+	if scene, ok := sm.game.sceneManager.scenes[string(nameC)]; ok do Scene_PreloadBegin(sm.game, scene)
+	return 0
+}
+
+// Scene.preload_progress(name) -> 0..1
+@(private="file")
+lua_scene_preload_progress :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	nameC := lua.tostring(L, 1)
+	v: f32
+	if nameC != nil && sm != nil && sm.game != nil {
+		if scene, ok := sm.game.sceneManager.scenes[string(nameC)]; ok do v = Scene_PreloadProgress(sm.game, scene)
+	}
+	lua.pushnumber(L, lua.Number(v))
+	return 1
+}
+
+@(private="file")
+lua_scene_is_transitioning :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	lua.pushboolean(L, b32(sm != nil && sm.game != nil && sm.game.transition.active))
+	return 1
+}
+
+// Engine.set_paused(bool): pausable nodes and physics stop; "always" nodes run.
+@(private="file")
+lua_engine_set_paused :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil do Game_SetPaused(sm.game, bool(lua.toboolean(L, 1)))
+	return 0
+}
+
+@(private="file")
+lua_engine_is_paused :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	lua.pushboolean(L, b32(sm != nil && sm.game != nil && sm.game.treePaused))
+	return 1
+}
+
+// node:set_paused(bool): pauses this node and its children (unless "always").
+@(private="file")
+lua_node_set_paused :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if node, ok := to_node_userdata(L, 1); ok do node.paused = bool(lua.toboolean(L, 2))
+	return 0
+}
+
+// node:is_paused() -> paused this frame (by itself, a parent or the game)
+@(private="file")
+lua_node_is_paused :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	lua.pushboolean(L, b32(ok && (node.paused || node.pausedNow)))
+	return 1
+}
+
+// node:set_pause_mode("inherit" | "pausable" | "always")
+@(private="file")
+lua_node_set_pause_mode :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if s := lua.tostring(L, 2); ok && s != nil do node.pauseMode = Pause_ModeParse(string(s))
 	return 0
 }
 
@@ -3545,6 +3647,12 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "light_set_radius")
 		lua.pushcfunction(L, lua_node_set_property)
 		lua.setfield(L, -2, "set_property")
+		lua.pushcfunction(L, lua_node_set_paused)
+		lua.setfield(L, -2, "set_paused")
+		lua.pushcfunction(L, lua_node_is_paused)
+		lua.setfield(L, -2, "is_paused")
+		lua.pushcfunction(L, lua_node_set_pause_mode)
+		lua.setfield(L, -2, "set_pause_mode")
 		lua.pushcfunction(L, lua_node_set_text)
 		lua.setfield(L, -2, "set_text")
 		lua.pushcfunction(L, lua_node_get_text)
@@ -3803,6 +3911,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "get_window_size")
 	lua.pushcfunction(L, lua_engine_get_virtual_size)
 	lua.setfield(L, -2, "get_virtual_size")
+	lua.pushcfunction(L, lua_engine_set_paused)
+	lua.setfield(L, -2, "set_paused")
+	lua.pushcfunction(L, lua_engine_is_paused)
+	lua.setfield(L, -2, "is_paused")
 	lua.setglobal(L, "Engine")
 
 	// 3. Global "Input" table
@@ -3945,6 +4057,12 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "get_name")
 	lua.pushcfunction(L, lua_scene_change_scene)
 	lua.setfield(L, -2, "change_scene")
+	lua.pushcfunction(L, lua_scene_preload)
+	lua.setfield(L, -2, "preload")
+	lua.pushcfunction(L, lua_scene_preload_progress)
+	lua.setfield(L, -2, "preload_progress")
+	lua.pushcfunction(L, lua_scene_is_transitioning)
+	lua.setfield(L, -2, "is_transitioning")
 	lua.pushcfunction(L, lua_scene_reload)
 	lua.setfield(L, -2, "reload")
 	lua.pushcfunction(L, lua_scene_get_nodes)

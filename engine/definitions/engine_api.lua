@@ -313,6 +313,16 @@ function Node:light_set_radius(radius) end
 ---@param y? number
 function Node:set_property(path, value, y) end
 
+---Pauses this node and its children (except "always" ones).
+---@param paused boolean
+function Node:set_paused(paused) end
+
+---@return boolean paused By itself, a parent or the game
+function Node:is_paused() end
+
+---@param mode "inherit"|"pausable"|"always"
+function Node:set_pause_mode(mode) end
+
 ---Sets the text of a TextNode (restarting its typewriter), UI label or button.
 ---@param text string
 function Node:set_text(text) end
@@ -1231,6 +1241,14 @@ function EngineModule.get_window_size() end
 ---@return number height
 function EngineModule.get_virtual_size() end
 
+---Pauses the game: nodes with pause mode "pausable" (the default) stop
+---updating and physics stops; "always" nodes keep running (pause menus).
+---@param paused boolean
+function EngineModule.set_paused(paused) end
+
+---@return boolean
+function EngineModule.is_paused() end
+
 
 ---@class InputModule
 ---Engine input subsystem for keyboard, mouse, and mapped action queries.
@@ -1575,9 +1593,31 @@ function SceneModule.get_ambient() end
 ---@return string
 function SceneModule.get_name() end
 
----Requests a transition to another scene by name.
+---@alias TransitionKind "fade"|"wipe_left"|"wipe_right"|"wipe_up"|"wipe_down"|"circle"
+
+---@class SceneTransition
+---@field transition? TransitionKind Default "fade"
+---@field duration? number Seconds for each half (cover, uncover); default 0.4
+---@field color? number[] {r, g, b} 0..1; default black
+
+---Switches to another scene by name - at once, or behind a transition (the
+---screen is covered, the scene switches once its assets are loaded, then
+---it's uncovered).
 ---@param name SceneName Name of registered scene
-function SceneModule.change_scene(name) end
+---@param transition? SceneTransition
+function SceneModule.change_scene(name, transition) end
+
+---Starts loading a scene's assets in the background (a little each frame),
+---so switching to it later is quick.
+---@param name SceneName
+function SceneModule.preload(name) end
+
+---@param name SceneName
+---@return number progress 0..1
+function SceneModule.preload_progress(name) end
+
+---@return boolean
+function SceneModule.is_transitioning() end
 
 ---Reloads the currently active scene.
 function SceneModule.reload() end

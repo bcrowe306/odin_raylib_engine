@@ -237,6 +237,10 @@ Tween_Update :: proc(ts: ^Tween_State, dt: f32, sm: ^ScriptManager) {
 			ordered_remove(&ts.tweens, i)
 			continue
 		}
+		if t.node.pausedNow {
+			i += 1 // paused with its node
+			continue
+		}
 		if t.delay > 0 {
 			t.delay -= dt
 			if t.delay > 0 {

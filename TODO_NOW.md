@@ -44,7 +44,7 @@ out of scope here.
 - [x] 5.2 Physics: joints as editor nodes, one-way platforms for StaticBody, named collision layers
 - [x] 5.3 Navigation: A* on tile maps / LDtk grids
 - [x] 5.4 Text: bitmap/SDF fonts, rich text, dialogue box; localization string tables
-- [ ] 5.5 Scene flow: transitions, background scene loading (main thread, incremental), pausing subtrees
+- [x] 5.5 Scene flow: transitions, background scene loading (main thread, incremental), pausing subtrees
 - [ ] 5.6 Extras: parallax node, 9-slice sprite, trail/line renderer, screen-space post effects
 
 ## Phase 6 — Editor workflows & UX
