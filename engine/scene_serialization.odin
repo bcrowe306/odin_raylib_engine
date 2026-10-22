@@ -268,6 +268,16 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 				strings.write_string(&w.sb, ", \"sheet\": ")
 				Json_String(w, asset_rel(node, ssa.spriteSheet.filePath) if ssa.spriteSheet != nil else "")
 				fmt.sbprintf(&w.sb, ", \"grid\": [%d, %d], \"start\": %d, \"end\": %d", ssa.grid.x, ssa.grid.y, ssa.startFrame, ssa.endFrame)
+				if ssa.margin != {} do fmt.sbprintf(&w.sb, ", \"margin\": [%d, %d]", ssa.margin.x, ssa.margin.y)
+				if ssa.spacing != {} do fmt.sbprintf(&w.sb, ", \"spacing\": [%d, %d]", ssa.spacing.x, ssa.spacing.y)
+				if len(ssa.cells) > 0 {
+					strings.write_string(&w.sb, ", \"cells\": [")
+					for c, ci in ssa.cells {
+						if ci > 0 do strings.write_string(&w.sb, ", ")
+						fmt.sbprintf(&w.sb, "%d", c)
+					}
+					strings.write_byte(&w.sb, ']')
+				}
 			} else if a.renderFrame == FA_RenderFrame {
 				fa := cast(^FrameAnimation)a
 				strings.write_string(&w.sb, ", \"frames\": [")
@@ -870,9 +880,23 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 				anim: ^Animation
 				if sheet := sj_string(ao, "sheet", ""); sheet != "" || sj_obj_has(ao, "grid") {
 					grid := sj_vec2(ao, "grid", {1, 1})
-					anim = AnimationPlayerNode_AddSheetAnimation(apn, rm, name,
+					ssa := AnimationPlayerNode_AddSheetAnimation(apn, rm, name,
 						Project_ResolveAssetPath(ctx, sheet) if sheet != "" else "",
 						{int(grid.x), int(grid.y)}, sj_int(ao, "start", 0), sj_int(ao, "end", 0), loop)
+					m := sj_vec2(ao, "margin", {})
+					sp := sj_vec2(ao, "spacing", {})
+					ssa.margin, ssa.spacing = {int(m.x), int(m.y)}, {int(sp.x), int(sp.y)}
+					if cells, has := sj_arr(ao, "cells"); has {
+						list := make([dynamic]int, context.temp_allocator)
+						for cv in cells {
+							#partial switch x in cv {
+							case json.Integer: append(&list, int(x))
+							case json.Float: append(&list, int(x))
+							}
+						}
+						SpriteSheetAnimation_SetCells(ssa, list[:], apn.allocator)
+					}
+					anim = ssa
 				} else {
 					paths := make([dynamic]string, context.temp_allocator)
 					if frames, has := sj_arr(ao, "frames"); has {

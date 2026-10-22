@@ -226,6 +226,18 @@ on the node and called at runtime as `Target:method(value, source)`. The
 link button disconnects and removes the generated handler (asking first if
 you added code to it). See `engine/SCRIPTING.md`.
 
+### Sprite Sheet Slicer
+
+**Tools > Sprite Sheet Slicer...** (also a texture's right-click menu and the
+AnimationPlayer Inspector) cuts a sheet into cells: **Columns** / **Rows**
+or a **Cell Size**, **Margin** and **Spacing**. Click cells to pick them
+(drag across to add several, Shift+click for a range; the numbers are the
+play order), name the animation and **Add Animation**, or **One Animation
+per Row**. **Create Animation Player** adds a new node with the animations
+at the chosen FPS - or **Add to <name>** when an AnimationPlayer is
+selected. The selection previews as it plays. Animations keep the picked
+cells (`"cells"` in the scene; margin / spacing editable in the Inspector).
+
 ### Animation timeline
 
 The bottom panel's **Animation** tab edits the selected AnimationPlayer:

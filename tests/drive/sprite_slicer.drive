@@ -1,0 +1,36 @@
+# Sprite Sheet Slicer: a texture cut 4 x 2, three cells picked (click, then
+# Shift+click for the range) as "spin", one animation per row, a new
+# AnimationPlayer with them; saved with the picked cells.
+wait 5
+key escape
+click @menu:Tools
+click @menu:Tools/Sprite Sheet Slicer...
+click @slicer.texture
+click @pick:textures/Asteroid_2.png
+dblclick @slicer.cols
+key ctrl+a
+type 4
+key enter
+dblclick @slicer.rows
+key ctrl+a
+type 2
+key enter
+click @slicer.cell:0
+hold shift
+click @slicer.cell:2
+release
+click @slicer.name
+type spin
+click @slicer.add
+click @slicer.per-row
+screenshot slicer
+click @slicer.create
+expect node:Asteroid_2.type == AnimationPlayerNode
+expect selected == Asteroid_2
+expect anim contains spin:
+expect anim contains /3
+key ctrl+s
+expect file:scenes/main.scene.json contains "cells": [0, 1, 2]
+expect file:scenes/main.scene.json contains "name": "row2"
+expect file:scenes/main.scene.json contains "cells": [4, 5, 6, 7]
+screenshot created

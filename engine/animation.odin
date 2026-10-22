@@ -90,7 +90,31 @@ SpriteSheetAnimation :: struct {
 	using animation: Animation,
 	spriteSheet:     ^Texture,
 	loadSpriteSheet: proc(ssa: ^SpriteSheetAnimation, rm: ^ResourceManager, filePath: string),
-	grid:            [2]int,
+	grid:            [2]int, // columns, rows
+	margin:          [2]int, // px before the first cell (left, top)
+	spacing:         [2]int, // px between cells
+	// The cells played, in order (row-major indices); empty = start..end.
+	cells:           [dynamic]int,
+}
+
+// SpriteSheet_CellRect: a cell's pixels in a sheet of `size` cut into
+// `grid` cells, after `margin` and with `spacing` between cells.
+SpriteSheet_CellRect :: proc(size: [2]f32, grid, margin, spacing: [2]int, cell: int) -> rl.Rectangle {
+	cols, rows := max(grid.x, 1), max(grid.y, 1)
+	w := (size.x - 2 * f32(margin.x) - f32(cols - 1) * f32(spacing.x)) / f32(cols)
+	h := (size.y - 2 * f32(margin.y) - f32(rows - 1) * f32(spacing.y)) / f32(rows)
+	col, row := cell % cols, cell / cols
+	return {f32(margin.x) + f32(col) * (w + f32(spacing.x)), f32(margin.y) + f32(row) * (h + f32(spacing.y)), w, h}
+}
+
+// SpriteSheetAnimation_SetCells plays these cells in order.
+SpriteSheetAnimation_SetCells :: proc(ssa: ^SpriteSheetAnimation, cells: []int, allocator := context.allocator) {
+	if ssa.cells == nil do ssa.cells = make([dynamic]int, allocator)
+	clear(&ssa.cells)
+	append(&ssa.cells, ..cells)
+	if len(cells) > 0 {
+		ssa.startFrame, ssa.endFrame = 0, len(cells) - 1
+	}
 }
 
 
@@ -132,17 +156,10 @@ SSA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	animation := cast(^SpriteSheetAnimation)animation
 	if animation.spriteSheet == nil do return
 	tex := animation.spriteSheet.texture
-	grid := animation.grid
-	frameSize: [2]f32 = {f32(tex.width) / f32(grid.x), f32(tex.height) / f32(grid.y)}
-	x: int = (frame % grid.x) * auto_cast frameSize.x
-	y: int = (frame / grid.x) * auto_cast frameSize.y
-
-	animation.source = rl.Rectangle {
-		x      = auto_cast x,
-		y      = auto_cast y,
-		width  = frameSize.x,
-		height = frameSize.y,
-	}
+	cell := frame
+	if len(animation.cells) > 0 do cell = animation.cells[clamp(frame, 0, len(animation.cells) - 1)]
+	animation.source = SpriteSheet_CellRect({f32(tex.width), f32(tex.height)}, animation.grid, animation.margin, animation.spacing, cell)
+	frameSize := [2]f32{animation.source.width, animation.source.height}
 	animation.dest = rl.Rectangle {
 		x      = node.globalPosition.x,
 		y      = node.globalPosition.y,

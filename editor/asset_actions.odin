@@ -129,6 +129,7 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 			Editor_RecordUndo(state, "Set texture")
 			Editor_SetTexture(state, cast(^e.TextureNode)sel, rel)
 		}
+		if menu(ICON_FA_TABLE_CELLS, "Slice Sprite Sheet...", "slice-sheet") do Slicer_Open(state, rel)
 		if menu(ICON_FA_TABLE_CELLS, "Use as Tileset of Selected Tile Map", "use-tileset", sel != nil && sel.typeId == e.TileMapNode) {
 			Editor_RecordUndo(state, "Set tileset")
 			e.TileMapNode_SetTileset(cast(^e.TileMapNode)sel, rel, &state.game.gameContext)

@@ -155,6 +155,8 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "tool.rotate", "Rotate")
 		menu_action(state, "tool.scale", "Scale")
 		menu_action(state, "tool.pan", "Pan")
+		imgui.Separator()
+		menu_action(state, "tool.sprite_slicer")
 		imgui.EndMenu()
 	}
 

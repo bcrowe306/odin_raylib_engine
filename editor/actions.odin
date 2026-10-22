@@ -153,6 +153,7 @@ Actions_Init :: proc() {
 	add({id = "tool.move", category = "Tools", label = "Move Tool", chords = k(ch(.W)), scope = .Scene, run = proc(s: ^EditorState) {s.toolMode = .Translate}, checked = proc(s: ^EditorState) -> bool {return s.toolMode == .Translate}})
 	add({id = "tool.rotate", category = "Tools", label = "Rotate Tool", chords = k(ch(.E)), scope = .Scene, run = proc(s: ^EditorState) {s.toolMode = .Rotate}, checked = proc(s: ^EditorState) -> bool {return s.toolMode == .Rotate}})
 	add({id = "tool.scale", category = "Tools", label = "Scale Tool", chords = k(ch(.R)), scope = .Scene, run = proc(s: ^EditorState) {s.toolMode = .Scale}, checked = proc(s: ^EditorState) -> bool {return s.toolMode == .Scale}})
+	add({id = "tool.sprite_slicer", category = "Tools", label = "Sprite Sheet Slicer...", scope = .Global, run = proc(s: ^EditorState) {Slicer_Open(s, "")}})
 	add({id = "tool.pan", category = "Tools", label = "Pan Tool", chords = k(ch(.T)), scope = .Scene, run = proc(s: ^EditorState) {s.toolMode = .Pan}, checked = proc(s: ^EditorState) -> bool {return s.toolMode == .Pan}})
 	add({id = "view.frame", category = "View", label = "Frame Selection", chords = k(ch(.F)), scope = .Scene, run = proc(s: ^EditorState) {s.cameraPos = s.selectedNode.globalPosition}, enabled = has_selection})
 	add({id = "view.reset_zoom", category = "View", label = "Reset Zoom (100%)", chords = k(ch(._0, P)), scope = .Scene, run = proc(s: ^EditorState) {s.cameraZoom = 1}})

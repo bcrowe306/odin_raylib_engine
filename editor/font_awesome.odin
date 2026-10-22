@@ -104,3 +104,4 @@ ICON_FA_LOCK_OPEN                 :: ""
 ICON_FA_RULER_COMBINED            :: "" // Rulers & guides
 ICON_FA_EYE_LOW_VISION            :: "" // Hidden in the editor
 ICON_FA_FOLDER_TREE               :: "" // Assets: folders view
+ICON_FA_BARS                      :: "" // Slicer: one animation per row

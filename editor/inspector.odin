@@ -1062,8 +1062,20 @@ inspector_animation_player :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 				undo_on_activate(state, "Edit grid")
 				UI_PropLabel("Frames")
 				fr := [2]c.int{c.int(ssa.startFrame), c.int(ssa.endFrame)}
-				if imgui.DragInt2("##range", &fr, 0.1, 0, c.int(ssa.grid.x * ssa.grid.y - 1)) do ssa.startFrame, ssa.endFrame = int(fr.x), int(fr.y)
-				undo_on_activate(state, "Edit frame range")
+				if len(ssa.cells) > 0 {
+					UI_DimText(fmt.tprintf("%d picked cells (Sprite Sheet Slicer)", len(ssa.cells)))
+				} else {
+					if imgui.DragInt2("##range", &fr, 0.1, 0, c.int(ssa.grid.x * ssa.grid.y - 1)) do ssa.startFrame, ssa.endFrame = int(fr.x), int(fr.y)
+					undo_on_activate(state, "Edit frame range")
+				}
+				UI_PropLabel("Margin")
+				m := [2]c.int{c.int(ssa.margin.x), c.int(ssa.margin.y)}
+				if imgui.DragInt2("##margin", &m, 0.1, 0, 512) do ssa.margin = {int(m.x), int(m.y)}
+				undo_on_activate(state, "Edit margin")
+				UI_PropLabel("Spacing")
+				sp := [2]c.int{c.int(ssa.spacing.x), c.int(ssa.spacing.y)}
+				if imgui.DragInt2("##spacing", &sp, 0.1, 0, 512) do ssa.spacing = {int(sp.x), int(sp.y)}
+				undo_on_activate(state, "Edit spacing")
 			}
 			UI_EndProps()
 		}
@@ -1103,6 +1115,8 @@ inspector_animation_player :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 		imgui.EndCombo()
 	}
 	Drive_Item("insp.anim.add-sheet")
+	if UI_Button(fmt.tprintf("%s  Slice a Sprite Sheet...", ICON_FA_TABLE_CELLS), "insp.anim.slicer", {-1, 0}) do Slicer_Open(state, "")
+	UI_Tooltip("Pick cells of a sheet and make animations of them (added to this player)")
 }
 
 // inspector_scene_settings: scene-level properties (shown for the root).
