@@ -179,7 +179,7 @@ test_node_hierarchy_removal_and_memory_cleanup :: proc(t: ^testing.T) {
 		res^ = {1, 2, 3, 4}
 
 		exitCount := 0
-		grandchild.onExit->subscribe(proc(source: rawptr, value: EventValue, ctx: ^GameContext, user_data: rawptr) {
+		Node_Subject(grandchild, .Exited_Tree)->subscribe(proc(source: rawptr, value: EventValue, ctx: ^GameContext, user_data: rawptr) {
 			cnt := cast(^int)user_data
 			cnt^ += 1
 		}, &exitCount)

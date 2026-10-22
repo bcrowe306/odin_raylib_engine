@@ -151,10 +151,8 @@ HasParent :: proc(manager: ^NodeManager, node: ^Node) -> bool {
 
 
 RemoveNode :: proc(manager: ^NodeManager, node: ^Node) {
-	if node == nil do return
-	for existing in manager.removal {
-		if existing == node do return
-	}
+	if node == nil || node.removing do return
+	node.removing = true
 	for child in GetChildrenTemp(manager, node) {
 		RemoveNode(manager, child)
 	}
@@ -164,17 +162,34 @@ RemoveNode :: proc(manager: ^NodeManager, node: ^Node) {
 
 
 ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
-	// Remove
+	// Remove. The parents' child lists lose their removed children in one
+	// pass each (removing them one by one is quadratic for big scenes).
+	filtered := make(map[^Node]bool, context.temp_allocator)
+	for n in manager.removal {
+		if parent, ok := manager.parentOf[n]; ok && !parent.removing && parent not_in filtered {
+			filtered[parent] = true
+			if list, has := manager.childrenOf[parent]; has {
+				keep := 0
+				for c in list do if !c.removing {list[keep] = c; keep += 1}
+				resize(&list, keep)
+				manager.childrenOf[parent] = list
+			}
+		}
+	}
 	for removingNode in manager.removal {
 		// Remove relationships (to its parent and to its children).
 		if parent, ok := manager.parentOf[removingNode]; ok {
-			parent.onChildRemoved->notify(parent, removingNode, gameContext)
-			removingNode.onParentRemoved->notify(removingNode, parent, gameContext)
-			unlink(manager, parent, removingNode)
+			Node_NotifyEvent(parent, .Child_Removed, removingNode, gameContext)
+			Node_NotifyEvent(removingNode, .Parent_Removed, parent, gameContext)
+			if parent in filtered {
+				if p, has := manager.parentOf[removingNode]; has && p == parent do delete_key(&manager.parentOf, removingNode)
+			} else {
+				unlink(manager, parent, removingNode)
+			}
 		}
 		for child in GetChildrenTemp(manager, removingNode) {
-			removingNode.onChildRemoved->notify(removingNode, child, gameContext)
-			child.onParentRemoved->notify(child, removingNode, gameContext)
+			Node_NotifyEvent(removingNode, .Child_Removed, child, gameContext)
+			Node_NotifyEvent(child, .Parent_Removed, removingNode, gameContext)
 			unlink(manager, removingNode, child)
 		}
 		if list, ok := manager.childrenOf[removingNode]; ok {
@@ -183,17 +198,23 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 		}
 
 		// Remove nodes from manager. No modify node array. use free list
-		for node, index in manager.nodes {
-			if removingNode == node {
-				log.debug("Removing node from tree: ", node)
-				node.gameContext = gameContext
-				node.onExit->notify(node, nil, gameContext)
+		index := removingNode.managerIndex - 1
+		if index < 0 || index >= len(manager.nodes) || manager.nodes[index] != removingNode {
+			index = -1
+			for node, i in manager.nodes do if node == removingNode {index = i; break}
+		}
+		if index >= 0 {
+			node := removingNode
+			log.debug("Removing node from tree: ", node)
+			node.gameContext = gameContext
+			Node_NotifyEvent(node, .Exited_Tree, nil, gameContext)
 
-				// Frees node's arena, subjects, and any custom onDestroy resources.
-				Node_Terminate(node)
-				manager.nodes[index] = nil
-				queue.push_back(&manager.free, index)
-			}
+			// Frees node's arena, subjects, and any custom onDestroy resources.
+			Node_Terminate(node)
+			manager.nodes[index] = nil
+			queue.push_back(&manager.free, index)
+		} else {
+			removingNode.removing = false // not in the list (yet): it stays
 		}
 	}
 	clear(&manager.removal)
@@ -214,12 +235,14 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 		else {
 			log.debug("Adding node")
 			append(&manager.nodes, addNode)
+			index = len(manager.nodes) - 1
 		}
+		if addNode != nil do addNode.managerIndex = index + 1
 		if addNode != nil do append(&added, addNode)
 	}
 	clear(&manager.addition)
 	for n in added {
-		if Node_IsAlive(n) do n.onEnter->notify(n, nil, gameContext)
+		if Node_IsAlive(n) do Node_NotifyEvent(n, .Entered_Tree, nil, gameContext)
 	}
 }
 
@@ -296,8 +319,8 @@ AddChild :: proc(manager: ^NodeManager, parent, child: ^Node) {
 	manager.childrenOf[parent] = list
 	manager.parentOf[child] = parent
 	ctx := parent.gameContext if parent.gameContext != nil else child.gameContext
-	parent.onChildAdded->notify(parent, child, ctx)
-	child.onParentAdded->notify(child, parent, ctx)
+	Node_NotifyEvent(parent, .Child_Added, child, ctx)
+	Node_NotifyEvent(child, .Parent_Added, parent, ctx)
 }
 
 // MoveChild moves a child to position `index` among its siblings.

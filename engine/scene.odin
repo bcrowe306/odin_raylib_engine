@@ -46,6 +46,7 @@ SceneAddNode :: proc(scene: ^Scene, node: ^Node, parent: ^Node = nil) {
 		log.error("Error queueing node for addition. ", err)
 		return
 	}
+	node.inTree = true
 	if parent == nil && scene.rootNode != node {
 		AddChild(scene.manager, scene.rootNode, node)
 	} else if parent != nil {
@@ -113,7 +114,7 @@ Scene_Unload :: proc(scene: ^Scene, gameContext: ^GameContext = nil) {
 		for node in scene.manager.nodes {
 			if node != nil {
 				node.gameContext = gameContext
-				node.onExit->notify(node, nil, gameContext)
+				Node_NotifyEvent(node, .Exited_Tree, nil, gameContext)
 			}
 		}
 	}

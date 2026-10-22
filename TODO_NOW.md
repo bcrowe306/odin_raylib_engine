@@ -32,7 +32,7 @@ out of scope here.
 
 ## Phase 4 — Performance (single-threaded)
 
-- [ ] 4.1 Node diet: event subjects out of every node (side table), shared vtables, per-type pools instead of an arena per node; split hot transform data
+- [x] 4.1 Node diet: event subjects out of every node (side table), shared vtables, per-type pools instead of an arena per node; split hot transform data
 - [ ] 4.2 Batching: sort draws by texture per layer, texture atlases, cache static LDtk/tile layers in render textures
 - [ ] 4.3 `#soa` + SIMD for particles and tile layers (verify the `#soa` compiler issue first)
 - [ ] 4.4 Editor: incremental undo/modified tracking (change counters, not whole-scene JSON); cache per-frame inspector/LDtk work

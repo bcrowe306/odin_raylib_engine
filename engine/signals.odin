@@ -71,6 +71,11 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 Node_EventNames :: proc(node: ^Node, allocator := context.temp_allocator) -> []Event_Info {
 	out := make([dynamic]Event_Info, allocator)
 	if node == nil do return out[:]
+	// Every node's tree events (kept outside the node: Node_Subject).
+	for name in NODE_EVENT_NAMES {
+		p, d := Event_Describe(name)
+		append(&out, Event_Info{name, p, d})
+	}
 	walk :: proc(out: ^[dynamic]Event_Info, tid: typeid, base: rawptr) {
 		for f in reflect.struct_fields_zipped(tid) {
 			ptr := rawptr(uintptr(base) + f.offset)

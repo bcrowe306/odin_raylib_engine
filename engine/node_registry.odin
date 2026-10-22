@@ -120,16 +120,7 @@ Node_CreateByTypeName :: proc(scene: ^Scene, typeName: string, parent: ^Node = n
 // constructor did: some add to the root, some take a parent, some add nothing.
 @(private = "file")
 place_under :: proc(scene: ^Scene, node, parent: ^Node) {
-	queued := false
-	for q in scene.manager.addition {
-		if q == node {queued = true; break}
-	}
-	if !queued {
-		for n in scene.manager.nodes {
-			if n == node {queued = true; break}
-		}
-	}
-	if !queued {
+	if !node.inTree {
 		SceneAddNode(scene, node, parent)
 		return
 	}

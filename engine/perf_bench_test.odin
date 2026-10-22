@@ -8,6 +8,7 @@ import "core:time"
 // the per-frame global transform pass and a full scene update.
 @(test)
 bench_scene_hot_paths :: proc(t: ^testing.T) {
+	fmt.printfln("[bench] size_of: Node %d B, TextureNode %d B, DynamicBodyNode %d B", size_of(Node), size_of(TextureNode), size_of(DynamicBodyNode))
 	for count in ([]int{500, 2000, 5000}) {
 		game := new(Game)
 		InitializeGame(game)
@@ -32,8 +33,10 @@ bench_scene_hot_paths :: proc(t: ^testing.T) {
 		frame := time.tick_since(start) / 10
 
 		// Respawn: destroy every node and create as many again (recycled arenas).
+		start = time.tick_now()
 		for n in scene.manager.nodes do if n != nil && n != scene.rootNode do RemoveNode(scene.manager, n)
 		ProcessNodeQueues(scene.manager, &game.gameContext)
+		destroy := time.tick_since(start)
 		start = time.tick_now()
 		for i in 0 ..< count {
 			n := CreateNode(scene.manager, Node)
@@ -43,8 +46,14 @@ bench_scene_hot_paths :: proc(t: ^testing.T) {
 		ProcessNodeQueues(scene.manager, &game.gameContext)
 		respawn := time.tick_since(start)
 
-		fmt.printfln("[bench] %5d nodes: create %8.2f ms | respawn %8.2f ms | global transforms %8.3f ms | RunScene frame %8.3f ms",
-			count, time.duration_milliseconds(create), time.duration_milliseconds(respawn), time.duration_milliseconds(globals), time.duration_milliseconds(frame))
+		// Typed nodes through the registry (what scenes and the editor do).
+		start = time.tick_now()
+		for _ in 0 ..< count do Node_CreateByTypeName(scene, "TextureNode")
+		ProcessNodeQueues(scene.manager, &game.gameContext)
+		typed := time.tick_since(start)
+
+		fmt.printfln("[bench] %5d nodes: create %8.2f ms | destroy all %8.2f ms | respawn %8.2f ms | create TextureNodes %8.2f ms | global transforms %8.3f ms | RunScene frame %8.3f ms",
+			count, time.duration_milliseconds(create), time.duration_milliseconds(destroy), time.duration_milliseconds(respawn), time.duration_milliseconds(typed), time.duration_milliseconds(globals), time.duration_milliseconds(frame))
 		game->terminate()
 	}
 }

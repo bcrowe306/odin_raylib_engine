@@ -42,16 +42,17 @@ Node :: struct {
 	globalRotation: f32,
 	layer: RenderLayer,
 	gameContext: ^GameContext, // Node does not own this
-	onEnter: EventSubject,
-	onExit: EventSubject,
-	onChildAdded: EventSubject,
-	onChildRemoved: EventSubject,
-	onParentAdded: EventSubject,
-	onParentRemoved: EventSubject,
+	// The tree events every node raises (Node_Event), with their listeners -
+	// allocated when something subscribes (most nodes never have one):
+	// Node_Subject / Node_NotifyEvent.
+	events: ^Node_Events,
 	renderable: bool `gui:"true"`,
 	enabled: bool `gui:"true"`,
 	isReady: bool,
 	isUI: bool,
+	inTree: bool, // queued for (or in) a scene's node list (SceneAddNode)
+	removing: bool, // queued for removal (RemoveNode)
+	managerIndex: int, // slot in the manager's node list (+1; 0 = not in it)
 	ready: proc(node: ^Node, gameContext: ^GameContext),
 	update: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
 	render: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
@@ -72,9 +73,10 @@ CreateNode :: proc(manager: ^NodeManager, $T: typeid) -> (node: ^T) {
 }
 
 // Node creation cost: every node owns a virtual-memory arena and a UUID.
-// Arenas of destroyed nodes are recycled (reserving virtual memory is the
-// expensive part), and UUIDs come from a fast generator seeded once from
-// the OS (they only need to be unique, not unpredictable).
+// The arena is reserved on the node's first allocation (many nodes never
+// allocate), arenas of destroyed nodes are recycled (reserving virtual
+// memory is the expensive part), and UUIDs come from a fast generator
+// seeded once from the OS (they only need to be unique, not unpredictable).
 @(private = "file")
 arenaPool: [dynamic]vmem.Arena
 @(private = "file")
@@ -106,15 +108,27 @@ Node_ReleaseArenaPool :: proc() {
 	arenaPool = nil
 }
 
-InitializeNode :: proc(node: ^Node) {
-	if node.arena.total_reserved == 0 {
-		if len(arenaPool) > 0 {
-			node.arena = pop(&arenaPool)
-		} else if err := vmem.arena_init_growing(&node.arena, NODE_ARENA_BLOCK); err != nil {
-			log.panic("Error allocating node's arena", err)
+// node_arena_proc: the node's allocator - its arena, reserved (or taken
+// from the pool) on the first allocation.
+@(private = "file")
+node_arena_proc :: proc(data: rawptr, mode: mem.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
+	arena := (^vmem.Arena)(data)
+	if arena.total_reserved == 0 {
+		#partial switch mode {
+		case .Free, .Free_All: return nil, nil // nothing allocated yet
+		case .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed:
+			if len(arenaPool) > 0 {
+				arena^ = pop(&arenaPool)
+			} else if err := vmem.arena_init_growing(arena, NODE_ARENA_BLOCK); err != nil {
+				return nil, .Out_Of_Memory
+			}
 		}
 	}
-	node.allocator = vmem.arena_allocator(&node.arena)
+	return vmem.arena_allocator_proc(data, mode, size, alignment, old_memory, old_size, loc)
+}
+
+InitializeNode :: proc(node: ^Node) {
+	node.allocator = mem.Allocator{procedure = node_arena_proc, data = &node.arena}
 	// Typed *_Init procs call InitializeNode again after CreateNode: keep
 	// one registry entry per node.
 	if Node_IsAlive(node) do Node_Unregister(node)
@@ -129,12 +143,50 @@ InitializeNode :: proc(node: ^Node) {
 	node.enabled = true
 	node.renderable = true
 	node.layer = RenderLayer.Layer1
-	InitializeSubject(&node.onEnter, "entered_tree", node)
-	InitializeSubject(&node.onExit, "exited_tree", node)
-	InitializeSubject(&node.onChildAdded, "child_added", node)
-	InitializeSubject(&node.onChildRemoved, "child_removed", node)
-	InitializeSubject(&node.onParentAdded, "parent_added", node)
-	InitializeSubject(&node.onParentRemoved, "parent_removed", node)
+	node.events = nil
+}
+
+// Node_Event: the tree events every node raises.
+Node_Event :: enum {
+	Entered_Tree,   // "entered_tree": joined the scene
+	Exited_Tree,    // "exited_tree": being removed
+	Child_Added,    // "child_added"(child)
+	Child_Removed,  // "child_removed"(child)
+	Parent_Added,   // "parent_added"(parent)
+	Parent_Removed, // "parent_removed"(parent)
+}
+
+NODE_EVENT_NAMES := [Node_Event]string {
+	.Entered_Tree   = "entered_tree",
+	.Exited_Tree    = "exited_tree",
+	.Child_Added    = "child_added",
+	.Child_Removed  = "child_removed",
+	.Parent_Added   = "parent_added",
+	.Parent_Removed = "parent_removed",
+}
+
+Node_Events :: struct {
+	subjects: [Node_Event]EventSubject,
+}
+
+// Node_Subject: a node's tree event subject, made on first use (in the
+// node's arena) - subscribe to it like any other event.
+Node_Subject :: proc(node: ^Node, ev: Node_Event) -> ^EventSubject {
+	if node.events == nil {
+		node.events = new(Node_Events, node.allocator)
+		for &s, k in node.events.subjects do InitializeSubject(&s, NODE_EVENT_NAMES[k], node)
+	}
+	return &node.events.subjects[ev]
+}
+
+// Node_NotifyEvent raises a tree event: its listeners (if any) and the
+// node's Lua handlers / signal connections.
+Node_NotifyEvent :: proc(node: ^Node, ev: Node_Event, value: EventValue, ctx: ^GameContext) {
+	if node.events != nil {
+		Notify(&node.events.subjects[ev], node, value, ctx)
+	} else {
+		Script_DispatchEvent(node, NODE_EVENT_NAMES[ev], value, ctx)
+	}
 }
 
 Node_AddResource :: proc(node: ^Node, $T: typeid) -> ^T {
@@ -148,6 +200,9 @@ Node_AddResource :: proc(node: ^Node, $T: typeid) -> ^T {
 
 Node_Terminate :: proc(node: ^Node) {
 	if node == nil do return
+	node.inTree = false
+	node.removing = false
+	node.managerIndex = 0
 
 	if node.onDestroy != nil {
 		destroyProc := node.onDestroy
@@ -163,17 +218,17 @@ Node_Terminate :: proc(node: ^Node) {
 		ScriptInstance_Destroy(inst)
 	}
 
-	DestroySubject(&node.onEnter)
-	DestroySubject(&node.onExit)
-	DestroySubject(&node.onChildAdded)
-	DestroySubject(&node.onChildRemoved)
-	DestroySubject(&node.onParentAdded)
-	DestroySubject(&node.onParentRemoved)
+	if node.events != nil {
+		for &s in node.events.subjects do DestroySubject(&s)
+		node.events = nil // its memory goes with the arena
+	}
 	// Lua: drop connections to/from this node; references become nil.
 	Script_ForgetNode(node)
 	Node_Unregister(node)
 	// Recycle the arena (keeps its first block reserved).
-	if len(arenaPool) < ARENA_POOL_MAX && node.arena.kind == .Growing && node.arena.curr_block != nil {
+	if node.arena.total_reserved == 0 {
+		// Never allocated: nothing to give back.
+	} else if len(arenaPool) < ARENA_POOL_MAX && node.arena.kind == .Growing && node.arena.curr_block != nil {
 		vmem.arena_free_all(&node.arena)
 		if arenaPool == nil do arenaPool = make([dynamic]vmem.Arena, 0, 256, runtime.heap_allocator())
 		append(&arenaPool, node.arena)
