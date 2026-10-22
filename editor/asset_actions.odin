@@ -97,6 +97,12 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		if menu(ICON_FA_PLUS, "Add as Child of Selected", "add-component-child", hasScene && sel != nil) {
 			Editor_InstantiateComponentFile(state, rel, sel.globalPosition)
 		}
+	case .Shader:
+		if menu(ICON_FA_CODE, "Edit Shader", "edit-shader") do Editor_OpenScript(state, rel)
+		if menu(ICON_FA_WAND_MAGIC_SPARKLES, "Use on Selected Node", "use-shader", sel != nil) {
+			Editor_RecordUndo(state, "Set shader")
+			e.Material_SetShader(sel, rel)
+		}
 	case .Script:
 		if menu(ICON_FA_CODE, "Edit Script", "edit-script") do Editor_OpenScript(state, rel)
 		if menu(ICON_FA_PLUS, "Attach to Selected Node", "attach-script", sel != nil && sel != state.activeScene.rootNode) {
@@ -303,6 +309,7 @@ Asset_AddMenu :: proc(state: ^EditorState) {
 	imgui.Separator()
 	if menu(ICON_FA_CLAPPERBOARD, "New Scene", "add-new-scene") do Toolbar_NewScene(state)
 	if menu(ICON_FA_FILE_CODE, "New Script", "add-new-script") do Editor_NewScript(state)
+	if menu(ICON_FA_WAND_MAGIC_SPARKLES, "New Shader", "add-new-shader") do Editor_NewShader(state)
 }
 
 // AssetDelete_Render: the delete confirmation.

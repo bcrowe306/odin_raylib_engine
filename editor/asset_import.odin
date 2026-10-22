@@ -30,7 +30,7 @@ TEXTURE_EXTS := []string{".png", ".jpg", ".jpeg", ".bmp", ".tga"}
 AUDIO_EXTS := []string{".wav", ".ogg", ".mp3"}
 
 // Extensions the importer accepts (for dialog filters), without dots.
-IMPORT_EXTS := []string{"png", "jpg", "jpeg", "bmp", "tga", "wav", "ogg", "mp3", "lua", "json", "ldtk"}
+IMPORT_EXTS := []string{"png", "jpg", "jpeg", "bmp", "tga", "wav", "ogg", "mp3", "lua", "json", "ldtk", "fs", "glsl", "frag"}
 
 Import_Status :: enum {
 	Imported,
@@ -68,6 +68,7 @@ Asset_ImportDir :: proc(name: string) -> (dir: string, ok: bool) {
 	case .Scene:     return "scenes", true
 	case .Component: return "components", true
 	case .Level:     return "levels", true
+	case .Shader:    return "shaders", true
 	case .Package, .Other:
 	}
 	return "", false
@@ -364,7 +365,7 @@ validate :: proc(name: string, data: []byte) -> (why: string, ok: bool) {
 		case .Level: if "defs" not_in obj do return "not an LDtk project (no \"defs\")", false
 		case .Component: if "type" not_in obj do return "not a component file (no \"type\")", false
 		}
-	case .Script:
+	case .Script, .Shader:
 		if !utf8_valid(data) do return "not a text file", false
 	case .Package, .Other:
 		return "unsupported file type", false

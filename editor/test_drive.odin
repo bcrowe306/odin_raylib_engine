@@ -662,7 +662,7 @@ fmt_vec :: proc(v: [2]f32) -> string {
 //   game (running|stopped) | build (running|idle) | log (all console text)
 //   last-log | add-node-open | item:<id> (visible|missing)
 //   file:<project-relative path> (contents, "" if missing)
-//   node:<Name>.<field> with field = exists type parent position global
+//   node:<Name>.<field> with field = exists type parent position global material
 //     rotation scale visible enabled children script prop.<path> script.<prop>
 Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "code.") do return Code_DriveQuery(q)
@@ -770,6 +770,10 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		case "rotation": return fmt.tprintf("%.1f", n.rotation), true
 		case "scale": return fmt.tprintf("%.2f,%.2f", n.scale.x, n.scale.y), true
 		case "visible": return "true" if n.renderable else "false", true
+		case "material":
+			// "<shader> <blend>" ("" without a material)
+			if n.material == nil do return "", true
+			return fmt.tprintf("%s %s", n.material.shader, e.Material_BlendName(n.material.blend)), true
 		case "enabled": return "true" if n.enabled else "false", true
 		case "children":
 			c := e.GetChildren(state.activeScene.manager, n)

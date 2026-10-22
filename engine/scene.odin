@@ -369,7 +369,9 @@ render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, 
 			}
 		}
 		renderStats.drawn += 1
+		withMaterial := node.material != nil && Material_Begin(node, gameContext)
 		if node.render != nil do node->render(gameContext, deltaTime)
+		if withMaterial do Material_End(node)
 		if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
 	}
 }

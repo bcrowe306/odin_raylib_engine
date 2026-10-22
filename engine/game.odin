@@ -142,6 +142,7 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 
 	// 1. Poll and update Two-Tier Input System once per frame (before physics and game/scene update)
 	InputSystem_Update(&game.input, deltaTime)
+	if game.scriptManager.hotReload do Shader_CheckForChanges() // edited .fs files
 
 	// 2. Process Scene Transitions
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
@@ -174,6 +175,7 @@ GameTerminate :: proc(game: ^Game) {
 	AssetManager_Destroy(&game.assetManager)
 	ResourceManager_Terminate(&game.resourceManager)
 	PhysicsWorld_Destroy(&game.physicsWorld)
+	Shader_UnloadAll()
 	InputSystem_Destroy(&game.input)
 	Node_ReleaseArenaPool()
 	Component_ClearCaches()

@@ -189,7 +189,7 @@ palette_open_file :: proc(state: ^EditorState, rel: string) {
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	switch Asset_KindOf(rel) {
 	case .Scene: Editor_OpenScene(state, rel)
-	case .Script: Editor_OpenScript(state, rel)
+	case .Script, .Shader: Editor_OpenScript(state, rel)
 	case .Component: Editor_OpenComponent(state, rel)
 	case .Level: Editor_AddLevel(state, rel, state.cameraPos)
 	case .Texture, .Audio, .Package, .Other:

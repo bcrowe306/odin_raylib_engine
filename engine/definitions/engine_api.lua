@@ -241,6 +241,45 @@ function Node:is_awake() end
 function Node:set_awake(awake) end
 
 -- ----------------------------------------------------------------------------
+-- Materials (any node): shader, blend mode, shader parameters
+-- ----------------------------------------------------------------------------
+
+---@alias BuiltinShader
+---| "builtin:flash"     # flash_color, amount: tint toward a colour (hit flash)
+---| "builtin:outline"   # outline_color, width: outline around the sprite
+---| "builtin:dissolve"  # threshold, edge_width, edge_color: burn away
+---| "builtin:grayscale" # amount
+---| "builtin:wave"      # amplitude, frequency, speed: horizontal wave
+
+---@alias BlendMode "alpha"|"additive"|"multiply"|"add_colors"|"subtract_colors"|"premultiplied"
+
+---Sets the node's shader: a built-in or a project fragment shader (.fs). nil removes it.
+---@param shader BuiltinShader|string|nil
+function Node:set_shader(shader) end
+
+---Sets a shader parameter (a uniform of the shader): a number, up to four
+---numbers, a table {r, g, b, a} / {x, y}, or a texture path.
+---@param name string
+---@param x number|number[]|string
+---@param y? number
+---@param z? number
+---@param w? number
+function Node:set_shader_param(name, x, y, z, w) end
+
+---Gets a shader parameter (its value, else the shader's default): up to four
+---numbers, or the texture path.
+---@param name string
+---@return number|string|nil x
+---@return number? y
+---@return number? z
+---@return number? w
+function Node:get_shader_param(name) end
+
+---Sets how the node is blended with what's behind it.
+---@param mode BlendMode
+function Node:set_blend_mode(mode) end
+
+-- ----------------------------------------------------------------------------
 -- CharacterMoverNode Methods
 --
 -- Two control modes (Inspector: Control Mode):

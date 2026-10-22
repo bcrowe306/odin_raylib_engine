@@ -32,6 +32,7 @@ Asset_Kind :: enum {
 	Texture,
 	Audio,
 	Level,   // LDtk project (.ldtk)
+	Shader,  // fragment shader (.fs / .glsl / .frag)
 	Package,
 }
 
@@ -43,6 +44,7 @@ Asset_KindOf :: proc(path: string) -> Asset_Kind {
 	case strings.has_suffix(lower, ".lua"): return .Script
 	case strings.has_suffix(lower, ".ldtk"): return .Level
 	case strings.has_suffix(lower, ".ore"): return .Package
+	case strings.has_suffix(lower, ".fs"), strings.has_suffix(lower, ".glsl"), strings.has_suffix(lower, ".frag"): return .Shader
 	}
 	ext := filepath.ext(lower)
 	switch {
@@ -60,6 +62,7 @@ kind_icon :: proc(k: Asset_Kind) -> (string, imgui.Vec4) {
 	case .Texture: return ICON_FA_FILE_IMAGE, {0.95, 0.68, 0.35, 1}
 	case .Audio: return ICON_FA_FILE_AUDIO, UI_SUCCESS
 	case .Level: return ICON_FA_TABLE_CELLS, {0.35, 0.82, 0.86, 1}
+	case .Shader: return ICON_FA_WAND_MAGIC_SPARKLES, {0.92, 0.55, 0.95, 1}
 	case .Package: return ICON_FA_BOX_ARCHIVE, UI_TEXT_DIM
 	case .Other: return ICON_FA_FILE, UI_TEXT_DIM
 	}
@@ -96,6 +99,7 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 		section_files(state, "Textures", Editor_ListProjectFiles(state, "textures", TEXTURE_EXTS), filter)
 		section_files(state, "Audio", Editor_ListProjectFiles(state, "audio", AUDIO_EXTS), filter)
 		section_files(state, "Levels", Editor_ListProjectFiles(state, "", {".ldtk"}), filter)
+		section_files(state, "Shaders", Editor_ListProjectFiles(state, "", SHADER_EXTS), filter)
 		section_packages(state, filter)
 		imgui.Dummy({0, 8})
 		UI_DimText(fmt.tprintf("%s  Drop files or folders here to import", ICON_FA_FILE_IMPORT))
@@ -179,6 +183,7 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 		case .Component: Component_InstantiateFromFile(state, full, state.cameraPos)
 		case .Script: Editor_OpenScript(state, rel)
 		case .Level: Editor_AddLevel(state, rel, state.cameraPos)
+		case .Shader: Editor_OpenScript(state, rel)
 		}
 	}
 	UI_Tooltip(asset_tooltip(kind, rel))
@@ -322,6 +327,18 @@ Editor_DropAsset :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) {
 		}
 	case .Level:
 		Editor_AddLevel(state, rel, worldPos)
+	case .Shader:
+		// Onto a node: it gets this shader.
+		target := Viewport_PickNode(state, worldPos)
+		if target == nil do target = state.selectedNode
+		if target == nil {
+			Editor_Log(state, .Warn, "Drop the shader onto a node to apply it")
+			return
+		}
+		Editor_RecordUndo(state, "Set shader")
+		e.Material_SetShader(target, rel)
+		state.selectedNode = target
+		Editor_Log(state, .Info, "%s uses %s", target.name, rel)
 	case .Scene, .Package, .Other:
 	}
 }

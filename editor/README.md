@@ -171,6 +171,17 @@ a property (position, rotation, scale, colours, any numeric property); the
 yellow dot keys the current value at the playhead; right-click a key to
 delete it.
 
+### Materials & shaders
+
+Every drawable node has a **Material** section (collapsed until used): a
+shader - built-in Flash, Outline, Dissolve, Grayscale, Wave, or a project
+`.fs` file - a blend mode (alpha, additive, multiply, ...) and the shader's
+parameters, generated from its `uniform`s (sliders, colour pickers, texture
+pickers; the reset arrow returns one to the shader's default). **New
+Shader...** (here or Assets **+**) writes a documented template; drop a
+shader from Assets on a node to apply it; saving a shader reloads it in the
+viewport. Lua: `node:set_shader`, `set_shader_param`, `set_blend_mode`.
+
 ### Camera follow
 
 Select a Camera and pick its **Follow Target** in the Inspector (or drop a

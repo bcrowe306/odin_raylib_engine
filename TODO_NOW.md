@@ -14,7 +14,7 @@ out of scope here.
 
 ## Phase 2 — Core engine features
 
-- [ ] 2.1 Shaders & materials: per-node material (shader + uniforms), blend modes, Inspector editing, Lua `set_shader_param`
+- [x] 2.1 Shaders & materials: per-node material (shader + uniforms), blend modes, Inspector editing, Lua `set_shader_param`
 - [ ] 2.2 2D lighting: light map render target, point/spot lights, ambient colour, occluder shadows from collision shapes; normal maps later
 - [ ] 2.3 Tweens & easing: `Tween.to(node, "position", {x, y}, 0.3, "out_quad")`, easing curves on animation tracks
 - [ ] 2.4 Animation tracks: method-call and audio tracks, blending/crossfade between animations

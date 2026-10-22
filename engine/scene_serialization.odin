@@ -330,6 +330,7 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	}
 
 	write_connections(w, node, &first)
+	write_material(w, node, &first)
 
 	if manager != nil {
 		all := GetChildren(manager, node)
@@ -354,6 +355,65 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	w.indent -= 1
 	Json_NewLine(w)
 	strings.write_byte(&w.sb, '}')
+}
+
+// "material": {"shader": "...", "blend": "additive", "params": {"amount": 0.5,
+// "flash_color": [1, 0, 0, 1], "noise": "textures/noise.png"}}
+@(private = "file")
+write_material :: proc(w: ^Json_Writer, node: ^Node, first: ^bool) {
+	m := node.material
+	if m == nil || (m.shader == "" && m.blend == .Alpha && len(m.params) == 0) do return
+	Json_Key(w, "material", first)
+	strings.write_string(&w.sb, "{\"shader\": ")
+	Json_String(w, m.shader)
+	fmt.sbprintf(&w.sb, ", \"blend\": \"%s\"", Material_BlendName(m.blend))
+	if len(m.params) > 0 {
+		strings.write_string(&w.sb, ", \"params\": {")
+		for p, i in m.params {
+			if i > 0 do strings.write_string(&w.sb, ", ")
+			Json_String(w, p.name)
+			strings.write_string(&w.sb, ": ")
+			if p.texture != "" {
+				Json_String(w, p.texture)
+			} else {
+				fmt.sbprintf(&w.sb, "[%g, %g, %g, %g]", p.value.x, p.value.y, p.value.z, p.value.w)
+			}
+		}
+		strings.write_byte(&w.sb, '}')
+	}
+	strings.write_byte(&w.sb, '}')
+}
+
+@(private = "file")
+read_material :: proc(node: ^Node, obj: json.Object) {
+	mo, ok := sj_obj(obj, "material")
+	if !ok do return
+	m := Node_EnsureMaterial(node)
+	m.shader = strings.clone(sj_string(mo, "shader", ""), node.allocator)
+	m.blend = Material_BlendParse(sj_string(mo, "blend", "alpha"))
+	clear(&m.params)
+	if params, has := sj_obj(mo, "params"); has {
+		for name, v in params {
+			#partial switch x in v {
+			case json.String:
+				Material_SetParam(node, name, {}, string(x))
+			case json.Array:
+				val: [4]f32
+				for el, i in x {
+					if i >= 4 do break
+					#partial switch n in el {
+					case json.Float:   val[i] = f32(n)
+					case json.Integer: val[i] = f32(n)
+					}
+				}
+				Material_SetParam(node, name, val)
+			case json.Float:
+				Material_SetParam(node, name, {f32(x), 0, 0, 0})
+			case json.Integer:
+				Material_SetParam(node, name, {f32(x), 0, 0, 0})
+			}
+		}
+	}
 }
 
 @(private = "file")
@@ -833,6 +893,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	}
 
 	read_connections(node, obj)
+	read_material(node, obj)
 
 	if children, ok := sj_arr(obj, "children"); ok {
 		for c in children {

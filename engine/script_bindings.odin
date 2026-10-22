@@ -1523,6 +1523,78 @@ lua_camera_get_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.de
 @(private="file")
 lua_camera_get_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_targets_impl(L, true)}
 
+// --- materials ---
+
+// node:set_shader(path | nil): "builtin:flash" or a project .fs file.
+@(private="file")
+lua_node_set_shader :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	path := string(lua.tostring(L, 2)) if lua.type(L, 2) == .STRING else ""
+	Material_SetShader(node, path)
+	return 0
+}
+
+// node:set_shader_param(name, x [, y, z, w]) / (name, {r, g, b, a}) /
+// (name, "textures/noise.png")
+@(private="file")
+lua_node_set_shader_param :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || lua.type(L, 2) != .STRING do return 0
+	name := strings.clone(string(lua.tostring(L, 2)), context.temp_allocator)
+	v: [4]f32
+	#partial switch lua.type(L, 3) {
+	case .STRING:
+		Material_SetParam(node, name, {}, string(lua.tostring(L, 3)))
+		return 0
+	case .TABLE:
+		for i in 0 ..< 4 {
+			lua.rawgeti(L, 3, lua.Integer(i + 1))
+			v[i] = f32(lua.tonumber(L, -1))
+			lua.pop(L, 1)
+		}
+	case:
+		for i in 0 ..< 4 do v[i] = f32(lua.tonumber(L, c.int(3 + i)))
+	}
+	Material_SetParam(node, name, v)
+	return 0
+}
+
+// node:get_shader_param(name) -> x, y, z, w (or the texture path)
+@(private="file")
+lua_node_get_shader_param :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || lua.type(L, 2) != .STRING {
+		lua.pushnil(L)
+		return 1
+	}
+	v, tex, found := Material_GetParam(node, string(lua.tostring(L, 2)))
+	if !found {
+		lua.pushnil(L)
+		return 1
+	}
+	if tex != "" {
+		lua.pushstring(L, strings.clone_to_cstring(tex, context.temp_allocator))
+		return 1
+	}
+	for i in 0 ..< 4 do lua.pushnumber(L, lua.Number(v[i]))
+	return 4
+}
+
+// node:set_blend_mode("alpha" | "additive" | "multiply" | "add_colors" |
+// "subtract_colors" | "premultiplied")
+@(private="file")
+lua_node_set_blend_mode :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok do return 0
+	Node_EnsureMaterial(node).blend = Material_BlendParse(string(lua.tostring(L, 2)) if lua.type(L, 2) == .STRING else "alpha")
+	return 0
+}
+
 @(private="file")
 lua_node_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -2776,6 +2848,14 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "remove_child")
 		lua.pushcfunction(L, lua_node_destroy)
 		lua.setfield(L, -2, "destroy")
+		lua.pushcfunction(L, lua_node_set_shader)
+		lua.setfield(L, -2, "set_shader")
+		lua.pushcfunction(L, lua_node_set_shader_param)
+		lua.setfield(L, -2, "set_shader_param")
+		lua.pushcfunction(L, lua_node_get_shader_param)
+		lua.setfield(L, -2, "get_shader_param")
+		lua.pushcfunction(L, lua_node_set_blend_mode)
+		lua.setfield(L, -2, "set_blend_mode")
 		Script_RegisterEventBindings(L) // connect / disconnect / emit
 		Script_RegisterLdtkBindings(L)
 

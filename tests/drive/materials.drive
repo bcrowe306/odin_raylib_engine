@@ -1,0 +1,37 @@
+# Materials: a built-in shader and a blend mode on a sprite from the
+# Inspector, a new project shader from the Assets + menu, applying a shader
+# by dropping it on a node, and saving.
+wait 5
+click @hier:PlayerShip
+click @section:Material
+expect item:insp.material.shader == visible
+click @insp.material.shader
+click @pick:builtin:flash
+expect node:PlayerShip.material == builtin:flash alpha
+expect item:insp.material.param:amount == visible
+expect item:insp.material.param:flash_color == visible
+screenshot flash
+click @insp.material.blend
+click @pick:Additive
+expect node:PlayerShip.material == builtin:flash additive
+key ctrl+z
+expect node:PlayerShip.material == builtin:flash alpha
+
+# A project shader: created from the template, then dropped on an asteroid.
+click @asset.add
+click @ctx:add-new-shader
+expect file:shaders/new_shader.fs contains uniform float strength;
+expect code.file == shaders/new_shader.fs
+click @code.tab:shaders/new_shader.fs
+key ctrl+w
+expect item:asset:shaders/new_shader.fs == visible
+drag @asset:shaders/new_shader.fs @node:PatrolDroneAlpha 12
+expect node:PatrolDroneAlpha.material == shaders/new_shader.fs alpha
+click @hier:PatrolDroneAlpha
+expect item:insp.material.param:strength == visible
+expect item:insp.material.param:tint_color == visible
+screenshot project_shader
+
+click @toolbar.save
+expect file:scenes/main.scene.json contains "material": {"shader": "builtin:flash", "blend": "alpha"
+expect file:scenes/main.scene.json contains "material": {"shader": "shaders/new_shader.fs"

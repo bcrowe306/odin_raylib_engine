@@ -31,6 +31,9 @@ Node :: struct {
 	// Runtime-only node (built by another node, e.g. LDtk colliders and
 	// spawned entities): never saved with the scene.
 	transient: bool,
+	// Shader / blend mode / shader parameters applied around render (nil =
+	// plain drawing; material.odin).
+	material: ^Material,
 	position: [2]f32 `gui:"true" min:"0" max:"1280"`,
 	scale: [2]f32 `gui:"true" min:"0.01" max:"10"`,
 	rotation: f32 `gui:"true" min:"0" max:"360"`,

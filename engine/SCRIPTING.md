@@ -338,6 +338,36 @@ The engine provides full IntelliSense, autocomplete, parameter hints, and type d
 | `is_awake()` | - | `boolean` | Checks if body is actively simulating. |
 | `set_awake(awake)` | `awake: boolean` | - | Wakes body up or puts to sleep. |
 
+#### Materials (any node)
+
+A node's **material** (Inspector > Material) is a shader, a blend mode and
+the shader's parameters, applied when the node draws. Shaders: built-in
+(`builtin:flash`, `builtin:outline`, `builtin:dissolve`, `builtin:grayscale`,
+`builtin:wave`) or a project fragment shader (`.fs`, GLSL 330: Assets **+** >
+New Shader). Every `uniform` of the shader is a parameter; hints after `//`
+(`color`, `range 0 1`, `default 0.5`) shape the Inspector; `time` is set
+automatically. Saving a shader reloads it.
+
+```lua
+function Enemy:on_hit()
+    self.node:set_shader("builtin:flash")
+    self.node:set_shader_param("flash_color", {1, 1, 1, 1})
+    self.node:set_shader_param("amount", 1.0)
+end
+
+function Enemy:update(dt)
+    local a = self.node:get_shader_param("amount")
+    if a and a > 0 then self.node:set_shader_param("amount", math.max(0, a - dt * 4)) end
+end
+```
+
+| Method | Parameters | Return | Description |
+|---|---|---|---|
+| `set_shader(shader)` | `"builtin:..."`, a `.fs` path, or `nil` | - | Sets / removes the shader. |
+| `set_shader_param(name, ...)` | number(s), `{r,g,b,a}`, or a texture path | - | Sets a uniform. |
+| `get_shader_param(name)` | `name` | up to 4 numbers / path | Current value (or the shader's default). |
+| `set_blend_mode(mode)` | `"alpha"`, `"additive"`, `"multiply"`, `"add_colors"`, `"subtract_colors"`, `"premultiplied"` | - | Blending. |
+
 #### CharacterMoverNode
 
 A CharacterMover has two **control modes** (Inspector: *Control Mode*):

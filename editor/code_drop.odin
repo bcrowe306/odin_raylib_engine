@@ -30,6 +30,7 @@ Script_AssetKind :: proc(rel: string) -> string {
 	case .Script:    return "script"
 	case .Component: return "component"
 	case .Level:     return "level"
+	case .Shader:    return "file"
 	case .Package, .Other:
 	}
 	if strings.has_suffix(strings.to_lower(rel, context.temp_allocator), ".ldtk") do return "level"
