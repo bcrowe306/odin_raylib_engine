@@ -233,6 +233,7 @@ inspector_body :: proc(state: ^EditorState) {
 		if UI_Button(fmt.tprintf("%s  Open Animation Timeline", ICON_FA_FILM), "insp.animation-editor", {-1, 0}) do animTabRequest = true
 	}
 	inspector_properties(state, node)
+	if !isRoot do Inspector_Tags(state, node)
 	if !isRoot do inspector_material(state, node)
 	if !isRoot do inspector_script(state, node)
 	if !isRoot do Inspector_Signals(state, node)

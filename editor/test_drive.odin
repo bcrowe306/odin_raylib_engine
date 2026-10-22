@@ -786,6 +786,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		case "position": return fmt_vec(n.position), true
 		case "locked": return "true" if n.editorLocked else "false", true
 		case "editor-hidden": return "true" if n.editorHidden else "false", true
+		case "tags": return strings.join(n.tags[:], ",", context.temp_allocator), true
 		case "global": return fmt_vec(n.globalPosition), true
 		case "rotation": return fmt.tprintf("%.1f", n.rotation), true
 		case "scale": return fmt.tprintf("%.2f,%.2f", n.scale.x, n.scale.y), true
@@ -804,6 +805,10 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 			c := e.GetChildren(state.activeScene.manager, n)
 			defer delete(c)
 			return fmt.tprint(len(c)), true
+		case "child-names":
+			names := make([dynamic]string, context.temp_allocator)
+			for c in e.GetChildrenView(state.activeScene.manager, n) do if c != nil && !c.transient do append(&names, c.name)
+			return strings.join(names[:], ",", context.temp_allocator), true
 		case "tiles":
 			if n.typeId != e.TileMapNode do return "<not a tile map>", true
 			tm := cast(^e.TileMapNode)n

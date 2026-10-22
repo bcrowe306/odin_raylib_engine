@@ -19,6 +19,7 @@ import lsp "../odin_editor/lsp"
 //   SceneName     scene names (Scene.change_scene)
 //   ScenePath, TexturePath, AudioPath, ComponentPath, LevelPath, ScriptPath
 //   NodeName      node names in the project's scenes and components
+//   NodeTag       tags used on those nodes (node:add_tag, Scene.find_by_tag)
 //   NodeEvent     (engine) + the project's custom events aren't known
 //   LdtkEntity, LdtkLevel, LdtkLayer, LdtkEnumName, LdtkEnum_<Name>
 //   one class per script with its exported properties, so `self.speed` is
@@ -72,14 +73,16 @@ sorted_unique :: proc(list: ^[dynamic]string) -> []string {
 	return out[:]
 }
 
-// node_names collects the "name" of every node of a scene/component JSON.
+// node_names collects the "name" (and "tags") of every node of a
+// scene/component JSON.
 @(private = "file")
-node_names :: proc(v: json.Value, out: ^[dynamic]string) {
+node_names :: proc(v: json.Value, out: ^[dynamic]string, tags: ^[dynamic]string) {
 	obj, ok := v.(json.Object)
 	if !ok do return
 	if n, isStr := obj["name"].(json.String); isStr do append(out, string(n))
-	if kids, has := obj["children"].(json.Array); has do for k in kids do node_names(k, out)
-	if inner, has := obj["node"].(json.Object); has do node_names(inner, out)
+	if ts, has := obj["tags"].(json.Array); has do for t in ts do if s, isStr := t.(json.String); isStr do append(tags, string(s))
+	if kids, has := obj["children"].(json.Array); has do for k in kids do node_names(k, out, tags)
+	if inner, has := obj["node"].(json.Object); has do node_names(inner, out, tags)
 }
 
 // script_class: the class a script declares (---@class X, else the table
@@ -150,6 +153,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	scenePaths := make([dynamic]string, context.temp_allocator)
 	sceneNames := make([dynamic]string, context.temp_allocator)
 	nodeNames := make([dynamic]string, context.temp_allocator)
+	nodeTags := make([dynamic]string, context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "", {".scene.json"}) {
 		append(&scenePaths, rel)
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
@@ -161,7 +165,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		if n, ok := root["name"].(json.String); ok do append(&sceneNames, string(n))
 		if r, ok := root["root"]; ok {
 			if ro, isObj := r.(json.Object); isObj {
-				if kids, has := ro["children"].(json.Array); has do for k in kids do node_names(k, &nodeNames)
+				if kids, has := ro["children"].(json.Array); has do for k in kids do node_names(k, &nodeNames, &nodeTags)
 			}
 		}
 	}
@@ -170,12 +174,13 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		append(&components, rel)
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
-			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None do node_names(val, &nodeNames)
+			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None do node_names(val, &nodeNames, &nodeTags)
 		}
 	}
 	alias(&sb, "SceneName", "Scene names (Scene.change_scene)", sorted_unique(&sceneNames))
 	alias(&sb, "ScenePath", "Scene files", sorted_unique(&scenePaths))
 	alias(&sb, "NodeName", "Node names in the project's scenes and components", sorted_unique(&nodeNames))
+	alias(&sb, "NodeTag", "Tags used in the project's scenes and components", sorted_unique(&nodeTags))
 	alias(&sb, "ComponentPath", "Component files", sorted_unique(&components))
 	list :: proc(state: ^EditorState, exts: []string) -> []string {
 		l := make([dynamic]string, context.temp_allocator)

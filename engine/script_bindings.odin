@@ -3664,6 +3664,16 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.pushcfunction(L, lua_node_set_visible)
 		lua.setfield(L, -2, "set_visible")
 
+		// Tags (node_tags.odin)
+		lua.pushcfunction(L, lua_node_add_tag)
+		lua.setfield(L, -2, "add_tag")
+		lua.pushcfunction(L, lua_node_remove_tag)
+		lua.setfield(L, -2, "remove_tag")
+		lua.pushcfunction(L, lua_node_has_tag)
+		lua.setfield(L, -2, "has_tag")
+		lua.pushcfunction(L, lua_node_get_tags)
+		lua.setfield(L, -2, "get_tags")
+
 		// Hierarchy
 		lua.pushcfunction(L, lua_node_get_parent)
 		lua.setfield(L, -2, "get_parent")
@@ -4105,6 +4115,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.newtable(L)
 	lua.pushcfunction(L, lua_scene_find_node)
 	lua.setfield(L, -2, "find_node")
+	lua.pushcfunction(L, lua_scene_find_by_tag)
+	lua.setfield(L, -2, "find_by_tag")
 	lua.pushcfunction(L, lua_scene_set_ambient)
 	lua.setfield(L, -2, "set_ambient")
 	lua.pushcfunction(L, lua_scene_get_ambient)

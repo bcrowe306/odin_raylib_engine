@@ -156,7 +156,7 @@ Editor_SerializeNodes :: proc(state: ^EditorState, nodes: []^e.Node) -> string {
 // Editor_InstantiateNodes adds the nodes of a JSON array (from
 // Editor_SerializeNodes) next to their originals' parent — the primary
 // selection's parent, or root — offset by `offset`; selects them.
-Editor_InstantiateNodes :: proc(state: ^EditorState, json: string, _: int, offset: [2]f32) -> int {
+Editor_InstantiateNodes :: proc(state: ^EditorState, json: string, _: int, offset: [2]f32, worlds: [][2]f32 = nil) -> int {
 	if state.activeScene == nil do return 0
 	mgr := state.activeScene.manager
 	parent := state.activeScene.rootNode
@@ -166,11 +166,13 @@ Editor_InstantiateNodes :: proc(state: ^EditorState, json: string, _: int, offse
 	if root := e.Node_ComponentRoot(mgr, parent); root != nil do parent = e.GetParent(mgr, root)
 	items := split_json_array(json)
 	Editor_ClearSelection(state)
-	for item in items {
+	for item, i in items {
 		n := e.Scene_InstantiateNodeFromJSON(state.activeScene, transmute([]u8)item, parent, &state.game.gameContext)
 		if n == nil do continue
 		n.name = strings.clone(Editor_UniqueChildName(state, parent, n.name, n), n.allocator)
 		n.position += offset
+		// From another scene: at the same world position.
+		if i < len(worlds) do n.position = Editor_WorldToLocal(parent, worlds[i])
 		append(&state.selection, n)
 		state.selectedNode = n
 	}
@@ -215,6 +217,7 @@ Editor_CopySelection :: proc(state: ^EditorState) {
 	if len(roots) == 0 do return
 	delete(nodeClipboard)
 	nodeClipboard = strings.clone(Editor_SerializeNodes(state, roots))
+	Clipboard_NoteSource(state, roots)
 	imgui.SetClipboardText(strings.clone_to_cstring(strings.concatenate({NODE_CLIPBOARD_PREFIX, nodeClipboard}, context.temp_allocator), context.temp_allocator))
 	Editor_Log(state, .Info, "Copied %d node(s)", len(roots))
 }
@@ -246,13 +249,23 @@ Editor_PasteNodesInto :: proc(state: ^EditorState, parent: ^e.Node) {
 Editor_PasteNodes :: proc(state: ^EditorState) {
 	// Nodes copied in another editor window arrive through the system clipboard.
 	if clip := imgui.GetClipboardText(); clip != nil && strings.has_prefix(string(clip), NODE_CLIPBOARD_PREFIX) {
+		if string(clip)[len(NODE_CLIPBOARD_PREFIX):] != nodeClipboard {
+			delete(nodeClipboardScene) // from another window: no source scene
+			nodeClipboardScene = ""
+			clear(&nodeClipboardWorld)
+		}
 		delete(nodeClipboard)
 		nodeClipboard = strings.clone(string(clip)[len(NODE_CLIPBOARD_PREFIX):])
 	}
 	if nodeClipboard == "" || state.activeScene == nil do return
 	Editor_RecordUndo(state, "Paste")
 	step := state.gridSize if state.gridSize > 0 else 16
-	n := Editor_InstantiateNodes(state, nodeClipboard, -1, {step, step})
+	n: int
+	if Clipboard_FromOtherScene(state) {
+		n = Editor_InstantiateNodes(state, nodeClipboard, -1, {}, nodeClipboardWorld[:])
+	} else {
+		n = Editor_InstantiateNodes(state, nodeClipboard, -1, {step, step})
+	}
 	Editor_Log(state, .Info, "Pasted %d node(s)", n)
 }
 

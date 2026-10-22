@@ -1,0 +1,67 @@
+# Scene tree: tags from the Inspector (typed, picked from the scene's tags,
+# removed), filter by #tag and t:type, reorder by dropping on a row's edge,
+# copy a node to another scene at the same world position; the generated Lua
+# types list the tags.
+wait 5
+key escape
+click @hier:Asteroid_Alpha
+click @insp.tag.input
+type enemy
+key enter
+expect node:Asteroid_Alpha.tags == enemy
+click @insp.tag.input
+type boss
+key enter
+expect node:Asteroid_Alpha.tags == enemy,boss
+click @hier:Asteroid_Beta
+click @insp.tag.pick
+click @pick:#enemy
+expect node:Asteroid_Beta.tags == enemy
+click @hier:Asteroid_Alpha
+click @insp.tag:boss
+expect node:Asteroid_Alpha.tags == enemy
+screenshot tags
+
+# Filter: by tag, by type (the Add Node name works too).
+click @hier.filter
+type #enemy
+wait 2
+expect item:hier:Asteroid_Alpha == visible
+expect item:hier:Asteroid_Gamma == missing
+screenshot filter_tag
+key cmd+a
+type t:sprite
+wait 2
+expect item:hier:Asteroid_Gamma == visible
+expect item:hier:MainCamera == missing
+key cmd+a
+key backspace
+wait 2
+
+# Reorder: drop on the top edge of a row = before it, bottom edge = after.
+drag @hier:Asteroid_Gamma @hier:Asteroid_Alpha+0,-9 12
+expect node:root.child-names == MainCamera,StarfieldEmitter,PlayerShip,Asteroid_Delta,PatrolDroneAlpha,Asteroid_Gamma,Asteroid_Alpha,Asteroid_Beta
+drag @hier:Asteroid_Delta @hier:Asteroid_Beta+0,9 12
+expect node:root.child-names == MainCamera,StarfieldEmitter,PlayerShip,PatrolDroneAlpha,Asteroid_Gamma,Asteroid_Alpha,Asteroid_Beta,Asteroid_Delta
+expect node:Asteroid_Delta.parent == root
+key ctrl+z
+expect node:root.child-names == MainCamera,StarfieldEmitter,PlayerShip,Asteroid_Delta,PatrolDroneAlpha,Asteroid_Gamma,Asteroid_Alpha,Asteroid_Beta
+key ctrl+s
+wait-until file:.ore/definitions/project_types.lua contains "enemy" timeout=300
+
+# Copy to another scene: same world position, tags kept (renamed first so
+# the name is free there).
+click @hier:Asteroid_Alpha
+key f2
+expect item:rename.input == visible
+key ctrl+a
+type DriveTaggedRock
+key enter
+expect node:DriveTaggedRock.tags == enemy
+rclick @hier:DriveTaggedRock
+click @ctx:copy-to-scene
+click @ctx:copy-to:scenes/battle_arena.scene.json
+expect scene == scenes/battle_arena.scene.json
+expect node:DriveTaggedRock.global ~= 240,180
+expect node:DriveTaggedRock.tags == enemy
+screenshot copied_to_other_scene

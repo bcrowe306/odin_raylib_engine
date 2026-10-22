@@ -60,7 +60,7 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 	if !canModify do imgui.EndDisabled()
 
 	imgui.SetNextItemWidth(-1)
-	imgui.InputTextWithHint("##hierfilter", fmt.ctprintf("%s  Filter nodes", ICON_FA_MAGNIFYING_GLASS), cstring(raw_data(hierarchyFilterBuf[:])), len(hierarchyFilterBuf), {})
+	imgui.InputTextWithHint("##hierfilter", fmt.ctprintf("%s  Filter: name  #tag  t:type", ICON_FA_MAGNIFYING_GLASS), cstring(raw_data(hierarchyFilterBuf[:])), len(hierarchyFilterBuf), {})
 	Drive_Item("hier.filter")
 	imgui.Dummy({0, 2})
 
@@ -98,7 +98,7 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 // subtree_matches: a node is shown when it or a descendant matches the filter.
 @(private = "file")
 subtree_matches :: proc(state: ^EditorState, node: ^e.Node, filter: string) -> bool {
-	if filter == "" || strings.contains(strings.to_lower(node.name, context.temp_allocator), filter) do return true
+	if node_matches(node, filter) do return true
 	for c in e.GetChildrenView(state.activeScene.manager, node) do if subtree_matches(state, c, filter) do return true
 	return false
 }
@@ -202,11 +202,32 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 		imgui.TextUnformatted(fmt.ctprintf("%s  %s", Editor_NodeIcon(node), node.name))
 		imgui.EndDragDropSource()
 	}
+	// The row's top / bottom edge: place before / after it; the middle:
+	// make it a child.
 	if imgui.BeginDragDropTarget() {
-		if payload := imgui.AcceptDragDropPayload("ORE_NODE"); payload != nil {
-			dragged := (^^e.Node)(payload.Data)^
-			if Editor_ReparentNode(state, dragged, node) {
-				Editor_Log(state, .Info, "Moved %s under %s", dragged.name, node.name)
+		rmin, rmax := imgui.GetItemRectMin(), imgui.GetItemRectMax()
+		my := imgui.GetIO().MousePos.y
+		edge := (rmax.y - rmin.y) * 0.28
+		zone := 0
+		if e.GetParent(mgr, node) != nil {
+			if my < rmin.y + edge do zone = -1
+			else if my > rmax.y - edge && !(open && len(children) > 0) do zone = 1
+		}
+		flags: imgui.DragDropFlags = {.AcceptBeforeDelivery}
+		if zone != 0 do flags += {.AcceptNoDrawDefaultRect}
+		if payload := imgui.AcceptDragDropPayload("ORE_NODE", flags); payload != nil {
+			if zone != 0 {
+				y := rmin.y if zone < 0 else rmax.y
+				dl := imgui.GetWindowDrawList()
+				imgui.DrawList_AddLine(dl, {rmin.x, y}, {rmax.x, y}, col_u32(UI_ACCENT), 2)
+			}
+			if payload.Delivery {
+				dragged := (^^e.Node)(payload.Data)^
+				if zone != 0 {
+					_ = Editor_InsertNodeAt(state, dragged, node, zone > 0)
+				} else if Editor_ReparentNode(state, dragged, node) {
+					Editor_Log(state, .Info, "Moved %s under %s", dragged.name, node.name)
+				}
 			}
 		}
 		imgui.EndDragDropTarget()
@@ -379,6 +400,10 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 	if hier_menu(ICON_FA_LOCK_OPEN if node.editorLocked else ICON_FA_LOCK, "Unlock in Viewport" if node.editorLocked else "Lock in Viewport", "toggle-lock", !isRoot) do Editor_ToggleViewLock(state)
 	if hier_menu(ICON_FA_EYE_LOW_VISION, "Show in Editor" if node.editorHidden else "Hide in Editor", "toggle-editor-hidden", !isRoot) do Editor_ToggleViewHidden(state)
 	if hier_menu(ICON_FA_CROSSHAIRS, "Frame in Viewport", "frame", true, "F") do state.cameraPos = node.globalPosition
+	if !isRoot {
+		SendToScene_Menu(state, false)
+		SendToScene_Menu(state, true)
+	}
 	imgui.Separator()
 	// Script.
 	if node.scriptInstance != nil {

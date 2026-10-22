@@ -60,6 +60,7 @@ Node :: struct {
 	// one isn't drawn there (Render_HideEditorHidden).
 	editorLocked: bool,
 	editorHidden: bool,
+	tags: [dynamic]string, // groups ("enemy"); node_tags.odin
 	pausedNow: bool,  // paused this frame (set by the update pass)
 	bodyPaused: bool, // its physics body was disabled by a pause
 	removing: bool, // queued for removal (RemoveNode)

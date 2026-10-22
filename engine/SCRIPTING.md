@@ -299,6 +299,17 @@ The engine provides full IntelliSense, autocomplete, parameter hints, and type d
 | `add_child(child)` | `child: Node` | - | Reparents node as child. |
 | `remove_child(child)` | `child: Node` | - | Detaches child node. |
 | `destroy()` | - | - | Queues node for scene removal. |
+| `add_tag(tag)` / `remove_tag(tag)` | `string` | `boolean` | Tags (groups), also set in the Inspector's **Tags** section and saved with the scene. |
+| `has_tag(tag)` | `string` | `boolean` | |
+| `get_tags()` | - | `string[]` | |
+
+`Scene.find_by_tag("enemy")` returns every node with the tag, in tree order:
+
+```lua
+for _, enemy in ipairs(Scene.find_by_tag("enemy")) do
+    enemy:set_enabled(false)
+end
+```
 
 #### Lookup & textures
 | Method | Parameters | Return | Description |

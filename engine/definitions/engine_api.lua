@@ -104,6 +104,22 @@ function Node:get_parent() end
 ---@return Node[]
 function Node:get_children() end
 
+---Adds a tag (group) to the node; false when it already has it.
+---@param tag NodeTag|string
+---@return boolean
+function Node:add_tag(tag) end
+
+---@param tag NodeTag|string
+---@return boolean removed
+function Node:remove_tag(tag) end
+
+---@param tag NodeTag|string
+---@return boolean
+function Node:has_tag(tag) end
+
+---@return string[]
+function Node:get_tags() end
+
 ---Finds a direct child node by its exact name.
 ---@param name NodeName|string
 ---@return Node?
@@ -1588,6 +1604,11 @@ local SceneModule = {}
 ---@param name NodeName|string Name of node to find
 ---@return Node? node Found node or nil
 function SceneModule.find_node(name) end
+
+---Every node in the active scene with a tag, in tree order.
+---@param tag NodeTag|string
+---@return Node[]
+function SceneModule.find_by_tag(tag) end
 
 ---Sets the scene's ambient light (0..1): the colour where no light reaches.
 ---White = an unlit scene. With LightNodes, the scene is lit by them on top.

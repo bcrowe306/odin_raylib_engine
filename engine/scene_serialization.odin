@@ -22,7 +22,7 @@ import rl "vendor:raylib"
 //
 // Node object:
 //   "type", "name", "position", "scale", "rotation", "enabled", "visible", "layer"
-//   optional: "pause_mode", "paused", "editor_locked", "editor_hidden" (editor only)
+//   optional: "pause_mode", "paused", "tags", "editor_locked", "editor_hidden" (editor only)
 //   "properties": { <reflected gui:"true" fields> }        (see node_properties.odin)
 //   resources by type: "texture"/"origin" (TextureNode), "frames"/"fps"/"loop"/"origin"
 //   (FrameAnimationNode), "audio" (Sound/Music), "timer" {duration, auto_start, loop},
@@ -156,6 +156,15 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	if node.paused {Json_Key(w, "paused", &first); write_bool(w, true)}
 	if node.editorLocked {Json_Key(w, "editor_locked", &first); write_bool(w, true)}
 	if node.editorHidden {Json_Key(w, "editor_hidden", &first); write_bool(w, true)}
+	if len(node.tags) > 0 {
+		Json_Key(w, "tags", &first)
+		strings.write_byte(&w.sb, '[')
+		for t, i in node.tags {
+			if i > 0 do strings.write_string(&w.sb, ", ")
+			Json_String(w, t)
+		}
+		strings.write_byte(&w.sb, ']')
+	}
 
 	// A linked component instance saves only its link: everything below the
 	// instance root comes from the component file.
@@ -759,6 +768,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.paused = sj_bool(obj, "paused", false)
 	node.editorLocked = sj_bool(obj, "editor_locked", false)
 	node.editorHidden = sj_bool(obj, "editor_hidden", false)
+	read_tags(node, obj)
 
 	read_legacy_blocks(node, obj, ctx)
 
@@ -1205,6 +1215,14 @@ sj_obj :: proc(obj: json.Object, key: string) -> (json.Object, bool) {
 }
 
 @(private = "file")
+read_tags :: proc(node: ^Node, obj: json.Object) {
+	clear(&node.tags)
+	if arr, ok := sj_arr(obj, "tags"); ok {
+		for v in arr do if s, isStr := v.(json.String); isStr do Node_AddTag(node, s)
+	}
+}
+
+@(private = "file")
 sj_arr :: proc(obj: json.Object, key: string) -> (json.Array, bool) {
 	a, ok := obj[key].(json.Array)
 	return a, ok
@@ -1273,6 +1291,7 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.paused = sj_bool(inst, "paused", false)
 	node.editorLocked = sj_bool(inst, "editor_locked", false)
 	node.editorHidden = sj_bool(inst, "editor_hidden", false)
+	read_tags(node, inst)
 	if sj_obj_has(inst, "connections") do read_connections(node, inst)
 	return node
 }
