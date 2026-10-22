@@ -59,11 +59,13 @@ ProcessSceneChange :: proc(manager: ^SceneManager, gameContext: ^GameContext = n
 		oldScene := manager.currentScene
 		newScene := manager.nextScene
 
-		if oldScene != nil && oldScene != newScene {
+		// Switching scenes - or changing to the current one, which restarts
+		// it (Scene.reload, the editor's reload on save): destroy everything
+		// in the exiting scene and reset its state.
+		if oldScene != nil {
 			if oldScene.onExit != nil {
 				oldScene->onExit(gameContext)
 			}
-			// When scenes switch, destroy all objects in exiting scene and reset its state!
 			Scene_Unload(oldScene, gameContext)
 		}
 

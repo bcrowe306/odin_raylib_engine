@@ -390,6 +390,15 @@ binary (`bin/odin_raylib_engine`) if any engine/game source changed, then starts
 `--project <dir>` (plus `--scene <file>` for F6). The game's output streams into the
 Console. **Game → Simulate in Editor** runs the scene inside the editor and restores it when stopped.
 
+While the game runs, the bottom panel's **Game** tab is linked to it
+(`--editor-link`): the running game's scene tree (refreshed twice a
+second), the selected node's live properties - type a value and press Enter
+to change it in the game - and **Pause** / **Resume** / **Step** (one frame
+of 1/60 s; paused, the game is still drawn). Saving a scene while the game
+runs reloads it there (the current scene restarts with the saved version);
+edited scripts and images reload by themselves, in the game and in the
+editor.
+
 ### Code tab (Lua scripts)
 
 Scripts open in a **Code** tab next to the Viewport: double-click a script in Assets, use the

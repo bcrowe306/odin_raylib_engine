@@ -41,6 +41,11 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:profiler")
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Game###GameTab", ICON_FA_GAMEPAD if RemoteGame_Connected() else ICON_FA_PLAY)) {
+			GamePanel_Render(state)
+			imgui.EndTabItem()
+		}
+		Drive_Item("bottom:game")
 		animFlags: imgui.TabItemFlags = {}
 		if animTabRequest {
 			animFlags += {.SetSelected}

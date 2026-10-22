@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:path/filepath"
+import "core:slice"
 import "core:strconv"
 import "core:strings"
 import "core:time"
@@ -26,6 +27,7 @@ Run_Options :: struct {
 	userDataDir:    string, // Save data folder instead of the platform's
 	benchFrames:    int,    // --bench N: N uncapped frames, then print frame timings and quit
 	noRenderCache:  bool,   // --no-render-cache: no tile chunk cache, no draw reordering (comparisons)
+	editorLink:     bool,   // --editor-link: driven by the editor over stdin/stdout (editor_link.odin)
 }
 
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
@@ -55,6 +57,8 @@ Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 			opts.userDataDir = next; i += 1
 		case arg == "--no-render-cache":
 			opts.noRenderCache = true
+		case arg == "--editor-link":
+			opts.editorLink = true
 		case arg == "--bench" && next != "":
 			n, _ := strconv.parse_int(next); opts.benchFrames = n; i += 1
 		case !strings.has_prefix(arg, "-") && opts.projectPath == "":
@@ -214,6 +218,10 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 		game.backgroundColor = rl.Color{8, 10, 18, 255}
 	}
 
+	// The editor's Play: it drives the game over stdin/stdout. (Read from the
+	// command line too: front ends pass on only the options they know.)
+	if opts.editorLink || slice.contains(os.args, "--editor-link") do EditorLink_Enable()
+
 	frameCount := 0
 	targetCaptureFrame := max(25, maxFrames) if maxFrames > 0 else 30
 	// --bench: the first 30 frames warm up (loading, caches), then N timed.
@@ -225,6 +233,8 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	fixedStep := screenshotPath != "" || dumpScenePath != ""
 	for !rl.WindowShouldClose() && !game.shouldQuit {
 		dt := 1.0 / 60 if fixedStep else rl.GetFrameTime()
+		EditorLink_BeginFrame(game)
+		if game.linkPaused && !game.frozen do dt = 1.0 / 60 // a step
 
 		sw := f32(rl.GetScreenWidth())
 		sh := f32(rl.GetScreenHeight())

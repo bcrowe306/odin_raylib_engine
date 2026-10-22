@@ -140,6 +140,7 @@ Editor_UpdatePlaytest :: proc(state: ^EditorState) {
 		drain_pipe(state, &state.gameOutput, &state.gameLineBuf, "game")
 	}
 	Editor_CheckGameProcess(state)
+	RemoteGame_Update(state)
 }
 
 Editor_LaunchGame :: proc(state: ^EditorState) {
@@ -148,7 +149,7 @@ Editor_LaunchGame :: proc(state: ^EditorState) {
 		exePath = "./odin_raylib_engine"
 	}
 	cmd := make([dynamic]string, context.temp_allocator)
-	append(&cmd, exePath, "--project", state.projectPath)
+	append(&cmd, exePath, "--project", state.projectPath, "--editor-link")
 	if state.pendingPlayScene != "" {
 		append(&cmd, "--scene", state.pendingPlayScene)
 	}
@@ -157,19 +158,25 @@ Editor_LaunchGame :: proc(state: ^EditorState) {
 	}
 
 	r, w, perr := os.pipe()
+	// The game's stdin: the editor link's commands (remote_game.odin).
+	inR, inW, ierr := os.pipe()
 	desc := os.Process_Desc{command = cmd[:]}
 	if perr == nil {
 		desc.stdout = w
 		desc.stderr = w
 	}
+	if ierr == nil do desc.stdin = inR
 	procHandle, err := os.process_start(desc)
 	if perr == nil do os.close(w)
+	if ierr == nil do os.close(inR)
 	if err != nil {
 		if perr == nil do os.close(r)
+		if ierr == nil do os.close(inW)
 		Editor_Log(state, .Error, "Failed to launch game process: %v", err)
 		return
 	}
 	if perr == nil do state.gameOutput = r
+	if ierr == nil do RemoteGame_Attach(inW)
 
 	state.gameProcess = procHandle
 	state.gameProcessRunning = true
@@ -202,6 +209,10 @@ drain_pipe :: proc(state: ^EditorState, f: ^^os.File, lineBuf: ^[dynamic]u8, sou
 		}
 		if idx < 0 do break
 		line := strings.trim_right_space(string(lineBuf[:idx]))
+		if source == "game" && RemoteGame_HandleLine(state, line) {
+			remove_range(lineBuf, 0, idx + 1)
+			continue
+		}
 		if line != "" {
 			level := LogLevel.Info
 			lower := strings.to_lower(line, context.temp_allocator)
@@ -285,6 +296,8 @@ Editor_SaveSceneDocument :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 	// reload see the same thing.
 	scene.sourceJson = strings.clone(jsonStr, state.game.sceneManager.allocator)
 	Editor_SetSceneBaseline(state, scene)
+	// The running game picks the saved scene up (restarting it if current).
+	if RemoteGame_Connected() do RemoteGame_Send(fmt.tprintf("reload-scene %s", scene.filePath))
 	Editor_Log(state, .Info, "Saved %s", scene.filePath)
 	return true
 }

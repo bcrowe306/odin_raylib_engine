@@ -1,0 +1,40 @@
+# Play-in-editor link: Play, the Game tab shows the running game's tree;
+# pause, step one frame, inspect a node and change its rotation live,
+# resume; a scene saved in the editor reloads in the running game; stop.
+wait 5
+key escape
+click @toolbar.play
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+click @bottom:game
+wait-until remote-nodes >= 5 timeout=300
+expect remote-names contains PlayerShip
+wait-until remote-frame >= 10 timeout=300
+screenshot game_tab
+click @remote.pause
+wait-until remote-paused == true timeout=200
+click @remote.step
+wait-until remote-steps == 1 timeout=200
+click @remote.node:PlayerShip
+wait-until remote-prop:position contains 640 timeout=200
+click @remote.prop:rotation
+key cmd+a
+type 45
+key enter
+wait-until remote-prop:rotation contains 45 timeout=200
+screenshot inspected
+click @remote.resume
+wait-until remote-paused == false timeout=200
+
+# Hot reload: a node renamed and the scene saved in the editor.
+click @hier:Asteroid_Gamma
+key f2
+key ctrl+a
+type DriveReloadedRock
+key enter
+key ctrl+s
+wait-until remote-names contains DriveReloadedRock timeout=400
+expect remote-reloads >= 1
+click @toolbar.stop
+wait-until game == stopped timeout=300
+expect remote-connected == false

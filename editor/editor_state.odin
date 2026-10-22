@@ -357,6 +357,7 @@ Editor_CheckGameProcess :: proc(state: ^EditorState) {
 		return
 	}
 	state.gameProcessRunning = false
+	RemoteGame_Detach()
 	Editor_Log(state, .Info, "Game process exited (exit code: %d)", pState.exit_code)
 }
 
@@ -379,6 +380,7 @@ Editor_StopGameProcess :: proc(state: ^EditorState) {
 		_ = os.process_kill(state.gameProcess)
 	}
 	state.gameProcessRunning = false
+	RemoteGame_Detach()
 	Editor_Log(state, .Info, "Game process stopped.")
 }
 

@@ -55,7 +55,7 @@ out of scope here.
 - [x] 6.4 Scene tree: search by type/tag, groups/tags, reorder by drag, cross-scene copy/paste
 - [x] 6.5 Asset browser: thumbnail grid, real folders (create/move/rename with reference updates), find usages, per-asset import settings
 - [x] 6.6 Sprite-sheet slicer → frame animations
-- [ ] 6.7 Play-in-editor: remote scene tree of the running game, frame step, hot reload while playing
+- [x] 6.7 Play-in-editor: remote scene tree of the running game, frame step, hot reload while playing
 - [ ] 6.8 Layout presets / workspaces and reset layout
 - [ ] 6.9 Welcome / new-project window with templates; icons for every node type; empty-state guidance
 

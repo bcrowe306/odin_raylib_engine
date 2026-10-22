@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:strings"
+import "core:time"
 import rl "vendor:raylib"
 
 MAX_TEXTURES :: 1000
@@ -17,6 +18,7 @@ Texture :: struct {
 	fileName: string,
 	texture: rl.Texture2D,
 	refCount: int,
+	modTime: time.Time, // of the file when loaded (hot reload)
 }
 
 AudioSound :: struct {
@@ -156,6 +158,7 @@ LoadTexture_FilePath :: proc(rm: ^ResourceManager, filePath: string) -> (texture
 	tex.texture = texture2d
 	tex.refCount = 1
 	Texture_ApplyImport(&tex.texture, Texture_ImportFor(rm, filePath)) // project.json "texture_import"
+	if info, serr := os.stat(filePath, context.temp_allocator); serr == nil do tex.modTime = info.modification_time
 	append(&rm.textures, tex)
 	return tex, true
 }
@@ -339,4 +342,30 @@ ResourceManager_ReleaseMusic :: proc(rm: ^ResourceManager, m: ^AudioMusic) {
 Node_ResourceManager :: proc(node: ^Node) -> ^ResourceManager {
 	if node != nil && node.gameContext != nil && node.gameContext.game != nil do return &node.gameContext.game.resourceManager
 	return nil
+}
+
+@(private = "file")
+textureCheck: time.Tick
+
+// ResourceManager_CheckForChanges reloads textures whose files changed
+// (an image edited while the game or editor runs); every user of the
+// texture sees the new pixels. Stats files at most twice a second.
+ResourceManager_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
+	if rm == nil || !rl.IsWindowReady() || time.tick_since(textureCheck) < 500 * time.Millisecond do return 0
+	textureCheck = time.tick_now()
+	n := 0
+	for t in rm.textures {
+		if t == nil || t.modTime == {} do continue
+		info, err := os.stat(t.filePath, context.temp_allocator)
+		if err != nil || time.diff(t.modTime, info.modification_time) <= 0 do continue
+		fresh := rl.LoadTexture(strings.clone_to_cstring(t.filePath, context.temp_allocator))
+		if fresh.id == 0 do continue // half-written: try again later
+		t.modTime = info.modification_time
+		rl.UnloadTexture(t.texture)
+		t.texture = fresh
+		Texture_ApplyImport(&t.texture, Texture_ImportFor(rm, t.filePath))
+		log.infof("Reloaded %s", t.fileName)
+		n += 1
+	}
+	return n
 }

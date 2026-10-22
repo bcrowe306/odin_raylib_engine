@@ -698,6 +698,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return fmt.tprintf("%s:%d/%d:%d", a.name, apn.currentFrame - a.startFrame + 1, e.Animation_Length(a), len(a.tracks)), true
 	case "shortcuts-open": return "true" if showShortcutsWindow else "false", true
 	case "usages": return fmt.tprint(AssetUsages_Count()), true
+	case "remote-connected", "remote-paused", "remote-frame", "remote-steps", "remote-reloads", "remote-nodes", "remote-names": return RemoteGame_Query(q)
 	case "guides":
 		if state.activeScene == nil do return "", true
 		parts := make([dynamic]string, context.temp_allocator)
@@ -758,6 +759,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		if a == nil || b == nil do return "<no node>", true
 		return fmt_vec(b.globalPosition - a.globalPosition), true
 	}
+	if strings.has_prefix(q, "remote-prop:") do return RemoteGame_Query(q)
 	if strings.has_prefix(q, "folder-open:") {
 		return "true" if assetFolderOpen[q[len("folder-open:"):]] else "false", true
 	}

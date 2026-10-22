@@ -39,6 +39,10 @@ Game :: struct {
 	drawBounds:      bool `gui:"true"`,
 	shouldQuit:      bool,
 	treePaused:      bool, // Engine.set_paused: Pausable nodes stop (scene_flow.odin)
+	// Editor link (editor_link.odin): paused from the editor; frozen = this
+	// frame only draws (no input, physics, scripts or animation).
+	linkPaused:      bool,
+	frozen:          bool,
 	transition:      Scene_Transition,
 	preloads:        map[^Scene]^Scene_Preload,
 
@@ -145,6 +149,12 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 	}
 
 	game.uiMouseConsumed = false
+	if game.scriptManager.hotReload do ResourceManager_CheckForChanges(&game.resourceManager) // edited images
+	if game.frozen {
+		// Paused from the editor: only draw.
+		RunScene(game.sceneManager.currentScene, &game.gameContext, 0)
+		return
+	}
 
 	// 1. Poll and update Two-Tier Input System once per frame (before physics and game/scene update)
 	InputSystem_Update(&game.input, deltaTime)

@@ -105,3 +105,6 @@ ICON_FA_RULER_COMBINED            :: "" // Rulers & guides
 ICON_FA_EYE_LOW_VISION            :: "" // Hidden in the editor
 ICON_FA_FOLDER_TREE               :: "" // Assets: folders view
 ICON_FA_BARS                      :: "" // Slicer: one animation per row
+ICON_FA_CARET_RIGHT               :: "" // Tree: closed
+ICON_FA_CARET_DOWN                :: "" // Tree: open
+ICON_FA_GAMEPAD                   :: "" // Game tab (connected)

@@ -244,7 +244,8 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	// Ensure any newly added nodes have their ready proc called before update
 	Scene_CallReady(scene, scene.rootNode, gameContext)
 
-	if scene.update != nil {
+	frozen := gameContext != nil && gameContext.game != nil && gameContext.game.frozen
+	if scene.update != nil && !frozen {
 		scene->update(gameContext, deltaTime)
 	}
 
@@ -255,15 +256,17 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	// Propagate initial global positions before hierarchy update
 	Node_SetGlobalPositions(nodeManager, scene.rootNode)
 
-	// Update active dropdown popup first so it can capture clicks before underlying widgets
-	UI_UpdateActiveDropdownOverlay(gameContext)
+	if !frozen {
+		// Update active dropdown popup first so it can capture clicks before underlying widgets
+		UI_UpdateActiveDropdownOverlay(gameContext)
 
-	// Update UI keyboard navigation and focus state
-	UI_UpdateFocusNavigation(scene, gameContext)
+		// Update UI keyboard navigation and focus state
+		UI_UpdateFocusNavigation(scene, gameContext)
 
-	// Update hierarchy (calls update on each node)
-	Scene_UpdateNodeHirearchy(scene, scene.rootNode, gameContext, deltaTime)
-	if gameContext != nil && gameContext.game != nil do Tween_Update(&gameContext.game.tweens, deltaTime, &gameContext.game.scriptManager)
+		// Update hierarchy (calls update on each node)
+		Scene_UpdateNodeHirearchy(scene, scene.rootNode, gameContext, deltaTime)
+		if gameContext != nil && gameContext.game != nil do Tween_Update(&gameContext.game.tweens, deltaTime, &gameContext.game.scriptManager)
+	}
 
 	// Update global positions after node updates & container layout
 	Node_SetGlobalPositions(nodeManager, scene.rootNode)

@@ -85,6 +85,7 @@ editor_main :: proc() -> int {
 		NativeDialog_Poll(&GlobalEditor)
 		Lua_UpdateProjectTypes(&GlobalEditor)
 		if n := e.Shader_CheckForChanges(); n > 0 do Editor_Log(&GlobalEditor, .Info, "Reloaded %d changed shader(s)", n)
+		e.ResourceManager_CheckForChanges(&GlobalEditor.game.resourceManager) // edited images
 		if n := e.ScriptManager_CheckForChanges(&GlobalEditor.game.scriptManager); n > 0 {
 			Editor_Log(&GlobalEditor, .Info, "Reloaded %d changed script(s)", n)
 		}

@@ -104,7 +104,7 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 		imgui.PopStyleColor()
 	case state.gameProcessRunning:
 		imgui.PushStyleColorImVec4(.Text, UI_SUCCESS)
-		imgui.TextUnformatted("● Running")
+		imgui.TextUnformatted(fmt.ctprintf("%s  Running", ICON_FA_CIRCLE))
 		imgui.PopStyleColor()
 	}
 	Drive_Item("toolbar.status")
