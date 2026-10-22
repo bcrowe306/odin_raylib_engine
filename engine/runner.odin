@@ -6,6 +6,7 @@ import "core:os"
 import "core:path/filepath"
 import "core:strconv"
 import "core:strings"
+import "core:time"
 import rl "vendor:raylib"
 
 // ============================================================================
@@ -23,10 +24,12 @@ Run_Options :: struct {
 	startScene:     string, // project-relative scene file to start in
 	dumpScenePath:  string, // write the running scene's JSON (tests)
 	userDataDir:    string, // Save data folder instead of the platform's
+	benchFrames:    int,    // --bench N: N uncapped frames, then print frame timings and quit
+	noRenderCache:  bool,   // --no-render-cache: no tile chunk cache, no draw reordering (comparisons)
 }
 
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
-// --hidden, --dump-scene and --user-data. A bare argument is taken as the project.
+// --hidden, --dump-scene, --user-data, --bench and --no-render-cache. A bare argument is taken as the project.
 Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
@@ -50,6 +53,10 @@ Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 			opts.dumpScenePath = next; i += 1
 		case arg == "--user-data" && next != "":
 			opts.userDataDir = next; i += 1
+		case arg == "--no-render-cache":
+			opts.noRenderCache = true
+		case arg == "--bench" && next != "":
+			n, _ := strconv.parse_int(next); opts.benchFrames = n; i += 1
 		case !strings.has_prefix(arg, "-") && opts.projectPath == "":
 			opts.projectPath = arg
 		}
@@ -111,6 +118,10 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	InitializeGame(game)
 	defer game->terminate()
 	if opts.userDataDir != "" do Save_SetDirectory(opts.userDataDir)
+	if opts.noRenderCache {
+		TileCache_SetEnabled(false)
+		Render_SetBatching(false)
+	}
 
 	winW := i32(1280)
 	winH := i32(720)
@@ -149,7 +160,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	// Project Video settings.
 	flags: rl.ConfigFlags = {}
 	if video.resizable do flags += {.WINDOW_RESIZABLE}
-	if video.vsync do flags += {.VSYNC_HINT}
+	if video.vsync && opts.benchFrames <= 0 do flags += {.VSYNC_HINT}
 	if video.fullscreen do flags += {.FULLSCREEN_MODE}
 	if video.msaa do flags += {.MSAA_4X_HINT}
 	if video.highDPI do flags += {.WINDOW_HIGHDPI}
@@ -161,8 +172,10 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	titleC := strings.clone_to_cstring(winTitle, context.temp_allocator)
 	rl.InitWindow(winW, winH, titleC)
 	defer rl.CloseWindow()
+	if !opts.noRenderCache do Render_InitBatching()
+	defer Render_ReleaseBatching()
 
-	rl.SetTargetFPS(targetFPS)
+	rl.SetTargetFPS(0 if opts.benchFrames > 0 else targetFPS)
 	rl.InitAudioDevice()
 	defer rl.CloseAudioDevice()
 
@@ -202,23 +215,40 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 
 	frameCount := 0
 	targetCaptureFrame := max(25, maxFrames) if maxFrames > 0 else 30
+	// --bench: the first 30 frames warm up (loading, caches), then N timed.
+	benchWarmup :: 30
+	benchRun, benchFrame: time.Duration
 
 	// Game loop
+	// Captures for tests step a fixed 1/60 s, so runs are comparable.
+	fixedStep := screenshotPath != "" || dumpScenePath != ""
 	for !rl.WindowShouldClose() && !game.shouldQuit {
-		dt := rl.GetFrameTime()
+		dt := 1.0 / 60 if fixedStep else rl.GetFrameTime()
 
 		sw := f32(rl.GetScreenWidth())
 		sh := f32(rl.GetScreenHeight())
 		game.viewportCanvasRect = {0, 0, sw, sh}
 
+		frameStart := time.tick_now()
 		rl.BeginDrawing()
 		rl.ClearBackground(Game_ClearColor(game))
 
 		game->run(dt)
+		runTime := time.tick_since(frameStart)
 
 		rl.EndDrawing()
 
 		frameCount += 1
+		if opts.benchFrames > 0 && frameCount > benchWarmup {
+			benchRun += runTime
+			benchFrame += time.tick_since(frameStart)
+			if frameCount >= benchWarmup + opts.benchFrames {
+				n := f64(opts.benchFrames)
+				fmt.printfln("[bench] %d frames: update+draw %.3f ms | whole frame (incl. GPU sync) %.3f ms | %d drawn, %d culled | %d tile chunks (%d built)",
+					opts.benchFrames, time.duration_milliseconds(benchRun) / n, time.duration_milliseconds(benchFrame) / n, renderStats.drawn, renderStats.culled, TileCache_Stats(), TileCache_Builds())
+				break
+			}
+		}
 		if (screenshotPath != "" || dumpScenePath != "") && frameCount >= targetCaptureFrame {
 			// --dump-scene: what the game is actually running, for tests.
 			if dumpScenePath != "" && game.sceneManager.currentScene != nil {

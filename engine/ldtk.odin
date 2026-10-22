@@ -236,7 +236,11 @@ LdtkWorld :: struct {
 	levels:     [dynamic]int, // indices in project.levels
 }
 
+@(private = "file")
+ldtkLoadCounter: u64
+
 LdtkProject :: struct {
+	loadId:              u64,    // unique per parse (render caches key on it)
 	filePath:            string,
 	basePath:            string,
 	iid:                 string,
@@ -504,6 +508,8 @@ Ldtk_ParseProject :: proc(jsonBytes: []u8, basePath: string = "", allocator := c
 
 	project := new(LdtkProject, allocator)
 	project.ownerAllocator = allocator
+	ldtkLoadCounter += 1
+	project.loadId = ldtkLoadCounter
 	if vmem.arena_init_growing(&project.arena) != nil {
 		free(project, allocator)
 		return nil, false

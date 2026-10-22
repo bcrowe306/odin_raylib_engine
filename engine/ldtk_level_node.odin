@@ -3,6 +3,7 @@ package engine
 import "core:encoding/json"
 import "core:fmt"
 import "core:log"
+import "core:math"
 import "core:os"
 import "core:slice"
 import "core:strconv"
@@ -270,6 +271,7 @@ LdtkLevelNode_LevelOffset :: proc(ln: ^LdtkLevelNode, level: ^LdtkLevel) -> [2]f
 // LdtkLevelNode_SetProject (re)loads the node's LDtk project and level.
 LdtkLevelNode_SetProject :: proc(node: ^LdtkLevelNode, projectPath: string, levelIdentifier: string = "") {
 	if node == nil do return
+	TileCache_Evict(node)
 	LdtkLevelNode_ClearBuilt(node)
 	if node.ownsProject && node.project != nil do Ldtk_DestroyProject(node.project)
 	node.project = nil
@@ -935,6 +937,163 @@ Ldtk_ParallaxTransform :: proc(layer: ^LdtkLayerInstance, camLevel: [2]f32) -> (
 	return
 }
 
+// ldtk_parallax_camera: the camera centre parallax follows (the editor's
+// view, else the game camera) and whether parallax applies.
+@(private = "file")
+ldtk_parallax_camera :: proc(ln: ^LdtkLevelNode, ctx: ^GameContext) -> (cam: [2]f32, has: bool) {
+	if ln.editorPreview {
+		cam, has = ln.editorCamera, ln.editorParallax
+	} else if ctx != nil && ctx.camera != nil {
+		cam, has = ctx.camera.currentPosition, true
+	}
+	return cam, has && ln.parallax
+}
+
+// ldtk_layer_place: where a layer draws (its origin and scale, parallax
+// included).
+@(private = "file")
+ldtk_layer_place :: proc(base, scale: [2]f32, layer: ^LdtkLayerInstance, camLevel: [2]f32, hasCam: bool) -> (origin, layerScale: [2]f32) {
+	pOff, pScale := [2]f32{}, f32(1)
+	if hasCam do pOff, pScale = Ldtk_ParallaxTransform(layer, camLevel)
+	return base + (pOff + layer.offset * pScale) * scale, scale * pScale
+}
+
+@(private = "file")
+ldtk_layer_tileset :: proc(ln: ^LdtkLevelNode, layer: ^LdtkLayerInstance) -> ^LdtkTilesetDef {
+	ts := Ldtk_GetTilesetByUid(ln.project, layer.tilesetDefUid)
+	if ts == nil && len(layer.tilesetRelPath) > 0 do ts = Ldtk_GetTilesetByRelPath(ln.project, layer.tilesetRelPath)
+	return ts
+}
+
+// ldtk_draw_tiles draws tiles in view; `skip` leaves out tiles whose
+// chunk is drawn from the cache.
+@(private = "file")
+ldtk_draw_tiles :: proc(tiles: []LdtkTileInstance, tex: rl.Texture2D, origin, scale: [2]f32, opacity: f32, tint: rl.Color, skip: map[[2]i32]bool = nil) {
+	for t in tiles {
+		if t.alpha <= 0.001 do continue
+		if skip != nil {
+			c := [2]i32{i32(t.px.x) / TILE_CHUNK_PX, i32(t.px.y) / TILE_CHUNK_PX}
+			if c in skip do continue
+		}
+		dest := rl.Rectangle{origin.x + t.px.x * scale.x, origin.y + t.px.y * scale.y, t.size.x * scale.x, t.size.y * scale.y}
+		if !Render_IsVisible({min(dest.x, dest.x + dest.width), min(dest.y, dest.y + dest.height), abs(dest.width), abs(dest.height)}) do continue
+		src := rl.Rectangle{t.src.x, t.src.y, t.size.x, t.size.y}
+		if t.flipX do src.width = -src.width
+		if t.flipY do src.height = -src.height
+		rl.DrawTexturePro(tex, src, dest, {0, 0}, 0, rl.ColorAlpha(tint, opacity * t.alpha))
+	}
+}
+
+// ldtk_layer_chunks: the layer's chunk grid (its cells, plus a tile's worth
+// for tiles hanging over the edge).
+@(private = "file")
+ldtk_layer_chunks :: proc(layer: ^LdtkLayerInstance) -> [2]int {
+	w := (layer.cWid + 1) * layer.gridSize
+	h := (layer.cHei + 1) * layer.gridSize
+	return {(w + TILE_CHUNK_PX - 1) / TILE_CHUNK_PX, (h + TILE_CHUNK_PX - 1) / TILE_CHUNK_PX}
+}
+
+// ldtk_visible_chunks: the layer's chunks in view (ok = false: draw tiles).
+@(private = "file")
+ldtk_visible_chunks :: proc(layer: ^LdtkLayerInstance, origin, scale: [2]f32, view: rl.Rectangle, hasView: bool) -> (c0, c1: [2]int, ok: bool) {
+	n := ldtk_layer_chunks(layer)
+	c0, c1 = {0, 0}, n
+	if scale.x <= 0 || scale.y <= 0 do return c0, c1, false
+	if hasView {
+		cp := f32(TILE_CHUNK_PX)
+		c0.x = clamp(int(math.floor((view.x - origin.x) / scale.x / cp)), 0, n.x)
+		c0.y = clamp(int(math.floor((view.y - origin.y) / scale.y / cp)), 0, n.y)
+		c1.x = clamp(int(math.ceil((view.x + view.width - origin.x) / scale.x / cp)), 0, n.x)
+		c1.y = clamp(int(math.ceil((view.y + view.height - origin.y) / scale.y / cp)), 0, n.y)
+	}
+	return c0, c1, true
+}
+
+@(private = "file")
+Ldtk_Chunk_Build :: struct {
+	layer: ^LdtkLayerInstance,
+	ts:    ^LdtkTilesetDef,
+}
+
+@(private = "file")
+ldtk_build_chunk :: proc(data: rawptr, key: Tile_Chunk_Key) {
+	b := cast(^Ldtk_Chunk_Build)data
+	cp := f32(TILE_CHUNK_PX)
+	area := rl.Rectangle{f32(key.cx) * cp, f32(key.cy) * cp, cp, cp}
+	for list in ([2][]LdtkTileInstance{b.layer.autoLayerTiles[:], b.layer.gridTiles[:]}) {
+		for t in list {
+			if t.alpha <= 0.001 do continue
+			r := rl.Rectangle{t.px.x, t.px.y, t.size.x, t.size.y}
+			if !(r.x < area.x + area.width && area.x < r.x + r.width && r.y < area.y + area.height && area.y < r.y + r.height) do continue
+			src := rl.Rectangle{t.src.x, t.src.y, t.size.x, t.size.y}
+			if t.flipX do src.width = -src.width
+			if t.flipY do src.height = -src.height
+			rl.DrawTexturePro(b.ts.texture, src, {r.x - area.x, r.y - area.y, r.width, r.height}, {0, 0}, 0, rl.ColorAlpha(rl.WHITE, t.alpha))
+		}
+	}
+}
+
+// ldtk_draw_layer_cached draws a tile layer from cached chunks (and the
+// tiles of chunks that aren't cached).
+@(private = "file")
+ldtk_draw_layer_cached :: proc(ln: ^LdtkLevelNode, layer: ^LdtkLayerInstance, ts: ^LdtkTilesetDef, origin, scale: [2]f32) {
+	c0, c1, ok := ldtk_visible_chunks(layer, origin, scale, renderView.rect, renderView.active)
+	if !ok {
+		ldtk_draw_tiles(layer.autoLayerTiles[:], ts.texture, origin, scale, layer.opacity, ln.tintColor)
+		ldtk_draw_tiles(layer.gridTiles[:], ts.texture, origin, scale, layer.opacity, ln.tintColor)
+		return
+	}
+	cached := make(map[[2]i32]bool, context.temp_allocator)
+	missing := false
+	cp := f32(TILE_CHUNK_PX)
+	TileCache_BeginDraw()
+	defer if missing {
+		ldtk_draw_tiles(layer.autoLayerTiles[:], ts.texture, origin, scale, layer.opacity, ln.tintColor, cached)
+		ldtk_draw_tiles(layer.gridTiles[:], ts.texture, origin, scale, layer.opacity, ln.tintColor, cached)
+	}
+	defer TileCache_EndDraw()
+	for cy in c0.y ..< c1.y {
+		for cx in c0.x ..< c1.x {
+			key := Tile_Chunk_Key{ln, layer, ln.project.loadId, i32(cx), i32(cy)}
+			dst := rl.Rectangle{origin.x + f32(cx) * cp * scale.x, origin.y + f32(cy) * cp * scale.y, cp * scale.x, cp * scale.y}
+			if TileCache_Draw(key, u64(ts.texture.id), {0, 0, cp, cp}, dst, 0, ln.tintColor, layer.opacity) {
+				cached[{i32(cx), i32(cy)}] = true
+			} else {
+				missing = true
+			}
+		}
+	}
+}
+
+// LdtkLevelNode_PrepareChunks builds the cached chunks of its tile layers
+// in view.
+LdtkLevelNode_PrepareChunks :: proc(ln: ^LdtkLevelNode, view: rl.Rectangle, ctx: ^GameContext) {
+	if ln.level == nil || ln.project == nil do return
+	if len(ln.activeLevels) == 0 do LdtkLevelNode_RefreshActiveLevels(ln)
+	scale := ln.globalScale
+	cam, hasCam := ldtk_parallax_camera(ln, ctx if ctx != nil else ln.gameContext)
+	for lvl in ln.activeLevels {
+		base := ln.globalPosition + LdtkLevelNode_LevelOffset(ln, lvl) * scale
+		camLevel := (cam - base) / [2]f32{scale.x if scale.x != 0 else 1, scale.y if scale.y != 0 else 1}
+		for i := len(lvl.layers) - 1; i >= 0; i -= 1 {
+			layer := &lvl.layers[i]
+			if !LdtkLevelNode_LayerVisible(ln, layer) || layer.opacity <= 0.001 do continue
+			if len(layer.autoLayerTiles) + len(layer.gridTiles) < TILE_CACHE_MIN_TILES do continue
+			ts := ldtk_layer_tileset(ln, layer)
+			if ts == nil || !ts.textureLoaded do continue
+			origin, layerScale := ldtk_layer_place(base, scale, layer, camLevel, hasCam)
+			c0, c1, ok := ldtk_visible_chunks(layer, origin, layerScale, view, true)
+			if !ok do continue
+			b := Ldtk_Chunk_Build{layer, ts}
+			for cy in c0.y ..< c1.y {
+				for cx in c0.x ..< c1.x {
+					TileCache_Ensure({ln, layer, ln.project.loadId, i32(cx), i32(cy)}, u64(ts.texture.id), {TILE_CHUNK_PX, TILE_CHUNK_PX}, ldtk_build_chunk, &b)
+				}
+			}
+		}
+	}
+}
+
 LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	if !rl.IsWindowReady() do return
 	ln := cast(^LdtkLevelNode)node
@@ -942,16 +1101,7 @@ LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	if len(ln.activeLevels) == 0 do LdtkLevelNode_RefreshActiveLevels(ln)
 	pos := ln.globalPosition
 	scale := ln.globalScale
-
-	// Camera centre for parallax: the editor's view, else the game camera.
-	cam: [2]f32
-	hasCam := false
-	if ln.editorPreview {
-		cam, hasCam = ln.editorCamera, ln.editorParallax
-	} else if ctx != nil && ctx.camera != nil {
-		cam, hasCam = ctx.camera.currentPosition, true
-	}
-	hasCam = hasCam && ln.parallax
+	cam, hasCam := ldtk_parallax_camera(ln, ctx)
 
 	for lvl in ln.activeLevels {
 		base := pos + LdtkLevelNode_LevelOffset(ln, lvl) * scale
@@ -969,27 +1119,15 @@ LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 		for i := len(lvl.layers) - 1; i >= 0; i -= 1 {
 			layer := &lvl.layers[i]
 			if !LdtkLevelNode_LayerVisible(ln, layer) || layer.opacity <= 0.001 do continue
-			pOff, pScale := [2]f32{}, f32(1)
-			if hasCam do pOff, pScale = Ldtk_ParallaxTransform(layer, camLevel)
-			origin := base + (pOff + layer.offset * pScale) * scale
-			layerScale := scale * pScale
+			origin, layerScale := ldtk_layer_place(base, scale, layer, camLevel, hasCam)
 
-			ts := Ldtk_GetTilesetByUid(ln.project, layer.tilesetDefUid)
-			if ts == nil && len(layer.tilesetRelPath) > 0 do ts = Ldtk_GetTilesetByRelPath(ln.project, layer.tilesetRelPath)
-			if ts != nil && ts.textureLoaded {
-				draw_tile_list :: proc(tiles: []LdtkTileInstance, tex: rl.Texture2D, origin, scale: [2]f32, opacity: f32, tint: rl.Color) {
-					for t in tiles {
-						if t.alpha <= 0.001 do continue
-						dest := rl.Rectangle{origin.x + t.px.x * scale.x, origin.y + t.px.y * scale.y, t.size.x * scale.x, t.size.y * scale.y}
-						if !Render_IsVisible({min(dest.x, dest.x + dest.width), min(dest.y, dest.y + dest.height), abs(dest.width), abs(dest.height)}) do continue
-						src := rl.Rectangle{t.src.x, t.src.y, t.size.x, t.size.y}
-						if t.flipX do src.width = -src.width
-						if t.flipY do src.height = -src.height
-						rl.DrawTexturePro(tex, src, dest, {0, 0}, 0, rl.ColorAlpha(tint, opacity * t.alpha))
-					}
+			if ts := ldtk_layer_tileset(ln, layer); ts != nil && ts.textureLoaded {
+				if ln.material == nil && TileCache_Enabled() && len(layer.autoLayerTiles) + len(layer.gridTiles) >= TILE_CACHE_MIN_TILES {
+					ldtk_draw_layer_cached(ln, layer, ts, origin, layerScale)
+				} else {
+					ldtk_draw_tiles(layer.autoLayerTiles[:], ts.texture, origin, layerScale, layer.opacity, ln.tintColor)
+					ldtk_draw_tiles(layer.gridTiles[:], ts.texture, origin, layerScale, layer.opacity, ln.tintColor)
 				}
-				draw_tile_list(layer.autoLayerTiles[:], ts.texture, origin, layerScale, layer.opacity, ln.tintColor)
-				draw_tile_list(layer.gridTiles[:], ts.texture, origin, layerScale, layer.opacity, ln.tintColor)
 			}
 			// IntGrid cells in their LDtk colours (editor view of value layers).
 			if ln.editorPreview && ln.editorShowIntGrid && layer.type == .IntGrid {
@@ -1043,6 +1181,7 @@ LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 
 LdtkLevelNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 	ln := cast(^LdtkLevelNode)node
+	TileCache_Evict(ln)
 	ldtk_unregister_one_way(ln.oneWayBody)
 	DestroySubject(&ln.onLevelLoaded)
 	DestroySubject(&ln.onEntitySpawned)

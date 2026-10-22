@@ -38,6 +38,8 @@ editor_main :: proc() -> int {
 	}
 	rl.InitWindow(1600, 900, "Odin Raylib Engine - Game Editor")
 	defer rl.CloseWindow()
+	e.Render_InitBatching() // fewer GPU stalls on batch flushes (batching.odin)
+	defer e.Render_ReleaseBatching()
 	rl.SetTargetFPS(60)
 	rl.SetExitKey(.KEY_NULL) // Esc is an editor key (deselect, close popups), not "quit"
 

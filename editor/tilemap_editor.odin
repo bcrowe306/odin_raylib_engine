@@ -2,6 +2,7 @@ package editor
 
 import "core:c"
 import "core:fmt"
+import "core:math"
 import e "../engine"
 import imgui "lib/imgui"
 
@@ -23,6 +24,7 @@ Tile_State :: struct {
 	tool:   Tile_Tool,
 	brush:  i32,
 	stroke: bool, // a paint stroke is in progress (undo recorded)
+	last:   [2]int, // the stroke's previous cell (painted to the current one in a line)
 }
 
 GlobalTiles: Tile_State
@@ -51,13 +53,19 @@ Inspector_TileMap :: proc(state: ^EditorState, tm: ^e.TileMapNode) {
 		undo_on_activate(state, "Tile size")
 		Drive_Item("tile.size")
 		UI_PropLabel("Map Size")
-		msz := [2]c.int{c.int(tm.mapSize.x), c.int(tm.mapSize.y)}
-		if imgui.DragInt2("##mapsize", &msz, 0.2, 1, 1024) {
-			tm.mapSize = {int(max(msz.x, 1)), int(max(msz.y, 1))}
-			e.TileMapNode_Layout(tm)
+		// Width and height as separate fields (each can be typed into).
+		half := (imgui.GetContentRegionAvail().x - imgui.GetStyle().ItemInnerSpacing.x) * 0.5
+		for k in 0 ..< 2 {
+			if k == 1 do imgui.SameLine(0, imgui.GetStyle().ItemInnerSpacing.x)
+			v := c.int(tm.mapSize[k])
+			imgui.SetNextItemWidth(half)
+			if imgui.DragInt(fmt.ctprintf("##mapsize%d", k), &v, 0.2, 1, 1024) {
+				tm.mapSize[k] = int(max(v, 1))
+				e.TileMapNode_Layout(tm)
+			}
+			undo_on_activate(state, "Map size")
+			Drive_Item(fmt.tprintf("tile.map-%s", "w" if k == 0 else "h"))
 		}
-		undo_on_activate(state, "Map size")
-		Drive_Item("tile.map-size")
 		UI_EndProps()
 	}
 	// Tools.
@@ -137,15 +145,27 @@ Viewport_TilePaint :: proc(state: ^EditorState, drawList: ^imgui.DrawList, mouse
 	if !ts.stroke {
 		Editor_RecordUndo(state, "Paint tiles")
 		ts.stroke = true
+		ts.last = cell
 		if left && ts.tool == .Fill {
 			e.TileMapNode_Fill(tm, cell.x, cell.y, ts.brush)
 			return true
 		}
 	}
+	tile: i32
 	switch {
-	case right || ts.tool == .Erase: e.TileMapNode_Set(tm, cell.x, cell.y, -1)
-	case ts.tool == .Paint:          e.TileMapNode_Set(tm, cell.x, cell.y, ts.brush)
-	case:
+	case right || ts.tool == .Erase: tile = -1
+	case ts.tool == .Paint:          tile = ts.brush
+	case:                            return true
 	}
+	// Every cell from the previous one to this one: a fast stroke (or a
+	// zoomed-out view) moves more than a cell per frame.
+	from := ts.last
+	steps := max(abs(cell.x - from.x), abs(cell.y - from.y))
+	for i in 0 ..= steps {
+		t := f32(i) / f32(max(steps, 1))
+		p := [2]int{from.x + int(math.round(f32(cell.x - from.x) * t)), from.y + int(math.round(f32(cell.y - from.y) * t))}
+		e.TileMapNode_Set(tm, p.x, p.y, tile)
+	}
+	ts.last = cell
 	return true
 }

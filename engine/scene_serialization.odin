@@ -893,6 +893,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 						i += 1
 					}
 				}
+				TileMapNode_Changed(tm)
 			}
 		}
 	case LdtkLevelNode:

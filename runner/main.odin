@@ -10,6 +10,8 @@
 // Usage: runner [project-dir | game.ore] [--scene <file>] [--frames N]
 //        [--screenshot out.png] [--dump-scene out.json] [--hidden]
 //        [--user-data <dir>]  (Save data folder instead of the platform's)
+//        [--bench N]          (N uncapped frames, then frame timings; scripts/make_bench_project.py)
+//        [--no-render-cache]  (no tile chunk cache / draw reordering, for comparisons)
 // With no project argument it looks for game.ore (or any .ore, or a
 // project/ directory) next to the executable.
 package main

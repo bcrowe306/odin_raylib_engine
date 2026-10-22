@@ -29,6 +29,10 @@ TileMapNode :: struct {
 	tiles:       [dynamic]i32,
 	staticBody:  ^StaticBodyNode,
 	builtSize:   [2]int, // mapSize the tiles array was laid out for
+	// Chunk cache (tile_cache.odin): bumped when the tiles change; chunkVer
+	// per chunk for single-cell edits.
+	cacheVersion: u64,
+	chunkVer:     map[[2]i32]u64,
 }
 
 TileMapNode_Create :: proc(scene: ^Scene, name: string = "TileMap", parent: ^Node = nil) -> ^TileMapNode {
@@ -56,6 +60,7 @@ TileMapNode_Layout :: proc(tm: ^TileMapNode) {
 	copy(old, tm.tiles[:])
 	ow, oh := tm.builtSize.x, tm.builtSize.y
 	resize(&tm.tiles, w * h)
+	tm.cacheVersion += 1
 	for i in 0 ..< w * h do tm.tiles[i] = -1
 	for y in 0 ..< min(h, oh) {
 		for x in 0 ..< min(w, ow) {
@@ -78,7 +83,16 @@ TileMapNode_Set :: proc(tm: ^TileMapNode, x, y: int, tile: i32) -> bool {
 	i := y * tm.mapSize.x + x
 	if tm.tiles[i] == tile do return false
 	tm.tiles[i] = tile
+	cs := tilemap_chunk_cells(tm)
+	c := [2]i32{i32(x / cs.x), i32(y / cs.y)}
+	if tm.chunkVer == nil do tm.chunkVer = make(map[[2]i32]u64, tm.allocator)
+	tm.chunkVer[c] = tm.chunkVer[c] + 1
 	return true
+}
+
+// TileMapNode_Changed: call after writing tm.tiles directly.
+TileMapNode_Changed :: proc(tm: ^TileMapNode) {
+	tm.cacheVersion += 1
 }
 
 // TileMapNode_Fill flood-fills the region of equal tiles around (x, y).
@@ -118,6 +132,7 @@ TileMapNode_SetTileset :: proc(tm: ^TileMapNode, path: string, ctx: ^GameContext
 	rm := Node_ResourceManager(tm)
 	if tm.tileset != nil && rm != nil do ResourceManager_ReleaseTexture(rm, tm.tileset)
 	tm.tileset = nil
+	tm.cacheVersion += 1
 	tm.tilesetPath = strings.clone(path, tm.allocator)
 	if path == "" || rm == nil || !rl.IsWindowReady() do return
 	if tex, ok := rm.loadTexture(rm, Project_ResolveAssetPath(ctx, path)); ok do tm.tileset = tex
@@ -144,34 +159,115 @@ TileMapNode_CellCorner :: proc(tm: ^TileMapNode, cell: [2]int) -> [2]f32 {
 	return tm.globalPosition + {local.x * c - local.y * s, local.x * s + local.y * c}
 }
 
+// tilemap_visible_cells: the cell range in a view (unrotated maps; rotated
+// ones: all).
+@(private = "file")
+tilemap_visible_cells :: proc(tm: ^TileMapNode, view: rl.Rectangle, hasView: bool) -> (x0, y0, x1, y1: int) {
+	x0, y0, x1, y1 = 0, 0, tm.mapSize.x, tm.mapSize.y
+	tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
+	sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
+	sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
+	if hasView && tm.globalRotation == 0 && sx > 0 && sy > 0 {
+		o := TileMapNode_CellCorner(tm, {0, 0})
+		x0 = clamp(int(math.floor((view.x - o.x) / (tw * sx))), 0, tm.mapSize.x)
+		y0 = clamp(int(math.floor((view.y - o.y) / (th * sy))), 0, tm.mapSize.y)
+		x1 = clamp(int(math.ceil((view.x + view.width - o.x) / (tw * sx))), 0, tm.mapSize.x)
+		y1 = clamp(int(math.ceil((view.y + view.height - o.y) / (th * sy))), 0, tm.mapSize.y)
+	}
+	return
+}
+
+// tilemap_chunk_cells: cells per cache chunk (up to TILE_CHUNK_PX pixels).
+@(private = "file")
+tilemap_chunk_cells :: proc(tm: ^TileMapNode) -> [2]int {
+	return {max(TILE_CHUNK_PX / max(tm.tileSize.x, 1), 1), max(TILE_CHUNK_PX / max(tm.tileSize.y, 1), 1)}
+}
+
+@(private = "file")
+tilemap_chunk_version :: proc(tm: ^TileMapNode, c: [2]i32) -> u64 {
+	v := tm.cacheVersion * 1_000_003 + u64(tm.tileset.texture.id) * 7919 + u64(tm.tileSize.x) * 131 + u64(tm.tileSize.y)
+	return v + tm.chunkVer[c] * 0x9E3779B97F4A7C15
+}
+
+@(private = "file")
+draw_cells :: proc(tm: ^TileMapNode, cols, x0, y0, x1, y1: int, local: bool, origin: [2]int = {}) {
+	tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
+	sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
+	sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
+	for y in y0 ..< y1 {
+		for x in x0 ..< x1 {
+			t := tm.tiles[y * tm.mapSize.x + x]
+			if t < 0 do continue
+			src := rl.Rectangle{f32(int(t) % cols) * tw, f32(int(t) / cols) * th, tw, th}
+			if local {
+				// Into a chunk: unscaled pixels from the chunk's corner.
+				rl.DrawTexturePro(tm.tileset.texture, src, {f32(x - origin.x) * tw, f32(y - origin.y) * th, tw, th}, {0, 0}, 0, rl.WHITE)
+			} else {
+				p := TileMapNode_CellCorner(tm, {x, y})
+				rl.DrawTexturePro(tm.tileset.texture, src, {p.x, p.y, tw * sx, th * sy}, {0, 0}, tm.globalRotation, tm.tint)
+			}
+		}
+	}
+}
+
+// TileMapNode_PrepareChunks builds the cached chunks in view.
+TileMapNode_PrepareChunks :: proc(tm: ^TileMapNode, view: rl.Rectangle) {
+	if tm.tileset == nil || tm.tileset.texture.id == 0 do return
+	TileMapNode_Layout(tm)
+	if TileMapNode_Columns(tm) <= 0 do return
+	x0, y0, x1, y1 := tilemap_visible_cells(tm, view, true)
+	if (x1 - x0) * (y1 - y0) < TILE_CACHE_MIN_TILES do return
+	cs := tilemap_chunk_cells(tm)
+	size := [2]i32{i32(cs.x * tm.tileSize.x), i32(cs.y * tm.tileSize.y)}
+	build :: proc(data: rawptr, key: Tile_Chunk_Key) {
+		tm := cast(^TileMapNode)data
+		cs := tilemap_chunk_cells(tm)
+		o := [2]int{int(key.cx) * cs.x, int(key.cy) * cs.y}
+		draw_cells(tm, TileMapNode_Columns(tm), o.x, o.y, min(o.x + cs.x, tm.mapSize.x), min(o.y + cs.y, tm.mapSize.y), true, o)
+	}
+	if x1 <= x0 || y1 <= y0 do return
+	for cy in y0 / cs.y ..= (y1 - 1) / cs.y {
+		for cx in x0 / cs.x ..= (x1 - 1) / cs.x {
+			c := [2]i32{i32(cx), i32(cy)}
+			TileCache_Ensure({tm, tm, 0, c.x, c.y}, tilemap_chunk_version(tm, c), size, build, tm)
+		}
+	}
+}
+
 TileMapNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	tm := cast(^TileMapNode)node
 	if !tm.renderable || tm.tileset == nil do return
 	TileMapNode_Layout(tm)
 	cols := TileMapNode_Columns(tm)
 	if cols <= 0 do return
+	x0, y0, x1, y1 := tilemap_visible_cells(tm, renderView.rect, renderView.active)
+	if x1 <= x0 || y1 <= y0 do return
+	if tm.material != nil || !TileCache_Enabled() || (x1 - x0) * (y1 - y0) < TILE_CACHE_MIN_TILES {
+		draw_cells(tm, cols, x0, y0, x1, y1, false)
+		return
+	}
+	// Cached chunks as single quads; the rest tile by tile.
 	tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
 	sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
 	sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
-	// Only the cells in view (unrotated maps; rotated ones draw all).
-	x0, y0, x1, y1 := 0, 0, tm.mapSize.x, tm.mapSize.y
-	if renderView.active && tm.globalRotation == 0 && sx > 0 && sy > 0 {
-		o := TileMapNode_CellCorner(tm, {0, 0})
-		v := renderView.rect
-		x0 = clamp(int(math.floor((v.x - o.x) / (tw * sx))), 0, tm.mapSize.x)
-		y0 = clamp(int(math.floor((v.y - o.y) / (th * sy))), 0, tm.mapSize.y)
-		x1 = clamp(int(math.ceil((v.x + v.width - o.x) / (tw * sx))), 0, tm.mapSize.x)
-		y1 = clamp(int(math.ceil((v.y + v.height - o.y) / (th * sy))), 0, tm.mapSize.y)
-	}
-	for y in y0 ..< y1 {
-		for x in x0 ..< x1 {
-			t := tm.tiles[y * tm.mapSize.x + x]
-			if t < 0 do continue
-			src := rl.Rectangle{f32(int(t) % cols) * tw, f32(int(t) / cols) * th, tw, th}
-			p := TileMapNode_CellCorner(tm, {x, y})
-			dst := rl.Rectangle{p.x, p.y, tw * sx, th * sy}
-			rl.DrawTexturePro(tm.tileset.texture, src, dst, {0, 0}, tm.globalRotation, tm.tint)
+	cs := tilemap_chunk_cells(tm)
+	missing := make([dynamic][2]int, context.temp_allocator)
+	TileCache_BeginDraw()
+	for cy in y0 / cs.y ..= (y1 - 1) / cs.y {
+		for cx in x0 / cs.x ..= (x1 - 1) / cs.x {
+			c := [2]i32{i32(cx), i32(cy)}
+			o := [2]int{cx * cs.x, cy * cs.y}
+			w, h := min(cs.x, tm.mapSize.x - o.x), min(cs.y, tm.mapSize.y - o.y)
+			p := TileMapNode_CellCorner(tm, o)
+			src := rl.Rectangle{0, 0, f32(w) * tw, f32(h) * th}
+			dst := rl.Rectangle{p.x, p.y, f32(w) * tw * sx, f32(h) * th * sy}
+			if !TileCache_Draw({tm, tm, 0, c.x, c.y}, tilemap_chunk_version(tm, c), src, dst, tm.globalRotation, tm.tint) do append(&missing, o)
 		}
+	}
+	TileCache_EndDraw()
+	// Chunks of a map don't overlap: the rest can follow.
+	for o in missing {
+		draw_cells(tm, cols, max(o.x, x0), max(o.y, y0), min(o.x + cs.x, x1, tm.mapSize.x), min(o.y + cs.y, y1, tm.mapSize.y), false)
 	}
 }
 
@@ -214,6 +310,7 @@ TileMapNode_Ready :: proc(node: ^Node, ctx: ^GameContext) {
 
 TileMapNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 	tm := cast(^TileMapNode)node
+	TileCache_Evict(tm)
 	if tm.tileset != nil {
 		if rm := Node_ResourceManager(tm); rm != nil do ResourceManager_ReleaseTexture(rm, tm.tileset)
 		tm.tileset = nil

@@ -265,6 +265,8 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	}
 	lastWorld := -1
 	if scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent && rl.IsWindowReady() {
+		// Cached tile chunks in view (built before any layer draws).
+		TileCache_Prepare(scene, Camera2D_ViewRect(CameraNode_GetCamera2D(scene.camera, lightVW, lightVH), lightVW, lightVH), gameContext)
 		for l in RenderLayer do if l in scene.camera.targetLayers do lastWorld = int(l)
 		if lastWorld >= 0 do Lighting_Prepare(scene, CameraNode_GetCamera2D(scene.camera, lightVW, lightVH), i32(lightVW), i32(lightVH))
 	}
@@ -376,6 +378,7 @@ Scene_RenderAllLayers :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTim
 // render_bucket draws one layer's nodes, skipping those outside the view.
 @(private = "file")
 render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, deltaTime: f32) {
+	visible := make([dynamic]^Node, 0, len(nodes), context.temp_allocator)
 	for node in nodes {
 		if renderView.active {
 			if r, ok := Node_RenderBounds(node); ok && !Render_IsVisible(r) {
@@ -383,6 +386,10 @@ render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, 
 				continue
 			}
 		}
+		append(&visible, node)
+	}
+	// Sprites sharing a texture drawn together (same picture: batching.odin).
+	for node in Render_BatchOrder(visible[:]) {
 		renderStats.drawn += 1
 		withMaterial := node.material != nil && Material_Begin(node, gameContext)
 		if node.render != nil do node->render(gameContext, deltaTime)

@@ -33,3 +33,32 @@ click @tile.erase
 key ctrl+s
 expect file:scenes/main.scene.json contains "type": "TileMapNode"
 expect file:scenes/main.scene.json contains "tileset": "textures/Asteroid_1.png"
+
+# A big map draws from cached chunks (tile_cache.odin); edits refresh them.
+dblclick @tile.map-w
+key cmd+a
+type 80
+key enter
+dblclick @tile.map-h
+key cmd+a
+type 80
+key enter
+click @toolbar.zoom
+click @pick:25%
+wait 2
+click @tile.fill
+click @world:1000,1000
+expect node:TileMap.tiles >= 6300
+# Zoomed out: the whole map in view (enough tiles to use the chunk cache).
+key cmd+minus
+key cmd+minus
+key cmd+minus
+key cmd+minus
+wait 2
+expect tile-chunks >= 4
+screenshot big_map_cached
+click @tile.erase
+drag @world:700,1200 @world:2000,1200
+expect node:TileMap.tiles <= 6360
+wait 2
+screenshot big_map_erased

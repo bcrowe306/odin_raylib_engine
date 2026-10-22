@@ -699,6 +699,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return strings.to_lower(fmt.tprint(state.toolMode), context.temp_allocator), true
 	case "zoom":
 		return fmt.tprintf("%.2f", state.cameraZoom), true
+	case "tile-chunks":
+		return fmt.tprint(e.TileCache_Stats()), true
 	case "camera":
 		return fmt_vec(state.cameraPos), true
 	case "nodes":

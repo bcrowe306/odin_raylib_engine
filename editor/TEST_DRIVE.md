@@ -82,7 +82,7 @@ and `hold cmd` (not ctrl, which macOS turns into a right-click) adds to a
 selection. `~=` compares numbers or `x,y` pairs within 0.5.
 
 Queries:
-- `selected`, `scene`, `tool`, `zoom`, `camera`, `nodes`
+- `selected`, `scene`, `tool`, `zoom`, `camera`, `nodes`, `tile-chunks` (cached tile chunks)
 - `modified`, `modified-count`, `undo`, `redo`
 - `game` (running/stopped), `build`, `log`, `last-log`
 - `add-node-open`, `project-settings-open`, `item:<id>`
