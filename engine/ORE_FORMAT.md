@@ -164,7 +164,7 @@ Scenes define the active camera, debug boundaries, and hierarchical node graphs.
         "name": "HeroSprite",
         "position": [400.0, 300.0],
         "texture_path": "assets/textures/hero.png",
-        "origin": [32.0, 32.0]
+        "pivot": [0.5, 1.0]
       }
     ]
   }
@@ -178,7 +178,7 @@ Scenes define the active camera, debug boundaries, and hierarchical node graphs.
 | Node Type | Key Properties | Physics Support |
 |---|---|---|
 | `Node` | Basic transform (`position`, `scale`, `rotation`, `enabled`, `visible`, `layer`) | Hierarchy transform |
-| `TextureNode` | `texture_path`, `origin` | Sprite rendering |
+| `TextureNode` | `texture_path`, `pivot` (the origin: a fraction of the image, `[0.5, 0.5]` = centre; also on animations, AnimationPlayers, nine-slices, text). An older pixel `origin` is still read. | Sprite rendering |
 | `DynamicBodyNode` | `physics.gravity_scale`, `physics.fixed_rotation`, `physics.shape` | Box2D dynamic body |
 | `StaticBodyNode` | `physics.shape` | Box2D static geometry |
 | `CharacterMoverNode` | `character.speed`, `character.jump_speed`, `character.radius`, `character.height` | Kinematic character controller |

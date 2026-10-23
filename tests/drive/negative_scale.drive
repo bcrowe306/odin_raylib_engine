@@ -1,6 +1,6 @@
-# Negative scale mirrors: an AnimationPlayer with scale x -1 draws its frame
-# mirrored around its position (as the game does), and its bounds (picking,
-# the selection box) follow.
+# Negative scale mirrors around the origin: an AnimationPlayer (origin at
+# the centre) flips in place; with the origin at the top-left it mirrors
+# around that corner. Its bounds (picking, the selection box) follow.
 wait 5
 click @menu:View
 click @menu:View/Workspaces
@@ -16,12 +16,17 @@ click @anim.new
 drag @asset:textures/Spaceship_1.png @anim.frame-drop
 expect anim-info contains frames=1
 screenshot normal
-expect selected-bounds == 640,360,882,569
+expect selected-bounds == 518,255,761,464
 click @insp.scale.link
 dblclick @insp.scale.x
 key ctrl+a
 type -1
 key enter
 expect node:AnimationPlayer.scale == -1.00,1.00
-expect selected-bounds == 397,360,640,569
+expect selected-bounds == 518,255,761,464
 screenshot mirrored
+# The origin at the top-left: mirrored around that corner (the position).
+click @insp.origin-presets
+click @insp.origin:Top Left
+expect selected-bounds == 397,360,640,569
+screenshot mirrored_top_left

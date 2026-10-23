@@ -1114,7 +1114,7 @@ lua_node_texture_set_origin :: proc "c" (L: ^lua.State) -> c.int {
 	ox := f32(lua.tonumber(L, 2))
 	oy := f32(lua.tonumber(L, 3))
 	tex := cast(^TextureNode)node
-	tex.origin = {ox, oy}
+	Node_SetOriginPx(tex, {ox, oy}, tex.size) // pixels -> the node's origin
 	return 0
 }
 

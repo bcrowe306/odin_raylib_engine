@@ -369,7 +369,6 @@ TextNode :: struct {
 	richText:    bool `gui:"true"`, // [color=..] [size=..] [wave] [shake]
 	localized:   bool `gui:"true"`, // `text` is a key in the locale tables
 	sdf:         bool `gui:"true"`, // sharp at any scale (vector fonts)
-	centered:    bool `gui:"true"`, // the node's position is the text's centre
 	revealSpeed: f32 `gui:"true" min:"0" max:"500"`, // characters per second (0 = all at once)
 	revealed:    f32, // characters shown (typewriter)
 	time:        f32,
@@ -448,7 +447,7 @@ TextNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	glyphs, size, f := TextNode_Layout(t, ctx)
 	scale := t.globalScale.x if t.globalScale.x != 0 else 1
 	origin := t.globalPosition
-	if t.centered do origin -= rotate_vec(size * 0.5 * scale, t.globalRotation)
+	origin -= rotate_vec(size * t.pivot * scale, t.globalRotation) // the origin (node_origin.odin)
 	reveal := -1
 	if t.revealSpeed > 0 && !t.revealDone do reveal = int(t.revealed)
 	Text_DrawGlyphs(f, glyphs, origin, t.globalRotation, scale, reveal, t.time)
@@ -459,6 +458,6 @@ TextNode_Bounds :: proc(t: ^TextNode, ctx: ^GameContext) -> rl.Rectangle {
 	_, size, _ := TextNode_Layout(t, ctx)
 	scale := t.globalScale.x if t.globalScale.x != 0 else 1
 	o := t.globalPosition
-	if t.centered do o -= size * 0.5 * scale
+	o -= size * t.pivot * scale
 	return {o.x, o.y, size.x * scale, size.y * scale}
 }

@@ -44,7 +44,6 @@ NineSliceNode :: struct {
 	marginsLT:   [2]f32 `gui:"true" min:"0" max:"512"`, // left, top border (texture pixels)
 	marginsRB:   [2]f32 `gui:"true" min:"0" max:"512"`, // right, bottom
 	tint:        rl.Color `gui:"true"`,
-	centered:    bool `gui:"true"`, // the position is the centre (else the top-left)
 	texture:     ^Texture,
 	loadedPath:  string,
 }
@@ -69,7 +68,7 @@ NineSliceNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	n := cast(^NineSliceNode)node
 	texture_for(n, n.texturePath, &n.loadedPath, &n.texture)
 	size := n.size * n.globalScale
-	origin := size * 0.5 if n.centered else [2]f32{}
+	origin := size * n.pivot // the origin (node_origin.odin)
 	if n.texture == nil {
 		// No texture yet: an outline of where it goes.
 		if rl.IsWindowReady() do rl.DrawRectanglePro({n.globalPosition.x, n.globalPosition.y, size.x, size.y}, origin, n.globalRotation, {n.tint.r, n.tint.g, n.tint.b, 60})

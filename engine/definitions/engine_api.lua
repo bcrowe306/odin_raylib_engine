@@ -791,7 +791,8 @@ function ParticleEmitterNode:particle_set_lifetime(lifetime) end
 ---@return number height
 function TextureNode:texture_get_size() end
 
----Sets the local pivot origin for texture rotation and scaling.
+---Sets the origin (what it rotates and scales around) in pixels of the image;
+---stored as a fraction of it - set_property("origin", fx, fy) takes that.
 ---@param ox number Origin X in pixels
 ---@param oy number Origin Y in pixels
 function TextureNode:texture_set_origin(ox, oy) end

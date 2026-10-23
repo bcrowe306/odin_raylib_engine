@@ -94,8 +94,7 @@ Node_RenderBounds :: proc(node: ^Node) -> (rect: rl.Rectangle, ok: bool) {
 		tn := cast(^TextureNode)node
 		if tn.texture == nil do return {}, false
 		size := tn.size * tn.globalScale
-		origin := tn.origin * tn.globalScale
-		if tn.origin == {0, 0} do origin = size * 0.5
+		origin := Node_OriginPx(tn, tn.size) * tn.globalScale
 		return rect_aabb(tn.globalPosition, {abs(size.x), abs(size.y)}, {abs(origin.x), abs(origin.y)}, tn.globalRotation), true
 	case TextNode:
 		if !rl.IsWindowReady() do return {}, false

@@ -37,6 +37,10 @@ Node :: struct {
 	position: [2]f32 `gui:"true" min:"0" max:"1280"`,
 	scale: [2]f32 `gui:"true" min:"0.01" max:"10"`,
 	rotation: f32 `gui:"true" min:"0" max:"360"`,
+	// The origin (node_origin.odin): where in what the node draws its
+	// position is - and what it rotates and scales around - as a fraction
+	// of the drawn size ({0.5, 0.5} = the centre, {0, 0} the top-left).
+	pivot: [2]f32,
 	globalPosition: [2]f32,
 	globalScale: [2]f32,
 	globalRotation: f32,
@@ -152,6 +156,7 @@ InitializeNode :: proc(node: ^Node) {
 	node.position = {0, 0}
 	node.scale = {1, 1}
 	node.rotation = 0
+	node.pivot = {0.5, 0.5}
 	node.enabled = true
 	node.renderable = true
 	node.layer = RenderLayer.Layer1

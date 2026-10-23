@@ -847,6 +847,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		case "global": return fmt_vec(n.globalPosition), true
 		case "rotation": return fmt.tprintf("%.1f", n.rotation), true
 		case "scale": return fmt.tprintf("%.2f,%.2f", n.scale.x, n.scale.y), true
+		case "origin": return fmt.tprintf("%.2f,%.2f", n.pivot.x, n.pivot.y), true
 		case "visible": return "true" if n.renderable else "false", true
 		case "material":
 			// "<shader> <blend>" ("" without a material)

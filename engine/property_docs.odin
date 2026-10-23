@@ -82,6 +82,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"AnimationPlayerNode.reverse", "Play the animation backwards."},
 	{"AnimationPlayerNode.autoplay", "Start playing the current animation when the node becomes ready."},
 	{"Node.position", "Position relative to the parent, in pixels (+y is down)."},
+	{"Node.origin", "Where in the image the position is, and what it rotates and scales around: a fraction of its size (0.5, 0.5 = the centre, 0, 0 = the top-left, 0.5, 1 = the bottom centre)."},
 	{"Node.rotation", "Rotation relative to the parent, in degrees (clockwise)."},
 	{"Node.scale", "Size multiplier relative to the parent (1, 1 = as is; negative flips)."},
 	{"Node.layer", "Drawing layer: higher layers draw over lower ones (Layer8 is for UI)."},
@@ -161,7 +162,6 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"TextNode.richText", "Interpret [color=..] [size=..] [wave] [shake] tags."},
 	{"TextNode.localized", "The text is a key in the locale tables; shows the current language's translation."},
 	{"TextNode.sdf", "Signed-distance-field rendering: stays sharp when scaled or zoomed (vector fonts)."},
-	{"TextNode.centered", "The node's position is the text's centre (else its top-left)."},
 	{"TextNode.revealSpeed", "Typewriter: characters per second (0 = all at once); emits \"revealed\" when done."},
 
 	// --- Game / input (project settings) ---
@@ -369,7 +369,6 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"NineSliceNode.size", "Drawn size (px); the borders keep their size, the middle stretches."},
 	{"NineSliceNode.marginsLT", "Left and top border widths (texture px)."},
 	{"NineSliceNode.marginsRB", "Right and bottom border widths (texture px)."},
-	{"NineSliceNode.centered", "The position is the centre (else the top-left)."},
 	{"ParallaxNode.texturePath", "Background texture."},
 	{"ParallaxNode.factor", "Movement relative to the camera: 1 moves with the world, 0 stays fixed on screen."},
 	{"ParallaxNode.repeatX", "Tile horizontally to fill the view."},

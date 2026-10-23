@@ -45,6 +45,7 @@ exits non-zero if any check fails.
 | `game_colliders.drive` | The toolbar's Show Colliders button: saved in project.json, switched live in a running game, Game menu entry. |
 | `node_drop_typed.drive` | A node dropped into a script: on an empty line a `---@type` local (indented into the function), into an assignment the annotation above it, elsewhere an inline `--[[@as Type]]` cast; undo. |
 | `negative_scale.drive` | An AnimationPlayer with scale x -1 draws mirrored around its position; its bounds (selection box, picking) mirror too. |
+| `origin.drive` | The Origin row (help path, presets, typed, reset to the centre, undo), none for a camera, a new AnimationPlayer centred, saved as `"pivot"`; a migrated pixel origin. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

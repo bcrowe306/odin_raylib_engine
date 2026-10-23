@@ -8,7 +8,7 @@ TextureNode :: struct {
 	filePath: string,
 	size: [2]f32,
 	texture: ^Texture,
-	origin: rl.Vector2,
+	origin: rl.Vector2, // pixel origin overriding Node.pivot when not {0, 0} (node_origin.odin)
 	tint: rl.Color `gui:"true"`, // multiplies the texture ({} = white)
 }
 
@@ -43,7 +43,6 @@ TextureNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, fi
 		textureNode.texture = tex
 		textureNode.size.x = auto_cast tex.texture.width
 		textureNode.size.y = auto_cast tex.texture.height
-		textureNode.origin = {textureNode.size.x * 0.5, textureNode.size.y * 0.5}
 	} else {
 		log.error("Failed to load texture from file: ", filePath)
 	}
@@ -67,10 +66,8 @@ TextureNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 	scl := textureNode.globalScale
 	rot := textureNode.globalRotation
 
-	// The pivot: `origin` (unscaled px), else the centre. A negative scale
-	// mirrors the image around it.
-	origin := textureNode.origin
-	if origin == {0, 0} do origin = textureNode.size * 0.5
+	// Around the origin (node_origin.odin); a negative scale mirrors there.
+	origin := Node_OriginPx(textureNode, textureNode.size)
 	tint := textureNode.tint if textureNode.tint != {} else rl.WHITE
 	Texture_DrawScaled(textureNode.texture.texture, source, pos, textureNode.size, scl, origin, rot, tint)
 }

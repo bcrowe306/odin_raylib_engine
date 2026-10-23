@@ -11,7 +11,6 @@ FrameAnimationNode :: struct {
 	currentFrame: u32,
 	reverse: bool,
 	loop: bool,
-	origin: [2]f32,
 	frames: [dynamic]^Texture,
 	// "animation_finished": a non-looping animation reached its last frame.
 	onFinished: EventSubject,
@@ -43,9 +42,6 @@ FrameAnimationNode_AddFrame :: proc(fan: ^FrameAnimationNode, rm: ^ResourceManag
 	if ok && texture != nil {
 		append(&fan.frames, texture)
 		fan.end = auto_cast len(fan.frames) - 1
-		if fan.origin.x == 0 && fan.origin.y == 0 {
-			fan.origin = {f32(texture.texture.width) * 0.5, f32(texture.texture.height) * 0.5}
-		}
 	} else {
 		log.error("Error adding frame. Texture file loading error: ", filePath)
 	}
@@ -121,11 +117,9 @@ FrameAnimationNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 	scl := fan.globalScale
 	rot := fan.globalRotation
 
-	// The pivot: `origin` (unscaled px), else the centre; a negative scale
-	// mirrors around it.
+	// Around the origin (node_origin.odin); a negative scale mirrors there.
 	size := [2]f32{f32(texture.texture.width), f32(texture.texture.height)}
-	origin := fan.origin
-	if origin == {0, 0} do origin = size * 0.5
+	origin := Node_OriginPx(fan, size)
 	if rl.IsWindowReady() && texture.texture.id > 0 {
 		Texture_DrawScaled(texture.texture, source, pos, size, scl, origin, rot, rl.WHITE)
 	}

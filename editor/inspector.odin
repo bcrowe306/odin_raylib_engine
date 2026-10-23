@@ -172,6 +172,20 @@ inspector_body :: proc(state: ^EditorState) {
 			mp := multi_begin(state, node, mpField)
 			vec2_edit(state, "insp.position", &node.position, 1, "Move", mixed = mp.mixed)
 			multi_end(&mp)
+			// The origin (nodes that draw a rectangle): a fraction of the
+			// drawn size; reset = the centre.
+			if e.Node_HasOrigin(node) {
+				moField := node_field(node, &node.pivot, "origin", .Vec2, [2]f32)
+				prop_row_label(state, node, "Origin", moField)
+				mo := multi_begin(state, node, moField)
+				if vec2_edit(state, "insp.origin", &node.pivot, 0.005, "Edit origin", {0.5, 0.5}, mo.mixed) {
+					if node.typeId == e.TextureNode do (cast(^e.TextureNode)node).origin = {} // the fraction rules now
+				}
+				multi_end(&mo)
+				size := e.Node_OriginSize(node, &state.game.gameContext)
+				UI_Tooltip(fmt.tprintf("%.0f, %.0f px of %.0f × %.0f", node.pivot.x * size.x, node.pivot.y * size.y, size.x, size.y))
+				origin_presets(state, node)
+			}
 			mrField := node_field(node, &node.rotation, "rotation", .Float, f32)
 			prop_row_label(state, node, "Rotation", mrField)
 			mr := multi_begin(state, node, mrField)
@@ -349,6 +363,37 @@ script_prop_label :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: st
 	return pretty_name(name)
 }
 
+// origin_presets: a row with a 3 x 3 grid of common origins (corners, edge
+// middles, centre) in a popup.
+@(private = "file")
+origin_presets :: proc(state: ^EditorState, node: ^e.Node) {
+	UI_PropLabel("")
+	if UI_Button(fmt.tprintf("%s  Presets", ICON_FA_CROSSHAIRS), "insp.origin-presets") do imgui.OpenPopup("##origin_presets")
+	UI_Tooltip("Set the origin to a corner, an edge's middle or the centre")
+	if imgui.BeginPopup("##origin_presets") {
+		UI_DimText("Origin")
+		NAMES := [3][3]string{{"Top Left", "Top", "Top Right"}, {"Left", "Centre", "Right"}, {"Bottom Left", "Bottom", "Bottom Right"}}
+		for row in 0 ..< 3 {
+			for col in 0 ..< 3 {
+				if col > 0 do imgui.SameLine(0, 4)
+				p := [2]f32{f32(col) * 0.5, f32(row) * 0.5}
+				on := node.pivot == p
+				if UI_IconButton(ICON_FA_CIRCLE if on else ICON_FA_CIRCLE_DOT, fmt.tprintf("insp.origin:%s", NAMES[row][col]), NAMES[row][col], on, 28) {
+					Editor_RecordUndo(state, "Set origin")
+					targets := multi_selection(state)
+					if len(targets) == 0 do targets = []^e.Node{node}
+					for n in targets do if e.Node_HasOrigin(n) {
+						n.pivot = p
+						if n.typeId == e.TextureNode do (cast(^e.TextureNode)n).origin = {}
+					}
+					imgui.CloseCurrentPopup()
+				}
+			}
+		}
+		imgui.EndPopup()
+	}
+}
+
 // prop_row_label: a hand-drawn property row's label, with the help (pane and
 // tooltip) and dragging into a script like the generated rows.
 prop_row_label :: proc(state: ^EditorState, node: ^e.Node, label: string, p: e.Node_Property) {
@@ -491,7 +536,6 @@ Editor_SetTexture :: proc(state: ^EditorState, tn: ^e.TextureNode, rel: string) 
 	if ok && tex != nil {
 		tn.texture = tex
 		tn.size = {f32(tex.texture.width), f32(tex.texture.height)}
-		tn.origin = tn.size * 0.5
 	}
 }
 
@@ -518,8 +562,6 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 					UI_PropLabel("Size")
 					UI_DimText(fmt.tprintf("%.0f × %.0f px", tn.size.x, tn.size.y))
 				}
-				UI_PropLabel("Origin")
-				vec2_edit(state, "insp.origin", &tn.origin, 0.5, "Edit origin", tn.size * 0.5)
 				UI_EndProps()
 			}
 			if tn.texture != nil {

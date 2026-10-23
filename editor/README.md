@@ -167,6 +167,16 @@ Scenes and components are listed without their `.scene.json` /
 
 ### Inspector
 
+**Origin** (Transform, for nodes that draw an image or a box: textures,
+animations, AnimationPlayers, nine-slices, text): the point of the image
+that sits at the node's position and that it rotates and scales around - a
+fraction of its size, so **0.5, 0.5** is the centre (the default and what
+the reset button restores), **0, 0** the top-left, **0.5, 1** the bottom
+centre. **Presets** sets a corner, an edge's middle or the centre; Alt-drag
+in the viewport moves it while the image stays. Scripts:
+`node:set_property("origin", 0.5, 1)`. Scenes saved before keep their look
+(older AnimationPlayers stay drawn from their top-left, `origin: 0, 0`).
+
 X/Y fields have a link toggle (linked: changing one scales the other by
 the same ratio). Every field has a reset button when its value differs from
 the default (the node type's default, a script property's declared default).
@@ -333,10 +343,9 @@ Machine driving this player follow the new name), **Duplicate** copies it
 and the **trash** deletes it (Cmd+Z brings it back).
 
 A negative **scale** mirrors what the player draws (and a TextureNode or
-FrameAnimationNode): around the node's position - the frame's top-left
-corner for an AnimationPlayer, the pivot for textures - in the game and the
-viewport, whose selection box follows. Flipping a character's parent (its
-CharacterMover) mirrors the whole character around the parent instead.
+FrameAnimationNode) around its **origin**, in the game and the viewport,
+whose selection box follows: with the origin at the centre a character
+flips in place.
 
 **Frames**: the strip shows every frame of the animation; the ones it plays
 (its **range**) are under the blue band in the header - drag the band's

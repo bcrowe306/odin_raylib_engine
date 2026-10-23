@@ -1,0 +1,50 @@
+# The origin (Transform section, nodes that draw a rectangle): the centre by
+# default, typed, presets, reset to the centre; the image moves around the
+# position; saved as "pivot". New AnimationPlayers / text default to the
+# centre; nodes without one have no Origin row.
+wait 5
+click @hier:Asteroid_Alpha
+expect item:insp.origin.x == visible
+# (The demo scene's pixel origin for it was converted on load.)
+expect node:Asteroid_Alpha.origin == 0.31,0.33
+hover @insp.origin.x+-85,0
+wait 5
+expect insp-help-path == origin
+screenshot centre
+
+# Bottom centre from the presets: the image sits above the position.
+click @insp.origin-presets
+click @insp.origin:Bottom
+expect node:Asteroid_Alpha.origin == 0.50,1.00
+screenshot bottom
+# Typed: top-left.
+dblclick @insp.origin.x
+key ctrl+a
+type 0
+key enter
+dblclick @insp.origin.y
+key ctrl+a
+type 0
+key enter
+expect node:Asteroid_Alpha.origin == 0.00,0.00
+screenshot top_left
+# Reset: the centre.
+click @insp.origin.reset
+expect node:Asteroid_Alpha.origin == 0.50,0.50
+key cmd+z
+expect node:Asteroid_Alpha.origin == 0.00,0.00
+
+# Nodes without an origin: no row. A new AnimationPlayer: the centre.
+click @hier:MainCamera
+expect item:insp.origin.x == missing
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+wait 3
+expect node:AnimationPlayer.origin == 0.50,0.50
+expect item:insp.origin.x == visible
+
+key ctrl+s
+wait 2
+expect file:scenes/main.scene.json contains "pivot": [0, 0]

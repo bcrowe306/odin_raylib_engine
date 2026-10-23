@@ -21,7 +21,8 @@ import rl "vendor:raylib"
 // (editor guide lines: [{"x": 100}, {"y": 50}]), "root".
 //
 // Node object:
-//   "type", "name", "position", "scale", "rotation", "enabled", "visible", "layer"
+//   "type", "name", "position", "scale", "rotation", "pivot" (the origin, nodes
+//   that draw a rectangle), "enabled", "visible", "layer"
 //   optional: "pause_mode", "paused", "tags", "editor_locked", "editor_hidden" (editor only)
 //   "properties": { <reflected gui:"true" fields> }        (see node_properties.odin)
 //   resources by type: "texture"/"origin" (TextureNode), "frames"/"fps"/"loop"/"origin"
@@ -149,6 +150,7 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	Json_Key(w, "position", &first); Json_Vec2(w, node.position)
 	Json_Key(w, "scale", &first); Json_Vec2(w, node.scale)
 	Json_Key(w, "rotation", &first); Json_Float(w, node.rotation)
+	if Node_HasOrigin(node) {Json_Key(w, "pivot", &first); Json_Vec2(w, node.pivot)} // the origin (node_origin.odin)
 	Json_Key(w, "enabled", &first); write_bool(w, node.enabled)
 	Json_Key(w, "visible", &first); write_bool(w, node.renderable)
 	Json_Key(w, "layer", &first); fmt.sbprintf(&w.sb, "%d", int(node.layer))
@@ -194,9 +196,6 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		fan := cast(^FrameAnimationNode)node
 		Json_Key(w, "fps", &first); Json_Float(w, fan.ticker.framesPerSecond)
 		Json_Key(w, "loop", &first); write_bool(w, fan.loop)
-		if fan.origin != {0, 0} {
-			Json_Key(w, "origin", &first); Json_Vec2(w, fan.origin)
-		}
 		Json_Key(w, "frames", &first)
 		strings.write_byte(&w.sb, '[')
 		n := 0
@@ -753,7 +752,6 @@ load_texture_into :: proc(tn: ^TextureNode, path: string, ctx: ^GameContext) {
 	if ok && tex != nil {
 		tn.texture = tex
 		tn.size = {f32(tex.texture.width), f32(tex.texture.height)}
-		tn.origin = tn.size * 0.5
 	}
 }
 
@@ -805,7 +803,6 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	case TextureNode:
 		tn := cast(^TextureNode)node
 		if path := sj_texture_path(obj); path != "" do load_texture_into(tn, path, ctx)
-		if orig := sj_vec2(obj, "origin", {0, 0}); orig != {0, 0} do tn.origin = orig
 	case FrameAnimationNode:
 		fan := cast(^FrameAnimationNode)node
 		fan.loop = sj_bool(obj, "loop", true)
@@ -819,7 +816,6 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 				}
 			}
 		}
-		if orig := sj_vec2(obj, "origin", {0, 0}); orig != {0, 0} do fan.origin = orig
 		FrameAnimationNode_Start(fan)
 	case SoundNode:
 		sn := cast(^SoundNode)node
@@ -1054,6 +1050,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		}
 	}
 
+	if Node_HasOrigin(node) do read_origin(node, obj, ctx)
 	read_connections(node, obj)
 	read_material(node, obj)
 
@@ -1063,6 +1060,36 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		}
 	}
 	return node
+}
+
+// read_origin: the node's origin ("pivot", a fraction of its drawn size);
+// scenes saved before it keep their look: a TextureNode's / animation's
+// pixel "origin" converts, AnimationPlayers stay drawn from the top-left,
+// nine-slices and text follow their old "centered" flag.
+@(private = "file")
+read_origin :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
+	legacyPx := sj_vec2(obj, "origin", {0, 0})
+	if _, has := obj["pivot"]; has {
+		node.pivot = sj_vec2(obj, "pivot", {0.5, 0.5})
+		if node.typeId == TextureNode && legacyPx != {0, 0} do (cast(^TextureNode)node).origin = legacyPx // the pixel override
+		return
+	}
+	switch node.typeId {
+	case TextureNode, FrameAnimationNode:
+		if legacyPx == {0, 0} do return // the centre
+		size := Node_OriginSize(node, ctx)
+		if size.x > 0 && size.y > 0 {
+			node.pivot = legacyPx / size
+		} else if node.typeId == TextureNode {
+			(cast(^TextureNode)node).origin = legacyPx // no texture loaded (headless): keep the pixels
+		}
+	case AnimationPlayerNode:
+		node.pivot = {0, 0}
+	case NineSliceNode, TextNode:
+		centered := false
+		if props, ok := sj_obj(obj, "properties"); ok do centered = bool(props["centered"].(json.Boolean) or_else false)
+		node.pivot = {0.5, 0.5} if centered else {0, 0}
+	}
 }
 
 @(private = "file")
@@ -1320,6 +1347,7 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.position = sj_vec2(inst, "position", node.position)
 	node.scale = sj_vec2(inst, "scale", node.scale)
 	node.rotation = sj_float(inst, "rotation", node.rotation)
+	if Node_HasOrigin(node) do node.pivot = sj_vec2(inst, "pivot", node.pivot)
 	node.enabled = sj_bool(inst, "enabled", node.enabled)
 	node.renderable = sj_bool(inst, "visible", node.renderable)
 	node.layer = RenderLayer(math.clamp(sj_int(inst, "layer", int(node.layer)), 0, len(RenderLayer) - 1))

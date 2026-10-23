@@ -377,7 +377,7 @@ SmartSnap_Apply :: proc(state: ^EditorState, start: [2]f32, world: ^[2]f32, axes
 // --- pivot ------------------------------------------------------------------------------
 
 // Pivot_MoveTo puts a node's pivot (its position) at a world point without
-// moving what it shows: children, a texture's / animation's origin, a line's
+// moving what it shows: children, the origin of what it draws, a line's
 // points and collision shapes shift back by the same amount.
 Pivot_MoveTo :: proc(state: ^EditorState, node: ^e.Node, world: [2]f32) {
 	mgr := state.activeScene.manager
@@ -394,21 +394,14 @@ Pivot_MoveTo :: proc(state: ^EditorState, node: ^e.Node, world: [2]f32) {
 	node.globalPosition = world
 	for child in e.GetChildrenView(mgr, node) do if child != nil do child.position -= local
 
-	switch node.typeId {
-	case e.TextureNode:
-		tn := cast(^e.TextureNode)node
-		if tn.origin == {0, 0} do tn.origin = tn.size * 0.5
-		tn.origin += local
-		if tn.origin == {0, 0} do tn.origin = {0.001, 0} // {0, 0} means "centre"
-	case e.FrameAnimationNode:
-		fan := cast(^e.FrameAnimationNode)node
-		if fan.origin == {0, 0} && len(fan.frames) > 0 {
-			if t := fan.frames[int(fan.currentFrame) % len(fan.frames)]; t != nil {
-				fan.origin = {f32(t.texture.width), f32(t.texture.height)} * 0.5
-			}
+	// The origin moves with it: by the same amount, as a fraction of the
+	// drawn size (node_origin.odin).
+	if e.Node_HasOrigin(node) {
+		if size := e.Node_OriginSize(node, &state.game.gameContext); size.x > 0 && size.y > 0 {
+			e.Node_SetOriginPx(node, e.Node_OriginPx(node, size) + local, size)
 		}
-		fan.origin += local
-		if fan.origin == {0, 0} do fan.origin = {0.001, 0}
+	}
+	switch node.typeId {
 	case e.LineNode:
 		for &p in (cast(^e.LineNode)node).points do p -= local
 	}

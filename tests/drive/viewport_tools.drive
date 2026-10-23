@@ -72,4 +72,4 @@ click @menu:View/Show All Colliders
 key ctrl+s
 expect file:scenes/new_scene.scene.json contains "guides": [{"x": 704}]
 expect file:scenes/new_scene.scene.json contains "editor_hidden": true
-expect file:scenes/new_scene.scene.json contains "origin": [344, 273]
+expect file:scenes/new_scene.scene.json contains "pivot": [0.6143, 0.5]

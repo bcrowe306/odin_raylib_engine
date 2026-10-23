@@ -271,35 +271,17 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 	lo, hi: [2]f32
 	have := false
 
+	// Nodes with an origin: their drawn rectangle around it (text scales
+	// uniformly by x). A negative scale mirrors it, as the game does.
+	if e.Node_HasOrigin(node) {
+		size := e.Node_OriginSize(node, &state.game.gameContext)
+		if size.x > 0 && size.y > 0 {
+			s := scl if node.typeId != e.TextNode else [2]f32{scl.x, scl.x}
+			o := e.Node_OriginPx(node, size)
+			lo, hi, have = -o * s, (size - o) * s, true
+		}
+	}
 	switch node.typeId {
-	case e.TextureNode:
-		tn := cast(^e.TextureNode)node
-		if tn.size.x > 0 && tn.size.y > 0 {
-			size := tn.size * scl
-			origin := tn.origin * scl
-			if tn.origin == {0, 0} do origin = size * 0.5
-			lo, hi, have = -origin, size - origin, true
-		}
-	case e.FrameAnimationNode:
-		fan := cast(^e.FrameAnimationNode)node
-		if len(fan.frames) > 0 && fan.frames[0] != nil {
-			size := [2]f32{f32(fan.frames[0].texture.width), f32(fan.frames[0].texture.height)} * scl
-			origin := fan.origin * scl
-			if fan.origin == {0, 0} do origin = size * 0.5
-			lo, hi, have = -origin, size - origin, true
-		}
-	case e.AnimationPlayerNode:
-		// The frame shown, drawn from the node's position (a negative scale
-		// mirrors it there, as the game does).
-		apn := cast(^e.AnimationPlayerNode)node
-		if size := e.Animation_FrameSize(e.AnimationPlayerNode_GetAnimation(apn), apn.currentFrame); size.x > 0 && size.y > 0 {
-			lo, hi, have = {0, 0}, size * scl, true
-		}
-	case e.NineSliceNode:
-		n := cast(^e.NineSliceNode)node
-		s := n.size * scl
-		lo, hi, have = {0, 0}, s, true
-		if n.centered do lo, hi = -s * 0.5, s * 0.5
 	case e.LineNode:
 		l := cast(^e.LineNode)node
 		for p, i in l.points {
@@ -311,14 +293,6 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 		pad := l.width * 0.5 * max(abs(scl.x), abs(scl.y))
 		lo -= pad
 		hi += pad
-	case e.TextNode:
-		t := cast(^e.TextNode)node
-		_, size, _ := e.TextNode_Layout(t, &state.game.gameContext)
-		s := size * scl.x
-		if s.x > 0 && s.y > 0 {
-			lo, hi, have = {0, 0}, s, true
-			if t.centered do lo, hi = -s * 0.5, s * 0.5
-		}
 	case e.LdtkLevelNode:
 		// The active levels (in world mode, the whole world).
 		ln := cast(^e.LdtkLevelNode)node
