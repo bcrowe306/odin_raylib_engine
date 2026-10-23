@@ -107,3 +107,10 @@ Script authoring
 Docs in place
 - [x] 8.25 Every API function documented in `engine_api.lua` (description + example) for hover
 - [x] 8.26 F1 on an API symbol opens its section of the scripting reference in the editor
+
+## Release packaging (editor)
+
+- [ ] R.1 libcmark for a released editor: the Scripting Reference's markdown (`editor/markdown_view.odin`, `vendor:commonmark`) links the system `libcmark` (`brew install cmark` on dev machines - `/opt/homebrew/opt/cmark/lib/libcmark.dylib`), which users won't have. Before shipping the editor, either
+  - a) bundle it as a dynamic lib: copy `libcmark.dylib` (`.so` / `cmark.dll`) next to the editor (macOS: into the .app's `Frameworks`, `install_name_tool -change` to `@rpath/libcmark.dylib`, `-Wl,-rpath,@executable_path/../Frameworks` as `scripts/build_runners.sh` does for the runners), or
+  - b) build cmark as a static lib (cmake `-DBUILD_SHARED_LIBS=OFF`, per platform; the vendor's `build.bat` does this on Windows) and link it in, so the editor has no extra file.
+  The game runner doesn't use cmark.
