@@ -3318,12 +3318,16 @@ lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
 	sm := get_script_manager(L)
 	if nameC == nil || sm == nil || sm.game == nil do return 0
 	// Scene.change_scene(name [, {transition = "fade"|"wipe_left"|..|"circle", duration = 0.4, color = {r, g, b}}])
+	// A scene name, or its file ("scenes/level_2.scene.json", e.g. a scene property).
+	scene, ok := sm.game.sceneManager.scenes[string(nameC)]
+	if !ok {
+		if s := Game_FindSceneByFile(sm.game, string(nameC)); s != nil do scene, ok = s, true
+	}
+	if !ok {
+		Script_Problem(.Error, "Scene.change_scene: no scene %q (a scene name, or a scene file listed in the project)", string(nameC))
+		return 0
+	}
 	if lua.type(L, 2) == .TABLE {
-		scene, ok := sm.game.sceneManager.scenes[string(nameC)]
-		if !ok {
-			log.errorf("Scene: %s, not found", nameC)
-			return 0
-		}
 		lua.getfield(L, 2, "transition")
 		kind := Transition_KindParse(string(lua.tostring(L, -1)) if lua.type(L, -1) == .STRING else "fade")
 		lua.pop(L, 1)
@@ -3344,7 +3348,7 @@ lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
 		Game_ChangeSceneWith(sm.game, scene, kind, duration, color)
 		return 0
 	}
-	ChangeScene_ByName(&sm.game.sceneManager, string(nameC))
+	ChangeScene_ByPtr(&sm.game.sceneManager, scene)
 	return 0
 }
 

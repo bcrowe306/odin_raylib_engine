@@ -953,17 +953,7 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 				Editor_Log(state, .Error, "Could not attach %s (see errors above)", path)
 			}
 		}
-		if UI_Button(fmt.tprintf("%s  New Script", ICON_FA_PLUS), "insp.script-new", {-1, 0}) {
-			Editor_RecordUndo(state, "Attach script")
-			if rel := Editor_NewScriptForNode(state, node); rel != "" {
-				node.gameContext = &state.game.gameContext
-				if e.Script_AttachToNode(node, rel, nil, sm) != nil {
-					Editor_Log(state, .Info, "Attached %s to %s", rel, node.name)
-				} else {
-					Editor_Log(state, .Error, "Could not attach %s", rel)
-				}
-			}
-		}
+		if UI_Button(fmt.tprintf("%s  New Script...", ICON_FA_PLUS), "insp.script-new", {-1, 0}) do NewScriptDialog_Open(state, node)
 		UI_DimText("Attach a Lua script to give this node behaviour.")
 		return
 	}

@@ -232,7 +232,7 @@ Asset_FolderContextMenu :: proc(state: ^EditorState, title: string) {
 	folder := strings.to_lower(title, context.temp_allocator)
 	switch title {
 	case "Scenes": if menu(ICON_FA_PLUS, "New Scene", "new-scene") do Toolbar_NewScene(state)
-	case "Scripts": if menu(ICON_FA_PLUS, "New Script", "new-script") do Editor_NewScript(state)
+	case "Scripts": if menu(ICON_FA_PLUS, "New Script...", "new-script") do NewScriptDialog_Open(state)
 	case "Levels": if menu(ICON_FA_FILE_IMPORT, "Import LDtk Project...", "import-level") do Asset_OpenImportDialog(state, {"ldtk"}, "Import LDtk Project")
 	}
 	// Import with this folder's file types in the dialog filter.
@@ -347,7 +347,7 @@ Asset_AddMenu :: proc(state: ^EditorState) {
 	UI_Tooltip("Imports every supported file in a folder, keeping its layout")
 	imgui.Separator()
 	if menu(ICON_FA_CLAPPERBOARD, "New Scene", "add-new-scene") do Toolbar_NewScene(state)
-	if menu(ICON_FA_FILE_CODE, "New Script", "add-new-script") do Editor_NewScript(state)
+	if menu(ICON_FA_FILE_CODE, "New Script...", "add-new-script") do NewScriptDialog_Open(state)
 	if menu(ICON_FA_WAND_MAGIC_SPARKLES, "New Shader", "add-new-shader") do Editor_NewShader(state)
 }
 

@@ -1,0 +1,39 @@
+# New Script dialog: templates with a preview; Assets + creates one from
+# the picked template; a node's New Script picks the template that suits
+# its type (a Trigger Area: Pickup) and attaches it.
+wait 5
+click @asset.new-script
+expect item:newscript.template:enemy_patrol == visible
+click @newscript.template:enemy_patrol
+click @newscript.name
+key cmd+a
+type drive_patrol_zz
+screenshot dialog
+click @newscript.create
+wait 2
+expect code.file == scripts/drive_patrol_zz.lua
+expect file:scripts/drive_patrol_zz.lua contains local DrivePatrolZz = {}
+expect file:scripts/drive_patrol_zz.lua contains chase_range
+expect code.diagnostic-messages !contains Runtime
+
+# A Trigger Area gets the Pickup template, attached.
+click @hier.add
+type trigger area
+click @addnode.create
+dblclick @insp.name
+key ctrl+a
+type DriveCoinZz
+key enter
+click @insp.script-new
+expect item:newscript.template:pickup == visible
+screenshot dialog_area
+click @newscript.create
+wait 2
+expect node:DriveCoinZz.script contains drive_coin_zz.lua
+expect file:scripts/drive_coin_zz.lua contains function DriveCoinZz:on_body_entered(other)
+expect node:DriveCoinZz.script.collector_tag == player
+
+# Cancel creates nothing.
+click @asset.new-script
+click @newscript.cancel
+expect file:scripts/new_script.lua == 

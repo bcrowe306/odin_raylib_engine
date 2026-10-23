@@ -376,8 +376,20 @@ Scripts open in a **Code** tab next to the Viewport:
 - the edit button next to the script in the *Inspector*,
 - *Open Script* in a node's context menu in the scene tree,
 - double-click a console message containing `file.lua:LINE`,
-- *New Script* (Inspector) or the **+** on the *Scripts* folder: creates a
-  script from a template (`---@class Name : ScriptInstanceBase`) and opens it.
+- *New Script* (Inspector, scene tree) or the **+** on the *Scripts* folder:
+  a dialog with the file name and a template, then creates and opens the
+  script (`---@class Name : ScriptInstanceBase`). Templates (a preview shows
+  each; the one made for the node's type is picked first):
+
+  | Template | For | What it does |
+  |---|---|---|
+  | Empty | any | `ready` / `update` and one property |
+  | Platformer Character | CharacterMover | run, jump (coyote time, buffer, variable height), wall slide |
+  | Top-Down Character | CharacterMover | eight-way movement (`move_left/right/up/down`), acceleration, friction, facing |
+  | Enemy Patrol | any | walks back and forth (or up and down), waits at the ends, chases a `target` node within range (`spotted` / `lost` events) |
+  | UI Menu | a UI root | Start (changes to a `scene` property, with a transition), Options shows a panel, Back hides it - buttons are `node` properties |
+  | Pickup | AreaNode | bobs; a body with the collector tag picks it up: sound, `collected` event on the body with its value, shrinks and frees itself |
+  | Door / Trigger | AreaNode | a tagged body slides a door node open (closes when everyone left) or changes scene; `triggered` event, once option |
 
 The editor uses `lua-language-server` (built in `lua-language-server/`) with
 the engine definitions as its library: completion for every engine module and
@@ -842,7 +854,7 @@ A CharacterMover has two **control modes** (Inspector: *Control Mode*):
 
 - **Script** (Godot's `CharacterBody2D` style): the script owns the velocity
   and calls `character_move_and_slide()` every frame. **New Script** on a
-  CharacterMover writes a documented **platformer template** (gravity, run
+  CharacterMover picks a documented **platformer template** (gravity, run
   with acceleration/friction, jump with coyote time, buffering and variable
   height, optional wall slide/jump, `jumped`/`landed` events) and switches
   the node to Script mode; delete what you don't need.
@@ -1109,6 +1121,7 @@ rock:queue_free()          -- same as rock:destroy()
 
 -- Scene transitions
 Scene.change_scene("battle_arena")
+Scene.change_scene(self.next_level)   -- or its file (a `scene` property): "scenes/level_2.scene.json"
 Scene.reload()
 ```
 

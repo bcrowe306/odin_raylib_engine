@@ -72,6 +72,7 @@ expect code.open == 0
 # New Script from the Inspector creates, attaches and opens it.
 click @hier:PatrolDroneAlpha
 click @insp.script-new
+click @newscript.create
 wait 2
 expect code.file == scripts/patrol_drone_alpha.lua
 expect node:PatrolDroneAlpha.script contains patrol_drone_alpha.lua

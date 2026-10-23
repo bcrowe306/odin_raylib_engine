@@ -98,7 +98,7 @@ Engine API
 - (on hold) coroutines (`wait` / `await` / `tween`) - not wanted yet; (not chosen) lifecycle hooks
 
 Script authoring
-- [ ] 8.20 New-script templates (character, enemy patrol, UI menu, pickup, door/trigger)
+- [x] 8.20 New-script templates (character, enemy patrol, UI menu, pickup, door/trigger)
 - [ ] 8.21 Snippets (Tab-expanded): ready, update, connect, properties, tween
 - [ ] 8.22 Attach by dropping a `.lua` onto a scene-tree node
 - [ ] 8.23 Lua console: evaluate expressions in the simulating / running game

@@ -498,7 +498,7 @@ asset_folder_header :: proc(title: string, count: int, default_open := true, add
 	}
 	if add_script && state != nil {
 		imgui.SetCursorScreenPos({rowMax.x - 26, rowMin.y})
-		if UI_IconButton(ICON_FA_PLUS, "asset.new-script", "New Lua script", size = 26) do Editor_NewScript(state)
+		if UI_IconButton(ICON_FA_PLUS, "asset.new-script", "New Lua script (from a template)", size = 26) do NewScriptDialog_Open(state)
 	}
 	imgui.SetCursorScreenPos({rowMin.x, rowMax.y + 2})
 	imgui.Dummy({0, 0})

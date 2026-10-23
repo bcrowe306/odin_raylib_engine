@@ -1465,24 +1465,7 @@ code_close_prompt :: proc(state: ^EditorState) {
 
 // --- new scripts -------------------------------------------------------------------
 
-CODE_SCRIPT_TEMPLATE :: `-- $NAME$
----@class $CLASS$ : ScriptInstanceBase
-local $CLASS$ = {}
-
--- Exported properties appear in the Inspector.
-$CLASS$.properties = {
-    speed = { type = "float", default = 100.0, label = "Speed" },
-}
-
-function $CLASS$:ready()
-end
-
----@param dt number
-function $CLASS$:update(dt)
-end
-
-return $CLASS$
-`
+CODE_SCRIPT_TEMPLATE :: e.SCRIPT_TEMPLATE_EMPTY // more in New Script (new_script_dialog.odin)
 
 // Editor_NewScript creates scripts/<name>.lua from a template (unique
 // name) and opens it. Returns the project-relative path.
@@ -1497,16 +1480,7 @@ Editor_NewScript :: proc(state: ^EditorState, baseName := "new_script", template
 		path, _ = filepath.join({dir, fmt.tprintf("%s.lua", name)}, context.temp_allocator)
 		if !os.exists(path) do break
 	}
-	// PascalCase class name.
-	cls := strings.builder_make(context.temp_allocator)
-	upper := true
-	for ch in name {
-		if ch == '_' || ch == '-' {upper = true; continue}
-		if upper && ch >= 'a' && ch <= 'z' do strings.write_rune(&cls, ch - 32)
-		else do strings.write_rune(&cls, ch)
-		upper = false
-	}
-	cn := strings.to_string(cls)
+	cn := script_class_name(name)
 	text, _ := strings.replace_all(template, "$CLASS$", cn, context.temp_allocator)
 	text, _ = strings.replace_all(text, "$NAME$", name, context.temp_allocator)
 	if os.write_entire_file(path, transmute([]u8)text) != nil {
@@ -1524,22 +1498,36 @@ Editor_NewScript :: proc(state: ^EditorState, baseName := "new_script", template
 	return rel
 }
 
-// Editor_NewScriptForNode creates a script for a node from the template that
-// suits its type: a CharacterMover gets the platformer template and is
-// switched to Script mode (the script moves it with character_move_and_slide).
-Editor_NewScriptForNode :: proc(state: ^EditorState, node: ^e.Node) -> string {
-	// "PatrolDrone" -> patrol_drone.lua with class PatrolDrone.
-	base := strings.to_snake_case(node.name, context.temp_allocator)
-	if base == "" do base = "new_script"
-	if node.typeId == e.CharacterMoverNode {
-		rel := Editor_NewScript(state, base, e.CHARACTER_PLATFORMER_TEMPLATE)
-		if rel != "" {
-			(cast(^e.CharacterMoverNode)node).controlMode = .Script
-			Editor_Log(state, .Info, "%s uses the platformer template; %s now moves by script", rel, node.name)
-		}
-		return rel
+// script_class_name: the PascalCase class of a script file name.
+script_class_name :: proc(name: string) -> string {
+	cls := strings.builder_make(context.temp_allocator)
+	upper := true
+	for ch in name {
+		if ch == '_' || ch == '-' {upper = true; continue}
+		if upper && ch >= 'a' && ch <= 'z' do strings.write_rune(&cls, ch - 32)
+		else do strings.write_rune(&cls, ch)
+		upper = false
 	}
-	return Editor_NewScript(state, base)
+	return strings.to_string(cls)
+}
+
+// Editor_NewScriptForNode creates a script for a node from a template (""
+// = the one that suits its type, e.Script_TemplateFor), named after the
+// node unless given a name. A CharacterMover with a character template is
+// switched to Script mode (the script moves it with character_move_and_slide).
+Editor_NewScriptForNode :: proc(state: ^EditorState, node: ^e.Node, template := "", name := "") -> string {
+	// "PatrolDrone" -> patrol_drone.lua with class PatrolDrone.
+	base := name if name != "" else strings.to_snake_case(node.name, context.temp_allocator)
+	if base == "" do base = "new_script"
+	id := template if template != "" else e.Script_TemplateFor(node.typeId)
+	tp, ok := e.Script_TemplateById(id)
+	if !ok do tp, _ = e.Script_TemplateById("empty")
+	rel := Editor_NewScript(state, base, tp.text)
+	if rel != "" && node.typeId == e.CharacterMoverNode && (id == "platformer" || id == "top_down") {
+		(cast(^e.CharacterMoverNode)node).controlMode = .Script
+		Editor_Log(state, .Info, "%s uses the %s template; %s now moves by script", rel, tp.label, node.name)
+	}
+	return rel
 }
 
 // --- drive queries -----------------------------------------------------------------

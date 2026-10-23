@@ -437,13 +437,7 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 		attachOpen := imgui.BeginMenu(fmt.ctprintf("%s  Attach Script", ICON_FA_CODE))
 		Drive_Item("ctx:attach-script")
 		if attachOpen {
-			if hier_menu(ICON_FA_PLUS, "New Script", "attach-new-script") {
-				Editor_RecordUndo(state, "Attach script")
-				if rel := Editor_NewScriptForNode(state, node); rel != "" {
-					node.gameContext = &state.game.gameContext
-					e.Script_AttachToNode(node, rel, nil, &state.game.scriptManager)
-				}
-			}
+			if hier_menu(ICON_FA_PLUS, "New Script...", "attach-new-script") do NewScriptDialog_Open(state, node)
 			imgui.Separator()
 			for rel in Editor_ListProjectFiles(state, "scripts", {".lua"}) {
 				if imgui.MenuItem(strings.clone_to_cstring(rel, context.temp_allocator)) {

@@ -576,8 +576,10 @@ editor.
 
 Scripts open in a **Code** tab next to the Viewport: double-click a script in Assets, use the
 edit button beside a node's script in the Inspector, *Open Script* in the scene tree's context
-menu, or double-click a console message with `file.lua:LINE`. *New Script* (Inspector, or the
-**+** on the Scripts folder) creates one from a template. Completion, signature help, hover,
+menu, or double-click a console message with `file.lua:LINE`. *New Script* (Inspector, scene
+tree, the **+** on the Scripts folder, the command palette) opens a dialog: the file name and a
+template - Empty, Platformer or Top-Down Character, Enemy Patrol, UI Menu, Pickup, Door /
+Trigger - with a preview; templates made for the node's type are starred and picked first. Completion, signature help, hover,
 diagnostics and go to definition (F12 / Ctrl-click) come from `lua-language-server` with the
 engine API definitions (`engine/definitions`). Hover docs, signature help and the selected
 completion's docs show in boxes that stay inside the Code area, wrap, and scroll with the

@@ -5879,10 +5879,10 @@ function SceneModule.get_name() end
 ---@field duration? number Seconds for each half (cover, uncover); default 0.4
 ---@field color? number[] {r, g, b} 0..1; default black
 
----Switches to another scene by name - at once, or behind a transition (the
----screen is covered, the scene switches once its assets are loaded, then
----it's uncovered).
----@param name SceneName Name of registered scene
+---Switches to another scene by name (or its file, e.g. a `scene` property) -
+---at once, or behind a transition (the screen is covered, the scene switches
+---once its assets are loaded, then it's uncovered).
+---@param name SceneName|ScenePath A scene's name, or its file
 ---@param transition? SceneTransition
 function SceneModule.change_scene(name, transition) end
 

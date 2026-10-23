@@ -230,7 +230,7 @@ Actions_Init :: proc() {
 	add({id = "code.font_bigger", category = "Code", label = "Increase Font Size", chords = k(ch(.Equal, P)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdFontSize(s, 1)}, repeat = true})
 	add({id = "code.font_smaller", category = "Code", label = "Decrease Font Size", chords = k(ch(.Minus, P)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdFontSize(s, -1)}, repeat = true})
 	add({id = "code.font_reset", category = "Code", label = "Reset Font Size", chords = k(ch(._0, P)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdFontSize(s, 0)}})
-	add({id = "code.new_script", category = "Code", label = "New Script", scope = .Global, run = proc(s: ^EditorState) {Editor_NewScript(s)}})
+	add({id = "code.new_script", category = "Code", label = "New Script", scope = .Global, run = proc(s: ^EditorState) {NewScriptDialog_Open(s)}})
 }
 
 // Default chords of every action (for "Reset" in the keymap editor).

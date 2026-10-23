@@ -16,6 +16,7 @@ type DriveHero
 key enter
 expect selected == DriveHero
 click @insp.script-new
+click @newscript.create
 expect node:DriveHero.script contains drive_hero.lua
 expect node:DriveHero.prop.controlMode == Script
 expect file:scripts/drive_hero.lua contains node:character_move_and_slide()

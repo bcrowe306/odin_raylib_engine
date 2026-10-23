@@ -6,6 +6,7 @@
 wait 5
 click @hier:PatrolDroneAlpha
 click @insp.script-new
+click @newscript.create
 wait 2
 expect code.file == scripts/patrol_drone_alpha.lua
 

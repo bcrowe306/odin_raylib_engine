@@ -351,7 +351,7 @@ Signals_Connect :: proc(state: ^EditorState, source: ^e.Node, signal: string, ta
 	mgr := state.activeScene.manager
 	Editor_RecordUndo(state, fmt.tprintf("Connect %s", signal))
 	if target.scriptInstance == nil {
-		rel := Editor_NewScriptForNode(state, target)
+		rel := Editor_NewScriptForNode(state, target, "platformer" if target.typeId == e.CharacterMoverNode else "empty")
 		if rel == "" do return false
 		target.gameContext = &state.game.gameContext
 		if e.Script_AttachToNode(target, rel, nil, &state.game.scriptManager) == nil {

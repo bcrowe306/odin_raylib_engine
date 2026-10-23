@@ -202,6 +202,7 @@ editor_main :: proc() -> int {
 
 		// Modals & Popups
 		AddNodeDialog_Render(&GlobalEditor)
+		NewScriptDialog_Render(&GlobalEditor)
 		ProjectSettingsDialog_Render(&GlobalEditor)
 		Palette_Render(&GlobalEditor)
 		Shortcuts_Render(&GlobalEditor)

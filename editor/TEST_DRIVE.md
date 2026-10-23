@@ -65,6 +65,7 @@ exits non-zero if any check fails.
 | `lua_property_fields.drive` | Property-style access completes: self.node.rot -> rotation; self.node.position is a Vec2 (normalized completes). |
 | `lua_spawn.drive` | Scene.instantiate is typed per component: the generated overload returns the root type (DynamicBodyNode), so the result completes apply_impulse and queue_free. |
 | `script_globals.drive` | Global scripts: right-click > Make Global (globe and name in Assets, saved in project.json, listed in Project Settings > Globals); the global completes in another script; Simulate runs its ready and update; Remove Global. |
+| `script_templates.drive` | New Script dialog: Assets + creates from the picked template (Enemy Patrol, named); a Trigger Area's New Script picks Pickup and attaches it; Cancel creates nothing. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
