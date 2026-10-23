@@ -178,6 +178,17 @@ inline: the text after them moves right, and clicks and carets skip them.
 **Ctrl+Alt+H** (or Settings > Code Editor > Inlay Hints) turns them off.
 They are computed per line when first shown and cached until the next edit.
 
+## Colours and images
+
+- **Colour swatches**: a small swatch sits before colour tables -
+  `{r, g, b}` / `{r, g, b, a}` with 0..1 values (one written with a dot),
+  or 0..255 values after a key saying colour (`color`, `colour`, `tint`,
+  `rgb`); `{1, 2, 3}` gets none. **Click** it for a colour picker: the table
+  is rewritten as you pick, in its own style (0..1 or 0..255, 3 or 4
+  values), as undoable edits. Settings > Code Editor > Colour Swatches.
+- **Image preview**: hovering a string that names an image of the project
+  (`"textures/ship.png"`) shows the image and its size.
+
 ## Breadcrumbs and sticky scroll
 
 - **Breadcrumbs** (a bar above the code): the file › the function › the

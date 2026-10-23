@@ -14,8 +14,11 @@ import buf "../odin_editor/buffer"
 EDITOR_ENGINE_API :: #load("../engine/definitions/engine_api.lua", string)
 
 Code_Inlay :: struct {
-	col:   int,    // byte column the hint sits before
-	label: string, // "name:" (static / doc-cache owned)
+	col:    int,    // byte column the hint sits before
+	label:  string, // "name:" (static / doc-cache owned)
+	swatch: bool,   // a colour swatch (code_engine_extras.odin) instead of a label
+	color:  [4]f32,
+	to:     int,    // swatch: the table's end (byte after '}')
 }
 
 @(private = "file")
@@ -62,11 +65,17 @@ parse_params :: proc(s: string) -> []string {
 	return out[:]
 }
 
-// code_inlays: a line's hints (empty when off / none).
+// code_inlays: a line's hints and colour swatches (empty when off / none).
 code_inlays :: proc(doc: ^Code_Doc, ln: int) -> []Code_Inlay {
-	if !GlobalSettings.inlayHints || !doc.isLua do return nil
+	if (!GlobalSettings.inlayHints && !GlobalSettings.colorSwatches) || !doc.isLua do return nil
 	c := &doc.inlayCache
 	b := &doc.buffer
+	flags := (1 if GlobalSettings.inlayHints else 0) | (2 if GlobalSettings.colorSwatches else 0)
+	if c.flags != flags {
+		code_inlay_cache_clear(c)
+		c.flags = flags
+		c.version = -1
+	}
 	if c.version != b.version {
 		code_inlay_cache_clear(c)
 		c.version = b.version
@@ -80,6 +89,7 @@ code_inlays :: proc(doc: ^Code_Doc, ln: int) -> []Code_Inlay {
 
 Code_Inlay_Cache :: struct {
 	version:  int,
+	flags:    int, // the settings the cache was built with
 	lines:    map[int][]Code_Inlay,
 	fileSigs: map[string][]string, // functions defined in the file: "name" / ":name"
 	strings:  [dynamic]string,     // labels owned by the cache
@@ -140,7 +150,8 @@ code_inlay_line :: proc(doc: ^Code_Doc, ln: int) -> []Code_Inlay {
 		if t.kind == .String || t.kind == .Comment do for k in t.start ..< t.end do skip[k] = true
 	}
 	out := make([dynamic]Code_Inlay)
-	for i := 0; i < len(text); i += 1 {
+	if GlobalSettings.colorSwatches do code_color_swatches(&out, text, skip)
+	for i := 0; i < len(text) && GlobalSettings.inlayHints; i += 1 {
 		if text[i] != '(' || skip[i] do continue
 		// The callee: an identifier chain right before '('.
 		e := i
@@ -169,13 +180,20 @@ code_inlay_line :: proc(doc: ^Code_Doc, ln: int) -> []Code_Inlay {
 					col := argStart + (len(text[argStart:k]) - len(strings.trim_left(text[argStart:k], " \t")))
 					label := strings.concatenate({name, ":"})
 					append(&c.strings, label)
-					append(&out, Code_Inlay{col, label})
+					append(&out, Code_Inlay{col = col, label = label})
 				}
 			}
 			argIdx += 1
 			argStart = k + 1
 			if ch == ')' || k == len(text) do break
 		}
+	}
+	// By column (swatches and hints mixed).
+	for i in 1 ..< len(out) {
+		x := out[i]
+		j := i - 1
+		for j >= 0 && out[j].col > x.col {out[j + 1] = out[j]; j -= 1}
+		out[j + 1] = x
 	}
 	return out[:]
 }
@@ -202,8 +220,8 @@ code_inlay_params :: proc(c: ^Code_Inlay_Cache, callee: string) -> []string {
 	return nil
 }
 
-// code_inlay_width: columns a hint takes (its label and a space).
-code_inlay_width :: proc(h: Code_Inlay) -> int {return len(h.label) + 1}
+// code_inlay_width: columns a hint takes (its label and a space; a swatch 2).
+code_inlay_width :: proc(h: Code_Inlay) -> int {return 2 if h.swatch else len(h.label) + 1}
 
 // code_inlay_before: columns of hints at or before col on a row.
 code_inlay_before :: proc(hints: []Code_Inlay, from, col: int) -> int {

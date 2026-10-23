@@ -1,0 +1,30 @@
+# Colour swatches before {r, g, b[, a]} tables (not before {1, 2, 3}); a
+# click opens the picker. Hovering an image path shows the image.
+wait 5
+exec cp tests/drive/fixtures/drive_swatch_zz.lua $PROJECT/scripts/drive_swatch_zz.lua
+wait-until item:asset:scripts/drive_swatch_zz.lua == visible timeout=300
+dblclick @asset:scripts/drive_swatch_zz.lua
+wait 5
+expect code.inlays:3 contains ■@
+expect code.inlays:7 contains ■@14
+expect code.inlays:8 !contains ■
+screenshot swatches
+click @code.swatch:7:14
+wait 2
+expect item:code.swatch-picker == visible
+screenshot picker
+key esc
+# The texture path: hover it.
+key ctrl+g
+type 6
+key enter
+key end
+key left
+key left
+key left
+key left
+key left
+hover @code.caret
+wait 50
+expect item:code.texture-hover == visible
+screenshot texture_hover

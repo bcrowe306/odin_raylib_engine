@@ -150,5 +150,5 @@ Files
 Engine
 - [ ] 9.22 Inline values while debugging
 - [ ] 9.23 Property in code <-> Inspector (click to select)
-- [ ] 9.24 Colour swatches beside {r, g, b, a} with a picker
-- [ ] 9.25 Texture path hover preview
+- [x] 9.24 Colour swatches beside {r, g, b, a} with a picker
+- [x] 9.25 Texture path hover preview

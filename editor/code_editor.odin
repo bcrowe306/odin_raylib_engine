@@ -532,8 +532,9 @@ code_token_color :: proc(k: syn.TokenKind) -> u32 {
 }
 
 // code_draw_inlay draws a hint chip at column v; returns the column after.
-code_draw_inlay :: proc(dl: ^imgui.DrawList, x0, y: f32, v: int, h: Code_Inlay) -> int {
+code_draw_inlay :: proc(dl: ^imgui.DrawList, x0, y: f32, v: int, h: Code_Inlay, doc: ^Code_Doc = nil, line := 0) -> int {
 	cm := &GlobalCode
+	if h.swatch do return code_draw_swatch(dl, x0, y, v, h, doc, line)
 	w := code_inlay_width(h)
 	x := x0 + f32(v) * cm.charW
 	imgui.DrawList_AddRectFilled(dl, {x, y}, {x + f32(w - 1) * cm.charW + 2, y + code_font_size()}, col_u32(ui_line(0.06)), 3)
@@ -891,6 +892,7 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	Code_GutterMenu(state, doc)      // right-click a line number
 	Code_PeekRender(state)           // peek definition / references
 	Code_ActionsRender(state, doc)   // Cmd+. fixes
+	Code_SwatchPicker(doc)           // a clicked colour swatch
 	// Right-click: the text menu - in the gutter, a breakpoint condition instead.
 	if hovered && imgui.IsMouseReleased(.Right) && imgui.GetIO().MousePos.x >= winPos.x + gutterW {
 		Code_ContextOpen(state, doc, code_pos_at(b, {imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y}))
@@ -1167,12 +1169,12 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		hi := 0
 		for hi < len(hints) && hints[hi].col < row.from do hi += 1
 		// seg draws text[s:e] in color with the hints that sit inside it.
-		seg :: proc(dl: ^imgui.DrawList, x0, y: f32, v: int, text: string, s, e: int, color: u32, marks: []Code_Bracket_Mark, hints: []Code_Inlay, hi: ^int) -> int {
+		seg :: proc(dl: ^imgui.DrawList, x0, y: f32, v: int, text: string, s, e: int, color: u32, marks: []Code_Bracket_Mark, hints: []Code_Inlay, hi: ^int, doc: ^Code_Doc, ln: int) -> int {
 			v, pos := v, s
 			for hi^ < len(hints) && hints[hi^].col < e {
 				h := hints[hi^]
 				if h.col > pos do v = code_draw_marked(dl, x0, y, v, text, pos, h.col, color, marks)
-				v = code_draw_inlay(dl, x0, y, v, h)
+				v = code_draw_inlay(dl, x0, y, v, h, doc, ln)
 				pos = max(pos, h.col)
 				hi^ += 1
 			}
@@ -1182,13 +1184,13 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		for t in tokens {
 			ts, te := max(t.start, row.from), min(t.end, rowEnd)
 			if te <= ts do continue
-			if ts > at do v = seg(dl, textX, y + textY, v, text, at, ts, col_u32(UI_TEXT), lineMarks, hints, &hi)
-			v = seg(dl, textX, y + textY, v, text, ts, te, code_token_color(t.kind), lineMarks, hints, &hi)
+			if ts > at do v = seg(dl, textX, y + textY, v, text, at, ts, col_u32(UI_TEXT), lineMarks, hints, &hi, doc, ln)
+			v = seg(dl, textX, y + textY, v, text, ts, te, code_token_color(t.kind), lineMarks, hints, &hi, doc, ln)
 			at = te
 		}
-		if at < rowEnd do v = seg(dl, textX, y + textY, v, text, at, rowEnd, col_u32(UI_TEXT), lineMarks, hints, &hi)
+		if at < rowEnd do v = seg(dl, textX, y + textY, v, text, at, rowEnd, col_u32(UI_TEXT), lineMarks, hints, &hi, doc, ln)
 		for hi < len(hints) && hints[hi].col <= rowEnd && lastRowOfLine {
-			v = code_draw_inlay(dl, textX, y + textY, v, hints[hi])
+			v = code_draw_inlay(dl, textX, y + textY, v, hints[hi], doc, ln)
 			hi += 1
 		}
 
@@ -1767,7 +1769,7 @@ code_hover :: proc(doc: ^Code_Doc, hovered: bool, mouse: [2]f32) {
 		line = buf.buffer_line_str(b, p.line)
 	}
 	// Only over actual text.
-	endX := cm.textOrigin.x + f32(code_visual_col(line, len(line))) * cm.charW
+	endX := code_screen_pos(b, {p.line, len(line)}).x // inlay hints and wrapped rows counted
 	if !keep && (mouse.x > endX || mouse.x < cm.textOrigin.x) {
 		cm.hoverValid = false
 		return
@@ -1782,6 +1784,7 @@ code_hover :: proc(doc: ^Code_Doc, hovered: bool, mouse: [2]f32) {
 		cm.hoverValid = true
 	}
 	if time.tick_since(cm.hoverSince) < 450 * time.Millisecond do return
+	if code_texture_hover(doc, p) do return // an image path: its preview (code_engine_extras.odin)
 
 	// Diagnostics under the mouse.
 	msgs := make([dynamic]lsp.Diagnostic, context.temp_allocator)
@@ -1965,7 +1968,7 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 		ln := 0
 		for r in q[len("code.inlays:"):] do if r >= '0' && r <= '9' do ln = ln * 10 + int(r - '0')
 		sb := strings.builder_make(context.temp_allocator)
-		for h, i in code_inlays(doc, ln - 1) do fmt.sbprintf(&sb, "%s%s@%d", "," if i > 0 else "", h.label, h.col)
+		for h, i in code_inlays(doc, ln - 1) do fmt.sbprintf(&sb, "%s%s@%d", "," if i > 0 else "", "■" if h.swatch else h.label, h.col)
 		return strings.to_string(sb), true
 	}
 	switch q {

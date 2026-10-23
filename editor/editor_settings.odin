@@ -47,6 +47,7 @@ Editor_Settings :: struct {
 	stickyScroll:     bool, // block headers stay at the top while scrolling
 	breadcrumbs:      bool, // file > function > blocks bar above the code
 	inlayHints:       bool, // parameter names before call arguments
+	colorSwatches:    bool, // a swatch before {r, g, b[, a]} colour tables
 	showWhitespace:   Show_Whitespace,
 	formatOnSave:     bool,
 	lspEnabled:       bool,
@@ -82,6 +83,7 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 	stickyScroll    = true,
 	breadcrumbs     = true,
 	inlayHints      = true,
+	colorSwatches   = true,
 	formatOnSave    = false,
 	lspEnabled      = true,
 }
@@ -267,6 +269,7 @@ settings_from_ini :: proc(text: string) {
 	s.stickyScroll = b(m, "code", "sticky_scroll", s.stickyScroll)
 	s.breadcrumbs = b(m, "code", "breadcrumbs", s.breadcrumbs)
 	s.inlayHints = b(m, "code", "inlay_hints", s.inlayHints)
+	s.colorSwatches = b(m, "code", "color_swatches", s.colorSwatches)
 	if v, ok := m["code"]["show_whitespace"]; ok {
 		switch v {
 		case "none": s.showWhitespace = .None
@@ -361,7 +364,7 @@ Editor_SaveSettings :: proc() -> bool {
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
 	fmt.sbprintf(&sb, "auto_close_pairs = %t\nformat_on_save = %t\nlsp_enabled = %t\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)
 	fmt.sbprintf(&sb, "rainbow_brackets = %t\nindent_guides = %t\nsoft_wrap = %t\n", s.rainbowBrackets, s.indentGuides, s.softWrap)
-	fmt.sbprintf(&sb, "sticky_scroll = %t\nbreadcrumbs = %t\ninlay_hints = %t\n", s.stickyScroll, s.breadcrumbs, s.inlayHints)
+	fmt.sbprintf(&sb, "sticky_scroll = %t\nbreadcrumbs = %t\ninlay_hints = %t\ncolor_swatches = %t\n", s.stickyScroll, s.breadcrumbs, s.inlayHints, s.colorSwatches)
 	wsNames := [Show_Whitespace]string{.None = "none", .Selection = "selection", .All = "all"}
 	fmt.sbprintf(&sb, "show_whitespace = %s\n", wsNames[s.showWhitespace])
 	fmt.sbprintf(&sb, "lua_server_path = %s\n", s.luaServerPath)
