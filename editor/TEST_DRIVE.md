@@ -71,6 +71,7 @@ exits non-zero if any check fails.
 | `lua_console.drive` | The Console's Lua line: in Simulate an expression (a node), a statement then its value, an error, history (Up); in Play the game evaluates (`Scene.get_name()`, a Vec2). |
 | `debug_watch_condition.drive` | A breakpoint condition from the gutter's right-click: false never stops, true stops with the reason; watch expressions in the paused frame; the Console's Lua line there. |
 | `lua_api_reference.drive` | Hover over an engine function shows its description and `Example:`; F1 opens the Scripting Reference with its API entry and the Audio section; search and pick a section; a section with a table (Events) rendered as markdown. |
+| `particles_viewport.drive` | Particle emitters animate in the viewport while editing (live particles without Simulate); the Particles tab's button pauses and resumes the preview. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -147,6 +148,7 @@ Queries:
 - `slicer-zoom` (the slicer's zoom, `0.00` = Fit), `slicer-selection` (picked cells, `0,1,2`), `hidden-tab-bars` (docked spaces whose tab bar is hidden)
 - `game-pid` (the running game's process id, 0 = none), `last-played` (the scene Restart plays, `project` = the initial scene)
 - `insp-help-path` (the path the help pane shows)
+- `particle-preview` (on / off; `node:<Name>.particles` = an emitter's live particles)
 - `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk)
 - `remote-debug-draw` (the running game's last debug-draw reply)
@@ -168,7 +170,7 @@ Queries:
   vertices points count`; shape handles are items `shape<i>.<Kind><n>` (Move, Rotate, Radius, Edge 0-3,
   Corner 0-3, CapEnd 0-1, Point n, AddPoint n)
 - `node-delta:A,B` (global position of B minus A), `anim` (`<animation>:<frame>/<length>:<tracks>` of the selected AnimationPlayer)
-- `node:<Name>.<field>`, where field is one of `exists type parent position global locked editor-hidden tags child-names rotation scale visible enabled children script prop.<path> script.<prop> connections overrides tiles material state` (`state`: a StateMachine's `<current>/<state count>`)
+- `node:<Name>.<field>`, where field is one of `exists type parent position global locked editor-hidden tags child-names rotation scale visible enabled children script prop.<path> script.<prop> connections overrides tiles material state particles` (`state`: a StateMachine's `<current>/<state count>`)
 
 Widgets register themselves with `Drive_Item("<id>")` right after they are drawn
 (see `editor/test_drive.odin` and `UI_IconButton`/`UI_Button` in `ui_style.odin`).

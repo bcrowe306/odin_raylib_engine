@@ -189,7 +189,10 @@ the default (the node type's default, a script property's declared default).
 Particle emitters open the **Particles** tab (bottom panel): Emission, Shape,
 Motion, Size & Rotation, Color (gradient over the particle's life with
 draggable stops, plus a red/green/blue/alpha plot whose alpha points you
-drag) and Collision, with a live preview in the viewport.
+drag) and Collision. Every particle emitter runs in the viewport while you
+edit (not only in Simulate), so a changed setting shows at once; the tab's
+play / pause button pauses or resumes that preview for all emitters, and
+Restart starts the emission over.
 
 With several nodes selected, the Inspector shows the primary one under a
 "N nodes selected" banner and only the properties they all have; values

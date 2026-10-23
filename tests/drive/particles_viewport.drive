@@ -1,0 +1,16 @@
+# Particle emitters animate in the viewport while editing (not only in
+# Simulate), so their settings show live; the Particles tab's button pauses
+# and resumes the preview.
+wait 5
+expect particle-preview == on
+wait 60
+expect node:StarfieldEmitter.particles >= 1
+screenshot viewport_particles
+click @hier:StarfieldEmitter
+click @insp.particle-editor
+click @particles.preview
+expect particle-preview == off
+wait 2
+expect node:StarfieldEmitter.particles >= 1
+click @particles.preview
+expect particle-preview == on

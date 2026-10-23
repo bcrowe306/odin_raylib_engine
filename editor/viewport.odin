@@ -175,6 +175,8 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 			e.Scene_UpdateNodeHirearchy(state.activeScene, state.activeScene.rootNode, ctx, dt)
 			e.Tween_Update(&state.game.tweens, dt, &state.game.scriptManager)
 			e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
+		} else if !state.isSimulating {
+			ParticlePreview_Tick(state, rl.GetFrameTime()) // emitters animate while editing
 		}
 		if viewportLighting do lit = e.Lighting_Prepare(state.activeScene, cam, i32(state.viewportSize.x), i32(state.viewportSize.y))
 		e.TileCache_Prepare(state.activeScene, e.Camera2D_ViewRect(cam, state.viewportSize.x, state.viewportSize.y), ctx)

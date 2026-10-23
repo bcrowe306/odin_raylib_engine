@@ -782,6 +782,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return "running" if state.gameProcessRunning else "stopped", true
 	case "build":
 		return "running" if state.buildRunning else "idle", true
+	case "particle-preview": return "on" if particlePreview else "off", true
 	case "refs-pending": return fmt.tprint(NodeRefs_Pending()), true
 	case "ref-section": return ScriptReference_Selected() if ScriptReference_IsOpen() else "", true
 	case "ref-api": return ScriptReference_Api(), true
@@ -859,6 +860,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 			if n.material == nil do return "", true
 			return fmt.tprintf("%s %s", n.material.shader, e.Material_BlendName(n.material.blend)), true
 		case "enabled": return "true" if n.enabled else "false", true
+		case "particles": return fmt.tprint(ParticleAlive(n)), true // live particles of an emitter
 		case "state":
 			// A StateMachineNode's current state ("" until it runs) and state count.
 			if n.typeId != e.StateMachineNode do return "<not a state machine>", true

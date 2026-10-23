@@ -16,7 +16,8 @@ import imgui "lib/imgui"
 // drag, add (double-click the bar) and remove (right-click a stop); the
 // selected stop's colour and alpha; and a plot of red, green, blue and alpha
 // over the lifetime whose alpha points can be dragged directly.
-// "Preview" runs the emitter in the viewport while editing.
+// Every emitter runs in the viewport while editing (ParticlePreview_Tick)
+// so its settings show live; the Particles tab's button pauses / resumes it.
 // ============================================================================
 
 @(private = "file")
@@ -24,8 +25,28 @@ Particle_Panel :: struct {
 	selectedStop: int,
 	dragStop:     int,  // stop being dragged on the gradient bar (-1 none)
 	dragAlpha:    int,  // stop whose alpha is dragged on the plot (-1 none)
-	preview:      bool,
-	lastTick:     time.Tick,
+}
+
+// particlePreview: emitters animate in the viewport outside Simulate.
+particlePreview := true
+
+// ParticlePreview_Tick runs the scene's particle emitters while editing
+// (the editor doesn't update nodes outside Simulate).
+ParticlePreview_Tick :: proc(state: ^EditorState, dt: f32) {
+	if !particlePreview || state.activeScene == nil do return
+	ctx := &state.game.gameContext
+	for n in state.activeScene.manager.nodes {
+		if n == nil || n.typeId != e.ParticleEmitterNode || n.removing do continue
+		e.ParticleEmitterNode_Update(n, ctx, min(dt, 0.1))
+	}
+}
+
+// ParticleAlive: live particles of an emitter (drives).
+ParticleAlive :: proc(n: ^e.Node) -> int {
+	if n == nil || n.typeId != e.ParticleEmitterNode do return -1
+	alive := 0
+	for p in (cast(^e.ParticleEmitterNode)n).emitter.particles do if p.alive do alive += 1
+	return alive
 }
 
 @(private = "file")
@@ -36,7 +57,6 @@ particleTabRequest := false // select the Particles tab next frame
 ParticlePanel_Render :: proc(state: ^EditorState) {
 	node := state.selectedNode
 	if node == nil || node.typeId != e.ParticleEmitterNode {
-		pp.preview = false
 		imgui.Dummy({0, 8})
 		UI_DimText("   Select a Particle Emitter node to edit its particles.")
 		return
@@ -46,10 +66,8 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 
 	// Toolbar.
 	imgui.Dummy({0, 2})
-	if UI_IconButton(ICON_FA_PAUSE if pp.preview else ICON_FA_PLAY, "particles.preview", "Stop preview" if pp.preview else "Preview in the viewport", pp.preview, 26) {
-		pp.preview = !pp.preview
-		pp.lastTick = time.tick_now()
-		if pp.preview do e.ParticleEmitter_Start(em)
+	if UI_IconButton(ICON_FA_PAUSE if particlePreview else ICON_FA_PLAY, "particles.preview", "Pause the particle preview in the viewport" if particlePreview else "Play the particle preview in the viewport", particlePreview, 26) {
+		particlePreview = !particlePreview
 	}
 	imgui.SameLine(0, 2)
 	if UI_IconButton(ICON_FA_ROTATE_LEFT, "particles.restart", "Restart emission", size = 26) {
@@ -61,13 +79,6 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 	alive := 0
 	for p in em.particles do if p.alive do alive += 1
 	UI_DimText(fmt.tprintf("%d particles alive · %d per cycle · %.1fs lifetime", alive, em.amount, em.lifetime))
-	if pp.preview {
-		// The editor doesn't update nodes outside Simulate: drive the emitter here.
-		dt := f32(time.duration_seconds(time.tick_since(pp.lastTick)))
-		pp.lastTick = time.tick_now()
-		em.position = pen.globalPosition
-		e.ParticleEmitter_Update(em, min(dt, 0.1))
-	}
 
 	if !imgui.BeginTabBar("##particle_tabs", {}) do return
 	defer imgui.EndTabBar()
