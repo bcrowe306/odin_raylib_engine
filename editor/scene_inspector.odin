@@ -239,6 +239,18 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 				}
 			}
 		}
+		// A script from Assets: attach it (replacing the node's script).
+		if payload := imgui.AcceptDragDropPayload(ASSET_PAYLOAD, {.AcceptBeforeDelivery, .AcceptNoDrawDefaultRect}); payload != nil {
+			p := (^Asset_Payload)(payload.Data)
+			rel := strings.clone(string(p.path[:p.len]), context.temp_allocator)
+			if Asset_KindOf(rel) == .Script && node != state.activeScene.rootNode {
+				rmin, rmax := imgui.GetItemRectMin(), imgui.GetItemRectMax()
+				imgui.DrawList_AddRect(imgui.GetWindowDrawList(), rmin, rmax, col_u32(UI_ACCENT), 4, {}, 2)
+				verb := "Replace the script of" if node.scriptInstance != nil else "Attach to"
+				imgui.SetTooltip("%s", fmt.ctprintf("%s  %s %s", ICON_FA_FILE_CODE, verb, node.name))
+				if payload.Delivery && Editor_AttachScript(state, node, rel) do Editor_SelectNode(state, node)
+			}
+		}
 		imgui.EndDragDropTarget()
 	}
 

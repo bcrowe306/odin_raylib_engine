@@ -574,7 +574,8 @@ editor.
 
 ### Code tab (Lua scripts)
 
-Scripts open in a **Code** tab next to the Viewport: double-click a script in Assets, use the
+Drag a script from Assets onto a scene-tree row to attach it (replacing the node's script; the
+row is outlined while you hover). Scripts open in a **Code** tab next to the Viewport: double-click a script in Assets, use the
 edit button beside a node's script in the Inspector, *Open Script* in the scene tree's context
 menu, or double-click a console message with `file.lua:LINE`. *New Script* (Inspector, scene
 tree, the **+** on the Scripts folder, the command palette) opens a dialog: the file name and a

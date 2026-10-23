@@ -49,6 +49,11 @@ inst := e.Script_AttachToNode(node, "assets/scripts/orbiting_drone.lua", overrid
 scriptNode := e.ScriptNode_Create(scene, "assets/scripts/orbiting_drone.lua", "ReconDrone")
 ```
 
+In the editor: drag a script from Assets onto a node in the scene tree (or
+onto it in the viewport), pick it in the Inspector's Script section, or
+right-click the script > *Attach to Selected Node*. Dropping onto a node
+that has a script replaces it (undo puts it back).
+
 ### Script Execution Lifecycle
 Each attached script has a private instance table (`self`) with `self.node` pointing to the underlying engine node. The engine dispatches the following lifecycle callbacks:
 

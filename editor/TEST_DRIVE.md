@@ -67,6 +67,7 @@ exits non-zero if any check fails.
 | `script_globals.drive` | Global scripts: right-click > Make Global (globe and name in Assets, saved in project.json, listed in Project Settings > Globals); the global completes in another script; Simulate runs its ready and update; Remove Global. |
 | `script_templates.drive` | New Script dialog: Assets + creates from the picked template (Enemy Patrol, named); a Trigger Area's New Script picks Pickup and attaches it; Cancel creates nothing. |
 | `lua_snippets.drive` | Snippets: `method` + Tab (class filled, placeholders across lines), `connect` inside it (indented), `tween` with the completion list open (hint shown, Tab expands), `ready`; undo. |
+| `script_drop_tree.drive` | A script dragged from Assets onto a scene-tree row attaches it (node selected); another replaces it; undo restores each. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

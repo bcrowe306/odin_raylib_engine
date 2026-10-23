@@ -1,0 +1,19 @@
+# A script dragged from Assets onto a scene-tree row attaches it (and
+# selects the node); onto a node with a script it replaces it; undo puts
+# the old one back. The scene root takes none.
+wait 5
+expect node:Asteroid_Beta.script == 
+drag @asset:scripts/asteroid.lua @hier:Asteroid_Beta 12
+wait 2
+expect node:Asteroid_Beta.script contains scripts/asteroid.lua
+expect selected == Asteroid_Beta
+screenshot attached
+drag @asset:scripts/orbiting_drone.lua @hier:Asteroid_Beta 12
+wait 2
+expect node:Asteroid_Beta.script contains scripts/orbiting_drone.lua
+key ctrl+z
+wait 2
+expect node:Asteroid_Beta.script contains scripts/asteroid.lua
+key ctrl+z
+wait 2
+expect node:Asteroid_Beta.script == 

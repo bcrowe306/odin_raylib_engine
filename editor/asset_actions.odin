@@ -60,11 +60,26 @@ Editor_AddLevel :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) -> ^
 
 @(private = "file")
 attach_script :: proc(state: ^EditorState, n: ^e.Node, rel: string) {
+	Editor_AttachScript(state, n, rel)
+}
+
+// Editor_AttachScript attaches a script to a node (undoable), replacing the
+// one it has.
+Editor_AttachScript :: proc(state: ^EditorState, n: ^e.Node, rel: string) -> bool {
+	sm := &state.game.scriptManager
+	if n.scriptInstance != nil && (cast(^e.ScriptInstance)n.scriptInstance).modulePath == e.ScriptVFS_NormalizePath(rel) do return true
 	Editor_RecordUndo(state, "Attach script")
-	n.gameContext = &state.game.gameContext
-	if e.Script_AttachToNode(n, rel, nil, &state.game.scriptManager) != nil {
-		Editor_Log(state, .Info, "Attached %s to %s", rel, n.name)
+	if n.scriptInstance != nil {
+		e.ScriptInstance_Destroy(cast(^e.ScriptInstance)n.scriptInstance, sm)
+		n.scriptInstance = nil
 	}
+	n.gameContext = &state.game.gameContext
+	if e.Script_AttachToNode(n, rel, nil, sm) == nil {
+		Editor_Log(state, .Error, "Could not attach %s to %s (see errors above)", rel, n.name)
+		return false
+	}
+	Editor_Log(state, .Info, "Attached %s to %s", rel, n.name)
+	return true
 }
 
 @(private = "file")
