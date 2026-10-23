@@ -559,8 +559,9 @@ started with Play, not in Simulate in Editor.)
 
 While the game runs, the bottom panel's **Game** tab is linked to it
 (`--editor-link`): the running game's scene tree (refreshed twice a
-second), the selected node's live properties - type a value and press Enter
-to change it in the game - and **Pause** / **Resume** / **Step** (one frame
+second), the selected node's live properties - including its script's
+exported values (`script.speed`, read from the running script) - type a
+value and press Enter to change it in the game - and **Pause** / **Resume** / **Step** (one frame
 of 1/60 s; paused, the game is still drawn). Saving a scene while the game
 runs reloads it there (the current scene restarts with the saved version);
 edited scripts and images reload by themselves, in the game and in the

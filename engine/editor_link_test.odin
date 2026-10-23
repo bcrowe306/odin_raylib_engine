@@ -70,3 +70,38 @@ test_editor_link :: proc(t: ^testing.T) {
 	game->run(1.0 / 60)
 	testing.expect(t, Scene_FindNodeByName(game.sceneManager.currentScene, "Fresh") != nil, "new contents running")
 }
+
+// The Game tab's live script values: inspect lists "script.<name>" read
+// from self; set changes them in the running script.
+@(test)
+test_editor_link_script_props :: proc(t: ^testing.T) {
+	ScriptVFS_RegisterEmbedded("link_props.lua", `
+local S = {}
+S.properties = {
+    speed = { type = "float", default = 240 },
+    mode  = { type = "enum", values = {"Idle", "Run"} },
+    path  = { type = "array", of = "float", default = {1, 2} },
+}
+return S
+`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("link", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	n := Node_CreateByTypeName(scene, "Node")
+	n.name = "Runner"
+	n.gameContext = &game.gameContext
+	Script_AttachToNode(n, "link_props.lua", nil, &game.scriptManager)
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+
+	text := EditorLink_NodeJSON(game, "Runner")
+	testing.expect(t, strings.contains(text, `["script.speed", "240"]`), text)
+	testing.expect(t, strings.contains(text, `["script.mode", "Idle"]`), text)
+	testing.expect(t, strings.contains(text, `["script.path", "[1, 2]"]`) || strings.contains(text, `["script.path", "[1.0, 2.0]"]`), text)
+	testing.expect(t, EditorLink_Set(game, "Runner", "script.speed", "99.5"), "set number")
+	testing.expect(t, EditorLink_Set(game, "Runner", "script.mode", "Run"), "set enum")
+	testing.expect(t, !EditorLink_Set(game, "Runner", "script.nope", "1"), "unknown property")
+	text = EditorLink_NodeJSON(game, "Runner")
+	testing.expect(t, strings.contains(text, `["script.speed", "99.5"]`) && strings.contains(text, `["script.mode", "Run"]`), text)
+}

@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:os"
 import "core:strconv"
 import "core:strings"
+import lua "vendor:lua/5.4"
 import "core:time"
 import rl "vendor:raylib"
 
@@ -234,8 +235,81 @@ EditorLink_NodeJSON :: proc(game: ^Game, path: string) -> string {
 	prop(&sb, &first, "enabled", fmt.tprintf("%t", n.enabled))
 	prop(&sb, &first, "visible", fmt.tprintf("%t", n.renderable))
 	for p in Node_CollectProperties(n) do prop(&sb, &first, p.name, Property_ToString(p))
+	// Its script's exported properties ("script.<name>"), live from self.
+	if inst := cast(^ScriptInstance)n.scriptInstance; inst != nil && game.scriptManager.L != nil {
+		if mod, ok := game.scriptManager.modules[ScriptVFS_NormalizePath(inst.modulePath)]; ok && mod != nil {
+			L := game.scriptManager.L
+			for p in mod.properties {
+				lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef))
+				lua.getfield(L, -1, strings.clone_to_cstring(p.name, context.temp_allocator))
+				text: string
+				#partial switch lua.type(L, -1) {
+				case .NUMBER:   text = fmt.tprintf("%v", f64(lua.tonumber(L, -1)))
+				case .BOOLEAN:  text = "true" if lua.toboolean(L, -1) else "false"
+				case .STRING:   text = strings.clone(string(lua.tostring(L, -1)), context.temp_allocator)
+				case .TABLE:
+					if p.type == .Color || p.type == .Vector2 {
+						// "r,g,b,a" / "x,y" (as the Game tab edits them)
+						parts := make([dynamic]string, context.temp_allocator)
+						for i in 1 ..= int(lua.rawlen(L, -1)) {
+							lua.rawgeti(L, -1, lua.Integer(i))
+							append(&parts, fmt.tprintf("%v", f64(lua.tonumber(L, -1))))
+							lua.pop(L, 1)
+						}
+						text = strings.join(parts[:], ",", context.temp_allocator)
+					} else {
+						text = lua_to_json(L, -1)
+					}
+				case .USERDATA:
+					if target, isNode := to_node_userdata(L, -1); isNode && target != nil do text = target.name
+				case: text = ""
+				}
+				lua.pop(L, 2)
+				prop(&sb, &first, fmt.tprintf("script.%s", p.name), text)
+			}
+		}
+	}
 	strings.write_string(&sb, "]}")
 	return strings.to_string(sb)
+}
+
+// link_set_script sets an exported script property from text, by its
+// declared type: numbers, true / false, "x,y" / "r,g,b,a", JSON lists,
+// strings (and enums, asset paths, node paths) as they are.
+@(private = "file")
+link_set_script :: proc(game: ^Game, n: ^Node, field, value: string) -> bool {
+	inst := cast(^ScriptInstance)n.scriptInstance
+	if inst == nil do return false
+	mod, ok := game.scriptManager.modules[ScriptVFS_NormalizePath(inst.modulePath)]
+	if !ok || mod == nil do return false
+	for p in mod.properties {
+		if p.name != field do continue
+		v := ScriptValue{type = p.type}
+		parts := strings.split(value, ",", context.temp_allocator)
+		switch p.type {
+		case .Float:
+			f, fok := strconv.parse_f32(strings.trim_space(value))
+			if !fok do return false
+			v.valFloat = f
+		case .Int:
+			i, iok := strconv.parse_i64(strings.trim_space(value))
+			if !iok do return false
+			v.valInt = i
+		case .Boolean:
+			v.valBool = strings.trim_space(value) == "true"
+		case .String:
+			v.valString = strings.clone(value, context.temp_allocator)
+		case .Vector2:
+			if len(parts) != 2 do return false
+			for i in 0 ..< 2 do v.valVec2[i], _ = strconv.parse_f32(strings.trim_space(parts[i]))
+		case .Color:
+			if len(parts) < 3 do return false
+			v.valColor = {1, 1, 1, 1}
+			for i in 0 ..< min(len(parts), 4) do v.valColor[i], _ = strconv.parse_f32(strings.trim_space(parts[i]))
+		}
+		return ScriptInstance_SetProperty(inst, field, v, &game.scriptManager)
+	}
+	return false
 }
 
 // EditorLink_Set changes a node's transform or reflected property from text.
@@ -265,6 +339,7 @@ EditorLink_Set :: proc(game: ^Game, path, name, value: string) -> bool {
 	case "enabled": n.enabled = value == "true"; return true
 	case "visible": n.renderable = value == "true"; return true
 	}
+	if strings.has_prefix(name, "script.") do return link_set_script(game, n, name[len("script."):], value)
 	p, found := Node_FindProperty(n, name)
 	if !found do return false
 	return Property_FromString(n, p, value)
