@@ -51,6 +51,7 @@ exits non-zero if any check fails.
 | `lua_events.drive` | Event names complete: a timer's `connect("` offers timeout, `emit("` the project's custom events, `function X:on_` the on_<event> methods. |
 | `lua_properties.drive` | Typed property paths: a camera's set_property(" completes followMode; get_property returns the enum (its names complete in a comparison). |
 | `lua_get_node.drive` | Typed get_node: self.node:get_node(" completes the paths in the script's scenes, each typed (EngineExhaust is a FrameAnimationNode). |
+| `lua_aliases.drive` | Project names complete in API calls: locale keys (tr), keys (Input.is_key_pressed), save keys (Save.get); animation and state names in the generated types. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

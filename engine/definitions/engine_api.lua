@@ -3740,11 +3740,11 @@ function NavGrid:nav_is_walkable(x, y, opts) end
 
 ---The collision layers this body's shapes are on: project layer names
 ---(Project Settings > Physics), "LayerN" or numbers 1-16; several or a table.
----@param ... string|integer|table
+---@param ... CollisionLayer|string|integer|table
 function Node:set_collision_layer(...) end
 
 ---The collision layers this body's shapes collide with.
----@param ... string|integer|table
+---@param ... CollisionLayer|string|integer|table
 function Node:set_collision_mask(...) end
 
 -- ----------------------------------------------------------------------------
@@ -3757,20 +3757,20 @@ function Node:set_collision_mask(...) end
 -- ----------------------------------------------------------------------------
 
 ---Sets a parameter that transition conditions test (booleans become 1 / 0).
----@param name string
+---@param name StateMachineParam|string
 ---@param value number|boolean
 function StateMachineNode:sm_set(name, value) end
 
----@param name string
+---@param name StateMachineParam|string
 ---@return number value
 function StateMachineNode:sm_get(name) end
 
 ---Sets a trigger: it stays set until a transition that tests it fires.
----@param name string
+---@param name StateMachineParam|string
 function StateMachineNode:sm_trigger(name) end
 
 ---Switches to a state now, ignoring conditions.
----@param state string
+---@param state StateMachineState|string
 ---@param blend? number Crossfade seconds for the state's animation
 ---@return boolean ok false when there is no such state
 function StateMachineNode:sm_travel(state, blend) end
@@ -3979,7 +3979,7 @@ function TextureNode:texture_get_path() end
 ---With `blend` > 0 the previous pose crossfades into the new animation over that many seconds.
 ---Event tracks fire while playing: method tracks call `self:<method>(frame)` on the
 ---track's target node script; sound tracks play their audio file on the key's frame.
----@param name? string Animation name
+---@param name? AnimationName|string Animation name (the project's complete)
 ---@param blend? number Crossfade time in seconds (default 0)
 function AnimationPlayerNode:animation_play(name, blend) end
 
@@ -4269,7 +4269,7 @@ function LdtkLevelNode:ldtk_get_levels(world) end
 function LdtkLevelNode:ldtk_load_level(identifier) end
 
 ---Gets a level's details (the current level by default).
----@param level? string
+---@param level? LdtkLevel|string
 ---@return LdtkLevel?
 function LdtkLevelNode:ldtk_get_level(level) end
 
@@ -4280,17 +4280,17 @@ function LdtkLevelNode:ldtk_get_level_size() end
 
 ---Gets a level field value (nil if absent or null).
 ---@param name string
----@param level? string Another level (default: the current one)
+---@param level? LdtkLevel|string Another level (default: the current one)
 ---@return any
 function LdtkLevelNode:ldtk_get_level_field(name, level) end
 
 ---Gets every field of a level.
----@param level? string
+---@param level? LdtkLevel|string
 ---@return table<string, any>
 function LdtkLevelNode:ldtk_get_level_fields(level) end
 
 ---Lists a level's neighbours.
----@param level? string
+---@param level? LdtkLevel|string
 ---@return LdtkNeighbour[]
 function LdtkLevelNode:ldtk_get_neighbours(level) end
 
@@ -4310,7 +4310,7 @@ function LdtkLevelNode:ldtk_get_world() end
 
 ---Switches world (its first level, or `level`).
 ---@param world string
----@param level? string
+---@param level? LdtkLevel|string
 ---@return boolean ok
 function LdtkLevelNode:ldtk_set_world(world, level) end
 
@@ -4322,7 +4322,7 @@ function LdtkLevelNode:ldtk_set_world_mode(on) end
 function LdtkLevelNode:ldtk_is_world_mode() end
 
 ---Lists a level's layers (top first).
----@param level? string
+---@param level? LdtkLevel|string
 ---@return LdtkLayer[]
 function LdtkLevelNode:ldtk_get_layers(level) end
 
@@ -4336,34 +4336,34 @@ function LdtkLevelNode:ldtk_set_layer_visible(name, visible) end
 function LdtkLevelNode:ldtk_is_layer_visible(name) end
 
 ---Gets the IntGrid value at a world position (0 = empty).
----@param layer string IntGrid layer identifier, e.g. "Collisions"
+---@param layer LdtkLayer|string IntGrid layer identifier, e.g. "Collisions"
 ---@param x number World X
 ---@param y number World Y
 ---@return integer
 function LdtkLevelNode:ldtk_get_int_grid(layer, x, y) end
 
 ---Gets the identifier of the IntGrid value at a world position ("" if none / unnamed).
----@param layer string
+---@param layer LdtkLayer|string
 ---@param x number
 ---@param y number
 ---@return string
 function LdtkLevelNode:ldtk_get_int_grid_name(layer, x, y) end
 
 ---Gets the IntGrid value of a cell.
----@param layer string
+---@param layer LdtkLayer|string
 ---@param cx integer
 ---@param cy integer
----@param level? string
+---@param level? LdtkLevel|string
 ---@return integer
 function LdtkLevelNode:ldtk_get_int_grid_cell(layer, cx, cy, level) end
 
 ---Lists an IntGrid layer's values (name, colour, collision).
----@param layer string
+---@param layer LdtkLayer|string
 ---@return LdtkIntGridValue[]
 function LdtkLevelNode:ldtk_get_int_grid_values(layer) end
 
 ---World position -> layer cell.
----@param layer string
+---@param layer LdtkLayer|string
 ---@param x number
 ---@param y number
 ---@return integer cx
@@ -4371,10 +4371,10 @@ function LdtkLevelNode:ldtk_get_int_grid_values(layer) end
 function LdtkLevelNode:ldtk_world_to_cell(layer, x, y) end
 
 ---Layer cell -> world position of its centre.
----@param layer string
+---@param layer LdtkLayer|string
 ---@param cx integer
 ---@param cy integer
----@param level? string
+---@param level? LdtkLevel|string
 ---@return number x
 ---@return number y
 function LdtkLevelNode:ldtk_cell_to_world(layer, cx, cy, level) end
@@ -4393,14 +4393,14 @@ function LdtkLevelNode:ldtk_get_collision(x, y) end
 function LdtkLevelNode:ldtk_get_triggers() end
 
 ---Gets the tile of a Tiles/AutoLayer layer at a world position.
----@param layer string
+---@param layer LdtkLayer|string
 ---@param x number
 ---@param y number
 ---@return LdtkTile?
 function LdtkLevelNode:ldtk_get_tile(layer, x, y) end
 
 ---Gets the enum values tagging the tile at a world position (tileset enum tags).
----@param layer string
+---@param layer LdtkLayer|string
 ---@param x number
 ---@param y number
 ---@return string[]
@@ -4536,20 +4536,20 @@ local SaveModule = {}
 
 ---Stores a value (nil removes the key). Tables are stored by reference:
 ---changes to a table you got from Save.get are saved too.
----@param key string
+---@param key SaveKey|string
 ---@param value SaveValue
 function SaveModule.set(key, value) end
 
----@param key string
+---@param key SaveKey|string
 ---@param default? SaveValue Returned when the key isn't set
 ---@return SaveValue
 function SaveModule.get(key, default) end
 
----@param key string
+---@param key SaveKey|string
 ---@return boolean
 function SaveModule.has(key) end
 
----@param key string
+---@param key SaveKey|string
 function SaveModule.delete(key) end
 
 ---@return string[] keys Sorted
@@ -4655,33 +4655,155 @@ function InputModule.get_axis(neg_action, pos_action) end
 ---@return number y Normalized Y axis
 function InputModule.get_vector(left, right, up, down) end
 
+-- key names begin (generated: lua_keys_definitions_test.odin)
+---Keyboard keys (raylib names; also RETURN, ESC, SHIFT, CTRL, ALT and "0"-"9").
+---@alias KeyName
+---| "APOSTROPHE"
+---| "COMMA"
+---| "MINUS"
+---| "PERIOD"
+---| "SLASH"
+---| "ZERO"
+---| "ONE"
+---| "TWO"
+---| "THREE"
+---| "FOUR"
+---| "FIVE"
+---| "SIX"
+---| "SEVEN"
+---| "EIGHT"
+---| "NINE"
+---| "SEMICOLON"
+---| "EQUAL"
+---| "A"
+---| "B"
+---| "C"
+---| "D"
+---| "E"
+---| "F"
+---| "G"
+---| "H"
+---| "I"
+---| "J"
+---| "K"
+---| "L"
+---| "M"
+---| "N"
+---| "O"
+---| "P"
+---| "Q"
+---| "R"
+---| "S"
+---| "T"
+---| "U"
+---| "V"
+---| "W"
+---| "X"
+---| "Y"
+---| "Z"
+---| "LEFT_BRACKET"
+---| "BACKSLASH"
+---| "RIGHT_BRACKET"
+---| "GRAVE"
+---| "SPACE"
+---| "ESCAPE"
+---| "ENTER"
+---| "TAB"
+---| "BACKSPACE"
+---| "INSERT"
+---| "DELETE"
+---| "RIGHT"
+---| "LEFT"
+---| "DOWN"
+---| "UP"
+---| "PAGE_UP"
+---| "PAGE_DOWN"
+---| "HOME"
+---| "END"
+---| "CAPS_LOCK"
+---| "SCROLL_LOCK"
+---| "NUM_LOCK"
+---| "PRINT_SCREEN"
+---| "PAUSE"
+---| "F1"
+---| "F2"
+---| "F3"
+---| "F4"
+---| "F5"
+---| "F6"
+---| "F7"
+---| "F8"
+---| "F9"
+---| "F10"
+---| "F11"
+---| "F12"
+---| "LEFT_SHIFT"
+---| "LEFT_CONTROL"
+---| "LEFT_ALT"
+---| "LEFT_SUPER"
+---| "RIGHT_SHIFT"
+---| "RIGHT_CONTROL"
+---| "RIGHT_ALT"
+---| "RIGHT_SUPER"
+---| "KB_MENU"
+---| "KP_0"
+---| "KP_1"
+---| "KP_2"
+---| "KP_3"
+---| "KP_4"
+---| "KP_5"
+---| "KP_6"
+---| "KP_7"
+---| "KP_8"
+---| "KP_9"
+---| "KP_DECIMAL"
+---| "KP_DIVIDE"
+---| "KP_MULTIPLY"
+---| "KP_SUBTRACT"
+---| "KP_ADD"
+---| "KP_ENTER"
+---| "KP_EQUAL"
+---| "BACK"
+---| "MENU"
+---| "VOLUME_UP"
+---| "VOLUME_DOWN"
+---| "RETURN"
+---| "ESC"
+---| "SHIFT"
+---| "CTRL"
+---| "ALT"
+-- key names end
+
+---Mouse buttons.
+---@alias MouseButton "LEFT"|"RIGHT"|"MIDDLE"|"SIDE"|"EXTRA"|"FORWARD"|"BACK"
+
 ---Queries raw keyboard key press state for a single frame.
----@param key string Key name like "SPACE", "W", "A", "S", "D", "ENTER", "ESCAPE"
+---@param key KeyName|string Key name like "SPACE", "W", "Z", "F5", "LEFT_ALT"
 ---@return boolean
 function InputModule.is_key_pressed(key) end
 
 ---Queries raw keyboard key held state.
----@param key string Key name
+---@param key KeyName|string Key name
 ---@return boolean
 function InputModule.is_key_down(key) end
 
 ---Queries raw keyboard key release state for a single frame.
----@param key string Key name
+---@param key KeyName|string Key name
 ---@return boolean
 function InputModule.is_key_released(key) end
 
 ---Queries mouse button pressed state for a single frame.
----@param button string "LEFT", "RIGHT", "MIDDLE", "SIDE", "EXTRA"
+---@param button MouseButton|string
 ---@return boolean
 function InputModule.is_mouse_button_pressed(button) end
 
 ---Queries mouse button held state.
----@param button string "LEFT", "RIGHT", "MIDDLE"
+---@param button MouseButton|string
 ---@return boolean
 function InputModule.is_mouse_button_down(button) end
 
 ---Queries mouse button release state for a single frame.
----@param button string "LEFT", "RIGHT", "MIDDLE"
+---@param button MouseButton|string
 ---@return boolean
 function InputModule.is_mouse_button_released(button) end
 
@@ -5081,7 +5203,7 @@ Navigation = NavigationModule
 
 ---The text for a key in the current language (locale/*.csv), with {name}
 ---placeholders filled from `args`; falls back to another language, then the key.
----@param key string
+---@param key LocaleKey|string
 ---@param args? table<string, any>
 ---@return string
 function tr(key, args) end
@@ -5090,7 +5212,7 @@ function tr(key, args) end
 local LocaleModule = {}
 
 ---Switches the language texts are shown in (a column of the locale tables).
----@param language string e.g. "fr"
+---@param language Language|string e.g. "fr" (the project's locale tables' languages)
 function LocaleModule.set(language) end
 
 ---@return string language

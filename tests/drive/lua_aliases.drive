@@ -1,0 +1,53 @@
+# Project names complete in API calls: animation names (animation_play),
+# state machine states (sm_travel), save keys (Save.get), locale keys and
+# languages (tr, Locale.set) and every keyboard key (Input.is_key_pressed).
+wait 5
+exec mkdir -p $PROJECT/locale
+exec cp tests/drive/fixtures/drive_locale_strings.csv $PROJECT/locale/drive_strings.csv
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+key escape
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+wait 3
+click @anim.new
+click @hier:PlayerShip
+key ctrl+a
+key ctrl+a
+type state machine
+key enter
+click @insp.sm.from-anims
+key ctrl+s
+wait 2
+dblclick @asset:scripts/player_ship.lua
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+type Save.set("high_score", 1)
+key ctrl+s
+wait-until file:.ore/definitions/project_types.lua contains ---| "high_score" timeout=600
+expect file:.ore/definitions/project_types.lua contains ---| "anim_1"
+expect file:.ore/definitions/project_types.lua contains ---| "greeting"
+expect file:.ore/definitions/project_types.lua contains ---| "fr"
+key end
+key enter
+type local t = tr("gr
+wait-until code.completion contains greeting timeout=600
+key esc
+key end
+key enter
+type if Input.is_key_pressed("F
+wait-until code.completion contains F5 timeout=600
+screenshot key_names
+key esc
+key end
+key enter
+type local hs = Save.get("hi
+wait-until code.completion contains high_score timeout=600

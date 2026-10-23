@@ -117,6 +117,17 @@ return Enemy
 
 ---
 
+## Completion of project names
+
+String arguments complete from the project: input actions
+(`Input.is_action_pressed`), scenes, textures, sounds, components, node
+names and tags, animation names (`animation_play`), state machine
+parameters and states (`sm_set`, `sm_travel`), save keys the scripts use
+(`Save.get`), locale keys and languages (`tr`, `Locale.set`), collision
+layers, LDtk levels / layers / entities, and every keyboard key
+(`Input.is_key_pressed("F5")` - any raylib key name works, plus RETURN,
+ESC, SHIFT, CTRL, ALT and "0"-"9").
+
 ## Events
 
 Every node raises named events (`EventSubject`s on the Odin side). A script

@@ -5,6 +5,7 @@ import "core:c"
 import "core:log"
 import "core:math"
 import "core:os"
+import "core:reflect"
 import "core:strings"
 import "core:time"
 import "core:encoding/uuid"
@@ -2100,29 +2101,29 @@ lua_engine_get_virtual_size :: proc "c" (L: ^lua.State) -> c.int {
 // Input Bindings (Engine.Input)
 // ----------------------------------------------------------------------------
 
+// parse_keyboard_key: any raylib key name ("Z", "F5", "KP_1", "LEFT_ALT"),
+// plus a few short forms (RETURN, ESC, SHIFT, CTRL, ALT, 0-9).
 @(private="file")
 parse_keyboard_key :: proc(name: string) -> (rl.KeyboardKey, bool) {
 	upper := strings.to_upper(name, context.temp_allocator)
 	switch upper {
-	case "SPACE": return .SPACE, true
-	case "ENTER", "RETURN": return .ENTER, true
-	case "ESCAPE", "ESC": return .ESCAPE, true
-	case "UP": return .UP, true
-	case "DOWN": return .DOWN, true
-	case "LEFT": return .LEFT, true
-	case "RIGHT": return .RIGHT, true
-	case "W": return .W, true
-	case "A": return .A, true
-	case "S": return .S, true
-	case "D": return .D, true
-	case "E": return .E, true
-	case "Q": return .Q, true
-	case "R": return .R, true
-	case "F": return .F, true
-	case "TAB": return .TAB, true
-	case "LEFT_SHIFT", "SHIFT": return .LEFT_SHIFT, true
-	case "LEFT_CONTROL", "CTRL": return .LEFT_CONTROL, true
+	case "RETURN": return .ENTER, true
+	case "ESC": return .ESCAPE, true
+	case "SHIFT": return .LEFT_SHIFT, true
+	case "CTRL", "CONTROL": return .LEFT_CONTROL, true
+	case "ALT": return .LEFT_ALT, true
+	case "0": return .ZERO, true
+	case "1": return .ONE, true
+	case "2": return .TWO, true
+	case "3": return .THREE, true
+	case "4": return .FOUR, true
+	case "5": return .FIVE, true
+	case "6": return .SIX, true
+	case "7": return .SEVEN, true
+	case "8": return .EIGHT, true
+	case "9": return .NINE, true
 	}
+	if k, ok := reflect.enum_from_name(rl.KeyboardKey, upper); ok && k != .KEY_NULL do return k, true
 	return .KEY_NULL, false
 }
 

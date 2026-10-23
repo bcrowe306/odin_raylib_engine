@@ -27,6 +27,9 @@ import lsp "../odin_editor/lsp"
 //   whose get_script() is that script's class (its fields and methods); a
 //   script's self.node is <Script>Node_, whose get_node completes the paths
 //   from it in its scenes / components, each returning that node's type
+//   AnimationName, StateMachineParam / State, SaveKey, LocaleKey,
+//   Language, CollisionLayer   names the project uses (animation_play,
+//   sm_*, Save.*, tr / Locale.set, set_collision_layer complete them)
 //   ProjectEvent  the custom events the project's scripts emit (connect /
 //   emit complete them; scripts get optional on_<event> methods for them
 //   and for their node type's own events). Each node class's connect takes
@@ -297,6 +300,52 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		alias(&sb, fmt.tprintf("LdtkEnum_%s", n), fmt.tprintf("Values of the LDtk enum %s", n), sorted_unique(&vals))
 	}
 
+	// Names used across the project: animations and state machines (scenes,
+	// components), save keys (scripts), locale keys and languages (locale/
+	// tables), collision layers (Project Settings).
+	anims := make([dynamic]string, context.temp_allocator)
+	smParams := make([dynamic]string, context.temp_allocator)
+	smStates := make([dynamic]string, context.temp_allocator)
+	for rel in Editor_ListProjectFiles(state, "", {".scene.json", ".component.json"}) {
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
+			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None do scene_names(val, &anims, &smParams, &smStates)
+		}
+	}
+	alias(&sb, "AnimationName", "Animations of the project's AnimationPlayers (animation_play)", sorted_unique(&anims))
+	alias(&sb, "StateMachineParam", "State machine parameters (sm_set / sm_get / sm_trigger)", sorted_unique(&smParams))
+	alias(&sb, "StateMachineState", "State machine states (sm_travel)", sorted_unique(&smStates))
+	saveKeys := make([dynamic]string, context.temp_allocator)
+	for rel in Editor_ListProjectFiles(state, "", {".lua"}) {
+		if strings.has_prefix(rel, ".") do continue
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
+			for fn in ([]string{"Save.set(", "Save.get(", "Save.has(", "Save.delete("}) do string_args(string(data), fn, &saveKeys)
+		}
+	}
+	alias(&sb, "SaveKey", "Save keys the project's scripts use (Save.set / get)", sorted_unique(&saveKeys))
+	localeKeys := make([dynamic]string, context.temp_allocator)
+	languages := make([dynamic]string, context.temp_allocator)
+	for rel in Editor_ListProjectFiles(state, "locale", {".csv"}) {
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
+			rows := e.Locale_ParseCSV(string(data))
+			for row, i in rows {
+				if len(row) == 0 do continue
+				if i == 0 {
+					for lang in row[1:] do append(&languages, strings.clone(strings.trim_space(lang), context.temp_allocator))
+				} else if k := strings.trim_space(row[0]); k != "" {
+					append(&localeKeys, strings.clone(k, context.temp_allocator))
+				}
+			}
+		}
+	}
+	alias(&sb, "LocaleKey", "Keys of the project's locale/ tables (tr)", sorted_unique(&localeKeys))
+	alias(&sb, "Language", "Languages of the project's locale/ tables (Locale.set)", sorted_unique(&languages))
+	layers_ := make([dynamic]string, context.temp_allocator)
+	for n in state.projectConfig.collisionLayers do if n != "" do append(&layers_, n)
+	alias(&sb, "CollisionLayer", "Collision layer names (Project Settings > Physics)", sorted_unique(&layers_))
+
 	// Custom events: what the project's scripts emit (connect / emit
 	// complete them).
 	custom := make([dynamic]string, context.temp_allocator)
@@ -377,6 +426,40 @@ Lua_WriteProjectTypes :: proc(state: ^EditorState) {
 
 // typed_lookups: overloads returning each named node's type (names whose
 // nodes all have the same, non-plain type).
+// scene_names collects animation names and state machine parameters /
+// states of a scene / component JSON.
+@(private = "file")
+scene_names :: proc(v: json.Value, anims, params, states: ^[dynamic]string) {
+	#partial switch x in v {
+	case json.Object:
+		if arr, ok := x["animations"].(json.Array); ok {
+			for a in arr do if o, isObj := a.(json.Object); isObj do if n, has := o["name"].(json.String); has do append(anims, string(n))
+		}
+		if sm, ok := x["state_machine"].(json.Object); ok {
+			if arr, has := sm["params"].(json.Array); has do for a in arr do if o, isObj := a.(json.Object); isObj do if n, hasN := o["name"].(json.String); hasN do append(params, string(n))
+			if arr, has := sm["states"].(json.Array); has do for a in arr do if o, isObj := a.(json.Object); isObj do if n, hasN := o["name"].(json.String); hasN do append(states, string(n))
+		}
+		for _, child in x do scene_names(child, anims, params, states)
+	case json.Array:
+		for child in x do scene_names(child, anims, params, states)
+	}
+}
+
+// string_args: the string literal passed first to `fn` ("Save.get(") in a
+// script, each time it's called.
+@(private = "file")
+string_args :: proc(text, fn: string, out: ^[dynamic]string) {
+	rest := text
+	for {
+		i := strings.index(rest, fn)
+		if i < 0 do return
+		rest = rest[i + len(fn):]
+		t := strings.trim_left_space(rest)
+		if len(t) < 2 || (t[0] != '"' && t[0] != '\'') do continue
+		if j := strings.index_byte(t[1:], t[0]); j > 0 do append(out, strings.clone(t[1:1 + j], context.temp_allocator))
+	}
+}
+
 // emitted_events: the names a script passes to emit("...") / :emit('...').
 @(private = "file")
 emitted_events :: proc(text: string, out: ^[dynamic]string) {
