@@ -18,7 +18,8 @@ build() {
 	done
 	return 1
 }
-build editor -out:bin/editor || exit 1
+# EDITOR_DEFINES: extra build flags (e.g. -define:ORE_MEM_TRACK=true for leak reports).
+build editor -out:bin/editor $EDITOR_DEFINES || exit 1
 build . -out:bin/odin_raylib_engine || exit 1
 
 if [ $# -gt 0 ]; then
@@ -53,6 +54,7 @@ for d in "${drives[@]}"; do
 	shots="editor_screenshots/drive/$name"
 	rm -rf "$shots"
 	if perl -e 'alarm 600; exec @ARGV' ./bin/editor --project "$tmp/project" --drive "$d" --shots "$shots" --no-build > "$tmp/editor.log" 2>&1; then
+		cp "$tmp/editor.log" "$shots/editor.log" 2>/dev/null # kept (memory reports, ...)
 		summary+=("PASS  $name")
 	else
 		summary+=("FAIL  $name   (log: $tmp/editor.log)")

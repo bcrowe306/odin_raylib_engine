@@ -340,3 +340,19 @@ Shift+F11 continue and step. See SCRIPTING.md > Debugging.
 the paused line) shows the current values of the locals it uses after its
 end - `dt = 0.0167, self = {vx = 0, ...}` - from the selected stack frame;
 they go when the game runs on.
+
+## Speed and memory
+
+Everything derived from the text is computed once per edit and only when
+something needs it: tokens per line (cached), the structure (brackets,
+blocks), the display map (folds, wrap), inlay hints per shown line, the git
+diff (after typing pauses), whole-file word uses. Drawing touches only the
+rows on screen. Per-document caches are freed when the tab closes, the
+rest at exit.
+
+To check for leaks: `EDITOR_DEFINES=-define:ORE_MEM_TRACK=true
+scripts/editor_drive.sh code_soak_mem` - 40 rounds of editing, folding,
+wrapping, find, clipboard and menus; the log
+(`editor_screenshots/drive/code_soak_mem/editor.log`) reports the live heap
+every 600 frames (flat after warm-up) and what is left at exit.
+

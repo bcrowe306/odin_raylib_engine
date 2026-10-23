@@ -27,9 +27,11 @@ main :: proc() {
 		track.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
 		context.allocator = mem.tracking_allocator(&track)
 		memTrack = &track
-		defer MemTrack_ReportLeaks()
 	}
-	os.exit(editor_main())
+	code := editor_main()
+	// (Called here, not deferred: os.exit skips defers.)
+	when ORE_MEM_TRACK do MemTrack_ReportLeaks()
+	os.exit(code)
 }
 
 editor_main :: proc() -> int {

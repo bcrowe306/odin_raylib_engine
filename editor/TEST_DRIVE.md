@@ -9,6 +9,7 @@ the game process it launched, and it captures screenshots along the way.
 ```bash
 ./scripts/editor_drive.sh                 # every tests/drive/*.drive
 ./scripts/editor_drive.sh playtest nodes  # selected drives
+EDITOR_DEFINES=-define:ORE_MEM_TRACK=true ./scripts/editor_drive.sh code_soak_mem  # memory reports in the kept log
 task editor:drive                         # same as the first line
 ```
 
@@ -92,6 +93,7 @@ exits non-zero if any check fails.
 | `code_swatch_texture.drive` | Swatches before a property's colour default and {0.2, 0.4, 0.8} (none for {1, 2, 3}); a click opens the picker; hovering a texture path shows the image. |
 | `code_inline_values.drive` | Paused at a breakpoint in update: line 27 shows self and dt; gone after Continue. |
 | `code_inspector_link.drive` | Show in Inspector on self.rotation_speed selects PlayerShip and lights its row; the Inspector's thrust_power > Find in Script opens the declaration, name selected. |
+| `code_soak_mem.drive` | 40 rounds of Code tab use (typing, undo, fold, soft wrap, find, expand selection, clipboard history, menus); with `EDITOR_DEFINES=-define:ORE_MEM_TRACK=true` the log shows the live heap staying flat. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
