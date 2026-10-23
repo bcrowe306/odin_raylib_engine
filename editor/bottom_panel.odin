@@ -112,6 +112,12 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:ldtk")
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Search###SearchTab", ICON_FA_MAGNIFYING_GLASS), nil, flags(.Search, req, hasReq)) {
+			state.bottomTab = .Search
+			Code_SearchPanel(state)
+			imgui.EndTabItem()
+		}
+		Drive_Item("bottom:search")
 		imgui.EndTabBar()
 	}
 	// A tab picked by hand: no going back when the selection changes.

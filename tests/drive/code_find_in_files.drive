@@ -1,0 +1,31 @@
+# Find in files (Cmd+Shift+F): matches by file in the Search tab, a result
+# opens the script there; Replace All writes a closed file.
+wait 5
+exec cp tests/drive/fixtures/drive_ctx_zz.lua $PROJECT/scripts/drive_ctx_zz.lua
+wait-until item:asset:scripts/drive_ctx_zz.lua == visible timeout=300
+# A tall bottom panel for the results.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+key cmd+shift+f
+wait 2
+expect bottom-tab == Search
+type DriveCtxZz
+key enter
+wait 2
+expect search-total == 3
+expect search-files == 1
+screenshot results
+click @search.hit:scripts/drive_ctx_zz.lua:7
+wait 3
+expect code.file == scripts/drive_ctx_zz.lua
+expect code.cursor contains 7:
+key cmd+w
+wait 2
+click @search.replace
+type DriveCtxQq
+click @search.replace-all
+wait 3
+expect file:scripts/drive_ctx_zz.lua contains local DriveCtxQq = {}
+expect search-total == 0

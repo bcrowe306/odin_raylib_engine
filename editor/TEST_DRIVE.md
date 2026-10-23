@@ -83,6 +83,7 @@ exits non-zero if any check fails.
 | `code_inlay_hints.drive` | Parameter-name hints on a module call and a node method (at the argument's column), the caret moves over the text not the hint, Ctrl+Alt+H off and on. |
 | `code_nav.drive` | Go back / forward after a jump; F8 / Shift+F8 to a syntax error; Alt+F8 / Alt+Shift+F8 between changed blocks (the project made a git repo). |
 | `code_symbols.drive` | Outline: a function and a script property by name; workspace symbols: another script's function opens it. |
+| `code_find_in_files.drive` | Cmd+Shift+F: three matches in one file, a result opens the script at its line; Replace All writes the closed file. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -163,7 +164,8 @@ Queries:
 - `insp-help-path` (the path the help pane shows)
 - `particle-preview` (on / off; `node:<Name>.particles` = an emitter's live particles)
 - `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
-- `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk)
+- `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk, Search)
+- `search-total`, `search-files` (find in files)
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
 - `runtime-diags` (script problems recorded from Simulate / Play)

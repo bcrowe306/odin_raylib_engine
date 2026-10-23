@@ -40,6 +40,7 @@ BottomTab :: enum {
 	Game,
 	Particles,
 	Ldtk,
+	Search, // find in files (code_search.odin)
 }
 
 ViewportTab :: enum {

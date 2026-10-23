@@ -733,6 +733,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		seen := make(map[string]bool, allocator = context.temp_allocator)
 		for entry in NODE_CATALOG do seen[entry.icon] = true
 		return fmt.tprintf("%d/%d", len(seen), len(NODE_CATALOG)), true
+	case "search-total", "search-files": return Code_SearchQuery(q)
 	case "remote-debug-draw", "remote-connected", "remote-paused", "remote-frame", "remote-steps", "remote-reloads", "remote-nodes", "remote-names": return RemoteGame_Query(q)
 	case "guides":
 		if state.activeScene == nil do return "", true

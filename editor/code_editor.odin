@@ -359,6 +359,7 @@ Code_Shutdown :: proc() {
 	delete(cm.snippetStops)
 	Code_ClipboardShutdown()
 	Code_NavShutdown()
+	Code_SearchShutdown()
 	code_find_destroy()
 	code_lsp_shutdown()
 }

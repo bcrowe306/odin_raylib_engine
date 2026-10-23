@@ -224,6 +224,15 @@ step aside: a disabled command never takes another's shortcut).
 | Cmd+F / Cmd+Alt+F | Find / find and replace |
 | Cmd+G / Cmd+Shift+G (F3 / Shift+F3) | Next / previous match |
 | Ctrl+G | Go to line |
+| Cmd+Shift+F | **Find in files** (the bottom panel's Search tab) |
+
+**Find in files** searches the project's scripts and shaders (`.lua`,
+`.fs`, `.vs`, `.glsl`; open files as edited, not as saved) with Match Case
+(Aa), Whole Word (ab) and Regex (.\*), started with the selection when
+there is one. Matches are listed by file with their line, the match
+highlighted; click one to open it there. **Replace All** (not with regex)
+changes open files as undoable edits and writes the others, then searches
+again. Up to 2000 matches are listed.
 
 ## Language server
 
