@@ -1,0 +1,20 @@
+# Property-style access completes: self.node.<property> (a TextureNode's
+# rotation, tint), typed (position is a Vec2: its methods complete).
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+type self.node.rot
+wait-until code.completion contains rotation timeout=600
+key esc
+key end
+key enter
+type local p = self.node.position
+key enter
+type p:norm
+wait-until code.completion contains normalized timeout=600
+screenshot fields

@@ -32,6 +32,15 @@ test_lua_node_properties_definitions :: proc(t: ^testing.T) {
 		}
 		if info.name != "Node" && len(own) == 0 && !Node_HasOrigin(n) && n.typeId != AnimationPlayerNode do continue // Node's own declarations cover it
 		cls := info.name
+		// Property-style access: node.<property> (paths without dots).
+		fmt.sbprintf(&sb, "\n---@class %s\n", cls)
+		for p in props {
+			ty := lua_prop_type(p)
+			if ty == "" || strings.contains(p.name, ".") do continue
+			doc := Property_Doc(p)
+			if len(doc) > 90 do doc = strings.concatenate({doc[:87], "..."}, context.temp_allocator)
+			fmt.sbprintf(&sb, "---@field %s %s %s\n", p.name, ty, doc)
+		}
 		fmt.sbprintf(&sb, "\n---@alias %sProperty\n", cls)
 		for p in props {
 			ty := lua_prop_type(p)

@@ -92,7 +92,7 @@ Exported properties
 
 Engine API
 - [x] 8.16 Vec2 / Vec3 / Vec4 types with operators, used by the API
-- [ ] 8.17 Property-style access (`self.node.position = ...`), old methods kept
+- [x] 8.17 Property-style access (`self.node.position = ...`), old methods kept
 - [ ] 8.18 Spawning: `Scene.instantiate(component, parent, x, y)` (typed root), `node:queue_free()`
 - [ ] 8.19 Global scripts (autoloads) in Project Settings, reachable from every script; globe marker in the asset browser
 - (on hold) coroutines (`wait` / `await` / `tween`) - not wanted yet; (not chosen) lifecycle hooks

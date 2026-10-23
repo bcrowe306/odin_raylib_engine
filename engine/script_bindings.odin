@@ -2754,6 +2754,41 @@ lua_sm_stop :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// --- node.<property>: property-style access -------------------------------------
+
+// node.key: a method, else `name`, else the property at that path (as
+// get_property: vectors as Vec2, "script.<name>" a script field).
+@(private="file")
+lua_node_index :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	lua.L_getmetatable(L, "Engine.Node")
+	lua.pushvalue(L, 2)
+	lua.rawget(L, -2)
+	if !lua.isnil(L, -1) do return 1 // a method
+	lua.pop(L, 2)
+	if lua.type(L, 2) != .STRING {lua.pushnil(L); return 1}
+	if string(lua.tostring(L, 2)) == "name" {
+		node, ok := to_node_userdata(L, 1)
+		if !ok {lua.pushnil(L); return 1}
+		lua.pushstring(L, strings.clone_to_cstring(node.name, context.temp_allocator))
+		return 1
+	}
+	return lua_node_get_property(L) // (node, path)
+}
+
+// node.key = value: `name` renames, anything else sets the property (as
+// set_property; an unknown one is an error).
+@(private="file")
+lua_node_newindex :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	if lua.type(L, 2) == .STRING && string(lua.tostring(L, 2)) == "name" {
+		node, ok := to_node_userdata(L, 1)
+		if ok && lua.type(L, 3) == .STRING do node.name = strings.clone(string(lua.tostring(L, 3)), node.allocator)
+		return 0
+	}
+	return lua_node_set_property(L) // (node, path, value)
+}
+
 // --- node:set_property / get_property: any Inspector property by path -------
 //
 // "script.<name>" is a field of the node's script (its exported properties,
@@ -4068,9 +4103,12 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.pushcfunction(L, lua_node_ldtk_get_level_identifier)
 		lua.setfield(L, -2, "ldtk_get_level_identifier")
 
-		// __index points to itself
-		lua.pushvalue(L, -1)
+		// node.method(...) (this table), else node.<property> by path:
+		// `node.position = Vec2(1, 2)`, `node.rotation = node.rotation + 5`.
+		lua.pushcfunction(L, lua_node_index)
 		lua.setfield(L, -2, "__index")
+		lua.pushcfunction(L, lua_node_newindex)
+		lua.setfield(L, -2, "__newindex")
 	}
 	lua.pop(L, 1)
 

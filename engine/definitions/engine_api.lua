@@ -12,6 +12,7 @@
 ---@field node? Node Engine node attached to the struck body, if any
 
 ---@class Node
+---@field name string The node's name (assigning renames it). Properties read and write as fields: `node.rotation = node.rotation + 5`.
 ---Represents an engine scene hierarchy node with transform, lifecycle, and optional physics.
 local Node = {}
 
@@ -545,6 +546,15 @@ function UIToolbarNode:connect(event, handler) end
 
 -- node properties begin (generated from the engine: lua_properties_definitions_test.odin)
 
+---@class Node
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+
 ---@alias NodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -578,6 +588,62 @@ function Node:get_property(path) end
 ---@overload fun(self: Node, path: "paused", value: boolean)
 ---@overload fun(self: Node, path: "enabled", value: boolean)
 function Node:set_property(path, value, y) end
+
+---@class CameraNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field isCurrent boolean The camera the game renders through (one per scene).
+---@field followMode "Static"|"SingleTarget"|"MultiTarget"|"Manual" Static: stays put. Single Target: follows its Follow Target. Multi Target: frames all t...
+---@field dragType "None"|"SmoothDamp"|"SpringDamp"|"LookAhead"|"AutoSpeed" How the camera catches up with its target: none (locked), smooth damp, spring, look-ahe...
+---@field targetPosition Vec2 Where the camera is heading (world px).
+---@field currentPosition Vec2 Where the camera is now (world px).
+---@field smoothDrag boolean Ease towards the target instead of snapping.
+---@field smoothDragSpeed Vec2 Smooth-damp time per axis (s): higher lags more.
+---@field springConstant number Spring Damp: stiffness pulling the camera to the target.
+---@field dampingRatio number Spring Damp: 1 settles without overshoot, lower wobbles.
+---@field predictionTime Vec2 Look Ahead: how far ahead of the target to aim, in seconds of its velocity.
+---@field maxDistance Vec2 Reserved (not used yet).
+---@field offset Vec2 Added to the target position (world px).
+---@field smoothOffset boolean Ease offset changes in.
+---@field smoothOffsetSpeed number How fast offset changes ease in.
+---@field screenOffset Vec2 Where on screen the camera's position appears (px; half the window = centred).
+---@field currentRotation number The camera's rotation now (degrees).
+---@field targetRotation number Rotation the camera turns to (degrees).
+---@field allowRotation boolean Let the camera rotate (else it stays upright).
+---@field smoothRotation boolean Ease rotation changes in.
+---@field smoothRotationSpeed number How fast rotation eases in.
+---@field zoom number Zoom now (1 = 100%, 2 = everything twice as big).
+---@field targetZoom number Zoom the camera eases to.
+---@field smoothZoom boolean Ease zoom changes in.
+---@field smoothZoomSpeed number How fast zoom eases in.
+---@field minZoom number Smallest zoom (auto zoom and scripts).
+---@field maxZoom number Largest zoom (auto zoom and scripts).
+---@field autoZoom boolean Multi Target: zoom out to keep every target on screen.
+---@field zoomMargin number Auto zoom: extra space around the targets (0.1 = 10%).
+---@field hasLimits boolean Keep the view inside the left / right / top / bottom limits.
+---@field smoothLimit boolean Ease into the limits instead of stopping hard.
+---@field leftLimit number Left edge the view may not pass (world px).
+---@field rightLimit number Right edge the view may not pass (world px).
+---@field topLimit number Top edge the view may not pass (world px).
+---@field bottomLimit number Bottom edge the view may not pass (world px).
+---@field useHMargins boolean Dead zone: the target moves freely between the left / right margins before the camera f...
+---@field useVMargins boolean Dead zone: the target moves freely between the top / bottom margins before the camera f...
+---@field leftMargin number Left dead-zone margin (fraction of the screen).
+---@field rightMargin number Right dead-zone margin (fraction of the screen).
+---@field topMargin number Top dead-zone margin (fraction of the screen).
+---@field bottomMargin number Bottom dead-zone margin (fraction of the screen).
+---@field enableMouseFollow boolean Nudge the camera towards the mouse.
+---@field mouseInfluence Vec2 How much the mouse pulls the camera per axis (0-1).
+---@field shakePreset "Custom"|"Gunshot"|"Earthquake"|"Handheld"|"Explosion"|"Impact"|"Rumble"|"Vibration"|"Wobbly" Ready-made shake (gunshot, earthquake...); Custom uses the settings below.
+---@field isShaking boolean A shake is running.
+---@field shakeSpeed number Custom shake: how fast it shakes.
+---@field shakeIntensity number Custom shake: how far it moves (px).
+---@field shakeTrauma number Shake strength now (0-1); decays over time.
 
 ---@alias CameraNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -754,6 +820,17 @@ function CameraNode:get_property(path) end
 ---@overload fun(self: CameraNode, path: "shakeTrauma", value: number)
 function CameraNode:set_property(path, value, y) end
 
+---@class TextureNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
+
 ---@alias TextureNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -794,6 +871,16 @@ function TextureNode:get_property(path) end
 ---@overload fun(self: TextureNode, path: "tint", value: number[])
 function TextureNode:set_property(path, value, y) end
 
+---@class FrameAnimationNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+
 ---@alias FrameAnimationNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -830,6 +917,20 @@ function FrameAnimationNode:get_property(path) end
 ---@overload fun(self: FrameAnimationNode, path: "paused", value: boolean)
 ---@overload fun(self: FrameAnimationNode, path: "enabled", value: boolean)
 function FrameAnimationNode:set_property(path, value, y) end
+
+---@class AnimationPlayerNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field reverse boolean Play the animation backwards.
+---@field autoplay boolean Start playing the current animation when the node becomes ready.
+---@field fps number Frames per second of the animations that don't set their own (the Animation tab's FPS b...
+---@field defaultAnimation string The animation selected (and autoplayed) when the scene loads; empty = the one saved as ...
 
 ---@alias AnimationPlayerNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -879,6 +980,15 @@ function AnimationPlayerNode:get_property(path) end
 ---@overload fun(self: AnimationPlayerNode, path: "fps", value: number)
 ---@overload fun(self: AnimationPlayerNode, path: "defaultAnimation", value: string)
 function AnimationPlayerNode:set_property(path, value, y) end
+
+---@class ParticleEmitterNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 
 ---@alias ParticleEmitterNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1025,6 +1135,22 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.continuous", value: boolean)
 function ParticleEmitterNode:set_property(path, value, y) end
 
+---@class SoundNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field volume number Volume (0-1), before the bus and master volumes.
+---@field pitch number Playback speed / pitch (1 = normal).
+---@field autoplay boolean Play once when the node becomes ready.
+---@field voices integer Plays over itself up to this many times (1: a new play restarts it).
+---@field positional boolean Volume and pan follow the node's distance and side from the listener (the current camera).
+---@field minDistance number Positional: full volume within this distance (px).
+---@field maxDistance number Positional: silent beyond this distance (px).
+
 ---@alias SoundNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -1079,6 +1205,22 @@ function SoundNode:get_property(path) end
 ---@overload fun(self: SoundNode, path: "minDistance", value: number)
 ---@overload fun(self: SoundNode, path: "maxDistance", value: number)
 function SoundNode:set_property(path, value, y) end
+
+---@class MusicNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field volume number Volume (0-1), before the bus and master volumes.
+---@field pitch number Playback speed / pitch (1 = normal).
+---@field pan number Stereo position: 0 left, 0.5 centre, 1 right.
+---@field looping boolean Start again at the end.
+---@field autoplay boolean Start playing when the node becomes ready.
+---@field isPlaying boolean Playing now.
+---@field isPaused boolean Paused now.
 
 ---@alias MusicNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1135,6 +1277,17 @@ function MusicNode:get_property(path) end
 ---@overload fun(self: MusicNode, path: "isPaused", value: boolean)
 function MusicNode:set_property(path, value, y) end
 
+---@class StaticBodyNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field debugColor number[] Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug...
+---@field oneWay boolean Jump-through platform: bodies pass from below and land on top.
+
 ---@alias StaticBodyNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -1174,6 +1327,27 @@ function StaticBodyNode:get_property(path) end
 ---@overload fun(self: StaticBodyNode, path: "debugColor", value: number[])
 ---@overload fun(self: StaticBodyNode, path: "oneWay", value: boolean)
 function StaticBodyNode:set_property(path, value, y) end
+
+---@class DynamicBodyNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field linearVelocity Vec2 Velocity (px/s).
+---@field angularVelocity number Spin (degrees/s).
+---@field linearDamping number Slows movement over time (air drag).
+---@field angularDamping number Slows spin over time.
+---@field gravityScale number Multiplies the world's gravity for this body (0 floats, negative rises).
+---@field sleepThreshold number Below this speed the body may sleep (px/s).
+---@field enableSleep boolean Let the body sleep when at rest (saves time; contacts wake it).
+---@field isAwake boolean Awake (simulated) now.
+---@field fixedRotation boolean Never rotate (characters, upright crates).
+---@field isBullet boolean Continuous collision against other moving bodies (fast projectiles).
+---@field allowFastRotation boolean Allow very fast spin (wheels); can be less stable.
+---@field debugColor number[] Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug...
 
 ---@alias DynamicBodyNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1244,6 +1418,29 @@ function DynamicBodyNode:get_property(path) end
 ---@overload fun(self: DynamicBodyNode, path: "allowFastRotation", value: boolean)
 ---@overload fun(self: DynamicBodyNode, path: "debugColor", value: number[])
 function DynamicBodyNode:set_property(path, value, y) end
+
+---@class CharacterMoverNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field radius number Capsule radius (px).
+---@field height number Capsule height (px).
+---@field velocity Vec2 Velocity now (px/s).
+---@field targetSpeedX number Horizontal speed the built-in movement accelerates to (px/s).
+---@field maxSpeed number Top running speed (px/s).
+---@field acceleration number How quickly it reaches top speed (px/s²).
+---@field jumpSpeed number Upward speed of a jump (px/s).
+---@field gravityScale number Multiplies the world's gravity for the character.
+---@field pushLimit number Most push per step from overlapping bodies (px/s; 0 = unlimited).
+---@field clipVelocity boolean Remove velocity into walls and floors it hits (slide along them).
+---@field enableKeyboardInput boolean Built-in movement: the move / jump input actions drive it.
+---@field isGrounded boolean Standing on something now.
+---@field debugColor number[] Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug...
+---@field controlMode "BuiltIn"|"Script" Built-in movement, or Script: the script moves it (character_move_and_slide).
 
 ---@alias CharacterMoverNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1321,6 +1518,19 @@ function CharacterMoverNode:get_property(path) end
 ---@overload fun(self: CharacterMoverNode, path: "controlMode", value: "BuiltIn"|"Script")
 function CharacterMoverNode:set_property(path, value, y) end
 
+---@class AreaNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field overlapCount integer Bodies overlapping now.
+---@field hasOverlaps boolean Anything overlapping now.
+---@field debugColor number[] Outline colour when nothing overlaps.
+---@field activeColor number[] Outline colour while something overlaps.
+
 ---@alias AreaNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -1366,6 +1576,24 @@ function AreaNode:get_property(path) end
 ---@overload fun(self: AreaNode, path: "debugColor", value: number[])
 ---@overload fun(self: AreaNode, path: "activeColor", value: number[])
 function AreaNode:set_property(path, value, y) end
+
+---@class RaycastNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field direction Vec2 Direction of the ray (rotated with the node).
+---@field length number Length of the ray (px).
+---@field collideWithSensors boolean Sensor shapes (areas) also stop the ray.
+---@field isColliding boolean The ray hit something this frame.
+---@field hitFraction number Where along the ray it hit (0 start, 1 end).
+---@field hitPoint Vec2 World point of the hit (px).
+---@field hitNormal Vec2 Surface direction at the hit.
+---@field rayColor number[] Ray colour when it hits nothing.
+---@field hitColor number[] Ray colour when it hits.
 
 ---@alias RaycastNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1428,6 +1656,23 @@ function RaycastNode:get_property(path) end
 ---@overload fun(self: RaycastNode, path: "hitColor", value: number[])
 function RaycastNode:set_property(path, value, y) end
 
+---@class LdtkLevelNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field enablePhysics boolean Build colliders from IntGrid cells whose collision rule is Solid / One Way.
+---@field spawnEntities boolean Spawn the level's entities (mapped to components) when ready.
+---@field parallax boolean Apply the LDtk layers' parallax factors.
+---@field drawBackground boolean Draw the level's background colour / image.
+---@field drawEntityTiles boolean Draw entities' LDtk tiles (editor visuals for unspawned entities).
+---@field tintColor number[] Multiplies every layer's colours.
+---@field drawDebugColliders boolean Outline the generated colliders.
+---@field drawDebugEntities boolean Outline entity bounds with their names.
+
 ---@alias LdtkLevelNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -1486,6 +1731,17 @@ function LdtkLevelNode:get_property(path) end
 ---@overload fun(self: LdtkLevelNode, path: "drawDebugEntities", value: boolean)
 function LdtkLevelNode:set_property(path, value, y) end
 
+---@class TileMapNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field solid boolean Build static colliders for the painted tiles.
+---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
+
 ---@alias TileMapNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -1525,6 +1781,22 @@ function TileMapNode:get_property(path) end
 ---@overload fun(self: TileMapNode, path: "solid", value: boolean)
 ---@overload fun(self: TileMapNode, path: "tint", value: number[])
 function TileMapNode:set_property(path, value, y) end
+
+---@class LightNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field kind "Point"|"Spot" Point: shines all round. Spot: a cone along the node's rotation.
+---@field color number[] Colour of the light.
+---@field energy number Brightness multiplier.
+---@field radius number Reach of the light (px).
+---@field falloff number Fade towards the edge: 1 linear, 2 smooth, higher = tighter.
+---@field spread number Spot: half-angle of the cone (degrees).
+---@field shadows boolean Cast shadows from the scene's physics shapes (bodies, LDtk and tile map colliders; not ...
 
 ---@alias LightNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1580,6 +1852,16 @@ function LightNode:get_property(path) end
 ---@overload fun(self: LightNode, path: "spread", value: number)
 ---@overload fun(self: LightNode, path: "shadows", value: boolean)
 function LightNode:set_property(path, value, y) end
+
+---@class JointNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field debugColor number[] Colour of the line drawn between the anchors.
 
 ---@alias JointNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1843,6 +2125,27 @@ function JointNode:get_property(path) end
 ---@overload fun(self: JointNode, path: "debugColor", value: number[])
 function JointNode:set_property(path, value, y) end
 
+---@class TextNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field text string The text; rich text markup when Rich Text is on, a locale key when Localized.
+---@field font string Project font (.ttf / .otf / .fnt; "" = the engine font).
+---@field fontSize number Text size (px).
+---@field color number[] Text colour (rich text [color] overrides it).
+---@field align "Left"|"Center"|"Right" Alignment of the lines within the text block.
+---@field maxWidth number Wrap lines at this width (px); 0 = only at line breaks.
+---@field lineSpacing number Line height as a multiple of the font size.
+---@field richText boolean Interpret [color=..] [size=..] [wave] [shake] tags.
+---@field localized boolean The text is a key in the locale tables; shows the current language's translation.
+---@field sdf boolean Signed-distance-field rendering: stays sharp when scaled or zoomed (vector fonts).
+---@field revealSpeed number Typewriter: characters per second (0 = all at once); emits "revealed" when done.
+
 ---@alias TextNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -1913,6 +2216,26 @@ function TextNode:get_property(path) end
 ---@overload fun(self: TextNode, path: "revealSpeed", value: number)
 function TextNode:set_property(path, value, y) end
 
+---@class DialogueNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field font string Project font ("" = the engine font).
+---@field fontSize number Text size (px).
+---@field textColor number[] Colour of the line's text.
+---@field speakerColor number[] Colour of the speaker's name.
+---@field panelColor number[] Fill colour of the box.
+---@field borderColor number[] Colour of the box's border.
+---@field padding number Space between the border and the text (px).
+---@field revealSpeed number Typewriter speed in characters per second (0 = whole lines).
+---@field advanceAction string Input action that shows the rest of the line, then the next ("confirm").
+---@field localized boolean Lines are keys in the locale tables (locale/*.csv).
+
 ---@alias DialogueNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -1980,6 +2303,21 @@ function DialogueNode:get_property(path) end
 ---@overload fun(self: DialogueNode, path: "localized", value: boolean)
 function DialogueNode:set_property(path, value, y) end
 
+---@class NineSliceNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field texturePath string Texture to slice.
+---@field size Vec2 Drawn size (px); the borders keep their size, the middle stretches.
+---@field marginsLT Vec2 Left and top border widths (texture px).
+---@field marginsRB Vec2 Right and bottom border widths (texture px).
+---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
+
 ---@alias NineSliceNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2031,6 +2369,21 @@ function NineSliceNode:get_property(path) end
 ---@overload fun(self: NineSliceNode, path: "marginsRB", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NineSliceNode, path: "tint", value: number[])
 function NineSliceNode:set_property(path, value, y) end
+
+---@class ParallaxNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field texturePath string Background texture.
+---@field factor Vec2 Movement relative to the camera: 1 moves with the world, 0 stays fixed on screen.
+---@field repeatX boolean Tile horizontally to fill the view.
+---@field repeatY boolean Tile vertically to fill the view.
+---@field scrollSpeed Vec2 Drifts by itself (px/s; clouds).
+---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
 
 ---@alias ParallaxNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2084,6 +2437,19 @@ function ParallaxNode:get_property(path) end
 ---@overload fun(self: ParallaxNode, path: "tint", value: number[])
 function ParallaxNode:set_property(path, value, y) end
 
+---@class LineNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field width number Line thickness (px).
+---@field color number[] Line colour.
+---@field closed boolean Join the last point to the first.
+---@field rounded boolean Round joints and caps.
+
 ---@alias LineNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2129,6 +2495,21 @@ function LineNode:get_property(path) end
 ---@overload fun(self: LineNode, path: "closed", value: boolean)
 ---@overload fun(self: LineNode, path: "rounded", value: boolean)
 function LineNode:set_property(path, value, y) end
+
+---@class TrailNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field lifetime number Seconds a point of the trail lasts.
+---@field width number Width at the head (it tapers to the tail; px).
+---@field color number[] Colour at the head.
+---@field endColor number[] Colour at the tail (fades to it).
+---@field minDistance number Distance the parent must move before a new point is recorded (px).
+---@field emitting boolean Record new points (off: the trail fades away).
 
 ---@alias TrailNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2181,6 +2562,34 @@ function TrailNode:get_property(path) end
 ---@overload fun(self: TrailNode, path: "minDistance", value: number)
 ---@overload fun(self: TrailNode, path: "emitting", value: boolean)
 function TrailNode:set_property(path, value, y) end
+
+---@class UIContainerNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field title string Header text.
+---@field direction "Vertical"|"Horizontal"|"Grid" Children are laid out in a column, a row or a grid.
+---@field alignment "Start"|"Center"|"End"|"Stretch" Where children sit across the layout direction.
+---@field spacing number Gap between items (px).
+---@field paddingTop number Space above the children (px).
+---@field paddingBottom number Space below the children (px).
+---@field paddingLeft number Space left of the children (px).
+---@field paddingRight number Space right of the children (px).
+---@field columns integer Grid layout: columns per row.
+---@field autoSizeHeight boolean Grow to fit the children.
+---@field drawBackground boolean Fill the background.
+---@field drawBorder boolean Draw a border.
+---@field showHeader boolean Draw a header with the title.
+---@field headerHeight number Height of the header (px).
+---@field backgroundColor number[] Fill colour of the background.
+---@field headerColor number[] Header fill colour.
+---@field borderColor number[] Colour of the border.
+---@field titleColor number[] Title text colour.
 
 ---@alias UIContainerNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2273,6 +2682,22 @@ function UIContainerNode:get_property(path) end
 ---@overload fun(self: UIContainerNode, path: "titleColor", value: number[])
 function UIContainerNode:set_property(path, value, y) end
 
+---@class UILabelNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field text string Label text.
+---@field fontSize number Text size (px).
+---@field textColor number[] Colour of the text.
+---@field align "Left"|"Center"|"Right" Horizontal text alignment.
+---@field drawBackground boolean Fill the background.
+---@field backgroundColor number[] Fill colour of the background.
+
 ---@alias UILabelNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2327,6 +2752,26 @@ function UILabelNode:get_property(path) end
 ---@overload fun(self: UILabelNode, path: "drawBackground", value: boolean)
 ---@overload fun(self: UILabelNode, path: "backgroundColor", value: number[])
 function UILabelNode:set_property(path, value, y) end
+
+---@class UIButtonNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field text string Button caption.
+---@field fontSize number Text size (px).
+---@field icon "None"|"Digit0"|"Digit1"|"Digit2"|"Digit3"|"Digit4"|"Digit5"|"Digit6"|"Digit7"|"Digit8"|"Digit9"|"A"|"AddressBook"|"AddressCard"|"AlignCenter"|"AlignJustify"|"AlignLeft"|"AlignRight"|"Anchor"|"AnchorCircleCheck"|"AnchorCircleExclamation"|"AnchorCircleXmark"|"AnchorLock"|"AngleDown"|"AngleLeft"|"AngleRight"|"AngleUp"|"AnglesDown"|"AnglesLeft"|"AnglesRight"|"AnglesUp"|"Ankh"|"AppleWhole"|"Archway"|"ArrowDown"|"ArrowDown19"|"ArrowDown91"|"ArrowDownAZ"|"ArrowDownLong"|"ArrowDownShortWide"|"ArrowDownUpAcrossLine"|"ArrowDownUpLock"|"ArrowDownWideShort"|"ArrowDownZA"|"ArrowLeft"|"ArrowLeftLong"|"ArrowPointer"|"ArrowRight"|"ArrowRightArrowLeft"|"ArrowRightFromBracket"|"ArrowRightLong"|"ArrowRightToBracket"|"ArrowRightToCity"|"ArrowRotateLeft"|"ArrowRotateRight"|"ArrowTrendDown"|"ArrowTrendUp"|"ArrowTurnDown"|"ArrowTurnUp"|"ArrowUp"|"ArrowUp19"|"ArrowUp91"|"ArrowUpAZ"|"ArrowUpFromBracket"|"ArrowUpFromGroundWater"|"ArrowUpFromWaterPump"|"ArrowUpLong"|"ArrowUpRightDots"|"ArrowUpRightFromSquare"|"ArrowUpShortWide"|"ArrowUpWideShort"|"ArrowUpZA"|"ArrowsDownToLine"|"ArrowsDownToPeople"|"ArrowsLeftRight"|"ArrowsLeftRightToLine"|"ArrowsRotate"|"ArrowsSpin"|"ArrowsSplitUpAndLeft"|"ArrowsToCircle"|"ArrowsToDot"|"ArrowsToEye"|"ArrowsTurnRight"|"ArrowsTurnToDots"|"ArrowsUpDown"|"ArrowsUpDownLeftRight"|"ArrowsUpToLine"|"Asterisk"|"At"|"Atom"|"AudioDescription"|"AustralSign"|"Award"|"B"|"Baby"|"BabyCarriage"|"Backward"|"BackwardFast"|"BackwardStep"|"Bacon"|"Bacteria"|"Bacterium"|"BagShopping"|"Bahai"|"BahtSign"|"Ban"|"BanSmoking"|"Bandage"|"BangladeshiTakaSign"|"Barcode"|"Bars"|"BarsProgress"|"BarsStaggered"|"Baseball"|"BaseballBatBall"|"BasketShopping"|"Basketball"|"Bath"|"BatteryEmpty"|"BatteryFull"|"BatteryHalf"|"BatteryQuarter"|"BatteryThreeQuarters"|"Bed"|"BedPulse"|"BeerMugEmpty"|"Bell"|"BellConcierge"|"BellSlash"|"BezierCurve"|"Bicycle"|"Binoculars"|"Biohazard"|"BitcoinSign"|"Blender"|"BlenderPhone"|"Blog"|"Bold"|"Bolt"|"BoltLightning"|"Bomb"|"Bone"|"Bong"|"Book"|"BookAtlas"|"BookBible"|"BookBookmark"|"BookJournalWhills"|"BookMedical"|"BookOpen"|"BookOpenReader"|"BookQuran"|"BookSkull"|"BookTanakh"|"Bookmark"|"BorderAll"|"BorderNone"|"BorderTopLeft"|"BoreHole"|"BottleDroplet"|"BottleWater"|"BowlFood"|"BowlRice"|"BowlingBall"|"Box"|"BoxArchive"|"BoxOpen"|"BoxTissue"|"BoxesPacking"|"BoxesStacked"|"Braille"|"Brain"|"BrazilianRealSign"|"BreadSlice"|"Bridge"|"BridgeCircleCheck"|"BridgeCircleExclamation"|"BridgeCircleXmark"|"BridgeLock"|"BridgeWater"|"Briefcase"|"BriefcaseMedical"|"Broom"|"BroomBall"|"Brush"|"Bucket"|"Bug"|"BugSlash"|"Bugs"|"Building"|"BuildingCircleArrowRight"|"BuildingCircleCheck"|"BuildingCircleExclamation"|"BuildingCircleXmark"|"BuildingColumns"|"BuildingFlag"|"BuildingLock"|"BuildingNgo"|"BuildingShield"|"BuildingUn"|"BuildingUser"|"BuildingWheat"|"Bullhorn"|"Bullseye"|"Burger"|"Burst"|"Bus"|"BusSimple"|"BusinessTime"|"C"|"CableCar"|"CakeCandles"|"Calculator"|"Calendar"|"CalendarCheck"|"CalendarDay"|"CalendarDays"|"CalendarMinus"|"CalendarPlus"|"CalendarWeek"|"CalendarXmark"|"Camera"|"CameraRetro"|"CameraRotate"|"Campground"|"CandyCane"|"Cannabis"|"Capsules"|"Car"|"CarBattery"|"CarBurst"|"CarOn"|"CarRear"|"CarSide"|"CarTunnel"|"Caravan"|"CaretDown"|"CaretLeft"|"CaretRight"|"CaretUp"|"Carrot"|"CartArrowDown"|"CartFlatbed"|"CartFlatbedSuitcase"|"CartPlus"|"CartShopping"|"CashRegister"|"Cat"|"CediSign"|"CentSign"|"Certificate"|"Chair"|"Chalkboard"|"ChalkboardUser"|"ChampagneGlasses"|"ChargingStation"|"ChartArea"|"ChartBar"|"ChartColumn"|"ChartDiagram"|"ChartGantt"|"ChartLine"|"ChartPie"|"ChartSimple"|"Check"|"CheckDouble"|"CheckToSlot"|"Cheese"|"Chess"|"ChessBishop"|"ChessBoard"|"ChessKing"|"ChessKnight"|"ChessPawn"|"ChessQueen"|"ChessRook"|"ChevronDown"|"ChevronLeft"|"ChevronRight"|"ChevronUp"|"Child"|"ChildCombatant"|"ChildDress"|"ChildReaching"|"Children"|"Church"|"Circle"|"CircleArrowDown"|"CircleArrowLeft"|"CircleArrowRight"|"CircleArrowUp"|"CircleCheck"|"CircleChevronDown"|"CircleChevronLeft"|"CircleChevronRight"|"CircleChevronUp"|"CircleDollarToSlot"|"CircleDot"|"CircleDown"|"CircleExclamation"|"CircleH"|"CircleHalfStroke"|"CircleInfo"|"CircleLeft"|"CircleMinus"|"CircleNodes"|"CircleNotch"|"CirclePause"|"CirclePlay"|"CirclePlus"|"CircleQuestion"|"CircleRadiation"|"CircleRight"|"CircleStop"|"CircleUp"|"CircleUser"|"CircleXmark"|"City"|"Clapperboard"|"Clipboard"|"ClipboardCheck"|"ClipboardList"|"ClipboardQuestion"|"ClipboardUser"|"Clock"|"ClockRotateLeft"|"Clone"|"ClosedCaptioning"|"Cloud"|"CloudArrowDown"|"CloudArrowUp"|"CloudBolt"|"CloudMeatball"|"CloudMoon"|"CloudMoonRain"|"CloudRain"|"CloudShowersHeavy"|"CloudShowersWater"|"CloudSun"|"CloudSunRain"|"Clover"|"Code"|"CodeBranch"|"CodeCommit"|"CodeCompare"|"CodeFork"|"CodeMerge"|"CodePullRequest"|"Coins"|"ColonSign"|"Comment"|"CommentDollar"|"CommentDots"|"CommentMedical"|"CommentNodes"|"CommentSlash"|"CommentSms"|"Comments"|"CommentsDollar"|"CompactDisc"|"Compass"|"CompassDrafting"|"Compress"|"Computer"|"ComputerMouse"|"Cookie"|"CookieBite"|"Copy"|"Copyright"|"Couch"|"Cow"|"CreditCard"|"Crop"|"CropSimple"|"Cross"|"Crosshairs"|"Crow"|"Crown"|"Crutch"|"CruzeiroSign"|"Cube"|"Cubes"|"CubesStacked"|"D"|"Database"|"DeleteLeft"|"Democrat"|"Desktop"|"Dharmachakra"|"DiagramNext"|"DiagramPredecessor"|"DiagramProject"|"DiagramSuccessor"|"Diamond"|"DiamondTurnRight"|"Dice"|"DiceD20"|"DiceD6"|"DiceFive"|"DiceFour"|"DiceOne"|"DiceSix"|"DiceThree"|"DiceTwo"|"Disease"|"Display"|"Divide"|"Dna"|"Dog"|"DollarSign"|"Dolly"|"DongSign"|"DoorClosed"|"DoorOpen"|"Dove"|"DownLeftAndUpRightToCenter"|"DownLong"|"Download"|"Dragon"|"DrawPolygon"|"Droplet"|"DropletSlash"|"Drum"|"DrumSteelpan"|"DrumstickBite"|"Dumbbell"|"Dumpster"|"DumpsterFire"|"Dungeon"|"E"|"EarDeaf"|"EarListen"|"EarthAfrica"|"EarthAmericas"|"EarthAsia"|"EarthEurope"|"EarthOceania"|"Egg"|"Eject"|"Elevator"|"Ellipsis"|"EllipsisVertical"|"Envelope"|"EnvelopeCircleCheck"|"EnvelopeOpen"|"EnvelopeOpenText"|"EnvelopesBulk"|"Equals"|"Eraser"|"Ethernet"|"EuroSign"|"Exclamation"|"Expand"|"Explosion"|"Eye"|"EyeDropper"|"EyeLowVision"|"EyeSlash"|"F"|"FaceAngry"|"FaceDizzy"|"FaceFlushed"|"FaceFrown"|"FaceFrownOpen"|"FaceGrimace"|"FaceGrin"|"FaceGrinBeam"|"FaceGrinBeamSweat"|"FaceGrinHearts"|"FaceGrinSquint"|"FaceGrinSquintTears"|"FaceGrinStars"|"FaceGrinTears"|"FaceGrinTongue"|"FaceGrinTongueSquint"|"FaceGrinTongueWink"|"FaceGrinWide"|"FaceGrinWink"|"FaceKiss"|"FaceKissBeam"|"FaceKissWinkHeart"|"FaceLaugh"|"FaceLaughBeam"|"FaceLaughSquint"|"FaceLaughWink"|"FaceMeh"|"FaceMehBlank"|"FaceRollingEyes"|"FaceSadCry"|"FaceSadTear"|"FaceSmile"|"FaceSmileBeam"|"FaceSmileWink"|"FaceSurprise"|"FaceTired"|"Fan"|"Faucet"|"FaucetDrip"|"Fax"|"Feather"|"FeatherPointed"|"Ferry"|"File"|"FileArrowDown"|"FileArrowUp"|"FileAudio"|"FileCircleCheck"|"FileCircleExclamation"|"FileCircleMinus"|"FileCirclePlus"|"FileCircleQuestion"|"FileCircleXmark"|"FileCode"|"FileContract"|"FileCsv"|"FileExcel"|"FileExport"|"FileFragment"|"FileHalfDashed"|"FileImage"|"FileImport"|"FileInvoice"|"FileInvoiceDollar"|"FileLines"|"FileMedical"|"FilePdf"|"FilePen"|"FilePowerpoint"|"FilePrescription"|"FileShield"|"FileSignature"|"FileVideo"|"FileWaveform"|"FileWord"|"FileZipper"|"Fill"|"FillDrip"|"Film"|"Filter"|"FilterCircleDollar"|"FilterCircleXmark"|"Fingerprint"|"Fire"|"FireBurner"|"FireExtinguisher"|"FireFlameCurved"|"FireFlameSimple"|"Fish"|"FishFins"|"Flag"|"FlagCheckered"|"FlagUsa"|"Flask"|"FlaskVial"|"FloppyDisk"|"FlorinSign"|"Folder"|"FolderClosed"|"FolderMinus"|"FolderOpen"|"FolderPlus"|"FolderTree"|"Font"|"FontAwesome"|"Football"|"Forward"|"ForwardFast"|"ForwardStep"|"FrancSign"|"Frog"|"Futbol"|"G"|"Gamepad"|"GasPump"|"Gauge"|"GaugeHigh"|"GaugeSimple"|"GaugeSimpleHigh"|"Gavel"|"Gear"|"Gears"|"Gem"|"Genderless"|"Ghost"|"Gift"|"Gifts"|"GlassWater"|"GlassWaterDroplet"|"Glasses"|"Globe"|"GolfBallTee"|"Gopuram"|"GraduationCap"|"GreaterThan"|"GreaterThanEqual"|"Grip"|"GripLines"|"GripLinesVertical"|"GripVertical"|"GroupArrowsRotate"|"GuaraniSign"|"Guitar"|"Gun"|"H"|"Hammer"|"Hamsa"|"Hand"|"HandBackFist"|"HandDots"|"HandFist"|"HandHolding"|"HandHoldingDollar"|"HandHoldingDroplet"|"HandHoldingHand"|"HandHoldingHeart"|"HandHoldingMedical"|"HandLizard"|"HandMiddleFinger"|"HandPeace"|"HandPointDown"|"HandPointLeft"|"HandPointRight"|"HandPointUp"|"HandPointer"|"HandScissors"|"HandSparkles"|"HandSpock"|"Handcuffs"|"Hands"|"HandsAslInterpreting"|"HandsBound"|"HandsBubbles"|"HandsClapping"|"HandsHolding"|"HandsHoldingChild"|"HandsHoldingCircle"|"HandsPraying"|"Handshake"|"HandshakeAngle"|"HandshakeSimple"|"HandshakeSimpleSlash"|"HandshakeSlash"|"Hanukiah"|"HardDrive"|"Hashtag"|"HatCowboy"|"HatCowboySide"|"HatWizard"|"HeadSideCough"|"HeadSideCoughSlash"|"HeadSideMask"|"HeadSideVirus"|"Heading"|"Headphones"|"HeadphonesSimple"|"Headset"|"Heart"|"HeartCircleBolt"|"HeartCircleCheck"|"HeartCircleExclamation"|"HeartCircleMinus"|"HeartCirclePlus"|"HeartCircleXmark"|"HeartCrack"|"HeartPulse"|"Helicopter"|"HelicopterSymbol"|"HelmetSafety"|"HelmetUn"|"HexagonNodes"|"HexagonNodesBolt"|"Highlighter"|"HillAvalanche"|"HillRockslide"|"Hippo"|"HockeyPuck"|"HollyBerry"|"Horse"|"HorseHead"|"Hospital"|"HospitalUser"|"HotTubPerson"|"Hotdog"|"Hotel"|"Hourglass"|"HourglassEnd"|"HourglassHalf"|"HourglassStart"|"House"|"HouseChimney"|"HouseChimneyCrack"|"HouseChimneyMedical"|"HouseChimneyUser"|"HouseChimneyWindow"|"HouseCircleCheck"|"HouseCircleExclamation"|"HouseCircleXmark"|"HouseCrack"|"HouseFire"|"HouseFlag"|"HouseFloodWater"|"HouseFloodWaterCircleArrowRight"|"HouseLaptop"|"HouseLock"|"HouseMedical"|"HouseMedicalCircleCheck"|"HouseMedicalCircleExclamation"|"HouseMedicalCircleXmark"|"HouseMedicalFlag"|"HouseSignal"|"HouseTsunami"|"HouseUser"|"HryvniaSign"|"Hurricane"|"I"|"ICursor"|"IceCream"|"Icicles"|"Icons"|"IdBadge"|"IdCard"|"IdCardClip"|"Igloo"|"Image"|"ImagePortrait"|"Images"|"Inbox"|"Indent"|"IndianRupeeSign"|"Industry"|"Infinity"|"Info"|"Italic"|"J"|"Jar"|"JarWheat"|"Jedi"|"JetFighter"|"JetFighterUp"|"Joint"|"JugDetergent"|"K"|"Kaaba"|"Key"|"Keyboard"|"Khanda"|"KipSign"|"KitMedical"|"KitchenSet"|"KiwiBird"|"L"|"LandMineOn"|"Landmark"|"LandmarkDome"|"LandmarkFlag"|"Language"|"Laptop"|"LaptopCode"|"LaptopFile"|"LaptopMedical"|"LariSign"|"LayerGroup"|"Leaf"|"LeftLong"|"LeftRight"|"Lemon"|"LessThan"|"LessThanEqual"|"LifeRing"|"Lightbulb"|"LinesLeaning"|"Link"|"LinkSlash"|"LiraSign"|"List"|"ListCheck"|"ListOl"|"ListUl"|"LitecoinSign"|"LocationArrow"|"LocationCrosshairs"|"LocationDot"|"LocationPin"|"LocationPinLock"|"Lock"|"LockOpen"|"Locust"|"Lungs"|"LungsVirus"|"M"|"Magnet"|"MagnifyingGlass"|"MagnifyingGlassArrowRight"|"MagnifyingGlassChart"|"MagnifyingGlassDollar"|"MagnifyingGlassLocation"|"MagnifyingGlassMinus"|"MagnifyingGlassPlus"|"ManatSign"|"Map"|"MapLocation"|"MapLocationDot"|"MapPin"|"Marker"|"Mars"|"MarsAndVenus"|"MarsAndVenusBurst"|"MarsDouble"|"MarsStroke"|"MarsStrokeRight"|"MarsStrokeUp"|"MartiniGlass"|"MartiniGlassCitrus"|"MartiniGlassEmpty"|"Mask"|"MaskFace"|"MaskVentilator"|"MasksTheater"|"MattressPillow"|"Maximize"|"Medal"|"Memory"|"Menorah"|"Mercury"|"Message"|"Meteor"|"Microchip"|"Microphone"|"MicrophoneLines"|"MicrophoneLinesSlash"|"MicrophoneSlash"|"Microscope"|"MillSign"|"Minimize"|"Minus"|"Mitten"|"Mobile"|"MobileButton"|"MobileRetro"|"MobileScreen"|"MobileScreenButton"|"MoneyBill"|"MoneyBill1"|"MoneyBill1Wave"|"MoneyBillTransfer"|"MoneyBillTrendUp"|"MoneyBillWave"|"MoneyBillWheat"|"MoneyBills"|"MoneyCheck"|"MoneyCheckDollar"|"Monument"|"Moon"|"MortarPestle"|"Mosque"|"Mosquito"|"MosquitoNet"|"Motorcycle"|"Mound"|"Mountain"|"MountainCity"|"MountainSun"|"MugHot"|"MugSaucer"|"Music"|"N"|"NairaSign"|"NetworkWired"|"Neuter"|"Newspaper"|"NotEqual"|"Notdef"|"NoteSticky"|"NotesMedical"|"O"|"ObjectGroup"|"ObjectUngroup"|"OilCan"|"OilWell"|"Om"|"Otter"|"Outdent"|"P"|"Pager"|"PaintRoller"|"Paintbrush"|"Palette"|"Pallet"|"Panorama"|"PaperPlane"|"Paperclip"|"ParachuteBox"|"Paragraph"|"Passport"|"Paste"|"Pause"|"Paw"|"Peace"|"Pen"|"PenClip"|"PenFancy"|"PenNib"|"PenRuler"|"PenToSquare"|"Pencil"|"PeopleArrows"|"PeopleCarryBox"|"PeopleGroup"|"PeopleLine"|"PeoplePulling"|"PeopleRobbery"|"PeopleRoof"|"PepperHot"|"Percent"|"Person"|"PersonArrowDownToLine"|"PersonArrowUpFromLine"|"PersonBiking"|"PersonBooth"|"PersonBreastfeeding"|"PersonBurst"|"PersonCane"|"PersonChalkboard"|"PersonCircleCheck"|"PersonCircleExclamation"|"PersonCircleMinus"|"PersonCirclePlus"|"PersonCircleQuestion"|"PersonCircleXmark"|"PersonDigging"|"PersonDotsFromLine"|"PersonDress"|"PersonDressBurst"|"PersonDrowning"|"PersonFalling"|"PersonFallingBurst"|"PersonHalfDress"|"PersonHarassing"|"PersonHiking"|"PersonMilitaryPointing"|"PersonMilitaryRifle"|"PersonMilitaryToPerson"|"PersonPraying"|"PersonPregnant"|"PersonRays"|"PersonRifle"|"PersonRunning"|"PersonShelter"|"PersonSkating"|"PersonSkiing"|"PersonSkiingNordic"|"PersonSnowboarding"|"PersonSwimming"|"PersonThroughWindow"|"PersonWalking"|"PersonWalkingArrowLoopLeft"|"PersonWalkingArrowRight"|"PersonWalkingDashedLineArrowRight"|"PersonWalkingLuggage"|"PersonWalkingWithCane"|"PesetaSign"|"PesoSign"|"Phone"|"PhoneFlip"|"PhoneSlash"|"PhoneVolume"|"PhotoFilm"|"PiggyBank"|"Pills"|"PizzaSlice"|"PlaceOfWorship"|"Plane"|"PlaneArrival"|"PlaneCircleCheck"|"PlaneCircleExclamation"|"PlaneCircleXmark"|"PlaneDeparture"|"PlaneLock"|"PlaneSlash"|"PlaneUp"|"PlantWilt"|"PlateWheat"|"Play"|"Plug"|"PlugCircleBolt"|"PlugCircleCheck"|"PlugCircleExclamation"|"PlugCircleMinus"|"PlugCirclePlus"|"PlugCircleXmark"|"Plus"|"PlusMinus"|"Podcast"|"Poo"|"PooStorm"|"Poop"|"PowerOff"|"Prescription"|"PrescriptionBottle"|"PrescriptionBottleMedical"|"Print"|"PumpMedical"|"PumpSoap"|"PuzzlePiece"|"Q"|"Qrcode"|"Question"|"QuoteLeft"|"QuoteRight"|"R"|"Radiation"|"Radio"|"Rainbow"|"RankingStar"|"Receipt"|"RecordVinyl"|"RectangleAd"|"RectangleList"|"RectangleXmark"|"Recycle"|"Registered"|"Repeat"|"Reply"|"ReplyAll"|"Republican"|"Restroom"|"Retweet"|"Ribbon"|"RightFromBracket"|"RightLeft"|"RightLong"|"RightToBracket"|"Ring"|"Road"|"RoadBarrier"|"RoadBridge"|"RoadCircleCheck"|"RoadCircleExclamation"|"RoadCircleXmark"|"RoadLock"|"RoadSpikes"|"Robot"|"Rocket"|"Rotate"|"RotateLeft"|"RotateRight"|"Route"|"Rss"|"RubleSign"|"Rug"|"Ruler"|"RulerCombined"|"RulerHorizontal"|"RulerVertical"|"RupeeSign"|"RupiahSign"|"S"|"SackDollar"|"SackXmark"|"Sailboat"|"Satellite"|"SatelliteDish"|"ScaleBalanced"|"ScaleUnbalanced"|"ScaleUnbalancedFlip"|"School"|"SchoolCircleCheck"|"SchoolCircleExclamation"|"SchoolCircleXmark"|"SchoolFlag"|"SchoolLock"|"Scissors"|"Screwdriver"|"ScrewdriverWrench"|"Scroll"|"ScrollTorah"|"SdCard"|"Section"|"Seedling"|"Server"|"Shapes"|"Share"|"ShareFromSquare"|"ShareNodes"|"SheetPlastic"|"ShekelSign"|"Shield"|"ShieldCat"|"ShieldDog"|"ShieldHalved"|"ShieldHeart"|"ShieldVirus"|"Ship"|"Shirt"|"ShoePrints"|"Shop"|"ShopLock"|"ShopSlash"|"Shower"|"Shrimp"|"Shuffle"|"ShuttleSpace"|"SignHanging"|"Signal"|"Signature"|"SignsPost"|"SimCard"|"Sink"|"Sitemap"|"Skull"|"SkullCrossbones"|"Slash"|"Sleigh"|"Sliders"|"Smog"|"Smoking"|"Snowflake"|"Snowman"|"Snowplow"|"Soap"|"Socks"|"SolarPanel"|"Sort"|"SortDown"|"SortUp"|"Spa"|"SpaghettiMonsterFlying"|"SpellCheck"|"Spider"|"Spinner"|"Splotch"|"Spoon"|"SprayCan"|"SprayCanSparkles"|"Square"|"SquareArrowUpRight"|"SquareBinary"|"SquareCaretDown"|"SquareCaretLeft"|"SquareCaretRight"|"SquareCaretUp"|"SquareCheck"|"SquareEnvelope"|"SquareFull"|"SquareH"|"SquareMinus"|"SquareNfi"|"SquareParking"|"SquarePen"|"SquarePersonConfined"|"SquarePhone"|"SquarePhoneFlip"|"SquarePlus"|"SquarePollHorizontal"|"SquarePollVertical"|"SquareRootVariable"|"SquareRss"|"SquareShareNodes"|"SquareUpRight"|"SquareVirus"|"SquareXmark"|"StaffSnake"|"Stairs"|"Stamp"|"Stapler"|"Star"|"StarAndCrescent"|"StarHalf"|"StarHalfStroke"|"StarOfDavid"|"StarOfLife"|"SterlingSign"|"Stethoscope"|"Stop"|"Stopwatch"|"Stopwatch20"|"Store"|"StoreSlash"|"StreetView"|"Strikethrough"|"Stroopwafel"|"Subscript"|"Suitcase"|"SuitcaseMedical"|"SuitcaseRolling"|"Sun"|"SunPlantWilt"|"Superscript"|"Swatchbook"|"Synagogue"|"Syringe"|"T"|"Table"|"TableCells"|"TableCellsColumnLock"|"TableCellsLarge"|"TableCellsRowLock"|"TableCellsRowUnlock"|"TableColumns"|"TableList"|"TableTennisPaddleBall"|"Tablet"|"TabletButton"|"TabletScreenButton"|"Tablets"|"TachographDigital"|"Tag"|"Tags"|"Tape"|"Tarp"|"TarpDroplet"|"Taxi"|"Teeth"|"TeethOpen"|"TemperatureArrowDown"|"TemperatureArrowUp"|"TemperatureEmpty"|"TemperatureFull"|"TemperatureHalf"|"TemperatureHigh"|"TemperatureLow"|"TemperatureQuarter"|"TemperatureThreeQuarters"|"TengeSign"|"Tent"|"TentArrowDownToLine"|"TentArrowLeftRight"|"TentArrowTurnLeft"|"TentArrowsDown"|"Tents"|"Terminal"|"TextHeight"|"TextSlash"|"TextWidth"|"Thermometer"|"ThumbsDown"|"ThumbsUp"|"Thumbtack"|"ThumbtackSlash"|"Ticket"|"TicketSimple"|"Timeline"|"ToggleOff"|"ToggleOn"|"Toilet"|"ToiletPaper"|"ToiletPaperSlash"|"ToiletPortable"|"ToiletsPortable"|"Toolbox"|"Tooth"|"ToriiGate"|"Tornado"|"TowerBroadcast"|"TowerCell"|"TowerObservation"|"Tractor"|"Trademark"|"TrafficLight"|"Trailer"|"Train"|"TrainSubway"|"TrainTram"|"Transgender"|"Trash"|"TrashArrowUp"|"TrashCan"|"TrashCanArrowUp"|"Tree"|"TreeCity"|"TriangleExclamation"|"Trophy"|"Trowel"|"TrowelBricks"|"Truck"|"TruckArrowRight"|"TruckDroplet"|"TruckFast"|"TruckField"|"TruckFieldUn"|"TruckFront"|"TruckMedical"|"TruckMonster"|"TruckMoving"|"TruckPickup"|"TruckPlane"|"TruckRampBox"|"Tty"|"TurkishLiraSign"|"TurnDown"|"TurnUp"|"Tv"|"U"|"Umbrella"|"UmbrellaBeach"|"Underline"|"UniversalAccess"|"Unlock"|"UnlockKeyhole"|"UpDown"|"UpDownLeftRight"|"UpLong"|"UpRightAndDownLeftFromCenter"|"UpRightFromSquare"|"Upload"|"User"|"UserAstronaut"|"UserCheck"|"UserClock"|"UserDoctor"|"UserGear"|"UserGraduate"|"UserGroup"|"UserInjured"|"UserLarge"|"UserLargeSlash"|"UserLock"|"UserMinus"|"UserNinja"|"UserNurse"|"UserPen"|"UserPlus"|"UserSecret"|"UserShield"|"UserSlash"|"UserTag"|"UserTie"|"UserXmark"|"Users"|"UsersBetweenLines"|"UsersGear"|"UsersLine"|"UsersRays"|"UsersRectangle"|"UsersSlash"|"UsersViewfinder"|"Utensils"|"V"|"VanShuttle"|"Vault"|"VectorSquare"|"Venus"|"VenusDouble"|"VenusMars"|"Vest"|"VestPatches"|"Vial"|"VialCircleCheck"|"VialVirus"|"Vials"|"Video"|"VideoSlash"|"Vihara"|"Virus"|"VirusCovid"|"VirusCovidSlash"|"VirusSlash"|"Viruses"|"Voicemail"|"Volcano"|"Volleyball"|"VolumeHigh"|"VolumeLow"|"VolumeOff"|"VolumeXmark"|"VrCardboard"|"W"|"WalkieTalkie"|"Wallet"|"WandMagic"|"WandMagicSparkles"|"WandSparkles"|"Warehouse"|"Water"|"WaterLadder"|"WaveSquare"|"WebAwesome"|"WeightHanging"|"WeightScale"|"WheatAwn"|"WheatAwnCircleExclamation"|"Wheelchair"|"WheelchairMove"|"WhiskeyGlass"|"Wifi"|"Wind"|"WindowMaximize"|"WindowMinimize"|"WindowRestore"|"WineBottle"|"WineGlass"|"WineGlassEmpty"|"WonSign"|"Worm"|"Wrench"|"X"|"XRay"|"Xmark"|"XmarksLines"|"Y"|"YenSign"|"YinYang"|"Z"|"Search"|"Save"|"Settings"|"Cog"|"Home"|"Edit"|"Close"|"Cancel"|"Refresh"|"Warning"|"CheckCircle"|"TimesCircle"|"VolumeMute"|"Cut"|"Undo"|"Redo"|"StepForward"|"StepBackward"|"Pin"|"ZoomIn"|"ZoomOut" Icon shown (Font Awesome).
+---@field iconSize number Icon size (px).
+---@field normalColor number[] Fill colour at rest.
+---@field hoverColor number[] Fill colour under the mouse.
+---@field pressedColor number[] Fill colour while pressed.
+---@field borderColor number[] Colour of the border.
+---@field textColor number[] Colour of the text.
+---@field align "Left"|"Center"|"Right" Horizontal text alignment.
 
 ---@alias UIButtonNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2395,6 +2840,25 @@ function UIButtonNode:get_property(path) end
 ---@overload fun(self: UIButtonNode, path: "align", value: "Left"|"Center"|"Right")
 function UIButtonNode:set_property(path, value, y) end
 
+---@class UISliderNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field value number Current value (between min and max).
+---@field minValue number Lowest value.
+---@field maxValue number Highest value.
+---@field defaultValue number Value restored by reset (double-click).
+---@field fineScale number Drag speed with Shift held (fine adjustment).
+---@field isInteger boolean Snap to whole numbers.
+---@field showResetButton boolean Show a button that restores the default value.
+---@field labelWidth number Width reserved for the label (px); 0 = none.
+
 ---@alias UISliderNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2459,6 +2923,21 @@ function UISliderNode:get_property(path) end
 ---@overload fun(self: UISliderNode, path: "labelWidth", value: number)
 function UISliderNode:set_property(path, value, y) end
 
+---@class UICheckboxNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field checked boolean Ticked now.
+---@field defaultChecked boolean State restored by reset.
+---@field accentColor number[] Tick and fill colour.
+---@field boxSize number Box size (px).
+
 ---@alias UICheckboxNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2510,6 +2989,23 @@ function UICheckboxNode:get_property(path) end
 ---@overload fun(self: UICheckboxNode, path: "accentColor", value: number[])
 ---@overload fun(self: UICheckboxNode, path: "boxSize", value: number)
 function UICheckboxNode:set_property(path, value, y) end
+
+---@class UIProgressBarNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field value number Progress (between min and max).
+---@field minValue number Lowest value.
+---@field maxValue number Highest value.
+---@field fillColor number[] Colour of the filled part.
+---@field direction "Horizontal"|"Vertical" Direction the bar fills.
+---@field showText boolean Show the percentage.
 
 ---@alias UIProgressBarNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2569,6 +3065,19 @@ function UIProgressBarNode:get_property(path) end
 ---@overload fun(self: UIProgressBarNode, path: "showText", value: boolean)
 function UIProgressBarNode:set_property(path, value, y) end
 
+---@class UITextInputNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field labelWidth number Width reserved for the label (px); 0 = none.
+---@field maxLength integer Most characters accepted.
+
 ---@alias UITextInputNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2614,6 +3123,21 @@ function UITextInputNode:get_property(path) end
 ---@overload fun(self: UITextInputNode, path: "labelWidth", value: number)
 ---@overload fun(self: UITextInputNode, path: "maxLength", value: integer)
 function UITextInputNode:set_property(path, value, y) end
+
+---@class UIDropdownNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field selectedIndex integer Index of the selected item (-1 = none).
+---@field defaultIndex integer Index restored by reset.
+---@field labelWidth number Width reserved for the label (px); 0 = none.
+---@field isOpen boolean List open now.
 
 ---@alias UIDropdownNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2667,6 +3191,21 @@ function UIDropdownNode:get_property(path) end
 ---@overload fun(self: UIDropdownNode, path: "isOpen", value: boolean)
 function UIDropdownNode:set_property(path, value, y) end
 
+---@class UIRadioGroupNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field labelWidth number Width reserved for the label (px); 0 = none.
+---@field selectedIndex integer Index of the selected item (-1 = none).
+---@field defaultIndex integer Index restored by reset.
+---@field horizontal boolean Options in a row (else a column).
+
 ---@alias UIRadioGroupNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2719,6 +3258,18 @@ function UIRadioGroupNode:get_property(path) end
 ---@overload fun(self: UIRadioGroupNode, path: "horizontal", value: boolean)
 function UIRadioGroupNode:set_property(path, value, y) end
 
+---@class UIToggleSwitchNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field active boolean Switched on.
+
 ---@alias UIToggleSwitchNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2761,6 +3312,21 @@ function UIToggleSwitchNode:get_property(path) end
 ---@overload fun(self: UIToggleSwitchNode, path: "label", value: string)
 ---@overload fun(self: UIToggleSwitchNode, path: "active", value: boolean)
 function UIToggleSwitchNode:set_property(path, value, y) end
+
+---@class UIKnobNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field value number Current value (between min and max).
+---@field minValue number Lowest value.
+---@field maxValue number Highest value.
+---@field defaultValue number Value restored by reset (double-click).
 
 ---@alias UIKnobNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2813,6 +3379,23 @@ function UIKnobNode:get_property(path) end
 ---@overload fun(self: UIKnobNode, path: "maxValue", value: number)
 ---@overload fun(self: UIKnobNode, path: "defaultValue", value: number)
 function UIKnobNode:set_property(path, value, y) end
+
+---@class UINotchedSliderNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field value number Current value.
+---@field minValue number Lowest value.
+---@field maxValue number Highest value.
+---@field numNotches integer Number of notch marks.
+---@field snapToNotches boolean Snap the value to the notches.
+---@field orientation "Horizontal"|"Vertical" Horizontal or vertical.
 
 ---@alias UINotchedSliderNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2872,6 +3455,21 @@ function UINotchedSliderNode:get_property(path) end
 ---@overload fun(self: UINotchedSliderNode, path: "orientation", value: "Horizontal"|"Vertical")
 function UINotchedSliderNode:set_property(path, value, y) end
 
+---@class UIVolumeFaderNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field valueDb number Level (dB).
+---@field minDb number Bottom of the fader (dB).
+---@field maxDb number Top of the fader (dB).
+---@field defaultDb number Level restored by reset (dB).
+
 ---@alias UIVolumeFaderNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2923,6 +3521,22 @@ function UIVolumeFaderNode:get_property(path) end
 ---@overload fun(self: UIVolumeFaderNode, path: "maxDb", value: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "defaultDb", value: number)
 function UIVolumeFaderNode:set_property(path, value, y) end
+
+---@class UIVolumeMeterNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Caption shown next to the control.
+---@field levelL number Left channel level (dB).
+---@field levelR number Right channel level (dB).
+---@field minDb number Bottom of the meter (dB).
+---@field maxDb number Top of the meter (dB).
+---@field orientation "Vertical"|"Horizontal" Horizontal or vertical.
 
 ---@alias UIVolumeMeterNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2979,6 +3593,18 @@ function UIVolumeMeterNode:get_property(path) end
 ---@overload fun(self: UIVolumeMeterNode, path: "orientation", value: "Vertical"|"Horizontal")
 function UIVolumeMeterNode:set_property(path, value, y) end
 
+---@class UISeparatorNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field label string Text in the middle of the line ("" = a plain line).
+---@field lineColor number[] Colour of the line.
+
 ---@alias UISeparatorNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -3021,6 +3647,28 @@ function UISeparatorNode:get_property(path) end
 ---@overload fun(self: UISeparatorNode, path: "label", value: string)
 ---@overload fun(self: UISeparatorNode, path: "lineColor", value: number[])
 function UISeparatorNode:set_property(path, value, y) end
+
+---@class UIXYPlotNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field xMin number Left end of the X axis.
+---@field xMax number Right end of the X axis.
+---@field yMin number Bottom of the Y axis.
+---@field yMax number Top of the Y axis.
+---@field autoScaleX boolean Fit the X axis to the data.
+---@field autoScaleY boolean Fit the Y axis to the data.
+---@field showGrid boolean Draw grid lines.
+---@field showPoints boolean Mark each data point.
+---@field showCrosshair boolean Crosshair with the value under the mouse.
+---@field lineColor number[] Colour of the line.
+---@field secondaryLineColor number[] Colour of the second series.
+---@field gridColor number[] Grid line colour.
 
 ---@alias UIXYPlotNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -3095,6 +3743,18 @@ function UIXYPlotNode:get_property(path) end
 ---@overload fun(self: UIXYPlotNode, path: "gridColor", value: number[])
 function UIXYPlotNode:set_property(path, value, y) end
 
+---@class UIListViewNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field selectedIndex integer Index of the selected item (-1 = none).
+---@field itemHeight number Height of each row (px).
+
 ---@alias UIListViewNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -3138,6 +3798,18 @@ function UIListViewNode:get_property(path) end
 ---@overload fun(self: UIListViewNode, path: "itemHeight", value: number)
 function UIListViewNode:set_property(path, value, y) end
 
+---@class UITreeViewNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field selectedId integer Id of the selected item (-1 = none).
+---@field itemHeight number Height of each row (px).
+
 ---@alias UITreeViewNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -3180,6 +3852,19 @@ function UITreeViewNode:get_property(path) end
 ---@overload fun(self: UITreeViewNode, path: "selectedId", value: integer)
 ---@overload fun(self: UITreeViewNode, path: "itemHeight", value: number)
 function UITreeViewNode:set_property(path, value, y) end
+
+---@class UIUnorderedListNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field selectedIndex integer Index of the selected item (-1 = none).
+---@field defaultBullet "Disc"|"Circle"|"Square"|"Dash"|"Arrow" Bullet style for items without their own.
+---@field itemHeight number Height of each row (px).
 
 ---@alias UIUnorderedListNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -3226,6 +3911,20 @@ function UIUnorderedListNode:get_property(path) end
 ---@overload fun(self: UIUnorderedListNode, path: "defaultBullet", value: "Disc"|"Circle"|"Square"|"Dash"|"Arrow")
 ---@overload fun(self: UIUnorderedListNode, path: "itemHeight", value: number)
 function UIUnorderedListNode:set_property(path, value, y) end
+
+---@class UIOrderedListNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field selectedIndex integer Index of the selected item (-1 = none).
+---@field numbering "Decimal"|"AlphaLower"|"AlphaUpper"|"RomanLower"|"RomanUpper" Numbering style (1, a, i...).
+---@field startNumber integer Number of the first item.
+---@field itemHeight number Height of each row (px).
 
 ---@alias UIOrderedListNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -3275,6 +3974,21 @@ function UIOrderedListNode:get_property(path) end
 ---@overload fun(self: UIOrderedListNode, path: "startNumber", value: integer)
 ---@overload fun(self: UIOrderedListNode, path: "itemHeight", value: number)
 function UIOrderedListNode:set_property(path, value, y) end
+
+---@class UITableNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field selectedRow integer Index of the selected row.
+---@field sortColumn integer Column the rows are sorted by.
+---@field sortAscending boolean Sort ascending (else descending).
+---@field headerHeight number Height of the header (px).
+---@field rowHeight number Height of each row (px).
 
 ---@alias UITableNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -3328,6 +4042,20 @@ function UITableNode:get_property(path) end
 ---@overload fun(self: UITableNode, path: "rowHeight", value: number)
 function UITableNode:set_property(path, value, y) end
 
+---@class UIIconNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field icon "None"|"Digit0"|"Digit1"|"Digit2"|"Digit3"|"Digit4"|"Digit5"|"Digit6"|"Digit7"|"Digit8"|"Digit9"|"A"|"AddressBook"|"AddressCard"|"AlignCenter"|"AlignJustify"|"AlignLeft"|"AlignRight"|"Anchor"|"AnchorCircleCheck"|"AnchorCircleExclamation"|"AnchorCircleXmark"|"AnchorLock"|"AngleDown"|"AngleLeft"|"AngleRight"|"AngleUp"|"AnglesDown"|"AnglesLeft"|"AnglesRight"|"AnglesUp"|"Ankh"|"AppleWhole"|"Archway"|"ArrowDown"|"ArrowDown19"|"ArrowDown91"|"ArrowDownAZ"|"ArrowDownLong"|"ArrowDownShortWide"|"ArrowDownUpAcrossLine"|"ArrowDownUpLock"|"ArrowDownWideShort"|"ArrowDownZA"|"ArrowLeft"|"ArrowLeftLong"|"ArrowPointer"|"ArrowRight"|"ArrowRightArrowLeft"|"ArrowRightFromBracket"|"ArrowRightLong"|"ArrowRightToBracket"|"ArrowRightToCity"|"ArrowRotateLeft"|"ArrowRotateRight"|"ArrowTrendDown"|"ArrowTrendUp"|"ArrowTurnDown"|"ArrowTurnUp"|"ArrowUp"|"ArrowUp19"|"ArrowUp91"|"ArrowUpAZ"|"ArrowUpFromBracket"|"ArrowUpFromGroundWater"|"ArrowUpFromWaterPump"|"ArrowUpLong"|"ArrowUpRightDots"|"ArrowUpRightFromSquare"|"ArrowUpShortWide"|"ArrowUpWideShort"|"ArrowUpZA"|"ArrowsDownToLine"|"ArrowsDownToPeople"|"ArrowsLeftRight"|"ArrowsLeftRightToLine"|"ArrowsRotate"|"ArrowsSpin"|"ArrowsSplitUpAndLeft"|"ArrowsToCircle"|"ArrowsToDot"|"ArrowsToEye"|"ArrowsTurnRight"|"ArrowsTurnToDots"|"ArrowsUpDown"|"ArrowsUpDownLeftRight"|"ArrowsUpToLine"|"Asterisk"|"At"|"Atom"|"AudioDescription"|"AustralSign"|"Award"|"B"|"Baby"|"BabyCarriage"|"Backward"|"BackwardFast"|"BackwardStep"|"Bacon"|"Bacteria"|"Bacterium"|"BagShopping"|"Bahai"|"BahtSign"|"Ban"|"BanSmoking"|"Bandage"|"BangladeshiTakaSign"|"Barcode"|"Bars"|"BarsProgress"|"BarsStaggered"|"Baseball"|"BaseballBatBall"|"BasketShopping"|"Basketball"|"Bath"|"BatteryEmpty"|"BatteryFull"|"BatteryHalf"|"BatteryQuarter"|"BatteryThreeQuarters"|"Bed"|"BedPulse"|"BeerMugEmpty"|"Bell"|"BellConcierge"|"BellSlash"|"BezierCurve"|"Bicycle"|"Binoculars"|"Biohazard"|"BitcoinSign"|"Blender"|"BlenderPhone"|"Blog"|"Bold"|"Bolt"|"BoltLightning"|"Bomb"|"Bone"|"Bong"|"Book"|"BookAtlas"|"BookBible"|"BookBookmark"|"BookJournalWhills"|"BookMedical"|"BookOpen"|"BookOpenReader"|"BookQuran"|"BookSkull"|"BookTanakh"|"Bookmark"|"BorderAll"|"BorderNone"|"BorderTopLeft"|"BoreHole"|"BottleDroplet"|"BottleWater"|"BowlFood"|"BowlRice"|"BowlingBall"|"Box"|"BoxArchive"|"BoxOpen"|"BoxTissue"|"BoxesPacking"|"BoxesStacked"|"Braille"|"Brain"|"BrazilianRealSign"|"BreadSlice"|"Bridge"|"BridgeCircleCheck"|"BridgeCircleExclamation"|"BridgeCircleXmark"|"BridgeLock"|"BridgeWater"|"Briefcase"|"BriefcaseMedical"|"Broom"|"BroomBall"|"Brush"|"Bucket"|"Bug"|"BugSlash"|"Bugs"|"Building"|"BuildingCircleArrowRight"|"BuildingCircleCheck"|"BuildingCircleExclamation"|"BuildingCircleXmark"|"BuildingColumns"|"BuildingFlag"|"BuildingLock"|"BuildingNgo"|"BuildingShield"|"BuildingUn"|"BuildingUser"|"BuildingWheat"|"Bullhorn"|"Bullseye"|"Burger"|"Burst"|"Bus"|"BusSimple"|"BusinessTime"|"C"|"CableCar"|"CakeCandles"|"Calculator"|"Calendar"|"CalendarCheck"|"CalendarDay"|"CalendarDays"|"CalendarMinus"|"CalendarPlus"|"CalendarWeek"|"CalendarXmark"|"Camera"|"CameraRetro"|"CameraRotate"|"Campground"|"CandyCane"|"Cannabis"|"Capsules"|"Car"|"CarBattery"|"CarBurst"|"CarOn"|"CarRear"|"CarSide"|"CarTunnel"|"Caravan"|"CaretDown"|"CaretLeft"|"CaretRight"|"CaretUp"|"Carrot"|"CartArrowDown"|"CartFlatbed"|"CartFlatbedSuitcase"|"CartPlus"|"CartShopping"|"CashRegister"|"Cat"|"CediSign"|"CentSign"|"Certificate"|"Chair"|"Chalkboard"|"ChalkboardUser"|"ChampagneGlasses"|"ChargingStation"|"ChartArea"|"ChartBar"|"ChartColumn"|"ChartDiagram"|"ChartGantt"|"ChartLine"|"ChartPie"|"ChartSimple"|"Check"|"CheckDouble"|"CheckToSlot"|"Cheese"|"Chess"|"ChessBishop"|"ChessBoard"|"ChessKing"|"ChessKnight"|"ChessPawn"|"ChessQueen"|"ChessRook"|"ChevronDown"|"ChevronLeft"|"ChevronRight"|"ChevronUp"|"Child"|"ChildCombatant"|"ChildDress"|"ChildReaching"|"Children"|"Church"|"Circle"|"CircleArrowDown"|"CircleArrowLeft"|"CircleArrowRight"|"CircleArrowUp"|"CircleCheck"|"CircleChevronDown"|"CircleChevronLeft"|"CircleChevronRight"|"CircleChevronUp"|"CircleDollarToSlot"|"CircleDot"|"CircleDown"|"CircleExclamation"|"CircleH"|"CircleHalfStroke"|"CircleInfo"|"CircleLeft"|"CircleMinus"|"CircleNodes"|"CircleNotch"|"CirclePause"|"CirclePlay"|"CirclePlus"|"CircleQuestion"|"CircleRadiation"|"CircleRight"|"CircleStop"|"CircleUp"|"CircleUser"|"CircleXmark"|"City"|"Clapperboard"|"Clipboard"|"ClipboardCheck"|"ClipboardList"|"ClipboardQuestion"|"ClipboardUser"|"Clock"|"ClockRotateLeft"|"Clone"|"ClosedCaptioning"|"Cloud"|"CloudArrowDown"|"CloudArrowUp"|"CloudBolt"|"CloudMeatball"|"CloudMoon"|"CloudMoonRain"|"CloudRain"|"CloudShowersHeavy"|"CloudShowersWater"|"CloudSun"|"CloudSunRain"|"Clover"|"Code"|"CodeBranch"|"CodeCommit"|"CodeCompare"|"CodeFork"|"CodeMerge"|"CodePullRequest"|"Coins"|"ColonSign"|"Comment"|"CommentDollar"|"CommentDots"|"CommentMedical"|"CommentNodes"|"CommentSlash"|"CommentSms"|"Comments"|"CommentsDollar"|"CompactDisc"|"Compass"|"CompassDrafting"|"Compress"|"Computer"|"ComputerMouse"|"Cookie"|"CookieBite"|"Copy"|"Copyright"|"Couch"|"Cow"|"CreditCard"|"Crop"|"CropSimple"|"Cross"|"Crosshairs"|"Crow"|"Crown"|"Crutch"|"CruzeiroSign"|"Cube"|"Cubes"|"CubesStacked"|"D"|"Database"|"DeleteLeft"|"Democrat"|"Desktop"|"Dharmachakra"|"DiagramNext"|"DiagramPredecessor"|"DiagramProject"|"DiagramSuccessor"|"Diamond"|"DiamondTurnRight"|"Dice"|"DiceD20"|"DiceD6"|"DiceFive"|"DiceFour"|"DiceOne"|"DiceSix"|"DiceThree"|"DiceTwo"|"Disease"|"Display"|"Divide"|"Dna"|"Dog"|"DollarSign"|"Dolly"|"DongSign"|"DoorClosed"|"DoorOpen"|"Dove"|"DownLeftAndUpRightToCenter"|"DownLong"|"Download"|"Dragon"|"DrawPolygon"|"Droplet"|"DropletSlash"|"Drum"|"DrumSteelpan"|"DrumstickBite"|"Dumbbell"|"Dumpster"|"DumpsterFire"|"Dungeon"|"E"|"EarDeaf"|"EarListen"|"EarthAfrica"|"EarthAmericas"|"EarthAsia"|"EarthEurope"|"EarthOceania"|"Egg"|"Eject"|"Elevator"|"Ellipsis"|"EllipsisVertical"|"Envelope"|"EnvelopeCircleCheck"|"EnvelopeOpen"|"EnvelopeOpenText"|"EnvelopesBulk"|"Equals"|"Eraser"|"Ethernet"|"EuroSign"|"Exclamation"|"Expand"|"Explosion"|"Eye"|"EyeDropper"|"EyeLowVision"|"EyeSlash"|"F"|"FaceAngry"|"FaceDizzy"|"FaceFlushed"|"FaceFrown"|"FaceFrownOpen"|"FaceGrimace"|"FaceGrin"|"FaceGrinBeam"|"FaceGrinBeamSweat"|"FaceGrinHearts"|"FaceGrinSquint"|"FaceGrinSquintTears"|"FaceGrinStars"|"FaceGrinTears"|"FaceGrinTongue"|"FaceGrinTongueSquint"|"FaceGrinTongueWink"|"FaceGrinWide"|"FaceGrinWink"|"FaceKiss"|"FaceKissBeam"|"FaceKissWinkHeart"|"FaceLaugh"|"FaceLaughBeam"|"FaceLaughSquint"|"FaceLaughWink"|"FaceMeh"|"FaceMehBlank"|"FaceRollingEyes"|"FaceSadCry"|"FaceSadTear"|"FaceSmile"|"FaceSmileBeam"|"FaceSmileWink"|"FaceSurprise"|"FaceTired"|"Fan"|"Faucet"|"FaucetDrip"|"Fax"|"Feather"|"FeatherPointed"|"Ferry"|"File"|"FileArrowDown"|"FileArrowUp"|"FileAudio"|"FileCircleCheck"|"FileCircleExclamation"|"FileCircleMinus"|"FileCirclePlus"|"FileCircleQuestion"|"FileCircleXmark"|"FileCode"|"FileContract"|"FileCsv"|"FileExcel"|"FileExport"|"FileFragment"|"FileHalfDashed"|"FileImage"|"FileImport"|"FileInvoice"|"FileInvoiceDollar"|"FileLines"|"FileMedical"|"FilePdf"|"FilePen"|"FilePowerpoint"|"FilePrescription"|"FileShield"|"FileSignature"|"FileVideo"|"FileWaveform"|"FileWord"|"FileZipper"|"Fill"|"FillDrip"|"Film"|"Filter"|"FilterCircleDollar"|"FilterCircleXmark"|"Fingerprint"|"Fire"|"FireBurner"|"FireExtinguisher"|"FireFlameCurved"|"FireFlameSimple"|"Fish"|"FishFins"|"Flag"|"FlagCheckered"|"FlagUsa"|"Flask"|"FlaskVial"|"FloppyDisk"|"FlorinSign"|"Folder"|"FolderClosed"|"FolderMinus"|"FolderOpen"|"FolderPlus"|"FolderTree"|"Font"|"FontAwesome"|"Football"|"Forward"|"ForwardFast"|"ForwardStep"|"FrancSign"|"Frog"|"Futbol"|"G"|"Gamepad"|"GasPump"|"Gauge"|"GaugeHigh"|"GaugeSimple"|"GaugeSimpleHigh"|"Gavel"|"Gear"|"Gears"|"Gem"|"Genderless"|"Ghost"|"Gift"|"Gifts"|"GlassWater"|"GlassWaterDroplet"|"Glasses"|"Globe"|"GolfBallTee"|"Gopuram"|"GraduationCap"|"GreaterThan"|"GreaterThanEqual"|"Grip"|"GripLines"|"GripLinesVertical"|"GripVertical"|"GroupArrowsRotate"|"GuaraniSign"|"Guitar"|"Gun"|"H"|"Hammer"|"Hamsa"|"Hand"|"HandBackFist"|"HandDots"|"HandFist"|"HandHolding"|"HandHoldingDollar"|"HandHoldingDroplet"|"HandHoldingHand"|"HandHoldingHeart"|"HandHoldingMedical"|"HandLizard"|"HandMiddleFinger"|"HandPeace"|"HandPointDown"|"HandPointLeft"|"HandPointRight"|"HandPointUp"|"HandPointer"|"HandScissors"|"HandSparkles"|"HandSpock"|"Handcuffs"|"Hands"|"HandsAslInterpreting"|"HandsBound"|"HandsBubbles"|"HandsClapping"|"HandsHolding"|"HandsHoldingChild"|"HandsHoldingCircle"|"HandsPraying"|"Handshake"|"HandshakeAngle"|"HandshakeSimple"|"HandshakeSimpleSlash"|"HandshakeSlash"|"Hanukiah"|"HardDrive"|"Hashtag"|"HatCowboy"|"HatCowboySide"|"HatWizard"|"HeadSideCough"|"HeadSideCoughSlash"|"HeadSideMask"|"HeadSideVirus"|"Heading"|"Headphones"|"HeadphonesSimple"|"Headset"|"Heart"|"HeartCircleBolt"|"HeartCircleCheck"|"HeartCircleExclamation"|"HeartCircleMinus"|"HeartCirclePlus"|"HeartCircleXmark"|"HeartCrack"|"HeartPulse"|"Helicopter"|"HelicopterSymbol"|"HelmetSafety"|"HelmetUn"|"HexagonNodes"|"HexagonNodesBolt"|"Highlighter"|"HillAvalanche"|"HillRockslide"|"Hippo"|"HockeyPuck"|"HollyBerry"|"Horse"|"HorseHead"|"Hospital"|"HospitalUser"|"HotTubPerson"|"Hotdog"|"Hotel"|"Hourglass"|"HourglassEnd"|"HourglassHalf"|"HourglassStart"|"House"|"HouseChimney"|"HouseChimneyCrack"|"HouseChimneyMedical"|"HouseChimneyUser"|"HouseChimneyWindow"|"HouseCircleCheck"|"HouseCircleExclamation"|"HouseCircleXmark"|"HouseCrack"|"HouseFire"|"HouseFlag"|"HouseFloodWater"|"HouseFloodWaterCircleArrowRight"|"HouseLaptop"|"HouseLock"|"HouseMedical"|"HouseMedicalCircleCheck"|"HouseMedicalCircleExclamation"|"HouseMedicalCircleXmark"|"HouseMedicalFlag"|"HouseSignal"|"HouseTsunami"|"HouseUser"|"HryvniaSign"|"Hurricane"|"I"|"ICursor"|"IceCream"|"Icicles"|"Icons"|"IdBadge"|"IdCard"|"IdCardClip"|"Igloo"|"Image"|"ImagePortrait"|"Images"|"Inbox"|"Indent"|"IndianRupeeSign"|"Industry"|"Infinity"|"Info"|"Italic"|"J"|"Jar"|"JarWheat"|"Jedi"|"JetFighter"|"JetFighterUp"|"Joint"|"JugDetergent"|"K"|"Kaaba"|"Key"|"Keyboard"|"Khanda"|"KipSign"|"KitMedical"|"KitchenSet"|"KiwiBird"|"L"|"LandMineOn"|"Landmark"|"LandmarkDome"|"LandmarkFlag"|"Language"|"Laptop"|"LaptopCode"|"LaptopFile"|"LaptopMedical"|"LariSign"|"LayerGroup"|"Leaf"|"LeftLong"|"LeftRight"|"Lemon"|"LessThan"|"LessThanEqual"|"LifeRing"|"Lightbulb"|"LinesLeaning"|"Link"|"LinkSlash"|"LiraSign"|"List"|"ListCheck"|"ListOl"|"ListUl"|"LitecoinSign"|"LocationArrow"|"LocationCrosshairs"|"LocationDot"|"LocationPin"|"LocationPinLock"|"Lock"|"LockOpen"|"Locust"|"Lungs"|"LungsVirus"|"M"|"Magnet"|"MagnifyingGlass"|"MagnifyingGlassArrowRight"|"MagnifyingGlassChart"|"MagnifyingGlassDollar"|"MagnifyingGlassLocation"|"MagnifyingGlassMinus"|"MagnifyingGlassPlus"|"ManatSign"|"Map"|"MapLocation"|"MapLocationDot"|"MapPin"|"Marker"|"Mars"|"MarsAndVenus"|"MarsAndVenusBurst"|"MarsDouble"|"MarsStroke"|"MarsStrokeRight"|"MarsStrokeUp"|"MartiniGlass"|"MartiniGlassCitrus"|"MartiniGlassEmpty"|"Mask"|"MaskFace"|"MaskVentilator"|"MasksTheater"|"MattressPillow"|"Maximize"|"Medal"|"Memory"|"Menorah"|"Mercury"|"Message"|"Meteor"|"Microchip"|"Microphone"|"MicrophoneLines"|"MicrophoneLinesSlash"|"MicrophoneSlash"|"Microscope"|"MillSign"|"Minimize"|"Minus"|"Mitten"|"Mobile"|"MobileButton"|"MobileRetro"|"MobileScreen"|"MobileScreenButton"|"MoneyBill"|"MoneyBill1"|"MoneyBill1Wave"|"MoneyBillTransfer"|"MoneyBillTrendUp"|"MoneyBillWave"|"MoneyBillWheat"|"MoneyBills"|"MoneyCheck"|"MoneyCheckDollar"|"Monument"|"Moon"|"MortarPestle"|"Mosque"|"Mosquito"|"MosquitoNet"|"Motorcycle"|"Mound"|"Mountain"|"MountainCity"|"MountainSun"|"MugHot"|"MugSaucer"|"Music"|"N"|"NairaSign"|"NetworkWired"|"Neuter"|"Newspaper"|"NotEqual"|"Notdef"|"NoteSticky"|"NotesMedical"|"O"|"ObjectGroup"|"ObjectUngroup"|"OilCan"|"OilWell"|"Om"|"Otter"|"Outdent"|"P"|"Pager"|"PaintRoller"|"Paintbrush"|"Palette"|"Pallet"|"Panorama"|"PaperPlane"|"Paperclip"|"ParachuteBox"|"Paragraph"|"Passport"|"Paste"|"Pause"|"Paw"|"Peace"|"Pen"|"PenClip"|"PenFancy"|"PenNib"|"PenRuler"|"PenToSquare"|"Pencil"|"PeopleArrows"|"PeopleCarryBox"|"PeopleGroup"|"PeopleLine"|"PeoplePulling"|"PeopleRobbery"|"PeopleRoof"|"PepperHot"|"Percent"|"Person"|"PersonArrowDownToLine"|"PersonArrowUpFromLine"|"PersonBiking"|"PersonBooth"|"PersonBreastfeeding"|"PersonBurst"|"PersonCane"|"PersonChalkboard"|"PersonCircleCheck"|"PersonCircleExclamation"|"PersonCircleMinus"|"PersonCirclePlus"|"PersonCircleQuestion"|"PersonCircleXmark"|"PersonDigging"|"PersonDotsFromLine"|"PersonDress"|"PersonDressBurst"|"PersonDrowning"|"PersonFalling"|"PersonFallingBurst"|"PersonHalfDress"|"PersonHarassing"|"PersonHiking"|"PersonMilitaryPointing"|"PersonMilitaryRifle"|"PersonMilitaryToPerson"|"PersonPraying"|"PersonPregnant"|"PersonRays"|"PersonRifle"|"PersonRunning"|"PersonShelter"|"PersonSkating"|"PersonSkiing"|"PersonSkiingNordic"|"PersonSnowboarding"|"PersonSwimming"|"PersonThroughWindow"|"PersonWalking"|"PersonWalkingArrowLoopLeft"|"PersonWalkingArrowRight"|"PersonWalkingDashedLineArrowRight"|"PersonWalkingLuggage"|"PersonWalkingWithCane"|"PesetaSign"|"PesoSign"|"Phone"|"PhoneFlip"|"PhoneSlash"|"PhoneVolume"|"PhotoFilm"|"PiggyBank"|"Pills"|"PizzaSlice"|"PlaceOfWorship"|"Plane"|"PlaneArrival"|"PlaneCircleCheck"|"PlaneCircleExclamation"|"PlaneCircleXmark"|"PlaneDeparture"|"PlaneLock"|"PlaneSlash"|"PlaneUp"|"PlantWilt"|"PlateWheat"|"Play"|"Plug"|"PlugCircleBolt"|"PlugCircleCheck"|"PlugCircleExclamation"|"PlugCircleMinus"|"PlugCirclePlus"|"PlugCircleXmark"|"Plus"|"PlusMinus"|"Podcast"|"Poo"|"PooStorm"|"Poop"|"PowerOff"|"Prescription"|"PrescriptionBottle"|"PrescriptionBottleMedical"|"Print"|"PumpMedical"|"PumpSoap"|"PuzzlePiece"|"Q"|"Qrcode"|"Question"|"QuoteLeft"|"QuoteRight"|"R"|"Radiation"|"Radio"|"Rainbow"|"RankingStar"|"Receipt"|"RecordVinyl"|"RectangleAd"|"RectangleList"|"RectangleXmark"|"Recycle"|"Registered"|"Repeat"|"Reply"|"ReplyAll"|"Republican"|"Restroom"|"Retweet"|"Ribbon"|"RightFromBracket"|"RightLeft"|"RightLong"|"RightToBracket"|"Ring"|"Road"|"RoadBarrier"|"RoadBridge"|"RoadCircleCheck"|"RoadCircleExclamation"|"RoadCircleXmark"|"RoadLock"|"RoadSpikes"|"Robot"|"Rocket"|"Rotate"|"RotateLeft"|"RotateRight"|"Route"|"Rss"|"RubleSign"|"Rug"|"Ruler"|"RulerCombined"|"RulerHorizontal"|"RulerVertical"|"RupeeSign"|"RupiahSign"|"S"|"SackDollar"|"SackXmark"|"Sailboat"|"Satellite"|"SatelliteDish"|"ScaleBalanced"|"ScaleUnbalanced"|"ScaleUnbalancedFlip"|"School"|"SchoolCircleCheck"|"SchoolCircleExclamation"|"SchoolCircleXmark"|"SchoolFlag"|"SchoolLock"|"Scissors"|"Screwdriver"|"ScrewdriverWrench"|"Scroll"|"ScrollTorah"|"SdCard"|"Section"|"Seedling"|"Server"|"Shapes"|"Share"|"ShareFromSquare"|"ShareNodes"|"SheetPlastic"|"ShekelSign"|"Shield"|"ShieldCat"|"ShieldDog"|"ShieldHalved"|"ShieldHeart"|"ShieldVirus"|"Ship"|"Shirt"|"ShoePrints"|"Shop"|"ShopLock"|"ShopSlash"|"Shower"|"Shrimp"|"Shuffle"|"ShuttleSpace"|"SignHanging"|"Signal"|"Signature"|"SignsPost"|"SimCard"|"Sink"|"Sitemap"|"Skull"|"SkullCrossbones"|"Slash"|"Sleigh"|"Sliders"|"Smog"|"Smoking"|"Snowflake"|"Snowman"|"Snowplow"|"Soap"|"Socks"|"SolarPanel"|"Sort"|"SortDown"|"SortUp"|"Spa"|"SpaghettiMonsterFlying"|"SpellCheck"|"Spider"|"Spinner"|"Splotch"|"Spoon"|"SprayCan"|"SprayCanSparkles"|"Square"|"SquareArrowUpRight"|"SquareBinary"|"SquareCaretDown"|"SquareCaretLeft"|"SquareCaretRight"|"SquareCaretUp"|"SquareCheck"|"SquareEnvelope"|"SquareFull"|"SquareH"|"SquareMinus"|"SquareNfi"|"SquareParking"|"SquarePen"|"SquarePersonConfined"|"SquarePhone"|"SquarePhoneFlip"|"SquarePlus"|"SquarePollHorizontal"|"SquarePollVertical"|"SquareRootVariable"|"SquareRss"|"SquareShareNodes"|"SquareUpRight"|"SquareVirus"|"SquareXmark"|"StaffSnake"|"Stairs"|"Stamp"|"Stapler"|"Star"|"StarAndCrescent"|"StarHalf"|"StarHalfStroke"|"StarOfDavid"|"StarOfLife"|"SterlingSign"|"Stethoscope"|"Stop"|"Stopwatch"|"Stopwatch20"|"Store"|"StoreSlash"|"StreetView"|"Strikethrough"|"Stroopwafel"|"Subscript"|"Suitcase"|"SuitcaseMedical"|"SuitcaseRolling"|"Sun"|"SunPlantWilt"|"Superscript"|"Swatchbook"|"Synagogue"|"Syringe"|"T"|"Table"|"TableCells"|"TableCellsColumnLock"|"TableCellsLarge"|"TableCellsRowLock"|"TableCellsRowUnlock"|"TableColumns"|"TableList"|"TableTennisPaddleBall"|"Tablet"|"TabletButton"|"TabletScreenButton"|"Tablets"|"TachographDigital"|"Tag"|"Tags"|"Tape"|"Tarp"|"TarpDroplet"|"Taxi"|"Teeth"|"TeethOpen"|"TemperatureArrowDown"|"TemperatureArrowUp"|"TemperatureEmpty"|"TemperatureFull"|"TemperatureHalf"|"TemperatureHigh"|"TemperatureLow"|"TemperatureQuarter"|"TemperatureThreeQuarters"|"TengeSign"|"Tent"|"TentArrowDownToLine"|"TentArrowLeftRight"|"TentArrowTurnLeft"|"TentArrowsDown"|"Tents"|"Terminal"|"TextHeight"|"TextSlash"|"TextWidth"|"Thermometer"|"ThumbsDown"|"ThumbsUp"|"Thumbtack"|"ThumbtackSlash"|"Ticket"|"TicketSimple"|"Timeline"|"ToggleOff"|"ToggleOn"|"Toilet"|"ToiletPaper"|"ToiletPaperSlash"|"ToiletPortable"|"ToiletsPortable"|"Toolbox"|"Tooth"|"ToriiGate"|"Tornado"|"TowerBroadcast"|"TowerCell"|"TowerObservation"|"Tractor"|"Trademark"|"TrafficLight"|"Trailer"|"Train"|"TrainSubway"|"TrainTram"|"Transgender"|"Trash"|"TrashArrowUp"|"TrashCan"|"TrashCanArrowUp"|"Tree"|"TreeCity"|"TriangleExclamation"|"Trophy"|"Trowel"|"TrowelBricks"|"Truck"|"TruckArrowRight"|"TruckDroplet"|"TruckFast"|"TruckField"|"TruckFieldUn"|"TruckFront"|"TruckMedical"|"TruckMonster"|"TruckMoving"|"TruckPickup"|"TruckPlane"|"TruckRampBox"|"Tty"|"TurkishLiraSign"|"TurnDown"|"TurnUp"|"Tv"|"U"|"Umbrella"|"UmbrellaBeach"|"Underline"|"UniversalAccess"|"Unlock"|"UnlockKeyhole"|"UpDown"|"UpDownLeftRight"|"UpLong"|"UpRightAndDownLeftFromCenter"|"UpRightFromSquare"|"Upload"|"User"|"UserAstronaut"|"UserCheck"|"UserClock"|"UserDoctor"|"UserGear"|"UserGraduate"|"UserGroup"|"UserInjured"|"UserLarge"|"UserLargeSlash"|"UserLock"|"UserMinus"|"UserNinja"|"UserNurse"|"UserPen"|"UserPlus"|"UserSecret"|"UserShield"|"UserSlash"|"UserTag"|"UserTie"|"UserXmark"|"Users"|"UsersBetweenLines"|"UsersGear"|"UsersLine"|"UsersRays"|"UsersRectangle"|"UsersSlash"|"UsersViewfinder"|"Utensils"|"V"|"VanShuttle"|"Vault"|"VectorSquare"|"Venus"|"VenusDouble"|"VenusMars"|"Vest"|"VestPatches"|"Vial"|"VialCircleCheck"|"VialVirus"|"Vials"|"Video"|"VideoSlash"|"Vihara"|"Virus"|"VirusCovid"|"VirusCovidSlash"|"VirusSlash"|"Viruses"|"Voicemail"|"Volcano"|"Volleyball"|"VolumeHigh"|"VolumeLow"|"VolumeOff"|"VolumeXmark"|"VrCardboard"|"W"|"WalkieTalkie"|"Wallet"|"WandMagic"|"WandMagicSparkles"|"WandSparkles"|"Warehouse"|"Water"|"WaterLadder"|"WaveSquare"|"WebAwesome"|"WeightHanging"|"WeightScale"|"WheatAwn"|"WheatAwnCircleExclamation"|"Wheelchair"|"WheelchairMove"|"WhiskeyGlass"|"Wifi"|"Wind"|"WindowMaximize"|"WindowMinimize"|"WindowRestore"|"WineBottle"|"WineGlass"|"WineGlassEmpty"|"WonSign"|"Worm"|"Wrench"|"X"|"XRay"|"Xmark"|"XmarksLines"|"Y"|"YenSign"|"YinYang"|"Z"|"Search"|"Save"|"Settings"|"Cog"|"Home"|"Edit"|"Close"|"Cancel"|"Refresh"|"Warning"|"CheckCircle"|"TimesCircle"|"VolumeMute"|"Cut"|"Undo"|"Redo"|"StepForward"|"StepBackward"|"Pin"|"ZoomIn"|"ZoomOut" Icon shown (Font Awesome).
+---@field iconSize number Icon size (px).
+---@field color number[] Icon colour.
+---@field align "Left"|"Center"|"Right" Horizontal text alignment.
+
 ---@alias UIIconNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -3377,6 +4105,19 @@ function UIIconNode:get_property(path) end
 ---@overload fun(self: UIIconNode, path: "align", value: "Left"|"Center"|"Right")
 function UIIconNode:set_property(path, value, y) end
 
+---@class UIToolbarNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field activeToggleId integer Id of the pressed toggle button.
+---@field buttonSize Vec2 Size of each button (px).
+---@field spacing number Gap between items (px).
+
 ---@alias UIToolbarNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -3422,6 +4163,37 @@ function UIToolbarNode:get_property(path) end
 ---@overload fun(self: UIToolbarNode, path: "buttonSize", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToolbarNode, path: "spacing", value: number)
 function UIToolbarNode:set_property(path, value, y) end
+
+---@class UITabContainerNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 Width and height (px).
+---@field title string Header text.
+---@field direction "Vertical"|"Horizontal"|"Grid" Children are laid out in a column, a row or a grid.
+---@field alignment "Start"|"Center"|"End"|"Stretch" Where children sit across the layout direction.
+---@field spacing number Gap between items (px).
+---@field paddingTop number Space above the children (px).
+---@field paddingBottom number Space below the children (px).
+---@field paddingLeft number Space left of the children (px).
+---@field paddingRight number Space right of the children (px).
+---@field columns integer Grid layout: columns per row.
+---@field autoSizeHeight boolean Grow to fit the children.
+---@field drawBackground boolean Fill the background.
+---@field drawBorder boolean Draw a border.
+---@field showHeader boolean Draw a header with the title.
+---@field headerHeight number Height of the header (px).
+---@field backgroundColor number[] Fill colour of the background.
+---@field headerColor number[] Header fill colour.
+---@field borderColor number[] Colour of the border.
+---@field titleColor number[] Title text colour.
+---@field tabDirection "Horizontal"|"Vertical" Tabs along the top or the side.
+---@field activeTab integer Index of the shown tab (child).
+---@field tabSize number Tab height (or width when vertical; px).
 
 ---@alias UITabContainerNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).

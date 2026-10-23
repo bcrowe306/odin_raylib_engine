@@ -148,6 +148,24 @@ return Enemy
 
 ---
 
+## Properties as fields
+
+A node's Inspector properties read and write as fields - the same as
+`get_property` / `set_property`, which keep working:
+
+```lua
+self.node.position = Vec2(100, 200)
+self.node.rotation = self.node.rotation + 90 * dt
+local cam = Scene.find_node("MainCamera")
+cam.followMode = "SingleTarget"            -- enums by name
+self.node.name = "Boss"                    -- name renames
+```
+
+Fields complete per node class with their type and help. Paths with a dot
+(`emitter.amount`) and script fields (`script.health`) stay with
+`get_property` / `set_property`; an unknown field is an error when set
+(and a warning, once, when read).
+
 ## Vectors
 
 `Vec2`, `Vec3` and `Vec4` are value types with operators:
