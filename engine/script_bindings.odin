@@ -3364,6 +3364,26 @@ lua_scene_is_transitioning :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 // Engine.set_paused(bool): pausable nodes and physics stop; "always" nodes run.
+// Engine.set_fullscreen(on) / is_fullscreen(): the game window covering the
+// monitor (the frame scales to it) or back to the project's window size.
+@(private="file")
+lua_engine_set_fullscreen :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil do sm.game.fullscreenRequest = bool(lua.toboolean(L, 1))
+	return 0
+}
+
+@(private="file")
+lua_engine_is_fullscreen :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	on := false
+	if sm != nil && sm.game != nil do on = sm.game.fullscreenRequest.? or_else sm.game.fullscreen
+	lua.pushboolean(L, b32(on))
+	return 1
+}
+
 @(private="file")
 lua_engine_set_paused :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -4059,6 +4079,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "set_paused")
 	lua.pushcfunction(L, lua_engine_is_paused)
 	lua.setfield(L, -2, "is_paused")
+	lua.pushcfunction(L, lua_engine_set_fullscreen)
+	lua.setfield(L, -2, "set_fullscreen")
+	lua.pushcfunction(L, lua_engine_is_fullscreen)
+	lua.setfield(L, -2, "is_fullscreen")
 	lua.setglobal(L, "Engine")
 
 	// 3. Global "Input" table

@@ -38,6 +38,10 @@ Game :: struct {
 	gameContext:     GameContext,
 	drawBounds:      bool `gui:"true"`,
 	shouldQuit:      bool,
+	// Fullscreen asked for (Engine.set_fullscreen): the runner switches at
+	// the start of its next frame. `fullscreen`: what the window is now.
+	fullscreenRequest: Maybe(bool),
+	fullscreen:        bool,
 	treePaused:      bool, // Engine.set_paused: Pausable nodes stop (scene_flow.odin)
 	// Editor link (editor_link.odin): paused from the editor; frozen = this
 	// frame only draws (no input, physics, scripts or animation).

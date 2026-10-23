@@ -37,6 +37,7 @@ ProjectConfig :: struct {
 
 	// Video
 	fullscreen:    bool,
+	sharpScaling:  bool, // the frame is scaled to the window nearest-neighbour (pixel art) - else smoothly
 	vsync:         bool,
 	resizable:     bool,
 	msaa:          bool,
@@ -305,6 +306,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 
 	if videoObj, ok := json_get_obj(rootObj, "video"); ok {
 		cfg.fullscreen = json_get_bool(videoObj, "fullscreen", cfg.fullscreen)
+		cfg.sharpScaling = json_get_bool(videoObj, "sharp_scaling", cfg.sharpScaling)
 		cfg.vsync = json_get_bool(videoObj, "vsync", cfg.vsync)
 		cfg.resizable = json_get_bool(videoObj, "resizable", cfg.resizable)
 		cfg.msaa = json_get_bool(videoObj, "msaa", cfg.msaa)
@@ -413,7 +415,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	fmt.sbprintf(&sb, "    \"virtual_height\": %.2f,\n", cfg.virtualHeight)
 	fmt.sbprintf(&sb, "    \"target_fps\": %d\n", cfg.targetFPS)
 	strings.write_string(&sb, "  },\n")
-	fmt.sbprintf(&sb, "  \"video\": {{\"fullscreen\": %t, \"vsync\": %t, \"resizable\": %t, \"msaa\": %t, \"high_dpi\": %t}},\n", cfg.fullscreen, cfg.vsync, cfg.resizable, cfg.msaa, cfg.highDPI)
+	fmt.sbprintf(&sb, "  \"video\": {{\"fullscreen\": %t, \"vsync\": %t, \"resizable\": %t, \"msaa\": %t, \"high_dpi\": %t, \"sharp_scaling\": %t}},\n", cfg.fullscreen, cfg.vsync, cfg.resizable, cfg.msaa, cfg.highDPI, cfg.sharpScaling)
 	fmt.sbprintf(&sb, "  \"audio\": {{\"master_volume\": %.2f, \"music_volume\": %.2f, \"sfx_volume\": %.2f}},\n", cfg.masterVolume, cfg.musicVolume, cfg.sfxVolume)
 	strings.write_string(&sb, "  \"physics\": {\n")
 	fmt.sbprintf(&sb, "    \"gravity\": [%.2f, %.2f],\n    \"debug_draw\": %t", cfg.gravity.x, cfg.gravity.y, cfg.debugDraw)

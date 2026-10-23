@@ -1437,6 +1437,15 @@ function EngineModule.set_paused(paused) end
 ---@return boolean
 function EngineModule.is_paused() end
 
+---Fullscreen on or off: the window covers the screen at its resolution (the
+---game is scaled to it) or goes back to the project's window size.
+---@param on boolean
+function EngineModule.set_fullscreen(on) end
+
+---Whether the game is fullscreen.
+---@return boolean
+function EngineModule.is_fullscreen() end
+
 
 ---@class InputModule
 ---Engine input subsystem for keyboard, mouse, and mapped action queries.

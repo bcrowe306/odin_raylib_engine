@@ -688,12 +688,13 @@ project_video :: proc(state: ^EditorState) {
 	vres := [2]f32{d.virtualWidth, d.virtualHeight}
 	if imgui.DragFloat2("##vres", &vres, 1, 160, 7680, "%.0f") do d.virtualWidth, d.virtualHeight = vres.x, vres.y
 	Drive_Item("settings.virtual-res")
-	UI_Tooltip("The resolution the game is designed for (cameras and UI scale to the window)")
+	UI_Tooltip("The resolution the game draws at; it is scaled to fit the window or the screen (fullscreen), with bars where the shapes differ")
 	UI_PropLabel("Target FPS")
 	fps := c.int(d.targetFPS)
 	if imgui.SliderInt("##fps", &fps, 30, 240) do d.targetFPS = int(fps)
 	Drive_Item("settings.fps")
-	check("settings.fullscreen", "Fullscreen", &d.fullscreen)
+	check("settings.fullscreen", "Fullscreen", &d.fullscreen, "Cover the whole screen at its own resolution (the game is scaled to it). Scripts: Engine.set_fullscreen(true)")
+	check("settings.sharp-scaling", "Sharp Pixels", &d.sharpScaling, "Scale the game to the window nearest-neighbour - crisp pixel art; off: smooth")
 	check("settings.vsync", "VSync", &d.vsync)
 	check("settings.resizable", "Resizable Window", &d.resizable)
 	check("settings.msaa", "Anti-aliasing (MSAA 4x)", &d.msaa)

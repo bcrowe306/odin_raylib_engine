@@ -145,7 +145,10 @@ standalone game), **Settings** (Cmd+,) and Quit.
   shapes, joints and areas, on by default; the viewport always can - scenes),
   **Input** (named actions and their key/mouse/gamepad bindings — scripts
   call `Input.is_action_down("jump")`), **Video** (window, virtual
-  resolution, FPS, fullscreen, vsync, resizable, MSAA, high-DPI), **Audio**
+  resolution, FPS, fullscreen, vsync, resizable, MSAA, high-DPI, sharp
+  pixels - the game draws at its virtual resolution and is scaled to fit
+  the window or, fullscreen, the whole screen at its own resolution, with
+  bars where the shapes differ; the mouse reads in game units), **Audio**
   (master, music and sound-effect volumes) and **Export** (executable name,
   output folder, targets, compression, font, which prebuilt runners exist).
 

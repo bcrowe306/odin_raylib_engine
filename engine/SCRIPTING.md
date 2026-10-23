@@ -843,6 +843,7 @@ local dt = Engine.get_delta_time()
 local elapsed = Engine.get_time()
 local screen_w, screen_h = Engine.get_window_size()
 local virtual_w, virtual_h = Engine.get_virtual_size()
+Engine.set_fullscreen(not Engine.is_fullscreen())   -- e.g. an options menu toggle
 ```
 
 ---
