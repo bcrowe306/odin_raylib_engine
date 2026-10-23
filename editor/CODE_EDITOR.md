@@ -144,6 +144,16 @@ feature needs it.
   and marked in the gutter; Up / Down move by screen row. There is no
   horizontal scrolling while it is on.
 
+## Breadcrumbs and sticky scroll
+
+- **Breadcrumbs** (a bar above the code): the file › the function › the
+  blocks around the caret (`PlayerShip:update › if self.cooldown_timer > 0
+  then`). Click one to go to its first line.
+- **Sticky scroll**: while the top of the view is inside a block, the
+  first lines of up to 3 enclosing blocks stay pinned at the top with
+  their line numbers (and a shadow under them). Click one to go there.
+- Both can be turned off in Settings > Code Editor.
+
 ## Overview strip and git gutter
 
 - **Overview strip** (right edge, beside the scrollbar - the minimap): the

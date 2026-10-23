@@ -384,6 +384,8 @@ settings_code :: proc(state: ^EditorState, h: f32) {
 	check("settings.auto-pairs", "Auto-Close Brackets", &s.autoClosePairs, "Insert closing brackets and quotes, step over them, wrap selections")
 	check("settings.rainbow-brackets", "Rainbow Brackets", &s.rainbowBrackets, "Colour brackets by how deeply they are nested")
 	check("settings.indent-guides", "Indent Guides", &s.indentGuides, "Vertical lines at each indentation level; the block around the caret is brighter")
+	check("settings.sticky-scroll", "Sticky Scroll", &s.stickyScroll, "The first lines of the blocks you are scrolled into stay at the top")
+	check("settings.breadcrumbs", "Breadcrumbs", &s.breadcrumbs, "File > function > blocks around the caret, above the code")
 	check("settings.soft-wrap", "Soft Wrap", &s.softWrap, "Wrap long lines at the Code area's width (Alt+Z toggles)")
 	UI_PropLabel("Show Whitespace")
 	ws := c.int(s.showWhitespace)

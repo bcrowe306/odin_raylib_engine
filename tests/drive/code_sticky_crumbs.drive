@@ -1,0 +1,25 @@
+# Sticky scroll (the function's first line pinned while inside it; click
+# goes there) and breadcrumbs (function > if around the caret; click).
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 72
+key enter
+wait 3
+expect item:code.sticky:24 == visible
+expect item:code.crumb:0 == visible
+expect item:code.crumb:1 == visible
+screenshot sticky_crumbs
+click @code.crumb:0
+wait 3
+expect code.cursor == 24:1
+key ctrl+g
+type 72
+key enter
+wait 3
+screenshot second
+click @code.sticky:24
+wait 3
+expect code.cursor == 24:1
+expect item:code.sticky:24 == missing

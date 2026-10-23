@@ -79,6 +79,7 @@ exits non-zero if any check fails.
 | `code_brackets_guides.drive` | Cmd+Shift+\\ jumps between a bracket pair and from inside to the closer; rainbow brackets and indent guides (screenshot) and their settings. |
 | `code_display_fold.drive` | The caret word's other uses; fold from the gutter arrow (rows hidden, Up/Down skip it, follows an edit above, the chip unfolds), Fold All / Unfold All, fold at the caret; soft wrap (more rows, Alt+Z off again); whitespace in a selection. |
 | `code_git_overview.drive` | The project made a git repo: a modified, an added and a removed line marked in the gutter (and gone after undo); the overview strip scrolls when clicked. |
+| `code_sticky_crumbs.drive` | Inside update: its first line pinned and the breadcrumbs function > if; the crumb and the pinned line go to line 24. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

@@ -44,6 +44,8 @@ Editor_Settings :: struct {
 	rainbowBrackets:  bool, // brackets coloured by depth (Code tab)
 	indentGuides:     bool, // vertical lines at each indent level
 	softWrap:         bool, // long lines wrap at the Code area's width
+	stickyScroll:     bool, // block headers stay at the top while scrolling
+	breadcrumbs:      bool, // file > function > blocks bar above the code
 	showWhitespace:   Show_Whitespace,
 	formatOnSave:     bool,
 	lspEnabled:       bool,
@@ -76,6 +78,8 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 	rainbowBrackets = true,
 	indentGuides    = true,
 	showWhitespace  = .Selection,
+	stickyScroll    = true,
+	breadcrumbs     = true,
 	formatOnSave    = false,
 	lspEnabled      = true,
 }
@@ -258,6 +262,8 @@ settings_from_ini :: proc(text: string) {
 	s.rainbowBrackets = b(m, "code", "rainbow_brackets", s.rainbowBrackets)
 	s.indentGuides = b(m, "code", "indent_guides", s.indentGuides)
 	s.softWrap = b(m, "code", "soft_wrap", s.softWrap)
+	s.stickyScroll = b(m, "code", "sticky_scroll", s.stickyScroll)
+	s.breadcrumbs = b(m, "code", "breadcrumbs", s.breadcrumbs)
 	if v, ok := m["code"]["show_whitespace"]; ok {
 		switch v {
 		case "none": s.showWhitespace = .None
@@ -352,6 +358,7 @@ Editor_SaveSettings :: proc() -> bool {
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
 	fmt.sbprintf(&sb, "auto_close_pairs = %t\nformat_on_save = %t\nlsp_enabled = %t\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)
 	fmt.sbprintf(&sb, "rainbow_brackets = %t\nindent_guides = %t\nsoft_wrap = %t\n", s.rainbowBrackets, s.indentGuides, s.softWrap)
+	fmt.sbprintf(&sb, "sticky_scroll = %t\nbreadcrumbs = %t\n", s.stickyScroll, s.breadcrumbs)
 	wsNames := [Show_Whitespace]string{.None = "none", .Selection = "selection", .All = "all"}
 	fmt.sbprintf(&sb, "show_whitespace = %s\n", wsNames[s.showWhitespace])
 	fmt.sbprintf(&sb, "lua_server_path = %s\n", s.luaServerPath)

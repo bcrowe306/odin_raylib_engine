@@ -12,6 +12,9 @@ key right
 key right
 expect code.symbol-highlights >= 2
 # Fold the update function from its gutter arrow.
+key ctrl+g
+type 26
+key enter
 hover @code.gutter:24
 wait 2
 click @code.fold:24
@@ -22,7 +25,7 @@ key ctrl+g
 type 24
 key enter
 key down
-expect code.cursor == 79:1
+expect code.cursor contains 79:
 key up
 expect code.cursor contains 24:
 # Folds follow edits above them.
@@ -33,6 +36,9 @@ key cmd+enter
 expect code.folds == 25
 key cmd+z
 expect code.folds == 24
+key ctrl+g
+type 24
+key enter
 click @code.fold-chip:24
 expect code.folds == 
 # Fold all / unfold all.

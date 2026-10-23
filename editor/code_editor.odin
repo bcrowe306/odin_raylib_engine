@@ -63,6 +63,7 @@ Code_Doc :: struct {
 	foldsVersion:  int,
 	foldsTextVersion: int,
 	symCache:      Code_Sym_Cache, // whole-file uses of the caret word (code_minimap.odin)
+	scrollToTop:   bool, // scroll the caret's line to the top (under the pinned lines)
 	git:           Code_Git,       // changes since the last commit (code_git.odin)
 }
 
@@ -101,6 +102,7 @@ Code_Editor :: struct {
 	closeOthers:   int,  // close every tab but this one (-2 = all, -1 = none)
 	closeMode:     enum {Others, Right, Saved}, // with closeOthers: which tabs go
 	columnFrom:    [2]f32, // Alt-drag column selection: where it started (screen)
+	stickyH:       f32,    // height of the pinned block headers this frame (code_sticky.odin)
 	lastDiskCheck: time.Tick,
 	cursorMoved:   time.Tick, // caret blink restarts on movement
 	// Layout of the last drawn frame (screen space).
@@ -761,6 +763,10 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	digits := len(fmt.tprint(lineCount))
 	gutterW := f32(max(digits, 3) + 2) * cm.charW + 14
 
+	if GlobalSettings.breadcrumbs {
+		Code_Breadcrumbs(state, doc) // file > function > blocks (code_sticky.odin)
+		avail.y -= CODE_CRUMBS_H + imgui.GetStyle().ItemSpacing.y
+	}
 	imgui.PushStyleColorImVec4(.ChildBg, CODE_BG)
 	if cm.focusRequest {
 		imgui.SetNextWindowFocus()
@@ -829,7 +835,7 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	io := imgui.GetIO()
 	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
 	inPopup := cm.completion.open && point_in_rect(mouse, cm.popupMin, cm.popupMax)
-	overOverlay := Code_OverlayHovered() || Code_OverviewHovered(winPos, winSize) // boxes / the overview strip: no clicks through
+	overOverlay := Code_OverlayHovered() || Code_OverviewHovered(winPos, winSize) || Code_StickyHovered(winPos, winSize) // boxes / strip / pinned lines: no clicks through
 
 	// Mouse: click places the caret (Shift extends), double-click selects a
 	// word, triple-click the line, drag selects.
@@ -886,7 +892,12 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 		doc.scrollToCursor = false
 		c := code_primary(b).pos
 		y := f32(code_row_of(doc, c)) * cm.lineH
-		if y < scrollY do imgui.SetScrollY(y)
+		pinned := cm.stickyH if GlobalSettings.stickyScroll else 0
+		if doc.scrollToTop {
+			// A pinned line / breadcrumb was clicked: its line just below the pins.
+			doc.scrollToTop = false
+			imgui.SetScrollY(max(y - f32(len(code_sticky_lines(doc, c.line))) * cm.lineH, 0))
+		} else if y < scrollY + pinned do imgui.SetScrollY(max(y - pinned, 0))
 		else if y + cm.lineH * 2 > scrollY + winSize.y do imgui.SetScrollY(y + cm.lineH * 2 - winSize.y)
 		x := code_screen_pos(b, c).x - cm.textOrigin.x
 		textW := winSize.x - gutterW - pad * 2
@@ -1223,6 +1234,9 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 			imgui.DrawList_AddCircleFilled(dl, {winPos.x + 8, y + code_font_size() * 0.5}, 3.5, code_severity_color(sev))
 		}
 	}
+	// Pinned block headers (sticky scroll) over the top.
+	cm.stickyH = 0
+	code_draw_sticky(doc, winPos, winSize, gutterW, firstRow)
 }
 
 code_squiggle :: proc(dl: ^imgui.DrawList, x0, x1, y: f32, color: u32, faint: bool) {
