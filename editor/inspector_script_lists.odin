@@ -19,6 +19,31 @@ import imgui "lib/imgui"
 // Each returns the edited list as JSON text when it changed.
 // ============================================================================
 
+// Script_PropComment: the `---` comment lines right above a property's
+// declaration in the script's properties table ("" when none).
+Script_PropComment :: proc(scriptText, name: string) -> string {
+	lines := strings.split_lines(scriptText, context.temp_allocator)
+	inTable := false
+	for l, i in lines {
+		t := strings.trim_space(l)
+		if strings.contains(t, ".properties = {") || strings.contains(t, ".properties={") {inTable = true; continue}
+		if !inTable do continue
+		if t == "}" do break
+		if !strings.has_prefix(t, name) do continue
+		rest := strings.trim_left_space(t[len(name):])
+		if !strings.has_prefix(rest, "=") do continue
+		// The comment block above it.
+		doc := make([dynamic]string, context.temp_allocator)
+		for j := i - 1; j >= 0; j -= 1 {
+			c := strings.trim_space(lines[j])
+			if !strings.has_prefix(c, "---") do break
+			inject_at(&doc, 0, strings.trim_space(c[3:]))
+		}
+		return strings.join(doc[:], " ", context.temp_allocator)
+	}
+	return ""
+}
+
 // Script_PropInfo: a script property's declaration (nil when unknown).
 Script_PropInfo :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: string) -> ^e.ScriptProperty {
 	mod, ok := state.game.scriptManager.modules[e.ScriptVFS_NormalizePath(inst.modulePath)]

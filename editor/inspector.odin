@@ -1016,7 +1016,15 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 			propLabel := script_prop_label(state, inst, name)
 			prop_label(propLabel, node, fmt.tprintf("script.%s", name), script_lua_value(val))
 			TIP :: imgui.HoveredFlags_DelayNormal | imgui.HoveredFlags_Stationary
-			if imgui.IsItemHovered() do script_prop_help(node, inst, name, propLabel, val, imgui.IsItemHovered(TIP), info.tooltip if info != nil else "")
+			if imgui.IsItemHovered() {
+				// Help: `tooltip = "..."`, else the `---` comment above it in the script.
+				help := info.tooltip if info != nil else ""
+				if help == "" {
+					path := code_abs_path(state, asset_rel_editor(state, inst.modulePath))
+					if data, err := os.read_entire_file(path, context.temp_allocator); err == nil do help = Script_PropComment(string(data), name)
+				}
+				script_prop_help(node, inst, name, propLabel, val, imgui.IsItemHovered(TIP), help)
+			}
 			id := fmt.tprintf("insp.script:%s", name)
 			label := fmt.ctprintf("##%s", id)
 			changed := false

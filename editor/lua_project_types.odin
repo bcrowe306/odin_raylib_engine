@@ -405,7 +405,9 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		if !ok || mod == nil do continue
 		for p in mod.properties {
 			t := lua_type_of(p)
-			doc := p.tooltip if p.tooltip != "" else (p.label if p.label != "" else "")
+			doc := p.tooltip
+			if doc == "" do doc = Script_PropComment(string(data), p.name)
+			if doc == "" do doc = p.label
 			if i := strings.index(t, " # "); i >= 0 {
 				if doc == "" do doc = t[i + 3:]
 				t = t[:i]

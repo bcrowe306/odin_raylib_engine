@@ -87,7 +87,7 @@ Drag and drop, editor ↔ code
 
 Exported properties
 - [x] 8.13 More types: enum, range/slider, array, curve, gradient, colour alpha; `group` / `header`, `tooltip`
-- [ ] 8.14 `---` comments above a property become its help-pane text
+- [x] 8.14 `---` comments above a property become its help-pane text
 - [ ] 8.15 Live editing of exported values in the running game (Game tab)
 
 Engine API

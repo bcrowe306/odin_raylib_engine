@@ -113,7 +113,16 @@ Scripts declare exposed properties in a `properties` table. These properties are
   for the colour, double-click to add, right-click to remove);
   `local r, g, b, a = Gradient.sample(self.tint, t)`.
 - Any property: `group = "Movement"` puts it under that header in the
-  Inspector; `tooltip = "..."` is its help (hover / help pane).
+  Inspector; `tooltip = "..."` is its help (hover / help pane). Without
+  one, a `---` comment right above the property is its help (and its doc
+  in completion):
+
+  ```lua
+  MyScript.properties = {
+      --- How fast it runs, in pixels per second.
+      speed = { type = "float", default = 240 },
+  }
+  ```
 - `float` / `number`: 32-bit floating point number. Supports `min` and `max`.
 - `int` / `integer`: 64-bit integer. Supports `min` and `max`.
 - `string`: Text string.

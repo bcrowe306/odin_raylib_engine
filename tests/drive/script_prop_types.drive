@@ -1,6 +1,7 @@
 # Script property types in the Inspector: groups, an enum combo, a range
 # slider, an array (add / remove), a curve (double-click adds a point), a
-# gradient (double-click adds a stop), a tooltip; saved as JSON.
+# gradient (double-click adds a stop), a tooltip, a --- comment as help;
+# saved as JSON.
 wait 5
 exec cp tests/drive/fixtures/drive_prop_types.lua $PROJECT/scripts/asteroid.lua
 click @hier:PatrolDroneAlpha
@@ -24,6 +25,10 @@ click @insp.script:speeds.add
 expect node:PatrolDroneAlpha.script.speeds == [1, 2, 0]
 click @insp.script:speeds.remove:0
 expect node:PatrolDroneAlpha.script.speeds == [2, 0]
+# The --- comment above it is its help.
+hover @insp.script:speeds.item:0+-100,0
+wait 5
+expect insp-help contains How fast each stage moves, in pixels per second.
 scroll @insp.script:speeds.add -60
 wait 3
 dblclick @insp.script:ease.curve
