@@ -22,6 +22,17 @@ console message with `file.lua:LINE`. *New Script* opens a dialog with
 templates (see SCRIPTING.md). Cmd+P goes to a file; Cmd+Shift+T reopens the
 last closed tab; Cmd+W closes one.
 
+## Tabs
+
+- **Preview tabs**: a file reached by navigating - go to definition,
+  symbol and search results, references, peek - opens as a preview (dim
+  title, eye icon) that the next preview replaces, so jumping around
+  doesn't pile up tabs. Editing it, double-clicking its tab or *Keep Open*
+  in its menu makes it a normal tab; opening the file yourself does too.
+- **Pinned tabs** (tab menu > *Pin Tab*) sit first with a pin, have no
+  close button, and are skipped by Close Others / to the Right / Saved /
+  All (Cmd+W still closes one).
+
 ## Editing
 
 | Shortcut | Command |

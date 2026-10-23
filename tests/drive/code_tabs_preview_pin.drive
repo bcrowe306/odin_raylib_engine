@@ -1,0 +1,32 @@
+# Preview tabs (navigation opens a file as a preview; the next preview
+# replaces it; editing keeps it) and pinned tabs (first, kept by Close All).
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key cmd+t
+type drone:update
+key enter
+wait 3
+expect code.tabs == player_ship.lua,orbiting_drone.lua (preview)
+key cmd+t
+type asteroid
+key enter
+wait 3
+expect code.tabs == player_ship.lua,asteroid.lua (preview)
+screenshot preview
+type -- kept
+wait 2
+expect code.tabs == player_ship.lua,asteroid.lua
+key cmd+z
+key cmd+s
+wait 3
+# Pin player_ship; Close All keeps it.
+rclick @code.tab:scripts/player_ship.lua
+click @ctx:pin-tab
+wait 2
+expect code.tabs == player_ship.lua (pinned),asteroid.lua
+screenshot pinned
+rclick @code.tab:scripts/asteroid.lua
+click @ctx:close-saved
+wait 2
+expect code.tabs == player_ship.lua (pinned)

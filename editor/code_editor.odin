@@ -65,6 +65,8 @@ Code_Doc :: struct {
 	foldsTextVersion: int,
 	symCache:      Code_Sym_Cache, // whole-file uses of the caret word (code_minimap.odin)
 	scrollToTop:   bool, // scroll the caret's line to the top (under the pinned lines)
+	preview:       bool, // a preview tab: replaced by the next preview until edited / kept
+	pinned:        bool, // a pinned tab: first, no close button, skipped by bulk closes
 	git:           Code_Git,       // changes since the last commit (code_git.odin)
 	inlayCache:    Code_Inlay_Cache, // parameter-name hints per line (code_inlay.odin)
 }
@@ -195,7 +197,7 @@ code_file_mtime :: proc(path: string) -> time.Time {
 // Editor_OpenScript opens a script (project-relative or absolute) in the
 // Code tab, focusing it, and moves the caret to `line`/`col` (0-based) if
 // given. Opening an already open file just switches to its tab.
-Editor_OpenScript :: proc(state: ^EditorState, path: string, line := -1, col := 0) -> bool {
+Editor_OpenScript :: proc(state: ^EditorState, path: string, line := -1, col := 0, preview := false) -> bool {
 	cm := &GlobalCode
 	abs := code_abs_path(state, path)
 	// The same file through a symlink (the language server reports
@@ -205,6 +207,17 @@ Editor_OpenScript :: proc(state: ^EditorState, path: string, line := -1, col := 
 	}
 	idx := -1
 	for d, i in cm.docs do if d.path == abs do idx = i
+	if idx >= 0 && !preview do cm.docs[idx].preview = false // opened for real: keep it
+	if idx < 0 && preview {
+		// A preview replaces the previous one (unless it was edited).
+		for d, i in cm.docs {
+			if d.preview && !code_doc_dirty(d) {
+				code_close_doc(i)
+				if cm.active >= len(cm.docs) do cm.active = len(cm.docs) - 1
+				break
+			}
+		}
+	}
 	if idx < 0 {
 		doc := new(Code_Doc)
 		doc.buffer = buf.buffer_init()
@@ -230,6 +243,7 @@ Editor_OpenScript :: proc(state: ^EditorState, path: string, line := -1, col := 
 			if strings.has_prefix(l, "\t") {doc.useTabs = true; break}
 			if strings.has_prefix(l, "  ") {doc.useTabs = false; break}
 		}
+		doc.preview = preview
 		append(&cm.docs, doc)
 		idx = len(cm.docs) - 1
 	}
@@ -663,6 +677,7 @@ Code_Render :: proc(state: ^EditorState) {
 		for i := len(cm.docs) - 1; i >= 0; i -= 1 {
 			d := cm.docs[i]
 			if d == keep && cm.closeMode != .Saved do continue
+			if d.pinned do continue // pinned tabs stay
 			if cm.closeMode == .Right && i <= anchor do continue
 			if cm.closeMode == .Saved && code_doc_dirty(d) do continue
 			if code_doc_dirty(d) {
@@ -685,10 +700,19 @@ code_tabs :: proc(state: ^EditorState) {
 	for doc, i in cm.docs {
 		open := true
 		flags: imgui.TabItemFlags = {}
-		if code_doc_dirty(doc) do flags += {.UnsavedDocument}
+		if code_doc_dirty(doc) {
+			flags += {.UnsavedDocument}
+			doc.preview = false // edited: a preview becomes a real tab
+		}
 		if cm.selectRequest == i do flags += {.SetSelected}
-		label := fmt.ctprintf("%s  %s###codetab_%s", ICON_FA_FILE_CODE, filepath.base(doc.rel), doc.path)
-		if imgui.BeginTabItem(label, &open, flags) {
+		if doc.pinned do flags += {.Leading} // first, not reorderable
+		icon := ICON_FA_THUMBTACK if doc.pinned else (ICON_FA_EYE if doc.preview else ICON_FA_FILE_CODE)
+		label := fmt.ctprintf("%s  %s###codetab_%s", icon, filepath.base(doc.rel), doc.path)
+		if doc.preview do imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
+		tabOpen := imgui.BeginTabItem(label, nil if doc.pinned else &open, flags)
+		if doc.preview do imgui.PopStyleColor()
+		if imgui.IsItemHovered() && imgui.IsMouseDoubleClicked(.Left) do doc.preview = false // keep it
+		if tabOpen {
 			if cm.selectRequest < 0 && cm.active != i {
 				cm.active = i
 				cm.completion.open = false
@@ -712,6 +736,15 @@ code_tabs :: proc(state: ^EditorState) {
 			imgui.Separator()
 			if imgui.MenuItem(fmt.ctprintf("%s  Close", ICON_FA_XMARK), "Cmd+W") do closeIdx = i
 			Drive_Item("ctx:close-tab")
+			if imgui.MenuItem(fmt.ctprintf("%s  %s", ICON_FA_THUMBTACK, "Unpin Tab" if doc.pinned else "Pin Tab")) {
+				doc.pinned = !doc.pinned
+				doc.preview = false
+			}
+			Drive_Item("ctx:pin-tab")
+			if doc.preview {
+				if imgui.MenuItem("Keep Open") do doc.preview = false
+				Drive_Item("ctx:keep-tab")
+			}
 			if imgui.MenuItem("Close Others", nil, false, len(cm.docs) > 1) do cm.closeOthers = i
 			Drive_Item("ctx:close-others")
 			if imgui.MenuItem("Close to the Right", nil, false, i < len(cm.docs) - 1) {cm.closeOthers = i; cm.closeMode = .Right}
@@ -1990,6 +2023,11 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 		s, e_, ok := buf.selection_range(code_primary(b)^)
 		if !ok || s.line != e_.line do return "", true
 		return buf.buffer_line_str(b, s.line)[s.col:e_.col], true
+	case "code.tabs":
+		// open tabs in order, "(preview)" / "(pinned)" marked
+		sb := strings.builder_make(context.temp_allocator)
+		for d, i in cm.docs do fmt.sbprintf(&sb, "%s%s%s", "," if i > 0 else "", filepath.base(d.rel), " (pinned)" if d.pinned else (" (preview)" if d.preview else ""))
+		return strings.to_string(sb), true
 	case "code.folds":
 		// folded block first lines, 1-based, comma-separated
 		if doc == nil do return "", true

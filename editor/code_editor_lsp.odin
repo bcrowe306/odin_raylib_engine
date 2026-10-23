@@ -176,7 +176,7 @@ code_lsp_update :: proc(state: ^EditorState) {
 		if len(cm.client.last_locations) > 0 {
 			loc := cm.client.last_locations[0]
 			path := strings.clone(loc.key, context.temp_allocator)
-			if Editor_OpenScript(state, path, loc.range.start.line) {
+			if Editor_OpenScript(state, path, loc.range.start.line, preview = true) {
 				doc := cm.docs[cm.active]
 				line := buf.buffer_line_str(&doc.buffer, loc.range.start.line)
 				doc.buffer.cursors[0].pos.col = code_byte_from_u16(line, loc.range.start.character)

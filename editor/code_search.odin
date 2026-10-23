@@ -218,7 +218,7 @@ Code_SearchPanel :: proc(state: ^EditorState) {
 					from = 40
 				}
 				if imgui.Selectable("##hit", false, {}, {0, 0}) {
-					Editor_OpenScript(state, f.path, h.line, h.from)
+					Editor_OpenScript(state, f.path, h.line, h.from, preview = true)
 				}
 				Drive_Item(fmt.tprintf("search.hit:%s:%d", f.rel, h.line + 1))
 				imgui.SameLine(0, 0)

@@ -369,7 +369,7 @@ Palette_Render :: proc(state: ^EditorState) {
 			}
 		case .Locations:
 			l := pal.locations[it.index]
-			Editor_OpenScript(state, l.path, l.line, l.col)
+			Editor_OpenScript(state, l.path, l.line, l.col, preview = true)
 		}
 	}
 }

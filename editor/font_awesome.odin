@@ -142,3 +142,4 @@ ICON_FA_INDENT                    :: "" // Indent
 ICON_FA_OUTDENT                   :: "" // Outdent
 ICON_FA_ARROW_LEFT                :: "" // Back
 ICON_FA_BRACKET                   :: "" // Brackets (code)
+ICON_FA_THUMBTACK                 :: "\uF08D" // Pinned tab

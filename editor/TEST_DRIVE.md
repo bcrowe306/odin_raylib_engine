@@ -87,6 +87,7 @@ exits non-zero if any check fails.
 | `code_peek.drive` | Peek references of self.rotation (a list, Enter opens one - the same tab), peek the definition of Log.info (engine API), Esc closes. |
 | `code_actions.drive` | Lightbulb on a line with an unknown node name; Cmd+. picks PlayerShip from the scene; the lightbulb adds a missing input action to project.json. |
 | `code_refactor.drive` | Extract local (typing renames both), inline it back, toggle set_property to a field and {1, 2} to Vec2 from the Refactor menu, extract two lines into a method (renamed by typing). |
+| `code_tabs_preview_pin.drive` | A symbol in another file opens as a preview, the next one replaces it, typing keeps it; a pinned tab survives Close Saved. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -158,6 +159,7 @@ Queries:
   comma-separated), `code.signature`, `code.errors`, `code.diagnostics`, `code.diagnostic-messages`, `code.hover`
 - `code.overlays` (`ok <n>` when every overlay is inside the Code area and bounded), `code.update-ms` (last line-state pass), `code.token-bench` (`full=<ms> cached=<ms> tokenized=<n> lines=<n>`), `code.token-speedup`
 - `code.inlays:<line>` (`label@col,...`), `code.changes` (`line:added|modified|deleted`), `code.git` (Unknown / Loading / None / Ready)
+- `code.tabs` (open tabs, `(preview)` / `(pinned)`)
 - `code.folds` (folded first lines), `code.rows` (display rows), `code.lines`, `code.symbol-highlights`
 - `code.cursors`, `code.selection`, `code.selection-range` (`line:col-line:col`), `code.find` (match count), `code.font`, `code.completion-doc`
 - `insp-help` (the Inspector help pane: `<Title>: <doc>`), `guides` (`x=704,y=50`), `usages` (files in the Find Usages window, -1 = closed), `folder-open:<dir>`
