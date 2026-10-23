@@ -99,6 +99,21 @@ Scripts declare exposed properties in a `properties` table. These properties are
   node itself (resolved just before `ready()`; nil, with a warning, when it
   points at nothing). Dropping a node into the code's `properties` table
   adds one, set to that node when you save the script.
+- `enum`: one of `values` - `mode = { type = "enum", values = {"Idle", "Run"}, default = "Idle" }`;
+  a combo in the Inspector, the chosen string in Lua (typed as the union).
+- `range`: a number between `min` and `max` edited with a slider (any
+  `float` / `int` with `slider = true` too).
+- `array`: a list - `speeds = { type = "array", of = "float", default = {1, 2} }`;
+  `of` is `string` (default), `float`, `int`, `bool`, `color`, `vector2`,
+  `node` or an asset kind (`texture`...). The Inspector edits one row per
+  item (+ / remove); Lua gets a table.
+- `curve`: points `{{t, v}, ...}` edited in a small graph (drag points,
+  double-click to add, right-click to remove); `Curve.sample(self.ease, t)`.
+- `gradient`: stops `{{t, r, g, b, a}, ...}` edited on a bar (drag, click
+  for the colour, double-click to add, right-click to remove);
+  `local r, g, b, a = Gradient.sample(self.tint, t)`.
+- Any property: `group = "Movement"` puts it under that header in the
+  Inspector; `tooltip = "..."` is its help (hover / help pane).
 - `float` / `number`: 32-bit floating point number. Supports `min` and `max`.
 - `int` / `integer`: 64-bit integer. Supports `min` and `max`.
 - `string`: Text string.

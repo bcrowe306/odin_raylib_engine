@@ -127,12 +127,7 @@ ScriptManager_ReloadModule :: proc(mgr: ^ScriptManager, path: string, quiet := f
 	// New property declarations.
 	newProps := Script_ParseProperties(L, oldIdx)
 	lua.pop(L, 2) // old (now updated) table, new table
-	for p in mod.properties {
-		delete(p.name)
-		delete(p.label)
-		if p.assetKind != "" do delete(p.assetKind)
-		if p.type == .String && len(p.defaultVal.valString) > 0 do delete(p.defaultVal.valString)
-	}
+	for &p in mod.properties do ScriptProperty_Destroy(&p)
 	delete(mod.properties)
 	mod.properties = newProps
 

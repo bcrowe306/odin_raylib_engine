@@ -1,0 +1,37 @@
+# Script property types in the Inspector: groups, an enum combo, a range
+# slider, an array (add / remove), a curve (double-click adds a point), a
+# gradient (double-click adds a stop), a tooltip; saved as JSON.
+wait 5
+exec cp tests/drive/fixtures/drive_prop_types.lua $PROJECT/scripts/asteroid.lua
+click @hier:PatrolDroneAlpha
+click @insp.script-attach
+click @pick:scripts/asteroid.lua
+wait 3
+scroll @insp.position.x -120
+wait 3
+expect item:insp.script-group:State == visible
+expect item:insp.script-group:Audio == visible
+click @insp.script:mode
+click @pick:Run
+expect node:PatrolDroneAlpha.script.mode == Run
+hover @insp.script:mode+-130,0
+wait 5
+expect insp-help contains The current behaviour
+screenshot groups
+scroll @insp.script:mode -40
+wait 3
+click @insp.script:speeds.add
+expect node:PatrolDroneAlpha.script.speeds == [1, 2, 0]
+click @insp.script:speeds.remove:0
+expect node:PatrolDroneAlpha.script.speeds == [2, 0]
+scroll @insp.script:speeds.add -60
+wait 3
+dblclick @insp.script:ease.curve
+expect node:PatrolDroneAlpha.script.ease != [[0, 0], [1, 1]]
+dblclick @insp.script:tint.gradient
+expect node:PatrolDroneAlpha.script.tint != [[0, 1, 1, 1, 1], [1, 1, 1, 1, 1]]
+screenshot lists
+key ctrl+s
+wait 2
+expect file:scenes/main.scene.json contains "speeds": [2, 0]
+expect file:scenes/main.scene.json contains "mode": "Run"

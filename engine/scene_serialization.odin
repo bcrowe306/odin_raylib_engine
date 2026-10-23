@@ -585,7 +585,11 @@ write_script_props :: proc(w: ^Json_Writer, inst: ^ScriptInstance) {
 		switch v.type {
 		case .Float: Json_Float(w, v.valFloat)
 		case .Int: fmt.sbprintf(&w.sb, "%d", v.valInt)
-		case .String: Json_String(w, v.valString)
+		case .String:
+			// Lists (array / curve / gradient) are saved as JSON, not as a string.
+			mgr := inst.scriptManager if inst.scriptManager != nil else &scriptManager
+			if Script_IsJsonKind(script_prop_kind(inst, k, mgr)) && v.valString != "" do strings.write_string(&w.sb, v.valString)
+			else do Json_String(w, v.valString)
 		case .Boolean: write_bool(w, v.valBool)
 		case .Vector2: Json_Vec2(w, v.valVec2)
 		case .Color:
@@ -1203,6 +1207,42 @@ read_legacy_blocks :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
 	}
 }
 
+// Json_Compact: a JSON value as compact text, whole numbers without
+// decimals ("[4, 5]", not "[4.0000000000000000,5.0000000000000000]").
+Json_Compact :: proc(v: json.Value) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	write :: proc(sb: ^strings.Builder, v: json.Value) {
+		switch x in v {
+		case json.Null:    strings.write_string(sb, "null")
+		case json.Integer: fmt.sbprintf(sb, "%d", x)
+		case json.Float:
+			if x == f64(i64(x)) do fmt.sbprintf(sb, "%d", i64(x))
+			else do fmt.sbprintf(sb, "%v", x)
+		case json.Boolean: strings.write_string(sb, "true" if x else "false")
+		case json.String:  fmt.sbprintf(sb, "%q", x)
+		case json.Array:
+			strings.write_byte(sb, '[')
+			for e, i in x {
+				if i > 0 do strings.write_string(sb, ", ")
+				write(sb, e)
+			}
+			strings.write_byte(sb, ']')
+		case json.Object:
+			strings.write_byte(sb, '{')
+			i := 0
+			for k, e in x {
+				if i > 0 do strings.write_string(sb, ", ")
+				fmt.sbprintf(sb, "%q: ", k)
+				write(sb, e)
+				i += 1
+			}
+			strings.write_byte(sb, '}')
+		}
+	}
+	write(&sb, v)
+	return strings.to_string(sb)
+}
+
 @(private)
 parse_script_overrides :: proc(propsObj: json.Object, allocator := context.temp_allocator) -> map[string]ScriptValue {
 	overrides := make(map[string]ScriptValue, len(propsObj), allocator)
@@ -1217,14 +1257,18 @@ parse_script_overrides :: proc(propsObj: json.Object, allocator := context.temp_
 		case json.Boolean:
 			overrides[key] = ScriptValue{type = .Boolean, valBool = bool(v)}
 		case json.Array:
+			// Also the array's JSON text: list properties (array / curve /
+			// gradient) use it whatever its length.
+			raw := Json_Compact(val)
+			overrides[key] = ScriptValue{type = .String, valString = strings.clone(string(raw), allocator)}
 			if len(v) >= 4 {
 				c: [4]f32
 				for i in 0 ..< 4 do c[i], _ = json_number(v[i])
-				overrides[key] = ScriptValue{type = .Color, valColor = c}
+				overrides[key] = ScriptValue{type = .Color, valColor = c, valString = strings.clone(string(raw), allocator)}
 			} else if len(v) >= 2 {
 				x, _ := json_number(v[0])
 				y, _ := json_number(v[1])
-				overrides[key] = ScriptValue{type = .Vector2, valVec2 = {x, y}}
+				overrides[key] = ScriptValue{type = .Vector2, valVec2 = {x, y}, valString = strings.clone(string(raw), allocator)}
 			}
 		}
 	}

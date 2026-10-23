@@ -989,21 +989,78 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 			return
 		}
 
-		// Stable order (map order is random).
+		// Stable order (map order is random): ungrouped first, then by group.
 		keys := make([dynamic]string, context.temp_allocator)
 		for k in inst.properties do append(&keys, k)
-		slice.sort(keys[:])
-		for name in keys {
+		group_of :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: string) -> string {
+			if p := Script_PropInfo(state, inst, name); p != nil do return p.group
+			return ""
+		}
+		Keyed :: struct {group, name: string}
+		keyed := make([dynamic]Keyed, context.temp_allocator)
+		for k in keys do append(&keyed, Keyed{group_of(state, inst, k), k})
+		slice.sort_by(keyed[:], proc(a, b: Keyed) -> bool {return a.group < b.group if a.group != b.group else a.name < b.name})
+		lastGroup := ""
+		for kk in keyed {
+			name := kk.name
+			if kk.group != lastGroup {
+				lastGroup = kk.group
+				UI_PropLabel("")
+				imgui.PushStyleColorImVec4(.Text, UI_ACCENT)
+				imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_LAYER_GROUP, kk.group))
+				imgui.PopStyleColor()
+				Drive_Item(fmt.tprintf("insp.script-group:%s", kk.group))
+			}
 			val := inst.properties[name]
+			info := Script_PropInfo(state, inst, name)
 			propLabel := script_prop_label(state, inst, name)
 			prop_label(propLabel, node, fmt.tprintf("script.%s", name), script_lua_value(val))
 			TIP :: imgui.HoveredFlags_DelayNormal | imgui.HoveredFlags_Stationary
-			if imgui.IsItemHovered() do script_prop_help(node, inst, name, propLabel, val, imgui.IsItemHovered(TIP))
+			if imgui.IsItemHovered() do script_prop_help(node, inst, name, propLabel, val, imgui.IsItemHovered(TIP), info.tooltip if info != nil else "")
 			id := fmt.tprintf("insp.script:%s", name)
 			label := fmt.ctprintf("##%s", id)
 			changed := false
 			defVal, hasDef := script_prop_default(state, inst, name)
 			imgui.SetNextItemWidth(field_width())
+			// Enum, lists (array / curve / gradient), sliders.
+			if info != nil && val.type == .String && (info.assetKind == "enum" || e.Script_IsJsonKind(info.assetKind)) {
+				newText := val.valString
+				edited := false
+				switch info.assetKind {
+				case "enum":
+					idx := -1
+					for v, i in info.values do if v == val.valString do idx = i
+					if picked, ok := UI_Combo(id, idx, info.values[:]); ok && picked >= 0 do newText, edited = info.values[picked], true
+				case "array":    newText, edited = script_array_field(state, node, id, info.elem, val.valString)
+				case "curve":    newText, edited = script_curve_field(id, val.valString)
+				case "gradient": newText, edited = script_gradient_field(id, val.valString)
+				}
+				if edited && newText != val.valString {
+					Editor_RecordUndo(state, fmt.tprintf("Edit %s", name))
+					e.ScriptInstance_SetProperty(inst, name, {type = .String, valString = newText}, sm)
+				}
+				if field_reset(id, hasDef && !script_value_equal(val, defVal)) {
+					Editor_RecordUndo(state, fmt.tprintf("Reset %s", name))
+					e.ScriptInstance_SetProperty(inst, name, defVal, sm)
+				}
+				continue
+			}
+			if info != nil && info.slider && info.max > info.min && (val.type == .Float || val.type == .Int) {
+				if val.type == .Float {
+					changed = imgui.SliderFloat(label, &val.valFloat, info.min, info.max, "%.2f")
+				} else {
+					iv := c.int(val.valInt)
+					if imgui.SliderInt(label, &iv, c.int(info.min), c.int(info.max)) {val.valInt = i64(iv); changed = true}
+				}
+				undo_on_activate(state, fmt.tprintf("Edit %s", name))
+				Drive_Item(id)
+				if changed do e.ScriptInstance_SetProperty(inst, name, val, sm)
+				if field_reset(id, hasDef && !script_value_equal(val, defVal)) {
+					Editor_RecordUndo(state, fmt.tprintf("Reset %s", name))
+					e.ScriptInstance_SetProperty(inst, name, defVal, sm)
+				}
+				continue
+			}
 			if val.type == .Vector2 {
 				if vec2_edit(state, id, &val.valVec2, 0.5, fmt.tprintf("Edit %s", name), defVal.valVec2 if hasDef else {}) {
 					e.ScriptInstance_SetProperty(inst, name, val, sm)
@@ -1062,7 +1119,7 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 				e.ScriptInstance_SetProperty(inst, name, defVal, sm)
 			}
 		}
-		if len(keys) == 0 {
+		if len(keyed) == 0 {
 			UI_PropLabel("")
 			UI_DimText("No exported properties")
 		}

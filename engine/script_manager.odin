@@ -29,6 +29,7 @@ ScriptManager_Init :: proc(sm: ^ScriptManager = nil, game: ^Game = nil) -> bool 
 	ScriptVFS_Init()
 	ScriptVFS_RegisterLuaSearcher(mgr.L)
 	RegisterEngineLuaBindings(mgr.L, mgr)
+	_ = lua.L_dostring(mgr.L, LUA_CURVE_HELPERS)
 
 	mgr.game = game
 	mgr.modules = make(map[string]^ScriptModule)
@@ -38,6 +39,43 @@ ScriptManager_Init :: proc(sm: ^ScriptManager = nil, game: ^Game = nil) -> bool 
 	log.info("[ScriptManager] Lua 5.4 scripting engine successfully initialized")
 	return true
 }
+
+// Curve / Gradient: sampling the values of curve and gradient script
+// properties (points {t, v}, stops {t, r, g, b, a}; t in 0..1).
+LUA_CURVE_HELPERS :: `
+Curve = {}
+function Curve.sample(points, t)
+    local n = #points
+    if n == 0 then return 0 end
+    if t <= points[1][1] then return points[1][2] end
+    for i = 2, n do
+        local a, b = points[i - 1], points[i]
+        if t <= b[1] then
+            local span = b[1] - a[1]
+            local f = span > 0 and (t - a[1]) / span or 0
+            return a[2] + (b[2] - a[2]) * f
+        end
+    end
+    return points[n][2]
+end
+Gradient = {}
+function Gradient.sample(stops, t)
+    local n = #stops
+    if n == 0 then return 1, 1, 1, 1 end
+    local function rgba(s) return s[2], s[3], s[4], s[5] or 1 end
+    if t <= stops[1][1] then return rgba(stops[1]) end
+    for i = 2, n do
+        local a, b = stops[i - 1], stops[i]
+        if t <= b[1] then
+            local span = b[1] - a[1]
+            local f = span > 0 and (t - a[1]) / span or 0
+            local function mix(k, d) return (a[k] or d) + ((b[k] or d) - (a[k] or d)) * f end
+            return mix(2, 1), mix(3, 1), mix(4, 1), mix(5, 1)
+        end
+    end
+    return rgba(stops[n])
+end
+`
 
 ScriptManager_Destroy :: proc(sm: ^ScriptManager = nil) {
 	mgr := sm if sm != nil else &scriptManager
@@ -56,14 +94,7 @@ ScriptManager_Destroy :: proc(sm: ^ScriptManager = nil) {
 	for k, mod in mgr.modules {
 		delete(k)
 		delete(mod.diskPath)
-		for p in mod.properties {
-			delete(p.name)
-			delete(p.label)
-			if p.assetKind != "" do delete(p.assetKind)
-			if p.type == .String && len(p.defaultVal.valString) > 0 {
-				delete(p.defaultVal.valString)
-			}
-		}
+		for &p in mod.properties do ScriptProperty_Destroy(&p)
 		delete(mod.properties)
 		free(mod)
 	}
@@ -223,8 +254,14 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 		if overrides != nil {
 			if overrideVal, hasOverride := overrides[prop.name]; hasOverride {
 				val = overrideVal
+				// A list kept as JSON: the saved array's text (overrides read
+				// short arrays as vectors / colours otherwise).
+				if Script_IsJsonKind(prop.assetKind) {
+					val = {type = .String, valString = overrideVal.valString if overrideVal.valString != "" else prop.defaultVal.valString}
+				}
 			}
 		}
+		if val.type != .String do val.valString = "" // (a list override's text, temp)
 		// The instance owns its strings (the default belongs to the module,
 		// overrides are often temp-allocated): sharing them double-freed.
 		if val.type == .String do val.valString = strings.clone(val.valString)
@@ -240,6 +277,8 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 		case .String:
 			if prop.assetKind == "node" {
 				lua.pushnil(L) // resolved to the node before ready() (the tree may not be built yet)
+			} else if Script_IsJsonKind(prop.assetKind) {
+				Lua_PushJSONText(L, val.valString) // a list: a table
 			} else {
 				sC := strings.clone_to_cstring(val.valString, context.temp_allocator)
 				lua.pushstring(L, sC)
@@ -276,6 +315,15 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 
 // Alias for Script_AttachToNode
 Node_AttachScript :: Script_AttachToNode
+
+// script_prop_kind: a script property's kind (assetKind: "node", "enum",
+// "array"..., "" for plain values).
+script_prop_kind :: proc(inst: ^ScriptInstance, name: string, mgr: ^ScriptManager) -> string {
+	mod, ok := mgr.modules[ScriptVFS_NormalizePath(inst.modulePath)]
+	if !ok || mod == nil do return ""
+	for p in mod.properties do if p.name == name do return p.assetKind
+	return ""
+}
 
 // script_node_prop: whether a script property is a node reference.
 script_node_prop :: proc(inst: ^ScriptInstance, name: string, mgr: ^ScriptManager) -> bool {
@@ -458,6 +506,7 @@ ScriptInstance_SetProperty :: proc(inst: ^ScriptInstance, name: string, val: Scr
 	propNameC := strings.clone_to_cstring(name, context.temp_allocator)
 
 	isNode := val.type == .String && script_node_prop(inst, name, mgr)
+	isJson := val.type == .String && Script_IsJsonKind(script_prop_kind(inst, name, mgr))
 	switch val.type {
 	case .Float:
 		lua.pushnumber(L, lua.Number(val.valFloat))
@@ -466,6 +515,8 @@ ScriptInstance_SetProperty :: proc(inst: ^ScriptInstance, name: string, val: Scr
 	case .String:
 		if isNode {
 			script_push_node_prop(L, inst, name, val.valString)
+		} else if isJson {
+			Lua_PushJSONText(L, val.valString)
 		} else {
 			sC := strings.clone_to_cstring(val.valString, context.temp_allocator)
 			lua.pushstring(L, sC)
@@ -539,6 +590,10 @@ Script_ParseProperties :: proc(L: ^lua.State, moduleIdx: c.int) -> [dynamic]Scri
 					case "bool", "boolean": prop.type = .Boolean
 					case "color":           prop.type = .Color
 					case "vector2", "vec2": prop.type = .Vector2
+					case "range":           prop.type = .Float; prop.slider = true
+					case "enum", "array", "curve", "gradient":
+						prop.type = .String
+						prop.assetKind = strings.clone(string(typeStr))
 					case "texture", "audio", "scene", "script", "component", "level", "file", "node":
 						// Asset paths - and node references ("node": a path from
 						// the script's node, the node itself in Lua).
@@ -558,8 +613,18 @@ Script_ParseProperties :: proc(L: ^lua.State, moduleIdx: c.int) -> [dynamic]Scri
 				case .Int:
 					prop.defaultVal.valInt = i64(lua.tointeger(L, -1))
 				case .String:
-					sC := lua.tostring(L, -1)
-					if sC != nil {
+					if Script_IsJsonKind(prop.assetKind) {
+						// A list: kept as JSON (pushed to Lua as a table).
+						json_text := lua_to_json(L, -1) if lua.type(L, -1) == .TABLE else ""
+						if json_text == "" {
+							switch prop.assetKind {
+							case "curve":    json_text = "[[0, 0], [1, 1]]"
+							case "gradient": json_text = "[[0, 1, 1, 1, 1], [1, 1, 1, 1, 1]]"
+							case:            json_text = "[]"
+							}
+						}
+						prop.defaultVal.valString = strings.clone(json_text)
+					} else if sC := lua.tostring(L, -1); sC != nil {
 						prop.defaultVal.valString = strings.clone(string(sC))
 					}
 				case .Boolean:
@@ -590,6 +655,33 @@ Script_ParseProperties :: proc(L: ^lua.State, moduleIdx: c.int) -> [dynamic]Scri
 				if lua.isnumber(L, -1) {
 					prop.max = f32(lua.tonumber(L, -1))
 				}
+				lua.pop(L, 1)
+
+				// Enum values, array element type, slider, group, tooltip.
+				lua.getfield(L, -1, "values")
+				if lua.type(L, -1) == .TABLE {
+					for i in 1 ..= int(lua.rawlen(L, -1)) {
+						lua.rawgeti(L, -1, lua.Integer(i))
+						if v := lua.tostring(L, -1); v != nil do append(&prop.values, strings.clone(string(v)))
+						lua.pop(L, 1)
+					}
+				}
+				lua.pop(L, 1)
+				if prop.assetKind == "enum" && prop.defaultVal.valString == "" && len(prop.values) > 0 {
+					prop.defaultVal.valString = strings.clone(prop.values[0])
+				}
+				str_field :: proc(L: ^lua.State, key: cstring) -> string {
+					lua.getfield(L, -1, key)
+					defer lua.pop(L, 1)
+					if lua.type(L, -1) == .STRING do return strings.clone(string(lua.tostring(L, -1)))
+					return ""
+				}
+				prop.elem = str_field(L, "of")
+				if prop.assetKind == "array" && prop.elem == "" do prop.elem = strings.clone("string")
+				prop.group = str_field(L, "group")
+				prop.tooltip = str_field(L, "tooltip")
+				lua.getfield(L, -1, "slider")
+				if lua.toboolean(L, -1) do prop.slider = true
 				lua.pop(L, 1)
 
 				// 4. Label / Tooltip

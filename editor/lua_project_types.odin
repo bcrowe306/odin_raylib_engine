@@ -173,6 +173,23 @@ lua_type_of :: proc(p: e.ScriptProperty) -> string {
 	case "level":     return "LevelPath"
 	case "script":    return "ScriptPath"
 	case "node":      return "Node? # a node (set in the Inspector)"
+	case "curve":     return "number[][] # a curve: {{t, v}, ...} (Curve.sample)"
+	case "gradient":  return "number[][] # a gradient: {{t, r, g, b, a}, ...} (Gradient.sample)"
+	case "enum":
+		vals := make([dynamic]string, context.temp_allocator)
+		for v in p.values do append(&vals, fmt.tprintf("%q", v))
+		if len(vals) == 0 do return "string"
+		return strings.join(vals[:], "|", context.temp_allocator)
+	case "array":
+		el := "string"
+		switch p.elem {
+		case "float", "number":  el = "number"
+		case "int", "integer":   el = "integer"
+		case "bool", "boolean":  el = "boolean"
+		case "color", "vector2", "vec2": el = "number[]"
+		case "node":             el = "Node"
+		}
+		return fmt.tprintf("%s[]", el)
 	}
 	switch p.type {
 	case .Float:   return "number"
@@ -388,7 +405,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		if !ok || mod == nil do continue
 		for p in mod.properties {
 			t := lua_type_of(p)
-			doc := p.label if p.label != "" else ""
+			doc := p.tooltip if p.tooltip != "" else (p.label if p.label != "" else "")
 			if i := strings.index(t, " # "); i >= 0 {
 				if doc == "" do doc = t[i + 3:]
 				t = t[:i]

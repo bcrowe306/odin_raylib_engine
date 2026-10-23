@@ -5178,6 +5178,35 @@ Camera = CameraModule
 ---@type PhysicsModule
 Physics = PhysicsModule
 
+---Sampling curve script properties ({ type = "curve" }: points {t, v}).
+---@class CurveModule
+CurveModule = {}
+
+---The curve's value at t (linear between points; clamped at the ends).
+---@param points number[][] The property's value ({{t, v}, ...})
+---@param t number 0..1 (any value works)
+---@return number
+function CurveModule.sample(points, t) end
+
+---Sampling gradient script properties ({ type = "gradient" }: stops {t, r, g, b, a}).
+---@class GradientModule
+GradientModule = {}
+
+---The gradient's colour at t (linear between stops), 0..1 channels.
+---@param stops number[][] The property's value ({{t, r, g, b, a}, ...})
+---@param t number 0..1
+---@return number r
+---@return number g
+---@return number b
+---@return number a
+function GradientModule.sample(stops, t) end
+
+---@type CurveModule
+Curve = CurveModule
+
+---@type GradientModule
+Gradient = GradientModule
+
 ---@type SceneModule
 Scene = SceneModule
 Tween = TweenModule

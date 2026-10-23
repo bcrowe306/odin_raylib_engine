@@ -36,8 +36,31 @@ ScriptProperty :: struct {
 	label:      string,
 	// Asset reference properties (type = "texture", "audio", "scene",
 	// "script", "component", "level", "file"): a project-relative path
-	// (String value) that the Inspector edits with an asset picker.
+	// (String value) that the Inspector edits with an asset picker. Also
+	// "node" (a path from the script's node), "enum" (one of `values`), and
+	// JSON lists: "array" (of `elem`), "curve" ({{t, v}, ...}), "gradient"
+	// ({{t, r, g, b, a}, ...}) - Lua tables.
 	assetKind:  string,
+	values:     [dynamic]string, // enum choices
+	elem:       string,          // array element type ("string", "float", "node", "texture"...)
+	slider:     bool,            // a slider between min and max (type = "range" or slider = true)
+	group:      string,          // Inspector group header
+	tooltip:    string,          // Inspector help
+}
+
+// Script_IsJsonKind: a property kind stored as JSON text (a Lua table).
+Script_IsJsonKind :: proc(kind: string) -> bool {return kind == "array" || kind == "curve" || kind == "gradient"}
+
+ScriptProperty_Destroy :: proc(p: ^ScriptProperty) {
+	delete(p.name)
+	delete(p.label)
+	if p.assetKind != "" do delete(p.assetKind)
+	if p.type == .String && len(p.defaultVal.valString) > 0 do delete(p.defaultVal.valString)
+	for v in p.values do delete(v)
+	delete(p.values)
+	delete(p.elem)
+	delete(p.group)
+	delete(p.tooltip)
 }
 
 ScriptModule :: struct {

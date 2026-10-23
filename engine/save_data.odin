@@ -93,6 +93,23 @@ Save_FilePath :: proc(allocator := context.temp_allocator) -> string {
 
 // --- JSON <-> Lua ------------------------------------------------------------------
 
+// Lua_PushJSONText pushes a JSON text as a Lua value (nil if it doesn't parse).
+Lua_PushJSONText :: proc(L: ^lua.State, text: string) {
+	v, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
+	if err != .None {
+		lua.pushnil(L)
+		return
+	}
+	push_json(L, v)
+}
+
+// lua_to_json: the Lua value at `idx` as JSON text (temp).
+lua_to_json :: proc(L: ^lua.State, idx: c.int) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	write_lua(L, lua.absindex(L, idx), &sb, 0, "")
+	return strings.to_string(sb)
+}
+
 @(private = "file")
 push_json :: proc(L: ^lua.State, v: json.Value) {
 	switch x in v {

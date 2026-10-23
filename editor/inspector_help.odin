@@ -66,7 +66,7 @@ help_show :: proc(node: ^e.Node, keyName, title, doc, meta, path: string, tip: b
 
 // script_prop_help: help for a script's exported property (path
 // "script.<name>").
-script_prop_help :: proc(node: ^e.Node, inst: ^e.ScriptInstance, name, label: string, val: e.ScriptValue, tip: bool) {
+script_prop_help :: proc(node: ^e.Node, inst: ^e.ScriptInstance, name, label: string, val: e.ScriptValue, tip: bool, tooltip := "") {
 	kind: string
 	switch val.type {
 	case .Float:   kind = "number"
@@ -76,7 +76,7 @@ script_prop_help :: proc(node: ^e.Node, inst: ^e.ScriptInstance, name, label: st
 	case .Color:   kind = "colour"
 	case .Vector2: kind = "x, y"
 	}
-	doc := fmt.tprintf("An exported property of %s.", filepath.base(inst.modulePath))
+	doc := tooltip if tooltip != "" else fmt.tprintf("An exported property of %s.", filepath.base(inst.modulePath))
 	help_show(node, fmt.tprintf("script.%s", name), label, doc, kind, fmt.tprintf("script.%s", name), tip)
 }
 
