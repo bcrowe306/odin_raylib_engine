@@ -40,6 +40,7 @@ api_build :: proc() {
 			q := strings.index_byte(sig, ')')
 			if p < 0 || q < p do continue
 			head := sig[:p]
+			if head in api.sigs do continue // (declared twice)
 			if dot := strings.last_index_any(head, ".:"); dot >= 0 {
 				params := parse_params(sig[p + 1:q]) // (only stored ones: global functions are skipped)
 				api.sigs[strings.clone(head)] = params
@@ -232,14 +233,15 @@ code_inlay_before :: proc(hints: []Code_Inlay, from, col: int) -> int {
 
 // Code_InlayShutdown frees the engine API signatures (built once).
 Code_InlayShutdown :: proc() {
-	for k, v in api.sigs {
-		delete(k)
-		// Methods ":name" share their params with the class entry: free each slice once.
-		if !strings.has_prefix(k, ":") || !api_shared(v) {
-			for p in v do delete(p)
-			delete(v)
-		}
+	// Methods ":name" share their params with the class entry: free each slice once.
+	freed := make(map[rawptr]bool, context.temp_allocator)
+	for _, v in api.sigs {
+		if raw_data(v) == nil || raw_data(v) in freed do continue
+		freed[raw_data(v)] = true
+		for p in v do delete(p)
+		delete(v)
 	}
+	for k in api.sigs do delete(k)
 	delete(api.sigs)
 	for k, v in api.modules {
 		delete(k)
@@ -247,10 +249,4 @@ Code_InlayShutdown :: proc() {
 	}
 	delete(api.modules)
 	api = {}
-}
-
-@(private = "file")
-api_shared :: proc(v: []string) -> bool {
-	for k, w in api.sigs do if !strings.has_prefix(k, ":") && raw_data(w) == raw_data(v) do return true
-	return false
 }
