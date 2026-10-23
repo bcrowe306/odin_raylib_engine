@@ -70,6 +70,7 @@ exits non-zero if any check fails.
 | `script_drop_tree.drive` | A script dragged from Assets onto a scene-tree row attaches it (node selected); another replaces it; undo restores each. |
 | `lua_console.drive` | The Console's Lua line: in Simulate an expression (a node), a statement then its value, an error, history (Up); in Play the game evaluates (`Scene.get_name()`, a Vec2). |
 | `debug_watch_condition.drive` | A breakpoint condition from the gutter's right-click: false never stops, true stops with the reason; watch expressions in the paused frame; the Console's Lua line there. |
+| `lua_api_reference.drive` | Hover over an engine function shows its description and `Example:`; F1 opens the Scripting Reference with its API entry and the Audio section; search and pick a section. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -146,6 +147,7 @@ Queries:
 - `slicer-zoom` (the slicer's zoom, `0.00` = Fit), `slicer-selection` (picked cells, `0,1,2`), `hidden-tab-bars` (docked spaces whose tab bar is hidden)
 - `game-pid` (the running game's process id, 0 = none), `last-played` (the scene Restart plays, `project` = the initial scene)
 - `insp-help-path` (the path the help pane shows)
+- `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk)
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)

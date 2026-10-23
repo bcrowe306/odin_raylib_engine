@@ -106,4 +106,4 @@ Script authoring
 
 Docs in place
 - [x] 8.25 Every API function documented in `engine_api.lua` (description + example) for hover
-- [ ] 8.26 F1 on an API symbol opens its section of the scripting reference in the editor
+- [x] 8.26 F1 on an API symbol opens its section of the scripting reference in the editor

@@ -124,6 +124,7 @@ Actions_Init :: proc() {
 	add({id = "debug.step_in", category = "Debug", label = "Step Into", chords = k(ch(.F11)), scope = .Global, run = proc(s: ^EditorState) {Debug_Command("step-in")}, enabled = proc(s: ^EditorState) -> bool {return Debug_IsStopped()}})
 	add({id = "debug.step_out", category = "Debug", label = "Step Out", chords = k(ch(.F11, SH)), scope = .Global, run = proc(s: ^EditorState) {Debug_Command("step-out")}, enabled = proc(s: ^EditorState) -> bool {return Debug_IsStopped()}})
 	add({id = "help.welcome", category = "Help", label = "Welcome", scope = .Global, run = Welcome_Open})
+	add({id = "help.reference", category = "Help", label = "Scripting Reference", scope = .Global, run = proc(s: ^EditorState) {ScriptReference_Open()}})
 	add({id = "help.shortcuts", category = "Help", label = "Keyboard Shortcuts", chords = k(ch(.K, PS)), scope = .Global, run = proc(s: ^EditorState) {showShortcutsWindow = true}})
 
 	// --- Scene editing ---
@@ -188,6 +189,7 @@ Actions_Init :: proc() {
 	add({id = "view.snap_rotation", category = "View", label = "Snap Rotation", scope = .Scene, run = proc(s: ^EditorState) {s.snapRotation = !s.snapRotation}, checked = proc(s: ^EditorState) -> bool {return s.snapRotation}})
 
 	// --- Code editor (Zed defaults) ---
+	add({id = "code.reference", category = "Code", label = "Scripting Reference for Symbol", chords = k(ch(.F1)), scope = .Code, run = Code_CmdReference})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})

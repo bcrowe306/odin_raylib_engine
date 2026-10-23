@@ -458,7 +458,10 @@ callbacks.
 The engine provides full IntelliSense, autocomplete, parameter hints, and type diagnostics for `lua-language-server` (VS Code, Neovim, Helix, Sublime Text).
 
 Every API function in the definitions has a description and a one-line
-`Example:` - shown when you hover it or pick it in completion
+`Example:` - shown when you hover it or pick it in completion. **F1** on a
+name in the Code tab opens **Help > Scripting Reference** (this guide, by
+section, searchable) with the function's API entry on top and the section
+about it (`Audio.play_sound` -> the Audio module)
 (`lua_api_docs_test.odin` keeps it that way: a new binding needs both).
 
 - **Stubs definition file**: [`engine/definitions/engine_api.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/definitions/engine_api.lua)

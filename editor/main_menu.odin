@@ -205,6 +205,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 
 	if menu_begin("Help") {
 		menu_action(state, "help.welcome")
+		menu_action(state, "help.reference")
 		menu_action(state, "help.shortcuts")
 		menu_action(state, "palette.commands")
 		if menu_item("About") do Editor_Log(state, .Info, "Odin Raylib Engine editor")

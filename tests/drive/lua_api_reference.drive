@@ -1,0 +1,34 @@
+# API docs: hover over an engine function shows its description and
+# example; F1 on it opens the Scripting Reference with its API entry and
+# the section about it (Help menu opens it too).
+wait 5
+click @asset.new-script
+click @newscript.create
+wait 2
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 4
+key enter
+key enter
+type Audio.play_sound
+key esc
+wait 30
+hover @code.caret+-20,0
+wait-until code.hover contains Example: timeout=600
+expect code.hover contains Audio.play_sound(
+screenshot hover
+key f1
+wait 3
+expect item:ref.window == visible
+expect ref-api contains AudioModule.play_sound(path, volume, pitch)
+expect ref-api contains Example:
+expect ref-section contains Audio
+screenshot reference
+click @ref.search
+type spawn
+wait 2
+expect item:ref.section:7. Scene Module (`Scene`) == visible
+click @ref.section:7. Scene Module (`Scene`)
+wait 2
+expect ref-section == 7. Scene Module (`Scene`)
+screenshot section

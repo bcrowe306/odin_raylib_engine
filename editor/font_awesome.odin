@@ -132,3 +132,4 @@ ICON_FA_ARROW_RIGHT_LONG          :: ""
 ICON_FA_HAND_POINTER              :: ""
 ICON_FA_STAR                      :: "" // Default animation
 ICON_FA_GLOBE                     :: "\uF0AC" // Global script
+ICON_FA_BOOK                      :: "\uF02D" // Reference
