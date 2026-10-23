@@ -266,6 +266,59 @@ code_node_ref :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, selfOk
 	return fmt.tprintf("Scene.find_node(%q)", node.name)
 }
 
+// --- Dragging project names into a script (input actions, animations) -------
+
+CODE_ITEM_PAYLOAD :: "ORE_CODE_ITEM"
+
+Code_Item_Kind :: enum {
+	Action,    // an input action: Input.is_action_pressed (Shift: is_action_down)
+	Animation, // an AnimationPlayer's animation: animation_play
+}
+
+Code_Item_Payload :: struct {
+	kind: Code_Item_Kind,
+	node: ^e.Node, // the AnimationPlayer (animations)
+	name: [128]u8,
+	nlen: int,
+}
+
+// code_item_drag makes the item just drawn a drag source of a project name.
+code_item_drag :: proc(kind: Code_Item_Kind, name: string, node: ^e.Node = nil) {
+	if imgui.IsItemHovered() do imgui.SetMouseCursor(.Hand)
+	if !imgui.BeginDragDropSource({}) do return
+	pl := Code_Item_Payload{kind = kind, node = node}
+	pl.nlen = copy(pl.name[:], name)
+	imgui.SetDragDropPayload(CODE_ITEM_PAYLOAD, &pl, size_of(Code_Item_Payload))
+	imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_CODE, name))
+	UI_DimText("Drop in a script" if kind == .Animation else "Drop in a script · Shift: held, not just pressed")
+	imgui.EndDragDropSource()
+}
+
+// code_item_text: the Lua a dropped project name becomes.
+code_item_text :: proc(state: ^EditorState, doc: ^Code_Doc, it: ^Code_Item_Payload, shift: bool) -> string {
+	name := string(it.name[:it.nlen])
+	switch it.kind {
+	case .Action:
+		return fmt.tprintf("Input.%s(%q)", "is_action_down" if shift else "is_action_pressed", name)
+	case .Animation:
+		if !e.Node_IsAlive(it.node) || state.activeScene == nil do return fmt.tprintf("animation_play(%q)", name)
+		return fmt.tprintf("%s:animation_play(%q)", code_node_ref(state, doc, it.node, true), name)
+	}
+	return ""
+}
+
+// code_asset_use: the Lua that uses an asset (Alt + drop): play a sound,
+// change to a scene, show a texture on this script's node ("" = none).
+code_asset_use :: proc(state: ^EditorState, doc: ^Code_Doc, rel: string) -> string {
+	switch Asset_KindOf(rel) {
+	case .Audio:   return fmt.tprintf("Audio.play_sound(%q)", rel)
+	case .Scene:   return fmt.tprintf("Scene.change_scene(%q)", Asset_DisplayName(rel))
+	case .Texture: return fmt.tprintf("self.node:set_texture(%q)", rel)
+	case .Component, .Script, .Level, .Shader, .Package, .Other:
+	}
+	return ""
+}
+
 // --- Dragging an Inspector property's name ----------------------------------
 
 PROP_PAYLOAD :: "ORE_PROP"
@@ -362,11 +415,27 @@ code_drop_target :: proc(state: ^EditorState, doc: ^Code_Doc, mouse: [2]f32) {
 		preview(b, pos)
 		io := imgui.GetIO()
 		asProp := io.KeyCtrl || io.KeySuper
-		if asProp do imgui.SetTooltip("Add as an exported property")
+		p := (^Asset_Payload)(payload.Data)
+		rel := strings.clone(string(p.path[:p.len]), context.temp_allocator)
+		use := code_asset_use(state, doc, rel)
+		switch {
+		case asProp:                imgui.SetTooltip("Add as an exported property")
+		case io.KeyAlt && use != "": imgui.SetTooltip("%s", strings.clone_to_cstring(use, context.temp_allocator))
+		case use != "":             imgui.SetTooltip("The path · Cmd: an exported property · Alt: %s", strings.clone_to_cstring(use, context.temp_allocator))
+		}
 		if payload.Delivery {
-			p := (^Asset_Payload)(payload.Data)
-			rel := strings.clone(string(p.path[:p.len]), context.temp_allocator)
-			Code_DropAsset(doc, rel, pos, asProp)
+			if io.KeyAlt && use != "" && !asProp do code_insert(doc, pos, use)
+			else do Code_DropAsset(doc, rel, pos, asProp)
+			cm.focusRequest = true
+		}
+	}
+	if payload := imgui.AcceptDragDropPayload(CODE_ITEM_PAYLOAD, {.AcceptBeforeDelivery, .AcceptNoDrawDefaultRect}); payload != nil {
+		preview(b, pos)
+		it := (^Code_Item_Payload)(payload.Data)
+		text := code_item_text(state, doc, it, imgui.GetIO().KeyShift)
+		imgui.SetTooltip("%s", strings.clone_to_cstring(text, context.temp_allocator))
+		if payload.Delivery {
+			if text != "" do code_insert(doc, pos, text)
 			cm.focusRequest = true
 		}
 	}

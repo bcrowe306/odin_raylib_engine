@@ -78,7 +78,7 @@ Autocomplete and type safety
 - [x] 8.6 Diagnostics: Lua runtime errors as squiggles in the Code tab (Play / Simulate); warnings for unknown node paths / property names
 
 Drag and drop, editor ↔ code
-- [ ] 8.7 Drop an animation / input action / scene / sound into code
+- [x] 8.7 Drop an animation / input action / scene / sound into code
 - [ ] 8.8 Drop a Signals-panel event row into code: a `connect` with the handler signature
 - [ ] 8.9 Drop a node onto a method: a `connect` to one of its events
 - [ ] 8.10 Node-reference exported properties (`type = "node"`, Inspector picker); dropping a node on the `properties` table adds one

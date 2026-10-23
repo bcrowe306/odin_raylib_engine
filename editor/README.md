@@ -217,6 +217,14 @@ it; anywhere else (an argument) it gets an inline cast,
 `self.node:get_node("../Player") --[[@as CharacterMoverNode]]`. Plain
 `Node`s get no annotation.
 
+**Drag project names into a script**: an input action from the chips in
+the Preview panel's Script tab inserts `Input.is_action_pressed("jump")`
+(Shift: `is_action_down`); the hand next to the Animation tab's picker
+inserts `<player>:animation_play("walk")`; an asset dropped with **Alt**
+inserts code that uses it - a sound `Audio.play_sound(...)`, a scene
+`Scene.change_scene(...)`, a texture `self.node:set_texture(...)` (plain:
+its path; Cmd: an exported property).
+
 **Drag a property's name into a script** (the Code tab) to insert a read:
 `self.node:get_property("rotation")`. Hold **Shift** when dropping for a
 write with the current value: `self.node:set_property("rotation", 45)`.

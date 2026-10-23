@@ -54,6 +54,7 @@ exits non-zero if any check fails.
 | `lua_aliases.drive` | Project names complete in API calls: locale keys (tr), keys (Input.is_key_pressed), save keys (Save.get); animation and state names in the generated types. |
 | `lua_runtime_diags.drive` | Simulate: a get_node on a missing path (warning) and a nil index (error) show as diagnostics on their lines; saving clears them. |
 | `lua_runtime_diags_play.drive` | Play: a script error in the game's output becomes a diagnostic on its line. |
+| `code_drop_items.drive` | Dropped into a script: an input action chip (is_action_pressed, Shift: is_action_down), a sound with Alt (Audio.play_sound), an animation (animation_play). |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

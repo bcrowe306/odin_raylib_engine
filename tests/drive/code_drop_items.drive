@@ -1,0 +1,43 @@
+# Project names dropped into a script: an input action (Preview > Script
+# chips: is_action_pressed, Shift: is_action_down), an asset with Alt (a
+# sound: Audio.play_sound), an animation (Animation tab's hand:
+# animation_play on that player).
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+key escape
+click @asset:scripts/player_ship.lua
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+drag @preview.action:jump @code.caret
+expect code.text contains Input.is_action_pressed("jump")
+key end
+key enter
+hold shift
+drag @preview.action:fire @code.caret
+release
+expect code.text contains Input.is_action_down("fire")
+key end
+key enter
+hold alt
+drag @asset:audio/cannon-gunshot-1.wav @code.caret
+release
+expect code.text contains Audio.play_sound("audio/cannon-gunshot-1.wav")
+screenshot dropped
+key end
+key enter
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+wait 3
+click @anim.new
+drag @anim.drag @code.caret
+expect code.text contains :animation_play("anim_1")

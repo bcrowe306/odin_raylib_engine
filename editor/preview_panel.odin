@@ -848,6 +848,21 @@ PreviewPanel_RenderScript :: proc(state: ^EditorState) {
 
 	imgui.Separator()
 
+	// Project names to drag into a script.
+	if len(state.projectConfig.actions) > 0 {
+		UI_DimText(fmt.tprintf("%s  Input actions - drag into the script:", ICON_FA_GAMEPAD))
+		right := imgui.GetWindowPos().x + imgui.GetWindowContentRegionMax().x
+		lastX: f32 = 0
+		for a, i in state.projectConfig.actions {
+			w := imgui.CalcTextSize(strings.clone_to_cstring(a.name, context.temp_allocator)).x + imgui.GetStyle().FramePadding.x * 2
+			if i > 0 && lastX + 4 + w < right do imgui.SameLine(0, 4) // wrap when the row is full
+			UI_Button(a.name, fmt.tprintf("preview.action:%s", a.name))
+			code_item_drag(.Action, a.name)
+			lastX = imgui.GetItemRectMax().x
+		}
+		imgui.Separator()
+	}
+
 	// 1. Exported Properties Table (inspected via engine ScriptManager)
 	props, hasProps := e.Script_InspectProperties(scriptPath, state.game.gameContext.scriptManager)
 	if hasProps && len(props) > 0 {

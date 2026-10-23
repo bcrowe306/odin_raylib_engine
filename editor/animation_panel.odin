@@ -383,6 +383,9 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		return
 	}
 	imgui.SameLine(0, 2)
+	UI_IconButton(ICON_FA_HAND, "anim.drag", "Drag into a script: animation_play(\"name\") on this player", size = 26)
+	code_item_drag(.Animation, anim.name, apn)
+	imgui.SameLine(0, 2)
 	if UI_IconButton(ICON_FA_TRASH, "anim.delete-animation", "Delete animation (Cmd+Z brings it back)", size = 26) {
 		preview_restore(state)
 		Editor_RecordUndo(state, "Delete animation")
