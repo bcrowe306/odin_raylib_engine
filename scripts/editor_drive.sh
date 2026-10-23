@@ -19,7 +19,7 @@ build() {
 	return 1
 }
 # EDITOR_DEFINES: extra build flags (e.g. -define:ORE_MEM_TRACK=true for leak reports).
-build editor -out:bin/editor $EDITOR_DEFINES || exit 1
+build editor -out:bin/editor ${EDITOR_DEFINES:-} || exit 1
 build . -out:bin/odin_raylib_engine || exit 1
 
 if [ $# -gt 0 ]; then
