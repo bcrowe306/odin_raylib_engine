@@ -555,7 +555,7 @@ code_completion_popup :: proc(state: ^EditorState, doc: ^Code_Doc) {
 
 	imgui.DrawList_AddRectFilled(dl, {pos.x + 2, pos.y + 3}, {cm.popupMax.x + 2, cm.popupMax.y + 3}, col_u32({0, 0, 0, 0.35}), 8)
 	imgui.DrawList_AddRectFilled(dl, {pos.x, pos.y}, {cm.popupMax.x, cm.popupMax.y}, col_u32(UI_BG_RAISED), 8)
-	imgui.DrawList_AddRect(dl, {pos.x, pos.y}, {cm.popupMax.x, cm.popupMax.y}, col_u32({1, 1, 1, 0.08}), 8)
+	imgui.DrawList_AddRect(dl, {pos.x, pos.y}, {cm.popupMax.x, cm.popupMax.y}, col_u32(ui_line(0.08)), 8)
 
 	clicked := -1
 	for r in 0 ..< rows {
@@ -592,7 +592,7 @@ code_completion_popup :: proc(state: ^EditorState, doc: ^Code_Doc) {
 		frac := f32(rows) / f32(len(comp.filtered))
 		barH := h * frac
 		barY := pos.y + (h - barH) * f32(top) / f32(max(len(comp.filtered) - rows, 1))
-		imgui.DrawList_AddRectFilled(dl, {pos.x + w - 4, barY + 2}, {pos.x + w - 1, barY + barH - 2}, col_u32({1, 1, 1, 0.18}), 2)
+		imgui.DrawList_AddRectFilled(dl, {pos.x + w - 4, barY + 2}, {pos.x + w - 1, barY + barH - 2}, col_u32(ui_line(0.18)), 2)
 	}
 	if doc_text != "" {
 		// The selected item's docs: next to the list when there's room,

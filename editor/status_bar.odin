@@ -27,7 +27,7 @@ StatusBar_Render :: proc(state: ^EditorState, width, displayH, barHeight: f32) {
 	defer imgui.PopFont()
 
 	modified := Editor_ModifiedSceneCountCached(state)
-	scene := filepath.base(state.activeScenePath) if state.activeScenePath != "" else "no scene"
+	scene := Asset_DisplayName(state.activeScenePath) if state.activeScenePath != "" else "no scene"
 	if modified > 0 {
 		imgui.PushStyleColorImVec4(.Text, UI_WARNING)
 		imgui.TextUnformatted(fmt.ctprintf("%s  %s - %d unsaved", ICON_FA_CLAPPERBOARD, scene, modified))

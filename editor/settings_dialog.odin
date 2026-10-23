@@ -32,7 +32,7 @@ Settings_Tab :: enum {
 Settings_State :: struct {
 	tab:        Settings_Tab,
 	selectTab:  bool,
-	generalPage: int, // 0 Basic, 1 Keymap
+	generalPage: int, // 0 Basic, 1 Keymap, 2 Theme
 	projectPage: int, // 0 General, 1 Input, 2 Video, 3 Audio, 4 Export
 	editor:     Editor_Settings,
 	project:    e.ProjectConfig,
@@ -162,6 +162,7 @@ ProjectSettingsDialog_Render :: proc(state: ^EditorState) {
 	imgui.SetCursorPosX(imgui.GetWindowWidth() - 18 - 120 - 96 - UI_SPACE)
 	if UI_Button("Cancel", "settings.cancel", {96, 32}) || (imgui.IsKeyPressed(.Escape) && st.recording == "" && !st.listening) {
 		state.showProjectSettings = false
+		Theme_Apply(GlobalSettings.theme) // drop a previewed theme
 		imgui.CloseCurrentPopup()
 	}
 	imgui.SameLine(0, UI_SPACE)
@@ -200,7 +201,7 @@ settings_save :: proc(state: ^EditorState) {
 
 @(private = "file")
 settings_general :: proc(state: ^EditorState, h: f32) {
-	if imgui.BeginChild("##gen_nav", {170, h}, {}, {}) do nav("general", {"Basic", "Keymap"}, &st.generalPage)
+	if imgui.BeginChild("##gen_nav", {170, h}, {}, {}) do nav("general", {"Basic", "Keymap", "Theme"}, &st.generalPage)
 	imgui.EndChild()
 	imgui.SameLine(0, UI_SPACE * 2)
 	if imgui.BeginChild("##gen_body", {0, h}, {}, {}) {
@@ -226,6 +227,8 @@ settings_general :: proc(state: ^EditorState, h: f32) {
 			}
 		case 1:
 			settings_keymap(state)
+		case 2:
+			Theme_Editor(&s.theme) // previews live; Cancel restores the saved theme
 		}
 	}
 	imgui.EndChild()

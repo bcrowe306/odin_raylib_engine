@@ -699,6 +699,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	case "shortcuts-open": return "true" if showShortcutsWindow else "false", true
 	case "usages": return fmt.tprint(AssetUsages_Count()), true
 	case "workspace": return currentWorkspace, true
+	case "theme": return GlobalSettings.theme.name, true // the saved theme
+	case "theme-panel": return theme_color_text(UI_BG_PANEL), true // the colour panels draw with now
 	case "node-icons":
 		// "<distinct icons>/<node types>" in the Add Node catalogue.
 		seen := make(map[string]bool, allocator = context.temp_allocator)

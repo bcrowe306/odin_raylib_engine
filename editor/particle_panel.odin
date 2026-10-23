@@ -173,7 +173,7 @@ particle_color :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode) {
 		c1 := col_u32(to_vec4(e.ColorRamp_Evaluate(ramp, t1)))
 		imgui.DrawList_AddRectFilledMultiColor(dl, {mn.x + w * t0, mn.y}, {mn.x + w * t1, mx.y}, c0, c1, c1, c0)
 	}
-	imgui.DrawList_AddRect(dl, mn, mx, col_u32({1, 1, 1, 0.25}), 3)
+	imgui.DrawList_AddRect(dl, mn, mx, col_u32(ui_line(0.25)), 3)
 	imgui.SetCursorScreenPos(mn)
 	imgui.InvisibleButton("##gradbar", {w, barH})
 	Drive_Item("particles.gradient")
@@ -197,7 +197,7 @@ particle_color :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode) {
 		imgui.DrawList_AddTriangleFilled(dl, tri[0], tri[1], tri[2], col_u32(UI_ACCENT if sel else {0.85, 0.85, 0.9, 1}))
 		checker(dl, box[0], box[1])
 		imgui.DrawList_AddRectFilled(dl, box[0], box[1], col_u32(to_vec4(st.color)))
-		imgui.DrawList_AddRect(dl, box[0], box[1], col_u32(UI_ACCENT if sel else {1, 1, 1, 0.6}), 0, {}, 2 if sel else 1)
+		imgui.DrawList_AddRect(dl, box[0], box[1], col_u32(UI_ACCENT if sel else ui_line(0.6)), 0, {}, 2 if sel else 1)
 		if point_in_rect(mouse, {x - r, my}, {x + r, my + 24}) do hovered = i
 		Drive_ItemRect(fmt.tprintf("particles.stop:%d", i), {x - r, my}, {x + r, my + 24})
 	}
@@ -269,11 +269,11 @@ particle_color :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode) {
 	imgui.DrawList_AddRectFilled(dl, pmn, pmx, col_u32(UI_BG_APP), 4)
 	for g in 1 ..< 4 {
 		y := pmn.y + plotH * f32(g) / 4
-		imgui.DrawList_AddLine(dl, {pmn.x, y}, {pmx.x, y}, col_u32({1, 1, 1, 0.06}))
+		imgui.DrawList_AddLine(dl, {pmn.x, y}, {pmx.x, y}, col_u32(ui_line(0.06)))
 	}
 	for g in 1 ..< 4 {
 		x := pmn.x + plotW * f32(g) / 4
-		imgui.DrawList_AddLine(dl, {x, pmn.y}, {x, pmx.y}, col_u32({1, 1, 1, 0.06}))
+		imgui.DrawList_AddLine(dl, {x, pmn.y}, {x, pmx.y}, col_u32(ui_line(0.06)))
 	}
 	curve :: proc(dl: ^imgui.DrawList, ramp: ^e.ColorRamp, pmn: [2]f32, w, h: f32, channel: int, col: imgui.Vec4) {
 		prev: [2]f32

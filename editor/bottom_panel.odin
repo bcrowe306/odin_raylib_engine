@@ -8,7 +8,7 @@ import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
-// Bottom panel: Console (editor, build and game output), Scene JSON, Profiler.
+// Bottom panel: Console (editor, build and game output), Profiler, Game, tools.
 // ============================================================================
 
 consoleFilterBuf: [128]u8
@@ -29,12 +29,6 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:console")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Scene JSON###OutputTab", ICON_FA_CODE)) {
-			state.bottomTab = .Output
-			BottomPanel_RenderOutput(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:json")
 		if imgui.BeginTabItem(fmt.ctprintf("%s  Profiler###ProfTab", ICON_FA_CHART_LINE)) {
 			state.bottomTab = .Profiler
 			BottomPanel_RenderProfiler(state)
@@ -178,26 +172,6 @@ BottomPanel_RenderConsole :: proc(state: ^EditorState, counts: [LogLevel]int) {
 	}
 	imgui.EndChild()
 	imgui.PopStyleVar()
-	imgui.PopStyleColor()
-}
-
-BottomPanel_RenderOutput :: proc(state: ^EditorState) {
-	if state.activeScene == nil {
-		UI_DimText("No scene open.")
-		return
-	}
-	jsonStr := e.Scene_SerializeToJSON(state.activeScene, context.temp_allocator)
-	if UI_Button(fmt.tprintf("%s  Copy", ICON_FA_COPY), "json.copy") {
-		imgui.SetClipboardText(strings.clone_to_cstring(jsonStr, context.temp_allocator))
-		Editor_Log(state, .Info, "Copied scene JSON to clipboard")
-	}
-	imgui.SameLine()
-	UI_DimText(fmt.tprintf("%d bytes - exactly what Save writes", len(jsonStr)))
-	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
-	if imgui.BeginChild("##SceneJSONScroll", {0, 0}, {}, {.HorizontalScrollbar}) {
-		imgui.TextUnformatted(strings.clone_to_cstring(jsonStr, context.temp_allocator))
-	}
-	imgui.EndChild()
 	imgui.PopStyleColor()
 }
 

@@ -1,0 +1,59 @@
+# UI tweaks: panel headers with aligned buttons, legible ruler numbers, no
+# Scene JSON tab, scene / component names without their extensions, a
+# Welcome window that stands out, and themes (Settings > General > Theme):
+# presets preview live, Save writes settings.ini, Cancel puts it back.
+wait 5
+expect item:bottom:json == missing
+expect item:bottom:console == visible
+screenshot headers_and_rulers
+click @menu:Help
+click @menu:Help/Welcome
+wait 3
+screenshot welcome
+click @welcome.close
+
+click @toolbar.settings
+click @settings.tab:general
+click @settings.page:Theme
+click @theme.preset:Light
+wait 3
+expect theme-panel == #eef0f3ff
+screenshot theme_light
+click @settings.save
+wait 3
+expect theme == Light
+expect file:.editor_settings.ini contains [theme]
+expect file:.editor_settings.ini contains name = Light
+expect file:.editor_settings.ini contains bg_panel = #eef0f3ff
+expect file:.editor_settings.ini contains [keymap]
+click @menu:Help
+click @menu:Help/Welcome
+wait 3
+screenshot welcome_light
+click @welcome.close
+
+# Previewed, then cancelled: the saved theme comes back.
+click @toolbar.settings
+click @settings.tab:general
+click @settings.page:Theme
+click @theme.preset:Mid-day
+wait 3
+expect theme-panel == #343a44ff
+screenshot theme_midday
+click @theme.preset:Dark
+wait 3
+screenshot theme_dark
+click @settings.cancel
+wait 3
+expect theme == Light
+expect theme-panel == #eef0f3ff
+
+# Back to the default.
+click @toolbar.settings
+click @settings.tab:general
+click @settings.page:Theme
+click @theme.preset:Default
+click @settings.save
+wait 3
+expect theme == Default
+expect file:.editor_settings.ini contains name = Default

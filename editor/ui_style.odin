@@ -3,6 +3,7 @@ package editor
 import "core:fmt"
 import "core:os"
 import "core:strings"
+import "core:unicode/utf8"
 import imgui "lib/imgui"
 
 // ============================================================================
@@ -15,20 +16,35 @@ import imgui "lib/imgui"
 // Panels use the helpers below so spacing stays consistent everywhere.
 // ============================================================================
 
-// Palette (sRGB 0..1).
-UI_BG_APP      :: imgui.Vec4{0.067, 0.075, 0.090, 1} // #11131 7  window background / gaps
-UI_BG_PANEL    :: imgui.Vec4{0.090, 0.102, 0.122, 1} // #171A1F  panels
-UI_BG_RAISED   :: imgui.Vec4{0.118, 0.133, 0.161, 1} // #1E2229  inputs, cards
-UI_BG_HOVER    :: imgui.Vec4{0.149, 0.169, 0.204, 1} // #262B34
-UI_BG_ACTIVE   :: imgui.Vec4{0.180, 0.204, 0.247, 1} // #2E343F
-UI_TEXT        :: imgui.Vec4{0.871, 0.886, 0.910, 1} // #DEE2E8
-UI_TEXT_DIM    :: imgui.Vec4{0.553, 0.584, 0.635, 1} // #8D95A2
-UI_TEXT_FAINT  :: imgui.Vec4{0.380, 0.408, 0.455, 1} // #616874
-UI_ACCENT      :: imgui.Vec4{0.361, 0.553, 1.000, 1} // #5C8DFF
-UI_ACCENT_SOFT :: imgui.Vec4{0.361, 0.553, 1.000, 0.18}
-UI_SUCCESS     :: imgui.Vec4{0.298, 0.808, 0.553, 1} // #4CCE8D
-UI_WARNING     :: imgui.Vec4{0.961, 0.722, 0.298, 1} // #F5B84C
-UI_DANGER      :: imgui.Vec4{0.937, 0.373, 0.373, 1} // #EF5F5F
+// Palette (sRGB 0..1): set from the editor theme (theme.odin, Settings >
+// General > Theme); these are the Default theme's colours until then.
+UI_BG_APP      := imgui.Vec4{0.067, 0.075, 0.090, 1} // window background / gaps
+UI_BG_PANEL    := imgui.Vec4{0.090, 0.102, 0.122, 1} // panels
+UI_BG_RAISED   := imgui.Vec4{0.118, 0.133, 0.161, 1} // inputs, cards
+UI_BG_HOVER    := imgui.Vec4{0.149, 0.169, 0.204, 1}
+UI_BG_ACTIVE   := imgui.Vec4{0.180, 0.204, 0.247, 1}
+UI_TEXT        := imgui.Vec4{0.871, 0.886, 0.910, 1}
+UI_TEXT_DIM    := imgui.Vec4{0.553, 0.584, 0.635, 1}
+UI_TEXT_FAINT  := imgui.Vec4{0.380, 0.408, 0.455, 1}
+UI_ACCENT      := imgui.Vec4{0.361, 0.553, 1.000, 1}
+UI_ACCENT_SOFT := imgui.Vec4{0.361, 0.553, 1.000, 0.18}
+UI_SUCCESS     := imgui.Vec4{0.298, 0.808, 0.553, 1}
+UI_WARNING     := imgui.Vec4{0.961, 0.722, 0.298, 1}
+UI_DANGER      := imgui.Vec4{0.937, 0.373, 0.373, 1}
+CODE_BG        := imgui.Vec4{0.071, 0.078, 0.094, 1}
+UI_LINE_RGB    := [3]f32{1, 1, 1} // faint lines / borders: the text side of the theme
+UI_THEME_LIGHT := false           // light backgrounds (darker syntax colours)
+
+// ui_accent: the accent colour with alpha `a`.
+ui_accent :: proc(a: f32) -> imgui.Vec4 {
+	return {UI_ACCENT.x, UI_ACCENT.y, UI_ACCENT.z, a}
+}
+
+// ui_line: a faint line / border colour with alpha `a` (white on dark
+// themes, dark on light ones).
+ui_line :: proc(a: f32) -> imgui.Vec4 {
+	return {UI_LINE_RGB.x, UI_LINE_RGB.y, UI_LINE_RGB.z, a * (1.6 if UI_THEME_LIGHT else 1)}
+}
 
 UI_SPACE :: 8.0 // base spacing unit
 
@@ -37,6 +53,7 @@ UI_Fonts :: struct {
 	semibold: ^imgui.Font,
 	small:    ^imgui.Font,
 	mono:     ^imgui.Font, // code editor (nil -> regular)
+	ruler:    ^imgui.Font, // viewport ruler numbers: small, drawn at its own size
 }
 
 GlobalFonts: UI_Fonts
@@ -67,6 +84,7 @@ UI_LoadFonts :: proc() {
 	GlobalFonts.regular = add(io, "engine/Open_Sans/static/OpenSans-Regular.ttf", 15)
 	GlobalFonts.semibold = add(io, "engine/Open_Sans/static/OpenSans-SemiBold.ttf", 15)
 	GlobalFonts.small = add(io, "engine/Open_Sans/static/OpenSans-Medium.ttf", 12.5)
+	GlobalFonts.ruler = imgui.FontAtlas_AddFontFromFileTTF(io.Fonts, "engine/Open_Sans/static/OpenSans-SemiBold.ttf", 11, nil, &ui_text_ranges[0])
 	for path in ([]cstring{"/System/Library/Fonts/SFNSMono.ttf", "/System/Library/Fonts/Menlo.ttc", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", "C:/Windows/Fonts/consola.ttf"}) {
 		if os.exists(string(path)) {
 			GlobalFonts.mono = imgui.FontAtlas_AddFontFromFileTTF(io.Fonts, path, CODE_FONT_SIZE)
@@ -113,8 +131,10 @@ UI_ApplyTheme :: proc() {
 	c[imgui.Col.TextDisabled] = UI_TEXT_FAINT
 	c[imgui.Col.WindowBg] = UI_BG_PANEL
 	c[imgui.Col.ChildBg] = {0, 0, 0, 0}
-	c[imgui.Col.PopupBg] = {0.105, 0.118, 0.141, 0.99}
-	c[imgui.Col.Border] = {1, 1, 1, 0.06}
+	// Popups: one tone from the inputs on them (panel tone on light themes).
+	popup := UI_BG_PANEL if UI_THEME_LIGHT else (UI_BG_PANEL + UI_BG_RAISED) * 0.5
+	c[imgui.Col.PopupBg] = {popup.x, popup.y, popup.z, 0.99}
+	c[imgui.Col.Border] = ui_line(0.06)
 	c[imgui.Col.BorderShadow] = {0, 0, 0, 0}
 	c[imgui.Col.FrameBg] = UI_BG_RAISED
 	c[imgui.Col.FrameBgHovered] = UI_BG_HOVER
@@ -124,19 +144,19 @@ UI_ApplyTheme :: proc() {
 	c[imgui.Col.TitleBgCollapsed] = UI_BG_APP
 	c[imgui.Col.MenuBarBg] = UI_BG_APP
 	c[imgui.Col.ScrollbarBg] = {0, 0, 0, 0}
-	c[imgui.Col.ScrollbarGrab] = {1, 1, 1, 0.10}
-	c[imgui.Col.ScrollbarGrabHovered] = {1, 1, 1, 0.18}
-	c[imgui.Col.ScrollbarGrabActive] = {1, 1, 1, 0.26}
+	c[imgui.Col.ScrollbarGrab] = ui_line(0.10)
+	c[imgui.Col.ScrollbarGrabHovered] = ui_line(0.18)
+	c[imgui.Col.ScrollbarGrabActive] = ui_line(0.26)
 	c[imgui.Col.CheckMark] = UI_ACCENT
 	c[imgui.Col.SliderGrab] = UI_ACCENT
-	c[imgui.Col.SliderGrabActive] = {0.48, 0.65, 1, 1}
+	c[imgui.Col.SliderGrabActive] = ui_accent(1)
 	c[imgui.Col.Button] = UI_BG_RAISED
 	c[imgui.Col.ButtonHovered] = UI_BG_HOVER
 	c[imgui.Col.ButtonActive] = UI_BG_ACTIVE
 	c[imgui.Col.Header] = UI_ACCENT_SOFT
-	c[imgui.Col.HeaderHovered] = {1, 1, 1, 0.05}
-	c[imgui.Col.HeaderActive] = {0.361, 0.553, 1.000, 0.26}
-	c[imgui.Col.Separator] = {1, 1, 1, 0.06}
+	c[imgui.Col.HeaderHovered] = ui_line(0.05)
+	c[imgui.Col.HeaderActive] = ui_accent(0.26)
+	c[imgui.Col.Separator] = ui_line(0.06)
 	c[imgui.Col.SeparatorHovered] = UI_ACCENT_SOFT
 	c[imgui.Col.SeparatorActive] = UI_ACCENT
 	c[imgui.Col.ResizeGrip] = {0, 0, 0, 0}
@@ -155,8 +175,8 @@ UI_ApplyTheme :: proc() {
 	c[imgui.Col.TableBorderStrong] = {0, 0, 0, 0}
 	c[imgui.Col.TableBorderLight] = {0, 0, 0, 0}
 	c[imgui.Col.TableRowBg] = {0, 0, 0, 0}
-	c[imgui.Col.TableRowBgAlt] = {1, 1, 1, 0.02}
-	c[imgui.Col.TextSelectedBg] = {0.361, 0.553, 1.000, 0.35}
+	c[imgui.Col.TableRowBgAlt] = ui_line(0.02)
+	c[imgui.Col.TextSelectedBg] = ui_accent(0.35)
 	c[imgui.Col.NavHighlight] = UI_ACCENT
 	c[imgui.Col.ModalWindowDimBg] = {0, 0, 0, 0.55}
 }
@@ -221,7 +241,7 @@ UI_PropLabel :: proc(label: string) {
 UI_IconButton :: proc(icon: string, id: string, tooltip: string, active := false, size: f32 = 30, tint: imgui.Vec4 = {}) -> bool {
 	if active {
 		imgui.PushStyleColorImVec4(.Button, UI_ACCENT_SOFT)
-		imgui.PushStyleColorImVec4(.ButtonHovered, {0.361, 0.553, 1.000, 0.28})
+		imgui.PushStyleColorImVec4(.ButtonHovered, ui_accent(0.28))
 		imgui.PushStyleColorImVec4(.Text, UI_ACCENT)
 	} else {
 		imgui.PushStyleColorImVec4(.Button, {0, 0, 0, 0})
@@ -267,22 +287,62 @@ UI_VerticalDivider :: proc(height: f32 = 20) {
 	pos := imgui.GetCursorScreenPos()
 	dl := imgui.GetWindowDrawList()
 	y := pos.y + (30 - height) * 0.5
-	imgui.DrawList_AddLine(dl, {pos.x, y}, {pos.x, y + height}, col_u32({1, 1, 1, 0.08}), 1)
+	imgui.DrawList_AddLine(dl, {pos.x, y}, {pos.x, y + height}, col_u32(ui_line(0.08)), 1)
 	imgui.Dummy({1, 30})
 	imgui.SameLine(0, UI_SPACE)
 }
 
 // UI_PanelTitle draws a panel's heading row (icon + title + dim detail).
-UI_PanelTitle :: proc(icon, title: string, detail: string = "") {
+// Panel headers: a title and icon buttons on one row of PANEL_BUTTON
+// height - UI_PanelTitle starts the row (text centred on it), then
+// UI_HeaderButtons(n) moves to the right edge and UI_HeaderButton draws
+// each button at the row's top, all the same size.
+PANEL_BUTTON :: 26
+
+@(private = "file")
+headerRow: struct {
+	y:     f32,
+	first: bool,
+}
+
+UI_PanelTitle :: proc(icon, title: string, detail: string = "", maxWidth: f32 = 0) {
+	headerRow = {imgui.GetCursorPosY(), true}
+	imgui.SetCursorPosY(headerRow.y + max((PANEL_BUTTON - imgui.GetTextLineHeight()) * 0.5, 0))
 	imgui.PushFont(GlobalFonts.semibold)
 	imgui.PushStyleColorImVec4(.Text, UI_TEXT)
-	imgui.TextUnformatted(fmt.ctprintf("%s  %s", icon, title))
+	text := fmt.tprintf("%s  %s", icon, title) if icon != "" else title
+	if maxWidth > 0 && imgui.CalcTextSize(strings.clone_to_cstring(text, context.temp_allocator)).x > maxWidth {
+		// Too long for the room left by the buttons: cut with an ellipsis.
+		runes := utf8.string_to_runes(text, context.temp_allocator)
+		for n := len(runes) - 1; n > 0; n -= 1 {
+			t := fmt.tprintf("%s…", utf8.runes_to_string(runes[:n], context.temp_allocator))
+			if imgui.CalcTextSize(strings.clone_to_cstring(t, context.temp_allocator)).x <= maxWidth {
+				text = t
+				break
+			}
+		}
+	}
+	imgui.TextUnformatted(strings.clone_to_cstring(text, context.temp_allocator))
 	imgui.PopStyleColor()
 	imgui.PopFont()
 	if detail != "" {
 		imgui.SameLine(0, UI_SPACE)
 		UI_DimText(detail)
 	}
+}
+
+// UI_HeaderButtons: the next `count` header buttons sit at the right edge.
+UI_HeaderButtons :: proc(count: int) {
+	w := f32(count) * PANEL_BUTTON + f32(max(count - 1, 0)) * 2
+	imgui.SameLine(imgui.GetWindowContentRegionMax().x - w)
+	headerRow.first = true
+}
+
+UI_HeaderButton :: proc(icon, id, tooltip: string, active := false) -> bool {
+	if !headerRow.first do imgui.SameLine(0, 2)
+	headerRow.first = false
+	imgui.SetCursorPosY(headerRow.y)
+	return UI_IconButton(icon, id, tooltip, active, PANEL_BUTTON)
 }
 
 // UI_Combo: a combo over `names`; returns the new index when changed.

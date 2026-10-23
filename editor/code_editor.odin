@@ -31,7 +31,7 @@ CODE_WINDOW :: "Code###CodeEditorWindow"
 // Tab stops come from Settings > Code Editor (code_tab_width()).
 CODE_FONT_SIZE :: 14
 
-CODE_BG :: imgui.Vec4{0.071, 0.078, 0.094, 1}
+// CODE_BG: the code area background (a theme colour, theme.odin).
 
 Code_Doc :: struct {
 	path:          string, // absolute
@@ -449,22 +449,29 @@ code_selected_text :: proc(b: ^buf.Buffer, allocator := context.temp_allocator) 
 
 // --- rendering ---------------------------------------------------------------------
 
+// code_syntax: a syntax colour, darker on light themes.
+code_syntax :: proc(v: imgui.Vec4) -> u32 {
+	c := v
+	if UI_THEME_LIGHT do c = {v.x * 0.58, v.y * 0.58, v.z * 0.58, v.w}
+	return col_u32(c)
+}
+
 code_token_color :: proc(k: syn.TokenKind) -> u32 {
 	switch k {
-	case .Keyword:     return col_u32({0.78, 0.55, 0.95, 1})
-	case .String:      return col_u32({0.60, 0.82, 0.52, 1})
-	case .Number:      return col_u32({0.96, 0.66, 0.42, 1})
-	case .Comment:     return col_u32({0.42, 0.47, 0.55, 1})
-	case .Function:    return col_u32({0.42, 0.68, 1.00, 1})
-	case .Builtin:     return col_u32({0.35, 0.82, 0.86, 1})
-	case .Constant:    return col_u32({0.96, 0.55, 0.45, 1})
-	case .Property:    return col_u32({0.90, 0.78, 0.55, 1})
-	case .Type:        return col_u32({0.95, 0.80, 0.40, 1})
-	case .Operator, .Punctuation: return col_u32({0.65, 0.70, 0.78, 1})
-	case .Directive, .Attribute:  return col_u32({0.78, 0.55, 0.95, 1})
-	case .Identifier, .Default:   return col_u32(UI_TEXT)
+	case .Keyword:     return code_syntax({0.78, 0.55, 0.95, 1})
+	case .String:      return code_syntax({0.60, 0.82, 0.52, 1})
+	case .Number:      return code_syntax({0.96, 0.66, 0.42, 1})
+	case .Comment:     return code_syntax({0.42, 0.47, 0.55, 1})
+	case .Function:    return code_syntax({0.42, 0.68, 1.00, 1})
+	case .Builtin:     return code_syntax({0.35, 0.82, 0.86, 1})
+	case .Constant:    return code_syntax({0.96, 0.55, 0.45, 1})
+	case .Property:    return code_syntax({0.90, 0.78, 0.55, 1})
+	case .Type:        return code_syntax({0.95, 0.80, 0.40, 1})
+	case .Operator, .Punctuation: return code_syntax({0.65, 0.70, 0.78, 1})
+	case .Directive, .Attribute:  return code_syntax({0.78, 0.55, 0.95, 1})
+	case .Identifier, .Default:   return code_syntax(UI_TEXT)
 	}
-	return col_u32(UI_TEXT)
+	return code_syntax(UI_TEXT)
 }
 
 // code_draw_text draws `text` starting at screen column `vcol`; tabs advance
@@ -838,7 +845,7 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 
 		// Current line / selection backgrounds.
 		if !hasSel && ln == c.pos.line && focused {
-			imgui.DrawList_AddRectFilled(dl, {winPos.x, y}, {winPos.x + winSize.x, y + cm.lineH}, col_u32({1, 1, 1, 0.035}))
+			imgui.DrawList_AddRectFilled(dl, {winPos.x, y}, {winPos.x + winSize.x, y + cm.lineH}, col_u32(ui_line(0.035)))
 		}
 		// Find matches.
 		for m in findMatches {
@@ -853,7 +860,7 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 			from := code_visual_col(text, selStart.col) if ln == selStart.line else 0
 			to := code_visual_col(text, selEnd.col) if ln == selEnd.line else code_visual_col(text, len(text)) + 1
 			if to > from || ln != selEnd.line {
-				imgui.DrawList_AddRectFilled(dl, {textX + f32(from) * cm.charW, y}, {textX + f32(max(to, from + 1)) * cm.charW, y + cm.lineH}, col_u32({0.361, 0.553, 1.000, 0.30}))
+				imgui.DrawList_AddRectFilled(dl, {textX + f32(from) * cm.charW, y}, {textX + f32(max(to, from + 1)) * cm.charW, y + cm.lineH}, col_u32(ui_accent(0.30)))
 			}
 		}
 

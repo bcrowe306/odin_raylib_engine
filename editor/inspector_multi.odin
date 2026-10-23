@@ -164,5 +164,5 @@ Inspector_MultiBanner :: proc(state: ^EditorState) {
 		imgui.TextWrapped("%s", fmt.ctprintf("Shared properties edit all of them (%s = values differ). Other sections edit %s.", MIXED_TEXT, state.selectedNode.name))
 		imgui.PopStyleColor()
 	}
-	UI_EndBanner({0.361, 0.553, 1.000, 0.10})
+	UI_EndBanner(ui_accent(0.10))
 }

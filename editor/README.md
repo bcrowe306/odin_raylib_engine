@@ -119,7 +119,10 @@ standalone game), **Settings** (Cmd+,) and Quit.
 
 - **General** — Basic: UI scale, grid size and snapping, autosave, quit
   confirmation. Keymap: every command with its shortcuts; record a new one,
-  clear it or reset it (conflicts are flagged).
+  clear it or reset it (conflicts are flagged). **Theme**: the presets
+  Default, Dark, Mid-day and Light, and every colour of the current theme
+  (backgrounds, text, accent, status colours, code background) - changes
+  preview live; Save keeps them, Cancel goes back.
 - **Code Editor** — font size, tab width, spaces vs tabs, auto-closing
   brackets, format on save, the language server and its path.
 - **Project** — General (name, version, startup scene, icon, physics, scenes),
@@ -129,8 +132,13 @@ standalone game), **Settings** (Cmd+,) and Quit.
   (master, music and sound-effect volumes) and **Export** (executable name,
   output folder, targets, compression, font, which prebuilt runners exist).
 
-Editor settings are per user (`~/.config/ore_editor/settings.json`); project
+Editor settings are per user, in `~/.config/ore_editor/settings.ini` -
+`[general]`, `[code]`, `[theme]`, `[recent_projects]` and `[keymap]`
+sections (an older `settings.json` is read once and replaced); project
 settings live in the project's `project.json`.
+
+Scenes and components are listed without their `.scene.json` /
+`.component.json` endings (Assets, scene tree, toolbar, status bar).
 
 ### Inspector
 

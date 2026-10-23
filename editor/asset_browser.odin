@@ -85,16 +85,12 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 	if !imgui.Begin("Assets###AssetBrowserWindow") do return
 	UI_PanelTitle(ICON_FA_FOLDER_OPEN, "Assets")
 	// View toggles and "+" at the right: import (system file dialog) or create.
-	imgui.SameLine(imgui.GetWindowContentRegionMax().x - 26 * 3 - 4)
-	imgui.SetCursorPosY(imgui.GetCursorPosY() - 3)
-	if UI_IconButton(ICON_FA_FOLDER_TREE, "asset.view-folders", "Folders view (else by type)", assetView == .Folders, size = 26) {
+	UI_HeaderButtons(3)
+	if UI_HeaderButton(ICON_FA_FOLDER_TREE, "asset.view-folders", "Folders view (else by type)", assetView == .Folders) {
 		assetView = .Types if assetView == .Folders else .Folders
 	}
-	imgui.SameLine(0, 2)
-	imgui.SetCursorPosY(imgui.GetCursorPosY())
-	if UI_IconButton(ICON_FA_TABLE_CELLS, "asset.view-grid", "Thumbnail grid (else a list)", assetGrid, size = 26) do assetGrid = !assetGrid
-	imgui.SameLine(0, 2)
-	if UI_IconButton(ICON_FA_PLUS, "asset.add", "Import assets or create new", active = imgui.IsPopupOpen("##asset_add"), size = 26) do imgui.OpenPopup("##asset_add")
+	if UI_HeaderButton(ICON_FA_TABLE_CELLS, "asset.view-grid", "Thumbnail grid (else a list)", assetGrid) do assetGrid = !assetGrid
+	if UI_HeaderButton(ICON_FA_PLUS, "asset.add", "Import assets or create new", imgui.IsPopupOpen("##asset_add")) do imgui.OpenPopup("##asset_add")
 	if imgui.BeginPopup("##asset_add") {
 		Asset_AddMenu(state)
 		imgui.EndPopup()
@@ -127,6 +123,17 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 		UI_DimText(fmt.tprintf("%s  Drop files or folders here to import", ICON_FA_FILE_IMPORT))
 	}
 	imgui.EndChild()
+}
+
+// Asset_DisplayName: how a file is shown - the file name without the
+// ".scene.json" / ".component.json" every scene and component has
+// (keepDir: keep the folders before it).
+Asset_DisplayName :: proc(path: string, keepDir := false) -> string {
+	name := path if keepDir else filepath.base(path)
+	for suffix in ([]string{".scene.json", ".component.json"}) {
+		if strings.has_suffix(name, suffix) do return name[:len(name) - len(suffix)]
+	}
+	return name
 }
 
 @(private = "file")
@@ -174,6 +181,7 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 	if label == "" {
 		if i := strings.index_byte(rel, '/'); i >= 0 do name = rel[i + 1:]
 	}
+	name = Asset_DisplayName(name, keepDir = true)
 	suffix := ""
 	if kind == .Scene {
 		if s := e.Game_FindSceneByFile(state.game, rel); s != nil && Editor_SceneIsModifiedCached(state, s) do suffix = "  " + ICON_FA_CIRCLE
@@ -242,7 +250,7 @@ asset_tile :: proc(state: ^EditorState, rel: string) {
 	icon, col := kind_icon(kind)
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	isActive := kind == .Scene && state.activeScenePath == rel
-	name := filepath.base(rel)
+	name := Asset_DisplayName(rel)
 	clicked := imgui.Selectable(fmt.ctprintf("##t_%s", rel), state.selectedAssetPath == full || isActive, {.AllowDoubleClick}, {TILE, TILE + 18})
 	mn, mx := imgui.GetItemRectMin(), imgui.GetItemRectMax()
 	asset_events(state, rel, kind, full, name, icon, clicked)

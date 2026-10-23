@@ -42,8 +42,25 @@ Welcome_Render :: proc(state: ^EditorState) {
 	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
 	imgui.SetNextWindowPos(center, .Appearing, {0.5, 0.5})
 	imgui.SetNextWindowSize({820, 520}, .Appearing)
+	// Its own surface (lighter than the panels: two steps on dark themes)
+	// and an accent edge, so it
+	// stands out above the editor.
+	surface := UI_BG_RAISED if UI_THEME_LIGHT else UI_BG_HOVER
+	imgui.PushStyleColorImVec4(.WindowBg, surface)
+	imgui.PushStyleColorImVec4(.TitleBg, surface)
+	imgui.PushStyleColorImVec4(.TitleBgActive, surface)
+	imgui.PushStyleColorImVec4(.Border, ui_accent(0.45))
+	imgui.PushStyleVar(.WindowBorderSize, 1)
+	imgui.PushStyleVar(.WindowRounding, 10)
 	defer imgui.End()
-	if !imgui.Begin("Welcome###WelcomeWindow", &welcome.open, {.NoCollapse, .NoDocking}) do return
+	visible := imgui.Begin("Welcome###WelcomeWindow", &welcome.open, {.NoCollapse, .NoDocking})
+	imgui.PopStyleVar(2)
+	imgui.PopStyleColor(4)
+	if !visible do return
+	// Cards and inputs one step brighter than the window.
+	imgui.PushStyleColorImVec4(.FrameBg, UI_BG_PANEL if UI_THEME_LIGHT else UI_BG_ACTIVE)
+	imgui.PushStyleColorImVec4(.Button, UI_BG_PANEL if UI_THEME_LIGHT else UI_BG_ACTIVE)
+	defer imgui.PopStyleColor(2)
 
 	imgui.PushFont(GlobalFonts.semibold)
 	imgui.TextUnformatted(fmt.ctprintf("%s  Welcome to the Ore editor", ICON_FA_WAND_MAGIC_SPARKLES))

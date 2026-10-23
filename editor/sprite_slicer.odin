@@ -262,7 +262,7 @@ slicer_sheet :: proc(state: ^EditorState) {
 		idx := -1
 		for s, i in slicer.selection do if s == cell do idx = i
 		if idx >= 0 {
-			imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32({0.361, 0.553, 1.0, 0.30}))
+			imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(ui_accent(0.30)))
 			imgui.DrawList_AddText(dl, mn + {3, 2}, col_u32(UI_ACCENT), fmt.ctprintf("%d", idx + 1))
 		}
 		imgui.DrawList_AddRect(dl, mn, mx, col32(0, 206, 201, 160))

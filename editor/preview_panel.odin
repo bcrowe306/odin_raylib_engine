@@ -260,18 +260,11 @@ PreviewPanel_Render :: proc(state: ^EditorState) {
 		{.Scene, ICON_FA_CLAPPERBOARD, "Scene"},
 		{.Script, ICON_FA_CODE, "Script"},
 	}
-	imgui.AlignTextToFramePadding()
-	imgui.PushFont(GlobalFonts.semibold)
-	imgui.TextUnformatted(strings.clone_to_cstring(assetName, context.temp_allocator))
-	imgui.PopFont()
-	imgui.SameLine(imgui.GetWindowContentRegionMax().x - f32(len(modes)) * 26)
-	imgui.PushStyleVarImVec2(.ItemSpacing, {0, 0})
+	UI_PanelTitle("", Asset_DisplayName(assetName), maxWidth = imgui.GetContentRegionAvail().x - f32(len(modes)) * (PANEL_BUTTON + 2) - 8)
+	UI_HeaderButtons(len(modes))
 	for m in modes {
-		if UI_IconButton(m.icon, fmt.tprintf("preview.%v", m.tab), m.tip, state.previewTab == m.tab, size = 26) do state.previewTab = m.tab
-		imgui.SameLine()
+		if UI_HeaderButton(m.icon, fmt.tprintf("preview.%v", m.tab), m.tip, state.previewTab == m.tab) do state.previewTab = m.tab
 	}
-	imgui.PopStyleVar()
-	imgui.NewLine()
 
 	switch state.previewTab {
 	case .Texture: PreviewPanel_RenderTexture(state)

@@ -119,57 +119,70 @@ draw_guide_line :: proc(state: ^EditorState, dl: ^imgui.DrawList, vertical: bool
 	}
 }
 
+// ruler_text draws a ruler number at whole pixels in the ruler font at its
+// own size (scaled small text was blurry); vertical: rotated to read
+// upwards, ending at `pos`.
+@(private = "file")
+ruler_text :: proc(dl: ^imgui.DrawList, pos: [2]f32, col: u32, text: cstring, vertical: bool) {
+	font := GlobalFonts.ruler if GlobalFonts.ruler != nil else GlobalFonts.small
+	size := font.FontSize if font != nil else 11
+	p := [2]f32{math.round(pos.x), math.round(pos.y)}
+	start := dl.VtxBuffer.Size
+	imgui.DrawList_AddTextImFontPtr(dl, font, size, p, col, text)
+	if !vertical do return
+	// Rotate the new glyphs -90 degrees about p: (x, y) -> (p.x + (y - p.y), p.y - (x - p.x)).
+	verts := ([^]imgui.DrawVert)(dl.VtxBuffer.Data)
+	for k in start ..< dl.VtxBuffer.Size {
+		v := &verts[k]
+		dx, dy := v.pos.x - p.x, v.pos.y - p.y
+		v.pos = {p.x + dy, p.y - dx}
+	}
+}
+
 @(private = "file")
 draw_rulers :: proc(state: ^EditorState, dl: ^imgui.DrawList, mouseScreen: [2]f32) {
 	vp, vs := state.viewportPos, state.viewportSize
 	R :: f32(RULER_SIZE)
-	bg := col32(27, 30, 38, 240)
-	tickCol := col32(110, 118, 136, 255)
-	textCol := col32(140, 148, 166, 255)
+	bg := col_u32({UI_BG_APP.x, UI_BG_APP.y, UI_BG_APP.z, 0.94})
+	tickCol := col_u32(UI_TEXT_FAINT)
+	textCol := col_u32(UI_TEXT_DIM)
+	edge := col_u32(ui_line(0.12))
 	imgui.DrawList_AddRectFilled(dl, {vp.x, vp.y}, {vp.x + vs.x, vp.y + R}, bg)
 	imgui.DrawList_AddRectFilled(dl, {vp.x, vp.y + R}, {vp.x + R, vp.y + vs.y}, bg)
-	imgui.DrawList_AddLine(dl, {vp.x + R, vp.y + R}, {vp.x + vs.x, vp.y + R}, col32(60, 66, 80, 255))
-	imgui.DrawList_AddLine(dl, {vp.x + R, vp.y + R}, {vp.x + R, vp.y + vs.y}, col32(60, 66, 80, 255))
+	imgui.DrawList_AddLine(dl, {vp.x + R, vp.y + R}, {vp.x + vs.x, vp.y + R}, edge)
+	imgui.DrawList_AddLine(dl, {vp.x + R, vp.y + R}, {vp.x + R, vp.y + vs.y}, edge)
 
 	step := ruler_step(state.cameraZoom)
 	lead := step / math.pow(10, math.floor(math.log10(step)))
 	minor := step / (4 if lead == 2 else 5)
-	font := GlobalFonts.small
-	fs: f32 = 10
 	label :: proc(v: f32) -> cstring {
 		if abs(v - math.round(v)) < 0.001 do return fmt.ctprintf("%d", int(math.round(v)))
 		return fmt.ctprintf("%.1f", v)
 	}
 
-	// Top: x.
+	// Top: x, the number right of its tick.
 	x0 := Viewport_ScreenToWorld(state, {vp.x + R, 0}).x
 	x1 := Viewport_ScreenToWorld(state, {vp.x + vs.x, 0}).x
 	for i := int(math.floor(x0 / minor)); f32(i) * minor <= x1; i += 1 {
 		x := f32(i) * minor
-		s := Viewport_WorldToScreen(state, {x, 0}).x
+		s := math.round(Viewport_WorldToScreen(state, {x, 0}).x) + 0.5
 		if s < vp.x + R do continue
 		major := abs(x / step - math.round(x / step)) < 0.001
-		h := R * (0.55 if major else 0.25)
+		h := R * (0.5 if major else 0.22)
 		imgui.DrawList_AddLine(dl, {s, vp.y + R - h}, {s, vp.y + R}, tickCol)
-		if major do imgui.DrawList_AddTextImFontPtr(dl, font, fs, {s + 3, vp.y + 1}, textCol, label(x))
+		if major do ruler_text(dl, {s + 3, vp.y + 2}, textCol, label(x), false)
 	}
-	// Left: y, the label's digits stacked.
+	// Left: y, the number above its tick, reading upwards.
 	y0 := Viewport_ScreenToWorld(state, {0, vp.y + R}).y
 	y1 := Viewport_ScreenToWorld(state, {0, vp.y + vs.y}).y
 	for i := int(math.floor(y0 / minor)); f32(i) * minor <= y1; i += 1 {
 		y := f32(i) * minor
-		s := Viewport_WorldToScreen(state, {0, y}).y
+		s := math.round(Viewport_WorldToScreen(state, {0, y}).y) + 0.5
 		if s < vp.y + R do continue
 		major := abs(y / step - math.round(y / step)) < 0.001
-		h := R * (0.55 if major else 0.25)
+		h := R * (0.5 if major else 0.22)
 		imgui.DrawList_AddLine(dl, {vp.x + R - h, s}, {vp.x + R, s}, tickCol)
-		if major {
-			text := string(label(y))
-			for c, k in text {
-				buf := [2]u8{u8(c), 0}
-				imgui.DrawList_AddTextImFontPtr(dl, font, fs, {vp.x + 2, s + 2 + f32(k) * 8}, textCol, cstring(&buf[0]))
-			}
-		}
+		if major do ruler_text(dl, {vp.x + 2, s - 3}, textCol, label(y), true)
 	}
 	// The mouse position.
 	if mouseScreen.x > vp.x + R && mouseScreen.x < vp.x + vs.x && mouseScreen.y > vp.y && mouseScreen.y < vp.y + vs.y {
@@ -178,8 +191,8 @@ draw_rulers :: proc(state: ^EditorState, dl: ^imgui.DrawList, mouseScreen: [2]f3
 		imgui.DrawList_AddLine(dl, {vp.x, mouseScreen.y}, {vp.x + R, mouseScreen.y}, accent)
 	}
 	// Corner.
-	imgui.DrawList_AddRectFilled(dl, {vp.x, vp.y}, {vp.x + R, vp.y + R}, col32(22, 25, 32, 255))
-	imgui.DrawList_AddTextImFontPtr(dl, font, 11, {vp.x + 3, vp.y + 3}, textCol, ICON_FA_RULER_COMBINED)
+	imgui.DrawList_AddRectFilled(dl, {vp.x, vp.y}, {vp.x + R, vp.y + R}, col_u32(UI_BG_APP))
+	imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 11, {vp.x + 3, vp.y + 3}, textCol, ICON_FA_RULER_COMBINED)
 }
 
 // Viewport_Guides draws the rulers, guides and smart-snap lines over the

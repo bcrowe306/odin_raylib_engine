@@ -42,7 +42,7 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	imgui.AlignTextToFramePadding()
 	UI_DimText("/")
 	imgui.SameLine(0, 0)
-	sceneLabel := filepath.base(state.activeScenePath) if state.activeScenePath != "" else "untitled"
+	sceneLabel := Asset_DisplayName(state.activeScenePath) if state.activeScenePath != "" else "untitled"
 	modified := Editor_ModifiedSceneCountCached(state) > 0
 	imgui.Button(fmt.ctprintf("%s%s##crumb_scene", sceneLabel, "  " + ICON_FA_CIRCLE if modified else ""))
 	Drive_Item("toolbar.scene")

@@ -318,7 +318,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		if f % 5 == 0 || length <= 20 {
 			imgui.DrawList_AddText(dl, {x + 4, origin.y + 3}, col_u32(UI_TEXT_DIM), fmt.ctprintf("%d", f + 1))
 		}
-		imgui.DrawList_AddLine(dl, {x, origin.y + 14}, {x, origin.y + 20}, col_u32({1, 1, 1, 0.12}))
+		imgui.DrawList_AddLine(dl, {x, origin.y + 14}, {x, origin.y + 20}, col_u32(ui_line(0.12)))
 	}
 	imgui.SetCursorScreenPos(headMn)
 	imgui.InvisibleButton("##anim_head", {max(headMx.x - headMn.x, 1), 20})
@@ -384,7 +384,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	if isFrames {
 		dropMn := [2]f32{x0 + f32(frameCount) * CELL_W + 1, fy}
 		dropMx := [2]f32{dropMn.x + CELL_W * 2, fy + THUMB_H}
-		imgui.DrawList_AddRect(dl, dropMn, dropMx, col_u32({1, 1, 1, 0.15}), 4)
+		imgui.DrawList_AddRect(dl, dropMn, dropMx, col_u32(ui_line(0.15)), 4)
 		imgui.DrawList_AddText(dl, {dropMn.x + CELL_W - 6, fy + THUMB_H * 0.5 - 8}, col_u32(UI_TEXT_FAINT), ICON_FA_PLUS)
 		imgui.SetCursorScreenPos(dropMn)
 		imgui.InvisibleButton("##frame_drop", dropMx - dropMn)
@@ -419,7 +419,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	removeTrack := -1
 	for &tr, ti in anim.tracks {
 		y := ty + f32(ti) * ROW_H
-		imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, y}, {x0 + f32(length) * CELL_W, y + ROW_H - 2}, col_u32({1, 1, 1, 0.025}), 3)
+		imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, y}, {x0 + f32(length) * CELL_W, y + ROW_H - 2}, col_u32(ui_line(0.025)), 3)
 		target: ^e.Node = apn
 		if tr.target != "." && tr.target != "" do target = e.Node_ResolvePath(mgr, apn, tr.target)
 		prop := tr.property

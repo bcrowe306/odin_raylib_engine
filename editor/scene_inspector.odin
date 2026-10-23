@@ -38,7 +38,7 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 
 	// Header: scene name (+ modified dot) and actions on the right.
 	modified := Editor_SceneIsModifiedCached(state, state.activeScene)
-	title := filepath.base(state.activeScenePath) if state.activeScenePath != "" else state.activeScene.name
+	title := Asset_DisplayName(state.activeScenePath) if state.activeScenePath != "" else state.activeScene.name
 	UI_PanelTitle(ICON_FA_LAYER_GROUP, title)
 	if modified {
 		imgui.SameLine(0, 6)
@@ -50,13 +50,11 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 		UI_Tooltip("Unsaved changes (Ctrl+S to save)")
 	}
 	canModify := state.selectedNode != nil && state.selectedNode != state.activeScene.rootNode
-	imgui.SameLine(imgui.GetWindowWidth() - 3 * 30 - 18)
-	if UI_IconButton(ICON_FA_PLUS, "hier.add", "Add node (Ctrl+A)", size = 28) do AddNodeDialog_Open()
-	imgui.SameLine(0, 2)
+	UI_HeaderButtons(3)
+	if UI_HeaderButton(ICON_FA_PLUS, "hier.add", "Add node (Ctrl+A)") do AddNodeDialog_Open()
 	if !canModify do imgui.BeginDisabled(true)
-	if UI_IconButton(ICON_FA_COPY, "hier.duplicate", "Duplicate (Ctrl+D)", size = 28) do SceneHierarchy_DuplicateSelected(state)
-	imgui.SameLine(0, 2)
-	if UI_IconButton(ICON_FA_TRASH, "hier.delete", "Delete (Del)", size = 28) do SceneHierarchy_DeleteSelected(state)
+	if UI_HeaderButton(ICON_FA_COPY, "hier.duplicate", "Duplicate (Ctrl+D)") do SceneHierarchy_DuplicateSelected(state)
+	if UI_HeaderButton(ICON_FA_TRASH, "hier.delete", "Delete (Del)") do SceneHierarchy_DeleteSelected(state)
 	if !canModify do imgui.EndDisabled()
 
 	imgui.SetNextItemWidth(-1)

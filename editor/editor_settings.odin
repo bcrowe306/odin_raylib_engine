@@ -1,16 +1,21 @@
 package editor
 
+import "core:encoding/ini"
 import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
+import "core:slice"
+import "core:strconv"
 import "core:strings"
 import imgui "lib/imgui"
 
 // ============================================================================
 // Editor settings (per user, not per project): ~/.config/ore_editor/
-// settings.json. Edited in Settings > General / Code Editor. Test drives use
-// a file inside the drive's project copy so they never touch the user's.
+// settings.ini - general options, code editor, theme, recent projects,
+// keymap, one [section] each. Edited in Settings > General / Code Editor.
+// An older settings.json is read once and replaced. Test drives use a file
+// inside the drive's project copy so they never touch the user's.
 // ============================================================================
 
 Editor_Settings :: struct {
@@ -34,6 +39,8 @@ Editor_Settings :: struct {
 	keymap:           map[string][3]Chord,
 	// File > Open Recent (absolute project paths, most recent first)
 	recentProjects:   [dynamic]string,
+	// The editor's colours (theme.odin)
+	theme:            Theme,
 }
 
 DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
@@ -53,7 +60,10 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 }
 
 Editor_DefaultSettings :: proc() -> Editor_Settings {
-	return DEFAULT_EDITOR_SETTINGS
+	s := DEFAULT_EDITOR_SETTINGS
+	s.theme = Theme_PresetColors(.Default)
+	s.theme.name = strings.clone(s.theme.name)
+	return s
 }
 
 GlobalSettings := DEFAULT_EDITOR_SETTINGS
@@ -66,6 +76,7 @@ Editor_Settings_Clone :: proc(s: ^Editor_Settings) -> Editor_Settings {
 	for k, v in s.keymap do c.keymap[strings.clone(k)] = v
 	c.recentProjects = make([dynamic]string)
 	for r in s.recentProjects do append(&c.recentProjects, strings.clone(r))
+	c.theme.name = strings.clone(s.theme.name)
 	return c
 }
 
@@ -78,17 +89,19 @@ Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 	delete(s.recentProjects)
 	s.recentProjects = nil
 	s.luaServerPath = ""
+	delete(s.theme.name)
+	s.theme.name = ""
 }
 
 // Editor_SettingsPath: where settings live (drives: inside the project copy).
 Editor_SettingsFilePath :: proc(state: ^EditorState) -> string {
 	if GlobalDrive.enabled {
-		p, _ := filepath.join({state.projectPath, ".editor_settings.json"}, context.allocator)
+		p, _ := filepath.join({state.projectPath, ".editor_settings.ini"}, context.allocator)
 		return p
 	}
 	home, err := os.user_home_dir(context.temp_allocator)
-	if err != nil do return strings.clone(".editor_settings.json")
-	p, _ := filepath.join({home, ".config", "ore_editor", "settings.json"}, context.allocator)
+	if err != nil do return strings.clone(".editor_settings.ini")
+	p, _ := filepath.join({home, ".config", "ore_editor", "settings.ini"}, context.allocator)
 	return p
 }
 
@@ -128,8 +141,23 @@ Chord_Parse :: proc(text: string) -> (c: Chord, ok: bool) {
 Editor_LoadSettings :: proc(state: ^EditorState) {
 	if settingsPath != "" do delete(settingsPath)
 	settingsPath = Editor_SettingsFilePath(state)
+	Editor_Settings_Destroy(&GlobalSettings)
 	GlobalSettings = Editor_DefaultSettings()
-	data, err := os.read_entire_file(settingsPath, context.temp_allocator)
+	if data, err := os.read_entire_file(settingsPath, context.temp_allocator); err == nil {
+		settings_from_ini(string(data))
+	} else {
+		// An older settings.json next to it: read once, saved as .ini below.
+		jsonPath := strings.concatenate({strings.trim_suffix(settingsPath, ".ini"), ".json"}, context.temp_allocator)
+		if jdata, jerr := os.read_entire_file(jsonPath, context.temp_allocator); jerr == nil do settings_from_json(jdata)
+	}
+	Editor_ApplySettings(state)
+	Editor_AddRecentProject(state.projectPath)
+	_ = Editor_SaveSettings()
+}
+
+@(private = "file")
+settings_from_json :: proc(data: []u8) {
+	err: os.Error
 	if err == nil {
 		val, perr := json.parse(data, allocator = context.temp_allocator)
 		if obj, ok := val.(json.Object); perr == .None && ok {
@@ -171,9 +199,67 @@ Editor_LoadSettings :: proc(state: ^EditorState) {
 			}
 		}
 	}
-	Editor_ApplySettings(state)
-	Editor_AddRecentProject(state.projectPath)
-	_ = Editor_SaveSettings()
+}
+
+// settings_from_ini reads settings.ini (missing keys keep their defaults).
+@(private = "file")
+settings_from_ini :: proc(text: string) {
+	m, _ := ini.load_map_from_string(text, context.temp_allocator)
+	s := &GlobalSettings
+	f :: proc(m: ini.Map, sec, key: string, d: f32) -> f32 {
+		if v, ok := m[sec][key]; ok do if x, pok := strconv.parse_f32(v); pok do return x
+		return d
+	}
+	b :: proc(m: ini.Map, sec, key: string, d: bool) -> bool {
+		if v, ok := m[sec][key]; ok do return v == "true" || v == "1" || v == "yes"
+		return d
+	}
+	s.uiScale = f(m, "general", "ui_scale", s.uiScale)
+	s.autosaveMinutes = int(f(m, "general", "autosave_minutes", f32(s.autosaveMinutes)))
+	s.gridSize = f(m, "general", "grid_size", s.gridSize)
+	s.snapToGrid = b(m, "general", "snap_to_grid", s.snapToGrid)
+	s.showGrid = b(m, "general", "show_grid", s.showGrid)
+	s.confirmQuit = b(m, "general", "confirm_quit", s.confirmQuit)
+	s.showWelcome = b(m, "general", "show_welcome", s.showWelcome)
+	s.codeFontSize = f(m, "code", "font_size", s.codeFontSize)
+	s.tabWidth = int(f(m, "code", "tab_width", f32(s.tabWidth)))
+	s.insertSpaces = b(m, "code", "insert_spaces", s.insertSpaces)
+	s.autoClosePairs = b(m, "code", "auto_close_pairs", s.autoClosePairs)
+	s.formatOnSave = b(m, "code", "format_on_save", s.formatOnSave)
+	s.lspEnabled = b(m, "code", "lsp_enabled", s.lspEnabled)
+	if v, ok := m["code"]["lua_server_path"]; ok && v != "" do s.luaServerPath = strings.clone(v)
+	if th, ok := m["theme"]; ok {
+		if name, has := th["name"]; has && name != "" {
+			delete(s.theme.name)
+			s.theme.name = strings.clone(name)
+		}
+		for k in Theme_Color {
+			if v, has := th[THEME_COLOR_INFO[k].key]; has {
+				if c, cok := theme_parse_color(v); cok do s.theme.colors[k] = c
+			}
+		}
+	}
+	if rp, ok := m["recent_projects"]; ok {
+		for i in 0 ..< len(rp) {
+			if v, has := rp[fmt.tprint(i)]; has && v != "" do append(&s.recentProjects, strings.clone(v))
+		}
+	}
+	if km, ok := m["keymap"]; ok {
+		s.keymap = make(map[string][3]Chord)
+		for id, v in km {
+			chords: [3]Chord
+			n := 0
+			for cs in strings.split(v, ",", context.temp_allocator) {
+				t := strings.trim_space(cs)
+				if t == "" || n >= 3 do continue
+				if c, cok := Chord_Parse(t); cok {
+					chords[n] = c
+					n += 1
+				}
+			}
+			s.keymap[strings.clone(id)] = chords
+		}
+	}
 }
 
 // Editor_AddRecentProject moves a project to the top of File > Open Recent.
@@ -213,31 +299,27 @@ jb :: proc(obj: json.Object, k: string, d: bool) -> bool {
 Editor_SaveSettings :: proc() -> bool {
 	s := &GlobalSettings
 	sb := strings.builder_make(context.temp_allocator)
-	fmt.sbprintf(&sb, "{{\n  \"ui_scale\": %.2f,\n  \"autosave_minutes\": %d,\n  \"grid_size\": %.0f,\n", s.uiScale, s.autosaveMinutes, s.gridSize)
-	fmt.sbprintf(&sb, "  \"snap_to_grid\": %t,\n  \"show_grid\": %t,\n  \"confirm_quit\": %t,\n  \"show_welcome\": %t,\n", s.snapToGrid, s.showGrid, s.confirmQuit, s.showWelcome)
-	fmt.sbprintf(&sb, "  \"code_font_size\": %.0f,\n  \"tab_width\": %d,\n  \"insert_spaces\": %t,\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
-	fmt.sbprintf(&sb, "  \"auto_close_pairs\": %t,\n  \"format_on_save\": %t,\n  \"lsp_enabled\": %t,\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)
-	fmt.sbprintf(&sb, "  \"lua_server_path\": %q,\n  \"recent_projects\": [", s.luaServerPath)
-	for r, i in s.recentProjects {
-		if i > 0 do strings.write_string(&sb, ", ")
-		fmt.sbprintf(&sb, "%q", r)
+	strings.write_string(&sb, "; Ore editor settings (Settings in the editor writes this file)\n\n[general]\n")
+	fmt.sbprintf(&sb, "ui_scale = %.2f\nautosave_minutes = %d\ngrid_size = %.0f\n", s.uiScale, s.autosaveMinutes, s.gridSize)
+	fmt.sbprintf(&sb, "snap_to_grid = %t\nshow_grid = %t\nconfirm_quit = %t\nshow_welcome = %t\n", s.snapToGrid, s.showGrid, s.confirmQuit, s.showWelcome)
+	strings.write_string(&sb, "\n[code]\n")
+	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
+	fmt.sbprintf(&sb, "auto_close_pairs = %t\nformat_on_save = %t\nlsp_enabled = %t\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)
+	fmt.sbprintf(&sb, "lua_server_path = %s\n", s.luaServerPath)
+	strings.write_string(&sb, "\n[theme]\n")
+	fmt.sbprintf(&sb, "name = %s\n", s.theme.name)
+	for k in Theme_Color do fmt.sbprintf(&sb, "%s = %s\n", THEME_COLOR_INFO[k].key, theme_color_text(s.theme.colors[k]))
+	strings.write_string(&sb, "\n[recent_projects]\n")
+	for r, i in s.recentProjects do fmt.sbprintf(&sb, "%d = %s\n", i, r)
+	strings.write_string(&sb, "\n[keymap]\n")
+	ids := make([dynamic]string, context.temp_allocator)
+	for id in s.keymap do append(&ids, id)
+	slice.sort(ids[:])
+	for id in ids {
+		parts := make([dynamic]string, context.temp_allocator)
+		for c in s.keymap[id] do if c.key != .None do append(&parts, Chord_Text(c))
+		fmt.sbprintf(&sb, "%s = %s\n", id, strings.join(parts[:], ", ", context.temp_allocator))
 	}
-	strings.write_string(&sb, "],\n  \"keymap\": {")
-	n := 0
-	for id, chords in s.keymap {
-		if n > 0 do strings.write_string(&sb, ",")
-		fmt.sbprintf(&sb, "\n    %q: [", id)
-		m := 0
-		for c in chords {
-			if c.key == .None do continue
-			if m > 0 do strings.write_string(&sb, ", ")
-			fmt.sbprintf(&sb, "%q", Chord_Text(c))
-			m += 1
-		}
-		strings.write_string(&sb, "]")
-		n += 1
-	}
-	strings.write_string(&sb, "\n  }\n}\n")
 	_ = os.make_directory_all(filepath.dir(settingsPath, context.temp_allocator))
 	return os.write_entire_file(settingsPath, transmute([]u8)strings.to_string(sb)) == nil
 }
@@ -253,4 +335,5 @@ Editor_ApplySettings :: proc(state: ^EditorState) {
 	state.showGrid = s.showGrid
 	GlobalCode.fontSize = s.codeFontSize if s.codeFontSize != CODE_FONT_SIZE else 0
 	Actions_ApplyKeymap(s.keymap)
+	Theme_Apply(s.theme)
 }

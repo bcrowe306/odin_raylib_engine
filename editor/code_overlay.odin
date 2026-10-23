@@ -86,7 +86,7 @@ Code_Overlay_Draw :: proc(id: string, anchor: [2]f32, lineH: f32, blocks: []Over
 	dl := imgui.GetForegroundDrawList()
 	imgui.DrawList_AddRectFilled(dl, {x + 2, y + 3}, {rmax.x + 2, rmax.y + 3}, col_u32({0, 0, 0, 0.35}), 7)
 	imgui.DrawList_AddRectFilled(dl, rmin, rmax, col_u32(UI_BG_RAISED), 7)
-	imgui.DrawList_AddRect(dl, rmin, rmax, col_u32({1, 1, 1, 0.08}), 7)
+	imgui.DrawList_AddRect(dl, rmin, rmax, col_u32(ui_line(0.08)), 7)
 	clip := imgui.Vec4{x + 1, y + 1, rmax.x - 1, rmax.y - 1}
 	ty := y + PAD - o.scroll
 	for b, i in blocks {
@@ -102,7 +102,7 @@ Code_Overlay_Draw :: proc(id: string, anchor: [2]f32, lineH: f32, blocks: []Over
 		frac := h / (content + 2 * PAD)
 		barH := max(h * frac, 16)
 		barY := y + (h - barH) * (o.scroll / overflow)
-		imgui.DrawList_AddRectFilled(dl, {rmax.x - 5, barY + 3}, {rmax.x - 2, barY + barH - 3}, col_u32({1, 1, 1, 0.22}), 2)
+		imgui.DrawList_AddRectFilled(dl, {rmax.x - 5, barY + 3}, {rmax.x - 2, barY + barH - 3}, col_u32(ui_line(0.22)), 2)
 	}
 	o.min, o.max, o.frame, o.content = rmin, rmax, imgui.GetFrameCount(), content + 2 * PAD
 	codeOverlays[id] = o

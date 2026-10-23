@@ -32,7 +32,7 @@ click @settings.save
 expect project-settings-open == false
 expect file:project.json contains {"name": "dash", "bindings": [{"key": "K"}]}
 expect file:project.json contains "fullscreen": true
-expect abs-file:$PROJECT/.editor_settings.json contains "tool.pan": ["Y"]
+expect abs-file:$PROJECT/.editor_settings.ini contains tool.pan = Y
 key y
 expect tool == pan
 
