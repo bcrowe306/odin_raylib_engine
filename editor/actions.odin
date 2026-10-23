@@ -220,6 +220,8 @@ Actions_Init :: proc() {
 	add({id = "code.prev_diagnostic", category = "Code", label = "Previous Problem", chords = k(ch(.F8, SH)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdNextDiagnostic(s, -1)}, enabled = proc(s: ^EditorState) -> bool {return !Debug_IsStopped()}})
 	add({id = "code.next_change", category = "Code", label = "Next Change", chords = k(ch(.F8, AL)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdNextChange(s, 1)}})
 	add({id = "code.prev_change", category = "Code", label = "Previous Change", chords = k(ch(.F8, Mods{.Alt, .Shift})), scope = .Code, run = proc(s: ^EditorState) {Code_CmdNextChange(s, -1)}})
+	add({id = "code.outline", category = "Code", label = "Go to Symbol in File...", chords = k(ch(.O, PS)), scope = .Code, run = Code_CmdOutline})
+	add({id = "code.workspace_symbols", category = "Code", label = "Go to Symbol in Project...", chords = k(ch(.T, P)), scope = .Global, run = Code_CmdWorkspaceSymbols})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})

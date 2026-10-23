@@ -136,7 +136,7 @@ Display
 - [x] 9.11 Git gutter (added / modified / removed)
 Navigation
 - [x] 9.12 Back / forward history
-- [ ] 9.13 Outline (Cmd+Shift+O) and workspace symbols (Cmd+T)
+- [x] 9.13 Outline (Cmd+Shift+O) and workspace symbols (Cmd+T)
 - [x] 9.14 Next / previous diagnostic (F8), next / previous change
 - [ ] 9.15 Find in files (Cmd+Shift+F) with a results pane
 - [ ] 9.16 Peek definition / references inline

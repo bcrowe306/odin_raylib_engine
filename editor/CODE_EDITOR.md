@@ -202,6 +202,9 @@ folds change; drawing touches only the visible rows.
 
 | Shortcut | Command |
 |---|---|
+| Cmd+Shift+O | **Go to symbol in file** (outline): functions, script properties, top-level locals |
+| Cmd+T | **Go to symbol in project**: the functions of every script |
+| Cmd+P | Go to file |
 | Ctrl+- / Ctrl+Shift+- | **Go back / forward** through the places the caret jumped from |
 | F8 / Shift+F8 | Next / previous **problem** (error or warning; wraps around) |
 | Alt+F8 / Alt+Shift+F8 | Next / previous **change** since the last commit (git gutter) |

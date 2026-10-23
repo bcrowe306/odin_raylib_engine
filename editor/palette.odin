@@ -104,6 +104,16 @@ Palette_ShowLocations :: proc(state: ^EditorState, title: string, locs: []lsp.Lo
 	Palette_Open(.Locations)
 }
 
+// Palette_ShowList opens the palette on a list of places (copied).
+Palette_ShowList :: proc(title: string, entries: []Palette_Location) {
+	palette_clear_locations()
+	for e in entries {
+		append(&pal.locations, Palette_Location{strings.clone(e.path), e.line, e.col, strings.clone(e.label), strings.clone(e.detail)})
+	}
+	pal.title = title
+	Palette_Open(.Locations)
+}
+
 @(private = "file")
 palette_clear_locations :: proc() {
 	for l in pal.locations {

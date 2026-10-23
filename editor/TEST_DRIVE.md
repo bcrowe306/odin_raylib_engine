@@ -82,6 +82,7 @@ exits non-zero if any check fails.
 | `code_sticky_crumbs.drive` | Inside update: its first line pinned and the breadcrumbs function > if; the crumb and the pinned line go to line 24. |
 | `code_inlay_hints.drive` | Parameter-name hints on a module call and a node method (at the argument's column), the caret moves over the text not the hint, Ctrl+Alt+H off and on. |
 | `code_nav.drive` | Go back / forward after a jump; F8 / Shift+F8 to a syntax error; Alt+F8 / Alt+Shift+F8 between changed blocks (the project made a git repo). |
+| `code_symbols.drive` | Outline: a function and a script property by name; workspace symbols: another script's function opens it. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

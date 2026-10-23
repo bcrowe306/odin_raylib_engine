@@ -1,0 +1,26 @@
+# Outline (Cmd+Shift+O: functions, properties, locals of the script) and
+# workspace symbols (Cmd+T: functions in every script), fuzzy filtered.
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key cmd+shift+o
+wait 2
+expect palette.open == true
+type update
+screenshot outline
+key enter
+wait 2
+expect code.cursor contains 24:
+key cmd+shift+o
+type thrust_power
+key enter
+wait 2
+expect code.cursor contains 9:
+key cmd+t
+wait 2
+expect palette.open == true
+type drone:update
+screenshot workspace
+key enter
+wait 3
+expect code.file == scripts/orbiting_drone.lua
