@@ -1065,6 +1065,15 @@ local allNodes = Scene.get_nodes()
 local sprite = Scene.create_node("TextureNode", "SpawnedExplosion", self.node)
 sprite:set_position(0.0, 0.0)
 
+-- Spawn a saved component (a .component.json) under a parent, at a position.
+-- The result is typed as the component's root node (completion knows each
+-- component file), or nil with a Console warning if the file is missing.
+local rock = Scene.instantiate("components/AsteroidLarge.component.json", self.node:get_parent(), self.node.position)
+rock:apply_impulse(Vec2(0, -200))
+
+-- Remove a node (and its children) at the end of the frame.
+rock:queue_free()          -- same as rock:destroy()
+
 -- Scene transitions
 Scene.change_scene("battle_arena")
 Scene.reload()

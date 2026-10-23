@@ -63,6 +63,7 @@ exits non-zero if any check fails.
 | `script_prop_types.drive` | Script property types: groups, enum combo, tooltip, array add / remove, curve and gradient double-click adds, saved as JSON. |
 | `remote_script_props.drive` | Play: the Game tab lists the drone's script.orbit_radius live and an edit changes it in the game. |
 | `lua_property_fields.drive` | Property-style access completes: self.node.rot -> rotation; self.node.position is a Vec2 (normalized completes). |
+| `lua_spawn.drive` | Scene.instantiate is typed per component: the generated overload returns the root type (DynamicBodyNode), so the result completes apply_impulse and queue_free. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

@@ -3475,6 +3475,37 @@ lua_scene_get_nodes :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// Scene.instantiate(component, parent?, x?, y?): a component instance at
+// runtime (added to the parent, else the scene's root; the position is
+// local to the parent - two numbers or a vector). Returns its root node.
+@(private="file")
+lua_scene_instantiate :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil || lua.type(L, 1) != .STRING {
+		lua.pushnil(L)
+		return 1
+	}
+	scene := sm.game.sceneManager.currentScene
+	path := string(lua.tostring(L, 1))
+	parent, _ := to_node_userdata(L, 2)
+	root := Scene_InstantiateComponent(scene, path, parent, &sm.game.gameContext)
+	if root == nil {
+		lua.L_where(L, 1)
+		where_ := strings.clone(string(lua.tostring(L, -1)), context.temp_allocator)
+		lua.pop(L, 1)
+		Script_Problem(.Warning, "%sScene.instantiate: no component \"%s\"", where_, path)
+		lua.pushnil(L)
+		return 1
+	}
+	if !lua.isnoneornil(L, 3) {
+		x, y := arg_xy(L, 3)
+		root.position = {x, y}
+	}
+	push_node_userdata(L, root)
+	return 1
+}
+
 @(private="file")
 lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -3829,6 +3860,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "remove_child")
 		lua.pushcfunction(L, lua_node_destroy)
 		lua.setfield(L, -2, "destroy")
+		lua.pushcfunction(L, lua_node_destroy)
+		lua.setfield(L, -2, "queue_free") // the same: removal waits for the end of the frame
 		lua.pushcfunction(L, lua_node_set_shader)
 		lua.setfield(L, -2, "set_shader")
 		lua.pushcfunction(L, lua_node_set_shader_param)
@@ -4292,6 +4325,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "get_nodes")
 	lua.pushcfunction(L, lua_scene_create_node)
 	lua.setfield(L, -2, "create_node")
+	lua.pushcfunction(L, lua_scene_instantiate)
+	lua.setfield(L, -2, "instantiate")
 	lua.pushcfunction(L, lua_scene_get_draw_bounds)
 	lua.setfield(L, -2, "get_draw_bounds")
 	lua.pushcfunction(L, lua_scene_set_draw_bounds)

@@ -267,6 +267,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	alias(&sb, "NodeName", "Node names in the project's scenes and components", sorted_unique(&nodeNames))
 	alias(&sb, "NodeTag", "Tags used in the project's scenes and components", sorted_unique(&nodeTags))
 	alias(&sb, "ComponentPath", "Component files", sorted_unique(&components))
+	component_overloads(&sb, state, sorted_unique(&components))
 	// Script classes (---@class / the returned table) by script path.
 	classOf := make(map[string]string, allocator = context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "", {".lua"}) {
@@ -596,6 +597,31 @@ script_node_block :: proc(sb: ^strings.Builder, cls, nodeType: string, paths: ma
 	fmt.sbprintf(sb, "\n---@class %s : %s\nlocal %s = {{}}\n---A node by path from this one (\"Gun\", \"../Player\"): the paths in its scenes complete, typed.\n", nc, nodeType, nc)
 	for k in keys do fmt.sbprintf(sb, "---@overload fun(self: %s, path: %q): %s\n", nc, k, paths[k])
 	fmt.sbprintf(sb, "---@param path string\n---@return Node?\nfunction %s:get_node(path) end\n", nc)
+}
+
+// component_overloads: Scene.instantiate per component file, returning its
+// root node's type.
+@(private = "file")
+component_overloads :: proc(sb: ^strings.Builder, state: ^EditorState, comps: []string) {
+	if len(comps) == 0 do return
+	strings.write_string(sb, "\n-- Components by path: Scene.instantiate returns the root's type.\n---@class SceneModule\nlocal SceneModule = {}\n")
+	for rel in comps {
+		t := "Node"
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
+			if v, perr := json.parse(data, allocator = context.temp_allocator); perr == .None {
+				if o, ok := v.(json.Object); ok {
+					if inner, isObj := o["node"].(json.Object); isObj && o["type"] == nil do o = inner
+					if ty, has := o["type"].(json.String); has {
+						t = string(ty)
+						if info, found := e.Node_TypeInfoByName(t); found do t = info.name
+					}
+				}
+			}
+		}
+		fmt.sbprintf(sb, "---@overload fun(component: %q, parent?: Node, x?: number|Vec2, y?: number): %s\n", rel, t)
+	}
+	strings.write_string(sb, "---@param component ComponentPath|string\n---@param parent? Node\n---@param x? number|Vec2\n---@param y? number\n---@return Node?\nfunction SceneModule.instantiate(component, parent, x, y) end\n")
 }
 
 // node_class_name: the refined class of a node name that has a script.

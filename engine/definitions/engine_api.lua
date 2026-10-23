@@ -286,8 +286,12 @@ function Node:add_child(child) end
 ---@param child Node
 function Node:remove_child(child) end
 
----Removes this node and all its children from the active scene.
+---Removes this node and all its children from the active scene (at the end
+---of the frame, so it's safe from its own update).
 function Node:destroy() end
+
+---Removes this node and its children at the end of the frame (= destroy).
+function Node:queue_free() end
 
 -- ----------------------------------------------------------------------------
 -- Events
@@ -5907,6 +5911,16 @@ function SceneModule.get_nodes() end
 ---@param parent? Node Optional parent node (defaults to scene root)
 ---@return Node? node Newly spawned node
 function SceneModule.create_node(nodeType, name, parent) end
+
+---Instances a component at runtime - `Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position)`.
+---Added under `parent` (else the scene's root), at x, y local to it (two
+---numbers or a Vec2). Returns its root node (typed per component), or nil.
+---@param component ComponentPath|string
+---@param parent? Node
+---@param x? number|Vec2
+---@param y? number
+---@return Node?
+function SceneModule.instantiate(component, parent, x, y) end
 
 ---Checks if debug collider and bounds rendering is enabled on this scene.
 ---@return boolean
