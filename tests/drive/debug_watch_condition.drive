@@ -16,6 +16,8 @@ key enter
 wait 3
 rclick @code.gutter:32
 wait 2
+click @ctx:gutter-condition
+wait 2
 expect item:debug.condition == visible
 type self.rotation > 100000
 key enter
@@ -30,6 +32,8 @@ expect debug-stopped == false
 
 # A condition that holds stops, with the reason.
 rclick @code.gutter:32
+wait 2
+click @ctx:gutter-condition
 wait 2
 key cmd+a
 type dt > 0

@@ -89,6 +89,7 @@ Code_Editor :: struct {
 	closePrompt:   int,  // doc waiting for Save / Don't Save (-1 = none)
 	closeRequest:  int,  // tab to close at the end of the frame (-1 = none)
 	closeOthers:   int,  // close every tab but this one (-2 = all, -1 = none)
+	closeMode:     enum {Others, Right, Saved}, // with closeOthers: which tabs go
 	lastDiskCheck: time.Tick,
 	cursorMoved:   time.Tick, // caret blink restarts on movement
 	// Layout of the last drawn frame (screen space).
@@ -576,9 +577,12 @@ Code_Render :: proc(state: ^EditorState) {
 	}
 	if cm.closeOthers != -1 {
 		keep := cm.docs[cm.closeOthers] if cm.closeOthers >= 0 && cm.closeOthers < len(cm.docs) else nil
+		anchor := cm.closeOthers
 		for i := len(cm.docs) - 1; i >= 0; i -= 1 {
 			d := cm.docs[i]
-			if d == keep do continue
+			if d == keep && cm.closeMode != .Saved do continue
+			if cm.closeMode == .Right && i <= anchor do continue
+			if cm.closeMode == .Saved && code_doc_dirty(d) do continue
 			if code_doc_dirty(d) {
 				Editor_Log(state, .Warn, "%s has unsaved changes; not closed", d.rel)
 				continue
@@ -586,6 +590,7 @@ Code_Render :: proc(state: ^EditorState) {
 			code_close_doc(i)
 		}
 		cm.closeOthers = -1
+		cm.closeMode = .Others
 	}
 }
 
@@ -612,6 +617,7 @@ code_tabs :: proc(state: ^EditorState) {
 		Drive_Item(fmt.tprintf("code.tab:%s", doc.rel))
 		UI_Tooltip(doc.path)
 		if imgui.BeginPopupContextItem(fmt.ctprintf("##tabctx%d", i)) {
+			if imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
 			if imgui.MenuItem(fmt.ctprintf("%s  Save", ICON_FA_FLOPPY_DISK), nil, false, code_doc_dirty(doc)) do Code_SaveDoc(state, doc)
 			if imgui.MenuItem(fmt.ctprintf("%s  Save As...", ICON_FA_FLOPPY_DISK)) {
 				cm.selectRequest = i
@@ -625,9 +631,17 @@ code_tabs :: proc(state: ^EditorState) {
 			if imgui.MenuItem(fmt.ctprintf("%s  Close", ICON_FA_XMARK), "Cmd+W") do closeIdx = i
 			Drive_Item("ctx:close-tab")
 			if imgui.MenuItem("Close Others", nil, false, len(cm.docs) > 1) do cm.closeOthers = i
+			Drive_Item("ctx:close-others")
+			if imgui.MenuItem("Close to the Right", nil, false, i < len(cm.docs) - 1) {cm.closeOthers = i; cm.closeMode = .Right}
+			Drive_Item("ctx:close-right")
+			if imgui.MenuItem("Close Saved") {cm.closeOthers = -2; cm.closeMode = .Saved}
+			Drive_Item("ctx:close-saved")
 			if imgui.MenuItem("Close All") do cm.closeOthers = -2
 			imgui.Separator()
 			if imgui.MenuItem(fmt.ctprintf("%s  Copy Path", ICON_FA_LINK)) do imgui.SetClipboardText(strings.clone_to_cstring(doc.rel, context.temp_allocator))
+			if imgui.MenuItem(fmt.ctprintf("%s  Copy Absolute Path", ICON_FA_LINK)) do imgui.SetClipboardText(strings.clone_to_cstring(doc.path, context.temp_allocator))
+			if imgui.MenuItem(fmt.ctprintf("%s  Reveal in Assets", ICON_FA_FOLDER_OPEN)) do Asset_Reveal(state, doc.rel)
+			Drive_Item("ctx:tab-reveal-asset")
 			if imgui.MenuItem(fmt.ctprintf("%s  Reveal in Finder", ICON_FA_FOLDER_OPEN)) do Editor_OpenExternally(state, filepath.dir(doc.path, context.temp_allocator))
 			imgui.EndPopup()
 		}
@@ -741,8 +755,12 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	Code_NodeDropMenu(state, doc) // a node dropped onto a method: its events
 	Debug_ConditionPopup()        // right-click in the gutter: a breakpoint condition
 	Code_ClipboardPicker(state, doc) // Cmd+Shift+V
+	Code_GutterMenu(state, doc)      // right-click a line number
 	// Right-click: the text menu - in the gutter, a breakpoint condition instead.
-	if hovered && imgui.IsMouseReleased(.Right) && imgui.GetIO().MousePos.x >= winPos.x + gutterW do imgui.OpenPopup("##code_ctx")
+	if hovered && imgui.IsMouseReleased(.Right) && imgui.GetIO().MousePos.x >= winPos.x + gutterW {
+		Code_ContextOpen(state, doc, code_pos_at(b, {imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y}))
+		imgui.OpenPopup("##code_ctx")
+	}
 	if imgui.BeginPopup("##code_ctx") {
 		code_text_context_menu(state, doc)
 		imgui.EndPopup()
@@ -943,7 +961,7 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		Drive_ItemRect(fmt.tprintf("code.gutter:%d", ln + 1), rowMin, rowMax, inWindow = true)
 		if doc.isLua && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && point_in_rect(gutterMouse, rowMin, rowMax) {
 			if imgui.IsMouseClicked(.Left) do Debug_ToggleBreakpoint(doc.rel, ln + 1)
-			if imgui.IsMouseClicked(.Right) do Debug_EditCondition(doc.rel, ln + 1) // a condition
+			if imgui.IsMouseClicked(.Right) do Code_GutterMenuOpen(ln + 1) // breakpoint / condition / run to here
 			if cond := Debug_Condition(doc.rel, ln + 1); cond != "" do UI_Tooltip(fmt.tprintf("Stops when: %s (right-click to edit)", cond))
 		}
 		if Debug_HasBreakpoint(doc.rel, ln + 1) {
@@ -1666,36 +1684,3 @@ Code_ParseLocation :: proc(msg: string) -> (path: string, line: int, ok: bool) {
 	return msg[start:i + 4], line, true
 }
 
-// code_text_context_menu: right-click in the code.
-code_text_context_menu :: proc(state: ^EditorState, doc: ^Code_Doc) {
-	run :: proc(state: ^EditorState, id: string) {
-		if a := Action_Find(id); a != nil do Action_Run(state, a)
-	}
-	item :: proc(state: ^EditorState, icon: string, id: string, enabled := true) {
-		a := Action_Find(id)
-		if a == nil do return
-		sc := Action_ShortcutText(a)
-		if imgui.MenuItem(fmt.ctprintf("%s  %s", icon, a.label), strings.clone_to_cstring(sc, context.temp_allocator) if sc != "" else nil, false, enabled) do Action_Run(state, a)
-		Drive_Item(fmt.tprintf("ctx:%s", id))
-	}
-	GlobalCode.focusRequest = true
-	lsp := GlobalCode.lspState == .Ready && doc.isLua
-	item(state, ICON_FA_SCISSORS, "code.cut")
-	item(state, ICON_FA_COPY, "code.copy")
-	item(state, ICON_FA_PASTE, "code.paste")
-	item(state, ICON_FA_CHECK, "code.select_all")
-	imgui.Separator()
-	item(state, ICON_FA_ARROW_POINTER, "code.definition", lsp)
-	item(state, ICON_FA_MAGNIFYING_GLASS, "code.references", lsp)
-	item(state, ICON_FA_PEN, "code.rename", lsp)
-	item(state, ICON_FA_CODE, "code.format", lsp)
-	imgui.Separator()
-	item(state, ICON_FA_CODE, "code.comment")
-	item(state, ICON_FA_CLONE, "code.duplicate_down")
-	item(state, ICON_FA_TRASH, "code.delete_line")
-	imgui.Separator()
-	item(state, ICON_FA_MAGNIFYING_GLASS, "code.find")
-	item(state, ICON_FA_RIGHT_LEFT, "code.replace")
-	item(state, ICON_FA_ARROW_DOWN, "code.goto_line")
-	_ = run
-}

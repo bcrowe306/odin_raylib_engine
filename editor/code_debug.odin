@@ -40,6 +40,8 @@ dbg: struct {
 	condLine:    int,
 	condBuf:     [256]u8,
 	condOpen:    bool,
+	runToRel:    string, // Run to Here: a temporary breakpoint, removed at the next stop
+	runToLine:   int,
 }
 
 Debug_Watch :: struct {
@@ -175,6 +177,12 @@ Debug_HandleReply :: proc(state: ^EditorState, kind, rest: string) {
 		delete(dbg.file)
 		dbg.file = strings.clone(string(o["file"].(json.String) or_else ""))
 		dbg.line = json_int(o["line"])
+		if dbg.runToLine > 0 {
+			// The Run to Here breakpoint has done its job.
+			if Debug_HasBreakpoint(dbg.runToRel, dbg.runToLine) do Debug_ToggleBreakpoint(dbg.runToRel, dbg.runToLine)
+			delete(dbg.runToRel)
+			dbg.runToRel, dbg.runToLine = "", 0
+		}
 		dbg.level = 0
 		delete(dbg.reason)
 		dbg.reason = strings.clone(string(o["reason"].(json.String) or_else ""))
@@ -317,6 +325,19 @@ Debug_Panel :: proc(state: ^EditorState) {
 	}
 	imgui.EndChild()
 	imgui.Separator()
+}
+
+// Debug_RunTo continues to a line (a temporary breakpoint there unless it
+// has one).
+Debug_RunTo :: proc(rel: string, line: int) {
+	if !dbg.stopped do return
+	if !Debug_HasBreakpoint(rel, line) {
+		Debug_ToggleBreakpoint(rel, line)
+		delete(dbg.runToRel)
+		dbg.runToRel = strings.clone(rel)
+		dbg.runToLine = line
+	}
+	Debug_Command("continue")
 }
 
 // Debug_AddWatch adds a watch expression (evaluated now when stopped).

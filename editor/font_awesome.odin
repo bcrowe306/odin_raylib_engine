@@ -133,3 +133,12 @@ ICON_FA_HAND_POINTER              :: ""
 ICON_FA_STAR                      :: "" // Default animation
 ICON_FA_GLOBE                     :: "\uF0AC" // Global script
 ICON_FA_BOOK                      :: "\uF02D" // Reference
+ICON_FA_SITEMAP                   :: "" // Scene tree
+ICON_FA_I_CURSOR                  :: "" // Text cursor
+ICON_FA_GRIP_LINES                :: "" // Lines
+ICON_FA_COMPRESS                  :: "" // Shrink
+ICON_FA_FORWARD                   :: "" // Skip
+ICON_FA_INDENT                    :: "" // Indent
+ICON_FA_OUTDENT                   :: "" // Outdent
+ICON_FA_ARROW_LEFT                :: "" // Back
+ICON_FA_BRACKET                   :: "" // Brackets (code)

@@ -73,6 +73,7 @@ exits non-zero if any check fails.
 | `lua_api_reference.drive` | Hover over an engine function shows its description and `Example:`; F1 opens the Scripting Reference with its API entry and the Audio section; search and pick a section; a section with a table (Events) rendered as markdown. |
 | `particles_viewport.drive` | Particle emitters animate in the viewport while editing (live particles without Simulate); the Particles tab's button pauses and resumes the preview. |
 | `code_clipboard.drive` | A copy with nothing selected pastes as a whole line above the cursor's line; Cmd+Enter indents inside a function; a block pasted there is re-indented; Cmd+Shift+V pastes from the history. |
+| `code_context_menu.drive` | The code context menu: a node-name string selects the node, a file path reveals it, a symbol's entries, the Selection submenu; Wrap In if on two lines; the gutter menu; the tab menu. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

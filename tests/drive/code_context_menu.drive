@@ -1,0 +1,82 @@
+# Code context menus: what is under the click first (a node name string ->
+# select it; a file path -> reveal; a symbol -> definition / references /
+# rename / reference), grouped submenus (Selection, Go To, Lines, Refactor);
+# Wrap In on a selection; the gutter menu; the tab menu.
+wait 5
+exec cp tests/drive/fixtures/drive_ctx_zz.lua $PROJECT/scripts/drive_ctx_zz.lua
+wait-until item:asset:scripts/drive_ctx_zz.lua == visible timeout=300
+dblclick @asset:scripts/drive_ctx_zz.lua
+wait 5
+key ctrl+g
+type 3
+key enter
+key end
+key left
+key left
+key left
+rclick @code.caret
+wait 2
+expect item:ctx:select-node == visible
+screenshot node_string
+click @ctx:select-node
+expect selected == PlayerShip
+key ctrl+g
+type 4
+key enter
+key end
+key left
+key left
+key left
+rclick @code.caret
+wait 2
+expect item:ctx:reveal-asset == visible
+click @ctx:reveal-asset
+key ctrl+g
+type 5
+key enter
+key home
+key right
+key right
+key right
+key right
+key right
+key right
+key right
+key right
+rclick @code.caret
+wait 2
+expect item:ctx:code.definition == visible
+expect item:ctx:code.reference == visible
+click @ctx:selection
+wait 2
+expect item:ctx:code.select_line == visible
+screenshot symbol_menu
+key esc
+key esc
+# Wrap the two locals in an if.
+key ctrl+g
+type 3
+key enter
+key shift+down
+key shift+down
+rclick @code.caret
+wait 2
+screenshot wrap_menu
+click @ctx:wrap
+wait 2
+click @ctx:code.wrap_if
+type ship
+expect code.text contains \s\s\s\sif ship then\n\s\s\s\s\s\s\s\slocal ship = Scene.find_node("PlayerShip")\n\s\s\s\s\s\s\s\slocal tex = "textures/Spaceship_1.png"\n\s\s\s\send\n
+screenshot wrapped
+# Gutter and tab menus.
+rclick @code.gutter:3
+wait 2
+expect item:ctx:gutter-breakpoint == visible
+expect item:ctx:gutter-copy-location == visible
+screenshot gutter_menu
+key esc
+rclick @code.tab:scripts/drive_ctx_zz.lua
+wait 2
+expect item:ctx:close-right == visible
+expect item:ctx:tab-reveal-asset == visible
+key esc

@@ -57,6 +57,36 @@ selection typed over with a bracket is wrapped.
 - **Copy Path / Copy Absolute Path / Copy Location** (`scripts/x.lua:12`)
   in the command palette and the context menus.
 
+## Context menus
+
+**Right-click in the code** moves the caret to the click (unless it is
+inside a selection) and opens the menu. First comes what is under the click:
+
+- a **string naming a node** (`find_node("Player")`, a `get_node` path from
+  the script's node, any node name of the open scene): *Select in the Scene
+  Tree*;
+- a **string naming a project file** (`"textures/ship.png"`): *Reveal in
+  Assets*, and *Open* for scripts and shaders;
+- a **symbol**: Go to Definition, Find All References, Rename Symbol,
+  Scripting Reference (F1);
+- a **selection**: Copy as Markdown (a fenced `lua` block) and **Wrap In** -
+  `if condition then ... end` (the condition selected, type to replace it),
+  `do ... end`, `local function name() ... end`; the lines are indented.
+
+Then Cut / Copy / Paste / Paste from History, the **Selection**, **Go To**,
+**Lines** and **Refactor** submenus, Format Document, Find / Replace, and
+Copy Path / Copy Location. Every entry shows its shortcut; entries the
+language server provides are disabled until it is ready. Esc closes a menu.
+
+**Right-click a line number**: Add / Remove Breakpoint, Add / Edit
+Condition..., **Run to Here** (while paused: continues to that line with a
+temporary breakpoint), Select Line, Copy Location.
+
+**Right-click a tab**: Save, Save As..., Find Usages of This Script, Close,
+Close Others, Close to the Right, Close Saved, Close All, Copy Path, Copy
+Absolute Path, Reveal in Assets, Reveal in Finder. Tabs with unsaved changes
+are never closed by the bulk closes.
+
 ## Multi-cursor
 
 | Shortcut | Command |
