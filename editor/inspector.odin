@@ -74,7 +74,9 @@ inspector_body :: proc(state: ^EditorState) {
 		if newName != "" && newName != node.name && !isRoot {
 			Editor_RecordUndo(state, "Rename")
 			parent := e.GetParent(state.activeScene.manager, node)
+			snap := NodeRefs_Capture(state) // scripts / node properties pointing at it
 			node.name = strings.clone(Editor_UniqueChildName(state, parent, newName, node), node.allocator)
+			NodeRefs_AfterChange(state, snap)
 			inspectorNameNode = nil
 		}
 	}

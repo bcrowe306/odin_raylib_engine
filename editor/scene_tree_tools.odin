@@ -58,11 +58,13 @@ Editor_InsertNodeAt :: proc(state: ^EditorState, node, target: ^e.Node, after: b
 	}
 	Editor_RecordUndo(state, fmt.tprintf("Move %s", node.name))
 	if old := e.GetParent(mgr, node); old != parent {
+		snap := NodeRefs_Capture(state) // scripts / node properties pointing into it
 		world := node.globalPosition
 		if old != nil do e.RemoveChild(mgr, old, node)
 		e.AddChild(mgr, parent, node)
 		node.position = Editor_WorldToLocal(parent, world)
 		node.name = strings.clone(Editor_UniqueChildName(state, parent, node.name, node), node.allocator)
+		NodeRefs_AfterChange(state, snap)
 	}
 	index := 0
 	for c in e.GetChildrenView(mgr, parent) {

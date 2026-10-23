@@ -1,0 +1,32 @@
+# Rename-safe references: a script's get_node path to a node that's renamed,
+# then moved, is offered for update (and updated); Skip leaves it.
+wait 5
+click @hier:PatrolDroneAlpha
+click @insp.script-attach
+click @pick:scripts/orbiting_drone.lua
+click @insp.script-edit
+wait 5
+click @code.area
+key ctrl+g
+type 17
+key enter
+key end
+key enter
+type local cam = self.node:get_node("../MainCamera")
+key ctrl+s
+wait 3
+click @hier:MainCamera
+dblclick @insp.name
+key ctrl+a
+type Cam
+key enter
+wait 3
+expect refs-pending == 1
+screenshot prompt
+click @refs.update
+expect code.text contains self.node:get_node("../Cam")
+drag @hier:Cam @hier:Asteroid_Beta 12
+wait 3
+expect refs-pending == 1
+click @refs.update
+expect code.text contains self.node:get_node("../Asteroid_Beta/Cam")

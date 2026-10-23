@@ -286,12 +286,14 @@ Editor_ReparentNode :: proc(state: ^EditorState, node, newParent: ^e.Node) -> bo
 	old := e.GetParent(mgr, node)
 	if old == newParent do return false
 	Editor_RecordUndo(state, fmt.tprintf("Move %s", node.name))
+	snap := NodeRefs_Capture(state) // scripts / node properties pointing into it
 	world := node.globalPosition
 	if old != nil do e.RemoveChild(mgr, old, node)
 	e.AddChild(mgr, newParent, node)
 	node.position = Editor_WorldToLocal(newParent, world)
 	node.name = strings.clone(Editor_UniqueChildName(state, newParent, node.name, node), node.allocator)
 	e.Node_SetGlobalPositions(mgr, state.activeScene.rootNode)
+	NodeRefs_AfterChange(state, snap)
 	return true
 }
 

@@ -214,6 +214,7 @@ editor_main :: proc() -> int {
 		Welcome_Render(&GlobalEditor)
 		OpenProject_Render(&GlobalEditor)
 		Signals_Render(&GlobalEditor)
+		NodeRefs_Render(&GlobalEditor) // update script references after a rename / move
 		AssetImport_Render(&GlobalEditor)
 
 		// Files dropped from the OS (after the panels: their rects are current).

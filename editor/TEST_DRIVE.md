@@ -58,6 +58,7 @@ exits non-zero if any check fails.
 | `code_drop_event.drive` | A Signals event row dropped into a script: an indented connect with the handler (value named for the event), the cursor in its body. |
 | `code_drop_node_method.drive` | A node dropped onto a method's line: its events in a menu; the pick adds a connect calling the method to ready(). |
 | `node_ref_property.drive` | A node dropped into the properties table adds a `type = "node"` property, set to it after the save; the Inspector picker re-points it; saved as a path. |
+| `node_refs_rename.drive` | Rename then move a node a script reaches with get_node: the prompt offers the new path each time, Update rewrites it. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -138,6 +139,7 @@ Queries:
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
 - `runtime-diags` (script problems recorded from Simulate / Play)
+- `refs-pending` (script reference edits waiting in the rename / move prompt)
 - `anim-names` (the selected AnimationPlayer's animations, the current one in `[brackets]`)
 - `anim-preview` (`playing` / `paused`), `anim-info` (`frames=<n> range=<a>-<b> reverse=<b> fps=<f> default=<name>` of the selected AnimationPlayer), `theme` (the saved theme), `theme-panel` (the panel colour in use, `#rrggbbaa`), `node-icons` (`<distinct icons>/<node types>`), `workspace` (the current workspace), `window-h:<item>` (height of the window an item is in)
 - `debug-stopped`, `debug-line` (`file:line`), `debug-stack`, `debug-local:<name>` (the Lua debugger)
