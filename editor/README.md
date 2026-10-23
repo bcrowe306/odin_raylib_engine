@@ -582,6 +582,9 @@ editor.
 
 ### Code tab (Lua scripts)
 
+**Full reference: [`CODE_EDITOR.md`](CODE_EDITOR.md)** - every editing
+feature and shortcut of the Code tab.
+
 Drag a script from Assets onto a scene-tree row to attach it (replacing the node's script; the
 row is outlined while you hover). Scripts open in a **Code** tab next to the Viewport: double-click a script in Assets, use the
 edit button beside a node's script in the Inspector, *Open Script* in the scene tree's context

@@ -190,6 +190,10 @@ Actions_Init :: proc() {
 
 	// --- Code editor (Zed defaults) ---
 	add({id = "code.reference", category = "Code", label = "Scripting Reference for Symbol", chords = k(ch(.F1)), scope = .Code, run = Code_CmdReference})
+	add({id = "code.clipboard_history", category = "Code", label = "Paste from Clipboard History", chords = k(ch(.V, PS)), scope = .Code, run = Code_CmdClipboardHistory})
+	add({id = "code.copy_path", category = "Code", label = "Copy Path", scope = .Code, run = proc(s: ^EditorState) {Code_CmdCopyPath(s, .Relative)}})
+	add({id = "code.copy_absolute_path", category = "Code", label = "Copy Absolute Path", scope = .Code, run = proc(s: ^EditorState) {Code_CmdCopyPath(s, .Absolute)}})
+	add({id = "code.copy_location", category = "Code", label = "Copy Location (path:line)", scope = .Code, run = proc(s: ^EditorState) {Code_CmdCopyPath(s, .Location)}})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})

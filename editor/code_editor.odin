@@ -331,6 +331,7 @@ Code_Shutdown :: proc() {
 	for f in cm.closedFiles do delete(f)
 	delete(cm.closedFiles)
 	delete(cm.snippetStops)
+	Code_ClipboardShutdown()
 	code_find_destroy()
 	code_lsp_shutdown()
 }
@@ -739,6 +740,7 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	code_drop_target(state, doc, {imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y})
 	Code_NodeDropMenu(state, doc) // a node dropped onto a method: its events
 	Debug_ConditionPopup()        // right-click in the gutter: a breakpoint condition
+	Code_ClipboardPicker(state, doc) // Cmd+Shift+V
 	// Right-click: the text menu - in the gutter, a breakpoint condition instead.
 	if hovered && imgui.IsMouseReleased(.Right) && imgui.GetIO().MousePos.x >= winPos.x + gutterW do imgui.OpenPopup("##code_ctx")
 	if imgui.BeginPopup("##code_ctx") {
@@ -1313,8 +1315,10 @@ code_newline :: proc(doc: ^Code_Doc) {
 		return
 	}
 	c := b.cursors[0].pos
-	before := strings.trim_space(buf.buffer_line_str(b, c.line)[:min(c.col, buf.buffer_line_len(b, c.line))])
-	after := strings.trim_space(buf.buffer_line_str(b, c.line)[min(c.col, buf.buffer_line_len(b, c.line)):])
+	// Copies: the newline below changes the buffer the line string points into.
+	line := strings.clone(buf.buffer_line_str(b, c.line), context.temp_allocator)
+	before := strings.trim_space(line[:min(c.col, len(line))])
+	after := strings.trim_space(line[min(c.col, len(line)):])
 	buf.buffer_newline(b)
 	if !doc.isLua do return
 	opens := false

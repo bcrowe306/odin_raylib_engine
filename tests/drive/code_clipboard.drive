@@ -1,0 +1,46 @@
+# Clipboard: a copy with nothing selected pastes as a whole line above the
+# cursor's line; multi-line text pasted at an indented line start is
+# re-indented; Cmd+Shift+V pastes from the history; Copy Location.
+wait 5
+click @asset.new-script
+click @newscript.create
+wait 2
+expect code.file == scripts/new_script.lua
+key ctrl+g
+type 3
+key enter
+key end
+key cmd+c
+key ctrl+g
+type 10
+key enter
+key end
+key cmd+v
+expect code.text contains \nlocal NewScript = {}\nfunction NewScript:ready()\n
+expect code.cursor == 11:27
+# Re-indent: the properties block pasted inside a function body.
+key ctrl+g
+type 6
+key enter
+key home
+key shift+down
+key shift+down
+key shift+down
+key cmd+c
+key ctrl+g
+type 11
+key enter
+key cmd+enter
+expect code.cursor == 12:5
+key cmd+v
+expect code.text contains function NewScript:ready()\n\s\s\s\sNewScript.properties = {\n\s\s\s\s\s\s\s\sspeed
+screenshot reindent
+# History: the older whole-line copy, from the picker (above the line).
+key cmd+shift+v
+wait 2
+expect item:clip.item:1 == visible
+screenshot history
+key down
+key enter
+wait 2
+expect code.text contains \s\s\s\s}\nlocal NewScript = {}\n

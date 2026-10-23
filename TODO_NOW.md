@@ -114,3 +114,41 @@ Docs in place
   - a) bundle it as a dynamic lib: copy `libcmark.dylib` (`.so` / `cmark.dll`) next to the editor (macOS: into the .app's `Frameworks`, `install_name_tool -change` to `@rpath/libcmark.dylib`, `-Wl,-rpath,@executable_path/../Frameworks` as `scripts/build_runners.sh` does for the runners), or
   - b) build cmark as a static lib (cmake `-DBUILD_SHARED_LIBS=OFF`, per platform; the vendor's `build.bat` does this on Windows) and link it in, so the editor has no extra file.
   The game runner doesn't use cmark.
+
+## Phase 9 — Code editor on par with Zed (2026-10-23)
+
+Docs: `editor/CODE_EDITOR.md`. Constraints: no frame-time cost (cache per buffer version, draw only visible lines), no leaks (owned allocations freed with the doc / on close).
+
+Copy / paste
+- [x] 9.1 Whole-line paste (a whole-line copy pastes as a line above), paste re-indent, clipboard history (Cmd+Shift+V), Copy Path / Absolute Path / Location
+Context menus
+- [ ] 9.2 Grouped context menu with shortcuts; context items (symbol, selection, node / asset path strings); gutter menu; tab menu (close others / right / saved, copy path, reveal, pin)
+Selection & multi-cursor
+- [ ] 9.3 Expand / shrink selection (word -> string / brackets -> line -> block -> function -> file)
+- [ ] 9.4 Column selection (Alt+drag), cursors at line ends (Shift+Alt+I), skip occurrence, select inside brackets / quotes, undo last cursor
+Display
+- [ ] 9.5 Matching bracket highlight + jump, rainbow brackets, indent guides
+- [ ] 9.6 Symbol highlights (LSP document highlight), visible whitespace, soft wrap
+- [ ] 9.7 Code folding (gutter arrows; functions, tables, comment blocks)
+- [ ] 9.8 Scrollbar markers (errors, find matches, breakpoints, changes) - the minimap
+- [ ] 9.9 Sticky scroll + breadcrumbs
+- [ ] 9.10 Inlay hints (LSP)
+- [ ] 9.11 Git gutter (added / modified / removed)
+Navigation
+- [ ] 9.12 Back / forward history
+- [ ] 9.13 Outline (Cmd+Shift+O) and workspace symbols (Cmd+T)
+- [ ] 9.14 Next / previous diagnostic (F8), next / previous change
+- [ ] 9.15 Find in files (Cmd+Shift+F) with a results pane
+- [ ] 9.16 Peek definition / references inline
+Refactoring
+- [ ] 9.17 Code actions / lightbulb (Cmd+.): LSP quick fixes + engine fixes (unknown node path, unknown input action)
+- [ ] 9.18 Extract local / extract method / inline variable; wrap in if / function / do; get_property <-> field, strings <-> Vec2
+- [ ] 9.19 Rename across files with a preview
+Files
+- [ ] 9.20 Tab pinning + preview tab
+- [ ] 9.21 Files changed on disk: reload prompt; local history (restore earlier saves)
+Engine
+- [ ] 9.22 Inline values while debugging
+- [ ] 9.23 Property in code <-> Inspector (click to select)
+- [ ] 9.24 Colour swatches beside {r, g, b, a} with a picker
+- [ ] 9.25 Texture path hover preview

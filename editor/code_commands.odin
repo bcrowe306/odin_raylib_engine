@@ -51,7 +51,6 @@ code_font_size :: proc() -> f32 {
 }
 
 // code_touched: common bookkeeping after a command moved/edited carets.
-@(private = "file")
 code_touched :: proc(doc: ^Code_Doc) {
 	cm := &GlobalCode
 	code_merge_cursors(&doc.buffer)
@@ -489,7 +488,7 @@ Code_CmdCopy :: proc(cut: bool) {
 		}
 	}
 	if !anySel do strings.write_byte(&sb, '\n')
-	imgui.SetClipboardText(strings.clone_to_cstring(strings.to_string(sb), context.temp_allocator))
+	code_clipboard_set(strings.to_string(sb), !anySel) // code_clipboard.odin: history, whole lines
 	if cut {
 		if anySel do buf.buffer_backspace(b)
 		else do buf.buffer_delete_lines(b)
@@ -503,25 +502,7 @@ Code_CmdPaste :: proc(state: ^EditorState) {
 	clip := imgui.GetClipboardText()
 	if clip == nil do return
 	text, _ := strings.replace_all(string(clip), "\r\n", "\n", context.temp_allocator)
-	b := &doc.buffer
-	// One line per cursor: distribute (VSCode/Zed).
-	lines := strings.split(strings.trim_suffix(text, "\n"), "\n", context.temp_allocator)
-	if len(b.cursors) > 1 && len(lines) == len(b.cursors) {
-		group := buf.buffer_next_group(b)
-		order := buf.buffer_sorted_cursor_indices(b)
-		// Insert from the bottom so earlier positions stay valid.
-		#reverse for i, n in order {
-			c := &b.cursors[i]
-			if s, e_, ok := buf.selection_range(c^); ok {
-				buf.buffer_delete_range(b, s, e_, group)
-				c.pos = s
-				c.sel.active = false
-			}
-			c.pos = buf.buffer_insert_text(b, c.pos, lines[n], group)
-		}
-	} else {
-		buf.buffer_type_text(b, text)
-	}
+	code_paste_text(doc, text) // whole lines, one per cursor, re-indented (code_clipboard.odin)
 	code_touched(doc)
 }
 
@@ -617,10 +598,27 @@ Code_CmdDeleteLine :: proc(state: ^EditorState) {
 }
 
 Code_CmdInsertLine :: proc(state: ^EditorState, above: bool) {
-	if doc := code_active_doc(); doc != nil {
-		buf.buffer_insert_line(&doc.buffer, above)
+	doc := code_active_doc()
+	if doc == nil do return
+	b := &doc.buffer
+	if len(b.cursors) > 1 {
+		buf.buffer_insert_line(b, above)
 		code_touched(doc)
+		return
 	}
+	// Smart indentation like Enter: below = Enter at the line end (one more
+	// level after a block opener); above = a line with this line's indent.
+	ln := b.cursors[0].pos.line
+	if above {
+		line := buf.buffer_line_str(b, ln)
+		indent := strings.clone(line[:len(line) - len(strings.trim_left(line, " \t"))], context.temp_allocator)
+		end := buf.buffer_insert_text(b, {ln, 0}, strings.concatenate({indent, "\n"}, context.temp_allocator), buf.buffer_next_group(b))
+		code_set_single_cursor(b, {end.line - 1, len(indent)}, false)
+	} else {
+		code_set_single_cursor(b, {ln, buf.buffer_line_len(b, ln)}, false)
+		code_newline(doc)
+	}
+	code_touched(doc)
 }
 
 // Code_CmdJoinLines (Ctrl+J) joins each caret line with the next.
