@@ -18,6 +18,13 @@ import imgui "lib/imgui"
 // inside the drive's project copy so they never touch the user's.
 // ============================================================================
 
+// Show_Whitespace: dots / arrows for spaces and tabs in the Code tab.
+Show_Whitespace :: enum {
+	None,
+	Selection, // inside selections (Zed's default)
+	All,
+}
+
 Editor_Settings :: struct {
 	// General > Basic
 	uiScale:          f32,  // ImGui font scale
@@ -36,6 +43,8 @@ Editor_Settings :: struct {
 	autoClosePairs:   bool,
 	rainbowBrackets:  bool, // brackets coloured by depth (Code tab)
 	indentGuides:     bool, // vertical lines at each indent level
+	softWrap:         bool, // long lines wrap at the Code area's width
+	showWhitespace:   Show_Whitespace,
 	formatOnSave:     bool,
 	lspEnabled:       bool,
 	luaServerPath:    string, // "" = lua-language-server/ in the engine checkout
@@ -66,6 +75,7 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 	autoClosePairs  = true,
 	rainbowBrackets = true,
 	indentGuides    = true,
+	showWhitespace  = .Selection,
 	formatOnSave    = false,
 	lspEnabled      = true,
 }
@@ -247,6 +257,14 @@ settings_from_ini :: proc(text: string) {
 	s.autoClosePairs = b(m, "code", "auto_close_pairs", s.autoClosePairs)
 	s.rainbowBrackets = b(m, "code", "rainbow_brackets", s.rainbowBrackets)
 	s.indentGuides = b(m, "code", "indent_guides", s.indentGuides)
+	s.softWrap = b(m, "code", "soft_wrap", s.softWrap)
+	if v, ok := m["code"]["show_whitespace"]; ok {
+		switch v {
+		case "none": s.showWhitespace = .None
+		case "all": s.showWhitespace = .All
+		case: s.showWhitespace = .Selection
+		}
+	}
 	s.formatOnSave = b(m, "code", "format_on_save", s.formatOnSave)
 	s.lspEnabled = b(m, "code", "lsp_enabled", s.lspEnabled)
 	if v, ok := m["code"]["lua_server_path"]; ok && v != "" do s.luaServerPath = strings.clone(v)
@@ -333,7 +351,9 @@ Editor_SaveSettings :: proc() -> bool {
 	strings.write_string(&sb, "\n[code]\n")
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
 	fmt.sbprintf(&sb, "auto_close_pairs = %t\nformat_on_save = %t\nlsp_enabled = %t\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)
-	fmt.sbprintf(&sb, "rainbow_brackets = %t\nindent_guides = %t\n", s.rainbowBrackets, s.indentGuides)
+	fmt.sbprintf(&sb, "rainbow_brackets = %t\nindent_guides = %t\nsoft_wrap = %t\n", s.rainbowBrackets, s.indentGuides, s.softWrap)
+	wsNames := [Show_Whitespace]string{.None = "none", .Selection = "selection", .All = "all"}
+	fmt.sbprintf(&sb, "show_whitespace = %s\n", wsNames[s.showWhitespace])
 	fmt.sbprintf(&sb, "lua_server_path = %s\n", s.luaServerPath)
 	strings.write_string(&sb, "\n[theme]\n")
 	fmt.sbprintf(&sb, "name = %s\n", s.theme.name)

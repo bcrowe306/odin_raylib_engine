@@ -142,7 +142,7 @@ code_column_select :: proc(doc: ^Code_Doc, from, to: [2]f32) {
 	clear(&b.cursors)
 	l0, l1 := min(a.line, z.line), max(a.line, z.line)
 	for ln in l0 ..= l1 {
-		y := GlobalCode.textOrigin.y + f32(ln) * GlobalCode.lineH + GlobalCode.lineH * 0.5
+		y := code_screen_pos(b, {ln, 0}).y + GlobalCode.lineH * 0.5 // through the display map
 		s := code_pos_at(b, {from.x, y})
 		e := code_pos_at(b, {to.x, y})
 		append(&b.cursors, buf.Cursor{pos = e, sel = {anchor = s, active = s != e}})

@@ -57,6 +57,11 @@ Code_Doc :: struct {
 	structure:     Code_Structure, // brackets / blocks (code_structure.odin)
 	selStack:      [dynamic][2]buf.Position, // expand selection history (shrink pops)
 	cursorHistory: [dynamic][]buf.Cursor,    // cursor sets before additions (Cmd+U)
+	display:       Code_Display,             // rows on screen (code_display.odin)
+	folds:         [dynamic]int,             // folded block start lines (code_fold.odin)
+	foldText:      map[int]u64,              // ... their first line's text (to follow edits)
+	foldsVersion:  int,
+	foldsTextVersion: int,
 }
 
 Code_Completion :: struct {
@@ -308,6 +313,9 @@ code_close_doc :: proc(idx: int) {
 	code_structure_destroy(&doc.structure)
 	delete(doc.selStack)
 	code_cursor_history_destroy(doc)
+	code_display_destroy(&doc.display)
+	delete(doc.folds)
+	delete(doc.foldText)
 	delete(doc.path)
 	delete(doc.rel)
 	delete(doc.uri)
@@ -765,6 +773,7 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 		imgui.SetScrollX(lastScroll.x)
 		imgui.SetScrollY(lastScroll.y)
 	}
+	if GlobalSettings.softWrap && imgui.GetScrollX() != 0 do imgui.SetScrollX(0) // wrapped: nothing to the right
 	scrollX := imgui.GetScrollX()
 	scrollY := imgui.GetScrollY()
 	pad := f32(6)
@@ -781,7 +790,9 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	}
 	maxCols := doc.maxCols
 	imgui.SetCursorPos({0, 0})
-	imgui.Dummy({gutterW + f32(maxCols + 4) * cm.charW, f32(lineCount) * cm.lineH + winSize.y * 0.5})
+	rowCount := len(code_display(doc).rows)
+	contentW := gutterW + f32(maxCols + 4) * cm.charW if !GlobalSettings.softWrap else winSize.x - 4 // soft wrap: no horizontal scroll
+	imgui.Dummy({contentW, f32(rowCount) * cm.lineH + winSize.y * 0.5})
 
 	// Input catcher covering the visible area.
 	imgui.SetCursorPos({scrollX, scrollY})
@@ -868,45 +879,73 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	if doc.scrollToCursor {
 		doc.scrollToCursor = false
 		c := code_primary(b).pos
-		y := f32(c.line) * cm.lineH
+		y := f32(code_row_of(doc, c)) * cm.lineH
 		if y < scrollY do imgui.SetScrollY(y)
 		else if y + cm.lineH * 2 > scrollY + winSize.y do imgui.SetScrollY(y + cm.lineH * 2 - winSize.y)
-		x := f32(code_visual_col(buf.buffer_line_str(b, c.line), c.col)) * cm.charW
+		x := code_screen_pos(b, c).x - cm.textOrigin.x
 		textW := winSize.x - gutterW - pad * 2
-		if x < scrollX do imgui.SetScrollX(max(x - cm.charW * 4, 0))
-		else if x > scrollX + textW - cm.charW * 2 do imgui.SetScrollX(x - textW + cm.charW * 6)
+		if GlobalSettings.softWrap {
+		} else if x < scrollX {
+			imgui.SetScrollX(max(x - cm.charW * 4, 0))
+		} else if x > scrollX + textW - cm.charW * 2 {
+			imgui.SetScrollX(x - textW + cm.charW * 6)
+		}
 	}
 
 	code_draw(doc, winPos, winSize, gutterW, focused)
 	return focused
 }
 
-// code_pos_at maps a screen position to a buffer position.
+// code_doc_of: the open doc owning a buffer.
+code_doc_of :: proc(b: ^buf.Buffer) -> ^Code_Doc {
+	for d in GlobalCode.docs do if &d.buffer == b do return d
+	return nil
+}
+
+// code_pos_at maps a screen position to a buffer position (through the
+// display map: folds, soft wrap).
 code_pos_at :: proc(b: ^buf.Buffer, screen: [2]f32) -> buf.Position {
 	cm := &GlobalCode
-	line := int((screen.y - cm.textOrigin.y) / cm.lineH)
-	if screen.y < cm.textOrigin.y do line = 0
-	line = clamp(line, 0, buf.buffer_line_count(b) - 1)
+	doc := code_doc_of(b)
 	vcol := int((screen.x - cm.textOrigin.x) / cm.charW + 0.5)
-	text := buf.buffer_line_str(b, line)
-	return {line, code_byte_col(text, max(vcol, 0))}
+	if doc == nil {
+		line := clamp(int((screen.y - cm.textOrigin.y) / cm.lineH), 0, buf.buffer_line_count(b) - 1)
+		return {line, code_byte_col(buf.buffer_line_str(b, line), max(vcol, 0))}
+	}
+	d := code_display(doc)
+	r := int((screen.y - cm.textOrigin.y) / cm.lineH)
+	if screen.y < cm.textOrigin.y do r = 0
+	r = clamp(r, 0, len(d.rows) - 1)
+	row := d.rows[r]
+	return {row.line, code_row_col(buf.buffer_line_str(b, row.line), row, max(vcol, 0))}
 }
 
 // code_screen_pos: top-left of the cell at a buffer position.
 code_screen_pos :: proc(b: ^buf.Buffer, p: buf.Position) -> [2]f32 {
 	cm := &GlobalCode
 	line := buf.buffer_line_str(b, p.line)
-	return {cm.textOrigin.x + f32(code_visual_col(line, p.col)) * cm.charW, cm.textOrigin.y + f32(p.line) * cm.lineH}
+	doc := code_doc_of(b)
+	if doc == nil do return {cm.textOrigin.x + f32(code_visual_col(line, p.col)) * cm.charW, cm.textOrigin.y + f32(p.line) * cm.lineH}
+	d := code_display(doc)
+	r := code_row_of(doc, p)
+	row := d.rows[r]
+	x := code_row_x(line, row, p.col) if row.line == p.line else code_visual_col(buf.buffer_line_str(b, row.line), len(buf.buffer_line_str(b, row.line)))
+	return {cm.textOrigin.x + f32(x) * cm.charW, cm.textOrigin.y + f32(r) * cm.lineH}
 }
 
 code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, focused: bool) {
 	cm := &GlobalCode
 	b := &doc.buffer
 	code_update_line_states(doc) // keys may have edited the text this frame
+	code_folds_follow(doc)       // folds stay on their lines through edits
 	dl := imgui.GetWindowDrawList()
 	lineCount := buf.buffer_line_count(b)
-	first := max(int((winPos.y - cm.textOrigin.y) / cm.lineH), 0)
-	last := min(first + int(winSize.y / cm.lineH) + 2, lineCount - 1)
+	// Rows on screen (code_display.odin: folds and soft wrap).
+	disp := code_display(doc)
+	firstRow := clamp(int((winPos.y - cm.textOrigin.y) / cm.lineH), 0, len(disp.rows) - 1)
+	lastRow := min(firstRow + int(winSize.y / cm.lineH) + 2, len(disp.rows) - 1)
+	first := disp.rows[firstRow].line
+	last := disp.rows[lastRow].line
 	c := code_primary(b)^
 	_, _, hasSel := buf.selection_range(c)
 	textX := cm.textOrigin.x
@@ -928,18 +967,34 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		}
 	}
 	blankIndent, blankFor := 0, -1 // indentation of the next code line (blank lines)
+	symRanges := code_symbol_occurrences(doc, first, last) if !hasSel else nil // same word as the caret's
+	showWs := GlobalSettings.showWhitespace
 
-	for ln in first ..= last {
-		y := cm.textOrigin.y + f32(ln) * cm.lineH
+	lastMarkLine := -1
+	lineMarks: []Code_Bracket_Mark
+	for r in firstRow ..= lastRow {
+		row := disp.rows[r]
+		ln := row.line
+		y := cm.textOrigin.y + f32(r) * cm.lineH
 		text := buf.buffer_line_str(b, ln)
+		rowEnd := row.to if row.to < len(text) else len(text)
+		lastRowOfLine := r + 1 >= len(disp.rows) || disp.rows[r + 1].line != ln
+		// x of a byte column on this row.
+		xof :: proc(textX: f32, text: string, row: Display_Row, col: int) -> f32 {
+			return textX + f32(code_row_x(text, row, col)) * GlobalCode.charW
+		}
 		// This line's bracket marks.
-		lm := mi
-		for mi < len(st.marks) && st.marks[mi].pos.line == ln do mi += 1
-		lineMarks := st.marks[lm:mi] if GlobalSettings.rainbowBrackets else nil
+		if ln != lastMarkLine {
+			for mi < len(st.marks) && st.marks[mi].pos.line < ln do mi += 1
+			lm := mi
+			for k := mi; k < len(st.marks) && st.marks[k].pos.line == ln; k += 1 do lm = k + 1
+			lineMarks = st.marks[mi:lm] if GlobalSettings.rainbowBrackets else nil
+			lastMarkLine = ln
+		}
 
 		// Indent guides: a line per indentation level (blank lines take the
 		// next code line's); the caret's block is brighter.
-		if GlobalSettings.indentGuides && tab > 0 {
+		if GlobalSettings.indentGuides && tab > 0 && row.from == 0 {
 			ind := 0
 			if strings.trim_space(text) == "" {
 				if blankFor < ln {
@@ -964,47 +1019,97 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		if !hasSel && ln == c.pos.line && focused {
 			imgui.DrawList_AddRectFilled(dl, {winPos.x, y}, {winPos.x + winSize.x, y + cm.lineH}, col_u32(ui_line(0.035)))
 		}
-		// Find matches.
+		// Find matches and the caret word's other occurrences.
+		hl :: proc(dl: ^imgui.DrawList, textX, y: f32, text: string, row: Display_Row, rowEnd: int, s, e: int, color: u32) {
+			s, e := max(s, row.from), min(e, rowEnd)
+			if e <= s && !(s == e && s == row.from) do return
+			x0 := textX + f32(code_row_x(text, row, s)) * GlobalCode.charW
+			x1 := textX + f32(code_row_x(text, row, e)) * GlobalCode.charW
+			imgui.DrawList_AddRectFilled(dl, {x0, y + 1}, {max(x1, x0 + GlobalCode.charW), y + GlobalCode.lineH - 1}, color, 2)
+		}
 		for m in findMatches {
 			if m.start.line != ln do continue
-			from := code_visual_col(text, m.start.col)
-			to := code_visual_col(text, m.end.col)
-			imgui.DrawList_AddRectFilled(dl, {textX + f32(from) * cm.charW, y + 1}, {textX + f32(max(to, from + 1)) * cm.charW, y + cm.lineH - 1}, col_u32({0.961, 0.722, 0.298, 0.28}), 2)
+			hl(dl, textX, y, text, row, rowEnd, m.start.col, m.end.col, col_u32({0.961, 0.722, 0.298, 0.28}))
+		}
+		for sr in symRanges {
+			if sr.line != ln do continue
+			hl(dl, textX, y, text, row, rowEnd, sr.from, sr.to, col_u32(ui_line(0.10)))
 		}
 		for cur in b.cursors {
 			selStart, selEnd, curSel := buf.selection_range(cur)
 			if !curSel || ln < selStart.line || ln > selEnd.line do continue
-			from := code_visual_col(text, selStart.col) if ln == selStart.line else 0
-			to := code_visual_col(text, selEnd.col) if ln == selEnd.line else code_visual_col(text, len(text)) + 1
-			if to > from || ln != selEnd.line {
-				imgui.DrawList_AddRectFilled(dl, {textX + f32(from) * cm.charW, y}, {textX + f32(max(to, from + 1)) * cm.charW, y + cm.lineH}, col_u32(ui_accent(0.30)))
+			s := selStart.col if ln == selStart.line else 0
+			e := selEnd.col if ln == selEnd.line else len(text)
+			s, e = max(s, row.from), min(e, rowEnd)
+			if e < s do continue
+			x0 := xof(textX, text, row, s)
+			x1 := xof(textX, text, row, e)
+			if ln != selEnd.line && lastRowOfLine && e == len(text) do x1 += cm.charW // the newline
+			if x1 > x0 || (ln != selEnd.line && lastRowOfLine) {
+				imgui.DrawList_AddRectFilled(dl, {x0, y}, {max(x1, x0 + 1), y + cm.lineH}, col_u32(ui_accent(0.30)))
 			}
 		}
 
-		// Syntax-colored text.
+		// Syntax-colored text (this row's part of the line).
 		tokens, _ := Token_CacheGet(&doc.tokens, doc.lang, text, doc.lineStates[ln], b.version)
-		v := 0
-		at := 0
+		v := row.indent
+		at := row.from
 		for t in tokens {
-			if t.start > at do v = code_draw_marked(dl, textX, y + textY, v, text, at, t.start, col_u32(UI_TEXT), lineMarks)
-			v = code_draw_marked(dl, textX, y + textY, v, text, t.start, t.end, code_token_color(t.kind), lineMarks)
-			at = t.end
+			ts, te := max(t.start, row.from), min(t.end, rowEnd)
+			if te <= ts do continue
+			if ts > at do v = code_draw_marked(dl, textX, y + textY, v, text, at, ts, col_u32(UI_TEXT), lineMarks)
+			v = code_draw_marked(dl, textX, y + textY, v, text, ts, te, code_token_color(t.kind), lineMarks)
+			at = te
 		}
-		if at < len(text) do code_draw_marked(dl, textX, y + textY, v, text, at, len(text), col_u32(UI_TEXT), lineMarks)
+		if at < rowEnd do code_draw_marked(dl, textX, y + textY, v, text, at, rowEnd, col_u32(UI_TEXT), lineMarks)
+
+		// Whitespace: dots for spaces, arrows for tabs (in selections, or all).
+		if showWs != .None {
+			for i in row.from ..< rowEnd {
+				ch := text[i]
+				if ch != ' ' && ch != '\t' do continue
+				if showWs == .Selection && !code_in_selection(b, {ln, i}) do continue
+				x := xof(textX, text, row, i)
+				cy := y + cm.lineH * 0.5
+				if ch == ' ' {
+					imgui.DrawList_AddCircleFilled(dl, {x + cm.charW * 0.5, cy}, 1.2, col_u32(ui_line(0.22)))
+				} else {
+					imgui.DrawList_AddLine(dl, {x + 2, cy}, {x + cm.charW * f32(tab) - 3, cy}, col_u32(ui_line(0.22)))
+				}
+			}
+		}
+		// A folded block: a chip after its first line (click to unfold).
+		if lastRowOfLine {
+			if end, folded := code_fold_end(doc, ln); folded {
+				x := xof(textX, text, row, len(text)) + cm.charW
+				label := fmt.ctprintf(" … %d lines ", end - ln - 1)
+				w := imgui.CalcTextSize(label).x
+				mn, mx := [2]f32{x, y + 2}, [2]f32{x + w, y + cm.lineH - 2}
+				imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(ui_line(0.10)), 4)
+				imgui.DrawList_AddText(dl, {x, y + (cm.lineH - imgui.GetFontSize()) * 0.5}, col_u32(UI_TEXT_DIM), label)
+				Drive_ItemRect(fmt.tprintf("code.fold-chip:%d", ln + 1), mn, mx, inWindow = true)
+				io := imgui.GetIO()
+				if imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && point_in_rect({io.MousePos.x, io.MousePos.y}, mn, mx) {
+					imgui.SetMouseCursor(.Hand)
+					if imgui.IsMouseClicked(.Left) do code_fold_toggle(doc, ln)
+				}
+			}
+		}
 	}
 
 	// The bracket pair at the caret.
 	if !hasSel {
 		if br, ok := code_bracket_at(doc, c.pos); ok {
 			for q in ([2]buf.Position{br.open, br.close}) {
-				if q.line < first || q.line > last do continue
+				qr := code_row_of(doc, q)
+				if qr < firstRow || qr > lastRow || disp.rows[qr].line != q.line do continue
 				p := code_screen_pos(b, q)
 				imgui.DrawList_AddRect(dl, {p.x - 0.5, p.y + 1}, {p.x + cm.charW + 0.5, p.y + cm.lineH - 1}, col_u32(ui_line(0.45)), 2)
 			}
 		}
 	}
 
-	// Diagnostic squiggles.
+	// Diagnostic squiggles (per row they cover).
 	for d in diags {
 		sl := d.range.start.line
 		el := d.range.end.line
@@ -1014,11 +1119,17 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 			text := buf.buffer_line_str(b, ln)
 			from := code_byte_from_u16(text, d.range.start.character) if ln == sl else 0
 			to := code_byte_from_u16(text, d.range.end.character) if ln == el else len(text)
-			vf := code_visual_col(text, from)
-			vt := code_visual_col(text, to)
-			if vt <= vf do vt = vf + 1
-			y := cm.textOrigin.y + f32(ln + 1) * cm.lineH - 2
-			code_squiggle(dl, textX + f32(vf) * cm.charW, textX + f32(vt) * cm.charW, y, color, d.unnecessary)
+			for r := code_row_of(doc, {ln, from}); r <= lastRow && r < len(disp.rows) && disp.rows[r].line == ln; r += 1 {
+				row := disp.rows[r]
+				s, e := max(from, row.from), min(to, row.to)
+				if e < s || (s == e && from != to && s == row.to && row.to < len(text)) do continue
+				vf := code_row_x(text, row, s)
+				vt := code_row_x(text, row, e)
+				if vt <= vf do vt = vf + 1
+				y := cm.textOrigin.y + f32(r + 1) * cm.lineH - 2
+				code_squiggle(dl, textX + f32(vf) * cm.charW, textX + f32(vt) * cm.charW, y, color, d.unnecessary)
+				if row.to >= to do break
+			}
 		}
 	}
 
@@ -1046,17 +1157,29 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 	}
 	font := code_font()
 	gutterMouse := [2]f32{imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y}
-	for ln in first ..= last {
-		y := cm.textOrigin.y + f32(ln) * cm.lineH + textY
+	for r in firstRow ..= lastRow {
+		row := disp.rows[r]
+		ln := row.line
+		rowMin := [2]f32{winPos.x, cm.textOrigin.y + f32(r) * cm.lineH}
+		rowMax := [2]f32{winPos.x + gutterW, rowMin.y + cm.lineH}
+		y := rowMin.y + textY
+		if row.from > 0 {
+			// A wrapped line's continuation row: a small hook, no number.
+			hx, hy := winPos.x + gutterW - 24, rowMin.y + cm.lineH * 0.3
+			imgui.DrawList_AddLine(dl, {hx, hy}, {hx, hy + cm.lineH * 0.35}, col_u32(UI_TEXT_FAINT))
+			imgui.DrawList_AddLine(dl, {hx, hy + cm.lineH * 0.35}, {hx + 6, hy + cm.lineH * 0.35}, col_u32(UI_TEXT_FAINT))
+			continue
+		}
 		num := fmt.ctprintf("%d", ln + 1)
 		w := imgui.Font_CalcTextSizeA(font, code_font_size(), max(f32), 0, num).x
 		color := col_u32(UI_TEXT_DIM if ln == c.pos.line else UI_TEXT_FAINT)
-		imgui.DrawList_AddTextImFontPtr(dl, font, code_font_size(), {winPos.x + gutterW - 10 - w, y}, color, num)
+		imgui.DrawList_AddTextImFontPtr(dl, font, code_font_size(), {winPos.x + gutterW - 18 - w, y}, color, num)
+		// Fold arrow (code_fold.odin): shown on hover or when folded.
+		code_gutter_fold(doc, ln, {winPos.x + gutterW - 14, rowMin.y}, cm.lineH, gutterMouse, point_in_rect(gutterMouse, {winPos.x, winPos.y}, {winPos.x + gutterW, winPos.y + winSize.y}))
 		// Breakpoints (click the gutter) and where the game is paused.
-		rowMin := [2]f32{winPos.x, cm.textOrigin.y + f32(ln) * cm.lineH}
-		rowMax := [2]f32{winPos.x + gutterW, rowMin.y + cm.lineH}
 		Drive_ItemRect(fmt.tprintf("code.gutter:%d", ln + 1), rowMin, rowMax, inWindow = true)
-		if doc.isLua && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && point_in_rect(gutterMouse, rowMin, rowMax) {
+		numArea := [2]f32{winPos.x + gutterW - 16, rowMax.y} // the fold arrow's column is its own
+		if doc.isLua && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && point_in_rect(gutterMouse, rowMin, numArea) {
 			if imgui.IsMouseClicked(.Left) do Debug_ToggleBreakpoint(doc.rel, ln + 1)
 			if imgui.IsMouseClicked(.Right) do Code_GutterMenuOpen(ln + 1) // breakpoint / condition / run to here
 			if cond := Debug_Condition(doc.rel, ln + 1); cond != "" do UI_Tooltip(fmt.tprintf("Stops when: %s (right-click to edit)", cond))
@@ -1218,11 +1341,11 @@ code_handle_keys :: proc(state: ^EditorState, doc: ^Code_Doc) {
 			moved = true
 		case code_pressed(.UpArrow) && !alt:
 			if lineMod do for &cur in b.cursors do buf.cursor_move_doc_start(b, &cur, shift)
-			else do for &cur in b.cursors do buf.cursor_move_up(b, &cur, shift)
+			else do for &cur in b.cursors do code_display_move(doc, &cur, -1, shift) // rows: folds, wrap
 			moved = true
 		case code_pressed(.DownArrow) && !alt:
 			if lineMod do for &cur in b.cursors do buf.cursor_move_doc_end(b, &cur, shift)
-			else do for &cur in b.cursors do buf.cursor_move_down(b, &cur, shift)
+			else do for &cur in b.cursors do code_display_move(doc, &cur, 1, shift)
 			moved = true
 		case code_pressed(.Home):
 			if primary do for &cur in b.cursors do buf.cursor_move_doc_start(b, &cur, shift)
@@ -1235,7 +1358,7 @@ code_handle_keys :: proc(state: ^EditorState, doc: ^Code_Doc) {
 		case code_pressed(.PageUp), code_pressed(.PageDown):
 			lines := max(int((cm.areaMax.y - cm.areaMin.y) / cm.lineH) - 2, 1)
 			if imgui.IsKeyDown(.PageUp) do lines = -lines
-			for &cur in b.cursors do buf.cursor_move_page(b, &cur, lines, shift)
+			for &cur in b.cursors do code_display_move(doc, &cur, lines, shift)
 			moved = true
 		case code_pressed(.Backspace) && !primary:
 			if !wordMod && GlobalSettings.autoClosePairs && code_delete_pair(b) {
@@ -1740,6 +1863,19 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 		s, e_, ok := buf.selection_range(code_primary(b)^)
 		if !ok || s.line != e_.line do return "", true
 		return buf.buffer_line_str(b, s.line)[s.col:e_.col], true
+	case "code.folds":
+		// folded block first lines, 1-based, comma-separated
+		if doc == nil do return "", true
+		sb := strings.builder_make(context.temp_allocator)
+		sorted := slice.clone(doc.folds[:], context.temp_allocator)
+		slice.sort(sorted)
+		for f, i in sorted do fmt.sbprintf(&sb, "%s%d", "," if i > 0 else "", f + 1)
+		return strings.to_string(sb), true
+	case "code.rows": return fmt.tprint(len(code_display(doc).rows)) if doc != nil else "0", true
+	case "code.lines": return fmt.tprint(buf.buffer_line_count(&doc.buffer)) if doc != nil else "0", true
+	case "code.symbol-highlights":
+		if doc == nil do return "0", true
+		return fmt.tprint(len(code_symbol_occurrences(doc, 0, buf.buffer_line_count(&doc.buffer) - 1))), true
 	case "code.selection-range":
 		// "<line>:<col>-<line>:<col>" (1-based lines, 0-based columns)
 		if doc == nil do return "", true

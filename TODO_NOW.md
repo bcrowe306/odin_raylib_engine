@@ -128,8 +128,8 @@ Selection & multi-cursor
 - [x] 9.4 Column selection (Alt+drag), cursors at line ends (Shift+Alt+I), skip occurrence, select inside brackets / quotes, undo last cursor
 Display
 - [x] 9.5 Matching bracket highlight + jump, rainbow brackets, indent guides
-- [ ] 9.6 Symbol highlights (LSP document highlight), visible whitespace, soft wrap
-- [ ] 9.7 Code folding (gutter arrows; functions, tables, comment blocks)
+- [x] 9.6 Symbol highlights (LSP document highlight), visible whitespace, soft wrap
+- [x] 9.7 Code folding (gutter arrows; functions, tables, comment blocks)
 - [ ] 9.8 Scrollbar markers (errors, find matches, breakpoints, changes) - the minimap
 - [ ] 9.9 Sticky scroll + breadcrumbs
 - [ ] 9.10 Inlay hints (LSP)

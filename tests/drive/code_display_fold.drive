@@ -1,0 +1,64 @@
+# Display: other uses of the caret's word highlighted; folding (gutter
+# arrow, the "…" chip unfolds, Up/Down skip the fold, folds follow edits,
+# Fold / Unfold All); soft wrap (Alt+Z); whitespace shown in selections.
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 21
+key enter
+key home
+key right
+key right
+expect code.symbol-highlights >= 2
+# Fold the update function from its gutter arrow.
+hover @code.gutter:24
+wait 2
+click @code.fold:24
+expect code.folds == 24
+expect code.rows == 32
+screenshot folded
+key ctrl+g
+type 24
+key enter
+key down
+expect code.cursor == 79:1
+key up
+expect code.cursor contains 24:
+# Folds follow edits above them.
+key ctrl+g
+type 1
+key enter
+key cmd+enter
+expect code.folds == 25
+key cmd+z
+expect code.folds == 24
+click @code.fold-chip:24
+expect code.folds == 
+# Fold all / unfold all.
+key cmd+alt+shift+lbracket
+expect code.folds == 7,16,24,81
+key cmd+alt+shift+rbracket
+expect code.folds == 
+# Fold at the caret (inside update).
+key ctrl+g
+type 30
+key enter
+key cmd+alt+lbracket
+expect code.folds != 
+key cmd+alt+shift+rbracket
+# Soft wrap: a long line takes several rows.
+key ctrl+g
+type 1
+key enter
+key cmd+enter
+type -- a long comment line that goes on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on
+key alt+z
+wait 2
+expect code.rows >= 88
+screenshot soft_wrap
+key alt+z
+wait 2
+expect code.rows == 87
+key cmd+l
+screenshot whitespace_selection

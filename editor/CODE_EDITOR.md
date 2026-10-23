@@ -132,6 +132,38 @@ feature needs it.
 - Both are in Settings > Code Editor (`rainbow_brackets`, `indent_guides`
   in settings.ini).
 
+## Display
+
+- **Other uses of the caret's word** get a faint background (identifiers
+  only, not strings or comments).
+- **Visible whitespace**: dots for spaces and lines for tabs - inside
+  selections by default (Settings > Code Editor > Show Whitespace: None /
+  In Selections / All).
+- **Soft wrap** (Alt+Z, or Settings > Code Editor): long lines wrap at the
+  Code area's width at a space, continuation rows indented like the line
+  and marked in the gutter; Up / Down move by screen row. There is no
+  horizontal scrolling while it is on.
+
+## Folding
+
+A `function` / `if` / `for` / `while` / `repeat` / `do` ... `end` block, a
+`{ }` table spanning lines or a run of comment lines folds to its first and
+last line, with a **… N lines** chip after the first (click it to unfold).
+
+| Shortcut | Command |
+|---|---|
+| (gutter arrow) | Fold / unfold - the arrow shows when the mouse is over the gutter, and always on a folded line |
+| Cmd+Alt+[ / Cmd+Alt+] | Fold the innermost block around the caret / unfold |
+| Cmd+Alt+Shift+[ / ] | Fold all functions, tables and comment runs / unfold all |
+
+Up / Down step over a fold; a caret inside a block that gets folded moves
+to its first line. Folds stay with their block through edits above them
+and disappear when the block does.
+
+The display (rows on screen: folds and wrapped lines) comes from
+`code_display.odin`, rebuilt only when the text, the wrap width or the
+folds change; drawing touches only the visible rows.
+
 ## Find
 
 | Shortcut | Command |
