@@ -74,6 +74,7 @@ exits non-zero if any check fails.
 | `particles_viewport.drive` | Particle emitters animate in the viewport while editing (live particles without Simulate); the Particles tab's button pauses and resumes the preview. |
 | `code_clipboard.drive` | A copy with nothing selected pastes as a whole line above the cursor's line; Cmd+Enter indents inside a function; a block pasted there is re-indented; Cmd+Shift+V pastes from the history. |
 | `code_context_menu.drive` | The code context menu: a node-name string selects the node, a file path reveals it, a symbol's entries, the Selection submenu; Wrap In if on two lines; the gutter menu; the tab menu. |
+| `code_expand_selection.drive` | Expand selection from inside a string: word, string, brackets, call, line, function body, function, file; shrink back. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -144,7 +145,7 @@ Queries:
   `code.dirty`, `code.focused`, `code.lsp` (off/starting/ready/failed), `code.completion` (visible items,
   comma-separated), `code.signature`, `code.errors`, `code.diagnostics`, `code.diagnostic-messages`, `code.hover`
 - `code.overlays` (`ok <n>` when every overlay is inside the Code area and bounded), `code.update-ms` (last line-state pass), `code.token-bench` (`full=<ms> cached=<ms> tokenized=<n> lines=<n>`), `code.token-speedup`
-- `code.cursors`, `code.selection`, `code.find` (match count), `code.font`, `code.completion-doc`
+- `code.cursors`, `code.selection`, `code.selection-range` (`line:col-line:col`), `code.find` (match count), `code.font`, `code.completion-doc`
 - `insp-help` (the Inspector help pane: `<Title>: <doc>`), `guides` (`x=704,y=50`), `usages` (files in the Find Usages window, -1 = closed), `folder-open:<dir>`
 - `dialog-start` (the folder the last system file dialog opened in), `last-dir:import` / `last-dir:export` / `last-dir:projects` (the remembered folders)
 - `slicer-zoom` (the slicer's zoom, `0.00` = Fit), `slicer-selection` (picked cells, `0,1,2`), `hidden-tab-bars` (docked spaces whose tab bar is hidden)

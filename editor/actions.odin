@@ -48,6 +48,9 @@ P :: Mods{.Primary}
 PS :: Mods{.Primary, .Shift}
 PA :: Mods{.Primary, .Alt}
 CT :: Mods{.Ctrl}
+// Expand / shrink selection: Ctrl+Shift+Right / Left on macOS (Zed), Alt+Shift
+// elsewhere (Ctrl+Shift+arrows select words there).
+EXPAND_MODS :: Mods{.Ctrl, .Shift} when ODIN_OS == .Darwin else Mods{.Alt, .Shift}
 SH :: Mods{.Shift}
 AL :: Mods{.Alt}
 
@@ -198,6 +201,8 @@ Actions_Init :: proc() {
 	add({id = "code.wrap_if", category = "Code", label = "Wrap in if ... end", scope = .Code, run = proc(s: ^EditorState) {Code_CmdWrap(s, .If)}})
 	add({id = "code.wrap_do", category = "Code", label = "Wrap in do ... end", scope = .Code, run = proc(s: ^EditorState) {Code_CmdWrap(s, .Do)}})
 	add({id = "code.wrap_function", category = "Code", label = "Wrap in local function ... end", scope = .Code, run = proc(s: ^EditorState) {Code_CmdWrap(s, .Function)}})
+	add({id = "code.expand_selection", category = "Code", label = "Expand Selection", chords = k(ch(.RightArrow, EXPAND_MODS)), scope = .Code, run = Code_CmdExpandSelection, repeat = true})
+	add({id = "code.shrink_selection", category = "Code", label = "Shrink Selection", chords = k(ch(.LeftArrow, EXPAND_MODS)), scope = .Code, run = Code_CmdShrinkSelection, repeat = true})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})

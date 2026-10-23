@@ -124,7 +124,7 @@ Copy / paste
 Context menus
 - [x] 9.2 Grouped context menu with shortcuts; context items (symbol, selection, node / asset path strings); gutter menu; tab menu (close others / right / saved, copy path, reveal, pin)
 Selection & multi-cursor
-- [ ] 9.3 Expand / shrink selection (word -> string / brackets -> line -> block -> function -> file)
+- [x] 9.3 Expand / shrink selection (word -> string / brackets -> line -> block -> function -> file)
 - [ ] 9.4 Column selection (Alt+drag), cursors at line ends (Shift+Alt+I), skip occurrence, select inside brackets / quotes, undo last cursor
 Display
 - [ ] 9.5 Matching bracket highlight + jump, rainbow brackets, indent guides

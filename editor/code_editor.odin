@@ -54,6 +54,8 @@ Code_Doc :: struct {
 	widthVersion:  int,
 	widthValid:    bool,
 	scrollToCursor: bool,
+	structure:     Code_Structure, // brackets / blocks (code_structure.odin)
+	selStack:      [dynamic][2]buf.Position, // expand selection history (shrink pops)
 }
 
 Code_Completion :: struct {
@@ -301,6 +303,8 @@ code_close_doc :: proc(idx: int) {
 	buf.buffer_destroy(&doc.buffer)
 	delete(doc.lineStates)
 	Token_CacheDestroy(&doc.tokens)
+	code_structure_destroy(&doc.structure)
+	delete(doc.selStack)
 	delete(doc.path)
 	delete(doc.rel)
 	delete(doc.uri)
@@ -1099,7 +1103,7 @@ code_handle_keys :: proc(state: ^EditorState, doc: ^Code_Doc) {
 	// Plain movement / editing keys (modified chords are actions).
 	{
 		switch {
-		case code_pressed(.LeftArrow) && !(alt && primary):
+		case code_pressed(.LeftArrow) && !(alt && primary) && !code_expand_chord(ctrl, alt, shift):
 			if !shift && !wordMod && !lineMod && code_collapse_selections(b, true) {
 			} else if lineMod {
 				for &cur in b.cursors do code_smart_home(b, &cur, shift)
@@ -1109,7 +1113,7 @@ code_handle_keys :: proc(state: ^EditorState, doc: ^Code_Doc) {
 				for &cur in b.cursors do buf.cursor_move_left(b, &cur, shift)
 			}
 			moved = true
-		case code_pressed(.RightArrow) && !(alt && primary):
+		case code_pressed(.RightArrow) && !(alt && primary) && !code_expand_chord(ctrl, alt, shift):
 			if !shift && !wordMod && !lineMod && code_collapse_selections(b, false) {
 			} else if lineMod {
 				for &cur in b.cursors do buf.cursor_move_line_end(b, &cur, shift)
@@ -1322,6 +1326,13 @@ code_delete_pair :: proc(b: ^buf.Buffer) -> bool {
 		c.pos.col -= 1
 	}
 	return true
+}
+
+// code_expand_chord: the modifiers of expand / shrink selection (an action,
+// not a caret move).
+code_expand_chord :: proc(ctrl, alt, shift: bool) -> bool {
+	when ODIN_OS == .Darwin do return ctrl && shift && !alt
+	else do return alt && shift && !ctrl
 }
 
 // code_newline: Enter keeps the indentation and indents one more level
@@ -1636,6 +1647,12 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 		s, e_, ok := buf.selection_range(code_primary(b)^)
 		if !ok || s.line != e_.line do return "", true
 		return buf.buffer_line_str(b, s.line)[s.col:e_.col], true
+	case "code.selection-range":
+		// "<line>:<col>-<line>:<col>" (1-based lines, 0-based columns)
+		if doc == nil do return "", true
+		s, e_, ok := buf.selection_range(code_primary(&doc.buffer)^)
+		if !ok do return "", true
+		return fmt.tprintf("%d:%d-%d:%d", s.line + 1, s.col, e_.line + 1, e_.col), true
 	case "code.signature":
 		return code_signature_label() if cm.sigOpen else "", true
 	case "code.errors":

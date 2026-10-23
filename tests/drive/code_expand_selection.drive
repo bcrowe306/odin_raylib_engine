@@ -1,0 +1,36 @@
+# Expand / shrink selection: word -> string -> brackets -> call -> line -> function
+# body -> function -> file, and back.
+wait 5
+exec cp tests/drive/fixtures/drive_ctx_zz.lua $PROJECT/scripts/drive_ctx_zz.lua
+wait-until item:asset:scripts/drive_ctx_zz.lua == visible timeout=300
+dblclick @asset:scripts/drive_ctx_zz.lua
+wait 5
+key ctrl+g
+type 3
+key enter
+key end
+key left
+key left
+key left
+key ctrl+shift+right
+expect code.selection == PlayerShip
+key ctrl+shift+right
+expect code.selection == "PlayerShip"
+key ctrl+shift+right
+expect code.selection == ("PlayerShip")
+key ctrl+shift+right
+expect code.selection == find_node("PlayerShip")
+key ctrl+shift+right
+expect code.selection == local ship = Scene.find_node("PlayerShip")
+key ctrl+shift+right
+expect code.selection-range == 3:0-5:39
+key ctrl+shift+right
+expect code.selection-range == 2:0-6:3
+screenshot function
+key ctrl+shift+right
+expect code.selection-range == 1:0-8:0
+key ctrl+shift+left
+expect code.selection-range == 2:0-6:3
+key ctrl+shift+left
+key ctrl+shift+left
+expect code.selection == local ship = Scene.find_node("PlayerShip")

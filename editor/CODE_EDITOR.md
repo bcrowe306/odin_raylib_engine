@@ -87,6 +87,24 @@ Close Others, Close to the Right, Close Saved, Close All, Copy Path, Copy
 Absolute Path, Reveal in Assets, Reveal in Finder. Tabs with unsaved changes
 are never closed by the bulk closes.
 
+## Selection
+
+| Shortcut (macOS / Windows, Linux) | Command |
+|---|---|
+| Cmd+A | Select all |
+| Cmd+L | Select line (again: the next line too) |
+| Ctrl+Shift+Right / Alt+Shift+Right | **Expand selection** to the next enclosing unit |
+| Ctrl+Shift+Left / Alt+Shift+Left | **Shrink selection** back one step |
+
+Expand selection grows through the code's structure (Zed's "select larger
+syntax node"): the word -> a call (`find_node("Player")`) -> a string's
+contents -> the string -> inside brackets -> the brackets -> the line ->
+the body of the enclosing `function` / `if` / `for` / `while` / `do` /
+`repeat` block or `{ }` table -> the whole block -> the next block out ->
+the file. The structure comes from `code_structure.odin`: bracket pairs and
+blocks outside strings and comments, computed once per edit only when a
+feature needs it.
+
 ## Multi-cursor
 
 | Shortcut | Command |
