@@ -214,6 +214,12 @@ Actions_Init :: proc() {
 	add({id = "code.unfold_all", category = "Code", label = "Unfold All", chords = k(ch(.RightBracket, Mods{.Primary, .Alt, .Shift})), scope = .Code, run = Code_CmdUnfoldAll})
 	add({id = "code.soft_wrap", category = "Code", label = "Toggle Soft Wrap", chords = k(ch(.Z, AL)), scope = .Code, run = Code_CmdToggleSoftWrap})
 	add({id = "code.inlay_hints", category = "Code", label = "Toggle Inlay Hints", chords = k(ch(.H, Mods{.Ctrl, .Alt})), scope = .Code, run = proc(s: ^EditorState) {GlobalSettings.inlayHints = !GlobalSettings.inlayHints; _ = Editor_SaveSettings()}})
+	add({id = "code.nav_back", category = "Code", label = "Go Back", chords = k(ch(.Minus, CT)), scope = .Code, run = Code_CmdNavBack})
+	add({id = "code.nav_forward", category = "Code", label = "Go Forward", chords = k(ch(.Minus, Mods{.Ctrl, .Shift})), scope = .Code, run = Code_CmdNavForward})
+	add({id = "code.next_diagnostic", category = "Code", label = "Next Problem", chords = k(ch(.F8)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdNextDiagnostic(s, 1)}, enabled = proc(s: ^EditorState) -> bool {return !Debug_IsStopped()}})
+	add({id = "code.prev_diagnostic", category = "Code", label = "Previous Problem", chords = k(ch(.F8, SH)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdNextDiagnostic(s, -1)}, enabled = proc(s: ^EditorState) -> bool {return !Debug_IsStopped()}})
+	add({id = "code.next_change", category = "Code", label = "Next Change", chords = k(ch(.F8, AL)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdNextChange(s, 1)}})
+	add({id = "code.prev_change", category = "Code", label = "Previous Change", chords = k(ch(.F8, Mods{.Alt, .Shift})), scope = .Code, run = proc(s: ^EditorState) {Code_CmdNextChange(s, -1)}})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})
@@ -439,6 +445,9 @@ Actions_Dispatch :: proc(state: ^EditorState) {
 		if Code_FindBarFocused() && a.scope == .Code {
 			if a.id != "code.find_next" && a.id != "code.find_prev" && a.id != "code.find" && a.id != "code.replace" && a.id != "code.save" do continue
 		}
+		// A disabled action doesn't shadow another on the same key (F8: next
+		// diagnostic in the code, continue while the debugger is paused).
+		if a.enabled != nil && !a.enabled(state) do continue
 		for c in a.chords {
 			if !chord_pressed(c, a.repeat) do continue
 			// Code actions beat global/scene ones bound to the same chord.

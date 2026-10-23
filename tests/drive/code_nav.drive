@@ -1,0 +1,46 @@
+# Back / forward through jumps (Ctrl+- / Ctrl+Shift+-), next / previous
+# problem (F8 / Shift+F8), next / previous change (Alt+F8).
+wait 5
+exec git -C $PROJECT init -q
+exec git -C $PROJECT add scripts/player_ship.lua
+exec git -C $PROJECT -c user.email=drive@example.com -c user.name=drive commit -q -m base
+dblclick @asset:scripts/player_ship.lua
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 70
+key enter
+expect code.cursor contains 70:
+key ctrl+minus
+expect code.cursor contains 1:
+key ctrl+shift+minus
+expect code.cursor contains 70:
+# A syntax error on line 40; F8 from the top goes there.
+key ctrl+g
+type 40
+key enter
+key cmd+enter
+type local broken = = 1
+wait-until code.errors >= 1 timeout=600
+key ctrl+g
+type 3
+key enter
+key f8
+expect code.cursor contains 41:
+key shift+f8
+expect code.cursor contains 41:
+# Changes: line 41 added and line 12 modified; Alt+F8 visits both.
+key ctrl+g
+type 12
+key enter
+key end
+type \s-- x
+wait 30
+key ctrl+g
+type 1
+key enter
+key alt+f8
+expect code.cursor contains 12:
+key alt+f8
+expect code.cursor contains 41:
+key alt+shift+f8
+expect code.cursor contains 12:

@@ -358,6 +358,7 @@ Code_Shutdown :: proc() {
 	delete(cm.closedFiles)
 	delete(cm.snippetStops)
 	Code_ClipboardShutdown()
+	Code_NavShutdown()
 	code_find_destroy()
 	code_lsp_shutdown()
 }
@@ -627,6 +628,7 @@ Code_Render :: proc(state: ^EditorState) {
 		}
 	}
 	imgui.End()
+	Code_NavTrack() // back / forward history (code_nav.odin)
 	cm.focused = focusedNow
 	if !focusedNow {
 		cm.completion.open = false

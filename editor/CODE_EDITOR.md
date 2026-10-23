@@ -198,6 +198,22 @@ The display (rows on screen: folds and wrapped lines) comes from
 `code_display.odin`, rebuilt only when the text, the wrap width or the
 folds change; drawing touches only the visible rows.
 
+## Navigation
+
+| Shortcut | Command |
+|---|---|
+| Ctrl+- / Ctrl+Shift+- | **Go back / forward** through the places the caret jumped from |
+| F8 / Shift+F8 | Next / previous **problem** (error or warning; wraps around) |
+| Alt+F8 / Alt+Shift+F8 | Next / previous **change** since the last commit (git gutter) |
+| Cmd+Shift+\\ | Matching bracket |
+| Ctrl+G | Go to line |
+
+Back / forward remember a place whenever the caret moves more than 10
+lines or to another file - go to definition, references, go to line,
+breadcrumbs, sticky lines, problems, search results all come back with
+Ctrl+-. While the debugger is paused F8 is Continue (the problem commands
+step aside: a disabled command never takes another's shortcut).
+
 ## Find
 
 | Shortcut | Command |
