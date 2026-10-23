@@ -542,6 +542,41 @@ code_draw_inlay :: proc(dl: ^imgui.DrawList, x0, y: f32, v: int, h: Code_Inlay, 
 	return v + w
 }
 
+// code_draw_inline_values: "name = value" for each local the line uses
+// (once each), after the line, faint.
+code_draw_inline_values :: proc(dl: ^imgui.DrawList, x, y: f32, text: string, tokens: []syn.Token, locals: [][3]string) {
+	s := code_inline_values_text(text, tokens, locals)
+	if s == "" do return
+	label := strings.clone_to_cstring(s, context.temp_allocator)
+	w := imgui.CalcTextSize(label).x
+	imgui.DrawList_AddRectFilled(dl, {x - 4, y - 1}, {x + w + 4, y + code_font_size() + 1}, col_u32({0.96, 0.72, 0.30, 0.10}), 3)
+	imgui.DrawList_AddText(dl, {x, y}, col_u32({0.96, 0.78, 0.45, 0.85}), label)
+}
+
+// code_inline_values_text: "a = 1, b = 2" for the locals a line uses.
+code_inline_values_text :: proc(text: string, tokens: []syn.Token, locals: [][3]string) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	seen := make([dynamic]string, context.temp_allocator)
+	for t in tokens {
+		if t.kind != .Identifier && t.kind != .Builtin do continue
+		name := text[t.start:t.end]
+		if t.start > 0 && (text[t.start - 1] == '.' || text[t.start - 1] == ':') do continue // a field
+		dup := false
+		for s in seen do if s == name do dup = true
+		if dup do continue
+		for l in locals {
+			if l[0] != name do continue
+			v := l[1]
+			if len(v) > 40 do v = fmt.tprintf("%s…", v[:38])
+			fmt.sbprintf(&sb, "%s%s = %s", ", " if strings.builder_len(sb) > 0 else "", name, v)
+			append(&seen, name)
+			break
+		}
+		if strings.builder_len(sb) > 120 do break
+	}
+	return strings.to_string(sb)
+}
+
 RAINBOW := [3]imgui.Vec4{{0.98, 0.82, 0.30, 1}, {0.85, 0.50, 0.95, 1}, {0.35, 0.72, 1.00, 1}}
 
 // code_draw_marked draws text[from:to] in color, with any bracket in marks
@@ -1079,6 +1114,15 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 	}
 	blankIndent, blankFor := 0, -1 // indentation of the next code line (blank lines)
 	symRanges := code_symbol_occurrences(doc, first, last) if !hasSel else nil // same word as the caret's
+	// Inline values while the debugger is paused in this file: lines of the
+	// paused function up to the paused line.
+	inlineFn: Code_Block
+	inlineStop := -1
+	inlineLocals: [][3]string
+	if file, line, locals, ok := Debug_InlineInfo(); ok && file == doc.rel {
+		for bl in code_blocks_around(doc, line - 1) do if bl.kind == .Function do inlineFn = bl
+		inlineStop, inlineLocals = line - 1, locals
+	}
 	showWs := GlobalSettings.showWhitespace
 
 	lastMarkLine := -1
@@ -1208,6 +1252,10 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 					imgui.DrawList_AddLine(dl, {x + 2, cy}, {x + cm.charW * f32(tab) - 3, cy}, col_u32(ui_line(0.22)))
 				}
 			}
+		}
+		// While paused here: the values of the locals this line uses (code_debug).
+		if lastRowOfLine && inlineFn.end > 0 && ln >= inlineFn.start && ln <= inlineStop {
+			code_draw_inline_values(dl, xof(textX, text, row, len(text), hints) + cm.charW * 2, y + textY, text, tokens, inlineLocals)
 		}
 		// A folded block: a chip after its first line (click to unfold).
 		if lastRowOfLine {
@@ -1962,6 +2010,18 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 	cm := &GlobalCode
 	doc: ^Code_Doc
 	if cm.active >= 0 && cm.active < len(cm.docs) do doc = cm.docs[cm.active]
+	if strings.has_prefix(q, "code.inline-values:") {
+		// the debugger's inline values on a line (1-based), while paused
+		if doc == nil do return "", true
+		ln := 0
+		for r in q[len("code.inline-values:"):] do if r >= '0' && r <= '9' do ln = ln * 10 + int(r - '0')
+		_, _, locals, ok := Debug_InlineInfo()
+		if !ok || ln < 1 || ln > buf.buffer_line_count(&doc.buffer) do return "", true
+		text := buf.buffer_line_str(&doc.buffer, ln - 1)
+		code_update_line_states(doc)
+		tokens, _ := Token_CacheGet(&doc.tokens, doc.lang, text, doc.lineStates[ln - 1], doc.buffer.version)
+		return code_inline_values_text(text, tokens, locals), true
+	}
 	if strings.has_prefix(q, "code.inlays:") {
 		// the hints of a line (1-based): "label@col,..."
 		if doc == nil do return "", true

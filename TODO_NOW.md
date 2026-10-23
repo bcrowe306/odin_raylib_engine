@@ -148,7 +148,7 @@ Files
 - [x] 9.20 Tab pinning + preview tab
 - [x] 9.21 Files changed on disk: reload prompt; local history (restore earlier saves)
 Engine
-- [ ] 9.22 Inline values while debugging
+- [x] 9.22 Inline values while debugging
 - [ ] 9.23 Property in code <-> Inspector (click to select)
 - [x] 9.24 Colour swatches beside {r, g, b, a} with a picker
 - [x] 9.25 Texture path hover preview

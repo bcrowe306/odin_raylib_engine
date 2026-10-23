@@ -1,0 +1,25 @@
+# Inline values while debugging: paused at a breakpoint, lines of the
+# function show the locals they use (dt, self); gone after Continue.
+wait 5
+dblclick @asset:scenes/battle_arena.scene.json
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 32
+key enter
+wait 3
+click @code.gutter:32
+click @toolbar.play-scene
+wait-until game == running timeout=600
+wait-until debug-stopped == true timeout=600
+expect code.inline-values:27 contains self = {
+expect code.inline-values:27 contains dt = 0.
+screenshot inline_values
+click @code.gutter:32
+click @bottom:game
+wait 3
+click @debug.continue
+wait-until debug-stopped == false timeout=300
+expect code.inline-values:27 == 
+click @toolbar.stop
+wait-until game == stopped timeout=300

@@ -322,3 +322,8 @@ Language server.
 Click a line number for a breakpoint; right-click it for a condition. The
 Game tab shows the call stack, locals and watches; F8 / F10 / F11 /
 Shift+F11 continue and step. See SCRIPTING.md > Debugging.
+
+**Inline values**: while paused, each line of the paused function (up to
+the paused line) shows the current values of the locals it uses after its
+end - `dt = 0.0167, self = {vx = 0, ...}` - from the selected stack frame;
+they go when the game runs on.

@@ -56,6 +56,17 @@ Debug_HasBreakpoint :: proc(rel: string, line: int) -> bool {
 	return ok && slice.contains(lines[:], line)
 }
 
+// Debug_InlineInfo: where the debugger is paused in the selected frame
+// (file, 1-based line) and that frame's locals [name, value, type].
+Debug_InlineInfo :: proc() -> (file: string, line: int, locals: [][3]string, ok: bool) {
+	if !dbg.stopped do return
+	file, line = dbg.file, dbg.line
+	if dbg.level > 0 {
+		for fr in dbg.stack do if fr.level == dbg.level {file, line = fr.file, fr.line}
+	}
+	return file, line, dbg.locals[:], true
+}
+
 // Debug_BreakpointLines: a script's breakpoints (1-based).
 Debug_BreakpointLines :: proc(rel: string) -> []int {
 	if lines, ok := dbg.breakpoints[rel]; ok do return lines[:]

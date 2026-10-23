@@ -90,6 +90,7 @@ exits non-zero if any check fails.
 | `code_tabs_preview_pin.drive` | A symbol in another file opens as a preview, the next one replaces it, typing keeps it; a pinned tab survives Close Saved. |
 | `code_disk_history.drive` | Two saves kept; Local History restores the older; the file changed on disk while edited - the bar, Reload (undo brings the edits back); clean, a change reloads by itself. |
 | `code_swatch_texture.drive` | Swatches before a property's colour default and {0.2, 0.4, 0.8} (none for {1, 2, 3}); a click opens the picker; hovering a texture path shows the image. |
+| `code_inline_values.drive` | Paused at a breakpoint in update: line 27 shows self and dt; gone after Continue. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -160,7 +161,7 @@ Queries:
   `code.dirty`, `code.focused`, `code.lsp` (off/starting/ready/failed), `code.completion` (visible items,
   comma-separated), `code.signature`, `code.errors`, `code.diagnostics`, `code.diagnostic-messages`, `code.hover`
 - `code.overlays` (`ok <n>` when every overlay is inside the Code area and bounded), `code.update-ms` (last line-state pass), `code.token-bench` (`full=<ms> cached=<ms> tokenized=<n> lines=<n>`), `code.token-speedup`
-- `code.inlays:<line>` (`label@col,...`), `code.changes` (`line:added|modified|deleted`), `code.git` (Unknown / Loading / None / Ready)
+- `code.inlays:<line>` (`label@col,...`, `■` = a colour swatch), `code.inline-values:<line>` (the debugger's values on a line), `code.changes` (`line:added|modified|deleted`), `code.git` (Unknown / Loading / None / Ready)
 - `code.tabs` (open tabs, `(preview)` / `(pinned)`)
 - `code.folds` (folded first lines), `code.rows` (display rows), `code.lines`, `code.symbol-highlights`
 - `code.cursors`, `code.selection`, `code.selection-range` (`line:col-line:col`), `code.find` (match count), `code.font`, `code.completion-doc`
