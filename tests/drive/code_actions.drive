@@ -1,0 +1,42 @@
+# Code actions (Cmd+. / the gutter lightbulb): a node name that isn't in the
+# scene - pick one; an input action the project lacks - add it.
+wait 5
+exec cp tests/drive/fixtures/drive_fix_zz.lua $PROJECT/scripts/drive_fix_zz.lua
+wait-until item:asset:scripts/drive_fix_zz.lua == visible timeout=300
+dblclick @asset:scripts/drive_fix_zz.lua
+wait 5
+key ctrl+g
+type 3
+key enter
+key end
+key left
+key left
+key left
+wait 2
+expect item:code.lightbulb == visible
+key cmd+period
+wait 2
+expect item:code.action:0 == visible
+screenshot actions
+click @code.action:0
+wait 2
+type PlayerSh
+wait 2
+screenshot picker
+key enter
+wait 2
+expect code.text contains Scene.find_node("PlayerShip")
+# The input action.
+key ctrl+g
+type 4
+key enter
+key end
+key left
+key left
+key left
+wait 2
+click @code.lightbulb
+wait 2
+click @code.action:0
+wait 3
+expect file:project.json contains "drive_dash_zz"

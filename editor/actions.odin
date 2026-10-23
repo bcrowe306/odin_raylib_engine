@@ -225,6 +225,7 @@ Actions_Init :: proc() {
 	add({id = "code.find_in_files", category = "Code", label = "Find in Files", chords = k(ch(.F, PS)), scope = .Global, run = Code_CmdFindInFiles})
 	add({id = "code.peek_definition", category = "Code", label = "Peek Definition", chords = k(ch(.F12, AL)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdPeek(s, false)}})
 	add({id = "code.peek_references", category = "Code", label = "Peek References", chords = k(ch(.F12, Mods{.Alt, .Shift})), scope = .Code, run = proc(s: ^EditorState) {Code_CmdPeek(s, true)}})
+	add({id = "code.code_actions", category = "Code", label = "Code Actions (Quick Fix)", chords = k(ch(.Period, P)), scope = .Code, run = Code_CmdCodeActions})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})

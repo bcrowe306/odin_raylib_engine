@@ -764,7 +764,6 @@ code_rename_popup :: proc(state: ^EditorState) {
 
 // code_doc_for_key finds (or opens, without focusing) the document for an
 // LSP uri_key ("" = the document being formatted).
-@(private = "file")
 code_doc_for_key :: proc(state: ^EditorState, key: string) -> ^Code_Doc {
 	cm := &GlobalCode
 	if key == "" do return cm.formatDoc
@@ -786,6 +785,13 @@ code_apply_edits :: proc(state: ^EditorState) {
 		if cm.client.edits_kind == .Rename do Editor_Log(state, .Info, "Nothing to rename here")
 		return
 	}
+	files := code_apply_edit_list(state, edits)
+	if cm.client.edits_kind == .Rename do Editor_Log(state, .Info, "Renamed %d occurrence(s) in %d file(s)", len(edits), files)
+}
+
+// code_apply_edit_list applies LSP text edits (any files; one undo step per
+// file). Returns the number of files changed.
+code_apply_edit_list :: proc(state: ^EditorState, edits: []lsp.Code_Action_Edit) -> int {
 	keys := make([dynamic]string, context.temp_allocator)
 	for e_ in edits do if !slice.contains(keys[:], e_.key) do append(&keys, e_.key)
 	files := 0
@@ -812,7 +818,7 @@ code_apply_edits :: proc(state: ^EditorState) {
 		for &c in b.cursors do c.pos = buf.buffer_clamp_position(b, c.pos)
 		files += 1
 	}
-	if cm.client.edits_kind == .Rename do Editor_Log(state, .Info, "Renamed %d occurrence(s) in %d file(s)", len(edits), files)
+	return files
 }
 
 // code_commands_update handles LSP answers for the commands above.

@@ -85,6 +85,7 @@ exits non-zero if any check fails.
 | `code_symbols.drive` | Outline: a function and a script property by name; workspace symbols: another script's function opens it. |
 | `code_find_in_files.drive` | Cmd+Shift+F: three matches in one file, a result opens the script at its line; Replace All writes the closed file. |
 | `code_peek.drive` | Peek references of self.rotation (a list, Enter opens one - the same tab), peek the definition of Log.info (engine API), Esc closes. |
+| `code_actions.drive` | Lightbulb on a line with an unknown node name; Cmd+. picks PlayerShip from the scene; the lightbulb adds a missing input action to project.json. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

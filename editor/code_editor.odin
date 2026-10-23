@@ -105,6 +105,7 @@ Code_Editor :: struct {
 	closeMode:     enum {Others, Right, Saved}, // with closeOthers: which tabs go
 	columnFrom:    [2]f32, // Alt-drag column selection: where it started (screen)
 	stickyH:       f32,    // height of the pinned block headers this frame (code_sticky.odin)
+	bulbMin, bulbMax: [2]f32, // the gutter lightbulb's rect (last frame; zero = none)
 	lastDiskCheck: time.Tick,
 	cursorMoved:   time.Tick, // caret blink restarts on movement
 	// Layout of the last drawn frame (screen space).
@@ -367,6 +368,7 @@ Code_Shutdown :: proc() {
 	Code_NavShutdown()
 	Code_SearchShutdown()
 	Code_PeekShutdown()
+	Code_ActionsShutdown()
 	code_find_destroy()
 	code_lsp_shutdown()
 }
@@ -842,6 +844,7 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	Code_ClipboardPicker(state, doc) // Cmd+Shift+V
 	Code_GutterMenu(state, doc)      // right-click a line number
 	Code_PeekRender(state)           // peek definition / references
+	Code_ActionsRender(state, doc)   // Cmd+. fixes
 	// Right-click: the text menu - in the gutter, a breakpoint condition instead.
 	if hovered && imgui.IsMouseReleased(.Right) && imgui.GetIO().MousePos.x >= winPos.x + gutterW {
 		Code_ContextOpen(state, doc, code_pos_at(b, {imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y}))
@@ -859,7 +862,8 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	io := imgui.GetIO()
 	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
 	inPopup := cm.completion.open && point_in_rect(mouse, cm.popupMin, cm.popupMax)
-	overOverlay := Code_OverlayHovered() || Code_OverviewHovered(winPos, winSize) || Code_StickyHovered(winPos, winSize) // boxes / strip / pinned lines: no clicks through
+	overBulb := cm.bulbMax.x > 0 && point_in_rect(mouse, cm.bulbMin, cm.bulbMax)
+	overOverlay := Code_OverlayHovered() || Code_OverviewHovered(winPos, winSize) || Code_StickyHovered(winPos, winSize) || overBulb // boxes / strip / pinned lines / lightbulb: no clicks through
 
 	// Mouse: click places the caret (Shift extends), double-click selects a
 	// word, triple-click the line, drag selects.
@@ -948,6 +952,9 @@ code_real_path :: proc(path: string) -> string {
 		return strings.clone(string(r), context.temp_allocator)
 	}
 }
+
+// code_state: the editor state (drawing code that has none passed in).
+code_state :: proc() -> ^EditorState {return &GlobalEditor}
 
 // code_doc_of: the open doc owning a buffer.
 code_doc_of :: proc(b: ^buf.Buffer) -> ^Code_Doc {
@@ -1240,6 +1247,8 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 	}
 	font := code_font()
 	gutterMouse := [2]f32{imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y}
+	prevBulbMin, prevBulbMax := cm.bulbMin, cm.bulbMax
+	cm.bulbMin, cm.bulbMax = {}, {}
 	for r in firstRow ..= lastRow {
 		row := disp.rows[r]
 		ln := row.line
@@ -1257,6 +1266,18 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		w := imgui.Font_CalcTextSizeA(font, code_font_size(), max(f32), 0, num).x
 		color := col_u32(UI_TEXT_DIM if ln == c.pos.line else UI_TEXT_FAINT)
 		imgui.DrawList_AddTextImFontPtr(dl, font, code_font_size(), {winPos.x + gutterW - 18 - w, y}, color, num)
+		// A lightbulb on the caret's line when there is something to fix (Cmd+.).
+		if ln == c.pos.line && Code_LightbulbAt(code_state(), doc, ln) {
+			bx := winPos.x + 2
+			imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.regular, code_font_size() - 2, {bx, y}, col_u32(UI_WARNING), ICON_FA_LIGHTBULB)
+			bmx := [2]f32{bx + 14, rowMax.y}
+			Drive_ItemRect("code.lightbulb", rowMin, bmx, inWindow = true)
+			cm.bulbMin, cm.bulbMax = rowMin, bmx // clicks here are the bulb's, not the gutter's / text's
+			if point_in_rect(gutterMouse, rowMin, bmx) && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) {
+				UI_Tooltip("Code actions (Cmd+.)")
+				if imgui.IsMouseClicked(.Left) do Code_CmdCodeActions(code_state())
+			}
+		}
 		// Changes since the last commit (code_git.odin): a bar at the gutter's edge.
 		if gc, changed := code_git_change_at(doc, ln); changed {
 			gx := winPos.x + gutterW - 3
@@ -1271,7 +1292,7 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		// Breakpoints (click the gutter) and where the game is paused.
 		Drive_ItemRect(fmt.tprintf("code.gutter:%d", ln + 1), rowMin, rowMax, inWindow = true)
 		numArea := [2]f32{winPos.x + gutterW - 16, rowMax.y} // the fold arrow's column is its own
-		if doc.isLua && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && point_in_rect(gutterMouse, rowMin, numArea) {
+		if doc.isLua && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && point_in_rect(gutterMouse, rowMin, numArea) && !(prevBulbMax.x > 0 && point_in_rect(gutterMouse, prevBulbMin, prevBulbMax)) {
 			if imgui.IsMouseClicked(.Left) do Debug_ToggleBreakpoint(doc.rel, ln + 1)
 			if imgui.IsMouseClicked(.Right) do Code_GutterMenuOpen(ln + 1) // breakpoint / condition / run to here
 			if cond := Debug_Condition(doc.rel, ln + 1); cond != "" do UI_Tooltip(fmt.tprintf("Stops when: %s (right-click to edit)", cond))

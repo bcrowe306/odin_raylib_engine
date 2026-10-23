@@ -248,6 +248,21 @@ hover, diagnostics (squiggles, gutter, status line), go to definition (F12
 (SCRIPTING.md > Completion of project names). F1 opens the Scripting
 Reference at the symbol.
 
+## Code actions
+
+**Cmd+.** (or the **lightbulb** in the gutter, shown on the caret's line
+when there is something to fix) lists fixes for the caret:
+
+- a node name / path in `find_node` / `get_node` / `get_child` that isn't in
+  the open scene: *pick one* - a filtered list of the scene's nodes (paths
+  from the script's node for `get_node`) replaces the string;
+- an input action in `Input.is_action_pressed` / `_down` / `_released`
+  that the project doesn't have: *add it* to Project Settings > Input
+  (then give it keys there);
+- lua-language-server's quick fixes for the diagnostics on the line.
+
+Up / Down / Enter or a click applies one; Esc closes.
+
 ## Debugging
 
 Click a line number for a breakpoint; right-click it for a condition. The
