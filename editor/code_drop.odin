@@ -3,6 +3,7 @@ package editor
 import "core:fmt"
 import "core:path/filepath"
 import "core:strings"
+import "core:time"
 import buf "../odin_editor/buffer"
 import e "../engine"
 import imgui "lib/imgui"
@@ -146,6 +147,10 @@ Code_DropAsset :: proc(doc: ^Code_Doc, rel: string, pos: buf.Position, asPropert
 // Plain Nodes get no annotation (get_node returns Node already).
 Code_DropNode :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, pos: buf.Position) {
 	if state.activeScene == nil || node == nil do return
+	if code_in_properties_table(&doc.buffer, pos.line) {
+		code_add_node_property(state, doc, node, pos)
+		return
+	}
 	expr := code_node_ref(state, doc, node, false)
 	class := e.Node_TypeName(node)
 	b := &doc.buffer
@@ -199,6 +204,86 @@ code_blank_line_indent :: proc(b: ^buf.Buffer, line: int) -> string {
 		return strings.concatenate({ind, unit}, context.temp_allocator) if opens else ind
 	}
 	return ""
+}
+
+// code_in_properties_table: the line is inside `Cls.properties = { ... }`.
+@(private = "file")
+code_in_properties_table :: proc(b: ^buf.Buffer, line: int) -> bool {
+	for l := line; l >= 0; l -= 1 {
+		t := strings.trim_space(buf.buffer_line_str(b, l))
+		if strings.contains(t, ".properties = {") || strings.contains(t, ".properties={") do return !strings.has_suffix(t, "}") || l == line
+		if l < line && (t == "}" || strings.has_prefix(t, "function ") || strings.has_prefix(t, "local ")) do return false
+	}
+	return false
+}
+
+// A node property dropped into a script's properties table: set to that
+// node once the script reloads with it.
+@(private = "file")
+pendingNodeProp: struct {
+	owner:      ^e.Node,
+	name, path: string,
+	since:      time.Tick,
+}
+
+// code_add_node_property adds `<name> = { type = "node" },` on the line
+// after the drop and remembers which node it should point at.
+@(private = "file")
+code_add_node_property :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, pos: buf.Position) {
+	b := &doc.buffer
+	name := snake_ident(node.name)
+	if name == "" || code_lua_keyword(name) do name = "target"
+	text := buf.buffer_to_string(b, context.temp_allocator)
+	for i := 2; strings.contains(text, fmt.tprintf(" %s = {{", name)); i += 1 do name = fmt.tprintf("%s_%d", snake_ident(node.name), i)
+	line := strings.clone(buf.buffer_line_str(b, pos.line), context.temp_allocator)
+	indent := line[:len(line) - len(strings.trim_left_space(line))]
+	at := pos.line + 1
+	unit := "\t" if doc.useTabs else "    "
+	if strings.contains(line, ".properties") do indent = strings.concatenate({indent, unit}, context.temp_allocator)
+	if strings.trim_space(line) == "}" { // the closing brace: before it
+		at = pos.line
+		indent = strings.concatenate({indent, unit}, context.temp_allocator)
+	}
+	entry := fmt.tprintf("%s%s = {{ type = \"node\" }}, -- %s\n", indent, name, node.name)
+	end := buf.buffer_insert_text(b, {at, 0}, entry, buf.buffer_next_group(b))
+	code_set_single_cursor(b, {end.line - 1, len(indent) + len(name)}, false)
+	doc.scrollToCursor = true
+	if owner := code_script_owner(state, doc); owner != nil {
+		delete(pendingNodeProp.name)
+		delete(pendingNodeProp.path)
+		pendingNodeProp = {owner, strings.clone(name), strings.clone(e.Node_RelativePath(state.activeScene.manager, owner, node)), time.tick_now()}
+		Editor_Log(state, .Info, "Added the node property %s: save the script to set it to %s", name, node.name)
+	}
+}
+
+// Code_ApplyPendingNodeProp (each frame): once the script has the dropped
+// node property (saved, reloaded), point it at the node.
+Code_ApplyPendingNodeProp :: proc(state: ^EditorState) {
+	p := &pendingNodeProp
+	if p.owner == nil do return
+	if !e.Node_IsAlive(p.owner) || p.owner.scriptInstance == nil || time.tick_since(p.since) > 10 * time.Minute {
+		p.owner = nil
+		return
+	}
+	inst := cast(^e.ScriptInstance)p.owner.scriptInstance
+	if _, has := inst.properties[p.name]; !has do return
+	Editor_RecordUndo(state, fmt.tprintf("Set %s", p.name))
+	e.ScriptInstance_SetProperty(inst, p.name, {type = .String, valString = p.path}, &state.game.scriptManager)
+	p.owner = nil
+}
+
+// code_script_owner: a node that runs this script (the selection if it
+// does, else the first in the scene).
+code_script_owner :: proc(state: ^EditorState, doc: ^Code_Doc) -> ^e.Node {
+	if state.activeScene == nil do return nil
+	usesScript :: proc(state: ^EditorState, n: ^e.Node, doc: ^Code_Doc) -> bool {
+		if n == nil || n.scriptInstance == nil do return false
+		rel := asset_rel_editor(state, (cast(^e.ScriptInstance)n.scriptInstance).modulePath)
+		return strings.has_suffix(doc.path, rel)
+	}
+	if usesScript(state, state.selectedNode, doc) do return state.selectedNode
+	for n in state.activeScene.manager.nodes do if usesScript(state, n, doc) do return n
+	return nil
 }
 
 // code_is_assignment: the line so far is a statement assigning a value

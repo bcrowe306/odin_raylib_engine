@@ -57,6 +57,7 @@ exits non-zero if any check fails.
 | `code_drop_items.drive` | Dropped into a script: an input action chip (is_action_pressed, Shift: is_action_down), a sound with Alt (Audio.play_sound), an animation (animation_play). |
 | `code_drop_event.drive` | A Signals event row dropped into a script: an indented connect with the handler (value named for the event), the cursor in its body. |
 | `code_drop_node_method.drive` | A node dropped onto a method's line: its events in a menu; the pick adds a connect calling the method to ready(). |
+| `node_ref_property.drive` | A node dropped into the properties table adds a `type = "node"` property, set to it after the save; the Inspector picker re-points it; saved as a path. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

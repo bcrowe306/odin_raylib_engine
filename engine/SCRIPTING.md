@@ -92,6 +92,13 @@ Scripts declare exposed properties in a `properties` table. These properties are
   shows an asset picker; e.g. `self.node:set_texture(self.skin)`,
   `Audio.play_sound(self.hit_sound)`. Dropping an asset onto the code with
   Cmd/Ctrl held adds one of these to the `properties` table.
+- `node`: a **node reference** - `target = { type = "node" }`. The
+  Inspector shows a node picker (or drop a node from the scene tree on it);
+  it is saved as a path from the script's node (`"../Player"`), so it keeps
+  working when the subtree moves or is instanced, and `self.target` is the
+  node itself (resolved just before `ready()`; nil, with a warning, when it
+  points at nothing). Dropping a node into the code's `properties` table
+  adds one, set to that node when you save the script.
 - `float` / `number`: 32-bit floating point number. Supports `min` and `max`.
 - `int` / `integer`: 64-bit integer. Supports `min` and `max`.
 - `string`: Text string.

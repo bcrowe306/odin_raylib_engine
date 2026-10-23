@@ -172,6 +172,7 @@ lua_type_of :: proc(p: e.ScriptProperty) -> string {
 	case "component": return "ComponentPath"
 	case "level":     return "LevelPath"
 	case "script":    return "ScriptPath"
+	case "node":      return "Node? # a node (set in the Inspector)"
 	}
 	switch p.type {
 	case .Float:   return "number"

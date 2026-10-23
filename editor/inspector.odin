@@ -363,6 +363,35 @@ script_prop_label :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: st
 	return pretty_name(name)
 }
 
+// node_ref_field: a node-reference script property - a combo of the
+// scene's nodes and a drop target for nodes from the tree; returns the
+// picked node's path from `owner`.
+node_ref_field :: proc(state: ^EditorState, owner: ^e.Node, id, current: string) -> (path: string, changed: bool) {
+	mgr := state.activeScene.manager
+	target := e.Node_ResolvePath(mgr, owner, current) if current != "" else nil
+	shown := "(none)" if current == "" else (fmt.tprintf("%s  %s", Editor_NodeIcon(target), target.name) if target != nil else fmt.tprintf("%s  %s (missing)", ICON_FA_TRIANGLE_EXCLAMATION, current))
+	imgui.SetNextItemWidth(field_width())
+	if imgui.BeginCombo(fmt.ctprintf("##%s", id), strings.clone_to_cstring(shown, context.temp_allocator)) {
+		if imgui.Selectable("(none)", current == "") do path, changed = "", true
+		for n in mgr.nodes {
+			if n == nil || n == state.activeScene.rootNode || n.transient do continue
+			rel := e.Node_RelativePath(mgr, owner, n)
+			if imgui.Selectable(fmt.ctprintf("%s  %s   %s", Editor_NodeIcon(n), n.name, rel), rel == current) do path, changed = rel, true
+			Drive_Item(fmt.tprintf("pick:%s", n.name))
+		}
+		imgui.EndCombo()
+	}
+	Drive_Item(id)
+	UI_Tooltip(fmt.tprintf("A node (path from this one: %q). Pick it, or drop one from the scene tree", current) if current != "" else "Pick a node, or drop one from the scene tree")
+	if imgui.BeginDragDropTarget() {
+		if pl := imgui.AcceptDragDropPayload("ORE_NODE"); pl != nil {
+			if n := (^^e.Node)(pl.Data)^; e.Node_IsAlive(n) do path, changed = e.Node_RelativePath(mgr, owner, n), true
+		}
+		imgui.EndDragDropTarget()
+	}
+	return
+}
+
 // origin_presets: a row with a 3 x 3 grid of common origins (corners, edge
 // middles, centre) in a popup.
 @(private = "file")
@@ -988,7 +1017,19 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 			case .Boolean:
 				changed = imgui.Checkbox(label, &val.valBool)
 			case .String:
-				if kind := Script_PropAssetKind(state, inst, name); kind != "" {
+				if kind := Script_PropAssetKind(state, inst, name); kind == "node" {
+					// A node reference: a picker (or drop a node from the tree), saved as a path.
+					if path, ok := node_ref_field(state, node, id, val.valString); ok && path != val.valString {
+						Editor_RecordUndo(state, fmt.tprintf("Edit %s", name))
+						val.valString = path
+						e.ScriptInstance_SetProperty(inst, name, val, sm)
+					}
+					if field_reset(id, val.valString != "") {
+						Editor_RecordUndo(state, fmt.tprintf("Reset %s", name))
+						e.ScriptInstance_SetProperty(inst, name, {type = .String}, sm)
+					}
+					continue
+				} else if kind != "" {
 					if path, ok := asset_picker(id, val.valString, Script_AssetFiles(state, kind), allowNone = true); ok && path != val.valString {
 						Editor_RecordUndo(state, fmt.tprintf("Edit %s", name))
 						val.valString = path

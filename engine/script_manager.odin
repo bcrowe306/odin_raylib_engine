@@ -238,8 +238,12 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 		case .Int:
 			lua.pushinteger(L, lua.Integer(val.valInt))
 		case .String:
-			sC := strings.clone_to_cstring(val.valString, context.temp_allocator)
-			lua.pushstring(L, sC)
+			if prop.assetKind == "node" {
+				lua.pushnil(L) // resolved to the node before ready() (the tree may not be built yet)
+			} else {
+				sC := strings.clone_to_cstring(val.valString, context.temp_allocator)
+				lua.pushstring(L, sC)
+			}
 		case .Boolean:
 			lua.pushboolean(L, b32(val.valBool))
 		case .Color:
@@ -273,6 +277,40 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 // Alias for Script_AttachToNode
 Node_AttachScript :: Script_AttachToNode
 
+// script_node_prop: whether a script property is a node reference.
+script_node_prop :: proc(inst: ^ScriptInstance, name: string, mgr: ^ScriptManager) -> bool {
+	mod, ok := mgr.modules[ScriptVFS_NormalizePath(inst.modulePath)]
+	if !ok || mod == nil do return false
+	for p in mod.properties do if p.name == name do return p.assetKind == "node"
+	return false
+}
+
+// script_push_node_prop pushes the node a node property points at (nil
+// when unset or missing - warned about).
+@(private = "file")
+script_push_node_prop :: proc(L: ^lua.State, inst: ^ScriptInstance, name, path: string) {
+	if path == "" || inst.node == nil || inst.node.gameContext == nil || inst.node.gameContext.scene == nil {
+		lua.pushnil(L)
+		return
+	}
+	found := Node_ResolvePath(inst.node.gameContext.scene.manager, inst.node, path)
+	if found == nil do Script_Problem(.Warning, "%s: property %s points at \"%s\", which %s doesn't have", inst.modulePath, name, path, inst.node.name)
+	push_node_userdata(L, found)
+}
+
+// script_resolve_node_props sets self's node properties to their nodes
+// (self at the top of the stack).
+@(private = "file")
+script_resolve_node_props :: proc(L: ^lua.State, inst: ^ScriptInstance, mgr: ^ScriptManager) {
+	mod, ok := mgr.modules[ScriptVFS_NormalizePath(inst.modulePath)]
+	if !ok || mod == nil do return
+	for p in mod.properties {
+		if p.assetKind != "node" do continue
+		script_push_node_prop(L, inst, p.name, (inst.properties[p.name] or_else {}).valString)
+		lua.setfield(L, -2, strings.clone_to_cstring(p.name, context.temp_allocator))
+	}
+}
+
 ScriptInstance_CallReady :: proc(inst: ^ScriptInstance, sm: ^ScriptManager = nil) {
 	if inst == nil || inst.isReady do return
 	mgr := sm
@@ -285,6 +323,7 @@ ScriptInstance_CallReady :: proc(inst: ^ScriptInstance, sm: ^ScriptManager = nil
 	errHandler := lua.gettop(L)
 
 	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef)) // push self
+	script_resolve_node_props(L, inst, mgr) // self.<node property> = the node
 	lua.getfield(L, -1, "ready")
 	if lua.type(L, -1) == .FUNCTION {
 		lua.pushvalue(L, -2) // pass self as first arg
@@ -418,14 +457,19 @@ ScriptInstance_SetProperty :: proc(inst: ^ScriptInstance, name: string, val: Scr
 	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef)) // push self
 	propNameC := strings.clone_to_cstring(name, context.temp_allocator)
 
+	isNode := val.type == .String && script_node_prop(inst, name, mgr)
 	switch val.type {
 	case .Float:
 		lua.pushnumber(L, lua.Number(val.valFloat))
 	case .Int:
 		lua.pushinteger(L, lua.Integer(val.valInt))
 	case .String:
-		sC := strings.clone_to_cstring(val.valString, context.temp_allocator)
-		lua.pushstring(L, sC)
+		if isNode {
+			script_push_node_prop(L, inst, name, val.valString)
+		} else {
+			sC := strings.clone_to_cstring(val.valString, context.temp_allocator)
+			lua.pushstring(L, sC)
+		}
 	case .Boolean:
 		lua.pushboolean(L, b32(val.valBool))
 	case .Color:
@@ -495,7 +539,9 @@ Script_ParseProperties :: proc(L: ^lua.State, moduleIdx: c.int) -> [dynamic]Scri
 					case "bool", "boolean": prop.type = .Boolean
 					case "color":           prop.type = .Color
 					case "vector2", "vec2": prop.type = .Vector2
-					case "texture", "audio", "scene", "script", "component", "level", "file":
+					case "texture", "audio", "scene", "script", "component", "level", "file", "node":
+						// Asset paths - and node references ("node": a path from
+						// the script's node, the node itself in Lua).
 						prop.type = .String
 						prop.assetKind = strings.clone(string(typeStr))
 					case:                   prop.type = .Float

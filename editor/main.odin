@@ -101,6 +101,7 @@ editor_main :: proc() -> int {
 		Editor_UpdatePlaytest(&GlobalEditor)
 		NativeDialog_Poll(&GlobalEditor)
 		Lua_UpdateProjectTypes(&GlobalEditor)
+		Code_ApplyPendingNodeProp(&GlobalEditor) // a node property dropped into a properties table
 		when ORE_MEM_TRACK {
 			@(static) memFrame: int
 			memFrame += 1
