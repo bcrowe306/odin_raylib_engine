@@ -399,7 +399,7 @@ test_animation_player_round_trips :: proc(t: ^testing.T) {
 	AnimationPlayerNode_AddFrameAnimation(apn, rm, "thrust", {"assets/demo_project/textures/exhaust/Exhaust_1_1_005.png", "assets/demo_project/textures/exhaust/Exhaust_1_1_006.png"}, true)
 	AnimationPlayerNode_AddSheetAnimation(apn, rm, "explode", "assets/demo_project/textures/Asteroid_1.png", {4, 2}, 0, 7, false)
 	AnimationPlayerNode_SetAnimationByName(apn, "explode")
-	apn.ticker->setFPS(24)
+	AnimationPlayerNode_SetFPS(apn, 24)
 	apn.autoplay = true
 	ProcessNodeQueues(scene.manager, &game.gameContext)
 

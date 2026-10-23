@@ -1,0 +1,75 @@
+# Animation player: frames deleted with the button, the context menu and
+# the Delete key (the node stays); frames copied and pasted (buttons and
+# Cmd+C / Cmd+V); the range played (fields, menu); per-animation reverse and
+# FPS; the default animation on load; all saved.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+expect node:AnimationPlayer.type == AnimationPlayerNode
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+drag @asset:textures/Asteroid_4.png @anim.frame-drop
+expect anim-info contains frames=4 range=1-4
+screenshot four_frames
+
+# Delete: the button (frame 2), the context menu (frame 3).
+click @anim.frame:2
+click @anim.delete
+expect anim-info contains frames=3 range=1-3
+rclick @anim.frame:3
+click @anim.ctx-delete
+expect anim-info contains frames=2 range=1-2
+
+# Copy frames 1-2 (Shift+click), paste after them: 4 frames.
+click @anim.frame:1
+hold shift
+click @anim.frame:2
+release
+click @anim.copy
+click @anim.paste
+expect anim-info contains frames=4 range=1-4
+# Keys: Cmd+V pastes again, Delete removes the selection - not the node.
+key cmd+v
+expect anim-info contains frames=6
+key delete
+expect anim-info contains frames=4
+expect node:AnimationPlayer.exists == true
+
+# The range: frames 2..3 (fields), then from the menu ending at 4.
+dblclick @anim.start
+key ctrl+a
+type 2
+key enter
+dblclick @anim.end
+key ctrl+a
+type 3
+key enter
+expect anim-info contains range=2-3
+expect anim == anim_1:1/2:0
+rclick @anim.frame:4
+click @anim.ctx-range-end
+expect anim-info contains range=2-4
+screenshot range
+
+# Reverse, its own FPS, and the default animation (a second one).
+click @anim.reverse
+expect anim-info contains reverse=true
+dblclick @anim.fps
+key ctrl+a
+type 24
+key enter
+expect anim-info contains fps=24
+click @anim.default
+expect anim-info contains default=anim_1
+click @anim.new
+expect anim-info contains default=anim_1
+screenshot second_animation
+key ctrl+s
+expect file:scenes/main.scene.json contains "default_animation": "anim_1"
+expect file:scenes/main.scene.json contains "reverse": true, "fps": 24
+expect file:scenes/main.scene.json contains "start": 1, "end": 3

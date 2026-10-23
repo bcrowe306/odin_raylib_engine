@@ -2,6 +2,8 @@ package editor
 
 import "core:c"
 import "core:fmt"
+import "core:math"
+import "core:slice"
 import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
@@ -11,9 +13,14 @@ import imgui "lib/imgui"
 // ============================================================================
 // Animation timeline (bottom panel "Animation" tab) for AnimationPlayerNode.
 //
-//   toolbar   animation picker, new, play/stop preview, FPS, loop, frame
-//   frames    one cell per frame (thumbnail); click scrubs; drag to reorder;
-//             drop textures from Assets to append; right-click removes
+//   toolbar   animation picker, new, play/stop preview, loop, reverse, the
+//             animation's FPS, default-on-load, frame; range (start / end),
+//             copy / paste / delete the selected frames
+//   frames    every source frame (frames outside the range dimmed; the range
+//             handles in the header drag); click selects (Shift: a run,
+//             Cmd: toggle) and scrubs; drag to reorder; drop textures from
+//             Assets to append; right-click: copy, paste, delete, set range;
+//             Delete / Cmd+C / Cmd+V while the panel has focus
 //   tracks    keyframed properties (engine/animation_tracks.odin): a row per
 //             target.property with diamonds on keyed frames. "Key" records
 //             the property's current value at the playhead; right-click a
@@ -46,7 +53,19 @@ Anim_Panel :: struct {
 	trackNode:  ^e.Node, // Add Track dialog
 	trackOpen:  bool,
 	newName:    [64]u8,
+	// Selected source frames (of selAnim) and the last one clicked.
+	sel:        [dynamic]int,
+	selAnim:    ^e.Animation,
+	anchor:     int,
+	rangeDrag:  int, // 1: dragging the range start handle, 2: the end
 }
+
+// The copied frames (Copy / Paste in the timeline).
+frameClip: e.Frame_Clip
+
+// animTimelineFocused: the Animation tab has focus (its keys aren't the
+// scene's: Delete, Cmd+C / V act on frames).
+animTimelineFocused: bool
 
 @(private = "file")
 panel: Anim_Panel
@@ -107,17 +126,80 @@ scrub :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animati
 }
 
 @(private = "file")
+selected :: proc(f: int) -> bool {
+	for s in panel.sel do if s == f do return true
+	return false
+}
+
+// frame_select: a click on source frame f (Shift extends, Cmd toggles).
+@(private = "file")
+frame_select :: proc(f: int) {
+	io := imgui.GetIO()
+	if io.KeyShift && len(panel.sel) > 0 {
+		clear(&panel.sel)
+		for i in min(panel.anchor, f) ..= max(panel.anchor, f) do append(&panel.sel, i)
+		return
+	}
+	if io.KeySuper || io.KeyCtrl {
+		for s, i in panel.sel do if s == f {ordered_remove(&panel.sel, i); return}
+		append(&panel.sel, f)
+	} else {
+		clear(&panel.sel)
+		append(&panel.sel, f)
+	}
+	panel.anchor = f
+}
+
+@(private = "file")
+frames_delete :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, frames: []int) {
+	if len(frames) == 0 do return
+	Editor_RecordUndo(state, "Delete frames")
+	n := e.Animation_RemoveFrames(apn, anim, frames, &state.game.resourceManager)
+	clear(&panel.sel)
+	Editor_Log(state, .Info, "Deleted %d frame(s)", n)
+}
+
+@(private = "file")
+frames_copy :: proc(state: ^EditorState, anim: ^e.Animation, frames: []int) {
+	if len(frames) == 0 do return
+	n := e.Animation_CopyFrames(anim, frames, &frameClip)
+	Editor_Log(state, .Info, "Copied %d frame(s)", n)
+}
+
+// frames_paste: after the last selected frame (else at the end).
+@(private = "file")
+frames_paste :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation) {
+	if e.Frame_ClipEmpty(&frameClip) do return
+	at := e.Animation_SourceCount(anim)
+	if len(panel.sel) > 0 {
+		at = 0
+		for s in panel.sel do at = max(at, s + 1)
+	}
+	Editor_RecordUndo(state, "Paste frames")
+	n := e.Animation_PasteFrames(apn, anim, at, &frameClip, &state.game.resourceManager)
+	if n == 0 {
+		Editor_Log(state, .Warn, "Those frames don't fit this animation (images go into frame animations, cells into the same sprite sheet)")
+		return
+	}
+	clear(&panel.sel)
+	for i in at ..< at + n do append(&panel.sel, i)
+	Editor_Log(state, .Info, "Pasted %d frame(s)", n)
+}
+
+@(private = "file")
 draw_frame_thumb :: proc(dl: ^imgui.DrawList, anim: ^e.Animation, frame: int, mn, mx: [2]f32) {
 	tex: ^rl.Texture2D
 	uv0, uv1 := [2]f32{0, 0}, [2]f32{1, 1}
 	if anim.renderFrame == e.SSA_RenderFrame {
+		// `frame` is a source frame: a cell of the sheet.
 		ssa := cast(^e.SpriteSheetAnimation)anim
 		if ssa.spriteSheet == nil || ssa.grid.x <= 0 || ssa.grid.y <= 0 do return
 		tex = &ssa.spriteSheet.texture
-		idx := anim.startFrame + frame
-		cw, ch := 1 / f32(ssa.grid.x), 1 / f32(ssa.grid.y)
-		uv0 = {f32(idx % ssa.grid.x) * cw, f32(idx / ssa.grid.x) * ch}
-		uv1 = uv0 + {cw, ch}
+		cell := ssa.cells[frame] if frame >= 0 && frame < len(ssa.cells) else frame
+		size := [2]f32{f32(tex.width), f32(tex.height)}
+		r := e.SpriteSheet_CellRect(size, ssa.grid, ssa.margin, ssa.spacing, cell)
+		uv0 = {r.x / max(size.x, 1), r.y / max(size.y, 1)}
+		uv1 = uv0 + {r.width / max(size.x, 1), r.height / max(size.y, 1)}
 	} else {
 		fa := cast(^e.FrameAnimation)anim
 		if frame < 0 || frame >= len(fa.frames) || fa.frames[frame] == nil do return
@@ -162,6 +244,7 @@ ease_preview :: proc(ease: e.Ease) {
 }
 
 AnimationPanel_Render :: proc(state: ^EditorState) {
+	animTimelineFocused = false
 	node := state.selectedNode
 	apn: ^e.AnimationPlayerNode
 	if node != nil && node.typeId == e.AnimationPlayerNode do apn = cast(^e.AnimationPlayerNode)node
@@ -215,15 +298,28 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	imgui.SameLine(0, 2)
 	if UI_IconButton(ICON_FA_STOP, "anim.stop", "Stop (restore the scene)", size = 26) do preview_restore(state)
 	imgui.SameLine(0, UI_SPACE)
-	imgui.SetNextItemWidth(80)
-	fps := apn.ticker.framesPerSecond
-	if imgui.DragFloat("##anim_fps", &fps, 0.2, 1, 120, "%.0f fps") do apn.ticker->setFPS(fps)
-	undo_on_activate(state, "Edit FPS")
-	Drive_Item("anim.fps")
-	imgui.SameLine(0, UI_SPACE)
 	imgui.Checkbox("Loop##anim_loop", &anim.loop)
 	undo_on_activate(state, "Toggle loop")
 	Drive_Item("anim.loop")
+	imgui.SameLine(0, UI_SPACE)
+	imgui.Checkbox("Reverse##anim_rev", &anim.reverse)
+	undo_on_activate(state, "Toggle reverse")
+	Drive_Item("anim.reverse")
+	UI_Tooltip("Play this animation from its last frame to its first")
+	// This animation's frame rate (0 = the player's).
+	imgui.SameLine(0, UI_SPACE)
+	imgui.SetNextItemWidth(96)
+	fpsFmt := fmt.ctprintf("player %.0f", apn.fps) if anim.fps <= 0 else "%.0f fps"
+	if imgui.DragFloat("##anim_fps", &anim.fps, 0.2, 0, 120, fpsFmt) do e.AnimationPlayerNode_SetAnimationIndex(apn, apn.animationIndex)
+	undo_on_activate(state, "Edit FPS")
+	Drive_Item("anim.fps")
+	UI_Tooltip("This animation's frames per second (0: the player's FPS, set in the Inspector)")
+	imgui.SameLine(0, 2)
+	isDefault := apn.defaultAnimation == anim.name
+	if UI_IconButton(ICON_FA_STAR, "anim.default", "Played first when the scene loads (click to clear)" if isDefault else "Make this the animation played when the scene loads", isDefault, 26) {
+		Editor_RecordUndo(state, "Default animation")
+		apn.defaultAnimation = "" if isDefault else strings.clone(anim.name, apn.allocator)
+	}
 	imgui.SameLine(0, UI_SPACE)
 	imgui.AlignTextToFramePadding()
 	UI_DimText(fmt.tprintf("Frame %d / %d", rel + 1, length))
@@ -278,22 +374,45 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		imgui.EndPopup()
 	}
 
+	// Selection follows the animation.
+	if panel.selAnim != anim {
+		clear(&panel.sel)
+		panel.selAnim = anim
+	}
+	srcCount := e.Animation_SourceCount(anim)
+
+	hasSel := len(panel.sel) > 0
+	canPaste := !e.Frame_ClipEmpty(&frameClip)
+	// Keys while the panel has focus (not while typing in a field).
+	animTimelineFocused = imgui.IsWindowFocused(imgui.FocusedFlags_RootAndChildWindows)
+	if animTimelineFocused && !imgui.GetIO().WantTextInput {
+		primary := imgui.GetIO().KeySuper || imgui.GetIO().KeyCtrl
+		if hasSel && (imgui.IsKeyPressed(.Delete) || imgui.IsKeyPressed(.Backspace)) do frames_delete(state, apn, anim, slice.clone(panel.sel[:], context.temp_allocator))
+		if hasSel && primary && imgui.IsKeyPressed(.C) do frames_copy(state, anim, panel.sel[:])
+		if canPaste && primary && imgui.IsKeyPressed(.V) do frames_paste(state, apn, anim)
+	}
+	srcCount = e.Animation_SourceCount(anim)
+	length = e.Animation_Length(anim)
+	rel = clamp(apn.currentFrame - anim.startFrame, 0, max(length - 1, 0))
+
 	// Preview playback (the editor doesn't run node updates outside Simulate).
+	reversed := e.AnimationPlayerNode_IsReversed(apn, anim)
 	if panel.playing {
 		dt := f32(time.duration_seconds(time.tick_since(panel.lastTick)))
 		panel.lastTick = time.tick_now()
-		panel.accum += dt * max(apn.ticker.framesPerSecond, 1)
+		panel.accum += dt * max(e.AnimationPlayerNode_FPS(apn), 1)
 		if int(panel.accum) >= length {
 			if anim.loop do panel.accum -= f32(length)
 			else {panel.accum = f32(length - 1); panel.playing = false}
 		}
 		f := int(panel.accum)
+		if reversed do f = length - 1 - f
 		apn.currentFrame = anim.startFrame + min(f, max(anim->frameCount() - 1, 0))
-		e.AnimationPlayerNode_ApplyTracks(apn, panel.accum)
+		e.AnimationPlayerNode_ApplyTracks(apn, f32(f))
 		rel = f
 	}
 
-	// --- timeline ---
+	// --- timeline: one column per source frame; the range starts at `base` ---
 	avail := imgui.GetContentRegionAvail()
 	if !imgui.BeginChild("##anim_timeline", {avail.x, max(avail.y, 40)}, {}, {.HorizontalScrollbar}) {
 		imgui.EndChild()
@@ -306,52 +425,135 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	io := imgui.GetIO()
 	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
 	nTracks := len(anim.tracks)
+	base := anim.startFrame
+	cols := max(srcCount, base + length)
 	totalH := 20 + THUMB_H + 4 + f32(nTracks) * ROW_H
-	imgui.Dummy({LABEL_W + f32(length + 4) * CELL_W, totalH})
+	imgui.Dummy({LABEL_W + f32(cols + 4) * CELL_W, totalH})
+	colX :: proc(x0: f32, col: int) -> f32 {return x0 + f32(col) * CELL_W}
 
-	// Header: frame numbers; click/drag scrubs.
+	// Header: frame numbers and the range band with its handles; click /
+	// drag inside the range scrubs.
 	headMn := [2]f32{x0, origin.y}
-	headMx := [2]f32{x0 + f32(length) * CELL_W, origin.y + 18}
+	headMx := [2]f32{colX(x0, cols), origin.y + 18}
 	imgui.DrawList_AddRectFilled(dl, headMn, headMx, col_u32(UI_BG_RAISED), 4)
-	for f in 0 ..< length {
-		x := x0 + f32(f) * CELL_W
-		if f % 5 == 0 || length <= 20 {
-			imgui.DrawList_AddText(dl, {x + 4, origin.y + 3}, col_u32(UI_TEXT_DIM), fmt.ctprintf("%d", f + 1))
+	rangeMn := [2]f32{colX(x0, base), origin.y}
+	rangeMx := [2]f32{colX(x0, base + length), origin.y + 18}
+	imgui.DrawList_AddRectFilled(dl, rangeMn, rangeMx, col_u32(UI_ACCENT_SOFT), 4)
+	for f in 0 ..< cols {
+		x := colX(x0, f)
+		if f % 5 == 0 || cols <= 20 {
+			inRange := f >= base && f < base + length
+			imgui.DrawList_AddText(dl, {x + 4, origin.y + 3}, col_u32(UI_TEXT_DIM if inRange else UI_TEXT_FAINT), fmt.ctprintf("%d", f + 1))
 		}
 		imgui.DrawList_AddLine(dl, {x, origin.y + 14}, {x, origin.y + 20}, col_u32(ui_line(0.12)))
 	}
-	imgui.SetCursorScreenPos(headMn)
-	imgui.InvisibleButton("##anim_head", {max(headMx.x - headMn.x, 1), 20})
+	// Left of the header: copy / paste / delete the selected frames.
+	{
+		imgui.PushStyleVarImVec2(.FramePadding, {3, 1})
+		bx := origin.x + scrollX + 6
+		imgui.SetCursorScreenPos({bx, origin.y})
+		if !hasSel do imgui.BeginDisabled(true)
+		if UI_IconButton(ICON_FA_COPY, "anim.copy", "Copy the selected frames (Cmd+C)", size = 20) do frames_copy(state, anim, panel.sel[:])
+		if !hasSel do imgui.EndDisabled()
+		imgui.SameLine(0, 2)
+		if !canPaste do imgui.BeginDisabled(true)
+		if UI_IconButton(ICON_FA_PASTE, "anim.paste", "Paste frames after the selection, else at the end (Cmd+V)", size = 20) do frames_paste(state, apn, anim)
+		if !canPaste do imgui.EndDisabled()
+		imgui.SameLine(0, 2)
+		if !hasSel do imgui.BeginDisabled(true)
+		if UI_IconButton(ICON_FA_TRASH, "anim.delete", "Delete the selected frames (Delete)", size = 20, tint = UI_DANGER) do frames_delete(state, apn, anim, slice.clone(panel.sel[:], context.temp_allocator))
+		if !hasSel do imgui.EndDisabled()
+		imgui.SameLine(0, 6)
+		imgui.SetCursorPosY(imgui.GetCursorPosY() + 2)
+		UI_DimText(fmt.tprintf("%d selected", len(panel.sel)) if hasSel else "")
+		imgui.PopStyleVar()
+	}
+	imgui.SetCursorScreenPos(rangeMn)
+	imgui.InvisibleButton("##anim_head", {max(rangeMx.x - rangeMn.x, 1), 20})
 	Drive_Item("anim.header")
-	if imgui.IsItemActive() {
-		f := int((mouse.x - x0) / CELL_W)
+	if imgui.IsItemActive() && panel.rangeDrag == 0 {
+		f := int((mouse.x - rangeMn.x) / CELL_W)
 		scrub(state, apn, anim, f)
 		panel.playing = false
 		rel = clamp(f, 0, length - 1)
 	}
+	// Range handles: drag to the first / last frame played.
+	handle :: proc(id: string, x, y: f32) -> bool {
+		imgui.SetCursorScreenPos({x - 4, y})
+		imgui.InvisibleButton(strings.clone_to_cstring(id, context.temp_allocator), {8, 20})
+		Drive_Item(id)
+		hot := imgui.IsItemHovered() || imgui.IsItemActive()
+		imgui.DrawList_AddRectFilled(imgui.GetWindowDrawList(), {x - 2, y}, {x + 2, y + 20}, col_u32(UI_ACCENT if hot else ui_accent(0.7)), 2)
+		if hot do imgui.SetMouseCursor(.ResizeEW)
+		return imgui.IsItemActive()
+	}
+	if handle("anim.range-start", rangeMn.x, origin.y) {
+		if panel.rangeDrag == 0 do Editor_RecordUndo(state, "Edit range")
+		panel.rangeDrag = 1
+		e.Animation_SetRange(anim, int(math.round((mouse.x - x0) / CELL_W)), anim.endFrame)
+	} else if handle("anim.range-end", rangeMx.x, origin.y) {
+		if panel.rangeDrag == 0 do Editor_RecordUndo(state, "Edit range")
+		panel.rangeDrag = 2
+		e.Animation_SetRange(anim, anim.startFrame, int(math.round((mouse.x - x0) / CELL_W)) - 1)
+	} else if !imgui.IsMouseDown(.Left) {
+		panel.rangeDrag = 0
+	}
 
-	// Frames row.
+	// Frames row: every source frame.
 	fy := origin.y + 20
 	label :: proc(dl: ^imgui.DrawList, x, y: f32, text: string, col: imgui.Vec4) {
 		imgui.DrawList_AddText(dl, {x + 8, y}, col_u32(col), strings.clone_to_cstring(text, context.temp_allocator))
 	}
-	label(dl, origin.x + scrollX, fy + THUMB_H * 0.5 - 8, fmt.tprintf("%s  Frames", ICON_FA_IMAGE), UI_TEXT)
+	label(dl, origin.x + scrollX, fy + 1, fmt.tprintf("%s  Frames", ICON_FA_IMAGE), UI_TEXT)
+	// Under the label: the range played (first / last frame).
+	{
+		imgui.PushStyleVarImVec2(.FramePadding, {4, 1})
+		imgui.SetCursorScreenPos({origin.x + scrollX + 8, fy + 19})
+		imgui.SetNextItemWidth(56)
+		first := c.int(anim.startFrame + 1)
+		if imgui.DragInt("##anim_start", &first, 0.1, 1, c.int(max(srcCount, 1)), "from %d") do e.Animation_SetRange(anim, int(first) - 1, max(anim.endFrame, int(first) - 1))
+		undo_on_activate(state, "Edit range")
+		Drive_Item("anim.start")
+		UI_Tooltip("First frame played (or drag the range handles in the header)")
+		imgui.SameLine(0, 3)
+		imgui.SetNextItemWidth(56)
+		last := c.int(anim.endFrame + 1)
+		if imgui.DragInt("##anim_end", &last, 0.1, 1, c.int(max(srcCount, 1)), "to %d") do e.Animation_SetRange(anim, anim.startFrame, int(last) - 1)
+		undo_on_activate(state, "Edit range")
+		Drive_Item("anim.end")
+		UI_Tooltip("Last frame played")
+		imgui.SameLine(0, 4)
+		imgui.SetCursorPosY(imgui.GetCursorPosY() + 1)
+		UI_DimText(fmt.tprintf("/ %d", srcCount))
+		imgui.PopStyleVar()
+	}
 	isFrames := anim.renderFrame == e.FA_RenderFrame
-	frameCount := anim->frameCount() if anim.frameCount != nil else 0
-	if isFrames && len((cast(^e.FrameAnimation)anim).frames) == 0 do frameCount = 0
-	removeFrame := -1
-	for f in 0 ..< max(frameCount, 0) {
-		mn := [2]f32{x0 + f32(f) * CELL_W + 1, fy}
+	ctxFrame := -1
+	for f in 0 ..< srcCount {
+		mn := [2]f32{colX(x0, f) + 1, fy}
 		mx := [2]f32{mn.x + CELL_W - 2, fy + THUMB_H}
-		imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(UI_ACCENT_SOFT if f == rel else UI_BG_RAISED), 4)
+		inRange := f >= base && f <= anim.endFrame
+		imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(UI_ACCENT_SOFT if f == apn.currentFrame else UI_BG_RAISED), 4)
 		draw_frame_thumb(dl, anim, f, mn, mx)
+		if !inRange do imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32({UI_BG_PANEL.x, UI_BG_PANEL.y, UI_BG_PANEL.z, 0.65}), 4)
+		if selected(f) do imgui.DrawList_AddRect(dl, mn, mx, col_u32(UI_ACCENT), 4, {}, 2)
 		imgui.SetCursorScreenPos(mn)
 		imgui.PushIDInt(c.int(f))
 		if imgui.InvisibleButton("##frame", mx - mn) {
-			scrub(state, apn, anim, f)
+			frame_select(f)
 			panel.playing = false
+			if inRange do scrub(state, apn, anim, f - base)
+			else do apn.currentFrame = f // just show it
 		}
 		Drive_Item(fmt.tprintf("anim.frame:%d", f + 1))
+		if imgui.IsItemHovered() && imgui.IsMouseClicked(.Right) {
+			if !selected(f) {
+				clear(&panel.sel)
+				append(&panel.sel, f)
+			}
+			panel.anchor = f
+			ctxFrame = f
+		}
 		if isFrames {
 			// Drag to reorder.
 			if imgui.BeginDragDropSource({}) {
@@ -363,26 +565,45 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			if imgui.BeginDragDropTarget() {
 				if pl := imgui.AcceptDragDropPayload("ORE_ANIM_FRAME"); pl != nil {
 					from := int((cast(^c.int)pl.Data)^)
-					fa := cast(^e.FrameAnimation)anim
-					if from != f && from >= 0 && from < len(fa.frames) {
+					if from != f {
 						Editor_RecordUndo(state, "Move frame")
-						t := fa.frames[from]
-						ordered_remove(&fa.frames, from)
-						inject_at(&fa.frames, f, t)
+						e.Animation_MoveFrame(anim, from, f)
+						clear(&panel.sel)
+						append(&panel.sel, f)
 					}
 				}
 				imgui.EndDragDropTarget()
 			}
-			if imgui.BeginPopupContextItem("##frame_ctx") {
-				if imgui.MenuItem(fmt.ctprintf("%s  Remove frame", ICON_FA_TRASH)) do removeFrame = f
-				imgui.EndPopup()
-			}
 		}
 		imgui.PopID()
 	}
+	if ctxFrame >= 0 do imgui.OpenPopup("##frame_ctx")
+	if imgui.BeginPopup("##frame_ctx") {
+		f := panel.anchor
+		UI_DimText(fmt.tprintf("%d frame(s) selected", len(panel.sel)))
+		imgui.Separator()
+		if imgui.MenuItem(fmt.ctprintf("%s  Copy", ICON_FA_COPY), "Cmd+C") do frames_copy(state, anim, panel.sel[:])
+		Drive_Item("anim.ctx-copy")
+		if imgui.MenuItem(fmt.ctprintf("%s  Paste After", ICON_FA_PASTE), "Cmd+V", false, !e.Frame_ClipEmpty(&frameClip)) do frames_paste(state, apn, anim)
+		Drive_Item("anim.ctx-paste")
+		if imgui.MenuItem(fmt.ctprintf("%s  Delete", ICON_FA_TRASH), "Del") do frames_delete(state, apn, anim, slice.clone(panel.sel[:], context.temp_allocator))
+		Drive_Item("anim.ctx-delete")
+		imgui.Separator()
+		if imgui.MenuItem(fmt.ctprintf("Start the Range Here (frame %d)", f + 1)) {
+			Editor_RecordUndo(state, "Edit range")
+			e.Animation_SetRange(anim, f, max(anim.endFrame, f))
+		}
+		Drive_Item("anim.ctx-range-start")
+		if imgui.MenuItem(fmt.ctprintf("End the Range Here (frame %d)", f + 1)) {
+			Editor_RecordUndo(state, "Edit range")
+			e.Animation_SetRange(anim, min(anim.startFrame, f), f)
+		}
+		Drive_Item("anim.ctx-range-end")
+		imgui.EndPopup()
+	}
 	// Drop textures to append frames.
 	if isFrames {
-		dropMn := [2]f32{x0 + f32(frameCount) * CELL_W + 1, fy}
+		dropMn := [2]f32{colX(x0, srcCount) + 1, fy}
 		dropMx := [2]f32{dropMn.x + CELL_W * 2, fy + THUMB_H}
 		imgui.DrawList_AddRect(dl, dropMn, dropMx, col_u32(ui_line(0.15)), 4)
 		imgui.DrawList_AddText(dl, {dropMn.x + CELL_W - 6, fy + THUMB_H * 0.5 - 8}, col_u32(UI_TEXT_FAINT), ICON_FA_PLUS)
@@ -404,22 +625,13 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			imgui.EndDragDropTarget()
 		}
 	}
-	if removeFrame >= 0 {
-		Editor_RecordUndo(state, "Remove frame")
-		fa := cast(^e.FrameAnimation)anim
-		t := fa.frames[removeFrame]
-		ordered_remove(&fa.frames, removeFrame)
-		e.ResourceManager_ReleaseTexture(&state.game.resourceManager, t)
-		fa.endFrame = max(len(fa.frames) - 1, 0)
-		apn.currentFrame = clamp(apn.currentFrame, anim.startFrame, anim.startFrame + max(len(fa.frames) - 1, 0))
-	}
 
 	// Track rows.
 	ty := fy + THUMB_H + 4
 	removeTrack := -1
 	for &tr, ti in anim.tracks {
 		y := ty + f32(ti) * ROW_H
-		imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, y}, {x0 + f32(length) * CELL_W, y + ROW_H - 2}, col_u32(ui_line(0.025)), 3)
+		imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, y}, {colX(x0, cols), y + ROW_H - 2}, col_u32(ui_line(0.025)), 3)
 		target: ^e.Node = apn
 		if tr.target != "." && tr.target != "" do target = e.Node_ResolvePath(mgr, apn, tr.target)
 		prop := tr.property
@@ -458,7 +670,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("anim.remove-track:%s", tr.property), "Remove track", size = 24) do removeTrack = ti
 		// Keys (right-click: easing to the next key, delete).
 		for k in tr.keys {
-			cx := x0 + k.frame * CELL_W + CELL_W * 0.5
+			cx := x0 + (f32(base) + k.frame) * CELL_W + CELL_W * 0.5
 			cy := y + ROW_H * 0.5 - 1
 			r := f32(6)
 			pts := [4][2]f32{{cx, cy - r}, {cx + r, cy}, {cx, cy + r}, {cx - r, cy}}
@@ -538,7 +750,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	}
 
 	// Playhead.
-	px := x0 + (f32(rel) + 0.5) * CELL_W
+	px := x0 + (f32(base + rel) + 0.5) * CELL_W
 	imgui.DrawList_AddLine(dl, {px, origin.y}, {px, ty + f32(nTracks) * ROW_H}, col_u32(UI_ACCENT), 2)
 	imgui.EndChild()
 }

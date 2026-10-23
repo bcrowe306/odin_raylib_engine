@@ -16,6 +16,7 @@ animTabRequest := false // select the Animation tab next frame
 consoleShow: [LogLevel]bool = {.Info = true, .Warn = true, .Error = true}
 
 BottomPanel_Render :: proc(state: ^EditorState) {
+	animTimelineFocused = false // set again by the Animation tab when it has focus
 	defer imgui.End()
 	if !imgui.Begin("Console###BottomPanelWindow") do return
 	if imgui.BeginTabBar("##BottomPanelTabs", {}) {

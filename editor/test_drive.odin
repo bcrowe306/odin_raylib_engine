@@ -689,6 +689,13 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	case "selection-count": return fmt.tprint(len(state.selection)), true
 	case "quit-prompt": return "true" if state.quitRequested else "false", true
 	case "clipboard-nodes": return "true" if Editor_HasClipboardNodes() else "false", true
+	case "anim-info":
+		// "frames=<n> range=<first>-<last> reverse=<b> fps=<f> default=<name>" (1-based) of the current animation.
+		if state.selectedNode == nil || state.selectedNode.typeId != e.AnimationPlayerNode do return "", true
+		apn := cast(^e.AnimationPlayerNode)state.selectedNode
+		a := e.AnimationPlayerNode_GetAnimation(apn)
+		if a == nil do return "none", true
+		return fmt.tprintf("frames=%d range=%d-%d reverse=%t fps=%v default=%s", e.Animation_SourceCount(a), a.startFrame + 1, a.endFrame + 1, a.reverse, a.fps, apn.defaultAnimation), true
 	case "anim":
 		// "<animation>:<frame>/<length>:<tracks>" of the selected AnimationPlayer.
 		if state.selectedNode == nil || state.selectedNode.typeId != e.AnimationPlayerNode do return "", true

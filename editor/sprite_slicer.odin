@@ -110,7 +110,7 @@ Slicer_Apply :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) -> ^e.Ani
 		ssa.spacing = {int(slicer.spacing.x), int(slicer.spacing.y)}
 		e.SpriteSheetAnimation_SetCells(ssa, a.cells[:], target.allocator)
 	}
-	target.ticker->setFPS(slicer.fps)
+	e.AnimationPlayerNode_SetFPS(target, slicer.fps)
 	if apn == nil && len(target.animations) > 0 {
 		// A new player starts on the first animation.
 		target.animationIndex = 0

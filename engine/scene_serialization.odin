@@ -249,8 +249,9 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		fmt.sbprintf(&w.sb, ", \"auto_start\": %t, \"loop\": %t}}", tm.running, tm.loop)
 	case AnimationPlayerNode:
 		apn := cast(^AnimationPlayerNode)node
-		Json_Key(w, "fps", &first); Json_Float(w, apn.ticker.framesPerSecond)
+		Json_Key(w, "fps", &first); Json_Float(w, apn.fps)
 		Json_Key(w, "animation", &first); Json_String(w, AnimationPlayerNode_GetAnimationName(apn))
+		if apn.defaultAnimation != "" {Json_Key(w, "default_animation", &first); Json_String(w, apn.defaultAnimation)}
 		Json_Key(w, "animations", &first)
 		strings.write_byte(&w.sb, '[')
 		w.indent += 1
@@ -263,6 +264,8 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 			fmt.sbprintf(&w.sb, "{{\"name\": ")
 			Json_String(w, a.name)
 			fmt.sbprintf(&w.sb, ", \"loop\": %t, \"flip_x\": %t, \"flip_y\": %t", a.loop, a.flipX, a.flipY)
+			if a.reverse do strings.write_string(&w.sb, ", \"reverse\": true")
+			if a.fps > 0 {strings.write_string(&w.sb, ", \"fps\": "); Json_Float(w, a.fps)}
 			if a.renderFrame == SSA_RenderFrame {
 				ssa := cast(^SpriteSheetAnimation)a
 				strings.write_string(&w.sb, ", \"sheet\": ")
@@ -280,6 +283,8 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 				}
 			} else if a.renderFrame == FA_RenderFrame {
 				fa := cast(^FrameAnimation)a
+				// A range shorter than the frames.
+				if fa.startFrame != 0 || fa.endFrame != len(fa.frames) - 1 do fmt.sbprintf(&w.sb, ", \"start\": %d, \"end\": %d", fa.startFrame, fa.endFrame)
 				strings.write_string(&w.sb, ", \"frames\": [")
 				for f, fi in fa.frames {
 					if fi > 0 do strings.write_string(&w.sb, ", ")
@@ -905,8 +910,13 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 						}
 					}
 					fa := AnimationPlayerNode_AddFrameAnimation(apn, rm, name, paths[:], loop)
+					if sj_obj_has(ao, "start") || sj_obj_has(ao, "end") {
+						Animation_SetRange(fa, sj_int(ao, "start", 0), sj_int(ao, "end", len(fa.frames) - 1))
+					}
 					anim = fa
 				}
+				anim.reverse = sj_bool(ao, "reverse", false)
+				anim.fps = sj_float(ao, "fps", 0)
 				anim.flipX = sj_bool(ao, "flip_x", false)
 				anim.flipY = sj_bool(ao, "flip_y", false)
 				if tracks, has := sj_arr(ao, "tracks"); has {
@@ -945,8 +955,10 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 				}
 			}
 		}
-		apn.ticker->setFPS(sj_float(obj, "fps", 12))
-		if cur := sj_string(obj, "animation", ""); cur != "" do AnimationPlayerNode_SetAnimationByName(apn, cur)
+		AnimationPlayerNode_SetFPS(apn, sj_float(obj, "fps", 12))
+		apn.defaultAnimation = strings.clone(sj_string(obj, "default_animation", ""), apn.allocator)
+		cur := apn.defaultAnimation if apn.defaultAnimation != "" else sj_string(obj, "animation", "")
+		if cur != "" do AnimationPlayerNode_SetAnimationByName(apn, cur)
 		if a := AnimationPlayerNode_GetAnimation(apn); a != nil do apn.currentFrame = a.startFrame
 	case ParticleEmitterNode:
 		pen := cast(^ParticleEmitterNode)node

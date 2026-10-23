@@ -130,3 +130,4 @@ ICON_FA_PERSON_RUNNING            :: ""
 ICON_FA_RULER_HORIZONTAL          :: ""
 ICON_FA_ARROW_RIGHT_LONG          :: ""
 ICON_FA_HAND_POINTER              :: ""
+ICON_FA_STAR                      :: "" // Default animation

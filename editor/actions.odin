@@ -394,7 +394,10 @@ Actions_Dispatch :: proc(state: ^EditorState) {
 	for &a in GlobalActions {
 		switch a.scope {
 		case .Global: if typing do continue
-		case .Scene:  if typing || codeFocus do continue
+		case .Scene:
+			if typing || codeFocus do continue
+			// The animation timeline has its own delete / copy / paste.
+			if animTimelineFocused && strings.has_prefix(a.id, "node.") do continue
 		case .Code:   if !codeFocus do continue
 		}
 		// While the find bar has focus, plain keys belong to its text field.

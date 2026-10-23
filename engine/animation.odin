@@ -9,6 +9,8 @@ Animation :: struct {
 	startFrame:  int,
 	endFrame:    int,
 	loop:        bool,
+	reverse:     bool, // plays end -> start (flipped again by the player's Reverse)
+	fps:         f32,  // frames per second; 0 = the player's
 	flipX:       bool,
 	flipY:       bool,
 	source:      rl.Rectangle,
@@ -48,8 +50,10 @@ FrameAnimation_AddFrame :: proc(
 ) {
 	texture, ok := rm->loadTexture(filePath)
 	if ok && texture != nil {
+		// A range that ended at the last frame grows with it; a shorter one stays.
+		full := frameAnimation.endFrame >= len(frameAnimation.frames) - 1
 		append(&frameAnimation.frames, texture)
-		frameAnimation.endFrame = auto_cast len(frameAnimation.frames) - 1
+		if full do frameAnimation.endFrame = auto_cast len(frameAnimation.frames) - 1
 
 	} else {
 		log.error("Error adding frame. Texture file loading error.")

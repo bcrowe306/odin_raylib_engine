@@ -14,6 +14,8 @@ AnimationPlayerNode :: struct {
 	ticker: Ticker,
 	reverse: bool `gui:"true"`,
 	autoplay: bool `gui:"true"`, // start playing when the node becomes ready
+	fps: f32, // frames per second of animations without their own
+	defaultAnimation: string, // selected when the node becomes ready ("" = the saved current one)
 	// "animation_finished"(name): a non-looping animation reached its end.
 	onFinished: EventSubject,
 	finishedNotified: bool,
@@ -81,6 +83,7 @@ AnimationPlayerNode_Init :: proc(apn: ^AnimationPlayerNode) {
 	apn.onDestroy = AnimationPlayerNode_Destroy
 	apn.owned = make([dynamic]^Animation, apn.allocator)
 	InitializeSubject(&apn.onFinished, "animation_finished", apn)
+	apn.fps = 12
 	apn.ticker->setFPS(12)
 	apn.ticker->setCallback(proc(ticker: ^Ticker, currentTick: int, user_data: rawptr) {
 		apn := cast(^AnimationPlayerNode)user_data
@@ -92,7 +95,8 @@ AnimationPlayerNode_Init :: proc(apn: ^AnimationPlayerNode) {
 AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 	if len(apn.animations) == 0 do return
 	a := apn.animations[apn.animationIndex]
-	if apn.reverse {
+	reversed := AnimationPlayerNode_IsReversed(apn, a)
+	if reversed {
 		if apn.currentFrame <= auto_cast a.startFrame {
 			if a.loop {
 				apn.currentFrame = a.endFrame
@@ -114,7 +118,7 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 	}
 	if a.tracks != nil do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
 	// A non-looping animation that reached its last frame finishes once.
-	atEnd := apn.currentFrame <= a.startFrame if apn.reverse else apn.currentFrame >= a.endFrame
+	atEnd := apn.currentFrame <= a.startFrame if reversed else apn.currentFrame >= a.endFrame
 	if !a.loop && atEnd && !apn.finishedNotified {
 		apn.finishedNotified = true
 		apn.ticker->stop()
@@ -124,7 +128,29 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 
 AnimationPlayerNode_Ready :: proc(node: ^Node, gameContext: ^GameContext) {
 	apn := cast(^AnimationPlayerNode)node
+	if apn.defaultAnimation != "" {
+		for a, i in apn.animations do if a.name == apn.defaultAnimation do AnimationPlayerNode_SetAnimationIndex(apn, i)
+	}
 	if apn.autoplay && len(apn.animations) > 0 do AnimationPlayerNode_Start(apn)
+}
+
+// AnimationPlayerNode_IsReversed: the animation plays backwards (its own
+// Reverse, flipped by the player's).
+AnimationPlayerNode_IsReversed :: proc(apn: ^AnimationPlayerNode, a: ^Animation) -> bool {
+	return apn.reverse != (a != nil && a.reverse)
+}
+
+// AnimationPlayerNode_FPS: the current animation's rate (its own, else the
+// player's).
+AnimationPlayerNode_FPS :: proc(apn: ^AnimationPlayerNode) -> f32 {
+	if a := AnimationPlayerNode_GetAnimation(apn); a != nil && a.fps > 0 do return a.fps
+	return apn.fps if apn.fps > 0 else 12
+}
+
+@(private = "file")
+apply_fps :: proc(apn: ^AnimationPlayerNode) {
+	fps := AnimationPlayerNode_FPS(apn)
+	if apn.ticker.framesPerSecond != fps do apn.ticker->setFPS(fps)
 }
 
 AnimationPlayerNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
@@ -197,8 +223,9 @@ AnimationPlayerNode_Render :: proc(node: ^Node, gameContext: ^GameContext, delta
 
 AnimationPlayerNode_Start :: proc(apn: ^AnimationPlayerNode) {
 	apn.finishedNotified = false
+	apply_fps(apn)
 	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
-		apn.currentFrame = a.endFrame if apn.reverse else a.startFrame
+		apn.currentFrame = a.endFrame if AnimationPlayerNode_IsReversed(apn, a) else a.startFrame
 		if a.tracks != nil do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
 	}
 	apn.ticker->start(true)
@@ -236,14 +263,18 @@ AnimationPlayerNode_Resume :: proc(apn: ^AnimationPlayerNode) {
 	apn.ticker->resume()
 }
 
+// AnimationPlayerNode_SetFPS: the player's rate (animations with their own
+// FPS keep it).
 AnimationPlayerNode_SetFPS :: proc(apn: ^AnimationPlayerNode, fps: f32) {
-	apn.ticker->setFPS(fps)
+	apn.fps = max(fps, 0.1)
+	apply_fps(apn)
 }
 
 AnimationPlayerNode_SetAnimationIndex :: proc(apn: ^AnimationPlayerNode, index: int) {
 	if len(apn.animations) == 0 do return
 	index := clamp(index, 0, len(apn.animations) - 1)
 	apn.animationIndex = index
+	apply_fps(apn)
 }
 
 AnimationPlayerNode_SetAnimationByName :: proc(apn: ^AnimationPlayerNode, name: string) {

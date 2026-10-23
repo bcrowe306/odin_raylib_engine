@@ -271,9 +271,22 @@ cells (`"cells"` in the scene; margin / spacing editable in the Inspector).
 
 ### Animation timeline
 
-The bottom panel's **Animation** tab edits the selected AnimationPlayer:
-frames (scrub the header, drag to reorder, drop textures on **+**,
-right-click to remove), play/stop preview (Stop puts the scene back), and
+The bottom panel's **Animation** tab edits the selected AnimationPlayer.
+**Frames**: the strip shows every frame of the animation; the ones it plays
+(its **range**) are under the blue band in the header - drag the band's
+handles, type **from / to** under the Frames label, or right-click a frame:
+*Start / End the Range Here*; frames outside it are dimmed. Click frames to
+select them (Shift: a run, Cmd: add / remove), then **Copy**, **Paste**
+(after the selection, else at the end) or **Delete** with the buttons left
+of the header, the right-click menu, or Cmd+C / Cmd+V / Delete while the
+panel has focus (they act on frames there, not on scene nodes). Images
+paste into frame animations, sprite-sheet cells into animations of the same
+sheet. Drag frames to reorder; drop textures on **+** to add some. The
+toolbar: **Loop**, **Reverse** (this animation plays last to first; the
+player's own Reverse flips them all), the animation's **FPS** (0 = the
+player's, set in the Inspector) and the **star**: the animation selected -
+and autoplayed - when the scene loads (also the Inspector's **Default**).
+Then play/stop preview (Stop puts the scene back), and
 keyframed **property tracks**: **Add Track** picks the player or a child and
 a property (position, rotation, scale, colours, any numeric property); the
 yellow dot keys the current value at the playhead; right-click a key to

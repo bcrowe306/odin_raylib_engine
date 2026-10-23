@@ -1022,10 +1022,24 @@ inspector_animation_player :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 			e.AnimationPlayerNode_SetAnimationIndex(apn, idx)
 			if a := e.AnimationPlayerNode_GetAnimation(apn); a != nil do apn.currentFrame = a.startFrame
 		}
+		UI_PropLabel("Default")
+		defNames := make([dynamic]string, context.temp_allocator)
+		append(&defNames, "(the saved current one)")
+		defIdx := 0
+		for a, i in apn.animations {
+			append(&defNames, a.name)
+			if a.name == apn.defaultAnimation do defIdx = i + 1
+		}
+		if idx, changed := UI_Combo("insp.anim.default", defIdx, defNames[:]); changed {
+			Editor_RecordUndo(state, "Default animation")
+			apn.defaultAnimation = "" if idx == 0 else strings.clone(apn.animations[idx - 1].name, apn.allocator)
+		}
+		UI_Tooltip("The animation selected (and autoplayed) when the scene loads")
 		UI_PropLabel("FPS")
-		fps := apn.ticker.framesPerSecond
-		if imgui.DragFloat("##apnfps", &fps, 0.2, 1, 120, "%.0f") do apn.ticker->setFPS(fps)
+		fps := apn.fps
+		if imgui.DragFloat("##apnfps", &fps, 0.2, 1, 120, "%.0f") do e.AnimationPlayerNode_SetFPS(apn, fps)
 		undo_on_activate(state, "Edit FPS")
+		UI_Tooltip("Frames per second of animations without their own FPS")
 		UI_PropLabel("Preview")
 		previewing := animPreviewNode == apn && apn.ticker.running
 		if UI_Button(previewing ? fmt.tprintf("%s  Stop", ICON_FA_STOP) : fmt.tprintf("%s  Play", ICON_FA_PLAY), "insp.anim.preview", {-1, 0}) {
@@ -1064,19 +1078,29 @@ inspector_animation_player :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 			UI_PropLabel("Loop")
 			imgui.Checkbox("##loop", &anim.loop)
 			undo_on_activate(state, "Toggle loop")
+			UI_PropLabel("Reverse")
+			imgui.Checkbox("##reverse", &anim.reverse)
+			undo_on_activate(state, "Toggle reverse")
+			Drive_Item(fmt.tprintf("insp.anim%d.reverse", i))
+			UI_PropLabel("FPS")
+			if imgui.DragFloat("##afps", &anim.fps, 0.2, 0, 120, fmt.ctprintf("player (%.0f)", apn.fps) if anim.fps <= 0 else "%.0f") do e.AnimationPlayerNode_SetAnimationIndex(apn, apn.animationIndex)
+			undo_on_activate(state, "Edit FPS")
+			Drive_Item(fmt.tprintf("insp.anim%d.fps", i))
+			UI_Tooltip("This animation's frames per second (0: the player's)")
+			UI_PropLabel("Range")
+			rng := [2]c.int{c.int(anim.startFrame + 1), c.int(anim.endFrame + 1)}
+			if imgui.DragInt2("##range_all", &rng, 0.1, 1, c.int(max(e.Animation_SourceCount(anim), 1))) do e.Animation_SetRange(anim, int(rng.x) - 1, int(rng.y) - 1)
+			undo_on_activate(state, "Edit range")
+			UI_Tooltip(fmt.tprintf("First and last of the %d frames played", e.Animation_SourceCount(anim)))
 			if anim.renderFrame == e.SSA_RenderFrame {
 				ssa := cast(^e.SpriteSheetAnimation)anim
 				UI_PropLabel("Grid")
 				grid := [2]c.int{c.int(ssa.grid.x), c.int(ssa.grid.y)}
 				if imgui.DragInt2("##grid", &grid, 0.1, 1, 64) do ssa.grid = {int(grid.x), int(grid.y)}
 				undo_on_activate(state, "Edit grid")
-				UI_PropLabel("Frames")
-				fr := [2]c.int{c.int(ssa.startFrame), c.int(ssa.endFrame)}
 				if len(ssa.cells) > 0 {
-					UI_DimText(fmt.tprintf("%d picked cells (Sprite Sheet Slicer)", len(ssa.cells)))
-				} else {
-					if imgui.DragInt2("##range", &fr, 0.1, 0, c.int(ssa.grid.x * ssa.grid.y - 1)) do ssa.startFrame, ssa.endFrame = int(fr.x), int(fr.y)
-					undo_on_activate(state, "Edit frame range")
+					UI_PropLabel("Cells")
+					UI_DimText(fmt.tprintf("%d picked (Sprite Sheet Slicer, timeline)", len(ssa.cells)))
 				}
 				UI_PropLabel("Margin")
 				m := [2]c.int{c.int(ssa.margin.x), c.int(ssa.margin.y)}
