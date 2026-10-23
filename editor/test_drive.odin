@@ -159,13 +159,6 @@ Drive_ItemRect :: proc(id: string, mn, mx: [2]f32, inWindow := false) {
 TestDrive_BeginFrame :: proc(d: ^TestDrive, state: ^EditorState) -> (quit: bool) {
 	if !d.enabled do return false
 	d.frame += 1
-	// Last frame's registrations become the lookup table. (Ids were
-	// temp-allocated during that frame, and temp memory is freed per frame,
-	// so keep owned copies.)
-	for k in d.prevItems do delete(k)
-	clear(&d.prevItems)
-	for k, v in d.items do d.prevItems[strings.clone(k)] = v
-	clear(&d.items)
 
 	io := imgui.GetIO()
 	for k in d.keyUp do imgui.IO_AddKeyEvent(io, k, false)
@@ -200,7 +193,15 @@ TestDrive_BeginFrame :: proc(d: ^TestDrive, state: ^EditorState) -> (quit: bool)
 // TestDrive_EndFrame runs after the UI is drawn (before the buffer swap):
 // screenshots see the finished frame.
 TestDrive_EndFrame :: proc(d: ^TestDrive) {
-	if !d.enabled || d.pendingShot == "" do return
+	if !d.enabled do return
+	// This frame's registrations become the next frame's lookup table: owned
+	// copies, made now - the ids are temp-allocated and the temp arena is
+	// freed at the end of the frame (main.odin).
+	for k in d.prevItems do delete(k)
+	clear(&d.prevItems)
+	for k, v in d.items do d.prevItems[strings.clone(k)] = v
+	clear(&d.items)
+	if d.pendingShot == "" do return
 	d.shotIndex += 1
 	path := fmt.tprintf("%s/%02d_%s.png", d.shotsDir, d.shotIndex, d.pendingShot)
 	img := rl.LoadImageFromScreen()

@@ -1,5 +1,6 @@
 package engine
 
+import "core:strings"
 import "core:math"
 import rl "vendor:raylib"
 import uilib "../ui"
@@ -57,7 +58,7 @@ UIPanelNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIContainerNode {
 	c := CreateNode(scene.manager, UIContainerNode)
-	c.name = name
+	c.name = strings.clone(name, c.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&c.ui, .Panel, size)
 	c.position = position
 	c.globalPosition = position
@@ -92,7 +93,7 @@ UIVerticalContainerNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIContainerNode {
 	c := CreateNode(scene.manager, UIContainerNode)
-	c.name = name
+	c.name = strings.clone(name, c.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&c.ui, .VerticalContainer, size)
 	c.position = {0, 0}
 	c.globalPosition = {0, 0}
@@ -122,7 +123,7 @@ UIHorizontalContainerNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIContainerNode {
 	c := CreateNode(scene.manager, UIContainerNode)
-	c.name = name
+	c.name = strings.clone(name, c.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&c.ui, .HorizontalContainer, size)
 	c.position = {0, 0}
 	c.globalPosition = {0, 0}
@@ -152,7 +153,7 @@ UIGridContainerNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIContainerNode {
 	c := CreateNode(scene.manager, UIContainerNode)
-	c.name = name
+	c.name = strings.clone(name, c.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&c.ui, .GridContainer, size)
 	c.position = {0, 0}
 	c.globalPosition = {0, 0}
@@ -200,7 +201,7 @@ UITabContainerNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UITabContainerNode {
 	tc := CreateNode(scene.manager, UITabContainerNode)
-	tc.name = name
+	tc.name = strings.clone(name, tc.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&tc.ui, .TabContainer, size)
 	tc.position = position
 	tc.globalPosition = position
@@ -474,7 +475,7 @@ UIDockSpaceNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIDockSpaceNode {
 	ds := CreateNode(scene.manager, UIDockSpaceNode)
-	ds.name = name
+	ds.name = strings.clone(name, ds.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&ds.ui, .DockSpace, size)
 	ds.position = position
 	ds.globalPosition = position

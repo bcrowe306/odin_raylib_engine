@@ -279,6 +279,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 		rlgl.DrawRenderBatchActive()
 		rlgl.EnableColorBlend()
 		rl.EndDrawing()
+		defer free_all(context.temp_allocator) // the frame's temp allocations (after the captures below)
 
 		frameCount += 1
 		if opts.benchFrames > 0 && frameCount > benchWarmup {

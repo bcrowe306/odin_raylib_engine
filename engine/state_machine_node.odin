@@ -91,7 +91,7 @@ StateMachineNode :: struct {
 StateMachineNode_Create :: proc(scene: ^Scene, name: string = "StateMachine", parent: ^Node = nil) -> ^StateMachineNode {
 	sm := CreateNode(scene.manager, StateMachineNode)
 	StateMachineNode_Init(sm)
-	sm.name = name
+	sm.name = strings.clone(name, sm.allocator) // owned: callers pass temp strings too
 	return sm
 }
 

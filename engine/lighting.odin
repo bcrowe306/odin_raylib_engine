@@ -1,5 +1,6 @@
 package engine
 
+import "core:strings"
 import "core:math"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
@@ -40,7 +41,7 @@ LightNode :: struct {
 
 LightNode_Create :: proc(scene: ^Scene, name: string = "Light", parent: ^Node = nil) -> ^LightNode {
 	l := CreateNode(scene.manager, LightNode)
-	l.name = name
+	l.name = strings.clone(name, l.allocator) // owned: callers pass temp strings too
 	l.color = {255, 236, 200, 255}
 	l.energy = 1
 	l.radius = 256

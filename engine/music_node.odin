@@ -1,5 +1,6 @@
 package engine
 
+import "core:strings"
 import "core:log"
 import "core:math"
 import rl "vendor:raylib"
@@ -57,7 +58,7 @@ MusicNode_Create :: proc(
 ) -> ^MusicNode {
 	musicNode := CreateNode(scene.manager, MusicNode)
 	MusicNode_Init(musicNode)
-	musicNode.name = name
+	musicNode.name = strings.clone(name, musicNode.allocator) // owned: callers pass temp strings too
 	musicNode.autoplay = autoplay
 	musicNode.looping = looping
 

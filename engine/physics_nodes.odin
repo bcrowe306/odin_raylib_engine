@@ -1,5 +1,6 @@
 package engine
 
+import "core:strings"
 import "core:math"
 import b2 "vendor:box2d"
 import rl "vendor:raylib"
@@ -26,7 +27,7 @@ StaticBody :: StaticBodyNode
 
 StaticBodyNode_Create :: proc(scene: ^Scene, name: string = "StaticBody", parent: ^Node = nil) -> ^StaticBodyNode {
 	sb := CreateNode(scene.manager, StaticBodyNode)
-	sb.name = name
+	sb.name = strings.clone(name, sb.allocator) // owned: callers pass temp strings too
 	sb.position = {640, 620}
 	sb.debugColor = rl.Color{74, 222, 128, 255} // Green
 	sb.shapes = make([dynamic]PhysicsShape, sb.allocator)
@@ -169,7 +170,7 @@ DynamicBody :: DynamicBodyNode
 
 DynamicBodyNode_Create :: proc(scene: ^Scene, name: string = "DynamicBody", parent: ^Node = nil) -> ^DynamicBodyNode {
 	db := CreateNode(scene.manager, DynamicBodyNode)
-	db.name = name
+	db.name = strings.clone(name, db.allocator) // owned: callers pass temp strings too
 	db.position = {640, 200}
 	db.linearVelocity = {0, 0}
 	db.angularVelocity = 0
@@ -393,7 +394,7 @@ CharacterMover :: CharacterMoverNode
 
 CharacterMoverNode_Create :: proc(scene: ^Scene, name: string = "CharacterMover", parent: ^Node = nil) -> ^CharacterMoverNode {
 	cm := CreateNode(scene.manager, CharacterMoverNode)
-	cm.name = name
+	cm.name = strings.clone(name, cm.allocator) // owned: callers pass temp strings too
 	cm.position = {540, 300}
 	cm.radius = 14.0
 	cm.height = 28.0
@@ -692,7 +693,7 @@ Area :: AreaNode
 
 AreaNode_Create :: proc(scene: ^Scene, name: string = "Area", parent: ^Node = nil) -> ^AreaNode {
 	area := CreateNode(scene.manager, AreaNode)
-	area.name = name
+	area.name = strings.clone(name, area.allocator) // owned: callers pass temp strings too
 	area.position = {640, 460}
 	area.debugColor = rl.Color{168, 85, 247, 255}  // Purple
 	area.activeColor = rl.Color{236, 72, 153, 255} // Pink when overlapping
@@ -879,7 +880,7 @@ Raycast :: RaycastNode
 
 RaycastNode_Create :: proc(scene: ^Scene, name: string = "Raycast", parent: ^Node = nil) -> ^RaycastNode {
 	rc := CreateNode(scene.manager, RaycastNode)
-	rc.name = name
+	rc.name = strings.clone(name, rc.allocator) // owned: callers pass temp strings too
 	rc.position = {450, 260}
 	rc.direction = {1.0, 0.5}
 	rc.length = 450.0

@@ -1,5 +1,6 @@
 package engine
 
+import "core:strings"
 import rl "vendor:raylib"
 
 
@@ -30,7 +31,7 @@ ParticleEmitterNode_Create :: proc(scene: ^Scene, name: string = "Particle Emitt
 	pen := CreateNode(scene.manager, ParticleEmitterNode)
 	ParticleEmitterNode_Init(pen)
 	if name != "" {
-		pen.name = name
+		pen.name = strings.clone(name, pen.allocator) // owned: callers pass temp strings too
 	}
 	scene->addNode(pen)
 	return pen

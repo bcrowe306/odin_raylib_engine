@@ -29,7 +29,7 @@ ScriptNode_Create :: proc(
 	snode := CreateNode(scene.manager, ScriptNode)
 	ScriptNode_Init(snode)
 
-	snode.name = name if name != "" else scriptPath
+	snode.name = strings.clone(name if name != "" else scriptPath, snode.allocator) // owned
 	snode.scriptPath = strings.clone(scriptPath, snode.allocator)
 	snode.gameContext = scene.rootNode.gameContext if scene.rootNode != nil else nil
 

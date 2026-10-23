@@ -25,7 +25,7 @@ JointNode :: struct {
 
 JointNode_Create :: proc(scene: ^Scene, name: string = "Joint", parent: ^Node = nil) -> ^JointNode {
 	j := CreateNode(scene.manager, JointNode)
-	j.name = name
+	j.name = strings.clone(name, j.allocator) // owned: callers pass temp strings too
 	PhysicsJoint_Init(&j.joint, .Revolute)
 	// Motors strong enough for pixel-scale bodies (a 40 px box weighs 1600).
 	j.joint.revolute.maxMotorTorque = 5e6

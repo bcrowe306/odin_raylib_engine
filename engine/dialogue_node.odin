@@ -42,7 +42,7 @@ DialogueNode :: struct {
 DialogueNode_Create :: proc(scene: ^Scene, name: string = "Dialogue", parent: ^Node = nil) -> ^DialogueNode {
 	d := CreateNode(scene.manager, DialogueNode)
 	DialogueNode_Init(d)
-	d.name = name
+	d.name = strings.clone(name, d.allocator) // owned: callers pass temp strings too
 	scene->addNode(d, parent)
 	return d
 }

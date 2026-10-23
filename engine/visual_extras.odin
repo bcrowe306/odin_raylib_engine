@@ -50,7 +50,7 @@ NineSliceNode :: struct {
 
 NineSliceNode_Create :: proc(scene: ^Scene, name: string = "NineSlice", parent: ^Node = nil) -> ^NineSliceNode {
 	n := CreateNode(scene.manager, NineSliceNode)
-	n.name = name
+	n.name = strings.clone(name, n.allocator) // owned: callers pass temp strings too
 	n.size = {200, 100}
 	n.marginsLT = {16, 16}
 	n.marginsRB = {16, 16}
@@ -100,7 +100,7 @@ ParallaxNode :: struct {
 
 ParallaxNode_Create :: proc(scene: ^Scene, name: string = "Parallax", parent: ^Node = nil) -> ^ParallaxNode {
 	p := CreateNode(scene.manager, ParallaxNode)
-	p.name = name
+	p.name = strings.clone(name, p.allocator) // owned: callers pass temp strings too
 	p.factor = {0.5, 0.5}
 	p.repeatX = true
 	p.tint = rl.WHITE
@@ -162,7 +162,7 @@ LineNode :: struct {
 
 LineNode_Create :: proc(scene: ^Scene, name: string = "Line", parent: ^Node = nil) -> ^LineNode {
 	l := CreateNode(scene.manager, LineNode)
-	l.name = name
+	l.name = strings.clone(name, l.allocator) // owned: callers pass temp strings too
 	l.points = make([dynamic][2]f32, l.allocator)
 	append(&l.points, [2]f32{-60, 0}, [2]f32{60, 0})
 	l.width = 4
@@ -214,7 +214,7 @@ TRAIL_MAX_POINTS :: 512
 
 TrailNode_Create :: proc(scene: ^Scene, name: string = "Trail", parent: ^Node = nil) -> ^TrailNode {
 	t := CreateNode(scene.manager, TrailNode)
-	t.name = name
+	t.name = strings.clone(name, t.allocator) // owned: callers pass temp strings too
 	t.lifetime = 0.5
 	t.width = 12
 	t.color = {255, 255, 255, 220}
@@ -305,7 +305,7 @@ PostEffectNode :: struct {
 
 PostEffectNode_Create :: proc(scene: ^Scene, name: string = "PostEffect", parent: ^Node = nil) -> ^PostEffectNode {
 	p := CreateNode(scene.manager, PostEffectNode)
-	p.name = name
+	p.name = strings.clone(name, p.allocator) // owned: callers pass temp strings too
 	Material_SetShader(p, "builtin:vignette")
 	scene->addNode(p, parent)
 	return p

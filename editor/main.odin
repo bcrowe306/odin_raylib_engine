@@ -2,6 +2,7 @@ package editor
 
 import "core:c"
 import "core:fmt"
+import "core:mem"
 import "core:log"
 import "core:os"
 import rl "vendor:raylib"
@@ -19,6 +20,15 @@ STATUS_BAR_HEIGHT :: 28.0
 faRanges: [3]imgui.Wchar = {0xE000, 0xF8FF, 0}
 
 main :: proc() {
+	// Memory diagnostics (-define:ORE_MEM_TRACK=true, mem_track.odin).
+	when ORE_MEM_TRACK {
+		track: mem.Tracking_Allocator
+		mem.tracking_allocator_init(&track, context.allocator)
+		track.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
+		context.allocator = mem.tracking_allocator(&track)
+		memTrack = &track
+		defer MemTrack_ReportLeaks()
+	}
 	os.exit(editor_main())
 }
 
@@ -90,6 +100,11 @@ editor_main :: proc() -> int {
 		Editor_UpdatePlaytest(&GlobalEditor)
 		NativeDialog_Poll(&GlobalEditor)
 		Lua_UpdateProjectTypes(&GlobalEditor)
+		when ORE_MEM_TRACK {
+			@(static) memFrame: int
+			memFrame += 1
+			if memFrame % MEM_TRACK_EVERY == 0 do MemTrack_Report(fmt.tprintf("frame %d", memFrame))
+		}
 		if n := e.Shader_CheckForChanges(); n > 0 do Editor_Log(&GlobalEditor, .Info, "Reloaded %d changed shader(s)", n)
 		e.ResourceManager_CheckForChanges(&GlobalEditor.game.resourceManager) // edited images
 		if n := e.ScriptManager_CheckForChanges(&GlobalEditor.game.scriptManager); n > 0 {
@@ -214,6 +229,9 @@ editor_main :: proc() -> int {
 		imgui_rl.render_draw_data(imgui.GetDrawData())
 		TestDrive_EndFrame(&GlobalDrive)
 		rl.EndDrawing()
+		// Everything temp-allocated this frame (tprintf, temp clones) goes:
+		// without this the temp arena grew ~40 KB a frame, forever.
+		free_all(context.temp_allocator)
 	}
 	Editor_LaunchPendingProject(&GlobalEditor)
 	return TestDrive_ExitCode(&GlobalDrive) if driving else 0

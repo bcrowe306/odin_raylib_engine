@@ -1,5 +1,6 @@
 package engine
 
+import "core:strings"
 import "core:log"
 import rl "vendor:raylib"
 
@@ -88,7 +89,7 @@ SoundNode_Ready :: proc(node: ^Node, gameContext: ^GameContext) {
 SoundNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, filePath: string, name: string) -> ^SoundNode {
 	soundNode := CreateNode(scene.manager, SoundNode)
 	SoundNode_Init(soundNode)
-	soundNode.name = name
+	soundNode.name = strings.clone(name, soundNode.allocator) // owned: callers pass temp strings too
 	sound, ok := resource_manager->loadAudioSound(filePath)
 	if ok {
 		log.info("Loaded sound: ", filePath)

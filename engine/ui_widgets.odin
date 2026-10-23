@@ -1,5 +1,6 @@
 package engine
 
+import "core:strings"
 import "core:fmt"
 import "core:math"
 import "core:strconv"
@@ -474,9 +475,9 @@ UILabelNode_Create :: proc(
 	textColor: rl.Color = {238, 240, 246, 255},
 ) -> ^UILabelNode {
 	lbl := CreateNode(scene.manager, UILabelNode)
-	lbl.name = name
+	lbl.name = strings.clone(name, lbl.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&lbl.ui, .Label, {240, fontSize + 8})
-	lbl.text = text
+	lbl.text = strings.clone(text, lbl.allocator)
 	lbl.fontSize = fontSize
 	lbl.textColor = textColor
 	lbl.align = .Left
@@ -527,9 +528,9 @@ UIButtonNode_Create :: proc(
 	iconSize: f32 = 0,
 ) -> ^UIButtonNode {
 	btn := CreateNode(scene.manager, UIButtonNode)
-	btn.name = name
+	btn.name = strings.clone(name, btn.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&btn.ui, .Button, size)
-	btn.text = text
+	btn.text = strings.clone(text, btn.allocator)
 	btn.fontSize = fontSize
 	btn.icon = icon
 	btn.iconSize = iconSize
@@ -682,9 +683,9 @@ UISliderNode_Create :: proc(
 	showResetButton: bool = true,
 ) -> ^UISliderNode {
 	s := CreateNode(scene.manager, UISliderNode)
-	s.name = name
+	s.name = strings.clone(name, s.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&s.ui, .Slider, {360, 28})
-	s.label = label
+	s.label = strings.clone(label, s.allocator)
 	s.value = value
 	s.minValue = minValue
 	s.maxValue = maxValue
@@ -918,9 +919,9 @@ UICheckboxNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UICheckboxNode {
 	cb := CreateNode(scene.manager, UICheckboxNode)
-	cb.name = name
+	cb.name = strings.clone(name, cb.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&cb.ui, .Checkbox, {260, 26})
-	cb.label = label
+	cb.label = strings.clone(label, cb.allocator)
 	cb.checked = checked
 	cb.defaultChecked = checked
 	cb.accentColor = {59, 130, 246, 255}
@@ -1012,10 +1013,10 @@ UITextInputNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UITextInputNode {
 	ti := CreateNode(scene.manager, UITextInputNode)
-	ti.name = name
+	ti.name = strings.clone(name, ti.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&ti.ui, .TextInput, {360, 28})
-	ti.label = label
-	ti.placeholder = placeholder
+	ti.label = strings.clone(label, ti.allocator)
+	ti.placeholder = strings.clone(placeholder, ti.allocator)
 	ti.labelWidth = 130
 	ti.maxLength = 64
 	InitializeSubject(&ti.onChanged, "value_changed", ti)
@@ -1158,9 +1159,9 @@ UIDropdownNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIDropdownNode {
 	dd := CreateNode(scene.manager, UIDropdownNode)
-	dd.name = name
+	dd.name = strings.clone(name, dd.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&dd.ui, .Dropdown, {360, 28})
-	dd.label = label
+	dd.label = strings.clone(label, dd.allocator)
 	dd.items = make([dynamic]string, dd.allocator)
 	for item in items {
 		append(&dd.items, item)
@@ -1360,10 +1361,10 @@ UIRadioGroupNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIRadioGroupNode {
 	rg := CreateNode(scene.manager, UIRadioGroupNode)
-	rg.name = name
+	rg.name = strings.clone(name, rg.allocator) // owned: callers pass temp strings too
 	h: f32 = 28 if horizontal else f32(max(len(options), 1)) * 26 + 4
 	UIElement_Init(&rg.ui, .RadioGroup, {360, h})
-	rg.label = label
+	rg.label = strings.clone(label, rg.allocator)
 	rg.labelWidth = 110
 	rg.options = make([dynamic]string, rg.allocator)
 	for opt in options {
@@ -1503,9 +1504,9 @@ UIXYPlotNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIXYPlotNode {
 	plot := CreateNode(scene.manager, UIXYPlotNode)
-	plot.name = name
+	plot.name = strings.clone(name, plot.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&plot.ui, .XYPlot, size)
-	plot.title = title
+	plot.title = strings.clone(title, plot.allocator)
 	plot.xLabel = "X Axis"
 	plot.series1Name = "Series A"
 	plot.series2Name = "Series B"
@@ -1630,9 +1631,9 @@ UISeparatorNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UISeparatorNode {
 	sep := CreateNode(scene.manager, UISeparatorNode)
-	sep.name = name
+	sep.name = strings.clone(name, sep.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&sep.ui, .Separator, {360, 18 if label != "" else 10})
-	sep.label = label
+	sep.label = strings.clone(label, sep.allocator)
 	sep.lineColor = rl.Color{62, 68, 82, 255}
 	sep.render = UISeparatorNode_Render
 	scene->addNode(sep, parent)
@@ -1669,10 +1670,10 @@ UIProgressBarNode_Create :: proc(
 	direction: uilib.ProgressBarDirection = .Horizontal,
 ) -> ^UIProgressBarNode {
 	pb := CreateNode(scene.manager, UIProgressBarNode)
-	pb.name = name
+	pb.name = strings.clone(name, pb.allocator) // owned: callers pass temp strings too
 	size: [2]f32 = {360, 22} if direction == .Horizontal else {28, 160}
 	UIElement_Init(&pb.ui, .ProgressBar, size)
-	pb.label = label
+	pb.label = strings.clone(label, pb.allocator)
 	pb.value = value
 	pb.minValue = minValue
 	pb.maxValue = maxValue
@@ -1710,9 +1711,9 @@ UIToggleSwitchNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIToggleSwitchNode {
 	ts := CreateNode(scene.manager, UIToggleSwitchNode)
-	ts.name = name
+	ts.name = strings.clone(name, ts.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&ts.ui, .ToggleSwitch, {140, 24})
-	ts.label = label
+	ts.label = strings.clone(label, ts.allocator)
 	ts.active = active
 	ts.update = UIToggleSwitchNode_Update
 	ts.render = UIToggleSwitchNode_Render
@@ -1795,9 +1796,9 @@ UIKnobNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIKnobNode {
 	knob := CreateNode(scene.manager, UIKnobNode)
-	knob.name = name
+	knob.name = strings.clone(name, knob.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&knob.ui, .Knob, {64, 80})
-	knob.label = label
+	knob.label = strings.clone(label, knob.allocator)
 	knob.value = value
 	knob.minValue = minValue
 	knob.maxValue = maxValue
@@ -1900,7 +1901,7 @@ UIListViewNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIListViewNode {
 	lv := CreateNode(scene.manager, UIListViewNode)
-	lv.name = name
+	lv.name = strings.clone(name, lv.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&lv.ui, .ListView, size)
 	for it in items do append(&lv.items, it)
 	lv.selectedIndex = 0 if len(items) > 0 else -1
@@ -1984,7 +1985,7 @@ UITreeViewNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UITreeViewNode {
 	tv := CreateNode(scene.manager, UITreeViewNode)
-	tv.name = name
+	tv.name = strings.clone(name, tv.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&tv.ui, .TreeView, size)
 	tv.selectedId = -1
 	tv.scroll = {0, 0}
@@ -2122,9 +2123,9 @@ UIVolumeFaderNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIVolumeFaderNode {
 	fader := CreateNode(scene.manager, UIVolumeFaderNode)
-	fader.name = name
+	fader.name = strings.clone(name, fader.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&fader.ui, .VolumeFader, {96, 320})
-	fader.label = label
+	fader.label = strings.clone(label, fader.allocator)
 	fader.valueDb = valueDb
 	fader.minDb = minDb
 	fader.maxDb = maxDb
@@ -2256,9 +2257,9 @@ UIVolumeMeterNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIVolumeMeterNode {
 	meter := CreateNode(scene.manager, UIVolumeMeterNode)
-	meter.name = name
+	meter.name = strings.clone(name, meter.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&meter.ui, .VolumeMeter, size)
-	meter.label = label
+	meter.label = strings.clone(label, meter.allocator)
 	meter.levelL = levelL
 	meter.levelR = levelR
 	meter.minDb = -60.0
@@ -2361,9 +2362,9 @@ UINotchedSliderNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UINotchedSliderNode {
 	ns := CreateNode(scene.manager, UINotchedSliderNode)
-	ns.name = name
+	ns.name = strings.clone(name, ns.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&ns.ui, .NotchedSlider, size)
-	ns.label = label
+	ns.label = strings.clone(label, ns.allocator)
 	ns.value = value
 	ns.minValue = minValue
 	ns.maxValue = maxValue
@@ -2520,7 +2521,7 @@ UIUnorderedListNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIUnorderedListNode {
 	ul := CreateNode(scene.manager, UIUnorderedListNode)
-	ul.name = name
+	ul.name = strings.clone(name, ul.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&ul.ui, .UnorderedList, size)
 	ul.defaultBullet = defaultBullet
 	ul.itemHeight = 24.0
@@ -2638,7 +2639,7 @@ UIOrderedListNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UIOrderedListNode {
 	ol := CreateNode(scene.manager, UIOrderedListNode)
-	ol.name = name
+	ol.name = strings.clone(name, ol.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&ol.ui, .OrderedList, size)
 	ol.numbering = numbering
 	ol.startNumber = startNumber
@@ -2760,7 +2761,7 @@ UITableNode_Create :: proc(
 	parent: ^Node = nil,
 ) -> ^UITableNode {
 	tbl := CreateNode(scene.manager, UITableNode)
-	tbl.name = name
+	tbl.name = strings.clone(name, tbl.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&tbl.ui, .Table, size)
 	tbl.headerHeight = 32.0
 	tbl.rowHeight = 28.0
@@ -2881,7 +2882,7 @@ UIIconNode_Create :: proc(
 	align: UITextAlign = .Center,
 ) -> ^UIIconNode {
 	node := CreateNode(scene.manager, UIIconNode)
-	node.name = name
+	node.name = strings.clone(name, node.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&node.ui, .Icon, size)
 	node.icon = icon
 	node.iconSize = iconSize
@@ -2923,7 +2924,7 @@ UIToolbarNode_Create :: proc(
 	spacing: f32 = 4.0,
 ) -> ^UIToolbarNode {
 	tb := CreateNode(scene.manager, UIToolbarNode)
-	tb.name = name
+	tb.name = strings.clone(name, tb.allocator) // owned: callers pass temp strings too
 	UIElement_Init(&tb.ui, .Toolbar, size)
 	tb.items = make([dynamic]ToolbarItem, tb.allocator)
 	tb.activeToggleId = -1

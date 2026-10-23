@@ -69,7 +69,7 @@ AnimationPlayerNode_Create :: proc(scene: ^Scene, name: string = "") -> ^Animati
 	apn := CreateNode(scene.manager, AnimationPlayerNode)
 	AnimationPlayerNode_Init(apn)
 	if name != "" {
-		apn.name = name
+		apn.name = strings.clone(name, apn.allocator) // owned: callers pass temp strings too
 	}
 	return apn
 }

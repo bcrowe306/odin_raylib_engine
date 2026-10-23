@@ -667,4 +667,14 @@ task test
 
 # Operate the editor through injected input (see TEST_DRIVE.md)
 task editor:drive
+
+# Memory diagnostics: the heap through Odin's tracking allocator; every 600
+# frames the live bytes, the allocation sites that grew and the temp arena
+# (editor/mem_track.odin)
+odin build editor -out:bin/editor_mem -define:ORE_MEM_TRACK=true -debug
 ```
+
+Temp memory (`fmt.tprintf`, `context.temp_allocator`) lives for one frame:
+the editor and the game free it after drawing. Keep an owned copy of
+anything that must outlive the frame (node constructors copy their name and
+text into the node's arena).

@@ -153,7 +153,7 @@ DEFAULT_LDTK_RESTITUTION :: 0.2
 
 @(private = "file")
 ldtk_node_init :: proc(node: ^LdtkLevelNode, scene: ^Scene, name: string) {
-	node.name = name
+	node.name = strings.clone(name, node.allocator) // owned: callers pass temp strings too
 	node.scene = scene
 	node.tintColor = rl.WHITE
 	node.enablePhysics = true

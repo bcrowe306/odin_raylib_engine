@@ -37,7 +37,7 @@ TileMapNode :: struct {
 
 TileMapNode_Create :: proc(scene: ^Scene, name: string = "TileMap", parent: ^Node = nil) -> ^TileMapNode {
 	tm := CreateNode(scene.manager, TileMapNode)
-	tm.name = name
+	tm.name = strings.clone(name, tm.allocator) // owned: callers pass temp strings too
 	tm.tileSize = {32, 32}
 	tm.mapSize = {20, 12}
 	tm.tint = rl.WHITE

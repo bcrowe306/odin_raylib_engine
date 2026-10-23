@@ -379,7 +379,7 @@ TextNode :: struct {
 TextNode_Create :: proc(scene: ^Scene, name: string = "Text", parent: ^Node = nil) -> ^TextNode {
 	t := CreateNode(scene.manager, TextNode)
 	TextNode_Init(t)
-	t.name = name
+	t.name = strings.clone(name, t.allocator) // owned: callers pass temp strings too
 	scene->addNode(t, parent)
 	return t
 }

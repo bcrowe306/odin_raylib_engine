@@ -45,6 +45,9 @@ for d in "${drives[@]}"; do
 		cfg["scenes"] = [s for s in cfg.get("scenes", []) if not s.startswith("scenes/new_scene")]
 		if cfg.get("initial_scene", "").startswith("scenes/new_scene"):
 		    cfg["initial_scene"] = "scenes/main.scene.json"
+		# Settings drives toggle start from their defaults, whatever the demo
+		# project has now.
+		cfg.setdefault("physics", {})["debug_draw"] = True
 		json.dump(cfg, open(p, "w"), indent=2)
 	EOF
 	shots="editor_screenshots/drive/$name"

@@ -423,7 +423,7 @@ CameraNode_Create :: proc(
 ) -> ^CameraNode {
 	cameraNode := CreateNode(scene.manager, CameraNode)
 	CameraNode_Init(cameraNode)
-	cameraNode.name = name
+	cameraNode.name = strings.clone(name, cameraNode.allocator) // owned: callers pass temp strings too
 	cameraNode.isCurrent = isCurrent
 	if isCurrent && scene != nil {
 		scene.camera = cameraNode
