@@ -24,7 +24,9 @@ import lsp "../odin_editor/lsp"
 //   name, returning that node's type (TextureNode, CameraNode...), so its
 //   own methods complete; a script's `self.node` has the type of the nodes
 //   it is attached to; a node name that runs a script returns NodeOf_<name>,
-//   whose get_script() is that script's class (its fields and methods)
+//   whose get_script() is that script's class (its fields and methods); a
+//   script's self.node is <Script>Node_, whose get_node completes the paths
+//   from it in its scenes / components, each returning that node's type
 //   ProjectEvent  the custom events the project's scripts emit (connect /
 //   emit complete them; scripts get optional on_<event> methods for them
 //   and for their node type's own events). Each node class's connect takes
@@ -84,6 +86,14 @@ sorted_unique :: proc(list: ^[dynamic]string) -> []string {
 // Node types seen per node name and per attached script ("" once two
 // differ: plain Node).
 @(private = "file")
+// A node of a scene / component: its path from the root and type, for the
+// paths scripts reach with get_node.
+Tree_Node :: struct {
+	path:   []string, // names from the root's child down
+	type:   string,
+	script: string,
+}
+
 Node_Types_Seen :: struct {
 	byName:       map[string]string,
 	byScript:     map[string]string,
@@ -196,6 +206,8 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	types.byName = make(map[string]string, allocator = context.temp_allocator)
 	types.byScript = make(map[string]string, allocator = context.temp_allocator)
 	types.scriptByName = make(map[string]string, allocator = context.temp_allocator)
+	// get_node paths per script: path -> type ("Node" once two differ).
+	pathsOf := make(map[string]map[string]string, allocator = context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "", {".scene.json"}) {
 		append(&scenePaths, rel)
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
@@ -207,7 +219,12 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		if n, ok := root["name"].(json.String); ok do append(&sceneNames, string(n))
 		if r, ok := root["root"]; ok {
 			if ro, isObj := r.(json.Object); isObj {
-				if kids, has := ro["children"].(json.Array); has do for k in kids do node_names(k, &nodeNames, &nodeTags, &types)
+				if kids, has := ro["children"].(json.Array); has {
+					for k in kids do node_names(k, &nodeNames, &nodeTags, &types)
+					tree := make([dynamic]Tree_Node, context.temp_allocator)
+					for k in kids do tree_nodes(k, {}, &tree)
+					script_paths(tree[:], &pathsOf)
+				}
 			}
 		}
 	}
@@ -216,7 +233,12 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		append(&components, rel)
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
-			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None do node_names(val, &nodeNames, &nodeTags, &types)
+			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None {
+				node_names(val, &nodeNames, &nodeTags, &types)
+				tree := make([dynamic]Tree_Node, context.temp_allocator)
+				tree_nodes(val, {}, &tree)
+				script_paths(tree[:], &pathsOf)
+			}
 		}
 	}
 	alias(&sb, "SceneName", "Scene names (Scene.change_scene)", sorted_unique(&sceneNames))
@@ -289,6 +311,8 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	// Script classes with their exported properties.
 	strings.write_string(&sb, "\n-- Script classes: exported properties (set in the Inspector) are fields of self.\n")
 	sm := &state.game.scriptManager
+	Script_Node_Class :: struct {cls, nodeType: string, paths: map[string]string}
+	nodeClasses := make([dynamic]Script_Node_Class, context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "", {".lua"}) {
 		if strings.has_prefix(rel, ".") do continue
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
@@ -300,7 +324,13 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		nodeType := types.byScript[rel] or_else ""
 		if (!ok || mod == nil || len(mod.properties) == 0) && nodeType == "" do continue
 		fmt.sbprintf(&sb, "\n-- %s\n---@class %s\n", rel, cls)
-		if nodeType != "" do fmt.sbprintf(&sb, "---@field node %s The node this script is attached to.\n", nodeType)
+		if paths, has := pathsOf[rel]; has && len(paths) > 0 {
+			// Its node's own class: get_node completes the paths from it.
+			fmt.sbprintf(&sb, "---@field node %s The node this script is attached to.\n", script_node_class(cls))
+			append(&nodeClasses, Script_Node_Class{cls, nodeType if nodeType != "" else "Node", paths}) // written after the script classes
+		} else if nodeType != "" {
+			fmt.sbprintf(&sb, "---@field node %s The node this script is attached to.\n", nodeType)
+		}
 		// Its node's own events (the tree ones are on ScriptInstanceBase) and
 		// the project's custom events as optional methods.
 		for ev in node_type_events(nodeType)[6:] do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) %s event of its node\n", ev, cls, ev)
@@ -316,6 +346,8 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 			fmt.sbprintf(&sb, "---@field %s %s%s\n", p.name, t, fmt.tprintf(" %s", doc) if doc != "" else "")
 		}
 	}
+	// The scripts' node classes (typed get_node paths).
+	for nc in nodeClasses do script_node_block(&sb, nc.cls, nc.nodeType, nc.paths)
 	return strings.to_string(sb)
 }
 
@@ -382,6 +414,85 @@ node_type_events :: proc(nodeType: string) -> []string {
 		if len(p) > 2 && p[0] == '"' do append(&out, p[1:len(p) - 1])
 	}
 	return out[:]
+}
+
+// tree_nodes flattens a scene / component JSON node tree.
+@(private = "file")
+tree_nodes :: proc(v: json.Value, parent: []string, out: ^[dynamic]Tree_Node) {
+	obj, ok := v.(json.Object)
+	if !ok do return
+	if inner, has := obj["node"].(json.Object); has && obj["type"] == nil {
+		tree_nodes(inner, parent, out) // a component file: {"node": {...}}
+		return
+	}
+	name := string(obj["name"].(json.String) or_else "")
+	t := string(obj["type"].(json.String) or_else "Node")
+	if info, found := e.Node_TypeInfoByName(t); found do t = info.name
+	path := make([]string, len(parent) + 1, context.temp_allocator)
+	copy(path, parent)
+	path[len(parent)] = name
+	script := ""
+	if sc, isObj := obj["script"].(json.Object); isObj do script = string(sc["path"].(json.String) or_else "")
+	append(out, Tree_Node{path, t, script})
+	if kids, has := obj["children"].(json.Array); has do for k in kids do tree_nodes(k, path, out)
+}
+
+MAX_SCRIPT_PATHS :: 200
+
+// script_paths: for each node with a script, the relative path to every
+// other node of its tree (children, "..", siblings "../X"), with its type.
+@(private = "file")
+script_paths :: proc(tree: []Tree_Node, out: ^map[string]map[string]string) {
+	for owner in tree {
+		if owner.script == "" do continue
+		if owner.script not_in out do out[owner.script] = make(map[string]string, allocator = context.temp_allocator)
+		m := &out[owner.script]
+		for other in tree {
+			if len(m) >= MAX_SCRIPT_PATHS do break
+			rel := relative_tree_path(owner.path, other.path)
+			if rel == "" || rel == "." do continue
+			if old, seen := m[rel]; seen {
+				if old != other.type do m[rel] = "Node"
+			} else {
+				m[rel] = other.type
+			}
+		}
+		// The parent ("..") too.
+		if len(owner.path) > 1 {
+			for other in tree do if len(other.path) == len(owner.path) - 1 && slice.equal(other.path, owner.path[:len(owner.path) - 1]) {
+				if old, seen := m[".."]; seen && old != other.type do m[".."] = "Node"
+				else if !seen do m[".."] = other.type
+			}
+		}
+	}
+}
+
+// relative_tree_path: get_node path from one node to another ("Gun",
+// "Gun/Muzzle", "../Camera", "../../X"); "" for itself or its ancestors.
+@(private = "file")
+relative_tree_path :: proc(from, to: []string) -> string {
+	common := 0
+	for common < len(from) && common < len(to) && from[common] == to[common] do common += 1
+	if common == len(to) do return "" // itself or an ancestor
+	parts := make([dynamic]string, context.temp_allocator)
+	for _ in common ..< len(from) do append(&parts, "..")
+	for p in to[common:] do append(&parts, p)
+	return strings.join(parts[:], "/", context.temp_allocator)
+}
+
+// script_node_class: the class of a script's self.node with typed get_node.
+script_node_class :: proc(cls: string) -> string {return fmt.tprintf("%sNode_", cls)}
+
+// script_node_block writes that class: get_node overloads per path.
+@(private = "file")
+script_node_block :: proc(sb: ^strings.Builder, cls, nodeType: string, paths: map[string]string) {
+	keys := make([dynamic]string, context.temp_allocator)
+	for k in paths do append(&keys, k)
+	slice.sort(keys[:])
+	nc := script_node_class(cls)
+	fmt.sbprintf(sb, "\n---@class %s : %s\nlocal %s = {{}}\n---A node by path from this one (\"Gun\", \"../Player\"): the paths in its scenes complete, typed.\n", nc, nodeType, nc)
+	for k in keys do fmt.sbprintf(sb, "---@overload fun(self: %s, path: %q): %s\n", nc, k, paths[k])
+	fmt.sbprintf(sb, "---@param path string\n---@return Node?\nfunction %s:get_node(path) end\n", nc)
 }
 
 // node_class_name: the refined class of a node name that has a script.

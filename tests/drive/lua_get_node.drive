@@ -1,0 +1,25 @@
+# Typed get_node: a script's self.node is a class of its own whose
+# get_node completes the paths from it in the project's scenes, each
+# returning that node's type (player_ship.lua: "EngineExhaust" is a
+# FrameAnimationNode, "../MainCamera" a CameraNode).
+wait 5
+wait-until file:.ore/definitions/project_types.lua contains ---@class PlayerShipNode_ : TextureNode timeout=600
+expect file:.ore/definitions/project_types.lua contains fun(self: PlayerShipNode_, path: "EngineExhaust"): FrameAnimationNode
+expect file:.ore/definitions/project_types.lua contains fun(self: PlayerShipNode_, path: "../MainCamera"): CameraNode
+expect file:.ore/definitions/project_types.lua contains ---@field node PlayerShipNode_ The node this script is attached to.
+expect file:.ore/definitions/project_types.lua contains ---@field drone_name string Drone Codename
+dblclick @asset:scripts/player_ship.lua
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+type local fx = self.node:get_node("Eng
+wait-until code.completion contains EngineExhaust timeout=600
+screenshot paths
+key esc
+key end
+key enter
+type fx:connect("anim
+wait-until code.completion contains animation_finished timeout=600

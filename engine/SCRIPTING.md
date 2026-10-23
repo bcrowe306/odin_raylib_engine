@@ -306,7 +306,9 @@ The definitions have a class per node type (`CameraNode`, `TextureNode`,
 the node can do. The editor's generated `project_types.lua` makes
 `Scene.find_node("Player")` and `node:get_child("Gun")` return the type of
 the node with that name in your scenes, and gives a script's `self.node`
-the type of the nodes it is attached to. Elsewhere (a node from
+the type of the nodes it is attached to, and `self.node:get_node("` completes
+the paths from that node in its scenes (`"Gun"`, `"../MainCamera"`), each
+returning that node's type. Elsewhere (a node from
 `get_children()`, a script not attached yet) the type is `Node`; say what it
 is with an annotation:
 
