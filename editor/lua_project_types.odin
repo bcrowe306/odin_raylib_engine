@@ -28,7 +28,8 @@ import lsp "../odin_editor/lsp"
 //   script's self.node is <Script>Node_, whose get_node completes the paths
 //   from it in its scenes / components, each returning that node's type
 //   global scripts (Project Settings > Globals) as globals
-//   AnimationName, StateMachineParam / State, SaveKey, LocaleKey,
+//   AnimationName, StateMachineParam / State (and on_enter_ / on_update_ /
+//   on_exit_<state> on the script classes), SaveKey, LocaleKey,
 //   Language, CollisionLayer   names the project uses (animation_play,
 //   sm_*, Save.*, tr / Locale.set, set_collision_layer complete them)
 //   ProjectEvent  the custom events the project's scripts emit (connect /
@@ -413,6 +414,13 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		// the project's custom events as optional methods.
 		for ev in node_type_events(nodeType)[6:] do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) %s event of its node\n", ev, cls, ev)
 		for ev in customEvents do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) custom event (emit)\n", ev, cls)
+		// State machine callbacks for the project's states (on the machine's
+		// script or its parent's).
+		for st in sorted_unique(&smStates) {
+			fmt.sbprintf(&sb, "---@field on_enter_%s? fun(self: %s, previous: string) state machine: entered %s\n", st, cls, st)
+			fmt.sbprintf(&sb, "---@field on_update_%s? fun(self: %s, dt: number) state machine: every frame in %s\n", st, cls, st)
+			fmt.sbprintf(&sb, "---@field on_exit_%s? fun(self: %s, next: string) state machine: left %s\n", st, cls, st)
+		}
 		if !ok || mod == nil do continue
 		for p in mod.properties {
 			t := lua_type_of(p)

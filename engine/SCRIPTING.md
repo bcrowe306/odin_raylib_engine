@@ -864,7 +864,9 @@ for **gameplay** (AI, player modes, doors, menus) as much as animation:
   Transitions are checked in order, one per frame.
 - **Script callbacks** (on the machine's script and its parent's, when
   defined): `on_enter_<state>(previous)`, `on_update_<state>(dt)` every
-  frame while in the state, `on_exit_<state>(next)`.
+  frame while in the state, `on_exit_<state>(next)`. The editor's generated
+  types list these for every state in the project, so the code editor (and
+  lua-language-server) complete `function Cls:on_enter_` with the names.
 - The machine keeps the **last 32 changes** (`sm_history()`); the editor's
   State Machine tab shows them live, in Simulate and in the running game,
   and can **break on entering** a state.

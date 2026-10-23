@@ -1,0 +1,50 @@
+# State machine scripting: a gameplay state's callbacks completed in the
+# script (generated types) and written by Add Script Callbacks.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type state machine
+key enter
+wait 3
+rclick @smg.canvas+-150,-20
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type hover_zz
+key enter
+wait 2
+key cmd+s
+wait 3
+wait-until file:.ore/definitions/project_types.lua contains on_update_hover_zz timeout=600
+# PlayerShip has no script: Add Script Callbacks says so.
+rclick @smg.state:hover_zz
+click @ctx:smg-callbacks
+wait 2
+expect log contains Attach a script to StateMachine or its parent first
+# With a script (battle_arena's PlayerShip runs player_ship.lua): the
+# callbacks are written into it.
+dblclick @asset:scenes/battle_arena.scene.json
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type state machine
+key enter
+wait 3
+rclick @smg.canvas+-150,-20
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type dash_zz
+key enter
+wait 2
+click @smg.add-callbacks
+wait 3
+expect code.file == scripts/player_ship.lua
+expect code.text contains function PlayerShip:on_enter_dash_zz(previous)
+expect code.text contains function PlayerShip:on_update_dash_zz(dt)
+expect code.text contains function PlayerShip:on_exit_dash_zz(next)
+screenshot callbacks

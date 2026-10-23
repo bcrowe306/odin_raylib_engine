@@ -422,7 +422,9 @@ film its animation, otherwise *gameplay*; a child machine is named), the
 - Right-click empty space: **Add State** (a gameplay state) or **Add State
   for Animation**; right-click a state: Set as Initial, Break on Enter,
   **Add Script Callbacks** (writes `on_enter_` / `on_update_` / `on_exit_`
-  into the machine's or its parent's script), Delete.
+  into the machine's or its parent's script), Delete. Every state in the
+  project is also in the generated types (`.ore/definitions/project_types.lua`),
+  so typing `function Cls:on_update_` completes the state names.
 - Drag a box to move it (positions are saved); drag a box's **dot** onto
   another box for a transition; click an arrow or a box to edit it in the
   side panel (name, animation or none, **child machine**, initial, break on
