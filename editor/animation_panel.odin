@@ -58,7 +58,14 @@ Anim_Panel :: struct {
 	selAnim:    ^e.Animation,
 	anchor:     int,
 	rangeDrag:  int, // 1: dragging the range start handle, 2: the end
+	// The preview at the right: loops the range by itself (paused: shows
+	// the frame scrubbed to).
+	miniPaused: bool,
+	miniAccum:  f32,
+	miniTick:   time.Tick,
 }
+
+PREVIEW_W :: f32(200)
 
 // The copied frames (Copy / Paste in the timeline).
 frameClip: e.Frame_Clip
@@ -414,8 +421,10 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 
 	// --- timeline: one column per source frame; the range starts at `base` ---
 	avail := imgui.GetContentRegionAvail()
-	if !imgui.BeginChild("##anim_timeline", {avail.x, max(avail.y, 40)}, {}, {.HorizontalScrollbar}) {
+	previewW := PREVIEW_W if avail.x >= 640 else 0 // the preview at the right, when there's room
+	if !imgui.BeginChild("##anim_timeline", {avail.x - previewW - (UI_SPACE if previewW > 0 else 0), max(avail.y, 40)}, {}, {.HorizontalScrollbar}) {
 		imgui.EndChild()
+		if previewW > 0 do anim_preview(state, apn, anim, {previewW, max(avail.y, 40)})
 		return
 	}
 	dl := imgui.GetWindowDrawList()
@@ -753,4 +762,62 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	px := x0 + (f32(base + rel) + 0.5) * CELL_W
 	imgui.DrawList_AddLine(dl, {px, origin.y}, {px, ty + f32(nTracks) * ROW_H}, col_u32(UI_ACCENT), 2)
 	imgui.EndChild()
+	if previewW > 0 do anim_preview(state, apn, anim, {previewW, max(avail.y, 40)})
 }
+
+// anim_preview: the animation playing in a box right of the timeline - its
+// range, at its FPS, in its direction - with pause (then it shows the frame
+// the timeline is on).
+@(private = "file")
+anim_preview :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, size: [2]f32) {
+	imgui.SameLine(0, UI_SPACE)
+	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
+	defer imgui.PopStyleColor()
+	if !imgui.BeginChild("##anim_preview", size, {}, {.NoScrollbar, .NoScrollWithMouse}) {
+		imgui.EndChild()
+		return
+	}
+	defer imgui.EndChild()
+	length := max(anim.endFrame - anim.startFrame + 1, 1)
+	if !panel.miniPaused {
+		dt := f32(time.duration_seconds(time.tick_since(panel.miniTick)))
+		panel.miniAccum += min(dt, 0.25) * max(e.AnimationPlayerNode_FPS(apn), 1)
+		if panel.miniAccum >= f32(length) {
+			// A non-looping animation holds its last frame a moment, then starts over.
+			hold: f32 = 0 if anim.loop else max(e.AnimationPlayerNode_FPS(apn), 1) * 0.6
+			if panel.miniAccum >= f32(length) + hold do panel.miniAccum = 0
+		}
+	}
+	panel.miniTick = time.tick_now()
+	f := min(int(panel.miniAccum), length - 1)
+	if e.AnimationPlayerNode_IsReversed(apn, anim) do f = length - 1 - f
+	frame := anim.startFrame + f
+	if panel.miniPaused do frame = clamp(apn.currentFrame, 0, max(e.Animation_SourceCount(anim) - 1, 0))
+
+	// Checkerboard behind the frame (transparency), the frame fitted.
+	o := imgui.GetCursorScreenPos()
+	dl := imgui.GetWindowDrawList()
+	box := [2]f32{size.x, size.y - 26}
+	CHECK :: f32(10)
+	for y: f32 = 0; y < box.y; y += CHECK {
+		for x: f32 = 0; x < box.x; x += CHECK {
+			dark := (int(x / CHECK) + int(y / CHECK)) % 2 == 0
+			c := UI_BG_PANEL if dark else UI_BG_RAISED
+			imgui.DrawList_AddRectFilled(dl, o + {x, y}, o + {min(x + CHECK, box.x), min(y + CHECK, box.y)}, col_u32(c))
+		}
+	}
+	draw_frame_thumb(dl, anim, frame, o + {6, 6}, o + box - {6, 6})
+	Drive_ItemRect("anim.preview", o, o + box, inWindow = true)
+
+	// Under it: pause / play and the frame shown.
+	imgui.SetCursorScreenPos({o.x + 2, o.y + box.y + 2})
+	if UI_IconButton(ICON_FA_PLAY if panel.miniPaused else ICON_FA_PAUSE, "anim.preview-toggle", "Play the preview" if panel.miniPaused else "Pause the preview (then it shows the timeline's frame)", size = 22) {
+		panel.miniPaused = !panel.miniPaused
+	}
+	imgui.SameLine(0, 6)
+	imgui.SetCursorPosY(imgui.GetCursorPosY() + 3)
+	UI_DimText(fmt.tprintf("%s  %d / %d  ·  %.0f fps%s", anim.name, frame + 1, e.Animation_SourceCount(anim), e.AnimationPlayerNode_FPS(apn), "  ·  reverse" if e.AnimationPlayerNode_IsReversed(apn, anim) else ""))
+}
+
+// AnimationPanel_PreviewPaused: the preview is paused (drives).
+AnimationPanel_PreviewPaused :: proc() -> bool {return panel.miniPaused}

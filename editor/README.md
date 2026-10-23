@@ -286,7 +286,10 @@ toolbar: **Loop**, **Reverse** (this animation plays last to first; the
 player's own Reverse flips them all), the animation's **FPS** (0 = the
 player's, set in the Inspector) and the **star**: the animation selected -
 and autoplayed - when the scene loads (also the Inspector's **Default**).
-Then play/stop preview (Stop puts the scene back), and
+At the right of the timeline (when the panel is wide enough) a **preview**
+plays the animation by itself - its range, FPS and direction, looping;
+pause it to see the frame the timeline is on. Then play/stop preview in the
+viewport (Stop puts the scene back), and
 keyframed **property tracks**: **Add Track** picks the player or a child and
 a property (position, rotation, scale, colours, any numeric property); the
 yellow dot keys the current value at the playhead; right-click a key to

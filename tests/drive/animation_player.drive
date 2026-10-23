@@ -15,7 +15,17 @@ drag @asset:textures/Asteroid_2.png @anim.frame-drop
 drag @asset:textures/Asteroid_3.png @anim.frame-drop
 drag @asset:textures/Asteroid_4.png @anim.frame-drop
 expect anim-info contains frames=4 range=1-4
+# The preview right of the timeline plays the animation; paused, it shows
+# the timeline's frame.
+expect item:anim.preview == visible
+expect anim-preview == playing
 screenshot four_frames
+click @anim.preview-toggle
+expect anim-preview == paused
+click @anim.frame:3
+screenshot preview_paused_on_frame_3
+click @anim.preview-toggle
+expect anim-preview == playing
 
 # Delete: the button (frame 2), the context menu (frame 3).
 click @anim.frame:2
