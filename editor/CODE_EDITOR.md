@@ -236,6 +236,11 @@ again. Up to 2000 matches are listed.
 
 ## Language server
 
+**Peek definition** (Alt+F12) and **peek references** (Alt+Shift+F12) show
+the target's code in a box under the caret line - syntax coloured, its line
+marked - without leaving the file; references list on the left (Up / Down
+pick). Enter or a double-click opens it, Esc or a click outside closes.
+
 Completion (Ctrl+Space, as you type), signature help (Cmd+Shift+Space),
 hover, diagnostics (squiggles, gutter, status line), go to definition (F12
 / Cmd+click), find references (Shift+F12), rename (F2), format

@@ -5,6 +5,7 @@ import "core:os"
 import "core:path/filepath"
 import "core:slice"
 import "core:strings"
+import "core:sys/posix"
 import "core:time"
 import "core:unicode/utf8"
 import e "../engine"
@@ -196,6 +197,11 @@ code_file_mtime :: proc(path: string) -> time.Time {
 Editor_OpenScript :: proc(state: ^EditorState, path: string, line := -1, col := 0) -> bool {
 	cm := &GlobalCode
 	abs := code_abs_path(state, path)
+	// The same file through a symlink (the language server reports
+	// /private/tmp/... for /tmp/... on macOS): use the project's spelling.
+	if real, realProj := code_real_path(abs), code_real_path(state.projectPath); realProj != "" && strings.has_prefix(real, strings.concatenate({strings.trim_suffix(realProj, "/"), "/"}, context.temp_allocator)) {
+		abs = strings.concatenate({strings.trim_suffix(state.projectPath, "/"), real[len(strings.trim_suffix(realProj, "/")):]}, context.temp_allocator)
+	}
 	idx := -1
 	for d, i in cm.docs do if d.path == abs do idx = i
 	if idx < 0 {
@@ -360,6 +366,7 @@ Code_Shutdown :: proc() {
 	Code_ClipboardShutdown()
 	Code_NavShutdown()
 	Code_SearchShutdown()
+	Code_PeekShutdown()
 	code_find_destroy()
 	code_lsp_shutdown()
 }
@@ -605,6 +612,7 @@ code_update_line_states :: proc(doc: ^Code_Doc) {
 Code_Render :: proc(state: ^EditorState) {
 	cm := &GlobalCode
 	code_lsp_update(state)
+	Code_PeekUpdate(state)
 	code_commands_update(state)
 	code_check_disk(state)
 	if len(cm.docs) == 0 {
@@ -833,6 +841,7 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	Debug_ConditionPopup()        // right-click in the gutter: a breakpoint condition
 	Code_ClipboardPicker(state, doc) // Cmd+Shift+V
 	Code_GutterMenu(state, doc)      // right-click a line number
+	Code_PeekRender(state)           // peek definition / references
 	// Right-click: the text menu - in the gutter, a breakpoint condition instead.
 	if hovered && imgui.IsMouseReleased(.Right) && imgui.GetIO().MousePos.x >= winPos.x + gutterW {
 		Code_ContextOpen(state, doc, code_pos_at(b, {imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y}))
@@ -926,6 +935,18 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 
 	code_draw(doc, winPos, winSize, gutterW, focused)
 	return focused
+}
+
+// code_real_path: a path with its symlinks resolved ("" when it doesn't exist).
+code_real_path :: proc(path: string) -> string {
+	when ODIN_OS == .Windows {
+		return path
+	} else {
+		out: [4096]u8
+		r := posix.realpath(strings.clone_to_cstring(path, context.temp_allocator), &out[0])
+		if r == nil do return ""
+		return strings.clone(string(r), context.temp_allocator)
+	}
 }
 
 // code_doc_of: the open doc owning a buffer.

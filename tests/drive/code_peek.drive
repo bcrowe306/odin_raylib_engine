@@ -1,0 +1,42 @@
+# Peek definition (Alt+F12): the definition's code in a box without leaving
+# the file; peek references (Alt+Shift+F12): a list and the code; Enter
+# opens the picked one, Esc closes.
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait-until code.lsp == ready timeout=600
+# "self.rotation" on line 32: references within the file.
+key ctrl+g
+type 32
+key enter
+key end
+key left
+key left
+key left
+key alt+shift+f12
+wait-until item:code.peek == visible timeout=600
+expect item:code.peek-loc:1 == visible
+screenshot peek_refs
+key down
+key enter
+wait 3
+expect code.file == scripts/player_ship.lua
+expect code.open == 1
+expect item:code.peek == missing
+# Peek the definition of Log.info (engine API definitions).
+key ctrl+g
+type 17
+key enter
+key home
+key right
+key right
+key right
+key right
+key right
+key right
+key alt+f12
+wait-until item:code.peek == visible timeout=600
+screenshot peek_def
+key esc
+wait 2
+expect item:code.peek == missing
+expect code.file == scripts/player_ship.lua
