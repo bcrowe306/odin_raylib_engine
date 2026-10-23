@@ -75,7 +75,7 @@ Autocomplete and type safety
 - [x] 8.3 Typed `get_property` / `set_property` paths per node class
 - [x] 8.4 Typed `get_node("path")` (paths relative to each script's nodes)
 - [x] 8.5 Asset / scene / action aliases on more API parameters
-- [ ] 8.6 Diagnostics: Lua runtime errors as squiggles in the Code tab (Play / Simulate); warnings for unknown node paths / property names
+- [x] 8.6 Diagnostics: Lua runtime errors as squiggles in the Code tab (Play / Simulate); warnings for unknown node paths / property names
 
 Drag and drop, editor ↔ code
 - [ ] 8.7 Drop an animation / input action / scene / sound into code

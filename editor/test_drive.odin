@@ -782,6 +782,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return "running" if state.gameProcessRunning else "stopped", true
 	case "build":
 		return "running" if state.buildRunning else "idle", true
+	case "runtime-diags": return fmt.tprint(CodeRuntime_Count()), true
 	case "game-pid": return fmt.tprint(state.gameProcess.pid if state.gameProcessRunning else 0), true
 	case "last-played": return state.lastPlayedScene if state.lastPlayedScene != "" else "project", true
 	case "log":

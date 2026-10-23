@@ -226,8 +226,15 @@ code_lsp_position :: proc(doc: ^Code_Doc, p: buf.Position) -> (line, character: 
 
 code_diagnostics :: proc(doc: ^Code_Doc) -> []lsp.Diagnostic {
 	cm := &GlobalCode
-	if cm.lspState == .Off || cm.lspState == .Failed || !doc.isLua do return nil
-	return lsp.client_diagnostics_for(&cm.client, doc.uri)
+	if !doc.isLua do return nil
+	runtime := code_runtime_diagnostics(doc) // the game's / simulation's errors
+	if cm.lspState == .Off || cm.lspState == .Failed do return runtime
+	server := lsp.client_diagnostics_for(&cm.client, doc.uri)
+	if len(runtime) == 0 do return server
+	all := make([dynamic]lsp.Diagnostic, context.temp_allocator)
+	append(&all, ..server)
+	append(&all, ..runtime)
+	return all[:]
 }
 
 code_diagnostic_counts :: proc(doc: ^Code_Doc) -> (errors, warnings: int) {

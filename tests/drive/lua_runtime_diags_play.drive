@@ -1,0 +1,24 @@
+# Runtime errors from the game process (Play): its output's
+# "scripts/x.lua:N:" errors become diagnostics in the Code tab.
+wait 5
+click @hier:PatrolDroneAlpha
+click @insp.script-attach
+click @pick:scripts/orbiting_drone.lua
+click @insp.script-edit
+wait 5
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+type local broken = nil
+key enter
+type broken.value = 1
+key ctrl+s
+wait 3
+click @toolbar.play-scene
+wait-until game == running timeout=600
+wait-until runtime-diags >= 1 timeout=600
+expect code.diagnostic-messages contains 18: Runtime: attempt to index a nil value
+click @toolbar.stop
+wait-until game == stopped timeout=300

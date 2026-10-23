@@ -84,6 +84,7 @@ editor_main :: proc() -> int {
 	e.scriptLogSink = proc(level: log.Level, text: string) {
 		lvl: LogLevel = .Error if level >= .Error else (.Warn if level == .Warning else .Info)
 		Editor_Log(&GlobalEditor, lvl, "[Lua] %s", text)
+		if level >= .Warning do CodeRuntime_Report(text, level == .Warning) // squiggles in the Code tab
 	}
 	Editor_Init(&GlobalEditor)
 	Actions_Init()

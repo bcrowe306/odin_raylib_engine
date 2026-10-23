@@ -121,7 +121,7 @@ ScriptManager_LoadModule :: proc(path: string, sm: ^ScriptManager = nil) -> (^Sc
 	loadStatus := lua.L_loadbuffer(L, cast([^]u8)codeC, c.size_t(len(code)), chunkNameC)
 	if loadStatus != .OK {
 		errStr := lua.tostring(L, -1)
-		log.errorf("[ScriptManager] Syntax error compiling '%s': %s", normPath, errStr)
+		Script_Problem(.Error, "[ScriptManager] Syntax error compiling '%s': %s", normPath, errStr)
 		lua.pop(L, 1)
 		return nil, false
 	}
@@ -130,7 +130,7 @@ ScriptManager_LoadModule :: proc(path: string, sm: ^ScriptManager = nil) -> (^Sc
 	pcallStatus := lua.pcall(L, 0, 1, 0)
 	if pcallStatus != 0 {
 		errStr := lua.tostring(L, -1)
-		log.errorf("[ScriptManager] Runtime error loading '%s': %s", normPath, errStr)
+		Script_Problem(.Error, "[ScriptManager] Runtime error loading '%s': %s", normPath, errStr)
 		lua.pop(L, 1)
 		return nil, false
 	}
@@ -294,7 +294,7 @@ ScriptInstance_CallReady :: proc(inst: ^ScriptInstance, sm: ^ScriptManager = nil
 		mgr.currentInstance = prev
 		if status != 0 {
 			errStr := lua.tostring(L, -1)
-			log.errorf("[ScriptInstance] Error in ready() for '%s': %s", inst.modulePath, errStr)
+			Script_Problem(.Error, "[ScriptInstance] Error in ready() for '%s': %s", inst.modulePath, errStr)
 			lua.pop(L, 1)
 		}
 	} else {
@@ -328,7 +328,7 @@ ScriptInstance_CallUpdate :: proc(inst: ^ScriptInstance, deltaTime: f32, sm: ^Sc
 		mgr.currentInstance = prev
 		if status != 0 {
 			errStr := lua.tostring(L, -1)
-			log.errorf("[ScriptInstance] Error in update() for '%s': %s", inst.modulePath, errStr)
+			Script_Problem(.Error, "[ScriptInstance] Error in update() for '%s': %s", inst.modulePath, errStr)
 			lua.pop(L, 1)
 		}
 	} else {
@@ -357,7 +357,7 @@ ScriptInstance_CallDestroy :: proc(inst: ^ScriptInstance, sm: ^ScriptManager = n
 		status := lua.pcall(L, 1, 0, errHandler)
 		if status != 0 {
 			errStr := lua.tostring(L, -1)
-			log.errorf("[ScriptInstance] Error in on_destroy() for '%s': %s", inst.modulePath, errStr)
+			Script_Problem(.Error, "[ScriptInstance] Error in on_destroy() for '%s': %s", inst.modulePath, errStr)
 			lua.pop(L, 1)
 		}
 	} else {

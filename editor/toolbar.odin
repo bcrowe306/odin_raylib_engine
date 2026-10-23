@@ -191,6 +191,7 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 }
 
 Toolbar_StartSimulation :: proc(state: ^EditorState) {
+	CodeRuntime_Clear() // the last run's script problems
 	if state.activeScene == nil do return
 
 	if state.snapshotJson != "" {

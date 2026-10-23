@@ -52,6 +52,8 @@ exits non-zero if any check fails.
 | `lua_properties.drive` | Typed property paths: a camera's set_property(" completes followMode; get_property returns the enum (its names complete in a comparison). |
 | `lua_get_node.drive` | Typed get_node: self.node:get_node(" completes the paths in the script's scenes, each typed (EngineExhaust is a FrameAnimationNode). |
 | `lua_aliases.drive` | Project names complete in API calls: locale keys (tr), keys (Input.is_key_pressed), save keys (Save.get); animation and state names in the generated types. |
+| `lua_runtime_diags.drive` | Simulate: a get_node on a missing path (warning) and a nil index (error) show as diagnostics on their lines; saving clears them. |
+| `lua_runtime_diags_play.drive` | Play: a script error in the game's output becomes a diagnostic on its line. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -131,6 +133,7 @@ Queries:
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk)
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
+- `runtime-diags` (script problems recorded from Simulate / Play)
 - `anim-names` (the selected AnimationPlayer's animations, the current one in `[brackets]`)
 - `anim-preview` (`playing` / `paused`), `anim-info` (`frames=<n> range=<a>-<b> reverse=<b> fps=<f> default=<name>` of the selected AnimationPlayer), `theme` (the saved theme), `theme-panel` (the panel colour in use, `#rrggbbaa`), `node-icons` (`<distinct icons>/<node types>`), `workspace` (the current workspace), `window-h:<item>` (height of the window an item is in)
 - `debug-stopped`, `debug-line` (`file:line`), `debug-stack`, `debug-local:<name>` (the Lua debugger)

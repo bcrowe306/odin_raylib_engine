@@ -265,6 +265,7 @@ Code_DirtyCount :: proc() -> int {
 }
 
 Code_SaveDoc :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
+	CodeRuntime_Clear(doc.rel) // its runtime problems were about the old text
 	if !buf.buffer_save_file(&doc.buffer, doc.path) {
 		Editor_Log(state, .Error, "Could not save %s", doc.rel)
 		return false

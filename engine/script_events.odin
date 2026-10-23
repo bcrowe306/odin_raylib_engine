@@ -94,7 +94,7 @@ Script_DispatchEvent :: proc(owner: ^Node, name: string, value: EventValue, ctx:
 			prev := mgr.currentInstance
 			mgr.currentInstance = inst
 			if lua.pcall(L, 2, 0, errHandler) != 0 {
-				log.errorf("[Script] Error in %s:%s(): %s", inst.modulePath, method, lua.tostring(L, -1))
+				Script_Problem(.Error, "[Script] Error in %s:%s(): %s", inst.modulePath, method, lua.tostring(L, -1))
 				lua.pop(L, 1)
 			}
 			mgr.currentInstance = prev
@@ -127,7 +127,7 @@ Script_DispatchEvent :: proc(owner: ^Node, name: string, value: EventValue, ctx:
 		prev := mgr.currentInstance
 		mgr.currentInstance = conn.owner
 		if lua.pcall(L, 2, 0, errHandler) != 0 {
-			log.errorf("[Script] Error in '%s' handler of %s: %s", name, owner.name, lua.tostring(L, -1))
+			Script_Problem(.Error, "[Script] Error in '%s' handler of %s: %s", name, owner.name, lua.tostring(L, -1))
 			lua.pop(L, 1)
 		}
 		mgr.currentInstance = prev

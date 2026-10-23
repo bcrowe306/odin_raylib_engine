@@ -238,6 +238,16 @@ leaks into the next run or into the saved scene.
 
 ## Debugging
 
+**Errors in the Code tab.** Script errors while the game runs (Play) or in
+Simulate - a failing `ready` / `update` / event handler, a syntax error on
+hot reload - show as red squiggles on their line in the Code tab (hover
+for the message; repeated ones say how many times), next to the language
+server's. Some calls warn (yellow) once per call site: `get_node` finding
+nothing ("get_node: no node at "Gun" from Player") and `get_property` with
+an unknown path. They clear when the game or simulation starts again, or
+when you save that script. A game built without the editor writes them to
+its log.
+
 Set breakpoints by clicking line numbers in the editor's Code tab, then
 Play: the game stops in the script at a breakpoint, with the call stack
 and locals in the Game tab, and steps with F8 (continue), F10 (over), F11

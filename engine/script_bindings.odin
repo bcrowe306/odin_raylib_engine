@@ -2,6 +2,7 @@ package engine
 
 import "base:runtime"
 import "core:c"
+import "core:fmt"
 import "core:log"
 import "core:math"
 import "core:os"
@@ -231,7 +232,10 @@ lua_node_get_node :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnil(L)
 		return 1
 	}
-	push_node_userdata(L, Node_ResolvePath(node.gameContext.scene.manager, node, string(lua.tostring(L, 2))))
+	path := string(lua.tostring(L, 2))
+	found := Node_ResolvePath(node.gameContext.scene.manager, node, path)
+	if found == nil do script_warn_once(L, path, "get_node: no node at \"%s\" from %s", path, node.name)
+	push_node_userdata(L, found)
 	return 1
 }
 
@@ -2884,7 +2888,11 @@ lua_node_get_property :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	p, found := Node_FindProperty(node, string(name))
-	if !found {lua.pushnil(L); return 1}
+	if !found {
+		script_warn_once(L, string(name), "get_property: %s has no property \"%s\"", node.name, string(name))
+		lua.pushnil(L)
+		return 1
+	}
 	switch p.kind {
 	case .Float: lua.pushnumber(L, lua.Number(Property_GetFloat(p)))
 	case .Int:   lua.pushinteger(L, lua.Integer(Property_GetInt(p)))
@@ -3567,6 +3575,34 @@ lua_scene_set_draw_bounds :: proc "c" (L: ^lua.State) -> c.int {
 Script_LogSink :: #type proc(level: log.Level, text: string)
 scriptLogSink: Script_LogSink
 scriptLogger: runtime.Logger
+
+// Script_Problem reports an error or warning about a script - a failing
+// callback, a bad call - with its "path.lua:line:" when known: to the sink
+// (the editor: Console and Code tab diagnostics), else the game's log.
+Script_Problem :: proc(level: log.Level, format: string, args: ..any) {
+	text := fmt.tprintf(format, ..args)
+	if scriptLogSink != nil {
+		scriptLogSink(level, text)
+		return
+	}
+	if scriptLogger.procedure != nil do context.logger = scriptLogger
+	if level >= .Error do log.errorf("%s", text)
+	else do log.warnf("%s", text)
+}
+
+// script_warn_once: a warning about a call site, once per site + subject
+// (a script calling get_node every frame warns once).
+@(private="file")
+script_warn_once :: proc(L: ^lua.State, subject: string, format: string, args: ..any) {
+	@(static) warned: map[string]bool
+	lua.L_where(L, 1)
+	where_ := strings.clone(string(lua.tostring(L, -1)), context.temp_allocator)
+	lua.pop(L, 1)
+	key := strings.concatenate({where_, subject}, context.temp_allocator)
+	if key in warned || len(warned) > 1000 do return
+	warned[strings.clone(key, runtime.heap_allocator())] = true
+	Script_Problem(.Warning, "%s%s", where_, fmt.tprintf(format, ..args))
+}
 
 // script_log_args joins the call's arguments with tabs, each converted as
 // Lua's tostring does (nil, booleans, tables and nodes included).

@@ -1,0 +1,34 @@
+# Runtime problems in the Code tab: Simulate a script whose ready() calls
+# get_node on a missing path (a warning) and indexes nil (an error); both
+# show as diagnostics on their lines; saving the script clears them.
+wait 5
+click @hier:PatrolDroneAlpha
+click @insp.script-attach
+click @pick:scripts/orbiting_drone.lua
+click @insp.script-edit
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+type self.node:get_node("NoSuchNodeZq")
+key enter
+type local broken = nil
+key enter
+type broken.value = 1
+key ctrl+s
+wait 5
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 30
+expect runtime-diags >= 2
+expect code.diagnostic-messages contains 17: Runtime warning: get_node: no node at "NoSuchNodeZq" from PatrolDroneAlpha
+expect code.diagnostic-messages contains 19: Runtime: attempt to index a nil value
+expect log contains get_node: no node at "NoSuchNodeZq"
+screenshot squiggles
+click @menu:Game
+click @menu:Game/Simulate in Editor
+key ctrl+s
+wait 3
+expect runtime-diags == 0

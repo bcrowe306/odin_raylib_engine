@@ -83,17 +83,17 @@ ScriptManager_ReloadModule :: proc(mgr: ^ScriptManager, path: string, quiet := f
 
 	chunk := strings.clone_to_cstring(strings.concatenate({"@", mod.path}, context.temp_allocator), context.temp_allocator)
 	if lua.L_loadbuffer(L, cast([^]u8)raw_data(data), c.size_t(len(data)), chunk) != .OK {
-		log.warnf("[HotReload] %s: %s (keeping the previous version)", mod.path, lua.tostring(L, -1))
+		Script_Problem(.Warning, "[HotReload] %s: %s (keeping the previous version)", mod.path, lua.tostring(L, -1))
 		lua.pop(L, 1)
 		return false
 	}
 	if lua.pcall(L, 0, 1, 0) != 0 {
-		log.warnf("[HotReload] %s: %s (keeping the previous version)", mod.path, lua.tostring(L, -1))
+		Script_Problem(.Warning, "[HotReload] %s: %s (keeping the previous version)", mod.path, lua.tostring(L, -1))
 		lua.pop(L, 1)
 		return false
 	}
 	if lua.type(L, -1) != .TABLE {
-		log.warnf("[HotReload] %s did not return a table (keeping the previous version)", mod.path)
+		Script_Problem(.Warning, "[HotReload] %s did not return a table (keeping the previous version)", mod.path)
 		lua.pop(L, 1)
 		return false
 	}

@@ -153,6 +153,7 @@ Editor_LaunchGame :: proc(state: ^EditorState) {
 	if !os.exists(exePath) && os.exists("./odin_raylib_engine") {
 		exePath = "./odin_raylib_engine"
 	}
+	CodeRuntime_Clear() // the last run's script problems
 	cmd := make([dynamic]string, context.temp_allocator)
 	append(&cmd, exePath, "--project", state.projectPath, "--editor-link")
 	if state.pendingPlayScene != "" {
@@ -226,6 +227,8 @@ drain_pipe :: proc(state: ^EditorState, f: ^^os.File, lineBuf: ^[dynamic]u8, sou
 			if strings.contains(lower, "error") do level = .Error
 			else if strings.contains(lower, "warn") do level = .Warn
 			Editor_Log(state, level, "[%s] %s", source, line)
+			// A script problem: a squiggle on its line in the Code tab.
+			if source == "game" && level != .Info do CodeRuntime_Report(line, level == .Warn)
 		}
 		remove_range(lineBuf, 0, idx + 1)
 	}
