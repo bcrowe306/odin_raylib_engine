@@ -1024,12 +1024,11 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 
 animPreviewNode: ^e.AnimationPlayerNode
 
+// inspector_animation_player: the player's own settings - its animations
+// are edited in the bottom panel's Animation tab.
 @(private = "file")
 inspector_animation_player :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
-	if !UI_SectionHeader("Animations") do return
-	rm := &state.game.resourceManager
-	ctx := &state.game.gameContext
-
+	if !UI_SectionHeader("Animation Player") do return
 	if UI_BeginProps("##apn") {
 		UI_PropLabel("Current")
 		names := make([dynamic]string, context.temp_allocator)
@@ -1039,24 +1038,28 @@ inspector_animation_player :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 			e.AnimationPlayerNode_SetAnimationIndex(apn, idx)
 			if a := e.AnimationPlayerNode_GetAnimation(apn); a != nil do apn.currentFrame = a.startFrame
 		}
-		UI_PropLabel("Default")
-		defNames := make([dynamic]string, context.temp_allocator)
-		append(&defNames, "(the saved current one)")
-		defIdx := 0
-		for a, i in apn.animations {
-			append(&defNames, a.name)
-			if a.name == apn.defaultAnimation do defIdx = i + 1
+		UI_Tooltip("The animation shown now (scripts: animation_play(\"name\"))")
+		if p, ok := e.Node_FindProperty(apn, "defaultAnimation"); ok {
+			prop_row_label(state, apn, "Default", p)
+			defNames := make([dynamic]string, context.temp_allocator)
+			append(&defNames, "(the saved current one)")
+			defIdx := 0
+			for a, i in apn.animations {
+				append(&defNames, a.name)
+				if a.name == apn.defaultAnimation do defIdx = i + 1
+			}
+			if idx, changed := UI_Combo("insp.anim.default", defIdx, defNames[:]); changed {
+				Editor_RecordUndo(state, "Default animation")
+				apn.defaultAnimation = "" if idx == 0 else strings.clone(apn.animations[idx - 1].name, apn.allocator)
+			}
 		}
-		if idx, changed := UI_Combo("insp.anim.default", defIdx, defNames[:]); changed {
-			Editor_RecordUndo(state, "Default animation")
-			apn.defaultAnimation = "" if idx == 0 else strings.clone(apn.animations[idx - 1].name, apn.allocator)
+		if p, ok := e.Node_FindProperty(apn, "fps"); ok {
+			prop_row_label(state, apn, "FPS", p)
+			fps := apn.fps
+			if imgui.DragFloat("##apnfps", &fps, 0.2, 1, 120, "%.0f") do e.AnimationPlayerNode_SetFPS(apn, fps)
+			undo_on_activate(state, "Edit FPS")
+			Drive_Item("insp.anim.fps")
 		}
-		UI_Tooltip("The animation selected (and autoplayed) when the scene loads")
-		UI_PropLabel("FPS")
-		fps := apn.fps
-		if imgui.DragFloat("##apnfps", &fps, 0.2, 1, 120, "%.0f") do e.AnimationPlayerNode_SetFPS(apn, fps)
-		undo_on_activate(state, "Edit FPS")
-		UI_Tooltip("Frames per second of animations without their own FPS")
 		UI_PropLabel("Preview")
 		previewing := animPreviewNode == apn && apn.ticker.running
 		if UI_Button(previewing ? fmt.tprintf("%s  Stop", ICON_FA_STOP) : fmt.tprintf("%s  Play", ICON_FA_PLAY), "insp.anim.preview", {-1, 0}) {
@@ -1068,104 +1071,13 @@ inspector_animation_player :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 				animPreviewNode = apn
 			}
 		}
+		UI_PropLabel("Animations")
+		UI_DimText(fmt.tprintf("%d  ·  edit them in the Animation tab", len(apn.animations)))
+		Drive_Item("insp.anim.count")
 		UI_EndProps()
 	}
 	// The editor doesn't update nodes outside Simulate: advance the preview here.
 	if animPreviewNode == apn do apn.ticker->process()
-
-	remove := -1
-	for anim, i in apn.animations {
-		imgui.PushIDInt(c.int(i))
-		if UI_BeginProps("##anim") {
-			kind := "frames"
-			detail := ""
-			if anim.renderFrame == e.SSA_RenderFrame {
-				kind = "sheet"
-				ssa := cast(^e.SpriteSheetAnimation)anim
-				detail = filepath.base(ssa.spriteSheet.filePath) if ssa.spriteSheet != nil else "no sheet"
-			} else {
-				fa := cast(^e.FrameAnimation)anim
-				detail = fmt.tprintf("%d frames", len(fa.frames))
-			}
-			UI_PropLabel(anim.name)
-			avail := imgui.GetContentRegionAvail().x
-			UI_DimText(fmt.tprintf("%s · %s", kind, detail))
-			imgui.SameLine(imgui.GetCursorPosX() + avail - 30)
-			if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("insp.anim%d.remove", i), "Remove animation", size = 24) do remove = i
-			UI_PropLabel("Loop")
-			imgui.Checkbox("##loop", &anim.loop)
-			undo_on_activate(state, "Toggle loop")
-			UI_PropLabel("Reverse")
-			imgui.Checkbox("##reverse", &anim.reverse)
-			undo_on_activate(state, "Toggle reverse")
-			Drive_Item(fmt.tprintf("insp.anim%d.reverse", i))
-			UI_PropLabel("FPS")
-			if imgui.DragFloat("##afps", &anim.fps, 0.2, 0, 120, fmt.ctprintf("player (%.0f)", apn.fps) if anim.fps <= 0 else "%.0f") do e.AnimationPlayerNode_SetAnimationIndex(apn, apn.animationIndex)
-			undo_on_activate(state, "Edit FPS")
-			Drive_Item(fmt.tprintf("insp.anim%d.fps", i))
-			UI_Tooltip("This animation's frames per second (0: the player's)")
-			UI_PropLabel("Range")
-			rng := [2]c.int{c.int(anim.startFrame + 1), c.int(anim.endFrame + 1)}
-			if imgui.DragInt2("##range_all", &rng, 0.1, 1, c.int(max(e.Animation_SourceCount(anim), 1))) do e.Animation_SetRange(anim, int(rng.x) - 1, int(rng.y) - 1)
-			undo_on_activate(state, "Edit range")
-			UI_Tooltip(fmt.tprintf("First and last of the %d frames played", e.Animation_SourceCount(anim)))
-			if anim.renderFrame == e.SSA_RenderFrame {
-				ssa := cast(^e.SpriteSheetAnimation)anim
-				UI_PropLabel("Grid")
-				grid := [2]c.int{c.int(ssa.grid.x), c.int(ssa.grid.y)}
-				if imgui.DragInt2("##grid", &grid, 0.1, 1, 64) do ssa.grid = {int(grid.x), int(grid.y)}
-				undo_on_activate(state, "Edit grid")
-				if len(ssa.cells) > 0 {
-					UI_PropLabel("Cells")
-					UI_DimText(fmt.tprintf("%d picked (Sprite Sheet Slicer, timeline)", len(ssa.cells)))
-				}
-				UI_PropLabel("Margin")
-				m := [2]c.int{c.int(ssa.margin.x), c.int(ssa.margin.y)}
-				if imgui.DragInt2("##margin", &m, 0.1, 0, 512) do ssa.margin = {int(m.x), int(m.y)}
-				undo_on_activate(state, "Edit margin")
-				UI_PropLabel("Spacing")
-				sp := [2]c.int{c.int(ssa.spacing.x), c.int(ssa.spacing.y)}
-				if imgui.DragInt2("##spacing", &sp, 0.1, 0, 512) do ssa.spacing = {int(sp.x), int(sp.y)}
-				undo_on_activate(state, "Edit spacing")
-			}
-			UI_EndProps()
-		}
-		imgui.PopID()
-	}
-	if remove >= 0 {
-		Editor_RecordUndo(state, "Remove animation")
-		e.AnimationPlayerNode_RemoveAnimation(apn, remove)
-		apn.animationIndex = clamp(apn.animationIndex, 0, max(0, len(apn.animations) - 1))
-	}
-
-	half := (imgui.GetContentRegionAvail().x - UI_SPACE) * 0.5
-	imgui.SetNextItemWidth(half)
-	if imgui.BeginCombo("##addframes", fmt.ctprintf("%s  Frames from folder", ICON_FA_PLUS)) {
-		for d in Editor_ListProjectDirs(state, "textures") {
-			if imgui.Selectable(strings.clone_to_cstring(d, context.temp_allocator)) {
-				Editor_RecordUndo(state, "Add animation")
-				paths := make([dynamic]string, context.temp_allocator)
-				for f in Editor_ListProjectFiles(state, d, {".png"}) do append(&paths, e.Project_ResolveAssetPath(ctx, f))
-				e.AnimationPlayerNode_AddFrameAnimation(apn, rm, filepath.base(d), paths[:], true)
-			}
-			Drive_Item(fmt.tprintf("pick:%s", d))
-		}
-		imgui.EndCombo()
-	}
-	Drive_Item("insp.anim.add-frames")
-	imgui.SameLine(0, UI_SPACE)
-	imgui.SetNextItemWidth(half)
-	if imgui.BeginCombo("##addsheet", fmt.ctprintf("%s  Sprite sheet", ICON_FA_PLUS)) {
-		for f in Editor_ListProjectFiles(state, "textures", {".png"}) {
-			if imgui.Selectable(strings.clone_to_cstring(f, context.temp_allocator)) {
-				Editor_RecordUndo(state, "Add animation")
-				e.AnimationPlayerNode_AddSheetAnimation(apn, rm, filepath.stem(f), e.Project_ResolveAssetPath(ctx, f), {4, 1}, 0, 3, true)
-			}
-			Drive_Item(fmt.tprintf("pick:%s", f))
-		}
-		imgui.EndCombo()
-	}
-	Drive_Item("insp.anim.add-sheet")
 	if UI_Button(fmt.tprintf("%s  Slice a Sprite Sheet...", ICON_FA_TABLE_CELLS), "insp.anim.slicer", {-1, 0}) do Slicer_Open(state, "")
 	UI_Tooltip("Pick cells of a sheet and make animations of them (added to this player)")
 }

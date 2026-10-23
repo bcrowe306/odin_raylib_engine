@@ -1,0 +1,59 @@
+# The AnimationPlayer in the Inspector: only the player's settings (paths
+# shown), its animations live in the Animation tab, whose + menu makes them
+# from a sprite sheet. The bottom panel follows the selection (and goes back);
+# a tab picked by hand stays; the setting turns it off.
+wait 5
+click @hier:PlayerShip
+expect bottom-tab == Console
+key ctrl+a
+type animation player
+key enter
+expect node:AnimationPlayer.type == AnimationPlayerNode
+wait 3
+expect bottom-tab == Animation
+expect item:insp.anim.count == visible
+expect item:insp.anim.add-frames == missing
+hover @insp.anim.fps+-145,0
+wait 5
+expect insp-help-path == fps
+screenshot inspector
+
+# The Animation tab's menu: an animation from a sprite sheet.
+click @anim.new-from
+hover @anim.new-sheet
+wait 3
+click @pick:textures/Asteroid_2.png
+expect anim-names == [Asteroid_2]
+expect anim-info contains frames=4
+screenshot sheet_animation
+
+# Something else selected: back to the Console; the player again: Animation.
+click @hier:Asteroid_Alpha
+expect bottom-tab == Console
+click @hier:PlayerShip/AnimationPlayer
+expect bottom-tab == Animation
+click @hier:StarfieldEmitter
+expect bottom-tab == Particles
+click @hier:Asteroid_Alpha
+expect bottom-tab == Console
+
+# A tab picked by hand stays.
+click @hier:StarfieldEmitter
+expect bottom-tab == Particles
+click @bottom:profiler
+wait 2
+click @hier:Asteroid_Alpha
+wait 2
+expect bottom-tab == Profiler
+
+# Settings > General > Basic: off.
+click @toolbar.settings
+click @settings.tab:general
+click @settings.page:Basic
+click @settings.auto-bottom-panel
+click @settings.save
+wait 2
+expect file:.editor_settings.ini contains auto_bottom_panel = false
+click @hier:StarfieldEmitter
+wait 2
+expect bottom-tab == Profiler

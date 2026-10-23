@@ -82,9 +82,38 @@ Node_BaseProperty :: proc(node: ^Node, name: string) -> (Node_Property, bool) {
 	case "pauseMode": p.kind, p.ptr, p.type = .Enum, &node.pauseMode, type_info_of(Pause_Mode)
 	case "paused":   p.kind, p.ptr, p.type = .Bool, &node.paused, type_info_of(bool)
 	case "enabled":  p.kind, p.ptr, p.type = .Bool, &node.enabled, type_info_of(bool)
-	case: return {}, false
+	case: return node_type_property(node, name)
 	}
 	return p, true
+}
+
+// node_type_property: settings a node type shows in its own Inspector rows
+// (not reflected, saved by the type): AnimationPlayer fps / defaultAnimation.
+@(private = "file")
+node_type_property :: proc(node: ^Node, name: string) -> (Node_Property, bool) {
+	if node.typeId == AnimationPlayerNode {
+		apn := cast(^AnimationPlayerNode)node
+		p := Node_Property{name = name, owner = "AnimationPlayerNode"}
+		switch name {
+		case "fps":
+			p.kind, p.ptr, p.type = .Float, &apn.fps, type_info_of(f32)
+			p.min, p.max, p.has_range = 1, 120, true
+			return p, true
+		case "defaultAnimation":
+			p.kind, p.ptr, p.type = .String, &apn.defaultAnimation, type_info_of(string)
+			return p, true
+		}
+	}
+	return {}, false
+}
+
+// Node_PropertyChanged applies a property written by path (set_property)
+// that needs more than the field: an AnimationPlayer's fps retimes it.
+Node_PropertyChanged :: proc(node: ^Node, name: string) {
+	if node.typeId == AnimationPlayerNode && name == "fps" {
+		apn := cast(^AnimationPlayerNode)node
+		AnimationPlayerNode_SetFPS(apn, apn.fps)
+	}
 }
 
 @(private = "file")

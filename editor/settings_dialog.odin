@@ -252,6 +252,7 @@ settings_general :: proc(state: ^EditorState, h: f32) {
 				Drive_Item("settings.autosave")
 				UI_Tooltip("Save modified scenes and scripts every N minutes (0 = off)")
 				check("settings.confirm-quit", "Ask Before Quitting", &s.confirmQuit, "Ask about unsaved scenes and scripts when quitting")
+				check("settings.auto-bottom-panel", "Bottom Panel Follows Selection", &s.autoBottomPanel, "Selecting an AnimationPlayer, particle emitter or LDtk level shows its tab in the bottom panel; selecting something else goes back to the tab you had")
 				UI_EndProps()
 			}
 		case 1:

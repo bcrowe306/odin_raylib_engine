@@ -135,7 +135,7 @@ multi_end :: proc(m: ^Multi_Edit) {
 
 // node_field: a Node base field as a property (for the Transform section).
 node_field :: proc(node: ^e.Node, ptr: rawptr, name: string, kind: e.Property_Kind, T: typeid) -> e.Node_Property {
-	return {name = name, kind = kind, ptr = ptr, type = type_info_of(T)}
+	return {name = name, kind = kind, ptr = ptr, type = type_info_of(T), owner = "Node"} // base Node fields (help: Node.<name>)
 }
 
 // mixed_push / mixed_pop: a checkbox shows a dash.

@@ -2846,6 +2846,7 @@ lua_node_set_property :: proc "c" (L: ^lua.State) -> c.int {
 	case .String:
 		if s := lua.tostring(L, 3); s != nil do Property_SetString(node, p, string(s))
 	}
+	Node_PropertyChanged(node, p.name)
 	return 0
 }
 

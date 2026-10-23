@@ -28,6 +28,7 @@ Editor_Settings :: struct {
 	confirmQuit:      bool,
 	showWelcome:      bool, // the Welcome window at startup
 	showTabBars:      bool, // View > Show Tab Bars: every docked window keeps its tab
+	autoBottomPanel:  bool, // the bottom panel shows the selected node's tool tab
 	// Code Editor
 	codeFontSize:     f32,
 	tabWidth:         int,
@@ -56,6 +57,7 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 	showGrid        = true,
 	confirmQuit     = true,
 	showWelcome     = true,
+	autoBottomPanel = true,
 	codeFontSize    = CODE_FONT_SIZE,
 	tabWidth        = 4,
 	insertSpaces    = true,
@@ -234,6 +236,7 @@ settings_from_ini :: proc(text: string) {
 	s.confirmQuit = b(m, "general", "confirm_quit", s.confirmQuit)
 	s.showWelcome = b(m, "general", "show_welcome", s.showWelcome)
 	s.showTabBars = b(m, "general", "show_tab_bars", s.showTabBars)
+	s.autoBottomPanel = b(m, "general", "auto_bottom_panel", s.autoBottomPanel)
 	s.codeFontSize = f(m, "code", "font_size", s.codeFontSize)
 	s.tabWidth = int(f(m, "code", "tab_width", f32(s.tabWidth)))
 	s.insertSpaces = b(m, "code", "insert_spaces", s.insertSpaces)
@@ -320,7 +323,7 @@ Editor_SaveSettings :: proc() -> bool {
 	strings.write_string(&sb, "; Ore editor settings (Settings in the editor writes this file)\n\n[general]\n")
 	fmt.sbprintf(&sb, "ui_scale = %.2f\nautosave_minutes = %d\ngrid_size = %.0f\n", s.uiScale, s.autosaveMinutes, s.gridSize)
 	fmt.sbprintf(&sb, "snap_to_grid = %t\nshow_grid = %t\nconfirm_quit = %t\nshow_welcome = %t\n", s.snapToGrid, s.showGrid, s.confirmQuit, s.showWelcome)
-	fmt.sbprintf(&sb, "show_tab_bars = %t\n", s.showTabBars)
+	fmt.sbprintf(&sb, "show_tab_bars = %t\nauto_bottom_panel = %t\n", s.showTabBars, s.autoBottomPanel)
 	strings.write_string(&sb, "\n[code]\n")
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
 	fmt.sbprintf(&sb, "auto_close_pairs = %t\nformat_on_save = %t\nlsp_enabled = %t\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)

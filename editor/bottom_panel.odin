@@ -13,67 +13,109 @@ import imgui "lib/imgui"
 
 consoleFilterBuf: [128]u8
 animTabRequest := false // select the Animation tab next frame
+bottomTabRequest: Maybe(BottomTab) // select this tab next frame
+
+// Following the selection (Settings > General: Bottom Panel Follows
+// Selection): an AnimationPlayer shows the Animation tab, a particle emitter
+// Particles, an LDtk level LDtk; selecting something else returns to the tab
+// shown before. Picking a tab by hand stops the return.
+@(private = "file")
+follow: struct {
+	lastSel: ^e.Node,
+	active:  bool,      // the shown tab was picked for the selection
+	tab:     BottomTab, // that tab
+	prev:    BottomTab, // the tab to go back to
+}
+
+// bottom_tab_for: the tool tab for a node (false: none).
+bottom_tab_for :: proc(node: ^e.Node) -> (BottomTab, bool) {
+	if node == nil do return {}, false
+	switch node.typeId {
+	case e.AnimationPlayerNode: return .Animation, true
+	case e.ParticleEmitterNode: return .Particles, true
+	case e.LdtkLevelNode:       return .Ldtk, true
+	}
+	return {}, false
+}
+
+@(private = "file")
+bottom_follow_selection :: proc(state: ^EditorState) {
+	sel := state.selectedNode
+	if sel == follow.lastSel do return
+	follow.lastSel = sel
+	if !GlobalSettings.autoBottomPanel do return
+	if want, ok := bottom_tab_for(sel); ok {
+		if state.bottomTab == want && !follow.active do return // already there by hand
+		if !follow.active do follow.prev = state.bottomTab
+		follow.active, follow.tab = true, want
+		bottomTabRequest = want
+	} else if follow.active {
+		follow.active = false
+		bottomTabRequest = follow.prev
+	}
+}
+
+// BottomPanel_Tab: the tab shown (drives).
+BottomPanel_Tab :: proc(state: ^EditorState) -> BottomTab {return state.bottomTab}
 consoleShow: [LogLevel]bool = {.Info = true, .Warn = true, .Error = true}
 
 BottomPanel_Render :: proc(state: ^EditorState) {
 	animTimelineFocused = false // set again by the Animation tab when it has focus
 	defer imgui.End()
 	if !imgui.Begin("Console###BottomPanelWindow") do return
+	bottom_follow_selection(state)
+	// Tab requests (the old per-tab flags too).
+	if animTabRequest {bottomTabRequest = .Animation; animTabRequest = false}
+	if particleTabRequest {bottomTabRequest = .Particles; particleTabRequest = false}
+	if ldtkTabRequest {bottomTabRequest = .Ldtk; ldtkTabRequest = false}
+	req, hasReq := bottomTabRequest.?
+	bottomTabRequest = nil
+	flags :: proc(t: BottomTab, req: BottomTab, has: bool) -> imgui.TabItemFlags {return {.SetSelected} if has && req == t else {}}
 	if imgui.BeginTabBar("##BottomPanelTabs", {}) {
 		counts: [LogLevel]int
 		for l in state.logs do counts[l.level] += 1
 		label := fmt.ctprintf("%s  Console###ConsoleTab", ICON_FA_TERMINAL)
 		if counts[.Error] > 0 do label = fmt.ctprintf("%s  Console  %s %d###ConsoleTab", ICON_FA_TERMINAL, ICON_FA_CIRCLE_XMARK, counts[.Error])
-		if imgui.BeginTabItem(label) {
+		if imgui.BeginTabItem(label, nil, flags(.Console, req, hasReq)) {
 			state.bottomTab = .Console
 			BottomPanel_RenderConsole(state, counts)
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:console")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Profiler###ProfTab", ICON_FA_CHART_LINE)) {
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Profiler###ProfTab", ICON_FA_CHART_LINE), nil, flags(.Profiler, req, hasReq)) {
 			state.bottomTab = .Profiler
 			BottomPanel_RenderProfiler(state)
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:profiler")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Game###GameTab", ICON_FA_GAMEPAD if RemoteGame_Connected() else ICON_FA_PLAY)) {
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Game###GameTab", ICON_FA_GAMEPAD if RemoteGame_Connected() else ICON_FA_PLAY), nil, flags(.Game, req, hasReq)) {
+			state.bottomTab = .Game
 			GamePanel_Render(state)
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:game")
-		animFlags: imgui.TabItemFlags = {}
-		if animTabRequest {
-			animFlags += {.SetSelected}
-			animTabRequest = false
-		}
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Animation###AnimTab", ICON_FA_FILM), nil, animFlags) {
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Animation###AnimTab", ICON_FA_FILM), nil, flags(.Animation, req, hasReq)) {
 			state.bottomTab = .Animation
 			AnimationPanel_Render(state)
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:animation")
-		partFlags: imgui.TabItemFlags = {}
-		if particleTabRequest {
-			partFlags += {.SetSelected}
-			particleTabRequest = false
-		}
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Particles###ParticlesTab", ICON_FA_WAND_MAGIC_SPARKLES), nil, partFlags) {
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Particles###ParticlesTab", ICON_FA_WAND_MAGIC_SPARKLES), nil, flags(.Particles, req, hasReq)) {
+			state.bottomTab = .Particles
 			ParticlePanel_Render(state)
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:particles")
-		ldtkFlags: imgui.TabItemFlags = {}
-		if ldtkTabRequest {
-			ldtkFlags += {.SetSelected}
-			ldtkTabRequest = false
-		}
-		if imgui.BeginTabItem(fmt.ctprintf("%s  LDtk###LdtkTab", ICON_FA_TABLE_CELLS), nil, ldtkFlags) {
+		if imgui.BeginTabItem(fmt.ctprintf("%s  LDtk###LdtkTab", ICON_FA_TABLE_CELLS), nil, flags(.Ldtk, req, hasReq)) {
+			state.bottomTab = .Ldtk
 			LdtkPanel_Render(state)
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:ldtk")
 		imgui.EndTabBar()
 	}
+	// A tab picked by hand: no going back when the selection changes.
+	if follow.active && !hasReq && bottomTabRequest == nil && state.bottomTab != follow.tab do follow.active = false
 }
 
 @(private = "file")

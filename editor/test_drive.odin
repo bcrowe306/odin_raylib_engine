@@ -739,6 +739,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return strings.join(parts[:], ",", context.temp_allocator), true
 	case "insp-help": return fmt.tprintf("%s: %s", inspectorHelp.title, inspectorHelp.doc), true
 	case "insp-help-path": return inspectorHelp.path, true
+	case "bottom-tab": return fmt.tprint(BottomPanel_Tab(state)), true
 	}
 	switch q {
 	case "selected":

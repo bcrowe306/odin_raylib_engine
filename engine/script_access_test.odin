@@ -74,4 +74,23 @@ r9 = pcall(function() Scene.find_node("Plain"):set_property("script.health", 1) 
 	testing.expect(t, boolean(L, "r7") && boolean(L, "r8"), "no script: nil")
 	testing.expect(t, !boolean(L, "r9"), "set on a node without a script is an error")
 	testing.expect_value(t, num(L, "r10"), 41) // the Transform rows' paths
+
+	// An AnimationPlayer's own settings by path.
+	apn := cast(^AnimationPlayerNode)Node_CreateByTypeName(scene, "AnimationPlayerNode")
+	apn.name = "Player"
+	AnimationPlayerNode_AddFrameAnimation(apn, nil, "walk", nil)
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	ok = lua.L_dostring(L, `
+local p = Scene.find_node("Player")
+p:set_property("fps", 24)
+p:set_property("defaultAnimation", "walk")
+r11 = p:get_property("fps")
+r12 = p:get_property("defaultAnimation")
+`)
+	testing.expect_value(t, ok, i32(0))
+	testing.expect_value(t, num(L, "r11"), 24)
+	testing.expect_value(t, apn.ticker.framesPerSecond, f32(24)) // retimed
+	lua.getglobal(L, "r12")
+	testing.expect_value(t, string(lua.tostring(L, -1)), "walk")
+	lua.pop(L, 1)
 }

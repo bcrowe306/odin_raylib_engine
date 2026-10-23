@@ -621,7 +621,7 @@ rather than re-pathing every frame.
   write any Inspector property by its path - the help pane's `path = "..."`
   (hover the property; or drag its name into the script). Every node has
   `position`, `rotation`, `scale`, `layer`, `pauseMode`, `paused` and
-  `enabled`.
+  `enabled`; an AnimationPlayer also `fps` and `defaultAnimation`.
 - **Another node's script**: `"script.<name>"` reads / writes a field of
   the node's script, live (`enemy:set_property("script.health", 50)`), and
   `node:get_script()` returns that script's `self` - its fields and methods:

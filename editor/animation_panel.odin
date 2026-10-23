@@ -2,6 +2,7 @@ package editor
 
 import "core:c"
 import "core:fmt"
+import "core:path/filepath"
 import "core:math"
 import "core:slice"
 import "core:strings"
@@ -281,6 +282,51 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		name := fmt.tprintf("anim_%d", len(apn.animations) + 1)
 		e.AnimationPlayerNode_AddFrameAnimation(apn, &state.game.resourceManager, name, nil)
 		e.AnimationPlayerNode_SetAnimationIndex(apn, len(apn.animations) - 1)
+	}
+	// More ways to make one: a folder of frames, a sprite sheet, the slicer.
+	imgui.SameLine(0, 0)
+	if UI_IconButton(ICON_FA_CHEVRON_DOWN, "anim.new-from", "New animation from a folder of frames or a sprite sheet", size = 20) do imgui.OpenPopup("##anim_new_from")
+	if imgui.BeginPopup("##anim_new_from") {
+		rm := &state.game.resourceManager
+		gctx := &state.game.gameContext
+		added := false
+		if imgui.BeginMenu(fmt.ctprintf("%s  From a Folder of Frames", ICON_FA_FOLDER)) {
+			for d in Editor_ListProjectDirs(state, "textures") {
+				if imgui.MenuItem(strings.clone_to_cstring(d, context.temp_allocator)) {
+					Editor_RecordUndo(state, "Add animation")
+					paths := make([dynamic]string, context.temp_allocator)
+					for f in Editor_ListProjectFiles(state, d, {".png"}) do append(&paths, e.Project_ResolveAssetPath(gctx, f))
+					name := e.AnimationPlayerNode_UniqueAnimationName(apn, filepath.base(d))
+					e.AnimationPlayerNode_AddFrameAnimation(apn, rm, name, paths[:], true)
+					added = true
+				}
+				Drive_Item(fmt.tprintf("pick:%s", d))
+			}
+			imgui.EndMenu()
+		}
+		Drive_Item("anim.new-folder")
+		if imgui.BeginMenu(fmt.ctprintf("%s  From a Sprite Sheet", ICON_FA_TABLE_CELLS)) {
+			for f in Editor_ListProjectFiles(state, "textures", {".png"}) {
+				if imgui.MenuItem(strings.clone_to_cstring(f, context.temp_allocator)) {
+					Editor_RecordUndo(state, "Add animation")
+					name := e.AnimationPlayerNode_UniqueAnimationName(apn, filepath.stem(f))
+					e.AnimationPlayerNode_AddSheetAnimation(apn, rm, name, e.Project_ResolveAssetPath(gctx, f), {4, 1}, 0, 3, true)
+					added = true
+				}
+				Drive_Item(fmt.tprintf("pick:%s", f))
+			}
+			imgui.EndMenu()
+		}
+		Drive_Item("anim.new-sheet")
+		imgui.Separator()
+		if imgui.MenuItem(fmt.ctprintf("%s  Slice a Sprite Sheet...", ICON_FA_SCISSORS)) do Slicer_Open(state, "")
+		Drive_Item("anim.new-slicer")
+		if added {
+			preview_restore(state)
+			e.AnimationPlayerNode_SetAnimationIndex(apn, len(apn.animations) - 1)
+			if a := e.AnimationPlayerNode_GetAnimation(apn); a != nil do apn.currentFrame = a.startFrame
+		}
+		imgui.EndPopup()
 	}
 	anim := e.AnimationPlayerNode_GetAnimation(apn)
 	if anim == nil {

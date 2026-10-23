@@ -109,6 +109,12 @@ layout of your own: arrange the panels, **Save Workspace As...**, and pick
 it from the same menu later (saved in `~/.config/ore_editor/workspaces/`;
 **Delete Workspace** removes one). **Reset Layout** returns to Default.
 
+The bottom panel **follows the selection**: selecting an AnimationPlayer
+shows the Animation tab, a particle emitter Particles, an LDtk level LDtk;
+selecting something else goes back to the tab you had (a tab you pick by
+hand stays). Turn it off in Settings > General > Basic (**Bottom Panel
+Follows Selection**; `auto_bottom_panel` in settings.ini).
+
 A docked window alone in its space hides its tab (the panels have their own
 headers), so after closing a window docked next to another, the one left
 loses its tab. **View > Show Tab Bars** gives every docked window its tab
@@ -299,8 +305,12 @@ wheel scrolls (Shift: sideways) and middle-drag pans when zoomed in.
 
 ### Animation timeline
 
-The bottom panel's **Animation** tab edits the selected AnimationPlayer.
-Next to the animation picker: **+** adds an animation, the **pen** renames
+The bottom panel's **Animation** tab edits the selected AnimationPlayer's
+animations; the Inspector shows only the player's own settings - Current,
+**Default** (`defaultAnimation`), **FPS** (`fps`), Preview, Reverse,
+Autoplay - with their script paths. Next to the animation picker: **+** adds
+an empty animation, its **▾** makes one from a folder of frames or a sprite
+sheet (or opens the slicer), the **pen** renames
 it (names are unique; the default animation and the states of a State
 Machine driving this player follow the new name), **Duplicate** copies it
 (frames, range, settings and tracks) right after itself as `<name>_copy`,

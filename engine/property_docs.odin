@@ -81,6 +81,15 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	// --- Animation ---
 	{"AnimationPlayerNode.reverse", "Play the animation backwards."},
 	{"AnimationPlayerNode.autoplay", "Start playing the current animation when the node becomes ready."},
+	{"Node.position", "Position relative to the parent, in pixels (+y is down)."},
+	{"Node.rotation", "Rotation relative to the parent, in degrees (clockwise)."},
+	{"Node.scale", "Size multiplier relative to the parent (1, 1 = as is; negative flips)."},
+	{"Node.layer", "Drawing layer: higher layers draw over lower ones (Layer8 is for UI)."},
+	{"Node.pauseMode", "Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e.g. pause menus)."},
+	{"Node.paused", "Pauses this node and its children (except Always ones) while the game runs."},
+	{"Node.enabled", "Disabled nodes (and their children) neither update nor draw."},
+	{"AnimationPlayerNode.fps", "Frames per second of the animations that don't set their own (the Animation tab's FPS box)."},
+	{"AnimationPlayerNode.defaultAnimation", "The animation selected (and autoplayed) when the scene loads; empty = the one saved as current."},
 
 	// --- Camera ---
 	{"CameraNode.isCurrent", "The camera the game renders through (one per scene)."},

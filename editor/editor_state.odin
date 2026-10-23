@@ -37,6 +37,9 @@ BottomTab :: enum {
 	Output,
 	Profiler,
 	Animation,
+	Game,
+	Particles,
+	Ldtk,
 }
 
 ViewportTab :: enum {
