@@ -140,7 +140,9 @@ standalone game), **Settings** (Cmd+,) and Quit.
   preview live; Save keeps them, Cancel goes back.
 - **Code Editor** — font size, tab width, spaces vs tabs, auto-closing
   brackets, format on save, the language server and its path.
-- **Project** — General (name, version, startup scene, icon, physics, scenes),
+- **Project** — General (name, version, startup scene, icon, physics -
+  gravity and **Show Colliders**: whether the running game draws collision
+  shapes, joints and areas, on by default; the viewport always can - scenes),
   **Input** (named actions and their key/mouse/gamepad bindings — scripts
   call `Input.is_action_down("jump")`), **Video** (window, virtual
   resolution, FPS, fullscreen, vsync, resizable, MSAA, high-DPI), **Audio**

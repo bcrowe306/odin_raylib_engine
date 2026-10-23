@@ -1,6 +1,7 @@
 # Physics extras: a named collision layer (Project Settings > Physics) shown
 # in a shape's layer list, a one-way static body, and a Joint between two
-# bodies (pickers, only the active type's parameters), saved.
+# bodies (pickers, only the active type's parameters), saved; Show Colliders
+# off in Project Settings.
 wait 5
 click @toolbar.settings
 click @settings.page:General
@@ -8,8 +9,11 @@ click @section:Collision Layers
 click @settings.layer:2
 type Enemies
 key enter
+# Show Colliders off: the running game doesn't draw them.
+click @settings.debug-draw
 click @settings.save
 expect file:project.json contains "layers": ["", "Enemies"]
+expect file:project.json contains "debug_draw": false
 
 click @hier.add
 key ctrl+a

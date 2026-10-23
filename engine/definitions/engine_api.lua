@@ -1730,6 +1730,15 @@ function PhysicsModule.get_gravity() end
 ---@param gy number
 function PhysicsModule.set_gravity(gx, gy) end
 
+---Draws collision shapes, joints and areas while the game runs (debugging);
+---the project's Show Colliders setting (physics.debug_draw) sets the start.
+---@param on boolean
+function PhysicsModule.set_debug_draw(on) end
+
+---Whether colliders are drawn while the game runs.
+---@return boolean
+function PhysicsModule.get_debug_draw() end
+
 ---Checks if physics simulation is paused.
 ---@return boolean
 function PhysicsModule.is_paused() end

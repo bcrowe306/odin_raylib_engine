@@ -29,6 +29,7 @@ ProjectConfig :: struct {
 	virtualHeight: f32,
 	targetFPS:     int,
 	gravity:       [2]f32,
+	debugDraw:     bool, // the running game draws colliders, joints and areas (physics.debug_draw)
 	collisionLayers: [16]string, // collision layer names ("" = unnamed; physics_extras.odin)
 	scenes:        [dynamic]string,
 	icon:          string, // project-relative PNG: the game window's icon (and the exported app's)
@@ -259,6 +260,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		virtualHeight = 720.0,
 		targetFPS     = 60,
 		gravity       = {0, 980.0},
+		debugDraw     = true,
 		scenes        = make([dynamic]string, allocator),
 		vsync         = true,
 		resizable     = true,
@@ -359,6 +361,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 	// Physics settings
 	if physObj, ok := json_get_obj(rootObj, "physics"); ok {
 		cfg.gravity = json_get_vec2(physObj, "gravity", cfg.gravity)
+		if v, has := physObj["debug_draw"].(json.Boolean); has do cfg.debugDraw = bool(v)
 		if arr, has := json_get_arr(physObj, "layers"); has {
 			for v, i in arr {
 				if i >= 16 do break
@@ -413,7 +416,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	fmt.sbprintf(&sb, "  \"video\": {{\"fullscreen\": %t, \"vsync\": %t, \"resizable\": %t, \"msaa\": %t, \"high_dpi\": %t}},\n", cfg.fullscreen, cfg.vsync, cfg.resizable, cfg.msaa, cfg.highDPI)
 	fmt.sbprintf(&sb, "  \"audio\": {{\"master_volume\": %.2f, \"music_volume\": %.2f, \"sfx_volume\": %.2f}},\n", cfg.masterVolume, cfg.musicVolume, cfg.sfxVolume)
 	strings.write_string(&sb, "  \"physics\": {\n")
-	fmt.sbprintf(&sb, "    \"gravity\": [%.2f, %.2f]", cfg.gravity.x, cfg.gravity.y)
+	fmt.sbprintf(&sb, "    \"gravity\": [%.2f, %.2f],\n    \"debug_draw\": %t", cfg.gravity.x, cfg.gravity.y, cfg.debugDraw)
 	last := -1
 	for n, i in cfg.collisionLayers do if n != "" do last = i
 	if last >= 0 {
@@ -542,6 +545,8 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	}
 
 	if activate {
+		// The game (not the editor, which shows colliders itself).
+		game.physicsWorld.drawPhysicsDebug = cfg.debugDraw
 		ProcessSceneChange(&game.sceneManager, &game.gameContext)
 	}
 	return true

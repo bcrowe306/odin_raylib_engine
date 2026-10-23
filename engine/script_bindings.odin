@@ -1956,6 +1956,25 @@ lua_physics_set_gravity :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// Physics.set_debug_draw(on) / get_debug_draw(): colliders, joints and
+// areas drawn while the game runs (project setting physics.debug_draw).
+@(private="file")
+lua_physics_set_debug_draw :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil do return 0
+	sm.game.physicsWorld.drawPhysicsDebug = bool(lua.toboolean(L, 1))
+	return 0
+}
+
+@(private="file")
+lua_physics_get_debug_draw :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := get_script_manager(L)
+	lua.pushboolean(L, b32(sm != nil && sm.game != nil && sm.game.physicsWorld.drawPhysicsDebug))
+	return 1
+}
+
 @(private="file")
 lua_physics_is_paused :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -4160,6 +4179,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "get_gravity")
 	lua.pushcfunction(L, lua_physics_set_gravity)
 	lua.setfield(L, -2, "set_gravity")
+	lua.pushcfunction(L, lua_physics_set_debug_draw)
+	lua.setfield(L, -2, "set_debug_draw")
+	lua.pushcfunction(L, lua_physics_get_debug_draw)
+	lua.setfield(L, -2, "get_debug_draw")
 	lua.pushcfunction(L, lua_physics_is_paused)
 	lua.setfield(L, -2, "is_paused")
 	lua.pushcfunction(L, lua_physics_set_paused)

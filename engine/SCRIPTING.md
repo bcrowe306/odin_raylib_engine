@@ -934,6 +934,7 @@ local cx, cy, cw, ch = Camera.get_visible_world_bounds()
 Physics.set_gravity(0.0, 500.0)
 local gx, gy = Physics.get_gravity()
 Physics.set_paused(false)
+Physics.set_debug_draw(false)   -- hide colliders / joints / areas (Project Settings > Physics: Show Colliders)
 
 -- Cast ray across world coordinates
 local hit = Physics.raycast(100.0, 100.0, 100.0, 600.0)

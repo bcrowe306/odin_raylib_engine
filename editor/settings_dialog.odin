@@ -466,6 +466,10 @@ project_general :: proc(state: ^EditorState) {
 		if UI_Button("Zero-G", "settings.zero-g") do d.gravity = {0, 0}
 		imgui.SameLine()
 		if UI_Button("Earth (0, 980)", "settings.earth-g") do d.gravity = {0, 980}
+		UI_PropLabel("Show Colliders")
+		imgui.Checkbox("##debug_draw", &d.debugDraw)
+		Drive_Item("settings.debug-draw")
+		UI_Tooltip("Draw collision shapes, joints and areas while the game runs (debugging). The editor's viewport shows them either way; scripts: Physics.set_debug_draw(false)")
 		UI_EndProps()
 	}
 	if UI_SectionHeader("Collision Layers", false) && UI_BeginProps("##layers") {
