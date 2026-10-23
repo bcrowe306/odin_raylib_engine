@@ -231,6 +231,12 @@ inserts code that uses it - a sound `Audio.play_sound(...)`, a scene
 `Scene.change_scene(...)`, a texture `self.node:set_texture(...)` (plain:
 its path; Cmd: an exported property).
 
+**Cmd+click a node path** in a script - the string in `self.node:get_node("...")`,
+`get_child("...")` or `Scene.find_node("...")` - to select that node (and
+centre the view on it); Cmd+click anything else goes to its definition. A
+script tab's right-click menu has **Find Usages of This Script** (the
+scenes and components that use it).
+
 **Drag a property's name into a script** (the Code tab) to insert a read:
 `self.node:get_property("rotation")`. Hold **Shift** when dropping for a
 write with the current value: `self.node:set_property("rotation", 45)`.

@@ -83,7 +83,7 @@ Drag and drop, editor ↔ code
 - [x] 8.9 Drop a node onto a method: a `connect` to one of its events
 - [x] 8.10 Node-reference exported properties (`type = "node"`, Inspector picker); dropping a node on the `properties` table adds one
 - [x] 8.11 Rename-safe references: renaming / moving a node offers to update `get_node` / `find_node` in scripts
-- [ ] 8.12 Code → scene: Cmd+click a `get_node("...")` path selects the node; find a script's usages
+- [x] 8.12 Code → scene: Cmd+click a `get_node("...")` path selects the node; find a script's usages
 
 Exported properties
 - [ ] 8.13 More types: enum, range/slider, array, curve, gradient, colour alpha; `group` / `header`, `tooltip`

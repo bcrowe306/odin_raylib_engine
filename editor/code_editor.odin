@@ -618,6 +618,9 @@ code_tabs :: proc(state: ^EditorState) {
 				Prompt_Open(.SaveScriptAs, doc.rel)
 			}
 			imgui.Separator()
+			if imgui.MenuItem(fmt.ctprintf("%s  Find Usages of This Script", ICON_FA_MAGNIFYING_GLASS)) do Asset_ShowUsages(state, doc.rel, false)
+			Drive_Item("ctx:script-usages")
+			imgui.Separator()
 			if imgui.MenuItem(fmt.ctprintf("%s  Close", ICON_FA_XMARK), "Cmd+W") do closeIdx = i
 			Drive_Item("ctx:close-tab")
 			if imgui.MenuItem("Close Others", nil, false, len(cm.docs) > 1) do cm.closeOthers = i
@@ -778,7 +781,9 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 			cm.completion.open = false
 			cm.sigOpen = false
 			cm.cursorMoved = time.tick_now()
-			if code_primary_down() && clicks == 1 do code_lsp_goto_definition(doc)
+			// Cmd+click: a node path (get_node / find_node / get_child) selects
+			// the node; anything else goes to its definition.
+			if code_primary_down() && clicks == 1 && !Code_GotoNode(state, doc, p) do code_lsp_goto_definition(doc)
 		}
 	}
 	if active && imgui.IsMouseDragging(.Left) && imgui.GetMouseClickedCount(.Left) <= 1 && !io.KeyAlt {

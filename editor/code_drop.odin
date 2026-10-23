@@ -286,6 +286,44 @@ code_script_owner :: proc(state: ^EditorState, doc: ^Code_Doc) -> ^e.Node {
 	return nil
 }
 
+// Code_GotoNode: Cmd+click on the string of a get_node / get_child /
+// find_node call selects that node (true when the click was on one).
+Code_GotoNode :: proc(state: ^EditorState, doc: ^Code_Doc, p: buf.Position) -> bool {
+	if state.activeScene == nil || p.line >= buf.buffer_line_count(&doc.buffer) do return false
+	line := buf.buffer_line_str(&doc.buffer, p.line)
+	// The string literal around the click.
+	open := -1
+	for i := min(p.col, len(line)) - 1; i >= 0; i -= 1 do if line[i] == '"' || line[i] == '\'' {open = i; break}
+	if open < 0 do return false
+	close := strings.index_byte(line[open + 1:], line[open])
+	if close < 0 || open + 1 + close < p.col do return false
+	lit := line[open + 1:open + 1 + close]
+	before := strings.trim_right_space(line[:open])
+	mgr := state.activeScene.manager
+	target: ^e.Node
+	switch {
+	case strings.has_suffix(before, "get_node("):
+		owner := code_script_owner(state, doc)
+		if owner == nil do return false
+		target = e.Node_ResolvePath(mgr, owner, lit)
+	case strings.has_suffix(before, "get_child("):
+		owner := code_script_owner(state, doc)
+		if owner == nil do return false
+		for c in e.GetChildrenView(mgr, owner) do if c != nil && c.name == lit {target = c; break}
+	case strings.has_suffix(before, "find_node("):
+		target = e.Scene_FindNodeByName(state.activeScene, lit)
+	case:
+		return false
+	}
+	if target == nil {
+		Editor_Log(state, .Warn, "No node at \"%s\" in this scene", lit)
+		return true
+	}
+	Editor_SelectNode(state, target, false)
+	state.cameraPos = target.globalPosition
+	return true
+}
+
 // code_is_assignment: the line so far is a statement assigning a value
 // (`local x =`, `self.body =`), the drop being its right-hand side.
 @(private = "file")

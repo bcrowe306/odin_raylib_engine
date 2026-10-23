@@ -1,0 +1,36 @@
+# Code -> scene: Cmd+click a get_node path selects that node; Cmd+click a
+# find_node name too; a script tab's Find Usages lists where it's used.
+wait 5
+click @hier:PatrolDroneAlpha
+click @insp.script-attach
+click @pick:scripts/orbiting_drone.lua
+click @insp.script-edit
+wait 5
+click @code.area
+key ctrl+g
+type 17
+key enter
+key end
+key enter
+type local cam = self.node:get_node("../MainCamera")
+key escape
+hold cmd
+click @code.caret+-40,0
+release
+wait 2
+expect selected == MainCamera
+click @code.area
+key end
+key enter
+type local rock = Scene.find_node("Asteroid_Beta")
+key escape
+hold cmd
+click @code.caret+-40,0
+release
+wait 2
+expect selected == Asteroid_Beta
+rclick @code.tab:scripts/orbiting_drone.lua
+click @ctx:script-usages
+wait 3
+expect usages >= 1
+screenshot usages

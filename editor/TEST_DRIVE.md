@@ -59,6 +59,7 @@ exits non-zero if any check fails.
 | `code_drop_node_method.drive` | A node dropped onto a method's line: its events in a menu; the pick adds a connect calling the method to ready(). |
 | `node_ref_property.drive` | A node dropped into the properties table adds a `type = "node"` property, set to it after the save; the Inspector picker re-points it; saved as a path. |
 | `node_refs_rename.drive` | Rename then move a node a script reaches with get_node: the prompt offers the new path each time, Update rewrites it. |
+| `code_goto_node.drive` | Cmd+click a get_node path / a find_node name selects the node; a script tab's Find Usages lists where it's used. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
