@@ -320,6 +320,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 // nodes with pauseMode Always keep running through either.
 Scene_UpdateNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	gamePaused := gameContext != nil && gameContext.game != nil && gameContext.game.treePaused
+	if !gamePaused && gameContext != nil && node == scene.rootNode do Globals_Update(gameContext.scriptManager, deltaTime)
 	update_tree(scene, node, gameContext, deltaTime, gamePaused, .Pausable)
 }
 

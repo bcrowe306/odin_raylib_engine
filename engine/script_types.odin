@@ -88,6 +88,7 @@ ScriptManager :: struct {
 	suspended:        bool,
 	lastHotReloadCheck: time.Tick,
 	hotReload:          bool, // poll script files and reload changed ones
+	globals:            [dynamic]Global_Script, // loaded global scripts (script_globals.odin)
 }
 
 ScriptInstance :: struct {

@@ -85,6 +85,57 @@ set_audio :: proc(state: ^EditorState, n: ^e.Node, rel: string) {
 	}
 }
 
+// Editor_SetScriptGlobal adds a script to the project's global scripts
+// (named after its file: game_state.lua -> GameState) or removes it, saves
+// project.json and reloads the globals.
+Editor_SetScriptGlobal :: proc(state: ^EditorState, rel: string, global: bool) {
+	g := &state.projectConfig.globals
+	for x, i in g {
+		if x.script != rel do continue
+		if global do return
+		Editor_Log(state, .Info, "%s is no longer global (%s)", rel, x.name)
+		delete(x.name)
+		delete(x.script)
+		ordered_remove(g, i)
+		break
+	}
+	if global {
+		name := Globals_DefaultName(rel)
+		append(g, e.Global_Script{strings.clone(name), strings.clone(rel)})
+		Editor_Log(state, .Info, "%s is global: every script can use %s", rel, name)
+	}
+	e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
+	Editor_ReloadGlobals(state)
+}
+
+// Globals_DefaultName: a Lua global name from a script's file name
+// ("scripts/game_state.lua" -> "GameState").
+Globals_DefaultName :: proc(rel: string) -> string {
+	base := strings.trim_suffix(filepath.base(rel), ".lua")
+	sb := strings.builder_make(context.temp_allocator)
+	up := true
+	for r in base {
+		switch r {
+		case 'a' ..= 'z', 'A' ..= 'Z', '0' ..= '9':
+			if strings.builder_len(sb) == 0 && r >= '0' && r <= '9' do strings.write_byte(&sb, '_')
+			strings.write_rune(&sb, r - 32 if up && r >= 'a' && r <= 'z' else r)
+			up = false
+		case:
+			up = true
+		}
+	}
+	return strings.to_string(sb) if strings.builder_len(sb) > 0 else "Global"
+}
+
+// Editor_ReloadGlobals applies the project's global scripts to the editor's
+// Lua state (outside Simulate: they start when it does) and refreshes the
+// generated Lua types.
+Editor_ReloadGlobals :: proc(state: ^EditorState) {
+	Lua_MarkProjectTypesDirty()
+	if state.isSimulating do return
+	e.Globals_Load(&state.game.scriptManager, state.projectConfig.globals[:])
+}
+
 // Asset_ContextMenu draws the actions for one asset (inside a popup).
 Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 	kind := Asset_KindOf(rel)
@@ -122,6 +173,11 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		if menu(ICON_FA_CODE, "Edit Script", "edit-script") do Editor_OpenScript(state, rel)
 		if menu(ICON_FA_PLUS, "Attach to Selected Node", "attach-script", sel != nil && sel != state.activeScene.rootNode) {
 			for n in Editor_SelectionRoots(state) do attach_script(state, n, rel)
+		}
+		if name := Asset_GlobalName(state, rel); name != "" {
+			if menu(ICON_FA_GLOBE, fmt.tprintf("Remove Global (%s)", name), "remove-global") do Editor_SetScriptGlobal(state, rel, false)
+		} else {
+			if menu(ICON_FA_GLOBE, "Make Global", "make-global") do Editor_SetScriptGlobal(state, rel, true)
 		}
 	case .Texture:
 		if menu(ICON_FA_PLUS, "Add Sprite to Scene", "add-sprite", hasScene) do Editor_DropAsset(state, rel, state.cameraPos)

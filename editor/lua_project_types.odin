@@ -27,6 +27,7 @@ import lsp "../odin_editor/lsp"
 //   whose get_script() is that script's class (its fields and methods); a
 //   script's self.node is <Script>Node_, whose get_node completes the paths
 //   from it in its scenes / components, each returning that node's type
+//   global scripts (Project Settings > Globals) as globals
 //   AnimationName, StateMachineParam / State, SaveKey, LocaleKey,
 //   Language, CollisionLayer   names the project uses (animation_play,
 //   sm_*, Save.*, tr / Locale.set, set_collision_layer complete them)
@@ -287,6 +288,15 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	alias(&sb, "AudioPath", "Audio files", list(state, AUDIO_EXTS))
 	alias(&sb, "LevelPath", "LDtk projects", list(state, {".ldtk"}))
 	alias(&sb, "ScriptPath", "Lua scripts", list(state, {".lua"}))
+	// Global scripts: their tables as globals (require infers the fields and
+	// methods from the script itself).
+	if len(state.projectConfig.globals) > 0 {
+		strings.write_string(&sb, "\n-- Global scripts (Project Settings > Globals): the same table in every script.\n")
+		for g in state.projectConfig.globals {
+			if !e.Globals_ValidName(g.name) do continue
+			fmt.sbprintf(&sb, "---Global script %s\n%s = require(%q)\n", g.script, g.name, strings.trim_suffix(g.script, ".lua"))
+		}
+	}
 
 	// LDtk names.
 	entities := make([dynamic]string, context.temp_allocator)

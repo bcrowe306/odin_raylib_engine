@@ -83,6 +83,8 @@ ScriptManager_Destroy :: proc(sm: ^ScriptManager = nil) {
 	if !mgr.isReady do return
 
 	Script_ReleaseAllConnections(mgr)
+	globals_clear(mgr)
+	delete(mgr.globals)
 
 	// Destroy all active instances
 	for len(mgr.instances) > 0 {

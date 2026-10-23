@@ -215,6 +215,7 @@ settings_save :: proc(state: ^EditorState) {
 	state.game.musicVolume = d.musicVolume
 	state.game.sfxVolume = d.sfxVolume
 	e.Input_ApplyActionConfigs(&state.game.input, d.actions[:])
+	Editor_ReloadGlobals(state)
 
 	Editor_Settings_Destroy(&GlobalSettings)
 	GlobalSettings = Editor_Settings_Clone(&st.editor)
@@ -392,7 +393,7 @@ settings_code :: proc(state: ^EditorState, h: f32) {
 
 @(private = "file")
 settings_project :: proc(state: ^EditorState, h: f32) {
-	if imgui.BeginChild("##proj_nav", {170, h}, {}, {}) do nav("project", {"General", "Input", "Video", "Audio", "Export"}, &st.projectPage)
+	if imgui.BeginChild("##proj_nav", {170, h}, {}, {}) do nav("project", {"General", "Input", "Video", "Audio", "Export", "Globals"}, &st.projectPage)
 	imgui.EndChild()
 	imgui.SameLine(0, UI_SPACE * 2)
 	if imgui.BeginChild("##proj_body", {0, h}, {}, {}) {
@@ -402,9 +403,63 @@ settings_project :: proc(state: ^EditorState, h: f32) {
 		case 2: project_video(state)
 		case 3: project_audio(state)
 		case 4: project_export(state)
+		case 5: project_globals(state)
 		}
 	}
 	imgui.EndChild()
+}
+
+// project_globals: global scripts (autoloads) - a name and a script each.
+@(private = "file")
+project_globals :: proc(state: ^EditorState) {
+	d := &st.project
+	UI_SectionHeader("Global Scripts")
+	UI_DimText("Each script is loaded once, before any scene. The table it returns is a Lua global")
+	UI_DimText("with this name in every script, kept across scene changes. Its ready(self) runs")
+	UI_DimText("when the game starts and update(self, dt) every frame.")
+	imgui.Dummy({0, 4})
+	scripts := Editor_ListProjectFiles(state, "", {".lua"})
+	remove := -1
+	if len(d.globals) > 0 && imgui.BeginTable("##globals", 3, imgui.TableFlags_SizingStretchProp) {
+		imgui.TableSetupColumn("Name", {.WidthStretch}, 1)
+		imgui.TableSetupColumn("Script", {.WidthStretch}, 1.6)
+		imgui.TableSetupColumn("", {.WidthFixed}, 30)
+		imgui.TableHeadersRow()
+		for &g, i in d.globals {
+			imgui.PushIDInt(c.int(i))
+			imgui.TableNextRow()
+			imgui.TableNextColumn()
+			text_field(fmt.tprintf("settings.global-name:%d", i), &g.name, "Name")
+			problem := ""
+			if !e.Globals_ValidName(g.name) do problem = "Not a valid Lua name (letters, digits, _)"
+			for o, j in d.globals do if j < i && o.name == g.name do problem = "Another global has this name"
+			if problem != "" {
+				imgui.TextColored(UI_DANGER, fmt.ctprintf("%s  %s", ICON_FA_TRIANGLE_EXCLAMATION, problem))
+				Drive_Item(fmt.tprintf("settings.global-problem:%d", i))
+			}
+			imgui.TableNextColumn()
+			imgui.SetNextItemWidth(-1)
+			if path, ok := asset_picker(fmt.tprintf("settings.global-script:%d", i), g.script, scripts, allowNone = false); ok {
+				delete(g.script)
+				g.script = strings.clone(path)
+			}
+			imgui.TableNextColumn()
+			if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("settings.global-remove:%d", i), "Remove", size = 24) do remove = i
+			imgui.PopID()
+		}
+		imgui.EndTable()
+	}
+	if remove >= 0 {
+		delete(d.globals[remove].name)
+		delete(d.globals[remove].script)
+		ordered_remove(&d.globals, remove)
+	}
+	if UI_Button(fmt.tprintf("%s  Add Global", ICON_FA_PLUS), "settings.global-add") {
+		script := scripts[0] if len(scripts) > 0 else ""
+		for sc in scripts do if e.Globals_NameOf(d.globals[:], sc) == "" {script = sc; break}
+		append(&d.globals, e.Global_Script{strings.clone(Globals_DefaultName(script) if script != "" else "Global"), strings.clone(script)})
+	}
+	UI_Tooltip("Or right-click a script in the Assets panel > Make Global")
 }
 
 @(private = "file")

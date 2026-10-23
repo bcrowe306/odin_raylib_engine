@@ -52,6 +52,14 @@ ProjectConfig :: struct {
 	export:        Export_Settings,
 	// Per-texture filtering / wrap / mipmaps (asset_paths.odin)
 	textureImport: [dynamic]Texture_Import,
+	// Global scripts (autoloads): loaded once at start, reachable from every
+	// script as a Lua global (script_globals.odin)
+	globals:       [dynamic]Global_Script,
+}
+
+Global_Script :: struct {
+	name:   string, // the Lua global's name
+	script: string, // project-relative .lua
 }
 
 Export_Target :: enum {
@@ -96,6 +104,11 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	delete(cfg.export.presets)
 	for t in cfg.textureImport do delete(t.path, allocator)
 	delete(cfg.textureImport)
+	for g in cfg.globals {
+		delete(g.name, allocator)
+		delete(g.script, allocator)
+	}
+	delete(cfg.globals)
 }
 
 // ProjectConfig_Clone deep-copies a config.
@@ -129,6 +142,8 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 		ct.path = strings.clone(t.path, allocator)
 		append(&c.textureImport, ct)
 	}
+	c.globals = make([dynamic]Global_Script, allocator)
+	for g in src.globals do append(&c.globals, Global_Script{strings.clone(g.name, allocator), strings.clone(g.script, allocator)})
 	return c
 }
 
@@ -372,6 +387,18 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		}
 	}
 
+	// Global scripts
+	cfg.globals = make([dynamic]Global_Script, allocator)
+	if arr, ok := json_get_arr(rootObj, "globals"); ok {
+		for v in arr {
+			o, isObj := v.(json.Object)
+			if !isObj do continue
+			name, script := json_get_string(o, "name", ""), json_get_string(o, "script", "")
+			if name == "" || script == "" do continue
+			append(&cfg.globals, Global_Script{strings.clone(name, allocator), strings.clone(script, allocator)})
+		}
+	}
+
 	// Scenes
 	if sceneArr, ok := json_get_arr(rootObj, "scenes"); ok {
 		for sVal in sceneArr {
@@ -462,6 +489,15 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	Export_PresetsWrite(&sb, &cfg.export)
 	strings.write_string(&sb, "},\n")
 	texture_imports_write(&sb, cfg.textureImport[:])
+	if len(cfg.globals) > 0 {
+		strings.write_string(&sb, "  \"globals\": [\n")
+		for g, i in cfg.globals {
+			strings.write_string(&sb, "    {\"name\": "); jstr(&sb, g.name)
+			strings.write_string(&sb, ", \"script\": "); jstr(&sb, g.script)
+			strings.write_string(&sb, "},\n" if i < len(cfg.globals) - 1 else "}\n")
+		}
+		strings.write_string(&sb, "  ],\n")
+	}
 	strings.write_string(&sb, "  \"scenes\": [\n")
 	for sc, i in cfg.scenes {
 		strings.write_string(&sb, "    "); jstr(&sb, sc)
@@ -514,6 +550,10 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	if rl.IsAudioDeviceReady() do rl.SetMasterVolume(cfg.masterVolume)
 	Input_ApplyActionConfigs(&game.input, cfg.actions[:])
 	Texture_ImportsSet(cfg.textureImport[:])
+	// Global scripts exist before any scene; the game starts them (ready)
+	// now, the editor when Simulate starts.
+	Globals_Load(&game.scriptManager, cfg.globals[:])
+	if activate do Globals_Ready(&game.scriptManager)
 
 	if rl.IsWindowReady() {
 		if cfg.windowTitle != "" {

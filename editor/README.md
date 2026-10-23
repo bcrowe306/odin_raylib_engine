@@ -151,6 +151,9 @@ standalone game), **Settings** (Cmd+,) and Quit.
   bars where the shapes differ; the mouse reads in game units), **Audio**
   (master, music and sound-effect volumes) and **Export** (executable name,
   output folder, targets, compression, font, which prebuilt runners exist).
+  **Globals**: global scripts - a Lua global name and a script each (an
+  invalid or repeated name is flagged). Each is loaded once, before any
+  scene, and every script can use it by that name (see `engine/SCRIPTING.md`).
 
 Editor settings are per user, in `~/.config/ore_editor/settings.ini` -
 `[general]`, `[code]`, `[theme]`, `[paths]`, `[recent_projects]` and `[keymap]`
@@ -252,7 +255,9 @@ lines have a right-click menu with all their actions — for nodes: add child
 or component, cut/copy/paste/paste as child, duplicate, rename, delete, move
 up/down/to root, select children, enable/show, frame, script actions and
 component actions; for assets: open/add/use on the selection, copy/paste,
-duplicate, rename, delete, copy path, reveal. LDtk projects (`.ldtk`) are
+duplicate, rename, delete, copy path, reveal; for scripts also **Make
+Global** / **Remove Global** (a global script shows a globe and its global
+name in Assets). LDtk projects (`.ldtk`) are
 listed under **Levels** (double-click or drag to add a level).
 
 ### Asset folders, grid and usages

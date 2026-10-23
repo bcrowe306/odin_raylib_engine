@@ -166,6 +166,39 @@ Fields complete per node class with their type and help. Paths with a dot
 `get_property` / `set_property`; an unknown field is an error when set
 (and a warning, once, when read).
 
+## Global scripts
+
+A global script (an autoload) holds state or helpers every script shares: a
+score, the player's inventory, a sound manager. Add one in **Project Settings
+> Globals** (a name and a script) or right-click a script in Assets > **Make
+Global** (named after the file: `game_state.lua` -> `GameState`); global
+scripts show a globe in Assets. project.json lists them:
+
+```json
+"globals": [{"name": "GameState", "script": "scripts/game_state.lua"}]
+```
+
+The table the script returns becomes the Lua global `GameState` - the same
+table in every script and across scene changes. Like a node script it may
+define `ready(self)` (once, when the game starts, before any scene's nodes;
+in the editor when Simulate starts) and `update(self, dt)` (every frame, not
+while the game is paused). It has no `self.node`.
+
+```lua
+-- scripts/game_state.lua
+local GameState = {score = 0}
+function GameState:ready() self.score = Save.get("best", 0) end
+function GameState:add(points) self.score = self.score + points end
+return GameState
+
+-- any other script
+GameState:add(10)
+Log.info("score", GameState.score)
+```
+
+`GameState` completes in every script with the script's own fields and
+methods (the generated types declare it as `require` of its file).
+
 ## Vectors
 
 `Vec2`, `Vec3` and `Vec4` are value types with operators:

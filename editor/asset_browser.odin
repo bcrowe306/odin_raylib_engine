@@ -187,6 +187,7 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 		if s := e.Game_FindSceneByFile(state.game, rel); s != nil && Editor_SceneIsModifiedCached(state, s) do suffix = "  " + ICON_FA_CIRCLE
 	}
 	if kind == .Script && Code_IsDirty(state, rel) do suffix = "  " + ICON_FA_CIRCLE
+	global := Asset_GlobalName(state, rel) if kind == .Script else ""
 
 	x0 := imgui.GetCursorPosX() // indented in the Folders view
 	imgui.PushStyleColorImVec4(.Text, col)
@@ -197,6 +198,15 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 	imgui.PushStyleColorImVec4(.Text, UI_ACCENT if isActive else UI_TEXT)
 	imgui.TextUnformatted(fmt.ctprintf("%s%s", name, suffix))
 	imgui.PopStyleColor()
+	if global != "" {
+		// A global script (Project Settings > Globals): a globe and its name.
+		imgui.SameLine(0, 8)
+		imgui.PushStyleColorImVec4(.Text, UI_ACCENT)
+		imgui.TextUnformatted(fmt.ctprintf("%s %s", ICON_FA_GLOBE, global))
+		imgui.PopStyleColor()
+		Drive_Item(fmt.tprintf("asset.global:%s", rel))
+		UI_Tooltip(fmt.tprintf("Global script: every script can use %s (Project Settings > Globals)", global))
+	}
 	return dbl
 }
 
@@ -271,6 +281,15 @@ asset_tile :: proc(state: ^EditorState, rel: string) {
 	label := strings.clone_to_cstring(name, context.temp_allocator)
 	lw := imgui.CalcTextSize(label).x * 0.8
 	imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12, {mn.x + max(2, (TILE - lw) * 0.5), mx.y - 16}, col_u32(UI_ACCENT if isActive else UI_TEXT), label, nil, 0, &clip)
+	if kind == .Script && Asset_GlobalName(state, rel) != "" {
+		imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.regular, 16, {mx.x - 20, mn.y + 4}, col_u32(UI_ACCENT), ICON_FA_GLOBE)
+	}
+}
+
+// Asset_GlobalName: the Lua global a script is loaded as (Project Settings
+// > Globals), "" if it isn't a global script.
+Asset_GlobalName :: proc(state: ^EditorState, rel: string) -> string {
+	return e.Globals_NameOf(state.projectConfig.globals[:], rel)
 }
 
 @(private = "file")
@@ -280,7 +299,7 @@ asset_tooltip :: proc(k: Asset_Kind, rel: string) -> string {
 	case .Component: return fmt.tprintf("%s - double-click or drag into the viewport to add", rel)
 	case .Texture: return fmt.tprintf("%s - drag into the viewport to add a sprite", rel)
 	case .Audio: return fmt.tprintf("%s - drag into the viewport to add a sound", rel)
-	case .Script: return fmt.tprintf("%s - drag onto a node in the viewport to attach", rel)
+	case .Script: return fmt.tprintf("%s - drag onto a node in the viewport to attach (or right-click > Make Global)", rel)
 	case .Level: return fmt.tprintf("%s - LDtk project: double-click or drag into the viewport to add a level", rel)
 	}
 	return rel

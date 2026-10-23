@@ -203,6 +203,7 @@ Toolbar_StartSimulation :: proc(state: ^EditorState) {
 	e.ScriptManager_SnapshotGlobals(&state.game.scriptManager)
 	// Edit-mode scenes never ran ready(); start them like the game would.
 	state.game.scriptManager.suspended = false
+	e.Globals_Ready(&state.game.scriptManager) // global scripts start first
 	e.Scene_CallReady(state.activeScene, state.activeScene.rootNode, &state.game.gameContext)
 
 	state.isSimulating = true
