@@ -1,0 +1,27 @@
+# Negative scale mirrors: an AnimationPlayer with scale x -1 draws its frame
+# mirrored around its position (as the game does), and its bounds (picking,
+# the selection box) follow.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+key escape
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+wait 3
+click @anim.new
+drag @asset:textures/Spaceship_1.png @anim.frame-drop
+expect anim-info contains frames=1
+screenshot normal
+expect selected-bounds == 640,360,882,569
+click @insp.scale.link
+dblclick @insp.scale.x
+key ctrl+a
+type -1
+key enter
+expect node:AnimationPlayer.scale == -1.00,1.00
+expect selected-bounds == 397,360,640,569
+screenshot mirrored

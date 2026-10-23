@@ -85,7 +85,8 @@ FA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 
 	RectangleFlipAxis(&animation.source, animation.flipX, animation.flipY)
 	if rl.IsWindowReady() && texture.texture.id > 0 {
-		rl.DrawTexturePro(texture.texture, animation.source, animation.dest, {0, 0}, node.globalRotation, rl.WHITE)
+		size := [2]f32{f32(texture.texture.width), f32(texture.texture.height)}
+		Texture_DrawScaled(texture.texture, animation.source, node.globalPosition, size, node.globalScale, {0, 0}, node.globalRotation, rl.WHITE)
 	}
 }
 
@@ -172,13 +173,6 @@ SSA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	}
 	RectangleFlipAxis(&animation.source, animation.flipX, animation.flipY)
 	if rl.IsWindowReady() && tex.id > 0 {
-		rl.DrawTexturePro(
-			animation.spriteSheet.texture,
-			animation.source,
-			animation.dest,
-			{0, 0},
-			node.globalRotation,
-			rl.WHITE,
-		)
+		Texture_DrawScaled(tex, animation.source, node.globalPosition, frameSize, node.globalScale, {0, 0}, node.globalRotation, rl.WHITE)
 	}
 }

@@ -739,6 +739,13 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return strings.join(parts[:], ",", context.temp_allocator), true
 	case "insp-help": return fmt.tprintf("%s: %s", inspectorHelp.title, inspectorHelp.doc), true
 	case "insp-help-path": return inspectorHelp.path, true
+	case "selected-bounds":
+		// The selected node's bounds in the world: "minx,miny,maxx,maxy" (rounded).
+		if state.selectedNode == nil do return "", true
+		corners, _ := Node_Bounds(state, state.selectedNode)
+		lo, hi := corners[0], corners[0]
+		for c in corners {lo = {min(lo.x, c.x), min(lo.y, c.y)}; hi = {max(hi.x, c.x), max(hi.y, c.y)}}
+		return fmt.tprintf("%d,%d,%d,%d", int(lo.x), int(lo.y), int(hi.x), int(hi.y)), true
 	case "bottom-tab": return fmt.tprint(BottomPanel_Tab(state)), true
 	}
 	switch q {

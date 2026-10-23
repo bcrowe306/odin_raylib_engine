@@ -42,6 +42,27 @@ Animation_SourceCount :: proc(a: ^Animation) -> int {
 	return a.endFrame - a.startFrame + 1
 }
 
+// Animation_FrameSize: the pixel size a source frame is drawn at (before
+// the node's scale; 0 when there is nothing to draw).
+Animation_FrameSize :: proc(a: ^Animation, frame: int) -> [2]f32 {
+	if a == nil do return {}
+	if a.renderFrame == FA_RenderFrame {
+		fa := cast(^FrameAnimation)a
+		if len(fa.frames) == 0 do return {}
+		t := fa.frames[clamp(frame, 0, len(fa.frames) - 1)]
+		if t == nil do return {}
+		return {f32(t.texture.width), f32(t.texture.height)}
+	}
+	if a.renderFrame == SSA_RenderFrame {
+		ssa := cast(^SpriteSheetAnimation)a
+		if ssa.spriteSheet == nil do return {}
+		tex := ssa.spriteSheet.texture
+		r := SpriteSheet_CellRect({f32(tex.width), f32(tex.height)}, ssa.grid, ssa.margin, ssa.spacing, 0)
+		return {r.width, r.height}
+	}
+	return {}
+}
+
 // Animation_SetRange plays source frames start..end (clamped).
 Animation_SetRange :: proc(a: ^Animation, start, end: int) {
 	n := Animation_SourceCount(a)

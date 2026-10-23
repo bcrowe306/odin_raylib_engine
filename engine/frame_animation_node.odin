@@ -121,22 +121,13 @@ FrameAnimationNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 	scl := fan.globalScale
 	rot := fan.globalRotation
 
-	destW := f32(texture.texture.width) * scl.x
-	destH := f32(texture.texture.height) * scl.y
-
-	origin := rl.Vector2{ fan.origin.x * scl.x, fan.origin.y * scl.y }
-	if fan.origin.x == 0 && fan.origin.y == 0 {
-		origin = {destW * 0.5, destH * 0.5}
-	}
-
-	destination := rl.Rectangle{
-		x = pos.x,
-		y = pos.y,
-		width = destW,
-		height = destH,
-	}
+	// The pivot: `origin` (unscaled px), else the centre; a negative scale
+	// mirrors around it.
+	size := [2]f32{f32(texture.texture.width), f32(texture.texture.height)}
+	origin := fan.origin
+	if origin == {0, 0} do origin = size * 0.5
 	if rl.IsWindowReady() && texture.texture.id > 0 {
-		rl.DrawTexturePro(texture.texture, source, destination, origin, rot, rl.WHITE)
+		Texture_DrawScaled(texture.texture, source, pos, size, scl, origin, rot, rl.WHITE)
 	}
 }
 

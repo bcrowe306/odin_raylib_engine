@@ -332,6 +332,12 @@ Machine driving this player follow the new name), **Duplicate** copies it
 (frames, range, settings and tracks) right after itself as `<name>_copy`,
 and the **trash** deletes it (Cmd+Z brings it back).
 
+A negative **scale** mirrors what the player draws (and a TextureNode or
+FrameAnimationNode): around the node's position - the frame's top-left
+corner for an AnimationPlayer, the pivot for textures - in the game and the
+viewport, whose selection box follows. Flipping a character's parent (its
+CharacterMover) mirrors the whole character around the parent instead.
+
 **Frames**: the strip shows every frame of the animation; the ones it plays
 (its **range**) are under the blue band in the header - drag the band's
 handles, type **from / to** under the Frames label, or right-click a frame:

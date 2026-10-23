@@ -67,20 +67,10 @@ TextureNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 	scl := textureNode.globalScale
 	rot := textureNode.globalRotation
 
-	destW := textureNode.size.x * scl.x
-	destH := textureNode.size.y * scl.y
-
-	origin := rl.Vector2{ textureNode.origin.x * scl.x, textureNode.origin.y * scl.y }
-	if textureNode.origin.x == 0 && textureNode.origin.y == 0 {
-		origin = {destW * 0.5, destH * 0.5}
-	}
-
-	destination := rl.Rectangle{
-		x = pos.x,
-		y = pos.y,
-		width = destW,
-		height = destH,
-	}
+	// The pivot: `origin` (unscaled px), else the centre. A negative scale
+	// mirrors the image around it.
+	origin := textureNode.origin
+	if origin == {0, 0} do origin = textureNode.size * 0.5
 	tint := textureNode.tint if textureNode.tint != {} else rl.WHITE
-	rl.DrawTexturePro(textureNode.texture.texture, source, destination, origin, rot, tint)
+	Texture_DrawScaled(textureNode.texture.texture, source, pos, textureNode.size, scl, origin, rot, tint)
 }

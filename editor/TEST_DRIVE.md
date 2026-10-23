@@ -44,6 +44,7 @@ exits non-zero if any check fails.
 | `bottom_follow.drive` | The AnimationPlayer Inspector (player settings only, `fps` path), the Animation tab's ▾ menu (an animation from a sprite sheet); the bottom panel follows the selection and goes back, a hand-picked tab stays, the setting turns it off. |
 | `game_colliders.drive` | The toolbar's Show Colliders button: saved in project.json, switched live in a running game, Game menu entry. |
 | `node_drop_typed.drive` | A node dropped into a script: on an empty line a `---@type` local (indented into the function), into an assignment the annotation above it, elsewhere an inline `--[[@as Type]]` cast; undo. |
+| `negative_scale.drive` | An AnimationPlayer with scale x -1 draws mirrored around its position; its bounds (selection box, picking) mirror too. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -122,6 +123,7 @@ Queries:
 - `insp-help-path` (the path the help pane shows)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk)
 - `remote-debug-draw` (the running game's last debug-draw reply)
+- `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
 - `anim-names` (the selected AnimationPlayer's animations, the current one in `[brackets]`)
 - `anim-preview` (`playing` / `paused`), `anim-info` (`frames=<n> range=<a>-<b> reverse=<b> fps=<f> default=<name>` of the selected AnimationPlayer), `theme` (the saved theme), `theme-panel` (the panel colour in use, `#rrggbbaa`), `node-icons` (`<distinct icons>/<node types>`), `workspace` (the current workspace), `window-h:<item>` (height of the window an item is in)
 - `debug-stopped`, `debug-line` (`file:line`), `debug-stack`, `debug-local:<name>` (the Lua debugger)

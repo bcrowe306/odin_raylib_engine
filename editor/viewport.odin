@@ -288,6 +288,13 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 			if fan.origin == {0, 0} do origin = size * 0.5
 			lo, hi, have = -origin, size - origin, true
 		}
+	case e.AnimationPlayerNode:
+		// The frame shown, drawn from the node's position (a negative scale
+		// mirrors it there, as the game does).
+		apn := cast(^e.AnimationPlayerNode)node
+		if size := e.Animation_FrameSize(e.AnimationPlayerNode_GetAnimation(apn), apn.currentFrame); size.x > 0 && size.y > 0 {
+			lo, hi, have = {0, 0}, size * scl, true
+		}
 	case e.NineSliceNode:
 		n := cast(^e.NineSliceNode)node
 		s := n.size * scl

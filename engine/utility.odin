@@ -47,6 +47,25 @@ RectangleFlipHorizontal :: proc(rect: rl.Rectangle) -> rl.Rectangle {
 	}
 }
 
+// Texture_DrawScaled draws `source` of a texture `size` px big (unscaled)
+// at `pos`, scaled, rotated around `origin` (unscaled px from its top-left).
+// A negative scale mirrors the image around the pivot - raylib takes the
+// absolute size of the destination, so the flip goes into the source.
+Texture_DrawScaled :: proc(tex: rl.Texture2D, source: rl.Rectangle, pos, size, scale, origin: [2]f32, rotation: f32, tint: rl.Color) {
+	src := source
+	o := origin
+	if scale.x < 0 {
+		src.width = -src.width
+		o.x = size.x - o.x
+	}
+	if scale.y < 0 {
+		src.height = -src.height
+		o.y = size.y - o.y
+	}
+	s := [2]f32{abs(scale.x), abs(scale.y)}
+	rl.DrawTexturePro(tex, src, {pos.x, pos.y, size.x * s.x, size.y * s.y}, {o.x * s.x, o.y * s.y}, rotation, tint)
+}
+
 RectangleFlipAxis :: proc(rect: ^rl.Rectangle, x: bool, y: bool) {
 	if x {
 		rect.width = -rect.width
