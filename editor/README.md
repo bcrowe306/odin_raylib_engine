@@ -491,7 +491,10 @@ scene, or the same exported package - saving and rebuilding first like
 Play) and **Stop** (Shift+F5); next to them the game's state - Running,
 Paused or Breakpoint (the status bar shows it too). While the game is
 building, Stop cancels the build. The same commands are in the **Game**
-menu; Restart there also replays the last run after it was stopped.
+menu; Restart there also replays the last run after it was stopped. The
+**Show Colliders** button next to them (also Game > Show Colliders in Game)
+switches whether the game draws collision shapes, joints and areas - the
+project setting, saved in project.json, and at once in a running game.
 
 **Debugging Lua**: click a line number in the Code tab to set a breakpoint
 (a red dot; click again to remove it) and Play. When a script reaches it,

@@ -43,6 +43,7 @@ remote: struct {
 	nodeAt:     time.Tick,
 	steps:      int, // "@ore:stepped" replies (drives)
 	reloads:    int, // "@ore:reloaded" replies
+	debugDraw:  string, // the last "@ore:debug-draw" reply (drives)
 	connected:  bool,
 	collapsed:  map[string]bool,
 }
@@ -114,6 +115,9 @@ RemoteGame_HandleLine :: proc(state: ^EditorState, line: string) -> bool {
 		Editor_Log(state, .Info, "Reloaded in the running game: %s", rest)
 	case "tree": remote_parse_tree(rest)
 	case "node": remote_parse_node(rest)
+	case "debug-draw":
+		delete(remote.debugDraw)
+		remote.debugDraw = strings.clone(rest)
 	case "set":
 	}
 	return true
@@ -199,6 +203,7 @@ RemoteGame_Query :: proc(q: string) -> (string, bool) {
 		for r in remote.rows do append(&names, r.name)
 		return strings.join(names[:], ",", context.temp_allocator), true
 	}
+	if q == "remote-debug-draw" do return remote.debugDraw, true
 	if strings.has_prefix(q, "remote-prop:") {
 		for p in remote.props do if p[0] == q[len("remote-prop:"):] do return p[1], true
 		return "<none>", true

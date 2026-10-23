@@ -109,6 +109,7 @@ Actions_Init :: proc() {
 	add({id = "game.pause", category = "Game", label = "Pause Game", chords = k(ch(.F9)), scope = .Global, run = Editor_TogglePause, enabled = proc(s: ^EditorState) -> bool {return s.gameProcessRunning && RemoteGame_Connected() && !Debug_IsStopped()}, checked = proc(s: ^EditorState) -> bool {return s.gameProcessRunning && RemoteGame_Paused()}})
 	add({id = "game.step", category = "Game", label = "Step One Frame", chords = k(ch(.F9, SH)), scope = .Global, run = Editor_StepGame, enabled = proc(s: ^EditorState) -> bool {return s.gameProcessRunning && RemoteGame_Connected() && !Debug_IsStopped()}})
 	add({id = "game.restart", category = "Game", label = "Restart Game", chords = k(ch(.F5, PS)), scope = .Global, run = Editor_RestartGame, enabled = proc(s: ^EditorState) -> bool {return !s.buildRunning && (s.gameProcessRunning || s.hasPlayed)}})
+	add({id = "game.colliders", category = "Game", label = "Show Colliders in Game", scope = .Global, run = Editor_ToggleGameColliders, checked = proc(s: ^EditorState) -> bool {return s.projectConfig.debugDraw}})
 	add({id = "game.simulate", category = "Game", label = "Simulate in Editor", chords = k(ch(.F7)), scope = .Global, run = proc(s: ^EditorState) {
 		if s.isSimulating do Toolbar_StopSimulation(s)
 		else do Toolbar_StartSimulation(s)

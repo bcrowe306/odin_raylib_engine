@@ -444,6 +444,18 @@ Editor_RestartGame :: proc(state: ^EditorState) {
 	}
 }
 
+// Editor_ToggleGameColliders flips the project's Show Colliders setting
+// (physics.debug_draw): saved in project.json, applied to a running game.
+Editor_ToggleGameColliders :: proc(state: ^EditorState) {
+	state.projectConfig.debugDraw = !state.projectConfig.debugDraw
+	on := state.projectConfig.debugDraw
+	if !e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig) {
+		Editor_Log(state, .Error, "Could not save project.json")
+	}
+	if RemoteGame_Connected() do RemoteGame_Send(fmt.tprintf("debug-draw %t", on))
+	Editor_Log(state, .Info, "Colliders %s in the game", "shown" if on else "hidden")
+}
+
 // Editor_TogglePause pauses / resumes the running game (editor link).
 Editor_TogglePause :: proc(state: ^EditorState) {
 	if !RemoteGame_Connected() do return

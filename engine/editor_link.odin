@@ -137,6 +137,10 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 		LuaDebugger_ClearBreakpoints()
 	case "reload-scene":
 		fmt.printfln("@ore:reloaded %s %t", rest, Game_ReloadSceneFile(game, rest))
+	case "debug-draw":
+		// Colliders, joints and areas drawn (the toolbar's Show Colliders).
+		game.physicsWorld.drawPhysicsDebug = rest == "true"
+		fmt.printfln("@ore:debug-draw %t", game.physicsWorld.drawPhysicsDebug)
 	}
 }
 

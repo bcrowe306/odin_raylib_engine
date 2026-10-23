@@ -1,0 +1,25 @@
+# The toolbar's Show Colliders button (next to Play This Scene): saved in
+# project.json, the game started then draws none; switched in a running
+# game too; the Game menu has it.
+wait 5
+key escape
+expect item:toolbar.colliders == visible
+click @toolbar.colliders
+expect file:project.json contains "debug_draw": false
+expect log contains Colliders hidden in the game
+screenshot off
+
+# A running game: switched live.
+click @toolbar.play-scene
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+click @toolbar.colliders
+wait-until remote-debug-draw == true timeout=200
+expect file:project.json contains "debug_draw": true
+screenshot running
+click @menu:Game
+click @menu:Game/Show Colliders in Game
+wait-until remote-debug-draw == false timeout=200
+click @toolbar.stop
+wait-until game == stopped timeout=300
+expect file:project.json contains "debug_draw": false

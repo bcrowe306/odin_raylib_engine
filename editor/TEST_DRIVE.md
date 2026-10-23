@@ -42,6 +42,7 @@ exits non-zero if any check fails.
 | `game_controls.drive` | Play This Scene; toolbar Pause / Resume and Step, F9 / Shift+F9; Restart (a new process, the same scene); Stop, then Game > Restart plays it again; Game > Pause / Stop. |
 | `prop_drag.drive` | The help pane's `path = "..."` (a Transform row, a script property `script.<name>`); a property name dragged into a script: get_property, Shift: set_property with the value; another node's via get_node. |
 | `bottom_follow.drive` | The AnimationPlayer Inspector (player settings only, `fps` path), the Animation tab's ▾ menu (an animation from a sprite sheet); the bottom panel follows the selection and goes back, a hand-picked tab stays, the setting turns it off. |
+| `game_colliders.drive` | The toolbar's Show Colliders button: saved in project.json, switched live in a running game, Game menu entry. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -119,6 +120,7 @@ Queries:
 - `game-pid` (the running game's process id, 0 = none), `last-played` (the scene Restart plays, `project` = the initial scene)
 - `insp-help-path` (the path the help pane shows)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk)
+- `remote-debug-draw` (the running game's last debug-draw reply)
 - `anim-names` (the selected AnimationPlayer's animations, the current one in `[brackets]`)
 - `anim-preview` (`playing` / `paused`), `anim-info` (`frames=<n> range=<a>-<b> reverse=<b> fps=<f> default=<name>` of the selected AnimationPlayer), `theme` (the saved theme), `theme-panel` (the panel colour in use, `#rrggbbaa`), `node-icons` (`<distinct icons>/<node types>`), `workspace` (the current workspace), `window-h:<item>` (height of the window an item is in)
 - `debug-stopped`, `debug-line` (`file:line`), `debug-stack`, `debug-local:<name>` (the Lua debugger)

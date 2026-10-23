@@ -191,6 +191,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "game.step", "Step One Frame")
 		menu_action(state, "game.restart", "Restart")
 		menu_action(state, "game.stop", "Stop")
+		menu_action(state, "game.colliders")
 		imgui.Separator()
 		menu_action(state, "game.simulate")
 		imgui.Separator()

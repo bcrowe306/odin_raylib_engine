@@ -77,7 +77,7 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	// 3. Play controls, centred (but never over the tools on the left):
 	// Play / Play Scene; while the game runs Pause (Resume), Step, Restart
 	// and Stop; while building, Stop cancels the build.
-	playW: f32 = 4 * 32 + 110
+	playW: f32 = 5 * 32 + 110
 	imgui.SameLine()
 	imgui.SetCursorPosX(max(imgui.GetCursorPosX() + UI_SPACE * 3, (width - playW) * 0.5))
 	switch {
@@ -106,6 +106,15 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 		imgui.SameLine()
 		if UI_IconButton(ICON_FA_CIRCLE_PLAY, "toolbar.play-scene", "Play this scene (F6)", tint = UI_SUCCESS) {
 			Editor_PlayGameProcess(state, .CurrentScene)
+		}
+	}
+	// Show Colliders in the game (Project Settings > Physics); also switches
+	// a running game.
+	if !state.buildRunning {
+		imgui.SameLine()
+		colliders := state.projectConfig.debugDraw
+		if UI_IconButton(ICON_FA_VECTOR_SQUARE, "toolbar.colliders", "Colliders are drawn in the game - click to hide them" if colliders else "Colliders are hidden in the game - click to show them", colliders) {
+			Editor_ToggleGameColliders(state)
 		}
 	}
 	imgui.SameLine(0, UI_SPACE)
