@@ -827,7 +827,11 @@ code_commands_update :: proc(state: ^EditorState) {
 	if cm.lspState != .Ready do return
 	if cm.editsWaiting && cm.client.edit_seq != cm.editsSeq {
 		cm.editsWaiting = false
-		code_apply_edits(state)
+		if cm.client.edits_kind == .Rename && len(cm.client.last_edits) > 0 {
+			Code_RenamePreviewOpen(state, cm.client.last_edits[:]) // confirm first (code_rename_preview.odin)
+		} else {
+			code_apply_edits(state)
+		}
 		if cm.saveAfterFormat != nil {
 			Code_SaveDoc(state, cm.saveAfterFormat)
 			cm.saveAfterFormat = nil

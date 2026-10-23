@@ -143,7 +143,7 @@ Navigation
 Refactoring
 - [x] 9.17 Code actions / lightbulb (Cmd+.): LSP quick fixes + engine fixes (unknown node path, unknown input action)
 - [ ] 9.18 Extract local / extract method / inline variable; wrap in if / function / do; get_property <-> field, strings <-> Vec2
-- [ ] 9.19 Rename across files with a preview
+- [x] 9.19 Rename across files with a preview
 Files
 - [ ] 9.20 Tab pinning + preview tab
 - [ ] 9.21 Files changed on disk: reload prompt; local history (restore earlier saves)

@@ -369,6 +369,7 @@ Code_Shutdown :: proc() {
 	Code_SearchShutdown()
 	Code_PeekShutdown()
 	Code_ActionsShutdown()
+	Code_RenamePreviewShutdown()
 	code_find_destroy()
 	code_lsp_shutdown()
 }
@@ -651,6 +652,7 @@ Code_Render :: proc(state: ^EditorState) {
 	}
 	code_close_prompt(state)
 	code_rename_popup(state)
+	Code_RenamePreviewRender(state)
 	if cm.closeRequest >= 0 {
 		code_close_doc(cm.closeRequest)
 		cm.closeRequest = -1

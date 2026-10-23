@@ -105,6 +105,11 @@ key f2
 expect item:code.rename-input == visible
 type Probe
 key enter
+# The rename preview lists the changes; Apply makes them.
+wait-until item:rename.apply == visible timeout=600
+expect item:rename.line:0 == visible
+screenshot rename_preview
+click @rename.apply
 wait-until code.text contains function Probe:update timeout=600
 expect code.text !contains function Drone:
 screenshot renamed

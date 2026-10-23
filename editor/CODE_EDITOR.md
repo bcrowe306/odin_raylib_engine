@@ -248,6 +248,11 @@ hover, diagnostics (squiggles, gutter, status line), go to definition (F12
 (SCRIPTING.md > Completion of project names). F1 opens the Scripting
 Reference at the symbol.
 
+**Rename** (F2): type the new name; the **Rename Preview** lists every
+change by file - each line before (red) and after (green) - and nothing
+changes until **Apply** (Enter); Cancel (Esc) drops them. Applied changes
+are one undo step per file.
+
 ## Code actions
 
 **Cmd+.** (or the **lightbulb** in the gutter, shown on the caret's line
