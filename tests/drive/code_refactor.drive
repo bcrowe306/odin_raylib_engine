@@ -1,0 +1,63 @@
+# Refactors: extract local (both names selected: typing renames both),
+# inline variable, toggle get/set_property <-> field, {x, y} <-> Vec2,
+# extract method.
+wait 5
+exec cp tests/drive/fixtures/drive_refactor_zz.lua $PROJECT/scripts/drive_refactor_zz.lua
+wait-until item:asset:scripts/drive_refactor_zz.lua == visible timeout=300
+dblclick @asset:scripts/drive_refactor_zz.lua
+wait 5
+key ctrl+g
+type 3
+key enter
+key end
+key shift+left
+key shift+left
+key shift+left
+key shift+left
+key shift+left
+key shift+left
+key shift+left
+key cmd+alt+v
+expect code.cursors == 2
+type step
+expect code.text contains \s\s\s\slocal step = 10 * dt\n\s\s\s\slocal speed = step\n
+# Inline `speed` (now line 4) into its use.
+key esc
+key ctrl+g
+type 4
+key enter
+key cmd+alt+n
+expect code.text contains Vec2(step, 0)
+expect code.text !contains local speed
+# Toggle set_property (line 5) to a field assignment, from the menu.
+key ctrl+g
+type 5
+key enter
+key end
+rclick @code.caret
+click @ctx:refactor
+click @ctx:code.toggle_property_access
+expect code.text contains \s\s\s\sself.node.rotation = 45\n
+# {1, 2} -> Vec2(1, 2).
+key ctrl+g
+type 6
+key enter
+key end
+key left
+key left
+rclick @code.caret
+click @ctx:refactor
+click @ctx:code.toggle_vec2
+expect code.text contains local p = Vec2(1, 2)
+# Extract lines 4-5 into a method.
+key ctrl+g
+type 4
+key enter
+key shift+down
+key shift+down
+key cmd+alt+m
+expect code.cursors == 2
+type move
+expect code.text contains \s\s\s\sself:move()\n
+expect code.text contains function DriveRefZz:move()\n\s\s\s\sself.node.position
+screenshot refactored

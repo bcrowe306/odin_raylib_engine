@@ -142,7 +142,7 @@ Navigation
 - [x] 9.16 Peek definition / references inline
 Refactoring
 - [x] 9.17 Code actions / lightbulb (Cmd+.): LSP quick fixes + engine fixes (unknown node path, unknown input action)
-- [ ] 9.18 Extract local / extract method / inline variable; wrap in if / function / do; get_property <-> field, strings <-> Vec2
+- [x] 9.18 Extract local / extract method / inline variable; wrap in if / function / do; get_property <-> field, strings <-> Vec2
 - [x] 9.19 Rename across files with a preview
 Files
 - [ ] 9.20 Tab pinning + preview tab

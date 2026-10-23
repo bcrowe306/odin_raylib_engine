@@ -268,6 +268,21 @@ when there is something to fix) lists fixes for the caret:
 
 Up / Down / Enter or a click applies one; Esc closes.
 
+## Refactoring
+
+| Shortcut | Command |
+|---|---|
+| Cmd+Alt+V | **Extract local**: the selected expression becomes `local value = ...` above the statement |
+| Cmd+Alt+M | **Extract method**: the selected lines become `function Cls:new_method()` after the current function, `self:new_method()` in their place |
+| Cmd+Alt+N | **Inline variable**: on a `local x = expr` line, `expr` replaces `x` at its uses (to the end of its block or until `x` is reassigned) and the line goes |
+| (Refactor menu) | **Toggle property access**: `node:get_property("p")` <-> `node.p`, `node:set_property("p", v)` <-> `node.p = v` |
+| (Refactor menu) | **Toggle Vec2**: `{x, y}` <-> `Vec2(x, y)` around the caret |
+| (Wrap In menu) | `if ... then` / `do` / `local function` around the selected lines |
+
+Extract leaves a cursor on each copy of the new name, both selected: type
+the real name once. Everything is one undo step. Rename (F2) is in
+Language server.
+
 ## Debugging
 
 Click a line number for a breakpoint; right-click it for a condition. The

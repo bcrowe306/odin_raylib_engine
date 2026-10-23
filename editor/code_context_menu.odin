@@ -236,6 +236,11 @@ code_text_context_menu :: proc(state: ^EditorState, doc: ^Code_Doc) {
 		item(state, ICON_FA_ARROW_RIGHT, "code.extract_method")
 		item(state, ICON_FA_ARROW_LEFT, "code.inline_variable")
 		item(state, ICON_FA_RIGHT_LEFT, "code.toggle_property_access")
+		item(state, ICON_FA_RIGHT_LEFT, "code.toggle_vec2")
+		imgui.Separator()
+		item(state, ICON_FA_CODE, "code.wrap_if")
+		item(state, ICON_FA_CODE, "code.wrap_do")
+		item(state, ICON_FA_CODE, "code.wrap_function")
 		imgui.EndMenu()
 	}
 	item(state, ICON_FA_CODE, "code.format", lsp)
