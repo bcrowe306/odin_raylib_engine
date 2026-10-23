@@ -1,0 +1,24 @@
+# Typed property paths: a camera's set_property(" completes its own paths
+# (followMode), and get_property returns the property's type (the enum's
+# names complete when comparing).
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+type local cam = Scene.find_node("MainCamera")
+key enter
+type cam:set_property("follow
+wait-until code.completion contains followMode timeout=600
+screenshot camera_paths
+key esc
+key end
+key enter
+type local mode = cam:get_property("followMode")
+key enter
+type if mode == "Si
+wait-until code.completion contains SingleTarget timeout=600
+screenshot enum_values

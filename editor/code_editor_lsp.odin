@@ -305,11 +305,26 @@ code_refilter :: proc(doc: ^Code_Doc) {
 	comp.filteredSeq = cm.client.completion_seq
 	prefixed := make([dynamic]int, context.temp_allocator)
 	others := make([dynamic]int, context.temp_allocator)
+	// One row per label (a string literal can come both from a typed alias
+	// and from overloads): the one with documentation wins.
+	seen := make(map[string]int, allocator = context.temp_allocator) // label -> slot (+1: prefixed, -1: others)
 	for &item, i in cm.client.last_completion {
-		ok, pre := code_fuzzy(code_completion_label(&item), prefix)
+		label := code_completion_label(&item)
+		ok, pre := code_fuzzy(label, prefix)
 		if !ok do continue
-		if pre do append(&prefixed, i)
-		else do append(&others, i)
+		if slot, dup := seen[label]; dup {
+			list := &prefixed if slot > 0 else &others
+			k := abs(slot) - 1
+			if cm.client.last_completion[list[k]].documentation == "" && item.documentation != "" do list[k] = i
+			continue
+		}
+		if pre {
+			append(&prefixed, i)
+			seen[label] = len(prefixed)
+		} else {
+			append(&others, i)
+			seen[label] = -len(others)
+		}
 	}
 	append(&comp.filtered, ..prefixed[:])
 	append(&comp.filtered, ..others[:])

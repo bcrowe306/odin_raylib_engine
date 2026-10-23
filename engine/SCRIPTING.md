@@ -624,7 +624,10 @@ rather than re-pathing every frame.
   print(Physics.layer_name(2))   --> "Enemies"
   ```
 - `node:set_property(path, value)` / `node:get_property(path)` read and
-  write any Inspector property by its path - the help pane's `path = "..."`
+  write any Inspector property by its path (the paths complete per node
+  class with their type and help, `get_property` returns the property's
+  type and `set_property` checks the value; engine_api.lua's generated
+  block, kept in step with the engine by test_lua_node_properties_definitions) - the help pane's `path = "..."`
   (hover the property; or drag its name into the script). Every node has
   `position`, `rotation`, `scale`, `layer`, `pauseMode`, `paused` and
   `enabled`; nodes that draw an image or a box also `origin` (a fraction of
