@@ -1,0 +1,57 @@
+# Multi-cursor extras: cursors at the ends of the selected lines, undo
+# cursor, skip occurrence, select inside quotes / brackets, Alt+drag column
+# selection.
+wait 5
+exec cp tests/drive/fixtures/drive_ctx_zz.lua $PROJECT/scripts/drive_ctx_zz.lua
+wait-until item:asset:scripts/drive_ctx_zz.lua == visible timeout=300
+dblclick @asset:scripts/drive_ctx_zz.lua
+wait 5
+key ctrl+g
+type 3
+key enter
+key shift+down
+key shift+down
+key alt+shift+i
+expect code.cursors == 2
+type \s-- x
+expect code.text contains find_node("PlayerShip") -- x\n
+expect code.text contains Spaceship_1.png" -- x\n
+key cmd+z
+key cmd+u
+expect code.cursors == 1
+# Skip: from line 3's "local" to line 4's.
+key esc
+key ctrl+g
+type 3
+key enter
+key home
+key cmd+d
+expect code.selection == local
+key cmd+alt+d
+expect code.cursors == 1
+expect code.cursor == 4:10
+# Select inside the quotes, then the brackets.
+key ctrl+g
+type 5
+key enter
+key end
+key left
+key left
+key left
+key cmd+shift+m
+expect code.selection == sounds/none.wav
+key cmd+shift+m
+expect code.selection == "sounds/none.wav"
+# Column selection: Alt+drag over three lines.
+key esc
+key ctrl+g
+type 3
+key enter
+key home
+hold alt
+drag @code.caret @code.caret+48,40 8
+release
+expect code.cursors == 3
+screenshot column
+type X
+expect code.text contains \n\s\s\s\sXhip = Scene.find_node("PlayerShip")\n\s\s\s\sXex = 

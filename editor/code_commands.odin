@@ -350,6 +350,7 @@ Code_CmdAddCursor :: proc(state: ^EditorState, dir: int) {
 	srcLine := buf.buffer_line_str(b, last.pos.line)
 	vcol := code_visual_col(srcLine, last.pos.col)
 	col := code_byte_col(buf.buffer_line_str(b, target), vcol)
+	code_cursor_history_push(doc)
 	append(&b.cursors, buf.Cursor{pos = {target, col}})
 	code_touched(doc)
 }
@@ -384,6 +385,7 @@ Code_CmdSelectNextOccurrence :: proc(state: ^EditorState) {
 			if has && cs == m.start && ce == m.end {taken = true; break}
 		}
 		if !taken {
+			code_cursor_history_push(doc)
 			append(&b.cursors, buf.Cursor{pos = m.end, sel = {anchor = m.start, active = true}})
 			code_touched(doc)
 			return
@@ -406,6 +408,7 @@ Code_CmdSelectAllOccurrences :: proc(state: ^EditorState) {
 	needle := buf.buffer_line_str(b, s.line)[s.col:e_.col]
 	matches, _ := code_find_matches(b, needle, true, whole, false)
 	if len(matches) == 0 do return
+	code_cursor_history_push(doc)
 	clear(&b.cursors)
 	for m in matches do append(&b.cursors, buf.Cursor{pos = m.end, sel = {anchor = m.start, active = true}})
 	code_touched(doc)

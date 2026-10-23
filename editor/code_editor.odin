@@ -56,6 +56,7 @@ Code_Doc :: struct {
 	scrollToCursor: bool,
 	structure:     Code_Structure, // brackets / blocks (code_structure.odin)
 	selStack:      [dynamic][2]buf.Position, // expand selection history (shrink pops)
+	cursorHistory: [dynamic][]buf.Cursor,    // cursor sets before additions (Cmd+U)
 }
 
 Code_Completion :: struct {
@@ -92,6 +93,7 @@ Code_Editor :: struct {
 	closeRequest:  int,  // tab to close at the end of the frame (-1 = none)
 	closeOthers:   int,  // close every tab but this one (-2 = all, -1 = none)
 	closeMode:     enum {Others, Right, Saved}, // with closeOthers: which tabs go
+	columnFrom:    [2]f32, // Alt-drag column selection: where it started (screen)
 	lastDiskCheck: time.Tick,
 	cursorMoved:   time.Tick, // caret blink restarts on movement
 	// Layout of the last drawn frame (screen space).
@@ -305,6 +307,7 @@ code_close_doc :: proc(idx: int) {
 	Token_CacheDestroy(&doc.tokens)
 	code_structure_destroy(&doc.structure)
 	delete(doc.selStack)
+	code_cursor_history_destroy(doc)
 	delete(doc.path)
 	delete(doc.rel)
 	delete(doc.uri)
@@ -794,7 +797,10 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 				code_set_single_cursor(b, p, false)
 				buf.cursor_select_line(b, &b.cursors[0])
 			case io.KeyAlt:
-				// Alt-click adds a cursor (or removes one already there).
+				// Alt-click adds a cursor (or removes one already there);
+				// Alt-drag from here makes a column selection.
+				code_cursor_history_push(doc)
+				cm.columnFrom = mouse
 				removed := false
 				if len(b.cursors) > 1 {
 					for c, i in b.cursors {
@@ -817,6 +823,9 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 		p := code_pos_at(b, mouse)
 		code_set_single_cursor(b, p, true)
 		doc.scrollToCursor = true
+	}
+	if active && imgui.IsMouseDragging(.Left, 4) && io.KeyAlt {
+		code_column_select(doc, cm.columnFrom, mouse) // box selection (code_multicursor.odin)
 	}
 
 	if focused do code_handle_keys(state, doc)

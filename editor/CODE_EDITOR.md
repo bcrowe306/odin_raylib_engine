@@ -111,8 +111,13 @@ feature needs it.
 |---|---|
 | Cmd+D | Select the next occurrence |
 | Cmd+Shift+L | Select all occurrences |
+| Cmd+Alt+D | **Skip occurrence**: select the next one instead of this one |
 | Cmd+Alt+Up / Down | Add a cursor above / below |
-| Alt+click | Add a cursor |
+| Shift+Alt+I | **A cursor at the end of every selected line** |
+| Cmd+U | **Undo cursor**: back to the cursors before the last added |
+| Cmd+Shift+M | **Select inside** the quotes / brackets around the caret (again: the next pair out) |
+| Alt+click | Add a cursor (on one: remove it) |
+| Alt+drag | **Column (box) selection**: a cursor per line, the same columns |
 
 ## Find
 

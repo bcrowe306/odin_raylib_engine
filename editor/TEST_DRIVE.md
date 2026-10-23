@@ -75,6 +75,7 @@ exits non-zero if any check fails.
 | `code_clipboard.drive` | A copy with nothing selected pastes as a whole line above the cursor's line; Cmd+Enter indents inside a function; a block pasted there is re-indented; Cmd+Shift+V pastes from the history. |
 | `code_context_menu.drive` | The code context menu: a node-name string selects the node, a file path reveals it, a symbol's entries, the Selection submenu; Wrap In if on two lines; the gutter menu; the tab menu. |
 | `code_expand_selection.drive` | Expand selection from inside a string: word, string, brackets, call, line, function body, function, file; shrink back. |
+| `code_multicursor.drive` | Cursors at line ends (typing at both), undo cursor, skip occurrence, select inside quotes then brackets, Alt+drag column selection. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
