@@ -94,6 +94,7 @@ exits non-zero if any check fails.
 | `code_inline_values.drive` | Paused at a breakpoint in update: line 27 shows self and dt; gone after Continue. |
 | `code_inspector_link.drive` | Show in Inspector on self.rotation_speed selects PlayerShip and lights its row; the Inspector's thrust_power > Find in Script opens the declaration, name selected. |
 | `code_soak_mem.drive` | 40 rounds of Code tab use (typing, undo, fold, soft wrap, find, expand selection, clipboard history, menus); with `EDITOR_DEFINES=-define:ORE_MEM_TRACK=true` the log shows the live heap staying flat. |
+| `state_graph.drive` | The State Machine tab follows a new StateMachine; right-click adds states, renamed in the side panel; a dot dragged onto a state makes a transition (a condition added); saved with positions; Delete removes the arrow (not the node). |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -175,8 +176,9 @@ Queries:
 - `insp-help-path` (the path the help pane shows), `insp-flash` (the row Show in Inspector lit)
 - `particle-preview` (on / off; `node:<Name>.particles` = an emitter's live particles)
 - `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
-- `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk, Search)
+- `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk, Search, StateGraph)
 - `search-total`, `search-files` (find in files)
+- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
 - `runtime-diags` (script problems recorded from Simulate / Play)

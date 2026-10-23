@@ -22,6 +22,8 @@ OP_LABELS := [e.SM_Op]string {
 	.Trigger   = "trigger",
 	.Finished  = "animation finished",
 	.After     = "after (s)",
+	.Call      = "script says",
+	.Or        = "-- or --",
 }
 
 // name_field: an InputText for a string held in the node's arena; returns
@@ -232,71 +234,7 @@ inspector_state_machine :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 		Drive_Item(fmt.tprintf("insp.sm.tr:%d", i))
 		if len(t.conditions) == 0 do UI_Tooltip("No conditions: fires at once")
 		if open {
-			w := avail * 0.36
-			imgui.SetNextItemWidth(w)
-			if v, ok := state_combo(fmt.tprintf("insp.sm.tr-from:%d", i), sm, t.from, true); ok {
-				Editor_RecordUndo(state, "Transition from")
-				t.from = v
-			}
-			imgui.SameLine()
-			imgui.TextUnformatted(ICON_FA_ARROW_RIGHT)
-			imgui.SameLine()
-			imgui.SetNextItemWidth(w)
-			if v, ok := state_combo(fmt.tprintf("insp.sm.tr-to:%d", i), sm, t.to, false); ok {
-				Editor_RecordUndo(state, "Transition to")
-				t.to = v
-			}
-			imgui.SameLine()
-			if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("insp.sm.tr-del:%d", i), "Remove transition", size = 24) do removeTr = i
-			imgui.SetNextItemWidth(w)
-			imgui.DragFloat("##blend", &t.blend, 0.01, 0, 5, "blend %.2fs")
-			undo_on_activate(state, "Transition blend")
-			Drive_Item(fmt.tprintf("insp.sm.tr-blend:%d", i))
-			UI_Tooltip("Crossfade time into the target state's animation")
-
-			removeCond := -1
-			for &c, j in t.conditions {
-				imgui.PushIDInt(i32(j))
-				imgui.TextDisabled(j == 0 ? "when" : "and")
-				imgui.SameLine()
-				if e.SM_Op_UsesParam(c.op) {
-					imgui.SetNextItemWidth(avail * 0.34)
-					pi := -1
-					for n, k in paramNames do if n == c.param do pi = k
-					if k, changed := UI_Combo(fmt.tprintf("insp.sm.cond-param:%d.%d", i, j), pi, paramNames[:]); changed {
-						Editor_RecordUndo(state, "Condition parameter")
-						c.param = clone(sm, paramNames[k])
-					}
-					imgui.SameLine()
-				}
-				opNames := make([]string, len(e.SM_Op), context.temp_allocator)
-				for op in e.SM_Op do opNames[int(op)] = OP_LABELS[op]
-				imgui.SetNextItemWidth(avail * 0.22)
-				if k, changed := UI_Combo(fmt.tprintf("insp.sm.cond-op:%d.%d", i, j), int(c.op), opNames); changed {
-					Editor_RecordUndo(state, "Condition")
-					c.op = e.SM_Op(k)
-					if e.SM_Op_UsesParam(c.op) && c.param == "" && len(paramNames) > 0 do c.param = clone(sm, paramNames[0])
-				}
-				if e.SM_Op_UsesValue(c.op) {
-					imgui.SameLine()
-					imgui.SetNextItemWidth(avail * 0.14)
-					imgui.DragFloat("##cv", &c.value, 0.1, 0, 0, "%.3g")
-					undo_on_activate(state, "Condition value")
-					Drive_Item(fmt.tprintf("insp.sm.cond-value:%d.%d", i, j))
-				}
-				imgui.SameLine()
-				if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("insp.sm.cond-del:%d.%d", i, j), "Remove condition", size = 22) do removeCond = j
-				imgui.PopID()
-			}
-			if removeCond >= 0 {
-				Editor_RecordUndo(state, "Remove condition")
-				ordered_remove(&t.conditions, removeCond)
-			}
-			if UI_Button(fmt.tprintf("%s  Condition", ICON_FA_PLUS), fmt.tprintf("insp.sm.add-cond:%d", i)) {
-				Editor_RecordUndo(state, "Add condition")
-				if len(paramNames) > 0 do e.StateMachine_AddCondition(sm, &t, .Is_True, paramNames[0])
-				else do e.StateMachine_AddCondition(sm, &t, .Finished)
-			}
+			if SM_TransitionEditor(state, sm, &t, i, avail) do removeTr = i
 			imgui.TreePop()
 		}
 		imgui.PopID()
@@ -315,3 +253,101 @@ inspector_state_machine :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 	UI_DimText("Scripts: on_enter_<state>(previous) / on_exit_<state>(next) on the machine's or its parent's script")
 }
 
+// SM_TransitionEditor: from / to, blend and the conditions of a transition
+// (the Inspector and the graph's side panel); true = remove it.
+SM_TransitionEditor :: proc(state: ^EditorState, sm: ^e.StateMachineNode, t: ^e.SM_Transition, i: int, avail: f32) -> (remove: bool) {
+	clone :: proc(sm: ^e.StateMachineNode, s: string) -> string {return strings.clone(s, sm.allocator)}
+	paramNames := make([dynamic]string, context.temp_allocator)
+	for p in sm.params do append(&paramNames, p.name)
+	w := avail * 0.36
+	imgui.SetNextItemWidth(w)
+	if v, ok := state_combo(fmt.tprintf("insp.sm.tr-from:%d", i), sm, t.from, true); ok {
+		Editor_RecordUndo(state, "Transition from")
+		t.from = v
+	}
+	imgui.SameLine()
+	imgui.TextUnformatted(ICON_FA_ARROW_RIGHT)
+	imgui.SameLine()
+	imgui.SetNextItemWidth(w)
+	if v, ok := state_combo(fmt.tprintf("insp.sm.tr-to:%d", i), sm, t.to, false); ok {
+		Editor_RecordUndo(state, "Transition to")
+		t.to = v
+	}
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("insp.sm.tr-del:%d", i), "Remove transition", size = 24) do remove = true
+	imgui.SetNextItemWidth(w)
+	imgui.DragFloat("##blend", &t.blend, 0.01, 0, 5, "blend %.2fs")
+	undo_on_activate(state, "Transition blend")
+	Drive_Item(fmt.tprintf("insp.sm.tr-blend:%d", i))
+	UI_Tooltip("Crossfade time into the target state's animation")
+
+	removeCond := -1
+	for &c, j in t.conditions {
+		imgui.PushIDInt(i32(j))
+		if c.op == .Or {
+			// A group separator: the conditions after it are an alternative.
+			imgui.TextColored(UI_ACCENT, "or")
+			imgui.SameLine()
+			UI_DimText("(the next conditions are another way to fire)")
+			imgui.SameLine()
+			if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("insp.sm.cond-del:%d.%d", i, j), "Remove", size = 22) do removeCond = j
+			imgui.PopID()
+			continue
+		}
+		first := j == 0 || t.conditions[j - 1].op == .Or
+		imgui.TextDisabled(first ? "when" : "and")
+		imgui.SameLine()
+		if c.op == .Call {
+			// A script method that says yes / no.
+			if v, ok := name_field(state, fmt.tprintf("insp.sm.cond-call:%d.%d", i, j), c.param, avail * 0.34, "method_name"); ok {
+				Editor_RecordUndo(state, "Condition method")
+				c.param = clone(sm, v)
+			}
+			UI_Tooltip("A method of the machine's script (else its parent's), e.g. function Guard:sees_player() return ... end; fires when it returns true")
+			imgui.SameLine()
+		} else if e.SM_Op_UsesParam(c.op) {
+			imgui.SetNextItemWidth(avail * 0.34)
+			pi := -1
+			for n, k in paramNames do if n == c.param do pi = k
+			if k, changed := UI_Combo(fmt.tprintf("insp.sm.cond-param:%d.%d", i, j), pi, paramNames[:]); changed {
+				Editor_RecordUndo(state, "Condition parameter")
+				c.param = clone(sm, paramNames[k])
+			}
+			imgui.SameLine()
+		}
+		opNames := make([]string, len(e.SM_Op), context.temp_allocator)
+		for op in e.SM_Op do opNames[int(op)] = OP_LABELS[op]
+		imgui.SetNextItemWidth(avail * 0.22)
+		if k, changed := UI_Combo(fmt.tprintf("insp.sm.cond-op:%d.%d", i, j), int(c.op), opNames); changed {
+			Editor_RecordUndo(state, "Condition")
+			c.op = e.SM_Op(k)
+			if e.SM_Op_UsesParam(c.op) && c.param == "" && len(paramNames) > 0 do c.param = clone(sm, paramNames[0])
+		}
+		if e.SM_Op_UsesValue(c.op) {
+			imgui.SameLine()
+			imgui.SetNextItemWidth(avail * 0.14)
+			imgui.DragFloat("##cv", &c.value, 0.1, 0, 0, "%.3g")
+			undo_on_activate(state, "Condition value")
+			Drive_Item(fmt.tprintf("insp.sm.cond-value:%d.%d", i, j))
+		}
+		imgui.SameLine()
+		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("insp.sm.cond-del:%d.%d", i, j), "Remove condition", size = 22) do removeCond = j
+		imgui.PopID()
+	}
+	if removeCond >= 0 {
+		Editor_RecordUndo(state, "Remove condition")
+		ordered_remove(&t.conditions, removeCond)
+	}
+	if UI_Button(fmt.tprintf("%s  Condition", ICON_FA_PLUS), fmt.tprintf("insp.sm.add-cond:%d", i)) {
+		Editor_RecordUndo(state, "Add condition")
+		if len(paramNames) > 0 do e.StateMachine_AddCondition(sm, t, .Is_True, paramNames[0])
+		else do e.StateMachine_AddCondition(sm, t, .Finished)
+	}
+	imgui.SameLine()
+	if UI_Button("Or", fmt.tprintf("insp.sm.add-or:%d", i)) {
+		Editor_RecordUndo(state, "Add or")
+		e.StateMachine_AddCondition(sm, t, .Or)
+	}
+	UI_Tooltip("Start another group of conditions: the transition fires when any group holds")
+	return
+}

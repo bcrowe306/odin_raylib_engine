@@ -1,0 +1,608 @@
+package editor
+
+import "core:fmt"
+import "core:math"
+import "core:math/linalg"
+import "core:strings"
+import "core:time"
+import e "../engine"
+import buf "../odin_editor/buffer"
+import imgui "lib/imgui"
+
+// ============================================================================
+// State machine graph (bottom panel "State Machine" tab) for the selected
+// StateMachineNode: states as boxes (gameplay states or ones that play an
+// animation, a child machine marked), transitions as arrows labelled with
+// their conditions, the "Any state" box for transitions from anywhere.
+//
+//   drag a box             move it (saved with the scene)
+//   drag a box's handle    (the dot on its right) onto another: a transition
+//   click / Delete         select a state or an arrow / remove it
+//   right-click            add a state (gameplay, or for an animation) /
+//                          the state's actions (initial, break on enter, ...)
+//   wheel / middle drag    zoom / pan;  F frames everything
+//
+// The side panel edits the selection: a state's name, animation, child
+// machine, break on enter and its script callbacks; a transition's
+// conditions (shared with the Inspector). While the scene runs (Simulate)
+// the current state is lit, the transition that fired flashes, and the
+// history lists the last changes.
+// ============================================================================
+
+SMG_BOX :: [2]f32{150, 54}
+
+// stateGraphFocused: the graph tab has focus (its Delete isn't the scene's).
+stateGraphFocused: bool
+
+@(private = "file")
+smg: struct {
+	node:      ^e.StateMachineNode,
+	pan:       [2]f32,
+	zoom:      f32,
+	selState:  int, // -1 none; -2 the Any box
+	selTr:     int,
+	dragging:  int, // state being moved (-1)
+	dragGrab:  [2]f32,
+	dragUndo:  bool,
+	linkFrom:  int, // drag from a handle: -1 none, -2 = Any
+	ctxState:  int,
+	ctxWorld:  [2]f32,
+	lastHist:  int,    // history length seen (flash on change)
+	flashAt:   time.Tick,
+	flashTr:   int,
+	frame:     bool,
+}
+
+@(private = "file")
+smg_reset :: proc(sm: ^e.StateMachineNode) {
+	smg.node = sm
+	smg.zoom = 1
+	smg.pan = {}
+	smg.selState, smg.selTr, smg.dragging, smg.linkFrom = -1, -1, -1, -1
+	smg.lastHist = sm.historyLen if sm != nil else 0
+	smg.frame = true
+}
+
+// StateGraph_Render draws the tab.
+StateGraph_Render :: proc(state: ^EditorState) {
+	sel := state.selectedNode
+	if sel == nil || sel.typeId != e.StateMachineNode {
+		imgui.Dummy({0, 8})
+		UI_DimText("   Select a State Machine node to edit its states and transitions as a graph.")
+		return
+	}
+	sm := cast(^e.StateMachineNode)sel
+	if smg.node != sm do smg_reset(sm)
+	stateGraphFocused = imgui.IsWindowFocused(imgui.FocusedFlags_RootAndChildWindows)
+	if smg.zoom == 0 do smg.zoom = 1
+	avail := imgui.GetContentRegionAvail()
+	panelW: f32 = 330
+	if imgui.BeginChild("##smg_canvas", {max(avail.x - panelW - 8, 200), avail.y}, {.Borders}, {.NoScrollbar, .NoScrollWithMouse}) {
+		smg_canvas(state, sm)
+	}
+	imgui.EndChild()
+	imgui.SameLine()
+	if imgui.BeginChild("##smg_side", {0, avail.y}, {}, {}) {
+		smg_side_panel(state, sm)
+	}
+	imgui.EndChild()
+}
+
+// --- geometry -----------------------------------------------------------------------
+
+@(private = "file")
+smg_to_screen :: proc(origin: [2]f32, w: [2]f32) -> [2]f32 {return origin + smg.pan + w * smg.zoom}
+
+@(private = "file")
+smg_to_world :: proc(origin: [2]f32, s: [2]f32) -> [2]f32 {return (s - origin - smg.pan) / smg.zoom}
+
+@(private = "file")
+smg_box_pos :: proc(sm: ^e.StateMachineNode, i: int) -> [2]f32 {
+	return sm.anyPos if i == -2 else sm.states[i].pos
+}
+
+// smg_edge: where the segment from a box's centre towards p leaves the box.
+@(private = "file")
+smg_edge :: proc(mn, mx, p: [2]f32) -> [2]f32 {
+	c := (mn + mx) * 0.5
+	d := p - c
+	half := (mx - mn) * 0.5
+	if d.x == 0 && d.y == 0 do return c
+	sx := half.x / abs(d.x) if d.x != 0 else max(f32)
+	sy := half.y / abs(d.y) if d.y != 0 else max(f32)
+	return c + d * min(sx, sy)
+}
+
+@(private = "file")
+seg_dist :: proc(p, a, b: [2]f32) -> f32 {
+	ab := b - a
+	t := clamp(linalg.dot(p - a, ab) / max(linalg.dot(ab, ab), 0.0001), 0, 1)
+	return linalg.length(p - (a + ab * t))
+}
+
+// smg_condition_text: a short label for a transition's conditions.
+smg_condition_text :: proc(t: e.SM_Transition) -> string {
+	if len(t.conditions) == 0 do return "always"
+	sb := strings.builder_make(context.temp_allocator)
+	sep := ""
+	for c in t.conditions {
+		if c.op == .Or {
+			strings.write_string(&sb, " | ")
+			sep = ""
+			continue
+		}
+		strings.write_string(&sb, sep)
+		sep = ", "
+		switch c.op {
+		case .Is_True:   fmt.sbprintf(&sb, "%s", c.param)
+		case .Is_False:  fmt.sbprintf(&sb, "!%s", c.param)
+		case .Equal, .Not_Equal, .Greater, .Less: fmt.sbprintf(&sb, "%s %s %g", c.param, e.SM_OP_NAMES[c.op], c.value)
+		case .Trigger:   fmt.sbprintf(&sb, "%s!", c.param)
+		case .Finished:  strings.write_string(&sb, "anim done")
+		case .After:     fmt.sbprintf(&sb, "after %gs", c.value)
+		case .Call:      fmt.sbprintf(&sb, "%s()", c.param)
+		case .Or:
+		}
+	}
+	s := strings.to_string(sb)
+	return s if len(s) <= 34 else fmt.tprintf("%s…", s[:32])
+}
+
+// --- canvas -------------------------------------------------------------------------
+
+@(private = "file")
+smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
+	dl := imgui.GetWindowDrawList()
+	origin := imgui.GetCursorScreenPos()
+	size := imgui.GetContentRegionAvail()
+	io := imgui.GetIO()
+	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
+	hovered := imgui.IsWindowHovered()
+	imgui.DrawList_AddRectFilled(dl, origin, origin + size, col_u32(CODE_BG))
+	Drive_ItemRect("smg.canvas", origin, origin + size, inWindow = true)
+	// Grid.
+	step := 40 * smg.zoom
+	if step > 8 {
+		gx := math.mod(smg.pan.x, step)
+		for x := origin.x + gx; x < origin.x + size.x; x += step do imgui.DrawList_AddLine(dl, {x, origin.y}, {x, origin.y + size.y}, col_u32(ui_line(0.03)))
+		gy := math.mod(smg.pan.y, step)
+		for y := origin.y + gy; y < origin.y + size.y; y += step do imgui.DrawList_AddLine(dl, {origin.x, y}, {origin.x + size.x, y}, col_u32(ui_line(0.03)))
+	}
+	// Frame everything (first show, F).
+	if smg.frame || (hovered && imgui.IsKeyPressed(.F) && !io.WantTextInput) {
+		smg.frame = false
+		mn, mx := sm.anyPos, sm.anyPos + SMG_BOX
+		for s in sm.states {
+			mn = {min(mn.x, s.pos.x), min(mn.y, s.pos.y)}
+			mx = {max(mx.x, s.pos.x + SMG_BOX.x), max(mx.y, s.pos.y + SMG_BOX.y)}
+		}
+		ext := mx - mn + {80, 80}
+		smg.zoom = clamp(min(size.x / ext.x, size.y / ext.y), 0.35, 1.3)
+		smg.pan = (size - (mx - mn) * smg.zoom) * 0.5 - mn * smg.zoom
+	}
+	// Zoom at the mouse / pan.
+	if hovered && io.MouseWheel != 0 {
+		before := smg_to_world(origin, mouse)
+		smg.zoom = clamp(smg.zoom * (1 + io.MouseWheel * 0.1), 0.3, 2.5)
+		smg.pan += mouse - smg_to_screen(origin, before)
+	}
+	if hovered && imgui.IsMouseDragging(.Middle) do smg.pan += {io.MouseDelta.x, io.MouseDelta.y}
+
+	// History change: flash the transition that fired.
+	if sm.historyLen != smg.lastHist || (sm.historyLen == e.SM_HISTORY_MAX && sm.historyNext != smg.lastHist % e.SM_HISTORY_MAX) {
+		smg.lastHist = sm.historyLen
+		smg.flashAt = time.tick_now()
+		smg.flashTr = sm.lastFired
+	}
+	flash := f32(1) - clamp(f32(time.duration_seconds(time.tick_since(smg.flashAt))) / 0.8, 0, 1)
+
+	box :: proc(origin: [2]f32, sm: ^e.StateMachineNode, i: int) -> (mn, mx: [2]f32) {
+		mn = smg_to_screen(origin, smg_box_pos(sm, i))
+		mx = mn + SMG_BOX * smg.zoom
+		return
+	}
+	// Transitions.
+	hoverTr := -1
+	for t, ti in sm.transitions {
+		fi := -2 if t.from == e.SM_ANY else e.StateMachine_FindState(sm, t.from)
+		toI := e.StateMachine_FindState(sm, t.to)
+		if fi == -1 || toI < 0 do continue
+		amn, amx := box(origin, sm, fi)
+		bmn, bmx := box(origin, sm, toI)
+		ca, cb := (amn + amx) * 0.5, (bmn + bmx) * 0.5
+		// A pair both ways: each arrow shifted to its side.
+		dir := linalg.normalize0(cb - ca)
+		perp := [2]f32{-dir.y, dir.x}
+		for o in sm.transitions do if o.from == t.to && o.to == t.from {ca += perp * 7; cb += perp * 7}
+		a := smg_edge(amn, amx, cb)
+		b := smg_edge(bmn, bmx, ca)
+		if hovered && seg_dist(mouse, a, b) < 6 do hoverTr = ti
+		col := ui_line(0.45)
+		thick: f32 = 1.5
+		if ti == smg.selTr {col = UI_ACCENT; thick = 2.5}
+		else if ti == hoverTr do col = ui_line(0.7)
+		if ti == smg.flashTr && flash > 0 {col = {0.96, 0.72, 0.30, 0.4 + 0.6 * flash}; thick = 2 + 2 * flash}
+		imgui.DrawList_AddLine(dl, a, b, col_u32(col), thick)
+		// Arrowhead.
+		ah := 9 * max(smg.zoom, 0.6)
+		imgui.DrawList_AddTriangleFilled(dl, b, b - dir * ah + perp * ah * 0.5, b - dir * ah - perp * ah * 0.5, col_u32(col))
+		// The conditions at the middle.
+		if smg.zoom > 0.55 {
+			label := strings.clone_to_cstring(smg_condition_text(t), context.temp_allocator)
+			w := imgui.CalcTextSize(label).x * 0.85
+			mid := (a + b) * 0.5 + perp * 10
+			imgui.DrawList_AddRectFilled(dl, {mid.x - w * 0.5 - 4, mid.y - 8}, {mid.x + w * 0.5 + 4, mid.y + 8}, col_u32(CODE_BG), 3)
+			imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12, {mid.x - w * 0.5, mid.y - 7}, col_u32(UI_TEXT_DIM if ti != smg.selTr else UI_ACCENT), label)
+		}
+		Drive_ItemRect(fmt.tprintf("smg.tr:%d", ti), (a + b) * 0.5 - {6, 6}, (a + b) * 0.5 + {6, 6}, inWindow = true)
+	}
+
+	// Boxes: Any, then the states.
+	hoverState := -1
+	hoverHandle := -1
+	for i := -2; i < len(sm.states); i += 1 {
+		if i == -1 do continue
+		mn, mx := box(origin, sm, i)
+		inside := hovered && point_in_rect(mouse, mn, mx)
+		handle := [2]f32{mx.x, (mn.y + mx.y) * 0.5}
+		onHandle := hovered && linalg.length(mouse - handle) < 8
+		if inside do hoverState = i
+		if onHandle do hoverHandle = i
+		isAny := i == -2
+		current := !isAny && sm.running && sm.current == i
+		fill := UI_BG_RAISED
+		if current do fill = ui_accent(0.35)
+		if isAny do fill = UI_BG_PANEL
+		imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(fill), 8)
+		border := ui_line(0.18)
+		if (isAny && smg.selState == -2) || (!isAny && smg.selState == i) do border = UI_ACCENT
+		else if current do border = UI_ACCENT
+		imgui.DrawList_AddRect(dl, mn, mx, col_u32(border), 8, {}, 2 if border == UI_ACCENT else 1)
+		pad := [2]f32{10, 7} * smg.zoom
+		if isAny {
+			imgui.DrawList_AddText(dl, mn + pad, col_u32(UI_TEXT_DIM), "Any state")
+		} else {
+			s := sm.states[i]
+			title := strings.clone_to_cstring(s.name, context.temp_allocator)
+			if s.name == sm.initial do imgui.DrawList_AddText(dl, mn + pad, col_u32(UI_WARNING), ICON_FA_FLAG)
+			tx := mn.x + pad.x + (16 if s.name == sm.initial else 0)
+			imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.semibold, imgui.GetFontSize(), {tx, mn.y + pad.y}, col_u32(UI_TEXT), title)
+			sub := fmt.tprintf("%s %s", ICON_FA_FILM, s.animation) if s.animation != "" else "gameplay"
+			if s.child != "" do sub = fmt.tprintf("%s  %s %s", sub, ICON_FA_SITEMAP, s.child)
+			if smg.zoom > 0.6 do imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12, {mn.x + pad.x, mx.y - pad.y - 13}, col_u32(UI_TEXT_DIM), strings.clone_to_cstring(sub, context.temp_allocator))
+			if s.breakOnEnter do imgui.DrawList_AddCircleFilled(dl, {mx.x - 10, mn.y + 10}, 4.5, col_u32({0.92, 0.30, 0.29, 1}))
+			if current {
+				// Time in the state, a thin bar along the bottom.
+				f := clamp(sm.timeInState / 3, 0, 1)
+				imgui.DrawList_AddRectFilled(dl, {mn.x + 6, mx.y - 3}, {mn.x + 6 + (mx.x - mn.x - 12) * f, mx.y - 1}, col_u32(UI_ACCENT))
+			}
+		}
+		// The link handle.
+		imgui.DrawList_AddCircleFilled(dl, handle, 4.5 if !onHandle else 6, col_u32(UI_ACCENT if onHandle else ui_line(0.35)))
+		Drive_ItemRect(fmt.tprintf("smg.state:%s", "Any" if isAny else sm.states[i].name), mn, {mx.x - 12, mx.y}, inWindow = true)
+		Drive_ItemRect(fmt.tprintf("smg.handle:%s", "Any" if isAny else sm.states[i].name), handle - {6, 6}, handle + {6, 6}, inWindow = true)
+	}
+
+	// Mouse.
+	if hovered && (imgui.IsMouseClicked(.Left) || imgui.IsMouseClicked(.Right)) do imgui.SetWindowFocus() // keys go to the graph
+	if hovered && imgui.IsMouseClicked(.Left) {
+		switch {
+		case hoverHandle != -1:
+			smg.linkFrom = hoverHandle
+		case hoverState != -1:
+			smg.selState, smg.selTr = hoverState, -1
+			smg.dragging = hoverState // the Any box (-2) moves too
+			smg.dragGrab = smg_to_world(origin, mouse) - smg_box_pos(sm, hoverState)
+			smg.dragUndo = false
+		case hoverTr != -1:
+			smg.selTr, smg.selState = hoverTr, -1
+		case:
+			smg.selState, smg.selTr = -1, -1
+		}
+	}
+	if smg.dragging == -2 || (smg.dragging >= 0 && smg.dragging < len(sm.states)) {
+		if imgui.IsMouseDragging(.Left, 2) {
+			if !smg.dragUndo {
+				Editor_RecordUndo(state, "Move state")
+				smg.dragUndo = true
+			}
+			p := smg_to_world(origin, mouse) - smg.dragGrab
+			snapped := [2]f32{math.round(p.x / 10) * 10, math.round(p.y / 10) * 10}
+			if smg.dragging == -2 do sm.anyPos = snapped
+			else do sm.states[smg.dragging].pos = snapped
+		}
+		if !imgui.IsMouseDown(.Left) do smg.dragging = -1
+	}
+	if smg.linkFrom != -1 {
+		// Dragging a new transition: an arrow to the mouse.
+		amn, amx := box(origin, sm, smg.linkFrom)
+		start := [2]f32{amx.x, (amn.y + amx.y) * 0.5}
+		imgui.DrawList_AddLine(dl, start, mouse, col_u32(UI_ACCENT), 2)
+		if !imgui.IsMouseDown(.Left) {
+			if hoverState >= 0 && hoverState != smg.linkFrom {
+				Editor_RecordUndo(state, "Add transition")
+				from := e.SM_ANY if smg.linkFrom == -2 else sm.states[smg.linkFrom].name
+				e.StateMachine_AddTransition(sm, from, sm.states[hoverState].name)
+				smg.selTr, smg.selState = len(sm.transitions) - 1, -1
+			}
+			smg.linkFrom = -1
+		}
+	}
+	// Delete the selection.
+	if (imgui.IsWindowFocused() || hovered) && !io.WantTextInput && (imgui.IsKeyPressed(.Delete) || imgui.IsKeyPressed(.Backspace)) {
+		smg_delete_selection(state, sm)
+	}
+	// Right-click: on a state its actions, elsewhere add a state.
+	if hovered && imgui.IsMouseClicked(.Right) {
+		smg.ctxState = hoverState
+		smg.ctxWorld = smg_to_world(origin, mouse)
+		if hoverState != -1 do smg.selState, smg.selTr = hoverState, -1
+		imgui.OpenPopup("##smg_ctx")
+	}
+	if imgui.BeginPopup("##smg_ctx") {
+		smg_context_menu(state, sm)
+		imgui.EndPopup()
+	}
+	if len(sm.states) == 0 {
+		imgui.SetCursorScreenPos(origin + {20, size.y * 0.5})
+		UI_DimText("Right-click to add a state. Drag a state's dot onto another to connect them.")
+	}
+}
+
+@(private = "file")
+smg_delete_selection :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
+	if smg.selTr >= 0 && smg.selTr < len(sm.transitions) {
+		Editor_RecordUndo(state, "Remove transition")
+		ordered_remove(&sm.transitions, smg.selTr)
+		smg.selTr = -1
+	} else if smg.selState >= 0 && smg.selState < len(sm.states) {
+		Editor_RecordUndo(state, "Remove state")
+		e.StateMachine_RemoveState(sm, smg.selState)
+		smg.selState = -1
+	}
+}
+
+@(private = "file")
+smg_add_state :: proc(state: ^EditorState, sm: ^e.StateMachineNode, base, animation: string, at: [2]f32) {
+	Editor_RecordUndo(state, "Add state")
+	name := base
+	for k := 2; e.StateMachine_FindState(sm, name) >= 0; k += 1 do name = fmt.tprintf("%s_%d", base, k)
+	i := e.StateMachine_AddState(sm, name, animation)
+	p := [2]f32{math.round(at.x / 10) * 10, math.round(at.y / 10) * 10}
+	// Not on top of another box: step down until it's clear.
+	overlaps :: proc(sm: ^e.StateMachineNode, i: int, p: [2]f32) -> bool {
+		hit :: proc(a, b: [2]f32) -> bool {return abs(a.x - b.x) < SMG_BOX.x + 10 && abs(a.y - b.y) < SMG_BOX.y + 10}
+		if hit(p, sm.anyPos) do return true
+		for s, k in sm.states do if k != i && hit(p, s.pos) do return true
+		return false
+	}
+	for tries := 0; overlaps(sm, i, p) && tries < 40; tries += 1 do p.y += 70
+	sm.states[i].pos = p
+	smg.selState, smg.selTr = i, -1
+}
+
+@(private = "file")
+smg_context_menu :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
+	i := smg.ctxState
+	if i >= 0 && i < len(sm.states) {
+		s := &sm.states[i]
+		UI_DimText(s.name)
+		if imgui.MenuItem(fmt.ctprintf("%s  Set as Initial State", ICON_FA_FLAG), nil, false, sm.initial != s.name) {
+			Editor_RecordUndo(state, "Initial state")
+			sm.initial = s.name
+		}
+		Drive_Item("ctx:smg-initial")
+		if imgui.MenuItem(fmt.ctprintf("%s  Break on Enter", ICON_FA_CIRCLE), nil, s.breakOnEnter) do s.breakOnEnter = !s.breakOnEnter
+		Drive_Item("ctx:smg-break")
+		if imgui.MenuItem(fmt.ctprintf("%s  Add Script Callbacks", ICON_FA_CODE)) do smg_add_callbacks(state, sm, s.name)
+		Drive_Item("ctx:smg-callbacks")
+		imgui.Separator()
+		if imgui.MenuItem(fmt.ctprintf("%s  Delete State", ICON_FA_TRASH)) {
+			smg.selState = i
+			smg_delete_selection(state, sm)
+		}
+		Drive_Item("ctx:smg-delete")
+		return
+	}
+	if imgui.MenuItem(fmt.ctprintf("%s  Add State", ICON_FA_PLUS)) do smg_add_state(state, sm, "state", "", smg.ctxWorld)
+	Drive_Item("ctx:smg-add-state")
+	if player := e.StateMachine_Player(sm, state.activeScene.manager); player != nil && len(player.animations) > 0 {
+		if imgui.BeginMenu(fmt.ctprintf("%s  Add State for Animation", ICON_FA_FILM)) {
+			for a in player.animations {
+				if a == nil do continue
+				if imgui.MenuItem(strings.clone_to_cstring(a.name, context.temp_allocator)) do smg_add_state(state, sm, a.name, a.name, smg.ctxWorld)
+				Drive_Item(fmt.tprintf("ctx:smg-add-anim:%s", a.name))
+			}
+			imgui.EndMenu()
+		}
+	}
+	if imgui.MenuItem(fmt.ctprintf("%s  Frame All", ICON_FA_EXPAND), "F") do smg.frame = true
+}
+
+// smg_script_rel: the script that gets the machine's callbacks (the
+// machine's own, else its parent's).
+@(private = "file")
+smg_script_rel :: proc(state: ^EditorState, sm: ^e.StateMachineNode) -> (string, ^e.Node) {
+	if rel := node_script_rel(state, sm); rel != "" do return rel, sm
+	if p := e.GetParent(state.activeScene.manager, sm); p != nil {
+		if rel := node_script_rel(state, p); rel != "" do return rel, p
+	}
+	return "", nil
+}
+
+// smg_add_callbacks writes on_enter_ / on_update_ / on_exit_<state> into
+// the script (those missing), before its final `return`.
+@(private = "file")
+smg_add_callbacks :: proc(state: ^EditorState, sm: ^e.StateMachineNode, name: string) {
+	rel, _ := smg_script_rel(state, sm)
+	if rel == "" {
+		Editor_Log(state, .Warn, "Attach a script to %s or its parent first: the callbacks go there", sm.name)
+		return
+	}
+	if !Editor_OpenScript(state, rel) do return
+	doc := code_active_doc()
+	b := &doc.buffer
+	cls := Script_ClassName(buf.buffer_to_string(b, context.temp_allocator))
+	if cls == "" do return
+	sb := strings.builder_make(context.temp_allocator)
+	methods := [3][3]string{{"on_enter_", "previous", "Entered (from the previous state)"}, {"on_update_", "dt", "Every frame while in the state"}, {"on_exit_", "next", "Left (for the next state)"}}
+	for m in methods {
+		method := strings.concatenate({m[0], name}, context.temp_allocator)
+		if _, _, _, found := Script_FindMethod(b, cls, method); found do continue
+		fmt.sbprintf(&sb, "\n---State %s: %s\nfunction %s:%s(%s)\nend\n", name, m[2], cls, method, m[1])
+	}
+	if strings.builder_len(sb) == 0 {
+		Editor_Log(state, .Info, "%s already has the callbacks of %s", rel, name)
+		return
+	}
+	insertLine := buf.buffer_line_count(b)
+	for ln := buf.buffer_line_count(b) - 1; ln >= 0; ln -= 1 {
+		if strings.trim_space(buf.buffer_line_str(b, ln)) == fmt.tprintf("return %s", cls) {insertLine = ln; break}
+	}
+	group := buf.buffer_next_group(b)
+	buf.buffer_insert_text(b, {insertLine, 0}, strings.to_string(sb), group)
+	code_set_single_cursor(b, {insertLine + 3, 0}, false)
+	doc.scrollToCursor = true
+	Editor_Log(state, .Info, "Added %s's callbacks to %s", name, rel)
+}
+
+// --- side panel ---------------------------------------------------------------------
+
+@(private = "file")
+smg_side_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
+	avail := imgui.GetContentRegionAvail().x
+	switch {
+	case smg.selTr >= 0 && smg.selTr < len(sm.transitions):
+		UI_PanelTitle(ICON_FA_ARROW_RIGHT, "Transition")
+		if SM_TransitionEditor(state, sm, &sm.transitions[smg.selTr], smg.selTr, avail) do smg_delete_selection(state, sm)
+		imgui.Dummy({0, 4})
+		UI_DimText("Conditions are ANDed; Or starts another group. Checked in order; one fires per frame.")
+	case smg.selState >= 0 && smg.selState < len(sm.states):
+		smg_state_panel(state, sm, smg.selState, avail)
+	case:
+		UI_PanelTitle(ICON_FA_DIAGRAM_PROJECT, sm.name)
+		UI_DimText(fmt.tprintf("%d states, %d transitions, %d parameters", len(sm.states), len(sm.transitions), len(sm.params)))
+		if sm.running {
+			imgui.TextColored(UI_ACCENT, "%s", fmt.ctprintf("%s  %s  (%.1fs)", ICON_FA_PLAY, e.StateMachine_CurrentName(sm), sm.timeInState))
+		}
+		if len(sm.params) > 0 {
+			imgui.SeparatorText("Parameters")
+			for &p in sm.params {
+				imgui.SetNextItemWidth(avail * 0.4)
+				imgui.DragFloat(fmt.ctprintf("%s##smgp", p.name), &p.value, 0.1, 0, 0, "%.3g")
+			}
+		}
+		UI_DimText("Select a state or an arrow to edit it.")
+	}
+	// The history (while running / after a run).
+	if sm.historyLen > 0 {
+		imgui.SeparatorText("History")
+		hist := e.StateMachine_History(sm)
+		#reverse for h, k in hist {
+			if k < len(hist) - 12 do break
+			from := h.from if h.from != "" else "-"
+			imgui.TextColored(UI_TEXT_FAINT, "%s", fmt.ctprintf("%6.2fs", h.time))
+			imgui.SameLine()
+			imgui.TextUnformatted(fmt.ctprintf("%s %s %s", from, ICON_FA_ARROW_RIGHT, h.to))
+			imgui.SameLine()
+			UI_DimText(h.why)
+		}
+		Drive_Item("smg.history")
+	}
+}
+
+@(private = "file")
+smg_state_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode, i: int, avail: f32) {
+	s := &sm.states[i]
+	UI_PanelTitle(ICON_FA_CIRCLE, "State")
+	@(static) nameBuf: [64]u8
+	@(static) nameFor: int = -1
+	if nameFor != i || !imgui.IsAnyItemActive() {
+		if nameFor != i || string(cstring(raw_data(nameBuf[:]))) != s.name {
+			nameBuf = {}
+			copy(nameBuf[:len(nameBuf) - 1], s.name)
+		}
+		nameFor = i
+	}
+	if UI_BeginProps("##smgstate") {
+		UI_PropLabel("Name")
+		imgui.SetNextItemWidth(-1)
+		if imgui.InputText("##smg_name", cstring(raw_data(nameBuf[:])), len(nameBuf), {.EnterReturnsTrue, .CharsNoBlank}) || imgui.IsItemDeactivatedAfterEdit() {
+			v := strings.trim_space(string(cstring(raw_data(nameBuf[:]))))
+			if v != "" && v != s.name {
+				if e.StateMachine_FindState(sm, v) >= 0 {
+					Editor_Log(state, .Warn, "A state named %s already exists", v)
+				} else {
+					Editor_RecordUndo(state, "Rename state")
+					e.StateMachine_RenameState(sm, i, v)
+				}
+			}
+		}
+		Drive_Item("smg.state-name")
+		UI_PropLabel("Animation")
+		player := e.StateMachine_Player(sm, state.activeScene.manager)
+		names := make([dynamic]string, context.temp_allocator)
+		append(&names, "(none: gameplay)")
+		if player != nil do for a in player.animations do if a != nil do append(&names, a.name)
+		cur := 0
+		for n, k in names do if k > 0 && n == s.animation do cur = k
+		if k, changed := UI_Combo("smg.state-anim", cur, names[:]); changed {
+			Editor_RecordUndo(state, "State animation")
+			s.animation = strings.clone(names[k], sm.allocator) if k > 0 else ""
+		}
+		UI_Tooltip("Played on entering the state (none: a gameplay state - use its script callbacks)")
+		UI_PropLabel("Child Machine")
+		machines := make([dynamic]string, context.temp_allocator)
+		append(&machines, "(none)")
+		mgr := state.activeScene.manager
+		for n in mgr.nodes do if n != nil && n != sm && n.typeId == e.StateMachineNode && !n.removing do append(&machines, e.Node_RelativePath(mgr, sm, n))
+		cc := 0
+		for n, k in machines do if k > 0 && n == s.child do cc = k
+		if k, changed := UI_Combo("smg.state-child", cc, machines[:]); changed {
+			Editor_RecordUndo(state, "Child machine")
+			s.child = strings.clone(machines[k], sm.allocator) if k > 0 else ""
+		}
+		UI_Tooltip("Another state machine that runs only while this state is current (sub-states)")
+		UI_PropLabel("Initial")
+		isInit := sm.initial == s.name
+		if imgui.Checkbox("##smg_init", &isInit) && isInit {
+			Editor_RecordUndo(state, "Initial state")
+			sm.initial = s.name
+		}
+		Drive_Item("smg.state-initial")
+		UI_PropLabel("Break on Enter")
+		imgui.Checkbox("##smg_break", &s.breakOnEnter)
+		Drive_Item("smg.state-break")
+		UI_Tooltip("Pause when the machine enters this state (Simulate and Play)")
+		UI_EndProps()
+	}
+	imgui.SeparatorText("Script callbacks")
+	rel, owner := smg_script_rel(state, sm)
+	if rel != "" {
+		UI_DimText(fmt.tprintf("on %s's script (%s):", owner.name, rel))
+		for m in ([3]string{"on_enter_", "on_update_", "on_exit_"}) do imgui.TextUnformatted(fmt.ctprintf("  %s%s", m, s.name))
+		if UI_Button(fmt.tprintf("%s  Add Missing Callbacks", ICON_FA_CODE), "smg.add-callbacks") do smg_add_callbacks(state, sm, s.name)
+	} else {
+		UI_DimText("Attach a script to the machine or its parent for on_enter_ / on_update_ / on_exit_ callbacks.")
+	}
+	imgui.SeparatorText("Transitions out")
+	for t, ti in sm.transitions {
+		if t.from != s.name do continue
+		if imgui.Selectable(fmt.ctprintf("%s %s   %s##smgout%d", ICON_FA_ARROW_RIGHT, t.to, smg_condition_text(t), ti)) do smg.selTr, smg.selState = ti, -1
+	}
+}
+
+// StateGraph_Query: drive queries smg-*.
+StateGraph_Query :: proc(q: string) -> (string, bool) {
+	switch q {
+	case "smg-selected":
+		sm := smg.node
+		if sm == nil do return "", true
+		if smg.selTr >= 0 && smg.selTr < len(sm.transitions) do return fmt.tprintf("transition %d", smg.selTr), true
+		if smg.selState == -2 do return "Any", true
+		if smg.selState >= 0 && smg.selState < len(sm.states) do return sm.states[smg.selState].name, true
+		return "", true
+	case "smg-zoom": return fmt.tprintf("%.2f", smg.zoom), true
+	}
+	return "", false
+}

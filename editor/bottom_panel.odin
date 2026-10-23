@@ -34,6 +34,7 @@ bottom_tab_for :: proc(node: ^e.Node) -> (BottomTab, bool) {
 	case e.AnimationPlayerNode: return .Animation, true
 	case e.ParticleEmitterNode: return .Particles, true
 	case e.LdtkLevelNode:       return .Ldtk, true
+	case e.StateMachineNode:    return .StateGraph, true
 	}
 	return {}, false
 }
@@ -61,6 +62,7 @@ consoleShow: [LogLevel]bool = {.Info = true, .Warn = true, .Error = true}
 
 BottomPanel_Render :: proc(state: ^EditorState) {
 	animTimelineFocused = false // set again by the Animation tab when it has focus
+	stateGraphFocused = false   // ... and the State Machine tab
 	defer imgui.End()
 	if !imgui.Begin("Console###BottomPanelWindow") do return
 	bottom_follow_selection(state)
@@ -112,6 +114,12 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:ldtk")
+		if imgui.BeginTabItem(fmt.ctprintf("%s  State Machine###StateGraphTab", ICON_FA_DIAGRAM_PROJECT), nil, flags(.StateGraph, req, hasReq)) {
+			state.bottomTab = .StateGraph
+			StateGraph_Render(state)
+			imgui.EndTabItem()
+		}
+		Drive_Item("bottom:stategraph")
 		if imgui.BeginTabItem(fmt.ctprintf("%s  Search###SearchTab", ICON_FA_MAGNIFYING_GLASS), nil, flags(.Search, req, hasReq)) {
 			state.bottomTab = .Search
 			Code_SearchPanel(state)

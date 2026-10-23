@@ -413,6 +413,27 @@ crossfade between animations with `node:animation_play(name, blend)`.
 
 ### State machines
 
+**State Machine tab** (bottom panel; it follows a selected State Machine):
+the machine as a graph - states as boxes (a flag marks the initial one, a
+film its animation, otherwise *gameplay*; a child machine is named), the
+**Any state** box, transitions as arrows labelled with their conditions
+(`speed > 10`, `jump!`, `sees_player()`, `a | b` for or-groups).
+
+- Right-click empty space: **Add State** (a gameplay state) or **Add State
+  for Animation**; right-click a state: Set as Initial, Break on Enter,
+  **Add Script Callbacks** (writes `on_enter_` / `on_update_` / `on_exit_`
+  into the machine's or its parent's script), Delete.
+- Drag a box to move it (positions are saved); drag a box's **dot** onto
+  another box for a transition; click an arrow or a box to edit it in the
+  side panel (name, animation or none, **child machine**, initial, break on
+  enter; a transition's from / to, blend and conditions - including
+  *script says* and *or*); Delete removes the selection. Wheel zooms, the
+  middle button pans, F frames everything.
+- While the scene runs the current state is lit (with a bar for its time),
+  the transition that fired flashes, and the side panel lists the
+  **history** of changes.
+
+The Inspector still edits everything as lists.
 Add a **State Machine** (Animation & Effects) next to an AnimationPlayer.
 The Inspector edits its **Player** (Auto finds a sibling or child),
 **Initial State** and **Autostart**; **States** (name + the animation it

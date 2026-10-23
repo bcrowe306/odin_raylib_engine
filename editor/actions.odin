@@ -452,6 +452,7 @@ Actions_Dispatch :: proc(state: ^EditorState) {
 			if typing || codeFocus do continue
 			// The animation timeline has its own delete / copy / paste.
 			if animTimelineFocused && strings.has_prefix(a.id, "node.") do continue
+			if stateGraphFocused && strings.has_prefix(a.id, "node.") do continue // the graph's own Delete / copy
 		case .Code:   if !codeFocus do continue
 		}
 		// While the find bar has focus, plain keys belong to its text field.

@@ -41,6 +41,7 @@ BottomTab :: enum {
 	Particles,
 	Ldtk,
 	Search, // find in files (code_search.odin)
+	StateGraph, // state machine graph (state_machine_graph.odin)
 }
 
 ViewportTab :: enum {

@@ -222,7 +222,6 @@ Code_RemoveSignalHandler :: proc(state: ^EditorState, scriptRel, method: string,
 
 // --- inspector section -------------------------------------------------------------
 
-@(private = "file")
 node_script_rel :: proc(state: ^EditorState, n: ^e.Node) -> string {
 	if n == nil || n.scriptInstance == nil do return ""
 	return asset_rel_editor(state, (cast(^e.ScriptInstance)n.scriptInstance).modulePath)

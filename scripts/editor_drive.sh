@@ -19,8 +19,11 @@ build() {
 	return 1
 }
 # EDITOR_DEFINES: extra build flags (e.g. -define:ORE_MEM_TRACK=true for leak reports).
-build editor -out:bin/editor ${EDITOR_DEFINES:-} || exit 1
-build . -out:bin/odin_raylib_engine || exit 1
+# EDITOR_BIN: where to build the editor (a second run can use its own binary).
+EDITOR_BIN="${EDITOR_BIN:-bin/editor}"
+build editor -out:"$EDITOR_BIN" ${EDITOR_DEFINES:-} || exit 1
+# SKIP_GAME_BUILD=1: keep bin/odin_raylib_engine (another run is using it).
+[ -n "${SKIP_GAME_BUILD:-}" ] || build . -out:bin/odin_raylib_engine || exit 1
 
 if [ $# -gt 0 ]; then
 	drives=()
@@ -53,7 +56,7 @@ for d in "${drives[@]}"; do
 	EOF
 	shots="editor_screenshots/drive/$name"
 	rm -rf "$shots"
-	if perl -e 'alarm 600; exec @ARGV' ./bin/editor --project "$tmp/project" --drive "$d" --shots "$shots" --no-build > "$tmp/editor.log" 2>&1; then
+	if perl -e 'alarm 600; exec @ARGV' "./$EDITOR_BIN" --project "$tmp/project" --drive "$d" --shots "$shots" --no-build > "$tmp/editor.log" 2>&1; then
 		cp "$tmp/editor.log" "$shots/editor.log" 2>/dev/null # kept (memory reports, ...)
 		summary+=("PASS  $name")
 	else

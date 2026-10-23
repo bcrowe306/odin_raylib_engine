@@ -1,0 +1,56 @@
+# State machine graph: the tab follows a selected State Machine; right-click
+# adds states (gameplay ones), drag a state's dot onto another for a
+# transition, the side panel renames / edits, Delete removes, saved with
+# positions.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type state machine
+key enter
+expect node:StateMachine.type == StateMachineNode
+wait 3
+expect bottom-tab == StateGraph
+rclick @smg.canvas+-180,-20
+click @ctx:smg-add-state
+wait 2
+expect smg-selected == state
+click @smg.state-name
+key cmd+a
+type patrol
+key enter
+wait 2
+expect smg-selected == patrol
+rclick @smg.canvas+120,40
+click @ctx:smg-add-state
+wait 2
+click @smg.state-name
+key cmd+a
+type chase
+key enter
+wait 2
+expect node:StateMachine.state == /2
+drag @smg.handle:patrol @smg.state:chase 10
+wait 2
+expect smg-selected == transition 0
+screenshot graph
+# The side panel edits the selected transition: a script condition.
+click @insp.sm.add-cond:0
+wait 2
+expect item:insp.sm.cond-op:0.0 == visible
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "name": "patrol", "pos": [
+expect file:scenes/main.scene.json contains "from": "patrol", "to": "chase"
+# Delete removes the selected arrow.
+click @smg.tr:0
+key delete
+wait 2
+expect smg-selected == 
+expect node:StateMachine.exists == true
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json !contains "to": "chase"
