@@ -1,0 +1,58 @@
+# Game launch controls: Play This Scene; the toolbar's Pause / Resume, Step
+# one frame, F9 / Shift+F9, Restart (the same scene again, a new process),
+# Stop; Restart after stopping plays it again; Game menu entries.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+key escape
+click @toolbar.play-scene
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+expect last-played == scenes/main.scene.json
+expect item:toolbar.status == visible
+wait-until remote-frame >= 10 timeout=300
+screenshot running
+
+# Pause, step, resume from the toolbar.
+click @toolbar.pause
+wait-until remote-paused == true timeout=200
+screenshot paused
+click @toolbar.step
+wait-until remote-steps == 1 timeout=200
+expect remote-paused == true
+click @toolbar.pause
+wait-until remote-paused == false timeout=200
+
+# The same with the keys.
+key f9
+wait-until remote-paused == true timeout=200
+key shift+f9
+wait-until remote-steps == 2 timeout=200
+key f9
+wait-until remote-paused == false timeout=200
+
+# Restart: a new game process playing the same scene.
+click @toolbar.restart
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+expect log contains Restarting the game
+expect last-played == scenes/main.scene.json
+expect remote-paused == false
+
+# Stop, then Restart from the Game menu plays it again.
+click @toolbar.stop
+wait-until game == stopped timeout=300
+click @menu:Game
+click @menu:Game/Restart
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+expect last-played == scenes/main.scene.json
+click @menu:Game
+click @menu:Game/Pause
+wait-until remote-paused == true timeout=200
+click @menu:Game
+click @menu:Game/Stop
+wait-until game == stopped timeout=300
+expect remote-connected == false

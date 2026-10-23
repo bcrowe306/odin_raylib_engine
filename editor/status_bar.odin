@@ -45,6 +45,10 @@ StatusBar_Render :: proc(state: ^EditorState, width, displayH, barHeight: f32) {
 		imgui.PushStyleColorImVec4(.Text, UI_WARNING)
 		imgui.TextUnformatted(fmt.ctprintf("%s  Building game...", ICON_FA_HAMMER))
 		imgui.PopStyleColor()
+	case state.gameProcessRunning && (RemoteGame_Paused() || Debug_IsStopped()):
+		imgui.PushStyleColorImVec4(.Text, UI_WARNING)
+		imgui.TextUnformatted(fmt.ctprintf("%s  Game paused%s (PID %d)", ICON_FA_PAUSE, " at a breakpoint" if Debug_IsStopped() else "", state.gameProcess.pid))
+		imgui.PopStyleColor()
 	case state.gameProcessRunning:
 		imgui.PushStyleColorImVec4(.Text, UI_SUCCESS)
 		imgui.TextUnformatted(fmt.ctprintf("%s  Game running (PID %d)", ICON_FA_PLAY, state.gameProcess.pid))

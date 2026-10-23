@@ -71,6 +71,8 @@ RemoteGame_Detach :: proc() {
 
 RemoteGame_Connected :: proc() -> bool {return remote.input != nil && remote.connected}
 
+RemoteGame_Paused :: proc() -> bool {return remote.paused}
+
 // RemoteGame_Send writes one command line to the game.
 RemoteGame_Send :: proc(line: string) -> bool {
 	if remote.input == nil do return false

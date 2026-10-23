@@ -74,19 +74,32 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	if UI_IconButton(ICON_FA_ROTATE_RIGHT, "toolbar.redo", "Redo (Ctrl+Shift+Z)") do Editor_Redo(state)
 	if !canRedo do imgui.EndDisabled()
 
-	// 3. Play controls, centred (but never over the tools on the left).
-	playW: f32 = 3 * 32 + 120
+	// 3. Play controls, centred (but never over the tools on the left):
+	// Play / Play Scene; while the game runs Pause (Resume), Step, Restart
+	// and Stop; while building, Stop cancels the build.
+	playW: f32 = 4 * 32 + 110
 	imgui.SameLine()
 	imgui.SetCursorPosX(max(imgui.GetCursorPosX() + UI_SPACE * 3, (width - playW) * 0.5))
-	if state.gameProcessRunning || state.buildRunning {
-		if UI_IconButton(ICON_FA_STOP, "toolbar.stop", "Stop (Shift+F5)", tint = UI_DANGER) {
-			if state.buildRunning {
-				_ = os.process_kill(state.buildProcess)
-			} else {
-				Editor_StopGameProcess(state)
-			}
+	switch {
+	case state.buildRunning:
+		if UI_IconButton(ICON_FA_STOP, "toolbar.stop", "Cancel the build", tint = UI_DANGER) do _ = os.process_kill(state.buildProcess)
+	case state.gameProcessRunning:
+		linked := RemoteGame_Connected() && !Debug_IsStopped()
+		paused := RemoteGame_Paused()
+		if !linked do imgui.BeginDisabled(true)
+		if paused {
+			if UI_IconButton(ICON_FA_PLAY, "toolbar.pause", "Resume (F9)", true, tint = UI_SUCCESS) do Editor_TogglePause(state)
+		} else {
+			if UI_IconButton(ICON_FA_PAUSE, "toolbar.pause", "Pause (F9)") do Editor_TogglePause(state)
 		}
-	} else {
+		imgui.SameLine()
+		if UI_IconButton(ICON_FA_FORWARD_STEP, "toolbar.step", "Step one frame (Shift+F9) - pauses the game") do Editor_StepGame(state)
+		if !linked do imgui.EndDisabled()
+		imgui.SameLine()
+		if UI_IconButton(ICON_FA_ROTATE_RIGHT, "toolbar.restart", "Restart (Cmd+Shift+F5) - saves, rebuilds if needed, plays the same again") do Editor_RestartGame(state)
+		imgui.SameLine()
+		if UI_IconButton(ICON_FA_STOP, "toolbar.stop", "Stop (Shift+F5)", tint = UI_DANGER) do Editor_StopGameProcess(state)
+	case:
 		if UI_IconButton(ICON_FA_PLAY, "toolbar.play", "Play project (F5) - saves changes, rebuilds if code changed", tint = UI_SUCCESS) {
 			Editor_PlayGameProcess(state, .Project)
 		}
@@ -101,6 +114,14 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	case state.buildRunning:
 		imgui.PushStyleColorImVec4(.Text, UI_WARNING)
 		imgui.TextUnformatted(fmt.ctprintf("%s  Building...", ICON_FA_HAMMER))
+		imgui.PopStyleColor()
+	case state.gameProcessRunning && Debug_IsStopped():
+		imgui.PushStyleColorImVec4(.Text, UI_WARNING)
+		imgui.TextUnformatted(fmt.ctprintf("%s  Breakpoint", ICON_FA_PAUSE))
+		imgui.PopStyleColor()
+	case state.gameProcessRunning && RemoteGame_Paused():
+		imgui.PushStyleColorImVec4(.Text, UI_WARNING)
+		imgui.TextUnformatted(fmt.ctprintf("%s  Paused", ICON_FA_PAUSE))
 		imgui.PopStyleColor()
 	case state.gameProcessRunning:
 		imgui.PushStyleColorImVec4(.Text, UI_SUCCESS)

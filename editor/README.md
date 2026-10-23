@@ -75,6 +75,7 @@ that works. On macOS "Cmd" is the Command key; elsewhere it is Ctrl.
 | **Cmd+S / Cmd+Shift+S** | Save scene / save all scenes and scripts |
 | **Cmd+N** | New scene (added to the project) |
 | **F5 / F6 / F7 / Shift+F5** | Play project / play the current scene / simulate in editor / stop |
+| **F9 / Shift+F9 / Cmd+Shift+F5** | Pause or resume the game / step one frame / restart it |
 | **Cmd+1 / Cmd+2 / Cmd+J** | Focus Viewport / Code / Console |
 | **Cmd+Q** | Quit (asks about unsaved scenes and scripts) |
 
@@ -462,6 +463,15 @@ Play always runs what is in the editor. It saves every modified scene, rebuilds 
 binary (`bin/odin_raylib_engine`) if any engine/game source changed, then starts the game with
 `--project <dir>` (plus `--scene <file>` for F6). The game's output streams into the
 Console. **Game → Simulate in Editor** runs the scene inside the editor and restores it when stopped.
+
+While the game runs, the toolbar's play controls become **Pause** /
+**Resume** (F9), **Step** one frame (Shift+F9; pauses first), **Restart**
+(Cmd+Shift+F5: stops and plays the same thing again - the project, the same
+scene, or the same exported package - saving and rebuilding first like
+Play) and **Stop** (Shift+F5); next to them the game's state - Running,
+Paused or Breakpoint (the status bar shows it too). While the game is
+building, Stop cancels the build. The same commands are in the **Game**
+menu; Restart there also replays the last run after it was stopped.
 
 **Debugging Lua**: click a line number in the Code tab to set a breakpoint
 (a red dot; click again to remove it) and Play. When a script reaches it,

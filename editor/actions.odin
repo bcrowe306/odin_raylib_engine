@@ -106,6 +106,9 @@ Actions_Init :: proc() {
 	add({id = "game.play", category = "Game", label = "Play Project", chords = k(ch(.F5)), scope = .Global, run = proc(s: ^EditorState) {Editor_PlayGameProcess(s, .Project)}, enabled = proc(s: ^EditorState) -> bool {return !s.gameProcessRunning && !s.buildRunning}})
 	add({id = "game.play_scene", category = "Game", label = "Play Current Scene", chords = k(ch(.F6)), scope = .Global, run = proc(s: ^EditorState) {Editor_PlayGameProcess(s, .CurrentScene)}, enabled = proc(s: ^EditorState) -> bool {return !s.gameProcessRunning && !s.buildRunning}})
 	add({id = "game.stop", category = "Game", label = "Stop Game", chords = k(ch(.F5, SH), ch(.F8)), scope = .Global, run = Editor_StopGameProcess, enabled = proc(s: ^EditorState) -> bool {return s.gameProcessRunning}})
+	add({id = "game.pause", category = "Game", label = "Pause Game", chords = k(ch(.F9)), scope = .Global, run = Editor_TogglePause, enabled = proc(s: ^EditorState) -> bool {return s.gameProcessRunning && RemoteGame_Connected() && !Debug_IsStopped()}, checked = proc(s: ^EditorState) -> bool {return s.gameProcessRunning && RemoteGame_Paused()}})
+	add({id = "game.step", category = "Game", label = "Step One Frame", chords = k(ch(.F9, SH)), scope = .Global, run = Editor_StepGame, enabled = proc(s: ^EditorState) -> bool {return s.gameProcessRunning && RemoteGame_Connected() && !Debug_IsStopped()}})
+	add({id = "game.restart", category = "Game", label = "Restart Game", chords = k(ch(.F5, PS)), scope = .Global, run = Editor_RestartGame, enabled = proc(s: ^EditorState) -> bool {return !s.buildRunning && (s.gameProcessRunning || s.hasPlayed)}})
 	add({id = "game.simulate", category = "Game", label = "Simulate in Editor", chords = k(ch(.F7)), scope = .Global, run = proc(s: ^EditorState) {
 		if s.isSimulating do Toolbar_StopSimulation(s)
 		else do Toolbar_StartSimulation(s)

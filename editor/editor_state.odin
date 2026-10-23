@@ -101,7 +101,9 @@ EditorState :: struct {
 	showProjectSettings: bool,
 	pendingPlayMode:    Play_Mode,
 	pendingPlayScene:   string,
-	lastPlayedScene:    string,
+	lastPlayedScene:    string, // what Restart plays again ("" = the project)
+	lastPlayPackage:    string, // an exported .ore played last (Restart replays it)
+	hasPlayed:          bool,
 	gameOutput:         ^os.File,
 	gameLineBuf:        [dynamic]u8,
 	buildProcess:       os.Process,

@@ -772,6 +772,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return "running" if state.gameProcessRunning else "stopped", true
 	case "build":
 		return "running" if state.buildRunning else "idle", true
+	case "game-pid": return fmt.tprint(state.gameProcess.pid if state.gameProcessRunning else 0), true
+	case "last-played": return state.lastPlayedScene if state.lastPlayedScene != "" else "project", true
 	case "log":
 		sb := strings.builder_make(context.temp_allocator)
 		for l in state.logs do fmt.sbprintf(&sb, "%s\n", l.message)

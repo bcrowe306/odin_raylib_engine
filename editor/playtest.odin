@@ -28,7 +28,9 @@ Play_Mode :: enum {
 	CurrentScene, // the scene open in the editor
 }
 
-Editor_PlayRequest :: proc(state: ^EditorState, mode: Play_Mode) {
+// Editor_PlayRequest plays the project, or a scene (`scene`, else the one
+// being edited) for .CurrentScene.
+Editor_PlayRequest :: proc(state: ^EditorState, mode: Play_Mode, scene := "") {
 	if state.gameProcessRunning {
 		Editor_StopGameProcess(state)
 	}
@@ -44,7 +46,10 @@ Editor_PlayRequest :: proc(state: ^EditorState, mode: Play_Mode) {
 	}
 
 	state.pendingPlayMode = mode
-	state.pendingPlayScene = state.activeScenePath if mode == .CurrentScene else ""
+	delete(state.pendingPlayScene)
+	state.pendingPlayScene = strings.clone(scene if scene != "" else state.activeScenePath) if mode == .CurrentScene else ""
+	delete(state.lastPlayPackage)
+	state.lastPlayPackage = ""
 
 	// 2. Rebuild the game binary if sources changed since it was built.
 	if reason, stale := Editor_GameBinaryIsStale(); stale && !state.skipGameBuild {
@@ -180,7 +185,9 @@ Editor_LaunchGame :: proc(state: ^EditorState) {
 
 	state.gameProcess = procHandle
 	state.gameProcessRunning = true
+	delete(state.lastPlayedScene)
 	state.lastPlayedScene = strings.clone(state.pendingPlayScene)
+	state.hasPlayed = true
 	what := state.pendingPlayScene if state.pendingPlayScene != "" else fmt.tprintf("project (initial scene %s)", state.projectConfig.initialScene)
 	Editor_Log(state, .Info, "Playing %s - PID %d", what, procHandle.pid)
 }
@@ -417,4 +424,35 @@ Editor_RunPackage :: proc(state: ^EditorState, pkgPath: string) {
 	state.pendingPlayScene = ""
 	Editor_LaunchGame(state)
 	state.projectPath = saved
+	delete(state.lastPlayPackage)
+	state.lastPlayPackage = strings.clone(pkgPath)
+}
+
+// Editor_RestartGame stops the game and plays the same thing again (the
+// project, the same scene, or the same package) - saving and rebuilding
+// first like Play. With nothing played yet, it plays the project.
+Editor_RestartGame :: proc(state: ^EditorState) {
+	if state.buildRunning do return
+	scene := strings.clone(state.lastPlayedScene, context.temp_allocator)
+	pkg := strings.clone(state.lastPlayPackage, context.temp_allocator)
+	if state.gameProcessRunning do Editor_StopGameProcess(state)
+	Editor_Log(state, .Info, "Restarting the game")
+	switch {
+	case pkg != "":   Editor_RunPackage(state, pkg)
+	case scene != "": Editor_PlayRequest(state, .CurrentScene, scene)
+	case:             Editor_PlayRequest(state, .Project)
+	}
+}
+
+// Editor_TogglePause pauses / resumes the running game (editor link).
+Editor_TogglePause :: proc(state: ^EditorState) {
+	if !RemoteGame_Connected() do return
+	RemoteGame_Send("resume" if RemoteGame_Paused() else "pause")
+}
+
+// Editor_StepGame runs one frame of the paused game.
+Editor_StepGame :: proc(state: ^EditorState) {
+	if !RemoteGame_Connected() do return
+	if !RemoteGame_Paused() do RemoteGame_Send("pause")
+	RemoteGame_Send("step 1")
 }
