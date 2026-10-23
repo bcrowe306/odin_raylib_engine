@@ -628,6 +628,10 @@ rather than re-pathing every frame.
   the node's script, live (`enemy:set_property("script.health", 50)`), and
   `node:get_script()` returns that script's `self` - its fields and methods:
 
+  `get_script()` is typed: for a node name that runs a script in the
+  project's scenes, `Scene.find_node("Enemy"):get_script()` has that
+  script's class, so its exported fields and methods complete.
+
   ```lua
   local enemy = Scene.find_node("Enemy")
   enemy:get_script():take_damage(10)    -- call a method of its script

@@ -1,0 +1,26 @@
+# Typed get_script(): a node name that runs a script returns a class of its
+# own (NodeOf_<name>) whose get_script() is that script's class, so another
+# script's exported fields and methods complete.
+wait 5
+wait-until file:.ore/definitions/project_types.lua contains ---@class NodeOf_PatrolDroneAlpha : TextureNode timeout=600
+expect file:.ore/definitions/project_types.lua contains ---@return Drone
+expect file:.ore/definitions/project_types.lua contains fun(name: "PatrolDroneAlpha"): NodeOf_PatrolDroneAlpha
+expect file:.ore/definitions/project_types.lua contains fun(name: "MainCamera"): CameraNode
+dblclick @asset:scripts/player_ship.lua
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+type local drone = Scene.find_node("PatrolDroneAlpha"):get_script()
+key enter
+type drone.orbit_
+wait-until code.completion contains orbit_radius timeout=600
+screenshot script_fields
+key esc
+key enter
+type local ship = Scene.find_node("PatrolDroneAlpha")
+key enter
+type ship:texture_g
+wait-until code.completion contains texture_get_size timeout=600

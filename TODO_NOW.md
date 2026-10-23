@@ -70,7 +70,7 @@ out of scope here.
 ## Phase 8 — Lua integration (2026-10-23)
 
 Autocomplete and type safety
-- [ ] 8.1 Typed `get_script()`: returns the script's generated class (methods, fields)
+- [x] 8.1 Typed `get_script()`: returns the script's generated class (methods, fields)
 - [ ] 8.2 Event names complete in `connect` / `emit` (engine events per node type + custom ones scripts emit) and `on_<event>` methods
 - [ ] 8.3 Typed `get_property` / `set_property` paths per node class
 - [ ] 8.4 Typed `get_node("path")` (paths relative to each script's nodes)
