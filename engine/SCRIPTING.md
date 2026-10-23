@@ -457,6 +457,10 @@ callbacks.
 
 The engine provides full IntelliSense, autocomplete, parameter hints, and type diagnostics for `lua-language-server` (VS Code, Neovim, Helix, Sublime Text).
 
+Every API function in the definitions has a description and a one-line
+`Example:` - shown when you hover it or pick it in completion
+(`lua_api_docs_test.odin` keeps it that way: a new binding needs both).
+
 - **Stubs definition file**: [`engine/definitions/engine_api.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/definitions/engine_api.lua)
 - **Root configuration**: [`.luarc.json`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/.luarc.json)
 

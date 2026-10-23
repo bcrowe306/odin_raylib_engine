@@ -164,50 +164,72 @@ local TrailNode = {}
 ---@class UITabContainerNode : Node
 
 ---Gets the concrete runtime type of the node (e.g. "Node", "TextureNode", "DynamicBodyNode", "CameraNode").
+---
+---Example: `if self.node:get_type() == "DynamicBodyNode" then Log.info("physics body") end`
 ---@return string
 function Node:get_type() end
 
 ---Gets the display/debug name of the node.
+---
+---Example: `Log.info("Spawned " .. self.node:get_name())`
 ---@return string
 function Node:get_name() end
 
 ---Sets the display/debug name of the node.
+---
+---Example: `self.node:set_name("Enemy_" .. tostring(index))`
 ---@param name string
 function Node:set_name(name) end
 
 ---Gets the local position of the node.
+---
+---Example: `local x, y = self.node:get_position()`
 ---@return number x Local X position
 ---@return number y Local Y position
 function Node:get_position() end
 
 ---Sets the local position of the node.
+---
+---Example: `self.node:set_position(320, 180)`
 ---@param x number Local X position
 ---@param y number Local Y position
 function Node:set_position(x, y) end
 
 ---Translates the node position by the given delta offset.
+---
+---Example: `self.node:translate(self.speed * dt, 0)`
 ---@param dx number Delta X
 ---@param dy number Delta Y
 function Node:translate(dx, dy) end
 
 ---Gets the local rotation of the node in degrees.
+---
+---Example: `local angle = self.node:get_rotation()`
 ---@return number rotation Rotation in degrees
 function Node:get_rotation() end
 
 ---Sets the local rotation of the node in degrees.
+---
+---Example: `self.node:set_rotation(90)`
 ---@param degrees number Rotation in degrees
 function Node:set_rotation(degrees) end
 
 ---Rotates the node by delta degrees.
+---
+---Example: `self.node:rotate(180 * dt)`
 ---@param degrees number Delta degrees
 function Node:rotate(degrees) end
 
 ---Gets the local scale factor of the node.
+---
+---Example: `local sx, sy = self.node:get_scale()`
 ---@return number sx Scale X
 ---@return number sy Scale Y
 function Node:get_scale() end
 
 ---Sets the local scale factor of the node.
+---
+---Example: `self.node:set_scale(-1, 1)`
 ---@param sx number Scale X
 ---@param sy? number Scale Y (defaults to sx if omitted)
 function Node:set_scale(sx, sy) end
@@ -215,82 +237,123 @@ function Node:set_scale(sx, sy) end
 ---Shows another image on a TextureNode (project-relative path, e.g. a
 ---`texture` script property). Returns false if it isn't a TextureNode or
 ---the file can't be loaded.
+---
+---Example: `local sprite = self.node:get_node("Sprite"); sprite:set_texture("textures/coin.png")`
 ---@param path TexturePath|string Project-relative texture path
 ---@return boolean ok
 function TextureNode:set_texture(path) end
 
 ---Gets the world-space global position of the node calculated from parent transforms.
+---
+---Example: `local gx, gy = self.node:get_global_position()`
 ---@return number x Global world X position
 ---@return number y Global world Y position
 function Node:get_global_position() end
 
 ---Gets the world-space global rotation of the node in degrees.
+---
+---Example: `local world_angle = self.node:get_global_rotation()`
 ---@return number rotation Global world rotation in degrees
 function Node:get_global_rotation() end
 
 ---Checks if the node is actively updated in the scene loop.
+---
+---Example: `if not self.node:is_enabled() then return end`
 ---@return boolean
 function Node:is_enabled() end
 
 ---Enables or disables updates for the node and its children.
+---
+---Example: `Scene.find_node("Enemy"):set_enabled(false)`
 ---@param enabled boolean
 function Node:set_enabled(enabled) end
 
 ---Checks if the node is rendered in the scene draw loop.
+---
+---Example: `local shown = self.node:is_visible()`
 ---@return boolean
 function Node:is_visible() end
 
 ---Sets whether the node is rendered.
+---
+---Example: `self.node:get_node("Shield"):set_visible(true)`
 ---@param visible boolean
 function Node:set_visible(visible) end
 
 ---Gets the parent node, or nil if this is a root node.
+---
+---Example: `local parent = self.node:get_parent(); if parent then Log.info(parent:get_name()) end`
 ---@return Node?
 function Node:get_parent() end
 
 ---Returns an array of all direct child nodes.
+---
+---Example: `for _, child in ipairs(self.node:get_children()) do child:set_visible(false) end`
 ---@return Node[]
 function Node:get_children() end
 
 ---Adds a tag (group) to the node; false when it already has it.
+---
+---Example: `self.node:add_tag("enemies")`
 ---@param tag NodeTag|string
 ---@return boolean
 function Node:add_tag(tag) end
 
+---Removes a tag (group) from the node; returns false when it did not have it.
+---
+---Example: `local removed = self.node:remove_tag("enemies")`
 ---@param tag NodeTag|string
 ---@return boolean removed
 function Node:remove_tag(tag) end
 
+---Checks whether the node has the given tag (group).
+---
+---Example: `if other:has_tag("player") then self:collect() end`
 ---@param tag NodeTag|string
 ---@return boolean
 function Node:has_tag(tag) end
 
+---Returns an array of all tags (groups) on the node.
+---
+---Example: `for _, tag in ipairs(self.node:get_tags()) do Log.info(tag) end`
 ---@return string[]
 function Node:get_tags() end
 
 ---Finds a direct child node by its exact name.
+---
+---Example: `local sprite = self.node:get_child("Sprite")`
 ---@param name NodeName|string
 ---@return Node?
 function Node:get_child(name) end
 
 ---Finds a node by path relative to this one: "Gun", "Body/Gun", "../Player", "." (self).
+---
+---Example: `local gun = self.node:get_node("Body/Gun")`
 ---@param path string Relative node path
 ---@return Node? node The node, or nil if there is none
 function Node:get_node(path) end
 
 ---Reparents a child node under this node.
+---
+---Example: `local item = Scene.find_node("Key"); self.node:add_child(item)`
 ---@param child Node
 function Node:add_child(child) end
 
 ---Detaches a child node from this node.
+---
+---Example: `self.node:remove_child(self.node:get_child("Shield"))`
 ---@param child Node
 function Node:remove_child(child) end
 
 ---Removes this node and all its children from the active scene (at the end
 ---of the frame, so it's safe from its own update).
+---
+---Example: `self.node:destroy()`
 function Node:destroy() end
 
 ---Removes this node and its children at the end of the frame (= destroy).
+---
+---Example: `if self.health <= 0 then self.node:queue_free() end`
 function Node:queue_free() end
 
 -- ----------------------------------------------------------------------------
@@ -340,18 +403,24 @@ function Node:queue_free() end
 ---are removed automatically when the connecting script or this node is
 ---destroyed. A script also receives its own node's events as methods named
 ---`on_<event>` (e.g. `function MyScript:on_timeout() end`).
+---
+---Example: `self.conn = timer:connect("timeout", function(value, source) self:fire() end)`
 ---@param event NodeEvent|ProjectEvent|string Event name (custom ones: the project's `emit` names)
 ---@param handler fun(value: any, source: Node) Called with the event value and this node
 ---@return integer id Connection id for `disconnect`
 function Node:connect(event, handler) end
 
 ---Removes a connection made with `connect`.
+---
+---Example: `local removed = timer:disconnect(self.conn)`
 ---@param id integer Connection id
 ---@return boolean removed
 function Node:disconnect(id) end
 
 ---Raises a custom event on this node: calls the node script's `on_<event>`
 ---method and every handler connected to that event name.
+---
+---Example: `self.node:emit("health_changed", self.health)`
 ---@param event ProjectEvent|string Event name (the project's custom events complete)
 ---@param value? any Value passed to handlers
 function Node:emit(event, value) end
@@ -4305,62 +4374,90 @@ function UITabContainerNode:set_property(path, value, y) end
 -- ----------------------------------------------------------------------------
 
 ---Applies a continuous force to this node (requires DynamicBodyNode).
+---
+---Example: `self.node:apply_force(0, -500)`
 ---@param fx number Force X in Newtons
 ---@param fy number Force Y in Newtons
 function DynamicBodyNode:apply_force(fx, fy) end
 
 ---Applies an instantaneous impulse to this node (requires DynamicBodyNode).
+---
+---Example: `self.node:apply_impulse(0, -300)`
 ---@param ix number Impulse X
 ---@param iy number Impulse Y
 function DynamicBodyNode:apply_impulse(ix, iy) end
 
 ---Gets the linear velocity of the physics body or character mover in world units per second.
+---
+---Example: `local vx, vy = self.node:get_linear_velocity(); if vy > 400 then self.falling = true end`
 ---@return number vx Linear velocity X
 ---@return number vy Linear velocity Y
 function DynamicBodyNode:get_linear_velocity() end
 
 ---Sets the linear velocity of the physics body or character mover directly.
+---
+---Example: `self.node:set_linear_velocity(200, 0)`
 ---@param vx number Linear velocity X
 ---@param vy number Linear velocity Y
 function DynamicBodyNode:set_linear_velocity(vx, vy) end
 
 ---Gets the angular velocity of the physics body in degrees per second.
+---
+---Example: `local omega = self.node:get_angular_velocity(); if math.abs(omega) > 720 then Log.info("spinning") end`
 ---@return number omega Angular velocity in degrees/sec
 function DynamicBodyNode:get_angular_velocity() end
 
 ---Sets the angular velocity of the physics body in degrees per second.
+---
+---Example: `self.node:set_angular_velocity(180)`
 ---@param omega number Angular velocity in degrees/sec
 function DynamicBodyNode:set_angular_velocity(omega) end
 
 ---Gets the gravity scale multiplier for this physics body.
+---
+---Example: `local g = self.node:get_gravity_scale(); self.node:set_gravity_scale(g * 0.5)`
 ---@return number
 function DynamicBodyNode:get_gravity_scale() end
 
 ---Sets the gravity scale multiplier for this physics body.
+---
+---Example: `self.node:set_gravity_scale(0)`
 ---@param scale number
 function DynamicBodyNode:set_gravity_scale(scale) end
 
 ---Checks whether rotation is locked on this body.
+---
+---Example: `if not self.node:is_fixed_rotation() then self.node:set_fixed_rotation(true) end`
 ---@return boolean
 function DynamicBodyNode:is_fixed_rotation() end
 
 ---Locks or unlocks rotation on this physics body.
+---
+---Example: `self.node:set_fixed_rotation(true)`
 ---@param fixed boolean
 function DynamicBodyNode:set_fixed_rotation(fixed) end
 
 ---Sets the linear drag/damping coefficient.
+---
+---Example: `self.node:set_linear_damping(2.0)`
 ---@param damping number
 function DynamicBodyNode:set_linear_damping(damping) end
 
 ---Sets the angular drag/damping coefficient.
+---
+---Example: `self.node:set_angular_damping(1.5)`
 ---@param damping number
 function DynamicBodyNode:set_angular_damping(damping) end
 
 ---Checks if the physics body is awake and participating in simulation.
+---
+---Example: `if not self.node:is_awake() then self.node:set_awake(true) end`
 ---@return boolean
 function DynamicBodyNode:is_awake() end
 
 ---Wakes up or puts the body to sleep.
+---
+---Example: `self.node:set_awake(true)`
 ---@param awake boolean
 function DynamicBodyNode:set_awake(awake) end
 
@@ -4378,11 +4475,15 @@ function DynamicBodyNode:set_awake(awake) end
 ---@alias BlendMode "alpha"|"additive"|"multiply"|"add_colors"|"subtract_colors"|"premultiplied"
 
 ---Sets the node's shader: a built-in or a project fragment shader (.fs). nil removes it.
+---
+---Example: `self.node:set_shader("builtin:flash")`
 ---@param shader BuiltinShader|string|nil
 function Node:set_shader(shader) end
 
 ---Sets a shader parameter (a uniform of the shader): a number, up to four
 ---numbers, a table {r, g, b, a} / {x, y}, or a texture path.
+---
+---Example: `self.node:set_shader_param("amount", 0.8)`
 ---@param name string
 ---@param x number|number[]|string
 ---@param y? number
@@ -4392,6 +4493,8 @@ function Node:set_shader_param(name, x, y, z, w) end
 
 ---Gets a shader parameter (its value, else the shader's default): up to four
 ---numbers, or the texture path.
+---
+---Example: `local amount = self.node:get_shader_param("amount")`
 ---@param name string
 ---@return number|string|nil x
 ---@return number? y
@@ -4400,6 +4503,8 @@ function Node:set_shader_param(name, x, y, z, w) end
 function Node:get_shader_param(name) end
 
 ---Sets how the node is blended with what's behind it.
+---
+---Example: `self.node:set_blend_mode("additive")`
 ---@param mode BlendMode
 function Node:set_blend_mode(mode) end
 
@@ -4408,19 +4513,28 @@ function Node:set_blend_mode(mode) end
 -- ----------------------------------------------------------------------------
 
 ---Sets the light's colour (0..1).
+---
+---Example: `local lamp = self.node:get_node("Lamp"); lamp:light_set_color(1.0, 0.8, 0.4)`
 ---@param r number
 ---@param g number
 ---@param b number
 function LightNode:light_set_color(r, g, b) end
 
 ---Sets the light's energy (brightness multiplier, 0..8).
+---
+---Example: `local lamp = self.node:get_node("Lamp"); lamp:light_set_energy(2.5)`
 ---@param energy number
 function LightNode:light_set_energy(energy) end
 
+---Gets the light's energy (brightness multiplier).
+---
+---Example: `local lamp = self.node:get_node("Lamp"); lamp:light_set_energy(lamp:light_get_energy() * 0.9)`
 ---@return number energy
 function LightNode:light_get_energy() end
 
 ---Sets the light's radius (world units).
+---
+---Example: `local lamp = self.node:get_node("Lamp"); lamp:light_set_radius(200)`
 ---@param radius number
 function LightNode:light_set_radius(radius) end
 
@@ -4432,27 +4546,44 @@ function LightNode:light_set_radius(radius) end
 ---The node's script instance - the `self` its script sees: read or change its
 ---fields and call its methods (`enemy:get_script():take_damage(10)`). nil
 ---when the node has no script.
+---
+---Example: `local enemy = Scene.find_node("Enemy"); enemy:get_script():take_damage(10)`
 ---@return table?
 function Node:get_script() end
 
 ---Pauses this node and its children (except "always" ones).
+---
+---Example: `Scene.find_node("Enemies"):set_paused(true)`
 ---@param paused boolean
 function Node:set_paused(paused) end
 
+---Checks whether the node is paused, by itself, a parent or the game.
+---
+---Example: `if self.node:is_paused() then return end`
 ---@return boolean paused By itself, a parent or the game
 function Node:is_paused() end
 
+---Sets how the node reacts to pausing: inherit from its parent, pausable, or always running.
+---
+---Example: `self.node:set_pause_mode("always")`
 ---@param mode "inherit"|"pausable"|"always"
 function Node:set_pause_mode(mode) end
 
 ---Sets the text of a TextNode (restarting its typewriter), UI label or button.
+---
+---Example: `self.node:get_node("ScoreLabel"):set_text("Score: " .. self.score)`
 ---@param text string
 function TextHolder:set_text(text) end
 
+---Gets the text of a TextNode, UI label or button.
+---
+---Example: `local text = self.node:get_node("ScoreLabel"):get_text()`
 ---@return string
 function TextHolder:get_text() end
 
 ---TextNode: types the text out again (revealSpeed > 0).
+---
+---Example: `self.node:get_node("Intro"):text_restart()`
 function TextNode:text_restart() end
 
 ---@class DialogueLine
@@ -4463,31 +4594,49 @@ function TextNode:text_restart() end
 ---or one line: box:dialogue_show(text, speaker). Each line types out; the
 ---advance action (default "confirm") shows the rest, then the next line.
 ---Events: "line_shown"(index), "finished".
+---
+---Example: `local box = Scene.find_node("Dialogue"); box:dialogue_show({ { speaker = "Guard", text = "Halt!" } })`
 ---@param lines string|(string|DialogueLine)[]
 ---@param speaker? string
 function DialogueNode:dialogue_show(lines, speaker) end
 
 ---Shows the rest of the line, else the next one.
+---
+---Example: `Scene.find_node("Dialogue"):dialogue_next()`
 function DialogueNode:dialogue_next() end
 
+---Closes the dialogue box.
+---
+---Example: `Scene.find_node("Dialogue"):dialogue_close()`
 function DialogueNode:dialogue_close() end
 
+---Checks whether the dialogue box is currently open.
+---
+---Example: `if Scene.find_node("Dialogue"):dialogue_is_open() then return end`
 ---@return boolean
 function DialogueNode:dialogue_is_open() end
 
 ---LineNode: replaces its points (local to the node).
+---
+---Example: `self.node:get_node("Laser"):line_set_points({ {0, 0}, {120, 0} })`
 ---@param points number[][] { {x, y}, ... }
 function LineNode:line_set_points(points) end
 
 ---LineNode: appends a point (local to the node).
+---
+---Example: `self.node:get_node("Path"):line_add_point(64, 32)`
 ---@param x number
 ---@param y number
 function LineNode:line_add_point(x, y) end
 
 ---LineNode: removes every point.
+---
+---Example: `self.node:get_node("Path"):line_clear()`
 function LineNode:line_clear() end
 
 ---TrailNode: drops the recorded ribbon (e.g. after a teleport).
+---
+---Example: `self.node:set_position(0, 0); self.node:get_node("Trail"):trail_clear()`
 function TrailNode:trail_clear() end
 
 ---@class NavOptions
@@ -4498,6 +4647,8 @@ function TrailNode:trail_clear() end
 ---A* path on this TileMap's or LDtk level's grid (TileMap: painted tiles
 ---are walls when the map is solid; LDtk: IntGrid cells whose collision rule
 ---is Solid). Waypoints from the start to the end, or nil when unreachable.
+---
+---Example: `local level = Scene.find_node("Level"); local path = level:nav_find_path(x, y, tx, ty, {diagonal = false})`
 ---@param x1 number
 ---@param y1 number
 ---@param x2 number
@@ -4507,6 +4658,8 @@ function TrailNode:trail_clear() end
 function NavGrid:nav_find_path(x1, y1, x2, y2, opts) end
 
 ---Whether the grid cell at a world position is walkable.
+---
+---Example: `local level = Scene.find_node("Level"); if level:nav_is_walkable(tx, ty) then self.target = {tx, ty} end`
 ---@param x number
 ---@param y number
 ---@param opts? NavOptions
@@ -4516,10 +4669,14 @@ function NavGrid:nav_is_walkable(x, y, opts) end
 
 ---The collision layers this body's shapes are on: project layer names
 ---(Project Settings > Physics), "LayerN" or numbers 1-16; several or a table.
+---
+---Example: `self.node:set_collision_layer("player")`
 ---@param ... CollisionLayer|string|integer|table
 function Node:set_collision_layer(...) end
 
 ---The collision layers this body's shapes collide with.
+---
+---Example: `self.node:set_collision_mask("world", "enemies")`
 ---@param ... CollisionLayer|string|integer|table
 function Node:set_collision_mask(...) end
 
@@ -4533,38 +4690,60 @@ function Node:set_collision_mask(...) end
 -- ----------------------------------------------------------------------------
 
 ---Sets a parameter that transition conditions test (booleans become 1 / 0).
+---
+---Example: `local sm = self.node:get_node("StateMachine"); sm:sm_set("on_floor", true)`
 ---@param name StateMachineParam|string
 ---@param value number|boolean
 function StateMachineNode:sm_set(name, value) end
 
+---Gets the value of a state machine parameter.
+---
+---Example: `local speed = self.node:get_node("StateMachine"):sm_get("speed")`
 ---@param name StateMachineParam|string
 ---@return number value
 function StateMachineNode:sm_get(name) end
 
 ---Sets a trigger: it stays set until a transition that tests it fires.
+---
+---Example: `self.node:get_node("StateMachine"):sm_trigger("jump")`
 ---@param name StateMachineParam|string
 function StateMachineNode:sm_trigger(name) end
 
 ---Switches to a state now, ignoring conditions.
+---
+---Example: `local ok = self.node:get_node("StateMachine"):sm_travel("hurt", 0.1)`
 ---@param state StateMachineState|string
 ---@param blend? number Crossfade seconds for the state's animation
 ---@return boolean ok false when there is no such state
 function StateMachineNode:sm_travel(state, blend) end
 
+---Gets the name of the current state.
+---
+---Example: `if self.node:get_node("StateMachine"):sm_state() == "attack" then return end`
 ---@return string state The current state ("" before it starts)
 function StateMachineNode:sm_state() end
 
+---Gets the name of the state before the current one.
+---
+---Example: `local prev = self.node:get_node("StateMachine"):sm_previous()`
 ---@return string state The state before the current one
 function StateMachineNode:sm_previous() end
 
+---Gets the time in seconds spent in the current state.
+---
+---Example: `if self.node:get_node("StateMachine"):sm_time() > 2 then self:give_up() end`
 ---@return number seconds Time spent in the current state
 function StateMachineNode:sm_time() end
 
 ---Starts (or restarts) in a state, or in the initial state.
+---
+---Example: `self.node:get_node("StateMachine"):sm_start("idle")`
 ---@param state? string
 function StateMachineNode:sm_start(state) end
 
 ---Stops checking transitions (the current state stays).
+---
+---Example: `self.node:get_node("StateMachine"):sm_stop()`
 function StateMachineNode:sm_stop() end
 
 -- ----------------------------------------------------------------------------
@@ -4581,74 +4760,106 @@ function StateMachineNode:sm_stop() end
 ---Moves by the velocity (x dt), sliding along whatever it touches; the velocity
 ---loses the part going into surfaces. Updates the floor / wall / ceiling state.
 ---Switches the node to Script mode.
+---
+---Example: `local collided = self.node:character_move_and_slide(dt)`
 ---@param dt? number Defaults to the frame's delta time
 ---@return boolean collided
 function CharacterMoverNode:character_move_and_slide(dt) end
 
 ---Gets the velocity in pixels per second (+y is down).
+---
+---Example: `local vx, vy = self.node:character_get_velocity(); vx = Input.get_axis("left", "right") * 200`
 ---@return number vx
 ---@return number vy
 function CharacterMoverNode:character_get_velocity() end
 
 ---Sets the velocity in pixels per second (+y is down).
+---
+---Example: `self.node:character_set_velocity(vx, -350)`
 ---@param vx number
 ---@param vy number
 function CharacterMoverNode:character_set_velocity(vx, vy) end
 
 ---Gets the gravity acting on the character: world gravity x its gravity scale.
+---
+---Example: `local gx, gy = self.node:character_get_gravity(); vy = vy + gy * dt`
 ---@return number gx
 ---@return number gy
 function CharacterMoverNode:character_get_gravity() end
 
 ---Sets the multiplier of the world gravity for this character.
+---
+---Example: `self.node:character_set_gravity_scale(0.5)`
 ---@param scale number
 function CharacterMoverNode:character_set_gravity_scale(scale) end
 
 ---Was the character standing on a floor after the last move?
+---
+---Example: `if self.node:character_is_on_floor() and Input.is_action_pressed("jump") then vy = -350 end`
 ---@return boolean
 function CharacterMoverNode:character_is_on_floor() end
 
 ---Was the character touching a wall after the last move?
+---
+---Example: `if self.node:character_is_on_wall() then vy = math.min(vy, 60) end`
 ---@return boolean
 function CharacterMoverNode:character_is_on_wall() end
 
 ---Was the character touching a ceiling after the last move?
+---
+---Example: `if self.node:character_is_on_ceiling() then vy = 0 end`
 ---@return boolean
 function CharacterMoverNode:character_is_on_ceiling() end
 
 ---The floor's normal (0, -1 on flat ground; tilted on slopes).
+---
+---Example: `local nx, ny = self.node:character_get_floor_normal(); local on_slope = math.abs(nx) > 0.1`
 ---@return number nx
 ---@return number ny
 function CharacterMoverNode:character_get_floor_normal() end
 
 ---The wall's normal (points away from the wall).
+---
+---Example: `local nx, ny = self.node:character_get_wall_normal(); self.node:character_set_velocity(nx * 250, -300)`
 ---@return number nx
 ---@return number ny
 function CharacterMoverNode:character_get_wall_normal() end
 
 ---How far the last move actually went.
+---
+---Example: `local dx, dy = self.node:character_get_last_motion(); self.distance = self.distance + math.abs(dx)`
 ---@return number dx
 ---@return number dy
 function CharacterMoverNode:character_get_last_motion() end
 
 ---"script": the script moves it with character_move_and_slide; "builtin": it moves itself.
+---
+---Example: `self.node:character_set_control_mode("builtin")`
 ---@param mode "script"|"builtin"
 function CharacterMoverNode:character_set_control_mode(mode) end
 
 ---BuiltIn mode: steers the character horizontally and jumps if grounded.
+---
+---Example: `self.node:character_move(Input.get_axis("left", "right"), Input.is_action_pressed("jump"))`
 ---@param dirX number Horizontal direction (-1.0 to 1.0), times the node's max speed
 ---@param jump? boolean Whether to jump if grounded
 function CharacterMoverNode:character_move(dirX, jump) end
 
 ---Same as character_is_on_floor().
+---
+---Example: `if self.node:character_is_grounded() then self.coyote = 0.1 end`
 ---@return boolean
 function CharacterMoverNode:character_is_grounded() end
 
 ---BuiltIn mode: sets the maximum horizontal run speed.
+---
+---Example: `self.node:character_set_speed(220)`
 ---@param speed number
 function CharacterMoverNode:character_set_speed(speed) end
 
 ---BuiltIn mode: sets the jump speed.
+---
+---Example: `self.node:character_set_jump_speed(400)`
 ---@param speed number
 function CharacterMoverNode:character_set_jump_speed(speed) end
 
@@ -4657,14 +4868,20 @@ function CharacterMoverNode:character_set_jump_speed(speed) end
 -- ----------------------------------------------------------------------------
 
 ---Checks whether any physics nodes are currently inside this sensor area.
+---
+---Example: `if self.node:get_node("Hitbox"):area_is_overlapping() then self:take_damage(1) end`
 ---@return boolean
 function AreaNode:area_is_overlapping() end
 
 ---Returns the number of bodies currently overlapping this sensor area.
+---
+---Example: `local count = self.node:get_node("Zone"):area_get_overlap_count()`
 ---@return number
 function AreaNode:area_get_overlap_count() end
 
 ---Returns an array of all nodes currently overlapping this sensor area.
+---
+---Example: `for _, n in ipairs(self.node:area_get_overlapping_nodes()) do Log.info(n:get_name()) end`
 ---@return Node[]
 function AreaNode:area_get_overlapping_nodes() end
 
@@ -4673,36 +4890,52 @@ function AreaNode:area_get_overlapping_nodes() end
 -- ----------------------------------------------------------------------------
 
 ---Executes the raycast immediately against the physics world.
+---
+---Example: `local ray = self.node:get_node("Ray"); ray:raycast_cast()`
 function RaycastNode:raycast_cast() end
 
 ---Checks whether the raycast is currently intersecting a physics obstacle.
+---
+---Example: `local ray = self.node:get_node("Ray"); ray:raycast_cast(); local grounded = ray:raycast_is_colliding()`
 ---@return boolean
 function RaycastNode:raycast_is_colliding() end
 
 ---Gets the world-space intersection point of the raycast hit.
+---
+---Example: `local ray = self.node:get_node("Ray"); local x, y = ray:raycast_get_hit_point()`
 ---@return number x
 ---@return number y
 function RaycastNode:raycast_get_hit_point() end
 
 ---Gets the world-space surface normal at the raycast intersection.
+---
+---Example: `local ray = self.node:get_node("Ray"); local nx, ny = ray:raycast_get_hit_normal()`
 ---@return number nx
 ---@return number ny
 function RaycastNode:raycast_get_hit_normal() end
 
 ---Gets the fraction from 0.0 to 1.0 along the ray length where the hit occurred.
+---
+---Example: `local ray = self.node:get_node("Ray"); local dist = ray:raycast_get_hit_fraction() * 64`
 ---@return number fraction
 function RaycastNode:raycast_get_hit_fraction() end
 
 ---Gets the Node struck by the raycast, or nil if none.
+---
+---Example: `local ray = self.node:get_node("Ray"); local hit = ray:raycast_get_hit_node(); if hit then Log.info(hit.name) end`
 ---@return Node?
 function RaycastNode:raycast_get_hit_node() end
 
 ---Sets the local direction vector for the raycast node.
+---
+---Example: `local ray = self.node:get_node("Ray"); ray:raycast_set_direction(1, 0)`
 ---@param dx number
 ---@param dy number
 function RaycastNode:raycast_set_direction(dx, dy) end
 
 ---Sets the maximum reach length in pixels for the raycast node.
+---
+---Example: `local ray = self.node:get_node("Ray"); ray:raycast_set_length(128)`
 ---@param length number
 function RaycastNode:raycast_set_length(length) end
 
@@ -4711,20 +4944,30 @@ function RaycastNode:raycast_set_length(length) end
 -- ----------------------------------------------------------------------------
 
 ---Starts continuous or burst particle emission.
+---
+---Example: `self.node:get_node("Sparks"):particle_start()`
 function ParticleEmitterNode:particle_start() end
 
 ---Stops particle emission.
+---
+---Example: `self.node:get_node("Sparks"):particle_stop()`
 function ParticleEmitterNode:particle_stop() end
 
 ---Checks if particles are actively being emitted.
+---
+---Example: `local fx = self.node:get_node("Smoke"); if not fx:particle_is_emitting() then fx:particle_start() end`
 ---@return boolean
 function ParticleEmitterNode:particle_is_emitting() end
 
 ---Sets the maximum particle pool count for this emitter.
+---
+---Example: `self.node:get_node("Sparks"):particle_set_amount(64)`
 ---@param amount integer
 function ParticleEmitterNode:particle_set_amount(amount) end
 
 ---Sets the base lifetime in seconds for newly spawned particles.
+---
+---Example: `self.node:get_node("Sparks"):particle_set_lifetime(1.5)`
 ---@param lifetime number
 function ParticleEmitterNode:particle_set_lifetime(lifetime) end
 
@@ -4733,17 +4976,23 @@ function ParticleEmitterNode:particle_set_lifetime(lifetime) end
 -- ----------------------------------------------------------------------------
 
 ---Gets the base unscaled pixel width and height of the texture.
+---
+---Example: `local w, h = self.node:get_node("Sprite"):texture_get_size()`
 ---@return number width
 ---@return number height
 function TextureNode:texture_get_size() end
 
 ---Sets the origin (what it rotates and scales around) in pixels of the image;
 ---stored as a fraction of it - set_property("origin", fx, fy) takes that.
+---
+---Example: `local sprite = self.node:get_node("Sprite"); sprite:texture_set_origin(16, 16)`
 ---@param ox number Origin X in pixels
 ---@param oy number Origin Y in pixels
 function TextureNode:texture_set_origin(ox, oy) end
 
 ---Gets the file path string from which this texture was loaded.
+---
+---Example: `local path = self.node:get_node("Sprite"):texture_get_path()`
 ---@return string
 function TextureNode:texture_get_path() end
 
@@ -4755,27 +5004,41 @@ function TextureNode:texture_get_path() end
 ---With `blend` > 0 the previous pose crossfades into the new animation over that many seconds.
 ---Event tracks fire while playing: method tracks call `self:<method>(frame)` on the
 ---track's target node script; sound tracks play their audio file on the key's frame.
+---
+---Example: `self.node:get_node("AnimationPlayer"):animation_play("run", 0.15)`
 ---@param name? AnimationName|string Animation name (the project's complete)
 ---@param blend? number Crossfade time in seconds (default 0)
 function AnimationPlayerNode:animation_play(name, blend) end
 
 ---Stops animation playback and freezes at current frame.
+---
+---Example: `self.node:get_node("AnimationPlayer"):animation_stop()`
 function AnimationPlayerNode:animation_stop() end
 
 ---Pauses animation playback.
+---
+---Example: `self.node:get_node("AnimationPlayer"):animation_pause()`
 function AnimationPlayerNode:animation_pause() end
 
 ---Resumes animation playback from the current frame.
+---
+---Example: `self.node:get_node("AnimationPlayer"):animation_resume()`
 function AnimationPlayerNode:animation_resume() end
 
 ---Resets the animation to the first frame.
+---
+---Example: `self.node:get_node("AnimationPlayer"):animation_reset()`
 function AnimationPlayerNode:animation_reset() end
 
 ---Sets playback speed in frames per second.
+---
+---Example: `self.node:get_node("AnimationPlayer"):animation_set_fps(12)`
 ---@param fps number
 function AnimationPlayerNode:animation_set_fps(fps) end
 
 ---Gets the name of the currently active animation track.
+---
+---Example: `local current = self.node:get_node("AnimationPlayer"):animation_get_current()`
 ---@return string
 function AnimationPlayerNode:animation_get_current() end
 
@@ -4784,24 +5047,36 @@ function AnimationPlayerNode:animation_get_current() end
 -- ----------------------------------------------------------------------------
 
 ---Starts or restarts the timer from zero.
+---
+---Example: `local timer = self.node:get_node("Cooldown"); timer:timer_start()`
 function TimerNode:timer_start() end
 
 ---Stops the timer.
+---
+---Example: `self.node:get_node("Cooldown"):timer_stop()`
 function TimerNode:timer_stop() end
 
 ---Checks if the timer is actively running.
+---
+---Example: `if self.node:get_node("Cooldown"):timer_is_running() then return end`
 ---@return boolean
 function TimerNode:timer_is_running() end
 
 ---Gets the elapsed time in seconds since start.
+---
+---Example: `local t = self.node:get_node("Cooldown"):timer_get_elapsed()`
 ---@return number
 function TimerNode:timer_get_elapsed() end
 
 ---Sets the timer expiration duration in seconds.
+---
+---Example: `self.node:get_node("Cooldown"):timer_set_duration(0.5)`
 ---@param durationSec number
 function TimerNode:timer_set_duration(durationSec) end
 
 ---Sets whether the timer automatically restarts upon expiring.
+---
+---Example: `self.node:get_node("SpawnTimer"):timer_set_loop(true)`
 ---@param loop boolean
 function TimerNode:timer_set_loop(loop) end
 
@@ -4810,31 +5085,49 @@ function TimerNode:timer_set_loop(loop) end
 -- ----------------------------------------------------------------------------
 
 ---Plays the sound effect associated with this SoundNode.
+---
+---Example: `self.node:get_node("JumpSound"):sound_play()`
 function SoundNode:sound_play() end
 
 ---Stops playing the sound effect.
+---
+---Example: `self.node:get_node("EngineSound"):sound_stop()`
 function SoundNode:sound_stop() end
 
 ---Pauses the sound effect.
+---
+---Example: `self.node:get_node("EngineSound"):sound_pause()`
 function SoundNode:sound_pause() end
 
 ---Resumes the paused sound effect.
+---
+---Example: `self.node:get_node("EngineSound"):sound_resume()`
 function SoundNode:sound_resume() end
 
 ---Plays or resumes the background music on this MusicNode.
+---
+---Example: `Scene.find_node("Music"):music_play()`
 function MusicNode:music_play() end
 
 ---Stops background music on this MusicNode.
+---
+---Example: `Scene.find_node("Music"):music_stop()`
 function MusicNode:music_stop() end
 
 ---Pauses background music on this MusicNode.
+---
+---Example: `Scene.find_node("Music"):music_pause()`
 function MusicNode:music_pause() end
 
 ---Resumes paused background music on this MusicNode.
+---
+---Example: `Scene.find_node("Music"):music_resume()`
 function MusicNode:music_resume() end
 
 ---Fades this MusicNode's volume to `volume` (0..1) over `seconds`, starting
 ---it if it isn't playing.
+---
+---Example: `Scene.find_node("Music"):music_fade(0, 2.0, true)`
 ---@param volume number
 ---@param seconds number
 ---@param stop_at_end? boolean Stop when the fade reaches 0
@@ -4845,55 +5138,81 @@ function MusicNode:music_fade(volume, seconds, stop_at_end) end
 -- ----------------------------------------------------------------------------
 
 ---Sets the zoom level on this CameraNode.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_zoom(2.0)`
 ---@param zoom number
 function CameraNode:camera_set_zoom(zoom) end
 
 ---Gets the configured zoom level on this CameraNode.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_zoom(cam:camera_get_zoom() * 1.1)`
 ---@return number
 function CameraNode:camera_get_zoom() end
 
 ---Sets the target Node to follow.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_target(Scene.find_node("Player"))`
 ---@param target Node?
 function CameraNode:camera_set_target(target) end
 
 ---Adds a node to the group this camera frames (see Camera.add_target).
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_add_target(Scene.find_node("Boss"), {weight = 2})`
 ---@param target Node
 ---@param options? CameraTargetOptions
 function CameraNode:camera_add_target(target, options) end
 
 ---Takes a node out of this camera's group.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_remove_target(Scene.find_node("Boss"))`
 ---@param target Node
 function CameraNode:camera_remove_target(target) end
 
 ---Stops this camera following anything.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_clear_targets()`
 function CameraNode:camera_clear_targets() end
 
 ---The node this camera follows (single target), or nil.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); local target = cam:camera_get_target()`
 ---@return Node?
 function CameraNode:camera_get_target() end
 
 ---Every node this camera follows.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); for _, t in ipairs(cam:camera_get_targets()) do Log.info(t.name) end`
 ---@return Node[]
 function CameraNode:camera_get_targets() end
 
 ---Sets the fixed world position for the camera target.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_target_position(640, 360)`
 ---@param x number
 ---@param y number
 function CameraNode:camera_set_target_position(x, y) end
 
 ---Triggers trauma screen shake on this CameraNode.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_shake(0.6, 0.3)`
 ---@param strength number Shake intensity (0.0 to 1.0)
 ---@param duration? number Duration in seconds (default 0.5)
 function CameraNode:camera_shake(strength, duration) end
 
 ---Immediately cancels any active screen shake.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_stop_shake()`
 function CameraNode:camera_stop_shake() end
 
 ---Checks if screen shake is currently active.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); if not cam:camera_is_shaking() then cam:camera_shake(0.4) end`
 ---@return boolean
 function CameraNode:camera_is_shaking() end
 
 ---Constrains camera movement within bounding rectangle limits.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_limits(0, 2560, 0, 720)`
 ---@param left number
 ---@param right number
 ---@param top number
@@ -4901,6 +5220,8 @@ function CameraNode:camera_is_shaking() end
 function CameraNode:camera_set_limits(left, right, top, bottom) end
 
 ---Clears all bounding rectangle limits.
+---
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_clear_limits()`
 function CameraNode:camera_clear_limits() end
 
 -- ----------------------------------------------------------------------------
@@ -5031,87 +5352,125 @@ function CameraNode:camera_clear_limits() end
 ---@field index integer
 
 ---Gets the current level identifier.
+---
+---Example: `local lv = Scene.find_node("Level"); Log.info("In " .. lv:ldtk_get_level_identifier())`
 ---@return string
 function LdtkLevelNode:ldtk_get_level_identifier() end
 
 ---Lists level identifiers (every level, or one world's).
+---
+---Example: `local lv = Scene.find_node("Level"); for _, id in ipairs(lv:ldtk_get_levels()) do Log.info(id) end`
 ---@param world? string
 ---@return string[]
 function LdtkLevelNode:ldtk_get_levels(world) end
 
 ---Switches to another level (identifier or iid); colliders and entities are rebuilt.
+---
+---Example: `local lv = Scene.find_node("Level"); local ok = lv:ldtk_load_level("Level_2")`
 ---@param identifier LdtkLevel|string
 ---@return boolean ok
 function LdtkLevelNode:ldtk_load_level(identifier) end
 
 ---Gets a level's details (the current level by default).
+---
+---Example: `local lv = Scene.find_node("Level"); local info = lv:ldtk_get_level(); Log.info(info.width)`
 ---@param level? LdtkLevel|string
 ---@return LdtkLevel?
 function LdtkLevelNode:ldtk_get_level(level) end
 
 ---Gets the current level size in pixels.
+---
+---Example: `local lv = Scene.find_node("Level"); local w, h = lv:ldtk_get_level_size(); Log.info(w, h)`
 ---@return number width
 ---@return number height
 function LdtkLevelNode:ldtk_get_level_size() end
 
 ---Gets a level field value (nil if absent or null).
+---
+---Example: `local lv = Scene.find_node("Level"); local music = lv:ldtk_get_level_field("music")`
 ---@param name string
 ---@param level? LdtkLevel|string Another level (default: the current one)
 ---@return any
 function LdtkLevelNode:ldtk_get_level_field(name, level) end
 
 ---Gets every field of a level.
+---
+---Example: `local lv = Scene.find_node("Level"); local fields = lv:ldtk_get_level_fields(); Log.info(fields.music)`
 ---@param level? LdtkLevel|string
 ---@return table<string, any>
 function LdtkLevelNode:ldtk_get_level_fields(level) end
 
 ---Lists a level's neighbours.
+---
+---Example: `local lv = Scene.find_node("Level"); for _, n in ipairs(lv:ldtk_get_neighbours()) do Log.info(n.dir) end`
 ---@param level? LdtkLevel|string
 ---@return LdtkNeighbour[]
 function LdtkLevelNode:ldtk_get_neighbours(level) end
 
 ---The level at a world position (world mode: any loaded level; otherwise looked up in the world layout).
+---
+---Example: `local lv = Scene.find_node("Level"); local id = lv:ldtk_level_at(self.node:get_position())`
 ---@param x number
 ---@param y number
 ---@return string?
 function LdtkLevelNode:ldtk_level_at(x, y) end
 
 ---Lists the project's worlds.
+---
+---Example: `local lv = Scene.find_node("Level"); for _, w in ipairs(lv:ldtk_get_worlds()) do Log.info(w.identifier) end`
 ---@return LdtkWorld[]
 function LdtkLevelNode:ldtk_get_worlds() end
 
 ---Gets the current world identifier.
+---
+---Example: `local lv = Scene.find_node("Level"); local world = lv:ldtk_get_world()`
 ---@return string
 function LdtkLevelNode:ldtk_get_world() end
 
 ---Switches world (its first level, or `level`).
+---
+---Example: `local lv = Scene.find_node("Level"); local ok = lv:ldtk_set_world("Dungeon", "Dungeon_Entrance")`
 ---@param world string
 ---@param level? LdtkLevel|string
 ---@return boolean ok
 function LdtkLevelNode:ldtk_set_world(world, level) end
 
 ---World mode: every level of the world at its world position (rebuilds).
+---
+---Example: `local lv = Scene.find_node("Level"); lv:ldtk_set_world_mode(true)`
 ---@param on boolean
 function LdtkLevelNode:ldtk_set_world_mode(on) end
 
+---Returns true when world mode is on (every level of the world loaded at its world position).
+---
+---Example: `local lv = Scene.find_node("Level"); if not lv:ldtk_is_world_mode() then lv:ldtk_set_world_mode(true) end`
 ---@return boolean
 function LdtkLevelNode:ldtk_is_world_mode() end
 
 ---Lists a level's layers (top first).
+---
+---Example: `local lv = Scene.find_node("Level"); for _, layer in ipairs(lv:ldtk_get_layers()) do Log.info(layer.type) end`
 ---@param level? LdtkLevel|string
 ---@return LdtkLayer[]
 function LdtkLevelNode:ldtk_get_layers(level) end
 
 ---Shows or hides a layer (in every loaded level).
+---
+---Example: `local lv = Scene.find_node("Level"); lv:ldtk_set_layer_visible("Background", false)`
 ---@param name LdtkLayer|string
 ---@param visible boolean
 function LdtkLevelNode:ldtk_set_layer_visible(name, visible) end
 
+---Returns whether a layer is currently shown.
+---
+---Example: `local lv = Scene.find_node("Level"); lv:ldtk_set_layer_visible("Fog", not lv:ldtk_is_layer_visible("Fog"))`
 ---@param name LdtkLayer|string
 ---@return boolean
 function LdtkLevelNode:ldtk_is_layer_visible(name) end
 
 ---Gets the IntGrid value at a world position (0 = empty).
+---
+---Example: `local lv = Scene.find_node("Level"); local v = lv:ldtk_get_int_grid("Collisions", self.node:get_position())`
 ---@param layer LdtkLayer|string IntGrid layer identifier, e.g. "Collisions"
 ---@param x number World X
 ---@param y number World Y
@@ -5119,6 +5478,8 @@ function LdtkLevelNode:ldtk_is_layer_visible(name) end
 function LdtkLevelNode:ldtk_get_int_grid(layer, x, y) end
 
 ---Gets the identifier of the IntGrid value at a world position ("" if none / unnamed).
+---
+---Example: `local lv = Scene.find_node("Level"); local name = lv:ldtk_get_int_grid_name("Collisions", self.node:get_position())`
 ---@param layer LdtkLayer|string
 ---@param x number
 ---@param y number
@@ -5126,6 +5487,8 @@ function LdtkLevelNode:ldtk_get_int_grid(layer, x, y) end
 function LdtkLevelNode:ldtk_get_int_grid_name(layer, x, y) end
 
 ---Gets the IntGrid value of a cell.
+---
+---Example: `local lv = Scene.find_node("Level"); local v = lv:ldtk_get_int_grid_cell("Collisions", 4, 7)`
 ---@param layer LdtkLayer|string
 ---@param cx integer
 ---@param cy integer
@@ -5134,11 +5497,15 @@ function LdtkLevelNode:ldtk_get_int_grid_name(layer, x, y) end
 function LdtkLevelNode:ldtk_get_int_grid_cell(layer, cx, cy, level) end
 
 ---Lists an IntGrid layer's values (name, colour, collision).
+---
+---Example: `local lv = Scene.find_node("Level"); local values = lv:ldtk_get_int_grid_values("Collisions")`
 ---@param layer LdtkLayer|string
 ---@return LdtkIntGridValue[]
 function LdtkLevelNode:ldtk_get_int_grid_values(layer) end
 
 ---World position -> layer cell.
+---
+---Example: `local lv = Scene.find_node("Level"); local cx, cy = lv:ldtk_world_to_cell("Collisions", self.node:get_position())`
 ---@param layer LdtkLayer|string
 ---@param x number
 ---@param y number
@@ -5147,6 +5514,8 @@ function LdtkLevelNode:ldtk_get_int_grid_values(layer) end
 function LdtkLevelNode:ldtk_world_to_cell(layer, x, y) end
 
 ---Layer cell -> world position of its centre.
+---
+---Example: `local lv = Scene.find_node("Level"); self.node:set_position(lv:ldtk_cell_to_world("Collisions", 4, 7))`
 ---@param layer LdtkLayer|string
 ---@param cx integer
 ---@param cy integer
@@ -5156,6 +5525,8 @@ function LdtkLevelNode:ldtk_world_to_cell(layer, x, y) end
 function LdtkLevelNode:ldtk_cell_to_world(layer, cx, cy, level) end
 
 ---Collision at a world position: "solid", "one_way", "trigger" or "none", plus the layer and value name.
+---
+---Example: `local lv = Scene.find_node("Level"); local kind, layer, value = lv:ldtk_get_collision(self.node:get_position())`
 ---@param x number
 ---@param y number
 ---@return string type
@@ -5165,10 +5536,14 @@ function LdtkLevelNode:ldtk_get_collision(x, y) end
 
 ---The trigger areas built from IntGrid values set to Trigger ("<Layer>_<value>" -> AreaNode).
 ---Connect to their "body_entered" / "body_exited" events.
+---
+---Example: `local lv = Scene.find_node("Level"); local spikes = lv:ldtk_get_triggers()["Collisions_spikes"]`
 ---@return table<string, Node>
 function LdtkLevelNode:ldtk_get_triggers() end
 
 ---Gets the tile of a Tiles/AutoLayer layer at a world position.
+---
+---Example: `local lv = Scene.find_node("Level"); local tile = lv:ldtk_get_tile("Ground", self.node:get_position())`
 ---@param layer LdtkLayer|string
 ---@param x number
 ---@param y number
@@ -5176,6 +5551,8 @@ function LdtkLevelNode:ldtk_get_triggers() end
 function LdtkLevelNode:ldtk_get_tile(layer, x, y) end
 
 ---Gets the enum values tagging the tile at a world position (tileset enum tags).
+---
+---Example: `local lv = Scene.find_node("Level"); local tags = lv:ldtk_get_tile_enums("Ground", self.node:get_position())`
 ---@param layer LdtkLayer|string
 ---@param x number
 ---@param y number
@@ -5183,68 +5560,96 @@ function LdtkLevelNode:ldtk_get_tile(layer, x, y) end
 function LdtkLevelNode:ldtk_get_tile_enums(layer, x, y) end
 
 ---Gets an enum's values (colour, tile, index).
+---
+---Example: `local lv = Scene.find_node("Level"); for _, v in ipairs(lv:ldtk_get_enum("ItemType") or {}) do Log.info(v.id) end`
 ---@param name LdtkEnumName
 ---@return LdtkEnumValue[]?
 function LdtkLevelNode:ldtk_get_enum(name) end
 
 ---Every enum: name -> value ids.
+---
+---Example: `local lv = Scene.find_node("Level"); local item_types = lv:ldtk_get_enums()["ItemType"]`
 ---@return table<string, string[]>
 function LdtkLevelNode:ldtk_get_enums() end
 
 ---Lists the loaded levels' entities, optionally only those with an identifier.
+---
+---Example: `local lv = Scene.find_node("Level"); for _, e in ipairs(lv:ldtk_get_entities("Enemy")) do Log.info(e.iid) end`
 ---@param identifier? LdtkEntity
 ---@return LdtkEntity[]
 function LdtkLevelNode:ldtk_get_entities(identifier) end
 
 ---Lists the loaded levels' entities with a tag.
+---
+---Example: `local lv = Scene.find_node("Level"); local pickups = lv:ldtk_get_entities_by_tag("pickup")`
 ---@param tag string
 ---@return LdtkEntity[]
 function LdtkLevelNode:ldtk_get_entities_by_tag(tag) end
 
 ---Gets an entity anywhere in the project by iid.
+---
+---Example: `local lv = Scene.find_node("Level"); local e = lv:ldtk_get_entity(self.target_iid)`
 ---@param iid string
 ---@return LdtkEntity?
 function LdtkLevelNode:ldtk_get_entity(iid) end
 
 ---Gets the node spawned for an entity (by iid).
+---
+---Example: `local lv = Scene.find_node("Level"); local door = lv:ldtk_get_entity_node(self.door_iid)`
 ---@param iid string
 ---@return Node?
 function LdtkLevelNode:ldtk_get_entity_node(iid) end
 
 ---Lists the project's entity definitions.
+---
+---Example: `local lv = Scene.find_node("Level"); local defs = lv:ldtk_get_entity_defs(); Log.info(defs[1].identifier)`
 ---@return LdtkEntityDef[]
 function LdtkLevelNode:ldtk_get_entity_defs() end
 
 ---Lists the resolved EntityRef links between spawned entities.
+---
+---Example: `local lv = Scene.find_node("Level"); for _, link in ipairs(lv:ldtk_get_links()) do Log.info(link.field) end`
 ---@return LdtkLink[]
 function LdtkLevelNode:ldtk_get_links() end
 
 -- On any node spawned from an LDtk entity:
 
 ---The LDtk entity this node was spawned from (nil otherwise).
+---
+---Example: `local e = self.node:ldtk_entity(); if e then Log.info(e.identifier) end`
 ---@return LdtkEntity?
 function LdtkLevelNode:ldtk_entity() end
 
 ---The LdtkLevelNode that spawned this node.
+---
+---Example: `local level = self.node:ldtk_level_node()`
 ---@return Node?
 function LdtkLevelNode:ldtk_level_node() end
 
 ---A field of this node's entity.
+---
+---Example: `self.health = self.node:ldtk_field("health") or 3`
 ---@param name string
 ---@return any
 function LdtkLevelNode:ldtk_field(name) end
 
 ---The node an EntityRef field points to (the first one for arrays).
+---
+---Example: `local door = self.node:ldtk_ref("target_door"); if door then door:set_visible(false) end`
 ---@param field string
 ---@return Node?
 function LdtkLevelNode:ldtk_ref(field) end
 
 ---Nodes referenced by a field, or every reference ({field, iid, node}) without one.
+---
+---Example: `for _, n in ipairs(self.node:ldtk_refs("lights")) do n:set_visible(true) end`
 ---@param field? string
 ---@return Node[]|{field: string, iid: string, node: Node?}[]
 function LdtkLevelNode:ldtk_refs(field) end
 
 ---Entities whose EntityRef fields point at this one.
+---
+---Example: `for _, r in ipairs(self.node:ldtk_referenced_by("target")) do Log.info(r.field) end`
 ---@param field? string
 ---@return {node: Node, field: string}[]
 function LdtkLevelNode:ldtk_referenced_by(field) end
@@ -5268,6 +5673,8 @@ local TweenModule = {}
 ---Tweens a property to a value: "position", "scale", "rotation", any numeric
 ---or colour property ("tint", "emitter.amount", ...; colours as {r, g, b[, a]} 0..1),
 ---or a material parameter ("shader:amount"). Returns the tween's id.
+---
+---Example: `local id = Tween.to(self.node, "scale", {1.2, 1.2}, 0.15, "out_quad", {loops = -1, yoyo = true})`
 ---@param node Node
 ---@param property string
 ---@param value number|number[]
@@ -5278,21 +5685,30 @@ local TweenModule = {}
 function TweenModule.to(node, property, value, duration, ease, options) end
 
 ---Stops a tween (it stays where it is).
+---
+---Example: `if self.fade_id then Tween.cancel(self.fade_id) end`
 ---@param id integer
 ---@return boolean found
 function TweenModule.cancel(id) end
 
 ---Stops a node's tweens (all, or one property's).
+---
+---Example: `local stopped = Tween.cancel_all(self.node, "position")`
 ---@param node Node
 ---@param property? string
 ---@return integer count
 function TweenModule.cancel_all(node, property) end
 
+---Whether the tween with this id is still playing.
+---
+---Example: `if not Tween.is_running(self.bounce_id) then self.bounce_id = nil end`
 ---@param id integer
 ---@return boolean
 function TweenModule.is_running(id) end
 
 ---Maps progress 0..1 through an easing curve (for your own animation).
+---
+---Example: `local k = Tween.ease("in_out_sine", self.elapsed / self.duration)`
 ---@param ease EaseName
 ---@param t number
 ---@return number
@@ -5312,38 +5728,61 @@ local SaveModule = {}
 
 ---Stores a value (nil removes the key). Tables are stored by reference:
 ---changes to a table you got from Save.get are saved too.
+---
+---Example: `if score > Save.get("best_score", 0) then Save.set("best_score", score) end`
 ---@param key SaveKey|string
 ---@param value SaveValue
 function SaveModule.set(key, value) end
 
+---Returns the stored value for a key, or the default when the key is not set.
+---
+---Example: `local settings = Save.get("settings", {music = 0.8, fullscreen = false})`
 ---@param key SaveKey|string
 ---@param default? SaveValue Returned when the key isn't set
 ---@return SaveValue
 function SaveModule.get(key, default) end
 
+---Whether a value is stored under the key.
+---
+---Example: `if not Save.has("tutorial_done") then Scene.change_scene("tutorial") end`
 ---@param key SaveKey|string
 ---@return boolean
 function SaveModule.has(key) end
 
+---Removes a key from the save data.
+---
+---Example: `Save.delete("checkpoint")`
 ---@param key SaveKey|string
 function SaveModule.delete(key) end
 
+---Returns every stored key, sorted.
+---
+---Example: `for _, key in ipairs(Save.keys()) do Log.info(key, Save.get(key)) end`
 ---@return string[] keys Sorted
 function SaveModule.keys() end
 
 ---Removes every key (the file is rewritten on the next flush).
+---
+---Example: `Save.clear(); Save.flush()`
 function SaveModule.clear() end
 
 ---Writes the save file now.
+---
+---Example: `if not Save.flush() then Log.warn("could not write save file") end`
 ---@return boolean ok
 function SaveModule.flush() end
 
 ---Switches to another save file (<name>.json; default "save"), writing the
 ---current one first. Returns the current slot.
+---
+---Example: `local previous = Save.slot("slot_2")`
 ---@param name? string
 ---@return string slot
 function SaveModule.slot(name) end
 
+---Returns the file path of the current save slot.
+---
+---Example: `Log.info("saving to", Save.path())`
 ---@return string path The current save file
 function SaveModule.path() end
 
@@ -5354,41 +5793,60 @@ function SaveModule.path() end
 local EngineModule = {}
 
 ---Gets current display refresh frames per second.
+---
+---Example: `Log.info("FPS: " .. Engine.get_fps())`
 ---@return integer
 function EngineModule.get_fps() end
 
 ---Gets the last frame duration in seconds.
+---
+---Example: `local dt = Engine.get_delta_time(); self.elapsed = self.elapsed + dt`
 ---@return number
 function EngineModule.get_delta_time() end
 
 ---Gets running time in seconds since the engine launched.
+---
+---Example: `local t = Engine.get_time(); self.node:set_position(self.base_x, self.base_y + math.sin(t * 2) * 8)`
 ---@return number
 function EngineModule.get_time() end
 
 ---Gets current physical window width and height in screen pixels.
+---
+---Example: `local w, h = Engine.get_window_size()`
 ---@return integer width
 ---@return integer height
 function EngineModule.get_window_size() end
 
 ---Gets virtual canvas reference resolution (e.g. 1280x720).
+---
+---Example: `local vw, vh = Engine.get_virtual_size(); self.node:set_position(vw / 2, vh / 2)`
 ---@return number width
 ---@return number height
 function EngineModule.get_virtual_size() end
 
 ---Pauses the game: nodes with pause mode "pausable" (the default) stop
 ---updating and physics stops; "always" nodes keep running (pause menus).
+---
+---Example: `if Input.is_action_pressed("pause") then Engine.set_paused(not Engine.is_paused()) end`
 ---@param paused boolean
 function EngineModule.set_paused(paused) end
 
+---Returns whether the game is currently paused.
+---
+---Example: `if Engine.is_paused() then return end`
 ---@return boolean
 function EngineModule.is_paused() end
 
 ---Fullscreen on or off: the window covers the screen at its resolution (the
 ---game is scaled to it) or goes back to the project's window size.
+---
+---Example: `if Input.is_key_pressed("F11") then Engine.set_fullscreen(not Engine.is_fullscreen()) end`
 ---@param on boolean
 function EngineModule.set_fullscreen(on) end
 
 ---Whether the game is fullscreen.
+---
+---Example: `local full = Engine.is_fullscreen(); Log.info("Fullscreen: " .. tostring(full))`
 ---@return boolean
 function EngineModule.is_fullscreen() end
 
@@ -5402,27 +5860,37 @@ function EngineModule.is_fullscreen() end
 local InputModule = {}
 
 ---Checks if an action was pressed this frame (just triggered).
+---
+---Example: `if Input.is_action_pressed("jump") then self.vy = -self.jump_speed end`
 ---@param action InputAction Action name from the project's Input settings (e.g. "move_up", "fire", "jump", "dash")
 ---@return boolean
 function InputModule.is_action_pressed(action) end
 
 ---Checks if an action is currently held down.
+---
+---Example: `if Input.is_action_down("fire") then self:shoot() end`
 ---@param action InputAction
 ---@return boolean
 function InputModule.is_action_down(action) end
 
 ---Checks if an action was released this frame.
+---
+---Example: `if Input.is_action_released("jump") and self.vy < 0 then self.vy = self.vy * 0.5 end`
 ---@param action InputAction
 ---@return boolean
 function InputModule.is_action_released(action) end
 
 ---Calculates a 1D axis value between -1.0 and 1.0 from negative and positive action names.
+---
+---Example: `local dir = Input.get_axis("move_left", "move_right"); self.vx = dir * self.speed`
 ---@param neg_action InputAction Action name representing negative direction (e.g. "move_left")
 ---@param pos_action InputAction Action name representing positive direction (e.g. "move_right")
 ---@return number axis Value from -1.0 to 1.0
 function InputModule.get_axis(neg_action, pos_action) end
 
 ---Calculates a normalized 2D direction vector from 4 directional action inputs.
+---
+---Example: `local dx, dy = Input.get_vector("move_left", "move_right", "move_up", "move_down")`
 ---@param left? InputAction
 ---@param right? InputAction
 ---@param up? InputAction
@@ -5554,41 +6022,57 @@ function InputModule.get_vector(left, right, up, down) end
 ---@alias MouseButton "LEFT"|"RIGHT"|"MIDDLE"|"SIDE"|"EXTRA"|"FORWARD"|"BACK"
 
 ---Queries raw keyboard key press state for a single frame.
+---
+---Example: `if Input.is_key_pressed("F5") then Scene.reload() end`
 ---@param key KeyName|string Key name like "SPACE", "W", "Z", "F5", "LEFT_ALT"
 ---@return boolean
 function InputModule.is_key_pressed(key) end
 
 ---Queries raw keyboard key held state.
+---
+---Example: `if Input.is_key_down("LEFT_SHIFT") then speed = speed * 2 end`
 ---@param key KeyName|string Key name
 ---@return boolean
 function InputModule.is_key_down(key) end
 
 ---Queries raw keyboard key release state for a single frame.
+---
+---Example: `if Input.is_key_released("SPACE") then self.charging = false end`
 ---@param key KeyName|string Key name
 ---@return boolean
 function InputModule.is_key_released(key) end
 
 ---Queries mouse button pressed state for a single frame.
+---
+---Example: `if Input.is_mouse_button_pressed("LEFT") then self:shoot() end`
 ---@param button MouseButton|string
 ---@return boolean
 function InputModule.is_mouse_button_pressed(button) end
 
 ---Queries mouse button held state.
+---
+---Example: `if Input.is_mouse_button_down("RIGHT") then self.aiming = true end`
 ---@param button MouseButton|string
 ---@return boolean
 function InputModule.is_mouse_button_down(button) end
 
 ---Queries mouse button release state for a single frame.
+---
+---Example: `if Input.is_mouse_button_released("LEFT") then self.dragging = false end`
 ---@param button MouseButton|string
 ---@return boolean
 function InputModule.is_mouse_button_released(button) end
 
 ---Gets the current mouse cursor position in screen pixels.
+---
+---Example: `local mx, my = Input.get_mouse_position(); local wx, wy = Camera.screen_to_world(mx, my)`
 ---@return number x Mouse X
 ---@return number y Mouse Y
 function InputModule.get_mouse_position() end
 
 ---Gets mouse wheel scroll delta for this frame.
+---
+---Example: `local wheel = Input.get_mouse_wheel_move(); Camera.set_zoom(Camera.get_zoom() + wheel * 0.1)`
 ---@return number
 function InputModule.get_mouse_wheel_move() end
 
@@ -5599,6 +6083,8 @@ local AudioModule = {}
 
 ---Plays a sound effect from the given file path. Calls in quick succession
 ---overlap (up to 4 voices per sound) instead of restarting it.
+---
+---Example: `Audio.play_sound("sounds/jump.wav", 0.8, 1.1)`
 ---@param path AudioPath|string File path, e.g. "assets/audio/laser.wav"
 ---@param volume? number 0..1 (default 1), times the sfx bus
 ---@param pitch? number Default 1
@@ -5606,6 +6092,8 @@ function AudioModule.play_sound(path, volume, pitch) end
 
 ---Plays a one-shot heard from a world position: quieter with distance from
 ---the listener (the camera, or Audio.set_listener) and panned to its side.
+---
+---Example: `local x, y = self.node:get_position(); Audio.play_sound_at("sounds/explosion.wav", x, y)`
 ---@param path AudioPath|string
 ---@param x number
 ---@param y number
@@ -5615,61 +6103,88 @@ function AudioModule.play_sound_at(path, x, y, volume) end
 ---@alias AudioBus "master"|"music"|"sfx"
 
 ---Sets a bus volume (0..1) and applies it to what's playing.
+---
+---Example: `Audio.set_bus_volume("music", 0.5)`
 ---@param bus AudioBus
 ---@param volume number
 function AudioModule.set_bus_volume(bus, volume) end
 
+---Returns the current volume (0..1) of an audio bus.
+---
+---Example: `local vol = Audio.get_bus_volume("sfx"); Audio.set_bus_volume("sfx", vol * 0.5)`
 ---@param bus AudioBus
 ---@return number volume
 function AudioModule.get_bus_volume(bus) end
 
 ---A low-pass filter on the whole mix (e.g. underwater, a pause menu).
+---
+---Example: `Audio.set_lowpass(800)  -- muffled while the pause menu is open`
 ---@param hz number Cutoff in Hz; 0 turns it off
 function AudioModule.set_lowpass(hz) end
 
 ---Reverb on the whole mix.
+---
+---Example: `Audio.set_reverb(0.4, 0.8)`
 ---@param mix number 0..1 (0 turns it off)
 ---@param size? number Room size 0..1 (default 0.5)
 function AudioModule.set_reverb(mix, size) end
 
 ---Where positional sounds are heard from (nil: the current camera).
+---
+---Example: `Audio.set_listener(Scene.find_node("Player"))`
 ---@param node Node?
 function AudioModule.set_listener(node) end
 
 ---Fades one MusicNode out (stopping it) while another fades in.
+---
+---Example: `Audio.crossfade(Scene.find_node("ExploreMusic"), Scene.find_node("BattleMusic"), 2.0)`
 ---@param from Node? MusicNode playing now
 ---@param to Node MusicNode to fade in (started if needed)
 ---@param seconds number
 function AudioModule.crossfade(from, to, seconds) end
 
 ---Streams a music track from the given file path.
+---
+---Example: `Audio.play_music("music/theme.ogg", true)`
 ---@param path AudioPath|string File path, e.g. "assets/audio/theme.ogg"
 ---@param loop? boolean Whether to loop playback (default true)
 function AudioModule.play_music(path, loop) end
 
 ---Stops playing the specified music stream.
+---
+---Example: `Audio.stop_music("music/theme.ogg")`
 ---@param path AudioPath|string
 function AudioModule.stop_music(path) end
 
 ---Pauses playback of the specified music stream.
+---
+---Example: `Audio.pause_music("music/theme.ogg")`
 ---@param path AudioPath|string
 function AudioModule.pause_music(path) end
 
 ---Resumes playback of the specified paused music stream.
+---
+---Example: `Audio.resume_music("music/theme.ogg")`
 ---@param path AudioPath|string
 function AudioModule.resume_music(path) end
 
 ---Checks if the specified music stream is currently playing.
+---
+---Example: `if not Audio.is_music_playing("music/theme.ogg") then Audio.play_music("music/theme.ogg") end`
 ---@param path AudioPath|string
 ---@return boolean
 function AudioModule.is_music_playing(path) end
 
 ---Sets volume for a specific music stream.
+---
+---Example: `Audio.set_music_volume("music/theme.ogg", 0.6)`
 ---@param path AudioPath|string
 ---@param volume number Volume between 0.0 and 1.0
 function AudioModule.set_music_volume(path, volume) end
 
 ---Sets the global master audio volume.
+---
+---Example: `Audio.set_master_volume(0.75)`
 ---@param volume number Volume between 0.0 (silent) and 1.0 (full)
 function AudioModule.set_master_volume(volume) end
 
@@ -5679,17 +6194,23 @@ function AudioModule.set_master_volume(volume) end
 local CameraModule = {}
 
 ---Gets current target world position of the camera.
+---
+---Example: `local cx, cy = Camera.get_target_position()`
 ---@return number x
 ---@return number y
 function CameraModule.get_target_position() end
 
 ---Sets target world position for the camera.
+---
+---Example: `local x, y = self.node:get_position(); Camera.set_target_position(x, y)`
 ---@param x number
 ---@param y number
 function CameraModule.set_target_position(x, y) end
 
 ---Sets a node for the camera to smoothly follow (nil stops following).
 ---A follow target picked in the Inspector is set automatically when the scene loads.
+---
+---Example: `Camera.set_target(Scene.find_node("Player"))`
 ---@param target Node?
 function CameraModule.set_target(target) end
 
@@ -5705,64 +6226,94 @@ function CameraModule.set_target(target) end
 ---Adds a node to the group the camera frames: it centres on their weighted
 ---average and, with Auto Zoom on, zooms to keep them all in view. A single
 ---follow target joins the group first. Adding a node again updates its options.
+---
+---Example: `Camera.add_target(Scene.find_node("Boss"), {weight = 2, radius = 120})`
 ---@param target Node
 ---@param options? CameraTargetOptions
 function CameraModule.add_target(target, options) end
 
 ---Takes a node out of the group.
+---
+---Example: `Camera.remove_target(Scene.find_node("Boss"))`
 ---@param target Node
 function CameraModule.remove_target(target) end
 
 ---Stops following: clears the group and the follow target.
+---
+---Example: `Camera.clear_targets()`
 function CameraModule.clear_targets() end
 
 ---The node the camera follows (single target), or nil.
+---
+---Example: `local target = Camera.get_target(); if target then Log.info(target.name) end`
 ---@return Node?
 function CameraModule.get_target() end
 
 ---Every node the camera follows (the group, or the single target).
+---
+---Example: `for _, node in ipairs(Camera.get_targets()) do Log.info(node.name) end`
 ---@return Node[]
 function CameraModule.get_targets() end
 
 ---Gets configured target zoom level.
+---
+---Example: `local zoom = Camera.get_zoom(); Camera.set_zoom(zoom * 1.1)`
 ---@return number
 function CameraModule.get_zoom() end
 
 ---Sets camera target zoom.
+---
+---Example: `Camera.set_zoom(2.0)`
 ---@param zoom number
 function CameraModule.set_zoom(zoom) end
 
 ---Gets screen offset vector.
+---
+---Example: `local ox, oy = Camera.get_offset()`
 ---@return number ox
 ---@return number oy
 function CameraModule.get_offset() end
 
 ---Sets screen offset vector.
+---
+---Example: `Camera.set_offset(0, -40)`
 ---@param ox number
 ---@param oy number
 function CameraModule.set_offset(ox, oy) end
 
 ---Gets camera rotation in degrees.
+---
+---Example: `local deg = Camera.get_rotation(); Camera.set_rotation(deg + 90 * dt)`
 ---@return number
 function CameraModule.get_rotation() end
 
 ---Sets camera rotation in degrees.
+---
+---Example: `Camera.set_rotation(15)`
 ---@param degrees number
 function CameraModule.set_rotation(degrees) end
 
 ---Triggers screen shake trauma.
+---
+---Example: `Camera.shake(0.6, 0.3)`
 ---@param strength number Shake intensity (0.0 to 1.0)
 ---@param duration? number Duration in seconds
 function CameraModule.shake(strength, duration) end
 
 ---Immediately stops active screen shake.
+---
+---Example: `Camera.stop_shake()`
 function CameraModule.stop_shake() end
 
 ---Checks if screen shake is active.
+---
+---Example: `if not Camera.is_shaking() then Camera.shake(0.3, 0.2) end`
 ---@return boolean
 function CameraModule.is_shaking() end
 
 ---Constrains camera movement within bounding rectangle limits.
+---
+---Example: `Camera.set_limits(0, 3200, 0, 1800)`
 ---@param left number
 ---@param right number
 ---@param top number
@@ -5770,9 +6321,13 @@ function CameraModule.is_shaking() end
 function CameraModule.set_limits(left, right, top, bottom) end
 
 ---Clears all bounding rectangle limits.
+---
+---Example: `Camera.clear_limits()`
 function CameraModule.clear_limits() end
 
 ---Transforms screen coordinates to world coordinates.
+---
+---Example: `local wx, wy = Camera.screen_to_world(Input.get_mouse_position())`
 ---@param sx number Screen X
 ---@param sy number Screen Y
 ---@return number wx World X
@@ -5780,6 +6335,8 @@ function CameraModule.clear_limits() end
 function CameraModule.screen_to_world(sx, sy) end
 
 ---Transforms world coordinates to screen pixel coordinates.
+---
+---Example: `local sx, sy = Camera.world_to_screen(self.node:get_position())`
 ---@param wx number World X
 ---@param wy number World Y
 ---@return number sx Screen X
@@ -5787,6 +6344,8 @@ function CameraModule.screen_to_world(sx, sy) end
 function CameraModule.world_to_screen(wx, wy) end
 
 ---Gets visible world bounds rectangle currently seen by camera.
+---
+---Example: `local x, y, w, h = Camera.get_visible_world_bounds()`
 ---@return number x
 ---@return number y
 ---@return number width
@@ -5799,33 +6358,47 @@ function CameraModule.get_visible_world_bounds() end
 local PhysicsModule = {}
 
 ---Gets world gravity vector in pixels per second squared.
+---
+---Example: `local gx, gy = Physics.get_gravity()`
 ---@return number gx
 ---@return number gy
 function PhysicsModule.get_gravity() end
 
 ---Sets world gravity vector.
+---
+---Example: `Physics.set_gravity(0, 980)`
 ---@param gx number
 ---@param gy number
 function PhysicsModule.set_gravity(gx, gy) end
 
 ---Draws collision shapes, joints and areas while the game runs (debugging);
 ---the project's Show Colliders setting (physics.debug_draw) sets the start.
+---
+---Example: `if Input.is_key_pressed("F3") then Physics.set_debug_draw(not Physics.get_debug_draw()) end`
 ---@param on boolean
 function PhysicsModule.set_debug_draw(on) end
 
 ---Whether colliders are drawn while the game runs.
+---
+---Example: `local showing = Physics.get_debug_draw()`
 ---@return boolean
 function PhysicsModule.get_debug_draw() end
 
 ---Checks if physics simulation is paused.
+---
+---Example: `if Physics.is_paused() then Physics.set_paused(false) end`
 ---@return boolean
 function PhysicsModule.is_paused() end
 
 ---Pauses or unpauses physics simulation.
+---
+---Example: `Physics.set_paused(true)`
 ---@param paused boolean
 function PhysicsModule.set_paused(paused) end
 
 ---Casts a ray between start and end world points against non-sensor colliders.
+---
+---Example: `local hit = Physics.raycast(x, y, x, y + 64); if hit and hit.node then Log.info(hit.node.name) end`
 ---@param startX number
 ---@param startY number
 ---@param endX number
@@ -5834,6 +6407,8 @@ function PhysicsModule.set_paused(paused) end
 function PhysicsModule.raycast(startX, startY, endX, endY) end
 
 ---The project's name for collision layer n (Project Settings > Physics), or "".
+---
+---Example: `local name = Physics.layer_name(3); Log.info("Layer 3: " .. name)`
 ---@param n integer 1-16
 ---@return string name
 function PhysicsModule.layer_name(n) end
@@ -5844,17 +6419,23 @@ function PhysicsModule.layer_name(n) end
 local SceneModule = {}
 
 ---Finds any node in the active scene hierarchy by name.
+---
+---Example: `local player = Scene.find_node("Player"); if player then player:queue_free() end`
 ---@param name NodeName|string Name of node to find
 ---@return Node? node Found node or nil
 function SceneModule.find_node(name) end
 
 ---Every node in the active scene with a tag, in tree order.
+---
+---Example: `for _, enemy in ipairs(Scene.find_by_tag("enemy")) do enemy:queue_free() end`
 ---@param tag NodeTag|string
 ---@return Node[]
 function SceneModule.find_by_tag(tag) end
 
 ---Sets the scene's ambient light (0..1): the colour where no light reaches.
 ---White = an unlit scene. With LightNodes, the scene is lit by them on top.
+---
+---Example: `Scene.set_ambient(0.2, 0.2, 0.35)`
 ---@param r number
 ---@param g number
 ---@param b number
@@ -5862,6 +6443,8 @@ function SceneModule.find_by_tag(tag) end
 function SceneModule.set_ambient(r, g, b, a) end
 
 ---Gets the scene's ambient light (0..1).
+---
+---Example: `local r, g, b, a = Scene.get_ambient()`
 ---@return number r
 ---@return number g
 ---@return number b
@@ -5869,6 +6452,8 @@ function SceneModule.set_ambient(r, g, b, a) end
 function SceneModule.get_ambient() end
 
 ---Gets the name of the currently active scene.
+---
+---Example: `Log.info("Entered scene: " .. Scene.get_name())`
 ---@return string
 function SceneModule.get_name() end
 
@@ -5882,30 +6467,46 @@ function SceneModule.get_name() end
 ---Switches to another scene by name (or its file, e.g. a `scene` property) -
 ---at once, or behind a transition (the screen is covered, the scene switches
 ---once its assets are loaded, then it's uncovered).
+---
+---Example: `Scene.change_scene("level_2", {transition = "fade", duration = 0.5})`
 ---@param name SceneName|ScenePath A scene's name, or its file
 ---@param transition? SceneTransition
 function SceneModule.change_scene(name, transition) end
 
 ---Starts loading a scene's assets in the background (a little each frame),
 ---so switching to it later is quick.
+---
+---Example: `Scene.preload("level_2")`
 ---@param name SceneName
 function SceneModule.preload(name) end
 
+---Returns how far a scene started with Scene.preload has loaded, from 0 to 1.
+---
+---Example: `local p = Scene.preload_progress("level_2"); Log.info("Loading: " .. math.floor(p * 100) .. "%")`
 ---@param name SceneName
 ---@return number progress 0..1
 function SceneModule.preload_progress(name) end
 
+---Returns whether a scene transition is currently in progress.
+---
+---Example: `if Scene.is_transitioning() then return end`
 ---@return boolean
 function SceneModule.is_transitioning() end
 
 ---Reloads the currently active scene.
+---
+---Example: `if Input.is_key_pressed("R") then Scene.reload() end`
 function SceneModule.reload() end
 
 ---Returns an array of all active nodes in the current scene.
+---
+---Example: `Log.info("Node count: " .. #Scene.get_nodes())`
 ---@return Node[]
 function SceneModule.get_nodes() end
 
 ---Dynamically instantiates a new scene node and adds it to the active scene graph.
+---
+---Example: `local timer = Scene.create_node("TimerNode", "Cooldown", self.node)`
 ---@param nodeType string "Node", "TextureNode", "ScriptNode", "CameraNode", "ParticleEmitterNode", "TimerNode", "DynamicBodyNode", "StaticBodyNode", "AreaNode", "RaycastNode", "CharacterMoverNode"
 ---@param name? string Optional node name
 ---@param parent? Node Optional parent node (defaults to scene root)
@@ -5915,6 +6516,8 @@ function SceneModule.create_node(nodeType, name, parent) end
 ---Instances a component at runtime - `Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position)`.
 ---Added under `parent` (else the scene's root), at x, y local to it (two
 ---numbers or a Vec2). Returns its root node (typed per component), or nil.
+---
+---Example: `local b = Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position)`
 ---@param component ComponentPath|string
 ---@param parent? Node
 ---@param x? number|Vec2
@@ -5923,10 +6526,14 @@ function SceneModule.create_node(nodeType, name, parent) end
 function SceneModule.instantiate(component, parent, x, y) end
 
 ---Checks if debug collider and bounds rendering is enabled on this scene.
+---
+---Example: `local on = Scene.get_draw_bounds(); Scene.set_draw_bounds(not on)`
 ---@return boolean
 function SceneModule.get_draw_bounds() end
 
 ---Enables or disables debug bounds rendering on the scene.
+---
+---Example: `Scene.set_draw_bounds(true)`
 ---@param draw boolean
 function SceneModule.set_draw_bounds(draw) end
 
@@ -5936,14 +6543,20 @@ function SceneModule.set_draw_bounds(draw) end
 local LogModule = {}
 
 ---Logs an informational message.
+---
+---Example: `Log.info("player spawned at", x, y)`
 ---@param ... any
 function LogModule.info(...) end
 
 ---Logs a warning message.
+---
+---Example: `Log.warn("missing texture:", "textures/coin.png")`
 ---@param ... any
 function LogModule.warn(...) end
 
 ---Logs an error message.
+---
+---Example: `Log.error("could not load level", "level_2")`
 ---@param ... any
 function LogModule.error(...) end
 
@@ -5969,6 +6582,8 @@ Physics = PhysicsModule
 CurveModule = {}
 
 ---The curve's value at t (linear between points; clamped at the ends).
+---
+---Example: `local speed = self.max_speed * Curve.sample(self.speed_curve, self.elapsed / 2.0)`
 ---@param points number[][] The property's value ({{t, v}, ...})
 ---@param t number 0..1 (any value works)
 ---@return number
@@ -5979,6 +6594,8 @@ function CurveModule.sample(points, t) end
 GradientModule = {}
 
 ---The gradient's colour at t (linear between stops), 0..1 channels.
+---
+---Example: `local r, g, b, a = Gradient.sample(self.tint, self.health / self.max_health)`
 ---@param stops number[][] The property's value ({{t, r, g, b, a}, ...})
 ---@param t number 0..1
 ---@return number r
@@ -6003,26 +6620,48 @@ function GradientModule.sample(stops, t) end
 ---@operator div(Vec2|number): Vec2
 ---@operator unm: Vec2
 local Vec2_ = {}
+---Returns the vector's length (magnitude).
+---
+---Example: `local speed = self.velocity:length()`
 ---@return number
 function Vec2_:length() end
+---Returns the squared length, cheaper than length() for comparisons.
+---
+---Example: `if (target - pos):length_squared() < 16 * 16 then self.arrived = true end`
 ---@return number
 function Vec2_:length_squared() end
 ---A vector of length 1 in the same direction (zero stays zero).
+---
+---Example: `local dir = (target - pos):normalized()`
 ---@return Vec2
 function Vec2_:normalized() end
+---Returns the dot product with another vector.
+---
+---Example: `local facing = forward:dot((target - pos):normalized())`
 ---@param other Vec2
 ---@return number
 function Vec2_:dot(other) end
+---Returns the distance to another vector.
+---
+---Example: `local d = pos:distance(target)`
 ---@param other Vec2
 ---@return number
 function Vec2_:distance(other) end
+---Returns the vector interpolated toward other by t (0 = this, 1 = other).
+---
+---Example: `local mid = a:lerp(b, 0.5)`
 ---@param other Vec2
 ---@param t number 0..1
 ---@return Vec2
 function Vec2_:lerp(other, t) end
+---Returns a new vector with the same components.
+---
+---Example: `local start = pos:copy()`
 ---@return Vec2
 function Vec2_:copy() end
 ---The components as values: `local x, y = v:unpack()`.
+---
+---Example: `local x, y = Vec2(3, 4):unpack()`
 ---@return number ...
 function Vec2_:unpack() end
 
@@ -6037,26 +6676,48 @@ function Vec2_:unpack() end
 ---@operator div(Vec3|number): Vec3
 ---@operator unm: Vec3
 local Vec3_ = {}
+---Returns the vector's length (magnitude).
+---
+---Example: `local len = Vec3(1, 2, 2):length()`
 ---@return number
 function Vec3_:length() end
+---Returns the squared length, cheaper than length() for comparisons.
+---
+---Example: `local len2 = Vec3(1, 2, 3):length_squared()`
 ---@return number
 function Vec3_:length_squared() end
 ---A vector of length 1 in the same direction (zero stays zero).
+---
+---Example: `local axis = Vec3(1, 2, 3):normalized()`
 ---@return Vec3
 function Vec3_:normalized() end
+---Returns the dot product with another vector.
+---
+---Example: `local d = Vec3(1, 0, 0):dot(Vec3(0, 1, 0))`
 ---@param other Vec3
 ---@return number
 function Vec3_:dot(other) end
+---Returns the distance to another vector.
+---
+---Example: `local d = Vec3(0, 0, 0):distance(Vec3(1, 2, 2))`
 ---@param other Vec3
 ---@return number
 function Vec3_:distance(other) end
+---Returns the vector interpolated toward other by t (0 = this, 1 = other).
+---
+---Example: `local mid = Vec3(0, 0, 0):lerp(Vec3(10, 20, 30), 0.5)`
 ---@param other Vec3
 ---@param t number 0..1
 ---@return Vec3
 function Vec3_:lerp(other, t) end
+---Returns a new vector with the same components.
+---
+---Example: `local backup = Vec3(1, 2, 3):copy()`
 ---@return Vec3
 function Vec3_:copy() end
 ---The components as values: `local x, y = v:unpack()`.
+---
+---Example: `local x, y, z = Vec3(1, 2, 3):unpack()`
 ---@return number ...
 function Vec3_:unpack() end
 
@@ -6072,33 +6733,59 @@ function Vec3_:unpack() end
 ---@operator div(Vec4|number): Vec4
 ---@operator unm: Vec4
 local Vec4_ = {}
+---Returns the vector's length (magnitude).
+---
+---Example: `local len = Vec4(1, 1, 1, 1):length()`
 ---@return number
 function Vec4_:length() end
+---Returns the squared length, cheaper than length() for comparisons.
+---
+---Example: `local len2 = Vec4(1, 2, 3, 4):length_squared()`
 ---@return number
 function Vec4_:length_squared() end
 ---A vector of length 1 in the same direction (zero stays zero).
+---
+---Example: `local q = Vec4(0, 0, 1, 1):normalized()`
 ---@return Vec4
 function Vec4_:normalized() end
+---Returns the dot product with another vector.
+---
+---Example: `local d = Vec4(1, 0, 0, 0):dot(Vec4(0.5, 0.5, 0, 0))`
 ---@param other Vec4
 ---@return number
 function Vec4_:dot(other) end
+---Returns the distance to another vector.
+---
+---Example: `local d = Vec4(1, 0, 0, 1):distance(Vec4(0, 1, 0, 1))`
 ---@param other Vec4
 ---@return number
 function Vec4_:distance(other) end
+---Returns the vector interpolated toward other by t (0 = this, 1 = other).
+---
+---Example: `local c = Vec4(1, 0, 0, 1):lerp(Vec4(0, 0, 1, 1), t)`
 ---@param other Vec4
 ---@param t number 0..1
 ---@return Vec4
 function Vec4_:lerp(other, t) end
+---Returns a new vector with the same components.
+---
+---Example: `local backup = Vec4(1, 2, 3, 4):copy()`
 ---@return Vec4
 function Vec4_:copy() end
 ---The components as values: `local x, y = v:unpack()`.
+---
+---Example: `local x, y, z, w = Vec4(1, 0, 0, 1):unpack()`
 ---@return number ...
 function Vec4_:unpack() end
 
 ---The angle of the vector in degrees (0 = right, 90 = down).
+---
+---Example: `local deg = (target - pos):angle(); self.node:set_rotation(deg)`
 ---@return number
 function Vec2_:angle() end
 ---The vector rotated by degrees (clockwise on screen).
+---
+---Example: `local spread = Vec2.RIGHT:rotated(15) * 300`
 ---@param degrees number
 ---@return Vec2
 function Vec2_:rotated(degrees) end
@@ -6148,6 +6835,8 @@ Save = SaveModule
 local NavigationModule = {}
 
 ---Same as map:nav_find_path(x1, y1, x2, y2, opts).
+---
+---Example: `local path = Navigation.find_path(Scene.find_node("Level"), x, y, tx, ty, {smooth = false})`
 ---@param map Node TileMapNode or LdtkLevelNode
 ---@param x1 number
 ---@param y1 number
@@ -6162,6 +6851,8 @@ Navigation = NavigationModule
 
 ---The text for a key in the current language (locale/*.csv), with {name}
 ---placeholders filled from `args`; falls back to another language, then the key.
+---
+---Example: `self.node:set_text(tr("greeting", {name = player_name}))`
 ---@param key LocaleKey|string
 ---@param args? table<string, any>
 ---@return string
@@ -6171,12 +6862,20 @@ function tr(key, args) end
 local LocaleModule = {}
 
 ---Switches the language texts are shown in (a column of the locale tables).
+---
+---Example: `Locale.set("fr")`
 ---@param language Language|string e.g. "fr" (the project's locale tables' languages)
 function LocaleModule.set(language) end
 
+---Returns the current language.
+---
+---Example: `if Locale.get() == "fr" then self.flag = "textures/flag_fr.png" end`
 ---@return string language
 function LocaleModule.get() end
 
+---Returns the languages available in the project's locale tables.
+---
+---Example: `for _, lang in ipairs(Locale.languages()) do Log.info(lang) end`
 ---@return string[] languages The languages the tables have
 function LocaleModule.languages() end
 
@@ -6192,26 +6891,36 @@ Log = LogModule
 local ProjectModule = {}
 
 ---Loads a complete project either from a directory containing project.json or from an .ore package archive.
+---
+---Example: `local ok = Project.load("assets/demo_project.ore")`
 ---@param pathOrDir string Path to directory or .ore file
 ---@return boolean success
 function ProjectModule.load(pathOrDir) end
 
 ---Packages a loose project directory into a portable .ore container archive with zlib compression.
+---
+---Example: `local ok = Project.export_ore("assets/demo_project", "bin/demo_project.ore")`
 ---@param projectDir string Source directory path
 ---@param outOrePath string Target output .ore file path
 ---@return boolean success
 function ProjectModule.export_ore(projectDir, outOrePath) end
 
 ---Serializes the currently active scene graph and node states to a JSON formatted string.
+---
+---Example: `local json = Project.serialize_scene(); Log.info(#json, "bytes")`
 ---@return string json
 function ProjectModule.serialize_scene() end
 
 ---Reads a text file either from the mounted .ore archive package or the loose project directory.
+---
+---Example: `local text = Project.read_file("data/items.json"); if text then Log.info(text) end`
 ---@param relPath string Project-relative file path
 ---@return string? content File contents as a string, or nil if not found
 function ProjectModule.read_file(relPath) end
 
 ---Checks if a file exists in the active project (.ore archive or disk).
+---
+---Example: `if Project.has_file("levels/level_2.json") then Scene.change_scene("level_2") end`
 ---@param relPath string Project-relative file path
 ---@return boolean exists
 function ProjectModule.has_file(relPath) end
