@@ -158,7 +158,13 @@ editor_main :: proc() -> int {
 		// The dock layout: built the first time, or for a picked workspace preset.
 		Workspace_BuildIfNeeded(&GlobalEditor, dockspaceID, dockAreaPos, dockAreaSize)
 
-		imgui.DockSpace(dockspaceID, imgui.Vec2{0, 0}, {.PassthruCentralNode, .AutoHideTabBar}) // panels draw their own headers
+		// Single windows hide their tab (panels draw their own headers) unless
+		// View > Show Tab Bars is on.
+		dockFlags: imgui.DockNodeFlags = {.PassthruCentralNode}
+		if !GlobalSettings.showTabBars do dockFlags += {.AutoHideTabBar}
+		imgui.DockSpace(dockspaceID, imgui.Vec2{0, 0}, dockFlags)
+		editorDockspaceID = dockspaceID
+		if GlobalSettings.showTabBars do Dock_ApplyTabBars(dockspaceID, true)
 		imgui.End()
 
 		// --------------------------------------------------------------------

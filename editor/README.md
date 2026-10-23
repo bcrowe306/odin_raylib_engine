@@ -108,6 +108,12 @@ layout of your own: arrange the panels, **Save Workspace As...**, and pick
 it from the same menu later (saved in `~/.config/ore_editor/workspaces/`;
 **Delete Workspace** removes one). **Reset Layout** returns to Default.
 
+A docked window alone in its space hides its tab (the panels have their own
+headers), so after closing a window docked next to another, the one left
+loses its tab. **View > Show Tab Bars** gives every docked window its tab
+(to see what is docked where, drag a window out or re-dock it); turn it off
+for the clean look again. Saved in settings.ini (`show_tab_bars`).
+
 ### File menu
 
 New Scene / Script / Project, **Open Project** (recent projects and a
@@ -278,6 +284,9 @@ per Row**. **Create Animation Player** adds a new node with the animations
 at the chosen FPS - or **Add to <name>** when an AnimationPlayer is
 selected. The selection previews as it plays. Animations keep the picked
 cells (`"cells"` in the scene; margin / spacing editable in the Inspector).
+Zoom the sheet with **-** / **+**, the zoom field, **Fit** (the whole sheet,
+the default) or **1:1**, or Cmd+wheel (Ctrl+wheel) around the mouse; the
+wheel scrolls (Shift: sideways) and middle-drag pans when zoomed in.
 
 ### Animation timeline
 

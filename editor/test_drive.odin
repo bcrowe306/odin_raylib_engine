@@ -690,6 +690,9 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	case "quit-prompt": return "true" if state.quitRequested else "false", true
 	case "clipboard-nodes": return "true" if Editor_HasClipboardNodes() else "false", true
 	case "anim-preview": return "paused" if AnimationPanel_PreviewPaused() else "playing", true
+	case "slicer-selection": return Slicer_Selection(), true
+	case "slicer-zoom": return fmt.tprintf("%.2f", Slicer_Zoom()), true
+	case "hidden-tab-bars": return fmt.tprint(Dock_HiddenTabBars(editorDockspaceID)), true
 	case "anim-names":
 		// "<name>,<name>,..." of the selected AnimationPlayer, the current one in [brackets].
 		if state.selectedNode == nil || state.selectedNode.typeId != e.AnimationPlayerNode do return "", true

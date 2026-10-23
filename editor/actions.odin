@@ -175,6 +175,11 @@ Actions_Init :: proc() {
 	add({id = "view.smart_snap", category = "View", label = "Smart Snapping", scope = .Scene, run = proc(s: ^EditorState) {s.smartSnap = !s.smartSnap}, checked = proc(s: ^EditorState) -> bool {return s.smartSnap}})
 	add({id = "view.colliders", category = "View", label = "Show All Colliders", scope = .Scene, run = proc(s: ^EditorState) {s.showAllColliders = !s.showAllColliders}, checked = proc(s: ^EditorState) -> bool {return s.showAllColliders}})
 	add({id = "view.inspector_help", category = "View", label = "Inspector Help", run = proc(s: ^EditorState) {s.showInspectorHelp = !s.showInspectorHelp}, checked = proc(s: ^EditorState) -> bool {return s.showInspectorHelp}})
+	add({id = "view.tab_bars", category = "View", label = "Show Tab Bars", run = proc(s: ^EditorState) {
+		GlobalSettings.showTabBars = !GlobalSettings.showTabBars
+		if !GlobalSettings.showTabBars do Dock_ApplyTabBars(editorDockspaceID, false) // single windows hide theirs again
+		Editor_SaveSettings()
+	}, checked = proc(s: ^EditorState) -> bool {return GlobalSettings.showTabBars}})
 	add({id = "view.snap_grid", category = "View", label = "Snap to Grid", chords = k(ch(.S, SH)), scope = .Scene, run = proc(s: ^EditorState) {s.snapGrid = !s.snapGrid}, checked = proc(s: ^EditorState) -> bool {return s.snapGrid}})
 	add({id = "view.snap_rotation", category = "View", label = "Snap Rotation", scope = .Scene, run = proc(s: ^EditorState) {s.snapRotation = !s.snapRotation}, checked = proc(s: ^EditorState) -> bool {return s.snapRotation}})
 

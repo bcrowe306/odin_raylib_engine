@@ -1,0 +1,56 @@
+# Sprite slicer zoom: Fit, the + / - buttons, 1:1, Cmd+wheel around the
+# mouse, and picking a cell while zoomed in. View > Show Tab Bars: every
+# docked window gets its tab back; saved in settings.ini.
+wait 5
+key escape
+click @menu:Tools
+click @menu:Tools/Sprite Sheet Slicer...
+click @slicer.texture
+click @pick:textures/Asteroid_2.png
+dblclick @slicer.cols
+key ctrl+a
+type 4
+key enter
+dblclick @slicer.rows
+key ctrl+a
+type 2
+key enter
+expect slicer-zoom == 0.00
+click @slicer.zoom-1
+expect slicer-zoom == 1.00
+click @slicer.zoom-in
+expect slicer-zoom == 1.25
+click @slicer.zoom-out
+click @slicer.zoom-out
+expect slicer-zoom == 0.80
+click @slicer.zoom-1
+hold cmd
+scroll @slicer.cell:0 1
+release
+expect slicer-zoom == 1.15
+click @slicer.cell:0
+expect slicer-selection == 0
+screenshot zoomed
+click @slicer.zoom-fit
+expect slicer-zoom == 0.00
+screenshot fit
+
+# Show Tab Bars: off (the default), single docked windows hide their tab
+# (Viewport and Code, sharing a space, keep theirs); on, every docked
+# window has its tab; saved in settings.ini.
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key escape
+expect hidden-tab-bars != 0
+click @menu:View
+click @menu:View/Show Tab Bars
+wait 2
+expect hidden-tab-bars == 0
+expect file:.editor_settings.ini contains show_tab_bars = true
+screenshot tab_bars_on
+click @menu:View
+click @menu:View/Show Tab Bars
+wait 2
+expect hidden-tab-bars != 0
+expect file:.editor_settings.ini contains show_tab_bars = false
+screenshot tab_bars_off

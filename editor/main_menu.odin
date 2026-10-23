@@ -165,6 +165,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 			}
 			imgui.EndMenu()
 		}
+		menu_action(state, "view.tab_bars")
 		if menu_item("Reset Layout") {
 			Workspace_RequestPreset(.Default)
 			Editor_Log(state, .Info, "Layout reset")

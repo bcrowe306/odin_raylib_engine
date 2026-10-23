@@ -40,6 +40,8 @@ slicer: struct {
 	fps:       f32,
 	anims:     [dynamic]Slicer_Anim,
 	preview:   f32,
+	// Sheet view: zoom (pixels per texel; 0 = fit the view).
+	zoom:      f32,
 }
 
 // Slicer_Open opens the slicer on a texture ("" = keep the current one).
@@ -234,25 +236,106 @@ Slicer_Render :: proc(state: ^EditorState) {
 			UI_DimText("Pick a texture to slice.")
 		} else {
 			slicer_sheet(state)
+			slicer_preview(90)
 		}
 	}
 	imgui.EndChild()
 }
 
 @(private = "file")
+SLICER_ZOOM_MIN :: f32(0.05)
+@(private = "file")
+SLICER_ZOOM_MAX :: f32(32)
+
+// slicer_fit_scale: the zoom that fits the whole sheet in `avail`.
+@(private = "file")
+slicer_fit_scale :: proc(avail: [2]f32) -> f32 {
+	s := min((avail.x - 8) / f32(slicer.tex.width), (avail.y - 8) / f32(slicer.tex.height))
+	return clamp(s, SLICER_ZOOM_MIN, 8)
+}
+
+// Slicer_Selection: the picked cells, "0,1,2" (drives).
+Slicer_Selection :: proc() -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	for c, i in slicer.selection {
+		if i > 0 do strings.write_string(&sb, ",")
+		fmt.sbprint(&sb, c)
+	}
+	return strings.to_string(sb)
+}
+
+// Slicer_Zoom: the sheet's zoom (0 = fit) - drives.
+Slicer_Zoom :: proc() -> f32 {return slicer.zoom}
+
+@(private = "file")
 slicer_sheet :: proc(state: ^EditorState) {
-	avail := imgui.GetContentRegionAvail()
 	previewH: f32 = 90
-	scale := min((avail.x - 8) / f32(slicer.tex.width), (avail.y - previewH - 8) / f32(slicer.tex.height))
-	scale = clamp(scale, 0.05, 8)
+	io := imgui.GetIO()
+
+	// --- zoom bar: - / % / + / Fit / 1:1 ---
+	fitScale := slicer_fit_scale(imgui.GetContentRegionAvail() - {0, previewH + 34})
+	scale := slicer.zoom if slicer.zoom > 0 else fitScale
+	zoomTo := f32(-1)
+	if UI_IconButton(ICON_FA_MINUS, "slicer.zoom-out", "Zoom out (Cmd+wheel)", size = 24) do zoomTo = scale / 1.25
+	imgui.SameLine(0, 2)
+	imgui.SetNextItemWidth(64)
+	pct := scale * 100
+	if imgui.DragFloat("##slicer_zoom", &pct, 1, SLICER_ZOOM_MIN * 100, SLICER_ZOOM_MAX * 100, "%.0f%%") do zoomTo = pct / 100
+	Drive_Item("slicer.zoom")
+	imgui.SameLine(0, 2)
+	if UI_IconButton(ICON_FA_PLUS, "slicer.zoom-in", "Zoom in (Cmd+wheel)", size = 24) do zoomTo = scale * 1.25
+	imgui.SameLine(0, UI_SPACE)
+	if UI_Button("Fit", "slicer.zoom-fit") do slicer.zoom = 0
+	UI_Tooltip("Fit the whole sheet in the view")
+	imgui.SameLine(0, 2)
+	if UI_Button("1:1", "slicer.zoom-1") do zoomTo = 1
+	UI_Tooltip("One screen pixel per texture pixel")
+	imgui.SameLine(0, UI_SPACE)
+	imgui.AlignTextToFramePadding()
+	UI_DimText("Cmd+wheel zooms · middle-drag pans")
+
+	// --- the sheet: scrolls when zoomed in ---
+	avail := imgui.GetContentRegionAvail()
+	canvasOpen := imgui.BeginChild("##slicer_canvas", {avail.x, max(avail.y - previewH - 6, 60)}, {}, {.HorizontalScrollbar, .NoScrollWithMouse})
+	defer imgui.EndChild()
+	if !canvasOpen do return
+	canvasMn := imgui.GetWindowPos()
+	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
+	canvasHovered := imgui.IsWindowHovered({})
+	if canvasHovered {
+		// Cmd / Ctrl + wheel zooms around the mouse; the wheel scrolls (Shift: across).
+		if io.MouseWheel != 0 && (io.KeySuper || io.KeyCtrl) {
+			zoomTo = scale * (1.15 if io.MouseWheel > 0 else 1 / 1.15)
+		} else if io.MouseWheel != 0 || io.MouseWheelH != 0 {
+			dx, dy := io.MouseWheelH, io.MouseWheel
+			if io.KeyShift && dx == 0 do dx, dy = dy, 0
+			imgui.SetScrollX(imgui.GetScrollX() - dx * 40)
+			imgui.SetScrollY(imgui.GetScrollY() - dy * 40)
+		}
+	}
+	if canvasHovered && imgui.IsMouseDragging(.Middle) {
+		d := io.MouseDelta
+		imgui.SetScrollX(imgui.GetScrollX() - d.x)
+		imgui.SetScrollY(imgui.GetScrollY() - d.y)
+	}
+	if zoomTo > 0 {
+		zoomTo = clamp(zoomTo, SLICER_ZOOM_MIN, SLICER_ZOOM_MAX)
+		// Keep the point under the mouse (else the view's centre) in place.
+		anchor := mouse - canvasMn if canvasHovered else imgui.GetWindowSize() * 0.5
+		content := ([2]f32{imgui.GetScrollX(), imgui.GetScrollY()} + anchor) / scale
+		slicer.zoom = zoomTo
+		scale = zoomTo
+		imgui.SetScrollX(max(content.x * scale - anchor.x, 0))
+		imgui.SetScrollY(max(content.y * scale - anchor.y, 0))
+	}
+	if slicer.zoom == 0 do scale = fitScale
+
 	size := [2]f32{f32(slicer.tex.width), f32(slicer.tex.height)} * scale
 	p0 := imgui.GetCursorScreenPos()
 	dl := imgui.GetWindowDrawList()
 	imgui.DrawList_AddRectFilled(dl, p0, p0 + size, col32(30, 34, 44, 255))
 	imgui.Image(transmute(imgui.TextureID)&slicer.tex, size, {0, 0}, {1, 1}, {1, 1, 1, 1}, {0, 0, 0, 0})
 	hovered := imgui.IsItemHovered()
-	io := imgui.GetIO()
-	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
 	if !imgui.IsMouseDown(.Left) do slicer.dragAdd = false
 	for cell in 0 ..< cell_count() {
 		r := cell_rect(cell)
@@ -288,8 +371,12 @@ slicer_sheet :: proc(state: ^EditorState) {
 			slicer.lastCell = cell
 		}
 	}
+}
 
-	// Preview: the selection (else the last animation) playing.
+// slicer_preview: the selection (else the last animation) playing.
+@(private = "file")
+slicer_preview :: proc(previewH: f32) {
+	dl := imgui.GetWindowDrawList()
 	frames := slicer.selection[:]
 	if len(frames) == 0 && len(slicer.anims) > 0 do frames = slicer.anims[len(slicer.anims) - 1].cells[:]
 	imgui.Dummy({0, 6})
