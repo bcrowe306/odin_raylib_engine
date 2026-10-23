@@ -137,6 +137,8 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 		LuaDebugger_Command(rest)
 	case "break-clear":
 		LuaDebugger_ClearBreakpoints()
+	case "break-cond":
+		LuaDebugger_CondCommand(rest)
 	case "reload-scene":
 		fmt.printfln("@ore:reloaded %s %t", rest, Game_ReloadSceneFile(game, rest))
 	case "eval":

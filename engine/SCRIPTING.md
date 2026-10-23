@@ -371,7 +371,20 @@ its log.
 Set breakpoints by clicking line numbers in the editor's Code tab, then
 Play: the game stops in the script at a breakpoint, with the call stack
 and locals in the Game tab, and steps with F8 (continue), F10 (over), F11
-(into) and Shift+F11 (out). The engine side is `engine/lua_debugger.odin`
+(into) and Shift+F11 (out).
+
+- **Conditional breakpoints**: right-click a line number to give its
+  breakpoint a condition (a Lua expression - `self.health <= 0`,
+  `i == 10`); it stops only when the condition is true, seeing the line's
+  locals, upvalues (`self`, module locals) and globals. A condition that
+  errors stops too and says why. Conditional breakpoints are amber; hover
+  for the condition.
+- **Watch**: expressions in the Game tab's Watch column are evaluated in
+  the selected frame at every stop (and when you pick another frame).
+- While paused, the Console's **Lua** line evaluates in the paused frame
+  (its locals are visible; assigning to a local doesn't change it).
+
+The engine side is `engine/lua_debugger.odin`
 (a line hook installed only while there are breakpoints or a step pending,
 so scripts run at full speed otherwise).
 

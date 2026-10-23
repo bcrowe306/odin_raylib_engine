@@ -542,7 +542,9 @@ binary (`bin/odin_raylib_engine`) if any engine/game source changed, then starts
 Console. **Game → Simulate in Editor** runs the scene inside the editor and restores it when stopped.
 The **Lua** line under the Console evaluates Lua there - in the simulation, or in the running
 game - showing an expression's value (`Scene.find_node("PlayerShip").position`) or running a
-statement (`GameState.score = 100`); Up / Down recall earlier lines.
+statement (`GameState.score = 100`); Up / Down recall earlier lines. Breakpoints: click a line
+number; right-click it for a condition (amber marker); the Game tab's debugger shows the call
+stack, locals and a **Watch** column evaluated at every stop.
 
 While the game runs, the toolbar's play controls become **Pause** /
 **Resume** (F9), **Step** one frame (Shift+F9; pauses first), **Restart**

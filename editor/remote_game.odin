@@ -106,7 +106,7 @@ RemoteGame_HandleLine :: proc(state: ^EditorState, line: string) -> bool {
 	case "hello":
 		remote.connected = true
 		Debug_SendAll() // breakpoints set before Play
-	case "stopped", "locals", "running": Debug_HandleReply(state, kind, rest)
+	case "stopped", "locals", "running", "watch": Debug_HandleReply(state, kind, rest)
 	case "paused": remote.paused = true
 	case "resumed": remote.paused = false
 	case "stepped": remote.steps += 1

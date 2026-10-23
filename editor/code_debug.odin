@@ -1,5 +1,6 @@
 package editor
 
+import "core:c"
 import "core:encoding/json"
 import "core:fmt"
 import "core:slice"
@@ -11,7 +12,9 @@ import imgui "lib/imgui"
 // editor link): click the Code tab's gutter to toggle a breakpoint; when the
 // game reaches it, it pauses there, the script opens at that line, and the
 // Game tab shows the call stack and locals with Continue (F8), Step Over
-// (F10), Step Into (F11) and Step Out (Shift+F11).
+// (F10), Step Into (F11) and Step Out (Shift+F11). Right-click the gutter
+// for a breakpoint condition (it stops only when the Lua expression is
+// true); watch expressions are evaluated in the selected frame at each stop.
 // ============================================================================
 
 Debug_Frame :: struct {
@@ -29,6 +32,19 @@ dbg: struct {
 	stack:       [dynamic]Debug_Frame,
 	locals:      [dynamic][3]string, // name, value, type
 	level:       int,
+	reason:      string, // why it stopped ("condition: ...", "")
+	conditions:  map[string]map[int]string, // script -> line -> condition
+	watches:     [dynamic]Debug_Watch,
+	watchBuf:    [256]u8,
+	condRel:     string, // the breakpoint whose condition is being edited
+	condLine:    int,
+	condBuf:     [256]u8,
+	condOpen:    bool,
+}
+
+Debug_Watch :: struct {
+	expr, value: string,
+	ok:          bool,
 }
 
 Debug_IsStopped :: proc() -> bool {return dbg.stopped}
@@ -44,6 +60,7 @@ Debug_ToggleBreakpoint :: proc(rel: string, line: int) {
 	lines := &dbg.breakpoints[rel]
 	if i, found := slice.linear_search(lines[:], line); found {
 		ordered_remove(lines, i)
+		Debug_SetCondition(rel, line, "", keep = false)
 	} else {
 		append(lines, line)
 		slice.sort(lines[:])
@@ -58,6 +75,75 @@ debug_send :: proc(rel: string) {
 	parts := make([dynamic]string, context.temp_allocator)
 	for l in lines do append(&parts, fmt.tprint(l))
 	RemoteGame_Send(fmt.tprintf("break-set %s %s", rel, strings.join(parts[:], ",", context.temp_allocator)))
+	if conds, ok := dbg.conditions[rel]; ok {
+		for line, cond in conds do RemoteGame_Send(fmt.tprintf("break-cond %s %d %s", rel, line, cond))
+	}
+}
+
+// Debug_Condition: a breakpoint's condition ("" = none).
+Debug_Condition :: proc(rel: string, line: int) -> string {
+	if conds, ok := dbg.conditions[rel]; ok do return conds[line] or_else ""
+	return ""
+}
+
+// Debug_SetCondition sets a breakpoint's condition (adding the breakpoint
+// unless keep is false) and tells a running game.
+Debug_SetCondition :: proc(rel: string, line: int, cond: string, keep := true) {
+	cond := strings.trim_space(cond)
+	if rel not_in dbg.conditions do dbg.conditions[strings.clone(rel)] = make(map[int]string)
+	conds := &dbg.conditions[rel]
+	if old, has := conds[line]; has {
+		delete(old)
+		delete_key(conds, line)
+	}
+	if cond != "" do conds[line] = strings.clone(cond)
+	if keep && !Debug_HasBreakpoint(rel, line) {
+		Debug_ToggleBreakpoint(rel, line) // sends the condition with it
+		return
+	}
+	if RemoteGame_Connected() do RemoteGame_Send(fmt.tprintf("break-cond %s %d %s", rel, line, cond))
+}
+
+// Debug_EditCondition opens the condition popup for a gutter line.
+Debug_EditCondition :: proc(rel: string, line: int) {
+	delete(dbg.condRel)
+	dbg.condRel = strings.clone(rel)
+	dbg.condLine = line
+	dbg.condBuf = {}
+	copy(dbg.condBuf[:len(dbg.condBuf) - 1], Debug_Condition(rel, line))
+	dbg.condOpen = true
+}
+
+// Debug_ConditionPopup: the breakpoint condition editor (Code tab).
+Debug_ConditionPopup :: proc() {
+	if dbg.condOpen {
+		imgui.OpenPopup("##bp_condition")
+		dbg.condOpen = false
+	}
+	if !imgui.BeginPopup("##bp_condition") do return
+	imgui.TextUnformatted(fmt.ctprintf("%s  Breakpoint condition - %s:%d", ICON_FA_CIRCLE, dbg.condRel, dbg.condLine))
+	UI_DimText("Stops only when this Lua expression is true (locals, self, globals).")
+	if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
+	imgui.SetNextItemWidth(420)
+	enter := imgui.InputTextWithHint("##bp_cond_text", "e.g. self.health <= 0 or i == 10", cstring(raw_data(dbg.condBuf[:])), len(dbg.condBuf), {.EnterReturnsTrue})
+	Drive_Item("debug.condition")
+	if enter || UI_PrimaryButton("Set", "debug.condition-set") {
+		Debug_SetCondition(dbg.condRel, dbg.condLine, string(cstring(raw_data(dbg.condBuf[:]))))
+		imgui.CloseCurrentPopup()
+	}
+	imgui.SameLine()
+	if Debug_HasBreakpoint(dbg.condRel, dbg.condLine) && UI_Button("Remove Breakpoint", "debug.condition-remove") {
+		Debug_ToggleBreakpoint(dbg.condRel, dbg.condLine)
+		imgui.CloseCurrentPopup()
+	}
+	imgui.EndPopup()
+}
+
+// debug_request_watches evaluates every watch in the selected frame.
+@(private = "file")
+debug_request_watches :: proc() {
+	if !dbg.stopped do return
+	for w in dbg.watches do RemoteGame_Send(fmt.tprintf("watch %d %s", dbg.level, w.expr))
 }
 
 // Debug_SendAll: every breakpoint to a game that just connected.
@@ -90,6 +176,8 @@ Debug_HandleReply :: proc(state: ^EditorState, kind, rest: string) {
 		dbg.file = strings.clone(string(o["file"].(json.String) or_else ""))
 		dbg.line = json_int(o["line"])
 		dbg.level = 0
+		delete(dbg.reason)
+		dbg.reason = strings.clone(string(o["reason"].(json.String) or_else ""))
 		clear(&dbg.stack)
 		if st, ok := o["stack"].(json.Array); ok {
 			for fv in st {
@@ -98,14 +186,26 @@ Debug_HandleReply :: proc(state: ^EditorState, kind, rest: string) {
 			}
 		}
 		debug_set_locals(o["locals"])
+		debug_request_watches()
 		Editor_OpenScript(state, dbg.file, dbg.line - 1)
-		Editor_Log(state, .Info, "Paused at %s:%d", dbg.file, dbg.line)
+		Editor_Log(state, .Info, "Paused at %s:%d%s", dbg.file, dbg.line, fmt.tprintf(" (%s)", dbg.reason) if dbg.reason != "" else "")
 	case "locals":
 		v, err := json.parse(transmute([]u8)rest, allocator = context.temp_allocator)
 		if err != .None do return
 		o, _ := v.(json.Object)
 		dbg.level = json_int(o["level"])
 		debug_set_locals(o["locals"])
+		debug_request_watches()
+	case "watch":
+		v, err := json.parse(transmute([]u8)rest, allocator = context.temp_allocator)
+		if err != .None do return
+		o, _ := v.(json.Object)
+		expr := string(o["expr"].(json.String) or_else "")
+		for &w in dbg.watches do if w.expr == expr {
+			delete(w.value)
+			w.value = strings.clone(string(o["text"].(json.String) or_else ""))
+			w.ok = bool(o["ok"].(json.Boolean) or_else false)
+		}
 	}
 }
 
@@ -144,7 +244,7 @@ Debug_CurrentLine :: proc(rel: string) -> int {
 Debug_Panel :: proc(state: ^EditorState) {
 	if !dbg.stopped do return
 	imgui.PushStyleColorImVec4(.Text, UI_WARNING)
-	imgui.TextUnformatted(fmt.ctprintf("%s  Paused at %s:%d", ICON_FA_PAUSE, dbg.file, dbg.line))
+	imgui.TextUnformatted(fmt.ctprintf("%s  Paused at %s:%d%s", ICON_FA_PAUSE, dbg.file, dbg.line, fmt.tprintf("  (%s)", dbg.reason) if dbg.reason != "" else ""))
 	imgui.PopStyleColor()
 	Drive_Item("debug.where")
 	imgui.SameLine()
@@ -159,8 +259,8 @@ Debug_Panel :: proc(state: ^EditorState) {
 	imgui.SameLine()
 	if UI_Button("Step Out", "debug.step-out") do Debug_Command("step-out")
 	UI_Tooltip("Step Out (Shift+F11)")
-	h := imgui.GetContentRegionAvail().y * 0.5
-	if imgui.BeginChild("##dbg_stack", {imgui.GetContentRegionAvail().x * 0.4, h}, {.Borders}, {}) {
+	h := max(imgui.GetContentRegionAvail().y * 0.5, 150) // the Game tab scrolls when it is short
+	if imgui.BeginChild("##dbg_stack", {imgui.GetContentRegionAvail().x * 0.3, h}, {.Borders}, {}) {
 		UI_DimText("Call stack")
 		for fr in dbg.stack {
 			if imgui.Selectable(fmt.ctprintf("%s  %s:%d##fr%d", fr.name, fr.file, fr.line, fr.level), fr.level == dbg.level) {
@@ -172,7 +272,7 @@ Debug_Panel :: proc(state: ^EditorState) {
 	}
 	imgui.EndChild()
 	imgui.SameLine()
-	if imgui.BeginChild("##dbg_locals", {0, h}, {.Borders}, {}) {
+	if imgui.BeginChild("##dbg_locals", {imgui.GetContentRegionAvail().x * 0.55, h}, {.Borders}, {}) {
 		UI_DimText(fmt.tprintf("Locals (frame %d)", dbg.level))
 		if UI_BeginProps("##dbglocals") {
 			for l in dbg.locals {
@@ -186,18 +286,71 @@ Debug_Panel :: proc(state: ^EditorState) {
 		}
 	}
 	imgui.EndChild()
+	imgui.SameLine()
+	if imgui.BeginChild("##dbg_watches", {0, h}, {.Borders}, {}) {
+		UI_DimText("Watch")
+		remove := -1
+		for w, i in dbg.watches {
+			imgui.PushIDInt(c.int(i))
+			if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("debug.watch-remove:%d", i), "Remove", size = 20) do remove = i
+			imgui.SameLine()
+			imgui.TextUnformatted(fmt.ctprintf("%s =", w.expr))
+			imgui.SameLine()
+			imgui.PushStyleColorImVec4(.Text, UI_TEXT if w.ok else UI_DANGER)
+			imgui.PushTextWrapPos(0)
+			imgui.TextWrapped("%s", fmt.ctprintf("%s", w.value))
+			imgui.PopTextWrapPos()
+			imgui.PopStyleColor()
+			imgui.PopID()
+		}
+		if remove >= 0 {
+			delete(dbg.watches[remove].expr)
+			delete(dbg.watches[remove].value)
+			ordered_remove(&dbg.watches, remove)
+		}
+		imgui.SetNextItemWidth(-1)
+		if imgui.InputTextWithHint("##dbg_watch_add", "+ expression (self.vx, #enemies)", cstring(raw_data(dbg.watchBuf[:])), len(dbg.watchBuf), {.EnterReturnsTrue}) {
+			Debug_AddWatch(string(cstring(raw_data(dbg.watchBuf[:]))))
+			dbg.watchBuf = {}
+		}
+		Drive_Item("debug.watch-add")
+	}
+	imgui.EndChild()
 	imgui.Separator()
+}
+
+// Debug_AddWatch adds a watch expression (evaluated now when stopped).
+Debug_AddWatch :: proc(expr: string) {
+	expr := strings.trim_space(expr)
+	if expr == "" do return
+	for w in dbg.watches do if w.expr == expr do return
+	append(&dbg.watches, Debug_Watch{expr = strings.clone(expr), value = strings.clone("")})
+	if dbg.stopped do RemoteGame_Send(fmt.tprintf("watch %d %s", dbg.level, expr))
 }
 
 // Debug_Query: drive queries debug-*.
 Debug_Query :: proc(q: string) -> (string, bool) {
 	switch q {
 	case "debug-stopped": return "true" if dbg.stopped else "false", true
+	case "debug-reason": return dbg.reason, true
 	case "debug-line": return fmt.tprintf("%s:%d", dbg.file, dbg.line) if dbg.stopped else "", true
 	case "debug-stack":
 		names := make([dynamic]string, context.temp_allocator)
 		for f in dbg.stack do append(&names, f.name)
 		return strings.join(names[:], ",", context.temp_allocator), true
+	}
+	if strings.has_prefix(q, "debug-watch:") {
+		for w in dbg.watches do if w.expr == q[len("debug-watch:"):] do return w.value, true
+		return "<none>", true
+	}
+	if strings.has_prefix(q, "debug-condition:") {
+		// debug-condition:<file>:<line>
+		rest := q[len("debug-condition:"):]
+		if i := strings.last_index_byte(rest, ':'); i > 0 {
+			line := 0
+			for r in rest[i + 1:] do if r >= '0' && r <= '9' do line = line * 10 + int(r - '0')
+			return Debug_Condition(rest[:i], line), true
+		}
 	}
 	if strings.has_prefix(q, "debug-local:") {
 		for l in dbg.locals do if l[0] == q[len("debug-local:"):] do return l[1], true

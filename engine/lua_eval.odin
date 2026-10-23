@@ -14,8 +14,11 @@ import lua "vendor:lua/5.4"
 // ============================================================================
 
 // Lua_Eval runs code; text is its results (", "-separated) or the error.
-Lua_Eval :: proc(L: ^lua.State, code: string, allocator := context.allocator) -> (text: string, ok: bool) {
+// With env (a stack index of a table), the code's globals are that table
+// (the debugger: a frame's locals over _G).
+Lua_Eval :: proc(L: ^lua.State, code: string, allocator := context.allocator, env: c.int = 0) -> (text: string, ok: bool) {
 	if L == nil do return strings.clone("no Lua state", allocator), false
+	env := lua.absindex(L, env) if env != 0 else 0
 	top := lua.gettop(L)
 	defer lua.settop(L, top)
 	src := strings.trim_space(code)
@@ -27,6 +30,10 @@ Lua_Eval :: proc(L: ^lua.State, code: string, allocator := context.allocator) ->
 		if lua.L_loadbuffer(L, cast([^]u8)raw_data(src), c.size_t(len(src)), chunk) != .OK {
 			return strings.clone(string(lua.tostring(L, -1)), allocator), false
 		}
+	}
+	if env != 0 {
+		lua.pushvalue(L, env)
+		_ = lua.setupvalue(L, -2, 1) // the chunk's _ENV
 	}
 	if lua.pcall(L, 0, lua.MULTRET, 0) != 0 {
 		return strings.clone(string(lua.tostring(L, -1)), allocator), false

@@ -1,0 +1,65 @@
+# Debugger: a breakpoint condition (right-click the gutter) - false never
+# stops, true stops and says why; watch expressions in the paused frame;
+# the Console's Lua line evaluates there too.
+wait 5
+# A tall bottom panel for the debugger's columns.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+dblclick @asset:scenes/battle_arena.scene.json
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 32
+key enter
+wait 3
+rclick @code.gutter:32
+wait 2
+expect item:debug.condition == visible
+type self.rotation > 100000
+key enter
+wait 2
+expect debug-condition:scripts/player_ship.lua:32 == self.rotation > 100000
+screenshot condition_marker
+click @toolbar.play-scene
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+wait 90
+expect debug-stopped == false
+
+# A condition that holds stops, with the reason.
+rclick @code.gutter:32
+wait 2
+key cmd+a
+type dt > 0
+key enter
+wait-until debug-stopped == true timeout=600
+expect debug-line == scripts/player_ship.lua:32
+expect debug-reason == condition: dt > 0
+click @bottom:game
+wait 3
+click @debug.watch-add
+type dt*2
+key enter
+wait-until debug-watch:dt*2 contains 0. timeout=300
+click @debug.watch-add
+type self.rotation_speed
+key enter
+wait-until debug-watch:self.rotation_speed != \s timeout=300
+screenshot watches
+click @bottom:console
+click @console.lua
+type dt
+key enter
+wait-until log contains = 0. timeout=300
+
+click @code.gutter:32
+click @bottom:game
+wait 3
+click @debug.continue
+wait-until debug-stopped == false timeout=300
+wait 30
+expect debug-stopped == false
+click @toolbar.stop
+wait-until game == stopped timeout=300

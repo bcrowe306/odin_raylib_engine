@@ -102,7 +102,7 @@ Script authoring
 - [x] 8.21 Snippets (Tab-expanded): ready, update, connect, properties, tween
 - [x] 8.22 Attach by dropping a `.lua` onto a scene-tree node
 - [x] 8.23 Lua console: evaluate expressions in the simulating / running game
-- [ ] 8.24 Debugger: watch expressions, conditional breakpoints
+- [x] 8.24 Debugger: watch expressions, conditional breakpoints
 
 Docs in place
 - [ ] 8.25 Every API function documented in `engine_api.lua` (description + example) for hover

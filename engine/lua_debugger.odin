@@ -18,7 +18,12 @@ import lua "vendor:lua/5.4"
 //
 //   continue | step-in | step-over | step-out
 //   locals <level>          -> the locals of another stack frame
+//   watch <level> <expr>    -> "watch {expr, ok, text}": an expression in a frame
+//   eval <lua>              -> "eval {...}": the Console's Lua line, in the top frame
 //   break-set <file> <l,l>  /  break-clear
+//   break-cond <file> <line> [expr]  a condition: stop only when it is true
+//                           (in the frame's locals, upvalues and globals;
+//                           an error in it stops too and says so)
 //
 // The host supplies the two ends: the editor link (editor_link.odin) prints
 // "@ore:stopped {...}" and reads commands from stdin; tests use a queue.
@@ -42,6 +47,7 @@ Lua_Debugger :: struct {
 	reply:        proc(kind, json: string),
 	stopped:      bool, // inside a stop right now
 	hits:         int,
+	conditions:   map[string]string, // "<file>:<line>" -> Lua expression (break-cond)
 	projectDir:   string, // to read function names from scripts on disk
 }
 
@@ -83,6 +89,11 @@ LuaDebugger_ClearBreakpoints :: proc() {
 		delete(k, heap)
 	}
 	clear(&luaDebugger.breakpoints)
+	for k, v in luaDebugger.conditions {
+		delete(k, heap)
+		delete(v, heap)
+	}
+	clear(&luaDebugger.conditions)
 	luaDebugger.step = .Run
 	debugger_update_hook()
 }
@@ -107,16 +118,17 @@ debug_norm :: proc(source: string) -> string {
 	return strings.trim_prefix(s, "./")
 }
 
+// breakpoint_at: the breakpoint file (as set) with one at this line.
 @(private = "file")
-breakpoint_at :: proc(source: string, line: int) -> bool {
+breakpoint_at :: proc(source: string, line: int) -> (string, bool) {
 	src := debug_norm(source)
 	for file, lines in luaDebugger.breakpoints {
 		// Absolute vs. relative paths: the shorter one ends the longer one.
 		match := src == file || strings.has_suffix(src, strings.concatenate({"/", file}, context.temp_allocator)) || strings.has_suffix(file, strings.concatenate({"/", src}, context.temp_allocator))
 		if !match do continue
-		for l in lines do if l == line do return true
+		for l in lines do if l == line do return file, true
 	}
-	return false
+	return "", false
 }
 
 @(private = "file")
@@ -142,18 +154,104 @@ debug_hook :: proc "c" (L: ^lua.State, ar: ^lua.Debug) {
 	case .Out: stop = stack_depth(L) < luaDebugger.stepDepth
 	case .Run:
 	}
-	if !stop do stop = breakpoint_at(source, line)
-	if stop do debugger_stop(L, debug_norm(source), line)
+	reason := ""
+	if !stop {
+		file, hit := breakpoint_at(source, line)
+		if hit {
+			stop = true
+			if cond := luaDebugger.conditions[fmt.tprintf("%s:%d", file, line)]; cond != "" {
+				stop, reason = debug_condition(L, cond)
+			}
+		}
+	}
+	if stop do debugger_stop(L, debug_norm(source), line, reason)
+}
+
+// debug_condition: a breakpoint condition, true in the top frame? (An
+// error counts as true, with the reason.)
+@(private = "file")
+debug_condition :: proc(L: ^lua.State, cond: string) -> (hit: bool, reason: string) {
+	top := lua.gettop(L)
+	defer lua.settop(L, top)
+	if !debug_push_frame_env(L, 0) do return true, ""
+	env := lua.gettop(L)
+	src := strings.concatenate({"return ", cond}, context.temp_allocator)
+	if lua.L_loadbuffer(L, cast([^]u8)raw_data(src), len(src), "=condition") != .OK {
+		return true, fmt.tprintf("condition error: %s", lua.tostring(L, -1))
+	}
+	lua.pushvalue(L, env)
+	_ = lua.setupvalue(L, -2, 1)
+	if lua.pcall(L, 0, 1, 0) != 0 do return true, fmt.tprintf("condition error: %s", lua.tostring(L, -1))
+	if lua.toboolean(L, -1) do return true, fmt.tprintf("condition: %s", cond)
+	return false, ""
+}
+
+// debug_push_frame_env pushes a table with a stack frame's upvalues and
+// locals (locals win) whose __index is _G - expressions see what the code
+// at that line sees.
+debug_push_frame_env :: proc(L: ^lua.State, level: int) -> bool {
+	ar: lua.Debug
+	if lua.getstack(L, i32(level), &ar) == 0 do return false
+	lua.newtable(L)
+	env := lua.gettop(L)
+	lua.getinfo(L, "f", &ar)
+	fn := lua.gettop(L)
+	for i: i32 = 1; ; i += 1 {
+		name := lua.getupvalue(L, fn, i)
+		if name == nil do break
+		if string(name) == "_ENV" || string(name) == "" {
+			lua.pop(L, 1)
+			continue
+		}
+		lua.setfield(L, env, name)
+	}
+	lua.pop(L, 1) // function
+	for i: i32 = 1; ; i += 1 {
+		name := lua.getlocal(L, &ar, i)
+		if name == nil do break
+		if strings.has_prefix(string(name), "(") {
+			lua.pop(L, 1)
+			continue
+		}
+		lua.setfield(L, env, name)
+	}
+	lua.newtable(L)
+	lua.pushglobaltable(L)
+	lua.setfield(L, -2, "__index")
+	lua.setmetatable(L, env)
+	return true
+}
+
+// LuaDebugger_EvalInFrame: code with a frame's locals visible (watches, the
+// Console while stopped). Assigning to a local doesn't change it.
+LuaDebugger_EvalInFrame :: proc(L: ^lua.State, level: int, code: string, allocator := context.allocator) -> (string, bool) {
+	top := lua.gettop(L)
+	defer lua.settop(L, top)
+	if !debug_push_frame_env(L, level) do return Lua_Eval(L, code, allocator)
+	return Lua_Eval(L, code, allocator, lua.gettop(L))
+}
+
+// LuaDebugger_SetCondition: a breakpoint's condition ("" = none).
+LuaDebugger_SetCondition :: proc(file: string, line: int, cond: string) {
+	heap := runtime.heap_allocator()
+	if luaDebugger.conditions == nil do luaDebugger.conditions = make(map[string]string, heap)
+	key := fmt.tprintf("%s:%d", debug_norm(file), line)
+	if key in luaDebugger.conditions {
+		k, v := delete_key(&luaDebugger.conditions, key)
+		delete(k, heap)
+		delete(v, heap)
+	}
+	if c := strings.trim_space(cond); c != "" do luaDebugger.conditions[strings.clone(key, heap)] = strings.clone(c, heap)
 }
 
 @(private = "file")
-debugger_stop :: proc(L: ^lua.State, file: string, line: int) {
+debugger_stop :: proc(L: ^lua.State, file: string, line: int, reason := "") {
 	luaDebugger.stopped = true
 	defer luaDebugger.stopped = false
 	luaDebugger.hits += 1
 	luaDebugger.step = .Run
 	depth := stack_depth(L)
-	if luaDebugger.reply != nil do luaDebugger.reply("stopped", debugger_state_json(L, file, line))
+	if luaDebugger.reply != nil do luaDebugger.reply("stopped", debugger_state_json(L, file, line, reason))
 	for {
 		cmd := luaDebugger.wait_command() if luaDebugger.wait_command != nil else ""
 		verb, rest := cmd, ""
@@ -173,6 +271,23 @@ debugger_stop :: proc(L: ^lua.State, file: string, line: int) {
 			level := 0
 			for r in rest do if r >= '0' && r <= '9' do level = level * 10 + int(r - '0')
 			if luaDebugger.reply != nil do luaDebugger.reply("locals", fmt.tprintf("{{\"level\": %d, \"locals\": %s}}", level, debugger_locals_json(L, level)))
+			continue
+		case "watch":
+			// watch <level> <expr>
+			level, expr := 0, rest
+			if i := strings.index_byte(rest, ' '); i >= 0 {
+				for r in rest[:i] do if r >= '0' && r <= '9' do level = level * 10 + int(r - '0')
+				expr = strings.trim_space(rest[i + 1:])
+			}
+			text, ok := LuaDebugger_EvalInFrame(L, level, expr, context.temp_allocator)
+			if luaDebugger.reply != nil do luaDebugger.reply("watch", fmt.tprintf("{{\"expr\": %q, \"ok\": %t, \"text\": %q}}", expr, ok, text))
+			continue
+		case "eval":
+			text, ok := LuaDebugger_EvalInFrame(L, 0, rest, context.temp_allocator)
+			if luaDebugger.reply != nil do luaDebugger.reply("eval", fmt.tprintf("{{\"ok\": %t, \"code\": %q, \"text\": %q}}", ok, rest, text))
+			continue
+		case "break-cond":
+			LuaDebugger_CondCommand(rest)
 			continue
 		case "break-set":
 			LuaDebugger_Command(rest)
@@ -204,10 +319,25 @@ LuaDebugger_Command :: proc(args: string) {
 	LuaDebugger_SetBreakpoints(parts[0], lines[:])
 }
 
+// LuaDebugger_CondCommand: "break-cond <file> <line> [expr]".
+LuaDebugger_CondCommand :: proc(args: string) {
+	parts := strings.fields(args, context.temp_allocator)
+	if len(parts) < 2 do return
+	line := 0
+	for r in parts[1] do if r >= '0' && r <= '9' do line = line * 10 + int(r - '0')
+	cond := ""
+	if len(parts) > 2 {
+		// The rest of the line, as typed.
+		i := strings.index(args, parts[1]) + len(parts[1])
+		cond = strings.trim_space(args[i:])
+	}
+	LuaDebugger_SetCondition(parts[0], line, cond)
+}
+
 @(private = "file")
-debugger_state_json :: proc(L: ^lua.State, file: string, line: int) -> string {
+debugger_state_json :: proc(L: ^lua.State, file: string, line: int, reason := "") -> string {
 	sb := strings.builder_make(context.temp_allocator)
-	fmt.sbprintf(&sb, "{{\"file\": %q, \"line\": %d, \"stack\": [", file, line)
+	fmt.sbprintf(&sb, "{{\"file\": %q, \"line\": %d, \"reason\": %q, \"stack\": [", file, line, reason)
 	ar: lua.Debug
 	n := 0
 	for level := 0; lua.getstack(L, i32(level), &ar) != 0; level += 1 {

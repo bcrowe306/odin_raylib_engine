@@ -738,7 +738,10 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	focused := imgui.IsWindowFocused()
 	code_drop_target(state, doc, {imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y})
 	Code_NodeDropMenu(state, doc) // a node dropped onto a method: its events
-	if imgui.BeginPopupContextItem("##code_ctx") {
+	Debug_ConditionPopup()        // right-click in the gutter: a breakpoint condition
+	// Right-click: the text menu - in the gutter, a breakpoint condition instead.
+	if hovered && imgui.IsMouseReleased(.Right) && imgui.GetIO().MousePos.x >= winPos.x + gutterW do imgui.OpenPopup("##code_ctx")
+	if imgui.BeginPopup("##code_ctx") {
 		code_text_context_menu(state, doc)
 		imgui.EndPopup()
 	}
@@ -936,11 +939,16 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		rowMin := [2]f32{winPos.x, cm.textOrigin.y + f32(ln) * cm.lineH}
 		rowMax := [2]f32{winPos.x + gutterW, rowMin.y + cm.lineH}
 		Drive_ItemRect(fmt.tprintf("code.gutter:%d", ln + 1), rowMin, rowMax, inWindow = true)
-		if doc.isLua && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && imgui.IsMouseClicked(.Left) && point_in_rect(gutterMouse, rowMin, rowMax) {
-			Debug_ToggleBreakpoint(doc.rel, ln + 1)
+		if doc.isLua && imgui.IsWindowHovered(imgui.HoveredFlags_AllowWhenBlockedByActiveItem) && point_in_rect(gutterMouse, rowMin, rowMax) {
+			if imgui.IsMouseClicked(.Left) do Debug_ToggleBreakpoint(doc.rel, ln + 1)
+			if imgui.IsMouseClicked(.Right) do Debug_EditCondition(doc.rel, ln + 1) // a condition
+			if cond := Debug_Condition(doc.rel, ln + 1); cond != "" do UI_Tooltip(fmt.tprintf("Stops when: %s (right-click to edit)", cond))
 		}
 		if Debug_HasBreakpoint(doc.rel, ln + 1) {
-			imgui.DrawList_AddCircleFilled(dl, {winPos.x + 9, y + code_font_size() * 0.5}, 5, col_u32({0.92, 0.30, 0.29, 1}))
+			conditional := Debug_Condition(doc.rel, ln + 1) != ""
+			center := [2]f32{winPos.x + 9, y + code_font_size() * 0.5}
+			imgui.DrawList_AddCircleFilled(dl, center, 5, col_u32({0.96, 0.62, 0.22, 1} if conditional else {0.92, 0.30, 0.29, 1}))
+			if conditional do imgui.DrawList_AddRectFilled(dl, center - {2.5, 0.75}, center + {2.5, 0.75}, col_u32({0.10, 0.08, 0.06, 1})) // "=" mark
 		}
 		if Debug_CurrentLine(doc.rel) == ln + 1 {
 			imgui.DrawList_AddRectFilled(dl, {winPos.x + gutterW, rowMin.y}, {winPos.x + winSize.x, rowMax.y}, col_u32({0.96, 0.72, 0.30, 0.16}))
