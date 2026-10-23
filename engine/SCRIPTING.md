@@ -844,15 +844,50 @@ rather than re-pathing every frame.
 
 #### State machines (StateMachineNode)
 
-A **StateMachine** node holds named states, each optionally playing an
-animation on an AnimationPlayer (a sibling or child unless one is picked),
-and transitions between them. A transition goes from a state (or *any
-state*) to another when all its conditions hold; it can crossfade (`blend`).
-Conditions: a parameter `is true` / `is false` / `==` / `!=` / `>` / `<` a
-value, a `trigger`, the state's animation `finished`, or `after` N seconds
-in the state. No conditions = at once. Transitions are checked in order, one
-per frame. Build it in the Inspector (**From Animations** makes a state per
-animation); scripts feed it parameters:
+A **StateMachine** node holds named states and transitions between them -
+for **gameplay** (AI, player modes, doors, menus) as much as animation:
+
+- **States** can play an animation on an AnimationPlayer (a sibling or
+  child unless one is picked) - or none: a **gameplay state** whose logic is
+  in its script callbacks. A state can also run a **child state machine**
+  while it is current (sub-states: `fight` runs `Combat` with `aim` ->
+  `shoot`); the child starts when the state is entered and stops when it is
+  left (a child doesn't start by itself).
+- **Transitions** go from a state (or *any state*) to another when their
+  conditions hold; they can crossfade (`blend`). Conditions: a parameter
+  `is true` / `is false` / `==` / `!=` / `>` / `<` a value, a `trigger`,
+  the state's animation `finished`, `after` N seconds in the state, or
+  **`script says`**: a method of the machine's script (else its parent's)
+  that returns true (`function Guard:sees_player() return ... end`).
+  Conditions are ANDed; an **`or`** row starts another group (the
+  transition fires when any group holds). No conditions = at once.
+  Transitions are checked in order, one per frame.
+- **Script callbacks** (on the machine's script and its parent's, when
+  defined): `on_enter_<state>(previous)`, `on_update_<state>(dt)` every
+  frame while in the state, `on_exit_<state>(next)`.
+- The machine keeps the **last 32 changes** (`sm_history()`).
+
+Build it in the **State Machine** tab of the bottom panel (a graph; see the
+editor README) or the Inspector. A gameplay example - a guard that patrols
+until it sees the player:
+
+```lua
+---@class Guard : ScriptInstanceBase
+local Guard = {}
+
+function Guard:sees_player()        -- a "script says" condition
+    local p = Scene.find_node("Player")
+    return p ~= nil and self.node.position:distance(p.position) < 200
+end
+
+function Guard:on_update_patrol(dt) self:walk_route(dt) end
+function Guard:on_enter_chase(previous) self.node:get_child("Alert"):sound_play() end
+function Guard:on_update_chase(dt) self:move_towards(Scene.find_node("Player"), dt) end
+
+return Guard
+```
+
+Scripts can also feed it parameters:
 
 ```lua
 function Player:update(dt)
@@ -876,11 +911,14 @@ function Player:on_exit_attack(next) self.node:get_child("Hitbox"):set_enabled(f
 | `sm_travel(state [, blend])` | state name | boolean | Switches now, ignoring conditions. |
 | `sm_state()` / `sm_previous()` | - | string | Current / previous state. |
 | `sm_time()` | - | number | Seconds in the current state. |
+| `sm_history()` | - | table | The last changes, oldest first: `{from, to, time, why}` (`why`: `start`, `travel`, `transition N`). |
 | `sm_start([state])` / `sm_stop()` | - | - | Start (initial state by default) / stop checking transitions. |
 
 The machine emits `state_changed`(state) for signal connections. Saved in
-the scene as `"state_machine": {"initial", "player", "autostart", "params",
-"states", "transitions"}`.
+the scene as `"state_machine": {"initial", "player", "autostart", "any_pos",
+"params", "states": [{"name", "animation", "child", "pos"}], "transitions":
+[{"from", "to", "blend", "when": [["call", "sees_player"], ["or"], ["true",
+"alarm"]]}]}`.
 
 #### Lighting (LightNode, scene ambient)
 

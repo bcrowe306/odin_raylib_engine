@@ -122,3 +122,84 @@ m:sm_set("speed", 20)
 	testing.expect_value(t, m2.transitions[4].conditions[0].value, 0.5)
 	testing.expect(t, StateMachine_Player(m2, s2.manager) != nil, "player found among siblings")
 }
+
+// Gameplay states: on_update_<state>(dt), a `call` condition asking the
+// script, OR groups, a child machine run while its state is current, the
+// history; children / positions / or / call saved.
+@(test)
+test_state_machine_gameplay :: proc(t: ^testing.T) {
+	ScriptVFS_RegisterEmbedded("sm_guard.lua", `
+local G = {}
+G.properties = {}
+function G:ready() ticks = 0; alert = false end
+function G:on_update_patrol(dt) ticks = ticks + 1 end
+function G:sees_player() return alert end
+return G
+`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("smg", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	guard := Node_CreateByTypeName(scene, "Node")
+	guard.name = "Guard"
+	guard.gameContext = &game.gameContext
+	Script_AttachToNode(guard, "sm_guard.lua", nil, &game.scriptManager)
+	sm := cast(^StateMachineNode)Node_CreateByTypeName(scene, "StateMachineNode", guard)
+	sm.name = "Brain"
+	sm.gameContext = &game.gameContext
+	combat := cast(^StateMachineNode)Node_CreateByTypeName(scene, "StateMachineNode", sm)
+	combat.name = "Combat"
+	combat.gameContext = &game.gameContext
+	StateMachine_AddState(combat, "aim")
+	StateMachine_AddState(combat, "shoot")
+	tr := StateMachine_AddTransition(combat, "aim", "shoot")
+	StateMachine_AddCondition(combat, tr, .After, "", 0.05)
+
+	StateMachine_AddState(sm, "patrol")
+	fight := StateMachine_AddState(sm, "fight")
+	sm.states[fight].child = strings.clone("Combat", sm.allocator)
+	// patrol -> fight when the script says so OR alarm is set.
+	tr = StateMachine_AddTransition(sm, "patrol", "fight")
+	StateMachine_AddCondition(sm, tr, .Call, "sees_player")
+	StateMachine_AddCondition(sm, tr, .Or)
+	StateMachine_AddCondition(sm, tr, .Is_True, "alarm")
+	tr = StateMachine_AddTransition(sm, "fight", "patrol")
+	StateMachine_AddCondition(sm, tr, .Is_False, "alarm")
+	StateMachine_AddCondition(sm, tr, .Call, "calm") // missing method: false -> stays
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+
+	L := game.scriptManager.L
+	for _ in 0 ..< 3 do game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "patrol")
+	testing.expect(t, !combat.running, "a child machine waits for its state")
+	lua.getglobal(L, "ticks")
+	testing.expect(t, lua.tointeger(L, -1) >= 2, "on_update_patrol ran")
+	lua.pop(L, 1)
+	// The OR group: alarm alone takes it to fight (and starts Combat).
+	StateMachine_SetParam(sm, "alarm", 1)
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "fight")
+	testing.expect(t, combat.running && StateMachine_CurrentName(combat) == "aim", "child started")
+	for _ in 0 ..< 6 do game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(combat), "shoot")
+	// fight -> patrol needs calm() too (missing): stays; then travel back.
+	StateMachine_SetParam(sm, "alarm", 0)
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "fight")
+	StateMachine_Travel(sm, "patrol")
+	testing.expect(t, !combat.running, "child stopped with its state")
+	// The script's condition: patrol -> fight.
+	r := lua.L_dostring(L, "alert = true")
+	testing.expect_value(t, r, i32(0))
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "fight")
+	hist := StateMachine_History(sm)
+	testing.expect(t, len(hist) == 4 && hist[0].why == "start" && hist[2].why == "travel" && hist[3].to == "fight", "history")
+
+	// Saved and read back.
+	json := Scene_SerializeToJSON(scene)
+	defer delete(json)
+	testing.expect(t, strings.contains(json, `"child": "Combat"`) && strings.contains(json, `["call", "sees_player"], ["or"], ["true", "alarm"]`) && strings.contains(json, `"pos": [`), json)
+}

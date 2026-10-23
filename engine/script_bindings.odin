@@ -2728,6 +2728,24 @@ lua_sm_previous :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// sm:sm_history() -> {{from=, to=, time=, why=}, ...} oldest first.
+@(private="file")
+lua_sm_history :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	lua.newtable(L)
+	if sm == nil do return 1
+	for h, i in StateMachine_History(sm) {
+		lua.newtable(L)
+		lua.pushstring(L, strings.clone_to_cstring(h.from, context.temp_allocator)); lua.setfield(L, -2, "from")
+		lua.pushstring(L, strings.clone_to_cstring(h.to, context.temp_allocator)); lua.setfield(L, -2, "to")
+		lua.pushnumber(L, lua.Number(h.time)); lua.setfield(L, -2, "time")
+		lua.pushstring(L, strings.clone_to_cstring(h.why, context.temp_allocator)); lua.setfield(L, -2, "why")
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
 @(private="file")
 lua_sm_time :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
@@ -3936,6 +3954,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "sm_state")
 		lua.pushcfunction(L, lua_sm_previous)
 		lua.setfield(L, -2, "sm_previous")
+		lua.pushcfunction(L, lua_sm_history)
+		lua.setfield(L, -2, "sm_history")
 		lua.pushcfunction(L, lua_sm_time)
 		lua.setfield(L, -2, "sm_time")
 		lua.pushcfunction(L, lua_sm_start)

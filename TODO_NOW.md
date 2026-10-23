@@ -115,6 +115,13 @@ Docs in place
   - b) build cmark as a static lib (cmake `-DBUILD_SHARED_LIBS=OFF`, per platform; the vendor's `build.bat` does this on Windows) and link it in, so the editor has no extra file.
   The game runner doesn't use cmark.
 
+## Phase 10 — State machines for gameplay (2026-10-23)
+
+- [x] 10.1 Engine: on_update_<state>(dt), "script says" conditions, or-groups, child machines, history (sm_history), graph positions
+- [x] 10.2 State Machine graph tab (add / connect / move / delete states, side panel, script callbacks)
+- [ ] 10.3 Live debugging: current state + fired transition (Simulate and Play), history, break on enter
+- [ ] 10.4 Lua / docs polish: generated types, drives, README
+
 ## Phase 9 — Code editor on par with Zed (2026-10-23)
 
 Docs: `editor/CODE_EDITOR.md`. Constraints: no frame-time cost (cache per buffer version, draw only visible lines), no leaks (owned allocations freed with the doc / on close).

@@ -1459,10 +1459,10 @@ Node_ComponentRoot :: proc(manager: ^NodeManager, node: ^Node) -> ^Node {
 // --- StateMachineNode ------------------------------------------------------------
 // "state_machine": {"initial", "player", "autostart",
 //   "params": [[name, value], ...],
-//   "states": [{"name", "animation"}, ...],
+//   "states": [{"name", "animation", "child", "pos": [x, y]}, ...],
 //   "transitions": [{"from", "to", "blend", "when": [[op, param, value], ...]}, ...]}
 // Conditions: ["true"|"false"|"trigger", param], ["=="|"!="|">"|"<", param, value],
-// ["finished"], ["after", seconds].
+// ["finished"], ["after", seconds], ["call", method], ["or"] (starts another group).
 
 @(private = "file")
 write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
@@ -1470,7 +1470,11 @@ write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
 	w.indent += 1
 	Json_NewLine(w); strings.write_string(&w.sb, "\"initial\": "); Json_String(w, sm.initial)
 	strings.write_string(&w.sb, ", \"player\": "); Json_String(w, sm.player)
-	fmt.sbprintf(&w.sb, ", \"autostart\": %t,", sm.autostart)
+	fmt.sbprintf(&w.sb, ", \"autostart\": %t, \"any_pos\": [", sm.autostart)
+	Json_Float(w, sm.anyPos.x)
+	strings.write_string(&w.sb, ", ")
+	Json_Float(w, sm.anyPos.y)
+	strings.write_string(&w.sb, "],")
 	Json_NewLine(w); strings.write_string(&w.sb, "\"params\": [")
 	for p, i in sm.params {
 		if i > 0 do strings.write_string(&w.sb, ", ")
@@ -1488,7 +1492,12 @@ write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
 		Json_NewLine(w)
 		strings.write_string(&w.sb, "{\"name\": "); Json_String(w, s.name)
 		if s.animation != "" {strings.write_string(&w.sb, ", \"animation\": "); Json_String(w, s.animation)}
-		strings.write_byte(&w.sb, '}')
+		if s.child != "" {strings.write_string(&w.sb, ", \"child\": "); Json_String(w, s.child)}
+		strings.write_string(&w.sb, ", \"pos\": [")
+		Json_Float(w, s.pos.x)
+		strings.write_string(&w.sb, ", ")
+		Json_Float(w, s.pos.y)
+		strings.write_string(&w.sb, "]}")
 	}
 	w.indent -= 1
 	if len(sm.states) > 0 do Json_NewLine(w)
@@ -1526,6 +1535,11 @@ read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
 	clear(&sm.transitions)
 	clear(&sm.params)
 	sm.autostart = sj_bool(obj, "autostart", true)
+	if pa, pok := sj_arr(obj, "any_pos"); pok && len(pa) == 2 {
+		x, _ := json_number(pa[0])
+		y, _ := json_number(pa[1])
+		sm.anyPos = {x, y}
+	}
 	sm.player = strings.clone(sj_string(obj, "player", ""), sm.allocator)
 	sm.playerNode = nil
 	if arr, ok := sj_arr(obj, "params"); ok {
@@ -1546,7 +1560,15 @@ read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
 		for v in arr {
 			so, sok := v.(json.Object)
 			if !sok do continue
-			if name := sj_string(so, "name", ""); name != "" do StateMachine_AddState(sm, name, sj_string(so, "animation", ""))
+			name := sj_string(so, "name", "")
+			if name == "" do continue
+			i := StateMachine_AddState(sm, name, sj_string(so, "animation", ""))
+			sm.states[i].child = strings.clone(sj_string(so, "child", ""), sm.allocator)
+			if pa, pok := sj_arr(so, "pos"); pok && len(pa) == 2 {
+				x, _ := json_number(pa[0])
+				y, _ := json_number(pa[1])
+				sm.states[i].pos = {x, y}
+			}
 		}
 	}
 	if arr, ok := sj_arr(obj, "transitions"); ok {

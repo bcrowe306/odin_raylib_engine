@@ -4729,6 +4729,18 @@ function StateMachineNode:sm_state() end
 ---@return string state The state before the current one
 function StateMachineNode:sm_previous() end
 
+---@class SM_Change
+---@field from string The state left ("" when it started)
+---@field to string The state entered
+---@field time number Seconds the machine had run
+---@field why string "start", "travel" or "transition N"
+
+---The last state changes (up to 32), oldest first.
+---
+---Example: `for _, c in ipairs(self.node:get_node("Brain"):sm_history()) do Log.info(c.from, "->", c.to, c.why) end`
+---@return SM_Change[] changes
+function StateMachineNode:sm_history() end
+
 ---Gets the time in seconds spent in the current state.
 ---
 ---Example: `if self.node:get_node("StateMachine"):sm_time() > 2 then self:give_up() end`
