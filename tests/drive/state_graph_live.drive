@@ -1,0 +1,75 @@
+# Live state machines: in Simulate the graph lights the current state and
+# lists the history, and break on enter pauses; in Play the graph shows the
+# running game's machine and break on enter pauses the game.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type state machine
+key enter
+wait 3
+click @insp.sm.add-param
+rclick @smg.canvas+-150,-20
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type idle
+key enter
+rclick @smg.canvas+120,40
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type moving
+key enter
+wait 2
+click @smg.state-break
+drag @smg.handle:idle @smg.state:moving 10
+wait 2
+click @insp.sm.add-cond:0
+wait 2
+key cmd+s
+wait 3
+# Simulate: param true -> moving -> paused there.
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+expect node:StateMachine.state == idle/2
+click @bottom:console
+click @console.lua
+type Scene.find_node("StateMachine"):sm_set("param", true)
+key enter
+wait 20
+expect node:StateMachine.state == moving/2
+expect log contains Paused: StateMachine entered moving
+click @bottom:stategraph
+wait 2
+expect item:smg.history == visible
+screenshot simulate_live
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5
+# Play: the running game's machine; break on enter pauses the game.
+click @toolbar.play-scene
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+wait 30
+click @hier:PlayerShip/StateMachine
+click @bottom:console
+click @console.lua
+type Scene.find_node("StateMachine"):sm_set("param", true)
+key enter
+wait-until log contains Game paused: a state machine entered timeout=300
+expect remote-paused == true
+click @bottom:stategraph
+wait 20
+expect item:smg.live == visible
+hover @smg.canvas
+key f
+wait 2
+expect smg-zoom <= 1.0
+screenshot play_live
+click @toolbar.stop
+wait-until game == stopped timeout=300

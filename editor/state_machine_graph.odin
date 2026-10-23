@@ -1,5 +1,6 @@
 package editor
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:math"
 import "core:math/linalg"
@@ -20,7 +21,8 @@ import imgui "lib/imgui"
 //   click / Delete         select a state or an arrow / remove it
 //   right-click            add a state (gameplay, or for an animation) /
 //                          the state's actions (initial, break on enter, ...)
-//   wheel / middle drag    zoom / pan;  F frames everything
+//   wheel / middle drag    pan (Shift+wheel sideways); Cmd/Ctrl+wheel zooms;
+//                          F frames everything
 //
 // The side panel edits the selection: a state's name, animation, child
 // machine, break on enter and its script callbacks; a transition's
@@ -53,13 +55,173 @@ smg: struct {
 	frame:     bool,
 }
 
+// SMG_View: what the graph shows as live - the editor's own machine
+// (Simulate) or the running game's (Play, polled over the editor link).
+SMG_View :: struct {
+	running: bool,
+	current: int, // state index (-1 none)
+	time:    f32,
+	fired:   int,
+	history: []e.SM_Change,
+	changes: int, // a counter that moves on every change (flash)
+	remote:  bool,
+}
+
+// The game's last answer for the machine shown (heap strings).
+@(private = "file")
+smgRemote: struct {
+	path:    string,
+	running: bool,
+	current: string,
+	secs:    f32,
+	fired:   int,
+	history: [dynamic]e.SM_Change,
+	count:   int,
+	asked:   time.Tick,
+	got:     bool,
+}
+
+@(private = "file")
+smg_remote_clear :: proc() {
+	for h in smgRemote.history {
+		delete(h.from)
+		delete(h.to)
+		delete(h.why)
+	}
+	clear(&smgRemote.history)
+	delete(smgRemote.current)
+	smgRemote.current = ""
+	smgRemote.got = false
+}
+
+StateGraph_Shutdown :: proc() {
+	for k in smgBreaks do delete(k)
+	delete(smgBreaks)
+	smg_remote_clear()
+	delete(smgRemote.history)
+	delete(smgRemote.path)
+}
+
+// smg_path: the machine's path from the scene root (the link's paths).
+@(private = "file")
+smg_path :: proc(state: ^EditorState, sm: ^e.StateMachineNode) -> string {
+	return e.Node_RelativePath(state.activeScene.manager, state.activeScene.rootNode, sm)
+}
+
+@(private = "file")
+smg_view :: proc(state: ^EditorState, sm: ^e.StateMachineNode) -> SMG_View {
+	if RemoteGame_Connected() && state.gameProcessRunning {
+		path := smg_path(state, sm)
+		// Ask four times a second while shown.
+		if time.duration_milliseconds(time.tick_since(smgRemote.asked)) > 250 {
+			smgRemote.asked = time.tick_now()
+			RemoteGame_Send(fmt.tprintf("sm %s", path))
+		}
+		if smgRemote.got && smgRemote.path == path {
+			return {smgRemote.running, e.StateMachine_FindState(sm, smgRemote.current), smgRemote.secs, smgRemote.fired, smgRemote.history[:], smgRemote.count, true}
+		}
+		return {remote = true, current = -1, fired = -1}
+	}
+	return {sm.running, sm.current, sm.timeInState, sm.lastFired, e.StateMachine_History(sm), sm.historyLen * 1000 + sm.historyNext, false}
+}
+
+// StateGraph_RemoteReply: the game's "@ore:sm" answer.
+StateGraph_RemoteReply :: proc(text: string) {
+	v, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
+	if err != .None do return
+	o, ok := v.(json.Object)
+	if !ok do return
+	smg_remote_clear()
+	delete(smgRemote.path)
+	smgRemote.path = strings.clone(string(o["path"].(json.String) or_else ""))
+	if _, missing := o["missing"]; missing do return
+	smgRemote.running = bool(o["running"].(json.Boolean) or_else false)
+	smgRemote.current = strings.clone(string(o["current"].(json.String) or_else ""))
+	num :: proc(v: json.Value) -> f64 {
+		#partial switch x in v {
+		case json.Float: return f64(x)
+		case json.Integer: return f64(x)
+		}
+		return 0
+	}
+	smgRemote.secs = f32(num(o["time"]))
+	smgRemote.fired = int(num(o["fired"]))
+	if arr, isArr := o["history"].(json.Array); isArr {
+		for hv in arr {
+			h, hok := hv.(json.Array)
+			if !hok || len(h) < 4 do continue
+			append(&smgRemote.history, e.SM_Change{strings.clone(string(h[0].(json.String) or_else "")), strings.clone(string(h[1].(json.String) or_else "")), f32(num(h[2])), strings.clone(string(h[3].(json.String) or_else ""))})
+		}
+	}
+	if n := len(smgRemote.history); n > 0 {
+		last := smgRemote.history[n - 1]
+		smgRemote.count = n * 100000 + int(last.time * 1000)
+	}
+	smgRemote.got = true
+}
+
+// --- break on enter --------------------------------------------------------------------
+// Kept in the editor by "<machine path>|<state>" (not saved with the scene;
+// survives Simulate's restore and is sent to games that connect).
+
+@(private = "file")
+smgBreaks: map[string]bool
+
+@(private = "file")
+smg_break_key :: proc(path, st: string) -> string {return strings.concatenate({path, "|", st}, context.temp_allocator)}
+
+// smg_sync_breaks: the machine's states show the editor's breaks.
+@(private = "file")
+smg_sync_breaks :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
+	path := smg_path(state, sm)
+	for &s in sm.states do s.breakOnEnter = smgBreaks[smg_break_key(path, s.name)] or_else false
+}
+
+// StateGraph_SimulationStarted: break-on-enter for the editor's machines.
+StateGraph_SimulationStarted :: proc(state: ^EditorState) {
+	if state.activeScene == nil do return
+	for n in state.activeScene.manager.nodes {
+		if n == nil || n.typeId != e.StateMachineNode do continue
+		smg_sync_breaks(state, cast(^e.StateMachineNode)n)
+		(cast(^e.StateMachineNode)n).onEnterHook = proc(sm: ^e.StateMachineNode, name: string) {
+			i := e.StateMachine_FindState(sm, name)
+			if i < 0 || !sm.states[i].breakOnEnter do return
+			GlobalEditor.isPaused = true
+			Editor_Log(&GlobalEditor, .Info, "Paused: %s entered %s (break on enter)", sm.name, name)
+		}
+	}
+}
+
+// StateGraph_SendBreaks: the break-on-enter states to a game that connected.
+StateGraph_SendBreaks :: proc(state: ^EditorState) {
+	if state.activeScene == nil do return
+	for key, on in smgBreaks {
+		if !on do continue
+		if bar := strings.last_index_byte(key, '|'); bar > 0 do RemoteGame_Send(fmt.tprintf("sm-break %s %s 1", key[:bar], key[bar + 1:]))
+	}
+}
+
+// smg_set_break toggles a state's break on enter (and tells a running game).
+@(private = "file")
+smg_set_break :: proc(state: ^EditorState, sm: ^e.StateMachineNode, i: int, on: bool) {
+	sm.states[i].breakOnEnter = on
+	key := smg_break_key(smg_path(state, sm), sm.states[i].name)
+	if on {
+		if key not_in smgBreaks do smgBreaks[strings.clone(key)] = true
+	} else if key in smgBreaks {
+		k, _ := delete_key(&smgBreaks, key)
+		delete(k)
+	}
+	if RemoteGame_Connected() do RemoteGame_Send(fmt.tprintf("sm-break %s %s %d", smg_path(state, sm), sm.states[i].name, 1 if on else 0))
+}
+
 @(private = "file")
 smg_reset :: proc(sm: ^e.StateMachineNode) {
 	smg.node = sm
 	smg.zoom = 1
 	smg.pan = {}
 	smg.selState, smg.selTr, smg.dragging, smg.linkFrom = -1, -1, -1, -1
-	smg.lastHist = sm.historyLen if sm != nil else 0
+	smg.lastHist = -1
 	smg.frame = true
 }
 
@@ -74,6 +236,7 @@ StateGraph_Render :: proc(state: ^EditorState) {
 	sm := cast(^e.StateMachineNode)sel
 	if smg.node != sm do smg_reset(sm)
 	stateGraphFocused = imgui.IsWindowFocused(imgui.FocusedFlags_RootAndChildWindows)
+	smg_sync_breaks(state, sm) // the editor keeps them (scene rebuilds don't)
 	if smg.zoom == 0 do smg.zoom = 1
 	avail := imgui.GetContentRegionAvail()
 	panelW: f32 = 330
@@ -169,7 +332,7 @@ smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 		for y := origin.y + gy; y < origin.y + size.y; y += step do imgui.DrawList_AddLine(dl, {origin.x, y}, {origin.x + size.x, y}, col_u32(ui_line(0.03)))
 	}
 	// Frame everything (first show, F).
-	if smg.frame || (hovered && imgui.IsKeyPressed(.F) && !io.WantTextInput) {
+	if (smg.frame && size.x > 120 && size.y > 80) || (hovered && imgui.IsKeyPressed(.F) && !io.WantTextInput) { // (laid out first)
 		smg.frame = false
 		mn, mx := sm.anyPos, sm.anyPos + SMG_BOX
 		for s in sm.states {
@@ -177,22 +340,31 @@ smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 			mx = {max(mx.x, s.pos.x + SMG_BOX.x), max(mx.y, s.pos.y + SMG_BOX.y)}
 		}
 		ext := mx - mn + {80, 80}
-		smg.zoom = clamp(min(size.x / ext.x, size.y / ext.y), 0.35, 1.3)
+		smg.zoom = clamp(min(size.x / ext.x, size.y / ext.y), 0.3, 1.0)
 		smg.pan = (size - (mx - mn) * smg.zoom) * 0.5 - mn * smg.zoom
 	}
-	// Zoom at the mouse / pan.
-	if hovered && io.MouseWheel != 0 {
-		before := smg_to_world(origin, mouse)
-		smg.zoom = clamp(smg.zoom * (1 + io.MouseWheel * 0.1), 0.3, 2.5)
-		smg.pan += mouse - smg_to_screen(origin, before)
+	// Cmd/Ctrl+wheel zooms at the mouse; the wheel pans (Shift: sideways).
+	if hovered && (io.MouseWheel != 0 || io.MouseWheelH != 0) {
+		if io.KeyCtrl || io.KeySuper {
+			before := smg_to_world(origin, mouse)
+			smg.zoom = clamp(smg.zoom * (1 + io.MouseWheel * 0.1), 0.3, 2.5)
+			smg.pan += mouse - smg_to_screen(origin, before)
+		} else if io.KeyShift {
+			smg.pan.x += io.MouseWheel * 30
+		} else {
+			smg.pan += {io.MouseWheelH * 30, io.MouseWheel * 30}
+		}
 	}
 	if hovered && imgui.IsMouseDragging(.Middle) do smg.pan += {io.MouseDelta.x, io.MouseDelta.y}
 
-	// History change: flash the transition that fired.
-	if sm.historyLen != smg.lastHist || (sm.historyLen == e.SM_HISTORY_MAX && sm.historyNext != smg.lastHist % e.SM_HISTORY_MAX) {
-		smg.lastHist = sm.historyLen
-		smg.flashAt = time.tick_now()
-		smg.flashTr = sm.lastFired
+	// A change: flash the transition that fired.
+	view := smg_view(state, sm)
+	if view.changes != smg.lastHist {
+		if smg.lastHist != -1 {
+			smg.flashAt = time.tick_now()
+			smg.flashTr = view.fired
+		}
+		smg.lastHist = view.changes
 	}
 	flash := f32(1) - clamp(f32(time.duration_seconds(time.tick_since(smg.flashAt))) / 0.8, 0, 1)
 
@@ -249,7 +421,7 @@ smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 		if inside do hoverState = i
 		if onHandle do hoverHandle = i
 		isAny := i == -2
-		current := !isAny && sm.running && sm.current == i
+		current := !isAny && view.running && view.current == i
 		fill := UI_BG_RAISED
 		if current do fill = ui_accent(0.35)
 		if isAny do fill = UI_BG_PANEL
@@ -273,7 +445,7 @@ smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 			if s.breakOnEnter do imgui.DrawList_AddCircleFilled(dl, {mx.x - 10, mn.y + 10}, 4.5, col_u32({0.92, 0.30, 0.29, 1}))
 			if current {
 				// Time in the state, a thin bar along the bottom.
-				f := clamp(sm.timeInState / 3, 0, 1)
+				f := clamp(view.time / 3, 0, 1)
 				imgui.DrawList_AddRectFilled(dl, {mn.x + 6, mx.y - 3}, {mn.x + 6 + (mx.x - mn.x - 12) * f, mx.y - 1}, col_u32(UI_ACCENT))
 			}
 		}
@@ -392,7 +564,7 @@ smg_context_menu :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 			sm.initial = s.name
 		}
 		Drive_Item("ctx:smg-initial")
-		if imgui.MenuItem(fmt.ctprintf("%s  Break on Enter", ICON_FA_CIRCLE), nil, s.breakOnEnter) do s.breakOnEnter = !s.breakOnEnter
+		if imgui.MenuItem(fmt.ctprintf("%s  Break on Enter", ICON_FA_CIRCLE), nil, s.breakOnEnter) do smg_set_break(state, sm, i, !s.breakOnEnter)
 		Drive_Item("ctx:smg-break")
 		if imgui.MenuItem(fmt.ctprintf("%s  Add Script Callbacks", ICON_FA_CODE)) do smg_add_callbacks(state, sm, s.name)
 		Drive_Item("ctx:smg-callbacks")
@@ -482,9 +654,11 @@ smg_side_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 	case:
 		UI_PanelTitle(ICON_FA_DIAGRAM_PROJECT, sm.name)
 		UI_DimText(fmt.tprintf("%d states, %d transitions, %d parameters", len(sm.states), len(sm.transitions), len(sm.params)))
-		if sm.running {
-			imgui.TextColored(UI_ACCENT, "%s", fmt.ctprintf("%s  %s  (%.1fs)", ICON_FA_PLAY, e.StateMachine_CurrentName(sm), sm.timeInState))
+		view := smg_view(state, sm)
+		if view.running && view.current >= 0 {
+			imgui.TextColored(UI_ACCENT, "%s", fmt.ctprintf("%s  %s  (%.1fs)%s", ICON_FA_PLAY, sm.states[view.current].name, view.time, "  - in the running game" if view.remote else ""))
 		}
+		Drive_Item("smg.live")
 		if len(sm.params) > 0 {
 			imgui.SeparatorText("Parameters")
 			for &p in sm.params {
@@ -495,9 +669,9 @@ smg_side_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 		UI_DimText("Select a state or an arrow to edit it.")
 	}
 	// The history (while running / after a run).
-	if sm.historyLen > 0 {
+	hist := smg_view(state, sm).history
+	if len(hist) > 0 {
 		imgui.SeparatorText("History")
-		hist := e.StateMachine_History(sm)
 		#reverse for h, k in hist {
 			if k < len(hist) - 12 do break
 			from := h.from if h.from != "" else "-"
@@ -571,7 +745,8 @@ smg_state_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode, i: int, av
 		}
 		Drive_Item("smg.state-initial")
 		UI_PropLabel("Break on Enter")
-		imgui.Checkbox("##smg_break", &s.breakOnEnter)
+		brk := s.breakOnEnter
+		if imgui.Checkbox("##smg_break", &brk) do smg_set_break(state, sm, i, brk)
 		Drive_Item("smg.state-break")
 		UI_Tooltip("Pause when the machine enters this state (Simulate and Play)")
 		UI_EndProps()
@@ -603,6 +778,7 @@ StateGraph_Query :: proc(q: string) -> (string, bool) {
 		if smg.selState >= 0 && smg.selState < len(sm.states) do return sm.states[smg.selState].name, true
 		return "", true
 	case "smg-zoom": return fmt.tprintf("%.2f", smg.zoom), true
+	case "smg-pan": return fmt.tprintf("%.0f,%.0f", smg.pan.x, smg.pan.y), true
 	}
 	return "", false
 }

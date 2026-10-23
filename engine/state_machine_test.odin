@@ -197,6 +197,8 @@ return G
 	testing.expect_value(t, StateMachine_CurrentName(sm), "fight")
 	hist := StateMachine_History(sm)
 	testing.expect(t, len(hist) == 4 && hist[0].why == "start" && hist[2].why == "travel" && hist[3].to == "fight", "history")
+	status := StateMachine_StatusJSON(sm, "Guard/Brain")
+	testing.expect(t, strings.contains(status, `"current": "fight"`) && strings.contains(status, `["patrol", "fight", `) && strings.contains(status, `"why"`) == false, status)
 
 	// Saved and read back.
 	json := Scene_SerializeToJSON(scene)

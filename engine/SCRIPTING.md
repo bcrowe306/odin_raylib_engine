@@ -865,7 +865,9 @@ for **gameplay** (AI, player modes, doors, menus) as much as animation:
 - **Script callbacks** (on the machine's script and its parent's, when
   defined): `on_enter_<state>(previous)`, `on_update_<state>(dt)` every
   frame while in the state, `on_exit_<state>(next)`.
-- The machine keeps the **last 32 changes** (`sm_history()`).
+- The machine keeps the **last 32 changes** (`sm_history()`); the editor's
+  State Machine tab shows them live, in Simulate and in the running game,
+  and can **break on entering** a state.
 
 Build it in the **State Machine** tab of the bottom panel (a graph; see the
 editor README) or the Inspector. A gameplay example - a guard that patrols

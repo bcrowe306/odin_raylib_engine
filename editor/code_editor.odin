@@ -389,6 +389,7 @@ Code_Shutdown :: proc() {
 	Code_RenamePreviewShutdown()
 	Code_HistoryShutdown()
 	Code_InlayShutdown()
+	StateGraph_Shutdown()
 	code_find_destroy()
 	code_lsp_shutdown()
 }

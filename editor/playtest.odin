@@ -21,6 +21,13 @@ import e "../engine"
 // ============================================================================
 
 GAME_BINARY :: "bin/odin_raylib_engine"
+
+// Editor_GameBinary: the game Play runs (ORE_GAME_BIN overrides: drives
+// running beside another run use their own build).
+Editor_GameBinary :: proc() -> string {
+	if v := os.get_env("ORE_GAME_BIN", context.temp_allocator); v != "" do return v
+	return GAME_BINARY
+}
 GAME_SOURCE_DIRS :: [?]string{".", "engine", "asteroids"}
 
 Play_Mode :: enum {
@@ -66,7 +73,7 @@ Editor_PlayRequest :: proc(state: ^EditorState, mode: Play_Mode, scene := "") {
 // Editor_GameBinaryIsStale reports whether the game binary is missing or
 // older than any .odin source it is built from.
 Editor_GameBinaryIsStale :: proc() -> (reason: string, stale: bool) {
-	binInfo, err := os.stat(GAME_BINARY, context.temp_allocator)
+	binInfo, err := os.stat(Editor_GameBinary(), context.temp_allocator)
 	if err != nil do return "binary missing", true
 	binTime := binInfo.modification_time
 	for dir in GAME_SOURCE_DIRS {
@@ -86,7 +93,7 @@ Editor_GameBinaryIsStale :: proc() -> (reason: string, stale: bool) {
 
 Editor_StartGameBuild :: proc(state: ^EditorState) -> bool {
 	_ = os.make_directory("bin")
-	return Editor_StartBuild(state, {"odin", "build", ".", "-out:" + GAME_BINARY}, .Game)
+	return Editor_StartBuild(state, {"odin", "build", ".", strings.concatenate({"-out:", Editor_GameBinary()}, context.temp_allocator)}, .Game)
 }
 
 // Editor_StartBuild runs a build command in the background; its output
@@ -149,7 +156,7 @@ Editor_UpdatePlaytest :: proc(state: ^EditorState) {
 }
 
 Editor_LaunchGame :: proc(state: ^EditorState) {
-	exePath := GAME_BINARY
+	exePath := Editor_GameBinary()
 	if !os.exists(exePath) && os.exists("./odin_raylib_engine") {
 		exePath = "./odin_raylib_engine"
 	}

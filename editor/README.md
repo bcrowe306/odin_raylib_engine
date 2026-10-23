@@ -427,11 +427,17 @@ film its animation, otherwise *gameplay*; a child machine is named), the
   another box for a transition; click an arrow or a box to edit it in the
   side panel (name, animation or none, **child machine**, initial, break on
   enter; a transition's from / to, blend and conditions - including
-  *script says* and *or*); Delete removes the selection. Wheel zooms, the
-  middle button pans, F frames everything.
-- While the scene runs the current state is lit (with a bar for its time),
-  the transition that fired flashes, and the side panel lists the
-  **history** of changes.
+  *script says* and *or*); Delete removes the selection. The wheel (or the
+  middle button) pans, Shift+wheel sideways, **Cmd/Ctrl+wheel zooms**, F
+  frames everything.
+- **Live**: in Simulate *and* while the game plays (Play: the running
+  game's machine, polled over the editor link) the current state is lit
+  (with a bar for its time), the transition that fired flashes, and the side
+  panel lists the **history** of changes.
+- **Break on Enter** (a state's menu or side panel; a red dot): entering
+  that state pauses Simulate, or the running game (its toolbar shows
+  Paused; Resume / Step as usual). Kept by the editor (not saved in the
+  scene) and sent to every game Play starts.
 
 The Inspector still edits everything as lists.
 Add a **State Machine** (Animation & Effects) next to an AnimationPlayer.

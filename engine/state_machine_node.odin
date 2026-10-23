@@ -1,5 +1,6 @@
 package engine
 
+import "core:fmt"
 import "core:strings"
 import lua "vendor:lua/5.4"
 
@@ -355,6 +356,45 @@ StateMachine_Enter :: proc(sm: ^StateMachineNode, index: int, blend: f32, ctx: ^
 	if parent != nil && Node_IsAlive(parent) do Script_CallMethod(mgr, parent, method, old, quiet = true)
 	if Node_IsAlive(sm) do sm.onStateChanged->notify(sm, next, gc)
 	if Node_IsAlive(sm) && sm.onEnterHook != nil do sm.onEnterHook(sm, next)
+	if Node_IsAlive(sm) && StateMachine_EnterHook != nil do StateMachine_EnterHook(sm, next)
+}
+
+// StateMachine_EnterHook: every machine's state change (the editor link's
+// break on enter in a running game).
+StateMachine_EnterHook: proc(sm: ^StateMachineNode, state: string)
+
+// StateMachine_StatusJSON: a machine's live status for the editor link:
+// {"path", "running", "current", "time", "fired", "history": [[from, to, time, why], ...]}.
+StateMachine_StatusJSON :: proc(sm: ^StateMachineNode, path: string) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	q :: proc(sb: ^strings.Builder, s: string) {
+		strings.write_byte(sb, '"')
+		for r in s {
+			switch r {
+			case '"': strings.write_string(sb, `\"`)
+			case '\\': strings.write_string(sb, `\\`)
+			case: strings.write_rune(sb, r)
+			}
+		}
+		strings.write_byte(sb, '"')
+	}
+	strings.write_string(&sb, "{\"path\": ")
+	q(&sb, path)
+	fmt.sbprintf(&sb, ", \"running\": %t, \"current\": ", sm.running)
+	q(&sb, StateMachine_CurrentName(sm))
+	fmt.sbprintf(&sb, ", \"time\": %.3f, \"fired\": %d, \"history\": [", sm.timeInState, sm.lastFired)
+	for h, i in StateMachine_History(sm) {
+		if i > 0 do strings.write_string(&sb, ", ")
+		strings.write_byte(&sb, '[')
+		q(&sb, h.from)
+		strings.write_string(&sb, ", ")
+		q(&sb, h.to)
+		fmt.sbprintf(&sb, ", %.3f, ", h.time)
+		q(&sb, h.why)
+		strings.write_byte(&sb, ']')
+	}
+	strings.write_string(&sb, "]}")
+	return strings.to_string(sb)
 }
 
 // sm_call_bool: Target:method() on the machine's script, else its

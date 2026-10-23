@@ -20,6 +20,8 @@ import rl "vendor:raylib"
 //   set <path> <prop> <value>   change a property ("position" "10,20", "rotation", any reflected one)
 //   reload-scene <file>         re-read a scene file; restart it when it's the current scene
 //   eval <lua>                  -> @ore:eval {"ok", "code", "text"} (the Console's Lua line)
+//   sm <path>                   -> @ore:sm {status} (a state machine, live: state_machine_node.odin)
+//   sm-break <path> <state> 0|1 pause when that machine enters that state (-> @ore:sm-break)
 //   break-set <file> <l,l,...>  breakpoints in a script (break-clear: none); a hit
 //                               pauses the game in the script (lua_debugger.odin):
 //                               -> @ore:stopped {...}, then continue / step-* / locals
@@ -30,6 +32,8 @@ import rl "vendor:raylib"
 
 Editor_Link :: struct {
 	enabled: bool,
+	smBreaks: [dynamic]string, // "path|state": break on enter
+	game:     ^Game,
 	steps:   int, // frames to run while paused
 	frame:   int, // frames run (not counting frozen ones)
 	inBuf:   [dynamic]u8,
@@ -39,6 +43,8 @@ editorLink: Editor_Link
 
 EditorLink_Enable :: proc(game: ^Game) {
 	editorLink.enabled = true
+	editorLink.game = game
+	StateMachine_EnterHook = link_sm_enter
 	// Breakpoints: the debugger waits for commands on stdin while stopped.
 	LuaDebugger_Attach(game.scriptManager.L, link_wait_command, proc(kind, json: string) {fmt.printfln("@ore:%s %s", kind, json)})
 	luaDebugger.projectDir = game.assetManager.projectDir
@@ -141,6 +147,29 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 		LuaDebugger_CondCommand(rest)
 	case "reload-scene":
 		fmt.printfln("@ore:reloaded %s %t", rest, Game_ReloadSceneFile(game, rest))
+	case "sm":
+		n := link_find(game, rest)
+		if n == nil || n.typeId != StateMachineNode {
+			sb := strings.builder_make(context.temp_allocator)
+			strings.write_string(&sb, "{\"path\": ")
+			link_str(&sb, rest)
+			strings.write_string(&sb, ", \"missing\": true}")
+			fmt.printfln("@ore:sm %s", strings.to_string(sb))
+		} else {
+			fmt.printfln("@ore:sm %s", StateMachine_StatusJSON(cast(^StateMachineNode)n, rest))
+		}
+	case "sm-break":
+		// sm-break <path> <state> 0|1
+		parts := strings.fields(rest, context.temp_allocator)
+		if len(parts) == 3 {
+			key := strings.concatenate({parts[0], "|", parts[1]}, context.temp_allocator)
+			for k, i in editorLink.smBreaks do if k == key {
+				delete(k)
+				ordered_remove(&editorLink.smBreaks, i)
+				break
+			}
+			if parts[2] == "1" do append(&editorLink.smBreaks, strings.clone(key))
+		}
 	case "eval":
 		text, ok := Lua_Eval(game.scriptManager.L, rest, context.temp_allocator)
 		sb := strings.builder_make(context.temp_allocator)
@@ -444,3 +473,27 @@ link_str :: proc(sb: ^strings.Builder, s: string) {
 	}
 	strings.write_byte(sb, '"')
 }
+
+// link_sm_enter: a machine entered a state - pause there when the editor
+// asked (sm-break), like a breakpoint.
+@(private = "file")
+link_sm_enter :: proc(sm: ^StateMachineNode, state: string) {
+	if len(editorLink.smBreaks) == 0 || editorLink.game == nil do return
+	scene := editorLink.game.sceneManager.currentScene
+	if scene == nil || scene.rootNode == nil do return
+	path := Node_RelativePath(scene.manager, scene.rootNode, sm)
+	key := strings.concatenate({path, "|", state}, context.temp_allocator)
+	for k in editorLink.smBreaks do if k == key {
+		editorLink.game.linkPaused = true
+		sb := strings.builder_make(context.temp_allocator)
+		strings.write_string(&sb, "{\"path\": ")
+		link_str(&sb, path)
+		strings.write_string(&sb, ", \"state\": ")
+		link_str(&sb, state)
+		strings.write_byte(&sb, '}')
+		fmt.printfln("@ore:sm-break %s", strings.to_string(sb))
+		fmt.println("@ore:paused")
+		return
+	}
+}
+

@@ -10,6 +10,7 @@ the game process it launched, and it captures screenshots along the way.
 ./scripts/editor_drive.sh                 # every tests/drive/*.drive
 ./scripts/editor_drive.sh playtest nodes  # selected drives
 EDITOR_DEFINES=-define:ORE_MEM_TRACK=true ./scripts/editor_drive.sh code_soak_mem  # memory reports in the kept log
+EDITOR_BIN=bin/editor_dev GAME_BIN=bin/game_dev ./scripts/editor_drive.sh state_graph  # beside another run (own binaries)
 task editor:drive                         # same as the first line
 ```
 
@@ -95,6 +96,7 @@ exits non-zero if any check fails.
 | `code_inspector_link.drive` | Show in Inspector on self.rotation_speed selects PlayerShip and lights its row; the Inspector's thrust_power > Find in Script opens the declaration, name selected. |
 | `code_soak_mem.drive` | 40 rounds of Code tab use (typing, undo, fold, soft wrap, find, expand selection, clipboard history, menus); with `EDITOR_DEFINES=-define:ORE_MEM_TRACK=true` the log shows the live heap staying flat. |
 | `state_graph.drive` | The State Machine tab follows a new StateMachine; right-click adds states, renamed in the side panel; a dot dragged onto a state makes a transition (a condition added); saved with positions; Delete removes the arrow (not the node). |
+| `state_graph_live.drive` | A machine with break on enter: in Simulate the param set from the Lua line takes it there and pauses, the history shows; in Play the graph shows the game's machine and break on enter pauses the game. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -178,7 +180,7 @@ Queries:
 - `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk, Search, StateGraph)
 - `search-total`, `search-files` (find in files)
-- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`
+- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`, `smg-pan`
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
 - `runtime-diags` (script problems recorded from Simulate / Play)

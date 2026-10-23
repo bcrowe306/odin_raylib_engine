@@ -119,7 +119,7 @@ Docs in place
 
 - [x] 10.1 Engine: on_update_<state>(dt), "script says" conditions, or-groups, child machines, history (sm_history), graph positions
 - [x] 10.2 State Machine graph tab (add / connect / move / delete states, side panel, script callbacks)
-- [ ] 10.3 Live debugging: current state + fired transition (Simulate and Play), history, break on enter
+- [x] 10.3 Live debugging: current state + fired transition (Simulate and Play), history, break on enter
 - [ ] 10.4 Lua / docs polish: generated types, drives, README
 
 ## Phase 9 — Code editor on par with Zed (2026-10-23)

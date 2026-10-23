@@ -22,8 +22,11 @@ build() {
 # EDITOR_BIN: where to build the editor (a second run can use its own binary).
 EDITOR_BIN="${EDITOR_BIN:-bin/editor}"
 build editor -out:"$EDITOR_BIN" ${EDITOR_DEFINES:-} || exit 1
-# SKIP_GAME_BUILD=1: keep bin/odin_raylib_engine (another run is using it).
-[ -n "${SKIP_GAME_BUILD:-}" ] || build . -out:bin/odin_raylib_engine || exit 1
+# GAME_BIN: where to build the game Play runs (passed to the editor as
+# ORE_GAME_BIN); SKIP_GAME_BUILD=1 keeps the existing one.
+GAME_BIN="${GAME_BIN:-bin/odin_raylib_engine}"
+export ORE_GAME_BIN="$GAME_BIN"
+[ -n "${SKIP_GAME_BUILD:-}" ] || build . -out:"$GAME_BIN" || exit 1
 
 if [ $# -gt 0 ]; then
 	drives=()

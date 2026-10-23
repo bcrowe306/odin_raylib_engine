@@ -106,6 +106,7 @@ RemoteGame_HandleLine :: proc(state: ^EditorState, line: string) -> bool {
 	case "hello":
 		remote.connected = true
 		Debug_SendAll() // breakpoints set before Play
+		StateGraph_SendBreaks(state) // state machine break on enter
 	case "stopped", "locals", "running", "watch": Debug_HandleReply(state, kind, rest)
 	case "paused": remote.paused = true
 	case "resumed": remote.paused = false
@@ -119,6 +120,10 @@ RemoteGame_HandleLine :: proc(state: ^EditorState, line: string) -> bool {
 		delete(remote.debugDraw)
 		remote.debugDraw = strings.clone(rest)
 	case "eval": LuaConsole_Reply(state, rest)
+	case "sm": StateGraph_RemoteReply(rest)
+	case "sm-break":
+		remote.paused = true
+		Editor_Log(state, .Info, "Game paused: a state machine entered a break-on-enter state %s", rest)
 	case "set":
 	}
 	return true
