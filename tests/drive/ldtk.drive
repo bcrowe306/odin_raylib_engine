@@ -4,6 +4,12 @@
 # value, link rules for EntityRef fields, level fields, enums, the world
 # mini-map and world mode - then save and simulate.
 wait 5
+# The bottom panel starts 100 px tall: the Animation workspace gives its
+# tools room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
 click @asset.new-scene
 expect scene == scenes/new_scene.scene.json
 

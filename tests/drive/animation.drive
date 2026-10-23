@@ -1,6 +1,12 @@
 # Animation timeline (bottom panel): frames from dropped textures, scrubbing,
 # property tracks with keyframes, preview playback and restore, save.
 wait 5
+# The bottom panel starts 100 px tall: the Animation workspace gives its
+# tools room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
 click @hier:PlayerShip
 key ctrl+a
 type animation player

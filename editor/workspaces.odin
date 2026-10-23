@@ -50,6 +50,10 @@ Workspace_BuildIfNeeded :: proc(state: ^EditorState, dockspaceID: imgui.ID, pos,
 	preset := Layout_Preset(layoutRequest) if layoutRequest >= 0 else .Default
 	layoutRequest = -1
 	r := preset_ratios(preset)
+	if preset == .Default && size.y > 0 {
+		// The bottom panel (Console, Animation, ...) starts DEFAULT_BOTTOM_PX tall.
+		r.bottom = clamp(DEFAULT_BOTTOM_PX / size.y, 0.05, 0.5)
+	}
 
 	DockBuilderRemoveNode(dockspaceID)
 	DockBuilderAddNode(dockspaceID, 0)
@@ -82,6 +86,8 @@ Workspace_BuildIfNeeded :: proc(state: ^EditorState, dockspaceID: imgui.ID, pos,
 		animTabRequest = true
 	}
 }
+
+DEFAULT_BOTTOM_PX :: f32(100)
 
 @(private = "file")
 preset_ratios :: proc(p: Layout_Preset) -> (r: struct {left, right, bottom: f32}) {

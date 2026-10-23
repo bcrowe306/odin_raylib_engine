@@ -3,6 +3,12 @@
 # Cmd+C / Cmd+V); the range played (fields, menu); per-animation reverse and
 # FPS; the default animation on load; all saved.
 wait 5
+# The bottom panel starts 100 px tall: the Animation workspace gives its
+# tools room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
 click @hier:PlayerShip
 key ctrl+a
 type animation player

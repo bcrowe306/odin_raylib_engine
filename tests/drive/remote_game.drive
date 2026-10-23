@@ -2,6 +2,12 @@
 # pause, step one frame, inspect a node and change its rotation live,
 # resume; a scene saved in the editor reloads in the running game; stop.
 wait 5
+# The bottom panel starts 100 px tall: the Animation workspace gives its
+# tools room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
 key escape
 click @toolbar.play
 wait-until game == running timeout=600

@@ -99,6 +99,8 @@ the console).
 
 ### Workspaces
 
+The bottom panel (Console, Game, Animation, ...) starts 100 px tall in
+the Default layout - drag its edge, or pick a workspace with a taller one.
 **View > Workspaces** switches the panel layout: **Default**, **Level
 Design** (a larger viewport), **Scripting** (the Code tab in the middle,
 in front), **Animation** (a tall bottom panel on the Animation tab) - or a

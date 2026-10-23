@@ -3,6 +3,8 @@
 # Layout.
 wait 5
 expect workspace == Default
+expect window-h:bottom:console >= 90
+expect window-h:bottom:console <= 115
 click @menu:View
 click @menu:View/Workspaces
 click @menu:Workspaces/Animation
@@ -41,5 +43,5 @@ click @menu:View
 click @menu:View/Reset Layout
 wait 5
 expect workspace == Default
-expect window-h:bottom:console >= 150
-expect window-h:bottom:console <= 220
+expect window-h:bottom:console >= 90
+expect window-h:bottom:console <= 115

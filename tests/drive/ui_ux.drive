@@ -129,6 +129,12 @@ key ctrl+s
 expect file:scenes/copy_of_main.scene.json !contains "$added"
 
 # --- particle editor ---
+# The bottom panel starts 100 px tall: the Animation workspace gives its
+# tools room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
 click @hier:StarfieldEmitter
 click @insp.particle-editor
 click @particles.tab:color
