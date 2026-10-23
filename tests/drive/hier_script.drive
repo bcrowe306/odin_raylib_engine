@@ -1,0 +1,16 @@
+# The scene tree marks nodes with a script (click: open it); attaching or
+# detaching one shows / removes the marker.
+wait 5
+expect item:hier.script:PatrolDroneAlpha == missing
+click @hier:PatrolDroneAlpha
+click @insp.script-attach
+click @pick:scripts/orbiting_drone.lua
+wait 2
+expect item:hier.script:PatrolDroneAlpha == visible
+screenshot marker
+click @hier.script:PatrolDroneAlpha
+wait 5
+expect code.file contains orbiting_drone.lua
+click @insp.script-detach
+wait 2
+expect item:hier.script:PatrolDroneAlpha == missing

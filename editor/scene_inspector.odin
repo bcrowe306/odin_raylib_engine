@@ -283,6 +283,17 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 		UI_Tooltip("Locked: can't be picked or moved in the viewport. Click to unlock")
 		Drive_Item(fmt.tprintf("hier.lock:%s", path))
 	}
+	// A script is attached: click to open it.
+	if node.scriptInstance != nil {
+		rel := asset_rel_editor(state, (cast(^e.ScriptInstance)node.scriptInstance).modulePath)
+		x -= 22
+		imgui.SameLine(x)
+		imgui.PushStyleColorImVec4(.Text, UI_ACCENT)
+		if imgui.SmallButton(fmt.ctprintf("%s##script%p", ICON_FA_FILE_CODE, node)) do Editor_OpenScript(state, rel)
+		imgui.PopStyleColor()
+		UI_Tooltip(fmt.tprintf("Script: %s - click to open it", rel))
+		Drive_Item(fmt.tprintf("hier.script:%s", path))
+	}
 	imgui.PopStyleVar()
 	imgui.PopStyleColor(3)
 	_ = rowMax

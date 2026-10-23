@@ -79,7 +79,7 @@ that works. On macOS "Cmd" is the Command key; elsewhere it is Ctrl.
 | **Cmd+1 / Cmd+2 / Cmd+J** | Focus Viewport / Code / Console |
 | **Cmd+Q** | Quit (asks about unsaved scenes and scripts) |
 
-Scene tree: drag a node onto another to re-parent it (onto empty space = root), onto the top / bottom edge of a row to place it before / after; right-click for actions (Copy / Move to Scene puts the selection into another scene at the same world position - pasting into another scene does that too).
+Scene tree: drag a node onto another to re-parent it (onto empty space = root), onto the top / bottom edge of a row to place it before / after; right-click for actions (Copy / Move to Scene puts the selection into another scene at the same world position - pasting into another scene does that too). Rows mark nodes with a script (the blue script icon beside the eye: hover for its file, click to open it), locked and hidden-in-editor ones.
 Filter the tree by name, `#tag` or `t:type` (`t:sprite`, `type:CameraNode`); terms combine.
 Tags (groups) are edited in the Inspector's **Tags** section (type one and press Enter, or pick one used in the scene; click a tag to remove it); scripts use `has_tag` / `Scene.find_by_tag`, and the generated Lua types list the project's tags (`NodeTag`).
 Assets: drag textures, audio, components or scripts into the viewport.
