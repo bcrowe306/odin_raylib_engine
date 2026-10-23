@@ -742,6 +742,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return strings.join(parts[:], ",", context.temp_allocator), true
 	case "insp-help": return fmt.tprintf("%s: %s", inspectorHelp.title, inspectorHelp.doc), true
 	case "insp-help-path": return inspectorHelp.path, true
+	case "insp-flash": return string(inspFlash.path[:inspFlash.pathLen]) if Inspector_FlashActive(inspFlash.node, string(inspFlash.path[:inspFlash.pathLen])) else "", true
 	case "selected-bounds":
 		// The selected node's bounds in the world: "minx,miny,maxx,maxy" (rounded).
 		if state.selectedNode == nil do return "", true

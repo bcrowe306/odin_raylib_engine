@@ -501,14 +501,144 @@ Prop_Payload :: struct {
 // it, hit tests clip to the next column.
 prop_label :: proc(label: string, node: ^e.Node, path, value: string) {
 	imgui.TableNextRow()
+	// Shown from the code (Show in Inspector): the row lights up for a moment.
+	if Inspector_FlashActive(node, path) {
+		imgui.TableSetBgColor(.RowBg0, col_u32(ui_accent(0.25)))
+		if !inspFlash.scrolled {
+			imgui.SetScrollHereY(0.4)
+			inspFlash.scrolled = true
+		}
+	}
 	imgui.TableNextColumn()
 	imgui.AlignTextToFramePadding()
 	imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
 	imgui.TextUnformatted(strings.clone_to_cstring(label, context.temp_allocator))
 	imgui.PopStyleColor()
+	if path != "" do Drive_Item(fmt.tprintf("insp.proplabel:%s", path))
 	prop_label_drag(node, path, value)
+	prop_label_menu(node, path)
 	imgui.TableNextColumn()
 	imgui.SetNextItemWidth(-1)
+}
+
+// --- Inspector <-> code ----------------------------------------------------------------
+
+// inspFlash: the Inspector row a code jump points at (Show in Inspector).
+inspFlash: struct {
+	node:     ^e.Node,
+	path:     [128]u8,
+	pathLen:  int,
+	until:    time.Tick,
+	scrolled: bool,
+}
+
+// Inspector_Flash lights a property row of a node (selects the node).
+Inspector_Flash :: proc(state: ^EditorState, node: ^e.Node, path: string) {
+	Editor_SelectNode(state, node, false)
+	inspFlash.node = node
+	inspFlash.pathLen = copy(inspFlash.path[:], path)
+	inspFlash.until = time.tick_add(time.tick_now(), 1500 * time.Millisecond)
+	inspFlash.scrolled = false
+}
+
+Inspector_FlashActive :: proc(node: ^e.Node, path: string) -> bool {
+	return inspFlash.node == node && node != nil && string(inspFlash.path[:inspFlash.pathLen]) == path && time.tick_diff(time.tick_now(), inspFlash.until) > 0
+}
+
+// prop_label_menu: right-click a property's name: Find in Script (script
+// properties), Copy Path.
+@(private = "file")
+prop_label_menu :: proc(node: ^e.Node, path: string) {
+	if node == nil || path == "" do return
+	if !imgui.BeginPopupContextItem(fmt.ctprintf("##propctx_%s", path)) do return
+	defer imgui.EndPopup()
+	state := code_state()
+	if strings.has_prefix(path, "script.") && node.scriptInstance != nil {
+		if imgui.MenuItem(fmt.ctprintf("%s  Find in Script", ICON_FA_CODE)) {
+			Code_FindScriptProperty(state, (cast(^e.ScriptInstance)node.scriptInstance).modulePath, path[len("script."):])
+		}
+		Drive_Item("ctx:find-in-script")
+	}
+	if imgui.MenuItem(fmt.ctprintf("%s  Copy Path", ICON_FA_LINK)) do imgui.SetClipboardText(strings.clone_to_cstring(path, context.temp_allocator))
+}
+
+// Code_FindScriptProperty opens a script at a property's declaration in
+// its properties table (else its first self.<name>), the name selected.
+Code_FindScriptProperty :: proc(state: ^EditorState, script, name: string) {
+	if !Editor_OpenScript(state, script) do return
+	doc := code_active_doc()
+	if doc == nil do return
+	b := &doc.buffer
+	target := buf.Position{-1, 0}
+	fallback := buf.Position{-1, 0}
+	for ln in 0 ..< buf.buffer_line_count(b) {
+		l := buf.buffer_line_str(b, ln)
+		t := strings.trim_left(l, " \t")
+		if strings.has_prefix(t, name) && strings.has_prefix(strings.trim_left(t[len(name):], " "), "=") {
+			target = {ln, len(l) - len(t)}
+			break
+		}
+		if fallback.line < 0 {
+			if i := strings.index(l, fmt.tprintf("self.%s", name)); i >= 0 do fallback = {ln, i + 5}
+		}
+	}
+	if target.line < 0 do target = fallback
+	if target.line < 0 do return
+	code_set_single_cursor(b, target, false)
+	b.cursors[0].sel = {anchor = target, active = true}
+	b.cursors[0].pos = {target.line, target.col + len(name)}
+	doc.scrollToCursor = true
+	GlobalCode.focusRequest = true
+}
+
+// Code_CmdShowInInspector: the property under the caret - self.<script
+// property>, self.node.<field>, get_property / set_property("path") on
+// self.node - selected and lit in the Inspector on the script's node.
+Code_CmdShowInInspector :: proc(state: ^EditorState) {
+	doc := code_active_doc()
+	if doc == nil do return
+	owner := code_script_owner(state, doc)
+	if owner == nil {
+		Editor_Log(state, .Info, "No node in this scene runs %s", doc.rel)
+		return
+	}
+	b := &doc.buffer
+	p := b.cursors[len(b.cursors) - 1].pos
+	line := buf.buffer_line_str(b, p.line)
+	// The property path string around the caret (get_property / set_property).
+	if lit, _, _, before, ok := code_literal_around(line, p.col); ok && (strings.has_suffix(before, "get_property(") || strings.has_suffix(before, "set_property(")) {
+		Inspector_Flash(state, owner, lit)
+		return
+	}
+	s, en := min(p.col, len(line)), min(p.col, len(line))
+	for s > 0 && code_is_ident_byte(line[s - 1]) do s -= 1
+	for en < len(line) && code_is_ident_byte(line[en]) do en += 1
+	name := line[s:en]
+	if name == "" do return
+	switch {
+	case strings.has_suffix(line[:s], "self.node."):
+		Inspector_Flash(state, owner, name)
+	case strings.has_suffix(line[:s], "self."):
+		if props, ok := e.Script_InspectProperties(doc.rel, &state.game.scriptManager); ok {
+			for pr in props do if pr.name == name {
+				Inspector_Flash(state, owner, fmt.tprintf("script.%s", name))
+				return
+			}
+		}
+		Editor_Log(state, .Info, "%s is not an exported property of %s", name, doc.rel)
+	case:
+		Editor_Log(state, .Info, "Put the caret on self.<property>, self.node.<field> or a get_property path")
+	}
+}
+
+// code_literal_around: the string literal around col and the text before it.
+code_literal_around :: proc(line: string, col: int) -> (lit: string, from, to: int, before: string, ok: bool) {
+	open := -1
+	for i := min(col, len(line)) - 1; i >= 0; i -= 1 do if line[i] == '"' || line[i] == '\'' {open = i; break}
+	if open < 0 do return
+	close := strings.index_byte(line[open + 1:], line[open])
+	if close < 0 || open + 1 + close < col do return
+	return line[open + 1:open + 1 + close], open + 1, open + 1 + close, strings.trim_right_space(line[:open]), true
 }
 
 @(private = "file")

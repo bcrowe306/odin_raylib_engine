@@ -178,6 +178,19 @@ inline: the text after them moves right, and clicks and carets skip them.
 **Ctrl+Alt+H** (or Settings > Code Editor > Inlay Hints) turns them off.
 They are computed per line when first shown and cached until the next edit.
 
+## Code and the Inspector
+
+- **Show in Inspector** (the context menu on a symbol, or the palette): on
+  `self.<exported property>`, `self.node.<field>` or a `get_property` /
+  `set_property("path")` string, the node that runs the script is selected
+  and that property's Inspector row lights up (scrolled into view).
+- **Find in Script** (right-click a script property's name in the
+  Inspector): the script opens at the property's declaration in its
+  `properties` table, the name selected. *Copy Path* copies the property's
+  path (`script.speed`, `rotation`).
+- Dragging a property's name into a script inserts a `get_property` /
+  `set_property` (Shift) call (see SCRIPTING.md).
+
 ## Colours and images
 
 - **Colour swatches**: a small swatch sits before colour tables -

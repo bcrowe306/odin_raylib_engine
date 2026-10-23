@@ -161,6 +161,7 @@ code_text_context_menu :: proc(state: ^EditorState, doc: ^Code_Doc) {
 		item(state, ICON_FA_MAGNIFYING_GLASS, "code.references", lsp)
 		item(state, ICON_FA_PEN, "code.rename", lsp)
 		item(state, ICON_FA_BOOK, "code.reference")
+		item(state, ICON_FA_SLIDERS, "code.show_in_inspector")
 		contextual = true
 	}
 	if info.hasSel {

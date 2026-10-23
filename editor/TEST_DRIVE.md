@@ -91,6 +91,7 @@ exits non-zero if any check fails.
 | `code_disk_history.drive` | Two saves kept; Local History restores the older; the file changed on disk while edited - the bar, Reload (undo brings the edits back); clean, a change reloads by itself. |
 | `code_swatch_texture.drive` | Swatches before a property's colour default and {0.2, 0.4, 0.8} (none for {1, 2, 3}); a click opens the picker; hovering a texture path shows the image. |
 | `code_inline_values.drive` | Paused at a breakpoint in update: line 27 shows self and dt; gone after Continue. |
+| `code_inspector_link.drive` | Show in Inspector on self.rotation_speed selects PlayerShip and lights its row; the Inspector's thrust_power > Find in Script opens the declaration, name selected. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -169,7 +170,7 @@ Queries:
 - `dialog-start` (the folder the last system file dialog opened in), `last-dir:import` / `last-dir:export` / `last-dir:projects` (the remembered folders)
 - `slicer-zoom` (the slicer's zoom, `0.00` = Fit), `slicer-selection` (picked cells, `0,1,2`), `hidden-tab-bars` (docked spaces whose tab bar is hidden)
 - `game-pid` (the running game's process id, 0 = none), `last-played` (the scene Restart plays, `project` = the initial scene)
-- `insp-help-path` (the path the help pane shows)
+- `insp-help-path` (the path the help pane shows), `insp-flash` (the row Show in Inspector lit)
 - `particle-preview` (on / off; `node:<Name>.particles` = an emitter's live particles)
 - `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk, Search)

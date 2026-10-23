@@ -1,0 +1,34 @@
+# Code <-> Inspector: Show in Inspector on self.<script property> selects
+# the script's node and lights the row; a script property's Find in Script
+# opens the script at its declaration.
+wait 5
+dblclick @asset:scenes/battle_arena.scene.json
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 27
+key enter
+key end
+key left
+key left
+key left
+key left
+key left
+key left
+rclick @code.caret
+wait 2
+click @ctx:code.show_in_inspector
+wait 3
+expect selected == PlayerShip
+expect insp-flash == script.rotation_speed
+screenshot flash
+# Back: the Inspector's thrust_power row > Find in Script.
+key cmd+1
+wait 2
+rclick @insp.proplabel:script.thrust_power
+wait 2
+click @ctx:find-in-script
+wait 3
+expect code.file == scripts/player_ship.lua
+expect code.selection == thrust_power
+expect code.cursor contains 9:
