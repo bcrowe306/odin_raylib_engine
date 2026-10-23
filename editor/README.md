@@ -282,6 +282,12 @@ cells (`"cells"` in the scene; margin / spacing editable in the Inspector).
 ### Animation timeline
 
 The bottom panel's **Animation** tab edits the selected AnimationPlayer.
+Next to the animation picker: **+** adds an animation, the **pen** renames
+it (names are unique; the default animation and the states of a State
+Machine driving this player follow the new name), **Duplicate** copies it
+(frames, range, settings and tracks) right after itself as `<name>_copy`,
+and the **trash** deletes it (Cmd+Z brings it back).
+
 **Frames**: the strip shows every frame of the animation; the ones it plays
 (its **range**) are under the blue band in the header - drag the band's
 handles, type **from / to** under the Frames label, or right-click a frame:

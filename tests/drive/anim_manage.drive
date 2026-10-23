@@ -1,0 +1,81 @@
+# Managing animations: rename (taken names refused; the default animation
+# and a state machine's states follow), duplicate (frames, range, settings
+# and tracks; placed after the original), delete (undo brings it back);
+# saved.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+expect node:AnimationPlayer.type == AnimationPlayerNode
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+click @anim.reverse
+click @anim.default
+click @anim.new
+expect anim-names == anim_1,[anim_2]
+
+# A state machine plays anim_1 in one of its states.
+click @hier:PlayerShip
+key ctrl+a
+key ctrl+a
+type state machine
+key enter
+click @insp.sm.from-anims
+click @hier:PlayerShip/AnimationPlayer
+click @bottom:animation
+click @anim.select
+click @pick:anim_1
+expect anim-names == [anim_1],anim_2
+
+# Rename: a taken name is refused, then "walk".
+click @anim.rename
+key cmd+a
+type anim_2
+key enter
+expect anim-names == [anim_1],anim_2
+expect log contains There is already an animation named "anim_2"
+screenshot name_taken
+key escape
+click @anim.rename
+key cmd+a
+type walk
+click @anim.rename-ok
+expect anim-names == [walk],anim_2
+expect anim-info contains default=walk
+screenshot renamed
+
+# Duplicate: right after it, the same frames and settings.
+click @anim.duplicate
+expect anim-names == walk,[walk_copy],anim_2
+expect anim-info contains frames=3 range=1-3 reverse=true
+screenshot duplicated
+
+# Delete the original: the copy is current; undo brings it back.
+click @anim.select
+click @pick:walk
+click @anim.delete-animation
+expect anim-names == [walk_copy],anim_2
+expect anim-info contains default=
+expect node:AnimationPlayer.exists == true
+key cmd+z
+expect anim-names == [walk],walk_copy,anim_2
+click @hier:PlayerShip/AnimationPlayer
+click @bottom:animation
+click @anim.select
+click @pick:anim_2
+click @anim.delete-animation
+expect anim-names == walk,[walk_copy]
+
+key cmd+s
+wait 2
+expect file:scenes/main.scene.json contains "default_animation": "walk"
+expect file:scenes/main.scene.json contains "name": "walk_copy"
+expect file:scenes/main.scene.json contains {"name": "anim_1", "animation": "walk"}

@@ -1,5 +1,6 @@
 package engine
 
+import "core:fmt"
 import "core:slice"
 import "core:strings"
 
@@ -156,4 +157,122 @@ Animation_MoveFrame :: proc(a: ^Animation, from, to: int) {
 	t := fa.frames[from]
 	ordered_remove(&fa.frames, from)
 	inject_at(&fa.frames, to, t)
+}
+
+// ============================================================================
+// Managing a player's animations: rename, delete, duplicate.
+// ============================================================================
+
+// AnimationPlayerNode_FindAnimation: the index of the animation named `name`
+// (-1 when there is none).
+AnimationPlayerNode_FindAnimation :: proc(apn: ^AnimationPlayerNode, name: string) -> int {
+	for a, i in apn.animations do if a.name == name do return i
+	return -1
+}
+
+// AnimationPlayerNode_UniqueAnimationName: `base`, or `base_2`, `base_3`, ...
+// when it is taken (temp allocated).
+AnimationPlayerNode_UniqueAnimationName :: proc(apn: ^AnimationPlayerNode, base: string) -> string {
+	if AnimationPlayerNode_FindAnimation(apn, base) < 0 do return base
+	for i := 2; ; i += 1 {
+		n := fmt.tprintf("%s_%d", base, i)
+		if AnimationPlayerNode_FindAnimation(apn, n) < 0 do return n
+	}
+}
+
+// AnimationPlayerNode_RenameAnimation renames an animation (and the default
+// animation with it). Fails for an empty name or one another animation has.
+AnimationPlayerNode_RenameAnimation :: proc(apn: ^AnimationPlayerNode, index: int, name: string) -> bool {
+	if index < 0 || index >= len(apn.animations) do return false
+	name := strings.trim_space(name)
+	a := apn.animations[index]
+	if name == "" do return false
+	if name == a.name do return true
+	if AnimationPlayerNode_FindAnimation(apn, name) >= 0 do return false
+	if apn.defaultAnimation == a.name do apn.defaultAnimation = strings.clone(name, apn.allocator)
+	a.name = strings.clone(name, apn.allocator)
+	return true
+}
+
+// AnimationPlayerNode_DeleteAnimation removes an animation (freed when the
+// player owns it; its images go back to `rm`). The default animation is
+// cleared with it; the next animation (or the previous) becomes current.
+AnimationPlayerNode_DeleteAnimation :: proc(apn: ^AnimationPlayerNode, index: int, rm: ^ResourceManager) -> bool {
+	if index < 0 || index >= len(apn.animations) do return false
+	a := apn.animations[index]
+	if apn.defaultAnimation == a.name do apn.defaultAnimation = ""
+	if apn.blendFrom == a do apn.blendFrom = nil
+	ordered_remove(&apn.animations, index)
+	for o, i in apn.owned do if o == a {
+		ordered_remove(&apn.owned, i)
+		if a.renderFrame == FA_RenderFrame {
+			fa := cast(^FrameAnimation)a
+			if rm != nil do for t in fa.frames do if t != nil do ResourceManager_ReleaseTexture(rm, t)
+			FrameAnimation_Destroy(fa)
+		} else if a.renderFrame == SSA_RenderFrame {
+			ssa := cast(^SpriteSheetAnimation)a
+			if rm != nil && ssa.spriteSheet != nil do ResourceManager_ReleaseTexture(rm, ssa.spriteSheet)
+		}
+		break
+	}
+	if len(apn.animations) == 0 {
+		apn.animationIndex, apn.currentFrame = 0, 0
+	} else {
+		AnimationPlayerNode_SetAnimationIndex(apn, min(index, len(apn.animations) - 1))
+		if cur := AnimationPlayerNode_GetAnimation(apn); cur != nil do apn.currentFrame = cur.startFrame
+	}
+	return true
+}
+
+// AnimationPlayerNode_DuplicateAnimation copies an animation (frames,
+// cells, range, settings and tracks) right after it as `<name>_copy` and
+// makes the copy current.
+AnimationPlayerNode_DuplicateAnimation :: proc(apn: ^AnimationPlayerNode, index: int, rm: ^ResourceManager) -> ^Animation {
+	if index < 0 || index >= len(apn.animations) do return nil
+	src := apn.animations[index]
+	name := AnimationPlayerNode_UniqueAnimationName(apn, fmt.tprintf("%s_copy", src.name))
+	dup: ^Animation
+	if src.renderFrame == FA_RenderFrame {
+		sfa := cast(^FrameAnimation)src
+		fa := new(FrameAnimation, apn.allocator)
+		fa^ = sfa^
+		fa.frames = make([dynamic]^Texture, apn.allocator)
+		for t in sfa.frames {
+			if t == nil do continue
+			if rm != nil {
+				if nt, ok := rm->loadTexture(t.filePath); ok && nt != nil do append(&fa.frames, nt) // one more reference
+			} else do append(&fa.frames, t)
+		}
+		dup = fa
+	} else if src.renderFrame == SSA_RenderFrame {
+		sssa := cast(^SpriteSheetAnimation)src
+		ssa := new(SpriteSheetAnimation, apn.allocator)
+		ssa^ = sssa^
+		ssa.cells = nil
+		if len(sssa.cells) > 0 do SpriteSheetAnimation_SetCells(ssa, sssa.cells[:], apn.allocator)
+		ssa.startFrame, ssa.endFrame = sssa.startFrame, sssa.endFrame
+		ssa.spriteSheet = nil
+		if sssa.spriteSheet != nil {
+			if rm != nil {
+				if t, ok := rm->loadTexture(sssa.spriteSheet.filePath); ok do ssa.spriteSheet = t
+			} else do ssa.spriteSheet = sssa.spriteSheet
+		}
+		dup = ssa
+	} else do return nil
+	dup.name = strings.clone(name, apn.allocator)
+	dup.tracks = nil
+	for tr in src.tracks {
+		nt := Animation_AddTrack(apn, dup, tr.target, tr.property)
+		nt.kind = tr.kind
+		for k in tr.keys {
+			nk := k
+			if k.text != "" do nk.text = strings.clone(k.text, apn.allocator)
+			append(&nt.keys, nk)
+		}
+	}
+	append(&apn.owned, dup)
+	inject_at(&apn.animations, index + 1, dup)
+	AnimationPlayerNode_SetAnimationIndex(apn, index + 1)
+	apn.currentFrame = dup.startFrame
+	return dup
 }

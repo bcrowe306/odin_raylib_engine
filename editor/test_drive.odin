@@ -690,6 +690,16 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	case "quit-prompt": return "true" if state.quitRequested else "false", true
 	case "clipboard-nodes": return "true" if Editor_HasClipboardNodes() else "false", true
 	case "anim-preview": return "paused" if AnimationPanel_PreviewPaused() else "playing", true
+	case "anim-names":
+		// "<name>,<name>,..." of the selected AnimationPlayer, the current one in [brackets].
+		if state.selectedNode == nil || state.selectedNode.typeId != e.AnimationPlayerNode do return "", true
+		apn := cast(^e.AnimationPlayerNode)state.selectedNode
+		sb := strings.builder_make(context.temp_allocator)
+		for a, i in apn.animations {
+			if i > 0 do strings.write_string(&sb, ",")
+			fmt.sbprintf(&sb, "[%s]" if i == apn.animationIndex else "%s", a.name)
+		}
+		return strings.to_string(sb), true
 	case "anim-info":
 		// "frames=<n> range=<first>-<last> reverse=<b> fps=<f> default=<name>" (1-based) of the current animation.
 		if state.selectedNode == nil || state.selectedNode.typeId != e.AnimationPlayerNode do return "", true

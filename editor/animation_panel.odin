@@ -288,6 +288,65 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		UI_DimText("No animations yet: add one with +")
 		return
 	}
+	// Rename / duplicate / delete the current animation.
+	imgui.SameLine(0, 2)
+	if UI_IconButton(ICON_FA_PEN, "anim.rename", "Rename animation", size = 26) {
+		panel.newName = {}
+		copy(panel.newName[:len(panel.newName) - 1], anim.name)
+		imgui.OpenPopup("##anim_rename")
+	}
+	if imgui.BeginPopup("##anim_rename") {
+		UI_DimText("Rename animation")
+		if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
+		imgui.SetNextItemWidth(200)
+		enter := imgui.InputText("##anim_new_name", cstring(raw_data(panel.newName[:])), len(panel.newName), {.EnterReturnsTrue, .AutoSelectAll})
+		Drive_Item("anim.rename-field")
+		imgui.SameLine(0, 4)
+		if UI_Button("Rename", "anim.rename-ok") || enter {
+			old := strings.clone(anim.name, context.temp_allocator)
+			name := strings.trim_space(string(cstring(raw_data(panel.newName[:]))))
+			if name == old {
+				imgui.CloseCurrentPopup()
+			} else if name == "" {
+				Editor_Log(state, .Warn, "An animation needs a name")
+			} else if e.AnimationPlayerNode_FindAnimation(apn, name) >= 0 {
+				Editor_Log(state, .Warn, "There is already an animation named \"%s\"", name)
+			} else {
+				Editor_RecordUndo(state, "Rename animation")
+				e.AnimationPlayerNode_RenameAnimation(apn, apn.animationIndex, name)
+				rename_state_machine_refs(state, apn, old, anim.name)
+				imgui.CloseCurrentPopup()
+			}
+		}
+		typed := strings.trim_space(string(cstring(raw_data(panel.newName[:]))))
+		if typed != anim.name && e.AnimationPlayerNode_FindAnimation(apn, typed) >= 0 {
+			imgui.PushStyleColorImVec4(.Text, UI_WARNING)
+			imgui.TextUnformatted(fmt.ctprintf("%s  Another animation is named \"%s\"", ICON_FA_TRIANGLE_EXCLAMATION, typed))
+			imgui.PopStyleColor()
+		}
+		if imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		imgui.EndPopup()
+	}
+	imgui.SameLine(0, 2)
+	if UI_IconButton(ICON_FA_CLONE, "anim.duplicate", "Duplicate animation (frames, range, settings and tracks)", size = 26) {
+		preview_restore(state)
+		Editor_RecordUndo(state, "Duplicate animation")
+		if d := e.AnimationPlayerNode_DuplicateAnimation(apn, apn.animationIndex, &state.game.resourceManager); d != nil {
+			Editor_Log(state, .Info, "Duplicated animation as %s", d.name)
+		}
+		return
+	}
+	imgui.SameLine(0, 2)
+	if UI_IconButton(ICON_FA_TRASH, "anim.delete-animation", "Delete animation (Cmd+Z brings it back)", size = 26) {
+		preview_restore(state)
+		Editor_RecordUndo(state, "Delete animation")
+		name := strings.clone(anim.name, context.temp_allocator)
+		e.AnimationPlayerNode_DeleteAnimation(apn, apn.animationIndex, &state.game.resourceManager)
+		clear(&panel.sel)
+		panel.selAnim = nil
+		Editor_Log(state, .Info, "Deleted animation %s", name)
+		return
+	}
 	length := e.Animation_Length(anim)
 	rel := apn.currentFrame - anim.startFrame
 	imgui.SameLine(0, UI_SPACE)
@@ -821,3 +880,17 @@ anim_preview :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.
 
 // AnimationPanel_PreviewPaused: the preview is paused (drives).
 AnimationPanel_PreviewPaused :: proc() -> bool {return panel.miniPaused}
+
+// rename_state_machine_refs: states of machines driving `apn` that play
+// `old` play `name` instead.
+@(private = "file")
+rename_state_machine_refs :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, old, name: string) {
+	if state.activeScene == nil do return
+	mgr := state.activeScene.manager
+	for n in mgr.nodes {
+		if n == nil || n.typeId != e.StateMachineNode do continue
+		sm := cast(^e.StateMachineNode)n
+		if e.StateMachine_Player(sm, mgr) != apn do continue
+		for &s in sm.states do if s.animation == old do s.animation = strings.clone(name, sm.allocator)
+	}
+}

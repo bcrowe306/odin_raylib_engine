@@ -93,3 +93,67 @@ test_animation_editing :: proc(t: ^testing.T) {
 	testing.expect(t, w2.reverse && w2.fps == 24 && w2.startFrame == 0 && w2.endFrame == 3 && Animation_SourceCount(w2) == 5, "loaded")
 	testing.expect_value(t, h.fps, f32(10))
 }
+
+@(test)
+test_animation_manage :: proc(t: ^testing.T) {
+	dir, _ := filepath.join({os.get_env("TMPDIR", context.temp_allocator), "ore_anim_manage"}, context.temp_allocator)
+	_ = os.remove_all(dir)
+	_ = os.make_directory_all(dir)
+	defer os.remove_all(dir)
+	paths := make([dynamic]string, context.temp_allocator)
+	for n in ([]string{"a", "b", "c"}) {
+		p, _ := filepath.join({dir, strings.concatenate({n, ".png"}, context.temp_allocator)}, context.temp_allocator)
+		_ = os.write_entire_file(p, transmute([]u8)string("x"))
+		append(&paths, p)
+	}
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("anim", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	rm := &game.resourceManager
+	apn := cast(^AnimationPlayerNode)Node_CreateByTypeName(scene, "AnimationPlayerNode")
+	walk := AnimationPlayerNode_AddFrameAnimation(apn, rm, "walk", paths[:])
+	AnimationPlayerNode_AddSheetAnimation(apn, rm, "spin", "", {4, 2}, 0, 7)
+	Animation_SetRange(walk, 1, 2)
+	walk.fps = 12
+	tr := Animation_AddTrack(apn, walk, ".", "rotation")
+	Track_SetKey(tr, 0, {0, 0, 0, 0})
+	Track_SetKey(tr, 2, {90, 0, 0, 0})
+	apn.defaultAnimation = "walk"
+
+	// Rename: the default follows; taken / empty names are refused.
+	testing.expect(t, AnimationPlayerNode_RenameAnimation(apn, 0, " run "), "renamed")
+	testing.expect(t, walk.name == "run" && apn.defaultAnimation == "run", "name + default")
+	testing.expect(t, !AnimationPlayerNode_RenameAnimation(apn, 0, "spin"), "taken")
+	testing.expect(t, !AnimationPlayerNode_RenameAnimation(apn, 0, "  "), "empty")
+
+	// Duplicate: right after, its own frames / tracks, current.
+	refs := walk.frames[0].refCount
+	d := AnimationPlayerNode_DuplicateAnimation(apn, 0, rm)
+	testing.expect(t, d != nil && d.name == "run_copy" && apn.animations[1] == d && apn.animationIndex == 1, "dup placed")
+	dfa := cast(^FrameAnimation)d
+	testing.expect(t, len(dfa.frames) == 3 && d.startFrame == 1 && d.endFrame == 2 && d.fps == 12, "dup content")
+	testing.expect_value(t, walk.frames[0].refCount, refs + 1)
+	testing.expect(t, len(d.tracks) == 1 && len(d.tracks[0].keys) == 2, "dup tracks")
+	Track_SetKey(&d.tracks[0], 1, {45, 0, 0, 0})
+	testing.expect_value(t, len(walk.tracks[0].keys), 2) // not shared
+	d2 := AnimationPlayerNode_DuplicateAnimation(apn, 0, rm)
+	testing.expect_value(t, d2.name, "run_copy_2")
+	s := AnimationPlayerNode_DuplicateAnimation(apn, 3, rm)
+	testing.expect(t, s != nil && s.name == "spin_copy" && (cast(^SpriteSheetAnimation)s).grid == {4, 2}, "sheet dup")
+
+	// Delete: the default clears, the next one is current, references drop.
+	testing.expect(t, AnimationPlayerNode_DeleteAnimation(apn, 1, rm), "deleted copy")
+	testing.expect_value(t, walk.frames[0].refCount, refs + 1)
+	testing.expect_value(t, AnimationPlayerNode_GetAnimationName(apn), "run_copy") // run_copy_2 went in before run_copy
+	testing.expect(t, AnimationPlayerNode_DeleteAnimation(apn, 0, rm), "deleted run")
+	testing.expect_value(t, apn.defaultAnimation, "")
+	testing.expect_value(t, len(apn.animations), 3)
+	testing.expect_value(t, len(apn.owned), 3)
+	testing.expect(t, !AnimationPlayerNode_DeleteAnimation(apn, 5, rm), "out of range")
+
+	// Saved and loaded with the new names.
+	text := Scene_SerializeToJSON(scene, context.temp_allocator)
+	testing.expect(t, strings.contains(text, `"run_copy"`) && strings.contains(text, `"spin_copy"`) && !strings.contains(text, `"run"`), "saved")
+}
