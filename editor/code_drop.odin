@@ -236,6 +236,42 @@ Code_DropProperty :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, pa
 	code_insert(doc, pos, text)
 }
 
+// code_insert_block inserts text whose later lines take the drop line's
+// indentation (+1 level for an empty middle line, where the cursor goes).
+@(private = "file")
+code_insert_block :: proc(doc: ^Code_Doc, pos: buf.Position, text: string) {
+	if !strings.contains(text, "\n") {
+		code_insert(doc, pos, text)
+		return
+	}
+	b := &doc.buffer
+	line := strings.clone(buf.buffer_line_str(b, pos.line), context.temp_allocator)
+	indent := line[:len(line) - len(strings.trim_left_space(line))]
+	pos := pos
+	if strings.trim_space(line) == "" {
+		// An empty line: the indent of the code around it.
+		indent = code_blank_line_indent(b, pos.line)
+		if len(line) > 0 do buf.buffer_delete_range(b, {pos.line, 0}, {pos.line, len(line)}, buf.buffer_next_group(b))
+		buf.buffer_insert_text(b, {pos.line, 0}, indent, buf.buffer_next_group(b))
+		pos = {pos.line, len(indent)}
+	}
+	unit := "\t" if doc.useTabs else "    "
+	lines := strings.split(text, "\n", context.temp_allocator)
+	sb := strings.builder_make(context.temp_allocator)
+	body := -1
+	for l, i in lines {
+		if i > 0 {
+			strings.write_byte(&sb, '\n')
+			strings.write_string(&sb, indent)
+			if l == "" {strings.write_string(&sb, unit); body = i}
+		}
+		strings.write_string(&sb, l)
+	}
+	buf.buffer_insert_text(b, pos, strings.to_string(sb), buf.buffer_next_group(b))
+	if body >= 0 do code_set_single_cursor(b, {pos.line + body, len(indent) + len(unit)}, false)
+	doc.scrollToCursor = true
+}
+
 @(private = "file")
 code_insert :: proc(doc: ^Code_Doc, pos: buf.Position, text: string) {
 	b := &doc.buffer
@@ -273,6 +309,7 @@ CODE_ITEM_PAYLOAD :: "ORE_CODE_ITEM"
 Code_Item_Kind :: enum {
 	Action,    // an input action: Input.is_action_pressed (Shift: is_action_down)
 	Animation, // an AnimationPlayer's animation: animation_play
+	Event,     // a node's event (Signals panel): a connect with its handler
 }
 
 Code_Item_Payload :: struct {
@@ -283,14 +320,14 @@ Code_Item_Payload :: struct {
 }
 
 // code_item_drag makes the item just drawn a drag source of a project name.
-code_item_drag :: proc(kind: Code_Item_Kind, name: string, node: ^e.Node = nil) {
+code_item_drag :: proc(kind: Code_Item_Kind, name: string, node: ^e.Node = nil, textItem := false) {
 	if imgui.IsItemHovered() do imgui.SetMouseCursor(.Hand)
-	if !imgui.BeginDragDropSource({}) do return
+	if !imgui.BeginDragDropSource({.SourceAllowNullID} if textItem else {}) do return
 	pl := Code_Item_Payload{kind = kind, node = node}
 	pl.nlen = copy(pl.name[:], name)
 	imgui.SetDragDropPayload(CODE_ITEM_PAYLOAD, &pl, size_of(Code_Item_Payload))
 	imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_CODE, name))
-	UI_DimText("Drop in a script" if kind == .Animation else "Drop in a script · Shift: held, not just pressed")
+	UI_DimText("Drop in a script · Shift: held, not just pressed" if kind == .Action else "Drop in a script")
 	imgui.EndDragDropSource()
 }
 
@@ -303,6 +340,11 @@ code_item_text :: proc(state: ^EditorState, doc: ^Code_Doc, it: ^Code_Item_Paylo
 	case .Animation:
 		if !e.Node_IsAlive(it.node) || state.activeScene == nil do return fmt.tprintf("animation_play(%q)", name)
 		return fmt.tprintf("%s:animation_play(%q)", code_node_ref(state, doc, it.node, true), name)
+	case .Event:
+		ref := "self.node"
+		if e.Node_IsAlive(it.node) && state.activeScene != nil do ref = code_node_ref(state, doc, it.node, true)
+		param, _ := e.Event_Describe(name)
+		return fmt.tprintf("%s:connect(%q, function(%s, source)\n\nend)", ref, name, param if param != "" else "value")
 	}
 	return ""
 }
@@ -435,7 +477,7 @@ code_drop_target :: proc(state: ^EditorState, doc: ^Code_Doc, mouse: [2]f32) {
 		text := code_item_text(state, doc, it, imgui.GetIO().KeyShift)
 		imgui.SetTooltip("%s", strings.clone_to_cstring(text, context.temp_allocator))
 		if payload.Delivery {
-			if text != "" do code_insert(doc, pos, text)
+			if text != "" do code_insert_block(doc, pos, text)
 			cm.focusRequest = true
 		}
 	}

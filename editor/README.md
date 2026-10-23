@@ -220,7 +220,9 @@ it; anywhere else (an argument) it gets an inline cast,
 **Drag project names into a script**: an input action from the chips in
 the Preview panel's Script tab inserts `Input.is_action_pressed("jump")`
 (Shift: `is_action_down`); the hand next to the Animation tab's picker
-inserts `<player>:animation_play("walk")`; an asset dropped with **Alt**
+inserts `<player>:animation_play("walk")`; an event from the Inspector's
+**Signals** section inserts `<node>:connect("timeout", function(value,
+source) ... end)` with the cursor in the handler; an asset dropped with **Alt**
 inserts code that uses it - a sound `Audio.play_sound(...)`, a scene
 `Scene.change_scene(...)`, a texture `self.node:set_texture(...)` (plain:
 its path; Cmd: an exported property).

@@ -1,0 +1,20 @@
+# An event row from the Signals section dropped into a script: a connect
+# with the handler (its value named for the event), indented, the cursor in
+# its body.
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 17
+key enter
+key enter
+key up
+click @hier:PlayerShip
+scroll @insp.position.x -80
+wait 3
+drag @insp.signal-event:child_added @code.caret
+expect code.text contains ready()\n    Scene.find_node("PlayerShip"):connect("child_added", function(child, source)\n
+expect code.text contains \n        \n    end)
+screenshot handler
+type print(child)
+expect code.text contains function(child, source)\n        print(child)\n    end)

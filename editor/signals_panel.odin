@@ -261,6 +261,8 @@ Inspector_Signals :: proc(state: ^EditorState, node: ^e.Node) {
 		imgui.PopStyleColor()
 		imgui.SameLine(0, 6)
 		imgui.TextUnformatted(strings.clone_to_cstring(ev.name, context.temp_allocator))
+		Drive_Item(fmt.tprintf("insp.signal-event:%s", ev.name))
+		code_item_drag(.Event, ev.name, node, textItem = true) // into a script: a connect with its handler
 		if ev.param != "" {
 			imgui.SameLine(0, 4)
 			UI_DimText(fmt.tprintf("(%s)", ev.param))
