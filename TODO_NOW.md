@@ -66,3 +66,44 @@ out of scope here.
 - [x] 7.3 Per-line token cache keyed on buffer version; measure with a 10k-line file
 - [x] 7.4 Overlays: hover / signature / completion docs as bounded, wrapped, scrollable popups clamped to the editor
 - [x] 7.5 Lua debugger: breakpoints, stepping, locals (debug hooks)
+
+## Phase 8 — Lua integration (2026-10-23)
+
+Autocomplete and type safety
+- [ ] 8.1 Typed `get_script()`: returns the script's generated class (methods, fields)
+- [ ] 8.2 Event names complete in `connect` / `emit` (engine events per node type + custom ones scripts emit) and `on_<event>` methods
+- [ ] 8.3 Typed `get_property` / `set_property` paths per node class
+- [ ] 8.4 Typed `get_node("path")` (paths relative to each script's nodes)
+- [ ] 8.5 Asset / scene / action aliases on more API parameters
+- [ ] 8.6 Diagnostics: Lua runtime errors as squiggles in the Code tab (Play / Simulate); warnings for unknown node paths / property names
+
+Drag and drop, editor ↔ code
+- [ ] 8.7 Drop an animation / input action / scene / sound into code
+- [ ] 8.8 Drop a Signals-panel event row into code: a `connect` with the handler signature
+- [ ] 8.9 Drop a node onto a method: a `connect` to one of its events
+- [ ] 8.10 Node-reference exported properties (`type = "node"`, Inspector picker); dropping a node on the `properties` table adds one
+- [ ] 8.11 Rename-safe references: renaming / moving a node offers to update `get_node` / `find_node` in scripts
+- [ ] 8.12 Code → scene: Cmd+click a `get_node("...")` path selects the node; find a script's usages
+
+Exported properties
+- [ ] 8.13 More types: enum, range/slider, array, curve, gradient, colour alpha; `group` / `header`, `tooltip`
+- [ ] 8.14 `---` comments above a property become its help-pane text
+- [ ] 8.15 Live editing of exported values in the running game (Game tab)
+
+Engine API
+- [ ] 8.16 Vec2 / Vec3 / Vec4 types with operators, used by the API
+- [ ] 8.17 Property-style access (`self.node.position = ...`), old methods kept
+- [ ] 8.18 Spawning: `Scene.instantiate(component, parent, x, y)` (typed root), `node:queue_free()`
+- [ ] 8.19 Global scripts (autoloads) in Project Settings, reachable from every script; globe marker in the asset browser
+- (on hold) coroutines (`wait` / `await` / `tween`) - not wanted yet; (not chosen) lifecycle hooks
+
+Script authoring
+- [ ] 8.20 New-script templates (character, enemy patrol, UI menu, pickup, door/trigger)
+- [ ] 8.21 Snippets (Tab-expanded): ready, update, connect, properties, tween
+- [ ] 8.22 Attach by dropping a `.lua` onto a scene-tree node
+- [ ] 8.23 Lua console: evaluate expressions in the simulating / running game
+- [ ] 8.24 Debugger: watch expressions, conditional breakpoints
+
+Docs in place
+- [ ] 8.25 Every API function documented in `engine_api.lua` (description + example) for hover
+- [ ] 8.26 F1 on an API symbol opens its section of the scripting reference in the editor
