@@ -1,0 +1,32 @@
+# Bracket matching (the pair at the caret outlined; Cmd+Shift+\ jumps),
+# rainbow brackets and indent guides (both in Settings > Code Editor).
+wait 5
+exec cp tests/drive/fixtures/drive_ctx_zz.lua $PROJECT/scripts/drive_ctx_zz.lua
+wait-until item:asset:scripts/drive_ctx_zz.lua == visible timeout=300
+dblclick @asset:scripts/drive_ctx_zz.lua
+wait 5
+key ctrl+g
+type 3
+key enter
+key end
+expect code.cursor == 3:47
+key cmd+shift+backslash
+expect code.cursor == 3:33
+key cmd+shift+backslash
+expect code.cursor == 3:46
+screenshot brackets_guides
+# Inside the parentheses: to their closer.
+key ctrl+g
+type 5
+key enter
+key end
+key left
+key left
+key left
+key cmd+shift+backslash
+expect code.cursor == 5:39
+click @toolbar.settings
+click @settings.tab:code
+expect item:settings.rainbow-brackets == visible
+expect item:settings.indent-guides == visible
+click @settings.cancel

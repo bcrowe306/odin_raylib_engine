@@ -485,6 +485,38 @@ code_token_color :: proc(k: syn.TokenKind) -> u32 {
 	return code_syntax(UI_TEXT)
 }
 
+RAINBOW := [3]imgui.Vec4{{0.98, 0.82, 0.30, 1}, {0.85, 0.50, 0.95, 1}, {0.35, 0.72, 1.00, 1}}
+
+// code_draw_marked draws text[from:to] in color, with any bracket in marks
+// (this line's, code_structure.odin) in its depth's rainbow colour
+// (unmatched ones red). Returns the column after it.
+code_draw_marked :: proc(dl: ^imgui.DrawList, x0, y: f32, vcol: int, text: string, from, to: int, color: u32, marks: []Code_Bracket_Mark) -> int {
+	v := vcol
+	at := from
+	for m in marks {
+		if m.pos.col < from || m.pos.col >= to do continue
+		if m.pos.col > at do v = code_draw_text(dl, x0, y, v, text[at:m.pos.col], color)
+		col := code_syntax(RAINBOW[m.depth % len(RAINBOW)]) if m.matched else col_u32(UI_DANGER)
+		v = code_draw_text(dl, x0, y, v, text[m.pos.col:m.pos.col + 1], col)
+		at = m.pos.col + 1
+	}
+	if at < to do v = code_draw_text(dl, x0, y, v, text[at:to], color)
+	return v
+}
+
+// code_line_indent: a line's indentation in columns (tabs to tab stops).
+code_line_indent :: proc(line: string, tab: int) -> int {
+	v := 0
+	for ch in transmute([]u8)line {
+		switch ch {
+		case ' ': v += 1
+		case '\t': v = (v / max(tab, 1) + 1) * max(tab, 1)
+		case: return v
+		}
+	}
+	return v
+}
+
 // code_draw_text draws `text` starting at screen column `vcol`; tabs advance
 // to the next tab stop. Returns the column after the text.
 code_draw_text :: proc(dl: ^imgui.DrawList, x0, y: f32, vcol: int, text: string, color: u32) -> int {
@@ -883,9 +915,50 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 
 	diags := code_diagnostics(doc)
 
+	// Structure for rainbow brackets, bracket matching, indent guides
+	// (code_structure.odin: computed once per edit).
+	st := code_structure(doc)
+	mi := code_marks_from(st, first)
+	tab := code_tab_width()
+	activeLevel, activeFrom, activeTo := -1, 0, -1
+	if GlobalSettings.indentGuides {
+		if bl, ok := code_block_at(doc, c.pos.line); ok && bl.end > bl.start + 1 {
+			activeLevel = code_line_indent(buf.buffer_line_str(b, bl.start), tab) / max(tab, 1)
+			activeFrom, activeTo = bl.start + 1, bl.end - 1
+		}
+	}
+	blankIndent, blankFor := 0, -1 // indentation of the next code line (blank lines)
+
 	for ln in first ..= last {
 		y := cm.textOrigin.y + f32(ln) * cm.lineH
 		text := buf.buffer_line_str(b, ln)
+		// This line's bracket marks.
+		lm := mi
+		for mi < len(st.marks) && st.marks[mi].pos.line == ln do mi += 1
+		lineMarks := st.marks[lm:mi] if GlobalSettings.rainbowBrackets else nil
+
+		// Indent guides: a line per indentation level (blank lines take the
+		// next code line's); the caret's block is brighter.
+		if GlobalSettings.indentGuides && tab > 0 {
+			ind := 0
+			if strings.trim_space(text) == "" {
+				if blankFor < ln {
+					blankIndent, blankFor = 0, ln
+					for k in ln + 1 ..< min(lineCount, ln + 200) {
+						t := buf.buffer_line_str(b, k)
+						if strings.trim_space(t) != "" {blankIndent, blankFor = code_line_indent(t, tab), k - 1; break}
+					}
+				}
+				ind = blankIndent
+			} else {
+				ind = code_line_indent(text, tab)
+			}
+			for lv in 0 ..< ind / tab {
+				x := textX + f32(lv * tab) * cm.charW + 1
+				bright := lv == activeLevel && ln >= activeFrom && ln <= activeTo
+				imgui.DrawList_AddLine(dl, {x, y}, {x, y + cm.lineH}, col_u32(ui_line(0.16 if bright else 0.06)))
+			}
+		}
 
 		// Current line / selection backgrounds.
 		if !hasSel && ln == c.pos.line && focused {
@@ -913,11 +986,22 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		v := 0
 		at := 0
 		for t in tokens {
-			if t.start > at do v = code_draw_text(dl, textX, y + textY, v, text[at:t.start], col_u32(UI_TEXT))
-			v = code_draw_text(dl, textX, y + textY, v, text[t.start:t.end], code_token_color(t.kind))
+			if t.start > at do v = code_draw_marked(dl, textX, y + textY, v, text, at, t.start, col_u32(UI_TEXT), lineMarks)
+			v = code_draw_marked(dl, textX, y + textY, v, text, t.start, t.end, code_token_color(t.kind), lineMarks)
 			at = t.end
 		}
-		if at < len(text) do code_draw_text(dl, textX, y + textY, v, text[at:], col_u32(UI_TEXT))
+		if at < len(text) do code_draw_marked(dl, textX, y + textY, v, text, at, len(text), col_u32(UI_TEXT), lineMarks)
+	}
+
+	// The bracket pair at the caret.
+	if !hasSel {
+		if br, ok := code_bracket_at(doc, c.pos); ok {
+			for q in ([2]buf.Position{br.open, br.close}) {
+				if q.line < first || q.line > last do continue
+				p := code_screen_pos(b, q)
+				imgui.DrawList_AddRect(dl, {p.x - 0.5, p.y + 1}, {p.x + cm.charW + 0.5, p.y + cm.lineH - 1}, col_u32(ui_line(0.45)), 2)
+			}
+		}
 	}
 
 	// Diagnostic squiggles.

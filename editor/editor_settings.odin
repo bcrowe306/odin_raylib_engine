@@ -34,6 +34,8 @@ Editor_Settings :: struct {
 	tabWidth:         int,
 	insertSpaces:     bool, // for files without an indentation style yet
 	autoClosePairs:   bool,
+	rainbowBrackets:  bool, // brackets coloured by depth (Code tab)
+	indentGuides:     bool, // vertical lines at each indent level
 	formatOnSave:     bool,
 	lspEnabled:       bool,
 	luaServerPath:    string, // "" = lua-language-server/ in the engine checkout
@@ -62,6 +64,8 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 	tabWidth        = 4,
 	insertSpaces    = true,
 	autoClosePairs  = true,
+	rainbowBrackets = true,
+	indentGuides    = true,
 	formatOnSave    = false,
 	lspEnabled      = true,
 }
@@ -241,6 +245,8 @@ settings_from_ini :: proc(text: string) {
 	s.tabWidth = int(f(m, "code", "tab_width", f32(s.tabWidth)))
 	s.insertSpaces = b(m, "code", "insert_spaces", s.insertSpaces)
 	s.autoClosePairs = b(m, "code", "auto_close_pairs", s.autoClosePairs)
+	s.rainbowBrackets = b(m, "code", "rainbow_brackets", s.rainbowBrackets)
+	s.indentGuides = b(m, "code", "indent_guides", s.indentGuides)
 	s.formatOnSave = b(m, "code", "format_on_save", s.formatOnSave)
 	s.lspEnabled = b(m, "code", "lsp_enabled", s.lspEnabled)
 	if v, ok := m["code"]["lua_server_path"]; ok && v != "" do s.luaServerPath = strings.clone(v)
@@ -327,6 +333,7 @@ Editor_SaveSettings :: proc() -> bool {
 	strings.write_string(&sb, "\n[code]\n")
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
 	fmt.sbprintf(&sb, "auto_close_pairs = %t\nformat_on_save = %t\nlsp_enabled = %t\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)
+	fmt.sbprintf(&sb, "rainbow_brackets = %t\nindent_guides = %t\n", s.rainbowBrackets, s.indentGuides)
 	fmt.sbprintf(&sb, "lua_server_path = %s\n", s.luaServerPath)
 	strings.write_string(&sb, "\n[theme]\n")
 	fmt.sbprintf(&sb, "name = %s\n", s.theme.name)

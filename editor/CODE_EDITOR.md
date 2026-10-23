@@ -119,6 +119,19 @@ feature needs it.
 | Alt+click | Add a cursor (on one: remove it) |
 | Alt+drag | **Column (box) selection**: a cursor per line, the same columns |
 
+## Brackets and indentation
+
+- The **bracket pair at the caret** is outlined. **Cmd+Shift+\\** jumps to
+  the matching bracket; away from a bracket, to the closer of the brackets
+  around the caret.
+- **Rainbow brackets**: brackets are coloured by nesting depth (gold,
+  violet, blue, repeating); an unmatched bracket is red.
+- **Indent guides**: a thin line at each indentation level (blank lines
+  take the next code line's); the guide of the block around the caret is
+  brighter.
+- Both are in Settings > Code Editor (`rainbow_brackets`, `indent_guides`
+  in settings.ini).
+
 ## Find
 
 | Shortcut | Command |

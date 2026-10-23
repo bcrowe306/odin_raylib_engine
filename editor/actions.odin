@@ -207,6 +207,7 @@ Actions_Init :: proc() {
 	add({id = "code.cursors_line_ends", category = "Code", label = "Add Cursors to Line Ends", chords = k(ch(.I, Mods{.Alt, .Shift})), scope = .Code, run = Code_CmdCursorsAtLineEnds})
 	add({id = "code.undo_cursor", category = "Code", label = "Undo Cursor", chords = k(ch(.U, P)), scope = .Code, run = Code_CmdUndoCursor})
 	add({id = "code.select_inside", category = "Code", label = "Select Inside Brackets / Quotes", chords = k(ch(.M, Mods{.Primary, .Shift})), scope = .Code, run = Code_CmdSelectInside})
+	add({id = "code.matching_bracket", category = "Code", label = "Go to Matching Bracket", chords = k(ch(.Backslash, PS)), scope = .Code, run = Code_CmdMatchingBracket})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})

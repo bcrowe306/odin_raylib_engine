@@ -382,6 +382,8 @@ settings_code :: proc(state: ^EditorState, h: f32) {
 	Drive_Item("settings.tab-width")
 	check("settings.insert-spaces", "Indent With Spaces", &s.insertSpaces, "For files that don't have an indentation style yet")
 	check("settings.auto-pairs", "Auto-Close Brackets", &s.autoClosePairs, "Insert closing brackets and quotes, step over them, wrap selections")
+	check("settings.rainbow-brackets", "Rainbow Brackets", &s.rainbowBrackets, "Colour brackets by how deeply they are nested")
+	check("settings.indent-guides", "Indent Guides", &s.indentGuides, "Vertical lines at each indentation level; the block around the caret is brighter")
 	check("settings.format-on-save", "Format On Save", &s.formatOnSave, "Run the language server's formatter before saving")
 	check("settings.lsp", "Language Server", &s.lspEnabled, "Completion, diagnostics and navigation from lua-language-server (restart the editor to apply)")
 	UI_PropLabel("Server Path")

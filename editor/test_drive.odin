@@ -495,6 +495,7 @@ key_by_name :: proc(name: string) -> (imgui.Key, bool) {
 	case "pageup": return .PageUp, true
 	case "pagedown": return .PageDown, true
 	case "slash", "/": return .Slash, true
+	case "backslash", "\\": return .Backslash, true
 	case "comma", ",": return .Comma, true
 	case "period", ".": return .Period, true
 	case "minus", "-": return .Minus, true
