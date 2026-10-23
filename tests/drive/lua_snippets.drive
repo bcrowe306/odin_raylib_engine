@@ -1,0 +1,50 @@
+# Snippets: a snippet's name + Tab expands it (the script's class, the
+# line's indentation); Tab moves through the placeholders, across lines;
+# with the completion list open Tab still expands it (the list shows a hint).
+wait 5
+click @asset.new-script
+click @newscript.create
+wait 2
+expect code.file == scripts/new_script.lua
+wait-until code.lsp == ready timeout=600
+key ctrl+g
+type 4
+key enter
+key enter
+type method
+key tab
+type jump
+key tab
+type height
+key tab
+type connect
+key tab
+key tab
+key tab
+type print(value)
+expect code.text contains function NewScript:jump(height)\n\s\s\s\sself.node:connect("timeout", function(value, source)\n\s\s\s\s\s\s\s\sprint(value)\n\s\s\s\send)\nend
+key down
+key down
+key end
+key enter
+key enter
+type tween
+wait-until code.completion contains Tween timeout=300
+expect item:code.snippet-hint == visible
+screenshot hint
+key tab
+expect code.text contains Tween.to(self.node, "position", {0, 0}, 0.5, "out_quad")
+key tab
+type scale
+key tab
+type {2, 2}
+expect code.text contains Tween.to(self.node, "scale", {2, 2}, 0.5, "out_quad")
+key esc
+key end
+key enter
+type ready
+key tab
+expect code.text contains function NewScript:ready()\n\s\s\s\s\nend
+screenshot expanded
+key ctrl+z
+expect code.text !contains function NewScript:ready()\n\s\s\s\s\nend

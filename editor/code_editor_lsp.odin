@@ -485,19 +485,7 @@ code_accept_completion :: proc(doc: ^Code_Doc) {
 	end := buf.buffer_insert_text(b, start, text, group)
 	b.cursors[0].sel.active = false
 	b.cursors[0].pos = end
-	if len(stops) > 0 {
-		// Remember the later stops (single-line snippets) as distances from
-		// the line end: typing into the current placeholder doesn't move them.
-		code_snippet_clear()
-		cm.snippetLine = start.line
-		lineLen := buf.buffer_line_len(b, start.line)
-		for st, n in stops {
-			if n == 0 do continue
-			if strings.contains(text[:st.offset], "\n") do continue
-			append(&cm.snippetStops, Snippet_Pending{fromEnd = lineLen - (start.col + st.offset), length = st.length})
-		}
-		code_snippet_select(b, start.line, start.col + stops[0].offset, stops[0].length)
-	}
+	if len(stops) > 0 do code_snippet_start(b, start, text, stops[:])
 	comp.open = false
 	doc.scrollToCursor = true
 	if strings.contains(text, "(") do code_lsp_request_signature(doc)
@@ -558,6 +546,11 @@ code_completion_popup :: proc(state: ^EditorState, doc: ^Code_Doc) {
 	tagW := cm.charW * 5 + 8
 	w := clamp(tagW + labelW + 24 + min(detailW, 220), 260, 640)
 	h := f32(rows) * rowH + 8
+	snippetHint := Code_SnippetHint(doc) // Tab would expand a snippet
+	if snippetHint != "" {
+		w = max(w, imgui.CalcTextSize(strings.clone_to_cstring(snippetHint, context.temp_allocator)).x + 24)
+		h += rowH
+	}
 
 	// Selected item's documentation below the list (resolved on demand).
 	sel := &items[comp.filtered[comp.selected]]
@@ -622,6 +615,12 @@ code_completion_popup :: proc(state: ^EditorState, doc: ^Code_Doc) {
 			}
 		}
 		Drive_ItemRect(fmt.tprintf("code.completion:%s", code_completion_label(item)), mn, mx)
+	}
+	if snippetHint != "" {
+		hy := pos.y + h - rowH - 2
+		imgui.DrawList_AddLine(dl, {pos.x + 6, hy}, {pos.x + w - 6, hy}, col_u32(ui_line(0.10)))
+		imgui.DrawList_AddText(dl, {pos.x + 10, hy + (rowH - imgui.GetFontSize()) * 0.5}, col_u32(UI_ACCENT), strings.clone_to_cstring(snippetHint, context.temp_allocator))
+		Drive_ItemRect("code.snippet-hint", {pos.x, hy}, {pos.x + w, hy + rowH})
 	}
 	if len(comp.filtered) > rows {
 		// Scroll indicator.
@@ -740,8 +739,32 @@ code_lsp_goto_definition :: proc(doc: ^Code_Doc) {
 // --- snippet tab stops -------------------------------------------------------------
 
 Snippet_Pending :: struct {
-	fromEnd: int, // byte distance from the end of the line
+	line:    int,
+	fromEnd: int, // byte distance from the end of its line
 	length:  int,
+}
+
+// code_snippet_start selects the first tab stop of text just inserted at
+// start and remembers the later ones as distances from their line's end:
+// typing into the current placeholder doesn't move them (nor, on other
+// lines, their line numbers).
+code_snippet_start :: proc(b: ^buf.Buffer, start: buf.Position, text: string, stops: []Snippet_Stop) {
+	cm := &GlobalCode
+	code_snippet_clear()
+	pos :: proc(start: buf.Position, text: string, offset: int) -> buf.Position {
+		before := text[:offset]
+		nl := strings.count(before, "\n")
+		if nl == 0 do return {start.line, start.col + offset}
+		return {start.line + nl, offset - strings.last_index_byte(before, '\n') - 1}
+	}
+	for st, n in stops {
+		if n == 0 do continue
+		p := pos(start, text, st.offset)
+		append(&cm.snippetStops, Snippet_Pending{line = p.line, fromEnd = buf.buffer_line_len(b, p.line) - p.col, length = st.length})
+	}
+	first := pos(start, text, stops[0].offset)
+	cm.snippetLine = first.line
+	code_snippet_select(b, first.line, first.col, stops[0].length)
 }
 
 code_snippet_clear :: proc() {
@@ -768,9 +791,14 @@ Code_SnippetNext :: proc(doc: ^Code_Doc) -> bool {
 	}
 	st := cm.snippetStops[0]
 	ordered_remove(&cm.snippetStops, 0)
-	lineLen := buf.buffer_line_len(b, cm.snippetLine)
+	if st.line >= buf.buffer_line_count(b) {
+		code_snippet_clear()
+		return false
+	}
+	cm.snippetLine = st.line
+	lineLen := buf.buffer_line_len(b, st.line)
 	col := clamp(lineLen - st.fromEnd, 0, lineLen)
-	code_snippet_select(b, cm.snippetLine, col, min(st.length, lineLen - col))
+	code_snippet_select(b, st.line, col, min(st.length, lineLen - col))
 	doc.scrollToCursor = true
 	return true
 }

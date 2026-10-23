@@ -1044,6 +1044,8 @@ code_handle_keys :: proc(state: ^EditorState, doc: ^Code_Doc) {
 			comp.selected = min(comp.selected + 8, len(comp.filtered) - 1); comp.scrollTo = true; return
 		case code_pressed(.PageUp):
 			comp.selected = max(comp.selected - 8, 0); comp.scrollTo = true; return
+		case imgui.IsKeyPressed(.Tab, false) && !primary && !shift && Code_ExpandSnippet(doc):
+			return // a snippet's name: Tab expands it (Enter still picks the item)
 		case (imgui.IsKeyPressed(.Enter, false) || imgui.IsKeyPressed(.KeypadEnter, false) || imgui.IsKeyPressed(.Tab, false)) && !primary:
 			code_accept_completion(doc)
 			return
@@ -1123,6 +1125,7 @@ code_handle_keys :: proc(state: ^EditorState, doc: ^Code_Doc) {
 			code_newline(doc)
 			moved = true
 		case code_pressed(.Tab) && !ctrl && !primary && !shift && Code_SnippetNext(doc):
+		case code_pressed(.Tab) && !ctrl && !primary && !shift && Code_ExpandSnippet(doc):
 		case code_pressed(.Tab) && !ctrl && !primary:
 			if shift do buf.buffer_outdent(b)
 			else do buf.buffer_indent(b, doc.useTabs)

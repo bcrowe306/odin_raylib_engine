@@ -391,6 +391,22 @@ Scripts open in a **Code** tab next to the Viewport:
   | Pickup | AreaNode | bobs; a body with the collector tag picks it up: sound, `collected` event on the body with its value, shrinks and frees itself |
   | Door / Trigger | AreaNode | a tagged body slides a door node open (closes when everyone left) or changes scene; `triggered` event, once option |
 
+**Snippets**: type a snippet's name at the start of a statement and press
+**Tab** - it expands with the script's class and the line's indentation,
+and Tab then moves through its placeholders (Esc stops). With the
+completion list open, Tab still expands it (the list shows
+`Tab: <name> snippet`); Enter picks the list's item.
+
+| Name | Expands to |
+|---|---|
+| `ready` | `function Cls:ready() ... end` |
+| `update` | `---@param dt number` + `function Cls:update(dt) ... end` |
+| `connect` | `self.node:connect("timeout", function(value, source) ... end)` |
+| `properties` | `Cls.properties = { speed = { type = "float", default = 100 }, }` |
+| `tween` | `Tween.to(self.node, "position", {0, 0}, 0.5, "out_quad")` |
+| `on` | `function Cls:on_body_entered(other) ... end` |
+| `method` | `function Cls:name() ... end` |
+
 The editor uses `lua-language-server` (built in `lua-language-server/`) with
 the engine definitions as its library: completion for every engine module and
 `self.node` method, signature help, hover documentation, diagnostics
