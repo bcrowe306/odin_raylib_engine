@@ -372,14 +372,27 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	undo_on_activate(state, "Toggle reverse")
 	Drive_Item("anim.reverse")
 	UI_Tooltip("Play this animation from its last frame to its first")
-	// This animation's frame rate (0 = the player's).
+	// This animation's frame rate (anim.fps 0 = the player's).
 	imgui.SameLine(0, UI_SPACE)
 	imgui.SetNextItemWidth(96)
-	fpsFmt := fmt.ctprintf("player %.0f", apn.fps) if anim.fps <= 0 else "%.0f fps"
-	if imgui.DragFloat("##anim_fps", &anim.fps, 0.2, 0, 120, fpsFmt) do e.AnimationPlayerNode_SetAnimationIndex(apn, apn.animationIndex)
+	// Shows the rate it plays at: its own, else the player's (dimmed);
+	// dragging gives it its own, right-click goes back to the player's.
+	inherited := anim.fps <= 0
+	fps := apn.fps if inherited else anim.fps
+	if inherited do imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
+	if imgui.DragFloat("##anim_fps", &fps, 0.2, 1, 120, "%.0f fps") {
+		anim.fps = max(fps, 1)
+		e.AnimationPlayerNode_SetAnimationIndex(apn, apn.animationIndex)
+	}
+	if inherited do imgui.PopStyleColor()
 	undo_on_activate(state, "Edit FPS")
 	Drive_Item("anim.fps")
-	UI_Tooltip("This animation's frames per second (0: the player's FPS, set in the Inspector)")
+	if !inherited && imgui.IsItemHovered() && imgui.IsMouseClicked(.Right) {
+		Editor_RecordUndo(state, "Edit FPS")
+		anim.fps = 0
+		e.AnimationPlayerNode_SetAnimationIndex(apn, apn.animationIndex)
+	}
+	UI_Tooltip("Frames per second: the player's (set in the Inspector) until you change it here" if inherited else "This animation's frames per second (right-click: use the player's)")
 	imgui.SameLine(0, 2)
 	isDefault := apn.defaultAnimation == anim.name
 	if UI_IconButton(ICON_FA_STAR, "anim.default", "Played first when the scene loads (click to clear)" if isDefault else "Make this the animation played when the scene loads", isDefault, 26) {

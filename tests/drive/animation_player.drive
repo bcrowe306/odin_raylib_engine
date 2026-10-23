@@ -80,6 +80,15 @@ key ctrl+a
 type 24
 key enter
 expect anim-info contains fps=24
+# Right-click goes back to the player's rate (shown dimmed), then 24 again.
+rclick @anim.fps
+expect anim-info contains fps=0
+screenshot fps_inherited
+dblclick @anim.fps
+key ctrl+a
+type 24
+key enter
+expect anim-info contains fps=24
 click @anim.default
 expect anim-info contains default=anim_1
 click @anim.new

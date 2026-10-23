@@ -36,7 +36,7 @@ exits non-zero if any check fails.
 | `animation.drive` | Animation tab: frames from dropped textures, scrubbing, rotation track with keys, preview restore, save. |
 | `tilemap.drive` | Tile map: tileset, palette, paint stroke (undo/redo), flood fill, erase, save. |
 | `ui_ux.drive` | Settings (keymap record, input action + key, video, export), linked X/Y and reset, Save As / Revert / Open Project, asset copy/paste/rename/delete, paste as child, LDtk level asset, instance add child + apply to component, particle editor, viewport fit. |
-| `animation_player.drive` | The preview right of the timeline (playing, paused on a frame); frames deleted (button, menu, Delete key - the node stays), copied and pasted (buttons, Cmd+C / Cmd+V), the range (fields, menu), per-animation reverse and FPS, the default animation, saved. |
+| `animation_player.drive` | The preview right of the timeline (playing, paused on a frame); frames deleted (button, menu, Delete key - the node stays), copied and pasted (buttons, Cmd+C / Cmd+V), the range (fields, menu), per-animation reverse and FPS (right-click: the player's FPS), the default animation, saved. |
 | `anim_manage.drive` | Animations renamed (a taken name refused with a warning; the default and a state machine's state follow), duplicated (frames, range, reverse; placed after it), deleted (the copy becomes current, undo restores it), saved. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |

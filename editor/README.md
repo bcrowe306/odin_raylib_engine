@@ -299,7 +299,8 @@ panel has focus (they act on frames there, not on scene nodes). Images
 paste into frame animations, sprite-sheet cells into animations of the same
 sheet. Drag frames to reorder; drop textures on **+** to add some. The
 toolbar: **Loop**, **Reverse** (this animation plays last to first; the
-player's own Reverse flips them all), the animation's **FPS** (0 = the
+player's own Reverse flips them all), the animation's **FPS** (the rate it plays at -
+the player's, dimmed, until you change it; right-click goes back to the
 player's, set in the Inspector) and the **star**: the animation selected -
 and autoplayed - when the scene loads (also the Inspector's **Default**).
 At the right of the timeline (when the panel is wide enough) a **preview**
