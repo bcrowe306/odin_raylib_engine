@@ -1,0 +1,49 @@
+# The Console's Lua line: disabled while editing; in Simulate it evaluates
+# in the editor's Lua state (expressions, statements, errors, history); in
+# a running game (Play) over the editor link.
+wait 5
+expect item:console.lua == visible
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 10
+click @console.lua
+type Scene.find_node("PlayerShip")
+key enter
+wait 2
+expect log contains = Node "PlayerShip" (TextureNode)
+type drive_console_zz = 41
+key enter
+wait 2
+type drive_console_zz + 1
+key enter
+wait 2
+expect log contains = 42
+type nosuch.field
+key enter
+wait 2
+expect log contains attempt to index a nil value
+key up
+key up
+key enter
+wait 2
+expect last-log == = 42
+screenshot simulate
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 2
+
+# Play: the same line runs in the game.
+click @toolbar.play-scene
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+click @console.lua
+type Scene.get_name()
+key enter
+wait-until log contains = "main" timeout=300
+wait 2
+type Vec2(1, 2) * 3
+key enter
+wait-until log contains = Vec2(3, 6) timeout=300
+screenshot game
+click @toolbar.stop
+wait-until game == stopped timeout=300

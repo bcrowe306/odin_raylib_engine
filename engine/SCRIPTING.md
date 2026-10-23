@@ -343,6 +343,21 @@ leaks into the next run or into the saved scene.
 
 ## Debugging
 
+**Lua console.** The **Lua** line under the editor's Console runs Lua in
+the game while it plays (sent over the editor link) or in the editor's Lua
+state during Simulate. An expression prints its value(s) - nodes as
+`Node "Player" (CharacterMoverNode)`, vectors as `Vec2(3, 6)`, tables
+shallow - and a statement runs:
+
+```lua
+Scene.find_node("PlayerShip").position     -- = Vec2(640, 360)
+GameState.score = 100                      -- = ok
+Scene.find_node("Boss"):get_script().health
+```
+
+Errors come back in red. Up / Down walk the history. While editing (no
+Simulate, no Play) the line is disabled.
+
 **Errors in the Code tab.** Script errors while the game runs (Play) or in
 Simulate - a failing `ready` / `update` / event handler, a syntax error on
 hot reload - show as red squiggles on their line in the Code tab (hover

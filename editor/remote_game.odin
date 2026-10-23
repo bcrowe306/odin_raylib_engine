@@ -118,6 +118,7 @@ RemoteGame_HandleLine :: proc(state: ^EditorState, line: string) -> bool {
 	case "debug-draw":
 		delete(remote.debugDraw)
 		remote.debugDraw = strings.clone(rest)
+	case "eval": LuaConsole_Reply(state, rest)
 	case "set":
 	}
 	return true

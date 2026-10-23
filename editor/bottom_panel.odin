@@ -160,7 +160,7 @@ BottomPanel_RenderConsole :: proc(state: ^EditorState, counts: [LogLevel]int) {
 	filter := strings.to_lower(string(cstring(raw_data(consoleFilterBuf[:]))), context.temp_allocator)
 	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
 	imgui.PushStyleVarImVec2(.ItemSpacing, {8, 3})
-	if imgui.BeginChild("##ConsoleLogScroll", {0, 0}, {}, {.HorizontalScrollbar}) {
+	if imgui.BeginChild("##ConsoleLogScroll", {0, -LUA_CONSOLE_H}, {}, {.HorizontalScrollbar}) {
 		imgui.Dummy({0, 2})
 		if len(state.logs) == 0 {
 			imgui.Indent(6)
@@ -216,6 +216,7 @@ BottomPanel_RenderConsole :: proc(state: ^EditorState, counts: [LogLevel]int) {
 	imgui.EndChild()
 	imgui.PopStyleVar()
 	imgui.PopStyleColor()
+	LuaConsole_Render(state) // the Lua line (lua_console.odin)
 }
 
 BottomPanel_RenderProfiler :: proc(state: ^EditorState) {

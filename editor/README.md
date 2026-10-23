@@ -540,6 +540,9 @@ Play always runs what is in the editor. It saves every modified scene, rebuilds 
 binary (`bin/odin_raylib_engine`) if any engine/game source changed, then starts the game with
 `--project <dir>` (plus `--scene <file>` for F6). The game's output streams into the
 Console. **Game → Simulate in Editor** runs the scene inside the editor and restores it when stopped.
+The **Lua** line under the Console evaluates Lua there - in the simulation, or in the running
+game - showing an expression's value (`Scene.find_node("PlayerShip").position`) or running a
+statement (`GameState.score = 100`); Up / Down recall earlier lines.
 
 While the game runs, the toolbar's play controls become **Pause** /
 **Resume** (F9), **Step** one frame (Shift+F9; pauses first), **Restart**

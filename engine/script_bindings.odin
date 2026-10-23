@@ -4146,6 +4146,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "__index")
 		lua.pushcfunction(L, lua_node_newindex)
 		lua.setfield(L, -2, "__newindex")
+		lua.pushcfunction(L, lua_node_tostring) // lua_eval.odin
+		lua.setfield(L, -2, "__tostring")
 	}
 	lua.pop(L, 1)
 

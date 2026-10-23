@@ -68,6 +68,7 @@ exits non-zero if any check fails.
 | `script_templates.drive` | New Script dialog: Assets + creates from the picked template (Enemy Patrol, named); a Trigger Area's New Script picks Pickup and attaches it; Cancel creates nothing. |
 | `lua_snippets.drive` | Snippets: `method` + Tab (class filled, placeholders across lines), `connect` inside it (indented), `tween` with the completion list open (hint shown, Tab expands), `ready`; undo. |
 | `script_drop_tree.drive` | A script dragged from Assets onto a scene-tree row attaches it (node selected); another replaces it; undo restores each. |
+| `lua_console.drive` | The Console's Lua line: in Simulate an expression (a node), a statement then its value, an error, history (Up); in Play the game evaluates (`Scene.get_name()`, a Vec2). |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

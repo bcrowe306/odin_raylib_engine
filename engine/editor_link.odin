@@ -19,6 +19,7 @@ import rl "vendor:raylib"
 //   inspect <path>              -> @ore:node {"path", "props": [[name, value], ...]}
 //   set <path> <prop> <value>   change a property ("position" "10,20", "rotation", any reflected one)
 //   reload-scene <file>         re-read a scene file; restart it when it's the current scene
+//   eval <lua>                  -> @ore:eval {"ok", "code", "text"} (the Console's Lua line)
 //   break-set <file> <l,l,...>  breakpoints in a script (break-clear: none); a hit
 //                               pauses the game in the script (lua_debugger.odin):
 //                               -> @ore:stopped {...}, then continue / step-* / locals
@@ -138,6 +139,14 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 		LuaDebugger_ClearBreakpoints()
 	case "reload-scene":
 		fmt.printfln("@ore:reloaded %s %t", rest, Game_ReloadSceneFile(game, rest))
+	case "eval":
+		text, ok := Lua_Eval(game.scriptManager.L, rest, context.temp_allocator)
+		sb := strings.builder_make(context.temp_allocator)
+		fmt.sbprintf(&sb, "{{\"ok\": %t, \"code\": ", ok)
+		link_str(&sb, rest)
+		strings.write_string(&sb, ", \"text\": ")
+		link_str(&sb, text)
+		fmt.printfln("@ore:eval %s}", strings.to_string(sb))
 	case "debug-draw":
 		// Colliders, joints and areas drawn (the toolbar's Show Colliders).
 		game.physicsWorld.drawPhysicsDebug = rest == "true"
