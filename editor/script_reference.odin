@@ -22,6 +22,8 @@ Ref_Section :: struct {
 	title: string,
 	level: int,
 	body:  string,
+	doc:   Md_Doc, // parsed when first shown (markdown_view.odin)
+	parsed: bool,
 }
 
 @(private = "file")
@@ -31,7 +33,8 @@ ref: struct {
 	selected:  int,
 	search:    [128]u8,
 	symbol:    string, // highlighted in the section, scrolled to
-	api:       string, // engine_api.lua entry for the symbol ("" = none)
+	api:       string, // engine_api.lua entry for the symbol ("" = none), markdown
+	apiDoc:    Md_Doc,
 	scrollTo:  bool,
 }
 
@@ -71,6 +74,8 @@ ScriptReference_Open :: proc(symbol := "") {
 	if i := strings.last_index_any(symbol, ".:"); i >= 0 do qual, name = symbol[:i], symbol[i + 1:]
 	ref.symbol = strings.clone(name)
 	ref.api = strings.clone(ScriptReference_ApiDoc(qual, name))
+	Md_Destroy(&ref.apiDoc)
+	if ref.api != "" do ref.apiDoc = Md_Parse(ref.api)
 	ref.selected = ref_best_section(qual, name)
 	ref.scrollTo = true
 }
@@ -121,16 +126,31 @@ ScriptReference_ApiDoc :: proc(qual, name: string) -> string {
 		}
 	}
 	if found < 0 do return ""
+	// Markdown: the signature, the description (with its Example line), then
+	// parameters and returns as lists.
 	sb := strings.builder_make(context.temp_allocator)
 	sig := strings.trim_suffix(lines[found][len("function "):], " end")
-	strings.write_string(&sb, sig)
+	fmt.sbprintf(&sb, "#### `%s`\n\n", sig)
 	start := found
 	for start > 0 && strings.has_prefix(lines[start - 1], "---") do start -= 1
+	params := make([dynamic]string, context.temp_allocator)
 	for l in lines[start:found] {
 		d := l[3:]
-		if strings.has_prefix(d, "@param ") do fmt.sbprintf(&sb, "\n  %s", d[len("@param "):])
-		else if strings.has_prefix(d, "@return ") do fmt.sbprintf(&sb, "\n  -> %s", d[len("@return "):])
-		else if !strings.has_prefix(d, "@") do fmt.sbprintf(&sb, "\n%s", d)
+		if strings.has_prefix(d, "@param ") || strings.has_prefix(d, "@return ") {
+			isRet := strings.has_prefix(d, "@return ")
+			f := strings.fields(d[len("@return ") if isRet else len("@param "):], context.temp_allocator)
+			if len(f) == 0 do continue
+			item := ""
+			if isRet do item = fmt.tprintf("- returns `%s`%s", f[0], fmt.tprintf(" **%s** %s", f[1], strings.join(f[2:], " ", context.temp_allocator)) if len(f) > 1 else "")
+			else do item = fmt.tprintf("- **%s** `%s` %s", f[0], f[1] if len(f) > 1 else "", strings.join(f[2:], " ", context.temp_allocator) if len(f) > 2 else "")
+			append(&params, item)
+		} else if !strings.has_prefix(d, "@") {
+			fmt.sbprintf(&sb, "%s\n", d)
+		}
+	}
+	if len(params) > 0 {
+		strings.write_string(&sb, "\n")
+		for p in params do fmt.sbprintf(&sb, "%s\n", p)
 	}
 	return strings.to_string(sb)
 }
@@ -166,13 +186,35 @@ ScriptReference_Render :: proc(state: ^EditorState) {
 	if !ref.open do return
 	ref_parse()
 	imgui.SetNextWindowSize({940, 640}, .FirstUseEver)
-	if !imgui.Begin(fmt.ctprintf("%s  Scripting Reference###ScriptReference", ICON_FA_BOOK), &ref.open, {.NoCollapse}) {
+	// Its own background and a border: it floats over the editor.
+	imgui.PushStyleColorImVec4(.WindowBg, UI_BG_PANEL)
+	imgui.PushStyleColorImVec4(.Border, ui_line(0.22))
+	imgui.PushStyleColorImVec4(.TitleBg, UI_BG_RAISED)
+	imgui.PushStyleColorImVec4(.TitleBgActive, UI_BG_ACTIVE)
+	imgui.PushStyleVar(.WindowBorderSize, 1)
+	imgui.PushStyleVar(.WindowRounding, 8)
+	visible := imgui.Begin(fmt.ctprintf("%s  Scripting Reference###ScriptReference", ICON_FA_BOOK), &ref.open, {.NoCollapse})
+	imgui.PopStyleVar(2)
+	imgui.PopStyleColor(4)
+	if visible {
+		// A soft shadow around it.
+		p, sz := imgui.GetWindowPos(), imgui.GetWindowSize()
+		bg := imgui.GetBackgroundDrawList()
+		for i in 1 ..= 4 {
+			o := f32(i) * 3
+			imgui.DrawList_AddRect(bg, {p.x - o, p.y - o + 4}, {p.x + sz.x + o, p.y + sz.y + o + 4}, col_u32({0, 0, 0, 0.10}), 8 + o, {}, 3)
+		}
+	}
+	if !visible {
 		imgui.End()
 		return
 	}
 	Drive_Item("ref.window")
 	h := imgui.GetContentRegionAvail().y
-	if imgui.BeginChild("##ref_toc", {250, h}, {.Borders}, {}) {
+	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
+	tocOpen := imgui.BeginChild("##ref_toc", {250, h}, {.Borders}, {})
+	imgui.PopStyleColor()
+	if tocOpen {
 		imgui.SetNextItemWidth(-1)
 		imgui.InputTextWithHint("##ref_search", fmt.ctprintf("%s  Search", ICON_FA_MAGNIFYING_GLASS), cstring(raw_data(ref.search[:])), len(ref.search), {})
 		Drive_Item("ref.search")
@@ -180,7 +222,8 @@ ScriptReference_Render :: proc(state: ^EditorState) {
 		for s, i in ref.sections {
 			if q != "" && !strings.contains(strings.to_lower(s.title, context.temp_allocator), q) && !strings.contains(strings.to_lower(s.body, context.temp_allocator), q) do continue
 			imgui.Indent(f32(max(s.level - 1, 0)) * 12)
-			if imgui.Selectable(fmt.ctprintf("%s##sec%d", s.title, i), ref.selected == i) {
+			label, _ := strings.remove_all(s.title, "`", context.temp_allocator)
+			if imgui.Selectable(fmt.ctprintf("%s##sec%d", label, i), ref.selected == i) {
 				ref.selected = i
 				ref.scrollTo = true
 			}
@@ -190,59 +233,28 @@ ScriptReference_Render :: proc(state: ^EditorState) {
 	}
 	imgui.EndChild()
 	imgui.SameLine()
-	if imgui.BeginChild("##ref_body", {0, h}, {}, {}) {
+	if imgui.BeginChild("##ref_body", {0, h}, {}, {.HorizontalScrollbar}) {
 		if ref.scrollTo && (ref.symbol == "" || ref.api != "") do imgui.SetScrollY(0) // the API entry is on top
 		if ref.api != "" {
-			// The API entry for the symbol.
+			// The API entry for the symbol: a card above the section.
 			imgui.PushStyleColorImVec4(.ChildBg, UI_BG_RAISED)
-			lines := strings.split_lines(ref.api, context.temp_allocator)
-			if imgui.BeginChild("##ref_api", {0, f32(len(lines)) * imgui.GetTextLineHeightWithSpacing() + 18}, {.Borders}, {}) {
-				for l, i in lines {
-					if i == 0 {
-						if GlobalFonts.mono != nil do imgui.PushFont(GlobalFonts.mono)
-						imgui.TextColored(UI_ACCENT, "%s", fmt.ctprintf("%s", l))
-						if GlobalFonts.mono != nil do imgui.PopFont()
-					} else {
-						imgui.TextWrapped("%s", fmt.ctprintf("%s", l))
-					}
-				}
-			}
+			imgui.PushStyleColorImVec4(.Border, UI_ACCENT_SOFT)
+			imgui.PushStyleVar(.ChildRounding, 6)
+			imgui.PushStyleVarImVec2(.WindowPadding, {12, 10})
+			if imgui.BeginChild("##ref_api", {0, 0}, {.Borders, .AutoResizeY, .AlwaysUseWindowPadding}, {}) do Md_Draw(&ref.apiDoc)
 			imgui.EndChild()
-			imgui.PopStyleColor()
+			imgui.PopStyleVar(2)
+			imgui.PopStyleColor(2)
 			Drive_Item("ref.api")
+			imgui.Dummy({0, 6})
 		}
 		if ref.selected < len(ref.sections) {
-			s := ref.sections[ref.selected]
-			imgui.PushFont(GlobalFonts.semibold)
-			imgui.TextUnformatted(strings.clone_to_cstring(s.title, context.temp_allocator))
-			imgui.PopFont()
-			imgui.Separator()
-			inCode := false
-			scrolled := false
-			for l in strings.split_lines(s.body, context.temp_allocator) {
-				if strings.has_prefix(strings.trim_space(l), "```") {
-					inCode = !inCode
-					continue
-				}
-				hit := ref.symbol != "" && strings.contains(l, ref.symbol)
-				col := UI_ACCENT if hit else (UI_TEXT_DIM if inCode else UI_TEXT)
-				if inCode || strings.has_prefix(l, "|") {
-					if GlobalFonts.mono != nil do imgui.PushFont(GlobalFonts.mono)
-					imgui.TextColored(col, "%s", fmt.ctprintf("%s", l))
-					if GlobalFonts.mono != nil do imgui.PopFont()
-				} else if strings.trim_space(l) == "" {
-					imgui.Dummy({0, 4})
-				} else {
-					text, _ := strings.replace_all(l, "**", "", context.temp_allocator)
-					imgui.PushStyleColorImVec4(.Text, col)
-					imgui.TextWrapped("%s", fmt.ctprintf("%s", text))
-					imgui.PopStyleColor()
-				}
-				if hit && ref.scrollTo && !scrolled && ref.api == "" {
-					imgui.SetScrollHereY(0.3)
-					scrolled = true
-				}
+			s := &ref.sections[ref.selected]
+			if !s.parsed {
+				s.doc = Md_Parse(fmt.tprintf("%s %s\n\n%s", strings.repeat("#", s.level, context.temp_allocator), s.title, s.body))
+				s.parsed = true
 			}
+			Md_Draw(&s.doc, ref.symbol, ref.scrollTo && ref.api == "")
 		}
 		ref.scrollTo = false
 	}

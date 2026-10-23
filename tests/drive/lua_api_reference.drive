@@ -32,3 +32,11 @@ click @ref.section:7. Scene Module (`Scene`)
 wait 2
 expect ref-section == 7. Scene Module (`Scene`)
 screenshot section
+click @ref.search
+key cmd+a
+key backspace
+wait 2
+click @ref.section:Events
+wait 2
+expect ref-section == Events
+screenshot table

@@ -587,8 +587,10 @@ tree, the **+** on the Scripts folder, the command palette) opens a dialog: the 
 template - Empty, Platformer or Top-Down Character, Enemy Patrol, UI Menu, Pickup, Door /
 Trigger - with a preview; templates made for the node's type are starred and picked first.
 **F1** on an API name opens the **Scripting Reference** window (also Help > Scripting Reference):
-`engine/SCRIPTING.md` by section with search, the function's signature, description and example
-on top. Snippets: `ready`, `update`, `connect`, `properties`, `tween`, `on`, `method` + **Tab** expand
+`engine/SCRIPTING.md` by section with search, rendered as markdown (headings, **bold**, `code`,
+code blocks, lists, tables - `markdown_view.odin` on libcmark), the function's signature,
+description, example and parameters in a card on top. The window has its own background,
+border and shadow. Snippets: `ready`, `update`, `connect`, `properties`, `tween`, `on`, `method` + **Tab** expand
 (placeholders follow with Tab; see `engine/SCRIPTING.md`). Completion, signature help, hover,
 diagnostics and go to definition (F12 / Ctrl-click) come from `lua-language-server` with the
 engine API definitions (`engine/definitions`). Hover docs, signature help and the selected
@@ -686,6 +688,10 @@ The engine's open gaps and everything fixed in this pass are listed in [`engine/
 ---
 
 ## 5. Build and Run Commands
+
+The editor links the system **libcmark** (`vendor:commonmark`, for the
+Scripting Reference's markdown): `brew install cmark` on macOS,
+`apt install libcmark-dev` on Debian/Ubuntu. The game runner doesn't need it.
 
 ```bash
 # Check editor package type-checking

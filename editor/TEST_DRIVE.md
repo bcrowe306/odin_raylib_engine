@@ -70,7 +70,7 @@ exits non-zero if any check fails.
 | `script_drop_tree.drive` | A script dragged from Assets onto a scene-tree row attaches it (node selected); another replaces it; undo restores each. |
 | `lua_console.drive` | The Console's Lua line: in Simulate an expression (a node), a statement then its value, an error, history (Up); in Play the game evaluates (`Scene.get_name()`, a Vec2). |
 | `debug_watch_condition.drive` | A breakpoint condition from the gutter's right-click: false never stops, true stops with the reason; watch expressions in the paused frame; the Console's Lua line there. |
-| `lua_api_reference.drive` | Hover over an engine function shows its description and `Example:`; F1 opens the Scripting Reference with its API entry and the Audio section; search and pick a section. |
+| `lua_api_reference.drive` | Hover over an engine function shows its description and `Example:`; F1 opens the Scripting Reference with its API entry and the Audio section; search and pick a section; a section with a table (Events) rendered as markdown. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
