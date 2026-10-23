@@ -22,6 +22,8 @@ expect file:scenes/main.scene.json contains scripts/orbiting_drone.lua
 click @menu:Game
 click @menu:Game/Simulate in Editor
 wait 30
+# Log.info from the script reaches the Console.
+expect log contains [Lua] [Lua:Drone] Initializing drone:
 expect node:PatrolDroneAlpha.position !contains 840.0,360.0
 screenshot simulating
 click @menu:Game
@@ -33,5 +35,7 @@ expect node:PatrolDroneAlpha.script.orbit_radius == 222
 game-args --frames 30 --dump-scene $SHOTS/game_scene.json
 key f5
 wait-until game == stopped timeout=900
+# ... and from the game process (its output, prefixed [game]).
+expect log contains script_log()] [Lua] [Lua:Drone] Initializing drone:
 expect abs-file:$SHOTS/game_scene.json contains "orbit_radius": 222
 expect abs-file:$SHOTS/game_scene.json contains scripts/orbiting_drone.lua

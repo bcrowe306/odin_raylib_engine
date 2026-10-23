@@ -3465,63 +3465,65 @@ lua_scene_set_draw_bounds :: proc "c" (L: ^lua.State) -> c.int {
 // Log Bindings (Engine.Log & print)
 // ----------------------------------------------------------------------------
 
+// Script logs (Log.info / warn / error, print) go to `scriptLogSink` when
+// set (the editor's Console), else to the logger the game had when
+// scripting started - the bindings run with runtime.default_context(),
+// whose logger discards everything.
+Script_LogSink :: #type proc(level: log.Level, text: string)
+scriptLogSink: Script_LogSink
+scriptLogger: runtime.Logger
+
+// script_log_args joins the call's arguments with tabs, each converted as
+// Lua's tostring does (nil, booleans, tables and nodes included).
+@(private="file")
+script_log_args :: proc(L: ^lua.State) -> string {
+	nargs := lua.gettop(L)
+	sb := strings.builder_make(context.temp_allocator)
+	for i in 1 ..= nargs {
+		n: c.size_t
+		str := lua.L_tostring(L, c.int(i), &n) // pushes the string
+		if str != nil do strings.write_string(&sb, string(str)[:n])
+		lua.pop(L, 1)
+		if i < nargs do strings.write_string(&sb, "\t")
+	}
+	return strings.to_string(sb)
+}
+
+@(private="file")
+script_log :: proc(level: log.Level, text: string) {
+	if scriptLogSink != nil {
+		scriptLogSink(level, text)
+		return
+	}
+	if scriptLogger.procedure == nil do return
+	context.logger = scriptLogger
+	switch level {
+	case .Debug, .Info:     log.infof("[Lua] %s", text)
+	case .Warning:          log.warnf("[Lua WARN] %s", text)
+	case .Error, .Fatal:    log.errorf("[Lua ERROR] %s", text)
+	}
+}
+
 @(private="file")
 lua_log_info :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
-	nargs := lua.gettop(L)
-	sb: strings.Builder
-	strings.builder_init(&sb, context.temp_allocator)
-
-	for i in 1..=nargs {
-		strC := lua.tostring(L, i)
-		if strC != nil {
-			strings.write_string(&sb, string(strC))
-		} else {
-			strings.write_string(&sb, "[non-string]")
-		}
-		if i < nargs do strings.write_string(&sb, "\t")
-	}
-	log.infof("[Lua] %s", strings.to_string(sb))
+	script_log(.Info, script_log_args(L))
 	return 0
 }
 
 @(private="file")
 lua_log_warn :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
-	nargs := lua.gettop(L)
-	sb: strings.Builder
-	strings.builder_init(&sb, context.temp_allocator)
-
-	for i in 1..=nargs {
-		strC := lua.tostring(L, i)
-		if strC != nil {
-			strings.write_string(&sb, string(strC))
-		}
-		if i < nargs do strings.write_string(&sb, "\t")
-	}
-	log.warnf("[Lua WARN] %s", strings.to_string(sb))
+	script_log(.Warning, script_log_args(L))
 	return 0
 }
 
 @(private="file")
 lua_log_error :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
-	nargs := lua.gettop(L)
-	sb: strings.Builder
-	strings.builder_init(&sb, context.temp_allocator)
-
-	for i in 1..=nargs {
-		strC := lua.tostring(L, i)
-		if strC != nil {
-			strings.write_string(&sb, string(strC))
-		}
-		if i < nargs do strings.write_string(&sb, "\t")
-	}
-	log.errorf("[Lua ERROR] %s", strings.to_string(sb))
+	script_log(.Error, script_log_args(L))
 	return 0
 }
-
-// ----------------------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
 // Global Project Table (Engine.Project)

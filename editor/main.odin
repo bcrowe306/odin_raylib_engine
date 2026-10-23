@@ -2,6 +2,7 @@ package editor
 
 import "core:c"
 import "core:fmt"
+import "core:log"
 import "core:os"
 import rl "vendor:raylib"
 import e "../engine"
@@ -69,6 +70,11 @@ editor_main :: proc() -> int {
 	imgui_rl.build_font_atlas()
 
 	// 4. Initialize Core Editor State & Test Harness
+	// Script logs (Simulate in Editor) go to the Console.
+	e.scriptLogSink = proc(level: log.Level, text: string) {
+		lvl: LogLevel = .Error if level >= .Error else (.Warn if level == .Warning else .Info)
+		Editor_Log(&GlobalEditor, lvl, "[Lua] %s", text)
+	}
 	Editor_Init(&GlobalEditor)
 	Actions_Init()
 	Editor_LoadSettings(&GlobalEditor)

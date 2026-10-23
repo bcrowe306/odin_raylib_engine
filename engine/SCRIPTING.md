@@ -959,6 +959,12 @@ Log.error("Missing expected target node")
 print("Standard Lua print works as Log.info")
 ```
 
+Arguments are joined with tabs, each converted as `tostring` does (numbers,
+booleans, `nil`, tables, nodes). The lines appear in the editor's
+**Console**: from the game started with Play (its output, `[Lua]`,
+`[Lua WARN]`, `[Lua ERROR]`; warnings and errors are coloured) and from
+Simulate in Editor. A standalone game writes them to its standard output.
+
 ---
 
 ---

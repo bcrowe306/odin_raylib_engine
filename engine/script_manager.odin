@@ -16,6 +16,8 @@ ScriptManager_Init :: proc(sm: ^ScriptManager = nil, game: ^Game = nil) -> bool 
 	mgr := sm if sm != nil else &scriptManager
 	if mgr.isReady do return true
 
+	// Script logs use the logger the game runs with (script_bindings.odin).
+	if scriptLogger.procedure == nil do scriptLogger = context.logger
 	mgr.L = lua.L_newstate()
 	if mgr.L == nil {
 		log.error("[ScriptManager] Failed to create Lua 5.4 state")

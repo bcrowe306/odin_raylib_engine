@@ -312,6 +312,7 @@ Editor_Init :: proc(state: ^EditorState) {
 }
 
 Editor_Shutdown :: proc(state: ^EditorState) {
+	e.scriptLogSink = nil // scripts may still log while the game shuts down below
 	Code_Shutdown()
 	Palette_Shutdown()
 	AnimationPanel_Shutdown()
