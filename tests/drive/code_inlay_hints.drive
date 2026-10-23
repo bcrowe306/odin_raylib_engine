@@ -1,0 +1,20 @@
+# Inlay hints: parameter names before call arguments (engine API: a module
+# function, a node method); not when the argument says it; clicking and
+# typing land in the text, not in a hint; toggled with Ctrl+Alt+H.
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait 5
+expect code.inlays:26 contains key:@
+expect code.inlays:32 == degrees:@27
+key ctrl+g
+type 32
+key enter
+key end
+key left
+expect code.cursor == 32:41
+key home
+screenshot hints
+key ctrl+alt+h
+expect code.inlays:32 == 
+key ctrl+alt+h
+expect code.inlays:32 == degrees:@27

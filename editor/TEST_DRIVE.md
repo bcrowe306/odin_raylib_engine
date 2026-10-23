@@ -80,6 +80,7 @@ exits non-zero if any check fails.
 | `code_display_fold.drive` | The caret word's other uses; fold from the gutter arrow (rows hidden, Up/Down skip it, follows an edit above, the chip unfolds), Fold All / Unfold All, fold at the caret; soft wrap (more rows, Alt+Z off again); whitespace in a selection. |
 | `code_git_overview.drive` | The project made a git repo: a modified, an added and a removed line marked in the gutter (and gone after undo); the overview strip scrolls when clicked. |
 | `code_sticky_crumbs.drive` | Inside update: its first line pinned and the breadcrumbs function > if; the crumb and the pinned line go to line 24. |
+| `code_inlay_hints.drive` | Parameter-name hints on a module call and a node method (at the argument's column), the caret moves over the text not the hint, Ctrl+Alt+H off and on. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -150,7 +151,7 @@ Queries:
   `code.dirty`, `code.focused`, `code.lsp` (off/starting/ready/failed), `code.completion` (visible items,
   comma-separated), `code.signature`, `code.errors`, `code.diagnostics`, `code.diagnostic-messages`, `code.hover`
 - `code.overlays` (`ok <n>` when every overlay is inside the Code area and bounded), `code.update-ms` (last line-state pass), `code.token-bench` (`full=<ms> cached=<ms> tokenized=<n> lines=<n>`), `code.token-speedup`
-- `code.changes` (`line:added|modified|deleted`), `code.git` (Unknown / Loading / None / Ready)
+- `code.inlays:<line>` (`label@col,...`), `code.changes` (`line:added|modified|deleted`), `code.git` (Unknown / Loading / None / Ready)
 - `code.folds` (folded first lines), `code.rows` (display rows), `code.lines`, `code.symbol-highlights`
 - `code.cursors`, `code.selection`, `code.selection-range` (`line:col-line:col`), `code.find` (match count), `code.font`, `code.completion-doc`
 - `insp-help` (the Inspector help pane: `<Title>: <doc>`), `guides` (`x=704,y=50`), `usages` (files in the Find Usages window, -1 = closed), `folder-open:<dir>`

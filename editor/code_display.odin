@@ -111,17 +111,33 @@ code_row_of :: proc(doc: ^Code_Doc, p: buf.Position) -> int {
 	return r
 }
 
-// code_row_x: columns from the text's left edge to byte col on a row.
-code_row_x :: proc(text: string, row: Display_Row, col: int) -> int {
-	return row.indent + code_visual_col(text, clamp(col, row.from, len(text))) - code_visual_col(text, row.from)
+// code_row_x: columns from the text's left edge to byte col on a row
+// (inlay hints before it included).
+code_row_x :: proc(text: string, row: Display_Row, col: int, hints: []Code_Inlay = nil) -> int {
+	c := clamp(col, row.from, len(text))
+	return row.indent + code_visual_col(text, c) - code_visual_col(text, row.from) + code_inlay_before(hints, row.from, c)
 }
 
-// code_row_col: the byte of a row at a column from the text's left edge.
-code_row_col :: proc(text: string, row: Display_Row, vcol: int) -> int {
+// code_row_col: the byte of a row at a column from the text's left edge
+// (a column inside a hint maps to the text after it).
+code_row_col :: proc(text: string, row: Display_Row, vcol: int, hints: []Code_Inlay = nil) -> int {
 	base := code_visual_col(text, row.from)
-	col := code_byte_col(text, max(vcol - row.indent, 0) + base)
+	v := max(vcol - row.indent, 0)
 	last := row.to == len(text)
-	return clamp(col, row.from, row.to if last else max(row.to - 1, row.from))
+	hi := row.to if last else max(row.to - 1, row.from)
+	col := code_byte_col(text, v + base)
+	if len(hints) > 0 {
+		// Walk the row: text columns and hint widths.
+		x := 0
+		col = hi // past the last character: the row's end
+		for k := row.from; k < hi; k += 1 {
+			for h in hints do if h.col == k do x += code_inlay_width(h)
+			w := code_visual_col(text, k + 1) - code_visual_col(text, k)
+			if v < x + (w + 1) / 2 {col = k; break}
+			x += w
+		}
+	}
+	return clamp(col, row.from, hi)
 }
 
 // code_display_move: Up / Down by display rows, keeping the column.
@@ -131,14 +147,14 @@ code_display_move :: proc(doc: ^Code_Doc, c: ^buf.Cursor, rowsDelta: int, extend
 	r := code_row_of(doc, c.pos)
 	row := d.rows[r]
 	text := buf.buffer_line_str(b, row.line)
-	x := code_row_x(text, row, c.pos.col)
+	x := code_row_x(text, row, c.pos.col, code_inlays(doc, row.line))
 	t := clamp(r + rowsDelta, 0, len(d.rows) - 1)
 	if extend && !c.sel.active do c.sel = {anchor = c.pos, active = true}
 	if t == r {
 		c.pos = {row.line, 0} if rowsDelta < 0 else {row.line, len(text)}
 	} else {
 		tr := d.rows[t]
-		c.pos = {tr.line, code_row_col(buf.buffer_line_str(b, tr.line), tr, x)}
+		c.pos = {tr.line, code_row_col(buf.buffer_line_str(b, tr.line), tr, x, code_inlays(doc, tr.line))}
 	}
 	if !extend do c.sel.active = false
 }

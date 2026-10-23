@@ -14,8 +14,6 @@ import imgui "lib/imgui"
 
 @(private = "file")
 SCRIPTING_MD :: #load("../engine/SCRIPTING.md", string)
-@(private = "file")
-ENGINE_API :: #load("../engine/definitions/engine_api.lua", string)
 
 @(private = "file")
 Ref_Section :: struct {
@@ -110,7 +108,7 @@ ref_best_section :: proc(qual, name: string) -> int {
 // (the class matching the qualifier first: Audio -> AudioModule), as
 // "Class:name(args)\n<description and example>".
 ScriptReference_ApiDoc :: proc(qual, name: string) -> string {
-	lines := strings.split_lines(ENGINE_API, context.temp_allocator)
+	lines := strings.split_lines(EDITOR_ENGINE_API, context.temp_allocator)
 	found := -1
 	for l, i in lines {
 		if !strings.has_prefix(l, "function ") do continue

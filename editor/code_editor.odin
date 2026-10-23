@@ -65,6 +65,7 @@ Code_Doc :: struct {
 	symCache:      Code_Sym_Cache, // whole-file uses of the caret word (code_minimap.odin)
 	scrollToTop:   bool, // scroll the caret's line to the top (under the pinned lines)
 	git:           Code_Git,       // changes since the last commit (code_git.odin)
+	inlayCache:    Code_Inlay_Cache, // parameter-name hints per line (code_inlay.odin)
 }
 
 Code_Completion :: struct {
@@ -324,6 +325,7 @@ code_close_doc :: proc(idx: int) {
 	delete(doc.foldText)
 	code_sym_cache_destroy(&doc.symCache)
 	code_git_destroy(doc)
+	code_inlay_cache_destroy(&doc.inlayCache)
 	delete(doc.path)
 	delete(doc.rel)
 	delete(doc.uri)
@@ -499,6 +501,16 @@ code_token_color :: proc(k: syn.TokenKind) -> u32 {
 	case .Identifier, .Default:   return code_syntax(UI_TEXT)
 	}
 	return code_syntax(UI_TEXT)
+}
+
+// code_draw_inlay draws a hint chip at column v; returns the column after.
+code_draw_inlay :: proc(dl: ^imgui.DrawList, x0, y: f32, v: int, h: Code_Inlay) -> int {
+	cm := &GlobalCode
+	w := code_inlay_width(h)
+	x := x0 + f32(v) * cm.charW
+	imgui.DrawList_AddRectFilled(dl, {x, y}, {x + f32(w - 1) * cm.charW + 2, y + code_font_size()}, col_u32(ui_line(0.06)), 3)
+	code_draw_text(dl, x0 + 1, y, v, h.label, col_u32(UI_TEXT_FAINT))
+	return v + w
 }
 
 RAINBOW := [3]imgui.Vec4{{0.98, 0.82, 0.30, 1}, {0.85, 0.50, 0.95, 1}, {0.35, 0.72, 1.00, 1}}
@@ -934,7 +946,7 @@ code_pos_at :: proc(b: ^buf.Buffer, screen: [2]f32) -> buf.Position {
 	if screen.y < cm.textOrigin.y do r = 0
 	r = clamp(r, 0, len(d.rows) - 1)
 	row := d.rows[r]
-	return {row.line, code_row_col(buf.buffer_line_str(b, row.line), row, max(vcol, 0))}
+	return {row.line, code_row_col(buf.buffer_line_str(b, row.line), row, max(vcol, 0), code_inlays(doc, row.line))}
 }
 
 // code_screen_pos: top-left of the cell at a buffer position.
@@ -946,7 +958,7 @@ code_screen_pos :: proc(b: ^buf.Buffer, p: buf.Position) -> [2]f32 {
 	d := code_display(doc)
 	r := code_row_of(doc, p)
 	row := d.rows[r]
-	x := code_row_x(line, row, p.col) if row.line == p.line else code_visual_col(buf.buffer_line_str(b, row.line), len(buf.buffer_line_str(b, row.line)))
+	x := code_row_x(line, row, p.col, code_inlays(doc, p.line)) if row.line == p.line else code_visual_col(buf.buffer_line_str(b, row.line), len(buf.buffer_line_str(b, row.line)))
 	return {cm.textOrigin.x + f32(x) * cm.charW, cm.textOrigin.y + f32(r) * cm.lineH}
 }
 
@@ -999,9 +1011,10 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		text := buf.buffer_line_str(b, ln)
 		rowEnd := row.to if row.to < len(text) else len(text)
 		lastRowOfLine := r + 1 >= len(disp.rows) || disp.rows[r + 1].line != ln
+		hints := code_inlays(doc, ln) // parameter-name hints (code_inlay.odin)
 		// x of a byte column on this row.
-		xof :: proc(textX: f32, text: string, row: Display_Row, col: int) -> f32 {
-			return textX + f32(code_row_x(text, row, col)) * GlobalCode.charW
+		xof :: proc(textX: f32, text: string, row: Display_Row, col: int, hints: []Code_Inlay) -> f32 {
+			return textX + f32(code_row_x(text, row, col, hints)) * GlobalCode.charW
 		}
 		// This line's bracket marks.
 		if ln != lastMarkLine {
@@ -1040,20 +1053,20 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 			imgui.DrawList_AddRectFilled(dl, {winPos.x, y}, {winPos.x + winSize.x, y + cm.lineH}, col_u32(ui_line(0.035)))
 		}
 		// Find matches and the caret word's other occurrences.
-		hl :: proc(dl: ^imgui.DrawList, textX, y: f32, text: string, row: Display_Row, rowEnd: int, s, e: int, color: u32) {
+		hl :: proc(dl: ^imgui.DrawList, textX, y: f32, text: string, row: Display_Row, rowEnd: int, s, e: int, color: u32, hints: []Code_Inlay) {
 			s, e := max(s, row.from), min(e, rowEnd)
 			if e <= s && !(s == e && s == row.from) do return
-			x0 := textX + f32(code_row_x(text, row, s)) * GlobalCode.charW
-			x1 := textX + f32(code_row_x(text, row, e)) * GlobalCode.charW
+			x0 := textX + f32(code_row_x(text, row, s, hints)) * GlobalCode.charW
+			x1 := textX + f32(code_row_x(text, row, e, hints)) * GlobalCode.charW
 			imgui.DrawList_AddRectFilled(dl, {x0, y + 1}, {max(x1, x0 + GlobalCode.charW), y + GlobalCode.lineH - 1}, color, 2)
 		}
 		for m in findMatches {
 			if m.start.line != ln do continue
-			hl(dl, textX, y, text, row, rowEnd, m.start.col, m.end.col, col_u32({0.961, 0.722, 0.298, 0.28}))
+			hl(dl, textX, y, text, row, rowEnd, m.start.col, m.end.col, col_u32({0.961, 0.722, 0.298, 0.28}), hints)
 		}
 		for sr in symRanges {
 			if sr.line != ln do continue
-			hl(dl, textX, y, text, row, rowEnd, sr.from, sr.to, col_u32(ui_line(0.10)))
+			hl(dl, textX, y, text, row, rowEnd, sr.from, sr.to, col_u32(ui_line(0.10)), hints)
 		}
 		for cur in b.cursors {
 			selStart, selEnd, curSel := buf.selection_range(cur)
@@ -1062,8 +1075,8 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 			e := selEnd.col if ln == selEnd.line else len(text)
 			s, e = max(s, row.from), min(e, rowEnd)
 			if e < s do continue
-			x0 := xof(textX, text, row, s)
-			x1 := xof(textX, text, row, e)
+			x0 := xof(textX, text, row, s, hints)
+			x1 := xof(textX, text, row, e, hints)
 			if ln != selEnd.line && lastRowOfLine && e == len(text) do x1 += cm.charW // the newline
 			if x1 > x0 || (ln != selEnd.line && lastRowOfLine) {
 				imgui.DrawList_AddRectFilled(dl, {x0, y}, {max(x1, x0 + 1), y + cm.lineH}, col_u32(ui_accent(0.30)))
@@ -1074,14 +1087,33 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		tokens, _ := Token_CacheGet(&doc.tokens, doc.lang, text, doc.lineStates[ln], b.version)
 		v := row.indent
 		at := row.from
+		hi := 0
+		for hi < len(hints) && hints[hi].col < row.from do hi += 1
+		// seg draws text[s:e] in color with the hints that sit inside it.
+		seg :: proc(dl: ^imgui.DrawList, x0, y: f32, v: int, text: string, s, e: int, color: u32, marks: []Code_Bracket_Mark, hints: []Code_Inlay, hi: ^int) -> int {
+			v, pos := v, s
+			for hi^ < len(hints) && hints[hi^].col < e {
+				h := hints[hi^]
+				if h.col > pos do v = code_draw_marked(dl, x0, y, v, text, pos, h.col, color, marks)
+				v = code_draw_inlay(dl, x0, y, v, h)
+				pos = max(pos, h.col)
+				hi^ += 1
+			}
+			if pos < e do v = code_draw_marked(dl, x0, y, v, text, pos, e, color, marks)
+			return v
+		}
 		for t in tokens {
 			ts, te := max(t.start, row.from), min(t.end, rowEnd)
 			if te <= ts do continue
-			if ts > at do v = code_draw_marked(dl, textX, y + textY, v, text, at, ts, col_u32(UI_TEXT), lineMarks)
-			v = code_draw_marked(dl, textX, y + textY, v, text, ts, te, code_token_color(t.kind), lineMarks)
+			if ts > at do v = seg(dl, textX, y + textY, v, text, at, ts, col_u32(UI_TEXT), lineMarks, hints, &hi)
+			v = seg(dl, textX, y + textY, v, text, ts, te, code_token_color(t.kind), lineMarks, hints, &hi)
 			at = te
 		}
-		if at < rowEnd do code_draw_marked(dl, textX, y + textY, v, text, at, rowEnd, col_u32(UI_TEXT), lineMarks)
+		if at < rowEnd do v = seg(dl, textX, y + textY, v, text, at, rowEnd, col_u32(UI_TEXT), lineMarks, hints, &hi)
+		for hi < len(hints) && hints[hi].col <= rowEnd && lastRowOfLine {
+			v = code_draw_inlay(dl, textX, y + textY, v, hints[hi])
+			hi += 1
+		}
 
 		// Whitespace: dots for spaces, arrows for tabs (in selections, or all).
 		if showWs != .None {
@@ -1089,7 +1121,7 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 				ch := text[i]
 				if ch != ' ' && ch != '\t' do continue
 				if showWs == .Selection && !code_in_selection(b, {ln, i}) do continue
-				x := xof(textX, text, row, i)
+				x := xof(textX, text, row, i, hints)
 				cy := y + cm.lineH * 0.5
 				if ch == ' ' {
 					imgui.DrawList_AddCircleFilled(dl, {x + cm.charW * 0.5, cy}, 1.2, col_u32(ui_line(0.22)))
@@ -1101,7 +1133,7 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		// A folded block: a chip after its first line (click to unfold).
 		if lastRowOfLine {
 			if end, folded := code_fold_end(doc, ln); folded {
-				x := xof(textX, text, row, len(text)) + cm.charW
+				x := xof(textX, text, row, len(text), hints) + cm.charW
 				label := fmt.ctprintf(" … %d lines ", end - ln - 1)
 				w := imgui.CalcTextSize(label).x
 				mn, mx := [2]f32{x, y + 2}, [2]f32{x + w, y + cm.lineH - 2}
@@ -1143,8 +1175,8 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 				row := disp.rows[r]
 				s, e := max(from, row.from), min(to, row.to)
 				if e < s || (s == e && from != to && s == row.to && row.to < len(text)) do continue
-				vf := code_row_x(text, row, s)
-				vt := code_row_x(text, row, e)
+				vf := code_row_x(text, row, s, code_inlays(doc, ln))
+				vt := code_row_x(text, row, e, code_inlays(doc, ln))
 				if vt <= vf do vt = vf + 1
 				y := cm.textOrigin.y + f32(r + 1) * cm.lineH - 2
 				code_squiggle(dl, textX + f32(vf) * cm.charW, textX + f32(vt) * cm.charW, y, color, d.unnecessary)
@@ -1836,6 +1868,15 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 	cm := &GlobalCode
 	doc: ^Code_Doc
 	if cm.active >= 0 && cm.active < len(cm.docs) do doc = cm.docs[cm.active]
+	if strings.has_prefix(q, "code.inlays:") {
+		// the hints of a line (1-based): "label@col,..."
+		if doc == nil do return "", true
+		ln := 0
+		for r in q[len("code.inlays:"):] do if r >= '0' && r <= '9' do ln = ln * 10 + int(r - '0')
+		sb := strings.builder_make(context.temp_allocator)
+		for h, i in code_inlays(doc, ln - 1) do fmt.sbprintf(&sb, "%s%s@%d", "," if i > 0 else "", h.label, h.col)
+		return strings.to_string(sb), true
+	}
 	switch q {
 	case "code.open":
 		return fmt.tprint(len(cm.docs)), true

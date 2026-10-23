@@ -213,6 +213,7 @@ Actions_Init :: proc() {
 	add({id = "code.fold_all", category = "Code", label = "Fold All", chords = k(ch(.LeftBracket, Mods{.Primary, .Alt, .Shift})), scope = .Code, run = Code_CmdFoldAll})
 	add({id = "code.unfold_all", category = "Code", label = "Unfold All", chords = k(ch(.RightBracket, Mods{.Primary, .Alt, .Shift})), scope = .Code, run = Code_CmdUnfoldAll})
 	add({id = "code.soft_wrap", category = "Code", label = "Toggle Soft Wrap", chords = k(ch(.Z, AL)), scope = .Code, run = Code_CmdToggleSoftWrap})
+	add({id = "code.inlay_hints", category = "Code", label = "Toggle Inlay Hints", chords = k(ch(.H, Mods{.Ctrl, .Alt})), scope = .Code, run = proc(s: ^EditorState) {GlobalSettings.inlayHints = !GlobalSettings.inlayHints; _ = Editor_SaveSettings()}})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})

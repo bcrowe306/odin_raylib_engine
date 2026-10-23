@@ -132,7 +132,7 @@ Display
 - [x] 9.7 Code folding (gutter arrows; functions, tables, comment blocks)
 - [x] 9.8 Scrollbar markers (errors, find matches, breakpoints, changes) - the minimap
 - [x] 9.9 Sticky scroll + breadcrumbs
-- [ ] 9.10 Inlay hints (LSP)
+- [x] 9.10 Inlay hints (LSP)
 - [x] 9.11 Git gutter (added / modified / removed)
 Navigation
 - [ ] 9.12 Back / forward history

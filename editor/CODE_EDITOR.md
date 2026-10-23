@@ -144,6 +144,17 @@ feature needs it.
   and marked in the gutter; Up / Down move by screen row. There is no
   horizontal scrolling while it is on.
 
+## Inlay hints
+
+Parameter names appear before call arguments - `Audio.play_sound(path:
+"hit.wav", volume: 0.5)`, `self.node:set_rotation(degrees: angle)` - for
+the engine API (from `engine/definitions/engine_api.lua`, compiled into the
+editor) and for the functions the file defines. A hint is left out when the
+argument already says it (`x` for `x`, `self.speed` for `speed`). Hints are
+inline: the text after them moves right, and clicks and carets skip them.
+**Ctrl+Alt+H** (or Settings > Code Editor > Inlay Hints) turns them off.
+They are computed per line when first shown and cached until the next edit.
+
 ## Breadcrumbs and sticky scroll
 
 - **Breadcrumbs** (a bar above the code): the file › the function › the

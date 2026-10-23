@@ -386,6 +386,7 @@ settings_code :: proc(state: ^EditorState, h: f32) {
 	check("settings.indent-guides", "Indent Guides", &s.indentGuides, "Vertical lines at each indentation level; the block around the caret is brighter")
 	check("settings.sticky-scroll", "Sticky Scroll", &s.stickyScroll, "The first lines of the blocks you are scrolled into stay at the top")
 	check("settings.breadcrumbs", "Breadcrumbs", &s.breadcrumbs, "File > function > blocks around the caret, above the code")
+	check("settings.inlay-hints", "Inlay Hints", &s.inlayHints, "Parameter names before the arguments of engine API and file functions (Ctrl+Alt+H toggles)")
 	check("settings.soft-wrap", "Soft Wrap", &s.softWrap, "Wrap long lines at the Code area's width (Alt+Z toggles)")
 	UI_PropLabel("Show Whitespace")
 	ws := c.int(s.showWhitespace)
