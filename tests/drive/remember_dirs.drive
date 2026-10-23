@@ -1,0 +1,54 @@
+# Remembered folders: an import from a folder makes the next import dialog
+# open there; Export .ore asks where to write and the next export starts in
+# that folder; the export Output Folder's Browse... starts there too; a new
+# project's location is remembered; all kept in settings.ini [paths].
+wait 5
+click @asset.add
+dialog-files tests/drive/fixtures/import/crate.png
+click @ctx:add-import
+wait 3
+expect import.imported == 1
+expect last-dir:import contains tests/drive/fixtures/import
+click @asset.add
+dialog-files
+click @ctx:add-import
+wait 3
+expect dialog-start contains tests/drive/fixtures/import
+
+# Export .ore into a chosen folder; the next export opens there.
+exec mkdir -p $SHOTS/ore_out
+dialog-files $SHOTS/ore_out
+click @menu:File
+click @menu:File/Export
+click @menu:Export/.ore Package
+wait 5
+expect abs-file:$SHOTS/ore_out/project.ore !=
+expect last-dir:export contains ore_out
+dialog-files
+click @menu:File
+click @menu:File/Export
+click @menu:Export/.ore Package
+wait 3
+expect dialog-start contains ore_out
+
+# The standalone export's Output Folder: Browse... starts in that folder.
+click @toolbar.settings
+click @settings.tab:project
+click @settings.page:Export
+dialog-files
+click @settings.export-dir.browse
+wait 3
+expect dialog-start contains ore_out
+click @settings.cancel
+
+# A new project's location is remembered (and the Welcome window starts there).
+click @menu:Help
+click @menu:Help/Welcome
+click @welcome.template:Empty
+click @welcome.name
+key cmd+a
+type Drive Remember Zq
+click @welcome.create
+expect last-dir:projects contains ore_drive_remember_dirs
+expect file:.editor_settings.ini contains [paths]
+expect file:.editor_settings.ini contains tests/drive/fixtures/import

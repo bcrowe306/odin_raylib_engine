@@ -217,10 +217,25 @@ Editor_OrePath :: proc(state: ^EditorState) -> string {
 	return strings.concatenate({clean, ".ore"}, context.temp_allocator)
 }
 
+// Toolbar_ExportOre asks for a folder (opening in the one used last, else
+// next to the project) and writes <project>.ore there.
 Toolbar_ExportOre :: proc(state: ^EditorState) {
+	if GlobalDrive.enabled && len(driveDialogAnswers) == 0 {
+		export_ore_to(state, filepath.dir(Editor_OrePath(state), context.temp_allocator)) // drives: next to the project
+		return
+	}
+	start := Editor_StartDir(.Export, filepath.dir(Editor_OrePath(state), context.temp_allocator))
+	NativeDialog_Open(state, {title = "Export .ore Package To", folders = true, start = start}, proc(state: ^EditorState, paths: []string) {
+		Editor_RememberDir(.Export, paths[0], true)
+		export_ore_to(state, paths[0])
+	})
+}
+
+@(private = "file")
+export_ore_to :: proc(state: ^EditorState, dir: string) {
 	Editor_SaveAllScenes(state)
-	defer Editor_InvalidateProjectFiles() // the package appears next to the project
-	outPath := Editor_OrePath(state)
+	defer Editor_InvalidateProjectFiles() // a package next to the project shows in Assets
+	outPath, _ := filepath.join({dir, filepath.base(Editor_OrePath(state))}, context.temp_allocator)
 	ok := e.OrePackage_CreateFromDirectory(state.projectPath, outPath, true)
 	if ok {
 		Editor_Log(state, .Info, "Exported portable .ore archive: %s", outPath)

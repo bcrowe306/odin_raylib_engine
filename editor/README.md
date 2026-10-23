@@ -135,9 +135,17 @@ standalone game), **Settings** (Cmd+,) and Quit.
   output folder, targets, compression, font, which prebuilt runners exist).
 
 Editor settings are per user, in `~/.config/ore_editor/settings.ini` -
-`[general]`, `[code]`, `[theme]`, `[recent_projects]` and `[keymap]`
+`[general]`, `[code]`, `[theme]`, `[paths]`, `[recent_projects]` and `[keymap]`
 sections (an older `settings.json` is read once and replaced); project
 settings live in the project's `project.json`.
+
+The editor remembers folders in `[paths]`: where assets were last imported
+from (`import`), where the last `.ore` package or standalone game was
+exported (`export`) and where projects were last opened or created
+(`projects`). The next import, export, Output Folder **Browse...**, Open
+Project and the Welcome window's Location start there (a folder that no
+longer exists falls back to the default). **File > Export > .ore Package**
+asks for the folder to write `<project>.ore` into.
 
 Scenes and components are listed without their `.scene.json` /
 `.component.json` endings (Assets, scene tree, toolbar, status bar).

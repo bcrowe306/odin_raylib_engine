@@ -41,6 +41,10 @@ Editor_Settings :: struct {
 	recentProjects:   [dynamic]string,
 	// The editor's colours (theme.odin)
 	theme:            Theme,
+	// Folders used last (dialogs open there): imports, exports, projects.
+	lastImportDir:    string,
+	lastExportDir:    string,
+	lastProjectDir:   string,
 }
 
 DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
@@ -77,6 +81,9 @@ Editor_Settings_Clone :: proc(s: ^Editor_Settings) -> Editor_Settings {
 	c.recentProjects = make([dynamic]string)
 	for r in s.recentProjects do append(&c.recentProjects, strings.clone(r))
 	c.theme.name = strings.clone(s.theme.name)
+	c.lastImportDir = strings.clone(s.lastImportDir)
+	c.lastExportDir = strings.clone(s.lastExportDir)
+	c.lastProjectDir = strings.clone(s.lastProjectDir)
 	return c
 }
 
@@ -91,6 +98,10 @@ Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 	s.luaServerPath = ""
 	delete(s.theme.name)
 	s.theme.name = ""
+	delete(s.lastImportDir)
+	delete(s.lastExportDir)
+	delete(s.lastProjectDir)
+	s.lastImportDir, s.lastExportDir, s.lastProjectDir = "", "", ""
 }
 
 // Editor_SettingsPath: where settings live (drives: inside the project copy).
@@ -239,6 +250,11 @@ settings_from_ini :: proc(text: string) {
 			}
 		}
 	}
+	if pm, ok := m["paths"]; ok {
+		if v := pm["import"] or_else ""; v != "" do s.lastImportDir = strings.clone(v)
+		if v := pm["export"] or_else ""; v != "" do s.lastExportDir = strings.clone(v)
+		if v := pm["projects"] or_else ""; v != "" do s.lastProjectDir = strings.clone(v)
+	}
 	if rp, ok := m["recent_projects"]; ok {
 		for i in 0 ..< len(rp) {
 			if v, has := rp[fmt.tprint(i)]; has && v != "" do append(&s.recentProjects, strings.clone(v))
@@ -309,6 +325,8 @@ Editor_SaveSettings :: proc() -> bool {
 	strings.write_string(&sb, "\n[theme]\n")
 	fmt.sbprintf(&sb, "name = %s\n", s.theme.name)
 	for k in Theme_Color do fmt.sbprintf(&sb, "%s = %s\n", THEME_COLOR_INFO[k].key, theme_color_text(s.theme.colors[k]))
+	strings.write_string(&sb, "\n[paths]\n")
+	fmt.sbprintf(&sb, "import = %s\nexport = %s\nprojects = %s\n", s.lastImportDir, s.lastExportDir, s.lastProjectDir)
 	strings.write_string(&sb, "\n[recent_projects]\n")
 	for r, i in s.recentProjects do fmt.sbprintf(&sb, "%d = %s\n", i, r)
 	strings.write_string(&sb, "\n[keymap]\n")
@@ -336,4 +354,41 @@ Editor_ApplySettings :: proc(state: ^EditorState) {
 	GlobalCode.fontSize = s.codeFontSize if s.codeFontSize != CODE_FONT_SIZE else 0
 	Actions_ApplyKeymap(s.keymap)
 	Theme_Apply(s.theme)
+}
+
+Remembered_Dir :: enum {
+	Import,
+	Export,
+	Projects,
+}
+
+// Editor_RememberDir keeps the folder a file was picked in (a folder is
+// kept as is) for the next dialog of that kind, in settings.ini.
+Editor_RememberDir :: proc(kind: Remembered_Dir, path: string, isFolder := false) {
+	if path == "" do return
+	dir := path if isFolder || os.is_dir(path) else filepath.dir(path, context.temp_allocator)
+	if abs, err := filepath.abs(dir, context.temp_allocator); err == nil do dir = abs
+	field: ^string
+	switch kind {
+	case .Import: field = &GlobalSettings.lastImportDir
+	case .Export: field = &GlobalSettings.lastExportDir
+	case .Projects: field = &GlobalSettings.lastProjectDir
+	}
+	if field^ == dir do return
+	delete(field^)
+	field^ = strings.clone(dir)
+	_ = Editor_SaveSettings()
+}
+
+// Editor_StartDir: where a dialog of that kind opens - the folder used last,
+// else `fallback`.
+Editor_StartDir :: proc(kind: Remembered_Dir, fallback := "") -> string {
+	d: string
+	switch kind {
+	case .Import: d = GlobalSettings.lastImportDir
+	case .Export: d = GlobalSettings.lastExportDir
+	case .Projects: d = GlobalSettings.lastProjectDir
+	}
+	if d != "" && os.is_dir(d) do return d
+	return fallback
 }

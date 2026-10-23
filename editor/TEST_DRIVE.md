@@ -51,6 +51,7 @@ exits non-zero if any check fails.
 | `viewport_tools.drive` | Rulers, a guide dragged from the ruler, Alt-drag pivot (image and child stay), smart snap of an edge to the guide, viewport lock (not pickable) and hide in editor, Show All Colliders, saved. |
 | `multi_edit.drive` | Two lights selected: mixed value marked, a number / one axis of the position / a checkbox / a combo applied to both, undo. |
 | `inspector_help.drive` | Hovering a property fills the tooltip and the Inspector help pane (field or label); View > Inspector Help hides the pane. |
+| `remember_dirs.drive` | An import remembers its folder and the next import dialog opens there; Export .ore into a picked folder, the next export and the Output Folder's Browse... start there; a new project's location; all saved in settings.ini `[paths]`. |
 | `code_editor.drive` | Open a script in the Code tab; lua-language-server completion of the engine API, signature help, diagnostics, go to definition; save; unsaved-changes prompt; New Script from the Inspector. |
 
 ## Script language
@@ -108,6 +109,7 @@ Queries:
 - `code.overlays` (`ok <n>` when every overlay is inside the Code area and bounded), `code.update-ms` (last line-state pass), `code.token-bench` (`full=<ms> cached=<ms> tokenized=<n> lines=<n>`), `code.token-speedup`
 - `code.cursors`, `code.selection`, `code.find` (match count), `code.font`, `code.completion-doc`
 - `insp-help` (the Inspector help pane: `<Title>: <doc>`), `guides` (`x=704,y=50`), `usages` (files in the Find Usages window, -1 = closed), `folder-open:<dir>`
+- `dialog-start` (the folder the last system file dialog opened in), `last-dir:import` / `last-dir:export` / `last-dir:projects` (the remembered folders)
 - `anim-preview` (`playing` / `paused`), `anim-info` (`frames=<n> range=<a>-<b> reverse=<b> fps=<f> default=<name>` of the selected AnimationPlayer), `theme` (the saved theme), `theme-panel` (the panel colour in use, `#rrggbbaa`), `node-icons` (`<distinct icons>/<node types>`), `workspace` (the current workspace), `window-h:<item>` (height of the window an item is in)
 - `debug-stopped`, `debug-line` (`file:line`), `debug-stack`, `debug-local:<name>` (the Lua debugger)
 - `remote-connected`, `remote-paused`, `remote-frame`, `remote-steps`, `remote-reloads`, `remote-nodes`, `remote-names`, `remote-prop:<name>` (the Game tab's link to the running game)

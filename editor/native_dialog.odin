@@ -26,7 +26,11 @@ NativeDialog_Options :: struct {
 	exts:     []string, // without dots ("png"); empty = any file
 	multiple: bool,
 	folders:  bool,     // choose folders instead of files
+	start:    string,   // folder the dialog opens in ("" = the system's choice)
 }
+
+// The folder the last dialog was asked to open in (drives).
+nativeDialogLastStart: string
 
 @(private = "file")
 Dialog_Job :: struct {
@@ -56,6 +60,8 @@ NativeDialog_Open :: proc(state: ^EditorState, opts: NativeDialog_Options, callb
 		Editor_Log(state, .Warn, "A file dialog is already open")
 		return false
 	}
+	delete(nativeDialogLastStart)
+	nativeDialogLastStart = strings.clone(opts.start)
 	job := new(Dialog_Job)
 	if GlobalDrive.enabled {
 		// Scripted answer, delivered by the next poll like a real one.
@@ -137,9 +143,14 @@ dialog_command :: proc(opts: NativeDialog_Options) -> (cmd: []string, ok: bool) 
 		q, _ := strings.replace_all(title, "\"", "\\\"", context.temp_allocator)
 		what := "choose folder" if opts.folders else "choose file"
 		multi := " with multiple selections allowed" if opts.multiple else ""
+		location := ""
+		if opts.start != "" && os.is_dir(opts.start) {
+			sq, _ := strings.replace_all(opts.start, "\"", "\\\"", context.temp_allocator)
+			location = fmt.tprintf(" default location (POSIX file \"%s\")", sq)
+		}
 		script := []string{
 			"activate",
-			fmt.tprintf("set picked to (%s with prompt \"%s\"%s)", what, q, multi),
+			fmt.tprintf("set picked to (%s with prompt \"%s\"%s%s)", what, q, location, multi),
 			"if class of picked is not list then set picked to {picked}",
 			"set out to \"\"",
 			"repeat with f in picked",
@@ -151,9 +162,10 @@ dialog_command :: proc(opts: NativeDialog_Options) -> (cmd: []string, ok: bool) 
 		for line in script do append(&args, "-e", line)
 	} else when ODIN_OS == .Windows {
 		q, _ := strings.replace_all(title, "'", "''", context.temp_allocator)
+		start, _ := strings.replace_all(opts.start, "'", "''", context.temp_allocator)
 		ps: string
 		if opts.folders {
-			ps = fmt.tprintf("Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = '%s'; if ($d.ShowDialog() -eq 'OK') {{ $d.SelectedPath }} else {{ exit 1 }}", q)
+			ps = fmt.tprintf("Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description = '%s'; $d.SelectedPath = '%s'; if ($d.ShowDialog() -eq 'OK') {{ $d.SelectedPath }} else {{ exit 1 }}", q, start)
 		} else {
 			filter := "All files|*.*"
 			if len(opts.exts) > 0 {
@@ -161,7 +173,7 @@ dialog_command :: proc(opts: NativeDialog_Options) -> (cmd: []string, ok: bool) 
 				for e, i in opts.exts do fmt.sbprintf(&sb, "%s*.%s", ";" if i > 0 else "", e)
 				filter = fmt.tprintf("%s|%s|All files|*.*", opts.filter if opts.filter != "" else "Supported", strings.to_string(sb))
 			}
-			ps = fmt.tprintf("Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = '%s'; $d.Filter = '%s'; $d.Multiselect = $%v; if ($d.ShowDialog() -eq 'OK') {{ $d.FileNames }} else {{ exit 1 }}", q, filter, opts.multiple)
+			ps = fmt.tprintf("Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.OpenFileDialog; $d.Title = '%s'; $d.Filter = '%s'; $d.Multiselect = $%v; $d.InitialDirectory = '%s'; if ($d.ShowDialog() -eq 'OK') {{ $d.FileNames }} else {{ exit 1 }}", q, filter, opts.multiple, start)
 		}
 		append(&args, "powershell", "-NoProfile", "-STA", "-Command", ps)
 	} else {
@@ -171,16 +183,18 @@ dialog_command :: proc(opts: NativeDialog_Options) -> (cmd: []string, ok: bool) 
 			append(&args, "zenity", "--file-selection", fmt.tprintf("--title=%s", title), "--separator=\n")
 			if opts.multiple do append(&args, "--multiple")
 			if opts.folders do append(&args, "--directory")
+			if opts.start != "" do append(&args, fmt.tprintf("--filename=%s/", strings.trim_suffix(opts.start, "/")))
 			if !opts.folders && len(opts.exts) > 0 {
 				append(&args, fmt.tprintf("--file-filter=%s | %s", opts.filter if opts.filter != "" else "Supported", strings.to_string(patterns)), "--file-filter=All files | *")
 			}
 		} else if on_path("kdialog") {
 			append(&args, "kdialog", "--title", title)
+			startDir := opts.start if opts.start != "" else "."
 			if opts.folders {
-				append(&args, "--getexistingdirectory", ".")
+				append(&args, "--getexistingdirectory", startDir)
 			} else {
 				filter := strings.to_string(patterns) if len(opts.exts) > 0 else "*"
-				append(&args, "--getopenfilename", ".", filter)
+				append(&args, "--getopenfilename", startDir, filter)
 				if opts.multiple do append(&args, "--multiple", "--separate-output")
 			}
 		} else {

@@ -246,6 +246,7 @@ Editor_OpenProjectDialog :: proc(state: ^EditorState) {
 	browser.open = true
 	if browser.dir != "" do delete(browser.dir)
 	start := filepath.dir(strings.trim_suffix(GlobalSettings.recentProjects[0] if len(GlobalSettings.recentProjects) > 0 else state.projectPath, "/"), context.temp_allocator)
+	start = Editor_StartDir(.Projects, start) // the projects folder used last
 	if !filepath.is_abs(start) {
 		cwd, _ := os.get_working_directory(context.temp_allocator)
 		start, _ = filepath.join({cwd, start}, context.temp_allocator)
@@ -267,6 +268,7 @@ Editor_SwitchProject :: proc(state: ^EditorState, path: string) {
 		Editor_Log(state, .Error, "%s is not a project (no project.json)", path)
 		return
 	}
+	Editor_RememberDir(.Projects, filepath.dir(strings.trim_suffix(path, "/"), context.temp_allocator), true)
 	if GlobalDrive.enabled {
 		Editor_Log(state, .Info, "Would open project %s", path) // drives keep running
 		return

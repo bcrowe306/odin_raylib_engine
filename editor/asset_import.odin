@@ -131,14 +131,18 @@ Asset_IsHighlighted :: proc(rel: string) -> bool {
 // `only` limits the filter to one kind's extensions (e.g. {"ldtk"}).
 Asset_OpenImportDialog :: proc(state: ^EditorState, only: []string = nil, title := "Import Assets") {
 	exts := only if len(only) > 0 else IMPORT_EXTS
-	NativeDialog_Open(state, {title = title, filter = "Assets", exts = exts, multiple = true}, proc(state: ^EditorState, paths: []string) {
+	// Opens where the last import came from.
+	NativeDialog_Open(state, {title = title, filter = "Assets", exts = exts, multiple = true, start = Editor_StartDir(.Import)}, proc(state: ^EditorState, paths: []string) {
+		Editor_RememberDir(.Import, paths[0])
 		Asset_ImportFiles(state, paths)
 	})
 }
 
 // Asset_OpenImportFolderDialog imports a whole folder (keeps its layout).
 Asset_OpenImportFolderDialog :: proc(state: ^EditorState) {
-	NativeDialog_Open(state, {title = "Import Folder", folders = true}, proc(state: ^EditorState, paths: []string) {
+	NativeDialog_Open(state, {title = "Import Folder", folders = true, start = Editor_StartDir(.Import)}, proc(state: ^EditorState, paths: []string) {
+		// The folder it is in: the next folder is likely next to it.
+		Editor_RememberDir(.Import, filepath.dir(paths[0], context.temp_allocator), true)
 		Asset_ImportFiles(state, paths)
 	})
 }

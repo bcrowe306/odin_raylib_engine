@@ -143,7 +143,10 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false, only :
 	}
 	if state.exportDir != "" do delete(state.exportDir)
 	state.exportDir = strings.clone(outDir)
-	if exported > 0 do Editor_Log(state, .Info, "Standalone game ready: %s (%d preset(s))", outDir, exported)
+	if exported > 0 {
+		Editor_Log(state, .Info, "Standalone game ready: %s (%d preset(s))", outDir, exported)
+		Editor_RememberDir(.Export, outDir, true)
+	}
 }
 
 @(private = "file")

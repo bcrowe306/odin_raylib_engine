@@ -98,6 +98,35 @@ text_field :: proc(id: string, s: ^string, hint: cstring = "") {
 	Drive_Item(id)
 }
 
+// folder_field: a folder path with Browse... (a system folder dialog that
+// opens in the export folder used last).
+@(private = "file")
+browseTarget: ^string
+
+@(private = "file")
+folder_field :: proc(state: ^EditorState, id: string, s: ^string, hint: string) {
+	buf: [512]u8
+	copy(buf[:len(buf) - 1], s^)
+	imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 90)
+	if imgui.InputTextWithHint(fmt.ctprintf("##%s", id), strings.clone_to_cstring(hint, context.temp_allocator), cstring(raw_data(buf[:])), len(buf), {}) {
+		delete(s^)
+		s^ = strings.clone(string(cstring(raw_data(buf[:]))))
+	}
+	Drive_Item(id)
+	imgui.SameLine(0, 4)
+	if UI_Button("Browse...", fmt.tprintf("%s.browse", id), {86, 0}) {
+		browseTarget = s
+		start := Editor_StartDir(.Export, s^ if os.is_dir(s^) else filepath.dir(strings.trim_suffix(state.projectPath, "/"), context.temp_allocator))
+		NativeDialog_Open(state, {title = "Output Folder", folders = true, start = start}, proc(state: ^EditorState, paths: []string) {
+			if browseTarget == nil do return
+			delete(browseTarget^)
+			browseTarget^ = strings.clone(paths[0])
+			browseTarget = nil
+			Editor_RememberDir(.Export, paths[0], true)
+		})
+	}
+}
+
 @(private = "file")
 check :: proc(id, label: string, v: ^bool, tip := "") {
 	UI_PropLabel(label)
@@ -693,7 +722,7 @@ project_export :: proc(state: ^EditorState) {
 		UI_PropLabel("Executable Name")
 		text_field("settings.export-name", &x.executableName, strings.clone_to_cstring(export_default_name(d), context.temp_allocator))
 		UI_PropLabel("Output Folder")
-		text_field("settings.export-dir", &x.outputDir, strings.clone_to_cstring(fmt.tprintf("%s_standalone", strings.trim_suffix(state.projectPath, "/")), context.temp_allocator))
+		folder_field(state, "settings.export-dir", &x.outputDir, fmt.tprintf("%s_standalone", strings.trim_suffix(state.projectPath, "/")))
 		if len(x.presets) == 0 {
 			UI_PropLabel("Targets")
 			for t in e.Export_Target {
@@ -819,7 +848,7 @@ export_presets_section :: proc(state: ^EditorState) {
 	text_field("settings.preset-exe", &p.executableName, strings.clone_to_cstring(exeDefault, context.temp_allocator))
 	outDefault := fmt.tprintf("%s/%s", x.outputDir if x.outputDir != "" else fmt.tprintf("%s_standalone", strings.trim_suffix(state.projectPath, "/")), export_safe_name(p.name))
 	UI_PropLabel("Output Folder")
-	text_field("settings.preset-dir", &p.outputDir, strings.clone_to_cstring(outDefault, context.temp_allocator))
+	folder_field(state, "settings.preset-dir", &p.outputDir, outDefault)
 	UI_PropLabel("Version")
 	text_field("settings.preset-version", &p.version, strings.clone_to_cstring(fmt.tprintf("project: %s", d.version), context.temp_allocator))
 	UI_PropLabel("Icon")

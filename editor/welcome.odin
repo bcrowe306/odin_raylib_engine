@@ -26,6 +26,7 @@ Welcome_Open :: proc(state: ^EditorState) {
 	if welcome.whereBuf[0] == 0 {
 		parent := filepath.dir(strings.trim_suffix(state.projectPath, "/"), context.temp_allocator)
 		if abs, err := filepath.abs(parent, context.temp_allocator); err == nil do parent = abs
+		parent = Editor_StartDir(.Projects, parent) // where the last project was made / opened
 		copy(welcome.whereBuf[:len(welcome.whereBuf) - 1], parent)
 	}
 }
@@ -124,8 +125,17 @@ Welcome_Render :: proc(state: ^EditorState) {
 			imgui.InputText("##wname", cstring(raw_data(welcome.nameBuf[:])), len(welcome.nameBuf))
 			Drive_Item("welcome.name")
 			UI_PropLabel("Location")
+			imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 90)
 			imgui.InputText("##wwhere", cstring(raw_data(welcome.whereBuf[:])), len(welcome.whereBuf))
 			Drive_Item("welcome.where")
+			imgui.SameLine(0, 4)
+			if UI_Button("Browse...", "welcome.where.browse", {86, 0}) {
+				start := strings.clone(string(cstring(raw_data(welcome.whereBuf[:]))), context.temp_allocator)
+				NativeDialog_Open(state, {title = "New Project Location", folders = true, start = start}, proc(state: ^EditorState, paths: []string) {
+					welcome.whereBuf = {}
+					copy(welcome.whereBuf[:len(welcome.whereBuf) - 1], paths[0])
+				})
+			}
 			UI_EndProps()
 		}
 		name := strings.trim_space(string(cstring(raw_data(welcome.nameBuf[:]))))
