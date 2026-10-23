@@ -1,0 +1,56 @@
+# Inspector property paths: the help pane shows path = "..."; dragging a
+# property's name into a script inserts get_property, with Shift
+# set_property and the current value; another node's property gets a
+# get_node path; script properties use "script.<name>".
+wait 5
+click @hier:PatrolDroneAlpha
+click @insp.script-attach
+click @pick:scripts/orbiting_drone.lua
+click @insp.script-edit
+wait 5
+expect code.text contains Drone
+# The Inspector is short at this window size: back to its top.
+scroll @insp.script-edit 60
+wait 3
+
+# The help pane: path = "rotation".
+hover @insp.rotation+-110,0
+wait 5
+expect insp-help-path == rotation
+expect item:insp.help.path == visible
+screenshot help_path
+
+# Drag the label: get; with Shift: set with the current value.
+drag @insp.rotation+-110,0 @code.area
+expect code.text contains self.node:get_property("rotation")
+key ctrl+z
+hold shift
+drag @insp.rotation+-110,0 @code.area
+release
+expect code.text contains self.node:set_property("rotation", 0)
+key ctrl+z
+expect code.text !contains set_property
+
+# Another node's property: reached through get_node from the drone.
+click @hier:PlayerShip
+scroll @insp.position.x 60
+drag @insp.position.x+-80,0 @code.area
+expect code.text contains self.node:get_node("../PlayerShip"):get_property("position")
+key ctrl+z
+
+# A script property: "script.orbit_radius".
+click @hier:PatrolDroneAlpha
+scroll @insp.rotation -60
+wait 3
+hover @insp.script:orbit_radius+-110,0
+wait 5
+expect insp-help-path == script.orbit_radius
+screenshot script_path
+drag @insp.script:orbit_radius+-110,0 @code.area
+expect code.text contains self.node:get_property("script.orbit_radius")
+key ctrl+z
+hold shift
+drag @insp.script:orbit_radius+-110,0 @code.area
+release
+expect code.text contains self.node:set_property("script.orbit_radius", 130)
+screenshot dropped

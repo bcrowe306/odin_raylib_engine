@@ -1,6 +1,7 @@
 package editor
 
 import "core:fmt"
+import "core:path/filepath"
 import "core:strings"
 import e "../engine"
 import imgui "lib/imgui"
@@ -13,13 +14,14 @@ import rl "vendor:raylib"
 // Docs live in engine/property_docs.odin.
 // ============================================================================
 
-INSPECTOR_HELP_HEIGHT :: 96
+INSPECTOR_HELP_HEIGHT :: 140
 
 Inspector_Help :: struct {
 	key:   string, // "<node ptr>/<property>" of the shown property
 	title: string,
 	doc:   string,
 	meta:  string,
+	path:  string, // what get_property / set_property take ("" = not scriptable)
 }
 
 inspectorHelp: Inspector_Help
@@ -28,36 +30,67 @@ inspectorHelp: Inspector_Help
 // is hovered.
 prop_help :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, hovered, tip: bool) {
 	if !hovered do return
-	doc := e.Property_Doc(p)
-	meta := prop_meta(node, p)
-	key := fmt.tprintf("%p/%s", node, p.name)
-	if key != inspectorHelp.key {
-		inspector_help_set(key, pretty_name(p.name), doc, meta)
-	}
+	help_show(node, p.name, pretty_name(p.name), e.Property_Doc(p), prop_meta(node, p), prop_script_path(node, p), tip)
+}
+
+// prop_script_path: the property's get_property / set_property path ("" when
+// scripts can't reach it).
+prop_script_path :: proc(node: ^e.Node, p: e.Node_Property) -> string {
+	if node == nil || p.runtime || p.owner == "PhysicsShape" do return ""
+	return p.name
+}
+
+// help_show fills the help pane (and, with `tip`, the tooltip) for a
+// hovered property.
+help_show :: proc(node: ^e.Node, keyName, title, doc, meta, path: string, tip: bool) {
+	key := fmt.tprintf("%p/%s", node, keyName)
+	if key != inspectorHelp.key do inspector_help_set(key, title, doc, meta, path)
 	if tip && imgui.BeginTooltip() {
 		imgui.PushTextWrapPos(imgui.GetFontSize() * 22)
 		imgui.PushFont(GlobalFonts.semibold)
-		imgui.TextUnformatted(strings.clone_to_cstring(pretty_name(p.name), context.temp_allocator))
+		imgui.TextUnformatted(strings.clone_to_cstring(title, context.temp_allocator))
 		imgui.PopFont()
 		if doc != "" do imgui.TextWrapped("%s", strings.clone_to_cstring(doc, context.temp_allocator))
 		imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
 		imgui.TextWrapped("%s", strings.clone_to_cstring(meta, context.temp_allocator))
 		imgui.PopStyleColor()
+		if path != "" {
+			imgui.PushStyleColorImVec4(.Text, UI_ACCENT)
+			imgui.TextUnformatted(fmt.ctprintf("path = \"%s\"", path))
+			imgui.PopStyleColor()
+		}
 		imgui.PopTextWrapPos()
 		imgui.EndTooltip()
 	}
 }
 
+// script_prop_help: help for a script's exported property (path
+// "script.<name>").
+script_prop_help :: proc(node: ^e.Node, inst: ^e.ScriptInstance, name, label: string, val: e.ScriptValue, tip: bool) {
+	kind: string
+	switch val.type {
+	case .Float:   kind = "number"
+	case .Int:     kind = "integer"
+	case .String:  kind = "text"
+	case .Boolean: kind = "on / off"
+	case .Color:   kind = "colour"
+	case .Vector2: kind = "x, y"
+	}
+	doc := fmt.tprintf("An exported property of %s.", filepath.base(inst.modulePath))
+	help_show(node, fmt.tprintf("script.%s", name), label, doc, kind, fmt.tprintf("script.%s", name), tip)
+}
+
 @(private = "file")
-inspector_help_set :: proc(key, title, doc, meta: string) {
+inspector_help_set :: proc(key, title, doc, meta, path: string) {
 	delete(inspectorHelp.key)
 	delete(inspectorHelp.title)
 	delete(inspectorHelp.doc)
 	delete(inspectorHelp.meta)
-	inspectorHelp = {strings.clone(key), strings.clone(title), strings.clone(doc), strings.clone(meta)}
+	delete(inspectorHelp.path)
+	inspectorHelp = {strings.clone(key), strings.clone(title), strings.clone(doc), strings.clone(meta), strings.clone(path)}
 }
 
-// prop_meta: "number · 0 to 8 · default 1 · Lua \"energy\"" (get/set_property).
+// prop_meta: "number · 0 to 8 · default 1".
 prop_meta :: proc(node: ^e.Node, p: e.Node_Property) -> string {
 	parts := make([dynamic]string, context.temp_allocator)
 	switch p.kind {
@@ -80,7 +113,6 @@ prop_meta :: proc(node: ^e.Node, p: e.Node_Property) -> string {
 		if d, ok := prop_default(node, p); ok do append(&parts, fmt.tprintf("default %s", prop_value_text(d)))
 	}
 	if p.runtime do append(&parts, "runtime state (not saved)")
-	else if node != nil && p.owner != "PhysicsShape" do append(&parts, fmt.tprintf("Lua \"%s\"", p.name))
 	return strings.join(parts[:], "  ·  ", context.temp_allocator)
 }
 
@@ -127,9 +159,9 @@ Inspector_HelpPane :: proc(state: ^EditorState) {
 	defer imgui.EndChild()
 	node := state.selectedNode
 	prefix := fmt.tprintf("%p/", node)
-	title, doc, meta: string
+	title, doc, meta, path: string
 	if node != nil && strings.has_prefix(inspectorHelp.key, prefix) {
-		title, doc, meta = inspectorHelp.title, inspectorHelp.doc, inspectorHelp.meta
+		title, doc, meta, path = inspectorHelp.title, inspectorHelp.doc, inspectorHelp.meta, inspectorHelp.path
 	} else if node != nil {
 		title, doc = node_type_description(e.Node_TypeName(node))
 		meta = "Hover a property for its help."
@@ -150,4 +182,17 @@ Inspector_HelpPane :: proc(state: ^EditorState) {
 		imgui.PopStyleColor()
 	}
 	imgui.PopTextWrapPos()
+	// The script path: what get_property / set_property take.
+	if path != "" {
+		imgui.AlignTextToFramePadding()
+		imgui.PushStyleColorImVec4(.Text, UI_ACCENT)
+		imgui.TextUnformatted(fmt.ctprintf("path = \"%s\"", path))
+		imgui.PopStyleColor()
+		Drive_Item("insp.help.path")
+		imgui.SameLine(0, 6)
+		if UI_IconButton(ICON_FA_COPY, "insp.help.copy-path", "Copy the path", size = 22) {
+			imgui.SetClipboardText(strings.clone_to_cstring(path, context.temp_allocator))
+		}
+		UI_DimText("Drag the name into a script: get (Shift: set)")
+	}
 }

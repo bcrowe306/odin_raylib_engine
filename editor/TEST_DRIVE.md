@@ -40,6 +40,7 @@ exits non-zero if any check fails.
 | `anim_manage.drive` | Animations renamed (a taken name refused with a warning; the default and a state machine's state follow), duplicated (frames, range, reverse; placed after it), deleted (the copy becomes current, undo restores it), saved. |
 | `slicer_zoom_tabs.drive` | Sprite slicer zoom (1:1, + / -, Cmd+wheel, a cell picked zoomed in, Fit); View > Show Tab Bars on (every docked window has its tab) and off, saved in settings.ini. |
 | `game_controls.drive` | Play This Scene; toolbar Pause / Resume and Step, F9 / Shift+F9; Restart (a new process, the same scene); Stop, then Game > Restart plays it again; Game > Pause / Stop. |
+| `prop_drag.drive` | The help pane's `path = "..."` (a Transform row, a script property `script.<name>`); a property name dragged into a script: get_property, Shift: set_property with the value; another node's via get_node. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -115,6 +116,7 @@ Queries:
 - `dialog-start` (the folder the last system file dialog opened in), `last-dir:import` / `last-dir:export` / `last-dir:projects` (the remembered folders)
 - `slicer-zoom` (the slicer's zoom, `0.00` = Fit), `slicer-selection` (picked cells, `0,1,2`), `hidden-tab-bars` (docked spaces whose tab bar is hidden)
 - `game-pid` (the running game's process id, 0 = none), `last-played` (the scene Restart plays, `project` = the initial scene)
+- `insp-help-path` (the path the help pane shows)
 - `anim-names` (the selected AnimationPlayer's animations, the current one in `[brackets]`)
 - `anim-preview` (`playing` / `paused`), `anim-info` (`frames=<n> range=<a>-<b> reverse=<b> fps=<f> default=<name>` of the selected AnimationPlayer), `theme` (the saved theme), `theme-panel` (the panel colour in use, `#rrggbbaa`), `node-icons` (`<distinct icons>/<node types>`), `workspace` (the current workspace), `window-h:<item>` (height of the window an item is in)
 - `debug-stopped`, `debug-line` (`file:line`), `debug-stack`, `debug-local:<name>` (the Lua debugger)

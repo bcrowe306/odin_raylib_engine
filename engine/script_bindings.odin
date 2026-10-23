@@ -2752,6 +2752,37 @@ lua_sm_stop :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 // --- node:set_property / get_property: any Inspector property by path -------
+//
+// "script.<name>" is a field of the node's script (its exported properties,
+// or any other value the script keeps in `self`): read and written live.
+
+// script_field: "script.health" -> "health".
+@(private="file")
+script_field :: proc(path: string) -> (string, bool) {
+	if !strings.has_prefix(path, "script.") do return "", false
+	return path[len("script."):], true
+}
+
+// push_script_self pushes the node's script instance (its `self` table).
+@(private="file")
+push_script_self :: proc(L: ^lua.State, node: ^Node) -> bool {
+	if node == nil || node.scriptInstance == nil do return false
+	inst := cast(^ScriptInstance)node.scriptInstance
+	if inst.registryRef == 0 do return false
+	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef))
+	return true
+}
+
+// node:get_script(): the node's script instance - the `self` its script
+// sees (fields and methods) - or nil.
+@(private="file")
+lua_node_get_script :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	node, ok := to_node_userdata(L, 1)
+	if !ok || !push_script_self(L, node) do lua.pushnil(L)
+	return 1
+}
+
 
 // node:set_property(path, value...): numbers, booleans, {x, y} / x, y,
 // {r, g, b[, a]} colours (0..1), enum names, strings.
@@ -2761,6 +2792,23 @@ lua_node_set_property :: proc "c" (L: ^lua.State) -> c.int {
 	node, ok := to_node_userdata(L, 1)
 	name := lua.tostring(L, 2)
 	if !ok || name == nil do return 0
+	if field, isScript := script_field(string(name)); isScript {
+		if !push_script_self(L, node) {
+			lua.L_error(L, "set_property: %s has no script", strings.clone_to_cstring(node.name, context.temp_allocator))
+			return 0
+		}
+		// self[field] = value (x, y given separately become {x, y}).
+		if lua.gettop(L) >= 4 && lua.type(L, 3) == .NUMBER && lua.type(L, 4) == .NUMBER {
+			lua.createtable(L, 2, 0)
+			lua.pushvalue(L, 3); lua.rawseti(L, -2, 1)
+			lua.pushvalue(L, 4); lua.rawseti(L, -2, 2)
+		} else {
+			lua.pushvalue(L, 3)
+		}
+		lua.setfield(L, -2, strings.clone_to_cstring(field, context.temp_allocator))
+		lua.pop(L, 1)
+		return 0
+	}
 	p, found := Node_FindProperty(node, string(name))
 	if !found {
 		lua.L_error(L, "set_property: %s has no property '%s'", strings.clone_to_cstring(node.name, context.temp_allocator), name)
@@ -2808,6 +2856,12 @@ lua_node_get_property :: proc "c" (L: ^lua.State) -> c.int {
 	node, ok := to_node_userdata(L, 1)
 	name := lua.tostring(L, 2)
 	if !ok || name == nil {lua.pushnil(L); return 1}
+	if field, isScript := script_field(string(name)); isScript {
+		if !push_script_self(L, node) {lua.pushnil(L); return 1}
+		lua.getfield(L, -1, strings.clone_to_cstring(field, context.temp_allocator))
+		lua.remove(L, -2) // self
+		return 1
+	}
 	p, found := Node_FindProperty(node, string(name))
 	if !found {lua.pushnil(L); return 1}
 	switch p.kind {
@@ -3707,6 +3761,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "light_set_radius")
 		lua.pushcfunction(L, lua_node_set_property)
 		lua.setfield(L, -2, "set_property")
+		lua.pushcfunction(L, lua_node_get_script)
+		lua.setfield(L, -2, "get_script")
 		lua.pushcfunction(L, lua_node_line_set_points)
 		lua.setfield(L, -2, "line_set_points")
 		lua.pushcfunction(L, lua_node_line_add_point)

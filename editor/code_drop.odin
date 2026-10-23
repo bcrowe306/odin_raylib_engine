@@ -6,6 +6,7 @@ import "core:strings"
 import buf "../odin_editor/buffer"
 import e "../engine"
 import imgui "lib/imgui"
+import rl "vendor:raylib"
 
 // ============================================================================
 // Dragging assets and nodes into a script.
@@ -18,7 +19,9 @@ import imgui "lib/imgui"
 //
 // which the Inspector edits with an asset picker. Dropping a node from the
 // scene tree inserts `self.node:get_node("<relative path>")` (relative to a
-// node that uses this script), or `Scene.find_node("Name")`.
+// node that uses this script), or `Scene.find_node("Name")`. Dropping an
+// Inspector property's name inserts `<node>:get_property("<path>")` - with
+// Shift, `<node>:set_property("<path>", <its current value>)`.
 // ============================================================================
 
 // Script_AssetKind: the script property type for an asset path.
@@ -137,6 +140,31 @@ Code_DropAsset :: proc(doc: ^Code_Doc, rel: string, pos: buf.Position, asPropert
 // Code_DropNode inserts a reference to a scene node.
 Code_DropNode :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, pos: buf.Position) {
 	if state.activeScene == nil || node == nil do return
+	code_insert(doc, pos, code_node_ref(state, doc, node, false))
+}
+
+// Code_DropProperty inserts a property read - or, `set`, a write of its
+// current value.
+Code_DropProperty :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, path, value: string, set: bool, pos: buf.Position) {
+	if state.activeScene == nil || node == nil do return
+	ref := code_node_ref(state, doc, node, true)
+	text := fmt.tprintf("%s:set_property(%q, %s)", ref, path, value) if set else fmt.tprintf("%s:get_property(%q)", ref, path)
+	code_insert(doc, pos, text)
+}
+
+@(private = "file")
+code_insert :: proc(doc: ^Code_Doc, pos: buf.Position, text: string) {
+	b := &doc.buffer
+	end := buf.buffer_insert_text(b, pos, text, buf.buffer_next_group(b))
+	code_set_single_cursor(b, end, false)
+	doc.scrollToCursor = true
+}
+
+// code_node_ref: Lua for a node seen from this script: `self.node:get_node(
+// "<relative path>")` from a node that runs it (`self.node` for that node
+// itself when `selfOk`), else `Scene.find_node("Name")`.
+@(private = "file")
+code_node_ref :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, selfOk: bool) -> string {
 	mgr := state.activeScene.manager
 	// A node that runs this script: the selection if it does, else any.
 	owner: ^e.Node
@@ -149,16 +177,87 @@ Code_DropNode :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, pos: b
 	if owner == nil {
 		for n in mgr.nodes do if usesScript(state, n, doc) {owner = n; break}
 	}
-	text: string
-	if owner != nil {
-		text = fmt.tprintf("self.node:get_node(%q)", e.Node_RelativePath(mgr, owner, node))
-	} else {
-		text = fmt.tprintf("Scene.find_node(%q)", node.name)
+	if owner != nil && owner == node && selfOk do return "self.node"
+	if owner != nil do return fmt.tprintf("self.node:get_node(%q)", e.Node_RelativePath(mgr, owner, node))
+	return fmt.tprintf("Scene.find_node(%q)", node.name)
+}
+
+// --- Dragging an Inspector property's name ----------------------------------
+
+PROP_PAYLOAD :: "ORE_PROP"
+
+Prop_Payload :: struct {
+	node:  ^e.Node,
+	path:  [128]u8,
+	plen:  int,
+	value: [256]u8,
+	vlen:  int,
+}
+
+// prop_label: a property row's label (as UI_PropLabel) that can be dragged
+// into a script. The drag source starts inside the label's table cell: past
+// it, hit tests clip to the next column.
+prop_label :: proc(label: string, node: ^e.Node, path, value: string) {
+	imgui.TableNextRow()
+	imgui.TableNextColumn()
+	imgui.AlignTextToFramePadding()
+	imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
+	imgui.TextUnformatted(strings.clone_to_cstring(label, context.temp_allocator))
+	imgui.PopStyleColor()
+	prop_label_drag(node, path, value)
+	imgui.TableNextColumn()
+	imgui.SetNextItemWidth(-1)
+}
+
+@(private = "file")
+prop_label_drag :: proc(node: ^e.Node, path, value: string) {
+	if node == nil || path == "" do return
+	if imgui.IsItemHovered() do imgui.SetMouseCursor(.Hand)
+	if !imgui.BeginDragDropSource({.SourceAllowNullID}) do return
+	pl: Prop_Payload
+	pl.node = node
+	pl.plen = copy(pl.path[:], path)
+	pl.vlen = copy(pl.value[:], value)
+	imgui.SetDragDropPayload(PROP_PAYLOAD, &pl, size_of(Prop_Payload))
+	imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_CODE, path))
+	UI_DimText("Drop in a script: get_property · Shift: set_property")
+	imgui.EndDragDropSource()
+}
+
+// prop_lua_value: a property's current value as Lua (for set_property).
+prop_lua_value :: proc(p: e.Node_Property) -> string {
+	switch p.kind {
+	case .Float: return fmt.tprintf("%v", e.Property_GetFloat(p))
+	case .Int:   return fmt.tprintf("%v", e.Property_GetInt(p))
+	case .Bool:  return "true" if (^bool)(p.ptr)^ else "false"
+	case .Vec2:
+		v := (^[2]f32)(p.ptr)^
+		return fmt.tprintf("%v, %v", v.x, v.y)
+	case .Color:
+		col := (^rl.Color)(p.ptr)^
+		f :: proc(v: u8) -> f32 {return f32(int(f32(v) / 255 * 1000 + 0.5)) / 1000}
+		return fmt.tprintf("{{%v, %v, %v, %v}}", f(col.r), f(col.g), f(col.b), f(col.a))
+	case .Enum:
+		names := e.Property_EnumNames(p)
+		i := e.Property_GetEnumIndex(p)
+		return fmt.tprintf("%q", names[i] if i >= 0 && i < len(names) else "")
+	case .String: return fmt.tprintf("%q", (^string)(p.ptr)^)
+	case .Bit_Set:
 	}
-	b := &doc.buffer
-	end := buf.buffer_insert_text(b, pos, text, buf.buffer_next_group(b))
-	code_set_single_cursor(b, end, false)
-	doc.scrollToCursor = true
+	return "nil"
+}
+
+// script_lua_value: a script property's value as Lua.
+script_lua_value :: proc(v: e.ScriptValue) -> string {
+	switch v.type {
+	case .Float:   return fmt.tprintf("%v", v.valFloat)
+	case .Int:     return fmt.tprintf("%v", v.valInt)
+	case .Boolean: return "true" if v.valBool else "false"
+	case .String:  return fmt.tprintf("%q", v.valString)
+	case .Vector2: return fmt.tprintf("{{%v, %v}}", v.valVec2.x, v.valVec2.y)
+	case .Color:   return fmt.tprintf("{{%v, %v, %v, %v}}", v.valColor.r, v.valColor.g, v.valColor.b, v.valColor.a)
+	}
+	return "nil"
 }
 
 // code_drop_target makes the text area accept assets and nodes; call right
@@ -184,6 +283,18 @@ code_drop_target :: proc(state: ^EditorState, doc: ^Code_Doc, mouse: [2]f32) {
 			p := (^Asset_Payload)(payload.Data)
 			rel := strings.clone(string(p.path[:p.len]), context.temp_allocator)
 			Code_DropAsset(doc, rel, pos, asProp)
+			cm.focusRequest = true
+		}
+	}
+	if payload := imgui.AcceptDragDropPayload(PROP_PAYLOAD, {.AcceptBeforeDelivery, .AcceptNoDrawDefaultRect}); payload != nil {
+		preview(b, pos)
+		set := imgui.GetIO().KeyShift
+		imgui.SetTooltip(set ? "set_property (release Shift: get)" : "get_property (Shift: set)")
+		if payload.Delivery {
+			p := (^Prop_Payload)(payload.Data)
+			path := strings.clone(string(p.path[:p.plen]), context.temp_allocator)
+			value := strings.clone(string(p.value[:p.vlen]), context.temp_allocator)
+			if e.Node_IsAlive(p.node) do Code_DropProperty(state, doc, p.node, path, value, set, pos)
 			cm.focusRequest = true
 		}
 	}

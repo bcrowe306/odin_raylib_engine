@@ -618,8 +618,23 @@ rather than re-pathing every frame.
   print(Physics.layer_name(2))   --> "Enemies"
   ```
 - `node:set_property(path, value)` / `node:get_property(path)` read and
-  write any Inspector property by its path (as shown in the Inspector's
-  tooltips and saved scenes).
+  write any Inspector property by its path - the help pane's `path = "..."`
+  (hover the property; or drag its name into the script). Every node has
+  `position`, `rotation`, `scale`, `layer`, `pauseMode`, `paused` and
+  `enabled`.
+- **Another node's script**: `"script.<name>"` reads / writes a field of
+  the node's script, live (`enemy:set_property("script.health", 50)`), and
+  `node:get_script()` returns that script's `self` - its fields and methods:
+
+  ```lua
+  local enemy = Scene.find_node("Enemy")
+  enemy:get_script():take_damage(10)    -- call a method of its script
+  local hp = enemy:get_script().health  -- or read any field it keeps
+  ```
+
+  `get_script()` is `nil` (and `get_property("script.x")` returns `nil`)
+  when the node has no script; `set_property("script.x", ...)` on one is an
+  error.
 
 #### State machines (StateMachineNode)
 

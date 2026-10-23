@@ -470,11 +470,19 @@ function LightNode:light_set_radius(radius) end
 
 ---Sets any Inspector property by its path ("gravityScale", "emitter.amount",
 ---"joint.revolute.motorSpeed", "tint", ...). Vectors as {x, y} or x, y;
----colours as {r, g, b[, a]} 0..1; enums by name.
+---colours as {r, g, b[, a]} 0..1; enums by name. "script.<name>" sets a field
+---of the node's script (e.g. "script.health"), live. Hover a property in the
+---Inspector for its path.
 ---@param path string
 ---@param value any
 ---@param y? number
 function Node:set_property(path, value, y) end
+
+---The node's script instance - the `self` its script sees: read or change its
+---fields and call its methods (`enemy:get_script():take_damage(10)`). nil
+---when the node has no script.
+---@return table?
+function Node:get_script() end
 
 ---Pauses this node and its children (except "always" ones).
 ---@param paused boolean
@@ -554,7 +562,8 @@ function NavGrid:nav_find_path(x1, y1, x2, y2, opts) end
 ---@return boolean
 function NavGrid:nav_is_walkable(x, y, opts) end
 
----Reads an Inspector property by its path (vectors and colours as tables).
+---Reads an Inspector property by its path (vectors and colours as tables);
+---"script.<name>" reads a field of the node's script.
 ---@param path string
 ---@return any
 function Node:get_property(path) end

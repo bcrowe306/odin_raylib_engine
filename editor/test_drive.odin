@@ -738,6 +738,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		for g in state.activeScene.guides[:state.activeScene.guideCount] do append(&parts, fmt.tprintf("%s=%v", "x" if g.vertical else "y", g.pos))
 		return strings.join(parts[:], ",", context.temp_allocator), true
 	case "insp-help": return fmt.tprintf("%s: %s", inspectorHelp.title, inspectorHelp.doc), true
+	case "insp-help-path": return inspectorHelp.path, true
 	}
 	switch q {
 	case "selected":

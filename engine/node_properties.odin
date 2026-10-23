@@ -66,7 +66,25 @@ Node_FindProperty :: proc(node: ^Node, name: string) -> (Node_Property, bool) {
 	for p in Node_CollectProperties(node) {
 		if p.name == name do return p, true
 	}
-	return {}, false
+	return Node_BaseProperty(node, name)
+}
+
+// Node_BaseProperty: a field every node has (the Inspector's Transform
+// section): position, rotation, scale, layer, pauseMode, paused, enabled.
+Node_BaseProperty :: proc(node: ^Node, name: string) -> (Node_Property, bool) {
+	if node == nil do return {}, false
+	p := Node_Property{name = name, owner = "Node"}
+	switch name {
+	case "position": p.kind, p.ptr, p.type = .Vec2, &node.position, type_info_of([2]f32)
+	case "scale":    p.kind, p.ptr, p.type = .Vec2, &node.scale, type_info_of([2]f32)
+	case "rotation": p.kind, p.ptr, p.type = .Float, &node.rotation, type_info_of(f32)
+	case "layer":    p.kind, p.ptr, p.type = .Enum, &node.layer, type_info_of(RenderLayer)
+	case "pauseMode": p.kind, p.ptr, p.type = .Enum, &node.pauseMode, type_info_of(Pause_Mode)
+	case "paused":   p.kind, p.ptr, p.type = .Bool, &node.paused, type_info_of(bool)
+	case "enabled":  p.kind, p.ptr, p.type = .Bool, &node.enabled, type_info_of(bool)
+	case: return {}, false
+	}
+	return p, true
 }
 
 @(private = "file")

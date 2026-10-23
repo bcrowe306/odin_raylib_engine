@@ -175,10 +175,18 @@ their other coordinate. Enable / visible toggles apply to all; the other
 sections (script, material, signals) edit the primary node.
 
 Hover any property (its label or field) for help: a tooltip with what it
-does, its type, range, default and the name scripts use with
-`get_property` / `set_property`. The **help pane** at the bottom of the
-Inspector keeps the last hovered property's help, or describes the selected
-node type; **View > Inspector Help** hides it. The help text lives in
+does, its type, range and default, and its script path. The **help pane**
+at the bottom of the Inspector keeps the last hovered property's help, or
+describes the selected node type; its `path = "..."` line is what
+`get_property` / `set_property` take (the copy button copies it) - a
+script's exported properties are `script.<name>`. **View > Inspector Help**
+hides it.
+
+**Drag a property's name into a script** (the Code tab) to insert a read:
+`self.node:get_property("rotation")`. Hold **Shift** when dropping for a
+write with the current value: `self.node:set_property("rotation", 45)`.
+The node is `self.node` when it runs that script, `self.node:get_node(
+"<relative path>")` for another node of the scene (or `Scene.find_node`). The help text lives in
 `engine/property_docs.odin` (`test_property_docs` fails when a property has
 none).
 

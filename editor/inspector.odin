@@ -167,12 +167,14 @@ inspector_body :: proc(state: ^EditorState) {
 	if !isRoot && UI_SectionHeader("Transform") {
 		if UI_BeginProps("##transform") {
 			// Each field edits every selected node (mixed values show "—").
-			UI_PropLabel("Position")
-			mp := multi_begin(state, node, node_field(node, &node.position, "position", .Vec2, [2]f32))
+			mpField := node_field(node, &node.position, "position", .Vec2, [2]f32)
+			prop_row_label(state, node, "Position", mpField)
+			mp := multi_begin(state, node, mpField)
 			vec2_edit(state, "insp.position", &node.position, 1, "Move", mixed = mp.mixed)
 			multi_end(&mp)
-			UI_PropLabel("Rotation")
-			mr := multi_begin(state, node, node_field(node, &node.rotation, "rotation", .Float, f32))
+			mrField := node_field(node, &node.rotation, "rotation", .Float, f32)
+			prop_row_label(state, node, "Rotation", mrField)
+			mr := multi_begin(state, node, mrField)
 			imgui.SetNextItemWidth(field_width())
 			imgui.DragFloat("##rot", &node.rotation, 0.5, -36000, 36000, MIXED_TEXT if mr.mixed[0] else "%.1f°")
 			undo_on_activate(state, "Rotate")
@@ -182,15 +184,17 @@ inspector_body :: proc(state: ^EditorState) {
 				node.rotation = 0
 			}
 			multi_end(&mr)
-			UI_PropLabel("Scale")
-			ms := multi_begin(state, node, node_field(node, &node.scale, "scale", .Vec2, [2]f32))
+			msField := node_field(node, &node.scale, "scale", .Vec2, [2]f32)
+			prop_row_label(state, node, "Scale", msField)
+			ms := multi_begin(state, node, msField)
 			vec2_edit(state, "insp.scale", &node.scale, 0.01, "Scale", {1, 1}, ms.mixed)
 			multi_end(&ms)
-			UI_PropLabel("Layer")
+			mlField := node_field(node, &node.layer, "layer", .Enum, e.RenderLayer)
+			prop_row_label(state, node, "Layer", mlField)
 			names := []string{"Layer 1 (back)", "Layer 2", "Layer 3", "Layer 4", "Layer 5", "Layer 6", "Layer 7", "Layer 8 (UI)"}
 			defLayer := e.RenderLayer.Layer1
 			if d := Editor_DefaultNode(node); d != nil do defLayer = d.layer
-			ml := multi_begin(state, node, node_field(node, &node.layer, "layer", .Enum, e.RenderLayer))
+			ml := multi_begin(state, node, mlField)
 			defer multi_end(&ml)
 			imgui.SetNextItemWidth(field_width())
 			if layer, changed := UI_Combo("insp.layer", int(node.layer), names, ml.mixed[0]); changed {
@@ -201,8 +205,9 @@ inspector_body :: proc(state: ^EditorState) {
 				Editor_RecordUndo(state, "Reset layer")
 				node.layer = defLayer
 			}
-			UI_PropLabel("Pause Mode")
-			mpm := multi_begin(state, node, node_field(node, &node.pauseMode, "pauseMode", .Enum, e.Pause_Mode))
+			mpmField := node_field(node, &node.pauseMode, "pauseMode", .Enum, e.Pause_Mode)
+			prop_row_label(state, node, "Pause Mode", mpmField)
+			mpm := multi_begin(state, node, mpmField)
 			defer multi_end(&mpm)
 			imgui.SetNextItemWidth(field_width())
 			if mode, changed := UI_Combo("insp.pause-mode", int(node.pauseMode), {"Inherit", "Pausable", "Always"}, mpm.mixed[0]); changed {
@@ -210,8 +215,9 @@ inspector_body :: proc(state: ^EditorState) {
 				node.pauseMode = e.Pause_Mode(mode)
 			}
 			UI_Tooltip("Pausable: stops when its parent or the game pauses (Engine.set_paused). Always: keeps running (pause menus)")
-			UI_PropLabel("Paused")
-			mpa := multi_begin(state, node, node_field(node, &node.paused, "paused", .Bool, bool))
+			mpaField := node_field(node, &node.paused, "paused", .Bool, bool)
+			prop_row_label(state, node, "Paused", mpaField)
+			mpa := multi_begin(state, node, mpaField)
 			defer multi_end(&mpa)
 			mixed_push(mpa.mixed[0])
 			imgui.Checkbox("##paused", &node.paused)
@@ -265,7 +271,7 @@ inspector_properties :: proc(state: ^EditorState, node: ^e.Node) {
 			for p in props {
 				if p.runtime || !prop_relevant(node, p.name) do continue
 				if len(state.selection) > 1 && !multi_shared(state, node, p) do continue
-				UI_PropLabel(pretty_name(p.name))
+				prop_label(pretty_name(p.name), node, prop_script_path(node, p), prop_lua_value(p)) // drags into a script
 				property_widget(state, node, p, false)
 			}
 			if node.typeId == e.CharacterMoverNode && (cast(^e.CharacterMoverNode)node).controlMode == .Script {
@@ -341,6 +347,14 @@ script_prop_label :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: st
 		for p in mod.properties do if p.name == name && p.label != "" do return p.label
 	}
 	return pretty_name(name)
+}
+
+// prop_row_label: a hand-drawn property row's label, with the help (pane and
+// tooltip) and dragging into a script like the generated rows.
+prop_row_label :: proc(state: ^EditorState, node: ^e.Node, label: string, p: e.Node_Property) {
+	prop_label(label, node, prop_script_path(node, p), prop_lua_value(p))
+	TIP :: imgui.HoveredFlags_DelayNormal | imgui.HoveredFlags_Stationary
+	if imgui.IsItemHovered() do prop_help(state, node, p, true, imgui.IsItemHovered(TIP))
 }
 
 property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, readonly: bool) {
@@ -908,7 +922,10 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 		slice.sort(keys[:])
 		for name in keys {
 			val := inst.properties[name]
-			UI_PropLabel(script_prop_label(state, inst, name))
+			propLabel := script_prop_label(state, inst, name)
+			prop_label(propLabel, node, fmt.tprintf("script.%s", name), script_lua_value(val))
+			TIP :: imgui.HoveredFlags_DelayNormal | imgui.HoveredFlags_Stationary
+			if imgui.IsItemHovered() do script_prop_help(node, inst, name, propLabel, val, imgui.IsItemHovered(TIP))
 			id := fmt.tprintf("insp.script:%s", name)
 			label := fmt.ctprintf("##%s", id)
 			changed := false
