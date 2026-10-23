@@ -43,6 +43,7 @@ exits non-zero if any check fails.
 | `prop_drag.drive` | The help pane's `path = "..."` (a Transform row, a script property `script.<name>`); a property name dragged into a script: get_property, Shift: set_property with the value; another node's via get_node. |
 | `bottom_follow.drive` | The AnimationPlayer Inspector (player settings only, `fps` path), the Animation tab's ▾ menu (an animation from a sprite sheet); the bottom panel follows the selection and goes back, a hand-picked tab stays, the setting turns it off. |
 | `game_colliders.drive` | The toolbar's Show Colliders button: saved in project.json, switched live in a running game, Game menu entry. |
+| `node_drop_typed.drive` | A node dropped into a script: on an empty line a `---@type` local (indented into the function), into an assignment the annotation above it, elsewhere an inline `--[[@as Type]]` cast; undo. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

@@ -1,0 +1,37 @@
+# A node dragged into a script is typed for the language server: on an
+# empty line a local with ---@type (indented into the function body); into
+# an assignment the annotation goes above it; elsewhere an inline
+# --[[@as Type]] cast. One undo removes a drop.
+wait 5
+click @hier:PatrolDroneAlpha
+click @insp.script-attach
+click @pick:scripts/orbiting_drone.lua
+click @insp.script-edit
+wait 5
+
+# An empty line in Drone:ready().
+click @code.gutter:16+300,0
+key end
+key enter
+drag @hier:PlayerShip @code.caret
+expect code.text contains function Drone:ready()\n\s\s\s\s---@type TextureNode\n\s\s\s\slocal player_ship = self.node:get_node("../PlayerShip")\n
+screenshot local_declaration
+
+# An assignment on the next line: the annotation above it.
+key end
+key enter
+type self.ship =
+drag @hier:PlayerShip @code.caret
+expect code.text contains local player_ship = self.node:get_node("../PlayerShip")\n\s\s\s\s---@type TextureNode\n\s\s\s\sself.ship = self.node:get_node("../PlayerShip")\n
+
+# Anywhere else: an inline cast.
+key end
+key enter
+type print(
+drag @hier:PlayerShip @code.caret
+expect code.text contains print(self.node:get_node("../PlayerShip") --[[@as TextureNode]]
+screenshot inline_cast
+# One undo removes the last drop, another the one before.
+key ctrl+z
+expect code.text !contains --[[@as TextureNode]]
+expect code.text contains self.ship = self.node:get_node("../PlayerShip")

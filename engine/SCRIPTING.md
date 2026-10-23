@@ -348,7 +348,7 @@ end
 #### Lookup & textures
 | Method | Parameters | Return | Description |
 |---|---|---|---|
-| `get_node(path)` | `string` | `Node?` | A node by path relative to this one (`"Gun"`, `"../Player"`, `"."`). Dragging a node from the scene tree onto a script inserts this call. |
+| `get_node(path)` | `string` | `Node?` | A node by path relative to this one (`"Gun"`, `"../Player"`, `"."`). Dragging a node from the scene tree onto a script inserts this call, typed (`---@type CharacterMoverNode` or `--[[@as ...]]`). |
 | `set_texture(path)` | `string` | `boolean` | Shows another image on a TextureNode (e.g. a `texture` property). |
 
 #### Transforms

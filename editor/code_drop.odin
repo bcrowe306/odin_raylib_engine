@@ -137,10 +137,94 @@ Code_DropAsset :: proc(doc: ^Code_Doc, rel: string, pos: buf.Position, asPropert
 	}
 }
 
-// Code_DropNode inserts a reference to a scene node.
+// Code_DropNode inserts a reference to a scene node, typed for the language
+// server with the node's class (`---@type CharacterMoverNode`):
+//   - on an empty line: a local declaration with the annotation above it;
+//   - into an assignment (`local mover = |`, `self.body = |`): the
+//     annotation goes above that line (unless one is there already);
+//   - anywhere else (an argument...): an inline cast, `--[[@as Type]]`.
+// Plain Nodes get no annotation (get_node returns Node already).
 Code_DropNode :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, pos: buf.Position) {
 	if state.activeScene == nil || node == nil do return
-	code_insert(doc, pos, code_node_ref(state, doc, node, false))
+	expr := code_node_ref(state, doc, node, false)
+	class := e.Node_TypeName(node)
+	b := &doc.buffer
+	if class == "Node" || pos.line >= buf.buffer_line_count(b) {
+		code_insert(doc, pos, expr)
+		return
+	}
+	// A copy: the buffer's line memory moves as text is inserted.
+	line := strings.clone(buf.buffer_line_str(b, pos.line), context.temp_allocator)
+	indent := line[:len(line) - len(strings.trim_left_space(line))]
+	group := buf.buffer_next_group(b)
+	end: buf.Position
+	switch {
+	case strings.trim_space(line) == "":
+		name := snake_ident(node.name)
+		if name == "" || code_lua_keyword(name) do name = "node"
+		ind := code_blank_line_indent(b, pos.line)
+		text := fmt.tprintf("%s---@type %s\n%slocal %s = %s", ind, class, ind, name, expr)
+		// Replace the blank line's own whitespace with the computed indent.
+		if len(line) > 0 do buf.buffer_delete_range(b, {pos.line, 0}, {pos.line, len(line)}, group)
+		end = buf.buffer_insert_text(b, {pos.line, 0}, text, group)
+	case code_is_assignment(line[:min(pos.col, len(line))]):
+		pre := line[:min(pos.col, len(line))]
+		if strings.has_suffix(pre, "=") do expr = strings.concatenate({" ", expr}, context.temp_allocator)
+		end = buf.buffer_insert_text(b, pos, expr, group)
+		above := strings.trim_space(buf.buffer_line_str(b, pos.line - 1)) if pos.line > 0 else ""
+		if !strings.has_prefix(above, "---@type") {
+			buf.buffer_insert_text(b, {pos.line, 0}, fmt.tprintf("%s---@type %s\n", indent, class), group)
+			end.line += 1
+		}
+	case:
+		end = buf.buffer_insert_text(b, pos, fmt.tprintf("%s --[[@as %s]]", expr, class), group)
+	}
+	code_set_single_cursor(b, end, false)
+	doc.scrollToCursor = true
+}
+
+// code_blank_line_indent: the indent for code on a blank line - the
+// previous non-blank line's, one level deeper after a block opener
+// (`function ...)`, `then`, `do`, `repeat`, `{`).
+@(private = "file")
+code_blank_line_indent :: proc(b: ^buf.Buffer, line: int) -> string {
+	for l := line - 1; l >= 0; l -= 1 {
+		prev := strings.clone(buf.buffer_line_str(b, l), context.temp_allocator)
+		t := strings.trim_space(prev)
+		if t == "" do continue
+		ind := prev[:len(prev) - len(strings.trim_left_space(prev))]
+		unit := "\t" if strings.has_prefix(ind, "\t") else "    "
+		opens := strings.has_suffix(t, "then") || strings.has_suffix(t, " do") || t == "do" || t == "repeat" || strings.has_suffix(t, "{") || t == "else" ||
+			(strings.contains(t, "function") && strings.has_suffix(t, ")"))
+		return strings.concatenate({ind, unit}, context.temp_allocator) if opens else ind
+	}
+	return ""
+}
+
+// code_is_assignment: the line so far is a statement assigning a value
+// (`local x =`, `self.body =`), the drop being its right-hand side.
+@(private = "file")
+code_is_assignment :: proc(pre: string) -> bool {
+	t := strings.trim_space(pre)
+	if !strings.has_suffix(t, "=") do return false
+	t = strings.trim_right_space(t[:len(t) - 1])
+	if len(t) == 0 do return false
+	switch t[len(t) - 1] {
+	case '=', '~', '<', '>': return false // ==, ~=, <=, >=
+	}
+	// Left side: `local a`, `a.b`, `self.c` - names, dots and brackets only.
+	t = strings.trim_prefix(t, "local ")
+	for ch in t do if !(ch == '_' || ch == '.' || ch == ':' || ch == '[' || ch == ']' || ch == '"' || ch == ' ' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) do return false
+	return true
+}
+
+@(private = "file")
+code_lua_keyword :: proc(s: string) -> bool {
+	switch s {
+	case "and", "break", "do", "else", "elseif", "end", "false", "for", "function", "goto", "if", "in", "local", "nil", "not", "or", "repeat", "return", "then", "true", "until", "while", "self":
+		return true
+	}
+	return false
 }
 
 // Code_DropProperty inserts a property read - or, `set`, a write of its

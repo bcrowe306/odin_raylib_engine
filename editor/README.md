@@ -190,6 +190,20 @@ describes the selected node type; its `path = "..."` line is what
 script's exported properties are `script.<name>`. **View > Inspector Help**
 hides it.
 
+**Drag a node from the Scene tree into a script** to insert a reference to
+it, typed for the language server (its class, so its own methods
+complete). On an empty line it becomes a declaration:
+
+```lua
+---@type CharacterMoverNode
+local player = self.node:get_node("../Player")
+```
+
+Dropped into an assignment (`self.body = `) the `---@type` line goes above
+it; anywhere else (an argument) it gets an inline cast,
+`self.node:get_node("../Player") --[[@as CharacterMoverNode]]`. Plain
+`Node`s get no annotation.
+
 **Drag a property's name into a script** (the Code tab) to insert a read:
 `self.node:get_property("rotation")`. Hold **Shift** when dropping for a
 write with the current value: `self.node:set_property("rotation", 45)`.
