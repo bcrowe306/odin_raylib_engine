@@ -63,6 +63,7 @@ Code_Completion :: struct {
 	anchor:    buf.Position, // start of the word being completed
 	selected:  int,
 	filtered:  [dynamic]int, // indices into client.last_completion
+	filteredSeq: int,        // the client.completion_seq `filtered` was built from
 	scrollTo:  bool,
 	// While the server is still loading the workspace it answers with empty
 	// lists; those requests are retried for a while.
@@ -1562,7 +1563,7 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 	case "code.lsp":
 		return strings.to_lower(fmt.tprint(cm.lspState), context.temp_allocator), true
 	case "code.completion":
-		if !cm.completion.open do return "", true
+		if !cm.completion.open || !completion_indices_valid() do return "", true
 		sb := strings.builder_make(context.temp_allocator)
 		for i, n in cm.completion.filtered {
 			if n > 0 do strings.write_string(&sb, ",")

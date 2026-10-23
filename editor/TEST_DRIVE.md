@@ -48,6 +48,7 @@ exits non-zero if any check fails.
 | `origin.drive` | The Origin row (help path, presets, typed, reset to the centre, undo), none for a camera, a new AnimationPlayer centred, saved as `"pivot"`; a migrated pixel origin. |
 | `hier_script.drive` | The scene tree's script marker: shown when a script is attached, opens it, gone when detached. |
 | `lua_get_script.drive` | Typed get_script(): a node name that runs a script returns NodeOf_<name>; another script's fields complete through it. |
+| `lua_events.drive` | Event names complete: a timer's `connect("` offers timeout, `emit("` the project's custom events, `function X:on_` the on_<event> methods. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

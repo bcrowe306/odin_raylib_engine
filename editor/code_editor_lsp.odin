@@ -160,6 +160,9 @@ code_lsp_update :: proc(state: ^EditorState) {
 			code_refilter(cm.docs[cm.active])
 		}
 	}
+	// A newer list than the one filtered (a late reply): filter it again -
+	// the indices point into the old one.
+	if comp.open && !comp.waiting && hasDoc && comp.filteredSeq != cm.client.completion_seq do code_refilter(cm.docs[cm.active])
 	if comp.retryPending && time.tick_since(comp.retryAt) > 250 * time.Millisecond {
 		comp.retryPending = false
 		if comp.open && hasDoc do code_lsp_request_completion(cm.docs[cm.active], false, retry = true)
@@ -299,6 +302,7 @@ code_refilter :: proc(doc: ^Code_Doc) {
 	line := buf.buffer_line_str(b, c.line)
 	prefix := line[comp.anchor.col:min(c.col, len(line))]
 	clear(&comp.filtered)
+	comp.filteredSeq = cm.client.completion_seq
 	prefixed := make([dynamic]int, context.temp_allocator)
 	others := make([dynamic]int, context.temp_allocator)
 	for &item, i in cm.client.last_completion {
@@ -442,7 +446,7 @@ code_advance :: proc(p: buf.Position, text: string) -> buf.Position {
 code_accept_completion :: proc(doc: ^Code_Doc) {
 	cm := &GlobalCode
 	comp := &cm.completion
-	if !comp.open || comp.selected >= len(comp.filtered) do return
+	if !comp.open || comp.selected >= len(comp.filtered) || !completion_indices_valid() do return
 	item := &cm.client.last_completion[comp.filtered[comp.selected]]
 	b := &doc.buffer
 	cursor := b.cursors[0].pos
@@ -494,13 +498,23 @@ code_kind_tag :: proc(kind: int) -> (string, imgui.Vec4) {
 	return "txt", UI_TEXT_DIM
 }
 
+// completion_indices_valid: `filtered` still indexes the current list (a
+// reply can replace it before the next refilter).
+completion_indices_valid :: proc() -> bool {
+	cm := &GlobalCode
+	n := len(cm.client.last_completion)
+	if cm.completion.filteredSeq != cm.client.completion_seq do return false
+	for i in cm.completion.filtered do if i < 0 || i >= n do return false
+	return true
+}
+
 // code_completion_popup draws the completion list under the word being
 // completed (foreground layer, so it can extend past the code window).
 code_completion_popup :: proc(state: ^EditorState, doc: ^Code_Doc) {
 	cm := &GlobalCode
 	comp := &cm.completion
 	cm.popupMin, cm.popupMax = {}, {}
-	if !comp.open || len(comp.filtered) == 0 do return
+	if !comp.open || len(comp.filtered) == 0 || !completion_indices_valid() do return
 	b := &doc.buffer
 	items := cm.client.last_completion[:]
 	font := code_font()

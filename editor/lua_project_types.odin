@@ -25,7 +25,10 @@ import lsp "../odin_editor/lsp"
 //   own methods complete; a script's `self.node` has the type of the nodes
 //   it is attached to; a node name that runs a script returns NodeOf_<name>,
 //   whose get_script() is that script's class (its fields and methods)
-//   NodeEvent     (engine) + the project's custom events aren't known
+//   ProjectEvent  the custom events the project's scripts emit (connect /
+//   emit complete them; scripts get optional on_<event> methods for them
+//   and for their node type's own events). Each node class's connect takes
+//   its own events (engine_api.lua, checked by test_lua_node_events_definitions)
 //   LdtkEntity, LdtkLevel, LdtkLayer, LdtkEnumName, LdtkEnum_<Name>
 //   one class per script with its exported properties, so `self.speed` is
 //   typed (merged with the script's own ---@class)
@@ -272,6 +275,17 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		alias(&sb, fmt.tprintf("LdtkEnum_%s", n), fmt.tprintf("Values of the LDtk enum %s", n), sorted_unique(&vals))
 	}
 
+	// Custom events: what the project's scripts emit (connect / emit
+	// complete them).
+	custom := make([dynamic]string, context.temp_allocator)
+	for rel in Editor_ListProjectFiles(state, "", {".lua"}) {
+		if strings.has_prefix(rel, ".") do continue
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil do emitted_events(string(data), &custom)
+	}
+	alias(&sb, "ProjectEvent", "Custom events the project's scripts emit (node:emit)", sorted_unique(&custom))
+	customEvents := sorted_unique(&custom)
+
 	// Script classes with their exported properties.
 	strings.write_string(&sb, "\n-- Script classes: exported properties (set in the Inspector) are fields of self.\n")
 	sm := &state.game.scriptManager
@@ -287,6 +301,10 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		if (!ok || mod == nil || len(mod.properties) == 0) && nodeType == "" do continue
 		fmt.sbprintf(&sb, "\n-- %s\n---@class %s\n", rel, cls)
 		if nodeType != "" do fmt.sbprintf(&sb, "---@field node %s The node this script is attached to.\n", nodeType)
+		// Its node's own events (the tree ones are on ScriptInstanceBase) and
+		// the project's custom events as optional methods.
+		for ev in node_type_events(nodeType)[6:] do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) %s event of its node\n", ev, cls, ev)
+		for ev in customEvents do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) custom event (emit)\n", ev, cls)
 		if !ok || mod == nil do continue
 		for p in mod.properties {
 			t := lua_type_of(p)
@@ -327,6 +345,45 @@ Lua_WriteProjectTypes :: proc(state: ^EditorState) {
 
 // typed_lookups: overloads returning each named node's type (names whose
 // nodes all have the same, non-plain type).
+// emitted_events: the names a script passes to emit("...") / :emit('...').
+@(private = "file")
+emitted_events :: proc(text: string, out: ^[dynamic]string) {
+	rest := text
+	for {
+		i := strings.index(rest, "emit(")
+		if i < 0 do return
+		rest = rest[i + len("emit("):]
+		t := strings.trim_left_space(rest)
+		if len(t) < 2 || (t[0] != '"' && t[0] != '\'') do continue
+		q := t[0]
+		if j := strings.index_byte(t[1:], q); j > 0 {
+			name := t[1:1 + j]
+			ok := true
+			for ch in name do if !(ch == '_' || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9')) do ok = false
+			if ok do append(out, strings.clone(name, context.temp_allocator))
+		}
+	}
+}
+
+// node_type_events: the events a node type raises - the tree events and its
+// own, read from the engine definitions' `---@alias <Type>Event` lines.
+node_type_events :: proc(nodeType: string) -> []string {
+	out := make([dynamic]string, context.temp_allocator)
+	append(&out, "entered_tree", "exited_tree", "child_added", "child_removed", "parent_added", "parent_removed")
+	if nodeType == "" do return out[:]
+	api := ENGINE_API_LUA
+	key := fmt.tprintf("---@alias %sEvent ", nodeType)
+	i := strings.index(api, key)
+	if i < 0 do return out[:]
+	line := api[i + len(key):]
+	if nl := strings.index_byte(line, '\n'); nl >= 0 do line = line[:nl]
+	for part in strings.split(line, "|", context.temp_allocator) {
+		p := strings.trim_space(part)
+		if len(p) > 2 && p[0] == '"' do append(&out, p[1:len(p) - 1])
+	}
+	return out[:]
+}
+
 // node_class_name: the refined class of a node name that has a script.
 node_class_name :: proc(name: string) -> string {
 	sb := strings.builder_make(context.temp_allocator)

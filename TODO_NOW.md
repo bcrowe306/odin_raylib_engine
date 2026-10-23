@@ -71,7 +71,7 @@ out of scope here.
 
 Autocomplete and type safety
 - [x] 8.1 Typed `get_script()`: returns the script's generated class (methods, fields)
-- [ ] 8.2 Event names complete in `connect` / `emit` (engine events per node type + custom ones scripts emit) and `on_<event>` methods
+- [x] 8.2 Event names complete in `connect` / `emit` (engine events per node type + custom ones scripts emit) and `on_<event>` methods
 - [ ] 8.3 Typed `get_property` / `set_property` paths per node class
 - [ ] 8.4 Typed `get_node("path")` (paths relative to each script's nodes)
 - [ ] 8.5 Asset / scene / action aliases on more API parameters

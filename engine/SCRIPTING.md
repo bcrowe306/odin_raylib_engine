@@ -123,6 +123,12 @@ Every node raises named events (`EventSubject`s on the Odin side). A script
 receives the events of **its own node** as methods called `on_<event>`, and
 can subscribe to **any node's** events with `node:connect`.
 
+Event names complete in the Code tab: `timer:connect("` offers a timer's
+events (`timeout`, `tick`) plus the tree events, a button's `clicked`, and
+so on per node class; `connect` and `emit` also offer the project's custom
+events - the names its scripts `emit` (`self.node:emit("jumped")`) - and
+`function MyScript:on_` completes the `on_<event>` methods.
+
 | Event | Raised by | Value |
 |---|---|---|
 | `entered_tree` / `exited_tree` | every node | - |

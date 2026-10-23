@@ -319,12 +319,23 @@ function Node:destroy() end
 ---| "item_clicked"       # UI toolbar: value: item id
 ---| "level_loaded"       # LdtkLevelNode: colliders/entities built; value: level identifier
 ---| "entity_spawned"     # LdtkLevelNode: value: the spawned Node
+---| "revealed"           # TextNode: the typewriter reached the end
+---| "line_shown"         # DialogueNode: a line was fully shown; value: its index (1-based)
+
+---Events every node raises.
+---@alias NodeTreeEvent
+---| "entered_tree"       # the node joined the scene
+---| "exited_tree"        # the node is being removed
+---| "child_added"        # value: the child Node
+---| "child_removed"      # value: the child Node
+---| "parent_added"       # value: the new parent Node
+---| "parent_removed"     # value: the old parent Node
 
 ---Connects a handler to an event of this node (from any script). Handlers
 ---are removed automatically when the connecting script or this node is
 ---destroyed. A script also receives its own node's events as methods named
 ---`on_<event>` (e.g. `function MyScript:on_timeout() end`).
----@param event NodeEvent|string Event name (custom names work with `emit`)
+---@param event NodeEvent|ProjectEvent|string Event name (custom ones: the project's `emit` names)
 ---@param handler fun(value: any, source: Node) Called with the event value and this node
 ---@return integer id Connection id for `disconnect`
 function Node:connect(event, handler) end
@@ -336,9 +347,201 @@ function Node:disconnect(id) end
 
 ---Raises a custom event on this node: calls the node script's `on_<event>`
 ---method and every handler connected to that event name.
----@param event string Event name
+---@param event ProjectEvent|string Event name (the project's custom events complete)
 ---@param value? any Value passed to handlers
 function Node:emit(event, value) end
+
+-- node events begin (generated from the engine: lua_events_definitions_test.odin)
+
+---@alias TimerNodeEvent NodeTreeEvent|"tick"|"timeout"|ProjectEvent
+---Connects a handler to one of this node's events: tick (Every frame while the timer runs), timeout (The timer's duration elapsed); the tree events; custom ones.
+---@param event TimerNodeEvent|string
+---@param handler fun(value: any, source: TimerNode)
+---@return integer id Connection id for `disconnect`
+function TimerNode:connect(event, handler) end
+
+---@alias FrameAnimationNodeEvent NodeTreeEvent|"animation_finished"|ProjectEvent
+---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended); the tree events; custom ones.
+---@param event FrameAnimationNodeEvent|string
+---@param handler fun(value: any, source: FrameAnimationNode)
+---@return integer id Connection id for `disconnect`
+function FrameAnimationNode:connect(event, handler) end
+
+---@alias AnimationPlayerNodeEvent NodeTreeEvent|"animation_finished"|ProjectEvent
+---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended); the tree events; custom ones.
+---@param event AnimationPlayerNodeEvent|string
+---@param handler fun(value: any, source: AnimationPlayerNode)
+---@return integer id Connection id for `disconnect`
+function AnimationPlayerNode:connect(event, handler) end
+
+---@alias StateMachineNodeEvent NodeTreeEvent|"state_changed"|ProjectEvent
+---Connects a handler to one of this node's events: state_changed (The state machine entered a state); the tree events; custom ones.
+---@param event StateMachineNodeEvent|string
+---@param handler fun(value: any, source: StateMachineNode)
+---@return integer id Connection id for `disconnect`
+function StateMachineNode:connect(event, handler) end
+
+---@alias SoundNodeEvent NodeTreeEvent|"finished"|ProjectEvent
+---Connects a handler to one of this node's events: finished (Playback (or the dialogue) ended); the tree events; custom ones.
+---@param event SoundNodeEvent|string
+---@param handler fun(value: any, source: SoundNode)
+---@return integer id Connection id for `disconnect`
+function SoundNode:connect(event, handler) end
+
+---@alias MusicNodeEvent NodeTreeEvent|"finished"|ProjectEvent
+---Connects a handler to one of this node's events: finished (Playback (or the dialogue) ended); the tree events; custom ones.
+---@param event MusicNodeEvent|string
+---@param handler fun(value: any, source: MusicNode)
+---@return integer id Connection id for `disconnect`
+function MusicNode:connect(event, handler) end
+
+---@alias StaticBodyNodeEvent NodeTreeEvent|"collision_started"|"collision_ended"|ProjectEvent
+---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
+---@param event StaticBodyNodeEvent|string
+---@param handler fun(value: any, source: StaticBodyNode)
+---@return integer id Connection id for `disconnect`
+function StaticBodyNode:connect(event, handler) end
+
+---@alias DynamicBodyNodeEvent NodeTreeEvent|"collision_started"|"collision_ended"|ProjectEvent
+---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
+---@param event DynamicBodyNodeEvent|string
+---@param handler fun(value: any, source: DynamicBodyNode)
+---@return integer id Connection id for `disconnect`
+function DynamicBodyNode:connect(event, handler) end
+
+---@alias CharacterMoverNodeEvent NodeTreeEvent|"collision_started"|"collision_ended"|ProjectEvent
+---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
+---@param event CharacterMoverNodeEvent|string
+---@param handler fun(value: any, source: CharacterMoverNode)
+---@return integer id Connection id for `disconnect`
+function CharacterMoverNode:connect(event, handler) end
+
+---@alias AreaNodeEvent NodeTreeEvent|"body_entered"|"body_exited"|ProjectEvent
+---Connects a handler to one of this node's events: body_entered (A body entered the area), body_exited (A body left the area); the tree events; custom ones.
+---@param event AreaNodeEvent|string
+---@param handler fun(value: any, source: AreaNode)
+---@return integer id Connection id for `disconnect`
+function AreaNode:connect(event, handler) end
+
+---@alias RaycastNodeEvent NodeTreeEvent|"hit_started"|"hit_ended"|ProjectEvent
+---Connects a handler to one of this node's events: hit_started (The ray started hitting a node), hit_ended (The ray stopped hitting a node); the tree events; custom ones.
+---@param event RaycastNodeEvent|string
+---@param handler fun(value: any, source: RaycastNode)
+---@return integer id Connection id for `disconnect`
+function RaycastNode:connect(event, handler) end
+
+---@alias LdtkLevelNodeEvent NodeTreeEvent|"level_loaded"|"entity_spawned"|ProjectEvent
+---Connects a handler to one of this node's events: level_loaded (The LDtk level was built), entity_spawned (An LDtk entity was spawned); the tree events; custom ones.
+---@param event LdtkLevelNodeEvent|string
+---@param handler fun(value: any, source: LdtkLevelNode)
+---@return integer id Connection id for `disconnect`
+function LdtkLevelNode:connect(event, handler) end
+
+---@alias TextNodeEvent NodeTreeEvent|"revealed"|ProjectEvent
+---Connects a handler to one of this node's events: revealed (The text finished revealing); the tree events; custom ones.
+---@param event TextNodeEvent|string
+---@param handler fun(value: any, source: TextNode)
+---@return integer id Connection id for `disconnect`
+function TextNode:connect(event, handler) end
+
+---@alias DialogueNodeEvent NodeTreeEvent|"line_shown"|"finished"|ProjectEvent
+---Connects a handler to one of this node's events: line_shown (A dialogue line was fully shown (1-based)), finished (Playback (or the dialogue) ended); the tree events; custom ones.
+---@param event DialogueNodeEvent|string
+---@param handler fun(value: any, source: DialogueNode)
+---@return integer id Connection id for `disconnect`
+function DialogueNode:connect(event, handler) end
+
+---@alias UIButtonNodeEvent NodeTreeEvent|"clicked"|ProjectEvent
+---Connects a handler to one of this node's events: clicked (The button was clicked); the tree events; custom ones.
+---@param event UIButtonNodeEvent|string
+---@param handler fun(value: any, source: UIButtonNode)
+---@return integer id Connection id for `disconnect`
+function UIButtonNode:connect(event, handler) end
+
+---@alias UISliderNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
+---@param event UISliderNodeEvent|string
+---@param handler fun(value: any, source: UISliderNode)
+---@return integer id Connection id for `disconnect`
+function UISliderNode:connect(event, handler) end
+
+---@alias UICheckboxNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
+---@param event UICheckboxNodeEvent|string
+---@param handler fun(value: any, source: UICheckboxNode)
+---@return integer id Connection id for `disconnect`
+function UICheckboxNode:connect(event, handler) end
+
+---@alias UITextInputNodeEvent NodeTreeEvent|"value_changed"|"submitted"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed), submitted (Enter was pressed); the tree events; custom ones.
+---@param event UITextInputNodeEvent|string
+---@param handler fun(value: any, source: UITextInputNode)
+---@return integer id Connection id for `disconnect`
+function UITextInputNode:connect(event, handler) end
+
+---@alias UIDropdownNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
+---@param event UIDropdownNodeEvent|string
+---@param handler fun(value: any, source: UIDropdownNode)
+---@return integer id Connection id for `disconnect`
+function UIDropdownNode:connect(event, handler) end
+
+---@alias UIRadioGroupNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
+---@param event UIRadioGroupNodeEvent|string
+---@param handler fun(value: any, source: UIRadioGroupNode)
+---@return integer id Connection id for `disconnect`
+function UIRadioGroupNode:connect(event, handler) end
+
+---@alias UIKnobNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
+---@param event UIKnobNodeEvent|string
+---@param handler fun(value: any, source: UIKnobNode)
+---@return integer id Connection id for `disconnect`
+function UIKnobNode:connect(event, handler) end
+
+---@alias UINotchedSliderNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
+---@param event UINotchedSliderNodeEvent|string
+---@param handler fun(value: any, source: UINotchedSliderNode)
+---@return integer id Connection id for `disconnect`
+function UINotchedSliderNode:connect(event, handler) end
+
+---@alias UIVolumeFaderNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
+---@param event UIVolumeFaderNodeEvent|string
+---@param handler fun(value: any, source: UIVolumeFaderNode)
+---@return integer id Connection id for `disconnect`
+function UIVolumeFaderNode:connect(event, handler) end
+
+---@alias UIUnorderedListNodeEvent NodeTreeEvent|"selected"|ProjectEvent
+---Connects a handler to one of this node's events: selected (The selection changed); the tree events; custom ones.
+---@param event UIUnorderedListNodeEvent|string
+---@param handler fun(value: any, source: UIUnorderedListNode)
+---@return integer id Connection id for `disconnect`
+function UIUnorderedListNode:connect(event, handler) end
+
+---@alias UIOrderedListNodeEvent NodeTreeEvent|"selected"|ProjectEvent
+---Connects a handler to one of this node's events: selected (The selection changed); the tree events; custom ones.
+---@param event UIOrderedListNodeEvent|string
+---@param handler fun(value: any, source: UIOrderedListNode)
+---@return integer id Connection id for `disconnect`
+function UIOrderedListNode:connect(event, handler) end
+
+---@alias UITableNodeEvent NodeTreeEvent|"row_selected"|"sorted"|ProjectEvent
+---Connects a handler to one of this node's events: row_selected (A table row was selected), sorted (The table was sorted); the tree events; custom ones.
+---@param event UITableNodeEvent|string
+---@param handler fun(value: any, source: UITableNode)
+---@return integer id Connection id for `disconnect`
+function UITableNode:connect(event, handler) end
+
+---@alias UIToolbarNodeEvent NodeTreeEvent|"item_clicked"|ProjectEvent
+---Connects a handler to one of this node's events: item_clicked (A toolbar item was clicked); the tree events; custom ones.
+---@param event UIToolbarNodeEvent|string
+---@param handler fun(value: any, source: UIToolbarNode)
+---@return integer id Connection id for `disconnect`
+function UIToolbarNode:connect(event, handler) end
+-- node events end
 
 -- ----------------------------------------------------------------------------
 -- DynamicBodyNode Physics Methods
