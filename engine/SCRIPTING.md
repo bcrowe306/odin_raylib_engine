@@ -148,6 +148,24 @@ return Enemy
 
 ---
 
+## Vectors
+
+`Vec2`, `Vec3` and `Vec4` are value types with operators:
+
+```lua
+local v = Vec2(3, 4)
+local w = (v + Vec2.ONE) * 2 - Vec2(1, 0)    -- + - * / with a vector or a number
+print(v:length(), v:normalized(), v:dot(w), v:distance(w), v:lerp(w, 0.5))
+print(Vec2.RIGHT:rotated(90), v:angle())    -- degrees (y is down)
+local x, y = v:unpack()
+self.node:set_position(v)                   -- setters taking x, y take a vector too
+local p = self.node:get_property("position") -- vector properties come back as Vec2
+```
+
+Constants `Vec2.ZERO`, `ONE`, `UP`, `DOWN`, `LEFT`, `RIGHT`. A vector still
+answers `v[1]` / `v[2]`, so code written for `{x, y}` arrays keeps working;
+exported `vector2` script properties are Vec2 too.
+
 ## Completion of project names
 
 String arguments complete from the project: input actions

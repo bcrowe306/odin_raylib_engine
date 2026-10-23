@@ -546,8 +546,8 @@ function UIToolbarNode:connect(event, handler) end
 -- node properties begin (generated from the engine: lua_properties_definitions_test.odin)
 
 ---@alias NodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -557,8 +557,8 @@ function UIToolbarNode:connect(event, handler) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path NodeProperty|string
 ---@return any
----@overload fun(self: Node, path: "position"): number[]
----@overload fun(self: Node, path: "scale"): number[]
+---@overload fun(self: Node, path: "position"): Vec2
+---@overload fun(self: Node, path: "scale"): Vec2
 ---@overload fun(self: Node, path: "rotation"): number
 ---@overload fun(self: Node, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: Node, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -570,8 +570,8 @@ function Node:get_property(path) end
 ---@param path NodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: Node, path: "position", x: number|number[], y?: number)
----@overload fun(self: Node, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: Node, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: Node, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: Node, path: "rotation", value: number)
 ---@overload fun(self: Node, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: Node, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -580,8 +580,8 @@ function Node:get_property(path) end
 function Node:set_property(path, value, y) end
 
 ---@alias CameraNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -590,18 +590,18 @@ function Node:set_property(path, value, y) end
 ---| "isCurrent" # boolean - The camera the game renders through (one per scene).
 ---| "followMode" # "Static"|"SingleTarget"|"MultiTarget"|"Manual" - Static: stays put. Single Target: follows its Follow Target. Multi Target: frames all t...
 ---| "dragType" # "None"|"SmoothDamp"|"SpringDamp"|"LookAhead"|"AutoSpeed" - How the camera catches up with its target: none (locked), smooth damp, spring, look-ahe...
----| "targetPosition" # number[] - Where the camera is heading (world px).
----| "currentPosition" # number[] (runtime) - Where the camera is now (world px).
+---| "targetPosition" # Vec2 - Where the camera is heading (world px).
+---| "currentPosition" # Vec2 (runtime) - Where the camera is now (world px).
 ---| "smoothDrag" # boolean - Ease towards the target instead of snapping.
----| "smoothDragSpeed" # number[] - Smooth-damp time per axis (s): higher lags more.
+---| "smoothDragSpeed" # Vec2 - Smooth-damp time per axis (s): higher lags more.
 ---| "springConstant" # number - Spring Damp: stiffness pulling the camera to the target.
 ---| "dampingRatio" # number - Spring Damp: 1 settles without overshoot, lower wobbles.
----| "predictionTime" # number[] - Look Ahead: how far ahead of the target to aim, in seconds of its velocity.
----| "maxDistance" # number[] - Reserved (not used yet).
----| "offset" # number[] - Added to the target position (world px).
+---| "predictionTime" # Vec2 - Look Ahead: how far ahead of the target to aim, in seconds of its velocity.
+---| "maxDistance" # Vec2 - Reserved (not used yet).
+---| "offset" # Vec2 - Added to the target position (world px).
 ---| "smoothOffset" # boolean - Ease offset changes in.
 ---| "smoothOffsetSpeed" # number - How fast offset changes ease in.
----| "screenOffset" # number[] - Where on screen the camera's position appears (px; half the window = centred).
+---| "screenOffset" # Vec2 - Where on screen the camera's position appears (px; half the window = centred).
 ---| "currentRotation" # number (runtime) - The camera's rotation now (degrees).
 ---| "targetRotation" # number - Rotation the camera turns to (degrees).
 ---| "allowRotation" # boolean - Let the camera rotate (else it stays upright).
@@ -628,7 +628,7 @@ function Node:set_property(path, value, y) end
 ---| "topMargin" # number - Top dead-zone margin (fraction of the screen).
 ---| "bottomMargin" # number - Bottom dead-zone margin (fraction of the screen).
 ---| "enableMouseFollow" # boolean - Nudge the camera towards the mouse.
----| "mouseInfluence" # number[] - How much the mouse pulls the camera per axis (0-1).
+---| "mouseInfluence" # Vec2 - How much the mouse pulls the camera per axis (0-1).
 ---| "shakePreset" # "Custom"|"Gunshot"|"Earthquake"|"Handheld"|"Explosion"|"Impact"|"Rumble"|"Vibration"|"Wobbly" - Ready-made shake (gunshot, earthquake...); Custom uses the settings below.
 ---| "isShaking" # boolean (runtime) - A shake is running.
 ---| "shakeSpeed" # number - Custom shake: how fast it shakes.
@@ -638,8 +638,8 @@ function Node:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path CameraNodeProperty|string
 ---@return any
----@overload fun(self: CameraNode, path: "position"): number[]
----@overload fun(self: CameraNode, path: "scale"): number[]
+---@overload fun(self: CameraNode, path: "position"): Vec2
+---@overload fun(self: CameraNode, path: "scale"): Vec2
 ---@overload fun(self: CameraNode, path: "rotation"): number
 ---@overload fun(self: CameraNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: CameraNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -648,18 +648,18 @@ function Node:set_property(path, value, y) end
 ---@overload fun(self: CameraNode, path: "isCurrent"): boolean
 ---@overload fun(self: CameraNode, path: "followMode"): "Static"|"SingleTarget"|"MultiTarget"|"Manual"
 ---@overload fun(self: CameraNode, path: "dragType"): "None"|"SmoothDamp"|"SpringDamp"|"LookAhead"|"AutoSpeed"
----@overload fun(self: CameraNode, path: "targetPosition"): number[]
----@overload fun(self: CameraNode, path: "currentPosition"): number[]
+---@overload fun(self: CameraNode, path: "targetPosition"): Vec2
+---@overload fun(self: CameraNode, path: "currentPosition"): Vec2
 ---@overload fun(self: CameraNode, path: "smoothDrag"): boolean
----@overload fun(self: CameraNode, path: "smoothDragSpeed"): number[]
+---@overload fun(self: CameraNode, path: "smoothDragSpeed"): Vec2
 ---@overload fun(self: CameraNode, path: "springConstant"): number
 ---@overload fun(self: CameraNode, path: "dampingRatio"): number
----@overload fun(self: CameraNode, path: "predictionTime"): number[]
----@overload fun(self: CameraNode, path: "maxDistance"): number[]
----@overload fun(self: CameraNode, path: "offset"): number[]
+---@overload fun(self: CameraNode, path: "predictionTime"): Vec2
+---@overload fun(self: CameraNode, path: "maxDistance"): Vec2
+---@overload fun(self: CameraNode, path: "offset"): Vec2
 ---@overload fun(self: CameraNode, path: "smoothOffset"): boolean
 ---@overload fun(self: CameraNode, path: "smoothOffsetSpeed"): number
----@overload fun(self: CameraNode, path: "screenOffset"): number[]
+---@overload fun(self: CameraNode, path: "screenOffset"): Vec2
 ---@overload fun(self: CameraNode, path: "currentRotation"): number
 ---@overload fun(self: CameraNode, path: "targetRotation"): number
 ---@overload fun(self: CameraNode, path: "allowRotation"): boolean
@@ -686,7 +686,7 @@ function Node:set_property(path, value, y) end
 ---@overload fun(self: CameraNode, path: "topMargin"): number
 ---@overload fun(self: CameraNode, path: "bottomMargin"): number
 ---@overload fun(self: CameraNode, path: "enableMouseFollow"): boolean
----@overload fun(self: CameraNode, path: "mouseInfluence"): number[]
+---@overload fun(self: CameraNode, path: "mouseInfluence"): Vec2
 ---@overload fun(self: CameraNode, path: "shakePreset"): "Custom"|"Gunshot"|"Earthquake"|"Handheld"|"Explosion"|"Impact"|"Rumble"|"Vibration"|"Wobbly"
 ---@overload fun(self: CameraNode, path: "isShaking"): boolean
 ---@overload fun(self: CameraNode, path: "shakeSpeed"): number
@@ -698,8 +698,8 @@ function CameraNode:get_property(path) end
 ---@param path CameraNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: CameraNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: CameraNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: CameraNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: CameraNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "rotation", value: number)
 ---@overload fun(self: CameraNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: CameraNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -708,18 +708,18 @@ function CameraNode:get_property(path) end
 ---@overload fun(self: CameraNode, path: "isCurrent", value: boolean)
 ---@overload fun(self: CameraNode, path: "followMode", value: "Static"|"SingleTarget"|"MultiTarget"|"Manual")
 ---@overload fun(self: CameraNode, path: "dragType", value: "None"|"SmoothDamp"|"SpringDamp"|"LookAhead"|"AutoSpeed")
----@overload fun(self: CameraNode, path: "targetPosition", x: number|number[], y?: number)
----@overload fun(self: CameraNode, path: "currentPosition", x: number|number[], y?: number)
+---@overload fun(self: CameraNode, path: "targetPosition", x: number|Vec2|number[], y?: number)
+---@overload fun(self: CameraNode, path: "currentPosition", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "smoothDrag", value: boolean)
----@overload fun(self: CameraNode, path: "smoothDragSpeed", x: number|number[], y?: number)
+---@overload fun(self: CameraNode, path: "smoothDragSpeed", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "springConstant", value: number)
 ---@overload fun(self: CameraNode, path: "dampingRatio", value: number)
----@overload fun(self: CameraNode, path: "predictionTime", x: number|number[], y?: number)
----@overload fun(self: CameraNode, path: "maxDistance", x: number|number[], y?: number)
----@overload fun(self: CameraNode, path: "offset", x: number|number[], y?: number)
+---@overload fun(self: CameraNode, path: "predictionTime", x: number|Vec2|number[], y?: number)
+---@overload fun(self: CameraNode, path: "maxDistance", x: number|Vec2|number[], y?: number)
+---@overload fun(self: CameraNode, path: "offset", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "smoothOffset", value: boolean)
 ---@overload fun(self: CameraNode, path: "smoothOffsetSpeed", value: number)
----@overload fun(self: CameraNode, path: "screenOffset", x: number|number[], y?: number)
+---@overload fun(self: CameraNode, path: "screenOffset", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "currentRotation", value: number)
 ---@overload fun(self: CameraNode, path: "targetRotation", value: number)
 ---@overload fun(self: CameraNode, path: "allowRotation", value: boolean)
@@ -746,7 +746,7 @@ function CameraNode:get_property(path) end
 ---@overload fun(self: CameraNode, path: "topMargin", value: number)
 ---@overload fun(self: CameraNode, path: "bottomMargin", value: number)
 ---@overload fun(self: CameraNode, path: "enableMouseFollow", value: boolean)
----@overload fun(self: CameraNode, path: "mouseInfluence", x: number|number[], y?: number)
+---@overload fun(self: CameraNode, path: "mouseInfluence", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "shakePreset", value: "Custom"|"Gunshot"|"Earthquake"|"Handheld"|"Explosion"|"Impact"|"Rumble"|"Vibration"|"Wobbly")
 ---@overload fun(self: CameraNode, path: "isShaking", value: boolean)
 ---@overload fun(self: CameraNode, path: "shakeSpeed", value: number)
@@ -755,10 +755,10 @@ function CameraNode:get_property(path) end
 function CameraNode:set_property(path, value, y) end
 
 ---@alias TextureNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
----| "origin" # number[] - Where in the image the position is, and what it rotates and scales around: a fraction o...
+---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
@@ -768,10 +768,10 @@ function CameraNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path TextureNodeProperty|string
 ---@return any
----@overload fun(self: TextureNode, path: "position"): number[]
----@overload fun(self: TextureNode, path: "scale"): number[]
+---@overload fun(self: TextureNode, path: "position"): Vec2
+---@overload fun(self: TextureNode, path: "scale"): Vec2
 ---@overload fun(self: TextureNode, path: "rotation"): number
----@overload fun(self: TextureNode, path: "origin"): number[]
+---@overload fun(self: TextureNode, path: "origin"): Vec2
 ---@overload fun(self: TextureNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: TextureNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: TextureNode, path: "paused"): boolean
@@ -783,10 +783,10 @@ function TextureNode:get_property(path) end
 ---@param path TextureNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: TextureNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: TextureNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: TextureNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TextureNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextureNode, path: "rotation", value: number)
----@overload fun(self: TextureNode, path: "origin", x: number|number[], y?: number)
+---@overload fun(self: TextureNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextureNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: TextureNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: TextureNode, path: "paused", value: boolean)
@@ -795,10 +795,10 @@ function TextureNode:get_property(path) end
 function TextureNode:set_property(path, value, y) end
 
 ---@alias FrameAnimationNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
----| "origin" # number[] - Where in the image the position is, and what it rotates and scales around: a fraction o...
+---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
@@ -807,10 +807,10 @@ function TextureNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path FrameAnimationNodeProperty|string
 ---@return any
----@overload fun(self: FrameAnimationNode, path: "position"): number[]
----@overload fun(self: FrameAnimationNode, path: "scale"): number[]
+---@overload fun(self: FrameAnimationNode, path: "position"): Vec2
+---@overload fun(self: FrameAnimationNode, path: "scale"): Vec2
 ---@overload fun(self: FrameAnimationNode, path: "rotation"): number
----@overload fun(self: FrameAnimationNode, path: "origin"): number[]
+---@overload fun(self: FrameAnimationNode, path: "origin"): Vec2
 ---@overload fun(self: FrameAnimationNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: FrameAnimationNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: FrameAnimationNode, path: "paused"): boolean
@@ -821,10 +821,10 @@ function FrameAnimationNode:get_property(path) end
 ---@param path FrameAnimationNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: FrameAnimationNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: FrameAnimationNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: FrameAnimationNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: FrameAnimationNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: FrameAnimationNode, path: "rotation", value: number)
----@overload fun(self: FrameAnimationNode, path: "origin", x: number|number[], y?: number)
+---@overload fun(self: FrameAnimationNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: FrameAnimationNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: FrameAnimationNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: FrameAnimationNode, path: "paused", value: boolean)
@@ -832,10 +832,10 @@ function FrameAnimationNode:get_property(path) end
 function FrameAnimationNode:set_property(path, value, y) end
 
 ---@alias AnimationPlayerNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
----| "origin" # number[] - Where in the image the position is, and what it rotates and scales around: a fraction o...
+---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
@@ -848,10 +848,10 @@ function FrameAnimationNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path AnimationPlayerNodeProperty|string
 ---@return any
----@overload fun(self: AnimationPlayerNode, path: "position"): number[]
----@overload fun(self: AnimationPlayerNode, path: "scale"): number[]
+---@overload fun(self: AnimationPlayerNode, path: "position"): Vec2
+---@overload fun(self: AnimationPlayerNode, path: "scale"): Vec2
 ---@overload fun(self: AnimationPlayerNode, path: "rotation"): number
----@overload fun(self: AnimationPlayerNode, path: "origin"): number[]
+---@overload fun(self: AnimationPlayerNode, path: "origin"): Vec2
 ---@overload fun(self: AnimationPlayerNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: AnimationPlayerNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: AnimationPlayerNode, path: "paused"): boolean
@@ -866,10 +866,10 @@ function AnimationPlayerNode:get_property(path) end
 ---@param path AnimationPlayerNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: AnimationPlayerNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: AnimationPlayerNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: AnimationPlayerNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AnimationPlayerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AnimationPlayerNode, path: "rotation", value: number)
----@overload fun(self: AnimationPlayerNode, path: "origin", x: number|number[], y?: number)
+---@overload fun(self: AnimationPlayerNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AnimationPlayerNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: AnimationPlayerNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: AnimationPlayerNode, path: "paused", value: boolean)
@@ -881,8 +881,8 @@ function AnimationPlayerNode:get_property(path) end
 function AnimationPlayerNode:set_property(path, value, y) end
 
 ---@alias ParticleEmitterNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -890,13 +890,13 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "emitter.amount" # integer - Particles alive at once (the pool size).
 ---| "emitter.lifetime" # number - Seconds each particle lives.
----| "emitter.position" # number[] (runtime) - Emitter position (follows the node).
+---| "emitter.position" # Vec2 (runtime) - Emitter position (follows the node).
 ---| "emitter.burst" # number - 0 spreads emission evenly over the lifetime, 1 releases every particle at once.
----| "emitter.size" # number[] - Particle size (px).
+---| "emitter.size" # Vec2 - Particle size (px).
 ---| "emitter.sizeVariance" # number - How much of Size Spread is applied at random (0-1).
 ---| "emitter.sizeSpread" # number - Largest random size change (px).
----| "emitter.scaleStart" # number[] - Scale at birth (multiplies Size).
----| "emitter.scaleEnd" # number[] - Scale at death; it interpolates over the lifetime.
+---| "emitter.scaleStart" # Vec2 - Scale at birth (multiplies Size).
+---| "emitter.scaleEnd" # Vec2 - Scale at death; it interpolates over the lifetime.
 ---| "emitter.rotation" # number - Starting rotation (degrees).
 ---| "emitter.rotationVariance" # number - How much of Rotation Spread is applied at random (0-1).
 ---| "emitter.rotationSpread" # number - Largest random rotation change (degrees).
@@ -908,7 +908,7 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---| "emitter.particleColor" # number[] - Colour at birth.
 ---| "emitter.colorEnd" # number[] - Colour at death.
 ---| "emitter.colorVariance" # number - Random colour variation (0-1).
----| "emitter.spread" # number[] - Particles start anywhere within ± this box around the emitter (px).
+---| "emitter.spread" # Vec2 - Particles start anywhere within ± this box around the emitter (px).
 ---| "emitter.velocity" # number - Starting speed (px/s).
 ---| "emitter.velocityVariance" # number - How much of Velocity Spread is applied at random (0-1).
 ---| "emitter.velocitySpread" # number - Largest random speed change (px/s).
@@ -917,9 +917,9 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---| "emitter.angle" # number - Emission direction (degrees; 0 = right, 90 = down).
 ---| "emitter.angleVariance" # number - How much of Angle Spread is applied at random (0-1).
 ---| "emitter.angleSpread" # number - Largest random change to the angle (± degrees; 180 = all round).
----| "emitter.gravityDirection" # number[] - Direction gravity pulls particles.
+---| "emitter.gravityDirection" # Vec2 - Direction gravity pulls particles.
 ---| "emitter.gravityVelocity" # number - Strength of that gravity (px/s²).
----| "emitter.wind" # number[] - Constant drift added to every particle (px/s).
+---| "emitter.wind" # Vec2 - Constant drift added to every particle (px/s).
 ---| "emitter.collisionEnabled" # boolean - Particles bounce off physics colliders.
 ---| "emitter.elasticity" # number - Bounciness when colliding (0 stops, 1 keeps all speed).
 ---| "emitter.shape" # "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom" - Shape each particle is drawn as.
@@ -929,8 +929,8 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path ParticleEmitterNodeProperty|string
 ---@return any
----@overload fun(self: ParticleEmitterNode, path: "position"): number[]
----@overload fun(self: ParticleEmitterNode, path: "scale"): number[]
+---@overload fun(self: ParticleEmitterNode, path: "position"): Vec2
+---@overload fun(self: ParticleEmitterNode, path: "scale"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "rotation"): number
 ---@overload fun(self: ParticleEmitterNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: ParticleEmitterNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -938,13 +938,13 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "enabled"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.amount"): integer
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.lifetime"): number
----@overload fun(self: ParticleEmitterNode, path: "emitter.position"): number[]
+---@overload fun(self: ParticleEmitterNode, path: "emitter.position"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.burst"): number
----@overload fun(self: ParticleEmitterNode, path: "emitter.size"): number[]
+---@overload fun(self: ParticleEmitterNode, path: "emitter.size"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.sizeVariance"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.sizeSpread"): number
----@overload fun(self: ParticleEmitterNode, path: "emitter.scaleStart"): number[]
----@overload fun(self: ParticleEmitterNode, path: "emitter.scaleEnd"): number[]
+---@overload fun(self: ParticleEmitterNode, path: "emitter.scaleStart"): Vec2
+---@overload fun(self: ParticleEmitterNode, path: "emitter.scaleEnd"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.rotation"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.rotationVariance"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.rotationSpread"): number
@@ -956,7 +956,7 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.particleColor"): number[]
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.colorEnd"): number[]
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.colorVariance"): number
----@overload fun(self: ParticleEmitterNode, path: "emitter.spread"): number[]
+---@overload fun(self: ParticleEmitterNode, path: "emitter.spread"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.velocity"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.velocityVariance"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.velocitySpread"): number
@@ -965,9 +965,9 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.angle"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.angleVariance"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.angleSpread"): number
----@overload fun(self: ParticleEmitterNode, path: "emitter.gravityDirection"): number[]
+---@overload fun(self: ParticleEmitterNode, path: "emitter.gravityDirection"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.gravityVelocity"): number
----@overload fun(self: ParticleEmitterNode, path: "emitter.wind"): number[]
+---@overload fun(self: ParticleEmitterNode, path: "emitter.wind"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.collisionEnabled"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.elasticity"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.shape"): "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom"
@@ -979,8 +979,8 @@ function ParticleEmitterNode:get_property(path) end
 ---@param path ParticleEmitterNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: ParticleEmitterNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: ParticleEmitterNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "rotation", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: ParticleEmitterNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -988,13 +988,13 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "enabled", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.amount", value: integer)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.lifetime", value: number)
----@overload fun(self: ParticleEmitterNode, path: "emitter.position", x: number|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.burst", value: number)
----@overload fun(self: ParticleEmitterNode, path: "emitter.size", x: number|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.sizeVariance", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.sizeSpread", value: number)
----@overload fun(self: ParticleEmitterNode, path: "emitter.scaleStart", x: number|number[], y?: number)
----@overload fun(self: ParticleEmitterNode, path: "emitter.scaleEnd", x: number|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.scaleStart", x: number|Vec2|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.scaleEnd", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.rotation", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.rotationVariance", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.rotationSpread", value: number)
@@ -1006,7 +1006,7 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.particleColor", value: number[])
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.colorEnd", value: number[])
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.colorVariance", value: number)
----@overload fun(self: ParticleEmitterNode, path: "emitter.spread", x: number|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.spread", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.velocity", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.velocityVariance", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.velocitySpread", value: number)
@@ -1015,9 +1015,9 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.angle", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.angleVariance", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.angleSpread", value: number)
----@overload fun(self: ParticleEmitterNode, path: "emitter.gravityDirection", x: number|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.gravityDirection", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.gravityVelocity", value: number)
----@overload fun(self: ParticleEmitterNode, path: "emitter.wind", x: number|number[], y?: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.wind", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.collisionEnabled", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.elasticity", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.shape", value: "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom")
@@ -1026,8 +1026,8 @@ function ParticleEmitterNode:get_property(path) end
 function ParticleEmitterNode:set_property(path, value, y) end
 
 ---@alias SoundNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -1044,8 +1044,8 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path SoundNodeProperty|string
 ---@return any
----@overload fun(self: SoundNode, path: "position"): number[]
----@overload fun(self: SoundNode, path: "scale"): number[]
+---@overload fun(self: SoundNode, path: "position"): Vec2
+---@overload fun(self: SoundNode, path: "scale"): Vec2
 ---@overload fun(self: SoundNode, path: "rotation"): number
 ---@overload fun(self: SoundNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: SoundNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -1064,8 +1064,8 @@ function SoundNode:get_property(path) end
 ---@param path SoundNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: SoundNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: SoundNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: SoundNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: SoundNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: SoundNode, path: "rotation", value: number)
 ---@overload fun(self: SoundNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: SoundNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -1081,8 +1081,8 @@ function SoundNode:get_property(path) end
 function SoundNode:set_property(path, value, y) end
 
 ---@alias MusicNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -1099,8 +1099,8 @@ function SoundNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path MusicNodeProperty|string
 ---@return any
----@overload fun(self: MusicNode, path: "position"): number[]
----@overload fun(self: MusicNode, path: "scale"): number[]
+---@overload fun(self: MusicNode, path: "position"): Vec2
+---@overload fun(self: MusicNode, path: "scale"): Vec2
 ---@overload fun(self: MusicNode, path: "rotation"): number
 ---@overload fun(self: MusicNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: MusicNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -1119,8 +1119,8 @@ function MusicNode:get_property(path) end
 ---@param path MusicNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: MusicNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: MusicNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: MusicNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: MusicNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: MusicNode, path: "rotation", value: number)
 ---@overload fun(self: MusicNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: MusicNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -1136,8 +1136,8 @@ function MusicNode:get_property(path) end
 function MusicNode:set_property(path, value, y) end
 
 ---@alias StaticBodyNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -1149,8 +1149,8 @@ function MusicNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path StaticBodyNodeProperty|string
 ---@return any
----@overload fun(self: StaticBodyNode, path: "position"): number[]
----@overload fun(self: StaticBodyNode, path: "scale"): number[]
+---@overload fun(self: StaticBodyNode, path: "position"): Vec2
+---@overload fun(self: StaticBodyNode, path: "scale"): Vec2
 ---@overload fun(self: StaticBodyNode, path: "rotation"): number
 ---@overload fun(self: StaticBodyNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: StaticBodyNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -1164,8 +1164,8 @@ function StaticBodyNode:get_property(path) end
 ---@param path StaticBodyNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: StaticBodyNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: StaticBodyNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: StaticBodyNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: StaticBodyNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: StaticBodyNode, path: "rotation", value: number)
 ---@overload fun(self: StaticBodyNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: StaticBodyNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -1176,14 +1176,14 @@ function StaticBodyNode:get_property(path) end
 function StaticBodyNode:set_property(path, value, y) end
 
 ---@alias DynamicBodyNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "linearVelocity" # number[] - Velocity (px/s).
+---| "linearVelocity" # Vec2 - Velocity (px/s).
 ---| "angularVelocity" # number - Spin (degrees/s).
 ---| "linearDamping" # number - Slows movement over time (air drag).
 ---| "angularDamping" # number - Slows spin over time.
@@ -1199,14 +1199,14 @@ function StaticBodyNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path DynamicBodyNodeProperty|string
 ---@return any
----@overload fun(self: DynamicBodyNode, path: "position"): number[]
----@overload fun(self: DynamicBodyNode, path: "scale"): number[]
+---@overload fun(self: DynamicBodyNode, path: "position"): Vec2
+---@overload fun(self: DynamicBodyNode, path: "scale"): Vec2
 ---@overload fun(self: DynamicBodyNode, path: "rotation"): number
 ---@overload fun(self: DynamicBodyNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: DynamicBodyNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: DynamicBodyNode, path: "paused"): boolean
 ---@overload fun(self: DynamicBodyNode, path: "enabled"): boolean
----@overload fun(self: DynamicBodyNode, path: "linearVelocity"): number[]
+---@overload fun(self: DynamicBodyNode, path: "linearVelocity"): Vec2
 ---@overload fun(self: DynamicBodyNode, path: "angularVelocity"): number
 ---@overload fun(self: DynamicBodyNode, path: "linearDamping"): number
 ---@overload fun(self: DynamicBodyNode, path: "angularDamping"): number
@@ -1224,14 +1224,14 @@ function DynamicBodyNode:get_property(path) end
 ---@param path DynamicBodyNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: DynamicBodyNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: DynamicBodyNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: DynamicBodyNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: DynamicBodyNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DynamicBodyNode, path: "rotation", value: number)
 ---@overload fun(self: DynamicBodyNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: DynamicBodyNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: DynamicBodyNode, path: "paused", value: boolean)
 ---@overload fun(self: DynamicBodyNode, path: "enabled", value: boolean)
----@overload fun(self: DynamicBodyNode, path: "linearVelocity", x: number|number[], y?: number)
+---@overload fun(self: DynamicBodyNode, path: "linearVelocity", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DynamicBodyNode, path: "angularVelocity", value: number)
 ---@overload fun(self: DynamicBodyNode, path: "linearDamping", value: number)
 ---@overload fun(self: DynamicBodyNode, path: "angularDamping", value: number)
@@ -1246,8 +1246,8 @@ function DynamicBodyNode:get_property(path) end
 function DynamicBodyNode:set_property(path, value, y) end
 
 ---@alias CharacterMoverNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -1255,7 +1255,7 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "radius" # number - Capsule radius (px).
 ---| "height" # number - Capsule height (px).
----| "velocity" # number[] (runtime) - Velocity now (px/s).
+---| "velocity" # Vec2 (runtime) - Velocity now (px/s).
 ---| "targetSpeedX" # number (runtime) - Horizontal speed the built-in movement accelerates to (px/s).
 ---| "maxSpeed" # number - Top running speed (px/s).
 ---| "acceleration" # number - How quickly it reaches top speed (px/s²).
@@ -1271,8 +1271,8 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path CharacterMoverNodeProperty|string
 ---@return any
----@overload fun(self: CharacterMoverNode, path: "position"): number[]
----@overload fun(self: CharacterMoverNode, path: "scale"): number[]
+---@overload fun(self: CharacterMoverNode, path: "position"): Vec2
+---@overload fun(self: CharacterMoverNode, path: "scale"): Vec2
 ---@overload fun(self: CharacterMoverNode, path: "rotation"): number
 ---@overload fun(self: CharacterMoverNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: CharacterMoverNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -1280,7 +1280,7 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---@overload fun(self: CharacterMoverNode, path: "enabled"): boolean
 ---@overload fun(self: CharacterMoverNode, path: "radius"): number
 ---@overload fun(self: CharacterMoverNode, path: "height"): number
----@overload fun(self: CharacterMoverNode, path: "velocity"): number[]
+---@overload fun(self: CharacterMoverNode, path: "velocity"): Vec2
 ---@overload fun(self: CharacterMoverNode, path: "targetSpeedX"): number
 ---@overload fun(self: CharacterMoverNode, path: "maxSpeed"): number
 ---@overload fun(self: CharacterMoverNode, path: "acceleration"): number
@@ -1298,8 +1298,8 @@ function CharacterMoverNode:get_property(path) end
 ---@param path CharacterMoverNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: CharacterMoverNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: CharacterMoverNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: CharacterMoverNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: CharacterMoverNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CharacterMoverNode, path: "rotation", value: number)
 ---@overload fun(self: CharacterMoverNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: CharacterMoverNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -1307,7 +1307,7 @@ function CharacterMoverNode:get_property(path) end
 ---@overload fun(self: CharacterMoverNode, path: "enabled", value: boolean)
 ---@overload fun(self: CharacterMoverNode, path: "radius", value: number)
 ---@overload fun(self: CharacterMoverNode, path: "height", value: number)
----@overload fun(self: CharacterMoverNode, path: "velocity", x: number|number[], y?: number)
+---@overload fun(self: CharacterMoverNode, path: "velocity", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CharacterMoverNode, path: "targetSpeedX", value: number)
 ---@overload fun(self: CharacterMoverNode, path: "maxSpeed", value: number)
 ---@overload fun(self: CharacterMoverNode, path: "acceleration", value: number)
@@ -1322,8 +1322,8 @@ function CharacterMoverNode:get_property(path) end
 function CharacterMoverNode:set_property(path, value, y) end
 
 ---@alias AreaNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -1337,8 +1337,8 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path AreaNodeProperty|string
 ---@return any
----@overload fun(self: AreaNode, path: "position"): number[]
----@overload fun(self: AreaNode, path: "scale"): number[]
+---@overload fun(self: AreaNode, path: "position"): Vec2
+---@overload fun(self: AreaNode, path: "scale"): Vec2
 ---@overload fun(self: AreaNode, path: "rotation"): number
 ---@overload fun(self: AreaNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: AreaNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -1354,8 +1354,8 @@ function AreaNode:get_property(path) end
 ---@param path AreaNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: AreaNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: AreaNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: AreaNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AreaNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AreaNode, path: "rotation", value: number)
 ---@overload fun(self: AreaNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: AreaNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -1368,40 +1368,40 @@ function AreaNode:get_property(path) end
 function AreaNode:set_property(path, value, y) end
 
 ---@alias RaycastNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "direction" # number[] - Direction of the ray (rotated with the node).
+---| "direction" # Vec2 - Direction of the ray (rotated with the node).
 ---| "length" # number - Length of the ray (px).
 ---| "collideWithSensors" # boolean - Sensor shapes (areas) also stop the ray.
 ---| "isColliding" # boolean (runtime) - The ray hit something this frame.
 ---| "hitFraction" # number (runtime) - Where along the ray it hit (0 start, 1 end).
----| "hitPoint" # number[] (runtime) - World point of the hit (px).
----| "hitNormal" # number[] (runtime) - Surface direction at the hit.
+---| "hitPoint" # Vec2 (runtime) - World point of the hit (px).
+---| "hitNormal" # Vec2 (runtime) - Surface direction at the hit.
 ---| "rayColor" # number[] - Ray colour when it hits nothing.
 ---| "hitColor" # number[] - Ray colour when it hits.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path RaycastNodeProperty|string
 ---@return any
----@overload fun(self: RaycastNode, path: "position"): number[]
----@overload fun(self: RaycastNode, path: "scale"): number[]
+---@overload fun(self: RaycastNode, path: "position"): Vec2
+---@overload fun(self: RaycastNode, path: "scale"): Vec2
 ---@overload fun(self: RaycastNode, path: "rotation"): number
 ---@overload fun(self: RaycastNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: RaycastNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: RaycastNode, path: "paused"): boolean
 ---@overload fun(self: RaycastNode, path: "enabled"): boolean
----@overload fun(self: RaycastNode, path: "direction"): number[]
+---@overload fun(self: RaycastNode, path: "direction"): Vec2
 ---@overload fun(self: RaycastNode, path: "length"): number
 ---@overload fun(self: RaycastNode, path: "collideWithSensors"): boolean
 ---@overload fun(self: RaycastNode, path: "isColliding"): boolean
 ---@overload fun(self: RaycastNode, path: "hitFraction"): number
----@overload fun(self: RaycastNode, path: "hitPoint"): number[]
----@overload fun(self: RaycastNode, path: "hitNormal"): number[]
+---@overload fun(self: RaycastNode, path: "hitPoint"): Vec2
+---@overload fun(self: RaycastNode, path: "hitNormal"): Vec2
 ---@overload fun(self: RaycastNode, path: "rayColor"): number[]
 ---@overload fun(self: RaycastNode, path: "hitColor"): number[]
 function RaycastNode:get_property(path) end
@@ -1410,27 +1410,27 @@ function RaycastNode:get_property(path) end
 ---@param path RaycastNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: RaycastNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: RaycastNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: RaycastNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: RaycastNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: RaycastNode, path: "rotation", value: number)
 ---@overload fun(self: RaycastNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: RaycastNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: RaycastNode, path: "paused", value: boolean)
 ---@overload fun(self: RaycastNode, path: "enabled", value: boolean)
----@overload fun(self: RaycastNode, path: "direction", x: number|number[], y?: number)
+---@overload fun(self: RaycastNode, path: "direction", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: RaycastNode, path: "length", value: number)
 ---@overload fun(self: RaycastNode, path: "collideWithSensors", value: boolean)
 ---@overload fun(self: RaycastNode, path: "isColliding", value: boolean)
 ---@overload fun(self: RaycastNode, path: "hitFraction", value: number)
----@overload fun(self: RaycastNode, path: "hitPoint", x: number|number[], y?: number)
----@overload fun(self: RaycastNode, path: "hitNormal", x: number|number[], y?: number)
+---@overload fun(self: RaycastNode, path: "hitPoint", x: number|Vec2|number[], y?: number)
+---@overload fun(self: RaycastNode, path: "hitNormal", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: RaycastNode, path: "rayColor", value: number[])
 ---@overload fun(self: RaycastNode, path: "hitColor", value: number[])
 function RaycastNode:set_property(path, value, y) end
 
 ---@alias LdtkLevelNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -1448,8 +1448,8 @@ function RaycastNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path LdtkLevelNodeProperty|string
 ---@return any
----@overload fun(self: LdtkLevelNode, path: "position"): number[]
----@overload fun(self: LdtkLevelNode, path: "scale"): number[]
+---@overload fun(self: LdtkLevelNode, path: "position"): Vec2
+---@overload fun(self: LdtkLevelNode, path: "scale"): Vec2
 ---@overload fun(self: LdtkLevelNode, path: "rotation"): number
 ---@overload fun(self: LdtkLevelNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: LdtkLevelNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -1469,8 +1469,8 @@ function LdtkLevelNode:get_property(path) end
 ---@param path LdtkLevelNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: LdtkLevelNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: LdtkLevelNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: LdtkLevelNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: LdtkLevelNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LdtkLevelNode, path: "rotation", value: number)
 ---@overload fun(self: LdtkLevelNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: LdtkLevelNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -1487,8 +1487,8 @@ function LdtkLevelNode:get_property(path) end
 function LdtkLevelNode:set_property(path, value, y) end
 
 ---@alias TileMapNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -1500,8 +1500,8 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path TileMapNodeProperty|string
 ---@return any
----@overload fun(self: TileMapNode, path: "position"): number[]
----@overload fun(self: TileMapNode, path: "scale"): number[]
+---@overload fun(self: TileMapNode, path: "position"): Vec2
+---@overload fun(self: TileMapNode, path: "scale"): Vec2
 ---@overload fun(self: TileMapNode, path: "rotation"): number
 ---@overload fun(self: TileMapNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: TileMapNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -1515,8 +1515,8 @@ function TileMapNode:get_property(path) end
 ---@param path TileMapNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: TileMapNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: TileMapNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: TileMapNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TileMapNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TileMapNode, path: "rotation", value: number)
 ---@overload fun(self: TileMapNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: TileMapNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -1527,8 +1527,8 @@ function TileMapNode:get_property(path) end
 function TileMapNode:set_property(path, value, y) end
 
 ---@alias LightNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -1545,8 +1545,8 @@ function TileMapNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path LightNodeProperty|string
 ---@return any
----@overload fun(self: LightNode, path: "position"): number[]
----@overload fun(self: LightNode, path: "scale"): number[]
+---@overload fun(self: LightNode, path: "position"): Vec2
+---@overload fun(self: LightNode, path: "scale"): Vec2
 ---@overload fun(self: LightNode, path: "rotation"): number
 ---@overload fun(self: LightNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: LightNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -1565,8 +1565,8 @@ function LightNode:get_property(path) end
 ---@param path LightNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: LightNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: LightNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: LightNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: LightNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LightNode, path: "rotation", value: number)
 ---@overload fun(self: LightNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: LightNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -1582,16 +1582,16 @@ function LightNode:get_property(path) end
 function LightNode:set_property(path, value, y) end
 
 ---@alias JointNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "joint.type" # "Distance"|"Filter"|"Motor"|"Mouse"|"Prismatic"|"Revolute"|"Weld"|"Wheel" - Kind of joint; only that kind's settings are shown.
----| "joint.distance.localAnchorA" # number[] - Anchor on body A, relative to its origin (px).
----| "joint.distance.localAnchorB" # number[] - Anchor on body B, relative to its origin (px).
+---| "joint.distance.localAnchorA" # Vec2 - Anchor on body A, relative to its origin (px).
+---| "joint.distance.localAnchorB" # Vec2 - Anchor on body B, relative to its origin (px).
 ---| "joint.distance.length" # number - Rest distance between the anchors (px).
 ---| "joint.distance.enableSpring" # boolean - Make the joint springy instead of rigid.
 ---| "joint.distance.hertz" # number - Spring stiffness as an oscillation frequency (Hz); 0 = no spring.
@@ -1603,20 +1603,20 @@ function LightNode:set_property(path, value, y) end
 ---| "joint.distance.maxMotorForce" # number - Strongest push the motor applies (pixel-scale bodies are heavy: mass ~ area in px²).
 ---| "joint.distance.motorSpeed" # number - Speed the motor lengthens (+) or shortens (-) the joint (px/s).
 ---| "joint.distance.collideConnected" # boolean - Let the two connected bodies collide with each other.
----| "joint.motor.linearOffset" # number[] - Where body B is driven to, relative to body A (px).
+---| "joint.motor.linearOffset" # Vec2 - Where body B is driven to, relative to body A (px).
 ---| "joint.motor.angularOffset" # number - Angle body B is driven to, relative to body A (degrees).
 ---| "joint.motor.maxForce" # number - Strongest pull towards the offset (pixel-scale bodies are heavy).
 ---| "joint.motor.maxTorque" # number - Strongest twist towards the angle (pixel-scale bodies are heavy).
 ---| "joint.motor.correctionFactor" # number - How quickly position errors are corrected (0-1).
 ---| "joint.motor.collideConnected" # boolean - Let the two connected bodies collide with each other.
----| "joint.mouse.target" # number[] - World point the body is pulled to (px).
+---| "joint.mouse.target" # Vec2 - World point the body is pulled to (px).
 ---| "joint.mouse.hertz" # number - Stiffness of the pull (Hz).
 ---| "joint.mouse.dampingRatio" # number - Damping of the pull: 1 = no overshoot.
 ---| "joint.mouse.maxForce" # number - Strongest pull applied.
 ---| "joint.mouse.collideConnected" # boolean - Let the two connected bodies collide with each other.
----| "joint.prismatic.localAnchorA" # number[] - Anchor on body A, relative to its origin (px).
----| "joint.prismatic.localAnchorB" # number[] - Anchor on body B, relative to its origin (px).
----| "joint.prismatic.localAxisA" # number[] - Direction body B slides along, in body A's space.
+---| "joint.prismatic.localAnchorA" # Vec2 - Anchor on body A, relative to its origin (px).
+---| "joint.prismatic.localAnchorB" # Vec2 - Anchor on body B, relative to its origin (px).
+---| "joint.prismatic.localAxisA" # Vec2 - Direction body B slides along, in body A's space.
 ---| "joint.prismatic.referenceAngle" # number - Body B's angle relative to body A that counts as zero (degrees).
 ---| "joint.prismatic.targetTranslation" # number - Position the spring pulls to along the axis (px).
 ---| "joint.prismatic.enableSpring" # boolean - Make the joint springy instead of rigid.
@@ -1629,8 +1629,8 @@ function LightNode:set_property(path, value, y) end
 ---| "joint.prismatic.maxMotorForce" # number - Strongest push the motor applies (pixel-scale bodies are heavy).
 ---| "joint.prismatic.motorSpeed" # number - Sliding speed the motor drives (px/s).
 ---| "joint.prismatic.collideConnected" # boolean - Let the two connected bodies collide with each other.
----| "joint.revolute.localAnchorA" # number[] - Anchor on body A, relative to its origin (px).
----| "joint.revolute.localAnchorB" # number[] - Anchor on body B, relative to its origin (px).
+---| "joint.revolute.localAnchorA" # Vec2 - Anchor on body A, relative to its origin (px).
+---| "joint.revolute.localAnchorB" # Vec2 - Anchor on body B, relative to its origin (px).
 ---| "joint.revolute.referenceAngle" # number - Body B's angle relative to body A that counts as zero (degrees).
 ---| "joint.revolute.targetAngle" # number - Angle the spring pulls to (degrees).
 ---| "joint.revolute.enableSpring" # boolean - Make the joint springy instead of rigid.
@@ -1643,17 +1643,17 @@ function LightNode:set_property(path, value, y) end
 ---| "joint.revolute.maxMotorTorque" # number - Strongest twist the motor applies (pixel-scale bodies are heavy).
 ---| "joint.revolute.motorSpeed" # number - Spin speed the motor drives (radians/s).
 ---| "joint.revolute.collideConnected" # boolean - Let the two connected bodies collide with each other.
----| "joint.weld.localAnchorA" # number[] - Anchor on body A, relative to its origin (px).
----| "joint.weld.localAnchorB" # number[] - Anchor on body B, relative to its origin (px).
+---| "joint.weld.localAnchorA" # Vec2 - Anchor on body A, relative to its origin (px).
+---| "joint.weld.localAnchorB" # Vec2 - Anchor on body B, relative to its origin (px).
 ---| "joint.weld.referenceAngle" # number - Body B's angle relative to body A that counts as zero (degrees).
 ---| "joint.weld.linearHertz" # number - Positional softness (Hz); 0 = rigid.
 ---| "joint.weld.angularHertz" # number - Angular softness (Hz); 0 = rigid.
 ---| "joint.weld.linearDampingRatio" # number - Damping of the positional softness.
 ---| "joint.weld.angularDampingRatio" # number - Damping of the angular softness.
 ---| "joint.weld.collideConnected" # boolean - Let the two connected bodies collide with each other.
----| "joint.wheel.localAnchorA" # number[] - Anchor on body A, relative to its origin (px).
----| "joint.wheel.localAnchorB" # number[] - Anchor on body B, relative to its origin (px).
----| "joint.wheel.localAxisA" # number[] - Suspension direction, in body A's space.
+---| "joint.wheel.localAnchorA" # Vec2 - Anchor on body A, relative to its origin (px).
+---| "joint.wheel.localAnchorB" # Vec2 - Anchor on body B, relative to its origin (px).
+---| "joint.wheel.localAxisA" # Vec2 - Suspension direction, in body A's space.
 ---| "joint.wheel.enableSpring" # boolean - Springy suspension along the axis.
 ---| "joint.wheel.hertz" # number - Spring stiffness as an oscillation frequency (Hz); 0 = no spring.
 ---| "joint.wheel.dampingRatio" # number - Spring damping: 0 bounces forever, 1 settles without overshoot.
@@ -1669,16 +1669,16 @@ function LightNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path JointNodeProperty|string
 ---@return any
----@overload fun(self: JointNode, path: "position"): number[]
----@overload fun(self: JointNode, path: "scale"): number[]
+---@overload fun(self: JointNode, path: "position"): Vec2
+---@overload fun(self: JointNode, path: "scale"): Vec2
 ---@overload fun(self: JointNode, path: "rotation"): number
 ---@overload fun(self: JointNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: JointNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: JointNode, path: "paused"): boolean
 ---@overload fun(self: JointNode, path: "enabled"): boolean
 ---@overload fun(self: JointNode, path: "joint.type"): "Distance"|"Filter"|"Motor"|"Mouse"|"Prismatic"|"Revolute"|"Weld"|"Wheel"
----@overload fun(self: JointNode, path: "joint.distance.localAnchorA"): number[]
----@overload fun(self: JointNode, path: "joint.distance.localAnchorB"): number[]
+---@overload fun(self: JointNode, path: "joint.distance.localAnchorA"): Vec2
+---@overload fun(self: JointNode, path: "joint.distance.localAnchorB"): Vec2
 ---@overload fun(self: JointNode, path: "joint.distance.length"): number
 ---@overload fun(self: JointNode, path: "joint.distance.enableSpring"): boolean
 ---@overload fun(self: JointNode, path: "joint.distance.hertz"): number
@@ -1690,20 +1690,20 @@ function LightNode:set_property(path, value, y) end
 ---@overload fun(self: JointNode, path: "joint.distance.maxMotorForce"): number
 ---@overload fun(self: JointNode, path: "joint.distance.motorSpeed"): number
 ---@overload fun(self: JointNode, path: "joint.distance.collideConnected"): boolean
----@overload fun(self: JointNode, path: "joint.motor.linearOffset"): number[]
+---@overload fun(self: JointNode, path: "joint.motor.linearOffset"): Vec2
 ---@overload fun(self: JointNode, path: "joint.motor.angularOffset"): number
 ---@overload fun(self: JointNode, path: "joint.motor.maxForce"): number
 ---@overload fun(self: JointNode, path: "joint.motor.maxTorque"): number
 ---@overload fun(self: JointNode, path: "joint.motor.correctionFactor"): number
 ---@overload fun(self: JointNode, path: "joint.motor.collideConnected"): boolean
----@overload fun(self: JointNode, path: "joint.mouse.target"): number[]
+---@overload fun(self: JointNode, path: "joint.mouse.target"): Vec2
 ---@overload fun(self: JointNode, path: "joint.mouse.hertz"): number
 ---@overload fun(self: JointNode, path: "joint.mouse.dampingRatio"): number
 ---@overload fun(self: JointNode, path: "joint.mouse.maxForce"): number
 ---@overload fun(self: JointNode, path: "joint.mouse.collideConnected"): boolean
----@overload fun(self: JointNode, path: "joint.prismatic.localAnchorA"): number[]
----@overload fun(self: JointNode, path: "joint.prismatic.localAnchorB"): number[]
----@overload fun(self: JointNode, path: "joint.prismatic.localAxisA"): number[]
+---@overload fun(self: JointNode, path: "joint.prismatic.localAnchorA"): Vec2
+---@overload fun(self: JointNode, path: "joint.prismatic.localAnchorB"): Vec2
+---@overload fun(self: JointNode, path: "joint.prismatic.localAxisA"): Vec2
 ---@overload fun(self: JointNode, path: "joint.prismatic.referenceAngle"): number
 ---@overload fun(self: JointNode, path: "joint.prismatic.targetTranslation"): number
 ---@overload fun(self: JointNode, path: "joint.prismatic.enableSpring"): boolean
@@ -1716,8 +1716,8 @@ function LightNode:set_property(path, value, y) end
 ---@overload fun(self: JointNode, path: "joint.prismatic.maxMotorForce"): number
 ---@overload fun(self: JointNode, path: "joint.prismatic.motorSpeed"): number
 ---@overload fun(self: JointNode, path: "joint.prismatic.collideConnected"): boolean
----@overload fun(self: JointNode, path: "joint.revolute.localAnchorA"): number[]
----@overload fun(self: JointNode, path: "joint.revolute.localAnchorB"): number[]
+---@overload fun(self: JointNode, path: "joint.revolute.localAnchorA"): Vec2
+---@overload fun(self: JointNode, path: "joint.revolute.localAnchorB"): Vec2
 ---@overload fun(self: JointNode, path: "joint.revolute.referenceAngle"): number
 ---@overload fun(self: JointNode, path: "joint.revolute.targetAngle"): number
 ---@overload fun(self: JointNode, path: "joint.revolute.enableSpring"): boolean
@@ -1730,17 +1730,17 @@ function LightNode:set_property(path, value, y) end
 ---@overload fun(self: JointNode, path: "joint.revolute.maxMotorTorque"): number
 ---@overload fun(self: JointNode, path: "joint.revolute.motorSpeed"): number
 ---@overload fun(self: JointNode, path: "joint.revolute.collideConnected"): boolean
----@overload fun(self: JointNode, path: "joint.weld.localAnchorA"): number[]
----@overload fun(self: JointNode, path: "joint.weld.localAnchorB"): number[]
+---@overload fun(self: JointNode, path: "joint.weld.localAnchorA"): Vec2
+---@overload fun(self: JointNode, path: "joint.weld.localAnchorB"): Vec2
 ---@overload fun(self: JointNode, path: "joint.weld.referenceAngle"): number
 ---@overload fun(self: JointNode, path: "joint.weld.linearHertz"): number
 ---@overload fun(self: JointNode, path: "joint.weld.angularHertz"): number
 ---@overload fun(self: JointNode, path: "joint.weld.linearDampingRatio"): number
 ---@overload fun(self: JointNode, path: "joint.weld.angularDampingRatio"): number
 ---@overload fun(self: JointNode, path: "joint.weld.collideConnected"): boolean
----@overload fun(self: JointNode, path: "joint.wheel.localAnchorA"): number[]
----@overload fun(self: JointNode, path: "joint.wheel.localAnchorB"): number[]
----@overload fun(self: JointNode, path: "joint.wheel.localAxisA"): number[]
+---@overload fun(self: JointNode, path: "joint.wheel.localAnchorA"): Vec2
+---@overload fun(self: JointNode, path: "joint.wheel.localAnchorB"): Vec2
+---@overload fun(self: JointNode, path: "joint.wheel.localAxisA"): Vec2
 ---@overload fun(self: JointNode, path: "joint.wheel.enableSpring"): boolean
 ---@overload fun(self: JointNode, path: "joint.wheel.hertz"): number
 ---@overload fun(self: JointNode, path: "joint.wheel.dampingRatio"): number
@@ -1758,16 +1758,16 @@ function JointNode:get_property(path) end
 ---@param path JointNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: JointNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: JointNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: JointNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: JointNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "rotation", value: number)
 ---@overload fun(self: JointNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: JointNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: JointNode, path: "paused", value: boolean)
 ---@overload fun(self: JointNode, path: "enabled", value: boolean)
 ---@overload fun(self: JointNode, path: "joint.type", value: "Distance"|"Filter"|"Motor"|"Mouse"|"Prismatic"|"Revolute"|"Weld"|"Wheel")
----@overload fun(self: JointNode, path: "joint.distance.localAnchorA", x: number|number[], y?: number)
----@overload fun(self: JointNode, path: "joint.distance.localAnchorB", x: number|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.distance.localAnchorA", x: number|Vec2|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.distance.localAnchorB", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "joint.distance.length", value: number)
 ---@overload fun(self: JointNode, path: "joint.distance.enableSpring", value: boolean)
 ---@overload fun(self: JointNode, path: "joint.distance.hertz", value: number)
@@ -1779,20 +1779,20 @@ function JointNode:get_property(path) end
 ---@overload fun(self: JointNode, path: "joint.distance.maxMotorForce", value: number)
 ---@overload fun(self: JointNode, path: "joint.distance.motorSpeed", value: number)
 ---@overload fun(self: JointNode, path: "joint.distance.collideConnected", value: boolean)
----@overload fun(self: JointNode, path: "joint.motor.linearOffset", x: number|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.motor.linearOffset", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "joint.motor.angularOffset", value: number)
 ---@overload fun(self: JointNode, path: "joint.motor.maxForce", value: number)
 ---@overload fun(self: JointNode, path: "joint.motor.maxTorque", value: number)
 ---@overload fun(self: JointNode, path: "joint.motor.correctionFactor", value: number)
 ---@overload fun(self: JointNode, path: "joint.motor.collideConnected", value: boolean)
----@overload fun(self: JointNode, path: "joint.mouse.target", x: number|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.mouse.target", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "joint.mouse.hertz", value: number)
 ---@overload fun(self: JointNode, path: "joint.mouse.dampingRatio", value: number)
 ---@overload fun(self: JointNode, path: "joint.mouse.maxForce", value: number)
 ---@overload fun(self: JointNode, path: "joint.mouse.collideConnected", value: boolean)
----@overload fun(self: JointNode, path: "joint.prismatic.localAnchorA", x: number|number[], y?: number)
----@overload fun(self: JointNode, path: "joint.prismatic.localAnchorB", x: number|number[], y?: number)
----@overload fun(self: JointNode, path: "joint.prismatic.localAxisA", x: number|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.prismatic.localAnchorA", x: number|Vec2|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.prismatic.localAnchorB", x: number|Vec2|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.prismatic.localAxisA", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "joint.prismatic.referenceAngle", value: number)
 ---@overload fun(self: JointNode, path: "joint.prismatic.targetTranslation", value: number)
 ---@overload fun(self: JointNode, path: "joint.prismatic.enableSpring", value: boolean)
@@ -1805,8 +1805,8 @@ function JointNode:get_property(path) end
 ---@overload fun(self: JointNode, path: "joint.prismatic.maxMotorForce", value: number)
 ---@overload fun(self: JointNode, path: "joint.prismatic.motorSpeed", value: number)
 ---@overload fun(self: JointNode, path: "joint.prismatic.collideConnected", value: boolean)
----@overload fun(self: JointNode, path: "joint.revolute.localAnchorA", x: number|number[], y?: number)
----@overload fun(self: JointNode, path: "joint.revolute.localAnchorB", x: number|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.revolute.localAnchorA", x: number|Vec2|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.revolute.localAnchorB", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "joint.revolute.referenceAngle", value: number)
 ---@overload fun(self: JointNode, path: "joint.revolute.targetAngle", value: number)
 ---@overload fun(self: JointNode, path: "joint.revolute.enableSpring", value: boolean)
@@ -1819,17 +1819,17 @@ function JointNode:get_property(path) end
 ---@overload fun(self: JointNode, path: "joint.revolute.maxMotorTorque", value: number)
 ---@overload fun(self: JointNode, path: "joint.revolute.motorSpeed", value: number)
 ---@overload fun(self: JointNode, path: "joint.revolute.collideConnected", value: boolean)
----@overload fun(self: JointNode, path: "joint.weld.localAnchorA", x: number|number[], y?: number)
----@overload fun(self: JointNode, path: "joint.weld.localAnchorB", x: number|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.weld.localAnchorA", x: number|Vec2|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.weld.localAnchorB", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "joint.weld.referenceAngle", value: number)
 ---@overload fun(self: JointNode, path: "joint.weld.linearHertz", value: number)
 ---@overload fun(self: JointNode, path: "joint.weld.angularHertz", value: number)
 ---@overload fun(self: JointNode, path: "joint.weld.linearDampingRatio", value: number)
 ---@overload fun(self: JointNode, path: "joint.weld.angularDampingRatio", value: number)
 ---@overload fun(self: JointNode, path: "joint.weld.collideConnected", value: boolean)
----@overload fun(self: JointNode, path: "joint.wheel.localAnchorA", x: number|number[], y?: number)
----@overload fun(self: JointNode, path: "joint.wheel.localAnchorB", x: number|number[], y?: number)
----@overload fun(self: JointNode, path: "joint.wheel.localAxisA", x: number|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.wheel.localAnchorA", x: number|Vec2|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.wheel.localAnchorB", x: number|Vec2|number[], y?: number)
+---@overload fun(self: JointNode, path: "joint.wheel.localAxisA", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "joint.wheel.enableSpring", value: boolean)
 ---@overload fun(self: JointNode, path: "joint.wheel.hertz", value: number)
 ---@overload fun(self: JointNode, path: "joint.wheel.dampingRatio", value: number)
@@ -1844,10 +1844,10 @@ function JointNode:get_property(path) end
 function JointNode:set_property(path, value, y) end
 
 ---@alias TextNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
----| "origin" # number[] - Where in the image the position is, and what it rotates and scales around: a fraction o...
+---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
@@ -1867,10 +1867,10 @@ function JointNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path TextNodeProperty|string
 ---@return any
----@overload fun(self: TextNode, path: "position"): number[]
----@overload fun(self: TextNode, path: "scale"): number[]
+---@overload fun(self: TextNode, path: "position"): Vec2
+---@overload fun(self: TextNode, path: "scale"): Vec2
 ---@overload fun(self: TextNode, path: "rotation"): number
----@overload fun(self: TextNode, path: "origin"): number[]
+---@overload fun(self: TextNode, path: "origin"): Vec2
 ---@overload fun(self: TextNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: TextNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: TextNode, path: "paused"): boolean
@@ -1892,10 +1892,10 @@ function TextNode:get_property(path) end
 ---@param path TextNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: TextNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: TextNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: TextNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TextNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextNode, path: "rotation", value: number)
----@overload fun(self: TextNode, path: "origin", x: number|number[], y?: number)
+---@overload fun(self: TextNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: TextNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: TextNode, path: "paused", value: boolean)
@@ -1914,14 +1914,14 @@ function TextNode:get_property(path) end
 function TextNode:set_property(path, value, y) end
 
 ---@alias DialogueNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "font" # string - Project font ("" = the engine font).
 ---| "fontSize" # number - Text size (px).
 ---| "textColor" # number[] - Colour of the line's text.
@@ -1936,14 +1936,14 @@ function TextNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path DialogueNodeProperty|string
 ---@return any
----@overload fun(self: DialogueNode, path: "position"): number[]
----@overload fun(self: DialogueNode, path: "scale"): number[]
+---@overload fun(self: DialogueNode, path: "position"): Vec2
+---@overload fun(self: DialogueNode, path: "scale"): Vec2
 ---@overload fun(self: DialogueNode, path: "rotation"): number
 ---@overload fun(self: DialogueNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: DialogueNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: DialogueNode, path: "paused"): boolean
 ---@overload fun(self: DialogueNode, path: "enabled"): boolean
----@overload fun(self: DialogueNode, path: "size"): number[]
+---@overload fun(self: DialogueNode, path: "size"): Vec2
 ---@overload fun(self: DialogueNode, path: "font"): string
 ---@overload fun(self: DialogueNode, path: "fontSize"): number
 ---@overload fun(self: DialogueNode, path: "textColor"): number[]
@@ -1960,14 +1960,14 @@ function DialogueNode:get_property(path) end
 ---@param path DialogueNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: DialogueNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: DialogueNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: DialogueNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: DialogueNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DialogueNode, path: "rotation", value: number)
 ---@overload fun(self: DialogueNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: DialogueNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: DialogueNode, path: "paused", value: boolean)
 ---@overload fun(self: DialogueNode, path: "enabled", value: boolean)
----@overload fun(self: DialogueNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: DialogueNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DialogueNode, path: "font", value: string)
 ---@overload fun(self: DialogueNode, path: "fontSize", value: number)
 ---@overload fun(self: DialogueNode, path: "textColor", value: number[])
@@ -1981,35 +1981,35 @@ function DialogueNode:get_property(path) end
 function DialogueNode:set_property(path, value, y) end
 
 ---@alias NineSliceNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
----| "origin" # number[] - Where in the image the position is, and what it rotates and scales around: a fraction o...
+---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "texturePath" # string - Texture to slice.
----| "size" # number[] - Drawn size (px); the borders keep their size, the middle stretches.
----| "marginsLT" # number[] - Left and top border widths (texture px).
----| "marginsRB" # number[] - Right and bottom border widths (texture px).
+---| "size" # Vec2 - Drawn size (px); the borders keep their size, the middle stretches.
+---| "marginsLT" # Vec2 - Left and top border widths (texture px).
+---| "marginsRB" # Vec2 - Right and bottom border widths (texture px).
 ---| "tint" # number[] - Multiplies the texture's colours (white = unchanged; alpha fades it).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path NineSliceNodeProperty|string
 ---@return any
----@overload fun(self: NineSliceNode, path: "position"): number[]
----@overload fun(self: NineSliceNode, path: "scale"): number[]
+---@overload fun(self: NineSliceNode, path: "position"): Vec2
+---@overload fun(self: NineSliceNode, path: "scale"): Vec2
 ---@overload fun(self: NineSliceNode, path: "rotation"): number
----@overload fun(self: NineSliceNode, path: "origin"): number[]
+---@overload fun(self: NineSliceNode, path: "origin"): Vec2
 ---@overload fun(self: NineSliceNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: NineSliceNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: NineSliceNode, path: "paused"): boolean
 ---@overload fun(self: NineSliceNode, path: "enabled"): boolean
 ---@overload fun(self: NineSliceNode, path: "texturePath"): string
----@overload fun(self: NineSliceNode, path: "size"): number[]
----@overload fun(self: NineSliceNode, path: "marginsLT"): number[]
----@overload fun(self: NineSliceNode, path: "marginsRB"): number[]
+---@overload fun(self: NineSliceNode, path: "size"): Vec2
+---@overload fun(self: NineSliceNode, path: "marginsLT"): Vec2
+---@overload fun(self: NineSliceNode, path: "marginsRB"): Vec2
 ---@overload fun(self: NineSliceNode, path: "tint"): number[]
 function NineSliceNode:get_property(path) end
 
@@ -2017,51 +2017,51 @@ function NineSliceNode:get_property(path) end
 ---@param path NineSliceNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: NineSliceNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: NineSliceNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: NineSliceNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: NineSliceNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NineSliceNode, path: "rotation", value: number)
----@overload fun(self: NineSliceNode, path: "origin", x: number|number[], y?: number)
+---@overload fun(self: NineSliceNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NineSliceNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: NineSliceNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: NineSliceNode, path: "paused", value: boolean)
 ---@overload fun(self: NineSliceNode, path: "enabled", value: boolean)
 ---@overload fun(self: NineSliceNode, path: "texturePath", value: string)
----@overload fun(self: NineSliceNode, path: "size", x: number|number[], y?: number)
----@overload fun(self: NineSliceNode, path: "marginsLT", x: number|number[], y?: number)
----@overload fun(self: NineSliceNode, path: "marginsRB", x: number|number[], y?: number)
+---@overload fun(self: NineSliceNode, path: "size", x: number|Vec2|number[], y?: number)
+---@overload fun(self: NineSliceNode, path: "marginsLT", x: number|Vec2|number[], y?: number)
+---@overload fun(self: NineSliceNode, path: "marginsRB", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NineSliceNode, path: "tint", value: number[])
 function NineSliceNode:set_property(path, value, y) end
 
 ---@alias ParallaxNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "texturePath" # string - Background texture.
----| "factor" # number[] - Movement relative to the camera: 1 moves with the world, 0 stays fixed on screen.
+---| "factor" # Vec2 - Movement relative to the camera: 1 moves with the world, 0 stays fixed on screen.
 ---| "repeatX" # boolean - Tile horizontally to fill the view.
 ---| "repeatY" # boolean - Tile vertically to fill the view.
----| "scrollSpeed" # number[] - Drifts by itself (px/s; clouds).
+---| "scrollSpeed" # Vec2 - Drifts by itself (px/s; clouds).
 ---| "tint" # number[] - Multiplies the texture's colours (white = unchanged; alpha fades it).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path ParallaxNodeProperty|string
 ---@return any
----@overload fun(self: ParallaxNode, path: "position"): number[]
----@overload fun(self: ParallaxNode, path: "scale"): number[]
+---@overload fun(self: ParallaxNode, path: "position"): Vec2
+---@overload fun(self: ParallaxNode, path: "scale"): Vec2
 ---@overload fun(self: ParallaxNode, path: "rotation"): number
 ---@overload fun(self: ParallaxNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: ParallaxNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: ParallaxNode, path: "paused"): boolean
 ---@overload fun(self: ParallaxNode, path: "enabled"): boolean
 ---@overload fun(self: ParallaxNode, path: "texturePath"): string
----@overload fun(self: ParallaxNode, path: "factor"): number[]
+---@overload fun(self: ParallaxNode, path: "factor"): Vec2
 ---@overload fun(self: ParallaxNode, path: "repeatX"): boolean
 ---@overload fun(self: ParallaxNode, path: "repeatY"): boolean
----@overload fun(self: ParallaxNode, path: "scrollSpeed"): number[]
+---@overload fun(self: ParallaxNode, path: "scrollSpeed"): Vec2
 ---@overload fun(self: ParallaxNode, path: "tint"): number[]
 function ParallaxNode:get_property(path) end
 
@@ -2069,24 +2069,24 @@ function ParallaxNode:get_property(path) end
 ---@param path ParallaxNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: ParallaxNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: ParallaxNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: ParallaxNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: ParallaxNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParallaxNode, path: "rotation", value: number)
 ---@overload fun(self: ParallaxNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: ParallaxNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: ParallaxNode, path: "paused", value: boolean)
 ---@overload fun(self: ParallaxNode, path: "enabled", value: boolean)
 ---@overload fun(self: ParallaxNode, path: "texturePath", value: string)
----@overload fun(self: ParallaxNode, path: "factor", x: number|number[], y?: number)
+---@overload fun(self: ParallaxNode, path: "factor", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParallaxNode, path: "repeatX", value: boolean)
 ---@overload fun(self: ParallaxNode, path: "repeatY", value: boolean)
----@overload fun(self: ParallaxNode, path: "scrollSpeed", x: number|number[], y?: number)
+---@overload fun(self: ParallaxNode, path: "scrollSpeed", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParallaxNode, path: "tint", value: number[])
 function ParallaxNode:set_property(path, value, y) end
 
 ---@alias LineNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -2100,8 +2100,8 @@ function ParallaxNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path LineNodeProperty|string
 ---@return any
----@overload fun(self: LineNode, path: "position"): number[]
----@overload fun(self: LineNode, path: "scale"): number[]
+---@overload fun(self: LineNode, path: "position"): Vec2
+---@overload fun(self: LineNode, path: "scale"): Vec2
 ---@overload fun(self: LineNode, path: "rotation"): number
 ---@overload fun(self: LineNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: LineNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -2117,8 +2117,8 @@ function LineNode:get_property(path) end
 ---@param path LineNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: LineNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: LineNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: LineNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: LineNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LineNode, path: "rotation", value: number)
 ---@overload fun(self: LineNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: LineNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -2131,8 +2131,8 @@ function LineNode:get_property(path) end
 function LineNode:set_property(path, value, y) end
 
 ---@alias TrailNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
@@ -2148,8 +2148,8 @@ function LineNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path TrailNodeProperty|string
 ---@return any
----@overload fun(self: TrailNode, path: "position"): number[]
----@overload fun(self: TrailNode, path: "scale"): number[]
+---@overload fun(self: TrailNode, path: "position"): Vec2
+---@overload fun(self: TrailNode, path: "scale"): Vec2
 ---@overload fun(self: TrailNode, path: "rotation"): number
 ---@overload fun(self: TrailNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: TrailNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
@@ -2167,8 +2167,8 @@ function TrailNode:get_property(path) end
 ---@param path TrailNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: TrailNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: TrailNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: TrailNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TrailNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TrailNode, path: "rotation", value: number)
 ---@overload fun(self: TrailNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: TrailNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
@@ -2183,14 +2183,14 @@ function TrailNode:get_property(path) end
 function TrailNode:set_property(path, value, y) end
 
 ---@alias UIContainerNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "title" # string - Header text.
 ---| "direction" # "Vertical"|"Horizontal"|"Grid" - Children are laid out in a column, a row or a grid.
 ---| "alignment" # "Start"|"Center"|"End"|"Stretch" - Where children sit across the layout direction.
@@ -2213,14 +2213,14 @@ function TrailNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIContainerNodeProperty|string
 ---@return any
----@overload fun(self: UIContainerNode, path: "position"): number[]
----@overload fun(self: UIContainerNode, path: "scale"): number[]
+---@overload fun(self: UIContainerNode, path: "position"): Vec2
+---@overload fun(self: UIContainerNode, path: "scale"): Vec2
 ---@overload fun(self: UIContainerNode, path: "rotation"): number
 ---@overload fun(self: UIContainerNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIContainerNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIContainerNode, path: "paused"): boolean
 ---@overload fun(self: UIContainerNode, path: "enabled"): boolean
----@overload fun(self: UIContainerNode, path: "size"): number[]
+---@overload fun(self: UIContainerNode, path: "size"): Vec2
 ---@overload fun(self: UIContainerNode, path: "title"): string
 ---@overload fun(self: UIContainerNode, path: "direction"): "Vertical"|"Horizontal"|"Grid"
 ---@overload fun(self: UIContainerNode, path: "alignment"): "Start"|"Center"|"End"|"Stretch"
@@ -2245,14 +2245,14 @@ function UIContainerNode:get_property(path) end
 ---@param path UIContainerNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIContainerNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIContainerNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIContainerNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIContainerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIContainerNode, path: "rotation", value: number)
 ---@overload fun(self: UIContainerNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIContainerNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIContainerNode, path: "paused", value: boolean)
 ---@overload fun(self: UIContainerNode, path: "enabled", value: boolean)
----@overload fun(self: UIContainerNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIContainerNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIContainerNode, path: "title", value: string)
 ---@overload fun(self: UIContainerNode, path: "direction", value: "Vertical"|"Horizontal"|"Grid")
 ---@overload fun(self: UIContainerNode, path: "alignment", value: "Start"|"Center"|"End"|"Stretch")
@@ -2274,14 +2274,14 @@ function UIContainerNode:get_property(path) end
 function UIContainerNode:set_property(path, value, y) end
 
 ---@alias UILabelNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "text" # string - Label text.
 ---| "fontSize" # number - Text size (px).
 ---| "textColor" # number[] - Colour of the text.
@@ -2292,14 +2292,14 @@ function UIContainerNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UILabelNodeProperty|string
 ---@return any
----@overload fun(self: UILabelNode, path: "position"): number[]
----@overload fun(self: UILabelNode, path: "scale"): number[]
+---@overload fun(self: UILabelNode, path: "position"): Vec2
+---@overload fun(self: UILabelNode, path: "scale"): Vec2
 ---@overload fun(self: UILabelNode, path: "rotation"): number
 ---@overload fun(self: UILabelNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UILabelNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UILabelNode, path: "paused"): boolean
 ---@overload fun(self: UILabelNode, path: "enabled"): boolean
----@overload fun(self: UILabelNode, path: "size"): number[]
+---@overload fun(self: UILabelNode, path: "size"): Vec2
 ---@overload fun(self: UILabelNode, path: "text"): string
 ---@overload fun(self: UILabelNode, path: "fontSize"): number
 ---@overload fun(self: UILabelNode, path: "textColor"): number[]
@@ -2312,14 +2312,14 @@ function UILabelNode:get_property(path) end
 ---@param path UILabelNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UILabelNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UILabelNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UILabelNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UILabelNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UILabelNode, path: "rotation", value: number)
 ---@overload fun(self: UILabelNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UILabelNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UILabelNode, path: "paused", value: boolean)
 ---@overload fun(self: UILabelNode, path: "enabled", value: boolean)
----@overload fun(self: UILabelNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UILabelNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UILabelNode, path: "text", value: string)
 ---@overload fun(self: UILabelNode, path: "fontSize", value: number)
 ---@overload fun(self: UILabelNode, path: "textColor", value: number[])
@@ -2329,14 +2329,14 @@ function UILabelNode:get_property(path) end
 function UILabelNode:set_property(path, value, y) end
 
 ---@alias UIButtonNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "text" # string - Button caption.
 ---| "fontSize" # number - Text size (px).
 ---| "icon" # "None"|"Digit0"|"Digit1"|"Digit2"|"Digit3"|"Digit4"|"Digit5"|"Digit6"|"Digit7"|"Digit8"|"Digit9"|"A"|"AddressBook"|"AddressCard"|"AlignCenter"|"AlignJustify"|"AlignLeft"|"AlignRight"|"Anchor"|"AnchorCircleCheck"|"AnchorCircleExclamation"|"AnchorCircleXmark"|"AnchorLock"|"AngleDown"|"AngleLeft"|"AngleRight"|"AngleUp"|"AnglesDown"|"AnglesLeft"|"AnglesRight"|"AnglesUp"|"Ankh"|"AppleWhole"|"Archway"|"ArrowDown"|"ArrowDown19"|"ArrowDown91"|"ArrowDownAZ"|"ArrowDownLong"|"ArrowDownShortWide"|"ArrowDownUpAcrossLine"|"ArrowDownUpLock"|"ArrowDownWideShort"|"ArrowDownZA"|"ArrowLeft"|"ArrowLeftLong"|"ArrowPointer"|"ArrowRight"|"ArrowRightArrowLeft"|"ArrowRightFromBracket"|"ArrowRightLong"|"ArrowRightToBracket"|"ArrowRightToCity"|"ArrowRotateLeft"|"ArrowRotateRight"|"ArrowTrendDown"|"ArrowTrendUp"|"ArrowTurnDown"|"ArrowTurnUp"|"ArrowUp"|"ArrowUp19"|"ArrowUp91"|"ArrowUpAZ"|"ArrowUpFromBracket"|"ArrowUpFromGroundWater"|"ArrowUpFromWaterPump"|"ArrowUpLong"|"ArrowUpRightDots"|"ArrowUpRightFromSquare"|"ArrowUpShortWide"|"ArrowUpWideShort"|"ArrowUpZA"|"ArrowsDownToLine"|"ArrowsDownToPeople"|"ArrowsLeftRight"|"ArrowsLeftRightToLine"|"ArrowsRotate"|"ArrowsSpin"|"ArrowsSplitUpAndLeft"|"ArrowsToCircle"|"ArrowsToDot"|"ArrowsToEye"|"ArrowsTurnRight"|"ArrowsTurnToDots"|"ArrowsUpDown"|"ArrowsUpDownLeftRight"|"ArrowsUpToLine"|"Asterisk"|"At"|"Atom"|"AudioDescription"|"AustralSign"|"Award"|"B"|"Baby"|"BabyCarriage"|"Backward"|"BackwardFast"|"BackwardStep"|"Bacon"|"Bacteria"|"Bacterium"|"BagShopping"|"Bahai"|"BahtSign"|"Ban"|"BanSmoking"|"Bandage"|"BangladeshiTakaSign"|"Barcode"|"Bars"|"BarsProgress"|"BarsStaggered"|"Baseball"|"BaseballBatBall"|"BasketShopping"|"Basketball"|"Bath"|"BatteryEmpty"|"BatteryFull"|"BatteryHalf"|"BatteryQuarter"|"BatteryThreeQuarters"|"Bed"|"BedPulse"|"BeerMugEmpty"|"Bell"|"BellConcierge"|"BellSlash"|"BezierCurve"|"Bicycle"|"Binoculars"|"Biohazard"|"BitcoinSign"|"Blender"|"BlenderPhone"|"Blog"|"Bold"|"Bolt"|"BoltLightning"|"Bomb"|"Bone"|"Bong"|"Book"|"BookAtlas"|"BookBible"|"BookBookmark"|"BookJournalWhills"|"BookMedical"|"BookOpen"|"BookOpenReader"|"BookQuran"|"BookSkull"|"BookTanakh"|"Bookmark"|"BorderAll"|"BorderNone"|"BorderTopLeft"|"BoreHole"|"BottleDroplet"|"BottleWater"|"BowlFood"|"BowlRice"|"BowlingBall"|"Box"|"BoxArchive"|"BoxOpen"|"BoxTissue"|"BoxesPacking"|"BoxesStacked"|"Braille"|"Brain"|"BrazilianRealSign"|"BreadSlice"|"Bridge"|"BridgeCircleCheck"|"BridgeCircleExclamation"|"BridgeCircleXmark"|"BridgeLock"|"BridgeWater"|"Briefcase"|"BriefcaseMedical"|"Broom"|"BroomBall"|"Brush"|"Bucket"|"Bug"|"BugSlash"|"Bugs"|"Building"|"BuildingCircleArrowRight"|"BuildingCircleCheck"|"BuildingCircleExclamation"|"BuildingCircleXmark"|"BuildingColumns"|"BuildingFlag"|"BuildingLock"|"BuildingNgo"|"BuildingShield"|"BuildingUn"|"BuildingUser"|"BuildingWheat"|"Bullhorn"|"Bullseye"|"Burger"|"Burst"|"Bus"|"BusSimple"|"BusinessTime"|"C"|"CableCar"|"CakeCandles"|"Calculator"|"Calendar"|"CalendarCheck"|"CalendarDay"|"CalendarDays"|"CalendarMinus"|"CalendarPlus"|"CalendarWeek"|"CalendarXmark"|"Camera"|"CameraRetro"|"CameraRotate"|"Campground"|"CandyCane"|"Cannabis"|"Capsules"|"Car"|"CarBattery"|"CarBurst"|"CarOn"|"CarRear"|"CarSide"|"CarTunnel"|"Caravan"|"CaretDown"|"CaretLeft"|"CaretRight"|"CaretUp"|"Carrot"|"CartArrowDown"|"CartFlatbed"|"CartFlatbedSuitcase"|"CartPlus"|"CartShopping"|"CashRegister"|"Cat"|"CediSign"|"CentSign"|"Certificate"|"Chair"|"Chalkboard"|"ChalkboardUser"|"ChampagneGlasses"|"ChargingStation"|"ChartArea"|"ChartBar"|"ChartColumn"|"ChartDiagram"|"ChartGantt"|"ChartLine"|"ChartPie"|"ChartSimple"|"Check"|"CheckDouble"|"CheckToSlot"|"Cheese"|"Chess"|"ChessBishop"|"ChessBoard"|"ChessKing"|"ChessKnight"|"ChessPawn"|"ChessQueen"|"ChessRook"|"ChevronDown"|"ChevronLeft"|"ChevronRight"|"ChevronUp"|"Child"|"ChildCombatant"|"ChildDress"|"ChildReaching"|"Children"|"Church"|"Circle"|"CircleArrowDown"|"CircleArrowLeft"|"CircleArrowRight"|"CircleArrowUp"|"CircleCheck"|"CircleChevronDown"|"CircleChevronLeft"|"CircleChevronRight"|"CircleChevronUp"|"CircleDollarToSlot"|"CircleDot"|"CircleDown"|"CircleExclamation"|"CircleH"|"CircleHalfStroke"|"CircleInfo"|"CircleLeft"|"CircleMinus"|"CircleNodes"|"CircleNotch"|"CirclePause"|"CirclePlay"|"CirclePlus"|"CircleQuestion"|"CircleRadiation"|"CircleRight"|"CircleStop"|"CircleUp"|"CircleUser"|"CircleXmark"|"City"|"Clapperboard"|"Clipboard"|"ClipboardCheck"|"ClipboardList"|"ClipboardQuestion"|"ClipboardUser"|"Clock"|"ClockRotateLeft"|"Clone"|"ClosedCaptioning"|"Cloud"|"CloudArrowDown"|"CloudArrowUp"|"CloudBolt"|"CloudMeatball"|"CloudMoon"|"CloudMoonRain"|"CloudRain"|"CloudShowersHeavy"|"CloudShowersWater"|"CloudSun"|"CloudSunRain"|"Clover"|"Code"|"CodeBranch"|"CodeCommit"|"CodeCompare"|"CodeFork"|"CodeMerge"|"CodePullRequest"|"Coins"|"ColonSign"|"Comment"|"CommentDollar"|"CommentDots"|"CommentMedical"|"CommentNodes"|"CommentSlash"|"CommentSms"|"Comments"|"CommentsDollar"|"CompactDisc"|"Compass"|"CompassDrafting"|"Compress"|"Computer"|"ComputerMouse"|"Cookie"|"CookieBite"|"Copy"|"Copyright"|"Couch"|"Cow"|"CreditCard"|"Crop"|"CropSimple"|"Cross"|"Crosshairs"|"Crow"|"Crown"|"Crutch"|"CruzeiroSign"|"Cube"|"Cubes"|"CubesStacked"|"D"|"Database"|"DeleteLeft"|"Democrat"|"Desktop"|"Dharmachakra"|"DiagramNext"|"DiagramPredecessor"|"DiagramProject"|"DiagramSuccessor"|"Diamond"|"DiamondTurnRight"|"Dice"|"DiceD20"|"DiceD6"|"DiceFive"|"DiceFour"|"DiceOne"|"DiceSix"|"DiceThree"|"DiceTwo"|"Disease"|"Display"|"Divide"|"Dna"|"Dog"|"DollarSign"|"Dolly"|"DongSign"|"DoorClosed"|"DoorOpen"|"Dove"|"DownLeftAndUpRightToCenter"|"DownLong"|"Download"|"Dragon"|"DrawPolygon"|"Droplet"|"DropletSlash"|"Drum"|"DrumSteelpan"|"DrumstickBite"|"Dumbbell"|"Dumpster"|"DumpsterFire"|"Dungeon"|"E"|"EarDeaf"|"EarListen"|"EarthAfrica"|"EarthAmericas"|"EarthAsia"|"EarthEurope"|"EarthOceania"|"Egg"|"Eject"|"Elevator"|"Ellipsis"|"EllipsisVertical"|"Envelope"|"EnvelopeCircleCheck"|"EnvelopeOpen"|"EnvelopeOpenText"|"EnvelopesBulk"|"Equals"|"Eraser"|"Ethernet"|"EuroSign"|"Exclamation"|"Expand"|"Explosion"|"Eye"|"EyeDropper"|"EyeLowVision"|"EyeSlash"|"F"|"FaceAngry"|"FaceDizzy"|"FaceFlushed"|"FaceFrown"|"FaceFrownOpen"|"FaceGrimace"|"FaceGrin"|"FaceGrinBeam"|"FaceGrinBeamSweat"|"FaceGrinHearts"|"FaceGrinSquint"|"FaceGrinSquintTears"|"FaceGrinStars"|"FaceGrinTears"|"FaceGrinTongue"|"FaceGrinTongueSquint"|"FaceGrinTongueWink"|"FaceGrinWide"|"FaceGrinWink"|"FaceKiss"|"FaceKissBeam"|"FaceKissWinkHeart"|"FaceLaugh"|"FaceLaughBeam"|"FaceLaughSquint"|"FaceLaughWink"|"FaceMeh"|"FaceMehBlank"|"FaceRollingEyes"|"FaceSadCry"|"FaceSadTear"|"FaceSmile"|"FaceSmileBeam"|"FaceSmileWink"|"FaceSurprise"|"FaceTired"|"Fan"|"Faucet"|"FaucetDrip"|"Fax"|"Feather"|"FeatherPointed"|"Ferry"|"File"|"FileArrowDown"|"FileArrowUp"|"FileAudio"|"FileCircleCheck"|"FileCircleExclamation"|"FileCircleMinus"|"FileCirclePlus"|"FileCircleQuestion"|"FileCircleXmark"|"FileCode"|"FileContract"|"FileCsv"|"FileExcel"|"FileExport"|"FileFragment"|"FileHalfDashed"|"FileImage"|"FileImport"|"FileInvoice"|"FileInvoiceDollar"|"FileLines"|"FileMedical"|"FilePdf"|"FilePen"|"FilePowerpoint"|"FilePrescription"|"FileShield"|"FileSignature"|"FileVideo"|"FileWaveform"|"FileWord"|"FileZipper"|"Fill"|"FillDrip"|"Film"|"Filter"|"FilterCircleDollar"|"FilterCircleXmark"|"Fingerprint"|"Fire"|"FireBurner"|"FireExtinguisher"|"FireFlameCurved"|"FireFlameSimple"|"Fish"|"FishFins"|"Flag"|"FlagCheckered"|"FlagUsa"|"Flask"|"FlaskVial"|"FloppyDisk"|"FlorinSign"|"Folder"|"FolderClosed"|"FolderMinus"|"FolderOpen"|"FolderPlus"|"FolderTree"|"Font"|"FontAwesome"|"Football"|"Forward"|"ForwardFast"|"ForwardStep"|"FrancSign"|"Frog"|"Futbol"|"G"|"Gamepad"|"GasPump"|"Gauge"|"GaugeHigh"|"GaugeSimple"|"GaugeSimpleHigh"|"Gavel"|"Gear"|"Gears"|"Gem"|"Genderless"|"Ghost"|"Gift"|"Gifts"|"GlassWater"|"GlassWaterDroplet"|"Glasses"|"Globe"|"GolfBallTee"|"Gopuram"|"GraduationCap"|"GreaterThan"|"GreaterThanEqual"|"Grip"|"GripLines"|"GripLinesVertical"|"GripVertical"|"GroupArrowsRotate"|"GuaraniSign"|"Guitar"|"Gun"|"H"|"Hammer"|"Hamsa"|"Hand"|"HandBackFist"|"HandDots"|"HandFist"|"HandHolding"|"HandHoldingDollar"|"HandHoldingDroplet"|"HandHoldingHand"|"HandHoldingHeart"|"HandHoldingMedical"|"HandLizard"|"HandMiddleFinger"|"HandPeace"|"HandPointDown"|"HandPointLeft"|"HandPointRight"|"HandPointUp"|"HandPointer"|"HandScissors"|"HandSparkles"|"HandSpock"|"Handcuffs"|"Hands"|"HandsAslInterpreting"|"HandsBound"|"HandsBubbles"|"HandsClapping"|"HandsHolding"|"HandsHoldingChild"|"HandsHoldingCircle"|"HandsPraying"|"Handshake"|"HandshakeAngle"|"HandshakeSimple"|"HandshakeSimpleSlash"|"HandshakeSlash"|"Hanukiah"|"HardDrive"|"Hashtag"|"HatCowboy"|"HatCowboySide"|"HatWizard"|"HeadSideCough"|"HeadSideCoughSlash"|"HeadSideMask"|"HeadSideVirus"|"Heading"|"Headphones"|"HeadphonesSimple"|"Headset"|"Heart"|"HeartCircleBolt"|"HeartCircleCheck"|"HeartCircleExclamation"|"HeartCircleMinus"|"HeartCirclePlus"|"HeartCircleXmark"|"HeartCrack"|"HeartPulse"|"Helicopter"|"HelicopterSymbol"|"HelmetSafety"|"HelmetUn"|"HexagonNodes"|"HexagonNodesBolt"|"Highlighter"|"HillAvalanche"|"HillRockslide"|"Hippo"|"HockeyPuck"|"HollyBerry"|"Horse"|"HorseHead"|"Hospital"|"HospitalUser"|"HotTubPerson"|"Hotdog"|"Hotel"|"Hourglass"|"HourglassEnd"|"HourglassHalf"|"HourglassStart"|"House"|"HouseChimney"|"HouseChimneyCrack"|"HouseChimneyMedical"|"HouseChimneyUser"|"HouseChimneyWindow"|"HouseCircleCheck"|"HouseCircleExclamation"|"HouseCircleXmark"|"HouseCrack"|"HouseFire"|"HouseFlag"|"HouseFloodWater"|"HouseFloodWaterCircleArrowRight"|"HouseLaptop"|"HouseLock"|"HouseMedical"|"HouseMedicalCircleCheck"|"HouseMedicalCircleExclamation"|"HouseMedicalCircleXmark"|"HouseMedicalFlag"|"HouseSignal"|"HouseTsunami"|"HouseUser"|"HryvniaSign"|"Hurricane"|"I"|"ICursor"|"IceCream"|"Icicles"|"Icons"|"IdBadge"|"IdCard"|"IdCardClip"|"Igloo"|"Image"|"ImagePortrait"|"Images"|"Inbox"|"Indent"|"IndianRupeeSign"|"Industry"|"Infinity"|"Info"|"Italic"|"J"|"Jar"|"JarWheat"|"Jedi"|"JetFighter"|"JetFighterUp"|"Joint"|"JugDetergent"|"K"|"Kaaba"|"Key"|"Keyboard"|"Khanda"|"KipSign"|"KitMedical"|"KitchenSet"|"KiwiBird"|"L"|"LandMineOn"|"Landmark"|"LandmarkDome"|"LandmarkFlag"|"Language"|"Laptop"|"LaptopCode"|"LaptopFile"|"LaptopMedical"|"LariSign"|"LayerGroup"|"Leaf"|"LeftLong"|"LeftRight"|"Lemon"|"LessThan"|"LessThanEqual"|"LifeRing"|"Lightbulb"|"LinesLeaning"|"Link"|"LinkSlash"|"LiraSign"|"List"|"ListCheck"|"ListOl"|"ListUl"|"LitecoinSign"|"LocationArrow"|"LocationCrosshairs"|"LocationDot"|"LocationPin"|"LocationPinLock"|"Lock"|"LockOpen"|"Locust"|"Lungs"|"LungsVirus"|"M"|"Magnet"|"MagnifyingGlass"|"MagnifyingGlassArrowRight"|"MagnifyingGlassChart"|"MagnifyingGlassDollar"|"MagnifyingGlassLocation"|"MagnifyingGlassMinus"|"MagnifyingGlassPlus"|"ManatSign"|"Map"|"MapLocation"|"MapLocationDot"|"MapPin"|"Marker"|"Mars"|"MarsAndVenus"|"MarsAndVenusBurst"|"MarsDouble"|"MarsStroke"|"MarsStrokeRight"|"MarsStrokeUp"|"MartiniGlass"|"MartiniGlassCitrus"|"MartiniGlassEmpty"|"Mask"|"MaskFace"|"MaskVentilator"|"MasksTheater"|"MattressPillow"|"Maximize"|"Medal"|"Memory"|"Menorah"|"Mercury"|"Message"|"Meteor"|"Microchip"|"Microphone"|"MicrophoneLines"|"MicrophoneLinesSlash"|"MicrophoneSlash"|"Microscope"|"MillSign"|"Minimize"|"Minus"|"Mitten"|"Mobile"|"MobileButton"|"MobileRetro"|"MobileScreen"|"MobileScreenButton"|"MoneyBill"|"MoneyBill1"|"MoneyBill1Wave"|"MoneyBillTransfer"|"MoneyBillTrendUp"|"MoneyBillWave"|"MoneyBillWheat"|"MoneyBills"|"MoneyCheck"|"MoneyCheckDollar"|"Monument"|"Moon"|"MortarPestle"|"Mosque"|"Mosquito"|"MosquitoNet"|"Motorcycle"|"Mound"|"Mountain"|"MountainCity"|"MountainSun"|"MugHot"|"MugSaucer"|"Music"|"N"|"NairaSign"|"NetworkWired"|"Neuter"|"Newspaper"|"NotEqual"|"Notdef"|"NoteSticky"|"NotesMedical"|"O"|"ObjectGroup"|"ObjectUngroup"|"OilCan"|"OilWell"|"Om"|"Otter"|"Outdent"|"P"|"Pager"|"PaintRoller"|"Paintbrush"|"Palette"|"Pallet"|"Panorama"|"PaperPlane"|"Paperclip"|"ParachuteBox"|"Paragraph"|"Passport"|"Paste"|"Pause"|"Paw"|"Peace"|"Pen"|"PenClip"|"PenFancy"|"PenNib"|"PenRuler"|"PenToSquare"|"Pencil"|"PeopleArrows"|"PeopleCarryBox"|"PeopleGroup"|"PeopleLine"|"PeoplePulling"|"PeopleRobbery"|"PeopleRoof"|"PepperHot"|"Percent"|"Person"|"PersonArrowDownToLine"|"PersonArrowUpFromLine"|"PersonBiking"|"PersonBooth"|"PersonBreastfeeding"|"PersonBurst"|"PersonCane"|"PersonChalkboard"|"PersonCircleCheck"|"PersonCircleExclamation"|"PersonCircleMinus"|"PersonCirclePlus"|"PersonCircleQuestion"|"PersonCircleXmark"|"PersonDigging"|"PersonDotsFromLine"|"PersonDress"|"PersonDressBurst"|"PersonDrowning"|"PersonFalling"|"PersonFallingBurst"|"PersonHalfDress"|"PersonHarassing"|"PersonHiking"|"PersonMilitaryPointing"|"PersonMilitaryRifle"|"PersonMilitaryToPerson"|"PersonPraying"|"PersonPregnant"|"PersonRays"|"PersonRifle"|"PersonRunning"|"PersonShelter"|"PersonSkating"|"PersonSkiing"|"PersonSkiingNordic"|"PersonSnowboarding"|"PersonSwimming"|"PersonThroughWindow"|"PersonWalking"|"PersonWalkingArrowLoopLeft"|"PersonWalkingArrowRight"|"PersonWalkingDashedLineArrowRight"|"PersonWalkingLuggage"|"PersonWalkingWithCane"|"PesetaSign"|"PesoSign"|"Phone"|"PhoneFlip"|"PhoneSlash"|"PhoneVolume"|"PhotoFilm"|"PiggyBank"|"Pills"|"PizzaSlice"|"PlaceOfWorship"|"Plane"|"PlaneArrival"|"PlaneCircleCheck"|"PlaneCircleExclamation"|"PlaneCircleXmark"|"PlaneDeparture"|"PlaneLock"|"PlaneSlash"|"PlaneUp"|"PlantWilt"|"PlateWheat"|"Play"|"Plug"|"PlugCircleBolt"|"PlugCircleCheck"|"PlugCircleExclamation"|"PlugCircleMinus"|"PlugCirclePlus"|"PlugCircleXmark"|"Plus"|"PlusMinus"|"Podcast"|"Poo"|"PooStorm"|"Poop"|"PowerOff"|"Prescription"|"PrescriptionBottle"|"PrescriptionBottleMedical"|"Print"|"PumpMedical"|"PumpSoap"|"PuzzlePiece"|"Q"|"Qrcode"|"Question"|"QuoteLeft"|"QuoteRight"|"R"|"Radiation"|"Radio"|"Rainbow"|"RankingStar"|"Receipt"|"RecordVinyl"|"RectangleAd"|"RectangleList"|"RectangleXmark"|"Recycle"|"Registered"|"Repeat"|"Reply"|"ReplyAll"|"Republican"|"Restroom"|"Retweet"|"Ribbon"|"RightFromBracket"|"RightLeft"|"RightLong"|"RightToBracket"|"Ring"|"Road"|"RoadBarrier"|"RoadBridge"|"RoadCircleCheck"|"RoadCircleExclamation"|"RoadCircleXmark"|"RoadLock"|"RoadSpikes"|"Robot"|"Rocket"|"Rotate"|"RotateLeft"|"RotateRight"|"Route"|"Rss"|"RubleSign"|"Rug"|"Ruler"|"RulerCombined"|"RulerHorizontal"|"RulerVertical"|"RupeeSign"|"RupiahSign"|"S"|"SackDollar"|"SackXmark"|"Sailboat"|"Satellite"|"SatelliteDish"|"ScaleBalanced"|"ScaleUnbalanced"|"ScaleUnbalancedFlip"|"School"|"SchoolCircleCheck"|"SchoolCircleExclamation"|"SchoolCircleXmark"|"SchoolFlag"|"SchoolLock"|"Scissors"|"Screwdriver"|"ScrewdriverWrench"|"Scroll"|"ScrollTorah"|"SdCard"|"Section"|"Seedling"|"Server"|"Shapes"|"Share"|"ShareFromSquare"|"ShareNodes"|"SheetPlastic"|"ShekelSign"|"Shield"|"ShieldCat"|"ShieldDog"|"ShieldHalved"|"ShieldHeart"|"ShieldVirus"|"Ship"|"Shirt"|"ShoePrints"|"Shop"|"ShopLock"|"ShopSlash"|"Shower"|"Shrimp"|"Shuffle"|"ShuttleSpace"|"SignHanging"|"Signal"|"Signature"|"SignsPost"|"SimCard"|"Sink"|"Sitemap"|"Skull"|"SkullCrossbones"|"Slash"|"Sleigh"|"Sliders"|"Smog"|"Smoking"|"Snowflake"|"Snowman"|"Snowplow"|"Soap"|"Socks"|"SolarPanel"|"Sort"|"SortDown"|"SortUp"|"Spa"|"SpaghettiMonsterFlying"|"SpellCheck"|"Spider"|"Spinner"|"Splotch"|"Spoon"|"SprayCan"|"SprayCanSparkles"|"Square"|"SquareArrowUpRight"|"SquareBinary"|"SquareCaretDown"|"SquareCaretLeft"|"SquareCaretRight"|"SquareCaretUp"|"SquareCheck"|"SquareEnvelope"|"SquareFull"|"SquareH"|"SquareMinus"|"SquareNfi"|"SquareParking"|"SquarePen"|"SquarePersonConfined"|"SquarePhone"|"SquarePhoneFlip"|"SquarePlus"|"SquarePollHorizontal"|"SquarePollVertical"|"SquareRootVariable"|"SquareRss"|"SquareShareNodes"|"SquareUpRight"|"SquareVirus"|"SquareXmark"|"StaffSnake"|"Stairs"|"Stamp"|"Stapler"|"Star"|"StarAndCrescent"|"StarHalf"|"StarHalfStroke"|"StarOfDavid"|"StarOfLife"|"SterlingSign"|"Stethoscope"|"Stop"|"Stopwatch"|"Stopwatch20"|"Store"|"StoreSlash"|"StreetView"|"Strikethrough"|"Stroopwafel"|"Subscript"|"Suitcase"|"SuitcaseMedical"|"SuitcaseRolling"|"Sun"|"SunPlantWilt"|"Superscript"|"Swatchbook"|"Synagogue"|"Syringe"|"T"|"Table"|"TableCells"|"TableCellsColumnLock"|"TableCellsLarge"|"TableCellsRowLock"|"TableCellsRowUnlock"|"TableColumns"|"TableList"|"TableTennisPaddleBall"|"Tablet"|"TabletButton"|"TabletScreenButton"|"Tablets"|"TachographDigital"|"Tag"|"Tags"|"Tape"|"Tarp"|"TarpDroplet"|"Taxi"|"Teeth"|"TeethOpen"|"TemperatureArrowDown"|"TemperatureArrowUp"|"TemperatureEmpty"|"TemperatureFull"|"TemperatureHalf"|"TemperatureHigh"|"TemperatureLow"|"TemperatureQuarter"|"TemperatureThreeQuarters"|"TengeSign"|"Tent"|"TentArrowDownToLine"|"TentArrowLeftRight"|"TentArrowTurnLeft"|"TentArrowsDown"|"Tents"|"Terminal"|"TextHeight"|"TextSlash"|"TextWidth"|"Thermometer"|"ThumbsDown"|"ThumbsUp"|"Thumbtack"|"ThumbtackSlash"|"Ticket"|"TicketSimple"|"Timeline"|"ToggleOff"|"ToggleOn"|"Toilet"|"ToiletPaper"|"ToiletPaperSlash"|"ToiletPortable"|"ToiletsPortable"|"Toolbox"|"Tooth"|"ToriiGate"|"Tornado"|"TowerBroadcast"|"TowerCell"|"TowerObservation"|"Tractor"|"Trademark"|"TrafficLight"|"Trailer"|"Train"|"TrainSubway"|"TrainTram"|"Transgender"|"Trash"|"TrashArrowUp"|"TrashCan"|"TrashCanArrowUp"|"Tree"|"TreeCity"|"TriangleExclamation"|"Trophy"|"Trowel"|"TrowelBricks"|"Truck"|"TruckArrowRight"|"TruckDroplet"|"TruckFast"|"TruckField"|"TruckFieldUn"|"TruckFront"|"TruckMedical"|"TruckMonster"|"TruckMoving"|"TruckPickup"|"TruckPlane"|"TruckRampBox"|"Tty"|"TurkishLiraSign"|"TurnDown"|"TurnUp"|"Tv"|"U"|"Umbrella"|"UmbrellaBeach"|"Underline"|"UniversalAccess"|"Unlock"|"UnlockKeyhole"|"UpDown"|"UpDownLeftRight"|"UpLong"|"UpRightAndDownLeftFromCenter"|"UpRightFromSquare"|"Upload"|"User"|"UserAstronaut"|"UserCheck"|"UserClock"|"UserDoctor"|"UserGear"|"UserGraduate"|"UserGroup"|"UserInjured"|"UserLarge"|"UserLargeSlash"|"UserLock"|"UserMinus"|"UserNinja"|"UserNurse"|"UserPen"|"UserPlus"|"UserSecret"|"UserShield"|"UserSlash"|"UserTag"|"UserTie"|"UserXmark"|"Users"|"UsersBetweenLines"|"UsersGear"|"UsersLine"|"UsersRays"|"UsersRectangle"|"UsersSlash"|"UsersViewfinder"|"Utensils"|"V"|"VanShuttle"|"Vault"|"VectorSquare"|"Venus"|"VenusDouble"|"VenusMars"|"Vest"|"VestPatches"|"Vial"|"VialCircleCheck"|"VialVirus"|"Vials"|"Video"|"VideoSlash"|"Vihara"|"Virus"|"VirusCovid"|"VirusCovidSlash"|"VirusSlash"|"Viruses"|"Voicemail"|"Volcano"|"Volleyball"|"VolumeHigh"|"VolumeLow"|"VolumeOff"|"VolumeXmark"|"VrCardboard"|"W"|"WalkieTalkie"|"Wallet"|"WandMagic"|"WandMagicSparkles"|"WandSparkles"|"Warehouse"|"Water"|"WaterLadder"|"WaveSquare"|"WebAwesome"|"WeightHanging"|"WeightScale"|"WheatAwn"|"WheatAwnCircleExclamation"|"Wheelchair"|"WheelchairMove"|"WhiskeyGlass"|"Wifi"|"Wind"|"WindowMaximize"|"WindowMinimize"|"WindowRestore"|"WineBottle"|"WineGlass"|"WineGlassEmpty"|"WonSign"|"Worm"|"Wrench"|"X"|"XRay"|"Xmark"|"XmarksLines"|"Y"|"YenSign"|"YinYang"|"Z"|"Search"|"Save"|"Settings"|"Cog"|"Home"|"Edit"|"Close"|"Cancel"|"Refresh"|"Warning"|"CheckCircle"|"TimesCircle"|"VolumeMute"|"Cut"|"Undo"|"Redo"|"StepForward"|"StepBackward"|"Pin"|"ZoomIn"|"ZoomOut" - Icon shown (Font Awesome).
@@ -2351,14 +2351,14 @@ function UILabelNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIButtonNodeProperty|string
 ---@return any
----@overload fun(self: UIButtonNode, path: "position"): number[]
----@overload fun(self: UIButtonNode, path: "scale"): number[]
+---@overload fun(self: UIButtonNode, path: "position"): Vec2
+---@overload fun(self: UIButtonNode, path: "scale"): Vec2
 ---@overload fun(self: UIButtonNode, path: "rotation"): number
 ---@overload fun(self: UIButtonNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIButtonNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIButtonNode, path: "paused"): boolean
 ---@overload fun(self: UIButtonNode, path: "enabled"): boolean
----@overload fun(self: UIButtonNode, path: "size"): number[]
+---@overload fun(self: UIButtonNode, path: "size"): Vec2
 ---@overload fun(self: UIButtonNode, path: "text"): string
 ---@overload fun(self: UIButtonNode, path: "fontSize"): number
 ---@overload fun(self: UIButtonNode, path: "icon"): "None"|"Digit0"|"Digit1"|"Digit2"|"Digit3"|"Digit4"|"Digit5"|"Digit6"|"Digit7"|"Digit8"|"Digit9"|"A"|"AddressBook"|"AddressCard"|"AlignCenter"|"AlignJustify"|"AlignLeft"|"AlignRight"|"Anchor"|"AnchorCircleCheck"|"AnchorCircleExclamation"|"AnchorCircleXmark"|"AnchorLock"|"AngleDown"|"AngleLeft"|"AngleRight"|"AngleUp"|"AnglesDown"|"AnglesLeft"|"AnglesRight"|"AnglesUp"|"Ankh"|"AppleWhole"|"Archway"|"ArrowDown"|"ArrowDown19"|"ArrowDown91"|"ArrowDownAZ"|"ArrowDownLong"|"ArrowDownShortWide"|"ArrowDownUpAcrossLine"|"ArrowDownUpLock"|"ArrowDownWideShort"|"ArrowDownZA"|"ArrowLeft"|"ArrowLeftLong"|"ArrowPointer"|"ArrowRight"|"ArrowRightArrowLeft"|"ArrowRightFromBracket"|"ArrowRightLong"|"ArrowRightToBracket"|"ArrowRightToCity"|"ArrowRotateLeft"|"ArrowRotateRight"|"ArrowTrendDown"|"ArrowTrendUp"|"ArrowTurnDown"|"ArrowTurnUp"|"ArrowUp"|"ArrowUp19"|"ArrowUp91"|"ArrowUpAZ"|"ArrowUpFromBracket"|"ArrowUpFromGroundWater"|"ArrowUpFromWaterPump"|"ArrowUpLong"|"ArrowUpRightDots"|"ArrowUpRightFromSquare"|"ArrowUpShortWide"|"ArrowUpWideShort"|"ArrowUpZA"|"ArrowsDownToLine"|"ArrowsDownToPeople"|"ArrowsLeftRight"|"ArrowsLeftRightToLine"|"ArrowsRotate"|"ArrowsSpin"|"ArrowsSplitUpAndLeft"|"ArrowsToCircle"|"ArrowsToDot"|"ArrowsToEye"|"ArrowsTurnRight"|"ArrowsTurnToDots"|"ArrowsUpDown"|"ArrowsUpDownLeftRight"|"ArrowsUpToLine"|"Asterisk"|"At"|"Atom"|"AudioDescription"|"AustralSign"|"Award"|"B"|"Baby"|"BabyCarriage"|"Backward"|"BackwardFast"|"BackwardStep"|"Bacon"|"Bacteria"|"Bacterium"|"BagShopping"|"Bahai"|"BahtSign"|"Ban"|"BanSmoking"|"Bandage"|"BangladeshiTakaSign"|"Barcode"|"Bars"|"BarsProgress"|"BarsStaggered"|"Baseball"|"BaseballBatBall"|"BasketShopping"|"Basketball"|"Bath"|"BatteryEmpty"|"BatteryFull"|"BatteryHalf"|"BatteryQuarter"|"BatteryThreeQuarters"|"Bed"|"BedPulse"|"BeerMugEmpty"|"Bell"|"BellConcierge"|"BellSlash"|"BezierCurve"|"Bicycle"|"Binoculars"|"Biohazard"|"BitcoinSign"|"Blender"|"BlenderPhone"|"Blog"|"Bold"|"Bolt"|"BoltLightning"|"Bomb"|"Bone"|"Bong"|"Book"|"BookAtlas"|"BookBible"|"BookBookmark"|"BookJournalWhills"|"BookMedical"|"BookOpen"|"BookOpenReader"|"BookQuran"|"BookSkull"|"BookTanakh"|"Bookmark"|"BorderAll"|"BorderNone"|"BorderTopLeft"|"BoreHole"|"BottleDroplet"|"BottleWater"|"BowlFood"|"BowlRice"|"BowlingBall"|"Box"|"BoxArchive"|"BoxOpen"|"BoxTissue"|"BoxesPacking"|"BoxesStacked"|"Braille"|"Brain"|"BrazilianRealSign"|"BreadSlice"|"Bridge"|"BridgeCircleCheck"|"BridgeCircleExclamation"|"BridgeCircleXmark"|"BridgeLock"|"BridgeWater"|"Briefcase"|"BriefcaseMedical"|"Broom"|"BroomBall"|"Brush"|"Bucket"|"Bug"|"BugSlash"|"Bugs"|"Building"|"BuildingCircleArrowRight"|"BuildingCircleCheck"|"BuildingCircleExclamation"|"BuildingCircleXmark"|"BuildingColumns"|"BuildingFlag"|"BuildingLock"|"BuildingNgo"|"BuildingShield"|"BuildingUn"|"BuildingUser"|"BuildingWheat"|"Bullhorn"|"Bullseye"|"Burger"|"Burst"|"Bus"|"BusSimple"|"BusinessTime"|"C"|"CableCar"|"CakeCandles"|"Calculator"|"Calendar"|"CalendarCheck"|"CalendarDay"|"CalendarDays"|"CalendarMinus"|"CalendarPlus"|"CalendarWeek"|"CalendarXmark"|"Camera"|"CameraRetro"|"CameraRotate"|"Campground"|"CandyCane"|"Cannabis"|"Capsules"|"Car"|"CarBattery"|"CarBurst"|"CarOn"|"CarRear"|"CarSide"|"CarTunnel"|"Caravan"|"CaretDown"|"CaretLeft"|"CaretRight"|"CaretUp"|"Carrot"|"CartArrowDown"|"CartFlatbed"|"CartFlatbedSuitcase"|"CartPlus"|"CartShopping"|"CashRegister"|"Cat"|"CediSign"|"CentSign"|"Certificate"|"Chair"|"Chalkboard"|"ChalkboardUser"|"ChampagneGlasses"|"ChargingStation"|"ChartArea"|"ChartBar"|"ChartColumn"|"ChartDiagram"|"ChartGantt"|"ChartLine"|"ChartPie"|"ChartSimple"|"Check"|"CheckDouble"|"CheckToSlot"|"Cheese"|"Chess"|"ChessBishop"|"ChessBoard"|"ChessKing"|"ChessKnight"|"ChessPawn"|"ChessQueen"|"ChessRook"|"ChevronDown"|"ChevronLeft"|"ChevronRight"|"ChevronUp"|"Child"|"ChildCombatant"|"ChildDress"|"ChildReaching"|"Children"|"Church"|"Circle"|"CircleArrowDown"|"CircleArrowLeft"|"CircleArrowRight"|"CircleArrowUp"|"CircleCheck"|"CircleChevronDown"|"CircleChevronLeft"|"CircleChevronRight"|"CircleChevronUp"|"CircleDollarToSlot"|"CircleDot"|"CircleDown"|"CircleExclamation"|"CircleH"|"CircleHalfStroke"|"CircleInfo"|"CircleLeft"|"CircleMinus"|"CircleNodes"|"CircleNotch"|"CirclePause"|"CirclePlay"|"CirclePlus"|"CircleQuestion"|"CircleRadiation"|"CircleRight"|"CircleStop"|"CircleUp"|"CircleUser"|"CircleXmark"|"City"|"Clapperboard"|"Clipboard"|"ClipboardCheck"|"ClipboardList"|"ClipboardQuestion"|"ClipboardUser"|"Clock"|"ClockRotateLeft"|"Clone"|"ClosedCaptioning"|"Cloud"|"CloudArrowDown"|"CloudArrowUp"|"CloudBolt"|"CloudMeatball"|"CloudMoon"|"CloudMoonRain"|"CloudRain"|"CloudShowersHeavy"|"CloudShowersWater"|"CloudSun"|"CloudSunRain"|"Clover"|"Code"|"CodeBranch"|"CodeCommit"|"CodeCompare"|"CodeFork"|"CodeMerge"|"CodePullRequest"|"Coins"|"ColonSign"|"Comment"|"CommentDollar"|"CommentDots"|"CommentMedical"|"CommentNodes"|"CommentSlash"|"CommentSms"|"Comments"|"CommentsDollar"|"CompactDisc"|"Compass"|"CompassDrafting"|"Compress"|"Computer"|"ComputerMouse"|"Cookie"|"CookieBite"|"Copy"|"Copyright"|"Couch"|"Cow"|"CreditCard"|"Crop"|"CropSimple"|"Cross"|"Crosshairs"|"Crow"|"Crown"|"Crutch"|"CruzeiroSign"|"Cube"|"Cubes"|"CubesStacked"|"D"|"Database"|"DeleteLeft"|"Democrat"|"Desktop"|"Dharmachakra"|"DiagramNext"|"DiagramPredecessor"|"DiagramProject"|"DiagramSuccessor"|"Diamond"|"DiamondTurnRight"|"Dice"|"DiceD20"|"DiceD6"|"DiceFive"|"DiceFour"|"DiceOne"|"DiceSix"|"DiceThree"|"DiceTwo"|"Disease"|"Display"|"Divide"|"Dna"|"Dog"|"DollarSign"|"Dolly"|"DongSign"|"DoorClosed"|"DoorOpen"|"Dove"|"DownLeftAndUpRightToCenter"|"DownLong"|"Download"|"Dragon"|"DrawPolygon"|"Droplet"|"DropletSlash"|"Drum"|"DrumSteelpan"|"DrumstickBite"|"Dumbbell"|"Dumpster"|"DumpsterFire"|"Dungeon"|"E"|"EarDeaf"|"EarListen"|"EarthAfrica"|"EarthAmericas"|"EarthAsia"|"EarthEurope"|"EarthOceania"|"Egg"|"Eject"|"Elevator"|"Ellipsis"|"EllipsisVertical"|"Envelope"|"EnvelopeCircleCheck"|"EnvelopeOpen"|"EnvelopeOpenText"|"EnvelopesBulk"|"Equals"|"Eraser"|"Ethernet"|"EuroSign"|"Exclamation"|"Expand"|"Explosion"|"Eye"|"EyeDropper"|"EyeLowVision"|"EyeSlash"|"F"|"FaceAngry"|"FaceDizzy"|"FaceFlushed"|"FaceFrown"|"FaceFrownOpen"|"FaceGrimace"|"FaceGrin"|"FaceGrinBeam"|"FaceGrinBeamSweat"|"FaceGrinHearts"|"FaceGrinSquint"|"FaceGrinSquintTears"|"FaceGrinStars"|"FaceGrinTears"|"FaceGrinTongue"|"FaceGrinTongueSquint"|"FaceGrinTongueWink"|"FaceGrinWide"|"FaceGrinWink"|"FaceKiss"|"FaceKissBeam"|"FaceKissWinkHeart"|"FaceLaugh"|"FaceLaughBeam"|"FaceLaughSquint"|"FaceLaughWink"|"FaceMeh"|"FaceMehBlank"|"FaceRollingEyes"|"FaceSadCry"|"FaceSadTear"|"FaceSmile"|"FaceSmileBeam"|"FaceSmileWink"|"FaceSurprise"|"FaceTired"|"Fan"|"Faucet"|"FaucetDrip"|"Fax"|"Feather"|"FeatherPointed"|"Ferry"|"File"|"FileArrowDown"|"FileArrowUp"|"FileAudio"|"FileCircleCheck"|"FileCircleExclamation"|"FileCircleMinus"|"FileCirclePlus"|"FileCircleQuestion"|"FileCircleXmark"|"FileCode"|"FileContract"|"FileCsv"|"FileExcel"|"FileExport"|"FileFragment"|"FileHalfDashed"|"FileImage"|"FileImport"|"FileInvoice"|"FileInvoiceDollar"|"FileLines"|"FileMedical"|"FilePdf"|"FilePen"|"FilePowerpoint"|"FilePrescription"|"FileShield"|"FileSignature"|"FileVideo"|"FileWaveform"|"FileWord"|"FileZipper"|"Fill"|"FillDrip"|"Film"|"Filter"|"FilterCircleDollar"|"FilterCircleXmark"|"Fingerprint"|"Fire"|"FireBurner"|"FireExtinguisher"|"FireFlameCurved"|"FireFlameSimple"|"Fish"|"FishFins"|"Flag"|"FlagCheckered"|"FlagUsa"|"Flask"|"FlaskVial"|"FloppyDisk"|"FlorinSign"|"Folder"|"FolderClosed"|"FolderMinus"|"FolderOpen"|"FolderPlus"|"FolderTree"|"Font"|"FontAwesome"|"Football"|"Forward"|"ForwardFast"|"ForwardStep"|"FrancSign"|"Frog"|"Futbol"|"G"|"Gamepad"|"GasPump"|"Gauge"|"GaugeHigh"|"GaugeSimple"|"GaugeSimpleHigh"|"Gavel"|"Gear"|"Gears"|"Gem"|"Genderless"|"Ghost"|"Gift"|"Gifts"|"GlassWater"|"GlassWaterDroplet"|"Glasses"|"Globe"|"GolfBallTee"|"Gopuram"|"GraduationCap"|"GreaterThan"|"GreaterThanEqual"|"Grip"|"GripLines"|"GripLinesVertical"|"GripVertical"|"GroupArrowsRotate"|"GuaraniSign"|"Guitar"|"Gun"|"H"|"Hammer"|"Hamsa"|"Hand"|"HandBackFist"|"HandDots"|"HandFist"|"HandHolding"|"HandHoldingDollar"|"HandHoldingDroplet"|"HandHoldingHand"|"HandHoldingHeart"|"HandHoldingMedical"|"HandLizard"|"HandMiddleFinger"|"HandPeace"|"HandPointDown"|"HandPointLeft"|"HandPointRight"|"HandPointUp"|"HandPointer"|"HandScissors"|"HandSparkles"|"HandSpock"|"Handcuffs"|"Hands"|"HandsAslInterpreting"|"HandsBound"|"HandsBubbles"|"HandsClapping"|"HandsHolding"|"HandsHoldingChild"|"HandsHoldingCircle"|"HandsPraying"|"Handshake"|"HandshakeAngle"|"HandshakeSimple"|"HandshakeSimpleSlash"|"HandshakeSlash"|"Hanukiah"|"HardDrive"|"Hashtag"|"HatCowboy"|"HatCowboySide"|"HatWizard"|"HeadSideCough"|"HeadSideCoughSlash"|"HeadSideMask"|"HeadSideVirus"|"Heading"|"Headphones"|"HeadphonesSimple"|"Headset"|"Heart"|"HeartCircleBolt"|"HeartCircleCheck"|"HeartCircleExclamation"|"HeartCircleMinus"|"HeartCirclePlus"|"HeartCircleXmark"|"HeartCrack"|"HeartPulse"|"Helicopter"|"HelicopterSymbol"|"HelmetSafety"|"HelmetUn"|"HexagonNodes"|"HexagonNodesBolt"|"Highlighter"|"HillAvalanche"|"HillRockslide"|"Hippo"|"HockeyPuck"|"HollyBerry"|"Horse"|"HorseHead"|"Hospital"|"HospitalUser"|"HotTubPerson"|"Hotdog"|"Hotel"|"Hourglass"|"HourglassEnd"|"HourglassHalf"|"HourglassStart"|"House"|"HouseChimney"|"HouseChimneyCrack"|"HouseChimneyMedical"|"HouseChimneyUser"|"HouseChimneyWindow"|"HouseCircleCheck"|"HouseCircleExclamation"|"HouseCircleXmark"|"HouseCrack"|"HouseFire"|"HouseFlag"|"HouseFloodWater"|"HouseFloodWaterCircleArrowRight"|"HouseLaptop"|"HouseLock"|"HouseMedical"|"HouseMedicalCircleCheck"|"HouseMedicalCircleExclamation"|"HouseMedicalCircleXmark"|"HouseMedicalFlag"|"HouseSignal"|"HouseTsunami"|"HouseUser"|"HryvniaSign"|"Hurricane"|"I"|"ICursor"|"IceCream"|"Icicles"|"Icons"|"IdBadge"|"IdCard"|"IdCardClip"|"Igloo"|"Image"|"ImagePortrait"|"Images"|"Inbox"|"Indent"|"IndianRupeeSign"|"Industry"|"Infinity"|"Info"|"Italic"|"J"|"Jar"|"JarWheat"|"Jedi"|"JetFighter"|"JetFighterUp"|"Joint"|"JugDetergent"|"K"|"Kaaba"|"Key"|"Keyboard"|"Khanda"|"KipSign"|"KitMedical"|"KitchenSet"|"KiwiBird"|"L"|"LandMineOn"|"Landmark"|"LandmarkDome"|"LandmarkFlag"|"Language"|"Laptop"|"LaptopCode"|"LaptopFile"|"LaptopMedical"|"LariSign"|"LayerGroup"|"Leaf"|"LeftLong"|"LeftRight"|"Lemon"|"LessThan"|"LessThanEqual"|"LifeRing"|"Lightbulb"|"LinesLeaning"|"Link"|"LinkSlash"|"LiraSign"|"List"|"ListCheck"|"ListOl"|"ListUl"|"LitecoinSign"|"LocationArrow"|"LocationCrosshairs"|"LocationDot"|"LocationPin"|"LocationPinLock"|"Lock"|"LockOpen"|"Locust"|"Lungs"|"LungsVirus"|"M"|"Magnet"|"MagnifyingGlass"|"MagnifyingGlassArrowRight"|"MagnifyingGlassChart"|"MagnifyingGlassDollar"|"MagnifyingGlassLocation"|"MagnifyingGlassMinus"|"MagnifyingGlassPlus"|"ManatSign"|"Map"|"MapLocation"|"MapLocationDot"|"MapPin"|"Marker"|"Mars"|"MarsAndVenus"|"MarsAndVenusBurst"|"MarsDouble"|"MarsStroke"|"MarsStrokeRight"|"MarsStrokeUp"|"MartiniGlass"|"MartiniGlassCitrus"|"MartiniGlassEmpty"|"Mask"|"MaskFace"|"MaskVentilator"|"MasksTheater"|"MattressPillow"|"Maximize"|"Medal"|"Memory"|"Menorah"|"Mercury"|"Message"|"Meteor"|"Microchip"|"Microphone"|"MicrophoneLines"|"MicrophoneLinesSlash"|"MicrophoneSlash"|"Microscope"|"MillSign"|"Minimize"|"Minus"|"Mitten"|"Mobile"|"MobileButton"|"MobileRetro"|"MobileScreen"|"MobileScreenButton"|"MoneyBill"|"MoneyBill1"|"MoneyBill1Wave"|"MoneyBillTransfer"|"MoneyBillTrendUp"|"MoneyBillWave"|"MoneyBillWheat"|"MoneyBills"|"MoneyCheck"|"MoneyCheckDollar"|"Monument"|"Moon"|"MortarPestle"|"Mosque"|"Mosquito"|"MosquitoNet"|"Motorcycle"|"Mound"|"Mountain"|"MountainCity"|"MountainSun"|"MugHot"|"MugSaucer"|"Music"|"N"|"NairaSign"|"NetworkWired"|"Neuter"|"Newspaper"|"NotEqual"|"Notdef"|"NoteSticky"|"NotesMedical"|"O"|"ObjectGroup"|"ObjectUngroup"|"OilCan"|"OilWell"|"Om"|"Otter"|"Outdent"|"P"|"Pager"|"PaintRoller"|"Paintbrush"|"Palette"|"Pallet"|"Panorama"|"PaperPlane"|"Paperclip"|"ParachuteBox"|"Paragraph"|"Passport"|"Paste"|"Pause"|"Paw"|"Peace"|"Pen"|"PenClip"|"PenFancy"|"PenNib"|"PenRuler"|"PenToSquare"|"Pencil"|"PeopleArrows"|"PeopleCarryBox"|"PeopleGroup"|"PeopleLine"|"PeoplePulling"|"PeopleRobbery"|"PeopleRoof"|"PepperHot"|"Percent"|"Person"|"PersonArrowDownToLine"|"PersonArrowUpFromLine"|"PersonBiking"|"PersonBooth"|"PersonBreastfeeding"|"PersonBurst"|"PersonCane"|"PersonChalkboard"|"PersonCircleCheck"|"PersonCircleExclamation"|"PersonCircleMinus"|"PersonCirclePlus"|"PersonCircleQuestion"|"PersonCircleXmark"|"PersonDigging"|"PersonDotsFromLine"|"PersonDress"|"PersonDressBurst"|"PersonDrowning"|"PersonFalling"|"PersonFallingBurst"|"PersonHalfDress"|"PersonHarassing"|"PersonHiking"|"PersonMilitaryPointing"|"PersonMilitaryRifle"|"PersonMilitaryToPerson"|"PersonPraying"|"PersonPregnant"|"PersonRays"|"PersonRifle"|"PersonRunning"|"PersonShelter"|"PersonSkating"|"PersonSkiing"|"PersonSkiingNordic"|"PersonSnowboarding"|"PersonSwimming"|"PersonThroughWindow"|"PersonWalking"|"PersonWalkingArrowLoopLeft"|"PersonWalkingArrowRight"|"PersonWalkingDashedLineArrowRight"|"PersonWalkingLuggage"|"PersonWalkingWithCane"|"PesetaSign"|"PesoSign"|"Phone"|"PhoneFlip"|"PhoneSlash"|"PhoneVolume"|"PhotoFilm"|"PiggyBank"|"Pills"|"PizzaSlice"|"PlaceOfWorship"|"Plane"|"PlaneArrival"|"PlaneCircleCheck"|"PlaneCircleExclamation"|"PlaneCircleXmark"|"PlaneDeparture"|"PlaneLock"|"PlaneSlash"|"PlaneUp"|"PlantWilt"|"PlateWheat"|"Play"|"Plug"|"PlugCircleBolt"|"PlugCircleCheck"|"PlugCircleExclamation"|"PlugCircleMinus"|"PlugCirclePlus"|"PlugCircleXmark"|"Plus"|"PlusMinus"|"Podcast"|"Poo"|"PooStorm"|"Poop"|"PowerOff"|"Prescription"|"PrescriptionBottle"|"PrescriptionBottleMedical"|"Print"|"PumpMedical"|"PumpSoap"|"PuzzlePiece"|"Q"|"Qrcode"|"Question"|"QuoteLeft"|"QuoteRight"|"R"|"Radiation"|"Radio"|"Rainbow"|"RankingStar"|"Receipt"|"RecordVinyl"|"RectangleAd"|"RectangleList"|"RectangleXmark"|"Recycle"|"Registered"|"Repeat"|"Reply"|"ReplyAll"|"Republican"|"Restroom"|"Retweet"|"Ribbon"|"RightFromBracket"|"RightLeft"|"RightLong"|"RightToBracket"|"Ring"|"Road"|"RoadBarrier"|"RoadBridge"|"RoadCircleCheck"|"RoadCircleExclamation"|"RoadCircleXmark"|"RoadLock"|"RoadSpikes"|"Robot"|"Rocket"|"Rotate"|"RotateLeft"|"RotateRight"|"Route"|"Rss"|"RubleSign"|"Rug"|"Ruler"|"RulerCombined"|"RulerHorizontal"|"RulerVertical"|"RupeeSign"|"RupiahSign"|"S"|"SackDollar"|"SackXmark"|"Sailboat"|"Satellite"|"SatelliteDish"|"ScaleBalanced"|"ScaleUnbalanced"|"ScaleUnbalancedFlip"|"School"|"SchoolCircleCheck"|"SchoolCircleExclamation"|"SchoolCircleXmark"|"SchoolFlag"|"SchoolLock"|"Scissors"|"Screwdriver"|"ScrewdriverWrench"|"Scroll"|"ScrollTorah"|"SdCard"|"Section"|"Seedling"|"Server"|"Shapes"|"Share"|"ShareFromSquare"|"ShareNodes"|"SheetPlastic"|"ShekelSign"|"Shield"|"ShieldCat"|"ShieldDog"|"ShieldHalved"|"ShieldHeart"|"ShieldVirus"|"Ship"|"Shirt"|"ShoePrints"|"Shop"|"ShopLock"|"ShopSlash"|"Shower"|"Shrimp"|"Shuffle"|"ShuttleSpace"|"SignHanging"|"Signal"|"Signature"|"SignsPost"|"SimCard"|"Sink"|"Sitemap"|"Skull"|"SkullCrossbones"|"Slash"|"Sleigh"|"Sliders"|"Smog"|"Smoking"|"Snowflake"|"Snowman"|"Snowplow"|"Soap"|"Socks"|"SolarPanel"|"Sort"|"SortDown"|"SortUp"|"Spa"|"SpaghettiMonsterFlying"|"SpellCheck"|"Spider"|"Spinner"|"Splotch"|"Spoon"|"SprayCan"|"SprayCanSparkles"|"Square"|"SquareArrowUpRight"|"SquareBinary"|"SquareCaretDown"|"SquareCaretLeft"|"SquareCaretRight"|"SquareCaretUp"|"SquareCheck"|"SquareEnvelope"|"SquareFull"|"SquareH"|"SquareMinus"|"SquareNfi"|"SquareParking"|"SquarePen"|"SquarePersonConfined"|"SquarePhone"|"SquarePhoneFlip"|"SquarePlus"|"SquarePollHorizontal"|"SquarePollVertical"|"SquareRootVariable"|"SquareRss"|"SquareShareNodes"|"SquareUpRight"|"SquareVirus"|"SquareXmark"|"StaffSnake"|"Stairs"|"Stamp"|"Stapler"|"Star"|"StarAndCrescent"|"StarHalf"|"StarHalfStroke"|"StarOfDavid"|"StarOfLife"|"SterlingSign"|"Stethoscope"|"Stop"|"Stopwatch"|"Stopwatch20"|"Store"|"StoreSlash"|"StreetView"|"Strikethrough"|"Stroopwafel"|"Subscript"|"Suitcase"|"SuitcaseMedical"|"SuitcaseRolling"|"Sun"|"SunPlantWilt"|"Superscript"|"Swatchbook"|"Synagogue"|"Syringe"|"T"|"Table"|"TableCells"|"TableCellsColumnLock"|"TableCellsLarge"|"TableCellsRowLock"|"TableCellsRowUnlock"|"TableColumns"|"TableList"|"TableTennisPaddleBall"|"Tablet"|"TabletButton"|"TabletScreenButton"|"Tablets"|"TachographDigital"|"Tag"|"Tags"|"Tape"|"Tarp"|"TarpDroplet"|"Taxi"|"Teeth"|"TeethOpen"|"TemperatureArrowDown"|"TemperatureArrowUp"|"TemperatureEmpty"|"TemperatureFull"|"TemperatureHalf"|"TemperatureHigh"|"TemperatureLow"|"TemperatureQuarter"|"TemperatureThreeQuarters"|"TengeSign"|"Tent"|"TentArrowDownToLine"|"TentArrowLeftRight"|"TentArrowTurnLeft"|"TentArrowsDown"|"Tents"|"Terminal"|"TextHeight"|"TextSlash"|"TextWidth"|"Thermometer"|"ThumbsDown"|"ThumbsUp"|"Thumbtack"|"ThumbtackSlash"|"Ticket"|"TicketSimple"|"Timeline"|"ToggleOff"|"ToggleOn"|"Toilet"|"ToiletPaper"|"ToiletPaperSlash"|"ToiletPortable"|"ToiletsPortable"|"Toolbox"|"Tooth"|"ToriiGate"|"Tornado"|"TowerBroadcast"|"TowerCell"|"TowerObservation"|"Tractor"|"Trademark"|"TrafficLight"|"Trailer"|"Train"|"TrainSubway"|"TrainTram"|"Transgender"|"Trash"|"TrashArrowUp"|"TrashCan"|"TrashCanArrowUp"|"Tree"|"TreeCity"|"TriangleExclamation"|"Trophy"|"Trowel"|"TrowelBricks"|"Truck"|"TruckArrowRight"|"TruckDroplet"|"TruckFast"|"TruckField"|"TruckFieldUn"|"TruckFront"|"TruckMedical"|"TruckMonster"|"TruckMoving"|"TruckPickup"|"TruckPlane"|"TruckRampBox"|"Tty"|"TurkishLiraSign"|"TurnDown"|"TurnUp"|"Tv"|"U"|"Umbrella"|"UmbrellaBeach"|"Underline"|"UniversalAccess"|"Unlock"|"UnlockKeyhole"|"UpDown"|"UpDownLeftRight"|"UpLong"|"UpRightAndDownLeftFromCenter"|"UpRightFromSquare"|"Upload"|"User"|"UserAstronaut"|"UserCheck"|"UserClock"|"UserDoctor"|"UserGear"|"UserGraduate"|"UserGroup"|"UserInjured"|"UserLarge"|"UserLargeSlash"|"UserLock"|"UserMinus"|"UserNinja"|"UserNurse"|"UserPen"|"UserPlus"|"UserSecret"|"UserShield"|"UserSlash"|"UserTag"|"UserTie"|"UserXmark"|"Users"|"UsersBetweenLines"|"UsersGear"|"UsersLine"|"UsersRays"|"UsersRectangle"|"UsersSlash"|"UsersViewfinder"|"Utensils"|"V"|"VanShuttle"|"Vault"|"VectorSquare"|"Venus"|"VenusDouble"|"VenusMars"|"Vest"|"VestPatches"|"Vial"|"VialCircleCheck"|"VialVirus"|"Vials"|"Video"|"VideoSlash"|"Vihara"|"Virus"|"VirusCovid"|"VirusCovidSlash"|"VirusSlash"|"Viruses"|"Voicemail"|"Volcano"|"Volleyball"|"VolumeHigh"|"VolumeLow"|"VolumeOff"|"VolumeXmark"|"VrCardboard"|"W"|"WalkieTalkie"|"Wallet"|"WandMagic"|"WandMagicSparkles"|"WandSparkles"|"Warehouse"|"Water"|"WaterLadder"|"WaveSquare"|"WebAwesome"|"WeightHanging"|"WeightScale"|"WheatAwn"|"WheatAwnCircleExclamation"|"Wheelchair"|"WheelchairMove"|"WhiskeyGlass"|"Wifi"|"Wind"|"WindowMaximize"|"WindowMinimize"|"WindowRestore"|"WineBottle"|"WineGlass"|"WineGlassEmpty"|"WonSign"|"Worm"|"Wrench"|"X"|"XRay"|"Xmark"|"XmarksLines"|"Y"|"YenSign"|"YinYang"|"Z"|"Search"|"Save"|"Settings"|"Cog"|"Home"|"Edit"|"Close"|"Cancel"|"Refresh"|"Warning"|"CheckCircle"|"TimesCircle"|"VolumeMute"|"Cut"|"Undo"|"Redo"|"StepForward"|"StepBackward"|"Pin"|"ZoomIn"|"ZoomOut"
@@ -2375,14 +2375,14 @@ function UIButtonNode:get_property(path) end
 ---@param path UIButtonNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIButtonNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIButtonNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIButtonNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIButtonNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIButtonNode, path: "rotation", value: number)
 ---@overload fun(self: UIButtonNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIButtonNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIButtonNode, path: "paused", value: boolean)
 ---@overload fun(self: UIButtonNode, path: "enabled", value: boolean)
----@overload fun(self: UIButtonNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIButtonNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIButtonNode, path: "text", value: string)
 ---@overload fun(self: UIButtonNode, path: "fontSize", value: number)
 ---@overload fun(self: UIButtonNode, path: "icon", value: "None"|"Digit0"|"Digit1"|"Digit2"|"Digit3"|"Digit4"|"Digit5"|"Digit6"|"Digit7"|"Digit8"|"Digit9"|"A"|"AddressBook"|"AddressCard"|"AlignCenter"|"AlignJustify"|"AlignLeft"|"AlignRight"|"Anchor"|"AnchorCircleCheck"|"AnchorCircleExclamation"|"AnchorCircleXmark"|"AnchorLock"|"AngleDown"|"AngleLeft"|"AngleRight"|"AngleUp"|"AnglesDown"|"AnglesLeft"|"AnglesRight"|"AnglesUp"|"Ankh"|"AppleWhole"|"Archway"|"ArrowDown"|"ArrowDown19"|"ArrowDown91"|"ArrowDownAZ"|"ArrowDownLong"|"ArrowDownShortWide"|"ArrowDownUpAcrossLine"|"ArrowDownUpLock"|"ArrowDownWideShort"|"ArrowDownZA"|"ArrowLeft"|"ArrowLeftLong"|"ArrowPointer"|"ArrowRight"|"ArrowRightArrowLeft"|"ArrowRightFromBracket"|"ArrowRightLong"|"ArrowRightToBracket"|"ArrowRightToCity"|"ArrowRotateLeft"|"ArrowRotateRight"|"ArrowTrendDown"|"ArrowTrendUp"|"ArrowTurnDown"|"ArrowTurnUp"|"ArrowUp"|"ArrowUp19"|"ArrowUp91"|"ArrowUpAZ"|"ArrowUpFromBracket"|"ArrowUpFromGroundWater"|"ArrowUpFromWaterPump"|"ArrowUpLong"|"ArrowUpRightDots"|"ArrowUpRightFromSquare"|"ArrowUpShortWide"|"ArrowUpWideShort"|"ArrowUpZA"|"ArrowsDownToLine"|"ArrowsDownToPeople"|"ArrowsLeftRight"|"ArrowsLeftRightToLine"|"ArrowsRotate"|"ArrowsSpin"|"ArrowsSplitUpAndLeft"|"ArrowsToCircle"|"ArrowsToDot"|"ArrowsToEye"|"ArrowsTurnRight"|"ArrowsTurnToDots"|"ArrowsUpDown"|"ArrowsUpDownLeftRight"|"ArrowsUpToLine"|"Asterisk"|"At"|"Atom"|"AudioDescription"|"AustralSign"|"Award"|"B"|"Baby"|"BabyCarriage"|"Backward"|"BackwardFast"|"BackwardStep"|"Bacon"|"Bacteria"|"Bacterium"|"BagShopping"|"Bahai"|"BahtSign"|"Ban"|"BanSmoking"|"Bandage"|"BangladeshiTakaSign"|"Barcode"|"Bars"|"BarsProgress"|"BarsStaggered"|"Baseball"|"BaseballBatBall"|"BasketShopping"|"Basketball"|"Bath"|"BatteryEmpty"|"BatteryFull"|"BatteryHalf"|"BatteryQuarter"|"BatteryThreeQuarters"|"Bed"|"BedPulse"|"BeerMugEmpty"|"Bell"|"BellConcierge"|"BellSlash"|"BezierCurve"|"Bicycle"|"Binoculars"|"Biohazard"|"BitcoinSign"|"Blender"|"BlenderPhone"|"Blog"|"Bold"|"Bolt"|"BoltLightning"|"Bomb"|"Bone"|"Bong"|"Book"|"BookAtlas"|"BookBible"|"BookBookmark"|"BookJournalWhills"|"BookMedical"|"BookOpen"|"BookOpenReader"|"BookQuran"|"BookSkull"|"BookTanakh"|"Bookmark"|"BorderAll"|"BorderNone"|"BorderTopLeft"|"BoreHole"|"BottleDroplet"|"BottleWater"|"BowlFood"|"BowlRice"|"BowlingBall"|"Box"|"BoxArchive"|"BoxOpen"|"BoxTissue"|"BoxesPacking"|"BoxesStacked"|"Braille"|"Brain"|"BrazilianRealSign"|"BreadSlice"|"Bridge"|"BridgeCircleCheck"|"BridgeCircleExclamation"|"BridgeCircleXmark"|"BridgeLock"|"BridgeWater"|"Briefcase"|"BriefcaseMedical"|"Broom"|"BroomBall"|"Brush"|"Bucket"|"Bug"|"BugSlash"|"Bugs"|"Building"|"BuildingCircleArrowRight"|"BuildingCircleCheck"|"BuildingCircleExclamation"|"BuildingCircleXmark"|"BuildingColumns"|"BuildingFlag"|"BuildingLock"|"BuildingNgo"|"BuildingShield"|"BuildingUn"|"BuildingUser"|"BuildingWheat"|"Bullhorn"|"Bullseye"|"Burger"|"Burst"|"Bus"|"BusSimple"|"BusinessTime"|"C"|"CableCar"|"CakeCandles"|"Calculator"|"Calendar"|"CalendarCheck"|"CalendarDay"|"CalendarDays"|"CalendarMinus"|"CalendarPlus"|"CalendarWeek"|"CalendarXmark"|"Camera"|"CameraRetro"|"CameraRotate"|"Campground"|"CandyCane"|"Cannabis"|"Capsules"|"Car"|"CarBattery"|"CarBurst"|"CarOn"|"CarRear"|"CarSide"|"CarTunnel"|"Caravan"|"CaretDown"|"CaretLeft"|"CaretRight"|"CaretUp"|"Carrot"|"CartArrowDown"|"CartFlatbed"|"CartFlatbedSuitcase"|"CartPlus"|"CartShopping"|"CashRegister"|"Cat"|"CediSign"|"CentSign"|"Certificate"|"Chair"|"Chalkboard"|"ChalkboardUser"|"ChampagneGlasses"|"ChargingStation"|"ChartArea"|"ChartBar"|"ChartColumn"|"ChartDiagram"|"ChartGantt"|"ChartLine"|"ChartPie"|"ChartSimple"|"Check"|"CheckDouble"|"CheckToSlot"|"Cheese"|"Chess"|"ChessBishop"|"ChessBoard"|"ChessKing"|"ChessKnight"|"ChessPawn"|"ChessQueen"|"ChessRook"|"ChevronDown"|"ChevronLeft"|"ChevronRight"|"ChevronUp"|"Child"|"ChildCombatant"|"ChildDress"|"ChildReaching"|"Children"|"Church"|"Circle"|"CircleArrowDown"|"CircleArrowLeft"|"CircleArrowRight"|"CircleArrowUp"|"CircleCheck"|"CircleChevronDown"|"CircleChevronLeft"|"CircleChevronRight"|"CircleChevronUp"|"CircleDollarToSlot"|"CircleDot"|"CircleDown"|"CircleExclamation"|"CircleH"|"CircleHalfStroke"|"CircleInfo"|"CircleLeft"|"CircleMinus"|"CircleNodes"|"CircleNotch"|"CirclePause"|"CirclePlay"|"CirclePlus"|"CircleQuestion"|"CircleRadiation"|"CircleRight"|"CircleStop"|"CircleUp"|"CircleUser"|"CircleXmark"|"City"|"Clapperboard"|"Clipboard"|"ClipboardCheck"|"ClipboardList"|"ClipboardQuestion"|"ClipboardUser"|"Clock"|"ClockRotateLeft"|"Clone"|"ClosedCaptioning"|"Cloud"|"CloudArrowDown"|"CloudArrowUp"|"CloudBolt"|"CloudMeatball"|"CloudMoon"|"CloudMoonRain"|"CloudRain"|"CloudShowersHeavy"|"CloudShowersWater"|"CloudSun"|"CloudSunRain"|"Clover"|"Code"|"CodeBranch"|"CodeCommit"|"CodeCompare"|"CodeFork"|"CodeMerge"|"CodePullRequest"|"Coins"|"ColonSign"|"Comment"|"CommentDollar"|"CommentDots"|"CommentMedical"|"CommentNodes"|"CommentSlash"|"CommentSms"|"Comments"|"CommentsDollar"|"CompactDisc"|"Compass"|"CompassDrafting"|"Compress"|"Computer"|"ComputerMouse"|"Cookie"|"CookieBite"|"Copy"|"Copyright"|"Couch"|"Cow"|"CreditCard"|"Crop"|"CropSimple"|"Cross"|"Crosshairs"|"Crow"|"Crown"|"Crutch"|"CruzeiroSign"|"Cube"|"Cubes"|"CubesStacked"|"D"|"Database"|"DeleteLeft"|"Democrat"|"Desktop"|"Dharmachakra"|"DiagramNext"|"DiagramPredecessor"|"DiagramProject"|"DiagramSuccessor"|"Diamond"|"DiamondTurnRight"|"Dice"|"DiceD20"|"DiceD6"|"DiceFive"|"DiceFour"|"DiceOne"|"DiceSix"|"DiceThree"|"DiceTwo"|"Disease"|"Display"|"Divide"|"Dna"|"Dog"|"DollarSign"|"Dolly"|"DongSign"|"DoorClosed"|"DoorOpen"|"Dove"|"DownLeftAndUpRightToCenter"|"DownLong"|"Download"|"Dragon"|"DrawPolygon"|"Droplet"|"DropletSlash"|"Drum"|"DrumSteelpan"|"DrumstickBite"|"Dumbbell"|"Dumpster"|"DumpsterFire"|"Dungeon"|"E"|"EarDeaf"|"EarListen"|"EarthAfrica"|"EarthAmericas"|"EarthAsia"|"EarthEurope"|"EarthOceania"|"Egg"|"Eject"|"Elevator"|"Ellipsis"|"EllipsisVertical"|"Envelope"|"EnvelopeCircleCheck"|"EnvelopeOpen"|"EnvelopeOpenText"|"EnvelopesBulk"|"Equals"|"Eraser"|"Ethernet"|"EuroSign"|"Exclamation"|"Expand"|"Explosion"|"Eye"|"EyeDropper"|"EyeLowVision"|"EyeSlash"|"F"|"FaceAngry"|"FaceDizzy"|"FaceFlushed"|"FaceFrown"|"FaceFrownOpen"|"FaceGrimace"|"FaceGrin"|"FaceGrinBeam"|"FaceGrinBeamSweat"|"FaceGrinHearts"|"FaceGrinSquint"|"FaceGrinSquintTears"|"FaceGrinStars"|"FaceGrinTears"|"FaceGrinTongue"|"FaceGrinTongueSquint"|"FaceGrinTongueWink"|"FaceGrinWide"|"FaceGrinWink"|"FaceKiss"|"FaceKissBeam"|"FaceKissWinkHeart"|"FaceLaugh"|"FaceLaughBeam"|"FaceLaughSquint"|"FaceLaughWink"|"FaceMeh"|"FaceMehBlank"|"FaceRollingEyes"|"FaceSadCry"|"FaceSadTear"|"FaceSmile"|"FaceSmileBeam"|"FaceSmileWink"|"FaceSurprise"|"FaceTired"|"Fan"|"Faucet"|"FaucetDrip"|"Fax"|"Feather"|"FeatherPointed"|"Ferry"|"File"|"FileArrowDown"|"FileArrowUp"|"FileAudio"|"FileCircleCheck"|"FileCircleExclamation"|"FileCircleMinus"|"FileCirclePlus"|"FileCircleQuestion"|"FileCircleXmark"|"FileCode"|"FileContract"|"FileCsv"|"FileExcel"|"FileExport"|"FileFragment"|"FileHalfDashed"|"FileImage"|"FileImport"|"FileInvoice"|"FileInvoiceDollar"|"FileLines"|"FileMedical"|"FilePdf"|"FilePen"|"FilePowerpoint"|"FilePrescription"|"FileShield"|"FileSignature"|"FileVideo"|"FileWaveform"|"FileWord"|"FileZipper"|"Fill"|"FillDrip"|"Film"|"Filter"|"FilterCircleDollar"|"FilterCircleXmark"|"Fingerprint"|"Fire"|"FireBurner"|"FireExtinguisher"|"FireFlameCurved"|"FireFlameSimple"|"Fish"|"FishFins"|"Flag"|"FlagCheckered"|"FlagUsa"|"Flask"|"FlaskVial"|"FloppyDisk"|"FlorinSign"|"Folder"|"FolderClosed"|"FolderMinus"|"FolderOpen"|"FolderPlus"|"FolderTree"|"Font"|"FontAwesome"|"Football"|"Forward"|"ForwardFast"|"ForwardStep"|"FrancSign"|"Frog"|"Futbol"|"G"|"Gamepad"|"GasPump"|"Gauge"|"GaugeHigh"|"GaugeSimple"|"GaugeSimpleHigh"|"Gavel"|"Gear"|"Gears"|"Gem"|"Genderless"|"Ghost"|"Gift"|"Gifts"|"GlassWater"|"GlassWaterDroplet"|"Glasses"|"Globe"|"GolfBallTee"|"Gopuram"|"GraduationCap"|"GreaterThan"|"GreaterThanEqual"|"Grip"|"GripLines"|"GripLinesVertical"|"GripVertical"|"GroupArrowsRotate"|"GuaraniSign"|"Guitar"|"Gun"|"H"|"Hammer"|"Hamsa"|"Hand"|"HandBackFist"|"HandDots"|"HandFist"|"HandHolding"|"HandHoldingDollar"|"HandHoldingDroplet"|"HandHoldingHand"|"HandHoldingHeart"|"HandHoldingMedical"|"HandLizard"|"HandMiddleFinger"|"HandPeace"|"HandPointDown"|"HandPointLeft"|"HandPointRight"|"HandPointUp"|"HandPointer"|"HandScissors"|"HandSparkles"|"HandSpock"|"Handcuffs"|"Hands"|"HandsAslInterpreting"|"HandsBound"|"HandsBubbles"|"HandsClapping"|"HandsHolding"|"HandsHoldingChild"|"HandsHoldingCircle"|"HandsPraying"|"Handshake"|"HandshakeAngle"|"HandshakeSimple"|"HandshakeSimpleSlash"|"HandshakeSlash"|"Hanukiah"|"HardDrive"|"Hashtag"|"HatCowboy"|"HatCowboySide"|"HatWizard"|"HeadSideCough"|"HeadSideCoughSlash"|"HeadSideMask"|"HeadSideVirus"|"Heading"|"Headphones"|"HeadphonesSimple"|"Headset"|"Heart"|"HeartCircleBolt"|"HeartCircleCheck"|"HeartCircleExclamation"|"HeartCircleMinus"|"HeartCirclePlus"|"HeartCircleXmark"|"HeartCrack"|"HeartPulse"|"Helicopter"|"HelicopterSymbol"|"HelmetSafety"|"HelmetUn"|"HexagonNodes"|"HexagonNodesBolt"|"Highlighter"|"HillAvalanche"|"HillRockslide"|"Hippo"|"HockeyPuck"|"HollyBerry"|"Horse"|"HorseHead"|"Hospital"|"HospitalUser"|"HotTubPerson"|"Hotdog"|"Hotel"|"Hourglass"|"HourglassEnd"|"HourglassHalf"|"HourglassStart"|"House"|"HouseChimney"|"HouseChimneyCrack"|"HouseChimneyMedical"|"HouseChimneyUser"|"HouseChimneyWindow"|"HouseCircleCheck"|"HouseCircleExclamation"|"HouseCircleXmark"|"HouseCrack"|"HouseFire"|"HouseFlag"|"HouseFloodWater"|"HouseFloodWaterCircleArrowRight"|"HouseLaptop"|"HouseLock"|"HouseMedical"|"HouseMedicalCircleCheck"|"HouseMedicalCircleExclamation"|"HouseMedicalCircleXmark"|"HouseMedicalFlag"|"HouseSignal"|"HouseTsunami"|"HouseUser"|"HryvniaSign"|"Hurricane"|"I"|"ICursor"|"IceCream"|"Icicles"|"Icons"|"IdBadge"|"IdCard"|"IdCardClip"|"Igloo"|"Image"|"ImagePortrait"|"Images"|"Inbox"|"Indent"|"IndianRupeeSign"|"Industry"|"Infinity"|"Info"|"Italic"|"J"|"Jar"|"JarWheat"|"Jedi"|"JetFighter"|"JetFighterUp"|"Joint"|"JugDetergent"|"K"|"Kaaba"|"Key"|"Keyboard"|"Khanda"|"KipSign"|"KitMedical"|"KitchenSet"|"KiwiBird"|"L"|"LandMineOn"|"Landmark"|"LandmarkDome"|"LandmarkFlag"|"Language"|"Laptop"|"LaptopCode"|"LaptopFile"|"LaptopMedical"|"LariSign"|"LayerGroup"|"Leaf"|"LeftLong"|"LeftRight"|"Lemon"|"LessThan"|"LessThanEqual"|"LifeRing"|"Lightbulb"|"LinesLeaning"|"Link"|"LinkSlash"|"LiraSign"|"List"|"ListCheck"|"ListOl"|"ListUl"|"LitecoinSign"|"LocationArrow"|"LocationCrosshairs"|"LocationDot"|"LocationPin"|"LocationPinLock"|"Lock"|"LockOpen"|"Locust"|"Lungs"|"LungsVirus"|"M"|"Magnet"|"MagnifyingGlass"|"MagnifyingGlassArrowRight"|"MagnifyingGlassChart"|"MagnifyingGlassDollar"|"MagnifyingGlassLocation"|"MagnifyingGlassMinus"|"MagnifyingGlassPlus"|"ManatSign"|"Map"|"MapLocation"|"MapLocationDot"|"MapPin"|"Marker"|"Mars"|"MarsAndVenus"|"MarsAndVenusBurst"|"MarsDouble"|"MarsStroke"|"MarsStrokeRight"|"MarsStrokeUp"|"MartiniGlass"|"MartiniGlassCitrus"|"MartiniGlassEmpty"|"Mask"|"MaskFace"|"MaskVentilator"|"MasksTheater"|"MattressPillow"|"Maximize"|"Medal"|"Memory"|"Menorah"|"Mercury"|"Message"|"Meteor"|"Microchip"|"Microphone"|"MicrophoneLines"|"MicrophoneLinesSlash"|"MicrophoneSlash"|"Microscope"|"MillSign"|"Minimize"|"Minus"|"Mitten"|"Mobile"|"MobileButton"|"MobileRetro"|"MobileScreen"|"MobileScreenButton"|"MoneyBill"|"MoneyBill1"|"MoneyBill1Wave"|"MoneyBillTransfer"|"MoneyBillTrendUp"|"MoneyBillWave"|"MoneyBillWheat"|"MoneyBills"|"MoneyCheck"|"MoneyCheckDollar"|"Monument"|"Moon"|"MortarPestle"|"Mosque"|"Mosquito"|"MosquitoNet"|"Motorcycle"|"Mound"|"Mountain"|"MountainCity"|"MountainSun"|"MugHot"|"MugSaucer"|"Music"|"N"|"NairaSign"|"NetworkWired"|"Neuter"|"Newspaper"|"NotEqual"|"Notdef"|"NoteSticky"|"NotesMedical"|"O"|"ObjectGroup"|"ObjectUngroup"|"OilCan"|"OilWell"|"Om"|"Otter"|"Outdent"|"P"|"Pager"|"PaintRoller"|"Paintbrush"|"Palette"|"Pallet"|"Panorama"|"PaperPlane"|"Paperclip"|"ParachuteBox"|"Paragraph"|"Passport"|"Paste"|"Pause"|"Paw"|"Peace"|"Pen"|"PenClip"|"PenFancy"|"PenNib"|"PenRuler"|"PenToSquare"|"Pencil"|"PeopleArrows"|"PeopleCarryBox"|"PeopleGroup"|"PeopleLine"|"PeoplePulling"|"PeopleRobbery"|"PeopleRoof"|"PepperHot"|"Percent"|"Person"|"PersonArrowDownToLine"|"PersonArrowUpFromLine"|"PersonBiking"|"PersonBooth"|"PersonBreastfeeding"|"PersonBurst"|"PersonCane"|"PersonChalkboard"|"PersonCircleCheck"|"PersonCircleExclamation"|"PersonCircleMinus"|"PersonCirclePlus"|"PersonCircleQuestion"|"PersonCircleXmark"|"PersonDigging"|"PersonDotsFromLine"|"PersonDress"|"PersonDressBurst"|"PersonDrowning"|"PersonFalling"|"PersonFallingBurst"|"PersonHalfDress"|"PersonHarassing"|"PersonHiking"|"PersonMilitaryPointing"|"PersonMilitaryRifle"|"PersonMilitaryToPerson"|"PersonPraying"|"PersonPregnant"|"PersonRays"|"PersonRifle"|"PersonRunning"|"PersonShelter"|"PersonSkating"|"PersonSkiing"|"PersonSkiingNordic"|"PersonSnowboarding"|"PersonSwimming"|"PersonThroughWindow"|"PersonWalking"|"PersonWalkingArrowLoopLeft"|"PersonWalkingArrowRight"|"PersonWalkingDashedLineArrowRight"|"PersonWalkingLuggage"|"PersonWalkingWithCane"|"PesetaSign"|"PesoSign"|"Phone"|"PhoneFlip"|"PhoneSlash"|"PhoneVolume"|"PhotoFilm"|"PiggyBank"|"Pills"|"PizzaSlice"|"PlaceOfWorship"|"Plane"|"PlaneArrival"|"PlaneCircleCheck"|"PlaneCircleExclamation"|"PlaneCircleXmark"|"PlaneDeparture"|"PlaneLock"|"PlaneSlash"|"PlaneUp"|"PlantWilt"|"PlateWheat"|"Play"|"Plug"|"PlugCircleBolt"|"PlugCircleCheck"|"PlugCircleExclamation"|"PlugCircleMinus"|"PlugCirclePlus"|"PlugCircleXmark"|"Plus"|"PlusMinus"|"Podcast"|"Poo"|"PooStorm"|"Poop"|"PowerOff"|"Prescription"|"PrescriptionBottle"|"PrescriptionBottleMedical"|"Print"|"PumpMedical"|"PumpSoap"|"PuzzlePiece"|"Q"|"Qrcode"|"Question"|"QuoteLeft"|"QuoteRight"|"R"|"Radiation"|"Radio"|"Rainbow"|"RankingStar"|"Receipt"|"RecordVinyl"|"RectangleAd"|"RectangleList"|"RectangleXmark"|"Recycle"|"Registered"|"Repeat"|"Reply"|"ReplyAll"|"Republican"|"Restroom"|"Retweet"|"Ribbon"|"RightFromBracket"|"RightLeft"|"RightLong"|"RightToBracket"|"Ring"|"Road"|"RoadBarrier"|"RoadBridge"|"RoadCircleCheck"|"RoadCircleExclamation"|"RoadCircleXmark"|"RoadLock"|"RoadSpikes"|"Robot"|"Rocket"|"Rotate"|"RotateLeft"|"RotateRight"|"Route"|"Rss"|"RubleSign"|"Rug"|"Ruler"|"RulerCombined"|"RulerHorizontal"|"RulerVertical"|"RupeeSign"|"RupiahSign"|"S"|"SackDollar"|"SackXmark"|"Sailboat"|"Satellite"|"SatelliteDish"|"ScaleBalanced"|"ScaleUnbalanced"|"ScaleUnbalancedFlip"|"School"|"SchoolCircleCheck"|"SchoolCircleExclamation"|"SchoolCircleXmark"|"SchoolFlag"|"SchoolLock"|"Scissors"|"Screwdriver"|"ScrewdriverWrench"|"Scroll"|"ScrollTorah"|"SdCard"|"Section"|"Seedling"|"Server"|"Shapes"|"Share"|"ShareFromSquare"|"ShareNodes"|"SheetPlastic"|"ShekelSign"|"Shield"|"ShieldCat"|"ShieldDog"|"ShieldHalved"|"ShieldHeart"|"ShieldVirus"|"Ship"|"Shirt"|"ShoePrints"|"Shop"|"ShopLock"|"ShopSlash"|"Shower"|"Shrimp"|"Shuffle"|"ShuttleSpace"|"SignHanging"|"Signal"|"Signature"|"SignsPost"|"SimCard"|"Sink"|"Sitemap"|"Skull"|"SkullCrossbones"|"Slash"|"Sleigh"|"Sliders"|"Smog"|"Smoking"|"Snowflake"|"Snowman"|"Snowplow"|"Soap"|"Socks"|"SolarPanel"|"Sort"|"SortDown"|"SortUp"|"Spa"|"SpaghettiMonsterFlying"|"SpellCheck"|"Spider"|"Spinner"|"Splotch"|"Spoon"|"SprayCan"|"SprayCanSparkles"|"Square"|"SquareArrowUpRight"|"SquareBinary"|"SquareCaretDown"|"SquareCaretLeft"|"SquareCaretRight"|"SquareCaretUp"|"SquareCheck"|"SquareEnvelope"|"SquareFull"|"SquareH"|"SquareMinus"|"SquareNfi"|"SquareParking"|"SquarePen"|"SquarePersonConfined"|"SquarePhone"|"SquarePhoneFlip"|"SquarePlus"|"SquarePollHorizontal"|"SquarePollVertical"|"SquareRootVariable"|"SquareRss"|"SquareShareNodes"|"SquareUpRight"|"SquareVirus"|"SquareXmark"|"StaffSnake"|"Stairs"|"Stamp"|"Stapler"|"Star"|"StarAndCrescent"|"StarHalf"|"StarHalfStroke"|"StarOfDavid"|"StarOfLife"|"SterlingSign"|"Stethoscope"|"Stop"|"Stopwatch"|"Stopwatch20"|"Store"|"StoreSlash"|"StreetView"|"Strikethrough"|"Stroopwafel"|"Subscript"|"Suitcase"|"SuitcaseMedical"|"SuitcaseRolling"|"Sun"|"SunPlantWilt"|"Superscript"|"Swatchbook"|"Synagogue"|"Syringe"|"T"|"Table"|"TableCells"|"TableCellsColumnLock"|"TableCellsLarge"|"TableCellsRowLock"|"TableCellsRowUnlock"|"TableColumns"|"TableList"|"TableTennisPaddleBall"|"Tablet"|"TabletButton"|"TabletScreenButton"|"Tablets"|"TachographDigital"|"Tag"|"Tags"|"Tape"|"Tarp"|"TarpDroplet"|"Taxi"|"Teeth"|"TeethOpen"|"TemperatureArrowDown"|"TemperatureArrowUp"|"TemperatureEmpty"|"TemperatureFull"|"TemperatureHalf"|"TemperatureHigh"|"TemperatureLow"|"TemperatureQuarter"|"TemperatureThreeQuarters"|"TengeSign"|"Tent"|"TentArrowDownToLine"|"TentArrowLeftRight"|"TentArrowTurnLeft"|"TentArrowsDown"|"Tents"|"Terminal"|"TextHeight"|"TextSlash"|"TextWidth"|"Thermometer"|"ThumbsDown"|"ThumbsUp"|"Thumbtack"|"ThumbtackSlash"|"Ticket"|"TicketSimple"|"Timeline"|"ToggleOff"|"ToggleOn"|"Toilet"|"ToiletPaper"|"ToiletPaperSlash"|"ToiletPortable"|"ToiletsPortable"|"Toolbox"|"Tooth"|"ToriiGate"|"Tornado"|"TowerBroadcast"|"TowerCell"|"TowerObservation"|"Tractor"|"Trademark"|"TrafficLight"|"Trailer"|"Train"|"TrainSubway"|"TrainTram"|"Transgender"|"Trash"|"TrashArrowUp"|"TrashCan"|"TrashCanArrowUp"|"Tree"|"TreeCity"|"TriangleExclamation"|"Trophy"|"Trowel"|"TrowelBricks"|"Truck"|"TruckArrowRight"|"TruckDroplet"|"TruckFast"|"TruckField"|"TruckFieldUn"|"TruckFront"|"TruckMedical"|"TruckMonster"|"TruckMoving"|"TruckPickup"|"TruckPlane"|"TruckRampBox"|"Tty"|"TurkishLiraSign"|"TurnDown"|"TurnUp"|"Tv"|"U"|"Umbrella"|"UmbrellaBeach"|"Underline"|"UniversalAccess"|"Unlock"|"UnlockKeyhole"|"UpDown"|"UpDownLeftRight"|"UpLong"|"UpRightAndDownLeftFromCenter"|"UpRightFromSquare"|"Upload"|"User"|"UserAstronaut"|"UserCheck"|"UserClock"|"UserDoctor"|"UserGear"|"UserGraduate"|"UserGroup"|"UserInjured"|"UserLarge"|"UserLargeSlash"|"UserLock"|"UserMinus"|"UserNinja"|"UserNurse"|"UserPen"|"UserPlus"|"UserSecret"|"UserShield"|"UserSlash"|"UserTag"|"UserTie"|"UserXmark"|"Users"|"UsersBetweenLines"|"UsersGear"|"UsersLine"|"UsersRays"|"UsersRectangle"|"UsersSlash"|"UsersViewfinder"|"Utensils"|"V"|"VanShuttle"|"Vault"|"VectorSquare"|"Venus"|"VenusDouble"|"VenusMars"|"Vest"|"VestPatches"|"Vial"|"VialCircleCheck"|"VialVirus"|"Vials"|"Video"|"VideoSlash"|"Vihara"|"Virus"|"VirusCovid"|"VirusCovidSlash"|"VirusSlash"|"Viruses"|"Voicemail"|"Volcano"|"Volleyball"|"VolumeHigh"|"VolumeLow"|"VolumeOff"|"VolumeXmark"|"VrCardboard"|"W"|"WalkieTalkie"|"Wallet"|"WandMagic"|"WandMagicSparkles"|"WandSparkles"|"Warehouse"|"Water"|"WaterLadder"|"WaveSquare"|"WebAwesome"|"WeightHanging"|"WeightScale"|"WheatAwn"|"WheatAwnCircleExclamation"|"Wheelchair"|"WheelchairMove"|"WhiskeyGlass"|"Wifi"|"Wind"|"WindowMaximize"|"WindowMinimize"|"WindowRestore"|"WineBottle"|"WineGlass"|"WineGlassEmpty"|"WonSign"|"Worm"|"Wrench"|"X"|"XRay"|"Xmark"|"XmarksLines"|"Y"|"YenSign"|"YinYang"|"Z"|"Search"|"Save"|"Settings"|"Cog"|"Home"|"Edit"|"Close"|"Cancel"|"Refresh"|"Warning"|"CheckCircle"|"TimesCircle"|"VolumeMute"|"Cut"|"Undo"|"Redo"|"StepForward"|"StepBackward"|"Pin"|"ZoomIn"|"ZoomOut")
@@ -2396,14 +2396,14 @@ function UIButtonNode:get_property(path) end
 function UIButtonNode:set_property(path, value, y) end
 
 ---@alias UISliderNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "value" # number - Current value (between min and max).
 ---| "minValue" # number - Lowest value.
@@ -2417,14 +2417,14 @@ function UIButtonNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UISliderNodeProperty|string
 ---@return any
----@overload fun(self: UISliderNode, path: "position"): number[]
----@overload fun(self: UISliderNode, path: "scale"): number[]
+---@overload fun(self: UISliderNode, path: "position"): Vec2
+---@overload fun(self: UISliderNode, path: "scale"): Vec2
 ---@overload fun(self: UISliderNode, path: "rotation"): number
 ---@overload fun(self: UISliderNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UISliderNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UISliderNode, path: "paused"): boolean
 ---@overload fun(self: UISliderNode, path: "enabled"): boolean
----@overload fun(self: UISliderNode, path: "size"): number[]
+---@overload fun(self: UISliderNode, path: "size"): Vec2
 ---@overload fun(self: UISliderNode, path: "label"): string
 ---@overload fun(self: UISliderNode, path: "value"): number
 ---@overload fun(self: UISliderNode, path: "minValue"): number
@@ -2440,14 +2440,14 @@ function UISliderNode:get_property(path) end
 ---@param path UISliderNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UISliderNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UISliderNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UISliderNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UISliderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISliderNode, path: "rotation", value: number)
 ---@overload fun(self: UISliderNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UISliderNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UISliderNode, path: "paused", value: boolean)
 ---@overload fun(self: UISliderNode, path: "enabled", value: boolean)
----@overload fun(self: UISliderNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UISliderNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISliderNode, path: "label", value: string)
 ---@overload fun(self: UISliderNode, path: "value", value: number)
 ---@overload fun(self: UISliderNode, path: "minValue", value: number)
@@ -2460,14 +2460,14 @@ function UISliderNode:get_property(path) end
 function UISliderNode:set_property(path, value, y) end
 
 ---@alias UICheckboxNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "checked" # boolean - Ticked now.
 ---| "defaultChecked" # boolean - State restored by reset.
@@ -2477,14 +2477,14 @@ function UISliderNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UICheckboxNodeProperty|string
 ---@return any
----@overload fun(self: UICheckboxNode, path: "position"): number[]
----@overload fun(self: UICheckboxNode, path: "scale"): number[]
+---@overload fun(self: UICheckboxNode, path: "position"): Vec2
+---@overload fun(self: UICheckboxNode, path: "scale"): Vec2
 ---@overload fun(self: UICheckboxNode, path: "rotation"): number
 ---@overload fun(self: UICheckboxNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UICheckboxNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UICheckboxNode, path: "paused"): boolean
 ---@overload fun(self: UICheckboxNode, path: "enabled"): boolean
----@overload fun(self: UICheckboxNode, path: "size"): number[]
+---@overload fun(self: UICheckboxNode, path: "size"): Vec2
 ---@overload fun(self: UICheckboxNode, path: "label"): string
 ---@overload fun(self: UICheckboxNode, path: "checked"): boolean
 ---@overload fun(self: UICheckboxNode, path: "defaultChecked"): boolean
@@ -2496,14 +2496,14 @@ function UICheckboxNode:get_property(path) end
 ---@param path UICheckboxNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UICheckboxNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UICheckboxNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UICheckboxNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UICheckboxNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UICheckboxNode, path: "rotation", value: number)
 ---@overload fun(self: UICheckboxNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UICheckboxNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UICheckboxNode, path: "paused", value: boolean)
 ---@overload fun(self: UICheckboxNode, path: "enabled", value: boolean)
----@overload fun(self: UICheckboxNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UICheckboxNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UICheckboxNode, path: "label", value: string)
 ---@overload fun(self: UICheckboxNode, path: "checked", value: boolean)
 ---@overload fun(self: UICheckboxNode, path: "defaultChecked", value: boolean)
@@ -2512,14 +2512,14 @@ function UICheckboxNode:get_property(path) end
 function UICheckboxNode:set_property(path, value, y) end
 
 ---@alias UIProgressBarNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "value" # number - Progress (between min and max).
 ---| "minValue" # number - Lowest value.
@@ -2531,14 +2531,14 @@ function UICheckboxNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIProgressBarNodeProperty|string
 ---@return any
----@overload fun(self: UIProgressBarNode, path: "position"): number[]
----@overload fun(self: UIProgressBarNode, path: "scale"): number[]
+---@overload fun(self: UIProgressBarNode, path: "position"): Vec2
+---@overload fun(self: UIProgressBarNode, path: "scale"): Vec2
 ---@overload fun(self: UIProgressBarNode, path: "rotation"): number
 ---@overload fun(self: UIProgressBarNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIProgressBarNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIProgressBarNode, path: "paused"): boolean
 ---@overload fun(self: UIProgressBarNode, path: "enabled"): boolean
----@overload fun(self: UIProgressBarNode, path: "size"): number[]
+---@overload fun(self: UIProgressBarNode, path: "size"): Vec2
 ---@overload fun(self: UIProgressBarNode, path: "label"): string
 ---@overload fun(self: UIProgressBarNode, path: "value"): number
 ---@overload fun(self: UIProgressBarNode, path: "minValue"): number
@@ -2552,14 +2552,14 @@ function UIProgressBarNode:get_property(path) end
 ---@param path UIProgressBarNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIProgressBarNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIProgressBarNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIProgressBarNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIProgressBarNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIProgressBarNode, path: "rotation", value: number)
 ---@overload fun(self: UIProgressBarNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIProgressBarNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIProgressBarNode, path: "paused", value: boolean)
 ---@overload fun(self: UIProgressBarNode, path: "enabled", value: boolean)
----@overload fun(self: UIProgressBarNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIProgressBarNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIProgressBarNode, path: "label", value: string)
 ---@overload fun(self: UIProgressBarNode, path: "value", value: number)
 ---@overload fun(self: UIProgressBarNode, path: "minValue", value: number)
@@ -2570,14 +2570,14 @@ function UIProgressBarNode:get_property(path) end
 function UIProgressBarNode:set_property(path, value, y) end
 
 ---@alias UITextInputNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "labelWidth" # number - Width reserved for the label (px); 0 = none.
 ---| "maxLength" # integer - Most characters accepted.
@@ -2585,14 +2585,14 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UITextInputNodeProperty|string
 ---@return any
----@overload fun(self: UITextInputNode, path: "position"): number[]
----@overload fun(self: UITextInputNode, path: "scale"): number[]
+---@overload fun(self: UITextInputNode, path: "position"): Vec2
+---@overload fun(self: UITextInputNode, path: "scale"): Vec2
 ---@overload fun(self: UITextInputNode, path: "rotation"): number
 ---@overload fun(self: UITextInputNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UITextInputNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UITextInputNode, path: "paused"): boolean
 ---@overload fun(self: UITextInputNode, path: "enabled"): boolean
----@overload fun(self: UITextInputNode, path: "size"): number[]
+---@overload fun(self: UITextInputNode, path: "size"): Vec2
 ---@overload fun(self: UITextInputNode, path: "label"): string
 ---@overload fun(self: UITextInputNode, path: "labelWidth"): number
 ---@overload fun(self: UITextInputNode, path: "maxLength"): integer
@@ -2602,28 +2602,28 @@ function UITextInputNode:get_property(path) end
 ---@param path UITextInputNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UITextInputNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UITextInputNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UITextInputNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UITextInputNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITextInputNode, path: "rotation", value: number)
 ---@overload fun(self: UITextInputNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UITextInputNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UITextInputNode, path: "paused", value: boolean)
 ---@overload fun(self: UITextInputNode, path: "enabled", value: boolean)
----@overload fun(self: UITextInputNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UITextInputNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITextInputNode, path: "label", value: string)
 ---@overload fun(self: UITextInputNode, path: "labelWidth", value: number)
 ---@overload fun(self: UITextInputNode, path: "maxLength", value: integer)
 function UITextInputNode:set_property(path, value, y) end
 
 ---@alias UIDropdownNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
 ---| "defaultIndex" # integer - Index restored by reset.
@@ -2633,14 +2633,14 @@ function UITextInputNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIDropdownNodeProperty|string
 ---@return any
----@overload fun(self: UIDropdownNode, path: "position"): number[]
----@overload fun(self: UIDropdownNode, path: "scale"): number[]
+---@overload fun(self: UIDropdownNode, path: "position"): Vec2
+---@overload fun(self: UIDropdownNode, path: "scale"): Vec2
 ---@overload fun(self: UIDropdownNode, path: "rotation"): number
 ---@overload fun(self: UIDropdownNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIDropdownNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIDropdownNode, path: "paused"): boolean
 ---@overload fun(self: UIDropdownNode, path: "enabled"): boolean
----@overload fun(self: UIDropdownNode, path: "size"): number[]
+---@overload fun(self: UIDropdownNode, path: "size"): Vec2
 ---@overload fun(self: UIDropdownNode, path: "label"): string
 ---@overload fun(self: UIDropdownNode, path: "selectedIndex"): integer
 ---@overload fun(self: UIDropdownNode, path: "defaultIndex"): integer
@@ -2652,14 +2652,14 @@ function UIDropdownNode:get_property(path) end
 ---@param path UIDropdownNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIDropdownNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIDropdownNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIDropdownNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIDropdownNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIDropdownNode, path: "rotation", value: number)
 ---@overload fun(self: UIDropdownNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIDropdownNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIDropdownNode, path: "paused", value: boolean)
 ---@overload fun(self: UIDropdownNode, path: "enabled", value: boolean)
----@overload fun(self: UIDropdownNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIDropdownNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIDropdownNode, path: "label", value: string)
 ---@overload fun(self: UIDropdownNode, path: "selectedIndex", value: integer)
 ---@overload fun(self: UIDropdownNode, path: "defaultIndex", value: integer)
@@ -2668,14 +2668,14 @@ function UIDropdownNode:get_property(path) end
 function UIDropdownNode:set_property(path, value, y) end
 
 ---@alias UIRadioGroupNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "labelWidth" # number - Width reserved for the label (px); 0 = none.
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
@@ -2685,14 +2685,14 @@ function UIDropdownNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIRadioGroupNodeProperty|string
 ---@return any
----@overload fun(self: UIRadioGroupNode, path: "position"): number[]
----@overload fun(self: UIRadioGroupNode, path: "scale"): number[]
+---@overload fun(self: UIRadioGroupNode, path: "position"): Vec2
+---@overload fun(self: UIRadioGroupNode, path: "scale"): Vec2
 ---@overload fun(self: UIRadioGroupNode, path: "rotation"): number
 ---@overload fun(self: UIRadioGroupNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIRadioGroupNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIRadioGroupNode, path: "paused"): boolean
 ---@overload fun(self: UIRadioGroupNode, path: "enabled"): boolean
----@overload fun(self: UIRadioGroupNode, path: "size"): number[]
+---@overload fun(self: UIRadioGroupNode, path: "size"): Vec2
 ---@overload fun(self: UIRadioGroupNode, path: "label"): string
 ---@overload fun(self: UIRadioGroupNode, path: "labelWidth"): number
 ---@overload fun(self: UIRadioGroupNode, path: "selectedIndex"): integer
@@ -2704,14 +2704,14 @@ function UIRadioGroupNode:get_property(path) end
 ---@param path UIRadioGroupNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIRadioGroupNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIRadioGroupNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIRadioGroupNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIRadioGroupNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIRadioGroupNode, path: "rotation", value: number)
 ---@overload fun(self: UIRadioGroupNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIRadioGroupNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIRadioGroupNode, path: "paused", value: boolean)
 ---@overload fun(self: UIRadioGroupNode, path: "enabled", value: boolean)
----@overload fun(self: UIRadioGroupNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIRadioGroupNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIRadioGroupNode, path: "label", value: string)
 ---@overload fun(self: UIRadioGroupNode, path: "labelWidth", value: number)
 ---@overload fun(self: UIRadioGroupNode, path: "selectedIndex", value: integer)
@@ -2720,28 +2720,28 @@ function UIRadioGroupNode:get_property(path) end
 function UIRadioGroupNode:set_property(path, value, y) end
 
 ---@alias UIToggleSwitchNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "active" # boolean - Switched on.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIToggleSwitchNodeProperty|string
 ---@return any
----@overload fun(self: UIToggleSwitchNode, path: "position"): number[]
----@overload fun(self: UIToggleSwitchNode, path: "scale"): number[]
+---@overload fun(self: UIToggleSwitchNode, path: "position"): Vec2
+---@overload fun(self: UIToggleSwitchNode, path: "scale"): Vec2
 ---@overload fun(self: UIToggleSwitchNode, path: "rotation"): number
 ---@overload fun(self: UIToggleSwitchNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIToggleSwitchNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIToggleSwitchNode, path: "paused"): boolean
 ---@overload fun(self: UIToggleSwitchNode, path: "enabled"): boolean
----@overload fun(self: UIToggleSwitchNode, path: "size"): number[]
+---@overload fun(self: UIToggleSwitchNode, path: "size"): Vec2
 ---@overload fun(self: UIToggleSwitchNode, path: "label"): string
 ---@overload fun(self: UIToggleSwitchNode, path: "active"): boolean
 function UIToggleSwitchNode:get_property(path) end
@@ -2750,27 +2750,27 @@ function UIToggleSwitchNode:get_property(path) end
 ---@param path UIToggleSwitchNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIToggleSwitchNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIToggleSwitchNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIToggleSwitchNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIToggleSwitchNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToggleSwitchNode, path: "rotation", value: number)
 ---@overload fun(self: UIToggleSwitchNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIToggleSwitchNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIToggleSwitchNode, path: "paused", value: boolean)
 ---@overload fun(self: UIToggleSwitchNode, path: "enabled", value: boolean)
----@overload fun(self: UIToggleSwitchNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIToggleSwitchNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToggleSwitchNode, path: "label", value: string)
 ---@overload fun(self: UIToggleSwitchNode, path: "active", value: boolean)
 function UIToggleSwitchNode:set_property(path, value, y) end
 
 ---@alias UIKnobNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "value" # number - Current value (between min and max).
 ---| "minValue" # number - Lowest value.
@@ -2780,14 +2780,14 @@ function UIToggleSwitchNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIKnobNodeProperty|string
 ---@return any
----@overload fun(self: UIKnobNode, path: "position"): number[]
----@overload fun(self: UIKnobNode, path: "scale"): number[]
+---@overload fun(self: UIKnobNode, path: "position"): Vec2
+---@overload fun(self: UIKnobNode, path: "scale"): Vec2
 ---@overload fun(self: UIKnobNode, path: "rotation"): number
 ---@overload fun(self: UIKnobNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIKnobNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIKnobNode, path: "paused"): boolean
 ---@overload fun(self: UIKnobNode, path: "enabled"): boolean
----@overload fun(self: UIKnobNode, path: "size"): number[]
+---@overload fun(self: UIKnobNode, path: "size"): Vec2
 ---@overload fun(self: UIKnobNode, path: "label"): string
 ---@overload fun(self: UIKnobNode, path: "value"): number
 ---@overload fun(self: UIKnobNode, path: "minValue"): number
@@ -2799,14 +2799,14 @@ function UIKnobNode:get_property(path) end
 ---@param path UIKnobNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIKnobNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIKnobNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIKnobNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIKnobNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIKnobNode, path: "rotation", value: number)
 ---@overload fun(self: UIKnobNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIKnobNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIKnobNode, path: "paused", value: boolean)
 ---@overload fun(self: UIKnobNode, path: "enabled", value: boolean)
----@overload fun(self: UIKnobNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIKnobNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIKnobNode, path: "label", value: string)
 ---@overload fun(self: UIKnobNode, path: "value", value: number)
 ---@overload fun(self: UIKnobNode, path: "minValue", value: number)
@@ -2815,14 +2815,14 @@ function UIKnobNode:get_property(path) end
 function UIKnobNode:set_property(path, value, y) end
 
 ---@alias UINotchedSliderNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "value" # number - Current value.
 ---| "minValue" # number - Lowest value.
@@ -2834,14 +2834,14 @@ function UIKnobNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UINotchedSliderNodeProperty|string
 ---@return any
----@overload fun(self: UINotchedSliderNode, path: "position"): number[]
----@overload fun(self: UINotchedSliderNode, path: "scale"): number[]
+---@overload fun(self: UINotchedSliderNode, path: "position"): Vec2
+---@overload fun(self: UINotchedSliderNode, path: "scale"): Vec2
 ---@overload fun(self: UINotchedSliderNode, path: "rotation"): number
 ---@overload fun(self: UINotchedSliderNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UINotchedSliderNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UINotchedSliderNode, path: "paused"): boolean
 ---@overload fun(self: UINotchedSliderNode, path: "enabled"): boolean
----@overload fun(self: UINotchedSliderNode, path: "size"): number[]
+---@overload fun(self: UINotchedSliderNode, path: "size"): Vec2
 ---@overload fun(self: UINotchedSliderNode, path: "label"): string
 ---@overload fun(self: UINotchedSliderNode, path: "value"): number
 ---@overload fun(self: UINotchedSliderNode, path: "minValue"): number
@@ -2855,14 +2855,14 @@ function UINotchedSliderNode:get_property(path) end
 ---@param path UINotchedSliderNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UINotchedSliderNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UINotchedSliderNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UINotchedSliderNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UINotchedSliderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UINotchedSliderNode, path: "rotation", value: number)
 ---@overload fun(self: UINotchedSliderNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UINotchedSliderNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UINotchedSliderNode, path: "paused", value: boolean)
 ---@overload fun(self: UINotchedSliderNode, path: "enabled", value: boolean)
----@overload fun(self: UINotchedSliderNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UINotchedSliderNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UINotchedSliderNode, path: "label", value: string)
 ---@overload fun(self: UINotchedSliderNode, path: "value", value: number)
 ---@overload fun(self: UINotchedSliderNode, path: "minValue", value: number)
@@ -2873,14 +2873,14 @@ function UINotchedSliderNode:get_property(path) end
 function UINotchedSliderNode:set_property(path, value, y) end
 
 ---@alias UIVolumeFaderNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "valueDb" # number - Level (dB).
 ---| "minDb" # number - Bottom of the fader (dB).
@@ -2890,14 +2890,14 @@ function UINotchedSliderNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIVolumeFaderNodeProperty|string
 ---@return any
----@overload fun(self: UIVolumeFaderNode, path: "position"): number[]
----@overload fun(self: UIVolumeFaderNode, path: "scale"): number[]
+---@overload fun(self: UIVolumeFaderNode, path: "position"): Vec2
+---@overload fun(self: UIVolumeFaderNode, path: "scale"): Vec2
 ---@overload fun(self: UIVolumeFaderNode, path: "rotation"): number
 ---@overload fun(self: UIVolumeFaderNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIVolumeFaderNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIVolumeFaderNode, path: "paused"): boolean
 ---@overload fun(self: UIVolumeFaderNode, path: "enabled"): boolean
----@overload fun(self: UIVolumeFaderNode, path: "size"): number[]
+---@overload fun(self: UIVolumeFaderNode, path: "size"): Vec2
 ---@overload fun(self: UIVolumeFaderNode, path: "label"): string
 ---@overload fun(self: UIVolumeFaderNode, path: "valueDb"): number
 ---@overload fun(self: UIVolumeFaderNode, path: "minDb"): number
@@ -2909,14 +2909,14 @@ function UIVolumeFaderNode:get_property(path) end
 ---@param path UIVolumeFaderNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIVolumeFaderNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIVolumeFaderNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIVolumeFaderNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIVolumeFaderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "rotation", value: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIVolumeFaderNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIVolumeFaderNode, path: "paused", value: boolean)
 ---@overload fun(self: UIVolumeFaderNode, path: "enabled", value: boolean)
----@overload fun(self: UIVolumeFaderNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIVolumeFaderNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "label", value: string)
 ---@overload fun(self: UIVolumeFaderNode, path: "valueDb", value: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "minDb", value: number)
@@ -2925,14 +2925,14 @@ function UIVolumeFaderNode:get_property(path) end
 function UIVolumeFaderNode:set_property(path, value, y) end
 
 ---@alias UIVolumeMeterNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "levelL" # number - Left channel level (dB).
 ---| "levelR" # number - Right channel level (dB).
@@ -2943,14 +2943,14 @@ function UIVolumeFaderNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIVolumeMeterNodeProperty|string
 ---@return any
----@overload fun(self: UIVolumeMeterNode, path: "position"): number[]
----@overload fun(self: UIVolumeMeterNode, path: "scale"): number[]
+---@overload fun(self: UIVolumeMeterNode, path: "position"): Vec2
+---@overload fun(self: UIVolumeMeterNode, path: "scale"): Vec2
 ---@overload fun(self: UIVolumeMeterNode, path: "rotation"): number
 ---@overload fun(self: UIVolumeMeterNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIVolumeMeterNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIVolumeMeterNode, path: "paused"): boolean
 ---@overload fun(self: UIVolumeMeterNode, path: "enabled"): boolean
----@overload fun(self: UIVolumeMeterNode, path: "size"): number[]
+---@overload fun(self: UIVolumeMeterNode, path: "size"): Vec2
 ---@overload fun(self: UIVolumeMeterNode, path: "label"): string
 ---@overload fun(self: UIVolumeMeterNode, path: "levelL"): number
 ---@overload fun(self: UIVolumeMeterNode, path: "levelR"): number
@@ -2963,14 +2963,14 @@ function UIVolumeMeterNode:get_property(path) end
 ---@param path UIVolumeMeterNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIVolumeMeterNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIVolumeMeterNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIVolumeMeterNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIVolumeMeterNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "rotation", value: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIVolumeMeterNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIVolumeMeterNode, path: "paused", value: boolean)
 ---@overload fun(self: UIVolumeMeterNode, path: "enabled", value: boolean)
----@overload fun(self: UIVolumeMeterNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIVolumeMeterNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "label", value: string)
 ---@overload fun(self: UIVolumeMeterNode, path: "levelL", value: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "levelR", value: number)
@@ -2980,28 +2980,28 @@ function UIVolumeMeterNode:get_property(path) end
 function UIVolumeMeterNode:set_property(path, value, y) end
 
 ---@alias UISeparatorNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Text in the middle of the line ("" = a plain line).
 ---| "lineColor" # number[] - Colour of the line.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UISeparatorNodeProperty|string
 ---@return any
----@overload fun(self: UISeparatorNode, path: "position"): number[]
----@overload fun(self: UISeparatorNode, path: "scale"): number[]
+---@overload fun(self: UISeparatorNode, path: "position"): Vec2
+---@overload fun(self: UISeparatorNode, path: "scale"): Vec2
 ---@overload fun(self: UISeparatorNode, path: "rotation"): number
 ---@overload fun(self: UISeparatorNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UISeparatorNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UISeparatorNode, path: "paused"): boolean
 ---@overload fun(self: UISeparatorNode, path: "enabled"): boolean
----@overload fun(self: UISeparatorNode, path: "size"): number[]
+---@overload fun(self: UISeparatorNode, path: "size"): Vec2
 ---@overload fun(self: UISeparatorNode, path: "label"): string
 ---@overload fun(self: UISeparatorNode, path: "lineColor"): number[]
 function UISeparatorNode:get_property(path) end
@@ -3010,27 +3010,27 @@ function UISeparatorNode:get_property(path) end
 ---@param path UISeparatorNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UISeparatorNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UISeparatorNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UISeparatorNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UISeparatorNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISeparatorNode, path: "rotation", value: number)
 ---@overload fun(self: UISeparatorNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UISeparatorNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UISeparatorNode, path: "paused", value: boolean)
 ---@overload fun(self: UISeparatorNode, path: "enabled", value: boolean)
----@overload fun(self: UISeparatorNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UISeparatorNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISeparatorNode, path: "label", value: string)
 ---@overload fun(self: UISeparatorNode, path: "lineColor", value: number[])
 function UISeparatorNode:set_property(path, value, y) end
 
 ---@alias UIXYPlotNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "xMin" # number - Left end of the X axis.
 ---| "xMax" # number - Right end of the X axis.
 ---| "yMin" # number - Bottom of the Y axis.
@@ -3047,14 +3047,14 @@ function UISeparatorNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIXYPlotNodeProperty|string
 ---@return any
----@overload fun(self: UIXYPlotNode, path: "position"): number[]
----@overload fun(self: UIXYPlotNode, path: "scale"): number[]
+---@overload fun(self: UIXYPlotNode, path: "position"): Vec2
+---@overload fun(self: UIXYPlotNode, path: "scale"): Vec2
 ---@overload fun(self: UIXYPlotNode, path: "rotation"): number
 ---@overload fun(self: UIXYPlotNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIXYPlotNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIXYPlotNode, path: "paused"): boolean
 ---@overload fun(self: UIXYPlotNode, path: "enabled"): boolean
----@overload fun(self: UIXYPlotNode, path: "size"): number[]
+---@overload fun(self: UIXYPlotNode, path: "size"): Vec2
 ---@overload fun(self: UIXYPlotNode, path: "xMin"): number
 ---@overload fun(self: UIXYPlotNode, path: "xMax"): number
 ---@overload fun(self: UIXYPlotNode, path: "yMin"): number
@@ -3073,14 +3073,14 @@ function UIXYPlotNode:get_property(path) end
 ---@param path UIXYPlotNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIXYPlotNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIXYPlotNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIXYPlotNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIXYPlotNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIXYPlotNode, path: "rotation", value: number)
 ---@overload fun(self: UIXYPlotNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIXYPlotNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIXYPlotNode, path: "paused", value: boolean)
 ---@overload fun(self: UIXYPlotNode, path: "enabled", value: boolean)
----@overload fun(self: UIXYPlotNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIXYPlotNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIXYPlotNode, path: "xMin", value: number)
 ---@overload fun(self: UIXYPlotNode, path: "xMax", value: number)
 ---@overload fun(self: UIXYPlotNode, path: "yMin", value: number)
@@ -3096,28 +3096,28 @@ function UIXYPlotNode:get_property(path) end
 function UIXYPlotNode:set_property(path, value, y) end
 
 ---@alias UIListViewNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
 ---| "itemHeight" # number - Height of each row (px).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIListViewNodeProperty|string
 ---@return any
----@overload fun(self: UIListViewNode, path: "position"): number[]
----@overload fun(self: UIListViewNode, path: "scale"): number[]
+---@overload fun(self: UIListViewNode, path: "position"): Vec2
+---@overload fun(self: UIListViewNode, path: "scale"): Vec2
 ---@overload fun(self: UIListViewNode, path: "rotation"): number
 ---@overload fun(self: UIListViewNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIListViewNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIListViewNode, path: "paused"): boolean
 ---@overload fun(self: UIListViewNode, path: "enabled"): boolean
----@overload fun(self: UIListViewNode, path: "size"): number[]
+---@overload fun(self: UIListViewNode, path: "size"): Vec2
 ---@overload fun(self: UIListViewNode, path: "selectedIndex"): integer
 ---@overload fun(self: UIListViewNode, path: "itemHeight"): number
 function UIListViewNode:get_property(path) end
@@ -3126,41 +3126,41 @@ function UIListViewNode:get_property(path) end
 ---@param path UIListViewNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIListViewNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIListViewNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIListViewNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIListViewNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIListViewNode, path: "rotation", value: number)
 ---@overload fun(self: UIListViewNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIListViewNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIListViewNode, path: "paused", value: boolean)
 ---@overload fun(self: UIListViewNode, path: "enabled", value: boolean)
----@overload fun(self: UIListViewNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIListViewNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIListViewNode, path: "selectedIndex", value: integer)
 ---@overload fun(self: UIListViewNode, path: "itemHeight", value: number)
 function UIListViewNode:set_property(path, value, y) end
 
 ---@alias UITreeViewNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "selectedId" # integer - Id of the selected item (-1 = none).
 ---| "itemHeight" # number - Height of each row (px).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UITreeViewNodeProperty|string
 ---@return any
----@overload fun(self: UITreeViewNode, path: "position"): number[]
----@overload fun(self: UITreeViewNode, path: "scale"): number[]
+---@overload fun(self: UITreeViewNode, path: "position"): Vec2
+---@overload fun(self: UITreeViewNode, path: "scale"): Vec2
 ---@overload fun(self: UITreeViewNode, path: "rotation"): number
 ---@overload fun(self: UITreeViewNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UITreeViewNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UITreeViewNode, path: "paused"): boolean
 ---@overload fun(self: UITreeViewNode, path: "enabled"): boolean
----@overload fun(self: UITreeViewNode, path: "size"): number[]
+---@overload fun(self: UITreeViewNode, path: "size"): Vec2
 ---@overload fun(self: UITreeViewNode, path: "selectedId"): integer
 ---@overload fun(self: UITreeViewNode, path: "itemHeight"): number
 function UITreeViewNode:get_property(path) end
@@ -3169,27 +3169,27 @@ function UITreeViewNode:get_property(path) end
 ---@param path UITreeViewNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UITreeViewNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UITreeViewNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UITreeViewNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UITreeViewNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITreeViewNode, path: "rotation", value: number)
 ---@overload fun(self: UITreeViewNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UITreeViewNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UITreeViewNode, path: "paused", value: boolean)
 ---@overload fun(self: UITreeViewNode, path: "enabled", value: boolean)
----@overload fun(self: UITreeViewNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UITreeViewNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITreeViewNode, path: "selectedId", value: integer)
 ---@overload fun(self: UITreeViewNode, path: "itemHeight", value: number)
 function UITreeViewNode:set_property(path, value, y) end
 
 ---@alias UIUnorderedListNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
 ---| "defaultBullet" # "Disc"|"Circle"|"Square"|"Dash"|"Arrow" - Bullet style for items without their own.
 ---| "itemHeight" # number - Height of each row (px).
@@ -3197,14 +3197,14 @@ function UITreeViewNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIUnorderedListNodeProperty|string
 ---@return any
----@overload fun(self: UIUnorderedListNode, path: "position"): number[]
----@overload fun(self: UIUnorderedListNode, path: "scale"): number[]
+---@overload fun(self: UIUnorderedListNode, path: "position"): Vec2
+---@overload fun(self: UIUnorderedListNode, path: "scale"): Vec2
 ---@overload fun(self: UIUnorderedListNode, path: "rotation"): number
 ---@overload fun(self: UIUnorderedListNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIUnorderedListNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIUnorderedListNode, path: "paused"): boolean
 ---@overload fun(self: UIUnorderedListNode, path: "enabled"): boolean
----@overload fun(self: UIUnorderedListNode, path: "size"): number[]
+---@overload fun(self: UIUnorderedListNode, path: "size"): Vec2
 ---@overload fun(self: UIUnorderedListNode, path: "selectedIndex"): integer
 ---@overload fun(self: UIUnorderedListNode, path: "defaultBullet"): "Disc"|"Circle"|"Square"|"Dash"|"Arrow"
 ---@overload fun(self: UIUnorderedListNode, path: "itemHeight"): number
@@ -3214,28 +3214,28 @@ function UIUnorderedListNode:get_property(path) end
 ---@param path UIUnorderedListNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIUnorderedListNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIUnorderedListNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIUnorderedListNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIUnorderedListNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIUnorderedListNode, path: "rotation", value: number)
 ---@overload fun(self: UIUnorderedListNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIUnorderedListNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIUnorderedListNode, path: "paused", value: boolean)
 ---@overload fun(self: UIUnorderedListNode, path: "enabled", value: boolean)
----@overload fun(self: UIUnorderedListNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIUnorderedListNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIUnorderedListNode, path: "selectedIndex", value: integer)
 ---@overload fun(self: UIUnorderedListNode, path: "defaultBullet", value: "Disc"|"Circle"|"Square"|"Dash"|"Arrow")
 ---@overload fun(self: UIUnorderedListNode, path: "itemHeight", value: number)
 function UIUnorderedListNode:set_property(path, value, y) end
 
 ---@alias UIOrderedListNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
 ---| "numbering" # "Decimal"|"AlphaLower"|"AlphaUpper"|"RomanLower"|"RomanUpper" - Numbering style (1, a, i...).
 ---| "startNumber" # integer - Number of the first item.
@@ -3244,14 +3244,14 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIOrderedListNodeProperty|string
 ---@return any
----@overload fun(self: UIOrderedListNode, path: "position"): number[]
----@overload fun(self: UIOrderedListNode, path: "scale"): number[]
+---@overload fun(self: UIOrderedListNode, path: "position"): Vec2
+---@overload fun(self: UIOrderedListNode, path: "scale"): Vec2
 ---@overload fun(self: UIOrderedListNode, path: "rotation"): number
 ---@overload fun(self: UIOrderedListNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIOrderedListNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIOrderedListNode, path: "paused"): boolean
 ---@overload fun(self: UIOrderedListNode, path: "enabled"): boolean
----@overload fun(self: UIOrderedListNode, path: "size"): number[]
+---@overload fun(self: UIOrderedListNode, path: "size"): Vec2
 ---@overload fun(self: UIOrderedListNode, path: "selectedIndex"): integer
 ---@overload fun(self: UIOrderedListNode, path: "numbering"): "Decimal"|"AlphaLower"|"AlphaUpper"|"RomanLower"|"RomanUpper"
 ---@overload fun(self: UIOrderedListNode, path: "startNumber"): integer
@@ -3262,14 +3262,14 @@ function UIOrderedListNode:get_property(path) end
 ---@param path UIOrderedListNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIOrderedListNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIOrderedListNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIOrderedListNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIOrderedListNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIOrderedListNode, path: "rotation", value: number)
 ---@overload fun(self: UIOrderedListNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIOrderedListNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIOrderedListNode, path: "paused", value: boolean)
 ---@overload fun(self: UIOrderedListNode, path: "enabled", value: boolean)
----@overload fun(self: UIOrderedListNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIOrderedListNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIOrderedListNode, path: "selectedIndex", value: integer)
 ---@overload fun(self: UIOrderedListNode, path: "numbering", value: "Decimal"|"AlphaLower"|"AlphaUpper"|"RomanLower"|"RomanUpper")
 ---@overload fun(self: UIOrderedListNode, path: "startNumber", value: integer)
@@ -3277,14 +3277,14 @@ function UIOrderedListNode:get_property(path) end
 function UIOrderedListNode:set_property(path, value, y) end
 
 ---@alias UITableNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "selectedRow" # integer - Index of the selected row.
 ---| "sortColumn" # integer - Column the rows are sorted by.
 ---| "sortAscending" # boolean - Sort ascending (else descending).
@@ -3294,14 +3294,14 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UITableNodeProperty|string
 ---@return any
----@overload fun(self: UITableNode, path: "position"): number[]
----@overload fun(self: UITableNode, path: "scale"): number[]
+---@overload fun(self: UITableNode, path: "position"): Vec2
+---@overload fun(self: UITableNode, path: "scale"): Vec2
 ---@overload fun(self: UITableNode, path: "rotation"): number
 ---@overload fun(self: UITableNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UITableNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UITableNode, path: "paused"): boolean
 ---@overload fun(self: UITableNode, path: "enabled"): boolean
----@overload fun(self: UITableNode, path: "size"): number[]
+---@overload fun(self: UITableNode, path: "size"): Vec2
 ---@overload fun(self: UITableNode, path: "selectedRow"): integer
 ---@overload fun(self: UITableNode, path: "sortColumn"): integer
 ---@overload fun(self: UITableNode, path: "sortAscending"): boolean
@@ -3313,14 +3313,14 @@ function UITableNode:get_property(path) end
 ---@param path UITableNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UITableNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UITableNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UITableNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UITableNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITableNode, path: "rotation", value: number)
 ---@overload fun(self: UITableNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UITableNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UITableNode, path: "paused", value: boolean)
 ---@overload fun(self: UITableNode, path: "enabled", value: boolean)
----@overload fun(self: UITableNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UITableNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITableNode, path: "selectedRow", value: integer)
 ---@overload fun(self: UITableNode, path: "sortColumn", value: integer)
 ---@overload fun(self: UITableNode, path: "sortAscending", value: boolean)
@@ -3329,14 +3329,14 @@ function UITableNode:get_property(path) end
 function UITableNode:set_property(path, value, y) end
 
 ---@alias UIIconNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "icon" # "None"|"Digit0"|"Digit1"|"Digit2"|"Digit3"|"Digit4"|"Digit5"|"Digit6"|"Digit7"|"Digit8"|"Digit9"|"A"|"AddressBook"|"AddressCard"|"AlignCenter"|"AlignJustify"|"AlignLeft"|"AlignRight"|"Anchor"|"AnchorCircleCheck"|"AnchorCircleExclamation"|"AnchorCircleXmark"|"AnchorLock"|"AngleDown"|"AngleLeft"|"AngleRight"|"AngleUp"|"AnglesDown"|"AnglesLeft"|"AnglesRight"|"AnglesUp"|"Ankh"|"AppleWhole"|"Archway"|"ArrowDown"|"ArrowDown19"|"ArrowDown91"|"ArrowDownAZ"|"ArrowDownLong"|"ArrowDownShortWide"|"ArrowDownUpAcrossLine"|"ArrowDownUpLock"|"ArrowDownWideShort"|"ArrowDownZA"|"ArrowLeft"|"ArrowLeftLong"|"ArrowPointer"|"ArrowRight"|"ArrowRightArrowLeft"|"ArrowRightFromBracket"|"ArrowRightLong"|"ArrowRightToBracket"|"ArrowRightToCity"|"ArrowRotateLeft"|"ArrowRotateRight"|"ArrowTrendDown"|"ArrowTrendUp"|"ArrowTurnDown"|"ArrowTurnUp"|"ArrowUp"|"ArrowUp19"|"ArrowUp91"|"ArrowUpAZ"|"ArrowUpFromBracket"|"ArrowUpFromGroundWater"|"ArrowUpFromWaterPump"|"ArrowUpLong"|"ArrowUpRightDots"|"ArrowUpRightFromSquare"|"ArrowUpShortWide"|"ArrowUpWideShort"|"ArrowUpZA"|"ArrowsDownToLine"|"ArrowsDownToPeople"|"ArrowsLeftRight"|"ArrowsLeftRightToLine"|"ArrowsRotate"|"ArrowsSpin"|"ArrowsSplitUpAndLeft"|"ArrowsToCircle"|"ArrowsToDot"|"ArrowsToEye"|"ArrowsTurnRight"|"ArrowsTurnToDots"|"ArrowsUpDown"|"ArrowsUpDownLeftRight"|"ArrowsUpToLine"|"Asterisk"|"At"|"Atom"|"AudioDescription"|"AustralSign"|"Award"|"B"|"Baby"|"BabyCarriage"|"Backward"|"BackwardFast"|"BackwardStep"|"Bacon"|"Bacteria"|"Bacterium"|"BagShopping"|"Bahai"|"BahtSign"|"Ban"|"BanSmoking"|"Bandage"|"BangladeshiTakaSign"|"Barcode"|"Bars"|"BarsProgress"|"BarsStaggered"|"Baseball"|"BaseballBatBall"|"BasketShopping"|"Basketball"|"Bath"|"BatteryEmpty"|"BatteryFull"|"BatteryHalf"|"BatteryQuarter"|"BatteryThreeQuarters"|"Bed"|"BedPulse"|"BeerMugEmpty"|"Bell"|"BellConcierge"|"BellSlash"|"BezierCurve"|"Bicycle"|"Binoculars"|"Biohazard"|"BitcoinSign"|"Blender"|"BlenderPhone"|"Blog"|"Bold"|"Bolt"|"BoltLightning"|"Bomb"|"Bone"|"Bong"|"Book"|"BookAtlas"|"BookBible"|"BookBookmark"|"BookJournalWhills"|"BookMedical"|"BookOpen"|"BookOpenReader"|"BookQuran"|"BookSkull"|"BookTanakh"|"Bookmark"|"BorderAll"|"BorderNone"|"BorderTopLeft"|"BoreHole"|"BottleDroplet"|"BottleWater"|"BowlFood"|"BowlRice"|"BowlingBall"|"Box"|"BoxArchive"|"BoxOpen"|"BoxTissue"|"BoxesPacking"|"BoxesStacked"|"Braille"|"Brain"|"BrazilianRealSign"|"BreadSlice"|"Bridge"|"BridgeCircleCheck"|"BridgeCircleExclamation"|"BridgeCircleXmark"|"BridgeLock"|"BridgeWater"|"Briefcase"|"BriefcaseMedical"|"Broom"|"BroomBall"|"Brush"|"Bucket"|"Bug"|"BugSlash"|"Bugs"|"Building"|"BuildingCircleArrowRight"|"BuildingCircleCheck"|"BuildingCircleExclamation"|"BuildingCircleXmark"|"BuildingColumns"|"BuildingFlag"|"BuildingLock"|"BuildingNgo"|"BuildingShield"|"BuildingUn"|"BuildingUser"|"BuildingWheat"|"Bullhorn"|"Bullseye"|"Burger"|"Burst"|"Bus"|"BusSimple"|"BusinessTime"|"C"|"CableCar"|"CakeCandles"|"Calculator"|"Calendar"|"CalendarCheck"|"CalendarDay"|"CalendarDays"|"CalendarMinus"|"CalendarPlus"|"CalendarWeek"|"CalendarXmark"|"Camera"|"CameraRetro"|"CameraRotate"|"Campground"|"CandyCane"|"Cannabis"|"Capsules"|"Car"|"CarBattery"|"CarBurst"|"CarOn"|"CarRear"|"CarSide"|"CarTunnel"|"Caravan"|"CaretDown"|"CaretLeft"|"CaretRight"|"CaretUp"|"Carrot"|"CartArrowDown"|"CartFlatbed"|"CartFlatbedSuitcase"|"CartPlus"|"CartShopping"|"CashRegister"|"Cat"|"CediSign"|"CentSign"|"Certificate"|"Chair"|"Chalkboard"|"ChalkboardUser"|"ChampagneGlasses"|"ChargingStation"|"ChartArea"|"ChartBar"|"ChartColumn"|"ChartDiagram"|"ChartGantt"|"ChartLine"|"ChartPie"|"ChartSimple"|"Check"|"CheckDouble"|"CheckToSlot"|"Cheese"|"Chess"|"ChessBishop"|"ChessBoard"|"ChessKing"|"ChessKnight"|"ChessPawn"|"ChessQueen"|"ChessRook"|"ChevronDown"|"ChevronLeft"|"ChevronRight"|"ChevronUp"|"Child"|"ChildCombatant"|"ChildDress"|"ChildReaching"|"Children"|"Church"|"Circle"|"CircleArrowDown"|"CircleArrowLeft"|"CircleArrowRight"|"CircleArrowUp"|"CircleCheck"|"CircleChevronDown"|"CircleChevronLeft"|"CircleChevronRight"|"CircleChevronUp"|"CircleDollarToSlot"|"CircleDot"|"CircleDown"|"CircleExclamation"|"CircleH"|"CircleHalfStroke"|"CircleInfo"|"CircleLeft"|"CircleMinus"|"CircleNodes"|"CircleNotch"|"CirclePause"|"CirclePlay"|"CirclePlus"|"CircleQuestion"|"CircleRadiation"|"CircleRight"|"CircleStop"|"CircleUp"|"CircleUser"|"CircleXmark"|"City"|"Clapperboard"|"Clipboard"|"ClipboardCheck"|"ClipboardList"|"ClipboardQuestion"|"ClipboardUser"|"Clock"|"ClockRotateLeft"|"Clone"|"ClosedCaptioning"|"Cloud"|"CloudArrowDown"|"CloudArrowUp"|"CloudBolt"|"CloudMeatball"|"CloudMoon"|"CloudMoonRain"|"CloudRain"|"CloudShowersHeavy"|"CloudShowersWater"|"CloudSun"|"CloudSunRain"|"Clover"|"Code"|"CodeBranch"|"CodeCommit"|"CodeCompare"|"CodeFork"|"CodeMerge"|"CodePullRequest"|"Coins"|"ColonSign"|"Comment"|"CommentDollar"|"CommentDots"|"CommentMedical"|"CommentNodes"|"CommentSlash"|"CommentSms"|"Comments"|"CommentsDollar"|"CompactDisc"|"Compass"|"CompassDrafting"|"Compress"|"Computer"|"ComputerMouse"|"Cookie"|"CookieBite"|"Copy"|"Copyright"|"Couch"|"Cow"|"CreditCard"|"Crop"|"CropSimple"|"Cross"|"Crosshairs"|"Crow"|"Crown"|"Crutch"|"CruzeiroSign"|"Cube"|"Cubes"|"CubesStacked"|"D"|"Database"|"DeleteLeft"|"Democrat"|"Desktop"|"Dharmachakra"|"DiagramNext"|"DiagramPredecessor"|"DiagramProject"|"DiagramSuccessor"|"Diamond"|"DiamondTurnRight"|"Dice"|"DiceD20"|"DiceD6"|"DiceFive"|"DiceFour"|"DiceOne"|"DiceSix"|"DiceThree"|"DiceTwo"|"Disease"|"Display"|"Divide"|"Dna"|"Dog"|"DollarSign"|"Dolly"|"DongSign"|"DoorClosed"|"DoorOpen"|"Dove"|"DownLeftAndUpRightToCenter"|"DownLong"|"Download"|"Dragon"|"DrawPolygon"|"Droplet"|"DropletSlash"|"Drum"|"DrumSteelpan"|"DrumstickBite"|"Dumbbell"|"Dumpster"|"DumpsterFire"|"Dungeon"|"E"|"EarDeaf"|"EarListen"|"EarthAfrica"|"EarthAmericas"|"EarthAsia"|"EarthEurope"|"EarthOceania"|"Egg"|"Eject"|"Elevator"|"Ellipsis"|"EllipsisVertical"|"Envelope"|"EnvelopeCircleCheck"|"EnvelopeOpen"|"EnvelopeOpenText"|"EnvelopesBulk"|"Equals"|"Eraser"|"Ethernet"|"EuroSign"|"Exclamation"|"Expand"|"Explosion"|"Eye"|"EyeDropper"|"EyeLowVision"|"EyeSlash"|"F"|"FaceAngry"|"FaceDizzy"|"FaceFlushed"|"FaceFrown"|"FaceFrownOpen"|"FaceGrimace"|"FaceGrin"|"FaceGrinBeam"|"FaceGrinBeamSweat"|"FaceGrinHearts"|"FaceGrinSquint"|"FaceGrinSquintTears"|"FaceGrinStars"|"FaceGrinTears"|"FaceGrinTongue"|"FaceGrinTongueSquint"|"FaceGrinTongueWink"|"FaceGrinWide"|"FaceGrinWink"|"FaceKiss"|"FaceKissBeam"|"FaceKissWinkHeart"|"FaceLaugh"|"FaceLaughBeam"|"FaceLaughSquint"|"FaceLaughWink"|"FaceMeh"|"FaceMehBlank"|"FaceRollingEyes"|"FaceSadCry"|"FaceSadTear"|"FaceSmile"|"FaceSmileBeam"|"FaceSmileWink"|"FaceSurprise"|"FaceTired"|"Fan"|"Faucet"|"FaucetDrip"|"Fax"|"Feather"|"FeatherPointed"|"Ferry"|"File"|"FileArrowDown"|"FileArrowUp"|"FileAudio"|"FileCircleCheck"|"FileCircleExclamation"|"FileCircleMinus"|"FileCirclePlus"|"FileCircleQuestion"|"FileCircleXmark"|"FileCode"|"FileContract"|"FileCsv"|"FileExcel"|"FileExport"|"FileFragment"|"FileHalfDashed"|"FileImage"|"FileImport"|"FileInvoice"|"FileInvoiceDollar"|"FileLines"|"FileMedical"|"FilePdf"|"FilePen"|"FilePowerpoint"|"FilePrescription"|"FileShield"|"FileSignature"|"FileVideo"|"FileWaveform"|"FileWord"|"FileZipper"|"Fill"|"FillDrip"|"Film"|"Filter"|"FilterCircleDollar"|"FilterCircleXmark"|"Fingerprint"|"Fire"|"FireBurner"|"FireExtinguisher"|"FireFlameCurved"|"FireFlameSimple"|"Fish"|"FishFins"|"Flag"|"FlagCheckered"|"FlagUsa"|"Flask"|"FlaskVial"|"FloppyDisk"|"FlorinSign"|"Folder"|"FolderClosed"|"FolderMinus"|"FolderOpen"|"FolderPlus"|"FolderTree"|"Font"|"FontAwesome"|"Football"|"Forward"|"ForwardFast"|"ForwardStep"|"FrancSign"|"Frog"|"Futbol"|"G"|"Gamepad"|"GasPump"|"Gauge"|"GaugeHigh"|"GaugeSimple"|"GaugeSimpleHigh"|"Gavel"|"Gear"|"Gears"|"Gem"|"Genderless"|"Ghost"|"Gift"|"Gifts"|"GlassWater"|"GlassWaterDroplet"|"Glasses"|"Globe"|"GolfBallTee"|"Gopuram"|"GraduationCap"|"GreaterThan"|"GreaterThanEqual"|"Grip"|"GripLines"|"GripLinesVertical"|"GripVertical"|"GroupArrowsRotate"|"GuaraniSign"|"Guitar"|"Gun"|"H"|"Hammer"|"Hamsa"|"Hand"|"HandBackFist"|"HandDots"|"HandFist"|"HandHolding"|"HandHoldingDollar"|"HandHoldingDroplet"|"HandHoldingHand"|"HandHoldingHeart"|"HandHoldingMedical"|"HandLizard"|"HandMiddleFinger"|"HandPeace"|"HandPointDown"|"HandPointLeft"|"HandPointRight"|"HandPointUp"|"HandPointer"|"HandScissors"|"HandSparkles"|"HandSpock"|"Handcuffs"|"Hands"|"HandsAslInterpreting"|"HandsBound"|"HandsBubbles"|"HandsClapping"|"HandsHolding"|"HandsHoldingChild"|"HandsHoldingCircle"|"HandsPraying"|"Handshake"|"HandshakeAngle"|"HandshakeSimple"|"HandshakeSimpleSlash"|"HandshakeSlash"|"Hanukiah"|"HardDrive"|"Hashtag"|"HatCowboy"|"HatCowboySide"|"HatWizard"|"HeadSideCough"|"HeadSideCoughSlash"|"HeadSideMask"|"HeadSideVirus"|"Heading"|"Headphones"|"HeadphonesSimple"|"Headset"|"Heart"|"HeartCircleBolt"|"HeartCircleCheck"|"HeartCircleExclamation"|"HeartCircleMinus"|"HeartCirclePlus"|"HeartCircleXmark"|"HeartCrack"|"HeartPulse"|"Helicopter"|"HelicopterSymbol"|"HelmetSafety"|"HelmetUn"|"HexagonNodes"|"HexagonNodesBolt"|"Highlighter"|"HillAvalanche"|"HillRockslide"|"Hippo"|"HockeyPuck"|"HollyBerry"|"Horse"|"HorseHead"|"Hospital"|"HospitalUser"|"HotTubPerson"|"Hotdog"|"Hotel"|"Hourglass"|"HourglassEnd"|"HourglassHalf"|"HourglassStart"|"House"|"HouseChimney"|"HouseChimneyCrack"|"HouseChimneyMedical"|"HouseChimneyUser"|"HouseChimneyWindow"|"HouseCircleCheck"|"HouseCircleExclamation"|"HouseCircleXmark"|"HouseCrack"|"HouseFire"|"HouseFlag"|"HouseFloodWater"|"HouseFloodWaterCircleArrowRight"|"HouseLaptop"|"HouseLock"|"HouseMedical"|"HouseMedicalCircleCheck"|"HouseMedicalCircleExclamation"|"HouseMedicalCircleXmark"|"HouseMedicalFlag"|"HouseSignal"|"HouseTsunami"|"HouseUser"|"HryvniaSign"|"Hurricane"|"I"|"ICursor"|"IceCream"|"Icicles"|"Icons"|"IdBadge"|"IdCard"|"IdCardClip"|"Igloo"|"Image"|"ImagePortrait"|"Images"|"Inbox"|"Indent"|"IndianRupeeSign"|"Industry"|"Infinity"|"Info"|"Italic"|"J"|"Jar"|"JarWheat"|"Jedi"|"JetFighter"|"JetFighterUp"|"Joint"|"JugDetergent"|"K"|"Kaaba"|"Key"|"Keyboard"|"Khanda"|"KipSign"|"KitMedical"|"KitchenSet"|"KiwiBird"|"L"|"LandMineOn"|"Landmark"|"LandmarkDome"|"LandmarkFlag"|"Language"|"Laptop"|"LaptopCode"|"LaptopFile"|"LaptopMedical"|"LariSign"|"LayerGroup"|"Leaf"|"LeftLong"|"LeftRight"|"Lemon"|"LessThan"|"LessThanEqual"|"LifeRing"|"Lightbulb"|"LinesLeaning"|"Link"|"LinkSlash"|"LiraSign"|"List"|"ListCheck"|"ListOl"|"ListUl"|"LitecoinSign"|"LocationArrow"|"LocationCrosshairs"|"LocationDot"|"LocationPin"|"LocationPinLock"|"Lock"|"LockOpen"|"Locust"|"Lungs"|"LungsVirus"|"M"|"Magnet"|"MagnifyingGlass"|"MagnifyingGlassArrowRight"|"MagnifyingGlassChart"|"MagnifyingGlassDollar"|"MagnifyingGlassLocation"|"MagnifyingGlassMinus"|"MagnifyingGlassPlus"|"ManatSign"|"Map"|"MapLocation"|"MapLocationDot"|"MapPin"|"Marker"|"Mars"|"MarsAndVenus"|"MarsAndVenusBurst"|"MarsDouble"|"MarsStroke"|"MarsStrokeRight"|"MarsStrokeUp"|"MartiniGlass"|"MartiniGlassCitrus"|"MartiniGlassEmpty"|"Mask"|"MaskFace"|"MaskVentilator"|"MasksTheater"|"MattressPillow"|"Maximize"|"Medal"|"Memory"|"Menorah"|"Mercury"|"Message"|"Meteor"|"Microchip"|"Microphone"|"MicrophoneLines"|"MicrophoneLinesSlash"|"MicrophoneSlash"|"Microscope"|"MillSign"|"Minimize"|"Minus"|"Mitten"|"Mobile"|"MobileButton"|"MobileRetro"|"MobileScreen"|"MobileScreenButton"|"MoneyBill"|"MoneyBill1"|"MoneyBill1Wave"|"MoneyBillTransfer"|"MoneyBillTrendUp"|"MoneyBillWave"|"MoneyBillWheat"|"MoneyBills"|"MoneyCheck"|"MoneyCheckDollar"|"Monument"|"Moon"|"MortarPestle"|"Mosque"|"Mosquito"|"MosquitoNet"|"Motorcycle"|"Mound"|"Mountain"|"MountainCity"|"MountainSun"|"MugHot"|"MugSaucer"|"Music"|"N"|"NairaSign"|"NetworkWired"|"Neuter"|"Newspaper"|"NotEqual"|"Notdef"|"NoteSticky"|"NotesMedical"|"O"|"ObjectGroup"|"ObjectUngroup"|"OilCan"|"OilWell"|"Om"|"Otter"|"Outdent"|"P"|"Pager"|"PaintRoller"|"Paintbrush"|"Palette"|"Pallet"|"Panorama"|"PaperPlane"|"Paperclip"|"ParachuteBox"|"Paragraph"|"Passport"|"Paste"|"Pause"|"Paw"|"Peace"|"Pen"|"PenClip"|"PenFancy"|"PenNib"|"PenRuler"|"PenToSquare"|"Pencil"|"PeopleArrows"|"PeopleCarryBox"|"PeopleGroup"|"PeopleLine"|"PeoplePulling"|"PeopleRobbery"|"PeopleRoof"|"PepperHot"|"Percent"|"Person"|"PersonArrowDownToLine"|"PersonArrowUpFromLine"|"PersonBiking"|"PersonBooth"|"PersonBreastfeeding"|"PersonBurst"|"PersonCane"|"PersonChalkboard"|"PersonCircleCheck"|"PersonCircleExclamation"|"PersonCircleMinus"|"PersonCirclePlus"|"PersonCircleQuestion"|"PersonCircleXmark"|"PersonDigging"|"PersonDotsFromLine"|"PersonDress"|"PersonDressBurst"|"PersonDrowning"|"PersonFalling"|"PersonFallingBurst"|"PersonHalfDress"|"PersonHarassing"|"PersonHiking"|"PersonMilitaryPointing"|"PersonMilitaryRifle"|"PersonMilitaryToPerson"|"PersonPraying"|"PersonPregnant"|"PersonRays"|"PersonRifle"|"PersonRunning"|"PersonShelter"|"PersonSkating"|"PersonSkiing"|"PersonSkiingNordic"|"PersonSnowboarding"|"PersonSwimming"|"PersonThroughWindow"|"PersonWalking"|"PersonWalkingArrowLoopLeft"|"PersonWalkingArrowRight"|"PersonWalkingDashedLineArrowRight"|"PersonWalkingLuggage"|"PersonWalkingWithCane"|"PesetaSign"|"PesoSign"|"Phone"|"PhoneFlip"|"PhoneSlash"|"PhoneVolume"|"PhotoFilm"|"PiggyBank"|"Pills"|"PizzaSlice"|"PlaceOfWorship"|"Plane"|"PlaneArrival"|"PlaneCircleCheck"|"PlaneCircleExclamation"|"PlaneCircleXmark"|"PlaneDeparture"|"PlaneLock"|"PlaneSlash"|"PlaneUp"|"PlantWilt"|"PlateWheat"|"Play"|"Plug"|"PlugCircleBolt"|"PlugCircleCheck"|"PlugCircleExclamation"|"PlugCircleMinus"|"PlugCirclePlus"|"PlugCircleXmark"|"Plus"|"PlusMinus"|"Podcast"|"Poo"|"PooStorm"|"Poop"|"PowerOff"|"Prescription"|"PrescriptionBottle"|"PrescriptionBottleMedical"|"Print"|"PumpMedical"|"PumpSoap"|"PuzzlePiece"|"Q"|"Qrcode"|"Question"|"QuoteLeft"|"QuoteRight"|"R"|"Radiation"|"Radio"|"Rainbow"|"RankingStar"|"Receipt"|"RecordVinyl"|"RectangleAd"|"RectangleList"|"RectangleXmark"|"Recycle"|"Registered"|"Repeat"|"Reply"|"ReplyAll"|"Republican"|"Restroom"|"Retweet"|"Ribbon"|"RightFromBracket"|"RightLeft"|"RightLong"|"RightToBracket"|"Ring"|"Road"|"RoadBarrier"|"RoadBridge"|"RoadCircleCheck"|"RoadCircleExclamation"|"RoadCircleXmark"|"RoadLock"|"RoadSpikes"|"Robot"|"Rocket"|"Rotate"|"RotateLeft"|"RotateRight"|"Route"|"Rss"|"RubleSign"|"Rug"|"Ruler"|"RulerCombined"|"RulerHorizontal"|"RulerVertical"|"RupeeSign"|"RupiahSign"|"S"|"SackDollar"|"SackXmark"|"Sailboat"|"Satellite"|"SatelliteDish"|"ScaleBalanced"|"ScaleUnbalanced"|"ScaleUnbalancedFlip"|"School"|"SchoolCircleCheck"|"SchoolCircleExclamation"|"SchoolCircleXmark"|"SchoolFlag"|"SchoolLock"|"Scissors"|"Screwdriver"|"ScrewdriverWrench"|"Scroll"|"ScrollTorah"|"SdCard"|"Section"|"Seedling"|"Server"|"Shapes"|"Share"|"ShareFromSquare"|"ShareNodes"|"SheetPlastic"|"ShekelSign"|"Shield"|"ShieldCat"|"ShieldDog"|"ShieldHalved"|"ShieldHeart"|"ShieldVirus"|"Ship"|"Shirt"|"ShoePrints"|"Shop"|"ShopLock"|"ShopSlash"|"Shower"|"Shrimp"|"Shuffle"|"ShuttleSpace"|"SignHanging"|"Signal"|"Signature"|"SignsPost"|"SimCard"|"Sink"|"Sitemap"|"Skull"|"SkullCrossbones"|"Slash"|"Sleigh"|"Sliders"|"Smog"|"Smoking"|"Snowflake"|"Snowman"|"Snowplow"|"Soap"|"Socks"|"SolarPanel"|"Sort"|"SortDown"|"SortUp"|"Spa"|"SpaghettiMonsterFlying"|"SpellCheck"|"Spider"|"Spinner"|"Splotch"|"Spoon"|"SprayCan"|"SprayCanSparkles"|"Square"|"SquareArrowUpRight"|"SquareBinary"|"SquareCaretDown"|"SquareCaretLeft"|"SquareCaretRight"|"SquareCaretUp"|"SquareCheck"|"SquareEnvelope"|"SquareFull"|"SquareH"|"SquareMinus"|"SquareNfi"|"SquareParking"|"SquarePen"|"SquarePersonConfined"|"SquarePhone"|"SquarePhoneFlip"|"SquarePlus"|"SquarePollHorizontal"|"SquarePollVertical"|"SquareRootVariable"|"SquareRss"|"SquareShareNodes"|"SquareUpRight"|"SquareVirus"|"SquareXmark"|"StaffSnake"|"Stairs"|"Stamp"|"Stapler"|"Star"|"StarAndCrescent"|"StarHalf"|"StarHalfStroke"|"StarOfDavid"|"StarOfLife"|"SterlingSign"|"Stethoscope"|"Stop"|"Stopwatch"|"Stopwatch20"|"Store"|"StoreSlash"|"StreetView"|"Strikethrough"|"Stroopwafel"|"Subscript"|"Suitcase"|"SuitcaseMedical"|"SuitcaseRolling"|"Sun"|"SunPlantWilt"|"Superscript"|"Swatchbook"|"Synagogue"|"Syringe"|"T"|"Table"|"TableCells"|"TableCellsColumnLock"|"TableCellsLarge"|"TableCellsRowLock"|"TableCellsRowUnlock"|"TableColumns"|"TableList"|"TableTennisPaddleBall"|"Tablet"|"TabletButton"|"TabletScreenButton"|"Tablets"|"TachographDigital"|"Tag"|"Tags"|"Tape"|"Tarp"|"TarpDroplet"|"Taxi"|"Teeth"|"TeethOpen"|"TemperatureArrowDown"|"TemperatureArrowUp"|"TemperatureEmpty"|"TemperatureFull"|"TemperatureHalf"|"TemperatureHigh"|"TemperatureLow"|"TemperatureQuarter"|"TemperatureThreeQuarters"|"TengeSign"|"Tent"|"TentArrowDownToLine"|"TentArrowLeftRight"|"TentArrowTurnLeft"|"TentArrowsDown"|"Tents"|"Terminal"|"TextHeight"|"TextSlash"|"TextWidth"|"Thermometer"|"ThumbsDown"|"ThumbsUp"|"Thumbtack"|"ThumbtackSlash"|"Ticket"|"TicketSimple"|"Timeline"|"ToggleOff"|"ToggleOn"|"Toilet"|"ToiletPaper"|"ToiletPaperSlash"|"ToiletPortable"|"ToiletsPortable"|"Toolbox"|"Tooth"|"ToriiGate"|"Tornado"|"TowerBroadcast"|"TowerCell"|"TowerObservation"|"Tractor"|"Trademark"|"TrafficLight"|"Trailer"|"Train"|"TrainSubway"|"TrainTram"|"Transgender"|"Trash"|"TrashArrowUp"|"TrashCan"|"TrashCanArrowUp"|"Tree"|"TreeCity"|"TriangleExclamation"|"Trophy"|"Trowel"|"TrowelBricks"|"Truck"|"TruckArrowRight"|"TruckDroplet"|"TruckFast"|"TruckField"|"TruckFieldUn"|"TruckFront"|"TruckMedical"|"TruckMonster"|"TruckMoving"|"TruckPickup"|"TruckPlane"|"TruckRampBox"|"Tty"|"TurkishLiraSign"|"TurnDown"|"TurnUp"|"Tv"|"U"|"Umbrella"|"UmbrellaBeach"|"Underline"|"UniversalAccess"|"Unlock"|"UnlockKeyhole"|"UpDown"|"UpDownLeftRight"|"UpLong"|"UpRightAndDownLeftFromCenter"|"UpRightFromSquare"|"Upload"|"User"|"UserAstronaut"|"UserCheck"|"UserClock"|"UserDoctor"|"UserGear"|"UserGraduate"|"UserGroup"|"UserInjured"|"UserLarge"|"UserLargeSlash"|"UserLock"|"UserMinus"|"UserNinja"|"UserNurse"|"UserPen"|"UserPlus"|"UserSecret"|"UserShield"|"UserSlash"|"UserTag"|"UserTie"|"UserXmark"|"Users"|"UsersBetweenLines"|"UsersGear"|"UsersLine"|"UsersRays"|"UsersRectangle"|"UsersSlash"|"UsersViewfinder"|"Utensils"|"V"|"VanShuttle"|"Vault"|"VectorSquare"|"Venus"|"VenusDouble"|"VenusMars"|"Vest"|"VestPatches"|"Vial"|"VialCircleCheck"|"VialVirus"|"Vials"|"Video"|"VideoSlash"|"Vihara"|"Virus"|"VirusCovid"|"VirusCovidSlash"|"VirusSlash"|"Viruses"|"Voicemail"|"Volcano"|"Volleyball"|"VolumeHigh"|"VolumeLow"|"VolumeOff"|"VolumeXmark"|"VrCardboard"|"W"|"WalkieTalkie"|"Wallet"|"WandMagic"|"WandMagicSparkles"|"WandSparkles"|"Warehouse"|"Water"|"WaterLadder"|"WaveSquare"|"WebAwesome"|"WeightHanging"|"WeightScale"|"WheatAwn"|"WheatAwnCircleExclamation"|"Wheelchair"|"WheelchairMove"|"WhiskeyGlass"|"Wifi"|"Wind"|"WindowMaximize"|"WindowMinimize"|"WindowRestore"|"WineBottle"|"WineGlass"|"WineGlassEmpty"|"WonSign"|"Worm"|"Wrench"|"X"|"XRay"|"Xmark"|"XmarksLines"|"Y"|"YenSign"|"YinYang"|"Z"|"Search"|"Save"|"Settings"|"Cog"|"Home"|"Edit"|"Close"|"Cancel"|"Refresh"|"Warning"|"CheckCircle"|"TimesCircle"|"VolumeMute"|"Cut"|"Undo"|"Redo"|"StepForward"|"StepBackward"|"Pin"|"ZoomIn"|"ZoomOut" - Icon shown (Font Awesome).
 ---| "iconSize" # number - Icon size (px).
 ---| "color" # number[] - Icon colour.
@@ -3345,14 +3345,14 @@ function UITableNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIIconNodeProperty|string
 ---@return any
----@overload fun(self: UIIconNode, path: "position"): number[]
----@overload fun(self: UIIconNode, path: "scale"): number[]
+---@overload fun(self: UIIconNode, path: "position"): Vec2
+---@overload fun(self: UIIconNode, path: "scale"): Vec2
 ---@overload fun(self: UIIconNode, path: "rotation"): number
 ---@overload fun(self: UIIconNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIIconNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIIconNode, path: "paused"): boolean
 ---@overload fun(self: UIIconNode, path: "enabled"): boolean
----@overload fun(self: UIIconNode, path: "size"): number[]
+---@overload fun(self: UIIconNode, path: "size"): Vec2
 ---@overload fun(self: UIIconNode, path: "icon"): "None"|"Digit0"|"Digit1"|"Digit2"|"Digit3"|"Digit4"|"Digit5"|"Digit6"|"Digit7"|"Digit8"|"Digit9"|"A"|"AddressBook"|"AddressCard"|"AlignCenter"|"AlignJustify"|"AlignLeft"|"AlignRight"|"Anchor"|"AnchorCircleCheck"|"AnchorCircleExclamation"|"AnchorCircleXmark"|"AnchorLock"|"AngleDown"|"AngleLeft"|"AngleRight"|"AngleUp"|"AnglesDown"|"AnglesLeft"|"AnglesRight"|"AnglesUp"|"Ankh"|"AppleWhole"|"Archway"|"ArrowDown"|"ArrowDown19"|"ArrowDown91"|"ArrowDownAZ"|"ArrowDownLong"|"ArrowDownShortWide"|"ArrowDownUpAcrossLine"|"ArrowDownUpLock"|"ArrowDownWideShort"|"ArrowDownZA"|"ArrowLeft"|"ArrowLeftLong"|"ArrowPointer"|"ArrowRight"|"ArrowRightArrowLeft"|"ArrowRightFromBracket"|"ArrowRightLong"|"ArrowRightToBracket"|"ArrowRightToCity"|"ArrowRotateLeft"|"ArrowRotateRight"|"ArrowTrendDown"|"ArrowTrendUp"|"ArrowTurnDown"|"ArrowTurnUp"|"ArrowUp"|"ArrowUp19"|"ArrowUp91"|"ArrowUpAZ"|"ArrowUpFromBracket"|"ArrowUpFromGroundWater"|"ArrowUpFromWaterPump"|"ArrowUpLong"|"ArrowUpRightDots"|"ArrowUpRightFromSquare"|"ArrowUpShortWide"|"ArrowUpWideShort"|"ArrowUpZA"|"ArrowsDownToLine"|"ArrowsDownToPeople"|"ArrowsLeftRight"|"ArrowsLeftRightToLine"|"ArrowsRotate"|"ArrowsSpin"|"ArrowsSplitUpAndLeft"|"ArrowsToCircle"|"ArrowsToDot"|"ArrowsToEye"|"ArrowsTurnRight"|"ArrowsTurnToDots"|"ArrowsUpDown"|"ArrowsUpDownLeftRight"|"ArrowsUpToLine"|"Asterisk"|"At"|"Atom"|"AudioDescription"|"AustralSign"|"Award"|"B"|"Baby"|"BabyCarriage"|"Backward"|"BackwardFast"|"BackwardStep"|"Bacon"|"Bacteria"|"Bacterium"|"BagShopping"|"Bahai"|"BahtSign"|"Ban"|"BanSmoking"|"Bandage"|"BangladeshiTakaSign"|"Barcode"|"Bars"|"BarsProgress"|"BarsStaggered"|"Baseball"|"BaseballBatBall"|"BasketShopping"|"Basketball"|"Bath"|"BatteryEmpty"|"BatteryFull"|"BatteryHalf"|"BatteryQuarter"|"BatteryThreeQuarters"|"Bed"|"BedPulse"|"BeerMugEmpty"|"Bell"|"BellConcierge"|"BellSlash"|"BezierCurve"|"Bicycle"|"Binoculars"|"Biohazard"|"BitcoinSign"|"Blender"|"BlenderPhone"|"Blog"|"Bold"|"Bolt"|"BoltLightning"|"Bomb"|"Bone"|"Bong"|"Book"|"BookAtlas"|"BookBible"|"BookBookmark"|"BookJournalWhills"|"BookMedical"|"BookOpen"|"BookOpenReader"|"BookQuran"|"BookSkull"|"BookTanakh"|"Bookmark"|"BorderAll"|"BorderNone"|"BorderTopLeft"|"BoreHole"|"BottleDroplet"|"BottleWater"|"BowlFood"|"BowlRice"|"BowlingBall"|"Box"|"BoxArchive"|"BoxOpen"|"BoxTissue"|"BoxesPacking"|"BoxesStacked"|"Braille"|"Brain"|"BrazilianRealSign"|"BreadSlice"|"Bridge"|"BridgeCircleCheck"|"BridgeCircleExclamation"|"BridgeCircleXmark"|"BridgeLock"|"BridgeWater"|"Briefcase"|"BriefcaseMedical"|"Broom"|"BroomBall"|"Brush"|"Bucket"|"Bug"|"BugSlash"|"Bugs"|"Building"|"BuildingCircleArrowRight"|"BuildingCircleCheck"|"BuildingCircleExclamation"|"BuildingCircleXmark"|"BuildingColumns"|"BuildingFlag"|"BuildingLock"|"BuildingNgo"|"BuildingShield"|"BuildingUn"|"BuildingUser"|"BuildingWheat"|"Bullhorn"|"Bullseye"|"Burger"|"Burst"|"Bus"|"BusSimple"|"BusinessTime"|"C"|"CableCar"|"CakeCandles"|"Calculator"|"Calendar"|"CalendarCheck"|"CalendarDay"|"CalendarDays"|"CalendarMinus"|"CalendarPlus"|"CalendarWeek"|"CalendarXmark"|"Camera"|"CameraRetro"|"CameraRotate"|"Campground"|"CandyCane"|"Cannabis"|"Capsules"|"Car"|"CarBattery"|"CarBurst"|"CarOn"|"CarRear"|"CarSide"|"CarTunnel"|"Caravan"|"CaretDown"|"CaretLeft"|"CaretRight"|"CaretUp"|"Carrot"|"CartArrowDown"|"CartFlatbed"|"CartFlatbedSuitcase"|"CartPlus"|"CartShopping"|"CashRegister"|"Cat"|"CediSign"|"CentSign"|"Certificate"|"Chair"|"Chalkboard"|"ChalkboardUser"|"ChampagneGlasses"|"ChargingStation"|"ChartArea"|"ChartBar"|"ChartColumn"|"ChartDiagram"|"ChartGantt"|"ChartLine"|"ChartPie"|"ChartSimple"|"Check"|"CheckDouble"|"CheckToSlot"|"Cheese"|"Chess"|"ChessBishop"|"ChessBoard"|"ChessKing"|"ChessKnight"|"ChessPawn"|"ChessQueen"|"ChessRook"|"ChevronDown"|"ChevronLeft"|"ChevronRight"|"ChevronUp"|"Child"|"ChildCombatant"|"ChildDress"|"ChildReaching"|"Children"|"Church"|"Circle"|"CircleArrowDown"|"CircleArrowLeft"|"CircleArrowRight"|"CircleArrowUp"|"CircleCheck"|"CircleChevronDown"|"CircleChevronLeft"|"CircleChevronRight"|"CircleChevronUp"|"CircleDollarToSlot"|"CircleDot"|"CircleDown"|"CircleExclamation"|"CircleH"|"CircleHalfStroke"|"CircleInfo"|"CircleLeft"|"CircleMinus"|"CircleNodes"|"CircleNotch"|"CirclePause"|"CirclePlay"|"CirclePlus"|"CircleQuestion"|"CircleRadiation"|"CircleRight"|"CircleStop"|"CircleUp"|"CircleUser"|"CircleXmark"|"City"|"Clapperboard"|"Clipboard"|"ClipboardCheck"|"ClipboardList"|"ClipboardQuestion"|"ClipboardUser"|"Clock"|"ClockRotateLeft"|"Clone"|"ClosedCaptioning"|"Cloud"|"CloudArrowDown"|"CloudArrowUp"|"CloudBolt"|"CloudMeatball"|"CloudMoon"|"CloudMoonRain"|"CloudRain"|"CloudShowersHeavy"|"CloudShowersWater"|"CloudSun"|"CloudSunRain"|"Clover"|"Code"|"CodeBranch"|"CodeCommit"|"CodeCompare"|"CodeFork"|"CodeMerge"|"CodePullRequest"|"Coins"|"ColonSign"|"Comment"|"CommentDollar"|"CommentDots"|"CommentMedical"|"CommentNodes"|"CommentSlash"|"CommentSms"|"Comments"|"CommentsDollar"|"CompactDisc"|"Compass"|"CompassDrafting"|"Compress"|"Computer"|"ComputerMouse"|"Cookie"|"CookieBite"|"Copy"|"Copyright"|"Couch"|"Cow"|"CreditCard"|"Crop"|"CropSimple"|"Cross"|"Crosshairs"|"Crow"|"Crown"|"Crutch"|"CruzeiroSign"|"Cube"|"Cubes"|"CubesStacked"|"D"|"Database"|"DeleteLeft"|"Democrat"|"Desktop"|"Dharmachakra"|"DiagramNext"|"DiagramPredecessor"|"DiagramProject"|"DiagramSuccessor"|"Diamond"|"DiamondTurnRight"|"Dice"|"DiceD20"|"DiceD6"|"DiceFive"|"DiceFour"|"DiceOne"|"DiceSix"|"DiceThree"|"DiceTwo"|"Disease"|"Display"|"Divide"|"Dna"|"Dog"|"DollarSign"|"Dolly"|"DongSign"|"DoorClosed"|"DoorOpen"|"Dove"|"DownLeftAndUpRightToCenter"|"DownLong"|"Download"|"Dragon"|"DrawPolygon"|"Droplet"|"DropletSlash"|"Drum"|"DrumSteelpan"|"DrumstickBite"|"Dumbbell"|"Dumpster"|"DumpsterFire"|"Dungeon"|"E"|"EarDeaf"|"EarListen"|"EarthAfrica"|"EarthAmericas"|"EarthAsia"|"EarthEurope"|"EarthOceania"|"Egg"|"Eject"|"Elevator"|"Ellipsis"|"EllipsisVertical"|"Envelope"|"EnvelopeCircleCheck"|"EnvelopeOpen"|"EnvelopeOpenText"|"EnvelopesBulk"|"Equals"|"Eraser"|"Ethernet"|"EuroSign"|"Exclamation"|"Expand"|"Explosion"|"Eye"|"EyeDropper"|"EyeLowVision"|"EyeSlash"|"F"|"FaceAngry"|"FaceDizzy"|"FaceFlushed"|"FaceFrown"|"FaceFrownOpen"|"FaceGrimace"|"FaceGrin"|"FaceGrinBeam"|"FaceGrinBeamSweat"|"FaceGrinHearts"|"FaceGrinSquint"|"FaceGrinSquintTears"|"FaceGrinStars"|"FaceGrinTears"|"FaceGrinTongue"|"FaceGrinTongueSquint"|"FaceGrinTongueWink"|"FaceGrinWide"|"FaceGrinWink"|"FaceKiss"|"FaceKissBeam"|"FaceKissWinkHeart"|"FaceLaugh"|"FaceLaughBeam"|"FaceLaughSquint"|"FaceLaughWink"|"FaceMeh"|"FaceMehBlank"|"FaceRollingEyes"|"FaceSadCry"|"FaceSadTear"|"FaceSmile"|"FaceSmileBeam"|"FaceSmileWink"|"FaceSurprise"|"FaceTired"|"Fan"|"Faucet"|"FaucetDrip"|"Fax"|"Feather"|"FeatherPointed"|"Ferry"|"File"|"FileArrowDown"|"FileArrowUp"|"FileAudio"|"FileCircleCheck"|"FileCircleExclamation"|"FileCircleMinus"|"FileCirclePlus"|"FileCircleQuestion"|"FileCircleXmark"|"FileCode"|"FileContract"|"FileCsv"|"FileExcel"|"FileExport"|"FileFragment"|"FileHalfDashed"|"FileImage"|"FileImport"|"FileInvoice"|"FileInvoiceDollar"|"FileLines"|"FileMedical"|"FilePdf"|"FilePen"|"FilePowerpoint"|"FilePrescription"|"FileShield"|"FileSignature"|"FileVideo"|"FileWaveform"|"FileWord"|"FileZipper"|"Fill"|"FillDrip"|"Film"|"Filter"|"FilterCircleDollar"|"FilterCircleXmark"|"Fingerprint"|"Fire"|"FireBurner"|"FireExtinguisher"|"FireFlameCurved"|"FireFlameSimple"|"Fish"|"FishFins"|"Flag"|"FlagCheckered"|"FlagUsa"|"Flask"|"FlaskVial"|"FloppyDisk"|"FlorinSign"|"Folder"|"FolderClosed"|"FolderMinus"|"FolderOpen"|"FolderPlus"|"FolderTree"|"Font"|"FontAwesome"|"Football"|"Forward"|"ForwardFast"|"ForwardStep"|"FrancSign"|"Frog"|"Futbol"|"G"|"Gamepad"|"GasPump"|"Gauge"|"GaugeHigh"|"GaugeSimple"|"GaugeSimpleHigh"|"Gavel"|"Gear"|"Gears"|"Gem"|"Genderless"|"Ghost"|"Gift"|"Gifts"|"GlassWater"|"GlassWaterDroplet"|"Glasses"|"Globe"|"GolfBallTee"|"Gopuram"|"GraduationCap"|"GreaterThan"|"GreaterThanEqual"|"Grip"|"GripLines"|"GripLinesVertical"|"GripVertical"|"GroupArrowsRotate"|"GuaraniSign"|"Guitar"|"Gun"|"H"|"Hammer"|"Hamsa"|"Hand"|"HandBackFist"|"HandDots"|"HandFist"|"HandHolding"|"HandHoldingDollar"|"HandHoldingDroplet"|"HandHoldingHand"|"HandHoldingHeart"|"HandHoldingMedical"|"HandLizard"|"HandMiddleFinger"|"HandPeace"|"HandPointDown"|"HandPointLeft"|"HandPointRight"|"HandPointUp"|"HandPointer"|"HandScissors"|"HandSparkles"|"HandSpock"|"Handcuffs"|"Hands"|"HandsAslInterpreting"|"HandsBound"|"HandsBubbles"|"HandsClapping"|"HandsHolding"|"HandsHoldingChild"|"HandsHoldingCircle"|"HandsPraying"|"Handshake"|"HandshakeAngle"|"HandshakeSimple"|"HandshakeSimpleSlash"|"HandshakeSlash"|"Hanukiah"|"HardDrive"|"Hashtag"|"HatCowboy"|"HatCowboySide"|"HatWizard"|"HeadSideCough"|"HeadSideCoughSlash"|"HeadSideMask"|"HeadSideVirus"|"Heading"|"Headphones"|"HeadphonesSimple"|"Headset"|"Heart"|"HeartCircleBolt"|"HeartCircleCheck"|"HeartCircleExclamation"|"HeartCircleMinus"|"HeartCirclePlus"|"HeartCircleXmark"|"HeartCrack"|"HeartPulse"|"Helicopter"|"HelicopterSymbol"|"HelmetSafety"|"HelmetUn"|"HexagonNodes"|"HexagonNodesBolt"|"Highlighter"|"HillAvalanche"|"HillRockslide"|"Hippo"|"HockeyPuck"|"HollyBerry"|"Horse"|"HorseHead"|"Hospital"|"HospitalUser"|"HotTubPerson"|"Hotdog"|"Hotel"|"Hourglass"|"HourglassEnd"|"HourglassHalf"|"HourglassStart"|"House"|"HouseChimney"|"HouseChimneyCrack"|"HouseChimneyMedical"|"HouseChimneyUser"|"HouseChimneyWindow"|"HouseCircleCheck"|"HouseCircleExclamation"|"HouseCircleXmark"|"HouseCrack"|"HouseFire"|"HouseFlag"|"HouseFloodWater"|"HouseFloodWaterCircleArrowRight"|"HouseLaptop"|"HouseLock"|"HouseMedical"|"HouseMedicalCircleCheck"|"HouseMedicalCircleExclamation"|"HouseMedicalCircleXmark"|"HouseMedicalFlag"|"HouseSignal"|"HouseTsunami"|"HouseUser"|"HryvniaSign"|"Hurricane"|"I"|"ICursor"|"IceCream"|"Icicles"|"Icons"|"IdBadge"|"IdCard"|"IdCardClip"|"Igloo"|"Image"|"ImagePortrait"|"Images"|"Inbox"|"Indent"|"IndianRupeeSign"|"Industry"|"Infinity"|"Info"|"Italic"|"J"|"Jar"|"JarWheat"|"Jedi"|"JetFighter"|"JetFighterUp"|"Joint"|"JugDetergent"|"K"|"Kaaba"|"Key"|"Keyboard"|"Khanda"|"KipSign"|"KitMedical"|"KitchenSet"|"KiwiBird"|"L"|"LandMineOn"|"Landmark"|"LandmarkDome"|"LandmarkFlag"|"Language"|"Laptop"|"LaptopCode"|"LaptopFile"|"LaptopMedical"|"LariSign"|"LayerGroup"|"Leaf"|"LeftLong"|"LeftRight"|"Lemon"|"LessThan"|"LessThanEqual"|"LifeRing"|"Lightbulb"|"LinesLeaning"|"Link"|"LinkSlash"|"LiraSign"|"List"|"ListCheck"|"ListOl"|"ListUl"|"LitecoinSign"|"LocationArrow"|"LocationCrosshairs"|"LocationDot"|"LocationPin"|"LocationPinLock"|"Lock"|"LockOpen"|"Locust"|"Lungs"|"LungsVirus"|"M"|"Magnet"|"MagnifyingGlass"|"MagnifyingGlassArrowRight"|"MagnifyingGlassChart"|"MagnifyingGlassDollar"|"MagnifyingGlassLocation"|"MagnifyingGlassMinus"|"MagnifyingGlassPlus"|"ManatSign"|"Map"|"MapLocation"|"MapLocationDot"|"MapPin"|"Marker"|"Mars"|"MarsAndVenus"|"MarsAndVenusBurst"|"MarsDouble"|"MarsStroke"|"MarsStrokeRight"|"MarsStrokeUp"|"MartiniGlass"|"MartiniGlassCitrus"|"MartiniGlassEmpty"|"Mask"|"MaskFace"|"MaskVentilator"|"MasksTheater"|"MattressPillow"|"Maximize"|"Medal"|"Memory"|"Menorah"|"Mercury"|"Message"|"Meteor"|"Microchip"|"Microphone"|"MicrophoneLines"|"MicrophoneLinesSlash"|"MicrophoneSlash"|"Microscope"|"MillSign"|"Minimize"|"Minus"|"Mitten"|"Mobile"|"MobileButton"|"MobileRetro"|"MobileScreen"|"MobileScreenButton"|"MoneyBill"|"MoneyBill1"|"MoneyBill1Wave"|"MoneyBillTransfer"|"MoneyBillTrendUp"|"MoneyBillWave"|"MoneyBillWheat"|"MoneyBills"|"MoneyCheck"|"MoneyCheckDollar"|"Monument"|"Moon"|"MortarPestle"|"Mosque"|"Mosquito"|"MosquitoNet"|"Motorcycle"|"Mound"|"Mountain"|"MountainCity"|"MountainSun"|"MugHot"|"MugSaucer"|"Music"|"N"|"NairaSign"|"NetworkWired"|"Neuter"|"Newspaper"|"NotEqual"|"Notdef"|"NoteSticky"|"NotesMedical"|"O"|"ObjectGroup"|"ObjectUngroup"|"OilCan"|"OilWell"|"Om"|"Otter"|"Outdent"|"P"|"Pager"|"PaintRoller"|"Paintbrush"|"Palette"|"Pallet"|"Panorama"|"PaperPlane"|"Paperclip"|"ParachuteBox"|"Paragraph"|"Passport"|"Paste"|"Pause"|"Paw"|"Peace"|"Pen"|"PenClip"|"PenFancy"|"PenNib"|"PenRuler"|"PenToSquare"|"Pencil"|"PeopleArrows"|"PeopleCarryBox"|"PeopleGroup"|"PeopleLine"|"PeoplePulling"|"PeopleRobbery"|"PeopleRoof"|"PepperHot"|"Percent"|"Person"|"PersonArrowDownToLine"|"PersonArrowUpFromLine"|"PersonBiking"|"PersonBooth"|"PersonBreastfeeding"|"PersonBurst"|"PersonCane"|"PersonChalkboard"|"PersonCircleCheck"|"PersonCircleExclamation"|"PersonCircleMinus"|"PersonCirclePlus"|"PersonCircleQuestion"|"PersonCircleXmark"|"PersonDigging"|"PersonDotsFromLine"|"PersonDress"|"PersonDressBurst"|"PersonDrowning"|"PersonFalling"|"PersonFallingBurst"|"PersonHalfDress"|"PersonHarassing"|"PersonHiking"|"PersonMilitaryPointing"|"PersonMilitaryRifle"|"PersonMilitaryToPerson"|"PersonPraying"|"PersonPregnant"|"PersonRays"|"PersonRifle"|"PersonRunning"|"PersonShelter"|"PersonSkating"|"PersonSkiing"|"PersonSkiingNordic"|"PersonSnowboarding"|"PersonSwimming"|"PersonThroughWindow"|"PersonWalking"|"PersonWalkingArrowLoopLeft"|"PersonWalkingArrowRight"|"PersonWalkingDashedLineArrowRight"|"PersonWalkingLuggage"|"PersonWalkingWithCane"|"PesetaSign"|"PesoSign"|"Phone"|"PhoneFlip"|"PhoneSlash"|"PhoneVolume"|"PhotoFilm"|"PiggyBank"|"Pills"|"PizzaSlice"|"PlaceOfWorship"|"Plane"|"PlaneArrival"|"PlaneCircleCheck"|"PlaneCircleExclamation"|"PlaneCircleXmark"|"PlaneDeparture"|"PlaneLock"|"PlaneSlash"|"PlaneUp"|"PlantWilt"|"PlateWheat"|"Play"|"Plug"|"PlugCircleBolt"|"PlugCircleCheck"|"PlugCircleExclamation"|"PlugCircleMinus"|"PlugCirclePlus"|"PlugCircleXmark"|"Plus"|"PlusMinus"|"Podcast"|"Poo"|"PooStorm"|"Poop"|"PowerOff"|"Prescription"|"PrescriptionBottle"|"PrescriptionBottleMedical"|"Print"|"PumpMedical"|"PumpSoap"|"PuzzlePiece"|"Q"|"Qrcode"|"Question"|"QuoteLeft"|"QuoteRight"|"R"|"Radiation"|"Radio"|"Rainbow"|"RankingStar"|"Receipt"|"RecordVinyl"|"RectangleAd"|"RectangleList"|"RectangleXmark"|"Recycle"|"Registered"|"Repeat"|"Reply"|"ReplyAll"|"Republican"|"Restroom"|"Retweet"|"Ribbon"|"RightFromBracket"|"RightLeft"|"RightLong"|"RightToBracket"|"Ring"|"Road"|"RoadBarrier"|"RoadBridge"|"RoadCircleCheck"|"RoadCircleExclamation"|"RoadCircleXmark"|"RoadLock"|"RoadSpikes"|"Robot"|"Rocket"|"Rotate"|"RotateLeft"|"RotateRight"|"Route"|"Rss"|"RubleSign"|"Rug"|"Ruler"|"RulerCombined"|"RulerHorizontal"|"RulerVertical"|"RupeeSign"|"RupiahSign"|"S"|"SackDollar"|"SackXmark"|"Sailboat"|"Satellite"|"SatelliteDish"|"ScaleBalanced"|"ScaleUnbalanced"|"ScaleUnbalancedFlip"|"School"|"SchoolCircleCheck"|"SchoolCircleExclamation"|"SchoolCircleXmark"|"SchoolFlag"|"SchoolLock"|"Scissors"|"Screwdriver"|"ScrewdriverWrench"|"Scroll"|"ScrollTorah"|"SdCard"|"Section"|"Seedling"|"Server"|"Shapes"|"Share"|"ShareFromSquare"|"ShareNodes"|"SheetPlastic"|"ShekelSign"|"Shield"|"ShieldCat"|"ShieldDog"|"ShieldHalved"|"ShieldHeart"|"ShieldVirus"|"Ship"|"Shirt"|"ShoePrints"|"Shop"|"ShopLock"|"ShopSlash"|"Shower"|"Shrimp"|"Shuffle"|"ShuttleSpace"|"SignHanging"|"Signal"|"Signature"|"SignsPost"|"SimCard"|"Sink"|"Sitemap"|"Skull"|"SkullCrossbones"|"Slash"|"Sleigh"|"Sliders"|"Smog"|"Smoking"|"Snowflake"|"Snowman"|"Snowplow"|"Soap"|"Socks"|"SolarPanel"|"Sort"|"SortDown"|"SortUp"|"Spa"|"SpaghettiMonsterFlying"|"SpellCheck"|"Spider"|"Spinner"|"Splotch"|"Spoon"|"SprayCan"|"SprayCanSparkles"|"Square"|"SquareArrowUpRight"|"SquareBinary"|"SquareCaretDown"|"SquareCaretLeft"|"SquareCaretRight"|"SquareCaretUp"|"SquareCheck"|"SquareEnvelope"|"SquareFull"|"SquareH"|"SquareMinus"|"SquareNfi"|"SquareParking"|"SquarePen"|"SquarePersonConfined"|"SquarePhone"|"SquarePhoneFlip"|"SquarePlus"|"SquarePollHorizontal"|"SquarePollVertical"|"SquareRootVariable"|"SquareRss"|"SquareShareNodes"|"SquareUpRight"|"SquareVirus"|"SquareXmark"|"StaffSnake"|"Stairs"|"Stamp"|"Stapler"|"Star"|"StarAndCrescent"|"StarHalf"|"StarHalfStroke"|"StarOfDavid"|"StarOfLife"|"SterlingSign"|"Stethoscope"|"Stop"|"Stopwatch"|"Stopwatch20"|"Store"|"StoreSlash"|"StreetView"|"Strikethrough"|"Stroopwafel"|"Subscript"|"Suitcase"|"SuitcaseMedical"|"SuitcaseRolling"|"Sun"|"SunPlantWilt"|"Superscript"|"Swatchbook"|"Synagogue"|"Syringe"|"T"|"Table"|"TableCells"|"TableCellsColumnLock"|"TableCellsLarge"|"TableCellsRowLock"|"TableCellsRowUnlock"|"TableColumns"|"TableList"|"TableTennisPaddleBall"|"Tablet"|"TabletButton"|"TabletScreenButton"|"Tablets"|"TachographDigital"|"Tag"|"Tags"|"Tape"|"Tarp"|"TarpDroplet"|"Taxi"|"Teeth"|"TeethOpen"|"TemperatureArrowDown"|"TemperatureArrowUp"|"TemperatureEmpty"|"TemperatureFull"|"TemperatureHalf"|"TemperatureHigh"|"TemperatureLow"|"TemperatureQuarter"|"TemperatureThreeQuarters"|"TengeSign"|"Tent"|"TentArrowDownToLine"|"TentArrowLeftRight"|"TentArrowTurnLeft"|"TentArrowsDown"|"Tents"|"Terminal"|"TextHeight"|"TextSlash"|"TextWidth"|"Thermometer"|"ThumbsDown"|"ThumbsUp"|"Thumbtack"|"ThumbtackSlash"|"Ticket"|"TicketSimple"|"Timeline"|"ToggleOff"|"ToggleOn"|"Toilet"|"ToiletPaper"|"ToiletPaperSlash"|"ToiletPortable"|"ToiletsPortable"|"Toolbox"|"Tooth"|"ToriiGate"|"Tornado"|"TowerBroadcast"|"TowerCell"|"TowerObservation"|"Tractor"|"Trademark"|"TrafficLight"|"Trailer"|"Train"|"TrainSubway"|"TrainTram"|"Transgender"|"Trash"|"TrashArrowUp"|"TrashCan"|"TrashCanArrowUp"|"Tree"|"TreeCity"|"TriangleExclamation"|"Trophy"|"Trowel"|"TrowelBricks"|"Truck"|"TruckArrowRight"|"TruckDroplet"|"TruckFast"|"TruckField"|"TruckFieldUn"|"TruckFront"|"TruckMedical"|"TruckMonster"|"TruckMoving"|"TruckPickup"|"TruckPlane"|"TruckRampBox"|"Tty"|"TurkishLiraSign"|"TurnDown"|"TurnUp"|"Tv"|"U"|"Umbrella"|"UmbrellaBeach"|"Underline"|"UniversalAccess"|"Unlock"|"UnlockKeyhole"|"UpDown"|"UpDownLeftRight"|"UpLong"|"UpRightAndDownLeftFromCenter"|"UpRightFromSquare"|"Upload"|"User"|"UserAstronaut"|"UserCheck"|"UserClock"|"UserDoctor"|"UserGear"|"UserGraduate"|"UserGroup"|"UserInjured"|"UserLarge"|"UserLargeSlash"|"UserLock"|"UserMinus"|"UserNinja"|"UserNurse"|"UserPen"|"UserPlus"|"UserSecret"|"UserShield"|"UserSlash"|"UserTag"|"UserTie"|"UserXmark"|"Users"|"UsersBetweenLines"|"UsersGear"|"UsersLine"|"UsersRays"|"UsersRectangle"|"UsersSlash"|"UsersViewfinder"|"Utensils"|"V"|"VanShuttle"|"Vault"|"VectorSquare"|"Venus"|"VenusDouble"|"VenusMars"|"Vest"|"VestPatches"|"Vial"|"VialCircleCheck"|"VialVirus"|"Vials"|"Video"|"VideoSlash"|"Vihara"|"Virus"|"VirusCovid"|"VirusCovidSlash"|"VirusSlash"|"Viruses"|"Voicemail"|"Volcano"|"Volleyball"|"VolumeHigh"|"VolumeLow"|"VolumeOff"|"VolumeXmark"|"VrCardboard"|"W"|"WalkieTalkie"|"Wallet"|"WandMagic"|"WandMagicSparkles"|"WandSparkles"|"Warehouse"|"Water"|"WaterLadder"|"WaveSquare"|"WebAwesome"|"WeightHanging"|"WeightScale"|"WheatAwn"|"WheatAwnCircleExclamation"|"Wheelchair"|"WheelchairMove"|"WhiskeyGlass"|"Wifi"|"Wind"|"WindowMaximize"|"WindowMinimize"|"WindowRestore"|"WineBottle"|"WineGlass"|"WineGlassEmpty"|"WonSign"|"Worm"|"Wrench"|"X"|"XRay"|"Xmark"|"XmarksLines"|"Y"|"YenSign"|"YinYang"|"Z"|"Search"|"Save"|"Settings"|"Cog"|"Home"|"Edit"|"Close"|"Cancel"|"Refresh"|"Warning"|"CheckCircle"|"TimesCircle"|"VolumeMute"|"Cut"|"Undo"|"Redo"|"StepForward"|"StepBackward"|"Pin"|"ZoomIn"|"ZoomOut"
 ---@overload fun(self: UIIconNode, path: "iconSize"): number
 ---@overload fun(self: UIIconNode, path: "color"): number[]
@@ -3363,14 +3363,14 @@ function UIIconNode:get_property(path) end
 ---@param path UIIconNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIIconNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIIconNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIIconNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIIconNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIIconNode, path: "rotation", value: number)
 ---@overload fun(self: UIIconNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIIconNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIIconNode, path: "paused", value: boolean)
 ---@overload fun(self: UIIconNode, path: "enabled", value: boolean)
----@overload fun(self: UIIconNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIIconNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIIconNode, path: "icon", value: "None"|"Digit0"|"Digit1"|"Digit2"|"Digit3"|"Digit4"|"Digit5"|"Digit6"|"Digit7"|"Digit8"|"Digit9"|"A"|"AddressBook"|"AddressCard"|"AlignCenter"|"AlignJustify"|"AlignLeft"|"AlignRight"|"Anchor"|"AnchorCircleCheck"|"AnchorCircleExclamation"|"AnchorCircleXmark"|"AnchorLock"|"AngleDown"|"AngleLeft"|"AngleRight"|"AngleUp"|"AnglesDown"|"AnglesLeft"|"AnglesRight"|"AnglesUp"|"Ankh"|"AppleWhole"|"Archway"|"ArrowDown"|"ArrowDown19"|"ArrowDown91"|"ArrowDownAZ"|"ArrowDownLong"|"ArrowDownShortWide"|"ArrowDownUpAcrossLine"|"ArrowDownUpLock"|"ArrowDownWideShort"|"ArrowDownZA"|"ArrowLeft"|"ArrowLeftLong"|"ArrowPointer"|"ArrowRight"|"ArrowRightArrowLeft"|"ArrowRightFromBracket"|"ArrowRightLong"|"ArrowRightToBracket"|"ArrowRightToCity"|"ArrowRotateLeft"|"ArrowRotateRight"|"ArrowTrendDown"|"ArrowTrendUp"|"ArrowTurnDown"|"ArrowTurnUp"|"ArrowUp"|"ArrowUp19"|"ArrowUp91"|"ArrowUpAZ"|"ArrowUpFromBracket"|"ArrowUpFromGroundWater"|"ArrowUpFromWaterPump"|"ArrowUpLong"|"ArrowUpRightDots"|"ArrowUpRightFromSquare"|"ArrowUpShortWide"|"ArrowUpWideShort"|"ArrowUpZA"|"ArrowsDownToLine"|"ArrowsDownToPeople"|"ArrowsLeftRight"|"ArrowsLeftRightToLine"|"ArrowsRotate"|"ArrowsSpin"|"ArrowsSplitUpAndLeft"|"ArrowsToCircle"|"ArrowsToDot"|"ArrowsToEye"|"ArrowsTurnRight"|"ArrowsTurnToDots"|"ArrowsUpDown"|"ArrowsUpDownLeftRight"|"ArrowsUpToLine"|"Asterisk"|"At"|"Atom"|"AudioDescription"|"AustralSign"|"Award"|"B"|"Baby"|"BabyCarriage"|"Backward"|"BackwardFast"|"BackwardStep"|"Bacon"|"Bacteria"|"Bacterium"|"BagShopping"|"Bahai"|"BahtSign"|"Ban"|"BanSmoking"|"Bandage"|"BangladeshiTakaSign"|"Barcode"|"Bars"|"BarsProgress"|"BarsStaggered"|"Baseball"|"BaseballBatBall"|"BasketShopping"|"Basketball"|"Bath"|"BatteryEmpty"|"BatteryFull"|"BatteryHalf"|"BatteryQuarter"|"BatteryThreeQuarters"|"Bed"|"BedPulse"|"BeerMugEmpty"|"Bell"|"BellConcierge"|"BellSlash"|"BezierCurve"|"Bicycle"|"Binoculars"|"Biohazard"|"BitcoinSign"|"Blender"|"BlenderPhone"|"Blog"|"Bold"|"Bolt"|"BoltLightning"|"Bomb"|"Bone"|"Bong"|"Book"|"BookAtlas"|"BookBible"|"BookBookmark"|"BookJournalWhills"|"BookMedical"|"BookOpen"|"BookOpenReader"|"BookQuran"|"BookSkull"|"BookTanakh"|"Bookmark"|"BorderAll"|"BorderNone"|"BorderTopLeft"|"BoreHole"|"BottleDroplet"|"BottleWater"|"BowlFood"|"BowlRice"|"BowlingBall"|"Box"|"BoxArchive"|"BoxOpen"|"BoxTissue"|"BoxesPacking"|"BoxesStacked"|"Braille"|"Brain"|"BrazilianRealSign"|"BreadSlice"|"Bridge"|"BridgeCircleCheck"|"BridgeCircleExclamation"|"BridgeCircleXmark"|"BridgeLock"|"BridgeWater"|"Briefcase"|"BriefcaseMedical"|"Broom"|"BroomBall"|"Brush"|"Bucket"|"Bug"|"BugSlash"|"Bugs"|"Building"|"BuildingCircleArrowRight"|"BuildingCircleCheck"|"BuildingCircleExclamation"|"BuildingCircleXmark"|"BuildingColumns"|"BuildingFlag"|"BuildingLock"|"BuildingNgo"|"BuildingShield"|"BuildingUn"|"BuildingUser"|"BuildingWheat"|"Bullhorn"|"Bullseye"|"Burger"|"Burst"|"Bus"|"BusSimple"|"BusinessTime"|"C"|"CableCar"|"CakeCandles"|"Calculator"|"Calendar"|"CalendarCheck"|"CalendarDay"|"CalendarDays"|"CalendarMinus"|"CalendarPlus"|"CalendarWeek"|"CalendarXmark"|"Camera"|"CameraRetro"|"CameraRotate"|"Campground"|"CandyCane"|"Cannabis"|"Capsules"|"Car"|"CarBattery"|"CarBurst"|"CarOn"|"CarRear"|"CarSide"|"CarTunnel"|"Caravan"|"CaretDown"|"CaretLeft"|"CaretRight"|"CaretUp"|"Carrot"|"CartArrowDown"|"CartFlatbed"|"CartFlatbedSuitcase"|"CartPlus"|"CartShopping"|"CashRegister"|"Cat"|"CediSign"|"CentSign"|"Certificate"|"Chair"|"Chalkboard"|"ChalkboardUser"|"ChampagneGlasses"|"ChargingStation"|"ChartArea"|"ChartBar"|"ChartColumn"|"ChartDiagram"|"ChartGantt"|"ChartLine"|"ChartPie"|"ChartSimple"|"Check"|"CheckDouble"|"CheckToSlot"|"Cheese"|"Chess"|"ChessBishop"|"ChessBoard"|"ChessKing"|"ChessKnight"|"ChessPawn"|"ChessQueen"|"ChessRook"|"ChevronDown"|"ChevronLeft"|"ChevronRight"|"ChevronUp"|"Child"|"ChildCombatant"|"ChildDress"|"ChildReaching"|"Children"|"Church"|"Circle"|"CircleArrowDown"|"CircleArrowLeft"|"CircleArrowRight"|"CircleArrowUp"|"CircleCheck"|"CircleChevronDown"|"CircleChevronLeft"|"CircleChevronRight"|"CircleChevronUp"|"CircleDollarToSlot"|"CircleDot"|"CircleDown"|"CircleExclamation"|"CircleH"|"CircleHalfStroke"|"CircleInfo"|"CircleLeft"|"CircleMinus"|"CircleNodes"|"CircleNotch"|"CirclePause"|"CirclePlay"|"CirclePlus"|"CircleQuestion"|"CircleRadiation"|"CircleRight"|"CircleStop"|"CircleUp"|"CircleUser"|"CircleXmark"|"City"|"Clapperboard"|"Clipboard"|"ClipboardCheck"|"ClipboardList"|"ClipboardQuestion"|"ClipboardUser"|"Clock"|"ClockRotateLeft"|"Clone"|"ClosedCaptioning"|"Cloud"|"CloudArrowDown"|"CloudArrowUp"|"CloudBolt"|"CloudMeatball"|"CloudMoon"|"CloudMoonRain"|"CloudRain"|"CloudShowersHeavy"|"CloudShowersWater"|"CloudSun"|"CloudSunRain"|"Clover"|"Code"|"CodeBranch"|"CodeCommit"|"CodeCompare"|"CodeFork"|"CodeMerge"|"CodePullRequest"|"Coins"|"ColonSign"|"Comment"|"CommentDollar"|"CommentDots"|"CommentMedical"|"CommentNodes"|"CommentSlash"|"CommentSms"|"Comments"|"CommentsDollar"|"CompactDisc"|"Compass"|"CompassDrafting"|"Compress"|"Computer"|"ComputerMouse"|"Cookie"|"CookieBite"|"Copy"|"Copyright"|"Couch"|"Cow"|"CreditCard"|"Crop"|"CropSimple"|"Cross"|"Crosshairs"|"Crow"|"Crown"|"Crutch"|"CruzeiroSign"|"Cube"|"Cubes"|"CubesStacked"|"D"|"Database"|"DeleteLeft"|"Democrat"|"Desktop"|"Dharmachakra"|"DiagramNext"|"DiagramPredecessor"|"DiagramProject"|"DiagramSuccessor"|"Diamond"|"DiamondTurnRight"|"Dice"|"DiceD20"|"DiceD6"|"DiceFive"|"DiceFour"|"DiceOne"|"DiceSix"|"DiceThree"|"DiceTwo"|"Disease"|"Display"|"Divide"|"Dna"|"Dog"|"DollarSign"|"Dolly"|"DongSign"|"DoorClosed"|"DoorOpen"|"Dove"|"DownLeftAndUpRightToCenter"|"DownLong"|"Download"|"Dragon"|"DrawPolygon"|"Droplet"|"DropletSlash"|"Drum"|"DrumSteelpan"|"DrumstickBite"|"Dumbbell"|"Dumpster"|"DumpsterFire"|"Dungeon"|"E"|"EarDeaf"|"EarListen"|"EarthAfrica"|"EarthAmericas"|"EarthAsia"|"EarthEurope"|"EarthOceania"|"Egg"|"Eject"|"Elevator"|"Ellipsis"|"EllipsisVertical"|"Envelope"|"EnvelopeCircleCheck"|"EnvelopeOpen"|"EnvelopeOpenText"|"EnvelopesBulk"|"Equals"|"Eraser"|"Ethernet"|"EuroSign"|"Exclamation"|"Expand"|"Explosion"|"Eye"|"EyeDropper"|"EyeLowVision"|"EyeSlash"|"F"|"FaceAngry"|"FaceDizzy"|"FaceFlushed"|"FaceFrown"|"FaceFrownOpen"|"FaceGrimace"|"FaceGrin"|"FaceGrinBeam"|"FaceGrinBeamSweat"|"FaceGrinHearts"|"FaceGrinSquint"|"FaceGrinSquintTears"|"FaceGrinStars"|"FaceGrinTears"|"FaceGrinTongue"|"FaceGrinTongueSquint"|"FaceGrinTongueWink"|"FaceGrinWide"|"FaceGrinWink"|"FaceKiss"|"FaceKissBeam"|"FaceKissWinkHeart"|"FaceLaugh"|"FaceLaughBeam"|"FaceLaughSquint"|"FaceLaughWink"|"FaceMeh"|"FaceMehBlank"|"FaceRollingEyes"|"FaceSadCry"|"FaceSadTear"|"FaceSmile"|"FaceSmileBeam"|"FaceSmileWink"|"FaceSurprise"|"FaceTired"|"Fan"|"Faucet"|"FaucetDrip"|"Fax"|"Feather"|"FeatherPointed"|"Ferry"|"File"|"FileArrowDown"|"FileArrowUp"|"FileAudio"|"FileCircleCheck"|"FileCircleExclamation"|"FileCircleMinus"|"FileCirclePlus"|"FileCircleQuestion"|"FileCircleXmark"|"FileCode"|"FileContract"|"FileCsv"|"FileExcel"|"FileExport"|"FileFragment"|"FileHalfDashed"|"FileImage"|"FileImport"|"FileInvoice"|"FileInvoiceDollar"|"FileLines"|"FileMedical"|"FilePdf"|"FilePen"|"FilePowerpoint"|"FilePrescription"|"FileShield"|"FileSignature"|"FileVideo"|"FileWaveform"|"FileWord"|"FileZipper"|"Fill"|"FillDrip"|"Film"|"Filter"|"FilterCircleDollar"|"FilterCircleXmark"|"Fingerprint"|"Fire"|"FireBurner"|"FireExtinguisher"|"FireFlameCurved"|"FireFlameSimple"|"Fish"|"FishFins"|"Flag"|"FlagCheckered"|"FlagUsa"|"Flask"|"FlaskVial"|"FloppyDisk"|"FlorinSign"|"Folder"|"FolderClosed"|"FolderMinus"|"FolderOpen"|"FolderPlus"|"FolderTree"|"Font"|"FontAwesome"|"Football"|"Forward"|"ForwardFast"|"ForwardStep"|"FrancSign"|"Frog"|"Futbol"|"G"|"Gamepad"|"GasPump"|"Gauge"|"GaugeHigh"|"GaugeSimple"|"GaugeSimpleHigh"|"Gavel"|"Gear"|"Gears"|"Gem"|"Genderless"|"Ghost"|"Gift"|"Gifts"|"GlassWater"|"GlassWaterDroplet"|"Glasses"|"Globe"|"GolfBallTee"|"Gopuram"|"GraduationCap"|"GreaterThan"|"GreaterThanEqual"|"Grip"|"GripLines"|"GripLinesVertical"|"GripVertical"|"GroupArrowsRotate"|"GuaraniSign"|"Guitar"|"Gun"|"H"|"Hammer"|"Hamsa"|"Hand"|"HandBackFist"|"HandDots"|"HandFist"|"HandHolding"|"HandHoldingDollar"|"HandHoldingDroplet"|"HandHoldingHand"|"HandHoldingHeart"|"HandHoldingMedical"|"HandLizard"|"HandMiddleFinger"|"HandPeace"|"HandPointDown"|"HandPointLeft"|"HandPointRight"|"HandPointUp"|"HandPointer"|"HandScissors"|"HandSparkles"|"HandSpock"|"Handcuffs"|"Hands"|"HandsAslInterpreting"|"HandsBound"|"HandsBubbles"|"HandsClapping"|"HandsHolding"|"HandsHoldingChild"|"HandsHoldingCircle"|"HandsPraying"|"Handshake"|"HandshakeAngle"|"HandshakeSimple"|"HandshakeSimpleSlash"|"HandshakeSlash"|"Hanukiah"|"HardDrive"|"Hashtag"|"HatCowboy"|"HatCowboySide"|"HatWizard"|"HeadSideCough"|"HeadSideCoughSlash"|"HeadSideMask"|"HeadSideVirus"|"Heading"|"Headphones"|"HeadphonesSimple"|"Headset"|"Heart"|"HeartCircleBolt"|"HeartCircleCheck"|"HeartCircleExclamation"|"HeartCircleMinus"|"HeartCirclePlus"|"HeartCircleXmark"|"HeartCrack"|"HeartPulse"|"Helicopter"|"HelicopterSymbol"|"HelmetSafety"|"HelmetUn"|"HexagonNodes"|"HexagonNodesBolt"|"Highlighter"|"HillAvalanche"|"HillRockslide"|"Hippo"|"HockeyPuck"|"HollyBerry"|"Horse"|"HorseHead"|"Hospital"|"HospitalUser"|"HotTubPerson"|"Hotdog"|"Hotel"|"Hourglass"|"HourglassEnd"|"HourglassHalf"|"HourglassStart"|"House"|"HouseChimney"|"HouseChimneyCrack"|"HouseChimneyMedical"|"HouseChimneyUser"|"HouseChimneyWindow"|"HouseCircleCheck"|"HouseCircleExclamation"|"HouseCircleXmark"|"HouseCrack"|"HouseFire"|"HouseFlag"|"HouseFloodWater"|"HouseFloodWaterCircleArrowRight"|"HouseLaptop"|"HouseLock"|"HouseMedical"|"HouseMedicalCircleCheck"|"HouseMedicalCircleExclamation"|"HouseMedicalCircleXmark"|"HouseMedicalFlag"|"HouseSignal"|"HouseTsunami"|"HouseUser"|"HryvniaSign"|"Hurricane"|"I"|"ICursor"|"IceCream"|"Icicles"|"Icons"|"IdBadge"|"IdCard"|"IdCardClip"|"Igloo"|"Image"|"ImagePortrait"|"Images"|"Inbox"|"Indent"|"IndianRupeeSign"|"Industry"|"Infinity"|"Info"|"Italic"|"J"|"Jar"|"JarWheat"|"Jedi"|"JetFighter"|"JetFighterUp"|"Joint"|"JugDetergent"|"K"|"Kaaba"|"Key"|"Keyboard"|"Khanda"|"KipSign"|"KitMedical"|"KitchenSet"|"KiwiBird"|"L"|"LandMineOn"|"Landmark"|"LandmarkDome"|"LandmarkFlag"|"Language"|"Laptop"|"LaptopCode"|"LaptopFile"|"LaptopMedical"|"LariSign"|"LayerGroup"|"Leaf"|"LeftLong"|"LeftRight"|"Lemon"|"LessThan"|"LessThanEqual"|"LifeRing"|"Lightbulb"|"LinesLeaning"|"Link"|"LinkSlash"|"LiraSign"|"List"|"ListCheck"|"ListOl"|"ListUl"|"LitecoinSign"|"LocationArrow"|"LocationCrosshairs"|"LocationDot"|"LocationPin"|"LocationPinLock"|"Lock"|"LockOpen"|"Locust"|"Lungs"|"LungsVirus"|"M"|"Magnet"|"MagnifyingGlass"|"MagnifyingGlassArrowRight"|"MagnifyingGlassChart"|"MagnifyingGlassDollar"|"MagnifyingGlassLocation"|"MagnifyingGlassMinus"|"MagnifyingGlassPlus"|"ManatSign"|"Map"|"MapLocation"|"MapLocationDot"|"MapPin"|"Marker"|"Mars"|"MarsAndVenus"|"MarsAndVenusBurst"|"MarsDouble"|"MarsStroke"|"MarsStrokeRight"|"MarsStrokeUp"|"MartiniGlass"|"MartiniGlassCitrus"|"MartiniGlassEmpty"|"Mask"|"MaskFace"|"MaskVentilator"|"MasksTheater"|"MattressPillow"|"Maximize"|"Medal"|"Memory"|"Menorah"|"Mercury"|"Message"|"Meteor"|"Microchip"|"Microphone"|"MicrophoneLines"|"MicrophoneLinesSlash"|"MicrophoneSlash"|"Microscope"|"MillSign"|"Minimize"|"Minus"|"Mitten"|"Mobile"|"MobileButton"|"MobileRetro"|"MobileScreen"|"MobileScreenButton"|"MoneyBill"|"MoneyBill1"|"MoneyBill1Wave"|"MoneyBillTransfer"|"MoneyBillTrendUp"|"MoneyBillWave"|"MoneyBillWheat"|"MoneyBills"|"MoneyCheck"|"MoneyCheckDollar"|"Monument"|"Moon"|"MortarPestle"|"Mosque"|"Mosquito"|"MosquitoNet"|"Motorcycle"|"Mound"|"Mountain"|"MountainCity"|"MountainSun"|"MugHot"|"MugSaucer"|"Music"|"N"|"NairaSign"|"NetworkWired"|"Neuter"|"Newspaper"|"NotEqual"|"Notdef"|"NoteSticky"|"NotesMedical"|"O"|"ObjectGroup"|"ObjectUngroup"|"OilCan"|"OilWell"|"Om"|"Otter"|"Outdent"|"P"|"Pager"|"PaintRoller"|"Paintbrush"|"Palette"|"Pallet"|"Panorama"|"PaperPlane"|"Paperclip"|"ParachuteBox"|"Paragraph"|"Passport"|"Paste"|"Pause"|"Paw"|"Peace"|"Pen"|"PenClip"|"PenFancy"|"PenNib"|"PenRuler"|"PenToSquare"|"Pencil"|"PeopleArrows"|"PeopleCarryBox"|"PeopleGroup"|"PeopleLine"|"PeoplePulling"|"PeopleRobbery"|"PeopleRoof"|"PepperHot"|"Percent"|"Person"|"PersonArrowDownToLine"|"PersonArrowUpFromLine"|"PersonBiking"|"PersonBooth"|"PersonBreastfeeding"|"PersonBurst"|"PersonCane"|"PersonChalkboard"|"PersonCircleCheck"|"PersonCircleExclamation"|"PersonCircleMinus"|"PersonCirclePlus"|"PersonCircleQuestion"|"PersonCircleXmark"|"PersonDigging"|"PersonDotsFromLine"|"PersonDress"|"PersonDressBurst"|"PersonDrowning"|"PersonFalling"|"PersonFallingBurst"|"PersonHalfDress"|"PersonHarassing"|"PersonHiking"|"PersonMilitaryPointing"|"PersonMilitaryRifle"|"PersonMilitaryToPerson"|"PersonPraying"|"PersonPregnant"|"PersonRays"|"PersonRifle"|"PersonRunning"|"PersonShelter"|"PersonSkating"|"PersonSkiing"|"PersonSkiingNordic"|"PersonSnowboarding"|"PersonSwimming"|"PersonThroughWindow"|"PersonWalking"|"PersonWalkingArrowLoopLeft"|"PersonWalkingArrowRight"|"PersonWalkingDashedLineArrowRight"|"PersonWalkingLuggage"|"PersonWalkingWithCane"|"PesetaSign"|"PesoSign"|"Phone"|"PhoneFlip"|"PhoneSlash"|"PhoneVolume"|"PhotoFilm"|"PiggyBank"|"Pills"|"PizzaSlice"|"PlaceOfWorship"|"Plane"|"PlaneArrival"|"PlaneCircleCheck"|"PlaneCircleExclamation"|"PlaneCircleXmark"|"PlaneDeparture"|"PlaneLock"|"PlaneSlash"|"PlaneUp"|"PlantWilt"|"PlateWheat"|"Play"|"Plug"|"PlugCircleBolt"|"PlugCircleCheck"|"PlugCircleExclamation"|"PlugCircleMinus"|"PlugCirclePlus"|"PlugCircleXmark"|"Plus"|"PlusMinus"|"Podcast"|"Poo"|"PooStorm"|"Poop"|"PowerOff"|"Prescription"|"PrescriptionBottle"|"PrescriptionBottleMedical"|"Print"|"PumpMedical"|"PumpSoap"|"PuzzlePiece"|"Q"|"Qrcode"|"Question"|"QuoteLeft"|"QuoteRight"|"R"|"Radiation"|"Radio"|"Rainbow"|"RankingStar"|"Receipt"|"RecordVinyl"|"RectangleAd"|"RectangleList"|"RectangleXmark"|"Recycle"|"Registered"|"Repeat"|"Reply"|"ReplyAll"|"Republican"|"Restroom"|"Retweet"|"Ribbon"|"RightFromBracket"|"RightLeft"|"RightLong"|"RightToBracket"|"Ring"|"Road"|"RoadBarrier"|"RoadBridge"|"RoadCircleCheck"|"RoadCircleExclamation"|"RoadCircleXmark"|"RoadLock"|"RoadSpikes"|"Robot"|"Rocket"|"Rotate"|"RotateLeft"|"RotateRight"|"Route"|"Rss"|"RubleSign"|"Rug"|"Ruler"|"RulerCombined"|"RulerHorizontal"|"RulerVertical"|"RupeeSign"|"RupiahSign"|"S"|"SackDollar"|"SackXmark"|"Sailboat"|"Satellite"|"SatelliteDish"|"ScaleBalanced"|"ScaleUnbalanced"|"ScaleUnbalancedFlip"|"School"|"SchoolCircleCheck"|"SchoolCircleExclamation"|"SchoolCircleXmark"|"SchoolFlag"|"SchoolLock"|"Scissors"|"Screwdriver"|"ScrewdriverWrench"|"Scroll"|"ScrollTorah"|"SdCard"|"Section"|"Seedling"|"Server"|"Shapes"|"Share"|"ShareFromSquare"|"ShareNodes"|"SheetPlastic"|"ShekelSign"|"Shield"|"ShieldCat"|"ShieldDog"|"ShieldHalved"|"ShieldHeart"|"ShieldVirus"|"Ship"|"Shirt"|"ShoePrints"|"Shop"|"ShopLock"|"ShopSlash"|"Shower"|"Shrimp"|"Shuffle"|"ShuttleSpace"|"SignHanging"|"Signal"|"Signature"|"SignsPost"|"SimCard"|"Sink"|"Sitemap"|"Skull"|"SkullCrossbones"|"Slash"|"Sleigh"|"Sliders"|"Smog"|"Smoking"|"Snowflake"|"Snowman"|"Snowplow"|"Soap"|"Socks"|"SolarPanel"|"Sort"|"SortDown"|"SortUp"|"Spa"|"SpaghettiMonsterFlying"|"SpellCheck"|"Spider"|"Spinner"|"Splotch"|"Spoon"|"SprayCan"|"SprayCanSparkles"|"Square"|"SquareArrowUpRight"|"SquareBinary"|"SquareCaretDown"|"SquareCaretLeft"|"SquareCaretRight"|"SquareCaretUp"|"SquareCheck"|"SquareEnvelope"|"SquareFull"|"SquareH"|"SquareMinus"|"SquareNfi"|"SquareParking"|"SquarePen"|"SquarePersonConfined"|"SquarePhone"|"SquarePhoneFlip"|"SquarePlus"|"SquarePollHorizontal"|"SquarePollVertical"|"SquareRootVariable"|"SquareRss"|"SquareShareNodes"|"SquareUpRight"|"SquareVirus"|"SquareXmark"|"StaffSnake"|"Stairs"|"Stamp"|"Stapler"|"Star"|"StarAndCrescent"|"StarHalf"|"StarHalfStroke"|"StarOfDavid"|"StarOfLife"|"SterlingSign"|"Stethoscope"|"Stop"|"Stopwatch"|"Stopwatch20"|"Store"|"StoreSlash"|"StreetView"|"Strikethrough"|"Stroopwafel"|"Subscript"|"Suitcase"|"SuitcaseMedical"|"SuitcaseRolling"|"Sun"|"SunPlantWilt"|"Superscript"|"Swatchbook"|"Synagogue"|"Syringe"|"T"|"Table"|"TableCells"|"TableCellsColumnLock"|"TableCellsLarge"|"TableCellsRowLock"|"TableCellsRowUnlock"|"TableColumns"|"TableList"|"TableTennisPaddleBall"|"Tablet"|"TabletButton"|"TabletScreenButton"|"Tablets"|"TachographDigital"|"Tag"|"Tags"|"Tape"|"Tarp"|"TarpDroplet"|"Taxi"|"Teeth"|"TeethOpen"|"TemperatureArrowDown"|"TemperatureArrowUp"|"TemperatureEmpty"|"TemperatureFull"|"TemperatureHalf"|"TemperatureHigh"|"TemperatureLow"|"TemperatureQuarter"|"TemperatureThreeQuarters"|"TengeSign"|"Tent"|"TentArrowDownToLine"|"TentArrowLeftRight"|"TentArrowTurnLeft"|"TentArrowsDown"|"Tents"|"Terminal"|"TextHeight"|"TextSlash"|"TextWidth"|"Thermometer"|"ThumbsDown"|"ThumbsUp"|"Thumbtack"|"ThumbtackSlash"|"Ticket"|"TicketSimple"|"Timeline"|"ToggleOff"|"ToggleOn"|"Toilet"|"ToiletPaper"|"ToiletPaperSlash"|"ToiletPortable"|"ToiletsPortable"|"Toolbox"|"Tooth"|"ToriiGate"|"Tornado"|"TowerBroadcast"|"TowerCell"|"TowerObservation"|"Tractor"|"Trademark"|"TrafficLight"|"Trailer"|"Train"|"TrainSubway"|"TrainTram"|"Transgender"|"Trash"|"TrashArrowUp"|"TrashCan"|"TrashCanArrowUp"|"Tree"|"TreeCity"|"TriangleExclamation"|"Trophy"|"Trowel"|"TrowelBricks"|"Truck"|"TruckArrowRight"|"TruckDroplet"|"TruckFast"|"TruckField"|"TruckFieldUn"|"TruckFront"|"TruckMedical"|"TruckMonster"|"TruckMoving"|"TruckPickup"|"TruckPlane"|"TruckRampBox"|"Tty"|"TurkishLiraSign"|"TurnDown"|"TurnUp"|"Tv"|"U"|"Umbrella"|"UmbrellaBeach"|"Underline"|"UniversalAccess"|"Unlock"|"UnlockKeyhole"|"UpDown"|"UpDownLeftRight"|"UpLong"|"UpRightAndDownLeftFromCenter"|"UpRightFromSquare"|"Upload"|"User"|"UserAstronaut"|"UserCheck"|"UserClock"|"UserDoctor"|"UserGear"|"UserGraduate"|"UserGroup"|"UserInjured"|"UserLarge"|"UserLargeSlash"|"UserLock"|"UserMinus"|"UserNinja"|"UserNurse"|"UserPen"|"UserPlus"|"UserSecret"|"UserShield"|"UserSlash"|"UserTag"|"UserTie"|"UserXmark"|"Users"|"UsersBetweenLines"|"UsersGear"|"UsersLine"|"UsersRays"|"UsersRectangle"|"UsersSlash"|"UsersViewfinder"|"Utensils"|"V"|"VanShuttle"|"Vault"|"VectorSquare"|"Venus"|"VenusDouble"|"VenusMars"|"Vest"|"VestPatches"|"Vial"|"VialCircleCheck"|"VialVirus"|"Vials"|"Video"|"VideoSlash"|"Vihara"|"Virus"|"VirusCovid"|"VirusCovidSlash"|"VirusSlash"|"Viruses"|"Voicemail"|"Volcano"|"Volleyball"|"VolumeHigh"|"VolumeLow"|"VolumeOff"|"VolumeXmark"|"VrCardboard"|"W"|"WalkieTalkie"|"Wallet"|"WandMagic"|"WandMagicSparkles"|"WandSparkles"|"Warehouse"|"Water"|"WaterLadder"|"WaveSquare"|"WebAwesome"|"WeightHanging"|"WeightScale"|"WheatAwn"|"WheatAwnCircleExclamation"|"Wheelchair"|"WheelchairMove"|"WhiskeyGlass"|"Wifi"|"Wind"|"WindowMaximize"|"WindowMinimize"|"WindowRestore"|"WineBottle"|"WineGlass"|"WineGlassEmpty"|"WonSign"|"Worm"|"Wrench"|"X"|"XRay"|"Xmark"|"XmarksLines"|"Y"|"YenSign"|"YinYang"|"Z"|"Search"|"Save"|"Settings"|"Cog"|"Home"|"Edit"|"Close"|"Cancel"|"Refresh"|"Warning"|"CheckCircle"|"TimesCircle"|"VolumeMute"|"Cut"|"Undo"|"Redo"|"StepForward"|"StepBackward"|"Pin"|"ZoomIn"|"ZoomOut")
 ---@overload fun(self: UIIconNode, path: "iconSize", value: number)
 ---@overload fun(self: UIIconNode, path: "color", value: number[])
@@ -3378,31 +3378,31 @@ function UIIconNode:get_property(path) end
 function UIIconNode:set_property(path, value, y) end
 
 ---@alias UIToolbarNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "activeToggleId" # integer - Id of the pressed toggle button.
----| "buttonSize" # number[] - Size of each button (px).
+---| "buttonSize" # Vec2 - Size of each button (px).
 ---| "spacing" # number - Gap between items (px).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UIToolbarNodeProperty|string
 ---@return any
----@overload fun(self: UIToolbarNode, path: "position"): number[]
----@overload fun(self: UIToolbarNode, path: "scale"): number[]
+---@overload fun(self: UIToolbarNode, path: "position"): Vec2
+---@overload fun(self: UIToolbarNode, path: "scale"): Vec2
 ---@overload fun(self: UIToolbarNode, path: "rotation"): number
 ---@overload fun(self: UIToolbarNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UIToolbarNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIToolbarNode, path: "paused"): boolean
 ---@overload fun(self: UIToolbarNode, path: "enabled"): boolean
----@overload fun(self: UIToolbarNode, path: "size"): number[]
+---@overload fun(self: UIToolbarNode, path: "size"): Vec2
 ---@overload fun(self: UIToolbarNode, path: "activeToggleId"): integer
----@overload fun(self: UIToolbarNode, path: "buttonSize"): number[]
+---@overload fun(self: UIToolbarNode, path: "buttonSize"): Vec2
 ---@overload fun(self: UIToolbarNode, path: "spacing"): number
 function UIToolbarNode:get_property(path) end
 
@@ -3410,28 +3410,28 @@ function UIToolbarNode:get_property(path) end
 ---@param path UIToolbarNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UIToolbarNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UIToolbarNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UIToolbarNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIToolbarNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToolbarNode, path: "rotation", value: number)
 ---@overload fun(self: UIToolbarNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UIToolbarNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIToolbarNode, path: "paused", value: boolean)
 ---@overload fun(self: UIToolbarNode, path: "enabled", value: boolean)
----@overload fun(self: UIToolbarNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UIToolbarNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToolbarNode, path: "activeToggleId", value: integer)
----@overload fun(self: UIToolbarNode, path: "buttonSize", x: number|number[], y?: number)
+---@overload fun(self: UIToolbarNode, path: "buttonSize", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToolbarNode, path: "spacing", value: number)
 function UIToolbarNode:set_property(path, value, y) end
 
 ---@alias UITabContainerNodeProperty
----| "position" # number[] - Position relative to the parent, in pixels (+y is down).
----| "scale" # number[] - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "size" # number[] - Width and height (px).
+---| "size" # Vec2 - Width and height (px).
 ---| "title" # string - Header text.
 ---| "direction" # "Vertical"|"Horizontal"|"Grid" - Children are laid out in a column, a row or a grid.
 ---| "alignment" # "Start"|"Center"|"End"|"Stretch" - Where children sit across the layout direction.
@@ -3457,14 +3457,14 @@ function UIToolbarNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path UITabContainerNodeProperty|string
 ---@return any
----@overload fun(self: UITabContainerNode, path: "position"): number[]
----@overload fun(self: UITabContainerNode, path: "scale"): number[]
+---@overload fun(self: UITabContainerNode, path: "position"): Vec2
+---@overload fun(self: UITabContainerNode, path: "scale"): Vec2
 ---@overload fun(self: UITabContainerNode, path: "rotation"): number
 ---@overload fun(self: UITabContainerNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
 ---@overload fun(self: UITabContainerNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UITabContainerNode, path: "paused"): boolean
 ---@overload fun(self: UITabContainerNode, path: "enabled"): boolean
----@overload fun(self: UITabContainerNode, path: "size"): number[]
+---@overload fun(self: UITabContainerNode, path: "size"): Vec2
 ---@overload fun(self: UITabContainerNode, path: "title"): string
 ---@overload fun(self: UITabContainerNode, path: "direction"): "Vertical"|"Horizontal"|"Grid"
 ---@overload fun(self: UITabContainerNode, path: "alignment"): "Start"|"Center"|"End"|"Stretch"
@@ -3492,14 +3492,14 @@ function UITabContainerNode:get_property(path) end
 ---@param path UITabContainerNodeProperty|string
 ---@param value any
 ---@param y? number
----@overload fun(self: UITabContainerNode, path: "position", x: number|number[], y?: number)
----@overload fun(self: UITabContainerNode, path: "scale", x: number|number[], y?: number)
+---@overload fun(self: UITabContainerNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UITabContainerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITabContainerNode, path: "rotation", value: number)
 ---@overload fun(self: UITabContainerNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
 ---@overload fun(self: UITabContainerNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UITabContainerNode, path: "paused", value: boolean)
 ---@overload fun(self: UITabContainerNode, path: "enabled", value: boolean)
----@overload fun(self: UITabContainerNode, path: "size", x: number|number[], y?: number)
+---@overload fun(self: UITabContainerNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITabContainerNode, path: "title", value: string)
 ---@overload fun(self: UITabContainerNode, path: "direction", value: "Vertical"|"Horizontal"|"Grid")
 ---@overload fun(self: UITabContainerNode, path: "alignment", value: "Start"|"Center"|"End"|"Stretch")
@@ -5200,6 +5200,150 @@ GradientModule = {}
 ---@return number b
 ---@return number a
 function GradientModule.sample(stops, t) end
+
+
+-- ----------------------------------------------------------------------------
+-- Vectors: Vec2 / Vec3 / Vec4 (vector properties come back as Vec2; setters
+-- taking x, y also take a vector). v[1] / v[2] work too.
+-- ----------------------------------------------------------------------------
+
+---A 2D vector: v.x, v.y (also v[1]...); + - * / with a vector or a number.
+---@class Vec2
+---@field x number
+---@field y number
+---@operator add(Vec2|number): Vec2
+---@operator sub(Vec2|number): Vec2
+---@operator mul(Vec2|number): Vec2
+---@operator div(Vec2|number): Vec2
+---@operator unm: Vec2
+local Vec2_ = {}
+---@return number
+function Vec2_:length() end
+---@return number
+function Vec2_:length_squared() end
+---A vector of length 1 in the same direction (zero stays zero).
+---@return Vec2
+function Vec2_:normalized() end
+---@param other Vec2
+---@return number
+function Vec2_:dot(other) end
+---@param other Vec2
+---@return number
+function Vec2_:distance(other) end
+---@param other Vec2
+---@param t number 0..1
+---@return Vec2
+function Vec2_:lerp(other, t) end
+---@return Vec2
+function Vec2_:copy() end
+---The components as values: `local x, y = v:unpack()`.
+---@return number ...
+function Vec2_:unpack() end
+
+---A 3D vector: v.x, v.y, v.z (also v[1]...); + - * / with a vector or a number.
+---@class Vec3
+---@field x number
+---@field y number
+---@field z number
+---@operator add(Vec3|number): Vec3
+---@operator sub(Vec3|number): Vec3
+---@operator mul(Vec3|number): Vec3
+---@operator div(Vec3|number): Vec3
+---@operator unm: Vec3
+local Vec3_ = {}
+---@return number
+function Vec3_:length() end
+---@return number
+function Vec3_:length_squared() end
+---A vector of length 1 in the same direction (zero stays zero).
+---@return Vec3
+function Vec3_:normalized() end
+---@param other Vec3
+---@return number
+function Vec3_:dot(other) end
+---@param other Vec3
+---@return number
+function Vec3_:distance(other) end
+---@param other Vec3
+---@param t number 0..1
+---@return Vec3
+function Vec3_:lerp(other, t) end
+---@return Vec3
+function Vec3_:copy() end
+---The components as values: `local x, y = v:unpack()`.
+---@return number ...
+function Vec3_:unpack() end
+
+---A 4D vector: v.x, v.y, v.z, v.w (also v[1]...); + - * / with a vector or a number.
+---@class Vec4
+---@field x number
+---@field y number
+---@field z number
+---@field w number
+---@operator add(Vec4|number): Vec4
+---@operator sub(Vec4|number): Vec4
+---@operator mul(Vec4|number): Vec4
+---@operator div(Vec4|number): Vec4
+---@operator unm: Vec4
+local Vec4_ = {}
+---@return number
+function Vec4_:length() end
+---@return number
+function Vec4_:length_squared() end
+---A vector of length 1 in the same direction (zero stays zero).
+---@return Vec4
+function Vec4_:normalized() end
+---@param other Vec4
+---@return number
+function Vec4_:dot(other) end
+---@param other Vec4
+---@return number
+function Vec4_:distance(other) end
+---@param other Vec4
+---@param t number 0..1
+---@return Vec4
+function Vec4_:lerp(other, t) end
+---@return Vec4
+function Vec4_:copy() end
+---The components as values: `local x, y = v:unpack()`.
+---@return number ...
+function Vec4_:unpack() end
+
+---The angle of the vector in degrees (0 = right, 90 = down).
+---@return number
+function Vec2_:angle() end
+---The vector rotated by degrees (clockwise on screen).
+---@param degrees number
+---@return Vec2
+function Vec2_:rotated(degrees) end
+
+---Makes a Vec2: `Vec2(3, 4)`; constants Vec2.ZERO, ONE, UP, DOWN, LEFT, RIGHT.
+---@class Vec2Constructor
+---@overload fun(x?: number, y?: number): Vec2
+---@field ZERO Vec2
+---@field ONE Vec2
+---@field UP Vec2
+---@field DOWN Vec2
+---@field LEFT Vec2
+---@field RIGHT Vec2
+---@field new fun(x?: number, y?: number): Vec2
+
+---Makes a Vec3: `Vec3(1, 2, 3)`.
+---@class Vec3Constructor
+---@overload fun(x?: number, y?: number, z?: number): Vec3
+---@field new fun(x?: number, y?: number, z?: number): Vec3
+
+---Makes a Vec4: `Vec4(1, 2, 3, 4)`.
+---@class Vec4Constructor
+---@overload fun(x?: number, y?: number, z?: number, w?: number): Vec4
+---@field new fun(x?: number, y?: number, z?: number, w?: number): Vec4
+
+---@type Vec2Constructor
+Vec2 = {}
+---@type Vec3Constructor
+Vec3 = {}
+---@type Vec4Constructor
+Vec4 = {}
 
 ---@type CurveModule
 Curve = CurveModule

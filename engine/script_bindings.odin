@@ -144,8 +144,7 @@ lua_node_set_position :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
-	x := f32(lua.tonumber(L, 2))
-	y := f32(lua.tonumber(L, 3))
+	x, y := arg_xy(L, 2) // two numbers or a vector
 	node.position = {x, y}
 	return 0
 }
@@ -155,8 +154,7 @@ lua_node_translate :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
-	dx := f32(lua.tonumber(L, 2))
-	dy := f32(lua.tonumber(L, 3))
+	dx, dy := arg_xy(L, 2) // two numbers or a vector
 	node.position.x += dx
 	node.position.y += dy
 	return 0
@@ -213,8 +211,7 @@ lua_node_set_scale :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
-	sx := f32(lua.tonumber(L, 2))
-	sy := f32(lua.tonumber(L, 3))
+	sx, sy := arg_xy(L, 2) // two numbers or a vector
 	if lua.gettop(L) == 2 {
 		sy = sx
 	}
@@ -435,8 +432,7 @@ lua_node_apply_force :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
-	fx := f32(lua.tonumber(L, 2))
-	fy := f32(lua.tonumber(L, 3))
+	fx, fy := arg_xy(L, 2) // two numbers or a vector
 
 	if node.typeId == DynamicBodyNode {
 		dynBody := cast(^DynamicBodyNode)node
@@ -452,8 +448,7 @@ lua_node_apply_impulse :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
-	ix := f32(lua.tonumber(L, 2))
-	iy := f32(lua.tonumber(L, 3))
+	ix, iy := arg_xy(L, 2) // two numbers or a vector
 
 	if node.typeId == DynamicBodyNode {
 		dynBody := cast(^DynamicBodyNode)node
@@ -497,8 +492,7 @@ lua_node_set_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
-	vx := f32(lua.tonumber(L, 2))
-	vy := f32(lua.tonumber(L, 3))
+	vx, vy := arg_xy(L, 2) // two numbers or a vector
 	if node.typeId == DynamicBodyNode {
 		dynBody := cast(^DynamicBodyNode)node
 		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
@@ -741,8 +735,7 @@ lua_node_character_set_velocity :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CharacterMoverNode do return 0
-	vx := f32(lua.tonumber(L, 2))
-	vy := f32(lua.tonumber(L, 3))
+	vx, vy := arg_xy(L, 2) // two numbers or a vector
 	cm := cast(^CharacterMoverNode)node
 	cm.velocity = {vx, vy}
 	return 0
@@ -1015,8 +1008,7 @@ lua_node_raycast_set_direction :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != RaycastNode do return 0
-	dx := f32(lua.tonumber(L, 2))
-	dy := f32(lua.tonumber(L, 3))
+	dx, dy := arg_xy(L, 2) // two numbers or a vector
 	rc := cast(^RaycastNode)node
 	rc.direction = {dx, dy}
 	return 0
@@ -1116,8 +1108,7 @@ lua_node_texture_set_origin :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TextureNode do return 0
-	ox := f32(lua.tonumber(L, 2))
-	oy := f32(lua.tonumber(L, 3))
+	ox, oy := arg_xy(L, 2) // two numbers or a vector
 	tex := cast(^TextureNode)node
 	Node_SetOriginPx(tex, {ox, oy}, tex.size) // pixels -> the node's origin
 	return 0
@@ -1613,8 +1604,7 @@ lua_node_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
-	tx := f32(lua.tonumber(L, 2))
-	ty := f32(lua.tonumber(L, 3))
+	tx, ty := arg_xy(L, 2) // two numbers or a vector
 	CameraNode_SetTargetPosition(cast(^CameraNode)node, {tx, ty})
 	return 0
 }
@@ -1656,10 +1646,8 @@ lua_node_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
-	l := f32(lua.tonumber(L, 2))
-	r := f32(lua.tonumber(L, 3))
-	t := f32(lua.tonumber(L, 4))
-	b := f32(lua.tonumber(L, 5))
+	l, r := arg_xy(L, 2) // two numbers or a vector
+	t, b := arg_xy(L, 4) // two numbers or a vector
 	CameraNode_SetLimits(cast(^CameraNode)node, l, r, t, b)
 	return 0
 }
@@ -1703,8 +1691,7 @@ lua_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	cam := get_current_camera(L)
 	if cam == nil do return 0
-	x := f32(lua.tonumber(L, 1))
-	y := f32(lua.tonumber(L, 2))
+	x, y := arg_xy(L, 1) // two numbers or a vector
 	CameraNode_SetTargetPosition(cam, {x, y})
 	return 0
 }
@@ -1762,8 +1749,7 @@ lua_camera_set_offset :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	cam := get_current_camera(L)
 	if cam != nil {
-		ox := f32(lua.tonumber(L, 1))
-		oy := f32(lua.tonumber(L, 2))
+		ox, oy := arg_xy(L, 1) // two numbers or a vector
 		CameraNode_SetOffset(cam, {ox, oy})
 	}
 	return 0
@@ -1831,10 +1817,8 @@ lua_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	cam := get_current_camera(L)
 	if cam != nil {
-		l := f32(lua.tonumber(L, 1))
-		r := f32(lua.tonumber(L, 2))
-		t := f32(lua.tonumber(L, 3))
-		b := f32(lua.tonumber(L, 4))
+		l, r := arg_xy(L, 1) // two numbers or a vector
+		t, b := arg_xy(L, 3) // two numbers or a vector
 		CameraNode_SetLimits(cam, l, r, t, b)
 	}
 	return 0
@@ -1854,8 +1838,7 @@ lua_camera_clear_limits :: proc "c" (L: ^lua.State) -> c.int {
 lua_camera_screen_to_world :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	cam := get_current_camera(L)
-	sx := f32(lua.tonumber(L, 1))
-	sy := f32(lua.tonumber(L, 2))
+	sx, sy := arg_xy(L, 1) // two numbers or a vector
 	if cam == nil {
 		lua.pushnumber(L, lua.Number(sx))
 		lua.pushnumber(L, lua.Number(sy))
@@ -1871,8 +1854,7 @@ lua_camera_screen_to_world :: proc "c" (L: ^lua.State) -> c.int {
 lua_camera_world_to_screen :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	cam := get_current_camera(L)
-	wx := f32(lua.tonumber(L, 1))
-	wy := f32(lua.tonumber(L, 2))
+	wx, wy := arg_xy(L, 1) // two numbers or a vector
 	if cam == nil {
 		lua.pushnumber(L, lua.Number(wx))
 		lua.pushnumber(L, lua.Number(wy))
@@ -1954,8 +1936,7 @@ lua_physics_set_gravity :: proc "c" (L: ^lua.State) -> c.int {
 	context = runtime.default_context()
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil do return 0
-	gx := f32(lua.tonumber(L, 1))
-	gy := f32(lua.tonumber(L, 2))
+	gx, gy := arg_xy(L, 1) // two numbers or a vector
 	sm.game.physicsWorld.gravity = {gx, gy}
 	PhysicsWorld_SyncSettings(&sm.game.physicsWorld)
 	return 0
@@ -2011,10 +1992,8 @@ lua_physics_raycast :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 
-	startX := f32(lua.tonumber(L, 1))
-	startY := f32(lua.tonumber(L, 2))
-	endX := f32(lua.tonumber(L, 3))
-	endY := f32(lua.tonumber(L, 4))
+	startX, startY := arg_xy(L, 1) // two numbers or a vector
+	endX, endY := arg_xy(L, 3) // two numbers or a vector
 
 	origin := [2]f32{startX, startY}
 	translation := [2]f32{endX - startX, endY - startY}
@@ -2849,10 +2828,8 @@ lua_node_set_property :: proc "c" (L: ^lua.State) -> c.int {
 	case .Int:   Property_SetInt(p, i64(lua.tointeger(L, 3)))
 	case .Bool:  (^bool)(p.ptr)^ = bool(lua.toboolean(L, 3))
 	case .Vec2:
-		v: [2]f32
-		if lua.type(L, 3) == .TABLE do v = {tbl(L, 1), tbl(L, 2)}
-		else do v = {num(L, 3), num(L, 4)}
-		(^[2]f32)(p.ptr)^ = v
+		x, y := arg_xy(L, 3) // x, y or a vector ({x =, y =} / {x, y})
+		(^[2]f32)(p.ptr)^ = {x, y}
 	case .Color:
 		ch :: proc(v: f32) -> u8 {return u8(clamp(v, 0, 1) * 255 + 0.5)}
 		if lua.type(L, 3) == .TABLE {
@@ -2898,10 +2875,7 @@ lua_node_get_property :: proc "c" (L: ^lua.State) -> c.int {
 	case .Int:   lua.pushinteger(L, lua.Integer(Property_GetInt(p)))
 	case .Bool:  lua.pushboolean(L, b32((^bool)(p.ptr)^))
 	case .Vec2:
-		v := (^[2]f32)(p.ptr)^
-		lua.createtable(L, 2, 0)
-		lua.pushnumber(L, lua.Number(v.x)); lua.rawseti(L, -2, 1)
-		lua.pushnumber(L, lua.Number(v.y)); lua.rawseti(L, -2, 2)
+		Lua_PushVec2(L, (^[2]f32)(p.ptr)^) // a Vec2 (v.x / v[1])
 	case .Color:
 		col := (^rl.Color)(p.ptr)^
 		lua.createtable(L, 4, 0)

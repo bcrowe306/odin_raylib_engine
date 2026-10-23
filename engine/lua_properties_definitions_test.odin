@@ -49,7 +49,7 @@ test_lua_node_properties_definitions :: proc(t: ^testing.T) {
 		for p in props {
 			ty := lua_prop_type(p)
 			if ty == "" do continue
-			if p.kind == .Vec2 do fmt.sbprintf(&sb, "---@overload fun(self: %s, path: %q, x: number|number[], y?: number)\n", cls, p.name)
+			if p.kind == .Vec2 do fmt.sbprintf(&sb, "---@overload fun(self: %s, path: %q, x: number|Vec2|number[], y?: number)\n", cls, p.name)
 			else do fmt.sbprintf(&sb, "---@overload fun(self: %s, path: %q, value: %s)\n", cls, p.name, ty)
 		}
 		fmt.sbprintf(&sb, "function %s:set_property(path, value, y) end\n", cls)
@@ -76,7 +76,7 @@ lua_prop_type :: proc(p: Node_Property) -> string {
 	case .Float:  return "number"
 	case .Int:    return "integer"
 	case .Bool:   return "boolean"
-	case .Vec2:   return "number[]"
+	case .Vec2:   return "Vec2"
 	case .Color:  return "number[]"
 	case .String: return "string"
 	case .Enum:

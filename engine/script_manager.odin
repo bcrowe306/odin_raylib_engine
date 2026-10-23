@@ -29,6 +29,7 @@ ScriptManager_Init :: proc(sm: ^ScriptManager = nil, game: ^Game = nil) -> bool 
 	ScriptVFS_Init()
 	ScriptVFS_RegisterLuaSearcher(mgr.L)
 	RegisterEngineLuaBindings(mgr.L, mgr)
+	Lua_RegisterVectors(mgr.L) // Vec2 / Vec3 / Vec4
 	_ = lua.L_dostring(mgr.L, LUA_CURVE_HELPERS)
 
 	mgr.game = game
@@ -292,9 +293,7 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 			lua.pushnumber(L, lua.Number(val.valColor.b)); lua.rawseti(L, -2, 3)
 			lua.pushnumber(L, lua.Number(val.valColor.a)); lua.rawseti(L, -2, 4)
 		case .Vector2:
-			lua.createtable(L, 2, 0)
-			lua.pushnumber(L, lua.Number(val.valVec2.x)); lua.rawseti(L, -2, 1)
-			lua.pushnumber(L, lua.Number(val.valVec2.y)); lua.rawseti(L, -2, 2)
+			Lua_PushVec2(L, val.valVec2) // a Vec2 (v.x / v[1])
 		}
 		lua.setfield(L, instanceTableIdx, propNameC)
 	}
@@ -530,9 +529,7 @@ ScriptInstance_SetProperty :: proc(inst: ^ScriptInstance, name: string, val: Scr
 		lua.pushnumber(L, lua.Number(val.valColor.b)); lua.rawseti(L, -2, 3)
 		lua.pushnumber(L, lua.Number(val.valColor.a)); lua.rawseti(L, -2, 4)
 	case .Vector2:
-		lua.createtable(L, 2, 0)
-		lua.pushnumber(L, lua.Number(val.valVec2.x)); lua.rawseti(L, -2, 1)
-		lua.pushnumber(L, lua.Number(val.valVec2.y)); lua.rawseti(L, -2, 2)
+		Lua_PushVec2(L, val.valVec2)
 	}
 	lua.setfield(L, -2, propNameC)
 	lua.pop(L, 1) // pop self
