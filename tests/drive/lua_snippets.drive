@@ -34,11 +34,12 @@ expect item:code.snippet-hint == visible
 screenshot hint
 key tab
 expect code.text contains Tween.to(self.node, "position", {0, 0}, 0.5, "out_quad")
+# (a word nothing completes: an open list would take the Tab)
 key tab
-type scale
+type qzscale
 key tab
 type {2, 2}
-expect code.text contains Tween.to(self.node, "scale", {2, 2}, 0.5, "out_quad")
+expect code.text contains Tween.to(self.node, "qzscale", {2, 2}, 0.5, "out_quad")
 key esc
 key end
 key enter
