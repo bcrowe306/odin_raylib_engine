@@ -588,7 +588,8 @@ template - Empty, Platformer or Top-Down Character, Enemy Patrol, UI Menu, Picku
 Trigger - with a preview; templates made for the node's type are starred and picked first.
 **F1** on an API name opens the **Scripting Reference** window (also Help > Scripting Reference):
 `engine/SCRIPTING.md` by section with search, rendered as markdown (headings, **bold**, `code`,
-code blocks, lists, tables - `markdown_view.odin` on libcmark), the function's signature,
+code blocks, lists, tables - `markdown_view.odin` on libcmark; Lua code blocks and inline code
+syntax-highlighted in the Code tab's colours), the function's signature,
 description, example and parameters in a card on top. The window has its own background,
 border and shadow. Snippets: `ready`, `update`, `connect`, `properties`, `tween`, `on`, `method` + **Tab** expand
 (placeholders follow with Tab; see `engine/SCRIPTING.md`). Completion, signature help, hover,

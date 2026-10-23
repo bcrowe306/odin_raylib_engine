@@ -4,6 +4,7 @@ import "core:fmt"
 import vmem "core:mem/virtual"
 import "core:strings"
 import cm "vendor:commonmark"
+import syn "../odin_editor/syntax"
 import imgui "lib/imgui"
 
 // ============================================================================
@@ -12,6 +13,8 @@ import imgui "lib/imgui"
 // emphasis, `code`, links), fenced code, bullet / numbered lists, quotes,
 // rules - plus GitHub-style pipe tables (not CommonMark: read from the
 // paragraph's lines). Drawn with ImGui, wrapped to the available width.
+// Lua (and Odin) code blocks and inline `code` are syntax highlighted with
+// the Code tab's tokenizer and colours.
 // ============================================================================
 
 Md_Style :: enum {
@@ -42,8 +45,14 @@ Md_Block :: struct {
 	quote:  bool,
 	spans:  [dynamic]Md_Span,
 	code:   string,    // code block text
+	lines:  [dynamic]Md_Code_Line, // code block lines, tokenized (Lua / Odin)
 	rows:   [dynamic][dynamic][dynamic]Md_Span, // table: rows -> cells -> spans
 	plain:  string,    // the block's text (search / highlight)
+}
+
+Md_Code_Line :: struct {
+	text:   string,
+	tokens: []syn.Token, // nil = plain
 }
 
 Md_Doc :: struct {
@@ -105,8 +114,10 @@ md_blocks :: proc(doc: ^Md_Doc, parent: ^cm.Node, indent: int, quote: bool, line
 			b.plain = md_plain(b.spans[:])
 			append(&doc.blocks, b)
 		case .Code_Block:
-			code := strings.trim_right(string(cm.node_get_literal(n)), "\n")
-			append(&doc.blocks, Md_Block{kind = .Code, indent = indent, code = strings.clone(code), plain = strings.clone(code)})
+			code := strings.clone(strings.trim_right(string(cm.node_get_literal(n)), "\n"))
+			b := Md_Block{kind = .Code, indent = indent, code = code, plain = code}
+			md_tokenize(&b.lines, code, string(cm.node_get_fence_info(n)))
+			append(&doc.blocks, b)
 		case .Thematic_Break:
 			append(&doc.blocks, Md_Block{kind = .Rule})
 		case .Block_Quote:
@@ -123,6 +134,47 @@ md_blocks :: proc(doc: ^Md_Doc, parent: ^cm.Node, indent: int, quote: bool, line
 			md_blocks(doc, n, indent, quote, lines, nil, mark)
 		}
 	}
+}
+
+// md_tokenize splits a code block into lines, tokenized for lua (the
+// default: an untagged block in these docs is Lua) and odin fences.
+@(private = "file")
+md_tokenize :: proc(out: ^[dynamic]Md_Code_Line, code, info: string) {
+	lang := strings.to_lower(strings.trim_space(info), context.temp_allocator)
+	tokenize: proc(line: string, state: int, allocator := context.allocator) -> ([]syn.Token, int)
+	switch lang {
+	case "", "lua": tokenize = proc(line: string, state: int, allocator := context.allocator) -> ([]syn.Token, int) {return syn.tokenize_lua_line(line, state, allocator)}
+	case "odin": tokenize = proc(line: string, state: int, allocator := context.allocator) -> ([]syn.Token, int) {return syn.tokenize_odin_line(line, state, allocator)}
+	}
+	state := 0
+	for line in strings.split_lines(code, context.temp_allocator) {
+		l := Md_Code_Line{text = line}
+		if tokenize != nil do l.tokens, state = tokenize(line, state)
+		append(out, l)
+	}
+}
+
+// md_draw_code draws one line of code at pos in the current (code) font:
+// tokens in their syntax colours, the gaps in the default colour.
+@(private = "file")
+md_draw_code :: proc(dl: ^imgui.DrawList, pos: [2]f32, text: string, tokens: []syn.Token, plain: u32) -> f32 {
+	x := pos.x
+	put :: proc(dl: ^imgui.DrawList, x: ^f32, y: f32, s: string, col: u32) {
+		if len(s) == 0 do return
+		cs := strings.clone_to_cstring(s, context.temp_allocator)
+		imgui.DrawList_AddText(dl, {x^, y}, col, cs)
+		x^ += imgui.CalcTextSize(cs).x
+	}
+	at := 0
+	for t in tokens {
+		if t.start < at || t.end > len(text) do continue
+		put(dl, &x, pos.y, text[at:t.start], plain)
+		col := plain if t.kind == .Identifier || t.kind == .Default else code_token_color(t.kind)
+		put(dl, &x, pos.y, text[t.start:t.end], col)
+		at = t.end
+	}
+	put(dl, &x, pos.y, text[at:], plain)
+	return x - pos.x
 }
 
 @(private = "file")
@@ -252,9 +304,14 @@ md_draw_block :: proc(b: ^Md_Block, hit: bool) {
 		imgui.Dummy({0, 2})
 		imgui.Indent(10)
 		if GlobalFonts.mono != nil do imgui.PushFont(GlobalFonts.mono)
-		imgui.PushStyleColorImVec4(.Text, {0.80, 0.86, 0.95, 1})
-		imgui.TextUnformatted(strings.clone_to_cstring(b.code, context.temp_allocator))
-		imgui.PopStyleColor()
+		plain := code_syntax({0.80, 0.86, 0.95, 1})
+		lh := imgui.GetTextLineHeight()
+		imgui.PushStyleVarImVec2(.ItemSpacing, {0, 1}) // lines as tight as plain text
+		for l in b.lines {
+			w := md_draw_code(dl, imgui.GetCursorScreenPos(), l.text, l.tokens, plain)
+			imgui.Dummy({max(w, 1), lh})
+		}
+		imgui.PopStyleVar()
 		if GlobalFonts.mono != nil do imgui.PopFont()
 		imgui.Unindent(10)
 		imgui.Dummy({0, 2})
@@ -333,10 +390,15 @@ md_flow :: proc(spans: []Md_Span, color: imgui.Vec4) {
 				}
 			}
 			if .Code in s.style {
+				// A chip, the code highlighted as Lua.
 				p := imgui.GetCursorScreenPos()
 				imgui.DrawList_AddRectFilled(dl, {p.x - 1, p.y}, {p.x + w + 1, p.y + imgui.GetTextLineHeight()}, col_u32(ui_line(0.07)), 3)
+				toks, _ := syn.tokenize_lua_line(word, 0, context.temp_allocator)
+				md_draw_code(dl, p, word, toks, col_u32(col))
+				imgui.Dummy({w, imgui.GetTextLineHeight()})
+			} else {
+				imgui.TextColored(col, "%s", wc)
 			}
-			imgui.TextColored(col, "%s", wc)
 			if .Link in s.style {
 				mn, mx := imgui.GetItemRectMin(), imgui.GetItemRectMax()
 				imgui.DrawList_AddLine(dl, {mn.x, mx.y}, {mx.x, mx.y}, col_u32(UI_ACCENT_SOFT))
