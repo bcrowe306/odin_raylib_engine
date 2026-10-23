@@ -212,6 +212,10 @@ complete). On an empty line it becomes a declaration:
 local player = self.node:get_node("../Player")
 ```
 
+Dropped onto a method's line (`function Enemy:on_hit(...)`) it offers the
+node's events instead: the one you pick is connected in `ready()` (made if
+missing) to call that method -
+`<node>:connect("body_entered", function(other, source) self:on_hit(other, source) end)`.
 Dropped into an assignment (`self.body = `) the `---@type` line goes above
 it; anywhere else (an argument) it gets an inline cast,
 `self.node:get_node("../Player") --[[@as CharacterMoverNode]]`. Plain

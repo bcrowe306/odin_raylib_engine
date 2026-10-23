@@ -495,10 +495,103 @@ code_drop_target :: proc(state: ^EditorState, doc: ^Code_Doc, mouse: [2]f32) {
 	}
 	if payload := imgui.AcceptDragDropPayload("ORE_NODE", {.AcceptBeforeDelivery, .AcceptNoDrawDefaultRect}); payload != nil {
 		preview(b, pos)
+		cls, method := code_method_at(b, pos.line)
+		if method != "" do imgui.SetTooltip("Connect one of its events to %s:%s()", strings.clone_to_cstring(cls, context.temp_allocator), strings.clone_to_cstring(method, context.temp_allocator))
 		if payload.Delivery {
 			n := (^^e.Node)(payload.Data)^
-			if e.Node_IsAlive(n) do Code_DropNode(state, doc, n, pos)
+			if e.Node_IsAlive(n) {
+				if method != "" {
+					// Onto a method: pick one of the node's events (menu below).
+					delete(nodeDropMenu.cls)
+					delete(nodeDropMenu.method)
+					nodeDropMenu = {node = n, cls = strings.clone(cls), method = strings.clone(method), open = true}
+					return // no focus request: focusing the code window would close the menu
+				} else {
+					Code_DropNode(state, doc, n, pos)
+				}
+			}
 			cm.focusRequest = true
+		}
+	}
+}
+
+// A node dropped onto a method: the menu of its events to connect.
+@(private = "file")
+nodeDropMenu: struct {
+	node:        ^e.Node,
+	cls, method: string,
+	open:        bool,
+}
+
+// code_method_at: the class and method a `function Cls:method(` line
+// defines ("" when it isn't one).
+code_method_at :: proc(b: ^buf.Buffer, line: int) -> (cls, method: string) {
+	if line >= buf.buffer_line_count(b) do return
+	l := strings.trim_space(buf.buffer_line_str(b, line))
+	if !strings.has_prefix(l, "function ") do return
+	sig := l[len("function "):]
+	colon := strings.index_byte(sig, ':')
+	paren := strings.index_byte(sig, '(')
+	if colon <= 0 || paren <= colon + 1 do return
+	return sig[:colon], sig[colon + 1:paren]
+}
+
+// Code_NodeDropMenu shows the event menu after a node was dropped onto a
+// method (call each frame while the code area is drawn).
+Code_NodeDropMenu :: proc(state: ^EditorState, doc: ^Code_Doc) {
+	m := &nodeDropMenu
+	if m.open {
+		imgui.OpenPopup("##node_drop_events")
+		m.open = false
+	}
+	if !imgui.BeginPopup("##node_drop_events") do return
+	defer imgui.EndPopup()
+	if !e.Node_IsAlive(m.node) {
+		imgui.CloseCurrentPopup()
+		return
+	}
+	UI_DimText(fmt.tprintf("Connect %s's event to %s:%s()", m.node.name, m.cls, m.method))
+	imgui.Separator()
+	for ev in e.Node_EventNames(m.node) {
+		label := fmt.tprintf("%s  %s", ICON_FA_BOLT, ev.name)
+		if imgui.MenuItem(strings.clone_to_cstring(label, context.temp_allocator)) {
+			code_connect_in_ready(state, doc, m.node, ev.name, m.cls, m.method)
+			imgui.CloseCurrentPopup()
+		}
+		Drive_Item(fmt.tprintf("node-drop.event:%s", ev.name))
+		if ev.doc != "" do UI_Tooltip(ev.doc)
+	}
+}
+
+// code_connect_in_ready adds `<node>:connect("ev", function(v, source)
+// self:method(v, source) end)` to Cls:ready() (made when missing).
+@(private = "file")
+code_connect_in_ready :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, event, cls, method: string) {
+	b := &doc.buffer
+	param, _ := e.Event_Describe(event)
+	if param == "" do param = "value"
+	ref := code_node_ref(state, doc, node, true)
+	unit := "\t" if doc.useTabs else "    "
+	stmt := fmt.tprintf("%s%s:connect(%q, function(%s, source) self:%s(%s, source) end)\n", unit, ref, event, param, method, param)
+	group := buf.buffer_next_group(b)
+	header := fmt.tprintf("function %s:ready()", cls)
+	for ln in 0 ..< buf.buffer_line_count(b) {
+		if strings.has_prefix(strings.trim_space(buf.buffer_line_str(b, ln)), header) {
+			buf.buffer_insert_text(b, {ln + 1, 0}, stmt, group)
+			code_set_single_cursor(b, {ln + 1, len(stmt) - 1}, false)
+			doc.scrollToCursor = true
+			return
+		}
+	}
+	// No ready(): one before the method.
+	for ln in 0 ..< buf.buffer_line_count(b) {
+		c, m := code_method_at(b, ln)
+		if c == cls && m == method {
+			block := fmt.tprintf("%s\n%send\n\n", header, stmt)
+			buf.buffer_insert_text(b, {ln, 0}, block, group)
+			code_set_single_cursor(b, {ln + 1, len(stmt) - 1}, false)
+			doc.scrollToCursor = true
+			return
 		}
 	}
 }

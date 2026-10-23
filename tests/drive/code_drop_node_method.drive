@@ -1,0 +1,16 @@
+# A node dropped onto a method's line: a menu of its events; the pick adds
+# a connect calling that method to ready().
+wait 5
+dblclick @asset:scripts/orbiting_drone.lua
+wait 5
+click @code.area
+key ctrl+g
+type 23
+key enter
+wait 3
+drag @hier:MainCamera @code.caret
+wait 3
+expect item:node-drop.event:child_added == visible
+screenshot event_menu
+click @node-drop.event:child_added
+expect code.text contains function Drone:ready()\n    Scene.find_node("MainCamera"):connect("child_added", function(child, source) self:update(child, source) end)\n

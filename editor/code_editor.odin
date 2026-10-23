@@ -734,6 +734,7 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	active := imgui.IsItemActive()
 	focused := imgui.IsWindowFocused()
 	code_drop_target(state, doc, {imgui.GetIO().MousePos.x, imgui.GetIO().MousePos.y})
+	Code_NodeDropMenu(state, doc) // a node dropped onto a method: its events
 	if imgui.BeginPopupContextItem("##code_ctx") {
 		code_text_context_menu(state, doc)
 		imgui.EndPopup()

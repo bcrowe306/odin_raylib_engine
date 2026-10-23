@@ -80,7 +80,7 @@ Autocomplete and type safety
 Drag and drop, editor ↔ code
 - [x] 8.7 Drop an animation / input action / scene / sound into code
 - [x] 8.8 Drop a Signals-panel event row into code: a `connect` with the handler signature
-- [ ] 8.9 Drop a node onto a method: a `connect` to one of its events
+- [x] 8.9 Drop a node onto a method: a `connect` to one of its events
 - [ ] 8.10 Node-reference exported properties (`type = "node"`, Inspector picker); dropping a node on the `properties` table adds one
 - [ ] 8.11 Rename-safe references: renaming / moving a node offers to update `get_node` / `find_node` in scripts
 - [ ] 8.12 Code → scene: Cmd+click a `get_node("...")` path selects the node; find a script's usages
