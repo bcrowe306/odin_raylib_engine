@@ -62,6 +62,8 @@ Code_Doc :: struct {
 	foldText:      map[int]u64,              // ... their first line's text (to follow edits)
 	foldsVersion:  int,
 	foldsTextVersion: int,
+	symCache:      Code_Sym_Cache, // whole-file uses of the caret word (code_minimap.odin)
+	git:           Code_Git,       // changes since the last commit (code_git.odin)
 }
 
 Code_Completion :: struct {
@@ -210,6 +212,7 @@ Editor_OpenScript :: proc(state: ^EditorState, path: string, line := -1, col := 
 		doc.isLua = doc.lang.name == "lua"
 		doc.savedVersion = doc.buffer.version
 		doc.diskTime = code_file_mtime(abs)
+		code_git_load(doc) // the committed version, for the git gutter
 		// Keep the file's indentation style (Settings decide for new files).
 		doc.useTabs = !GlobalSettings.insertSpaces
 		for i in 0 ..< buf.buffer_line_count(&doc.buffer) {
@@ -282,6 +285,7 @@ Code_SaveDoc :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	}
 	doc.savedVersion = doc.buffer.version
 	doc.diskTime = code_file_mtime(doc.path)
+	code_git_load(doc) // HEAD may have moved
 	code_lsp_did_save(doc)
 	Editor_Log(state, .Info, "Saved %s", doc.rel)
 	// Running scripts (Simulate) pick the change up right away.
@@ -316,6 +320,8 @@ code_close_doc :: proc(idx: int) {
 	code_display_destroy(&doc.display)
 	delete(doc.folds)
 	delete(doc.foldText)
+	code_sym_cache_destroy(&doc.symCache)
+	code_git_destroy(doc)
 	delete(doc.path)
 	delete(doc.rel)
 	delete(doc.uri)
@@ -823,7 +829,7 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	io := imgui.GetIO()
 	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
 	inPopup := cm.completion.open && point_in_rect(mouse, cm.popupMin, cm.popupMax)
-	overOverlay := Code_OverlayHovered() // hover / signature / docs box: no clicks through
+	overOverlay := Code_OverlayHovered() || Code_OverviewHovered(winPos, winSize) // boxes / the overview strip: no clicks through
 
 	// Mouse: click places the caret (Shift extends), double-click selects a
 	// word, triple-click the line, drag selects.
@@ -949,7 +955,10 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 	c := code_primary(b)^
 	_, _, hasSel := buf.selection_range(c)
 	textX := cm.textOrigin.x
-	findMatches := code_find_visible_matches(doc, first, last)
+	findAll: []Code_Match
+	if cm.find.open do findAll = code_find_all(doc)[:]
+	findMatches := make([dynamic]Code_Match, context.temp_allocator)
+	for m in findAll do if m.start.line >= first && m.start.line <= last do append(&findMatches, m)
 	textY := (cm.lineH - code_font_size()) * 0.5
 
 	diags := code_diagnostics(doc)
@@ -1133,6 +1142,13 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		}
 	}
 
+	// Overview strip at the right (code_minimap.odin).
+	{
+		views := make([dynamic]Code_Diag_View, context.temp_allocator)
+		for d in diags do append(&views, Code_Diag_View{d.range.start.line, code_severity_color(d.severity)})
+		code_overview(nil, doc, winPos, winSize, findAll, views[:])
+	}
+
 	// Carets (blink while idle).
 	if len(b.cursors) > 0 {
 		cp := code_screen_pos(b, b.cursors[0].pos)
@@ -1174,6 +1190,15 @@ code_draw :: proc(doc: ^Code_Doc, winPos, winSize: imgui.Vec2, gutterW: f32, foc
 		w := imgui.Font_CalcTextSizeA(font, code_font_size(), max(f32), 0, num).x
 		color := col_u32(UI_TEXT_DIM if ln == c.pos.line else UI_TEXT_FAINT)
 		imgui.DrawList_AddTextImFontPtr(dl, font, code_font_size(), {winPos.x + gutterW - 18 - w, y}, color, num)
+		// Changes since the last commit (code_git.odin): a bar at the gutter's edge.
+		if gc, changed := code_git_change_at(doc, ln); changed {
+			gx := winPos.x + gutterW - 3
+			if gc == CHANGE_DELETED {
+				imgui.DrawList_AddTriangleFilled(dl, {gx - 2, rowMin.y - 3}, {gx - 2, rowMin.y + 3}, {gx + 3, rowMin.y}, col_u32(gc))
+			} else {
+				imgui.DrawList_AddRectFilled(dl, {gx, rowMin.y}, {gx + 3, rowMax.y}, col_u32(gc))
+			}
+		}
 		// Fold arrow (code_fold.odin): shown on hover or when folded.
 		code_gutter_fold(doc, ln, {winPos.x + gutterW - 14, rowMin.y}, cm.lineH, gutterMouse, point_in_rect(gutterMouse, {winPos.x, winPos.y}, {winPos.x + gutterW, winPos.y + winSize.y}))
 		// Breakpoints (click the gutter) and where the game is paused.
@@ -1871,6 +1896,18 @@ Code_DriveQuery :: proc(q: string) -> (string, bool) {
 		slice.sort(sorted)
 		for f, i in sorted do fmt.sbprintf(&sb, "%s%d", "," if i > 0 else "", f + 1)
 		return strings.to_string(sb), true
+	case "code.changes":
+		// "<line>:<added|modified|deleted>" (1-based), sorted
+		if doc == nil do return "", true
+		marks := slice.clone(Code_ChangedLines(doc), context.temp_allocator)
+		slice.sort_by(marks, proc(a, b: Code_Change_Mark) -> bool {return a.line < b.line})
+		sb := strings.builder_make(context.temp_allocator)
+		for m, i in marks {
+			kind := "added" if m.color == CHANGE_ADDED else ("modified" if m.color == CHANGE_MODIFIED else "deleted")
+			fmt.sbprintf(&sb, "%s%d:%s", "," if i > 0 else "", m.line + 1, kind)
+		}
+		return strings.to_string(sb), true
+	case "code.git": return fmt.tprint(doc.git.state) if doc != nil else "", true
 	case "code.rows": return fmt.tprint(len(code_display(doc).rows)) if doc != nil else "0", true
 	case "code.lines": return fmt.tprint(buf.buffer_line_count(&doc.buffer)) if doc != nil else "0", true
 	case "code.symbol-highlights":

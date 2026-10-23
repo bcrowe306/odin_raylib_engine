@@ -1,0 +1,41 @@
+# Git gutter (added / modified / removed since the last commit) and the
+# overview strip (diagnostics, find matches, changes, the caret; click to
+# scroll).
+wait 5
+exec git -C $PROJECT init -q
+exec git -C $PROJECT add scripts/player_ship.lua
+exec git -C $PROJECT -c user.email=drive@example.com -c user.name=drive commit -q -m base
+dblclick @asset:scripts/player_ship.lua
+wait-until code.git == Ready timeout=300
+expect code.changes == 
+# Modify line 17, add a line after 20, delete line 30.
+key ctrl+g
+type 17
+key enter
+key end
+type \s-- changed
+key ctrl+g
+type 20
+key enter
+key cmd+enter
+type -- new line
+key ctrl+g
+type 31
+key enter
+key cmd+shift+k
+wait 30
+expect code.changes == 17:modified,21:added,31:deleted
+screenshot git_gutter
+# The overview strip: find matches show; clicking near the bottom scrolls.
+key cmd+f
+type self
+key esc
+click @code.overview+0,180
+wait 5
+screenshot overview
+key cmd+z
+key cmd+z
+key cmd+z
+key cmd+z
+wait 30
+expect code.changes == 

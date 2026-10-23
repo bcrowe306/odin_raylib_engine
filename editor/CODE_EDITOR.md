@@ -144,6 +144,19 @@ feature needs it.
   and marked in the gutter; Up / Down move by screen row. There is no
   horizontal scrolling while it is on.
 
+## Overview strip and git gutter
+
+- **Overview strip** (right edge, beside the scrollbar - the minimap): the
+  whole file at a glance - errors and warnings, find matches, uses of the
+  caret's word, breakpoints, changes since the last commit, the caret, and
+  the visible part. Click or drag in it to scroll there.
+- **Git gutter**: lines added (green bar), modified (blue bar) and removed
+  (red triangle) since the last commit, at the gutter's right edge. The
+  committed text is read with `git show HEAD:<file>` on a worker thread
+  when the script opens and when it is saved; the comparison (a Myers line
+  diff) runs once per edit after typing pauses. Files outside git or not
+  committed show nothing.
+
 ## Folding
 
 A `function` / `if` / `for` / `while` / `repeat` / `do` ... `end` block, a

@@ -56,6 +56,12 @@ Debug_HasBreakpoint :: proc(rel: string, line: int) -> bool {
 	return ok && slice.contains(lines[:], line)
 }
 
+// Debug_BreakpointLines: a script's breakpoints (1-based).
+Debug_BreakpointLines :: proc(rel: string) -> []int {
+	if lines, ok := dbg.breakpoints[rel]; ok do return lines[:]
+	return nil
+}
+
 // Debug_ToggleBreakpoint (line is 1-based).
 Debug_ToggleBreakpoint :: proc(rel: string, line: int) {
 	if rel not_in dbg.breakpoints do dbg.breakpoints[strings.clone(rel)] = make([dynamic]int)

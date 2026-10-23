@@ -130,10 +130,10 @@ Display
 - [x] 9.5 Matching bracket highlight + jump, rainbow brackets, indent guides
 - [x] 9.6 Symbol highlights (LSP document highlight), visible whitespace, soft wrap
 - [x] 9.7 Code folding (gutter arrows; functions, tables, comment blocks)
-- [ ] 9.8 Scrollbar markers (errors, find matches, breakpoints, changes) - the minimap
+- [x] 9.8 Scrollbar markers (errors, find matches, breakpoints, changes) - the minimap
 - [ ] 9.9 Sticky scroll + breadcrumbs
 - [ ] 9.10 Inlay hints (LSP)
-- [ ] 9.11 Git gutter (added / modified / removed)
+- [x] 9.11 Git gutter (added / modified / removed)
 Navigation
 - [ ] 9.12 Back / forward history
 - [ ] 9.13 Outline (Cmd+Shift+O) and workspace symbols (Cmd+T)
