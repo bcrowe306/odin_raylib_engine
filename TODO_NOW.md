@@ -146,7 +146,7 @@ Refactoring
 - [x] 9.19 Rename across files with a preview
 Files
 - [x] 9.20 Tab pinning + preview tab
-- [ ] 9.21 Files changed on disk: reload prompt; local history (restore earlier saves)
+- [x] 9.21 Files changed on disk: reload prompt; local history (restore earlier saves)
 Engine
 - [ ] 9.22 Inline values while debugging
 - [ ] 9.23 Property in code <-> Inspector (click to select)

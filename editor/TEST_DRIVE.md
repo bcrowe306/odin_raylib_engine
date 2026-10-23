@@ -88,6 +88,7 @@ exits non-zero if any check fails.
 | `code_actions.drive` | Lightbulb on a line with an unknown node name; Cmd+. picks PlayerShip from the scene; the lightbulb adds a missing input action to project.json. |
 | `code_refactor.drive` | Extract local (typing renames both), inline it back, toggle set_property to a field and {1, 2} to Vec2 from the Refactor menu, extract two lines into a method (renamed by typing). |
 | `code_tabs_preview_pin.drive` | A symbol in another file opens as a preview, the next one replaces it, typing keeps it; a pinned tab survives Close Saved. |
+| `code_disk_history.drive` | Two saves kept; Local History restores the older; the file changed on disk while edited - the bar, Reload (undo brings the edits back); clean, a change reloads by itself. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

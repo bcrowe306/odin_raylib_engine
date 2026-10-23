@@ -33,6 +33,18 @@ last closed tab; Cmd+W closes one.
   close button, and are skipped by Close Others / to the Right / Saved /
   All (Cmd+W still closes one).
 
+## Files changed on disk, local history
+
+- A script changed outside the editor (another editor, git) **reloads by
+  itself** when you have no unsaved edits - as one undoable edit. With
+  unsaved edits a bar over the code asks: **Reload** (the disk version;
+  your edits stay in Undo) or **Keep Mine** (saving writes them over it).
+- **Local history**: every save keeps a copy in
+  `<project>/.ore/history/<script>/` (the 30 newest; `.ore` is never
+  packaged into games). Tab menu > *Local History...* (or the palette)
+  lists them by date with a preview; **Restore** puts one in the buffer -
+  undoable, not saved until you save.
+
 ## Editing
 
 | Shortcut | Command |

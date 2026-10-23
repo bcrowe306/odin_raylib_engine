@@ -1,0 +1,45 @@
+# Local history: each save is kept; Restore brings an older one back.
+# Files changed on disk: with unsaved edits a bar asks (Reload is undoable);
+# without, the file reloads by itself.
+wait 5
+dblclick @asset:scripts/player_ship.lua
+wait 5
+key ctrl+g
+type 1
+key enter
+type -- first save\n
+key cmd+s
+wait 70
+key ctrl+g
+type 1
+key enter
+type -- second save\n
+key cmd+s
+wait 5
+rclick @code.tab:scripts/player_ship.lua
+click @ctx:local-history
+wait 3
+expect item:history.item:1 == visible
+click @history.item:1
+wait 2
+screenshot history
+click @history.restore
+wait 2
+expect code.text !contains -- second save
+expect code.text contains -- first save
+# Changed on disk while edited: the bar; Reload takes the disk version (undoable).
+exec cp tests/drive/fixtures/drive_ctx_zz.lua $PROJECT/scripts/player_ship.lua
+wait-until item:code.disk-reload == visible timeout=300
+screenshot disk_banner
+click @code.disk-reload
+wait 2
+expect code.text contains local DriveCtxZz = {}
+key cmd+z
+expect code.text contains -- first save
+key cmd+shift+z
+key cmd+s
+wait 70
+# Clean now: a change on disk reloads by itself.
+exec cp tests/drive/fixtures/drive_fix_zz.lua $PROJECT/scripts/player_ship.lua
+wait-until code.text contains local DriveFixZz = {} timeout=300
+expect item:code.disk-reload == missing

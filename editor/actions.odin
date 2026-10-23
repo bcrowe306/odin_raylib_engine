@@ -231,6 +231,7 @@ Actions_Init :: proc() {
 	add({id = "code.inline_variable", category = "Code", label = "Inline Variable", chords = k(ch(.N, PA)), scope = .Code, run = Code_CmdInlineVariable})
 	add({id = "code.toggle_property_access", category = "Code", label = "Toggle get_property / Field Access", scope = .Code, run = Code_CmdTogglePropertyAccess})
 	add({id = "code.toggle_vec2", category = "Code", label = "Toggle {x, y} / Vec2(x, y)", scope = .Code, run = Code_CmdToggleVec2})
+	add({id = "code.local_history", category = "Code", label = "Local History...", scope = .Code, run = Code_CmdLocalHistory})
 	add({id = "code.save", category = "Code", label = "Save File", scope = .Code, run = Code_CmdSave})
 	add({id = "code.close", category = "Code", label = "Close Tab", chords = k(ch(.W, P)), scope = .Code, run = Code_CmdClose})
 	add({id = "code.reopen", category = "Code", label = "Reopen Closed Tab", chords = k(ch(.T, PS)), scope = .Code, run = Code_CmdReopen})

@@ -67,6 +67,7 @@ Code_Doc :: struct {
 	scrollToTop:   bool, // scroll the caret's line to the top (under the pinned lines)
 	preview:       bool, // a preview tab: replaced by the next preview until edited / kept
 	pinned:        bool, // a pinned tab: first, no close button, skipped by bulk closes
+	diskConflict:  bool, // changed on disk while edited here (the banner asks)
 	git:           Code_Git,       // changes since the last commit (code_git.odin)
 	inlayCache:    Code_Inlay_Cache, // parameter-name hints per line (code_inlay.odin)
 }
@@ -309,7 +310,9 @@ Code_SaveDoc :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	}
 	doc.savedVersion = doc.buffer.version
 	doc.diskTime = code_file_mtime(doc.path)
+	doc.diskConflict = false
 	code_git_load(doc) // HEAD may have moved
+	Code_HistorySave(state, doc) // local history (code_history.odin)
 	code_lsp_did_save(doc)
 	Editor_Log(state, .Info, "Saved %s", doc.rel)
 	// Running scripts (Simulate) pick the change up right away.
@@ -384,6 +387,7 @@ Code_Shutdown :: proc() {
 	Code_PeekShutdown()
 	Code_ActionsShutdown()
 	Code_RenamePreviewShutdown()
+	Code_HistoryShutdown()
 	code_find_destroy()
 	code_lsp_shutdown()
 }
@@ -398,15 +402,13 @@ code_check_disk :: proc(state: ^EditorState) {
 		if mt == doc.diskTime || mt == {} do continue
 		doc.diskTime = mt
 		if code_doc_dirty(doc) {
-			Editor_Log(state, .Warn, "%s changed on disk; keeping your unsaved edits", doc.rel)
+			doc.diskConflict = true // ask: Reload / Keep Mine (code_history.odin)
 			continue
 		}
-		cursor := doc.buffer.cursors[0].pos
 		data, err := os.read_entire_file(doc.path, context.temp_allocator)
 		if err != nil do continue
-		buf.buffer_set_text(&doc.buffer, string(data))
-		buf.buffer_clear_undo_history(&doc.buffer)
-		code_set_single_cursor(&doc.buffer, buf.buffer_clamp_position(&doc.buffer, cursor), false)
+		if string(data) == buf.buffer_to_string(&doc.buffer, context.temp_allocator) do continue
+		code_replace_text(doc, string(data)) // one undoable edit
 		doc.savedVersion = doc.buffer.version
 	}
 }
@@ -667,6 +669,7 @@ Code_Render :: proc(state: ^EditorState) {
 	code_close_prompt(state)
 	code_rename_popup(state)
 	Code_RenamePreviewRender(state)
+	Code_HistoryRender(state)
 	if cm.closeRequest >= 0 {
 		code_close_doc(cm.closeRequest)
 		cm.closeRequest = -1
@@ -731,6 +734,12 @@ code_tabs :: proc(state: ^EditorState) {
 				Prompt_Open(.SaveScriptAs, doc.rel)
 			}
 			imgui.Separator()
+			if imgui.MenuItem(fmt.ctprintf("%s  Local History...", ICON_FA_ROTATE_LEFT)) {
+				cm.selectRequest = i
+				cm.active = i
+				Code_CmdLocalHistory(state)
+			}
+			Drive_Item("ctx:local-history")
 			if imgui.MenuItem(fmt.ctprintf("%s  Find Usages of This Script", ICON_FA_MAGNIFYING_GLASS)) do Asset_ShowUsages(state, doc.rel, false)
 			Drive_Item("ctx:script-usages")
 			imgui.Separator()
@@ -823,6 +832,8 @@ code_text_area :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	digits := len(fmt.tprint(lineCount))
 	gutterW := f32(max(digits, 3) + 2) * cm.charW + 14
 
+	Code_DiskBanner(state, doc) // changed on disk while edited
+	if doc.diskConflict do avail.y -= 32 + imgui.GetStyle().ItemSpacing.y
 	if GlobalSettings.breadcrumbs {
 		Code_Breadcrumbs(state, doc) // file > function > blocks (code_sticky.odin)
 		avail.y -= CODE_CRUMBS_H + imgui.GetStyle().ItemSpacing.y
