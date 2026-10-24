@@ -7,6 +7,11 @@ from IntGrid values, spawns entities as engine nodes (optionally as
 components), links entities through their EntityRef fields, exposes every
 part of the project to Lua, and reloads when the `.ldtk` file is saved.
 
+Levels can be edited in LDtk or in the editor's **Level** tab, which saves
+the same file (`engine/docs/level_editor.md`, `engine/ldtk_doc*.odin`).
+Animated tiles: a tile whose custom data has `anim=<ids>` (and `fps=<n>`)
+lines cycles through those tiles in the game.
+
 Implementation:
 - `engine/ldtk.odin` - project data: worlds, levels, layers, entities, fields
   and references, definitions (layers with IntGrid value names, entities with

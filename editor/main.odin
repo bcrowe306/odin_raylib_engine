@@ -136,7 +136,7 @@ editor_main :: proc() -> int {
 		// the code editor and global commands.
 		Editor_SyncSelection(&GlobalEditor)
 		Editor_Autosave(&GlobalEditor)
-		Actions_Dispatch(&GlobalEditor)
+		if !LevelEditor_Shortcuts(&GlobalEditor) do Actions_Dispatch(&GlobalEditor)
 
 		// --------------------------------------------------------------------
 		// 1. Standard Main Menu Bar (File, Edit, View, Tools, Help)
@@ -154,10 +154,13 @@ editor_main :: proc() -> int {
 		// --------------------------------------------------------------------
 		StatusBar_Render(&GlobalEditor, displayW, displayH, STATUS_BAR_HEIGHT)
 
+		// Root tabs: Game (scenes) | Level (the LDtk level editor)
+		RootTabs_Render(&GlobalEditor, displayW, menuBarH + TOOLBAR_HEIGHT)
+
 		// --------------------------------------------------------------------
 		// 4. Central DockSpace Host Window
 		// --------------------------------------------------------------------
-		dockAreaY := menuBarH + TOOLBAR_HEIGHT
+		dockAreaY := menuBarH + TOOLBAR_HEIGHT + ROOT_TABS_HEIGHT
 		dockAreaH := displayH - dockAreaY - STATUS_BAR_HEIGHT
 		dockAreaPos := imgui.Vec2{0, dockAreaY}
 		dockAreaSize := imgui.Vec2{displayW, dockAreaH}
@@ -174,33 +177,37 @@ editor_main :: proc() -> int {
 			.NoBackground,
 		}
 
-		imgui.PushStyleVarImVec2(imgui.StyleVar.WindowPadding, imgui.Vec2{0, 0})
-		imgui.Begin("##EditorDockSpaceHost", nil, dockHostFlags)
-		imgui.PopStyleVar()
+		levelTab := LevelEditor_Active()
+		if levelTab do LevelEditor_Render(&GlobalEditor, dockAreaPos, dockAreaSize)
+		if !levelTab {
+			imgui.PushStyleVarImVec2(imgui.StyleVar.WindowPadding, imgui.Vec2{0, 0})
+			imgui.Begin("##EditorDockSpaceHost", nil, dockHostFlags)
+			imgui.PopStyleVar()
 
-		dockspaceID := imgui.GetID("EditorMainDockSpace_v4")
+			dockspaceID := imgui.GetID("EditorMainDockSpace_v4")
 
-		// The dock layout: built the first time, or for a picked workspace preset.
-		Workspace_BuildIfNeeded(&GlobalEditor, dockspaceID, dockAreaPos, dockAreaSize)
+			// The dock layout: built the first time, or for a picked workspace preset.
+			Workspace_BuildIfNeeded(&GlobalEditor, dockspaceID, dockAreaPos, dockAreaSize)
 
-		// Single windows hide their tab (panels draw their own headers) unless
-		// View > Show Tab Bars is on.
-		dockFlags: imgui.DockNodeFlags = {.PassthruCentralNode}
-		if !GlobalSettings.showTabBars do dockFlags += {.AutoHideTabBar}
-		imgui.DockSpace(dockspaceID, imgui.Vec2{0, 0}, dockFlags)
-		editorDockspaceID = dockspaceID
-		if GlobalSettings.showTabBars do Dock_ApplyTabBars(dockspaceID, true)
-		imgui.End()
+			// Single windows hide their tab (panels draw their own headers) unless
+			// View > Show Tab Bars is on.
+			dockFlags: imgui.DockNodeFlags = {.PassthruCentralNode}
+			if !GlobalSettings.showTabBars do dockFlags += {.AutoHideTabBar}
+			imgui.DockSpace(dockspaceID, imgui.Vec2{0, 0}, dockFlags)
+			editorDockspaceID = dockspaceID
+			if GlobalSettings.showTabBars do Dock_ApplyTabBars(dockspaceID, true)
+			imgui.End()
 
-		// --------------------------------------------------------------------
-		// 5. Render Dockable Editor Panels & Dialogs
-		// --------------------------------------------------------------------
-		AssetBrowser_Render(&GlobalEditor)
-		Viewport_UpdateAndRender(&GlobalEditor)
-		Code_Render(&GlobalEditor)
-		SceneInspector_Render(&GlobalEditor)
-		BottomPanel_Render(&GlobalEditor)
-		PreviewPanel_Render(&GlobalEditor)
+			// --------------------------------------------------------------------
+			// 5. Render Dockable Editor Panels & Dialogs
+			// --------------------------------------------------------------------
+			AssetBrowser_Render(&GlobalEditor)
+			Viewport_UpdateAndRender(&GlobalEditor)
+			Code_Render(&GlobalEditor)
+			SceneInspector_Render(&GlobalEditor)
+			BottomPanel_Render(&GlobalEditor)
+			PreviewPanel_Render(&GlobalEditor)
+		}
 
 		// Modals & Popups
 		AddNodeDialog_Render(&GlobalEditor)

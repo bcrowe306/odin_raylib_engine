@@ -7,6 +7,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 
 | Guide | |
 |---|---|
+| [Level editor](level_editor.md) | The **Level** tab: LDtk projects edited in place - worlds, levels, IntGrid / Tiles / Auto layers with LDtk's rule engine, entities and fields, definitions, terrains, per-tile data and animated tiles; the `Ldtk_Doc` API - with tutorials. |
 | [Skeletal animation](skeletal_animation.md) | Spine and DragonBones exports on the engine's own runtime: Skeleton and Bone Attachment nodes, crossfades, skins, IK, events, bone overrides - with a tutorial. |
 | [Animation editing](animation_editing.md) | Custom key curves (cubic Bezier), method events with arguments and the animation_event signal, onion skin - with tutorials. |
 | [Draw order](draw_order.md) | Layers, Z index, Y-sort (top-down / isometric depth). |

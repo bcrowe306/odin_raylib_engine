@@ -137,6 +137,15 @@ LdtkTilesetDef :: struct {
 	customData:        map[int]string,   // tile id -> custom data string
 	tagsSourceEnumUid: int,              // enum whose values tag tiles (-1 = none)
 	enumTags:          map[int][dynamic]string, // tile id -> enum value ids
+	anims:             map[int]Ldtk_TileAnim,   // animated tiles (custom data "anim=" lines, ldtk_tiles.odin)
+}
+
+// Ldtk_TilesetTileSrc: a tile id's top-left pixel in the tileset image.
+Ldtk_TilesetTileSrc :: proc(ts: ^LdtkTilesetDef, tid: int) -> [2]f32 {
+	step := ts.tileGridSize + ts.spacing
+	if step <= 0 do return {}
+	cw := max((ts.pxWid - ts.padding * 2 + step - 1) / step, 1)
+	return {f32(ts.padding + (tid % cw) * step), f32(ts.padding + (tid / cw) * step)}
 }
 
 // --- definitions ---------------------------------------------------------------------
@@ -585,8 +594,13 @@ parse_defs :: proc(project: ^LdtkProject, defs: json.Object) {
 			ts.tagsSourceEnumUid = json_get_int(tsObj, "tagsSourceEnumUid", -1)
 			ts.customData = make(map[int]string, allocator = a)
 			ts.enumTags = make(map[int][dynamic]string, allocator = a)
+			ts.anims = make(map[int]Ldtk_TileAnim, allocator = a)
 			if cd, has := json_get_arr(tsObj, "customData"); has {
-				for item in cd do ts.customData[json_get_int(item, "tileId")] = strings.clone(json_get_str(item, "data"), a)
+				for item in cd {
+					data := strings.clone(json_get_str(item, "data"), a)
+					ts.customData[json_get_int(item, "tileId")] = data
+					if anim, ok := Ldtk_ParseTileAnim(data, a); ok do ts.anims[json_get_int(item, "tileId")] = anim
+				}
 			}
 			if tags, has := json_get_arr(tsObj, "enumTags"); has {
 				for tag in tags {

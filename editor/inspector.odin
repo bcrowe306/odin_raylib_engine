@@ -792,6 +792,10 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 				}
 				if ln.projectPath != "" {
 					UI_PropLabel("")
+					if UI_Button(fmt.tprintf("%s  Edit in Level Tab", ICON_FA_MAP), "insp.ldtk.edit", {-1, 0}) {
+						LevelEditor_OpenAt(state, asset_rel_editor(state, ln.projectPath), ln.levelIdentifier)
+					}
+					UI_PropLabel("")
 					if UI_Button(fmt.tprintf("%s  Open in LDtk", ICON_FA_TABLE_CELLS), "insp.ldtk.open", {-1, 0}) {
 						Editor_OpenExternally(state, ln.projectPath)
 					}

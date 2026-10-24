@@ -927,16 +927,30 @@ ldtk_layer_tileset :: proc(ln: ^LdtkLevelNode, layer: ^LdtkLayerInstance) -> ^Ld
 // ldtk_draw_tiles draws tiles in view; `skip` leaves out tiles whose
 // chunk is drawn from the cache.
 @(private = "file")
-ldtk_draw_tiles :: proc(tiles: []LdtkTileInstance, tex: rl.Texture2D, origin, scale: [2]f32, opacity: f32, tint: rl.Color, skip: map[[2]i32]bool = nil) {
+// ldtk_draw_tiles draws tiles (animated ones at their current frame);
+// `skip`: chunks drawn from the cache; `onlyAnimated`: just the animated
+// tiles (over cached chunks, which leave them out).
+ldtk_draw_tiles :: proc(tiles: []LdtkTileInstance, ts: ^LdtkTilesetDef, origin, scale: [2]f32, opacity: f32, tint: rl.Color, skip: map[[2]i32]bool = nil, onlyAnimated := false) {
+	tex := ts.texture
+	animated := len(ts.anims) > 0
+	if onlyAnimated && !animated do return
+	now := rl.GetTime()
 	for t in tiles {
 		if t.alpha <= 0.001 do continue
+		anim, isAnim := animated ? ts.anims[t.tileId] : Ldtk_TileAnim{}, animated && t.tileId in ts.anims
+		if onlyAnimated && !isAnim do continue
 		if skip != nil {
 			c := [2]i32{i32(t.px.x) / TILE_CHUNK_PX, i32(t.px.y) / TILE_CHUNK_PX}
-			if c in skip do continue
+			// cached chunks: everything but animated tiles is in the cache
+			if (c in skip) != onlyAnimated do continue
 		}
 		dest := rl.Rectangle{origin.x + t.px.x * scale.x, origin.y + t.px.y * scale.y, t.size.x * scale.x, t.size.y * scale.y}
 		if !Render_IsVisible({min(dest.x, dest.x + dest.width), min(dest.y, dest.y + dest.height), abs(dest.width), abs(dest.height)}) do continue
 		src := rl.Rectangle{t.src.x, t.src.y, t.size.x, t.size.y}
+		if isAnim {
+			p := Ldtk_TilesetTileSrc(ts, int(Ldtk_TileAnimFrame(anim, now)))
+			src.x, src.y = p.x, p.y
+		}
 		if t.flipX do src.width = -src.width
 		if t.flipY do src.height = -src.height
 		rl.DrawTexturePro(tex, src, dest, {0, 0}, 0, rl.ColorAlpha(tint, opacity * t.alpha))
@@ -982,6 +996,7 @@ ldtk_build_chunk :: proc(data: rawptr, key: Tile_Chunk_Key) {
 	for list in ([2][]LdtkTileInstance{b.layer.autoLayerTiles[:], b.layer.gridTiles[:]}) {
 		for t in list {
 			if t.alpha <= 0.001 do continue
+			if t.tileId in b.ts.anims do continue // drawn every frame
 			r := rl.Rectangle{t.px.x, t.px.y, t.size.x, t.size.y}
 			if !(r.x < area.x + area.width && area.x < r.x + r.width && r.y < area.y + area.height && area.y < r.y + r.height) do continue
 			src := rl.Rectangle{t.src.x, t.src.y, t.size.x, t.size.y}
@@ -998,8 +1013,8 @@ ldtk_build_chunk :: proc(data: rawptr, key: Tile_Chunk_Key) {
 ldtk_draw_layer_cached :: proc(ln: ^LdtkLevelNode, layer: ^LdtkLayerInstance, ts: ^LdtkTilesetDef, origin, scale: [2]f32) {
 	c0, c1, ok := ldtk_visible_chunks(layer, origin, scale, renderView.rect, renderView.active)
 	if !ok {
-		ldtk_draw_tiles(layer.autoLayerTiles[:], ts.texture, origin, scale, layer.opacity, ln.tintColor)
-		ldtk_draw_tiles(layer.gridTiles[:], ts.texture, origin, scale, layer.opacity, ln.tintColor)
+		ldtk_draw_tiles(layer.autoLayerTiles[:], ts, origin, scale, layer.opacity, ln.tintColor)
+		ldtk_draw_tiles(layer.gridTiles[:], ts, origin, scale, layer.opacity, ln.tintColor)
 		return
 	}
 	cached := make(map[[2]i32]bool, context.temp_allocator)
@@ -1007,8 +1022,13 @@ ldtk_draw_layer_cached :: proc(ln: ^LdtkLevelNode, layer: ^LdtkLayerInstance, ts
 	cp := f32(TILE_CHUNK_PX)
 	TileCache_BeginDraw()
 	defer if missing {
-		ldtk_draw_tiles(layer.autoLayerTiles[:], ts.texture, origin, scale, layer.opacity, ln.tintColor, cached)
-		ldtk_draw_tiles(layer.gridTiles[:], ts.texture, origin, scale, layer.opacity, ln.tintColor, cached)
+		ldtk_draw_tiles(layer.autoLayerTiles[:], ts, origin, scale, layer.opacity, ln.tintColor, cached)
+		ldtk_draw_tiles(layer.gridTiles[:], ts, origin, scale, layer.opacity, ln.tintColor, cached)
+	}
+	// animated tiles aren't in the cached chunks: drawn every frame
+	defer if len(ts.anims) > 0 {
+		ldtk_draw_tiles(layer.autoLayerTiles[:], ts, origin, scale, layer.opacity, ln.tintColor, cached, true)
+		ldtk_draw_tiles(layer.gridTiles[:], ts, origin, scale, layer.opacity, ln.tintColor, cached, true)
 	}
 	defer TileCache_EndDraw()
 	for cy in c0.y ..< c1.y {
@@ -1084,8 +1104,8 @@ LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 				if ln.material == nil && TileCache_Enabled() && len(layer.autoLayerTiles) + len(layer.gridTiles) >= TILE_CACHE_MIN_TILES {
 					ldtk_draw_layer_cached(ln, layer, ts, origin, layerScale)
 				} else {
-					ldtk_draw_tiles(layer.autoLayerTiles[:], ts.texture, origin, layerScale, layer.opacity, ln.tintColor)
-					ldtk_draw_tiles(layer.gridTiles[:], ts.texture, origin, layerScale, layer.opacity, ln.tintColor)
+					ldtk_draw_tiles(layer.autoLayerTiles[:], ts, origin, layerScale, layer.opacity, ln.tintColor)
+					ldtk_draw_tiles(layer.gridTiles[:], ts, origin, layerScale, layer.opacity, ln.tintColor)
 				}
 			}
 			// IntGrid cells in their LDtk colours (editor view of value layers).

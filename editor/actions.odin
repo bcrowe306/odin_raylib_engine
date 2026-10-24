@@ -91,7 +91,10 @@ Actions_Init :: proc() {
 	// --- Global ---
 	add({id = "palette.commands", category = "View", label = "Command Palette", chords = k(ch(.P, PS), ch(.F1)), scope = .Global, run = proc(s: ^EditorState) {Palette_Open(.Commands)}})
 	add({id = "palette.files", category = "View", label = "Go to File", chords = k(ch(.P, P)), scope = .Global, run = proc(s: ^EditorState) {Palette_Open(.Files)}})
-	add({id = "file.save", category = "File", label = "Save", chords = k(ch(.S, P)), scope = .Global, run = Editor_SaveActive})
+	add({id = "file.save", category = "File", label = "Save", chords = k(ch(.S, P)), scope = .Global, run = proc(s: ^EditorState) {
+		if LevelEditor_Active() do LevelEditor_Save(s) // the Level tab saves its .ldtk
+		else do Editor_SaveActive(s)
+	}})
 	add({id = "file.save_as", category = "File", label = "Save As...", chords = k(ch(.S, PS)), scope = .Global, run = Editor_SaveAsActive})
 	add({id = "file.revert", category = "File", label = "Revert Scene", scope = .Global, run = Editor_RevertScene, enabled = proc(s: ^EditorState) -> bool {return s.activeScene != nil && Editor_SceneIsModified(s, s.activeScene)}})
 	add({id = "file.new_project", category = "File", label = "New Project...", scope = .Global, run = proc(s: ^EditorState) {Prompt_Open(.NewProject, "../my_game")}})
@@ -132,8 +135,16 @@ Actions_Init :: proc() {
 	add({id = "help.shortcuts", category = "Help", label = "Keyboard Shortcuts", chords = k(ch(.K, PS)), scope = .Global, run = proc(s: ^EditorState) {showShortcutsWindow = true}})
 
 	// --- Scene editing ---
-	add({id = "edit.undo", category = "Edit", label = "Undo", chords = k(ch(.Z, P)), scope = .Scene, run = proc(s: ^EditorState) {Editor_Undo(s)}, enabled = proc(s: ^EditorState) -> bool {return len(s.undoStack) > 0}, repeat = true})
-	add({id = "edit.redo", category = "Edit", label = "Redo", chords = k(ch(.Z, PS), ch(.Y, P)), scope = .Scene, run = proc(s: ^EditorState) {Editor_Redo(s)}, enabled = proc(s: ^EditorState) -> bool {return len(s.redoStack) > 0}, repeat = true})
+	add({id = "edit.undo", category = "Edit", label = "Undo", chords = k(ch(.Z, P)), scope = .Scene, run = proc(s: ^EditorState) {
+		if LevelEditor_Active() do level_undo(s)
+		else do Editor_Undo(s)
+	}, enabled = proc(s: ^EditorState) -> bool {return LevelEditor_Active() ? GlobalLevel.doc != nil && len(GlobalLevel.doc.undo) > 0 : len(s.undoStack) > 0}, repeat = true})
+	add({id = "edit.redo", category = "Edit", label = "Redo", chords = k(ch(.Z, PS), ch(.Y, P)), scope = .Scene, run = proc(s: ^EditorState) {
+		if LevelEditor_Active() do level_redo(s)
+		else do Editor_Redo(s)
+	}, enabled = proc(s: ^EditorState) -> bool {return LevelEditor_Active() ? GlobalLevel.doc != nil && len(GlobalLevel.doc.redo) > 0 : len(s.redoStack) > 0}, repeat = true})
+	add({id = "view.tab_game", category = "View", label = "Game Tab", chords = k(ch(._1, PS)), scope = .Global, run = proc(s: ^EditorState) {GlobalLevel.tab = .Game}, checked = proc(s: ^EditorState) -> bool {return !LevelEditor_Active()}})
+	add({id = "view.tab_level", category = "View", label = "Level Tab (LDtk level editor)", chords = k(ch(._2, PS)), scope = .Global, run = proc(s: ^EditorState) {GlobalLevel.tab = .Level}, checked = proc(s: ^EditorState) -> bool {return LevelEditor_Active()}})
 	add({id = "scene.new", category = "File", label = "New Scene", chords = k(ch(.N, P)), scope = .Scene, run = Toolbar_NewScene})
 	add({id = "scene.save", category = "File", label = "Save Scene", scope = .Scene, run = Toolbar_SaveScene, enabled = has_scene})
 	add({id = "node.add", category = "Edit", label = "Add Node...", chords = k(ch(.A, P)), scope = .Scene, run = proc(s: ^EditorState) {AddNodeDialog_Open()}, enabled = has_scene})
@@ -454,7 +465,11 @@ Actions_Dispatch :: proc(state: ^EditorState) {
 	typing := io.WantTextInput && !codeFocus
 	best: ^Editor_Action
 	bestScore := -1
+	levelMode := LevelEditor_Active()
 	for &a in GlobalActions {
+		// The Level tab: only global commands (it has its own keys).
+		if levelMode && a.scope != .Global do continue
+		if levelMode && (a.id == "view.viewport" || a.id == "view.code" || a.id == "file.save_as" || a.id == "file.revert") do continue
 		switch a.scope {
 		case .Global: if typing do continue
 		case .Scene:

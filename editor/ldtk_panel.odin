@@ -264,6 +264,8 @@ header :: proc(state: ^EditorState, ln: ^e.LdtkLevelNode) {
 		Editor_Log(state, .Info, "Reloaded %s", asset_rel_editor(state, path))
 	}
 	imgui.SameLine(0, 2)
+	if UI_IconButton(ICON_FA_MAP, "ldtk.edit", "Edit in the Level tab", size = 26) do LevelEditor_OpenAt(state, asset_rel_editor(state, ln.projectPath), ln.levelIdentifier)
+	imgui.SameLine(0, 2)
 	if UI_IconButton(ICON_FA_UP_RIGHT_FROM_SQUARE, "ldtk.open", "Open in LDtk", size = 26) do Editor_OpenExternally(state, ln.projectPath)
 	if ln.level != nil {
 		imgui.SameLine(0, UI_SPACE)

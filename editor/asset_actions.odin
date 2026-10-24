@@ -215,6 +215,7 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		}
 		if menu(ICON_FA_MUSIC, "Use on Selected Sound/Music", "use-audio", sel != nil && (sel.typeId == e.SoundNode || sel.typeId == e.MusicNode)) do set_audio(state, sel, rel)
 	case .Level:
+		if menu(ICON_FA_MAP, "Edit in Level Tab", "edit-level") do LevelEditor_Open(state, rel)
 		if menu(ICON_FA_PLUS, "Add Level to Scene", "add-level", hasScene) do Editor_AddLevel(state, rel, state.cameraPos)
 		if menu(ICON_FA_TABLE_CELLS, "Open in LDtk", "open-ldtk") do Editor_OpenExternally(state, full)
 		if menu(ICON_FA_TABLE_CELLS, "Use on Selected Level", "use-level", sel != nil && sel.typeId == e.LdtkLevelNode) {

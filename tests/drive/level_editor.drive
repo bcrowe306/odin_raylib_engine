@@ -1,0 +1,135 @@
+# Level editor (root "Level" tab): an LDtk project (tests/drive/fixtures/ldtk,
+# copied as levels_zz) opened from the start page; IntGrid painted with the
+# brush (auto-layer rules follow), a line, undo / redo, a rectangle; a tile
+# stamped from the palette; an entity placed, moved and given a field value;
+# a level added; a layer added in Definitions; saved - the .ldtk keeps its
+# format and the game tab is back.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/levels_zz
+wait 90
+click @root.level
+wait 3
+expect level.tab == level
+screenshot start_page
+click @level.open:levels_zz/topdown.ldtk
+wait 5
+expect level.open == levels_zz/topdown.ldtk
+expect level.level == World_Level_0
+screenshot opened
+click @level.zoom
+click @pick:100%
+wait 2
+expect level.zoom == 1.00
+# IntGrid: the Collisions layer feeds two auto layers
+click @level.layer:Collisions
+wait 2
+expect level.layer == Collisions
+click @level.value:1
+click @level.origin+40,40
+wait 2
+expect level.cell:2,2 == 1
+drag @level.origin+40,104 @level.origin+152,104
+wait 2
+expect level.cell:2,6 == 1
+expect level.cell:5,6 == 1
+expect level.cell:9,6 == 1
+expect level.modified == true
+screenshot painted
+key cmd+z
+wait 2
+expect level.cell:5,6 == 0
+expect level.cell:2,2 == 1
+key cmd+shift+z
+wait 2
+expect level.cell:5,6 == 1
+key r
+drag @level.origin+232,40 @level.origin+296,88
+wait 2
+expect level.cell:14,2 == 1
+expect level.cell:18,5 == 1
+expect level.tool == Rect
+screenshot rectangle
+# Tiles: stamp tile 12 (column 1, row 1) of the tileset
+key b
+click @level.layer:Custom_floor
+wait 2
+screenshot tiles_palette
+click @level.palette+40,40
+wait 1
+expect level.tilesel == 12
+click @level.origin+392,200
+wait 2
+expect level.tile:24,12 == 12
+# Entities: place a Button, move it, set a field
+click @level.layer:Entities
+wait 2
+click @level.entity:Button
+click @level.origin+344,56
+wait 2
+expect level.selected == Button
+screenshot entity_placed
+key v
+drag @level.origin+344,56 @level.origin+376,88
+wait 2
+expect level.selected.px !=
+screenshot entity_moved
+# a level next to the active one
+click @level.add
+wait 3
+expect level.levels == 4
+screenshot level_added
+click @level.pick:World_Level_0
+wait 2
+click @level.layer:Collisions
+wait 1
+# Definitions: add an IntGrid layer
+click @level.defs
+wait 2
+click @defs.page:Layers
+click @defs.addlayer:IntGrid
+wait 2
+expect level.layerdefs contains IntGrid
+expect level.layer == Collisions
+screenshot definitions
+# rules: a new rule in Collisions' "Front faces" group, its pattern edited
+click @defs.layer:Collisions
+wait 2
+expect level.rules == 18
+click @defs.rule.add:Front faces
+wait 3
+expect level.rules == 19
+screenshot rules
+# terrain: a 3x3 block picked in the layer's tileset -> 9 rules
+scroll @level.layer:Default_floor -10
+wait 3
+drag @level.palette+40,40 @level.palette+104,104
+wait 2
+expect level.tilesel == 12,13,14,23,24,25,34,35,36
+click @defs.terrain
+wait 3
+expect level.rules == 28
+screenshot terrain
+# per-tile data: tile 0 animates through the picked tiles
+click @defs.page:Tilesets
+click @defs.tileset:TopDown_by_deepnight
+wait 2
+click @defs.tile.animate
+wait 2
+screenshot tile_data
+click @defs.page:Entities
+click @defs.entity:Button
+wait 2
+screenshot entity_defs
+click @level.defs
+wait 2
+key cmd+s
+wait 3
+expect level.modified == false
+expect file:levels_zz/topdown.ldtk contains "identifier": "IntGrid"
+expect file:levels_zz/topdown.ldtk contains "__identifier": "Button"
+expect file:levels_zz/topdown.ldtk contains anim=12,13,14,23,24,25,34,35,36
+expect file:levels_zz/topdown.ldtk contains "name": "Terrain 1"
+screenshot saved
+click @root.game
+wait 3
+expect level.tab == game
+screenshot game_tab

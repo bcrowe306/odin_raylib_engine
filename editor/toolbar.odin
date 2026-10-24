@@ -27,6 +27,11 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	}
 	defer imgui.End()
 	if !imgui.Begin("Toolbar###FixedToolbarWindow", nil, flags) do return
+	// The Level tab has its own tools (Play stays).
+	if LevelEditor_Active() {
+		LevelEditor_Toolbar(state, width, Toolbar_PlayControls)
+		return
+	}
 
 	// 1. Breadcrumb: project › scene
 	imgui.PushStyleColorImVec4(.Button, {0, 0, 0, 0})
@@ -74,6 +79,62 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	if UI_IconButton(ICON_FA_ROTATE_RIGHT, "toolbar.redo", "Redo (Ctrl+Shift+Z)") do Editor_Redo(state)
 	if !canRedo do imgui.EndDisabled()
 
+	Toolbar_PlayControls(state, width)
+
+	// 4. View toggles and file actions, right-aligned.
+	rightW: f32 = 7 * 32 + 64 + 3 * 18 + 32 + 80
+	imgui.SameLine()
+	imgui.SetCursorPosX(max(imgui.GetCursorPosX() + UI_SPACE * 3, width - rightW - 10))
+	toggle :: proc(v: ^bool, icon, id, tip: string) {
+		if UI_IconButton(icon, id, tip, v^) do v^ = !v^
+		imgui.SameLine()
+	}
+	toggle(&state.snapGrid, ICON_FA_MAGNET, "toolbar.snap", "Snap to grid")
+	imgui.SetNextItemWidth(56)
+	imgui.PushStyleVarImVec2(.FramePadding, {6, 6})
+	imgui.DragFloat("##GridStep", &state.gridSize, 1.0, 4.0, 256.0, "%.0f px")
+	imgui.PopStyleVar()
+	Drive_Item("toolbar.grid-size")
+	UI_Tooltip("Grid size")
+	imgui.SameLine()
+	toggle(&state.showGrid, ICON_FA_BORDER_ALL, "toolbar.grid", "Show grid")
+	toggle(&state.showBounds, ICON_FA_EYE, "toolbar.bounds", "Show bounds & colliders")
+	toggle(&state.showCameraBounds, ICON_FA_VIDEO, "toolbar.camera", "Show camera frames")
+	toggle(&viewportLighting, ICON_FA_SUN, "toolbar.lighting", "Preview lighting (lights, the scene's ambient) and post effects")
+	UI_VerticalDivider()
+	if UI_IconButton(ICON_FA_EXPAND, "toolbar.fit", "Fit the scene to the view (Home)") do Viewport_FitScene(state)
+	imgui.SameLine()
+	imgui.SetNextItemWidth(76)
+	imgui.PushStyleVarImVec2(.FramePadding, {6, 7})
+	if imgui.BeginCombo("##zoom", fmt.ctprintf("%.0f%%", state.cameraZoom * 100)) {
+		for z in ([]f32{0.25, 0.5, 1, 2, 4}) {
+			if imgui.Selectable(fmt.ctprintf("%.0f%%", z * 100), abs(state.cameraZoom - z) < 0.001) do state.cameraZoom = z
+			Drive_Item(fmt.tprintf("pick:%.0f%%", z * 100))
+		}
+		imgui.Separator()
+		if imgui.Selectable("Fit Scene") do Viewport_FitScene(state)
+		Drive_Item("pick:Fit Scene")
+		if imgui.Selectable("Fit Game View") do Viewport_FitGameView(state)
+		Drive_Item("pick:Fit Game View")
+		if imgui.Selectable("Fit Selection") do Viewport_FitSelection(state)
+		Drive_Item("pick:Fit Selection")
+		imgui.EndCombo()
+	}
+	imgui.PopStyleVar()
+	Drive_Item("toolbar.zoom")
+	UI_Tooltip("Zoom")
+	imgui.SameLine()
+	UI_VerticalDivider()
+	if UI_IconButton(ICON_FA_FLOPPY_DISK, "toolbar.save", "Save scene (Ctrl+S)", tint = UI_WARNING if modified else {}) do Toolbar_SaveScene(state)
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_BOX_ARCHIVE, "toolbar.export", "Export .ore package") do Toolbar_ExportOre(state)
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_GEAR, "toolbar.settings", "Project settings") do ProjectSettingsDialog_Open(state)
+}
+
+// Toolbar_PlayControls: Play / Play Scene, or Pause / Step / Restart / Stop
+// while the game runs (shared by the Game and Level toolbars).
+Toolbar_PlayControls :: proc(state: ^EditorState, width: f32) {
 	// 3. Play controls, centred (but never over the tools on the left):
 	// Play / Play Scene; while the game runs Pause (Resume), Step, Restart
 	// and Stop; while building, Stop cancels the build.
@@ -139,55 +200,6 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	}
 	Drive_Item("toolbar.status")
 
-	// 4. View toggles and file actions, right-aligned.
-	rightW: f32 = 7 * 32 + 64 + 3 * 18 + 32 + 80
-	imgui.SameLine()
-	imgui.SetCursorPosX(max(imgui.GetCursorPosX() + UI_SPACE * 3, width - rightW - 10))
-	toggle :: proc(v: ^bool, icon, id, tip: string) {
-		if UI_IconButton(icon, id, tip, v^) do v^ = !v^
-		imgui.SameLine()
-	}
-	toggle(&state.snapGrid, ICON_FA_MAGNET, "toolbar.snap", "Snap to grid")
-	imgui.SetNextItemWidth(56)
-	imgui.PushStyleVarImVec2(.FramePadding, {6, 6})
-	imgui.DragFloat("##GridStep", &state.gridSize, 1.0, 4.0, 256.0, "%.0f px")
-	imgui.PopStyleVar()
-	Drive_Item("toolbar.grid-size")
-	UI_Tooltip("Grid size")
-	imgui.SameLine()
-	toggle(&state.showGrid, ICON_FA_BORDER_ALL, "toolbar.grid", "Show grid")
-	toggle(&state.showBounds, ICON_FA_EYE, "toolbar.bounds", "Show bounds & colliders")
-	toggle(&state.showCameraBounds, ICON_FA_VIDEO, "toolbar.camera", "Show camera frames")
-	toggle(&viewportLighting, ICON_FA_SUN, "toolbar.lighting", "Preview lighting (lights, the scene's ambient) and post effects")
-	UI_VerticalDivider()
-	if UI_IconButton(ICON_FA_EXPAND, "toolbar.fit", "Fit the scene to the view (Home)") do Viewport_FitScene(state)
-	imgui.SameLine()
-	imgui.SetNextItemWidth(76)
-	imgui.PushStyleVarImVec2(.FramePadding, {6, 7})
-	if imgui.BeginCombo("##zoom", fmt.ctprintf("%.0f%%", state.cameraZoom * 100)) {
-		for z in ([]f32{0.25, 0.5, 1, 2, 4}) {
-			if imgui.Selectable(fmt.ctprintf("%.0f%%", z * 100), abs(state.cameraZoom - z) < 0.001) do state.cameraZoom = z
-			Drive_Item(fmt.tprintf("pick:%.0f%%", z * 100))
-		}
-		imgui.Separator()
-		if imgui.Selectable("Fit Scene") do Viewport_FitScene(state)
-		Drive_Item("pick:Fit Scene")
-		if imgui.Selectable("Fit Game View") do Viewport_FitGameView(state)
-		Drive_Item("pick:Fit Game View")
-		if imgui.Selectable("Fit Selection") do Viewport_FitSelection(state)
-		Drive_Item("pick:Fit Selection")
-		imgui.EndCombo()
-	}
-	imgui.PopStyleVar()
-	Drive_Item("toolbar.zoom")
-	UI_Tooltip("Zoom")
-	imgui.SameLine()
-	UI_VerticalDivider()
-	if UI_IconButton(ICON_FA_FLOPPY_DISK, "toolbar.save", "Save scene (Ctrl+S)", tint = UI_WARNING if modified else {}) do Toolbar_SaveScene(state)
-	imgui.SameLine()
-	if UI_IconButton(ICON_FA_BOX_ARCHIVE, "toolbar.export", "Export .ore package") do Toolbar_ExportOre(state)
-	imgui.SameLine()
-	if UI_IconButton(ICON_FA_GEAR, "toolbar.settings", "Project settings") do ProjectSettingsDialog_Open(state)
 }
 
 Toolbar_StartSimulation :: proc(state: ^EditorState) {

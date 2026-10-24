@@ -10,7 +10,7 @@ import imgui "lib/imgui"
 // ============================================================================
 
 Editor_RequestQuit :: proc(state: ^EditorState) {
-	if !GlobalSettings.confirmQuit || (Editor_ModifiedSceneCount(state) == 0 && Code_DirtyCount() == 0) {
+	if !GlobalSettings.confirmQuit || (Editor_ModifiedSceneCount(state) == 0 && Code_DirtyCount() == 0 && !LevelEditor_HasUnsaved()) {
 		state.quitConfirmed = true
 		return
 	}
@@ -30,11 +30,13 @@ QuitPrompt_Render :: proc(state: ^EditorState) {
 	imgui.Dummy({0, 4})
 	if scenes > 0 do imgui.TextUnformatted(fmt.ctprintf("%d scene(s) have unsaved changes.", scenes))
 	if scripts > 0 do imgui.TextUnformatted(fmt.ctprintf("%d script(s) have unsaved changes.", scripts))
+	if LevelEditor_HasUnsaved() do imgui.TextUnformatted(fmt.ctprintf("The level %s has unsaved changes.", GlobalLevel.rel))
 	imgui.Dummy({0, 8})
 	if UI_PrimaryButton("Save All and Quit", "quit.save") {
 		Editor_SaveAllScenes(state)
 		Code_SaveAll(state)
-		if Editor_ModifiedSceneCount(state) == 0 && Code_DirtyCount() == 0 do state.quitConfirmed = true
+		if LevelEditor_HasUnsaved() do LevelEditor_Save(state)
+		if Editor_ModifiedSceneCount(state) == 0 && Code_DirtyCount() == 0 && !LevelEditor_HasUnsaved() do state.quitConfirmed = true
 		state.quitRequested = false
 		imgui.CloseCurrentPopup()
 	}

@@ -688,6 +688,12 @@ colliders.
 
 ### LDtk levels
 
+The **Level** root tab (under the toolbar, next to **Game**; Cmd+Shift+2)
+edits LDtk projects in place: levels, IntGrid / Tiles / Auto layers (LDtk's
+rule engine), entities, definitions, terrains, animated tiles. Open a file
+from its start page, Assets > right-click > **Edit in Level Tab**, or an LDtk
+Level node's **Edit in Level Tab**. See `engine/docs/level_editor.md`.
+
 Import a `.ldtk` project and double-click it under **Levels** to add an
 LDtk level. The **LDtk** tab of the bottom panel (Inspector: *Layers,
 Entities, Collision...*) shows the selected level: pick the world and level
