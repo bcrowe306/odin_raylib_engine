@@ -41,6 +41,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "CameraNode",
 	},
 	{
+		name        = "Advanced Camera",
+		category    = "Core & 2D",
+		icon        = ICON_FA_CAMERA,
+		description = "A virtual camera (Phantom Camera style): follow modes (glued, damped with look-ahead, group with auto-zoom, path, dead zone), limits incl. the LDtk level the target is in, trauma shake. The highest priority one is shown; switching blends.",
+		typeName    = "AdvancedCameraNode",
+	},
+	{
 		name        = "Timer",
 		category    = "Core & 2D",
 		icon        = ICON_FA_GEAR,

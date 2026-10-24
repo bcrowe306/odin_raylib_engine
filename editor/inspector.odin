@@ -767,6 +767,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_line(state, cast(^e.LineNode)node)
 	case e.PathNode:
 		inspector_path(state, cast(^e.PathNode)node)
+	case e.AdvancedCameraNode:
+		inspector_adv_camera(state, cast(^e.AdvancedCameraNode)node)
 	case e.NavigationRegionNode:
 		inspector_nav_region(state, cast(^e.NavigationRegionNode)node)
 	case e.StateMachineNode:
@@ -1218,6 +1220,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.PathFollowNode: return ICON_FA_ROUTE
 	case e.NavigationRegionNode: return ICON_FA_MAP
 	case e.NavigationAgentNode: return ICON_FA_PERSON_RUNNING
+	case e.AdvancedCameraNode: return ICON_FA_CAMERA
 	case e.PostEffectNode: return ICON_FA_FILTER
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS
 	case e.ScriptNode: return ICON_FA_CODE

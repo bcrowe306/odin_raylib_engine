@@ -23,6 +23,8 @@ NodeManager :: struct {
 	// NavigationRegion / NavigationAgent nodes (navigation_nodes.odin).
 	navRegions: [dynamic]^Node,
 	navAgents:  [dynamic]^Node,
+	// AdvancedCameraNodes (advanced_camera.odin), in the order added.
+	advCameras: [dynamic]^Node,
 }
 
 NodeManagerStats :: struct {
@@ -87,6 +89,7 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	delete(manager.notifiers)
 	delete(manager.navRegions)
 	delete(manager.navAgents)
+	delete(manager.advCameras)
 	for _, list in manager.childrenOf do delete(list)
 	delete(manager.childrenOf)
 	delete(manager.parentOf)
@@ -99,6 +102,7 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	manager.notifiers = nil
 	manager.navRegions = nil
 	manager.navAgents = nil
+	manager.advCameras = nil
 	manager.childrenOf = nil
 	manager.parentOf = nil
 }
@@ -239,6 +243,9 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 			if node.typeId == NavigationAgentNode {
 				for n, k in manager.navAgents do if n == node {unordered_remove(&manager.navAgents, k); break}
 			}
+			if node.typeId == AdvancedCameraNode {
+				for n, k in manager.advCameras do if n == node {ordered_remove(&manager.advCameras, k); break}
+			}
 			// Frees node's arena, subjects, and any custom onDestroy resources.
 			Node_Terminate(node)
 			manager.nodes[index] = nil
@@ -272,6 +279,7 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 		if addNode != nil && addNode.typeId == VisibilityNotifierNode do append(&manager.notifiers, addNode)
 		if addNode != nil && addNode.typeId == NavigationRegionNode do append(&manager.navRegions, addNode)
 		if addNode != nil && addNode.typeId == NavigationAgentNode do append(&manager.navAgents, addNode)
+		if addNode != nil && addNode.typeId == AdvancedCameraNode do append(&manager.advCameras, addNode)
 	}
 	clear(&manager.addition)
 	for n in added {

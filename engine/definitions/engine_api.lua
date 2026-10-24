@@ -125,6 +125,10 @@ local NavigationRegionNode = {}
 ---@class NavigationAgentNode : Node
 local NavigationAgentNode = {}
 
+---A virtual camera: follow modes (Glued, Simple, Group, Path, Framed), limits (incl. the LDtk level the target is in), trauma shake; the scene's camera shows the highest priority one and blends on a switch. "became_active" / "became_inactive".
+---@class AdvancedCameraNode : Node
+local AdvancedCameraNode = {}
+
 ---A curve through points with Bézier handles (routes, rails, platforms' tracks); a PathFollowNode child travels along it.
 ---@class PathNode : Node
 local PathNode = {}
@@ -530,6 +534,13 @@ function RaycastNode:connect(event, handler) end
 ---@param handler fun(value: any, source: VisibilityNotifierNode)
 ---@return integer id Connection id for `disconnect`
 function VisibilityNotifierNode:connect(event, handler) end
+
+---@alias AdvancedCameraNodeEvent NodeTreeEvent|"became_active"|"became_inactive"|ProjectEvent
+---Connects a handler to one of this node's events: became_active (The host camera switched to this advanced camera), became_inactive (Another advanced camera took over); the tree events; custom ones.
+---@param event AdvancedCameraNodeEvent|string
+---@param handler fun(value: any, source: AdvancedCameraNode)
+---@return integer id Connection id for `disconnect`
+function AdvancedCameraNode:connect(event, handler) end
 
 ---@alias NavigationAgentNodeEvent NodeTreeEvent|"navigation_finished"|"target_unreachable"|ProjectEvent
 ---Connects a handler to one of this node's events: navigation_finished (The agent arrived at its target), target_unreachable (No way to the agent's target); the tree events; custom ones.
@@ -2004,6 +2015,177 @@ function VisibilityNotifierNode:get_property(path) end
 ---@overload fun(self: VisibilityNotifierNode, path: "action", value: "None"|"Pause_Parent"|"Disable_Parent"|"Remove_Parent")
 ---@overload fun(self: VisibilityNotifierNode, path: "onScreen", value: boolean)
 function VisibilityNotifierNode:set_property(path, value, y) end
+
+---@class AdvancedCameraNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field priority integer The host camera shows the enabled advanced camera with the highest priority (a tie: the...
+---@field followMode "None"|"Glued"|"Simple"|"Group"|"Path"|"Framed" None (stays where placed), Glued (exactly on the target), Simple (offset, damping, look...
+---@field followTarget string The node it follows (a path like Player or ../Hero).
+---@field followTargets string Group: more nodes to frame, comma separated.
+---@field followPath string Path: the PathNode the camera rides along.
+---@field followOffset Vec2 Added to the target's position (px).
+---@field damping number Smoothing time in seconds: 0 locks on, 0.2-0.5 feels smooth.
+---@field axisLock "None"|"X"|"Y"|"XY" Don't follow along these axes (e.g. Y for a side-scroller that never moves vertically).
+---@field lookahead number Looks ahead of a moving target by this many seconds of its velocity.
+---@field deadZone Vec2 Framed: the part of the view (fraction of width / height) the target can move in withou...
+---@field zoom number Zoom (2 = twice as close).
+---@field autoZoom boolean Group: zoom so every target fits, between Auto Zoom Min and Max.
+---@field autoZoomMin number Group auto zoom: farthest out.
+---@field autoZoomMax number Group auto zoom: closest in.
+---@field autoZoomMargin number Group auto zoom: space kept around the targets (px).
+---@field limitMode "None"|"Rect"|"Node"|"LdtkLevel" Keeps the view inside: None, Rect (Limit Rect), Node (a TileMap / LDtk level / Navigati...
+---@field limitNode string Node limits: the node whose bounds the view stays in.
+---@field limitMargin number Shrinks (+) or grows (-) the limits (px).
+---@field limitBlend number Seconds to glide to new limits (moving into another LDtk level); 0 = at once.
+---@field blendTime number Seconds the host takes to move from the previous camera to this one when it becomes act...
+---@field blendEase "Linear"|"In_Sine"|"Out_Sine"|"In_Out_Sine"|"In_Quad"|"Out_Quad"|"In_Out_Quad"|"In_Cubic"|"Out_Cubic"|"In_Out_Cubic"|"In_Quart"|"Out_Quart"|"In_Out_Quart"|"In_Expo"|"Out_Expo"|"In_Out_Expo"|"In_Back"|"Out_Back"|"In_Out_Back"|"In_Elastic"|"Out_Elastic"|"In_Out_Elastic"|"In_Bounce"|"Out_Bounce"|"In_Out_Bounce"|"Constant" The easing of that blend.
+---@field snapToPixel boolean Round the position to whole pixels (pixel art).
+---@field shakeIntensity number Shake offset at full trauma (px).
+---@field shakeRotation number Shake rotation at full trauma (degrees).
+---@field shakeDecay number Trauma lost per second.
+---@field shakeFrequency number How fast the shake moves (noise speed).
+---@field traumaExponent number Shake = trauma ^ exponent: 2-3 makes small hits subtle and big ones strong.
+---@field trauma number Current trauma 0..1 (add_trauma stacks it; runtime).
+---@field active boolean The host camera shows this one now (runtime, read-only).
+
+---@alias AdvancedCameraNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "priority" # integer - The host camera shows the enabled advanced camera with the highest priority (a tie: the...
+---| "followMode" # "None"|"Glued"|"Simple"|"Group"|"Path"|"Framed" - None (stays where placed), Glued (exactly on the target), Simple (offset, damping, look...
+---| "followTarget" # string - The node it follows (a path like Player or ../Hero).
+---| "followTargets" # string - Group: more nodes to frame, comma separated.
+---| "followPath" # string - Path: the PathNode the camera rides along.
+---| "followOffset" # Vec2 - Added to the target's position (px).
+---| "damping" # number - Smoothing time in seconds: 0 locks on, 0.2-0.5 feels smooth.
+---| "axisLock" # "None"|"X"|"Y"|"XY" - Don't follow along these axes (e.g. Y for a side-scroller that never moves vertically).
+---| "lookahead" # number - Looks ahead of a moving target by this many seconds of its velocity.
+---| "deadZone" # Vec2 - Framed: the part of the view (fraction of width / height) the target can move in withou...
+---| "zoom" # number - Zoom (2 = twice as close).
+---| "autoZoom" # boolean - Group: zoom so every target fits, between Auto Zoom Min and Max.
+---| "autoZoomMin" # number - Group auto zoom: farthest out.
+---| "autoZoomMax" # number - Group auto zoom: closest in.
+---| "autoZoomMargin" # number - Group auto zoom: space kept around the targets (px).
+---| "limitMode" # "None"|"Rect"|"Node"|"LdtkLevel" - Keeps the view inside: None, Rect (Limit Rect), Node (a TileMap / LDtk level / Navigati...
+---| "limitNode" # string - Node limits: the node whose bounds the view stays in.
+---| "limitMargin" # number - Shrinks (+) or grows (-) the limits (px).
+---| "limitBlend" # number - Seconds to glide to new limits (moving into another LDtk level); 0 = at once.
+---| "blendTime" # number - Seconds the host takes to move from the previous camera to this one when it becomes act...
+---| "blendEase" # "Linear"|"In_Sine"|"Out_Sine"|"In_Out_Sine"|"In_Quad"|"Out_Quad"|"In_Out_Quad"|"In_Cubic"|"Out_Cubic"|"In_Out_Cubic"|"In_Quart"|"Out_Quart"|"In_Out_Quart"|"In_Expo"|"Out_Expo"|"In_Out_Expo"|"In_Back"|"Out_Back"|"In_Out_Back"|"In_Elastic"|"Out_Elastic"|"In_Out_Elastic"|"In_Bounce"|"Out_Bounce"|"In_Out_Bounce"|"Constant" - The easing of that blend.
+---| "snapToPixel" # boolean - Round the position to whole pixels (pixel art).
+---| "shakeIntensity" # number - Shake offset at full trauma (px).
+---| "shakeRotation" # number - Shake rotation at full trauma (degrees).
+---| "shakeDecay" # number - Trauma lost per second.
+---| "shakeFrequency" # number - How fast the shake moves (noise speed).
+---| "traumaExponent" # number - Shake = trauma ^ exponent: 2-3 makes small hits subtle and big ones strong.
+---| "trauma" # number (runtime) - Current trauma 0..1 (add_trauma stacks it; runtime).
+---| "active" # boolean (runtime) - The host camera shows this one now (runtime, read-only).
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path AdvancedCameraNodeProperty|string
+---@return any
+---@overload fun(self: AdvancedCameraNode, path: "position"): Vec2
+---@overload fun(self: AdvancedCameraNode, path: "scale"): Vec2
+---@overload fun(self: AdvancedCameraNode, path: "rotation"): number
+---@overload fun(self: AdvancedCameraNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: AdvancedCameraNode, path: "zIndex"): integer
+---@overload fun(self: AdvancedCameraNode, path: "ySort"): boolean
+---@overload fun(self: AdvancedCameraNode, path: "ySortOffset"): number
+---@overload fun(self: AdvancedCameraNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: AdvancedCameraNode, path: "paused"): boolean
+---@overload fun(self: AdvancedCameraNode, path: "enabled"): boolean
+---@overload fun(self: AdvancedCameraNode, path: "priority"): integer
+---@overload fun(self: AdvancedCameraNode, path: "followMode"): "None"|"Glued"|"Simple"|"Group"|"Path"|"Framed"
+---@overload fun(self: AdvancedCameraNode, path: "followTarget"): string
+---@overload fun(self: AdvancedCameraNode, path: "followTargets"): string
+---@overload fun(self: AdvancedCameraNode, path: "followPath"): string
+---@overload fun(self: AdvancedCameraNode, path: "followOffset"): Vec2
+---@overload fun(self: AdvancedCameraNode, path: "damping"): number
+---@overload fun(self: AdvancedCameraNode, path: "axisLock"): "None"|"X"|"Y"|"XY"
+---@overload fun(self: AdvancedCameraNode, path: "lookahead"): number
+---@overload fun(self: AdvancedCameraNode, path: "deadZone"): Vec2
+---@overload fun(self: AdvancedCameraNode, path: "zoom"): number
+---@overload fun(self: AdvancedCameraNode, path: "autoZoom"): boolean
+---@overload fun(self: AdvancedCameraNode, path: "autoZoomMin"): number
+---@overload fun(self: AdvancedCameraNode, path: "autoZoomMax"): number
+---@overload fun(self: AdvancedCameraNode, path: "autoZoomMargin"): number
+---@overload fun(self: AdvancedCameraNode, path: "limitMode"): "None"|"Rect"|"Node"|"LdtkLevel"
+---@overload fun(self: AdvancedCameraNode, path: "limitNode"): string
+---@overload fun(self: AdvancedCameraNode, path: "limitMargin"): number
+---@overload fun(self: AdvancedCameraNode, path: "limitBlend"): number
+---@overload fun(self: AdvancedCameraNode, path: "blendTime"): number
+---@overload fun(self: AdvancedCameraNode, path: "blendEase"): "Linear"|"In_Sine"|"Out_Sine"|"In_Out_Sine"|"In_Quad"|"Out_Quad"|"In_Out_Quad"|"In_Cubic"|"Out_Cubic"|"In_Out_Cubic"|"In_Quart"|"Out_Quart"|"In_Out_Quart"|"In_Expo"|"Out_Expo"|"In_Out_Expo"|"In_Back"|"Out_Back"|"In_Out_Back"|"In_Elastic"|"Out_Elastic"|"In_Out_Elastic"|"In_Bounce"|"Out_Bounce"|"In_Out_Bounce"|"Constant"
+---@overload fun(self: AdvancedCameraNode, path: "snapToPixel"): boolean
+---@overload fun(self: AdvancedCameraNode, path: "shakeIntensity"): number
+---@overload fun(self: AdvancedCameraNode, path: "shakeRotation"): number
+---@overload fun(self: AdvancedCameraNode, path: "shakeDecay"): number
+---@overload fun(self: AdvancedCameraNode, path: "shakeFrequency"): number
+---@overload fun(self: AdvancedCameraNode, path: "traumaExponent"): number
+---@overload fun(self: AdvancedCameraNode, path: "trauma"): number
+---@overload fun(self: AdvancedCameraNode, path: "active"): boolean
+function AdvancedCameraNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---@param path AdvancedCameraNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: AdvancedCameraNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AdvancedCameraNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AdvancedCameraNode, path: "rotation", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: AdvancedCameraNode, path: "zIndex", value: integer)
+---@overload fun(self: AdvancedCameraNode, path: "ySort", value: boolean)
+---@overload fun(self: AdvancedCameraNode, path: "ySortOffset", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: AdvancedCameraNode, path: "paused", value: boolean)
+---@overload fun(self: AdvancedCameraNode, path: "enabled", value: boolean)
+---@overload fun(self: AdvancedCameraNode, path: "priority", value: integer)
+---@overload fun(self: AdvancedCameraNode, path: "followMode", value: "None"|"Glued"|"Simple"|"Group"|"Path"|"Framed")
+---@overload fun(self: AdvancedCameraNode, path: "followTarget", value: string)
+---@overload fun(self: AdvancedCameraNode, path: "followTargets", value: string)
+---@overload fun(self: AdvancedCameraNode, path: "followPath", value: string)
+---@overload fun(self: AdvancedCameraNode, path: "followOffset", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AdvancedCameraNode, path: "damping", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "axisLock", value: "None"|"X"|"Y"|"XY")
+---@overload fun(self: AdvancedCameraNode, path: "lookahead", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "deadZone", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AdvancedCameraNode, path: "zoom", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "autoZoom", value: boolean)
+---@overload fun(self: AdvancedCameraNode, path: "autoZoomMin", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "autoZoomMax", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "autoZoomMargin", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "limitMode", value: "None"|"Rect"|"Node"|"LdtkLevel")
+---@overload fun(self: AdvancedCameraNode, path: "limitNode", value: string)
+---@overload fun(self: AdvancedCameraNode, path: "limitMargin", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "limitBlend", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "blendTime", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "blendEase", value: "Linear"|"In_Sine"|"Out_Sine"|"In_Out_Sine"|"In_Quad"|"Out_Quad"|"In_Out_Quad"|"In_Cubic"|"Out_Cubic"|"In_Out_Cubic"|"In_Quart"|"Out_Quart"|"In_Out_Quart"|"In_Expo"|"Out_Expo"|"In_Out_Expo"|"In_Back"|"Out_Back"|"In_Out_Back"|"In_Elastic"|"Out_Elastic"|"In_Out_Elastic"|"In_Bounce"|"Out_Bounce"|"In_Out_Bounce"|"Constant")
+---@overload fun(self: AdvancedCameraNode, path: "snapToPixel", value: boolean)
+---@overload fun(self: AdvancedCameraNode, path: "shakeIntensity", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "shakeRotation", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "shakeDecay", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "shakeFrequency", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "traumaExponent", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "trauma", value: number)
+---@overload fun(self: AdvancedCameraNode, path: "active", value: boolean)
+function AdvancedCameraNode:set_property(path, value, y) end
 
 ---@class PathNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -5787,6 +5969,28 @@ function NavigationAgentNode:nav_get_path() end
 ---@return number
 function NavigationAgentNode:nav_distance_left() end
 
+---Adds shake trauma (stacks up to 1, decays by Shake Decay per second).
+---
+---Example: `cam:add_trauma(0.4)  -- a hit`
+---@param amount number 0..1
+function AdvancedCameraNode:add_trauma(amount) end
+
+---Raises its priority above every other advanced camera: the host blends to it.
+---
+---Example: `Scene.find_node("BossCam"):make_active()`
+function AdvancedCameraNode:make_active() end
+
+---The scene's camera shows this one now.
+---
+---Example: `if cam:is_active() then hud:show_hint() end`
+---@return boolean
+function AdvancedCameraNode:is_active() end
+
+---Jumps to where it wants to be now (no damping; ends the blend if active) - after a teleport.
+---
+---Example: `player.position = spawn; cam:snap()`
+function AdvancedCameraNode:snap() end
+
 
 ---The collision layers this body's shapes are on: project layer names
 ---(Project Settings > Physics), "LayerN" or numbers 1-16; several or a table.
@@ -7657,6 +7861,18 @@ function CameraModule.stop_shake() end
 ---Example: `if not Camera.is_shaking() then Camera.shake(0.3, 0.2) end`
 ---@return boolean
 function CameraModule.is_shaking() end
+
+---Adds shake trauma to the active advanced camera (stacks up to 1; see AdvancedCameraNode).
+---
+---Example: `Camera.add_trauma(0.3)`
+---@param amount number 0..1
+function CameraModule.add_trauma(amount) end
+
+---The advanced camera the scene's camera shows (nil if there are none).
+---
+---Example: `local cam = Camera.get_active()`
+---@return AdvancedCameraNode?
+function CameraModule.get_active() end
 
 ---Constrains camera movement within bounding rectangle limits.
 ---

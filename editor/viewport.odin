@@ -212,6 +212,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 		Viewport_DrawNotifiers(state)
 		Viewport_DrawPaths(state)
 		Viewport_DrawNavigation(state)
+		Viewport_DrawAdvancedCameras(state)
 
 		// Draw bounding boxes / physics colliders (when enabled or node selected)
 		Viewport_DrawSceneBounds(state)

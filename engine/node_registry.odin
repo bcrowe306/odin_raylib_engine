@@ -40,6 +40,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"AreaNode", AreaNode, factory_area, {"area"}},
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
 	{"VisibilityNotifierNode", VisibilityNotifierNode, factory_visibility, {"visibility", "on screen", "notifier"}},
+	{"AdvancedCameraNode", AdvancedCameraNode, factory_adv_camera, {"advanced camera", "virtual camera", "phantom", "cinemachine"}},
 	{"PathNode", PathNode, factory_path, {"path", "curve", "bezier", "route", "rail"}},
 	{"NavigationRegionNode", NavigationRegionNode, factory_nav_region, {"navigation", "nav region", "navmesh", "pathfinding"}},
 	{"NavigationAgentNode", NavigationAgentNode, factory_nav_agent, {"nav agent", "agent", "pathfinding agent"}},
@@ -267,6 +268,9 @@ factory_nav_agent :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return Navigat
 
 @(private = "file")
 factory_path_follow :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PathFollowNode_Create(scene, "PathFollow", parent)}
+
+@(private = "file")
+factory_adv_camera :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return AdvancedCameraNode_Create(scene, "AdvancedCamera", parent)}
 
 @(private = "file")
 factory_visibility :: proc(scene: ^Scene, parent: ^Node) -> ^Node {

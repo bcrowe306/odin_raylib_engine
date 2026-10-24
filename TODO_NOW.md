@@ -158,7 +158,7 @@ Platform and shipping (later): 18 mobile export + touch, 19 Steam, 20 gamepad ru
 
 Quality of life:
 - [ ] 23 Accessibility: UI scaling, colourblind filters, remappable controls, subtitles from dialogue
-- [ ] 24 Advanced camera node (the basic CameraNode stays): Phantom Camera features (reference: `phantom-camera/`) - follow modes, dead zones, look-ahead, limits, framing groups, priorities / blending, paths - plus trauma-based shake / juice (https://github.com/filipbasara/trauma-gd)
+- [x] 24 Advanced camera: AdvancedCameraNode virtual cameras hosted by the scene's CameraNode (highest priority shown, eased blends of position / zoom / rotation, a transient host when the scene has no camera); follow modes None / Glued / Simple (offset, damping, look-ahead) / Group (auto zoom) / Path / Framed (dead zone), axis lock; limits Rect / Node bounds / the LDtk level the target is in (glides between linked levels); trauma shake (trauma ^ exponent, noise, decay); Lua add_trauma / make_active / is_active / snap, Camera.add_trauma / get_active, became_active / inactive; Inspector node pickers, viewport frames / dead zone / limits (preview on a copy); guide with tutorials, tests, drive
 
 ## Phase 11 — State transition guards (2026-10-23)
 

@@ -1335,6 +1335,19 @@ local sx, sy = Camera.world_to_screen(player_x, player_y)
 local cx, cy, cw, ch = Camera.get_visible_world_bounds()
 ```
 
+**Advanced cameras** (virtual cameras the scene's camera hosts, blending
+between them by priority; follow modes, LDtk level limits, trauma shake):
+
+```lua
+Camera.add_trauma(0.4)                       -- shake the active advanced camera (stacks to 1)
+local cam = Camera.get_active()              -- nil when the scene has none
+Scene.find_node("BossCam"):make_active()     -- priority above the others: the host blends to it
+cam:add_trauma(0.2); cam:snap(); cam:is_active()
+cam:connect("became_active", function() end) -- also "became_inactive"
+```
+
+Guide with tutorials: [`docs/advanced_camera.md`](docs/advanced_camera.md).
+
 ---
 
 ### 6. Physics Module (`Physics`)

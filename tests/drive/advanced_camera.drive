@@ -1,0 +1,53 @@
+# Advanced camera: added from Add Node, Follow Target picked in the
+# Inspector's Targets section (saved as a path); in Simulate it is the
+# active camera and the host follows the ship; trauma from Lua; a second
+# camera with a higher priority takes over.
+wait 5
+key escape
+key ctrl+a
+type advanced camera
+key enter
+wait 5
+expect node:AdvancedCamera.type == AdvancedCameraNode
+dblclick @insp.name
+key ctrl+a
+type CamZz
+key enter
+wait 2
+expect item:insp.advcam.follow == visible
+click @insp.advcam.follow
+click @pick:PlayerShip
+wait 2
+scroll @viewport -3
+scroll @viewport -3
+wait 3
+screenshot picked
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "type": "AdvancedCameraNode"
+expect file:scenes/main.scene.json contains "followTarget": "../PlayerShip"
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 30
+click @bottom:console
+click @console.lua
+type local c = Camera.get_active(); local s = Scene.find_node("PlayerShip").position; local x, y, w, h = Camera.get_visible_world_bounds(); print("ADV active=" .. tostring(c and c:get_name()) .. " follows=" .. tostring(math.abs(x + w / 2 - s.x) < 2 and math.abs(y + h / 2 - s.y) < 2))
+key enter
+wait 3
+expect log contains ADV active=CamZz follows=true
+type Camera.add_trauma(0.8); print("ADV trauma=" .. tostring(Camera.get_active().trauma > 0.5))
+key enter
+wait 3
+expect log contains ADV trauma=true
+screenshot shaking
+type local c2 = Scene.create_node("AdvancedCameraNode", "WideZz"); c2.priority = 5; c2.zoom = 0.5
+key enter
+wait 90
+type print("ADV now=" .. Camera.get_active():get_name() .. " old=" .. tostring(Scene.find_node("CamZz"):is_active()))
+key enter
+wait 3
+expect log contains ADV now=WideZz old=false
+screenshot wide
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

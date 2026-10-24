@@ -9,6 +9,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 |---|---|
 | [Draw order](draw_order.md) | Layers, Z index, Y-sort (top-down / isometric depth). |
 | [Navigation](navigation.md) | Path finding on tile maps, LDtk levels and Navigation Regions; agents that walk there (radius, avoidance, doors) - with tutorials. |
+| [Advanced camera](advanced_camera.md) | Virtual cameras with priorities and blending, follow modes (group, path, dead zone, look-ahead), limits incl. the LDtk level the target is in, trauma shake - with tutorials. |
 | [Audio mixer](audio_mixer.md) | Buses (fader, pan, mute / solo, effects, routing), the Mixer tab, Lua control - with tutorials. |
 | [Input and rebinding](input_rebinding.md) | Actions, player rebinding (listen, conflicts, saving), gamepad menus, the Controls Menu template. |
 | [Changing scenes](scene_flow.md) | Transitions, preloading, loading screens (background texture decoding) - with a loading screen tutorial. |

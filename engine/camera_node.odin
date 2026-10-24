@@ -861,6 +861,10 @@ CameraNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32
 		camera.viewportSize = {f32(rl.GetRenderWidth()), f32(rl.GetRenderHeight())}
 	}
 
+	// Advanced cameras in the scene: this camera hosts them (shows the
+	// highest-priority one, blending between them).
+	if AdvCam_Host(camera, gameContext, dt) do return
+
 	// ------------------------------------------------------------------------
 	// 1. Cinematic Sequence Update
 	// ------------------------------------------------------------------------

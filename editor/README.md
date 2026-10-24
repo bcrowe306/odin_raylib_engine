@@ -537,6 +537,16 @@ the Inspector rebuilds them. **Navigation Agent** under a character walks
 it to targets; in Simulate its path is drawn green. Guide:
 [`engine/docs/navigation.md`](../engine/docs/navigation.md).
 
+### Advanced cameras
+
+**Advanced Camera** (Add Node > Core & 2D): a virtual camera. The viewport
+draws each one's frame (violet - where it would look now, at its zoom,
+with its priority); selected, its dead zone and limits (pink). The
+Inspector's **Targets** section picks the follow target, group members,
+path and limit node (or drop a node from the Scene panel). In Simulate,
+**Make Active** and **Shake** try it out. Guide:
+[`engine/docs/advanced_camera.md`](../engine/docs/advanced_camera.md).
+
 ### Mixer
 
 Bottom panel > **Mixer**: the project's buses as a console - a strip per
