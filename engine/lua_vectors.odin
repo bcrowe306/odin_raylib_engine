@@ -1,7 +1,7 @@
 package engine
 
 import "core:c"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Vec2 / Vec3 / Vec4 for Lua: small value types with operators, defined in

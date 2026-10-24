@@ -7,7 +7,7 @@ import "core:encoding/endian"
 import "core:hash"
 import "core:log"
 import "core:mem"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import zlib "vendor:zlib"
@@ -86,7 +86,7 @@ OreFileSource :: struct {
 }
 
 OrePackage_CreateFromFiles :: proc(sources: []OreFileSource, outPath: string, compress: bool = true) -> bool {
-	context = runtime.default_context()
+	context = Engine_DefaultContext()
 	buf: bytes.Buffer
 	bytes.buffer_init_allocator(&buf, 0, 1024, context.temp_allocator)
 	defer bytes.buffer_destroy(&buf)
@@ -188,18 +188,15 @@ OrePackage_CreateFromFiles :: proc(sources: []OreFileSource, outPath: string, co
 // filter: which project files go in (nil = all); overrides: archive paths
 // whose content is replaced (or added), e.g. a preset's project.json.
 OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compress: bool = true, filter: proc(path: string, data: rawptr) -> bool = nil, filterData: rawptr = nil, overrides: map[string][]u8 = nil) -> bool {
-	context = runtime.default_context()
+	context = Engine_DefaultContext()
 	sources := make([dynamic]OreFileSource, context.temp_allocator)
 
 	absDir, absErr := filepath.abs(dirPath, context.temp_allocator)
 	if absErr != nil do return false
 
-	w := filepath.walker_create(absDir)
-	defer filepath.walker_destroy(&w)
-
-	for info in filepath.walker_walk(&w) {
-		if info.type == .Regular {
-			relPath, err := filepath.rel(absDir, info.fullpath, context.temp_allocator)
+	for fullpath in os.walk_files(absDir) {
+		{
+			relPath, err := filepath.rel(absDir, fullpath, context.temp_allocator)
 			// Hidden files and folders (.ore/ tooling, .luarc.json, editor
 			// settings, .DS_Store) aren't part of the game.
 			hidden := false
@@ -211,7 +208,7 @@ OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compres
 				if norm in overrides do continue
 				append(&sources, OreFileSource{
 					archivePath = strings.clone(norm, context.temp_allocator),
-					diskPath    = strings.clone(info.fullpath, context.temp_allocator),
+					diskPath    = strings.clone(fullpath, context.temp_allocator),
 					data        = nil,
 					owned       = false,
 				})

@@ -2,7 +2,7 @@ package engine
 
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 @(test)
 test_node_tags :: proc(t: ^testing.T) {

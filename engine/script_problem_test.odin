@@ -3,7 +3,7 @@ package engine
 import "core:log"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Script problems reach the sink with the Lua location: a get_node that
 // finds nothing and an unknown get_property path warn once per call site.

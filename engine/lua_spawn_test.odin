@@ -1,9 +1,9 @@
 package engine
 
 import "core:log"
-import "core:os"
+import os "osx"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Spawning from Lua: Scene.instantiate puts a component instance under a
 // parent at a position and returns its root; queue_free removes a node at

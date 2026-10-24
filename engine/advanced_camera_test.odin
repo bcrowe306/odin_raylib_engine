@@ -1,9 +1,9 @@
 package engine
 
 import "core:math"
-import "core:os"
+import os "osx"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Advanced cameras: a host made when the scene has no camera, following
 // (Simple with an offset, Framed's dead zone, Group's auto zoom), Rect

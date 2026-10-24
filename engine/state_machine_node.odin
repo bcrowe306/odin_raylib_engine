@@ -2,7 +2,7 @@ package engine
 
 import "core:fmt"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // StateMachineNode: named states, transitions between them guarded by

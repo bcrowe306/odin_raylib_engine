@@ -30,6 +30,7 @@ import "winres"
 RUNNER_FONT :: "OpenSans-Regular.ttf"
 
 runner_file_name :: proc(t: e.Export_Target, debug := false) -> string {
+	if t == .Web do return "index.wasm" // (one web runner: index.html / .js / .wasm + odin.js)
 	base := "runner-debug" if debug else "runner"
 	return strings.concatenate({base, ".exe"}, context.temp_allocator) if t == .Windows else base
 }
@@ -189,6 +190,7 @@ export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) 
 	case .MacOS:   return Export_MacApp(state, &pc, runner, ore, dir, name)
 	case .Linux:   return export_linux(state, &pc, runner, ore, dir, name)
 	case .Windows: return export_windows(state, &pc, runner, ore, dir, name)
+	case .Web:     return export_web(state, &pc, runner, ore, dir, name)
 	}
 	return "", false
 }

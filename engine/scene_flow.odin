@@ -227,9 +227,9 @@ Scene_Preload :: struct {
 // (Scene_PreloadStep). Loading the scene afterwards finds them cached.
 Scene_PreloadBegin :: proc(game: ^Game, scene: ^Scene) {
 	if scene == nil || scene.isLoaded || scene in game.preloads do return
-	p := new(Scene_Preload, runtime.heap_allocator())
-	p.items = make([dynamic]Preload_Item, runtime.heap_allocator())
-	if game.preloads == nil do game.preloads = make(map[^Scene]^Scene_Preload, allocator = runtime.heap_allocator())
+	p := new(Scene_Preload, Engine_HeapAllocator())
+	p.items = make([dynamic]Preload_Item, Engine_HeapAllocator())
+	if game.preloads == nil do game.preloads = make(map[^Scene]^Scene_Preload, allocator = Engine_HeapAllocator())
 	game.preloads[scene] = p
 	if scene.sourceJson == "" do return
 	seen := make(map[string]bool, allocator = context.temp_allocator)
@@ -238,7 +238,7 @@ Scene_PreloadBegin :: proc(game: ^Game, scene: ^Scene) {
 		key := fmt.tprintf("%v|%s|%v", kind, path, size)
 		if key in seen do return
 		seen[key] = true
-		append(&p.items, Preload_Item{kind = kind, path = strings.clone(path, runtime.heap_allocator()), size = size})
+		append(&p.items, Preload_Item{kind = kind, path = strings.clone(path, Engine_HeapAllocator()), size = size})
 	}
 	walk :: proc(game: ^Game, p: ^Scene_Preload, seen: ^map[string]bool, v: json.Value, depth: int) {
 		if depth > 64 do return
@@ -370,10 +370,10 @@ Scene_PreloadRelease :: proc(game: ^Game, scene: ^Scene) {
 			case .Font:
 			}
 		}
-		delete(it.path, runtime.heap_allocator())
+		delete(it.path, Engine_HeapAllocator())
 	}
 	delete(p.items)
-	free(p, runtime.heap_allocator())
+	free(p, Engine_HeapAllocator())
 	delete_key(&game.preloads, scene)
 }
 

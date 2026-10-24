@@ -82,3 +82,7 @@ else
 fi
 cp engine/Open_Sans/static/OpenSans-Regular.ttf bin/runners/
 echo "Built $out/$exe"
+# The web runner too when emscripten is installed (scripts/build_web_runner.sh).
+if command -v emcc >/dev/null; then
+	scripts/build_web_runner.sh >/dev/null && echo "Built bin/runners/web"
+fi

@@ -2,7 +2,7 @@ package engine
 
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Script property types: enum, range (slider), array, curve, gradient,
 // group / tooltip; lists are Lua tables, saved as JSON, read back.

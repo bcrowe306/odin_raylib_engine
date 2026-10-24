@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:c"
 import "core:math"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 
 // ============================================================================
@@ -51,7 +51,7 @@ NavigationRegionNode_Create :: proc(scene: ^Scene, name: string = "NavigationReg
 	r.ready = proc(n: ^Node, ctx: ^GameContext) {NavRegion_Bake(cast(^NavigationRegionNode)n, ctx)}
 	r.onDestroy = proc(n: ^Node, ctx: ^GameContext) {
 		rr := cast(^NavigationRegionNode)n
-		if rr.blocked != nil do delete(rr.blocked, runtime.heap_allocator())
+		if rr.blocked != nil do delete(rr.blocked, Engine_HeapAllocator())
 		rr.blocked = nil
 		Nav_Forget(n)
 	}
@@ -66,7 +66,7 @@ NavRegion_Bake :: proc(r: ^NavigationRegionNode, ctx: ^GameContext = nil) {
 	cell := max(r.cellSize, 1)
 	w := max(int(math.ceil(r.size.x / cell)), 1)
 	h := max(int(math.ceil(r.size.y / cell)), 1)
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	nb := make([]u8, w * h, a)
 	if r.cells == {w, h} && r.blocked != nil do for v, i in r.blocked do if v == 2 do nb[i] = 2
 	if r.blocked != nil do delete(r.blocked, a)
@@ -271,7 +271,7 @@ NavigationAgentNode_Create :: proc(scene: ^Scene, name: string = "NavigationAgen
 	a.name = strings.clone(name, a.allocator)
 	a.speed, a.radius, a.arriveDistance, a.repathInterval = 120, 10, 6, 0.5
 	a.moveParent, a.avoidance = true, true
-	a.path = make([dynamic][2]f32, runtime.heap_allocator())
+	a.path = make([dynamic][2]f32, Engine_HeapAllocator())
 	a.update = NavigationAgentNode_Update
 	a.onDestroy = proc(n: ^Node, ctx: ^GameContext) {
 		ag := cast(^NavigationAgentNode)n

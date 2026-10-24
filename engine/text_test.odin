@@ -1,9 +1,9 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 
 @(private = "file")

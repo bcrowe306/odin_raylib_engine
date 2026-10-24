@@ -3,7 +3,7 @@ package engine
 import "base:runtime"
 import "core:testing"
 import "core:time"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 
 // Loading screens: change_scene with loading = "<scene>" goes through the

@@ -1,7 +1,7 @@
 package engine
 
 import "base:runtime"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:slice"
 import "core:strings"
@@ -34,7 +34,7 @@ locale: struct {
 }
 
 @(private = "file")
-heap :: proc() -> runtime.Allocator {return runtime.heap_allocator()}
+heap :: proc() -> runtime.Allocator {return Engine_HeapAllocator()}
 
 Locale_Reset :: proc() {
 	for l in locale.languages do delete(l, heap())

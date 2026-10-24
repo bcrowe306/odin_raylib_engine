@@ -3,7 +3,7 @@ package engine
 import "core:math"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 @(test)
 test_tweens_and_easing :: proc(t: ^testing.T) {

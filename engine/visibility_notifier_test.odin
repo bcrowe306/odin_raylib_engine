@@ -1,7 +1,7 @@
 package engine
 
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Visibility notifiers: entered / exited against the view (no camera: the
 // virtual screen), the script's on_screen_* callbacks, Pause / Remove

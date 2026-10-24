@@ -67,7 +67,7 @@ font_codepoints :: proc() -> []rune {
 
 // Text_GetFont: a font for drawing at `size` (cached). Path "" = engine font.
 Text_GetFont :: proc(path: string, size: f32, sdf := false, ctx: ^GameContext = nil) -> ^Text_Font {
-	if fontCache == nil do fontCache = make(map[string]^Text_Font, allocator = runtime.heap_allocator())
+	if fontCache == nil do fontCache = make(map[string]^Text_Font, allocator = Engine_HeapAllocator())
 	ext := strings.to_lower(filepath.ext(path), context.temp_allocator)
 	vector := ext == ".ttf" || ext == ".otf"
 	px := f32(int(size + 0.5))
@@ -79,8 +79,8 @@ Text_GetFont :: proc(path: string, size: f32, sdf := false, ctx: ^GameContext = 
 	case:                key = path
 	}
 	if f, ok := fontCache[key]; ok do return f
-	f := new(Text_Font, runtime.heap_allocator())
-	defer fontCache[strings.clone(key, runtime.heap_allocator())] = f
+	f := new(Text_Font, Engine_HeapAllocator())
+	defer fontCache[strings.clone(key, Engine_HeapAllocator())] = f
 	if path == "" || !rl.IsWindowReady() {
 		f.engine = true
 		return f
@@ -103,7 +103,7 @@ Text_GetFont :: proc(path: string, size: f32, sdf := false, ctx: ^GameContext = 
 		f.size = f32(base)
 		f.sdf = true
 		if !sdfShader.ok {
-			sdfShader.shader = rl.LoadShaderFromMemory(nil, SDF_FRAGMENT)
+			sdfShader.shader = rl.LoadShaderFromMemory(nil, Shader_Port(SDF_FRAGMENT))
 			sdfShader.ok = rl.IsShaderValid(sdfShader.shader)
 		}
 	case vector && data != nil:
@@ -125,8 +125,8 @@ Text_GetFont :: proc(path: string, size: f32, sdf := false, ctx: ^GameContext = 
 Text_UnloadFonts :: proc() {
 	for k, f in fontCache {
 		if !f.engine && rl.IsWindowReady() do rl.UnloadFont(f.font)
-		delete(k, runtime.heap_allocator())
-		free(f, runtime.heap_allocator())
+		delete(k, Engine_HeapAllocator())
+		free(f, Engine_HeapAllocator())
 	}
 	delete(fontCache)
 	fontCache = nil

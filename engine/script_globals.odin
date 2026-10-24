@@ -2,7 +2,7 @@ package engine
 
 import "core:c"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Global scripts (autoloads)

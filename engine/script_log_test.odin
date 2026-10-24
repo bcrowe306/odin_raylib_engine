@@ -3,7 +3,7 @@ package engine
 import "core:log"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Script logs reach the sink (the editor's Console) with every argument
 // converted as tostring does.

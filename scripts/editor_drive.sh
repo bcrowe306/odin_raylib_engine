@@ -59,7 +59,7 @@ for d in "${drives[@]}"; do
 	EOF
 	shots="editor_screenshots/drive/$name"
 	rm -rf "$shots"
-	if perl -e 'alarm 600; exec @ARGV' "./$EDITOR_BIN" --project "$tmp/project" --drive "$d" --shots "$shots" --no-build > "$tmp/editor.log" 2>&1; then
+	if perl -e 'alarm 600; exec @ARGV' "./$EDITOR_BIN" --project "$tmp/project" --drive "$d" --shots "$shots" --no-build --user-data "$tmp/userdata" > "$tmp/editor.log" 2>&1; then
 		cp "$tmp/editor.log" "$shots/editor.log" 2>/dev/null # kept (memory reports, ...)
 		summary+=("PASS  $name")
 	else

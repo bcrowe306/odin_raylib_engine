@@ -1,7 +1,7 @@
 package engine
 
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Another node's script: "script.<name>" through get/set_property, and
 // node:get_script() for its fields and methods.

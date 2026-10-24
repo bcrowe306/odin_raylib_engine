@@ -2,7 +2,7 @@ package engine
 
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // The Console's Lua line: expressions show their values, statements run,
 // errors come back as text; nodes / vectors / tables print readably.

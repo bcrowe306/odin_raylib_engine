@@ -5,7 +5,7 @@ import "core:c"
 import "core:log"
 import "core:math"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Tweens: animate a node property to a value over time with an easing curve.
@@ -176,7 +176,7 @@ Tween_PropertyIsColor :: proc(node: ^Node, property: string) -> bool {
 // Tween_To starts a tween; returns its id (0 if the property doesn't exist).
 Tween_To :: proc(ts: ^Tween_State, node: ^Node, property: string, to: [4]f32, duration: f32, ease: Ease = .Out_Quad, delay: f32 = 0, loops := 0, yoyo := false, onComplete: c.int = 0) -> int {
 	// Tweens are made from Lua callbacks too: always the heap.
-	context.allocator = runtime.heap_allocator()
+	context.allocator = Engine_HeapAllocator()
 	if node == nil do return 0
 	if _, ok := tween_read(node, property); !ok && !strings.has_prefix(property, "shader:") do return 0
 	ts.nextId += 1
@@ -190,7 +190,7 @@ Tween_To :: proc(ts: ^Tween_State, node: ^Node, property: string, to: [4]f32, du
 
 @(private = "file")
 tween_release :: proc(t: ^Tween, L: ^lua.State) {
-	delete(t.property, runtime.heap_allocator())
+	delete(t.property, Engine_HeapAllocator())
 	if t.onComplete != 0 && L != nil do lua.L_unref(L, lua.REGISTRYINDEX, t.onComplete)
 	t.onComplete = 0
 }

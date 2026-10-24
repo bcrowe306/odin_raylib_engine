@@ -3,7 +3,7 @@ package engine
 import "core:math"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Paths: the bake (length, sampling by distance, closest point), Bézier
 // handles bending it, followers stopping / looping / ping-ponging with

@@ -1,11 +1,11 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:testing"
 import "core:time"
 import b2 "vendor:box2d"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 @(test)
 test_pausing :: proc(t: ^testing.T) {

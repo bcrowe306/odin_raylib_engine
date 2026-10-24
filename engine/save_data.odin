@@ -6,10 +6,10 @@ import "core:encoding/json"
 import "core:fmt"
 import "core:log"
 import "core:math"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Save data (Lua `Save` module): a key/value store of plain Lua values
@@ -37,20 +37,20 @@ save: struct {
 
 // Save_SetGameName: the folder name under the platform user-data folder.
 Save_SetGameName :: proc(name: string) {
-	delete(save.gameName, runtime.heap_allocator())
-	save.gameName = strings.clone(name, runtime.heap_allocator())
+	delete(save.gameName, Engine_HeapAllocator())
+	save.gameName = strings.clone(name, Engine_HeapAllocator())
 }
 
 // Save_SetDirectory overrides where save files go ("" = platform folder).
 Save_SetDirectory :: proc(dir: string) {
-	delete(save.dir, runtime.heap_allocator())
-	save.dir = strings.clone(dir, runtime.heap_allocator())
+	delete(save.dir, Engine_HeapAllocator())
+	save.dir = strings.clone(dir, Engine_HeapAllocator())
 }
 
 Save_Reset :: proc() {
-	delete(save.gameName, runtime.heap_allocator())
-	delete(save.dir, runtime.heap_allocator())
-	delete(save.slot, runtime.heap_allocator())
+	delete(save.gameName, Engine_HeapAllocator())
+	delete(save.dir, Engine_HeapAllocator())
+	delete(save.slot, Engine_HeapAllocator())
 	save = {}
 }
 
@@ -381,8 +381,8 @@ lua_save_slot :: proc "c" (L: ^lua.State) -> c.int {
 		if name != "" && name != cur {
 			Save_Flush(L)
 			Save_Forget(L)
-			delete(save.slot, runtime.heap_allocator())
-			save.slot = strings.clone(name, runtime.heap_allocator())
+			delete(save.slot, Engine_HeapAllocator())
+			save.slot = strings.clone(name, Engine_HeapAllocator())
 		}
 	}
 	lua.pushstring(L, strings.clone_to_cstring(save.slot if save.slot != "" else "save", context.temp_allocator))

@@ -2,7 +2,7 @@ package engine
 
 import "core:math"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 @(private = "file")
 rms :: proc(s: []f32, from: int) -> f32 {

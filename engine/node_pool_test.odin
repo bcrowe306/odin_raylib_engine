@@ -1,9 +1,9 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:testing"
 import b2 "vendor:box2d"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Node pools: take makes or reuses instances (parked ones disabled with
 // their bodies off), destroy() returns a pooled node, on_spawn / on_despawn

@@ -2,7 +2,7 @@ package engine
 
 import "core:math"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Navigation regions and agents: a static body wall baked into a region,
 // a path around it (and wider with a radius), a script-blocked gap making

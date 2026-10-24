@@ -163,6 +163,7 @@ Editor_LaunchGame :: proc(state: ^EditorState) {
 	CodeRuntime_Clear() // the last run's script problems
 	cmd := make([dynamic]string, context.temp_allocator)
 	append(&cmd, exePath, "--project", state.projectPath, "--editor-link")
+	if state.userDataDir != "" do append(&cmd, "--user-data", state.userDataDir)
 	if state.pendingPlayScene != "" {
 		append(&cmd, "--scene", state.pendingPlayScene)
 	}

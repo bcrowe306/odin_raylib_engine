@@ -1,8 +1,8 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 @(test)
 test_navigation_tilemap :: proc(t: ^testing.T) {

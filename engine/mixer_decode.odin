@@ -15,6 +15,8 @@ import rl "vendor:raylib"
 
 when ODIN_OS == .Windows {
 	foreign import raydec "system:kernel32.lib" // (any always-linked library: the symbols come from raylib)
+} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
+	foreign import raydec "env.o" // (web: resolved against the emcc-built raylib; a "system:" module would stay an import)
 } else {
 	foreign import raydec "system:c"
 }

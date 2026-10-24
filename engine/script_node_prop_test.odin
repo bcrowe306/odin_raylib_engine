@@ -1,7 +1,7 @@
 package engine
 
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // A `type = "node"` property: saved as a path from the script's node, the
 // node itself in Lua - resolved before ready(), and on a live edit.

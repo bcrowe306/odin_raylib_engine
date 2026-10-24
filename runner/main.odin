@@ -18,7 +18,7 @@ package main
 
 import "core:fmt"
 import "core:log"
-import "core:os"
+import os "../engine/osx"
 import e "../engine"
 
 main :: proc() {

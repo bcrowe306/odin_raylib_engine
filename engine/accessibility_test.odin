@@ -1,10 +1,10 @@
 package engine
 
 import "core:encoding/json"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Accessibility: settings JSON (only differences saved, clamped), the
 // player's file over the project's defaults, the colour filter maths, UI

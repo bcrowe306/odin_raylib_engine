@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:c"
 import "core:strings"
 import b2 "vendor:box2d"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Node pools: reuse instances of a component instead of creating and

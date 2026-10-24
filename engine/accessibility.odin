@@ -3,10 +3,10 @@ package engine
 import "core:c"
 import "core:encoding/json"
 import "core:fmt"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 
@@ -277,7 +277,7 @@ cbShader: struct {
 Colorblind_Begin :: proc(mode: Colorblind_Mode, strength: f32, simulate: bool) -> bool {
 	if mode == .None || strength <= 0 || !rl.IsWindowReady() do return false
 	if !cbShader.loaded {
-		cbShader.shader = rl.LoadShaderFromMemory(nil, COLORBLIND_FS)
+		cbShader.shader = rl.LoadShaderFromMemory(nil, Shader_Port(COLORBLIND_FS))
 		cbShader.loaded = true
 		cbShader.locMode = rl.GetShaderLocation(cbShader.shader, "mode")
 		cbShader.locStrength = rl.GetShaderLocation(cbShader.shader, "strength")

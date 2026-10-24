@@ -1,7 +1,7 @@
 package engine
 
 import "core:math/rand"
-import "core:os"
+import os "osx"
 import "core:testing"
 import rl "vendor:raylib"
 

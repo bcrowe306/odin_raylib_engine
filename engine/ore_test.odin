@@ -3,11 +3,11 @@ package engine
 import "base:runtime"
 import "core:c"
 import "core:fmt"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // ORE Package Container & Project Format Unit Tests

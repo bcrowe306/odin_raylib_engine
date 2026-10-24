@@ -1,10 +1,10 @@
 package engine
 
 import "core:fmt"
-import "core:os"
+import os "osx"
 import "core:strconv"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import "core:time"
 import rl "vendor:raylib"
 

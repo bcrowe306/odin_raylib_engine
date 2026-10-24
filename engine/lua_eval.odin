@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:c"
 import "core:fmt"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Lua console: evaluate a line typed in the editor's Console - in the

@@ -2,11 +2,11 @@ package engine
 
 import "core:c"
 import "core:log"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import "core:time"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Lua hot reload

@@ -3,7 +3,7 @@ package engine
 import "core:fmt"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // New-script templates: each compiles, declares its properties, and runs;
 // the patrol walks and turns, the pickup is collected by a tagged body, the

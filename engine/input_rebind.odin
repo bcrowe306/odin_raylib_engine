@@ -4,10 +4,10 @@ import "base:runtime"
 import "core:c"
 import "core:encoding/json"
 import "core:fmt"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 
 // ============================================================================
@@ -56,7 +56,7 @@ Input_MappingOf :: proc(input: ^InputSystem, name: string) -> ^ActionMapping {
 
 // Input_RebindSetDefaults keeps a copy of the project's actions (reset).
 Input_RebindSetDefaults :: proc(input: ^InputSystem, actions: []Input_Action_Config) {
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	Input_ActionConfigs_Destroy(&input.rebind.defaults, a)
 	input.rebind.defaults = make([dynamic]Input_Action_Config, a)
 	src := actions
@@ -74,7 +74,7 @@ Input_RebindSetDefaults :: proc(input: ^InputSystem, actions: []Input_Action_Con
 }
 
 Input_RebindDestroy :: proc(input: ^InputSystem) {
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	Input_ActionConfigs_Destroy(&input.rebind.defaults, a)
 	delete(input.rebind.action, a)
 	input.rebind.action = ""
@@ -185,7 +185,7 @@ Input_Conflicts :: proc(input: ^InputSystem, b: InputBinding, allocator := conte
 // Input_RebindListen starts capturing the next input for an action.
 Input_RebindListen :: proc(input: ^InputSystem, name: string, slot := 0, device := Rebind_Device.Any, conflicts := Rebind_Conflicts.Clear, cancelKey := rl.KeyboardKey.ESCAPE) -> bool {
 	if Input_MappingOf(input, name) == nil do return false
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	delete(input.rebind.action, a)
 	input.rebind.action = strings.clone(name, a)
 	input.rebind.slot, input.rebind.device, input.rebind.conflicts, input.rebind.cancelKey = slot, device, conflicts, cancelKey

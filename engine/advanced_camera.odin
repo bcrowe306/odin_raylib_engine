@@ -4,7 +4,7 @@ import "core:c"
 import "core:math"
 import "core:math/noise"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // AdvancedCameraNode (docs/advanced_camera.md): a virtual camera in the

@@ -34,6 +34,7 @@ Decode_Job :: struct {
 @(private = "file")
 decoder: struct {
 	pool:    thread.Pool,
+	webDone: [dynamic]^Decode_Job, // (web: no threads - decoded at once, picked up by Pump)
 	started: bool,
 	jobs:    [dynamic]^Decode_Job, // in flight (heap)
 }
@@ -42,10 +43,12 @@ DECODE_THREADS :: 2
 
 // Decode_Submit queues a file's bytes (taken over) for decoding.
 Decode_Submit :: proc(path: string, bytes: []u8) -> ^Decode_Job {
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	if !decoder.started {
-		thread.pool_init(&decoder.pool, a, DECODE_THREADS)
-		thread.pool_start(&decoder.pool)
+		when ODIN_OS != .JS {
+			thread.pool_init(&decoder.pool, a, DECODE_THREADS)
+			thread.pool_start(&decoder.pool)
+		}
 		decoder.jobs = make([dynamic]^Decode_Job, a)
 		decoder.started = true
 	}
@@ -54,7 +57,13 @@ Decode_Submit :: proc(path: string, bytes: []u8) -> ^Decode_Job {
 	j.ext = strings.clone_to_cstring(Image_ExtFor(bytes, path), a) // (QOI from export)
 	j.bytes = bytes
 	append(&decoder.jobs, j)
-	thread.pool_add_task(&decoder.pool, a, decode_task, j)
+	when ODIN_OS == .JS {
+		decode_task({data = j})
+		if decoder.webDone == nil do decoder.webDone = make([dynamic]^Decode_Job, a)
+		append(&decoder.webDone, j)
+	} else {
+		thread.pool_add_task(&decoder.pool, a, decode_task, j)
+	}
 	return j
 }
 
@@ -64,7 +73,7 @@ decode_task :: proc(t: thread.Task) {
 	j := cast(^Decode_Job)t.data
 	j.image = rl.LoadImageFromMemory(j.ext, raw_data(j.bytes), i32(len(j.bytes)))
 	j.size = {j.image.width, j.image.height}
-	delete(j.bytes, runtime.heap_allocator())
+	delete(j.bytes, Engine_HeapAllocator())
 	j.bytes = nil
 	sync.atomic_thread_fence(.Release)
 }
@@ -76,10 +85,16 @@ Decode_Pump :: proc(rm: ^ResourceManager, budget := 4) {
 	if !decoder.started do return
 	n := 0
 	for n < budget {
-		task, ok := thread.pool_pop_done(&decoder.pool)
-		if !ok do break
-		sync.atomic_thread_fence(.Acquire)
-		j := cast(^Decode_Job)task.data
+		j: ^Decode_Job
+		when ODIN_OS == .JS {
+			if len(decoder.webDone) == 0 do break
+			j = pop_front(&decoder.webDone)
+		} else {
+			task, ok := thread.pool_pop_done(&decoder.pool)
+			if !ok do break
+			sync.atomic_thread_fence(.Acquire)
+			j = cast(^Decode_Job)task.data
+		}
 		if j.abandoned {
 			decode_free(j)
 			continue
@@ -117,7 +132,7 @@ Decode_Abandon :: proc(rm: ^ResourceManager, j: ^Decode_Job) {
 
 @(private = "file")
 decode_free :: proc(j: ^Decode_Job) {
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	for x, i in decoder.jobs do if x == j {
 		unordered_remove(&decoder.jobs, i)
 		break
@@ -132,13 +147,16 @@ decode_free :: proc(j: ^Decode_Job) {
 // Decode_Shutdown waits for the workers and frees every job (game end).
 Decode_Shutdown :: proc() {
 	if !decoder.started do return
-	thread.pool_join(&decoder.pool)
-	for {
-		_, ok := thread.pool_pop_done(&decoder.pool)
-		if !ok do break
+	when ODIN_OS != .JS {
+		thread.pool_join(&decoder.pool)
+		for {
+			_, ok := thread.pool_pop_done(&decoder.pool)
+			if !ok do break
+		}
 	}
 	for len(decoder.jobs) > 0 do decode_free(decoder.jobs[len(decoder.jobs) - 1])
 	delete(decoder.jobs)
-	thread.pool_destroy(&decoder.pool)
+	delete(decoder.webDone)
+	when ODIN_OS != .JS do thread.pool_destroy(&decoder.pool)
 	decoder = {}
 }

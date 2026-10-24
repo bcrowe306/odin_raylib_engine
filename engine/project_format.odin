@@ -7,7 +7,7 @@ import "core:fmt"
 import "core:log"
 import "core:math"
 import "core:mem"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strconv"
 import "core:strings"
@@ -71,6 +71,7 @@ Export_Target :: enum {
 	MacOS,
 	Windows,
 	Linux,
+	Web, // a page (index.html + wasm) and game.ore - runners/web/ (scripts/build_web_runner.sh)
 }
 
 Export_Settings :: struct {
@@ -273,7 +274,7 @@ json_extract_texture_path :: proc(nodeObj: json.Object) -> string {
 // ----------------------------------------------------------------------------
 
 Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> (ProjectConfig, bool) {
-	context = runtime.default_context()
+	context = Engine_DefaultContext()
 	cfg := ProjectConfig{
 		name          = "Untitled Project",
 		version       = "1.0.0",
@@ -533,6 +534,7 @@ export_target_name :: proc(t: Export_Target) -> string {
 	case .MacOS: return "macos"
 	case .Windows: return "windows"
 	case .Linux: return "linux"
+	case .Web: return "web"
 	}
 	return ""
 }

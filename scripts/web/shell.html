@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; outline: none; }
+  #start { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+           flex-direction: column; gap: 12px; color: #e8eaf0; font: 600 20px system-ui, sans-serif;
+           background: #080a12; cursor: pointer; }
+  #start small { font-weight: 400; font-size: 14px; opacity: .65; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1" oncontextmenu="event.preventDefault()"></canvas>
+<div id="start"><span id="status">Loading...</span><small id="hint"></small></div>
+<script src="odin.js"></script>
+<script>
+// The web runner (engine/runner/web): odin.js gives the Odin side its
+// imports; emscripten runs raylib, Lua and Box2D. game.ore (next to this
+// page) is fetched into the file system; saves live in /save, kept in the
+// browser (IndexedDB). Browsers only allow audio after a click, so the
+// game starts on the first click / key.
+var odinMemoryInterface = new odin.WasmMemoryInterface();
+odinMemoryInterface.setIntSize(4);
+var odinImports = odin.setupDefaultImports(odinMemoryInterface);
+var started = false, ready = false;
+var statusEl = document.getElementById("status"), hintEl = document.getElementById("hint");
+var Module = {
+  canvas: document.getElementById("canvas"),
+  print: (t) => console.log(t),
+  printErr: (t) => console.warn(t),
+  instantiateWasm: (imports, successCallback) => {
+    const all = { ...odinImports, ...imports };
+    WebAssembly.instantiateStreaming(fetch("index.wasm"), all).then((output) => {
+      const e = output.instance.exports;
+      odinMemoryInterface.setExports(e);
+      odinMemoryInterface.setMemory(e.memory);
+      successCallback(output.instance);
+    });
+    return {};
+  },
+  onRuntimeInitialized: async () => {
+    try {
+      const res = await fetch("game.ore");
+      if (!res.ok) throw new Error("game.ore: " + res.status);
+      FS.writeFile("/game.ore", new Uint8Array(await res.arrayBuffer()));
+      // The UI font (fonts/ next to the page, like the desktop exports).
+      const font = await fetch("fonts/OpenSans-Regular.ttf");
+      if (font.ok) {
+        FS.mkdir("/fonts");
+        FS.writeFile("/fonts/OpenSans-Regular.ttf", new Uint8Array(await font.arrayBuffer()));
+      }
+      FS.mkdir("/save");
+      FS.mount(IDBFS, {}, "/save");
+      await new Promise((ok) => FS.syncfs(true, () => ok()));
+      ready = true;
+      statusEl.textContent = "Click to play";
+      hintEl.textContent = "(or press any key)";
+      // ?autostart: no click needed (kiosks, automated captures; audio may
+      // stay muted until the page is clicked).
+      if (new URLSearchParams(location.search).has("autostart")) start();
+    } catch (err) {
+      statusEl.textContent = "Could not load the game";
+      hintEl.textContent = String(err);
+    }
+  },
+};
+function start() {
+  if (!ready || started) return;
+  started = true;
+  document.getElementById("start").remove();
+  Module.canvas.focus();
+  try { Module._main_start(); } catch (err) { console.error("main_start:", err, err && err.stack); return; }
+  const resize = () => Module._main_resize(window.innerWidth, window.innerHeight);
+  window.addEventListener("resize", resize);
+  resize();
+  const frame = () => {
+    let more = false;
+    try { more = Module._main_update(); } catch (err) { console.error("main_update:", err, err && err.stack); }
+    if (more) requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  // Saves reach IndexedDB every couple of seconds and when the tab hides.
+  const sync = () => FS.syncfs(false, () => {});
+  setInterval(sync, 2000);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) sync(); });
+}
+document.getElementById("start").addEventListener("click", start);
+window.addEventListener("keydown", start, { once: false });
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>

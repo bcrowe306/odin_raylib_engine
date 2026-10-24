@@ -116,8 +116,8 @@ Node_Register :: proc(node: ^Node) {
 	if liveNodes == nil {
 		// Process-lifetime registry: not owned by whatever allocator the
 		// caller happens to use.
-		liveNodes = make(map[uuid.Identifier]^Node, allocator = runtime.heap_allocator())
-		livePtrs = make(map[^Node]bool, allocator = runtime.heap_allocator())
+		liveNodes = make(map[uuid.Identifier]^Node, allocator = Engine_HeapAllocator())
+		livePtrs = make(map[^Node]bool, allocator = Engine_HeapAllocator())
 	}
 	liveNodes[node.id] = node
 	livePtrs[node] = true

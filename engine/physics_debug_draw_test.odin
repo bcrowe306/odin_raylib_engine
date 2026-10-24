@@ -2,7 +2,7 @@ package engine
 
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // The project's Show Colliders setting (physics.debug_draw): on by default,
 // read, saved; scripts switch it with Physics.set_debug_draw.

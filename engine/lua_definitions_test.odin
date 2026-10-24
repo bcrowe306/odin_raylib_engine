@@ -3,7 +3,7 @@ package engine
 import "core:slice"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // definitions/engine_api.lua (what the language server knows) matches the
 // functions the engine registers in Lua: every node method and module

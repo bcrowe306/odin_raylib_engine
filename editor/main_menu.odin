@@ -74,6 +74,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 			menuCurrent = "Export"
 			menu_action(state, "file.export", ".ore Package")
 			menu_action(state, "file.export_standalone", "Standalone Game")
+			menu_action(state, "file.open_web_export", "Open Web Export in Browser")
 			menuCurrent = "File"
 			imgui.EndMenu()
 		}

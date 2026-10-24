@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
 import "core:math"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import rl "vendor:raylib"
@@ -264,17 +264,15 @@ Asset_ExportOverrides :: proc(projectDir: string, overrides: ^map[string][]u8, i
 	absDir, absErr := filepath.abs(projectDir, context.temp_allocator)
 	if absErr != nil do return 0
 	n := 0
-	w := filepath.walker_create(absDir)
-	defer filepath.walker_destroy(&w)
-	for info in filepath.walker_walk(&w) {
-		if info.type != .Regular || !Asset_IsImportFile(info.fullpath) do continue
-		asset := info.fullpath[:len(info.fullpath) - len(IMPORT_SUFFIX)]
+	for fullpath in os.walk_files(absDir) {
+		if !Asset_IsImportFile(fullpath) do continue
+		asset := fullpath[:len(fullpath) - len(IMPORT_SUFFIX)]
 		rel, err := filepath.rel(absDir, asset, context.temp_allocator)
 		if err != nil do continue
 		rel, _ = strings.replace_all(rel, "\\", "/", context.temp_allocator)
 		if include != nil && !include(rel, includeData) do continue
 		if rel in overrides^ do continue
-		data, rerr := os.read_entire_file(info.fullpath, context.temp_allocator)
+		data, rerr := os.read_entire_file(fullpath, context.temp_allocator)
 		if rerr != nil do continue
 		imp: Asset_Import
 		Asset_ImportParse(string(data), &imp, context.temp_allocator)

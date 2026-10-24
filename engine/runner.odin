@@ -2,7 +2,7 @@ package engine
 
 import "core:fmt"
 import "core:log"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:slice"
 import "core:strconv"
@@ -102,7 +102,8 @@ Engine_FindBundledProject :: proc(exePath: string, allocator := context.allocato
 @(private = "file")
 runner_font_path :: proc() -> cstring {
 	dev :: "engine/Open_Sans/static/OpenSans-Regular.ttf"
-	if os.is_file(dev) do return dev
+	when ODIN_OS == .JS do return "/fonts/OpenSans-Regular.ttf" // (the page fetches fonts/ next to it)
+	if os.is_file(dev) || len(os.args) == 0 do return dev
 	exeDir := filepath.dir(os.args[0], context.temp_allocator)
 	nextTo, _ := filepath.join({exeDir, "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
 	inApp, _ := filepath.join({exeDir, "..", "Resources", "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
@@ -110,18 +111,41 @@ runner_font_path :: proc() -> cstring {
 	return dev
 }
 
+// Runner_State: a running game (Runner_Start / Runner_Frame / Runner_Stop) -
+// the desktop loop below, or the web page calling Runner_Frame once per
+// animation frame (runner_web).
+Runner_State :: struct {
+	game:               ^Game,
+	opts:               Run_Options,
+	video:              ProjectConfig,
+	frameCount:         int,
+	targetCaptureFrame: int,
+	fixedStep:          bool,
+	benchRun:           time.Duration,
+	benchFrame:         time.Duration,
+	windowOpen, audioOpen, fontsLoaded: bool,
+}
+
 // Engine_RunProject opens a window and plays the project until it quits.
 // Returns a process exit code.
 Engine_RunProject :: proc(opts: Run_Options) -> int {
+	rs, ok := Runner_Start(opts)
+	if !ok do return 1
+	for Runner_Frame(rs) {}
+	Runner_Stop(rs)
+	return 0
+}
+
+// Runner_Start creates the game and its window and loads the project
+// (false: it failed - everything is cleaned up).
+Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
+	rs := new(Runner_State)
+	rs.opts = opts
 	projectPath := opts.projectPath
-	screenshotPath := opts.screenshotPath
-	maxFrames := opts.maxFrames
-	isHidden := opts.hidden
 	startScene := opts.startScene
-	dumpScenePath := opts.dumpScenePath
 	game := new(Game)
+	rs.game = game
 	InitializeGame(game)
-	defer game->terminate()
 	if opts.userDataDir != "" do Save_SetDirectory(opts.userDataDir)
 	if opts.noRenderCache {
 		TileCache_SetEnabled(false)
@@ -161,6 +185,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 			}
 		}
 	}
+	rs.video = video
 
 	// Project Video settings.
 	flags: rl.ConfigFlags = {}
@@ -168,37 +193,34 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	if video.vsync && opts.benchFrames <= 0 do flags += {.VSYNC_HINT}
 	if video.msaa do flags += {.MSAA_4X_HINT}
 	if video.highDPI do flags += {.WINDOW_HIGHDPI}
-	if isHidden {
+	if opts.hidden {
 		flags += {.WINDOW_HIDDEN}
 	}
 	rl.SetConfigFlags(flags)
 	rl.SetTraceLogLevel(.ERROR) // raylib warns once per oversized icon glyph (thousands of lines)
+	when ODIN_OS == .JS do rl.SetTraceLogLevel(.WARNING) // (the browser console: shader / GL problems)
 	titleC := strings.clone_to_cstring(winTitle, context.temp_allocator)
 	rl.InitWindow(winW, winH, titleC)
-	defer rl.CloseWindow()
+	rs.windowOpen = true
 	// Fullscreen (project Video, Engine.set_fullscreen): applied from the
 	// first frames on (Runner_ApplyFullscreen); the frame scales to the window.
-	if video.fullscreen && !isHidden do game.fullscreenRequest = true
-	defer if runnerTarget.id != 0 {
-		rl.UnloadRenderTexture(runnerTarget)
-		runnerTarget = {}
-	}
+	if video.fullscreen && !opts.hidden do game.fullscreenRequest = true
 	if !opts.noRenderCache do Render_InitBatching()
-	defer Render_ReleaseBatching()
-	defer Post_Unload()
 
 	rl.SetTargetFPS(0 if opts.benchFrames > 0 else targetFPS)
+	when ODIN_OS == .JS do rl.SetTargetFPS(0) // (the page's requestAnimationFrame paces frames: raylib mustn't sleep)
 	rl.InitAudioDevice()
-	defer rl.CloseAudioDevice()
+	rs.audioOpen = true
 
 	// Multi-size engine fonts
 	InitEngineFonts(runner_font_path())
-	defer UnloadEngineFonts()
+	rs.fontsLoaded = true
 
 	// Load Project (populates scenes, sets gravity, activates initial_scene)
 	if !game->loadProject(projectPath) {
 		log.errorf("Failed to load project: %s", projectPath)
-		return 1
+		Runner_Stop(rs)
+		return nil, false
 	}
 	if video.icon != "" do Runner_SetWindowIcon(game, video.icon)
 
@@ -229,21 +251,31 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	// command line too: front ends pass on only the options they know.)
 	if opts.editorLink || slice.contains(os.args, "--editor-link") do EditorLink_Enable(game)
 
-	frameCount := 0
-	targetCaptureFrame := max(25, maxFrames) if maxFrames > 0 else 30
+	rs.targetCaptureFrame = max(25, opts.maxFrames) if opts.maxFrames > 0 else 30
+	// Captures for tests step a fixed 1/60 s, so runs are comparable.
+	rs.fixedStep = opts.screenshotPath != "" || opts.dumpScenePath != ""
+	return rs, true
+}
+
+// Runner_Frame runs and draws one frame; false when the game is over (the
+// window closed, the game quit, a capture or benchmark finished).
+Runner_Frame :: proc(rs: ^Runner_State) -> bool {
+	game := rs.game
+	opts := rs.opts
+	video := rs.video
+	screenshotPath := opts.screenshotPath
+	dumpScenePath := opts.dumpScenePath
 	// --bench: the first 30 frames warm up (loading, caches), then N timed.
 	benchWarmup :: 30
-	benchRun, benchFrame: time.Duration
-
-	// Game loop
-	// Captures for tests step a fixed 1/60 s, so runs are comparable.
-	fixedStep := screenshotPath != "" || dumpScenePath != ""
-	for !rl.WindowShouldClose() && !game.shouldQuit {
-		dt := 1.0 / 60 if fixedStep else rl.GetFrameTime()
+	// (raylib's web WindowShouldClose sleeps for a blocking loop: a page never "closes")
+	when ODIN_OS != .JS do if rl.WindowShouldClose() do return false
+	if game.shouldQuit do return false
+	{
+		dt := 1.0 / 60 if rs.fixedStep else rl.GetFrameTime()
 		EditorLink_BeginFrame(game)
 		if game.linkPaused && !game.frozen do dt = 1.0 / 60 // a step
 
-		if on, asked := game.fullscreenRequest.?; asked && frameCount >= 2 {
+		if on, asked := game.fullscreenRequest.?; asked && rs.frameCount >= 2 {
 			Runner_ApplyFullscreen(game, on)
 			game.fullscreenRequest = nil
 		}
@@ -298,36 +330,52 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 		rl.EndDrawing()
 		defer free_all(context.temp_allocator) // the frame's temp allocations (after the captures below)
 
-		frameCount += 1
-		if opts.benchFrames > 0 && frameCount > benchWarmup {
-			benchRun += runTime
-			benchFrame += time.tick_since(frameStart)
-			if frameCount >= benchWarmup + opts.benchFrames {
+		rs.frameCount += 1
+		if opts.benchFrames > 0 && rs.frameCount > benchWarmup {
+			rs.benchRun += runTime
+			rs.benchFrame += time.tick_since(frameStart)
+			if rs.frameCount >= benchWarmup + opts.benchFrames {
 				n := f64(opts.benchFrames)
 				fmt.printfln("[bench] %d frames: update+draw %.3f ms | whole frame (incl. GPU sync) %.3f ms | %d drawn, %d culled | %d tile chunks (%d built)",
-					opts.benchFrames, time.duration_milliseconds(benchRun) / n, time.duration_milliseconds(benchFrame) / n, renderStats.drawn, renderStats.culled, TileCache_Stats(), TileCache_Builds())
-				break
+					opts.benchFrames, time.duration_milliseconds(rs.benchRun) / n, time.duration_milliseconds(rs.benchFrame) / n, renderStats.drawn, renderStats.culled, TileCache_Stats(), TileCache_Builds())
+				return false
 			}
 		}
-		if (screenshotPath != "" || dumpScenePath != "") && frameCount >= targetCaptureFrame {
+		if (screenshotPath != "" || dumpScenePath != "") && rs.frameCount >= rs.targetCaptureFrame {
 			// --dump-scene: what the game is actually running, for tests.
 			if dumpScenePath != "" && game.sceneManager.currentScene != nil {
 				dump := Scene_SerializeToJSON(game.sceneManager.currentScene, context.temp_allocator)
 				_ = os.write_entire_file(dumpScenePath, transmute([]u8)dump)
 			}
 		}
-		if screenshotPath == "" && dumpScenePath != "" && frameCount >= targetCaptureFrame do break
-		if screenshotPath != "" && frameCount >= targetCaptureFrame {
+		if screenshotPath == "" && dumpScenePath != "" && rs.frameCount >= rs.targetCaptureFrame do return false
+		if screenshotPath != "" && rs.frameCount >= rs.targetCaptureFrame {
 			img := rl.LoadImageFromScreen()
 			cPath := strings.clone_to_cstring(screenshotPath, context.temp_allocator)
 			rl.ExportImage(img, cPath)
 			rl.UnloadImage(img)
 			log.infof("[Gameplay Screenshot] Saved gameplay capture to: %s", screenshotPath)
-			break
+			return false
 		}
 	}
+	return true
+}
+
+// Runner_Stop frees the game, its window and everything the runner made.
+Runner_Stop :: proc(rs: ^Runner_State) {
+	if rs == nil do return
 	Pixel_Release()
-	return 0
+	if rs.fontsLoaded do UnloadEngineFonts()
+	if rs.audioOpen do rl.CloseAudioDevice()
+	Post_Unload()
+	Render_ReleaseBatching()
+	if runnerTarget.id != 0 {
+		rl.UnloadRenderTexture(runnerTarget)
+		runnerTarget = {}
+	}
+	if rs.windowOpen do rl.CloseWindow()
+	rs.game->terminate()
+	free(rs)
 }
 
 // Runner_ApplyFullscreen switches the window to cover the monitor (a

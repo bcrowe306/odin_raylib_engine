@@ -3,10 +3,10 @@ package engine
 import "base:runtime"
 import "core:c"
 import "core:fmt"
-import "core:os"
+import os "osx"
 import "core:strings"
 import "core:sync"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Virtual File System (VFS) & Embedded Asset Packaging for Lua Scripts
@@ -28,7 +28,7 @@ ScriptVFS_Init :: proc() {
 
 	if vfsGlobal.initialized do return
 
-	alloc := runtime.default_allocator()
+	alloc := Engine_HeapAllocator()
 	vfsGlobal.embedded = make(map[string]string, allocator = alloc)
 	vfsGlobal.searchPaths = make([dynamic]string, allocator = alloc)
 	append(&vfsGlobal.searchPaths, "assets/scripts/")
@@ -43,7 +43,7 @@ ScriptVFS_Destroy :: proc() {
 
 	if !vfsGlobal.initialized do return
 
-	alloc := runtime.default_allocator()
+	alloc := Engine_HeapAllocator()
 	for k, v in vfsGlobal.embedded {
 		delete(k, alloc)
 		delete(v, alloc)
@@ -58,7 +58,7 @@ ScriptVFS_RegisterEmbedded :: proc(path: string, code: string) {
 	sync.mutex_lock(&vfsGlobal.mutex)
 	defer sync.mutex_unlock(&vfsGlobal.mutex)
 
-	alloc := runtime.default_allocator()
+	alloc := Engine_HeapAllocator()
 	norm := ScriptVFS_NormalizePath(path)
 	for k, v in vfsGlobal.embedded {
 		if k == norm {

@@ -1,9 +1,9 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Reads the global Lua array `events` as "a,b,c".
 @(private = "file")

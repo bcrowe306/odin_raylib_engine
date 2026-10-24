@@ -97,7 +97,7 @@ Scene_HasLighting :: proc(scene: ^Scene) -> bool {
 ensure_targets :: proc(w, h: i32) -> bool {
 	if !rl.IsWindowReady() || w <= 0 || h <= 0 do return false
 	if !lighting.shaderOk {
-		lighting.shader = rl.LoadShaderFromMemory(nil, LIGHT_SHADER)
+		lighting.shader = rl.LoadShaderFromMemory(nil, Shader_Port(LIGHT_SHADER))
 		if !rl.IsShaderValid(lighting.shader) do return false
 		lighting.locFalloff = rl.GetShaderLocation(lighting.shader, "falloff")
 		lighting.locSpread = rl.GetShaderLocation(lighting.shader, "spread")

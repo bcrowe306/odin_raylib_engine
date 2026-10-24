@@ -813,6 +813,14 @@ Export**) writes, for each target platform, `<output>/<platform>/` with the
 game runner renamed to the executable name, `game.ore` and the UI font: a
 folder you can ship.
 
+**Web**: a preset (or target) with platform **web** exports a static site
+- the prebuilt web runner (`runners/web/`: index.html, index.js,
+index.wasm, odin.js), `game.ore`, the font and the icon as favicon, the
+page titled with the window title. **File > Export > Open Web Export in
+Browser** serves it on `http://127.0.0.1:8765/` and opens it. Building the
+web runner (once, with emscripten): `scripts/build_web_runner.sh`. Guide:
+[`engine/docs/web_export.md`](../engine/docs/web_export.md).
+
 **Export presets** (Project Settings > Export > **Use Presets**) give each
 export its own settings: platform, executable name, output folder (default
 `<output>/<preset name>`), version, icon, window title / size, fullscreen,

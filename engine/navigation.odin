@@ -54,8 +54,8 @@ navCache: map[rawptr]^Nav_Grid
 @(private = "file")
 grid_alloc :: proc(g: ^Nav_Grid, w, h: int) {
 	if len(g.blocked) != w * h {
-		delete(g.blocked, runtime.heap_allocator())
-		g.blocked = make([]bool, w * h, runtime.heap_allocator())
+		delete(g.blocked, Engine_HeapAllocator())
+		g.blocked = make([]bool, w * h, Engine_HeapAllocator())
 	} else {
 		for &b in g.blocked do b = false
 	}
@@ -65,10 +65,10 @@ grid_alloc :: proc(g: ^Nav_Grid, w, h: int) {
 // Nav_GridFor: the (cached) grid of a TileMapNode or LdtkLevelNode, or nil.
 Nav_GridFor :: proc(n: ^Node, opts: Nav_Options = {}) -> ^Nav_Grid {
 	if n == nil do return nil
-	if navCache == nil do navCache = make(map[rawptr]^Nav_Grid, allocator = runtime.heap_allocator())
+	if navCache == nil do navCache = make(map[rawptr]^Nav_Grid, allocator = Engine_HeapAllocator())
 	g := navCache[n]
 	if g == nil {
-		g = new(Nav_Grid, runtime.heap_allocator())
+		g = new(Nav_Grid, Engine_HeapAllocator())
 		navCache[n] = g
 	}
 	switch n.typeId {
@@ -150,8 +150,8 @@ Nav_GridFor :: proc(n: ^Node, opts: Nav_Options = {}) -> ^Nav_Grid {
 Nav_Clearance :: proc(g: ^Nav_Grid) -> []f32 {
 	if g.clearKey == g.key + 1 && len(g.clear) == g.w * g.h do return g.clear
 	if len(g.clear) != g.w * g.h {
-		delete(g.clear, runtime.heap_allocator())
-		g.clear = make([]f32, g.w * g.h, runtime.heap_allocator())
+		delete(g.clear, Engine_HeapAllocator())
+		g.clear = make([]f32, g.w * g.h, Engine_HeapAllocator())
 	}
 	INF :: f32(1e9)
 	D2 :: f32(math.SQRT_TWO)
@@ -193,9 +193,9 @@ nav_radius_cells :: proc(g: ^Nav_Grid, radius: f32) -> f32 {
 // Nav_Forget drops a map's cached grid (the map node is going away).
 Nav_Forget :: proc(n: ^Node) {
 	if g, ok := navCache[n]; ok {
-		delete(g.blocked, runtime.heap_allocator())
-		delete(g.clear, runtime.heap_allocator())
-		free(g, runtime.heap_allocator())
+		delete(g.blocked, Engine_HeapAllocator())
+		delete(g.clear, Engine_HeapAllocator())
+		free(g, Engine_HeapAllocator())
 		delete_key(&navCache, n)
 	}
 }

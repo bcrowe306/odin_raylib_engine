@@ -109,7 +109,7 @@ mixer: struct {
 // Mixer_Init makes the buses' buffers and, with an audio device, starts the
 // output stream. Master is bus 0; `Music` and `SFX` exist by default.
 Mixer_Init :: proc() {
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	if mixer.scratch == nil do mixer.scratch = make([]f32, 2 * MIXER_BLOCK, a)
 	sync.mutex_lock(&mixer.lock)
 	if !mixer.buses[0].used {
@@ -139,13 +139,13 @@ Mixer_Shutdown :: proc() {
 	for i in 0 ..< MIXER_MAX_VOICES do mixer_free_voice_locked(i)
 	for &b in mixer.buses do mixer_free_bus(&b)
 	sync.mutex_unlock(&mixer.lock)
-	if mixer.scratch != nil do delete(mixer.scratch, runtime.heap_allocator())
+	if mixer.scratch != nil do delete(mixer.scratch, Engine_HeapAllocator())
 	mixer = {}
 }
 
 @(private = "file")
 mixer_free_bus :: proc(b: ^Mixer_Bus) {
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	if b.name != "" do delete(b.name, a)
 	if b.buf != nil do delete(b.buf, a)
 	for &e in b.effects do Effect_Free(&e)
@@ -156,7 +156,7 @@ mixer_free_bus :: proc(b: ^Mixer_Bus) {
 mixer_add_bus_locked :: proc(name: string, output: int) -> int {
 	for &b, i in mixer.buses {
 		if b.used do continue
-		a := runtime.heap_allocator()
+		a := Engine_HeapAllocator()
 		b = {used = true, name = strings.clone(name, a), volume = 1, output = output, gainL = 1, gainR = 1}
 		b.buf = make([]f32, 2 * MIXER_BLOCK, a)
 		return i
@@ -247,7 +247,7 @@ Mixer_RemoveBus :: proc(index: int) {
 Mixer_RenameBus :: proc(index: int, name: string) -> bool {
 	if index <= 0 || index >= MIXER_MAX_BUSES || !mixer.buses[index].used || name == "" do return false
 	if j := Mixer_BusIndex(name); j >= 0 && j != index do return false
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	delete(mixer.buses[index].name, a)
 	mixer.buses[index].name = strings.clone(name, a)
 	return true
@@ -363,7 +363,7 @@ Mixer_ResetBuses :: proc() {
 @(private = "file")
 mixer_free_voice_locked :: proc(i: int) {
 	v := &mixer.voices[i]
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	if v.kind == .Music && v.fifo != nil {
 		delete(v.fifo, a)
 		delete(v.dec, a)
@@ -404,7 +404,7 @@ Mixer_PlaySound :: proc(pcm: []f32, bus: int, volume: f32 = 1, pan: f32 = 0, pit
 // its decoder is read here). The Music must outlive the voice.
 Mixer_PlayMusic :: proc(m: rl.Music, bus: int, volume: f32 = 1, loop := true, owner: rawptr = nil, startSeconds: f32 = 0) -> Mixer_Voice_Handle {
 	if m.ctxData == nil do return {}
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	ch := int(max(m.stream.channels, 1))
 	v := Mixer_Voice{kind = .Music, bus = bus if mixer_bus_ok(bus) else 0, volume = volume, pitch = 1, loop = loop, owner = owner, music = m, srcRate = f32(m.stream.sampleRate), srcCh = ch}
 	v.fifo = make([]f32, 2 * MIXER_STREAM_FIFO, a)
@@ -500,7 +500,7 @@ Mixer_ActiveVoices :: proc() -> int {
 
 @(private = "file")
 mixer_callback :: proc "c" (buffer: rawptr, frames: u32) {
-	context = runtime.default_context()
+	context = Engine_DefaultContext()
 	out := ([^]f32)(buffer)[:frames * 2]
 	Mixer_Render(out)
 }

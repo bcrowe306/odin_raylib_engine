@@ -1,7 +1,7 @@
 package engine
 
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 
 // The frame fits the window centred (bars where the shapes differ);

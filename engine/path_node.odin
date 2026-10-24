@@ -6,7 +6,7 @@ import "core:hash"
 import "core:math"
 import "core:mem"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 
 // ============================================================================

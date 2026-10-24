@@ -2,7 +2,7 @@ package engine
 
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // The origin (Node.pivot): the centre by default, saved as "pivot", older
 // scenes keep their look, scripts set it by the "origin" path.

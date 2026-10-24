@@ -2,7 +2,7 @@ package engine
 
 import "core:c"
 import "core:fmt"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strconv"
 import "core:strings"
@@ -52,7 +52,7 @@ Icon_Images :: proc(pngPath: string, sizes: []int, allocator := context.allocato
 @(private = "file")
 le16 :: proc(b: ^[dynamic]u8, v: int) {append(b, u8(v), u8(v >> 8))}
 @(private = "file")
-le32 :: proc(b: ^[dynamic]u8, v: int) {append(b, u8(v), u8(v >> 8), u8(v >> 16), u8(v >> 24))}
+le32 :: proc(b: ^[dynamic]u8, v: u32) {append(b, u8(v), u8(v >> 8), u8(v >> 16), u8(v >> 24))}
 
 // Ico_Write: an .ico file with PNG-encoded images (Windows Vista+).
 Ico_Write :: proc(images: []Icon_Image, allocator := context.allocator) -> []u8 {
@@ -65,8 +65,8 @@ Ico_Write :: proc(images: []Icon_Image, allocator := context.allocator) -> []u8 
 		append(&b, u8(im.size if im.size < 256 else 0), u8(im.size if im.size < 256 else 0), 0, 0) // w, h (0 = 256), colours, reserved
 		le16(&b, 1)  // planes
 		le16(&b, 32) // bits per pixel
-		le32(&b, len(im.png))
-		le32(&b, offset)
+		le32(&b, u32(len(im.png)))
+		le32(&b, u32(offset))
 		offset += len(im.png)
 	}
 	for im in images do append(&b, ..im.png)
@@ -84,7 +84,7 @@ Ico_GroupDirectory :: proc(images: []Icon_Image, firstId: int, allocator := cont
 		append(&b, u8(im.size if im.size < 256 else 0), u8(im.size if im.size < 256 else 0), 0, 0)
 		le16(&b, 1)
 		le16(&b, 32)
-		le32(&b, len(im.png))
+		le32(&b, u32(len(im.png)))
 		le16(&b, firstId + i)
 	}
 	return b[:]
@@ -150,8 +150,8 @@ VersionInfo_Resource :: proc(productName, description, version, exeName: string,
 	le32(&fixed, 0x00010000)                         // structure version
 	ms := int(ver[0]) << 16 | int(ver[1])
 	ls := int(ver[2]) << 16 | int(ver[3])
-	le32(&fixed, ms); le32(&fixed, ls)               // file version
-	le32(&fixed, ms); le32(&fixed, ls)               // product version
+	le32(&fixed, u32(ms)); le32(&fixed, u32(ls))               // file version
+	le32(&fixed, u32(ms)); le32(&fixed, u32(ls))               // product version
 	le32(&fixed, 0x3F)                               // flags mask
 	le32(&fixed, 0)                                  // flags
 	le32(&fixed, 0x00040004)                         // VOS_NT_WINDOWS32

@@ -1,0 +1,32 @@
+# Web export: a "web" preset with its own window title exported next to the
+# others (the prebuilt web runner, game.ore, the font, the page titled);
+# File > Export > Open Web Export in Browser serves it on localhost, and the
+# game runs there in headless Chrome (screenshot).
+exec bash scripts/web/ensure_runner.sh
+wait 5
+click @toolbar.settings
+click @settings.page:Export
+click @settings.preset-convert
+click @settings.preset-add
+click @pick:web
+click @settings.preset-name
+key cmd+a
+type Browser
+key enter
+click @settings.preset-title
+type Web Demo
+key enter
+screenshot web_preset
+click @settings.export-preset
+wait 10
+expect log contains Exported Browser (web):
+expect abs-file:$PROJECT_standalone/Browser/index.html contains <title>Web Demo</title>
+expect abs-file:$PROJECT_standalone/Browser/index.html contains odin.js
+wait 3
+click @menu:File
+click @menu:File/Export
+click @menu:Export/Open Web Export in Browser
+wait 5
+expect log contains Serving
+expect log contains index.html
+exec node scripts/web/capture.mjs http://127.0.0.1:8765/index.html?autostart $SHOTS/web_game.png 12

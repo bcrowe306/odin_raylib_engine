@@ -94,6 +94,8 @@ EditorState :: struct {
 	// Project & Game
 	game:              ^e.Game,
 	projectConfig:     e.ProjectConfig,
+	userDataDir:        string, // --user-data: where save data goes ("" = the player's folder)
+	webExportDir:       string, // the last Web export (Game > Open Web Export in Browser)
 	projectPath:       string,
 	projectLoaded:     bool,
 	activeScenePath:   string,
@@ -247,6 +249,13 @@ Editor_Init :: proc(state: ^EditorState) {
 	for i := 0; i < len(os.args); i += 1 {
 		if os.args[i] == "--project" && i + 1 < len(os.args) do state.projectPath = os.args[i + 1]
 		if os.args[i] == "--no-build" do state.skipGameBuild = true
+		// --user-data <dir>: save data (Save, accessibility, bindings) goes
+		// there, also for the game started with Play - test drives keep the
+		// player's real folders untouched.
+		if os.args[i] == "--user-data" && i + 1 < len(os.args) {
+			state.userDataDir = strings.clone(os.args[i + 1])
+			e.Save_SetDirectory(state.userDataDir)
+		}
 	}
 	state.sceneBaselines = make(map[^e.Scene]string)
 	state.sceneVersion = make(map[^e.Scene]int)
@@ -321,6 +330,7 @@ Editor_Init :: proc(state: ^EditorState) {
 Editor_Shutdown :: proc(state: ^EditorState) {
 	e.scriptLogSink = nil // scripts may still log while the game shuts down below
 	SceneTabs_Shutdown(state) // (writes the open tabs)
+	WebServer_Stop()
 	Code_Shutdown()
 	Palette_Shutdown()
 	AnimationPanel_Shutdown()

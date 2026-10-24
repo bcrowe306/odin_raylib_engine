@@ -1,10 +1,10 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 
 // Player rebinding: slots, conflicts (clear / swap / allow), names for the

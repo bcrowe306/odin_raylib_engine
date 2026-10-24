@@ -3,7 +3,7 @@ package engine
 import "base:runtime"
 import "core:c"
 import "core:time"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Lua Scripting Data Types & Property Definitions

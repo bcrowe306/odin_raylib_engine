@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:c"
 import "core:log"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Engine events in Lua
@@ -147,7 +147,7 @@ connection_index :: proc(mgr: ^ScriptManager, id: int) -> int {
 release_connection :: proc(mgr: ^ScriptManager, i: int) {
 	conn := mgr.connections[i]
 	if mgr.L != nil && conn.fnRef != 0 do lua.L_unref(mgr.L, lua.REGISTRYINDEX, conn.fnRef)
-	delete(conn.event, runtime.heap_allocator())
+	delete(conn.event, Engine_HeapAllocator())
 	ordered_remove(&mgr.connections, i)
 }
 
@@ -198,7 +198,7 @@ lua_node_connect :: proc "c" (L: ^lua.State) -> c.int {
 	append(&mgr.connections, Lua_Connection{
 		id     = mgr.nextConnectionId,
 		source = node,
-		event  = strings.clone(string(lua.tostring(L, 2)), runtime.heap_allocator()), // made in a Lua callback
+		event  = strings.clone(string(lua.tostring(L, 2)), Engine_HeapAllocator()), // made in a Lua callback
 		fnRef  = ref,
 		owner  = mgr.currentInstance,
 	})

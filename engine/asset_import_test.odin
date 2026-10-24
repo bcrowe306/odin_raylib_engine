@@ -1,6 +1,6 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:strings"
 import "core:testing"
 import rl "vendor:raylib"

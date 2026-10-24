@@ -4,7 +4,7 @@ import "core:fmt"
 import "core:log"
 import "core:reflect"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Signal connections (Godot-style, saved with the scene).

@@ -594,14 +594,14 @@ Scene_RevertComponentOverrides :: proc(scene: ^Scene, node: ^Node, ctx: ^GameCon
 
 @(private = "file")
 runtime_heap :: proc() -> runtime.Allocator {
-	return runtime.heap_allocator()
+	return Engine_HeapAllocator()
 }
 
 // Component_ClearCaches frees the per-type default cache (engine shutdown / tests).
 Component_ClearCaches :: proc() {
 	for k, v in typeDefaults {
-		delete(k, runtime.heap_allocator())
-		delete(v, runtime.heap_allocator())
+		delete(k, Engine_HeapAllocator())
+		delete(v, Engine_HeapAllocator())
 	}
 	delete(typeDefaults)
 	typeDefaults = nil

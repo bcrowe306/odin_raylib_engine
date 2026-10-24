@@ -1,7 +1,7 @@
 package engine
 
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Vec2 / Vec3 / Vec4: operators, methods, v[1] compatibility; the API
 // returns Vec2 for vector properties and setters take a vector.

@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:path/filepath"
 import "core:fmt"
 import "core:log"
-import "core:os"
+import os "osx"
 import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
@@ -100,7 +100,7 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 	for i in 0..<rm.audioCount {
 		audio := &rm.audioSounds[i]
 		Mixer_StopOwner(audio) // its voices first (they read the samples)
-		delete(audio.pcm, runtime.heap_allocator())
+		delete(audio.pcm, Engine_HeapAllocator())
 		if audio.sound.frameCount > 0 && rl.IsAudioDeviceReady() do rl.UnloadSound(audio.sound)
 		delete(audio.filePath)
 		audio^ = {}
@@ -289,7 +289,7 @@ ResourceManager_LoadAudioSound :: proc(rm: ^ResourceManager, filePath: string) -
 	if wave.data != nil && wave.frameCount > 0 {
 		if rl.IsAudioDeviceReady() do sound = rl.LoadSoundFromWave(wave)
 		rl.WaveFormat(&wave, MIXER_RATE, 32, 2)
-		pcm = make([]f32, int(wave.frameCount) * 2, runtime.heap_allocator())
+		pcm = make([]f32, int(wave.frameCount) * 2, Engine_HeapAllocator())
 		copy(pcm, ([^]f32)(wave.data)[:len(pcm)])
 		// Import gain (asset_import.odin), applied once here.
 		if g := Asset_GainLinear(Asset_ImportGet(rm, filePath)); g != 1 do for &v in pcm do v *= g
@@ -330,7 +330,7 @@ ResourceManager_ReleaseSound :: proc(rm: ^ResourceManager, audio: ^AudioSound) {
 	audio.refCount -= 1
 	if audio.refCount > 0 do return
 	Mixer_StopOwner(audio) // its voices first (they read the samples)
-	delete(audio.pcm, runtime.heap_allocator())
+	delete(audio.pcm, Engine_HeapAllocator())
 	if audio.sound.frameCount > 0 && rl.IsAudioDeviceReady() do rl.UnloadSound(audio.sound)
 	delete(audio.filePath)
 	audio^ = {}
@@ -442,12 +442,12 @@ ResourceManager_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 // the packed project (main thread).
 Decode_ReadBytes :: proc(rm: ^ResourceManager, path: string) -> ([]u8, bool) {
 	if os.is_file(path) {
-		data, err := os.read_entire_file(path, runtime.heap_allocator())
+		data, err := os.read_entire_file(path, Engine_HeapAllocator())
 		return data, err == nil
 	}
 	if b, ok := resource_bytes(rm, path); ok {
 		defer delete(b)
-		c := make([]u8, len(b), runtime.heap_allocator())
+		c := make([]u8, len(b), Engine_HeapAllocator())
 		copy(c, b)
 		return c, true
 	}

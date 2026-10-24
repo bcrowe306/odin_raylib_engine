@@ -4,7 +4,7 @@ import "base:runtime"
 import "core:c"
 import "core:log"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Lua Script Manager & Instance Lifecycle Controller
@@ -709,5 +709,5 @@ Script_Context :: proc "contextless" (L: ^lua.State) -> runtime.Context {
 	mgr := cast(^ScriptManager)lua.touserdata(L, -1)
 	lua.pop(L, 1)
 	if mgr != nil && mgr.hasCtx do return mgr.ctx
-	return runtime.default_context()
+	return Engine_DefaultContext()
 }

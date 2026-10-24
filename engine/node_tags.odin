@@ -3,7 +3,7 @@ package engine
 import "base:runtime"
 import "core:c"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Node tags (groups): any number of names per node ("enemy", "pickup"),

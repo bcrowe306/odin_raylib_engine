@@ -1,9 +1,9 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Global scripts: project.json "globals" round-trips; each script's table
 // is a Lua global, ready runs at start, update every frame (not paused).

@@ -3,7 +3,7 @@ package engine
 import "base:runtime"
 import "core:c"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // LDtk in Lua. Positions are world coordinates; levels are identified by

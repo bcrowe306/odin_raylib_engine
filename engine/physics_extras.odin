@@ -26,7 +26,7 @@ Physics_SetOneWay :: proc(node: ^Node, on: bool, side: [2]f32 = {0, -1}, worldId
 	if node == nil do return
 	key := rawptr(node)
 	if on {
-		if oneWayBodies == nil do oneWayBodies = make(map[rawptr][2]f32, allocator = runtime.heap_allocator())
+		if oneWayBodies == nil do oneWayBodies = make(map[rawptr][2]f32, allocator = Engine_HeapAllocator())
 		oneWayBodies[key] = side
 		if b2.World_IsValid(worldId) do b2.World_SetPreSolveCallback(worldId, physics_pre_solve, nil)
 	} else if key in oneWayBodies {
@@ -61,12 +61,12 @@ collisionLayerNames: [16]string
 
 Physics_SetLayerNames :: proc(names: []string) {
 	for &n in collisionLayerNames {
-		if n != "" do delete(n, runtime.heap_allocator())
+		if n != "" do delete(n, Engine_HeapAllocator())
 		n = ""
 	}
 	for name, i in names {
 		if i >= 16 do break
-		collisionLayerNames[i] = strings.clone(strings.trim_space(name), runtime.heap_allocator())
+		collisionLayerNames[i] = strings.clone(strings.trim_space(name), Engine_HeapAllocator())
 	}
 }
 

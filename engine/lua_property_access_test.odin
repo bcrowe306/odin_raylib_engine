@@ -1,7 +1,7 @@
 package engine
 
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Property-style access: node.<property> reads / writes like
 // get_property / set_property; methods and `name` still work.

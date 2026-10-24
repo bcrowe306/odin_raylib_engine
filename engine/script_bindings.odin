@@ -5,12 +5,12 @@ import "core:c"
 import "core:fmt"
 import "core:log"
 import "core:math"
-import "core:os"
+import os "osx"
 import "core:reflect"
 import "core:strings"
 import "core:time"
 import "core:encoding/uuid"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 import rl "vendor:raylib"
 import b2 "vendor:box2d"
 
@@ -3791,7 +3791,7 @@ lua_scene_set_draw_bounds :: proc "c" (L: ^lua.State) -> c.int {
 
 // Script logs (Log.info / warn / error, print) go to `scriptLogSink` when
 // set (the editor's Console), else to the logger the game had when
-// scripting started - the bindings run with runtime.default_context(),
+// scripting started - the bindings run with Engine_DefaultContext(),
 // whose logger discards everything.
 Script_LogSink :: #type proc(level: log.Level, text: string)
 scriptLogSink: Script_LogSink
@@ -3821,8 +3821,8 @@ script_warn_once :: proc(L: ^lua.State, subject: string, format: string, args: .
 	lua.pop(L, 1)
 	key := strings.concatenate({where_, subject}, context.temp_allocator)
 	if key in warned || len(warned) > 1000 do return
-	if warned == nil do warned = make(map[string]bool, runtime.heap_allocator()) // (lives for the process)
-	warned[strings.clone(key, runtime.heap_allocator())] = true
+	if warned == nil do warned = make(map[string]bool, Engine_HeapAllocator()) // (lives for the process)
+	warned[strings.clone(key, Engine_HeapAllocator())] = true
 	Script_Problem(.Warning, "%s%s", where_, fmt.tprintf(format, ..args))
 }
 

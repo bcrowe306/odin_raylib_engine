@@ -145,7 +145,7 @@ Effect_Init :: proc(e: ^Mixer_Effect, t: Mixer_Effect_Type, rate: f32) {
 	Effect_Free(e)
 	e^ = {type = t, enabled = true}
 	for d, i in MIXER_EFFECT_PARAMS[t] do e.params[i] = d.def
-	a := runtime.heap_allocator()
+	a := Engine_HeapAllocator()
 	#partial switch t {
 	case .Delay:
 		e.buf = make([]f32, int(rate * DELAY_MAX_MS / 1000 + 4) * 2, a)
@@ -173,7 +173,7 @@ Effect_Init :: proc(e: ^Mixer_Effect, t: Mixer_Effect_Type, rate: f32) {
 }
 
 Effect_Free :: proc(e: ^Mixer_Effect) {
-	if e.buf != nil do delete(e.buf, runtime.heap_allocator())
+	if e.buf != nil do delete(e.buf, Engine_HeapAllocator())
 	e.buf = nil
 }
 

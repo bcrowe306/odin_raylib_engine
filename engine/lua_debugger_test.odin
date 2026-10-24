@@ -3,7 +3,7 @@ package engine
 import "core:encoding/json"
 import "core:strings"
 import "core:testing"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 @(private = "file")
 dbg_queue: [dynamic]string

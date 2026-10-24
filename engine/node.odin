@@ -256,7 +256,7 @@ Node_Terminate :: proc(node: ^Node) {
 		// Never allocated: nothing to give back.
 	} else if len(arenaPool) < ARENA_POOL_MAX && node.arena.kind == .Growing && node.arena.curr_block != nil {
 		vmem.arena_free_all(&node.arena)
-		if arenaPool == nil do arenaPool = make([dynamic]vmem.Arena, 0, 256, runtime.heap_allocator())
+		if arenaPool == nil do arenaPool = make([dynamic]vmem.Arena, 0, 256, Engine_HeapAllocator())
 		append(&arenaPool, node.arena)
 	} else {
 		vmem.arena_destroy(&node.arena)

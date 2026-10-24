@@ -1,10 +1,10 @@
 package engine
 
-import "core:os"
+import os "osx"
 import "core:strings"
 import "core:testing"
 import b2 "vendor:box2d"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // Two worlds; Overworld has levels A (0,0) and B (64,0), side by side.
 // A: Collisions 4x2 = [wall wall platform platform / water water 0 wall],

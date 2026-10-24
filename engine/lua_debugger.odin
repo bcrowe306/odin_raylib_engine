@@ -2,10 +2,10 @@ package engine
 
 import "base:runtime"
 import "core:fmt"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 // ============================================================================
 // Lua debugger: breakpoints, stepping and locals through a line hook.
@@ -64,7 +64,7 @@ LuaDebugger_Attach :: proc(L: ^lua.State, wait_command: proc() -> string, reply:
 // (The debugger's state lives on the heap allocator: it is changed from the
 // Lua hook, which runs with a default context.)
 LuaDebugger_SetBreakpoints :: proc(file: string, lines: []int) {
-	heap := runtime.heap_allocator()
+	heap := Engine_HeapAllocator()
 	if luaDebugger.breakpoints == nil do luaDebugger.breakpoints = make(map[string][dynamic]int, heap)
 	key := debug_norm(file)
 	if old, ok := luaDebugger.breakpoints[key]; ok {
@@ -83,7 +83,7 @@ LuaDebugger_SetBreakpoints :: proc(file: string, lines: []int) {
 }
 
 LuaDebugger_ClearBreakpoints :: proc() {
-	heap := runtime.heap_allocator()
+	heap := Engine_HeapAllocator()
 	for k, v in luaDebugger.breakpoints {
 		delete(v)
 		delete(k, heap)
@@ -233,7 +233,7 @@ LuaDebugger_EvalInFrame :: proc(L: ^lua.State, level: int, code: string, allocat
 
 // LuaDebugger_SetCondition: a breakpoint's condition ("" = none).
 LuaDebugger_SetCondition :: proc(file: string, line: int, cond: string) {
-	heap := runtime.heap_allocator()
+	heap := Engine_HeapAllocator()
 	if luaDebugger.conditions == nil do luaDebugger.conditions = make(map[string]string, heap)
 	key := fmt.tprintf("%s:%d", debug_norm(file), line)
 	if key in luaDebugger.conditions {

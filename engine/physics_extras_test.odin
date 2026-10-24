@@ -3,7 +3,7 @@ package engine
 import "core:strings"
 import "core:testing"
 import b2 "vendor:box2d"
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 @(test)
 test_collision_layer_names :: proc(t: ^testing.T) {
