@@ -135,6 +135,9 @@ level_tip :: proc(text: string, topic := "") {
 	UI_Tooltip(topic != "" ? fmt.tprintf("%s\n\nF1: more", text) : text)
 }
 
+// LevelRef_Hover: F1 opens `topic` (for hovered areas that aren't items).
+LevelRef_Hover :: proc(topic: string) {lref.hovered = topic}
+
 // LevelRef_Panel: the current window's topic (call inside the panel).
 LevelRef_Panel :: proc(topic: string) {
 	if imgui.IsWindowHovered(imgui.HoveredFlags_ChildWindows) do lref.panel = topic

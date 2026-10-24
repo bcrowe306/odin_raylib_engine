@@ -28,7 +28,6 @@ import imgui "lib/imgui"
 
 @(private = "file")
 defs: struct {
-	rulesLayerUid: int,
 	layerUid:  int,
 	entityUid: int,
 	enumUid:   int,
@@ -63,7 +62,7 @@ LevelDefs_Page :: proc(state: ^EditorState, page: Level_Panel_Tab) {
 	case .Entities: LevelDefs_EntitiesPage(state)
 	case .Enums: page_enums(state)
 	case .Layers: page_layers(state)
-	case .Rules: page_rules(state)
+	case .Rules: LevelRules_Page(state)
 	case .Project: page_project(state)
 	}
 }
@@ -244,7 +243,7 @@ layer_props :: proc(state: ^EditorState, di: int) {
 	if d.type == .AutoLayer || d.type == .IntGrid {
 		imgui.Dummy({0, 4})
 		if UI_Button(fmt.tprintf("%s  Edit auto-layer rules (%d groups)", ICON_FA_WAND_MAGIC_SPARKLES, len(d.groups)), "defs.layer.rules") {
-			defs.rulesLayerUid = uid
+			LevelRules_SelectLayer(uid)
 			LevelEditor_ShowTab(.Rules)
 		}
 	}
@@ -253,40 +252,6 @@ layer_props :: proc(state: ^EditorState, di: int) {
 // ----------------------------------------------------------------------------
 // Rules page
 // ----------------------------------------------------------------------------
-
-@(private = "file")
-page_rules :: proc(state: ^EditorState) {
-	L := &GlobalLevel
-	doc := L.doc
-	// the active layer's rules by default
-	if e.Ldtk_Doc_LayerDefIndex(doc, defs.rulesLayerUid) < 0 {
-		if _, d := level_active_layer(); d != nil && (d.type == .IntGrid || d.type == .AutoLayer) do defs.rulesLayerUid = d.uid
-	}
-	avail := imgui.GetContentRegionAvail()
-	if imgui.BeginChild("##rules_layers", {200, avail.y}, {.Borders}, {}) {
-		UI_DimText("Layers with rules:")
-		for &d in doc.layerDefs {
-			if d.type != .IntGrid && d.type != .AutoLayer do continue
-			n := 0
-			for g in d.groups do n += len(g.rules)
-			if imgui.Selectable(fmt.ctprintf("%s  %s (%d)##rl%d", LAYER_TYPE_ICON[d.type], d.identifier, n, d.uid), defs.rulesLayerUid == d.uid, {}, {0, 22}) do defs.rulesLayerUid = d.uid
-			Drive_Item(fmt.tprintf("defs.rules.layer:%s", d.identifier))
-		}
-	}
-	imgui.EndChild()
-	imgui.SameLine(0, 8)
-	if imgui.BeginChild("##rules_page", {0, avail.y}, {}, {}) {
-		di := e.Ldtk_Doc_LayerDefIndex(doc, defs.rulesLayerUid)
-		if di < 0 {
-			UI_DimText("Pick an IntGrid layer (with a tileset) or an Auto layer.")
-		} else {
-			d := &doc.layerDefs[di]
-			UI_PanelTitle(LAYER_TYPE_ICON[d.type], d.identifier, "auto-layer rules")
-			rules_editor(state, d.uid)
-		}
-	}
-	imgui.EndChild()
-}
 
 // ----------------------------------------------------------------------------
 // New layer dialog (the Layers panel's + button)
@@ -306,7 +271,7 @@ newLayer: struct {
 // LevelDefs_SelectLayer / SelectRulesLayer / SelectEntity: what the Layers,
 // Rules and Entities tabs show.
 LevelDefs_SelectLayer :: proc(uid: int) {defs.layerUid = uid}
-LevelDefs_SelectRulesLayer :: proc(uid: int) {defs.rulesLayerUid = uid}
+LevelDefs_SelectRulesLayer :: proc(uid: int) {LevelRules_SelectLayer(uid)}
 LevelDefs_SelectEntity :: proc(uid: int) {defs.entityUid = uid}
 LevelDefs_SelectedEntity :: proc() -> int {return defs.entityUid}
 
@@ -561,278 +526,6 @@ page_project :: proc(state: ^EditorState) {
 	imgui.SameLine(0, 8)
 	if imgui.BeginChild("##project_fields", {0, avail.y}, {}, {}) do LevelDefs_FieldsPanel(state, -1)
 	imgui.EndChild()
-}
-
-// ----------------------------------------------------------------------------
-// Rules
-// ----------------------------------------------------------------------------
-
-@(private = "file")
-rules_editor :: proc(state: ^EditorState, layerUid: int) {
-	L := &GlobalLevel
-	doc := L.doc
-	d := &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, layerUid)]
-	if d.tilesetUid < 0 {
-		UI_DimText("Pick a tileset first: rules place its tiles.")
-		return
-	}
-	srcDef := d
-	if d.type == .AutoLayer {
-		si := e.Ldtk_Doc_LayerDefIndex(doc, d.autoSourceUid)
-		if si < 0 {
-			UI_DimText("Pick the IntGrid layer the rules read.")
-			return
-		}
-		srcDef = &doc.layerDefs[si]
-	}
-	for gi in 0 ..< len(d.groups) {
-		g := &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, layerUid)].groups[gi]
-		imgui.PushIDInt(i32(g.uid))
-		active := g.active
-		if imgui.Checkbox("##gactive", &active) {
-			defs_checkpoint("Rule Group")
-			e.LdtkJson_SetBool(g.obj, "active", active, doc.allocator)
-			e.Ldtk_Doc_RulesChanged(doc, layerUid)
-			imgui.PopID()
-			return
-		}
-		UI_Tooltip("Group on / off")
-		imgui.SameLine()
-		imgui.PushFont(GlobalFonts.semibold)
-		imgui.TextUnformatted(fmt.ctprintf("%s", g.name))
-		imgui.PopFont()
-		imgui.SameLine()
-		optional := g.isOptional
-		if imgui.Checkbox("optional##gopt", &optional) {
-			defs_checkpoint("Rule Group")
-			e.LdtkJson_SetBool(g.obj, "isOptional", optional, doc.allocator)
-			e.Ldtk_Doc_RulesChanged(doc, layerUid)
-			imgui.PopID()
-			return
-		}
-		UI_Tooltip("Optional groups are enabled per level (Layers panel)")
-		imgui.SameLine()
-		if UI_Button(fmt.tprintf("%s Rule", ICON_FA_PLUS), fmt.tprintf("defs.rule.add:%s", g.name)) {
-			defs_checkpoint("Add Rule")
-			v := len(srcDef.values) > 0 ? srcDef.values[0].value : 1
-			tile := 0
-			if len(L.tileSel) > 0 do tile = int(L.tileSel[0])
-			defs.ruleUid = e.Ldtk_Doc_AddRule(doc, layerUid, g.uid, 3, v, tile)
-			imgui.PopID()
-			return
-		}
-		g = &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, layerUid)].groups[gi]
-		for &r, ri in g.rules {
-			imgui.PushIDInt(i32(r.uid))
-			if rule_row(state, layerUid, srcDef, &r, ri) {
-				imgui.PopID()
-				imgui.PopID()
-				return
-			}
-			imgui.PopID()
-		}
-		imgui.PopID()
-		imgui.Separator()
-	}
-	if UI_Button(fmt.tprintf("%s  Terrain from picked 3x3 tiles", ICON_FA_WAND_MAGIC_SPARKLES), "defs.terrain") {
-		if len(L.tileSel) == 9 && L.tileSelW == 3 {
-			v := L.intValue
-			if e.Ldtk_Doc_IntValue(srcDef, v) == nil do v = len(srcDef.values) > 0 ? srcDef.values[0].value : 1
-			block: [9]int
-			for t, i in L.tileSel do block[i] = int(t)
-			defs_checkpoint("Terrain Rules")
-			e.Ldtk_Doc_AddTerrainRules(doc, layerUid, v, block)
-			return // (definitions rebuilt many times: this frame's pointers are stale)
-		} else do Editor_Log(state, .Info, "Pick a 3x3 block of tiles (corners, edges, centre) in the Layers panel's tileset first")
-	}
-	UI_Tooltip("Rules drawing a 3x3 terrain block over the picked IntGrid value: corners, edges and the centre")
-	imgui.SameLine()
-	if UI_Button(fmt.tprintf("%s  Add rule group", ICON_FA_PLUS), "defs.group.add") {
-		defs_checkpoint("Add Rule Group")
-		e.Ldtk_Doc_AddRuleGroup(doc, layerUid, fmt.tprintf("Group %d", len(d.groups) + 1))
-	}
-	UI_DimText("Pattern: left click requires the picked value, right click forbids it,")
-	UI_DimText("Shift+click means any value, middle click clears.")
-}
-
-// rule_row draws one rule; returns true when the defs changed (stop).
-@(private = "file")
-rule_row :: proc(state: ^EditorState, layerUid: int, srcDef: ^e.Ldtk_DocLayerDef, r: ^e.Ldtk_DocRule, index: int) -> bool {
-	L := &GlobalLevel
-	doc := L.doc
-	ts := e.Ldtk_Doc_Tileset(doc, doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, layerUid)].tilesetUid)
-	cell :: 14
-	size := r.size
-	start := imgui.GetCursorScreenPos()
-	dl := imgui.GetWindowDrawList()
-	// pattern grid
-	imgui.InvisibleButton("##pattern", {f32(size * cell), f32(size * cell)}, {.MouseButtonLeft, .MouseButtonRight, .MouseButtonMiddle})
-	Drive_Item(fmt.tprintf("defs.rule.pattern:%d", index))
-	hovered := imgui.IsItemHovered()
-	for cy in 0 ..< size {
-		for cx in 0 ..< size {
-			v := int(r.pattern[cx + cy * size])
-			mn := [2]f32{start.x + f32(cx * cell), start.y + f32(cy * cell)}
-			mx := mn + {cell - 1, cell - 1}
-			fill := imgui.Vec4{0.15, 0.16, 0.19, 1}
-			if v == e.LDTK_AUTO_LAYER_ANYTHING do fill = {0.8, 0.8, 0.8, 1}
-			else if v == -e.LDTK_AUTO_LAYER_ANYTHING do fill = {0.05, 0.05, 0.05, 1}
-			else if v != 0 {
-				iv := e.Ldtk_Doc_IntValue(srcDef, abs(v))
-				c := iv != nil ? iv.color : rl.MAGENTA
-				fill = {f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255, 1}
-			}
-			imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(fill), 0, {})
-			if v < 0 && v != -e.LDTK_AUTO_LAYER_ANYTHING do imgui.DrawList_AddLine(dl, mn, mx, col_u32(UI_DANGER), 2)
-			if cx == size / 2 && cy == size / 2 do imgui.DrawList_AddRect(dl, mn, mx, col_u32(UI_WARNING), 0, {}, 1)
-		}
-	}
-	if hovered {
-		m := imgui.GetIO().MousePos
-		cx := int((m.x - start.x) / cell)
-		cy := int((m.y - start.y) / cell)
-		if cx >= 0 && cy >= 0 && cx < size && cy < size {
-			val := L.intValue
-			if e.Ldtk_Doc_IntValue(srcDef, val) == nil do val = len(srcDef.values) > 0 ? srcDef.values[0].value : 1
-			nv, set := 0, false
-			shift := imgui.GetIO().KeyShift
-			switch {
-			case imgui.IsMouseClicked(.Left): nv, set = shift ? e.LDTK_AUTO_LAYER_ANYTHING : val, true
-			case imgui.IsMouseClicked(.Right): nv, set = shift ? -e.LDTK_AUTO_LAYER_ANYTHING : -val, true
-			case imgui.IsMouseClicked(.Middle): nv, set = 0, true
-			}
-			if set {
-				defs_checkpoint("Rule Pattern")
-				e.Ldtk_Doc_SetRuleCell(doc, r.uid, cx, cy, nv)
-				return true
-			}
-		}
-	}
-	imgui.SameLine(0, 8)
-	// tiles
-	if ts != nil {
-		if tex, ok := level_texture(ts.uid); ok {
-			for rect, i in r.tileRects {
-				if i >= 6 do break
-				if len(rect) == 0 do continue
-				src := e.Ldtk_Doc_TileSrc(ts, int(rect[0]))
-				uv0 := imgui.Vec2{f32(src.x) / f32(tex.width), f32(src.y) / f32(tex.height)}
-				uv1 := imgui.Vec2{f32(int(src.x) + ts.gridSize) / f32(tex.width), f32(int(src.y) + ts.gridSize) / f32(tex.height)}
-				imgui.Image(transmute(imgui.TextureID)level_texture_ptr(ts.uid), {28, 28}, uv0, uv1)
-				imgui.SameLine(0, 2)
-			}
-		}
-	}
-	if UI_Button(fmt.tprintf("%s", ICON_FA_TABLE_CELLS), fmt.tprintf("defs.rule.tiles:%d", index)) && len(L.tileSel) > 0 {
-		// the palette's selection: each tile a random choice (or one stamp)
-		defs_checkpoint("Rule Tiles")
-		a := doc.allocator
-		rects := e.LdtkJson_New(.Array, a)
-		if r.stamp {
-			one := e.LdtkJson_New(.Array, a)
-			for t in L.tileSel do append(&one.items, e.LdtkJson_NewInt(int(t), a))
-			append(&rects.items, one)
-		} else {
-			for t in L.tileSel {
-				one := e.LdtkJson_New(.Array, a)
-				append(&one.items, e.LdtkJson_NewInt(int(t), a))
-				append(&rects.items, one)
-			}
-		}
-		e.LdtkJson_Set(r.obj, "tileRectsIds", rects, a)
-		e.Ldtk_Doc_RulesChanged(doc, layerUid)
-		return true
-	}
-	UI_Tooltip("Use the tiles picked in the Layers panel's tileset (pick a Tiles layer, or this layer's tileset)")
-	imgui.SameLine()
-	if row_bool(r.obj, "flipX", "X", "Also match mirrored horizontally") || row_bool(r.obj, "flipY", "Y", "Also match mirrored vertically") || row_bool(r.obj, "breakOnMatch", ICON_FA_CIRCLE, "Break on match: later rules don't paint this cell") || row_bool(r.obj, "active", ICON_FA_EYE, "Rule on / off") {
-		e.Ldtk_Doc_RulesChanged(doc, layerUid)
-		return true
-	}
-	imgui.SameLine()
-	if row_bool(r.obj, "tileMode", "S", "Stamp: place all the tiles as one block (else one at random)", true) {
-		e.Ldtk_Doc_RulesChanged(doc, layerUid)
-		return true
-	}
-	// numbers, on a second line next to the pattern
-	imgui.NewLine()
-	imgui.SetCursorScreenPos({start.x + f32(size * cell) + 8, imgui.GetCursorScreenPos().y})
-	imgui.SetNextItemWidth(70)
-	chance := f32(r.chance * 100)
-	entered := imgui.InputFloat("##chance", &chance, 0, 0, "%.0f%%", {.EnterReturnsTrue})
-	UI_Tooltip("Chance (Enter applies)")
-	if entered {
-		defs_checkpoint("Rule Chance")
-		e.LdtkJson_SetFloat(r.obj, "chance", f64(clamp(chance, 0, 100)) / 100, doc.allocator)
-		e.Ldtk_Doc_RulesChanged(doc, layerUid)
-		return true
-	}
-	imgui.SameLine()
-	imgui.SetNextItemWidth(80)
-	mod := [2]i32{i32(r.xModulo), i32(r.yModulo)}
-	modEntered := imgui.InputInt2("##mod", &mod, {.EnterReturnsTrue})
-	UI_Tooltip("Modulo X / Y: only every Nth cell (Enter applies)")
-	if modEntered {
-		defs_checkpoint("Rule Modulo")
-		e.LdtkJson_SetInt(r.obj, "xModulo", max(int(mod.x), 1), doc.allocator)
-		e.LdtkJson_SetInt(r.obj, "yModulo", max(int(mod.y), 1), doc.allocator)
-		e.Ldtk_Doc_RulesChanged(doc, layerUid)
-		return true
-	}
-	imgui.SameLine()
-	imgui.SetNextItemWidth(60)
-	sz := i32(size)
-	if imgui.InputInt("##size", &sz, 2, 2) {
-		ns := clamp(int(sz) | 1, 1, e.LDTK_MAX_AUTO_PATTERN_SIZE)
-		if ns != size {
-			defs_checkpoint("Rule Size")
-			resize_rule(r, ns)
-			e.Ldtk_Doc_RulesChanged(doc, layerUid)
-			return true
-		}
-	}
-	UI_Tooltip("Pattern size")
-	imgui.SameLine()
-	if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("defs.rule.remove:%d", index), "Delete the rule", false, 22) {
-		defs_checkpoint("Delete Rule")
-		e.Ldtk_Doc_RemoveRule(doc, r.uid)
-		return true
-	}
-	imgui.SetCursorScreenPos({start.x, max(imgui.GetCursorScreenPos().y, start.y + f32(size * cell) + 4)})
-	return false
-}
-
-// row_bool: a small toggle for a rule's boolean (or "tileMode" Stamp).
-@(private = "file")
-row_bool :: proc(obj: ^e.LdtkJson, key, label, tip: string, isMode := false) -> bool {
-	doc := GlobalLevel.doc
-	on := isMode ? e.LdtkJson_Str(obj, key) == "Stamp" : e.LdtkJson_Bool(obj, key, key == "active")
-	pressed := UI_IconButton(label, fmt.tprintf("defs.rule.%s:%p", key, obj), tip, on, 22)
-	imgui.SameLine(0, 2)
-	if !pressed do return false
-	defs_checkpoint("Rule Option")
-	if isMode do e.LdtkJson_SetStr(obj, key, on ? "Single" : "Stamp", doc.allocator)
-	else do e.LdtkJson_SetBool(obj, key, !on, doc.allocator)
-	return true
-}
-
-@(private = "file")
-resize_rule :: proc(r: ^e.Ldtk_DocRule, ns: int) {
-	doc := GlobalLevel.doc
-	a := doc.allocator
-	old := r.size
-	pat := e.LdtkJson_New(.Array, a)
-	pad := (ns - old) / 2
-	for y in 0 ..< ns {
-		for x in 0 ..< ns {
-			ox, oy := x - pad, y - pad
-			v := 0
-			if ox >= 0 && oy >= 0 && ox < old && oy < old do v = int(r.pattern[ox + oy * old])
-			append(&pat.items, e.LdtkJson_NewInt(v, a))
-		}
-	}
-	e.LdtkJson_Set(r.obj, "pattern", pat, a)
-	e.LdtkJson_SetInt(r.obj, "size", ns, a)
 }
 
 // ----------------------------------------------------------------------------

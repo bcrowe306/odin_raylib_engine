@@ -1,0 +1,100 @@
+# Level editor rules (Rules tab): a rule's options (chance, flips, break on
+# match, modulo, Perlin); rule context menu (duplicate, show matching cells,
+# move, delete); a group's context menu (rename, duplicate and remap, move);
+# the Rules Assistant writing a new group; undo.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/rules_zz
+wait 90
+click @root.level
+wait 3
+click @level.open:rules_zz/topdown.ldtk
+wait 5
+click @level.zoom
+click @pick:100%
+wait 1
+click @level.layer:Collisions
+click @level.tab:Rules
+wait 2
+expect level.rules == 18
+expect level.groups contains Front faces
+screenshot rules_tab
+# the first rule's options
+click @defs.rule:Front faces:0
+wait 1
+expect level.rule contains 3
+click @defs.rule.chance
+key cmd+a
+type 50
+key enter
+wait 1
+expect level.rule contains 50%
+click @defs.rule.flipy
+wait 1
+expect level.rule contains flipY
+click @defs.rule.modulo.x
+key cmd+a
+type 2
+key enter
+wait 1
+expect level.rule contains mod2x
+click @defs.rule.perlin
+wait 1
+expect level.rule contains perlin
+screenshot rule_editor
+# rule menu: show matching cells, duplicate, delete
+rclick @defs.rule:Front faces:0
+click @ctx:Show matching cells
+wait 2
+expect level.rulematches >= 1
+screenshot matching_cells
+rclick @defs.rule:Front faces:0
+click @ctx:Duplicate
+wait 2
+expect level.rules == 19
+rclick @defs.rule:Front faces:1
+click @ctx:Delete
+wait 2
+expect level.rules == 18
+# group menu: rename, duplicate and remap
+rclick @defs.group:Front faces
+click @ctx:Rename...
+wait 1
+key cmd+a
+type Fronts zz
+key enter
+wait 1
+expect level.groups contains Fronts zz
+rclick @defs.group:Fronts zz
+click @ctx:Duplicate and remap...
+wait 1
+screenshot remap_dialog
+click @defs.remap.ok
+wait 2
+expect level.groups contains Fronts zz copy
+rclick @defs.group:Fronts zz copy
+click @ctx:Move up
+wait 1
+screenshot groups
+# the Assistant: one tile for every wall
+click @level.palette+8,8
+wait 1
+click @defs.rules.wizard
+wait 2
+click @wiz.name
+key cmd+a
+type Walls zz
+click @wiz.frag:Full
+click @wiz.use
+click @wiz.frag:Wall_N
+click @wiz.use
+click @wiz.frag:Single
+click @wiz.use
+wait 1
+screenshot assistant
+click @wiz.ok
+wait 2
+expect level.groups contains Walls zz
+expect level.rules >= 21
+screenshot assistant_group
+key cmd+z
+wait 2
+expect level.groups !contains Walls zz

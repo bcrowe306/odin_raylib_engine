@@ -770,3 +770,90 @@ test_ldtk_doc_field_and_entity_def_ops :: proc(t: ^testing.T) {
 	f1 := LdtkJson_Arr(Ldtk_Doc_EntityDef(doc, cd).obj, "fieldDefs")[0]
 	testing.expect(t, LdtkJson_Int(f1, "uid") != tag) // fields got new uids
 }
+
+@(test)
+test_ldtk_doc_rules_edit_and_wizard :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_rulesed.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	ts := Ldtk_Doc_AddTileset(doc, "atlas/w_zz.png", {128, 128}, 16)
+	col := doc.layerDefs[0].uid
+	Ldtk_Doc_AddIntGridValue(doc, col, "water")
+	auto := Ldtk_Doc_AddLayerDef(doc, .AutoLayer, "Walls", ts)
+	LdtkJson_SetInt(doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, auto)].obj, "autoSourceLayerDefUid", col, doc.allocator)
+	Ldtk_Doc_LayerDefChanged(doc, auto)
+	// the Assistant: centre, north wall (south comes from flipping it), west wall
+	s: Ldtk_WizardSetup
+	defer Ldtk_WizardSetup_Destroy(&s)
+	s.name = "Walls"
+	s.mainValue = 1
+	s.breakOnMatch = true
+	append(&s.tiles[.Full], 9)
+	append(&s.tiles[.Wall_N], 1, 2) // two random tiles
+	append(&s.tiles[.Wall_W], 8)
+	g := Ldtk_Doc_RulesWizardApply(doc, auto, -1, &s)
+	testing.expect(t, g > 0)
+	grp, _, _ := Ldtk_Doc_FindRuleGroup(doc, g)
+	rules := LdtkJson_Arr(grp, "rules")
+	testing.expect_value(t, len(rules), 3)
+	testing.expect(t, LdtkJson_Bool(grp, "usesWizard"))
+	// order follows the fragments: Wall_N, Wall_W, Full (enum order)
+	wn := rules[len(rules) - 3]
+	testing.expect(t, LdtkJson_Bool(wn, "flipY")) // Wall_S has no tiles: Wall_N flips
+	testing.expect_value(t, len(LdtkJson_Arr(wn, "tileRectsIds")), 2)
+	testing.expect_value(t, LdtkJson_Int(wn, "outOfBoundsValue"), 1)
+	full := rules[len(rules) - 1]
+	testing.expect_value(t, LdtkJson_Int(full, "size"), 1) // trimmed to 1x1
+	// read back
+	s2: Ldtk_WizardSetup
+	defer Ldtk_WizardSetup_Destroy(&s2)
+	testing.expect(t, Ldtk_Doc_RulesWizardImport(doc, g, &s2))
+	testing.expect_value(t, s2.mainValue, 1)
+	testing.expect_value(t, len(s2.tiles[.Wall_N]), 2)
+	testing.expect_value(t, len(s2.tiles[.Full]), 1)
+	testing.expect_value(t, len(s2.tiles[.Wall_W]), 1)
+	// paint: a 3x3 block - the middle gets the full tile, the top the wall tiles
+	li := 0
+	cl := -1
+	for &ly, j in doc.levels[0].layers do if Ldtk_Doc_LayerDef(doc, &ly).uid == col do cl = j
+	for y in 2 ..= 4 do for x in 2 ..= 4 do Ldtk_Doc_SetIntGrid(doc, li, cl, x, y, 1)
+	Ldtk_Doc_ApplyRules(doc, li, cl, 2, 2, 4, 4)
+	wl := Ldtk_Doc_LevelLayer(doc, &doc.levels[li], auto)
+	at :: proc(ly: ^Ldtk_DocLayer, cx, cy: int) -> i32 {
+		for tl in ly.autoTiles do if int(tl.coord) == cx + cy * ly.cWid do return tl.t
+		return -1
+	}
+	testing.expect_value(t, at(wl, 3, 3), 9)
+	testing.expect(t, at(wl, 3, 2) == 1 || at(wl, 3, 2) == 2)
+	// preview cells of the full rule: 9 cells
+	testing.expect_value(t, len(Ldtk_Doc_RuleMatchCells(doc, li, LdtkJson_Int(full, "uid"))), 9)
+	// duplicate with remap 1 -> 2 and tiles one row down
+	remap := make(map[i32]i32, allocator = context.temp_allocator)
+	remap[1] = 2
+	g2 := Ldtk_Doc_DuplicateRuleGroup(doc, g, "Water", remap, {0, 1})
+	grp2, _, idx2 := Ldtk_Doc_FindRuleGroup(doc, g2)
+	testing.expect_value(t, idx2, 1)
+	r2 := LdtkJson_Arr(grp2, "rules")[len(LdtkJson_Arr(grp2, "rules")) - 1]
+	testing.expect_value(t, int(LdtkJson_Arr(r2, "pattern")[0].num), 2)
+	testing.expect_value(t, int(LdtkJson_Arr(r2, "tileRectsIds")[0].items[0].num), 9 + 8) // one row = 8 tiles
+	// move the first rule of the copy up: it goes to the end of the first group
+	first2 := LdtkJson_Int(LdtkJson_Arr(grp2, "rules")[0], "uid")
+	testing.expect(t, Ldtk_Doc_MoveRule(doc, first2, -1))
+	testing.expect_value(t, len(LdtkJson_Arr(grp, "rules")), 4)
+	// copy / paste a rule
+	text := Ldtk_Doc_RuleText(doc, LdtkJson_Int(full, "uid"), context.temp_allocator)
+	pasted := Ldtk_Doc_PasteRule(doc, g2, text)
+	testing.expect(t, pasted > 0 && pasted != LdtkJson_Int(full, "uid"))
+	// optional on, enabled in the level, optional off: the level forgets it
+	Ldtk_Doc_SetRuleGroupOptional(doc, g2, true)
+	opt := LdtkJson_New(.Array, doc.allocator)
+	append(&opt.items, LdtkJson_NewInt(g2, doc.allocator))
+	LdtkJson_Set(wl.obj, "optionalRules", opt, doc.allocator)
+	Ldtk_Doc_SetRuleGroupOptional(doc, g2, false)
+	testing.expect_value(t, len(LdtkJson_Arr(wl.obj, "optionalRules")), 0)
+	// out of bounds for all rules
+	Ldtk_Doc_SetRuleGroupOutOfBounds(doc, g, -1)
+	for r in LdtkJson_Arr(grp, "rules") do testing.expect(t, LdtkJson_IsNull(r, "outOfBoundsValue"))
+	testing.expect(t, Ldtk_Doc_RemoveRuleGroup(doc, g2))
+}

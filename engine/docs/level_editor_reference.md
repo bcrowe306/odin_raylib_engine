@@ -375,28 +375,125 @@ values** (colour, name).
 ## Rules tab
 <!-- topic: tab.rules, rules -->
 
-Auto-layer rules draw tiles from an IntGrid layer's values.
+Auto-layer rules draw tiles from an IntGrid layer's values. An IntGrid
+layer with a tileset has rules of its own; an Auto layer reads another
+IntGrid layer's values.
 
-- **Pattern**: left click requires the picked value, right click forbids
-  it, Shift + left / right means any value / no value, and middle click
-  clears.
-- **Tiles button**: uses the palette's picked tiles. With several tiles,
-  one is picked at random per cell; **S** places them as one stamp.
-- **X / Y**: also match the pattern mirrored.
-- **Dot**: break on match. Later rules don't paint a cell this rule
-  painted.
-- **Eye**: turns the rule on or off.
+The tab has three columns: the layers that have rules, that layer's
+groups and rules, and the editor for the picked rule.
+
+**Groups** run from the top down, and their rules run top to bottom. The
+check box turns a group on or off, and the arrow folds it. Badges show
+whether the group is optional, made by the Assistant, or limited to a
+biome. Right-click a group to:
+
+- rename it;
+- duplicate and remap it (see below);
+- copy it (**Paste** sits next to the add buttons);
+- make it optional or global;
+- set its colour, or use the picked tile as its icon;
+- limit it to a biome;
+- set the out-of-bounds value of all its rules;
+- move or delete it.
+
+Assistant groups open in the Assistant on a double-click. **Advanced mode**
+turns one into plain rules.
+
+**Rules**: each row shows the rule's pattern, its tiles and its options.
+Click a row to edit it. Right-click a row to:
+
+- edit it;
+- show the cells it matches;
+- enable or disable it;
+- duplicate it, copy it, or paste after it;
+- insert a rule before or after it;
+- move it (past the group's edge, it moves into the next group);
+- delete it.
+
+**The rule editor**:
+
+- **Pattern**: pick a value above the grid (**\*** means any value). Left
+  click requires it, right click forbids it, and middle click clears the
+  cell. The yellow cell is the one that gets the tile. **Size**: odd
+  numbers, up to 9.
+- **Tiles**: individual tiles (one at random per match) or rectangles
+  (stamps placed as a block, around the **pivot**). **Use picked tiles**
+  replaces them with the palette's selection; **Add picked** adds to
+  them. Right-click a tile to remove it.
+- **Out of bounds**: what cells outside the level count as.
+- **Break on match**: later rules don't paint the cells this rule painted.
+- **Flip X / Y**: also match the pattern mirrored; the tiles flip too.
 - **Chance**: the percentage of matching cells that get tiles.
-- **Modulo**: only every Nth cell.
-- **Size**: the pattern size (odd numbers, up to 9).
+- **Opacity** of the tiles.
+- Modulo, checker, Perlin noise and offsets have their own sections.
 
-Rules run from the top group down. Changing a rule redraws every level.
+The eye in the rule's header shows the cells it matches in the canvas
+(green). Changing a rule redraws every level.
+
+## Rule groups: duplicate and remap
+<!-- topic: rules.groups, rules.remap -->
+
+**Duplicate and remap** copies a group. Each IntGrid value it uses can
+become another value, and its tiles can move by whole cells in the
+tileset. For example, "0, 4" uses the tiles four rows lower: another
+terrain drawn in the same layout. Use it to reuse one set of wall rules
+for every material.
+
+**Biome**: when the layer has a biome field (Layers tab), a group can
+require some of that enum's values in the level's field: any of them
+(OR) or all of them (AND).
+
+**Optional** groups are off by default. You turn them on per level with
+the check box in the Layers panel.
+
+## Modulo and checker
+<!-- topic: rules.modulo -->
+
+**Modulo X, Y** matches only every Nth column / row. **Offset X, Y**
+shifts which columns / rows are picked. **Checker** shifts every other
+row (horizontal) or column (vertical) by half the modulo, which gives a
+checkerboard.
+
+## Perlin noise
+<!-- topic: rules.perlin -->
+
+Matches only where a noise is positive, which gives natural-looking
+patches (grass, cracks). **Seed** picks another noise. A smaller
+**scale** gives bigger patches; more **octaves** give rougher edges.
+
+## Tile offsets
+<!-- topic: rules.offsets -->
+
+**Tile offset X, Y** moves the placed tiles by that many pixels.
+**Random X / Y min, max** adds a random shift per cell, which breaks up
+repeated patterns. The offsets don't change which cells match.
+
+## The Rules Assistant
+<!-- topic: rules.wizard -->
+
+The Assistant writes a group of wall rules. It is LDtk's rules wizard.
+
+1. Click **Assistant** in the Rules tab.
+2. Name the group, pick the IntGrid **value** the walls draw over, and
+   what the edges are **next to**: anything else, or one specific value
+   (walls next to water, say).
+3. Click a shape in the grid: a single cell, walls, corners, turns, T
+   crossings, diagonals, the full centre...
+4. Pick its tile(s) in the Layers panel's tileset, then click **Use picked
+   tiles**. With several tiles, one is picked at random. Right-click a
+   shape to clear it.
+5. Click **Create rules**.
+
+Shapes left empty use a mirrored shape when there is one: give **Wall N**
+tiles, and **Wall S** uses them flipped. The group remembers its tiles.
+Double-click it, or pick **Edit with the Assistant** from its menu, to
+change them and **Update rules**.
 
 ## Terrains
 <!-- topic: rules.terrain -->
 
 Pick a 3x3 block of tiles in the palette: corners, edges and the middle.
-Then click **Terrain from picked 3x3 tiles**. It adds nine rules that draw
+Then click **3x3** next to **Empty group**. It adds nine rules that draw
 the block over the picked value: edges where the neighbours are empty, and
 the middle inside.
 

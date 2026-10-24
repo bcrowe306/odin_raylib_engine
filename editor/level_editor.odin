@@ -1860,6 +1860,7 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		fd := e.Ldtk_Doc_FieldDef(doc, LevelDefs_SelectedField())
 		return fd != nil ? fmt.tprintf("%s %s %s", e.LdtkJson_Str(fd, "identifier"), e.LdtkJson_Str(fd, "__type"), e.LdtkJson_Str(fd, "editorDisplayMode")) : "", true
 	}
+	if v, ok := LevelRules_Query(q); ok do return v, true
 	case_pick := q == "level.picking"
 	if case_pick do return LevelFields_PickActive() ? "true" : "false", true
 	// level.cell:cx,cy -> IntGrid value of the active layer

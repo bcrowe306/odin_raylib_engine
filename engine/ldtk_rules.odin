@@ -377,6 +377,33 @@ rule_cell :: proc(c: ^Rule_Ctx, cx, cy: int, out: ^[dynamic]Ldtk_DocTile) {
 	}
 }
 
+// ldtk_rule_cells: the cells where one rule matches (the preview).
+@(private)
+ldtk_rule_cells :: proc(doc: ^Ldtk_Doc, lv: ^Ldtk_DocLevel, ly: ^Ldtk_DocLayer, ruleUid: int, out: ^[dynamic][2]int) {
+	src := Ldtk_RuleSource(doc, lv, ly)
+	if src == nil do return
+	arena: vmem.Arena
+	if vmem.arena_init_growing(&arena) != nil do return
+	defer vmem.arena_destroy(&arena)
+	c: Rule_Ctx
+	rule_ctx_init(&c, doc, lv, ly, src, vmem.arena_allocator(&arena))
+	r: ^Ldtk_DocRule
+	for &g in c.def.groups do for &x in g.rules do if x.uid == ruleUid do r = &x
+	if r == nil do return
+	for cy in 0 ..< ly.cHei {
+		for cx in 0 ..< ly.cWid {
+			if !rule_relevant_at(&c, r, cx, cy) do continue
+			if r.checker != .Vertical && (cy - r.yOffset) % r.yModulo != 0 do continue
+			if r.checker == .Vertical && (cy + (cx / r.xModulo) % 2) % r.yModulo != 0 do continue
+			if r.checker != .Horizontal && (cx - r.xOffset) % r.xModulo != 0 do continue
+			if r.checker == .Horizontal && (cx + (cy / r.yModulo) % 2) % r.xModulo != 0 do continue
+			if rule_matches(&c, r, cx, cy) || (r.flipX && rule_matches(&c, r, cx, cy, -1)) || (r.flipY && rule_matches(&c, r, cx, cy, 1, -1)) || (r.flipX && r.flipY && rule_matches(&c, r, cx, cy, -1, -1)) {
+				append(out, [2]int{cx, cy})
+			}
+		}
+	}
+}
+
 @(private = "file")
 tile_less :: proc(a, b: Ldtk_DocTile) -> bool {
 	if a.rank != b.rank do return a.rank < b.rank

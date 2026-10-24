@@ -130,6 +130,7 @@ canvas_draw :: proc() {
 	}
 	for li in order do draw_level(li, li == L.level)
 	draw_field_geometry()
+	draw_rule_preview()
 	draw_selection()
 	draw_tool_preview()
 	draw_pick_hint()
@@ -919,6 +920,32 @@ selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
 
 @(private = "file")
 linalg_len :: proc(v: [2]f32) -> f32 {return math.sqrt(v.x * v.x + v.y * v.y)}
+
+// draw_rule_preview: the cells where the rule picked in the Rules tab matches.
+@(private = "file")
+draw_rule_preview :: proc() {
+	L := &GlobalLevel
+	doc := L.doc
+	if doc == nil || len(doc.levels) == 0 || levelRulePreview == 0 do return
+	_, _, layerUid := e.Ldtk_Doc_FindRule(doc, levelRulePreview)
+	if layerUid < 0 {
+		levelRulePreview = 0
+		return
+	}
+	lv := &doc.levels[L.level]
+	for &ly, i in lv.layers {
+		d := e.Ldtk_Doc_LayerDef(doc, &ly)
+		if d == nil || d.uid != layerUid do continue
+		o := layer_origin_of(i)
+		g := f32(d.gridSize)
+		for c in e.Ldtk_Doc_RuleMatchCells(doc, L.level, levelRulePreview) {
+			r := rl.Rectangle{o.x + f32(c.x) * g, o.y + f32(c.y) * g, g, g}
+			rl.DrawRectangleRec(r, {80, 220, 120, 60})
+			rl.DrawRectangleLinesEx(r, 1 / L.zoom, {80, 220, 120, 200})
+		}
+		break
+	}
+}
 
 // draw_selection: outlines of the selection, the drag ghost, the rectangle.
 @(private = "file")

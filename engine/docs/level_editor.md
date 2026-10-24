@@ -146,8 +146,9 @@ topic.
 3. **Layers** tab: select **Collisions** and set its **Tileset**. The
    Layers panel now shows the tileset under the values.
 4. In the Layers panel drag over the 3x3 wall block (corners, edges and the
-   middle), then in the **Rules** tab click **Terrain from picked 3x3
-   tiles**: nine rules in a group "Terrain 1".
+   middle), then in the **Rules** tab click **3x3** next to **Empty
+   group**: nine rules in a group "Terrain 1". (Or click **Assistant** and
+   give each wall shape its tile: see *Auto-layer rules*.)
 5. Pick value **1 walls** and paint: the walls draw
    themselves - edges where the neighbours are empty, the middle inside.
    Erase with the right button and they follow.
@@ -195,18 +196,34 @@ Bottom panel > **Rules** > an IntGrid layer with a tileset, or an Auto layer
 (the **Layers** tab sets the tileset, and the IntGrid layer an auto layer's
 rules read under **Rules read**):
 
-- **+ Rule** in a group adds a 3x3 rule placing the picked tile where the
-  centre has the picked value. In the pattern: left click requires the
-  picked value, right click forbids it, Shift + left / right means any
-  value / no value, middle click clears. Larger patterns: the size field
-  (odd sizes up to 9).
-- The tiles button replaces the rule's tiles with the palette's selection
-  (several tiles: one at random per cell; **S** = stamp: all as one block).
-- **X** / **Y**: also match mirrored; the dot: *break on match* (later
-  rules don't paint the cell); the eye: rule on / off; chance in percent;
-  modulo X / Y.
-- Group check box: on / off; **optional**: enabled per level in the Layers
-  panel.
+Three columns: the layers with rules, the layer's groups and rules, and
+the picked rule's editor.
+
+- **Assistant** (LDtk's rules wizard): name, value, what the edges are
+  next to; click a wall shape (single, walls, corners, turns, T
+  crossings, diagonals, full) and **Use picked tiles** for it; shapes
+  left empty reuse a mirrored one. **Create rules** writes a group the
+  Assistant can reopen (double-click it) and update.
+- **Empty group**, **3x3** (terrain from a picked 3x3 block), **Paste** (a
+  copied group).
+- **+ Rule** in a group: a 3x3 rule placing the picked tile where the
+  centre has the picked value.
+- Rule editor: the pattern (pick a value above it, **\*** = any; left
+  click requires, right forbids, middle clears; size up to 9); tiles
+  (individual or stamps with a pivot; **Use picked tiles** / **Add
+  picked**; right-click a tile to remove it); out of bounds; break on
+  match; flip X / Y; chance; opacity; modulo X / Y with offsets and
+  checker; Perlin noise (seed, scale, octaves); tile offsets and random
+  offsets; active. The eye in its header shows the cells it matches in
+  the canvas.
+- Right-click a rule: edit, show matching cells, enable / disable,
+  duplicate, copy, paste after, insert before / after, move up / down
+  (across groups), delete.
+- Right-click a group: rename, Assistant / advanced mode, duplicate and
+  remap (values to other values, tiles moved by cells in the tileset),
+  copy, optional / global, colour, icon from the picked tile, biome (the
+  layer's biome field: any / all of the values), out of bounds for all
+  rules, move, delete.
 
 Rules run in order (groups top to bottom, rules top to bottom); the canvas
 updates the auto tiles around every painted cell, and changing a rule
@@ -259,6 +276,8 @@ e.Ldtk_Doc_Save(doc)
 | `Ldtk_Doc_AddLayerDef`, `RemoveLayerDef`, `MoveLayerDef`, `RenameLayerDef`, `LayerDefChanged`, `AddIntGridValue`, `RemoveIntGridValue` | layers |
 | `Ldtk_Doc_AddEntityDef`, `EntityDefChanged`, `SetEntityTile`, `RemoveEntityDef`, `AddFieldDef`, `RemoveFieldDef`, `AddEnum`, `AddEnumValue`, `AddTileset` | definitions |
 | `Ldtk_Doc_AddRuleGroup`, `AddRule`, `SetRuleCell`, `RemoveRule`, `RulesChanged`, `AddTerrainRules` | rules |
+| `Ldtk_Doc_FindRuleGroup`, `RenameRuleGroup`, `MoveRuleGroup`, `RemoveRuleGroup`, `SetRuleGroupOptional` / `Color` / `Icon` / `Biome` / `OutOfBounds`, `DuplicateRuleGroup` (remap), `InsertRule`, `DuplicateRule`, `MoveRule`, `RuleText` / `RuleGroupText` / `PasteRule` / `PasteRuleGroup`, `RuleMatchCells` | editing rules |
+| `Ldtk_Doc_RulesWizardApply`, `RulesWizardImport`; `Ldtk_WizardSetup`, `Ldtk_WallFragment` | the Rules Assistant |
 | `Ldtk_Doc_SetTileCustomData`, `SetTileAnimation`, `TileAnimation`, `SetTileTag`, `TileHasTag`; `Ldtk_ParseTileAnim` | per-tile data |
 
 Memory: the JSON tree lives in the document's arena (freed with it), the
