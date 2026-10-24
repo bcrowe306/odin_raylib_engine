@@ -211,6 +211,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 		Viewport_DrawLights(state)
 		Viewport_DrawNotifiers(state)
 		Viewport_DrawPaths(state)
+		Viewport_DrawNavigation(state)
 
 		// Draw bounding boxes / physics colliders (when enabled or node selected)
 		Viewport_DrawSceneBounds(state)
@@ -308,6 +309,8 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 			lo = {min(lo.x, o.x), min(lo.y, o.y)}
 			hi = {max(hi.x, p.x), max(hi.y, p.y)}
 		}
+	case e.NavigationRegionNode:
+		lo, hi, have = {0, 0}, (cast(^e.NavigationRegionNode)node).size * {abs(scl.x), abs(scl.y)}, true
 	case e.PathNode:
 		pn := cast(^e.PathNode)node
 		e.PathNode_Bake(pn)
@@ -383,6 +386,31 @@ Viewport_DrawSceneBounds :: proc(state: ^EditorState) {
 			// Corner ticks read better than a heavy box.
 			for c in q do rl.DrawCircleV(c, 3 / state.cameraZoom, col)
 		}
+	}
+}
+
+// Viewport_DrawNavigation: regions (outline; cells while selected) and,
+// in Simulate, each agent's path.
+Viewport_DrawNavigation :: proc(state: ^EditorState) {
+	if state.activeScene == nil do return
+	m := state.activeScene.manager
+	for n in m.navRegions {
+		if Editor_ViewHidden(state, n) do continue
+		r := cast(^e.NavigationRegionNode)n
+		sel := n == state.selectedNode
+		if sel && !r.baked do e.NavRegion_Bake(r, &state.game.gameContext)
+		e.NavRegion_Draw(r, sel)
+	}
+	if !state.isSimulating do return
+	for n in m.navAgents {
+		a := cast(^e.NavigationAgentNode)n
+		if !a.hasTarget do continue
+		p := e.NavAgent_Position(a, m)
+		for i in a.pathIndex ..< len(a.path) {
+			rl.DrawLineEx(p, a.path[i], 2 / state.cameraZoom, {52, 211, 153, 220})
+			p = a.path[i]
+		}
+		rl.DrawCircleV(a.target, 4 / state.cameraZoom, {52, 211, 153, 255})
 	}
 }
 

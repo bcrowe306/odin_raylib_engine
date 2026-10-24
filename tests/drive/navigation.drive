@@ -1,0 +1,49 @@
+# Navigation: a Navigation Region added and baked (its cells in the viewport,
+# the Inspector's count), a Walker node with a Navigation Agent; in Simulate
+# the agent walks the Walker to a target set from Lua; saved.
+wait 5
+key escape
+key ctrl+a
+type navigation region
+key enter
+wait 5
+expect node:NavigationRegion.type == NavigationRegionNode
+click @insp.nav.bake
+wait 2
+expect log contains Baked NavigationRegion
+screenshot region
+key escape
+key ctrl+a
+type empty node
+key enter
+wait 3
+dblclick @insp.name
+key ctrl+a
+type WalkerZz
+key enter
+wait 2
+key ctrl+a
+type navigation agent
+key enter
+wait 3
+expect node:NavigationAgent.parent == WalkerZz
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "type": "NavigationRegionNode"
+expect file:scenes/main.scene.json contains "type": "NavigationAgentNode"
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+click @bottom:console
+click @console.lua
+type local r = Scene.find_node("NavigationRegion"); r.position = {0, 0}; r:nav_rebake(); local w = Scene.find_node("WalkerZz"); w.position = {200, 200}; w:get_node("NavigationAgent"):nav_set_target(420, 260)
+key enter
+wait 180
+type local p = Scene.find_node("WalkerZz").position; local d = math.sqrt((p.x - 420) ^ 2 + (p.y - 260) ^ 2); print(d < 10 and "WALKER arrived" or "WALKER far")
+key enter
+wait 3
+expect log contains WALKER arrived
+screenshot walked
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

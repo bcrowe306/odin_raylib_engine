@@ -238,6 +238,20 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "VisibilityNotifierNode",
 	},
 	{
+		name        = "Navigation Region",
+		category    = "Physics & Collision",
+		icon        = ICON_FA_MAP,
+		description = "An area agents find paths in: baked into a grid from static bodies, solid tile maps and LDtk Solid cells. Bake in the Inspector; scripts can block cells (doors).",
+		typeName    = "NavigationRegionNode",
+	},
+	{
+		name        = "Navigation Agent",
+		category    = "Physics & Collision",
+		icon        = ICON_FA_ROUTE,
+		description = "Put it under a character: give it a target and it walks there along a path, around walls and other agents (moves a CharacterMover, a DynamicBody or any node).",
+		typeName    = "NavigationAgentNode",
+	},
+	{
 		name        = "Joint",
 		category    = "Physics & Collision",
 		icon        = ICON_FA_LINK,

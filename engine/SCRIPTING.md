@@ -770,12 +770,19 @@ Scene.find_node("Trail"):trail_clear()          -- after a teleport
 Scene.find_node("Crt"):set_enabled(false)       -- turn an effect off
 ```
 
-#### Navigation (A* on tile maps and LDtk levels)
+#### Navigation (A* on tile maps, LDtk levels and Navigation Regions)
+
+Navigation Regions bake a grid from static bodies, solid tile maps and LDtk
+Solid cells (`nav_rebake`, `nav_set_blocked` for doors); Navigation Agents
+walk their parent to a target (`nav_set_target`, `nav_stop`,
+`nav_is_finished`, `nav_get_path`, `nav_distance_left`; events
+`navigation_finished`, `target_unreachable`). `{radius = r}` keeps paths
+clear of walls. Guide with tutorials: [`docs/navigation.md`](docs/navigation.md).
 
 ```lua
 local level = Scene.find_node("Level")          -- a TileMap or LDtk level node
 local x, y = self.node:get_position()
-local path = level:nav_find_path(x, y, target_x, target_y)   -- nil: no way
+local path = level:nav_find_path(x, y, target_x, target_y, {radius = 12})   -- nil: no way
 if path then
     self.path, self.next = path, 2               -- path[1] is the start
 end

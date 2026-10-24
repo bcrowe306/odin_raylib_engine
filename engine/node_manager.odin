@@ -20,6 +20,9 @@ NodeManager :: struct {
 	// VisibilityNotifierNodes in the manager (added / removed with them),
 	// so the per-frame visibility pass touches only those.
 	notifiers: [dynamic]^Node,
+	// NavigationRegion / NavigationAgent nodes (navigation_nodes.odin).
+	navRegions: [dynamic]^Node,
+	navAgents:  [dynamic]^Node,
 }
 
 NodeManagerStats :: struct {
@@ -82,6 +85,8 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	delete(manager.removal)
 	delete(manager.nodes)
 	delete(manager.notifiers)
+	delete(manager.navRegions)
+	delete(manager.navAgents)
 	for _, list in manager.childrenOf do delete(list)
 	delete(manager.childrenOf)
 	delete(manager.parentOf)
@@ -92,6 +97,8 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	manager.removal = nil
 	manager.nodes = nil
 	manager.notifiers = nil
+	manager.navRegions = nil
+	manager.navAgents = nil
 	manager.childrenOf = nil
 	manager.parentOf = nil
 }
@@ -226,6 +233,12 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 			if node.typeId == VisibilityNotifierNode {
 				for n, k in manager.notifiers do if n == node {unordered_remove(&manager.notifiers, k); break}
 			}
+			if node.typeId == NavigationRegionNode {
+				for n, k in manager.navRegions do if n == node {unordered_remove(&manager.navRegions, k); break}
+			}
+			if node.typeId == NavigationAgentNode {
+				for n, k in manager.navAgents do if n == node {unordered_remove(&manager.navAgents, k); break}
+			}
 			// Frees node's arena, subjects, and any custom onDestroy resources.
 			Node_Terminate(node)
 			manager.nodes[index] = nil
@@ -257,6 +270,8 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 		if addNode != nil do addNode.managerIndex = index + 1
 		if addNode != nil do append(&added, addNode)
 		if addNode != nil && addNode.typeId == VisibilityNotifierNode do append(&manager.notifiers, addNode)
+		if addNode != nil && addNode.typeId == NavigationRegionNode do append(&manager.navRegions, addNode)
+		if addNode != nil && addNode.typeId == NavigationAgentNode do append(&manager.navAgents, addNode)
 	}
 	clear(&manager.addition)
 	for n in added {

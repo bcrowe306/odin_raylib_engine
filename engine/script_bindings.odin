@@ -95,6 +95,8 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case VisibilityNotifierNode: typeName = "VisibilityNotifierNode"
 	case PathNode: typeName = "PathNode"
 	case PathFollowNode: typeName = "PathFollowNode"
+	case NavigationRegionNode: typeName = "NavigationRegionNode"
+	case NavigationAgentNode: typeName = "NavigationAgentNode"
 	case PostEffectNode: typeName = "PostEffectNode"
 	case TileMapNode: typeName = "TileMapNode"
 	}
@@ -3120,6 +3122,9 @@ nav_opts :: proc(L: ^lua.State, idx: c.int) -> Nav_Options {
 	lua.getfield(L, idx, "walkable_painted")
 	if lua.type(L, -1) == .BOOLEAN do o.walkablePainted = bool(lua.toboolean(L, -1))
 	lua.pop(L, 1)
+	lua.getfield(L, idx, "radius")
+	if lua.type(L, -1) == .NUMBER do o.radius = f32(lua.tonumber(L, -1))
+	lua.pop(L, 1)
 	return o
 }
 
@@ -3166,8 +3171,11 @@ lua_node_nav_is_walkable :: proc "c" (L: ^lua.State) -> c.int {
 	node, ok := to_node_userdata(L, 1)
 	walk := false
 	if ok {
-		if g := Nav_GridFor(node, nav_opts(L, 4)); g != nil {
-			walk = Nav_Walkable(g, Nav_CellAt(g, {f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3))}))
+		opts := nav_opts(L, 4)
+		if g := Nav_GridFor(node, opts); g != nil {
+			rc := opts.radius / max(min(g.cell.x, g.cell.y), 0.0001)
+			if rc > 0 do Nav_Clearance(g)
+			walk = Nav_Walkable(g, Nav_CellAt(g, {f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3))}), rc)
 		}
 	}
 	lua.pushboolean(L, b32(walk))
@@ -4082,6 +4090,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "nav_find_path")
 		lua.pushcfunction(L, lua_node_nav_is_walkable)
 		lua.setfield(L, -2, "nav_is_walkable")
+		Script_RegisterNavNodeBindings(L) // nav_rebake, nav_set_blocked, agents (navigation_nodes.odin)
 		lua.pushcfunction(L, lua_node_get_property)
 		lua.setfield(L, -2, "get_property")
 		lua.pushcfunction(L, lua_node_set_collision_layer)

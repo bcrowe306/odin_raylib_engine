@@ -117,6 +117,14 @@ local TrailNode = {}
 ---@class VisibilityNotifierNode : Node
 local VisibilityNotifierNode = {}
 
+---A grid area agents find paths in: baked from static bodies, solid tile maps and LDtk Solid cells; scripts can block cells (doors).
+---@class NavigationRegionNode : Node, NavGrid
+local NavigationRegionNode = {}
+
+---Follows a path to a target and moves its parent: speed, radius (keeps clear of walls and other agents), avoidance; "navigation_finished" / "target_unreachable".
+---@class NavigationAgentNode : Node
+local NavigationAgentNode = {}
+
 ---A curve through points with Bézier handles (routes, rails, platforms' tracks); a PathFollowNode child travels along it.
 ---@class PathNode : Node
 local PathNode = {}
@@ -522,6 +530,13 @@ function RaycastNode:connect(event, handler) end
 ---@param handler fun(value: any, source: VisibilityNotifierNode)
 ---@return integer id Connection id for `disconnect`
 function VisibilityNotifierNode:connect(event, handler) end
+
+---@alias NavigationAgentNodeEvent NodeTreeEvent|"navigation_finished"|"target_unreachable"|ProjectEvent
+---Connects a handler to one of this node's events: navigation_finished (The agent arrived at its target), target_unreachable (No way to the agent's target); the tree events; custom ones.
+---@param event NavigationAgentNodeEvent|string
+---@param handler fun(value: any, source: NavigationAgentNode)
+---@return integer id Connection id for `disconnect`
+function NavigationAgentNode:connect(event, handler) end
 
 ---@alias PathFollowNodeEvent NodeTreeEvent|"path_finished"|"path_looped"|ProjectEvent
 ---Connects a handler to one of this node's events: path_finished (The follower reached the end of its path (loop: Stop)), path_looped (The follower wrapped round or turned back (Loop / Ping Pong)); the tree events; custom ones.
@@ -2060,6 +2075,168 @@ function PathNode:get_property(path) end
 ---@overload fun(self: PathNode, path: "lineWidth", value: number)
 ---@overload fun(self: PathNode, path: "color", value: number[])
 function PathNode:set_property(path, value, y) end
+
+---@class NavigationRegionNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 The area agents find paths in, from the node's position (px).
+---@field cellSize number Size of a grid cell (px): smaller follows walls more closely, larger finds paths faster.
+---@field usePhysics boolean Static bodies' collision shapes inside the area block.
+---@field useTileMaps boolean Solid tile maps' painted tiles block.
+---@field useLdtk boolean LDtk IntGrid cells with a Solid collision rule block.
+
+---@alias NavigationRegionNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "size" # Vec2 - The area agents find paths in, from the node's position (px).
+---| "cellSize" # number - Size of a grid cell (px): smaller follows walls more closely, larger finds paths faster.
+---| "usePhysics" # boolean - Static bodies' collision shapes inside the area block.
+---| "useTileMaps" # boolean - Solid tile maps' painted tiles block.
+---| "useLdtk" # boolean - LDtk IntGrid cells with a Solid collision rule block.
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path NavigationRegionNodeProperty|string
+---@return any
+---@overload fun(self: NavigationRegionNode, path: "position"): Vec2
+---@overload fun(self: NavigationRegionNode, path: "scale"): Vec2
+---@overload fun(self: NavigationRegionNode, path: "rotation"): number
+---@overload fun(self: NavigationRegionNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: NavigationRegionNode, path: "zIndex"): integer
+---@overload fun(self: NavigationRegionNode, path: "ySort"): boolean
+---@overload fun(self: NavigationRegionNode, path: "ySortOffset"): number
+---@overload fun(self: NavigationRegionNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: NavigationRegionNode, path: "paused"): boolean
+---@overload fun(self: NavigationRegionNode, path: "enabled"): boolean
+---@overload fun(self: NavigationRegionNode, path: "size"): Vec2
+---@overload fun(self: NavigationRegionNode, path: "cellSize"): number
+---@overload fun(self: NavigationRegionNode, path: "usePhysics"): boolean
+---@overload fun(self: NavigationRegionNode, path: "useTileMaps"): boolean
+---@overload fun(self: NavigationRegionNode, path: "useLdtk"): boolean
+function NavigationRegionNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---@param path NavigationRegionNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: NavigationRegionNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: NavigationRegionNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: NavigationRegionNode, path: "rotation", value: number)
+---@overload fun(self: NavigationRegionNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: NavigationRegionNode, path: "zIndex", value: integer)
+---@overload fun(self: NavigationRegionNode, path: "ySort", value: boolean)
+---@overload fun(self: NavigationRegionNode, path: "ySortOffset", value: number)
+---@overload fun(self: NavigationRegionNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: NavigationRegionNode, path: "paused", value: boolean)
+---@overload fun(self: NavigationRegionNode, path: "enabled", value: boolean)
+---@overload fun(self: NavigationRegionNode, path: "size", x: number|Vec2|number[], y?: number)
+---@overload fun(self: NavigationRegionNode, path: "cellSize", value: number)
+---@overload fun(self: NavigationRegionNode, path: "usePhysics", value: boolean)
+---@overload fun(self: NavigationRegionNode, path: "useTileMaps", value: boolean)
+---@overload fun(self: NavigationRegionNode, path: "useLdtk", value: boolean)
+function NavigationRegionNode:set_property(path, value, y) end
+
+---@class NavigationAgentNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field speed number How fast it moves along its path (px/s).
+---@field radius number Its size: paths keep this far from walls, and agents keep this far apart.
+---@field arriveDistance number How close to the target counts as arrived (px).
+---@field repathInterval number Seconds between new paths while moving (a moving target, opened doors); 0 = only when t...
+---@field navMap string The NavigationRegion, TileMap or LDtk level to find paths in (a node path); empty = the...
+---@field moveParent boolean Move the parent along the path (a CharacterMover, a DynamicBody or any node); off: read...
+---@field avoidance boolean Steer away from other agents (their radius).
+---@field velocity Vec2 The velocity it wants this frame (px/s; read-only).
+
+---@alias NavigationAgentNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "speed" # number - How fast it moves along its path (px/s).
+---| "radius" # number - Its size: paths keep this far from walls, and agents keep this far apart.
+---| "arriveDistance" # number - How close to the target counts as arrived (px).
+---| "repathInterval" # number - Seconds between new paths while moving (a moving target, opened doors); 0 = only when t...
+---| "navMap" # string - The NavigationRegion, TileMap or LDtk level to find paths in (a node path); empty = the...
+---| "moveParent" # boolean - Move the parent along the path (a CharacterMover, a DynamicBody or any node); off: read...
+---| "avoidance" # boolean - Steer away from other agents (their radius).
+---| "velocity" # Vec2 (runtime) - The velocity it wants this frame (px/s; read-only).
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path NavigationAgentNodeProperty|string
+---@return any
+---@overload fun(self: NavigationAgentNode, path: "position"): Vec2
+---@overload fun(self: NavigationAgentNode, path: "scale"): Vec2
+---@overload fun(self: NavigationAgentNode, path: "rotation"): number
+---@overload fun(self: NavigationAgentNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: NavigationAgentNode, path: "zIndex"): integer
+---@overload fun(self: NavigationAgentNode, path: "ySort"): boolean
+---@overload fun(self: NavigationAgentNode, path: "ySortOffset"): number
+---@overload fun(self: NavigationAgentNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: NavigationAgentNode, path: "paused"): boolean
+---@overload fun(self: NavigationAgentNode, path: "enabled"): boolean
+---@overload fun(self: NavigationAgentNode, path: "speed"): number
+---@overload fun(self: NavigationAgentNode, path: "radius"): number
+---@overload fun(self: NavigationAgentNode, path: "arriveDistance"): number
+---@overload fun(self: NavigationAgentNode, path: "repathInterval"): number
+---@overload fun(self: NavigationAgentNode, path: "navMap"): string
+---@overload fun(self: NavigationAgentNode, path: "moveParent"): boolean
+---@overload fun(self: NavigationAgentNode, path: "avoidance"): boolean
+---@overload fun(self: NavigationAgentNode, path: "velocity"): Vec2
+function NavigationAgentNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---@param path NavigationAgentNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: NavigationAgentNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: NavigationAgentNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: NavigationAgentNode, path: "rotation", value: number)
+---@overload fun(self: NavigationAgentNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: NavigationAgentNode, path: "zIndex", value: integer)
+---@overload fun(self: NavigationAgentNode, path: "ySort", value: boolean)
+---@overload fun(self: NavigationAgentNode, path: "ySortOffset", value: number)
+---@overload fun(self: NavigationAgentNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: NavigationAgentNode, path: "paused", value: boolean)
+---@overload fun(self: NavigationAgentNode, path: "enabled", value: boolean)
+---@overload fun(self: NavigationAgentNode, path: "speed", value: number)
+---@overload fun(self: NavigationAgentNode, path: "radius", value: number)
+---@overload fun(self: NavigationAgentNode, path: "arriveDistance", value: number)
+---@overload fun(self: NavigationAgentNode, path: "repathInterval", value: number)
+---@overload fun(self: NavigationAgentNode, path: "navMap", value: string)
+---@overload fun(self: NavigationAgentNode, path: "moveParent", value: boolean)
+---@overload fun(self: NavigationAgentNode, path: "avoidance", value: boolean)
+---@overload fun(self: NavigationAgentNode, path: "velocity", x: number|Vec2|number[], y?: number)
+function NavigationAgentNode:set_property(path, value, y) end
 
 ---@class PathFollowNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -5540,10 +5717,12 @@ function PathFollowNode:follow_restart() end
 ---@field diagonal? boolean 8 directions (default true); no cutting past blocked corners
 ---@field smooth? boolean Straighten where the line of sight is clear (default true)
 ---@field walkable_painted? boolean TileMap: painted tiles are the floor (default: not `solid`)
+---@field radius? number Agent radius (px): the path keeps this far from walls (a goal too close to one moves to the nearest place that fits)
 
----A* path on this TileMap's or LDtk level's grid (TileMap: painted tiles
----are walls when the map is solid; LDtk: IntGrid cells whose collision rule
----is Solid). Waypoints from the start to the end, or nil when unreachable.
+---A* path on this TileMap's, LDtk level's or NavigationRegion's grid
+---(TileMap: painted tiles are walls when the map is solid; LDtk: IntGrid
+---cells whose collision rule is Solid; a region: what it baked).
+---Waypoints from the start to the end, or nil when unreachable.
 ---
 ---Example: `local level = Scene.find_node("Level"); local path = level:nav_find_path(x, y, tx, ty, {diagonal = false})`
 ---@param x1 number
@@ -5562,6 +5741,51 @@ function NavGrid:nav_find_path(x1, y1, x2, y2, opts) end
 ---@param opts? NavOptions
 ---@return boolean
 function NavGrid:nav_is_walkable(x, y, opts) end
+
+---Rebuilds the region's cells from the scene (after moving walls, loading a level, painting tiles).
+---
+---Example: `Scene.find_node("NavigationRegion"):nav_rebake()`
+function NavigationRegionNode:nav_rebake() end
+
+---Blocks (or opens) a world rectangle for paths - doors, bridges, placed towers. Kept across rebakes.
+---
+---Example: `region:nav_set_blocked(door.position.x - 16, door.position.y - 32, 32, 64, not self.open)`
+---@param x number
+---@param y number
+---@param w number
+---@param h number
+---@param blocked? boolean Default true
+function NavigationRegionNode:nav_set_blocked(x, y, w, h, blocked) end
+
+---Sends the agent (and the node it moves) to a world position along a path.
+---
+---Example: `self.node:get_node("NavigationAgent"):nav_set_target(Scene.find_node("Player").position)`
+---@param x number|Vec2
+---@param y? number
+function NavigationAgentNode:nav_set_target(x, y) end
+
+---Stops following the path (velocity 0).
+---
+---Example: `agent:nav_stop()`
+function NavigationAgentNode:nav_stop() end
+
+---Arrived (or no target).
+---
+---Example: `if agent:nav_is_finished() then self:look_around() end`
+---@return boolean
+function NavigationAgentNode:nav_is_finished() end
+
+---The waypoints still to go (world).
+---
+---Example: `local left = #agent:nav_get_path()  -- waypoints still to go`
+---@return number[][]
+function NavigationAgentNode:nav_get_path() end
+
+---Path length still to go (px).
+---
+---Example: `if agent:nav_distance_left() < 64 then self:slow_down() end`
+---@return number
+function NavigationAgentNode:nav_distance_left() end
 
 
 ---The collision layers this body's shapes are on: project layer names

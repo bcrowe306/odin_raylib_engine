@@ -41,6 +41,8 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
 	{"VisibilityNotifierNode", VisibilityNotifierNode, factory_visibility, {"visibility", "on screen", "notifier"}},
 	{"PathNode", PathNode, factory_path, {"path", "curve", "bezier", "route", "rail"}},
+	{"NavigationRegionNode", NavigationRegionNode, factory_nav_region, {"navigation", "nav region", "navmesh", "pathfinding"}},
+	{"NavigationAgentNode", NavigationAgentNode, factory_nav_agent, {"nav agent", "agent", "pathfinding agent"}},
 	{"PathFollowNode", PathFollowNode, factory_path_follow, {"path follow", "follower", "moving platform"}},
 	{"LdtkLevelNode", LdtkLevelNode, factory_ldtk, {"ldtk", "ldtklevel"}},
 	{"TileMapNode", TileMapNode, factory_tilemap, {"tilemap"}},
@@ -256,6 +258,12 @@ factory_area :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 
 @(private = "file")
 factory_path :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PathNode_Create(scene, "Path", parent)}
+
+@(private = "file")
+factory_nav_region :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return NavigationRegionNode_Create(scene, "NavigationRegion", parent)}
+
+@(private = "file")
+factory_nav_agent :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return NavigationAgentNode_Create(scene, "NavigationAgent", parent)}
 
 @(private = "file")
 factory_path_follow :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PathFollowNode_Create(scene, "PathFollow", parent)}

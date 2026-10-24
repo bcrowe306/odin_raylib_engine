@@ -529,6 +529,14 @@ points are edited in the Inspector's **Points** section (**Add Point**, the
 x removes one). Post effects show in the viewport while the lighting
 preview (toolbar) is on; pick the shader in the **Material** section.
 
+### Navigation
+
+**Navigation Region** (Add Node > Physics & Collision): a rectangle baked
+into cells - selected, the viewport shows the blocked ones red; **Bake** in
+the Inspector rebuilds them. **Navigation Agent** under a character walks
+it to targets; in Simulate its path is drawn green. Guide:
+[`engine/docs/navigation.md`](../engine/docs/navigation.md).
+
 ### Mixer
 
 Bottom panel > **Mixer**: the project's buses as a console - a strip per

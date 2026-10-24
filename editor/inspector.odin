@@ -767,6 +767,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_line(state, cast(^e.LineNode)node)
 	case e.PathNode:
 		inspector_path(state, cast(^e.PathNode)node)
+	case e.NavigationRegionNode:
+		inspector_nav_region(state, cast(^e.NavigationRegionNode)node)
 	case e.StateMachineNode:
 		inspector_state_machine(state, cast(^e.StateMachineNode)node)
 	case e.LdtkLevelNode:
@@ -1214,6 +1216,8 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.VisibilityNotifierNode: return ICON_FA_EYE
 	case e.PathNode: return ICON_FA_BEZIER_CURVE
 	case e.PathFollowNode: return ICON_FA_ROUTE
+	case e.NavigationRegionNode: return ICON_FA_MAP
+	case e.NavigationAgentNode: return ICON_FA_PERSON_RUNNING
 	case e.PostEffectNode: return ICON_FA_FILTER
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS
 	case e.ScriptNode: return ICON_FA_CODE
@@ -1439,6 +1443,22 @@ inspector_texture_path :: proc(state: ^EditorState, node: ^e.Node) {
 	} else {
 		UI_Tooltip("Factor 1 moves with the world, 0 stays on screen; repeat to tile it")
 	}
+}
+
+// inspector_nav_region: bake the cells (the editor doesn't run ready) and
+// what they hold.
+@(private = "file")
+inspector_nav_region :: proc(state: ^EditorState, r: ^e.NavigationRegionNode) {
+	if !UI_SectionHeader("Navigation") do return
+	if !r.baked do e.NavRegion_Bake(r, &state.game.gameContext)
+	blocked := 0
+	for b in r.blocked do if b != 0 do blocked += 1
+	UI_DimText(fmt.tprintf("%d x %d cells, %d blocked (red in the viewport). The game bakes it when the scene starts.", r.cells.x, r.cells.y, blocked))
+	if UI_Button(fmt.tprintf("%s  Bake", ICON_FA_ROTATE), "insp.nav.bake") {
+		e.NavRegion_Bake(r, &state.game.gameContext)
+		Editor_Log(state, .Info, "Baked %s: %d x %d cells", r.name, r.cells.x, r.cells.y)
+	}
+	UI_Tooltip("Rebuild the cells from the scene now (after moving walls or painting tiles)")
 }
 
 // inspector_path: a PathNode's points (local) and handles; Smooth / Sharp.
