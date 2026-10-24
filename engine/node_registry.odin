@@ -40,6 +40,8 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"AreaNode", AreaNode, factory_area, {"area"}},
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
 	{"VisibilityNotifierNode", VisibilityNotifierNode, factory_visibility, {"visibility", "on screen", "notifier"}},
+	{"PathNode", PathNode, factory_path, {"path", "curve", "bezier", "route", "rail"}},
+	{"PathFollowNode", PathFollowNode, factory_path_follow, {"path follow", "follower", "moving platform"}},
 	{"LdtkLevelNode", LdtkLevelNode, factory_ldtk, {"ldtk", "ldtklevel"}},
 	{"TileMapNode", TileMapNode, factory_tilemap, {"tilemap"}},
 	{"LightNode", LightNode, factory_light, {"light", "pointlight", "spotlight"}},
@@ -251,6 +253,12 @@ factory_character :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 factory_area :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return AreaNode_Create(scene, "Area", parent)
 }
+
+@(private = "file")
+factory_path :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PathNode_Create(scene, "Path", parent)}
+
+@(private = "file")
+factory_path_follow :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PathFollowNode_Create(scene, "PathFollow", parent)}
 
 @(private = "file")
 factory_visibility :: proc(scene: ^Scene, parent: ^Node) -> ^Node {

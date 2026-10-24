@@ -878,6 +878,9 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 			names := make([dynamic]string, context.temp_allocator)
 			for c in e.GetChildrenView(state.activeScene.manager, n) do if c != nil && !c.transient do append(&names, c.name)
 			return strings.join(names[:], ",", context.temp_allocator), true
+		case "path-points":
+			if n.typeId != e.PathNode do return "<not a path>", true
+			return fmt.tprint(len((cast(^e.PathNode)n).points)), true
 		case "tiles":
 			if n.typeId != e.TileMapNode do return "<not a tile map>", true
 			tm := cast(^e.TileMapNode)n

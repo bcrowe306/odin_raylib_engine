@@ -92,6 +92,20 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "LineNode",
 	},
 	{
+		name        = "Path",
+		category    = "Animation & Effects",
+		icon        = ICON_FA_BEZIER_CURVE,
+		description = "A curve through points with Bézier handles, edited in the viewport: routes, rails, moving platforms' tracks, camera paths. Add a Path Follow under it.",
+		typeName    = "PathNode",
+	},
+	{
+		name        = "Path Follow",
+		category    = "Animation & Effects",
+		icon        = ICON_FA_ROUTE,
+		description = "Travels along its parent Path: speed, loop / ping-pong / stop, faces the way it goes. Put a sprite, a platform or an enemy under it.",
+		typeName    = "PathFollowNode",
+	},
+	{
 		name        = "Trail",
 		category    = "Animation & Effects",
 		icon        = ICON_FA_WIND,

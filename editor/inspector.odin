@@ -747,6 +747,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_texture_path(state, node)
 	case e.LineNode:
 		inspector_line(state, cast(^e.LineNode)node)
+	case e.PathNode:
+		inspector_path(state, cast(^e.PathNode)node)
 	case e.StateMachineNode:
 		inspector_state_machine(state, cast(^e.StateMachineNode)node)
 	case e.LdtkLevelNode:
@@ -1192,6 +1194,8 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.LineNode: return ICON_FA_DRAW_POLYGON
 	case e.TrailNode: return ICON_FA_WIND
 	case e.VisibilityNotifierNode: return ICON_FA_EYE
+	case e.PathNode: return ICON_FA_BEZIER_CURVE
+	case e.PathFollowNode: return ICON_FA_ROUTE
 	case e.PostEffectNode: return ICON_FA_FILTER
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS
 	case e.ScriptNode: return ICON_FA_CODE
@@ -1417,6 +1421,67 @@ inspector_texture_path :: proc(state: ^EditorState, node: ^e.Node) {
 	} else {
 		UI_Tooltip("Factor 1 moves with the world, 0 stays on screen; repeat to tile it")
 	}
+}
+
+// inspector_path: a PathNode's points (local) and handles; Smooth / Sharp.
+@(private = "file")
+inspector_path :: proc(state: ^EditorState, p: ^e.PathNode) {
+	if !UI_SectionHeader("Points") do return
+	UI_DimText(fmt.tprintf("Length %.0f px. In the viewport: drag points and handles, double-click the curve to add, Alt+click to remove.", e.PathNode_Length(p)))
+	sel := PathEdit_Selected(p)
+	remove := -1
+	w := imgui.GetContentRegionAvail().x
+	for &pt, i in p.points {
+		imgui.PushIDInt(i32(i))
+		if i == sel do imgui.TextColored(UI_ACCENT, "%d", i32(i + 1))
+		else do UI_DimText(fmt.tprintf("%d", i + 1))
+		imgui.SameLine(28)
+		imgui.SetNextItemWidth(w * 0.42)
+		imgui.DragFloat2("##pos", &pt.pos, 1, 0, 0, "%.0f")
+		undo_on_activate(state, "Path point")
+		Drive_Item(fmt.tprintf("insp.path.point:%d", i))
+		imgui.SameLine()
+		smooth := pt.in_ != {} || pt.out != {}
+		if UI_IconButton(ICON_FA_BEZIER_CURVE, fmt.tprintf("insp.path.smooth:%d", i), "Sharp corner" if smooth else "Smooth (add handles)", smooth, 24) {
+			Editor_RecordUndo(state, "Path point handles")
+			if smooth {
+				pt.in_, pt.out = {}, {}
+			} else {
+				// Handles along the line through its neighbours.
+				n := len(p.points)
+				prev := p.points[(i + n - 1) % n].pos if i > 0 || p.closed else pt.pos
+				next := p.points[(i + 1) % n].pos if i < n - 1 || p.closed else pt.pos
+				d := (next - prev) * 0.25
+				if d == {} do d = {30, 0}
+				pt.in_, pt.out = -d, d
+			}
+		}
+		if len(p.points) > 2 {
+			imgui.SameLine()
+			if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("insp.path.remove:%d", i), "Remove point", size = 24) do remove = i
+		}
+		if smooth {
+			imgui.SetCursorPosX(imgui.GetCursorPosX() + 28)
+			imgui.SetNextItemWidth(w * 0.36)
+			imgui.DragFloat2("##in", &pt.in_, 1, 0, 0, "in %.0f")
+			undo_on_activate(state, "Path handle")
+			imgui.SameLine()
+			imgui.SetNextItemWidth(w * 0.36)
+			imgui.DragFloat2("##out", &pt.out, 1, 0, 0, "out %.0f")
+			undo_on_activate(state, "Path handle")
+		}
+		imgui.PopID()
+	}
+	if remove >= 0 {
+		Editor_RecordUndo(state, "Remove path point")
+		ordered_remove(&p.points, remove)
+	}
+	if UI_Button(fmt.tprintf("%s  Add Point", ICON_FA_PLUS), "insp.path.add") {
+		Editor_RecordUndo(state, "Add path point")
+		last := p.points[len(p.points) - 1].pos if len(p.points) > 0 else [2]f32{}
+		append(&p.points, e.Path_Point{pos = last + {80, 0}})
+	}
+	UI_Tooltip("A point 80 px after the last (or Ctrl+click in the viewport)")
 }
 
 // inspector_line: a LineNode's points (local to the node).

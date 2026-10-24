@@ -404,6 +404,8 @@ Pivot_MoveTo :: proc(state: ^EditorState, node: ^e.Node, world: [2]f32) {
 	switch node.typeId {
 	case e.LineNode:
 		for &p in (cast(^e.LineNode)node).points do p -= local
+	case e.PathNode:
+		for &p in (cast(^e.PathNode)node).points do p.pos -= local
 	}
 	if shapes := node_shapes_editor(node); shapes != nil {
 		for &sh in shapes^ do sh.offset -= local

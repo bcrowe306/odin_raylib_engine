@@ -134,7 +134,7 @@ Missing (all):
 - [ ] 1 Pathfinding / navigation: A* on tile grids, navigation regions (polygons), a navigation agent node (path following, steering), obstacle avoidance
 - [x] 2 Y-sort / depth sorting (top-down, isometric): zIndex (relative), ySort, ySortOffset; sorted in the one render walk (stable sorts only where used); picking follows draw order; guide engine/docs/draw_order.md, test, y_sort drive
 - [ ] 3 Level editor (root app tabs: **Game** = today's editor, **Level** = a level-editing mode): our own interface on the LDtk file format, re-implementing LDtk's features (reference: `ldtk/` sources) - worlds, levels, layers (IntGrid, Entities, Tiles, Auto-layers with rules), tilesets, enums, entity fields, autotiling / terrains, animated tiles, per-tile data
-- [ ] 4 Path / curve node (Bézier, edited in the viewport) + path follower (moving platforms, routes, rails, camera tracks)
+- [x] 4 Paths: PathNode (Bézier points, baked polyline by distance, closest offset, drawn line), PathFollowNode (speed, Stop / Loop / PingPong, rotate, side offset, events); viewport editing (drag points / handles, double-click insert keeping the shape, Alt+click remove), Inspector points; CharacterMover rides moving floors; Lua path_* / follow_*; guide with tutorials, test, drive
 - [ ] 5 Web export (emscripten - bundle it with a shipped editor: raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio) (was 3.4)
 - [x] 6 Visibility notifier: VisibilityNotifierNode (size, margin, action: pause / disable / remove the parent), screen_entered / exited, onScreen; per-manager notifier list, one pass after the transforms (game + Simulate); guide engine/docs/visibility.md, test, drive
 

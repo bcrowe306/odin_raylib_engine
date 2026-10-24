@@ -67,6 +67,8 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "entity_spawned":     return "node", "An LDtk entity was spawned"
 	case "screen_entered":     return "", "The camera started seeing it"
 	case "screen_exited":      return "", "The camera stopped seeing it"
+	case "path_finished":      return "", "The follower reached the end of its path (loop: Stop)"
+	case "path_looped":        return "", "The follower wrapped round or turned back (Loop / Ping Pong)"
 	}
 	return "value", ""
 }

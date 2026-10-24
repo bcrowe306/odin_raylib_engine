@@ -1,0 +1,54 @@
+# Paths: added from Add Node, points dragged in the viewport, a point
+# inserted by double-clicking the curve, one removed in the Inspector, a
+# Path Follow under it that travels in Simulate; saved.
+wait 5
+key escape
+key ctrl+a
+type path
+key enter
+wait 5
+expect node:Path.type == PathNode
+expect node:Path.path-points == 2
+expect item:path.point:0 == visible
+drag @path.point:1 @path.point:1+60,40 10
+wait 2
+dblclick @path.seg:0
+wait 3
+expect node:Path.path-points == 3
+expect item:insp.path.point:2 == visible
+screenshot path_edit
+click @insp.path.remove:1
+wait 2
+expect node:Path.path-points == 2
+# The first point has handles: the button makes it a sharp corner, again smooth.
+click @insp.path.smooth:0
+wait 2
+expect item:path.out:0 == missing
+click @insp.path.smooth:0
+wait 2
+expect item:path.out:0 == visible
+# A follower travelling along it.
+click @hier:Path
+key ctrl+a
+type path follow
+key enter
+wait 5
+expect node:PathFollow.parent == Path
+dblclick @insp.prop:speed
+key ctrl+a
+type 200
+key enter
+wait 2
+expect node:PathFollow.prop.speed == 200
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "type": "PathNode"
+expect file:scenes/main.scene.json contains "type": "PathFollowNode"
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 30
+expect node:PathFollow.prop.progress >= 50
+screenshot path_follow
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

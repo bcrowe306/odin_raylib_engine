@@ -210,6 +210,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 		}
 		Viewport_DrawLights(state)
 		Viewport_DrawNotifiers(state)
+		Viewport_DrawPaths(state)
 
 		// Draw bounding boxes / physics colliders (when enabled or node selected)
 		Viewport_DrawSceneBounds(state)
@@ -307,6 +308,17 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 			lo = {min(lo.x, o.x), min(lo.y, o.y)}
 			hi = {max(hi.x, p.x), max(hi.y, p.y)}
 		}
+	case e.PathNode:
+		pn := cast(^e.PathNode)node
+		e.PathNode_Bake(pn)
+		for p, i in pn.baked {
+			q := p * scl
+			if i == 0 do lo, hi, have = q, q, true
+			lo = {min(lo.x, q.x), min(lo.y, q.y)}
+			hi = {max(hi.x, q.x), max(hi.y, q.y)}
+		}
+		lo -= 4 / state.cameraZoom
+		hi += 4 / state.cameraZoom
 	case e.VisibilityNotifierNode:
 		v := cast(^e.VisibilityNotifierNode)node
 		lo, hi, have = -v.size * 0.5 * {abs(scl.x), abs(scl.y)}, v.size * 0.5 * {abs(scl.x), abs(scl.y)}, true
@@ -606,6 +618,12 @@ Viewport_HandleInputAndGizmos :: proc(state: ^EditorState) {
 
 	// Collision-shape handles (replace the gizmo while editing shapes).
 	shapeOwnsMouse := Viewport_ShapeEdit(state, drawList, mouseScreen, mouseWorld)
+	// A selected path's points and handles.
+	if !shapeOwnsMouse && Viewport_PathEdit(state, drawList, mouseScreen, mouseWorld) {
+		state.activeHandle = .None
+		state.isDraggingGizmo = false
+		return
+	}
 
 	// Rulers and guides (and their mouse handling).
 	guidesOwn := shapeOwnsMouse ? false : Viewport_Guides(state, drawList, mouseScreen, mouseWorld)

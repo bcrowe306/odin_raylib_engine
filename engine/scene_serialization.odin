@@ -219,6 +219,21 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		if mn.music != nil && mn.music.filePath != "" {
 			Json_Key(w, "audio", &first); Json_String(w, asset_rel(node, mn.music.filePath))
 		}
+	case PathNode:
+		// [x, y, in x, in y, out x, out y] per point.
+		pn := cast(^PathNode)node
+		Json_Key(w, "points", &first)
+		strings.write_byte(&w.sb, '[')
+		for p, i in pn.points {
+			if i > 0 do strings.write_string(&w.sb, ", ")
+			strings.write_byte(&w.sb, '[')
+			for v, k in ([6]f32{p.pos.x, p.pos.y, p.in_.x, p.in_.y, p.out.x, p.out.y}) {
+				if k > 0 do strings.write_string(&w.sb, ", ")
+				Json_Float(w, v)
+			}
+			strings.write_byte(&w.sb, ']')
+		}
+		strings.write_byte(&w.sb, ']')
 	case LineNode:
 		ln := cast(^LineNode)node
 		Json_Key(w, "points", &first)
@@ -849,6 +864,18 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		if smObj, ok := sj_obj(obj, "state_machine"); ok do read_state_machine(cast(^StateMachineNode)node, smObj)
 	case JointNode:
 		if jo, ok := sj_obj(obj, "joint"); ok do JointNode_SetBodies(cast(^JointNode)node, sj_string(jo, "a", ""), sj_string(jo, "b", ""))
+	case PathNode:
+		pn := cast(^PathNode)node
+		if pts, ok := sj_arr(obj, "points"); ok {
+			clear(&pn.points)
+			for v in pts {
+				pa, pok := v.(json.Array)
+				if !pok || len(pa) < 2 do continue
+				f: [6]f32
+				for k in 0 ..< min(6, len(pa)) do f[k], _ = json_number(pa[k])
+				append(&pn.points, Path_Point{{f[0], f[1]}, {f[2], f[3]}, {f[4], f[5]}})
+			}
+		}
 	case LineNode:
 		ln := cast(^LineNode)node
 		if pts, ok := sj_arr(obj, "points"); ok {

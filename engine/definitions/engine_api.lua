@@ -117,6 +117,14 @@ local TrailNode = {}
 ---@class VisibilityNotifierNode : Node
 local VisibilityNotifierNode = {}
 
+---A curve through points with Bézier handles (routes, rails, platforms' tracks); a PathFollowNode child travels along it.
+---@class PathNode : Node
+local PathNode = {}
+
+---Travels along its parent PathNode: progress (px), speed, loop (Stop / Loop / PingPong), rotate; "path_finished" / "path_looped".
+---@class PathFollowNode : Node
+local PathFollowNode = {}
+
 ---@class PostEffectNode : Node
 
 ---@class UIContainerNode : Node
@@ -514,6 +522,13 @@ function RaycastNode:connect(event, handler) end
 ---@param handler fun(value: any, source: VisibilityNotifierNode)
 ---@return integer id Connection id for `disconnect`
 function VisibilityNotifierNode:connect(event, handler) end
+
+---@alias PathFollowNodeEvent NodeTreeEvent|"path_finished"|"path_looped"|ProjectEvent
+---Connects a handler to one of this node's events: path_finished (The follower reached the end of its path (loop: Stop)), path_looped (The follower wrapped round or turned back (Loop / Ping Pong)); the tree events; custom ones.
+---@param event PathFollowNodeEvent|string
+---@param handler fun(value: any, source: PathFollowNode)
+---@return integer id Connection id for `disconnect`
+function PathFollowNode:connect(event, handler) end
 
 ---@alias LdtkLevelNodeEvent NodeTreeEvent|"level_loaded"|"entity_spawned"|ProjectEvent
 ---Connects a handler to one of this node's events: level_loaded (The LDtk level was built), entity_spawned (An LDtk entity was spawned); the tree events; custom ones.
@@ -1966,6 +1981,152 @@ function VisibilityNotifierNode:get_property(path) end
 ---@overload fun(self: VisibilityNotifierNode, path: "action", value: "None"|"Pause_Parent"|"Disable_Parent"|"Remove_Parent")
 ---@overload fun(self: VisibilityNotifierNode, path: "onScreen", value: boolean)
 function VisibilityNotifierNode:set_property(path, value, y) end
+
+---@class PathNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field closed boolean Join the last point back to the first (a loop).
+---@field bakeInterval number Distance between the points the curve is turned into (px): smaller follows the curve mo...
+---@field lineWidth number Draw the path in the game this wide (rails, ropes); 0 = invisible (the editor always sh...
+---@field color number[] Colour of the drawn path (and of its outline in the editor).
+
+---@alias PathNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "closed" # boolean - Join the last point back to the first (a loop).
+---| "bakeInterval" # number - Distance between the points the curve is turned into (px): smaller follows the curve mo...
+---| "lineWidth" # number - Draw the path in the game this wide (rails, ropes); 0 = invisible (the editor always sh...
+---| "color" # number[] - Colour of the drawn path (and of its outline in the editor).
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path PathNodeProperty|string
+---@return any
+---@overload fun(self: PathNode, path: "position"): Vec2
+---@overload fun(self: PathNode, path: "scale"): Vec2
+---@overload fun(self: PathNode, path: "rotation"): number
+---@overload fun(self: PathNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: PathNode, path: "zIndex"): integer
+---@overload fun(self: PathNode, path: "ySort"): boolean
+---@overload fun(self: PathNode, path: "ySortOffset"): number
+---@overload fun(self: PathNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: PathNode, path: "paused"): boolean
+---@overload fun(self: PathNode, path: "enabled"): boolean
+---@overload fun(self: PathNode, path: "closed"): boolean
+---@overload fun(self: PathNode, path: "bakeInterval"): number
+---@overload fun(self: PathNode, path: "lineWidth"): number
+---@overload fun(self: PathNode, path: "color"): number[]
+function PathNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---@param path PathNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: PathNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: PathNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: PathNode, path: "rotation", value: number)
+---@overload fun(self: PathNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: PathNode, path: "zIndex", value: integer)
+---@overload fun(self: PathNode, path: "ySort", value: boolean)
+---@overload fun(self: PathNode, path: "ySortOffset", value: number)
+---@overload fun(self: PathNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: PathNode, path: "paused", value: boolean)
+---@overload fun(self: PathNode, path: "enabled", value: boolean)
+---@overload fun(self: PathNode, path: "closed", value: boolean)
+---@overload fun(self: PathNode, path: "bakeInterval", value: number)
+---@overload fun(self: PathNode, path: "lineWidth", value: number)
+---@overload fun(self: PathNode, path: "color", value: number[])
+function PathNode:set_property(path, value, y) end
+
+---@class PathFollowNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field progress number Distance travelled along the parent path (px). Set it to place the follower; scripts ca...
+---@field speed number Pixels per second it moves along the path by itself (negative: backwards; 0: only scrip...
+---@field loop "Stop"|"Loop"|"PingPong" At the end: Stop (path_finished), Loop (start again) or Ping Pong (turn back).
+---@field rotate boolean Turn to face the direction it travels.
+---@field sideOffset number Pixels to the side of the path (positive: to the right of the travel direction) - lanes...
+
+---@alias PathFollowNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "progress" # number - Distance travelled along the parent path (px). Set it to place the follower; scripts ca...
+---| "speed" # number - Pixels per second it moves along the path by itself (negative: backwards; 0: only scrip...
+---| "loop" # "Stop"|"Loop"|"PingPong" - At the end: Stop (path_finished), Loop (start again) or Ping Pong (turn back).
+---| "rotate" # boolean - Turn to face the direction it travels.
+---| "sideOffset" # number - Pixels to the side of the path (positive: to the right of the travel direction) - lanes...
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path PathFollowNodeProperty|string
+---@return any
+---@overload fun(self: PathFollowNode, path: "position"): Vec2
+---@overload fun(self: PathFollowNode, path: "scale"): Vec2
+---@overload fun(self: PathFollowNode, path: "rotation"): number
+---@overload fun(self: PathFollowNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: PathFollowNode, path: "zIndex"): integer
+---@overload fun(self: PathFollowNode, path: "ySort"): boolean
+---@overload fun(self: PathFollowNode, path: "ySortOffset"): number
+---@overload fun(self: PathFollowNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: PathFollowNode, path: "paused"): boolean
+---@overload fun(self: PathFollowNode, path: "enabled"): boolean
+---@overload fun(self: PathFollowNode, path: "progress"): number
+---@overload fun(self: PathFollowNode, path: "speed"): number
+---@overload fun(self: PathFollowNode, path: "loop"): "Stop"|"Loop"|"PingPong"
+---@overload fun(self: PathFollowNode, path: "rotate"): boolean
+---@overload fun(self: PathFollowNode, path: "sideOffset"): number
+function PathFollowNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---@param path PathFollowNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: PathFollowNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: PathFollowNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: PathFollowNode, path: "rotation", value: number)
+---@overload fun(self: PathFollowNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: PathFollowNode, path: "zIndex", value: integer)
+---@overload fun(self: PathFollowNode, path: "ySort", value: boolean)
+---@overload fun(self: PathFollowNode, path: "ySortOffset", value: number)
+---@overload fun(self: PathFollowNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: PathFollowNode, path: "paused", value: boolean)
+---@overload fun(self: PathFollowNode, path: "enabled", value: boolean)
+---@overload fun(self: PathFollowNode, path: "progress", value: number)
+---@overload fun(self: PathFollowNode, path: "speed", value: number)
+---@overload fun(self: PathFollowNode, path: "loop", value: "Stop"|"Loop"|"PingPong")
+---@overload fun(self: PathFollowNode, path: "rotate", value: boolean)
+---@overload fun(self: PathFollowNode, path: "sideOffset", value: number)
+function PathFollowNode:set_property(path, value, y) end
 
 ---@class LdtkLevelNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -5285,6 +5446,88 @@ function LineNode:line_clear() end
 ---Example: `self.node:set_position(0, 0); self.node:get_node("Trail"):trail_clear()`
 function TrailNode:trail_clear() end
 
+---The path's length in pixels (along the curve).
+---
+---Example: `local len = self.node:get_node("Route"):path_length()`
+---@return number
+function PathNode:path_length() end
+
+---The point at a distance along the path (world) and the direction the path goes there.
+---
+---Example: `local pos, dir = route:path_point_at(route:path_length() * 0.5)`
+---@param distance number Pixels from the start (clamped)
+---@return Vec2 position World position
+---@return Vec2 direction Unit vector (world)
+function PathNode:path_point_at(distance) end
+
+---The distance along the path of the point nearest to a world position (snap something onto the path).
+---
+---Example: `local d = route:path_closest_offset(player.position)`
+---@param x number|Vec2
+---@param y? number
+---@return number distance
+function PathNode:path_closest_offset(x, y) end
+
+---How many points the path has.
+---
+---Example: `for i = 1, route:path_point_count() do print(route:path_get_point(i)) end`
+---@return integer
+function PathNode:path_point_count() end
+
+---A point (1-based): its position and its in / out handles, local to the path.
+---
+---Example: `local pos, handle_in, handle_out = route:path_get_point(1)`
+---@param index integer
+---@return Vec2 position
+---@return Vec2 handle_in Offset from the point
+---@return Vec2 handle_out Offset from the point
+function PathNode:path_get_point(index) end
+
+---Moves a point (1-based), optionally setting its handles (offsets; zero = a sharp corner).
+---
+---Example: `route:path_set_point(2, Vec2(200, 40), Vec2(-30, 0), Vec2(30, 0))`
+---@param index integer
+---@param position Vec2
+---@param handle_in? Vec2
+---@param handle_out? Vec2
+function PathNode:path_set_point(index, position, handle_in, handle_out) end
+
+---Adds a point at the end (local to the path), optionally with handles.
+---
+---Example: `route:path_add_point(Vec2(400, 0))`
+---@param position Vec2
+---@param handle_in? Vec2
+---@param handle_out? Vec2
+function PathNode:path_add_point(position, handle_in, handle_out) end
+
+---Removes a point (1-based).
+---
+---Example: `route:path_remove_point(route:path_point_count())`
+---@param index integer
+function PathNode:path_remove_point(index) end
+
+---Removes every point.
+---
+---Example: `route:path_clear()`
+function PathNode:path_clear() end
+
+---How far along its path the follower is: 0 at the start, 1 at the end.
+---
+---Example: `if platform:follow_ratio() > 0.5 then ... end`
+---@return number
+function PathFollowNode:follow_ratio() end
+
+---Puts the follower at a fraction of its path (0..1) at once.
+---
+---Example: `platform:follow_set_ratio(0.25)`
+---@param ratio number
+function PathFollowNode:follow_set_ratio(ratio) end
+
+---Back to the start, moving forwards again (after "path_finished").
+---
+---Example: `self.node:get_node("Route/Cart"):follow_restart()`
+function PathFollowNode:follow_restart() end
+
 ---@class NavOptions
 ---@field diagonal? boolean 8 directions (default true); no cutting past blocked corners
 ---@field smooth? boolean Straighten where the line of sight is clear (default true)
@@ -5349,9 +5592,14 @@ function StateMachineNode:sm_set(name, value) end
 ---@return number value
 function StateMachineNode:sm_get(name) end
 
----Sets a trigger: it stays set until a transition that tests it fires.
+---Sets a trigger: a one-shot event such as a button press. A trigger is a parameter
+---(Inspector > Parameters, starting value 0) that a condition tests with the
+---`trigger` operator (the condition row's second dropdown). This sets it to 1; it
+---stays set (also while a guard blocks the change) until a transition testing it
+---fires, which resets it to 0. An arrow with no conditions fires at once, so give an
+---arrow a trigger condition to change state only when the script says.
 ---
----Example: `self.node:get_node("StateMachine"):sm_trigger("jump")`
+---Example: `if Input.is_action_pressed("fire") then self.node:get_node("StateMachine"):sm_trigger("punch") end`
 ---@param name StateMachineParam|string
 function StateMachineNode:sm_trigger(name) end
 

@@ -850,6 +850,17 @@ parent's), `ySort` (draw its children by Y: top-down / isometric depth) and
 `node.zIndex = 10`, `world:set_property("ySort", true)`. Guide with a
 tutorial: [`docs/draw_order.md`](docs/draw_order.md).
 
+#### Paths (PathNode, PathFollowNode)
+
+A PathNode is a Bézier curve (`path_length`, `path_point_at(d)` -> world
+position and direction, `path_closest_offset`, `path_add_point` / `path_set_point` /
+`path_get_point` / `path_remove_point` / `path_clear`); a PathFollowNode child
+travels along it (`progress`, `speed`, `loop` Stop / Loop / PingPong,
+`rotate`, `sideOffset`; `follow_ratio`, `follow_set_ratio`, `follow_restart`;
+events `path_finished`, `path_looped`). A CharacterMover rides whatever
+floor it stands on when that floor moves. Guide:
+[`docs/paths.md`](docs/paths.md).
+
 #### Object pooling (Pool)
 
 `Pool.take(component [, parent [, x, y]])` instead of `Scene.instantiate`
@@ -879,7 +890,9 @@ for **gameplay** (AI, player modes, doors, menus) as much as animation:
   left (a child doesn't start by itself).
 - **Transitions** go from a state (or *any state*) to another when their
   conditions hold; they can crossfade (`blend`). Conditions: a parameter
-  `is true` / `is false` / `==` / `!=` / `>` / `<` a value, a `trigger`,
+  `is true` / `is false` / `==` / `!=` / `>` / `<` a value, a `trigger`
+  (a parameter set by `sm_trigger`, reset when the arrow fires; see
+  *Triggers* below),
   the state's animation `finished`, `after` N seconds in the state, or
   **`script says`**: a method of the machine's script (else its parent's)
   that returns true (`function Guard:sees_player() return ... end`).
@@ -959,11 +972,68 @@ local ok, why = sm:sm_request("dash")
 if not ok then print(why) end   -- e.g. "dash: its enter conditions don't hold"
 ```
 
+##### Triggers: one-shot events (a button press, a hit)
+
+A **trigger** is not a separate kind of parameter: it is an ordinary
+parameter that a condition tests with the **`trigger`** operator.
+`sm_trigger(name)` sets the parameter to 1; a `trigger` condition holds while
+it isn't 0; when the transition testing it fires, the machine resets it to 0.
+So a trigger is a press the machine remembers until it is used - you never
+clear it yourself. (`sm_set(name, true)` + `is true` is different: the value
+stays 1 until your script sets it back.)
+
+Example: Idle -> Punch only when a button is pressed, back to Idle when the
+punch animation ends.
+
+1. Select the State Machine node; in the Inspector's **Parameters**, click
+   **Add Parameter** and rename it `punch` (keep the starting value **0**).
+   A non-zero starting value counts as already triggered: the arrow would
+   fire at once. Nothing marks it as a trigger - step 2 does.
+2. Select the **Idle -> Punch** arrow and click **+ Condition**. The row
+   reads `when <parameter> <operator>`: pick `punch` in the first dropdown,
+   then **`trigger`** in the second (the operator; it starts as *is true*).
+   The value box goes away - triggers have no value. The graph labels the
+   arrow `punch!`.
+3. Add a **Punch -> Idle** arrow with the condition **animation finished**
+   (the Punch animation must not loop), or **after (s)** with the punch's
+   length.
+4. Set the trigger from a script:
+
+   ```lua
+   function Player:update(dt)
+       if Input.is_action_pressed("fire") then
+           self.node:get_child("StateMachine"):sm_trigger("punch")
+       end
+   end
+   ```
+
+Things to know:
+
+- **An arrow with no conditions fires at once.** To go somewhere only when
+  a script says so, give the arrow a condition - a trigger is the usual one.
+- A trigger **stays set while the change is blocked** (Punch has *Leave
+  after*, a guard refuses, the arrow isn't from the current state): pressing
+  during the end of an attack buffers the next one. Clear it yourself with
+  `sm_set("punch", 0)` if you don't want that.
+- One trigger can be tested by several arrows (Idle -> Punch, Run -> Punch)
+  and from **Any state** (`* -> hurt` on trigger `hit`, unless the current
+  state turns off *Any state interrupts*). It is reset by whichever fires.
+- Triggers combine with other conditions: `punch` trigger **and**
+  `on_floor` *is true* fires only on the floor (the trigger waits until
+  then).
+- `sm_trigger` adds the parameter if the machine doesn't have it, but add
+  it in the editor anyway: the condition's dropdown lists only existing
+  parameters.
+- Alternatives: `sm_request("Punch")` follows an arrow from the current
+  state when the guards agree, without checking the arrow's own conditions
+  (the arrow still needs one, or it goes by itself); `sm_travel("Punch")`
+  switches unconditionally.
+
 | Method | Arguments | Returns | Description |
 |---|---|---|---|
 | `sm_set(name, value)` | number or boolean | - | Sets a parameter. |
 | `sm_get(name)` | `name` | number | A parameter's value. |
-| `sm_trigger(name)` | `name` | - | Sets a trigger; reset when the transition testing it fires. |
+| `sm_trigger(name)` | `name` | - | Sets a trigger (the parameter becomes 1) for conditions using the `trigger` operator; reset to 0 when a transition testing it fires, kept while blocked. See *Triggers* above. |
 | `sm_travel(state [, blend])` | state name | boolean | Switches now, ignoring conditions and guards. |
 | `sm_request(state [, blend])` | state name | boolean, reason | Goes there if an arrow leads there from the current state (or Any state) and the guards agree; the arrow's own conditions aren't checked. `reason` says why not. |
 | `sm_state()` / `sm_previous()` | - | string | Current / previous state. |

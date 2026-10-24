@@ -93,6 +93,8 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case LineNode: typeName = "LineNode"
 	case TrailNode: typeName = "TrailNode"
 	case VisibilityNotifierNode: typeName = "VisibilityNotifierNode"
+	case PathNode: typeName = "PathNode"
+	case PathFollowNode: typeName = "PathFollowNode"
 	case PostEffectNode: typeName = "PostEffectNode"
 	case TileMapNode: typeName = "TileMapNode"
 	}
@@ -3988,6 +3990,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "sm_stop")
 		Script_RegisterEventBindings(L) // connect / disconnect / emit
 		Script_RegisterLdtkBindings(L)
+		Script_RegisterPathBindings(L) // path_* / follow_* (path_node.odin)
 
 		// DynamicBodyNode Physics
 		lua.pushcfunction(L, lua_node_apply_force)

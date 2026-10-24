@@ -378,6 +378,12 @@ CharacterMoverNode :: struct {
 	floorNormal: [2]f32 `save:"false"`,
 	wallNormal: [2]f32 `save:"false"`,
 	lastMotion: [2]f32 `save:"false"`,
+	// Moving platforms: the node it stands on and where that was last frame;
+	// the mover is carried by how far its floor moved (path followers,
+	// animated or scripted bodies).
+	floorNode:    ^Node,
+	floorLastPos: [2]f32,
+	floorShape:   b2.ShapeId, // (while gathering planes)
 	frameDelta: f32 `save:"false"`, // delta of the current frame (move_and_slide's default)
 	collisionPlanes: [MAX_MOVER_PLANES]b2.CollisionPlane,
 	planeCount: int,
@@ -483,6 +489,7 @@ CharacterMover_PlaneResultCallback :: proc "c" (shapeId: b2.ShapeId, planeResult
 			clipVelocity = cm.clipVelocity,
 		}
 		cm.planeCount += 1
+		if planeResult.plane.normal.y < -0.5 do cm.floorShape = shapeId // a floor (normals point up: -y)
 	}
 	return true
 }
@@ -592,9 +599,22 @@ CharacterMoverNode_MoveAndSlide :: proc(cm: ^CharacterMoverNode, gameContext: ^G
 		maskBits     = CollisionLayerSet_ToBits(cm.maskLayers),
 	}
 
+	// 0. Ride a moving floor: move with it by how far it moved since last frame.
+	if cm.floorNode != nil {
+		if Node_IsAlive(cm.floorNode) && !cm.floorNode.removing {
+			carry := cm.floorNode.globalPosition - cm.floorLastPos
+			if carry != {} && carry.x * carry.x + carry.y * carry.y < 256 * 256 { // (not a teleport)
+				Physics_SetWorldTransform(cm, cm.globalPosition + carry, cm.globalRotation)
+			}
+		} else {
+			cm.floorNode = nil
+		}
+	}
+
 	// 1. Gather collision planes around the capsule mover using Box2D v3 World_CollideMover
 	moverCapsule := CharacterMoverNode_GetWorldCapsule(cm)
 	cm.planeCount = 0
+	cm.floorShape = {}
 	b2.World_CollideMover(pw.worldId, moverCapsule, qFilter, CharacterMover_PlaneResultCallback, cast(rawptr)cm)
 
 	// 2. Solve collision planes for target translation using Box2D v3 SolvePlanes
@@ -620,6 +640,14 @@ CharacterMoverNode_MoveAndSlide :: proc(cm: ^CharacterMoverNode, gameContext: ^G
 		}
 	}
 	cm.isGrounded = cm.isOnFloor
+	// The floor it stands on now (for the carry next frame).
+	cm.floorNode = nil
+	if cm.isOnFloor && b2.Shape_IsValid(cm.floorShape) {
+		if n := cast(^Node)b2.Body_GetUserData(b2.Shape_GetBody(cm.floorShape)); n != nil && Node_IsAlive(n) {
+			cm.floorNode = n
+			cm.floorLastPos = n.globalPosition
+		}
+	}
 	if cm.planeCount > 0 && cm.clipVelocity {
 		cm.velocity = b2.ClipVector(cm.velocity, planesSlice)
 	}

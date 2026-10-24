@@ -478,6 +478,13 @@ animation finished, after N seconds). While simulating, the current state
 is marked with a play icon. Scripts: `sm_set`, `sm_trigger`, `sm_travel`,
 `on_enter_<state>` / `on_exit_<state>` (see `engine/SCRIPTING.md`).
 
+**Triggers** have no list of their own: a trigger is a parameter (Add
+Parameter, starting value 0) that a condition tests with the **trigger**
+operator - the condition row's second dropdown (`when <parameter>
+<operator>`; it starts as *is true*). The graph labels it `name!`. A script's
+`sm_trigger("name")` sets it; the arrow that uses it resets it. Step by
+step: *Triggers* in `engine/SCRIPTING.md`.
+
 ### Materials & shaders
 
 Every drawable node has a **Material** section (collapsed until used): a
@@ -521,6 +528,15 @@ starting language is set in Project Settings > General.
 points are edited in the Inspector's **Points** section (**Add Point**, the
 x removes one). Post effects show in the viewport while the lighting
 preview (toolbar) is on; pick the shader in the **Material** section.
+
+### Paths
+
+Select a **Path**: drag its points (squares) and Bézier handles (dots; Alt
+moves one alone), double-click the curve to add a point, Alt+click to
+remove one, Ctrl/Cmd+click to add at the end. The Inspector lists the
+points with a sharp / smooth toggle. **Path Follow** children preview at
+their **Progress** while editing and travel in Simulate / Play. Guide:
+[`engine/docs/paths.md`](../engine/docs/paths.md).
 
 ### Profiler: pools
 

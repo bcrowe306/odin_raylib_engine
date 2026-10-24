@@ -143,3 +143,10 @@ ICON_FA_OUTDENT                   :: "" // Outdent
 ICON_FA_ARROW_LEFT                :: "" // Back
 ICON_FA_BRACKET                   :: "" // Brackets (code)
 ICON_FA_THUMBTACK                 :: "\uF08D" // Pinned tab
+ICON_FA_ROUTE                     :: "\uF4D7" // paths
+ICON_FA_BEZIER_CURVE              :: "\uF55B" // curve handles
+ICON_FA_BONE                      :: "\uF5D7" // skeletons
+ICON_FA_UNIVERSAL_ACCESS          :: "\uF29A" // accessibility
+ICON_FA_KEYBOARD                  :: "\uF11C" // bindings
+ICON_FA_IMAGES                    :: "\uF302" // atlases
+ICON_FA_OBJECT_GROUP              :: "\uF247" // groups

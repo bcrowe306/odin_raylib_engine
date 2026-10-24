@@ -103,6 +103,7 @@ exits non-zero if any check fails.
 | `visibility_notifier.drive` | A Visibility Notifier added under PlayerShip, its Size row, saved; in Simulate on screen, then the ship moved far away: off screen and (Pause Parent) the ship paused. |
 | `node_pool.drive` | Pools from the Lua console in Simulate: prewarm, take, `destroy()` returns the instance (parked, disabled), stats; the Profiler lists the pool. |
 | `pixel_perfect.drive` | Project Settings > Video: Integer Scaling, Pixel Snap, then Smooth Camera (disabled until Pixel Snap), saved in project.json. |
+| `path.drive` | A Path from Add Node: a point dragged, a point added by double-clicking the curve, one removed in the Inspector, sharp / smooth; a Path Follow under it travels in Simulate; saved. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -186,7 +187,7 @@ Queries:
 - `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk, Search, StateGraph)
 - `search-total`, `search-files` (find in files)
-- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`, `smg-pan`, `smg-ways` (live ways out: `idle:Min_Time, run:waiting, ...`)
+- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`, `smg-pan`, `smg-ways` (live ways out: `idle:Min_Time, run:waiting, ...`); `node:<Name>.path-points` (a PathNode's point count)
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
 - `runtime-diags` (script problems recorded from Simulate / Play)
