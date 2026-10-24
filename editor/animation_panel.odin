@@ -421,6 +421,8 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	undo_on_activate(state, "Toggle reverse")
 	Drive_Item("anim.reverse")
 	UI_Tooltip("Play this animation from its last frame to its first")
+	imgui.SameLine(0, UI_SPACE)
+	Onion_ToolbarButton(state)
 	// This animation's frame rate (anim.fps 0 = the player's).
 	imgui.SameLine(0, UI_SPACE)
 	imgui.SetNextItemWidth(96)
@@ -448,10 +450,10 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		Editor_RecordUndo(state, "Default animation")
 		apn.defaultAnimation = "" if isDefault else strings.clone(anim.name, apn.allocator)
 	}
-	imgui.SameLine(0, UI_SPACE)
+	UI_SameLineOrWrap(80, UI_SPACE)
 	imgui.AlignTextToFramePadding()
 	UI_DimText(fmt.tprintf("Frame %d / %d", rel + 1, length))
-	imgui.SameLine(0, UI_SPACE)
+	UI_SameLineOrWrap(110, UI_SPACE)
 	if UI_Button(fmt.tprintf("%s  Add Track", ICON_FA_PLUS), "anim.add-track") {
 		panel.trackNode = apn
 		imgui.OpenPopup("##anim_add_track")
@@ -798,6 +800,13 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		}
 		imgui.SameLine(0, 2)
 		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("anim.remove-track:%s", tr.property), "Remove track", size = 24) do removeTrack = ti
+		// The curves between keys (eased / custom ones).
+		Key_X :: struct {x0: f32, base: int}
+		kx := Key_X{x0, base}
+		Track_DrawCurves(dl, &tr, proc(frame: f32, data: rawptr) -> f32 {
+			k := cast(^Key_X)data
+			return k.x0 + (f32(k.base) + frame) * CELL_W + CELL_W * 0.5
+		}, &kx, y + 5, y + ROW_H - 7)
 		// Keys (right-click: easing to the next key, delete).
 		for k in tr.keys {
 			cx := x0 + (f32(base) + k.frame) * CELL_W + CELL_W * 0.5
@@ -814,12 +823,14 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				if tr.kind == .Method do imgui.DrawList_AddRectFilled(dl, {cx - r + 1, cy - r + 1}, {cx + r - 1, cy + r - 1}, ec, 2)
 				else do imgui.DrawList_AddCircleFilled(dl, {cx, cy}, r - 1, ec)
 			}
-			if k.ease != .Linear do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
+			if k.ease != .Linear || k.hasCurve do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
 			Drive_ItemRect(fmt.tprintf("anim.keyframe:%s:%d", tr.property, int(k.frame) + 1), {cx - r, cy - r}, {cx + r, cy + r})
 			if hot {
 				switch tr.kind {
-				case .Property: imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %.2f %.2f %.2f %.2f\nEasing to the next key: %s  (right-click: easing, delete)", int(k.frame) + 1, k.value[0], k.value[1], k.value[2], k.value[3], e.Ease_Name(k.ease)))
-				case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: calls %s:%s(frame)  (right-click: edit, delete)", int(k.frame) + 1, tr.target, k.text))
+				case .Property:
+					curve := fmt.tprintf("custom curve (%.2f, %.2f, %.2f, %.2f)", k.curve[0], k.curve[1], k.curve[2], k.curve[3]) if k.hasCurve else e.Ease_Name(k.ease)
+					imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %.2f %.2f %.2f %.2f\nTo the next key: %s  (right-click: easing, curve, delete)", int(k.frame) + 1, k.value[0], k.value[1], k.value[2], k.value[3], curve))
+				case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: calls %s:%s(%s)  (right-click: edit, delete)", int(k.frame) + 1, tr.target, k.text, k.arg if k.arg != "" else "frame"))
 				case .Audio:    imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: plays %s  (right-click: edit, delete)", int(k.frame) + 1, k.text))
 				}
 				if imgui.IsMouseClicked(.Left) do scrub(state, apn, anim, int(k.frame))
@@ -844,7 +855,31 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 					}
 					if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
 					Drive_Item("anim.event-method")
-					UI_DimText("Called on the target's script: method(frame)")
+					// The target script's methods.
+					if methods := Script_ListMethods(state, target); len(methods) > 0 {
+						imgui.SameLine()
+						if imgui.BeginCombo("##method_pick", nil, {.NoPreview}) {
+							for m in methods {
+								if imgui.Selectable(fmt.ctprintf("%s", m), m == key.text) {
+									Editor_RecordUndo(state, "Event key")
+									key.text = strings.clone(m, apn.allocator)
+								}
+								Drive_Item(fmt.tprintf("pick:%s", m))
+							}
+							imgui.EndCombo()
+						}
+						Drive_Item("anim.event-method-pick")
+						UI_Tooltip("The target script's methods")
+					}
+					abuf: [128]u8
+					copy(abuf[:len(abuf) - 1], key.arg)
+					imgui.SetNextItemWidth(220)
+					if imgui.InputTextWithHint("##method_arg", "argument (empty: the frame)", cstring(raw_data(abuf[:])), len(abuf), {.AutoSelectAll}) {
+						key.arg = strings.clone(string(cstring(raw_data(abuf[:]))), apn.allocator)
+					}
+					if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
+					Drive_Item("anim.event-arg")
+					UI_DimText("Called on the target's script: method(argument) - a number when it reads as one. The player also emits animation_event(method).")
 				} else if tr.kind == .Audio {
 					if path, ok := asset_picker("anim.event-sound", key.text, Editor_ListProjectFiles(state, "", AUDIO_EXTS), allowNone = false); ok {
 						Editor_RecordUndo(state, "Event key")
@@ -863,6 +898,10 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 					imgui.EndMenu()
 				}
 				Drive_Item("anim.key-easing")
+				if tr.kind == .Property {
+					if imgui.MenuItem(fmt.ctprintf("%s  Edit Curve...%s", ICON_FA_BEZIER_CURVE, " (custom)" if key.hasCurve else "")) do curveEdit = {true, ti, key.frame}
+					Drive_Item("anim.key-curve")
+				}
 				if imgui.MenuItem(fmt.ctprintf("%s  Delete Key", ICON_FA_TRASH)) {
 					Editor_RecordUndo(state, "Delete key")
 					e.Track_RemoveKey(&tr, keyMenu.frame)
@@ -873,6 +912,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		}
 		imgui.PopID()
 	}
+	CurveEditor_Render(state, anim)
 	if removeTrack >= 0 {
 		Editor_RecordUndo(state, "Remove track")
 		preview_restore(state)

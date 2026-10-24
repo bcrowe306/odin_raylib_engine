@@ -1,0 +1,69 @@
+# Animation editor depth: a custom curve on a key (a preset in the curve
+# editor; frame 2 follows it), saved with the key; onion skin in the
+# viewport; a method key with an argument, saved.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+click @anim.frame:1
+click @anim.add-track
+click @anim.track-prop:rotation
+click @anim.frame:3
+dblclick @insp.rotation
+key ctrl+a
+type 90
+key enter
+click @anim.key:rotation
+expect item:anim.keyframe:rotation:3 == visible
+
+# A custom curve from key 1: Ease In - frame 2 is behind the linear 45.
+rclick @anim.keyframe:rotation:1
+click @anim.key-curve
+wait 3
+expect item:anim.curve-canvas == visible
+click @anim.curve-preset:Ease In
+wait 2
+screenshot curve_editor
+click @anim.frame:2
+wait 2
+click @anim.frame:2
+expect node:AnimationPlayer.rotation <= 40.0
+expect node:AnimationPlayer.rotation >= 20.0
+click @anim.stop
+screenshot curve_on_timeline
+key ctrl+s
+expect file:scenes/main.scene.json contains "linear", [0.42, 0, 1, 1]]
+
+# Onion skin: the frames around the playhead, ghosted in the viewport.
+click @anim.frame:2
+click @anim.onion
+wait 3
+screenshot onion_skin
+click @anim.onion
+click @anim.stop
+
+# A method key with an argument.
+click @anim.add-track
+click @anim.track-node:AnimationPlayer
+click @anim.track-methods
+click @anim.frame:2
+click @anim.key:@call
+rclick @anim.keyframe:@call:2
+click @anim.event-arg
+key ctrl+a
+type 3
+screenshot method_arg
+click @anim.frame:1
+wait 2
+click @toolbar.save
+expect file:scenes/main.scene.json contains [1, "on_animation_event", "3"]

@@ -1,0 +1,91 @@
+# Animation editing: curves, events, onion skin
+
+The **Animation** tab (bottom panel) edits the selected AnimationPlayer:
+frames, property tracks and event tracks. This guide covers the tools for
+polishing motion: per-key curves, events that call your scripts, and onion
+skinning. The basics (frames, ranges, tracks, easing presets) are in the
+editor README's *Animation timeline*.
+
+## Curves between keys
+
+A property track interpolates from each key to the next. Right-click a key:
+
+- **Easing** - a preset (sine, quad, cubic, back, elastic, bounce, ...).
+- **Edit Curve...** - your own curve: drag its two handles (time across,
+  progress up; handles may go above 1 or below 0 to overshoot or
+  anticipate), or start from **Ease In / Ease Out / Ease In Out / Back Out /
+  Anticipate / Snap**. **Use Easing** goes back to the preset.
+
+The curve is a cubic Bezier from (0,0) to (1,1), the same as CSS
+`cubic-bezier(x1, y1, x2, y2)` - values from web tools or other animation
+software can be typed straight in by matching the handles. Keys with an
+easing or curve show a small dot, and the timeline row draws the shape of
+the motion between them.
+
+Saved with the key as a 7th element:
+
+```json
+"keys": [[0, 0, 0, 0, 0, "linear", [0.42, 0, 0.58, 1]], [12, 90, 0, 0, 0]]
+```
+
+### Tutorial: a jump that feels right
+
+1. Track **position** on the player; key the ground at frame 1, the top at
+   frame 6, the ground again at frame 12.
+2. Key 1: **Edit Curve > Ease Out** (fast take-off, slowing at the top).
+3. Key 6: **Ease In** (slow at the top, falling faster).
+4. A squash before take-off: track **scale**, key (1, 1) at frame 1 and
+   (1.2, 0.8) at frame 3 with **Anticipate** from the first key.
+
+## Events: calling scripts from an animation
+
+**Add Track > Events > Call Script Methods** adds a track whose keys call a
+method on the target node's script when playback reaches the key (not when
+you scrub). Right-click a key: type the method or pick it from the target
+script's methods (the list button), and an optional **argument** - a number
+when it reads as one (`2.5`), `true` / `false`, else text (`"heavy"`);
+empty passes the frame.
+
+```lua
+-- on the target's script
+function Hero:footstep(volume)      -- argument "0.6"
+    Audio.play_sound("audio/step.wav", volume)
+end
+
+function Hero:attack_hit(kind)      -- argument "heavy"
+    self:deal_damage(kind == "heavy" and 20 or 10)
+end
+```
+
+Every Method key also makes the player emit **animation_event** with the
+method's name - listen to it from any script (no method needed on the
+target):
+
+```lua
+player:connect("animation_event", function(method)
+    if method == "spawn_dust" then Pool.take("components/dust.component.json", nil, self.node.position) end
+end)
+```
+
+**Play Sounds** tracks play a sound per key (into its import settings' bus,
+else SFX).
+
+Saved as `[frame, "method", "argument"]`.
+
+## Onion skin
+
+The toolbar's **onion** button (overlapping squares) draws the frames
+around the playhead ghosted in the viewport - before in red, after in blue,
+fading with distance - where the player's own position / rotation / scale
+tracks put it at those frames. Right-click it for how many frames
+before and after (0-5) and the opacity. Use it to check spacing (are the
+steps even?), arcs and that a cycle's last frame leads into its first
+(looping animations wrap around).
+
+## Performance notes
+
+- Curves are evaluated per sample with a few Newton steps (a bisection
+  fallback) - cheap enough for every property every frame.
+- Events fire once per key when playback passes its frame; the
+  `animation_event` signal is a plain event (no allocation).
+- Onion skin is editor-only drawing.

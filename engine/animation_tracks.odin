@@ -2,6 +2,7 @@ package engine
 
 import "core:math"
 import "core:slice"
+import "core:strconv"
 import "core:strings"
 import rl "vendor:raylib"
 
@@ -17,14 +18,58 @@ import rl "vendor:raylib"
 //
 // Saved with the animation: "tracks": [{"target", "property",
 // "keys": [[frame, a, b, c, d], ...]}] - a 6th element names the easing
-// from that key to the next ("out_quad"; linear when absent).
+// from that key to the next ("out_quad"; linear when absent), a 7th is a
+// custom curve [x1, y1, x2, y2] (a cubic Bezier like CSS cubic-bezier,
+// from (0,0) to (1,1); y may overshoot) that replaces the easing.
+// Event keys: [frame, "method or sound"(, "argument")].
 // ============================================================================
 
 Track_Key :: struct {
 	frame: f32,
 	value: [4]f32, // float: [0]; vec2: [0..1]; colour: rgba 0..255
 	ease:  Ease,   // curve from this key to the next (saved as a 6th element)
+	curve: [4]f32, // custom curve to the next key: cubic Bezier x1, y1, x2, y2 (when hasCurve)
+	hasCurve: bool,
 	text:  string, // Method tracks: the method; Audio tracks: the sound path
+	arg:   string, // Method tracks: the value passed to the method ("" = the frame); a number when it reads as one
+}
+
+// Curve_Eval: a cubic Bezier easing curve (P0 = (0,0), P3 = (1,1), control
+// points (x1,y1), (x2,y2), x1 / x2 in 0..1) at x = t: x solved for the
+// curve parameter (Newton steps, bisection fallback), then y.
+Curve_Eval :: proc(c: [4]f32, t: f32) -> f32 {
+	t := clamp(t, 0, 1)
+	x1, y1, x2, y2 := clamp(c[0], 0, 1), c[1], clamp(c[2], 0, 1), c[3]
+	bez :: proc(a, b, u: f32) -> f32 {
+		// B(u) with P0 = 0, P1 = a, P2 = b, P3 = 1
+		v := 1 - u
+		return 3 * v * v * u * a + 3 * v * u * u * b + u * u * u
+	}
+	dbez :: proc(a, b, u: f32) -> f32 {
+		v := 1 - u
+		return 3 * v * v * a + 6 * v * u * (b - a) + 3 * u * u * (1 - b)
+	}
+	u := t
+	for _ in 0 ..< 8 {
+		d := dbez(x1, x2, u)
+		if abs(d) < 1e-5 do break
+		u = clamp(u - (bez(x1, x2, u) - t) / d, 0, 1)
+	}
+	if abs(bez(x1, x2, u) - t) > 1e-4 {
+		lo, hi: f32 = 0, 1
+		for _ in 0 ..< 30 {
+			u = (lo + hi) * 0.5
+			if bez(x1, x2, u) < t do lo = u
+			else do hi = u
+		}
+	}
+	return bez(y1, y2, u)
+}
+
+// Track_KeyCurve: a key's interpolation factor at u (0..1 between it and
+// the next key) - its custom curve, else its easing.
+Track_KeyCurve :: proc(k: Track_Key, u: f32) -> f32 {
+	return Curve_Eval(k.curve, u) if k.hasCurve else Ease_Apply(k.ease, u)
 }
 
 // Property tracks interpolate values; Method and Audio tracks fire their
@@ -113,7 +158,7 @@ Track_Sample :: proc(track: ^Property_Track, frame: f32) -> (value: [4]f32, ok: 
 	for i in 0 ..< n - 1 {
 		a, b := track.keys[i], track.keys[i + 1]
 		if frame >= a.frame && frame <= b.frame {
-			t := Ease_Apply(a.ease, (frame - a.frame) / max(b.frame - a.frame, 0.0001))
+			t := Track_KeyCurve(a, (frame - a.frame) / max(b.frame - a.frame, 0.0001))
 			return a.value + (b.value - a.value) * t, true
 		}
 	}
@@ -223,9 +268,10 @@ AnimationPlayerNode_FireEvents :: proc(apn: ^AnimationPlayerNode, frame: int) {
 			switch track.kind {
 			case .Property:
 			case .Method:
+				apn.onEvent->notify(apn, k.text, ctx)
 				target := track_target(apn, &track)
 				if target == nil || ctx == nil || ctx.scriptManager == nil do continue
-				Script_CallMethod(ctx.scriptManager, target, k.text, frame)
+				Script_CallMethod(ctx.scriptManager, target, k.text, Track_EventArg(k, frame), quiet = target.scriptInstance == nil)
 			case .Audio:
 				if ctx == nil || ctx.game == nil || !Audio_Ready() do continue
 				rm := &ctx.game.resourceManager
@@ -243,4 +289,13 @@ Animation_Length :: proc(anim: ^Animation) -> int {
 	if anim.frameCount != nil do n = anim->frameCount()
 	for t in anim.tracks do for k in t.keys do n = max(n, int(k.frame) + 1)
 	return max(n, 1)
+}
+
+// Track_EventArg: the value a Method key passes - its argument (a number
+// when it reads as one, else the text), else the frame.
+Track_EventArg :: proc(k: Track_Key, frame: int) -> EventValue {
+	if k.arg == "" do return frame
+	if f, ok := strconv.parse_f64(k.arg); ok do return f
+	if k.arg == "true" || k.arg == "false" do return k.arg == "true"
+	return k.arg
 }

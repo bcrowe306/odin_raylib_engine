@@ -256,6 +256,7 @@ events - the names its scripts `emit` (`self.node:emit("jumped")`) - and
 | `collision_started` / `collision_ended` | Static/Dynamic bodies, CharacterMover | the other `Node` |
 | `hit_started` / `hit_ended` | RaycastNode | the `Node` hit |
 | `animation_finished` | FrameAnimationNode, AnimationPlayerNode (non-looping) | animation name |
+| `animation_event` | AnimationPlayerNode (a Method key fired; see docs/animation_editing.md) | method name |
 | `finished` | SoundNode, MusicNode | - |
 | `clicked`, `value_changed`, `submitted`, `selected`, `row_selected`, `sorted`, `item_clicked` | UI widgets | widget-specific |
 | `level_loaded` / `entity_spawned` | LdtkLevelNode | level identifier / spawned `Node` |

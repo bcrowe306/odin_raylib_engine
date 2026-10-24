@@ -465,8 +465,8 @@ function TimerNode:connect(event, handler) end
 ---@return integer id Connection id for `disconnect`
 function FrameAnimationNode:connect(event, handler) end
 
----@alias AnimationPlayerNodeEvent NodeTreeEvent|"animation_finished"|ProjectEvent
----Connects a handler to one of this node's events: animation_finished (A non-looping animation ended); the tree events; custom ones.
+---@alias AnimationPlayerNodeEvent NodeTreeEvent|"animation_finished"|"animation_event"|ProjectEvent
+---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended), animation_event (A Method key of the animation fired (its method name)); the tree events; custom ones.
 ---@param event AnimationPlayerNodeEvent|string
 ---@param handler fun(value: any, source: AnimationPlayerNode)
 ---@return integer id Connection id for `disconnect`

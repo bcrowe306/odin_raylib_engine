@@ -328,6 +328,10 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 							// Event keys: [frame, "method or sound"]
 							strings.write_string(&w.sb, ", ")
 							Json_String(w, k.text)
+							if k.arg != "" {
+								strings.write_string(&w.sb, ", ")
+								Json_String(w, k.arg)
+							}
 							strings.write_byte(&w.sb, ']')
 							continue
 						}
@@ -335,7 +339,8 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 							strings.write_string(&w.sb, ", ")
 							Json_Float(w, v)
 						}
-						if k.ease != .Linear do fmt.sbprintf(&w.sb, ", \"%s\"", Ease_Name(k.ease))
+						if k.ease != .Linear || k.hasCurve do fmt.sbprintf(&w.sb, ", \"%s\"", Ease_Name(k.ease))
+						if k.hasCurve do fmt.sbprintf(&w.sb, ", [%.4g, %.4g, %.4g, %.4g]", k.curve[0], k.curve[1], k.curve[2], k.curve[3])
 						strings.write_byte(&w.sb, ']')
 					}
 					strings.write_string(&w.sb, "]}")
@@ -975,12 +980,21 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 							key := Track_Key{frame = num(ka[0])}
 							if text, isStr := ka[1].(json.String); isStr {
 								key.text = strings.clone(string(text), apn.allocator)
+								if len(ka) >= 3 {
+									if arg, argStr := ka[2].(json.String); argStr do key.arg = strings.clone(string(arg), apn.allocator)
+								}
 								append(&track.keys, key)
 								continue
 							}
 							for i in 1 ..< min(len(ka), 5) do key.value[i - 1] = num(ka[i])
 							if len(ka) >= 6 {
 								if name, isStr := ka[5].(json.String); isStr do key.ease, _ = Ease_Parse(string(name))
+							}
+							if len(ka) >= 7 {
+								if c, isCurve := ka[6].(json.Array); isCurve && len(c) == 4 {
+									for i in 0 ..< 4 do key.curve[i] = num(c[i])
+									key.hasCurve = true
+								}
 							}
 							append(&track.keys, key)
 						}

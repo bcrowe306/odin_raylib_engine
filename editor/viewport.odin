@@ -215,6 +215,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 		Viewport_DrawLights(state)
 		Viewport_DrawNotifiers(state)
 		Viewport_DrawPaths(state)
+		Viewport_DrawOnionSkin(state) // (the selected AnimationPlayer's neighbouring frames)
 		Viewport_DrawNavigation(state)
 		Viewport_DrawAdvancedCameras(state)
 

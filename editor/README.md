@@ -448,6 +448,15 @@ field) or a **Play Sounds** track (pick an audio file per key). Event keys
 are drawn as squares (methods) or circles (sounds); hover one for its method or sound. Scripts
 crossfade between animations with `node:animation_play(name, blend)`.
 
+Polishing (guide: [`engine/docs/animation_editing.md`](../engine/docs/animation_editing.md)):
+right-click a key > **Edit Curve...** draws your own curve to the next key
+(drag two handles, or a preset: Ease In / Out / In Out, Back Out,
+Anticipate, Snap); the row shows the curves between keys. A method key can
+pass an **argument** and pick its method from the target script's list; the
+player also emits `animation_event`. The **onion skin** button (right-click
+for frames before / after and opacity) ghosts the neighbouring frames in the
+viewport.
+
 ### State machines
 
 **State Machine tab** (bottom panel; it follows a selected State Machine):

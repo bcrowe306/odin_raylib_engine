@@ -7,6 +7,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 
 | Guide | |
 |---|---|
+| [Animation editing](animation_editing.md) | Custom key curves (cubic Bezier), method events with arguments and the animation_event signal, onion skin - with tutorials. |
 | [Draw order](draw_order.md) | Layers, Z index, Y-sort (top-down / isometric depth). |
 | [Navigation](navigation.md) | Path finding on tile maps, LDtk levels and Navigation Regions; agents that walk there (radius, avoidance, doors) - with tutorials. |
 | [Accessibility](accessibility.md) | UI scale, colour-blind filters (and an editor preview), subtitles from dialogue and sound captions, screen shake scale; the Accessibility Menu template - with a tutorial. |

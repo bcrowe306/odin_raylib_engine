@@ -288,6 +288,7 @@ AnimationPlayerNode_DuplicateAnimation :: proc(apn: ^AnimationPlayerNode, index:
 		for k in tr.keys {
 			nk := k
 			if k.text != "" do nk.text = strings.clone(k.text, apn.allocator)
+			if k.arg != "" do nk.arg = strings.clone(k.arg, apn.allocator)
 			append(&nt.keys, nk)
 		}
 	}

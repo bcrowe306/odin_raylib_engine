@@ -18,6 +18,9 @@ AnimationPlayerNode :: struct {
 	defaultAnimation: string, // selected when the node becomes ready ("" = the saved current one)
 	// "animation_finished"(name): a non-looping animation reached its end.
 	onFinished: EventSubject,
+	// "animation_event"(method): a Method key fired (also for listeners
+	// without a script method of that name).
+	onEvent: EventSubject,
 	finishedNotified: bool,
 	// Animations added with AddFrameAnimation/AddSheetAnimation are owned
 	// (freed with the node); AddAnimation keeps caller-owned ones as is.
@@ -83,6 +86,7 @@ AnimationPlayerNode_Init :: proc(apn: ^AnimationPlayerNode) {
 	apn.onDestroy = AnimationPlayerNode_Destroy
 	apn.owned = make([dynamic]^Animation, apn.allocator)
 	InitializeSubject(&apn.onFinished, "animation_finished", apn)
+	InitializeSubject(&apn.onEvent, "animation_event", apn)
 	apn.fps = 12
 	apn.ticker->setFPS(12)
 	apn.ticker->setCallback(proc(ticker: ^Ticker, currentTick: int, user_data: rawptr) {
@@ -156,6 +160,7 @@ apply_fps :: proc(apn: ^AnimationPlayerNode) {
 AnimationPlayerNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	apn := cast(^AnimationPlayerNode)node
 	DestroySubject(&apn.onFinished)
+	DestroySubject(&apn.onEvent)
 	rm := &gameContext.game.resourceManager if gameContext != nil && gameContext.game != nil else Node_ResourceManager(apn)
 	for a in apn.owned {
 		if a.renderFrame == FA_RenderFrame {

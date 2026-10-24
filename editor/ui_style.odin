@@ -395,3 +395,10 @@ UI_EndBanner :: proc(color: imgui.Vec4) {
 	imgui.DrawList_ChannelsMerge(dl)
 	imgui.Dummy({0, PAD - imgui.GetStyle().ItemSpacing.y})
 }
+
+// UI_SameLineOrWrap: the next item on this line when `w` px fit, else on
+// the next line (toolbars in narrow panels).
+UI_SameLineOrWrap :: proc(w: f32, spacing: f32 = -1) {
+	imgui.SameLine(0, spacing)
+	if imgui.GetContentRegionAvail().x < w do imgui.NewLine()
+}
