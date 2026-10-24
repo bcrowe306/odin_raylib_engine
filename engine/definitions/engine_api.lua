@@ -7424,12 +7424,18 @@ function SceneModule.get_name() end
 ---@field transition? TransitionKind Default "fade"
 ---@field duration? number Seconds for each half (cover, uncover); default 0.4
 ---@field color? number[] {r, g, b} 0..1; default black
+---@field loading? SceneName|ScenePath A loading screen scene shown while the scene loads in the background
+---@field min_time? number Seconds the loading screen stays at least (default 0.5)
 
 ---Switches to another scene by name (or its file, e.g. a `scene` property) -
 ---at once, or behind a transition (the screen is covered, the scene switches
 ---once its assets are loaded, then it's uncovered).
 ---
----Example: `Scene.change_scene("level_2", {transition = "fade", duration = 0.5})`
+---With `loading`, it goes through a loading screen: a transition into that
+---scene, the target loading in the background (textures decoded on worker
+---threads), then a transition into the target once it's loaded.
+---
+---Example: `Scene.change_scene("level_2", {transition = "fade", duration = 0.5, loading = "loading"})`
 ---@param name SceneName|ScenePath A scene's name, or its file
 ---@param transition? SceneTransition
 function SceneModule.change_scene(name, transition) end
@@ -7453,6 +7459,18 @@ function SceneModule.preload_progress(name) end
 ---Example: `if Scene.is_transitioning() then return end`
 ---@return boolean
 function SceneModule.is_transitioning() end
+
+---How far the scene behind the loading screen has loaded, 0 to 1 (1 when nothing is loading) - for a loading screen's progress bar.
+---
+---Example: `self.node:get_node("Bar").value = Scene.loading_progress() * 100`
+---@return number
+function SceneModule.loading_progress() end
+
+---The name of the scene the loading screen is loading, or nil.
+---
+---Example: `local next = Scene.loading_target()`
+---@return string?
+function SceneModule.loading_target() end
 
 ---Reloads the currently active scene.
 ---

@@ -850,6 +850,15 @@ parent's), `ySort` (draw its children by Y: top-down / isometric depth) and
 `node.zIndex = 10`, `world:set_property("ySort", true)`. Guide with a
 tutorial: [`docs/draw_order.md`](docs/draw_order.md).
 
+#### Changing scenes
+
+`Scene.change_scene(name [, {transition, duration, color, loading, min_time}])`
+- behind a fade / wipe / iris, or through a **loading screen** scene
+(`loading = "loading"`) whose scripts read `Scene.loading_progress()` and
+`Scene.loading_target()`. `Scene.preload(name)` / `Scene.preload_progress(name)`
+load ahead. Textures decode on worker threads. Guide with a loading-screen
+tutorial: [`docs/scene_flow.md`](docs/scene_flow.md).
+
 #### Paths (PathNode, PathFollowNode)
 
 A PathNode is a Bézier curve (`path_length`, `path_point_at(d)` -> world

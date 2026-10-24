@@ -145,7 +145,7 @@ Common:
 - [x] 9 Pixel-perfect rendering: Integer Scaling, Pixel Snap (camera + sprites), Smooth Camera (world in a margin texture shifted by the leftover fraction at the upscale; UI layers on top); Project Settings > Video; guide engine/docs/pixel_perfect.md, test, runner screenshots, drive
 - [ ] 10 Sprite atlas packing on export
 - [ ] 11 Input rebinding (player-facing flow, saved bindings, gamepad menu navigation)
-- [ ] 12 Scene transitions: change-scene API with transitions, loading screen, async preloading
+- [x] 12 Scene transitions: (transitions + preload existed) loading screens (change_scene loading / min_time, Scene.loading_progress / loading_target, Game_ChangeSceneVia), textures decoded on worker threads (async_decode.odin; jobs owned by the decoder, abandon-safe), preload finds "texture" (it only read legacy "texture_path") and images named by properties; guide with a tutorial, tests, a real-game run
 
 Editor:
 - [ ] 13 (later - to be designed) Editor extensions / plugins in Lua

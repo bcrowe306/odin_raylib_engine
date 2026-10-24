@@ -48,6 +48,7 @@ Game :: struct {
 	linkPaused:      bool,
 	frozen:          bool,
 	transition:      Scene_Transition,
+	loading:         Scene_Loading, // a loading screen shown while a scene loads (scene_flow.odin)
 	preloads:        map[^Scene]^Scene_Preload,
 
 	// Viewport mapping & UI interaction state

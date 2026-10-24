@@ -89,6 +89,8 @@ test_scene_transitions_and_preload :: proc(t: ^testing.T) {
 	write(dir, "scenes/a.scene.json", `{"name": "a", "root": {"type": "Node", "name": "root"}}`)
 	write(dir, "scenes/b.scene.json", `{"name": "b", "root": {"type": "Node", "name": "root", "children": [
 		{"type": "TextureNode", "name": "Sky", "texture_path": "textures/sky.png"},
+		{"type": "TextureNode", "name": "Ground", "texture": "textures/ground.png"},
+		{"type": "NineSliceNode", "name": "Panel", "properties": {"texturePath": "ui/panel.png"}},
 		{"type": "SoundNode", "name": "Boom", "audio": "audio/boom.wav"},
 		{"type": "MusicNode", "name": "Theme", "audio": "audio/theme.ogg"},
 		{"type": "Node", "name": "Enemy", "component": "components/enemy.component.json"}]}}`)
@@ -106,7 +108,7 @@ test_scene_transitions_and_preload :: proc(t: ^testing.T) {
 
 	// Preloading collects the scene's (and its components') assets.
 	Scene_PreloadBegin(game, b)
-	testing.expect_value(t, len(game.preloads[b].items), 4)
+	testing.expect_value(t, len(game.preloads[b].items), 6) // "texture", legacy "texture_path", a property's image, audio, a component's texture
 	testing.expect_value(t, Scene_PreloadProgress(game, b), 0)
 	Scene_PreloadStep(game, time.Second) // headless: counted, nothing to load
 	testing.expect_value(t, Scene_PreloadProgress(game, b), 1)

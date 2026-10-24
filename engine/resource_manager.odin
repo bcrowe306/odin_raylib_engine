@@ -1,5 +1,6 @@
 package engine
 
+import "base:runtime"
 import "core:path/filepath"
 import "core:fmt"
 import "core:log"
@@ -161,6 +162,33 @@ LoadTexture_FilePath :: proc(rm: ^ResourceManager, filePath: string) -> (texture
 	if info, serr := os.stat(filePath, context.temp_allocator); serr == nil do tex.modTime = info.modification_time
 	append(&rm.textures, tex)
 	return tex, true
+}
+
+// ResourceManager_TextureFromImage: the cached texture for a path (a
+// reference taken), else one uploaded from an already decoded image (the
+// background decoder, async_decode.odin). The image stays the caller's.
+ResourceManager_TextureFromImage :: proc(rm: ^ResourceManager, filePath: string, img: rl.Image) -> ^Texture {
+	for tex in rm.textures {
+		if tex != nil && tex.filePath == filePath {
+			tex.refCount += 1
+			return tex
+		}
+	}
+	tex := new(Texture)
+	tex.filePath = strings.clone(filePath)
+	tex.fileName = filepath.base(tex.filePath)
+	tex.texture = rl.LoadTextureFromImage(img)
+	tex.refCount = 1
+	Texture_ApplyImport(&tex.texture, Texture_ImportFor(rm, filePath))
+	if info, serr := os.stat(filePath, context.temp_allocator); serr == nil do tex.modTime = info.modification_time
+	append(&rm.textures, tex)
+	return tex
+}
+
+// ResourceManager_HasTexture: is a path's texture cached (no reference taken)?
+ResourceManager_HasTexture :: proc(rm: ^ResourceManager, filePath: string) -> bool {
+	for tex in rm.textures do if tex != nil && tex.filePath == filePath do return true
+	return false
 }
 
 GetTexture :: proc(rm: ^ResourceManager, fileName: string) -> (texture: ^Texture, ok: bool) {
@@ -368,4 +396,20 @@ ResourceManager_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 		n += 1
 	}
 	return n
+}
+
+// Decode_ReadBytes: a texture file's bytes for decoding (heap), from disk or
+// the packed project (main thread).
+Decode_ReadBytes :: proc(rm: ^ResourceManager, path: string) -> ([]u8, bool) {
+	if os.is_file(path) {
+		data, err := os.read_entire_file(path, runtime.heap_allocator())
+		return data, err == nil
+	}
+	if b, ok := resource_bytes(rm, path); ok {
+		defer delete(b)
+		c := make([]u8, len(b), runtime.heap_allocator())
+		copy(c, b)
+		return c, true
+	}
+	return nil, false
 }

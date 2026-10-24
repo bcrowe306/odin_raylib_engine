@@ -3387,11 +3387,54 @@ lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
 			color = {ch(L, 1), ch(L, 2), ch(L, 3), 255}
 		}
 		lua.pop(L, 1)
+		// loading = "<scene>": through a loading screen (min_time seconds at least).
+		lua.getfield(L, 2, "loading")
+		if lua.type(L, -1) == .STRING {
+			name := strings.clone(string(lua.tostring(L, -1)), context.temp_allocator)
+			lua.pop(L, 1)
+			screen, sok := sm.game.sceneManager.scenes[name]
+			if !sok {
+				if s := Game_FindSceneByFile(sm.game, name); s != nil do screen, sok = s, true
+			}
+			if !sok {
+				Script_Problem(.Error, "Scene.change_scene: no loading scene %q", name)
+				Game_ChangeSceneWith(sm.game, scene, kind, duration, color)
+				return 0
+			}
+			lua.getfield(L, 2, "min_time")
+			minTime := f32(lua.tonumber(L, -1)) if lua.type(L, -1) == .NUMBER else 0.5
+			lua.pop(L, 1)
+			Game_ChangeSceneVia(sm.game, scene, screen, kind, max(duration, 0.01), color, minTime)
+			return 0
+		}
+		lua.pop(L, 1)
 		Game_ChangeSceneWith(sm.game, scene, kind, duration, color)
 		return 0
 	}
 	ChangeScene_ByPtr(&sm.game.sceneManager, scene)
 	return 0
+}
+
+// Scene.loading_progress() -> 0..1: the scene behind the loading screen.
+@(private="file")
+lua_scene_loading_progress :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := get_script_manager(L)
+	lua.pushnumber(L, lua.Number(Scene_LoadingProgress(sm.game) if sm != nil && sm.game != nil else 1))
+	return 1
+}
+
+// Scene.loading_target() -> name | nil: the scene the loading screen waits for.
+@(private="file")
+lua_scene_loading_target :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || !sm.game.loading.active || sm.game.loading.target == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	lua.pushstring(L, strings.clone_to_cstring(sm.game.loading.target.name, context.temp_allocator))
+	return 1
 }
 
 // Scene.preload(name): load its assets in the background (a little each frame).
@@ -4370,6 +4413,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "preload")
 	lua.pushcfunction(L, lua_scene_preload_progress)
 	lua.setfield(L, -2, "preload_progress")
+	lua.pushcfunction(L, lua_scene_loading_progress)
+	lua.setfield(L, -2, "loading_progress")
+	lua.pushcfunction(L, lua_scene_loading_target)
+	lua.setfield(L, -2, "loading_target")
 	lua.pushcfunction(L, lua_scene_is_transitioning)
 	lua.setfield(L, -2, "is_transitioning")
 	lua.pushcfunction(L, lua_scene_reload)
