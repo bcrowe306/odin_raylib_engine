@@ -175,6 +175,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 			e.Scene_UpdateNodeHirearchy(state.activeScene, state.activeScene.rootNode, ctx, dt)
 			e.Tween_Update(&state.game.tweens, dt, &state.game.scriptManager)
 			e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
+			e.Visibility_Update(state.activeScene, ctx) // (the game camera's view, not the editor's)
 		} else if !state.isSimulating {
 			ParticlePreview_Tick(state, rl.GetFrameTime()) // emitters animate while editing
 		}
@@ -208,6 +209,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 			rl.BeginMode2D(cam)
 		}
 		Viewport_DrawLights(state)
+		Viewport_DrawNotifiers(state)
 
 		// Draw bounding boxes / physics colliders (when enabled or node selected)
 		Viewport_DrawSceneBounds(state)
@@ -305,6 +307,9 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 			lo = {min(lo.x, o.x), min(lo.y, o.y)}
 			hi = {max(hi.x, p.x), max(hi.y, p.y)}
 		}
+	case e.VisibilityNotifierNode:
+		v := cast(^e.VisibilityNotifierNode)node
+		lo, hi, have = -v.size * 0.5 * {abs(scl.x), abs(scl.y)}, v.size * 0.5 * {abs(scl.x), abs(scl.y)}, true
 	case e.StaticBodyNode, e.DynamicBodyNode, e.CharacterMoverNode, e.AreaNode:
 		// Every shape (rotated, any type), scaled with the node.
 		if shapes := node_shapes_editor(node); shapes != nil && len(shapes) > 0 {
@@ -366,6 +371,20 @@ Viewport_DrawSceneBounds :: proc(state: ^EditorState) {
 			// Corner ticks read better than a heavy box.
 			for c in q do rl.DrawCircleV(c, 3 / state.cameraZoom, col)
 		}
+	}
+}
+
+// Viewport_DrawNotifiers: each visibility notifier's rectangle (yellow; in
+// Simulate brighter while the game camera sees it).
+Viewport_DrawNotifiers :: proc(state: ^EditorState) {
+	if state.activeScene == nil do return
+	for n in state.activeScene.manager.notifiers {
+		if Editor_ViewHidden(state, n) do continue
+		v := cast(^e.VisibilityNotifierNode)n
+		r := e.VisibilityNotifierNode_Rect(v)
+		a: u8 = 220 if (state.isSimulating && v.onScreen) || n == state.selectedNode else 110
+		rl.DrawRectangleRec(r, {250, 204, 21, a / 8})
+		rl.DrawRectangleLinesEx(r, 1.5 / state.cameraZoom, {250, 204, 21, a})
 	}
 }
 

@@ -1191,6 +1191,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.ParallaxNode: return ICON_FA_MOUNTAIN
 	case e.LineNode: return ICON_FA_DRAW_POLYGON
 	case e.TrailNode: return ICON_FA_WIND
+	case e.VisibilityNotifierNode: return ICON_FA_EYE
 	case e.PostEffectNode: return ICON_FA_FILTER
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS
 	case e.ScriptNode: return ICON_FA_CODE

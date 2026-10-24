@@ -271,6 +271,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 
 	// Update global positions after node updates & container layout
 	Node_SetGlobalPositions(nodeManager, scene.rootNode)
+	if !frozen do Visibility_Update(scene, gameContext) // on / off screen (visibility_notifier.odin)
 
 	// One traversal buckets renderable nodes by layer (hierarchy order is
 	// kept within a layer) instead of walking the whole tree per layer.

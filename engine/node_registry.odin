@@ -39,6 +39,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"CharacterMoverNode", CharacterMoverNode, factory_character, {"charactermover", "character_mover"}},
 	{"AreaNode", AreaNode, factory_area, {"area"}},
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
+	{"VisibilityNotifierNode", VisibilityNotifierNode, factory_visibility, {"visibility", "on screen", "notifier"}},
 	{"LdtkLevelNode", LdtkLevelNode, factory_ldtk, {"ldtk", "ldtklevel"}},
 	{"TileMapNode", TileMapNode, factory_tilemap, {"tilemap"}},
 	{"LightNode", LightNode, factory_light, {"light", "pointlight", "spotlight"}},
@@ -249,6 +250,11 @@ factory_character :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 @(private = "file")
 factory_area :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return AreaNode_Create(scene, "Area", parent)
+}
+
+@(private = "file")
+factory_visibility :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return VisibilityNotifierNode_Create(scene, "VisibilityNotifier", parent)
 }
 
 @(private = "file")

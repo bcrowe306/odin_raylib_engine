@@ -113,6 +113,10 @@ local LineNode = {}
 ---@class TrailNode : Node
 local TrailNode = {}
 
+---Knows when the camera sees a rectangle: "screen_entered" / "screen_exited"; can pause, disable or remove its parent off screen.
+---@class VisibilityNotifierNode : Node
+local VisibilityNotifierNode = {}
+
 ---@class PostEffectNode : Node
 
 ---@class UIContainerNode : Node
@@ -503,6 +507,13 @@ function AreaNode:connect(event, handler) end
 ---@param handler fun(value: any, source: RaycastNode)
 ---@return integer id Connection id for `disconnect`
 function RaycastNode:connect(event, handler) end
+
+---@alias VisibilityNotifierNodeEvent NodeTreeEvent|"screen_entered"|"screen_exited"|ProjectEvent
+---Connects a handler to one of this node's events: screen_entered (The camera started seeing it), screen_exited (The camera stopped seeing it); the tree events; custom ones.
+---@param event VisibilityNotifierNodeEvent|string
+---@param handler fun(value: any, source: VisibilityNotifierNode)
+---@return integer id Connection id for `disconnect`
+function VisibilityNotifierNode:connect(event, handler) end
 
 ---@alias LdtkLevelNodeEvent NodeTreeEvent|"level_loaded"|"entity_spawned"|ProjectEvent
 ---Connects a handler to one of this node's events: level_loaded (The LDtk level was built), entity_spawned (An LDtk entity was spawned); the tree events; custom ones.
@@ -1884,6 +1895,77 @@ function RaycastNode:get_property(path) end
 ---@overload fun(self: RaycastNode, path: "rayColor", value: number[])
 ---@overload fun(self: RaycastNode, path: "hitColor", value: number[])
 function RaycastNode:set_property(path, value, y) end
+
+---@class VisibilityNotifierNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field size Vec2 The rectangle (centred on the node, scaled with it) the camera has to see.
+---@field margin number Grows the camera's view by this many pixels: fires a little before it really shows.
+---@field action "None"|"Pause_Parent"|"Disable_Parent"|"Remove_Parent" What happens to the parent off screen: Pause (stops updating, resumes when seen), Disab...
+---@field onScreen boolean The camera sees it now (runtime, read-only).
+
+---@alias VisibilityNotifierNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "size" # Vec2 - The rectangle (centred on the node, scaled with it) the camera has to see.
+---| "margin" # number - Grows the camera's view by this many pixels: fires a little before it really shows.
+---| "action" # "None"|"Pause_Parent"|"Disable_Parent"|"Remove_Parent" - What happens to the parent off screen: Pause (stops updating, resumes when seen), Disab...
+---| "onScreen" # boolean (runtime) - The camera sees it now (runtime, read-only).
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path VisibilityNotifierNodeProperty|string
+---@return any
+---@overload fun(self: VisibilityNotifierNode, path: "position"): Vec2
+---@overload fun(self: VisibilityNotifierNode, path: "scale"): Vec2
+---@overload fun(self: VisibilityNotifierNode, path: "rotation"): number
+---@overload fun(self: VisibilityNotifierNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: VisibilityNotifierNode, path: "zIndex"): integer
+---@overload fun(self: VisibilityNotifierNode, path: "ySort"): boolean
+---@overload fun(self: VisibilityNotifierNode, path: "ySortOffset"): number
+---@overload fun(self: VisibilityNotifierNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: VisibilityNotifierNode, path: "paused"): boolean
+---@overload fun(self: VisibilityNotifierNode, path: "enabled"): boolean
+---@overload fun(self: VisibilityNotifierNode, path: "size"): Vec2
+---@overload fun(self: VisibilityNotifierNode, path: "margin"): number
+---@overload fun(self: VisibilityNotifierNode, path: "action"): "None"|"Pause_Parent"|"Disable_Parent"|"Remove_Parent"
+---@overload fun(self: VisibilityNotifierNode, path: "onScreen"): boolean
+function VisibilityNotifierNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---@param path VisibilityNotifierNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: VisibilityNotifierNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VisibilityNotifierNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VisibilityNotifierNode, path: "rotation", value: number)
+---@overload fun(self: VisibilityNotifierNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: VisibilityNotifierNode, path: "zIndex", value: integer)
+---@overload fun(self: VisibilityNotifierNode, path: "ySort", value: boolean)
+---@overload fun(self: VisibilityNotifierNode, path: "ySortOffset", value: number)
+---@overload fun(self: VisibilityNotifierNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: VisibilityNotifierNode, path: "paused", value: boolean)
+---@overload fun(self: VisibilityNotifierNode, path: "enabled", value: boolean)
+---@overload fun(self: VisibilityNotifierNode, path: "size", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VisibilityNotifierNode, path: "margin", value: number)
+---@overload fun(self: VisibilityNotifierNode, path: "action", value: "None"|"Pause_Parent"|"Disable_Parent"|"Remove_Parent")
+---@overload fun(self: VisibilityNotifierNode, path: "onScreen", value: boolean)
+function VisibilityNotifierNode:set_property(path, value, y) end
 
 ---@class LdtkLevelNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).

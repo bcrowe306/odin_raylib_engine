@@ -17,6 +17,9 @@ NodeManager :: struct {
 	parentOf: map[^Node]^Node,
 	free: queue.Queue(int),
 	arena: vmem.Arena,
+	// VisibilityNotifierNodes in the manager (added / removed with them),
+	// so the per-frame visibility pass touches only those.
+	notifiers: [dynamic]^Node,
 }
 
 NodeManagerStats :: struct {
@@ -43,6 +46,7 @@ NodeManager_Init :: proc(manager: ^NodeManager) {
 	manager.removal = nil
 	manager.childrenOf = make(map[^Node][dynamic]^Node)
 	manager.parentOf = make(map[^Node]^Node)
+	manager.notifiers = nil
 	err := vmem.arena_init_growing(&manager.arena)
 	if err != nil {
 		log.error(err)
@@ -77,6 +81,7 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	delete(manager.addition)
 	delete(manager.removal)
 	delete(manager.nodes)
+	delete(manager.notifiers)
 	for _, list in manager.childrenOf do delete(list)
 	delete(manager.childrenOf)
 	delete(manager.parentOf)
@@ -86,6 +91,7 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	manager.addition = nil
 	manager.removal = nil
 	manager.nodes = nil
+	manager.notifiers = nil
 	manager.childrenOf = nil
 	manager.parentOf = nil
 }
@@ -209,6 +215,9 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 			node.gameContext = gameContext
 			Node_NotifyEvent(node, .Exited_Tree, nil, gameContext)
 
+			if node.typeId == VisibilityNotifierNode {
+				for n, k in manager.notifiers do if n == node {unordered_remove(&manager.notifiers, k); break}
+			}
 			// Frees node's arena, subjects, and any custom onDestroy resources.
 			Node_Terminate(node)
 			manager.nodes[index] = nil
@@ -239,6 +248,7 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 		}
 		if addNode != nil do addNode.managerIndex = index + 1
 		if addNode != nil do append(&added, addNode)
+		if addNode != nil && addNode.typeId == VisibilityNotifierNode do append(&manager.notifiers, addNode)
 	}
 	clear(&manager.addition)
 	for n in added {

@@ -92,6 +92,7 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case ParallaxNode: typeName = "ParallaxNode"
 	case LineNode: typeName = "LineNode"
 	case TrailNode: typeName = "TrailNode"
+	case VisibilityNotifierNode: typeName = "VisibilityNotifierNode"
 	case PostEffectNode: typeName = "PostEffectNode"
 	case TileMapNode: typeName = "TileMapNode"
 	}

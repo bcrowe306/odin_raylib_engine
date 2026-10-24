@@ -850,6 +850,14 @@ parent's), `ySort` (draw its children by Y: top-down / isometric depth) and
 `node.zIndex = 10`, `world:set_property("ySort", true)`. Guide with a
 tutorial: [`docs/draw_order.md`](docs/draw_order.md).
 
+#### Visibility (VisibilityNotifierNode)
+
+A child rectangle that knows whether the camera sees it: events
+`screen_entered` / `screen_exited` (or `on_screen_entered` /
+`on_screen_exited` on its script), `node.onScreen`, and an **action** on its
+parent off screen (`Pause_Parent`, `Disable_Parent`, `Remove_Parent`).
+Guide with examples: [`docs/visibility.md`](docs/visibility.md).
+
 #### State machines (StateMachineNode)
 
 A **StateMachine** node holds named states and transitions between them -

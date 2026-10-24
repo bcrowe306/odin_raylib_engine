@@ -217,6 +217,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "RaycastNode",
 	},
 	{
+		name        = "Visibility Notifier",
+		category    = "Physics & Collision",
+		icon        = ICON_FA_EYE,
+		description = "Knows when the camera sees a rectangle: screen_entered / screen_exited, and can pause, disable or remove its parent off screen (enemies wake up, bullets despawn).",
+		typeName    = "VisibilityNotifierNode",
+	},
+	{
 		name        = "Joint",
 		category    = "Physics & Collision",
 		icon        = ICON_FA_LINK,

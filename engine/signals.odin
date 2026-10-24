@@ -65,6 +65,8 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "item_clicked":       return "id", "A toolbar item was clicked"
 	case "level_loaded":       return "identifier", "The LDtk level was built"
 	case "entity_spawned":     return "node", "An LDtk entity was spawned"
+	case "screen_entered":     return "", "The camera started seeing it"
+	case "screen_exited":      return "", "The camera stopped seeing it"
 	}
 	return "value", ""
 }

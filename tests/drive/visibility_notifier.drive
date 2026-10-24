@@ -1,0 +1,33 @@
+# Visibility notifier: added under PlayerShip from Add Node, its size in the
+# Inspector, saved; in Simulate it is on screen, and moving the ship far
+# away takes it off screen and (action Pause Parent) pauses the ship.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type visibility notifier
+key enter
+wait 5
+expect node:VisibilityNotifier.type == VisibilityNotifierNode
+expect node:VisibilityNotifier.parent == PlayerShip
+expect item:insp.prop:size.x == visible
+screenshot notifier_rect
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "type": "VisibilityNotifierNode"
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+expect node:VisibilityNotifier.prop.onScreen == true
+click @bottom:console
+click @console.lua
+type Scene.find_node("VisibilityNotifier"):set_property("action", "Pause_Parent")
+key enter
+wait 3
+type Scene.find_node("PlayerShip").position = {99999, 99999}
+key enter
+wait 20
+expect node:VisibilityNotifier.prop.onScreen == false
+expect node:PlayerShip.prop.paused == true
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

@@ -136,7 +136,7 @@ Missing (all):
 - [ ] 3 Level editor (root app tabs: **Game** = today's editor, **Level** = a level-editing mode): our own interface on the LDtk file format, re-implementing LDtk's features (reference: `ldtk/` sources) - worlds, levels, layers (IntGrid, Entities, Tiles, Auto-layers with rules), tilesets, enums, entity fields, autotiling / terrains, animated tiles, per-tile data
 - [ ] 4 Path / curve node (Bézier, edited in the viewport) + path follower (moving platforms, routes, rails, camera tracks)
 - [ ] 5 Web export (emscripten - bundle it with a shipped editor: raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio) (was 3.4)
-- [ ] 6 Visibility notifier: on_screen_entered / exited, auto-disable off-screen
+- [x] 6 Visibility notifier: VisibilityNotifierNode (size, margin, action: pause / disable / remove the parent), screen_entered / exited, onScreen; per-manager notifier list, one pass after the transforms (game + Simulate); guide engine/docs/visibility.md, test, drive
 
 Common:
 - [ ] A Audio mixer (bottom tab, laid out like a DAW console): user buses that sound / music nodes are assigned to, a master channel at the far right, buses to its left; each bus: volume, mute, pan (solo), effects chain; meters

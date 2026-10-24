@@ -515,6 +515,14 @@ points are edited in the Inspector's **Points** section (**Add Point**, the
 x removes one). Post effects show in the viewport while the lighting
 preview (toolbar) is on; pick the shader in the **Material** section.
 
+### Visibility notifiers
+
+**Add Node > Visibility Notifier** under a node: a yellow rectangle in the
+viewport (brighter in Simulate while the game camera sees it) with
+**Size**, **Margin** and an **Action** on the parent off screen (pause,
+disable, remove). Events `screen_entered` / `screen_exited` in the Signals
+panel. Guide: [`engine/docs/visibility.md`](../engine/docs/visibility.md).
+
 ### Physics: joints, one-way, layers
 
 Add a **Joint** (Physics & Collision) and pick **Body A** / **Body B** in
