@@ -1,0 +1,16 @@
+# Sprite atlas: Atlas ticked in a texture's import settings (saved next to
+# it); exporting the .ore packs it into an atlas page; the exported game
+# runs from the package and shows the ship.
+wait 5
+click @asset:textures/Spaceship_1.png
+click @preview.import.atlas
+wait 2
+expect file:textures/Spaceship_1.png.import.json contains "atlas": true
+screenshot atlas_ticked
+click @toolbar.export
+wait 10
+expect log contains Exported portable .ore archive
+expect log contains packed into 1 atlas page(s)
+exec bin/odin_raylib_engine --project $PROJECT.ore --scene scenes/main.scene.json --frames 20 --screenshot $SHOTS/atlas_game.png
+exec bin/odin_raylib_engine --project $PROJECT.ore --scene scenes/main.scene.json --frames 20 --dump-scene $SHOTS/atlas_scene.json
+expect abs-file:$SHOTS/atlas_scene.json contains "textures/Spaceship_1.png"

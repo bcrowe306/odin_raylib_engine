@@ -69,24 +69,19 @@ FA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	animation := cast(^FrameAnimation)animation
 	if len(animation.frames) == 0 || frame < 0 || frame >= len(animation.frames) do return
 	texture := animation.frames[frame]
-	animation.source = rl.Rectangle {
-		x      = 0,
-		y      = 0,
-		width  = auto_cast texture.texture.width,
-		height = auto_cast texture.texture.height,
-	}
+	size := Texture_Size(texture)
+	animation.source = rl.Rectangle{0, 0, size.x, size.y}
 
 	animation.dest = rl.Rectangle {
 		x      = node.globalPosition.x,
 		y      = node.globalPosition.y,
-		width  = f32(texture.texture.width) * node.globalScale.x,
-		height = f32(texture.texture.height) * node.globalScale.y,
+		width  = size.x * node.globalScale.x,
+		height = size.y * node.globalScale.y,
 	}
 
 	RectangleFlipAxis(&animation.source, animation.flipX, animation.flipY)
 	if rl.IsWindowReady() && texture.texture.id > 0 {
-		size := [2]f32{f32(texture.texture.width), f32(texture.texture.height)}
-		Texture_DrawScaled(texture.texture, animation.source, node.globalPosition, size, node.globalScale, node.pivot * size, node.globalRotation, rl.WHITE)
+		Texture_DrawScaled(texture.texture, Texture_Src(texture, animation.source), node.globalPosition, size, node.globalScale, node.pivot * size, node.globalRotation, rl.WHITE)
 	}
 }
 
@@ -163,7 +158,7 @@ SSA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	tex := animation.spriteSheet.texture
 	cell := frame
 	if len(animation.cells) > 0 do cell = animation.cells[clamp(frame, 0, len(animation.cells) - 1)]
-	animation.source = SpriteSheet_CellRect({f32(tex.width), f32(tex.height)}, animation.grid, animation.margin, animation.spacing, cell)
+	animation.source = SpriteSheet_CellRect(Texture_Size(animation.spriteSheet), animation.grid, animation.margin, animation.spacing, cell)
 	frameSize := [2]f32{animation.source.width, animation.source.height}
 	animation.dest = rl.Rectangle {
 		x      = node.globalPosition.x,
@@ -173,6 +168,6 @@ SSA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	}
 	RectangleFlipAxis(&animation.source, animation.flipX, animation.flipY)
 	if rl.IsWindowReady() && tex.id > 0 {
-		Texture_DrawScaled(tex, animation.source, node.globalPosition, frameSize, node.globalScale, node.pivot * frameSize, node.globalRotation, rl.WHITE)
+		Texture_DrawScaled(tex, Texture_Src(animation.spriteSheet, animation.source), node.globalPosition, frameSize, node.globalScale, node.pivot * frameSize, node.globalRotation, rl.WHITE)
 	}
 }

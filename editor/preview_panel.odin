@@ -1167,6 +1167,10 @@ preview_texture_import :: proc(state: ^EditorState) {
 		changed = true
 	}
 	UI_Tooltip("How export stores it: Keep the file as it is, or QOI - decodes several times faster than PNG (faster loading), usually a bigger file")
+	same_or_wrap(70)
+	if imgui.Checkbox("Atlas##imp", &imp.atlas) do changed = true
+	Drive_Item("preview.import.atlas")
+	UI_Tooltip("Pack it into a sprite atlas on export: sprites sharing an atlas page draw in one batch (faster with many sprites). Not for textures with mipmaps / Trilinear, or ones a shader samples as a whole (those get their own copy)")
 	// Slicing preset (the Sprite Sheet Slicer starts from it; Save Preset there).
 	if imp.slice.grid != {} {
 		same_or_wrap(110)
@@ -1182,7 +1186,7 @@ preview_texture_import :: proc(state: ^EditorState) {
 		preview_save_import(state, state.previewTexturePath, rel, imp)
 		e.ResourceManager_ReapplyImports(rm)
 		e.Texture_ApplyImport(&state.previewTexture, e.Texture_ImportFor(rm, rel))
-		Editor_Log(state, .Info, "Import settings of %s: %v filter, %v wrap%s%s", rel, imp.filter, imp.wrap, ", mipmaps" if imp.mipmaps else "", ", QOI on export" if imp.compress == .QOI else "")
+		Editor_Log(state, .Info, "Import settings of %s: %v filter, %v wrap%s%s%s", rel, imp.filter, imp.wrap, ", mipmaps" if imp.mipmaps else "", ", QOI on export" if imp.compress == .QOI else "", ", atlas" if imp.atlas else "")
 	}
 }
 

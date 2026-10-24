@@ -76,7 +76,7 @@ NineSliceNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	}
 	t := n.texture.texture
 	info := rl.NPatchInfo{
-		source = {0, 0, f32(t.width), f32(t.height)},
+		source = Texture_Full(n.texture), // (its rectangle on an atlas page)
 		left = i32(n.marginsLT.x), top = i32(n.marginsLT.y), right = i32(n.marginsRB.x), bottom = i32(n.marginsRB.y),
 		layout = .NINE_PATCH,
 	}
@@ -128,10 +128,12 @@ ParallaxNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	texture_for(p, p.texturePath, &p.loadedPath, &p.texture)
 	if p.texture == nil || !rl.IsWindowReady() do return
 	t := p.texture.texture
+	ts := Texture_Size(p.texture)
+	src := Texture_Full(p.texture) // (tiles are drawn one by one: an atlas page works too)
 	view := renderView.rect if renderView.active else rl.Rectangle{0, 0, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight())}
 	cam := [2]f32{view.x + view.width * 0.5, view.y + view.height * 0.5}
 	scale := [2]f32{abs(p.globalScale.x), abs(p.globalScale.y)}
-	w, h := f32(t.width) * scale.x, f32(t.height) * scale.y
+	w, h := ts.x * scale.x, ts.y * scale.y
 	if w <= 0 || h <= 0 do return
 	origin := p.globalPosition + ParallaxNode_Offset(p, cam)
 	x0, x1, y0, y1 := 0, 1, 0, 1
@@ -145,7 +147,7 @@ ParallaxNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	}
 	if (x1 - x0) * (y1 - y0) > 4096 do return // absurdly small tiles
 	for y in y0 ..< y1 do for x in x0 ..< x1 {
-		rl.DrawTexturePro(t, {0, 0, f32(t.width), f32(t.height)}, {origin.x + f32(x) * w, origin.y + f32(y) * h, w, h}, {0, 0}, 0, p.tint)
+		rl.DrawTexturePro(t, src, {origin.x + f32(x) * w, origin.y + f32(y) * h, w, h}, {0, 0}, 0, p.tint)
 	}
 }
 

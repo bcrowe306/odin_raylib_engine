@@ -271,6 +271,8 @@ export_ore_to :: proc(state: ^EditorState, dir: string) {
 	outPath, _ := filepath.join({dir, filepath.base(Editor_OrePath(state))}, context.temp_allocator)
 	overrides := make(map[string][]u8, context.temp_allocator)
 	e.Asset_ExportOverrides(state.projectPath, &overrides, allocator = context.temp_allocator) // (import settings: QOI)
+	sprites, pages := e.Atlas_Build(state.projectPath, &overrides, allocator = context.temp_allocator) // (and sprite atlases)
+	if sprites > 0 do Editor_Log(state, .Info, "%d texture(s) packed into %d atlas page(s)", sprites, pages)
 	ok := e.OrePackage_CreateFromDirectory(state.projectPath, outPath, true, overrides = overrides)
 	if ok {
 		Editor_Log(state, .Info, "Exported portable .ore archive: %s", outPath)

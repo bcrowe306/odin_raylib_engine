@@ -319,7 +319,7 @@ Scene_PreloadStep :: proc(game: ^Game, budget: time.Duration = 4 * time.Millisec
 			}
 			resolved := Project_ResolveAssetPath(ctx, it.path)
 			if it.kind == .Texture {
-				if ResourceManager_HasTexture(rm, resolved) {
+				if ResourceManager_HasTexture(rm, resolved) || Atlas_Has(rm, resolved) { // (atlased: its page loads now)
 					if t, ok := rm.loadTexture(rm, resolved); ok do it.held = t // cached: a reference
 				} else if bytes, ok := Decode_ReadBytes(rm, resolved); ok {
 					it.job = Decode_Submit(resolved, bytes)

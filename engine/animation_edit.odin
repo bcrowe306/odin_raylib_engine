@@ -51,7 +51,7 @@ Animation_FrameSize :: proc(a: ^Animation, frame: int) -> [2]f32 {
 		if len(fa.frames) == 0 do return {}
 		t := fa.frames[clamp(frame, 0, len(fa.frames) - 1)]
 		if t == nil do return {}
-		return {f32(t.texture.width), f32(t.texture.height)}
+		return Texture_Size(t)
 	}
 	if a.renderFrame == SSA_RenderFrame {
 		ssa := cast(^SpriteSheetAnimation)a

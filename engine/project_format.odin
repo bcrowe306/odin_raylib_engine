@@ -717,6 +717,7 @@ Game_LoadProjectFromOre :: proc(game: ^Game, oreFilePath: string) -> bool {
 	}
 	AssetManager_MountPackage(&game.assetManager, pkg)
 	game.resourceManager.package_ = pkg
+	if Atlas_Mount(&game.resourceManager) do log.infof("[ProjectLoader] Sprite atlas: %d images on %d page(s)", len(game.resourceManager.atlas.entries), len(game.resourceManager.atlas.pages))
 	game.scriptManager.hotReload = false // packaged scripts don't change
 
 	bytes, readOk := AssetManager_ReadFileBytes(&game.assetManager, "project.json", context.temp_allocator)

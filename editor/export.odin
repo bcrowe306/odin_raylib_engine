@@ -176,6 +176,9 @@ export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) 
 	if n := e.Asset_ExportOverrides(state.projectPath, &overrides, filter, p, context.temp_allocator); n > 0 {
 		Editor_Log(state, .Info, "%s: %d texture(s) stored as QOI (import settings)", p.name, n)
 	}
+	if sprites, pages := e.Atlas_Build(state.projectPath, &overrides, filter, p, context.temp_allocator); sprites > 0 {
+		Editor_Log(state, .Info, "%s: %d texture(s) packed into %d atlas page(s)", p.name, sprites, pages)
+	}
 	if !e.OrePackage_CreateFromDirectory(state.projectPath, ore, cfg.export.compress, filter, p, overrides) {
 		Editor_Log(state, .Error, "Failed to package the project into %s", ore)
 		return "", false

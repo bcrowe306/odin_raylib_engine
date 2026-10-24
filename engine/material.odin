@@ -469,7 +469,7 @@ material_texture :: proc(path: string, ctx: ^GameContext) -> ^Texture {
 	if path == "" || ctx == nil || ctx.game == nil do return nil
 	if t, ok := materialTextures[path]; ok do return t
 	rm := &ctx.game.resourceManager
-	t, ok := rm.loadTexture(rm, Project_ResolveAssetPath(ctx, path))
+	t, ok := ResourceManager_LoadTextureOwn(rm, Project_ResolveAssetPath(ctx, path)) // (not an atlas page: shaders sample the whole texture)
 	if !ok do return nil
 	if materialTextures == nil do materialTextures = make(map[string]^Texture, allocator = runtime.heap_allocator())
 	materialTextures[strings.clone(path, runtime.heap_allocator())] = t

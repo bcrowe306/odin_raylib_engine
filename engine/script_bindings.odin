@@ -262,7 +262,7 @@ lua_node_set_texture :: proc "c" (L: ^lua.State) -> c.int {
 	if loaded && tex != nil {
 		TextureNode_SetTexture(tn, tex)
 		tn.filePath = strings.clone(path, tn.allocator)
-		tn.size = {f32(tex.texture.width), f32(tex.texture.height)}
+		tn.size = Texture_Size(tex)
 	}
 	lua.pushboolean(L, b32(loaded))
 	return 1

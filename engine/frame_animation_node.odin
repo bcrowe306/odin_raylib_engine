@@ -106,19 +106,14 @@ FrameAnimationNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 	texture := fan.frames[idx]
 	if texture == nil || texture.texture.id == 0 do return
 
-	source := rl.Rectangle{
-		x = 0,
-		y = 0,
-		width = auto_cast texture.texture.width,
-		height = auto_cast texture.texture.height,
-	}
+	source := Texture_Full(texture) // (its rectangle on an atlas page)
 
 	pos := fan.globalPosition
 	scl := fan.globalScale
 	rot := fan.globalRotation
 
 	// Around the origin (node_origin.odin); a negative scale mirrors there.
-	size := [2]f32{f32(texture.texture.width), f32(texture.texture.height)}
+	size := Texture_Size(texture)
 	origin := Node_OriginPx(fan, size)
 	if rl.IsWindowReady() && texture.texture.id > 0 {
 		Texture_DrawScaled(texture.texture, source, pos, size, scl, origin, rot, rl.WHITE)

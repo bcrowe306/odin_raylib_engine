@@ -119,12 +119,12 @@ TileMapNode_Fill :: proc(tm: ^TileMapNode, x, y: int, tile: i32) -> int {
 // TileMapNode_Columns: tiles per row in the tileset image.
 TileMapNode_Columns :: proc(tm: ^TileMapNode) -> int {
 	if tm.tileset == nil || tm.tileSize.x <= 0 do return 0
-	return max(int(tm.tileset.texture.width) / tm.tileSize.x, 1)
+	return max(int(Texture_Size(tm.tileset).x) / tm.tileSize.x, 1)
 }
 
 TileMapNode_TileCount :: proc(tm: ^TileMapNode) -> int {
 	if tm.tileset == nil || tm.tileSize.y <= 0 do return 0
-	return TileMapNode_Columns(tm) * max(int(tm.tileset.texture.height) / tm.tileSize.y, 1)
+	return TileMapNode_Columns(tm) * max(int(Texture_Size(tm.tileset).y) / tm.tileSize.y, 1)
 }
 
 // TileMapNode_SetTileset loads the tileset image (project-relative path).
@@ -198,7 +198,7 @@ draw_cells :: proc(tm: ^TileMapNode, cols, x0, y0, x1, y1: int, local: bool, ori
 		for x in x0 ..< x1 {
 			t := tm.tiles[y * tm.mapSize.x + x]
 			if t < 0 do continue
-			src := rl.Rectangle{f32(int(t) % cols) * tw, f32(int(t) / cols) * th, tw, th}
+			src := Texture_Src(tm.tileset, {f32(int(t) % cols) * tw, f32(int(t) / cols) * th, tw, th})
 			if local {
 				// Into a chunk: unscaled pixels from the chunk's corner.
 				rl.DrawTexturePro(tm.tileset.texture, src, {f32(x - origin.x) * tw, f32(y - origin.y) * th, tw, th}, {0, 0}, 0, rl.WHITE)

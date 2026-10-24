@@ -293,7 +293,9 @@ open it.
 
 **Import settings** are in the preview panel. Textures: **Filter** (Point
 keeps pixel art crisp; Bilinear / Trilinear smooth scaled images), **Wrap**
-(Repeat / Clamp), **Mipmaps**, **Export** (Keep, or QOI for faster loading)
+(Repeat / Clamp), **Mipmaps**, **Export** (Keep, or QOI for faster loading),
+**Atlas** (packed into a sprite atlas on export - see
+[`engine/docs/atlas.md`](../engine/docs/atlas.md))
 and the slicing preset (saved from the Sprite Sheet Slicer's **Save
 Preset**). Audio: **Gain** and the default **Bus**. They're saved next to
 the asset (`hero.png.import.json` - hidden in Assets, moved and copied

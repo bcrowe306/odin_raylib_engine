@@ -20,6 +20,10 @@ Texture :: struct {
 	texture: rl.Texture2D,
 	refCount: int,
 	modTime: time.Time, // of the file when loaded (hot reload)
+	// Atlased (exported games, atlas.odin): `texture` is the page and this
+	// its rectangle - use Texture_Size / Texture_Src. Zero = the whole texture.
+	region: rl.Rectangle,
+	page: int, // atlas page + 1 (0 = its own texture)
 }
 
 AudioSound :: struct {
@@ -61,6 +65,7 @@ ResourceManager :: struct {
 	// .ore package (paths relative to projectDir).
 	package_: ^OrePackage,
 	projectDir: string,
+	atlas: Atlas_Index, // the package's sprite atlas (atlas.odin)
 }
 
 ResourceManager_Init :: proc(rm: ^ResourceManager) {
@@ -80,7 +85,7 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 	if rm == nil do return
 	for tex in rm.textures {
 		if tex != nil {
-			if tex.texture.id > 0 && rl.IsWindowReady() {
+			if tex.page == 0 && tex.texture.id > 0 && rl.IsWindowReady() {
 				rl.UnloadTexture(tex.texture)
 				tex.texture.id = 0
 			}
@@ -90,6 +95,7 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 	}
 	delete(rm.textures)
 	rm.textures = nil
+	Atlas_Unmount(rm) // (its pages)
 
 	for i in 0..<rm.audioCount {
 		audio := &rm.audioSounds[i]
@@ -131,11 +137,34 @@ file_ext_cstring :: proc(path: string) -> cstring {
 }
 
 LoadTexture_FilePath :: proc(rm: ^ResourceManager, filePath: string) -> (texture: ^Texture, ok: bool) {
+	return texture_load(rm, filePath, false)
+}
+
+// ResourceManager_LoadTextureOwn: a texture of its own even when the image
+// is in the sprite atlas (shaders sample whole textures).
+ResourceManager_LoadTextureOwn :: proc(rm: ^ResourceManager, filePath: string) -> (texture: ^Texture, ok: bool) {
+	return texture_load(rm, filePath, true)
+}
+
+@(private = "file")
+texture_load :: proc(rm: ^ResourceManager, filePath: string, own: bool) -> (texture: ^Texture, ok: bool) {
 	for tex in rm.textures {
-		if tex != nil && tex.filePath == filePath {
+		if tex != nil && tex.filePath == filePath && !(own && tex.page > 0) {
 			tex.refCount += 1
 			return tex, true
 		}
+	}
+	// In the package's atlas: the page and the image's rectangle in it.
+	if e, inAtlas := Atlas_Lookup(rm, filePath); inAtlas && !own {
+		tex := new(Texture)
+		tex.filePath = strings.clone(filePath)
+		tex.fileName = filepath.base(tex.filePath)
+		tex.texture = Atlas_AcquirePage(rm, e.page)
+		tex.region = e.rect
+		tex.page = e.page + 1
+		tex.refCount = 1
+		append(&rm.textures, tex)
+		return tex, true
 	}
 
 	texture2d: rl.Texture2D
@@ -218,7 +247,8 @@ ResourceManager_ReleaseTexture :: proc(rm: ^ResourceManager, tex: ^Texture) {
 		if t != tex do continue
 		tex.refCount -= 1
 		if tex.refCount > 0 do return
-		if tex.texture.id > 0 && rl.IsWindowReady() do rl.UnloadTexture(tex.texture)
+		if tex.page > 0 do Atlas_ReleasePage(rm, tex.page - 1)
+		else if tex.texture.id > 0 && rl.IsWindowReady() do rl.UnloadTexture(tex.texture)
 		delete(tex.filePath)
 		free(tex)
 		ordered_remove(&rm.textures, i)
@@ -393,7 +423,7 @@ ResourceManager_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 	textureCheck = time.tick_now()
 	n := 0
 	for t in rm.textures {
-		if t == nil || t.modTime == {} do continue
+		if t == nil || t.modTime == {} || t.page > 0 do continue
 		info, err := os.stat(t.filePath, context.temp_allocator)
 		if err != nil || time.diff(t.modTime, info.modification_time) <= 0 do continue
 		fresh := rl.LoadTexture(strings.clone_to_cstring(t.filePath, context.temp_allocator))

@@ -34,7 +34,7 @@ Node_OriginSize :: proc(node: ^Node, ctx: ^GameContext = nil) -> [2]f32 {
 		if len(fan.frames) == 0 do return {}
 		t := fan.frames[int(fan.currentFrame) % len(fan.frames)]
 		if t == nil do return {}
-		return {f32(t.texture.width), f32(t.texture.height)}
+		return Texture_Size(t)
 	case AnimationPlayerNode:
 		apn := cast(^AnimationPlayerNode)node
 		return Animation_FrameSize(AnimationPlayerNode_GetAnimation(apn), apn.currentFrame)

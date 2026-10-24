@@ -41,8 +41,7 @@ TextureNode_Create :: proc(scene: ^Scene, resource_manager: ^ResourceManager, fi
 	tex, ok := resource_manager.loadTexture(resource_manager, filePath)
 	if ok {
 		textureNode.texture = tex
-		textureNode.size.x = auto_cast tex.texture.width
-		textureNode.size.y = auto_cast tex.texture.height
+		textureNode.size = Texture_Size(tex)
 	} else {
 		log.error("Failed to load texture from file: ", filePath)
 	}
@@ -55,12 +54,7 @@ TextureNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 	textureNode := cast(^TextureNode)node
 	if textureNode.texture == nil || textureNode.texture.texture.id == 0 do return
 
-	source := rl.Rectangle{
-		x = 0,
-		y = 0,
-		width = auto_cast textureNode.texture.texture.width,
-		height = auto_cast textureNode.texture.texture.height,
-	}
+	source := Texture_Full(textureNode.texture) // (its rectangle on an atlas page)
 
 	pos := textureNode.globalPosition
 	scl := textureNode.globalScale

@@ -773,7 +773,7 @@ load_texture_into :: proc(tn: ^TextureNode, path: string, ctx: ^GameContext) {
 	tex, ok := rm.loadTexture(rm, Project_ResolveAssetPath(ctx, path))
 	if ok && tex != nil {
 		tn.texture = tex
-		tn.size = {f32(tex.texture.width), f32(tex.texture.height)}
+		tn.size = Texture_Size(tex)
 	}
 }
 
