@@ -1,0 +1,46 @@
+# Scene tabs: opening a second scene adds a tab; switching keeps each tab's
+# selection; Cmd+Alt+Right cycles; closing a tab with unsaved changes asks
+# (Cancel keeps it, Don't Save closes and unloads it); the open tabs are
+# remembered in .ore/open_scenes.json; reopening loads the saved file.
+wait 5
+expect item:scenetab:scenes/main.scene.json == visible
+click @hier:PlayerShip
+expect selected == PlayerShip
+dblclick @asset:scenes/battle_arena.scene.json
+wait 5
+expect scene == scenes/battle_arena.scene.json
+expect scene-tabs == 2
+key escape
+key ctrl+a
+type empty node
+key enter
+wait 3
+expect modified == true
+screenshot two_tabs
+click @scenetab:scenes/main.scene.json
+wait 2
+expect scene == scenes/main.scene.json
+expect selected == PlayerShip
+key cmd+alt+right
+wait 2
+expect scene == scenes/battle_arena.scene.json
+key cmd+w
+wait 2
+expect item:scenetab.cancel == visible
+screenshot close_prompt
+click @scenetab.cancel
+wait 2
+expect scene-tabs == 2
+key cmd+w
+wait 2
+click @scenetab.discard
+wait 2
+expect scene-tabs == 1
+expect scene == scenes/main.scene.json
+expect file:.ore/open_scenes.json contains "scenes/main.scene.json"
+expect file:.ore/open_scenes.json !contains battle_arena
+dblclick @asset:scenes/battle_arena.scene.json
+wait 5
+expect scene-tabs == 2
+expect modified == false
+expect file:.ore/open_scenes.json contains battle_arena

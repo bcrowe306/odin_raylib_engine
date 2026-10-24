@@ -188,6 +188,10 @@ Actions_Init :: proc() {
 		if !GlobalSettings.showTabBars do Dock_ApplyTabBars(editorDockspaceID, false) // single windows hide theirs again
 		Editor_SaveSettings()
 	}, checked = proc(s: ^EditorState) -> bool {return GlobalSettings.showTabBars}})
+	// Scene tabs (scene_tabs.odin).
+	add({id = "scene.close_tab", category = "Scene", label = "Close Scene Tab", chords = k(ch(.W, P)), scope = .Scene, run = proc(s: ^EditorState) {SceneTabs_RequestClose(s, s.activeScene)}, enabled = proc(s: ^EditorState) -> bool {return len(SceneTabs_Open()) > 1}})
+	add({id = "scene.next_tab", category = "Scene", label = "Next Scene Tab", chords = k(ch(.PageDown, CT), ch(.Tab, CT), ch(.RightArrow, PA)), scope = .Scene, run = proc(s: ^EditorState) {SceneTabs_Cycle(s, 1)}})
+	add({id = "scene.prev_tab", category = "Scene", label = "Previous Scene Tab", chords = k(ch(.PageUp, CT), ch(.Tab, Mods{.Ctrl, .Shift}), ch(.LeftArrow, PA)), scope = .Scene, run = proc(s: ^EditorState) {SceneTabs_Cycle(s, -1)}})
 	// Colour vision preview: the viewport as seen with a colour vision deficiency (simulated).
 	add({id = "view.vision_protanopia", category = "View", label = "Colour Vision: Protanopia", scope = .Scene, run = proc(s: ^EditorState) {viewport_set_vision(.Protanopia)}, checked = proc(s: ^EditorState) -> bool {return viewportVision == .Protanopia}})
 	add({id = "view.vision_deuteranopia", category = "View", label = "Colour Vision: Deuteranopia", scope = .Scene, run = proc(s: ^EditorState) {viewport_set_vision(.Deuteranopia)}, checked = proc(s: ^EditorState) -> bool {return viewportVision == .Deuteranopia}})

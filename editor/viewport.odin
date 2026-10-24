@@ -83,6 +83,7 @@ Viewport_UpdateAndRender :: proc(state: ^EditorState) {
 	if imgui.Begin("Viewport###ViewportWindow", nil, viewportFlags) {
 		driveNoScroll = true // the wheel zooms here: drives never "scroll" it
 		defer driveNoScroll = false
+		SceneTabs_Draw(state) // open scenes as tabs (scene_tabs.odin)
 		// Available region for rendering
 		avail := imgui.GetContentRegionAvail()
 		reqW := i32(math.max(f32(64.0), avail.x))

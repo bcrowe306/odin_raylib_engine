@@ -53,7 +53,9 @@ Editor_OpenComponent :: proc(state: ^EditorState, rel: string) -> bool {
 		Editor_Log(state, .Error, "Component file not found: %s", rel)
 		return false
 	}
-	scene := state.game->createScene(fmt.tprintf("component:%s", rel), false)
+	// A document closed before keeps its (unloaded) scene: reuse it.
+	scene := state.game.sceneManager.scenes[fmt.tprintf("component:%s", rel)]
+	if scene == nil do scene = state.game->createScene(fmt.tprintf("component:%s", rel), false)
 	scene.filePath = strings.clone(rel, state.game.sceneManager.allocator)
 	scene.rootNode.gameContext = &state.game.gameContext
 	node := e.Scene_InstantiateNodeFromJSON(scene, data, scene.rootNode, &state.game.gameContext)

@@ -759,6 +759,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return state.selectedNode.name if state.selectedNode != nil else "", true
 	case "scene":
 		return state.activeScenePath, true
+	case "scene-tabs":
+		return fmt.tprint(len(SceneTabs_Open())), true
 	case "tool":
 		return strings.to_lower(fmt.tprint(state.toolMode), context.temp_allocator), true
 	case "zoom":

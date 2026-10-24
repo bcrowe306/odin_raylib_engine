@@ -108,6 +108,7 @@ exits non-zero if any check fails.
 | `mixer.drive` | The Mixer tab: a new bus, a Reverb on it (its parameter popup), the level typed in dB, mute; saved in project.json; in Simulate a sound into the bus plays (a voice, the meters move). |
 | `navigation.drive` | A Navigation Region added and baked (the Inspector's Bake), a node with a Navigation Agent; saved; in Simulate the agent walks it to a target set from Lua. |
 | `accessibility.drive` | Project Settings > Accessibility (Sound Captions) saved in project.json; View > Colour Vision: Deuteranopia previews the viewport; a UI Container's Accessibility Menu template builds its rows in Simulate (captions on from the project) and its filter button follows the setting. |
+| `scene_tabs.drive` | A second scene opens in a tab; switching keeps each tab's selection; Cmd+Alt+Right cycles; closing a modified tab asks (Cancel keeps it, Don't Save unloads it); the open tabs are written to .ore/open_scenes.json; reopening loads the saved file. |
 | `advanced_camera.drive` | An Advanced Camera added, Follow Target picked (PlayerShip), Damping set; saved; in Simulate it's active, the host follows the ship, Shake adds trauma, a second camera with a higher priority takes over. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |

@@ -323,6 +323,24 @@ different file with a taken name is imported as `name_2.ext`. An LDtk
 project brings its external levels and the tileset/background images it
 references (into `textures/`, with the paths in the level rewritten).
 
+### Scene tabs
+
+Every scene you open (from Assets, the palette, Edit Component, ...) gets a
+tab above the viewport; component documents show a cubes icon.
+
+| | |
+|---|---|
+| Click a tab | Switch to it. Each tab keeps its own camera, selection and undo history. |
+| Drag a tab | Reorder. The arrow at the left lists every tab. |
+| Dot on a tab | Unsaved changes (the tooltip shows the file). |
+| **x**, middle-click, **Cmd+W** | Close it - with unsaved changes it asks: **Save**, **Don't Save**, **Cancel**. Closing unloads the scene (and frees its undo history); opening it again loads the file. The last tab can't be closed. |
+| **Cmd+Alt+Right / Left**, **Ctrl+PageDown / PageUp**, **Ctrl+Tab** | Next / previous tab. |
+| Right-click a tab | Close, Close Others (ones with unsaved changes stay), Copy Path. |
+
+Switching is off while simulating. The open tabs and the active one are
+remembered per project (`.ore/open_scenes.json`) and come back when you
+open it again.
+
 ### Viewport
 
 **Fit** (Home) zooms to the whole scene; the zoom menu also has Fit Game

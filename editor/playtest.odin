@@ -291,7 +291,7 @@ Editor_OpenScene :: proc(state: ^EditorState, relPath: string) -> bool {
 		delete(state.activeScenePath)
 		state.activeScenePath = strings.clone(relPath)
 	}
-	state.selectedNode = nil
+	state.selectedNode = SceneTabs_SelectionFor(state, scene) // (what was selected when it was left)
 	Editor_Log(state, .Info, "Opened scene %s", relPath)
 	return true
 }
@@ -377,6 +377,7 @@ Editor_ModifiedSceneCountCached :: proc(state: ^EditorState) -> int {
 Editor_SwitchView :: proc(state: ^EditorState, next: ^e.Scene) {
 	if state.activeScene != nil && state.activeScene != next {
 		state.sceneViews[state.activeScene] = {state.cameraPos.x, state.cameraPos.y, state.cameraZoom}
+		SceneTabs_RememberSelection(state) // (each tab keeps its selection)
 	}
 	if v, ok := state.sceneViews[next]; ok {
 		state.cameraPos = {v[0], v[1]}

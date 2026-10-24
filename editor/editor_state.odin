@@ -305,6 +305,7 @@ Editor_Init :: proc(state: ^EditorState) {
 		if !Editor_OpenScene(state, initial) {
 			state.activeScene = state.game->createScene("DefaultScene", true, nil)
 		}
+		SceneTabs_Restore(state) // the last session's tabs (scene_tabs.odin)
 	} else {
 		// Fallback empty scene
 		state.activeScene = state.game->createScene("DefaultScene", true, nil)
@@ -319,6 +320,7 @@ Editor_Init :: proc(state: ^EditorState) {
 
 Editor_Shutdown :: proc(state: ^EditorState) {
 	e.scriptLogSink = nil // scripts may still log while the game shuts down below
+	SceneTabs_Shutdown(state) // (writes the open tabs)
 	Code_Shutdown()
 	Palette_Shutdown()
 	AnimationPanel_Shutdown()
