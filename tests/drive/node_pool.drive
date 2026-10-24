@@ -1,0 +1,32 @@
+# Node pools from Lua in Simulate: prewarm, take, destroy() returns the
+# instance (still parked, not freed), stats; the Profiler lists the pool.
+wait 5
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+click @bottom:console
+click @console.lua
+type Pool.prewarm("components/AsteroidSmall.component.json", 4)
+key enter
+wait 3
+type pool_a = Pool.take("components/AsteroidSmall.component.json", nil, 640, 360)
+key enter
+wait 5
+type print(string.format("taken %d %d %d", Pool.stats("components/AsteroidSmall.component.json")))
+key enter
+wait 3
+expect log contains taken 1 3 4
+type pool_a:destroy()
+key enter
+wait 5
+type local a, p, m = Pool.stats("components/AsteroidSmall.component.json"); print(string.format("back %d %d %d %s", a, p, m, tostring(pool_a.enabled)))
+key enter
+wait 3
+expect log contains back 0 4 4 false
+click @bottom:profiler
+wait 3
+expect item:prof.pools == visible
+screenshot profiler_pools
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

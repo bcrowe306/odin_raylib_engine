@@ -850,6 +850,14 @@ parent's), `ySort` (draw its children by Y: top-down / isometric depth) and
 `node.zIndex = 10`, `world:set_property("ySort", true)`. Guide with a
 tutorial: [`docs/draw_order.md`](docs/draw_order.md).
 
+#### Object pooling (Pool)
+
+`Pool.take(component [, parent [, x, y]])` instead of `Scene.instantiate`
+reuses parked instances; `node:destroy()` on a pooled node returns it.
+Pooled roots' scripts get `on_spawn()` (every take, before the next update)
+and `on_despawn()`. Also `Pool.prewarm`, `Pool.set_max`, `Pool.release`,
+`Pool.stats`. Guide and tutorial: [`docs/pooling.md`](docs/pooling.md).
+
 #### Visibility (VisibilityNotifierNode)
 
 A child rectangle that knows whether the camera sees it: events

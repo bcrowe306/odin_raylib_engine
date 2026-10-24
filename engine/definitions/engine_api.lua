@@ -6383,6 +6383,52 @@ function TweenModule.ease(ease, t) end
 
 -- ============================================================================
 
+---@class PoolModule
+---Reuses instances of a component instead of creating and freeing them (bullets, sparks, coins). A pooled node is parked disabled (no update, no drawing, bodies off) and comes back on take; `node:destroy()` / `queue_free()` on one returns it to its pool. Its root's script gets `on_spawn()` before its first update after every take (after `ready()` the first time) and `on_despawn()` when returned. Pools last while the scene is loaded.
+local PoolModule = {}
+
+---Takes an instance of the component: a parked one, else a new one (nil at the pool's max). Added under `parent` (else the scene's root) at x, y local to it.
+---
+---Example: `local b = Pool.take("components/bullet.component.json", self.node:get_parent(), self.node.position)`
+---@param component ComponentPath|string
+---@param parent? Node
+---@param x? number|Vec2
+---@param y? number
+---@return Node?
+function PoolModule.take(component, parent, x, y) end
+
+---Returns a taken instance to its pool (the same as `node:destroy()` on it).
+---
+---Example: `Pool.release(self.node)`
+---@param node Node
+---@return boolean ok false when it isn't a taken pooled node
+function PoolModule.release(node) end
+
+---Makes instances up front (parked) so the first takes don't create them mid-game.
+---
+---Example: `Pool.prewarm("components/bullet.component.json", 64)`
+---@param component ComponentPath|string
+---@param count integer Instances in total
+function PoolModule.prewarm(component, count) end
+
+---Caps how many instances the pool makes (0 = no cap); `take` returns nil at the cap.
+---
+---Example: `Pool.set_max("components/spark.component.json", 200)`
+---@param component ComponentPath|string
+---@param max integer
+function PoolModule.set_max(component, max) end
+
+---How many instances are taken, parked and made in total.
+---
+---Example: `local active, parked, made = Pool.stats("components/bullet.component.json")`
+---@param component ComponentPath|string
+---@return integer active
+---@return integer parked
+---@return integer created
+function PoolModule.stats(component) end
+
+-- ============================================================================
+
 ---@alias SaveValue nil|boolean|number|string|table
 
 ---@class SaveModule
@@ -7494,6 +7540,9 @@ Gradient = GradientModule
 ---@type SceneModule
 Scene = SceneModule
 Tween = TweenModule
+
+---@type PoolModule
+Pool = PoolModule
 
 ---@type SaveModule
 Save = SaveModule

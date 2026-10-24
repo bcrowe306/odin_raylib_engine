@@ -156,12 +156,19 @@ HasParent :: proc(manager: ^NodeManager, node: ^Node) -> bool {
 }
 
 
+// RemoveNode queues a node and its subtree for removal (at the end of the
+// frame). A node taken from a pool goes back to its pool instead.
 RemoveNode :: proc(manager: ^NodeManager, node: ^Node) {
 	if node == nil || node.removing do return
+	if node.pool != nil && node.enabled && Pool_Return(manager, node, node.gameContext) do return
+	remove_tree(manager, node)
+}
+
+@(private = "file")
+remove_tree :: proc(manager: ^NodeManager, node: ^Node) {
+	if node == nil || node.removing do return
 	node.removing = true
-	for child in GetChildrenTemp(manager, node) {
-		RemoveNode(manager, child)
-	}
+	for child in GetChildrenTemp(manager, node) do remove_tree(manager, child)
 	append(&manager.removal, node)
 }
 
@@ -215,6 +222,7 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 			node.gameContext = gameContext
 			Node_NotifyEvent(node, .Exited_Tree, nil, gameContext)
 
+			if node.pool != nil do Pool_Forget(node) // freed with its parent (not returned)
 			if node.typeId == VisibilityNotifierNode {
 				for n, k in manager.notifiers do if n == node {unordered_remove(&manager.notifiers, k); break}
 			}

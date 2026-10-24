@@ -261,6 +261,14 @@ BottomPanel_RenderProfiler :: proc(state: ^EditorState) {
 		}
 		UI_DimText(fmt.tprintf("Scene nodes  %d", nodeCount))
 		UI_DimText(fmt.tprintf("Viewport  %d drawn · %d culled (off screen)", e.renderStats.drawn, e.renderStats.culled))
+		if state.activeScene != nil && len(state.activeScene.pools) > 0 {
+			// Node pools (Pool.take): taken / parked / made.
+			for p in state.activeScene.pools {
+				name := p.component[strings.last_index_byte(p.component, '/') + 1:]
+				imgui.TextColored(UI_ACCENT, "%s", fmt.ctprintf("Pool %s  %d taken · %d parked · %d made%s", name, p.active, len(p.free), p.created, fmt.tprintf(" (max %d)", p.max) if p.max > 0 else ""))
+			}
+			Drive_Item("prof.pools")
+		}
 		for name, count in byType {
 			imgui.TextUnformatted(fmt.ctprintf("%s  %d", name, count))
 		}

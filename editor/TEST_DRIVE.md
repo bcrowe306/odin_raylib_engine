@@ -101,6 +101,7 @@ exits non-zero if any check fails.
 | `state_guards.drive` | A state's Leave After, Any State Interrupts (off) and Can enter when set in the side panel and saved, the lock on its box; in Simulate the arrow out is blocked: Ways out says Min_Time and `sm_request` prints why. |
 | `y_sort.drive` | Y Sort Children on a node, a new child's Y Sort Offset row (only under a Y-sorted parent) and Z Index, saved; off again. |
 | `visibility_notifier.drive` | A Visibility Notifier added under PlayerShip, its Size row, saved; in Simulate on screen, then the ship moved far away: off screen and (Pause Parent) the ship paused. |
+| `node_pool.drive` | Pools from the Lua console in Simulate: prewarm, take, `destroy()` returns the instance (parked, disabled), stats; the Profiler lists the pool. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

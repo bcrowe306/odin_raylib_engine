@@ -34,6 +34,7 @@ Scene :: struct {
 	addChild: proc(scene: ^Scene, parent, child: ^Node),
 	removeChild: proc(scene: ^Scene, parent, child: ^Node),
 	isLoaded: bool,
+	pools: [dynamic]^Node_Pool, // node pools (node_pool.odin), freed on unload
 }
 
 SCENE_MAX_GUIDES :: 64
@@ -137,6 +138,7 @@ Scene_Unload :: proc(scene: ^Scene, gameContext: ^GameContext = nil) {
 
 	scene.camera = nil
 
+	Pools_Destroy(scene)
 	NodeManager_Terminate(scene.manager)
 	NodeManager_Init(scene.manager)
 
@@ -214,6 +216,7 @@ Scene_JsonSetup :: proc(scene: ^Scene, gameContext: ^GameContext) {
 
 TerminateScene :: proc(scene: ^Scene) {
 	if scene == nil do return
+	Pools_Destroy(scene)
 	if scene.manager != nil {
 		NodeManager_Terminate(scene.manager)
 		free(scene.manager)
@@ -352,6 +355,12 @@ update_tree :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext, delta
 			sm := gameContext.scriptManager if gameContext != nil else nil
 			ScriptInstance_CallReady(cast(^ScriptInstance)node.scriptInstance, sm)
 		}
+	}
+
+	if node.poolSpawn {
+		// Taken from its pool: reset per-life state (node_pool.odin).
+		node.poolSpawn = false
+		if gameContext != nil do Script_CallMethod(gameContext.scriptManager, node, "on_spawn", nil, quiet = true)
 	}
 
 	// Copy: updates may add or remove children while we iterate.

@@ -515,6 +515,12 @@ points are edited in the Inspector's **Points** section (**Add Point**, the
 x removes one). Post effects show in the viewport while the lighting
 preview (toolbar) is on; pick the shader in the **Material** section.
 
+### Profiler: pools
+
+While the scene runs, the **Profiler** tab lists each node pool
+(`Pool.take`): taken, parked, made (and the cap). Guide:
+[`engine/docs/pooling.md`](../engine/docs/pooling.md).
+
 ### Visibility notifiers
 
 **Add Node > Visibility Notifier** under a node: a yellow rectangle in the
