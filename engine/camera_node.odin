@@ -1235,12 +1235,14 @@ CameraNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32
 
 CameraNode_GetCamera2D :: proc(camera: ^CameraNode, viewportWidth: f32 = 1280, viewportHeight: f32 = 720) -> rl.Camera2D {
 	if camera == nil {
-		return rl.Camera2D{
+		cam := rl.Camera2D{
 			offset   = {viewportWidth * 0.5, viewportHeight * 0.5},
 			target   = {0, 0},
 			rotation = 0.0,
 			zoom     = 1.0,
 		}
+		Pixel_SnapCamera(&cam)
+		return cam
 	}
 
 	scrOffset := camera.customScreenOffset ? camera.screenOffset : [2]f32{viewportWidth * 0.5, viewportHeight * 0.5}
@@ -1248,12 +1250,14 @@ CameraNode_GetCamera2D :: proc(camera: ^CameraNode, viewportWidth: f32 = 1280, v
 	camRot := camera.currentRotation + camera.shakeRotation
 	camZoom := max(0.001, camera.currentZoom + camera.shakeZoom)
 
-	return rl.Camera2D{
+	cam := rl.Camera2D{
 		offset   = scrOffset,
 		target   = camTarget,
 		rotation = camRot,
 		zoom     = camZoom,
 	}
+	Pixel_SnapCamera(&cam) // pixel snap / the smooth camera's margin (pixel_perfect.odin)
+	return cam
 }
 
 CameraNode_Begin :: proc(camera: ^CameraNode, viewportWidth: f32 = 1280, viewportHeight: f32 = 720) {

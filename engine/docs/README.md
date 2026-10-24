@@ -8,5 +8,6 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 | Guide | |
 |---|---|
 | [Draw order](draw_order.md) | Layers, Z index, Y-sort (top-down / isometric depth). |
+| [Pixel-perfect rendering](pixel_perfect.md) | Integer scaling, pixel snap, smooth sub-pixel camera - recipes for pixel art. |
 | [Object pooling](pooling.md) | Reuse bullets, effects, pickups: `Pool.take`, `on_spawn` / `on_despawn`, prewarm, caps - with a tutorial. |
 | [Visibility notifier](visibility.md) | On screen / off screen events; pause, disable or remove the parent off screen. |

@@ -259,25 +259,39 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 		frameStart := time.tick_now()
 		Render_SetFrameTarget(target)
 		rl.BeginTextureMode(target^)
-		rl.ClearBackground(Game_ClearColor(game))
+		// Smooth camera: the world gets its own texture; the frame holds the
+		// layers on top (transparent elsewhere).
+		rl.ClearBackground({0, 0, 0, 0} if renderPixel.smooth else Game_ClearColor(game))
 		game->run(dt)
 		rl.EndTextureMode()
 		Render_SetFrameTarget(nil)
 		frame := target.texture
-		if effects := Scene_PostEffects(game.sceneManager.currentScene); len(effects) > 0 {
+		if effects := Scene_PostEffects(game.sceneManager.currentScene); len(effects) > 0 && !renderPixel.smooth {
 			frame = Post_Process(effects, frame, &game.gameContext) // through each effect
 		}
 		runTime := time.tick_since(frameStart)
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.BLACK) // the letterbox bars
-		// Copied as is: blending would let the bars' black through where the
-		// frame's alpha dropped (anti-aliased text, translucent sprites).
-		rlgl.DrawRenderBatchActive()
-		rlgl.DisableColorBlend()
-		rl.DrawTexturePro(frame, {0, 0, f32(frame.width), -f32(frame.height)}, dest, {0, 0}, 0, rl.WHITE)
-		rlgl.DrawRenderBatchActive()
-		rlgl.EnableColorBlend()
+		if renderPixel.smooth {
+			// The background, the world moved by the camera's leftover
+			// fraction (post effects on it), then the other layers on top.
+			rl.DrawRectangleRec(dest, Game_ClearColor(game))
+			if renderPixel.usedWorld {
+				world := renderPixel.world.texture
+				if effects := Scene_PostEffects(game.sceneManager.currentScene); len(effects) > 0 do world = Post_Process(effects, world, &game.gameContext)
+				Pixel_DrawWorld(world, dest, vw, vh)
+			}
+			rl.DrawTexturePro(target.texture, {0, 0, f32(target.texture.width), -f32(target.texture.height)}, dest, {0, 0}, 0, rl.WHITE)
+		} else {
+			// Copied as is: blending would let the bars' black through where the
+			// frame's alpha dropped (anti-aliased text, translucent sprites).
+			rlgl.DrawRenderBatchActive()
+			rlgl.DisableColorBlend()
+			rl.DrawTexturePro(frame, {0, 0, f32(frame.width), -f32(frame.height)}, dest, {0, 0}, 0, rl.WHITE)
+			rlgl.DrawRenderBatchActive()
+			rlgl.EnableColorBlend()
+		}
 		rl.EndDrawing()
 		defer free_all(context.temp_allocator) // the frame's temp allocations (after the captures below)
 
@@ -309,6 +323,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 			break
 		}
 	}
+	Pixel_Release()
 	return 0
 }
 
@@ -331,10 +346,7 @@ Runner_VirtualSize :: proc(game: ^Game) -> (f32, f32) {
 // Runner_FitRect: a w x h frame scaled to fit a screen, centred (bars on the
 // sides that don't fill).
 Runner_FitRect :: proc(w, h, screenW, screenH: f32) -> rl.Rectangle {
-	if w <= 0 || h <= 0 || screenW <= 0 || screenH <= 0 do return {0, 0, max(w, 1), max(h, 1)}
-	s := min(screenW / w, screenH / h)
-	dw, dh := w * s, h * s
-	return {f32(int((screenW - dw) * 0.5)), f32(int((screenH - dh) * 0.5)), dw, dh}
+	return Pixel_FitRect(w, h, screenW, screenH) // (a whole-number scale with integer scaling)
 }
 
 @(private = "file")

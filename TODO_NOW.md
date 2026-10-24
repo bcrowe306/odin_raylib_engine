@@ -142,7 +142,7 @@ Common:
 - [ ] A Audio mixer (bottom tab, laid out like a DAW console): user buses that sound / music nodes are assigned to, a master channel at the far right, buses to its left; each bus: volume, mute, pan (solo), effects chain; meters
 - [ ] 7 Skeletal / cutout animation: bones, mesh deformation, IK; DragonBones and Spine file compatibility
 - [x] 8 Object pooling: Pool.take / release / prewarm / set_max / stats, destroy() returns pooled nodes, on_spawn / on_despawn, bodies off while parked, per-scene pools freed on unload; Profiler rows; guide + tutorial engine/docs/pooling.md, test, drive. Also: Lua C callbacks now run with their script manager's context (Script_Context: the engine's allocator and logger - no more bad frees under the leak tracker; errors from Lua-triggered engine code are logged)
-- [ ] 9 Pixel-perfect rendering: integer scaling, pixel-snapped camera / sub-pixel smoothing
+- [x] 9 Pixel-perfect rendering: Integer Scaling, Pixel Snap (camera + sprites), Smooth Camera (world in a margin texture shifted by the leftover fraction at the upscale; UI layers on top); Project Settings > Video; guide engine/docs/pixel_perfect.md, test, runner screenshots, drive
 - [ ] 10 Sprite atlas packing on export
 - [ ] 11 Input rebinding (player-facing flow, saved bindings, gamepad menu navigation)
 - [ ] 12 Scene transitions: change-scene API with transitions, loading screen, async preloading

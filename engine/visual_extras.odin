@@ -398,6 +398,8 @@ frameTarget: ^rl.RenderTexture2D
 
 Render_SetFrameTarget :: proc(t: ^rl.RenderTexture2D) {frameTarget = t}
 
+Render_FrameTarget :: proc() -> ^rl.RenderTexture2D {return frameTarget}
+
 Render_RestoreFrameTarget :: proc() {
 	if frameTarget != nil do rl.BeginTextureMode(frameTarget^)
 }

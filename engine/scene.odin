@@ -293,8 +293,32 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 		for l in RenderLayer do if l in scene.camera.targetLayers do lastWorld = int(l)
 		if lastWorld >= 0 do Lighting_Prepare(scene, CameraNode_GetCamera2D(scene.camera, lightVW, lightVH), i32(lightVW), i32(lightVH))
 	}
+	// Smooth camera (pixel_perfect.odin): the world layers go to a texture a
+	// pixel larger on every side, the others to the frame (on top).
+	frame := Render_FrameTarget()
+	smooth := renderPixel.smooth && frame != nil && rl.IsWindowReady()
+	renderPixel.usedWorld = false
+	inWorld := false
 	for layer in RenderLayer {
 		isWorldLayer := scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent && (layer in scene.camera.targetLayers)
+		if smooth && isWorldLayer != inWorld {
+			rl.EndTextureMode()
+			if isWorldLayer {
+				w := Pixel_WorldTarget(frame.texture.width, frame.texture.height)
+				Render_SetFrameTarget(w) // mid-frame passes come back to it
+				rl.BeginTextureMode(w^)
+				if !renderPixel.usedWorld {
+					rl.ClearBackground(Game_ClearColor(gameContext.game) if gameContext != nil && gameContext.game != nil else rl.BLACK)
+					renderPixel.usedWorld = true
+				}
+				renderPixel.margin = PIXEL_MARGIN
+			} else {
+				Render_SetFrameTarget(frame)
+				rl.BeginTextureMode(frame^)
+				renderPixel.margin = 0
+			}
+			inWorld = isWorldLayer
+		}
 		if isWorldLayer && rl.IsWindowReady() {
 			vw: f32 = 1280
 			vh: f32 = 720
@@ -313,6 +337,12 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 			CameraNode_End()
 		}
 		if int(layer) == lastWorld do Lighting_Composite()
+	}
+	if inWorld {
+		rl.EndTextureMode()
+		Render_SetFrameTarget(frame)
+		rl.BeginTextureMode(frame^)
+		renderPixel.margin = 0
 	}
 
 	// Render any active UI popups/dropdowns on top of all layers

@@ -269,7 +269,8 @@ Lighting_Composite :: proc() {
 	if !lighting.ready do return
 	t := lighting.lightMap.texture
 	rl.BeginBlendMode(.MULTIPLIED)
-	rl.DrawTextureRec(t, {0, 0, f32(t.width), -f32(t.height)}, {0, 0}, rl.WHITE)
+	m := renderPixel.margin // (inside the smooth camera's world texture)
+	rl.DrawTextureRec(t, {0, 0, f32(t.width), -f32(t.height)}, {m, m}, rl.WHITE)
 	rl.EndBlendMode()
 	lighting.ready = false
 }

@@ -102,6 +102,7 @@ exits non-zero if any check fails.
 | `y_sort.drive` | Y Sort Children on a node, a new child's Y Sort Offset row (only under a Y-sorted parent) and Z Index, saved; off again. |
 | `visibility_notifier.drive` | A Visibility Notifier added under PlayerShip, its Size row, saved; in Simulate on screen, then the ship moved far away: off screen and (Pause Parent) the ship paused. |
 | `node_pool.drive` | Pools from the Lua console in Simulate: prewarm, take, `destroy()` returns the instance (parked, disabled), stats; the Profiler lists the pool. |
+| `pixel_perfect.drive` | Project Settings > Video: Integer Scaling, Pixel Snap, then Smooth Camera (disabled until Pixel Snap), saved in project.json. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

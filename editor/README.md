@@ -171,6 +171,13 @@ asks for the folder to write `<project>.ore` into.
 Scenes and components are listed without their `.scene.json` /
 `.component.json` endings (Assets, scene tree, toolbar, status bar).
 
+
+**Video > pixel art**: Sharp Pixels, **Integer Scaling** (whole-number scale
+with bars), **Pixel Snap** (camera and sprites on whole game pixels) and
+**Smooth Camera** (with Pixel Snap: sub-pixel camera motion kept when
+scaling up; UI layers unshifted). Guide:
+[`engine/docs/pixel_perfect.md`](../engine/docs/pixel_perfect.md).
+
 ### Inspector
 
 **Origin** (Transform, for nodes that draw an image or a box: textures,

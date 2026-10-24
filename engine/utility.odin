@@ -63,6 +63,7 @@ Texture_DrawScaled :: proc(tex: rl.Texture2D, source: rl.Rectangle, pos, size, s
 		o.y = size.y - o.y
 	}
 	s := [2]f32{abs(scale.x), abs(scale.y)}
+	pos := Pixel_SnapSprite(pos, o * s, rotation) // on whole pixels with pixel snap
 	rl.DrawTexturePro(tex, src, {pos.x, pos.y, size.x * s.x, size.y * s.y}, {o.x * s.x, o.y * s.y}, rotation, tint)
 }
 
