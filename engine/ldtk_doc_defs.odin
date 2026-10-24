@@ -1,6 +1,7 @@
 package engine
 
 import "core:fmt"
+import "core:math"
 import "core:mem"
 import "core:strings"
 import rl "vendor:raylib"
@@ -85,7 +86,7 @@ Ldtk_Doc_New :: proc(path: string, heap := context.allocator) -> (^Ldtk_Doc, boo
 
 // Ldtk_CleanIdentifier: an LDtk identifier (letters, digits, _; not starting
 // with a digit; first letter upper case).
-Ldtk_CleanIdentifier :: proc(s: string, allocator := context.temp_allocator) -> string {
+Ldtk_CleanIdentifier :: proc(s: string, allocator := context.temp_allocator, keepCase := false) -> string {
 	b := strings.builder_make(allocator)
 	for r, i in strings.trim_space(s) {
 		ok := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_' || (r >= '0' && r <= '9')
@@ -95,7 +96,7 @@ Ldtk_CleanIdentifier :: proc(s: string, allocator := context.temp_allocator) -> 
 	}
 	out := strings.to_string(b)
 	if out == "" do return strings.clone("Unnamed", allocator)
-	if out[0] >= 'a' && out[0] <= 'z' {
+	if !keepCase && out[0] >= 'a' && out[0] <= 'z' {
 		bytes := transmute([]u8)out
 		bytes[0] -= 32
 	}
@@ -474,6 +475,9 @@ Ldtk_Doc_EntityDefChanged :: proc(doc: ^Ldtk_Doc, entityUid: int) {
 				if LdtkJson_Int(ent, "defUid", -1) != entityUid do continue
 				LdtkJson_SetStr(ent, "__identifier", ed.identifier, a)
 				LdtkJson_Set(ent, "__pivot", ldtk_pair_f(ed.pivot, a), a)
+				tags := LdtkJson_New(.Array, a)
+				for t in LdtkJson_Arr(ed.obj, "tags") do append(&tags.items, LdtkJson_Clone(t, a))
+				LdtkJson_Set(ent, "__tags", tags, a)
 				LdtkJson_Set(ent, "__tile", tile != nil && tile.kind == .Object ? LdtkJson_Clone(tile, a) : LdtkJson_New(.Null, a), a)
 				LdtkJson_SetStr(ent, "__smartColor", Ldtk_ColorHex(ed.color), a)
 				if !LdtkJson_Bool(ed.obj, "resizableX") do LdtkJson_SetInt(ent, "width", ed.size.x, a)
@@ -891,4 +895,331 @@ Ldtk_Doc_RulesChanged :: proc(doc: ^Ldtk_Doc, layerUid: int) {
 		}
 	}
 	Ldtk_Doc_Touch(doc)
+}
+
+// ----------------------------------------------------------------------------
+// Field definitions: rename, convert, reorder, duplicate
+// ----------------------------------------------------------------------------
+
+// ldtk_field_owner: the fieldDefs list holding a field def, and the entity
+// def uid (-1 for level fields).
+@(private = "file")
+ldtk_field_owner :: proc(doc: ^Ldtk_Doc, fieldUid: int) -> (list: ^LdtkJson, entityUid: int) {
+	defs := LdtkJson_Get(doc.root, "defs")
+	lf := LdtkJson_Get(defs, "levelFields")
+	if lf != nil do for f in lf.items do if LdtkJson_Int(f, "uid", -1) == fieldUid do return lf, -1
+	for ed in LdtkJson_Arr(defs, "entities") {
+		fl := LdtkJson_Get(ed, "fieldDefs")
+		if fl != nil do for f in fl.items do if LdtkJson_Int(f, "uid", -1) == fieldUid do return fl, LdtkJson_Int(ed, "uid")
+	}
+	return nil, -1
+}
+
+// ldtk_each_field_instance calls fn for every instance of a field def.
+@(private = "file")
+ldtk_each_field_instance :: proc(doc: ^Ldtk_Doc, fieldUid: int, fn: proc(doc: ^Ldtk_Doc, fi: ^LdtkJson, data: rawptr), data: rawptr = nil) {
+	for &lv in doc.levels {
+		for target in ([]^LdtkJson{lv.obj, lv.extRoot}) {
+			if target == nil do continue
+			for fi in LdtkJson_Arr(target, "fieldInstances") do if LdtkJson_Int(fi, "defUid", -1) == fieldUid do fn(doc, fi, data)
+		}
+		for &ly in lv.layers {
+			for ent in LdtkJson_Arr(ly.obj, "entityInstances") {
+				for fi in LdtkJson_Arr(ent, "fieldInstances") do if LdtkJson_Int(fi, "defUid", -1) == fieldUid do fn(doc, fi, data)
+			}
+		}
+		lv.dirty = true
+	}
+}
+
+// Ldtk_Doc_RenameFieldDef renames a field (and its instances' __identifier).
+Ldtk_Doc_RenameFieldDef :: proc(doc: ^Ldtk_Doc, fieldUid: int, name: string) -> bool {
+	list, _ := ldtk_field_owner(doc, fieldUid)
+	if list == nil do return false
+	clean := Ldtk_CleanIdentifier(name, keepCase = true) // (fields keep their case)
+	for f in list.items do if LdtkJson_Int(f, "uid", -1) != fieldUid && LdtkJson_Str(f, "identifier") == clean do return false
+	fd := Ldtk_Doc_FieldDef(doc, fieldUid)
+	LdtkJson_SetStr(fd, "identifier", clean, doc.allocator)
+	set :: proc(doc: ^Ldtk_Doc, fi: ^LdtkJson, data: rawptr) {LdtkJson_SetStr(fi, "__identifier", (cast(^string)data)^, doc.allocator)}
+	ldtk_each_field_instance(doc, fieldUid, set, &clean)
+	Ldtk_Doc_Touch(doc)
+	return true
+}
+
+// Ldtk_FieldConversion: misc/FieldTypeConverter's conversions.
+Ldtk_FieldConversion :: struct {
+	from, to: string, // "F_Int"... ("" from: any type, to: "array")
+	label:    string,
+	lossless: bool,
+}
+
+LDTK_FIELD_CONVERSIONS := [?]Ldtk_FieldConversion{
+	{"", "array", "Turn into an array", true},
+	{"F_String", "F_Text", "To Multilines", true},
+	{"F_Text", "F_String", "To String (removes line breaks)", false},
+	{"F_Path", "F_String", "To String", true},
+	{"F_String", "F_Path", "To FilePath", true},
+	{"F_Int", "F_Float", "To Float", true},
+	{"F_Bool", "F_Int", "To Int (0 / 1)", true},
+	{"F_Float", "F_Int", "To Int (truncate)", false},
+	{"F_Float", "F_Int", "To Int (round)", false},
+}
+
+// Ldtk_Doc_FieldConversions: the conversions a field def offers (indices in
+// LDTK_FIELD_CONVERSIONS).
+Ldtk_Doc_FieldConversions :: proc(fd: ^LdtkJson) -> []int {
+	out := make([dynamic]int, context.temp_allocator)
+	t := LdtkJson_Str(fd, "type")
+	for c, i in LDTK_FIELD_CONVERSIONS {
+		if c.from == "" {
+			if !LdtkJson_Bool(fd, "isArray") do append(&out, i)
+		} else if c.from == t do append(&out, i)
+	}
+	return out[:]
+}
+
+// Ldtk_FieldTypeLabel: "F_Int" -> "Int" (LDtk's __type names).
+Ldtk_FieldTypeLabel :: proc(t: string) -> string {
+	for x in LDTK_FIELD_TYPES do if x.type == t do return x.label
+	return t
+}
+
+// Ldtk_Doc_ConvertFieldDef applies a conversion (index in
+// LDTK_FIELD_CONVERSIONS) to a field def and its values.
+Ldtk_Doc_ConvertFieldDef :: proc(doc: ^Ldtk_Doc, fieldUid: int, conv: int) -> bool {
+	a := doc.allocator
+	fd := Ldtk_Doc_FieldDef(doc, fieldUid)
+	if fd == nil || conv < 0 || conv >= len(LDTK_FIELD_CONVERSIONS) do return false
+	c := LDTK_FIELD_CONVERSIONS[conv]
+	if c.from != "" && c.from != LdtkJson_Str(fd, "type") do return false
+	State :: struct {conv: int}
+	st := State{conv}
+	if c.to == "array" {
+		LdtkJson_SetBool(fd, "isArray", true, a)
+		LdtkJson_SetStr(fd, "__type", fmt.tprintf("Array<%s>", LdtkJson_Str(fd, "__type")), a)
+	} else {
+		LdtkJson_SetStr(fd, "type", c.to, a)
+		label := Ldtk_FieldTypeLabel(c.to)
+		LdtkJson_SetStr(fd, "__type", LdtkJson_Bool(fd, "isArray") ? fmt.tprintf("Array<%s>", label) : label, a)
+		// the default follows
+		if over := LdtkJson_Get(fd, "defaultOverride"); over != nil && over.kind == .Object {
+			LdtkJson_Set(fd, "defaultOverride", ldtk_convert_value(over, conv, a), a)
+		}
+		if c.to == "F_Int" {
+			for key in ([]string{"min", "max"}) {
+				if v := LdtkJson_Get(fd, key); v != nil && v.kind == .Number do LdtkJson_SetFloat(fd, key, conv == 8 ? math.round(v.num) : f64(i64(v.num)), a)
+			}
+		}
+	}
+	conv_inst :: proc(doc: ^Ldtk_Doc, fi: ^LdtkJson, data: rawptr) {
+		st := cast(^State)data
+		rev := LdtkJson_Get(fi, "realEditorValues")
+		if rev != nil do for v, i in rev.items do rev.items[i] = ldtk_convert_value(v, st.conv, doc.allocator)
+	}
+	ldtk_each_field_instance(doc, fieldUid, conv_inst, &st)
+	Ldtk_Doc_RefreshDefs(doc)
+	Ldtk_Doc_RefreshFieldInstances(doc, fieldUid)
+	Ldtk_Doc_Touch(doc)
+	return true
+}
+
+// ldtk_convert_value: one internal value through a conversion.
+@(private = "file")
+ldtk_convert_value :: proc(v: ^LdtkJson, conv: int, a: mem.Allocator) -> ^LdtkJson {
+	if v == nil || v.kind != .Object do return v // the default / missing: unchanged
+	id := LdtkJson_Str(v, "id")
+	if id == "V_Null" do return v
+	p := LdtkJson_Arr(v, "params")
+	if len(p) == 0 do return v
+	x := p[0]
+	mk :: proc(id: string, x: ^LdtkJson, a: mem.Allocator) -> ^LdtkJson {
+		o := LdtkJson_New(.Object, a)
+		arr := LdtkJson_New(.Array, a)
+		append(&arr.items, x)
+		append(&o.keys, strings.clone("id", a), strings.clone("params", a))
+		append(&o.items, LdtkJson_NewString(id, a), arr)
+		return o
+	}
+	switch conv {
+	case 2: // Text -> String
+		s, _ := strings.replace_all(x.text, "\n", " ", context.temp_allocator)
+		return mk("V_String", LdtkJson_NewString(s, a), a)
+	case 5: return mk("V_Float", LdtkJson_NewFloat(x.num, a), a) // Int -> Float
+	case 6: return mk("V_Int", LdtkJson_NewInt(x.kind == .Bool && x.b ? 1 : 0, a), a) // Bool -> Int
+	case 7: return mk("V_Int", LdtkJson_NewFloat(f64(i64(x.num)), a), a) // truncate
+	case 8: return mk("V_Int", LdtkJson_NewFloat(math.round(x.num), a), a) // round
+	}
+	return v
+}
+
+// Ldtk_Doc_MoveFieldDef moves a field def up / down (instances follow, like
+// LDtk keeps them in the definitions' order).
+Ldtk_Doc_MoveFieldDef :: proc(doc: ^Ldtk_Doc, fieldUid: int, delta: int) -> bool {
+	list, _ := ldtk_field_owner(doc, fieldUid)
+	if list == nil do return false
+	idx := -1
+	for f, i in list.items do if LdtkJson_Int(f, "uid", -1) == fieldUid do idx = i
+	j := idx + delta
+	if idx < 0 || j < 0 || j >= len(list.items) do return false
+	other := LdtkJson_Int(list.items[j], "uid", -1)
+	list.items[idx], list.items[j] = list.items[j], list.items[idx]
+	// swap the instances too
+	swap_in :: proc(fis: ^LdtkJson, a, b: int) {
+		if fis == nil do return
+		ia, ib := -1, -1
+		for f, i in fis.items {
+			if LdtkJson_Int(f, "defUid", -1) == a do ia = i
+			if LdtkJson_Int(f, "defUid", -1) == b do ib = i
+		}
+		if ia >= 0 && ib >= 0 do fis.items[ia], fis.items[ib] = fis.items[ib], fis.items[ia]
+	}
+	for &lv in doc.levels {
+		swap_in(LdtkJson_Get(lv.obj, "fieldInstances"), fieldUid, other)
+		if lv.extRoot != nil do swap_in(LdtkJson_Get(lv.extRoot, "fieldInstances"), fieldUid, other)
+		for &ly in lv.layers do for ent in LdtkJson_Arr(ly.obj, "entityInstances") do swap_in(LdtkJson_Get(ent, "fieldInstances"), fieldUid, other)
+		lv.dirty = true
+	}
+	Ldtk_Doc_RefreshDefs(doc)
+	Ldtk_Doc_Touch(doc)
+	return true
+}
+
+// Ldtk_Doc_DuplicateFieldDef copies a field def (instances get its default).
+Ldtk_Doc_DuplicateFieldDef :: proc(doc: ^Ldtk_Doc, fieldUid: int) -> int {
+	a := doc.allocator
+	list, entityUid := ldtk_field_owner(doc, fieldUid)
+	if list == nil do return -1
+	src := Ldtk_Doc_FieldDef(doc, fieldUid)
+	copy := LdtkJson_Clone(src, a)
+	uid := Ldtk_Doc_NextUid(doc)
+	LdtkJson_SetInt(copy, "uid", uid, a)
+	base := LdtkJson_Str(src, "identifier")
+	name := base
+	for n := 2; ; n += 1 {
+		name = fmt.tprintf("%s%d", base, n)
+		used := false
+		for f in list.items do if LdtkJson_Str(f, "identifier") == name do used = true
+		if !used do break
+	}
+	LdtkJson_SetStr(copy, "identifier", name, a)
+	at := len(list.items)
+	for f, i in list.items do if f == src do at = i + 1
+	inject_at(&list.items, at, copy)
+	Ldtk_Doc_RefreshDefs(doc)
+	// instances (after the source's)
+	add :: proc(fis: ^LdtkJson, doc: ^Ldtk_Doc, srcUid: int, fd: ^LdtkJson) {
+		if fis == nil do return
+		at := len(fis.items)
+		for f, i in fis.items do if LdtkJson_Int(f, "defUid", -1) == srcUid do at = i + 1
+		inject_at(&fis.items, at, Ldtk_Doc_NewFieldInstance(doc, fd, doc.allocator))
+	}
+	for &lv in doc.levels {
+		if entityUid < 0 {
+			add(LdtkJson_Get(lv.obj, "fieldInstances"), doc, fieldUid, copy)
+			if lv.extRoot != nil do add(LdtkJson_Get(lv.extRoot, "fieldInstances"), doc, fieldUid, copy)
+		} else {
+			for &ly in lv.layers do for ent in LdtkJson_Arr(ly.obj, "entityInstances") do if LdtkJson_Int(ent, "defUid", -1) == entityUid do add(LdtkJson_Get(ent, "fieldInstances"), doc, fieldUid, copy)
+		}
+		lv.dirty = true
+	}
+	Ldtk_Doc_Touch(doc)
+	return uid
+}
+
+// ----------------------------------------------------------------------------
+// Entity definitions: reorder, duplicate, limits, sizes
+// ----------------------------------------------------------------------------
+
+// Ldtk_Doc_MoveEntityDef moves an entity def up / down in the list.
+Ldtk_Doc_MoveEntityDef :: proc(doc: ^Ldtk_Doc, entityUid: int, delta: int) -> bool {
+	arr := defs_arr(doc, "entities")
+	for d, i in arr.items {
+		if LdtkJson_Int(d, "uid", -1) != entityUid do continue
+		j := i + delta
+		if j < 0 || j >= len(arr.items) do return false
+		arr.items[i], arr.items[j] = arr.items[j], arr.items[i]
+		Ldtk_Doc_RefreshDefs(doc)
+		Ldtk_Doc_Touch(doc)
+		return true
+	}
+	return false
+}
+
+// Ldtk_Doc_DuplicateEntityDef copies an entity def (with its fields).
+Ldtk_Doc_DuplicateEntityDef :: proc(doc: ^Ldtk_Doc, entityUid: int) -> int {
+	a := doc.allocator
+	ed := Ldtk_Doc_EntityDef(doc, entityUid)
+	if ed == nil do return -1
+	copy := LdtkJson_Clone(ed.obj, a)
+	uid := Ldtk_Doc_NextUid(doc)
+	LdtkJson_SetInt(copy, "uid", uid, a)
+	LdtkJson_SetStr(copy, "identifier", Ldtk_Doc_UniqueIdentifier(doc, "entities", ed.identifier), a)
+	for f in LdtkJson_Arr(copy, "fieldDefs") do LdtkJson_SetInt(f, "uid", Ldtk_Doc_NextUid(doc), a)
+	arr := defs_arr(doc, "entities")
+	at := len(arr.items)
+	for d, i in arr.items do if d == ed.obj do at = i + 1
+	inject_at(&arr.items, at, copy)
+	Ldtk_Doc_RefreshDefs(doc)
+	Ldtk_Doc_Touch(doc)
+	return uid
+}
+
+// Ldtk_Doc_PlaceEntity adds an entity respecting its def's "maxCount"
+// (limitScope: PerLayer / PerLevel / PerWorld; limitBehavior: MoveLastOne -
+// the last one moves here, DiscardOldOnes - the oldest goes, PreventAdding).
+// Returns the placed (or moved) entity, nil when prevented.
+Ldtk_Doc_PlaceEntity :: proc(doc: ^Ldtk_Doc, li, layer: int, defUid: int, px: [2]int) -> (ent: ^LdtkJson, moved: bool) {
+	ed := Ldtk_Doc_EntityDef(doc, defUid)
+	if ed == nil do return nil, false
+	maxCount := LdtkJson_Int(ed.obj, "maxCount")
+	if maxCount > 0 {
+		scope := LdtkJson_Str(ed.obj, "limitScope", "PerLevel")
+		Found :: struct {li, layer: int, ent: ^LdtkJson}
+		found := make([dynamic]Found, context.temp_allocator)
+		for &lv, i in doc.levels {
+			if scope != "PerWorld" && i != li do continue
+			if scope == "PerWorld" && lv.world != doc.levels[li].world do continue
+			for &ly, j in lv.layers {
+				if scope == "PerLayer" && (i != li || j != layer) do continue
+				for e in LdtkJson_Arr(ly.obj, "entityInstances") do if LdtkJson_Int(e, "defUid", -1) == defUid do append(&found, Found{i, j, e})
+			}
+		}
+		if len(found) >= maxCount {
+			switch LdtkJson_Str(ed.obj, "limitBehavior", "MoveLastOne") {
+			case "PreventAdding":
+				return nil, false
+			case "DiscardOldOnes":
+				for k in 0 ..= len(found) - maxCount do Ldtk_Doc_RemoveEntity(doc, found[k].li, found[k].layer, found[k].ent)
+			case: // MoveLastOne
+				last := found[len(found) - 1]
+				if last.li == li && last.layer == layer {
+					Ldtk_Doc_MoveEntity(doc, li, layer, last.ent, px)
+					return last.ent, true
+				}
+				Ldtk_Doc_RemoveEntity(doc, last.li, last.layer, last.ent)
+			}
+		}
+	}
+	return Ldtk_Doc_AddEntity(doc, li, layer, defUid, px), false
+}
+
+// Ldtk_Doc_ConstrainEntitySize: a size within the def's min / max (and its
+// aspect ratio when kept).
+Ldtk_Doc_ConstrainEntitySize :: proc(doc: ^Ldtk_Doc, defUid: int, size: [2]int, keepFrom: [2]int = {}) -> [2]int {
+	ed := Ldtk_Doc_EntityDef(doc, defUid)
+	if ed == nil do return size
+	s := size
+	if LdtkJson_Bool(ed.obj, "keepAspectRatio") && ed.size.x > 0 && ed.size.y > 0 {
+		// follow the axis that changed the most
+		if abs(s.x - keepFrom.x) >= abs(s.y - keepFrom.y) do s.y = int(math.round(f64(s.x) * f64(ed.size.y) / f64(ed.size.x)))
+		else do s.x = int(math.round(f64(s.y) * f64(ed.size.x) / f64(ed.size.y)))
+	}
+	lim :: proc(o: ^LdtkJson, key: string, v: int, isMin: bool) -> int {
+		x := LdtkJson_Get(o, key)
+		if x == nil || x.kind != .Number do return v
+		return isMin ? max(v, int(x.num)) : min(v, int(x.num))
+	}
+	s.x = lim(ed.obj, "maxWidth", lim(ed.obj, "minWidth", s.x, true), false)
+	s.y = lim(ed.obj, "maxHeight", lim(ed.obj, "minHeight", s.y, true), false)
+	return {max(s.x, 1), max(s.y, 1)}
 }

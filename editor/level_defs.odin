@@ -39,8 +39,7 @@ defs: struct {
 
 // text_edit: a text field bound to `key` of `obj`; returns the new text
 // after Enter / leaving the field (ok = changed).
-@(private = "file")
-text_edit :: proc(id: string, obj: ^e.LdtkJson, key: string) -> (string, bool) {
+defs_text_edit :: proc(id: string, obj: ^e.LdtkJson, key: string) -> (string, bool) {
 	// (ImGui edits its own copy while the field is active)
 	cur := e.LdtkJson_Str(obj, key)
 	buf: [256]u8
@@ -51,8 +50,7 @@ text_edit :: proc(id: string, obj: ^e.LdtkJson, key: string) -> (string, bool) {
 	return text, changed && text != cur
 }
 
-@(private = "file")
-checkpoint :: proc(label: string) {
+defs_checkpoint :: proc(label: string) {
 	e.Ldtk_Doc_Checkpoint(GlobalLevel.doc, -1, label)
 }
 
@@ -62,7 +60,7 @@ LevelDefs_Page :: proc(state: ^EditorState, page: Level_Panel_Tab) {
 	#partial switch page {
 	case .World: page_world(state)
 	case .Tilesets: page_tilesets(state)
-	case .Entities: page_entities(state)
+	case .Entities: LevelDefs_EntitiesPage(state)
 	case .Enums: page_enums(state)
 	case .Layers: page_layers(state)
 	case .Rules: page_rules(state)
@@ -119,19 +117,19 @@ layer_props :: proc(state: ^EditorState, di: int) {
 	UI_PanelTitle(LAYER_TYPE_ICON[d.type], d.identifier, fmt.tprintf("%v layer", d.type))
 	UI_HeaderButtons(3)
 	if UI_HeaderButton(ICON_FA_ARROW_UP, "defs.layer.up", "Move up (drawn above)") {
-		checkpoint("Move Layer")
+		defs_checkpoint("Move Layer")
 		e.Ldtk_Doc_MoveLayerDef(doc, uid, -1)
 		level_after_defs()
 		return
 	}
 	if UI_HeaderButton(ICON_FA_ARROW_DOWN, "defs.layer.down", "Move down") {
-		checkpoint("Move Layer")
+		defs_checkpoint("Move Layer")
 		e.Ldtk_Doc_MoveLayerDef(doc, uid, 1)
 		level_after_defs()
 		return
 	}
 	if UI_HeaderButton(ICON_FA_TRASH, "defs.layer.remove", "Delete the layer (and its content in every level)") {
-		checkpoint("Delete Layer")
+		defs_checkpoint("Delete Layer")
 		e.Ldtk_Doc_RemoveLayerDef(doc, uid)
 		defs.layerUid = -1
 		level_after_defs()
@@ -139,14 +137,14 @@ layer_props :: proc(state: ^EditorState, di: int) {
 	}
 	if UI_BeginProps("##layer_props_t") {
 		UI_PropLabel("Identifier")
-		if name, ok := text_edit("defs.layer.name", obj, "identifier"); ok {
-			checkpoint("Rename Layer")
+		if name, ok := defs_text_edit("defs.layer.name", obj, "identifier"); ok {
+			defs_checkpoint("Rename Layer")
 			e.Ldtk_Doc_RenameLayerDef(doc, uid, name)
 		}
 		UI_PropLabel("Grid size")
 		grid := i32(d.gridSize)
 		if imgui.InputInt("##grid", &grid, 1, 8, {.EnterReturnsTrue}) && grid >= 1 {
-			checkpoint("Layer Grid")
+			defs_checkpoint("Layer Grid")
 			e.LdtkJson_SetInt(obj, "gridSize", int(grid), doc.allocator)
 			e.Ldtk_Doc_LayerDefChanged(doc, uid)
 		}
@@ -163,7 +161,7 @@ layer_props :: proc(state: ^EditorState, di: int) {
 		UI_PropLabel("Offset (px)")
 		off := [2]i32{i32(d.pxOffset.x), i32(d.pxOffset.y)}
 		if imgui.InputInt2("##off", &off, {.EnterReturnsTrue}) {
-			checkpoint("Layer Offset")
+			defs_checkpoint("Layer Offset")
 			e.LdtkJson_SetInt(obj, "pxOffsetX", int(off.x), doc.allocator)
 			e.LdtkJson_SetInt(obj, "pxOffsetY", int(off.y), doc.allocator)
 			e.Ldtk_Doc_LayerDefChanged(doc, uid)
@@ -178,7 +176,7 @@ layer_props :: proc(state: ^EditorState, di: int) {
 				if ts.uid == d.tilesetUid do cur = i + 1
 			}
 			if pick, changed := UI_Combo("defs.layer.tileset", cur, names); changed {
-				checkpoint("Layer Tileset")
+				defs_checkpoint("Layer Tileset")
 				if pick == 0 do e.LdtkJson_SetNull(obj, "tilesetDefUid", doc.allocator)
 				else do e.LdtkJson_SetInt(obj, "tilesetDefUid", doc.tilesets[pick - 1].uid, doc.allocator)
 				e.Ldtk_Doc_LayerDefChanged(doc, uid)
@@ -197,7 +195,7 @@ layer_props :: proc(state: ^EditorState, di: int) {
 				append(&uids, o.uid)
 			}
 			if pick, changed := UI_Combo("defs.layer.source", cur, names[:]); changed {
-				checkpoint("Auto Layer Source")
+				defs_checkpoint("Auto Layer Source")
 				if uids[pick] < 0 do e.LdtkJson_SetNull(obj, "autoSourceLayerDefUid", doc.allocator)
 				else do e.LdtkJson_SetInt(obj, "autoSourceLayerDefUid", uids[pick], doc.allocator)
 				e.Ldtk_Doc_LayerDefChanged(doc, uid)
@@ -222,14 +220,14 @@ layer_props :: proc(state: ^EditorState, di: int) {
 			imgui.TextUnformatted(fmt.ctprintf("%d", value))
 			imgui.SameLine()
 			imgui.SetNextItemWidth(160)
-			if name, ok := text_edit(fmt.tprintf("defs.value.name:%d", value), v, "identifier"); ok {
-				checkpoint("IntGrid Name")
+			if name, ok := defs_text_edit(fmt.tprintf("defs.value.name:%d", value), v, "identifier"); ok {
+				defs_checkpoint("IntGrid Name")
 				e.LdtkJson_SetStr(v, "identifier", name, doc.allocator)
 				e.Ldtk_Doc_RefreshDefs(doc)
 			}
 			imgui.SameLine()
 			if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("defs.value.remove:%d", value), "Remove (clears its cells)", false, 22) {
-				checkpoint("Remove IntGrid Value")
+				defs_checkpoint("Remove IntGrid Value")
 				e.Ldtk_Doc_RemoveIntGridValue(doc, uid, value)
 				imgui.PopID()
 				break
@@ -237,7 +235,7 @@ layer_props :: proc(state: ^EditorState, di: int) {
 			imgui.PopID()
 		}
 		if UI_Button(fmt.tprintf("%s  Add value", ICON_FA_PLUS), "defs.value.add") {
-			checkpoint("Add IntGrid Value")
+			defs_checkpoint("Add IntGrid Value")
 			e.Ldtk_Doc_AddIntGridValue(doc, uid)
 			level_sync_palette()
 		}
@@ -310,6 +308,7 @@ newLayer: struct {
 LevelDefs_SelectLayer :: proc(uid: int) {defs.layerUid = uid}
 LevelDefs_SelectRulesLayer :: proc(uid: int) {defs.rulesLayerUid = uid}
 LevelDefs_SelectEntity :: proc(uid: int) {defs.entityUid = uid}
+LevelDefs_SelectedEntity :: proc() -> int {return defs.entityUid}
 
 LevelDefs_OpenNewLayer :: proc() {
 	newLayer.request = true
@@ -379,7 +378,7 @@ LevelDefs_NewLayerDialog :: proc(state: ^EditorState) {
 	if newLayer.type == .Tiles && newLayer.tileset == 0 do UI_DimText("Tiles layers paint a tileset's tiles: pick one (or add one in Tilesets).")
 	imgui.Dummy({0, 4})
 	if UI_PrimaryButton("Create", "defs.newlayer.create") {
-		checkpoint("Add Layer")
+		defs_checkpoint("Add Layer")
 		ts := newLayer.tileset > 0 && newLayer.tileset <= len(doc.tilesets) ? doc.tilesets[newLayer.tileset - 1].uid : -1
 		uid := e.Ldtk_Doc_AddLayerDef(doc, newLayer.type, string(cstring(raw_data(newLayer.name[:]))), ts)
 		d := &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, uid)]
@@ -429,7 +428,7 @@ page_world :: proc(state: ^EditorState) {
 			cur := 0
 			for n, i in e.LDTK_WORLD_LAYOUTS do if n == layout do cur = i
 			if pick, changed := UI_Combo("defs.world.layout", cur, e.LDTK_WORLD_LAYOUTS[:]); changed {
-				checkpoint("World Layout")
+				defs_checkpoint("World Layout")
 				e.Ldtk_Doc_SetWorldLayout(doc, L.world, e.LDTK_WORLD_LAYOUTS[pick])
 			}
 			UI_Tooltip("Free: levels anywhere. GridVania: on a grid. Linear: in a row / column, in the level list's order.")
@@ -437,7 +436,7 @@ page_world :: proc(state: ^EditorState) {
 				UI_PropLabel("World grid")
 				g := [2]i32{i32(e.LdtkJson_Int(w, "worldGridWidth", 256)), i32(e.LdtkJson_Int(w, "worldGridHeight", 256))}
 				if imgui.InputInt2("##wgrid", &g, {.EnterReturnsTrue}) && g.x > 0 && g.y > 0 {
-					checkpoint("World Grid")
+					defs_checkpoint("World Grid")
 					e.LdtkJson_SetInt(w, "worldGridWidth", int(g.x), a)
 					e.LdtkJson_SetInt(w, "worldGridHeight", int(g.y), a)
 					e.Ldtk_Doc_Touch(doc)
@@ -509,7 +508,7 @@ page_project :: proc(state: ^EditorState) {
 				UI_PropLabel(label)
 				v := [2]i32{i32(e.LdtkJson_Int(root, kx)), i32(e.LdtkJson_Int(root, ky))}
 				if imgui.InputInt2(fmt.ctprintf("##%s", id), &v, {.EnterReturnsTrue}) && v.x > 0 && v.y > 0 {
-					checkpoint(label)
+					defs_checkpoint(label)
 					e.LdtkJson_SetInt(root, kx, int(v.x), doc.allocator)
 					e.LdtkJson_SetInt(root, ky, int(v.y), doc.allocator)
 					e.Ldtk_Doc_Touch(doc)
@@ -519,7 +518,7 @@ page_project :: proc(state: ^EditorState) {
 			UI_PropLabel("Default grid")
 			g := i32(e.LdtkJson_Int(root, "defaultGridSize", 16))
 			if imgui.InputInt("##pgrid", &g, 1, 8, {.EnterReturnsTrue}) && g > 0 {
-				checkpoint("Default Grid")
+				defs_checkpoint("Default Grid")
 				e.LdtkJson_SetInt(root, "defaultGridSize", int(g), a)
 				e.Ldtk_Doc_Touch(doc)
 			}
@@ -539,8 +538,8 @@ page_project :: proc(state: ^EditorState) {
 			colour("Background", "bgColor", root)
 			colour("Level background", "defaultLevelBgColor", root)
 			UI_PropLabel("Level names")
-			if name, ok := text_edit("defs.project.levelnames", root, "levelNamePattern"); ok {
-				checkpoint("Level Names")
+			if name, ok := defs_text_edit("defs.project.levelnames", root, "levelNamePattern"); ok {
+				defs_checkpoint("Level Names")
 				e.LdtkJson_SetStr(root, "levelNamePattern", name, a)
 				e.Ldtk_Doc_Touch(doc)
 			}
@@ -548,7 +547,7 @@ page_project :: proc(state: ^EditorState) {
 			UI_PropLabel("Minify JSON")
 			minify := e.LdtkJson_Bool(root, "minifyJson")
 			if imgui.Checkbox("##minify", &minify) {
-				checkpoint("Minify JSON")
+				defs_checkpoint("Minify JSON")
 				e.LdtkJson_SetBool(root, "minifyJson", minify, a)
 				doc.minify = minify
 				for &lv in doc.levels do lv.dirty = true
@@ -560,7 +559,7 @@ page_project :: proc(state: ^EditorState) {
 	}
 	imgui.EndChild()
 	imgui.SameLine(0, 8)
-	if imgui.BeginChild("##project_fields", {0, avail.y}, {}, {}) do page_level_fields(state)
+	if imgui.BeginChild("##project_fields", {0, avail.y}, {}, {}) do LevelDefs_FieldsPanel(state, -1)
 	imgui.EndChild()
 }
 
@@ -591,7 +590,7 @@ rules_editor :: proc(state: ^EditorState, layerUid: int) {
 		imgui.PushIDInt(i32(g.uid))
 		active := g.active
 		if imgui.Checkbox("##gactive", &active) {
-			checkpoint("Rule Group")
+			defs_checkpoint("Rule Group")
 			e.LdtkJson_SetBool(g.obj, "active", active, doc.allocator)
 			e.Ldtk_Doc_RulesChanged(doc, layerUid)
 			imgui.PopID()
@@ -605,7 +604,7 @@ rules_editor :: proc(state: ^EditorState, layerUid: int) {
 		imgui.SameLine()
 		optional := g.isOptional
 		if imgui.Checkbox("optional##gopt", &optional) {
-			checkpoint("Rule Group")
+			defs_checkpoint("Rule Group")
 			e.LdtkJson_SetBool(g.obj, "isOptional", optional, doc.allocator)
 			e.Ldtk_Doc_RulesChanged(doc, layerUid)
 			imgui.PopID()
@@ -614,7 +613,7 @@ rules_editor :: proc(state: ^EditorState, layerUid: int) {
 		UI_Tooltip("Optional groups are enabled per level (Layers panel)")
 		imgui.SameLine()
 		if UI_Button(fmt.tprintf("%s Rule", ICON_FA_PLUS), fmt.tprintf("defs.rule.add:%s", g.name)) {
-			checkpoint("Add Rule")
+			defs_checkpoint("Add Rule")
 			v := len(srcDef.values) > 0 ? srcDef.values[0].value : 1
 			tile := 0
 			if len(L.tileSel) > 0 do tile = int(L.tileSel[0])
@@ -641,7 +640,7 @@ rules_editor :: proc(state: ^EditorState, layerUid: int) {
 			if e.Ldtk_Doc_IntValue(srcDef, v) == nil do v = len(srcDef.values) > 0 ? srcDef.values[0].value : 1
 			block: [9]int
 			for t, i in L.tileSel do block[i] = int(t)
-			checkpoint("Terrain Rules")
+			defs_checkpoint("Terrain Rules")
 			e.Ldtk_Doc_AddTerrainRules(doc, layerUid, v, block)
 			return // (definitions rebuilt many times: this frame's pointers are stale)
 		} else do Editor_Log(state, .Info, "Pick a 3x3 block of tiles (corners, edges, centre) in the Layers panel's tileset first")
@@ -649,7 +648,7 @@ rules_editor :: proc(state: ^EditorState, layerUid: int) {
 	UI_Tooltip("Rules drawing a 3x3 terrain block over the picked IntGrid value: corners, edges and the centre")
 	imgui.SameLine()
 	if UI_Button(fmt.tprintf("%s  Add rule group", ICON_FA_PLUS), "defs.group.add") {
-		checkpoint("Add Rule Group")
+		defs_checkpoint("Add Rule Group")
 		e.Ldtk_Doc_AddRuleGroup(doc, layerUid, fmt.tprintf("Group %d", len(d.groups) + 1))
 	}
 	UI_DimText("Pattern: left click requires the picked value, right click forbids it,")
@@ -703,7 +702,7 @@ rule_row :: proc(state: ^EditorState, layerUid: int, srcDef: ^e.Ldtk_DocLayerDef
 			case imgui.IsMouseClicked(.Middle): nv, set = 0, true
 			}
 			if set {
-				checkpoint("Rule Pattern")
+				defs_checkpoint("Rule Pattern")
 				e.Ldtk_Doc_SetRuleCell(doc, r.uid, cx, cy, nv)
 				return true
 			}
@@ -726,7 +725,7 @@ rule_row :: proc(state: ^EditorState, layerUid: int, srcDef: ^e.Ldtk_DocLayerDef
 	}
 	if UI_Button(fmt.tprintf("%s", ICON_FA_TABLE_CELLS), fmt.tprintf("defs.rule.tiles:%d", index)) && len(L.tileSel) > 0 {
 		// the palette's selection: each tile a random choice (or one stamp)
-		checkpoint("Rule Tiles")
+		defs_checkpoint("Rule Tiles")
 		a := doc.allocator
 		rects := e.LdtkJson_New(.Array, a)
 		if r.stamp {
@@ -763,7 +762,7 @@ rule_row :: proc(state: ^EditorState, layerUid: int, srcDef: ^e.Ldtk_DocLayerDef
 	entered := imgui.InputFloat("##chance", &chance, 0, 0, "%.0f%%", {.EnterReturnsTrue})
 	UI_Tooltip("Chance (Enter applies)")
 	if entered {
-		checkpoint("Rule Chance")
+		defs_checkpoint("Rule Chance")
 		e.LdtkJson_SetFloat(r.obj, "chance", f64(clamp(chance, 0, 100)) / 100, doc.allocator)
 		e.Ldtk_Doc_RulesChanged(doc, layerUid)
 		return true
@@ -774,7 +773,7 @@ rule_row :: proc(state: ^EditorState, layerUid: int, srcDef: ^e.Ldtk_DocLayerDef
 	modEntered := imgui.InputInt2("##mod", &mod, {.EnterReturnsTrue})
 	UI_Tooltip("Modulo X / Y: only every Nth cell (Enter applies)")
 	if modEntered {
-		checkpoint("Rule Modulo")
+		defs_checkpoint("Rule Modulo")
 		e.LdtkJson_SetInt(r.obj, "xModulo", max(int(mod.x), 1), doc.allocator)
 		e.LdtkJson_SetInt(r.obj, "yModulo", max(int(mod.y), 1), doc.allocator)
 		e.Ldtk_Doc_RulesChanged(doc, layerUid)
@@ -786,7 +785,7 @@ rule_row :: proc(state: ^EditorState, layerUid: int, srcDef: ^e.Ldtk_DocLayerDef
 	if imgui.InputInt("##size", &sz, 2, 2) {
 		ns := clamp(int(sz) | 1, 1, e.LDTK_MAX_AUTO_PATTERN_SIZE)
 		if ns != size {
-			checkpoint("Rule Size")
+			defs_checkpoint("Rule Size")
 			resize_rule(r, ns)
 			e.Ldtk_Doc_RulesChanged(doc, layerUid)
 			return true
@@ -795,7 +794,7 @@ rule_row :: proc(state: ^EditorState, layerUid: int, srcDef: ^e.Ldtk_DocLayerDef
 	UI_Tooltip("Pattern size")
 	imgui.SameLine()
 	if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("defs.rule.remove:%d", index), "Delete the rule", false, 22) {
-		checkpoint("Delete Rule")
+		defs_checkpoint("Delete Rule")
 		e.Ldtk_Doc_RemoveRule(doc, r.uid)
 		return true
 	}
@@ -811,7 +810,7 @@ row_bool :: proc(obj: ^e.LdtkJson, key, label, tip: string, isMode := false) -> 
 	pressed := UI_IconButton(label, fmt.tprintf("defs.rule.%s:%p", key, obj), tip, on, 22)
 	imgui.SameLine(0, 2)
 	if !pressed do return false
-	checkpoint("Rule Option")
+	defs_checkpoint("Rule Option")
 	if isMode do e.LdtkJson_SetStr(obj, key, on ? "Single" : "Stamp", doc.allocator)
 	else do e.LdtkJson_SetBool(obj, key, !on, doc.allocator)
 	return true
@@ -840,124 +839,9 @@ resize_rule :: proc(r: ^e.Ldtk_DocRule, ns: int) {
 // Entities
 // ----------------------------------------------------------------------------
 
-@(private = "file")
-page_entities :: proc(state: ^EditorState) {
-	L := &GlobalLevel
-	doc := L.doc
-	avail := imgui.GetContentRegionAvail()
-	if imgui.BeginChild("##entity_list", {200, avail.y}, {.Borders}, {}) {
-		if UI_Button(fmt.tprintf("%s  Add entity", ICON_FA_PLUS), "defs.entity.add") {
-			checkpoint("Add Entity")
-			defs.entityUid = e.Ldtk_Doc_AddEntityDef(doc, "Entity")
-			level_sync_palette()
-		}
-		imgui.Separator()
-		for &ed in doc.entityDefs {
-			if imgui.Selectable(fmt.ctprintf("%s##edl%d", ed.identifier, ed.uid), defs.entityUid == ed.uid, {}, {0, 22}) do defs.entityUid = ed.uid
-			Drive_Item(fmt.tprintf("defs.entity:%s", ed.identifier))
-		}
-	}
-	imgui.EndChild()
-	imgui.SameLine(0, 8)
-	if imgui.BeginChild("##entity_props", {0, avail.y}, {}, {}) {
-		ed := e.Ldtk_Doc_EntityDef(doc, defs.entityUid)
-		if ed == nil do UI_DimText("Pick an entity, or add one.")
-		else do entity_props(state, ed.uid)
-	}
-	imgui.EndChild()
-}
-
 PIVOTS := [9][2]f64{{0, 0}, {0.5, 0}, {1, 0}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 1}, {0.5, 1}, {1, 1}}
 
-@(private = "file")
-entity_props :: proc(state: ^EditorState, uid: int) {
-	L := &GlobalLevel
-	doc := L.doc
-	ed := e.Ldtk_Doc_EntityDef(doc, uid)
-	obj := ed.obj
-	a := doc.allocator
-	UI_PanelTitle(ICON_FA_CUBE, ed.identifier, "entity")
-	UI_HeaderButtons(1)
-	if UI_HeaderButton(ICON_FA_TRASH, "defs.entity.remove", "Delete the entity and its instances") {
-		checkpoint("Delete Entity")
-		e.Ldtk_Doc_RemoveEntityDef(doc, uid)
-		defs.entityUid = -1
-		level_after_defs()
-		return
-	}
-	if UI_BeginProps("##entity_props_t") {
-		UI_PropLabel("Identifier")
-		if name, ok := text_edit("defs.entity.name", obj, "identifier"); ok {
-			checkpoint("Rename Entity")
-			e.LdtkJson_SetStr(obj, "identifier", e.Ldtk_CleanIdentifier(name), a)
-			e.Ldtk_Doc_EntityDefChanged(doc, uid)
-		}
-		UI_PropLabel("Size")
-		size := [2]i32{i32(ed.size.x), i32(ed.size.y)}
-		if imgui.InputInt2("##esize", &size, {.EnterReturnsTrue}) {
-			checkpoint("Entity Size")
-			e.LdtkJson_SetInt(obj, "width", max(int(size.x), 1), a)
-			e.LdtkJson_SetInt(obj, "height", max(int(size.y), 1), a)
-			e.Ldtk_Doc_EntityDefChanged(doc, uid)
-		}
-		UI_PropLabel("Colour")
-		col := [3]f32{f32(ed.color.r) / 255, f32(ed.color.g) / 255, f32(ed.color.b) / 255}
-		if imgui.ColorEdit3("##ecol", &col, {.NoInputs}) {
-			e.Ldtk_Doc_CheckpointOnce(doc, -1, "Entity Colour", obj)
-			e.LdtkJson_SetStr(obj, "color", e.Ldtk_ColorHex({u8(col[0] * 255 + 0.5), u8(col[1] * 255 + 0.5), u8(col[2] * 255 + 0.5), 255}), a)
-			e.Ldtk_Doc_EntityDefChanged(doc, uid)
-		}
-		UI_PropLabel("Pivot")
-		for p, i in PIVOTS {
-			if i % 3 != 0 do imgui.SameLine(0, 2)
-			on := abs(p.x - ed.pivot.x) < 0.01 && abs(p.y - ed.pivot.y) < 0.01
-			if UI_IconButton(on ? ICON_FA_CIRCLE : "·", fmt.tprintf("defs.entity.pivot:%d", i), fmt.tprintf("Pivot %.1f, %.1f", p.x, p.y), on, 18) {
-				checkpoint("Entity Pivot")
-				e.LdtkJson_SetFloat(obj, "pivotX", p.x, a)
-				e.LdtkJson_SetFloat(obj, "pivotY", p.y, a)
-				e.Ldtk_Doc_EntityDefChanged(doc, uid)
-			}
-		}
-		UI_PropLabel("Resizable")
-		rx := e.LdtkJson_Bool(obj, "resizableX")
-		ry := e.LdtkJson_Bool(obj, "resizableY")
-		if imgui.Checkbox("X##rx", &rx) {
-			checkpoint("Entity Resizable")
-			e.LdtkJson_SetBool(obj, "resizableX", rx, a)
-		}
-		imgui.SameLine()
-		if imgui.Checkbox("Y##ry", &ry) {
-			checkpoint("Entity Resizable")
-			e.LdtkJson_SetBool(obj, "resizableY", ry, a)
-		}
-		UI_PropLabel("Tile")
-		if ed.tileRect[2] > 0 {
-			if tex, ok := level_texture(ed.tilesetUid); ok {
-				uv0 := imgui.Vec2{f32(ed.tileRect[0]) / f32(tex.width), f32(ed.tileRect[1]) / f32(tex.height)}
-				uv1 := imgui.Vec2{f32(ed.tileRect[0] + ed.tileRect[2]) / f32(tex.width), f32(ed.tileRect[1] + ed.tileRect[3]) / f32(tex.height)}
-				imgui.Image(transmute(imgui.TextureID)level_texture_ptr(ed.tilesetUid), {24, 24}, uv0, uv1)
-				imgui.SameLine()
-			}
-		}
-		if UI_Button("Use picked tile", "defs.entity.tile") {
-			// the Layers panel's tileset selection
-			if ts, rect, ok := picked_tile_rect(); ok {
-				checkpoint("Entity Tile")
-				e.Ldtk_Doc_SetEntityTile(doc, uid, ts, rect)
-			} else do Editor_Log(state, .Info, "Pick tiles in a Tiles layer's palette first")
-		}
-		imgui.SameLine()
-		if ed.tileRect[2] > 0 && UI_Button("Clear", "defs.entity.tile.clear") {
-			checkpoint("Entity Tile")
-			e.Ldtk_Doc_SetEntityTile(doc, uid, -1, {})
-		}
-		UI_EndProps()
-	}
-	if UI_SectionHeader("Fields") do fields_editor(state, uid, e.LdtkJson_Arr(obj, "fieldDefs"))
-}
-
 // picked_tile_rect: the palette selection as a pixel rectangle.
-@(private = "file")
 picked_tile_rect :: proc() -> (int, [4]int, bool) {
 	L := &GlobalLevel
 	if len(L.tileSel) == 0 do return -1, {}, false
@@ -967,51 +851,6 @@ picked_tile_rect :: proc() -> (int, [4]int, bool) {
 	if ts == nil do return -1, {}, false
 	src := e.Ldtk_Doc_TileSrc(ts, int(L.tileSel[0]))
 	return ts.uid, {int(src.x), int(src.y), ts.gridSize * L.tileSelW, ts.gridSize * L.tileSelH}, true
-}
-
-@(private = "file")
-fields_editor :: proc(state: ^EditorState, entityUid: int, fieldDefs: []^e.LdtkJson) {
-	L := &GlobalLevel
-	doc := L.doc
-	for fd, i in fieldDefs {
-		imgui.PushIDInt(i32(i))
-		imgui.TextUnformatted(fmt.ctprintf("%s", e.LdtkJson_Str(fd, "identifier")))
-		imgui.SameLine(180)
-		UI_DimText(e.LdtkJson_Str(fd, "__type"))
-		imgui.SameLine(320)
-		nullable := e.LdtkJson_Bool(fd, "canBeNull")
-		if imgui.Checkbox("nullable", &nullable) {
-			checkpoint("Field")
-			e.LdtkJson_SetBool(fd, "canBeNull", nullable, doc.allocator)
-		}
-		imgui.SameLine()
-		if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("defs.field.remove:%s", e.LdtkJson_Str(fd, "identifier")), "Delete the field", false, 22) {
-			checkpoint("Delete Field")
-			e.Ldtk_Doc_RemoveFieldDef(doc, e.LdtkJson_Int(fd, "uid"))
-			imgui.PopID()
-			return
-		}
-		imgui.PopID()
-	}
-	// add: a type, then a name
-	@(static) typeIdx: int
-	names := make([dynamic]string, context.temp_allocator)
-	types := make([dynamic]string, context.temp_allocator)
-	for t in e.LDTK_FIELD_TYPES {
-		append(&names, t.label)
-		append(&types, t.type)
-	}
-	for en in e.LdtkJson_Arr(e.LdtkJson_Get(doc.root, "defs"), "enums") {
-		append(&names, fmt.tprintf("Enum %s", e.LdtkJson_Str(en, "identifier")))
-		append(&types, fmt.tprintf("F_Enum(%d)", e.LdtkJson_Int(en, "uid")))
-	}
-	imgui.SetNextItemWidth(140)
-	typeIdx, _ = UI_Combo("defs.field.type", clamp(typeIdx, 0, len(names) - 1), names[:])
-	imgui.SameLine()
-	if UI_Button(fmt.tprintf("%s  Add field", ICON_FA_PLUS), "defs.field.add") {
-		checkpoint("Add Field")
-		e.Ldtk_Doc_AddFieldDef(doc, entityUid, types[typeIdx], strings.to_lower(names[typeIdx], context.temp_allocator))
-	}
 }
 
 // ----------------------------------------------------------------------------
@@ -1026,7 +865,7 @@ page_enums :: proc(state: ^EditorState) {
 	avail := imgui.GetContentRegionAvail()
 	if imgui.BeginChild("##enum_list", {200, avail.y}, {.Borders}, {}) {
 		if UI_Button(fmt.tprintf("%s  Add enum", ICON_FA_PLUS), "defs.enum.add") {
-			checkpoint("Add Enum")
+			defs_checkpoint("Add Enum")
 			defs.enumUid = e.Ldtk_Doc_AddEnum(doc, "Enum")
 		}
 		imgui.Separator()
@@ -1047,8 +886,8 @@ page_enums :: proc(state: ^EditorState) {
 			UI_PanelTitle(ICON_FA_LIST, e.LdtkJson_Str(en, "identifier"), "enum")
 			if UI_BeginProps("##enum_t") {
 				UI_PropLabel("Identifier")
-				if name, ok := text_edit("defs.enum.name", en, "identifier"); ok {
-					checkpoint("Rename Enum")
+				if name, ok := defs_text_edit("defs.enum.name", en, "identifier"); ok {
+					defs_checkpoint("Rename Enum")
 					e.LdtkJson_SetStr(en, "identifier", e.Ldtk_CleanIdentifier(name), doc.allocator)
 				}
 				UI_EndProps()
@@ -1060,7 +899,7 @@ page_enums :: proc(state: ^EditorState) {
 				imgui.TextUnformatted(fmt.ctprintf("%s", e.LdtkJson_Str(v, "id")))
 				imgui.SameLine(200)
 				if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("defs.enum.value.remove:%s", e.LdtkJson_Str(v, "id")), "Remove", false, 22) {
-					checkpoint("Remove Enum Value")
+					defs_checkpoint("Remove Enum Value")
 					ordered_remove(&vals.items, i)
 					e.Ldtk_Doc_Touch(doc)
 					imgui.PopID()
@@ -1074,7 +913,7 @@ page_enums :: proc(state: ^EditorState) {
 			Drive_Item("defs.enum.value.name")
 			imgui.SameLine()
 			if (UI_Button(fmt.tprintf("%s  Add", ICON_FA_PLUS), "defs.enum.value.add") || enter) && valBuf[0] != 0 {
-				checkpoint("Add Enum Value")
+				defs_checkpoint("Add Enum Value")
 				e.Ldtk_Doc_AddEnumValue(doc, defs.enumUid, string(cstring(raw_data(valBuf[:]))))
 				valBuf = {}
 			}
@@ -1122,7 +961,7 @@ page_tilesets :: proc(state: ^EditorState) {
 					UI_PropLabel(label)
 					v := i32(e.LdtkJson_Int(obj, key))
 					if imgui.InputInt(fmt.ctprintf("##%s", key), &v, 1, 8, {.EnterReturnsTrue}) && int(v) >= minv {
-						checkpoint("Tileset")
+						defs_checkpoint("Tileset")
 						e.LdtkJson_SetInt(obj, key, int(v), GlobalLevel.doc.allocator)
 						return true
 					}
@@ -1163,7 +1002,7 @@ add_tileset :: proc(state: ^EditorState, rel: string) {
 	if err != nil do relToDoc = rel
 	relToDoc, _ = strings.replace_all(relToDoc, "\\", "/", context.temp_allocator)
 	grid := e.LdtkJson_Int(doc.root, "defaultGridSize", 16)
-	checkpoint("Add Tileset")
+	defs_checkpoint("Add Tileset")
 	defs.tilesetUid = e.Ldtk_Doc_AddTileset(doc, relToDoc, {int(img.width), int(img.height)}, grid, &img)
 }
 
@@ -1193,13 +1032,6 @@ tileset_changed :: proc(state: ^EditorState, uid: int) {
 	for &d in doc.layerDefs do if d.tilesetUid == uid do e.Ldtk_Doc_LayerDefChanged(doc, d.uid)
 }
 
-@(private = "file")
-page_level_fields :: proc(state: ^EditorState) {
-	UI_PanelTitle(ICON_FA_MAP, "Level fields")
-	UI_DimText("Values every level has (edited in the Level tab).")
-	fields_editor(state, -1, e.LdtkJson_Arr(e.LdtkJson_Get(GlobalLevel.doc.root, "defs"), "levelFields"))
-}
-
 // tile_data_editor: the tileset's tiles; the picked tile's custom data,
 // animation and enum tags.
 @(private = "file")
@@ -1221,7 +1053,7 @@ tile_data_editor :: proc(state: ^EditorState, uid: int) {
 			if e.LdtkJson_Int(en, "uid") == src do cur = i + 1
 		}
 		if pick, changed := UI_Combo("defs.tileset.tagenum", cur, names); changed {
-			checkpoint("Tag Enum")
+			defs_checkpoint("Tag Enum")
 			if pick == 0 do e.LdtkJson_SetNull(ts.obj, "tagsSourceEnumUid", a)
 			else do e.LdtkJson_SetInt(ts.obj, "tagsSourceEnumUid", e.LdtkJson_Int(enums[pick - 1], "uid"), a)
 			e.Ldtk_Doc_Touch(doc)
@@ -1289,7 +1121,7 @@ tile_data_editor :: proc(state: ^EditorState, uid: int) {
 	}
 	if UI_Button(fmt.tprintf("%s  Animate with picked tiles", ICON_FA_PLAY), "defs.tile.animate") {
 		if len(L.tileSel) >= 2 {
-			checkpoint("Tile Animation")
+			defs_checkpoint("Tile Animation")
 			e.Ldtk_Doc_SetTileAnimation(doc, uid, tid, L.tileSel[:], animated ? anim.fps : e.LDTK_TILE_ANIM_DEFAULT_FPS)
 		} else do Editor_Log(state, .Info, "Pick two or more tiles (the frames, in order) in the Layers panel's tileset first")
 	}
@@ -1299,12 +1131,12 @@ tile_data_editor :: proc(state: ^EditorState, uid: int) {
 		imgui.SetNextItemWidth(80)
 		fps := anim.fps
 		if imgui.InputFloat("fps##tile_fps", &fps, 0, 0, "%.1f", {.EnterReturnsTrue}) && fps > 0 {
-			checkpoint("Tile Animation")
+			defs_checkpoint("Tile Animation")
 			e.Ldtk_Doc_SetTileAnimation(doc, uid, tid, anim.frames, fps)
 		}
 		imgui.SameLine()
 		if UI_Button("Stop", "defs.tile.animate.stop") {
-			checkpoint("Tile Animation")
+			defs_checkpoint("Tile Animation")
 			e.Ldtk_Doc_SetTileAnimation(doc, uid, tid, nil, 0)
 		}
 	}
@@ -1317,7 +1149,7 @@ tile_data_editor :: proc(state: ^EditorState, uid: int) {
 			on := e.Ldtk_Doc_TileHasTag(doc, uid, tid, id)
 			imgui.SameLine()
 			if imgui.Checkbox(fmt.ctprintf("%s##tag", id), &on) {
-				checkpoint("Tile Tag")
+				defs_checkpoint("Tile Tag")
 				e.Ldtk_Doc_SetTileTag(doc, uid, tid, id, on)
 			}
 			Drive_Item(fmt.tprintf("defs.tile.tag:%s", id))

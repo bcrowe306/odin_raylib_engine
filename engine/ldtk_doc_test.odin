@@ -697,3 +697,76 @@ test_ldtk_doc_field_values_arrays_refs :: proc(t: ^testing.T) {
 	testing.expect_value(t, LdtkJson_Str(d1, "__smartColor"), "#FF8000")
 	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(fi(d1, col), "realEditorValues"), .Minified, context.temp_allocator), `[{"id":"V_Int","params":[16744448]}]`)
 }
+
+@(test)
+test_ldtk_doc_field_and_entity_def_ops :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_defops.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	a := doc.allocator
+	ents := -1
+	for &ly, j in doc.levels[0].layers do if Ldtk_Doc_LayerDef(doc, &ly).type == .Entities do ents = j
+	coin := Ldtk_Doc_AddEntityDef(doc, "Coin")
+	val := Ldtk_Doc_AddFieldDef(doc, coin, "F_Float", "value")
+	tag := Ldtk_Doc_AddFieldDef(doc, coin, "F_String", "label")
+	c1 := Ldtk_Doc_AddEntity(doc, 0, ents, coin, {8, 8})
+	fi0 := LdtkJson_Arr(c1, "fieldInstances")[0]
+	Ldtk_Doc_SetFieldRaw(doc, fi0, 0, "2.6")
+	// rename: instances follow; no duplicates
+	testing.expect(t, Ldtk_Doc_RenameFieldDef(doc, val, "worth"))
+	testing.expect_value(t, LdtkJson_Str(fi0, "__identifier"), "worth")
+	testing.expect(t, !Ldtk_Doc_RenameFieldDef(doc, tag, "worth"))
+	// Float -> Int (round): 2.6 -> 3
+	convs := Ldtk_Doc_FieldConversions(Ldtk_Doc_FieldDef(doc, val))
+	round := -1
+	for c in convs do if LDTK_FIELD_CONVERSIONS[c].label == "To Int (round)" do round = c
+	testing.expect(t, round >= 0)
+	testing.expect(t, Ldtk_Doc_ConvertFieldDef(doc, val, round))
+	testing.expect_value(t, LdtkJson_Str(Ldtk_Doc_FieldDef(doc, val), "__type"), "Int")
+	v, _ := Ldtk_Doc_FieldText(doc, fi0, 0)
+	testing.expect_value(t, v, "3")
+	// into an array: the value stays as element 0
+	testing.expect(t, Ldtk_Doc_ConvertFieldDef(doc, val, 0))
+	testing.expect_value(t, LdtkJson_Str(Ldtk_Doc_FieldDef(doc, val), "__type"), "Array<Int>")
+	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(fi0, "__value"), .Minified, context.temp_allocator), "[3]")
+	// reorder: the instances follow
+	testing.expect(t, Ldtk_Doc_MoveFieldDef(doc, tag, -1))
+	testing.expect_value(t, LdtkJson_Int(LdtkJson_Arr(c1, "fieldInstances")[0], "defUid"), tag)
+	// duplicate a field: instances get one
+	dup := Ldtk_Doc_DuplicateFieldDef(doc, tag)
+	testing.expect(t, dup > 0)
+	testing.expect_value(t, len(LdtkJson_Arr(c1, "fieldInstances")), 3)
+	// limits: max 2 per level, PreventAdding / MoveLastOne / DiscardOldOnes
+	ed := Ldtk_Doc_EntityDef(doc, coin)
+	LdtkJson_SetInt(ed.obj, "maxCount", 2, a)
+	LdtkJson_SetStr(ed.obj, "limitScope", "PerLevel", a)
+	LdtkJson_SetStr(ed.obj, "limitBehavior", "PreventAdding", a)
+	c2, _ := Ldtk_Doc_PlaceEntity(doc, 0, ents, coin, {24, 8})
+	testing.expect(t, c2 != nil)
+	c3, _ := Ldtk_Doc_PlaceEntity(doc, 0, ents, coin, {40, 8})
+	testing.expect(t, c3 == nil)
+	LdtkJson_SetStr(ed.obj, "limitBehavior", "MoveLastOne", a)
+	c3m, moved := Ldtk_Doc_PlaceEntity(doc, 0, ents, coin, {40, 8})
+	testing.expect(t, moved && c3m == c2)
+	testing.expect_value(t, len(Ldtk_Doc_Entities(doc, 0, ents)), 2)
+	LdtkJson_SetStr(ed.obj, "limitBehavior", "DiscardOldOnes", a)
+	c4, _ := Ldtk_Doc_PlaceEntity(doc, 0, ents, coin, {56, 8})
+	testing.expect(t, c4 != nil)
+	testing.expect_value(t, len(Ldtk_Doc_Entities(doc, 0, ents)), 2)
+	testing.expect(t, Ldtk_Doc_Entities(doc, 0, ents)[0] != c1) // the oldest went
+	// sizes: min 8, max 32, keep the aspect (16x16 -> square)
+	LdtkJson_SetInt(ed.obj, "minWidth", 8, a)
+	LdtkJson_SetInt(ed.obj, "maxWidth", 32, a)
+	LdtkJson_SetBool(ed.obj, "keepAspectRatio", true, a)
+	Ldtk_Doc_RefreshDefs(doc)
+	testing.expect_value(t, Ldtk_Doc_ConstrainEntitySize(doc, coin, {64, 20}, {16, 16}), [2]int{32, 64})
+	testing.expect_value(t, Ldtk_Doc_ConstrainEntitySize(doc, coin, {4, 4}, {16, 16}), [2]int{8, 4})
+	// duplicate / reorder entity defs
+	cd := Ldtk_Doc_DuplicateEntityDef(doc, coin)
+	testing.expect_value(t, Ldtk_Doc_EntityDef(doc, cd).identifier, "Coin2")
+	testing.expect(t, Ldtk_Doc_MoveEntityDef(doc, cd, -1))
+	testing.expect_value(t, doc.entityDefs[0].uid, cd)
+	f1 := LdtkJson_Arr(Ldtk_Doc_EntityDef(doc, cd).obj, "fieldDefs")[0]
+	testing.expect(t, LdtkJson_Int(f1, "uid") != tag) // fields got new uids
+}

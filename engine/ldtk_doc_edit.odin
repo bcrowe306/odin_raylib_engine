@@ -366,7 +366,13 @@ Ldtk_Doc_EntityAt :: proc(doc: ^Ldtk_Doc, li, layer: int, p: [2]int) -> ^LdtkJso
 	ents := Ldtk_Doc_Entities(doc, li, layer)
 	#reverse for ent in ents {
 		r := Ldtk_Doc_EntityRect(ent)
-		if p.x >= r[0] && p.y >= r[1] && p.x < r[0] + r[2] && p.y < r[1] + r[3] do return ent
+		if !(p.x >= r[0] && p.y >= r[1] && p.x < r[0] + r[2] && p.y < r[1] + r[3]) do continue
+		// hollow entities are picked by their outline only (LDtk)
+		if ed := Ldtk_Doc_EntityDef(doc, LdtkJson_Int(ent, "defUid", -1)); ed != nil && LdtkJson_Bool(ed.obj, "hollow") {
+			border := max(min(r[2], r[3]) / 8, 3)
+			if p.x >= r[0] + border && p.y >= r[1] + border && p.x < r[0] + r[2] - border && p.y < r[1] + r[3] - border do continue
+		}
+		return ent
 	}
 	return nil
 }

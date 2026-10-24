@@ -1495,7 +1495,8 @@ level_entity_inspector :: proc(state: ^EditorState) {
 		if !resizable do imgui.BeginDisabled(true)
 		if imgui.InputInt2("##ent_size", &size, {.EnterReturnsTrue}) && size.x > 0 && size.y > 0 {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Resize Entity")
-			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.selEntityLayer, ent, {int(size.x), int(size.y)})
+			r := e.Ldtk_Doc_EntityRect(ent)
+			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.selEntityLayer, ent, e.Ldtk_Doc_ConstrainEntitySize(doc, e.LdtkJson_Int(ent, "defUid", -1), {int(size.x), int(size.y)}, {r[2], r[3]}))
 		}
 		if !resizable do imgui.EndDisabled()
 		// another Entities layer of the level (LDtk: move entities between layers)
@@ -1854,6 +1855,10 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 			return strings.to_string(b), true
 		}
 		return "<no field>", true
+	}
+	if q == "level.fielddef" {
+		fd := e.Ldtk_Doc_FieldDef(doc, LevelDefs_SelectedField())
+		return fd != nil ? fmt.tprintf("%s %s %s", e.LdtkJson_Str(fd, "identifier"), e.LdtkJson_Str(fd, "__type"), e.LdtkJson_Str(fd, "editorDisplayMode")) : "", true
 	}
 	case_pick := q == "level.picking"
 	if case_pick do return LevelFields_PickActive() ? "true" : "false", true

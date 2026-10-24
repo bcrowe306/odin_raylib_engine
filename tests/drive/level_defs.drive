@@ -1,0 +1,82 @@
+# Level editor definitions: an entity drawn as an ellipse, limited to one
+# per level (adding a second is prevented); an Int field with a default
+# shown as name = value; renamed; turned into an array.
+click @root.level
+wait 3
+click @level.new
+wait 2
+key cmd+a
+type levels/defs_zz.ldtk
+click @level.new.create
+wait 5
+click @level.zoom
+click @pick:100%
+wait 1
+click @level.tab:Entities
+click @defs.entity.add
+wait 2
+click @defs.entity.render
+click @pick:Ellipse
+wait 1
+# an Int field: default 5, shown as name = value
+click @defs.entity.tab:Fields
+wait 1
+click @defs.field.type
+click @pick:Int
+click @defs.field.add
+wait 2
+expect level.fielddef contains Int
+click @defs.field.default
+type 5
+key enter
+wait 1
+click @defs.field.display
+click @pick:Name and value
+wait 1
+expect level.fielddef contains NameAndValue
+screenshot entity_and_field_forms
+# place one
+click @level.layer:Entities
+click @level.entity:Entity
+key b
+click @level.origin+40,40
+wait 2
+expect level.entities == 1
+expect level.fieldvalue:int == 5
+screenshot placed
+# one per level, prevent adding
+click @level.tab:Entities
+click @defs.entity.tab:Settings
+wait 1
+click @defs.entity.maxcount
+key cmd+a
+type 1
+key enter
+wait 1
+click @defs.entity.limitbehavior
+click @pick:prevent adding
+wait 1
+click @level.origin+120,120
+wait 2
+expect level.entities == 1
+expect log contains its limit is reached
+# rename the field, turn it into an array
+click @level.tab:Entities
+click @defs.entity.tab:Fields
+wait 1
+click @defs.field:int
+click @defs.field.name
+key cmd+a
+type hp
+key enter
+wait 1
+expect level.fielddef contains hp
+click @defs.field.convert
+click @pick:Turn into an array
+wait 2
+expect level.fielddef contains Array<Int>
+screenshot converted
+key cmd+s
+wait 3
+expect file:levels/defs_zz.ldtk contains "renderMode": "Ellipse"
+expect file:levels/defs_zz.ldtk contains "limitBehavior": "PreventAdding"

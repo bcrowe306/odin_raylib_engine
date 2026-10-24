@@ -38,6 +38,8 @@ screenshot reference_arrow
 click @level.tab:Entities
 click @defs.entity:Door
 wait 2
+click @defs.entity.tab:Fields
+wait 1
 click @defs.field.type
 click @pick:Point
 click @defs.field.add

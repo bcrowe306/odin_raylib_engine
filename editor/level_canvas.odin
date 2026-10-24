@@ -205,22 +205,7 @@ draw_layer :: proc(li, layer: int, ly: ^e.Ldtk_DocLayer, origin: [2]f32, isActiv
 	if d.type == .Entities {
 		for ent in e.LdtkJson_Arr(ly.obj, "entityInstances") {
 			r := e.Ldtk_Doc_EntityRect(ent)
-			rect := rl.Rectangle{o.x + f32(r[0]), o.y + f32(r[1]), f32(r[2]), f32(r[3])}
-			ed := e.Ldtk_Doc_EntityDef(doc, e.LdtkJson_Int(ent, "defUid", -1))
-			c := ed != nil ? ed.color : rl.Color{148, 217, 179, 255}
-			drewTile := false
-			if ed != nil && ed.tileRect[2] > 0 {
-				if tex, ok := level_texture(ed.tilesetUid); ok {
-					src := rl.Rectangle{f32(ed.tileRect[0]), f32(ed.tileRect[1]), f32(ed.tileRect[2]), f32(ed.tileRect[3])}
-					// fit inside, keeping the aspect
-					sc := min(rect.width / src.width, rect.height / src.height)
-					dw, dh := src.width * sc, src.height * sc
-					rl.DrawTexturePro(tex, src, {rect.x + (rect.width - dw) * 0.5, rect.y + (rect.height - dh) * 0.5, dw, dh}, {}, 0, rl.WHITE)
-					drewTile = true
-				}
-			}
-			if !drewTile do rl.DrawRectangleRec(rect, col_rl(c, 0.35))
-			rl.DrawRectangleLinesEx(rect, 1 / L.zoom, ent == L.selEntity ? rl.Color{255, 220, 80, 255} : c)
+			draw_entity(ent, {o.x + f32(r[0]), o.y + f32(r[1]), f32(r[2]), f32(r[3])}, opacity)
 		}
 	}
 	if isActive && L.showGrid && d.type != .Entities {
@@ -666,7 +651,14 @@ entities_input :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_Doc
 		px := [2]int{cell.x * g + int(ed.pivot.x * f64(g)), cell.y * g + int(ed.pivot.y * f64(g))}
 		if imgui.GetIO().KeyShift do px = lp
 		e.Ldtk_Doc_Checkpoint(doc, L.level, "Add Entity")
-		level_select_entity(L.layer, e.Ldtk_Doc_AddEntity(doc, L.level, L.layer, L.entityDef, px))
+		placed, moved := e.Ldtk_Doc_PlaceEntity(doc, L.level, L.layer, L.entityDef, px)
+		if placed == nil {
+			Editor_Log(state, .Info, "%s: its limit is reached (Entities tab > Max count)", ed.identifier)
+			return
+		}
+		if moved do Editor_Log(state, .Info, "%s: its limit is reached - the last one moved here", ed.identifier)
+		// it may have moved from another layer / level (the limit's scope)
+		for &l, j in doc.levels[L.level].layers do for x in e.LdtkJson_Arr(l.obj, "entityInstances") do if x == placed do level_select_entity(j, placed)
 	}
 }
 
@@ -808,6 +800,7 @@ selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
 		if ed != nil {
 			if !e.LdtkJson_Bool(ed.obj, "resizableX") do size.x = r[2]
 			if !e.LdtkJson_Bool(ed.obj, "resizableY") do size.y = r[3]
+			size = e.Ldtk_Doc_ConstrainEntitySize(doc, ed.uid, size, {r[2], r[3]})
 		}
 		size = {max(size.x, 1), max(size.y, 1)}
 		if size.x != r[2] || size.y != r[3] {
@@ -1319,5 +1312,95 @@ draw_field_labels :: proc(dl: ^imgui.DrawList) {
 		w := imgui.CalcTextSize(fmt.ctprintf("%s", ln.text)).x
 		label(dl, {sp.x + 6 + w * 0.5, y}, ln.text, ln.col, ln.err)
 		y += h + 1
+	}
+}
+
+// draw_entity: an entity the way its definition says (EntityRender):
+// rectangle / ellipse / cross / tile (cover, fit inside, repeat, stretch,
+// full size, 9-slice), fill / line / tile opacities, hollow.
+draw_entity :: proc(ent: ^e.LdtkJson, rect: rl.Rectangle, layerOpacity: f32) {
+	L := &GlobalLevel
+	doc := L.doc
+	ed := e.Ldtk_Doc_EntityDef(doc, e.LdtkJson_Int(ent, "defUid", -1))
+	c := e.Ldtk_ParseHexColor(e.LdtkJson_Str(ent, "__smartColor", "#94D9B3"))
+	if ed == nil {
+		rl.DrawRectangleLinesEx(rect, 1 / L.zoom, c)
+		return
+	}
+	obj := ed.obj
+	mode := e.LdtkJson_Str(obj, "renderMode", "Rectangle")
+	fillOp := f32(e.LdtkJson_Float(obj, "fillOpacity", 0.08)) * layerOpacity
+	lineOp := f32(e.LdtkJson_Float(obj, "lineOpacity", 1)) * layerOpacity
+	tileOp := f32(e.LdtkJson_Float(obj, "tileOpacity", 1)) * layerOpacity
+	hollow := e.LdtkJson_Bool(obj, "hollow")
+	thick := 1 / L.zoom
+	// the tile: a field's (EntityTile) or the definition's
+	tile := e.LdtkJson_Get(ent, "__tile")
+	if tile != nil && tile.kind == .Object && (mode == "Tile" || mode == "Rectangle" || mode == "Ellipse") {
+		tsUid := e.LdtkJson_Int(tile, "tilesetUid", -1)
+		if tex, ok := level_texture(tsUid); ok {
+			src := rl.Rectangle{f32(e.LdtkJson_Int(tile, "x")), f32(e.LdtkJson_Int(tile, "y")), f32(e.LdtkJson_Int(tile, "w")), f32(e.LdtkJson_Int(tile, "h"))}
+			if mode == "Tile" {
+				draw_entity_tile(tex, src, rect, e.LdtkJson_Str(obj, "tileRenderMode", "FitInside"), e.LdtkJson_Arr(obj, "nineSliceBorders"), e.LdtkJson_Arr(ent, "__pivot"), col_rl(rl.WHITE, tileOp))
+			} else {
+				// a shape with the tile as an icon in it
+				sc := min(rect.width / max(src.width, 1), rect.height / max(src.height, 1))
+				dw, dh := src.width * sc, src.height * sc
+				rl.DrawTexturePro(tex, src, {rect.x + (rect.width - dw) * 0.5, rect.y + (rect.height - dh) * 0.5, dw, dh}, {}, 0, col_rl(rl.WHITE, tileOp))
+			}
+		}
+	}
+	switch mode {
+	case "Ellipse":
+		cx, cy := rect.x + rect.width * 0.5, rect.y + rect.height * 0.5
+		if !hollow do rl.DrawEllipse(i32(cx), i32(cy), rect.width * 0.5, rect.height * 0.5, col_rl(c, fillOp))
+		rl.DrawEllipseLines(i32(cx), i32(cy), rect.width * 0.5, rect.height * 0.5, col_rl(c, max(lineOp, 0.3)))
+	case "Cross":
+		rl.DrawLineEx({rect.x, rect.y}, {rect.x + rect.width, rect.y + rect.height}, thick * 2, col_rl(c, max(lineOp, 0.3)))
+		rl.DrawLineEx({rect.x + rect.width, rect.y}, {rect.x, rect.y + rect.height}, thick * 2, col_rl(c, max(lineOp, 0.3)))
+	case "Tile":
+		if tile == nil || tile.kind != .Object do rl.DrawRectangleLinesEx(rect, thick, col_rl(c, 0.6)) // no tile: just the box
+	case:
+		if !hollow do rl.DrawRectangleRec(rect, col_rl(c, fillOp))
+		rl.DrawRectangleLinesEx(rect, thick, col_rl(c, max(lineOp, 0.3)))
+	}
+}
+
+// draw_entity_tile: a tile filling an entity box in an LDtk tile render mode.
+@(private = "file")
+draw_entity_tile :: proc(tex: rl.Texture2D, src: rl.Rectangle, r: rl.Rectangle, mode: string, nine: []^e.LdtkJson, pivot: []^e.LdtkJson, tint: rl.Color) {
+	pv := [2]f32{0.5, 0.5}
+	if len(pivot) >= 2 do pv = {f32(pivot[0].num), f32(pivot[1].num)}
+	switch mode {
+	case "Stretch":
+		rl.DrawTexturePro(tex, src, r, {}, 0, tint)
+	case "Cover":
+		sc := max(r.width / src.width, r.height / src.height)
+		// the part of the source that covers the box
+		sw, sh := r.width / sc, r.height / sc
+		s := rl.Rectangle{src.x + (src.width - sw) * pv.x, src.y + (src.height - sh) * pv.y, sw, sh}
+		rl.DrawTexturePro(tex, s, r, {}, 0, tint)
+	case "Repeat":
+		for y := f32(0); y < r.height; y += src.height {
+			for x := f32(0); x < r.width; x += src.width {
+				w, h := min(src.width, r.width - x), min(src.height, r.height - y)
+				rl.DrawTexturePro(tex, {src.x, src.y, w, h}, {r.x + x, r.y + y, w, h}, {}, 0, tint)
+			}
+		}
+	case "FullSizeCropped":
+		w, h := min(src.width, r.width), min(src.height, r.height)
+		ox, oy := (r.width - w) * pv.x, (r.height - h) * pv.y
+		rl.DrawTexturePro(tex, {src.x + (src.width - w) * pv.x, src.y + (src.height - h) * pv.y, w, h}, {r.x + ox, r.y + oy, w, h}, {}, 0, tint)
+	case "FullSizeUncropped":
+		rl.DrawTexturePro(tex, src, {r.x + (r.width - src.width) * pv.x, r.y + (r.height - src.height) * pv.y, src.width, src.height}, {}, 0, tint)
+	case "NineSlice":
+		b := [4]f32{}
+		for x, i in nine do if i < 4 do b[i] = f32(x.num)
+		info := rl.NPatchInfo{source = src, top = i32(b[0]), right = i32(b[1]), bottom = i32(b[2]), left = i32(b[3]), layout = .NINE_PATCH}
+		rl.DrawTextureNPatch(tex, info, r, {}, 0, tint)
+	case: // FitInside
+		sc := min(r.width / src.width, r.height / src.height)
+		dw, dh := src.width * sc, src.height * sc
+		rl.DrawTexturePro(tex, src, {r.x + (r.width - dw) * pv.x, r.y + (r.height - dh) * pv.y, dw, dh}, {}, 0, tint)
 	}
 }

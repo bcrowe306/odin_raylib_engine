@@ -263,9 +263,48 @@ fps=6
 ## Entities tab
 <!-- topic: tab.entities -->
 
-Entity definitions: identifier, size, colour, pivot, whether it can be
-resized, its tile, and its **fields**. **Use picked tile** takes the tile
-picked in a palette.
+On the left is the list of entity definitions. Right-click one to place,
+duplicate, reorder or delete it. In a narrow panel, the definition's
+**Settings** and **Fields** are two tabs; in a wide one they sit side by
+side.
+
+| Setting | |
+|---|---|
+| Identifier, Doc, Tags | Its name, a description, and comma-separated tags. Layers can require or exclude tags, and references can allow them. |
+| Size, Resizable X / Y | Its default size, and whether instances can be resized with the corner handle. |
+| Keep aspect, Min / Max width / height | Limits for resizing. |
+| Pivot | The point placed on the grid. |
+| Colour | Its colour in the editor. A field can override it (smart colour). |
+| Render | Rectangle, Ellipse, Tile or Cross. |
+| Tile, Tile mode | Its picture (**Use picked tile**), and how the picture fills the box: Cover, Fit inside, Repeat, Stretch, Full size (cropped / uncropped), 9-slice (with borders). |
+| Tile / Fill / Line opacity, Hollow | How it looks. A hollow entity is selected by its outline only. |
+| Show name | Its name above it in the canvas. |
+| Max count, Limit, When reached | At most N per layer, per level or per world. Placing one more moves the last one, discards the oldest, or is prevented. |
+| Table of contents | List its instances in the project's `toc`, for games. |
+| Out of bounds | Instances may stand outside their level. |
+
+## Field definitions
+<!-- topic: fields.defs -->
+
+Pick a field in the list (right-click it to duplicate, reorder or delete
+it), or add one by picking a type and clicking **Add field**.
+
+| Setting | |
+|---|---|
+| Identifier, Doc | Its name (a script property with this name gets the value) and a description. |
+| Type | Converts the field and its values: String to Multilines and back, FilePath to String and back, Int to Float, Bool to Int, Float to Int (truncate / round), and any field to an array. |
+| Min / Max values | Array length limits. |
+| Nullable | Whether it can be empty. |
+| Default | The value new instances use. |
+| Min / Max | Number limits. |
+| Regex | String values must match it, written `/pattern/flags`. |
+| File types | Accepted extensions for FilePath fields. |
+| Language | Multilines syntax (used for LDtk's highlighting). |
+| Tileset | Tile fields: where the tiles come from. |
+| Can point at, Other levels, Symmetrical, Auto chain | Rules for references. |
+| Smart colour | A Color or Enum field gives the entity its colour. |
+| Display, Position, Link style, Display colour, Display scale, Always show, In world view, Cut long values, Prefix / Suffix | How the canvas shows it (see *Field display in the canvas*). |
+| Table of contents, Searchable | Its value in `toc` entries; searchable values. |
 
 ## Fields
 <!-- topic: fields -->
