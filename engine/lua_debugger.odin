@@ -141,7 +141,7 @@ stack_depth :: proc(L: ^lua.State) -> int {
 
 @(private = "file")
 debug_hook :: proc "c" (L: ^lua.State, ar: ^lua.Debug) {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if ar.event != lua.HOOKLINE || luaDebugger.stopped do return
 	lua.getinfo(L, "Sl", ar)
 	source := string(ar.source)

@@ -105,7 +105,7 @@ Lua_FormatValue :: proc(sb: ^strings.Builder, L: ^lua.State, idx: c.int, depth: 
 
 // lua_node_tostring: Node "Player" (CharacterMoverNode) - or a freed node.
 lua_node_tostring :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushstring(L, "Node (freed)")

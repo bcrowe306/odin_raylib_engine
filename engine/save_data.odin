@@ -232,7 +232,7 @@ push_data :: proc(L: ^lua.State) {
 				loaded = true
 			}
 		} else {
-			log.errorf("[Save] %s is not valid JSON (%v); starting empty", path, perr)
+			log.warnf("[Save] %s is not valid JSON (%v); starting empty", path, perr)
 		}
 	}
 	if !loaded do lua.newtable(L)
@@ -285,7 +285,7 @@ key_arg :: proc(L: ^lua.State) -> (cstring, bool) {
 // Save.set(key, value): nil removes the key.
 @(private = "file")
 lua_save_set :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	key, ok := key_arg(L)
 	if !ok do return 0
 	lua.settop(L, 2)
@@ -298,7 +298,7 @@ lua_save_set :: proc "c" (L: ^lua.State) -> c.int {
 // Save.get(key [, default])
 @(private = "file")
 lua_save_get :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	key, ok := key_arg(L)
 	if !ok do return 0
 	lua.settop(L, 2)
@@ -310,7 +310,7 @@ lua_save_get :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private = "file")
 lua_save_has :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	key, ok := key_arg(L)
 	if !ok do return 0
 	push_data(L)
@@ -321,7 +321,7 @@ lua_save_has :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private = "file")
 lua_save_delete :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	key, ok := key_arg(L)
 	if !ok do return 0
 	push_data(L)
@@ -333,7 +333,7 @@ lua_save_delete :: proc "c" (L: ^lua.State) -> c.int {
 // Save.keys() -> sorted array of keys
 @(private = "file")
 lua_save_keys :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	push_data(L)
 	data := lua.gettop(L)
 	keys := make([dynamic]string, context.temp_allocator)
@@ -355,7 +355,7 @@ lua_save_keys :: proc "c" (L: ^lua.State) -> c.int {
 // Save.clear(): removes every key (written on the next flush).
 @(private = "file")
 lua_save_clear :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	lua.newtable(L)
 	lua.setfield(L, lua.REGISTRYINDEX, SAVE_REGISTRY_KEY)
 	return 0
@@ -364,7 +364,7 @@ lua_save_clear :: proc "c" (L: ^lua.State) -> c.int {
 // Save.flush() -> ok
 @(private = "file")
 lua_save_flush :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	push_data(L) // flushing before any use writes an empty file
 	lua.pop(L, 1)
 	lua.pushboolean(L, b32(Save_Flush(L)))
@@ -374,7 +374,7 @@ lua_save_flush :: proc "c" (L: ^lua.State) -> c.int {
 // Save.slot([name]) -> current slot. Switching writes the current slot first.
 @(private = "file")
 lua_save_slot :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if lua.type(L, 1) == .STRING {
 		name := string(lua.tostring(L, 1))
 		cur := save.slot if save.slot != "" else "save"
@@ -392,7 +392,7 @@ lua_save_slot :: proc "c" (L: ^lua.State) -> c.int {
 // Save.path() -> the slot's file
 @(private = "file")
 lua_save_path :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	lua.pushstring(L, strings.clone_to_cstring(Save_FilePath(), context.temp_allocator))
 	return 1
 }

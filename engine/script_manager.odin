@@ -18,6 +18,7 @@ ScriptManager_Init :: proc(sm: ^ScriptManager = nil, game: ^Game = nil) -> bool 
 
 	// Script logs use the logger the game runs with (script_bindings.odin).
 	if scriptLogger.procedure == nil do scriptLogger = context.logger
+	mgr.ctx, mgr.hasCtx = context, true
 	mgr.L = lua.L_newstate()
 	if mgr.L == nil {
 		log.error("[ScriptManager] Failed to create Lua 5.4 state")
@@ -112,7 +113,7 @@ ScriptManager_Destroy :: proc(sm: ^ScriptManager = nil) {
 }
 
 lua_traceback_error_handler :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	msg := lua.tostring(L, 1)
 	lua.L_traceback(L, L, msg, 1)
 	return 1
@@ -698,4 +699,15 @@ Script_ParseProperties :: proc(L: ^lua.State, moduleIdx: c.int) -> [dynamic]Scri
 	}
 	lua.pop(L, 1) // properties value
 	return props
+}
+
+// Script_Context: the context a Lua C callback runs with - its script
+// manager's (Script_Init's: the engine's allocators and logger), else the
+// default one. `context = Script_Context(L)` at the top of every binding.
+Script_Context :: proc "contextless" (L: ^lua.State) -> runtime.Context {
+	lua.getfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
+	mgr := cast(^ScriptManager)lua.touserdata(L, -1)
+	lua.pop(L, 1)
+	if mgr != nil && mgr.hasCtx do return mgr.ctx
+	return runtime.default_context()
 }

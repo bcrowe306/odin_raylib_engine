@@ -152,7 +152,7 @@ ScriptVFS_Load :: proc(path: string, allocator := context.allocator) -> (code: s
 // Custom Lua 5.4 searcher function for package.searchers that looks up in ScriptVFS
 @(private="file")
 lua_vfs_searcher :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	modNameC := lua.tostring(L, 1)
 	if modNameC == nil {
 		lua.pushstring(L, "\n\t[ScriptVFS] module name is nil")

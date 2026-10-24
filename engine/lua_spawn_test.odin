@@ -1,5 +1,6 @@
 package engine
 
+import "core:log"
 import "core:os"
 import "core:testing"
 import lua "vendor:lua/5.4"
@@ -27,8 +28,12 @@ test_lua_spawning :: proc(t: ^testing.T) {
 local gun = Scene.find_node("Gun")
 b = Scene.instantiate("components/bullet.component.json", gun, Vec2(5, 6))
 b2 = Scene.instantiate("components/bullet.component.json", nil, 1, 2)
-missing = Scene.instantiate("components/nope.component.json")
 `)
+	// A missing component logs an error (expected here): quiet for that call.
+	logger := game.scriptManager.ctx.logger
+	game.scriptManager.ctx.logger = log.nil_logger()
+	ok |= lua.L_dostring(L, `missing = Scene.instantiate("components/nope.component.json")`)
+	game.scriptManager.ctx.logger = logger
 	if ok != 0 do testing.fail_now(t, string(lua.tostring(L, -1)))
 	ProcessNodeQueues(scene.manager, &game.gameContext)
 	b := Scene_FindNodeByName(scene, "Bullet")

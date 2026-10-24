@@ -1,5 +1,6 @@
 package engine
 
+import "base:runtime"
 import "core:c"
 import "core:time"
 import lua "vendor:lua/5.4"
@@ -76,6 +77,11 @@ ScriptManager :: struct {
 	L:         ^lua.State,
 	game:      ^Game,
 	isReady:   bool,
+	// The context it was made in (the engine's allocators, logger): Lua's C
+	// callbacks run with it (Script_Context), so what scripts create is
+	// freed by the allocator that made it.
+	ctx:       runtime.Context,
+	hasCtx:    bool,
 	modules:   map[string]^ScriptModule,
 	instances: [dynamic]^ScriptInstance,
 	// Lua event connections (script_events.odin) and the instance whose

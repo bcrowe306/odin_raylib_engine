@@ -181,7 +181,7 @@ Script_ReleaseAllConnections :: proc(mgr: ^ScriptManager) {
 
 // node:connect(event, fn) -> id
 lua_node_connect :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || lua.type(L, 2) != .STRING || lua.type(L, 3) != .FUNCTION {
 		lua.L_error(L, "usage: node:connect(event_name, function(value, source) ... end)")
@@ -208,7 +208,7 @@ lua_node_connect :: proc "c" (L: ^lua.State) -> c.int {
 
 // node:disconnect(id) -> bool
 lua_node_disconnect :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	mgr := get_script_manager(L)
 	id := int(lua.tointeger(L, 2))
 	if mgr != nil {
@@ -224,7 +224,7 @@ lua_node_disconnect :: proc "c" (L: ^lua.State) -> c.int {
 
 // node:emit(event, value?) raises a custom event on the node.
 lua_node_emit :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || lua.type(L, 2) != .STRING do return 0
 	name := strings.clone(string(lua.tostring(L, 2)), context.temp_allocator)

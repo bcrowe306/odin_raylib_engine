@@ -307,7 +307,7 @@ tween_state :: proc(L: ^lua.State) -> (^Tween_State, ^ScriptManager) {
 // Tween.to(node, property, value, duration [, ease [, opts]]) -> id
 @(private = "file")
 lua_tween_to :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ts, _ := tween_state(L)
 	node, ok := to_node_userdata(L, 1)
 	if ts == nil || !ok || lua.type(L, 2) != .STRING {
@@ -365,7 +365,7 @@ lua_tween_to :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private = "file")
 lua_tween_cancel :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ts, sm := tween_state(L)
 	if ts != nil do lua.pushboolean(L, b32(Tween_Cancel(ts, int(lua.tointeger(L, 1)), sm.L)))
 	else do lua.pushboolean(L, false)
@@ -375,7 +375,7 @@ lua_tween_cancel :: proc "c" (L: ^lua.State) -> c.int {
 // Tween.cancel_all(node [, property]) -> count
 @(private = "file")
 lua_tween_cancel_all :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ts, sm := tween_state(L)
 	node, ok := to_node_userdata(L, 1)
 	n := 0
@@ -389,7 +389,7 @@ lua_tween_cancel_all :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private = "file")
 lua_tween_is_running :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ts, _ := tween_state(L)
 	lua.pushboolean(L, b32(ts != nil && Tween_IsRunning(ts, int(lua.tointeger(L, 1)))))
 	return 1
@@ -398,7 +398,7 @@ lua_tween_is_running :: proc "c" (L: ^lua.State) -> c.int {
 // Tween.ease(name, t) -> eased t (for scripts' own animation).
 @(private = "file")
 lua_tween_ease :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	e, _ := Ease_Parse(string(lua.tostring(L, 1)) if lua.type(L, 1) == .STRING else "linear")
 	lua.pushnumber(L, lua.Number(Ease_Apply(e, f32(lua.tonumber(L, 2)))))
 	return 1

@@ -245,7 +245,7 @@ push_entity :: proc(L: ^lua.State, ln: ^LdtkLevelNode, ent: ^LdtkEntityInstance)
 // --- levels & worlds ------------------------------------------------------------------
 
 lua_ldtk_get_levels :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil || ln.project == nil do return 1
@@ -269,7 +269,7 @@ lua_ldtk_get_levels :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_load_level :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	id, ok := str_arg(L, 2)
 	lua.pushboolean(L, b32(ln != nil && ok && LdtkLevelNode_LoadLevel(ln, id)))
@@ -277,7 +277,7 @@ lua_ldtk_load_level :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_level :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	if ln == nil || ln.project == nil {
 		lua.pushnil(L)
@@ -330,7 +330,7 @@ push_neighbours :: proc(L: ^lua.State, ln: ^LdtkLevelNode, lvl: ^LdtkLevel) {
 }
 
 lua_ldtk_get_neighbours :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	if ln == nil || ln.project == nil {
 		lua.newtable(L)
@@ -346,7 +346,7 @@ lua_ldtk_get_neighbours :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_level_size :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	if ln == nil || ln.level == nil {
 		lua.pushnumber(L, 0)
@@ -359,7 +359,7 @@ lua_ldtk_get_level_size :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_level_field :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	name, ok := str_arg(L, 2)
 	if ln == nil || !ok || ln.project == nil {
@@ -373,7 +373,7 @@ lua_ldtk_get_level_field :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_level_fields :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	if ln == nil || ln.project == nil {
 		lua.newtable(L)
@@ -389,7 +389,7 @@ lua_ldtk_get_level_fields :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_level_at :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	if ln == nil {
 		lua.pushnil(L)
@@ -409,7 +409,7 @@ lua_ldtk_level_at :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_worlds :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil || ln.project == nil do return 1
@@ -432,7 +432,7 @@ lua_ldtk_get_worlds :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_world :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	if ln == nil do lua.pushnil(L)
 	else do push_str(L, ln.worldIdentifier)
@@ -440,7 +440,7 @@ lua_ldtk_get_world :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_set_world :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	id, ok := str_arg(L, 2)
 	level, _ := str_arg(L, 3)
@@ -449,13 +449,13 @@ lua_ldtk_set_world :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_set_world_mode :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if ln := ldtk_node_arg(L); ln != nil do LdtkLevelNode_SetWorldMode(ln, bool(lua.toboolean(L, 2)))
 	return 0
 }
 
 lua_ldtk_is_world_mode :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.pushboolean(L, b32(ln != nil && ln.worldMode))
 	return 1
@@ -464,7 +464,7 @@ lua_ldtk_is_world_mode :: proc "c" (L: ^lua.State) -> c.int {
 // --- layers ---------------------------------------------------------------------------
 
 lua_ldtk_get_layers :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil || ln.project == nil do return 1
@@ -492,7 +492,7 @@ lua_ldtk_get_layers :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_set_layer_visible :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	name, ok := str_arg(L, 2)
 	if ln == nil || !ok do return 0
@@ -504,7 +504,7 @@ lua_ldtk_set_layer_visible :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_is_layer_visible :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	name, ok := str_arg(L, 2)
 	layer := Ldtk_GetLayer(ln.level, name) if ln != nil && ok else nil
@@ -526,7 +526,7 @@ layer_at :: proc(L: ^lua.State, ln: ^LdtkLevelNode, nameIdx: c.int) -> (^LdtkLay
 }
 
 lua_ldtk_get_int_grid :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	value := 0
 	if ln != nil && ln.level != nil {
@@ -537,7 +537,7 @@ lua_ldtk_get_int_grid :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_int_grid_name :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	name := ""
 	if ln != nil && ln.level != nil {
@@ -550,7 +550,7 @@ lua_ldtk_get_int_grid_name :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_int_grid_cell :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	name, ok := str_arg(L, 2)
 	value := 0
@@ -564,7 +564,7 @@ lua_ldtk_get_int_grid_cell :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_int_grid_values :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	name, ok := str_arg(L, 2)
 	lua.newtable(L)
@@ -584,7 +584,7 @@ lua_ldtk_get_int_grid_values :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_world_to_cell :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	cx, cy := -1, -1
 	if ln != nil && ln.level != nil {
@@ -596,7 +596,7 @@ lua_ldtk_world_to_cell :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_cell_to_world :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	name, ok := str_arg(L, 2)
 	if ln == nil || !ok || ln.level == nil {
@@ -618,7 +618,7 @@ lua_ldtk_cell_to_world :: proc "c" (L: ^lua.State) -> c.int {
 // ldtk_get_collision(x, y) -> type ("solid", "one_way", "trigger", "none"),
 // layer, value name (or number).
 lua_ldtk_get_collision :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	if ln != nil && ln.level != nil {
 		lvl, p := level_local(ln, {f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3))})
@@ -643,7 +643,7 @@ lua_ldtk_get_collision :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_triggers :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil do return 1
@@ -658,7 +658,7 @@ lua_ldtk_get_triggers :: proc "c" (L: ^lua.State) -> c.int {
 // --- tiles & enums --------------------------------------------------------------------
 
 lua_ldtk_get_tile :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	if ln != nil && ln.level != nil {
 		if layer, p := layer_at(L, ln, 2); layer != nil {
@@ -686,7 +686,7 @@ lua_ldtk_get_tile :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_tile_enums :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil || ln.level == nil do return 1
@@ -702,7 +702,7 @@ lua_ldtk_get_tile_enums :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_enum :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	name, ok := str_arg(L, 2)
 	en := Ldtk_GetEnum(ln.project, name) if ln != nil && ok else nil
@@ -725,7 +725,7 @@ lua_ldtk_get_enum :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_enums :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil || ln.project == nil do return 1
@@ -743,7 +743,7 @@ lua_ldtk_get_enums :: proc "c" (L: ^lua.State) -> c.int {
 // --- entities -------------------------------------------------------------------------
 
 lua_ldtk_get_entities :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil || ln.level == nil do return 1
@@ -763,7 +763,7 @@ lua_ldtk_get_entities :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_entities_by_tag :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	tag, ok := str_arg(L, 2)
@@ -785,7 +785,7 @@ lua_ldtk_get_entities_by_tag :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_entity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	iid, ok := str_arg(L, 2)
 	ent: ^LdtkEntityInstance
@@ -796,7 +796,7 @@ lua_ldtk_get_entity :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_entity_node :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	iid, ok := str_arg(L, 2)
 	if ln == nil || !ok {
@@ -808,7 +808,7 @@ lua_ldtk_get_entity_node :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_entity_defs :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil || ln.project == nil do return 1
@@ -840,7 +840,7 @@ lua_ldtk_get_entity_defs :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_get_links :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	ln := ldtk_node_arg(L)
 	lua.newtable(L)
 	if ln == nil do return 1
@@ -872,7 +872,7 @@ entity_arg :: proc(L: ^lua.State) -> (^Node, ^LdtkLevelNode, ^LdtkEntityInstance
 }
 
 lua_ldtk_entity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	_, ln, ent := entity_arg(L)
 	if ent == nil do lua.pushnil(L)
 	else do push_entity(L, ln, ent)
@@ -880,14 +880,14 @@ lua_ldtk_entity :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_level_node :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	_, ln, _ := entity_arg(L)
 	push_node_userdata(L, ln)
 	return 1
 }
 
 lua_ldtk_field :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	_, _, ent := entity_arg(L)
 	name, ok := str_arg(L, 2)
 	f := Ldtk_GetField(ent, name) if ent != nil && ok else nil
@@ -897,7 +897,7 @@ lua_ldtk_field :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_ldtk_ref :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ln, _ := entity_arg(L)
 	field, ok := str_arg(L, 2)
 	if ln != nil && ok {
@@ -915,7 +915,7 @@ lua_ldtk_ref :: proc "c" (L: ^lua.State) -> c.int {
 // ldtk_refs([field]) -> nodes referenced by one field (in order), or all
 // references as { {field, node, iid}, ... } when no field is given.
 lua_ldtk_refs :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ln, _ := entity_arg(L)
 	field, hasField := str_arg(L, 2)
 	lua.newtable(L)
@@ -946,7 +946,7 @@ lua_ldtk_refs :: proc "c" (L: ^lua.State) -> c.int {
 // ldtk_referenced_by([field]) -> { {node, field}, ... } entities whose
 // EntityRef fields point at this one.
 lua_ldtk_referenced_by :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ln, _ := entity_arg(L)
 	field, hasField := str_arg(L, 2)
 	lua.newtable(L)

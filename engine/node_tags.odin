@@ -56,7 +56,7 @@ Scene_FindByTag :: proc(scene: ^Scene, tag: string, allocator := context.temp_al
 // --- Lua ------------------------------------------------------------------------------
 
 lua_node_add_tag :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	tag := lua.tostring(L, 2)
 	lua.pushboolean(L, b32(ok && tag != nil && Node_AddTag(node, string(tag))))
@@ -64,7 +64,7 @@ lua_node_add_tag :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_node_remove_tag :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	tag := lua.tostring(L, 2)
 	lua.pushboolean(L, b32(ok && tag != nil && Node_RemoveTag(node, string(tag))))
@@ -72,7 +72,7 @@ lua_node_remove_tag :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_node_has_tag :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	tag := lua.tostring(L, 2)
 	lua.pushboolean(L, b32(ok && tag != nil && Node_HasTag(node, string(tag))))
@@ -80,7 +80,7 @@ lua_node_has_tag :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 lua_node_get_tags :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.newtable(L)
@@ -96,7 +96,7 @@ lua_node_get_tags :: proc "c" (L: ^lua.State) -> c.int {
 
 // Scene.find_by_tag(tag) -> { node, ... } (tree order)
 lua_scene_find_by_tag :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	tag := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if tag == nil || sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {

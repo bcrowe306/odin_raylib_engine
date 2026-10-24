@@ -60,7 +60,7 @@ get_script_manager :: proc(L: ^lua.State) -> ^ScriptManager {
 
 @(private="file")
 lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushstring(L, "Unknown")
@@ -103,7 +103,7 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_name :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnil(L)
@@ -116,7 +116,7 @@ lua_node_get_name :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_name :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	nameC := lua.tostring(L, 2)
@@ -128,7 +128,7 @@ lua_node_set_name :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_position :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnumber(L, 0)
@@ -142,7 +142,7 @@ lua_node_get_position :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_position :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	x, y := arg_xy(L, 2) // two numbers or a vector
@@ -152,7 +152,7 @@ lua_node_set_position :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_translate :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	dx, dy := arg_xy(L, 2) // two numbers or a vector
@@ -163,7 +163,7 @@ lua_node_translate :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_rotation :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnumber(L, 0)
@@ -175,7 +175,7 @@ lua_node_get_rotation :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_rotation :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	rot := f32(lua.tonumber(L, 2))
@@ -185,7 +185,7 @@ lua_node_set_rotation :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_rotate :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	dRot := f32(lua.tonumber(L, 2))
@@ -195,7 +195,7 @@ lua_node_rotate :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_scale :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnumber(L, 1)
@@ -209,7 +209,7 @@ lua_node_get_scale :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_scale :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	sx, sy := arg_xy(L, 2) // two numbers or a vector
@@ -224,7 +224,7 @@ lua_node_set_scale :: proc "c" (L: ^lua.State) -> c.int {
 // "../Player", "." self); nil if missing.
 @(private="file")
 lua_node_get_node :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.gameContext == nil || node.gameContext.scene == nil || lua.type(L, 2) != .STRING {
 		lua.pushnil(L)
@@ -240,7 +240,7 @@ lua_node_get_node :: proc "c" (L: ^lua.State) -> c.int {
 // node:set_texture(path): a TextureNode shows another image (project path).
 @(private="file")
 lua_node_set_texture :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TextureNode || lua.type(L, 2) != .STRING {
 		lua.pushboolean(L, false)
@@ -265,7 +265,7 @@ lua_node_set_texture :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_global_position :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnumber(L, 0)
@@ -279,7 +279,7 @@ lua_node_get_global_position :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_global_rotation :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnumber(L, 0)
@@ -291,7 +291,7 @@ lua_node_get_global_rotation :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_is_enabled :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushboolean(L, false)
@@ -303,7 +303,7 @@ lua_node_is_enabled :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_enabled :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	enabled := lua.toboolean(L, 2)
@@ -313,7 +313,7 @@ lua_node_set_enabled :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_is_visible :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushboolean(L, false)
@@ -325,7 +325,7 @@ lua_node_is_visible :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_visible :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	visible := lua.toboolean(L, 2)
@@ -335,7 +335,7 @@ lua_node_set_visible :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_parent :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.gameContext == nil || node.gameContext.scene == nil {
 		lua.pushnil(L)
@@ -348,7 +348,7 @@ lua_node_get_parent :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_children :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.gameContext == nil || node.gameContext.scene == nil {
 		lua.newtable(L)
@@ -367,7 +367,7 @@ lua_node_get_children :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_child :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.gameContext == nil || node.gameContext.scene == nil {
 		lua.pushnil(L)
@@ -394,7 +394,7 @@ lua_node_get_child :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_add_child :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	parent, okP := to_node_userdata(L, 1)
 	child, okC := to_node_userdata(L, 2)
 	if okP && okC && parent.gameContext != nil && parent.gameContext.scene != nil {
@@ -405,7 +405,7 @@ lua_node_add_child :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_remove_child :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	parent, okP := to_node_userdata(L, 1)
 	child, okC := to_node_userdata(L, 2)
 	if okP && okC && parent.gameContext != nil && parent.gameContext.scene != nil {
@@ -416,7 +416,7 @@ lua_node_remove_child :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_destroy :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if ok && node.gameContext != nil && node.gameContext.scene != nil {
 		SceneRemoveNode(node.gameContext.scene, node)
@@ -430,7 +430,7 @@ lua_node_destroy :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_apply_force :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	fx, fy := arg_xy(L, 2) // two numbers or a vector
@@ -446,7 +446,7 @@ lua_node_apply_force :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_apply_impulse :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	ix, iy := arg_xy(L, 2) // two numbers or a vector
@@ -462,7 +462,7 @@ lua_node_apply_impulse :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnumber(L, 0)
@@ -490,7 +490,7 @@ lua_node_get_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	vx, vy := arg_xy(L, 2) // two numbers or a vector
@@ -509,7 +509,7 @@ lua_node_set_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_angular_velocity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnumber(L, 0)
@@ -529,7 +529,7 @@ lua_node_get_angular_velocity :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_angular_velocity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	w := f32(lua.tonumber(L, 2))
@@ -545,7 +545,7 @@ lua_node_set_angular_velocity :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushnumber(L, 1)
@@ -566,7 +566,7 @@ lua_node_get_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	scale := f32(lua.tonumber(L, 2))
@@ -585,7 +585,7 @@ lua_node_set_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_is_fixed_rotation :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushboolean(L, false)
@@ -602,7 +602,7 @@ lua_node_is_fixed_rotation :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_fixed_rotation :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	fixed := lua.toboolean(L, 2)
@@ -618,7 +618,7 @@ lua_node_set_fixed_rotation :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_linear_damping :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	damping := f32(lua.tonumber(L, 2))
@@ -634,7 +634,7 @@ lua_node_set_linear_damping :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_angular_damping :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	damping := f32(lua.tonumber(L, 2))
@@ -650,7 +650,7 @@ lua_node_set_angular_damping :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_is_awake :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok {
 		lua.pushboolean(L, false)
@@ -669,7 +669,7 @@ lua_node_is_awake :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_set_awake :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	awake := lua.toboolean(L, 2)
@@ -688,7 +688,7 @@ lua_node_set_awake :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_character_move :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CharacterMoverNode do return 0
 	dirX := f32(lua.tonumber(L, 2))
@@ -705,7 +705,7 @@ lua_node_character_move :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_character_is_grounded :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CharacterMoverNode {
 		lua.pushboolean(L, false)
@@ -718,7 +718,7 @@ lua_node_character_is_grounded :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_character_get_velocity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CharacterMoverNode {
 		lua.pushnumber(L, 0)
@@ -733,7 +733,7 @@ lua_node_character_get_velocity :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_character_set_velocity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CharacterMoverNode do return 0
 	vx, vy := arg_xy(L, 2) // two numbers or a vector
@@ -744,7 +744,7 @@ lua_node_character_set_velocity :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_character_set_speed :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CharacterMoverNode do return 0
 	spd := f32(lua.tonumber(L, 2))
@@ -755,7 +755,7 @@ lua_node_character_set_speed :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_character_set_jump_speed :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CharacterMoverNode do return 0
 	jspd := f32(lua.tonumber(L, 2))
@@ -775,7 +775,7 @@ mover_arg :: proc(L: ^lua.State) -> ^CharacterMoverNode {
 // along surfaces (Godot's move_and_slide). The node switches to Script mode.
 @(private="file")
 lua_node_character_move_and_slide :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cm := mover_arg(L)
 	if cm == nil {
 		lua.pushboolean(L, false)
@@ -805,19 +805,19 @@ lua_node_character_contact :: proc(L: ^lua.State, which: int) -> c.int {
 
 @(private="file")
 lua_node_character_is_on_floor :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	return lua_node_character_contact(L, 0)
 }
 
 @(private="file")
 lua_node_character_is_on_wall :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	return lua_node_character_contact(L, 1)
 }
 
 @(private="file")
 lua_node_character_is_on_ceiling :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	return lua_node_character_contact(L, 2)
 }
 
@@ -830,35 +830,35 @@ push_vec :: proc(L: ^lua.State, v: [2]f32) -> c.int {
 
 @(private="file")
 lua_node_character_get_floor_normal :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cm := mover_arg(L)
 	return push_vec(L, cm.floorNormal if cm != nil else {})
 }
 
 @(private="file")
 lua_node_character_get_wall_normal :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cm := mover_arg(L)
 	return push_vec(L, cm.wallNormal if cm != nil else {})
 }
 
 @(private="file")
 lua_node_character_get_last_motion :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cm := mover_arg(L)
 	return push_vec(L, cm.lastMotion if cm != nil else {})
 }
 
 @(private="file")
 lua_node_character_get_gravity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cm := mover_arg(L)
 	return push_vec(L, CharacterMoverNode_Gravity(cm, cm.gameContext) if cm != nil else {})
 }
 
 @(private="file")
 lua_node_character_set_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if cm := mover_arg(L); cm != nil do cm.gravityScale = f32(lua.tonumber(L, 2))
 	return 0
 }
@@ -866,7 +866,7 @@ lua_node_character_set_gravity_scale :: proc "c" (L: ^lua.State) -> c.int {
 // character_set_control_mode("script" | "builtin")
 @(private="file")
 lua_node_character_set_control_mode :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if cm := mover_arg(L); cm != nil && lua.type(L, 2) == .STRING {
 		cm.controlMode = .BuiltIn if string(lua.tostring(L, 2)) == "builtin" else .Script
 	}
@@ -879,7 +879,7 @@ lua_node_character_set_control_mode :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_area_is_overlapping :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AreaNode {
 		lua.pushboolean(L, false)
@@ -892,7 +892,7 @@ lua_node_area_is_overlapping :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_area_get_overlap_count :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AreaNode {
 		lua.pushinteger(L, 0)
@@ -905,7 +905,7 @@ lua_node_area_get_overlap_count :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_area_get_overlapping_nodes :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AreaNode {
 		lua.newtable(L)
@@ -926,7 +926,7 @@ lua_node_area_get_overlapping_nodes :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_raycast_cast :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	sm := get_script_manager(L)
 	if !ok || node.typeId != RaycastNode || sm == nil || sm.game == nil do return 0
@@ -937,7 +937,7 @@ lua_node_raycast_cast :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_raycast_is_colliding :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != RaycastNode {
 		lua.pushboolean(L, false)
@@ -950,7 +950,7 @@ lua_node_raycast_is_colliding :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_raycast_get_hit_point :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != RaycastNode {
 		lua.pushnumber(L, 0)
@@ -965,7 +965,7 @@ lua_node_raycast_get_hit_point :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_raycast_get_hit_normal :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != RaycastNode {
 		lua.pushnumber(L, 0)
@@ -980,7 +980,7 @@ lua_node_raycast_get_hit_normal :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_raycast_get_hit_fraction :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != RaycastNode {
 		lua.pushnumber(L, 1)
@@ -993,7 +993,7 @@ lua_node_raycast_get_hit_fraction :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_raycast_get_hit_node :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != RaycastNode {
 		lua.pushnil(L)
@@ -1006,7 +1006,7 @@ lua_node_raycast_get_hit_node :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_raycast_set_direction :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != RaycastNode do return 0
 	dx, dy := arg_xy(L, 2) // two numbers or a vector
@@ -1017,7 +1017,7 @@ lua_node_raycast_set_direction :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_raycast_set_length :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != RaycastNode do return 0
 	lenVal := f32(lua.tonumber(L, 2))
@@ -1032,7 +1032,7 @@ lua_node_raycast_set_length :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_particle_start :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != ParticleEmitterNode do return 0
 	pen := cast(^ParticleEmitterNode)node
@@ -1042,7 +1042,7 @@ lua_node_particle_start :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_particle_stop :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != ParticleEmitterNode do return 0
 	pen := cast(^ParticleEmitterNode)node
@@ -1052,7 +1052,7 @@ lua_node_particle_stop :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_particle_is_emitting :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != ParticleEmitterNode {
 		lua.pushboolean(L, false)
@@ -1065,7 +1065,7 @@ lua_node_particle_is_emitting :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_particle_set_amount :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != ParticleEmitterNode do return 0
 	amount := int(lua.tointeger(L, 2))
@@ -1076,7 +1076,7 @@ lua_node_particle_set_amount :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_particle_set_lifetime :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != ParticleEmitterNode do return 0
 	lifetime := f32(lua.tonumber(L, 2))
@@ -1091,7 +1091,7 @@ lua_node_particle_set_lifetime :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_texture_get_size :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TextureNode {
 		lua.pushnumber(L, 0)
@@ -1106,7 +1106,7 @@ lua_node_texture_get_size :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_texture_set_origin :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TextureNode do return 0
 	ox, oy := arg_xy(L, 2) // two numbers or a vector
@@ -1117,7 +1117,7 @@ lua_node_texture_set_origin :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_texture_get_path :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TextureNode {
 		lua.pushstring(L, "")
@@ -1135,7 +1135,7 @@ lua_node_texture_get_path :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_animation_play :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AnimationPlayerNode do return 0
 	apn := cast(^AnimationPlayerNode)node
@@ -1148,7 +1148,7 @@ lua_node_animation_play :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_animation_stop :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AnimationPlayerNode do return 0
 	apn := cast(^AnimationPlayerNode)node
@@ -1158,7 +1158,7 @@ lua_node_animation_stop :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_animation_pause :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AnimationPlayerNode do return 0
 	apn := cast(^AnimationPlayerNode)node
@@ -1168,7 +1168,7 @@ lua_node_animation_pause :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_animation_resume :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AnimationPlayerNode do return 0
 	apn := cast(^AnimationPlayerNode)node
@@ -1178,7 +1178,7 @@ lua_node_animation_resume :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_animation_reset :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AnimationPlayerNode do return 0
 	apn := cast(^AnimationPlayerNode)node
@@ -1188,7 +1188,7 @@ lua_node_animation_reset :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_animation_set_fps :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AnimationPlayerNode do return 0
 	fps := f32(lua.tonumber(L, 2))
@@ -1199,7 +1199,7 @@ lua_node_animation_set_fps :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_animation_get_current :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != AnimationPlayerNode {
 		lua.pushstring(L, "")
@@ -1218,7 +1218,7 @@ lua_node_animation_get_current :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_timer_start :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TimerNode do return 0
 	timer := cast(^TimerNode)node
@@ -1228,7 +1228,7 @@ lua_node_timer_start :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_timer_stop :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TimerNode do return 0
 	timer := cast(^TimerNode)node
@@ -1238,7 +1238,7 @@ lua_node_timer_stop :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_timer_is_running :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TimerNode {
 		lua.pushboolean(L, false)
@@ -1251,7 +1251,7 @@ lua_node_timer_is_running :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_timer_get_elapsed :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TimerNode {
 		lua.pushnumber(L, 0)
@@ -1264,7 +1264,7 @@ lua_node_timer_get_elapsed :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_timer_set_duration :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TimerNode do return 0
 	sec := f32(lua.tonumber(L, 2))
@@ -1277,7 +1277,7 @@ lua_node_timer_set_duration :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_timer_set_loop :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != TimerNode do return 0
 	loop := lua.toboolean(L, 2)
@@ -1292,7 +1292,7 @@ lua_node_timer_set_loop :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_sound_play :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != SoundNode do return 0
 	soundNode := cast(^SoundNode)node
@@ -1302,7 +1302,7 @@ lua_node_sound_play :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_sound_stop :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != SoundNode do return 0
 	soundNode := cast(^SoundNode)node
@@ -1312,7 +1312,7 @@ lua_node_sound_stop :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_sound_pause :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != SoundNode do return 0
 	soundNode := cast(^SoundNode)node
@@ -1322,7 +1322,7 @@ lua_node_sound_pause :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_sound_resume :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != SoundNode do return 0
 	soundNode := cast(^SoundNode)node
@@ -1332,7 +1332,7 @@ lua_node_sound_resume :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_music_play :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != MusicNode do return 0
 	musicNode := cast(^MusicNode)node
@@ -1342,7 +1342,7 @@ lua_node_music_play :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_music_stop :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != MusicNode do return 0
 	musicNode := cast(^MusicNode)node
@@ -1352,7 +1352,7 @@ lua_node_music_stop :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_music_pause :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != MusicNode do return 0
 	musicNode := cast(^MusicNode)node
@@ -1362,7 +1362,7 @@ lua_node_music_pause :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_music_resume :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != MusicNode do return 0
 	musicNode := cast(^MusicNode)node
@@ -1376,7 +1376,7 @@ lua_node_music_resume :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_ldtk_get_level_identifier :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != LdtkLevelNode {
 		lua.pushstring(L, "")
@@ -1394,7 +1394,7 @@ lua_node_ldtk_get_level_identifier :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_set_zoom :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
 	zoom := f32(lua.tonumber(L, 2))
@@ -1404,7 +1404,7 @@ lua_node_camera_set_zoom :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_get_zoom :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode {
 		lua.pushnumber(L, 1)
@@ -1417,7 +1417,7 @@ lua_node_camera_get_zoom :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_set_target :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	target, _ := to_node_userdata(L, 2)
 	if !ok || node.typeId != CameraNode do return 0
@@ -1508,32 +1508,32 @@ camera_get_targets_impl :: proc(L: ^lua.State, isModule: bool) -> c.int {
 }
 
 @(private="file")
-lua_node_camera_add_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_add_target_impl(L, false)}
+lua_node_camera_add_target :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_add_target_impl(L, false)}
 @(private="file")
-lua_node_camera_remove_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_remove_target_impl(L, false)}
+lua_node_camera_remove_target :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_remove_target_impl(L, false)}
 @(private="file")
-lua_node_camera_clear_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_clear_targets_impl(L, false)}
+lua_node_camera_clear_targets :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_clear_targets_impl(L, false)}
 @(private="file")
-lua_node_camera_get_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_target_impl(L, false)}
+lua_node_camera_get_target :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_get_target_impl(L, false)}
 @(private="file")
-lua_node_camera_get_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_targets_impl(L, false)}
+lua_node_camera_get_targets :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_get_targets_impl(L, false)}
 @(private="file")
-lua_camera_add_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_add_target_impl(L, true)}
+lua_camera_add_target :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_add_target_impl(L, true)}
 @(private="file")
-lua_camera_remove_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_remove_target_impl(L, true)}
+lua_camera_remove_target :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_remove_target_impl(L, true)}
 @(private="file")
-lua_camera_clear_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_clear_targets_impl(L, true)}
+lua_camera_clear_targets :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_clear_targets_impl(L, true)}
 @(private="file")
-lua_camera_get_target :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_target_impl(L, true)}
+lua_camera_get_target :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_get_target_impl(L, true)}
 @(private="file")
-lua_camera_get_targets :: proc "c" (L: ^lua.State) -> c.int {context = runtime.default_context(); return camera_get_targets_impl(L, true)}
+lua_camera_get_targets :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); return camera_get_targets_impl(L, true)}
 
 // --- materials ---
 
 // node:set_shader(path | nil): "builtin:flash" or a project .fs file.
 @(private="file")
 lua_node_set_shader :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	path := string(lua.tostring(L, 2)) if lua.type(L, 2) == .STRING else ""
@@ -1545,7 +1545,7 @@ lua_node_set_shader :: proc "c" (L: ^lua.State) -> c.int {
 // (name, "textures/noise.png")
 @(private="file")
 lua_node_set_shader_param :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || lua.type(L, 2) != .STRING do return 0
 	name := strings.clone(string(lua.tostring(L, 2)), context.temp_allocator)
@@ -1570,7 +1570,7 @@ lua_node_set_shader_param :: proc "c" (L: ^lua.State) -> c.int {
 // node:get_shader_param(name) -> x, y, z, w (or the texture path)
 @(private="file")
 lua_node_get_shader_param :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || lua.type(L, 2) != .STRING {
 		lua.pushnil(L)
@@ -1593,7 +1593,7 @@ lua_node_get_shader_param :: proc "c" (L: ^lua.State) -> c.int {
 // "subtract_colors" | "premultiplied")
 @(private="file")
 lua_node_set_blend_mode :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	Node_EnsureMaterial(node).blend = Material_BlendParse(string(lua.tostring(L, 2)) if lua.type(L, 2) == .STRING else "alpha")
@@ -1602,7 +1602,7 @@ lua_node_set_blend_mode :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
 	tx, ty := arg_xy(L, 2) // two numbers or a vector
@@ -1612,7 +1612,7 @@ lua_node_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_shake :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
 	strength := f32(lua.tonumber(L, 2))
@@ -1623,7 +1623,7 @@ lua_node_camera_shake :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_stop_shake :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
 	CameraNode_StopShake(cast(^CameraNode)node)
@@ -1632,7 +1632,7 @@ lua_node_camera_stop_shake :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_is_shaking :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode {
 		lua.pushboolean(L, false)
@@ -1644,7 +1644,7 @@ lua_node_camera_is_shaking :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
 	l, r := arg_xy(L, 2) // two numbers or a vector
@@ -1655,7 +1655,7 @@ lua_node_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_camera_clear_limits :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
 	CameraNode_ClearLimits(cast(^CameraNode)node)
@@ -1675,7 +1675,7 @@ get_current_camera :: proc(L: ^lua.State) -> ^CameraNode {
 
 @(private="file")
 lua_camera_get_target_position :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam == nil {
 		lua.pushnumber(L, 0)
@@ -1689,7 +1689,7 @@ lua_camera_get_target_position :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam == nil do return 0
 	x, y := arg_xy(L, 1) // two numbers or a vector
@@ -1699,7 +1699,7 @@ lua_camera_set_target_position :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_set_target :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	target, _ := to_node_userdata(L, 1)
 	if cam != nil {
@@ -1710,7 +1710,7 @@ lua_camera_set_target :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_get_zoom :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam == nil {
 		lua.pushnumber(L, 1)
@@ -1722,7 +1722,7 @@ lua_camera_get_zoom :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_set_zoom :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
 		zoom := f32(lua.tonumber(L, 1))
@@ -1733,7 +1733,7 @@ lua_camera_set_zoom :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_get_offset :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam == nil {
 		lua.pushnumber(L, 0)
@@ -1747,7 +1747,7 @@ lua_camera_get_offset :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_set_offset :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
 		ox, oy := arg_xy(L, 1) // two numbers or a vector
@@ -1758,7 +1758,7 @@ lua_camera_set_offset :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_get_rotation :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam == nil {
 		lua.pushnumber(L, 0)
@@ -1770,7 +1770,7 @@ lua_camera_get_rotation :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_set_rotation :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
 		deg := f32(lua.tonumber(L, 1))
@@ -1781,7 +1781,7 @@ lua_camera_set_rotation :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_shake :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
 		strength := f32(lua.tonumber(L, 1))
@@ -1793,7 +1793,7 @@ lua_camera_shake :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_stop_shake :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
 		CameraNode_StopShake(cam)
@@ -1803,7 +1803,7 @@ lua_camera_stop_shake :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_is_shaking :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam == nil {
 		lua.pushboolean(L, false)
@@ -1815,7 +1815,7 @@ lua_camera_is_shaking :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
 		l, r := arg_xy(L, 1) // two numbers or a vector
@@ -1827,7 +1827,7 @@ lua_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_clear_limits :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
 		CameraNode_ClearLimits(cam)
@@ -1837,7 +1837,7 @@ lua_camera_clear_limits :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_screen_to_world :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	sx, sy := arg_xy(L, 1) // two numbers or a vector
 	if cam == nil {
@@ -1853,7 +1853,7 @@ lua_camera_screen_to_world :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_world_to_screen :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	wx, wy := arg_xy(L, 1) // two numbers or a vector
 	if cam == nil {
@@ -1869,7 +1869,7 @@ lua_camera_world_to_screen :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_camera_get_visible_world_bounds :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam == nil {
 		lua.pushnumber(L, 0)
@@ -1920,7 +1920,7 @@ world_raycast_callback :: proc "c" (shapeId: b2.ShapeId, point: b2.Vec2, normal:
 
 @(private="file")
 lua_physics_get_gravity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil {
 		lua.pushnumber(L, 0)
@@ -1934,7 +1934,7 @@ lua_physics_get_gravity :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_physics_set_gravity :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil do return 0
 	gx, gy := arg_xy(L, 1) // two numbers or a vector
@@ -1947,7 +1947,7 @@ lua_physics_set_gravity :: proc "c" (L: ^lua.State) -> c.int {
 // areas drawn while the game runs (project setting physics.debug_draw).
 @(private="file")
 lua_physics_set_debug_draw :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil do return 0
 	sm.game.physicsWorld.drawPhysicsDebug = bool(lua.toboolean(L, 1))
@@ -1956,7 +1956,7 @@ lua_physics_set_debug_draw :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_physics_get_debug_draw :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	lua.pushboolean(L, b32(sm != nil && sm.game != nil && sm.game.physicsWorld.drawPhysicsDebug))
 	return 1
@@ -1964,7 +1964,7 @@ lua_physics_get_debug_draw :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_physics_is_paused :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil {
 		lua.pushboolean(L, false)
@@ -1976,7 +1976,7 @@ lua_physics_is_paused :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_physics_set_paused :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil do return 0
 	paused := lua.toboolean(L, 1)
@@ -1986,7 +1986,7 @@ lua_physics_set_paused :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_physics_raycast :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil || !b2.World_IsValid(sm.game.physicsWorld.worldId) {
 		lua.pushnil(L)
@@ -2034,7 +2034,7 @@ lua_physics_raycast :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_engine_get_fps :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	fps := rl.GetFPS() if rl.IsWindowReady() else 60
 	lua.pushnumber(L, lua.Number(fps))
 	return 1
@@ -2042,7 +2042,7 @@ lua_engine_get_fps :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_engine_get_delta_time :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	dt := rl.GetFrameTime() if rl.IsWindowReady() else 0.01667
 	lua.pushnumber(L, lua.Number(dt))
 	return 1
@@ -2050,7 +2050,7 @@ lua_engine_get_delta_time :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_engine_get_time :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	t := rl.GetTime() if rl.IsWindowReady() else 0
 	lua.pushnumber(L, lua.Number(t))
 	return 1
@@ -2058,7 +2058,7 @@ lua_engine_get_time :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_engine_get_window_size :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	w := rl.GetScreenWidth() if rl.IsWindowReady() else 1280
 	h := rl.GetScreenHeight() if rl.IsWindowReady() else 720
 	lua.pushnumber(L, lua.Number(w))
@@ -2068,7 +2068,7 @@ lua_engine_get_window_size :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_engine_get_virtual_size :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	vw: f32 = 1280
 	vh: f32 = 720
@@ -2128,7 +2128,7 @@ parse_mouse_button :: proc(name: string) -> (rl.MouseButton, bool) {
 
 @(private="file")
 lua_input_is_action_pressed :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	actStr := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if actStr == nil || sm == nil || sm.game == nil {
@@ -2142,7 +2142,7 @@ lua_input_is_action_pressed :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_is_action_down :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	actStr := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if actStr == nil || sm == nil || sm.game == nil {
@@ -2156,7 +2156,7 @@ lua_input_is_action_down :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_is_action_released :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	actStr := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if actStr == nil || sm == nil || sm.game == nil {
@@ -2170,7 +2170,7 @@ lua_input_is_action_released :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_get_axis :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	negStr := lua.tostring(L, 1)
 	posStr := lua.tostring(L, 2)
 	sm := get_script_manager(L)
@@ -2186,7 +2186,7 @@ lua_input_get_axis :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_get_vector :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil {
 		lua.pushnumber(L, 0)
@@ -2215,7 +2215,7 @@ lua_input_get_vector :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_is_key_down :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	keyStr := lua.tostring(L, 1)
 	if keyStr == nil {
 		lua.pushboolean(L, false)
@@ -2239,7 +2239,7 @@ lua_input_is_key_down :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_is_key_pressed :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	keyStr := lua.tostring(L, 1)
 	if keyStr == nil {
 		lua.pushboolean(L, false)
@@ -2257,7 +2257,7 @@ lua_input_is_key_pressed :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_is_key_released :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	keyStr := lua.tostring(L, 1)
 	if keyStr == nil {
 		lua.pushboolean(L, false)
@@ -2275,7 +2275,7 @@ lua_input_is_key_released :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	btnStr := lua.tostring(L, 1)
 	btn, ok := parse_mouse_button(string(btnStr) if btnStr != nil else "LEFT")
 	if !ok {
@@ -2289,7 +2289,7 @@ lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_is_mouse_button_down :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	btnStr := lua.tostring(L, 1)
 	btn, ok := parse_mouse_button(string(btnStr) if btnStr != nil else "LEFT")
 	if !ok {
@@ -2303,7 +2303,7 @@ lua_input_is_mouse_button_down :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	btnStr := lua.tostring(L, 1)
 	btn, ok := parse_mouse_button(string(btnStr) if btnStr != nil else "LEFT")
 	if !ok {
@@ -2317,7 +2317,7 @@ lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_get_mouse_position :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if rl.IsWindowReady() {
 		mPos := rl.GetMousePosition()
 		lua.pushnumber(L, lua.Number(mPos.x))
@@ -2331,7 +2331,7 @@ lua_input_get_mouse_position :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_input_get_mouse_wheel_move :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	move := rl.GetMouseWheelMove() if rl.IsWindowReady() else 0
 	lua.pushnumber(L, lua.Number(move))
 	return 1
@@ -2343,7 +2343,7 @@ lua_input_get_mouse_wheel_move :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_play_sound :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil do return 0
@@ -2365,7 +2365,7 @@ lua_audio_play_sound :: proc "c" (L: ^lua.State) -> c.int {
 // happens (distance and pan from the listener).
 @(private="file")
 lua_audio_play_sound_at :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil || !rl.IsAudioDeviceReady() do return 0
@@ -2398,7 +2398,7 @@ bus_arg :: proc(L: ^lua.State, idx: c.int) -> (Audio_Bus, bool) {
 // Audio.set_bus_volume("master"|"music"|"sfx", v)
 @(private="file")
 lua_audio_set_bus_volume :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	bus, ok := bus_arg(L, 1)
 	if ok && sm != nil && sm.game != nil do Game_SetBusVolume(sm.game, bus, f32(lua.tonumber(L, 2)))
@@ -2407,7 +2407,7 @@ lua_audio_set_bus_volume :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_get_bus_volume :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	bus, ok := bus_arg(L, 1)
 	v: f32 = 1
@@ -2425,7 +2425,7 @@ lua_audio_get_bus_volume :: proc "c" (L: ^lua.State) -> c.int {
 // Audio.set_lowpass(hz): a low-pass on the whole mix (0 = off).
 @(private="file")
 lua_audio_set_lowpass :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	Audio_SetLowpass(f32(lua.tonumber(L, 1)))
 	return 0
 }
@@ -2433,7 +2433,7 @@ lua_audio_set_lowpass :: proc "c" (L: ^lua.State) -> c.int {
 // Audio.set_reverb(mix [, size]): reverb on the whole mix (mix 0 = off).
 @(private="file")
 lua_audio_set_reverb :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	Audio_SetReverb(f32(lua.tonumber(L, 1)), f32(lua.tonumber(L, 2)) if lua.gettop(L) >= 2 else 0.5)
 	return 0
 }
@@ -2441,7 +2441,7 @@ lua_audio_set_reverb :: proc "c" (L: ^lua.State) -> c.int {
 // Audio.set_listener(node | nil): where positional sounds are heard from.
 @(private="file")
 lua_audio_set_listener :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	Audio_SetListener(node if ok else nil)
 	return 0
@@ -2450,7 +2450,7 @@ lua_audio_set_listener :: proc "c" (L: ^lua.State) -> c.int {
 // Audio.crossfade(fromMusicNode, toMusicNode, seconds)
 @(private="file")
 lua_audio_crossfade :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	from, fok := to_node_userdata(L, 1)
 	to, tok := to_node_userdata(L, 2)
 	a := cast(^MusicNode)from if fok && from.typeId == MusicNode else nil
@@ -2462,7 +2462,7 @@ lua_audio_crossfade :: proc "c" (L: ^lua.State) -> c.int {
 // node:music_fade(volume, seconds [, stop_at_end])
 @(private="file")
 lua_node_music_fade :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != MusicNode do return 0
 	MusicNode_FadeTo(cast(^MusicNode)node, f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3)), bool(lua.toboolean(L, 4)))
@@ -2471,7 +2471,7 @@ lua_node_music_fade :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_play_music :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil do return 0
@@ -2488,7 +2488,7 @@ lua_audio_play_music :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_stop_music :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil do return 0
@@ -2504,7 +2504,7 @@ lua_audio_stop_music :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_pause_music :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil do return 0
@@ -2520,7 +2520,7 @@ lua_audio_pause_music :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_resume_music :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil do return 0
@@ -2536,7 +2536,7 @@ lua_audio_resume_music :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_is_music_playing :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil {
@@ -2558,7 +2558,7 @@ lua_audio_is_music_playing :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_set_music_volume :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	vol := f32(lua.tonumber(L, 2))
 	sm := get_script_manager(L)
@@ -2575,7 +2575,7 @@ lua_audio_set_music_volume :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_audio_set_master_volume :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	vol := f32(lua.tonumber(L, 1))
 	if rl.IsWindowReady() {
 		rl.SetMasterVolume(vol)
@@ -2590,7 +2590,7 @@ lua_audio_set_master_volume :: proc "c" (L: ^lua.State) -> c.int {
 // Scene.set_ambient(r, g, b [, a]) (0..1): the light map's base colour.
 @(private="file")
 lua_scene_set_ambient :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil do return 0
 	a := f32(lua.tonumber(L, 4)) if lua.type(L, 4) == .NUMBER else 1
@@ -2601,7 +2601,7 @@ lua_scene_set_ambient :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_get_ambient :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	c := rl.Color{255, 255, 255, 255}
 	if sm != nil && sm.game != nil && sm.game.sceneManager.currentScene != nil && sm.game.sceneManager.currentScene.ambient != {} {
@@ -2621,7 +2621,7 @@ light_arg :: proc(L: ^lua.State) -> ^LightNode {
 // light:light_set_color(r, g, b) (0..1)
 @(private="file")
 lua_light_set_color :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if l := light_arg(L); l != nil {
 		ch :: proc(v: f32) -> u8 {return u8(clamp(v, 0, 1) * 255 + 0.5)}
 		l.color = {ch(f32(lua.tonumber(L, 2))), ch(f32(lua.tonumber(L, 3))), ch(f32(lua.tonumber(L, 4))), 255}
@@ -2631,21 +2631,21 @@ lua_light_set_color :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_light_set_energy :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if l := light_arg(L); l != nil do l.energy = max(f32(lua.tonumber(L, 2)), 0)
 	return 0
 }
 
 @(private="file")
 lua_light_set_radius :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if l := light_arg(L); l != nil do l.radius = max(f32(lua.tonumber(L, 2)), 0)
 	return 0
 }
 
 @(private="file")
 lua_light_get_energy :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	l := light_arg(L)
 	lua.pushnumber(L, lua.Number(l.energy if l != nil else 0))
 	return 1
@@ -2670,7 +2670,7 @@ sm_ctx :: proc(L: ^lua.State) -> ^GameContext {
 // machine:sm_set(param, value) (number or boolean)
 @(private="file")
 lua_sm_set :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	name := lua.tostring(L, 2)
 	if sm == nil || name == nil do return 0
@@ -2684,7 +2684,7 @@ lua_sm_set :: proc "c" (L: ^lua.State) -> c.int {
 // machine:sm_get(param) -> number
 @(private="file")
 lua_sm_get :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	name := lua.tostring(L, 2)
 	lua.pushnumber(L, lua.Number(StateMachine_GetParam(sm, string(name)) if sm != nil && name != nil else 0))
@@ -2694,7 +2694,7 @@ lua_sm_get :: proc "c" (L: ^lua.State) -> c.int {
 // machine:sm_trigger(name): sets a trigger, consumed by the transition it fires
 @(private="file")
 lua_sm_trigger :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	name := lua.tostring(L, 2)
 	if sm != nil && name != nil do StateMachine_SetParam(sm, string(name), 1)
@@ -2704,7 +2704,7 @@ lua_sm_trigger :: proc "c" (L: ^lua.State) -> c.int {
 // machine:sm_travel(state [, blend]) -> bool: switch now, no conditions
 @(private="file")
 lua_sm_travel :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	name := lua.tostring(L, 2)
 	ok := false
@@ -2717,7 +2717,7 @@ lua_sm_travel :: proc "c" (L: ^lua.State) -> c.int {
 // guards allow it (the arrow's conditions aren't checked)
 @(private="file")
 lua_sm_request :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	name := lua.tostring(L, 2)
 	if sm == nil || name == nil {
@@ -2736,7 +2736,7 @@ lua_sm_request :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_sm_state :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	lua.pushstring(L, strings.clone_to_cstring(StateMachine_CurrentName(sm) if sm != nil else "", context.temp_allocator))
 	return 1
@@ -2744,7 +2744,7 @@ lua_sm_state :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_sm_previous :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	lua.pushstring(L, strings.clone_to_cstring(StateMachine_PreviousName(sm) if sm != nil else "", context.temp_allocator))
 	return 1
@@ -2753,7 +2753,7 @@ lua_sm_previous :: proc "c" (L: ^lua.State) -> c.int {
 // sm:sm_history() -> {{from=, to=, time=, why=}, ...} oldest first.
 @(private="file")
 lua_sm_history :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	lua.newtable(L)
 	if sm == nil do return 1
@@ -2770,7 +2770,7 @@ lua_sm_history :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_sm_time :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	lua.pushnumber(L, lua.Number(sm.timeInState if sm != nil else 0))
 	return 1
@@ -2779,7 +2779,7 @@ lua_sm_time :: proc "c" (L: ^lua.State) -> c.int {
 // machine:sm_start([state])
 @(private="file")
 lua_sm_start :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := sm_arg(L)
 	if sm == nil do return 0
 	name := lua.tostring(L, 2) if lua.gettop(L) >= 2 else nil
@@ -2789,7 +2789,7 @@ lua_sm_start :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_sm_stop :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if sm := sm_arg(L); sm != nil do StateMachine_Stop(sm)
 	return 0
 }
@@ -2800,7 +2800,7 @@ lua_sm_stop :: proc "c" (L: ^lua.State) -> c.int {
 // get_property: vectors as Vec2, "script.<name>" a script field).
 @(private="file")
 lua_node_index :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	lua.L_getmetatable(L, "Engine.Node")
 	lua.pushvalue(L, 2)
 	lua.rawget(L, -2)
@@ -2820,7 +2820,7 @@ lua_node_index :: proc "c" (L: ^lua.State) -> c.int {
 // set_property; an unknown one is an error).
 @(private="file")
 lua_node_newindex :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if lua.type(L, 2) == .STRING && string(lua.tostring(L, 2)) == "name" {
 		node, ok := to_node_userdata(L, 1)
 		if ok && lua.type(L, 3) == .STRING do node.name = strings.clone(string(lua.tostring(L, 3)), node.allocator)
@@ -2855,7 +2855,7 @@ push_script_self :: proc(L: ^lua.State, node: ^Node) -> bool {
 // sees (fields and methods) - or nil.
 @(private="file")
 lua_node_get_script :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || !push_script_self(L, node) do lua.pushnil(L)
 	return 1
@@ -2866,7 +2866,7 @@ lua_node_get_script :: proc "c" (L: ^lua.State) -> c.int {
 // {r, g, b[, a]} colours (0..1), enum names, strings.
 @(private="file")
 lua_node_set_property :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	name := lua.tostring(L, 2)
 	if !ok || name == nil do return 0
@@ -2929,7 +2929,7 @@ lua_node_set_property :: proc "c" (L: ^lua.State) -> c.int {
 // node:get_property(path) -> value (vectors and colours as tables)
 @(private="file")
 lua_node_get_property :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	name := lua.tostring(L, 2)
 	if !ok || name == nil {lua.pushnil(L); return 1}
@@ -3017,21 +3017,21 @@ set_layers :: proc(L: ^lua.State, mask: bool) -> c.int {
 // body:set_collision_layer("Player"[, ...]): the layers its shapes are on.
 @(private="file")
 lua_node_set_collision_layer :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	return set_layers(L, false)
 }
 
 // body:set_collision_mask("World", "Enemies"[, ...]): the layers it collides with.
 @(private="file")
 lua_node_set_collision_mask :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	return set_layers(L, true)
 }
 
 // Physics.layer_name(n) -> the project's name for layer n (1-16), or "".
 @(private="file")
 lua_physics_layer_name :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	n := int(lua.tointeger(L, 1))
 	lua.pushstring(L, strings.clone_to_cstring(collisionLayerNames[n - 1] if n >= 1 && n <= 16 else "", context.temp_allocator))
 	return 1
@@ -3080,21 +3080,21 @@ nav_find :: proc(L: ^lua.State, mapIdx: c.int) -> c.int {
 // -> { {x, y}, ... } or nil (TileMap / LDtk level nodes)
 @(private="file")
 lua_node_nav_find_path :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	return nav_find(L, 1)
 }
 
 // Navigation.find_path(map, x1, y1, x2, y2 [, opts])
 @(private="file")
 lua_navigation_find_path :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	return nav_find(L, 1)
 }
 
 // map:nav_is_walkable(x, y) -> bool
 @(private="file")
 lua_node_nav_is_walkable :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	walk := false
 	if ok {
@@ -3111,7 +3111,7 @@ lua_node_nav_is_walkable :: proc "c" (L: ^lua.State) -> c.int {
 // node:set_text(text): a TextNode (restarts its typewriter), UI label or button.
 @(private="file")
 lua_node_set_text :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	s := lua.tostring(L, 2)
 	if !ok || s == nil do return 0
@@ -3125,7 +3125,7 @@ lua_node_set_text :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_get_text :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	text := ""
 	if ok {
@@ -3142,7 +3142,7 @@ lua_node_get_text :: proc "c" (L: ^lua.State) -> c.int {
 // text:text_restart(): types the text out again.
 @(private="file")
 lua_node_text_restart :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if ok && node.typeId == TextNode {
 		t := cast(^TextNode)node
@@ -3163,7 +3163,7 @@ dialogue_arg :: proc(L: ^lua.State) -> ^DialogueNode {
 // or box:dialogue_show(text [, speaker])
 @(private="file")
 lua_node_dialogue_show :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	d := dialogue_arg(L)
 	if d == nil do return 0
 	lines := make([dynamic]Dialogue_Line, context.temp_allocator)
@@ -3197,21 +3197,21 @@ lua_node_dialogue_show :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_node_dialogue_next :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if d := dialogue_arg(L); d != nil do DialogueNode_Advance(d, sm_game_ctx(L))
 	return 0
 }
 
 @(private="file")
 lua_node_dialogue_close :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if d := dialogue_arg(L); d != nil do DialogueNode_Close(d, sm_game_ctx(L))
 	return 0
 }
 
 @(private="file")
 lua_node_dialogue_is_open :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	d := dialogue_arg(L)
 	lua.pushboolean(L, b32(d != nil && DialogueNode_IsOpen(d)))
 	return 1
@@ -3227,7 +3227,7 @@ sm_game_ctx :: proc(L: ^lua.State) -> ^GameContext {
 // tr(key [, {name = value, ...}]) -> the text in the current language.
 @(private="file")
 lua_tr :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	key := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if key == nil {lua.pushstring(L, ""); return 1}
@@ -3253,14 +3253,14 @@ lua_tr :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_locale_set :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if s := lua.tostring(L, 1); s != nil do Locale_SetLanguage(string(s))
 	return 0
 }
 
 @(private="file")
 lua_locale_get :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm != nil && sm.game != nil do Locale_Languages(sm.game) // loads the tables
 	lua.pushstring(L, strings.clone_to_cstring(Locale_Language(), context.temp_allocator))
@@ -3269,7 +3269,7 @@ lua_locale_get :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_locale_languages :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	langs: []string
 	if sm != nil && sm.game != nil do langs = Locale_Languages(sm.game)
@@ -3286,7 +3286,7 @@ lua_locale_languages :: proc "c" (L: ^lua.State) -> c.int {
 // line:line_set_points({ {x, y}, ... }) (local to the node)
 @(private="file")
 lua_node_line_set_points :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != LineNode || lua.type(L, 2) != .TABLE do return 0
 	ln := cast(^LineNode)node
@@ -3307,7 +3307,7 @@ lua_node_line_set_points :: proc "c" (L: ^lua.State) -> c.int {
 // line:line_add_point(x, y)
 @(private="file")
 lua_node_line_add_point :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if ok && node.typeId == LineNode do append(&(cast(^LineNode)node).points, [2]f32{f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3))})
 	return 0
@@ -3316,7 +3316,7 @@ lua_node_line_add_point :: proc "c" (L: ^lua.State) -> c.int {
 // line:line_clear() / trail:trail_clear()
 @(private="file")
 lua_node_line_clear :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	if node.typeId == LineNode do clear(&(cast(^LineNode)node).points)
@@ -3326,7 +3326,7 @@ lua_node_line_clear :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	nameC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if nameC == nil || sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
@@ -3340,7 +3340,7 @@ lua_scene_find_node :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_get_name :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
 		lua.pushstring(L, "")
@@ -3353,7 +3353,7 @@ lua_scene_get_name :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	nameC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if nameC == nil || sm == nil || sm.game == nil do return 0
@@ -3395,7 +3395,7 @@ lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
 // Scene.preload(name): load its assets in the background (a little each frame).
 @(private="file")
 lua_scene_preload :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	nameC := lua.tostring(L, 1)
 	if nameC == nil || sm == nil || sm.game == nil do return 0
@@ -3406,7 +3406,7 @@ lua_scene_preload :: proc "c" (L: ^lua.State) -> c.int {
 // Scene.preload_progress(name) -> 0..1
 @(private="file")
 lua_scene_preload_progress :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	nameC := lua.tostring(L, 1)
 	v: f32
@@ -3419,7 +3419,7 @@ lua_scene_preload_progress :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_is_transitioning :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	lua.pushboolean(L, b32(sm != nil && sm.game != nil && sm.game.transition.active))
 	return 1
@@ -3430,7 +3430,7 @@ lua_scene_is_transitioning :: proc "c" (L: ^lua.State) -> c.int {
 // monitor (the frame scales to it) or back to the project's window size.
 @(private="file")
 lua_engine_set_fullscreen :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm != nil && sm.game != nil do sm.game.fullscreenRequest = bool(lua.toboolean(L, 1))
 	return 0
@@ -3438,7 +3438,7 @@ lua_engine_set_fullscreen :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_engine_is_fullscreen :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	on := false
 	if sm != nil && sm.game != nil do on = sm.game.fullscreenRequest.? or_else sm.game.fullscreen
@@ -3448,7 +3448,7 @@ lua_engine_is_fullscreen :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_engine_set_paused :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm != nil && sm.game != nil do Game_SetPaused(sm.game, bool(lua.toboolean(L, 1)))
 	return 0
@@ -3456,7 +3456,7 @@ lua_engine_set_paused :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_engine_is_paused :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	lua.pushboolean(L, b32(sm != nil && sm.game != nil && sm.game.treePaused))
 	return 1
@@ -3465,7 +3465,7 @@ lua_engine_is_paused :: proc "c" (L: ^lua.State) -> c.int {
 // node:set_paused(bool): pauses this node and its children (unless "always").
 @(private="file")
 lua_node_set_paused :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	if node, ok := to_node_userdata(L, 1); ok do node.paused = bool(lua.toboolean(L, 2))
 	return 0
 }
@@ -3473,7 +3473,7 @@ lua_node_set_paused :: proc "c" (L: ^lua.State) -> c.int {
 // node:is_paused() -> paused this frame (by itself, a parent or the game)
 @(private="file")
 lua_node_is_paused :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	lua.pushboolean(L, b32(ok && (node.paused || node.pausedNow)))
 	return 1
@@ -3482,7 +3482,7 @@ lua_node_is_paused :: proc "c" (L: ^lua.State) -> c.int {
 // node:set_pause_mode("inherit" | "pausable" | "always")
 @(private="file")
 lua_node_set_pause_mode :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if s := lua.tostring(L, 2); ok && s != nil do node.pauseMode = Pause_ModeParse(string(s))
 	return 0
@@ -3490,7 +3490,7 @@ lua_node_set_pause_mode :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_reload :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm != nil && sm.game != nil && sm.game.sceneManager.currentScene != nil {
 		ChangeScene_ByName(&sm.game.sceneManager, sm.game.sceneManager.currentScene.name)
@@ -3500,7 +3500,7 @@ lua_scene_reload :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_get_nodes :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil || sm.game.sceneManager.currentScene.manager == nil {
 		lua.newtable(L)
@@ -3524,7 +3524,7 @@ lua_scene_get_nodes :: proc "c" (L: ^lua.State) -> c.int {
 // local to the parent - two numbers or a vector). Returns its root node.
 @(private="file")
 lua_scene_instantiate :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil || lua.type(L, 1) != .STRING {
 		lua.pushnil(L)
@@ -3552,7 +3552,7 @@ lua_scene_instantiate :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
 		lua.pushnil(L)
@@ -3627,7 +3627,7 @@ lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_get_draw_bounds :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
 		lua.pushboolean(L, false)
@@ -3639,7 +3639,7 @@ lua_scene_get_draw_bounds :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_scene_set_draw_bounds :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm != nil && sm.game != nil && sm.game.sceneManager.currentScene != nil {
 		draw := lua.toboolean(L, 1)
@@ -3721,21 +3721,21 @@ script_log :: proc(level: log.Level, text: string) {
 
 @(private="file")
 lua_log_info :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	script_log(.Info, script_log_args(L))
 	return 0
 }
 
 @(private="file")
 lua_log_warn :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	script_log(.Warning, script_log_args(L))
 	return 0
 }
 
 @(private="file")
 lua_log_error :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	script_log(.Error, script_log_args(L))
 	return 0
 }
@@ -3746,7 +3746,7 @@ lua_log_error :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_project_load :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil {
@@ -3760,7 +3760,7 @@ lua_project_load :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_project_export_ore :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	dirC := lua.tostring(L, 1)
 	outC := lua.tostring(L, 2)
 	sm := get_script_manager(L)
@@ -3775,7 +3775,7 @@ lua_project_export_ore :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_project_serialize_scene :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
 		lua.pushstring(L, "{}")
@@ -3789,7 +3789,7 @@ lua_project_serialize_scene :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_project_read_file :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil {
@@ -3808,7 +3808,7 @@ lua_project_read_file :: proc "c" (L: ^lua.State) -> c.int {
 
 @(private="file")
 lua_project_has_file :: proc "c" (L: ^lua.State) -> c.int {
-	context = runtime.default_context()
+	context = Script_Context(L)
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil {
@@ -4383,6 +4383,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "set_draw_bounds")
 	lua.setglobal(L, "Scene")
 	Script_RegisterTweenModule(L)
+	Script_RegisterPoolModule(L)
 	Script_RegisterSaveModule(L)
 	lua.newtable(L)
 	lua.pushcfunction(L, lua_navigation_find_path)
