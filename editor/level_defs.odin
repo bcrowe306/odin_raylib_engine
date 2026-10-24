@@ -16,13 +16,14 @@ import imgui "lib/imgui"
 //   Tilesets     from project images, grid / spacing / padding, per-tile
 //                custom data, animations and enum tags
 //   Entities     size, colour, pivot, resizing, tile, fields
-//   Enums        values
+//   Enums        (level_defs_enums.odin) enums, values, external enums
 //   Layers       (level_defs_layers.odin) every layer option, IntGrid values
 //                and groups, copy / paste, bake (new layers: the Layers
 //                panel's + button)
 //   Rules        auto-layer rule groups and rules (pattern grid, tiles,
 //                chance, flips, modulo, break on match), terrains
-//   Project      defaults, background, JSON options, level fields
+//   Project      (level_project.odin) file / save options, identifier
+//                style, defaults, flags, level fields
 //
 // Every change is a project undo step (Ldtk_Doc_Checkpoint(doc, -1, ...)).
 // ============================================================================
@@ -61,10 +62,10 @@ LevelDefs_Page :: proc(state: ^EditorState, page: Level_Panel_Tab) {
 	case .World: page_world(state)
 	case .Tilesets: page_tilesets(state)
 	case .Entities: LevelDefs_EntitiesPage(state)
-	case .Enums: page_enums(state)
+	case .Enums: LevelEnums_Page(state)
 	case .Layers: LevelLayers_Page(state)
 	case .Rules: LevelRules_Page(state)
-	case .Project: page_project(state)
+	case .Project: LevelProject_Page(state)
 	}
 }
 
@@ -430,76 +431,6 @@ page_world :: proc(state: ^EditorState) {
 	imgui.EndChild()
 }
 
-@(private = "file")
-page_project :: proc(state: ^EditorState) {
-	L := &GlobalLevel
-	doc := L.doc
-	a := doc.allocator
-	root := doc.root
-	avail := imgui.GetContentRegionAvail()
-	if imgui.BeginChild("##project_props", {380, avail.y}, {}, {}) {
-		UI_PanelTitle(ICON_FA_GEAR, "Project", L.rel)
-		if UI_BeginProps("##project_t") {
-			defer UI_EndProps()
-			ints :: proc(label, id, kx, ky: string, root: ^e.LdtkJson) {
-				doc := GlobalLevel.doc
-				UI_PropLabel(label)
-				v := [2]i32{i32(e.LdtkJson_Int(root, kx)), i32(e.LdtkJson_Int(root, ky))}
-				if imgui.InputInt2(fmt.ctprintf("##%s", id), &v, {.EnterReturnsTrue}) && v.x > 0 && v.y > 0 {
-					defs_checkpoint(label)
-					e.LdtkJson_SetInt(root, kx, int(v.x), doc.allocator)
-					e.LdtkJson_SetInt(root, ky, int(v.y), doc.allocator)
-					e.Ldtk_Doc_Touch(doc)
-				}
-				Drive_Item(id)
-			}
-			UI_PropLabel("Default grid")
-			g := i32(e.LdtkJson_Int(root, "defaultGridSize", 16))
-			if imgui.InputInt("##pgrid", &g, 1, 8, {.EnterReturnsTrue}) && g > 0 {
-				defs_checkpoint("Default Grid")
-				e.LdtkJson_SetInt(root, "defaultGridSize", int(g), a)
-				e.Ldtk_Doc_Touch(doc)
-			}
-			ints("New entity size", "defs.project.entitysize", "defaultEntityWidth", "defaultEntityHeight", root)
-			colour :: proc(label, key: string, root: ^e.LdtkJson) {
-				doc := GlobalLevel.doc
-				UI_PropLabel(label)
-				c := e.Ldtk_ParseHexColor(e.LdtkJson_Str(root, key, "#40465B"))
-				col := [3]f32{f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255}
-				if imgui.ColorEdit3(fmt.ctprintf("##%s", key), &col, {.NoInputs}) {
-					e.Ldtk_Doc_CheckpointOnce(doc, -1, label, rawptr(raw_data(key)))
-					e.LdtkJson_SetStr(root, key, e.Ldtk_ColorHex({u8(col[0] * 255 + 0.5), u8(col[1] * 255 + 0.5), u8(col[2] * 255 + 0.5), 255}), doc.allocator)
-					e.Ldtk_Doc_Touch(doc)
-				}
-			}
-			colour("Background", "bgColor", root)
-			colour("Level background", "defaultLevelBgColor", root)
-			UI_PropLabel("Level names")
-			if name, ok := defs_text_edit("defs.project.levelnames", root, "levelNamePattern"); ok {
-				defs_checkpoint("Level Names")
-				e.LdtkJson_SetStr(root, "levelNamePattern", name, a)
-				e.Ldtk_Doc_Touch(doc)
-			}
-			UI_Tooltip("New levels' names: %idx = a free number, %world = the world's name")
-			UI_PropLabel("Minify JSON")
-			minify := e.LdtkJson_Bool(root, "minifyJson")
-			if imgui.Checkbox("##minify", &minify) {
-				defs_checkpoint("Minify JSON")
-				e.LdtkJson_SetBool(root, "minifyJson", minify, a)
-				doc.minify = minify
-				for &lv in doc.levels do lv.dirty = true
-				e.Ldtk_Doc_Touch(doc)
-			}
-			UI_PropLabel("Level files")
-			UI_DimText(doc.external ? "one .ldtkl per level" : "in the .ldtk")
-		}
-	}
-	imgui.EndChild()
-	imgui.SameLine(0, 8)
-	if imgui.BeginChild("##project_fields", {0, avail.y}, {}, {}) do LevelDefs_FieldsPanel(state, -1)
-	imgui.EndChild()
-}
-
 // ----------------------------------------------------------------------------
 // Entities
 // ----------------------------------------------------------------------------
@@ -544,71 +475,6 @@ picked_tile_rect :: proc() -> (int, [4]int, bool) {
 // ----------------------------------------------------------------------------
 // Enums / tilesets / level fields
 // ----------------------------------------------------------------------------
-
-@(private = "file")
-page_enums :: proc(state: ^EditorState) {
-	L := &GlobalLevel
-	doc := L.doc
-	enums := e.LdtkJson_Arr(e.LdtkJson_Get(doc.root, "defs"), "enums")
-	avail := imgui.GetContentRegionAvail()
-	if imgui.BeginChild("##enum_list", {200, avail.y}, {.Borders}, {}) {
-		if UI_Button(fmt.tprintf("%s  Add enum", ICON_FA_PLUS), "defs.enum.add") {
-			defs_checkpoint("Add Enum")
-			defs.enumUid = e.Ldtk_Doc_AddEnum(doc, "Enum")
-		}
-		imgui.Separator()
-		for en in enums {
-			uid := e.LdtkJson_Int(en, "uid")
-			name := e.LdtkJson_Str(en, "identifier")
-			if imgui.Selectable(fmt.ctprintf("%s##enl%d", name, uid), defs.enumUid == uid, {}, {0, 22}) do defs.enumUid = uid
-			Drive_Item(fmt.tprintf("defs.enum:%s", name))
-		}
-	}
-	imgui.EndChild()
-	imgui.SameLine(0, 8)
-	if imgui.BeginChild("##enum_props", {0, avail.y}, {}, {}) {
-		en := e.Ldtk_Doc_EnumDef(doc, defs.enumUid)
-		if en == nil {
-			UI_DimText("Pick an enum, or add one.")
-		} else {
-			UI_PanelTitle(ICON_FA_LIST, e.LdtkJson_Str(en, "identifier"), "enum")
-			if UI_BeginProps("##enum_t") {
-				UI_PropLabel("Identifier")
-				if name, ok := defs_text_edit("defs.enum.name", en, "identifier"); ok {
-					defs_checkpoint("Rename Enum")
-					e.LdtkJson_SetStr(en, "identifier", e.Ldtk_CleanIdentifier(name), doc.allocator)
-				}
-				UI_EndProps()
-			}
-			UI_SectionHeader("Values")
-			vals := e.LdtkJson_Get(en, "values")
-			for v, i in vals.items {
-				imgui.PushIDInt(i32(i))
-				imgui.TextUnformatted(fmt.ctprintf("%s", e.LdtkJson_Str(v, "id")))
-				imgui.SameLine(200)
-				if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("defs.enum.value.remove:%s", e.LdtkJson_Str(v, "id")), "Remove", false, 22) {
-					defs_checkpoint("Remove Enum Value")
-					ordered_remove(&vals.items, i)
-					e.Ldtk_Doc_Touch(doc)
-					imgui.PopID()
-					break
-				}
-				imgui.PopID()
-			}
-			@(static) valBuf: [64]u8
-			imgui.SetNextItemWidth(160)
-			enter := imgui.InputTextWithHint("##newval", "New value", cstring(raw_data(valBuf[:])), len(valBuf), {.EnterReturnsTrue})
-			Drive_Item("defs.enum.value.name")
-			imgui.SameLine()
-			if (UI_Button(fmt.tprintf("%s  Add", ICON_FA_PLUS), "defs.enum.value.add") || enter) && valBuf[0] != 0 {
-				defs_checkpoint("Add Enum Value")
-				e.Ldtk_Doc_AddEnumValue(doc, defs.enumUid, string(cstring(raw_data(valBuf[:]))))
-				valBuf = {}
-			}
-		}
-	}
-	imgui.EndChild()
-}
 
 @(private = "file")
 page_tilesets :: proc(state: ^EditorState) {

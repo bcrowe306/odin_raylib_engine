@@ -1060,6 +1060,7 @@ ldtk_flush_level :: proc(doc: ^Ldtk_Doc, lv: ^Ldtk_DocLevel, sa: mem.Allocator) 
 		append(swaps, Ldtk_FlushSwap{obj, i, obj.items[i]})
 		obj.items[i] = v
 	}
+	preCsv := Ldtk_Doc_HasFlag(doc, "ExportPreCsvIntGridFormat")
 	for &ly in lv.layers {
 		d := Ldtk_Doc_LayerDef(doc, &ly)
 		if ly.cellsDirty {
@@ -1070,6 +1071,18 @@ ldtk_flush_level :: proc(doc: ^Ldtk_Doc, lv: ^Ldtk_DocLevel, sa: mem.Allocator) 
 			}
 			swap(&swaps, ly.obj, "intGridCsv", csv, sa)
 			swap(&swaps, ly.obj, "gridTiles", ldtk_tiles_json(ly.gridTiles[:], false, sa), sa)
+			if preCsv {
+				// the ExportPreCsvIntGridFormat flag: also the old format
+				old := LdtkJson_New(.Array, sa)
+				for v, i in ly.intGrid {
+					if v == 0 do continue
+					e := LdtkJson_New(.Object, sa)
+					append(&e.keys, "coordId", "v")
+					append(&e.items, LdtkJson_NewInt(i, sa), LdtkJson_NewInt(int(v) - 1, sa))
+					append(&old.items, e)
+				}
+				swap(&swaps, ly.obj, "intGrid", old, sa)
+			}
 		}
 		if ly.autoDirty {
 			swap(&swaps, ly.obj, "autoLayerTiles", ldtk_tiles_json(ly.autoTiles[:], true, sa), sa)
@@ -1155,6 +1168,7 @@ Ldtk_Doc_ToText :: proc(doc: ^Ldtk_Doc) -> string {
 Ldtk_Doc_Save :: proc(doc: ^Ldtk_Doc, path := "") -> bool {
 	target := path != "" ? path : doc.path
 	if doc.modified do Ldtk_Doc_UpdateToc(doc)
+	if doc.external do Ldtk_Doc_FixLevelFiles(doc)
 	project, paths, texts := Ldtk_Doc_Serialize(doc, context.temp_allocator)
 	dir := filepath.dir(target, context.temp_allocator)
 	ok := os.write_entire_file(target, transmute([]byte)project) == nil

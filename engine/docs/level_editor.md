@@ -152,6 +152,16 @@ when inactive, filter tags; IntGrid values with groups, order and icons;
 the auto-layer tileset, biome field and "tiles removed by" layer; Entities
 layers' required / excluded tags; Tiles layers' tile pivot.
 
+### Enums and project options
+
+Bottom panel > **Enums**: copy / paste / duplicate / reorder / delete
+enums; rename values (fields follow), colours, icons, tags; **Import**
+external enums from `.txt`, `.json`, `.hx` or `.cdb` files and sync them
+when they change (used values that disappear can be renamed to new ones).
+**Project**: file extension, backups on save, minify, external level files,
+identifier style (converts every identifier), level name pattern,
+defaults, LDtk's advanced flags, a description.
+
 ### Context menus and help
 
 Right-click levels, layers and palette items for their actions: rename,
@@ -294,6 +304,9 @@ e.Ldtk_Doc_Save(doc)
 | `Ldtk_Doc_ResizeLevelBounds` (any edge, like LDtk's applyNewBounds), `ResizeLevel` | resizing |
 | `Ldtk_Doc_SetLevelBg`, `SetLevelBgPos`, `SetLevelBgPivot`, `LevelBg`; `Ldtk_LevelBgInfo`, `Ldtk_BgPos`, `Ldtk_ImageSize` | background images (`__bgPos`) |
 | `Ldtk_Doc_SetLayerGrid`, `DuplicateLayerDef`, `LayerDefText` / `PasteLayerDef`, `BakeLayer`, `LayerIsSource`, `MoveIntGridValue`, `AddIntGridGroup` / `RemoveIntGridGroup` / `SetIntGridGroup` / `MoveIntGridGroup` / `SetIntGridValueGroup`, `SetIntGridValueTile`, `MoveEntitiesBetweenLayers` | layer definitions |
+| `Ldtk_Doc_RenameEnum`, `RenameEnumValue`, `RemoveEnumValue`, `RemoveEnum`, `MoveEnum` / `MoveEnumValue`, `SetEnumValueColor` / `SetEnumValueTile` / `SetEnumIconTileset` / `SetEnumTags`, `EnumText` / `PasteEnum` / `DuplicateEnum`, `EnumUsed` / `EnumValueUsed` | enums |
+| `Ldtk_ParseExternalEnums`, `Ldtk_Doc_ExternalEnumDiff` / `ApplyEnumSync` (`Ldtk_EnumSync`), `ExternalEnumSources`, `RemoveExternalEnumSource`, `Ldtk_Md5Hex` | external enums |
+| `Ldtk_Doc_SetExternalLevels`, `LevelFileRel`, `FixLevelFiles`, `SetIdentifierStyle` / `IdentifierStyle` / `CleanIdentifier`, `SetProjectFlag` (`LDTK_PROJECT_FLAGS`), `Backup` / `BackupDir` | project options |
 | `Ldtk_Doc_SetMultiWorlds`, `AddWorld`, `RenameWorld`, `RemoveWorld`, `WorldInt` / `WorldStr` / `SetWorldInt`, `WorldName`; `SetFlag` / `HasFlag` | worlds and project flags |
 | `Ldtk_Doc_SetIntGrid`, `SetTile`, `TilesAt`, `GetIntGrid` | cells |
 | `Ldtk_Doc_ApplyRules` (an area), `ApplyRulesLayer`, `ApplyRulesFull` | auto tiles |
@@ -331,8 +344,8 @@ rules that can't match, as LDtk does.
   older LDtk versions (random tiles of flipped matches changed in 1.3.3,
   irrelevant rules are skipped since 1.5) get today's tiles when their
   layers are repainted - LDtk would do the same.
-- Not edited here yet (kept as they are, edit them in LDtk): external
-  enums, LDtk's custom commands and export options.
+- Not edited here yet (kept as they are, edit them in LDtk): LDtk's
+  custom commands and export options.
 - Animated tiles are this engine's convention (custom data); LDtk shows the
   first frame.
 

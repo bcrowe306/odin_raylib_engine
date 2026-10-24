@@ -102,6 +102,66 @@ Ldtk_CleanIdentifier :: proc(s: string, allocator := context.temp_allocator, kee
 	return out
 }
 
+Ldtk_IdentifierStyle :: enum u8 {
+	Capitalize,
+	Uppercase,
+	Lowercase,
+	Free,
+}
+
+LDTK_IDENTIFIER_STYLES := [Ldtk_IdentifierStyle]string {
+	.Capitalize = "Capitalize",
+	.Uppercase  = "Uppercase",
+	.Lowercase  = "Lowercase",
+	.Free       = "Free",
+}
+
+Ldtk_Doc_IdentifierStyle :: proc(doc: ^Ldtk_Doc) -> Ldtk_IdentifierStyle {
+	s := LdtkJson_Str(doc.root, "identifierStyle", "Capitalize")
+	for n, st in LDTK_IDENTIFIER_STYLES do if n == s do return st
+	return .Capitalize
+}
+
+// Ldtk_CleanIdentifierStyle: Project.cleanupIdentifier - invalid characters
+// and leading digits become "_", repeated "_" collapse, then the style.
+Ldtk_CleanIdentifierStyle :: proc(s: string, style: Ldtk_IdentifierStyle, allocator := context.temp_allocator) -> string {
+	b := strings.builder_make(context.temp_allocator)
+	for r in strings.trim_space(s) {
+		ok := (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || r == '_' || (r >= '0' && r <= '9')
+		c := ok ? r : '_'
+		// collapse "_" runs
+		if c == '_' && strings.builder_len(b) > 0 && strings.to_string(b)[strings.builder_len(b) - 1] == '_' do continue
+		strings.write_rune(&b, c)
+	}
+	id := strings.to_string(b)
+	if id == "" do return strings.clone("Unnamed", allocator)
+	if id[0] >= '0' && id[0] <= '9' {
+		// leading digits -> "_"
+		k := 0
+		for k < len(id) && id[k] >= '0' && id[k] <= '9' do k += 1
+		id = fmt.tprintf("_%s", id[k:])
+	}
+	out := strings.clone(id, allocator)
+	bytes := transmute([]u8)out
+	switch style {
+	case .Capitalize:
+		for i in 0 ..< len(bytes) {
+			if bytes[i] == '_' do continue
+			if bytes[i] >= 'a' && bytes[i] <= 'z' do bytes[i] -= 32
+			break
+		}
+	case .Uppercase: for &c in bytes do if c >= 'a' && c <= 'z' do c -= 32
+	case .Lowercase: for &c in bytes do if c >= 'A' && c <= 'Z' do c += 32
+	case .Free:
+	}
+	return out
+}
+
+// Ldtk_Doc_CleanIdentifier: cleanupIdentifier with the project's style.
+Ldtk_Doc_CleanIdentifier :: proc(doc: ^Ldtk_Doc, s: string, allocator := context.temp_allocator) -> string {
+	return Ldtk_CleanIdentifierStyle(s, Ldtk_Doc_IdentifierStyle(doc), allocator)
+}
+
 @(private = "file")
 jo :: proc(a: mem.Allocator) -> ^LdtkJson {return LdtkJson_New(.Object, a)}
 @(private = "file")
@@ -142,7 +202,7 @@ Ldtk_Doc_UniqueIdentifier :: proc(doc: ^Ldtk_Doc, list: string, base: string, al
 	// Project.fixUniqueIdStr: the name, else a trailing number counts up
 	// ("Wall2" -> "Wall3"), else "2", "3"... are appended
 	arr := defs_arr(doc, list)
-	clean := Ldtk_CleanIdentifier(base)
+	clean := Ldtk_Doc_CleanIdentifier(doc, base)
 	used :: proc(arr: ^LdtkJson, name: string) -> bool {
 		for d in arr.items do if LdtkJson_Str(d, "identifier") == name do return true
 		return false
@@ -293,7 +353,7 @@ Ldtk_Doc_MoveLayerDef :: proc(doc: ^Ldtk_Doc, uid: int, delta: int) -> bool {
 // Ldtk_Doc_RenameLayerDef renames a layer def and its instances' cache.
 Ldtk_Doc_RenameLayerDef :: proc(doc: ^Ldtk_Doc, uid: int, name: string) {
 	a := doc.allocator
-	clean := Ldtk_CleanIdentifier(name)
+	clean := Ldtk_Doc_CleanIdentifier(doc, name)
 	for d in defs_arr(doc, "layers").items do if LdtkJson_Int(d, "uid", -1) == uid do LdtkJson_SetStr(d, "identifier", clean, a)
 	for &lv in doc.levels {
 		for &ly in lv.layers do if LdtkJson_Int(ly.obj, "layerDefUid", -1) == uid do LdtkJson_SetStr(ly.obj, "__identifier", clean, a)
@@ -559,7 +619,7 @@ Ldtk_Doc_AddFieldDef :: proc(doc: ^Ldtk_Doc, entityUid: int, type: string, ident
 	for t in LDTK_FIELD_TYPES do if t.type == type do label = t.label
 	if strings.has_prefix(type, "F_Enum(") {
 		ed := Ldtk_Doc_EnumDef(doc, Ldtk_FieldTypeEnumUid(type))
-		label = fmt.tprintf("LocalEnum.%s", LdtkJson_Str(ed, "identifier"))
+		label = fmt.tprintf("%s.%s", Ldtk_Doc_EnumIsExternal(ed) ? "ExternEnum" : "LocalEnum", LdtkJson_Str(ed, "identifier"))
 	}
 	name := Ldtk_CleanIdentifier(identifier)
 	// unique among this list
@@ -682,12 +742,24 @@ Ldtk_Doc_AddEnumValue :: proc(doc: ^Ldtk_Doc, enumUid: int, id: string) -> bool 
 	ed := Ldtk_Doc_EnumDef(doc, enumUid)
 	if ed == nil do return false
 	vals := LdtkJson_Get(ed, "values")
-	clean := Ldtk_CleanIdentifier(id)
+	clean := Ldtk_Doc_CleanIdentifier(doc, id)
 	for v in vals.items do if LdtkJson_Str(v, "id") == clean do return false
+	// a palette colour no value uses yet (Const.suggestNiceColor)
+	color := 0
+	for hex in LDTK_PALETTE {
+		c := Ldtk_ParseHexColor(hex)
+		rgb := int(c.r) << 16 | int(c.g) << 8 | int(c.b)
+		used := false
+		for v in vals.items do if LdtkJson_Int(v, "color") == rgb do used = true
+		if !used {
+			color = rgb
+			break
+		}
+	}
 	o := jo(a)
 	pstr(o, "id", clean, a)
 	pnull(o, "tileRect", a)
-	pint(o, "color", 0, a)
+	pint(o, "color", color, a)
 	append(&vals.items, o)
 	Ldtk_Doc_Touch(doc)
 	return true

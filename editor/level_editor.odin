@@ -223,6 +223,7 @@ LevelEditor_Open :: proc(state: ^EditorState, rel: string) -> bool {
 	L.fitRequest = true
 	L.tab = .Level
 	Editor_Log(state, .Info, "Editing level %s", rel)
+	LevelProject_AfterLoad(state)
 	return true
 }
 
@@ -403,6 +404,7 @@ level_active_layer :: proc() -> (^e.Ldtk_DocLayer, ^e.Ldtk_DocLayerDef) {
 LevelEditor_Save :: proc(state: ^EditorState) -> bool {
 	L := &GlobalLevel
 	if L.doc == nil do return false
+	LevelProject_BeforeSave(state)
 	if !e.Ldtk_Doc_Save(L.doc) {
 		Editor_Log(state, .Error, "Could not save %s", L.rel)
 		return false
@@ -901,7 +903,7 @@ level_rename_popup :: proc(state: ^EditorState) {
 	UI_Tooltip("Letters, digits and _ (other characters become _)")
 	if UI_PrimaryButton("Rename", "level.rename.ok") || enter {
 		if L.renameLevel >= 0 && L.renameLevel < len(doc.levels) {
-			name := e.Ldtk_CleanIdentifier(string(cstring(raw_data(L.renameBuf[:]))))
+			name := e.Ldtk_Doc_CleanIdentifier(doc, string(cstring(raw_data(L.renameBuf[:]))))
 			e.Ldtk_Doc_Checkpoint(doc, L.renameLevel, "Rename Level")
 			if !e.Ldtk_Doc_RenameLevel(doc, L.renameLevel, name) do Editor_Log(state, .Warn, "A level is already called %s", name)
 		}
@@ -1486,7 +1488,7 @@ level_tab_level :: proc(state: ^EditorState) {
 			name := string(cstring(raw_data(nameBuf[:])))
 			if name != e.LdtkJson_Str(lv.obj, "identifier") {
 				e.Ldtk_Doc_Checkpoint(doc, L.level, "Rename Level")
-				if !e.Ldtk_Doc_RenameLevel(doc, L.level, e.Ldtk_CleanIdentifier(name)) do Editor_Log(state, .Warn, "A level is already called %s", name)
+				if !e.Ldtk_Doc_RenameLevel(doc, L.level, e.Ldtk_Doc_CleanIdentifier(doc, name)) do Editor_Log(state, .Warn, "A level is already called %s", name)
 			}
 		}
 		Drive_Item("level.name")
@@ -2032,6 +2034,22 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		return fd != nil ? fmt.tprintf("%s %s %s", e.LdtkJson_Str(fd, "identifier"), e.LdtkJson_Str(fd, "__type"), e.LdtkJson_Str(fd, "editorDisplayMode")) : "", true
 	}
 	if v, ok := LevelRules_Query(q); ok do return v, true
+	// level.enum:<name> -> its values; level.external / level.levelfile
+	if strings.has_prefix(q, "level.enum:") {
+		name := q[len("level.enum:"):]
+		defs := e.LdtkJson_Get(doc.root, "defs")
+		for key in ([]string{"enums", "externalEnums"}) do for en in e.LdtkJson_Arr(defs, key) do if e.LdtkJson_Str(en, "identifier") == name {
+			b := strings.builder_make(context.temp_allocator)
+			for v, i in e.LdtkJson_Arr(en, "values") {
+				if i > 0 do strings.write_byte(&b, ',')
+				strings.write_string(&b, e.LdtkJson_Str(v, "id"))
+			}
+			return strings.to_string(b), true
+		}
+		return "<no enum>", true
+	}
+	if q == "level.external" do return doc.external ? "true" : "false", true
+	if q == "level.levelfile" do return e.LdtkJson_Str(doc.levels[L.level].obj, "externalRelPath"), true
 	// level.layerprop:<layer>.<key> -> a layer definition's JSON value
 	if strings.has_prefix(q, "level.layerprop:") {
 		rest := q[len("level.layerprop:"):]

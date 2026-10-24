@@ -1,0 +1,71 @@
+# Level editor project options and enums: an enum value added and renamed;
+# external enums imported from a text file and synced after it changed;
+# the identifier style (undo); external level files with index prefixes;
+# backups on save.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/proj_zz
+exec cp tests/drive/fixtures/enums/fruits_zz.txt $PROJECT/proj_zz/fruits_zz.txt
+wait 90
+click @root.level
+wait 3
+click @level.open:proj_zz/topdown.ldtk
+wait 5
+# enums
+click @level.tab:Enums
+wait 1
+click @defs.enum:Item
+wait 1
+click @defs.enum.value.name
+type Gem
+key enter
+wait 1
+expect level.enum:Item contains Gem
+click @defs.enum.value.name:Gem
+key cmd+a
+type Jewel
+key enter
+wait 1
+expect level.enum:Item contains Jewel
+expect level.enum:Item !contains Gem
+screenshot enum_form
+# external enums from a text file
+click @defs.enum.import
+hover @ctx:Text file
+wait 1
+click @import:proj_zz/fruits_zz.txt
+wait 2
+expect level.enum:Fruit == Apple,Pear
+screenshot external_enum
+exec cp tests/drive/fixtures/enums/fruits2_zz.txt $PROJECT/proj_zz/fruits_zz.txt
+wait 1
+click @defs.enum.sync:fruits_zz.txt
+wait 2
+screenshot synced
+expect level.enum:Fruit == Apple,Peach
+# identifier style: uppercase, then undo
+click @level.tab:Project
+wait 1
+screenshot project_tab
+click @defs.project.style
+click @pick:Uppercase: MY_IDENTIFIER_1
+wait 1
+click @style.ok
+wait 2
+expect level.layerdefs contains COLLISIONS
+key cmd+z
+wait 2
+expect level.layerdefs contains Collisions
+# external level files, prefixed with their index; backups
+click @defs.project.external
+wait 1
+expect level.external == true
+click @section:Advanced
+wait 1
+click @defs.project.flag:PrependIndexToLevelFileNames
+wait 1
+click @defs.project.backup
+wait 1
+key cmd+s
+wait 3
+expect level.levelfile contains topdown/0000-
+expect log contains Backup:
+screenshot after_save

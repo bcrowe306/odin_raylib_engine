@@ -3,7 +3,7 @@ package engine
 import "core:fmt"
 import "core:math"
 import "core:mem"
-import "core:os"
+import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import rl "vendor:raylib"
@@ -141,7 +141,7 @@ Ldtk_Doc_AddWorld :: proc(doc: ^Ldtk_Doc, name := "World") -> int {
 
 // Ldtk_Doc_UniqueWorldName: Project.fixUniqueIdStr for worlds.
 Ldtk_Doc_UniqueWorldName :: proc(doc: ^Ldtk_Doc, base: string, except := -1, allocator := context.temp_allocator) -> string {
-	base := Ldtk_CleanIdentifier(base, keepCase = true)
+	base := Ldtk_Doc_CleanIdentifier(doc, base)
 	if base == "" || base == "_" do base = "Unnamed"
 	used :: proc(doc: ^Ldtk_Doc, id: string, except: int) -> bool {
 		for w, i in doc.worlds do if i != except && LdtkJson_Str(w.obj, "identifier") == id do return true

@@ -418,8 +418,44 @@ Fields still at their default (or empty arrays) are only shown when
 ## Enums tab
 <!-- topic: tab.enums -->
 
-Enumerations: lists of named values, for enum fields and tile tags. Add
-values with the box under the list.
+Enumerations are lists of named values, used by Enum fields, tileset tags
+and rule biomes.
+
+- **Add enum** adds one. **Import** brings in enums from a file (see
+  *External enums*).
+- Right-click an enum to copy, cut, paste after, duplicate, move or delete
+  it. Deleting an enum also deletes the fields that use it (it asks first).
+  The list groups enums by their first tag.
+- **Identifier**, **tags**, and **icons from**: the tileset each value's
+  icon comes from. Changing it clears the icons.
+- Values: a colour (used for smart colours), an icon (click the picture),
+  and a name. Renaming a value updates the fields that use it, the
+  tilesets' enum tags and the rule biomes. Right-click a value to move it,
+  clear its icon or remove it. Removing a used value asks first; those
+  fields become empty.
+
+## External enums
+<!-- topic: enums.external -->
+
+**Import** reads enums from a file of the project and keeps them linked to
+it. Supported files:
+
+| File | Format |
+|---|---|
+| Text (`.txt`) | One enum per line: `Name: A, B, C` (or `;` or spaces) |
+| JSON (`.json`) | `{"Name": ["A", "B"]}` or `{"Name": "A, B"}` |
+| Haxe (`.hx`) | Simple enums: `enum Name { A; B; }` (enums with parameters are skipped) |
+| CastleDB (`.cdb`) | Sheets with a unique identifier column; a colour column gives colours |
+
+External enums can't be renamed or edited by hand; they follow their file.
+The list shows each file with buttons to **sync** it (reload) or **remove**
+its enums. "(changed)" means the file changed since the last sync, and
+"(missing)" means it's gone. Opening the project syncs changed files.
+
+Syncing adds new enums and values and removes the ones the file no longer
+has. When removed values are used by fields, a dialog asks what each one
+becomes: removed (the fields become empty), or renamed to one of the new
+values (the fields keep their choice). Values follow the file's order.
 
 ## Layers tab
 <!-- topic: tab.layers -->
@@ -635,9 +671,66 @@ the middle inside.
 ## Project tab
 <!-- topic: tab.project -->
 
-Defaults for new levels and entities, background colours, the level name
-pattern (`%idx`, `%world`), whether to minify the JSON, and the **level
-fields**.
+Project settings on the left and the **level fields** on the right. The
+sections are *File*, *Names*, *Defaults*, *Advanced* and *Description*.
+
+## Project files
+<!-- topic: project.file -->
+
+- **File extension**: `.ldtk` or `.json`. The project file is renamed; the
+  content is the same.
+- **Backup on save**: before each save, the files as they were on disk (the
+  project and its level files) are copied to
+  `<backups>/<project iid>_<date>_<time>/`. **Backups kept** (3-50) limits
+  how many stay; the oldest go first. **Backup folder** is relative to the
+  project (default: `<project name>/backups`). **Back up now** makes one
+  immediately.
+- **Minify JSON**: the file is one line. It's smaller, but harder to read
+  or merge.
+- **External level files**: each level goes in its own `.ldtkl` file, in a
+  folder named like the project. This is good for big projects and version
+  control. Turning it off brings the levels back into the project file;
+  the `.ldtkl` files are removed on save.
+
+## Identifiers
+<!-- topic: project.names -->
+
+**Identifier style** controls how identifiers are written:
+
+- *Capitalize*: `My_identifier_1`, the default.
+- *Uppercase*: `MY_IDENTIFIER_1`.
+- *Lowercase*: `my_identifier_1`.
+- *Free*: letters are kept as typed.
+
+Changing it converts every identifier of the project: enums and their
+values, layers, entities, tilesets, worlds and levels. It asks first, and
+undo brings the old names back. Characters other than letters, digits and
+`_` always become `_`.
+
+**Level names**: the pattern for new levels' names. `%idx` is a free
+number and `%world` is the world's name.
+
+## Defaults
+<!-- topic: project.defaults -->
+
+The grid of new layers, the size and pivot of new entities, the workspace
+colour around the levels, and the background colour of levels that don't
+set their own (those levels follow when it changes).
+
+## Advanced flags
+<!-- topic: project.flags -->
+
+LDtk's advanced options, mostly for compatibility:
+
+- **Multi-worlds**: several worlds (see *Worlds*).
+- **Prefix level file names with their index**: `0000-Level_0.ldtkl`, ...
+  Files are renamed on the next save.
+- **Export the old IntGrid format**: also writes `"intGrid": [{coordId,
+  v}]`, for importers older than LDtk 0.8.
+- **Use the "Multilines" type name**: multi-line text fields are typed
+  `Multilines` instead of `String`.
+- **Export the old table of contents**: the table of contents also lists
+  entities' data in the old format.
 
 # Saving
 

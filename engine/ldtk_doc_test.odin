@@ -7,6 +7,7 @@ import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import "core:testing"
+import "core:time"
 
 // Samples saved by LDtk 1.5 (stamps, rule assistant, external levels) and
 // the drive project (9 rule layers).
@@ -1030,4 +1031,176 @@ test_ldtk_doc_layer_defs :: proc(t: ^testing.T) {
 	append(&tags.items, LdtkJson_NewString("enemy", doc.allocator))
 	LdtkJson_Set(doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, e1)].obj, "requiredTags", tags, doc.allocator)
 	testing.expect_value(t, Ldtk_Doc_MoveEntitiesBetweenLayers(doc, e2, e1, .Def, "Coin"), -1)
+}
+
+@(test)
+test_ldtk_doc_project_options :: proc(t: ^testing.T) {
+	dir := fmt.tprintf("%s/ore_ldtk_proj_zz", os.get_env("TMPDIR", context.temp_allocator))
+	os.remove_all(dir)
+	_ = os.make_directory(dir)
+	defer os.remove_all(dir)
+	path := fmt.tprintf("%s/opts.ldtk", dir)
+	doc, ok := Ldtk_Doc_New(path)
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	col := doc.layerDefs[0].uid
+	Ldtk_Doc_SetIntGrid(doc, 0, 0, 2, 3, 1)
+	testing.expect(t, Ldtk_Doc_Save(doc))
+	// identifier styles (cleanupIdentifier)
+	testing.expect_value(t, Ldtk_CleanIdentifierStyle("my  wall-1", .Capitalize), "My_wall_1")
+	testing.expect_value(t, Ldtk_CleanIdentifierStyle("9lives", .Free), "_lives")
+	testing.expect_value(t, Ldtk_CleanIdentifierStyle("_wall", .Capitalize), "_Wall")
+	Ldtk_Doc_SetIdentifierStyle(doc, .Uppercase)
+	testing.expect_value(t, doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)].identifier, "COLLISIONS")
+	testing.expect_value(t, LdtkJson_Str(doc.levels[0].obj, "identifier"), "LEVEL_0")
+	Ldtk_Doc_SetIdentifierStyle(doc, .Capitalize)
+	// external levels: on, saved as files, reloaded; then off again
+	Ldtk_Doc_SetExternalLevels(doc, true)
+	testing.expect(t, doc.levels[0].extRoot != nil)
+	testing.expect(t, Ldtk_Doc_Save(doc))
+	rel := LdtkJson_Str(doc.levels[0].obj, "externalRelPath")
+	testing.expect_value(t, rel, "opts/LEVEL_0.ldtkl")
+	testing.expect(t, os.is_file(fmt.tprintf("%s/%s", dir, rel)))
+	again, ok2 := Ldtk_Doc_Load(path)
+	testing.expect(t, ok2)
+	if ok2 {
+		testing.expect(t, again.external && again.levels[0].extRoot != nil)
+		testing.expect_value(t, Ldtk_Doc_GetIntGrid(&again.levels[0].layers[0], 2, 3), 1)
+		Ldtk_Doc_Destroy(again)
+	}
+	// file names with the index flag
+	Ldtk_Doc_SetProjectFlag(doc, "PrependIndexToLevelFileNames", true)
+	testing.expect(t, Ldtk_Doc_Save(doc))
+	testing.expect_value(t, LdtkJson_Str(doc.levels[0].obj, "externalRelPath"), "opts/0000-LEVEL_0.ldtkl")
+	testing.expect(t, !os.is_file(fmt.tprintf("%s/%s", dir, rel))) // the old name is gone
+	Ldtk_Doc_SetExternalLevels(doc, false)
+	testing.expect(t, Ldtk_Doc_Save(doc))
+	testing.expect(t, !os.is_file(fmt.tprintf("%s/opts/0000-LEVEL_0.ldtkl", dir)))
+	back, ok3 := Ldtk_Doc_Load(path)
+	testing.expect(t, ok3)
+	if ok3 {
+		testing.expect(t, !back.external)
+		testing.expect_value(t, Ldtk_Doc_GetIntGrid(&back.levels[0].layers[0], 2, 3), 1)
+		Ldtk_Doc_Destroy(back)
+	}
+	// the old IntGrid format flag
+	Ldtk_Doc_SetProjectFlag(doc, "ExportPreCsvIntGridFormat", true)
+	text := Ldtk_Doc_ToText(doc)
+	testing.expect(t, strings.contains(text, "\"coordId\""))
+	Ldtk_Doc_SetProjectFlag(doc, "ExportPreCsvIntGridFormat", false)
+	testing.expect(t, !strings.contains(Ldtk_Doc_ToText(doc), "\"coordId\""))
+	// backups: the newest backupLimit stay
+	LdtkJson_SetInt(doc.root, "backupLimit", 2, doc.allocator)
+	b1 := Ldtk_Doc_Backup(doc, time.unix(1000, 0))
+	b2 := Ldtk_Doc_Backup(doc, time.unix(2000, 0))
+	b3 := Ldtk_Doc_Backup(doc, time.unix(3000, 0))
+	testing.expect(t, b1 != "" && b2 != "" && b3 != "")
+	testing.expect(t, !os.exists(b1) && os.exists(b2) && os.exists(b3))
+	testing.expect(t, os.is_file(fmt.tprintf("%s/opts.ldtk", b3)))
+}
+
+@(test)
+test_ldtk_doc_enums :: proc(t: ^testing.T) {
+	dir := fmt.tprintf("%s/ore_ldtk_enums_zz", os.get_env("TMPDIR", context.temp_allocator))
+	os.remove_all(dir)
+	_ = os.make_directory(dir)
+	defer os.remove_all(dir)
+	doc, ok := Ldtk_Doc_New(fmt.tprintf("%s/enums.ldtk", dir))
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	en := Ldtk_Doc_AddEnum(doc, "Item")
+	Ldtk_Doc_AddEnumValue(doc, en, "Sword")
+	Ldtk_Doc_AddEnumValue(doc, en, "Shield")
+	f := Ldtk_Doc_AddFieldDef(doc, -1, fmt.tprintf("F_Enum(%d)", en), "loot")
+	fi := LdtkJson_Arr(doc.levels[0].obj, "fieldInstances")[0]
+	testing.expect(t, Ldtk_Doc_SetFieldRaw(doc, fi, 0, "Sword"))
+	testing.expect(t, Ldtk_Doc_EnumValueUsed(doc, en, "Sword"))
+	testing.expect(t, !Ldtk_Doc_EnumValueUsed(doc, en, "Shield"))
+	// renames follow into instances and the field types
+	testing.expect_value(t, Ldtk_Doc_RenameEnumValue(doc, en, "Sword", "Blade"), "Blade")
+	testing.expect_value(t, Ldtk_Doc_FieldRaw(fi, 0).text, "Blade")
+	Ldtk_Doc_RenameEnum(doc, en, "Loot")
+	testing.expect_value(t, LdtkJson_Str(Ldtk_Doc_FieldDef(doc, f), "__type"), "LocalEnum.Loot")
+	testing.expect_value(t, LdtkJson_Str(fi, "__type"), "LocalEnum.Loot")
+	// order, duplicate, paste
+	testing.expect(t, Ldtk_Doc_MoveEnumValue(doc, en, "Shield", -1))
+	testing.expect_value(t, LdtkJson_Str(LdtkJson_Arr(Ldtk_Doc_EnumDef(doc, en), "values")[0], "id"), "Shield")
+	dup := Ldtk_Doc_DuplicateEnum(doc, en)
+	testing.expect_value(t, LdtkJson_Str(Ldtk_Doc_EnumDef(doc, dup), "identifier"), "Loot2")
+	// removing a used value empties the instance; removing the enum removes its fields
+	Ldtk_Doc_RemoveEnumValue(doc, en, "Blade")
+	testing.expect(t, Ldtk_Doc_FieldRaw(fi, 0).isNull)
+	Ldtk_Doc_RemoveEnum(doc, en)
+	testing.expect(t, Ldtk_Doc_FieldDef(doc, f) == nil)
+	testing.expect_value(t, len(LdtkJson_Arr(doc.levels[0].obj, "fieldInstances")), 0)
+	// external enums: parsers
+	hx := "// items\nenum Weapon {\n\tSword;\n\tBow; // ranged\n}\nenum Hurt {\n\tPoison(n:Int);\n}\n/* enum Skip { A; } */\n"
+	pe := Ldtk_ParseExternalEnums("a.hx", hx)
+	testing.expect_value(t, len(pe), 1)
+	if len(pe) == 1 do testing.expect(t, pe[0].id == "Weapon" && len(pe[0].values) == 2 && pe[0].values[1].id == "Bow")
+	js := Ldtk_ParseExternalEnums("b.json", "{\"Colors\": [\"Red\", \"Blue\"], \"Sizes\": \"S, M, L\"}")
+	testing.expect_value(t, len(js), 2)
+	if len(js) == 2 do testing.expect_value(t, len(js[1].values), 3)
+	txt := Ldtk_ParseExternalEnums("c.txt", "Moods: Happy Sad\nnot an enum\n")
+	testing.expect_value(t, len(txt), 1)
+	cdb := Ldtk_ParseExternalEnums("d.cdb", "{\"sheets\":[{\"name\":\"Gems\",\"columns\":[{\"typeStr\":\"0\",\"name\":\"id\"},{\"typeStr\":\"11\",\"name\":\"c\"}],\"props\":{},\"lines\":[{\"id\":\"Ruby\",\"c\":16711680},{\"id\":\"Opal\"}]}]}")
+	testing.expect_value(t, len(cdb), 1)
+	if len(cdb) == 1 do testing.expect(t, cdb[0].values[0].color == 16711680 && cdb[0].values[1].color == -1)
+	// import, use, then sync a changed file: a used value renamed, one added
+	src := fmt.tprintf("%s/types.txt", dir)
+	_ = os.write_entire_file(src, transmute([]byte)string("Fruit: Apple, Pear\n"))
+	s, sok := Ldtk_Doc_ExternalEnumDiff(doc, "types.txt")
+	testing.expect(t, sok && s.isNew && s.conflict == "")
+	Ldtk_Doc_ApplyEnumSync(doc, &s)
+	ext := LdtkJson_Arr(LdtkJson_Get(doc.root, "defs"), "externalEnums")
+	testing.expect_value(t, len(ext), 1)
+	euid := LdtkJson_Int(ext[0], "uid")
+	testing.expect_value(t, len(LdtkJson_Arr(ext[0], "values")), 2)
+	testing.expect_value(t, len(Ldtk_Doc_ExternalEnumSources(doc)), 1)
+	testing.expect(t, !Ldtk_Doc_ExternalEnumSources(doc)[0].modified)
+	ef := Ldtk_Doc_AddFieldDef(doc, -1, fmt.tprintf("F_Enum(%d)", euid), "fruit")
+	efi := LdtkJson_Arr(doc.levels[0].obj, "fieldInstances")[0]
+	testing.expect_value(t, LdtkJson_Str(Ldtk_Doc_FieldDef(doc, ef), "__type"), "ExternEnum.Fruit")
+	testing.expect(t, Ldtk_Doc_SetFieldRaw(doc, efi, 0, "Pear"))
+	_ = os.write_entire_file(src, transmute([]byte)string("Fruit: Apple, Peach, Plum\n"))
+	testing.expect(t, Ldtk_Doc_ExternalEnumSources(doc)[0].modified)
+	s2, _ := Ldtk_Doc_ExternalEnumDiff(doc, "types.txt")
+	testing.expect(t, Ldtk_EnumSync_NeedsConfirm(&s2))
+	for &it in s2.items do if it.change == .Removed && it.valueId == "Pear" {
+		it.change = .Renamed
+		it.to = "Peach"
+	}
+	Ldtk_Doc_ApplyEnumSync(doc, &s2)
+	testing.expect_value(t, Ldtk_Doc_FieldRaw(efi, 0).text, "Peach")
+	vals := LdtkJson_Arr(LdtkJson_Arr(LdtkJson_Get(doc.root, "defs"), "externalEnums")[0], "values")
+	testing.expect_value(t, len(vals), 3)
+	if len(vals) == 3 do testing.expect(t, LdtkJson_Str(vals[1], "id") == "Peach" && LdtkJson_Str(vals[2], "id") == "Plum")
+	testing.expect(t, !Ldtk_Doc_ExternalEnumSources(doc)[0].modified)
+	Ldtk_Doc_RemoveExternalEnumSource(doc, "types.txt")
+	testing.expect_value(t, len(LdtkJson_Arr(LdtkJson_Get(doc.root, "defs"), "externalEnums")), 0)
+}
+
+@(test)
+test_ldtk_doc_enum_sync_unused :: proc(t: ^testing.T) {
+	dir := fmt.tprintf("%s/ore_ldtk_esync_zz", os.get_env("TMPDIR", context.temp_allocator))
+	os.remove_all(dir)
+	_ = os.make_directory(dir)
+	defer os.remove_all(dir)
+	doc, ok := Ldtk_Doc_New(fmt.tprintf("%s/e.ldtk", dir))
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	src := fmt.tprintf("%s/f.txt", dir)
+	_ = os.write_entire_file(src, transmute([]byte)string("Fruit: Apple, Pear\n"))
+	s, _ := Ldtk_Doc_ExternalEnumDiff(doc, "f.txt")
+	Ldtk_Doc_ApplyEnumSync(doc, &s)
+	_ = os.write_entire_file(src, transmute([]byte)string("Fruit: Apple, Peach\n"))
+	s2, _ := Ldtk_Doc_ExternalEnumDiff(doc, "f.txt")
+	testing.expect_value(t, len(s2.items), 2)
+	testing.expect(t, !Ldtk_EnumSync_NeedsConfirm(&s2))
+	Ldtk_Doc_ApplyEnumSync(doc, &s2)
+	vals := LdtkJson_Arr(LdtkJson_Arr(LdtkJson_Get(doc.root, "defs"), "externalEnums")[0], "values")
+	testing.expect_value(t, len(vals), 2)
+	if len(vals) == 2 do testing.expect_value(t, LdtkJson_Str(vals[1], "id"), "Peach")
 }
