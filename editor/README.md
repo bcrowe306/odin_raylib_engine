@@ -724,15 +724,28 @@ Over** (F10), **Step Into** (F11), **Step Out** (Shift+F11). Breakpoints can
 be added or removed while the game runs. (Debugging works in the game
 started with Play, not in Simulate in Editor.)
 
-While the game runs, the bottom panel's **Game** tab is linked to it
-(`--editor-link`): the running game's scene tree (refreshed twice a
-second), the selected node's live properties - including its script's
-exported values (`script.speed`, read from the running script) - type a
-value and press Enter to change it in the game - and **Pause** / **Resume** / **Step** (one frame
-of 1/60 s; paused, the game is still drawn). Saving a scene while the game
-runs reloads it there (the current scene restarts with the saved version);
-edited scripts and images reload by themselves, in the game and in the
-editor.
+While the game runs, the editor is linked to it (`--editor-link`).
+
+**Remote view.** The Scene panel gets a **Local / Remote** switch:
+**Remote** shows the running game's scene tree (refreshed twice a second;
+re-read only when it changed) - filter it, toggle a node's **enabled** (power)
+and **visible** (eye), right-click for **Apply to Scene**, **Remove from
+Game**, **Copy Path**. The crosshair button **picks**: click a node in the
+game window and it is selected here. The selected node is outlined (amber)
+in the game. The Inspector shows its live properties with the usual
+widgets - drag numbers and vectors, tick check boxes, pick colours and enum
+values (double-click a number to type it) - each change goes to the game at
+once; its script's exported values too (`script.speed`). **Apply to Scene**
+copies the node's current values (transform and properties, not script
+values) into the edited scene's node with the same path - undoable - to
+keep what you tuned while playing. **Local** goes back to the edited scene;
+stopping the game does too.
+
+The bottom panel's **Game** tab shows the same tree and properties side by
+side, with **Pause** / **Resume** / **Step** (one frame of 1/60 s; paused,
+the game is still drawn). Saving a scene while the game runs reloads it
+there (the current scene restarts with the saved version); edited scripts
+and images reload by themselves, in the game and in the editor.
 
 ### Code tab (Lua scripts)
 

@@ -348,6 +348,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 
 	// Render any active UI popups/dropdowns on top of all layers
 	UI_RenderActiveDropdownOverlay(gameContext)
+	if gameContext != nil && gameContext.game != nil do EditorLink_DrawOverlay(gameContext.game) // (the editor's highlighted node)
 	Subtitles_Render(gameContext) // the subtitle track over everything (subtitles.odin)
 }
 

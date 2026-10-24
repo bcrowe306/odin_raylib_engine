@@ -15,8 +15,14 @@ import rl "vendor:raylib"
 //
 //   pause / resume              freeze the game (it is still drawn) / go on
 //   step [n]                    while paused: run n frames of 1/60 s
-//   tree                        -> @ore:tree {"frame", "frozen", "scene", "root"}
-//   inspect <path>              -> @ore:node {"path", "props": [[name, value], ...]}
+//   tree [hash]                 -> @ore:tree {"frame", "frozen", "scene", "hash", "root"}, or
+//                                  @ore:tree-same {"frame", ...} when the tree's hash is still `hash`
+//   inspect <path>              -> @ore:node {"path", "props": [[name, value, kind, extra], ...]}
+//                                  kind: float int bool vec2 color enum bit_set string (ro = read-only);
+//                                  extra: enum names "A|B" or a range "min|max"
+//   highlight <path>            outline that node in the game ("" = none)
+//   pick                        the next click in the game picks the topmost node there -> @ore:picked <path>
+//   remove <path>               remove a node -> @ore:removed <path> true|false
 //   set <path> <prop> <value>   change a property ("position" "10,20", "rotation", any reflected one)
 //   reload-scene <file>         re-read a scene file; restart it when it's the current scene
 //   eval <lua>                  -> @ore:eval {"ok", "code", "text"} (the Console's Lua line)
@@ -38,6 +44,9 @@ Editor_Link :: struct {
 	smBreaks: [dynamic]string, // "path|state": break on enter
 	game:     ^Game,
 	steps:   int, // frames to run while paused
+	highlight: string, // the node outlined in the game (heap; "" = none)
+	picking:   bool,   // the next click picks a node
+	treeHash:  u64,
 	frame:   int, // frames run (not counting frozen ones)
 	inBuf:   [dynamic]u8,
 }
@@ -111,6 +120,7 @@ EditorLink_BeginFrame :: proc(game: ^Game) {
 		game.frozen = false
 	}
 	if !game.frozen do editorLink.frame += 1
+	EditorLink_UpdatePick(game)
 }
 
 // EditorLink_Command runs one command (also used by tests).
@@ -132,7 +142,23 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 		editorLink.steps += n
 		fmt.printfln("@ore:stepped %d", n)
 	case "tree":
-		fmt.printfln("@ore:tree %s", EditorLink_TreeJSON(game))
+		// "tree <hash>": unchanged trees answer in a few bytes.
+		root, h := EditorLink_TreeRootJSON(game)
+		if rest != "" && rest == fmt.tprint(h) {
+			fmt.printfln("@ore:tree-same {{\"frame\": %d, \"frozen\": %t, \"paused\": %t}}", editorLink.frame, game.frozen, game.linkPaused)
+		} else {
+			fmt.printfln("@ore:tree %s", EditorLink_TreeJSON(game, root, h))
+		}
+	case "highlight":
+		delete(editorLink.highlight)
+		editorLink.highlight = strings.clone(rest) if rest != "" else ""
+	case "pick":
+		editorLink.picking = rest != "off"
+	case "remove":
+		n := link_find(game, rest)
+		ok := n != nil && n != game.sceneManager.currentScene.rootNode
+		if ok do RemoveNode(game.sceneManager.currentScene.manager, n)
+		fmt.printfln("@ore:removed %s %t", rest, ok)
 	case "inspect":
 		fmt.printfln("@ore:node %s", EditorLink_NodeJSON(game, rest))
 	case "set":
@@ -262,12 +288,26 @@ link_find :: proc(game: ^Game, path: string) -> ^Node {
 	return n
 }
 
-EditorLink_TreeJSON :: proc(game: ^Game) -> string {
+// EditorLink_TreeJSON: the current scene's tree (its root JSON and hash
+// from EditorLink_TreeRootJSON, or computed).
+EditorLink_TreeJSON :: proc(game: ^Game, root := "", hash: u64 = 0) -> string {
+	root, hash := root, hash
+	if root == "" do root, hash = EditorLink_TreeRootJSON(game)
 	sb := strings.builder_make(context.temp_allocator)
 	scene := game.sceneManager.currentScene
-	fmt.sbprintf(&sb, "{{\"frame\": %d, \"frozen\": %t, \"paused\": %t, \"scene\": ", editorLink.frame, game.frozen, game.linkPaused)
+	fmt.sbprintf(&sb, "{{\"frame\": %d, \"frozen\": %t, \"paused\": %t, \"hash\": \"%d\", \"scene\": ", editorLink.frame, game.frozen, game.linkPaused, hash)
 	link_str(&sb, scene.filePath if scene != nil else "")
 	strings.write_string(&sb, ", \"root\": ")
+	strings.write_string(&sb, root)
+	strings.write_byte(&sb, '}')
+	return strings.to_string(sb)
+}
+
+// EditorLink_TreeRootJSON: the scene tree (names, types, enabled /
+// visible) and its FNV-1a hash.
+EditorLink_TreeRootJSON :: proc(game: ^Game) -> (string, u64) {
+	sb := strings.builder_make(context.temp_allocator)
+	scene := game.sceneManager.currentScene
 	walk :: proc(sb: ^strings.Builder, m: ^NodeManager, n: ^Node) {
 		strings.write_string(sb, "{\"name\": ")
 		link_str(sb, n.name)
@@ -290,8 +330,10 @@ EditorLink_TreeJSON :: proc(game: ^Game) -> string {
 	}
 	if scene != nil && scene.rootNode != nil do walk(&sb, scene.manager, scene.rootNode)
 	else do strings.write_string(&sb, "null")
-	strings.write_byte(&sb, '}')
-	return strings.to_string(sb)
+	text := strings.to_string(sb)
+	h: u64 = 14695981039346656037
+	for i in 0 ..< len(text) do h = (h ~ u64(text[i])) * 1099511628211
+	return text, h
 }
 
 EditorLink_NodeJSON :: proc(game: ^Game, path: string) -> string {
@@ -306,23 +348,30 @@ EditorLink_NodeJSON :: proc(game: ^Game, path: string) -> string {
 	strings.write_string(&sb, ", \"type\": ")
 	link_str(&sb, Node_TypeName(n))
 	strings.write_string(&sb, ", \"props\": [")
-	prop :: proc(sb: ^strings.Builder, first: ^bool, name, value: string) {
+	prop :: proc(sb: ^strings.Builder, first: ^bool, name, value: string, kind := "string", extra := "") {
 		if !first^ do strings.write_string(sb, ", ")
 		first^ = false
 		strings.write_byte(sb, '[')
 		link_str(sb, name)
 		strings.write_string(sb, ", ")
 		link_str(sb, value)
+		strings.write_string(sb, ", ")
+		link_str(sb, kind)
+		strings.write_string(sb, ", ")
+		link_str(sb, extra)
 		strings.write_byte(sb, ']')
 	}
 	first := true
-	prop(&sb, &first, "position", fmt.tprintf("%.2f,%.2f", n.position.x, n.position.y))
-	prop(&sb, &first, "global", fmt.tprintf("%.2f,%.2f", n.globalPosition.x, n.globalPosition.y))
-	prop(&sb, &first, "rotation", fmt.tprintf("%.2f", n.rotation))
-	prop(&sb, &first, "scale", fmt.tprintf("%.3f,%.3f", n.scale.x, n.scale.y))
-	prop(&sb, &first, "enabled", fmt.tprintf("%t", n.enabled))
-	prop(&sb, &first, "visible", fmt.tprintf("%t", n.renderable))
-	for p in Node_CollectProperties(n) do prop(&sb, &first, p.name, Property_ToString(p))
+	prop(&sb, &first, "position", fmt.tprintf("%.2f,%.2f", n.position.x, n.position.y), "vec2")
+	prop(&sb, &first, "global", fmt.tprintf("%.2f,%.2f", n.globalPosition.x, n.globalPosition.y), "ro")
+	prop(&sb, &first, "rotation", fmt.tprintf("%.2f", n.rotation), "float")
+	prop(&sb, &first, "scale", fmt.tprintf("%.3f,%.3f", n.scale.x, n.scale.y), "vec2")
+	prop(&sb, &first, "enabled", fmt.tprintf("%t", n.enabled), "bool")
+	prop(&sb, &first, "visible", fmt.tprintf("%t", n.renderable), "bool")
+	for p in Node_CollectProperties(n) {
+		kind, extra := link_prop_kind(p)
+		prop(&sb, &first, p.name, Property_ToString(p), kind, extra)
+	}
 	// Its script's exported properties ("script.<name>"), live from self.
 	if inst := cast(^ScriptInstance)n.scriptInstance; inst != nil && game.scriptManager.L != nil {
 		if mod, ok := game.scriptManager.modules[ScriptVFS_NormalizePath(inst.modulePath)]; ok && mod != nil {
@@ -353,7 +402,17 @@ EditorLink_NodeJSON :: proc(game: ^Game, path: string) -> string {
 				case: text = ""
 				}
 				lua.pop(L, 2)
-				prop(&sb, &first, fmt.tprintf("script.%s", p.name), text)
+				sk, sx := "string", ""
+				#partial switch p.type {
+				case .Float: sk = "float"
+				case .Int: sk = "int"
+				case .Boolean: sk = "bool"
+				case .Vector2: sk = "vec2"
+				case .Color: sk = "color01"
+				}
+				if len(p.values) > 0 do sk, sx = "enum", strings.join(p.values[:], "|", context.temp_allocator)
+				else if (sk == "float" || sk == "int") && p.max > p.min do sx = fmt.tprintf("%g|%g", p.min, p.max)
+				prop(&sb, &first, fmt.tprintf("script.%s", p.name), text, sk, sx)
 			}
 		}
 	}
@@ -404,6 +463,13 @@ link_set_script :: proc(game: ^Game, n: ^Node, field, value: string) -> bool {
 EditorLink_Set :: proc(game: ^Game, path, name, value: string) -> bool {
 	n := link_find(game, path)
 	if n == nil do return false
+	return Node_SetFromText(game, n, name, value)
+}
+
+// Node_SetFromText sets a node's transform, reflected property or (in a
+// running game) script property from its text form - the live inspector's
+// edits, and the editor applying runtime values to a scene.
+Node_SetFromText :: proc(game: ^Game, n: ^Node, name, value: string) -> bool {
 	vec :: proc(s: string) -> ([2]f32, bool) {
 		parts := strings.split(s, ",", context.temp_allocator)
 		if len(parts) != 2 do return {}, false
@@ -545,3 +611,104 @@ link_sm_enter :: proc(sm: ^StateMachineNode, state: string) {
 	}
 }
 
+
+// link_prop_kind: a reflected property's widget kind and extra (enum names,
+// range) for the editor's live inspector.
+@(private = "file")
+link_prop_kind :: proc(p: Node_Property) -> (kind: string, extra: string) {
+	switch p.kind {
+	case .Float: kind = "float"
+	case .Int: kind = "int"
+	case .Bool: kind = "bool"
+	case .Vec2: kind = "vec2"
+	case .Color: kind = "color"
+	case .Enum: kind = "enum"
+	case .Bit_Set: kind = "bit_set"
+	case .String: kind = "string"
+	}
+	if p.kind == .Enum || p.kind == .Bit_Set {
+		extra = strings.join(Property_EnumNames(p), "|", context.temp_allocator)
+	} else if p.has_range {
+		extra = fmt.tprintf("%g|%g", p.min, p.max)
+	}
+	return
+}
+
+// link_path: a node's name path from the scene root ("Player/Gun").
+link_path :: proc(m: ^NodeManager, root, n: ^Node) -> string {
+	parts := make([dynamic]string, context.temp_allocator)
+	for c := n; c != nil && c != root; c = GetParent(m, c) do inject_at(&parts, 0, c.name)
+	return strings.join(parts[:], "/", context.temp_allocator)
+}
+
+// EditorLink_Pick: the topmost drawn node under a screen point (virtual
+// game pixels), from the top layer down - each layer in the space it is
+// drawn in (the camera's layers in the world).
+EditorLink_Pick :: proc(game: ^Game, screen: [2]f32) -> ^Node {
+	scene := game.sceneManager.currentScene
+	if scene == nil do return nil
+	buckets := Scene_CollectRenderables(scene)
+	world := screen
+	cam := scene.camera
+	vw, vh: f32 = 1280, 720
+	if game.virtualSize.x > 0 do vw, vh = game.virtualSize.x, game.virtualSize.y
+	if cam != nil do world = rl.GetScreenToWorld2D(screen, CameraNode_GetCamera2D(cam, vw, vh))
+	for li := len(RenderLayer) - 1; li >= 0; li -= 1 {
+		layer := RenderLayer(li)
+		isWorld := cam != nil && cam.enabled && cam.isCurrent && (layer in cam.targetLayers)
+		p := world if isWorld else screen
+		#reverse for n in buckets[layer] {
+			if n == nil || n == scene.rootNode do continue
+			r: rl.Rectangle
+			ok: bool
+			if n.isUI {
+				r, ok = UI_GetElementRect(cast(^UIElement)n), true
+			} else {
+				r, ok = Node_RenderBounds(n)
+			}
+			if ok && p.x >= r.x && p.y >= r.y && p.x <= r.x + r.width && p.y <= r.y + r.height do return n
+		}
+	}
+	return nil
+}
+
+// EditorLink_DrawOverlay outlines the highlighted node (after the scene's
+// layers, with the camera for world nodes).
+EditorLink_DrawOverlay :: proc(game: ^Game) {
+	if !editorLink.enabled || editorLink.highlight == "" || !rl.IsWindowReady() do return
+	n := link_find(game, editorLink.highlight)
+	scene := game.sceneManager.currentScene
+	if n == nil || scene == nil || n == scene.rootNode do return
+	col := rl.Color{255, 196, 0, 255}
+	r: rl.Rectangle
+	ok: bool
+	if n.isUI do r, ok = UI_GetElementRect(cast(^UIElement)n), true
+	else do r, ok = Node_RenderBounds(n)
+	if !ok do r = {n.globalPosition.x - 8, n.globalPosition.y - 8, 16, 16}
+	// In the space its layer is drawn in.
+	cam := scene.camera
+	if cam != nil && !(cam.enabled && cam.isCurrent && (n.layer in cam.targetLayers)) do cam = nil
+	vw, vh: f32 = 1280, 720
+	if game.virtualSize.x > 0 do vw, vh = game.virtualSize.x, game.virtualSize.y
+	zoom: f32 = 1
+	if cam != nil {
+		c2 := CameraNode_GetCamera2D(cam, vw, vh)
+		zoom = max(c2.zoom, 0.01)
+		rl.BeginMode2D(c2)
+	}
+	rl.DrawRectangleLinesEx(r, 2 / zoom, col)
+	rl.DrawCircleV(n.globalPosition, 3 / zoom, col)
+	if cam != nil do rl.EndMode2D()
+}
+
+// EditorLink_UpdatePick: while picking, a left click picks (game input
+// still sees the click).
+EditorLink_UpdatePick :: proc(game: ^Game) {
+	if !editorLink.enabled || !editorLink.picking || !rl.IsWindowReady() do return
+	if !rl.IsMouseButtonPressed(.LEFT) do return
+	editorLink.picking = false
+	scene := game.sceneManager.currentScene
+	n := EditorLink_Pick(game, rl.GetMousePosition())
+	path := link_path(scene.manager, scene.rootNode, n) if n != nil else ""
+	fmt.printfln("@ore:picked %s", path)
+}

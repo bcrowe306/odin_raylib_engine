@@ -23,7 +23,7 @@ click @remote.step
 wait-until remote-steps == 1 timeout=200
 click @remote.node:PlayerShip
 wait-until remote-prop:position contains 640 timeout=200
-click @remote.prop:rotation
+dblclick @remote.prop:rotation
 key cmd+a
 type 45
 key enter

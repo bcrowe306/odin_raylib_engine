@@ -17,7 +17,7 @@ wait-until remote-nodes >= 5 timeout=300
 click @remote.node:PatrolDroneAlpha
 wait-until remote-prop:script.orbit_radius contains 130 timeout=300
 screenshot script_props
-click @remote.prop:script.orbit_radius
+dblclick @remote.prop:script.orbit_radius
 key cmd+a
 type 200
 key enter

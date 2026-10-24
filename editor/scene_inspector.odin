@@ -31,6 +31,11 @@ hierarchyPendingFocus: ^e.Node
 SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 	defer imgui.End()
 	if !imgui.Begin("Scene###SceneHierarchyWindow") do return
+	// While the game runs: Local (the edited scene) / Remote (the game's live tree).
+	if RemoteView_Header(state) {
+		RemoteTree_Render(state, "hier")
+		return
+	}
 	if state.activeScene == nil {
 		UI_DimText("No scene open")
 		return

@@ -1,0 +1,39 @@
+# Live remote scene tree: while the game runs the Scene panel switches to
+# Remote (the game's tree); selecting a node shows its live properties in
+# the Inspector with typed widgets (a check box hides it in the game, a
+# drag field rotates it); the eye toggle; Apply to Scene copies the live
+# values into the edited scene (undoable); back to Local.
+wait 5
+click @toolbar.play
+wait-until game == running timeout=600
+wait-until remote-connected == true timeout=600
+click @hier.view-remote
+wait 3
+expect remote-view == true
+wait-until remote-nodes >= 5 timeout=300
+click @remote.node:PlayerShip
+wait-until remote-prop:rotation contains 0 timeout=200
+expect remote-selected == PlayerShip
+screenshot remote_view
+dblclick @remote.prop:rotation
+key cmd+a
+type 30
+key enter
+wait-until remote-prop:rotation contains 30 timeout=200
+click @remote.prop:visible
+wait-until remote-prop:visible == false timeout=200
+click @remote.visible:PlayerShip
+wait-until remote-prop:visible == true timeout=200
+screenshot live_edit
+click @remote.apply
+wait 3
+click @hier.view-local
+wait 2
+expect node:PlayerShip.rotation == 30.0
+expect modified == true
+key cmd+z
+wait 2
+expect node:PlayerShip.rotation == 0.0
+click @toolbar.stop
+wait-until game == stopped timeout=300
+expect remote-view == false

@@ -41,6 +41,12 @@ PropertyInspector_RenderWindow :: proc(state: ^EditorState) {
 
 @(private = "file")
 inspector_body :: proc(state: ^EditorState) {
+	if remoteView && RemoteGame_Connected() {
+		// The running game's selected node (Scene panel > Remote).
+		UI_PanelTitle(ICON_FA_GAMEPAD, "Live in the game")
+		RemoteProps_Render(state)
+		return
+	}
 	node := state.selectedNode
 	if node == nil || state.activeScene == nil {
 		imgui.Dummy({0, 24})

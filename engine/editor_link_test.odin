@@ -39,7 +39,7 @@ test_editor_link :: proc(t: ^testing.T) {
 
 	// Inspect and set by path.
 	node := EditorLink_NodeJSON(game, "Clock/Hand")
-	testing.expect(t, strings.contains(node, `["position", "5.00,6.00"]`), "position shown")
+	testing.expect(t, strings.contains(node, `["position", "5.00,6.00", "vec2"`), "position shown")
 	testing.expect(t, EditorLink_Set(game, "Clock/Hand", "position", "10, 20"), "set position")
 	hand := Scene_FindNodeByName(game.sceneManager.currentScene, "Hand")
 	testing.expect_value(t, hand.position, [2]f32{10, 20})
@@ -96,12 +96,74 @@ return S
 	ProcessNodeQueues(scene.manager, &game.gameContext)
 
 	text := EditorLink_NodeJSON(game, "Runner")
-	testing.expect(t, strings.contains(text, `["script.speed", "240"]`), text)
-	testing.expect(t, strings.contains(text, `["script.mode", "Idle"]`), text)
-	testing.expect(t, strings.contains(text, `["script.path", "[1, 2]"]`) || strings.contains(text, `["script.path", "[1.0, 2.0]"]`), text)
+	testing.expect(t, strings.contains(text, `["script.speed", "240", "float"`), text)
+	testing.expect(t, strings.contains(text, `["script.mode", "Idle", "enum", "Idle|Run`), text)
+	testing.expect(t, strings.contains(text, `["script.path", "[1, 2]"`) || strings.contains(text, `["script.path", "[1.0, 2.0]"`), text)
 	testing.expect(t, EditorLink_Set(game, "Runner", "script.speed", "99.5"), "set number")
 	testing.expect(t, EditorLink_Set(game, "Runner", "script.mode", "Run"), "set enum")
 	testing.expect(t, !EditorLink_Set(game, "Runner", "script.nope", "1"), "unknown property")
 	text = EditorLink_NodeJSON(game, "Runner")
-	testing.expect(t, strings.contains(text, `["script.speed", "99.5"]`) && strings.contains(text, `["script.mode", "Run"]`), text)
+	testing.expect(t, strings.contains(text, `["script.speed", "99.5"`) && strings.contains(text, `["script.mode", "Run"`), text)
+}
+
+// The live remote tree's tools: unchanged trees answer "same" by hash,
+// properties carry their widget kind (enum names, ranges), pick finds the
+// topmost drawn node (UI first), highlight / remove, and Node_SetFromText
+// (Apply to Scene).
+@(test)
+test_editor_link_remote_tools :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("remote", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	game.virtualSize = {1280, 720}
+	defer {delete(editorLink.highlight); editorLink.highlight = ""}
+	btn := cast(^UIButtonNode)Node_CreateByTypeName(scene, "UIButtonNode")
+	btn.name = "OkZz"
+	btn.position = {100, 100}
+	btn.size = {120, 40}
+	cam := cast(^CameraNode)Node_CreateByTypeName(scene, "CameraNode")
+	cam.name = "CamZz"
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	for _ in 0 ..< 3 do game->run(1.0 / 60)
+
+	// Tree hash: the same tree, the same hash; a new node changes it.
+	_, h1 := EditorLink_TreeRootJSON(game)
+	_, h2 := EditorLink_TreeRootJSON(game)
+	testing.expect(t, h1 == h2, "stable hash")
+	extra := Node_CreateByTypeName(scene, "Node")
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	_, h3 := EditorLink_TreeRootJSON(game)
+	testing.expect(t, h3 != h1, "a new node changes the hash")
+	tree := EditorLink_TreeJSON(game)
+	testing.expect(t, strings.contains(tree, `"hash": "`), "the hash is sent with the tree")
+
+	// Typed properties.
+	node := EditorLink_NodeJSON(game, "CamZz")
+	testing.expect(t, strings.contains(node, `["rotation", "0.00", "float"`), "transform kinds")
+	testing.expect(t, strings.contains(node, `"followMode", "`) && strings.contains(node, `"enum", "`), "an enum with its names")
+	testing.expect(t, strings.contains(node, `["global", `) && strings.contains(node, `"ro"`), "read-only global position")
+
+	// Pick: the button under the point; empty space: nothing.
+	cam.currentPosition = {640, 360} // (looking at the screen's middle: world = screen)
+	testing.expect(t, EditorLink_Pick(game, {150, 120}) == btn, "picks the UI button")
+	testing.expect(t, EditorLink_Pick(game, {900, 600}) == nil, "nothing there")
+	testing.expect_value(t, link_path(scene.manager, scene.rootNode, btn), "OkZz")
+
+	// Highlight and remove.
+	EditorLink_Command(game, "highlight OkZz")
+	testing.expect_value(t, editorLink.highlight, "OkZz")
+	EditorLink_Command(game, "highlight")
+	testing.expect_value(t, editorLink.highlight, "")
+	EditorLink_Command(game, "remove " + "OkZz")
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	testing.expect(t, Scene_FindNodeByName(scene, "OkZz") == nil, "removed")
+	_ = extra
+
+	// Node_SetFromText (the editor's Apply to Scene).
+	testing.expect(t, Node_SetFromText(game, cam, "rotation", "30") && cam.rotation == 30, "transform")
+	testing.expect(t, Node_SetFromText(game, cam, "followMode", "Manual"), "enum")
+	testing.expect(t, !Node_SetFromText(game, cam, "noSuchProp", "1"), "unknown property")
 }
