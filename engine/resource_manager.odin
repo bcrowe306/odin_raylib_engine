@@ -37,6 +37,7 @@ AudioMusic :: struct {
 	refCount: int,
 	streamData: []byte, // in-memory stream source (assets from a .ore package)
 	voice: Mixer_Voice_Handle, // Audio.play_music's voice (path-based music)
+	gain: f32, // import gain (asset_import.odin) as a factor
 }
 
 ResourceManager :: struct {
@@ -115,7 +116,6 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 
 // resource_bytes reads a resource that isn't on disk from the mounted .ore
 // package (exported games ship their assets inside it).
-@(private = "file")
 resource_bytes :: proc(rm: ^ResourceManager, filePath: string) -> ([]byte, bool) {
 	if rm.package_ == nil do return nil, false
 	rel := filePath
@@ -144,7 +144,7 @@ LoadTexture_FilePath :: proc(rm: ^ResourceManager, filePath: string) -> (texture
 	} else if bytes, found := resource_bytes(rm, filePath); found {
 		defer delete(bytes)
 		if rl.IsWindowReady() {
-			img := rl.LoadImageFromMemory(file_ext_cstring(filePath), raw_data(bytes), i32(len(bytes)))
+			img := rl.LoadImageFromMemory(fmt.ctprint(Image_ExtFor(bytes, filePath)), raw_data(bytes), i32(len(bytes))) // (QOI from export)
 			texture2d = rl.LoadTextureFromImage(img)
 			rl.UnloadImage(img)
 		}
@@ -261,6 +261,8 @@ ResourceManager_LoadAudioSound :: proc(rm: ^ResourceManager, filePath: string) -
 		rl.WaveFormat(&wave, MIXER_RATE, 32, 2)
 		pcm = make([]f32, int(wave.frameCount) * 2, runtime.heap_allocator())
 		copy(pcm, ([^]f32)(wave.data)[:len(pcm)])
+		// Import gain (asset_import.odin), applied once here.
+		if g := Asset_GainLinear(Asset_ImportGet(rm, filePath)); g != 1 do for &v in pcm do v *= g
 	}
 	rl.UnloadWave(wave)
 	owned := strings.clone(filePath)
@@ -338,7 +340,7 @@ ResourceManager_LoadAudioMusic :: proc(rm: ^ResourceManager, filePath: string) -
 		mslot = rm.musicCount
 		rm.musicCount += 1
 	}
-	rm.audioMusic[mslot] = AudioMusic{fileName = filepath.base(owned), filePath = owned, music = music, refCount = 1, streamData = streamData}
+	rm.audioMusic[mslot] = AudioMusic{fileName = filepath.base(owned), filePath = owned, music = music, refCount = 1, streamData = streamData, gain = Asset_GainLinear(Asset_ImportGet(rm, filePath))}
 	return &rm.audioMusic[mslot], true
 }
 

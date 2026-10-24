@@ -567,6 +567,7 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	Input_RebindSetDefaults(&game.input, cfg.actions[:]) // (Input.reset_bindings)
 	if activate do Input_LoadUserBindings(&game.input) // the player's own (the game, not the editor)
 	Texture_ImportsSet(cfg.textureImport[:])
+	Asset_ImportsReset() // per-asset settings are read again as assets load
 	// Global scripts exist before any scene; the game starts them (ready)
 	// now, the editor when Simulate starts.
 	Globals_Load(&game.scriptManager, cfg.globals[:])
@@ -618,6 +619,7 @@ Game_LoadProjectForEditing :: proc(game: ^Game, projectDir: string) -> (ProjectC
 	cfg: ProjectConfig
 	if game == nil do return cfg, false
 	AssetManager_SetProjectDir(&game.assetManager, projectDir)
+	game.resourceManager.projectDir = game.assetManager.projectDir // (borrowed: project-relative keys for import settings)
 	projPath, _ := filepath.join({projectDir, "project.json"}, context.temp_allocator)
 	bytes, readErr := os.read_entire_file(projPath, context.temp_allocator)
 	if readErr != nil {
@@ -691,6 +693,7 @@ Game_FindSceneByFile :: proc(game: ^Game, scenePath: string) -> ^Scene {
 Game_LoadProjectFromDirectory :: proc(game: ^Game, projectDir: string) -> bool {
 	if game == nil do return false
 	AssetManager_SetProjectDir(&game.assetManager, projectDir)
+	game.resourceManager.projectDir = game.assetManager.projectDir // (borrowed: project-relative keys for import settings)
 
 	projPath, _ := filepath.join({projectDir, "project.json"}, context.temp_allocator)
 	bytes, readErr := os.read_entire_file(projPath, context.temp_allocator)

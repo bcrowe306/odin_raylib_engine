@@ -57,6 +57,17 @@ Slicer_Open :: proc(state: ^EditorState, texRel: string) {
 
 Slicer_IsOpen :: proc() -> bool {return slicer.open}
 
+// Slicer_AssetMoved keeps the slicer's texture path when it was moved /
+// renamed (or its folder was).
+Slicer_AssetMoved :: proc(oldRel, newRel: string, isFolder: bool) {
+	r := slicer.texRel
+	if r == oldRel || (isFolder && strings.has_prefix(r, oldRel) && len(r) > len(oldRel) && r[len(oldRel)] == '/') {
+		moved := strings.concatenate({newRel, r[len(oldRel):]})
+		delete(slicer.texRel)
+		slicer.texRel = moved
+	}
+}
+
 @(private = "file")
 slicer_set_texture :: proc(state: ^EditorState, rel: string) {
 	if slicer.tex.id != 0 do rl.UnloadTexture(slicer.tex)
@@ -65,6 +76,13 @@ slicer_set_texture :: proc(state: ^EditorState, rel: string) {
 	slicer.texRel = strings.clone(rel)
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	slicer.tex = rl.LoadTexture(strings.clone_to_cstring(full, context.temp_allocator))
+	// The sheet's slicing preset (its import settings), if it has one.
+	if imp := e.Asset_ImportGet(&state.game.resourceManager, full); imp.slice.grid != {} {
+		s := imp.slice
+		slicer.grid = {c.int(s.grid.x), c.int(s.grid.y)}
+		slicer.margin = {c.int(s.margin.x), c.int(s.margin.y)}
+		slicer.spacing = {c.int(s.spacing.x), c.int(s.spacing.y)}
+	}
 	clear(&slicer.selection)
 	slicer_clear_anims()
 }
@@ -175,6 +193,14 @@ Slicer_Render :: proc(state: ^EditorState) {
 				if changed do clear(&slicer.selection)
 				UI_EndProps()
 			}
+			if UI_Button(fmt.tprintf("%s  Save Preset", ICON_FA_FLOPPY_DISK), "slicer.save-preset") {
+				full, _ := filepath.join({state.projectPath, slicer.texRel}, context.temp_allocator)
+				imp := Editor_AssetImport(state, full)
+				imp.slice = {grid = {int(slicer.grid.x), int(slicer.grid.y)}, margin = {int(slicer.margin.x), int(slicer.margin.y)}, spacing = {int(slicer.spacing.x), int(slicer.spacing.y)}}
+				preview_save_import(state, full, slicer.texRel, imp)
+				Editor_Log(state, .Info, "Slicing preset of %s: %d x %d", slicer.texRel, slicer.grid.x, slicer.grid.y)
+			}
+			UI_Tooltip("Remember this grid with the sheet (its import settings): the slicer opens it like this next time")
 			imgui.Separator()
 			UI_DimText(fmt.tprintf("Selected: %d cell(s)", len(slicer.selection)))
 			imgui.SetNextItemWidth(-1)

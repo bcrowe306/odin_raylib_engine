@@ -162,7 +162,7 @@ PreviewPanel_LoadAudio :: proc(state: ^EditorState, fullPath: string) {
 PreviewPanel_PlayAudio :: proc(state: ^EditorState) {
 	if state == nil do return
 	if rl.IsSoundReady(state.previewSound) {
-		rl.SetSoundVolume(state.previewSound, state.previewAudioVolume)
+		rl.SetSoundVolume(state.previewSound, state.previewAudioVolume * e.Asset_GainLinear(e.Asset_ImportGet(&state.game.resourceManager, state.previewSoundPath))) // (with the import gain)
 		rl.PlaySound(state.previewSound)
 		state.previewAudioPlaying = true
 		state.previewAudioTimer = 0.0
@@ -479,9 +479,11 @@ PreviewPanel_RenderAudio :: proc(state: ^EditorState) {
 	imgui.SetNextItemWidth(120)
 	if imgui.SliderFloat("Volume", &state.previewAudioVolume, 0.0, 1.0, "%.0f%%") {
 		if rl.IsSoundReady(state.previewSound) {
-			rl.SetSoundVolume(state.previewSound, state.previewAudioVolume)
+			rl.SetSoundVolume(state.previewSound, state.previewAudioVolume * e.Asset_GainLinear(e.Asset_ImportGet(&state.game.resourceManager, state.previewSoundPath))) // (with the import gain)
 		}
 	}
+
+	preview_audio_import(state)
 
 	imgui.PopStyleVar()
 
@@ -1127,41 +1129,139 @@ find_script_refs_in_json_node :: proc(
 	}
 }
 
-// preview_texture_import: the previewed project texture's import settings
-// (project.json "texture_import"), applied to every loaded copy at once.
+// preview_texture_import: the previewed project texture's import settings,
+// saved next to it (<file>.import.json, engine/asset_import.odin) and
+// applied to every loaded copy at once. An older project.json entry is
+// moved into the file on the first change.
 @(private = "file")
 preview_texture_import :: proc(state: ^EditorState) {
 	root := strings.concatenate({state.projectPath, "/"}, context.temp_allocator)
 	if state.projectPath == "" || !strings.has_prefix(state.previewTexturePath, root) do return
 	rel := state.previewTexturePath[len(root):]
-	imp := e.Texture_ImportFor(nil, rel)
+	rm := &state.game.resourceManager
+	imp := Editor_AssetImport(state, state.previewTexturePath)
 	changed := false
 	UI_DimText("Import")
-	imgui.SameLine()
+	same_or_wrap(96)
 	imgui.SetNextItemWidth(96)
 	if f, ok := UI_Combo("preview.import.filter", int(imp.filter), {"Point", "Bilinear", "Trilinear"}); ok {
 		imp.filter = e.Texture_Filter(f)
 		changed = true
 	}
 	UI_Tooltip("Filtering: Point keeps pixel art crisp; Bilinear / Trilinear smooth scaled images (Trilinear uses mipmaps)")
-	imgui.SameLine()
+	same_or_wrap(84)
 	imgui.SetNextItemWidth(84)
 	if w, ok := UI_Combo("preview.import.wrap", int(imp.wrap), {"Repeat", "Clamp"}); ok {
 		imp.wrap = e.Texture_Wrap(w)
 		changed = true
 	}
 	UI_Tooltip("Wrap: Repeat tiles the texture past its edges (parallax, shaders); Clamp stretches the edge pixels")
-	imgui.SameLine()
+	same_or_wrap(90)
 	if imgui.Checkbox("Mipmaps##imp", &imp.mipmaps) do changed = true
 	Drive_Item("preview.import.mipmaps")
 	UI_Tooltip("Smaller copies for drawing the texture far smaller than its size")
+	same_or_wrap(110)
+	imgui.SetNextItemWidth(110)
+	if c, ok := UI_Combo("preview.import.compress", int(imp.compress), {"Export: Keep", "Export: QOI"}); ok {
+		imp.compress = e.Texture_Compress(c)
+		changed = true
+	}
+	UI_Tooltip("How export stores it: Keep the file as it is, or QOI - decodes several times faster than PNG (faster loading), usually a bigger file")
+	// Slicing preset (the Sprite Sheet Slicer starts from it; Save Preset there).
+	if imp.slice.grid != {} {
+		same_or_wrap(110)
+		UI_DimText(fmt.tprintf("Slice %d x %d", imp.slice.grid.x, imp.slice.grid.y))
+		UI_Tooltip("The slicing preset the Sprite Sheet Slicer opens this sheet with (Save Preset in the slicer)")
+		imgui.SameLine()
+		if UI_IconButton(ICON_FA_XMARK, "preview.import.slice.clear", "Forget the slicing preset", size = 22) {
+			imp.slice = {}
+			changed = true
+		}
+	}
 	if changed {
-		imp.path = rel
-		e.ProjectConfig_SetTextureImport(&state.projectConfig, imp)
+		preview_save_import(state, state.previewTexturePath, rel, imp)
+		e.ResourceManager_ReapplyImports(rm)
+		e.Texture_ApplyImport(&state.previewTexture, e.Texture_ImportFor(rm, rel))
+		Editor_Log(state, .Info, "Import settings of %s: %v filter, %v wrap%s%s", rel, imp.filter, imp.wrap, ", mipmaps" if imp.mipmaps else "", ", QOI on export" if imp.compress == .QOI else "")
+	}
+}
+
+// Editor_AssetImport: an asset's import settings to edit - its file, or for
+// a texture without one an older project.json entry.
+Editor_AssetImport :: proc(state: ^EditorState, full: string) -> e.Asset_Import {
+	rm := &state.game.resourceManager
+	imp := e.Asset_ImportGet(rm, full)^
+	if !imp.found {
+		legacy := e.Texture_ImportFor(rm, e.Asset_RelPath(rm, full))
+		imp.filter, imp.wrap, imp.mipmaps = legacy.filter, legacy.wrap, legacy.mipmaps
+	}
+	return imp
+}
+
+// same_or_wrap: the next item on this line if `w` px fit, else on the next.
+@(private = "file")
+same_or_wrap :: proc(w: f32) {
+	imgui.SameLine()
+	if imgui.GetContentRegionAvail().x < w do imgui.NewLine()
+}
+
+// preview_save_import writes an asset's import settings file (and drops an
+// older project.json texture entry for it).
+preview_save_import :: proc(state: ^EditorState, full, rel: string, imp: e.Asset_Import) {
+	rm := &state.game.resourceManager
+	legacy := false
+	for t in state.projectConfig.textureImport do if t.path == rel do legacy = true
+	if legacy {
+		e.ProjectConfig_SetTextureImport(&state.projectConfig, {path = rel}) // (the defaults: removes it)
 		e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
 		e.Texture_ImportsSet(state.projectConfig.textureImport[:])
-		e.ResourceManager_ReapplyImports(&state.game.resourceManager)
-		e.Texture_ApplyImport(&state.previewTexture, imp)
-		Editor_Log(state, .Info, "Import settings of %s: %v filter, %v wrap%s", rel, imp.filter, imp.wrap, ", mipmaps" if imp.mipmaps else "")
+	}
+	if !e.Asset_ImportSave(rm, full, imp) do Editor_Log(state, .Error, "Could not write %s%s", rel, e.IMPORT_SUFFIX)
+	Editor_InvalidateProjectFiles()
+}
+
+// preview_audio_import: an audio file's import gain and default bus.
+@(private = "file")
+preview_audio_import :: proc(state: ^EditorState) {
+	root := strings.concatenate({state.projectPath, "/"}, context.temp_allocator)
+	if state.projectPath == "" || !strings.has_prefix(state.previewSoundPath, root) do return
+	rel := state.previewSoundPath[len(root):]
+	rm := &state.game.resourceManager
+	imp := e.Asset_ImportGet(rm, state.previewSoundPath)^
+	changed := false
+	UI_DimText("Import")
+	imgui.SameLine()
+	half := max((imgui.GetContentRegionAvail().x - imgui.GetStyle().ItemSpacing.x) * 0.5, 60)
+	imgui.SetNextItemWidth(half)
+	// (edited in a buffer: saved when the drag ends, not every frame)
+	@(static) gainBuf: f32
+	@(static) gainActive: bool
+	if !gainActive do gainBuf = imp.gainDb
+	imgui.SliderFloat("##imp_gain", &gainBuf, -24, 12, "Gain %+.1f dB")
+	gainActive = imgui.IsItemActive()
+	if imgui.IsItemDeactivatedAfterEdit() {
+		imp.gainDb = gainBuf
+		changed = true
+	}
+	Drive_Item("preview.import.gain")
+	UI_Tooltip("Louder / quieter wherever it plays (applied when loaded) - even out sounds recorded at different levels")
+	imgui.SameLine()
+	buses := e.Mixer_Buses()
+	names := make([dynamic]string, context.temp_allocator)
+	append(&names, "Default bus")
+	cur := 0
+	for b, i in buses {
+		append(&names, b.name)
+		if b.name == imp.bus do cur = i + 1
+	}
+	imgui.SetNextItemWidth(-1)
+	if b, ok := UI_Combo("preview.import.bus", cur, names[:]); ok {
+		imp.bus = names[b] if b > 0 else ""
+		changed = true
+	}
+	UI_Tooltip("The mixer bus it plays into when the node or the script names none (else SFX for sounds, Music for music)")
+	if changed {
+		preview_save_import(state, state.previewSoundPath, rel, imp)
+		Editor_Log(state, .Info, "Import settings of %s: gain %+.1f dB%s", rel, imp.gainDb, fmt.tprintf(", bus %s", imp.bus) if imp.bus != "" else "")
 	}
 }

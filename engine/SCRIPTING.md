@@ -864,8 +864,11 @@ project's own, made in the **Mixer** tab): `Audio.set_bus_volume / mute /
 solo / pan`, `Audio.get_buses`, `Audio.bus_peak`, `Audio.set_effect(bus,
 effect, param, value)`, `Audio.set_effect_enabled`; `Audio.play_sound(path,
 volume, pitch, bus)` and `Audio.play_music(path, loop, bus)`; Sound / Music
-nodes have a `bus` property. Effects: EQ, low-pass, high-pass, compressor,
-limiter, delay, reverb, distortion. Guide: [`docs/audio_mixer.md`](docs/audio_mixer.md).
+nodes have a `bus` property. Without a bus named, a sound plays into its
+import settings' bus (else SFX / Music), at its import gain
+([`docs/import_settings.md`](docs/import_settings.md)). Effects: EQ,
+low-pass, high-pass, compressor, limiter, delay, reverb, distortion. Guide:
+[`docs/audio_mixer.md`](docs/audio_mixer.md).
 
 #### Player rebinding (Input)
 

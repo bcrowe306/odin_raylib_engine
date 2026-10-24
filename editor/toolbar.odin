@@ -269,7 +269,9 @@ export_ore_to :: proc(state: ^EditorState, dir: string) {
 	Editor_SaveAllScenes(state)
 	defer Editor_InvalidateProjectFiles() // a package next to the project shows in Assets
 	outPath, _ := filepath.join({dir, filepath.base(Editor_OrePath(state))}, context.temp_allocator)
-	ok := e.OrePackage_CreateFromDirectory(state.projectPath, outPath, true)
+	overrides := make(map[string][]u8, context.temp_allocator)
+	e.Asset_ExportOverrides(state.projectPath, &overrides, allocator = context.temp_allocator) // (import settings: QOI)
+	ok := e.OrePackage_CreateFromDirectory(state.projectPath, outPath, true, overrides = overrides)
 	if ok {
 		Editor_Log(state, .Info, "Exported portable .ore archive: %s", outPath)
 	} else {

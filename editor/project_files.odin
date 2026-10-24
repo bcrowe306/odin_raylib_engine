@@ -5,6 +5,7 @@ import "core:path/filepath"
 import "core:slice"
 import "core:strings"
 import "core:time"
+import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
@@ -77,6 +78,7 @@ scan_project :: proc(root: string) {
 		if err != nil do return
 		for fi in infos {
 			if strings.has_prefix(fi.name, ".") do continue
+			if e.Asset_IsImportFile(fi.name) do continue // (shown as the asset's import settings)
 			child, _ := filepath.join({rel, fi.name}, context.temp_allocator)
 			if fi.type == .Directory {
 				append(&projectFiles.dirs, strings.clone(child))

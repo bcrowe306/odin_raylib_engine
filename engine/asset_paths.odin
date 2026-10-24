@@ -83,6 +83,11 @@ textureImports: [dynamic]Texture_Import
 Texture_ImportsSet :: proc(list: []Texture_Import) {
 	for t in textureImports do delete(t.path)
 	clear(&textureImports)
+	if len(list) == 0 {
+		delete(textureImports) // (none: no array kept)
+		textureImports = nil
+		return
+	}
 	for t in list {
 		c := t
 		c.path = strings.clone(t.path)
@@ -93,10 +98,9 @@ Texture_ImportsSet :: proc(list: []Texture_Import) {
 // Texture_ImportFor: the settings for a texture file (full or project-
 // relative path); the defaults when it has none.
 Texture_ImportFor :: proc(rm: ^ResourceManager, filePath: string) -> Texture_Import {
-	rel := filePath
-	if rm != nil && rm.projectDir != "" && strings.has_prefix(rel, rm.projectDir) && len(rel) > len(rm.projectDir) && rel[len(rm.projectDir)] == '/' {
-		rel = rel[len(rm.projectDir) + 1:]
-	}
+	rel := Asset_RelPath(rm, filePath)
+	// The file next to the texture (asset_import.odin) wins over project.json.
+	if e := Asset_ImportGet(rm, filePath); e.found do return {path = rel, filter = e.filter, wrap = e.wrap, mipmaps = e.mipmaps}
 	for t in textureImports do if t.path == rel do return t
 	return {path = rel}
 }

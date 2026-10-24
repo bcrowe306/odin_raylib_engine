@@ -152,7 +152,7 @@ Editor:
 - [ ] 14 Live remote scene tree in Play (inspect / edit the running game's nodes)
 - [ ] 15 Multiple open scenes as tabs
 - [ ] 16 Animation editor depth: onion skin, per-key curves / easing, animation events calling script methods
-- [ ] 17 Per-asset import settings (filter, compression, slicing presets next to the asset)
+- [x] 17 Per-asset import settings: `<asset>.import.json` next to the file (hidden in Assets, moved / copied / deleted with it, read through the package in exported games, cached per path in one arena): textures filter / wrap / mipmaps / slicing preset (the Sprite Sheet Slicer opens with it, Save Preset) / Export Keep or QOI (re-encoded into the package; loaders sniff QOI headers); audio gain (baked into decoded sounds, music volume) and default bus (nodes / Audio calls without one); old project.json texture_import still read and moved on the first change; preview panel rows (wrapping); guide with tutorials, test, drive. Also: two process-lifetime caches no longer show as leaks
 
 Platform and shipping (later): 18 mobile export + touch, 19 Steam, 20 gamepad rumble / multiple controllers / glyphs, 21 networking, 22 crash reports.
 

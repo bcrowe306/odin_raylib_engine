@@ -33,8 +33,7 @@ MusicNode :: struct {
 // MusicNode_BusIndex: the mixer bus it plays into (Music when "" / unknown).
 MusicNode_BusIndex :: proc(m: ^MusicNode) -> int {
 	if m.bus != "" do if i := Mixer_BusIndex(m.bus); i >= 0 do return i
-	if i := Mixer_BusIndex("Music"); i >= 0 do return i
-	return 0
+	return Audio_BusFor(node_rm(m), m.music.filePath if m.music != nil else "", "Music") // (its import bus)
 }
 
 @(private = "file")
@@ -272,7 +271,7 @@ MusicNode_GetProgress :: proc(musicNode: ^MusicNode) -> f32 {
 
 // MusicNode_EffectiveVolume: volume x fade (its bus fader applies in the mixer).
 MusicNode_EffectiveVolume :: proc(m: ^MusicNode) -> f32 {
-	return m.volume * m.fadeVolume
+	return m.volume * m.fadeVolume * (m.music.gain if m.music != nil && m.music.gain > 0 else 1)
 }
 
 // MusicNode_ApplyVolume pushes volume, pan and pitch to its voice.

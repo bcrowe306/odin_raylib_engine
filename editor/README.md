@@ -291,11 +291,14 @@ import settings); open scripts that move are reopened. **Find Usages** (on
 any asset's menu) lists the files that reference it; double-click one to
 open it.
 
-**Import settings** for a texture are in the preview panel's Texture tab:
-**Filter** (Point keeps pixel art crisp; Bilinear / Trilinear smooth
-scaled images), **Wrap** (Repeat / Clamp) and **Mipmaps**. They're saved in
-`project.json` (`texture_import`), applied at once in the editor and when
-the game loads the texture.
+**Import settings** are in the preview panel. Textures: **Filter** (Point
+keeps pixel art crisp; Bilinear / Trilinear smooth scaled images), **Wrap**
+(Repeat / Clamp), **Mipmaps**, **Export** (Keep, or QOI for faster loading)
+and the slicing preset (saved from the Sprite Sheet Slicer's **Save
+Preset**). Audio: **Gain** and the default **Bus**. They're saved next to
+the asset (`hero.png.import.json` - hidden in Assets, moved and copied
+with it) and applied at once in the editor and when the game loads the
+asset. Guide: [`engine/docs/import_settings.md`](../engine/docs/import_settings.md).
 
 ### Importing assets
 

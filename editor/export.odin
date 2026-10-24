@@ -173,6 +173,9 @@ export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) 
 	overrides["project.json"] = transmute([]u8)e.Project_SerializeToJSON(&pc, context.temp_allocator)
 	ore, _ := filepath.join({dir, ".game.ore.tmp"}, context.temp_allocator)
 	filter :: proc(path: string, data: rawptr) -> bool {return e.Export_PresetIncludes(cast(^e.Export_Preset)data, path)}
+	if n := e.Asset_ExportOverrides(state.projectPath, &overrides, filter, p, context.temp_allocator); n > 0 {
+		Editor_Log(state, .Info, "%s: %d texture(s) stored as QOI (import settings)", p.name, n)
+	}
 	if !e.OrePackage_CreateFromDirectory(state.projectPath, ore, cfg.export.compress, filter, p, overrides) {
 		Editor_Log(state, .Error, "Failed to package the project into %s", ore)
 		return "", false

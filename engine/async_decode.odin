@@ -51,8 +51,7 @@ Decode_Submit :: proc(path: string, bytes: []u8) -> ^Decode_Job {
 	}
 	j := new(Decode_Job, a)
 	j.path = strings.clone(path, a)
-	ext := path[strings.last_index_byte(path, '.'):] if strings.last_index_byte(path, '.') >= 0 else ".png"
-	j.ext = strings.clone_to_cstring(ext, a)
+	j.ext = strings.clone_to_cstring(Image_ExtFor(bytes, path), a) // (QOI from export)
 	j.bytes = bytes
 	append(&decoder.jobs, j)
 	thread.pool_add_task(&decoder.pool, a, decode_task, j)

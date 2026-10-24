@@ -104,6 +104,12 @@ Asset_Move :: proc(state: ^EditorState, oldRel, newRel: string) -> bool {
 		Editor_Log(state, .Error, "Could not move %s", oldRel)
 		return false
 	}
+	// Its import settings file goes with it (folders take theirs along).
+	if !isFolder && os.is_file(strings.concatenate({src, e.IMPORT_SUFFIX}, context.temp_allocator)) {
+		_ = os.rename(strings.concatenate({src, e.IMPORT_SUFFIX}, context.temp_allocator), strings.concatenate({dst, e.IMPORT_SUFFIX}, context.temp_allocator))
+	}
+	e.Asset_ImportsReset()
+	Slicer_AssetMoved(oldRel, newRel, isFolder)
 	Editor_InvalidateProjectFiles()
 	Lua_MarkProjectTypesDirty()
 	for i := len(GlobalCode.docs) - 1; i >= 0; i -= 1 {

@@ -302,6 +302,9 @@ Asset_Duplicate :: proc(state: ^EditorState, rel, toDir: string) -> string {
 		Editor_Log(state, .Error, "Could not write %s", dst)
 		return ""
 	}
+	if side, serr := os.read_entire_file(strings.concatenate({src, e.IMPORT_SUFFIX}, context.temp_allocator), context.temp_allocator); serr == nil {
+		_ = os.write_entire_file(strings.concatenate({full, e.IMPORT_SUFFIX}, context.temp_allocator), side) // (its import settings)
+	}
 	if Asset_KindOf(dst) == .Scene {
 		append(&state.projectConfig.scenes, strings.clone(dst))
 		e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
@@ -328,6 +331,8 @@ Asset_Delete :: proc(state: ^EditorState, rel: string) -> bool {
 		Editor_Log(state, .Error, "Could not delete %s", rel)
 		return false
 	}
+	if !isDir do _ = os.remove(strings.concatenate({full, e.IMPORT_SUFFIX}, context.temp_allocator)) // (its import settings)
+	e.Asset_ImportsReset()
 	Editor_InvalidateProjectFiles()
 	// Deleted scenes leave the project's scene list.
 	prefix := strings.concatenate({rel, "/"}, context.temp_allocator)

@@ -42,8 +42,7 @@ SoundNode_Init :: proc(soundNode: ^SoundNode) {
 // SoundNode_BusIndex: the mixer bus it plays into (SFX when "" or unknown).
 SoundNode_BusIndex :: proc(sn: ^SoundNode) -> int {
 	if sn.bus != "" do if i := Mixer_BusIndex(sn.bus); i >= 0 do return i
-	if i := Mixer_BusIndex("SFX"); i >= 0 do return i
-	return 0
+	return Audio_BusFor(node_rm(sn), sn.audio.filePath if sn.audio != nil else "", "SFX") // (its import bus)
 }
 
 // SoundNode_Playing: any of its voices still playing.

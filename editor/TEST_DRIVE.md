@@ -117,7 +117,8 @@ exits non-zero if any check fails.
 | `workspaces.drive` | Animation and Level Design presets (bottom panel height), a saved workspace loaded back, Reset Layout. |
 | `remote_game.drive` | Play with the editor link: the Game tab's live tree, pause, one-frame step, inspect and change a node's rotation in the running game, resume, a saved scene reloading in the game, stop. |
 | `sprite_slicer.drive` | Slicer: a texture cut 4 x 2, cells picked (click, Shift+click range) as an animation, one per row, a new AnimationPlayer; picked cells saved. |
-| `asset_folders.drive` | Folders view: new folder, a texture the scene uses dragged into it (reference updated), Find Usages, folder renamed (references updated), thumbnail grid, texture import settings in project.json, folder deleted. |
+| `asset_folders.drive` | Folders view: new folder, a texture the scene uses dragged into it (reference updated), Find Usages, folder renamed (references updated), thumbnail grid, texture import settings saved next to it, folder deleted. |
+| `import_settings.drive` | A texture's filter and Export: QOI saved in its `.import.json` (hidden in Assets), the file following a rename, an audio file's default bus, a slicing preset from the slicer's Save Preset. |
 | `scene_tree.drive` | Tags in the Inspector (typed, picked, removed), filter by `#tag` / `t:type`, reorder by dropping on a row's edge (undo), Copy to Scene at the same world position, tags in the generated Lua types. |
 | `viewport_tools.drive` | Rulers, a guide dragged from the ruler, Alt-drag pivot (image and child stay), smart snap of an edge to the guide, viewport lock (not pickable) and hide in editor, Show All Colliders, saved. |
 | `multi_edit.drive` | Two lights selected: mixed value marked, a number / one axis of the position / a checkbox / a combo applied to both, undo. |

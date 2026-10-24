@@ -1,7 +1,7 @@
 # Assets panel, Folders view: a new folder, a texture used by the main scene
 # dragged into it (the scene's reference follows), Find Usages, the folder
 # renamed (references follow again), the thumbnail grid, a texture's import
-# settings saved in project.json, a folder deleted.
+# settings saved next to it, a folder deleted.
 wait 5
 click @asset.view-folders
 expect item:folder:textures == visible
@@ -46,12 +46,11 @@ click @asset.view-grid
 wait 20
 screenshot grid
 
-# Import settings: bilinear filtering for this texture, saved in project.json.
+# Import settings: bilinear filtering for this texture, saved next to it.
 click @asset:textures/drive_art_yy/Asteroid_1.png
 click @preview.import.filter
 click @pick:Bilinear
-expect file:project.json contains "texture_import"
-expect file:project.json contains "textures/drive_art_yy/Asteroid_1.png": {"filter": "bilinear"
+expect file:textures/drive_art_yy/Asteroid_1.png.import.json contains "filter": "bilinear"
 screenshot import_settings
 
 # Delete an (empty) folder.

@@ -2360,7 +2360,7 @@ lua_audio_play_sound :: proc "c" (L: ^lua.State) -> c.int {
 			// Audio.play_sound(path [, volume [, pitch [, bus = "SFX"]]]): one-shots overlap.
 			vol := f32(lua.tonumber(L, 2)) if lua.gettop(L) >= 2 else 1
 			pitch := f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else 1
-			bus := Mixer_BusIndex(string(lua.tostring(L, 4))) if lua.type(L, 4) == .STRING else Mixer_BusIndex("SFX")
+			bus := Mixer_BusIndex(string(lua.tostring(L, 4))) if lua.type(L, 4) == .STRING else Audio_BusFor(&sm.game.resourceManager, path, "SFX")
 			if Audio_Ready() do Mixer_PlaySound(sound.pcm, bus if bus >= 0 else 0, vol, 0, pitch, owner = sound)
 		}
 	}
@@ -2385,8 +2385,8 @@ lua_audio_play_sound_at :: proc "c" (L: ^lua.State) -> c.int {
 		vol *= v
 		pan = p
 	}
-	sfx := Mixer_BusIndex("SFX")
-	if Audio_Ready() do Mixer_PlaySound(sound.pcm, sfx if sfx >= 0 else 0, vol, Audio_RaylibPanToMixer(pan), 1, owner = sound)
+	sfx := Audio_BusFor(&sm.game.resourceManager, sound.filePath, "SFX")
+	if Audio_Ready() do Mixer_PlaySound(sound.pcm, sfx, vol, Audio_RaylibPanToMixer(pan), 1, owner = sound)
 	return 0
 }
 
@@ -2601,9 +2601,10 @@ lua_audio_play_music :: proc "c" (L: ^lua.State) -> c.int {
 	m, _ := lua_music(L)
 	if m == nil || !Audio_Ready() do return 0
 	loop := lua.type(L, 2) != .BOOLEAN || bool(lua.toboolean(L, 2))
-	bus := Mixer_BusIndex(string(lua.tostring(L, 3))) if lua.type(L, 3) == .STRING else Mixer_BusIndex("Music")
+	sm := get_script_manager(L)
+	bus := Mixer_BusIndex(string(lua.tostring(L, 3))) if lua.type(L, 3) == .STRING else Audio_BusFor(&sm.game.resourceManager if sm != nil && sm.game != nil else nil, m.filePath, "Music")
 	Mixer_StopVoice(m.voice)
-	m.voice = Mixer_PlayMusic(m.music, bus if bus >= 0 else 0, 1, loop, owner = m)
+	m.voice = Mixer_PlayMusic(m.music, bus if bus >= 0 else 0, m.gain if m.gain > 0 else 1, loop, owner = m)
 	return 0
 }
 
@@ -3817,6 +3818,7 @@ script_warn_once :: proc(L: ^lua.State, subject: string, format: string, args: .
 	lua.pop(L, 1)
 	key := strings.concatenate({where_, subject}, context.temp_allocator)
 	if key in warned || len(warned) > 1000 do return
+	if warned == nil do warned = make(map[string]bool, runtime.heap_allocator()) // (lives for the process)
 	warned[strings.clone(key, runtime.heap_allocator())] = true
 	Script_Problem(.Warning, "%s%s", where_, fmt.tprintf(format, ..args))
 }

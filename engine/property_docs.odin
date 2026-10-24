@@ -1,5 +1,7 @@
 package engine
 
+import "base:runtime"
+
 // ============================================================================
 // Property docs: one line of help for every reflected (gui-tagged) property,
 // shown in the Inspector's tooltips and help pane. Looked up as
@@ -16,7 +18,7 @@ Property_Doc_Entry :: struct {
 Property_Doc :: proc(p: Node_Property) -> string {
 	@(static) table: map[string]string
 	if table == nil {
-		table = make(map[string]string, len(PROPERTY_DOCS) + len(PROPERTY_DOCS_SHARED))
+		table = make(map[string]string, len(PROPERTY_DOCS) + len(PROPERTY_DOCS_SHARED), runtime.heap_allocator()) // (lives for the process)
 		for e in PROPERTY_DOCS_SHARED do table[e.key] = e.doc
 		for e in PROPERTY_DOCS do table[e.key] = e.doc
 	}

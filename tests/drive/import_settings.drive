@@ -1,0 +1,48 @@
+# Per-asset import settings: a texture's filter and export compression saved
+# next to it (<file>.import.json, hidden in Assets), the file following a
+# rename, an audio file's default bus, a slicing preset from the Sprite
+# Sheet Slicer.
+wait 5
+click @asset:textures/Asteroid_5.png
+click @preview.import.filter
+click @pick:Bilinear
+wait 2
+expect file:textures/Asteroid_5.png.import.json contains "filter": "bilinear"
+click @preview.import.compress
+click @pick:Export: QOI
+wait 2
+expect file:textures/Asteroid_5.png.import.json contains "compress": "qoi"
+expect item:asset:textures/Asteroid_5.png.import.json == missing
+screenshot texture_import
+
+# Renamed: the settings go with it.
+rclick @asset:textures/Asteroid_5.png
+click @ctx:rename-asset
+key ctrl+a
+type Asteroid_5_zz.png
+key enter
+wait 3
+expect file:textures/Asteroid_5_zz.png.import.json contains "compress": "qoi"
+expect file:textures/Asteroid_5.png.import.json !contains "qoi"
+
+# Audio: the bus it plays into by default.
+click @asset:audio/cannon-gunshot-1.wav
+wait 3
+click @preview.import.bus
+click @pick:Music
+wait 2
+expect file:audio/cannon-gunshot-1.wav.import.json contains "bus": "Music"
+screenshot audio_import
+
+# A slicing preset.
+rclick @asset:textures/Asteroid_5_zz.png
+click @ctx:slice-sheet
+dblclick @slicer.cols
+key ctrl+a
+type 3
+key enter
+click @slicer.save-preset
+wait 2
+expect file:textures/Asteroid_5_zz.png.import.json contains "grid": [3, 1]
+screenshot slicer_preset
+

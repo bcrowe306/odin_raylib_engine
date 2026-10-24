@@ -230,8 +230,7 @@ AnimationPlayerNode_FireEvents :: proc(apn: ^AnimationPlayerNode, frame: int) {
 				if ctx == nil || ctx.game == nil || !Audio_Ready() do continue
 				rm := &ctx.game.resourceManager
 				if s, ok := rm.loadAudioSound(rm, Project_ResolveAssetPath(ctx, k.text)); ok {
-					sfx := Mixer_BusIndex("SFX")
-					Mixer_PlaySound(s.pcm, sfx if sfx >= 0 else 0, owner = s)
+					Mixer_PlaySound(s.pcm, Audio_BusFor(rm, s.filePath, "SFX"), owner = s)
 				}
 			}
 		}

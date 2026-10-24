@@ -207,6 +207,8 @@ GameTerminate :: proc(game: ^Game) {
 	SceneManager_Terminate(&game.sceneManager)
 	AssetManager_Destroy(&game.assetManager)
 	ResourceManager_Terminate(&game.resourceManager) // (stops the voices using its sounds)
+	Asset_ImportsReset()
+	Texture_ImportsSet(nil)
 	Mixer_Shutdown()
 	PhysicsWorld_Destroy(&game.physicsWorld)
 	Shader_UnloadAll()
