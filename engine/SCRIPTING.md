@@ -871,6 +871,21 @@ import settings' bus (else SFX / Music), at its import gain
 low-pass, high-pass, compressor, limiter, delay, reverb, distortion. Guide:
 [`docs/audio_mixer.md`](docs/audio_mixer.md).
 
+#### Skeletal animation (Spine, DragonBones)
+
+Skeleton nodes play Spine / DragonBones exports: `skeleton_play(name,
+loop, mix)`, `skeleton_stop`, `skeleton_set_skin`, `skeleton_animations`,
+`skeleton_bone_position(name)` (world), `skeleton_set_bone_rotation(name,
+deg | nil)` (aim); events `skeleton_event`(name), `animation_finished`.
+Bone Attachment children follow a bone. Guide:
+[`docs/skeletal_animation.md`](docs/skeletal_animation.md).
+
+```lua
+local hero = self.node:get_node("Body")
+hero:skeleton_play("run")
+hero:connect("skeleton_event", function(name) if name == "footstep" then Audio.play_sound("audio/step.wav") end end)
+```
+
 #### Accessibility and subtitles
 
 `Accessibility.get(key)` / `set(key, value)` / `get_all()` / `save()` /

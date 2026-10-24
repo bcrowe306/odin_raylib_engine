@@ -1,0 +1,7 @@
+hero_zz.png
+size:128,128
+filter:Linear,Linear
+torso
+bounds:0,0,48,96
+arm
+bounds:48,0,64,16

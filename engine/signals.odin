@@ -71,6 +71,7 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "navigation_finished": return "", "The agent arrived at its target"
 	case "target_unreachable":  return "", "No way to the agent's target"
 	case "animation_event":    return "method", "A Method key of the animation fired (its method name)"
+	case "skeleton_event":     return "name", "An event key of the skeleton's animation fired (its name)"
 	case "became_active":       return "", "The host camera switched to this advanced camera"
 	case "became_inactive":     return "", "Another advanced camera took over"
 	case "path_looped":        return "", "The follower wrapped round or turned back (Loop / Ping Pong)"

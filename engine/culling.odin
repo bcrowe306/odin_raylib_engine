@@ -90,6 +90,8 @@ rect_aabb :: proc(pos, size, origin: [2]f32, rotDeg: f32) -> rl.Rectangle {
 Node_RenderBounds :: proc(node: ^Node) -> (rect: rl.Rectangle, ok: bool) {
 	if node.isUI do return {}, false
 	switch node.typeId {
+	case SkeletonNode:
+		return SkeletonNode_WorldBounds(cast(^SkeletonNode)node)
 	case TextureNode:
 		tn := cast(^TextureNode)node
 		if tn.texture == nil do return {}, false

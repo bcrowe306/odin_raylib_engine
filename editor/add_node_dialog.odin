@@ -41,6 +41,20 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "CameraNode",
 	},
 	{
+		name        = "Skeleton",
+		category    = "Animation & Effects",
+		icon        = ICON_FA_BONE,
+		description = "Skeletal (cutout) animation from Spine or DragonBones exports: bones, meshes, skins, IK, events; crossfades; scripts can turn bones.",
+		typeName    = "SkeletonNode",
+	},
+	{
+		name        = "Bone Attachment",
+		category    = "Animation & Effects",
+		icon        = ICON_FA_LINK,
+		description = "Under a Skeleton: follows one of its bones - put a weapon, a light or particles under it.",
+		typeName    = "BoneAttachmentNode",
+	},
+	{
 		name        = "Advanced Camera",
 		category    = "Core & 2D",
 		icon        = ICON_FA_CAMERA,

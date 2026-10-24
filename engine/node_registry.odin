@@ -40,6 +40,8 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"AreaNode", AreaNode, factory_area, {"area"}},
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
 	{"VisibilityNotifierNode", VisibilityNotifierNode, factory_visibility, {"visibility", "on screen", "notifier"}},
+	{"SkeletonNode", SkeletonNode, factory_skeleton, {"skeleton", "spine", "dragonbones", "bones", "rig", "cutout"}},
+	{"BoneAttachmentNode", BoneAttachmentNode, factory_bone_attachment, {"bone attachment", "attach to bone"}},
 	{"AdvancedCameraNode", AdvancedCameraNode, factory_adv_camera, {"advanced camera", "virtual camera", "phantom", "cinemachine"}},
 	{"PathNode", PathNode, factory_path, {"path", "curve", "bezier", "route", "rail"}},
 	{"NavigationRegionNode", NavigationRegionNode, factory_nav_region, {"navigation", "nav region", "navmesh", "pathfinding"}},
@@ -268,6 +270,12 @@ factory_nav_agent :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return Navigat
 
 @(private = "file")
 factory_path_follow :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PathFollowNode_Create(scene, "PathFollow", parent)}
+
+@(private = "file")
+factory_skeleton :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return SkeletonNode_Create(scene, "Skeleton", parent)}
+
+@(private = "file")
+factory_bone_attachment :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return BoneAttachmentNode_Create(scene, "BoneAttachment", parent)}
 
 @(private = "file")
 factory_adv_camera :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return AdvancedCameraNode_Create(scene, "AdvancedCamera", parent)}

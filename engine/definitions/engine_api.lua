@@ -125,6 +125,14 @@ local NavigationRegionNode = {}
 ---@class NavigationAgentNode : Node
 local NavigationAgentNode = {}
 
+---Skeletal (cutout) animation from a Spine .json or DragonBones _ske.json export: animations crossfade, skins, IK, events ("skeleton_event"), "animation_finished"; scripts can turn bones.
+---@class SkeletonNode : Node
+local SkeletonNode = {}
+
+---Under a Skeleton: follows one of its bones (bone, followRotation, followScale) - put a weapon or particles under it.
+---@class BoneAttachmentNode : Node
+local BoneAttachmentNode = {}
+
 ---A virtual camera: follow modes (Glued, Simple, Group, Path, Framed), limits (incl. the LDtk level the target is in), trauma shake; the scene's camera shows the highest priority one and blends on a switch. "became_active" / "became_inactive".
 ---@class AdvancedCameraNode : Node
 local AdvancedCameraNode = {}
@@ -534,6 +542,13 @@ function RaycastNode:connect(event, handler) end
 ---@param handler fun(value: any, source: VisibilityNotifierNode)
 ---@return integer id Connection id for `disconnect`
 function VisibilityNotifierNode:connect(event, handler) end
+
+---@alias SkeletonNodeEvent NodeTreeEvent|"animation_finished"|"skeleton_event"|ProjectEvent
+---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended), skeleton_event (An event key of the skeleton's animation fired (its name)); the tree events; custom ones.
+---@param event SkeletonNodeEvent|string
+---@param handler fun(value: any, source: SkeletonNode)
+---@return integer id Connection id for `disconnect`
+function SkeletonNode:connect(event, handler) end
 
 ---@alias AdvancedCameraNodeEvent NodeTreeEvent|"became_active"|"became_inactive"|ProjectEvent
 ---Connects a handler to one of this node's events: became_active (The host camera switched to this advanced camera), became_inactive (Another advanced camera took over); the tree events; custom ones.
@@ -2023,6 +2038,172 @@ function VisibilityNotifierNode:get_property(path) end
 ---@overload fun(self: VisibilityNotifierNode, path: "action", value: "None"|"Pause_Parent"|"Disable_Parent"|"Remove_Parent")
 ---@overload fun(self: VisibilityNotifierNode, path: "onScreen", value: boolean)
 function VisibilityNotifierNode:set_property(path, value, y) end
+
+---@class SkeletonNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field file string The skeleton: a Spine .json export or a DragonBones _ske.json (project-relative).
+---@field atlas string Its texture atlas; empty = next to it (name.atlas for Spine, name_tex.json for DragonBo...
+---@field armature string DragonBones: the armature to show (empty = the first).
+---@field animation string The animation played when the scene starts (and shown in the editor).
+---@field skin string The skin (attachment set); empty = the default skin.
+---@field loop boolean Play the animation over and over.
+---@field autoplay boolean Start the animation when the node becomes ready.
+---@field speed number Playback speed (1 = as authored).
+---@field mixTime number Seconds to crossfade from one animation to the next.
+---@field tint number[] Multiplies every slot's colour.
+---@field showBones boolean Draw the bones over the art (also in the game, for debugging).
+
+---@alias SkeletonNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "file" # string - The skeleton: a Spine .json export or a DragonBones _ske.json (project-relative).
+---| "atlas" # string - Its texture atlas; empty = next to it (name.atlas for Spine, name_tex.json for DragonBo...
+---| "armature" # string - DragonBones: the armature to show (empty = the first).
+---| "animation" # string - The animation played when the scene starts (and shown in the editor).
+---| "skin" # string - The skin (attachment set); empty = the default skin.
+---| "loop" # boolean - Play the animation over and over.
+---| "autoplay" # boolean - Start the animation when the node becomes ready.
+---| "speed" # number - Playback speed (1 = as authored).
+---| "mixTime" # number - Seconds to crossfade from one animation to the next.
+---| "tint" # number[] - Multiplies every slot's colour.
+---| "showBones" # boolean - Draw the bones over the art (also in the game, for debugging).
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path SkeletonNodeProperty|string
+---@return any
+---@overload fun(self: SkeletonNode, path: "position"): Vec2
+---@overload fun(self: SkeletonNode, path: "scale"): Vec2
+---@overload fun(self: SkeletonNode, path: "rotation"): number
+---@overload fun(self: SkeletonNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: SkeletonNode, path: "zIndex"): integer
+---@overload fun(self: SkeletonNode, path: "ySort"): boolean
+---@overload fun(self: SkeletonNode, path: "ySortOffset"): number
+---@overload fun(self: SkeletonNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: SkeletonNode, path: "paused"): boolean
+---@overload fun(self: SkeletonNode, path: "enabled"): boolean
+---@overload fun(self: SkeletonNode, path: "file"): string
+---@overload fun(self: SkeletonNode, path: "atlas"): string
+---@overload fun(self: SkeletonNode, path: "armature"): string
+---@overload fun(self: SkeletonNode, path: "animation"): string
+---@overload fun(self: SkeletonNode, path: "skin"): string
+---@overload fun(self: SkeletonNode, path: "loop"): boolean
+---@overload fun(self: SkeletonNode, path: "autoplay"): boolean
+---@overload fun(self: SkeletonNode, path: "speed"): number
+---@overload fun(self: SkeletonNode, path: "mixTime"): number
+---@overload fun(self: SkeletonNode, path: "tint"): number[]
+---@overload fun(self: SkeletonNode, path: "showBones"): boolean
+function SkeletonNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---@param path SkeletonNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: SkeletonNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: SkeletonNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: SkeletonNode, path: "rotation", value: number)
+---@overload fun(self: SkeletonNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: SkeletonNode, path: "zIndex", value: integer)
+---@overload fun(self: SkeletonNode, path: "ySort", value: boolean)
+---@overload fun(self: SkeletonNode, path: "ySortOffset", value: number)
+---@overload fun(self: SkeletonNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: SkeletonNode, path: "paused", value: boolean)
+---@overload fun(self: SkeletonNode, path: "enabled", value: boolean)
+---@overload fun(self: SkeletonNode, path: "file", value: string)
+---@overload fun(self: SkeletonNode, path: "atlas", value: string)
+---@overload fun(self: SkeletonNode, path: "armature", value: string)
+---@overload fun(self: SkeletonNode, path: "animation", value: string)
+---@overload fun(self: SkeletonNode, path: "skin", value: string)
+---@overload fun(self: SkeletonNode, path: "loop", value: boolean)
+---@overload fun(self: SkeletonNode, path: "autoplay", value: boolean)
+---@overload fun(self: SkeletonNode, path: "speed", value: number)
+---@overload fun(self: SkeletonNode, path: "mixTime", value: number)
+---@overload fun(self: SkeletonNode, path: "tint", value: number[])
+---@overload fun(self: SkeletonNode, path: "showBones", value: boolean)
+function SkeletonNode:set_property(path, value, y) end
+
+---@class BoneAttachmentNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field bone string The parent skeleton's bone this node follows (its children ride along: a weapon in the ...
+---@field followRotation boolean Turn with the bone.
+---@field followScale boolean Scale with the bone.
+
+---@alias BoneAttachmentNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "bone" # string - The parent skeleton's bone this node follows (its children ride along: a weapon in the ...
+---| "followRotation" # boolean - Turn with the bone.
+---| "followScale" # boolean - Scale with the bone.
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path BoneAttachmentNodeProperty|string
+---@return any
+---@overload fun(self: BoneAttachmentNode, path: "position"): Vec2
+---@overload fun(self: BoneAttachmentNode, path: "scale"): Vec2
+---@overload fun(self: BoneAttachmentNode, path: "rotation"): number
+---@overload fun(self: BoneAttachmentNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: BoneAttachmentNode, path: "zIndex"): integer
+---@overload fun(self: BoneAttachmentNode, path: "ySort"): boolean
+---@overload fun(self: BoneAttachmentNode, path: "ySortOffset"): number
+---@overload fun(self: BoneAttachmentNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: BoneAttachmentNode, path: "paused"): boolean
+---@overload fun(self: BoneAttachmentNode, path: "enabled"): boolean
+---@overload fun(self: BoneAttachmentNode, path: "bone"): string
+---@overload fun(self: BoneAttachmentNode, path: "followRotation"): boolean
+---@overload fun(self: BoneAttachmentNode, path: "followScale"): boolean
+function BoneAttachmentNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---@param path BoneAttachmentNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: BoneAttachmentNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: BoneAttachmentNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: BoneAttachmentNode, path: "rotation", value: number)
+---@overload fun(self: BoneAttachmentNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: BoneAttachmentNode, path: "zIndex", value: integer)
+---@overload fun(self: BoneAttachmentNode, path: "ySort", value: boolean)
+---@overload fun(self: BoneAttachmentNode, path: "ySortOffset", value: number)
+---@overload fun(self: BoneAttachmentNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: BoneAttachmentNode, path: "paused", value: boolean)
+---@overload fun(self: BoneAttachmentNode, path: "enabled", value: boolean)
+---@overload fun(self: BoneAttachmentNode, path: "bone", value: string)
+---@overload fun(self: BoneAttachmentNode, path: "followRotation", value: boolean)
+---@overload fun(self: BoneAttachmentNode, path: "followScale", value: boolean)
+function BoneAttachmentNode:set_property(path, value, y) end
 
 ---@class AdvancedCameraNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -5981,6 +6162,79 @@ function NavigationAgentNode:nav_get_path() end
 ---Example: `if agent:nav_distance_left() < 64 then self:slow_down() end`
 ---@return number
 function NavigationAgentNode:nav_distance_left() end
+
+---Plays an animation (crossfading over `mix` seconds; default: the node's Mix Time). False when the skeleton has no such animation.
+---
+---Example: `skel:skeleton_play("run")`
+---@param name string
+---@param loop? boolean Default true
+---@param mix? number Seconds
+---@return boolean ok
+function SkeletonNode:skeleton_play(name, loop, mix) end
+
+---Stops at the current frame.
+---
+---Example: `skel:skeleton_stop()`
+function SkeletonNode:skeleton_stop() end
+
+---An animation is playing.
+---
+---Example: `if not skel:skeleton_is_playing() then skel:skeleton_play("idle") end`
+---@return boolean
+function SkeletonNode:skeleton_is_playing() end
+
+---Switches the skin (attachment set).
+---
+---Example: `skel:skeleton_set_skin("armored")`
+---@param name string
+function SkeletonNode:skeleton_set_skin(name) end
+
+---The animations' names.
+---
+---Example: `for _, a in ipairs(skel:skeleton_animations()) do print(a) end`
+---@return string[]
+function SkeletonNode:skeleton_animations() end
+
+---The skins' names.
+---
+---Example: `local skins = skel:skeleton_skins()`
+---@return string[]
+function SkeletonNode:skeleton_skins() end
+
+---The bones' names.
+---
+---Example: `local bones = skel:skeleton_bones()`
+---@return string[]
+function SkeletonNode:skeleton_bones() end
+
+---A bone's position in the world (nil: no such bone).
+---
+---Example: `local muzzle = skel:skeleton_bone_position("gun_tip")`
+---@param name string
+---@return Vec2?
+function SkeletonNode:skeleton_bone_position(name) end
+
+---A bone's rotation in the world (degrees).
+---
+---Example: `local angle = skel:skeleton_bone_rotation("arm")`
+---@param name string
+---@return number?
+function SkeletonNode:skeleton_bone_rotation(name) end
+
+---Overrides a bone's local rotation (degrees) over the animation; nil gives it back to the animation.
+---
+---Example: `skel:skeleton_set_bone_rotation("arm", aim_angle)`
+---@param name string
+---@param degrees? number
+---@return boolean ok
+function SkeletonNode:skeleton_set_bone_rotation(name, degrees) end
+
+---An animation's length in seconds (default: the current one).
+---
+---Example: `local t = skel:skeleton_duration("attack")`
+---@param name? string
+---@return number
+function SkeletonNode:skeleton_duration(name) end
 
 ---Adds shake trauma (stacks up to 1, decays by Shake Decay per second).
 ---

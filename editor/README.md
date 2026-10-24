@@ -569,6 +569,15 @@ the Inspector rebuilds them. **Navigation Agent** under a character walks
 it to targets; in Simulate its path is drawn green. Guide:
 [`engine/docs/navigation.md`](../engine/docs/navigation.md).
 
+### Skeletons (Spine, DragonBones)
+
+**Skeleton** (Add Node > Animation & Effects): pick a Spine `.json` (with
+its .atlas) or a DragonBones `_ske.json` in the Inspector, then the
+animation and skin; **Preview** plays / scrubs it in the viewport. The
+**Bones** list highlights a bone on hover; its link button adds a **Bone
+Attachment** that follows it. Guide:
+[`engine/docs/skeletal_animation.md`](../engine/docs/skeletal_animation.md).
+
 ### Accessibility
 
 **Project Settings > Project > Accessibility**: the players' defaults (UI

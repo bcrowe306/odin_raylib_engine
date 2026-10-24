@@ -1,0 +1,54 @@
+# Skeletal animation: a Spine export (tests/drive/fixtures/skeleton_zz)
+# shown by a Skeleton node - file and animation picked in the Inspector,
+# the preview scrubbed and played in the viewport, a bone highlighted,
+# a Bone Attachment added on the hand; saved; in Simulate it plays (Lua).
+exec cp -R tests/drive/fixtures/skeleton_zz $PROJECT/skeletons_zz
+wait 5
+key escape
+key ctrl+a
+type skeleton
+key enter
+wait 3
+expect node:Skeleton.type == SkeletonNode
+wait 90
+click @insp.skel.file
+wait 2
+screenshot file_combo
+click @pick:skeletons_zz/hero_zz.json
+wait 3
+click @insp.skel.animation
+click @pick:wave
+wait 2
+expect node:Skeleton.prop.animation == wave
+scroll @viewport 3
+scroll @viewport 3
+wait 2
+screenshot setup_pose
+drag @insp.skel.time @insp.skel.time+40,0
+wait 2
+screenshot scrubbed
+hover @insp.skel.bone:shoulder
+wait 2
+screenshot bone_highlight
+click @insp.skel.attach:hand
+wait 3
+expect node:hand_attach.type == BoneAttachmentNode
+expect node:hand_attach.parent == Skeleton
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "type": "SkeletonNode"
+expect file:scenes/main.scene.json contains skeletons_zz/hero_zz.json
+expect file:scenes/main.scene.json contains "bone": "hand"
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 30
+click @bottom:console
+click @console.lua
+type local s = Scene.find_node("Skeleton"); print("SKEL anims=" .. #s:skeleton_animations() .. " playing=" .. tostring(s:skeleton_is_playing()) .. " hand=" .. tostring(s:skeleton_bone_position("hand") ~= nil))
+key enter
+wait 3
+expect log contains SKEL anims=2 playing=true hand=true
+screenshot simulating
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5
