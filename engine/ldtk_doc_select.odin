@@ -81,14 +81,16 @@ ldtk_cell_has_value :: proc(doc: ^Ldtk_Doc, ly: ^Ldtk_DocLayer, cx, cy: int) -> 
 
 // Ldtk_Doc_SelectRect adds what lies in a level-pixel rectangle: cells with a
 // value and entities whose cell is inside (only `onlyLayer` when >= 0;
-// hidden layers are skipped).
-Ldtk_Doc_SelectRect :: proc(doc: ^Ldtk_Doc, li: int, s: ^Ldtk_Selection, r: [4]int, onlyLayer := -1) {
+// hidden layers are skipped; with `activeLayer`, other layers whose def
+// says canSelectWhenInactive = false are skipped too).
+Ldtk_Doc_SelectRect :: proc(doc: ^Ldtk_Doc, li: int, s: ^Ldtk_Selection, r: [4]int, onlyLayer := -1, activeLayer := -1) {
 	lv := &doc.levels[li]
 	for &ly, j in lv.layers {
 		if onlyLayer >= 0 && j != onlyLayer do continue
 		if !LdtkJson_Bool(ly.obj, "visible", true) do continue
 		d := Ldtk_Doc_LayerDef(doc, &ly)
 		if d == nil do continue
+		if activeLayer >= 0 && j != activeLayer && !LdtkJson_Bool(d.obj, "canSelectWhenInactive", true) do continue
 		off := Ldtk_Doc_LayerOffset(&ly)
 		g := d.gridSize
 		x0 := ldtk_floor_div(r[0] - off.x, g)
@@ -115,10 +117,10 @@ Ldtk_Doc_SelectRect :: proc(doc: ^Ldtk_Doc, li: int, s: ^Ldtk_Selection, r: [4]i
 }
 
 // Ldtk_Doc_SelectAll selects everything in a layer (or every layer: -1).
-Ldtk_Doc_SelectAll :: proc(doc: ^Ldtk_Doc, li: int, s: ^Ldtk_Selection, layer := -1) {
+Ldtk_Doc_SelectAll :: proc(doc: ^Ldtk_Doc, li: int, s: ^Ldtk_Selection, layer := -1, activeLayer := -1) {
 	Ldtk_Selection_Clear(s)
 	sz := Ldtk_Doc_LevelSize(doc, li)
-	Ldtk_Doc_SelectRect(doc, li, s, {-100000, -100000, sz.x + 200000, sz.y + 200000}, layer)
+	Ldtk_Doc_SelectRect(doc, li, s, {-100000, -100000, sz.x + 200000, sz.y + 200000}, layer, activeLayer)
 }
 
 @(private)

@@ -424,9 +424,88 @@ values with the box under the list.
 ## Layers tab
 <!-- topic: tab.layers -->
 
-Each layer's settings: identifier, grid size, opacity, pixel offset,
-tileset, the IntGrid layer an Auto layer reads, order, and **IntGrid
-values** (colour, name).
+The layer list on the left, and the picked layer's settings on the right.
+Right-click a layer to copy, cut, paste after, duplicate, move, bake, move
+its entities, or delete it. Right-click the empty part of the list to paste
+at the bottom. Duplicates and pasted layers get new uids (their rules
+too), a free name and empty content.
+
+| | |
+|---|---|
+| **Identifier**, **Documentation** | The name (unique), and a note shown in tooltips. |
+| **UI colour** | Marks the layer in lists. |
+| **Grid size** | Cells keep their coordinates when it changes; entities are scaled. Auto layers reading this layer follow. An Auto layer's grid is its source's. |
+| **Guide grid**, **Opacity**, **Inactive opacity**, **Hide in list**, ... | See *Layer display*. |
+| **Offset** | Moves the whole layer by some pixels. |
+| **Parallax** | See *Parallax*. |
+| **Filter tags** | Tags grouping layers (kept for LDtk). |
+
+Per type:
+
+- **IntGrid**: the values (see *IntGrid values*). Also the auto-layer
+  **tileset** its own rules use, the **biome field** (a level Enum field
+  rule groups can test), and **tiles removed by** (a Tiles layer: where it
+  has a tile, the auto tiles are left out).
+- **Auto layer**: **Rules read** (its IntGrid source; the grid follows),
+  the tileset, the biome field and tiles removed by.
+- **Entities**: **required / excluded tags** decide which entities can go
+  in it. **Move entities...** moves all of them, one kind, or one tag to
+  another Entities layer in every level. The target layer's tags must
+  accept them.
+- **Tiles**: the tileset (the layer takes its grid; a warning shows when
+  the grids aren't multiples) and the **tile pivot** (where tiles bigger
+  than a cell sit).
+
+## Layer display
+<!-- topic: layers.display -->
+
+- **Guide grid**: extra lines every W / H pixels while the layer is active,
+  for rooms or screens (0: none).
+- **Opacity**: always applied. **Inactive opacity**: applied while another
+  layer is active (0 hides it).
+- **Hide in list**: the Layers panel leaves the layer out unless it is
+  active. It is still drawn.
+- **Hide fields when inactive**: entity names and field labels show only
+  while the layer is active.
+- **Selectable when inactive**: when off, the Select tool and Alt only pick
+  this layer's content while it is active.
+- **Render in world view**, **Async render**: LDtk options, kept in the
+  file.
+
+## Parallax
+<!-- topic: layers.parallax -->
+
+A parallax factor makes a layer move slower (positive, far away) or faster
+(negative, close) than the camera. 0 means none and 1 fixes it to the
+screen. With **parallax scaling**, far layers are also drawn smaller so
+they still fit the level, and Y follows X.
+
+The canvas shows parallax on the active level's other layers as you pan.
+The active layer stays in place so painting lands where you click.
+Clicks on the other layers follow the parallax.
+
+## IntGrid values
+<!-- topic: layers.values -->
+
+Each value has a colour, a number and an identifier.
+
+- **Icons from** picks a tileset; then click a value's picture button to
+  pick its icon tile. The palette shows icons instead of colours.
+- **Add group** adds a group. Right-click a group's header to rename it,
+  colour it, move it or delete it; its values go back to *Ungrouped*. The
+  palette lists values by group.
+- Right-click a value to move it up or down, move it to a group, clear its
+  icon, or remove it. Removing a painted value asks first, because its
+  cells are cleared.
+
+## Baking
+<!-- topic: layers.bake -->
+
+**Bake...** (an Auto layer's or IntGrid layer's menu, or the Layers tab)
+flattens its generated tiles into a new Tiles layer, `<name>_baked`,
+placed after it. Tiles are stacked as LDtk stacks them. Choose what
+happens to the original: deleted, emptied (IntGrid layers lose their
+values), or kept. A layer that an Auto layer reads can't be baked.
 
 ## Rules tab
 <!-- topic: tab.rules, rules -->

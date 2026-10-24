@@ -6,6 +6,7 @@ import "core:math/rand"
 import "core:strconv"
 import "core:strings"
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 import e "../engine"
 import imgui "lib/imgui"
 
@@ -151,7 +152,19 @@ draw_level :: proc(li: int, active: bool) {
 	// layers: index 0 is the top one
 	#reverse for &ly, i in lv.layers {
 		if !e.LdtkJson_Bool(ly.obj, "visible", true) do continue
-		draw_layer(li, i, &ly, origin, active && i == L.layer)
+		d := e.Ldtk_Doc_LayerDef(doc, &ly)
+		// the active level's other layers: inactive opacity, parallax
+		inactive := active && i != L.layer
+		if inactive && d != nil && e.LdtkJson_Float(d.obj, "inactiveOpacity", 1) <= 0 do continue
+		off, sc := layer_parallax(li, i)
+		if off != {} || sc != 1 {
+			rlgl.PushMatrix()
+			rlgl.Translatef(origin.x + off.x, origin.y + off.y, 0)
+			rlgl.Scalef(sc, sc, 1)
+			rlgl.Translatef(-origin.x, -origin.y, 0)
+		}
+		draw_layer(li, i, &ly, origin, active && i == L.layer, inactive)
+		if off != {} || sc != 1 do rlgl.PopMatrix()
 	}
 	if !active {
 		rl.DrawRectangleV(origin, {f32(s.x), f32(s.y)}, {0, 0, 0, 90})
@@ -196,7 +209,7 @@ draw_level_bg :: proc(li: int, origin: [2]f32, s: [2]int) {
 }
 
 @(private = "file")
-draw_layer :: proc(li, layer: int, ly: ^e.Ldtk_DocLayer, origin: [2]f32, isActive: bool) {
+draw_layer :: proc(li, layer: int, ly: ^e.Ldtk_DocLayer, origin: [2]f32, isActive: bool, inactive := false) {
 	L := &GlobalLevel
 	doc := L.doc
 	d := e.Ldtk_Doc_LayerDef(doc, ly)
@@ -204,6 +217,7 @@ draw_layer :: proc(li, layer: int, ly: ^e.Ldtk_DocLayer, origin: [2]f32, isActiv
 	off := e.Ldtk_Doc_LayerOffset(ly)
 	o := origin + {f32(off.x), f32(off.y)}
 	opacity := d.opacity
+	if inactive do opacity *= f32(e.LdtkJson_Float(d.obj, "inactiveOpacity", 1))
 	ts := e.Ldtk_Doc_LayerTileset(doc, ly)
 	if ts != nil {
 		if tex, ok := level_texture(ts.uid); ok {
@@ -253,6 +267,47 @@ draw_layer :: proc(li, layer: int, ly: ^e.Ldtk_DocLayer, origin: [2]f32, isActiv
 			for cy in 0 ..= ly.cHei do rl.DrawLineV(o + {0, f32(cy) * g}, o + {f32(ly.cWid) * g, f32(cy) * g}, lc)
 		}
 	}
+	// the guide grid (LevelRender: every guideGridWid / Hei pixels)
+	if isActive {
+		s := e.Ldtk_Doc_LevelSize(doc, li)
+		gc := rl.Color{255, 255, 255, 84}
+		thick := 1 / L.zoom
+		if gw := e.LdtkJson_Int(d.obj, "guideGridWid"); gw > 1 {
+			for x := o.x; x <= origin.x + f32(s.x); x += f32(gw) {
+				if x < origin.x do continue
+				rl.DrawLineEx({x, max(o.y, origin.y)}, {x, origin.y + f32(s.y)}, thick, gc)
+			}
+		}
+		if gh := e.LdtkJson_Int(d.obj, "guideGridHei"); gh > 1 {
+			for y := o.y; y <= origin.y + f32(s.y); y += f32(gh) {
+				if y < origin.y do continue
+				rl.DrawLineEx({max(o.x, origin.x), y}, {origin.x + f32(s.x), y}, thick, gc)
+			}
+		}
+	}
+}
+
+// layer_parallax: Camera.getParallaxOffset / LayerDef.getScale for the
+// active level's inactive layers (the active layer stays put for editing).
+@(private = "file")
+layer_parallax :: proc(li, layer: int) -> (off: [2]f32, scale: f32) {
+	L := &GlobalLevel
+	doc := L.doc
+	scale = 1
+	if li != L.level || layer == L.layer do return
+	d := e.Ldtk_Doc_LayerDef(doc, &doc.levels[li].layers[layer])
+	if d == nil do return
+	fx := f32(e.LdtkJson_Float(d.obj, "parallaxFactorX"))
+	fy := f32(e.LdtkJson_Float(d.obj, "parallaxFactorY"))
+	if fx == 0 && fy == 0 do return
+	scaling := e.LdtkJson_Bool(d.obj, "parallaxScaling", true)
+	p := e.Ldtk_Doc_LevelPos(doc, li)
+	s := e.Ldtk_Doc_LevelSize(doc, li)
+	cam := to_world(L.canvasMin + L.canvasSize * 0.5)
+	lx, ly := cam.x - f32(p.x), cam.y - f32(p.y)
+	off = {lx * fx + (scaling ? 0 : -f32(s.x) * 0.5 * fx), ly * fy + (scaling ? 0 : -f32(s.y) * 0.5 * fy)}
+	if scaling && fx != 0 do scale = max(0.01, 1 - fx)
+	return
 }
 
 // layer_origin: world position of the active layer's cell (0, 0).
@@ -890,6 +945,13 @@ element_at :: proc(mw: [2]f32) -> (cell: e.Ldtk_SelCell, ent: e.Ldtk_SelEntity, 
 		if !e.LdtkJson_Bool(ly.obj, "visible", true) do return {}, {}, false
 		d := e.Ldtk_Doc_LayerDef(doc, ly)
 		if d == nil do return {}, {}, false
+		if j != GlobalLevel.layer && !e.LdtkJson_Bool(d.obj, "canSelectWhenInactive", true) do return {}, {}, false
+		mw := mw
+		if off, sc := layer_parallax(li, j); off != {} || sc != 1 {
+			lp0 := e.Ldtk_Doc_LevelPos(doc, li)
+			lo := [2]f32{f32(lp0.x), f32(lp0.y)}
+			mw = lo + (mw - lo - off) / sc
+		}
 		o := layer_origin_of(j)
 		lp := [2]int{int(math.floor(mw.x - o.x)), int(math.floor(mw.y - o.y))}
 		#partial switch d.type {
@@ -1037,7 +1099,7 @@ selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
 			mn := [2]f32{min(a.x, b.x), min(a.y, b.y)}
 			mx := [2]f32{max(a.x, b.x), max(a.y, b.y)}
 			r := [4]int{int(math.floor(mn.x)), int(math.floor(mn.y)), max(int(mx.x - mn.x), 1), max(int(mx.y - mn.y), 1)}
-			e.Ldtk_Doc_SelectRect(doc, L.level, &L.sel, r)
+			e.Ldtk_Doc_SelectRect(doc, L.level, &L.sel, r, activeLayer = L.layer)
 			level_sync_selection()
 		}
 		return true
@@ -1357,6 +1419,7 @@ draw_field_geometry :: proc() {
 	for &ly, j in lv.layers {
 		d := e.Ldtk_Doc_LayerDef(doc, &ly)
 		if d == nil || d.type != .Entities || !e.LdtkJson_Bool(ly.obj, "visible", true) do continue
+		if j != L.layer && e.LdtkJson_Bool(d.obj, "hideFieldsWhenInactive") do continue
 		o := layer_origin_of(j)
 		g := f32(d.gridSize)
 		for ent in e.LdtkJson_Arr(ly.obj, "entityInstances") {
@@ -1500,6 +1563,7 @@ draw_field_labels :: proc(dl: ^imgui.DrawList) {
 	for &ly, j in lv.layers {
 		d := e.Ldtk_Doc_LayerDef(doc, &ly)
 		if d == nil || d.type != .Entities || !e.LdtkJson_Bool(ly.obj, "visible", true) do continue
+		if j != L.layer && e.LdtkJson_Bool(d.obj, "hideFieldsWhenInactive") do continue
 		o := layer_origin_of(j)
 		for ent in e.LdtkJson_Arr(ly.obj, "entityInstances") {
 			base := e.Ldtk_ParseHexColor(e.LdtkJson_Str(ent, "__smartColor", "#FFFFFF"))

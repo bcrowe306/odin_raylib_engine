@@ -335,13 +335,22 @@ ldtk_level_free :: proc(doc: ^Ldtk_Doc, l: ^Ldtk_DocLevel) {
 
 @(private)
 ldtk_level_index_layers :: proc(doc: ^Ldtk_Doc, lv: ^Ldtk_DocLevel) {
-	for &ly in lv.layers {
-		delete(ly.intGrid, doc.heap)
-		delete(ly.gridTiles)
-		delete(ly.autoTiles)
-	}
+	// instances still in the tree keep their typed cells (they can hold edits
+	// not written to the tree yet); the others are read from the tree
+	old := make([dynamic]Ldtk_DocLayer, context.temp_allocator)
+	append(&old, ..lv.layers[:])
+	used := make([]bool, len(old), context.temp_allocator)
 	clear(&lv.layers)
 	for lobj in LdtkJson_Arr(lv.data, "layerInstances") {
+		kept := false
+		for &o, i in old do if !used[i] && o.obj == lobj {
+			used[i] = true
+			o.def = Ldtk_Doc_LayerDefIndex(doc, LdtkJson_Int(lobj, "layerDefUid", -1))
+			append(&lv.layers, o)
+			kept = true
+			break
+		}
+		if kept do continue
 		ly := Ldtk_DocLayer{obj = lobj}
 		ly.def = Ldtk_Doc_LayerDefIndex(doc, LdtkJson_Int(lobj, "layerDefUid", -1))
 		ly.cWid = LdtkJson_Int(lobj, "__cWid")
@@ -357,6 +366,11 @@ ldtk_level_index_layers :: proc(doc: ^Ldtk_Doc, lv: ^Ldtk_DocLevel) {
 		ldtk_read_tiles(&ly.gridTiles, LdtkJson_Arr(lobj, "gridTiles"), false)
 		ldtk_read_tiles(&ly.autoTiles, LdtkJson_Arr(lobj, "autoLayerTiles"), true)
 		append(&lv.layers, ly)
+	}
+	for &o, i in old do if !used[i] {
+		delete(o.intGrid, doc.heap)
+		delete(o.gridTiles)
+		delete(o.autoTiles)
 	}
 }
 
@@ -516,7 +530,7 @@ ldtk_ceil :: proc(v: f64) -> f64 {
 	return i < v ? i + 1 : i
 }
 
-@(private = "file")
+@(private)
 ldtk_nullable_int :: proc(o: ^LdtkJson, key: string) -> int {
 	v := LdtkJson_Get(o, key)
 	if v == nil || v.kind != .Number do return -1

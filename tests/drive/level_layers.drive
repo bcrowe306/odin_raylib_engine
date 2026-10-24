@@ -1,0 +1,85 @@
+# Level editor layer definitions (Layers tab): guide grid and parallax; a
+# grid change that keeps the cells (undo); duplicate / copy / paste from the
+# list's menu; an IntGrid value group; baking an auto layer; moving entities
+# to another layer; hide in list.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/layers_zz
+wait 90
+click @root.level
+wait 3
+click @level.open:layers_zz/topdown.ldtk
+wait 5
+click @level.zoom
+click @pick:100%
+wait 1
+click @level.layer:Collisions
+click @level.value:1
+click @level.origin+40,40
+wait 2
+expect level.cell:2,2 == 1
+click @level.tab:Layers
+wait 1
+click @defs.layer:Collisions
+wait 1
+screenshot layer_form
+# guide grid, parallax
+click @defs.layer.guide.x
+key cmd+a
+type 64
+key enter
+wait 1
+expect level.layerprop:Collisions.guideGridWid == 64
+screenshot guide_grid
+# grid 16 -> 8: cells keep their coordinates; Auto layers reading it follow
+click @defs.layer.grid
+key cmd+a
+type 8
+key enter
+wait 2
+expect level.layerprop:Collisions.gridSize == 8
+expect level.layerprop:Wall_tops.gridSize == 8
+expect level.cell:2,2 == 1
+key cmd+z
+wait 2
+expect level.layerprop:Collisions.gridSize == 16
+# duplicate, copy / paste
+rclick @defs.layer:Collisions
+click @ctx:Duplicate
+wait 2
+expect level.layerdefs contains Collisions2
+rclick @defs.layer:Collisions2
+click @ctx:Copy
+rclick @defs.layer:Entities
+click @ctx:Paste after
+wait 2
+expect level.layerdefs contains Collisions3
+# a value group
+click @defs.layer:Collisions
+wait 1
+click @defs.valuegroup.add
+wait 1
+expect level.layerprop:Collisions.intGridValuesGroups contains "uid":1
+screenshot value_group
+# bake an auto layer, keeping the original
+rclick @defs.layer:Wall_tops
+click @ctx:Bake...
+wait 1
+screenshot bake_dialog
+click @bake.keep
+wait 3
+expect level.layerdefs contains Wall_tops_baked
+# hide it in the Layers panel
+click @defs.layer.hideinlist
+wait 1
+expect level.layerprop:Wall_tops_baked.hideInList == true
+# move entities to another Entities layer
+rclick @defs.layer:Entities
+click @ctx:Duplicate
+wait 2
+rclick @defs.layer:Entities
+click @ctx:Move entities...
+wait 1
+screenshot move_entities
+click @move.ok
+wait 2
+expect log contains Moved
+screenshot after_move

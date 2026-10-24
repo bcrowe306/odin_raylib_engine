@@ -17,8 +17,9 @@ import imgui "lib/imgui"
 //                custom data, animations and enum tags
 //   Entities     size, colour, pivot, resizing, tile, fields
 //   Enums        values
-//   Layers       grid, opacity, offset, tileset, auto-layer source, order,
-//                IntGrid values (new layers: the Layers panel's + button)
+//   Layers       (level_defs_layers.odin) every layer option, IntGrid values
+//                and groups, copy / paste, bake (new layers: the Layers
+//                panel's + button)
 //   Rules        auto-layer rule groups and rules (pattern grid, tiles,
 //                chance, flips, modulo, break on match), terrains
 //   Project      defaults, background, JSON options, level fields
@@ -61,40 +62,10 @@ LevelDefs_Page :: proc(state: ^EditorState, page: Level_Panel_Tab) {
 	case .Tilesets: page_tilesets(state)
 	case .Entities: LevelDefs_EntitiesPage(state)
 	case .Enums: page_enums(state)
-	case .Layers: page_layers(state)
+	case .Layers: LevelLayers_Page(state)
 	case .Rules: LevelRules_Page(state)
 	case .Project: page_project(state)
 	}
-}
-
-// ----------------------------------------------------------------------------
-// Layers
-// ----------------------------------------------------------------------------
-
-@(private = "file")
-page_layers :: proc(state: ^EditorState) {
-	L := &GlobalLevel
-	doc := L.doc
-	avail := imgui.GetContentRegionAvail()
-	if imgui.BeginChild("##layer_list", {200, avail.y}, {.Borders}, {}) {
-		if UI_Button(fmt.tprintf("%s  New layer...", ICON_FA_PLUS), "defs.layer.new") do LevelDefs_OpenNewLayer()
-		imgui.Separator()
-		for &d in doc.layerDefs {
-			if imgui.Selectable(fmt.ctprintf("%s  %s##ld%d", LAYER_TYPE_ICON[d.type], d.identifier, d.uid), defs.layerUid == d.uid, {}, {0, 22}) do defs.layerUid = d.uid
-			Drive_Item(fmt.tprintf("defs.layer:%s", d.identifier))
-		}
-	}
-	imgui.EndChild()
-	imgui.SameLine(0, 8)
-	if imgui.BeginChild("##layer_props", {0, avail.y}, {}, {}) {
-		di := e.Ldtk_Doc_LayerDefIndex(doc, defs.layerUid)
-		if di < 0 {
-			UI_DimText("Pick a layer, or add one with the buttons on the left.")
-		} else {
-			layer_props(state, di)
-		}
-	}
-	imgui.EndChild()
 }
 
 // level_after_defs keeps the editor's indices valid after a defs change.
@@ -104,149 +75,6 @@ level_after_defs :: proc() {
 	level_follow_layer_uid()
 	level_clear_selection()
 	level_sync_palette()
-}
-
-@(private = "file")
-layer_props :: proc(state: ^EditorState, di: int) {
-	L := &GlobalLevel
-	doc := L.doc
-	d := &doc.layerDefs[di]
-	uid := d.uid
-	obj := d.obj
-	UI_PanelTitle(LAYER_TYPE_ICON[d.type], d.identifier, fmt.tprintf("%v layer", d.type))
-	UI_HeaderButtons(3)
-	if UI_HeaderButton(ICON_FA_ARROW_UP, "defs.layer.up", "Move up (drawn above)") {
-		defs_checkpoint("Move Layer")
-		e.Ldtk_Doc_MoveLayerDef(doc, uid, -1)
-		level_after_defs()
-		return
-	}
-	if UI_HeaderButton(ICON_FA_ARROW_DOWN, "defs.layer.down", "Move down") {
-		defs_checkpoint("Move Layer")
-		e.Ldtk_Doc_MoveLayerDef(doc, uid, 1)
-		level_after_defs()
-		return
-	}
-	if UI_HeaderButton(ICON_FA_TRASH, "defs.layer.remove", "Delete the layer (and its content in every level)") {
-		defs_checkpoint("Delete Layer")
-		e.Ldtk_Doc_RemoveLayerDef(doc, uid)
-		defs.layerUid = -1
-		level_after_defs()
-		return
-	}
-	if UI_BeginProps("##layer_props_t") {
-		UI_PropLabel("Identifier")
-		if name, ok := defs_text_edit("defs.layer.name", obj, "identifier"); ok {
-			defs_checkpoint("Rename Layer")
-			e.Ldtk_Doc_RenameLayerDef(doc, uid, name)
-		}
-		UI_PropLabel("Grid size")
-		grid := i32(d.gridSize)
-		if imgui.InputInt("##grid", &grid, 1, 8, {.EnterReturnsTrue}) && grid >= 1 {
-			defs_checkpoint("Layer Grid")
-			e.LdtkJson_SetInt(obj, "gridSize", int(grid), doc.allocator)
-			e.Ldtk_Doc_LayerDefChanged(doc, uid)
-		}
-		Drive_Item("defs.layer.grid")
-		UI_PropLabel("Opacity")
-		op := d.opacity
-		if imgui.SliderFloat("##opacity", &op, 0, 1, "%.2f") {
-			e.Ldtk_Doc_CheckpointOnce(doc, -1, "Layer Opacity", obj)
-			e.LdtkJson_SetFloat(obj, "displayOpacity", f64(op), doc.allocator)
-			e.Ldtk_Doc_RefreshDefs(doc)
-		}
-		if imgui.IsItemDeactivatedAfterEdit() do e.Ldtk_Doc_LayerDefChanged(doc, uid) // the instances' cached opacity
-		if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
-		UI_PropLabel("Offset (px)")
-		off := [2]i32{i32(d.pxOffset.x), i32(d.pxOffset.y)}
-		if imgui.InputInt2("##off", &off, {.EnterReturnsTrue}) {
-			defs_checkpoint("Layer Offset")
-			e.LdtkJson_SetInt(obj, "pxOffsetX", int(off.x), doc.allocator)
-			e.LdtkJson_SetInt(obj, "pxOffsetY", int(off.y), doc.allocator)
-			e.Ldtk_Doc_LayerDefChanged(doc, uid)
-		}
-		if d.type != .Entities {
-			UI_PropLabel("Tileset")
-			names := make([]string, len(doc.tilesets) + 1, context.temp_allocator)
-			names[0] = "(none)"
-			cur := 0
-			for ts, i in doc.tilesets {
-				names[i + 1] = ts.identifier
-				if ts.uid == d.tilesetUid do cur = i + 1
-			}
-			if pick, changed := UI_Combo("defs.layer.tileset", cur, names); changed {
-				defs_checkpoint("Layer Tileset")
-				if pick == 0 do e.LdtkJson_SetNull(obj, "tilesetDefUid", doc.allocator)
-				else do e.LdtkJson_SetInt(obj, "tilesetDefUid", doc.tilesets[pick - 1].uid, doc.allocator)
-				e.Ldtk_Doc_LayerDefChanged(doc, uid)
-			}
-		}
-		if d.type == .AutoLayer {
-			UI_PropLabel("Rules read")
-			names := make([dynamic]string, context.temp_allocator)
-			uids := make([dynamic]int, context.temp_allocator)
-			append(&names, "(none)")
-			append(&uids, -1)
-			cur := 0
-			for &o in doc.layerDefs do if o.type == .IntGrid {
-				if o.uid == d.autoSourceUid do cur = len(names)
-				append(&names, o.identifier)
-				append(&uids, o.uid)
-			}
-			if pick, changed := UI_Combo("defs.layer.source", cur, names[:]); changed {
-				defs_checkpoint("Auto Layer Source")
-				if uids[pick] < 0 do e.LdtkJson_SetNull(obj, "autoSourceLayerDefUid", doc.allocator)
-				else do e.LdtkJson_SetInt(obj, "autoSourceLayerDefUid", uids[pick], doc.allocator)
-				e.Ldtk_Doc_LayerDefChanged(doc, uid)
-			}
-		}
-		UI_EndProps()
-	}
-	d = &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, uid)]
-	if d.type == .IntGrid && UI_SectionHeader("IntGrid values") {
-		vals := e.LdtkJson_Arr(d.obj, "intGridValues")
-		for v, i in vals {
-			imgui.PushIDInt(i32(i))
-			value := e.LdtkJson_Int(v, "value")
-			c := e.Ldtk_ParseHexColor(e.LdtkJson_Str(v, "color", "#000000"))
-			col := [3]f32{f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255}
-			if imgui.ColorEdit3("##c", &col, {.NoInputs}) {
-				e.Ldtk_Doc_CheckpointOnce(doc, -1, "IntGrid Colour", v)
-				e.LdtkJson_SetStr(v, "color", e.Ldtk_ColorHex({u8(col[0] * 255 + 0.5), u8(col[1] * 255 + 0.5), u8(col[2] * 255 + 0.5), 255}), doc.allocator)
-				e.Ldtk_Doc_RefreshDefs(doc)
-			}
-			imgui.SameLine()
-			imgui.TextUnformatted(fmt.ctprintf("%d", value))
-			imgui.SameLine()
-			imgui.SetNextItemWidth(160)
-			if name, ok := defs_text_edit(fmt.tprintf("defs.value.name:%d", value), v, "identifier"); ok {
-				defs_checkpoint("IntGrid Name")
-				e.LdtkJson_SetStr(v, "identifier", name, doc.allocator)
-				e.Ldtk_Doc_RefreshDefs(doc)
-			}
-			imgui.SameLine()
-			if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("defs.value.remove:%d", value), "Remove (clears its cells)", false, 22) {
-				defs_checkpoint("Remove IntGrid Value")
-				e.Ldtk_Doc_RemoveIntGridValue(doc, uid, value)
-				imgui.PopID()
-				break
-			}
-			imgui.PopID()
-		}
-		if UI_Button(fmt.tprintf("%s  Add value", ICON_FA_PLUS), "defs.value.add") {
-			defs_checkpoint("Add IntGrid Value")
-			e.Ldtk_Doc_AddIntGridValue(doc, uid)
-			level_sync_palette()
-		}
-	}
-	d = &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, uid)]
-	if d.type == .AutoLayer || d.type == .IntGrid {
-		imgui.Dummy({0, 4})
-		if UI_Button(fmt.tprintf("%s  Edit auto-layer rules (%d groups)", ICON_FA_WAND_MAGIC_SPARKLES, len(d.groups)), "defs.layer.rules") {
-			LevelRules_SelectLayer(uid)
-			LevelEditor_ShowTab(.Rules)
-		}
-	}
 }
 
 // ----------------------------------------------------------------------------
@@ -271,6 +99,7 @@ newLayer: struct {
 // LevelDefs_SelectLayer / SelectRulesLayer / SelectEntity: what the Layers,
 // Rules and Entities tabs show.
 LevelDefs_SelectLayer :: proc(uid: int) {defs.layerUid = uid}
+LevelDefs_SelectedLayer :: proc() -> int {return defs.layerUid}
 LevelDefs_SelectRulesLayer :: proc(uid: int) {LevelRules_SelectLayer(uid)}
 LevelDefs_SelectEntity :: proc(uid: int) {defs.entityUid = uid}
 LevelDefs_SelectedEntity :: proc() -> int {return defs.entityUid}

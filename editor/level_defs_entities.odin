@@ -216,6 +216,32 @@ prop_text :: proc(label, id: string, obj: ^e.LdtkJson, key: string, tip, topic: 
 	return true
 }
 
+// prop_tags: comma-separated tags bound to a JSON string array.
+prop_tags :: proc(label, id: string, obj: ^e.LdtkJson, key: string, tip, topic: string) -> bool {
+	L := &GlobalLevel
+	a := L.doc.allocator
+	UI_PropLabel(label)
+	cur := strings.builder_make(context.temp_allocator)
+	for t, i in e.LdtkJson_Arr(obj, key) {
+		if i > 0 do strings.write_string(&cur, ", ")
+		strings.write_string(&cur, t.text)
+	}
+	buf: [256]u8
+	copy(buf[:255], strings.to_string(cur))
+	entered := imgui.InputTextWithHint(fmt.ctprintf("##%s", id), "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue})
+	Drive_Item(id)
+	level_tip(tip, topic)
+	if !entered do return false
+	defs_checkpoint(label)
+	tags := e.LdtkJson_New(.Array, a)
+	for t in strings.split(string(cstring(raw_data(buf[:]))), ",", context.temp_allocator) {
+		if c := strings.trim_space(t); c != "" do append(&tags.items, e.LdtkJson_NewString(c, a))
+	}
+	e.LdtkJson_Set(obj, key, tags, a)
+	e.Ldtk_Doc_Touch(L.doc)
+	return true
+}
+
 // prop_slider: a 0..1 opacity.
 prop_slider :: proc(label, id: string, obj: ^e.LdtkJson, key: string, tip, topic: string, def: f64 = 1) -> bool {
 	L := &GlobalLevel

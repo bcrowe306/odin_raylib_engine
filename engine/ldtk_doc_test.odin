@@ -953,3 +953,81 @@ test_ldtk_doc_level_bounds_bg_worlds :: proc(t: ^testing.T) {
 		Ldtk_Doc_Destroy(re)
 	}
 }
+
+@(test)
+test_ldtk_doc_layer_defs :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_layers.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	col := doc.layerDefs[0].uid
+	layer_of :: proc(doc: ^Ldtk_Doc, uid: int) -> int {
+		for &ly, i in doc.levels[0].layers do if d := Ldtk_Doc_LayerDef(doc, &ly); d != nil && d.uid == uid do return i
+		return -1
+	}
+	// grid changes keep cells at their cell coordinates (remapToGridSize)
+	Ldtk_Doc_SetIntGrid(doc, 0, layer_of(doc, col), 3, 2, 1)
+	Ldtk_Doc_SetLayerGrid(doc, col, 8)
+	ly := &doc.levels[0].layers[layer_of(doc, col)]
+	testing.expect_value(t, doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)].gridSize, 8)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(ly, 3, 2), 1)
+	testing.expect_value(t, ly.cWid, 256 / 8)
+	// duplicate: right after it, a free name, empty, new rule uids
+	ts := Ldtk_Doc_AddTileset(doc, "atlas/l_zz.png", {64, 64}, 8)
+	LdtkJson_SetInt(doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)].obj, "tilesetDefUid", ts, doc.allocator)
+	Ldtk_Doc_LayerDefChanged(doc, col)
+	Ldtk_Doc_AddTerrainRules(doc, col, 1, {0, 1, 2, 8, 9, 10, 16, 17, 18})
+	for y in 4 ..< 8 do for x in 4 ..< 8 do Ldtk_Doc_SetIntGrid(doc, 0, layer_of(doc, col), x, y, 1)
+	Ldtk_Doc_ApplyRulesFull(doc, -1)
+	n0 := len(doc.layerDefs)
+	dup := Ldtk_Doc_DuplicateLayerDef(doc, col)
+	testing.expect(t, dup > 0)
+	testing.expect_value(t, len(doc.layerDefs), n0 + 1)
+	testing.expect_value(t, Ldtk_Doc_LayerDefIndex(doc, dup), Ldtk_Doc_LayerDefIndex(doc, col) + 1)
+	src, cp := &doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)], &doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, dup)]
+	testing.expect(t, cp.identifier != src.identifier)
+	testing.expect_value(t, len(cp.groups), len(src.groups))
+	if len(cp.groups) > 0 do testing.expect(t, cp.groups[0].uid != src.groups[0].uid && cp.groups[0].rules[0].uid != src.groups[0].rules[0].uid)
+	testing.expect_value(t, len(doc.levels[0].layers), len(doc.layerDefs))
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(&doc.levels[0].layers[layer_of(doc, dup)], 3, 2), 0)
+	// edits not yet written to the tree survive layers being added (regression)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(&doc.levels[0].layers[layer_of(doc, col)], 3, 2), 1)
+	// paste rejects non-layers
+	testing.expect_value(t, Ldtk_Doc_PasteLayerDef(doc, "{\"a\":1}"), -1)
+	// bake: the auto tiles become grid tiles of a new Tiles layer
+	auto_n := len(doc.levels[0].layers[layer_of(doc, col)].autoTiles)
+	testing.expect(t, auto_n > 0)
+	baked := Ldtk_Doc_BakeLayer(doc, col, .Empty_Original)
+	testing.expect(t, baked > 0)
+	bd := &doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, baked)]
+	testing.expect_value(t, bd.type, LdtkLayerType.Tiles)
+	testing.expect_value(t, len(bd.groups), 0)
+	testing.expect(t, len(doc.levels[0].layers[layer_of(doc, baked)].gridTiles) > 0)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(&doc.levels[0].layers[layer_of(doc, col)], 3, 2), 0) // emptied
+	// IntGrid values: order, groups, icons
+	v2 := Ldtk_Doc_AddIntGridValue(doc, col, "water")
+	testing.expect(t, Ldtk_Doc_MoveIntGridValue(doc, col, v2, -1))
+	testing.expect_value(t, LdtkJson_Int(LdtkJson_Arr(doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)].obj, "intGridValues")[0], "value"), v2)
+	g := Ldtk_Doc_AddIntGridGroup(doc, col)
+	testing.expect_value(t, g, 1)
+	Ldtk_Doc_SetIntGridValueGroup(doc, col, v2, g)
+	Ldtk_Doc_SetIntGridGroup(doc, col, g, "liquids", "#2CE8F4")
+	grp := LdtkJson_Arr(doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)].obj, "intGridValuesGroups")[0]
+	testing.expect_value(t, LdtkJson_Str(grp, "identifier"), "liquids")
+	testing.expect_value(t, doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)].values[0].groupUid, g)
+	Ldtk_Doc_SetIntGridValueTile(doc, col, v2, ts, {8, 0, 8, 8})
+	Ldtk_Doc_RemoveIntGridGroup(doc, col, g)
+	testing.expect_value(t, doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)].values[0].groupUid, 0)
+	// moving entities between layers (by definition, tags checked)
+	coin := Ldtk_Doc_AddEntityDef(doc, "Coin")
+	e1 := Ldtk_Doc_AddLayerDef(doc, .Entities, "Items")
+	e2 := Ldtk_Doc_AddLayerDef(doc, .Entities, "Pickups")
+	Ldtk_Doc_AddEntity(doc, 0, layer_of(doc, e1), coin, {16, 16})
+	Ldtk_Doc_AddEntity(doc, 0, layer_of(doc, e1), coin, {32, 16})
+	testing.expect_value(t, Ldtk_Doc_MoveEntitiesBetweenLayers(doc, e1, e2, .Def, "Coin"), 2)
+	testing.expect_value(t, len(Ldtk_Doc_Entities(doc, 0, layer_of(doc, e2))), 2)
+	tags := LdtkJson_New(.Array, doc.allocator)
+	append(&tags.items, LdtkJson_NewString("enemy", doc.allocator))
+	LdtkJson_Set(doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, e1)].obj, "requiredTags", tags, doc.allocator)
+	testing.expect_value(t, Ldtk_Doc_MoveEntitiesBetweenLayers(doc, e2, e1, .Def, "Coin"), -1)
+}

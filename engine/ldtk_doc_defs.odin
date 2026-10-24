@@ -65,7 +65,6 @@ LDTK_EMPTY_PROJECT :: `{
 }`
 
 // LDtk's palette for new IntGrid values / entities.
-@(private = "file")
 LDTK_PALETTE := [?]string{"#E4A672", "#B86F50", "#743F39", "#3F2832", "#9E2835", "#E53B44", "#FB922B", "#FFE762", "#63C64D", "#327345", "#193D3F", "#4F6781", "#AFBFD2", "#FFFFFF", "#2CE8F4", "#0484D1"}
 
 // Ldtk_Doc_New makes an empty project (one level, an IntGrid "Collisions"
@@ -140,13 +139,27 @@ defs_arr :: proc(doc: ^Ldtk_Doc, key: string) -> ^LdtkJson {
 
 // Ldtk_Doc_UniqueIdentifier: `base`, or base2, base3... unused in a defs list.
 Ldtk_Doc_UniqueIdentifier :: proc(doc: ^Ldtk_Doc, list: string, base: string, allocator := context.temp_allocator) -> string {
+	// Project.fixUniqueIdStr: the name, else a trailing number counts up
+	// ("Wall2" -> "Wall3"), else "2", "3"... are appended
 	arr := defs_arr(doc, list)
 	clean := Ldtk_CleanIdentifier(base)
-	for n in 1 ..< 10000 {
-		name := n == 1 ? clean : fmt.tprintf("%s%d", clean, n)
-		used := false
-		for d in arr.items do if LdtkJson_Str(d, "identifier") == name do used = true
-		if !used do return strings.clone(name, allocator)
+	used :: proc(arr: ^LdtkJson, name: string) -> bool {
+		for d in arr.items do if LdtkJson_Str(d, "identifier") == name do return true
+		return false
+	}
+	if !used(arr, clean) do return strings.clone(clean, allocator)
+	stem, idx := clean, 2
+	end := len(clean)
+	for end > 0 && clean[end - 1] >= '0' && clean[end - 1] <= '9' do end -= 1
+	if end < len(clean) && end > 0 {
+		n := 0
+		for c in clean[end:] do n = n * 10 + int(c - '0')
+		stem, idx = clean[:end], n
+	}
+	for _ in 0 ..< 100000 {
+		name := fmt.tprintf("%s%d", stem, idx)
+		if !used(arr, name) do return strings.clone(name, allocator)
+		idx += 1
 	}
 	return strings.clone(clean, allocator)
 }

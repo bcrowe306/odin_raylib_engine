@@ -962,10 +962,16 @@ level_layers_panel :: proc(state: ^EditorState) {
 	for &ly, i in lv.layers {
 		d := e.Ldtk_Doc_LayerDef(doc, &ly)
 		if d == nil do continue
+		// "hide in list" layers stay out (unless active)
+		if i != L.layer && e.LdtkJson_Bool(d.obj, "hideInList") do continue
 		visible := e.LdtkJson_Bool(ly.obj, "visible", true)
 		imgui.PushIDInt(i32(i))
 		rowMin := imgui.GetCursorScreenPos()
 		rowW := imgui.GetContentRegionAvail().x
+		if hex := e.LdtkJson_Str(d.obj, "uiColor"); hex != "" {
+			c := e.Ldtk_ParseHexColor(hex)
+			imgui.DrawList_AddRectFilled(imgui.GetWindowDrawList(), {rowMin.x - 4, rowMin.y + 3}, {rowMin.x - 1, rowMin.y + ROW - 3}, col_u32({f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255, 1}), 1, {})
+		}
 		// grip: press and drag to reorder
 		imgui.AlignTextToFramePadding()
 		imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)
@@ -985,7 +991,9 @@ level_layers_panel :: proc(state: ^EditorState) {
 		}
 		if !visible do imgui.PopStyleColor()
 		Drive_Item(fmt.tprintf("level.layer:%s", d.identifier))
-		level_tip(fmt.tprintf("%s layer \"%s\" (grid %d px). Click to edit it; right-click for more.", LAYER_TYPE_NAME[d.type], d.identifier, d.gridSize), "panel.layers")
+		layerTip := fmt.tprintf("%s layer \"%s\" (grid %d px). Click to edit it; right-click for more.", LAYER_TYPE_NAME[d.type], d.identifier, d.gridSize)
+		if docText := e.LdtkJson_Str(d.obj, "doc"); docText != "" do layerTip = fmt.tprintf("%s\n\n%s", docText, layerTip)
+		level_tip(layerTip, "panel.layers")
 		if level_layer_menu(state, i, d.uid, visible) {
 			imgui.PopID()
 			return
@@ -1060,8 +1068,42 @@ level_palette_intgrid :: proc(state: ^EditorState, d: ^e.Ldtk_DocLayerDef) {
 	L := &GlobalLevel
 	UI_SectionHeader("Values")
 	if len(d.values) == 0 do UI_DimText("No values: add some in the Layers tab.")
+	groups := e.LdtkJson_Arr(d.obj, "intGridValuesGroups")
+	vals := e.LdtkJson_Arr(d.obj, "intGridValues")
+	// group order: ungrouped first, then the groups (LDtk's palette)
+	order := make([dynamic]int, context.temp_allocator)
+	gorder := make([dynamic]int, context.temp_allocator)
+	append(&gorder, 0)
+	for g in groups do append(&gorder, e.LdtkJson_Int(g, "uid"))
+	for gu in gorder do for v, i in d.values do if v.groupUid == gu do append(&order, i)
 	for v, i in d.values {
-		swatch(v.color)
+		found := false
+		for o in order do if o == i do found = true
+		if !found do append(&order, i) // a group that doesn't exist
+	}
+	lastGroup := -1
+	for i in order {
+		v := d.values[i]
+		if len(groups) > 0 && v.groupUid != lastGroup {
+			lastGroup = v.groupUid
+			gname := "Ungrouped"
+			for g in groups do if e.LdtkJson_Int(g, "uid") == v.groupUid do gname = e.LdtkJson_Str(g, "identifier", fmt.tprintf("Group %d", v.groupUid))
+			UI_DimText(strings.to_upper(gname, context.temp_allocator))
+		}
+		// the icon, else the colour
+		icon := false
+		if i < len(vals) {
+			if t := e.LdtkJson_Get(vals[i], "tile"); t != nil && t.kind == .Object {
+				if ptr := level_texture_ptr(e.LdtkJson_Int(t, "tilesetUid", -1)); ptr != nil {
+					tw, th := f32(ptr.width), f32(ptr.height)
+					x, y, w, h := f32(e.LdtkJson_Int(t, "x")), f32(e.LdtkJson_Int(t, "y")), f32(e.LdtkJson_Int(t, "w")), f32(e.LdtkJson_Int(t, "h"))
+					imgui.Image(transmute(imgui.TextureID)ptr, {18, 18}, {x / tw, y / th}, {(x + w) / tw, (y + h) / th})
+					imgui.SameLine(0, 6)
+					icon = true
+				}
+			}
+		}
+		if !icon do swatch(v.color)
 		label := v.identifier != "" ? v.identifier : fmt.tprintf("value %d", v.value)
 		if imgui.Selectable(fmt.ctprintf("%d  %s##iv%d", v.value, label, i), L.intValue == v.value, {}, {0, 22}) do L.intValue = v.value
 		Drive_Item(fmt.tprintf("level.value:%d", v.value))
@@ -1762,7 +1804,7 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 			return true
 		case imgui.IsKeyPressed(.A, false):
 			layer := io.KeyShift ? -1 : L.layer
-			e.Ldtk_Doc_SelectAll(L.doc, L.level, &L.sel, layer)
+			e.Ldtk_Doc_SelectAll(L.doc, L.level, &L.sel, layer, L.layer)
 			level_sync_selection()
 			return true
 		case imgui.IsKeyPressed(.C, false), imgui.IsKeyPressed(.X, false):
@@ -1990,6 +2032,17 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		return fd != nil ? fmt.tprintf("%s %s %s", e.LdtkJson_Str(fd, "identifier"), e.LdtkJson_Str(fd, "__type"), e.LdtkJson_Str(fd, "editorDisplayMode")) : "", true
 	}
 	if v, ok := LevelRules_Query(q); ok do return v, true
+	// level.layerprop:<layer>.<key> -> a layer definition's JSON value
+	if strings.has_prefix(q, "level.layerprop:") {
+		rest := q[len("level.layerprop:"):]
+		dot := strings.index_byte(rest, '.')
+		if dot < 0 do return "<need layer.key>", true
+		for &d in doc.layerDefs do if d.identifier == rest[:dot] {
+			v := e.LdtkJson_Get(d.obj, rest[dot + 1:])
+			return v != nil ? e.LdtkJson_ToString(v, .Minified, context.temp_allocator) : "<none>", true
+		}
+		return "<no layer>", true
+	}
 	case_pick := q == "level.picking"
 	if case_pick do return LevelFields_PickActive() ? "true" : "false", true
 	// level.cell:cx,cy -> IntGrid value of the active layer

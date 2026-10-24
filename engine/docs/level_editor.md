@@ -141,6 +141,17 @@ layer.
   new level size. Right-click a world to rename or delete it; the Levels
   panel picks the world.
 
+### Layer definitions
+
+Bottom panel > **Layers**: right-click a layer to copy / cut / paste /
+duplicate / reorder / bake / move its entities / delete it. Its form
+covers all of LDtk's layer options: documentation, UI colour, grid (cells
+keep their coordinates), guide grid, opacity and inactive opacity, offset,
+parallax (shown in the canvas), hide in list, hide fields / selectable
+when inactive, filter tags; IntGrid values with groups, order and icons;
+the auto-layer tileset, biome field and "tiles removed by" layer; Entities
+layers' required / excluded tags; Tiles layers' tile pivot.
+
 ### Context menus and help
 
 Right-click levels, layers and palette items for their actions: rename,
@@ -282,6 +293,7 @@ e.Ldtk_Doc_Save(doc)
 | `levels[i].layers[j]`: `intGrid`, `gridTiles`, `autoTiles`, `obj` (the JSON) | typed cells; everything else is in the JSON tree (`LdtkJson_Get` / `Set*`) |
 | `Ldtk_Doc_ResizeLevelBounds` (any edge, like LDtk's applyNewBounds), `ResizeLevel` | resizing |
 | `Ldtk_Doc_SetLevelBg`, `SetLevelBgPos`, `SetLevelBgPivot`, `LevelBg`; `Ldtk_LevelBgInfo`, `Ldtk_BgPos`, `Ldtk_ImageSize` | background images (`__bgPos`) |
+| `Ldtk_Doc_SetLayerGrid`, `DuplicateLayerDef`, `LayerDefText` / `PasteLayerDef`, `BakeLayer`, `LayerIsSource`, `MoveIntGridValue`, `AddIntGridGroup` / `RemoveIntGridGroup` / `SetIntGridGroup` / `MoveIntGridGroup` / `SetIntGridValueGroup`, `SetIntGridValueTile`, `MoveEntitiesBetweenLayers` | layer definitions |
 | `Ldtk_Doc_SetMultiWorlds`, `AddWorld`, `RenameWorld`, `RemoveWorld`, `WorldInt` / `WorldStr` / `SetWorldInt`, `WorldName`; `SetFlag` / `HasFlag` | worlds and project flags |
 | `Ldtk_Doc_SetIntGrid`, `SetTile`, `TilesAt`, `GetIntGrid` | cells |
 | `Ldtk_Doc_ApplyRules` (an area), `ApplyRulesLayer`, `ApplyRulesFull` | auto tiles |
