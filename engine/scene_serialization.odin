@@ -154,6 +154,9 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	Json_Key(w, "enabled", &first); write_bool(w, node.enabled)
 	Json_Key(w, "visible", &first); write_bool(w, node.renderable)
 	Json_Key(w, "layer", &first); fmt.sbprintf(&w.sb, "%d", int(node.layer))
+	if node.zIndex != 0 {Json_Key(w, "z_index", &first); fmt.sbprintf(&w.sb, "%d", node.zIndex)}
+	if node.ySort {Json_Key(w, "y_sort", &first); write_bool(w, true)}
+	if node.ySortOffset != 0 {Json_Key(w, "y_sort_offset", &first); Json_Float(w, node.ySortOffset)}
 	if node.pauseMode != .Inherit {Json_Key(w, "pause_mode", &first); Json_String(w, Pause_ModeName(node.pauseMode))}
 	if node.paused {Json_Key(w, "paused", &first); write_bool(w, true)}
 	if node.editorLocked {Json_Key(w, "editor_locked", &first); write_bool(w, true)}
@@ -781,6 +784,9 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.enabled = sj_bool(obj, "enabled", true)
 	node.renderable = sj_bool(obj, "visible", node.renderable)
 	node.layer = RenderLayer(math.clamp(sj_int(obj, "layer", int(node.layer)), 0, len(RenderLayer) - 1))
+	node.zIndex = i32(sj_int(obj, "z_index", 0))
+	node.ySort = sj_bool(obj, "y_sort", false)
+	node.ySortOffset = sj_float(obj, "y_sort_offset", 0)
 	node.pauseMode = Pause_ModeParse(sj_string(obj, "pause_mode", ""))
 	node.paused = sj_bool(obj, "paused", false)
 	node.editorLocked = sj_bool(obj, "editor_locked", false)
@@ -1395,6 +1401,9 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.enabled = sj_bool(inst, "enabled", node.enabled)
 	node.renderable = sj_bool(inst, "visible", node.renderable)
 	node.layer = RenderLayer(math.clamp(sj_int(inst, "layer", int(node.layer)), 0, len(RenderLayer) - 1))
+	node.zIndex = i32(sj_int(inst, "z_index", int(node.zIndex)))
+	node.ySort = sj_bool(inst, "y_sort", node.ySort)
+	node.ySortOffset = sj_float(inst, "y_sort_offset", node.ySortOffset)
 	node.pauseMode = Pause_ModeParse(sj_string(inst, "pause_mode", ""))
 	node.paused = sj_bool(inst, "paused", false)
 	node.editorLocked = sj_bool(inst, "editor_locked", false)

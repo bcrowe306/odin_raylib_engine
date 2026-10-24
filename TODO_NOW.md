@@ -132,7 +132,7 @@ Every feature: works with the rest of the engine and the editor (integration); m
 
 Missing (all):
 - [ ] 1 Pathfinding / navigation: A* on tile grids, navigation regions (polygons), a navigation agent node (path following, steering), obstacle avoidance
-- [ ] 2 Y-sort / depth sorting (top-down, isometric)
+- [x] 2 Y-sort / depth sorting (top-down, isometric): zIndex (relative), ySort, ySortOffset; sorted in the one render walk (stable sorts only where used); picking follows draw order; guide engine/docs/draw_order.md, test, y_sort drive
 - [ ] 3 Level editor (root app tabs: **Game** = today's editor, **Level** = a level-editing mode): our own interface on the LDtk file format, re-implementing LDtk's features (reference: `ldtk/` sources) - worlds, levels, layers (IntGrid, Entities, Tiles, Auto-layers with rules), tilesets, enums, entity fields, autotiling / terrains, animated tiles, per-tile data
 - [ ] 4 Path / curve node (Bézier, edited in the viewport) + path follower (moving platforms, routes, rails, camera tracks)
 - [ ] 5 Web export (emscripten - bundle it with a shipped editor: raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio) (was 3.4)

@@ -221,6 +221,44 @@ inspector_body :: proc(state: ^EditorState) {
 				Editor_RecordUndo(state, "Reset layer")
 				node.layer = defLayer
 			}
+			mzField := node_field(node, &node.zIndex, "zIndex", .Int, i32)
+			prop_row_label(state, node, "Z Index", mzField)
+			mz := multi_begin(state, node, mzField)
+			imgui.SetNextItemWidth(field_width())
+			imgui.DragInt("##zindex", &node.zIndex, 0.1, -4096, 4096, MIXED_TEXT if mz.mixed[0] else "%d")
+			undo_on_activate(state, "Z index")
+			Drive_Item("insp.z-index")
+			UI_Tooltip("Draw order within the layer, added to the parent's: higher draws on top")
+			if field_reset("insp.z-index", node.zIndex != 0) {
+				Editor_RecordUndo(state, "Reset z index")
+				node.zIndex = 0
+			}
+			multi_end(&mz)
+			mysField := node_field(node, &node.ySort, "ySort", .Bool, bool)
+			prop_row_label(state, node, "Y Sort Children", mysField)
+			mys := multi_begin(state, node, mysField)
+			mixed_push(mys.mixed[0])
+			imgui.Checkbox("##ysort", &node.ySort)
+			mixed_pop(mys.mixed[0])
+			undo_on_activate(state, "Y sort")
+			Drive_Item("insp.y-sort")
+			UI_Tooltip("Draw the children by their Y (lower = in front), each with its children: top-down / isometric depth")
+			multi_end(&mys)
+			if parent := e.GetParent(state.activeScene.manager, node); parent != nil && parent.ySort {
+				myoField := node_field(node, &node.ySortOffset, "ySortOffset", .Float, f32)
+				prop_row_label(state, node, "Y Sort Offset", myoField)
+				myo := multi_begin(state, node, myoField)
+				imgui.SetNextItemWidth(field_width())
+				imgui.DragFloat("##ysortoff", &node.ySortOffset, 0.5, -4096, 4096, MIXED_TEXT if myo.mixed[0] else "%.1f")
+				undo_on_activate(state, "Y sort offset")
+				Drive_Item("insp.y-sort-offset")
+				UI_Tooltip("Added to the Y it sorts by: put the line at the feet (the viewport shows it while selected)")
+				if field_reset("insp.y-sort-offset", node.ySortOffset != 0) {
+					Editor_RecordUndo(state, "Reset y sort offset")
+					node.ySortOffset = 0
+				}
+				multi_end(&myo)
+			}
 			mpmField := node_field(node, &node.pauseMode, "pauseMode", .Enum, e.Pause_Mode)
 			prop_row_label(state, node, "Pause Mode", mpmField)
 			mpm := multi_begin(state, node, mpmField)

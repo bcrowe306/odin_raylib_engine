@@ -624,6 +624,9 @@ function UIToolbarNode:connect(event, handler) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -633,6 +636,9 @@ function UIToolbarNode:connect(event, handler) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -644,6 +650,9 @@ function UIToolbarNode:connect(event, handler) end
 ---@overload fun(self: Node, path: "scale"): Vec2
 ---@overload fun(self: Node, path: "rotation"): number
 ---@overload fun(self: Node, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: Node, path: "zIndex"): integer
+---@overload fun(self: Node, path: "ySort"): boolean
+---@overload fun(self: Node, path: "ySortOffset"): number
 ---@overload fun(self: Node, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: Node, path: "paused"): boolean
 ---@overload fun(self: Node, path: "enabled"): boolean
@@ -657,6 +666,9 @@ function Node:get_property(path) end
 ---@overload fun(self: Node, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: Node, path: "rotation", value: number)
 ---@overload fun(self: Node, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: Node, path: "zIndex", value: integer)
+---@overload fun(self: Node, path: "ySort", value: boolean)
+---@overload fun(self: Node, path: "ySortOffset", value: number)
 ---@overload fun(self: Node, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: Node, path: "paused", value: boolean)
 ---@overload fun(self: Node, path: "enabled", value: boolean)
@@ -667,6 +679,9 @@ function Node:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -723,6 +738,9 @@ function Node:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -781,6 +799,9 @@ function Node:set_property(path, value, y) end
 ---@overload fun(self: CameraNode, path: "scale"): Vec2
 ---@overload fun(self: CameraNode, path: "rotation"): number
 ---@overload fun(self: CameraNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: CameraNode, path: "zIndex"): integer
+---@overload fun(self: CameraNode, path: "ySort"): boolean
+---@overload fun(self: CameraNode, path: "ySortOffset"): number
 ---@overload fun(self: CameraNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: CameraNode, path: "paused"): boolean
 ---@overload fun(self: CameraNode, path: "enabled"): boolean
@@ -841,6 +862,9 @@ function CameraNode:get_property(path) end
 ---@overload fun(self: CameraNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "rotation", value: number)
 ---@overload fun(self: CameraNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: CameraNode, path: "zIndex", value: integer)
+---@overload fun(self: CameraNode, path: "ySort", value: boolean)
+---@overload fun(self: CameraNode, path: "ySortOffset", value: number)
 ---@overload fun(self: CameraNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: CameraNode, path: "paused", value: boolean)
 ---@overload fun(self: CameraNode, path: "enabled", value: boolean)
@@ -899,6 +923,9 @@ function CameraNode:set_property(path, value, y) end
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -910,6 +937,9 @@ function CameraNode:set_property(path, value, y) end
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -923,6 +953,9 @@ function CameraNode:set_property(path, value, y) end
 ---@overload fun(self: TextureNode, path: "rotation"): number
 ---@overload fun(self: TextureNode, path: "origin"): Vec2
 ---@overload fun(self: TextureNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: TextureNode, path: "zIndex"): integer
+---@overload fun(self: TextureNode, path: "ySort"): boolean
+---@overload fun(self: TextureNode, path: "ySortOffset"): number
 ---@overload fun(self: TextureNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: TextureNode, path: "paused"): boolean
 ---@overload fun(self: TextureNode, path: "enabled"): boolean
@@ -938,6 +971,9 @@ function TextureNode:get_property(path) end
 ---@overload fun(self: TextureNode, path: "rotation", value: number)
 ---@overload fun(self: TextureNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextureNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: TextureNode, path: "zIndex", value: integer)
+---@overload fun(self: TextureNode, path: "ySort", value: boolean)
+---@overload fun(self: TextureNode, path: "ySortOffset", value: number)
 ---@overload fun(self: TextureNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: TextureNode, path: "paused", value: boolean)
 ---@overload fun(self: TextureNode, path: "enabled", value: boolean)
@@ -950,6 +986,9 @@ function TextureNode:set_property(path, value, y) end
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -960,6 +999,9 @@ function TextureNode:set_property(path, value, y) end
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -972,6 +1014,9 @@ function TextureNode:set_property(path, value, y) end
 ---@overload fun(self: FrameAnimationNode, path: "rotation"): number
 ---@overload fun(self: FrameAnimationNode, path: "origin"): Vec2
 ---@overload fun(self: FrameAnimationNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: FrameAnimationNode, path: "zIndex"): integer
+---@overload fun(self: FrameAnimationNode, path: "ySort"): boolean
+---@overload fun(self: FrameAnimationNode, path: "ySortOffset"): number
 ---@overload fun(self: FrameAnimationNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: FrameAnimationNode, path: "paused"): boolean
 ---@overload fun(self: FrameAnimationNode, path: "enabled"): boolean
@@ -986,6 +1031,9 @@ function FrameAnimationNode:get_property(path) end
 ---@overload fun(self: FrameAnimationNode, path: "rotation", value: number)
 ---@overload fun(self: FrameAnimationNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: FrameAnimationNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: FrameAnimationNode, path: "zIndex", value: integer)
+---@overload fun(self: FrameAnimationNode, path: "ySort", value: boolean)
+---@overload fun(self: FrameAnimationNode, path: "ySortOffset", value: number)
 ---@overload fun(self: FrameAnimationNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: FrameAnimationNode, path: "paused", value: boolean)
 ---@overload fun(self: FrameAnimationNode, path: "enabled", value: boolean)
@@ -997,6 +1045,9 @@ function FrameAnimationNode:set_property(path, value, y) end
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1011,6 +1062,9 @@ function FrameAnimationNode:set_property(path, value, y) end
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1027,6 +1081,9 @@ function FrameAnimationNode:set_property(path, value, y) end
 ---@overload fun(self: AnimationPlayerNode, path: "rotation"): number
 ---@overload fun(self: AnimationPlayerNode, path: "origin"): Vec2
 ---@overload fun(self: AnimationPlayerNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: AnimationPlayerNode, path: "zIndex"): integer
+---@overload fun(self: AnimationPlayerNode, path: "ySort"): boolean
+---@overload fun(self: AnimationPlayerNode, path: "ySortOffset"): number
 ---@overload fun(self: AnimationPlayerNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: AnimationPlayerNode, path: "paused"): boolean
 ---@overload fun(self: AnimationPlayerNode, path: "enabled"): boolean
@@ -1045,6 +1102,9 @@ function AnimationPlayerNode:get_property(path) end
 ---@overload fun(self: AnimationPlayerNode, path: "rotation", value: number)
 ---@overload fun(self: AnimationPlayerNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AnimationPlayerNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: AnimationPlayerNode, path: "zIndex", value: integer)
+---@overload fun(self: AnimationPlayerNode, path: "ySort", value: boolean)
+---@overload fun(self: AnimationPlayerNode, path: "ySortOffset", value: number)
 ---@overload fun(self: AnimationPlayerNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: AnimationPlayerNode, path: "paused", value: boolean)
 ---@overload fun(self: AnimationPlayerNode, path: "enabled", value: boolean)
@@ -1059,6 +1119,9 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1068,6 +1131,9 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1116,6 +1182,9 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "scale"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "rotation"): number
 ---@overload fun(self: ParticleEmitterNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: ParticleEmitterNode, path: "zIndex"): integer
+---@overload fun(self: ParticleEmitterNode, path: "ySort"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "ySortOffset"): number
 ---@overload fun(self: ParticleEmitterNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: ParticleEmitterNode, path: "paused"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "enabled"): boolean
@@ -1166,6 +1235,9 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "rotation", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: ParticleEmitterNode, path: "zIndex", value: integer)
+---@overload fun(self: ParticleEmitterNode, path: "ySort", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "ySortOffset", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: ParticleEmitterNode, path: "paused", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "enabled", value: boolean)
@@ -1213,6 +1285,9 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1229,6 +1304,9 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1247,6 +1325,9 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@overload fun(self: SoundNode, path: "scale"): Vec2
 ---@overload fun(self: SoundNode, path: "rotation"): number
 ---@overload fun(self: SoundNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: SoundNode, path: "zIndex"): integer
+---@overload fun(self: SoundNode, path: "ySort"): boolean
+---@overload fun(self: SoundNode, path: "ySortOffset"): number
 ---@overload fun(self: SoundNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: SoundNode, path: "paused"): boolean
 ---@overload fun(self: SoundNode, path: "enabled"): boolean
@@ -1267,6 +1348,9 @@ function SoundNode:get_property(path) end
 ---@overload fun(self: SoundNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: SoundNode, path: "rotation", value: number)
 ---@overload fun(self: SoundNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: SoundNode, path: "zIndex", value: integer)
+---@overload fun(self: SoundNode, path: "ySort", value: boolean)
+---@overload fun(self: SoundNode, path: "ySortOffset", value: number)
 ---@overload fun(self: SoundNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: SoundNode, path: "paused", value: boolean)
 ---@overload fun(self: SoundNode, path: "enabled", value: boolean)
@@ -1284,6 +1368,9 @@ function SoundNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1300,6 +1387,9 @@ function SoundNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1318,6 +1408,9 @@ function SoundNode:set_property(path, value, y) end
 ---@overload fun(self: MusicNode, path: "scale"): Vec2
 ---@overload fun(self: MusicNode, path: "rotation"): number
 ---@overload fun(self: MusicNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: MusicNode, path: "zIndex"): integer
+---@overload fun(self: MusicNode, path: "ySort"): boolean
+---@overload fun(self: MusicNode, path: "ySortOffset"): number
 ---@overload fun(self: MusicNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: MusicNode, path: "paused"): boolean
 ---@overload fun(self: MusicNode, path: "enabled"): boolean
@@ -1338,6 +1431,9 @@ function MusicNode:get_property(path) end
 ---@overload fun(self: MusicNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: MusicNode, path: "rotation", value: number)
 ---@overload fun(self: MusicNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: MusicNode, path: "zIndex", value: integer)
+---@overload fun(self: MusicNode, path: "ySort", value: boolean)
+---@overload fun(self: MusicNode, path: "ySortOffset", value: number)
 ---@overload fun(self: MusicNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: MusicNode, path: "paused", value: boolean)
 ---@overload fun(self: MusicNode, path: "enabled", value: boolean)
@@ -1355,6 +1451,9 @@ function MusicNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1366,6 +1465,9 @@ function MusicNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1379,6 +1481,9 @@ function MusicNode:set_property(path, value, y) end
 ---@overload fun(self: StaticBodyNode, path: "scale"): Vec2
 ---@overload fun(self: StaticBodyNode, path: "rotation"): number
 ---@overload fun(self: StaticBodyNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: StaticBodyNode, path: "zIndex"): integer
+---@overload fun(self: StaticBodyNode, path: "ySort"): boolean
+---@overload fun(self: StaticBodyNode, path: "ySortOffset"): number
 ---@overload fun(self: StaticBodyNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: StaticBodyNode, path: "paused"): boolean
 ---@overload fun(self: StaticBodyNode, path: "enabled"): boolean
@@ -1394,6 +1499,9 @@ function StaticBodyNode:get_property(path) end
 ---@overload fun(self: StaticBodyNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: StaticBodyNode, path: "rotation", value: number)
 ---@overload fun(self: StaticBodyNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: StaticBodyNode, path: "zIndex", value: integer)
+---@overload fun(self: StaticBodyNode, path: "ySort", value: boolean)
+---@overload fun(self: StaticBodyNode, path: "ySortOffset", value: number)
 ---@overload fun(self: StaticBodyNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: StaticBodyNode, path: "paused", value: boolean)
 ---@overload fun(self: StaticBodyNode, path: "enabled", value: boolean)
@@ -1406,6 +1514,9 @@ function StaticBodyNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1427,6 +1538,9 @@ function StaticBodyNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1450,6 +1564,9 @@ function StaticBodyNode:set_property(path, value, y) end
 ---@overload fun(self: DynamicBodyNode, path: "scale"): Vec2
 ---@overload fun(self: DynamicBodyNode, path: "rotation"): number
 ---@overload fun(self: DynamicBodyNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: DynamicBodyNode, path: "zIndex"): integer
+---@overload fun(self: DynamicBodyNode, path: "ySort"): boolean
+---@overload fun(self: DynamicBodyNode, path: "ySortOffset"): number
 ---@overload fun(self: DynamicBodyNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: DynamicBodyNode, path: "paused"): boolean
 ---@overload fun(self: DynamicBodyNode, path: "enabled"): boolean
@@ -1475,6 +1592,9 @@ function DynamicBodyNode:get_property(path) end
 ---@overload fun(self: DynamicBodyNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DynamicBodyNode, path: "rotation", value: number)
 ---@overload fun(self: DynamicBodyNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: DynamicBodyNode, path: "zIndex", value: integer)
+---@overload fun(self: DynamicBodyNode, path: "ySort", value: boolean)
+---@overload fun(self: DynamicBodyNode, path: "ySortOffset", value: number)
 ---@overload fun(self: DynamicBodyNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: DynamicBodyNode, path: "paused", value: boolean)
 ---@overload fun(self: DynamicBodyNode, path: "enabled", value: boolean)
@@ -1497,6 +1617,9 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1520,6 +1643,9 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1545,6 +1671,9 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---@overload fun(self: CharacterMoverNode, path: "scale"): Vec2
 ---@overload fun(self: CharacterMoverNode, path: "rotation"): number
 ---@overload fun(self: CharacterMoverNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: CharacterMoverNode, path: "zIndex"): integer
+---@overload fun(self: CharacterMoverNode, path: "ySort"): boolean
+---@overload fun(self: CharacterMoverNode, path: "ySortOffset"): number
 ---@overload fun(self: CharacterMoverNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: CharacterMoverNode, path: "paused"): boolean
 ---@overload fun(self: CharacterMoverNode, path: "enabled"): boolean
@@ -1572,6 +1701,9 @@ function CharacterMoverNode:get_property(path) end
 ---@overload fun(self: CharacterMoverNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CharacterMoverNode, path: "rotation", value: number)
 ---@overload fun(self: CharacterMoverNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: CharacterMoverNode, path: "zIndex", value: integer)
+---@overload fun(self: CharacterMoverNode, path: "ySort", value: boolean)
+---@overload fun(self: CharacterMoverNode, path: "ySortOffset", value: number)
 ---@overload fun(self: CharacterMoverNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: CharacterMoverNode, path: "paused", value: boolean)
 ---@overload fun(self: CharacterMoverNode, path: "enabled", value: boolean)
@@ -1596,6 +1728,9 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1609,6 +1744,9 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1624,6 +1762,9 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---@overload fun(self: AreaNode, path: "scale"): Vec2
 ---@overload fun(self: AreaNode, path: "rotation"): number
 ---@overload fun(self: AreaNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: AreaNode, path: "zIndex"): integer
+---@overload fun(self: AreaNode, path: "ySort"): boolean
+---@overload fun(self: AreaNode, path: "ySortOffset"): number
 ---@overload fun(self: AreaNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: AreaNode, path: "paused"): boolean
 ---@overload fun(self: AreaNode, path: "enabled"): boolean
@@ -1641,6 +1782,9 @@ function AreaNode:get_property(path) end
 ---@overload fun(self: AreaNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AreaNode, path: "rotation", value: number)
 ---@overload fun(self: AreaNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: AreaNode, path: "zIndex", value: integer)
+---@overload fun(self: AreaNode, path: "ySort", value: boolean)
+---@overload fun(self: AreaNode, path: "ySortOffset", value: number)
 ---@overload fun(self: AreaNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: AreaNode, path: "paused", value: boolean)
 ---@overload fun(self: AreaNode, path: "enabled", value: boolean)
@@ -1655,6 +1799,9 @@ function AreaNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1673,6 +1820,9 @@ function AreaNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1693,6 +1843,9 @@ function AreaNode:set_property(path, value, y) end
 ---@overload fun(self: RaycastNode, path: "scale"): Vec2
 ---@overload fun(self: RaycastNode, path: "rotation"): number
 ---@overload fun(self: RaycastNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: RaycastNode, path: "zIndex"): integer
+---@overload fun(self: RaycastNode, path: "ySort"): boolean
+---@overload fun(self: RaycastNode, path: "ySortOffset"): number
 ---@overload fun(self: RaycastNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: RaycastNode, path: "paused"): boolean
 ---@overload fun(self: RaycastNode, path: "enabled"): boolean
@@ -1715,6 +1868,9 @@ function RaycastNode:get_property(path) end
 ---@overload fun(self: RaycastNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: RaycastNode, path: "rotation", value: number)
 ---@overload fun(self: RaycastNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: RaycastNode, path: "zIndex", value: integer)
+---@overload fun(self: RaycastNode, path: "ySort", value: boolean)
+---@overload fun(self: RaycastNode, path: "ySortOffset", value: number)
 ---@overload fun(self: RaycastNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: RaycastNode, path: "paused", value: boolean)
 ---@overload fun(self: RaycastNode, path: "enabled", value: boolean)
@@ -1734,6 +1890,9 @@ function RaycastNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1751,6 +1910,9 @@ function RaycastNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1770,6 +1932,9 @@ function RaycastNode:set_property(path, value, y) end
 ---@overload fun(self: LdtkLevelNode, path: "scale"): Vec2
 ---@overload fun(self: LdtkLevelNode, path: "rotation"): number
 ---@overload fun(self: LdtkLevelNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: LdtkLevelNode, path: "zIndex"): integer
+---@overload fun(self: LdtkLevelNode, path: "ySort"): boolean
+---@overload fun(self: LdtkLevelNode, path: "ySortOffset"): number
 ---@overload fun(self: LdtkLevelNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: LdtkLevelNode, path: "paused"): boolean
 ---@overload fun(self: LdtkLevelNode, path: "enabled"): boolean
@@ -1791,6 +1956,9 @@ function LdtkLevelNode:get_property(path) end
 ---@overload fun(self: LdtkLevelNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LdtkLevelNode, path: "rotation", value: number)
 ---@overload fun(self: LdtkLevelNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: LdtkLevelNode, path: "zIndex", value: integer)
+---@overload fun(self: LdtkLevelNode, path: "ySort", value: boolean)
+---@overload fun(self: LdtkLevelNode, path: "ySortOffset", value: number)
 ---@overload fun(self: LdtkLevelNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: LdtkLevelNode, path: "paused", value: boolean)
 ---@overload fun(self: LdtkLevelNode, path: "enabled", value: boolean)
@@ -1809,6 +1977,9 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1820,6 +1991,9 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1833,6 +2007,9 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@overload fun(self: TileMapNode, path: "scale"): Vec2
 ---@overload fun(self: TileMapNode, path: "rotation"): number
 ---@overload fun(self: TileMapNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: TileMapNode, path: "zIndex"): integer
+---@overload fun(self: TileMapNode, path: "ySort"): boolean
+---@overload fun(self: TileMapNode, path: "ySortOffset"): number
 ---@overload fun(self: TileMapNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: TileMapNode, path: "paused"): boolean
 ---@overload fun(self: TileMapNode, path: "enabled"): boolean
@@ -1848,6 +2025,9 @@ function TileMapNode:get_property(path) end
 ---@overload fun(self: TileMapNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TileMapNode, path: "rotation", value: number)
 ---@overload fun(self: TileMapNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: TileMapNode, path: "zIndex", value: integer)
+---@overload fun(self: TileMapNode, path: "ySort", value: boolean)
+---@overload fun(self: TileMapNode, path: "ySortOffset", value: number)
 ---@overload fun(self: TileMapNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: TileMapNode, path: "paused", value: boolean)
 ---@overload fun(self: TileMapNode, path: "enabled", value: boolean)
@@ -1860,6 +2040,9 @@ function TileMapNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1876,6 +2059,9 @@ function TileMapNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -1894,6 +2080,9 @@ function TileMapNode:set_property(path, value, y) end
 ---@overload fun(self: LightNode, path: "scale"): Vec2
 ---@overload fun(self: LightNode, path: "rotation"): number
 ---@overload fun(self: LightNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: LightNode, path: "zIndex"): integer
+---@overload fun(self: LightNode, path: "ySort"): boolean
+---@overload fun(self: LightNode, path: "ySortOffset"): number
 ---@overload fun(self: LightNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: LightNode, path: "paused"): boolean
 ---@overload fun(self: LightNode, path: "enabled"): boolean
@@ -1914,6 +2103,9 @@ function LightNode:get_property(path) end
 ---@overload fun(self: LightNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LightNode, path: "rotation", value: number)
 ---@overload fun(self: LightNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: LightNode, path: "zIndex", value: integer)
+---@overload fun(self: LightNode, path: "ySort", value: boolean)
+---@overload fun(self: LightNode, path: "ySortOffset", value: number)
 ---@overload fun(self: LightNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: LightNode, path: "paused", value: boolean)
 ---@overload fun(self: LightNode, path: "enabled", value: boolean)
@@ -1931,6 +2123,9 @@ function LightNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -1941,6 +2136,9 @@ function LightNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2028,6 +2226,9 @@ function LightNode:set_property(path, value, y) end
 ---@overload fun(self: JointNode, path: "scale"): Vec2
 ---@overload fun(self: JointNode, path: "rotation"): number
 ---@overload fun(self: JointNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: JointNode, path: "zIndex"): integer
+---@overload fun(self: JointNode, path: "ySort"): boolean
+---@overload fun(self: JointNode, path: "ySortOffset"): number
 ---@overload fun(self: JointNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: JointNode, path: "paused"): boolean
 ---@overload fun(self: JointNode, path: "enabled"): boolean
@@ -2117,6 +2318,9 @@ function JointNode:get_property(path) end
 ---@overload fun(self: JointNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "rotation", value: number)
 ---@overload fun(self: JointNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: JointNode, path: "zIndex", value: integer)
+---@overload fun(self: JointNode, path: "ySort", value: boolean)
+---@overload fun(self: JointNode, path: "ySortOffset", value: number)
 ---@overload fun(self: JointNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: JointNode, path: "paused", value: boolean)
 ---@overload fun(self: JointNode, path: "enabled", value: boolean)
@@ -2204,6 +2408,9 @@ function JointNode:set_property(path, value, y) end
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2225,6 +2432,9 @@ function JointNode:set_property(path, value, y) end
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2248,6 +2458,9 @@ function JointNode:set_property(path, value, y) end
 ---@overload fun(self: TextNode, path: "rotation"): number
 ---@overload fun(self: TextNode, path: "origin"): Vec2
 ---@overload fun(self: TextNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: TextNode, path: "zIndex"): integer
+---@overload fun(self: TextNode, path: "ySort"): boolean
+---@overload fun(self: TextNode, path: "ySortOffset"): number
 ---@overload fun(self: TextNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: TextNode, path: "paused"): boolean
 ---@overload fun(self: TextNode, path: "enabled"): boolean
@@ -2273,6 +2486,9 @@ function TextNode:get_property(path) end
 ---@overload fun(self: TextNode, path: "rotation", value: number)
 ---@overload fun(self: TextNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: TextNode, path: "zIndex", value: integer)
+---@overload fun(self: TextNode, path: "ySort", value: boolean)
+---@overload fun(self: TextNode, path: "ySortOffset", value: number)
 ---@overload fun(self: TextNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: TextNode, path: "paused", value: boolean)
 ---@overload fun(self: TextNode, path: "enabled", value: boolean)
@@ -2294,6 +2510,9 @@ function TextNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2314,6 +2533,9 @@ function TextNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2336,6 +2558,9 @@ function TextNode:set_property(path, value, y) end
 ---@overload fun(self: DialogueNode, path: "scale"): Vec2
 ---@overload fun(self: DialogueNode, path: "rotation"): number
 ---@overload fun(self: DialogueNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: DialogueNode, path: "zIndex"): integer
+---@overload fun(self: DialogueNode, path: "ySort"): boolean
+---@overload fun(self: DialogueNode, path: "ySortOffset"): number
 ---@overload fun(self: DialogueNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: DialogueNode, path: "paused"): boolean
 ---@overload fun(self: DialogueNode, path: "enabled"): boolean
@@ -2360,6 +2585,9 @@ function DialogueNode:get_property(path) end
 ---@overload fun(self: DialogueNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DialogueNode, path: "rotation", value: number)
 ---@overload fun(self: DialogueNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: DialogueNode, path: "zIndex", value: integer)
+---@overload fun(self: DialogueNode, path: "ySort", value: boolean)
+---@overload fun(self: DialogueNode, path: "ySortOffset", value: number)
 ---@overload fun(self: DialogueNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: DialogueNode, path: "paused", value: boolean)
 ---@overload fun(self: DialogueNode, path: "enabled", value: boolean)
@@ -2382,6 +2610,9 @@ function DialogueNode:set_property(path, value, y) end
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2397,6 +2628,9 @@ function DialogueNode:set_property(path, value, y) end
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2414,6 +2648,9 @@ function DialogueNode:set_property(path, value, y) end
 ---@overload fun(self: NineSliceNode, path: "rotation"): number
 ---@overload fun(self: NineSliceNode, path: "origin"): Vec2
 ---@overload fun(self: NineSliceNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: NineSliceNode, path: "zIndex"): integer
+---@overload fun(self: NineSliceNode, path: "ySort"): boolean
+---@overload fun(self: NineSliceNode, path: "ySortOffset"): number
 ---@overload fun(self: NineSliceNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: NineSliceNode, path: "paused"): boolean
 ---@overload fun(self: NineSliceNode, path: "enabled"): boolean
@@ -2433,6 +2670,9 @@ function NineSliceNode:get_property(path) end
 ---@overload fun(self: NineSliceNode, path: "rotation", value: number)
 ---@overload fun(self: NineSliceNode, path: "origin", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NineSliceNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: NineSliceNode, path: "zIndex", value: integer)
+---@overload fun(self: NineSliceNode, path: "ySort", value: boolean)
+---@overload fun(self: NineSliceNode, path: "ySortOffset", value: number)
 ---@overload fun(self: NineSliceNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: NineSliceNode, path: "paused", value: boolean)
 ---@overload fun(self: NineSliceNode, path: "enabled", value: boolean)
@@ -2448,6 +2688,9 @@ function NineSliceNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2463,6 +2706,9 @@ function NineSliceNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2480,6 +2726,9 @@ function NineSliceNode:set_property(path, value, y) end
 ---@overload fun(self: ParallaxNode, path: "scale"): Vec2
 ---@overload fun(self: ParallaxNode, path: "rotation"): number
 ---@overload fun(self: ParallaxNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: ParallaxNode, path: "zIndex"): integer
+---@overload fun(self: ParallaxNode, path: "ySort"): boolean
+---@overload fun(self: ParallaxNode, path: "ySortOffset"): number
 ---@overload fun(self: ParallaxNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: ParallaxNode, path: "paused"): boolean
 ---@overload fun(self: ParallaxNode, path: "enabled"): boolean
@@ -2499,6 +2748,9 @@ function ParallaxNode:get_property(path) end
 ---@overload fun(self: ParallaxNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParallaxNode, path: "rotation", value: number)
 ---@overload fun(self: ParallaxNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: ParallaxNode, path: "zIndex", value: integer)
+---@overload fun(self: ParallaxNode, path: "ySort", value: boolean)
+---@overload fun(self: ParallaxNode, path: "ySortOffset", value: number)
 ---@overload fun(self: ParallaxNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: ParallaxNode, path: "paused", value: boolean)
 ---@overload fun(self: ParallaxNode, path: "enabled", value: boolean)
@@ -2515,6 +2767,9 @@ function ParallaxNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2528,6 +2783,9 @@ function ParallaxNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2543,6 +2801,9 @@ function ParallaxNode:set_property(path, value, y) end
 ---@overload fun(self: LineNode, path: "scale"): Vec2
 ---@overload fun(self: LineNode, path: "rotation"): number
 ---@overload fun(self: LineNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: LineNode, path: "zIndex"): integer
+---@overload fun(self: LineNode, path: "ySort"): boolean
+---@overload fun(self: LineNode, path: "ySortOffset"): number
 ---@overload fun(self: LineNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: LineNode, path: "paused"): boolean
 ---@overload fun(self: LineNode, path: "enabled"): boolean
@@ -2560,6 +2821,9 @@ function LineNode:get_property(path) end
 ---@overload fun(self: LineNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LineNode, path: "rotation", value: number)
 ---@overload fun(self: LineNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: LineNode, path: "zIndex", value: integer)
+---@overload fun(self: LineNode, path: "ySort", value: boolean)
+---@overload fun(self: LineNode, path: "ySortOffset", value: number)
 ---@overload fun(self: LineNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: LineNode, path: "paused", value: boolean)
 ---@overload fun(self: LineNode, path: "enabled", value: boolean)
@@ -2574,6 +2838,9 @@ function LineNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2589,6 +2856,9 @@ function LineNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2606,6 +2876,9 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: TrailNode, path: "scale"): Vec2
 ---@overload fun(self: TrailNode, path: "rotation"): number
 ---@overload fun(self: TrailNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: TrailNode, path: "zIndex"): integer
+---@overload fun(self: TrailNode, path: "ySort"): boolean
+---@overload fun(self: TrailNode, path: "ySortOffset"): number
 ---@overload fun(self: TrailNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: TrailNode, path: "paused"): boolean
 ---@overload fun(self: TrailNode, path: "enabled"): boolean
@@ -2625,6 +2898,9 @@ function TrailNode:get_property(path) end
 ---@overload fun(self: TrailNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TrailNode, path: "rotation", value: number)
 ---@overload fun(self: TrailNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: TrailNode, path: "zIndex", value: integer)
+---@overload fun(self: TrailNode, path: "ySort", value: boolean)
+---@overload fun(self: TrailNode, path: "ySortOffset", value: number)
 ---@overload fun(self: TrailNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: TrailNode, path: "paused", value: boolean)
 ---@overload fun(self: TrailNode, path: "enabled", value: boolean)
@@ -2641,6 +2917,9 @@ function TrailNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2669,6 +2948,9 @@ function TrailNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2699,6 +2981,9 @@ function TrailNode:set_property(path, value, y) end
 ---@overload fun(self: UIContainerNode, path: "scale"): Vec2
 ---@overload fun(self: UIContainerNode, path: "rotation"): number
 ---@overload fun(self: UIContainerNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIContainerNode, path: "zIndex"): integer
+---@overload fun(self: UIContainerNode, path: "ySort"): boolean
+---@overload fun(self: UIContainerNode, path: "ySortOffset"): number
 ---@overload fun(self: UIContainerNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIContainerNode, path: "paused"): boolean
 ---@overload fun(self: UIContainerNode, path: "enabled"): boolean
@@ -2731,6 +3016,9 @@ function UIContainerNode:get_property(path) end
 ---@overload fun(self: UIContainerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIContainerNode, path: "rotation", value: number)
 ---@overload fun(self: UIContainerNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIContainerNode, path: "zIndex", value: integer)
+---@overload fun(self: UIContainerNode, path: "ySort", value: boolean)
+---@overload fun(self: UIContainerNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIContainerNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIContainerNode, path: "paused", value: boolean)
 ---@overload fun(self: UIContainerNode, path: "enabled", value: boolean)
@@ -2760,6 +3048,9 @@ function UIContainerNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2776,6 +3067,9 @@ function UIContainerNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2794,6 +3088,9 @@ function UIContainerNode:set_property(path, value, y) end
 ---@overload fun(self: UILabelNode, path: "scale"): Vec2
 ---@overload fun(self: UILabelNode, path: "rotation"): number
 ---@overload fun(self: UILabelNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UILabelNode, path: "zIndex"): integer
+---@overload fun(self: UILabelNode, path: "ySort"): boolean
+---@overload fun(self: UILabelNode, path: "ySortOffset"): number
 ---@overload fun(self: UILabelNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UILabelNode, path: "paused"): boolean
 ---@overload fun(self: UILabelNode, path: "enabled"): boolean
@@ -2814,6 +3111,9 @@ function UILabelNode:get_property(path) end
 ---@overload fun(self: UILabelNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UILabelNode, path: "rotation", value: number)
 ---@overload fun(self: UILabelNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UILabelNode, path: "zIndex", value: integer)
+---@overload fun(self: UILabelNode, path: "ySort", value: boolean)
+---@overload fun(self: UILabelNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UILabelNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UILabelNode, path: "paused", value: boolean)
 ---@overload fun(self: UILabelNode, path: "enabled", value: boolean)
@@ -2831,6 +3131,9 @@ function UILabelNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2851,6 +3154,9 @@ function UILabelNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2873,6 +3179,9 @@ function UILabelNode:set_property(path, value, y) end
 ---@overload fun(self: UIButtonNode, path: "scale"): Vec2
 ---@overload fun(self: UIButtonNode, path: "rotation"): number
 ---@overload fun(self: UIButtonNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIButtonNode, path: "zIndex"): integer
+---@overload fun(self: UIButtonNode, path: "ySort"): boolean
+---@overload fun(self: UIButtonNode, path: "ySortOffset"): number
 ---@overload fun(self: UIButtonNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIButtonNode, path: "paused"): boolean
 ---@overload fun(self: UIButtonNode, path: "enabled"): boolean
@@ -2897,6 +3206,9 @@ function UIButtonNode:get_property(path) end
 ---@overload fun(self: UIButtonNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIButtonNode, path: "rotation", value: number)
 ---@overload fun(self: UIButtonNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIButtonNode, path: "zIndex", value: integer)
+---@overload fun(self: UIButtonNode, path: "ySort", value: boolean)
+---@overload fun(self: UIButtonNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIButtonNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIButtonNode, path: "paused", value: boolean)
 ---@overload fun(self: UIButtonNode, path: "enabled", value: boolean)
@@ -2918,6 +3230,9 @@ function UIButtonNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -2937,6 +3252,9 @@ function UIButtonNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -2958,6 +3276,9 @@ function UIButtonNode:set_property(path, value, y) end
 ---@overload fun(self: UISliderNode, path: "scale"): Vec2
 ---@overload fun(self: UISliderNode, path: "rotation"): number
 ---@overload fun(self: UISliderNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UISliderNode, path: "zIndex"): integer
+---@overload fun(self: UISliderNode, path: "ySort"): boolean
+---@overload fun(self: UISliderNode, path: "ySortOffset"): number
 ---@overload fun(self: UISliderNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UISliderNode, path: "paused"): boolean
 ---@overload fun(self: UISliderNode, path: "enabled"): boolean
@@ -2981,6 +3302,9 @@ function UISliderNode:get_property(path) end
 ---@overload fun(self: UISliderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISliderNode, path: "rotation", value: number)
 ---@overload fun(self: UISliderNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UISliderNode, path: "zIndex", value: integer)
+---@overload fun(self: UISliderNode, path: "ySort", value: boolean)
+---@overload fun(self: UISliderNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UISliderNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UISliderNode, path: "paused", value: boolean)
 ---@overload fun(self: UISliderNode, path: "enabled", value: boolean)
@@ -3001,6 +3325,9 @@ function UISliderNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3016,6 +3343,9 @@ function UISliderNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3033,6 +3363,9 @@ function UISliderNode:set_property(path, value, y) end
 ---@overload fun(self: UICheckboxNode, path: "scale"): Vec2
 ---@overload fun(self: UICheckboxNode, path: "rotation"): number
 ---@overload fun(self: UICheckboxNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UICheckboxNode, path: "zIndex"): integer
+---@overload fun(self: UICheckboxNode, path: "ySort"): boolean
+---@overload fun(self: UICheckboxNode, path: "ySortOffset"): number
 ---@overload fun(self: UICheckboxNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UICheckboxNode, path: "paused"): boolean
 ---@overload fun(self: UICheckboxNode, path: "enabled"): boolean
@@ -3052,6 +3385,9 @@ function UICheckboxNode:get_property(path) end
 ---@overload fun(self: UICheckboxNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UICheckboxNode, path: "rotation", value: number)
 ---@overload fun(self: UICheckboxNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UICheckboxNode, path: "zIndex", value: integer)
+---@overload fun(self: UICheckboxNode, path: "ySort", value: boolean)
+---@overload fun(self: UICheckboxNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UICheckboxNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UICheckboxNode, path: "paused", value: boolean)
 ---@overload fun(self: UICheckboxNode, path: "enabled", value: boolean)
@@ -3068,6 +3404,9 @@ function UICheckboxNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3085,6 +3424,9 @@ function UICheckboxNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3104,6 +3446,9 @@ function UICheckboxNode:set_property(path, value, y) end
 ---@overload fun(self: UIProgressBarNode, path: "scale"): Vec2
 ---@overload fun(self: UIProgressBarNode, path: "rotation"): number
 ---@overload fun(self: UIProgressBarNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIProgressBarNode, path: "zIndex"): integer
+---@overload fun(self: UIProgressBarNode, path: "ySort"): boolean
+---@overload fun(self: UIProgressBarNode, path: "ySortOffset"): number
 ---@overload fun(self: UIProgressBarNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIProgressBarNode, path: "paused"): boolean
 ---@overload fun(self: UIProgressBarNode, path: "enabled"): boolean
@@ -3125,6 +3470,9 @@ function UIProgressBarNode:get_property(path) end
 ---@overload fun(self: UIProgressBarNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIProgressBarNode, path: "rotation", value: number)
 ---@overload fun(self: UIProgressBarNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIProgressBarNode, path: "zIndex", value: integer)
+---@overload fun(self: UIProgressBarNode, path: "ySort", value: boolean)
+---@overload fun(self: UIProgressBarNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIProgressBarNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIProgressBarNode, path: "paused", value: boolean)
 ---@overload fun(self: UIProgressBarNode, path: "enabled", value: boolean)
@@ -3143,6 +3491,9 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3156,6 +3507,9 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3171,6 +3525,9 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---@overload fun(self: UITextInputNode, path: "scale"): Vec2
 ---@overload fun(self: UITextInputNode, path: "rotation"): number
 ---@overload fun(self: UITextInputNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UITextInputNode, path: "zIndex"): integer
+---@overload fun(self: UITextInputNode, path: "ySort"): boolean
+---@overload fun(self: UITextInputNode, path: "ySortOffset"): number
 ---@overload fun(self: UITextInputNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UITextInputNode, path: "paused"): boolean
 ---@overload fun(self: UITextInputNode, path: "enabled"): boolean
@@ -3188,6 +3545,9 @@ function UITextInputNode:get_property(path) end
 ---@overload fun(self: UITextInputNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITextInputNode, path: "rotation", value: number)
 ---@overload fun(self: UITextInputNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UITextInputNode, path: "zIndex", value: integer)
+---@overload fun(self: UITextInputNode, path: "ySort", value: boolean)
+---@overload fun(self: UITextInputNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UITextInputNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UITextInputNode, path: "paused", value: boolean)
 ---@overload fun(self: UITextInputNode, path: "enabled", value: boolean)
@@ -3202,6 +3562,9 @@ function UITextInputNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3217,6 +3580,9 @@ function UITextInputNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3234,6 +3600,9 @@ function UITextInputNode:set_property(path, value, y) end
 ---@overload fun(self: UIDropdownNode, path: "scale"): Vec2
 ---@overload fun(self: UIDropdownNode, path: "rotation"): number
 ---@overload fun(self: UIDropdownNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIDropdownNode, path: "zIndex"): integer
+---@overload fun(self: UIDropdownNode, path: "ySort"): boolean
+---@overload fun(self: UIDropdownNode, path: "ySortOffset"): number
 ---@overload fun(self: UIDropdownNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIDropdownNode, path: "paused"): boolean
 ---@overload fun(self: UIDropdownNode, path: "enabled"): boolean
@@ -3253,6 +3622,9 @@ function UIDropdownNode:get_property(path) end
 ---@overload fun(self: UIDropdownNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIDropdownNode, path: "rotation", value: number)
 ---@overload fun(self: UIDropdownNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIDropdownNode, path: "zIndex", value: integer)
+---@overload fun(self: UIDropdownNode, path: "ySort", value: boolean)
+---@overload fun(self: UIDropdownNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIDropdownNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIDropdownNode, path: "paused", value: boolean)
 ---@overload fun(self: UIDropdownNode, path: "enabled", value: boolean)
@@ -3269,6 +3641,9 @@ function UIDropdownNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3284,6 +3659,9 @@ function UIDropdownNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3301,6 +3679,9 @@ function UIDropdownNode:set_property(path, value, y) end
 ---@overload fun(self: UIRadioGroupNode, path: "scale"): Vec2
 ---@overload fun(self: UIRadioGroupNode, path: "rotation"): number
 ---@overload fun(self: UIRadioGroupNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIRadioGroupNode, path: "zIndex"): integer
+---@overload fun(self: UIRadioGroupNode, path: "ySort"): boolean
+---@overload fun(self: UIRadioGroupNode, path: "ySortOffset"): number
 ---@overload fun(self: UIRadioGroupNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIRadioGroupNode, path: "paused"): boolean
 ---@overload fun(self: UIRadioGroupNode, path: "enabled"): boolean
@@ -3320,6 +3701,9 @@ function UIRadioGroupNode:get_property(path) end
 ---@overload fun(self: UIRadioGroupNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIRadioGroupNode, path: "rotation", value: number)
 ---@overload fun(self: UIRadioGroupNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIRadioGroupNode, path: "zIndex", value: integer)
+---@overload fun(self: UIRadioGroupNode, path: "ySort", value: boolean)
+---@overload fun(self: UIRadioGroupNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIRadioGroupNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIRadioGroupNode, path: "paused", value: boolean)
 ---@overload fun(self: UIRadioGroupNode, path: "enabled", value: boolean)
@@ -3336,6 +3720,9 @@ function UIRadioGroupNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3348,6 +3735,9 @@ function UIRadioGroupNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3362,6 +3752,9 @@ function UIRadioGroupNode:set_property(path, value, y) end
 ---@overload fun(self: UIToggleSwitchNode, path: "scale"): Vec2
 ---@overload fun(self: UIToggleSwitchNode, path: "rotation"): number
 ---@overload fun(self: UIToggleSwitchNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIToggleSwitchNode, path: "zIndex"): integer
+---@overload fun(self: UIToggleSwitchNode, path: "ySort"): boolean
+---@overload fun(self: UIToggleSwitchNode, path: "ySortOffset"): number
 ---@overload fun(self: UIToggleSwitchNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIToggleSwitchNode, path: "paused"): boolean
 ---@overload fun(self: UIToggleSwitchNode, path: "enabled"): boolean
@@ -3378,6 +3771,9 @@ function UIToggleSwitchNode:get_property(path) end
 ---@overload fun(self: UIToggleSwitchNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToggleSwitchNode, path: "rotation", value: number)
 ---@overload fun(self: UIToggleSwitchNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIToggleSwitchNode, path: "zIndex", value: integer)
+---@overload fun(self: UIToggleSwitchNode, path: "ySort", value: boolean)
+---@overload fun(self: UIToggleSwitchNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIToggleSwitchNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIToggleSwitchNode, path: "paused", value: boolean)
 ---@overload fun(self: UIToggleSwitchNode, path: "enabled", value: boolean)
@@ -3391,6 +3787,9 @@ function UIToggleSwitchNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3406,6 +3805,9 @@ function UIToggleSwitchNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3423,6 +3825,9 @@ function UIToggleSwitchNode:set_property(path, value, y) end
 ---@overload fun(self: UIKnobNode, path: "scale"): Vec2
 ---@overload fun(self: UIKnobNode, path: "rotation"): number
 ---@overload fun(self: UIKnobNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIKnobNode, path: "zIndex"): integer
+---@overload fun(self: UIKnobNode, path: "ySort"): boolean
+---@overload fun(self: UIKnobNode, path: "ySortOffset"): number
 ---@overload fun(self: UIKnobNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIKnobNode, path: "paused"): boolean
 ---@overload fun(self: UIKnobNode, path: "enabled"): boolean
@@ -3442,6 +3847,9 @@ function UIKnobNode:get_property(path) end
 ---@overload fun(self: UIKnobNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIKnobNode, path: "rotation", value: number)
 ---@overload fun(self: UIKnobNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIKnobNode, path: "zIndex", value: integer)
+---@overload fun(self: UIKnobNode, path: "ySort", value: boolean)
+---@overload fun(self: UIKnobNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIKnobNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIKnobNode, path: "paused", value: boolean)
 ---@overload fun(self: UIKnobNode, path: "enabled", value: boolean)
@@ -3458,6 +3866,9 @@ function UIKnobNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3475,6 +3886,9 @@ function UIKnobNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3494,6 +3908,9 @@ function UIKnobNode:set_property(path, value, y) end
 ---@overload fun(self: UINotchedSliderNode, path: "scale"): Vec2
 ---@overload fun(self: UINotchedSliderNode, path: "rotation"): number
 ---@overload fun(self: UINotchedSliderNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UINotchedSliderNode, path: "zIndex"): integer
+---@overload fun(self: UINotchedSliderNode, path: "ySort"): boolean
+---@overload fun(self: UINotchedSliderNode, path: "ySortOffset"): number
 ---@overload fun(self: UINotchedSliderNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UINotchedSliderNode, path: "paused"): boolean
 ---@overload fun(self: UINotchedSliderNode, path: "enabled"): boolean
@@ -3515,6 +3932,9 @@ function UINotchedSliderNode:get_property(path) end
 ---@overload fun(self: UINotchedSliderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UINotchedSliderNode, path: "rotation", value: number)
 ---@overload fun(self: UINotchedSliderNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UINotchedSliderNode, path: "zIndex", value: integer)
+---@overload fun(self: UINotchedSliderNode, path: "ySort", value: boolean)
+---@overload fun(self: UINotchedSliderNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UINotchedSliderNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UINotchedSliderNode, path: "paused", value: boolean)
 ---@overload fun(self: UINotchedSliderNode, path: "enabled", value: boolean)
@@ -3533,6 +3953,9 @@ function UINotchedSliderNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3548,6 +3971,9 @@ function UINotchedSliderNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3565,6 +3991,9 @@ function UINotchedSliderNode:set_property(path, value, y) end
 ---@overload fun(self: UIVolumeFaderNode, path: "scale"): Vec2
 ---@overload fun(self: UIVolumeFaderNode, path: "rotation"): number
 ---@overload fun(self: UIVolumeFaderNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIVolumeFaderNode, path: "zIndex"): integer
+---@overload fun(self: UIVolumeFaderNode, path: "ySort"): boolean
+---@overload fun(self: UIVolumeFaderNode, path: "ySortOffset"): number
 ---@overload fun(self: UIVolumeFaderNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIVolumeFaderNode, path: "paused"): boolean
 ---@overload fun(self: UIVolumeFaderNode, path: "enabled"): boolean
@@ -3584,6 +4013,9 @@ function UIVolumeFaderNode:get_property(path) end
 ---@overload fun(self: UIVolumeFaderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "rotation", value: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIVolumeFaderNode, path: "zIndex", value: integer)
+---@overload fun(self: UIVolumeFaderNode, path: "ySort", value: boolean)
+---@overload fun(self: UIVolumeFaderNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIVolumeFaderNode, path: "paused", value: boolean)
 ---@overload fun(self: UIVolumeFaderNode, path: "enabled", value: boolean)
@@ -3600,6 +4032,9 @@ function UIVolumeFaderNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3616,6 +4051,9 @@ function UIVolumeFaderNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3634,6 +4072,9 @@ function UIVolumeFaderNode:set_property(path, value, y) end
 ---@overload fun(self: UIVolumeMeterNode, path: "scale"): Vec2
 ---@overload fun(self: UIVolumeMeterNode, path: "rotation"): number
 ---@overload fun(self: UIVolumeMeterNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIVolumeMeterNode, path: "zIndex"): integer
+---@overload fun(self: UIVolumeMeterNode, path: "ySort"): boolean
+---@overload fun(self: UIVolumeMeterNode, path: "ySortOffset"): number
 ---@overload fun(self: UIVolumeMeterNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIVolumeMeterNode, path: "paused"): boolean
 ---@overload fun(self: UIVolumeMeterNode, path: "enabled"): boolean
@@ -3654,6 +4095,9 @@ function UIVolumeMeterNode:get_property(path) end
 ---@overload fun(self: UIVolumeMeterNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "rotation", value: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIVolumeMeterNode, path: "zIndex", value: integer)
+---@overload fun(self: UIVolumeMeterNode, path: "ySort", value: boolean)
+---@overload fun(self: UIVolumeMeterNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIVolumeMeterNode, path: "paused", value: boolean)
 ---@overload fun(self: UIVolumeMeterNode, path: "enabled", value: boolean)
@@ -3671,6 +4115,9 @@ function UIVolumeMeterNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3683,6 +4130,9 @@ function UIVolumeMeterNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3697,6 +4147,9 @@ function UIVolumeMeterNode:set_property(path, value, y) end
 ---@overload fun(self: UISeparatorNode, path: "scale"): Vec2
 ---@overload fun(self: UISeparatorNode, path: "rotation"): number
 ---@overload fun(self: UISeparatorNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UISeparatorNode, path: "zIndex"): integer
+---@overload fun(self: UISeparatorNode, path: "ySort"): boolean
+---@overload fun(self: UISeparatorNode, path: "ySortOffset"): number
 ---@overload fun(self: UISeparatorNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UISeparatorNode, path: "paused"): boolean
 ---@overload fun(self: UISeparatorNode, path: "enabled"): boolean
@@ -3713,6 +4166,9 @@ function UISeparatorNode:get_property(path) end
 ---@overload fun(self: UISeparatorNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISeparatorNode, path: "rotation", value: number)
 ---@overload fun(self: UISeparatorNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UISeparatorNode, path: "zIndex", value: integer)
+---@overload fun(self: UISeparatorNode, path: "ySort", value: boolean)
+---@overload fun(self: UISeparatorNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UISeparatorNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UISeparatorNode, path: "paused", value: boolean)
 ---@overload fun(self: UISeparatorNode, path: "enabled", value: boolean)
@@ -3726,6 +4182,9 @@ function UISeparatorNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3748,6 +4207,9 @@ function UISeparatorNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3772,6 +4234,9 @@ function UISeparatorNode:set_property(path, value, y) end
 ---@overload fun(self: UIXYPlotNode, path: "scale"): Vec2
 ---@overload fun(self: UIXYPlotNode, path: "rotation"): number
 ---@overload fun(self: UIXYPlotNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIXYPlotNode, path: "zIndex"): integer
+---@overload fun(self: UIXYPlotNode, path: "ySort"): boolean
+---@overload fun(self: UIXYPlotNode, path: "ySortOffset"): number
 ---@overload fun(self: UIXYPlotNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIXYPlotNode, path: "paused"): boolean
 ---@overload fun(self: UIXYPlotNode, path: "enabled"): boolean
@@ -3798,6 +4263,9 @@ function UIXYPlotNode:get_property(path) end
 ---@overload fun(self: UIXYPlotNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIXYPlotNode, path: "rotation", value: number)
 ---@overload fun(self: UIXYPlotNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIXYPlotNode, path: "zIndex", value: integer)
+---@overload fun(self: UIXYPlotNode, path: "ySort", value: boolean)
+---@overload fun(self: UIXYPlotNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIXYPlotNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIXYPlotNode, path: "paused", value: boolean)
 ---@overload fun(self: UIXYPlotNode, path: "enabled", value: boolean)
@@ -3821,6 +4289,9 @@ function UIXYPlotNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3833,6 +4304,9 @@ function UIXYPlotNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3847,6 +4321,9 @@ function UIXYPlotNode:set_property(path, value, y) end
 ---@overload fun(self: UIListViewNode, path: "scale"): Vec2
 ---@overload fun(self: UIListViewNode, path: "rotation"): number
 ---@overload fun(self: UIListViewNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIListViewNode, path: "zIndex"): integer
+---@overload fun(self: UIListViewNode, path: "ySort"): boolean
+---@overload fun(self: UIListViewNode, path: "ySortOffset"): number
 ---@overload fun(self: UIListViewNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIListViewNode, path: "paused"): boolean
 ---@overload fun(self: UIListViewNode, path: "enabled"): boolean
@@ -3863,6 +4340,9 @@ function UIListViewNode:get_property(path) end
 ---@overload fun(self: UIListViewNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIListViewNode, path: "rotation", value: number)
 ---@overload fun(self: UIListViewNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIListViewNode, path: "zIndex", value: integer)
+---@overload fun(self: UIListViewNode, path: "ySort", value: boolean)
+---@overload fun(self: UIListViewNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIListViewNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIListViewNode, path: "paused", value: boolean)
 ---@overload fun(self: UIListViewNode, path: "enabled", value: boolean)
@@ -3876,6 +4356,9 @@ function UIListViewNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3888,6 +4371,9 @@ function UIListViewNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3902,6 +4388,9 @@ function UIListViewNode:set_property(path, value, y) end
 ---@overload fun(self: UITreeViewNode, path: "scale"): Vec2
 ---@overload fun(self: UITreeViewNode, path: "rotation"): number
 ---@overload fun(self: UITreeViewNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UITreeViewNode, path: "zIndex"): integer
+---@overload fun(self: UITreeViewNode, path: "ySort"): boolean
+---@overload fun(self: UITreeViewNode, path: "ySortOffset"): number
 ---@overload fun(self: UITreeViewNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UITreeViewNode, path: "paused"): boolean
 ---@overload fun(self: UITreeViewNode, path: "enabled"): boolean
@@ -3918,6 +4407,9 @@ function UITreeViewNode:get_property(path) end
 ---@overload fun(self: UITreeViewNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITreeViewNode, path: "rotation", value: number)
 ---@overload fun(self: UITreeViewNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UITreeViewNode, path: "zIndex", value: integer)
+---@overload fun(self: UITreeViewNode, path: "ySort", value: boolean)
+---@overload fun(self: UITreeViewNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UITreeViewNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UITreeViewNode, path: "paused", value: boolean)
 ---@overload fun(self: UITreeViewNode, path: "enabled", value: boolean)
@@ -3931,6 +4423,9 @@ function UITreeViewNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -3944,6 +4439,9 @@ function UITreeViewNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -3959,6 +4457,9 @@ function UITreeViewNode:set_property(path, value, y) end
 ---@overload fun(self: UIUnorderedListNode, path: "scale"): Vec2
 ---@overload fun(self: UIUnorderedListNode, path: "rotation"): number
 ---@overload fun(self: UIUnorderedListNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIUnorderedListNode, path: "zIndex"): integer
+---@overload fun(self: UIUnorderedListNode, path: "ySort"): boolean
+---@overload fun(self: UIUnorderedListNode, path: "ySortOffset"): number
 ---@overload fun(self: UIUnorderedListNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIUnorderedListNode, path: "paused"): boolean
 ---@overload fun(self: UIUnorderedListNode, path: "enabled"): boolean
@@ -3976,6 +4477,9 @@ function UIUnorderedListNode:get_property(path) end
 ---@overload fun(self: UIUnorderedListNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIUnorderedListNode, path: "rotation", value: number)
 ---@overload fun(self: UIUnorderedListNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIUnorderedListNode, path: "zIndex", value: integer)
+---@overload fun(self: UIUnorderedListNode, path: "ySort", value: boolean)
+---@overload fun(self: UIUnorderedListNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIUnorderedListNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIUnorderedListNode, path: "paused", value: boolean)
 ---@overload fun(self: UIUnorderedListNode, path: "enabled", value: boolean)
@@ -3990,6 +4494,9 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -4004,6 +4511,9 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -4020,6 +4530,9 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---@overload fun(self: UIOrderedListNode, path: "scale"): Vec2
 ---@overload fun(self: UIOrderedListNode, path: "rotation"): number
 ---@overload fun(self: UIOrderedListNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIOrderedListNode, path: "zIndex"): integer
+---@overload fun(self: UIOrderedListNode, path: "ySort"): boolean
+---@overload fun(self: UIOrderedListNode, path: "ySortOffset"): number
 ---@overload fun(self: UIOrderedListNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIOrderedListNode, path: "paused"): boolean
 ---@overload fun(self: UIOrderedListNode, path: "enabled"): boolean
@@ -4038,6 +4551,9 @@ function UIOrderedListNode:get_property(path) end
 ---@overload fun(self: UIOrderedListNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIOrderedListNode, path: "rotation", value: number)
 ---@overload fun(self: UIOrderedListNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIOrderedListNode, path: "zIndex", value: integer)
+---@overload fun(self: UIOrderedListNode, path: "ySort", value: boolean)
+---@overload fun(self: UIOrderedListNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIOrderedListNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIOrderedListNode, path: "paused", value: boolean)
 ---@overload fun(self: UIOrderedListNode, path: "enabled", value: boolean)
@@ -4053,6 +4569,9 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -4068,6 +4587,9 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -4085,6 +4607,9 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---@overload fun(self: UITableNode, path: "scale"): Vec2
 ---@overload fun(self: UITableNode, path: "rotation"): number
 ---@overload fun(self: UITableNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UITableNode, path: "zIndex"): integer
+---@overload fun(self: UITableNode, path: "ySort"): boolean
+---@overload fun(self: UITableNode, path: "ySortOffset"): number
 ---@overload fun(self: UITableNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UITableNode, path: "paused"): boolean
 ---@overload fun(self: UITableNode, path: "enabled"): boolean
@@ -4104,6 +4629,9 @@ function UITableNode:get_property(path) end
 ---@overload fun(self: UITableNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITableNode, path: "rotation", value: number)
 ---@overload fun(self: UITableNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UITableNode, path: "zIndex", value: integer)
+---@overload fun(self: UITableNode, path: "ySort", value: boolean)
+---@overload fun(self: UITableNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UITableNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UITableNode, path: "paused", value: boolean)
 ---@overload fun(self: UITableNode, path: "enabled", value: boolean)
@@ -4120,6 +4648,9 @@ function UITableNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -4134,6 +4665,9 @@ function UITableNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -4150,6 +4684,9 @@ function UITableNode:set_property(path, value, y) end
 ---@overload fun(self: UIIconNode, path: "scale"): Vec2
 ---@overload fun(self: UIIconNode, path: "rotation"): number
 ---@overload fun(self: UIIconNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIIconNode, path: "zIndex"): integer
+---@overload fun(self: UIIconNode, path: "ySort"): boolean
+---@overload fun(self: UIIconNode, path: "ySortOffset"): number
 ---@overload fun(self: UIIconNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIIconNode, path: "paused"): boolean
 ---@overload fun(self: UIIconNode, path: "enabled"): boolean
@@ -4168,6 +4705,9 @@ function UIIconNode:get_property(path) end
 ---@overload fun(self: UIIconNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIIconNode, path: "rotation", value: number)
 ---@overload fun(self: UIIconNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIIconNode, path: "zIndex", value: integer)
+---@overload fun(self: UIIconNode, path: "ySort", value: boolean)
+---@overload fun(self: UIIconNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIIconNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIIconNode, path: "paused", value: boolean)
 ---@overload fun(self: UIIconNode, path: "enabled", value: boolean)
@@ -4183,6 +4723,9 @@ function UIIconNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -4196,6 +4739,9 @@ function UIIconNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -4211,6 +4757,9 @@ function UIIconNode:set_property(path, value, y) end
 ---@overload fun(self: UIToolbarNode, path: "scale"): Vec2
 ---@overload fun(self: UIToolbarNode, path: "rotation"): number
 ---@overload fun(self: UIToolbarNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UIToolbarNode, path: "zIndex"): integer
+---@overload fun(self: UIToolbarNode, path: "ySort"): boolean
+---@overload fun(self: UIToolbarNode, path: "ySortOffset"): number
 ---@overload fun(self: UIToolbarNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UIToolbarNode, path: "paused"): boolean
 ---@overload fun(self: UIToolbarNode, path: "enabled"): boolean
@@ -4228,6 +4777,9 @@ function UIToolbarNode:get_property(path) end
 ---@overload fun(self: UIToolbarNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToolbarNode, path: "rotation", value: number)
 ---@overload fun(self: UIToolbarNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UIToolbarNode, path: "zIndex", value: integer)
+---@overload fun(self: UIToolbarNode, path: "ySort", value: boolean)
+---@overload fun(self: UIToolbarNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UIToolbarNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UIToolbarNode, path: "paused", value: boolean)
 ---@overload fun(self: UIToolbarNode, path: "enabled", value: boolean)
@@ -4242,6 +4794,9 @@ function UIToolbarNode:set_property(path, value, y) end
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---@field rotation number Rotation relative to the parent, in degrees (clockwise).
 ---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
@@ -4273,6 +4828,9 @@ function UIToolbarNode:set_property(path, value, y) end
 ---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
 ---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
 ---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
@@ -4306,6 +4864,9 @@ function UIToolbarNode:set_property(path, value, y) end
 ---@overload fun(self: UITabContainerNode, path: "scale"): Vec2
 ---@overload fun(self: UITabContainerNode, path: "rotation"): number
 ---@overload fun(self: UITabContainerNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: UITabContainerNode, path: "zIndex"): integer
+---@overload fun(self: UITabContainerNode, path: "ySort"): boolean
+---@overload fun(self: UITabContainerNode, path: "ySortOffset"): number
 ---@overload fun(self: UITabContainerNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: UITabContainerNode, path: "paused"): boolean
 ---@overload fun(self: UITabContainerNode, path: "enabled"): boolean
@@ -4341,6 +4902,9 @@ function UITabContainerNode:get_property(path) end
 ---@overload fun(self: UITabContainerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITabContainerNode, path: "rotation", value: number)
 ---@overload fun(self: UITabContainerNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: UITabContainerNode, path: "zIndex", value: integer)
+---@overload fun(self: UITabContainerNode, path: "ySort", value: boolean)
+---@overload fun(self: UITabContainerNode, path: "ySortOffset", value: number)
 ---@overload fun(self: UITabContainerNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: UITabContainerNode, path: "paused", value: boolean)
 ---@overload fun(self: UITabContainerNode, path: "enabled", value: boolean)

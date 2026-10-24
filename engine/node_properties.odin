@@ -70,7 +70,8 @@ Node_FindProperty :: proc(node: ^Node, name: string) -> (Node_Property, bool) {
 }
 
 // Node_BaseProperty: a field every node has (the Inspector's Transform
-// section): position, rotation, scale, layer, pauseMode, paused, enabled;
+// section): position, rotation, scale, layer, zIndex, ySort, ySortOffset,
+// pauseMode, paused, enabled;
 // origin (Node.pivot) for the nodes that have one.
 Node_BaseProperty :: proc(node: ^Node, name: string) -> (Node_Property, bool) {
 	if node == nil do return {}, false
@@ -83,6 +84,9 @@ Node_BaseProperty :: proc(node: ^Node, name: string) -> (Node_Property, bool) {
 		if !Node_HasOrigin(node) do return {}, false
 		p.kind, p.ptr, p.type = .Vec2, &node.pivot, type_info_of([2]f32)
 	case "layer":    p.kind, p.ptr, p.type = .Enum, &node.layer, type_info_of(RenderLayer)
+	case "zIndex":   p.kind, p.ptr, p.type = .Int, &node.zIndex, type_info_of(i32)
+	case "ySort":    p.kind, p.ptr, p.type = .Bool, &node.ySort, type_info_of(bool)
+	case "ySortOffset": p.kind, p.ptr, p.type = .Float, &node.ySortOffset, type_info_of(f32)
 	case "pauseMode": p.kind, p.ptr, p.type = .Enum, &node.pauseMode, type_info_of(Pause_Mode)
 	case "paused":   p.kind, p.ptr, p.type = .Bool, &node.paused, type_info_of(bool)
 	case "enabled":  p.kind, p.ptr, p.type = .Bool, &node.enabled, type_info_of(bool)

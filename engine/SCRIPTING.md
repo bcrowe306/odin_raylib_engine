@@ -842,6 +842,14 @@ rather than re-pathing every frame.
   when the node has no script; `set_property("script.x", ...)` on one is an
   error.
 
+#### Draw order (zIndex, ySort)
+
+Every node has `zIndex` (draw order within its layer, added to the
+parent's), `ySort` (draw its children by Y: top-down / isometric depth) and
+`ySortOffset` (added to its Y when its parent sorts) - as properties:
+`node.zIndex = 10`, `world:set_property("ySort", true)`. Guide with a
+tutorial: [`docs/draw_order.md`](docs/draw_order.md).
+
 #### State machines (StateMachineNode)
 
 A **StateMachine** node holds named states and transitions between them -

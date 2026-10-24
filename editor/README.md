@@ -183,6 +183,13 @@ in the viewport moves it while the image stays. Scripts:
 `node:set_property("origin", 0.5, 1)`. Scenes saved before keep their look
 (older AnimationPlayers stay drawn from their top-left, `origin: 0, 0`).
 
+**Draw order** (Transform): **Layer**, **Z Index** (within the layer,
+added to the parent's: higher on top), **Y Sort Children** (draw the
+children by Y - top-down / isometric depth) and, under a Y-sorted parent,
+**Y Sort Offset** (the line it sorts by, drawn dashed in the viewport while
+selected). Viewport clicks pick what is drawn on top. Guide:
+[`engine/docs/draw_order.md`](../engine/docs/draw_order.md).
+
 X/Y fields have a link toggle (linked: changing one scales the other by
 the same ratio). Every field has a reset button when its value differs from
 the default (the node type's default, a script property's declared default).

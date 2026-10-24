@@ -591,6 +591,20 @@ Viewport_HandleInputAndGizmos :: proc(state: ^EditorState) {
 	// Rulers and guides (and their mouse handling).
 	guidesOwn := shapeOwnsMouse ? false : Viewport_Guides(state, drawList, mouseScreen, mouseWorld)
 
+	// The Y-sort line of a selected node its parent sorts (y + ySortOffset).
+	if sel := state.selectedNode; sel != nil && state.activeScene != nil {
+		if parent := e.GetParent(state.activeScene.manager, sel); parent != nil && parent.ySort {
+			q, _ := Node_Bounds(state, sel)
+			y := sel.globalPosition.y + sel.ySortOffset
+			x0 := min(q[0].x, q[1].x, q[2].x, q[3].x) - 16
+			x1 := max(q[0].x, q[1].x, q[2].x, q[3].x) + 16
+			a := Viewport_WorldToScreen(state, {x0, y})
+			b := Viewport_WorldToScreen(state, {x1, y})
+			for x := a.x; x < b.x; x += 8 do imgui.DrawList_AddLine(drawList, {x, a.y}, {min(x + 4, b.x), a.y}, col_u32(UI_WARNING), 1.5)
+			imgui.DrawList_AddText(drawList, {b.x + 4, a.y - 8}, col_u32(UI_WARNING), "y sort")
+		}
+	}
+
 	// 3. Transform Gizmos for Selected Node (not for nodes locked in the viewport)
 	if state.selectedNode != nil && !ShapeEdit_IsActive(state) && !guidesOwn && !Editor_ViewLocked(state, state.selectedNode) {
 		Viewport_RenderAndInteractGizmo(state, drawList, mouseScreen, mouseWorld)
@@ -905,11 +919,14 @@ Viewport_RenderAndInteractGizmo :: proc(state: ^EditorState, drawList: ^imgui.Dr
 }
 
 // Viewport_PickNode returns the top-most visible node under a world point:
-// higher render layer first, then later (drawn later) nodes.
+// the one drawn last (layer, z index, Y sort, tree order); nodes that draw
+// nothing (handles) rank under the drawn ones of their layer.
 Viewport_PickNode :: proc(state: ^EditorState, worldPos: [2]f32) -> ^e.Node {
 	if state.activeScene == nil || state.activeScene.manager == nil do return nil
+	drawRank := make(map[^e.Node]int, 64, context.temp_allocator)
+	for b in e.Scene_CollectRenderables(state.activeScene) do for n, i in b do drawRank[n] = i + 1
 	best, level: ^e.Node
-	bestLayer := -1
+	bestLayer, bestRank := -1, -1
 	for node in state.activeScene.manager.nodes {
 		if node == nil || node == state.activeScene.rootNode || !node.enabled || !node.renderable do continue
 		if Editor_ViewLocked(state, node) || Editor_ViewHidden(state, node) do continue
@@ -920,8 +937,9 @@ Viewport_PickNode :: proc(state: ^EditorState, worldPos: [2]f32) -> ^e.Node {
 			if level == nil do level = node
 			continue
 		}
-		if int(node.layer) >= bestLayer {
-			best, bestLayer = node, int(node.layer)
+		rank := drawRank[node] or_else 0
+		if int(node.layer) > bestLayer || (int(node.layer) == bestLayer && rank >= bestRank) {
+			best, bestLayer, bestRank = node, int(node.layer), rank
 		}
 	}
 	if best == nil do best = level

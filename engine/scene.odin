@@ -2,6 +2,7 @@ package engine
 
 import vmem "core:mem/virtual"
 import "core:log"
+import "core:slice"
 import "core:strings"
 import b2 "vendor:box2d"
 import rl "vendor:raylib"
@@ -441,17 +442,64 @@ render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, 
 }
 
 // Scene_CollectRenderables walks the enabled hierarchy once and returns the
-// renderable nodes of each layer in draw order (temp-allocated).
+// renderable nodes of each layer in draw order (temp-allocated): tree
+// order, then Y-sorted subtrees (a ySort node's children by Y, each with
+// its subtree), then zIndex (stable). The sorts run on 16-byte items and
+// only where a ySort node / a zIndex is used.
 Scene_CollectRenderables :: proc(scene: ^Scene) -> (buckets: [RenderLayer][dynamic]^Node) {
-	for &b in buckets do b = make([dynamic]^Node, context.temp_allocator)
-	walk :: proc(m: ^NodeManager, node: ^Node, buckets: ^[RenderLayer][dynamic]^Node) {
-		if node == nil || !node.enabled do return
-		if Render_HideEditorHidden && node.editorHidden do return
-		if node.renderable && (node.render != nil || node.drawBounds != nil) {
-			append(&buckets[node.layer], node)
+	collect: Render_Collect
+	for &l in collect.items do l = make([dynamic]Render_Item, context.temp_allocator)
+	if scene != nil && scene.manager != nil do render_walk(&collect, scene.manager, scene.rootNode, 0, 0)
+	for &l, layer in collect.items {
+		if collect.anyZ {
+			for it in l do if it.z != 0 {
+				slice.stable_sort_by(l[:], proc(a, b: Render_Item) -> bool {return a.z < b.z})
+				break
+			}
 		}
-		for child in GetChildrenView(m, node) do walk(m, child, buckets)
+		buckets[layer] = make([dynamic]^Node, len(l), context.temp_allocator)
+		for it, i in l do buckets[layer][i] = it.node
 	}
-	if scene != nil && scene.manager != nil do walk(scene.manager, scene.rootNode, &buckets)
 	return
+}
+
+// Render_Item: a node to draw with its sort keys.
+Render_Item :: struct {
+	node: ^Node,
+	z:    i32, // global zIndex
+	y:    f32, // Y-sort key of the subtree it belongs to
+}
+
+@(private = "file")
+Render_Collect :: struct {
+	items: [RenderLayer][dynamic]Render_Item,
+	anyZ:  bool,
+}
+
+// render_walk appends a subtree's drawables; z = the parent's global
+// zIndex, key = the Y-sort key the subtree's items carry.
+@(private = "file")
+render_walk :: proc(c: ^Render_Collect, m: ^NodeManager, node: ^Node, z: i32, key: f32) {
+	if node == nil || !node.enabled do return
+	if Render_HideEditorHidden && node.editorHidden do return
+	z := z + node.zIndex
+	if z != 0 do c.anyZ = true
+	if node.renderable && (node.render != nil || node.drawBounds != nil) {
+		append(&c.items[node.layer], Render_Item{node, z, key})
+	}
+	if !node.ySort {
+		for child in GetChildrenView(m, node) do render_walk(c, m, child, z, key)
+		return
+	}
+	// Y-sort: each child's subtree keyed by the child's Y, then sorted per
+	// layer (stable: a subtree keeps its order), then given back the
+	// enclosing key (so an outer Y-sort moves it as one).
+	start: [RenderLayer]int
+	for l, layer in c.items do start[layer] = len(l)
+	for child in GetChildrenView(m, node) do render_walk(c, m, child, z, child.globalPosition.y + child.ySortOffset)
+	for &l, layer in c.items {
+		seg := l[start[layer]:]
+		if len(seg) > 1 do slice.stable_sort_by(seg, proc(a, b: Render_Item) -> bool {return a.y < b.y})
+		for &it in seg do it.y = key
+	}
 }

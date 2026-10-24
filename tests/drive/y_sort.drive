@@ -1,0 +1,34 @@
+# Draw order: Y Sort Children on a node, a child's Y Sort Offset (shown
+# only under a Y-sorted parent, its line drawn in the viewport) and Z Index;
+# saved with the scene.
+wait 5
+click @hier:PlayerShip
+click @insp.y-sort
+wait 2
+key ctrl+a
+type texture sprite
+key enter
+wait 5
+expect item:insp.y-sort-offset == visible
+dblclick @insp.y-sort-offset
+key ctrl+a
+type 24
+key enter
+dblclick @insp.z-index
+key ctrl+a
+type 3
+key enter
+wait 3
+screenshot y_sort_line
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "y_sort": true
+expect file:scenes/main.scene.json contains "y_sort_offset": 24
+expect file:scenes/main.scene.json contains "z_index": 3
+# Off again: the offset row goes away.
+click @hier:PlayerShip
+click @insp.y-sort
+wait 2
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json !contains "y_sort": true

@@ -45,6 +45,13 @@ Node :: struct {
 	globalScale: [2]f32,
 	globalRotation: f32,
 	layer: RenderLayer,
+	// Draw order within a layer (scene.odin): zIndex adds to the parent's
+	// (higher draws later); a ySort node draws its children ordered by
+	// their Y (+ their ySortOffset, the "feet" line), each child with its
+	// subtree - top-down and isometric depth.
+	zIndex: i32,
+	ySort: bool,
+	ySortOffset: f32,
 	gameContext: ^GameContext, // Node does not own this
 	// The tree events every node raises (Node_Event), with their listeners -
 	// allocated when something subscribes (most nodes never have one):
