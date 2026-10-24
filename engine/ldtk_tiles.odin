@@ -227,3 +227,133 @@ Ldtk_Doc_AddTerrainRules :: proc(doc: ^Ldtk_Doc, layerUid: int, value: int, bloc
 	}
 	return g
 }
+
+// ----------------------------------------------------------------------------
+// Painting tiles like LDtk's TileTool
+// ----------------------------------------------------------------------------
+
+// Ldtk_Doc_TileOpaque: does the tile cover its whole cell (no transparent
+// pixel; from the tileset's cached pixel data)?
+Ldtk_Doc_TileOpaque :: proc(ts: ^Ldtk_DocTileset, tid: int) -> bool {
+	return ts != nil && tid >= 0 && tid < len(ts.opaque) && ts.opaque[tid]
+}
+
+// Ldtk_Doc_AddGridTile: LayerInstance.addGridTile - with `stack`, a
+// non-opaque tile goes on top of the cell's tiles (the same tile moves to the
+// top); otherwise (or opaque) it replaces them.
+Ldtk_Doc_AddGridTile :: proc(doc: ^Ldtk_Doc, li, layer: int, cx, cy: int, tid: int, flips: u8, stack: bool) -> bool {
+	ly := &doc.levels[li].layers[layer]
+	ts := Ldtk_Doc_LayerTileset(doc, ly)
+	if !stack || Ldtk_Doc_TileOpaque(ts, tid) do return Ldtk_Doc_SetTile(doc, li, layer, cx, cy, tid, flips)
+	tiles := Ldtk_Doc_TilesAt(ly, cx, cy)
+	if len(tiles) > 0 && tiles[len(tiles) - 1].t == i32(tid) && tiles[len(tiles) - 1].f == flips do return false
+	// the same tile lower in the stack: off, then on top
+	keep := make([dynamic]Ldtk_DocTile, context.temp_allocator)
+	for t in tiles do if !(t.t == i32(tid) && t.f == flips) do append(&keep, t)
+	if len(keep) != len(tiles) {
+		Ldtk_Doc_SetTile(doc, li, layer, cx, cy, -1)
+		for t, k in keep do Ldtk_Doc_SetTile(doc, li, layer, cx, cy, int(t.t), t.f, k > 0)
+	}
+	return Ldtk_Doc_SetTile(doc, li, layer, cx, cy, tid, flips, len(keep) > 0)
+}
+
+// Ldtk_Doc_RemoveTopTile removes the top tile of a cell's stack.
+Ldtk_Doc_RemoveTopTile :: proc(doc: ^Ldtk_Doc, li, layer: int, cx, cy: int) -> bool {
+	ly := &doc.levels[li].layers[layer]
+	tiles := Ldtk_Doc_TilesAt(ly, cx, cy)
+	if len(tiles) == 0 do return false
+	keep := make([dynamic]Ldtk_DocTile, context.temp_allocator)
+	append(&keep, ..tiles[:len(tiles) - 1])
+	Ldtk_Doc_SetTile(doc, li, layer, cx, cy, -1)
+	for t, k in keep do Ldtk_Doc_SetTile(doc, li, layer, cx, cy, int(t.t), t.f, k > 0)
+	return true
+}
+
+// ----------------------------------------------------------------------------
+// Saved tile selections (TilesetDef.savedSelections)
+// ----------------------------------------------------------------------------
+
+// Ldtk_Doc_SavedSelectionFor: the saved selection containing a tile (ids in
+// the temp allocator).
+Ldtk_Doc_SavedSelectionFor :: proc(doc: ^Ldtk_Doc, tilesetUid: int, tid: int) -> (ids: []i32, random: bool, ok: bool) {
+	ts := Ldtk_Doc_Tileset(doc, tilesetUid)
+	if ts == nil do return nil, false, false
+	for sel in LdtkJson_Arr(ts.obj, "savedSelections") {
+		list := LdtkJson_Arr(sel, "ids")
+		for v in list {
+			if int(v.num) != tid do continue
+			out := make([]i32, len(list), context.temp_allocator)
+			for x, i in list do out[i] = i32(x.num)
+			return out, LdtkJson_Str(sel, "mode") == "Random", true
+		}
+	}
+	return nil, false, false
+}
+
+// Ldtk_Doc_SaveTileSelection saves a selection of 2+ tiles (replacing saved
+// selections sharing a tile, like LDtk).
+Ldtk_Doc_SaveTileSelection :: proc(doc: ^Ldtk_Doc, tilesetUid: int, ids: []i32, random: bool) -> bool {
+	a := doc.allocator
+	ts := Ldtk_Doc_Tileset(doc, tilesetUid)
+	if ts == nil do return false
+	Ldtk_Doc_ForgetTileSelection(doc, tilesetUid, ids)
+	if len(ids) < 2 do return false
+	list := LdtkJson_Get(ts.obj, "savedSelections")
+	if list == nil || list.kind != .Array {
+		list = LdtkJson_New(.Array, a)
+		LdtkJson_Set(ts.obj, "savedSelections", list, a)
+	}
+	o := LdtkJson_New(.Object, a)
+	idsJ := LdtkJson_New(.Array, a)
+	for t in ids do append(&idsJ.items, LdtkJson_NewInt(int(t), a))
+	append(&o.keys, strings.clone("ids", a), strings.clone("mode", a))
+	append(&o.items, idsJ, LdtkJson_NewString(random ? "Random" : "Stamp", a))
+	append(&list.items, o)
+	Ldtk_Doc_Touch(doc)
+	return true
+}
+
+// Ldtk_Doc_ForgetTileSelection removes the saved selections containing any
+// of the tiles.
+Ldtk_Doc_ForgetTileSelection :: proc(doc: ^Ldtk_Doc, tilesetUid: int, ids: []i32) {
+	ts := Ldtk_Doc_Tileset(doc, tilesetUid)
+	if ts == nil do return
+	list := LdtkJson_Get(ts.obj, "savedSelections")
+	if list == nil do return
+	w := 0
+	for sel in list.items {
+		hit := false
+		for v in LdtkJson_Arr(sel, "ids") do for t in ids do if int(v.num) == int(t) do hit = true
+		if hit do continue
+		list.items[w] = sel
+		w += 1
+	}
+	if w != len(list.items) {
+		resize(&list.items, w)
+		Ldtk_Doc_Touch(doc)
+	}
+}
+
+// Ldtk_Doc_SetLayerTilesetOverride uses another tileset for one layer
+// instance (LayerInstance.overrideTilesetUid; -1 = the definition's). The
+// tiles keep their ids; their source rectangles follow.
+Ldtk_Doc_SetLayerTilesetOverride :: proc(doc: ^Ldtk_Doc, li, layer: int, tilesetUid: int) {
+	a := doc.allocator
+	ly := &doc.levels[li].layers[layer]
+	d := Ldtk_Doc_LayerDef(doc, ly)
+	if tilesetUid >= 0 && (d == nil || tilesetUid != d.tilesetUid) do LdtkJson_SetInt(ly.obj, "overrideTilesetUid", tilesetUid, a)
+	else do LdtkJson_SetNull(ly.obj, "overrideTilesetUid", a)
+	ts := Ldtk_Doc_LayerTileset(doc, ly)
+	if ts != nil {
+		LdtkJson_SetInt(ly.obj, "__tilesetDefUid", ts.uid, a)
+		LdtkJson_SetStr(ly.obj, "__tilesetRelPath", ts.relPath, a)
+	} else {
+		LdtkJson_SetNull(ly.obj, "__tilesetDefUid", a)
+		LdtkJson_SetNull(ly.obj, "__tilesetRelPath", a)
+	}
+	for &t in ly.gridTiles do t.src = Ldtk_Doc_TileSrc(ts, int(t.t))
+	ly.cellsDirty = true
+	Ldtk_Doc_ApplyRulesLayer(doc, li, layer)
+	doc.levels[li].dirty = true
+	Ldtk_Doc_Touch(doc)
+}

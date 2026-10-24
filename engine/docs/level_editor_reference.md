@@ -44,6 +44,7 @@ IntGrid value.
 - **Entities**: places the picked entity on the grid. Hold **Shift** to
   place it off the grid.
 
+**Shift** + drag paints a rectangle instead (as with the Rectangle tool).
 Each stroke is one undo step. Auto tiles follow every painted cell.
 
 ## Rectangle
@@ -162,6 +163,47 @@ The picked tiles are also used by:
 - **Rules**: the tiles button, and terrains;
 - **Tilesets**: animating a tile;
 - **Entities**: an entity's tile.
+
+## Stamp and Random modes
+<!-- topic: tile.modes -->
+
+The dice button switches modes (**Shift+R**):
+
+- **Stamp**: the picked tiles are painted as a block, keeping their places
+  in the tileset (any shape: holes stay empty). Rectangles and fills repeat
+  the block.
+- **Random**: each painted cell gets one of the picked tiles at random.
+  This is useful for grass, floors and rubble. Rectangles and fills pick a
+  random tile per cell.
+
+## Tile stacking
+<!-- topic: tile.stacking -->
+
+The layers button (**Shift+T**) toggles stacking. With stacking on:
+
+- a painted tile goes on top of the tiles already in the cell, so you can
+  put decorations over a floor;
+- painting the same tile again moves it back to the top;
+- an **opaque** tile (no transparent pixel) still replaces the stack;
+- erasing removes only the top tile.
+
+## Saved tile groups
+<!-- topic: tile.saved -->
+
+Pick several tiles, then click the bookmark button (or press **Shift+S**).
+From then on, clicking any tile of that group picks the whole group, in its
+mode (Stamp or Random). **Alt** + click picks just the one tile. Saved groups
+are outlined in the palette. Right-click the palette to forget a group.
+Groups are stored in the tileset (LDtk's saved selections).
+
+## Tileset per level
+<!-- topic: layer.tileset.override -->
+
+Right-click a layer, then choose **Tileset in this level**, to draw that
+layer with another tileset in the active level only. Examples: a winter
+version of a level, or a different palette. The tiles keep their ids, so
+the other tileset should have the same layout. **The layer's own** goes back
+to the layer's tileset.
 
 ## Entity palette
 <!-- topic: palette.entities -->
@@ -310,6 +352,10 @@ editor keeps the last 100.
 | Alt (held) | Select with any tool |
 | 1-9 | IntGrid value |
 | X / Y | Flip the stamp |
+| Shift+R | Stamp / Random tile mode |
+| Shift+T | Tile stacking |
+| Shift+S | Save the picked tiles as a group |
+| Shift + drag | Rectangle with the Brush / Erase |
 | G | Grid |
 | Home | Fit the level |
 | Delete | Delete the selection |

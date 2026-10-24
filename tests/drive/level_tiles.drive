@@ -1,0 +1,81 @@
+# Level editor tiles: Random mode, a saved tile group (picked whole, Alt for
+# one tile), stacking (a transparent tile on top, erase the top one), the
+# Brush's Shift+drag rectangle, a per-level tileset override.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/levels_zz
+wait 90
+click @root.level
+wait 3
+click @level.open:levels_zz/topdown.ldtk
+wait 5
+click @level.zoom
+click @pick:100%
+wait 2
+click @level.layer:Custom_floor
+wait 2
+# two tiles, Random mode, a stroke
+drag @level.palette+40,40 @level.palette+72,40
+wait 1
+expect level.tilesel == 12,13
+key shift+r
+expect level.tilemode == Random
+drag @level.origin+8,232 @level.origin+152,232
+wait 2
+expect level.tile:0,14 != 
+expect level.tile:9,14 != 
+screenshot random_stroke
+# a saved group: one click picks it whole, Alt + click one tile
+key shift+s
+wait 1
+click @level.palette+8,8
+wait 1
+expect level.tilesel == 0
+click @level.palette+72,40
+wait 1
+expect level.tilesel == 12,13
+expect level.tilemode == Random
+hold alt
+click @level.palette+72,40
+release
+wait 1
+expect level.tilesel == 13
+screenshot saved_group
+# stacking: a transparent tile on top, erase removes the top one
+key shift+r
+click @level.palette+8,8
+key shift+t
+expect level.stacking == true
+click @level.origin+8,232
+wait 2
+expect level.tile:0,14 contains ,
+rclick @level.origin+8,232
+wait 2
+expect level.tile:0,14 !contains ,
+expect level.tile:0,14 != 
+key shift+t
+# the Brush's Shift + drag rectangle
+key b
+hold shift
+drag @level.origin+8,8 @level.origin+40,24
+release
+wait 2
+expect level.tile:2,1 == 0
+expect level.tile:0,0 == 0
+# this layer with another tileset in this level
+rclick @level.layer:Custom_floor
+wait 2
+hover @ctx:Tileset in this level
+wait 3
+screenshot override_menu
+click @ctx:Internal_Icons
+wait 2
+expect level.layer.override == Internal_Icons
+rclick @level.layer:Custom_floor
+wait 2
+hover @ctx:Tileset in this level
+wait 3
+click @ctx:The layer's own
+wait 2
+expect level.layer.override == 
+key cmd+s
+wait 3
+expect file:levels_zz/topdown.ldtk contains { "ids": [12,13], "mode": "Random" }

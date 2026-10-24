@@ -72,9 +72,11 @@ LevelEd :: struct {
 	world:        int,
 	tool:         Level_Tool,
 	intValue:     int,
-	tileSel:      [dynamic]i32, // stamp tile ids, row-major (heap)
-	tileSelW:     int,
+	tileSel:      [dynamic]i32, // picked tile ids (heap); a stamp keeps their places in the tileset
+	tileSelW:     int,          // their bounds in tiles
 	tileSelH:     int,
+	tileRandom:   bool,         // Random mode: one random tile of the selection per cell
+	stacking:     bool,         // tiles go on top of the cell's tiles (non-opaque ones)
 	flips:        u8,
 	entityDef:    int, // uid
 	showGrid:     bool,
@@ -276,6 +278,47 @@ level_select_entity :: proc(layer: int, ent: ^e.LdtkJson) {
 	if ent == nil do return
 	append(&L.sel.entities, e.Ldtk_SelEntity{layer, ent})
 	L.selEntity, L.selEntityLayer = ent, layer
+}
+
+Stamp_Tile :: struct {
+	tid: i32,
+	d:   [2]int, // offset in the stamp (flips applied)
+}
+
+// level_set_tile_sel picks tiles (their bounds use the active layer's
+// tileset).
+level_set_tile_sel :: proc(ids: []i32) {
+	L := &GlobalLevel
+	clear(&L.tileSel)
+	append(&L.tileSel, ..ids)
+	ts: ^e.Ldtk_DocTileset
+	if ly, _ := level_active_layer(); ly != nil do ts = e.Ldtk_Doc_LayerTileset(L.doc, ly)
+	_, L.tileSelW, L.tileSelH = level_stamp(ts)
+}
+
+// level_stamp: the picked tiles as a stamp - each tile at its place in the
+// tileset relative to the selection's top-left (mirrored by the flips),
+// and the stamp's size (temp-allocated).
+level_stamp :: proc(ts: ^e.Ldtk_DocTileset) -> ([]Stamp_Tile, int, int) {
+	L := &GlobalLevel
+	out := make([]Stamp_Tile, len(L.tileSel), context.temp_allocator)
+	if len(L.tileSel) == 0 do return out, 1, 1
+	cw := ts != nil ? max(ts.cWid, 1) : 1 << 20
+	mn := [2]int{max(int), max(int)}
+	mx := [2]int{min(int), min(int)}
+	for t in L.tileSel {
+		p := [2]int{int(t) % cw, int(t) / cw}
+		mn = {min(mn.x, p.x), min(mn.y, p.y)}
+		mx = {max(mx.x, p.x), max(mx.y, p.y)}
+	}
+	for t, i in L.tileSel {
+		p := [2]int{int(t) % cw, int(t) / cw}
+		d := p - mn
+		if (L.flips & 1) != 0 do d.x = mx.x - p.x
+		if (L.flips & 2) != 0 do d.y = mx.y - p.y
+		out[i] = {t, d}
+	}
+	return out, mx.x - mn.x + 1, mx.y - mn.y + 1
 }
 
 // level_pick_default_layer: the first layer you can paint.
@@ -1103,6 +1146,15 @@ level_palette_tiles :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer) {
 	if UI_IconButton("Y", "level.flipy", "", (L.flips & 2) != 0, 24) do L.flips ~= 2
 	level_tip("Flip what you paint vertically (Y)", "palette.tiles")
 	imgui.SameLine()
+	if UI_IconButton(ICON_FA_DICE, "level.tilerandom", "", L.tileRandom, 24) do L.tileRandom = !L.tileRandom
+	level_tip(L.tileRandom ? "Random mode: each cell gets one of the picked tiles at random (Shift+R)" : "Stamp mode: the picked tiles are painted as a block (Shift+R: random)", "tile.modes")
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_LAYER_GROUP, "level.tilestack", "", L.stacking, 24) do L.stacking = !L.stacking
+	level_tip(L.stacking ? "Stacking on: tiles go on top of the cell's tiles (opaque tiles still replace them); erasing removes the top one (Shift+T)" : "Stacking off: a tile replaces the cell's tiles (Shift+T)", "tile.stacking")
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_BOOKMARK, "level.tilesave", "", false, 24) do palette_save_selection(ts.uid)
+	level_tip("Save the picked tiles as a group: clicking one of them picks the whole group again (Shift+S)", "tile.saved")
+	UI_SameLineOrWrap(94)
 	imgui.SetNextItemWidth(90)
 	imgui.SliderFloat("##palzoom", &L.paletteZoom, 0.5, 6, "zoom %.1fx")
 	level_tip("Zoom the tileset", "palette.tiles")
@@ -1123,7 +1175,8 @@ level_palette_tiles :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer) {
 		dl := imgui.GetWindowDrawList()
 		imgui.InvisibleButton("##palette", {w, h})
 		Drive_ItemRect("level.palette", {p.x, p.y}, {p.x + 1, p.y + 1}, true) // anchor: tile (0, 0)'s corner
-		level_tip("Click a tile, or drag over several to paint them as a stamp", "palette.tiles")
+		level_tip("Click a tile, or drag over several to paint them as a stamp. A saved group is picked whole (Alt + click: just the tile). Right-click for more.", "palette.tiles")
+		palette_menu(ts.uid)
 		imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)level_texture_ptr(ts.uid), p, {p.x + w, p.y + h})
 		step := f32(ts.gridSize + ts.spacing) * z
 		pad := f32(ts.padding) * z
@@ -1145,20 +1198,61 @@ level_palette_tiles :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer) {
 			imgui.DrawList_AddRect(dl, {p.x + pad + f32(mn.x) * step, p.y + pad + f32(mn.y) * step}, {p.x + pad + f32(mx.x) * step + gs, p.y + pad + f32(mx.y) * step + gs}, col_u32(UI_WARNING), 0, {}, 2)
 			if !imgui.IsMouseDown(.Left) {
 				L.paletteDrag = false
-				clear(&L.tileSel)
-				for y in mn.y ..= mx.y do for x in mn.x ..= mx.x do append(&L.tileSel, i32(x + y * ts.cWid))
-				L.tileSelW, L.tileSelH = mx.x - mn.x + 1, mx.y - mn.y + 1
+				ids := make([dynamic]i32, context.temp_allocator)
+				for y in mn.y ..= mx.y do for x in mn.x ..= mx.x do append(&ids, i32(x + y * ts.cWid))
+				// one tile of a saved group: the group (LDtk)
+				if len(ids) == 1 && !imgui.GetIO().KeyAlt {
+					if saved, random, found := e.Ldtk_Doc_SavedSelectionFor(L.doc, ts.uid, int(ids[0])); found {
+						clear(&ids)
+						append(&ids, ..saved)
+						L.tileRandom = random
+					}
+				}
+				level_set_tile_sel(ids[:])
 				if L.tool != .Rect && L.tool != .Fill do L.tool = .Brush
 			}
 		}
-		// current selection
-		if len(L.tileSel) > 0 && L.tileSelW > 0 {
-			t0 := int(L.tileSel[0])
-			x0, y0 := t0 % max(ts.cWid, 1), t0 / max(ts.cWid, 1)
-			imgui.DrawList_AddRect(dl, {p.x + pad + f32(x0) * step, p.y + pad + f32(y0) * step}, {p.x + pad + f32(x0 + L.tileSelW - 1) * step + gs, p.y + pad + f32(y0 + L.tileSelH - 1) * step + gs}, col_u32(UI_ACCENT), 0, {}, 2)
+		// saved groups (faint) and the picked tiles (accent)
+		outline :: proc(dl: ^imgui.DrawList, p: [2]f32, pad, step, gs: f32, cw: int, tid: int, col: u32, thick: f32) {
+			x, y := tid % max(cw, 1), tid / max(cw, 1)
+			imgui.DrawList_AddRect(dl, {p.x + pad + f32(x) * step, p.y + pad + f32(y) * step}, {p.x + pad + f32(x) * step + gs, p.y + pad + f32(y) * step + gs}, col, 0, {}, thick)
 		}
+		for sel in e.LdtkJson_Arr(ts.obj, "savedSelections") {
+			for v in e.LdtkJson_Arr(sel, "ids") do outline(dl, {p.x, p.y}, pad, step, gs, ts.cWid, int(v.num), col_u32({1, 1, 1, 0.35}), 1)
+		}
+		for t in L.tileSel do outline(dl, {p.x, p.y}, pad, step, gs, ts.cWid, int(t), col_u32(UI_ACCENT), 2)
 	}
 	imgui.EndChild()
+}
+
+// palette_save_selection: Shift+S / the bookmark button.
+palette_save_selection :: proc(tilesetUid: int) {
+	L := &GlobalLevel
+	if len(L.tileSel) < 2 do return
+	e.Ldtk_Doc_Checkpoint(L.doc, -1, "Save Tile Selection")
+	e.Ldtk_Doc_SaveTileSelection(L.doc, tilesetUid, L.tileSel[:], L.tileRandom)
+}
+
+// palette_menu: the tileset palette's right-click menu.
+@(private = "file")
+palette_menu :: proc(tilesetUid: int) {
+	L := &GlobalLevel
+	if !imgui.BeginPopupContextItem("##palettectx") do return
+	defer imgui.EndPopup()
+	_, _, saved := e.Ldtk_Doc_SavedSelectionFor(L.doc, tilesetUid, len(L.tileSel) > 0 ? int(L.tileSel[0]) : -1)
+	if ctx_item(ICON_FA_BOOKMARK, "Save selection", "Save the picked tiles as a group", len(L.tileSel) >= 2, "Shift+S") do palette_save_selection(tilesetUid)
+	if ctx_item(ICON_FA_TRASH, "Forget saved group", "Remove the saved group of the picked tiles", saved) {
+		e.Ldtk_Doc_Checkpoint(L.doc, -1, "Forget Tile Selection")
+		e.Ldtk_Doc_ForgetTileSelection(L.doc, tilesetUid, L.tileSel[:])
+	}
+	imgui.Separator()
+	if ctx_item(ICON_FA_DICE, L.tileRandom ? "Stamp mode" : "Random mode", "Paint the picked tiles as a block, or one at random per cell", true, "Shift+R") do L.tileRandom = !L.tileRandom
+	if ctx_item(ICON_FA_LAYER_GROUP, L.stacking ? "Stacking off" : "Stacking on", "Put tiles on top of the cell's tiles instead of replacing them", true, "Shift+T") do L.stacking = !L.stacking
+	if ctx_item("X", "Flip X", "Mirror what you paint horizontally", true, "X") do L.flips ~= 1
+	if ctx_item("Y", "Flip Y", "Mirror what you paint vertically", true, "Y") do L.flips ~= 2
+	imgui.Separator()
+	if ctx_item(ICON_FA_TABLE_CELLS, "Tileset settings", "The Tilesets tab: tile size, per-tile data, animations") do LevelEditor_ShowTab(.Tilesets)
+	if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "Tiles in the reference") do LevelRef_Open("palette.tiles")
 }
 
 // ----------------------------------------------------------------------------
@@ -1183,6 +1277,28 @@ level_layer_menu :: proc(state: ^EditorState, i: int, uid: int, visible: bool) -
 			LevelDefs_SelectRulesLayer(uid)
 			LevelEditor_ShowTab(.Rules)
 		}
+	}
+	if d.type != .Entities && len(doc.tilesets) > 0 {
+		menuOpen := imgui.BeginMenu(fmt.ctprintf("%s  Tileset in this level", ICON_FA_TABLE_CELLS))
+		Drive_Item("ctx:Tileset in this level")
+		if menuOpen {
+			ly := &doc.levels[L.level].layers[i]
+			cur := e.Ldtk_Doc_LayerTileset(doc, ly)
+			if imgui.MenuItem("The layer's own", nil, e.LdtkJson_IsNull(ly.obj, "overrideTilesetUid")) {
+				e.Ldtk_Doc_Checkpoint(doc, L.level, "Layer Tileset")
+				e.Ldtk_Doc_SetLayerTilesetOverride(doc, L.level, i, -1)
+			}
+			Drive_Item("ctx:The layer's own")
+			for &ts in doc.tilesets {
+				if imgui.MenuItem(fmt.ctprintf("%s", ts.identifier), nil, cur != nil && cur.uid == ts.uid && !e.LdtkJson_IsNull(ly.obj, "overrideTilesetUid")) {
+					e.Ldtk_Doc_Checkpoint(doc, L.level, "Layer Tileset")
+					e.Ldtk_Doc_SetLayerTilesetOverride(doc, L.level, i, ts.uid)
+				}
+				Drive_Item(fmt.tprintf("ctx:%s", ts.identifier))
+			}
+			imgui.EndMenu()
+		}
+		UI_Tooltip("Use another tileset for this layer in this level only (the tiles keep their ids)")
 	}
 	if ctx_item(visible ? ICON_FA_EYE_SLASH : ICON_FA_EYE, visible ? "Hide" : "Show", "Per-level visibility (saved)") {
 		e.Ldtk_Doc_Checkpoint(doc, L.level, "Layer Visibility")
@@ -1640,6 +1756,21 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 		}
 		return false
 	}
+	if io.KeyShift {
+		switch {
+		case imgui.IsKeyPressed(.R, false):
+			L.tileRandom = !L.tileRandom
+			return true
+		case imgui.IsKeyPressed(.T, false):
+			L.stacking = !L.stacking
+			return true
+		case imgui.IsKeyPressed(.S, false):
+			if ly, _ := level_active_layer(); ly != nil {
+				if ts := e.Ldtk_Doc_LayerTileset(L.doc, ly); ts != nil do palette_save_selection(ts.uid)
+			}
+			return true
+		}
+	}
 	keys := [Level_Tool]imgui.Key{.Brush = .B, .Rect = .R, .Erase = .E, .Fill = .F, .Pick = .I, .Select = .V, .Move_Level = .M}
 	for k, t in keys {
 		if imgui.IsKeyPressed(k, false) {
@@ -1710,6 +1841,13 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 	case "level.open": return L.rel, true
 	case "level.tool": return fmt.tprintf("%v", L.tool), true
 	case "level.paneltab": return fmt.tprintf("%v", L.panelTab), true
+	case "level.tilemode": return L.tileRandom ? "Random" : "Stamp", true
+	case "level.layer.override":
+		ly, _ := level_active_layer()
+		if ly == nil || e.LdtkJson_IsNull(ly.obj, "overrideTilesetUid") do return "", true
+		ts := e.Ldtk_Doc_LayerTileset(doc, ly)
+		return ts != nil ? ts.identifier : "?", true
+	case "level.stacking": return L.stacking ? "true" : "false", true
 	case "level.ref": return LevelRef_IsOpen() ? LevelRef_Selected() : "", true
 	}
 	if doc == nil do return "<no level>", true

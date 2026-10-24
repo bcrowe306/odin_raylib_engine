@@ -93,6 +93,19 @@ Also: **1-9** pick an IntGrid value, **X** / **Y** flip the stamp, **G**
 grid, **Home** fit, **Cmd+S** saves, **Cmd+Z** / **Cmd+Shift+Z** undo /
 redo. Every stroke, move and edit is one undo step (100 steps).
 
+### Tiles
+
+- **Stamp** / **Random** mode (the dice button, **Shift+R**): paint the
+  picked tiles as a block, or one of them at random per cell.
+- **Stacking** (**Shift+T**): tiles go on top of the cell's tiles instead
+  of replacing them (opaque tiles still replace them). Erasing removes the
+  top one.
+- **Saved groups** (the bookmark button, **Shift+S**): clicking any tile of
+  a saved group picks the whole group again; **Alt** + click picks one tile.
+- **Shift** + drag with the Brush or Erase draws a rectangle.
+- Right-click a layer, then choose **Tileset in this level**, to draw it
+  with another tileset in this level only.
+
 ### Selection
 
 Like LDtk's Selection tool: use the **Select** tool (V), or hold **Alt**

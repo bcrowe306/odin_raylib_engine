@@ -2,6 +2,7 @@ package editor
 
 import "core:fmt"
 import "core:math"
+import "core:math/rand"
 import rl "vendor:raylib"
 import e "../engine"
 import imgui "lib/imgui"
@@ -275,23 +276,21 @@ draw_tool_preview :: proc() {
 	}
 	w, h := 1, 1
 	if d.type == .Tiles && L.tool == .Brush && len(L.tileSel) > 0 {
-		w, h = L.tileSelW, L.tileSelH
-		// ghost of the stamp
+		// ghost of the stamp (random mode: the first tile)
 		ts := e.Ldtk_Doc_LayerTileset(L.doc, ly)
+		stamp, sw, sh := level_stamp(ts)
+		if !L.tileRandom do w, h = sw, sh
 		if ts != nil {
 			if tex, ok := level_texture(ts.uid); ok {
 				gs := f32(ts.gridSize)
-				for j in 0 ..< h {
-					for i in 0 ..< w {
-						tid := int(L.tileSel[i + j * w])
-						src := e.Ldtk_Doc_TileSrc(ts, tid)
-						x := (L.flips & 1) != 0 ? w - 1 - i : i
-						y := (L.flips & 2) != 0 ? h - 1 - j : j
-						sr := rl.Rectangle{f32(src.x), f32(src.y), gs, gs}
-						if (L.flips & 1) != 0 do sr.width = -gs
-						if (L.flips & 2) != 0 do sr.height = -gs
-						rl.DrawTexturePro(tex, sr, {o.x + f32(c.x + x) * g, o.y + f32(c.y + y) * g, gs, gs}, {}, 0, {255, 255, 255, 150})
-					}
+				for st, k in stamp {
+					if L.tileRandom && k > 0 do break
+					src := e.Ldtk_Doc_TileSrc(ts, int(st.tid))
+					p := L.tileRandom ? [2]int{} : st.d
+					sr := rl.Rectangle{f32(src.x), f32(src.y), gs, gs}
+					if (L.flips & 1) != 0 do sr.width = -gs
+					if (L.flips & 2) != 0 do sr.height = -gs
+					rl.DrawTexturePro(tex, sr, {o.x + f32(c.x + p.x) * g, o.y + f32(c.y + p.y) * g, gs, gs}, {}, 0, {255, 255, 255, 150})
 				}
 			}
 		}
@@ -442,20 +441,46 @@ paint_cell :: proc(ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_DocLayerDef, c: [2]int, eras
 		if e.Ldtk_Doc_SetIntGrid(doc, L.level, L.layer, c.x, c.y, v) do e.Ldtk_Doc_ApplyRules(doc, L.level, L.layer, c.x, c.y, c.x, c.y)
 		return
 	}
-	// tiles: the stamp anchored at c
+	// tiles: the stamp anchored at c, or one random tile of the selection
 	if erase || len(L.tileSel) == 0 {
-		if e.Ldtk_Doc_SetTile(doc, L.level, L.layer, c.x, c.y, -1) do e.Ldtk_Doc_ApplyRules(doc, L.level, L.layer, c.x, c.y, c.x, c.y)
+		if erase_tile(c) do e.Ldtk_Doc_ApplyRules(doc, L.level, L.layer, c.x, c.y, c.x, c.y)
 		return
 	}
-	w, h := L.tileSelW, L.tileSelH
-	for j in 0 ..< h {
-		for i in 0 ..< w {
-			x := (L.flips & 1) != 0 ? w - 1 - i : i
-			y := (L.flips & 2) != 0 ? h - 1 - j : j
-			e.Ldtk_Doc_SetTile(doc, L.level, L.layer, c.x + x, c.y + y, int(L.tileSel[i + j * w]), L.flips)
-		}
+	if L.tileRandom {
+		if e.Ldtk_Doc_AddGridTile(doc, L.level, L.layer, c.x, c.y, random_tile(), L.flips, L.stacking) do e.Ldtk_Doc_ApplyRules(doc, L.level, L.layer, c.x, c.y, c.x, c.y)
+		return
 	}
+	stamp, w, h := level_stamp(e.Ldtk_Doc_LayerTileset(doc, ly))
+	for st in stamp do e.Ldtk_Doc_AddGridTile(doc, L.level, L.layer, c.x + st.d.x, c.y + st.d.y, int(st.tid), L.flips, L.stacking)
 	e.Ldtk_Doc_ApplyRules(doc, L.level, L.layer, c.x, c.y, c.x + w - 1, c.y + h - 1)
+}
+
+// erase_tile: the whole cell, or with stacking its top tile.
+@(private = "file")
+erase_tile :: proc(c: [2]int) -> bool {
+	L := &GlobalLevel
+	if L.stacking do return e.Ldtk_Doc_RemoveTopTile(L.doc, L.level, L.layer, c.x, c.y)
+	return e.Ldtk_Doc_SetTile(L.doc, L.level, L.layer, c.x, c.y, -1)
+}
+
+@(private = "file")
+random_tile :: proc() -> int {
+	L := &GlobalLevel
+	if len(L.tileSel) == 0 do return -1
+	return int(L.tileSel[rand.int_max(len(L.tileSel))])
+}
+
+// put_tile: one cell of a rectangle / fill (random mode: a random tile; a
+// stamp's hole: nothing).
+@(private = "file")
+put_tile :: proc(x, y: int, anchor: [2]int, erase: bool) {
+	L := &GlobalLevel
+	if erase {
+		erase_tile({x, y})
+		return
+	}
+	tid := L.tileRandom ? random_tile() : tile_for({x, y}, anchor)
+	if tid >= 0 do e.Ldtk_Doc_AddGridTile(L.doc, L.level, L.layer, x, y, tid, L.flips, L.stacking)
 }
 
 // tile_for: the stamp's tile repeating over a rectangle / fill.
@@ -463,12 +488,12 @@ paint_cell :: proc(ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_DocLayerDef, c: [2]int, eras
 tile_for :: proc(c, anchor: [2]int) -> int {
 	L := &GlobalLevel
 	if len(L.tileSel) == 0 do return -1
-	w, h := max(L.tileSelW, 1), max(L.tileSelH, 1)
+	ly, _ := level_active_layer()
+	stamp, w, h := level_stamp(ly != nil ? e.Ldtk_Doc_LayerTileset(L.doc, ly) : nil)
 	i := ((c.x - anchor.x) % w + w) % w
 	j := ((c.y - anchor.y) % h + h) % h
-	if (L.flips & 1) != 0 do i = w - 1 - i
-	if (L.flips & 2) != 0 do j = h - 1 - j
-	return int(L.tileSel[i + j * w])
+	for st in stamp do if st.d == {i, j} do return int(st.tid)
+	return -1
 }
 
 @(private = "file")
@@ -482,7 +507,9 @@ cells_input :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_DocLay
 	}
 	if (pressL || pressR) && inside && !L.painting {
 		L.paintErase = pressR || L.tool == .Erase
-		switch L.tool {
+		tool := L.tool
+		if (tool == .Brush || tool == .Erase) && imgui.GetIO().KeyShift do tool = .Rect // LDtk: Shift + drag = rectangle
+		switch tool {
 		case .Brush, .Erase:
 			e.Ldtk_Doc_BeginCells(doc, L.level, L.layer, "Paint")
 			L.painting = true
@@ -536,7 +563,7 @@ cells_input :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_DocLay
 					if d.type == .IntGrid {
 						e.Ldtk_Doc_SetIntGrid(doc, L.level, L.layer, x, y, L.paintErase ? 0 : L.intValue)
 					} else {
-						e.Ldtk_Doc_SetTile(doc, L.level, L.layer, x, y, L.paintErase ? -1 : tile_for({x, y}, mn), L.flips)
+						put_tile(x, y, mn, L.paintErase)
 					}
 				}
 			}
@@ -558,9 +585,7 @@ pick_at :: proc(ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_DocLayerDef, c: [2]int) {
 	tiles := e.Ldtk_Doc_TilesAt(ly, c.x, c.y)
 	if len(tiles) == 0 do return
 	t := tiles[len(tiles) - 1]
-	clear(&L.tileSel)
-	append(&L.tileSel, t.t)
-	L.tileSelW, L.tileSelH = 1, 1
+	level_set_tile_sel({t.t})
 	L.flips = t.f
 	L.tool = .Brush
 }
@@ -598,7 +623,7 @@ flood_fill :: proc(ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_DocLayerDef, start: [2]int, 
 			if d.type == .IntGrid {
 				e.Ldtk_Doc_SetIntGrid(doc, L.level, L.layer, x, y, erase ? 0 : L.intValue)
 			} else {
-				e.Ldtk_Doc_SetTile(doc, L.level, L.layer, x, y, erase ? -1 : tile_for({x, y}, start), L.flips)
+				put_tile(x, y, start, erase)
 			}
 		}
 	}
@@ -880,9 +905,7 @@ selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
 		ly := &doc.levels[L.level].layers[cell.layer]
 		if v := e.Ldtk_Doc_GetIntGrid(ly, cell.cx, cell.cy); v != 0 do L.intValue = v
 		if tiles := e.Ldtk_Doc_TilesAt(ly, cell.cx, cell.cy); len(tiles) > 0 {
-			clear(&L.tileSel)
-			append(&L.tileSel, tiles[len(tiles) - 1].t)
-			L.tileSelW, L.tileSelH = 1, 1
+			level_set_tile_sel({tiles[len(tiles) - 1].t})
 			L.flips = tiles[len(tiles) - 1].f
 		}
 		level_sync_selection()

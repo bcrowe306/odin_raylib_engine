@@ -557,3 +557,55 @@ test_ldtk_doc_duplicate_and_order_levels :: proc(t: ^testing.T) {
 	_ = proj
 	_ = texts
 }
+
+@(test)
+test_ldtk_doc_tile_stacking_saved_selections_override :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_tiles2.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	ts := Ldtk_Doc_AddTileset(doc, "atlas/a_zz.png", {64, 64}, 16)
+	ts2 := Ldtk_Doc_AddTileset(doc, "atlas/b_zz.png", {32, 32}, 16)
+	// tile 3 is opaque
+	tsd := Ldtk_Doc_Tileset(doc, ts)
+	cache := LdtkJson_New(.Object, doc.allocator)
+	LdtkJson_SetStr(cache, "opaqueTiles", "0001000000000000", doc.allocator)
+	LdtkJson_SetStr(cache, "averageColors", "", doc.allocator)
+	LdtkJson_Set(tsd.obj, "cachedPixelData", cache, doc.allocator)
+	Ldtk_Doc_RefreshDefs(doc)
+	tl := Ldtk_Doc_AddLayerDef(doc, .Tiles, "Deco", ts)
+	j := -1
+	for &ly, k in doc.levels[0].layers do if Ldtk_Doc_LayerDef(doc, &ly).uid == tl do j = k
+	ly := &doc.levels[0].layers[j]
+	Ldtk_Doc_AddGridTile(doc, 0, j, 1, 1, 0, 0, true)
+	Ldtk_Doc_AddGridTile(doc, 0, j, 1, 1, 1, 0, true)
+	testing.expect_value(t, len(Ldtk_Doc_TilesAt(ly, 1, 1)), 2)
+	// the same tile again moves to the top
+	Ldtk_Doc_AddGridTile(doc, 0, j, 1, 1, 0, 0, true)
+	st := Ldtk_Doc_TilesAt(ly, 1, 1)
+	testing.expect_value(t, len(st), 2)
+	testing.expect_value(t, st[1].t, 0)
+	// an opaque tile replaces the stack
+	Ldtk_Doc_AddGridTile(doc, 0, j, 1, 1, 3, 0, true)
+	testing.expect_value(t, len(Ldtk_Doc_TilesAt(ly, 1, 1)), 1)
+	Ldtk_Doc_AddGridTile(doc, 0, j, 1, 1, 2, 0, true)
+	testing.expect(t, Ldtk_Doc_RemoveTopTile(doc, 0, j, 1, 1))
+	testing.expect_value(t, Ldtk_Doc_TilesAt(ly, 1, 1)[0].t, 3)
+	// saved selections
+	testing.expect(t, Ldtk_Doc_SaveTileSelection(doc, ts, {4, 5, 8, 9}, false))
+	ids, random, found := Ldtk_Doc_SavedSelectionFor(doc, ts, 8)
+	testing.expect(t, found && !random && len(ids) == 4)
+	testing.expect(t, Ldtk_Doc_SaveTileSelection(doc, ts, {9, 10}, true)) // shares 9: replaces
+	_, _, found = Ldtk_Doc_SavedSelectionFor(doc, ts, 4)
+	testing.expect(t, !found)
+	ids, random, found = Ldtk_Doc_SavedSelectionFor(doc, ts, 10)
+	testing.expect(t, found && random)
+	testing.expect(t, !Ldtk_Doc_SaveTileSelection(doc, ts, {7}, false)) // one tile: not saved
+	// override: tile 3's source follows the other tileset (2 tiles per row)
+	Ldtk_Doc_SetLayerTilesetOverride(doc, 0, j, ts2)
+	testing.expect_value(t, LdtkJson_Int(ly.obj, "overrideTilesetUid"), ts2)
+	testing.expect_value(t, Ldtk_Doc_TilesAt(ly, 1, 1)[0].src, [2]i32{16, 16})
+	Ldtk_Doc_SetLayerTilesetOverride(doc, 0, j, -1)
+	testing.expect(t, LdtkJson_IsNull(ly.obj, "overrideTilesetUid"))
+	testing.expect_value(t, Ldtk_Doc_TilesAt(ly, 1, 1)[0].src, [2]i32{48, 0})
+}

@@ -53,7 +53,9 @@ key b
 click @level.layer:Custom_floor
 wait 2
 screenshot tiles_palette
+hold alt
 click @level.palette+40,40
+release
 wait 1
 expect level.tilesel == 12
 click @level.origin+392,200
