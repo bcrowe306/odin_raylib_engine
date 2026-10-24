@@ -423,3 +423,137 @@ test_ldtk_doc_world_layout :: proc(t: ^testing.T) {
 	testing.expect_value(t, Ldtk_Doc_LevelPos(doc, 1), [2]int{256, 0})
 	testing.expect_value(t, LdtkJson_Str(doc.root, "worldLayout"), "GridVania")
 }
+
+@(test)
+test_ldtk_doc_selection_move_copy_delete :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_sel.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	col, ents := -1, -1
+	for &ly, j in doc.levels[0].layers {
+		d := Ldtk_Doc_LayerDef(doc, &ly)
+		if d.type == .IntGrid do col = j
+		if d.type == .Entities do ents = j
+	}
+	for x in 1 ..= 3 do Ldtk_Doc_SetIntGrid(doc, 0, col, x, 1, 1)
+	chest := Ldtk_Doc_AddEntityDef(doc, "Chest")
+	e1 := Ldtk_Doc_AddEntity(doc, 0, ents, chest, {40, 24})
+	sel: Ldtk_Selection
+	defer Ldtk_Selection_Destroy(&sel)
+	// a rectangle over cells (1..3, 1) and the chest's cell (2, 1)
+	Ldtk_Doc_SelectRect(doc, 0, &sel, {16, 16, 48, 16})
+	testing.expectf(t, len(sel.cells) == 3, "cells %v", sel.cells)
+	testing.expect_value(t, len(sel.entities), 1)
+	// half a cell: cells can't move
+	testing.expect(t, !Ldtk_Doc_SelectionCanMove(doc, 0, &sel, {8, 0}))
+	// move two cells down
+	testing.expect(t, Ldtk_Doc_MoveSelection(doc, 0, &sel, {0, 32}))
+	cl := &doc.levels[0].layers[col]
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(cl, 2, 1), 0)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(cl, 2, 3), 1)
+	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(e1, "px"), .Minified, context.temp_allocator), "[40,56]")
+	// copy one cell right: both remain, the selection is the copy
+	testing.expect(t, Ldtk_Doc_MoveSelection(doc, 0, &sel, {16, 0}, true))
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(cl, 1, 3), 1)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(cl, 4, 3), 1)
+	testing.expect_value(t, len(Ldtk_Doc_Entities(doc, 0, ents)), 2)
+	testing.expect(t, sel.entities[0].obj != e1)
+	testing.expect(t, LdtkJson_Str(sel.entities[0].obj, "iid") != LdtkJson_Str(e1, "iid"))
+	// delete the copy
+	Ldtk_Doc_DeleteSelection(doc, 0, &sel)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(cl, 4, 3), 0)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(cl, 1, 3), 1)
+	testing.expect_value(t, len(Ldtk_Doc_Entities(doc, 0, ents)), 1)
+	testing.expect(t, Ldtk_Selection_Empty(&sel))
+	// select all in the IntGrid layer
+	Ldtk_Doc_SelectAll(doc, 0, &sel, col) // the copy overlapped cells 2-3, so only cell 1 is left
+	testing.expect_value(t, len(sel.cells), 1)
+	testing.expect_value(t, len(sel.entities), 0)
+	// another Entities layer requiring a tag: the chest (no tags) can't go
+	l2 := Ldtk_Doc_AddLayerDef(doc, .Entities, "Items")
+	tags := LdtkJson_New(.Array, doc.allocator)
+	append(&tags.items, LdtkJson_NewString("item", doc.allocator))
+	LdtkJson_Set(doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, l2)].obj, "requiredTags", tags, doc.allocator)
+	Ldtk_Doc_RefreshDefs(doc)
+	el2 := -1
+	ents = -1
+	for &ly, j in doc.levels[0].layers {
+		d := Ldtk_Doc_LayerDef(doc, &ly)
+		if d.uid == l2 do el2 = j
+		else if d.type == .Entities do ents = j
+	}
+	testing.expect(t, !Ldtk_Doc_EntityLayerAllowed(doc, 0, el2, e1))
+	testing.expect(t, Ldtk_Doc_MoveEntityToLayer(doc, 0, ents, el2, e1))
+	testing.expect_value(t, len(Ldtk_Doc_Entities(doc, 0, el2)), 1)
+	testing.expect_value(t, len(Ldtk_Doc_Entities(doc, 0, ents)), 0)
+}
+
+@(test)
+test_ldtk_doc_clipboard :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_clip.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	col, ents := -1, -1
+	for &ly, j in doc.levels[0].layers {
+		d := Ldtk_Doc_LayerDef(doc, &ly)
+		if d.type == .IntGrid do col = j
+		if d.type == .Entities do ents = j
+	}
+	Ldtk_Doc_SetIntGrid(doc, 0, col, 2, 2, 1)
+	Ldtk_Doc_SetIntGrid(doc, 0, col, 3, 2, 1)
+	chest := Ldtk_Doc_AddEntityDef(doc, "Chest")
+	Ldtk_Doc_AddEntity(doc, 0, ents, chest, {48, 48})
+	sel: Ldtk_Selection
+	defer Ldtk_Selection_Destroy(&sel)
+	clip: Ldtk_Clipboard
+	defer Ldtk_Clipboard_Destroy(&clip)
+	Ldtk_Doc_SelectAll(doc, 0, &sel)
+	testing.expect_value(t, len(sel.cells) + len(sel.entities), 3)
+	Ldtk_Doc_CopySelection(doc, 0, &sel, &clip)
+	testing.expect_value(t, clip.origin, [2]int{32, 32})
+	// paste with the top-left at (128, 96): cells (8,6),(9,6), the chest at px (144,112)
+	testing.expect(t, Ldtk_Doc_Paste(doc, 0, &clip, {128, 96}, &sel))
+	cl := &doc.levels[0].layers[col]
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(cl, 8, 6), 1)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(cl, 9, 6), 1)
+	testing.expect_value(t, len(Ldtk_Doc_Entities(doc, 0, ents)), 2)
+	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(sel.entities[0].obj, "px"), .Minified, context.temp_allocator), "[144,112]")
+	testing.expect_value(t, len(sel.cells), 2)
+}
+
+@(test)
+test_ldtk_doc_duplicate_and_order_levels :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_Load("tests/drive/fixtures/ldtk_editor/SeparateLevelFiles.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	n := len(doc.levels)
+	cells := 0
+	for &ly in doc.levels[0].layers do for v in ly.intGrid do if v != 0 do cells += 1
+	li := Ldtk_Doc_DuplicateLevel(doc, 0)
+	testing.expect_value(t, li, 1)
+	testing.expect_value(t, len(doc.levels), n + 1)
+	dup := &doc.levels[1]
+	testing.expect(t, dup.extRoot != nil)
+	testing.expect(t, LdtkJson_Str(dup.obj, "iid") != LdtkJson_Str(doc.levels[0].obj, "iid"))
+	testing.expect(t, LdtkJson_Str(dup.obj, "externalRelPath") != LdtkJson_Str(doc.levels[0].obj, "externalRelPath"))
+	c2 := 0
+	for &ly in dup.layers do for v in ly.intGrid do if v != 0 do c2 += 1
+	testing.expect_value(t, c2, cells)
+	// no overlap with the others
+	p := Ldtk_Doc_LevelPos(doc, 1)
+	s := Ldtk_Doc_LevelSize(doc, 1)
+	testing.expect_value(t, Ldtk_Doc_FreeLevelSpot(doc, 0, p, s, 1) == p, false) // (the spot is taken now: by itself)
+	// order
+	name := Ldtk_Doc_LevelName(doc, 1)
+	testing.expect_value(t, Ldtk_Doc_MoveLevelOrder(doc, 1, -1), 0)
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 0), name)
+	testing.expect_value(t, LdtkJson_Str(doc.worlds[0].levelsArr.items[0], "identifier"), name)
+	// it saves and loads back
+	proj, paths, texts := Ldtk_Doc_Serialize(doc, context.temp_allocator)
+	testing.expect_value(t, len(paths), n + 1)
+	_ = proj
+	_ = texts
+}

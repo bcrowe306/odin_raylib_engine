@@ -81,18 +81,48 @@ drag a panel's tab to move it.
 
 | Tool | Key | IntGrid / Tiles | Entities |
 |---|---|---|---|
-| Brush | B | paint (right button erases) | place the picked entity (Alt: off the grid) |
+| Brush | B | paint (right button erases) | place the picked entity (Shift: off the grid) |
 | Rectangle | R | drag a rectangle (right button: erase it) | |
 | Erase | E | erase | |
 | Fill | F | fill the connected area of equal cells | |
 | Pick | I | pick the value / tile under the mouse | |
-| Select | V | | click selects, drag moves (snapped; Alt: free), the corner handle resizes resizable entities |
+| Select | V | select cells (see *Selection*) | select entities; the corner handle resizes resizable ones |
 | Move levels | M | drag levels in the world | |
 
 Also: **1-9** pick an IntGrid value, **X** / **Y** flip the stamp, **G**
-grid, **Home** fit, **Delete** removes the selected entity, **Esc**
-deselects, **Cmd+S** saves, **Cmd+Z** / **Cmd+Shift+Z** undo / redo.
-Every stroke, move and edit is one undo step (100 steps).
+grid, **Home** fit, **Cmd+S** saves, **Cmd+Z** / **Cmd+Shift+Z** undo /
+redo. Every stroke, move and edit is one undo step (100 steps).
+
+### Selection
+
+Like LDtk's Selection tool: use the **Select** tool (V), or hold **Alt**
+with any tool.
+
+- Click an entity or a cell to select it. Its layer becomes active, and the
+  palette picks its value or tile.
+- **Shift** + click adds to the selection or removes from it. **Shift** +
+  drag from empty space selects a rectangle, over every visible layer.
+- Drag the selection to move it. Cells move by whole cells across all their
+  layers; entities snap to the grid (hold **Shift** to move entities
+  freely). **Cmd+Alt** + drag copies the selection instead.
+- Arrow keys move the selection one cell. **Delete** removes it, **Esc**
+  clears it.
+- **Cmd+A** selects everything in the layer, **Cmd+Shift+A** everything in
+  the level.
+- **Cmd+C** / **Cmd+X** / **Cmd+V** copy, cut and paste (it pastes under the
+  mouse, into the layers with the same definitions). **Cmd+D** duplicates
+  one cell to the right.
+
+A selected entity's **Layer** in the Level tab moves it to another Entities
+layer.
+
+### Context menus and help
+
+Right-click levels, layers and palette items for their actions: rename,
+duplicate, reorder, delete, settings, rules, select all of a value or
+entity. Every button and field has a tooltip. Hover anything and press
+**F1** (or click a **?**) to open **Help > Level Editor Reference** at that
+topic.
 
 ## Tutorial: a cave with auto-tiled walls
 

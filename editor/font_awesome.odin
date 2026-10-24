@@ -150,3 +150,14 @@ ICON_FA_UNIVERSAL_ACCESS          :: "\uF29A" // accessibility
 ICON_FA_KEYBOARD                  :: "\uF11C" // bindings
 ICON_FA_IMAGES                    :: "\uF302" // atlases
 ICON_FA_OBJECT_GROUP              :: "\uF247" // groups
+
+// Level editor
+ICON_FA_CIRCLE_QUESTION   :: "" // Help / reference
+ICON_FA_DICE              :: "" // Random tile mode
+ICON_FA_SHUFFLE           :: "" // Random
+ICON_FA_BOOKMARK          :: "" // Saved selection
+ICON_FA_EYE_DROPPER       :: "" // Pick
+ICON_FA_OBJECT_UNGROUP    :: "" // Selection
+ICON_FA_PEN_TO_SQUARE     :: "" // Edit
+ICON_FA_LOCATION_CROSSHAIRS :: "" // Point
+ICON_FA_FILE_EXPORT       :: "" // Export

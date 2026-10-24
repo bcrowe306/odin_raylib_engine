@@ -866,6 +866,19 @@ Ldtk_Doc_EndCells :: proc(doc: ^Ldtk_Doc) {
 	ldtk_undo_push(doc, p)
 }
 
+// Ldtk_Doc_LevelText: the level's full JSON (the object with its layer
+// instances, cells written in), minified, temp-allocated.
+Ldtk_Doc_LevelText :: proc(doc: ^Ldtk_Doc, li: int) -> string {
+	scratch: vmem.Arena
+	_ = vmem.arena_init_growing(&scratch)
+	defer vmem.arena_destroy(&scratch)
+	lv := &doc.levels[li]
+	restore := ldtk_flush_level(doc, lv, vmem.arena_allocator(&scratch))
+	text := LdtkJson_ToString(lv.data, .Minified, context.temp_allocator)
+	ldtk_unflush(restore[:])
+	return text
+}
+
 // ldtk_level_texts serializes a level for undo: [project-file level object,
 // external tree or ""].
 @(private = "file")

@@ -62,6 +62,7 @@ LevelCanvas_Render :: proc(state: ^EditorState) {
 	if !imgui.Begin(LEVEL_CANVAS_WINDOW, nil, {.NoScrollbar, .NoScrollWithMouse}) do return
 	driveNoScroll = true
 	defer driveNoScroll = false
+	LevelRef_Panel(LEVEL_TOOL_INFO[GlobalLevel.tool].topic) // F1 over the canvas: the current tool
 	avail := imgui.GetContentRegionAvail()
 	w := i32(max(avail.x, 64))
 	h := i32(max(avail.y, 64))
@@ -125,6 +126,7 @@ canvas_draw :: proc() {
 		}
 	}
 	for li in order do draw_level(li, li == L.level)
+	draw_selection()
 	draw_tool_preview()
 	rl.EndMode2D()
 }
@@ -346,7 +348,7 @@ selected_rect_screen :: proc() -> ([4]f32, bool) {
 	L := &GlobalLevel
 	if L.selEntity == nil do return {}, false
 	r := e.Ldtk_Doc_EntityRect(L.selEntity)
-	o := layer_origin()
+	o := layer_origin_of(L.selEntityLayer)
 	a := to_screen(o + {f32(r[0]), f32(r[1])})
 	b := to_screen(o + {f32(r[0] + r[2]), f32(r[1] + r[3])})
 	return {a.x, a.y, b.x, b.y}, true
@@ -411,7 +413,9 @@ canvas_input :: proc(state: ^EditorState) {
 			return
 		}
 	}
+	if !L.painting && selection_input(state, pressL, mw) do return
 	if ly == nil || d == nil do return
+	if L.tool == .Select do return
 	switch d.type {
 	case .IntGrid, .Tiles: cells_input(state, ly, d, pressL, pressR)
 	case .Entities: entities_input(state, ly, d, pressL, pressR, mw)
@@ -601,6 +605,9 @@ flood_fill :: proc(ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_DocLayerDef, start: [2]int, 
 	e.Ldtk_Doc_ApplyRules(doc, L.level, L.layer, mn.x, mn.y, mx.x, mx.y)
 }
 
+// entities_input: the Brush places the picked entity (Shift: off the grid);
+// the right button deletes the entity under the mouse. Selecting, moving and
+// resizing are selection_input's.
 @(private = "file")
 entities_input :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_DocLayerDef, pressL, pressR: bool, mw: [2]f32) {
 	L := &GlobalLevel
@@ -609,68 +616,160 @@ entities_input :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_Doc
 	local := mw - o
 	lp := [2]int{int(math.floor(local.x)), int(math.floor(local.y))}
 	g := d.gridSize
-	alt := imgui.GetIO().KeyAlt
 	if pressR {
 		if ent := e.Ldtk_Doc_EntityAt(doc, L.level, L.layer, lp); ent != nil {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Delete Entity")
 			e.Ldtk_Doc_RemoveEntity(doc, L.level, L.layer, ent)
-			if ent == L.selEntity do L.selEntity = nil
+			level_sync_selection()
 		}
 		return
 	}
-	if pressL {
-		// the resize handle of the selection
-		if r, ok := selected_rect_screen(); ok && entity_resizable(L.selEntity) {
-			m := imgui.GetIO().MousePos
-			if abs(m.x - r[2]) <= 6 && abs(m.y - r[3]) <= 6 {
-				L.entResize, L.entMoved = true, false
-				return
-			}
-		}
-		if ent := e.Ldtk_Doc_EntityAt(doc, L.level, L.layer, lp); ent != nil {
-			L.selEntity = ent
-			px := e.LdtkJson_Arr(ent, "px")
-			if len(px) >= 2 do L.entGrab = lp - {int(px[0].num), int(px[1].num)}
-			L.entDrag, L.entMoved = true, false
-			return
-		}
-		if L.tool == .Brush && L.entityDef >= 0 && lp.x >= 0 && lp.y >= 0 && lp.x < ly.cWid * g && lp.y < ly.cHei * g {
-			ed := e.Ldtk_Doc_EntityDef(doc, L.entityDef)
-			if ed != nil {
-				cell := [2]int{lp.x / g, lp.y / g}
-				px := [2]int{cell.x * g + int(ed.pivot.x * f64(g)), cell.y * g + int(ed.pivot.y * f64(g))}
-				if alt do px = lp
-				e.Ldtk_Doc_Checkpoint(doc, L.level, "Add Entity")
-				L.selEntity = e.Ldtk_Doc_AddEntity(doc, L.level, L.layer, L.entityDef, px)
-			}
-			return
-		}
-		L.selEntity = nil
-		return
+	if pressL && L.tool == .Brush && L.entityDef >= 0 && lp.x >= 0 && lp.y >= 0 && lp.x < ly.cWid * g && lp.y < ly.cHei * g {
+		ed := e.Ldtk_Doc_EntityDef(doc, L.entityDef)
+		if ed == nil do return
+		cell := [2]int{lp.x / g, lp.y / g}
+		px := [2]int{cell.x * g + int(ed.pivot.x * f64(g)), cell.y * g + int(ed.pivot.y * f64(g))}
+		if imgui.GetIO().KeyShift do px = lp
+		e.Ldtk_Doc_Checkpoint(doc, L.level, "Add Entity")
+		level_select_entity(L.layer, e.Ldtk_Doc_AddEntity(doc, L.level, L.layer, L.entityDef, px))
 	}
-	if L.entDrag && L.selEntity != nil {
-		ent := L.selEntity
-		np := lp - L.entGrab
-		if !alt {
-			ed := e.Ldtk_Doc_EntityDef(doc, e.LdtkJson_Int(ent, "defUid", -1))
-			pv := [2]int{}
-			if ed != nil do pv = {int(ed.pivot.x * f64(g)), int(ed.pivot.y * f64(g))}
-			np = {int(math.round(f32(np.x - pv.x) / f32(g))) * g + pv.x, int(math.round(f32(np.y - pv.y) / f32(g))) * g + pv.y}
-		}
-		px := e.LdtkJson_Arr(ent, "px")
-		if len(px) >= 2 && (np.x != int(px[0].num) || np.y != int(px[1].num)) {
-			if !L.entMoved do e.Ldtk_Doc_Checkpoint(doc, L.level, "Move Entity")
-			L.entMoved = true
-			e.Ldtk_Doc_MoveEntity(doc, L.level, L.layer, ent, np)
-		}
-		if !imgui.IsMouseDown(.Left) do L.entDrag = false
+}
+
+// ----------------------------------------------------------------------------
+// Selection (LDtk's Selection tool: the Select tool, or Alt with any tool)
+// ----------------------------------------------------------------------------
+
+// layer_origin_of: world position of a layer's cell (0, 0) in the level.
+@(private = "file")
+layer_origin_of :: proc(layer: int) -> [2]f32 {
+	L := &GlobalLevel
+	lp := e.Ldtk_Doc_LevelPos(L.doc, L.level)
+	o := [2]f32{f32(lp.x), f32(lp.y)}
+	lv := &L.doc.levels[L.level]
+	if layer >= 0 && layer < len(lv.layers) {
+		off := e.Ldtk_Doc_LayerOffset(&lv.layers[layer])
+		o += {f32(off.x), f32(off.y)}
 	}
-	if L.entResize && L.selEntity != nil {
+	return o
+}
+
+// element_at: the entity or the cell with a value under a world position -
+// the active layer first, then the others from the top (visible ones).
+@(private = "file")
+element_at :: proc(mw: [2]f32) -> (cell: e.Ldtk_SelCell, ent: e.Ldtk_SelEntity, found: bool) {
+	L := &GlobalLevel
+	doc := L.doc
+	lv := &doc.levels[L.level]
+	try :: proc(doc: ^e.Ldtk_Doc, li, j: int, mw: [2]f32) -> (e.Ldtk_SelCell, e.Ldtk_SelEntity, bool) {
+		ly := &doc.levels[li].layers[j]
+		if !e.LdtkJson_Bool(ly.obj, "visible", true) do return {}, {}, false
+		d := e.Ldtk_Doc_LayerDef(doc, ly)
+		if d == nil do return {}, {}, false
+		o := layer_origin_of(j)
+		lp := [2]int{int(math.floor(mw.x - o.x)), int(math.floor(mw.y - o.y))}
+		#partial switch d.type {
+		case .Entities:
+			if ent := e.Ldtk_Doc_EntityAt(doc, li, j, lp); ent != nil do return {}, {j, ent}, true
+		case .IntGrid:
+			c := [2]int{ldtk_floor(lp.x, d.gridSize), ldtk_floor(lp.y, d.gridSize)}
+			if e.Ldtk_Doc_GetIntGrid(ly, c.x, c.y) != 0 do return {j, c.x, c.y}, {}, true
+		case .Tiles:
+			c := [2]int{ldtk_floor(lp.x, d.gridSize), ldtk_floor(lp.y, d.gridSize)}
+			if len(e.Ldtk_Doc_TilesAt(ly, c.x, c.y)) > 0 do return {j, c.x, c.y}, {}, true
+		}
+		return {}, {}, false
+	}
+	if L.layer < len(lv.layers) {
+		if c, en, ok := try(doc, L.level, L.layer, mw); ok do return c, en, true
+	}
+	for _, j in lv.layers {
+		if j == L.layer do continue
+		if c, en, ok := try(doc, L.level, j, mw); ok do return c, en, true
+	}
+	return {}, {}, false
+}
+
+@(private = "file")
+ldtk_floor :: proc(a, b: int) -> int {
+	if b == 0 do return 0
+	q := a / b
+	if a % b != 0 && (a < 0) != (b < 0) do q -= 1
+	return q
+}
+
+// over_selection: is a world position on a selected cell or entity?
+@(private = "file")
+over_selection :: proc(mw: [2]f32) -> bool {
+	L := &GlobalLevel
+	doc := L.doc
+	lv := &doc.levels[L.level]
+	for c in L.sel.cells {
+		d := e.Ldtk_Doc_LayerDef(doc, &lv.layers[c.layer])
+		if d == nil do continue
+		o := layer_origin_of(c.layer)
+		g := f32(d.gridSize)
+		x, y := o.x + f32(c.cx) * g, o.y + f32(c.cy) * g
+		if mw.x >= x && mw.y >= y && mw.x < x + g && mw.y < y + g do return true
+	}
+	for se in L.sel.entities {
+		o := layer_origin_of(se.layer)
+		r := e.Ldtk_Doc_EntityRect(se.obj)
+		if mw.x >= o.x + f32(r[0]) && mw.y >= o.y + f32(r[1]) && mw.x < o.x + f32(r[0] + r[2]) && mw.y < o.y + f32(r[1] + r[3]) do return true
+	}
+	return false
+}
+
+// sel_delta: the drag's offset, snapped (entities alone with Shift: free).
+@(private = "file")
+sel_delta :: proc(mw: [2]f32) -> [2]int {
+	L := &GlobalLevel
+	raw := mw - L.selGrab
+	g := 16
+	if _, d := level_active_layer(); d != nil do g = d.gridSize
+	// the cells' coarsest grid decides the step
+	for c in L.sel.cells {
+		if d := e.Ldtk_Doc_LayerDef(L.doc, &L.doc.levels[L.level].layers[c.layer]); d != nil do g = max(g, d.gridSize)
+	}
+	if len(L.sel.cells) == 0 && imgui.GetIO().KeyShift do return {int(math.round(raw.x)), int(math.round(raw.y))}
+	return {int(math.round(raw.x / f32(g))) * g, int(math.round(raw.y / f32(g))) * g}
+}
+
+// LevelCanvas_PasteAt: where Cmd+V puts the clipboard's top-left - the cell
+// under the mouse (the clip's place when the mouse is off the canvas).
+LevelCanvas_PasteAt :: proc() -> [2]int {
+	L := &GlobalLevel
+	if !L.hovered do return L.clip.origin
+	m := imgui.GetIO().MousePos
+	lp := e.Ldtk_Doc_LevelPos(L.doc, L.level)
+	w := to_world({m.x, m.y}) - {f32(lp.x), f32(lp.y)}
+	g := 16
+	if _, d := level_active_layer(); d != nil do g = d.gridSize
+	return {ldtk_floor(int(w.x), g) * g, ldtk_floor(int(w.y), g) * g}
+}
+
+// selection_input runs the selection gestures; returns true when it took
+// the mouse this frame (painting tools then don't).
+@(private = "file")
+selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
+	L := &GlobalLevel
+	doc := L.doc
+	io := imgui.GetIO()
+	selectMode := L.tool == .Select || io.KeyAlt
+	// resizing the single selected entity (its corner handle)
+	if L.entResize {
 		ent := L.selEntity
+		if ent == nil {
+			L.entResize = false
+			return true
+		}
 		ed := e.Ldtk_Doc_EntityDef(doc, e.LdtkJson_Int(ent, "defUid", -1))
+		ld := e.Ldtk_Doc_LayerDef(doc, &doc.levels[L.level].layers[L.selEntityLayer])
+		g := ld != nil ? ld.gridSize : 16
+		o := layer_origin_of(L.selEntityLayer)
+		lp := [2]int{int(math.floor(mw.x - o.x)), int(math.floor(mw.y - o.y))}
 		r := e.Ldtk_Doc_EntityRect(ent)
 		size := [2]int{lp.x - r[0], lp.y - r[1]}
-		if !alt do size = {max(int(math.round(f32(size.x) / f32(g))), 1) * g, max(int(math.round(f32(size.y) / f32(g))), 1) * g}
+		if !io.KeyShift do size = {max(int(math.round(f32(size.x) / f32(g))), 1) * g, max(int(math.round(f32(size.y) / f32(g))), 1) * g}
 		if ed != nil {
 			if !e.LdtkJson_Bool(ed.obj, "resizableX") do size.x = r[2]
 			if !e.LdtkJson_Bool(ed.obj, "resizableY") do size.y = r[3]
@@ -679,8 +778,159 @@ entities_input :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk_Doc
 		if size.x != r[2] || size.y != r[3] {
 			if !L.entMoved do e.Ldtk_Doc_Checkpoint(doc, L.level, "Resize Entity")
 			L.entMoved = true
-			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.layer, ent, size)
+			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.selEntityLayer, ent, size)
 		}
 		if !imgui.IsMouseDown(.Left) do L.entResize = false
+		return true
+	}
+	// dragging the selection: a ghost follows, the move happens on release
+	if L.selMoving {
+		if !L.selMoved && linalg_len(mw - L.selGrab) * L.zoom >= 4 do L.selMoved = true
+		if !imgui.IsMouseDown(.Left) {
+			L.selMoving = false
+			if L.selMoved {
+				delta := sel_delta(mw)
+				if delta != {} || L.selCopy {
+					if e.Ldtk_Doc_SelectionCanMove(doc, L.level, &L.sel, delta) {
+						e.Ldtk_Doc_Checkpoint(doc, L.level, L.selCopy ? "Copy Selection" : "Move Selection")
+						e.Ldtk_Doc_MoveSelection(doc, L.level, &L.sel, delta, L.selCopy)
+						level_sync_selection()
+					} else do Editor_Log(state, .Warn, "The selection can't move by %d,%d px: its layers' grids don't line up", delta.x, delta.y)
+				}
+			}
+		}
+		return true
+	}
+	// rectangle selection
+	if L.selRect {
+		if !imgui.IsMouseDown(.Left) {
+			L.selRect = false
+			lp := e.Ldtk_Doc_LevelPos(doc, L.level)
+			a := L.selRectStart - {f32(lp.x), f32(lp.y)}
+			b := mw - {f32(lp.x), f32(lp.y)}
+			mn := [2]f32{min(a.x, b.x), min(a.y, b.y)}
+			mx := [2]f32{max(a.x, b.x), max(a.y, b.y)}
+			r := [4]int{int(math.floor(mn.x)), int(math.floor(mn.y)), max(int(mx.x - mn.x), 1), max(int(mx.y - mn.y), 1)}
+			e.Ldtk_Doc_SelectRect(doc, L.level, &L.sel, r)
+			level_sync_selection()
+		}
+		return true
+	}
+	if !pressL do return false
+	// the corner handle of a single resizable entity
+	if r, ok := selected_rect_screen(); ok && entity_resizable(L.selEntity) {
+		m := io.MousePos
+		if abs(m.x - r[2]) <= 6 && abs(m.y - r[3]) <= 6 {
+			L.entResize, L.entMoved = true, false
+			return true
+		}
+	}
+	startMove :: proc(mw: [2]f32) {
+		L := &GlobalLevel
+		io := imgui.GetIO()
+		L.selMoving, L.selMoved = true, false
+		L.selGrab = mw
+		L.selCopy = (io.KeySuper || io.KeyCtrl) && io.KeyAlt
+	}
+	// on the selection (any tool): move it
+	if !e.Ldtk_Selection_Empty(&L.sel) && over_selection(mw) && !io.KeyShift {
+		startMove(mw)
+		return true
+	}
+	cell, ent, found := element_at(mw)
+	if !selectMode {
+		// with the painting tools, a click on an entity of the active Entities layer selects it
+		if _, d := level_active_layer(); d != nil && d.type == .Entities && found && ent.obj != nil && ent.layer == L.layer {
+			level_select_entity(ent.layer, ent.obj)
+			startMove(mw)
+			return true
+		}
+		return false
+	}
+	if io.KeyShift {
+		// add / remove, or a rectangle from empty space
+		if found {
+			if ent.obj != nil do e.Ldtk_Selection_ToggleEntity(&L.sel, ent)
+			else do e.Ldtk_Selection_ToggleCell(&L.sel, cell)
+			level_sync_selection()
+		} else {
+			L.selRect = true
+			L.selRectStart = mw
+		}
+		return true
+	}
+	if !found {
+		level_clear_selection()
+		L.selRect = true // a drag from empty space selects a rectangle
+		L.selRectStart = mw
+		return true
+	}
+	// select it; its layer becomes active and the palette picks its value
+	level_clear_selection()
+	layer := ent.obj != nil ? ent.layer : cell.layer
+	if layer != L.layer {
+		L.layer = layer
+		level_sync_palette()
+	}
+	if ent.obj != nil {
+		level_select_entity(ent.layer, ent.obj)
+		if ed := e.Ldtk_Doc_EntityDef(doc, e.LdtkJson_Int(ent.obj, "defUid", -1)); ed != nil do L.entityDef = ed.uid
+	} else {
+		append(&L.sel.cells, cell)
+		ly := &doc.levels[L.level].layers[cell.layer]
+		if v := e.Ldtk_Doc_GetIntGrid(ly, cell.cx, cell.cy); v != 0 do L.intValue = v
+		if tiles := e.Ldtk_Doc_TilesAt(ly, cell.cx, cell.cy); len(tiles) > 0 {
+			clear(&L.tileSel)
+			append(&L.tileSel, tiles[len(tiles) - 1].t)
+			L.tileSelW, L.tileSelH = 1, 1
+			L.flips = tiles[len(tiles) - 1].f
+		}
+		level_sync_selection()
+	}
+	startMove(mw)
+	return true
+}
+
+@(private = "file")
+linalg_len :: proc(v: [2]f32) -> f32 {return math.sqrt(v.x * v.x + v.y * v.y)}
+
+// draw_selection: outlines of the selection, the drag ghost, the rectangle.
+@(private = "file")
+draw_selection :: proc() {
+	L := &GlobalLevel
+	doc := L.doc
+	if doc == nil || len(doc.levels) == 0 do return
+	lv := &doc.levels[L.level]
+	thick := 1.5 / L.zoom
+	col := rl.Color{255, 220, 80, 255}
+	off := [2]f32{}
+	if L.selMoving && L.selMoved {
+		m := imgui.GetIO().MousePos
+		dd := sel_delta(to_world({m.x, m.y}))
+		off = {f32(dd.x), f32(dd.y)}
+	}
+	for c in L.sel.cells {
+		if c.layer >= len(lv.layers) do continue
+		d := e.Ldtk_Doc_LayerDef(doc, &lv.layers[c.layer])
+		if d == nil do continue
+		o := layer_origin_of(c.layer) + off
+		g := f32(d.gridSize)
+		r := rl.Rectangle{o.x + f32(c.cx) * g, o.y + f32(c.cy) * g, g, g}
+		if off != {} do rl.DrawRectangleRec(r, {255, 220, 80, 70})
+		rl.DrawRectangleLinesEx(r, thick, col)
+	}
+	for se in L.sel.entities {
+		o := layer_origin_of(se.layer) + off
+		r := e.Ldtk_Doc_EntityRect(se.obj)
+		rect := rl.Rectangle{o.x + f32(r[0]), o.y + f32(r[1]), f32(r[2]), f32(r[3])}
+		if off != {} do rl.DrawRectangleRec(rect, {255, 220, 80, 70})
+		rl.DrawRectangleLinesEx(rect, thick * 1.3, col)
+	}
+	if L.selRect {
+		m := imgui.GetIO().MousePos
+		b := to_world({m.x, m.y})
+		a := L.selRectStart
+		rl.DrawRectangleRec({min(a.x, b.x), min(a.y, b.y), abs(b.x - a.x), abs(b.y - a.y)}, {120, 170, 255, 40})
+		rl.DrawRectangleLinesEx({min(a.x, b.x), min(a.y, b.y), abs(b.x - a.x), abs(b.y - a.y)}, thick, {120, 170, 255, 230})
 	}
 }

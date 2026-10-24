@@ -137,6 +137,7 @@ editor_main :: proc() -> int {
 		Editor_SyncSelection(&GlobalEditor)
 		Editor_Autosave(&GlobalEditor)
 		if !LevelEditor_Shortcuts(&GlobalEditor) do Actions_Dispatch(&GlobalEditor)
+		LevelRef_BeginFrame() // (after the shortcuts: F1 uses last frame's hovered topic)
 
 		// --------------------------------------------------------------------
 		// 1. Standard Main Menu Bar (File, Edit, View, Tools, Help)
@@ -213,6 +214,7 @@ editor_main :: proc() -> int {
 		AddNodeDialog_Render(&GlobalEditor)
 		NewScriptDialog_Render(&GlobalEditor)
 		ScriptReference_Render(&GlobalEditor)
+		LevelRef_Render(&GlobalEditor)
 		ProjectSettingsDialog_Render(&GlobalEditor)
 		Palette_Render(&GlobalEditor)
 		Shortcuts_Render(&GlobalEditor)

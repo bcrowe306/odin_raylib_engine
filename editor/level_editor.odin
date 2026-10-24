@@ -52,14 +52,14 @@ Level_Panel_Tab :: enum u8 {
 	Project,
 }
 
-LEVEL_TOOL_INFO := [Level_Tool]struct {icon, name, key: string}{
-	.Brush      = {ICON_FA_PAINTBRUSH, "Brush", "B"},
-	.Rect       = {ICON_FA_VECTOR_SQUARE, "Rectangle", "R"},
-	.Erase      = {ICON_FA_ERASER, "Erase", "E"},
-	.Fill       = {ICON_FA_FILL_DRIP, "Fill", "F"},
-	.Pick       = {ICON_FA_CIRCLE, "Pick", "I"},
-	.Select     = {ICON_FA_ARROW_POINTER, "Select / move entities", "V"},
-	.Move_Level = {ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT, "Move levels", "M"},
+LEVEL_TOOL_INFO := [Level_Tool]struct {icon, name, key, tip, topic: string}{
+	.Brush      = {ICON_FA_PAINTBRUSH, "Brush", "B", "Paint the picked value / tiles, place the picked entity. Right button erases.", "tool.brush"},
+	.Rect       = {ICON_FA_VECTOR_SQUARE, "Rectangle", "R", "Drag a rectangle to fill it (right button: erase it).", "tool.rect"},
+	.Erase      = {ICON_FA_ERASER, "Erase", "E", "Erase IntGrid values and tiles.", "tool.erase"},
+	.Fill       = {ICON_FA_FILL_DRIP, "Fill", "F", "Fill the connected area of equal cells.", "tool.fill"},
+	.Pick       = {ICON_FA_EYE_DROPPER, "Pick", "I", "Pick the value or tile under the mouse.", "tool.pick"},
+	.Select     = {ICON_FA_ARROW_POINTER, "Select", "V", "Select cells and entities, move, copy, delete them. Also: hold Alt with any tool.", "tool.select"},
+	.Move_Level = {ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT, "Move levels", "M", "Drag levels around the world.", "tool.movelevel"},
 }
 
 LevelEd :: struct {
@@ -96,7 +96,16 @@ LevelEd :: struct {
 	rectStart:    [2]int,
 	rectActive:   bool,
 	panning:      bool,
-	selEntity:    ^e.LdtkJson,
+	selEntity:    ^e.LdtkJson, // the selection's only entity (nil otherwise)
+	selEntityLayer: int,
+	sel:          e.Ldtk_Selection, // selected cells / entities of the active level
+	clip:         e.Ldtk_Clipboard,
+	selMoving:    bool,    // dragging the selection
+	selMoved:     bool,    // ... past the start threshold
+	selCopy:      bool,    // Cmd+Alt: copy instead of move
+	selGrab:      [2]f32,  // world position the drag started at
+	selRect:      bool,    // rectangle selection in progress
+	selRectStart: [2]f32,
 	entDrag:      bool,
 	entResize:    bool,
 	entMoved:     bool,
@@ -113,6 +122,9 @@ LevelEd :: struct {
 	panelRequest: Maybe(Level_Panel_Tab), // select this tab next frame
 	lastSel:      ^e.LdtkJson,          // entity selected last frame
 	layerDrag:    int,                  // layer row being dragged (-1 none)
+	renameLevel:  int,
+	renameRequest: bool,
+	renameBuf:    [128]u8,
 	newPrompt:    bool,
 	closePrompt:  bool,
 	closeThen:    string, // file to open after the close prompt ("" = none)
@@ -122,6 +134,22 @@ LevelEd :: struct {
 }
 
 GlobalLevel := LevelEd{zoom = 2, showGrid = true, showIntGrid = true, paletteZoom = 2, panelTab = .World, layerDrag = -1}
+
+LEVEL_TAB_TOPIC := [Level_Panel_Tab]string{
+	.World = "tab.world", .Level = "tab.level", .Tilesets = "tab.tilesets", .Entities = "tab.entities",
+	.Enums = "tab.enums", .Layers = "tab.layers", .Rules = "tab.rules", .Project = "tab.project",
+}
+
+LEVEL_TAB_TIP := [Level_Panel_Tab]string{
+	.World    = "World layout and grid, a map of the levels",
+	.Level    = "The active level's values and fields - or the selected entity's",
+	.Tilesets = "Tilesets: images, tile size, per-tile data, animations, tags",
+	.Entities = "Entity definitions and their fields",
+	.Enums    = "Enumerations for fields and tile tags",
+	.Layers   = "Layer settings and IntGrid values",
+	.Rules    = "Auto-layer rules and terrains",
+	.Project  = "Project defaults, JSON options, level fields",
+}
 
 // LevelEditor_ShowTab brings a bottom-panel tab to the front.
 LevelEditor_ShowTab :: proc(t: Level_Panel_Tab) {
@@ -176,7 +204,7 @@ LevelEditor_Open :: proc(state: ^EditorState, rel: string) -> bool {
 	L.doc = doc
 	L.rel = strings.clone(rel)
 	L.level, L.world, L.layer = 0, 0, 0
-	L.selEntity = nil
+	level_clear_selection()
 	level_pick_default_layer()
 	L.fitRequest = true
 	L.tab = .Level
@@ -194,8 +222,60 @@ level_close_doc :: proc() {
 	L.doc = nil
 	delete(L.rel)
 	L.rel = ""
-	L.selEntity = nil
+	level_clear_selection()
 	L.painting, L.rectActive, L.entDrag, L.levelDrag = false, false, false, false
+}
+
+// level_clear_selection empties the selection.
+level_clear_selection :: proc() {
+	L := &GlobalLevel
+	e.Ldtk_Selection_Clear(&L.sel)
+	L.selEntity = nil
+	L.selMoving, L.selRect = false, false
+}
+
+// level_sync_selection drops elements that no longer exist (after undo,
+// deleted layers / levels) and derives selEntity.
+level_sync_selection :: proc() {
+	L := &GlobalLevel
+	doc := L.doc
+	if doc == nil || len(doc.levels) == 0 || L.level >= len(doc.levels) {
+		level_clear_selection()
+		return
+	}
+	lv := &doc.levels[L.level]
+	w := 0
+	for c in L.sel.cells {
+		if c.layer < len(lv.layers) && c.cx >= 0 && c.cy >= 0 && c.cx < lv.layers[c.layer].cWid && c.cy < lv.layers[c.layer].cHei {
+			L.sel.cells[w] = c
+			w += 1
+		}
+	}
+	resize(&L.sel.cells, w)
+	w = 0
+	for se in L.sel.entities {
+		ok := false
+		if se.layer < len(lv.layers) do for ent in e.LdtkJson_Arr(lv.layers[se.layer].obj, "entityInstances") do if ent == se.obj do ok = true
+		if ok {
+			L.sel.entities[w] = se
+			w += 1
+		}
+	}
+	resize(&L.sel.entities, w)
+	L.selEntity = nil
+	if len(L.sel.entities) == 1 && len(L.sel.cells) == 0 {
+		L.selEntity = L.sel.entities[0].obj
+		L.selEntityLayer = L.sel.entities[0].layer
+	}
+}
+
+// level_select_entity makes one entity the selection.
+level_select_entity :: proc(layer: int, ent: ^e.LdtkJson) {
+	L := &GlobalLevel
+	level_clear_selection()
+	if ent == nil do return
+	append(&L.sel.entities, e.Ldtk_SelEntity{layer, ent})
+	L.selEntity, L.selEntityLayer = ent, layer
 }
 
 // level_pick_default_layer: the first layer you can paint.
@@ -279,7 +359,7 @@ LevelEditor_SetLevel :: proc(li: int) {
 	if ly, d := level_active_layer(); ly != nil && d != nil do defUid = d.uid
 	L.level = li
 	L.world = L.doc.levels[li].world
-	L.selEntity = nil
+	level_clear_selection()
 	L.layer = 0
 	found := false
 	for &ly, i in L.doc.levels[li].layers {
@@ -394,12 +474,14 @@ LevelEditor_Render :: proc(state: ^EditorState, pos, size: [2]f32) {
 	} else {
 		if L.level >= len(L.doc.levels) do L.level = max(len(L.doc.levels) - 1, 0)
 		level_follow_layer_uid()
+		level_sync_selection()
 		level_sync_textures(state)
 		LevelCanvas_Render(state)
 		level_levels_panel(state)
 		level_layers_panel(state)
 		level_bottom_panel(state)
 		LevelDefs_NewLayerDialog(state)
+		level_rename_popup(state)
 	}
 	level_prompts(state)
 }
@@ -524,6 +606,8 @@ LevelEditor_Shutdown :: proc() {
 	delete(L.textures)
 	delete(L.tileSel)
 	delete(L.closeThen)
+	e.Ldtk_Selection_Destroy(&L.sel)
+	e.Ldtk_Clipboard_Destroy(&L.clip)
 	if L.rt.id != 0 do rl.UnloadRenderTexture(L.rt)
 	L.rt = {}
 }
@@ -574,9 +658,12 @@ level_levels_panel :: proc(state: ^EditorState) {
 	doc := L.doc
 	defer imgui.End()
 	if !imgui.Begin(LEVEL_LEVELS_WINDOW, nil, {}) do return
+	LevelRef_Panel("panel.levels")
 	UI_PanelTitle(ICON_FA_GLOBE, "Levels", fmt.tprintf("%d", len(doc.levels)))
-	UI_HeaderButtons(2)
-	if UI_HeaderButton(ICON_FA_PLUS, "level.add", "Add a level next to the active one") {
+	UI_HeaderButtons(3)
+	if UI_HeaderButton(ICON_FA_CIRCLE_QUESTION, "level.help.levels", "") do LevelRef_Open("panel.levels")
+	level_tip("About the Levels panel", "panel.levels")
+	if UI_HeaderButton(ICON_FA_PLUS, "level.add", "") {
 		pos := [2]int{0, 0}
 		size := [2]int{e.LdtkJson_Int(doc.root, "defaultLevelWidth", 256), e.LdtkJson_Int(doc.root, "defaultLevelHeight", 256)}
 		step := LdtkJson_GridVania(doc) ? max(e.LdtkJson_Int(doc.root, "worldGridWidth", 256), 1) : 1
@@ -592,13 +679,15 @@ level_levels_panel :: proc(state: ^EditorState) {
 		L.level = -1
 		LevelEditor_SetLevel(li)
 	}
-	if UI_HeaderButton(ICON_FA_TRASH, "level.remove", "Delete the active level") && len(doc.levels) > 1 {
+	level_tip("Add a level next to the active one, in a free spot", "panel.levels")
+	if UI_HeaderButton(ICON_FA_TRASH, "level.remove", "") && len(doc.levels) > 1 {
 		e.Ldtk_Doc_Checkpoint(doc, -1, "Delete Level")
 		e.Ldtk_Doc_RemoveLevel(doc, L.level)
 		L.level = clamp(L.level, 0, len(doc.levels) - 1)
-		L.selEntity = nil
+		level_clear_selection()
 		level_pick_default_layer()
 	}
+	level_tip("Delete the active level (undo brings it back)", "panel.levels")
 	if doc.multiWorlds {
 		names := make([]string, len(doc.worlds), context.temp_allocator)
 		for w, i in doc.worlds do names[i] = e.LdtkJson_Str(w.obj, "identifier", fmt.tprintf("World %d", i))
@@ -628,6 +717,8 @@ level_levels_panel :: proc(state: ^EditorState) {
 				if imgui.IsMouseDoubleClicked(.Left) do L.fitRequest = true
 			}
 			Drive_Item(fmt.tprintf("level.pick:%s", name))
+			level_tip(fmt.tprintf("%s - %dx%d px. Double-click to frame it; right-click for more.", name, s.x, s.y), "panel.levels")
+			level_row_menu(state, i)
 			// the size, when it fits next to the name
 			size := fmt.ctprintf("%dx%d", s.x, s.y)
 			sw := imgui.CalcTextSize(size).x
@@ -638,6 +729,91 @@ level_levels_panel :: proc(state: ^EditorState) {
 		}
 	}
 	imgui.EndChild()
+}
+
+// ctx_item: a context-menu entry with a tooltip (drives: "ctx:<label>").
+ctx_item :: proc(icon, label: string, tip: string, enabled := true, shortcut := "") -> bool {
+	clicked := imgui.MenuItem(fmt.ctprintf("%s  %s", icon, label), shortcut != "" ? fmt.ctprintf("%s", shortcut) : nil, false, enabled)
+	Drive_Item(fmt.tprintf("ctx:%s", label))
+	if tip != "" && imgui.IsItemHovered(imgui.HoveredFlags_AllowWhenDisabled) do imgui.SetTooltip("%s", fmt.ctprintf("%s", tip))
+	return clicked
+}
+
+// level_row_menu: a level's right-click menu.
+@(private = "file")
+level_row_menu :: proc(state: ^EditorState, li: int) {
+	L := &GlobalLevel
+	doc := L.doc
+	if !imgui.BeginPopupContextItem(fmt.ctprintf("##lvlctx%d", li)) do return
+	defer imgui.EndPopup()
+	name := e.Ldtk_Doc_LevelName(doc, li)
+	if ctx_item(ICON_FA_FOLDER_OPEN, "Open", "Make it the active level") do LevelEditor_SetLevel(li)
+	if ctx_item(ICON_FA_EXPAND, "Frame", "Open it and fit it in the canvas") {
+		LevelEditor_SetLevel(li)
+		L.fitRequest = true
+	}
+	imgui.Separator()
+	if ctx_item(ICON_FA_PEN_TO_SQUARE, "Rename...", "Change its identifier (external level files are renamed too)") {
+		L.renameLevel = li
+		L.renameRequest = true
+		L.renameBuf = {}
+		copy(L.renameBuf[:len(L.renameBuf) - 1], name)
+	}
+	if ctx_item(ICON_FA_CLONE, "Duplicate", "Copy the level with its content, next to it") {
+		e.Ldtk_Doc_Checkpoint(doc, -1, "Duplicate Level")
+		if ni := e.Ldtk_Doc_DuplicateLevel(doc, li); ni >= 0 {
+			L.level = -1
+			LevelEditor_SetLevel(ni)
+		}
+	}
+	if ctx_item(ICON_FA_ARROW_UP, "Move up", "Earlier in the list (the order of linear layouts)", li > 0 && doc.levels[li - 1].world == doc.levels[li].world) {
+		e.Ldtk_Doc_Checkpoint(doc, -1, "Reorder Levels")
+		L.level = e.Ldtk_Doc_MoveLevelOrder(doc, li, -1)
+	}
+	if ctx_item(ICON_FA_ARROW_DOWN, "Move down", "Later in the list", li + 1 < len(doc.levels) && doc.levels[li + 1].world == doc.levels[li].world) {
+		e.Ldtk_Doc_Checkpoint(doc, -1, "Reorder Levels")
+		L.level = e.Ldtk_Doc_MoveLevelOrder(doc, li, 1)
+	}
+	imgui.Separator()
+	if ctx_item(ICON_FA_TRASH, "Delete", "Delete the level (undo brings it back)", len(doc.levels) > 1) {
+		e.Ldtk_Doc_Checkpoint(doc, -1, "Delete Level")
+		e.Ldtk_Doc_RemoveLevel(doc, li)
+		L.level = clamp(L.level, 0, len(doc.levels) - 1)
+		level_clear_selection()
+		level_pick_default_layer()
+	}
+	imgui.Separator()
+	if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "The Levels panel in the reference") do LevelRef_Open("panel.levels")
+}
+
+// level_rename_popup: the Rename dialog of the Levels menu.
+@(private = "file")
+level_rename_popup :: proc(state: ^EditorState) {
+	L := &GlobalLevel
+	doc := L.doc
+	if L.renameRequest {
+		imgui.OpenPopup("Rename Level###LevelRename")
+		L.renameRequest = false
+	}
+	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
+	imgui.SetNextWindowPos(center, .Appearing, {0.5, 0.5})
+	if !imgui.BeginPopupModal("Rename Level###LevelRename", nil, {.AlwaysAutoResize}) do return
+	defer imgui.EndPopup()
+	imgui.SetNextItemWidth(300)
+	if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
+	enter := imgui.InputText("##rename_level", cstring(raw_data(L.renameBuf[:])), len(L.renameBuf), {.EnterReturnsTrue})
+	Drive_Item("level.rename.name")
+	UI_Tooltip("Letters, digits and _ (other characters become _)")
+	if UI_PrimaryButton("Rename", "level.rename.ok") || enter {
+		if L.renameLevel >= 0 && L.renameLevel < len(doc.levels) {
+			name := e.Ldtk_CleanIdentifier(string(cstring(raw_data(L.renameBuf[:]))))
+			e.Ldtk_Doc_Checkpoint(doc, L.renameLevel, "Rename Level")
+			if !e.Ldtk_Doc_RenameLevel(doc, L.renameLevel, name) do Editor_Log(state, .Warn, "A level is already called %s", name)
+		}
+		imgui.CloseCurrentPopup()
+	}
+	imgui.SameLine()
+	if UI_Button("Cancel", "level.rename.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
 }
 
 LdtkJson_GridVania :: proc(doc: ^e.Ldtk_Doc) -> bool {
@@ -671,10 +847,15 @@ level_layers_panel :: proc(state: ^EditorState) {
 	doc := L.doc
 	defer imgui.End()
 	if !imgui.Begin(LEVEL_LAYERS_WINDOW, nil, {}) do return
+	LevelRef_Panel("panel.layers")
 	UI_PanelTitle(ICON_FA_LAYER_GROUP, "Layers")
-	UI_HeaderButtons(2)
-	if UI_HeaderButton(ICON_FA_PLUS, "level.layer.new", "New layer...") do LevelDefs_OpenNewLayer()
-	if UI_HeaderButton(ICON_FA_SLIDERS, "level.layer.settings", "Layer settings (the Layers tab)") do LevelEditor_ShowTab(.Layers)
+	UI_HeaderButtons(3)
+	if UI_HeaderButton(ICON_FA_CIRCLE_QUESTION, "level.help.layers", "") do LevelRef_Open("panel.layers")
+	level_tip("About the Layers panel", "panel.layers")
+	if UI_HeaderButton(ICON_FA_PLUS, "level.layer.new", "") do LevelDefs_OpenNewLayer()
+	level_tip("New layer: type, name, grid, tileset", "layer.new")
+	if UI_HeaderButton(ICON_FA_SLIDERS, "level.layer.settings", "") do LevelEditor_ShowTab(.Layers)
+	level_tip("Layer settings (the Layers tab)", "tab.layers")
 	if len(doc.levels) == 0 {
 		UI_DimText("No level.")
 		return
@@ -696,6 +877,7 @@ level_layers_panel :: proc(state: ^EditorState) {
 		imgui.TextUnformatted(ICON_FA_GRIP_LINES)
 		imgui.PopStyleColor()
 		Drive_Item(fmt.tprintf("level.layer.grip:%s", d.identifier))
+		level_tip("Drag to put the layer in another order (in every level)", "panel.layers")
 		if imgui.IsItemHovered() do imgui.SetMouseCursor(.ResizeNS)
 		if imgui.IsItemClicked() do L.layerDrag = i
 		imgui.SameLine(0, 8)
@@ -703,16 +885,22 @@ level_layers_panel :: proc(state: ^EditorState) {
 		label := fmt.ctprintf("%s: %s", LAYER_TYPE_NAME[d.type], d.identifier)
 		if imgui.Selectable(label, i == L.layer, {.AllowOverlap}, {rowW - 60, ROW}) {
 			L.layer = i
-			L.selEntity = nil
+			level_clear_selection()
 			level_sync_palette()
 		}
 		if !visible do imgui.PopStyleColor()
 		Drive_Item(fmt.tprintf("level.layer:%s", d.identifier))
+		level_tip(fmt.tprintf("%s layer \"%s\" (grid %d px). Click to edit it; right-click for more.", LAYER_TYPE_NAME[d.type], d.identifier, d.gridSize), "panel.layers")
+		if level_layer_menu(state, i, d.uid, visible) {
+			imgui.PopID()
+			return
+		}
 		imgui.SameLine(rowMin.x - imgui.GetWindowPos().x + rowW - 26)
-		if UI_IconButton(visible ? ICON_FA_EYE : ICON_FA_EYE_SLASH, fmt.tprintf("level.eye:%s", d.identifier), "Show / hide (saved in the level)", false, 24) {
+		if UI_IconButton(visible ? ICON_FA_EYE : ICON_FA_EYE_SLASH, fmt.tprintf("level.eye:%s", d.identifier), "", false, 24) {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Layer Visibility")
 			e.Ldtk_Doc_SetLayerVisible(doc, L.level, i, !visible)
 		}
+		level_tip(visible ? "Hide the layer in this level (saved, like LDtk)" : "Show the layer", "panel.layers")
 		rowMax := [2]f32{rowMin.x + rowW, imgui.GetItemRectMax().y}
 		if L.layerDrag >= 0 && m.y >= rowMin.y && m.y < rowMax.y + imgui.GetStyle().ItemSpacing.y do dropAt = i
 		if L.layerDrag == i {
@@ -782,6 +970,27 @@ level_palette_intgrid :: proc(state: ^EditorState, d: ^e.Ldtk_DocLayerDef) {
 		label := v.identifier != "" ? v.identifier : fmt.tprintf("value %d", v.value)
 		if imgui.Selectable(fmt.ctprintf("%d  %s##iv%d", v.value, label, i), L.intValue == v.value, {}, {0, 22}) do L.intValue = v.value
 		Drive_Item(fmt.tprintf("level.value:%d", v.value))
+		level_tip(fmt.tprintf("Value %d (%s)%s. Click, then paint; right-click for more.", v.value, label, i < 9 ? fmt.tprintf(" - key %d", i + 1) : ""), "palette.intgrid")
+		if imgui.BeginPopupContextItem(fmt.ctprintf("##ivctx%d", i)) {
+			if ctx_item(ICON_FA_PAINTBRUSH, "Paint with it", "Pick it and the Brush") {
+				L.intValue = v.value
+				L.tool = .Brush
+			}
+			if ctx_item(ICON_FA_OBJECT_UNGROUP, "Select its cells", "Select every cell of this value in the layer") {
+				level_clear_selection()
+				lv := &L.doc.levels[L.level]
+				ly := &lv.layers[L.layer]
+				for cy in 0 ..< ly.cHei do for cx in 0 ..< ly.cWid do if e.Ldtk_Doc_GetIntGrid(ly, cx, cy) == v.value do append(&L.sel.cells, e.Ldtk_SelCell{L.layer, cx, cy})
+				level_sync_selection()
+			}
+			if ctx_item(ICON_FA_SLIDERS, "Edit values", "Name, colour, add / remove values (Layers tab)") {
+				LevelDefs_SelectLayer(d.uid)
+				LevelEditor_ShowTab(.Layers)
+			}
+			imgui.Separator()
+			if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "IntGrid values in the reference") do LevelRef_Open("palette.intgrid")
+			imgui.EndPopup()
+		}
 	}
 	UI_DimText("Left paints, right erases; 1-9 picks a value.")
 }
@@ -798,6 +1007,27 @@ level_palette_entities :: proc(state: ^EditorState) {
 			if L.tool != .Brush do L.tool = .Brush
 		}
 		Drive_Item(fmt.tprintf("level.entity:%s", ed.identifier))
+		level_tip(fmt.tprintf("%s (%dx%d). Click, then click in the level to place it; right-click for more.", ed.identifier, ed.size.x, ed.size.y), "palette.entities")
+		if imgui.BeginPopupContextItem(fmt.ctprintf("##edctx%d", ed.uid)) {
+			if ctx_item(ICON_FA_PAINTBRUSH, "Place", "Pick it and the Brush") {
+				L.entityDef = ed.uid
+				L.tool = .Brush
+			}
+			if ctx_item(ICON_FA_OBJECT_UNGROUP, "Select all of them", "Select its instances in this level") {
+				level_clear_selection()
+				for &ly, j in L.doc.levels[L.level].layers {
+					for ent in e.LdtkJson_Arr(ly.obj, "entityInstances") do if e.LdtkJson_Int(ent, "defUid", -1) == ed.uid do append(&L.sel.entities, e.Ldtk_SelEntity{j, ent})
+				}
+				level_sync_selection()
+			}
+			if ctx_item(ICON_FA_SLIDERS, "Edit definition", "Size, colour, pivot, tile, fields (Entities tab)") {
+				LevelDefs_SelectEntity(ed.uid)
+				LevelEditor_ShowTab(.Entities)
+			}
+			imgui.Separator()
+			if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "Entities in the reference") do LevelRef_Open("palette.entities")
+			imgui.EndPopup()
+		}
 	}
 	UI_DimText("Brush places, Select (V) moves / resizes, Delete removes.")
 }
@@ -836,15 +1066,24 @@ level_palette_auto :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk
 				}
 				e.Ldtk_Doc_ApplyRulesLayer(doc, L.level, L.layer)
 			}
-			UI_Tooltip("Optional group: enabled per level")
+			level_tip("Optional group: on or off in this level", "palette.auto")
 		} else {
 			UI_DimText(fmt.tprintf("%s %s  (%d rules)", g.active ? ICON_FA_CIRCLE : "-", g.name, count))
+			level_tip(g.active ? "Active rule group (edit it in the Rules tab)" : "Inactive rule group", "palette.auto")
+		}
+		if imgui.BeginPopupContextItem(fmt.ctprintf("##grpctx%d", g.uid)) {
+			if ctx_item(ICON_FA_WAND_MAGIC_SPARKLES, "Edit rules", "This layer's rules in the Rules tab") {
+				LevelDefs_SelectRulesLayer(d.uid)
+				LevelEditor_ShowTab(.Rules)
+			}
+			if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "Auto-layer rules in the reference") do LevelRef_Open("palette.auto")
+			imgui.EndPopup()
 		}
 	}
 	if UI_Button(fmt.tprintf("%s  Re-run rules", ICON_FA_ROTATE_RIGHT), "level.rerun") {
 		e.Ldtk_Doc_ApplyRulesFull(doc, L.level)
 	}
-	UI_Tooltip("Regenerate this level's auto tiles")
+	level_tip("Regenerate this level's auto tiles", "palette.auto")
 }
 
 // level_palette_tiles: the tileset; click / drag selects the stamp.
@@ -858,12 +1097,15 @@ level_palette_tiles :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer) {
 	}
 	tex, ok := level_texture(ts.uid)
 	UI_SectionHeader(fmt.tprintf("Tileset  %s", ts.identifier))
-	if UI_IconButton("X", "level.flipx", "Flip X (X)", (L.flips & 1) != 0, 24) do L.flips ~= 1
+	if UI_IconButton("X", "level.flipx", "", (L.flips & 1) != 0, 24) do L.flips ~= 1
+	level_tip("Flip what you paint horizontally (X)", "palette.tiles")
 	imgui.SameLine()
-	if UI_IconButton("Y", "level.flipy", "Flip Y (Y)", (L.flips & 2) != 0, 24) do L.flips ~= 2
+	if UI_IconButton("Y", "level.flipy", "", (L.flips & 2) != 0, 24) do L.flips ~= 2
+	level_tip("Flip what you paint vertically (Y)", "palette.tiles")
 	imgui.SameLine()
 	imgui.SetNextItemWidth(90)
 	imgui.SliderFloat("##palzoom", &L.paletteZoom, 0.5, 6, "zoom %.1fx")
+	level_tip("Zoom the tileset", "palette.tiles")
 	if !ok {
 		UI_DimText(fmt.tprintf("Image not found: %s", ts.relPath))
 		return
@@ -881,6 +1123,7 @@ level_palette_tiles :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer) {
 		dl := imgui.GetWindowDrawList()
 		imgui.InvisibleButton("##palette", {w, h})
 		Drive_ItemRect("level.palette", {p.x, p.y}, {p.x + 1, p.y + 1}, true) // anchor: tile (0, 0)'s corner
+		level_tip("Click a tile, or drag over several to paint them as a stamp", "palette.tiles")
 		imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)level_texture_ptr(ts.uid), p, {p.x + w, p.y + h})
 		step := f32(ts.gridSize + ts.spacing) * z
 		pad := f32(ts.padding) * z
@@ -922,6 +1165,59 @@ level_palette_tiles :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer) {
 // Inspector (level or selected entity)
 // ----------------------------------------------------------------------------
 
+// level_layer_menu: a layer row's right-click menu; true when the layers
+// changed (stop drawing the list).
+@(private = "file")
+level_layer_menu :: proc(state: ^EditorState, i: int, uid: int, visible: bool) -> bool {
+	L := &GlobalLevel
+	doc := L.doc
+	if !imgui.BeginPopupContextItem("##layerctx") do return false
+	defer imgui.EndPopup()
+	d := &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, uid)]
+	if ctx_item(ICON_FA_SLIDERS, "Settings", "Its settings in the Layers tab") {
+		LevelDefs_SelectLayer(uid)
+		LevelEditor_ShowTab(.Layers)
+	}
+	if d.type == .IntGrid || d.type == .AutoLayer {
+		if ctx_item(ICON_FA_WAND_MAGIC_SPARKLES, "Rules", "Its auto-layer rules in the Rules tab") {
+			LevelDefs_SelectRulesLayer(uid)
+			LevelEditor_ShowTab(.Rules)
+		}
+	}
+	if ctx_item(visible ? ICON_FA_EYE_SLASH : ICON_FA_EYE, visible ? "Hide" : "Show", "Per-level visibility (saved)") {
+		e.Ldtk_Doc_Checkpoint(doc, L.level, "Layer Visibility")
+		e.Ldtk_Doc_SetLayerVisible(doc, L.level, i, !visible)
+	}
+	if ctx_item(ICON_FA_OBJECT_UNGROUP, "Select all", "Select everything in this layer (Cmd+A)") {
+		L.layer = i
+		level_sync_palette()
+		e.Ldtk_Doc_SelectAll(doc, L.level, &L.sel, i)
+		level_sync_selection()
+	}
+	imgui.Separator()
+	n := len(doc.levels[L.level].layers)
+	if ctx_item(ICON_FA_ARROW_UP, "Move up", "Draw it above the layer over it (every level)", i > 0) {
+		e.Ldtk_Doc_Checkpoint(doc, -1, "Move Layer")
+		e.Ldtk_Doc_MoveLayerDef(doc, uid, -1)
+		return true
+	}
+	if ctx_item(ICON_FA_ARROW_DOWN, "Move down", "Draw it below the layer under it", i + 1 < n) {
+		e.Ldtk_Doc_Checkpoint(doc, -1, "Move Layer")
+		e.Ldtk_Doc_MoveLayerDef(doc, uid, 1)
+		return true
+	}
+	imgui.Separator()
+	if ctx_item(ICON_FA_TRASH, "Delete layer", "Delete the layer and its content in every level (undo brings it back)") {
+		e.Ldtk_Doc_Checkpoint(doc, -1, "Delete Layer")
+		e.Ldtk_Doc_RemoveLayerDef(doc, uid)
+		level_after_defs()
+		return true
+	}
+	imgui.Separator()
+	if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "The Layers panel in the reference") do LevelRef_Open("panel.layers")
+	return false
+}
+
 // level_bottom_panel: the bottom panel's tab bar and the current page.
 @(private = "file")
 level_bottom_panel :: proc(state: ^EditorState) {
@@ -931,6 +1227,7 @@ level_bottom_panel :: proc(state: ^EditorState) {
 	// a newly selected entity shows its values
 	if L.selEntity != nil && L.selEntity != L.lastSel do L.panelRequest = .Level
 	L.lastSel = L.selEntity
+	LevelRef_Panel(LEVEL_TAB_TOPIC[L.panelTab])
 	if imgui.BeginTabBar("##level_panel_tabs", {}) {
 		for t in Level_Panel_Tab {
 			flags: imgui.TabItemFlags = {}
@@ -940,6 +1237,7 @@ level_bottom_panel :: proc(state: ^EditorState) {
 				imgui.EndTabItem()
 			}
 			Drive_Item(fmt.tprintf("level.tab:%v", t))
+			level_tip(LEVEL_TAB_TIP[t], LEVEL_TAB_TOPIC[t])
 		}
 		imgui.EndTabBar()
 	}
@@ -1134,8 +1432,8 @@ level_entity_inspector :: proc(state: ^EditorState) {
 	UI_HeaderButtons(1)
 	if UI_HeaderButton(ICON_FA_TRASH, "level.entity.remove", "Delete (Delete)") {
 		e.Ldtk_Doc_Checkpoint(doc, L.level, "Delete Entity")
-		e.Ldtk_Doc_RemoveEntity(doc, L.level, L.layer, ent)
-		L.selEntity = nil
+		e.Ldtk_Doc_RemoveEntity(doc, L.level, L.selEntityLayer, ent)
+		level_clear_selection()
 		imgui.EndChild()
 		return
 	}
@@ -1146,7 +1444,7 @@ level_entity_inspector :: proc(state: ^EditorState) {
 		UI_PropLabel("Position")
 		if imgui.DragInt2("##ent_pos", &pos, 1, 0, 0, "%d") {
 			e.Ldtk_Doc_CheckpointOnce(doc, L.level, "Move Entity", ent)
-			e.Ldtk_Doc_MoveEntity(doc, L.level, L.layer, ent, {int(pos.x), int(pos.y)})
+			e.Ldtk_Doc_MoveEntity(doc, L.level, L.selEntityLayer, ent, {int(pos.x), int(pos.y)})
 		}
 		if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
 		UI_PropLabel("Size")
@@ -1155,9 +1453,28 @@ level_entity_inspector :: proc(state: ^EditorState) {
 		if !resizable do imgui.BeginDisabled(true)
 		if imgui.InputInt2("##ent_size", &size, {.EnterReturnsTrue}) && size.x > 0 && size.y > 0 {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Resize Entity")
-			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.layer, ent, {int(size.x), int(size.y)})
+			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.selEntityLayer, ent, {int(size.x), int(size.y)})
 		}
 		if !resizable do imgui.EndDisabled()
+		// another Entities layer of the level (LDtk: move entities between layers)
+		UI_PropLabel("Layer")
+		lv := &doc.levels[L.level]
+		names := make([dynamic]string, context.temp_allocator)
+		idx := make([dynamic]int, context.temp_allocator)
+		cur := 0
+		for &ly, j in lv.layers {
+			ld := e.Ldtk_Doc_LayerDef(doc, &ly)
+			if ld == nil || ld.type != .Entities do continue
+			if j == L.selEntityLayer do cur = len(names)
+			allowed := e.Ldtk_Doc_EntityLayerAllowed(doc, L.level, j, ent)
+			append(&names, allowed ? ld.identifier : fmt.tprintf("%s (tags don't match)", ld.identifier))
+			append(&idx, j)
+		}
+		if pick, changed := UI_Combo("level.entity.layer", cur, names[:]); changed {
+			e.Ldtk_Doc_Checkpoint(doc, L.level, "Move Entity to Layer")
+			if e.Ldtk_Doc_MoveEntityToLayer(doc, L.level, L.selEntityLayer, idx[pick], ent) do level_select_entity(idx[pick], ent)
+		}
+		level_tip("The Entities layer it is in: pick another to move it there (its position is kept). Layers that require other tags say so.", "tool.select")
 		UI_PropLabel("Iid")
 		UI_DimText(e.LdtkJson_Str(ent, "iid"))
 		UI_EndProps()
@@ -1194,7 +1511,8 @@ LevelEditor_Toolbar :: proc(state: ^EditorState, width: f32, play: proc(state: ^
 	UI_VerticalDivider()
 	for t in Level_Tool {
 		info := LEVEL_TOOL_INFO[t]
-		if UI_IconButton(info.icon, fmt.tprintf("level.tool.%v", t), fmt.tprintf("%s (%s)", info.name, info.key), L.tool == t) do L.tool = t
+		if UI_IconButton(info.icon, fmt.tprintf("level.tool.%v", t), "", L.tool == t) do L.tool = t
+		level_tip(fmt.tprintf("%s (%s)\n%s", info.name, info.key, info.tip), info.topic)
 		imgui.SameLine()
 	}
 	UI_VerticalDivider()
@@ -1236,14 +1554,14 @@ LevelEditor_Toolbar :: proc(state: ^EditorState, width: f32, play: proc(state: ^
 level_undo :: proc(state: ^EditorState) {
 	L := &GlobalLevel
 	if L.doc == nil || !e.Ldtk_Doc_Undo(L.doc) do return
-	L.selEntity = nil
+	level_clear_selection()
 	level_fix_indices()
 }
 
 level_redo :: proc(state: ^EditorState) {
 	L := &GlobalLevel
 	if L.doc == nil || !e.Ldtk_Doc_Redo(L.doc) do return
-	L.selEntity = nil
+	level_clear_selection()
 	level_fix_indices()
 }
 
@@ -1269,6 +1587,10 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 	io := imgui.GetIO()
 	if imgui.IsPopupOpen("", imgui.PopupFlags_AnyPopup) do return false
 	cmd := io.KeySuper || io.KeyCtrl
+	if LevelEditor_Active() && imgui.IsKeyPressed(.F1, false) {
+		LevelRef_Open(LevelRef_HelpTopic() != "" ? LevelRef_HelpTopic() : "overview")
+		return true
+	}
 	if !LevelEditor_Active() || io.WantTextInput do return false
 	if L.doc == nil do return false
 	if cmd {
@@ -1281,6 +1603,39 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 			return true
 		case imgui.IsKeyPressed(.Z, true):
 			level_undo(state)
+			return true
+		case imgui.IsKeyPressed(.A, false):
+			layer := io.KeyShift ? -1 : L.layer
+			e.Ldtk_Doc_SelectAll(L.doc, L.level, &L.sel, layer)
+			level_sync_selection()
+			return true
+		case imgui.IsKeyPressed(.C, false), imgui.IsKeyPressed(.X, false):
+			if !e.Ldtk_Selection_Empty(&L.sel) {
+				e.Ldtk_Doc_CopySelection(L.doc, L.level, &L.sel, &L.clip)
+				if imgui.IsKeyPressed(.X, false) {
+					e.Ldtk_Doc_Checkpoint(L.doc, L.level, "Cut")
+					e.Ldtk_Doc_DeleteSelection(L.doc, L.level, &L.sel)
+					level_sync_selection()
+				}
+			}
+			return true
+		case imgui.IsKeyPressed(.V, false):
+			if !e.Ldtk_Clipboard_Empty(&L.clip) {
+				e.Ldtk_Doc_Checkpoint(L.doc, L.level, "Paste")
+				e.Ldtk_Doc_Paste(L.doc, L.level, &L.clip, LevelCanvas_PasteAt(), &L.sel)
+				level_sync_selection()
+			}
+			return true
+		case imgui.IsKeyPressed(.D, false):
+			if !e.Ldtk_Selection_Empty(&L.sel) {
+				g := 16
+				if _, d := level_active_layer(); d != nil do g = d.gridSize
+				if e.Ldtk_Doc_SelectionCanMove(L.doc, L.level, &L.sel, {g, 0}) {
+					e.Ldtk_Doc_Checkpoint(L.doc, L.level, "Duplicate")
+					e.Ldtk_Doc_MoveSelection(L.doc, L.level, &L.sel, {g, 0}, true)
+					level_sync_selection()
+				}
+			}
 			return true
 		}
 		return false
@@ -1306,14 +1661,29 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 		L.fitRequest = true
 		return true
 	case imgui.IsKeyPressed(.Delete, false), imgui.IsKeyPressed(.Backspace, false):
-		if L.selEntity != nil {
-			e.Ldtk_Doc_Checkpoint(L.doc, L.level, "Delete Entity")
-			e.Ldtk_Doc_RemoveEntity(L.doc, L.level, L.layer, L.selEntity)
-			L.selEntity = nil
+		if !e.Ldtk_Selection_Empty(&L.sel) {
+			e.Ldtk_Doc_Checkpoint(L.doc, L.level, "Delete")
+			e.Ldtk_Doc_DeleteSelection(L.doc, L.level, &L.sel)
+			level_sync_selection()
 		}
 		return true
 	case imgui.IsKeyPressed(.Escape, false):
-		L.selEntity = nil
+		level_clear_selection()
+		return true
+	case !e.Ldtk_Selection_Empty(&L.sel) && (imgui.IsKeyPressed(.LeftArrow, true) || imgui.IsKeyPressed(.RightArrow, true) || imgui.IsKeyPressed(.UpArrow, true) || imgui.IsKeyPressed(.DownArrow, true)):
+		// move the selection by one cell of the active layer
+		g := 16
+		if _, d := level_active_layer(); d != nil do g = d.gridSize
+		dir := [2]int{}
+		if imgui.IsKeyPressed(.LeftArrow, true) do dir.x = -1
+		if imgui.IsKeyPressed(.RightArrow, true) do dir.x = 1
+		if imgui.IsKeyPressed(.UpArrow, true) do dir.y = -1
+		if imgui.IsKeyPressed(.DownArrow, true) do dir.y = 1
+		if e.Ldtk_Doc_SelectionCanMove(L.doc, L.level, &L.sel, dir * g) {
+			e.Ldtk_Doc_CheckpointOnce(L.doc, L.level, "Move Selection", &L.sel)
+			e.Ldtk_Doc_MoveSelection(L.doc, L.level, &L.sel, dir * g)
+			level_sync_selection()
+		}
 		return true
 	}
 	if _, d := level_active_layer(); d != nil && d.type == .IntGrid {
@@ -1340,6 +1710,7 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 	case "level.open": return L.rel, true
 	case "level.tool": return fmt.tprintf("%v", L.tool), true
 	case "level.paneltab": return fmt.tprintf("%v", L.panelTab), true
+	case "level.ref": return LevelRef_IsOpen() ? LevelRef_Selected() : "", true
 	}
 	if doc == nil do return "<no level>", true
 	switch q {
@@ -1370,6 +1741,8 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		n := 0
 		if len(doc.levels) > 0 do for &ly in doc.levels[L.level].layers do n += len(e.LdtkJson_Arr(ly.obj, "entityInstances"))
 		return fmt.tprint(n), true
+	case "level.selection":
+		return fmt.tprintf("%d cells, %d entities", len(L.sel.cells), len(L.sel.entities)), true
 	case "level.selected":
 		return L.selEntity != nil ? e.LdtkJson_Str(L.selEntity, "__identifier") : "", true
 	case "level.selected.px":

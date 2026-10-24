@@ -132,6 +132,7 @@ Actions_Init :: proc() {
 	add({id = "debug.step_out", category = "Debug", label = "Step Out", chords = k(ch(.F11, SH)), scope = .Global, run = proc(s: ^EditorState) {Debug_Command("step-out")}, enabled = proc(s: ^EditorState) -> bool {return Debug_IsStopped()}})
 	add({id = "help.welcome", category = "Help", label = "Welcome", scope = .Global, run = Welcome_Open})
 	add({id = "help.reference", category = "Help", label = "Scripting Reference", scope = .Global, run = proc(s: ^EditorState) {ScriptReference_Open()}})
+	add({id = "help.level_reference", category = "Help", label = "Level Editor Reference", scope = .Global, run = proc(s: ^EditorState) {LevelRef_Open("overview")}})
 	add({id = "help.shortcuts", category = "Help", label = "Keyboard Shortcuts", chords = k(ch(.K, PS)), scope = .Global, run = proc(s: ^EditorState) {showShortcutsWindow = true}})
 
 	// --- Scene editing ---

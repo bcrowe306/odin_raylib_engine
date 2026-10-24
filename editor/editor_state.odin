@@ -331,6 +331,7 @@ Editor_Shutdown :: proc(state: ^EditorState) {
 	e.scriptLogSink = nil // scripts may still log while the game shuts down below
 	SceneTabs_Shutdown(state) // (writes the open tabs)
 	LevelEditor_Shutdown()
+	LevelRef_Shutdown()
 	WebServer_Stop()
 	Code_Shutdown()
 	Palette_Shutdown()

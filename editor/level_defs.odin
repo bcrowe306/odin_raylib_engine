@@ -105,7 +105,7 @@ level_after_defs :: proc() {
 	L := &GlobalLevel
 	if L.doc == nil || len(L.doc.levels) == 0 do return
 	level_follow_layer_uid()
-	L.selEntity = nil
+	level_clear_selection()
 	level_sync_palette()
 }
 
@@ -304,6 +304,12 @@ newLayer: struct {
 	tileset:   int, // index + 1 in doc.tilesets, 0 = none
 	source:    int, // auto layers: IntGrid def uid
 }
+
+// LevelDefs_SelectLayer / SelectRulesLayer / SelectEntity: what the Layers,
+// Rules and Entities tabs show.
+LevelDefs_SelectLayer :: proc(uid: int) {defs.layerUid = uid}
+LevelDefs_SelectRulesLayer :: proc(uid: int) {defs.rulesLayerUid = uid}
+LevelDefs_SelectEntity :: proc(uid: int) {defs.entityUid = uid}
 
 LevelDefs_OpenNewLayer :: proc() {
 	newLayer.request = true

@@ -904,3 +904,94 @@ Ldtk_Doc_SetWorldLayout :: proc(doc: ^Ldtk_Doc, world: int, layout: string) {
 	Ldtk_Doc_UpdateNeighbours(doc)
 	Ldtk_Doc_Touch(doc)
 }
+
+// ldtk_new_iids gives every "iid" in a tree (levels, layers, entities) a
+// fresh value.
+@(private = "file")
+ldtk_new_iids :: proc(n: ^LdtkJson, a: mem.Allocator) {
+	if n == nil do return
+	if n.kind == .Object {
+		for k, i in n.keys {
+			if k == "iid" && n.items[i].kind == .String do n.items[i] = jstr(Ldtk_Doc_Iid(context.temp_allocator), a)
+			else do ldtk_new_iids(n.items[i], a)
+		}
+	} else if n.kind == .Array {
+		for it in n.items do ldtk_new_iids(it, a)
+	}
+}
+
+// Ldtk_Doc_DuplicateLevel copies a level (content, fields) next to it in a
+// free spot; returns the copy's index.
+Ldtk_Doc_DuplicateLevel :: proc(doc: ^Ldtk_Doc, li: int) -> int {
+	a := doc.allocator
+	src := &doc.levels[li]
+	// the level with its layers as they are now (typed cells written in)
+	text := Ldtk_Doc_LevelText(doc, li)
+	obj, ok := LdtkJson_Parse(text, a)
+	if !ok do return -1
+	LdtkJson_Remove(obj, LDTK_JSON_HEADER_KEY)
+	ldtk_new_iids(obj, a)
+	uid := Ldtk_Doc_NextUid(doc)
+	LdtkJson_SetInt(obj, "uid", uid, a)
+	for ly in LdtkJson_Arr(obj, "layerInstances") do LdtkJson_SetInt(ly, "levelId", uid, a)
+	name := Ldtk_Doc_UniqueLevelName(doc, src.world)
+	LdtkJson_SetStr(obj, "identifier", name, a)
+	p := Ldtk_Doc_LevelPos(doc, li)
+	s := Ldtk_Doc_LevelSize(doc, li)
+	step := 1
+	if LdtkJson_Str(doc.worlds[src.world].obj, "worldLayout", LdtkJson_Str(doc.root, "worldLayout")) == "GridVania" do step = max(LdtkJson_Int(doc.root, "worldGridWidth", 256), 1)
+	pos := Ldtk_Doc_FreeLevelSpot(doc, src.world, {p.x + s.x, p.y}, s, step)
+	LdtkJson_SetInt(obj, "worldX", pos.x, a)
+	LdtkJson_SetInt(obj, "worldY", pos.y, a)
+	lv := Ldtk_DocLevel{obj = obj, data = obj, world = src.world}
+	if doc.external {
+		ext := LdtkJson_Clone(obj, a)
+		if hdr := LdtkJson_Get(doc.root, LDTK_JSON_HEADER_KEY); hdr != nil {
+			inject_at(&ext.keys, 0, strings.clone(LDTK_JSON_HEADER_KEY, a))
+			inject_at(&ext.items, 0, LdtkJson_Clone(hdr, a))
+		}
+		LdtkJson_SetNull(ext, "externalRelPath", a)
+		LdtkJson_Set(obj, "layerInstances", jnull(a), a)
+		LdtkJson_SetStr(obj, "externalRelPath", ldtk_external_rel(doc, name), a)
+		lv.extRoot, lv.data = ext, ext
+	}
+	// after the source in its world's list
+	arr := doc.worlds[src.world].levelsArr
+	at := len(arr.items)
+	for it, i in arr.items do if it == src.obj do at = i + 1
+	inject_at(&arr.items, at, obj)
+	lv.layers = make([dynamic]Ldtk_DocLayer, doc.heap)
+	inject_at(&doc.levels, li + 1, lv)
+	ldtk_level_index_layers(doc, &doc.levels[li + 1])
+	for &ly in doc.levels[li + 1].layers do ly.cellsDirty, ly.autoDirty = false, false
+	doc.levels[li + 1].dirty = true
+	// entities' cached world positions
+	for &ly, j in doc.levels[li + 1].layers {
+		for ent in LdtkJson_Arr(ly.obj, "entityInstances") do ldtk_entity_cached(doc, li + 1, j, ent)
+		_ = ly
+	}
+	Ldtk_Doc_UpdateNeighbours(doc)
+	Ldtk_Doc_Touch(doc)
+	return li + 1
+}
+
+// Ldtk_Doc_MoveLevelOrder moves a level up / down in its world's list (the
+// order of the linear layouts and of the Levels panel); returns its index.
+Ldtk_Doc_MoveLevelOrder :: proc(doc: ^Ldtk_Doc, li: int, delta: int) -> int {
+	lv := &doc.levels[li]
+	j := li + delta
+	if j < 0 || j >= len(doc.levels) || doc.levels[j].world != lv.world do return li
+	arr := doc.worlds[lv.world].levelsArr
+	a, b := -1, -1
+	for it, i in arr.items {
+		if it == doc.levels[li].obj do a = i
+		if it == doc.levels[j].obj do b = i
+	}
+	if a < 0 || b < 0 do return li
+	arr.items[a], arr.items[b] = arr.items[b], arr.items[a]
+	doc.levels[li], doc.levels[j] = doc.levels[j], doc.levels[li]
+	doc.levels[li].dirty, doc.levels[j].dirty = true, true
+	Ldtk_Doc_UpdateNeighbours(doc)
+	Ldtk_Doc_Touch(doc)
+	return j
+}

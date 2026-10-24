@@ -1,0 +1,117 @@
+# Level editor selection (LDtk's Selection tool): Alt+click with the brush,
+# Shift+click, rectangle, drag to move, Cmd+Alt drag to copy, arrows,
+# duplicate, delete, undo, clipboard; an entity selected shows in the Level
+# tab; the Levels / Layers context menus; F1 opens the reference.
+click @root.level
+wait 3
+click @level.new
+wait 2
+key cmd+a
+type levels/sel_zz.ldtk
+click @level.new.create
+wait 5
+expect level.open == levels/sel_zz.ldtk
+click @level.zoom
+click @pick:100%
+wait 2
+click @level.layer:Collisions
+click @level.value:1
+click @level.origin+40,40
+click @level.origin+56,40
+wait 2
+expect level.cell:3,2 == 1
+# Alt + click selects with any tool
+hold alt
+click @level.origin+40,40
+release
+wait 1
+expect level.selection == 1 cells, 0 entities
+expect level.tool == Brush
+# the Select tool: Shift + click adds
+key v
+hold shift
+click @level.origin+56,40
+release
+wait 1
+expect level.selection == 2 cells, 0 entities
+screenshot selected
+# drag to move two cells down
+drag @level.origin+40,40 @level.origin+40,72
+wait 2
+expect level.cell:2,2 == 0
+expect level.cell:2,4 == 1
+expect level.cell:3,4 == 1
+# duplicate one cell right, delete the copy, undo
+key cmd+d
+wait 2
+expect level.cell:4,4 == 1
+key delete
+wait 2
+expect level.cell:4,4 == 0
+expect level.cell:2,4 == 1
+key cmd+z
+wait 2
+expect level.cell:4,4 == 1
+# rectangle from empty space (Shift + drag), then an arrow key
+key escape
+hold shift
+drag @level.origin+20,60 @level.origin+90,90
+release
+wait 1
+expect level.selection == 3 cells, 0 entities
+key right
+wait 2
+expect level.cell:5,4 == 1
+expect level.cell:2,4 == 0
+screenshot moved_by_arrow
+# Cmd + Alt drag copies
+hold cmd+alt
+drag @level.origin+56,72 @level.origin+56,120
+release
+wait 2
+expect level.cell:3,7 == 1
+expect level.cell:3,4 == 1
+# clipboard: copy, paste under the mouse
+key cmd+c
+hover @level.origin+120,160
+wait 1
+key cmd+v
+wait 2
+expect level.cell:7,10 == 1
+expect level.cell:9,10 == 1
+screenshot pasted
+# an entity: placed, selected, shown in the Level tab
+click @level.tab:Entities
+click @defs.entity.add
+wait 2
+click @level.layer:Entities
+click @level.entity:Entity
+key b
+click @level.origin+200,200
+wait 2
+expect level.selected == Entity
+expect level.paneltab == Level
+screenshot entity_level_tab
+# context menus
+rclick @level.pick:Level_0
+wait 2
+screenshot level_menu
+click @ctx:Duplicate
+wait 3
+expect level.levels == 2
+rclick @level.layer:Collisions
+wait 2
+screenshot layer_menu
+click @ctx:Settings
+wait 2
+expect level.paneltab == Layers
+# F1 over a tool opens its reference page
+hover @level.tool.Fill
+wait 3
+key f1
+wait 2
+expect level.ref == Fill
+screenshot reference
+key cmd+s
+wait 3
+expect level.modified == false
