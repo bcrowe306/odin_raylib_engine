@@ -436,6 +436,18 @@ film its animation, otherwise *gameplay*; a child machine is named), the
   game's machine, polled over the editor link) the current state is lit
   (with a bar for its time), the transition that fired flashes, and the side
   panel lists the **history** of changes.
+- **Guards** (a state's side panel, *Guards*): **Leave After** (seconds
+  before any arrow can leave it), **Any State Interrupts** (off: arrows from
+  Any state don't fire while in it), **Can leave when** and **Can enter
+  when** (condition rows like an arrow's; empty = any time). A guarded state
+  shows a **lock** (hover it for the guards). *Add Guard Callbacks* (menu or
+  side panel) writes `can_exit_<state>(next)` / `can_enter_<state>(previous)`
+  returning true into the script. The rule: an arrow allows a change, its
+  conditions say when it goes by itself, the states' guards can refuse it.
+- **Ways out (live)**: with the current state selected (or nothing), each
+  arrow out of it - *fires*, *waiting for speed > 10*, or *blocked: attack:
+  leave after 0.4s (0.12s so far)*; a selected arrow marks each condition
+  green / red, and an arrow that would fire but is blocked is drawn red.
 - **Break on Enter** (a state's menu or side panel; a red dot): entering
   that state pauses Simulate, or the running game (its toolbar shows
   Paused; Resume / Step as usual). Kept by the editor (not saved in the

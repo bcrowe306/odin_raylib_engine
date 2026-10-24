@@ -156,7 +156,9 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 			strings.write_string(&sb, ", \"missing\": true}")
 			fmt.printfln("@ore:sm %s", strings.to_string(sb))
 		} else {
-			fmt.printfln("@ore:sm %s", StateMachine_StatusJSON(cast(^StateMachineNode)n, rest))
+			sm := cast(^StateMachineNode)n
+			sm.explain = true // the editor shows its ways out (from the next update)
+			fmt.printfln("@ore:sm %s", StateMachine_StatusJSON(sm, rest))
 		}
 	case "sm-break":
 		// sm-break <path> <state> 0|1

@@ -1,0 +1,84 @@
+# State guards: a state's Leave After, Any State Interrupts and Can enter
+# when (side panel), saved; the lock on its box; in Simulate the live Ways
+# out says which guard blocks an arrow, and sm_request says why not.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type state machine
+key enter
+wait 3
+click @insp.sm.add-param
+rclick @smg.canvas+-150,-20
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type idle
+key enter
+rclick @smg.canvas+120,40
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type attack
+key enter
+wait 2
+hover @smg.canvas
+key f
+wait 2
+# idle -> attack when param; attack -> idle always (but guarded).
+drag @smg.handle:idle @smg.state:attack 10
+wait 2
+click @insp.sm.add-cond:0
+drag @smg.handle:attack @smg.state:idle 10
+wait 2
+# attack: leave after 30 s, Any state can't interrupt it.
+click @smg.state:attack
+wait 2
+dblclick @smg.state-min-time
+key ctrl+a
+type 30
+key enter
+click @smg.state-interruptible
+wait 2
+expect item:smg.lock:attack == visible
+# idle: can enter when param.
+click @smg.state:idle
+wait 2
+click @smg.enter.add-cond:0
+wait 2
+screenshot guards_panel
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "name": "attack", "pos": [
+expect file:scenes/main.scene.json contains "min_time": 30, "interruptible": false
+expect file:scenes/main.scene.json contains "enter_when": [["true", "param"]]
+# Simulate: param -> attack; attack -> idle holds but Leave After blocks it.
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+expect node:StateMachine.state == idle/2
+click @bottom:console
+click @console.lua
+type Scene.find_node("StateMachine"):sm_set("param", true)
+key enter
+wait 20
+expect node:StateMachine.state == attack/2
+type print(Scene.find_node("StateMachine"):sm_request("idle"))
+key enter
+wait 5
+expect log contains attack: leave after 30s
+click @bottom:stategraph
+wait 5
+click @smg.state:attack
+wait 5
+expect smg-ways contains idle:Min_Time
+expect item:smg.way:idle == visible
+hover @smg.way:idle
+wait 3
+screenshot simulate_blocked
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

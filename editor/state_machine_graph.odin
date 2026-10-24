@@ -25,10 +25,13 @@ import imgui "lib/imgui"
 //                          F frames everything
 //
 // The side panel edits the selection: a state's name, animation, child
-// machine, break on enter and its script callbacks; a transition's
-// conditions (shared with the Inspector). While the scene runs (Simulate)
-// the current state is lit, the transition that fired flashes, and the
-// history lists the last changes.
+// machine, break on enter, its guards (leave after, interruptible by Any
+// state, can leave when / can enter when) and its script callbacks; a
+// transition's conditions (shared with the Inspector). While the scene
+// runs (Simulate, or the game in Play) the current state is lit, the
+// transition that fired flashes, the history lists the last changes, and
+// "Ways out" shows each arrow from the current state with every
+// condition's result and the guard that blocks it (blocked arrows red).
 // ============================================================================
 
 SMG_BOX :: [2]f32{150, 54}
@@ -65,6 +68,8 @@ SMG_View :: struct {
 	history: []e.SM_Change,
 	changes: int, // a counter that moves on every change (flash)
 	remote:  bool,
+	ways:    []e.SM_Way, // the ways out of the current state (explain)
+	leave:   u32,        // the current state's leave conditions (bits)
 }
 
 // The game's last answer for the machine shown (heap strings).
@@ -79,6 +84,9 @@ smgRemote: struct {
 	count:   int,
 	asked:   time.Tick,
 	got:     bool,
+	ways:    [e.SM_WAYS_MAX]e.SM_Way,
+	wayCount: int,
+	leave:   u32,
 }
 
 @(private = "file")
@@ -92,6 +100,8 @@ smg_remote_clear :: proc() {
 	delete(smgRemote.current)
 	smgRemote.current = ""
 	smgRemote.got = false
+	smgRemote.wayCount = 0
+	smgRemote.leave = 0
 }
 
 StateGraph_Shutdown :: proc() {
@@ -118,11 +128,11 @@ smg_view :: proc(state: ^EditorState, sm: ^e.StateMachineNode) -> SMG_View {
 			RemoteGame_Send(fmt.tprintf("sm %s", path))
 		}
 		if smgRemote.got && smgRemote.path == path {
-			return {smgRemote.running, e.StateMachine_FindState(sm, smgRemote.current), smgRemote.secs, smgRemote.fired, smgRemote.history[:], smgRemote.count, true}
+			return {smgRemote.running, e.StateMachine_FindState(sm, smgRemote.current), smgRemote.secs, smgRemote.fired, smgRemote.history[:], smgRemote.count, true, smgRemote.ways[:smgRemote.wayCount], smgRemote.leave}
 		}
 		return {remote = true, current = -1, fired = -1}
 	}
-	return {sm.running, sm.current, sm.timeInState, sm.lastFired, e.StateMachine_History(sm), sm.historyLen * 1000 + sm.historyNext, false}
+	return {sm.running, sm.current, sm.timeInState, sm.lastFired, e.StateMachine_History(sm), sm.historyLen * 1000 + sm.historyNext, false, sm.ways[:sm.wayCount], sm.leaveMask}
 }
 
 // StateGraph_RemoteReply: the game's "@ore:sm" answer.
@@ -151,6 +161,15 @@ StateGraph_RemoteReply :: proc(text: string) {
 			h, hok := hv.(json.Array)
 			if !hok || len(h) < 4 do continue
 			append(&smgRemote.history, e.SM_Change{strings.clone(string(h[0].(json.String) or_else "")), strings.clone(string(h[1].(json.String) or_else "")), f32(num(h[2])), strings.clone(string(h[3].(json.String) or_else ""))})
+		}
+	}
+	smgRemote.leave = u32(num(o["leave"]))
+	if arr, isArr := o["ways"].(json.Array); isArr {
+		for wv in arr {
+			wa, wok := wv.(json.Array)
+			if !wok || len(wa) < 5 || smgRemote.wayCount >= e.SM_WAYS_MAX do continue
+			smgRemote.ways[smgRemote.wayCount] = {i32(num(wa[0])), num(wa[1]) != 0, e.SM_Block(clamp(int(num(wa[2])), 0, len(e.SM_Block) - 1)), u32(num(wa[3])), u32(num(wa[4]))}
+			smgRemote.wayCount += 1
 		}
 	}
 	if n := len(smgRemote.history); n > 0 {
@@ -235,6 +254,7 @@ StateGraph_Render :: proc(state: ^EditorState) {
 	}
 	sm := cast(^e.StateMachineNode)sel
 	if smg.node != sm do smg_reset(sm)
+	sm.explain = true // the live "ways out" (Simulate)
 	stateGraphFocused = imgui.IsWindowFocused(imgui.FocusedFlags_RootAndChildWindows)
 	smg_sync_breaks(state, sm) // the editor keeps them (scene rebuilds don't)
 	if smg.zoom == 0 do smg.zoom = 1
@@ -284,11 +304,11 @@ seg_dist :: proc(p, a, b: [2]f32) -> f32 {
 }
 
 // smg_condition_text: a short label for a transition's conditions.
-smg_condition_text :: proc(t: e.SM_Transition) -> string {
-	if len(t.conditions) == 0 do return "always"
+smg_condition_text :: proc(conds: []e.SM_Condition) -> string {
+	if len(conds) == 0 do return "always"
 	sb := strings.builder_make(context.temp_allocator)
 	sep := ""
-	for c in t.conditions {
+	for c in conds {
 		if c.op == .Or {
 			strings.write_string(&sb, " | ")
 			sep = ""
@@ -393,6 +413,10 @@ smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 		thick: f32 = 1.5
 		if ti == smg.selTr {col = UI_ACCENT; thick = 2.5}
 		else if ti == hoverTr do col = ui_line(0.7)
+		if view.running do for w in view.ways do if int(w.transition) == ti && w.arrow && w.block != .None {
+			col = UI_DANGER // it would fire, a guard says no
+			thick = max(thick, 2)
+		}
 		if ti == smg.flashTr && flash > 0 {col = {0.96, 0.72, 0.30, 0.4 + 0.6 * flash}; thick = 2 + 2 * flash}
 		imgui.DrawList_AddLine(dl, a, b, col_u32(col), thick)
 		// Arrowhead.
@@ -400,7 +424,7 @@ smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 		imgui.DrawList_AddTriangleFilled(dl, b, b - dir * ah + perp * ah * 0.5, b - dir * ah - perp * ah * 0.5, col_u32(col))
 		// The conditions at the middle.
 		if smg.zoom > 0.55 {
-			label := strings.clone_to_cstring(smg_condition_text(t), context.temp_allocator)
+			label := strings.clone_to_cstring(smg_condition_text(t.conditions[:]), context.temp_allocator)
 			w := imgui.CalcTextSize(label).x * 0.85
 			mid := (a + b) * 0.5 + perp * 10
 			imgui.DrawList_AddRectFilled(dl, {mid.x - w * 0.5 - 4, mid.y - 8}, {mid.x + w * 0.5 + 4, mid.y + 8}, col_u32(CODE_BG), 3)
@@ -443,6 +467,13 @@ smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 			if s.child != "" do sub = fmt.tprintf("%s  %s %s", sub, ICON_FA_SITEMAP, s.child)
 			if smg.zoom > 0.6 do imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12, {mn.x + pad.x, mx.y - pad.y - 13}, col_u32(UI_TEXT_DIM), strings.clone_to_cstring(sub, context.temp_allocator))
 			if s.breakOnEnter do imgui.DrawList_AddCircleFilled(dl, {mx.x - 10, mn.y + 10}, 4.5, col_u32({0.92, 0.30, 0.29, 1}))
+			if e.StateMachine_HasGuards(s) {
+				// Guarded: a lock (what it refuses in the tooltip).
+				lp := [2]f32{mx.x - (34 if s.breakOnEnter else 22), mn.y + 4}
+				imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12, lp, col_u32(UI_WARNING), ICON_FA_LOCK)
+				if hovered && point_in_rect(mouse, lp - {3, 3}, lp + {15, 17}) do imgui.SetTooltip("%s", strings.clone_to_cstring(smg_guard_summary(s), context.temp_allocator))
+				Drive_ItemRect(fmt.tprintf("smg.lock:%s", s.name), lp, lp + {12, 14}, inWindow = true)
+			}
 			if current {
 				// Time in the state, a thin bar along the bottom.
 				f := clamp(view.time / 3, 0, 1)
@@ -568,6 +599,9 @@ smg_context_menu :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 		Drive_Item("ctx:smg-break")
 		if imgui.MenuItem(fmt.ctprintf("%s  Add Script Callbacks", ICON_FA_CODE)) do smg_add_callbacks(state, sm, s.name)
 		Drive_Item("ctx:smg-callbacks")
+		if imgui.MenuItem(fmt.ctprintf("%s  Add Guard Callbacks", ICON_FA_LOCK)) do smg_add_callbacks(state, sm, s.name, guards = true)
+		Drive_Item("ctx:smg-guard-callbacks")
+		UI_Tooltip("can_exit_ / can_enter_: return false to refuse the change")
 		imgui.Separator()
 		if imgui.MenuItem(fmt.ctprintf("%s  Delete State", ICON_FA_TRASH)) {
 			smg.selState = i
@@ -602,10 +636,11 @@ smg_script_rel :: proc(state: ^EditorState, sm: ^e.StateMachineNode) -> (string,
 	return "", nil
 }
 
-// smg_add_callbacks writes on_enter_ / on_update_ / on_exit_<state> into
-// the script (those missing), before its final `return`.
+// smg_add_callbacks writes on_enter_ / on_update_ / on_exit_<state> (or
+// with guards can_exit_ / can_enter_<state>) into the script (those
+// missing), before its final `return`.
 @(private = "file")
-smg_add_callbacks :: proc(state: ^EditorState, sm: ^e.StateMachineNode, name: string) {
+smg_add_callbacks :: proc(state: ^EditorState, sm: ^e.StateMachineNode, name: string, guards := false) {
 	rel, _ := smg_script_rel(state, sm)
 	if rel == "" {
 		Editor_Log(state, .Warn, "Attach a script to %s or its parent first: the callbacks go there", sm.name)
@@ -617,14 +652,17 @@ smg_add_callbacks :: proc(state: ^EditorState, sm: ^e.StateMachineNode, name: st
 	cls := Script_ClassName(buf.buffer_to_string(b, context.temp_allocator))
 	if cls == "" do return
 	sb := strings.builder_make(context.temp_allocator)
-	methods := [3][3]string{{"on_enter_", "previous", "Entered (from the previous state)"}, {"on_update_", "dt", "Every frame while in the state"}, {"on_exit_", "next", "Left (for the next state)"}}
+	CALLBACKS :: [?][4]string{{"on_enter_", "previous", "Entered (from the previous state)", ""}, {"on_update_", "dt", "Every frame while in the state", ""}, {"on_exit_", "next", "Left (for the next state)", ""}}
+	GUARDS :: [?][4]string{{"can_exit_", "next", "Can it leave for next? false keeps it here", "    return true\n"}, {"can_enter_", "previous", "Can it come in from previous? false keeps it out", "    return true\n"}}
+	cbs, gs := CALLBACKS, GUARDS
+	methods := gs[:] if guards else cbs[:]
 	for m in methods {
 		method := strings.concatenate({m[0], name}, context.temp_allocator)
 		if _, _, _, found := Script_FindMethod(b, cls, method); found do continue
-		fmt.sbprintf(&sb, "\n---State %s: %s\nfunction %s:%s(%s)\nend\n", name, m[2], cls, method, m[1])
+		fmt.sbprintf(&sb, "\n---State %s: %s\nfunction %s:%s(%s)\n%send\n", name, m[2], cls, method, m[1], m[3])
 	}
 	if strings.builder_len(sb) == 0 {
-		Editor_Log(state, .Info, "%s already has the callbacks of %s", rel, name)
+		Editor_Log(state, .Info, "%s already has the %s of %s", rel, "guard callbacks" if guards else "callbacks", name)
 		return
 	}
 	insertLine := buf.buffer_line_count(b)
@@ -635,7 +673,7 @@ smg_add_callbacks :: proc(state: ^EditorState, sm: ^e.StateMachineNode, name: st
 	buf.buffer_insert_text(b, {insertLine, 0}, strings.to_string(sb), group)
 	code_set_single_cursor(b, {insertLine + 3, 0}, false)
 	doc.scrollToCursor = true
-	Editor_Log(state, .Info, "Added %s's callbacks to %s", name, rel)
+	Editor_Log(state, .Info, "Added %s's %s to %s", name, "guard callbacks" if guards else "callbacks", rel)
 }
 
 // --- side panel ---------------------------------------------------------------------
@@ -646,9 +684,18 @@ smg_side_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 	switch {
 	case smg.selTr >= 0 && smg.selTr < len(sm.transitions):
 		UI_PanelTitle(ICON_FA_ARROW_RIGHT, "Transition")
-		if SM_TransitionEditor(state, sm, &sm.transitions[smg.selTr], smg.selTr, avail) do smg_delete_selection(state, sm)
+		// Live: its conditions' results while it's a way out of the current state.
+		view := smg_view(state, sm)
+		live, hasLive := u32(0), false
+		block := e.SM_Block.None
+		if view.running do for w in view.ways do if int(w.transition) == smg.selTr do live, hasLive, block = w.mask, true, w.block
+		if SM_TransitionEditor(state, sm, &sm.transitions[smg.selTr], smg.selTr, avail, live, hasLive) do smg_delete_selection(state, sm)
+		if hasLive && block != .None {
+			t := sm.transitions[smg.selTr]
+			imgui.TextColored(UI_DANGER, "%s", fmt.ctprintf("%s  blocked: %s", ICON_FA_LOCK, e.StateMachine_BlockText(sm, block, smg_current_name(sm, view), t.to, view.time)))
+		}
 		imgui.Dummy({0, 4})
-		UI_DimText("Conditions are ANDed; Or starts another group. Checked in order; one fires per frame.")
+		UI_DimText("An arrow allows the change; its conditions say when it goes by itself (ANDed; Or starts another group). Checked in order; one fires per frame. The states' guards can still refuse it.")
 	case smg.selState >= 0 && smg.selState < len(sm.states):
 		smg_state_panel(state, sm, smg.selState, avail)
 	case:
@@ -659,6 +706,7 @@ smg_side_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 			imgui.TextColored(UI_ACCENT, "%s", fmt.ctprintf("%s  %s  (%.1fs)%s", ICON_FA_PLAY, sm.states[view.current].name, view.time, "  - in the running game" if view.remote else ""))
 		}
 		Drive_Item("smg.live")
+		smg_ways_panel(state, sm, view)
 		if len(sm.params) > 0 {
 			imgui.SeparatorText("Parameters")
 			for &p in sm.params {
@@ -751,19 +799,117 @@ smg_state_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode, i: int, av
 		UI_Tooltip("Pause when the machine enters this state (Simulate and Play)")
 		UI_EndProps()
 	}
+	view := smg_view(state, sm)
+	isCurrent := view.running && view.current == i
+	if isCurrent do smg_ways_panel(state, sm, view)
+	smg_guards_section(state, sm, i, avail, view, isCurrent)
 	imgui.SeparatorText("Script callbacks")
 	rel, owner := smg_script_rel(state, sm)
 	if rel != "" {
 		UI_DimText(fmt.tprintf("on %s's script (%s):", owner.name, rel))
 		for m in ([3]string{"on_enter_", "on_update_", "on_exit_"}) do imgui.TextUnformatted(fmt.ctprintf("  %s%s", m, s.name))
 		if UI_Button(fmt.tprintf("%s  Add Missing Callbacks", ICON_FA_CODE), "smg.add-callbacks") do smg_add_callbacks(state, sm, s.name)
+		imgui.SameLine()
+		if UI_Button(fmt.tprintf("%s  Add Guard Callbacks", ICON_FA_LOCK), "smg.add-guard-callbacks") do smg_add_callbacks(state, sm, s.name, guards = true)
+		UI_Tooltip(fmt.tprintf("can_exit_%s(next) / can_enter_%s(previous): return false to refuse the change", s.name, s.name))
 	} else {
-		UI_DimText("Attach a script to the machine or its parent for on_enter_ / on_update_ / on_exit_ callbacks.")
+		UI_DimText("Attach a script to the machine or its parent for on_enter_ / on_update_ / on_exit_ callbacks (and can_exit_ / can_enter_ guards).")
 	}
 	imgui.SeparatorText("Transitions out")
 	for t, ti in sm.transitions {
 		if t.from != s.name do continue
-		if imgui.Selectable(fmt.ctprintf("%s %s   %s##smgout%d", ICON_FA_ARROW_RIGHT, t.to, smg_condition_text(t), ti)) do smg.selTr, smg.selState = ti, -1
+		if imgui.Selectable(fmt.ctprintf("%s %s   %s##smgout%d", ICON_FA_ARROW_RIGHT, t.to, smg_condition_text(t.conditions[:]), ti)) do smg.selTr, smg.selState = ti, -1
+	}
+}
+
+// smg_current_name: the live current state's name ("" none).
+@(private = "file")
+smg_current_name :: proc(sm: ^e.StateMachineNode, view: SMG_View) -> string {
+	return sm.states[view.current].name if view.current >= 0 && view.current < len(sm.states) else ""
+}
+
+// smg_guard_summary: one line per guard of a state (the lock's tooltip).
+@(private = "file")
+smg_guard_summary :: proc(s: e.SM_State) -> string {
+	sb := strings.builder_make(context.temp_allocator)
+	if s.minTime > 0 do fmt.sbprintf(&sb, "Leave after %.2gs\n", s.minTime)
+	if s.noInterrupt do strings.write_string(&sb, "Any state can't interrupt it\n")
+	if len(s.leaveWhen) > 0 do fmt.sbprintf(&sb, "Can leave when %s\n", smg_condition_text(s.leaveWhen[:]))
+	if len(s.enterWhen) > 0 do fmt.sbprintf(&sb, "Can enter when %s\n", smg_condition_text(s.enterWhen[:]))
+	return strings.trim_right(strings.to_string(sb), "\n")
+}
+
+// smg_guards_section: a state's guards in the side panel.
+@(private = "file")
+smg_guards_section :: proc(state: ^EditorState, sm: ^e.StateMachineNode, i: int, avail: f32, view: SMG_View, isCurrent: bool) {
+	s := &sm.states[i]
+	imgui.SeparatorText("Guards")
+	UI_Tooltip("An arrow says the machine may go there; guards let a state refuse: they apply to every arrow, Any state and sm_request (not sm_travel)")
+	if UI_BeginProps("##smgguards") {
+		UI_PropLabel("Leave After")
+		imgui.SetNextItemWidth(-1)
+		imgui.DragFloat("##smg_min", &s.minTime, 0.01, 0, 60, "%.2f s" if s.minTime > 0 else "any time")
+		undo_on_activate(state, "Leave after")
+		if s.minTime < 0 do s.minTime = 0
+		Drive_Item("smg.state-min-time")
+		UI_Tooltip("No arrow leaves this state before it has been in it this long (e.g. an attack that can't be cancelled)")
+		UI_PropLabel("Any State Interrupts")
+		interrupt := !s.noInterrupt
+		if imgui.Checkbox("##smg_interrupt", &interrupt) {
+			Editor_RecordUndo(state, "Interruptible")
+			s.noInterrupt = !interrupt
+		}
+		Drive_Item("smg.state-interruptible")
+		UI_Tooltip("Off: arrows from Any state don't fire while in this state (e.g. dead, a cutscene)")
+		UI_EndProps()
+	}
+	imgui.TextUnformatted("Can leave when")
+	imgui.SameLine()
+	UI_DimText("(empty: any time)" if len(s.leaveWhen) == 0 else "(else it stays)")
+	SM_ConditionList(state, sm, &s.leaveWhen, "smg.leave", i, avail, live = view.leave, hasLive = isCurrent)
+	imgui.TextUnformatted("Can enter when")
+	imgui.SameLine()
+	UI_DimText("(empty: any time)" if len(s.enterWhen) == 0 else "(else nothing comes in)")
+	// Live: when the current state has a way here, that way's enter results.
+	enterLive, enterHas := u32(0), false
+	if view.running do for w in view.ways do if int(w.transition) < len(sm.transitions) && sm.transitions[w.transition].to == s.name do enterLive, enterHas = w.enterMask, true
+	SM_ConditionList(state, sm, &s.enterWhen, "smg.enter", i, avail, live = enterLive, hasLive = enterHas)
+}
+
+// smg_ways_panel: live, each arrow out of the current state - its
+// conditions' results and what blocks it.
+@(private = "file")
+smg_ways_panel :: proc(state: ^EditorState, sm: ^e.StateMachineNode, view: SMG_View) {
+	if !view.running || view.current < 0 || view.current >= len(sm.states) do return
+	imgui.SeparatorText("Ways out (live)")
+	if len(view.ways) == 0 {
+		UI_DimText("No arrows out of this state.")
+		return
+	}
+	cur := sm.states[view.current].name
+	for w, k in view.ways {
+		if int(w.transition) >= len(sm.transitions) do continue
+		t := sm.transitions[w.transition]
+		from := "Any " if t.from == e.SM_ANY else ""
+		if imgui.Selectable(fmt.ctprintf("%s%s %s   %s##smgway%d", from, ICON_FA_ARROW_RIGHT, t.to, smg_condition_text(t.conditions[:]), k)) do smg.selTr, smg.selState = int(w.transition), -1
+		Drive_Item(fmt.tprintf("smg.way:%s", t.to))
+		imgui.Indent()
+		switch {
+		case w.block != .None:
+			imgui.TextColored(UI_DANGER if w.arrow else UI_TEXT_DIM, "%s", fmt.ctprintf("%s  %s%s", ICON_FA_LOCK, "blocked: " if w.arrow else "", e.StateMachine_BlockText(sm, w.block, cur, t.to, view.time)))
+		case w.arrow:
+			imgui.TextColored(UI_SUCCESS, "%s", fmt.ctprintf("%s  fires", ICON_FA_CIRCLE_CHECK))
+		case:
+			// Which conditions are still missing.
+			missing := strings.builder_make(context.temp_allocator)
+			for c, j in t.conditions {
+				if c.op == .Or || (j < e.SM_CONDITIONS_MAX && w.mask & (1 << u32(j)) != 0) do continue
+				if strings.builder_len(missing) > 0 do strings.write_string(&missing, ", ")
+				strings.write_string(&missing, smg_condition_text(t.conditions[j:j + 1]))
+			}
+			UI_DimText(fmt.tprintf("waiting for %s", strings.to_string(missing)))
+		}
+		imgui.Unindent()
 	}
 }
 
@@ -777,6 +923,21 @@ StateGraph_Query :: proc(q: string) -> (string, bool) {
 		if smg.selState == -2 do return "Any", true
 		if smg.selState >= 0 && smg.selState < len(sm.states) do return sm.states[smg.selState].name, true
 		return "", true
+	case "smg-ways":
+		// "to:fires|waiting|<block>, ..." for the machine shown (live).
+		sm := smg.node
+		if sm == nil do return "", true
+		view := smg_view(&GlobalEditor, sm)
+		sb := strings.builder_make(context.temp_allocator)
+		for w, k in view.ways {
+			if int(w.transition) >= len(sm.transitions) do continue
+			if k > 0 do strings.write_string(&sb, ", ")
+			status := "waiting"
+			if w.block != .None do status = fmt.tprintf("%v", w.block)
+			else if w.arrow do status = "fires"
+			fmt.sbprintf(&sb, "%s:%s", sm.transitions[w.transition].to, status)
+		}
+		return strings.to_string(sb), true
 	case "smg-zoom": return fmt.tprintf("%.2f", smg.zoom), true
 	case "smg-pan": return fmt.tprintf("%.0f,%.0f", smg.pan.x, smg.pan.y), true
 	}

@@ -30,6 +30,18 @@ import lua "vendor:lua/5.4"
 //   is entered, stopped when it is left (sub-states: Combat > Attack / Block).
 // - The last SM_HISTORY_MAX changes are kept (from, to, time, why) for the
 //   editor's history and Lua's sm_history().
+// - Guards (on states): an arrow says a change is allowed and when it goes
+//   by itself; a state can also refuse to be left or entered. A change
+//   happens only when the current state lets it leave (minTime seconds
+//   spent, not an Any-state arrow when noInterrupt, its leaveWhen
+//   conditions, the script's can_exit_<state>(next)) and the target lets it
+//   in (enterWhen, can_enter_<state>(previous)). A blocked arrow doesn't
+//   fire (its triggers stay set); the next one is tried. sm_travel ignores
+//   all of it; StateMachine_Request (sm_request) follows an arrow and the
+//   guards, but not the arrow's conditions.
+// - explain (the editor sets it on the machine it shows): each update keeps
+//   every way out of the current state with each condition's result and the
+//   guard that blocks it (ways / leaveMask) for the live "why not" display.
 // ============================================================================
 
 SM_Op :: enum {
@@ -72,6 +84,35 @@ SM_State :: struct {
 	child:     string,  // a child state machine (path) run while in this state
 	pos:       [2]f32,  // graph editor position
 	breakOnEnter: bool, // editor only: pause when entered (not saved)
+	// Guards.
+	minTime:     f32,                   // can't be left before this many seconds in it
+	noInterrupt: bool,                  // Any-state arrows don't fire from it
+	leaveWhen:   [dynamic]SM_Condition, // can be left only when these hold (empty: any time)
+	enterWhen:   [dynamic]SM_Condition, // can be entered only when these hold
+}
+
+// SM_Block: what stops a change (StateMachine_Guard / StateMachine_Request).
+SM_Block :: enum u8 {
+	None,
+	No_Transition,     // (a request) no arrow from the current state (or Any) to it
+	Not_Interruptible, // an Any-state arrow, and the state says no
+	Min_Time,          // not long enough in the state
+	Leave_When,        // the state's leave conditions don't hold
+	Enter_When,        // the target's enter conditions don't hold
+	Can_Exit,          // can_exit_<state>(next) returned false
+	Can_Enter,         // can_enter_<state>(previous) returned false
+}
+
+SM_WAYS_MAX :: 32
+SM_CONDITIONS_MAX :: 32 // per list, for the explain masks
+
+// SM_Way: one way out of the current state as last evaluated (explain).
+SM_Way :: struct {
+	transition: i32,
+	arrow:      bool,    // its conditions hold
+	block:      SM_Block,
+	mask:       u32,     // bit j: its condition j holds
+	enterMask:  u32,     // bit j: the target's enter condition j holds
 }
 
 SM_HISTORY_MAX :: 32
@@ -119,6 +160,10 @@ StateMachineNode :: struct {
 	historyNext: int,
 	lastFired:   int, // index of the transition that fired last (-1 = none)
 	onEnterHook: proc(sm: ^StateMachineNode, state: string), // editor: break on enter
+	explain:     bool,    // keep ways / leaveMask each update (the editor's live view)
+	ways:        [SM_WAYS_MAX]SM_Way,
+	wayCount:    int,
+	leaveMask:   u32,     // bit j: the current state's leave condition j holds
 	// "state_changed"(name): entered a state.
 	onStateChanged: EventSubject,
 }
@@ -158,7 +203,13 @@ StateMachine_FindState :: proc(sm: ^StateMachineNode, name: string) -> int {
 
 StateMachine_AddState :: proc(sm: ^StateMachineNode, name: string, animation := "") -> int {
 	if i := StateMachine_FindState(sm, name); i >= 0 do return i
-	append(&sm.states, SM_State{name = strings.clone(name, sm.allocator), animation = strings.clone(animation, sm.allocator), pos = {f32(len(sm.states) % 4) * 200 + 160, f32(len(sm.states) / 4) * 120 + 40}})
+	append(&sm.states, SM_State{
+		name = strings.clone(name, sm.allocator),
+		animation = strings.clone(animation, sm.allocator),
+		pos = {f32(len(sm.states) % 4) * 200 + 160, f32(len(sm.states) / 4) * 120 + 40},
+		leaveWhen = make([dynamic]SM_Condition, sm.allocator),
+		enterWhen = make([dynamic]SM_Condition, sm.allocator),
+	})
 	if sm.initial == "" do sm.initial = sm.states[len(sm.states) - 1].name
 	return len(sm.states) - 1
 }
@@ -201,8 +252,20 @@ StateMachine_AddTransition :: proc(sm: ^StateMachineNode, from, to: string, blen
 }
 
 StateMachine_AddCondition :: proc(sm: ^StateMachineNode, t: ^SM_Transition, op: SM_Op, param := "", value: f32 = 0) {
-	append(&t.conditions, SM_Condition{op, strings.clone(param, sm.allocator), value})
+	StateMachine_AddConditionTo(sm, &t.conditions, op, param, value)
+}
+
+// StateMachine_AddConditionTo: a condition on any list (an arrow's, a
+// state's leaveWhen / enterWhen).
+StateMachine_AddConditionTo :: proc(sm: ^StateMachineNode, list: ^[dynamic]SM_Condition, op: SM_Op, param := "", value: f32 = 0) {
+	if list.allocator.procedure == nil do list.allocator = sm.allocator
+	append(list, SM_Condition{op, strings.clone(param, sm.allocator), value})
 	if param != "" && SM_Op_UsesParam(op) && op != .Call do StateMachine_EnsureParam(sm, param)
+}
+
+// StateMachine_HasGuards: the state refuses some changes.
+StateMachine_HasGuards :: proc(s: SM_State) -> bool {
+	return s.minTime > 0 || s.noInterrupt || len(s.leaveWhen) > 0 || len(s.enterWhen) > 0
 }
 
 StateMachine_EnsureParam :: proc(sm: ^StateMachineNode, name: string, value: f32 = 0) -> ^SM_Param {
@@ -343,6 +406,8 @@ StateMachine_Enter :: proc(sm: ^StateMachineNode, index: int, blend: f32, ctx: ^
 	sm.previous = sm.current
 	sm.current = index
 	sm.timeInState = 0
+	sm.wayCount = 0 // (they were the old state's)
+	sm.leaveMask = 0
 	// History (ring).
 	sm.history[sm.historyNext] = SM_Change{old, next, sm.timeRunning, why}
 	sm.historyNext = (sm.historyNext + 1) % SM_HISTORY_MAX
@@ -382,7 +447,14 @@ StateMachine_StatusJSON :: proc(sm: ^StateMachineNode, path: string) -> string {
 	q(&sb, path)
 	fmt.sbprintf(&sb, ", \"running\": %t, \"current\": ", sm.running)
 	q(&sb, StateMachine_CurrentName(sm))
-	fmt.sbprintf(&sb, ", \"time\": %.3f, \"fired\": %d, \"history\": [", sm.timeInState, sm.lastFired)
+	fmt.sbprintf(&sb, ", \"time\": %.3f, \"fired\": %d", sm.timeInState, sm.lastFired)
+	// The ways out (explain): [transition, arrow 0|1, block, mask, enterMask].
+	fmt.sbprintf(&sb, ", \"leave\": %d, \"ways\": [", sm.leaveMask)
+	for w, i in sm.ways[:sm.wayCount] {
+		if i > 0 do strings.write_string(&sb, ", ")
+		fmt.sbprintf(&sb, "[%d, %d, %d, %d, %d]", w.transition, 1 if w.arrow else 0, int(w.block), w.mask, w.enterMask)
+	}
+	strings.write_string(&sb, "], \"history\": [")
 	for h, i in StateMachine_History(sm) {
 		if i > 0 do strings.write_string(&sb, ", ")
 		strings.write_byte(&sb, '[')
@@ -397,10 +469,10 @@ StateMachine_StatusJSON :: proc(sm: ^StateMachineNode, path: string) -> string {
 	return strings.to_string(sb)
 }
 
-// sm_call_bool: Target:method() on the machine's script, else its
-// parent's; (result, found).
+// sm_call_bool: Target:method([arg]) on the machine's script, else its
+// parent's (the first that defines it answers); (result, found).
 @(private = "file")
-sm_call_bool :: proc(sm: ^StateMachineNode, method: string) -> (bool, bool) {
+sm_call_bool :: proc(sm: ^StateMachineNode, method: string, arg := "", hasArg := false) -> (bool, bool) {
 	gc := sm.gameContext
 	if gc == nil || gc.scriptManager == nil || method == "" do return false, false
 	mgr := gc.scriptManager
@@ -420,10 +492,15 @@ sm_call_bool :: proc(sm: ^StateMachineNode, method: string) -> (bool, bool) {
 			continue
 		}
 		lua.pushvalue(L, -2) // self
+		nargs: i32 = 1
+		if hasArg {
+			lua.pushstring(L, strings.clone_to_cstring(arg, context.temp_allocator))
+			nargs = 2
+		}
 		prev := mgr.currentInstance
 		mgr.currentInstance = inst
 		ok := false
-		if lua.pcall(L, 1, 1, errHandler) != 0 {
+		if lua.pcall(L, nargs, 1, errHandler) != 0 {
 			Script_Problem(.Error, "[StateMachine] %s: error in %s(): %s", sm.name, method, lua.tostring(L, -1))
 		} else {
 			ok = bool(lua.toboolean(L, -1))
@@ -456,16 +533,17 @@ condition_holds :: proc(sm: ^StateMachineNode, c: SM_Condition) -> bool {
 		ok, _ := sm_call_bool(sm, c.param)
 		return ok
 	case .Or:
-		return true // a separator (transition_holds handles groups)
+		return true // a separator (conditions_hold handles groups)
 	}
 	return false
 }
 
-// transition_holds: any group of conditions (split by `or`) all hold.
+// conditions_hold: any group of conditions (split by `or`) all hold; an
+// empty list holds.
 @(private = "file")
-transition_holds :: proc(sm: ^StateMachineNode, t: ^SM_Transition) -> bool {
+conditions_hold :: proc(sm: ^StateMachineNode, conds: []SM_Condition) -> bool {
 	groupOk := true
-	for c in t.conditions {
+	for c in conds {
 		if c.op == .Or {
 			if groupOk do return true
 			groupOk = true
@@ -476,6 +554,74 @@ transition_holds :: proc(sm: ^StateMachineNode, t: ^SM_Transition) -> bool {
 	return groupOk
 }
 
+// conditions_mask: like conditions_hold, but every condition is evaluated
+// (bit j = condition j holds; the live view).
+@(private = "file")
+conditions_mask :: proc(sm: ^StateMachineNode, conds: []SM_Condition) -> (holds: bool, mask: u32) {
+	groupOk, anyGroup := true, false
+	for c, j in conds {
+		if c.op == .Or {
+			anyGroup ||= groupOk
+			groupOk = true
+			continue
+		}
+		ok := condition_holds(sm, c)
+		if ok && j < SM_CONDITIONS_MAX do mask |= 1 << u32(j)
+		if !ok do groupOk = false
+	}
+	return anyGroup || groupOk, mask
+}
+
+@(private = "file")
+consume_triggers :: proc(sm: ^StateMachineNode, conds: []SM_Condition) {
+	for c in conds do if c.op == .Trigger do StateMachine_SetParam(sm, c.param, 0)
+}
+
+// StateMachine_Guard: what stops the machine going from state `from` to
+// `to` (.None: nothing); viaAny = by an Any-state arrow. The cheap checks
+// come first, the scripts last.
+StateMachine_Guard :: proc(sm: ^StateMachineNode, from, to: int, viaAny: bool) -> SM_Block {
+	if from >= 0 && from < len(sm.states) {
+		s := &sm.states[from]
+		if viaAny && s.noInterrupt do return .Not_Interruptible
+		if s.minTime > 0 && sm.timeInState < s.minTime do return .Min_Time
+		if !conditions_hold(sm, s.leaveWhen[:]) do return .Leave_When
+	}
+	if to < 0 || to >= len(sm.states) do return .No_Transition
+	if !conditions_hold(sm, sm.states[to].enterWhen[:]) do return .Enter_When
+	return sm_script_guards(sm, from, to)
+}
+
+// sm_script_guards: can_exit_<from>(next) / can_enter_<to>(previous).
+@(private = "file")
+sm_script_guards :: proc(sm: ^StateMachineNode, from, to: int) -> SM_Block {
+	fromName := sm.states[from].name if from >= 0 && from < len(sm.states) else ""
+	toName := sm.states[to].name
+	if fromName != "" {
+		if ok, found := sm_call_bool(sm, strings.concatenate({"can_exit_", fromName}, context.temp_allocator), toName, true); found && !ok do return .Can_Exit
+	}
+	if ok, found := sm_call_bool(sm, strings.concatenate({"can_enter_", toName}, context.temp_allocator), fromName, true); found && !ok do return .Can_Enter
+	return .None
+}
+
+// StateMachine_BlockText: a line saying why a change is blocked.
+StateMachine_BlockText :: proc(sm: ^StateMachineNode, block: SM_Block, from, to: string, timeInState: f32) -> string {
+	fi := StateMachine_FindState(sm, from)
+	switch block {
+	case .None:              return ""
+	case .No_Transition:     return fmt.tprintf("no transition from %s to %s", from if from != "" else "(none)", to)
+	case .Not_Interruptible: return fmt.tprintf("%s can't be interrupted by Any state", from)
+	case .Min_Time:
+		need := sm.states[fi].minTime if fi >= 0 else 0
+		return fmt.tprintf("%s: leave after %.2gs (%.2fs so far)", from, need, timeInState)
+	case .Leave_When:        return fmt.tprintf("%s: its leave conditions don't hold", from)
+	case .Enter_When:        return fmt.tprintf("%s: its enter conditions don't hold", to)
+	case .Can_Exit:          return fmt.tprintf("can_exit_%s(\"%s\") said no", from, to)
+	case .Can_Enter:         return fmt.tprintf("can_enter_%s(\"%s\") said no", to, from)
+	}
+	return ""
+}
+
 // StateMachine_Step checks the transitions once; returns true when one fired.
 StateMachine_Step :: proc(sm: ^StateMachineNode, ctx: ^GameContext) -> bool {
 	if !sm.running do return false
@@ -483,19 +629,92 @@ StateMachine_Step :: proc(sm: ^StateMachineNode, ctx: ^GameContext) -> bool {
 		StateMachine_Start(sm, "", ctx)
 		return sm.current >= 0
 	}
+	if sm.explain do return sm_step_explained(sm, ctx)
 	cur := sm.states[sm.current].name
 	for &t, ti in sm.transitions {
 		if t.from != cur && t.from != SM_ANY do continue
 		if t.to == cur do continue // "any" -> the current state would restart it every update
 		to := StateMachine_FindState(sm, t.to)
 		if to < 0 do continue
-		if !transition_holds(sm, &t) do continue
-		for c in t.conditions do if c.op == .Trigger do StateMachine_SetParam(sm, c.param, 0)
-		sm.lastFired = ti
-		StateMachine_Enter(sm, to, t.blend, ctx, sm_why(ti))
+		if !conditions_hold(sm, t.conditions[:]) do continue
+		if StateMachine_Guard(sm, sm.current, to, t.from == SM_ANY) != .None do continue
+		sm_fire(sm, ti, to, ctx)
 		return true
 	}
 	return false
+}
+
+// sm_fire takes transition ti (its triggers and the guards' are used up).
+@(private = "file")
+sm_fire :: proc(sm: ^StateMachineNode, ti, to: int, ctx: ^GameContext, why := "") {
+	t := &sm.transitions[ti]
+	consume_triggers(sm, t.conditions[:])
+	consume_triggers(sm, sm.states[sm.current].leaveWhen[:])
+	consume_triggers(sm, sm.states[to].enterWhen[:])
+	sm.lastFired = ti
+	StateMachine_Enter(sm, to, t.blend, ctx, why if why != "" else sm_why(ti))
+}
+
+// sm_step_explained: Step, keeping every way out with each condition's
+// result (all evaluated) and what blocks it; the first open way fires.
+@(private = "file")
+sm_step_explained :: proc(sm: ^StateMachineNode, ctx: ^GameContext) -> bool {
+	cur := sm.states[sm.current].name
+	s := &sm.states[sm.current]
+	leaveOk: bool
+	leaveOk, sm.leaveMask = conditions_mask(sm, s.leaveWhen[:])
+	sm.wayCount = 0
+	fire, fireTo := -1, -1
+	for &t, ti in sm.transitions {
+		if t.from != cur && t.from != SM_ANY do continue
+		if t.to == cur do continue
+		to := StateMachine_FindState(sm, t.to)
+		if to < 0 do continue
+		w := SM_Way{transition = i32(ti)}
+		w.arrow, w.mask = conditions_mask(sm, t.conditions[:])
+		enterOk: bool
+		enterOk, w.enterMask = conditions_mask(sm, sm.states[to].enterWhen[:])
+		viaAny := t.from == SM_ANY
+		// The scripts' guards only for arrows that would fire.
+		if w.arrow do w.block = StateMachine_Guard(sm, sm.current, to, viaAny)
+		else {
+			switch {
+			case viaAny && s.noInterrupt:                           w.block = .Not_Interruptible
+			case s.minTime > 0 && sm.timeInState < s.minTime:      w.block = .Min_Time
+			case !leaveOk:                                          w.block = .Leave_When
+			case !enterOk:                                          w.block = .Enter_When
+			}
+		}
+		if sm.wayCount < SM_WAYS_MAX {
+			sm.ways[sm.wayCount] = w
+			sm.wayCount += 1
+		}
+		if fire < 0 && w.arrow && w.block == .None do fire, fireTo = ti, to
+	}
+	if fire < 0 do return false
+	sm_fire(sm, fire, fireTo, ctx)
+	return true
+}
+
+// StateMachine_Request: go to `state` if an arrow leads there from the
+// current state (or from Any) and the guards allow it; the arrow's own
+// conditions are not checked (the script decides when). blend < 0 = the
+// arrow's. Returns what blocked it (.None = done).
+StateMachine_Request :: proc(sm: ^StateMachineNode, state: string, blend: f32 = -1, ctx: ^GameContext = nil) -> SM_Block {
+	to := StateMachine_FindState(sm, state)
+	if to < 0 || !sm.running || sm.current < 0 || sm.current >= len(sm.states) || to == sm.current do return .No_Transition
+	cur := sm.states[sm.current].name
+	// A direct arrow first, then one from Any.
+	ti := -1
+	for t, k in sm.transitions do if t.from == cur && t.to == state {ti = k; break}
+	if ti < 0 do for t, k in sm.transitions do if t.from == SM_ANY && t.to == state {ti = k; break}
+	if ti < 0 do return .No_Transition
+	if b := StateMachine_Guard(sm, sm.current, to, sm.transitions[ti].from == SM_ANY); b != .None do return b
+	consume_triggers(sm, sm.states[sm.current].leaveWhen[:])
+	consume_triggers(sm, sm.states[to].enterWhen[:])
+	sm.lastFired = ti
+	StateMachine_Enter(sm, to, blend if blend >= 0 else sm.transitions[ti].blend, ctx, "request")
+	return .None
 }
 
 @(private = "file")

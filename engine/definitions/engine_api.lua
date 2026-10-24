@@ -4717,6 +4717,15 @@ function StateMachineNode:sm_trigger(name) end
 ---@return boolean ok false when there is no such state
 function StateMachineNode:sm_travel(state, blend) end
 
+---Asks to go to a state: allowed when an arrow leads there from the current state (or from Any state) and the guards agree (the current state's leave rules - leave after, interruptible, its leave conditions, can_exit_<state> - and the target's enter conditions and can_enter_<state>). The arrow's own conditions are not checked: the script decides when.
+---
+---Example: `local ok, why = self.node:get_node("StateMachine"):sm_request("dash")`
+---@param state StateMachineState|string
+---@param blend? number Crossfade seconds (default: the arrow's)
+---@return boolean ok true when it changed state
+---@return string? reason why not (e.g. "attack: leave after 0.4s (0.12s so far)")
+function StateMachineNode:sm_request(state, blend) end
+
 ---Gets the name of the current state.
 ---
 ---Example: `if self.node:get_node("StateMachine"):sm_state() == "attack" then return end`

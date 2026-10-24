@@ -867,9 +867,29 @@ for **gameplay** (AI, player modes, doors, menus) as much as animation:
   frame while in the state, `on_exit_<state>(next)`. The editor's generated
   types list these for every state in the project, so the code editor (and
   lua-language-server) complete `function Cls:on_enter_` with the names.
+- **Guards** (on a state): an arrow says the machine *may* go there (and
+  its conditions say when it goes by itself); a state can also refuse.
+  - **Leave after** N seconds: no arrow leaves it sooner (an attack that
+    can't be cancelled).
+  - **Any state interrupts** (on by default): off, arrows from *Any state*
+    don't fire while in it (dead, a cutscene).
+  - **Can leave when** / **Can enter when**: condition lists like an
+    arrow's (parameters, `script says`, `or`); empty = any time. *Can enter
+    when* holds for every way in (Dash only with `stamina > 20`, from Idle,
+    Run or Any).
+  - Script guards: `can_exit_<state>(next)` and `can_enter_<state>(previous)`
+    on the machine's script (else its parent's); returning `false` refuses.
+
+  A change happens only when the current state lets it leave and the target
+  lets it in. A blocked arrow doesn't fire (its triggers stay set) and the
+  next arrow is tried. `on_exit_` can't refuse: it runs after the change is
+  decided. Guards apply to arrows, *Any state* and `sm_request`;
+  `sm_travel` ignores them (a forced switch).
 - The machine keeps the **last 32 changes** (`sm_history()`); the editor's
   State Machine tab shows them live, in Simulate and in the running game,
-  and can **break on entering** a state.
+  and can **break on entering** a state. While it runs, **Ways out** lists
+  each arrow from the current state with every condition's result and the
+  guard that blocks it ("blocked: attack: leave after 0.4s (0.12s so far)").
 
 Build it in the **State Machine** tab of the bottom panel (a graph; see the
 editor README) or the Inspector. A gameplay example - a guard that patrols
@@ -905,6 +925,14 @@ end
 -- Called on the machine's script and on its parent's (when defined).
 function Player:on_enter_jump(previous) self.node:get_child("JumpSound"):sound_play() end
 function Player:on_exit_attack(next) self.node:get_child("Hitbox"):set_enabled(false) end
+
+-- Guards: false refuses the change.
+function Player:can_exit_attack(next) return next == "hurt" or self.combo_done end
+function Player:can_enter_dash(previous) return self.stamina > 20 end
+
+-- Ask instead of forcing: along an arrow, if the guards agree.
+local ok, why = sm:sm_request("dash")
+if not ok then print(why) end   -- e.g. "dash: its enter conditions don't hold"
 ```
 
 | Method | Arguments | Returns | Description |
@@ -912,15 +940,17 @@ function Player:on_exit_attack(next) self.node:get_child("Hitbox"):set_enabled(f
 | `sm_set(name, value)` | number or boolean | - | Sets a parameter. |
 | `sm_get(name)` | `name` | number | A parameter's value. |
 | `sm_trigger(name)` | `name` | - | Sets a trigger; reset when the transition testing it fires. |
-| `sm_travel(state [, blend])` | state name | boolean | Switches now, ignoring conditions. |
+| `sm_travel(state [, blend])` | state name | boolean | Switches now, ignoring conditions and guards. |
+| `sm_request(state [, blend])` | state name | boolean, reason | Goes there if an arrow leads there from the current state (or Any state) and the guards agree; the arrow's own conditions aren't checked. `reason` says why not. |
 | `sm_state()` / `sm_previous()` | - | string | Current / previous state. |
 | `sm_time()` | - | number | Seconds in the current state. |
-| `sm_history()` | - | table | The last changes, oldest first: `{from, to, time, why}` (`why`: `start`, `travel`, `transition N`). |
+| `sm_history()` | - | table | The last changes, oldest first: `{from, to, time, why}` (`why`: `start`, `travel`, `request`, `transition N`). |
 | `sm_start([state])` / `sm_stop()` | - | - | Start (initial state by default) / stop checking transitions. |
 
 The machine emits `state_changed`(state) for signal connections. Saved in
 the scene as `"state_machine": {"initial", "player", "autostart", "any_pos",
-"params", "states": [{"name", "animation", "child", "pos"}], "transitions":
+"params", "states": [{"name", "animation", "child", "pos", "min_time",
+"interruptible", "leave_when", "enter_when"}], "transitions":
 [{"from", "to", "blend", "when": [["call", "sees_player"], ["or"], ["true",
 "alarm"]]}]}`.
 

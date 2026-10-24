@@ -1459,10 +1459,47 @@ Node_ComponentRoot :: proc(manager: ^NodeManager, node: ^Node) -> ^Node {
 // --- StateMachineNode ------------------------------------------------------------
 // "state_machine": {"initial", "player", "autostart",
 //   "params": [[name, value], ...],
-//   "states": [{"name", "animation", "child", "pos": [x, y]}, ...],
+//   "states": [{"name", "animation", "child", "pos": [x, y],
+//               "min_time", "interruptible": false, "leave_when": [...], "enter_when": [...]}, ...],
 //   "transitions": [{"from", "to", "blend", "when": [[op, param, value], ...]}, ...]}
 // Conditions: ["true"|"false"|"trigger", param], ["=="|"!="|">"|"<", param, value],
 // ["finished"], ["after", seconds], ["call", method], ["or"] (starts another group).
+
+@(private = "file")
+write_sm_conditions :: proc(w: ^Json_Writer, conds: []SM_Condition) {
+	strings.write_byte(&w.sb, '[')
+	for c, j in conds {
+		if j > 0 do strings.write_string(&w.sb, ", ")
+		strings.write_byte(&w.sb, '[')
+		Json_String(w, SM_OP_NAMES[c.op])
+		if SM_Op_UsesParam(c.op) {strings.write_string(&w.sb, ", "); Json_String(w, c.param)}
+		if SM_Op_UsesValue(c.op) {strings.write_string(&w.sb, ", "); Json_Float(w, c.value)}
+		strings.write_byte(&w.sb, ']')
+	}
+	strings.write_byte(&w.sb, ']')
+}
+
+@(private = "file")
+read_sm_conditions :: proc(sm: ^StateMachineNode, list: ^[dynamic]SM_Condition, arr: json.Array) {
+	for cv in arr {
+		ca, cok := cv.(json.Array)
+		if !cok || len(ca) < 1 do continue
+		opName, _ := ca[0].(json.String)
+		op, opok := SM_Op_Parse(opName)
+		if !opok do continue
+		c := SM_Condition{op = op}
+		k := 1
+		if SM_Op_UsesParam(op) && k < len(ca) {
+			if s, sok := ca[k].(json.String); sok do c.param = strings.clone(s, sm.allocator)
+			k += 1
+		}
+		if SM_Op_UsesValue(op) && k < len(ca) {
+			if f, fok := json_number(ca[k]); fok do c.value = f
+		}
+		if list.allocator.procedure == nil do list.allocator = sm.allocator
+		append(list, c)
+	}
+}
 
 @(private = "file")
 write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
@@ -1497,7 +1534,12 @@ write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
 		Json_Float(w, s.pos.x)
 		strings.write_string(&w.sb, ", ")
 		Json_Float(w, s.pos.y)
-		strings.write_string(&w.sb, "]}")
+		strings.write_byte(&w.sb, ']')
+		if s.minTime > 0 {strings.write_string(&w.sb, ", \"min_time\": "); Json_Float(w, s.minTime)}
+		if s.noInterrupt do strings.write_string(&w.sb, ", \"interruptible\": false")
+		if len(s.leaveWhen) > 0 {strings.write_string(&w.sb, ", \"leave_when\": "); write_sm_conditions(w, s.leaveWhen[:])}
+		if len(s.enterWhen) > 0 {strings.write_string(&w.sb, ", \"enter_when\": "); write_sm_conditions(w, s.enterWhen[:])}
+		strings.write_byte(&w.sb, '}')
 	}
 	w.indent -= 1
 	if len(sm.states) > 0 do Json_NewLine(w)
@@ -1510,16 +1552,9 @@ write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
 		strings.write_string(&w.sb, "{\"from\": "); Json_String(w, t.from)
 		strings.write_string(&w.sb, ", \"to\": "); Json_String(w, t.to)
 		if t.blend > 0 {strings.write_string(&w.sb, ", \"blend\": "); Json_Float(w, t.blend)}
-		strings.write_string(&w.sb, ", \"when\": [")
-		for c, j in t.conditions {
-			if j > 0 do strings.write_string(&w.sb, ", ")
-			strings.write_byte(&w.sb, '[')
-			Json_String(w, SM_OP_NAMES[c.op])
-			if SM_Op_UsesParam(c.op) {strings.write_string(&w.sb, ", "); Json_String(w, c.param)}
-			if SM_Op_UsesValue(c.op) {strings.write_string(&w.sb, ", "); Json_Float(w, c.value)}
-			strings.write_byte(&w.sb, ']')
-		}
-		strings.write_string(&w.sb, "]}")
+		strings.write_string(&w.sb, ", \"when\": ")
+		write_sm_conditions(w, t.conditions[:])
+		strings.write_byte(&w.sb, '}')
 	}
 	w.indent -= 1
 	if len(sm.transitions) > 0 do Json_NewLine(w)
@@ -1569,6 +1604,11 @@ read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
 				y, _ := json_number(pa[1])
 				sm.states[i].pos = {x, y}
 			}
+			st := &sm.states[i]
+			st.minTime = sj_float(so, "min_time", 0)
+			st.noInterrupt = !sj_bool(so, "interruptible", true)
+			if a, aok := sj_arr(so, "leave_when"); aok do read_sm_conditions(sm, &st.leaveWhen, a)
+			if a, aok := sj_arr(so, "enter_when"); aok do read_sm_conditions(sm, &st.enterWhen, a)
 		}
 	}
 	if arr, ok := sj_arr(obj, "transitions"); ok {
@@ -1577,23 +1617,7 @@ read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
 			if !tok do continue
 			t := StateMachine_AddTransition(sm, sj_string(to, "from", SM_ANY), sj_string(to, "to", ""), sj_float(to, "blend", 0))
 			when_arr, _ := sj_arr(to, "when")
-			for cv in when_arr {
-				ca, cok := cv.(json.Array)
-				if !cok || len(ca) < 1 do continue
-				opName, _ := ca[0].(json.String)
-				op, opok := SM_Op_Parse(opName)
-				if !opok do continue
-				c := SM_Condition{op = op}
-				k := 1
-				if SM_Op_UsesParam(op) && k < len(ca) {
-					if s, sok := ca[k].(json.String); sok do c.param = strings.clone(s, sm.allocator)
-					k += 1
-				}
-				if SM_Op_UsesValue(op) && k < len(ca) {
-					if f, fok := json_number(ca[k]); fok do c.value = f
-				}
-				append(&t.conditions, c)
-			}
+			read_sm_conditions(sm, &t.conditions, when_arr)
 		}
 	}
 	sm.initial = ""

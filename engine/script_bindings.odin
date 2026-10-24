@@ -2650,7 +2650,7 @@ lua_light_get_energy :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
-// --- StateMachineNode: sm_set / sm_get / sm_trigger / sm_travel / sm_state / sm_previous / sm_time / sm_start / sm_stop
+// --- StateMachineNode: sm_set / sm_get / sm_trigger / sm_travel / sm_request / sm_state / sm_previous / sm_time / sm_start / sm_stop
 
 @(private="file")
 sm_arg :: proc(L: ^lua.State) -> ^StateMachineNode {
@@ -2710,6 +2710,27 @@ lua_sm_travel :: proc "c" (L: ^lua.State) -> c.int {
 	if sm != nil && name != nil do ok = StateMachine_Travel(sm, string(name), f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else 0, sm_ctx(L))
 	lua.pushboolean(L, b32(ok))
 	return 1
+}
+
+// machine:sm_request(state [, blend]) -> ok, reason: along an arrow, if the
+// guards allow it (the arrow's conditions aren't checked)
+@(private="file")
+lua_sm_request :: proc "c" (L: ^lua.State) -> c.int {
+	context = runtime.default_context()
+	sm := sm_arg(L)
+	name := lua.tostring(L, 2)
+	if sm == nil || name == nil {
+		lua.pushboolean(L, false)
+		lua.pushstring(L, "no such state machine or state")
+		return 2
+	}
+	from := StateMachine_CurrentName(sm)
+	secs := sm.timeInState
+	block := StateMachine_Request(sm, string(name), f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else -1, sm_ctx(L))
+	lua.pushboolean(L, b32(block == .None))
+	if block == .None do lua.pushnil(L)
+	else do lua.pushstring(L, strings.clone_to_cstring(StateMachine_BlockText(sm, block, from, string(name), secs), context.temp_allocator))
+	return 2
 }
 
 @(private="file")
@@ -3950,6 +3971,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "sm_trigger")
 		lua.pushcfunction(L, lua_sm_travel)
 		lua.setfield(L, -2, "sm_travel")
+		lua.pushcfunction(L, lua_sm_request)
+		lua.setfield(L, -2, "sm_request")
 		lua.pushcfunction(L, lua_sm_state)
 		lua.setfield(L, -2, "sm_state")
 		lua.pushcfunction(L, lua_sm_previous)

@@ -29,7 +29,7 @@ import lsp "../odin_editor/lsp"
 //   from it in its scenes / components, each returning that node's type
 //   global scripts (Project Settings > Globals) as globals
 //   AnimationName, StateMachineParam / State (and on_enter_ / on_update_ /
-//   on_exit_<state> on the script classes), SaveKey, LocaleKey,
+//   on_exit_ / can_exit_ / can_enter_<state> on the script classes), SaveKey, LocaleKey,
 //   Language, CollisionLayer   names the project uses (animation_play,
 //   sm_*, Save.*, tr / Locale.set, set_collision_layer complete them)
 //   ProjectEvent  the custom events the project's scripts emit (connect /
@@ -420,6 +420,8 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 			fmt.sbprintf(&sb, "---@field on_enter_%s? fun(self: %s, previous: string) state machine: entered %s\n", st, cls, st)
 			fmt.sbprintf(&sb, "---@field on_update_%s? fun(self: %s, dt: number) state machine: every frame in %s\n", st, cls, st)
 			fmt.sbprintf(&sb, "---@field on_exit_%s? fun(self: %s, next: string) state machine: left %s\n", st, cls, st)
+			fmt.sbprintf(&sb, "---@field can_exit_%s? fun(self: %s, next: string): boolean state machine guard: false keeps it in %s\n", st, cls, st)
+			fmt.sbprintf(&sb, "---@field can_enter_%s? fun(self: %s, previous: string): boolean state machine guard: false keeps it out of %s\n", st, cls, st)
 		}
 		if !ok || mod == nil do continue
 		for p in mod.properties {

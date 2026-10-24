@@ -98,6 +98,7 @@ exits non-zero if any check fails.
 | `state_graph.drive` | The State Machine tab follows a new StateMachine; right-click adds states, renamed in the side panel; a dot dragged onto a state makes a transition (a condition added); saved with positions; Delete removes the arrow (not the node). |
 | `state_graph_live.drive` | A machine with break on enter: in Simulate the param set from the Lua line takes it there and pauses, the history shows; in Play the graph shows the game's machine and break on enter pauses the game. |
 | `state_machine_lua.drive` | The generated Lua types list `on_enter_` / `on_update_` / `on_exit_<state>` for a new state; Add Script Callbacks without a script says to attach one; with player_ship.lua it writes the three methods into the script. |
+| `state_guards.drive` | A state's Leave After, Any State Interrupts (off) and Can enter when set in the side panel and saved, the lock on its box; in Simulate the arrow out is blocked: Ways out says Min_Time and `sm_request` prints why. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -181,7 +182,7 @@ Queries:
 - `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk, Search, StateGraph)
 - `search-total`, `search-files` (find in files)
-- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`, `smg-pan`
+- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`, `smg-pan`, `smg-ways` (live ways out: `idle:Min_Time, run:waiting, ...`)
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
 - `runtime-diags` (script problems recorded from Simulate / Play)

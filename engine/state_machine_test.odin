@@ -205,3 +205,102 @@ return G
 	defer delete(json)
 	testing.expect(t, strings.contains(json, `"child": "Combat"`) && strings.contains(json, `["call", "sees_player"], ["or"], ["true", "alarm"]`) && strings.contains(json, `"pos": [`), json)
 }
+
+@(test)
+test_state_machine_guards :: proc(t: ^testing.T) {
+	ScriptVFS_RegisterEmbedded("sm_guards.lua", `
+local G = {}
+G.properties = {}
+function G:ready() locked = false; asked = "" end
+function G:can_exit_attack(next) asked = next; return not locked end
+function G:can_enter_dash(previous) return previous ~= "hurt" end
+return G
+`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("smguard", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	sm := cast(^StateMachineNode)Node_CreateByTypeName(scene, "StateMachineNode")
+	sm.name = "Brain"
+	sm.gameContext = &game.gameContext
+	Script_AttachToNode(sm, "sm_guards.lua", nil, &game.scriptManager)
+	StateMachine_AddState(sm, "idle")
+	attack := StateMachine_AddState(sm, "attack")
+	StateMachine_AddState(sm, "hurt")
+	dash := StateMachine_AddState(sm, "dash")
+	sm.states[attack].minTime = 0.1
+	sm.states[attack].noInterrupt = true
+	StateMachine_AddConditionTo(sm, &sm.states[dash].enterWhen, .Greater, "stamina", 20)
+	tr := StateMachine_AddTransition(sm, "idle", "attack")
+	StateMachine_AddCondition(sm, tr, .Trigger, "attack")
+	tr = StateMachine_AddTransition(sm, SM_ANY, "hurt")
+	StateMachine_AddCondition(sm, tr, .Trigger, "hit")
+	StateMachine_AddTransition(sm, "attack", "idle") // always (after the guards)
+	StateMachine_AddTransition(sm, "idle", "dash")   // only by request
+	tr = StateMachine_AddTransition(sm, "hurt", "idle")
+	StateMachine_AddCondition(sm, tr, .After, "", 0.03)
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	sm.explain = true
+
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "idle")
+	// The dash arrow has no conditions but dash's enter guard says no; the
+	// explain view says why.
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "idle")
+	found := false
+	for w in sm.ways[:sm.wayCount] do if sm.transitions[w.transition].to == "dash" {
+		found = true
+		testing.expect(t, w.arrow && w.block == .Enter_When && w.enterMask == 0, "dash blocked by its enter guard")
+	}
+	testing.expect(t, found, "the dash way is listed")
+	// attack: minTime, and Any-state "hit" can't interrupt it.
+	StateMachine_SetParam(sm, "attack", 1)
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "attack")
+	StateMachine_SetParam(sm, "hit", 1)
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "attack")
+	testing.expect(t, StateMachine_GetParam(sm, "hit") == 1, "a blocked trigger stays set")
+	// The script's can_exit_attack holds it once the time is up.
+	lua.L_dostring(game.scriptManager.L, "locked = true")
+	for _ in 0 ..< 8 do game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "attack")
+	lua.getglobal(game.scriptManager.L, "asked")
+	testing.expect_value(t, string(lua.tostring(game.scriptManager.L, -1)), "idle")
+	lua.pop(game.scriptManager.L, 1)
+	b := StateMachine_Request(sm, "idle")
+	testing.expect_value(t, b, SM_Block.Can_Exit)
+	lua.L_dostring(game.scriptManager.L, "locked = false")
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "idle")
+	// In idle the pending hit takes it to hurt (Any is fine from idle).
+	game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "hurt")
+	// Requests: no arrow hurt -> dash; then from idle the enter guard, then ok.
+	testing.expect_value(t, StateMachine_Request(sm, "dash"), SM_Block.No_Transition)
+	for _ in 0 ..< 4 do game->run(0.016)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "idle")
+	testing.expect_value(t, StateMachine_Request(sm, "dash"), SM_Block.Enter_When)
+	StateMachine_SetParam(sm, "stamina", 50)
+	testing.expect_value(t, StateMachine_Request(sm, "dash"), SM_Block.None)
+	testing.expect_value(t, StateMachine_CurrentName(sm), "dash")
+	hist := StateMachine_History(sm)
+	testing.expect_value(t, hist[len(hist) - 1].why, "request")
+	testing.expect(t, strings.contains(StateMachine_BlockText(sm, .Min_Time, "attack", "idle", 0.05), "leave after 0.1s"), StateMachine_BlockText(sm, .Min_Time, "attack", "idle", 0.05))
+	// Lua: sm_request returns ok, reason.
+	r := lua.L_dostring(game.scriptManager.L, `local m = Scene.find_node("Brain"); req_ok, req_why = m:sm_request("attack")`)
+	testing.expect_value(t, r, i32(0))
+	lua.getglobal(game.scriptManager.L, "req_why")
+	testing.expect_value(t, string(lua.tostring(game.scriptManager.L, -1)), "no transition from dash to attack")
+	lua.pop(game.scriptManager.L, 1)
+
+	// Saved and read back.
+	json := Scene_SerializeToJSON(scene)
+	defer delete(json)
+	testing.expect(t, strings.contains(json, `"min_time": 0.1, "interruptible": false`) && strings.contains(json, `"enter_when": [[">", "stamina", 20]]`), json)
+	status := StateMachine_StatusJSON(sm, "Brain")
+	testing.expect(t, strings.contains(status, `"ways": [`) && strings.contains(status, `"leave": `), status)
+}

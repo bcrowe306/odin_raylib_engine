@@ -122,6 +122,14 @@ Docs in place
 - [x] 10.3 Live debugging: current state + fired transition (Simulate and Play), history, break on enter
 - [x] 10.4 Lua / docs polish: generated types, drives, README
 
+## Phase 11 — State transition guards (2026-10-23)
+
+Arrows allow a change (their conditions: when it goes by itself); states can refuse. Chosen: full guards, sm_travel stays forced + sm_request, a per-state "Any state interrupts" toggle, blocked attempts shown live only (not in the history).
+
+- [x] 11.1 Engine: minTime, noInterrupt, leaveWhen / enterWhen on states, can_exit_ / can_enter_ script guards, StateMachine_Request / sm_request (ok, reason), explain (ways out with each condition's result and the block), saved; tests
+- [x] 11.2 Editor: Guards in the state side panel (shared condition list), lock badge, Add Guard Callbacks, Ways out (live, Simulate and Play), blocked arrows red, live condition marks; generated types for can_exit_ / can_enter_
+- [x] 11.3 Drive state_guards, docs
+
 ## Phase 9 — Code editor on par with Zed (2026-10-23)
 
 Docs: `editor/CODE_EDITOR.md`. Constraints: no frame-time cost (cache per buffer version, draw only visible lines), no leaks (owned allocations freed with the doc / on close).
