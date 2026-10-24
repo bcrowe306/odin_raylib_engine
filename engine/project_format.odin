@@ -49,6 +49,7 @@ ProjectConfig :: struct {
 	masterVolume:  f32,
 	musicVolume:   f32,
 	sfxVolume:     f32,
+	mixerBuses:    string, // the mixer's buses ("audio": {"buses": [...]}, JSON text; mixer_config.odin) - "" = Master / Music / SFX
 	// Input actions (empty = the built-in defaults)
 	actions:       [dynamic]Input_Action_Config,
 	// Export
@@ -92,6 +93,7 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg.windowTitle != "" do delete(cfg.windowTitle, allocator)
 	if cfg.icon != "" do delete(cfg.icon, allocator)
 	if cfg.language != "" do delete(cfg.language, allocator)
+	if cfg.mixerBuses != "" do delete(cfg.mixerBuses, allocator)
 	for n in cfg.collisionLayers do if n != "" do delete(n, allocator)
 	for s in cfg.scenes {
 		delete(s, allocator)
@@ -123,6 +125,7 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c.windowTitle = strings.clone(src.windowTitle, allocator)
 	c.icon = strings.clone(src.icon, allocator)
 	c.language = strings.clone(src.language, allocator)
+	c.mixerBuses = strings.clone(src.mixerBuses, allocator) if src.mixerBuses != "" else ""
 	for n, i in src.collisionLayers do c.collisionLayers[i] = strings.clone(n, allocator) if n != "" else ""
 	c.scenes = make([dynamic]string, allocator)
 	for s in src.scenes do append(&c.scenes, strings.clone(s, allocator))
@@ -337,6 +340,9 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		cfg.masterVolume = json_get_float(audioObj, "master_volume", cfg.masterVolume)
 		cfg.musicVolume = json_get_float(audioObj, "music_volume", cfg.musicVolume)
 		cfg.sfxVolume = json_get_float(audioObj, "sfx_volume", cfg.sfxVolume)
+		if buses, has := audioObj["buses"]; has {
+			if text, merr := json.marshal(buses, {}, context.temp_allocator); merr == nil do cfg.mixerBuses = strings.clone(string(text), allocator)
+		}
 	}
 	if inputObj, ok := json_get_obj(rootObj, "input"); ok {
 		if arr, has := json_get_arr(inputObj, "actions"); has {
@@ -449,7 +455,9 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	fmt.sbprintf(&sb, "    \"target_fps\": %d\n", cfg.targetFPS)
 	strings.write_string(&sb, "  },\n")
 	fmt.sbprintf(&sb, "  \"video\": {{\"fullscreen\": %t, \"vsync\": %t, \"resizable\": %t, \"msaa\": %t, \"high_dpi\": %t, \"sharp_scaling\": %t, \"integer_scaling\": %t, \"pixel_snap\": %t, \"smooth_camera\": %t}},\n", cfg.fullscreen, cfg.vsync, cfg.resizable, cfg.msaa, cfg.highDPI, cfg.sharpScaling, cfg.integerScaling, cfg.pixelSnap, cfg.smoothCamera)
-	fmt.sbprintf(&sb, "  \"audio\": {{\"master_volume\": %.2f, \"music_volume\": %.2f, \"sfx_volume\": %.2f}},\n", cfg.masterVolume, cfg.musicVolume, cfg.sfxVolume)
+	fmt.sbprintf(&sb, "  \"audio\": {{\"master_volume\": %.2f, \"music_volume\": %.2f, \"sfx_volume\": %.2f", cfg.masterVolume, cfg.musicVolume, cfg.sfxVolume)
+	if cfg.mixerBuses != "" do fmt.sbprintf(&sb, ", \"buses\": %s", cfg.mixerBuses)
+	strings.write_string(&sb, "},\n")
 	strings.write_string(&sb, "  \"physics\": {\n")
 	fmt.sbprintf(&sb, "    \"gravity\": [%.2f, %.2f],\n    \"debug_draw\": %t", cfg.gravity.x, cfg.gravity.y, cfg.debugDraw)
 	last := -1
@@ -554,7 +562,7 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	game.musicVolume = cfg.musicVolume
 	game.sfxVolume = cfg.sfxVolume
 	game.masterVolume = cfg.masterVolume
-	if rl.IsAudioDeviceReady() do rl.SetMasterVolume(cfg.masterVolume)
+	Mixer_ApplyProject(cfg) // buses, faders, effects (mixer_config.odin)
 	Input_ApplyActionConfigs(&game.input, cfg.actions[:])
 	Input_RebindSetDefaults(&game.input, cfg.actions[:]) // (Input.reset_bindings)
 	if activate do Input_LoadUserBindings(&game.input) // the player's own (the game, not the editor)

@@ -8,6 +8,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 | Guide | |
 |---|---|
 | [Draw order](draw_order.md) | Layers, Z index, Y-sort (top-down / isometric depth). |
+| [Audio mixer](audio_mixer.md) | Buses (fader, pan, mute / solo, effects, routing), the Mixer tab, Lua control - with tutorials. |
 | [Input and rebinding](input_rebinding.md) | Actions, player rebinding (listen, conflicts, saving), gamepad menus, the Controls Menu template. |
 | [Changing scenes](scene_flow.md) | Transitions, preloading, loading screens (background texture decoding) - with a loading screen tutorial. |
 | [Paths and followers](paths.md) | Bézier paths edited in the viewport; followers for moving platforms, patrols, rails - with tutorials. |

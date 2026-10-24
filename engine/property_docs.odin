@@ -234,6 +234,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 
 	// --- Audio ---
 	{"MusicNode.volume", "Volume (0-1), before the bus and master volumes."},
+	{"MusicNode.bus", "The mixer bus it plays into (the Mixer tab; empty = Music): its fader, effects and output apply."},
 	{"MusicNode.pitch", "Playback speed / pitch (1 = normal)."},
 	{"MusicNode.pan", "Stereo position: 0 left, 0.5 centre, 1 right."},
 	{"MusicNode.looping", "Start again at the end."},
@@ -241,6 +242,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"MusicNode.isPlaying", "Playing now."},
 	{"MusicNode.isPaused", "Paused now."},
 	{"SoundNode.volume", "Volume (0-1), before the bus and master volumes."},
+	{"SoundNode.bus", "The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output apply."},
 	{"SoundNode.pitch", "Playback speed / pitch (1 = normal)."},
 	{"SoundNode.autoplay", "Play once when the node becomes ready."},
 	{"SoundNode.voices", "Plays over itself up to this many times (1: a new play restarts it)."},

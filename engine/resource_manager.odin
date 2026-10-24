@@ -25,10 +25,9 @@ Texture :: struct {
 AudioSound :: struct {
 	filePath: string,
 	fileName: string,
-	sound: rl.Sound,
+	pcm:      []f32, // 48 kHz stereo frames for the mixer (heap; decoded once)
+	sound:    rl.Sound, // the same as a raylib Sound, for code that plays it directly (bypasses the mixer)
 	refCount: int,
-	aliases: [dynamic]rl.Sound, // extra voices sharing the samples (audio.odin)
-	nextVoice: int,
 }
 
 AudioMusic :: struct {
@@ -37,6 +36,7 @@ AudioMusic :: struct {
 	music: rl.Music,
 	refCount: int,
 	streamData: []byte, // in-memory stream source (assets from a .ore package)
+	voice: Mixer_Voice_Handle, // Audio.play_music's voice (path-based music)
 }
 
 ResourceManager :: struct {
@@ -92,10 +92,9 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 
 	for i in 0..<rm.audioCount {
 		audio := &rm.audioSounds[i]
-		Audio_ReleaseVoices(audio)
-		if audio.sound.frameCount > 0 && rl.IsAudioDeviceReady() {
-			rl.UnloadSound(audio.sound)
-		}
+		Mixer_StopOwner(audio) // its voices first (they read the samples)
+		delete(audio.pcm, runtime.heap_allocator())
+		if audio.sound.frameCount > 0 && rl.IsAudioDeviceReady() do rl.UnloadSound(audio.sound)
 		delete(audio.filePath)
 		audio^ = {}
 	}
@@ -103,6 +102,7 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 
 	for i in 0..<rm.musicCount {
 		m := &rm.audioMusic[i]
+		Mixer_StopOwner(m)
 		if rl.IsAudioDeviceReady() && rl.IsMusicValid(m.music) {
 			rl.UnloadMusicStream(m.music)
 		}
@@ -242,26 +242,33 @@ ResourceManager_LoadAudioSound :: proc(rm: ^ResourceManager, filePath: string) -
 		log.error("Max audios reached")
 		return nil, false
 	}
-	sound: rl.Sound
+	// Decoded once to the mixer's format (48 kHz stereo floats); no audio
+	// device needed (tests mix them too).
+	wave: rl.Wave
 	if os.is_file(filePath) {
-		if rl.IsAudioDeviceReady() do sound = rl.LoadSound(fmt.ctprint(filePath))
+		wave = rl.LoadWave(fmt.ctprint(filePath))
 	} else if bytes, found := resource_bytes(rm, filePath); found {
 		defer delete(bytes)
-		if rl.IsAudioDeviceReady() {
-			wave := rl.LoadWaveFromMemory(file_ext_cstring(filePath), raw_data(bytes), i32(len(bytes)))
-			sound = rl.LoadSoundFromWave(wave)
-			rl.UnloadWave(wave)
-		}
+		wave = rl.LoadWaveFromMemory(file_ext_cstring(filePath), raw_data(bytes), i32(len(bytes)))
 	} else {
 		log.errorf("Sound not found: %s", filePath)
 		return nil, false
 	}
+	pcm: []f32
+	sound: rl.Sound
+	if wave.data != nil && wave.frameCount > 0 {
+		if rl.IsAudioDeviceReady() do sound = rl.LoadSoundFromWave(wave)
+		rl.WaveFormat(&wave, MIXER_RATE, 32, 2)
+		pcm = make([]f32, int(wave.frameCount) * 2, runtime.heap_allocator())
+		copy(pcm, ([^]f32)(wave.data)[:len(pcm)])
+	}
+	rl.UnloadWave(wave)
 	owned := strings.clone(filePath)
 	if slot < 0 {
 		slot = rm.audioCount
 		rm.audioCount += 1
 	}
-	rm.audioSounds[slot] = AudioSound{fileName = filepath.base(owned), filePath = owned, sound = sound, refCount = 1}
+	rm.audioSounds[slot] = AudioSound{fileName = filepath.base(owned), filePath = owned, pcm = pcm, sound = sound, refCount = 1}
 	return &rm.audioSounds[slot], true
 }
 
@@ -290,7 +297,8 @@ ResourceManager_ReleaseSound :: proc(rm: ^ResourceManager, audio: ^AudioSound) {
 	if rm == nil || audio == nil || audio.filePath == "" do return
 	audio.refCount -= 1
 	if audio.refCount > 0 do return
-	Audio_ReleaseVoices(audio)
+	Mixer_StopOwner(audio) // its voices first (they read the samples)
+	delete(audio.pcm, runtime.heap_allocator())
 	if audio.sound.frameCount > 0 && rl.IsAudioDeviceReady() do rl.UnloadSound(audio.sound)
 	delete(audio.filePath)
 	audio^ = {}
@@ -357,8 +365,8 @@ ResourceManager_ReleaseMusic :: proc(rm: ^ResourceManager, m: ^AudioMusic) {
 	if rm == nil || m == nil || m.filePath == "" do return
 	m.refCount -= 1
 	if m.refCount > 0 do return
+	Mixer_StopOwner(m) // its voice reads the decoder
 	if rl.IsAudioDeviceReady() && rl.IsMusicValid(m.music) {
-		rl.StopMusicStream(m.music)
 		rl.UnloadMusicStream(m.music)
 	}
 	delete(m.filePath)

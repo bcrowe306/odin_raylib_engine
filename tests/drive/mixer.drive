@@ -1,0 +1,54 @@
+# Mixer tab: a new bus (strip), a reverb on it (edited in its popup), the
+# fader moved, mute; all saved in project.json; in Simulate a sound played
+# into the bus makes a voice and moves its meter.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+click @bottom:mixer
+wait 3
+expect item:mixer.bus:Master == visible
+expect item:mixer.bus:Music == visible
+click @mixer.add-bus
+wait 3
+expect mixer-buses contains Bus:+0.0
+click @mixer.add-fx:Bus
+click @pick:Reverb
+wait 2
+expect item:mixer.fx:Bus:0 == visible
+click @mixer.fx:Bus:0
+wait 2
+expect item:mixer.param:mix == visible
+screenshot effect_popup
+key escape
+wait 2
+click @mixer.db:Bus
+type -6
+key enter
+wait 2
+expect mixer-buses contains Bus:-6.0
+click @mixer.mute:Bus
+wait 2
+expect file:project.json contains "name": "Bus", "output": "Master"
+expect file:project.json contains "mute": true
+expect file:project.json contains {"type": "reverb", "enabled": true
+screenshot mixer
+# Unmute; Simulate; a sound into the bus.
+click @mixer.mute:Bus
+wait 2
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+click @bottom:console
+click @console.lua
+type Audio.play_sound("audio/cannon-gunshot-1.wav", 1, 1, "Bus")
+key enter
+wait 3
+expect mixer-voices >= 1
+click @bottom:mixer
+wait 3
+screenshot playing
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

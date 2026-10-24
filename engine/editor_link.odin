@@ -21,6 +21,9 @@ import rl "vendor:raylib"
 //   reload-scene <file>         re-read a scene file; restart it when it's the current scene
 //   eval <lua>                  -> @ore:eval {"ok", "code", "text"} (the Console's Lua line)
 //   sm <path>                   -> @ore:sm {status} (a state machine, live: state_machine_node.odin)
+//   mixer-peaks                 -> @ore:mixer-peaks [[bus, left, right, clip], ...]
+//   mixer-set <bus> volume|pan|mute|solo <v> / mixer-fx <bus> <slot> <param> <v> /
+//   mixer-fx-enabled <bus> <slot> 0|1 / mixer-load <buses JSON>   the Mixer tab, live
 //   sm-break <path> <state> 0|1 pause when that machine enters that state (-> @ore:sm-break)
 //   break-set <file> <l,l,...>  breakpoints in a script (break-clear: none); a hit
 //                               pauses the game in the script (lua_debugger.odin):
@@ -160,6 +163,49 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 			sm.explain = true // the editor shows its ways out (from the next update)
 			fmt.printfln("@ore:sm %s", StateMachine_StatusJSON(sm, rest))
 		}
+	case "mixer-peaks":
+		// -> @ore:mixer-peaks [[index, left, right, clip], ...] (the meters while the game plays)
+		sb := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&sb, '[')
+		for b, i in Mixer_Buses() {
+			if i > 0 do strings.write_string(&sb, ", ")
+			fmt.sbprintf(&sb, "[%d, %.4f, %.4f, %d]", b.index, b.peak[0], b.peak[1], 1 if b.clip else 0)
+		}
+		strings.write_byte(&sb, ']')
+		fmt.printfln("@ore:mixer-peaks %s", strings.to_string(sb))
+	case "mixer-set":
+		// mixer-set <bus> volume|pan|mute|solo <value>
+		parts := strings.fields(rest, context.temp_allocator)
+		if len(parts) == 3 {
+			bus, _ := strconv.parse_int(parts[0])
+			v, _ := strconv.parse_f32(parts[2])
+			switch parts[1] {
+			case "volume": Mixer_SetBusVolume(bus, v)
+			case "pan":    Mixer_SetBusPan(bus, v)
+			case "mute":   Mixer_SetBusMute(bus, v != 0)
+			case "solo":   Mixer_SetBusSolo(bus, v != 0)
+			}
+		}
+	case "mixer-fx":
+		// mixer-fx <bus> <slot> <param> <value>
+		parts := strings.fields(rest, context.temp_allocator)
+		if len(parts) == 4 {
+			bus, _ := strconv.parse_int(parts[0])
+			slot, _ := strconv.parse_int(parts[1])
+			pi, _ := strconv.parse_int(parts[2])
+			v, _ := strconv.parse_f32(parts[3])
+			if e := Mixer_EffectRef(bus, slot); e != nil && pi >= 0 && pi < MIXER_MAX_PARAMS do e.params[pi] = v
+		}
+	case "mixer-fx-enabled":
+		parts := strings.fields(rest, context.temp_allocator)
+		if len(parts) == 3 {
+			bus, _ := strconv.parse_int(parts[0])
+			slot, _ := strconv.parse_int(parts[1])
+			Mixer_SetEffectEnabled(bus, slot, parts[2] == "1")
+		}
+	case "mixer-load":
+		// mixer-load <buses JSON>: the editor changed the mixer's layout.
+		Mixer_LoadJSON(rest)
 	case "sm-break":
 		// sm-break <path> <state> 0|1
 		parts := strings.fields(rest, context.temp_allocator)

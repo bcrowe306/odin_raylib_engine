@@ -562,6 +562,24 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 			imgui.EndCombo()
 		}
 	case .String:
+		if p.name == "bus" && (p.owner == "SoundNode" || p.owner == "MusicNode") {
+			// The mixer's buses (the Mixer tab); "" = the default (SFX / Music).
+			cur := (^string)(p.ptr)^
+			def := "SFX" if p.owner == "SoundNode" else "Music"
+			names := make([dynamic]string, context.temp_allocator)
+			at := 0
+			append(&names, fmt.tprintf("(default: %s)", def))
+			for b in e.Mixer_Buses() {
+				append(&names, b.name)
+				if strings.equal_fold(b.name, cur) do at = len(names) - 1
+			}
+			if k, changed := UI_Combo(id, at, names[:], mixed); changed {
+				Editor_RecordUndo(state, undoLabel)
+				e.Property_SetString(node, p, "" if k == 0 else names[k])
+			}
+			UI_Tooltip("The mixer bus it plays into: its fader, effects and output (Mixer tab)")
+			return
+		}
 		buf: [512]u8
 		if !mixed do copy(buf[:len(buf) - 1], (^string)(p.ptr)^)
 		if imgui.InputTextWithHint(label, MIXED_TEXT if mixed else "", cstring(raw_data(buf[:])), len(buf), {}) {

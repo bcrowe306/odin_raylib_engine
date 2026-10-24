@@ -227,11 +227,11 @@ AnimationPlayerNode_FireEvents :: proc(apn: ^AnimationPlayerNode, frame: int) {
 				if target == nil || ctx == nil || ctx.scriptManager == nil do continue
 				Script_CallMethod(ctx.scriptManager, target, k.text, frame)
 			case .Audio:
-				if ctx == nil || ctx.game == nil || !rl.IsAudioDeviceReady() do continue
+				if ctx == nil || ctx.game == nil || !Audio_Ready() do continue
 				rm := &ctx.game.resourceManager
 				if s, ok := rm.loadAudioSound(rm, Project_ResolveAssetPath(ctx, k.text)); ok {
-					rl.SetSoundVolume(s.sound, Game_BusVolume(ctx, false))
-					rl.PlaySound(s.sound)
+					sfx := Mixer_BusIndex("SFX")
+					Mixer_PlaySound(s.pcm, sfx if sfx >= 0 else 0, owner = s)
 				}
 			}
 		}

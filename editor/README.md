@@ -529,6 +529,16 @@ points are edited in the Inspector's **Points** section (**Add Point**, the
 x removes one). Post effects show in the viewport while the lighting
 preview (toolbar) is on; pick the shader in the **Material** section.
 
+### Mixer
+
+Bottom panel > **Mixer**: the project's buses as a console - a strip per
+bus (effects chain with bypass and parameter popups, output, pan, fader +
+stereo meter, mute / solo, a dB field), **Master** pinned at the right,
+**+ Bus**. Changes apply live (Simulate; and the running game during
+Play, whose meters it shows) and save in project.json. A Sound / Music
+node's **Bus** picks its bus. Guide:
+[`engine/docs/audio_mixer.md`](../engine/docs/audio_mixer.md).
+
 ### Controls menus (player rebinding)
 
 New Script on a **UI Container** offers the **Controls Menu (rebinding)**

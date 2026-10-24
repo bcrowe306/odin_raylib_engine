@@ -850,6 +850,16 @@ parent's), `ySort` (draw its children by Y: top-down / isometric depth) and
 `node.zIndex = 10`, `world:set_property("ySort", true)`. Guide with a
 tutorial: [`docs/draw_order.md`](docs/draw_order.md).
 
+#### The audio mixer (Audio, buses)
+
+Every sound and music plays into a bus (Master, Music, SFX and the
+project's own, made in the **Mixer** tab): `Audio.set_bus_volume / mute /
+solo / pan`, `Audio.get_buses`, `Audio.bus_peak`, `Audio.set_effect(bus,
+effect, param, value)`, `Audio.set_effect_enabled`; `Audio.play_sound(path,
+volume, pitch, bus)` and `Audio.play_music(path, loop, bus)`; Sound / Music
+nodes have a `bus` property. Effects: EQ, low-pass, high-pass, compressor,
+limiter, delay, reverb, distortion. Guide: [`docs/audio_mixer.md`](docs/audio_mixer.md).
+
 #### Player rebinding (Input)
 
 `Input.listen(action, {on_done = ...})` captures the next key / button /

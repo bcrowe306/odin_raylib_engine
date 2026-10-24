@@ -121,6 +121,7 @@ RemoteGame_HandleLine :: proc(state: ^EditorState, line: string) -> bool {
 		remote.debugDraw = strings.clone(rest)
 	case "eval": LuaConsole_Reply(state, rest)
 	case "sm": StateGraph_RemoteReply(rest)
+	case "mixer-peaks": MixerPanel_RemoteReply(rest)
 	case "sm-break":
 		remote.paused = true
 		Editor_Log(state, .Info, "Game paused: a state machine entered a break-on-enter state %s", rest)

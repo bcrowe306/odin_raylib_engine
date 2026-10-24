@@ -16,19 +16,20 @@ rms :: proc(s: []f32, from: int) -> f32 {
 }
 
 @(private = "file")
-sine :: proc(hz: f32, frames: int) -> []f32 {
-	out := make([]f32, frames * 2, context.temp_allocator)
-	for i in 0 ..< frames {
-		v := math.sin(2 * math.PI * hz * f32(i) / AUDIO_SAMPLE_RATE)
-		out[i * 2], out[i * 2 + 1] = v, v
+sine :: proc(buf: []f32, hz: f32) {
+	for i in 0 ..< len(buf) / 2 {
+		v := math.sin(2 * math.PI * hz * f32(i) / f32(MIXER_RATE))
+		buf[i * 2] = v
+		buf[i * 2 + 1] = v
 	}
-	return out
 }
 
+// The sound mixing pieces that need no audio device: spatialization, the
+// mixer's effects (a low-pass cuts highs, reverb leaves a tail) and the
+// master low-pass / reverb Lua calls (effects on the Master bus).
 @(test)
 test_audio_mixing :: proc(t: ^testing.T) {
-	// Positional: full at the listener, silent past maxDistance, panned by side
-	// (raylib: 1 = left, 0 = right).
+	defer Mixer_Shutdown()
 	v, p := Audio_Spatialize({0, 0}, {0, 0}, 100, 900, 450)
 	testing.expect(t, v == 1 && p == 0.5, "at the listener")
 	v, p = Audio_Spatialize({1000, 0}, {0, 0}, 100, 900, 450)
@@ -36,29 +37,38 @@ test_audio_mixing :: proc(t: ^testing.T) {
 	v, p = Audio_Spatialize({-300, 0}, {0, 0}, 100, 900, 450)
 	testing.expectf(t, v > 0.4 && v < 0.8 && p > 0.8, "left, part volume: %v %v", v, p)
 
-	// Low-pass at 2 kHz: 200 Hz passes, 12 kHz is cut.
-	Audio_ResetEffects()
-	low := sine(200, 4800)
-	Audio_ProcessEffects(low, {lowpassHz = 2000})
-	Audio_ResetEffects()
-	high := sine(12000, 4800)
-	Audio_ProcessEffects(high, {lowpassHz = 2000})
+	// A low-pass at 2 kHz: 200 Hz passes, 12 kHz is cut.
+	low := make([]f32, 9600, context.temp_allocator)
+	high := make([]f32, 9600, context.temp_allocator)
+	sine(low, 200)
+	sine(high, 12000)
+	lp: Mixer_Effect
+	Effect_Init(&lp, .Lowpass, MIXER_RATE)
+	lp.params[0] = 2000
+	Effect_Process(&lp, low, MIXER_RATE)
+	Effect_Clear(&lp)
+	Effect_Process(&lp, high, MIXER_RATE)
+	Effect_Free(&lp)
 	testing.expectf(t, rms(low, 2000) > 0.6, "200 Hz kept: %v", rms(low, 2000))
 	testing.expectf(t, rms(high, 2000) < 0.2, "12 kHz cut: %v", rms(high, 2000))
 
-	// Reverb: an impulse leaves a tail; mix 0 changes nothing.
-	Audio_ResetEffects()
-	Audio_SetReverb(0, 0) // buffers allocated on the main thread before use
+	// Reverb: an impulse leaves a tail.
 	imp := make([]f32, 16000, context.temp_allocator)
 	imp[0], imp[1] = 1, 1
-	dry := make([]f32, len(imp), context.temp_allocator)
-	copy(dry, imp)
-	Audio_ProcessEffects(dry, {})
-	testing.expect(t, dry[0] == 1 && rms(dry, 2) == 0, "no effects: passthrough")
-	Audio_SetReverb(0.5, 0.6)
-	Audio_ProcessEffects(imp, Audio_GetEffects())
+	rv: Mixer_Effect
+	Effect_Init(&rv, .Reverb, MIXER_RATE)
+	Effect_Process(&rv, imp, MIXER_RATE)
+	Effect_Free(&rv)
 	testing.expectf(t, rms(imp, 4000) > 0.0005, "reverb tail: %v", rms(imp, 4000))
-	Audio_ResetEffects()
+
+	// The Lua master effects are Master bus effects.
+	Mixer_Init()
+	Audio_SetLowpass(800)
+	Audio_SetReverb(0.4, 0.7)
+	master := Mixer_Buses()[0]
+	testing.expect(t, len(master.effects) == 2 && master.effects[0].type == .Lowpass && master.effects[0].params[0] == 800 && master.effects[1].type == .Reverb && master.effects[1].params[2] == 0.4, "on Master")
+	Audio_SetLowpass(0)
+	testing.expect(t, !Mixer_Buses()[0].effects[0].enabled, "0 Hz: bypassed")
 }
 
 @(test)
@@ -93,7 +103,8 @@ test_music_fades_and_buses :: proc(t: ^testing.T) {
 	// Buses, also from Lua.
 	Game_SetBusVolume(game, .Music, 0.25)
 	testing.expect_value(t, game.musicVolume, 0.25)
-	testing.expectf(t, abs(MusicNode_EffectiveVolume(b) - 0.25) < 0.001, "bus applies: %v", MusicNode_EffectiveVolume(b))
+	// The Music bus fader (applied in the mixer, not to the node's volume).
+	testing.expectf(t, abs(Mixer_Buses()[Mixer_BusIndex("Music")].volume - 0.25) < 0.001 && MusicNode_EffectiveVolume(b) == 1, "the Music fader: %v", Mixer_Buses()[Mixer_BusIndex("Music")].volume)
 	L := game.scriptManager.L
 	ok := lua.L_dostring(L, `
 Audio.set_bus_volume("sfx", 0.5)

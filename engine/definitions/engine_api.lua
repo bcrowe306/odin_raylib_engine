@@ -1319,6 +1319,7 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field volume number Volume (0-1), before the bus and master volumes.
 ---@field pitch number Playback speed / pitch (1 = normal).
+---@field bus string The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output...
 ---@field autoplay boolean Play once when the node becomes ready.
 ---@field voices integer Plays over itself up to this many times (1: a new play restarts it).
 ---@field positional boolean Volume and pan follow the node's distance and side from the listener (the current camera).
@@ -1338,6 +1339,7 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "volume" # number - Volume (0-1), before the bus and master volumes.
 ---| "pitch" # number - Playback speed / pitch (1 = normal).
+---| "bus" # string - The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output...
 ---| "autoplay" # boolean - Play once when the node becomes ready.
 ---| "voices" # integer - Plays over itself up to this many times (1: a new play restarts it).
 ---| "positional" # boolean - Volume and pan follow the node's distance and side from the listener (the current camera).
@@ -1359,6 +1361,7 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@overload fun(self: SoundNode, path: "enabled"): boolean
 ---@overload fun(self: SoundNode, path: "volume"): number
 ---@overload fun(self: SoundNode, path: "pitch"): number
+---@overload fun(self: SoundNode, path: "bus"): string
 ---@overload fun(self: SoundNode, path: "autoplay"): boolean
 ---@overload fun(self: SoundNode, path: "voices"): integer
 ---@overload fun(self: SoundNode, path: "positional"): boolean
@@ -1382,6 +1385,7 @@ function SoundNode:get_property(path) end
 ---@overload fun(self: SoundNode, path: "enabled", value: boolean)
 ---@overload fun(self: SoundNode, path: "volume", value: number)
 ---@overload fun(self: SoundNode, path: "pitch", value: number)
+---@overload fun(self: SoundNode, path: "bus", value: string)
 ---@overload fun(self: SoundNode, path: "autoplay", value: boolean)
 ---@overload fun(self: SoundNode, path: "voices", value: integer)
 ---@overload fun(self: SoundNode, path: "positional", value: boolean)
@@ -1403,6 +1407,7 @@ function SoundNode:set_property(path, value, y) end
 ---@field volume number Volume (0-1), before the bus and master volumes.
 ---@field pitch number Playback speed / pitch (1 = normal).
 ---@field pan number Stereo position: 0 left, 0.5 centre, 1 right.
+---@field bus string The mixer bus it plays into (the Mixer tab; empty = Music): its fader, effects and outp...
 ---@field looping boolean Start again at the end.
 ---@field autoplay boolean Start playing when the node becomes ready.
 ---@field isPlaying boolean Playing now.
@@ -1422,6 +1427,7 @@ function SoundNode:set_property(path, value, y) end
 ---| "volume" # number - Volume (0-1), before the bus and master volumes.
 ---| "pitch" # number - Playback speed / pitch (1 = normal).
 ---| "pan" # number - Stereo position: 0 left, 0.5 centre, 1 right.
+---| "bus" # string - The mixer bus it plays into (the Mixer tab; empty = Music): its fader, effects and outp...
 ---| "looping" # boolean - Start again at the end.
 ---| "autoplay" # boolean - Start playing when the node becomes ready.
 ---| "isPlaying" # boolean (runtime) - Playing now.
@@ -1443,6 +1449,7 @@ function SoundNode:set_property(path, value, y) end
 ---@overload fun(self: MusicNode, path: "volume"): number
 ---@overload fun(self: MusicNode, path: "pitch"): number
 ---@overload fun(self: MusicNode, path: "pan"): number
+---@overload fun(self: MusicNode, path: "bus"): string
 ---@overload fun(self: MusicNode, path: "looping"): boolean
 ---@overload fun(self: MusicNode, path: "autoplay"): boolean
 ---@overload fun(self: MusicNode, path: "isPlaying"): boolean
@@ -1466,6 +1473,7 @@ function MusicNode:get_property(path) end
 ---@overload fun(self: MusicNode, path: "volume", value: number)
 ---@overload fun(self: MusicNode, path: "pitch", value: number)
 ---@overload fun(self: MusicNode, path: "pan", value: number)
+---@overload fun(self: MusicNode, path: "bus", value: string)
 ---@overload fun(self: MusicNode, path: "looping", value: boolean)
 ---@overload fun(self: MusicNode, path: "autoplay", value: boolean)
 ---@overload fun(self: MusicNode, path: "isPlaying", value: boolean)
@@ -7138,17 +7146,18 @@ function InputModule.get_actions() end
 
 
 ---@class AudioModule
----Engine audio playback and volume control.
+---Engine audio playback and the mixer: every sound and music plays into a bus (Master, Music, SFX and the project's own - the Mixer tab), each with a fader, pan, mute / solo and effects.
 local AudioModule = {}
 
 ---Plays a sound effect from the given file path. Calls in quick succession
----overlap (up to 4 voices per sound) instead of restarting it.
+---overlap instead of restarting it.
 ---
 ---Example: `Audio.play_sound("sounds/jump.wav", 0.8, 1.1)`
 ---@param path AudioPath|string File path, e.g. "assets/audio/laser.wav"
----@param volume? number 0..1 (default 1), times the sfx bus
+---@param volume? number 0..1 (default 1), before the bus fader
 ---@param pitch? number Default 1
-function AudioModule.play_sound(path, volume, pitch) end
+---@param bus? string The mixer bus (default "SFX")
+function AudioModule.play_sound(path, volume, pitch, bus) end
 
 ---Plays a one-shot heard from a world position: quieter with distance from
 ---the listener (the camera, or Audio.set_listener) and panned to its side.
@@ -7160,29 +7169,82 @@ function AudioModule.play_sound(path, volume, pitch) end
 ---@param volume? number
 function AudioModule.play_sound_at(path, x, y, volume) end
 
----@alias AudioBus "master"|"music"|"sfx"
+---@alias AudioBus "master"|"music"|"sfx"|string
 
----Sets a bus volume (0..1) and applies it to what's playing.
+---Sets a mixer bus's fader (linear: 1 = 0 dB, 0.5 = -6 dB). "master", "music" and "sfx" also update the project's volumes.
 ---
 ---Example: `Audio.set_bus_volume("music", 0.5)`
----@param bus AudioBus
+---@param bus AudioBus A bus name (case doesn't matter)
 ---@param volume number
 function AudioModule.set_bus_volume(bus, volume) end
 
----Returns the current volume (0..1) of an audio bus.
+---Returns a bus's fader (linear).
 ---
 ---Example: `local vol = Audio.get_bus_volume("sfx"); Audio.set_bus_volume("sfx", vol * 0.5)`
 ---@param bus AudioBus
 ---@return number volume
 function AudioModule.get_bus_volume(bus) end
 
----A low-pass filter on the whole mix (e.g. underwater, a pause menu).
+---Mutes / unmutes a bus.
+---
+---Example: `Audio.set_bus_mute("Voice", true)`
+---@param bus AudioBus
+---@param mute boolean
+function AudioModule.set_bus_mute(bus, mute) end
+
+---Solos a bus (only soloed buses - and what they feed - are heard).
+---
+---Example: `Audio.set_bus_solo("Music", true)`
+---@param bus AudioBus
+---@param solo boolean
+function AudioModule.set_bus_solo(bus, solo) end
+
+---Pans a bus: -1 left, 0 centre, 1 right.
+---
+---Example: `Audio.set_bus_pan("Ambience", -0.3)`
+---@param bus AudioBus
+---@param pan number
+function AudioModule.set_bus_pan(bus, pan) end
+
+---The mixer's buses, Master first.
+---
+---Example: `for _, name in ipairs(Audio.get_buses()) do print(name, Audio.get_bus_volume(name)) end`
+---@return string[]
+function AudioModule.get_buses() end
+
+---A bus's level right now (post-fader peaks, falling off smoothly) - for in-game meters or music-reactive effects.
+---
+---Example: `local l, r = Audio.bus_peak("Music"); self.node.scale = {1 + l * 0.2, 1 + l * 0.2}`
+---@param bus AudioBus
+---@return number left
+---@return number right
+function AudioModule.bus_peak(bus) end
+
+---Sets an effect parameter on a bus: the effect by type name (the first of it) or 1-based position. Types and parameters: eq (low_gain, low_freq, mid_gain, mid_freq, high_gain, high_freq), lowpass / highpass (cutoff, resonance), compressor (threshold, ratio, attack, release, makeup), limiter (ceiling, release), delay (time, feedback, mix), reverb (size, damping, mix), distortion (drive, mix, output).
+---
+---Example: `Audio.set_effect("Music", "lowpass", "cutoff", 600) -- muffle the music underwater`
+---@param bus AudioBus
+---@param effect string|integer
+---@param param string
+---@param value number
+---@return boolean ok false when there's no such bus / effect / parameter
+function AudioModule.set_effect(bus, effect, param, value) end
+
+---Enables or bypasses an effect on a bus.
+---
+---Example: `Audio.set_effect_enabled("Music", "lowpass", in_water)`
+---@param bus AudioBus
+---@param effect string|integer
+---@param enabled boolean
+function AudioModule.set_effect_enabled(bus, effect, enabled) end
+
+---A low-pass filter on the whole mix (e.g. underwater, a pause menu) - a Low-pass effect on the Master bus.
 ---
 ---Example: `Audio.set_lowpass(800)  -- muffled while the pause menu is open`
 ---@param hz number Cutoff in Hz; 0 turns it off
 function AudioModule.set_lowpass(hz) end
 
----Reverb on the whole mix.
+---Reverb on the whole mix - a Reverb effect on the Master bus.
 ---
 ---Example: `Audio.set_reverb(0.4, 0.8)`
 ---@param mix number 0..1 (0 turns it off)
@@ -7208,7 +7270,8 @@ function AudioModule.crossfade(from, to, seconds) end
 ---Example: `Audio.play_music("music/theme.ogg", true)`
 ---@param path AudioPath|string File path, e.g. "assets/audio/theme.ogg"
 ---@param loop? boolean Whether to loop playback (default true)
-function AudioModule.play_music(path, loop) end
+---@param bus? string The mixer bus (default "Music")
+function AudioModule.play_music(path, loop, bus) end
 
 ---Stops playing the specified music stream.
 ---

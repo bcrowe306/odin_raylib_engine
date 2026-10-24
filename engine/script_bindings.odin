@@ -2350,14 +2350,15 @@ lua_audio_play_sound :: proc "c" (L: ^lua.State) -> c.int {
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil do return 0
 
-	path := string(pathC)
+	path := Project_ResolveAssetPath(&sm.game.gameContext, string(pathC)) // (project-relative)
 	if rl.IsAudioDeviceReady() {
 		sound, ok := sm.game.resourceManager->loadAudioSound(path)
 		if ok && sound != nil {
-			// Audio.play_sound(path [, volume [, pitch]]): one-shots overlap (4 voices).
+			// Audio.play_sound(path [, volume [, pitch [, bus = "SFX"]]]): one-shots overlap.
 			vol := f32(lua.tonumber(L, 2)) if lua.gettop(L) >= 2 else 1
 			pitch := f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else 1
-			Audio_PlayVoice(sound, 4, vol * sm.game.sfxVolume, pitch)
+			bus := Mixer_BusIndex(string(lua.tostring(L, 4))) if lua.type(L, 4) == .STRING else Mixer_BusIndex("SFX")
+			if Audio_Ready() do Mixer_PlaySound(sound.pcm, bus if bus >= 0 else 0, vol, 0, pitch, owner = sound)
 		}
 	}
 	return 0
@@ -2371,7 +2372,7 @@ lua_audio_play_sound_at :: proc "c" (L: ^lua.State) -> c.int {
 	pathC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if pathC == nil || sm == nil || sm.game == nil || !rl.IsAudioDeviceReady() do return 0
-	sound, ok := sm.game.resourceManager->loadAudioSound(string(pathC))
+	sound, ok := sm.game.resourceManager->loadAudioSound(Project_ResolveAssetPath(&sm.game.gameContext, string(pathC)))
 	if !ok || sound == nil do return 0
 	pos := [2]f32{f32(lua.tonumber(L, 2)), f32(lua.tonumber(L, 3))}
 	vol := f32(lua.tonumber(L, 4)) if lua.gettop(L) >= 4 else 1
@@ -2381,7 +2382,8 @@ lua_audio_play_sound_at :: proc "c" (L: ^lua.State) -> c.int {
 		vol *= v
 		pan = p
 	}
-	Audio_PlayVoice(sound, 4, vol * sm.game.sfxVolume, 1, pan)
+	sfx := Mixer_BusIndex("SFX")
+	if Audio_Ready() do Mixer_PlaySound(sound.pcm, sfx if sfx >= 0 else 0, vol, Audio_RaylibPanToMixer(pan), 1, owner = sound)
 	return 0
 }
 
@@ -2397,31 +2399,135 @@ bus_arg :: proc(L: ^lua.State, idx: c.int) -> (Audio_Bus, bool) {
 	return .Master, false
 }
 
-// Audio.set_bus_volume("master"|"music"|"sfx", v)
+// Audio.set_bus_volume(bus, v): any mixer bus by name ("master", "music",
+// "sfx" as before); master / music / sfx also update the project volumes.
 @(private="file")
 lua_audio_set_bus_volume :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	sm := get_script_manager(L)
-	bus, ok := bus_arg(L, 1)
-	if ok && sm != nil && sm.game != nil do Game_SetBusVolume(sm.game, bus, f32(lua.tonumber(L, 2)))
+	if sm == nil || sm.game == nil || lua.type(L, 1) != .STRING do return 0
+	v := f32(lua.tonumber(L, 2))
+	if bus, ok := bus_arg(L, 1); ok {
+		Game_SetBusVolume(sm.game, bus, v)
+		return 0
+	}
+	Mixer_Init()
+	if i := Mixer_BusIndex(string(lua.tostring(L, 1))); i >= 0 do Mixer_SetBusVolume(i, max(v, 0))
 	return 0
 }
 
 @(private="file")
 lua_audio_get_bus_volume :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	sm := get_script_manager(L)
-	bus, ok := bus_arg(L, 1)
 	v: f32 = 1
-	if ok && sm != nil && sm.game != nil {
-		switch bus {
-		case .Master: v = sm.game.masterVolume
-		case .Music:  v = sm.game.musicVolume
-		case .Sfx:    v = sm.game.sfxVolume
-		}
+	if lua.type(L, 1) == .STRING {
+		Mixer_Init()
+		i := Mixer_BusIndex(string(lua.tostring(L, 1)))
+		if i < 0 && string(lua.tostring(L, 1)) == "sfx" do i = Mixer_BusIndex("SFX")
+		for b in Mixer_Buses() do if b.index == i do v = b.volume
 	}
 	lua.pushnumber(L, lua.Number(v))
 	return 1
+}
+
+@(private="file")
+lua_bus_index :: proc(L: ^lua.State, idx: c.int) -> int {
+	if lua.type(L, idx) != .STRING do return -1
+	Mixer_Init()
+	return Mixer_BusIndex(string(lua.tostring(L, idx)))
+}
+
+// Audio.set_bus_mute(bus, on) / set_bus_solo(bus, on) / set_bus_pan(bus, -1..1)
+@(private="file")
+lua_audio_set_bus_mute :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	Mixer_SetBusMute(lua_bus_index(L, 1), bool(lua.toboolean(L, 2)))
+	return 0
+}
+
+@(private="file")
+lua_audio_set_bus_solo :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	Mixer_SetBusSolo(lua_bus_index(L, 1), bool(lua.toboolean(L, 2)))
+	return 0
+}
+
+@(private="file")
+lua_audio_set_bus_pan :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	Mixer_SetBusPan(lua_bus_index(L, 1), f32(lua.tonumber(L, 2)))
+	return 0
+}
+
+// Audio.get_buses() -> {"Master", "Music", "SFX", ...}
+@(private="file")
+lua_audio_get_buses :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	Mixer_Init()
+	buses := Mixer_Buses()
+	lua.createtable(L, c.int(len(buses)), 0)
+	for b, i in buses {
+		lua.pushstring(L, strings.clone_to_cstring(b.name, context.temp_allocator))
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
+// Audio.bus_peak(bus) -> left, right (0..1+, post-fader, decaying): in-game meters.
+@(private="file")
+lua_audio_bus_peak :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	i := lua_bus_index(L, 1)
+	pk: [2]f32
+	for b in Mixer_Buses() do if b.index == i do pk = b.peak
+	lua.pushnumber(L, lua.Number(pk[0]))
+	lua.pushnumber(L, lua.Number(pk[1]))
+	return 2
+}
+
+// lua_effect_slot: an effect on a bus by 1-based index or by type name
+// (the first of that type).
+@(private="file")
+lua_effect_slot :: proc(L: ^lua.State, bus: int, idx: c.int) -> int {
+	if bus < 0 do return -1
+	if lua.type(L, idx) == .NUMBER do return int(lua.tointeger(L, idx)) - 1
+	if lua.type(L, idx) != .STRING do return -1
+	t, ok := Effect_ParseType(string(lua.tostring(L, idx)))
+	if !ok do return -1
+	for b in Mixer_Buses() do if b.index == bus {
+		for e, k in b.effects do if e.type == t do return k
+	}
+	return -1
+}
+
+// Audio.set_effect(bus, effect, param, value): e.g. ("Music", "lowpass", "cutoff", 800)
+@(private="file")
+lua_audio_set_effect :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	bus := lua_bus_index(L, 1)
+	e := Mixer_EffectRef(bus, lua_effect_slot(L, bus, 2))
+	if e == nil || lua.type(L, 3) != .STRING {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	pi := Mixer_EffectParamIndex(e.type, string(lua.tostring(L, 3)))
+	if pi < 0 {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	d := MIXER_EFFECT_PARAMS[e.type][pi]
+	e.params[pi] = clamp(f32(lua.tonumber(L, 4)), d.min, d.max)
+	lua.pushboolean(L, true)
+	return 1
+}
+
+// Audio.set_effect_enabled(bus, effect, on)
+@(private="file")
+lua_audio_set_effect_enabled :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	bus := lua_bus_index(L, 1)
+	Mixer_SetEffectEnabled(bus, lua_effect_slot(L, bus, 2), bool(lua.toboolean(L, 3)))
+	return 0
 }
 
 // Audio.set_lowpass(hz): a low-pass on the whole mix (0 = off).
@@ -2471,35 +2577,39 @@ lua_node_music_fade :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// lua_music: a music resource by path - the loaded one (no new reference),
+// else loaded once (kept for later calls).
+@(private="file")
+lua_music :: proc(L: ^lua.State) -> (^AudioMusic, ^ScriptManager) {
+	pathC := lua.tostring(L, 1)
+	sm := get_script_manager(L)
+	if pathC == nil || sm == nil || sm.game == nil || !rl.IsAudioDeviceReady() do return nil, sm
+	rm := &sm.game.resourceManager
+	path := Project_ResolveAssetPath(&sm.game.gameContext, string(pathC))
+	for i in 0 ..< rm.musicCount do if rm.audioMusic[i].filePath == path || rm.audioMusic[i].filePath == string(pathC) do return &rm.audioMusic[i], sm
+	m, ok := rm->loadAudioMusic(path)
+	return m if ok else nil, sm
+}
+
+// Audio.play_music(path [, loop = true [, bus = "Music"]])
 @(private="file")
 lua_audio_play_music :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	pathC := lua.tostring(L, 1)
-	sm := get_script_manager(L)
-	if pathC == nil || sm == nil || sm.game == nil do return 0
-
-	path := string(pathC)
-	if rl.IsWindowReady() {
-		music, ok := sm.game.resourceManager->loadAudioMusic(path)
-		if ok && music != nil {
-			rl.PlayMusicStream(music.music)
-		}
-	}
+	m, _ := lua_music(L)
+	if m == nil || !Audio_Ready() do return 0
+	loop := lua.type(L, 2) != .BOOLEAN || bool(lua.toboolean(L, 2))
+	bus := Mixer_BusIndex(string(lua.tostring(L, 3))) if lua.type(L, 3) == .STRING else Mixer_BusIndex("Music")
+	Mixer_StopVoice(m.voice)
+	m.voice = Mixer_PlayMusic(m.music, bus if bus >= 0 else 0, 1, loop, owner = m)
 	return 0
 }
 
 @(private="file")
 lua_audio_stop_music :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	pathC := lua.tostring(L, 1)
-	sm := get_script_manager(L)
-	if pathC == nil || sm == nil || sm.game == nil do return 0
-	path := string(pathC)
-	if rl.IsWindowReady() {
-		music, ok := sm.game.resourceManager->loadAudioMusic(path)
-		if ok && music != nil {
-			rl.StopMusicStream(music.music)
-		}
+	if m, _ := lua_music(L); m != nil {
+		Mixer_StopVoice(m.voice)
+		m.voice = {}
 	}
 	return 0
 }
@@ -2507,81 +2617,37 @@ lua_audio_stop_music :: proc "c" (L: ^lua.State) -> c.int {
 @(private="file")
 lua_audio_pause_music :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	pathC := lua.tostring(L, 1)
-	sm := get_script_manager(L)
-	if pathC == nil || sm == nil || sm.game == nil do return 0
-	path := string(pathC)
-	if rl.IsWindowReady() {
-		music, ok := sm.game.resourceManager->loadAudioMusic(path)
-		if ok && music != nil {
-			rl.PauseMusicStream(music.music)
-		}
-	}
+	if m, _ := lua_music(L); m != nil do Mixer_SetVoicePaused(m.voice, true)
 	return 0
 }
 
 @(private="file")
 lua_audio_resume_music :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	pathC := lua.tostring(L, 1)
-	sm := get_script_manager(L)
-	if pathC == nil || sm == nil || sm.game == nil do return 0
-	path := string(pathC)
-	if rl.IsWindowReady() {
-		music, ok := sm.game.resourceManager->loadAudioMusic(path)
-		if ok && music != nil {
-			rl.ResumeMusicStream(music.music)
-		}
-	}
+	if m, _ := lua_music(L); m != nil do Mixer_SetVoicePaused(m.voice, false)
 	return 0
 }
 
 @(private="file")
 lua_audio_is_music_playing :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	pathC := lua.tostring(L, 1)
-	sm := get_script_manager(L)
-	if pathC == nil || sm == nil || sm.game == nil {
-		lua.pushboolean(L, false)
-		return 1
-	}
-	path := string(pathC)
-	if rl.IsWindowReady() {
-		music, ok := sm.game.resourceManager->loadAudioMusic(path)
-		if ok && music != nil {
-			isPlaying := rl.IsMusicStreamPlaying(music.music)
-			lua.pushboolean(L, b32(isPlaying))
-			return 1
-		}
-	}
-	lua.pushboolean(L, false)
+	m, _ := lua_music(L)
+	lua.pushboolean(L, b32(m != nil && Mixer_VoicePlaying(m.voice)))
 	return 1
 }
 
 @(private="file")
 lua_audio_set_music_volume :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	pathC := lua.tostring(L, 1)
-	vol := f32(lua.tonumber(L, 2))
-	sm := get_script_manager(L)
-	if pathC == nil || sm == nil || sm.game == nil do return 0
-	path := string(pathC)
-	if rl.IsWindowReady() {
-		music, ok := sm.game.resourceManager->loadAudioMusic(path)
-		if ok && music != nil {
-			rl.SetMusicVolume(music.music, vol * sm.game.musicVolume)
-		}
-	}
+	if m, _ := lua_music(L); m != nil do Mixer_SetVoice(m.voice, max(f32(lua.tonumber(L, 2)), 0), 0, 1)
 	return 0
 }
 
 @(private="file")
 lua_audio_set_master_volume :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	vol := f32(lua.tonumber(L, 1))
-	if rl.IsWindowReady() {
-		rl.SetMasterVolume(vol)
-	}
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil do Game_SetBusVolume(sm.game, .Master, f32(lua.tonumber(L, 1)))
 	return 0
 }
 
@@ -4327,6 +4393,20 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "set_bus_volume")
 	lua.pushcfunction(L, lua_audio_get_bus_volume)
 	lua.setfield(L, -2, "get_bus_volume")
+	lua.pushcfunction(L, lua_audio_set_bus_mute)
+	lua.setfield(L, -2, "set_bus_mute")
+	lua.pushcfunction(L, lua_audio_set_bus_solo)
+	lua.setfield(L, -2, "set_bus_solo")
+	lua.pushcfunction(L, lua_audio_set_bus_pan)
+	lua.setfield(L, -2, "set_bus_pan")
+	lua.pushcfunction(L, lua_audio_get_buses)
+	lua.setfield(L, -2, "get_buses")
+	lua.pushcfunction(L, lua_audio_bus_peak)
+	lua.setfield(L, -2, "bus_peak")
+	lua.pushcfunction(L, lua_audio_set_effect)
+	lua.setfield(L, -2, "set_effect")
+	lua.pushcfunction(L, lua_audio_set_effect_enabled)
+	lua.setfield(L, -2, "set_effect_enabled")
 	lua.pushcfunction(L, lua_audio_set_lowpass)
 	lua.setfield(L, -2, "set_lowpass")
 	lua.pushcfunction(L, lua_audio_set_reverb)

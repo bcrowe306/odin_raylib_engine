@@ -120,6 +120,12 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:stategraph")
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Mixer###MixerTab", ICON_FA_SLIDERS), nil, flags(.Mixer, req, hasReq)) {
+			state.bottomTab = .Mixer
+			MixerPanel_Render(state)
+			imgui.EndTabItem()
+		}
+		Drive_Item("bottom:mixer")
 		if imgui.BeginTabItem(fmt.ctprintf("%s  Search###SearchTab", ICON_FA_MAGNIFYING_GLASS), nil, flags(.Search, req, hasReq)) {
 			state.bottomTab = .Search
 			Code_SearchPanel(state)

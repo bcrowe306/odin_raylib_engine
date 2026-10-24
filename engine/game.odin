@@ -163,6 +163,7 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 
 	// 1. Poll and update Two-Tier Input System once per frame (before physics and game/scene update)
 	InputSystem_Update(&game.input, deltaTime)
+	Mixer_Reap() // voices that ended
 	if game.scriptManager.L != nil do Input_RebindDispatch(&game.input, game.scriptManager.L) // Input.listen's on_done
 	if game.scriptManager.hotReload do Shader_CheckForChanges() // edited .fs files
 
@@ -199,14 +200,14 @@ GameTerminate :: proc(game: ^Game) {
 	Tween_Destroy(&game.tweens, game.scriptManager.L) // releases Lua callbacks: before the Lua state goes
 	Scene_FlowShutdown(game)
 	if game.scriptManager.isReady do Save_Flush(game.scriptManager.L) // Save data is written on quit
-	Audio_ResetEffects()
 	Text_UnloadFonts()
 	Locale_Reset()
 	Audio_SetListener(nil)
 	ScriptManager_Destroy(&game.scriptManager)
 	SceneManager_Terminate(&game.sceneManager)
 	AssetManager_Destroy(&game.assetManager)
-	ResourceManager_Terminate(&game.resourceManager)
+	ResourceManager_Terminate(&game.resourceManager) // (stops the voices using its sounds)
+	Mixer_Shutdown()
 	PhysicsWorld_Destroy(&game.physicsWorld)
 	Shader_UnloadAll()
 	Lighting_Unload()
@@ -263,39 +264,24 @@ Audio_Bus :: enum {
 	Sfx,
 }
 
-// Game_SetBusVolume changes a bus volume and applies it to what's playing.
+// Game_SetBusVolume sets the Master / Music / SFX bus fader (the project's
+// volumes; Audio.set_bus_volume).
 Game_SetBusVolume :: proc(game: ^Game, bus: Audio_Bus, v: f32) {
 	v := clamp(v, 0, 1)
+	name := "Master"
 	switch bus {
-	case .Master:
-		game.masterVolume = v
-		if rl.IsAudioDeviceReady() do rl.SetMasterVolume(v)
+	case .Master: game.masterVolume = v
 	case .Music:
 		game.musicVolume = v
+		name = "Music"
 	case .Sfx:
 		game.sfxVolume = v
+		name = "SFX"
 	}
-	scene := game.sceneManager.currentScene
-	if scene == nil || scene.manager == nil do return
-	for n in scene.manager.nodes {
-		if n == nil do continue
-		#partial switch bus {
-		case .Music:
-			if n.typeId == MusicNode do MusicNode_ApplyVolume(cast(^MusicNode)n)
-		case .Sfx:
-			if n.typeId == SoundNode {
-				sn := cast(^SoundNode)n
-				if sn.audio != nil && rl.IsAudioDeviceReady() {
-					vol, _ := SoundNode_Mix(sn, &game.gameContext)
-					rl.SetSoundVolume(sn.audio.sound, vol)
-					for s in sn.audio.aliases do rl.SetSoundVolume(s, vol)
-				}
-			}
-		}
-	}
+	Mixer_Init()
+	if i := Mixer_BusIndex(name); i >= 0 do Mixer_SetBusVolume(i, v)
 }
 
-Game_BusVolume :: proc(ctx: ^GameContext, music: bool) -> f32 {
-	if ctx == nil || ctx.game == nil do return 1
-	return ctx.game.musicVolume if music else ctx.game.sfxVolume
-}
+// Game_BusVolume: 1 - bus faders now apply in the mixer, not to each node's
+// volume (kept for scripts / tools that multiplied by it).
+Game_BusVolume :: proc(ctx: ^GameContext, music: bool) -> f32 {return 1}

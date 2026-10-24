@@ -105,6 +105,7 @@ exits non-zero if any check fails.
 | `pixel_perfect.drive` | Project Settings > Video: Integer Scaling, Pixel Snap, then Smooth Camera (disabled until Pixel Snap), saved in project.json. |
 | `path.drive` | A Path from Add Node: a point dragged, a point added by double-clicking the curve, one removed in the Inspector, sharp / smooth; a Path Follow under it travels in Simulate; saved. |
 | `controls_menu.drive` | A UI Container's New Script picks the Controls Menu template; in Simulate it lists the actions with their keys (confirm hidden), and rebinding shows Press a key... |
+| `mixer.drive` | The Mixer tab: a new bus, a Reverb on it (its parameter popup), the level typed in dB, mute; saved in project.json; in Simulate a sound into the bus plays (a voice, the meters move). |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |
@@ -188,7 +189,7 @@ Queries:
 - `ref-section`, `ref-api` (the Scripting Reference window's section and API entry)
 - `bottom-tab` (the bottom panel tab shown: Console, Profiler, Game, Animation, Particles, Ldtk, Search, StateGraph)
 - `search-total`, `search-files` (find in files)
-- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`, `smg-pan`, `smg-ways` (live ways out: `idle:Min_Time, run:waiting, ...`); `node:<Name>.path-points` (a PathNode's point count)
+- `smg-selected` (the graph's selected state / `transition N`), `smg-zoom`, `smg-pan`, `smg-ways` (live ways out: `idle:Min_Time, run:waiting, ...`); `node:<Name>.path-points` (a PathNode's point count); `mixer-buses` (`Master:+0.0,Music:-6.0,...`), `mixer-voices`
 - `remote-debug-draw` (the running game's last debug-draw reply)
 - `selected-bounds` (the selected node's world bounds, `minx,miny,maxx,maxy`)
 - `runtime-diags` (script problems recorded from Simulate / Play)

@@ -21,9 +21,9 @@ expect code.text contains Input.is_action_pressed("jump")
 key end
 key enter
 hold shift
-drag @preview.action:fire @code.caret
+drag @preview.action:interact @code.caret
 release
-expect code.text contains Input.is_action_down("fire")
+expect code.text contains Input.is_action_down("interact")
 key end
 key enter
 hold alt

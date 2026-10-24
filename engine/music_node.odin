@@ -11,6 +11,7 @@ MusicNode :: struct {
 	volume:     f32 `gui:"true" min:"0" max:"1"`,
 	pitch:      f32 `gui:"true" min:"0.1" max:"3"`,
 	pan:        f32 `gui:"true" min:"0" max:"1"`,
+	bus:        string `gui:"true"`, // the mixer bus it plays into ("" = Music)
 	looping:    bool `gui:"true"`,
 	autoplay:   bool `gui:"true"`,
 	isPlaying:  bool `gui:"true" save:"false"`,
@@ -26,6 +27,19 @@ MusicNode :: struct {
 	fadeElapsed: f32,
 	fadeStop:   bool,
 	onFinished: EventSubject, // "finished": a non-looping track ended
+	voice:      Mixer_Voice_Handle, // its mixer voice (mixer.odin)
+}
+
+// MusicNode_BusIndex: the mixer bus it plays into (Music when "" / unknown).
+MusicNode_BusIndex :: proc(m: ^MusicNode) -> int {
+	if m.bus != "" do if i := Mixer_BusIndex(m.bus); i >= 0 do return i
+	if i := Mixer_BusIndex("Music"); i >= 0 do return i
+	return 0
+}
+
+@(private = "file")
+music_ok :: proc(m: ^MusicNode) -> bool {
+	return m.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(m.music.music)
 }
 
 MusicNode_Init :: proc(musicNode: ^MusicNode) {
@@ -95,15 +109,15 @@ MusicNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32)
 	if musicNode.isPlaying && musicNode.fadeTime > 0 do music_fade_step(musicNode, deltaTime)
 	if musicNode.music == nil do return
 
-	// When music is actively streaming, we must feed Raylib's audio stream buffer every frame!
+	// The mixer streams it (its voice); here: time, the end, the bus.
 	if musicNode.isPlaying && !musicNode.isPaused {
-		if rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-			rl.UpdateMusicStream(musicNode.music.music)
-			musicNode.timePlayed = rl.GetMusicTimePlayed(musicNode.music.music)
+		if music_ok(musicNode) {
 			musicNode.timeLength = rl.GetMusicTimeLength(musicNode.music.music)
-
-			// If music stopped playing and looping is disabled, transition isPlaying to false
-			if !musicNode.looping && !rl.IsMusicStreamPlaying(musicNode.music.music) {
+			if Mixer_VoicePlaying(musicNode.voice) {
+				t := Mixer_VoiceTime(musicNode.voice)
+				musicNode.timePlayed = math.mod(t, musicNode.timeLength) if musicNode.timeLength > 0 else t
+				Mixer_SetVoiceBus(musicNode.voice, MusicNode_BusIndex(musicNode))
+			} else if !musicNode.looping {
 				musicNode.isPlaying = false
 				musicNode.timePlayed = musicNode.timeLength
 				musicNode.onFinished->notify(musicNode, nil, gameContext)
@@ -149,16 +163,13 @@ MusicNode_Play :: proc(musicNode: ^MusicNode) {
 		return
 	}
 
-	if rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-		musicNode.music.music.looping = musicNode.looping
-		rl.SetMusicVolume(musicNode.music.music, MusicNode_EffectiveVolume(musicNode))
-		rl.SetMusicPitch(musicNode.music.music, musicNode.pitch)
-		rl.SetMusicPan(musicNode.music.music, musicNode.pan)
-
-		if musicNode.isPaused {
-			rl.ResumeMusicStream(musicNode.music.music)
+	if music_ok(musicNode) && Audio_Ready() {
+		if musicNode.isPaused && Mixer_VoicePlaying(musicNode.voice) {
+			Mixer_SetVoicePaused(musicNode.voice, false)
 		} else {
-			rl.PlayMusicStream(musicNode.music.music)
+			Mixer_StopVoice(musicNode.voice)
+			musicNode.voice = Mixer_PlayMusic(musicNode.music.music, MusicNode_BusIndex(musicNode), MusicNode_EffectiveVolume(musicNode), musicNode.looping, owner = musicNode.music)
+			Mixer_SetVoice(musicNode.voice, MusicNode_EffectiveVolume(musicNode), Audio_RaylibPanToMixer(musicNode.pan), musicNode.pitch)
 		}
 	}
 
@@ -169,11 +180,8 @@ MusicNode_Play :: proc(musicNode: ^MusicNode) {
 MusicNode_Stop :: proc(musicNode: ^MusicNode) {
 	if musicNode == nil do return
 
-	if musicNode.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-		if rl.IsMusicStreamPlaying(musicNode.music.music) || musicNode.isPaused {
-			rl.StopMusicStream(musicNode.music.music)
-		}
-	}
+	Mixer_StopVoice(musicNode.voice)
+	musicNode.voice = {}
 
 	musicNode.isPlaying = false
 	musicNode.isPaused = false
@@ -184,11 +192,7 @@ MusicNode_Pause :: proc(musicNode: ^MusicNode) {
 	if musicNode == nil do return
 
 	if musicNode.isPlaying && !musicNode.isPaused {
-		if musicNode.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-			if rl.IsMusicStreamPlaying(musicNode.music.music) {
-				rl.PauseMusicStream(musicNode.music.music)
-			}
-		}
+		Mixer_SetVoicePaused(musicNode.voice, true)
 		musicNode.isPaused = true
 	}
 }
@@ -197,9 +201,7 @@ MusicNode_Resume :: proc(musicNode: ^MusicNode) {
 	if musicNode == nil do return
 
 	if musicNode.isPaused {
-		if musicNode.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-			rl.ResumeMusicStream(musicNode.music.music)
-		}
+		Mixer_SetVoicePaused(musicNode.voice, false)
 		musicNode.isPaused = false
 		musicNode.isPlaying = true
 	}
@@ -213,8 +215,13 @@ MusicNode_Seek :: proc(musicNode: ^MusicNode, positionInSeconds: f32) {
 		targetPos = min(targetPos, musicNode.timeLength)
 	}
 
-	if musicNode.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-		rl.SeekMusicStream(musicNode.music.music, targetPos)
+	// A new voice from there (the decoder seeks).
+	if music_ok(musicNode) && Mixer_VoicePlaying(musicNode.voice) && Audio_Ready() {
+		paused := musicNode.isPaused
+		Mixer_StopVoice(musicNode.voice)
+		musicNode.voice = Mixer_PlayMusic(musicNode.music.music, MusicNode_BusIndex(musicNode), MusicNode_EffectiveVolume(musicNode), musicNode.looping, owner = musicNode.music, startSeconds = targetPos)
+		Mixer_SetVoice(musicNode.voice, MusicNode_EffectiveVolume(musicNode), Audio_RaylibPanToMixer(musicNode.pan), musicNode.pitch)
+		Mixer_SetVoicePaused(musicNode.voice, paused)
 	}
 	musicNode.timePlayed = targetPos
 }
@@ -222,33 +229,25 @@ MusicNode_Seek :: proc(musicNode: ^MusicNode, positionInSeconds: f32) {
 MusicNode_SetVolume :: proc(musicNode: ^MusicNode, volume: f32) {
 	if musicNode == nil do return
 	musicNode.volume = math.clamp(volume, 0.0, 1.0)
-	if musicNode.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-		rl.SetMusicVolume(musicNode.music.music, musicNode.volume * Game_BusVolume(musicNode.gameContext, music = true))
-	}
+	MusicNode_ApplyVolume(musicNode)
 }
 
 MusicNode_SetPitch :: proc(musicNode: ^MusicNode, pitch: f32) {
 	if musicNode == nil do return
 	musicNode.pitch = max(pitch, 0.01)
-	if musicNode.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-		rl.SetMusicPitch(musicNode.music.music, musicNode.pitch)
-	}
+	MusicNode_ApplyVolume(musicNode)
 }
 
 MusicNode_SetPan :: proc(musicNode: ^MusicNode, pan: f32) {
 	if musicNode == nil do return
 	musicNode.pan = math.clamp(pan, 0.0, 1.0)
-	if musicNode.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(musicNode.music.music) {
-		rl.SetMusicPan(musicNode.music.music, musicNode.pan)
-	}
+	MusicNode_ApplyVolume(musicNode)
 }
 
 MusicNode_SetLooping :: proc(musicNode: ^MusicNode, looping: bool) {
 	if musicNode == nil do return
 	musicNode.looping = looping
-	if musicNode.music != nil {
-		musicNode.music.music.looping = looping
-	}
+	Mixer_SetVoiceLoop(musicNode.voice, looping)
 }
 
 MusicNode_IsPlaying :: proc(musicNode: ^MusicNode) -> bool {
@@ -271,16 +270,14 @@ MusicNode_GetProgress :: proc(musicNode: ^MusicNode) -> f32 {
 	return math.clamp(musicNode.timePlayed / musicNode.timeLength, 0.0, 1.0)
 }
 
-// MusicNode_EffectiveVolume: volume x fade x the music bus.
+// MusicNode_EffectiveVolume: volume x fade (its bus fader applies in the mixer).
 MusicNode_EffectiveVolume :: proc(m: ^MusicNode) -> f32 {
-	return m.volume * m.fadeVolume * Game_BusVolume(m.gameContext, music = true)
+	return m.volume * m.fadeVolume
 }
 
-// MusicNode_ApplyVolume pushes the effective volume to the stream.
+// MusicNode_ApplyVolume pushes volume, pan and pitch to its voice.
 MusicNode_ApplyVolume :: proc(m: ^MusicNode) {
-	if m.music != nil && rl.IsAudioDeviceReady() && rl.IsMusicValid(m.music.music) {
-		rl.SetMusicVolume(m.music.music, MusicNode_EffectiveVolume(m))
-	}
+	Mixer_SetVoice(m.voice, MusicNode_EffectiveVolume(m), Audio_RaylibPanToMixer(m.pan), m.pitch)
 }
 
 // MusicNode_FadeTo fades the track's volume factor to `target` (0..1) over
