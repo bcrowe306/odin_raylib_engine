@@ -81,7 +81,9 @@ InputSystem :: struct {
 	// Project-defined actions (input_actions.odin).
 	named: [dynamic]Named_Action,
 
-	// Optional interactive rebinding state for UI menus
+	// Player rebinding (input_rebind.odin).
+	rebind: Input_Rebind,
+	// (Older UIs read these: they mirror `rebind` for built-in actions.)
 	isListeningForRebind: bool,
 	rebindTargetAction:   InputAction,
 }
@@ -95,7 +97,6 @@ InputSystem_Init :: proc(input: ^InputSystem) {
 	input.enabled = true
 	input.gamepadIndex = 0
 	input.useSimulatedInput = false
-	input.isListeningForRebind = false
 	Input_ResetDefaultBindings(input)
 }
 
@@ -104,6 +105,7 @@ InputSystem_Destroy :: proc(input: ^InputSystem) {
 	Input_ClearNamed(input)
 	delete(input.named)
 	input.named = nil
+	Input_RebindDestroy(input)
 	if input.simulatedKeysDown != nil {
 		delete(input.simulatedKeysDown)
 		input.simulatedKeysDown = nil
@@ -261,11 +263,13 @@ Input_BindGamepadAxis :: proc(
 	}, clearExisting)
 }
 
-// Start interactive rebind mode for a target action (next key pressed will rebind the primary key slot)
+// Start interactive rebind mode for a built-in action (the next input
+// replaces its binding of the same device kind; input_rebind.odin).
 Input_StartRebind :: proc(input: ^InputSystem, action: InputAction) {
 	if input == nil do return
-	input.isListeningForRebind = true
+	Input_RebindListen(input, Builtin_ActionName(action))
 	input.rebindTargetAction = action
+	input.isListeningForRebind = true
 }
 
 // Format human-readable binding list for an action (using temp allocator)
@@ -407,28 +411,9 @@ InputSystem_Update :: proc(input: ^InputSystem, deltaTime: f32) {
 		return
 	}
 
-	// Handle interactive key-rebinding if a UI menu requested it
-	if input.isListeningForRebind && rl.IsWindowReady() {
-		keyPressed := rl.GetKeyPressed()
-		if keyPressed != .KEY_NULL {
-			if keyPressed != .ESCAPE {
-				// Replace primary keyboard binding on the target action
-				mapping := &input.mappings[input.rebindTargetAction]
-				replaced := false
-				for i in 0..<mapping.bindingCount {
-					if mapping.bindings[i].deviceType == .KeyboardKey {
-						mapping.bindings[i].key = keyPressed
-						replaced = true
-						break
-					}
-				}
-				if !replaced {
-					Input_BindKey(input, input.rebindTargetAction, keyPressed, false)
-				}
-			}
-			input.isListeningForRebind = false
-		}
-	}
+	// Player rebinding: capture the next input while listening (input_rebind.odin).
+	Input_RebindUpdate(input)
+	input.isListeningForRebind = input.rebind.listening
 
 	// Poll all physical bindings for each logical action and compute new ActionState
 	for action in InputAction {

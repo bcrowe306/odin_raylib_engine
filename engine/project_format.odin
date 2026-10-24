@@ -556,6 +556,8 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	game.masterVolume = cfg.masterVolume
 	if rl.IsAudioDeviceReady() do rl.SetMasterVolume(cfg.masterVolume)
 	Input_ApplyActionConfigs(&game.input, cfg.actions[:])
+	Input_RebindSetDefaults(&game.input, cfg.actions[:]) // (Input.reset_bindings)
+	if activate do Input_LoadUserBindings(&game.input) // the player's own (the game, not the editor)
 	Texture_ImportsSet(cfg.textureImport[:])
 	// Global scripts exist before any scene; the game starts them (ready)
 	// now, the editor when Simulate starts.

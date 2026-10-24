@@ -1,0 +1,37 @@
+# Controls menu: a UI Container's New Script picks the Controls Menu
+# template; in Simulate it builds a row per input action with the keys, and
+# a rebind from Lua (the button's handler) shows "Press a key...".
+wait 5
+key escape
+click @hier.add
+type ui container
+click @addnode.create
+dblclick @insp.name
+key ctrl+a
+type ControlsZz
+key enter
+click @insp.script-new
+expect item:newscript.template:controls_menu == visible
+screenshot new_script
+click @newscript.create
+wait 3
+expect node:ControlsZz.script contains controls_zz.lua
+expect file:scripts/controls_zz.lua contains Input.listen(action
+key cmd+s
+wait 3
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+expect node:jump_keys.type == UIButtonNode
+expect node:jump_keys.prop.text == Space
+expect node:confirm_row.exists == false
+click @bottom:console
+click @console.lua
+type Scene.find_node("ControlsZz"):get_script():rebind("jump")
+key enter
+wait 3
+expect node:jump_keys.prop.text == Press a key...
+screenshot simulate_menu
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

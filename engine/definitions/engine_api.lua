@@ -7037,6 +7037,105 @@ function InputModule.get_mouse_position() end
 ---@return number
 function InputModule.get_mouse_wheel_move() end
 
+---@class InputBindingInfo
+---@field device "key"|"mouse"|"button"|"axis"
+---@field name string The raw name ("SPACE", "LEFT", "RIGHT_FACE_DOWN", "LEFT_X")
+---@field key? string
+---@field mouse? string
+---@field button? string
+---@field axis? string
+---@field positive? boolean Axis direction
+---@field text string What to show the player ("Space", "Left Shift", "A", "Left Stick Right")
+
+---@class InputBindingSpec
+---@field key? string A keyboard key ("SPACE", "W", "LEFT_SHIFT")
+---@field mouse? string A mouse button ("LEFT", "RIGHT", "MIDDLE")
+---@field button? string A gamepad button ("RIGHT_FACE_DOWN" = A, "LEFT_TRIGGER_1" = LB, "MIDDLE_RIGHT" = Start)
+---@field axis? string A gamepad axis ("LEFT_X", "LEFT_Y", "RIGHT_X", "RIGHT_Y")
+---@field positive? boolean Axis direction (true: right / down)
+
+---@class InputListenOptions
+---@field slot? integer Which binding to replace (1-based); default: the first one of the same device kind, else a new one
+---@field device? "any"|"keyboard"|"gamepad" Which inputs count (default any)
+---@field conflicts? "clear"|"swap"|"allow" Another action using it loses it (clear, default), gets this one's old binding (swap), or keeps it (allow)
+---@field cancel? string The key that cancels (default "ESCAPE")
+---@field on_done? fun(result: "bound"|"cancelled", text: string) Called when it's bound or cancelled
+
+---An action's bindings, each with a player-facing `text`.
+---
+---Example: `for i, b in ipairs(Input.get_bindings("jump")) do print(i, b.text) end`
+---@param action InputAction
+---@return InputBindingInfo[]
+function InputModule.get_bindings(action) end
+
+---What to show for an action's bindings: "Space / A" (or one slot's).
+---
+---Example: `label.text = "Jump: " .. Input.binding_text("jump")`
+---@param action InputAction
+---@param slot? integer
+---@return string
+function InputModule.binding_text(action, slot) end
+
+---Sets one of an action's bindings (nil removes that slot); slot 0 replaces the first binding of the same device kind. Saved for the player.
+---
+---Example: `Input.set_binding("jump", 1, {key = "W"})`
+---@param action InputAction
+---@param slot integer
+---@param binding InputBindingSpec|nil
+---@param conflicts? "clear"|"swap"|"allow"
+---@return boolean ok false for an unknown action
+function InputModule.set_binding(action, slot, binding, conflicts) end
+
+---Waits for the player to press the key / button / stick to bind to an action (a "press a key..." prompt). Everything must be let go first, so the button that opened the menu isn't taken. Escape cancels. The result is saved for the player.
+---
+---Example: `Input.listen("jump", {on_done = function(result, text) self.label.text = text end})`
+---@param action InputAction
+---@param options? InputListenOptions
+---@return boolean ok false for an unknown action
+function InputModule.listen(action, options) end
+
+---Whether Input.listen is waiting for a press.
+---
+---Example: `if Input.is_listening() then return end -- the menu ignores input meanwhile`
+---@return boolean
+function InputModule.is_listening() end
+
+---Stops waiting (on_done gets "cancelled").
+---
+---Example: `Input.cancel_listen()`
+function InputModule.cancel_listen() end
+
+---Back to the project's bindings: one action, or all of them. Saved for the player.
+---
+---Example: `Input.reset_bindings()`
+---@param action? InputAction
+function InputModule.reset_bindings(action) end
+
+---Saves the player's bindings now (set_binding, listen and reset_bindings already do).
+---
+---Example: `Input.save_bindings()`
+---@return boolean ok
+function InputModule.save_bindings() end
+
+---The actions that already use a binding.
+---
+---Example: `local used = Input.find_conflicts({key = "SPACE"})`
+---@param binding InputBindingSpec
+---@return string[]
+function InputModule.find_conflicts(binding) end
+
+---The kind of device the player used last - show keyboard or gamepad prompts.
+---
+---Example: `hint.text = Input.last_device() == "gamepad" and "Press A" or "Press Space"`
+---@return "keyboard"|"gamepad"
+function InputModule.last_device() end
+
+---The project's actions, in the order of Project Settings > Input (for building a controls menu).
+---
+---Example: `for _, name in ipairs(Input.get_actions()) do print(name, Input.binding_text(name)) end`
+---@return string[]
+function InputModule.get_actions() end
+
 
 ---@class AudioModule
 ---Engine audio playback and volume control.
@@ -7486,7 +7585,7 @@ function SceneModule.get_nodes() end
 ---Dynamically instantiates a new scene node and adds it to the active scene graph.
 ---
 ---Example: `local timer = Scene.create_node("TimerNode", "Cooldown", self.node)`
----@param nodeType string "Node", "TextureNode", "ScriptNode", "CameraNode", "ParticleEmitterNode", "TimerNode", "DynamicBodyNode", "StaticBodyNode", "AreaNode", "RaycastNode", "CharacterMoverNode"
+---@param nodeType string Any node type: "Node", "TextureNode", "UIButtonNode", "UILabelNode", "PathNode", ... (or a short name from Add Node's search: "sprite", "timer", "path")
 ---@param name? string Optional node name
 ---@param parent? Node Optional parent node (defaults to scene root)
 ---@return Node? node Newly spawned node

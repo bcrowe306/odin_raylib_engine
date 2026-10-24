@@ -104,6 +104,7 @@ exits non-zero if any check fails.
 | `node_pool.drive` | Pools from the Lua console in Simulate: prewarm, take, `destroy()` returns the instance (parked, disabled), stats; the Profiler lists the pool. |
 | `pixel_perfect.drive` | Project Settings > Video: Integer Scaling, Pixel Snap, then Smooth Camera (disabled until Pixel Snap), saved in project.json. |
 | `path.drive` | A Path from Add Node: a point dragged, a point added by double-clicking the curve, one removed in the Inspector, sharp / smooth; a Path Follow under it travels in Simulate; saved. |
+| `controls_menu.drive` | A UI Container's New Script picks the Controls Menu template; in Simulate it lists the actions with their keys (confirm hidden), and rebinding shows Press a key... |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
 | `code_overlays.drive` | Completion docs, signature help and hover boxes inside the Code area and bounded; the hover box stays while the mouse is on it. |

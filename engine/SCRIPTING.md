@@ -850,6 +850,16 @@ parent's), `ySort` (draw its children by Y: top-down / isometric depth) and
 `node.zIndex = 10`, `world:set_property("ySort", true)`. Guide with a
 tutorial: [`docs/draw_order.md`](docs/draw_order.md).
 
+#### Player rebinding (Input)
+
+`Input.listen(action, {on_done = ...})` captures the next key / button /
+stick for an action (conflicts cleared, swapped or allowed), `Input.set_binding`,
+`Input.get_bindings`, `Input.binding_text`, `Input.reset_bindings`,
+`Input.get_actions`, `Input.last_device`; saved for the player and loaded at
+start. UI menus work with a gamepad (D-pad / stick, A). The **Controls
+Menu** script template builds a rebinding menu. `Scene.create_node` now
+creates any node type. Guide: [`docs/input_rebinding.md`](docs/input_rebinding.md).
+
 #### Changing scenes
 
 `Scene.change_scene(name [, {transition, duration, color, loading, min_time}])`

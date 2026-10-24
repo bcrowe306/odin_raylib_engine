@@ -3655,6 +3655,19 @@ lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 		rc := RaycastNode_Create(scene, nodeName, parent)
 		createdNode = rc
 	case:
+		// Any other registered type (UI widgets, paths, lights, ...; names
+		// and search aliases as in Add Node), placed by the registry.
+		if _, known := Node_TypeInfoByName(typeStr); known {
+			n := Node_CreateByTypeName(scene, typeStr, parent)
+			if n == nil {
+				lua.pushnil(L)
+				return 1
+			}
+			if nodeName != "" do n.name = strings.clone(nodeName, n.allocator)
+			n.gameContext = &sm.game.gameContext
+			push_node_userdata(L, n)
+			return 1
+		}
 		nd := CreateNode(scene.manager, Node)
 		if nodeName != "" do nd.name = strings.clone(nodeName, nd.allocator)
 		createdNode = nd
@@ -4291,6 +4304,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "get_mouse_position")
 	lua.pushcfunction(L, lua_input_get_mouse_wheel_move)
 	lua.setfield(L, -2, "get_mouse_wheel_move")
+	Script_RegisterRebindBindings(L) // get_bindings, listen, ... (input_rebind.odin)
 	lua.setglobal(L, "Input")
 
 	// 4. Global "Audio" table

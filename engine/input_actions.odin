@@ -128,13 +128,11 @@ Input_UpdateNamed :: proc(input: ^InputSystem, deltaTime: f32) {
 
 // --- binding text / JSON -----------------------------------------------------------
 
-@(private = "file")
 enum_name :: proc(v: $T) -> string {
 	name, _ := reflect.enum_name_from_value(v)
 	return name
 }
 
-@(private = "file")
 enum_parse :: proc($T: typeid, name: string) -> (T, bool) {
 	return reflect.enum_from_name(T, strings.to_upper(name, context.temp_allocator))
 }

@@ -529,6 +529,14 @@ points are edited in the Inspector's **Points** section (**Add Point**, the
 x removes one). Post effects show in the viewport while the lighting
 preview (toolbar) is on; pick the shader in the **Material** section.
 
+### Controls menus (player rebinding)
+
+New Script on a **UI Container** offers the **Controls Menu (rebinding)**
+template: a row per input action with its key, click to rebind (saved for
+the player), Reset to defaults. Menus also work with a gamepad (D-pad /
+stick moves the focus, A presses). Guide:
+[`engine/docs/input_rebinding.md`](../engine/docs/input_rebinding.md).
+
 ### Paths
 
 Select a **Path**: drag its points (squares) and Bézier handles (dots; Alt

@@ -144,7 +144,7 @@ Common:
 - [x] 8 Object pooling: Pool.take / release / prewarm / set_max / stats, destroy() returns pooled nodes, on_spawn / on_despawn, bodies off while parked, per-scene pools freed on unload; Profiler rows; guide + tutorial engine/docs/pooling.md, test, drive. Also: Lua C callbacks now run with their script manager's context (Script_Context: the engine's allocator and logger - no more bad frees under the leak tracker; errors from Lua-triggered engine code are logged)
 - [x] 9 Pixel-perfect rendering: Integer Scaling, Pixel Snap (camera + sprites), Smooth Camera (world in a margin texture shifted by the leftover fraction at the upscale; UI layers on top); Project Settings > Video; guide engine/docs/pixel_perfect.md, test, runner screenshots, drive
 - [ ] 10 Sprite atlas packing on export
-- [ ] 11 Input rebinding (player-facing flow, saved bindings, gamepad menu navigation)
+- [x] 11 Input rebinding: Input.listen (release-first, keys / mouse / pad buttons / sticks, conflicts clear / swap / allow, on_done), set / get / reset bindings, player-facing names, saved to input_bindings.json and loaded at start; gamepad UI navigation (D-pad / stick with repeat, A); Controls Menu template; Scene.create_node makes any node type; guide, tests, drive
 - [x] 12 Scene transitions: (transitions + preload existed) loading screens (change_scene loading / min_time, Scene.loading_progress / loading_target, Game_ChangeSceneVia), textures decoded on worker threads (async_decode.odin; jobs owned by the decoder, abandon-safe), preload finds "texture" (it only read legacy "texture_path") and images named by properties; guide with a tutorial, tests, a real-game run
 
 Editor:

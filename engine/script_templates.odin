@@ -24,6 +24,7 @@ script_templates := [?]Script_Template{
 	{"ui_menu", "UI Menu", "Start / options / back buttons: starts a scene, shows and hides a panel.", SCRIPT_TEMPLATE_UI_MENU, nil},
 	{"pickup", "Pickup", "Bobs in place; a body with the collector tag picks it up (sound, shrink, gone) - for an AreaNode.", SCRIPT_TEMPLATE_PICKUP, {AreaNode}},
 	{"door_trigger", "Door / Trigger", "When a tagged body enters: opens a door node or changes scene - for an AreaNode.", SCRIPT_TEMPLATE_DOOR_TRIGGER, {AreaNode}},
+	{"controls_menu", "Controls Menu (rebinding)", "Builds a row per input action - click one, press a key or button to rebind it; Reset to defaults. Saved for the player - for a UI Container.", SCRIPT_TEMPLATE_CONTROLS_MENU, {UIContainerNode}},
 }
 
 Script_Templates :: proc() -> []Script_Template {return script_templates[:]}
@@ -351,6 +352,94 @@ function $CLASS$:on_body_exited(other)
     if other ~= nil and not self:counts(other) then return end -- nil: it was destroyed
     self.inside = math.max(0, self.inside - 1)
     if self.inside == 0 and self.auto_close and not self.once then self:move_door(false) end
+end
+
+return $CLASS$
+`
+
+SCRIPT_TEMPLATE_CONTROLS_MENU :: `-- $NAME$: a controls menu. Put it on a UI Container (vertical layout):
+-- it adds a row per input action (Project Settings > Input) - the action's
+-- name and a button showing its keys; click the button, then press the key
+-- or gamepad button to use (Escape cancels). Changes are saved for the
+-- player and loaded when the game starts. Gamepad: the D-pad moves between
+-- rows, A rebinds.
+---@class $CLASS$ : ScriptInstanceBase
+local $CLASS$ = {}
+
+$CLASS$.properties = {
+    --- Which binding the buttons change: keyboard / mouse, gamepad, or the first one.
+    device       = { type = "enum", values = {"keyboard", "gamepad", "any"}, default = "keyboard" },
+    --- Actions to leave out (comma separated, e.g. "pause, confirm, cancel").
+    hide         = { type = "string", default = "confirm, cancel" },
+    --- Width of the action name column (px).
+    label_width  = { type = "float", default = 180 },
+    --- Width of the key buttons (px).
+    button_width = { type = "float", default = 220 },
+}
+
+local function pretty(name)
+    local s = name:gsub("_", " ")
+    return (s:gsub("^%l", string.upper))
+end
+
+function $CLASS$:ready()
+    self.buttons = {}
+    local hidden = {}
+    for word in string.gmatch(self.hide, "[^,%s]+") do hidden[word] = true end
+    for _, action in ipairs(Input.get_actions()) do
+        if not hidden[action] then self:add_row(action) end
+    end
+    local reset = Scene.create_node("UIButtonNode", "ResetControls", self.node) --[[@as UIButtonNode]]
+    reset.text = "Reset to defaults"
+    reset.size = Vec2(self.label_width + self.button_width, 36)
+    reset:connect("clicked", function()
+        Input.reset_bindings()
+        self:refresh()
+    end)
+end
+
+function $CLASS$:add_row(action)
+    local row = Scene.create_node("UIContainerNode", action .. "_row", self.node) --[[@as UIContainerNode]]
+    row:set_property("direction", "Horizontal")
+    row.size = Vec2(self.label_width + self.button_width + 8, 40)
+    local label = Scene.create_node("UILabelNode", action .. "_label", row) --[[@as UILabelNode]]
+    label.text = pretty(action)
+    label.size = Vec2(self.label_width, 36)
+    local button = Scene.create_node("UIButtonNode", action .. "_keys", row) --[[@as UIButtonNode]]
+    button.size = Vec2(self.button_width, 36)
+    button:connect("clicked", function() self:rebind(action) end)
+    self.buttons[action] = button
+    self:show(action)
+end
+
+-- The slot the buttons change: keyboard -> the first keyboard / mouse
+-- binding, gamepad -> the first gamepad one (0 = "same device kind").
+function $CLASS$:show(action)
+    local text = "-"
+    for _, b in ipairs(Input.get_bindings(action)) do
+        local pad = (b.device == "button" or b.device == "axis")
+        if self.device == "any" or (self.device == "gamepad") == pad then
+            text = b.text
+            break
+        end
+    end
+    self.buttons[action].text = text
+end
+
+function $CLASS$:refresh()
+    for action in pairs(self.buttons) do self:show(action) end
+end
+
+function $CLASS$:rebind(action)
+    if Input.is_listening() then return end
+    local button = self.buttons[action]
+    button.text = "Press a key..."
+    Input.listen(action, {
+        device = self.device,
+        -- on_done(result, text): "bound" or "cancelled"; another action
+        -- may have lost that key, so refresh them all.
+        on_done = function() self:refresh() end,
+    })
 end
 
 return $CLASS$

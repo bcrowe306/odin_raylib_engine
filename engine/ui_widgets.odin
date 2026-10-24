@@ -129,7 +129,7 @@ UI_IsKeyPressedEnter :: proc(gameContext: ^GameContext) -> bool {
 	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
 		return gameContext.game.uiTestKeyEnter
 	}
-	return rl.IsWindowReady() && (rl.IsKeyPressed(.ENTER) || rl.IsKeyPressed(.KP_ENTER))
+	return rl.IsWindowReady() && (rl.IsKeyPressed(.ENTER) || rl.IsKeyPressed(.KP_ENTER) || uiPad.confirm)
 }
 
 UI_IsKeyPressedSpace :: proc(gameContext: ^GameContext) -> bool {
@@ -150,28 +150,28 @@ UI_IsKeyPressedUp :: proc(gameContext: ^GameContext) -> bool {
 	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
 		return gameContext.game.uiTestKeyUp
 	}
-	return rl.IsWindowReady() && (rl.IsKeyPressed(.UP) || rl.IsKeyPressedRepeat(.UP))
+	return rl.IsWindowReady() && (rl.IsKeyPressed(.UP) || rl.IsKeyPressedRepeat(.UP) || uiPad.fire[0])
 }
 
 UI_IsKeyPressedDown :: proc(gameContext: ^GameContext) -> bool {
 	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
 		return gameContext.game.uiTestKeyDown
 	}
-	return rl.IsWindowReady() && (rl.IsKeyPressed(.DOWN) || rl.IsKeyPressedRepeat(.DOWN))
+	return rl.IsWindowReady() && (rl.IsKeyPressed(.DOWN) || rl.IsKeyPressedRepeat(.DOWN) || uiPad.fire[1])
 }
 
 UI_IsKeyPressedLeft :: proc(gameContext: ^GameContext) -> bool {
 	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
 		return gameContext.game.uiTestKeyLeft
 	}
-	return rl.IsWindowReady() && (rl.IsKeyPressed(.LEFT) || rl.IsKeyPressedRepeat(.LEFT))
+	return rl.IsWindowReady() && (rl.IsKeyPressed(.LEFT) || rl.IsKeyPressedRepeat(.LEFT) || uiPad.fire[2])
 }
 
 UI_IsKeyPressedRight :: proc(gameContext: ^GameContext) -> bool {
 	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
 		return gameContext.game.uiTestKeyRight
 	}
-	return rl.IsWindowReady() && (rl.IsKeyPressed(.RIGHT) || rl.IsKeyPressedRepeat(.RIGHT))
+	return rl.IsWindowReady() && (rl.IsKeyPressed(.RIGHT) || rl.IsKeyPressedRepeat(.RIGHT) || uiPad.fire[3])
 }
 
 UI_IsKeyPressedBackspace :: proc(gameContext: ^GameContext) -> bool {
@@ -340,8 +340,56 @@ UI_DoesWidgetConsumeDirection :: proc(elem: ^UIElement, dir: uilib.NavDirection)
 	}
 }
 
+// Gamepad menu navigation: the D-pad or the left stick move the focus
+// (repeating while held, like keys), A confirms - computed once a frame.
+@(private = "file")
+uiPad: struct {
+	fire:    [4]bool, // up, down, left, right: move this frame
+	held:    [4]f32,  // seconds held
+	confirm: bool,
+}
+
+UI_PAD_REPEAT_DELAY :: 0.4
+UI_PAD_REPEAT_EVERY :: 0.12
+
+@(private = "file")
+ui_update_pad :: proc(gameContext: ^GameContext) {
+	uiPad.fire, uiPad.confirm = {}, false
+	if gameContext == nil || gameContext.game == nil || !rl.IsWindowReady() do return
+	pad := gameContext.game.input.gamepadIndex
+	if !rl.IsGamepadAvailable(pad) {
+		uiPad.held = {}
+		return
+	}
+	lx, ly := rl.GetGamepadAxisMovement(pad, .LEFT_X), rl.GetGamepadAxisMovement(pad, .LEFT_Y)
+	down := [4]bool{
+		rl.IsGamepadButtonDown(pad, .LEFT_FACE_UP) || ly < -0.5,
+		rl.IsGamepadButtonDown(pad, .LEFT_FACE_DOWN) || ly > 0.5,
+		rl.IsGamepadButtonDown(pad, .LEFT_FACE_LEFT) || lx < -0.5,
+		rl.IsGamepadButtonDown(pad, .LEFT_FACE_RIGHT) || lx > 0.5,
+	}
+	dt := rl.GetFrameTime()
+	for i in 0 ..< 4 {
+		if !down[i] {
+			uiPad.held[i] = 0
+			continue
+		}
+		before := uiPad.held[i]
+		uiPad.held[i] += dt
+		if before == 0 do uiPad.fire[i] = true
+		else if uiPad.held[i] >= UI_PAD_REPEAT_DELAY {
+			// Every UI_PAD_REPEAT_EVERY after the delay.
+			n0 := int((before - UI_PAD_REPEAT_DELAY) / UI_PAD_REPEAT_EVERY) if before >= UI_PAD_REPEAT_DELAY else -1
+			n1 := int((uiPad.held[i] - UI_PAD_REPEAT_DELAY) / UI_PAD_REPEAT_EVERY)
+			uiPad.fire[i] = n1 != n0
+		}
+	}
+	uiPad.confirm = rl.IsGamepadButtonPressed(pad, .RIGHT_FACE_DOWN)
+}
+
 UI_UpdateFocusNavigation :: proc(scene: ^Scene, gameContext: ^GameContext) {
 	if scene == nil || scene.manager == nil do return
+	ui_update_pad(gameContext)
 
 	// Reset justFocused flags from previous frame
 	for n in scene.manager.nodes {

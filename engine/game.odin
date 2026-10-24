@@ -163,6 +163,7 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 
 	// 1. Poll and update Two-Tier Input System once per frame (before physics and game/scene update)
 	InputSystem_Update(&game.input, deltaTime)
+	if game.scriptManager.L != nil do Input_RebindDispatch(&game.input, game.scriptManager.L) // Input.listen's on_done
 	if game.scriptManager.hotReload do Shader_CheckForChanges() // edited .fs files
 
 	// 2. Process Scene Transitions (and load scenes' assets in the background)
