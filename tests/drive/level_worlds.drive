@@ -1,0 +1,91 @@
+# Level editor levels and worlds: a background image (cover, repeat, pivot,
+# removed); resizing the level by dragging its right and left handles
+# (undo); worlds - add, rename, delete, undo.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/worlds_zz
+wait 90
+click @root.level
+wait 3
+click @level.open:worlds_zz/topdown.ldtk
+wait 5
+click @level.zoom
+click @pick:100%
+wait 1
+click @level.layer:Collisions
+expect level.level == World_Level_0
+expect level.size == 512,256
+# background image
+click @level.tab:Level
+wait 1
+click @level.bg.image
+click @pick:worlds_zz/atlas/TopDown_by_deepnight.png
+wait 2
+expect level.bg contains Cover atlas/TopDown_by_deepnight.png
+expect level.bg contains topLeft=0,0
+screenshot bg_cover
+click @level.bg.pos
+click @pick:Repeat
+wait 1
+expect level.bg contains Repeat
+click @level.bg.pivot:0
+wait 1
+screenshot bg_repeat
+click @level.bg.remove
+wait 1
+expect level.bg !contains Repeat
+# resize (a Free layout: GridVania snaps to its 256 px world grid): right
+# edge two cells out, left edge two cells in
+click @level.tab:World
+wait 1
+click @defs.world.layout
+click @pick:Free
+wait 1
+drag @level.resize:Right @level.resize:Right+32,0 8
+wait 2
+expect level.size == 544,256
+screenshot resized_right
+drag @level.resize:Left @level.resize:Left+32,0 8
+wait 2
+expect level.size == 512,256
+expect level.pos == 288,0
+key cmd+z
+wait 2
+expect level.size == 544,256
+expect level.pos == 256,0
+# worlds
+click @level.tab:World
+wait 1
+click @defs.world.add
+wait 2
+expect level.worlds == World,World2
+expect level.world == World2
+screenshot two_worlds
+# the new world's empty level shows its background image (contain, centred)
+click @level.tab:Level
+wait 1
+click @level.bg.image
+click @pick:worlds_zz/atlas/TopDown_by_deepnight.png
+wait 1
+click @level.bg.pos
+click @pick:Fit inside (keep aspect ratio)
+wait 2
+expect level.bg contains Contain
+screenshot bg_contain
+click @level.tab:World
+wait 1
+rclick @defs.world:World2
+click @ctx:Rename...
+wait 1
+key cmd+a
+type Caves
+key enter
+wait 1
+expect level.worlds == World,Caves
+rclick @defs.world:Caves
+click @ctx:Delete
+wait 2
+expect level.worlds == World
+expect level.world == World
+key cmd+z
+wait 2
+expect level.worlds == World,Caves
+screenshot worlds_undo

@@ -674,16 +674,11 @@ rule_editor :: proc(state: ^EditorState, layerUid: int, robj: ^e.LdtkJson) {
 	level_tip("Add the picked tiles (as more random choices, or one more stamp)", "tab.rules")
 	if r.stamp {
 		UI_PropLabel("Stamp pivot")
-		for p, i in PIVOTS {
-			if i % 3 != 0 do imgui.SameLine(0, 2)
-			on := abs(p.x - r.pivot.x) < 0.01 && abs(p.y - r.pivot.y) < 0.01
-			if UI_IconButton(on ? ICON_FA_CIRCLE : "·", fmt.tprintf("defs.rule.pivot:%d", i), "", on, 18) {
-				cp("Stamp Pivot")
-				e.LdtkJson_SetFloat(robj, "pivotX", p.x, a)
-				e.LdtkJson_SetFloat(robj, "pivotY", p.y, a)
-				changed = true
-			}
-			level_tip("Which point of the stamp sits on the matching cell", "tab.rules")
+		if p, ch := level_pivot_picker("defs.rule.pivot", r.pivot, "Which point of the stamp sits on the matching cell", "tab.rules"); ch {
+			cp("Stamp Pivot")
+			e.LdtkJson_SetFloat(robj, "pivotX", p.x, a)
+			e.LdtkJson_SetFloat(robj, "pivotY", p.y, a)
+			changed = true
 		}
 	}
 	// matching

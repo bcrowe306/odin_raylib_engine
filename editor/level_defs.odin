@@ -377,6 +377,172 @@ LevelDefs_NewLayerDialog :: proc(state: ^EditorState) {
 // ----------------------------------------------------------------------------
 
 @(private = "file")
+world_ui: struct {
+	renameReq: bool,
+	renameIdx: int,
+	renameBuf: [128]u8,
+}
+
+// world_props: worlds (multi-worlds), the world's layout, grid and new
+// level size (true: the worlds changed - stop drawing this frame).
+@(private = "file")
+world_props :: proc(state: ^EditorState) -> bool {
+	L := &GlobalLevel
+	doc := L.doc
+	w := doc.worlds[L.world].obj
+	UI_PanelTitle(ICON_FA_GLOBE, e.Ldtk_Doc_WorldName(doc, L.world), doc.multiWorlds ? fmt.tprintf("%d worlds", len(doc.worlds)) : "")
+	UI_HeaderButtons(1)
+	if UI_HeaderButton(ICON_FA_CIRCLE_QUESTION, "defs.world.help", "") do LevelRef_Open("tab.world")
+	level_tip("The World tab in the reference", "tab.world")
+	if UI_BeginProps("##world_t") {
+		defer UI_EndProps()
+		UI_PropLabel("Multiple worlds")
+		multi := doc.multiWorlds
+		if imgui.Checkbox("##multi", &multi) {
+			if !multi && len(doc.worlds) > 1 {
+				Editor_Log(state, .Warn, "Delete the other worlds first")
+			} else {
+				defs_checkpoint("Multiple Worlds")
+				e.Ldtk_Doc_SetMultiWorlds(doc, multi)
+				return true
+			}
+		}
+		Drive_Item("defs.world.multi")
+		level_tip("Several worlds in one project (LDtk's MultiWorlds flag): the levels and world settings move to a worlds list", "worlds")
+		if doc.multiWorlds {
+			UI_PropLabel("Name")
+			buf: [128]u8
+			copy(buf[:127], e.LdtkJson_Str(w, "identifier"))
+			if imgui.InputText("##wname", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+				defs_checkpoint("Rename World")
+				e.Ldtk_Doc_RenameWorld(doc, L.world, string(cstring(raw_data(buf[:]))))
+			}
+			Drive_Item("defs.world.name")
+			level_tip("The world's identifier (Enter applies)", "worlds")
+		}
+		UI_PropLabel("Layout")
+		layout := e.Ldtk_Doc_WorldStr(doc, L.world, "worldLayout", "Free")
+		cur := 0
+		for n, i in e.LDTK_WORLD_LAYOUTS do if n == layout do cur = i
+		if pick, changed := UI_Combo("defs.world.layout", cur, e.LDTK_WORLD_LAYOUTS[:]); changed {
+			defs_checkpoint("World Layout")
+			e.Ldtk_Doc_SetWorldLayout(doc, L.world, e.LDTK_WORLD_LAYOUTS[pick])
+		}
+		level_tip("Free: levels anywhere. GridVania: on a grid. Linear: in a row / column, in the level list's order.", "tab.world")
+		if layout == "GridVania" {
+			UI_PropLabel("World grid")
+			g := [2]i32{i32(e.LdtkJson_Int(w, "worldGridWidth", 256)), i32(e.LdtkJson_Int(w, "worldGridHeight", 256))}
+			if world_pair("defs.world.grid", &g) && g.x > 0 && g.y > 0 {
+				defs_checkpoint("World Grid")
+				e.Ldtk_Doc_SetWorldInt(doc, L.world, "worldGridWidth", int(g.x))
+				e.Ldtk_Doc_SetWorldInt(doc, L.world, "worldGridHeight", int(g.y))
+			}
+			level_tip("The grid cell size levels snap to (width, height; Enter applies)", "tab.world")
+		}
+		UI_PropLabel("New level size")
+		ls := [2]i32{i32(e.LdtkJson_Int(w, "defaultLevelWidth", 256)), i32(e.LdtkJson_Int(w, "defaultLevelHeight", 256))}
+		if world_pair("defs.world.levelsize", &ls) && ls.x > 0 && ls.y > 0 {
+			defs_checkpoint("New Level Size")
+			e.Ldtk_Doc_SetWorldInt(doc, L.world, "defaultLevelWidth", int(ls.x))
+			e.Ldtk_Doc_SetWorldInt(doc, L.world, "defaultLevelHeight", int(ls.y))
+		}
+		level_tip("The size of levels added to this world (pixels; Enter applies)", "tab.world")
+		UI_PropLabel("Levels")
+		UI_DimText(fmt.tprint(len(doc.worlds[L.world].levelsArr.items)))
+	}
+	if doc.multiWorlds {
+		imgui.Spacing()
+		UI_DimText("Worlds")
+		for wd, i in doc.worlds {
+			name := e.LdtkJson_Str(wd.obj, "identifier", "World")
+			if imgui.Selectable(fmt.ctprintf("%s  %s (%d levels)##w%d", ICON_FA_GLOBE, name, len(wd.levelsArr.items), i), i == L.world, {}, {0, 22}) do world_open(i)
+			Drive_Item(fmt.tprintf("defs.world:%s", name))
+			level_tip(fmt.tprintf("%s: click to open it; right-click for more", name), "worlds")
+			if imgui.BeginPopupContextItem(fmt.ctprintf("##wctx%d", i)) {
+				defer imgui.EndPopup()
+				if ctx_item(ICON_FA_FOLDER_OPEN, "Open", "Show this world's levels") do world_open(i)
+				if ctx_item(ICON_FA_PEN_TO_SQUARE, "Rename...", "Change its identifier") {
+					world_ui.renameReq = true
+					world_ui.renameIdx = i
+					world_ui.renameBuf = {}
+					copy(world_ui.renameBuf[:127], name)
+				}
+				if ctx_item(ICON_FA_TRASH, "Delete", "Delete the world and its levels (undo brings it back; not the last world)", len(doc.worlds) > 1) {
+					defs_checkpoint("Delete World")
+					e.Ldtk_Doc_RemoveWorld(doc, i)
+					L.world = clamp(L.world > i ? L.world - 1 : L.world, 0, len(doc.worlds) - 1)
+					world_open(L.world)
+					return true
+				}
+				imgui.Separator()
+				if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "Worlds in the reference") do LevelRef_Open("worlds")
+			}
+		}
+	}
+	if UI_Button(fmt.tprintf("%s  World", ICON_FA_PLUS), "defs.world.add") {
+		defs_checkpoint("Add World")
+		wi := e.Ldtk_Doc_AddWorld(doc)
+		world_open(wi)
+		return true
+	}
+	level_tip("Add a world with one level (turns multiple worlds on)", "worlds")
+	world_rename_popup(state)
+	UI_DimText("Move levels with the Move tool (M); resize them by")
+	UI_DimText("dragging the handles around the active level.")
+	return false
+}
+
+@(private = "file")
+world_pair :: proc(id: string, v: ^[2]i32) -> bool {
+	w := (imgui.GetContentRegionAvail().x - 4) * 0.5
+	imgui.SetNextItemWidth(w)
+	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0, {.EnterReturnsTrue})
+	Drive_Item(fmt.tprintf("%s.x", id))
+	imgui.SameLine(0, 4)
+	imgui.SetNextItemWidth(w)
+	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0, {.EnterReturnsTrue})
+	Drive_Item(fmt.tprintf("%s.y", id))
+	return a || b
+}
+
+// world_open: a world's first level becomes the active one.
+@(private = "file")
+world_open :: proc(wi: int) {
+	L := &GlobalLevel
+	for lv, i in L.doc.levels do if lv.world == wi {
+		L.level = -1
+		LevelEditor_SetLevel(i)
+		L.fitRequest = true
+		return
+	}
+	L.world = wi
+}
+
+@(private = "file")
+world_rename_popup :: proc(state: ^EditorState) {
+	doc := GlobalLevel.doc
+	if world_ui.renameReq {
+		imgui.OpenPopup("Rename World###LevelRenameWorld")
+		world_ui.renameReq = false
+	}
+	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
+	imgui.SetNextWindowPos(center, .Appearing, {0.5, 0.5})
+	if !imgui.BeginPopupModal("Rename World###LevelRenameWorld", nil, {.AlwaysAutoResize}) do return
+	defer imgui.EndPopup()
+	imgui.SetNextItemWidth(300)
+	if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
+	enter := imgui.InputText("##wrename", cstring(raw_data(world_ui.renameBuf[:])), len(world_ui.renameBuf), {.EnterReturnsTrue})
+	Drive_Item("defs.world.rename.name")
+	if UI_PrimaryButton("Rename", "defs.world.rename.ok") || enter {
+		defs_checkpoint("Rename World")
+		e.Ldtk_Doc_RenameWorld(doc, world_ui.renameIdx, string(cstring(raw_data(world_ui.renameBuf[:]))))
+		imgui.CloseCurrentPopup()
+	}
+	imgui.SameLine()
+	if UI_Button("Cancel", "defs.world.rename.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+}
+
+@(private = "file")
 page_world :: proc(state: ^EditorState) {
 	L := &GlobalLevel
 	doc := L.doc
@@ -384,33 +550,11 @@ page_world :: proc(state: ^EditorState) {
 	if len(doc.worlds) == 0 do return
 	w := doc.worlds[L.world].obj
 	avail := imgui.GetContentRegionAvail()
-	if imgui.BeginChild("##world_props", {320, avail.y}, {}, {}) {
-		UI_PanelTitle(ICON_FA_GLOBE, doc.multiWorlds ? e.LdtkJson_Str(w, "identifier", "World") : "World")
-		if UI_BeginProps("##world_t") {
-			defer UI_EndProps()
-			UI_PropLabel("Layout")
-			layout := e.LdtkJson_Str(w, "worldLayout", e.LdtkJson_Str(doc.root, "worldLayout", "Free"))
-			cur := 0
-			for n, i in e.LDTK_WORLD_LAYOUTS do if n == layout do cur = i
-			if pick, changed := UI_Combo("defs.world.layout", cur, e.LDTK_WORLD_LAYOUTS[:]); changed {
-				defs_checkpoint("World Layout")
-				e.Ldtk_Doc_SetWorldLayout(doc, L.world, e.LDTK_WORLD_LAYOUTS[pick])
-			}
-			UI_Tooltip("Free: levels anywhere. GridVania: on a grid. Linear: in a row / column, in the level list's order.")
-			if layout == "GridVania" {
-				UI_PropLabel("World grid")
-				g := [2]i32{i32(e.LdtkJson_Int(w, "worldGridWidth", 256)), i32(e.LdtkJson_Int(w, "worldGridHeight", 256))}
-				if imgui.InputInt2("##wgrid", &g, {.EnterReturnsTrue}) && g.x > 0 && g.y > 0 {
-					defs_checkpoint("World Grid")
-					e.LdtkJson_SetInt(w, "worldGridWidth", int(g.x), a)
-					e.LdtkJson_SetInt(w, "worldGridHeight", int(g.y), a)
-					e.Ldtk_Doc_Touch(doc)
-				}
-			}
-			UI_PropLabel("Levels")
-			UI_DimText(fmt.tprint(len(doc.worlds[L.world].levelsArr.items)))
+	if imgui.BeginChild("##world_props", {340, avail.y}, {}, {}) {
+		if world_props(state) {
+			imgui.EndChild()
+			return
 		}
-		UI_DimText("Move levels with the Move tool (M) or in the Level tab.")
 	}
 	imgui.EndChild()
 	imgui.SameLine(0, 8)
@@ -487,7 +631,6 @@ page_project :: proc(state: ^EditorState) {
 				e.LdtkJson_SetInt(root, "defaultGridSize", int(g), a)
 				e.Ldtk_Doc_Touch(doc)
 			}
-			ints("New level size", "defs.project.levelsize", "defaultLevelWidth", "defaultLevelHeight", root)
 			ints("New entity size", "defs.project.entitysize", "defaultEntityWidth", "defaultEntityHeight", root)
 			colour :: proc(label, key: string, root: ^e.LdtkJson) {
 				doc := GlobalLevel.doc
@@ -533,6 +676,29 @@ page_project :: proc(state: ^EditorState) {
 // ----------------------------------------------------------------------------
 
 PIVOTS := [9][2]f64{{0, 0}, {0.5, 0}, {1, 0}, {0, 0.5}, {0.5, 0.5}, {1, 0.5}, {0, 1}, {0.5, 1}, {1, 1}}
+
+// level_pivot_picker: a 3x3 box of pivot points (drive ids <id>:0..8).
+level_pivot_picker :: proc(id: string, cur: [2]f64, tip: string, topic: string) -> (pick: [2]f64, changed: bool) {
+	CELL :: 18
+	dl := imgui.GetWindowDrawList()
+	start := imgui.GetCursorScreenPos()
+	imgui.DrawList_AddRectFilled(dl, start, start + {3 * CELL + 4, 3 * CELL + 4}, col_u32(UI_BG_RAISED), 3, {})
+	imgui.DrawList_AddRect(dl, start + 2 + CELL * 0.5, start + 2 + CELL * 2.5, col_u32(ui_line(0.25)), 0, {}, 1)
+	for p, i in PIVOTS {
+		at := start + {2 + f32(i % 3) * CELL, 2 + f32(i / 3) * CELL}
+		imgui.SetCursorScreenPos(at)
+		if imgui.InvisibleButton(fmt.ctprintf("##%s%d", id, i), {CELL, CELL}) do pick, changed = p, true
+		Drive_Item(fmt.tprintf("%s:%d", id, i))
+		level_tip(fmt.tprintf("%s (%.1f, %.1f)", tip, p.x, p.y), topic)
+		on := abs(p.x - cur.x) < 0.01 && abs(p.y - cur.y) < 0.01
+		c := at + CELL * 0.5
+		if on do imgui.DrawList_AddCircleFilled(dl, c, 5, col_u32(UI_ACCENT), 0)
+		else do imgui.DrawList_AddCircleFilled(dl, c, imgui.IsItemHovered() ? 4 : 3, col_u32(imgui.IsItemHovered() ? UI_TEXT : UI_TEXT_FAINT), 0)
+	}
+	imgui.SetCursorScreenPos(start)
+	imgui.Dummy({3 * CELL + 4, 3 * CELL + 4})
+	return
+}
 
 // picked_tile_rect: the palette selection as a pixel rectangle.
 picked_tile_rect :: proc() -> (int, [4]int, bool) {

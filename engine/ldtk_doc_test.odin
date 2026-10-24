@@ -857,3 +857,99 @@ test_ldtk_doc_rules_edit_and_wizard :: proc(t: ^testing.T) {
 	for r in LdtkJson_Arr(grp, "rules") do testing.expect(t, LdtkJson_IsNull(r, "outOfBoundsValue"))
 	testing.expect(t, Ldtk_Doc_RemoveRuleGroup(doc, g2))
 }
+
+@(test)
+test_ldtk_doc_level_bounds_bg_worlds :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_levels.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	col := doc.layerDefs[0].uid
+	ent := Ldtk_Doc_AddEntityDef(doc, "Coin")
+	ents := Ldtk_Doc_AddLayerDef(doc, .Entities, "Things")
+	layer_of :: proc(doc: ^Ldtk_Doc, uid: int) -> int {
+		for &ly, i in doc.levels[0].layers do if d := Ldtk_Doc_LayerDef(doc, &ly); d != nil && d.uid == uid do return i
+		return -1
+	}
+	li, ei := layer_of(doc, col), layer_of(doc, ents)
+	g := doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, col)].gridSize
+	Ldtk_Doc_SetIntGrid(doc, 0, li, 3, 4, 1)
+	Ldtk_Doc_AddEntity(doc, 0, ei, ent, {5 * g, 5 * g})
+	Ldtk_Doc_AddEntity(doc, 0, ei, ent, {1 * g, 1 * g}) // removed: ends up outside
+	p0 := Ldtk_Doc_LevelPos(doc, 0)
+	s0 := Ldtk_Doc_LevelSize(doc, 0)
+	// drag the top-left corner in by two cells: content keeps its world place
+	removed := Ldtk_Doc_ResizeLevelBounds(doc, 0, 2 * g, 2 * g, s0.x - 2 * g, s0.y - 2 * g)
+	testing.expect_value(t, removed, 1)
+	testing.expect_value(t, Ldtk_Doc_LevelPos(doc, 0), p0 + {2 * g, 2 * g})
+	testing.expect_value(t, Ldtk_Doc_LevelSize(doc, 0), s0 - {2 * g, 2 * g})
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(&doc.levels[0].layers[li], 1, 2), 1)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(&doc.levels[0].layers[li], 3, 4), 0)
+	es := Ldtk_Doc_Entities(doc, 0, ei)
+	testing.expect_value(t, len(es), 1)
+	if len(es) == 1 {
+		px := LdtkJson_Arr(es[0], "px")
+		testing.expect_value(t, int(px[0].num), 3 * g)
+		testing.expect_value(t, LdtkJson_Int(es[0], "__worldX"), p0.x + 5 * g)
+	}
+	// a half-cell move keeps the remainder in the layer offset (pxOffsetX)
+	Ldtk_Doc_ResizeLevelBounds(doc, 0, -g / 2, 0, Ldtk_Doc_LevelSize(doc, 0).x + g / 2, Ldtk_Doc_LevelSize(doc, 0).y)
+	testing.expect_value(t, LdtkJson_Int(doc.levels[0].layers[li].obj, "pxOffsetX"), g / 2)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(&doc.levels[0].layers[li], 1, 2), 1)
+
+	// background placement (Level.getBgTileInfos)
+	cover := Ldtk_LevelBgInfo({256, 128}, {64, 64}, .Cover, {0.5, 0.5})
+	testing.expect_value(t, cover.scale, [2]f64{4, 4})
+	testing.expect_value(t, cover.crop, [4]f64{0, 16, 64, 32})
+	testing.expect_value(t, cover.topLeft, [2]int{0, 0})
+	contain := Ldtk_LevelBgInfo({256, 128}, {64, 64}, .Contain, {1, 0.5})
+	testing.expect_value(t, contain.scale, [2]f64{2, 2})
+	testing.expect_value(t, contain.topLeft, [2]int{128, 0})
+	dirty := Ldtk_LevelBgInfo({256, 128}, {64, 64}, .CoverDirty, {0.5, 0.5})
+	testing.expect_value(t, dirty.scale, [2]f64{4, 2})
+	unscaled := Ldtk_LevelBgInfo({32, 32}, {64, 64}, .Unscaled, {0, 1})
+	testing.expect_value(t, unscaled.crop, [4]f64{0, 32, 32, 32})
+	// a missing image: no __bgPos
+	Ldtk_Doc_SetLevelBg(doc, 0, "zz_missing.png")
+	testing.expect_value(t, LdtkJson_Str(doc.levels[0].obj, "bgPos"), "Cover")
+	testing.expect(t, LdtkJson_IsNull(doc.levels[0].obj, "__bgPos"))
+	Ldtk_Doc_SetLevelBg(doc, 0, "")
+	testing.expect(t, LdtkJson_IsNull(doc.levels[0].obj, "bgPos"))
+
+	// worlds: multi-worlds on and off again gives the same file
+	before, _, _ := Ldtk_Doc_Serialize(doc, context.temp_allocator)
+	testing.expect(t, Ldtk_Doc_SetMultiWorlds(doc, true))
+	testing.expect(t, doc.multiWorlds)
+	testing.expect(t, Ldtk_Doc_HasFlag(doc, "MultiWorlds"))
+	testing.expect(t, LdtkJson_IsNull(doc.root, "worldLayout"))
+	testing.expect_value(t, len(LdtkJson_Arr(doc.root, "levels")), 0)
+	testing.expect_value(t, LdtkJson_Str(doc.worlds[0].obj, "iid"), LdtkJson_Str(doc.root, "dummyWorldIid"))
+	testing.expect(t, Ldtk_Doc_SetMultiWorlds(doc, false))
+	after, _, _ := Ldtk_Doc_Serialize(doc, context.temp_allocator)
+	testing.expect(t, before == after)
+	// add / rename / remove worlds
+	w2 := Ldtk_Doc_AddWorld(doc)
+	testing.expect_value(t, w2, 1)
+	testing.expect_value(t, len(doc.worlds), 2)
+	testing.expect_value(t, Ldtk_Doc_WorldName(doc, 1), "World2")
+	testing.expect_value(t, len(doc.levels), 2)
+	testing.expect_value(t, doc.levels[1].world, 1)
+	Ldtk_Doc_RenameWorld(doc, 1, "World")
+	testing.expect_value(t, Ldtk_Doc_WorldName(doc, 1), "World2") // names stay unique
+	Ldtk_Doc_RenameWorld(doc, 1, "Caves")
+	testing.expect_value(t, Ldtk_Doc_WorldName(doc, 1), "Caves")
+	testing.expect(t, !Ldtk_Doc_SetMultiWorlds(doc, false)) // two worlds
+	testing.expect(t, Ldtk_Doc_RemoveWorld(doc, 0))
+	testing.expect_value(t, len(doc.levels), 1)
+	testing.expect_value(t, doc.levels[0].world, 0)
+	testing.expect(t, !Ldtk_Doc_RemoveWorld(doc, 0)) // the last one
+	// the saved file reloads with its worlds
+	text, _, _ := Ldtk_Doc_Serialize(doc, context.temp_allocator)
+	re, rok := Ldtk_Doc_LoadFromMemory(text, "/tmp/ore_zz_levels.ldtk")
+	testing.expect(t, rok)
+	if rok {
+		testing.expect(t, re.multiWorlds)
+		testing.expect_value(t, Ldtk_Doc_WorldName(re, 0), "Caves")
+		Ldtk_Doc_Destroy(re)
+	}
+}

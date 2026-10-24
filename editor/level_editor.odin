@@ -115,6 +115,9 @@ LevelEd :: struct {
 	levelDrag:    bool,
 	levelMoved:   bool,
 	levelGrab:    [2]int,
+	resizeHandle: Level_Handle, // dragging a level edge / corner
+	resizeFrom:   [2]f32,
+	bgTextures:   map[string]rl.Texture2D, // level background images (bgRelPath)
 	// panels
 	dockBuilt:    bool,
 	paletteZoom:  f32,
@@ -169,6 +172,15 @@ level_abs :: proc(state: ^EditorState, rel: string) -> string {
 	return p
 }
 
+// level_doc_rel: a project-relative path made relative to the .ldtk.
+level_doc_rel :: proc(state: ^EditorState, rel: string) -> string {
+	abs := level_abs(state, rel)
+	r, err := filepath.rel(GlobalLevel.doc.dir, abs, context.temp_allocator)
+	if err != nil do r = rel
+	r, _ = strings.replace_all(r, "\\", "/", context.temp_allocator)
+	return r
+}
+
 // LevelEditor_OpenAt opens a file at a level (by identifier).
 LevelEditor_OpenAt :: proc(state: ^EditorState, rel: string, levelIdentifier: string) {
 	if !LevelEditor_Open(state, rel) do return
@@ -220,6 +232,11 @@ level_close_doc :: proc() {
 	LevelFields_CancelPick()
 	for _, t in L.textures do rl.UnloadTexture(t)
 	clear(&L.textures)
+	for k, t in L.bgTextures {
+		if t.id != 0 do rl.UnloadTexture(t)
+		delete(k)
+	}
+	clear(&L.bgTextures)
 	L.texDefsRev = 0
 	e.Ldtk_Doc_Destroy(L.doc)
 	L.doc = nil
@@ -648,6 +665,7 @@ LevelEditor_Shutdown :: proc() {
 	L := &GlobalLevel
 	level_close_doc()
 	delete(L.textures)
+	delete(L.bgTextures)
 	delete(L.tileSel)
 	delete(L.closeThen)
 	e.Ldtk_Selection_Destroy(&L.sel)
@@ -680,6 +698,18 @@ level_sync_textures :: proc(state: ^EditorState) {
 	}
 }
 
+// level_bg_texture: a level background image (loaded once; id 0 when the
+// file can't be read).
+level_bg_texture :: proc(rel: string) -> rl.Texture2D {
+	L := &GlobalLevel
+	if t, ok := L.bgTextures[rel]; ok do return t
+	p, _ := filepath.join({L.doc.dir, rel}, context.temp_allocator)
+	tex: rl.Texture2D
+	if os.exists(p) do tex = rl.LoadTexture(strings.clone_to_cstring(p, context.temp_allocator))
+	L.bgTextures[strings.clone(rel)] = tex
+	return tex
+}
+
 level_texture :: proc(uid: int) -> (rl.Texture2D, bool) {
 	t, ok := GlobalLevel.textures[uid]
 	return t, ok
@@ -709,8 +739,8 @@ level_levels_panel :: proc(state: ^EditorState) {
 	level_tip("About the Levels panel", "panel.levels")
 	if UI_HeaderButton(ICON_FA_PLUS, "level.add", "") {
 		pos := [2]int{0, 0}
-		size := [2]int{e.LdtkJson_Int(doc.root, "defaultLevelWidth", 256), e.LdtkJson_Int(doc.root, "defaultLevelHeight", 256)}
-		step := LdtkJson_GridVania(doc) ? max(e.LdtkJson_Int(doc.root, "worldGridWidth", 256), 1) : 1
+		size := [2]int{e.Ldtk_Doc_WorldInt(doc, L.world, "defaultLevelWidth", 256), e.Ldtk_Doc_WorldInt(doc, L.world, "defaultLevelHeight", 256)}
+		step := LdtkJson_GridVania(doc) ? max(e.Ldtk_Doc_WorldInt(doc, L.world, "worldGridWidth", 256), 1) : 1
 		if len(doc.levels) > 0 {
 			p := e.Ldtk_Doc_LevelPos(doc, L.level)
 			s := e.Ldtk_Doc_LevelSize(doc, L.level)
@@ -724,10 +754,10 @@ level_levels_panel :: proc(state: ^EditorState) {
 		LevelEditor_SetLevel(li)
 	}
 	level_tip("Add a level next to the active one, in a free spot", "panel.levels")
-	if UI_HeaderButton(ICON_FA_TRASH, "level.remove", "") && len(doc.levels) > 1 {
+	if UI_HeaderButton(ICON_FA_TRASH, "level.remove", "") && level_world_count(L.world) > 1 {
 		e.Ldtk_Doc_Checkpoint(doc, -1, "Delete Level")
 		e.Ldtk_Doc_RemoveLevel(doc, L.level)
-		L.level = clamp(L.level, 0, len(doc.levels) - 1)
+		level_keep_world_level()
 		level_clear_selection()
 		level_pick_default_layer()
 	}
@@ -775,6 +805,27 @@ level_levels_panel :: proc(state: ^EditorState) {
 	imgui.EndChild()
 }
 
+// level_keep_world_level: after a level is deleted, the active level is
+// one of the same world.
+level_keep_world_level :: proc() {
+	L := &GlobalLevel
+	L.level = clamp(L.level, 0, len(L.doc.levels) - 1)
+	if L.doc.levels[L.level].world != L.world {
+		for lv, i in L.doc.levels do if lv.world == L.world {
+			L.level = i
+			break
+		}
+	}
+	L.world = L.doc.levels[L.level].world
+}
+
+// level_world_count: the number of levels in a world.
+level_world_count :: proc(world: int) -> int {
+	n := 0
+	for lv in GlobalLevel.doc.levels do if lv.world == world do n += 1
+	return n
+}
+
 // ctx_item: a context-menu entry with a tooltip (drives: "ctx:<label>").
 ctx_item :: proc(icon, label: string, tip: string, enabled := true, shortcut := "") -> bool {
 	clicked := imgui.MenuItem(fmt.ctprintf("%s  %s", icon, label), shortcut != "" ? fmt.ctprintf("%s", shortcut) : nil, false, enabled)
@@ -819,10 +870,10 @@ level_row_menu :: proc(state: ^EditorState, li: int) {
 		L.level = e.Ldtk_Doc_MoveLevelOrder(doc, li, 1)
 	}
 	imgui.Separator()
-	if ctx_item(ICON_FA_TRASH, "Delete", "Delete the level (undo brings it back)", len(doc.levels) > 1) {
+	if ctx_item(ICON_FA_TRASH, "Delete", "Delete the level (undo brings it back; not a world's last level)", level_world_count(doc.levels[li].world) > 1) {
 		e.Ldtk_Doc_Checkpoint(doc, -1, "Delete Level")
 		e.Ldtk_Doc_RemoveLevel(doc, li)
-		L.level = clamp(L.level, 0, len(doc.levels) - 1)
+		level_keep_world_level()
 		level_clear_selection()
 		level_pick_default_layer()
 	}
@@ -861,7 +912,7 @@ level_rename_popup :: proc(state: ^EditorState) {
 }
 
 LdtkJson_GridVania :: proc(doc: ^e.Ldtk_Doc) -> bool {
-	return e.LdtkJson_Str(doc.root, "worldLayout") == "GridVania"
+	return e.Ldtk_Doc_WorldStr(doc, GlobalLevel.world, "worldLayout") == "GridVania"
 }
 
 // ----------------------------------------------------------------------------
@@ -1436,6 +1487,7 @@ level_tab_level :: proc(state: ^EditorState) {
 				e.Ldtk_Doc_SetLevelBgColor(doc, L.level, "")
 			}
 		}
+		level_bg_image_props(state)
 		UI_EndProps()
 	}
 	imgui.EndChild()
@@ -1452,11 +1504,70 @@ level_tab_level :: proc(state: ^EditorState) {
 	if UI_SectionHeader("Project", false) {
 		UI_DimText(fmt.tprintf("%s", L.rel))
 		UI_DimText(fmt.tprintf("%d levels, %d layer defs, %d entities, %d tilesets", len(doc.levels), len(doc.layerDefs), len(doc.entityDefs), len(doc.tilesets)))
-		UI_DimText(fmt.tprintf("World layout: %s%s", e.LdtkJson_Str(doc.root, "worldLayout"), doc.external ? ", external level files" : ""))
+		UI_DimText(fmt.tprintf("World layout: %s%s", e.Ldtk_Doc_WorldStr(doc, L.world, "worldLayout"), doc.external ? ", external level files" : ""))
 		if UI_Button(fmt.tprintf("%s  Open in LDtk", ICON_FA_UP_RIGHT_FROM_SQUARE), "level.open_ldtk") do Editor_OpenExternally(state, level_abs(state, L.rel))
 		imgui.SameLine()
 		if UI_Button(fmt.tprintf("%s  Close", ICON_FA_FOLDER_OPEN), "level.close") do LevelEditor_Close(state)
 	}
+}
+
+// level_bg_image_props: the level's background image, its position and
+// pivot (LevelInstanceForm's image picker).
+@(private = "file")
+level_bg_image_props :: proc(state: ^EditorState) {
+	L := &GlobalLevel
+	doc := L.doc
+	lv := &doc.levels[L.level]
+	rel := e.LdtkJson_Str(lv.obj, "bgRelPath")
+	UI_PropLabel("Image")
+	images := Editor_ListProjectFiles(state, "", {".png", ".jpg", ".jpeg", ".bmp"})
+	names := make([dynamic]string, context.temp_allocator)
+	rels := make([dynamic]string, context.temp_allocator)
+	append(&names, "None")
+	append(&rels, "")
+	cur := 0
+	for img in images {
+		r := level_doc_rel(state, img)
+		if r == rel do cur = len(names)
+		append(&names, img)
+		append(&rels, r)
+	}
+	if rel != "" && cur == 0 {
+		cur = len(names)
+		append(&names, fmt.tprintf("%s (missing)", rel))
+		append(&rels, rel)
+	}
+	if pick, ch := UI_Combo("level.bg.image", cur, names[:]); ch && rels[pick] != rel {
+		e.Ldtk_Doc_Checkpoint(doc, L.level, "Level Background")
+		e.Ldtk_Doc_SetLevelBg(doc, L.level, rels[pick])
+	}
+	level_tip("An image drawn behind the level's layers (a project image)", "level.bg")
+	if rel == "" do return
+	if tex := level_bg_texture(rel); tex.id == 0 {
+		UI_PropLabel("")
+		imgui.TextColored(UI_DANGER, "Can't read %s", fmt.ctprintf("%s", rel))
+	}
+	UI_PropLabel("Image position")
+	pos, _ := e.Ldtk_BgPosOf(e.LdtkJson_Str(lv.obj, "bgPos", "Cover"))
+	labels := make([]string, len(e.Ldtk_BgPos), context.temp_allocator)
+	for l, p in e.LDTK_BG_POS_LABELS do labels[int(p)] = l
+	if pick, ch := UI_Combo("level.bg.pos", int(pos), labels); ch {
+		e.Ldtk_Doc_Checkpoint(doc, L.level, "Level Background")
+		e.Ldtk_Doc_SetLevelBgPos(doc, L.level, e.Ldtk_BgPos(pick))
+	}
+	level_tip("How the image fills the level: as is, fitted inside, covering it (cropped), stretched, or repeated", "level.bg")
+	UI_PropLabel("Image pivot")
+	pv := [2]f64{e.LdtkJson_Float(lv.obj, "bgPivotX", 0.5), e.LdtkJson_Float(lv.obj, "bgPivotY", 0.5)}
+	if p, ch := level_pivot_picker("level.bg.pivot", pv, "Which part of the image stays visible when it is cropped, and where it sits", "level.bg"); ch {
+		e.Ldtk_Doc_Checkpoint(doc, L.level, "Level Background")
+		e.Ldtk_Doc_SetLevelBgPivot(doc, L.level, p)
+	}
+	UI_PropLabel("")
+	if UI_Button(fmt.tprintf("%s  Remove image", ICON_FA_TRASH), "level.bg.remove") {
+		e.Ldtk_Doc_Checkpoint(doc, L.level, "Level Background")
+		e.Ldtk_Doc_SetLevelBg(doc, L.level, "")
+	}
+	level_tip("No background image", "level.bg")
 }
 
 @(private = "file")
@@ -1820,6 +1931,24 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 	case "level.size":
 		s := e.Ldtk_Doc_LevelSize(doc, L.level)
 		return fmt.tprintf("%d,%d", s.x, s.y), true
+	case "level.worlds":
+		b := strings.builder_make(context.temp_allocator)
+		for _, i in doc.worlds {
+			if i > 0 do strings.write_byte(&b, ',')
+			strings.write_string(&b, e.Ldtk_Doc_WorldName(doc, i))
+		}
+		return strings.to_string(b), true
+	case "level.world": return e.Ldtk_Doc_WorldName(doc, L.world), true
+	case "level.bg":
+		// "<bgPos> <bgRelPath> topLeft=x,y scale=sx,sy" (empty: no image)
+		lv := &doc.levels[L.level]
+		rel := e.LdtkJson_Str(lv.obj, "bgRelPath")
+		if rel == "" do return "", true
+		bp := e.LdtkJson_Get(lv.obj, "__bgPos")
+		if bp == nil || bp.kind != .Object do return fmt.tprintf("%s %s", e.LdtkJson_Str(lv.obj, "bgPos"), rel), true
+		tl := e.LdtkJson_Arr(bp, "topLeftPx")
+		sc := e.LdtkJson_Arr(bp, "scale")
+		return fmt.tprintf("%s %s topLeft=%v,%v scale=%v,%v", e.LdtkJson_Str(lv.obj, "bgPos"), rel, tl[0].num, tl[1].num, sc[0].num, sc[1].num), true
 	case "level.pos":
 		p := e.Ldtk_Doc_LevelPos(doc, L.level)
 		return fmt.tprintf("%d,%d", p.x, p.y), true

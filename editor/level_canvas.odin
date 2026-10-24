@@ -147,6 +147,7 @@ draw_level :: proc(li: int, active: bool) {
 	origin := [2]f32{f32(p.x), f32(p.y)}
 	bg := e.Ldtk_ParseHexColor(e.LdtkJson_Str(lv.obj, "__bgColor", e.LdtkJson_Str(doc.root, "defaultLevelBgColor", "#696A79")))
 	rl.DrawRectangleV(origin, {f32(s.x), f32(s.y)}, bg)
+	draw_level_bg(li, origin, s)
 	// layers: index 0 is the top one
 	#reverse for &ly, i in lv.layers {
 		if !e.LdtkJson_Bool(ly.obj, "visible", true) do continue
@@ -157,6 +158,41 @@ draw_level :: proc(li: int, active: bool) {
 	}
 	thick := 1 / L.zoom
 	rl.DrawRectangleLinesEx({origin.x, origin.y, f32(s.x), f32(s.y)}, (active ? 2 : 1) * thick, active ? rl.Color{255, 255, 255, 200} : rl.Color{0, 0, 0, 120})
+}
+
+// draw_level_bg: the background image (Level.createBgTiledTexture).
+@(private = "file")
+draw_level_bg :: proc(li: int, origin: [2]f32, s: [2]int) {
+	L := &GlobalLevel
+	lv := &L.doc.levels[li]
+	rel := e.LdtkJson_Str(lv.obj, "bgRelPath")
+	if rel == "" do return
+	tex := level_bg_texture(rel)
+	if tex.id == 0 do return
+	pos, _ := e.Ldtk_BgPosOf(e.LdtkJson_Str(lv.obj, "bgPos", "Cover"))
+	pivot := [2]f64{e.LdtkJson_Float(lv.obj, "bgPivotX", 0.5), e.LdtkJson_Float(lv.obj, "bgPivotY", 0.5)}
+	bg := e.Ldtk_LevelBgInfo(s, {int(tex.width), int(tex.height)}, pos, pivot)
+	if pos != .Repeat {
+		src := rl.Rectangle{f32(bg.crop[0]), f32(bg.crop[1]), f32(bg.crop[2]), f32(bg.crop[3])}
+		dst := rl.Rectangle{origin.x + f32(bg.topLeft.x), origin.y + f32(bg.topLeft.y), f32(bg.crop[2] * bg.scale.x), f32(bg.crop[3] * bg.scale.y)}
+		rl.DrawTexturePro(tex, src, dst, {}, 0, rl.WHITE)
+		return
+	}
+	// repeat the crop over the level, aligned by the pivot
+	tw, th := f32(bg.crop[2]), f32(bg.crop[3])
+	if tw < 1 || th < 1 do return
+	nx, ny := math.ceil(f32(s.x) / tw), math.ceil(f32(s.y) / th)
+	start := [2]f32{f32(pivot.x) * (f32(s.x) - nx * tw), f32(pivot.y) * (f32(s.y) - ny * th)}
+	for y := start.y; y < f32(s.y); y += th {
+		for x := start.x; x < f32(s.x); x += tw {
+			// clip to the level
+			x0, y0 := max(x, 0), max(y, 0)
+			x1, y1 := min(x + tw, f32(s.x)), min(y + th, f32(s.y))
+			if x1 <= x0 || y1 <= y0 do continue
+			src := rl.Rectangle{f32(bg.crop[0]) + (x0 - x), f32(bg.crop[1]) + (y0 - y), x1 - x0, y1 - y0}
+			rl.DrawTexturePro(tex, src, {origin.x + x0, origin.y + y0, x1 - x0, y1 - y0}, {}, 0, rl.WHITE)
+		}
+	}
 }
 
 @(private = "file")
@@ -302,6 +338,7 @@ canvas_overlay :: proc() {
 		imgui.DrawList_AddText(dl, {sp.x + 2, sp.y - 18}, col_u32(i == L.level ? UI_TEXT : UI_TEXT_DIM), fmt.ctprintf("%s", name))
 	}
 	draw_field_labels(dl)
+	draw_level_handles(dl)
 	if L.selEntity != nil {
 		// resize handle
 		if r, ok := selected_rect_screen(); ok && entity_resizable(L.selEntity) {
@@ -376,6 +413,7 @@ canvas_input :: proc(state: ^EditorState) {
 		pick_input(state, pressL, pressR, mw)
 		return
 	}
+	if level_resize_input(state, pressL, mouse, mw) do return
 	// move levels
 	if L.tool == .Move_Level {
 		if pressL {
@@ -418,11 +456,170 @@ canvas_input :: proc(state: ^EditorState) {
 	}
 }
 
+// ----------------------------------------------------------------------------
+// Level resizing (LDtk's Rulers): handles around the active level's edges
+// and corners; dragging snaps to the active layer's grid (the world grid in
+// GridVania); left / top edges move the level, content keeps its place.
+// ----------------------------------------------------------------------------
+
+Level_Handle :: enum u8 {
+	None,
+	Top,
+	Bottom,
+	Left,
+	Right,
+	TopLeft,
+	TopRight,
+	BottomLeft,
+	BottomRight,
+}
+
+@(private = "file")
+handle_rect :: proc(h: Level_Handle) -> (mn, mx: [2]f32) {
+	L := &GlobalLevel
+	p := e.Ldtk_Doc_LevelPos(L.doc, L.level)
+	s := e.Ldtk_Doc_LevelSize(L.doc, L.level)
+	a := to_screen({f32(p.x), f32(p.y)})
+	b := to_screen({f32(p.x + s.x), f32(p.y + s.y)})
+	PAD :: 8
+	HS :: 5
+	c := (a + b) * 0.5
+	at: [2]f32
+	switch h {
+	case .None: return
+	case .Top: at = {c.x, a.y - PAD}
+	case .Bottom: at = {c.x, b.y + PAD}
+	case .Left: at = {a.x - PAD, c.y}
+	case .Right: at = {b.x + PAD, c.y}
+	case .TopLeft: at = {a.x - PAD, a.y - PAD}
+	case .TopRight: at = {b.x + PAD, a.y - PAD}
+	case .BottomLeft: at = {a.x - PAD, b.y + PAD}
+	case .BottomRight: at = {b.x + PAD, b.y + PAD}
+	}
+	return at - HS, at + HS
+}
+
+@(private = "file")
+handle_at :: proc(m: [2]f32) -> Level_Handle {
+	for h in Level_Handle {
+		if h == .None do continue
+		mn, mx := handle_rect(h)
+		if m.x >= mn.x - 2 && m.y >= mn.y - 2 && m.x < mx.x + 2 && m.y < mx.y + 2 do return h
+	}
+	return .None
+}
+
+@(private = "file")
+resize_grid :: proc() -> int {
+	if _, d := level_active_layer(); d != nil do return max(d.gridSize, 1)
+	return max(e.LdtkJson_Int(GlobalLevel.doc.root, "defaultGridSize", 16), 1)
+}
+
+// resize_bounds: Rulers.getResizedBounds - left, top, right, bottom relative
+// to the level's top-left.
+@(private = "file")
+resize_bounds :: proc(mw: [2]f32) -> [4]int {
+	L := &GlobalLevel
+	doc := L.doc
+	g := resize_grid()
+	s := e.Ldtk_Doc_LevelSize(doc, L.level)
+	dx := int(math.floor((mw.x - L.resizeFrom.x) / f32(g))) * g
+	dy := int(math.floor((mw.y - L.resizeFrom.y) / f32(g))) * g
+	b := [4]int{0, 0, s.x, s.y}
+	#partial switch L.resizeHandle {
+	case .Left, .TopLeft, .BottomLeft: b[0] = dx
+	}
+	#partial switch L.resizeHandle {
+	case .Top, .TopLeft, .TopRight: b[1] = dy
+	}
+	#partial switch L.resizeHandle {
+	case .Right, .TopRight, .BottomRight: b[2] = s.x + dx
+	}
+	#partial switch L.resizeHandle {
+	case .Bottom, .BottomLeft, .BottomRight: b[3] = s.y + dy
+	}
+	if LdtkJson_GridVania(doc) {
+		gw := max(e.Ldtk_Doc_WorldInt(doc, L.world, "worldGridWidth", 256), 1)
+		gh := max(e.Ldtk_Doc_WorldInt(doc, L.world, "worldGridHeight", 256), 1)
+		b[0] = int(math.round(f32(b[0]) / f32(gw))) * gw
+		b[2] = int(math.round(f32(b[2]) / f32(gw))) * gw
+		b[1] = int(math.round(f32(b[1]) / f32(gh))) * gh
+		b[3] = int(math.round(f32(b[3]) / f32(gh))) * gh
+	}
+	return b
+}
+
+@(private = "file")
+level_resize_input :: proc(state: ^EditorState, pressL: bool, mouse, mw: [2]f32) -> bool {
+	L := &GlobalLevel
+	doc := L.doc
+	if L.resizeHandle != .None {
+		if !imgui.IsMouseDown(.Left) {
+			b := resize_bounds(mw)
+			s := e.Ldtk_Doc_LevelSize(doc, L.level)
+			g := resize_grid()
+			if b != {0, 0, s.x, s.y} {
+				if b[2] >= b[0] + g && b[3] >= b[1] + g {
+					e.Ldtk_Doc_Checkpoint(doc, -1, "Resize Level")
+					n := e.Ldtk_Doc_ResizeLevelBounds(doc, L.level, b[0], b[1], b[2] - b[0], b[3] - b[1])
+					level_clear_selection()
+					if n > 0 do Editor_Log(state, .Warn, "%d entit%s outside the level deleted", n, n == 1 ? "y" : "ies")
+				} else do Editor_Log(state, .Info, "A level can't be smaller than one cell")
+			}
+			L.resizeHandle = .None
+		}
+		return true
+	}
+	if L.painting || L.levelDrag || L.selMoving || !L.hovered do return false
+	h := handle_at(mouse)
+	if h == .None do return false
+	#partial switch h {
+	case .Left, .Right: imgui.SetMouseCursor(.ResizeEW)
+	case .Top, .Bottom: imgui.SetMouseCursor(.ResizeNS)
+	case .TopLeft, .BottomRight: imgui.SetMouseCursor(.ResizeNWSE)
+	case: imgui.SetMouseCursor(.ResizeNESW)
+	}
+	imgui.SetTooltip("Drag to resize the level (snaps to the grid)\n\nF1: more")
+	LevelRef_Hover("level.resize")
+	if pressL {
+		L.resizeHandle = h
+		L.resizeFrom = mw
+		return true
+	}
+	return true
+}
+
+@(private = "file")
+draw_level_handles :: proc(dl: ^imgui.DrawList) {
+	L := &GlobalLevel
+	if L.painting || L.levelDrag do return
+	m := imgui.GetIO().MousePos
+	hover := L.hovered ? handle_at({m.x, m.y}) : .None
+	for h in Level_Handle {
+		if h == .None do continue
+		mn, mx := handle_rect(h)
+		on := h == hover || h == L.resizeHandle
+		imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(on ? UI_ACCENT : imgui.Vec4{0.85, 0.85, 0.9, 0.55}), 2, {})
+		Drive_ItemRect(fmt.tprintf("level.resize:%v", h), mn, mx, true)
+	}
+	if L.resizeHandle == .None do return
+	b := resize_bounds(to_world({m.x, m.y}))
+	p := e.Ldtk_Doc_LevelPos(L.doc, L.level)
+	a := to_screen({f32(p.x + b[0]), f32(p.y + b[1])})
+	c := to_screen({f32(p.x + b[2]), f32(p.y + b[3])})
+	g := resize_grid()
+	ok := b[2] >= b[0] + g && b[3] >= b[1] + g
+	col := ok ? UI_ACCENT : UI_DANGER
+	imgui.DrawList_AddRectFilled(dl, a, c, col_u32({col.x, col.y, col.z, 0.12}), 0, {})
+	imgui.DrawList_AddRect(dl, a, c, col_u32(col), 0, {}, 2)
+	imgui.DrawList_AddText(dl, {a.x + 4, c.y + 4}, col_u32(UI_TEXT), fmt.ctprintf("%dx%d", b[2] - b[0], b[3] - b[1]))
+}
+
 // level_snap: the step levels move by (the world grid in GridVania).
 @(private = "file")
 level_snap :: proc() -> [2]int {
 	doc := GlobalLevel.doc
-	if LdtkJson_GridVania(doc) do return {max(e.LdtkJson_Int(doc.root, "worldGridWidth", 256), 1), max(e.LdtkJson_Int(doc.root, "worldGridHeight", 256), 1)}
+	if LdtkJson_GridVania(doc) do return {max(e.Ldtk_Doc_WorldInt(doc, GlobalLevel.world, "worldGridWidth", 256), 1), max(e.Ldtk_Doc_WorldInt(doc, GlobalLevel.world, "worldGridHeight", 256), 1)}
 	g := max(e.LdtkJson_Int(doc.root, "defaultGridSize", 16), 1)
 	return {g, g}
 }

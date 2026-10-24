@@ -226,16 +226,72 @@ Auto layer has no cells of its own: paint the IntGrid layer it reads.
 
 | | |
 |---|---|
+| **Multiple worlds** | Lets a project have several worlds. See *Worlds*. |
+| **Name** | The world's identifier (only with multiple worlds). |
 | **Layout** | **Free**: levels anywhere. **GridVania**: levels on the world grid. **Linear horizontal / vertical**: in a row or column, in the order of the Levels panel. |
-| **World grid** | GridVania's grid cell size. |
+| **World grid** | GridVania's grid cell size. Levels move and resize in these steps. |
+| **New level size** | The size of levels added to this world. |
 | **Map** | Every level of the world. Click one to open it. |
+
+## Worlds
+<!-- topic: worlds -->
+
+A project can hold several worlds, each with its own levels, layout and
+grid. This is LDtk's *MultiWorlds* option. Turn on **Multiple worlds** in
+the World tab, or click **+ World**. The levels and world settings then
+move into a list of worlds in the file.
+
+- **+ World** adds a world with one level and opens it.
+- Click a world in the list to open it. The Levels panel also has a world
+  picker.
+- Right-click a world to open, rename or delete it. Deleting a world
+  deletes its levels too; undo brings them back. The last world can't be
+  deleted.
+- **Multiple worlds** turns off again only when one world is left.
+
+Level names can include the world's name: put `%world` in the project's
+level name pattern.
+
+## Resizing levels
+<!-- topic: level.resize -->
+
+Handles sit around the active level's edges and corners. Drag one to
+resize the level. Changes snap to the active layer's grid; in a GridVania
+world they snap to the world grid. A preview shows the new size, in red
+while it is smaller than one cell.
+
+Dragging the left or top edge moves the level in the world: cells and
+entities keep their world positions. When an edge moves by part of a
+cell, the remainder goes into the layer's offset (as in LDtk). Entities
+that end up outside the level are deleted, unless their definition allows
+**out of bounds**. A message gives the count, and undo brings them back.
+
+The Level tab's **Size** field resizes from the top-left corner.
+
+## Level background image
+<!-- topic: level.bg -->
+
+Under the background colour, the Level tab picks an **image** from the
+project. It is drawn behind the level's layers.
+
+- **Image position**: **Not scaled**; **Fit inside** (the whole image,
+  keeping its aspect ratio); **Cover level** (fills the level, keeping its
+  aspect ratio; the rest is cropped); **Cover (dirty scaling)** (stretched
+  to the level); **Repeat** (tiled).
+- **Image pivot**: which part stays visible when the image is cropped, and
+  where a smaller image sits.
+- **Remove image** clears it.
+
+The file gets the image's placement in `__bgPos` (top-left, scale and crop
+rectangle), so games can draw it the way the editor does.
 
 ## Level tab
 <!-- topic: tab.level -->
 
 The active level's identifier, position, size (Enter applies), depth,
-background colour, and level fields. With an entity selected, it shows the
-entity instead: position, size, layer, iid and fields.
+background colour and image, and its level fields. With an entity
+selected, it shows the entity instead: position, size, layer, iid and
+fields.
 
 ## Tilesets tab
 <!-- topic: tab.tilesets -->

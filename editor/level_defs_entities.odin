@@ -315,16 +315,11 @@ entity_form :: proc(state: ^EditorState, uid: int) {
 			changed |= prop_opt_int("Max height", "defs.entity.maxh", obj, "maxHeight", "Largest height (empty: none)", "tab.entities")
 		}
 		UI_PropLabel("Pivot")
-		for p, i in PIVOTS {
-			if i % 3 != 0 do imgui.SameLine(0, 2)
-			on := abs(p.x - ed.pivot.x) < 0.01 && abs(p.y - ed.pivot.y) < 0.01
-			if UI_IconButton(on ? ICON_FA_CIRCLE : "·", fmt.tprintf("defs.entity.pivot:%d", i), "", on, 18) {
-				defs_checkpoint("Entity Pivot")
-				e.LdtkJson_SetFloat(obj, "pivotX", p.x, a)
-				e.LdtkJson_SetFloat(obj, "pivotY", p.y, a)
-				changed = true
-			}
-			level_tip(fmt.tprintf("Pivot %.1f, %.1f: the point placed on the grid (its position)", p.x, p.y), "tab.entities")
+		if p, ch := level_pivot_picker("defs.entity.pivot", ed.pivot, "The point placed on the grid (its position)", "tab.entities"); ch {
+			defs_checkpoint("Entity Pivot")
+			e.LdtkJson_SetFloat(obj, "pivotX", p.x, a)
+			e.LdtkJson_SetFloat(obj, "pivotY", p.y, a)
+			changed = true
 		}
 		UI_PropLabel("Colour")
 		col := [3]f32{f32(ed.color.r) / 255, f32(ed.color.g) / 255, f32(ed.color.b) / 255}

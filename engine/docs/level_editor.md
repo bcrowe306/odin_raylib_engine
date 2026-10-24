@@ -129,6 +129,18 @@ with any tool.
 A selected entity's **Layer** in the Level tab moves it to another Entities
 layer.
 
+### Levels and worlds
+
+- Drag the handles around the active level's edges and corners to resize
+  it (snapped to the layer's grid, or to the world grid in GridVania). The
+  left and top edges move the level; its content keeps its place.
+- Level tab > **Image**: a background image behind the layers - not
+  scaled, fit inside, cover, stretched or repeated, with a pivot.
+- World tab > **Multiple worlds** / **+ World**: several worlds in one
+  project (LDtk's MultiWorlds), each with its own levels, layout, grid and
+  new level size. Right-click a world to rename or delete it; the Levels
+  panel picks the world.
+
 ### Context menus and help
 
 Right-click levels, layers and palette items for their actions: rename,
@@ -268,6 +280,9 @@ e.Ldtk_Doc_Save(doc)
 |---|---|
 | `Ldtk_Doc_Load` / `LoadFromMemory` / `New` / `Save` / `Serialize` / `Destroy` | files (external levels included) |
 | `levels[i].layers[j]`: `intGrid`, `gridTiles`, `autoTiles`, `obj` (the JSON) | typed cells; everything else is in the JSON tree (`LdtkJson_Get` / `Set*`) |
+| `Ldtk_Doc_ResizeLevelBounds` (any edge, like LDtk's applyNewBounds), `ResizeLevel` | resizing |
+| `Ldtk_Doc_SetLevelBg`, `SetLevelBgPos`, `SetLevelBgPivot`, `LevelBg`; `Ldtk_LevelBgInfo`, `Ldtk_BgPos`, `Ldtk_ImageSize` | background images (`__bgPos`) |
+| `Ldtk_Doc_SetMultiWorlds`, `AddWorld`, `RenameWorld`, `RemoveWorld`, `WorldInt` / `WorldStr` / `SetWorldInt`, `WorldName`; `SetFlag` / `HasFlag` | worlds and project flags |
 | `Ldtk_Doc_SetIntGrid`, `SetTile`, `TilesAt`, `GetIntGrid` | cells |
 | `Ldtk_Doc_ApplyRules` (an area), `ApplyRulesLayer`, `ApplyRulesFull` | auto tiles |
 | `Ldtk_Doc_BeginCells` / `EndCells`, `Checkpoint` (level or project), `CheckpointOnce` (live edits), `Undo` / `Redo` | undo |
@@ -304,10 +319,8 @@ rules that can't match, as LDtk does.
   older LDtk versions (random tiles of flipped matches changed in 1.3.3,
   irrelevant rules are skipped since 1.5) get today's tiles when their
   layers are repainted - LDtk would do the same.
-- Not edited here (kept as they are, edit them in LDtk): array field values,
-  entity references, tile fields, level background images, external enums,
-  the rule "biome" field, tileset saved selections, LDtk's custom commands
-  and export options.
+- Not edited here yet (kept as they are, edit them in LDtk): external
+  enums, LDtk's custom commands and export options.
 - Animated tiles are this engine's convention (custom data); LDtk shows the
   first frame.
 
@@ -317,5 +330,6 @@ rules that can't match, as LDtk does.
 tiles regenerated equal to LDtk's (stamps, optional rules, biomes, flips),
 toc / neighbours equal to LDtk's, incremental rules equal to a full run,
 undo / redo, external levels, a project built from scratch (read back by
-the runtime loader), per-tile data / animations / terrains. Drive:
-`tests/drive/level_editor.drive`.
+the runtime loader), per-tile data / animations / terrains, rules editing
+and the Assistant, resizing / background images / worlds. Drives:
+`tests/drive/level_*.drive`.

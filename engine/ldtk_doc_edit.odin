@@ -259,7 +259,7 @@ Ldtk_Doc_EntityRect :: proc(ent: ^LdtkJson) -> [4]int {
 }
 
 // ldtk_entity_cached updates the "__" fields that follow position / size.
-@(private = "file")
+@(private)
 ldtk_entity_cached :: proc(doc: ^Ldtk_Doc, li, layer: int, ent: ^LdtkJson) {
 	a := doc.allocator
 	ly := &doc.levels[li].layers[layer]
@@ -276,7 +276,7 @@ ldtk_entity_cached :: proc(doc: ^Ldtk_Doc, li, layer: int, ent: ^LdtkJson) {
 	}
 }
 
-@(private = "file")
+@(private)
 ldtk_linear_layout :: proc(doc: ^Ldtk_Doc, li: int) -> bool {
 	l := LdtkJson_Str(doc.worlds[doc.levels[li].world].obj, "worldLayout", LdtkJson_Str(doc.root, "worldLayout"))
 	return l == "LinearHorizontal" || l == "LinearVertical"
@@ -446,8 +446,8 @@ ldtk_external_rel :: proc(doc: ^Ldtk_Doc, identifier: string) -> string {
 Ldtk_Doc_AddLevel :: proc(doc: ^Ldtk_Doc, world: int, pos: [2]int, size: [2]int = {}) -> int {
 	a := doc.allocator
 	size := size
-	if size.x <= 0 do size.x = LdtkJson_Int(doc.root, "defaultLevelWidth", 256)
-	if size.y <= 0 do size.y = LdtkJson_Int(doc.root, "defaultLevelHeight", 256)
+	if size.x <= 0 do size.x = Ldtk_Doc_WorldInt(doc, world, "defaultLevelWidth", 256)
+	if size.y <= 0 do size.y = Ldtk_Doc_WorldInt(doc, world, "defaultLevelHeight", 256)
 	uid := Ldtk_Doc_NextUid(doc)
 	name := Ldtk_Doc_UniqueLevelName(doc, world)
 	bg := LdtkJson_Str(doc.root, "defaultLevelBgColor", "#696A79")
@@ -528,7 +528,7 @@ Ldtk_Doc_RemoveLevel :: proc(doc: ^Ldtk_Doc, li: int) -> bool {
 
 // ldtk_level_set_* write level metadata to the project file object and the
 // external level file.
-@(private = "file")
+@(private)
 ldtk_level_set_int :: proc(doc: ^Ldtk_Doc, lv: ^Ldtk_DocLevel, key: string, v: int) {
 	LdtkJson_SetInt(lv.obj, key, v, doc.allocator)
 	if lv.extRoot != nil do LdtkJson_SetInt(lv.extRoot, key, v, doc.allocator)
@@ -595,45 +595,10 @@ Ldtk_Doc_SetLevelBgColor :: proc(doc: ^Ldtk_Doc, li: int, hex: string) {
 	Ldtk_Doc_Touch(doc)
 }
 
-// Ldtk_Doc_ResizeLevel changes a level's pixel size; cells keep their
-// coordinates (anchored top-left), auto tiles are regenerated.
-Ldtk_Doc_ResizeLevel :: proc(doc: ^Ldtk_Doc, li: int, size: [2]int) {
-	lv := &doc.levels[li]
-	a := doc.allocator
-	ldtk_level_set_int(doc, lv, "pxWid", max(size.x, 1))
-	ldtk_level_set_int(doc, lv, "pxHei", max(size.y, 1))
-	for &ly in lv.layers {
-		d := Ldtk_Doc_LayerDef(doc, &ly)
-		if d == nil do continue
-		off := Ldtk_Doc_LayerOffset(&ly)
-		cw := max(int(math.ceil(f64(size.x - off.x) / f64(d.gridSize))), 0)
-		ch := max(int(math.ceil(f64(size.y - off.y) / f64(d.gridSize))), 0)
-		if cw == ly.cWid && ch == ly.cHei do continue
-		grid := make([]i32, cw * ch, doc.heap)
-		for y in 0 ..< min(ch, ly.cHei) do for x in 0 ..< min(cw, ly.cWid) do grid[x + y * cw] = ly.intGrid[x + y * ly.cWid]
-		delete(ly.intGrid, doc.heap)
-		ly.intGrid = grid
-		w := 0
-		for t in ly.gridTiles {
-			x := int(t.coord) % max(ly.cWid, 1)
-			y := int(t.coord) / max(ly.cWid, 1)
-			if x >= cw || y >= ch do continue
-			nt := t
-			nt.coord = i32(x + y * cw)
-			ly.gridTiles[w] = nt
-			w += 1
-		}
-		resize(&ly.gridTiles, w)
-		slice.sort_by(ly.gridTiles[:], proc(p, q: Ldtk_DocTile) -> bool {return p.coord < q.coord})
-		ly.cWid, ly.cHei = cw, ch
-		LdtkJson_SetInt(ly.obj, "__cWid", cw, a)
-		LdtkJson_SetInt(ly.obj, "__cHei", ch, a)
-		ly.cellsDirty = true
-	}
-	Ldtk_Doc_ApplyRulesFull(doc, li)
-	lv.dirty = true
-	Ldtk_Doc_UpdateNeighbours(doc)
-	Ldtk_Doc_Touch(doc)
+// Ldtk_Doc_ResizeLevel changes a level's pixel size anchored top-left
+// (Ldtk_Doc_ResizeLevelBounds from 0, 0); returns the entities removed.
+Ldtk_Doc_ResizeLevel :: proc(doc: ^Ldtk_Doc, li: int, size: [2]int) -> int {
+	return Ldtk_Doc_ResizeLevelBounds(doc, li, 0, 0, size.x, size.y)
 }
 
 // Ldtk_Doc_UpdateNeighbours recomputes every level's "__neighbours" like
@@ -882,7 +847,7 @@ Ldtk_Doc_DuplicateLevel :: proc(doc: ^Ldtk_Doc, li: int) -> int {
 	p := Ldtk_Doc_LevelPos(doc, li)
 	s := Ldtk_Doc_LevelSize(doc, li)
 	step := 1
-	if LdtkJson_Str(doc.worlds[src.world].obj, "worldLayout", LdtkJson_Str(doc.root, "worldLayout")) == "GridVania" do step = max(LdtkJson_Int(doc.root, "worldGridWidth", 256), 1)
+	if LdtkJson_Str(doc.worlds[src.world].obj, "worldLayout", LdtkJson_Str(doc.root, "worldLayout")) == "GridVania" do step = max(Ldtk_Doc_WorldInt(doc, src.world, "worldGridWidth", 256), 1)
 	pos := Ldtk_Doc_FreeLevelSpot(doc, src.world, {p.x + s.x, p.y}, s, step)
 	LdtkJson_SetInt(obj, "worldX", pos.x, a)
 	LdtkJson_SetInt(obj, "worldY", pos.y, a)
