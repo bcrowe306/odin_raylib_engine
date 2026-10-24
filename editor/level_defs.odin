@@ -1006,9 +1006,9 @@ fields_editor :: proc(state: ^EditorState, entityUid: int, fieldDefs: []^e.LdtkJ
 		append(&types, fmt.tprintf("F_Enum(%d)", e.LdtkJson_Int(en, "uid")))
 	}
 	imgui.SetNextItemWidth(140)
-	typeIdx, _ = UI_Combo(fmt.tprintf("defs.field.type:%d", entityUid), clamp(typeIdx, 0, len(names) - 1), names[:])
+	typeIdx, _ = UI_Combo("defs.field.type", clamp(typeIdx, 0, len(names) - 1), names[:])
 	imgui.SameLine()
-	if UI_Button(fmt.tprintf("%s  Add field", ICON_FA_PLUS), fmt.tprintf("defs.field.add:%d", entityUid)) {
+	if UI_Button(fmt.tprintf("%s  Add field", ICON_FA_PLUS), "defs.field.add") {
 		checkpoint("Add Field")
 		e.Ldtk_Doc_AddFieldDef(doc, entityUid, types[typeIdx], strings.to_lower(names[typeIdx], context.temp_allocator))
 	}

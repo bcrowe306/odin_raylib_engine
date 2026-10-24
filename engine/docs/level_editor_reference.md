@@ -270,14 +270,55 @@ picked in a palette.
 ## Fields
 <!-- topic: fields -->
 
-Values each entity (or level) carries for the game:
+Values that each entity (or level) carries for the game. Edit them in the
+**Level** tab: the selected entity's fields, or the level's.
 
-- Int, Float, Bool, String, Multilines, Color;
-- Enum, Point, FilePath;
-- EntityRef, Tile.
+| Type | Edited with |
+|---|---|
+| Int, Float | a number (kept within the definition's min / max) |
+| Bool | a check box |
+| String | one line; it must match the definition's regex, if there is one |
+| Multilines | a text box |
+| Color | a colour picker |
+| Enum | a list of the enum's values |
+| Point | "cx,cy", or the crosshair: click a cell in the level |
+| FilePath | a path, or the folder button: a project file of an accepted type |
+| EntityRef | the crosshair: click the entity in the level (it may be in another level); the arrow button goes to it |
+| Tile | **Use picked tile**: the tiles picked in a tileset palette |
 
-Add a field by picking a type and clicking **Add field**. In the game, an
-entity's fields set script properties with the same names.
+- **Arrays**: **+** adds a value (for points and references, you then
+  click in the level, and **Shift** keeps adding). Each value has move up,
+  move down and remove buttons.
+- **Defaults**: a value that is still the definition's default is dimmed.
+  Right-click > **Reset to default** brings the default back. **Clear**
+  empties a nullable field.
+- **Errors** show in red: a required value missing, a reference to an entity
+  that no longer exists or isn't allowed, a string that doesn't match the
+  regex, a file of the wrong type.
+- **Symmetrical references** (a definition option): pointing A at B makes B
+  point at A, and clearing it removes both links.
+
+In the game, an entity's fields set the script properties with the same
+names.
+
+## Field display in the canvas
+<!-- topic: fields.display -->
+
+Each field definition decides how the canvas shows it (**Display** in the
+Entities tab):
+
+| Display | |
+|---|---|
+| Hidden | not shown |
+| Value only / Name and value | text above, at the centre of, or beneath the entity |
+| Array count (with / without label) | how many values |
+| Entity tile | an enum's icon or a tile field becomes the entity's picture |
+| Points / Path / Loop / Star | the points, joined as a path, a closed loop, or lines from the entity |
+| Radius (px / grid) | a circle of that radius |
+| Reference link (pivots / centres) | an arrow to the referenced entity, in the chosen link style |
+
+Fields still at their default (or empty arrays) are only shown when
+**Always show** is on. Errors are always shown, in red.
 
 ## Enums tab
 <!-- topic: tab.enums -->

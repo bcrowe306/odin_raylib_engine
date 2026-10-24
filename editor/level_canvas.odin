@@ -3,6 +3,8 @@ package editor
 import "core:fmt"
 import "core:math"
 import "core:math/rand"
+import "core:strconv"
+import "core:strings"
 import rl "vendor:raylib"
 import e "../engine"
 import imgui "lib/imgui"
@@ -127,8 +129,10 @@ canvas_draw :: proc() {
 		}
 	}
 	for li in order do draw_level(li, li == L.level)
+	draw_field_geometry()
 	draw_selection()
 	draw_tool_preview()
+	draw_pick_hint()
 	rl.EndMode2D()
 }
 
@@ -311,6 +315,7 @@ canvas_overlay :: proc() {
 		name := e.LdtkJson_Str(lv.obj, "identifier")
 		imgui.DrawList_AddText(dl, {sp.x + 2, sp.y - 18}, col_u32(i == L.level ? UI_TEXT : UI_TEXT_DIM), fmt.ctprintf("%s", name))
 	}
+	draw_field_labels(dl)
 	if L.selEntity != nil {
 		// resize handle
 		if r, ok := selected_rect_screen(); ok && entity_resizable(L.selEntity) {
@@ -328,6 +333,7 @@ canvas_overlay :: proc() {
 		}
 	}
 	if d != nil && d.type == .AutoLayer do status = fmt.tprintf("%s   (auto layer: paint its source IntGrid layer)", status)
+	if hint := LevelCanvas_PickHintText(); hint != "" do status = hint
 	h := imgui.GetTextLineHeight()
 	pos := [2]f32{L.canvasMin.x + 8, L.canvasMin.y + L.canvasSize.y - h - 8}
 	tw := imgui.CalcTextSize(fmt.ctprintf("%s", status)).x
@@ -380,6 +386,10 @@ canvas_input :: proc(state: ^EditorState) {
 	ly, d := level_active_layer()
 	pressL := L.hovered && imgui.IsMouseClicked(.Left)
 	pressR := L.hovered && imgui.IsMouseClicked(.Right)
+	if levelPick.active {
+		pick_input(state, pressL, pressR, mw)
+		return
+	}
 	// move levels
 	if L.tool == .Move_Level {
 		if pressL {
@@ -955,5 +965,359 @@ draw_selection :: proc() {
 		a := L.selRectStart
 		rl.DrawRectangleRec({min(a.x, b.x), min(a.y, b.y), abs(b.x - a.x), abs(b.y - a.y)}, {120, 170, 255, 40})
 		rl.DrawRectangleLinesEx({min(a.x, b.x), min(a.y, b.y), abs(b.x - a.x), abs(b.y - a.y)}, thick, {120, 170, 255, 230})
+	}
+}
+
+// ----------------------------------------------------------------------------
+// Picking a field value in the canvas (points, entity references)
+// ----------------------------------------------------------------------------
+
+// pick_grid: the grid points are picked on (the owner's layer, else the
+// active layer's, else the project's default).
+@(private = "file")
+pick_grid :: proc() -> (origin: [2]f32, g: int) {
+	L := &GlobalLevel
+	lv := &L.doc.levels[L.level]
+	layer := levelPick.layer
+	if layer < 0 || layer >= len(lv.layers) do layer = L.layer
+	g = e.LdtkJson_Int(L.doc.root, "defaultGridSize", 16)
+	if layer >= 0 && layer < len(lv.layers) {
+		if d := e.Ldtk_Doc_LayerDef(L.doc, &lv.layers[layer]); d != nil do g = d.gridSize
+	}
+	return layer_origin_of(layer), max(g, 1)
+}
+
+@(private = "file")
+pick_input :: proc(state: ^EditorState, pressL, pressR: bool, mw: [2]f32) {
+	L := &GlobalLevel
+	doc := L.doc
+	if pressR {
+		LevelFields_CancelPick()
+		return
+	}
+	if !pressL do return
+	p := &levelPick
+	fd := e.Ldtk_Doc_FieldDef(doc, e.LdtkJson_Int(p.fi, "defUid", -1))
+	if fd == nil {
+		LevelFields_CancelPick()
+		return
+	}
+	isArray := e.LdtkJson_Bool(fd, "isArray")
+	chain := isArray && imgui.GetIO().KeyShift // Shift: keep adding values
+	switch p.kind {
+	case .Point:
+		o, g := pick_grid()
+		c := [2]int{ldtk_floor(int(math.floor(mw.x - o.x)), g), ldtk_floor(int(math.floor(mw.y - o.y)), g)}
+		e.Ldtk_Doc_Checkpoint(doc, L.level, "Pick Point")
+		idx := p.idx
+		if idx < 0 do idx = e.Ldtk_Doc_FieldArrayAdd(doc, p.fi)
+		if idx >= 0 do e.Ldtk_Doc_SetFieldRaw(doc, p.fi, idx, fmt.tprintf("%d,%d", c.x, c.y))
+	case .EntityRef:
+		// a click in another level opens it (references can point there)
+		if li := e.Ldtk_Doc_LevelAt(doc, L.world, {int(math.floor(mw.x)), int(math.floor(mw.y))}); li >= 0 && li != L.level {
+			L.level = li
+			L.layer = 0
+			level_sync_selection()
+			return
+		}
+		_, ent, found := element_at(mw)
+		if !found || ent.obj == nil {
+			Editor_Log(state, .Info, "Click an entity (Esc cancels)")
+			return
+		}
+		if allowed, why := e.Ldtk_Doc_RefAllowed(doc, fd, p.owner, p.ownerLevel, ent.obj, L.level); p.owner != nil && !allowed {
+			Editor_Log(state, .Warn, "This reference allows %s", why)
+			return
+		}
+		e.Ldtk_Doc_Checkpoint(doc, -1, "Pick Reference") // (may touch two levels)
+		idx := p.idx
+		if idx < 0 do idx = e.Ldtk_Doc_FieldArrayAdd(doc, p.fi)
+		if idx >= 0 do e.Ldtk_Doc_SetFieldRef(doc, p.fi, idx, p.owner, e.LdtkJson_Str(ent.obj, "iid"))
+	case .Int, .Float, .Bool, .String, .Text, .Color, .Enum, .Path, .Tile, .Other:
+	}
+	if p.owner != nil do e.Ldtk_Doc_EntitySmart(doc, p.owner)
+	doc.levels[L.level].dirty = true
+	if p.ownerLevel < len(doc.levels) do doc.levels[p.ownerLevel].dirty = true
+	if chain do p.idx = -1
+	else do LevelFields_CancelPick()
+}
+
+// draw_pick_hint: what picking expects, and the cell / entity it would take.
+@(private = "file")
+draw_pick_hint :: proc() {
+	L := &GlobalLevel
+	if !levelPick.active do return
+	m := imgui.GetIO().MousePos
+	mw := to_world({m.x, m.y})
+	thick := 2 / L.zoom
+	if levelPick.kind == .Point {
+		o, g := pick_grid()
+		c := [2]int{ldtk_floor(int(math.floor(mw.x - o.x)), g), ldtk_floor(int(math.floor(mw.y - o.y)), g)}
+		rl.DrawRectangleLinesEx({o.x + f32(c.x * g), o.y + f32(c.y * g), f32(g), f32(g)}, thick, {120, 255, 160, 255})
+	} else {
+		if _, ent, found := element_at(mw); found && ent.obj != nil {
+			o := layer_origin_of(ent.layer)
+			r := e.Ldtk_Doc_EntityRect(ent.obj)
+			rl.DrawRectangleLinesEx({o.x + f32(r[0]), o.y + f32(r[1]), f32(r[2]), f32(r[3])}, thick, {120, 255, 160, 255})
+		}
+	}
+}
+
+// LevelCanvas_PickHintText: the line shown while picking.
+LevelCanvas_PickHintText :: proc() -> string {
+	if !levelPick.active do return ""
+	name := e.LdtkJson_Str(levelPick.fi, "__identifier")
+	what := levelPick.kind == .Point ? "a cell" : "an entity"
+	return fmt.tprintf("Picking %s for \"%s\": click %s%s - Esc or right-click cancels", levelPick.kind == .Point ? "a point" : "a reference", name, what, levelPick.idx < 0 ? " (Shift: keep adding)" : "")
+}
+
+// ----------------------------------------------------------------------------
+// Field values in the canvas (FieldDef.editorDisplayMode, like LDtk's
+// FieldInstanceRender): values / names above, at the centre or beneath an
+// entity, array counts, points (path, loop, star), radii, reference arrows;
+// errors in red. Geometry here, text in the overlay.
+// ----------------------------------------------------------------------------
+
+@(private = "file")
+Field_Show :: struct {
+	fi, fd: ^e.LdtkJson,
+	mode:   string,
+	color:  rl.Color,
+}
+
+// shown_fields: the fields of an entity / level to show.
+@(private = "file")
+shown_fields :: proc(fields: []^e.LdtkJson, owner: ^e.LdtkJson, base: rl.Color) -> []Field_Show {
+	L := &GlobalLevel
+	doc := L.doc
+	out := make([dynamic]Field_Show, context.temp_allocator)
+	for fi in fields {
+		fd := e.Ldtk_Doc_FieldDef(doc, e.LdtkJson_Int(fi, "defUid", -1))
+		if fd == nil do continue
+		mode := e.LdtkJson_Str(fd, "editorDisplayMode", "Hidden")
+		err := field_error(doc, fd, fi, 0, owner)
+		if err == "" && mode == "Hidden" do continue
+		isArray := e.LdtkJson_Bool(fd, "isArray")
+		empty := isArray ? e.Ldtk_Doc_FieldArrayLen(doc, fi) == 0 : e.Ldtk_Doc_FieldRaw(fi, 0).isDefault
+		if err == "" && empty && !e.LdtkJson_Bool(fd, "editorAlwaysShow") do continue
+		col := base
+		if dc := e.LdtkJson_Str(fd, "editorDisplayColor"); dc != "" do col = e.Ldtk_ParseHexColor(dc, base)
+		append(&out, Field_Show{fi, fd, mode, col})
+	}
+	return out[:]
+}
+
+// field_value_text: a field's values as one line (prefix / suffix, cut).
+@(private = "file")
+field_value_text :: proc(fs: Field_Show) -> string {
+	L := &GlobalLevel
+	doc := L.doc
+	n := e.Ldtk_Doc_FieldArrayLen(doc, fs.fi)
+	b := strings.builder_make(context.temp_allocator)
+	for i in 0 ..< n {
+		t, isNull := e.Ldtk_Doc_FieldText(doc, fs.fi, i)
+		if e.Ldtk_FieldKindOf(fs.fd) == .EntityRef && !isNull {
+			if _, _, target, ok := e.Ldtk_Doc_FindEntity(doc, t); ok do t = e.LdtkJson_Str(target, "__identifier")
+		}
+		if i > 0 do strings.write_string(&b, ", ")
+		strings.write_string(&b, e.LdtkJson_Str(fs.fd, "editorTextPrefix"))
+		strings.write_string(&b, isNull ? "-" : t)
+		strings.write_string(&b, e.LdtkJson_Str(fs.fd, "editorTextSuffix"))
+	}
+	s := strings.to_string(b)
+	if e.LdtkJson_Bool(fs.fd, "editorCutLongValues", true) && len(s) > 40 do s = fmt.tprintf("%s...", s[:37])
+	return s
+}
+
+// draw_field_geometry: points, radii and reference links of the active
+// level's entities (world space).
+draw_field_geometry :: proc() {
+	L := &GlobalLevel
+	doc := L.doc
+	if doc == nil || len(doc.levels) == 0 do return
+	lv := &doc.levels[L.level]
+	thick := 1.5 / L.zoom
+	for &ly, j in lv.layers {
+		d := e.Ldtk_Doc_LayerDef(doc, &ly)
+		if d == nil || d.type != .Entities || !e.LdtkJson_Bool(ly.obj, "visible", true) do continue
+		o := layer_origin_of(j)
+		g := f32(d.gridSize)
+		for ent in e.LdtkJson_Arr(ly.obj, "entityInstances") {
+			base := e.Ldtk_ParseHexColor(e.LdtkJson_Str(ent, "__smartColor", "#FFFFFF"))
+			px := e.LdtkJson_Arr(ent, "px")
+			if len(px) < 2 do continue
+			pivot := o + {f32(px[0].num), f32(px[1].num)}
+			r := e.Ldtk_Doc_EntityRect(ent)
+			center := o + {f32(r[0]) + f32(r[2]) * 0.5, f32(r[1]) + f32(r[3]) * 0.5}
+			for fs in shown_fields(e.LdtkJson_Arr(ent, "fieldInstances"), ent, base) {
+				n := e.Ldtk_Doc_FieldArrayLen(doc, fs.fi)
+				switch fs.mode {
+				case "Points", "PointPath", "PointPathLoop", "PointStar":
+					prev := pivot
+					first := [2]f32{}
+					for i in 0 ..< n {
+						t, isNull := e.Ldtk_Doc_FieldText(doc, fs.fi, i)
+						if isNull do continue
+						parts := strings.split(t, ",", context.temp_allocator)
+						if len(parts) != 2 do continue
+						cx, _ := strconv.parse_int(parts[0])
+						cy, _ := strconv.parse_int(parts[1])
+						p := o + {(f32(cx) + 0.5) * g, (f32(cy) + 0.5) * g}
+						if i == 0 do first = p
+						switch fs.mode {
+						case "PointPath", "PointPathLoop": rl.DrawLineEx(prev, p, thick, col_rl(fs.color, 0.8))
+						case "PointStar": rl.DrawLineEx(pivot, p, thick, col_rl(fs.color, 0.8))
+						}
+						rl.DrawRectangleV(p - g * 0.2, {g * 0.4, g * 0.4}, fs.color)
+						prev = p
+					}
+					if fs.mode == "PointPathLoop" && n > 1 do rl.DrawLineEx(prev, first, thick, col_rl(fs.color, 0.8))
+				case "RadiusPx", "RadiusGrid":
+					t, isNull := e.Ldtk_Doc_FieldText(doc, fs.fi, 0)
+					if isNull do continue
+					v, _ := strconv.parse_f64(t)
+					rad := f32(v) * (fs.mode == "RadiusGrid" ? g : 1)
+					if rad > 0 do rl.DrawCircleLinesV(center, rad, fs.color)
+				case "RefLinkBetweenPivots", "RefLinkBetweenCenters":
+					for i in 0 ..< n {
+						t, isNull := e.Ldtk_Doc_FieldText(doc, fs.fi, i)
+						if isNull do continue
+						tli, tlayer, target, ok := e.Ldtk_Doc_FindEntity(doc, t)
+						if !ok || tli != L.level do continue
+						to := layer_origin_of(tlayer)
+						a := fs.mode == "RefLinkBetweenCenters" ? center : pivot
+						tr := e.Ldtk_Doc_EntityRect(target)
+						tp := e.LdtkJson_Arr(target, "px")
+						b := fs.mode == "RefLinkBetweenCenters" ? to + {f32(tr[0]) + f32(tr[2]) * 0.5, f32(tr[1]) + f32(tr[3]) * 0.5} : to + {f32(tp[0].num), f32(tp[1].num)}
+						draw_link(a, b, e.LdtkJson_Str(fs.fd, "editorLinkStyle", "StraightArrow"), fs.color, thick)
+					}
+				}
+			}
+		}
+	}
+}
+
+// draw_link: a reference arrow in one of LDtk's link styles.
+@(private = "file")
+draw_link :: proc(a, b: [2]f32, style: string, col: rl.Color, thick: f32) {
+	d := b - a
+	l := math.sqrt(d.x * d.x + d.y * d.y)
+	if l < 1 do return
+	dir := d / l
+	nrm := [2]f32{-dir.y, dir.x}
+	switch style {
+	case "DashedLine":
+		step: f32 = 6
+		for t: f32 = 0; t < l; t += step * 2 do rl.DrawLineEx(a + dir * t, a + dir * min(t + step, l), thick, col)
+	case "ZigZag":
+		prev := a
+		segs := max(int(l / 8), 2)
+		for i in 1 ..= segs {
+			t := f32(i) / f32(segs)
+			off := (i % 2 == 0 ? -1 : 1) * f32(3) * (i == segs ? 0 : 1)
+			p := a + d * t + nrm * off
+			rl.DrawLineEx(prev, p, thick, col)
+			prev = p
+		}
+	case "CurvedArrow":
+		ctrl := a + d * 0.5 + nrm * l * 0.2
+		prev := a
+		for i in 1 ..= 16 {
+			t := f32(i) / 16
+			p := (1 - t) * (1 - t) * a + 2 * (1 - t) * t * ctrl + t * t * b
+			rl.DrawLineEx(prev, p, thick, col)
+			prev = p
+		}
+		dir = b - ctrl
+		dir /= max(math.sqrt(dir.x * dir.x + dir.y * dir.y), 0.001)
+	case "ArrowsLine":
+		rl.DrawLineEx(a, b, thick, col)
+		m := a + d * 0.5
+		rl.DrawTriangle(m + dir * 4, m - dir * 3 - nrm * 3, m - dir * 3 + nrm * 3, col)
+	case:
+		rl.DrawLineEx(a, b, thick, col)
+	}
+	if style != "DashedLine" && style != "ArrowsLine" {
+		h: f32 = 5
+		n2 := [2]f32{-dir.y, dir.x}
+		rl.DrawTriangle(b, b - dir * h - n2 * h * 0.6, b - dir * h + n2 * h * 0.6, col)
+	}
+}
+
+// draw_field_labels: values / names / counts of the active level's entities
+// and the level's own fields (screen space).
+draw_field_labels :: proc(dl: ^imgui.DrawList) {
+	L := &GlobalLevel
+	doc := L.doc
+	lv := &doc.levels[L.level]
+	h := imgui.GetTextLineHeight()
+	label :: proc(dl: ^imgui.DrawList, pos: [2]f32, text: string, col: rl.Color, err: bool) {
+		c := fmt.ctprintf("%s", text)
+		w := imgui.CalcTextSize(c).x
+		p := [2]f32{pos.x - w * 0.5, pos.y}
+		imgui.DrawList_AddRectFilled(dl, {p.x - 3, p.y}, {p.x + w + 3, p.y + imgui.GetTextLineHeight()}, col_u32({0, 0, 0, 0.6}), 3, {})
+		tc := err ? imgui.Vec4{1, 0.35, 0.2, 1} : imgui.Vec4{min(f32(col.r) / 255 + 0.35, 1), min(f32(col.g) / 255 + 0.35, 1), min(f32(col.b) / 255 + 0.35, 1), 1}
+		imgui.DrawList_AddText(dl, {p.x, p.y}, col_u32(tc), c)
+	}
+	lines :: proc(fields: []Field_Show, owner: ^e.LdtkJson) -> ([dynamic]struct {text: string, pos: string, col: rl.Color, err: bool}) {
+		out := make([dynamic]struct {text: string, pos: string, col: rl.Color, err: bool}, context.temp_allocator)
+		doc := GlobalLevel.doc
+		for fs in fields {
+			name := e.LdtkJson_Str(fs.fi, "__identifier")
+			pos := e.LdtkJson_Str(fs.fd, "editorDisplayPos", "Above")
+			if err := field_error(doc, fs.fd, fs.fi, 0, owner); err != "" {
+				append(&out, struct {text: string, pos: string, col: rl.Color, err: bool}{fmt.tprintf("%s <%s>", name, err), pos, fs.color, true})
+				continue
+			}
+			text := ""
+			switch fs.mode {
+			case "ValueOnly": text = field_value_text(fs)
+			case "NameAndValue": text = fmt.tprintf("%s = %s", name, field_value_text(fs))
+			case "ArrayCountWithLabel": text = fmt.tprintf("%s: %d value(s)", name, e.Ldtk_Doc_FieldArrayLen(doc, fs.fi))
+			case "ArrayCountNoLabel": text = fmt.tprintf("%d value(s)", e.Ldtk_Doc_FieldArrayLen(doc, fs.fi))
+			}
+			if text != "" do append(&out, struct {text: string, pos: string, col: rl.Color, err: bool}{text, pos, fs.color, false})
+		}
+		return out
+	}
+	for &ly, j in lv.layers {
+		d := e.Ldtk_Doc_LayerDef(doc, &ly)
+		if d == nil || d.type != .Entities || !e.LdtkJson_Bool(ly.obj, "visible", true) do continue
+		o := layer_origin_of(j)
+		for ent in e.LdtkJson_Arr(ly.obj, "entityInstances") {
+			base := e.Ldtk_ParseHexColor(e.LdtkJson_Str(ent, "__smartColor", "#FFFFFF"))
+			r := e.Ldtk_Doc_EntityRect(ent)
+			top := to_screen(o + {f32(r[0]) + f32(r[2]) * 0.5, f32(r[1])})
+			bottom := to_screen(o + {f32(r[0]) + f32(r[2]) * 0.5, f32(r[1] + r[3])})
+			mid := (top + bottom) * 0.5
+			above, below, centre: f32
+			ed := e.Ldtk_Doc_EntityDef(doc, e.LdtkJson_Int(ent, "defUid", -1))
+			if ed != nil && e.LdtkJson_Bool(ed.obj, "showName", true) && L.zoom >= 1 {
+				label(dl, {top.x, top.y - h - 1}, e.LdtkJson_Str(ent, "__identifier"), base, false)
+				above += h + 1
+			}
+			for ln in lines(shown_fields(e.LdtkJson_Arr(ent, "fieldInstances"), ent, base), ent) {
+				switch ln.pos {
+				case "Beneath":
+					label(dl, {bottom.x, bottom.y + 1 + below}, ln.text, ln.col, ln.err)
+					below += h + 1
+				case "Center":
+					label(dl, {mid.x, mid.y - h * 0.5 + centre}, ln.text, ln.col, ln.err)
+					centre += h + 1
+				case:
+					above += h + 1
+					label(dl, {top.x, top.y - above}, ln.text, ln.col, ln.err)
+				}
+			}
+		}
+	}
+	// the level's own fields, under its name
+	p := e.Ldtk_Doc_LevelPos(doc, L.level)
+	sp := to_screen({f32(p.x), f32(p.y)})
+	y := sp.y + 2
+	for ln in lines(shown_fields(e.LdtkJson_Arr(lv.obj, "fieldInstances"), nil, {200, 200, 200, 255}), nil) {
+		w := imgui.CalcTextSize(fmt.ctprintf("%s", ln.text)).x
+		label(dl, {sp.x + 6 + w * 0.5, y}, ln.text, ln.col, ln.err)
+		y += h + 1
 	}
 }

@@ -1,0 +1,67 @@
+# Level editor fields: an enum value on a Door, a Button's array of entity
+# references picked in the canvas (the arrow shows), a Point field added in
+# the Entities tab and picked as a cell, undo, Esc cancels picking.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/levels_zz
+wait 90
+click @root.level
+wait 3
+click @level.open:levels_zz/topdown.ldtk
+wait 5
+click @level.zoom
+click @pick:100%
+wait 2
+click @level.layer:Entities
+click @level.entity:Door
+click @level.origin+376,120
+wait 2
+expect level.selected == Door
+click @level.field:lockedWith
+wait 1
+click @pick:KeyA
+wait 2
+expect level.fieldvalue:lockedWith == KeyA
+click @level.entity:Button
+click @level.origin+344,56
+wait 2
+expect level.selected == Button
+# the targets array: + starts picking, click the Door
+click @level.field.add:targets
+wait 1
+expect level.picking == true
+screenshot picking
+click @level.origin+376,120
+wait 2
+expect level.picking == false
+expect level.fieldvalue:targets == Door
+screenshot reference_arrow
+# a Point field on the Door (Entities tab), picked as a cell
+click @level.tab:Entities
+click @defs.entity:Door
+wait 2
+click @defs.field.type
+click @pick:Point
+click @defs.field.add
+wait 2
+key v
+click @level.origin+376,120
+wait 2
+expect level.selected == Door
+click @level.field.pick:point:0
+wait 1
+click @level.origin+408,136
+wait 2
+expect level.fieldvalue:point == 25,8
+key cmd+z
+wait 2
+key v
+click @level.origin+376,120
+wait 2
+expect level.fieldvalue:point == 
+# Esc cancels picking
+click @level.field.pick:point:0
+expect level.picking == true
+key escape
+expect level.picking == false
+key cmd+s
+wait 3
+expect file:levels_zz/topdown.ldtk contains "__identifier": "lockedWith", "__type": "LocalEnum.Item", "__value": "KeyA", "__tile": null

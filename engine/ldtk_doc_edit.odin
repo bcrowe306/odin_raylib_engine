@@ -182,73 +182,10 @@ ldtk_wrap :: proc(id: string, v: ^LdtkJson, a: mem.Allocator) -> ^LdtkJson {
 // "cx,cy" points; "" (or "null") clears nullable fields. Returns false when
 // the text does not fit the type.
 Ldtk_Doc_SetFieldValue :: proc(doc: ^Ldtk_Doc, fi: ^LdtkJson, text: string) -> bool {
-	a := doc.allocator
 	fd := Ldtk_Doc_FieldDef(doc, LdtkJson_Int(fi, "defUid", -1))
 	if fd == nil || LdtkJson_Bool(fd, "isArray") do return false
-	kind := Ldtk_FieldKindOf(fd)
-	t := strings.trim_space(text)
-	isNull := (t == "" || t == "null") && kind != .String && kind != .Text
-	if isNull {
-		if !LdtkJson_Bool(fd, "canBeNull") && kind != .Point && kind != .Path && kind != .EntityRef && kind != .Tile && kind != .Enum do return false
-		LdtkJson_Set(fi, "__value", jnull(a), a)
-		LdtkJson_Set(fi, "realEditorValues", jarr(a, jnull(a)), a)
-		Ldtk_Doc_Touch(doc)
-		return true
-	}
-	value, real: ^LdtkJson
-	switch kind {
-	case .Int:
-		v, ok := strconv.parse_f64(t)
-		if !ok do return false
-		v = math.round(v)
-		if mn := LdtkJson_Get(fd, "min"); mn != nil && mn.kind == .Number do v = max(v, mn.num)
-		if mx := LdtkJson_Get(fd, "max"); mx != nil && mx.kind == .Number do v = min(v, mx.num)
-		value = LdtkJson_NewFloat(v, a)
-		real = ldtk_wrap("V_Int", LdtkJson_NewFloat(v, a), a)
-	case .Float:
-		v, ok := strconv.parse_f64(t)
-		if !ok do return false
-		if mn := LdtkJson_Get(fd, "min"); mn != nil && mn.kind == .Number do v = max(v, mn.num)
-		if mx := LdtkJson_Get(fd, "max"); mx != nil && mx.kind == .Number do v = min(v, mx.num)
-		value = LdtkJson_NewFloat(v, a)
-		real = ldtk_wrap("V_Float", LdtkJson_NewFloat(v, a), a)
-	case .Bool:
-		b := t == "true" || t == "1"
-		if !b && t != "false" && t != "0" do return false
-		value = LdtkJson_NewBool(b, a)
-		real = ldtk_wrap("V_Bool", LdtkJson_NewBool(b, a), a)
-	case .String, .Text, .Path:
-		value = jstr(text, a)
-		real = ldtk_wrap("V_String", jstr(text, a), a)
-	case .Color:
-		c := Ldtk_ParseHexColor(t, {0, 0, 0, 0})
-		if c.a == 0 do return false
-		value = jstr(Ldtk_ColorHex(c), a)
-		real = ldtk_wrap("V_Int", jint(int(c.r) << 16 | int(c.g) << 8 | int(c.b), a), a)
-	case .Enum:
-		ed := Ldtk_Doc_EnumDef(doc, Ldtk_FieldEnumUid(fd))
-		found := false
-		for v in LdtkJson_Arr(ed, "values") do if LdtkJson_Str(v, "id") == t do found = true
-		if !found do return false
-		value = jstr(t, a)
-		real = ldtk_wrap("V_String", jstr(t, a), a)
-	case .Point:
-		parts := strings.split(t, ",", context.temp_allocator)
-		if len(parts) != 2 do return false
-		x, ok1 := strconv.parse_int(strings.trim_space(parts[0]))
-		y, ok2 := strconv.parse_int(strings.trim_space(parts[1]))
-		if !ok1 || !ok2 do return false
-		value = LdtkJson_New(.Object, a)
-		jadd(value, "cx", jint(x, a), a)
-		jadd(value, "cy", jint(y, a), a)
-		real = ldtk_wrap("V_String", jstr(fmt.tprintf("%d,%d", x, y), a), a)
-	case .EntityRef, .Tile, .Other:
-		return false
-	}
-	LdtkJson_Set(fi, "__value", value, a)
-	LdtkJson_Set(fi, "realEditorValues", jarr(a, real), a)
-	Ldtk_Doc_Touch(doc)
-	return true
+	t := strings.trim_space(text) == "null" ? "" : text
+	return Ldtk_Doc_SetFieldRaw(doc, fi, 0, t)
 }
 
 // Ldtk_FieldText: a field instance's value as text (for editing).

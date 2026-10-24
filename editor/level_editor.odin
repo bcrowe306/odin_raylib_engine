@@ -217,6 +217,7 @@ LevelEditor_Open :: proc(state: ^EditorState, rel: string) -> bool {
 @(private = "file")
 level_close_doc :: proc() {
 	L := &GlobalLevel
+	LevelFields_CancelPick()
 	for _, t in L.textures do rl.UnloadTexture(t)
 	clear(&L.textures)
 	L.texDefsRev = 0
@@ -1446,7 +1447,7 @@ level_tab_level :: proc(state: ^EditorState) {
 	defer imgui.EndChild()
 	fields := e.LdtkJson_Arr(lv.obj, "fieldInstances")
 	if len(fields) > 0 && UI_SectionHeader("Level fields") {
-		level_fields_editor(state, fields, lv.extRoot != nil ? e.LdtkJson_Arr(lv.extRoot, "fieldInstances") : nil)
+		LevelFields_Editor(state, fields, lv.extRoot != nil ? e.LdtkJson_Arr(lv.extRoot, "fieldInstances") : nil, nil, -1)
 	}
 	if UI_SectionHeader("Project", false) {
 		UI_DimText(fmt.tprintf("%s", L.rel))
@@ -1456,81 +1457,6 @@ level_tab_level :: proc(state: ^EditorState) {
 		imgui.SameLine()
 		if UI_Button(fmt.tprintf("%s  Close", ICON_FA_FOLDER_OPEN), "level.close") do LevelEditor_Close(state)
 	}
-}
-
-// level_fields_editor edits field instances (`mirror`: the same fields in
-// an external level file, kept equal).
-@(private = "file")
-level_fields_editor :: proc(state: ^EditorState, fields: []^e.LdtkJson, mirror: []^e.LdtkJson) {
-	L := &GlobalLevel
-	doc := L.doc
-	if !UI_BeginProps("##fields") do return
-	defer UI_EndProps()
-	for fi, i in fields {
-		fd := e.Ldtk_Doc_FieldDef(doc, e.LdtkJson_Int(fi, "defUid", -1))
-		if fd == nil do continue
-		name := e.LdtkJson_Str(fi, "__identifier")
-		UI_PropLabel(name)
-		imgui.PushIDInt(i32(i))
-		kind := e.Ldtk_FieldKindOf(fd)
-		cur := e.Ldtk_FieldText(fi)
-		set :: proc(state: ^EditorState, fi: ^e.LdtkJson, mirror: []^e.LdtkJson, i: int, text: string, live := false) {
-			L := &GlobalLevel
-			if live do e.Ldtk_Doc_CheckpointOnce(L.doc, L.level, "Edit Field", fi)
-			else do e.Ldtk_Doc_Checkpoint(L.doc, L.level, "Edit Field")
-			if !e.Ldtk_Doc_SetFieldValue(L.doc, fi, text) {
-				Editor_Log(state, .Warn, "\"%s\" does not fit field %s", text, e.LdtkJson_Str(fi, "__identifier"))
-				return
-			}
-			if i < len(mirror) {
-				e.LdtkJson_Set(mirror[i], "__value", e.LdtkJson_Clone(e.LdtkJson_Get(fi, "__value"), L.doc.allocator), L.doc.allocator)
-				e.LdtkJson_Set(mirror[i], "realEditorValues", e.LdtkJson_Clone(e.LdtkJson_Get(fi, "realEditorValues"), L.doc.allocator), L.doc.allocator)
-			}
-			L.doc.levels[L.level].dirty = true
-		}
-		if e.LdtkJson_Bool(fd, "isArray") {
-			UI_DimText(cur)
-			UI_Tooltip("Array fields are edited in LDtk")
-		} else {
-			switch kind {
-			case .Bool:
-				b := cur == "true"
-				if imgui.Checkbox("##f", &b) do set(state, fi, mirror, i, b ? "true" : "false")
-			case .Int, .Float:
-				v: f64
-				v, _ = strconv_f64(cur)
-				if imgui.InputDouble("##f", &v, 0, 0, kind == .Int ? "%.0f" : "%.3f", {.EnterReturnsTrue}) do set(state, fi, mirror, i, fmt.tprintf("%v", v))
-			case .Color:
-				c := e.Ldtk_ParseHexColor(cur)
-				col := [3]f32{f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255}
-				if imgui.ColorEdit3("##f", &col, {.NoInputs}) do set(state, fi, mirror, i, e.Ldtk_ColorHex({u8(col[0] * 255 + 0.5), u8(col[1] * 255 + 0.5), u8(col[2] * 255 + 0.5), 255}), true)
-			case .Enum:
-				ed := e.Ldtk_Doc_EnumDef(doc, e.Ldtk_FieldEnumUid(fd))
-				if imgui.BeginCombo("##f", fmt.ctprintf("%s", cur == "" ? "-" : cur)) {
-					if e.LdtkJson_Bool(fd, "canBeNull") && imgui.Selectable("-", cur == "") do set(state, fi, mirror, i, "")
-					for v in e.LdtkJson_Arr(ed, "values") {
-						id := e.LdtkJson_Str(v, "id")
-						if imgui.Selectable(fmt.ctprintf("%s", id), id == cur) do set(state, fi, mirror, i, id)
-						Drive_Item(fmt.tprintf("pick:%s", id))
-					}
-					imgui.EndCombo()
-				}
-			case .String, .Text, .Path, .Point:
-				buf: [512]u8
-				copy(buf[:len(buf) - 1], cur)
-				if imgui.InputText("##f", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) do set(state, fi, mirror, i, string(cstring(raw_data(buf[:]))))
-			case .EntityRef, .Tile, .Other:
-				UI_DimText(cur == "" ? "-" : cur)
-			}
-		}
-		Drive_Item(fmt.tprintf("level.field:%s", name))
-		imgui.PopID()
-	}
-}
-
-@(private = "file")
-strconv_f64 :: proc(s: string) -> (f64, bool) {
-	return strconv.parse_f64(strings.trim_space(s))
 }
 
 @(private = "file")
@@ -1599,7 +1525,7 @@ level_entity_inspector :: proc(state: ^EditorState) {
 	imgui.SameLine(0, 16)
 	if imgui.BeginChild("##ent_right", {0, avail.y}, {}, {}) {
 		fields := e.LdtkJson_Arr(ent, "fieldInstances")
-		if len(fields) > 0 && UI_SectionHeader("Fields") do level_fields_editor(state, fields, nil)
+		if len(fields) > 0 && UI_SectionHeader("Fields") do LevelFields_Editor(state, fields, nil, ent, L.selEntityLayer)
 		else if len(fields) == 0 do UI_DimText("No fields (add some in the Entities tab).")
 	}
 	imgui.EndChild()
@@ -1669,6 +1595,7 @@ LevelEditor_Toolbar :: proc(state: ^EditorState, width: f32, play: proc(state: ^
 
 level_undo :: proc(state: ^EditorState) {
 	L := &GlobalLevel
+	LevelFields_CancelPick()
 	if L.doc == nil || !e.Ldtk_Doc_Undo(L.doc) do return
 	level_clear_selection()
 	level_fix_indices()
@@ -1676,6 +1603,7 @@ level_undo :: proc(state: ^EditorState) {
 
 level_redo :: proc(state: ^EditorState) {
 	L := &GlobalLevel
+	LevelFields_CancelPick()
 	if L.doc == nil || !e.Ldtk_Doc_Redo(L.doc) do return
 	level_clear_selection()
 	level_fix_indices()
@@ -1799,7 +1727,8 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 		}
 		return true
 	case imgui.IsKeyPressed(.Escape, false):
-		level_clear_selection()
+		if LevelFields_PickActive() do LevelFields_CancelPick()
+		else do level_clear_selection()
 		return true
 	case !e.Ldtk_Selection_Empty(&L.sel) && (imgui.IsKeyPressed(.LeftArrow, true) || imgui.IsKeyPressed(.RightArrow, true) || imgui.IsKeyPressed(.UpArrow, true) || imgui.IsKeyPressed(.DownArrow, true)):
 		// move the selection by one cell of the active layer
@@ -1905,6 +1834,29 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		for d in doc.layerDefs do for g in d.groups do n += len(g.rules)
 		return fmt.tprint(n), true
 	}
+	// level.fieldvalue:<name> -> the selected entity's (else the level's) field values
+	if strings.has_prefix(q, "level.fieldvalue:") {
+		name := q[len("level.fieldvalue:"):]
+		fields := L.selEntity != nil ? e.LdtkJson_Arr(L.selEntity, "fieldInstances") : e.LdtkJson_Arr(doc.levels[L.level].obj, "fieldInstances")
+		for fi in fields {
+			if e.LdtkJson_Str(fi, "__identifier") != name do continue
+			b := strings.builder_make(context.temp_allocator)
+			fd := e.Ldtk_Doc_FieldDef(doc, e.LdtkJson_Int(fi, "defUid", -1))
+			for i in 0 ..< e.Ldtk_Doc_FieldArrayLen(doc, fi) {
+				t, isNull := e.Ldtk_Doc_FieldText(doc, fi, i)
+				if isNull do continue
+				if fd != nil && e.Ldtk_FieldKindOf(fd) == .EntityRef {
+					if _, _, target, ok := e.Ldtk_Doc_FindEntity(doc, t); ok do t = e.LdtkJson_Str(target, "__identifier")
+				}
+				if strings.builder_len(b) > 0 do strings.write_byte(&b, ';')
+				strings.write_string(&b, t)
+			}
+			return strings.to_string(b), true
+		}
+		return "<no field>", true
+	}
+	case_pick := q == "level.picking"
+	if case_pick do return LevelFields_PickActive() ? "true" : "false", true
 	// level.cell:cx,cy -> IntGrid value of the active layer
 	// level.tile:cx,cy -> tile ids at the cell of the active layer
 	if strings.has_prefix(q, "level.cell:") || strings.has_prefix(q, "level.tile:") {

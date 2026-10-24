@@ -609,3 +609,91 @@ test_ldtk_doc_tile_stacking_saved_selections_override :: proc(t: ^testing.T) {
 	testing.expect(t, LdtkJson_IsNull(ly.obj, "overrideTilesetUid"))
 	testing.expect_value(t, Ldtk_Doc_TilesAt(ly, 1, 1)[0].src, [2]i32{48, 0})
 }
+
+@(test)
+test_ldtk_doc_field_values_arrays_refs :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_fields.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	a := doc.allocator
+	ents := -1
+	for &ly, j in doc.levels[0].layers do if Ldtk_Doc_LayerDef(doc, &ly).type == .Entities do ents = j
+	door := Ldtk_Doc_AddEntityDef(doc, "Door")
+	hp := Ldtk_Doc_AddFieldDef(doc, door, "F_Int", "hp")
+	name := Ldtk_Doc_AddFieldDef(doc, door, "F_String", "code")
+	links := Ldtk_Doc_AddFieldDef(doc, door, "F_EntityRef", "links")
+	path := Ldtk_Doc_AddFieldDef(doc, door, "F_Point", "path")
+	col := Ldtk_Doc_AddFieldDef(doc, door, "F_Color", "tint")
+	file := Ldtk_Doc_AddFieldDef(doc, door, "F_Path", "sound")
+	icon := Ldtk_Doc_AddFieldDef(doc, door, "F_Tile", "icon")
+	fdOf :: proc(doc: ^Ldtk_Doc, uid: int) -> ^LdtkJson {return Ldtk_Doc_FieldDef(doc, uid)}
+	// hp: default 10, min 0 max 50
+	testing.expect(t, Ldtk_Doc_FieldDefDefaultSet(doc, fdOf(doc, hp), "10"))
+	LdtkJson_SetInt(fdOf(doc, hp), "max", 50, a)
+	// code: regex /^[A-Z]{3}$/
+	LdtkJson_SetStr(fdOf(doc, name), "regex", "/^[A-Z]{3}$/", a)
+	// links: an array, symmetrical, any entity
+	LdtkJson_SetBool(fdOf(doc, links), "isArray", true, a)
+	LdtkJson_SetBool(fdOf(doc, links), "symmetricalRef", true, a)
+	LdtkJson_SetStr(fdOf(doc, links), "allowedRefs", "Any", a)
+	// path: array of points
+	LdtkJson_SetBool(fdOf(doc, path), "isArray", true, a)
+	// tint: the smart colour
+	LdtkJson_SetBool(fdOf(doc, col), "useForSmartColor", true, a)
+	// sound: .ogg / .wav only
+	exts := LdtkJson_New(.Array, a)
+	append(&exts.items, LdtkJson_NewString("ogg", a), LdtkJson_NewString(".wav", a))
+	LdtkJson_Set(fdOf(doc, file), "acceptFileTypes", exts, a)
+	LdtkJson_SetInt(fdOf(doc, icon), "tilesetUid", 7, a)
+	LdtkJson_SetStr(fdOf(doc, icon), "editorDisplayMode", "EntityTile", a)
+	Ldtk_Doc_RefreshDefs(doc)
+	d1 := Ldtk_Doc_AddEntity(doc, 0, ents, door, {16, 16})
+	d2 := Ldtk_Doc_AddEntity(doc, 0, ents, door, {64, 16})
+	fi :: proc(ent: ^LdtkJson, uid: int) -> ^LdtkJson {
+		for f in LdtkJson_Arr(ent, "fieldInstances") do if LdtkJson_Int(f, "defUid", -1) == uid do return f
+		return nil
+	}
+	v, null := Ldtk_Doc_FieldText(doc, fi(d1, hp), 0)
+	testing.expect(t, !null && v == "10")
+	testing.expect(t, Ldtk_Doc_SetFieldRaw(doc, fi(d1, hp), 0, "99"))
+	v, _ = Ldtk_Doc_FieldText(doc, fi(d1, hp), 0)
+	testing.expect_value(t, v, "50")
+	testing.expect(t, Ldtk_Doc_SetFieldRaw(doc, fi(d1, hp), 0, "", true)) // back to the default
+	v, _ = Ldtk_Doc_FieldText(doc, fi(d1, hp), 0)
+	testing.expect_value(t, v, "10")
+	testing.expect(t, !Ldtk_Doc_SetFieldRaw(doc, fi(d1, name), 0, "ab1"))
+	testing.expect(t, Ldtk_Doc_SetFieldRaw(doc, fi(d1, name), 0, "ABC"))
+	testing.expect(t, !Ldtk_Doc_SetFieldRaw(doc, fi(d1, file), 0, "sfx/door.mp3"))
+	testing.expect(t, Ldtk_Doc_SetFieldRaw(doc, fi(d1, file), 0, "sfx/door.WAV"))
+	// points: a path of two
+	p0 := Ldtk_Doc_FieldArrayAdd(doc, fi(d1, path))
+	p1 := Ldtk_Doc_FieldArrayAdd(doc, fi(d1, path))
+	Ldtk_Doc_SetFieldRaw(doc, fi(d1, path), p0, "3,4")
+	Ldtk_Doc_SetFieldRaw(doc, fi(d1, path), p1, "5,4")
+	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(fi(d1, path), "__value"), .Minified, context.temp_allocator), `[{"cx":3,"cy":4},{"cx":5,"cy":4}]`)
+	testing.expect(t, Ldtk_Doc_FieldArrayMove(doc, fi(d1, path), 1, -1))
+	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(fi(d1, path), "__value"), .Minified, context.temp_allocator), `[{"cx":5,"cy":4},{"cx":3,"cy":4}]`)
+	// a symmetrical reference: d1 -> d2 makes d2 -> d1
+	r0 := Ldtk_Doc_FieldArrayAdd(doc, fi(d1, links))
+	testing.expect(t, Ldtk_Doc_SetFieldRef(doc, fi(d1, links), r0, d1, LdtkJson_Str(d2, "iid")))
+	back, _ := Ldtk_Doc_FieldText(doc, fi(d2, links), 0)
+	testing.expect_value(t, back, LdtkJson_Str(d1, "iid"))
+	rv := LdtkJson_Arr(fi(d1, links), "__value")
+	testing.expect_value(t, len(rv), 1)
+	testing.expect_value(t, LdtkJson_Str(rv[0], "levelIid"), LdtkJson_Str(doc.levels[0].obj, "iid"))
+	// clearing it removes the way back
+	testing.expect(t, Ldtk_Doc_SetFieldRef(doc, fi(d1, links), r0, d1, ""))
+	testing.expect_value(t, Ldtk_Doc_FieldArrayLen(doc, fi(d2, links)), 0)
+	ok1, _ := Ldtk_Doc_RefAllowed(doc, fdOf(doc, links), d1, 0, d1, 0)
+	testing.expect(t, !ok1)
+	// tile and smart colour
+	testing.expect(t, Ldtk_Doc_SetFieldRaw(doc, fi(d1, icon), 0, "16,0,16,16"))
+	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(fi(d1, icon), "__value"), .Minified, context.temp_allocator), `{"tilesetUid":7,"x":16,"y":0,"w":16,"h":16}`)
+	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(fi(d1, icon), "__tile"), .Minified, context.temp_allocator), `{"tilesetUid":7,"x":16,"y":0,"w":16,"h":16}`)
+	testing.expect(t, Ldtk_Doc_SetFieldRaw(doc, fi(d1, col), 0, "#FF8000"))
+	Ldtk_Doc_EntitySmart(doc, d1)
+	testing.expect_value(t, LdtkJson_Int(LdtkJson_Get(d1, "__tile"), "x"), 16) // the field's tile is the entity's
+	testing.expect_value(t, LdtkJson_Str(d1, "__smartColor"), "#FF8000")
+	testing.expect_value(t, LdtkJson_ToString(LdtkJson_Get(fi(d1, col), "realEditorValues"), .Minified, context.temp_allocator), `[{"id":"V_Int","params":[16744448]}]`)
+}
