@@ -122,6 +122,44 @@ Docs in place
 - [x] 10.3 Live debugging: current state + fired transition (Simulate and Play), history, break on enter
 - [x] 10.4 Lua / docs polish: generated types, drives, README
 
+## Roadmap — 2D engine gaps (2026-10-24)
+
+Numbers are the user's (referenced in comments).
+
+Decisions (2026-10-24): 3 saves **.ldtk** directly (round-trips with the LDtk app; extras in LDtk custom fields). 24 = virtual cameras + host (many AdvancedCamera nodes with priorities; CameraNode hosts and blends) and must work with LDtk level / room linking (neighbours, room limits). 7 = own runtime + DragonBones / Spine importers + light editing (a rig editor may come later). 5: install emscripten with Homebrew; shipping the editor needs a way to bundle it (note for release packaging). A: buses route to master (or another bus); effects per bus.
+
+Every feature: works with the rest of the engine and the editor (integration); memory layout / cache misses / rendering cost / parallelism considered (performance); leak and use-after-free checked, arenas where lifetimes are shared (safety); documented for the engine API and the editor, with examples / tutorials (docs). Tests + drives per feature.
+
+Missing (all):
+- [ ] 1 Pathfinding / navigation: A* on tile grids, navigation regions (polygons), a navigation agent node (path following, steering), obstacle avoidance
+- [ ] 2 Y-sort / depth sorting (top-down, isometric)
+- [ ] 3 Level editor (root app tabs: **Game** = today's editor, **Level** = a level-editing mode): our own interface on the LDtk file format, re-implementing LDtk's features (reference: `ldtk/` sources) - worlds, levels, layers (IntGrid, Entities, Tiles, Auto-layers with rules), tilesets, enums, entity fields, autotiling / terrains, animated tiles, per-tile data
+- [ ] 4 Path / curve node (Bézier, edited in the viewport) + path follower (moving platforms, routes, rails, camera tracks)
+- [ ] 5 Web export (emscripten - bundle it with a shipped editor: raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio) (was 3.4)
+- [ ] 6 Visibility notifier: on_screen_entered / exited, auto-disable off-screen
+
+Common:
+- [ ] A Audio mixer (bottom tab, laid out like a DAW console): user buses that sound / music nodes are assigned to, a master channel at the far right, buses to its left; each bus: volume, mute, pan (solo), effects chain; meters
+- [ ] 7 Skeletal / cutout animation: bones, mesh deformation, IK; DragonBones and Spine file compatibility
+- [ ] 8 Object pooling for scripts (with usage examples / a tutorial)
+- [ ] 9 Pixel-perfect rendering: integer scaling, pixel-snapped camera / sub-pixel smoothing
+- [ ] 10 Sprite atlas packing on export
+- [ ] 11 Input rebinding (player-facing flow, saved bindings, gamepad menu navigation)
+- [ ] 12 Scene transitions: change-scene API with transitions, loading screen, async preloading
+
+Editor:
+- [ ] 13 (later - to be designed) Editor extensions / plugins in Lua
+- [ ] 14 Live remote scene tree in Play (inspect / edit the running game's nodes)
+- [ ] 15 Multiple open scenes as tabs
+- [ ] 16 Animation editor depth: onion skin, per-key curves / easing, animation events calling script methods
+- [ ] 17 Per-asset import settings (filter, compression, slicing presets next to the asset)
+
+Platform and shipping (later): 18 mobile export + touch, 19 Steam, 20 gamepad rumble / multiple controllers / glyphs, 21 networking, 22 crash reports.
+
+Quality of life:
+- [ ] 23 Accessibility: UI scaling, colourblind filters, remappable controls, subtitles from dialogue
+- [ ] 24 Advanced camera node (the basic CameraNode stays): Phantom Camera features (reference: `phantom-camera/`) - follow modes, dead zones, look-ahead, limits, framing groups, priorities / blending, paths - plus trauma-based shake / juice (https://github.com/filipbasara/trauma-gd)
+
 ## Phase 11 — State transition guards (2026-10-23)
 
 Arrows allow a change (their conditions: when it goes by itself); states can refuse. Chosen: full guards, sm_travel stays forced + sm_request, a per-state "Any state interrupts" toggle, blocked attempts shown live only (not in the history).
