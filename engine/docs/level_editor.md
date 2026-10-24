@@ -16,7 +16,7 @@ What it edits, the way LDtk does:
 | **Auto layers** | LDtk's rule engine: rule groups (optional ones per level, biomes), patterns up to 9x9, random tiles, stamps, flips, chance, Perlin, modulo / checker, offsets, break on match, "killed by" layers. The tiles are the ones LDtk would generate. |
 | **Tiles layers** | stamps of one or more tiles picked in the tileset, X / Y flips, stacking |
 | **Entities** | place, move, resize, delete; field values (Int, Float, Bool, String, Multilines, Color, Enum, Point, FilePath) |
-| **Definitions** | layers (order, grid, opacity, offset, tileset, auto source), IntGrid values, entities (size, colour, pivot, resizing, tile, fields), enums, tilesets, level fields |
+| **Definitions** (bottom tabs) | layers (order, grid, opacity, offset, tileset, auto source), IntGrid values, entities (size, colour, pivot, resizing, tile, fields), enums, tilesets, level fields |
 | **Terrains** | rules for a 3x3 terrain block from one click |
 | **Per-tile data** | custom data text, enum tags, **animated tiles** |
 
@@ -36,27 +36,46 @@ The engine side is `engine/ldtk_doc*.odin` (see [Engine API](#engine-api)).
 
 ```
  toolbar:  file | Brush Rect Erase Fill Pick Select MoveLevels | Undo Redo |  Play  | grid  IntGrid  fit  zoom  Save
- Levels    |                                            | Level Inspector
- Layers    |                canvas                      |  (level, or the
- + palette |                                            |   selected entity)
+ ┌──────────┬───────────────────────────────────────┬────────────┐
+ │ Levels   │               canvas                  │ Layers     │
+ │          │                                       │            │
+ │          ├───────────────────────────────────────┤ palette of │
+ │          │ World Level Tilesets Entities Enums   │ the active │
+ │          │ Layers Rules Project   (bottom panel) │ layer      │
+ └──────────┴───────────────────────────────────────┴────────────┘
 ```
 
-- **Levels**: the active world's levels (a combo picks the world in
+The panels dock like the Game tab's: drag their edges to resize them,
+drag a panel's tab to move it.
+
+- **Levels** (left): the active world's levels (a combo picks the world in
   multi-world projects); **+** adds a level next to the active one (in a
   free spot), the bin deletes it. Double-click frames a level.
-- **Layers**: the active level's layers, top first. The eye hides a layer
-  (that is LDtk's per-level visibility, saved). Under the list: the palette
-  of the active layer - IntGrid values, the tileset, entities, or the rule
-  groups of an auto layer (optional groups have a check box per level;
-  **Re-run rules** regenerates the level's auto tiles). The sliders button
-  opens **Definitions**.
+- **Layers** (right): the active level's layers, top first, as
+  *Type: Name*. Drag a layer by its grip to put it in another order (in
+  every level); the eye hides it (LDtk's per-level visibility, saved).
+  **+** opens **New Layer** (type, identifier, grid size, tileset, the
+  IntGrid layer an auto layer reads); the sliders button opens the Layers
+  tab. Under the list: the palette of the active layer - IntGrid values,
+  the tileset, entities, or the rule groups of an auto layer (optional
+  groups have a check box per level; **Re-run rules** regenerates the
+  level's auto tiles).
 - **Canvas**: the active world, the active level on top and the others
   dimmed. Click another level to make it active. Middle drag or
   Space + drag pans, the wheel zooms around the mouse. The bottom line shows
   the cell and IntGrid value under the mouse.
-- **Level Inspector**: the level's identifier, position, size (Enter
-  applies), depth, background and level fields; with an entity selected, its
-  position, size, iid and fields.
+- **Bottom panel**:
+  - **World**: the layout (Free, GridVania, linear), the world grid, and a
+    map of the levels (click one to open it).
+  - **Level**: the level's identifier, position, size (Enter applies),
+    depth, background and fields; with an entity selected (it switches to
+    this tab), the entity's position, size, iid and fields.
+  - **Tilesets**, **Entities**, **Enums**: those definitions (tilesets also
+    have per-tile custom data, animations and enum tags).
+  - **Layers**: each layer's settings and IntGrid values.
+  - **Rules**: the auto-layer rules of IntGrid and Auto layers, terrains.
+  - **Project**: defaults (grid, new level / entity size), background
+    colours, level name pattern, JSON options, level fields.
 
 ### Tools and keys
 
@@ -79,14 +98,14 @@ Every stroke, move and edit is one undo step (100 steps).
 
 1. **Level** tab > **New LDtk Project...** > `levels/cave.ldtk` > Create.
 2. Copy a tileset image (16x16 tiles, e.g. a 3x3 wall block somewhere in
-   it) into the project. In the Layers panel click the sliders button
-   (**Definitions**) > **Tilesets** > *Add from a project image*.
-3. **Layers** page: select **Collisions** and set its **Tileset**. The
+   it) into the project. Bottom panel > **Tilesets** > *Add from a project
+   image*.
+3. **Layers** tab: select **Collisions** and set its **Tileset**. The
    Layers panel now shows the tileset under the values.
 4. In the Layers panel drag over the 3x3 wall block (corners, edges and the
-   middle), then in Definitions click **Terrain from picked 3x3 tiles**:
-   nine rules in a group "Terrain 1".
-5. Close Definitions, pick value **1 walls**, and paint: the walls draw
+   middle), then in the **Rules** tab click **Terrain from picked 3x3
+   tiles**: nine rules in a group "Terrain 1".
+5. Pick value **1 walls** and paint: the walls draw
    themselves - edges where the neighbours are empty, the middle inside.
    Erase with the right button and they follow.
 6. **Cmd+S**. Back in the **Game** tab, drop `levels/cave.ldtk` in the
@@ -95,14 +114,14 @@ Every stroke, move and edit is one undo step (100 steps).
 
 ## Tutorial: entities with fields
 
-1. Definitions > **Entities** > **Add entity**, call it `Chest`, size
+1. Bottom panel > **Entities** > **Add entity**, call it `Chest`, size
    16x16, a colour, pivot bottom-centre. **Use picked tile** takes the tile
    picked in a Tiles layer's palette as its picture.
 2. Under **Fields**: pick *Int* and **Add field** (`int`, rename it in LDtk
-   or keep it), then an *Enum* field after adding an enum (**Enums** page:
+   or keep it), then an *Enum* field after adding an enum (**Enums** tab:
    `Rarity` with `Common`, `Rare`).
 3. Select the **Entities** layer, pick **Chest** in the palette, click in
-   the level to place chests. **V** to move them; the Level Inspector edits
+   the level to place chests. **V** to move them; the **Level** tab edits
    the selected chest's fields.
 4. In the game, entity fields set script properties of the same name (see
    `engine/LDTK.md`, *Entities*).
@@ -111,7 +130,7 @@ Every stroke, move and edit is one undo step (100 steps).
 
 1. In a Tiles layer's palette, pick the frames of the water animation in
    order (drag over them: left to right, top to bottom).
-2. Definitions > **Tilesets** > your tileset: click the first frame in the
+2. Bottom panel > **Tilesets** > your tileset: click the first frame in the
    tile grid, then **Animate with picked tiles**; set **fps**.
 3. Paint the first frame (or let a rule place it): it animates in the
    canvas, in the Game tab's viewport and in the game.
@@ -129,8 +148,9 @@ custom data are yours (scripts read them with
 
 ## Auto-layer rules
 
-Definitions > Layers > an IntGrid layer with a tileset, or an Auto layer
-(pick the IntGrid layer its rules read under **Rules read**):
+Bottom panel > **Rules** > an IntGrid layer with a tileset, or an Auto layer
+(the **Layers** tab sets the tileset, and the IntGrid layer an auto layer's
+rules read under **Rules read**):
 
 - **+ Rule** in a group adds a 3x3 rule placing the picked tile where the
   centre has the picked value. In the pattern: left click requires the

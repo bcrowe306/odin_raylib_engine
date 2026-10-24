@@ -402,3 +402,24 @@ test_ldtk_doc_tile_data_animation_terrain :: proc(t: ^testing.T) {
 	testing.expect_value(t, at(gl, 3, 3), 5)
 	testing.expect_value(t, at(gl, 4, 4), 10)
 }
+
+@(test)
+test_ldtk_doc_world_layout :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_layout.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	Ldtk_Doc_AddLevel(doc, 0, {600, 40}, {128, 64})
+	// linear: computed from the order (48 px apart), -1 stored
+	Ldtk_Doc_SetWorldLayout(doc, 0, "LinearHorizontal")
+	testing.expect_value(t, LdtkJson_Int(doc.levels[1].obj, "worldX"), -1)
+	testing.expect_value(t, Ldtk_Doc_LevelPos(doc, 1), [2]int{256 + 48, 0})
+	testing.expect_value(t, len(LdtkJson_Arr(doc.levels[0].obj, "__neighbours")), 0)
+	// back to free: the computed positions are written
+	Ldtk_Doc_SetWorldLayout(doc, 0, "Free")
+	testing.expect_value(t, LdtkJson_Int(doc.levels[1].obj, "worldX"), 304)
+	// GridVania snaps to the world grid
+	Ldtk_Doc_SetWorldLayout(doc, 0, "GridVania")
+	testing.expect_value(t, Ldtk_Doc_LevelPos(doc, 1), [2]int{256, 0})
+	testing.expect_value(t, LdtkJson_Str(doc.root, "worldLayout"), "GridVania")
+}

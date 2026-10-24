@@ -8,32 +8,27 @@ import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
-// Level editor: project definitions (LDtk's "Project" panels)
+// Level editor: the bottom panel's pages (LDtk's "Project" panels)
 //
-//   Layers       add / remove / reorder, grid, opacity, offset, tileset,
-//                auto-layer source, IntGrid values; auto-layer rule groups
-//                and rules (pattern grid, tiles, chance, flips, modulo,
-//                break on match)
+//   World        layout (Free / GridVania / linear), world grid, a map of
+//                the levels (click to open one)
+//   Level        (level_editor.odin) the level's / selected entity's values
+//   Tilesets     from project images, grid / spacing / padding, per-tile
+//                custom data, animations and enum tags
 //   Entities     size, colour, pivot, resizing, tile, fields
 //   Enums        values
-//   Tilesets     from project images, grid / spacing / padding
-//   Level fields
+//   Layers       grid, opacity, offset, tileset, auto-layer source, order,
+//                IntGrid values (new layers: the Layers panel's + button)
+//   Rules        auto-layer rule groups and rules (pattern grid, tiles,
+//                chance, flips, modulo, break on match), terrains
+//   Project      defaults, background, JSON options, level fields
 //
 // Every change is a project undo step (Ldtk_Doc_Checkpoint(doc, -1, ...)).
 // ============================================================================
 
 @(private = "file")
-Defs_Page :: enum u8 {
-	Layers,
-	Entities,
-	Enums,
-	Tilesets,
-	Level_Fields,
-}
-
-@(private = "file")
 defs: struct {
-	page:      Defs_Page,
+	rulesLayerUid: int,
 	layerUid:  int,
 	entityUid: int,
 	enumUid:   int,
@@ -61,35 +56,18 @@ checkpoint :: proc(label: string) {
 	e.Ldtk_Doc_Checkpoint(GlobalLevel.doc, -1, label)
 }
 
-LevelDefs_Render :: proc(state: ^EditorState) {
-	L := &GlobalLevel
-	if !L.showDefs || L.doc == nil do return
-	imgui.SetNextWindowSize({760, 560}, .FirstUseEver)
-	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
-	imgui.SetNextWindowPos(center, .FirstUseEver, {0.5, 0.5})
-	defer imgui.End()
-	if !imgui.Begin("Definitions###LevelDefsWindow", &L.showDefs, {.NoCollapse}) do return
-	avail := imgui.GetContentRegionAvail()
-	if imgui.BeginChild("##defs_nav", {130, avail.y}, {}, {}) {
-		for p in Defs_Page {
-			name := fmt.tprintf("%v", p)
-			name, _ = strings.replace_all(name, "_", " ", context.temp_allocator)
-			if imgui.Selectable(fmt.ctprintf("%s##defsnav", name), defs.page == p, {}, {0, 24}) do defs.page = p
-			Drive_Item(fmt.tprintf("defs.page:%s", name))
-		}
+// LevelDefs_Page draws a bottom-panel page (all but Level).
+LevelDefs_Page :: proc(state: ^EditorState, page: Level_Panel_Tab) {
+	if GlobalLevel.doc == nil do return
+	#partial switch page {
+	case .World: page_world(state)
+	case .Tilesets: page_tilesets(state)
+	case .Entities: page_entities(state)
+	case .Enums: page_enums(state)
+	case .Layers: page_layers(state)
+	case .Rules: page_rules(state)
+	case .Project: page_project(state)
 	}
-	imgui.EndChild()
-	imgui.SameLine(0, 8)
-	if imgui.BeginChild("##defs_page", {0, avail.y}, {}, {}) {
-		switch defs.page {
-		case .Layers: page_layers(state)
-		case .Entities: page_entities(state)
-		case .Enums: page_enums(state)
-		case .Tilesets: page_tilesets(state)
-		case .Level_Fields: page_level_fields(state)
-		}
-	}
-	imgui.EndChild()
 }
 
 // ----------------------------------------------------------------------------
@@ -102,16 +80,7 @@ page_layers :: proc(state: ^EditorState) {
 	doc := L.doc
 	avail := imgui.GetContentRegionAvail()
 	if imgui.BeginChild("##layer_list", {200, avail.y}, {.Borders}, {}) {
-		for t in e.LdtkLayerType {
-			if UI_IconButton(LAYER_TYPE_ICON[t], fmt.tprintf("defs.addlayer:%v", t), fmt.tprintf("Add a %v layer", t), false, 26) {
-				checkpoint("Add Layer")
-				ts := len(doc.tilesets) > 0 && t != .Entities && t != .IntGrid ? doc.tilesets[0].uid : -1
-				defs.layerUid = e.Ldtk_Doc_AddLayerDef(doc, t, fmt.tprintf("%v", t), ts)
-				level_after_defs()
-			}
-			imgui.SameLine()
-		}
-		imgui.NewLine()
+		if UI_Button(fmt.tprintf("%s  New layer...", ICON_FA_PLUS), "defs.layer.new") do LevelDefs_OpenNewLayer()
 		imgui.Separator()
 		for &d in doc.layerDefs {
 			if imgui.Selectable(fmt.ctprintf("%s  %s##ld%d", LAYER_TYPE_ICON[d.type], d.identifier, d.uid), defs.layerUid == d.uid, {}, {0, 22}) do defs.layerUid = d.uid
@@ -274,9 +243,319 @@ layer_props :: proc(state: ^EditorState, di: int) {
 		}
 	}
 	d = &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, uid)]
-	if (d.type == .AutoLayer || d.type == .IntGrid) && UI_SectionHeader("Auto-layer rules") {
-		rules_editor(state, uid)
+	if d.type == .AutoLayer || d.type == .IntGrid {
+		imgui.Dummy({0, 4})
+		if UI_Button(fmt.tprintf("%s  Edit auto-layer rules (%d groups)", ICON_FA_WAND_MAGIC_SPARKLES, len(d.groups)), "defs.layer.rules") {
+			defs.rulesLayerUid = uid
+			LevelEditor_ShowTab(.Rules)
+		}
 	}
+}
+
+// ----------------------------------------------------------------------------
+// Rules page
+// ----------------------------------------------------------------------------
+
+@(private = "file")
+page_rules :: proc(state: ^EditorState) {
+	L := &GlobalLevel
+	doc := L.doc
+	// the active layer's rules by default
+	if e.Ldtk_Doc_LayerDefIndex(doc, defs.rulesLayerUid) < 0 {
+		if _, d := level_active_layer(); d != nil && (d.type == .IntGrid || d.type == .AutoLayer) do defs.rulesLayerUid = d.uid
+	}
+	avail := imgui.GetContentRegionAvail()
+	if imgui.BeginChild("##rules_layers", {200, avail.y}, {.Borders}, {}) {
+		UI_DimText("Layers with rules:")
+		for &d in doc.layerDefs {
+			if d.type != .IntGrid && d.type != .AutoLayer do continue
+			n := 0
+			for g in d.groups do n += len(g.rules)
+			if imgui.Selectable(fmt.ctprintf("%s  %s (%d)##rl%d", LAYER_TYPE_ICON[d.type], d.identifier, n, d.uid), defs.rulesLayerUid == d.uid, {}, {0, 22}) do defs.rulesLayerUid = d.uid
+			Drive_Item(fmt.tprintf("defs.rules.layer:%s", d.identifier))
+		}
+	}
+	imgui.EndChild()
+	imgui.SameLine(0, 8)
+	if imgui.BeginChild("##rules_page", {0, avail.y}, {}, {}) {
+		di := e.Ldtk_Doc_LayerDefIndex(doc, defs.rulesLayerUid)
+		if di < 0 {
+			UI_DimText("Pick an IntGrid layer (with a tileset) or an Auto layer.")
+		} else {
+			d := &doc.layerDefs[di]
+			UI_PanelTitle(LAYER_TYPE_ICON[d.type], d.identifier, "auto-layer rules")
+			rules_editor(state, d.uid)
+		}
+	}
+	imgui.EndChild()
+}
+
+// ----------------------------------------------------------------------------
+// New layer dialog (the Layers panel's + button)
+// ----------------------------------------------------------------------------
+
+@(private = "file")
+newLayer: struct {
+	open:      bool,
+	request:   bool,
+	type:      e.LdtkLayerType,
+	name:      [64]u8,
+	grid:      i32,
+	tileset:   int, // index + 1 in doc.tilesets, 0 = none
+	source:    int, // auto layers: IntGrid def uid
+}
+
+LevelDefs_OpenNewLayer :: proc() {
+	newLayer.request = true
+	newLayer.type = .IntGrid
+	newLayer.name = {}
+	copy(newLayer.name[:], "IntGrid")
+	newLayer.grid = i32(e.LdtkJson_Int(GlobalLevel.doc.root, "defaultGridSize", 16))
+	newLayer.tileset = 0
+	newLayer.source = -1
+}
+
+LevelDefs_NewLayerDialog :: proc(state: ^EditorState) {
+	L := &GlobalLevel
+	doc := L.doc
+	if doc == nil do return
+	if newLayer.request {
+		imgui.OpenPopup("New Layer###LevelNewLayer")
+		newLayer.request = false
+	}
+	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
+	imgui.SetNextWindowPos(center, .Appearing, {0.5, 0.5})
+	imgui.SetNextWindowSize({420, 0}, .Appearing)
+	if !imgui.BeginPopupModal("New Layer###LevelNewLayer", nil, {.AlwaysAutoResize}) do return
+	defer imgui.EndPopup()
+	if UI_BeginProps("##newlayer") {
+		defer UI_EndProps()
+		UI_PropLabel("Type")
+		names := []string{"IntGrid", "Entities", "Tiles", "AutoLayer"}
+		if t, changed := UI_Combo("defs.newlayer.type", int(newLayer.type), names); changed {
+			// the name follows the type while it is still a type name
+			cur := string(cstring(raw_data(newLayer.name[:])))
+			for n in names do if cur == n {
+				newLayer.name = {}
+				copy(newLayer.name[:len(newLayer.name) - 1], names[t])
+			}
+			newLayer.type = e.LdtkLayerType(t)
+		}
+		UI_PropLabel("Identifier")
+		imgui.InputText("##nl_name", cstring(raw_data(newLayer.name[:])), len(newLayer.name), {})
+		Drive_Item("defs.newlayer.name")
+		UI_PropLabel("Grid size")
+		imgui.InputInt("##nl_grid", &newLayer.grid, 1, 8)
+		newLayer.grid = max(newLayer.grid, 1)
+		if newLayer.type != .Entities {
+			UI_PropLabel("Tileset")
+			tn := make([]string, len(doc.tilesets) + 1, context.temp_allocator)
+			tn[0] = "(none)"
+			for ts, i in doc.tilesets do tn[i + 1] = ts.identifier
+			newLayer.tileset, _ = UI_Combo("defs.newlayer.tileset", clamp(newLayer.tileset, 0, len(tn) - 1), tn)
+		}
+		if newLayer.type == .AutoLayer {
+			UI_PropLabel("Rules read")
+			sn := make([dynamic]string, context.temp_allocator)
+			su := make([dynamic]int, context.temp_allocator)
+			append(&sn, "(none)")
+			append(&su, -1)
+			cur := 0
+			for &d in doc.layerDefs do if d.type == .IntGrid {
+				if d.uid == newLayer.source do cur = len(sn)
+				append(&sn, d.identifier)
+				append(&su, d.uid)
+			}
+			if pick, changed := UI_Combo("defs.newlayer.source", cur, sn[:]); changed do newLayer.source = su[pick]
+		}
+	}
+	if newLayer.type == .AutoLayer && (newLayer.tileset == 0 || newLayer.source < 0) do UI_DimText("Auto layers need a tileset and an IntGrid layer to read.")
+	if newLayer.type == .Tiles && newLayer.tileset == 0 do UI_DimText("Tiles layers paint a tileset's tiles: pick one (or add one in Tilesets).")
+	imgui.Dummy({0, 4})
+	if UI_PrimaryButton("Create", "defs.newlayer.create") {
+		checkpoint("Add Layer")
+		ts := newLayer.tileset > 0 && newLayer.tileset <= len(doc.tilesets) ? doc.tilesets[newLayer.tileset - 1].uid : -1
+		uid := e.Ldtk_Doc_AddLayerDef(doc, newLayer.type, string(cstring(raw_data(newLayer.name[:]))), ts)
+		d := &doc.layerDefs[e.Ldtk_Doc_LayerDefIndex(doc, uid)]
+		changed := false
+		if int(newLayer.grid) != d.gridSize {
+			e.LdtkJson_SetInt(d.obj, "gridSize", int(newLayer.grid), doc.allocator)
+			changed = true
+		}
+		if newLayer.type == .AutoLayer && newLayer.source >= 0 {
+			e.LdtkJson_SetInt(d.obj, "autoSourceLayerDefUid", newLayer.source, doc.allocator)
+			changed = true
+		}
+		if changed do e.Ldtk_Doc_LayerDefChanged(doc, uid)
+		defs.layerUid = uid
+		// the new layer becomes the active one
+		for &ly, i in doc.levels[L.level].layers {
+			if ld := e.Ldtk_Doc_LayerDef(doc, &ly); ld != nil && ld.uid == uid {
+				L.layer = i
+				L.layerUid = uid
+			}
+		}
+		level_after_defs()
+		imgui.CloseCurrentPopup()
+	}
+	imgui.SameLine()
+	if UI_Button("Cancel", "defs.newlayer.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+}
+
+// ----------------------------------------------------------------------------
+// World and Project pages
+// ----------------------------------------------------------------------------
+
+@(private = "file")
+page_world :: proc(state: ^EditorState) {
+	L := &GlobalLevel
+	doc := L.doc
+	a := doc.allocator
+	if len(doc.worlds) == 0 do return
+	w := doc.worlds[L.world].obj
+	avail := imgui.GetContentRegionAvail()
+	if imgui.BeginChild("##world_props", {320, avail.y}, {}, {}) {
+		UI_PanelTitle(ICON_FA_GLOBE, doc.multiWorlds ? e.LdtkJson_Str(w, "identifier", "World") : "World")
+		if UI_BeginProps("##world_t") {
+			defer UI_EndProps()
+			UI_PropLabel("Layout")
+			layout := e.LdtkJson_Str(w, "worldLayout", e.LdtkJson_Str(doc.root, "worldLayout", "Free"))
+			cur := 0
+			for n, i in e.LDTK_WORLD_LAYOUTS do if n == layout do cur = i
+			if pick, changed := UI_Combo("defs.world.layout", cur, e.LDTK_WORLD_LAYOUTS[:]); changed {
+				checkpoint("World Layout")
+				e.Ldtk_Doc_SetWorldLayout(doc, L.world, e.LDTK_WORLD_LAYOUTS[pick])
+			}
+			UI_Tooltip("Free: levels anywhere. GridVania: on a grid. Linear: in a row / column, in the level list's order.")
+			if layout == "GridVania" {
+				UI_PropLabel("World grid")
+				g := [2]i32{i32(e.LdtkJson_Int(w, "worldGridWidth", 256)), i32(e.LdtkJson_Int(w, "worldGridHeight", 256))}
+				if imgui.InputInt2("##wgrid", &g, {.EnterReturnsTrue}) && g.x > 0 && g.y > 0 {
+					checkpoint("World Grid")
+					e.LdtkJson_SetInt(w, "worldGridWidth", int(g.x), a)
+					e.LdtkJson_SetInt(w, "worldGridHeight", int(g.y), a)
+					e.Ldtk_Doc_Touch(doc)
+				}
+			}
+			UI_PropLabel("Levels")
+			UI_DimText(fmt.tprint(len(doc.worlds[L.world].levelsArr.items)))
+		}
+		UI_DimText("Move levels with the Move tool (M) or in the Level tab.")
+	}
+	imgui.EndChild()
+	imgui.SameLine(0, 8)
+	// the map: every level of the world; click one to open it
+	if imgui.BeginChild("##world_map", {0, avail.y}, {.Borders}, {}) {
+		dl := imgui.GetWindowDrawList()
+		mp := imgui.GetCursorScreenPos()
+		ms := imgui.GetContentRegionAvail()
+		mn := [2]f32{1e9, 1e9}
+		mx := [2]f32{-1e9, -1e9}
+		for &lv, i in doc.levels {
+			if lv.world != L.world do continue
+			p := e.Ldtk_Doc_LevelPos(doc, i)
+			s := e.Ldtk_Doc_LevelSize(doc, i)
+			mn = {min(mn.x, f32(p.x)), min(mn.y, f32(p.y))}
+			mx = {max(mx.x, f32(p.x + s.x)), max(mx.y, f32(p.y + s.y))}
+		}
+		if mx.x > mn.x {
+			sc := min((ms.x - 16) / (mx.x - mn.x), (ms.y - 16) / (mx.y - mn.y))
+			imgui.InvisibleButton("##map", {max(ms.x, 1), max(ms.y, 1)})
+			Drive_Item("defs.world.map")
+			hovered := imgui.IsItemHovered()
+			clicked := imgui.IsItemClicked()
+			m := imgui.GetIO().MousePos
+			for &lv, i in doc.levels {
+				if lv.world != L.world do continue
+				p := e.Ldtk_Doc_LevelPos(doc, i)
+				s := e.Ldtk_Doc_LevelSize(doc, i)
+				a0 := imgui.Vec2{mp.x + 8 + (f32(p.x) - mn.x) * sc, mp.y + 8 + (f32(p.y) - mn.y) * sc}
+				a1 := imgui.Vec2{a0.x + f32(s.x) * sc, a0.y + f32(s.y) * sc}
+				c := e.Ldtk_ParseHexColor(e.LdtkJson_Str(lv.obj, "__bgColor", "#696A79"))
+				over := hovered && m.x >= a0.x && m.y >= a0.y && m.x < a1.x && m.y < a1.y
+				imgui.DrawList_AddRectFilled(dl, a0, a1, col_u32({f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255, over ? 1 : 0.8}), 2, {})
+				imgui.DrawList_AddRect(dl, a0, a1, col_u32(i == L.level ? UI_ACCENT : ui_line(0.25)), 2, {}, i == L.level ? 2 : 1)
+				name := e.LdtkJson_Str(lv.obj, "identifier")
+				if a1.x - a0.x > 40 do imgui.DrawList_AddText(dl, {a0.x + 4, a0.y + 2}, col_u32(UI_TEXT), fmt.ctprintf("%s", name))
+				if over && clicked {
+					LevelEditor_SetLevel(i)
+					L.fitRequest = true
+				}
+			}
+		}
+	}
+	imgui.EndChild()
+}
+
+@(private = "file")
+page_project :: proc(state: ^EditorState) {
+	L := &GlobalLevel
+	doc := L.doc
+	a := doc.allocator
+	root := doc.root
+	avail := imgui.GetContentRegionAvail()
+	if imgui.BeginChild("##project_props", {380, avail.y}, {}, {}) {
+		UI_PanelTitle(ICON_FA_GEAR, "Project", L.rel)
+		if UI_BeginProps("##project_t") {
+			defer UI_EndProps()
+			ints :: proc(label, id, kx, ky: string, root: ^e.LdtkJson) {
+				doc := GlobalLevel.doc
+				UI_PropLabel(label)
+				v := [2]i32{i32(e.LdtkJson_Int(root, kx)), i32(e.LdtkJson_Int(root, ky))}
+				if imgui.InputInt2(fmt.ctprintf("##%s", id), &v, {.EnterReturnsTrue}) && v.x > 0 && v.y > 0 {
+					checkpoint(label)
+					e.LdtkJson_SetInt(root, kx, int(v.x), doc.allocator)
+					e.LdtkJson_SetInt(root, ky, int(v.y), doc.allocator)
+					e.Ldtk_Doc_Touch(doc)
+				}
+				Drive_Item(id)
+			}
+			UI_PropLabel("Default grid")
+			g := i32(e.LdtkJson_Int(root, "defaultGridSize", 16))
+			if imgui.InputInt("##pgrid", &g, 1, 8, {.EnterReturnsTrue}) && g > 0 {
+				checkpoint("Default Grid")
+				e.LdtkJson_SetInt(root, "defaultGridSize", int(g), a)
+				e.Ldtk_Doc_Touch(doc)
+			}
+			ints("New level size", "defs.project.levelsize", "defaultLevelWidth", "defaultLevelHeight", root)
+			ints("New entity size", "defs.project.entitysize", "defaultEntityWidth", "defaultEntityHeight", root)
+			colour :: proc(label, key: string, root: ^e.LdtkJson) {
+				doc := GlobalLevel.doc
+				UI_PropLabel(label)
+				c := e.Ldtk_ParseHexColor(e.LdtkJson_Str(root, key, "#40465B"))
+				col := [3]f32{f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255}
+				if imgui.ColorEdit3(fmt.ctprintf("##%s", key), &col, {.NoInputs}) {
+					e.Ldtk_Doc_CheckpointOnce(doc, -1, label, rawptr(raw_data(key)))
+					e.LdtkJson_SetStr(root, key, e.Ldtk_ColorHex({u8(col[0] * 255 + 0.5), u8(col[1] * 255 + 0.5), u8(col[2] * 255 + 0.5), 255}), doc.allocator)
+					e.Ldtk_Doc_Touch(doc)
+				}
+			}
+			colour("Background", "bgColor", root)
+			colour("Level background", "defaultLevelBgColor", root)
+			UI_PropLabel("Level names")
+			if name, ok := text_edit("defs.project.levelnames", root, "levelNamePattern"); ok {
+				checkpoint("Level Names")
+				e.LdtkJson_SetStr(root, "levelNamePattern", name, a)
+				e.Ldtk_Doc_Touch(doc)
+			}
+			UI_Tooltip("New levels' names: %idx = a free number, %world = the world's name")
+			UI_PropLabel("Minify JSON")
+			minify := e.LdtkJson_Bool(root, "minifyJson")
+			if imgui.Checkbox("##minify", &minify) {
+				checkpoint("Minify JSON")
+				e.LdtkJson_SetBool(root, "minifyJson", minify, a)
+				doc.minify = minify
+				for &lv in doc.levels do lv.dirty = true
+				e.Ldtk_Doc_Touch(doc)
+			}
+			UI_PropLabel("Level files")
+			UI_DimText(doc.external ? "one .ldtkl per level" : "in the .ldtk")
+		}
+	}
+	imgui.EndChild()
+	imgui.SameLine(0, 8)
+	if imgui.BeginChild("##project_fields", {0, avail.y}, {}, {}) do page_level_fields(state)
+	imgui.EndChild()
 }
 
 // ----------------------------------------------------------------------------
@@ -911,7 +1190,7 @@ tileset_changed :: proc(state: ^EditorState, uid: int) {
 @(private = "file")
 page_level_fields :: proc(state: ^EditorState) {
 	UI_PanelTitle(ICON_FA_MAP, "Level fields")
-	UI_DimText("Values every level has (edited in the Level Inspector).")
+	UI_DimText("Values every level has (edited in the Level tab).")
 	fields_editor(state, -1, e.LdtkJson_Arr(e.LdtkJson_Get(GlobalLevel.doc.root, "defs"), "levelFields"))
 }
 

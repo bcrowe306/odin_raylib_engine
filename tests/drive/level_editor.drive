@@ -82,25 +82,31 @@ wait 2
 click @level.layer:Collisions
 wait 1
 # Definitions: add an IntGrid layer
-click @level.defs
+# a layer from the Layers panel's + (the New Layer dialog), dragged by its
+# grip under Collisions
+click @level.layer.new
 wait 2
-click @defs.page:Layers
-click @defs.addlayer:IntGrid
+screenshot new_layer_dialog
+click @defs.newlayer.create
 wait 2
-expect level.layerdefs contains IntGrid
-expect level.layer == Collisions
-screenshot definitions
-# rules: a new rule in Collisions' "Front faces" group, its pattern edited
-click @defs.layer:Collisions
+expect level.layerdefs == IntGrid,Entities,Wall_tops,Collisions,Custom_floor,Default_floor
+expect level.layer == IntGrid
+drag @level.layer.grip:IntGrid @level.layer.grip:Collisions
 wait 2
+expect level.layerdefs == Entities,Wall_tops,Collisions,IntGrid,Custom_floor,Default_floor
+expect level.layer == IntGrid
+screenshot layer_moved
+# rules: Collisions' rules in the Rules tab
+click @level.layer:Collisions
+click @level.tab:Rules
+wait 2
+expect level.paneltab == Rules
 expect level.rules == 18
 click @defs.rule.add:Front faces
 wait 3
 expect level.rules == 19
 screenshot rules
-# terrain: a 3x3 block picked in the layer's tileset -> 9 rules
-scroll @level.layer:Default_floor -10
-wait 3
+# terrain: a 3x3 block picked in the layer's tileset (right panel) -> 9 rules
 drag @level.palette+40,40 @level.palette+104,104
 wait 2
 expect level.tilesel == 12,13,14,23,24,25,34,35,36
@@ -109,17 +115,23 @@ wait 3
 expect level.rules == 28
 screenshot terrain
 # per-tile data: tile 0 animates through the picked tiles
-click @defs.page:Tilesets
+click @level.tab:Tilesets
 click @defs.tileset:TopDown_by_deepnight
 wait 2
 click @defs.tile.animate
 wait 2
 screenshot tile_data
-click @defs.page:Entities
+click @level.tab:Entities
 click @defs.entity:Button
 wait 2
 screenshot entity_defs
-click @level.defs
+click @level.tab:World
+wait 2
+screenshot world_tab
+click @level.tab:Project
+wait 2
+screenshot project_tab
+click @level.tab:Level
 wait 2
 key cmd+s
 wait 3

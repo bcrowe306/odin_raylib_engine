@@ -18,10 +18,11 @@ import imgui "lib/imgui"
 // e.Ldtk_Doc (engine/ldtk_doc*.odin): an order-preserving JSON tree, typed
 // cell data, LDtk's auto-layer rule engine, undo.
 //
-// Layout (its own dock space): Levels (worlds and levels) and Layers (with
-// the active layer's palette) on the left, the canvas in the middle, the
-// Level Inspector (level or selected entity) on the right. The toolbar
-// switches to level tools while this tab is shown; Play stays.
+// Layout (its own dock space, resizable and rearrangeable): Levels on the
+// left, Layers (with the active layer's palette) on the right, the canvas in
+// the middle over the bottom panel's tabs (World, Level, Tilesets, Entities,
+// Enums, Layers, Rules, Project - level_defs.odin). The toolbar switches to
+// level tools while this tab is shown; Play stays.
 // ============================================================================
 
 Root_Tab :: enum u8 {
@@ -37,6 +38,18 @@ Level_Tool :: enum u8 {
 	Pick,
 	Select,
 	Move_Level,
+}
+
+// The bottom panel's tabs.
+Level_Panel_Tab :: enum u8 {
+	World,
+	Level,
+	Tilesets,
+	Entities,
+	Enums,
+	Layers,
+	Rules,
+	Project,
 }
 
 LEVEL_TOOL_INFO := [Level_Tool]struct {icon, name, key: string}{
@@ -96,7 +109,10 @@ LevelEd :: struct {
 	paletteZoom:  f32,
 	paletteDrag:  bool,
 	paletteStart: [2]int,
-	showDefs:     bool,
+	panelTab:     Level_Panel_Tab,
+	panelRequest: Maybe(Level_Panel_Tab), // select this tab next frame
+	lastSel:      ^e.LdtkJson,          // entity selected last frame
+	layerDrag:    int,                  // layer row being dragged (-1 none)
 	newPrompt:    bool,
 	closePrompt:  bool,
 	closeThen:    string, // file to open after the close prompt ("" = none)
@@ -105,7 +121,12 @@ LevelEd :: struct {
 	error:        string,
 }
 
-GlobalLevel := LevelEd{zoom = 2, showGrid = true, showIntGrid = true, paletteZoom = 2}
+GlobalLevel := LevelEd{zoom = 2, showGrid = true, showIntGrid = true, paletteZoom = 2, panelTab = .World, layerDrag = -1}
+
+// LevelEditor_ShowTab brings a bottom-panel tab to the front.
+LevelEditor_ShowTab :: proc(t: Level_Panel_Tab) {
+	GlobalLevel.panelRequest = t
+}
 
 LevelEditor_Active :: proc() -> bool {return GlobalLevel.tab == .Level}
 
@@ -331,7 +352,7 @@ RootTabs_Render :: proc(state: ^EditorState, width, posY: f32) {
 LEVEL_CANVAS_WINDOW :: "Level###LevelCanvasWindow"
 LEVEL_LEVELS_WINDOW :: "Levels###LevelLevelsWindow"
 LEVEL_LAYERS_WINDOW :: "Layers###LevelLayersWindow"
-LEVEL_INSPECTOR_WINDOW :: "Level Inspector###LevelInspectorWindow"
+LEVEL_PANEL_WINDOW :: "Level Panel###LevelPanelWindow"
 
 LevelEditor_Render :: proc(state: ^EditorState, pos, size: [2]f32) {
 	L := &GlobalLevel
@@ -341,7 +362,7 @@ LevelEditor_Render :: proc(state: ^EditorState, pos, size: [2]f32) {
 	imgui.PushStyleVarImVec2(.WindowPadding, {0, 0})
 	imgui.Begin("##LevelDockSpaceHost", nil, hostFlags)
 	imgui.PopStyleVar()
-	dockID := imgui.GetID("LevelEditorDockSpace_v2")
+	dockID := imgui.GetID("LevelEditorDockSpace_v3")
 	if DockBuilderGetNode(dockID) == nil || !L.dockBuilt {
 		L.dockBuilt = true
 		if DockBuilderGetNode(dockID) == nil {
@@ -349,14 +370,16 @@ LevelEditor_Render :: proc(state: ^EditorState, pos, size: [2]f32) {
 			DockBuilderAddNode(dockID, 0)
 			DockBuilderSetNodePos(dockID, pos)
 			DockBuilderSetNodeSize(dockID, size)
+			// Levels | canvas over the bottom panel | Layers; the side
+			// panels run the full height (300 px of 1920 at the start)
 			main := dockID
-			left, leftBottom, right: imgui.ID
-			DockBuilderSplitNode(main, .Left, 0.2, &left, &main)
-			DockBuilderSplitNode(left, .Down, 0.72, &leftBottom, &left)
-			DockBuilderSplitNode(main, .Right, 0.24, &right, &main)
+			left, right, bottom: imgui.ID
+			DockBuilderSplitNode(main, .Left, 0.156, &left, &main)
+			DockBuilderSplitNode(main, .Right, 0.185, &right, &main)
+			DockBuilderSplitNode(main, .Down, 0.37, &bottom, &main)
 			DockBuilderDockWindow(LEVEL_LEVELS_WINDOW, left)
-			DockBuilderDockWindow(LEVEL_LAYERS_WINDOW, leftBottom)
-			DockBuilderDockWindow(LEVEL_INSPECTOR_WINDOW, right)
+			DockBuilderDockWindow(LEVEL_LAYERS_WINDOW, right)
+			DockBuilderDockWindow(LEVEL_PANEL_WINDOW, bottom)
 			DockBuilderDockWindow(LEVEL_CANVAS_WINDOW, main)
 			DockBuilderFinish(dockID)
 		}
@@ -375,8 +398,8 @@ LevelEditor_Render :: proc(state: ^EditorState, pos, size: [2]f32) {
 		LevelCanvas_Render(state)
 		level_levels_panel(state)
 		level_layers_panel(state)
-		level_inspector_panel(state)
-		LevelDefs_Render(state)
+		level_bottom_panel(state)
+		LevelDefs_NewLayerDialog(state)
 	}
 	level_prompts(state)
 }
@@ -409,7 +432,7 @@ level_start_page :: proc(state: ^EditorState) {
 		imgui.Unindent(24)
 	}
 	imgui.End()
-	for w in ([]cstring{LEVEL_LEVELS_WINDOW, LEVEL_LAYERS_WINDOW, LEVEL_INSPECTOR_WINDOW}) {
+	for w in ([]cstring{LEVEL_LEVELS_WINDOW, LEVEL_LAYERS_WINDOW, LEVEL_PANEL_WINDOW}) {
 		if imgui.Begin(w, nil, {}) do UI_DimText("  No level open.")
 		imgui.End()
 	}
@@ -605,8 +628,13 @@ level_levels_panel :: proc(state: ^EditorState) {
 				if imgui.IsMouseDoubleClicked(.Left) do L.fitRequest = true
 			}
 			Drive_Item(fmt.tprintf("level.pick:%s", name))
-			imgui.SameLine(imgui.GetContentRegionMax().x - 70)
-			UI_DimText(fmt.tprintf("%dx%d", s.x, s.y))
+			// the size, when it fits next to the name
+			size := fmt.ctprintf("%dx%d", s.x, s.y)
+			sw := imgui.CalcTextSize(size).x
+			if imgui.GetItemRectMax().x - imgui.GetItemRectMin().x - imgui.CalcTextSize(fmt.ctprintf("%s *", name)).x > sw + 16 {
+				imgui.SameLine(imgui.GetContentRegionMax().x - sw - 4)
+				UI_DimText(string(size))
+			}
 		}
 	}
 	imgui.EndChild()
@@ -627,6 +655,16 @@ LAYER_TYPE_ICON := [e.LdtkLayerType]string{
 	.AutoLayer = ICON_FA_WAND_MAGIC_SPARKLES,
 }
 
+LAYER_TYPE_NAME := [e.LdtkLayerType]string{
+	.IntGrid   = "IntGrid",
+	.Entities  = "Entities",
+	.Tiles     = "Tiles",
+	.AutoLayer = "Auto",
+}
+
+// level_layers_panel: the active level's layers (top first) - grip to drag
+// them into another order, "Type: Name", the eye on the right; + adds one.
+// Under the list: the active layer's palette.
 @(private = "file")
 level_layers_panel :: proc(state: ^EditorState) {
 	L := &GlobalLevel
@@ -634,32 +672,74 @@ level_layers_panel :: proc(state: ^EditorState) {
 	defer imgui.End()
 	if !imgui.Begin(LEVEL_LAYERS_WINDOW, nil, {}) do return
 	UI_PanelTitle(ICON_FA_LAYER_GROUP, "Layers")
-	UI_HeaderButtons(1)
-	if UI_HeaderButton(ICON_FA_SLIDERS, "level.defs", "Project definitions: layers, entities, enums, tilesets, rules", L.showDefs) do L.showDefs = !L.showDefs
+	UI_HeaderButtons(2)
+	if UI_HeaderButton(ICON_FA_PLUS, "level.layer.new", "New layer...") do LevelDefs_OpenNewLayer()
+	if UI_HeaderButton(ICON_FA_SLIDERS, "level.layer.settings", "Layer settings (the Layers tab)") do LevelEditor_ShowTab(.Layers)
 	if len(doc.levels) == 0 {
 		UI_DimText("No level.")
 		return
 	}
 	lv := &doc.levels[L.level]
+	ROW :: 26
+	dropAt := -1 // drag: the row the dragged layer goes to
+	m := imgui.GetIO().MousePos
 	for &ly, i in lv.layers {
 		d := e.Ldtk_Doc_LayerDef(doc, &ly)
 		if d == nil do continue
 		visible := e.LdtkJson_Bool(ly.obj, "visible", true)
 		imgui.PushIDInt(i32(i))
-		if UI_IconButton(visible ? ICON_FA_EYE : ICON_FA_EYE_SLASH, fmt.tprintf("level.eye:%s", d.identifier), "Show / hide (saved in the level)", false, 22) {
-			e.Ldtk_Doc_Checkpoint(doc, L.level, "Layer Visibility")
-			e.Ldtk_Doc_SetLayerVisible(doc, L.level, i, !visible)
-		}
-		imgui.SameLine()
+		rowMin := imgui.GetCursorScreenPos()
+		rowW := imgui.GetContentRegionAvail().x
+		// grip: press and drag to reorder
+		imgui.AlignTextToFramePadding()
+		imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)
+		imgui.TextUnformatted(ICON_FA_GRIP_LINES)
+		imgui.PopStyleColor()
+		Drive_Item(fmt.tprintf("level.layer.grip:%s", d.identifier))
+		if imgui.IsItemHovered() do imgui.SetMouseCursor(.ResizeNS)
+		if imgui.IsItemClicked() do L.layerDrag = i
+		imgui.SameLine(0, 8)
 		if !visible do imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
-		if imgui.Selectable(fmt.ctprintf("%s  %s", LAYER_TYPE_ICON[d.type], d.identifier), i == L.layer, {}, {0, 22}) {
+		label := fmt.ctprintf("%s: %s", LAYER_TYPE_NAME[d.type], d.identifier)
+		if imgui.Selectable(label, i == L.layer, {.AllowOverlap}, {rowW - 60, ROW}) {
 			L.layer = i
 			L.selEntity = nil
 			level_sync_palette()
 		}
 		if !visible do imgui.PopStyleColor()
 		Drive_Item(fmt.tprintf("level.layer:%s", d.identifier))
+		imgui.SameLine(rowMin.x - imgui.GetWindowPos().x + rowW - 26)
+		if UI_IconButton(visible ? ICON_FA_EYE : ICON_FA_EYE_SLASH, fmt.tprintf("level.eye:%s", d.identifier), "Show / hide (saved in the level)", false, 24) {
+			e.Ldtk_Doc_Checkpoint(doc, L.level, "Layer Visibility")
+			e.Ldtk_Doc_SetLayerVisible(doc, L.level, i, !visible)
+		}
+		rowMax := [2]f32{rowMin.x + rowW, imgui.GetItemRectMax().y}
+		if L.layerDrag >= 0 && m.y >= rowMin.y && m.y < rowMax.y + imgui.GetStyle().ItemSpacing.y do dropAt = i
+		if L.layerDrag == i {
+			imgui.DrawList_AddRect(imgui.GetWindowDrawList(), rowMin, rowMax, col_u32(UI_ACCENT), 3, {}, 1)
+		}
 		imgui.PopID()
+	}
+	if L.layerDrag >= 0 {
+		// where it would land
+		if dropAt >= 0 && dropAt != L.layerDrag {
+			imgui.SetMouseCursor(.ResizeNS)
+		}
+		if !imgui.IsMouseDown(.Left) {
+			from := L.layerDrag
+			L.layerDrag = -1
+			if dropAt >= 0 && dropAt != from && from < len(lv.layers) {
+				if d := e.Ldtk_Doc_LayerDef(doc, &lv.layers[from]); d != nil {
+					uid := d.uid
+					e.Ldtk_Doc_Checkpoint(doc, -1, "Move Layer")
+					step := dropAt > from ? 1 : -1
+					for _ in 0 ..< abs(dropAt - from) do e.Ldtk_Doc_MoveLayerDef(doc, uid, step)
+					L.layerUid = uid
+					level_follow_layer_uid()
+					return // the layers moved under this frame's list
+				}
+			}
+		}
 	}
 	imgui.Separator()
 	ly, d := level_active_layer()
@@ -696,7 +776,7 @@ swatch :: proc(c: rl.Color, size: f32 = 14) {
 level_palette_intgrid :: proc(state: ^EditorState, d: ^e.Ldtk_DocLayerDef) {
 	L := &GlobalLevel
 	UI_SectionHeader("Values")
-	if len(d.values) == 0 do UI_DimText("No values: add some in Definitions.")
+	if len(d.values) == 0 do UI_DimText("No values: add some in the Layers tab.")
 	for v, i in d.values {
 		swatch(v.color)
 		label := v.identifier != "" ? v.identifier : fmt.tprintf("value %d", v.value)
@@ -710,7 +790,7 @@ level_palette_intgrid :: proc(state: ^EditorState, d: ^e.Ldtk_DocLayerDef) {
 level_palette_entities :: proc(state: ^EditorState) {
 	L := &GlobalLevel
 	UI_SectionHeader("Entities")
-	if len(L.doc.entityDefs) == 0 do UI_DimText("No entities: add some in Definitions.")
+	if len(L.doc.entityDefs) == 0 do UI_DimText("No entities: add some in the Entities tab.")
 	for &ed in L.doc.entityDefs {
 		swatch(ed.color)
 		if imgui.Selectable(fmt.ctprintf("%s##ed%d", ed.identifier, ed.uid), L.entityDef == ed.uid, {}, {0, 22}) {
@@ -732,7 +812,7 @@ level_palette_auto :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer, d: ^e.Ldtk
 		if src != nil {
 			sd := e.Ldtk_Doc_LayerDef(doc, src)
 			UI_DimText(fmt.tprintf("Tiles come from rules over \"%s\": paint that layer.", sd != nil ? sd.identifier : "?"))
-		} else do UI_DimText("Pick a source IntGrid layer in Definitions.")
+		} else do UI_DimText("Pick the IntGrid layer it reads in the Layers tab.")
 	}
 	optional := e.LdtkJson_Get(ly.obj, "optionalRules")
 	for &g in d.groups {
@@ -773,7 +853,7 @@ level_palette_tiles :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer) {
 	L := &GlobalLevel
 	ts := e.Ldtk_Doc_LayerTileset(L.doc, ly)
 	if ts == nil {
-		UI_DimText("This layer has no tileset (Definitions > Layers).")
+		UI_DimText("This layer has no tileset (set one in the Layers tab).")
 		return
 	}
 	tex, ok := level_texture(ts.uid)
@@ -842,18 +922,53 @@ level_palette_tiles :: proc(state: ^EditorState, ly: ^e.Ldtk_DocLayer) {
 // Inspector (level or selected entity)
 // ----------------------------------------------------------------------------
 
+// level_bottom_panel: the bottom panel's tab bar and the current page.
 @(private = "file")
-level_inspector_panel :: proc(state: ^EditorState) {
+level_bottom_panel :: proc(state: ^EditorState) {
+	L := &GlobalLevel
+	defer imgui.End()
+	if !imgui.Begin(LEVEL_PANEL_WINDOW, nil, {}) do return
+	// a newly selected entity shows its values
+	if L.selEntity != nil && L.selEntity != L.lastSel do L.panelRequest = .Level
+	L.lastSel = L.selEntity
+	if imgui.BeginTabBar("##level_panel_tabs", {}) {
+		for t in Level_Panel_Tab {
+			flags: imgui.TabItemFlags = {}
+			if req, ok := L.panelRequest.?; ok && req == t do flags += {.SetSelected}
+			if imgui.BeginTabItem(fmt.ctprintf("%v###lvltab%v", t, t), nil, flags) {
+				L.panelTab = t
+				imgui.EndTabItem()
+			}
+			Drive_Item(fmt.tprintf("level.tab:%v", t))
+		}
+		imgui.EndTabBar()
+	}
+	L.panelRequest = nil
+	if imgui.BeginChild("##level_panel_page", {0, 0}, {}, {}) {
+		if L.panelTab == .Level do level_tab_level(state)
+		else do LevelDefs_Page(state, L.panelTab)
+	}
+	imgui.EndChild()
+}
+
+// level_tab_level: the active level's values, or the selected entity's.
+@(private = "file")
+level_tab_level :: proc(state: ^EditorState) {
 	L := &GlobalLevel
 	doc := L.doc
-	defer imgui.End()
-	if !imgui.Begin(LEVEL_INSPECTOR_WINDOW, nil, {}) do return
 	if len(doc.levels) == 0 do return
 	if L.selEntity != nil {
 		level_entity_inspector(state)
 		return
 	}
 	lv := &doc.levels[L.level]
+	// two columns: the level's values | its fields and the project
+	avail := imgui.GetContentRegionAvail()
+	leftW := min(avail.x, 460)
+	if !imgui.BeginChild("##lvl_left", {leftW, avail.y}, {}, {}) {
+		imgui.EndChild()
+		return
+	}
 	UI_PanelTitle(ICON_FA_MAP, e.LdtkJson_Str(lv.obj, "identifier"), "level")
 	if UI_BeginProps("##level_props") {
 		UI_PropLabel("Identifier")
@@ -908,6 +1023,13 @@ level_inspector_panel :: proc(state: ^EditorState) {
 		}
 		UI_EndProps()
 	}
+	imgui.EndChild()
+	imgui.SameLine(0, 16)
+	if !imgui.BeginChild("##lvl_right", {0, avail.y}, {}, {}) {
+		imgui.EndChild()
+		return
+	}
+	defer imgui.EndChild()
 	fields := e.LdtkJson_Arr(lv.obj, "fieldInstances")
 	if len(fields) > 0 && UI_SectionHeader("Level fields") {
 		level_fields_editor(state, fields, lv.extRoot != nil ? e.LdtkJson_Arr(lv.extRoot, "fieldInstances") : nil)
@@ -1003,12 +1125,18 @@ level_entity_inspector :: proc(state: ^EditorState) {
 	doc := L.doc
 	ent := L.selEntity
 	ed := e.Ldtk_Doc_EntityDef(doc, e.LdtkJson_Int(ent, "defUid", -1))
+	avail := imgui.GetContentRegionAvail()
+	if !imgui.BeginChild("##ent_left", {min(avail.x, 460), avail.y}, {}, {}) {
+		imgui.EndChild()
+		return
+	}
 	UI_PanelTitle(ICON_FA_CUBE, e.LdtkJson_Str(ent, "__identifier"), "entity")
 	UI_HeaderButtons(1)
 	if UI_HeaderButton(ICON_FA_TRASH, "level.entity.remove", "Delete (Delete)") {
 		e.Ldtk_Doc_Checkpoint(doc, L.level, "Delete Entity")
 		e.Ldtk_Doc_RemoveEntity(doc, L.level, L.layer, ent)
 		L.selEntity = nil
+		imgui.EndChild()
 		return
 	}
 	if UI_BeginProps("##entity_props") {
@@ -1034,8 +1162,14 @@ level_entity_inspector :: proc(state: ^EditorState) {
 		UI_DimText(e.LdtkJson_Str(ent, "iid"))
 		UI_EndProps()
 	}
-	fields := e.LdtkJson_Arr(ent, "fieldInstances")
-	if len(fields) > 0 && UI_SectionHeader("Fields") do level_fields_editor(state, fields, nil)
+	imgui.EndChild()
+	imgui.SameLine(0, 16)
+	if imgui.BeginChild("##ent_right", {0, avail.y}, {}, {}) {
+		fields := e.LdtkJson_Arr(ent, "fieldInstances")
+		if len(fields) > 0 && UI_SectionHeader("Fields") do level_fields_editor(state, fields, nil)
+		else if len(fields) == 0 do UI_DimText("No fields (add some in the Entities tab).")
+	}
+	imgui.EndChild()
 }
 
 // ----------------------------------------------------------------------------
@@ -1205,6 +1339,7 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 	case "level.tab": return L.tab == .Level ? "level" : "game", true
 	case "level.open": return L.rel, true
 	case "level.tool": return fmt.tprintf("%v", L.tool), true
+	case "level.paneltab": return fmt.tprintf("%v", L.panelTab), true
 	}
 	if doc == nil do return "<no level>", true
 	switch q {

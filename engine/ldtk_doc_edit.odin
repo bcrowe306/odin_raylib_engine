@@ -859,3 +859,48 @@ Ldtk_Doc_UpdateToc :: proc(doc: ^Ldtk_Doc) {
 	if old != nil && LdtkJson_ToString(old, .Minified, context.temp_allocator) == LdtkJson_ToString(toc, .Minified, context.temp_allocator) do return
 	LdtkJson_Set(doc.root, "toc", toc, a)
 }
+
+LDTK_WORLD_LAYOUTS := [?]string{"Free", "GridVania", "LinearHorizontal", "LinearVertical"}
+
+// Ldtk_Doc_SetWorldLayout changes a world's layout. Leaving a linear layout
+// writes the computed positions; entering one stores -1 like LDtk (the
+// positions are then computed from the level order).
+Ldtk_Doc_SetWorldLayout :: proc(doc: ^Ldtk_Doc, world: int, layout: string) {
+	a := doc.allocator
+	w := doc.worlds[world].obj
+	cur := LdtkJson_Str(w, "worldLayout", LdtkJson_Str(doc.root, "worldLayout"))
+	if cur == layout do return
+	// positions as they look now
+	pos := make([][2]int, len(doc.levels), context.temp_allocator)
+	for _, i in doc.levels do pos[i] = Ldtk_Doc_LevelPos(doc, i)
+	LdtkJson_SetStr(w, "worldLayout", layout, a)
+	if !doc.multiWorlds do LdtkJson_SetStr(doc.root, "worldLayout", layout, a)
+	linear := layout == "LinearHorizontal" || layout == "LinearVertical"
+	for &lv, i in doc.levels {
+		if lv.world != world do continue
+		p := linear ? [2]int{-1, -1} : pos[i]
+		if layout == "GridVania" {
+			gw := max(LdtkJson_Int(w, "worldGridWidth", 256), 1)
+			gh := max(LdtkJson_Int(w, "worldGridHeight", 256), 1)
+			p = {p.x / gw * gw, p.y / gh * gh}
+		}
+		ldtk_level_set_int(doc, &lv, "worldX", p.x)
+		ldtk_level_set_int(doc, &lv, "worldY", p.y)
+		for &ly, j in lv.layers {
+			for ent in LdtkJson_Arr(ly.obj, "entityInstances") {
+				if linear {
+					LdtkJson_Remove(ent, "__worldX")
+					LdtkJson_Remove(ent, "__worldY")
+				} else {
+					if LdtkJson_Get(ent, "__worldX") == nil do LdtkJson_Set(ent, "__worldX", jint(0, a), a)
+					if LdtkJson_Get(ent, "__worldY") == nil do LdtkJson_Set(ent, "__worldY", jint(0, a), a)
+					ldtk_entity_cached(doc, i, j, ent)
+				}
+			}
+			_ = ly
+		}
+		lv.dirty = true
+	}
+	Ldtk_Doc_UpdateNeighbours(doc)
+	Ldtk_Doc_Touch(doc)
+}
