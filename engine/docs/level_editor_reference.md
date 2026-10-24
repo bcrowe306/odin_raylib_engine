@@ -692,6 +692,53 @@ sections are *File*, *Names*, *Defaults*, *Advanced* and *Description*.
   control. Turning it off brings the levels back into the project file;
   the `.ldtkl` files are removed on save.
 
+## Exports
+<!-- topic: project.exports -->
+
+Exports run after each save (and with **Export now**). Their files go in
+the `<project name>` folder next to the project file. Turning an export off
+removes its folder on the next save.
+
+- **Images**: PNGs in `<project name>/png`.
+  - *One PNG per layer*: the tiles of each Tiles layer and auto layer.
+    IntGrid layers also get a tiny map with one pixel per cell in the
+    value's colour (`-int`).
+  - *One PNG per level*: the layers merged.
+  - *One PNG per layer and per level*: both.
+
+  **File names** use `%level_name`, `%level_idx`, `%layer_name`,
+  `%layer_idx` and `%world`. **Export backgrounds** adds each level's
+  colour and image (`<level>_bg.png`, and under merged images).
+- **Simplified export**: for each level, `<project name>/simplified/<level>/`
+  gets:
+  - `data.json`: the level's name, position, size, colour, neighbours and
+    fields, the layer images, and its entities (grouped by name, with their
+    fields);
+  - a PNG per layer, `_composite.png` and `_bg.png`;
+  - a CSV per IntGrid layer.
+
+  Simple engines can read it without an LDtk importer.
+- **Tiled export**: a `.tmx` map per level of the first world and a
+  `.world` file, in `<project name>/tiled`. IntGrid layers become coloured
+  tilesets; stacked auto tiles take several layers; entities become objects
+  with their fields as properties. Tiled has one grid per map, so layers
+  with another grid size are left out. The log lists what couldn't be
+  exported.
+
+## Custom commands
+<!-- topic: project.commands -->
+
+Commands the project runs in its folder. Each one runs **manually**
+(**Run manual** or **Cmd+R**), **after loading**, **before saving** (the
+save waits for it), or **after saving**. Use quotes to group arguments:
+`python "tools/export levels.py" --fast`.
+
+Before running a project's commands the first time, the editor shows them
+and asks: **Allow**, **Block** or Cancel. The choice is remembered for that
+project (in the editor settings); **Reset trust** asks again. Output shows
+in the Command window, with **Kill** to stop a command. The window stays
+open when a command fails.
+
 ## Identifiers
 <!-- topic: project.names -->
 

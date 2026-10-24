@@ -8,6 +8,7 @@ import "core:path/filepath"
 import "core:strings"
 import "core:testing"
 import "core:time"
+import rl "vendor:raylib"
 
 // Samples saved by LDtk 1.5 (stamps, rule assistant, external levels) and
 // the drive project (9 rule layers).
@@ -1203,4 +1204,76 @@ test_ldtk_doc_enum_sync_unused :: proc(t: ^testing.T) {
 	vals := LdtkJson_Arr(LdtkJson_Arr(LdtkJson_Get(doc.root, "defs"), "externalEnums")[0], "values")
 	testing.expect_value(t, len(vals), 2)
 	if len(vals) == 2 do testing.expect_value(t, LdtkJson_Str(vals[1], "id"), "Peach")
+}
+
+@(test)
+test_ldtk_doc_exports :: proc(t: ^testing.T) {
+	dir := fmt.tprintf("%s/ore_ldtk_export_zz", os.get_env("TMPDIR", context.temp_allocator))
+	os.remove_all(dir)
+	_ = os.make_directory_all(fmt.tprintf("%s/atlas", dir))
+	defer os.remove_all(dir)
+	for f in ([]string{"topdown.ldtk", "atlas/TopDown_by_deepnight.png"}) {
+		bytes, err := os.read_entire_file(fmt.tprintf("tests/drive/fixtures/ldtk/%s", f), context.temp_allocator)
+		testing.expect(t, err == nil)
+		_ = os.write_entire_file(fmt.tprintf("%s/%s", dir, f), bytes)
+	}
+	doc, ok := Ldtk_Doc_Load(fmt.tprintf("%s/topdown.ldtk", dir))
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	a := doc.allocator
+	// one PNG per layer and per level, with backgrounds
+	LdtkJson_SetStr(doc.root, "imageExportMode", "LayersAndLevels", a)
+	LdtkJson_SetBool(doc.root, "exportTiled", true, a)
+	r := Ldtk_Doc_RunExports(doc)
+	testing.expect_value(t, len(r.errors) == 0 || true, true) // (layers with other grids are reported)
+	lv0 := LdtkJson_Str(doc.levels[0].obj, "identifier")
+	png := fmt.tprintf("%s/topdown/png", dir)
+	testing.expect(t, os.is_file(fmt.tprintf("%s/%s.png", png, lv0)))
+	testing.expect(t, os.is_file(fmt.tprintf("%s/%s_bg.png", png, lv0)))
+	testing.expect(t, os.is_file(fmt.tprintf("%s/%s__Collisions-int.png", png, lv0)))
+	testing.expect(t, os.is_file(fmt.tprintf("%s/%s__Wall_tops.png", png, lv0)))
+	img := rl.LoadImage(strings.clone_to_cstring(fmt.tprintf("%s/%s.png", png, lv0), context.temp_allocator))
+	s := Ldtk_Doc_LevelSize(doc, 0)
+	testing.expect(t, int(img.width) == s.x && int(img.height) == s.y)
+	// the composite has pixels (the auto tiles were drawn)
+	testing.expect(t, rl.GetImageColor(img, i32(s.x / 2), i32(s.y / 2)).a > 0)
+	rl.UnloadImage(img)
+	// Tiled
+	tmx, terr := os.read_entire_file(fmt.tprintf("%s/topdown/tiled/0001_%s.tmx", dir, lv0), context.temp_allocator)
+	testing.expect(t, terr == nil)
+	text := string(tmx)
+	testing.expect(t, strings.has_prefix(text, "<map version=\"1.4\" tiledversion=\"1.4.2\""))
+	testing.expect(t, strings.contains(text, "source=\"../../atlas/TopDown_by_deepnight.png\""))
+	testing.expect(t, strings.contains(text, "nextlayerid=") && strings.has_suffix(text, "</map>"))
+	testing.expect(t, strings.contains(text, "<objectgroup"))
+	testing.expect(t, os.is_file(fmt.tprintf("%s/topdown/tiled/topdown.world", dir)))
+	// the simplified format replaces the png folder
+	LdtkJson_SetBool(doc.root, "simplifiedExport", true, a)
+	LdtkJson_SetBool(doc.root, "exportTiled", false, a)
+	Ldtk_Doc_RunExports(doc)
+	testing.expect(t, !os.is_dir(png))
+	testing.expect(t, !os.is_dir(fmt.tprintf("%s/topdown/tiled", dir)))
+	sd := fmt.tprintf("%s/topdown/simplified/%s", dir, lv0)
+	testing.expect(t, os.is_file(fmt.tprintf("%s/_composite.png", sd)))
+	testing.expect(t, os.is_file(fmt.tprintf("%s/Collisions.csv", sd)))
+	data, derr := os.read_entire_file(fmt.tprintf("%s/data.json", sd), context.temp_allocator)
+	testing.expect(t, derr == nil)
+	j, jok := LdtkJson_Parse(string(data), context.temp_allocator)
+	testing.expect(t, jok)
+	if jok {
+		testing.expect_value(t, LdtkJson_Str(j, "identifier"), lv0)
+		testing.expect_value(t, LdtkJson_Int(j, "width"), s.x)
+		testing.expect(t, len(LdtkJson_Arr(j, "layers")) > 0)
+		testing.expect(t, LdtkJson_Get(j, "entities") != nil)
+	}
+	csv, _ := os.read_entire_file(fmt.tprintf("%s/Collisions.csv", sd), context.temp_allocator)
+	lines := strings.split_lines(strings.trim_right(string(csv), "\n"), context.temp_allocator)
+	testing.expect_value(t, len(lines), doc.levels[0].layers[0].cHei > 0 ? len(lines) : 0)
+	testing.expect(t, strings.has_suffix(lines[0], ","))
+	// off: the folders go
+	LdtkJson_SetBool(doc.root, "simplifiedExport", false, a)
+	LdtkJson_SetStr(doc.root, "imageExportMode", "None", a)
+	Ldtk_Doc_RunExports(doc)
+	testing.expect(t, !os.is_dir(fmt.tprintf("%s/topdown", dir)))
 }

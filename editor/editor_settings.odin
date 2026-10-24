@@ -62,6 +62,8 @@ Editor_Settings :: struct {
 	lastImportDir:    string,
 	lastExportDir:    string,
 	lastProjectDir:   string,
+	// LDtk projects' custom commands: project iid -> allowed / blocked
+	ldtkTrust:        map[string]bool,
 }
 
 DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
@@ -109,6 +111,8 @@ Editor_Settings_Clone :: proc(s: ^Editor_Settings) -> Editor_Settings {
 	c.lastImportDir = strings.clone(s.lastImportDir)
 	c.lastExportDir = strings.clone(s.lastExportDir)
 	c.lastProjectDir = strings.clone(s.lastProjectDir)
+	c.ldtkTrust = make(map[string]bool)
+	for k, v in s.ldtkTrust do c.ldtkTrust[strings.clone(k)] = v
 	return c
 }
 
@@ -127,6 +131,9 @@ Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 	delete(s.lastExportDir)
 	delete(s.lastProjectDir)
 	s.lastImportDir, s.lastExportDir, s.lastProjectDir = "", "", ""
+	for k in s.ldtkTrust do delete(k)
+	delete(s.ldtkTrust)
+	s.ldtkTrust = nil
 }
 
 // Editor_SettingsPath: where settings live (drives: inside the project copy).
@@ -296,6 +303,9 @@ settings_from_ini :: proc(text: string) {
 		if v := pm["export"] or_else ""; v != "" do s.lastExportDir = strings.clone(v)
 		if v := pm["projects"] or_else ""; v != "" do s.lastProjectDir = strings.clone(v)
 	}
+	if lt, ok := m["ldtk_trust"]; ok {
+		for k, v in lt do s.ldtkTrust[strings.clone(k)] = v == "true"
+	}
 	if rp, ok := m["recent_projects"]; ok {
 		for i in 0 ..< len(rp) {
 			if v, has := rp[fmt.tprint(i)]; has && v != "" do append(&s.recentProjects, strings.clone(v))
@@ -373,6 +383,10 @@ Editor_SaveSettings :: proc() -> bool {
 	for k in Theme_Color do fmt.sbprintf(&sb, "%s = %s\n", THEME_COLOR_INFO[k].key, theme_color_text(s.theme.colors[k]))
 	strings.write_string(&sb, "\n[paths]\n")
 	fmt.sbprintf(&sb, "import = %s\nexport = %s\nprojects = %s\n", s.lastImportDir, s.lastExportDir, s.lastProjectDir)
+	if len(s.ldtkTrust) > 0 {
+		strings.write_string(&sb, "\n[ldtk_trust]\n")
+		for k, v in s.ldtkTrust do fmt.sbprintf(&sb, "%s = %t\n", k, v)
+	}
 	strings.write_string(&sb, "\n[recent_projects]\n")
 	for r, i in s.recentProjects do fmt.sbprintf(&sb, "%d = %s\n", i, r)
 	strings.write_string(&sb, "\n[keymap]\n")

@@ -35,11 +35,23 @@ LevelProject_BeforeSave :: proc(state: ^EditorState) {
 	if dir := e.Ldtk_Doc_Backup(doc); dir != "" do Editor_Log(state, .Info, "Backup: %s", dir)
 }
 
+// LevelProject_AfterSave: the exports the project asks for (images,
+// simplified data, Tiled), then AfterSave commands.
+LevelProject_AfterSave :: proc(state: ^EditorState) {
+	doc := GlobalLevel.doc
+	if doc == nil do return
+	r := e.Ldtk_Doc_RunExports(doc)
+	if r.files > 0 do Editor_Log(state, .Info, "Exported %d file(s)", r.files)
+	for err in r.errors do Editor_Log(state, .Warn, "Export: %s", err)
+	LevelCommands_Run(state, "AfterSave")
+}
+
 // LevelProject_AfterLoad: external enum files changed since the last sync are
-// synced (asking first when used values would go).
+// synced (asking first when used values would go); AfterLoad commands run.
 LevelProject_AfterLoad :: proc(state: ^EditorState) {
 	doc := GlobalLevel.doc
 	if doc == nil do return
+	defer LevelCommands_Run(state, "AfterLoad")
 	for src in e.Ldtk_Doc_ExternalEnumSources(doc) {
 		if src.missing {
 			Editor_Log(state, .Warn, "External enum file not found: %s", src.relPath)
@@ -113,6 +125,131 @@ LevelProject_Page :: proc(state: ^EditorState) {
 			Drive_Item("defs.project.external")
 			level_tip("Each level in its own .ldtkl file (in a folder named like the project): good for big projects and version control", "project.file")
 			UI_EndProps()
+		}
+		if UI_SectionHeader("Exports", false) && UI_BeginProps("##proj_exports") {
+			simplified := e.LdtkJson_Bool(root, "simplifiedExport")
+			UI_PropLabel("Images")
+			{
+				labels := []string{"No images", "One PNG per layer", "One PNG per level (layers merged)", "One PNG per layer and per level"}
+				mode := e.LdtkJson_Str(root, "imageExportMode", "None")
+				cur := 0
+				for m, i in e.LDTK_IMAGE_EXPORT_MODES do if m == mode do cur = i
+				imgui.BeginDisabled(simplified)
+				if pick, ch := UI_Combo("defs.project.images", cur, labels); ch {
+					defs_checkpoint("Image Export")
+					e.LdtkJson_SetStr(root, "imageExportMode", e.LDTK_IMAGE_EXPORT_MODES[pick], a)
+					e.LdtkJson_SetNull(root, "pngFilePattern", a)
+					e.Ldtk_Doc_Touch(doc)
+				}
+				imgui.EndDisabled()
+				level_tip(simplified ? "The simplified export writes its own images" : "PNGs written to <project name>/png on each save (IntGrid layers also as one pixel per cell, \"-int\")", "project.exports")
+			}
+			if !simplified && e.LdtkJson_Str(root, "imageExportMode", "None") != "None" {
+				UI_PropLabel("File names")
+				buf: [256]u8
+				pat := e.LdtkJson_Str(root, "pngFilePattern")
+				copy(buf[:255], pat != "" ? pat : e.Ldtk_Doc_DefaultPngPattern(doc))
+				if imgui.InputText("##pngpat", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+					t := strings.trim_space(string(cstring(raw_data(buf[:]))))
+					defs_checkpoint("PNG File Names")
+					if t == "" || t == e.Ldtk_Doc_DefaultPngPattern(doc) do e.LdtkJson_SetNull(root, "pngFilePattern", a)
+					else do e.LdtkJson_SetStr(root, "pngFilePattern", t, a)
+					e.Ldtk_Doc_Touch(doc)
+				}
+				Drive_Item("defs.project.pngpattern")
+				level_tip("%level_name, %level_idx, %layer_name, %layer_idx, %world (Enter applies; empty: the default)", "project.exports")
+				prop_bool("Export backgrounds", "defs.project.exportbg", root, "exportLevelBg", "Levels' background colour and image as <level>_bg.png (and under the merged images)", "project.exports", true)
+			}
+			prop_bool("Simplified export", "defs.project.simplified", root, "simplifiedExport", "Per level, in <project name>/simplified: data.json (level, fields, entities), layer PNGs, a merged PNG, IntGrid CSVs", "project.exports")
+			if prop_bool("Tiled export", "defs.project.tiled", root, "exportTiled", "A Tiled map (.tmx) per level and a .world file, in <project name>/tiled (one grid size; for engines that only read Tiled)", "project.exports") {
+				if e.LdtkJson_Bool(root, "exportTiled") do Editor_Log(state, .Info, "Tiled export: only for engines that just read Tiled files; some features (several grid sizes, off-grid tiles) don't exist there")
+			}
+			UI_PropLabel("")
+			if UI_Button(fmt.tprintf("%s  Export now", ICON_FA_FILE_EXPORT), "defs.project.exportnow") {
+				r := e.Ldtk_Doc_RunExports(doc)
+				Editor_Log(state, .Info, "Exported %d file(s)", r.files)
+				for err in r.errors do Editor_Log(state, .Warn, "Export: %s", err)
+				Editor_InvalidateProjectFiles()
+			}
+			level_tip("Run the exports now (they also run on each save)", "project.exports")
+			imgui.SameLine()
+			if UI_Button(fmt.tprintf("%s  Open folder", ICON_FA_FOLDER_OPEN), "defs.project.openexports") {
+				dir := e.Ldtk_Doc_ExternalDir(doc)
+				_ = os.make_directory_all(dir)
+				Editor_OpenExternally(state, dir)
+			}
+			level_tip("Show the <project name> folder", "project.exports")
+			UI_EndProps()
+		}
+		if UI_SectionHeader("Custom commands", false) {
+			cmds := e.LdtkJson_Get(root, "customCommands")
+			UI_DimText("Commands run in the project's folder (Cmd+R runs the manual ones).")
+			if cmds != nil && cmds.kind == .Array {
+				for c, i in cmds.items {
+					imgui.PushIDInt(i32(i))
+					buf: [512]u8
+					copy(buf[:511], e.LdtkJson_Str(c, "command"))
+					imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 210)
+					if imgui.InputTextWithHint("##cmd", "command and arguments", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+						defs_checkpoint("Custom Command")
+						e.LdtkJson_SetStr(c, "command", string(cstring(raw_data(buf[:]))), a)
+						e.Ldtk_Doc_Touch(doc)
+					}
+					Drive_Item(fmt.tprintf("defs.command:%d", i))
+					level_tip("The command (quotes group arguments; Enter applies)", "project.commands")
+					imgui.SameLine()
+					imgui.SetNextItemWidth(140)
+					cur := 0
+					for w, k in LDTK_COMMAND_WHEN do if w == e.LdtkJson_Str(c, "when", "Manual") do cur = k
+					if pick, ch := UI_Combo(fmt.tprintf("defs.command.when:%d", i), cur, LDTK_COMMAND_WHEN_LABELS[:]); ch {
+						defs_checkpoint("Custom Command")
+						e.LdtkJson_SetStr(c, "when", LDTK_COMMAND_WHEN[pick], a)
+						e.Ldtk_Doc_Touch(doc)
+					}
+					level_tip("When it runs", "project.commands")
+					imgui.SameLine()
+					if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("defs.command.remove:%d", i), "", false, 24) {
+						defs_checkpoint("Remove Custom Command")
+						ordered_remove(&cmds.items, i)
+						e.Ldtk_Doc_Touch(doc)
+						imgui.PopID()
+						break
+					}
+					level_tip("Remove the command", "project.commands")
+					imgui.PopID()
+				}
+			}
+			if UI_Button(fmt.tprintf("%s  Command", ICON_FA_PLUS), "defs.command.add") {
+				defs_checkpoint("Add Custom Command")
+				if cmds == nil || cmds.kind != .Array {
+					cmds = e.LdtkJson_New(.Array, a)
+					e.LdtkJson_Set(root, "customCommands", cmds, a)
+				}
+				o := e.LdtkJson_New(.Object, a)
+				e.LdtkJson_Set(o, "command", e.LdtkJson_NewString("", a), a)
+				e.LdtkJson_Set(o, "when", e.LdtkJson_NewString("Manual", a), a)
+				append(&cmds.items, o)
+				e.Ldtk_Doc_Touch(doc)
+			}
+			level_tip("A new command", "project.commands")
+			imgui.SameLine()
+			if UI_Button(fmt.tprintf("%s  Run manual", ICON_FA_PLAY), "defs.command.run") do LevelCommands_Run(state, "Manual")
+			level_tip("Run the manual commands now (Cmd+R)", "project.commands")
+			iid := e.LdtkJson_Str(root, "iid")
+			if t, known := GlobalSettings.ldtkTrust[iid]; known {
+				imgui.SameLine()
+				UI_DimText(t ? "(allowed)" : "(blocked)")
+				imgui.SameLine()
+				if UI_Button("Reset trust", "defs.command.resettrust") {
+					for k in GlobalSettings.ldtkTrust do if k == iid {
+						delete_key(&GlobalSettings.ldtkTrust, k)
+						delete(k)
+						break
+					}
+					Editor_SaveSettings()
+				}
+				level_tip("Ask again before running this project's commands", "project.commands")
+			}
 		}
 		if UI_SectionHeader("Names") && UI_BeginProps("##proj_names") {
 			UI_PropLabel("Identifier style")

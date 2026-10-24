@@ -400,8 +400,27 @@ level_active_layer :: proc() -> (^e.Ldtk_DocLayer, ^e.Ldtk_DocLayerDef) {
 	return ly, e.Ldtk_Doc_LayerDef(L.doc, ly)
 }
 
-// LevelEditor_Save writes the project (and changed external levels).
+// LevelEditor_Save writes the project (and changed external levels) like
+// LDtk's saver: BeforeSave commands (the save waits for them), a backup,
+// the files, exports, AfterSave commands.
 LevelEditor_Save :: proc(state: ^EditorState) -> bool {
+	L := &GlobalLevel
+	if L.doc == nil do return false
+	if LevelCommands_Busy() {
+		Editor_Log(state, .Warn, "A custom command is running: save again when it ends")
+		return false
+	}
+	has := false
+	for c in e.LdtkJson_Arr(L.doc.root, "customCommands") do if e.LdtkJson_Str(c, "when") == "BeforeSave" && strings.trim_space(e.LdtkJson_Str(c, "command")) != "" do has = true
+	if has {
+		LevelCommands_Run(state, "BeforeSave", .Save)
+		return true
+	}
+	return LevelEditor_SaveNow(state)
+}
+
+// LevelEditor_SaveNow: the save itself (after the BeforeSave commands).
+LevelEditor_SaveNow :: proc(state: ^EditorState) -> bool {
 	L := &GlobalLevel
 	if L.doc == nil do return false
 	LevelProject_BeforeSave(state)
@@ -410,6 +429,7 @@ LevelEditor_Save :: proc(state: ^EditorState) -> bool {
 		return false
 	}
 	Editor_Log(state, .Info, "Saved level %s", L.rel)
+	LevelProject_AfterSave(state)
 	Editor_InvalidateProjectFiles()
 	return true
 }
@@ -545,6 +565,8 @@ LevelEditor_Render :: proc(state: ^EditorState, pos, size: [2]f32) {
 		level_bottom_panel(state)
 		LevelDefs_NewLayerDialog(state)
 		level_rename_popup(state)
+		LevelCommands_Update(state)
+		LevelCommands_Window(state)
 	}
 	level_prompts(state)
 }
@@ -1798,6 +1820,10 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 		case imgui.IsKeyPressed(.S, false):
 			LevelEditor_Save(state)
 			return true
+		case imgui.IsKeyPressed(.R, false):
+			// LDtk's "run manual commands"
+			LevelCommands_Run(state, "Manual")
+			return true
 		case imgui.IsKeyPressed(.Z, true) && io.KeyShift, imgui.IsKeyPressed(.Y, true):
 			level_redo(state)
 			return true
@@ -2049,6 +2075,12 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		return "<no enum>", true
 	}
 	if q == "level.external" do return doc.external ? "true" : "false", true
+	// level.file:<path relative to the .ldtk> -> whether it exists
+	if strings.has_prefix(q, "level.file:") {
+		p, _ := filepath.join({doc.dir, q[len("level.file:"):]}, context.temp_allocator)
+		return os.exists(p) ? "true" : "false", true
+	}
+	if q == "level.commandoutput" do return LevelCommands_Output(), true
 	if q == "level.levelfile" do return e.LdtkJson_Str(doc.levels[L.level].obj, "externalRelPath"), true
 	// level.layerprop:<layer>.<key> -> a layer definition's JSON value
 	if strings.has_prefix(q, "level.layerprop:") {

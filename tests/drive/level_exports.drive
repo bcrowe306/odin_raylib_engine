@@ -1,0 +1,52 @@
+# Level editor exports and custom commands (Project tab): PNGs per layer and
+# per level, the simplified format, Tiled maps; a manual custom command run
+# after allowing the project's commands.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/export_zz
+wait 90
+click @root.level
+wait 3
+click @level.open:export_zz/topdown.ldtk
+wait 5
+click @level.tab:Project
+wait 1
+click @section:Exports
+wait 1
+click @defs.project.images
+click @pick:One PNG per layer and per level
+wait 1
+screenshot exports_section
+click @defs.project.exportnow
+wait 3
+expect log contains Exported
+expect level.file:topdown/png/World_Level_0.png == true
+expect level.file:topdown/png/World_Level_0__Collisions-int.png == true
+# the simplified format (replaces the png folder)
+click @defs.project.simplified
+wait 1
+click @defs.project.exportnow
+wait 3
+expect level.file:topdown/simplified/World_Level_0/data.json == true
+expect level.file:topdown/simplified/World_Level_0/_composite.png == true
+expect level.file:topdown/png == false
+# Tiled
+click @defs.project.tiled
+wait 1
+click @defs.project.exportnow
+wait 3
+expect level.file:topdown/tiled/topdown.world == true
+# a manual command, after allowing the project's commands
+click @section:Custom commands
+wait 1
+click @defs.command.add
+wait 1
+click @defs.command:0
+type touch command_zz.txt
+key enter
+wait 1
+click @defs.command.run
+wait 2
+screenshot trust_dialog
+click @trust.allow
+wait 30
+expect level.file:command_zz.txt == true
+expect level.commandoutput contains exit code 0

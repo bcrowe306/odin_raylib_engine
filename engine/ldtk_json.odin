@@ -43,6 +43,7 @@ LdtkJson :: struct {
 LdtkJson_Style :: enum u8 {
 	Compact,  // LDtk's default (small arrays / objects on one line)
 	Minified, // the project's "minifyJson" setting
+	Full,     // every object / array expanded (the simplified export's data.json)
 }
 
 LDTK_JSON_HEADER_KEY :: "__header__"
@@ -617,7 +618,7 @@ ljw_object :: proc(w: ^Ljw, name: string, named: bool, n: ^LdtkJson, force: bool
 		} else do strings.write_string(w.b, "{}")
 		return
 	}
-	l := w.style == .Compact ? ljw_eval_len(n, 0) : 0
+	l := w.style == .Compact ? ljw_eval_len(n, 0) : w.style == .Full ? max(int) : 0
 	if named do ljw_name(w, name)
 	space := w.style == .Minified ? "" : " "
 	if l <= LDTK_JSON_MAX_LINE && !header && !force {
@@ -658,7 +659,7 @@ ljw_array :: proc(w: ^Ljw, name: string, named: bool, n: ^LdtkJson, force: bool)
 		strings.write_string(w.b, "[]")
 		return
 	}
-	l := w.style == .Compact ? ljw_eval_len(n, 0) : 0
+	l := w.style == .Compact ? ljw_eval_len(n, 0) : w.style == .Full ? max(int) : 0
 	if named do ljw_name(w, name)
 	first := n.items[0].kind
 	if w.style != .Minified && first == .Number && !force && len(n.items) > LDTK_JSON_MAX_LINE {
