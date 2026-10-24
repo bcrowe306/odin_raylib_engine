@@ -1,0 +1,55 @@
+# Accessibility: Project Settings > Accessibility defaults saved in
+# project.json; View > Colour Vision previews the viewport (simulated);
+# a UI Container's New Script picks the Accessibility Menu template, which in
+# Simulate builds its rows from the settings (captions on from the project).
+wait 5
+key ctrl+comma
+expect project-settings-open == true
+click @settings.tab:project
+click @settings.page:Accessibility
+click @settings.acc-captions
+screenshot settings
+click @settings.save
+wait 3
+expect file:project.json contains "accessibility": {"captions": true}
+
+click @menu:View
+click @menu:View/Colour Vision: Deuteranopia
+wait 3
+screenshot vision_deuteranopia
+click @menu:View
+click @menu:View/Colour Vision: Deuteranopia
+wait 2
+
+key escape
+click @hier.add
+type ui container
+click @addnode.create
+dblclick @insp.name
+key ctrl+a
+type AccessZz
+key enter
+click @insp.script-new
+expect item:newscript.template:accessibility_menu == visible
+click @newscript.template:accessibility_menu
+click @newscript.create
+wait 3
+expect file:scripts/access_zz.lua contains Accessibility.set(key, v)
+key cmd+s
+wait 3
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+expect node:ui_scale_slider.type == UISliderNode
+expect node:captions_check.prop.checked == true
+expect node:colorblind_button.prop.text == Colour filter: Off
+click @bottom:console
+click @console.lua
+type Accessibility.set("colorblind", "deuteranopia"); Scene.find_node("AccessZz"):get_script():refresh()
+key enter
+wait 3
+expect node:colorblind_button.prop.text == Colour filter: Deuteranopia (green)
+screenshot menu
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

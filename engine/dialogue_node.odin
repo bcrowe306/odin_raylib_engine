@@ -10,12 +10,22 @@ import rl "vendor:raylib"
 // "confirm") shows the rest of a line, then the next one; after the last
 // the box closes. Events: "line_shown"(index, 1-based) when a line is fully
 // shown, "finished" when the box closes.
+//
+// A line may name a voice sound (played when the line starts). Mode
+// Subtitles shows the lines on the subtitle track instead of a box
+// (subtitles.odin: cutscene voice-over, barks): each line stays for its
+// voice's length (else its reading time), then the next one follows by
+// itself; the advance action skips. With the player's subtitles turned off
+// the lines still play and time out (events too), unseen.
 // ============================================================================
 
 Dialogue_Line :: struct {
 	speaker: string,
 	text:    string,
+	voice:   string, // a sound played with the line ("" = none)
 }
+
+Dialogue_Mode :: enum u8 {Box, Subtitles}
 
 DialogueNode :: struct {
 	using ui:      UIElement,
@@ -29,12 +39,18 @@ DialogueNode :: struct {
 	revealSpeed:   f32 `gui:"true" min:"0" max:"500"`, // characters per second (0 = whole lines)
 	advanceAction: string `gui:"true"`,                 // input action that advances ("confirm")
 	localized:     bool `gui:"true"`,                   // lines are locale keys
+	mode:          Dialogue_Mode `gui:"true"`,          // a box, or the subtitle track
 
 	lines:         [dynamic]Dialogue_Line,
 	current:       int,  // index into lines; -1 = closed
 	revealed:      f32,
 	lineDone:      bool,
 	time:          f32,
+	started:       bool, // the current line's voice / subtitle began
+	lineTime:      f32,  // Subtitles mode: seconds left on this line
+	subId:         u64,
+	voice:         Mixer_Voice_Handle,
+	voiceSound:    ^AudioSound,
 	onLineShown:   EventSubject,
 	onFinished:    EventSubject,
 }
@@ -69,17 +85,58 @@ DialogueNode_Init :: proc(d: ^DialogueNode) {
 
 DialogueNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 	d := cast(^DialogueNode)node
+	line_end(d)
 	DestroySubject(&d.onLineShown)
 	DestroySubject(&d.onFinished)
 }
 
 // DialogueNode_Show opens the box with these lines (replacing any).
 DialogueNode_Show :: proc(d: ^DialogueNode, lines: []Dialogue_Line) {
+	line_end(d)
 	clear(&d.lines)
-	for l in lines do append(&d.lines, Dialogue_Line{strings.clone(l.speaker, d.allocator), strings.clone(l.text, d.allocator)})
+	for l in lines do append(&d.lines, Dialogue_Line{strings.clone(l.speaker, d.allocator), strings.clone(l.text, d.allocator), strings.clone(l.voice, d.allocator)})
 	d.current = 0 if len(d.lines) > 0 else -1
 	d.revealed = 0
 	d.lineDone = false
+	d.started = false
+}
+
+// line_start: the current line's voice and (Subtitles mode) subtitle.
+@(private = "file")
+line_start :: proc(d: ^DialogueNode, ctx: ^GameContext) {
+	d.started = true
+	gc := ctx if ctx != nil else d.gameContext
+	l := d.lines[d.current]
+	length: f32
+	if l.voice != "" && gc != nil && gc.game != nil {
+		rm := &gc.game.resourceManager
+		if s, ok := rm.loadAudioSound(rm, Project_ResolveAssetPath(gc, l.voice)); ok {
+			d.voiceSound = s
+			length = f32(len(s.pcm) / 2) / MIXER_RATE
+			if Audio_Ready() do d.voice = Mixer_PlaySound(s.pcm, Audio_BusFor(rm, s.filePath, "SFX"), owner = s)
+		}
+	}
+	if d.mode == .Subtitles {
+		speaker, text := line_text(d, ctx)
+		d.lineTime = length + 0.3 if length > 0 else Subtitles_ReadingTime(text)
+		d.subId = Subtitles_Show(text, speaker, d.lineTime, .Dialogue)
+		d.lineDone = true
+		d.onLineShown->notify(d, d.current + 1, ctx)
+	}
+}
+
+// line_end: stops the line's voice and takes its subtitle down.
+@(private = "file")
+line_end :: proc(d: ^DialogueNode) {
+	Mixer_StopVoice(d.voice)
+	d.voice = {}
+	if d.voiceSound != nil {
+		if gc := d.gameContext; gc != nil && gc.game != nil do ResourceManager_ReleaseSound(&gc.game.resourceManager, d.voiceSound)
+		d.voiceSound = nil
+	}
+	Subtitles_Hide(d.subId)
+	d.subId = 0
+	d.started = false
 }
 
 DialogueNode_IsOpen :: proc(d: ^DialogueNode) -> bool {
@@ -106,6 +163,7 @@ DialogueNode_Advance :: proc(d: ^DialogueNode, ctx: ^GameContext) {
 		d.onLineShown->notify(d, d.current + 1, ctx)
 		return
 	}
+	line_end(d)
 	d.current += 1
 	d.revealed = 0
 	d.lineDone = false
@@ -117,6 +175,7 @@ DialogueNode_Advance :: proc(d: ^DialogueNode, ctx: ^GameContext) {
 
 DialogueNode_Close :: proc(d: ^DialogueNode, ctx: ^GameContext) {
 	if !DialogueNode_IsOpen(d) do return
+	line_end(d)
 	d.current = -1
 	d.onFinished->notify(d, nil, ctx)
 }
@@ -125,7 +184,14 @@ DialogueNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	d := cast(^DialogueNode)node
 	d.time += dt
 	if !DialogueNode_IsOpen(d) do return
-	if !d.lineDone {
+	if !d.started do line_start(d, ctx)
+	if d.mode == .Subtitles {
+		d.lineTime -= dt
+		if d.lineTime <= 0 {
+			DialogueNode_Advance(d, ctx) // the next line by itself
+			return
+		}
+	} else if !d.lineDone {
 		_, text := line_text(d, ctx)
 		total := Text_PlainLength(text, true)
 		d.revealed += d.revealSpeed * dt if d.revealSpeed > 0 else f32(total)
@@ -144,7 +210,7 @@ DialogueNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 
 DialogueNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	d := cast(^DialogueNode)node
-	if !rl.IsWindowReady() || !DialogueNode_IsOpen(d) do return
+	if !rl.IsWindowReady() || !DialogueNode_IsOpen(d) || d.mode == .Subtitles do return // (Subtitles: on the track)
 	rect := UI_GetElementRect(&d.ui)
 	rl.DrawRectangleRounded(rect, 0.08, 8, d.panelColor)
 	rl.DrawRectangleRoundedLinesEx(rect, 0.08, 8, 2, d.borderColor)

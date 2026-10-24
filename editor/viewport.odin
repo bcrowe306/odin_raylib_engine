@@ -116,6 +116,9 @@ Viewport_UpdateAndRender :: proc(state: ^EditorState) {
 			}
 		}
 
+		// Colour vision preview (View menu): simulated.
+		if viewportVision != .None do shown = e.Colorblind_Process(shown, viewportVision, 1, true)
+
 		// Render texture image into ImGui
 		imgui.Image(
 			transmute(imgui.TextureID)&shown,
@@ -1130,4 +1133,13 @@ Viewport_FitGameView :: proc(state: ^EditorState) {
 	center := [2]f32{vw * 0.5, vh * 0.5}
 	if state.activeScene != nil && state.activeScene.camera != nil do center = e.CameraNode_ViewCenter(state.activeScene.camera)
 	fit_bounds(state, center - {vw, vh} * 0.5, center + {vw, vh} * 0.5, 0.95)
+}
+
+// The viewport's colour vision preview (View > Colour Vision): how players
+// with that deficiency see the scene (simulated, not corrected).
+viewportVision: e.Colorblind_Mode
+
+// viewport_set_vision toggles a preview (choosing the shown one turns it off).
+viewport_set_vision :: proc(m: e.Colorblind_Mode) {
+	viewportVision = .None if viewportVision == m else m
 }

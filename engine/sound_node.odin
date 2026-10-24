@@ -10,6 +10,7 @@ SoundNode :: struct {
 	volume: f32 `gui:"true" min:"0" max:"1"`,
 	pitch: f32 `gui:"true" min:"0.1" max:"3"`,
 	bus: string `gui:"true"`, // the mixer bus it plays into ("" = SFX)
+	caption: string `gui:"true"`, // shown on the subtitle track when it plays, for players with captions on ("[door creaks]")
 	autoplay: bool `gui:"true"`, // play once when the node becomes ready
 	voices: int `gui:"true" min:"1" max:"8"`, // plays over itself up to this many times (1: restarts)
 	// Positional: volume falls from minDistance to maxDistance from the
@@ -131,6 +132,7 @@ SoundNode_Play :: proc(soundNode: ^SoundNode) {
 	soundNode.nextVoice = (slot + 1) % n
 	vol, pan := SoundNode_Mix(soundNode, soundNode.gameContext)
 	soundNode.handles[slot] = Mixer_PlaySound(soundNode.audio.pcm, SoundNode_BusIndex(soundNode), vol, Audio_RaylibPanToMixer(pan), soundNode.pitch, owner = soundNode.audio)
+	if soundNode.caption != "" do Subtitles_Show(soundNode.caption, "", clamp(f32(len(soundNode.audio.pcm) / 2) / MIXER_RATE, 1.5, 5), .Caption)
 	soundNode.wasPlaying = true
 	soundNode.soundPaused = false
 }

@@ -156,6 +156,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"DialogueNode.padding", "Space between the border and the text (px)."},
 	{"DialogueNode.revealSpeed", "Typewriter speed in characters per second (0 = whole lines)."},
 	{"DialogueNode.advanceAction", "Input action that shows the rest of the line, then the next (\"confirm\")."},
+	{"DialogueNode.mode", "Box: a dialogue box the player advances. Subtitles: the lines go on the subtitle track (no box), each for its voice's length or reading time, then the next by itself - cutscenes, barks."},
 	{"DialogueNode.localized", "Lines are keys in the locale tables (locale/*.csv)."},
 	{"TextNode.text", "The text; rich text markup when Rich Text is on, a locale key when Localized."},
 	{"TextNode.font", "Project font (.ttf / .otf / .fnt; \"\" = the engine font)."},
@@ -236,6 +237,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 
 	// --- Audio ---
 	{"MusicNode.volume", "Volume (0-1), before the bus and master volumes."},
+	{"MusicNode.caption", "Shown on the subtitle track when it starts, for players with sound captions on (e.g. \"[calm music]\")."},
 	{"MusicNode.bus", "The mixer bus it plays into (the Mixer tab; empty = Music): its fader, effects and output apply."},
 	{"MusicNode.pitch", "Playback speed / pitch (1 = normal)."},
 	{"MusicNode.pan", "Stereo position: 0 left, 0.5 centre, 1 right."},
@@ -244,6 +246,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"MusicNode.isPlaying", "Playing now."},
 	{"MusicNode.isPaused", "Paused now."},
 	{"SoundNode.volume", "Volume (0-1), before the bus and master volumes."},
+	{"SoundNode.caption", "Shown on the subtitle track when it plays, for players with sound captions on (e.g. \"[door creaks]\")."},
 	{"SoundNode.bus", "The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output apply."},
 	{"SoundNode.pitch", "Playback speed / pitch (1 = normal)."},
 	{"SoundNode.autoplay", "Play once when the node becomes ready."},

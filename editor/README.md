@@ -542,6 +542,16 @@ the Inspector rebuilds them. **Navigation Agent** under a character walks
 it to targets; in Simulate its path is drawn green. Guide:
 [`engine/docs/navigation.md`](../engine/docs/navigation.md).
 
+### Accessibility
+
+**Project Settings > Project > Accessibility**: the players' defaults (UI
+scale, colour filter, subtitles, captions, subtitle size / backdrop, screen
+shake). **View > Colour Vision** previews the viewport as players with
+protanopia, deuteranopia or tritanopia see it. The **Accessibility Menu**
+script template (on a UI Container) builds an in-game options menu. Sound
+and Music nodes have a **Caption**; Dialogue nodes a **Mode** (Box or
+Subtitles). Guide: [`engine/docs/accessibility.md`](../engine/docs/accessibility.md).
+
 ### Advanced cameras
 
 **Advanced Camera** (Add Node > Core & 2D): a virtual camera. The viewport

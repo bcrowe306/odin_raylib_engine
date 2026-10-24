@@ -49,7 +49,14 @@ UIElement_Init :: proc(elem: ^UIElement, widgetType: UIWidgetType, size: [2]f32)
 // ============================================================================
 // UI Input & Viewport Coordinate Helpers (Window + Headless Test Compatible)
 // ============================================================================
+// UI_GetMousePos: the mouse in game units, in the unscaled space of the UI
+// node whose input is being handled (accessibility UI scale).
 UI_GetMousePos :: proc(gameContext: ^GameContext) -> [2]f32 {
+	return UI_UnscalePoint(uiInputNode, UI_GetMousePosRaw(gameContext))
+}
+
+// UI_GetMousePosRaw: the mouse in game units (screen space).
+UI_GetMousePosRaw :: proc(gameContext: ^GameContext) -> [2]f32 {
 	if gameContext != nil && gameContext.game != nil {
 		g := gameContext.game
 		if g.uiTestInputEnabled {
@@ -409,11 +416,11 @@ UI_UpdateFocusNavigation :: proc(scene: ^Scene, gameContext: ^GameContext) {
 			defer delete(elements)
 			UI_CollectFocusableElements(scene, &elements)
 
-			mp := UI_GetMousePos(gameContext)
+			mp := UI_GetMousePosRaw(gameContext)
 			clickedElem: ^UIElement = nil
 			for elem in elements {
 				rect := UI_GetElementRect(elem)
-				if UI_PointInRect(mp, rect) {
+				if UI_PointInRect(UI_UnscalePoint(elem, mp), rect) { // (in its UI-scale space)
 					clickedElem = elem
 					break
 				}
@@ -1369,7 +1376,9 @@ UI_RenderActiveDropdownOverlay :: proc(gameContext: ^GameContext) {
 	if !dd.isOpen || !dd.enabled do return
 
 	popupRect := UIDropdownNode_GetPopupRect(dd)
+	scaled := UI_BeginScaled(dd) // (with its UI-scale transform)
 	uilib.RenderDropdownPopup(popupRect, dd.items[:], dd.selectedIndex, dd.hoveredItemIndex, 24)
+	if scaled do UI_EndScaled()
 }
 
 UIDropdownNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {

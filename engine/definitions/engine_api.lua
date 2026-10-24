@@ -1346,6 +1346,7 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@field volume number Volume (0-1), before the bus and master volumes.
 ---@field pitch number Playback speed / pitch (1 = normal).
 ---@field bus string The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output...
+---@field caption string Shown on the subtitle track when it plays, for players with sound captions on (e.g. "[d...
 ---@field autoplay boolean Play once when the node becomes ready.
 ---@field voices integer Plays over itself up to this many times (1: a new play restarts it).
 ---@field positional boolean Volume and pan follow the node's distance and side from the listener (the current camera).
@@ -1366,6 +1367,7 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---| "volume" # number - Volume (0-1), before the bus and master volumes.
 ---| "pitch" # number - Playback speed / pitch (1 = normal).
 ---| "bus" # string - The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output...
+---| "caption" # string - Shown on the subtitle track when it plays, for players with sound captions on (e.g. "[d...
 ---| "autoplay" # boolean - Play once when the node becomes ready.
 ---| "voices" # integer - Plays over itself up to this many times (1: a new play restarts it).
 ---| "positional" # boolean - Volume and pan follow the node's distance and side from the listener (the current camera).
@@ -1388,6 +1390,7 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@overload fun(self: SoundNode, path: "volume"): number
 ---@overload fun(self: SoundNode, path: "pitch"): number
 ---@overload fun(self: SoundNode, path: "bus"): string
+---@overload fun(self: SoundNode, path: "caption"): string
 ---@overload fun(self: SoundNode, path: "autoplay"): boolean
 ---@overload fun(self: SoundNode, path: "voices"): integer
 ---@overload fun(self: SoundNode, path: "positional"): boolean
@@ -1412,6 +1415,7 @@ function SoundNode:get_property(path) end
 ---@overload fun(self: SoundNode, path: "volume", value: number)
 ---@overload fun(self: SoundNode, path: "pitch", value: number)
 ---@overload fun(self: SoundNode, path: "bus", value: string)
+---@overload fun(self: SoundNode, path: "caption", value: string)
 ---@overload fun(self: SoundNode, path: "autoplay", value: boolean)
 ---@overload fun(self: SoundNode, path: "voices", value: integer)
 ---@overload fun(self: SoundNode, path: "positional", value: boolean)
@@ -1434,6 +1438,7 @@ function SoundNode:set_property(path, value, y) end
 ---@field pitch number Playback speed / pitch (1 = normal).
 ---@field pan number Stereo position: 0 left, 0.5 centre, 1 right.
 ---@field bus string The mixer bus it plays into (the Mixer tab; empty = Music): its fader, effects and outp...
+---@field caption string Shown on the subtitle track when it starts, for players with sound captions on (e.g. "[...
 ---@field looping boolean Start again at the end.
 ---@field autoplay boolean Start playing when the node becomes ready.
 ---@field isPlaying boolean Playing now.
@@ -1454,6 +1459,7 @@ function SoundNode:set_property(path, value, y) end
 ---| "pitch" # number - Playback speed / pitch (1 = normal).
 ---| "pan" # number - Stereo position: 0 left, 0.5 centre, 1 right.
 ---| "bus" # string - The mixer bus it plays into (the Mixer tab; empty = Music): its fader, effects and outp...
+---| "caption" # string - Shown on the subtitle track when it starts, for players with sound captions on (e.g. "[...
 ---| "looping" # boolean - Start again at the end.
 ---| "autoplay" # boolean - Start playing when the node becomes ready.
 ---| "isPlaying" # boolean (runtime) - Playing now.
@@ -1476,6 +1482,7 @@ function SoundNode:set_property(path, value, y) end
 ---@overload fun(self: MusicNode, path: "pitch"): number
 ---@overload fun(self: MusicNode, path: "pan"): number
 ---@overload fun(self: MusicNode, path: "bus"): string
+---@overload fun(self: MusicNode, path: "caption"): string
 ---@overload fun(self: MusicNode, path: "looping"): boolean
 ---@overload fun(self: MusicNode, path: "autoplay"): boolean
 ---@overload fun(self: MusicNode, path: "isPlaying"): boolean
@@ -1500,6 +1507,7 @@ function MusicNode:get_property(path) end
 ---@overload fun(self: MusicNode, path: "pitch", value: number)
 ---@overload fun(self: MusicNode, path: "pan", value: number)
 ---@overload fun(self: MusicNode, path: "bus", value: string)
+---@overload fun(self: MusicNode, path: "caption", value: string)
 ---@overload fun(self: MusicNode, path: "looping", value: boolean)
 ---@overload fun(self: MusicNode, path: "autoplay", value: boolean)
 ---@overload fun(self: MusicNode, path: "isPlaying", value: boolean)
@@ -3137,6 +3145,7 @@ function TextNode:set_property(path, value, y) end
 ---@field revealSpeed number Typewriter speed in characters per second (0 = whole lines).
 ---@field advanceAction string Input action that shows the rest of the line, then the next ("confirm").
 ---@field localized boolean Lines are keys in the locale tables (locale/*.csv).
+---@field mode "Box"|"Subtitles" Box: a dialogue box the player advances. Subtitles: the lines go on the subtitle track ...
 
 ---@alias DialogueNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -3160,6 +3169,7 @@ function TextNode:set_property(path, value, y) end
 ---| "revealSpeed" # number - Typewriter speed in characters per second (0 = whole lines).
 ---| "advanceAction" # string - Input action that shows the rest of the line, then the next ("confirm").
 ---| "localized" # boolean - Lines are keys in the locale tables (locale/*.csv).
+---| "mode" # "Box"|"Subtitles" - Box: a dialogue box the player advances. Subtitles: the lines go on the subtitle track ...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path DialogueNodeProperty|string
@@ -3185,6 +3195,7 @@ function TextNode:set_property(path, value, y) end
 ---@overload fun(self: DialogueNode, path: "revealSpeed"): number
 ---@overload fun(self: DialogueNode, path: "advanceAction"): string
 ---@overload fun(self: DialogueNode, path: "localized"): boolean
+---@overload fun(self: DialogueNode, path: "mode"): "Box"|"Subtitles"
 function DialogueNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
@@ -3212,6 +3223,7 @@ function DialogueNode:get_property(path) end
 ---@overload fun(self: DialogueNode, path: "revealSpeed", value: number)
 ---@overload fun(self: DialogueNode, path: "advanceAction", value: string)
 ---@overload fun(self: DialogueNode, path: "localized", value: boolean)
+---@overload fun(self: DialogueNode, path: "mode", value: "Box"|"Subtitles")
 function DialogueNode:set_property(path, value, y) end
 
 ---@class NineSliceNode
@@ -5763,6 +5775,7 @@ function TextNode:text_restart() end
 ---@class DialogueLine
 ---@field speaker? string
 ---@field text string Rich text ([color=..] [size=..] [wave] [shake]), or a locale key when the box is localized
+---@field voice? string A sound played with the line (in Subtitles mode the line lasts as long)
 
 ---DialogueNode: opens the box with these lines (strings or {speaker, text}),
 ---or one line: box:dialogue_show(text, speaker). Each line types out; the
@@ -7113,6 +7126,97 @@ function PoolModule.stats(component) end
 
 -- ============================================================================
 
+---@alias AccessibilityKey "ui_scale"|"colorblind"|"colorblind_strength"|"colorblind_simulate"|"subtitles"|"captions"|"subtitle_scale"|"subtitle_background"|"screen_shake"
+
+---@class AccessibilitySettings
+---@field ui_scale number 0.5..3 - top-level UI elements grow around the screen corner / edge / centre they're nearest to
+---@field colorblind "none"|"protanopia"|"deuteranopia"|"tritanopia" Colour filter (corrects the picture)
+---@field colorblind_strength number 0..1
+---@field colorblind_simulate boolean Show how it looks with the deficiency instead (testing)
+---@field subtitles boolean Spoken lines on the subtitle track
+---@field captions boolean Sounds' captions on the subtitle track
+---@field subtitle_scale number 0.5..3
+---@field subtitle_background number Backdrop opacity 0..1
+---@field screen_shake number 0..2 - scales every camera shake / trauma
+
+---@class AccessibilityModule
+---The player's accessibility settings: applied at once, saved with
+---Accessibility.save() (accessibility.json next to the save files) and
+---loaded when the game starts over the project's defaults (Project
+---Settings > Accessibility). See the Accessibility Menu script template.
+local AccessibilityModule = {}
+
+---A setting's value.
+---
+---Example: `local s = Accessibility.get("ui_scale")`
+---@param key AccessibilityKey
+---@return any
+function AccessibilityModule.get(key) end
+
+---Changes a setting (false for an unknown key or value).
+---
+---Example: `Accessibility.set("colorblind", "deuteranopia")`
+---@param key AccessibilityKey
+---@param value number|boolean|string
+---@return boolean ok
+function AccessibilityModule.set(key, value) end
+
+---Every setting.
+---
+---Example: `for k, v in pairs(Accessibility.get_all()) do print(k, v) end`
+---@return AccessibilitySettings
+function AccessibilityModule.get_all() end
+
+---Saves the player's settings.
+---
+---Example: `Accessibility.save()`
+---@return boolean ok
+function AccessibilityModule.save() end
+
+---Back to the project's defaults (save to keep).
+---
+---Example: `Accessibility.reset()`
+function AccessibilityModule.reset() end
+
+---@class SubtitleOptions
+---@field speaker? string Shown before the line
+---@field duration? number Seconds (default: its reading time)
+---@field caption? boolean A sound caption (shown when the player has captions on) instead of a spoken line
+---@field color? Color
+
+---@class SubtitlesModule
+---The subtitle track: lines at the bottom centre over everything, each for
+---a time (up to 3 at once). Spoken lines show when the player has
+---subtitles on, captions when captions are on.
+local SubtitlesModule = {}
+
+---Shows a line; returns its id (0 when the player turned that kind off).
+---
+---Example: `Subtitles.show("Over here!", {speaker = "Ada"})`
+---@param text string Rich text
+---@param options? SubtitleOptions
+---@return integer id
+function SubtitlesModule.show(text, options) end
+
+---Takes a line down early.
+---
+---Example: `Subtitles.hide(id)`
+---@param id integer
+function SubtitlesModule.hide(id) end
+
+---Takes every line down.
+---
+---Example: `Subtitles.clear()`
+function SubtitlesModule.clear() end
+
+---Lines on screen now.
+---
+---Example: `if Subtitles.count() == 0 then self:next_bark() end`
+---@return integer
+function SubtitlesModule.count() end
+
+-- ============================================================================
+
 ---@alias SaveValue nil|boolean|number|string|table
 
 ---@class SaveModule
@@ -8411,6 +8515,12 @@ Tween = TweenModule
 
 ---@type PoolModule
 Pool = PoolModule
+
+---@type AccessibilityModule
+Accessibility = AccessibilityModule
+
+---@type SubtitlesModule
+Subtitles = SubtitlesModule
 
 ---@type SaveModule
 Save = SaveModule

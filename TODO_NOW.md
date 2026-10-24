@@ -157,7 +157,7 @@ Editor:
 Platform and shipping (later): 18 mobile export + touch, 19 Steam, 20 gamepad rumble / multiple controllers / glyphs, 21 networking, 22 crash reports.
 
 Quality of life:
-- [ ] 23 Accessibility: UI scaling, colourblind filters, remappable controls, subtitles from dialogue
+- [x] 23 Accessibility: settings per player (accessibility.json, over project.json defaults; Project Settings > Accessibility), UI scale (top-level UI elements grow around their nearest screen corner / edge / centre; UI input mouse in the same space), colour-blind filters (daltonize correction / simulate shader on the final frame; View > Colour Vision preview in the editor), subtitle track (dialogue / captions, size, backdrop), Dialogue Mode Subtitles with per-line voice sounds, Sound / Music captions, screen shake scale (both cameras), remappable controls (11); Lua Accessibility.* / Subtitles.*; Accessibility Menu template; guide with a tutorial, test, real-game screenshots, drive
 - [x] 24 Advanced camera: AdvancedCameraNode virtual cameras hosted by the scene's CameraNode (highest priority shown, eased blends of position / zoom / rotation, a transient host when the scene has no camera); follow modes None / Glued / Simple (offset, damping, look-ahead) / Group (auto zoom) / Path / Framed (dead zone), axis lock; limits Rect / Node bounds / the LDtk level the target is in (glides between linked levels); trauma shake (trauma ^ exponent, noise, decay); Lua add_trauma / make_active / is_active / snap, Camera.add_trauma / get_active, became_active / inactive; Inspector node pickers, viewport frames / dead zone / limits (preview on a copy); guide with tutorials, tests, drive
 
 ## Phase 11 — State transition guards (2026-10-23)

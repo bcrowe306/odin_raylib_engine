@@ -50,6 +50,7 @@ ProjectConfig :: struct {
 	musicVolume:   f32,
 	sfxVolume:     f32,
 	mixerBuses:    string, // the mixer's buses ("audio": {"buses": [...]}, JSON text; mixer_config.odin) - "" = Master / Music / SFX
+	accessibility: string, // the players' default accessibility settings ("accessibility": {...}, JSON text; accessibility.odin) - "" = the engine's
 	// Input actions (empty = the built-in defaults)
 	actions:       [dynamic]Input_Action_Config,
 	// Export
@@ -94,6 +95,7 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg.icon != "" do delete(cfg.icon, allocator)
 	if cfg.language != "" do delete(cfg.language, allocator)
 	if cfg.mixerBuses != "" do delete(cfg.mixerBuses, allocator)
+	if cfg.accessibility != "" do delete(cfg.accessibility, allocator)
 	for n in cfg.collisionLayers do if n != "" do delete(n, allocator)
 	for s in cfg.scenes {
 		delete(s, allocator)
@@ -126,6 +128,7 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c.icon = strings.clone(src.icon, allocator)
 	c.language = strings.clone(src.language, allocator)
 	c.mixerBuses = strings.clone(src.mixerBuses, allocator) if src.mixerBuses != "" else ""
+	c.accessibility = strings.clone(src.accessibility, allocator) if src.accessibility != "" else ""
 	for n, i in src.collisionLayers do c.collisionLayers[i] = strings.clone(n, allocator) if n != "" else ""
 	c.scenes = make([dynamic]string, allocator)
 	for s in src.scenes do append(&c.scenes, strings.clone(s, allocator))
@@ -344,6 +347,9 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 			if text, merr := json.marshal(buses, {}, context.temp_allocator); merr == nil do cfg.mixerBuses = strings.clone(string(text), allocator)
 		}
 	}
+	if accObj, ok := json_get_obj(rootObj, "accessibility"); ok {
+		if text, merr := json.marshal(accObj, {}, context.temp_allocator); merr == nil && len(accObj) > 0 do cfg.accessibility = strings.clone(string(text), allocator)
+	}
 	if inputObj, ok := json_get_obj(rootObj, "input"); ok {
 		if arr, has := json_get_arr(inputObj, "actions"); has {
 			cfg.actions = make([dynamic]Input_Action_Config, allocator)
@@ -458,6 +464,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	fmt.sbprintf(&sb, "  \"audio\": {{\"master_volume\": %.2f, \"music_volume\": %.2f, \"sfx_volume\": %.2f", cfg.masterVolume, cfg.musicVolume, cfg.sfxVolume)
 	if cfg.mixerBuses != "" do fmt.sbprintf(&sb, ", \"buses\": %s", cfg.mixerBuses)
 	strings.write_string(&sb, "},\n")
+	if cfg.accessibility != "" do fmt.sbprintf(&sb, "  \"accessibility\": %s,\n", cfg.accessibility)
 	strings.write_string(&sb, "  \"physics\": {\n")
 	fmt.sbprintf(&sb, "    \"gravity\": [%.2f, %.2f],\n    \"debug_draw\": %t", cfg.gravity.x, cfg.gravity.y, cfg.debugDraw)
 	last := -1
@@ -566,6 +573,8 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	Input_ApplyActionConfigs(&game.input, cfg.actions[:])
 	Input_RebindSetDefaults(&game.input, cfg.actions[:]) // (Input.reset_bindings)
 	if activate do Input_LoadUserBindings(&game.input) // the player's own (the game, not the editor)
+	Access_SetDefaults(ProjectConfig_Accessibility(cfg))
+	if activate do Access_Load() // the player's accessibility settings (the game, not the editor)
 	Texture_ImportsSet(cfg.textureImport[:])
 	Asset_ImportsReset() // per-asset settings are read again as assets load
 	// Global scripts exist before any scene; the game starts them (ready)
@@ -737,4 +746,22 @@ Game_LoadProject :: proc(game: ^Game, pathOrDir: string) -> bool {
 		return Game_LoadProjectFromOre(game, pathOrDir)
 	}
 	return Game_LoadProjectFromDirectory(game, pathOrDir)
+}
+
+// ProjectConfig_Accessibility: the project's default accessibility settings.
+ProjectConfig_Accessibility :: proc(cfg: ^ProjectConfig) -> Access_Settings {
+	if cfg == nil || cfg.accessibility == "" do return ACCESS_DEFAULTS
+	v, err := json.parse_string(cfg.accessibility, allocator = context.temp_allocator)
+	if err != nil do return ACCESS_DEFAULTS
+	o, ok := v.(json.Object)
+	if !ok do return ACCESS_DEFAULTS
+	return Access_FromJSON(o, ACCESS_DEFAULTS)
+}
+
+// ProjectConfig_SetAccessibility stores the defaults (only what differs
+// from the engine's).
+ProjectConfig_SetAccessibility :: proc(cfg: ^ProjectConfig, s: Access_Settings, allocator := context.allocator) {
+	if cfg.accessibility != "" do delete(cfg.accessibility, allocator)
+	text := Access_ToJSON(Access_Clamp(s), context.temp_allocator, ACCESS_DEFAULTS)
+	cfg.accessibility = strings.clone(text, allocator) if text != "{}" else ""
 }

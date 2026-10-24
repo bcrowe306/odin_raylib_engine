@@ -275,6 +275,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	// Update global positions after node updates & container layout
 	Node_SetGlobalPositions(nodeManager, scene.rootNode)
 	if !frozen do Visibility_Update(scene, gameContext) // on / off screen (visibility_notifier.odin)
+	if !frozen do Subtitles_Update(deltaTime)           // (subtitles.odin)
 
 	// One traversal buckets renderable nodes by layer (hierarchy order is
 	// kept within a layer) instead of walking the whole tree per layer.
@@ -347,6 +348,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 
 	// Render any active UI popups/dropdowns on top of all layers
 	UI_RenderActiveDropdownOverlay(gameContext)
+	Subtitles_Render(gameContext) // the subtitle track over everything (subtitles.odin)
 }
 
 // Scene_UpdateNodeHirearchy updates a subtree (ready() first time, update,
@@ -397,11 +399,13 @@ update_tree :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext, delta
 	children := GetChildrenTemp(scene.manager, node)
 
 	if !paused {
+		if node.isUI do uiInputNode = node // (UI_GetMousePos reads in its UI-scale space)
 		if node.update != nil do node->update(gameContext, deltaTime)
 		if node.scriptInstance != nil {
 			sm := gameContext.scriptManager if gameContext != nil else nil
 			ScriptInstance_CallUpdate(cast(^ScriptInstance)node.scriptInstance, deltaTime, sm)
 		}
+		uiInputNode = nil
 	}
 
 	for child in children {
@@ -475,7 +479,9 @@ render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, 
 	for node in Render_BatchOrder(visible[:]) {
 		renderStats.drawn += 1
 		withMaterial := node.material != nil && Material_Begin(node, gameContext)
+		scaled := node.isUI && access.uiScale != 1 && UI_BeginScaled(node) // (accessibility UI scale)
 		if node.render != nil do node->render(gameContext, deltaTime)
+		if scaled do UI_EndScaled()
 		if withMaterial do Material_End(node)
 		if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
 	}

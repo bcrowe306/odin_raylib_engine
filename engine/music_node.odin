@@ -12,6 +12,7 @@ MusicNode :: struct {
 	pitch:      f32 `gui:"true" min:"0.1" max:"3"`,
 	pan:        f32 `gui:"true" min:"0" max:"1"`,
 	bus:        string `gui:"true"`, // the mixer bus it plays into ("" = Music)
+	caption:    string `gui:"true"`, // shown on the subtitle track when it starts, for players with captions on ("[calm music]")
 	looping:    bool `gui:"true"`,
 	autoplay:   bool `gui:"true"`,
 	isPlaying:  bool `gui:"true" save:"false"`,
@@ -169,6 +170,7 @@ MusicNode_Play :: proc(musicNode: ^MusicNode) {
 			Mixer_StopVoice(musicNode.voice)
 			musicNode.voice = Mixer_PlayMusic(musicNode.music.music, MusicNode_BusIndex(musicNode), MusicNode_EffectiveVolume(musicNode), musicNode.looping, owner = musicNode.music)
 			Mixer_SetVoice(musicNode.voice, MusicNode_EffectiveVolume(musicNode), Audio_RaylibPanToMixer(musicNode.pan), musicNode.pitch)
+			if musicNode.caption != "" do Subtitles_Show(musicNode.caption, "", 4, .Caption)
 		}
 	}
 

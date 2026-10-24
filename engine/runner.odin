@@ -273,6 +273,8 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.BLACK) // the letterbox bars
+		// Accessibility: the frame through the colour-blind filter on its way out.
+		filtered := Colorblind_Begin(access.colorblind, access.colorblindStrength, access.simulate)
 		if renderPixel.smooth {
 			// The background, the world moved by the camera's leftover
 			// fraction (post effects on it), then the other layers on top.
@@ -292,6 +294,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 			rlgl.DrawRenderBatchActive()
 			rlgl.EnableColorBlend()
 		}
+		if filtered do Colorblind_End()
 		rl.EndDrawing()
 		defer free_all(context.temp_allocator) // the frame's temp allocations (after the captures below)
 

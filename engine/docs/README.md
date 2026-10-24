@@ -9,6 +9,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 |---|---|
 | [Draw order](draw_order.md) | Layers, Z index, Y-sort (top-down / isometric depth). |
 | [Navigation](navigation.md) | Path finding on tile maps, LDtk levels and Navigation Regions; agents that walk there (radius, avoidance, doors) - with tutorials. |
+| [Accessibility](accessibility.md) | UI scale, colour-blind filters (and an editor preview), subtitles from dialogue and sound captions, screen shake scale; the Accessibility Menu template - with a tutorial. |
 | [Advanced camera](advanced_camera.md) | Virtual cameras with priorities and blending, follow modes (group, path, dead zone, look-ahead), limits incl. the LDtk level the target is in, trauma shake - with tutorials. |
 | [Sprite atlases](atlas.md) | Tick Atlas on textures: export packs them into pages (fewer draw calls); how it works, what to leave out, helpers for engine code. |
 | [Import settings](import_settings.md) | Per-asset settings next to the file: texture filter / wrap / mipmaps / slicing preset / QOI on export, audio gain and default bus - with tutorials. |

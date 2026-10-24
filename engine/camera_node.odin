@@ -1250,8 +1250,8 @@ CameraNode_GetCamera2D :: proc(camera: ^CameraNode, viewportWidth: f32 = 1280, v
 	}
 
 	scrOffset := camera.customScreenOffset ? camera.screenOffset : [2]f32{viewportWidth * 0.5, viewportHeight * 0.5}
-	camTarget := camera.currentPosition + camera.currentOffset + camera.shakeOffset
-	camRot := camera.currentRotation + camera.shakeRotation
+	camTarget := camera.currentPosition + camera.currentOffset + camera.shakeOffset * access.screenShake // (accessibility: shake scale)
+	camRot := camera.currentRotation + camera.shakeRotation * access.screenShake
 	camZoom := max(0.001, camera.currentZoom + camera.shakeZoom)
 
 	cam := rl.Camera2D{

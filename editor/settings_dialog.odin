@@ -215,6 +215,7 @@ settings_save :: proc(state: ^EditorState) {
 	state.game.musicVolume = d.musicVolume
 	state.game.sfxVolume = d.sfxVolume
 	e.Input_ApplyActionConfigs(&state.game.input, d.actions[:])
+	e.Access_SetDefaults(e.ProjectConfig_Accessibility(d)) // (Simulate uses the project's accessibility defaults)
 	Editor_ReloadGlobals(state)
 
 	Editor_Settings_Destroy(&GlobalSettings)
@@ -405,7 +406,7 @@ settings_code :: proc(state: ^EditorState, h: f32) {
 
 @(private = "file")
 settings_project :: proc(state: ^EditorState, h: f32) {
-	if imgui.BeginChild("##proj_nav", {170, h}, {}, {}) do nav("project", {"General", "Input", "Video", "Audio", "Export", "Globals"}, &st.projectPage)
+	if imgui.BeginChild("##proj_nav", {170, h}, {}, {}) do nav("project", {"General", "Input", "Video", "Audio", "Export", "Globals", "Accessibility"}, &st.projectPage)
 	imgui.EndChild()
 	imgui.SameLine(0, UI_SPACE * 2)
 	if imgui.BeginChild("##proj_body", {0, h}, {}, {}) {
@@ -416,6 +417,7 @@ settings_project :: proc(state: ^EditorState, h: f32) {
 		case 3: project_audio(state)
 		case 4: project_export(state)
 		case 5: project_globals(state)
+		case 6: project_accessibility(state)
 		}
 	}
 	imgui.EndChild()
@@ -790,6 +792,43 @@ project_audio :: proc(state: ^EditorState) {
 	UI_PropLabel("")
 	UI_DimText("Music and sound nodes play at their own volume times these.")
 	UI_EndProps()
+}
+
+// project_accessibility: the players' default accessibility settings
+// (each player changes their own in the game: Accessibility.set / the
+// Accessibility Menu template).
+@(private = "file")
+project_accessibility :: proc(state: ^EditorState) {
+	d := &st.project
+	a := e.ProjectConfig_Accessibility(d)
+	before := a
+	if !UI_BeginProps("##access") do return
+	UI_PropLabel("UI Scale")
+	imgui.SliderFloat("##acc_ui", &a.uiScale, 0.5, 3, "%.2fx")
+	Drive_Item("settings.acc-ui-scale")
+	UI_Tooltip("Top-level UI elements grow around the screen corner / edge / centre they're nearest to")
+	UI_PropLabel("Colour Filter")
+	cb := i32(a.colorblind)
+	if imgui.Combo("##acc_cb", &cb, "Off\x00Protanopia\x00Deuteranopia\x00Tritanopia\x00\x00") do a.colorblind = e.Colorblind_Mode(cb)
+	Drive_Item("settings.acc-colorblind")
+	UI_Tooltip("Corrects the picture for players with that colour vision deficiency (View > Colour Vision previews how they see the scene)")
+	UI_PropLabel("Filter Strength")
+	imgui.SliderFloat("##acc_cbs", &a.colorblindStrength, 0, 1, "%.2f")
+	check("settings.acc-subtitles", "Subtitles", &a.subtitles, "Spoken lines on the subtitle track (dialogue in Subtitles mode, Subtitles.show)")
+	check("settings.acc-captions", "Sound Captions", &a.captions, "Sounds' captions on the subtitle track (a Sound / Music node's Caption)")
+	UI_PropLabel("Subtitle Size")
+	imgui.SliderFloat("##acc_ss", &a.subtitleScale, 0.5, 3, "%.2fx")
+	UI_PropLabel("Subtitle Backdrop")
+	imgui.SliderFloat("##acc_sb", &a.subtitleBackground, 0, 1, "%.2f")
+	UI_PropLabel("Screen Shake")
+	imgui.SliderFloat("##acc_shake", &a.screenShake, 0, 2, "%.2fx")
+	Drive_Item("settings.acc-shake")
+	UI_Tooltip("Scales every camera shake and trauma (0 = no shake)")
+	UI_EndProps()
+	imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
+	imgui.TextWrapped("The defaults every player starts with. Players change theirs in the game - see the Accessibility Menu script template.")
+	imgui.PopStyleColor()
+	if a != before do e.ProjectConfig_SetAccessibility(d, a)
 }
 
 @(private = "file")

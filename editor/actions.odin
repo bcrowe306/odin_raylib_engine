@@ -188,6 +188,10 @@ Actions_Init :: proc() {
 		if !GlobalSettings.showTabBars do Dock_ApplyTabBars(editorDockspaceID, false) // single windows hide theirs again
 		Editor_SaveSettings()
 	}, checked = proc(s: ^EditorState) -> bool {return GlobalSettings.showTabBars}})
+	// Colour vision preview: the viewport as seen with a colour vision deficiency (simulated).
+	add({id = "view.vision_protanopia", category = "View", label = "Colour Vision: Protanopia", scope = .Scene, run = proc(s: ^EditorState) {viewport_set_vision(.Protanopia)}, checked = proc(s: ^EditorState) -> bool {return viewportVision == .Protanopia}})
+	add({id = "view.vision_deuteranopia", category = "View", label = "Colour Vision: Deuteranopia", scope = .Scene, run = proc(s: ^EditorState) {viewport_set_vision(.Deuteranopia)}, checked = proc(s: ^EditorState) -> bool {return viewportVision == .Deuteranopia}})
+	add({id = "view.vision_tritanopia", category = "View", label = "Colour Vision: Tritanopia", scope = .Scene, run = proc(s: ^EditorState) {viewport_set_vision(.Tritanopia)}, checked = proc(s: ^EditorState) -> bool {return viewportVision == .Tritanopia}})
 	add({id = "view.snap_grid", category = "View", label = "Snap to Grid", chords = k(ch(.S, SH)), scope = .Scene, run = proc(s: ^EditorState) {s.snapGrid = !s.snapGrid}, checked = proc(s: ^EditorState) -> bool {return s.snapGrid}})
 	add({id = "view.snap_rotation", category = "View", label = "Snap Rotation", scope = .Scene, run = proc(s: ^EditorState) {s.snapRotation = !s.snapRotation}, checked = proc(s: ^EditorState) -> bool {return s.snapRotation}})
 

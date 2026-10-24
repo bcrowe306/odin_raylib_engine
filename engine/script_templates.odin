@@ -24,6 +24,7 @@ script_templates := [?]Script_Template{
 	{"ui_menu", "UI Menu", "Start / options / back buttons: starts a scene, shows and hides a panel.", SCRIPT_TEMPLATE_UI_MENU, nil},
 	{"pickup", "Pickup", "Bobs in place; a body with the collector tag picks it up (sound, shrink, gone) - for an AreaNode.", SCRIPT_TEMPLATE_PICKUP, {AreaNode}},
 	{"door_trigger", "Door / Trigger", "When a tagged body enters: opens a door node or changes scene - for an AreaNode.", SCRIPT_TEMPLATE_DOOR_TRIGGER, {AreaNode}},
+	{"accessibility_menu", "Accessibility Menu", "Builds the player's accessibility options - UI scale, colour filter, subtitles, captions, subtitle size and backdrop, screen shake - applied at once and saved for the player. For a UI Container.", SCRIPT_TEMPLATE_ACCESSIBILITY_MENU, nil},
 	{"controls_menu", "Controls Menu (rebinding)", "Builds a row per input action - click one, press a key or button to rebind it; Reset to defaults. Saved for the player - for a UI Container.", SCRIPT_TEMPLATE_CONTROLS_MENU, {UIContainerNode}},
 }
 
@@ -440,6 +441,96 @@ function $CLASS$:rebind(action)
         -- may have lost that key, so refresh them all.
         on_done = function() self:refresh() end,
     })
+end
+
+return $CLASS$
+`
+
+SCRIPT_TEMPLATE_ACCESSIBILITY_MENU :: `-- $NAME$: an accessibility options menu. Put it on a UI Container (vertical
+-- layout): it adds a row per setting, applied at once (the UI grows, the
+-- colour filter changes, ...) and saved for the player when the menu goes
+-- away (or press Save). Gamepad: the D-pad moves between rows.
+---@class $CLASS$ : ScriptInstanceBase
+local $CLASS$ = {}
+
+$CLASS$.properties = {
+    --- Width of the rows (px).
+    width = { type = "float", default = 420 },
+    --- Show the colour-blind filter's Simulate switch (for testing your game, not for players).
+    show_simulate = { type = "bool", default = false },
+}
+
+local FILTERS = { "none", "protanopia", "deuteranopia", "tritanopia" }
+local FILTER_NAMES = { none = "Off", protanopia = "Protanopia (red)", deuteranopia = "Deuteranopia (green)", tritanopia = "Tritanopia (blue)" }
+
+function $CLASS$:ready()
+    self.rows = {}
+    self:slider("UI scale", "ui_scale", 0.75, 2)
+    self:filter_button()
+    self:slider("Filter strength", "colorblind_strength", 0, 1)
+    if self.show_simulate then self:checkbox("Simulate (testing)", "colorblind_simulate") end
+    self:checkbox("Subtitles", "subtitles")
+    self:checkbox("Sound captions", "captions")
+    self:slider("Subtitle size", "subtitle_scale", 0.75, 2)
+    self:slider("Subtitle backdrop", "subtitle_background", 0, 1)
+    self:slider("Screen shake", "screen_shake", 0, 1)
+    local save = Scene.create_node("UIButtonNode", "SaveAccessibility", self.node) --[[@as UIButtonNode]]
+    save.text = "Save"
+    save.size = Vec2(self.width, 36)
+    save:connect("clicked", function() Accessibility.save() end)
+    local reset = Scene.create_node("UIButtonNode", "ResetAccessibility", self.node) --[[@as UIButtonNode]]
+    reset.text = "Reset to defaults"
+    reset.size = Vec2(self.width, 36)
+    reset:connect("clicked", function()
+        Accessibility.reset()
+        self:refresh()
+    end)
+end
+
+-- Every row shows the current value again (after Reset).
+function $CLASS$:refresh()
+    for key, row in pairs(self.rows) do row() end
+end
+
+function $CLASS$:slider(label, key, min, max)
+    local s = Scene.create_node("UISliderNode", key .. "_slider", self.node) --[[@as UISliderNode]]
+    s.label = label
+    s.minValue, s.maxValue = min, max
+    s.value = Accessibility.get(key)
+    s.defaultValue = s.value
+    s.size = Vec2(self.width, 36)
+    self.rows[key] = function() s.value = Accessibility.get(key) end
+    s:connect("value_changed", function(v) Accessibility.set(key, v) end)
+end
+
+function $CLASS$:checkbox(label, key)
+    local cb = Scene.create_node("UICheckboxNode", key .. "_check", self.node) --[[@as UICheckboxNode]]
+    cb.label = label
+    cb.checked = Accessibility.get(key)
+    cb.size = Vec2(self.width, 32)
+    self.rows[key] = function() cb.checked = Accessibility.get(key) end
+    cb:connect("value_changed", function(v) Accessibility.set(key, v) end)
+end
+
+function $CLASS$:filter_button()
+    local b = Scene.create_node("UIButtonNode", "colorblind_button", self.node) --[[@as UIButtonNode]]
+    b.size = Vec2(self.width, 36)
+    local function show() b.text = "Colour filter: " .. FILTER_NAMES[Accessibility.get("colorblind")] end
+    show()
+    self.rows.colorblind = show
+    b:connect("clicked", function()
+        local cur = Accessibility.get("colorblind")
+        local next = FILTERS[1]
+        for i, f in ipairs(FILTERS) do
+            if f == cur then next = FILTERS[i % #FILTERS + 1] end
+        end
+        Accessibility.set("colorblind", next)
+        show()
+    end)
+end
+
+function $CLASS$:on_destroy()
+    Accessibility.save()
 end
 
 return $CLASS$

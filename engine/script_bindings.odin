@@ -3260,14 +3260,17 @@ lua_node_dialogue_show :: proc "c" (L: ^lua.State) -> c.int {
 				lua.getfield(L, -1, "text")
 				text := str(L, -1)
 				lua.pop(L, 1)
-				append(&lines, Dialogue_Line{speaker, text})
+				lua.getfield(L, -1, "voice")
+				voice := str(L, -1)
+				lua.pop(L, 1)
+				append(&lines, Dialogue_Line{speaker, text, voice})
 			} else {
-				append(&lines, Dialogue_Line{"", str(L, -1)})
+				append(&lines, Dialogue_Line{"", str(L, -1), ""})
 			}
 			lua.pop(L, 1)
 		}
 	} else {
-		append(&lines, Dialogue_Line{str(L, 3) if lua.gettop(L) >= 3 else "", str(L, 2)})
+		append(&lines, Dialogue_Line{str(L, 3) if lua.gettop(L) >= 3 else "", str(L, 2), ""})
 	}
 	DialogueNode_Show(d, lines[:])
 	return 0
@@ -4542,6 +4545,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setglobal(L, "Scene")
 	Script_RegisterTweenModule(L)
 	Script_RegisterPoolModule(L)
+	Script_RegisterAccessibilityModules(L) // Accessibility, Subtitles (accessibility.odin)
 	Script_RegisterSaveModule(L)
 	lua.newtable(L)
 	lua.pushcfunction(L, lua_navigation_find_path)

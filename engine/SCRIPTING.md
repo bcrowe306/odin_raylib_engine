@@ -870,6 +870,22 @@ import settings' bus (else SFX / Music), at its import gain
 low-pass, high-pass, compressor, limiter, delay, reverb, distortion. Guide:
 [`docs/audio_mixer.md`](docs/audio_mixer.md).
 
+#### Accessibility and subtitles
+
+`Accessibility.get(key)` / `set(key, value)` / `get_all()` / `save()` /
+`reset()` - UI scale, colour filter, subtitles, captions, subtitle size and
+backdrop, screen shake; saved for the player. `Subtitles.show(text,
+{speaker, duration, caption, color})` / `hide(id)` / `clear()` / `count()`.
+Dialogue nodes in Subtitles mode put their lines (with `voice` sounds) on
+the track; Sound / Music nodes have a `caption`. Guide:
+[`docs/accessibility.md`](docs/accessibility.md).
+
+```lua
+Accessibility.set("screen_shake", 0)
+Subtitles.show("[engine sputters]", { caption = true })
+box:dialogue_show({ { speaker = "Ada", text = "Hold on!", voice = "audio/vo/ada_hold.wav" } })
+```
+
 #### Player rebinding (Input)
 
 `Input.listen(action, {on_done = ...})` captures the next key / button /

@@ -4,7 +4,7 @@
 "-- <name> begin" ... "-- <name> end" sections.
   scripts/paste_lua_definitions.py /tmp/test.log"""
 import re, sys
-log = open(sys.argv[1]).read()
+log = open(sys.argv[1], errors="replace").read()
 api_path = 'engine/definitions/engine_api.lua'
 api = open(api_path).read()
 blocks = re.findall(r'---- paste into engine_api.lua ----\n(.*?)---- end ----', log, re.S)
