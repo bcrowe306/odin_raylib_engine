@@ -72,7 +72,10 @@ if [ "$platform" = macos ]; then
 	fi
 	rm -rf "$out"/*.dSYM
 elif [ "$platform" = windows ]; then
-	odin build runner -o:speed -subsystem:windows $(scripts/odin_flags.sh) -out:"$out/$exe" "$@"
+	# (Odin dev-2026-03 has crashed optimizing the runner with -o:speed on
+	# Windows CI: -o:size then.)
+	odin build runner -o:speed -subsystem:windows $(scripts/odin_flags.sh) -out:"$out/$exe" "$@" ||
+		{ echo "odin crashed at -o:speed: building with -o:size"; odin build runner -o:size -subsystem:windows $(scripts/odin_flags.sh) -out:"$out/$exe" "$@"; }
 	odin build runner -debug $(scripts/odin_flags.sh) -out:"$out/runner-debug.exe" "$@"
 	rm -f "$out"/*.pdb
 else

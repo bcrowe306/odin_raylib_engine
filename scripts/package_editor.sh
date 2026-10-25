@@ -58,7 +58,9 @@ elif [ "$platform" = windows ]; then
 	rm -rf "$root"
 	bin="$root"; libs="$root"; res="$root"
 	mkdir -p "$root"
-	odin build editor -o:speed -subsystem:windows $(scripts/odin_flags.sh) -define:ORE_RELEASE="$version" -out:"$bin/$exe"
+	# (-o:size when Odin crashes at -o:speed, as it has on Windows CI.)
+	odin build editor -o:speed -subsystem:windows $(scripts/odin_flags.sh) -define:ORE_RELEASE="$version" -out:"$bin/$exe" ||
+		odin build editor -o:size -subsystem:windows $(scripts/odin_flags.sh) -define:ORE_RELEASE="$version" -out:"$bin/$exe"
 	rm -f "$bin"/*.pdb
 else
 	root="$out/ore-editor-$platform"
