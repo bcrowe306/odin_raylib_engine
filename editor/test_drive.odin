@@ -111,7 +111,7 @@ TestDrive_Init :: proc(d: ^TestDrive) -> bool {
 	}
 	_ = os.make_directory_all(d.shotsDir)
 	if abs, err := os.get_absolute_path(d.shotsDir, context.allocator); err == nil do d.shotsDir = abs
-	// $SHOTS / $PROJECT expand to the screenshot dir / project dir.
+	// $SHOTS / $PROJECT / $CRASHDIR expand to the screenshot / project / crash report dir.
 	project := "assets/demo_project"
 	for i := 0; i < len(os.args); i += 1 {
 		if os.args[i] == "--project" && i + 1 < len(os.args) do project = os.args[i + 1]
@@ -119,6 +119,7 @@ TestDrive_Init :: proc(d: ^TestDrive) -> bool {
 	for &l in d.lines {
 		l, _ = strings.replace_all(l, "$SHOTS", d.shotsDir)
 		l, _ = strings.replace_all(l, "$PROJECT", project)
+		l, _ = strings.replace_all(l, "$CRASHDIR", e.Crash_Dir()) // (crash_reports.odin)
 	}
 	d.enabled = true
 	d.items = make(map[string]Drive_Rect)
@@ -466,6 +467,10 @@ drive_exec :: proc(d: ^TestDrive, state: ^EditorState, line: string) -> bool {
 		}
 		if !Action_Run(state, a) do drive_fail(d, fmt.tprintf("action %q is disabled", rest))
 		return true
+	case "crash-rescan":
+		// crash-rescan: read the crash folder again (reports a drive put there; crash_reports.odin).
+		CrashReports_Rescan()
+		return true
 	case "bench":
 		// bench <frames> [label]: time that many uncapped frames (frame_timing.odin).
 		if d.step == 0 {
@@ -717,6 +722,7 @@ fmt_vec :: proc(v: [2]f32) -> string {
 Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "code.") do return Code_DriveQuery(q)
 	if strings.has_prefix(q, "plugin:") do return Plugins_DriveQuery(q)
+	if strings.has_prefix(q, "crash-") do return CrashReports_DriveQuery(q)
 	if strings.has_prefix(q, "panel-open:") do return "true" if PluginPanels_IsOpen(q[len("panel-open:"):]) else "false", true
 	if strings.has_prefix(q, "import.") do return AssetImport_DriveQuery(q)
 	if strings.has_prefix(q, "ldtk.") do return LdtkPanel_DriveQuery(state, q)

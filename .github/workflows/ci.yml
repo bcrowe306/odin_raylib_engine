@@ -71,6 +71,11 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then xvfb-run -a "${cmd[@]}"; else "${cmd[@]}"; fi
           test -s "$RUNNER_TEMP/runner.png" && grep -q '"root"' "$RUNNER_TEMP/scene.json"
 
+      - name: Crash reports (the runner and the editor crash for real)
+        if: matrix.smoke
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then xvfb-run -a scripts/test_crash.sh; else scripts/test_crash.sh; fi
+
       - name: Package and smoke-test the editor
         if: matrix.smoke
         run: |

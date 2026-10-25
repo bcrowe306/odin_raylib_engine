@@ -3,6 +3,7 @@ package editor
 import "core:c"
 import "core:fmt"
 import "core:strings"
+import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
@@ -142,6 +143,8 @@ Actions_Init :: proc() {
 	add({id = "help.reference", category = "Help", label = "Scripting Reference", scope = .Global, run = proc(s: ^EditorState) {ScriptReference_Open()}})
 	add({id = "help.level_reference", category = "Help", label = "Level Editor Reference", scope = .Global, run = proc(s: ^EditorState) {LevelRef_Open("overview")}})
 	add({id = "help.level_shortcuts", category = "Help", label = "Level Editor Shortcuts", scope = .Global, run = proc(s: ^EditorState) {LevelRef_Open("shortcuts")}})
+	add({id = "help.report_bug", category = "Help", label = "Report a Bug...", scope = .Global, run = proc(s: ^EditorState) {CrashReports_ReportBug(s)}})
+	add({id = "help.crash_folder", category = "Help", label = "Open Crash Reports Folder", scope = .Global, run = proc(s: ^EditorState) {CrashReports_OpenFolder(s)}})
 	add({id = "help.shortcuts", category = "Help", label = "Keyboard Shortcuts", chords = k(ch(.K, PS)), scope = .Global, run = proc(s: ^EditorState) {showShortcutsWindow = true}})
 
 	// --- Scene editing ---
@@ -355,6 +358,7 @@ Action_Checked :: proc(state: ^EditorState, a: ^Editor_Action) -> bool {
 // Action_Run runs an action (if enabled) and remembers it for the palette.
 Action_Run :: proc(state: ^EditorState, a: ^Editor_Action) -> bool {
 	if a == nil || !Action_Enabled(state, a) do return false
+	e.Crash_Note(fmt.tprintf("action %s", a.id)) // (a crash report's recent lines)
 	for id, i in recentActions {
 		if id == a.id {ordered_remove(&recentActions, i); break}
 	}

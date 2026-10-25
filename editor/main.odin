@@ -23,6 +23,9 @@ STATUS_BAR_HEIGHT :: 28.0
 faRanges: [3]imgui.Wchar = {0xE000, 0xF8FF, 0}
 
 main :: proc() {
+	// Crash reports (crash_reports.odin): panics / failed checks write one.
+	context.assertion_failure_proc = e.Crash_AssertionFailure
+	context.logger = e.Crash_Logger(context.logger)
 	// Memory diagnostics (-define:ORE_MEM_TRACK=true, engine/mem_track.odin).
 	context.allocator = e.MemTrack_Init(context.allocator)
 	// Profiling builds (-define:ORE_PROF=true, engine/profiling.odin): --prof trace.spall.
@@ -40,6 +43,8 @@ editor_main :: proc() -> int {
 		fmt.println(e.ORE_RELEASE)
 		return 0
 	}
+	CrashReports_Install() // crash reports (crash_reports.odin)
+	defer CrashReports_Shutdown()
 	Resources_Init() // where the editor's own files are (resources.odin)
 	isTestMode := false
 	uncapped := false // --uncapped: no vsync, no frame cap (measuring; frame_timing.odin)
@@ -115,6 +120,7 @@ editor_main :: proc() -> int {
 	Plugins_Load(&GlobalEditor) // project + user plugins (plugins.odin)
 	defer Plugins_Unload(&GlobalEditor)
 	UpdateCheck_Start() // a newer release? (update_check.odin; off in development builds)
+	CrashReports_TestCrash() // --crash-test (tests)
 
 
 	// 5. Main Application Loop
@@ -267,6 +273,7 @@ editor_main :: proc() -> int {
 		NodeRefs_Render(&GlobalEditor) // update script references after a rename / move
 		AssetImport_Render(&GlobalEditor)
 		Plugins_TrustPrompt(&GlobalEditor)
+		CrashReports_Prompt(&GlobalEditor) // the last run crashed: report it?
 		PluginAPI_Dialogs(&GlobalEditor)
 
 		// Files dropped from the OS (after the panels: their rects are current).

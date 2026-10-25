@@ -23,4 +23,5 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 | [Paths and followers](paths.md) | Bézier paths edited in the viewport; followers for moving platforms, patrols, rails - with tutorials. |
 | [Pixel-perfect rendering](pixel_perfect.md) | Integer scaling, pixel snap, smooth sub-pixel camera - recipes for pixel art. |
 | [Object pooling](pooling.md) | Reuse bullets, effects, pickups: `Pool.take`, `on_spawn` / `on_despawn`, prewarm, caps - with a tutorial. |
+| [Crash reports](crash_reports.md) | What a crash writes (reason, stack, recent lines), where, the editor's "report on GitHub", and the `Crash` Lua module for games. |
 | [Visibility notifier](visibility.md) | On screen / off screen events; pause, disable or remove the parent off screen. |

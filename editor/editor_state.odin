@@ -417,6 +417,7 @@ Editor_StopGameProcess :: proc(state: ^EditorState) {
 
 Editor_Log :: proc(state: ^EditorState, level: LogLevel, format: string, args: ..any) {
 	msg := fmt.tprintf(format, ..args)
+	e.Crash_Note(fmt.tprintf("[%v] %s", level, msg)) // (a crash report's recent lines)
 	now := time.now()
 	h, m, s := time.clock(now)
 	timeStr := fmt.tprintf("%02d:%02d:%02d", h, m, s)

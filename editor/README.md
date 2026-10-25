@@ -771,6 +771,16 @@ the game is still drawn). Saving a scene while the game runs reloads it
 there (the current scene restarts with the saved version); edited scripts
 and images reload by themselves, in the game and in the editor.
 
+### Crash and bug reports
+
+If the editor crashes, the next start shows **Ore Editor Crashed** with the
+report (reason, stack, the last log lines and actions): **Report on GitHub**
+opens a prefilled issue in the browser (nothing is sent until you submit it),
+or Copy / Open Folder / Dismiss. **Help > Report a Bug...** opens a new issue
+with the version, platform and console tail; **Help > Open Crash Reports
+Folder**. A game crashing during Play prints its report's path in the
+Console. Details: [engine/docs/crash_reports.md](../engine/docs/crash_reports.md).
+
 ### Code tab (Lua scripts)
 
 **Full reference: [`CODE_EDITOR.md`](CODE_EDITOR.md)** - every editing

@@ -300,7 +300,7 @@ plugin_start :: proc(state: ^EditorState, p: ^Plugin) {
 	e.Lua_RegisterVectors(L)
 	_ = lua.L_dostring(L, e.LUA_CURVE_HELPERS)
 	// (The game's own services make no sense in the editor.)
-	for g in ([]cstring{"Save", "Engine", "Input", "Pool"}) {
+	for g in ([]cstring{"Save", "Engine", "Input", "Pool", "Crash"}) {
 		lua.pushnil(L)
 		lua.setglobal(L, g)
 	}
