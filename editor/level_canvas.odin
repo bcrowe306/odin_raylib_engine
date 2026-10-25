@@ -63,7 +63,12 @@ LevelCanvas_Render :: proc(state: ^EditorState) {
 	imgui.PushStyleVarImVec2(.WindowPadding, {0, 0})
 	defer imgui.PopStyleVar()
 	defer imgui.End()
-	if !imgui.Begin(LEVEL_CANVAS_WINDOW, nil, {.NoScrollbar, .NoScrollWithMouse}) do return
+	if L.zen {
+		// zen mode (Tab): the canvas over the whole Level tab
+		imgui.SetNextWindowPos(L.dockPos)
+		imgui.SetNextWindowSize(L.dockSize)
+		if !imgui.Begin("##LevelZenCanvas", nil, {.NoTitleBar, .NoResize, .NoScrollbar, .NoCollapse, .NoDocking, .NoMove, .NoSavedSettings, .NoScrollWithMouse}) do return
+	} else if !imgui.Begin(LEVEL_CANVAS_WINDOW, nil, {.NoScrollbar, .NoScrollWithMouse}) do return
 	driveNoScroll = true
 	defer driveNoScroll = false
 	LevelRef_Panel(LEVEL_TOOL_INFO[GlobalLevel.tool].topic) // F1 over the canvas: the current tool
@@ -130,7 +135,7 @@ canvas_draw :: proc() {
 		}
 	}
 	for li in order do draw_level(li, li == L.level)
-	draw_field_geometry()
+	if !L.hideDetails do draw_field_geometry()
 	draw_rule_preview()
 	draw_selection()
 	draw_tool_preview()
@@ -167,7 +172,9 @@ draw_level :: proc(li: int, active: bool) {
 		if off != {} || sc != 1 do rlgl.PopMatrix()
 	}
 	if !active {
-		rl.DrawRectangleV(origin, {f32(s.x), f32(s.y)}, {0, 0, 0, 90})
+		// levels of another world depth (PageUp / PageDown) fade more
+		otherDepth := e.LdtkJson_Int(lv.obj, "worldDepth") != e.LdtkJson_Int(doc.levels[L.level].obj, "worldDepth")
+		rl.DrawRectangleV(origin, {f32(s.x), f32(s.y)}, {0, 0, 0, otherDepth ? 175 : 90})
 	}
 	thick := 1 / L.zoom
 	rl.DrawRectangleLinesEx({origin.x, origin.y, f32(s.x), f32(s.y)}, (active ? 2 : 1) * thick, active ? rl.Color{255, 255, 255, 200} : rl.Color{0, 0, 0, 120})
@@ -218,6 +225,7 @@ draw_layer :: proc(li, layer: int, ly: ^e.Ldtk_DocLayer, origin: [2]f32, isActiv
 	o := origin + {f32(off.x), f32(off.y)}
 	opacity := d.opacity
 	if inactive do opacity *= f32(e.LdtkJson_Float(d.obj, "inactiveOpacity", 1))
+	if inactive && L.singleLayer do opacity *= 0.2
 	ts := e.Ldtk_Doc_LayerTileset(doc, ly)
 	if ts != nil {
 		if tex, ok := level_texture(ts.uid); ok {
@@ -233,13 +241,13 @@ draw_layer :: proc(li, layer: int, ly: ^e.Ldtk_DocLayer, origin: [2]f32, isActiv
 				dst := rl.Rectangle{o.x + f32(t.px.x), o.y + f32(t.px.y), gs, gs}
 				rl.DrawTexturePro(tex, src, dst, {}, 0, {255, 255, 255, u8(clamp(f32(t.a) * opacity * 255, 0, 255))})
 			}
-			for t in ly.autoTiles do draw(tex, ts, t, o, gs, opacity)
+			if !L.hideAuto do for t in ly.autoTiles do draw(tex, ts, t, o, gs, opacity)
 			for t in ly.gridTiles do draw(tex, ts, t, o, gs, opacity)
 		}
 	}
 	if d.type == .IntGrid {
 		// values: full colour without a tileset, faint over the active layer's auto tiles
-		alpha: f32 = ts == nil ? opacity : (isActive && L.showIntGrid ? 0.35 : 0)
+		alpha: f32 = ts == nil || L.hideAuto ? opacity : (isActive && L.showIntGrid ? 0.35 : 0)
 		if alpha > 0 {
 			g := f32(d.gridSize)
 			for cy in 0 ..< ly.cHei {
@@ -385,14 +393,16 @@ canvas_overlay :: proc() {
 	L := &GlobalLevel
 	doc := L.doc
 	dl := imgui.GetWindowDrawList()
-	for &lv, i in doc.levels {
-		if lv.world != L.world do continue
-		p := e.Ldtk_Doc_LevelPos(doc, i)
-		sp := to_screen({f32(p.x), f32(p.y)})
-		name := e.LdtkJson_Str(lv.obj, "identifier")
-		imgui.DrawList_AddText(dl, {sp.x + 2, sp.y - 18}, col_u32(i == L.level ? UI_TEXT : UI_TEXT_DIM), fmt.ctprintf("%s", name))
+	if !L.hideDetails {
+		for &lv, i in doc.levels {
+			if lv.world != L.world do continue
+			p := e.Ldtk_Doc_LevelPos(doc, i)
+			sp := to_screen({f32(p.x), f32(p.y)})
+			name := e.LdtkJson_Str(lv.obj, "identifier")
+			imgui.DrawList_AddText(dl, {sp.x + 2, sp.y - 18}, col_u32(i == L.level ? UI_TEXT : UI_TEXT_DIM), fmt.ctprintf("%s", name))
+		}
+		draw_field_labels(dl)
 	}
-	draw_field_labels(dl)
 	draw_level_handles(dl)
 	if L.selEntity != nil {
 		// resize handle
@@ -1099,7 +1109,7 @@ selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
 			mn := [2]f32{min(a.x, b.x), min(a.y, b.y)}
 			mx := [2]f32{max(a.x, b.x), max(a.y, b.y)}
 			r := [4]int{int(math.floor(mn.x)), int(math.floor(mn.y)), max(int(mx.x - mn.x), 1), max(int(mx.y - mn.y), 1)}
-			e.Ldtk_Doc_SelectRect(doc, L.level, &L.sel, r, activeLayer = L.layer)
+			e.Ldtk_Doc_SelectRect(doc, L.level, &L.sel, r, activeLayer = L.layer, includeEmpty = L.selectEmpty)
 			level_sync_selection()
 		}
 		return true

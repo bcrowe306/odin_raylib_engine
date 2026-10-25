@@ -765,6 +765,27 @@ Ldtk_Doc_AddEnumValue :: proc(doc: ^Ldtk_Doc, enumUid: int, id: string) -> bool 
 	return true
 }
 
+// Ldtk_Doc_ReloadTilesetImage: the image changed on disk - its size, cells
+// and cached pixel data (opaque tiles, which rules use) follow; auto tiles
+// are regenerated.
+Ldtk_Doc_ReloadTilesetImage :: proc(doc: ^Ldtk_Doc, tilesetUid: int, img: ^rl.Image) {
+	a := doc.allocator
+	ts := Ldtk_Doc_Tileset(doc, tilesetUid)
+	if ts == nil || img == nil || img.data == nil do return
+	o := ts.obj
+	grid := max(ts.gridSize, 1)
+	sp, pad := ts.spacing, ts.padding
+	LdtkJson_SetInt(o, "pxWid", int(img.width), a)
+	LdtkJson_SetInt(o, "pxHei", int(img.height), a)
+	// TilesetDef.cWid: ceil((pxWid - padding * 2) / (grid + spacing))
+	LdtkJson_SetInt(o, "__cWid", (int(img.width) - 2 * pad + grid + sp - 1) / (grid + sp), a)
+	LdtkJson_SetInt(o, "__cHei", (int(img.height) - 2 * pad + grid + sp - 1) / (grid + sp), a)
+	LdtkJson_Set(o, "cachedPixelData", Ldtk_TilesetPixelData(img, grid, sp, pad, a), a)
+	Ldtk_Doc_RefreshDefs(doc)
+	Ldtk_Doc_ApplyRulesFull(doc, -1)
+	Ldtk_Doc_Touch(doc)
+}
+
 // Ldtk_Doc_AddTileset adds a tileset from an image (path relative to the
 // project file). `img` (optional) fills LDtk's cached opaque-tile data,
 // which the rule engine uses.

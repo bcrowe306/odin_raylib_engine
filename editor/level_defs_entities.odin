@@ -46,8 +46,10 @@ LevelDefs_EntitiesPage :: proc(state: ^EditorState) {
 			level_sync_palette()
 		}
 		level_tip("A new entity definition", "tab.entities")
+		filter := level_filter_box("entities", "Filter entities")
 		imgui.Separator()
 		for &ed in doc.entityDefs {
+			if !level_filter_hit(filter, ed.identifier) do continue
 			p := imgui.GetCursorScreenPos()
 			imgui.DrawList_AddRectFilled(imgui.GetWindowDrawList(), {p.x + 2, p.y + 5}, {p.x + 12, p.y + 15}, col_u32({f32(ed.color.r) / 255, f32(ed.color.g) / 255, f32(ed.color.b) / 255, 1}), 2, {})
 			imgui.SetCursorScreenPos({p.x + 18, p.y})

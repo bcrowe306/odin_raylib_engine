@@ -81,6 +81,13 @@ LevelEd :: struct {
 	entityDef:    int, // uid
 	showGrid:     bool,
 	showIntGrid:  bool,
+	singleLayer:  bool, // LDtk's single layer mode: the other layers faded
+	hideAuto:     bool, // auto-layer tiles not drawn (their IntGrid values show)
+	hideDetails:  bool, // no level names / entity labels / field shapes
+	selectEmpty:  bool, // rectangle selections include empty cells
+	zen:          bool, // the canvas alone (Tab)
+	dockPos:      [2]f32,
+	dockSize:     [2]f32,
 	// canvas
 	cam:          [2]f32,
 	zoom:         f32,
@@ -429,6 +436,7 @@ LevelEditor_SaveNow :: proc(state: ^EditorState) -> bool {
 		return false
 	}
 	Editor_Log(state, .Info, "Saved level %s", L.rel)
+	LevelExtras_ProjectSaved()
 	LevelProject_AfterSave(state)
 	Editor_InvalidateProjectFiles()
 	return true
@@ -519,6 +527,7 @@ LEVEL_PANEL_WINDOW :: "Level Panel###LevelPanelWindow"
 
 LevelEditor_Render :: proc(state: ^EditorState, pos, size: [2]f32) {
 	L := &GlobalLevel
+	L.dockPos, L.dockSize = pos, size
 	imgui.SetNextWindowPos(pos)
 	imgui.SetNextWindowSize(size)
 	hostFlags: imgui.WindowFlags = {.NoTitleBar, .NoCollapse, .NoResize, .NoMove, .NoBringToFrontOnFocus, .NoNavFocus, .NoBackground}
@@ -560,10 +569,14 @@ LevelEditor_Render :: proc(state: ^EditorState, pos, size: [2]f32) {
 		level_sync_selection()
 		level_sync_textures(state)
 		LevelCanvas_Render(state)
-		level_levels_panel(state)
-		level_layers_panel(state)
-		level_bottom_panel(state)
+		if !L.zen {
+			level_levels_panel(state)
+			level_layers_panel(state)
+			level_bottom_panel(state)
+		}
 		LevelDefs_NewLayerDialog(state)
+		LevelExtras_Palette(state)
+		LevelExtras_Watch(state)
 		level_rename_popup(state)
 		LevelCommands_Update(state)
 		LevelCommands_Window(state)
@@ -734,6 +747,26 @@ level_bg_texture :: proc(rel: string) -> rl.Texture2D {
 	return tex
 }
 
+// level_reload_texture / level_reload_bg_texture: the image changed on disk.
+level_reload_texture :: proc(uid: int) {
+	L := &GlobalLevel
+	if t, ok := L.textures[uid]; ok {
+		rl.UnloadTexture(t)
+		delete_key(&L.textures, uid)
+	}
+	L.texDefsRev = 0 // reloaded on the next frame
+}
+
+level_reload_bg_texture :: proc(rel: string) {
+	L := &GlobalLevel
+	for k, t in L.bgTextures do if k == rel {
+		if t.id != 0 do rl.UnloadTexture(t)
+		delete_key(&L.bgTextures, k)
+		delete(k)
+		break
+	}
+}
+
 level_texture :: proc(uid: int) -> (rl.Texture2D, bool) {
 	t, ok := GlobalLevel.textures[uid]
 	return t, ok
@@ -801,10 +834,12 @@ level_levels_panel :: proc(state: ^EditorState) {
 		}
 	}
 	imgui.Separator()
+	filter := level_filter_box("levels", "Filter levels")
 	if imgui.BeginChild("##level_list", {0, 0}, {}, {}) {
 		for &lv, i in doc.levels {
 			if lv.world != L.world do continue
 			name := e.LdtkJson_Str(lv.obj, "identifier")
+			if !level_filter_hit(filter, name) do continue
 			s := e.Ldtk_Doc_LevelSize(doc, i)
 			c := e.Ldtk_ParseHexColor(e.LdtkJson_Str(lv.obj, "__bgColor", "#696A79"))
 			p := imgui.GetCursorScreenPos()
@@ -1746,12 +1781,18 @@ LevelEditor_Toolbar :: proc(state: ^EditorState, width: f32, play: proc(state: ^
 	if UI_IconButton(ICON_FA_ROTATE_RIGHT, "level.redo", "Redo (Cmd+Shift+Z)") do level_redo(state)
 	if !canRedo do imgui.EndDisabled()
 	play(state, width)
-	rightW: f32 = 4 * 32 + 76 + 40
+	rightW: f32 = 7 * 32 + 76 + 40
 	imgui.SameLine()
 	imgui.SetCursorPosX(max(imgui.GetCursorPosX() + UI_SPACE * 3, width - rightW - 10))
 	if UI_IconButton(ICON_FA_BORDER_ALL, "level.grid", "Show the grid (G)", L.showGrid) do L.showGrid = !L.showGrid
 	imgui.SameLine()
 	if UI_IconButton(ICON_FA_EYE, "level.intgrid", "Show IntGrid values over auto tiles", L.showIntGrid) do L.showIntGrid = !L.showIntGrid
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_LAYER_GROUP, "level.singlelayer", "Single layer mode: fade the other layers (Shift+A)", L.singleLayer) do L.singleLayer = !L.singleLayer
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_WAND_MAGIC_SPARKLES, "level.autorender", "Draw auto-layer tiles (Alt+R; off: their IntGrid values show)", !L.hideAuto) do L.hideAuto = !L.hideAuto
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_TAG, "level.details", "Show level names, entity labels and field shapes (Shift+H)", !L.hideDetails) do L.hideDetails = !L.hideDetails
 	imgui.SameLine()
 	if UI_IconButton(ICON_FA_EXPAND, "level.fit", "Fit the level (Home)") do L.fitRequest = true
 	imgui.SameLine()
@@ -1824,6 +1865,15 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 			// LDtk's "run manual commands"
 			LevelCommands_Run(state, "Manual")
 			return true
+		case imgui.IsKeyPressed(.K, false), imgui.IsKeyPressed(.F, false):
+			LevelExtras_OpenPalette()
+			return true
+		case imgui.IsKeyPressed(.PageUp, false):
+			level_move_depth(state, 1)
+			return true
+		case imgui.IsKeyPressed(.PageDown, false):
+			level_move_depth(state, -1)
+			return true
 		case imgui.IsKeyPressed(.Z, true) && io.KeyShift, imgui.IsKeyPressed(.Y, true):
 			level_redo(state)
 			return true
@@ -1866,8 +1916,38 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 		}
 		return false
 	}
+	if io.KeyAlt {
+		switch {
+		case imgui.IsKeyPressed(.R, false):
+			L.hideAuto = !L.hideAuto
+			return true
+		case imgui.IsKeyPressed(.LeftArrow, false): return level_goto_neighbour(state, {-1, 0})
+		case imgui.IsKeyPressed(.RightArrow, false): return level_goto_neighbour(state, {1, 0})
+		case imgui.IsKeyPressed(.UpArrow, false): return level_goto_neighbour(state, {0, -1})
+		case imgui.IsKeyPressed(.DownArrow, false): return level_goto_neighbour(state, {0, 1})
+		}
+	}
 	if io.KeyShift {
 		switch {
+		case imgui.IsKeyPressed(.PageUp, false):
+			level_move_depth(state, 1)
+			return true
+		case imgui.IsKeyPressed(.PageDown, false):
+			level_move_depth(state, -1)
+			return true
+		case imgui.IsKeyPressed(.A, false):
+			L.singleLayer = !L.singleLayer
+			return true
+		case imgui.IsKeyPressed(.E, false):
+			L.selectEmpty = !L.selectEmpty
+			return true
+		case imgui.IsKeyPressed(.H, false):
+			L.hideDetails = !L.hideDetails
+			return true
+		case imgui.IsKeyPressed(.W, false):
+			level_fit_world()
+			LevelEditor_ShowTab(.World)
+			return true
 		case imgui.IsKeyPressed(.R, false):
 			L.tileRandom = !L.tileRandom
 			return true
@@ -1889,6 +1969,30 @@ LevelEditor_Shortcuts :: proc(state: ^EditorState) -> bool {
 		}
 	}
 	switch {
+	case imgui.IsKeyPressed(.Tab, false):
+		L.zen = !L.zen
+		return true
+	case imgui.IsKeyPressed(.PageUp, false):
+		level_goto_depth(state, 1)
+		return true
+	case imgui.IsKeyPressed(.PageDown, false):
+		level_goto_depth(state, -1)
+		return true
+	case imgui.IsKeyPressed(.P, false):
+		LevelEditor_ShowTab(.Project)
+		return true
+	case imgui.IsKeyPressed(.L, false):
+		LevelEditor_ShowTab(.Layers)
+		return true
+	case imgui.IsKeyPressed(.U, false):
+		LevelEditor_ShowTab(.Enums)
+		return true
+	case imgui.IsKeyPressed(.T, false):
+		LevelEditor_ShowTab(.Tilesets)
+		return true
+	case imgui.IsKeyPressed(.C, false):
+		LevelEditor_ShowTab(.Level)
+		return true
 	case imgui.IsKeyPressed(.G, false):
 		L.showGrid = !L.showGrid
 		return true
@@ -2009,6 +2113,8 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		}
 		return strings.to_string(b), true
 	case "level.world": return e.Ldtk_Doc_WorldName(doc, L.world), true
+	case "level.modes": return fmt.tprintf("single=%t auto=%t details=%t empty=%t zen=%t", L.singleLayer, !L.hideAuto, !L.hideDetails, L.selectEmpty, L.zen), true
+	case "level.depth": return fmt.tprint(e.LdtkJson_Int(doc.levels[L.level].obj, "worldDepth")), true
 	case "level.bg":
 		// "<bgPos> <bgRelPath> topLeft=x,y scale=sx,sy" (empty: no image)
 		lv := &doc.levels[L.level]

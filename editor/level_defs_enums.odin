@@ -37,6 +37,8 @@ le: struct {
 
 ENUM_TOPIC :: "tab.enums"
 
+LevelEnums_Select :: proc(uid: int) {le.uid = uid}
+
 LevelEnums_Shutdown :: proc() {
 	delete(le.clip)
 	delete(le.syncPath)
@@ -79,6 +81,7 @@ LevelEnums_Page :: proc(state: ^EditorState) {
 			}
 			imgui.EndPopup()
 		}
+		filter := level_filter_box("enums", "Filter enums")
 		imgui.Separator()
 		enums := e.LdtkJson_Arr(defs, "enums")
 		// tag groups (untagged first), like LDtk
@@ -94,7 +97,7 @@ LevelEnums_Page :: proc(state: ^EditorState) {
 			for en in enums {
 				et := e.LdtkJson_Arr(en, "tags")
 				first := len(et) > 0 ? et[0].text : ""
-				if first != tag do continue
+				if first != tag || !level_filter_hit(filter, e.LdtkJson_Str(en, "identifier")) do continue
 				if enum_row(state, en, false) {
 					imgui.EndChild()
 					enum_dialogs(state)
@@ -124,7 +127,7 @@ LevelEnums_Page :: proc(state: ^EditorState) {
 			imgui.TextColored(col, "%s%s", fmt.ctprintf("%s  %s", ICON_FA_FILE, name), fmt.ctprintf("%s", src.missing ? " (missing)" : src.modified ? " (changed)" : ""))
 			level_tip(fmt.tprintf("%s%s", src.relPath, src.missing ? ": the file isn't there" : src.modified ? ": changed since the last sync - sync it" : ""), "enums.external")
 			for en in e.LdtkJson_Arr(defs, "externalEnums") {
-				if e.LdtkJson_Str(en, "externalRelPath") != src.relPath do continue
+				if e.LdtkJson_Str(en, "externalRelPath") != src.relPath || !level_filter_hit(filter, e.LdtkJson_Str(en, "identifier")) do continue
 				if enum_row(state, en, true) {
 					imgui.EndChild()
 					enum_dialogs(state)

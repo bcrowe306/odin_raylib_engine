@@ -165,6 +165,15 @@ save (PNGs per layer / per level, the simplified format, Tiled maps) and
 **custom commands** (manual - Cmd+R -, after loading, before / after saving;
 asked once per project before they run).
 
+### Search, view modes, navigation
+
+**Cmd+K** searches levels, layers, entities (also by field value) and
+definitions; the lists have filter boxes. Shift+A single layer mode, Alt+R
+auto-layer tiles on / off, Shift+H details, Tab zen mode, Shift+E select
+empty spaces; Alt+arrows open the neighbouring level; PageUp / PageDown move
+between world depths (Shift: move the level). Images, external enum files
+and the project file are watched for changes made by other programs.
+
 ### Context menus and help
 
 Right-click levels, layers and palette items for their actions: rename,
@@ -311,6 +320,7 @@ e.Ldtk_Doc_Save(doc)
 | `Ldtk_ParseExternalEnums`, `Ldtk_Doc_ExternalEnumDiff` / `ApplyEnumSync` (`Ldtk_EnumSync`), `ExternalEnumSources`, `RemoveExternalEnumSource`, `Ldtk_Md5Hex` | external enums |
 | `Ldtk_Doc_SetExternalLevels`, `LevelFileRel`, `FixLevelFiles`, `SetIdentifierStyle` / `IdentifierStyle` / `CleanIdentifier`, `SetProjectFlag` (`LDTK_PROJECT_FLAGS`), `Backup` / `BackupDir` | project options |
 | `Ldtk_Doc_RunExports`, `ExportImages`, `ExportSimplified` / `SimplifiedJson`, `ExportTiled`; `RenderLayer`, `RenderIntGridMap`, `RenderLevelBg` (CPU images); `PngFileName`, `ExternalDir` | exports |
+| `Ldtk_Doc_ReloadTilesetImage`; `Ldtk_Doc_SelectRect(..., includeEmpty)` | file watching, select empty spaces |
 | `Ldtk_Doc_SetMultiWorlds`, `AddWorld`, `RenameWorld`, `RemoveWorld`, `WorldInt` / `WorldStr` / `SetWorldInt`, `WorldName`; `SetFlag` / `HasFlag` | worlds and project flags |
 | `Ldtk_Doc_SetIntGrid`, `SetTile`, `TilesAt`, `GetIntGrid` | cells |
 | `Ldtk_Doc_ApplyRules` (an area), `ApplyRulesLayer`, `ApplyRulesFull` | auto tiles |

@@ -54,8 +54,10 @@ LevelLayers_Page :: proc(state: ^EditorState) {
 	if imgui.BeginChild("##layer_list", {210, avail.y}, {.Borders}, {}) {
 		if UI_Button(fmt.tprintf("%s  New layer...", ICON_FA_PLUS), "defs.layer.new") do LevelDefs_OpenNewLayer()
 		level_tip("A new layer: type, name, grid, tileset", "layer.new")
+		filter := level_filter_box("layerdefs", "Filter layers")
 		imgui.Separator()
 		for &d in doc.layerDefs {
+			if !level_filter_hit(filter, d.identifier) do continue
 			uid := d.uid
 			p := imgui.GetCursorScreenPos()
 			if hex := e.LdtkJson_Str(d.obj, "uiColor"); hex != "" {

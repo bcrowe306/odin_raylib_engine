@@ -1,0 +1,101 @@
+# Level editor conveniences: the search palette (an entity by name, then a
+# definition), neighbour levels (Alt+arrows), single layer / auto-layer /
+# details / select-empty modes, zen mode, world depths (PageUp / PageDown),
+# the panel keys, and the Levels filter.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/conv_zz
+wait 90
+click @root.level
+wait 3
+click @level.open:conv_zz/topdown.ldtk
+wait 5
+click @level.zoom
+click @pick:100%
+wait 1
+# the palette: an entity by name, then an enum
+key cmd+k
+wait 1
+type SecretWall
+wait 1
+screenshot palette
+key enter
+wait 2
+expect level.level == World_Level_1
+expect level.selected == SecretWall
+key escape
+key cmd+k
+wait 1
+type Biome
+wait 1
+screenshot palette_biome
+key enter
+wait 2
+screenshot after_biome
+expect level.paneltab == Enums
+# neighbour levels: World_Level_1 (left) -> 0 -> 2
+key alt+right
+wait 1
+expect level.level == World_Level_0
+key alt+right
+wait 1
+expect level.level == World_Level_2
+key alt+left
+wait 1
+expect level.level == World_Level_0
+# view modes
+key shift+a
+wait 1
+expect level.modes contains single=true
+screenshot single_layer
+key shift+a
+key alt+r
+wait 1
+expect level.modes contains auto=false
+screenshot no_auto_tiles
+key alt+r
+key shift+h
+wait 1
+expect level.modes contains details=false
+key shift+h
+key shift+e
+expect level.modes contains empty=true
+key shift+e
+key tab
+wait 1
+expect level.modes contains zen=true
+screenshot zen
+key tab
+wait 1
+expect level.modes contains zen=false
+# world depths: World_Level_0 one depth up; PageDown goes back to depth 0
+key shift+pageup
+wait 1
+expect level.depth == 1
+key pagedown
+wait 1
+expect level.depth == 0
+key pageup
+wait 1
+expect level.level == World_Level_0
+# panel keys
+key l
+expect level.paneltab == Layers
+key t
+expect level.paneltab == Tilesets
+key p
+expect level.paneltab == Project
+key c
+expect level.paneltab == Level
+# the Levels filter
+click @filter:levels
+type _2
+wait 1
+screenshot levels_filter
+# files changed on disk: the tileset image reloads; the project file asks
+exec cp tests/drive/fixtures/ldtk/atlas/TopDown_by_deepnight.png $PROJECT/conv_zz/atlas/TopDown_by_deepnight.png
+wait 150
+expect log contains Reloaded the tileset image
+exec cp tests/drive/fixtures/ldtk/topdown.ldtk $PROJECT/conv_zz/topdown.ldtk
+wait 150
+screenshot project_changed
+click @reload.keep
+wait 2

@@ -1277,3 +1277,34 @@ test_ldtk_doc_exports :: proc(t: ^testing.T) {
 	Ldtk_Doc_RunExports(doc)
 	testing.expect(t, !os.is_dir(fmt.tprintf("%s/topdown", dir)))
 }
+
+@(test)
+test_ldtk_doc_select_empty_and_reload :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_conv.ldtk")
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	g := doc.layerDefs[0].gridSize
+	Ldtk_Doc_SetIntGrid(doc, 0, 0, 1, 1, 1)
+	s: Ldtk_Selection
+	defer Ldtk_Selection_Destroy(&s)
+	Ldtk_Doc_SelectRect(doc, 0, &s, {0, 0, 3 * g, 3 * g}, 0)
+	testing.expect_value(t, len(s.cells), 1)
+	Ldtk_Selection_Clear(&s)
+	Ldtk_Doc_SelectRect(doc, 0, &s, {0, 0, 3 * g, 3 * g}, 0, includeEmpty = true)
+	testing.expect_value(t, len(s.cells), 9)
+	// moving the empty spaces with the value clears where they land
+	Ldtk_Doc_SetIntGrid(doc, 0, 0, 4, 1, 1)
+	testing.expect(t, Ldtk_Doc_MoveSelection(doc, 0, &s, {2 * g, 0}))
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(&doc.levels[0].layers[0], 3, 1), 1)
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(&doc.levels[0].layers[0], 4, 1), 0)
+	// a tileset image that changed size
+	ts := Ldtk_Doc_AddTileset(doc, "atlas/r_zz.png", {32, 32}, 16)
+	img := rl.GenImageColor(64, 48, {255, 0, 0, 255})
+	defer rl.UnloadImage(img)
+	Ldtk_Doc_ReloadTilesetImage(doc, ts, &img)
+	tsd := Ldtk_Doc_Tileset(doc, ts)
+	testing.expect_value(t, tsd.pxSize, [2]int{64, 48})
+	testing.expect_value(t, tsd.cWid, 4)
+	testing.expect_value(t, tsd.cHei, 3)
+	testing.expect(t, Ldtk_Doc_TileOpaque(tsd, 5))
+}

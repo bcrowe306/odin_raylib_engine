@@ -83,7 +83,9 @@ ldtk_cell_has_value :: proc(doc: ^Ldtk_Doc, ly: ^Ldtk_DocLayer, cx, cy: int) -> 
 // value and entities whose cell is inside (only `onlyLayer` when >= 0;
 // hidden layers are skipped; with `activeLayer`, other layers whose def
 // says canSelectWhenInactive = false are skipped too).
-Ldtk_Doc_SelectRect :: proc(doc: ^Ldtk_Doc, li: int, s: ^Ldtk_Selection, r: [4]int, onlyLayer := -1, activeLayer := -1) {
+// With `includeEmpty` (LDtk's "select empty spaces"), IntGrid and Tiles
+// cells are selected even without a value: moving them clears the target.
+Ldtk_Doc_SelectRect :: proc(doc: ^Ldtk_Doc, li: int, s: ^Ldtk_Selection, r: [4]int, onlyLayer := -1, activeLayer := -1, includeEmpty := false) {
 	lv := &doc.levels[li]
 	for &ly, j in lv.layers {
 		if onlyLayer >= 0 && j != onlyLayer do continue
@@ -110,7 +112,8 @@ Ldtk_Doc_SelectRect :: proc(doc: ^Ldtk_Doc, li: int, s: ^Ldtk_Selection, r: [4]i
 		for cy in max(y0, 0) ..= min(y1, ly.cHei - 1) {
 			for cx in max(x0, 0) ..= min(x1, ly.cWid - 1) {
 				c := Ldtk_SelCell{j, cx, cy}
-				if ldtk_cell_has_value(doc, &ly, cx, cy) && !Ldtk_Selection_HasCell(s, c) do append(&s.cells, c)
+				fits := ldtk_cell_has_value(doc, &ly, cx, cy) || (includeEmpty && (d.type == .IntGrid || d.type == .Tiles))
+				if fits && !Ldtk_Selection_HasCell(s, c) do append(&s.cells, c)
 			}
 		}
 	}

@@ -809,6 +809,18 @@ editor keeps the last 100.
 | Shift+S | Save the picked tiles as a group |
 | Shift + drag | Rectangle with the Brush / Erase |
 | G | Grid |
+| Shift+A | Single layer mode (the other layers faded) |
+| Alt+R | Draw auto-layer tiles on / off |
+| Shift+H | Details (level names, entity labels, field shapes) on / off |
+| Shift+E | Select empty spaces too |
+| Tab | Zen mode: the canvas alone |
+| Shift+W | Fit the whole world |
+| Alt+arrows | The neighbouring level |
+| PageUp / PageDown | The next world depth up / down |
+| Shift+PageUp / PageDown | Move the level one depth up / down |
+| P L U T C | Project, Layers, Enums, Tilesets, Level tabs |
+| Cmd+K / Cmd+F | Search (levels, layers, entities, definitions) |
+| Cmd+R | Run the manual custom commands |
 | Home | Fit the level |
 | Delete | Delete the selection |
 | Arrows | Move the selection |
@@ -819,3 +831,59 @@ editor keeps the last 100.
 | Cmd+Z / Cmd+Shift+Z | Undo / redo |
 | F1 | This reference, at the hovered item |
 | Cmd+Shift+1 / 2 | Game tab / Level tab |
+
+## Search
+<!-- topic: search, palette -->
+
+**Cmd+K** (or **Cmd+F**) opens the search. Type part of a name to find:
+
+- levels (by name or iid);
+- the active level's layers;
+- entities in any level (by name, iid, or a text / enum field value);
+- entity, layer and enum definitions (enums also by value), tilesets and
+  rule groups.
+
+Use the arrows and **Enter**, or click a result. Levels open, entities are
+selected and framed, and definitions open in their tab.
+
+The lists (Levels panel, Layers, Entities, Enums and Tilesets tabs) have a
+filter box: only the items whose name contains its text stay.
+
+## View modes
+<!-- topic: view -->
+
+The toolbar buttons and keys next to the grid button:
+
+- **Single layer mode** (Shift+A): the active level's other layers are
+  faded.
+- **Auto-layer tiles** (Alt+R): off shows the IntGrid values instead of
+  the tiles their rules generate.
+- **Details** (Shift+H): level names, entity names, field labels and field
+  shapes (points, paths, radii, references).
+- **Zen mode** (Tab): only the canvas. Press Tab again to bring the panels
+  back.
+- **Select empty spaces** (Shift+E): rectangle selections also take empty
+  cells, so moving them clears where they land.
+
+## Navigation and world depths
+<!-- topic: navigation -->
+
+**Alt+arrows** open the nearest level in that direction. Levels have a
+*world depth* (the Level tab's Depth): levels at another depth than the
+active one are drawn darker. **PageUp / PageDown** go to the nearest level
+one depth up or down, and **Shift+PageUp / PageDown** move the active level
+there. **Shift+W** frames the whole world.
+
+## Files changed on disk
+<!-- topic: files -->
+
+The editor watches the files the project uses:
+
+- When a tileset image changes, it is reloaded. Its size, cells and
+  opaque-tile data update, and auto tiles are regenerated.
+- When a level background image changes, it is reloaded.
+- When an external enum file changes, it is synced (it asks when used
+  values would go).
+- When another program changes the project file, the editor asks:
+  **Reload** (unsaved changes are lost) or **Keep mine** (the next save
+  overwrites it).

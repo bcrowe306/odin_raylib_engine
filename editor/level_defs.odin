@@ -101,6 +101,7 @@ newLayer: struct {
 // Rules and Entities tabs show.
 LevelDefs_SelectLayer :: proc(uid: int) {defs.layerUid = uid}
 LevelDefs_SelectedLayer :: proc() -> int {return defs.layerUid}
+LevelDefs_SelectTileset :: proc(uid: int) {defs.tilesetUid = uid}
 LevelDefs_SelectRulesLayer :: proc(uid: int) {LevelRules_SelectLayer(uid)}
 LevelDefs_SelectEntity :: proc(uid: int) {defs.entityUid = uid}
 LevelDefs_SelectedEntity :: proc() -> int {return defs.entityUid}
@@ -493,8 +494,10 @@ page_tilesets :: proc(state: ^EditorState) {
 			imgui.EndCombo()
 		}
 		Drive_Item("defs.tileset.add")
+		filter := level_filter_box("tilesets", "Filter tilesets")
 		imgui.Separator()
 		for &ts in doc.tilesets {
+			if !level_filter_hit(filter, ts.identifier) do continue
 			if imgui.Selectable(fmt.ctprintf("%s##tsl%d", ts.identifier, ts.uid), defs.tilesetUid == ts.uid, {}, {0, 22}) do defs.tilesetUid = ts.uid
 			Drive_Item(fmt.tprintf("defs.tileset:%s", ts.identifier))
 		}
