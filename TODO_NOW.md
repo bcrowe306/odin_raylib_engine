@@ -124,8 +124,8 @@ Editor that runs anywhere:
   Or c) replace it: the markdown view uses a subset; a small Odin renderer removes the dependency.
 - [ ] D.5 lua-language-server built per platform and bundled (the Code tab's completion / diagnostics)
 - [ ] D.6 The editor ships the runners for every platform (`runners/{macos,windows,linux,web}`), so any editor exports every desktop target and the web
-- [ ] D.7 One version string (from the git tag) in the editor, the runner and each `.ore`; the runner warns about a project from a newer version
-- [ ] D.8 Third-party license notices bundled (raylib, Lua, Box2D, Dear ImGui, LuaLS, cmark, Open Sans, Font Awesome)
+- [x] D.7 One version string (from the git tag) in the editor, the runner and each `.ore`; the runner warns about a project from a newer version
+- [x] D.8 Third-party license notices bundled (raylib, Lua, Box2D, Dear ImGui, LuaLS, cmark, Open Sans, Font Awesome)
 - [ ] D.9 Check for updates against GitHub Releases (later: an auto-updater)
 
 CI/CD (GitHub Actions):

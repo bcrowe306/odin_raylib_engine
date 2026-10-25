@@ -77,6 +77,17 @@ runner_libraries :: proc(runner: string) -> []string {
 	return out[:]
 }
 
+NOTICES_FILE :: "THIRD_PARTY_NOTICES.txt"
+
+// runner_notices: the third-party notices shipped with the runners (or the
+// checkout's licenses/) - "" when missing.
+runner_notices :: proc(runner: string) -> string {
+	p, _ := filepath.join({filepath.dir(filepath.dir(runner, context.temp_allocator), context.temp_allocator), NOTICES_FILE}, context.temp_allocator)
+	if os.is_file(p) do return p
+	if dev := Resource_Path("licenses", NOTICES_FILE); os.is_file(dev) do return dev
+	return ""
+}
+
 // runner_font: the UI font shipped with runners (or the engine's copy).
 runner_font :: proc(runner: string) -> string {
 	p, _ := filepath.join({filepath.dir(filepath.dir(runner, context.temp_allocator), context.temp_allocator), RUNNER_FONT}, context.temp_allocator)
@@ -189,6 +200,12 @@ export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) 
 		return "", false
 	}
 	defer os.remove(ore)
+	// The third-party notices the engine's licenses ask for (Lua, Box2D, ...),
+	// next to what was exported.
+	if notices := runner_notices(runner); notices != "" {
+		dst, _ := filepath.join({dir, NOTICES_FILE}, context.temp_allocator)
+		_ = os.copy_file(dst, notices)
+	}
 
 	switch t {
 	case .MacOS:   return Export_MacApp(state, &pc, runner, ore, dir, name)

@@ -88,6 +88,8 @@ for d in bin/runners/*/; do
 	cp -R "${d%/}" "$res/runners/" # (no trailing slash: BSD cp would copy the folder's contents)
 done
 cp engine/Open_Sans/static/OpenSans-Regular.ttf "$res/runners/"
+cp licenses/THIRD_PARTY_NOTICES.txt "$res/runners/"
+cp licenses/THIRD_PARTY_NOTICES.txt "$res/"
 cp engine/Open_Sans/static/OpenSans-Regular.ttf "$res/fonts/"
 # The demo project, without per-user editor state.
 cp -R assets/demo_project "$res/templates/demo_project"

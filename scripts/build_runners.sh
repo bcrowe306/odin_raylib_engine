@@ -80,6 +80,7 @@ else
 	odin build runner -debug -out:"$out/runner-debug" "$@"
 fi
 cp engine/Open_Sans/static/OpenSans-Regular.ttf bin/runners/
+cp licenses/THIRD_PARTY_NOTICES.txt bin/runners/ # (exports copy it next to the game)
 echo "Built $out/$exe"
 # The web runner too when emscripten is installed (scripts/build_web_runner.sh).
 if command -v emcc >/dev/null; then

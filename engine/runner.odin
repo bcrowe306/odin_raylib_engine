@@ -35,6 +35,10 @@ Run_Options :: struct {
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
 // --hidden, --dump-scene, --user-data, --bench, --uncapped and --no-render-cache. A bare argument is taken as the project.
 Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
+	for a in args do if a == "--version" {
+		fmt.println(ORE_RELEASE)
+		os.exit(0)
+	}
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
 		next := args[i + 1] if i + 1 < len(args) else ""
@@ -243,6 +247,10 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 		return nil, false
 	}
 	if video.icon != "" do Runner_SetWindowIcon(game, video.icon)
+	// A project saved by a newer editor may use what this runner lacks.
+	if !Version_IsDev(ORE_RELEASE) && !Version_IsDev(video.engineVersion) && Version_Compare(video.engineVersion, ORE_RELEASE) > 0 {
+		log.warnf("This project was saved by Ore %s; this runner is %s - update the editor (and re-export) if something is missing", video.engineVersion, ORE_RELEASE)
+	}
 	// (Loading the project applies its target FPS: uncapped runs undo it.)
 	if opts.uncapped do rl.SetTargetFPS(0)
 

@@ -21,6 +21,7 @@ import rl "vendor:raylib"
 ProjectConfig :: struct {
 	name:          string,
 	version:       string,
+	engineVersion: string, // the editor release that last saved it ("engine_version"; version.odin)
 	initialScene:  string,
 	windowTitle:   string,
 	windowWidth:   int,
@@ -91,6 +92,7 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg == nil do return
 	if cfg.name != "" do delete(cfg.name, allocator)
 	if cfg.version != "" do delete(cfg.version, allocator)
+	if cfg.engineVersion != "" do delete(cfg.engineVersion, allocator)
 	if cfg.initialScene != "" do delete(cfg.initialScene, allocator)
 	if cfg.windowTitle != "" do delete(cfg.windowTitle, allocator)
 	if cfg.icon != "" do delete(cfg.icon, allocator)
@@ -124,6 +126,7 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c := src^
 	c.name = strings.clone(src.name, allocator)
 	c.version = strings.clone(src.version, allocator)
+	c.engineVersion = strings.clone(src.engineVersion, allocator)
 	c.initialScene = strings.clone(src.initialScene, allocator)
 	c.windowTitle = strings.clone(src.windowTitle, allocator)
 	c.icon = strings.clone(src.icon, allocator)
@@ -311,6 +314,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 
 	cfg.name = strings.clone(json_get_string(rootObj, "name", cfg.name), allocator)
 	cfg.version = strings.clone(json_get_string(rootObj, "version", cfg.version), allocator)
+	cfg.engineVersion = strings.clone(json_get_string(rootObj, "engine_version", ""), allocator)
 	cfg.initialScene = strings.clone(json_get_string(rootObj, "initial_scene", cfg.initialScene), allocator)
 	cfg.icon = strings.clone(json_get_string(rootObj, "icon", ""), allocator)
 	cfg.language = strings.clone(json_get_string(rootObj, "language", ""), allocator)
@@ -451,6 +455,9 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 
 	strings.write_string(&sb, "{\n  \"name\": "); jstr(&sb, cfg.name)
 	strings.write_string(&sb, ",\n  \"version\": "); jstr(&sb, cfg.version)
+	// The release that saved it (a development build keeps what was there).
+	engineVersion := cfg.engineVersion if Version_IsDev(ORE_RELEASE) else ORE_RELEASE
+	if engineVersion != "" {strings.write_string(&sb, ",\n  \"engine_version\": "); jstr(&sb, engineVersion)}
 	strings.write_string(&sb, ",\n  \"initial_scene\": "); jstr(&sb, cfg.initialScene)
 	if cfg.icon != "" {strings.write_string(&sb, ",\n  \"icon\": "); jstr(&sb, cfg.icon)}
 	if cfg.language != "" {strings.write_string(&sb, ",\n  \"language\": "); jstr(&sb, cfg.language)}

@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:mem"
 import "core:log"
 import "core:os"
+import "core:slice"
 import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
@@ -35,6 +36,10 @@ main :: proc() {
 }
 
 editor_main :: proc() -> int {
+	if slice.contains(os.args, "--version") {
+		fmt.println(e.ORE_RELEASE)
+		return 0
+	}
 	Resources_Init() // where the editor's own files are (resources.odin)
 	isTestMode := false
 	uncapped := false // --uncapped: no vsync, no frame cap (measuring; frame_timing.odin)
@@ -50,7 +55,7 @@ editor_main :: proc() -> int {
 	if !isTestMode && !uncapped do flags += {.VSYNC_HINT}
 	if hidden do flags += {.WINDOW_HIDDEN, .WINDOW_UNFOCUSED}
 	rl.SetConfigFlags(flags)
-	rl.InitWindow(1600, 900, "Odin Raylib Engine - Game Editor")
+	rl.InitWindow(1600, 900, strings.clone_to_cstring(fmt.tprintf("Ore Editor %s", e.ORE_RELEASE), context.temp_allocator))
 	defer rl.CloseWindow()
 	e.Render_InitBatching() // fewer GPU stalls on batch flushes (batching.odin)
 	// The engine's font (in-game UI text in the viewport), as the game loads it.
