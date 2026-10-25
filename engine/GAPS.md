@@ -244,6 +244,14 @@ frame (the Profiler tab, the [bench] lines). E.g.:
     /tmp/prof_runner /tmp/ore_bench --scene scenes/bench_ysort.scene.json --bench 300 --prof /tmp/ysort.spall
     scripts/spall_summary.py /tmp/ysort.spall
 
+**Leaks** (`engine/mem_track.odin`): `-define:ORE_MEM_TRACK=true` puts the
+heap of the editor, the runner or the Play binary through a tracking
+allocator: every 600 frames the live heap and the sites that grew since
+the last report, at exit what is still allocated and any bad frees. The
+game frees everything (bench scenes: no growth from frame 600 to 1200, 0 KB
+at exit, no bad frees); the editor keeps a few process-lifetime tables to
+exit. Don't profile these builds: tracking is slow.
+
 Recorded 2026-10-24 on an Apple M2 Pro (macOS), Odin dev-2026-03,
 `-o:speed`, at the start of the optimization branch. Two runs agree within
 ~3% on CPU times (update+draw, editor phases); whole-frame times under 2 ms

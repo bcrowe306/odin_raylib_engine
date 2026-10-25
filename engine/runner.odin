@@ -133,6 +133,9 @@ Runner_State :: struct {
 // Engine_RunProject opens a window and plays the project until it quits.
 // Returns a process exit code.
 Engine_RunProject :: proc(opts: Run_Options) -> int {
+	// Memory diagnostics builds (mem_track.odin): leaks and bad frees.
+	context.allocator = MemTrack_Init(context.allocator)
+	defer MemTrack_Shutdown()
 	// Profiling builds (profiling.odin): the trace and the heap counters.
 	Prof_ParseArgs(os.args[1:])
 	context.allocator = Prof_Init(context.allocator)
@@ -347,6 +350,7 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 		Prof_End()
 		Prof_End() // frame
 		Prof_FrameEnd()
+		MemTrack_Frame()
 		defer free_all(context.temp_allocator) // the frame's temp allocations (after the captures below)
 
 		rs.frameCount += 1

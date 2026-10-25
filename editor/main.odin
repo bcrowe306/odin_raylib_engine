@@ -21,21 +21,15 @@ STATUS_BAR_HEIGHT :: 28.0
 faRanges: [3]imgui.Wchar = {0xE000, 0xF8FF, 0}
 
 main :: proc() {
-	// Memory diagnostics (-define:ORE_MEM_TRACK=true, mem_track.odin).
-	when ORE_MEM_TRACK {
-		track: mem.Tracking_Allocator
-		mem.tracking_allocator_init(&track, context.allocator)
-		track.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
-		context.allocator = mem.tracking_allocator(&track)
-		memTrack = &track
-	}
+	// Memory diagnostics (-define:ORE_MEM_TRACK=true, engine/mem_track.odin).
+	context.allocator = e.MemTrack_Init(context.allocator)
 	// Profiling builds (-define:ORE_PROF=true, engine/profiling.odin): --prof trace.spall.
 	e.Prof_ParseArgs(os.args[1:])
 	context.allocator = e.Prof_Init(context.allocator)
 	code := editor_main()
 	e.Prof_Shutdown()
 	// (Called here, not deferred: os.exit skips defers.)
-	when ORE_MEM_TRACK do MemTrack_ReportLeaks()
+	e.MemTrack_Shutdown()
 	os.exit(code)
 }
 
@@ -110,11 +104,7 @@ editor_main :: proc() -> int {
 		NativeDialog_Poll(&GlobalEditor)
 		Lua_UpdateProjectTypes(&GlobalEditor)
 		Code_ApplyPendingNodeProp(&GlobalEditor) // a node property dropped into a properties table
-		when ORE_MEM_TRACK {
-			@(static) memFrame: int
-			memFrame += 1
-			if memFrame % MEM_TRACK_EVERY == 0 do MemTrack_Report(fmt.tprintf("frame %d", memFrame))
-		}
+		e.MemTrack_Frame()
 		if n := e.Shader_CheckForChanges(); n > 0 do Editor_Log(&GlobalEditor, .Info, "Reloaded %d changed shader(s)", n)
 		e.ResourceManager_CheckForChanges(&GlobalEditor.game.resourceManager) // edited images
 		if n := e.ScriptManager_CheckForChanges(&GlobalEditor.game.scriptManager); n > 0 {
