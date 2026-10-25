@@ -59,6 +59,8 @@ StatusBar_Render :: proc(state: ^EditorState, width, displayH, barHeight: f32) {
 		imgui.PopStyleColor()
 	}
 
+	UpdateCheck_StatusBar(state)
+
 	io := imgui.GetIO()
 	world := Viewport_ScreenToWorld(state, {io.MousePos.x, io.MousePos.y})
 	right := fmt.tprintf("%.0f, %.0f     %d%%     %d FPS", world.x, world.y, int(state.cameraZoom * 100 + 0.5), rl.GetFPS())

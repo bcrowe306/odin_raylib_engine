@@ -1,7 +1,8 @@
 # The installed editor (scripts/test_package.sh runs it from outside the
 # source checkout, on a copy of the demo project): Play runs the bundled
-# runner (no compiler), export uses the bundled runners, and the Code tab's
-# language server starts from the bundle.
+# runner (no compiler), export uses the bundled runners, the Code tab's
+# language server starts from the bundle, and the update check sees a newer
+# release.
 wait 5
 expect scene == scenes/main.scene.json
 
@@ -25,6 +26,10 @@ wait 10
 expect log contains Standalone game ready
 expect log !contains building it once
 key escape
+
+# Check for updates (ORE_UPDATE_URL: tests/package/release.json, v99.0.0).
+wait-until item:status.update == visible timeout=600
+expect log contains Ore Editor 99.0.0 is available
 
 # The Code tab: lua-language-server from the bundle.
 dblclick @asset:scripts/orbiting_drone.lua

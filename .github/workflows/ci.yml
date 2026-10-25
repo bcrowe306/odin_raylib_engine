@@ -53,15 +53,19 @@ jobs:
       - name: Build
         run: |
           mkdir -p bin
-          ext=""; [ "$RUNNER_OS" = Windows ] && ext=.exe
-          odin build editor -out:bin/editor$ext
-          odin build . -out:bin/odin_raylib_engine$ext
+          # Windows: raylib as a DLL (statically, its CloseWindow / ShowCursor collide with user32's).
+          ext=""; flags=""
+          if [ "$RUNNER_OS" = Windows ]; then ext=.exe; flags=-define:RAYLIB_SHARED=true; cp "$(odin root)/vendor/raylib/windows/raylib.dll" bin/; fi
+          odin build editor $flags -out:bin/editor$ext
+          odin build . $flags -out:bin/odin_raylib_engine$ext
           scripts/build_runners.sh
 
       - name: Unit tests
         run: |
-          odin test engine -define:ODIN_TEST_THREADS=1
-          odin test ui -define:ODIN_TEST_THREADS=1
+          flags=""
+          if [ "$RUNNER_OS" = Windows ]; then flags=-define:RAYLIB_SHARED=true; cp "$(odin root)/vendor/raylib/windows/raylib.dll" .; fi
+          odin test engine -define:ODIN_TEST_THREADS=1 $flags
+          odin test ui -define:ODIN_TEST_THREADS=1 $flags
 
       - name: Smoke test (the runner plays the demo project)
         if: matrix.smoke

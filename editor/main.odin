@@ -103,6 +103,7 @@ editor_main :: proc() -> int {
 	Editor_LoadSettings(&GlobalEditor)
 	Lua_ProjectSetup(&GlobalEditor) // .ore/definitions + .luarc.json for Lua tooling
 	defer Editor_Shutdown(&GlobalEditor)
+	UpdateCheck_Start() // a newer release? (update_check.odin; off in development builds)
 
 
 	// 5. Main Application Loop
@@ -115,6 +116,7 @@ editor_main :: proc() -> int {
 		NativeDialog_Poll(&GlobalEditor)
 		Lua_UpdateProjectTypes(&GlobalEditor)
 		Code_ApplyPendingNodeProp(&GlobalEditor) // a node property dropped into a properties table
+		UpdateCheck_Poll(&GlobalEditor)
 		e.MemTrack_Frame()
 		if n := e.Shader_CheckForChanges(); n > 0 do Editor_Log(&GlobalEditor, .Info, "Reloaded %d changed shader(s)", n)
 		e.ResourceManager_CheckForChanges(&GlobalEditor.game.resourceManager) // edited images

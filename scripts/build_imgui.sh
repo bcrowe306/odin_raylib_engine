@@ -56,5 +56,15 @@ if ! python3 -c 'import ply' 2> /dev/null; then
 	"$py" -m pip install -q ply
 fi
 (cd "$work" && "$py" build.py)
+# The DockBuilder C entry points (editor/lib/imgui/dock_builder.cpp) go into
+# the same library.
+shim="$PWD/editor/lib/imgui/dock_builder.cpp"
+if [ "$os" = windows ]; then
+	(cd "$work" && cl -nologo -O2 -MT -DIMGUI_IMPL_API='extern "C"' -I imgui -c "$(cygpath -w "$shim")" -Fo:dock_builder.obj > /dev/null &&
+		lib -nologo "-OUT:$lib" "$lib" dock_builder.obj > /dev/null)
+else
+	(cd "$work" && clang++ -O3 -fPIC -std=c++11 -fno-exceptions -fno-rtti -I imgui -c "$shim" -o dock_builder.o &&
+		ar rcs "$lib" dock_builder.o)
+fi
 cp "$work/$lib" "$dst"
 echo "Built $dst"

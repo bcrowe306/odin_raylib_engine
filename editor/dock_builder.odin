@@ -7,32 +7,43 @@ import imgui "lib/imgui"
 // Dear ImGui Internal DockBuilder API Bindings
 // ============================================================================
 
-foreign import imgui_lib "lib/imgui/imgui_darwin_arm64.a"
+// The C entry points in lib/imgui/dock_builder.cpp, compiled into the ImGui
+// library by scripts/build_imgui.sh (C++ names are mangled differently by
+// Clang and MSVC: these are plain C).
+when ODIN_OS == .Windows {
+	foreign import imgui_lib "lib/imgui/imgui_windows_x64.lib"
+} else when ODIN_OS == .Linux {
+	foreign import imgui_lib "lib/imgui/imgui_linux_x64.a"
+} else when ODIN_ARCH == .amd64 {
+	foreign import imgui_lib "lib/imgui/imgui_darwin_x64.a"
+} else {
+	foreign import imgui_lib "lib/imgui/imgui_darwin_arm64.a"
+}
 
 @(default_calling_convention="c")
 foreign imgui_lib {
-	@(link_name="_ZN5ImGui18DockBuilderGetNodeEj")
+	@(link_name="OreDock_GetNode")
 	DockBuilderGetNode :: proc(node_id: imgui.ID) -> rawptr ---
 
-	@(link_name="_ZN5ImGui18DockBuilderAddNodeEji")
+	@(link_name="OreDock_AddNode")
 	DockBuilderAddNode :: proc(node_id: imgui.ID, flags: c.int = 0) -> imgui.ID ---
 
-	@(link_name="_ZN5ImGui21DockBuilderRemoveNodeEj")
+	@(link_name="OreDock_RemoveNode")
 	DockBuilderRemoveNode :: proc(node_id: imgui.ID) ---
 
-	@(link_name="_ZN5ImGui21DockBuilderSetNodePosEj6ImVec2")
+	@(link_name="OreDock_SetNodePos")
 	DockBuilderSetNodePos :: proc(node_id: imgui.ID, pos: imgui.Vec2) ---
 
-	@(link_name="_ZN5ImGui22DockBuilderSetNodeSizeEj6ImVec2")
+	@(link_name="OreDock_SetNodeSize")
 	DockBuilderSetNodeSize :: proc(node_id: imgui.ID, size: imgui.Vec2) ---
 
-	@(link_name="_ZN5ImGui20DockBuilderSplitNodeEj8ImGuiDirfPjS1_")
+	@(link_name="OreDock_SplitNode")
 	DockBuilderSplitNode :: proc(node_id: imgui.ID, split_dir: imgui.Dir, size_ratio: f32, out_id_at_dir: ^imgui.ID, out_id_at_opposite_dir: ^imgui.ID) -> imgui.ID ---
 
-	@(link_name="_ZN5ImGui21DockBuilderDockWindowEPKcj")
+	@(link_name="OreDock_DockWindow")
 	DockBuilderDockWindow :: proc(window_name: cstring, node_id: imgui.ID) ---
 
-	@(link_name="_ZN5ImGui17DockBuilderFinishEj")
+	@(link_name="OreDock_Finish")
 	DockBuilderFinish :: proc(node_id: imgui.ID) ---
 }
 

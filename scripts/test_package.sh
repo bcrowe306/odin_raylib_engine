@@ -30,7 +30,8 @@ python3 -I - "$tmp/project/project.json" <<-'EOF'
 EOF
 if command -v caffeinate > /dev/null; then caffeinate -u -t 900 & trap 'kill $! 2> /dev/null' EXIT; fi
 cd /tmp # (not the checkout: the editor must find everything in its own package)
-env -u ORE_GAME_BIN -u ORE_EDITOR_RESOURCES perl -e 'alarm 600; exec @ARGV' "$editor" \
+# (The update check reads a fixture release, not GitHub.)
+env -u ORE_GAME_BIN -u ORE_EDITOR_RESOURCES ORE_UPDATE_URL="file://$repo/tests/package/release.json" perl -e 'alarm 600; exec @ARGV' "$editor" \
 	--project "$tmp/project" --drive "$repo/tests/package/installed.drive" --shots "$tmp/shots" \
 	--user-data "$tmp/userdata" --hidden > "$tmp/editor.log" 2>&1
 status=$?

@@ -2,6 +2,7 @@ package editor
 
 import "core:fmt"
 import "core:strings"
+import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
@@ -215,7 +216,8 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "help.level_shortcuts")
 		menu_action(state, "help.shortcuts")
 		menu_action(state, "palette.commands")
-		if menu_item("About") do Editor_Log(state, .Info, "Odin Raylib Engine editor")
+		if menu_item("Check for Updates") do UpdateCheck_Start(manual = true)
+		if menu_item("About") do Editor_Log(state, .Info, "Ore Editor %s - third-party notices: THIRD_PARTY_NOTICES.txt in the editor's folder", e.ORE_RELEASE)
 		imgui.EndMenu()
 	}
 
