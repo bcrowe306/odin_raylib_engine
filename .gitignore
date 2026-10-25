@@ -2,6 +2,7 @@
 main
 plane_game
 asteroids/asteroids
+/rayzr
 /odin_raylib_engine
 !*.odin
 *.exe
@@ -24,8 +25,10 @@ asteroids/asteroids
 # history, generated Lua definitions, exported packages
 imgui.ini
 .editor_settings.ini
+.rayzr/
 .ore/
 .luarc.json
+/assets/demo_project.rayzr
 /assets/demo_project.ore
 
 # Tools

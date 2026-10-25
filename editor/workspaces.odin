@@ -11,7 +11,7 @@ import imgui "lib/imgui"
 // Workspaces (View > Workspaces): layout presets built with the dock
 // builder - Default, Level Design (big viewport), Scripting (the Code tab in
 // the middle), Animation (a tall timeline) - and layouts the user saves
-// (ImGui's layout text in ~/.config/ore_editor/workspaces/<name>.ini),
+// (ImGui's layout text in ~/.config/rayzr_editor/workspaces/<name>.ini),
 // loaded at the start of a frame. Reset Layout = the Default preset.
 // ============================================================================
 
@@ -115,7 +115,7 @@ workspaces_dir :: proc(state: ^EditorState) -> string {
 	}
 	home, err := os.user_home_dir(context.temp_allocator)
 	if err != nil do return ".editor_workspaces"
-	p, _ := filepath.join({home, ".config", "ore_editor", "workspaces"}, context.temp_allocator)
+	p, _ := filepath.join({home, ".config", "rayzr_editor", "workspaces"}, context.temp_allocator)
 	return p
 }
 

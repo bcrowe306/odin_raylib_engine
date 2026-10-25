@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Builds the web runner: bin/runners/web/{index.html, index.js, index.wasm, odin.js}.
-# The editor's Web export copies it next to the game's game.ore - exporting
+# The editor's Web export copies it next to the game's game.rayzr - exporting
 # needs no compiler; only building the runner needs emscripten (emcc) and
 # odin. Ship the editor with runners/web/ and web exports work anywhere.
 #
 #   scripts/build_web_runner.sh            (deps are built once into bin/web_deps)
-#   scripts/build_web_runner.sh -define:ORE_RELEASE=1.2.3   (extra odin flags)
+#   scripts/build_web_runner.sh -define:RAYZR_RELEASE=1.2.3   (extra odin flags)
 #
 # Dependencies built with emcc: raylib 5.5 (WebGL 2), Lua 5.4.7, Box2D 3.1.1
 # (the versions Odin's bindings expect). Sources: the official release

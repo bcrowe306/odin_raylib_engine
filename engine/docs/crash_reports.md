@@ -49,14 +49,14 @@ Play shows it in the editor's Console.
 
 | | Folder |
 |---|---|
-| Editor | `~/.config/ore_editor/crashes/` (`ORE_CRASH_DIR` overrides it) |
+| Editor | `~/.config/rayzr_editor/crashes/` (`RAYZR_CRASH_DIR` overrides it) |
 | A game | `<user data>/crashes/` - macOS `~/Library/Application Support/<game>`, Windows `%APPDATA%\<game>`, Linux `~/.local/share/<game>` (the Save folder) |
 
 The newest 20 reports are kept.
 
 ## In the editor
 
-After a crash, the next start shows **Ore Editor Crashed** with the report:
+After a crash, the next start shows **Rayzr Editor Crashed** with the report:
 
 - **Report on GitHub** opens a new issue on the engine's repository with the
   report filled in, in your browser. You can edit or remove anything before

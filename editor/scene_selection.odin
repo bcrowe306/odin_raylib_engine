@@ -132,7 +132,7 @@ Editor_DuplicateSelection :: proc(state: ^EditorState) -> int {
 
 // --- clipboard ---------------------------------------------------------------------
 
-NODE_CLIPBOARD_PREFIX :: "ore-nodes:"
+NODE_CLIPBOARD_PREFIX :: "rayzr-nodes:"
 
 @(private = "file")
 nodeClipboard: string

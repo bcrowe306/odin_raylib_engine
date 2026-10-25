@@ -12,7 +12,7 @@ builds atlases **on export** from the textures you tick:
 
 1. Select a texture in Assets; in the preview's **Import** row tick
    **Atlas** (saved in its [import settings](import_settings.md) file).
-2. Export (**Export .ore** in the toolbar, or **Project > Export**). The log
+2. Export (**Export .rayzr** in the toolbar, or **Project > Export**). The log
    says how many textures were packed into how many pages.
 
 Nothing changes in the project or the editor: scenes, scripts and

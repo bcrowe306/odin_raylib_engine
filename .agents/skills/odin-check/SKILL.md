@@ -34,11 +34,11 @@ This skill defines the verification process for Odin projects. Always invoke `od
 4. **Verify Build**:
    Verify full compilation succeeds:
    ```bash
-   odin build . -out:odin_raylib_engine
+   odin build . -out:rayzr
    ```
 
 5. **Run Automated UI Test Suite (if available)**:
    Verify UI & editor regressions:
    ```bash
-   ./odin_raylib_engine --test-ui
+   ./rayzr --test-ui
    ```

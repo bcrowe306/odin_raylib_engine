@@ -427,7 +427,7 @@ code_node_ref :: proc(state: ^EditorState, doc: ^Code_Doc, node: ^e.Node, selfOk
 
 // --- Dragging project names into a script (input actions, animations) -------
 
-CODE_ITEM_PAYLOAD :: "ORE_CODE_ITEM"
+CODE_ITEM_PAYLOAD :: "RAYZR_CODE_ITEM"
 
 Code_Item_Kind :: enum {
 	Action,    // an input action: Input.is_action_pressed (Shift: is_action_down)
@@ -486,7 +486,7 @@ code_asset_use :: proc(state: ^EditorState, doc: ^Code_Doc, rel: string) -> stri
 
 // --- Dragging an Inspector property's name ----------------------------------
 
-PROP_PAYLOAD :: "ORE_PROP"
+PROP_PAYLOAD :: "RAYZR_PROP"
 
 Prop_Payload :: struct {
 	node:  ^e.Node,
@@ -746,7 +746,7 @@ code_drop_target :: proc(state: ^EditorState, doc: ^Code_Doc, mouse: [2]f32) {
 			cm.focusRequest = true
 		}
 	}
-	if payload := imgui.AcceptDragDropPayload("ORE_NODE", {.AcceptBeforeDelivery, .AcceptNoDrawDefaultRect}); payload != nil {
+	if payload := imgui.AcceptDragDropPayload("RAYZR_NODE", {.AcceptBeforeDelivery, .AcceptNoDrawDefaultRect}); payload != nil {
 		preview(b, pos)
 		cls, method := code_method_at(b, pos.line)
 		if method != "" do imgui.SetTooltip("Connect one of its events to %s:%s()", strings.clone_to_cstring(cls, context.temp_allocator), strings.clone_to_cstring(method, context.temp_allocator))

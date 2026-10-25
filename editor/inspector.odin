@@ -439,7 +439,7 @@ node_ref_field :: proc(state: ^EditorState, owner: ^e.Node, id, current: string)
 	Drive_Item(id)
 	UI_Tooltip(fmt.tprintf("A node (path from this one: %q). Pick it, or drop one from the scene tree", current) if current != "" else "Pick a node, or drop one from the scene tree")
 	if imgui.BeginDragDropTarget() {
-		if pl := imgui.AcceptDragDropPayload("ORE_NODE"); pl != nil {
+		if pl := imgui.AcceptDragDropPayload("RAYZR_NODE"); pl != nil {
 			if n := (^^e.Node)(pl.Data)^; e.Node_IsAlive(n) do path, changed = e.Node_RelativePath(mgr, owner, n), true
 		}
 		imgui.EndDragDropTarget()
@@ -946,7 +946,7 @@ inspector_camera_follow :: proc(state: ^EditorState, cam: ^e.CameraNode) {
 	}
 	Drive_Item("insp.camera.follow")
 	if imgui.BeginDragDropTarget() {
-		if payload := imgui.AcceptDragDropPayload("ORE_NODE"); payload != nil {
+		if payload := imgui.AcceptDragDropPayload("RAYZR_NODE"); payload != nil {
 			n := (^^e.Node)(payload.Data)^
 			if e.Node_IsAlive(n) && n != cam do set(state, cam, n)
 		}
@@ -1031,7 +1031,7 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 		if path, ok := asset_picker("insp.script-attach", "", scripts, allowNone = false); ok && path != "" {
 			Editor_RecordUndo(state, "Attach script")
 			node.gameContext = &state.game.gameContext
-			// Project-relative: resolves from the project dir or a .ore package.
+			// Project-relative: resolves from the project dir or a .rayzr package.
 			if e.Script_AttachToNode(node, path, nil, sm) != nil {
 				Editor_Log(state, .Info, "Attached %s to %s", path, node.name)
 			} else {

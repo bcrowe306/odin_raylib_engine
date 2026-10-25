@@ -135,7 +135,7 @@ smg_view :: proc(state: ^EditorState, sm: ^e.StateMachineNode) -> SMG_View {
 	return {sm.running, sm.current, sm.timeInState, sm.lastFired, e.StateMachine_History(sm), sm.historyLen * 1000 + sm.historyNext, false, sm.ways[:sm.wayCount], sm.leaveMask}
 }
 
-// StateGraph_RemoteReply: the game's "@ore:sm" answer.
+// StateGraph_RemoteReply: the game's "@rayzr:sm" answer.
 StateGraph_RemoteReply :: proc(text: string) {
 	v, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
 	if err != .None do return

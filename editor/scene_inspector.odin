@@ -89,7 +89,7 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 			imgui.Dummy({imgui.GetContentRegionAvail().x, max(imgui.GetContentRegionAvail().y, 40)})
 			Drive_Item("hier.empty")
 			if imgui.BeginDragDropTarget() {
-				if payload := imgui.AcceptDragDropPayload("ORE_NODE"); payload != nil {
+				if payload := imgui.AcceptDragDropPayload("RAYZR_NODE"); payload != nil {
 					dragged := (^^e.Node)(payload.Data)^
 					Editor_ReparentNode(state, dragged, root)
 				}
@@ -212,7 +212,7 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 	// Drag to re-parent.
 	if imgui.BeginDragDropSource({}) {
 		n := node
-		imgui.SetDragDropPayload("ORE_NODE", &n, size_of(^e.Node))
+		imgui.SetDragDropPayload("RAYZR_NODE", &n, size_of(^e.Node))
 		imgui.TextUnformatted(fmt.ctprintf("%s  %s", Editor_NodeIcon(node), node.name))
 		imgui.EndDragDropSource()
 	}
@@ -229,7 +229,7 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 		}
 		flags: imgui.DragDropFlags = {.AcceptBeforeDelivery}
 		if zone != 0 do flags += {.AcceptNoDrawDefaultRect}
-		if payload := imgui.AcceptDragDropPayload("ORE_NODE", flags); payload != nil {
+		if payload := imgui.AcceptDragDropPayload("RAYZR_NODE", flags); payload != nil {
 			if zone != 0 {
 				y := rmin.y if zone < 0 else rmax.y
 				dl := imgui.GetWindowDrawList()

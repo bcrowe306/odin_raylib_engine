@@ -144,7 +144,7 @@ def main():
             tests = [{"name": "preview", "frames": 20, "expect": [], "screenshot": os.path.join(ROOT, "templates", tid, "preview.png")}] + tests
         for test in tests:
             total += 1
-            with tempfile.TemporaryDirectory(prefix=f"ore_tpl_{tid}_") as tmp:
+            with tempfile.TemporaryDirectory(prefix=f"rayzr_tpl_{tid}_") as tmp:
                 fails = run_test(runner, tid, test, tmp)
             if fails:
                 failed += 1

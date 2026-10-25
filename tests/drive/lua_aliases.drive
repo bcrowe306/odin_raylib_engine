@@ -32,10 +32,10 @@ key enter
 key up
 type Save.set("high_score", 1)
 key ctrl+s
-wait-until file:.ore/definitions/project_types.lua contains ---| "high_score" timeout=600
-expect file:.ore/definitions/project_types.lua contains ---| "anim_1"
-expect file:.ore/definitions/project_types.lua contains ---| "greeting"
-expect file:.ore/definitions/project_types.lua contains ---| "fr"
+wait-until file:.rayzr/definitions/project_types.lua contains ---| "high_score" timeout=600
+expect file:.rayzr/definitions/project_types.lua contains ---| "anim_1"
+expect file:.rayzr/definitions/project_types.lua contains ---| "greeting"
+expect file:.rayzr/definitions/project_types.lua contains ---| "fr"
 key end
 key enter
 type local t = tr("gr

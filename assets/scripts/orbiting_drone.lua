@@ -1,4 +1,4 @@
--- Orbiting Drone Behavior Script (Odin Raylib Engine)
+-- Orbiting Drone Behavior Script (Rayzr)
 -- Demonstrates Lua 5.4 scripting, exported properties, and runtime node lifecycle.
 
 ---@class Drone : ScriptInstanceBase

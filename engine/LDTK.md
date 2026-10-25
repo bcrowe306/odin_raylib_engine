@@ -46,7 +46,7 @@ and the `ldtk` editor drive (`tests/drive/ldtk.drive`).
 | **EntityRef** fields (also across levels/worlds) | ✅ resolved to nodes; link rules (signal / parenting); Lua helpers both ways |
 | Tileset custom data | ✅ |
 | Neighbours | ✅ |
-| Packaged games (`.ore`) | ✅ the project, levels and images load through the asset manager |
+| Packaged games (`.rayzr`) | ✅ the project, levels and images load through the asset manager |
 | Live reload | ✅ saving in LDtk rebuilds the level in the editor and in development builds |
 
 ---

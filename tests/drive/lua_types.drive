@@ -1,16 +1,16 @@
-# Generated project types: .ore/definitions/project_types.lua lists the
+# Generated project types: .rayzr/definitions/project_types.lua lists the
 # project's input actions, scenes, node names, assets and script classes;
 # lua-language-server flags a misspelled action, completes action names and
 # types `self.<property>`; the file follows project changes.
 wait 5
-expect file:.ore/definitions/project_types.lua contains ---@alias InputAction
-expect file:.ore/definitions/project_types.lua contains ---| "move_left"
-expect file:.ore/definitions/project_types.lua contains ---@alias SceneName
-expect file:.ore/definitions/project_types.lua contains ---| "main"
-expect file:.ore/definitions/project_types.lua contains ---| "PlayerShip"
-expect file:.ore/definitions/project_types.lua contains ---| "textures/Spaceship_1.png"
-expect file:.ore/definitions/project_types.lua contains ---@class Drone
-expect file:.ore/definitions/project_types.lua contains ---@field orbit_radius number Orbit Radius
+expect file:.rayzr/definitions/project_types.lua contains ---@alias InputAction
+expect file:.rayzr/definitions/project_types.lua contains ---| "move_left"
+expect file:.rayzr/definitions/project_types.lua contains ---@alias SceneName
+expect file:.rayzr/definitions/project_types.lua contains ---| "main"
+expect file:.rayzr/definitions/project_types.lua contains ---| "PlayerShip"
+expect file:.rayzr/definitions/project_types.lua contains ---| "textures/Spaceship_1.png"
+expect file:.rayzr/definitions/project_types.lua contains ---@class Drone
+expect file:.rayzr/definitions/project_types.lua contains ---@field orbit_radius number Orbit Radius
 
 dblclick @asset:scripts/orbiting_drone.lua
 wait-until code.lsp == ready timeout=600
@@ -39,4 +39,4 @@ type warp_drive
 click @settings.add-action
 click @settings.save
 wait 60
-expect file:.ore/definitions/project_types.lua contains ---| "warp_drive"
+expect file:.rayzr/definitions/project_types.lua contains ---| "warp_drive"

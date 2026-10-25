@@ -270,7 +270,7 @@ LdtkProject :: struct {
 	arena:               vmem.Arena,
 	ownerAllocator:      mem.Allocator, // allocated the LdtkProject itself
 	// Reads files relative to the project (external levels, textures); set
-	// to read from a mounted .ore package. nil = disk.
+	// to read from a mounted .rayzr package. nil = disk.
 	reader:              Ldtk_FileReader,
 	readerData:          rawptr,
 }

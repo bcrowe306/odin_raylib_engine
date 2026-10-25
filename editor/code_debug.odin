@@ -181,7 +181,7 @@ Debug_Command :: proc(cmd: string) {
 	RemoteGame_Send(cmd)
 }
 
-// Debug_HandleReply: "@ore:stopped / locals / running" from the game.
+// Debug_HandleReply: "@rayzr:stopped / locals / running" from the game.
 Debug_HandleReply :: proc(state: ^EditorState, kind, rest: string) {
 	switch kind {
 	case "running":

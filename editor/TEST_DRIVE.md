@@ -9,7 +9,7 @@ the game process it launched, and it captures screenshots along the way.
 ```bash
 ./scripts/editor_drive.sh                 # every tests/drive/*.drive
 ./scripts/editor_drive.sh playtest nodes  # selected drives
-EDITOR_DEFINES=-define:ORE_MEM_TRACK=true ./scripts/editor_drive.sh code_soak_mem  # memory reports in the kept log
+EDITOR_DEFINES=-define:RAYZR_MEM_TRACK=true ./scripts/editor_drive.sh code_soak_mem  # memory reports in the kept log
 EDITOR_BIN=bin/editor_dev GAME_BIN=bin/game_dev ./scripts/editor_drive.sh state_graph  # beside another run (own binaries)
 task editor:drive                         # same as the first line
 ```
@@ -29,7 +29,7 @@ exits non-zero if any check fails.
 | `scripts.drive` | Attach a Lua script from the inspector, edit an exported property, save, simulate in the editor (and restore), Play: the game runs with the edited value. |
 | `project.drive` | New scene, physics bodies, unsaved edits survive scene switches, Project Settings (gravity, startup scene), simulate a falling crate, Play starts in the new scene. |
 | `components.drive` | Save a subtree as a component from the context menu, instantiate it from Assets, built-in templates. |
-| `export.drive` | Export `.ore`, then run the game from the package (textures load from inside it). |
+| `export.drive` | Export `.rayzr`, then run the game from the package (textures load from inside it). |
 | `assets.drive` | Asset folders collapse/expand (folder icons); the Scenes folder's + creates a scene. |
 | `code_shortcuts.drive` | Zed-style code editing: auto-closing pairs, line operations, multi-cursor, find/replace, go to line, LSP rename (with its preview: Apply) and format, font size, Go to File, reopen tab, command palette, Keyboard Shortcuts window. |
 | `scene_editing.drive` | Multi-select (tree, box), align, nudge, copy/paste, multi-delete, F2 rename, select all, quit prompt. |
@@ -94,7 +94,7 @@ exits non-zero if any check fails.
 | `code_swatch_texture.drive` | Swatches before a property's colour default and {0.2, 0.4, 0.8} (none for {1, 2, 3}); a click opens the picker; hovering a texture path shows the image. |
 | `code_inline_values.drive` | Paused at a breakpoint in update: line 27 shows self and dt; gone after Continue. |
 | `code_inspector_link.drive` | Show in Inspector on self.rotation_speed selects PlayerShip and lights its row; the Inspector's thrust_power > Find in Script opens the declaration, name selected. |
-| `code_soak_mem.drive` | 40 rounds of Code tab use (typing, undo, fold, soft wrap, find, expand selection, clipboard history, menus); with `EDITOR_DEFINES=-define:ORE_MEM_TRACK=true` the log shows the live heap staying flat. |
+| `code_soak_mem.drive` | 40 rounds of Code tab use (typing, undo, fold, soft wrap, find, expand selection, clipboard history, menus); with `EDITOR_DEFINES=-define:RAYZR_MEM_TRACK=true` the log shows the live heap staying flat. |
 | `state_graph.drive` | The State Machine tab follows a new StateMachine; right-click adds states, renamed in the side panel; a dot dragged onto a state makes a transition (a condition added); saved with positions; Delete removes the arrow (not the node). |
 | `state_graph_live.drive` | A machine with break on enter: in Simulate the param set from the Lua line takes it there and pauses, the history shows; in Play the graph shows the game's machine and break on enter pauses the game. |
 | `state_machine_lua.drive` | The generated Lua types list `on_enter_` / `on_update_` / `on_exit_<state>` for a new state; Add Script Callbacks without a script says to attach one; with player_ship.lua it writes the three methods into the script. |
@@ -109,10 +109,10 @@ exits non-zero if any check fails.
 | `navigation.drive` | A Navigation Region added and baked (the Inspector's Bake), a node with a Navigation Agent; saved; in Simulate the agent walks it to a target set from Lua. |
 | `accessibility.drive` | Project Settings > Accessibility (Sound Captions) saved in project.json; View > Colour Vision: Deuteranopia previews the viewport; a UI Container's Accessibility Menu template builds its rows in Simulate (captions on from the project) and its filter button follows the setting. |
 | `skeleton.drive` | A Spine fixture (tests/drive/fixtures/skeleton_zz) on a Skeleton node: file and animation picked, preview scrubbed, a bone highlighted, a Bone Attachment on the hand; saved; in Simulate it plays (Lua bone position). |
-| `web_export.drive` | A web preset with its own title exported (runner files, game.ore, titled page); File > Export > Open Web Export in Browser serves it; the game runs in headless Chrome (screenshot). |
+| `web_export.drive` | A web preset with its own title exported (runner files, game.rayzr, titled page); File > Export > Open Web Export in Browser serves it; the game runs in headless Chrome (screenshot). |
 | `animation_depth.drive` | A key's Edit Curve with the Ease In preset (frame 2 follows it), saved as a 7th key element; the onion skin in the viewport; a method key's argument, saved. |
 | `remote_tree.drive` | Play; the Scene panel's Remote view lists the game's tree; selecting PlayerShip shows its live properties in the Inspector: rotation typed (drag field), visible unticked, the eye toggle; Apply to Scene copies the rotation into the edited scene (undo restores it); Stop leaves the Remote view. |
-| `scene_tabs.drive` | A second scene opens in a tab; switching keeps each tab's selection; Cmd+Alt+Right cycles; closing a modified tab asks (Cancel keeps it, Don't Save unloads it); the open tabs are written to .ore/open_scenes.json; reopening loads the saved file. |
+| `scene_tabs.drive` | A second scene opens in a tab; switching keeps each tab's selection; Cmd+Alt+Right cycles; closing a modified tab asks (Cancel keeps it, Don't Save unloads it); the open tabs are written to .rayzr/open_scenes.json; reopening loads the saved file. |
 | `advanced_camera.drive` | An Advanced Camera added, Follow Target picked (PlayerShip), Damping set; saved; in Simulate it's active, the host follows the ship, Shake adds trauma, a second camera with a higher priority takes over. |
 | `ui_theme.drive` | No Scene JSON tab; headers, rulers and the Welcome window; theme presets preview live, Save writes `[theme]` to settings.ini, Cancel restores the saved theme. |
 | `lua_debugger.drive` | A gutter breakpoint, Play This Scene stops in the script (line, locals, stack), step over, breakpoint removed and Continue, stop. |
@@ -124,13 +124,13 @@ exits non-zero if any check fails.
 | `remote_game.drive` | Play with the editor link: the Game tab's live tree, pause, one-frame step, inspect and change a node's rotation in the running game, resume, a saved scene reloading in the game, stop. |
 | `sprite_slicer.drive` | Slicer: a texture cut 4 x 2, cells picked (click, Shift+click range) as an animation, one per row, a new AnimationPlayer; picked cells saved. |
 | `asset_folders.drive` | Folders view: new folder, a texture the scene uses dragged into it (reference updated), Find Usages, folder renamed (references updated), thumbnail grid, texture import settings saved next to it, folder deleted. |
-| `atlas.drive` | Atlas ticked on a texture (saved in its import file); Export .ore packs it into an atlas page; the exported game runs from the package (screenshot) with the scene's texture. |
+| `atlas.drive` | Atlas ticked on a texture (saved in its import file); Export .rayzr packs it into an atlas page; the exported game runs from the package (screenshot) with the scene's texture. |
 | `import_settings.drive` | A texture's filter and Export: QOI saved in its `.import.json` (hidden in Assets), the file following a rename, an audio file's default bus, a slicing preset from the slicer's Save Preset. |
 | `scene_tree.drive` | Tags in the Inspector (typed, picked, removed), filter by `#tag` / `t:type`, reorder by dropping on a row's edge (undo), Copy to Scene at the same world position, tags in the generated Lua types. |
 | `viewport_tools.drive` | Rulers, a guide dragged from the ruler, Alt-drag pivot (image and child stay), smart snap of an edge to the guide, viewport lock (not pickable) and hide in editor, Show All Colliders, saved. |
 | `multi_edit.drive` | Two lights selected: mixed value marked, a number / one axis of the position / a checkbox / a combo applied to both, undo. |
 | `inspector_help.drive` | Hovering a property fills the tooltip and the Inspector help pane (field or label); View > Inspector Help hides the pane. |
-| `remember_dirs.drive` | An import remembers its folder and the next import dialog opens there; Export .ore into a picked folder, the next export and the Output Folder's Browse... start there; a new project's location; all saved in settings.ini `[paths]`. |
+| `remember_dirs.drive` | An import remembers its folder and the next import dialog opens there; Export .rayzr into a picked folder, the next export and the Output Folder's Browse... start there; a new project's location; all saved in settings.ini `[paths]`. |
 | `code_editor.drive` | Open a script in the Code tab; lua-language-server completion of the engine API, signature help, diagnostics, go to definition; save; unsaved-changes prompt; New Script from the Inspector. |
 
 ## Script language

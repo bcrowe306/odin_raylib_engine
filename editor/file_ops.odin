@@ -267,7 +267,7 @@ is_project_dir :: proc(dir: string) -> bool {
 // Editor_SwitchProject relaunches the editor on another project (after the
 // unsaved-changes prompt).
 Editor_SwitchProject :: proc(state: ^EditorState, path: string) {
-	if !is_project_dir(path) && !strings.has_suffix(path, ".ore") {
+	if !is_project_dir(path) && !e.Is_PackagePath(path) {
 		Editor_Log(state, .Error, "%s is not a project (no project.json)", path)
 		return
 	}
@@ -379,7 +379,7 @@ OpenProject_Render :: proc(state: ^EditorState) {
 		imgui.EndChild()
 	}
 	imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 220)
-	imgui.InputTextWithHint("##openpath", "Project folder or .ore", cstring(raw_data(browser.pathBuf[:])), len(browser.pathBuf), {})
+	imgui.InputTextWithHint("##openpath", "Project folder or .rayzr", cstring(raw_data(browser.pathBuf[:])), len(browser.pathBuf), {})
 	Drive_Item("open.path")
 	imgui.SameLine()
 	path := strings.trim_space(string(cstring(raw_data(browser.pathBuf[:]))))

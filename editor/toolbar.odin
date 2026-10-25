@@ -127,7 +127,7 @@ Toolbar_Render :: proc(state: ^EditorState, width, height, posY: f32) {
 	UI_VerticalDivider()
 	if UI_IconButton(ICON_FA_FLOPPY_DISK, "toolbar.save", "Save scene (Ctrl+S)", tint = UI_WARNING if modified else {}) do Toolbar_SaveScene(state)
 	imgui.SameLine()
-	if UI_IconButton(ICON_FA_BOX_ARCHIVE, "toolbar.export", "Export .ore package") do Toolbar_ExportOre(state)
+	if UI_IconButton(ICON_FA_BOX_ARCHIVE, "toolbar.export", "Export .rayzr package") do Toolbar_ExportRayzr(state)
 	imgui.SameLine()
 	if UI_IconButton(ICON_FA_GEAR, "toolbar.settings", "Project settings") do ProjectSettingsDialog_Open(state)
 }
@@ -256,39 +256,39 @@ Toolbar_SaveScene :: proc(state: ^EditorState) {
 	Editor_SaveSceneDocument(state, state.activeScene)
 }
 
-// Editor_OrePath: exports go next to the project folder (<dir>.ore).
-Editor_OrePath :: proc(state: ^EditorState) -> string {
+// Editor_RayzrPath: exports go next to the project folder (<dir>.rayzr).
+Editor_RayzrPath :: proc(state: ^EditorState) -> string {
 	clean := strings.trim_suffix(state.projectPath, "/")
-	return strings.concatenate({clean, ".ore"}, context.temp_allocator)
+	return strings.concatenate({clean, ".rayzr"}, context.temp_allocator)
 }
 
-// Toolbar_ExportOre asks for a folder (opening in the one used last, else
-// next to the project) and writes <project>.ore there.
-Toolbar_ExportOre :: proc(state: ^EditorState) {
+// Toolbar_ExportRayzr asks for a folder (opening in the one used last, else
+// next to the project) and writes <project>.rayzr there.
+Toolbar_ExportRayzr :: proc(state: ^EditorState) {
 	if GlobalDrive.enabled && len(driveDialogAnswers) == 0 {
-		export_ore_to(state, filepath.dir(Editor_OrePath(state), context.temp_allocator)) // drives: next to the project
+		export_rayzr_to(state, filepath.dir(Editor_RayzrPath(state), context.temp_allocator)) // drives: next to the project
 		return
 	}
-	start := Editor_StartDir(.Export, filepath.dir(Editor_OrePath(state), context.temp_allocator))
-	NativeDialog_Open(state, {title = "Export .ore Package To", folders = true, start = start}, proc(state: ^EditorState, paths: []string) {
+	start := Editor_StartDir(.Export, filepath.dir(Editor_RayzrPath(state), context.temp_allocator))
+	NativeDialog_Open(state, {title = "Export .rayzr Package To", folders = true, start = start}, proc(state: ^EditorState, paths: []string) {
 		Editor_RememberDir(.Export, paths[0], true)
-		export_ore_to(state, paths[0])
+		export_rayzr_to(state, paths[0])
 	})
 }
 
 @(private = "file")
-export_ore_to :: proc(state: ^EditorState, dir: string) {
+export_rayzr_to :: proc(state: ^EditorState, dir: string) {
 	Editor_SaveAllScenes(state)
 	defer Editor_InvalidateProjectFiles() // a package next to the project shows in Assets
-	outPath, _ := filepath.join({dir, filepath.base(Editor_OrePath(state))}, context.temp_allocator)
+	outPath, _ := filepath.join({dir, filepath.base(Editor_RayzrPath(state))}, context.temp_allocator)
 	overrides := make(map[string][]u8, context.temp_allocator)
 	e.Asset_ExportOverrides(state.projectPath, &overrides, allocator = context.temp_allocator) // (import settings: QOI)
 	sprites, pages := e.Atlas_Build(state.projectPath, &overrides, allocator = context.temp_allocator) // (and sprite atlases)
 	if sprites > 0 do Editor_Log(state, .Info, "%d texture(s) packed into %d atlas page(s)", sprites, pages)
-	ok := e.OrePackage_CreateFromDirectory(state.projectPath, outPath, true, overrides = overrides)
+	ok := e.RayzrPackage_CreateFromDirectory(state.projectPath, outPath, true, overrides = overrides)
 	if ok {
-		Editor_Log(state, .Info, "Exported portable .ore archive: %s", outPath)
+		Editor_Log(state, .Info, "Exported portable .rayzr archive: %s", outPath)
 	} else {
-		Editor_Log(state, .Error, "Failed to export .ore package: %s", outPath)
+		Editor_Log(state, .Error, "Failed to export .rayzr package: %s", outPath)
 	}
 }

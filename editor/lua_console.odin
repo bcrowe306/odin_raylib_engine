@@ -77,7 +77,7 @@ LuaConsole_Eval :: proc(state: ^EditorState, code: string) {
 	}
 }
 
-// LuaConsole_Reply: the game's "@ore:eval" answer.
+// LuaConsole_Reply: the game's "@rayzr:eval" answer.
 LuaConsole_Reply :: proc(state: ^EditorState, text: string) {
 	v, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
 	if err != .None do return

@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 # Linux: wraps the packaged editor (scripts/package_editor.sh's
-# dist/ore-editor-linux) in an AppImage - one file users download, mark
+# dist/rayzr-editor-linux) in an AppImage - one file users download, mark
 # executable and run. appimagetool is downloaded if it isn't on PATH.
 #   scripts/ci/appimage_editor.sh <version> [dist]
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 version="$1"
 dist="${2:-dist}"
-src="$dist/ore-editor-linux"
-[ -x "$src/ore-editor" ] || { echo "no packaged editor in $src" >&2; exit 1; }
+src="$dist/rayzr-editor-linux"
+[ -x "$src/rayzr-editor" ] || { echo "no packaged editor in $src" >&2; exit 1; }
 
-app="$dist/OreEditor.AppDir"
+app="$dist/RayzrEditor.AppDir"
 rm -rf "$app"
-mkdir -p "$app/usr/lib/ore-editor"
-cp -R "$src/." "$app/usr/lib/ore-editor/"
-cp editor/assets/icon.png "$app/ore-editor.png"
-cat > "$app/ore-editor.desktop" <<-EOF
+mkdir -p "$app/usr/lib/rayzr-editor"
+cp -R "$src/." "$app/usr/lib/rayzr-editor/"
+cp editor/assets/icon.png "$app/rayzr-editor.png"
+cat > "$app/rayzr-editor.desktop" <<-EOF
 	[Desktop Entry]
 	Type=Application
-	Name=Ore Editor
+	Name=Rayzr Editor
 	Comment=2D game editor
-	Exec=ore-editor
-	Icon=ore-editor
+	Exec=rayzr-editor
+	Icon=rayzr-editor
 	Categories=Development;Game;
 	Terminal=false
 	X-AppImage-Version=$version
@@ -30,7 +30,7 @@ cat > "$app/AppRun" <<-'EOF'
 	#!/bin/sh
 	# The editor finds its runners, fonts and language server next to itself.
 	here="$(dirname "$(readlink -f "$0")")"
-	exec "$here/usr/lib/ore-editor/ore-editor" "$@"
+	exec "$here/usr/lib/rayzr-editor/rayzr-editor" "$@"
 EOF
 chmod +x "$app/AppRun"
 
@@ -41,5 +41,5 @@ if [ -z "$tool" ]; then
 	chmod +x "$tool"
 fi
 # (--appimage-extract-and-run: no FUSE needed, e.g. in CI containers.)
-ARCH=x86_64 "$tool" --appimage-extract-and-run "$app" "$dist/Ore_Editor-$version-x86_64.AppImage"
-echo "Built $dist/Ore_Editor-$version-x86_64.AppImage"
+ARCH=x86_64 "$tool" --appimage-extract-and-run "$app" "$dist/Rayzr_Editor-$version-x86_64.AppImage"
+echo "Built $dist/Rayzr_Editor-$version-x86_64.AppImage"

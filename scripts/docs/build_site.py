@@ -20,8 +20,8 @@ import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 OUT = os.path.join(ROOT, "build", "docs_src")
 DOCS = os.path.join(OUT, "docs")
-REPO = "https://github.com/bcrowe306/odin_raylib_engine"
-SITE = "https://bcrowe306.github.io/odin_raylib_engine/"
+REPO = "https://github.com/bcrowe306/rayzr"
+SITE = "https://bcrowe306.github.io/rayzr/"
 
 # The pages (repository paths), in the site's navigation.
 GUIDES = [
@@ -37,7 +37,7 @@ GUIDES = [
     ]),
     ("Formats", [
         ("Level editor (LDtk)", "engine/LDTK.md"),
-        ("The .ore package", "engine/ORE_FORMAT.md"),
+        ("The .rayzr package", "engine/RAYZR_FORMAT.md"),
     ]),
     ("Contributing", [
         ("Releases and dev builds", "RELEASING.md"),
@@ -55,7 +55,7 @@ def rewrite_links(text, rel_path, pages):
         if re.match(r"^[a-z]+://|^#|^mailto:", target):
             return m.group(0)
         if target.startswith("file://"):  # (absolute local links in some files)
-            p = target.split("odin_raylib_engine/", 1)[-1]
+            p = target.split("rayzr/", 1)[-1]
             return f"[{label}]({REPO}/blob/main/{p})"
         path, _, anchor = target.partition("#")
         resolved = os.path.normpath(os.path.join(base, path)) if path else rel_path
@@ -228,7 +228,9 @@ def lua_reference():
 
 # --- pages written here ---------------------------------------------------------------
 
-HOME = """# Ore
+HOME = """# Rayzr
+
+![Rayzr](assets/rayzr.png){{ width="160" }}
 
 A 2D game engine and editor: scenes and nodes, Lua scripting with live
 reload, physics, tile maps and an integrated LDtk level editor, skeletal
@@ -305,6 +307,9 @@ def main():
     if os.path.isdir(OUT):
         shutil.rmtree(OUT)
     os.makedirs(DOCS)
+    # The logo (editor/assets/icon.png, made from branding/ by scripts/branding/make_icons.odin).
+    os.makedirs(os.path.join(DOCS, "assets"))
+    shutil.copy(os.path.join(ROOT, "editor", "assets", "icon.png"), os.path.join(DOCS, "assets", "rayzr.png"))
     nav_guides = []
     engine_docs = sorted(f for f in os.listdir(os.path.join(ROOT, "engine", "docs")) if f.endswith(".md"))
     pages = set()
@@ -338,7 +343,7 @@ def main():
         return "\n".join(y)
 
     with open(os.path.join(OUT, "mkdocs.yml"), "w") as f:
-        f.write(f"""site_name: Ore
+        f.write(f"""site_name: Rayzr
 site_description: A 2D game engine and editor
 site_url: {SITE}
 repo_url: {REPO}
@@ -347,13 +352,15 @@ docs_dir: docs
 site_dir: ../docs_site
 theme:
   name: material
+  logo: assets/rayzr.png
+  favicon: assets/rayzr.png
   palette:
     - scheme: slate
-      primary: indigo
+      primary: black
       accent: amber
       toggle: {{icon: material/brightness-4, name: Light mode}}
     - scheme: default
-      primary: indigo
+      primary: black
       accent: amber
       toggle: {{icon: material/brightness-7, name: Dark mode}}
   features: [navigation.sections, navigation.top, search.highlight, content.code.copy]

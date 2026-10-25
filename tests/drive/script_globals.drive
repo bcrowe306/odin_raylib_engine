@@ -11,7 +11,7 @@ wait 2
 expect item:asset.global:scripts/drive_global_zz.lua == visible
 expect file:project.json contains {"name": "DriveGlobalZz", "script": "scripts/drive_global_zz.lua"}
 screenshot asset_globe
-wait-until file:.ore/definitions/project_types.lua contains DriveGlobalZz = require("scripts/drive_global_zz") timeout=600
+wait-until file:.rayzr/definitions/project_types.lua contains DriveGlobalZz = require("scripts/drive_global_zz") timeout=600
 
 # Project Settings lists it.
 click @toolbar.settings

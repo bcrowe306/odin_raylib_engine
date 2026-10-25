@@ -16,7 +16,7 @@ const seconds = Number(secondsArg || 12);
 const click = process.argv.includes("--click");
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 9300 + Math.floor(Math.random() * 500);
-const profile = mkdtempSync(join(tmpdir(), "ore_chrome_"));
+const profile = mkdtempSync(join(tmpdir(), "rayzr_chrome_"));
 const proc = spawn(chrome, ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
   "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--window-size=1280,720", "--autoplay-policy=no-user-gesture-required", "about:blank"],
   { stdio: "ignore" });

@@ -10,7 +10,7 @@ out of scope here.
 - [x] 1.1 Editor viewport renders in one tree pass (`Scene_CollectRenderables`), not one walk per layer
 - [x] 1.2 Culling: skip nodes whose bounds are outside the camera view (game and editor); tile maps and LDtk draw only visible tiles
 - [x] 1.3 Lua language server: ship engine definitions with the editor (not the repo checkout); write `.luarc.json` into each project
-- [x] 1.4 Generated project types (`.ore/project_types.lua`): input action names, scene/asset paths, node names per scene, script classes with their properties, signals, LDtk entities/enums/levels, components
+- [x] 1.4 Generated project types (`.rayzr/project_types.lua`): input action names, scene/asset paths, node names per scene, script classes with their properties, signals, LDtk entities/enums/levels, components
 
 ## Phase 2 — Core engine features
 
@@ -23,10 +23,10 @@ out of scope here.
 
 ## Phase 3 — Export
 
-- [x] 3.1 Prebuilt runners per platform shipped with the editor; export copies the runner + `.ore` (no compiler needed), name and icon
-- [x] 3.2 macOS `.app` bundle (Info.plist, icon, `.ore` in Resources, universal binary); optional codesign/notarize step
+- [x] 3.1 Prebuilt runners per platform shipped with the editor; export copies the runner + `.rayzr` (no compiler needed), name and icon
+- [x] 3.2 macOS `.app` bundle (Info.plist, icon, `.rayzr` in Resources, universal binary); optional codesign/notarize step
 - [x] 3.3 Windows packaging (icon, version info, no console in release); Linux AppImage
-- [x] 3.4 Web (emscripten): raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio (done as roadmap 5: the prebuilt web runner; `web_export` drive)
+- [x] 3.4 Web (emscripten): raylib + Box2D + Lua to wasm, `.rayzr` preloaded, click-to-start audio (done as roadmap 5: the prebuilt web runner; `web_export` drive)
 - [x] 3.5 Export presets per target (icon, version, window, include/exclude, debug/release) in `project.json`
 
 ## Phase 4 — Performance (single-threaded)
@@ -121,6 +121,9 @@ Each item's PR is merged once local tests + CI pass.
 Each item: a feature branch, tests + drives, docs, a PR merged when CI is
 green (its dev build: RELEASING.md).
 
+Rebrand (2026-10-25):
+- [x] R.1 Ore / odin_raylib_engine -> Rayzr: names in code, docs, tests, CI, packages (rayzr-editor-*, Rayzr Editor.app, com.rayzr.*), the .rayzr package (magic RYZ1; ORE1 / .ore still read), projects' .rayzr/ (old .ore/ moved on open), ~/.config/rayzr_editor (moved from ore_editor), Lua Project.export_rayzr (export_ore kept); the icon (branding/, scripts/branding/make_icons.odin) in the macOS .icns, the Windows .exe (icon.res), deb / AppImage, the window, the Welcome window, the docs site; exported games without an icon get it; the GitHub repo is bcrowe306/rayzr
+
 High impact (now):
 - [x] E.1 Crash and bug reports (roadmap 22): editor panics / Lua errors write a crash file (version, platform, stack, log tail, recent actions), offered on the next start (a prefilled GitHub issue); exported games write crash logs to the user-data folder, with an optional developer hook - done: engine/crash_report*.odin (panics, signals, Windows exceptions; unwinder stacks, recent lines), editor/crash_reports.odin (offered on the next start, Report on GitHub, Help > Report a Bug), the Crash Lua module, scripts/test_crash.sh (CI), crash_report drive, engine/docs/crash_reports.md
 - [x] E.2 Starter templates, sample games, docs site: New Project templates (platformer, top-down RPG, shmup, puzzle), 2-3 larger samples, guides + the Lua API reference published by CI - done: templates/ built by scripts/templates/make_templates.py (Kenney CC0 art + pixel font), played by test_templates.py (runner --input-script; CI), levels proven finishable (find_route.py, runner --trace) / solvable (a Sokoban solver); samples Platformer Adventure + Asteroids; Welcome cards with previews; docs site (scripts/docs/build_site.py, MkDocs, GitHub Pages, generated Lua API reference); engine fixes found on the way (component tags, int properties from scenes, set_texture on new nodes, smooth-camera UI alpha, create_node log, hex colours in set_property)
@@ -138,7 +141,50 @@ Later:
 - [ ] E.10 Runtime mods: sandboxed Lua in exported games, mod folders, asset overrides (reuses the plugin host)
 - [ ] E.11 Multithreading: a job system for physics / particles / animation / culling, when a real game needs it
 - [ ] E.12 Plugin and template registry: browse community plugins / templates in the editor (a GitHub index)
-- [ ] E.13 Single-binary exports: game.ore + font appended to the runner on Windows / Linux (a footer: offset + magic; Windows signed after appending), macOS keeps the .app (Resources: signing-safe); an export option
+- [ ] E.13 Single-binary exports: game.rayzr + font appended to the runner on Windows / Linux (a footer: offset + magic; Windows signed after appending), macOS keeps the .app (Resources: signing-safe); an export option
+
+## Phase 14 — 2D vector art: Flash-style characters (2026-10-25)
+
+Goal: characters drawn and animated as vectors the way Flash / Adobe Animate
+did it - crisp at any zoom / resolution, symbols with swappable parts
+(mouths, hands, eyes), shape tweens, bones bending vector shapes - drawn in
+the editor or imported from Inkscape / Illustrator / Affinity / Animate.
+Decided (2026-10-25): Flash-style characters first; neon-arcade glow and
+destructible boolean terrain are secondary.
+
+Constraints: raylib is OpenGL 3.3 and macOS has no compute shaders, so no
+Vello-style GPU rasterizer - tessellate on the CPU (or NanoVG's
+stencil-then-cover) and cache the meshes. Every item: integration with
+nodes / animation / skeletons / Lua, performance (cached meshes, transforms
+in the vertex shader, instancing, flat vertex arrays), safety (leak / UAF
+tests, arenas for per-frame tessellation), docs with tutorials, tests + drives.
+
+Foundation:
+- [ ] V.1 Vector data model: paths (move / line / quad / cubic / arc / close), shapes = path + fill + stroke, groups with transforms; fills (solid, linear / radial gradients, image patterns, opacity), strokes (width, miter / round / bevel joins, butt / round / square caps, dashes, miter limit), non-zero / even-odd fill rules (holes), clip paths / masks; a native asset format (`.vec.json`) the editor writes, SVG being the import format
+- [ ] V.2 Renderer: curve flattening with a screen-space tolerance (re-flattened only when zoom changes enough), fill triangulation (earcut / libtess2-style for holes and self-intersections) or stencil-then-cover, stroke expansion (joins, caps, dashes), analytic edge anti-aliasing (NanoVG-style feathered fringe, no MSAA needed), gradient / pattern shaders, stencil masks. Evaluate Odin's `vendor:nanovg` first as a fast path (flush raylib's batch with rlDrawRenderBatchActive, restore GL state after); keep our own tessellator if it doesn't fit caching / instancing
+- [ ] V.3 Immediate-mode vector API (engine + Lua): canvas / NanoVG-style begin_path / move_to / line_to / bezier_to / arc / close / fill / stroke / set_fill (colour, gradient) / set_stroke / save / restore / transform, usable from on_draw; engine_api.lua docs with examples
+- [ ] V.4 VectorShapeNode: draws a vector asset with cached meshes (static GPU buffers; only matrix changes on move / rotate / scale; re-tessellated on shape edits or large zoom changes), per-instance tint / alpha, instancing for repeated shapes, tessellation of dirty shapes on worker threads into a per-frame arena; picking by the shape (point-in-path), bounds for culling / visibility notifiers
+- [ ] V.5 SVG import: nanosvg-style parser (path, rect, circle, ellipse, line, polyline, polygon, g, transform, use / defs, linear / radial gradients, style / presentation attributes, opacity, clip paths), groups become sub-shapes / layers; import settings (scale, origin / pivot, merge layers) in `<asset>.import.json`, live reload on save, Assets preview; real files from Inkscape / Illustrator / Affinity / Figma as test fixtures
+
+Flash-style characters:
+- [ ] V.6 Symbols and instances (Flash's library): a vector asset can contain named symbols (reusable groups with their own timeline); instances in a character with their own transform, colour effects (tint, brightness, alpha, advanced colour transform) and first-frame / loop / play-once modes; editing a symbol updates every instance
+- [ ] V.7 Part swapping: swap sets for mouths / hands / eyes / expressions (a symbol's frames chosen by name or index), keyable on the animation timeline and settable from Lua (`vector_swap(node, "mouth", "O")`); lip-sync mouth charts (Preston Blair set: A-I, O, U, E, L, WQ, MBP, FV, rest) driven by dialogue / subtitle lines or a phoneme file (Rhubarb Lip Sync output)
+- [ ] V.8 Vector timeline animation: keyframes on symbol instances (transform, colour effect, swap frame, visibility, draw order) in the existing animation editor, classic tweens with the existing easing / Bezier curves, frame-by-frame vector keys (hold frames, "on twos"), onion skin (exists) working with vector frames, labels / events
+- [ ] V.9 Shape tweens / morphing: interpolate one path into another (point correspondence by resampling to the same point count, shape hints to pin matching points like Flash), fill / stroke / gradient interpolation; trim paths (animate a stroke's drawn start / end) for draw-on lines and effects
+- [ ] V.10 Vector skinning on the skeletal runtime (item 7): vector shapes as SkeletonNode attachments (tessellated meshes weighted to bones, deformed in the vertex shader), path points bound to bones (smooth bending of limbs without visible joints), IK (exists) on vector rigs, mesh warp / free-form deformers for squash and stretch
+- [ ] V.11 Character effects: per-instance filters like Flash's - drop shadow, glow, blur, bevel, colour matrix - as cheap shader passes (render the character to a texture once when filters are used), line-weight scaling options (strokes scale with the character or stay constant thickness), outline / cel-shading strokes
+
+Editor:
+- [ ] V.12 Vector drawing tools: pen (Bezier with handles), node editing (smooth / corner / symmetric points, add / delete / convert), primitives (rect with corner radius, ellipse, polygon, star), pencil / brush with curve fitting (freehand to smooth Beziers - the Flash brush feel), paint bucket on closed regions, snapping (grid, points, guides), layers and draw order
+- [ ] V.13 Fill / stroke inspector: colour, gradient editor with stops and on-canvas gradient handles (Flash's gradient transform tool), stroke style, opacity, swatches / project palette; eyedropper
+- [ ] V.14 Symbol workflow in the editor: Convert to Symbol, a Library panel (symbols per vector asset, previews, usage counts), double-click to edit a symbol in place (the rest dimmed), swap-symbol dialog, the timeline per symbol
+- [ ] V.15 Path operations: boolean union / subtract / intersect / exclude, offset / outline stroke to fill, simplify, flatten (Clipper2-based); also the basis for runtime collision
+- [ ] V.16 Collision from vector shapes: flatten + convex decomposition into physics shapes (auto-regenerated when the shape changes), shown as an overlay; path queries (closest point, length, point / tangent at a distance) shared with PathNode
+
+Text and import (later):
+- [ ] V.17 Crisp text at any scale: MSDF font atlases for vector-style text, text on a path
+- [ ] V.18 Adobe Animate import: XFL / uncompressed .fla (DOMDocument.xml: symbols, timelines, shapes with Flash's edge format, tweens) and/or Animate's SVG / texture-atlas exports; Lottie / Rive as possible extra formats
+- [ ] V.19 Templates and docs: a vector character sample (rigged character with walk / idle / talk, swap sets, lip-sync), a "Drawing and animating a vector character" tutorial, engine/docs/vector.md
 
 ## Phase 12 — Distribution, CI/CD and export targets (2026-10-25)
 
@@ -157,7 +203,7 @@ Editor that runs anywhere:
   Or c) replace it: the markdown view uses a subset; a small Odin renderer removes the dependency.
 - [x] D.5 lua-language-server built per platform and bundled (the Code tab's completion / diagnostics)
 - [x] D.6 The editor ships the runners for every platform (`runners/{macos,windows,linux,web}`), so any editor exports every desktop target and the web
-- [x] D.7 One version string (from the git tag) in the editor, the runner and each `.ore`; the runner warns about a project from a newer version
+- [x] D.7 One version string (from the git tag) in the editor, the runner and each `.rayzr`; the runner warns about a project from a newer version
 - [x] D.8 Third-party license notices bundled (raylib, Lua, Box2D, Dear ImGui, LuaLS, cmark, Open Sans, Font Awesome)
 - [x] D.9 Check for updates against GitHub Releases (Help > Check for Updates, at startup unless turned off; status bar link; later: an auto-updater)
 
@@ -224,7 +270,7 @@ Editor:
   - [x] 13.6 editor_api.lua definitions, Tools > New Plugin, guide + examples, drives
   - [x] 13.7 D: inspectors, viewport overlays / handles, importers
 - [x] 14 Live remote scene tree in Play: (the Game tab's tree / text props existed) the Scene panel's Local / Remote view and the Inspector on the running game's node; typed live properties (drags, check boxes, colours, enum lists incl. script enums, ranges; throttled while dragging); enabled / visible toggles, Remove from Game, Pick (click in the game window; topmost node per layer space), amber outline of the selection in the game, Apply to Scene (undoable, Node_SetFromText); trees re-sent only when their hash changed; README, tests, drive
-- [x] 15 Multiple open scenes as tabs: a tab per open scene / component document above the viewport (reorder, unsaved dot, tooltip, context menu), per-tab camera / selection / undo, close with Save / Don't Save / Cancel (unloads the scene, frees its undo entries; closed component documents reuse their scene), Cmd+W, Cmd+Alt+Right/Left, Ctrl+PageDown/Up, Ctrl+Tab; open tabs restored per project (.ore/open_scenes.json); README, drive
+- [x] 15 Multiple open scenes as tabs: a tab per open scene / component document above the viewport (reorder, unsaved dot, tooltip, context menu), per-tab camera / selection / undo, close with Save / Don't Save / Cancel (unloads the scene, frees its undo entries; closed component documents reuse their scene), Cmd+W, Cmd+Alt+Right/Left, Ctrl+PageDown/Up, Ctrl+Tab; open tabs restored per project (.rayzr/open_scenes.json); README, drive
 - [x] 16 Animation editor depth: (easing presets and method / sound event tracks existed) custom key curves (cubic Bezier editor with handles and presets, saved as a 7th key element, drawn on the timeline rows), method keys with an argument and a method picker from the target script, the player's animation_event signal, onion skin in the viewport (before / after counts, opacity, follows the player's own tracks, wraps looping animations); toolbar wraps in narrow panels; guide with tutorials, test, drive
 - [x] 17 Per-asset import settings: `<asset>.import.json` next to the file (hidden in Assets, moved / copied / deleted with it, read through the package in exported games, cached per path in one arena): textures filter / wrap / mipmaps / slicing preset (the Sprite Sheet Slicer opens with it, Save Preset) / Export Keep or QOI (re-encoded into the package; loaders sniff QOI headers); audio gain (baked into decoded sounds, music volume) and default bus (nodes / Audio calls without one); old project.json texture_import still read and moved on the first change; preview panel rows (wrapping); guide with tutorials, test, drive. Also: two process-lifetime caches no longer show as leaks
 

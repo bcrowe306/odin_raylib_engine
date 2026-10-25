@@ -57,7 +57,7 @@ test_export_presets :: proc(t: ^testing.T) {
 	testing.expect(t, Export_PresetIncludes(win, "project.json") && Export_PresetIncludes(win, "textures/a.png") && !Export_PresetIncludes(win, "audio/x.wav"), "include")
 
 	// A package with the filter and a replaced project.json.
-	dir, _ := filepath.join({Engine_TempDir(), "ore_preset_pkg"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_preset_pkg"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	defer os.remove_all(dir)
 	for f in ([]string{"project.json", "scenes/main.scene.json", "textures/a.png", "audio/x.wav"}) {
@@ -66,18 +66,18 @@ test_export_presets :: proc(t: ^testing.T) {
 		_ = os.write_entire_file(p, transmute([]u8)string("{}"))
 	}
 	projDir, _ := filepath.join({dir, "proj"}, context.temp_allocator)
-	out, _ := filepath.join({dir, "game.ore"}, context.temp_allocator)
+	out, _ := filepath.join({dir, "game.rayzr"}, context.temp_allocator)
 	overrides := make(map[string][]u8, context.temp_allocator)
 	overrides["project.json"] = transmute([]u8)string(`{"name": "patched"}`)
 	filter :: proc(path: string, data: rawptr) -> bool {return Export_PresetIncludes(cast(^Export_Preset)data, path)}
-	testing.expect(t, OrePackage_CreateFromDirectory(projDir, out, false, filter, win, overrides), "package written")
-	pkg, pok := OrePackage_Open(out, context.temp_allocator)
+	testing.expect(t, RayzrPackage_CreateFromDirectory(projDir, out, false, filter, win, overrides), "package written")
+	pkg, pok := RayzrPackage_Open(out, context.temp_allocator)
 	testing.expect(t, pok, "package opens")
 	if !pok do return
-	defer OrePackage_Close(pkg)
-	_, hasWav := OrePackage_ReadFile(pkg, "audio/x.wav", context.temp_allocator)
-	_, hasPng := OrePackage_ReadFile(pkg, "textures/a.png", context.temp_allocator)
-	proj, _ := OrePackage_ReadFile(pkg, "project.json", context.temp_allocator)
+	defer RayzrPackage_Close(pkg)
+	_, hasWav := RayzrPackage_ReadFile(pkg, "audio/x.wav", context.temp_allocator)
+	_, hasPng := RayzrPackage_ReadFile(pkg, "textures/a.png", context.temp_allocator)
+	proj, _ := RayzrPackage_ReadFile(pkg, "project.json", context.temp_allocator)
 	testing.expect(t, !hasWav && hasPng, "filtered")
 	testing.expect_value(t, string(proj), `{"name": "patched"}`)
 	testing.expect(t, strings.contains(text, `"name": "Win Demo"`), "written")

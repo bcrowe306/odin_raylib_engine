@@ -4,7 +4,7 @@ package runner_web
 // The web runner (built by scripts/build_web_runner.sh into runners/web/):
 // Odin compiled for js_wasm32 and linked by emscripten with raylib, Lua and
 // Box2D built for the web. The page (scripts/web/shell.html) fetches
-// game.ore into emscripten's file system, then calls main_start once and
+// game.rayzr into emscripten's file system, then calls main_start once and
 // main_update every animation frame - a browser tab can't run a blocking
 // loop. Memory comes from emscripten's malloc (engine/platform_js.odin);
 // logs go to the browser console.
@@ -42,15 +42,15 @@ web_context :: proc "contextless" () -> runtime.Context {
 	return ctx
 }
 
-// main_start: the page has written game.ore into the file system.
+// main_start: the page has written game.rayzr into the file system.
 @(export)
 main_start :: proc "c" () {
 	context = web_context()
-	opts := e.Run_Options{projectPath = "/game.ore", userDataDir = "/save"}
-	log.info("[web] starting /game.ore")
+	opts := e.Run_Options{projectPath = "/game.rayzr", userDataDir = "/save"}
+	log.info("[web] starting /game.rayzr")
 	rs, ok := e.Runner_Start(opts)
 	if !ok {
-		log.error("The game could not start (is game.ore there?)")
+		log.error("The game could not start (is game.rayzr there?)")
 		return
 	}
 	state.rs = rs

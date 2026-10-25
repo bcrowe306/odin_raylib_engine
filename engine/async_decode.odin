@@ -11,7 +11,7 @@ import rl "vendor:raylib"
 //
 // Decoding a PNG is the slow part of loading a texture; the GPU upload must
 // stay on the main thread (OpenGL). A preload reads a file's bytes on the
-// main thread (packed .ore archives aren't safe to read from two threads),
+// main thread (packed .rayzr archives aren't safe to read from two threads),
 // hands them to a small thread pool that decodes them into an rl.Image, and
 // uploads finished images a few per frame (Decode_Pump).
 //

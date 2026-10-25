@@ -1,5 +1,5 @@
 {
-  "name": "Asteroids Space Combat (.ore)",
+  "name": "Asteroids Space Combat (.rayzr)",
   "version": "1.0.0",
   "initial_scene": "scenes/new_scene.scene.json",
   "window": {

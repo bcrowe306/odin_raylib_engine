@@ -75,12 +75,12 @@ test_sprite_atlas :: proc(t: ^testing.T) {
 	vmem_destroy_index(&ix)
 
 	// Runtime: a package with the atlas.
-	ore :: dir + "/game.ore"
-	testing.expect(t, OrePackage_CreateFromDirectory(dir, ore, true, overrides = overrides), "package")
-	pkg, ok := OrePackage_Open(ore)
+	rayzr :: dir + "/game.rayzr"
+	testing.expect(t, RayzrPackage_CreateFromDirectory(dir, rayzr, true, overrides = overrides), "package")
+	pkg, ok := RayzrPackage_Open(rayzr)
 	testing.expect(t, ok, "opens")
 	if !ok do return
-	defer OrePackage_Close(pkg)
+	defer RayzrPackage_Close(pkg)
 	rm: ResourceManager
 	ResourceManager_Init(&rm)
 	rm.package_ = pkg

@@ -13,7 +13,7 @@ import "core:strings"
 import zlib "vendor:zlib"
 
 // ============================================================================
-// ORE1 Portable Container Archive Format (.ore)
+// RYZ1 Portable Container Archive Format (.rayzr; old .ore / ORE1 files still read)
 // ============================================================================
 //
 // Binary Layout:
@@ -40,15 +40,16 @@ import zlib "vendor:zlib"
 //
 // ============================================================================
 
-ORE_MAGIC :: [4]u8{'O', 'R', 'E', '1'}
-ORE_VERSION :: 1
+RAYZR_MAGIC :: [4]u8{'R', 'Y', 'Z', '1'}
+LEGACY_MAGIC :: [4]u8{'O', 'R', 'E', '1'} // packages made before the rename (Ore): same layout
+RAYZR_VERSION :: 1
 
-OreCompression :: enum u8 {
+RayzrCompression :: enum u8 {
 	Store = 0,
 	Deflate = 1,
 }
 
-OreHeader :: struct #packed {
+RayzrHeader :: struct #packed {
 	magic:     [4]u8,
 	version:   u32,
 	fileCount: u32,
@@ -57,52 +58,52 @@ OreHeader :: struct #packed {
 	flags:     u32,
 }
 
-OreEntry :: struct {
+RayzrEntry :: struct {
 	path:             string,
 	dataOffset:       u64,
 	compressedSize:   u64,
 	uncompressedSize: u64,
-	compression:      OreCompression,
+	compression:      RayzrCompression,
 	crc32:            u32,
 }
 
-OrePackage :: struct {
+RayzrPackage :: struct {
 	allocator: mem.Allocator,
-	entries:   map[string]OreEntry,
+	entries:   map[string]RayzrEntry,
 	data:      []byte, // Full in-memory archive payload (if loaded into memory)
 	filePath:  string, // Path on disk if streamed or loaded
 	isMemory:  bool,
 }
 
 // ----------------------------------------------------------------------------
-// Package Creation (Packing Directory to .ore)
+// Package Creation (Packing Directory to .rayzr)
 // ----------------------------------------------------------------------------
 
-OreFileSource :: struct {
+RayzrFileSource :: struct {
 	archivePath: string,
 	diskPath:    string,
 	data:        []byte,
 	owned:       bool,
 }
 
-OrePackage_CreateFromFiles :: proc(sources: []OreFileSource, outPath: string, compress: bool = true) -> bool {
+RayzrPackage_CreateFromFiles :: proc(sources: []RayzrFileSource, outPath: string, compress: bool = true) -> bool {
 	context = Engine_DefaultContext()
 	buf: bytes.Buffer
 	bytes.buffer_init_allocator(&buf, 0, 1024, context.temp_allocator)
 	defer bytes.buffer_destroy(&buf)
 
 	// Write placeholder header (32 bytes)
-	header := OreHeader{
-		magic     = ORE_MAGIC,
-		version   = ORE_VERSION,
+	header := RayzrHeader{
+		magic     = RAYZR_MAGIC,
+		version   = RAYZR_VERSION,
 		fileCount = u32(len(sources)),
 		tocOffset = 0,
 		tocSize   = 0,
 		flags     = 0,
 	}
-	bytes.buffer_write(&buf, mem.byte_slice(&header, size_of(OreHeader)))
+	bytes.buffer_write(&buf, mem.byte_slice(&header, size_of(RayzrHeader)))
 
-	entries := make([dynamic]OreEntry, context.temp_allocator)
+	entries := make([dynamic]RayzrEntry, context.temp_allocator)
 
 	// Write payload data
 	for src in sources {
@@ -118,7 +119,7 @@ OrePackage_CreateFromFiles :: proc(sources: []OreFileSource, outPath: string, co
 		checksum := hash.crc32(uncompressedData)
 
 		offset := u64(bytes.buffer_length(&buf))
-		compType := OreCompression.Store
+		compType := RayzrCompression.Store
 		compressedData: []byte = uncompressedData
 
 		if compress && uncompressedLen > 64 {
@@ -136,7 +137,7 @@ OrePackage_CreateFromFiles :: proc(sources: []OreFileSource, outPath: string, co
 		compLen := u64(len(compressedData))
 		bytes.buffer_write(&buf, compressedData)
 
-		append(&entries, OreEntry{
+		append(&entries, RayzrEntry{
 			path             = src.archivePath,
 			dataOffset       = offset,
 			compressedSize   = compLen,
@@ -170,26 +171,26 @@ OrePackage_CreateFromFiles :: proc(sources: []OreFileSource, outPath: string, co
 
 	// Patch final header
 	finalSlice := bytes.buffer_to_bytes(&buf)
-	finalHeader := cast(^OreHeader)&finalSlice[0]
+	finalHeader := cast(^RayzrHeader)&finalSlice[0]
 	finalHeader.tocOffset = tocStart
 	finalHeader.tocSize = tocSize
 
 	writeErr := os.write_entire_file(outPath, finalSlice)
 	if writeErr != nil {
-		log.errorf("[OrePackage] Failed to write .ore file to: %s", outPath)
+		log.errorf("[RayzrPackage] Failed to write .rayzr file to: %s", outPath)
 		return false
 	}
 
-	log.infof("[OrePackage] Successfully built package '%s' (%d files, %d bytes)", outPath, len(sources), len(finalSlice))
+	log.infof("[RayzrPackage] Successfully built package '%s' (%d files, %d bytes)", outPath, len(sources), len(finalSlice))
 	return true
 }
 
-// Scans a directory recursively and packs all files into a single .ore file
+// Scans a directory recursively and packs all files into a single .rayzr file
 // filter: which project files go in (nil = all); overrides: archive paths
 // whose content is replaced (or added), e.g. a preset's project.json.
-OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compress: bool = true, filter: proc(path: string, data: rawptr) -> bool = nil, filterData: rawptr = nil, overrides: map[string][]u8 = nil) -> bool {
+RayzrPackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compress: bool = true, filter: proc(path: string, data: rawptr) -> bool = nil, filterData: rawptr = nil, overrides: map[string][]u8 = nil) -> bool {
 	context = Engine_DefaultContext()
-	sources := make([dynamic]OreFileSource, context.temp_allocator)
+	sources := make([dynamic]RayzrFileSource, context.temp_allocator)
 
 	absDir, absErr := filepath.abs(dirPath, context.temp_allocator)
 	if absErr != nil do return false
@@ -197,7 +198,7 @@ OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compres
 	for fullpath in os.walk_files(absDir) {
 		{
 			relPath, err := filepath.rel(absDir, fullpath, context.temp_allocator)
-			// Hidden files and folders (.ore/ tooling, .luarc.json, editor
+			// Hidden files and folders (.rayzr/ tooling, .luarc.json, editor
 			// settings, .DS_Store) aren't part of the game.
 			hidden := false
 			unixRel, _ := strings.replace_all(relPath, "\\", "/", context.temp_allocator)
@@ -206,7 +207,7 @@ OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compres
 				norm := strings.join(strings.split(relPath, "\\", context.temp_allocator), "/", context.temp_allocator)
 				if filter != nil && !filter(norm, filterData) do continue
 				if norm in overrides do continue
-				append(&sources, OreFileSource{
+				append(&sources, RayzrFileSource{
 					archivePath = strings.clone(norm, context.temp_allocator),
 					diskPath    = strings.clone(fullpath, context.temp_allocator),
 					data        = nil,
@@ -217,41 +218,41 @@ OrePackage_CreateFromDirectory :: proc(dirPath: string, outPath: string, compres
 	}
 
 	for path, data in overrides {
-		append(&sources, OreFileSource{archivePath = path, data = data, owned = false})
+		append(&sources, RayzrFileSource{archivePath = path, data = data, owned = false})
 	}
-	return OrePackage_CreateFromFiles(sources[:], outPath, compress)
+	return RayzrPackage_CreateFromFiles(sources[:], outPath, compress)
 }
 
 // ----------------------------------------------------------------------------
 // Package Loading & Extraction
 // ----------------------------------------------------------------------------
 
-OrePackage_OpenFromMemory :: proc(data: []byte, allocator := context.allocator) -> (^OrePackage, bool) {
-	if len(data) < size_of(OreHeader) {
-		log.error("[OrePackage] Buffer too small for ORE header")
+RayzrPackage_OpenFromMemory :: proc(data: []byte, allocator := context.allocator) -> (^RayzrPackage, bool) {
+	if len(data) < size_of(RayzrHeader) {
+		log.error("[RayzrPackage] Buffer too small for a package header")
 		return nil, false
 	}
 
-	header := cast(^OreHeader)&data[0]
-	if header.magic != ORE_MAGIC {
-		log.error("[OrePackage] Invalid magic header (not an ORE file)")
+	header := cast(^RayzrHeader)&data[0]
+	if header.magic != RAYZR_MAGIC && header.magic != LEGACY_MAGIC {
+		log.error("[RayzrPackage] Invalid magic header (not a Rayzr package)")
 		return nil, false
 	}
-	if header.version != ORE_VERSION {
-		log.errorf("[OrePackage] Unsupported ORE version: %d", header.version)
+	if header.version != RAYZR_VERSION {
+		log.errorf("[RayzrPackage] Unsupported package version: %d", header.version)
 		return nil, false
 	}
 
 	if header.tocOffset + header.tocSize > u64(len(data)) {
-		log.error("[OrePackage] Corrupted TOC bounds in ORE archive")
+		log.error("[RayzrPackage] Corrupted TOC bounds in the package")
 		return nil, false
 	}
 
-	pkg := new(OrePackage, allocator)
+	pkg := new(RayzrPackage, allocator)
 	pkg.allocator = allocator
 	pkg.isMemory = true
 	pkg.data = data
-	pkg.entries = make(map[string]OreEntry, int(header.fileCount), allocator)
+	pkg.entries = make(map[string]RayzrEntry, int(header.fileCount), allocator)
 
 	// Parse TOC
 	tocSlice := data[header.tocOffset : header.tocOffset + header.tocSize]
@@ -269,11 +270,11 @@ OrePackage_OpenFromMemory :: proc(data: []byte, allocator := context.allocator) 
 		dataOffset := endian.unchecked_get_u64le(meta[0:8])
 		compSize := endian.unchecked_get_u64le(meta[8:16])
 		uncompSize := endian.unchecked_get_u64le(meta[16:24])
-		compType := OreCompression(meta[24])
+		compType := RayzrCompression(meta[24])
 		crc := endian.unchecked_get_u32le(meta[25:29])
 		offset += 29
 
-		pkg.entries[pathStr] = OreEntry{
+		pkg.entries[pathStr] = RayzrEntry{
 			path             = pathStr,
 			dataOffset       = dataOffset,
 			compressedSize   = compSize,
@@ -286,14 +287,14 @@ OrePackage_OpenFromMemory :: proc(data: []byte, allocator := context.allocator) 
 	return pkg, true
 }
 
-OrePackage_Open :: proc(path: string, allocator := context.allocator) -> (^OrePackage, bool) {
+RayzrPackage_Open :: proc(path: string, allocator := context.allocator) -> (^RayzrPackage, bool) {
 	data, readErr := os.read_entire_file(path, allocator)
 	if readErr != nil {
-		log.errorf("[OrePackage] Failed to open .ore file at: %s", path)
+		log.errorf("[RayzrPackage] Failed to open .rayzr file at: %s", path)
 		return nil, false
 	}
 
-	pkg, okPkg := OrePackage_OpenFromMemory(data, allocator)
+	pkg, okPkg := RayzrPackage_OpenFromMemory(data, allocator)
 	if !okPkg {
 		delete(data, allocator)
 		return nil, false
@@ -302,7 +303,7 @@ OrePackage_Open :: proc(path: string, allocator := context.allocator) -> (^OrePa
 	return pkg, true
 }
 
-OrePackage_Close :: proc(pkg: ^OrePackage) {
+RayzrPackage_Close :: proc(pkg: ^RayzrPackage) {
 	if pkg == nil do return
 
 	for path, _ in pkg.entries {
@@ -322,7 +323,7 @@ OrePackage_Close :: proc(pkg: ^OrePackage) {
 }
 
 // Reads and decompresses a file from the package
-OrePackage_ReadFile :: proc(pkg: ^OrePackage, path: string, allocator := context.allocator) -> ([]byte, bool) {
+RayzrPackage_ReadFile :: proc(pkg: ^RayzrPackage, path: string, allocator := context.allocator) -> ([]byte, bool) {
 	if pkg == nil do return nil, false
 
 	// Normalize lookup path
@@ -336,7 +337,7 @@ OrePackage_ReadFile :: proc(pkg: ^OrePackage, path: string, allocator := context
 	}
 
 	if entry.dataOffset + entry.compressedSize > u64(len(pkg.data)) {
-		log.errorf("[OrePackage] Read offset out of bounds for '%s'", path)
+		log.errorf("[RayzrPackage] Read offset out of bounds for '%s'", path)
 		return nil, false
 	}
 
@@ -354,7 +355,7 @@ OrePackage_ReadFile :: proc(pkg: ^OrePackage, path: string, allocator := context
 		res := zlib.uncompress(raw_data(outBuf), &destLen, raw_data(rawSlice), zlib.uLong(len(rawSlice)))
 		if res != zlib.OK {
 			delete(outBuf, allocator)
-			log.errorf("[OrePackage] Zlib decompression failed for '%s': %d", path, res)
+			log.errorf("[RayzrPackage] Zlib decompression failed for '%s': %d", path, res)
 			return nil, false
 		}
 		return outBuf[:destLen], true
@@ -364,14 +365,14 @@ OrePackage_ReadFile :: proc(pkg: ^OrePackage, path: string, allocator := context
 }
 
 // Reads file as a string
-OrePackage_ReadString :: proc(pkg: ^OrePackage, path: string, allocator := context.allocator) -> (string, bool) {
-	bytes, ok := OrePackage_ReadFile(pkg, path, allocator)
+RayzrPackage_ReadString :: proc(pkg: ^RayzrPackage, path: string, allocator := context.allocator) -> (string, bool) {
+	bytes, ok := RayzrPackage_ReadFile(pkg, path, allocator)
 	if !ok do return "", false
 	return string(bytes), true
 }
 
 // Checks if a file path exists in the package
-OrePackage_HasFile :: proc(pkg: ^OrePackage, path: string) -> bool {
+RayzrPackage_HasFile :: proc(pkg: ^RayzrPackage, path: string) -> bool {
 	if pkg == nil do return false
 	norm := strings.join(strings.split(path, "\\", context.temp_allocator), "/", context.temp_allocator)
 	if _, exists := pkg.entries[norm]; exists do return true

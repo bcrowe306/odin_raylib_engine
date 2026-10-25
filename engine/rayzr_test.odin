@@ -10,18 +10,18 @@ import "core:testing"
 import lua "lua54"
 
 // ============================================================================
-// ORE Package Container & Project Format Unit Tests
+// RAYZR Package Container & Project Format Unit Tests
 // ============================================================================
 
 @(test)
-test_ore_package_create_and_read :: proc(t: ^testing.T) {
-	tempPath := "test_sample_package.ore"
+test_rayzr_package_create_and_read :: proc(t: ^testing.T) {
+	tempPath := "test_sample_package.rayzr"
 	defer {
 		if os.exists(tempPath) do os.remove(tempPath)
 	}
 
 	// 1. Prepare files: one small, one large repetitive string (deflates), one binary slice
-	smallText := "Hello, ORE portable package format!"
+	smallText := "Hello, RAYZR portable package format!"
 	largeTextSb: strings.Builder
 	strings.builder_init(&largeTextSb, context.temp_allocator)
 	for _ in 0..<50 {
@@ -31,43 +31,43 @@ test_ore_package_create_and_read :: proc(t: ^testing.T) {
 
 	binData := []u8{0xDE, 0xAD, 0xBE, 0xEF, 0x01, 0x02, 0x03, 0x04}
 
-	sources := []OreFileSource{
+	sources := []RayzrFileSource{
 		{archivePath = "project.json", data = transmute([]u8)smallText},
 		{archivePath = "scenes/main.scene.json", data = transmute([]u8)largeText},
 		{archivePath = "assets/data.bin", data = binData},
 	}
 
-	createOk := OrePackage_CreateFromFiles(sources, tempPath, true)
-	testing.expect(t, createOk, "OrePackage_CreateFromFiles should succeed")
+	createOk := RayzrPackage_CreateFromFiles(sources, tempPath, true)
+	testing.expect(t, createOk, "RayzrPackage_CreateFromFiles should succeed")
 
 	// 2. Open archive from disk
-	pkg, openOk := OrePackage_Open(tempPath)
-	testing.expect(t, openOk, "OrePackage_Open should succeed")
-	defer OrePackage_Close(pkg)
+	pkg, openOk := RayzrPackage_Open(tempPath)
+	testing.expect(t, openOk, "RayzrPackage_Open should succeed")
+	defer RayzrPackage_Close(pkg)
 
 	testing.expect_value(t, len(pkg.entries), 3)
-	testing.expect(t, OrePackage_HasFile(pkg, "project.json"), "Should contain project.json")
-	testing.expect(t, OrePackage_HasFile(pkg, "scenes/main.scene.json"), "Should contain scenes/main.scene.json")
-	testing.expect(t, OrePackage_HasFile(pkg, "assets/data.bin"), "Should contain assets/data.bin")
+	testing.expect(t, RayzrPackage_HasFile(pkg, "project.json"), "Should contain project.json")
+	testing.expect(t, RayzrPackage_HasFile(pkg, "scenes/main.scene.json"), "Should contain scenes/main.scene.json")
+	testing.expect(t, RayzrPackage_HasFile(pkg, "assets/data.bin"), "Should contain assets/data.bin")
 
 	// Verify small file
-	readSmall, ok1 := OrePackage_ReadString(pkg, "project.json")
+	readSmall, ok1 := RayzrPackage_ReadString(pkg, "project.json")
 	testing.expect(t, ok1, "Reading project.json should succeed")
 	testing.expect_value(t, readSmall, smallText)
 	delete(readSmall)
 
 	// Verify large compressed file
-	readLarge, ok2 := OrePackage_ReadString(pkg, "scenes/main.scene.json")
+	readLarge, ok2 := RayzrPackage_ReadString(pkg, "scenes/main.scene.json")
 	testing.expect(t, ok2, "Reading scenes/main.scene.json should succeed")
 	testing.expect_value(t, readLarge, largeText)
 	delete(readLarge)
 
 	largeEntry := pkg.entries["scenes/main.scene.json"]
-	testing.expect_value(t, largeEntry.compression, OreCompression.Deflate)
+	testing.expect_value(t, largeEntry.compression, RayzrCompression.Deflate)
 	testing.expect(t, largeEntry.compressedSize < largeEntry.uncompressedSize, "Compressed size should be strictly smaller")
 
 	// Verify binary data
-	readBin, ok3 := OrePackage_ReadFile(pkg, "assets/data.bin")
+	readBin, ok3 := RayzrPackage_ReadFile(pkg, "assets/data.bin")
 	testing.expect(t, ok3, "Reading assets/data.bin should succeed")
 	testing.expect_value(t, len(readBin), len(binData))
 	for b, i in binData {
@@ -77,25 +77,25 @@ test_ore_package_create_and_read :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_ore_package_memory :: proc(t: ^testing.T) {
-	tempPath := "test_memory_package.ore"
+test_rayzr_package_memory :: proc(t: ^testing.T) {
+	tempPath := "test_memory_package.rayzr"
 	defer {
 		if os.exists(tempPath) do os.remove(tempPath)
 	}
 
-	sources := []OreFileSource{
+	sources := []RayzrFileSource{
 		{archivePath = "hello.txt", data = transmute([]u8)string("In-memory test payload")},
 	}
-	OrePackage_CreateFromFiles(sources, tempPath, false)
+	RayzrPackage_CreateFromFiles(sources, tempPath, false)
 
 	data, err := os.read_entire_file(tempPath, context.allocator)
 	testing.expect(t, err == nil, "Reading temp file should succeed")
 
-	pkg, ok := OrePackage_OpenFromMemory(data)
-	testing.expect(t, ok, "OrePackage_OpenFromMemory should succeed")
-	defer OrePackage_Close(pkg)
+	pkg, ok := RayzrPackage_OpenFromMemory(data)
+	testing.expect(t, ok, "RayzrPackage_OpenFromMemory should succeed")
+	defer RayzrPackage_Close(pkg)
 
-	readStr, readOk := OrePackage_ReadString(pkg, "hello.txt")
+	readStr, readOk := RayzrPackage_ReadString(pkg, "hello.txt")
 	testing.expect(t, readOk, "Should read hello.txt")
 	testing.expect_value(t, readStr, "In-memory test payload")
 	delete(readStr)
@@ -235,11 +235,11 @@ test_scene_json_instantiation_and_serialization :: proc(t: ^testing.T) {
 }
 
 @(test)
-test_project_load_from_directory_and_ore :: proc(t: ^testing.T) {
+test_project_load_from_directory_and_rayzr :: proc(t: ^testing.T) {
 	tempDir := "temp_test_project"
-	tempOre := "temp_test_project.ore"
+	tempRayzr := "temp_test_project.rayzr"
 	defer {
-		if os.exists(tempOre) do os.remove(tempOre)
+		if os.exists(tempRayzr) do os.remove(tempRayzr)
 		if os.exists(tempDir) do os.remove_all(tempDir)
 	}
 
@@ -308,25 +308,25 @@ test_project_load_from_directory_and_ore :: proc(t: ^testing.T) {
 		testing.expect_value(t, game.physicsWorld.gravity.y, f32(980.0))
 		testing.expect(t, game.sceneManager.currentScene != nil, "Current scene should be set")
 
-		// Export project to .ore file
-		exportOk := game.exportOre(tempDir, tempOre)
-		testing.expect(t, exportOk, "game.exportOre should create package")
-		testing.expect(t, os.exists(tempOre), "tempOre file should exist on disk")
+		// Export project to .rayzr file
+		exportOk := game.exportRayzr(tempDir, tempRayzr)
+		testing.expect(t, exportOk, "game.exportRayzr should create package")
+		testing.expect(t, os.exists(tempRayzr), "tempRayzr file should exist on disk")
 	}
 
-	// 3. Test Game loading from .ore archive
+	// 3. Test Game loading from .rayzr archive
 	{
 		game2 := new(Game)
 		InitializeGame(game2)
 		defer game2->terminate()
 
-		loadOreOk := game2->loadProject(tempOre)
-		testing.expect(t, loadOreOk, "game2->loadProject from .ore should succeed")
+		loadRayzrOk := game2->loadProject(tempRayzr)
+		testing.expect(t, loadRayzrOk, "game2->loadProject from .rayzr should succeed")
 		testing.expect(t, game2.assetManager.package_ != nil, "AssetManager should have package mounted")
 
-		// Read script asset from inside mounted .ore archive
+		// Read script asset from inside mounted .rayzr archive
 		txt, readOk := AssetManager_ReadFileString(&game2.assetManager, "assets/scripts/test.lua")
-		testing.expect(t, readOk, "Reading script from mounted .ore package should succeed")
+		testing.expect(t, readOk, "Reading script from mounted .rayzr package should succeed")
 		testing.expect_value(t, txt, scriptCode)
 		delete(txt)
 	}
@@ -360,47 +360,47 @@ assert(missing == false, "Project.has_file should return false for nonexistent f
 }
 
 @(test)
-test_pack_demo_project_ore :: proc(t: ^testing.T) {
+test_pack_demo_project_rayzr :: proc(t: ^testing.T) {
 	if os.exists("assets/demo_project") {
-		ok := OrePackage_CreateFromDirectory("assets/demo_project", "assets/demo_project.ore", true)
-		testing.expect(t, ok, "Failed to create assets/demo_project.ore")
+		ok := RayzrPackage_CreateFromDirectory("assets/demo_project", "assets/demo_project.rayzr", true)
+		testing.expect(t, ok, "Failed to create assets/demo_project.rayzr")
 
 		_ = os.make_directory_all("bin")
-		ok2 := OrePackage_CreateFromDirectory("assets/demo_project", "bin/exported_game.ore", true)
-		testing.expect(t, ok2, "Failed to create bin/exported_game.ore")
+		ok2 := RayzrPackage_CreateFromDirectory("assets/demo_project", "bin/exported_game.rayzr", true)
+		testing.expect(t, ok2, "Failed to create bin/exported_game.rayzr")
 
-		// Verify that demo_project.ore can be opened and contains project.json, scenes, scripts, components
-		pkg, openOk := OrePackage_Open("assets/demo_project.ore")
-		testing.expect(t, openOk, "Should open assets/demo_project.ore")
-		defer OrePackage_Close(pkg)
+		// Verify that demo_project.rayzr can be opened and contains project.json, scenes, scripts, components
+		pkg, openOk := RayzrPackage_Open("assets/demo_project.rayzr")
+		testing.expect(t, openOk, "Should open assets/demo_project.rayzr")
+		defer RayzrPackage_Close(pkg)
 
-		testing.expect(t, OrePackage_HasFile(pkg, "project.json"), "Archive should contain project.json")
-		testing.expect(t, OrePackage_HasFile(pkg, "scenes/main.scene.json"), "Archive should contain main.scene.json")
-		testing.expect(t, OrePackage_HasFile(pkg, "scenes/battle_arena.scene.json"), "Archive should contain battle_arena.scene.json")
-		testing.expect(t, OrePackage_HasFile(pkg, "scripts/player_ship.lua"), "Archive should contain player_ship.lua")
-		testing.expect(t, OrePackage_HasFile(pkg, "scripts/asteroid.lua"), "Archive should contain asteroid.lua")
+		testing.expect(t, RayzrPackage_HasFile(pkg, "project.json"), "Archive should contain project.json")
+		testing.expect(t, RayzrPackage_HasFile(pkg, "scenes/main.scene.json"), "Archive should contain main.scene.json")
+		testing.expect(t, RayzrPackage_HasFile(pkg, "scenes/battle_arena.scene.json"), "Archive should contain battle_arena.scene.json")
+		testing.expect(t, RayzrPackage_HasFile(pkg, "scripts/player_ship.lua"), "Archive should contain player_ship.lua")
+		testing.expect(t, RayzrPackage_HasFile(pkg, "scripts/asteroid.lua"), "Archive should contain asteroid.lua")
 	}
 }
 
-// Hidden files and folders (.ore/ tooling, .luarc.json, editor settings)
+// Hidden files and folders (.rayzr/ tooling, .luarc.json, editor settings)
 // aren't packaged.
 @(test)
 test_pack_skips_hidden_files :: proc(t: ^testing.T) {
 	dir := "test_pack_hidden"
 	defer os.remove_all(dir)
-	_ = os.make_directory_all("test_pack_hidden/.ore/definitions")
+	_ = os.make_directory_all("test_pack_hidden/.rayzr/definitions")
 	_ = os.make_directory_all("test_pack_hidden/scripts")
 	_ = os.write_entire_file("test_pack_hidden/project.json", transmute([]u8)string(`{"name": "x"}`))
 	_ = os.write_entire_file("test_pack_hidden/scripts/a.lua", transmute([]u8)string(`return {}`))
 	_ = os.write_entire_file("test_pack_hidden/.luarc.json", transmute([]u8)string(`{}`))
-	_ = os.write_entire_file("test_pack_hidden/.ore/definitions/engine_api.lua", transmute([]u8)string(`-- api`))
+	_ = os.write_entire_file("test_pack_hidden/.rayzr/definitions/engine_api.lua", transmute([]u8)string(`-- api`))
 	_ = os.write_entire_file("test_pack_hidden/scripts/.DS_Store", transmute([]u8)string(`x`))
-	testing.expect(t, OrePackage_CreateFromDirectory(dir, "test_pack_hidden.ore", true), "packed")
-	defer os.remove("test_pack_hidden.ore")
-	pkg, ok := OrePackage_Open("test_pack_hidden.ore")
+	testing.expect(t, RayzrPackage_CreateFromDirectory(dir, "test_pack_hidden.rayzr", true), "packed")
+	defer os.remove("test_pack_hidden.rayzr")
+	pkg, ok := RayzrPackage_Open("test_pack_hidden.rayzr")
 	testing.expect(t, ok, "opens")
 	if !ok do return
-	defer OrePackage_Close(pkg)
-	testing.expect(t, OrePackage_HasFile(pkg, "project.json") && OrePackage_HasFile(pkg, "scripts/a.lua"), "game files packed")
-	testing.expect(t, !OrePackage_HasFile(pkg, ".luarc.json") && !OrePackage_HasFile(pkg, ".ore/definitions/engine_api.lua") && !OrePackage_HasFile(pkg, "scripts/.DS_Store"), "hidden files skipped")
+	defer RayzrPackage_Close(pkg)
+	testing.expect(t, RayzrPackage_HasFile(pkg, "project.json") && RayzrPackage_HasFile(pkg, "scripts/a.lua"), "game files packed")
+	testing.expect(t, !RayzrPackage_HasFile(pkg, ".luarc.json") && !RayzrPackage_HasFile(pkg, ".rayzr/definitions/engine_api.lua") && !RayzrPackage_HasFile(pkg, "scripts/.DS_Store"), "hidden files skipped")
 }

@@ -15,7 +15,7 @@ import imgui "lib/imgui"
 // Ctrl+Tab / Ctrl+Shift+Tab cycle. Each tab keeps its own camera (sceneViews),
 // undo history (entries are per scene) and selection. A closed scene is
 // unloaded (its undo entries freed); the open tabs and the active one come
-// back when the project opens (<project>/.ore/open_scenes.json).
+// back when the project opens (<project>/.rayzr/open_scenes.json).
 // ============================================================================
 
 @(private = "file")
@@ -27,7 +27,7 @@ tabs: struct {
 	restored:   bool,
 }
 
-SCENE_TABS_FILE :: ".ore/open_scenes.json"
+SCENE_TABS_FILE :: ".rayzr/open_scenes.json"
 
 // SceneTabs_Open: the open documents in tab order.
 SceneTabs_Open :: proc() -> []^e.Scene {return tabs.open[:]}

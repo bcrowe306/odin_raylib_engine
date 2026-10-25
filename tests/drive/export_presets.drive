@@ -32,7 +32,7 @@ expect log !contains Exported macos (macos):
 expect log contains (1 preset(s))
 expect file:project.json contains "presets": [
 expect file:project.json contains "name": "Mac Demo", "target": "macos", "version": "0.5.0", "window_title": "Space Demo", "exclude": ["audio/"], "debug": true
-expect abs-file:$PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatore.app/Contents/Info.plist contains <string>0.5.0</string>
-expect abs-file:$PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatore.app/Contents/Info.plist contains <string>Space Demo</string>
-exec $PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatore.app/Contents/MacOS/AsteroidsSpaceCombatore --frames 20 --dump-scene $SHOTS/demo_scene.json
+expect abs-file:$PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatrayzr.app/Contents/Info.plist contains <string>0.5.0</string>
+expect abs-file:$PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatrayzr.app/Contents/Info.plist contains <string>Space Demo</string>
+exec $PROJECT_standalone/Mac_Demo/AsteroidsSpaceCombatrayzr.app/Contents/MacOS/AsteroidsSpaceCombatrayzr --frames 20 --dump-scene $SHOTS/demo_scene.json
 expect abs-file:$SHOTS/demo_scene.json contains "PlayerShip"

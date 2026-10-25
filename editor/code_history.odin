@@ -16,8 +16,8 @@ import imgui "lib/imgui"
 //   A script changed outside the editor reloads by itself when it has no
 //   unsaved edits (one undoable edit); with edits, a bar over the code asks:
 //   Reload (also undoable) or Keep Mine.
-//   Every save keeps a copy in <project>/.ore/history/<script>/ (the 30
-//   newest; .ore is never packaged). Local History lists them with a
+//   Every save keeps a copy in <project>/.rayzr/history/<script>/ (the 30
+//   newest; .rayzr is never packaged). Local History lists them with a
 //   preview; Restore puts one in the buffer (undoable, not saved).
 // ============================================================================
 
@@ -64,7 +64,7 @@ Code_DiskBanner :: proc(state: ^EditorState, doc: ^Code_Doc) {
 @(private = "file")
 history_dir :: proc(state: ^EditorState, doc: ^Code_Doc) -> string {
 	name, _ := strings.replace_all(doc.rel, "/", "__", context.temp_allocator)
-	dir, _ := filepath.join({state.projectPath, ".ore", "history", name}, context.temp_allocator)
+	dir, _ := filepath.join({state.projectPath, ".rayzr", "history", name}, context.temp_allocator)
 	return dir
 }
 

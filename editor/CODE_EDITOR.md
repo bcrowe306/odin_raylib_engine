@@ -40,7 +40,7 @@ last closed tab; Cmd+W closes one.
   unsaved edits a bar over the code asks: **Reload** (the disk version;
   your edits stay in Undo) or **Keep Mine** (saving writes them over it).
 - **Local history**: every save keeps a copy in
-  `<project>/.ore/history/<script>/` (the 30 newest; `.ore` is never
+  `<project>/.rayzr/history/<script>/` (the 30 newest; `.rayzr` is never
   packaged into games). Tab menu > *Local History...* (or the palette)
   lists them by date with a preview; **Restore** puts one in the buffer -
   undoable, not saved until you save.
@@ -350,7 +350,7 @@ diff (after typing pauses), whole-file word uses. Drawing touches only the
 rows on screen. Per-document caches are freed when the tab closes, the
 rest at exit.
 
-To check for leaks: `EDITOR_DEFINES=-define:ORE_MEM_TRACK=true
+To check for leaks: `EDITOR_DEFINES=-define:RAYZR_MEM_TRACK=true
 scripts/editor_drive.sh code_soak_mem` - 40 rounds of editing, folding,
 wrapping, find, clipboard and menus; the log
 (`editor_screenshots/drive/code_soak_mem/editor.log`) reports the live heap

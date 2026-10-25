@@ -3942,7 +3942,7 @@ lua_project_load :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 @(private="file")
-lua_project_export_ore :: proc "c" (L: ^lua.State) -> c.int {
+lua_project_export_rayzr :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	dirC := lua.tostring(L, 1)
 	outC := lua.tostring(L, 2)
@@ -3951,7 +3951,7 @@ lua_project_export_ore :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	ok := sm.game.exportOre(string(dirC), string(outC))
+	ok := sm.game.exportRayzr(string(dirC), string(outC))
 	lua.pushboolean(L, b32(ok))
 	return 1
 }
@@ -3999,7 +3999,7 @@ lua_project_has_file :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	if sm.game.assetManager.package_ != nil {
-		lua.pushboolean(L, b32(OrePackage_HasFile(sm.game.assetManager.package_, string(pathC))))
+		lua.pushboolean(L, b32(RayzrPackage_HasFile(sm.game.assetManager.package_, string(pathC))))
 		return 1
 	}
 	resolved := AssetManager_ResolveDiskPath(&sm.game.assetManager, string(pathC), context.temp_allocator)
@@ -4623,8 +4623,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.newtable(L)
 	lua.pushcfunction(L, lua_project_load)
 	lua.setfield(L, -2, "load")
-	lua.pushcfunction(L, lua_project_export_ore)
-	lua.setfield(L, -2, "export_ore")
+	lua.pushcfunction(L, lua_project_export_rayzr)
+	lua.setfield(L, -2, "export_rayzr")
+	lua.pushcfunction(L, lua_project_export_rayzr)
+	lua.setfield(L, -2, "export_ore") // (the name before the rename: old scripts)
 	lua.pushcfunction(L, lua_project_serialize_scene)
 	lua.setfield(L, -2, "serialize_scene")
 	lua.pushcfunction(L, lua_project_read_file)

@@ -9,13 +9,13 @@ bench_physics (1000 dynamic boxes falling into a walled pit),
 bench_scripts (1000 sprites, each moved by a Lua update(dt)) and
 bench_ysort (3000 sprites in a y-sorted parent, moving every frame).
 
-  scripts/make_bench_project.py /tmp/ore_bench
-  bin/runners/macos/runner /tmp/ore_bench --scene scenes/bench_tiles.scene.json --bench 300
+  scripts/make_bench_project.py /tmp/rayzr_bench
+  bin/runners/macos/runner /tmp/rayzr_bench --scene scenes/bench_tiles.scene.json --bench 300
 """
 import json, random, shutil, sys
 from pathlib import Path
 
-out = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/ore_bench")
+out = Path(sys.argv[1] if len(sys.argv) > 1 else "/tmp/rayzr_bench")
 root = Path(__file__).resolve().parent.parent
 if out.exists():
     shutil.rmtree(out)

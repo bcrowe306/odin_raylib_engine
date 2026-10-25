@@ -3,9 +3,9 @@
 # a project node name returns that node's type; a script's self.node has the
 # type of the nodes it's attached to (player_ship.lua: a TextureNode).
 wait 5
-wait-until file:.ore/definitions/project_types.lua contains fun(name: "MainCamera"): CameraNode timeout=600
-expect file:.ore/definitions/project_types.lua contains ---@class NodeOf_PlayerShip : TextureNode
-expect file:.ore/definitions/project_types.lua contains ---@class PlayerShipNode_ : TextureNode
+wait-until file:.rayzr/definitions/project_types.lua contains fun(name: "MainCamera"): CameraNode timeout=600
+expect file:.rayzr/definitions/project_types.lua contains ---@class NodeOf_PlayerShip : TextureNode
+expect file:.rayzr/definitions/project_types.lua contains ---@class PlayerShipNode_ : TextureNode
 dblclick @asset:scripts/player_ship.lua
 wait-until code.lsp == ready timeout=600
 key ctrl+g

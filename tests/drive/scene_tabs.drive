@@ -1,7 +1,7 @@
 # Scene tabs: opening a second scene adds a tab; switching keeps each tab's
 # selection; Cmd+Alt+Right cycles; closing a tab with unsaved changes asks
 # (Cancel keeps it, Don't Save closes and unloads it); the open tabs are
-# remembered in .ore/open_scenes.json; reopening loads the saved file.
+# remembered in .rayzr/open_scenes.json; reopening loads the saved file.
 wait 5
 expect item:scenetab:scenes/main.scene.json == visible
 click @hier:PlayerShip
@@ -37,10 +37,10 @@ click @scenetab.discard
 wait 2
 expect scene-tabs == 1
 expect scene == scenes/main.scene.json
-expect file:.ore/open_scenes.json contains "scenes/main.scene.json"
-expect file:.ore/open_scenes.json !contains battle_arena
+expect file:.rayzr/open_scenes.json contains "scenes/main.scene.json"
+expect file:.rayzr/open_scenes.json !contains battle_arena
 dblclick @asset:scenes/battle_arena.scene.json
 wait 5
 expect scene-tabs == 2
 expect modified == false
-expect file:.ore/open_scenes.json contains battle_arena
+expect file:.rayzr/open_scenes.json contains battle_arena

@@ -27,7 +27,7 @@ Asset_View :: enum {
 assetView: Asset_View
 assetGrid: bool
 
-ASSET_PAYLOAD :: "ORE_ASSET"
+ASSET_PAYLOAD :: "RAYZR_ASSET"
 
 // Asset_Payload is the drag & drop payload: a project-relative path.
 Asset_Payload :: struct {
@@ -55,7 +55,7 @@ Asset_KindOf :: proc(path: string) -> Asset_Kind {
 	case strings.has_suffix(lower, ".component.json"): return .Component
 	case strings.has_suffix(lower, ".lua"): return .Script
 	case strings.has_suffix(lower, ".ldtk"): return .Level
-	case strings.has_suffix(lower, ".ore"): return .Package
+	case e.Is_PackagePath(lower): return .Package
 	case strings.has_suffix(lower, ".aseprite"), strings.has_suffix(lower, ".ase"): return .Aseprite
 	case strings.has_suffix(lower, ".fs"), strings.has_suffix(lower, ".glsl"), strings.has_suffix(lower, ".frag"): return .Shader
 	}
@@ -373,7 +373,7 @@ section_packages :: proc(state: ^EditorState, filter: string) {
 			}
 			imgui.EndPopup()
 		}
-		UI_Tooltip("Exported game package. Run it with: odin_raylib_engine --project <file>.ore")
+		UI_Tooltip("Exported game package. Run it with: rayzr --project <file>.rayzr")
 		imgui.SameLine(32)
 		imgui.TextUnformatted(strings.clone_to_cstring(p, context.temp_allocator))
 	}

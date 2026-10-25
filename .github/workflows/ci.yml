@@ -55,7 +55,7 @@ jobs:
           mkdir -p bin
           ext=""; [ "$RUNNER_OS" = Windows ] && ext=.exe
           odin build editor $(scripts/odin_flags.sh) -out:bin/editor$ext
-          odin build . $(scripts/odin_flags.sh) -out:bin/odin_raylib_engine$ext
+          odin build . $(scripts/odin_flags.sh) -out:bin/rayzr$ext
           scripts/build_runners.sh
 
       - name: Unit tests
@@ -100,7 +100,7 @@ jobs:
           name: ci-${{ matrix.platform }}
           path: |
             ${{ runner.temp }}/runner.png
-            /tmp/ore_package_test.*/shots
-            /tmp/ore_package_test.*/editor.log
+            /tmp/rayzr_package_test.*/shots
+            /tmp/rayzr_package_test.*/editor.log
           if-no-files-found: ignore
           retention-days: 7

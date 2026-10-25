@@ -135,7 +135,7 @@ ScriptManager_LoadModule :: proc(path: string, sm: ^ScriptManager = nil) -> (^Sc
 	}
 
 	// Project scripts resolve through the asset manager first (project
-	// directory or mounted .ore package), then the VFS / working directory.
+	// directory or mounted .rayzr package), then the VFS / working directory.
 	code, ok := "", false
 	if mgr.game != nil {
 		am := &mgr.game.assetManager

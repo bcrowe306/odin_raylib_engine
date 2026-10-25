@@ -5,7 +5,7 @@ package pathx
 // signatures, over forward-slash paths and without core:os - for the web
 // build, where core:path/filepath doesn't build (scripts/web_prepare.py
 // points the copied sources' filepath imports here). Paths are emscripten
-// file system paths ("/game.ore", "/save/...").
+// file system paths ("/game.rayzr", "/save/...").
 // ============================================================================
 
 import "base:runtime"

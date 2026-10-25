@@ -82,7 +82,7 @@ adv_pick :: proc(state: ^EditorState, c: ^e.AdvancedCameraNode, label, id: strin
 	}
 	Drive_Item(id)
 	if imgui.BeginDragDropTarget() {
-		if payload := imgui.AcceptDragDropPayload("ORE_NODE"); payload != nil {
+		if payload := imgui.AcceptDragDropPayload("RAYZR_NODE"); payload != nil {
 			n := (^^e.Node)(payload.Data)^
 			if e.Node_IsAlive(n) && n != c && (only == nil || n.typeId == only) do adv_set(state, c, field, n)
 		}

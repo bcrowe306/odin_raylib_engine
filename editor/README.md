@@ -1,4 +1,4 @@
-# Odin Raylib Engine - Game Editor
+# Rayzr - Game Editor
 
 A standalone GUI game engine editor built in Odin with **Dear ImGui** (docking branch) and **Raylib**.
 
@@ -11,7 +11,7 @@ The editor is organized as an independent package (`editor/`) that imports and m
 - **Standalone Package**: Resides in `editor/` with independent state, assets, and bindings.
 - **Dear ImGui Docking**: Full multi-window dockspace via `imgui.DockSpaceOverViewport` and docking layout persistence (`imgui.ini`).
 - **Embedded Raylib Viewport**: Raylib offscreen rendering via `rl.RenderTexture2D` embedded into Dear ImGui via `imgui.Image` with inverted UVs (`{0, 1}` to `{1, 0}`).
-- **Two-Way Data Serialization**: Projects and scenes load from and serialize to portable JSON (`.scene.json`, `.project.json`) and portable binary packages (`.ore`).
+- **Two-Way Data Serialization**: Projects and scenes load from and serialize to portable JSON (`.scene.json`, `.project.json`) and portable binary packages (`.rayzr`).
 - **Live Scripting Integration**: Automatic reflection of Lua script properties on nodes with interactive editing.
 
 ---
@@ -22,7 +22,7 @@ The editor is organized as an independent package (`editor/`) that imports and m
 +-----------------------------------------------------------------------------------------+
 |                                    Top Toolbar                                          |
 |  [Q] Select  [W] Move  [E] Rotate  [R] Scale  [T] Pan  |  ▶ Play  ⏸ Pause  ■ Stop      |
-|  Grid Snap [32px]  Angle Snap [15°]  Show Grid  Draw Bounds  |  New  Save  Export .ore   |
+|  Grid Snap [32px]  Angle Snap [15°]  Show Grid  Draw Bounds  |  New  Save  Export .rayzr   |
 +-------------------+-------------------------------------------------+-------------------+
 |   Left Sidebar    |                 Center Viewport                 |   Right Sidebar   |
 |   Asset Browser   |  [Scene Viewport]  [Component / Prefab Viewport]|  Scene Hierarchy  |
@@ -116,7 +116,7 @@ the Default layout - drag its edge, or pick a workspace with a taller one.
 Design** (a larger viewport), **Scripting** (the Code tab in the middle,
 in front), **Animation** (a tall bottom panel on the Animation tab) - or a
 layout of your own: arrange the panels, **Save Workspace As...**, and pick
-it from the same menu later (saved in `~/.config/ore_editor/workspaces/`;
+it from the same menu later (saved in `~/.config/rayzr_editor/workspaces/`;
 **Delete Workspace** removes one). **Reset Layout** returns to Default.
 
 The bottom panel **follows the selection**: selecting an AnimationPlayer
@@ -137,7 +137,7 @@ New Scene / Script / Project, **Open Project** (recent projects and a
 folder browser; the editor reopens on the chosen project after asking about
 unsaved work), **Open File** (Cmd+P), **Save** (Cmd+S: the focused script or
 the scene), **Save As** (Cmd+Shift+S: scene, script, or a component as a new
-component), **Save All** (Cmd+Alt+S), **Revert**, **Export** (.ore package /
+component), **Save All** (Cmd+Alt+S), **Revert**, **Export** (.rayzr package /
 standalone game), **Settings** (Cmd+,) and Quit.
 
 ### Settings (Cmd+,)
@@ -165,18 +165,18 @@ standalone game), **Settings** (Cmd+,) and Quit.
   invalid or repeated name is flagged). Each is loaded once, before any
   scene, and every script can use it by that name (see `engine/SCRIPTING.md`).
 
-Editor settings are per user, in `~/.config/ore_editor/settings.ini` -
+Editor settings are per user, in `~/.config/rayzr_editor/settings.ini` -
 `[general]`, `[code]`, `[theme]`, `[paths]`, `[recent_projects]` and `[keymap]`
 sections (an older `settings.json` is read once and replaced); project
 settings live in the project's `project.json`.
 
 The editor remembers folders in `[paths]`: where assets were last imported
-from (`import`), where the last `.ore` package or standalone game was
+from (`import`), where the last `.rayzr` package or standalone game was
 exported (`export`) and where projects were last opened or created
 (`projects`). The next import, export, Output Folder **Browse...**, Open
 Project and the Welcome window's Location start there (a folder that no
-longer exists falls back to the default). **File > Export > .ore Package**
-asks for the folder to write `<project>.ore` into.
+longer exists falls back to the default). **File > Export > .rayzr Package**
+asks for the folder to write `<project>.rayzr` into.
 
 Scenes and components are listed without their `.scene.json` /
 `.component.json` endings (Assets, scene tree, toolbar, status bar).
@@ -348,7 +348,7 @@ tab above the viewport; component documents show a cubes icon.
 | Right-click a tab | Close, Close Others (ones with unsaved changes stay), Copy Path. |
 
 Switching is off while simulating. The open tabs and the active one are
-remembered per project (`.ore/open_scenes.json`) and come back when you
+remembered per project (`.rayzr/open_scenes.json`) and come back when you
 open it again.
 
 ### Viewport
@@ -479,7 +479,7 @@ film its animation, otherwise *gameplay*; a child machine is named), the
   for Animation**; right-click a state: Set as Initial, Break on Enter,
   **Add Script Callbacks** (writes `on_enter_` / `on_update_` / `on_exit_`
   into the machine's or its parent's script), Delete. Every state in the
-  project is also in the generated types (`.ore/definitions/project_types.lua`),
+  project is also in the generated types (`.rayzr/definitions/project_types.lua`),
   so typing `function Cls:on_update_` completes the state names.
 - Drag a box to move it (positions are saved); drag a box's **dot** onto
   another box for a transition; click an arrow or a box to edit it in the
@@ -728,7 +728,7 @@ colliders and entities are built when you Simulate or Play. See
 ### Playtesting
 
 Play always runs what is in the editor. It saves every modified scene, rebuilds the game
-binary (`bin/odin_raylib_engine`) if any engine/game source changed, then starts the game with
+binary (`bin/rayzr`) if any engine/game source changed, then starts the game with
 `--project <dir>` (plus `--scene <file>` for F6). The game's output streams into the
 Console. **Game → Simulate in Editor** runs the scene inside the editor and restores it when stopped.
 The **Lua** line under the Console evaluates Lua there - in the simulation, or in the running
@@ -793,7 +793,7 @@ Details: [engine/docs/aseprite.md](../engine/docs/aseprite.md).
 
 ### Crash and bug reports
 
-If the editor crashes, the next start shows **Ore Editor Crashed** with the
+If the editor crashes, the next start shows **Rayzr Editor Crashed** with the
 report (reason, stack, the last log lines and actions): **Report on GitHub**
 opens a prefilled issue in the browser (nothing is sent until you submit it),
 or Copy / Open Folder / Dismiss. **Help > Report a Bug...** opens a new issue
@@ -835,16 +835,16 @@ property. Text editing uses the `odin_editor` packages (`buffer`, `syntax`, `lsp
 `code_editor.odin` and `code_editor_lsp.odin`.
 
 **Lua tooling files.** The editor writes the engine API definitions to
-`<project>/.ore/definitions/` (compiled into the editor, refreshed when it
+`<project>/.rayzr/definitions/` (compiled into the editor, refreshed when it
 updates) and a `.luarc.json` pointing at them, so lua-language-server - in
 the Code tab or in VS Code / any LuaLS editor opening the project folder -
 knows every engine type. A hand-written `.luarc.json` is left alone. Hidden
-files and folders (`.ore/`, `.luarc.json`, ...) are never packaged into
+files and folders (`.rayzr/`, `.luarc.json`, ...) are never packaged into
 games. The language server is looked up next to the editor, then in the
 engine checkout (or set its path in Settings > Code Editor).
 
 **Project types.** Next to the engine API the editor generates
-`.ore/definitions/project_types.lua` from the project: `InputAction` (the
+`.rayzr/definitions/project_types.lua` from the project: `InputAction` (the
 input actions - a misspelled action is an error and names complete inside
 the quotes), `SceneName`, `NodeName`, `ScenePath`/`TexturePath`/`AudioPath`/
 `ComponentPath`/`LevelPath`/`ScriptPath`, LDtk entity/level/layer/enum names,
@@ -855,12 +855,12 @@ settings changes, and the language server is told.
 
 **File > Export Standalone Game** (or Project Settings > Export > **Save and
 Export**) writes, for each target platform, `<output>/<platform>/` with the
-game runner renamed to the executable name, `game.ore` and the UI font: a
+game runner renamed to the executable name, `game.rayzr` and the UI font: a
 folder you can ship.
 
 **Web**: a preset (or target) with platform **web** exports a static site
 - the prebuilt web runner (`runners/web/`: index.html, index.js,
-index.wasm, odin.js), `game.ore`, the font and the icon as favicon, the
+index.wasm, odin.js), `game.rayzr`, the font and the icon as favicon, the
 page titled with the window title. **File > Export > Open Web Export in
 Browser** serves it on `http://127.0.0.1:8765/` and opens it. Building the
 web runner (once, with emscripten): `scripts/build_web_runner.sh`. Guide:
@@ -886,8 +886,8 @@ the game window's icon.
 
 **macOS** exports are an app bundle, `<output>/macos/<Name>.app`:
 `Info.plist` (name, version, bundle ID - Export > macOS Bundle ID, default
-`com.ore.<name>`), the runner in `Contents/MacOS`, its libraries (Lua) in
-`Contents/Frameworks`, and `game.ore`, the font and `AppIcon.icns` (made
+`com.rayzr.<name>`), the runner in `Contents/MacOS`, its libraries (Lua) in
+`Contents/Frameworks`, and `game.rayzr`, the font and `AppIcon.icns` (made
 from the project icon) in `Contents/Resources`. The app is signed with
 `codesign` - ad-hoc by default (runs on this Mac), or with the **Signing
 Identity** you set (a Developer ID to distribute; `none` skips signing).
@@ -897,7 +897,7 @@ Developer ID, the app is then notarized and stapled in the background
 `scripts/build_runners.sh` finds the x86_64 builds of raylib, Box2D and
 Lua; otherwise it's built for the Mac's own architecture.
 
-**Windows** exports are a folder with `<Name>.exe`, `lua54.dll`, `game.ore`
+**Windows** exports are a folder with `<Name>.exe`, `lua54.dll`, `game.rayzr`
 and the font. Release runners have no console window
 (`-subsystem:windows`). The exe gets the project icon (16-256 px) and
 version info (product name, description, version from Project > General) -
@@ -905,7 +905,7 @@ written with the Win32 resource API, so this happens when exporting on
 Windows; exports made elsewhere keep the runner's own.
 
 **Linux** exports are an AppDir, `<output>/linux/<Name>.AppDir` (`AppRun`,
-`<Name>.desktop`, the icon, `usr/bin/` with the runner, `game.ore` and the
+`<Name>.desktop`, the icon, `usr/bin/` with the runner, `game.rayzr` and the
 font); on Linux with `appimagetool` on `PATH` it's also packed into
 `<Name>-<arch>.AppImage`.
 
@@ -951,7 +951,7 @@ task editor:drive
 # Memory diagnostics: the heap through Odin's tracking allocator; every 600
 # frames the live bytes, the allocation sites that grew and the temp arena
 # (editor/mem_track.odin)
-odin build editor -out:bin/editor_mem -define:ORE_MEM_TRACK=true -debug
+odin build editor -out:bin/editor_mem -define:RAYZR_MEM_TRACK=true -debug
 ```
 
 Temp memory (`fmt.tprintf`, `context.temp_allocator`) lives for one frame:

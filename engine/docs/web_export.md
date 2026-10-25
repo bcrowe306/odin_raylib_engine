@@ -9,7 +9,7 @@ Browser/
 ├── index.js        emscripten's loader
 ├── index.wasm      the engine (Odin) + raylib + Lua + Box2D, compiled to WebAssembly
 ├── odin.js         Odin's browser runtime
-├── game.ore        your game (the same package the desktop exports use)
+├── game.rayzr      your game (the same package the desktop exports use)
 ├── fonts/          the UI font
 └── favicon.png     your project icon (when it has one)
 ```

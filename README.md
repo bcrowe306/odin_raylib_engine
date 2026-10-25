@@ -1,6 +1,15 @@
-# Odin Raylib Engine
+<p align="center"><img src="editor/assets/icon.png" width="180" alt="Rayzr"></p>
+
+# Rayzr
 
 A 2D game engine built in Odin utilizing Raylib for rendering, Box2D v3 for physics simulation, and Lua 5.4 for gameplay scripting.
+
+> Formerly **Ore** (the repository was `odin_raylib_engine`). Projects, packages
+> and settings from before the rename keep working: a project's `.ore/` folder
+> becomes `.rayzr/` when it's opened, `.ore` packages still load, and the
+> editor moves `~/.config/ore_editor` to `~/.config/rayzr_editor` on its first
+> start. The icon's source is `branding/rayzr_icon_source.png`;
+> `odin run scripts/branding/make_icons.odin -file` remakes the editor's icons.
 
 ---
 
@@ -9,10 +18,10 @@ A 2D game engine built in Odin utilizing Raylib for rendering, Box2D v3 for phys
 > [!IMPORTANT]
 > ### Mandatory Requirement: Lua Bindings, Documentation & Language Server (LSP) Stubs
 > Going forward, **all new engine features, node types, subsystems, and capabilities added to `engine/` MUST satisfy the following requirements**:
-> 1. **Lua 5.4 Bindings**: Implement corresponding Lua bindings in [`engine/script_bindings.odin`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/script_bindings.odin). Every native capability must have an accessible, ergonomic Lua counterpart.
-> 2. **Language Server Protocol (LSP) Definitions**: Add complete EmmyLua / LuaCATS type annotations, method signatures, parameter descriptions, and return types in [`engine/definitions/engine_api.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/definitions/engine_api.lua) and maintain global diagnostics in [`.luarc.json`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/.luarc.json).
-> 3. **Documentation**: Document the architecture, lifecycle integration, code samples, and API reference in [`engine/SCRIPTING.md`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/SCRIPTING.md).
-> 4. **Automated Verification**: Include unit tests in [`engine/script_test.odin`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/script_test.odin) asserting correctness and zero memory leaks under `mem.Tracking_Allocator`.
+> 1. **Lua 5.4 Bindings**: Implement corresponding Lua bindings in [`engine/script_bindings.odin`](engine/script_bindings.odin). Every native capability must have an accessible, ergonomic Lua counterpart.
+> 2. **Language Server Protocol (LSP) Definitions**: Add complete EmmyLua / LuaCATS type annotations, method signatures, parameter descriptions, and return types in [`engine/definitions/engine_api.lua`](engine/definitions/engine_api.lua) and maintain global diagnostics in [`.luarc.json`](.luarc.json).
+> 3. **Documentation**: Document the architecture, lifecycle integration, code samples, and API reference in [`engine/SCRIPTING.md`](engine/SCRIPTING.md).
+> 4. **Automated Verification**: Include unit tests in [`engine/script_test.odin`](engine/script_test.odin) asserting correctness and zero memory leaks under `mem.Tracking_Allocator`.
 
 ---
 
@@ -47,7 +56,7 @@ task test:engine
 task test:ui
 
 # Build executable
-odin build . -out:odin_raylib_engine
+odin build . -out:rayzr
 
 # Run demo game
 odin run .

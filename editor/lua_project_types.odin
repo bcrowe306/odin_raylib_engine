@@ -11,7 +11,7 @@ import e "../engine"
 import lsp "../odin_editor/lsp"
 
 // ============================================================================
-// Generated Lua types for the project: <project>/.ore/definitions/
+// Generated Lua types for the project: <project>/.rayzr/definitions/
 // project_types.lua, next to the engine API, so lua-language-server
 // completes and checks this project's names:
 //

@@ -12,7 +12,7 @@ expect item:crash.text == visible
 screenshot crash_dialog
 click @crash.report
 wait 1
-expect crash-url contains https://github.com/bcrowe306/odin_raylib_engine/issues/new?title=Crash%3A%20SIGSEGV
+expect crash-url contains https://github.com/bcrowe306/rayzr/issues/new?title=Crash%3A%20SIGSEGV
 expect crash-url contains labels=crash
 expect crash-url contains Scene_Update
 expect crash-pending == 0
@@ -23,4 +23,4 @@ click @menu:Help
 click @menu:Help/Report a Bug...
 wait 1
 expect crash-url contains labels=bug
-expect crash-url contains Ore%20Editor
+expect crash-url contains Rayzr%20Editor

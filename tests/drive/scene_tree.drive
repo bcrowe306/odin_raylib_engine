@@ -47,7 +47,7 @@ expect node:Asteroid_Delta.parent == root
 key ctrl+z
 expect node:root.child-names == MainCamera,StarfieldEmitter,PlayerShip,Asteroid_Delta,PatrolDroneAlpha,Asteroid_Gamma,Asteroid_Alpha,Asteroid_Beta
 key ctrl+s
-wait-until file:.ore/definitions/project_types.lua contains "enemy" timeout=300
+wait-until file:.rayzr/definitions/project_types.lua contains "enemy" timeout=300
 
 # Copy to another scene: same world position, tags kept (renamed first so
 # the name is free there).

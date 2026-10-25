@@ -4,7 +4,7 @@
 This document details the fixes and features implemented to resolve:
 1. **Viewport Texture & Animation Rendering**: Textures and multi-frame animations (e.g. ship hulls, asteroids, and animated exhaust plumes) rendering directly in the ImGui viewport texture target rather than blank bounding boxes.
 2. **Project Settings & Default Scene Selection**: An interactive settings modal to configure project parameters, window properties, physics gravity presets, and specify the `initial_scene` saved into `project.json`.
-3. **Standalone Game Process Architecture**: Launching the game engine in a distinct OS process (`os.process_start`) with `--project <path_or_ore>`, receiving the project definition and running the default scene independently of the editor.
+3. **Standalone Game Process Architecture**: Launching the game engine in a distinct OS process (`os.process_start`) with `--project <path_or_rayzr>`, receiving the project definition and running the default scene independently of the editor.
 
 ---
 
@@ -12,22 +12,22 @@ This document details the fixes and features implemented to resolve:
 
 ### A. Resource Manager Texture Pointer Stability
 - **Issue**: `ResourceManager.textures` was previously stored as a dynamic array of value types (`[dynamic]Texture`). When loading multiple textures into the project, dynamic array growth triggered reallocations that invalidated pointers returned to nodes (`^Texture`), causing textures to become corrupt or fail to render.
-- **Fix in [resource_manager.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/resource_manager.odin)**: Changed storage to `textures: [dynamic]^Texture` with individual heap allocations (`new(Texture)`), ensuring permanent pointer stability throughout the application lifecycle.
+- **Fix in [resource_manager.odin](../engine/resource_manager.odin)**: Changed storage to `textures: [dynamic]^Texture` with individual heap allocations (`new(Texture)`), ensuring permanent pointer stability throughout the application lifecycle.
 
 ### B. Texture Node Pivot & Coordinate Scaling
 - **Issue**: Rotation origins were unscaled pixel coordinates (`textureNode.origin`), causing scaled nodes (e.g. `0.2` scale spaceships) to calculate wrong Raylib origin offsets and fly off-screen during drawing.
-- **Fix in [texture_node.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/texture_node.odin)**:
+- **Fix in [texture_node.odin](../engine/texture_node.odin)**:
   ```odin
   origin := rl.Vector2{ textureNode.origin.x * scl.x, textureNode.origin.y * scl.y }
   rl.DrawTexturePro(tex^, src, dest, origin, rot, col)
   ```
 
 ### C. Live Animation Processing in Viewport
-- **Fix in [frame_animation_node.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/frame_animation_node.odin)**:
+- **Fix in [frame_animation_node.odin](../engine/frame_animation_node.odin)**:
   Integrated real-time ticker processing (`fan.ticker->process()`) directly in `FrameAnimationNode_Render`. Animated exhaust plumes and multi-frame sprite sequences now advance frames and play smoothly in real-time in both the editor viewport and the running game.
 
 ### D. Viewport Bounding Box Polish
-- **Update in [viewport.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/editor/viewport.odin)**:
+- **Update in [viewport.odin](viewport.odin)**:
   Replaced arbitrary 64x64 debug boxes with dimension calculations derived from actual sprite textures and physics collision shape definitions (`CircleShape.radius`, `BoxShape.size`).
   Bounding boxes are now focused on the actively selected node, or toggled on globally via the **Bounds** icon button (`ICON_FA_EYE`) in the toolbar.
 
@@ -35,7 +35,7 @@ This document details the fixes and features implemented to resolve:
 
 ## 2. Project Settings Dialog & Default Scene Selection
 
-Implemented in [project_settings_dialog.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/editor/project_settings_dialog.odin) and accessible via the **Gear** icon (`ICON_FA_GEAR`) in the toolbar, the breadcrumb folder button, or menu bar (`File -> Project Settings...`):
+Implemented in [project_settings_dialog.odin](project_settings_dialog.odin) and accessible via the **Gear** icon (`ICON_FA_GEAR`) in the toolbar, the breadcrumb folder button, or menu bar (`File -> Project Settings...`):
 
 - **Default Startup Scene Dropdown**:
   - Dynamically populates all scenes in the project directory (`scenes/main.scene.json`, `scenes/battle_arena.scene.json`).
@@ -51,8 +51,8 @@ Implemented in [project_settings_dialog.odin](file:///Users/brandoncrowe/Documen
 ## 3. Launching Game in a Separate Process
 
 ### A. Engine Standalone Execution (`--project`)
-Implemented in [main.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/main.odin):
-- Added CLI parsing for `--project <path>` and `-p <path>`, supporting both project directories and `.ore` archive containers.
+Implemented in [main.odin](../main.odin):
+- Added CLI parsing for `--project <path>` and `-p <path>`, supporting both project directories and `.rayzr` archive containers.
 - `RunDataDrivenGame(projectPath)`:
   1. Inspects `project.json` for customized window title, resolution, and target FPS.
   2. Initializes Raylib and audio subsystem.
@@ -61,10 +61,10 @@ Implemented in [main.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_
   5. Executes the clean runtime game loop without editor ImGui overhead.
 
 ### B. Editor Process Management
-Implemented in [editor_state.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/editor/editor_state.odin) and [toolbar.odin](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/editor/toolbar.odin):
+Implemented in [editor_state.odin](editor_state.odin) and [toolbar.odin](toolbar.odin):
 - **Play Button (`ICON_FA_PLAY`)**:
   - Automatically saves the active scene to disk.
-  - Spawns the separate engine process: `os.process_start(os.Process_Desc{ command = {"./odin_raylib_engine", "--project", state.projectPath} })`.
+  - Spawns the separate engine process: `os.process_start(os.Process_Desc{ command = {"./rayzr", "--project", state.projectPath} })`.
   - Captures PID and sets `state.gameProcessRunning = true`.
 - **Stop Button (`ICON_FA_STOP`)**:
   - Safely sends `SIGTERM` / kills child process and resets running state.

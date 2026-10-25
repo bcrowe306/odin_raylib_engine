@@ -26,7 +26,7 @@ import lua "lua54"
 //                           an error in it stops too and says so)
 //
 // The host supplies the two ends: the editor link (editor_link.odin) prints
-// "@ore:stopped {...}" and reads commands from stdin; tests use a queue.
+// "@rayzr:stopped {...}" and reads commands from stdin; tests use a queue.
 // ============================================================================
 
 Debug_Step :: enum {

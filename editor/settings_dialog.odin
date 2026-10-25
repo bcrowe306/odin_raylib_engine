@@ -292,7 +292,7 @@ settings_general :: proc(state: ^EditorState, h: f32) {
 				Drive_Item("settings.autosave")
 				UI_Tooltip("Save modified scenes and scripts every N minutes (0 = off)")
 				check("settings.confirm-quit", "Ask Before Quitting", &s.confirmQuit, "Ask about unsaved scenes and scripts when quitting")
-				check("settings.check-updates", "Check for Updates", &s.checkUpdates, "At startup, look for a newer Ore Editor release (GitHub) and show it in the status bar")
+				check("settings.check-updates", "Check for Updates", &s.checkUpdates, "At startup, look for a newer Rayzr Editor release (GitHub) and show it in the status bar")
 				check("settings.auto-bottom-panel", "Bottom Panel Follows Selection", &s.autoBottomPanel, "Selecting an AnimationPlayer, particle emitter or LDtk level shows its tab in the bottom panel; selecting something else goes back to the tab you had")
 				UI_PropLabel("Aseprite")
 				text_field("settings.aseprite-path", &s.asepritePath, strings.clone_to_cstring(Aseprite_DefaultPath(), context.temp_allocator))

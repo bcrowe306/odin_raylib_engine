@@ -26,9 +26,9 @@ main :: proc() {
 	// Crash reports (crash_reports.odin): panics / failed checks write one.
 	context.assertion_failure_proc = e.Crash_AssertionFailure
 	context.logger = e.Crash_Logger(context.logger)
-	// Memory diagnostics (-define:ORE_MEM_TRACK=true, engine/mem_track.odin).
+	// Memory diagnostics (-define:RAYZR_MEM_TRACK=true, engine/mem_track.odin).
 	context.allocator = e.MemTrack_Init(context.allocator)
-	// Profiling builds (-define:ORE_PROF=true, engine/profiling.odin): --prof trace.spall.
+	// Profiling builds (-define:RAYZR_PROF=true, engine/profiling.odin): --prof trace.spall.
 	e.Prof_ParseArgs(os.args[1:])
 	context.allocator = e.Prof_Init(context.allocator)
 	code := editor_main()
@@ -40,9 +40,10 @@ main :: proc() {
 
 editor_main :: proc() -> int {
 	if slice.contains(os.args, "--version") {
-		fmt.println(e.ORE_RELEASE)
+		fmt.println(e.RAYZR_RELEASE)
 		return 0
 	}
+	Editor_MigrateLegacyConfig() // ~/.config/ore_editor -> rayzr_editor (editor_settings.odin)
 	CrashReports_Install() // crash reports (crash_reports.odin)
 	defer CrashReports_Shutdown()
 	Resources_Init() // where the editor's own files are (resources.odin)
@@ -60,7 +61,7 @@ editor_main :: proc() -> int {
 	if !isTestMode && !uncapped do flags += {.VSYNC_HINT}
 	if hidden do flags += {.WINDOW_HIDDEN, .WINDOW_UNFOCUSED}
 	rl.SetConfigFlags(flags)
-	rl.InitWindow(1600, 900, strings.clone_to_cstring(fmt.tprintf("Ore Editor %s", e.ORE_RELEASE), context.temp_allocator))
+	rl.InitWindow(1600, 900, strings.clone_to_cstring(fmt.tprintf("Rayzr Editor %s", e.RAYZR_RELEASE), context.temp_allocator))
 	defer rl.CloseWindow()
 	{
 		// The editor's icon (editor/assets/icon.png, embedded).
@@ -115,7 +116,7 @@ editor_main :: proc() -> int {
 	Editor_Init(&GlobalEditor)
 	Actions_Init()
 	Editor_LoadSettings(&GlobalEditor)
-	Lua_ProjectSetup(&GlobalEditor) // .ore/definitions + .luarc.json for Lua tooling
+	Lua_ProjectSetup(&GlobalEditor) // .rayzr/definitions + .luarc.json for Lua tooling
 	defer Editor_Shutdown(&GlobalEditor)
 	defer Welcome_Shutdown() // (its preview textures)
 	Plugins_Load(&GlobalEditor) // project + user plugins (plugins.odin)

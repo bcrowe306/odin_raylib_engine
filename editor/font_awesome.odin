@@ -13,7 +13,7 @@ ICON_FA_PLAY                      :: "\uF04B" // Play
 ICON_FA_PAUSE                     :: "\uF04C" // Pause
 ICON_FA_STOP                      :: "\uF04D" // Stop
 ICON_FA_FLOPPY_DISK               :: "\uF0C7" // Save
-ICON_FA_BOX_ARCHIVE               :: "\uF187" // Export .ore
+ICON_FA_BOX_ARCHIVE               :: "\uF187" // Export .rayzr
 ICON_FA_MAGNET                    :: "\uF076" // Snap
 ICON_FA_BORDER_ALL                :: "\uF84C" // Grid
 ICON_FA_EYE                       :: "\uF06E" // Bounds

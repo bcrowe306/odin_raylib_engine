@@ -13,16 +13,16 @@ import imgui "lib/imgui"
 // Check for updates (TODO D.9): at startup (Settings > General, on by
 // default) and from Help > Check for Updates, the latest GitHub Release is
 // read (curl, on a thread) and compared with this editor's version
-// (ORE_RELEASE). A newer one shows in the status bar (click: its page) and
+// (RAYZR_RELEASE). A newer one shows in the status bar (click: its page) and
 // the console. Dev builds (0.1.0-dev.<n>, one per merge to main: release.yml)
 // look at every release, so a newer dev build is offered too; releases only
-// at releases. Not in local builds (0.0.0-dev) or test drives (ORE_UPDATE_URL
+// at releases. Not in local builds (0.0.0-dev) or test drives (RAYZR_UPDATE_URL
 // points it elsewhere: tests).
 // ============================================================================
 
-UPDATE_RELEASES_URL :: "https://api.github.com/repos/bcrowe306/odin_raylib_engine/releases/latest"
+UPDATE_RELEASES_URL :: "https://api.github.com/repos/bcrowe306/rayzr/releases/latest"
 // (Pre-releases too, newest first: what a dev build compares with.)
-UPDATE_ALL_RELEASES_URL :: "https://api.github.com/repos/bcrowe306/odin_raylib_engine/releases?per_page=30"
+UPDATE_ALL_RELEASES_URL :: "https://api.github.com/repos/bcrowe306/rayzr/releases?per_page=30"
 
 @(private = "file")
 Update_Job :: struct {
@@ -45,10 +45,10 @@ update: struct {
 // from the menu - also in development builds, and reports "up to date").
 UpdateCheck_Start :: proc(manual := false) {
 	if update.job != nil do return
-	url := os.get_env("ORE_UPDATE_URL", context.temp_allocator)
+	url := os.get_env("RAYZR_UPDATE_URL", context.temp_allocator)
 	if url == "" {
-		if !manual && (e.Version_IsDev(e.ORE_RELEASE) || GlobalDrive.enabled || !GlobalSettings.checkUpdates) do return
-		url = UPDATE_ALL_RELEASES_URL if e.Version_IsPrerelease(e.ORE_RELEASE) else UPDATE_RELEASES_URL
+		if !manual && (e.Version_IsDev(e.RAYZR_RELEASE) || GlobalDrive.enabled || !GlobalSettings.checkUpdates) do return
+		url = UPDATE_ALL_RELEASES_URL if e.Version_IsPrerelease(e.RAYZR_RELEASE) else UPDATE_RELEASES_URL
 	}
 	update.manual = manual
 	job := new(Update_Job)
@@ -85,14 +85,14 @@ UpdateCheck_Poll :: proc(state: ^EditorState) {
 		if update.manual do Editor_Log(state, .Warn, "Could not check for updates (offline?)")
 		return
 	}
-	if e.Version_Compare(tag, e.ORE_RELEASE) > 0 {
+	if e.Version_Compare(tag, e.RAYZR_RELEASE) > 0 {
 		delete(update.version)
 		delete(update.page)
 		update.version = strings.clone(strings.trim_prefix(tag, "v"))
 		update.page = strings.clone(page)
-		Editor_Log(state, .Info, "Ore Editor %s is available (this is %s): %s", update.version, e.ORE_RELEASE, page)
+		Editor_Log(state, .Info, "Rayzr Editor %s is available (this is %s): %s", update.version, e.RAYZR_RELEASE, page)
 	} else if update.manual {
-		Editor_Log(state, .Info, "Ore Editor %s is up to date", e.ORE_RELEASE)
+		Editor_Log(state, .Info, "Rayzr Editor %s is up to date", e.RAYZR_RELEASE)
 	}
 }
 
@@ -135,5 +135,5 @@ UpdateCheck_StatusBar :: proc(state: ^EditorState) {
 	}
 	imgui.PopStyleColor()
 	Drive_Item("status.update")
-	UI_Tooltip("A newer Ore Editor is out: click for its download page")
+	UI_Tooltip("A newer Rayzr Editor is out: click for its download page")
 }

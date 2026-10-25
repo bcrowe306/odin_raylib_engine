@@ -19,7 +19,7 @@ import lua "lua54"
 // SIGTRAP) or a Windows exception - writes `crash-<time>-<pid>.txt` to the
 // crash folder (Crash_SetDir):
 //
-//   Ore Editor crash report
+//   Rayzr Editor crash report
 //   version:  0.1.0-dev.240
 //   platform: macOS arm64
 //   time:     1793000000 (unix)
@@ -58,11 +58,11 @@ crash: struct {
 	dir:       string,
 }
 
-// Crash_Install starts catching crashes for `app` ("Ore Editor", the game's
+// Crash_Install starts catching crashes for `app` ("Rayzr Editor", the game's
 // name); reports go to `dir` ("": stderr until Crash_SetDir). Also set
 // context.assertion_failure_proc = Crash_AssertionFailure in main.
 Crash_Install :: proc(app: string, dir := "") {
-	h := fmt.bprintf(crash.header[:], "%s crash report\nversion:  %s\nplatform: %s %s\n", app, ORE_RELEASE, crash_os_name(), ODIN_ARCH_STRING)
+	h := fmt.bprintf(crash.header[:], "%s crash report\nversion:  %s\nplatform: %s %s\n", app, RAYZR_RELEASE, crash_os_name(), ODIN_ARCH_STRING)
 	crash.headerLen = len(h)
 	if dir != "" do Crash_SetDir(dir)
 	if !crash.installed {

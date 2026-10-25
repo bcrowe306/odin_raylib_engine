@@ -9,7 +9,7 @@ import "core:strconv"
 import "core:sync"
 
 // ============================================================================
-// Profiling (build with -define:ORE_PROF=true; without it every call below
+// Profiling (build with -define:RAYZR_PROF=true; without it every call below
 // compiles to nothing):
 //
 // - Zones: `Prof_Scope("name")` at the top of a block times it to the end of
@@ -24,12 +24,12 @@ import "core:sync"
 // The runner and the editor take `--prof <file.spall>` (the trace),
 // `--prof-skip N` (frames before recording; default 30, the warm-up) and
 // `--prof-frames N` (frames recorded; default 300, 0 = until exit). A
-// build without ORE_PROF says so when --prof is given. `--prof-alloc-sites`
+// build without RAYZR_PROF says so when --prof is given. `--prof-alloc-sites`
 // also counts heap allocations by source line (from frame --prof-skip on)
 // and prints the busiest at exit.
 // ============================================================================
 
-ORE_PROF :: #config(ORE_PROF, false)
+RAYZR_PROF :: #config(RAYZR_PROF, false)
 
 Prof_Frame_Stats :: struct {
 	allocs:    int, // heap allocations (and resizes) this frame
@@ -76,8 +76,8 @@ Prof_ParseArgs :: proc(args: []string) {
 		case "--prof-frames": prof.frames = max(n, 0)
 		}
 	}
-	when !ORE_PROF {
-		if prof.path != "" do log.warnf("--prof %s: this build has no profiling (build with -define:ORE_PROF=true)", prof.path)
+	when !RAYZR_PROF {
+		if prof.path != "" do log.warnf("--prof %s: this build has no profiling (build with -define:RAYZR_PROF=true)", prof.path)
 	}
 }
 
@@ -85,7 +85,7 @@ Prof_ParseArgs :: proc(args: []string) {
 // allocator for the counters: call at the top of main, before anything
 // allocates, and use the returned allocator as context.allocator.
 Prof_Init :: proc(heap: mem.Allocator) -> mem.Allocator {
-	when ORE_PROF {
+	when RAYZR_PROF {
 		prof.backingAllocator = heap
 		prof.mainThread = sync.current_thread_id()
 		if prof.allocSites do prof.sites = make(map[Prof_Site]int, 256, heap)
@@ -105,7 +105,7 @@ Prof_Init :: proc(heap: mem.Allocator) -> mem.Allocator {
 
 // Prof_Shutdown writes out and closes the trace.
 Prof_Shutdown :: proc() {
-	when ORE_PROF {
+	when RAYZR_PROF {
 		if prof.allocSites {
 			Row :: struct {site: Prof_Site, n: int}
 			rows := make([dynamic]Row, 0, len(prof.sites), prof.backingAllocator)
@@ -128,9 +128,9 @@ Prof_Shutdown :: proc() {
 // Prof_FrameEnd closes a frame: the counters roll over and the trace
 // starts / stops on its frame window. Call once per frame, outside every
 // zone (before freeing the temp arena).
-@(disabled = !ORE_PROF)
+@(disabled = !RAYZR_PROF)
 Prof_FrameEnd :: proc() {
-	when ORE_PROF {
+	when RAYZR_PROF {
 		if context.temp_allocator.procedure == runtime.default_temp_allocator_proc && context.temp_allocator.data != nil {
 			ta := cast(^runtime.Default_Temp_Allocator)context.temp_allocator.data
 			prof.counting.tempBytes = int(ta.arena.total_used)
@@ -148,41 +148,41 @@ Prof_FrameEnd :: proc() {
 	}
 }
 
-// Prof_Last: the counters of the last whole frame (zeros without ORE_PROF).
+// Prof_Last: the counters of the last whole frame (zeros without RAYZR_PROF).
 Prof_Last :: proc() -> Prof_Frame_Stats {
 	return prof.last
 }
 
 // Prof_Scope times the rest of the enclosing block as a zone named `name`
 // (a constant string: zones must not allocate).
-@(disabled = !ORE_PROF, deferred_none = prof_scope_end)
+@(disabled = !RAYZR_PROF, deferred_none = prof_scope_end)
 Prof_Scope :: proc(name: string, loc := #caller_location) {
-	when ORE_PROF {
+	when RAYZR_PROF {
 		if prof.recording do prof_trace_begin(name, loc)
 	}
 }
 
 // Prof_Begin / Prof_End: a zone that doesn't follow a block (must be paired).
-@(disabled = !ORE_PROF)
+@(disabled = !RAYZR_PROF)
 Prof_Begin :: proc(name: string, loc := #caller_location) {
-	when ORE_PROF {
+	when RAYZR_PROF {
 		if prof.recording do prof_trace_begin(name, loc)
 	}
 }
 
-@(disabled = !ORE_PROF)
+@(disabled = !RAYZR_PROF)
 Prof_End :: proc() {
 	prof_scope_end()
 }
 
-@(private = "file", disabled = !ORE_PROF)
+@(private = "file", disabled = !RAYZR_PROF)
 prof_scope_end :: proc() {
-	when ORE_PROF {
+	when RAYZR_PROF {
 		if prof.recording do prof_trace_end()
 	}
 }
 
-when ORE_PROF {
+when RAYZR_PROF {
 	@(private = "file")
 	prof_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
 		// (Atomic: worker threads, e.g. async_decode, allocate too.)

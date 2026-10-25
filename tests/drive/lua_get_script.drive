@@ -2,10 +2,10 @@
 # own (NodeOf_<name>) whose get_script() is that script's class, so another
 # script's exported fields and methods complete.
 wait 5
-wait-until file:.ore/definitions/project_types.lua contains ---@class NodeOf_PatrolDroneAlpha : TextureNode timeout=600
-expect file:.ore/definitions/project_types.lua contains ---@return Drone
-expect file:.ore/definitions/project_types.lua contains fun(name: "PatrolDroneAlpha"): NodeOf_PatrolDroneAlpha
-expect file:.ore/definitions/project_types.lua contains fun(name: "MainCamera"): CameraNode
+wait-until file:.rayzr/definitions/project_types.lua contains ---@class NodeOf_PatrolDroneAlpha : TextureNode timeout=600
+expect file:.rayzr/definitions/project_types.lua contains ---@return Drone
+expect file:.rayzr/definitions/project_types.lua contains fun(name: "PatrolDroneAlpha"): NodeOf_PatrolDroneAlpha
+expect file:.rayzr/definitions/project_types.lua contains fun(name: "MainCamera"): CameraNode
 dblclick @asset:scripts/player_ship.lua
 wait-until code.lsp == ready timeout=600
 key ctrl+g

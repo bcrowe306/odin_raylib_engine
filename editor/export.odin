@@ -9,19 +9,19 @@ import "winres"
 // ============================================================================
 // Standalone export: each export preset (Project Settings > Export; one per
 // selected platform when there are none) writes a folder with a prebuilt
-// runner (renamed to the game), game.ore and the UI font - no compiler
+// runner (renamed to the game), game.rayzr and the UI font - no compiler
 // needed. Runners come with the editor in runners/<platform>/ (next to the
 // editor, or bin/runners/ in a source checkout; scripts/build_runners.sh
 // builds the current platform's, release and debug). Without one for this
 // platform the editor builds it once (needs `odin`) and then exports.
 //
 // A preset's folder (<output>/<preset name> unless it sets one):
-//   Windows  <Name>.exe (+ the runner's libraries), game.ore, fonts/
+//   Windows  <Name>.exe (+ the runner's libraries), game.rayzr, fonts/
 //   macOS    <Name>.app                (export_macos.odin)
 //   Linux    <Name>.AppDir             (+ <Name>-<arch>.AppImage with appimagetool)
 //
 // The packaged project.json carries the preset's overrides (version, icon,
-// window), and only the files the preset includes go into game.ore.
+// window), and only the files the preset includes go into game.rayzr.
 // Windows: the exe gets the icon and version info (written with the Win32
 // resource API, so when exporting on Windows); release runners have no
 // console window.
@@ -167,6 +167,19 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false, only :
 }
 
 @(private = "file")
+// The icon of exported games that have none: Rayzr's (editor/assets/icon.png),
+// written into the project's hidden folder when exporting.
+DEFAULT_ICON :: ".rayzr/default_icon.png"
+@(private = "file")
+DEFAULT_ICON_PNG :: #load("assets/icon.png")
+
+@(private = "file")
+export_default_icon :: proc(projectPath: string) -> bool {
+	path, _ := filepath.join({projectPath, DEFAULT_ICON}, context.temp_allocator)
+	_ = os.make_directory_all(filepath.dir(path, context.temp_allocator))
+	return os.write_entire_file(path, DEFAULT_ICON_PNG) == nil
+}
+
 export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) -> (string, bool) {
 	cfg := &state.projectConfig
 	t := p.target
@@ -188,7 +201,7 @@ export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) 
 	pc := e.Export_PresetConfig(cfg, p)
 	overrides := make(map[string][]u8, context.temp_allocator)
 	overrides["project.json"] = transmute([]u8)e.Project_SerializeToJSON(&pc, context.temp_allocator)
-	ore, _ := filepath.join({dir, ".game.ore.tmp"}, context.temp_allocator)
+	rayzr, _ := filepath.join({dir, ".game.rayzr.tmp"}, context.temp_allocator)
 	filter :: proc(path: string, data: rawptr) -> bool {return e.Export_PresetIncludes(cast(^e.Export_Preset)data, path)}
 	if n := e.Asset_ExportOverrides(state.projectPath, &overrides, filter, p, context.temp_allocator); n > 0 {
 		Editor_Log(state, .Info, "%s: %d texture(s) stored as QOI (import settings)", p.name, n)
@@ -196,11 +209,11 @@ export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) 
 	if sprites, pages := e.Atlas_Build(state.projectPath, &overrides, filter, p, context.temp_allocator); sprites > 0 {
 		Editor_Log(state, .Info, "%s: %d texture(s) packed into %d atlas page(s)", p.name, sprites, pages)
 	}
-	if !e.OrePackage_CreateFromDirectory(state.projectPath, ore, cfg.export.compress, filter, p, overrides) {
-		Editor_Log(state, .Error, "Failed to package the project into %s", ore)
+	if !e.RayzrPackage_CreateFromDirectory(state.projectPath, rayzr, cfg.export.compress, filter, p, overrides) {
+		Editor_Log(state, .Error, "Failed to package the project into %s", rayzr)
 		return "", false
 	}
-	defer os.remove(ore)
+	defer os.remove(rayzr)
 	// The third-party notices the engine's licenses ask for (Lua, Box2D, ...),
 	// next to what was exported.
 	if notices := runner_notices(runner); notices != "" {
@@ -208,17 +221,20 @@ export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) 
 		_ = os.copy_file(dst, notices)
 	}
 
+	// No icon of its own: the engine's (the app, the .exe, the AppImage, the page).
+	if pc.icon == "" && export_default_icon(state.projectPath) do pc.icon = DEFAULT_ICON
+
 	switch t {
-	case .MacOS:   return Export_MacApp(state, &pc, runner, ore, dir, name)
-	case .Linux:   return export_linux(state, &pc, runner, ore, dir, name)
-	case .Windows: return export_windows(state, &pc, runner, ore, dir, name)
-	case .Web:     return export_web(state, &pc, runner, ore, dir, name)
+	case .MacOS:   return Export_MacApp(state, &pc, runner, rayzr, dir, name)
+	case .Linux:   return export_linux(state, &pc, runner, rayzr, dir, name)
+	case .Windows: return export_windows(state, &pc, runner, rayzr, dir, name)
+	case .Web:     return export_web(state, &pc, runner, rayzr, dir, name)
 	}
 	return "", false
 }
 
 @(private = "file")
-export_windows :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, dir, name: string) -> (string, bool) {
+export_windows :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, rayzr, dir, name: string) -> (string, bool) {
 	exe, _ := filepath.join({dir, strings.concatenate({name, ".exe"}, context.temp_allocator)}, context.temp_allocator)
 	if err := os.copy_file(exe, runner); err != nil {
 		Editor_Log(state, .Error, "Could not copy the runner to %s: %v", exe, err)
@@ -228,9 +244,9 @@ export_windows :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, 
 		dst, _ := filepath.join({dir, filepath.base(lib)}, context.temp_allocator)
 		_ = os.copy_file(dst, lib)
 	}
-	dstOre, _ := filepath.join({dir, "game.ore"}, context.temp_allocator)
-	if err := os.copy_file(dstOre, ore); err != nil {
-		Editor_Log(state, .Error, "Could not write %s: %v", dstOre, err)
+	dstRayzr, _ := filepath.join({dir, "game.rayzr"}, context.temp_allocator)
+	if err := os.copy_file(dstRayzr, rayzr); err != nil {
+		Editor_Log(state, .Error, "Could not write %s: %v", dstRayzr, err)
 		return "", false
 	}
 	if cfg.export.includeFont {
@@ -278,11 +294,11 @@ windows_resources :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, exe, name:
 // export_linux writes <dir>/<Name>.AppDir and, with appimagetool on PATH
 // (Linux), <Name>-<arch>.AppImage next to it.
 @(private = "file")
-export_linux :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, dir, name: string) -> (string, bool) {
+export_linux :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, rayzr, dir, name: string) -> (string, bool) {
 	icon := ""
 	if cfg.icon != "" do icon, _ = filepath.join({state.projectPath, cfg.icon}, context.temp_allocator)
 	font := runner_font(runner) if cfg.export.includeFont else ""
-	appDir, ok := e.Export_LinuxAppDir(dir, name, cfg, runner, runner_libraries(runner), ore, font, icon)
+	appDir, ok := e.Export_LinuxAppDir(dir, name, cfg, runner, runner_libraries(runner), rayzr, font, icon)
 	if !ok {
 		Editor_Log(state, .Error, "Could not write the AppDir in %s", dir)
 		return "", false

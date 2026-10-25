@@ -95,7 +95,7 @@ write_bool :: proc(w: ^Json_Writer, b: bool) {
 }
 
 // asset_rel makes a resolved disk path relative to the project directory so
-// saved scenes stay portable (and work from a .ore package).
+// saved scenes stay portable (and work from a .rayzr package).
 @(private = "file")
 asset_rel :: proc(node: ^Node, path: string) -> string {
 	p := strings.trim_prefix(path, "./")
@@ -1401,7 +1401,7 @@ sj_obj_has :: proc(obj: json.Object, key: string) -> bool {
 }
 
 // Component_ReadFile reads a component (prefab) file through the asset
-// manager (project directory or mounted .ore).
+// manager (project directory or mounted .rayzr).
 Component_ReadFile :: proc(ctx: ^GameContext, compPath: string) -> ([]byte, bool) {
 	if ctx != nil && ctx.game != nil {
 		if data, ok := AssetManager_ReadFileBytes(&ctx.game.assetManager, compPath, context.temp_allocator); ok do return data, true

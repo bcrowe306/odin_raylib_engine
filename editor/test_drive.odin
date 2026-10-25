@@ -414,7 +414,7 @@ drive_exec :: proc(d: ^TestDrive, state: ^EditorState, line: string) -> bool {
 		d.pendingShot = strings.clone(rest if rest != "" else "shot")
 		return true
 	case "exec":
-		// Run a command to completion (e.g. the game on an exported .ore).
+		// Run a command to completion (e.g. the game on an exported .rayzr).
 		desc := os.Process_Desc{command = strings.fields(rest, context.temp_allocator)}
 		p, err := os.process_start(desc)
 		if err != nil {

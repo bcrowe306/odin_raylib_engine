@@ -19,7 +19,7 @@ key enter
 wait 2
 key cmd+s
 wait 3
-wait-until file:.ore/definitions/project_types.lua contains on_update_hover_zz timeout=600
+wait-until file:.rayzr/definitions/project_types.lua contains on_update_hover_zz timeout=600
 # PlayerShip has no script: Add Script Callbacks says so.
 rclick @smg.state:hover_zz
 click @ctx:smg-callbacks

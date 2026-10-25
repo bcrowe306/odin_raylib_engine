@@ -12,7 +12,7 @@ import e "../engine"
 // ============================================================================
 // Web export (engine/docs/web_export.md): the prebuilt web runner
 // (runners/web/: index.html, index.js, index.wasm, odin.js - built once by
-// scripts/build_web_runner.sh) copied next to game.ore, the UI font and
+// scripts/build_web_runner.sh) copied next to game.rayzr, the UI font and
 // the project's icon as the page's favicon; the page title is the game's.
 // The folder is a static site: upload it (itch.io: zip it as an HTML game)
 // or open it with Game > Open Web Export in Browser - browsers don't run
@@ -21,7 +21,7 @@ import e "../engine"
 
 WEB_RUNNER_FILES :: [?]string{"index.html", "index.js", "index.wasm", "odin.js"}
 
-export_web :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, dir, name: string) -> (string, bool) {
+export_web :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, rayzr, dir, name: string) -> (string, bool) {
 	src := filepath.dir(runner, context.temp_allocator)
 	files := WEB_RUNNER_FILES
 	for f in files {
@@ -41,9 +41,9 @@ export_web :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, dir,
 			return "", false
 		}
 	}
-	dstOre, _ := filepath.join({dir, "game.ore"}, context.temp_allocator)
-	if err := os.copy_file(dstOre, ore); err != nil {
-		Editor_Log(state, .Error, "Could not write %s: %v", dstOre, err)
+	dstRayzr, _ := filepath.join({dir, "game.rayzr"}, context.temp_allocator)
+	if err := os.copy_file(dstRayzr, rayzr); err != nil {
+		Editor_Log(state, .Error, "Could not write %s: %v", dstRayzr, err)
 		return "", false
 	}
 	if font := runner_font(runner); font != "" {
