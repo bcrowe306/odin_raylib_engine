@@ -1,8 +1,0 @@
-package diag_fixture
-
-import "core:fmt"
-
-main :: proc() {
-	greeting := "héllo 😀"
-	fmt.println(greeting)
-}

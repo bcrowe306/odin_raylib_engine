@@ -10,12 +10,38 @@ tasks:
         desc: Run the game engine application
         cmds:
             - odin run .
+    editor:
+        desc: Run the standalone Dear ImGui Game Engine Editor
+        cmds:
+            - odin run editor
+    editor:build:
+        desc: Build the standalone Game Engine Editor binary
+        cmds:
+            - mkdir -p bin
+            - odin build editor -out:bin/editor
+    editor:check:
+        desc: Run type-checking on editor package
+        cmds:
+            - odin check editor
+    editor:e2e:
+        desc: Run the editor UI test-drives (alias of editor:drive)
+        cmds:
+            - task: editor:drive
+    editor:drive:
+        desc: Operate the editor through injected mouse/keyboard input (tests/drive/*.drive, SUITE=name for one)
+        cmds:
+            - ./scripts/editor_drive.sh {{.SUITE}}
+    game:build:
+        desc: Build the game runner the editor launches on Play
+        cmds:
+            - mkdir -p bin
+            - odin build . -out:bin/odin_raylib_engine
     test:
         desc: Run all tests (engine lifecycle, UI unit tests, and UI showcase E2E automation)
         cmds:
             - odin test engine -define:ODIN_TEST_THREADS=1
             - odin test ui -define:ODIN_TEST_THREADS=1
-            - ./scripts/test_ui_showcase.sh
+            - cd ui && ./scripts/test_showcase.sh
     test:engine:
         desc: Run engine package unit & memory leak tests
         cmds:
@@ -27,14 +53,17 @@ tasks:
     ui:e2e:
         desc: Run automated UI showcase test with event injection & screenshot capture
         cmds:
-            - ./scripts/test_ui_showcase.sh
+            - cd ui && ./scripts/test_showcase.sh
     ui:showcase:
         desc: Launch interactive standalone UI showcase app
         cmds:
-            - odin run ui
+            - cd ui && odin run .
     check:
-        desc: Run type-checking on root and ui packages, then run all tests
+        desc: Run type-checking on all packages (root, ui, editor), unit tests, and editor E2E
         cmds:
             - odin check .
             - odin check ui
-            - task: test
+            - odin check editor
+            - odin test engine -define:ODIN_TEST_THREADS=1
+            - odin test ui -define:ODIN_TEST_THREADS=1
+            - task: editor:e2e

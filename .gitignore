@@ -2,15 +2,35 @@
 main
 plane_game
 asteroids/asteroids
+/odin_raylib_engine
 !*.odin
 *.exe
 *.bin
 *.out
 
+# Build output (runners, web builds, editor builds)
+/bin/
+
 # Debug symbols / crash info
 *.dSYM/
 *.pdb
 *.dwarf
+
+# Test output: drive screenshots and logs
+/editor_screenshots/
+/test_*.png
+
+# Editor state (per user / per project): ImGui layouts, open tabs, script
+# history, generated Lua definitions, exported packages
+imgui.ini
+.editor_settings.ini
+.ore/
+.luarc.json
+/assets/demo_project.ore
+
+# Tools
+__pycache__/
+.claude/
 
 # OS / editor cruft
 .DS_Store

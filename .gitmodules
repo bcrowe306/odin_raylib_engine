@@ -4,3 +4,9 @@
 [submodule "lua-language-server"]
 	path = lua-language-server
 	url = https://github.com/LuaLS/lua-language-server.git
+[submodule "ui"]
+	path = ui
+	url = https://github.com/bcrowe306/raylib_ui.git
+[submodule "odin_editor"]
+	path = odin_editor
+	url = https://github.com/bcrowe306/odin_editor.git

@@ -1,9 +1,0 @@
-package problems_fixture
-
-import "core:fmt"
-import "core:os"
-
-main :: proc() {
-	total := helper()
-	fmt.println(total)
-}
