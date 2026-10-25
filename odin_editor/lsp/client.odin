@@ -19,6 +19,9 @@ RequestKind :: enum {
 	CodeAction,
 	Definition,
 	References,
+	Rename,
+	Formatting,
+	Resolve,
 	Other,
 }
 
@@ -70,6 +73,18 @@ Client :: struct {
 
 	last_code_actions:     [dynamic]Code_Action,
 	code_action_seq:       int,
+	// Last textDocument/rename (WorkspaceEdit) or /formatting (TextEdit[])
+	// answer, as edits keyed by uri_key. `edit_seq` bumps on every answer.
+	// completionItem/resolve: fills documentation/detail of one item of the
+	// current completion list (resolve_seq bumps when one arrives).
+	resolve_seq:            int,
+	latest_resolve_id:      int,
+	resolve_index:          int,
+	resolve_completion_seq: int,
+	last_edits:            [dynamic]Code_Action_Edit,
+	edits_kind:            RequestKind, // .Rename or .Formatting
+	edit_seq:              int,
+	latest_edit_id:        int,
 	latest_code_action_id: int,
 
 	// Set once the server process has gone away (crashed, killed, or
@@ -88,6 +103,9 @@ Client :: struct {
 	completion_incomplete: bool,
 	// initializationOptions JSON sent with `initialize` (owned; "" = null).
 	init_options: string,
+	// Settings returned for workspace/configuration requests: a JSON object
+	// keyed by section, e.g. {"Lua": {"runtime": {"version": "Lua 5.4"}}}.
+	settings: string,
 }
 
 client_init :: proc(allocator := context.allocator) -> Client {
@@ -99,6 +117,7 @@ client_init :: proc(allocator := context.allocator) -> Client {
 		last_completion  = make([dynamic]CompletionItem, allocator),
 		last_signatures  = make([dynamic]SignatureInformation, allocator),
 		last_code_actions = make([dynamic]Code_Action, allocator),
+		last_edits       = make([dynamic]Code_Action_Edit, allocator),
 		last_locations   = make([dynamic]Location, allocator),
 		sync_kind        = 1,
 	}
@@ -110,6 +129,7 @@ client_destroy :: proc(c: ^Client) {
 	}
 	delete(c.recv_buf)
 	delete(c.init_options, c.allocator)
+	delete(c.settings, c.allocator)
 	delete(c.pending_kind)
 	for uri, list in c.diagnostics {
 		free_diagnostics(c, list)
@@ -122,6 +142,8 @@ client_destroy :: proc(c: ^Client) {
 	delete(c.last_signatures)
 	client_clear_code_actions(c)
 	delete(c.last_code_actions)
+	client_clear_edits(c)
+	delete(c.last_edits)
 	delete(c.last_hover, c.allocator)
 	client_clear_locations(c)
 	delete(c.last_locations)

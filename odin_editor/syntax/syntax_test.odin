@@ -1,6 +1,8 @@
 package syntax
 
 import "core:mem"
+import "core:fmt"
+import "core:strings"
 import "core:testing"
 
 run_leak_free :: proc(t: ^testing.T, body: proc(t: ^testing.T)) {
@@ -152,4 +154,36 @@ test_identifier_classification :: proc(t: ^testing.T) {
 	testing.expect_value(t, kind_of("#partial switch v {", "#partial"), TokenKind.Directive)
 	testing.expect_value(t, kind_of("@(private)", "private"), TokenKind.Attribute)
 	testing.expect_value(t, kind_of("x := y", "y"), TokenKind.Identifier)
+}
+
+@(test)
+test_lua_tokenizer :: proc(t: ^testing.T) {
+	kinds :: proc(line: string, state: int) -> (string, int) {
+		toks, next := tokenize_lua_line(line, state, context.temp_allocator)
+		sb := strings.builder_make(context.temp_allocator)
+		for tk in toks {
+			fmt.sbprintf(&sb, "%s=%v ", line[tk.start:tk.end], tk.kind)
+		}
+		return strings.to_string(sb), next
+	}
+	s, st := kinds(`function Ship:update(dt) self.node:set_position(1.5e3, 0x1F) end -- note`, LUA_STATE_NORMAL)
+	testing.expect_value(t, st, LUA_STATE_NORMAL)
+	testing.expect(t, strings.contains(s, "update=Function"), s)
+	testing.expect(t, strings.contains(s, "set_position=Function"), s)
+	testing.expect(t, strings.contains(s, "node=Property"), s)
+	testing.expect(t, strings.contains(s, "self=Builtin"), s)
+	testing.expect(t, strings.contains(s, "1.5e3=Number") && strings.contains(s, "0x1F=Number"), s)
+	testing.expect(t, strings.contains(s, "-- note=Comment"), s)
+	// Long string spanning lines, with a level.
+	_, st = kinds(`local s = [==[ first`, LUA_STATE_NORMAL)
+	testing.expect_value(t, st, LUA_STATE_LONG_STRING + 2)
+	s, st = kinds(`still ]] not closed ]==] .. "x"`, st)
+	testing.expect_value(t, st, LUA_STATE_NORMAL)
+	testing.expect(t, strings.contains(s, `"x"=String`), s)
+	// Long comment.
+	_, st = kinds(`--[[ block`, LUA_STATE_NORMAL)
+	testing.expect_value(t, st, LUA_STATE_LONG_COMMENT)
+	s, st = kinds(`end ]] return nil`, st)
+	testing.expect(t, strings.contains(s, "return=Keyword") && strings.contains(s, "nil=Constant"), s)
+	testing.expect_value(t, language_for_path("scripts/a.lua").name, "lua")
 }

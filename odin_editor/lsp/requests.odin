@@ -13,6 +13,7 @@ client_initialize :: proc(c: ^Client, root_uri: string) -> int {
 		rootUri      = root_uri,
 		capabilities = default_client_capabilities(),
 	}
+	params.capabilities.workspace.configuration = len(c.settings) > 0
 	if len(c.init_options) > 0 {
 		if v, err := json.parse_string(c.init_options, allocator = context.temp_allocator); err == nil {
 			params.initializationOptions = v
@@ -124,6 +125,60 @@ client_request_references :: proc(c: ^Client, uri: string, line, character: int)
 	msg := encode_request(id, "textDocument/references", params, context.temp_allocator)
 	c.pending_kind[id] = .References
 	c.latest_location_id = id
+	client_send_raw(c, msg)
+	return id
+}
+
+// client_request_rename asks for the edits that rename the symbol at a
+// position (answer in `last_edits`, kind .Rename).
+client_request_rename :: proc(c: ^Client, uri: string, line, character: int, new_name: string) -> int {
+	id := client_next_id(c)
+	params := struct {
+		textDocument: TextDocumentIdentifier `json:"textDocument"`,
+		position:     Position               `json:"position"`,
+		newName:      string                 `json:"newName"`,
+	}{{uri = uri}, {line, character}, new_name}
+	msg := encode_request(id, "textDocument/rename", params, context.temp_allocator)
+	c.pending_kind[id] = .Rename
+	c.latest_edit_id = id
+	client_send_raw(c, msg)
+	return id
+}
+
+// client_request_formatting asks for edits that format a whole document
+// (answer in `last_edits` with key "", kind .Formatting).
+client_request_formatting :: proc(c: ^Client, uri: string, tab_size: int, insert_spaces: bool) -> int {
+	id := client_next_id(c)
+	params := struct {
+		textDocument: TextDocumentIdentifier `json:"textDocument"`,
+		options:      struct {
+			tabSize:      int  `json:"tabSize"`,
+			insertSpaces: bool `json:"insertSpaces"`,
+		} `json:"options"`,
+	}{{uri = uri}, {tab_size, insert_spaces}}
+	msg := encode_request(id, "textDocument/formatting", params, context.temp_allocator)
+	c.pending_kind[id] = .Formatting
+	c.latest_edit_id = id
+	client_send_raw(c, msg)
+	return id
+}
+
+// client_request_resolve asks for the full details (documentation) of
+// item `index` of the current completion list.
+client_request_resolve :: proc(c: ^Client, index: int) -> int {
+	if index < 0 || index >= len(c.last_completion) || c.last_completion[index].raw == "" {
+		return 0
+	}
+	params, err := json.parse_string(c.last_completion[index].raw, allocator = context.temp_allocator)
+	if err != nil {
+		return 0
+	}
+	id := client_next_id(c)
+	msg := encode_request(id, "completionItem/resolve", params, context.temp_allocator)
+	c.pending_kind[id] = .Resolve
+	c.latest_resolve_id = id
+	c.resolve_index = index
+	c.resolve_completion_seq = c.completion_seq
 	client_send_raw(c, msg)
 	return id
 }

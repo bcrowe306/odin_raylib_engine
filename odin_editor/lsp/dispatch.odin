@@ -45,6 +45,12 @@ client_handle_message_body :: proc(c: ^Client, body: []u8) {
 	if method_val, has_method := json_object_get(value, "method"); has_method {
 		method, _ := json_as_string(method_val)
 		params, _ := json_object_get(value, "params")
+		// A request from the server (it has an id) must be answered, or
+		// servers such as lua-language-server wait on it.
+		if req_id, is_request := json_object_get(value, "id"); is_request {
+			client_answer_server_request(c, req_id, method, params)
+			return
+		}
 		client_handle_server_message(c, method, params)
 		return
 	}
@@ -110,6 +116,16 @@ client_handle_message_body :: proc(c: ^Client, body: []u8) {
 			return
 		}
 		client_store_hover(c, result)
+	case .Resolve:
+		if id != c.latest_resolve_id || c.resolve_completion_seq != c.completion_seq {
+			return
+		}
+		client_store_resolve(c, result)
+	case .Rename, .Formatting:
+		if id != c.latest_edit_id {
+			return
+		}
+		client_store_edits(c, kind, result)
 	case .Initialize, .Other:
 		// No persistent storage needed for these yet.
 	}
@@ -214,6 +230,7 @@ client_clear_completion :: proc(c: ^Client) {
 		delete(item.filter_text, c.allocator)
 		delete(item.documentation, c.allocator)
 		delete(item.command, c.allocator)
+		delete(item.raw, c.allocator)
 	}
 	clear(&c.last_completion)
 }
@@ -308,7 +325,40 @@ client_store_completion :: proc(c: ^Client, result: json.Value) {
 				}
 			}
 		}
+		if raw, err := json.marshal(item, allocator = context.temp_allocator); err == nil {
+			ci.raw = strings.clone(string(raw), c.allocator)
+		}
 		append(&c.last_completion, ci)
+	}
+}
+
+// client_store_resolve merges a resolved item's documentation and detail.
+@(private)
+client_store_resolve :: proc(c: ^Client, result: json.Value) {
+	c.resolve_seq += 1
+	i := c.resolve_index
+	if i < 0 || i >= len(c.last_completion) {
+		return
+	}
+	ci := &c.last_completion[i]
+	ci.resolved = true
+	if doc, ok := json_object_get(result, "documentation"); ok {
+		delete(ci.documentation, c.allocator)
+		if s, is_str := json_as_string(doc); is_str {
+			ci.documentation = strings.clone(s, c.allocator)
+		} else {
+			ci.documentation = json_clone_string_field(c, doc, "value")
+			if k, has_kind := json_object_get(doc, "kind"); has_kind {
+				ks, _ := json_as_string(k)
+				ci.doc_markdown = ks == "markdown"
+			}
+		}
+	}
+	if d, ok := json_object_get(result, "detail"); ok {
+		if s, is_str := json_as_string(d); is_str && s != "" {
+			delete(ci.detail, c.allocator)
+			ci.detail = strings.clone(s, c.allocator)
+		}
 	}
 }
 
@@ -344,6 +394,18 @@ client_store_signature_help :: proc(c: ^Client, result: json.Value) {
 				params_list := make([]ParameterInformation, len(params_arr), c.allocator)
 				for p_v, i in params_arr {
 					params_list[i].label = json_clone_string_field(c, p_v, "label")
+					// The label may also be [start, end) offsets into the
+					// signature label (lua-language-server sends these).
+					if lv, has := json_object_get(p_v, "label"); has {
+						if off, is_off := lv.(json.Array); is_off && len(off) == 2 {
+							a, _ := json_as_int(off[0])
+							b, _ := json_as_int(off[1])
+							a = clamp(a, 0, len(si.label))
+							b = clamp(b, a, len(si.label))
+							delete(params_list[i].label, c.allocator)
+							params_list[i].label = strings.clone(si.label[a:b], c.allocator)
+						}
+					}
 				}
 				si.parameters = params_list
 			}
@@ -504,6 +566,54 @@ client_store_code_actions :: proc(c: ^Client, result: json.Value) {
 	}
 }
 
+// client_clear_edits frees and empties `last_edits`.
+client_clear_edits :: proc(c: ^Client) {
+	for e in c.last_edits {
+		delete(e.key, c.allocator)
+		delete(e.new_text, c.allocator)
+	}
+	clear(&c.last_edits)
+}
+
+// append_workspace_edit collects a WorkspaceEdit's edits (`changes` or
+// `documentChanges`).
+@(private)
+append_workspace_edit :: proc(c: ^Client, edits: ^[dynamic]Code_Action_Edit, edit_val: json.Value) {
+	if changes, ok := json_object_get(edit_val, "changes"); ok {
+		if obj, is_obj := changes.(json.Object); is_obj {
+			for uri, list in obj {
+				append_text_edits(c, edits, uri, list)
+			}
+		}
+	}
+	if doc_changes, ok := json_object_get(edit_val, "documentChanges"); ok {
+		if arr, is_arr := doc_changes.(json.Array); is_arr {
+			for dc in arr {
+				td, _ := json_object_get(dc, "textDocument")
+				uri_val, _ := json_object_get(td, "uri")
+				uri, _ := json_as_string(uri_val)
+				list, _ := json_object_get(dc, "edits")
+				append_text_edits(c, edits, uri, list)
+			}
+		}
+	}
+}
+
+// client_store_edits stores a rename (WorkspaceEdit) or formatting
+// (TextEdit[] for the requested document) answer.
+@(private)
+client_store_edits :: proc(c: ^Client, kind: RequestKind, result: json.Value) {
+	client_clear_edits(c)
+	c.edit_seq += 1
+	c.edits_kind = kind
+	if kind == .Rename {
+		append_workspace_edit(c, &c.last_edits, result)
+	} else {
+		// Formatting edits carry no uri; "" means "the requested document".
+		append_text_edits(c, &c.last_edits, "", result)
+	}
+}
+
 @(private)
 append_text_edits :: proc(c: ^Client, edits: ^[dynamic]Code_Action_Edit, uri: string, list: json.Value) {
 	arr, ok := list.(json.Array)
@@ -516,7 +626,7 @@ append_text_edits :: proc(c: ^Client, edits: ^[dynamic]Code_Action_Edit, uri: st
 			continue
 		}
 		append(edits, Code_Action_Edit{
-			key      = uri_key(uri, c.allocator),
+			key      = uri_key(uri, c.allocator) if uri != "" else "",
 			range    = parse_range(r),
 			new_text = json_clone_string_field(c, e, "newText"),
 		})
@@ -549,4 +659,58 @@ client_diagnostics_for_key :: proc(c: ^Client, key: string) -> []Diagnostic {
 		return nil
 	}
 	return list[:]
+}
+
+// client_answer_server_request replies to server->client requests:
+// workspace/configuration gets the matching sections of `c.settings`;
+// everything else (registerCapability, workDoneProgress/create, ...) is
+// acknowledged with a null result.
+@(private)
+client_answer_server_request :: proc(c: ^Client, id: json.Value, method: string, params: json.Value) {
+	sb := strings.builder_make(context.temp_allocator)
+	strings.write_string(&sb, `{"jsonrpc":"2.0","id":`)
+	id_text, _ := json.marshal(id, allocator = context.temp_allocator)
+	strings.write_string(&sb, string(id_text))
+	strings.write_string(&sb, `,"result":`)
+	if method == "workspace/configuration" {
+		settings: json.Value
+		if len(c.settings) > 0 {
+			settings, _ = json.parse_string(c.settings, allocator = context.temp_allocator)
+		}
+		strings.write_byte(&sb, '[')
+		items, _ := json_object_get(params, "items")
+		if arr, ok := items.(json.Array); ok {
+			for item, i in arr {
+				if i > 0 do strings.write_byte(&sb, ',')
+				section, _ := json_object_get(item, "section")
+				name, _ := json_as_string(section)
+				value := lookup_section(settings, name)
+				if value == nil {
+					strings.write_string(&sb, "null")
+				} else {
+					text, _ := json.marshal(value, allocator = context.temp_allocator)
+					strings.write_string(&sb, string(text))
+				}
+			}
+		}
+		strings.write_byte(&sb, ']')
+	} else {
+		strings.write_string(&sb, "null")
+	}
+	strings.write_byte(&sb, '}')
+	client_send_raw(c, frame_message(strings.to_string(sb), context.temp_allocator))
+}
+
+// lookup_section resolves a dotted section ("Lua.runtime") in a settings object.
+@(private)
+lookup_section :: proc(settings: json.Value, section: string) -> json.Value {
+	if settings == nil do return nil
+	if section == "" do return settings
+	cur := settings
+	for part in strings.split(section, ".", context.temp_allocator) {
+		next, ok := json_object_get(cur, part)
+		if !ok do return nil
+		cur = next
+	}
+	return cur
 }

@@ -151,6 +151,31 @@ test_feed_bytes_dispatches_signature_help_response :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_signature_help_offset_parameter_labels :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+
+		id := client_next_id(&c)
+		c.pending_kind[id] = .SignatureHelp
+		c.latest_signature_id = id
+
+		// lua-language-server style: labels are [start, end) offsets.
+		body := fmt.tprintf(
+			`{{"jsonrpc":"2.0","id":%d,"result":{{"signatures":[{{"label":"function f(a, bb)","parameters":[{{"label":[11,12]}},{{"label":[14,16]}}]}}]}}}}`,
+			id,
+		)
+		framed := frame_message(body, context.temp_allocator)
+		client_feed_bytes(&c, transmute([]u8)framed)
+
+		testing.expect_value(t, len(c.last_signatures), 1)
+		testing.expect_value(t, len(c.last_signatures[0].parameters), 2)
+		testing.expect_value(t, c.last_signatures[0].parameters[0].label, "a")
+		testing.expect_value(t, c.last_signatures[0].parameters[1].label, "bb")
+	})
+}
+
+@(test)
 test_feed_bytes_handles_split_across_two_calls :: proc(t: ^testing.T) {
 	run_leak_free(t, proc(t: ^testing.T) {
 		c := client_init()
@@ -565,5 +590,60 @@ test_definition_and_reference_results :: proc(t: ^testing.T) {
 		testing.expect_value(t, len(c.last_locations), 2)
 		testing.expect_value(t, c.locations_kind, RequestKind.References)
 		testing.expect_value(t, c.location_seq, 2)
+	})
+}
+
+@(test)
+test_rename_and_formatting_edits :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+
+		id := client_request_rename(&c, "file:///tmp/a.lua", 0, 6, "renamed")
+		body := fmt.tprintf(
+			`{{"jsonrpc":"2.0","id":%d,"result":{{"changes":{{"file:///tmp/a.lua":[{{"range":{{"start":{{"line":0,"character":6}},"end":{{"line":0,"character":9}}}},"newText":"renamed"}},{{"range":{{"start":{{"line":2,"character":0}},"end":{{"line":2,"character":3}}}},"newText":"renamed"}}]}}}}}}`,
+			id,
+		)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect_value(t, c.edit_seq, 1)
+		testing.expect_value(t, c.edits_kind, RequestKind.Rename)
+		testing.expect_value(t, len(c.last_edits), 2)
+		testing.expect_value(t, c.last_edits[1].new_text, "renamed")
+		testing.expect_value(t, c.last_edits[1].range.start.line, 2)
+
+		id = client_request_formatting(&c, "file:///tmp/a.lua", 4, true)
+		body = fmt.tprintf(
+			`{{"jsonrpc":"2.0","id":%d,"result":[{{"range":{{"start":{{"line":0,"character":0}},"end":{{"line":0,"character":2}}}},"newText":"    "}}]}}`,
+			id,
+		)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect_value(t, c.edit_seq, 2)
+		testing.expect_value(t, c.edits_kind, RequestKind.Formatting)
+		testing.expect_value(t, len(c.last_edits), 1)
+		testing.expect_value(t, c.last_edits[0].key, "")
+	})
+}
+
+@(test)
+test_completion_resolve_fills_documentation :: proc(t: ^testing.T) {
+	run_leak_free(t, proc(t: ^testing.T) {
+		c := client_init()
+		defer client_destroy(&c)
+		id := client_next_id(&c)
+		c.pending_kind[id] = .Completion
+		c.latest_completion_id = id
+		body := fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":[{{"label":"get_axis","kind":3,"data":{{"uri":"x","id":7}}}}]}}`, id)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect_value(t, len(c.last_completion), 1)
+		testing.expect(t, strings.contains(c.last_completion[0].raw, `"data"`), "raw item kept for resolve")
+
+		rid := client_request_resolve(&c, 0)
+		testing.expect(t, rid > 0, "resolve sent")
+		body = fmt.tprintf(`{{"jsonrpc":"2.0","id":%d,"result":{{"label":"get_axis","detail":"function InputModule.get_axis(neg, pos)","documentation":{{"kind":"markdown","value":"Axis value in [-1, 1]."}}}}}}`, rid)
+		client_feed_bytes(&c, transmute([]u8)frame_message(body, context.temp_allocator))
+		testing.expect_value(t, c.resolve_seq, 1)
+		testing.expect_value(t, c.last_completion[0].documentation, "Axis value in [-1, 1].")
+		testing.expect(t, c.last_completion[0].doc_markdown && c.last_completion[0].resolved, "markdown, resolved")
+		testing.expect_value(t, c.last_completion[0].detail, "function InputModule.get_axis(neg, pos)")
 	})
 }

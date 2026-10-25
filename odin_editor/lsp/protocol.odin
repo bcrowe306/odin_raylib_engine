@@ -49,6 +49,12 @@ InitializeParams :: struct {
 // what servers send (e.g. diagnostic tags, code-action literals).
 ClientCapabilities :: struct {
 	textDocument: TextDocumentClientCapabilities `json:"textDocument"`,
+	// configuration: the client answers workspace/configuration (set when
+	// the host supplied Client.settings; lua-language-server only asks
+	// for its settings when this is advertised).
+	workspace:    struct {
+		configuration: bool `json:"configuration"`,
+	} `json:"workspace"`,
 }
 
 TextDocumentClientCapabilities :: struct {
@@ -153,6 +159,9 @@ CompletionItem :: struct {
 	// command.command to run after accepting (e.g. OLS asks for
 	// "editor.action.triggerParameterHints" after inserting `name($0)`).
 	command:         string `json:"-"`,
+	// The item as the server sent it (JSON), for completionItem/resolve.
+	raw:             string `json:"-"`,
+	resolved:        bool   `json:"-"`,
 }
 
 // CompletionItemKind values from the LSP spec (the subset worth labeling).
