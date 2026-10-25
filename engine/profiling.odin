@@ -5,7 +5,6 @@ import "core:fmt"
 import "core:log"
 import "core:slice"
 import "core:mem"
-import "core:prof/spall"
 import "core:strconv"
 import "core:sync"
 
@@ -15,7 +14,9 @@ import "core:sync"
 //
 // - Zones: `Prof_Scope("name")` at the top of a block times it to the end of
 //   the block; the trace (spall format) opens in https://gravitymoth.com/spall/.
-//   Main thread only (other threads have no buffer and are skipped).
+//   Main thread only (other threads have no buffer and are skipped). The
+//   trace writer is desktop only (profiling_trace.odin; on the web the zones
+//   record nothing: profiling_trace_js.odin).
 // - Allocations: the heap allocator is wrapped to count allocations, frees
 //   and bytes per frame, and the temp arena's use is read before it's freed.
 //   The editor's Profiler tab and the [bench] lines show them.
@@ -44,8 +45,6 @@ Prof_Site :: struct {
 }
 
 Prof_State :: struct {
-	ctx:        spall.Context,
-	backing:    []u8,
 	path:       string,
 	skip:       int,  // frames before recording
 	frames:     int,  // frames to record (0 = until shutdown)
@@ -63,9 +62,6 @@ Prof_State :: struct {
 }
 
 prof: Prof_State
-
-@(thread_local)
-prof_buffer: spall.Buffer
 
 // Prof_ParseArgs reads --prof / --prof-skip / --prof-frames.
 Prof_ParseArgs :: proc(args: []string) {
@@ -94,11 +90,7 @@ Prof_Init :: proc(heap: mem.Allocator) -> mem.Allocator {
 		prof.mainThread = sync.current_thread_id()
 		if prof.allocSites do prof.sites = make(map[Prof_Site]int, 256, heap)
 		if prof.path != "" {
-			ctx, ok := spall.context_create(prof.path)
-			if ok {
-				prof.ctx = ctx
-				prof.backing = make([]u8, spall.BUFFER_DEFAULT_SIZE, heap)
-				prof_buffer = spall.buffer_create(prof.backing, u32(sync.current_thread_id()))
+			if prof_trace_open(prof.path, heap) {
 				prof.opened = true
 				log.infof("[prof] tracing frames %d..%d to %s", prof.skip, prof.skip + prof.frames if prof.frames > 0 else -1, prof.path)
 			} else {
@@ -126,9 +118,7 @@ Prof_Shutdown :: proc() {
 			delete(prof.sites)
 		}
 		if !prof.opened do return
-		spall.buffer_destroy(&prof.ctx, &prof_buffer)
-		spall.context_destroy(&prof.ctx)
-		delete(prof.backing, prof.backingAllocator)
+		prof_trace_close(prof.backingAllocator)
 		prof.opened = false
 		prof.recording = false
 		log.infof("[prof] wrote %s (%d heap allocations counted over %d frames)", prof.path, prof.totalAllocs, prof.frame)
@@ -153,7 +143,7 @@ Prof_FrameEnd :: proc() {
 			start := prof.skip
 			stop := prof.skip + prof.frames
 			prof.recording = prof.frame >= start && (prof.frames == 0 || prof.frame < stop)
-			if prof.frames > 0 && prof.frame == stop do spall.buffer_flush(&prof.ctx, &prof_buffer)
+			if prof.frames > 0 && prof.frame == stop do prof_trace_flush()
 		}
 	}
 }
@@ -168,7 +158,7 @@ Prof_Last :: proc() -> Prof_Frame_Stats {
 @(disabled = !ORE_PROF, deferred_none = prof_scope_end)
 Prof_Scope :: proc(name: string, loc := #caller_location) {
 	when ORE_PROF {
-		if prof.recording && len(prof_buffer.data) > 0 do spall._buffer_begin(&prof.ctx, &prof_buffer, name, "", loc)
+		if prof.recording do prof_trace_begin(name, loc)
 	}
 }
 
@@ -176,7 +166,7 @@ Prof_Scope :: proc(name: string, loc := #caller_location) {
 @(disabled = !ORE_PROF)
 Prof_Begin :: proc(name: string, loc := #caller_location) {
 	when ORE_PROF {
-		if prof.recording && len(prof_buffer.data) > 0 do spall._buffer_begin(&prof.ctx, &prof_buffer, name, "", loc)
+		if prof.recording do prof_trace_begin(name, loc)
 	}
 }
 
@@ -188,7 +178,7 @@ Prof_End :: proc() {
 @(private = "file", disabled = !ORE_PROF)
 prof_scope_end :: proc() {
 	when ORE_PROF {
-		if prof.recording && len(prof_buffer.data) > 0 do spall._buffer_end(&prof.ctx, &prof_buffer)
+		if prof.recording do prof_trace_end()
 	}
 }
 
