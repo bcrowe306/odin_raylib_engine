@@ -112,6 +112,20 @@ liveNodes: map[uuid.Identifier]^Node
 @(private = "file")
 livePtrs: map[^Node]bool
 
+// The live-node table: every registered node has a slot; a Lua reference
+// keeps (slot, generation) to find its node with an array read instead of
+// hashing the id (Node_FromSlot). A slot's generation changes when its node
+// goes, so stale references miss. Kept for the process (generations must
+// not restart).
+Node_Live_Slot :: struct {
+	node: ^Node,
+	gen:  u32,
+}
+@(private = "file")
+liveSlots: [dynamic]Node_Live_Slot
+@(private = "file")
+freeSlots: [dynamic]u32
+
 Node_Register :: proc(node: ^Node) {
 	if liveNodes == nil {
 		// Process-lifetime registry: not owned by whatever allocator the
@@ -121,6 +135,21 @@ Node_Register :: proc(node: ^Node) {
 	}
 	liveNodes[node.id] = node
 	livePtrs[node] = true
+	if node.liveSlot == 0 {
+		if liveSlots == nil {
+			liveSlots = make([dynamic]Node_Live_Slot, Engine_HeapAllocator())
+			freeSlots = make([dynamic]u32, Engine_HeapAllocator())
+		}
+		i: u32
+		if len(freeSlots) > 0 {
+			i = pop(&freeSlots)
+		} else {
+			i = u32(len(liveSlots))
+			append(&liveSlots, Node_Live_Slot{})
+		}
+		liveSlots[i].node = node
+		node.liveSlot = i + 1
+	}
 }
 
 Node_Unregister :: proc(node: ^Node) {
@@ -129,6 +158,15 @@ Node_Unregister :: proc(node: ^Node) {
 		delete_key(&liveNodes, node.id)
 	}
 	delete_key(&livePtrs, node)
+	if node.liveSlot > 0 {
+		i := node.liveSlot - 1
+		if int(i) < len(liveSlots) && liveSlots[i].node == node {
+			liveSlots[i].node = nil
+			liveSlots[i].gen += 1
+			append(&freeSlots, i)
+		}
+		node.liveSlot = 0
+	}
 	if len(liveNodes) == 0 && len(livePtrs) == 0 {
 		delete(liveNodes)
 		delete(livePtrs)
@@ -141,6 +179,19 @@ Node_Unregister :: proc(node: ^Node) {
 Node_FromId :: proc(id: uuid.Identifier) -> ^Node {
 	if liveNodes == nil do return nil
 	return liveNodes[id]
+}
+
+// Node_SlotOf: a live node's (slot, generation) for Node_FromSlot.
+Node_SlotOf :: proc "contextless" (node: ^Node) -> (slot, gen: u32) {
+	if node == nil || node.liveSlot == 0 || int(node.liveSlot - 1) >= len(liveSlots) do return 0, 0
+	return node.liveSlot, liveSlots[node.liveSlot - 1].gen
+}
+
+// Node_FromSlot: the live node in `slot` if its generation is still `gen`.
+Node_FromSlot :: #force_inline proc "contextless" (slot, gen: u32) -> ^Node {
+	if slot == 0 || int(slot - 1) >= len(liveSlots) do return nil
+	s := liveSlots[slot - 1]
+	return s.node if s.gen == gen else nil
 }
 
 // Node_IsAlive reports whether a pointer still refers to a live node.

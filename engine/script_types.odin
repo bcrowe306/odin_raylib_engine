@@ -74,6 +74,7 @@ ScriptModule :: struct {
 
 // Forward declaration of ScriptManager
 ScriptManager :: struct {
+	nodeMetaRef: c.int, // registry index of the "Engine.Node" metatable (push_node_meta)
 	L:         ^lua.State,
 	game:      ^Game,
 	isReady:   bool,

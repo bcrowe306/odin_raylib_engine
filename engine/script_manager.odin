@@ -25,6 +25,7 @@ ScriptManager_Init :: proc(sm: ^ScriptManager = nil, game: ^Game = nil) -> bool 
 		return false
 	}
 	Script_SetManager(mgr.L, mgr) // (before anything runs: Script_Context reads it)
+	mgr.nodeMetaRef = 0          // (a new state: its metatable gets a new registry index)
 
 	lua.L_openlibs(mgr.L)
 

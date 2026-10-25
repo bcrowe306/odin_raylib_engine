@@ -77,6 +77,7 @@ Node :: struct {
 	removing: bool, // queued for removal (RemoveNode)
 	pool: ^Node_Pool, // the pool it came from (node_pool.odin): removing returns it there
 	poolSpawn: bool,  // taken from its pool: on_spawn before its next update
+	liveSlot: u32,    // its slot in the live-node table (+1; 0 = not registered; events.odin)
 	managerIndex: int, // slot in the manager's node list (+1; 0 = not in it)
 	ready: proc(node: ^Node, gameContext: ^GameContext),
 	update: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),

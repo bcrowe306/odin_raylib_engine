@@ -21,6 +21,25 @@ import b2 "vendor:box2d"
 NodeUserData :: struct {
 	node:   ^Node,
 	nodeId: uuid.Identifier,
+	// The fast way back to the node (Node_FromSlot); the id is the truth
+	// (a node rebuilt with the same id, e.g. a reloaded scene, is found again).
+	slot, gen: u32,
+}
+
+// push_node_meta pushes the "Engine.Node" metatable (by a registry index
+// kept in the script manager: no lookup by name).
+push_node_meta :: proc(L: ^lua.State) {
+	mgr := Script_Manager(L)
+	if mgr == nil {
+		lua.L_getmetatable(L, "Engine.Node")
+		return
+	}
+	if mgr.nodeMetaRef == 0 {
+		lua.L_getmetatable(L, "Engine.Node")
+		if lua.isnil(L, -1) do return // (not registered yet)
+		mgr.nodeMetaRef = lua.L_ref(L, lua.REGISTRYINDEX)
+	}
+	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(mgr.nodeMetaRef))
 }
 
 push_node_userdata :: proc(L: ^lua.State, node: ^Node) {
@@ -31,8 +50,9 @@ push_node_userdata :: proc(L: ^lua.State, node: ^Node) {
 	ud := cast(^NodeUserData)lua.newuserdatauv(L, size_of(NodeUserData), 0)
 	ud.node = node
 	ud.nodeId = node.id
+	ud.slot, ud.gen = Node_SlotOf(node)
 
-	lua.L_getmetatable(L, "Engine.Node")
+	push_node_meta(L)
 	lua.setmetatable(L, -2)
 }
 
@@ -40,10 +60,17 @@ push_node_userdata :: proc(L: ^lua.State, node: ^Node) {
 // registry by id, so references to destroyed nodes yield (nil, false)
 // instead of reading freed memory.
 to_node_userdata :: proc(L: ^lua.State, idx: c.int) -> (^Node, bool) {
-	ud := cast(^NodeUserData)lua.L_testudata(L, idx, "Engine.Node")
-	if ud == nil do return nil, false
+	// (luaL_testudata, with the metatable by registry index.)
+	ud := cast(^NodeUserData)lua.touserdata(L, idx)
+	if ud == nil || lua.getmetatable(L, idx) == 0 do return nil, false
+	push_node_meta(L)
+	isNode := lua.rawequal(L, -1, -2)
+	lua.pop(L, 2)
+	if !isNode do return nil, false
+	if n := Node_FromSlot(ud.slot, ud.gen); n != nil && n.id == ud.nodeId do return n, true
 	node := Node_FromId(ud.nodeId)
 	if node == nil do return nil, false
+	ud.slot, ud.gen = Node_SlotOf(node) // (found again by id)
 	return node, true
 }
 
@@ -2872,7 +2899,7 @@ lua_sm_stop :: proc "c" (L: ^lua.State) -> c.int {
 @(private="file")
 lua_node_index :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	lua.L_getmetatable(L, "Engine.Node")
+	push_node_meta(L)
 	lua.pushvalue(L, 2)
 	lua.rawget(L, -2)
 	if !lua.isnil(L, -1) do return 1 // a method
