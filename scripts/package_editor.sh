@@ -67,7 +67,7 @@ else
 	rm -rf "$root"
 	bin="$root"; libs="$root"; res="$root"
 	mkdir -p "$root"
-	odin build editor -o:speed '-extra-linker-flags:-Wl,-rpath,$ORIGIN' -define:ORE_RELEASE="$version" -out:"$bin/$exe"
+	odin build editor -o:speed -define:ORE_RELEASE="$version" -out:"$bin/$exe" # (no bundled libraries: Lua and cmark are static)
 fi
 
 # The editor's shared libraries that aren't the system's (none since Lua and

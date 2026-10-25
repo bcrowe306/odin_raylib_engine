@@ -73,7 +73,6 @@ jobs:
 
       - name: Package and smoke-test the editor
         if: matrix.smoke
-        continue-on-error: true # (until the hosted runners' GL contexts are known to be reliable)
         run: |
           scripts/ci/fetch_luals.sh
           scripts/package_editor.sh --out dist --version "0.0.0-ci.${{ github.run_number }}"
