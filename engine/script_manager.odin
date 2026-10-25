@@ -24,6 +24,7 @@ ScriptManager_Init :: proc(sm: ^ScriptManager = nil, game: ^Game = nil) -> bool 
 		log.error("[ScriptManager] Failed to create Lua 5.4 state")
 		return false
 	}
+	Script_SetManager(mgr.L, mgr) // (before anything runs: Script_Context reads it)
 
 	lua.L_openlibs(mgr.L)
 
@@ -701,13 +702,26 @@ Script_ParseProperties :: proc(L: ^lua.State, moduleIdx: c.int) -> [dynamic]Scri
 	return props
 }
 
+// Script_SetManager ties a Lua state to its script manager: in the state's
+// extra space (read on every engine call: one load, where a registry lookup
+// by name cost ~0.08 us; coroutines copy it from the main thread when
+// created) and in the registry. Call right after creating the state (Lua
+// doesn't clear the extra space).
+Script_SetManager :: proc(L: ^lua.State, mgr: ^ScriptManager) {
+	(cast(^rawptr)lua.getextraspace(L))^ = mgr
+	lua.pushlightuserdata(L, mgr)
+	lua.setfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
+}
+
+// Script_Manager: the state's script manager (Script_SetManager).
+Script_Manager :: #force_inline proc "contextless" (L: ^lua.State) -> ^ScriptManager {
+	return (cast(^^ScriptManager)lua.getextraspace(L))^
+}
+
 // Script_Context: the context a Lua C callback runs with - its script
 // manager's (Script_Init's: the engine's allocators and logger), else the
 // default one. `context = Script_Context(L)` at the top of every binding.
 Script_Context :: proc "contextless" (L: ^lua.State) -> runtime.Context {
-	lua.getfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
-	mgr := cast(^ScriptManager)lua.touserdata(L, -1)
-	lua.pop(L, 1)
-	if mgr != nil && mgr.hasCtx do return mgr.ctx
+	if mgr := Script_Manager(L); mgr != nil && mgr.hasCtx do return mgr.ctx
 	return Engine_DefaultContext()
 }

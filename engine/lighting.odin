@@ -194,6 +194,7 @@ Lighting_Prepare :: proc(scene: ^Scene, cam: rl.Camera2D, w, h: i32) -> bool {
 		if c.x + r < view.x || c.x - r > view.x + view.width || c.y + r < view.y || c.y - r > view.y + view.height do continue
 
 		// The light on its own target, shadows cut out, then added to the map.
+		Prof_Begin("lighting.light")
 		rl.BeginTextureMode(lighting.scratch)
 		rl.ClearBackground(rl.BLACK)
 		rl.BeginMode2D(cam)
@@ -210,17 +211,39 @@ Lighting_Prepare :: proc(scene: ^Scene, cam: rl.Camera2D, w, h: i32) -> bool {
 		tex := rl.Texture2D{id = rlgl.GetTextureIdDefault(), width = 1, height = 1, mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8}
 		rl.DrawTexturePro(tex, {0, 0, 1, 1}, {c.x, c.y, r * 2, r * 2}, {r, r}, l.globalRotation, col)
 		rl.EndShaderMode()
+		Prof_End()
 		if l.shadows {
 			if !haveOccluders {
+				Prof_Scope("lighting.occluders")
 				occluders = occluder_polygons(scene)
 				haveOccluders = true
 			}
+			Prof_Begin("lighting.shadows")
+			// Each shadow quad is drawn once, culling off (either winding).
+			// A closed polygon casts from the edges facing the light only:
+			// whatever is behind it is behind the first edge a ray from the
+			// light crosses, which faces the light (half the edges, and the
+			// polygon itself is covered by them).
+			rlgl.DrawRenderBatchActive()
+			rlgl.DisableBackfaceCulling()
 			far := r * 4
 			for poly in occluders {
 				n := len(poly)
+				area: f32 = 0 // twice the signed area: the winding (negative scale flips it)
+				inside := false // the light inside the polygon: every edge casts (all dark outside it)
+				if n > 2 do for i in 0 ..< n {
+					p, q := poly[i], poly[(i + 1) % n]
+					area += p.x * q.y - q.x * p.y
+					if (p.y > c.y) != (q.y > c.y) && c.x < p.x + (c.y - p.y) / (q.y - p.y) * (q.x - p.x) do inside = !inside
+				}
 				for i in 0 ..< n {
 					if n == 2 && i == 1 do break
 					a, b := poly[i], poly[(i + 1) % n]
+					if n > 2 && !inside {
+						// The light on the edge's inner side: it faces away.
+						side := (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+						if side * area > 0 do continue
+					}
 					// Edges out of the light's reach cast nothing.
 					if !segment_near(c, a, b, r) do continue
 					da := a - c
@@ -231,12 +254,14 @@ Lighting_Prepare :: proc(scene: ^Scene, cam: rl.Camera2D, w, h: i32) -> bool {
 					a2 := a + da / la * far
 					b2 := b + db / lb * far
 					rl.DrawTriangle(a, a2, b2, rl.BLACK)
-					rl.DrawTriangle(a, b2, a2, rl.BLACK)
 					rl.DrawTriangle(a, b2, b, rl.BLACK)
-					rl.DrawTriangle(a, b, b2, rl.BLACK)
 				}
 			}
+			rlgl.DrawRenderBatchActive() // (drawn with culling off)
+			rlgl.EnableBackfaceCulling()
+			Prof_End()
 		}
+		Prof_Begin("lighting.accumulate")
 		rl.EndMode2D()
 		rl.EndTextureMode()
 
@@ -246,6 +271,7 @@ Lighting_Prepare :: proc(scene: ^Scene, cam: rl.Camera2D, w, h: i32) -> bool {
 		rl.DrawTextureRec(st, {0, 0, f32(st.width), -f32(st.height)}, {0, 0}, rl.WHITE)
 		rl.EndBlendMode()
 		rl.EndTextureMode()
+		Prof_End()
 	}
 	lighting.ready = true
 	Render_RestoreFrameTarget() // post effects: back to the frame's target

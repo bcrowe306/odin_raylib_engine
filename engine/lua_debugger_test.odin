@@ -52,8 +52,7 @@ test_lua_debugger :: proc(t: ^testing.T) {
 	lua.L_openlibs(L)
 	// The hook's allocations use this test's allocator (Script_Context).
 	mgr := ScriptManager{ctx = context, hasCtx = true}
-	lua.pushlightuserdata(L, &mgr)
-	lua.setfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
+	Script_SetManager(L, &mgr)
 	defer {
 		LuaDebugger_ClearBreakpoints()
 		luaDebugger.L = nil
@@ -111,8 +110,7 @@ test_lua_debugger_conditions_watches :: proc(t: ^testing.T) {
 	lua.L_openlibs(L)
 	// The hook's allocations use this test's allocator (Script_Context).
 	mgr := ScriptManager{ctx = context, hasCtx = true}
-	lua.pushlightuserdata(L, &mgr)
-	lua.setfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
+	Script_SetManager(L, &mgr)
 	defer {
 		LuaDebugger_ClearBreakpoints()
 		luaDebugger.L = nil

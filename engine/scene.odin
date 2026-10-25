@@ -2,7 +2,6 @@ package engine
 
 import vmem "core:mem/virtual"
 import "core:log"
-import "core:slice"
 import "core:strings"
 import b2 "vendor:box2d"
 import rl "vendor:raylib"
@@ -529,7 +528,7 @@ Scene_CollectRenderables :: proc(scene: ^Scene) -> (buckets: [RenderLayer][dynam
 	for &l, layer in collect.items {
 		if collect.anyZ {
 			for it in l do if it.z != 0 {
-				slice.stable_sort_by(l[:], proc(a, b: Render_Item) -> bool {return a.z < b.z})
+				Sort_Stable(l[:], proc(a, b: Render_Item) -> bool {return a.z < b.z})
 				break
 			}
 		}
@@ -575,7 +574,7 @@ render_walk :: proc(c: ^Render_Collect, m: ^NodeManager, node: ^Node, z: i32, ke
 	for child in GetChildrenView(m, node) do render_walk(c, m, child, z, child.globalPosition.y + child.ySortOffset)
 	for &l, layer in c.items {
 		seg := l[start[layer]:]
-		if len(seg) > 1 do slice.stable_sort_by(seg, proc(a, b: Render_Item) -> bool {return a.y < b.y})
+		if len(seg) > 1 do Sort_Stable(seg, proc(a, b: Render_Item) -> bool {return a.y < b.y})
 		for &it in seg do it.y = key
 	}
 }

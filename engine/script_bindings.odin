@@ -48,10 +48,7 @@ to_node_userdata :: proc(L: ^lua.State, idx: c.int) -> (^Node, bool) {
 }
 
 get_script_manager :: proc(L: ^lua.State) -> ^ScriptManager {
-	lua.getfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
-	mgr := cast(^ScriptManager)lua.touserdata(L, -1)
-	lua.pop(L, 1)
-	return mgr
+	return Script_Manager(L)
 }
 
 // ----------------------------------------------------------------------------
@@ -3968,9 +3965,7 @@ lua_project_has_file :: proc "c" (L: ^lua.State) -> c.int {
 // ----------------------------------------------------------------------------
 
 RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
-	// Store ScriptManager in Lua registry for thread-safe access
-	lua.pushlightuserdata(L, sm)
-	lua.setfield(L, lua.REGISTRYINDEX, "__Engine_ScriptManager")
+	Script_SetManager(L, sm) // (also set by ScriptManager_Init, before any of this runs)
 
 	// 1. "Engine.Node" Metatable
 	if lua.L_newmetatable(L, "Engine.Node") != 0 {
