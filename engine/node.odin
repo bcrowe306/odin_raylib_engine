@@ -10,14 +10,80 @@ import "core:crypto"
 import "core:encoding/uuid"
 import vmem "core:mem/virtual"
 
+// Field order: what the per-frame walks (update, transforms, Y-sort,
+// render, Lua calls) read comes first, packed (the bools and small enums
+// together), so a walk touches the node's first cache lines; the rest
+// (identity, memory, prefab and editor data) after. The Inspector lists the
+// gui:"true" fields in this order.
 Node :: struct {
-	id: uuid.Identifier,
-	typeId: typeid, // Concrete runtime type of the node (e.g. Node, TextureNode, DynamicBodyNode)
-	arena: vmem.Arena,
-	allocator: mem.Allocator,
-	resource: rawptr, // Pointer to the resource associated with this node. Used to give data to the node. Resoruce is stored on node's arena, and dealloc'd when node terminates.
+	// --- Read every frame -------------------------------------------------
+	// The hierarchy (node_manager.odin: AddChild / GetChildrenView / GetParent).
+	parent: ^Node,
+	children: Node_Children,
+	update: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
+	render: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
 	scriptInstance: rawptr, // Pointer to ScriptInstance attached to this node
+	gameContext: ^GameContext, // Node does not own this
+	position: [2]f32 `gui:"true" min:"0" max:"1280"`,
+	scale: [2]f32 `gui:"true" min:"0.01" max:"10"`,
+	rotation: f32 `gui:"true" min:"0" max:"360"`,
+	globalRotation: f32,
+	globalPosition: [2]f32,
+	globalScale: [2]f32,
+	// The origin (node_origin.odin): where in what the node draws its
+	// position is - and what it rotates and scales around - as a fraction
+	// of the drawn size ({0.5, 0.5} = the centre, {0, 0} the top-left).
+	pivot: [2]f32,
+	// Draw order within a layer (scene.odin): zIndex adds to the parent's
+	// (higher draws later); a ySort node draws its children ordered by
+	// their Y (+ their ySortOffset, the "feet" line), each child with its
+	// subtree - top-down and isometric depth.
+	zIndex: i32,
+	ySortOffset: f32,
+	liveSlot: u32,    // its slot in the live-node table (+1; 0 = not registered; events.odin)
+	layer: RenderLayer,
+	renderable: bool `gui:"true"`,
+	enabled: bool `gui:"true"`,
+	ySort: bool,
+	isReady: bool,
+	isUI: bool,
+	inTree: bool, // queued for (or in) a scene's node list (SceneAddNode)
+	// Pausing (scene_flow.odin): `paused` pauses this subtree; pauseMode
+	// decides whether the node stops when its parent / the game pauses.
+	pauseMode: Pause_Mode,
+	paused: bool,
+	pausedNow: bool,  // paused this frame (set by the update pass)
+	bodyPaused: bool, // its physics body was disabled by a pause
+	removing: bool, // queued for removal (RemoveNode)
+	poolSpawn: bool,  // taken from its pool: on_spawn before its next update
+	// Runtime-only node (built by another node, e.g. LDtk colliders and
+	// spawned entities): never saved with the scene.
+	transient: bool,
+	// Editor-only (saved with the scene, ignored by the game): a locked node
+	// and its children can't be picked or moved in the viewport; a hidden
+	// one isn't drawn there (Render_HideEditorHidden).
+	editorLocked: bool,
+	editorHidden: bool,
+	// Shader / blend mode / shader parameters applied around render (nil =
+	// plain drawing; material.odin).
+	material: ^Material,
+	typeId: typeid, // Concrete runtime type of the node (e.g. Node, TextureNode, DynamicBodyNode)
+	id: uuid.Identifier,
+	// The tree events every node raises (Node_Event), with their listeners -
+	// allocated when something subscribes (most nodes never have one):
+	// Node_Subject / Node_NotifyEvent.
+	events: ^Node_Events,
+	drawBounds: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
+
+	// --- The rest ----------------------------------------------------------
+	ready: proc(node: ^Node, gameContext: ^GameContext),
+	onDestroy: proc(node: ^Node, gameContext: ^GameContext),
+	managerIndex: int, // slot in the manager's node list (+1; 0 = not in it)
+	pool: ^Node_Pool, // the pool it came from (node_pool.odin): removing returns it there
 	name: string, // Name of the node
+	resource: rawptr, // Pointer to the resource associated with this node. Used to give data to the node. Resoruce is stored on node's arena, and dealloc'd when node terminates.
+	allocator: mem.Allocator,
+	arena: vmem.Arena,
 	// Linked prefab instance: project-relative component file this node was
 	// instantiated from ("" = not an instance). Its subtree comes from that
 	// file; the scene stores only the instance's name and transform.
@@ -28,62 +94,7 @@ Node :: struct {
 	// Saved signal connections from this node's events to script methods
 	// (signals.odin).
 	signalConnections: [dynamic]Signal_Connection,
-	// Runtime-only node (built by another node, e.g. LDtk colliders and
-	// spawned entities): never saved with the scene.
-	transient: bool,
-	// Shader / blend mode / shader parameters applied around render (nil =
-	// plain drawing; material.odin).
-	material: ^Material,
-	position: [2]f32 `gui:"true" min:"0" max:"1280"`,
-	scale: [2]f32 `gui:"true" min:"0.01" max:"10"`,
-	rotation: f32 `gui:"true" min:"0" max:"360"`,
-	// The origin (node_origin.odin): where in what the node draws its
-	// position is - and what it rotates and scales around - as a fraction
-	// of the drawn size ({0.5, 0.5} = the centre, {0, 0} the top-left).
-	pivot: [2]f32,
-	globalPosition: [2]f32,
-	globalScale: [2]f32,
-	globalRotation: f32,
-	layer: RenderLayer,
-	// Draw order within a layer (scene.odin): zIndex adds to the parent's
-	// (higher draws later); a ySort node draws its children ordered by
-	// their Y (+ their ySortOffset, the "feet" line), each child with its
-	// subtree - top-down and isometric depth.
-	zIndex: i32,
-	ySort: bool,
-	ySortOffset: f32,
-	gameContext: ^GameContext, // Node does not own this
-	// The tree events every node raises (Node_Event), with their listeners -
-	// allocated when something subscribes (most nodes never have one):
-	// Node_Subject / Node_NotifyEvent.
-	events: ^Node_Events,
-	renderable: bool `gui:"true"`,
-	enabled: bool `gui:"true"`,
-	isReady: bool,
-	isUI: bool,
-	inTree: bool, // queued for (or in) a scene's node list (SceneAddNode)
-	// Pausing (scene_flow.odin): `paused` pauses this subtree; pauseMode
-	// decides whether the node stops when its parent / the game pauses.
-	pauseMode: Pause_Mode,
-	paused: bool,
-	// Editor-only (saved with the scene, ignored by the game): a locked node
-	// and its children can't be picked or moved in the viewport; a hidden
-	// one isn't drawn there (Render_HideEditorHidden).
-	editorLocked: bool,
-	editorHidden: bool,
 	tags: [dynamic]string, // groups ("enemy"); node_tags.odin
-	pausedNow: bool,  // paused this frame (set by the update pass)
-	bodyPaused: bool, // its physics body was disabled by a pause
-	removing: bool, // queued for removal (RemoveNode)
-	pool: ^Node_Pool, // the pool it came from (node_pool.odin): removing returns it there
-	poolSpawn: bool,  // taken from its pool: on_spawn before its next update
-	liveSlot: u32,    // its slot in the live-node table (+1; 0 = not registered; events.odin)
-	managerIndex: int, // slot in the manager's node list (+1; 0 = not in it)
-	ready: proc(node: ^Node, gameContext: ^GameContext),
-	update: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
-	render: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
-	onDestroy: proc(node: ^Node, gameContext: ^GameContext),
-	drawBounds: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32),
 }
 
 CreateNode :: proc(manager: ^NodeManager, $T: typeid) -> (node: ^T) {

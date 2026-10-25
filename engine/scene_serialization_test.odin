@@ -49,8 +49,8 @@ test_node_factory_creates_every_registered_type :: proc(t: ^testing.T) {
 	child := Node_CreateByTypeName(scene, "TimerNode", parent) // TimerNode_Create adds to the root itself
 	testing.expect(t, GetParent(scene.manager, child) == parent, "re-parented under the requested parent")
 	rels := 0
-	for _, list in scene.manager.childrenOf {
-		for c in list do if c == child do rels += 1
+	for list in ([][dynamic]^Node{scene.manager.nodes, scene.manager.addition}) {
+		for n in list do if n != nil do for c in GetChildrenView(scene.manager, n) do if c == child do rels += 1
 	}
 	testing.expect_value(t, rels, 1)
 	_, aliasOk := Node_TypeInfoByName("dynamic_body")

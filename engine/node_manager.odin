@@ -3,18 +3,19 @@ package engine
 import "core:log"
 import "core:math"
 import "core:container/queue"
+import "core:mem"
 import vmem "core:mem/virtual"
 import "core:strings"
 
-// The hierarchy is indexed both ways (parent -> ordered children, child ->
-// parent) so lookups are O(1) instead of scanning a flat relationship list
-// (which made every frame O(n²) in the node count).
+// The hierarchy is kept on the nodes (node.parent, node.children: ordered),
+// so every walk reads a node's children from the node itself - no lookup.
+// (It was a pair of maps: a hash lookup per node per walk, several walks a
+// frame.) The child lists are allocated by the manager's listAllocator.
 NodeManager :: struct {
 	nodes: [dynamic]^Node,
 	addition: [dynamic]^Node,
 	removal: [dynamic]^Node,
-	childrenOf: map[^Node][dynamic]^Node,
-	parentOf: map[^Node]^Node,
+	listAllocator: mem.Allocator, // the nodes' child lists (context.allocator at NodeManager_Init)
 	free: queue.Queue(int),
 	arena: vmem.Arena,
 	// VisibilityNotifierNodes in the manager (added / removed with them),
@@ -49,8 +50,7 @@ NodeManager_Init :: proc(manager: ^NodeManager) {
 	manager.nodes = nil
 	manager.addition = nil
 	manager.removal = nil
-	manager.childrenOf = make(map[^Node][dynamic]^Node)
-	manager.parentOf = make(map[^Node]^Node)
+	manager.listAllocator = context.allocator
 	manager.notifiers = nil
 	err := vmem.arena_init_growing(&manager.arena)
 	if err != nil {
@@ -65,6 +65,7 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	// Terminate any nodes still active or queued
 	for node in manager.nodes {
 		if node != nil {
+			children_free(manager, node)
 			Node_Terminate(node)
 		}
 	}
@@ -78,6 +79,7 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 				}
 			}
 			if !alreadyInNodes {
+				children_free(manager, addNode)
 				Node_Terminate(addNode)
 			}
 		}
@@ -90,9 +92,6 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	delete(manager.navRegions)
 	delete(manager.navAgents)
 	delete(manager.advCameras)
-	for _, list in manager.childrenOf do delete(list)
-	delete(manager.childrenOf)
-	delete(manager.parentOf)
 	queue.destroy(&manager.free)
 	vmem.arena_destroy(&manager.arena)
 
@@ -103,16 +102,14 @@ NodeManager_Terminate :: proc(manager: ^NodeManager) {
 	manager.navRegions = nil
 	manager.navAgents = nil
 	manager.advCameras = nil
-	manager.childrenOf = nil
-	manager.parentOf = nil
 }
 
 // GetChildrenView returns a node's children in order without allocating.
 // The slice is invalidated by AddChild/RemoveChild on the same parent; copy
 // it (GetChildren / GetChildrenTemp) when the loop may change the hierarchy.
-GetChildrenView :: proc(manager: ^NodeManager, parent: ^Node) -> []^Node {
-	if list, ok := manager.childrenOf[parent]; ok do return list[:]
-	return nil
+GetChildrenView :: #force_inline proc(manager: ^NodeManager, parent: ^Node) -> []^Node {
+	if parent == nil do return nil
+	return parent.children.data[:parent.children.len]
 }
 
 // GetChildrenTemp copies a node's children into the temp allocator.
@@ -153,8 +150,8 @@ GetChildByName :: proc(manager: ^NodeManager, parent: ^Node, name: string) -> (n
 	return nil, false
 }
 
-GetParent :: proc(manager: ^NodeManager, node: ^Node) -> ^Node {
-	return manager.parentOf[node]
+GetParent :: #force_inline proc(manager: ^NodeManager, node: ^Node) -> ^Node {
+	return node.parent if node != nil else nil
 }
 
 GetRootNode :: proc(scene: ^Scene) -> ^Node {
@@ -162,8 +159,7 @@ GetRootNode :: proc(scene: ^Scene) -> ^Node {
 }
 
 HasParent :: proc(manager: ^NodeManager, node: ^Node) -> bool {
-	_, ok := manager.parentOf[node]
-	return ok
+	return node != nil && node.parent != nil
 }
 
 
@@ -190,23 +186,21 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 	// pass each (removing them one by one is quadratic for big scenes).
 	filtered := make(map[^Node]bool, context.temp_allocator)
 	for n in manager.removal {
-		if parent, ok := manager.parentOf[n]; ok && !parent.removing && parent not_in filtered {
+		if parent := n.parent; parent != nil && !parent.removing && parent not_in filtered {
 			filtered[parent] = true
-			if list, has := manager.childrenOf[parent]; has {
-				keep := 0
-				for c in list do if !c.removing {list[keep] = c; keep += 1}
-				resize(&list, keep)
-				manager.childrenOf[parent] = list
-			}
+			list := GetChildrenView(manager, parent)
+			keep := 0
+			for c in list do if !c.removing {list[keep] = c; keep += 1}
+			parent.children.len = i32(keep)
 		}
 	}
 	for removingNode in manager.removal {
 		// Remove relationships (to its parent and to its children).
-		if parent, ok := manager.parentOf[removingNode]; ok {
+		if parent := removingNode.parent; parent != nil {
 			Node_NotifyEvent(parent, .Child_Removed, removingNode, gameContext)
 			Node_NotifyEvent(removingNode, .Parent_Removed, parent, gameContext)
 			if parent in filtered {
-				if p, has := manager.parentOf[removingNode]; has && p == parent do delete_key(&manager.parentOf, removingNode)
+				if removingNode.parent == parent do removingNode.parent = nil
 			} else {
 				unlink(manager, parent, removingNode)
 			}
@@ -216,10 +210,7 @@ ProcessNodeQueues :: proc(manager: ^NodeManager, gameContext: ^GameContext) {
 			Node_NotifyEvent(child, .Parent_Removed, removingNode, gameContext)
 			unlink(manager, removingNode, child)
 		}
-		if list, ok := manager.childrenOf[removingNode]; ok {
-			delete(list)
-			delete_key(&manager.childrenOf, removingNode)
-		}
+		children_free(manager, removingNode)
 
 		// Remove nodes from manager. No modify node array. use free list
 		index := removingNode.managerIndex - 1
@@ -347,7 +338,7 @@ AddChild :: proc(manager: ^NodeManager, parent, child: ^Node) {
 		log.error("Child node cannot be it's own parent")
 		return
 	}
-	if existing, has := manager.parentOf[child]; has {
+	if existing := child.parent; existing != nil {
 		if existing == parent {
 			log.error("Parent already has child")
 			return
@@ -355,10 +346,8 @@ AddChild :: proc(manager: ^NodeManager, parent, child: ^Node) {
 		// A node has one parent: moving it detaches it from the old one.
 		unlink(manager, existing, child)
 	}
-	list := manager.childrenOf[parent]
-	append(&list, child)
-	manager.childrenOf[parent] = list
-	manager.parentOf[child] = parent
+	children_insert(manager, parent, int(parent.children.len), child)
+	child.parent = parent
 	ctx := parent.gameContext if parent.gameContext != nil else child.gameContext
 	Node_NotifyEvent(parent, .Child_Added, child, ctx)
 	Node_NotifyEvent(child, .Parent_Added, parent, ctx)
@@ -366,20 +355,13 @@ AddChild :: proc(manager: ^NodeManager, parent, child: ^Node) {
 
 // MoveChild moves a child to position `index` among its siblings.
 MoveChild :: proc(manager: ^NodeManager, parent, child: ^Node, index: int) {
-	list, ok := manager.childrenOf[parent]
-	if !ok do return
-	for c, i in list {
-		if c == child {
-			ordered_remove(&list, i)
-			break
-		}
-	}
-	inject_at(&list, clamp(index, 0, len(list)), child)
-	manager.childrenOf[parent] = list
+	if parent == nil || parent.children.len == 0 do return
+	children_remove(parent, child)
+	children_insert(manager, parent, clamp(index, 0, int(parent.children.len)), child)
 }
 
 RemoveChild :: proc(manager: ^NodeManager, parent, child: ^Node) {
-	if p, ok := manager.parentOf[child]; !ok || p != parent {
+	if child == nil || child.parent == nil || child.parent != parent {
 		log.error("Child Relationship not found. Cannot remove")
 		return
 	}
@@ -389,18 +371,58 @@ RemoveChild :: proc(manager: ^NodeManager, parent, child: ^Node) {
 // unlink removes a parent/child link, keeping the sibling order.
 @(private = "file")
 unlink :: proc(manager: ^NodeManager, parent, child: ^Node) {
-	if list, ok := manager.childrenOf[parent]; ok {
-		for c, i in list {
-			if c == child {
-				ordered_remove(&list, i)
-				break
-			}
+	children_remove(parent, child)
+	if child.parent == parent do child.parent = nil
+}
+
+// Node_Children: a node's ordered children - a pointer and 32-bit counts
+// (16 bytes in every node; the allocator is the manager's).
+Node_Children :: struct {
+	data:     [^]^Node,
+	len, cap: i32,
+}
+
+// children_insert puts `child` at `index` among parent's children.
+@(private = "file")
+children_insert :: proc(manager: ^NodeManager, parent: ^Node, index: int, child: ^Node) {
+	c := &parent.children
+	if c.len == c.cap {
+		newCap := max(4, int(c.cap) * 2)
+		data, err := mem.alloc(newCap * size_of(^Node), align_of(^Node), manager.listAllocator)
+		if err != nil {
+			log.errorf("AddChild: out of memory (%v)", err)
+			return
 		}
-		manager.childrenOf[parent] = list
+		grown := ([^]^Node)(data)
+		copy(grown[:c.len], c.data[:c.len])
+		if c.data != nil do mem.free(c.data, manager.listAllocator)
+		c.data = grown
+		c.cap = i32(newCap)
 	}
-	if p, ok := manager.parentOf[child]; ok && p == parent {
-		delete_key(&manager.parentOf, child)
+	copy(c.data[index + 1:c.len + 1], c.data[index:c.len])
+	c.data[index] = child
+	c.len += 1
+}
+
+// children_remove takes `child` out of parent's children (keeping the order).
+@(private = "file")
+children_remove :: proc(parent: ^Node, child: ^Node) {
+	if parent == nil do return
+	c := &parent.children
+	for i in 0 ..< int(c.len) {
+		if c.data[i] == child {
+			copy(c.data[i:c.len - 1], c.data[i + 1:c.len])
+			c.len -= 1
+			return
+		}
 	}
+}
+
+// children_free releases a node's child list (removed / terminated nodes).
+@(private = "file")
+children_free :: proc(manager: ^NodeManager, node: ^Node) {
+	if node.children.data != nil do mem.free(node.children.data, manager.listAllocator)
+	node.children = {}
 }
 
 PathStartState :: enum {

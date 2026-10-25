@@ -1,7 +1,7 @@
 package engine
 
 
-RenderLayer :: enum {
+RenderLayer :: enum u8 { // (one byte in every node)
 	Layer1,
 	Layer2,
 	Layer3,

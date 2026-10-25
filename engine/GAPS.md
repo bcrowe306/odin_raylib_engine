@@ -334,15 +334,20 @@ Found with the zones and `sample` (macOS); each fix measured on its own.
 | 24 shadow-casting lights (CPU) | 4.1 ms | 2.9 ms | one quad per edge, culling off; only edges facing the light (same pixels) |
 | 1000 Lua `update(dt)` (no window) | 0.49 ms | 0.32 ms | script manager in the Lua state's extra space; node references by slot + generation, not by hashing the UUID; the node metatable by registry index |
 | 1000 Lua-scripted sprites (CPU) | 0.97 ms | 0.70 ms | (Lua) |
+| RunScene frame, 5000 nodes (no window) | 0.254 ms | 0.13 ms | the hierarchy on the nodes (node.parent / node.children) instead of two maps: no hash lookup per node per walk |
+| Global transforms, 5000 nodes | 0.040 ms | 0.023 ms | (the same) |
+| Create / destroy 5000 nodes | 2.60 / 1.29 ms | 1.94 / 0.88 ms | (the same) |
+| 5000 sprites / 1000 bodies (CPU) | 0.97 / 1.82 ms | 0.78 / 1.55 ms | (the same) |
+| `size_of(Node)` | 440 B | 432 B | per-frame fields first and packed (bools together), RenderLayer a u8 - with the 24 bytes of hierarchy added; no measurable time change on its own |
 
 Heap allocations per frame in steady state: the game 0; the editor ~0 (the
 drive harness copied every widget id to the heap each frame: 5000+ with a
 5000-node scene, now per-frame arenas).
 
 Still open: overlapping sprites with interleaved textures (3.3 ms of draw
-for 5000: every sprite a texture switch - needs atlases); the children
-lists are a map lookup per node per walk (`GetChildrenView`), and the update
-walk copies each node's children (`GetChildrenTemp`); a Lua call still
+for 5000: every sprite a texture switch - needs atlases); the update
+walk copies each node's children (`GetChildrenTemp`, safe against
+scripts changing the tree); a Lua call still
 copies the context and checks the metatable; lights still switch render
 targets twice per light.
 
