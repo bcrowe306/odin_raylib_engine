@@ -80,6 +80,11 @@ if [ "$platform" = macos ]; then
 	done
 elif [ "$platform" = windows ]; then
 	cp "$(odin root)/vendor/lua/5.4/windows/lua54.dll" "$libs/" 2>/dev/null || true
+else
+	# Linux: cmark isn't on every distribution (found next to the editor: $ORIGIN).
+	for lib in $(ldd "$bin/$exe" | awk '/libcmark/ {print $3}'); do
+		cp "$lib" "$libs/"
+	done
 fi
 
 echo "== resources"
@@ -90,15 +95,16 @@ done
 cp engine/Open_Sans/static/OpenSans-Regular.ttf "$res/runners/"
 cp engine/Open_Sans/static/OpenSans-Regular.ttf "$res/fonts/"
 # The demo project, without per-user editor state.
-rsync -a --exclude '.ore' --exclude '.editor_settings.ini' --exclude '.luarc.json' --exclude '*.import.json.bak' \
-	assets/demo_project/ "$res/templates/demo_project/"
+cp -R assets/demo_project "$res/templates/demo_project"
+rm -rf "$res/templates/demo_project/.ore" "$res/templates/demo_project/.editor_settings.ini" "$res/templates/demo_project/.luarc.json"
 # lua-language-server: what it runs (its generated meta files go to the user's
 # cache folder: editor/code_editor_lsp.odin).
 luals="lua-language-server"
 if [ -x "$luals/bin/lua-language-server" ] || [ -f "$luals/bin/lua-language-server.exe" ]; then
 	mkdir -p "$res/$luals/meta"
 	cp -R "$luals/bin" "$luals/script" "$luals/locale" "$res/$luals/"
-	cp "$luals/main.lua" "$luals/debugger.lua" "$luals/LICENSE" "$res/$luals/"
+	cp "$luals/main.lua" "$res/$luals/"
+	cp "$luals/debugger.lua" "$luals/LICENSE" "$res/$luals/" 2>/dev/null || true
 	cp -R "$luals/meta/template" "$luals/meta/3rd" "$luals/meta/spell" "$res/$luals/meta/" 2>/dev/null || true
 	rm -rf "$res/$luals/bin/log" "$res/$luals/bin"/*.dSYM
 else

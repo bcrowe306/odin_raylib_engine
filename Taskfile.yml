@@ -28,9 +28,17 @@ tasks:
         cmds:
             - task: editor:drive
     editor:drive:
-        desc: Operate the editor through injected mouse/keyboard input (tests/drive/*.drive, SUITE=name for one)
+        desc: Editor UI test-drives in the background (hidden windows, JOBS in parallel; SUITE="a b" for some, VISIBLE=1 to watch)
         cmds:
             - ./scripts/editor_drive.sh {{.SUITE}}
+    editor:package:
+        desc: Package the editor as an installed app in dist/ (macOS .app, Linux / Windows folder); VERSION=1.2.3
+        cmds:
+            - ./scripts/package_editor.sh --out dist --version {{.VERSION | default "0.0.0-dev"}}
+    editor:package:test:
+        desc: Smoke-test the packaged editor in dist/ from outside the checkout (Play, export, the language server)
+        cmds:
+            - ./scripts/test_package.sh dist
     game:build:
         desc: Build the game runner the editor launches on Play
         cmds:
