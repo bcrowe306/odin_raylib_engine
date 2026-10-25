@@ -59,9 +59,12 @@ elif [ "$platform" = windows ]; then
 	bin="$root"; libs="$root"; res="$root"
 	mkdir -p "$root"
 	# (-o:size when Odin crashes at -o:speed, as it has on Windows CI.)
-	# (-resource: the icon, editor/assets/icon.res - scripts/branding/make_icons.odin)
-	odin build editor -o:speed -subsystem:windows -resource:editor/assets/icon.res $(scripts/odin_flags.sh) -define:RAYZR_RELEASE="$version" -out:"$bin/$exe" ||
-		odin build editor -o:size -subsystem:windows -resource:editor/assets/icon.res $(scripts/odin_flags.sh) -define:RAYZR_RELEASE="$version" -out:"$bin/$exe"
+	odin build editor -o:speed -subsystem:windows $(scripts/odin_flags.sh) -define:RAYZR_RELEASE="$version" -out:"$bin/$exe" ||
+		odin build editor -o:size -subsystem:windows $(scripts/odin_flags.sh) -define:RAYZR_RELEASE="$version" -out:"$bin/$exe"
+	# The icon, written into the linked exe (raylib.lib has its own resource:
+	# the linker can't take a second one) - scripts/branding/set_exe_icon.odin.
+	odin run scripts/branding/set_exe_icon.odin -file -out:"$out/set_exe_icon.exe" -- "$bin/$exe" editor/assets/icon.ico
+	rm -f "$out"/set_exe_icon.*
 	rm -f "$bin"/*.pdb
 else
 	root="$out/rayzr-editor-$platform"

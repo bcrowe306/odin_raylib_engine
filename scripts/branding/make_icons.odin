@@ -6,10 +6,8 @@ package make_icons
 //                                 Linux packages, Windows .ico)
 //   editor/assets/icon_macos.png  1024, the same at 824 px with Apple's
 //                                 margins (the .icns: sits right in the Dock)
-//   editor/assets/icon.ico        16-256, PNG-encoded
-//   editor/assets/icon.res        the same as a compiled Windows resource
-//                                 (RT_ICON + RT_GROUP_ICON 1): the editor
-//                                 .exe's icon (odin build -resource:...)
+//   editor/assets/icon.ico        16-256, PNG-encoded: the Windows .exe's
+//                                 icon (set_exe_icon.odin writes it in)
 // Run: odin run scripts/branding/make_icons.odin -file
 // The shape: a rounded square to the edges, each corner a superellipse
 // |x/r|^n + |y/r|^n = 1 with r = 420/1568 of the size, n = 1.76 (fitted to
@@ -88,35 +86,7 @@ main :: proc() {
 	for p in pngs do append(&ico, ..p)
 	_ = os.write_entire_file("editor/assets/icon.ico", ico[:])
 
-	// .res: an empty first entry, one RT_ICON per image, the RT_GROUP_ICON.
-	res := make([dynamic]u8)
-	entry :: proc(b: ^[dynamic]u8, type, id: int, flags: int, data: []u8) {
-		put16(b, 0); put16(b, 0) // (placeholder, patched below)
-		pos := len(b) - 4
-		v := len(data)
-		b[pos], b[pos + 1], b[pos + 2], b[pos + 3] = u8(v), u8(v >> 8), u8(v >> 16), u8(v >> 24)
-		put32(b, 32) // header size
-		put16(b, 0xFFFF); put16(b, type)
-		put16(b, 0xFFFF); put16(b, id)
-		put32(b, 0) // data version
-		put16(b, flags); put16(b, 0x0409 if type != 0 else 0)
-		put32(b, 0); put32(b, 0) // version, characteristics
-		append(b, ..data)
-		for len(b) % 4 != 0 do append(b, 0)
-	}
-	entry(&res, 0, 0, 0, nil)
-	for p, i in pngs do entry(&res, 3, i + 1, 0x1010, p) // RT_ICON
-	group := make([dynamic]u8)
-	put16(&group, 0); put16(&group, 1); put16(&group, len(sizes))
-	for s, i in sizes {
-		d := u8(0) if s >= 256 else u8(s)
-		append(&group, d, d, 0, 0)
-		put16(&group, 1); put16(&group, 32)
-		put32(&group, len(pngs[i])); put16(&group, i + 1)
-	}
-	entry(&res, 14, 1, 0x1030, group[:]) // RT_GROUP_ICON
-	_ = os.write_entire_file("editor/assets/icon.res", res[:])
-	fmt.println("editor/assets/icon.png, icon_macos.png, icon.ico, icon.res")
+	fmt.println("editor/assets/icon.png, icon_macos.png, icon.ico")
 }
 
 // Small sizes: shrink from 4x (smoother than one big step).
