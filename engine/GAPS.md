@@ -313,6 +313,31 @@ the optimization work: UI with a 5000-node scene (only ~7 scene rows are on
 screen), Draw's ~1.4 ms even for an empty scene, the y-sort scene, the
 lights.
 
+### Optimization round 1 (2026-10-24, perf/optimization)
+
+Found with the zones and `sample` (macOS); each fix measured on its own.
+
+| | Before | After | Change |
+|---|---|---|---|
+| Editor, demo scene (whole frame) | 2.67 ms (375 fps) | 0.86 ms (1170 fps) | ImGui's lists from GPU buffers, uploaded once per frame (draw 1.43 -> 0.07 ms) |
+| Editor, 5000 sprites | 13.4 ms (75 fps) | 2.57 ms (390 fps) | + the Scene Node Breakdown table builds its visible rows only (UI 9.6 -> 1.4 ms) |
+| Editor, 5000 particles simulating | 3.08 ms | 1.26 ms | (the ImGui draw) |
+| Y-sort, 3000 Lua-moved sprites (CPU) | 7.8 ms | 2.6 ms | stable merge sort (core:slice's stable sort is O(n^2)): collect 4.6 -> 0.26 ms; + Lua below |
+| 24 shadow-casting lights (CPU) | 4.1 ms | 2.9 ms | one quad per edge, culling off; only edges facing the light (same pixels) |
+| 1000 Lua `update(dt)` (no window) | 0.49 ms | 0.32 ms | script manager in the Lua state's extra space; node references by slot + generation, not by hashing the UUID; the node metatable by registry index |
+| 1000 Lua-scripted sprites (CPU) | 0.97 ms | 0.70 ms | (Lua) |
+
+Heap allocations per frame in steady state: the game 0; the editor ~0 (the
+drive harness copied every widget id to the heap each frame: 5000+ with a
+5000-node scene, now per-frame arenas).
+
+Still open: overlapping sprites with interleaved textures (3.3 ms of draw
+for 5000: every sprite a texture switch - needs atlases); the children
+lists are a map lookup per node per walk (`GetChildrenView`), and the update
+walk copies each node's children (`GetChildrenTemp`); a Lua call still
+copies the context and checks the metatable; lights still switch render
+targets twice per light.
+
 | Code tab, 10,000-line Lua file (`code_big_file` drive, debug editor) | Per edit |
 |---|---|
 | Line states, re-tokenizing every line (before 7.3) | 20.4 ms |
