@@ -9,7 +9,7 @@ import "core:unicode/utf16"
 AVAILABLE :: ODIN_OS == .Windows
 
 // Update replaces the exe's icon (RT_ICON images with ids 1..n and the
-// RT_GROUP_ICON directory id 1) and its RT_VERSION (id 1).
+// RT_GROUP_ICON directory, id 1 and GLFW_ICON) and its RT_VERSION (id 1).
 Update :: proc(exePath: string, icons: [][]u8, group: []u8, version: []u8) -> bool {
 	when ODIN_OS == .Windows {
 		path := make([]u16, len(exePath) * 2 + 1, context.temp_allocator)
@@ -25,6 +25,11 @@ Update :: proc(exePath: string, icons: [][]u8, group: []u8, version: []u8) -> bo
 				ok &&= bool(UpdateResourceW(h, res(RT_ICON), res(i + 1), LANG, raw_data(img), u32(len(img))))
 			}
 			ok &&= bool(UpdateResourceW(h, res(RT_GROUP_ICON), res(1), LANG, raw_data(group), u32(len(group))))
+			// raylib's own resource (raylib.lib) names its icon GLFW_ICON:
+			// GLFW loads it for the window, and Explorer shows the first
+			// group - named ones sort before numbered ones. Ours there too.
+			glfw := []u16{'G', 'L', 'F', 'W', '_', 'I', 'C', 'O', 'N', 0}
+			ok &&= bool(UpdateResourceW(h, res(RT_GROUP_ICON), raw_data(glfw), LANG, raw_data(group), u32(len(group))))
 		}
 		if len(version) > 0 {
 			ok &&= bool(UpdateResourceW(h, res(RT_VERSION), res(1), LANG, raw_data(version), u32(len(version))))
