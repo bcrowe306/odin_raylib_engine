@@ -129,8 +129,8 @@ Editor that runs anywhere:
 - [x] D.9 Check for updates against GitHub Releases (Help > Check for Updates, at startup unless turned off; status bar link; later: an auto-updater)
 
 CI/CD (GitHub Actions):
-- [ ] C.1 CI on pushes / pull requests: build the editor, the runner and the Play binary, engine + ui unit tests, on macOS (arm64), Windows (x64) and Linux (x64)
-- [ ] C.2 Smoke test in CI: export the demo project and run the runner (`--frames 60 --screenshot`); editor drives stay local (they need a GPU session)
+- [x] C.1 CI on pushes / pull requests: build the editor, the runner and the Play binary, engine + ui unit tests, on macOS (arm64), Windows (x64) and Linux (x64)
+- [x] C.2 Smoke test in CI: the runner plays the demo project and the packaged editor plays, exports and starts its language server (scripts/test_package.sh) - on Linux under Xvfb (hosted macOS runners have no GPU); editor drives stay local
 - [ ] C.3 Release workflow on `v*` tags: build the editor and runners per platform, put every platform's runners in each editor package, publish a GitHub Release with checksums
 - [ ] C.4 macOS signing + notarization (Developer ID, hardened runtime, every dylib signed; certificates as repository secrets) - needs an Apple Developer account
 - [ ] C.5 Windows code signing (Azure Trusted Signing or an OV certificate) - optional for early releases (SmartScreen warns without it)
