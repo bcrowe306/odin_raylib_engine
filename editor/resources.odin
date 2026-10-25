@@ -18,7 +18,7 @@ import "core:strings"
 //       lua-language-server/     the Code tab's language server
 //       fonts/                   the engine's font (OpenSans-Regular.ttf)
 //       templates/demo_project/  copied to Documents on the first start
-//   ORE_EDITOR_RESOURCES overrides the folder.
+//   RAYZR_EDITOR_RESOURCES overrides the folder.
 //
 // The editor's UI fonts are embedded (ui_style.odin): no file needed.
 // ============================================================================
@@ -35,7 +35,7 @@ Resources_Init :: proc() {
 	r := &editorResources
 	if r.root != "" do delete(r.root)
 	r^ = {}
-	if v := os.get_env("ORE_EDITOR_RESOURCES", context.temp_allocator); v != "" {
+	if v := os.get_env("RAYZR_EDITOR_RESOURCES", context.temp_allocator); v != "" {
 		r.root = strings.clone(resources_abs(v))
 		r.checkout = resources_is_checkout(r.root)
 		return
@@ -87,7 +87,7 @@ Resources_RunnersDir :: proc() -> string {
 
 // Resources_DefaultProject: the project opened when none is given - the
 // repo's demo in a checkout; else the most recent project, else (the first
-// start) a copy of the bundled demo in Documents/Ore Projects.
+// start) a copy of the bundled demo in Documents/Rayzr Projects.
 Resources_DefaultProject :: proc() -> string {
 	if editorResources.checkout do return "assets/demo_project"
 	for p in Editor_RecentProjectsAtStartup() {
@@ -95,7 +95,7 @@ Resources_DefaultProject :: proc() -> string {
 	}
 	home, err := os.user_home_dir(context.temp_allocator)
 	if err != nil do return ""
-	dst, _ := filepath.join({home, "Documents", "Ore Projects", "Demo Project"}, context.temp_allocator)
+	dst, _ := filepath.join({home, "Documents", "Rayzr Projects", "Demo Project"}, context.temp_allocator)
 	if os.is_file(fmt.tprintf("%s/project.json", dst)) do return dst
 	src := Resource_Path("templates", "demo_project")
 	if !os.is_dir(src) do return ""

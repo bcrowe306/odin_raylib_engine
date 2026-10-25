@@ -12,8 +12,13 @@ import rl "vendor:raylib"
 // Project, and a few pointers for a first session.
 // ============================================================================
 
+// The logo at the top (editor/assets/icon.png).
+@(private = "file")
+WELCOME_LOGO :: #load("assets/icon.png")
+
 @(private = "file")
 welcome: struct {
+	logo:      rl.Texture2D,
 	open:      bool,
 	shown:     bool, // opened at startup already
 	template:  string,                      // the chosen entry's name ("" = the first)
@@ -65,10 +70,28 @@ Welcome_Render :: proc(state: ^EditorState) {
 	imgui.PushStyleColorImVec4(.Button, UI_BG_PANEL if UI_THEME_LIGHT else UI_BG_ACTIVE)
 	defer imgui.PopStyleColor(2)
 
+	// The logo, then the title and the project.
+	if welcome.logo.id == 0 {
+		img := rl.LoadImageFromMemory(".png", raw_data(WELCOME_LOGO), i32(len(WELCOME_LOGO)))
+		if img.data != nil {
+			rl.ImageResize(&img, 128, 128) // (shown at 48: mipless, so shrink once)
+			welcome.logo = rl.LoadTextureFromImage(img)
+			rl.SetTextureFilter(welcome.logo, .BILINEAR)
+			rl.UnloadImage(img)
+		}
+	}
+	if welcome.logo.id != 0 {
+		imgui.Image(transmute(imgui.TextureID)&welcome.logo, {48, 48})
+		Drive_Item("welcome.logo")
+		imgui.SameLine(0, 12)
+	}
+	imgui.BeginGroup()
+	imgui.Dummy({0, 2})
 	imgui.PushFont(GlobalFonts.semibold)
-	imgui.TextUnformatted(fmt.ctprintf("%s  Welcome to the Ore editor", ICON_FA_WAND_MAGIC_SPARKLES))
+	imgui.TextUnformatted("Welcome to the Rayzr editor")
 	imgui.PopFont()
 	UI_DimText(fmt.tprintf("Editing %s", state.projectConfig.name if state.projectConfig.name != "" else state.projectPath))
+	imgui.EndGroup()
 	imgui.Dummy({0, 6})
 
 	// --- left: recent projects and pointers ---

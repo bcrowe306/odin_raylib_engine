@@ -20,7 +20,7 @@ utf16_contains :: proc(b: []u8, s: string) -> bool {
 
 @(test)
 test_export_formats :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({Engine_TempDir(), "ore_export_formats"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_export_formats"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	_ = os.make_directory_all(dir)
 	defer os.remove_all(dir)
@@ -77,10 +77,10 @@ test_export_formats :: proc(t: ^testing.T) {
 	// Linux AppDir from a (fake) runner.
 	runner, _ := filepath.join({dir, "runner"}, context.temp_allocator)
 	_ = os.write_entire_file(runner, transmute([]u8)string("#!/bin/sh\necho runner\n"))
-	ore, _ := filepath.join({dir, "game.ore"}, context.temp_allocator)
-	_ = os.write_entire_file(ore, transmute([]u8)string("ORE"))
+	rayzr, _ := filepath.join({dir, "game.rayzr"}, context.temp_allocator)
+	_ = os.write_entire_file(rayzr, transmute([]u8)string("RAYZR"))
 	cfg := ProjectConfig{name = "Space Game", windowTitle = "Space Game!"}
-	appDir, ok := Export_LinuxAppDir(dir, "SpaceGame", &cfg, runner, nil, ore, "", png)
+	appDir, ok := Export_LinuxAppDir(dir, "SpaceGame", &cfg, runner, nil, rayzr, "", png)
 	testing.expect(t, ok, "AppDir written")
 	check :: proc(t: ^testing.T, appDir: string, rel: string) -> string {
 		p, _ := filepath.join({appDir, rel}, context.temp_allocator)
@@ -92,7 +92,7 @@ test_export_formats :: proc(t: ^testing.T) {
 	desktop := check(t, appDir, "SpaceGame.desktop")
 	testing.expect(t, strings.contains(desktop, "Name=Space Game!\n") && strings.contains(desktop, "Exec=SpaceGame\n") && strings.contains(desktop, "Icon=SpaceGame\n"), desktop)
 	testing.expect(t, strings.has_prefix(check(t, appDir, "SpaceGame.png")[1:], "PNG"), "icon")
-	testing.expect_value(t, check(t, appDir, "usr/bin/game.ore"), "ORE")
+	testing.expect_value(t, check(t, appDir, "usr/bin/game.rayzr"), "RAYZR")
 	_ = check(t, appDir, "usr/bin/SpaceGame")
 	appRun, _ := filepath.join({appDir, "AppRun"}, context.temp_allocator)
 	// (Windows has no executable bit: an AppDir exported there needs chmod +x.)

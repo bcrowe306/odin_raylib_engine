@@ -22,28 +22,28 @@ when ODIN_OS == .Windows {
 
 @(default_calling_convention="c")
 foreign imgui_lib {
-	@(link_name="OreDock_GetNode")
+	@(link_name="RayzrDock_GetNode")
 	DockBuilderGetNode :: proc(node_id: imgui.ID) -> rawptr ---
 
-	@(link_name="OreDock_AddNode")
+	@(link_name="RayzrDock_AddNode")
 	DockBuilderAddNode :: proc(node_id: imgui.ID, flags: c.int = 0) -> imgui.ID ---
 
-	@(link_name="OreDock_RemoveNode")
+	@(link_name="RayzrDock_RemoveNode")
 	DockBuilderRemoveNode :: proc(node_id: imgui.ID) ---
 
-	@(link_name="OreDock_SetNodePos")
+	@(link_name="RayzrDock_SetNodePos")
 	DockBuilderSetNodePos :: proc(node_id: imgui.ID, pos: imgui.Vec2) ---
 
-	@(link_name="OreDock_SetNodeSize")
+	@(link_name="RayzrDock_SetNodeSize")
 	DockBuilderSetNodeSize :: proc(node_id: imgui.ID, size: imgui.Vec2) ---
 
-	@(link_name="OreDock_SplitNode")
+	@(link_name="RayzrDock_SplitNode")
 	DockBuilderSplitNode :: proc(node_id: imgui.ID, split_dir: imgui.Dir, size_ratio: f32, out_id_at_dir: ^imgui.ID, out_id_at_opposite_dir: ^imgui.ID) -> imgui.ID ---
 
-	@(link_name="OreDock_DockWindow")
+	@(link_name="RayzrDock_DockWindow")
 	DockBuilderDockWindow :: proc(window_name: cstring, node_id: imgui.ID) ---
 
-	@(link_name="OreDock_Finish")
+	@(link_name="RayzrDock_Finish")
 	DockBuilderFinish :: proc(node_id: imgui.ID) ---
 }
 

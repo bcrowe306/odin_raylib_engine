@@ -1,6 +1,6 @@
 # Memory soak for the Code tab: 40 rounds of typing, undo, folding, soft
 # wrap, find, peek-free navigation and menus (run with
-# EDITOR_DEFINES=-define:ORE_MEM_TRACK=true: live memory must not climb).
+# EDITOR_DEFINES=-define:RAYZR_MEM_TRACK=true: live memory must not climb).
 wait 5
 dblclick @asset:scripts/player_ship.lua
 wait 30

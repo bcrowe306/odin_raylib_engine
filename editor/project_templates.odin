@@ -125,7 +125,7 @@ Project_CreateFromEntry :: proc(dir, name: string, entry: Template_Entry) -> boo
 }
 
 // template_copy: the folder, without the template's own files (template.json,
-// preview.png) and editor / tool leftovers (.ore, .editor_settings.ini).
+// preview.png) and editor / tool leftovers (.rayzr, .editor_settings.ini).
 @(private = "file")
 template_copy :: proc(src, dst: string) -> bool {
 	if os.make_directory_all(dst) != nil do return false
@@ -133,7 +133,7 @@ template_copy :: proc(src, dst: string) -> bool {
 	if err != nil do return false
 	for fi in infos {
 		switch fi.name {
-		case "template.json", "preview.png", ".ore", ".editor_settings.ini", ".luarc.json", ".DS_Store": continue
+		case "template.json", "preview.png", ".rayzr", ".ore", ".editor_settings.ini", ".luarc.json", ".DS_Store": continue
 		}
 		from, _ := filepath.join({src, fi.name}, context.temp_allocator)
 		to, _ := filepath.join({dst, fi.name}, context.temp_allocator)

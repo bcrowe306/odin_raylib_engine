@@ -50,7 +50,7 @@ test_crash_issue_url :: proc(t: ^testing.T) {
 @(private = "file")
 crash_report_written_and_pending :: proc(t: ^testing.T) {
 	tmp := os.get_env("TMPDIR", context.temp_allocator)
-	dir, _ := filepath.join({tmp if tmp != "" else "/tmp", "ore_crash_unit"}, context.temp_allocator)
+	dir, _ := filepath.join({tmp if tmp != "" else "/tmp", "rayzr_crash_unit"}, context.temp_allocator)
 	os.remove_all(dir)
 	defer os.remove_all(dir)
 	crash.written = false

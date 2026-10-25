@@ -2,7 +2,7 @@
 
 Plugins add commands, panels and automation to the editor in Lua. The design
 and the full API list are in [plugins.md](plugins.md); completion and hover
-docs for everything here come from `.ore/definitions/editor_api.lua`
+docs for everything here come from `.rayzr/definitions/editor_api.lua`
 (written once the project has a `plugins/` folder).
 
 ## Your first plugin
@@ -21,7 +21,7 @@ plugins/my_plugin/
   main.lua        runs when the plugin starts; require() loads from this folder
 ```
 
-User plugins (every project) go in `~/.config/ore_editor/plugins/<id>/`
+User plugins (every project) go in `~/.config/rayzr_editor/plugins/<id>/`
 (Settings > Plugins > User Plugins Folder).
 
 ## Rules of thumb

@@ -15,7 +15,7 @@ import b2 "vendor:box2d"
 import rl "vendor:raylib"
 
 // ============================================================================
-// Data-Driven Project & Scene Format (.ore / JSON)
+// Data-Driven Project & Scene Format (.rayzr / JSON)
 // ============================================================================
 
 ProjectConfig :: struct {
@@ -72,17 +72,17 @@ Export_Target :: enum {
 	MacOS,
 	Windows,
 	Linux,
-	Web, // a page (index.html + wasm) and game.ore - runners/web/ (scripts/build_web_runner.sh)
+	Web, // a page (index.html + wasm) and game.rayzr - runners/web/ (scripts/build_web_runner.sh)
 }
 
 Export_Settings :: struct {
 	executableName: string,           // "" = the project name without spaces
 	outputDir:      string,           // "" = <project>_standalone next to the project
 	targets:        bit_set[Export_Target],
-	compress:       bool,             // compress the .ore package
+	compress:       bool,             // compress the .rayzr package
 	includeFont:    bool,             // ship the UI font next to the runner
 	// macOS .app
-	bundleId:       string,           // "" = com.ore.<executable, lower case>
+	bundleId:       string,           // "" = com.rayzr.<executable, lower case>
 	macSign:        string,           // codesign identity: "" = ad-hoc, "none" = don't sign
 	macNotaryProfile: string,         // notarytool keychain profile ("" = don't notarize)
 	presets:        [dynamic]Export_Preset, // export_presets.odin (empty = one per target)
@@ -282,7 +282,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		name          = "Untitled Project",
 		version       = "1.0.0",
 		initialScene  = "main",
-		windowTitle   = "Odin Raylib Engine",
+		windowTitle   = "Rayzr",
 		windowWidth   = 1280,
 		windowHeight  = 720,
 		virtualWidth  = 1280.0,
@@ -456,7 +456,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	strings.write_string(&sb, "{\n  \"name\": "); jstr(&sb, cfg.name)
 	strings.write_string(&sb, ",\n  \"version\": "); jstr(&sb, cfg.version)
 	// The release that saved it (a development build keeps what was there).
-	engineVersion := cfg.engineVersion if Version_IsDev(ORE_RELEASE) else ORE_RELEASE
+	engineVersion := cfg.engineVersion if Version_IsDev(RAYZR_RELEASE) else RAYZR_RELEASE
 	if engineVersion != "" {strings.write_string(&sb, ",\n  \"engine_version\": "); jstr(&sb, engineVersion)}
 	strings.write_string(&sb, ",\n  \"initial_scene\": "); jstr(&sb, cfg.initialScene)
 	if cfg.icon != "" {strings.write_string(&sb, ",\n  \"icon\": "); jstr(&sb, cfg.icon)}
@@ -560,7 +560,7 @@ Project_SaveConfigToFile :: proc(projectDir: string, cfg: ^ProjectConfig) -> boo
 }
 
 // ----------------------------------------------------------------------------
-// High-Level Project Loading (From Directory or .ore Archive)
+// High-Level Project Loading (From Directory or .rayzr Archive)
 // ----------------------------------------------------------------------------
 
 Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := true) -> bool {
@@ -710,6 +710,7 @@ Game_FindSceneByFile :: proc(game: ^Game, scenePath: string) -> ^Scene {
 
 Game_LoadProjectFromDirectory :: proc(game: ^Game, projectDir: string) -> bool {
 	if game == nil do return false
+	Project_MigrateLegacyDir(projectDir) // .ore/ -> .rayzr/ (branding.odin)
 	AssetManager_SetProjectDir(&game.assetManager, projectDir)
 	game.resourceManager.projectDir = game.assetManager.projectDir // (borrowed: project-relative keys for import settings)
 
@@ -726,11 +727,11 @@ Game_LoadProjectFromDirectory :: proc(game: ^Game, projectDir: string) -> bool {
 	return Game_LoadProjectConfig(game, &cfg)
 }
 
-Game_LoadProjectFromOre :: proc(game: ^Game, oreFilePath: string) -> bool {
+Game_LoadProjectFromRayzr :: proc(game: ^Game, rayzrFilePath: string) -> bool {
 	if game == nil do return false
-	pkg, ok := OrePackage_Open(oreFilePath, game.assetManager.allocator)
+	pkg, ok := RayzrPackage_Open(rayzrFilePath, game.assetManager.allocator)
 	if !ok {
-		log.errorf("[ProjectLoader] Failed to open .ore archive: %s", oreFilePath)
+		log.errorf("[ProjectLoader] Failed to open .rayzr archive: %s", rayzrFilePath)
 		return false
 	}
 	AssetManager_MountPackage(&game.assetManager, pkg)
@@ -740,7 +741,7 @@ Game_LoadProjectFromOre :: proc(game: ^Game, oreFilePath: string) -> bool {
 
 	bytes, readOk := AssetManager_ReadFileBytes(&game.assetManager, "project.json", context.temp_allocator)
 	if !readOk {
-		log.error("[ProjectLoader] project.json not found in .ore archive")
+		log.error("[ProjectLoader] project.json not found in .rayzr archive")
 		return false
 	}
 
@@ -751,8 +752,8 @@ Game_LoadProjectFromOre :: proc(game: ^Game, oreFilePath: string) -> bool {
 }
 
 Game_LoadProject :: proc(game: ^Game, pathOrDir: string) -> bool {
-	if strings.has_suffix(pathOrDir, ".ore") {
-		return Game_LoadProjectFromOre(game, pathOrDir)
+	if Is_PackagePath(pathOrDir) {
+		return Game_LoadProjectFromRayzr(game, pathOrDir)
 	}
 	return Game_LoadProjectFromDirectory(game, pathOrDir)
 }

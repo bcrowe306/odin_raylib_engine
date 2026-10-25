@@ -25,7 +25,7 @@ import lua "lua54"
 // ============================================================================
 
 @(private = "file")
-SAVE_REGISTRY_KEY :: "__ore_save"
+SAVE_REGISTRY_KEY :: "__rayzr_save"
 
 @(private = "file")
 save: struct {
@@ -63,7 +63,7 @@ safe_name :: proc(name: string, allocator := context.temp_allocator) -> string {
 	}
 	s := strings.to_string(sb)
 	s = strings.trim(s, ". ")
-	return s if s != "" else "OreGame"
+	return s if s != "" else "RayzrGame"
 }
 
 // Save_GameName: the game's name (the user-data folder's).

@@ -4,9 +4,9 @@ import "core:strconv"
 import "core:strings"
 
 // The release version of the engine, the editor and the runners (the git
-// tag in CI: -define:ORE_RELEASE=1.2.3; scripts/package_editor.sh). The .ore
-// package format has its own number (ORE_VERSION, ore_package.odin).
-ORE_RELEASE :: #config(ORE_RELEASE, "0.0.0-dev")
+// tag in CI: -define:RAYZR_RELEASE=1.2.3; scripts/package_editor.sh). The .rayzr
+// package format has its own number (RAYZR_VERSION, rayzr_package.odin).
+RAYZR_RELEASE :: #config(RAYZR_RELEASE, "0.0.0-dev")
 
 
 // Version_IsDev: a development build's version (no release: 0.0.0-...).

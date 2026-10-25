@@ -6,7 +6,7 @@ import "core:mem"
 import "core:slice"
 
 // ============================================================================
-// Memory diagnostics: build with -define:ORE_MEM_TRACK=true and the heap of
+// Memory diagnostics: build with -define:RAYZR_MEM_TRACK=true and the heap of
 // the editor or the game (the runner, the Play binary) goes through a
 // tracking allocator. Every MEM_TRACK_EVERY frames it logs the live bytes,
 // the allocation sites that grew since the last report (a leak shows up
@@ -19,7 +19,7 @@ import "core:slice"
 //   MemTrack_Shutdown()                                    // at exit
 // ============================================================================
 
-ORE_MEM_TRACK :: #config(ORE_MEM_TRACK, false)
+RAYZR_MEM_TRACK :: #config(RAYZR_MEM_TRACK, false)
 MEM_TRACK_EVERY :: 600
 
 memTrack: ^mem.Tracking_Allocator
@@ -29,10 +29,10 @@ memTrackState: mem.Tracking_Allocator
 @(private = "file")
 memTrackFrame: int
 
-// MemTrack_Init wraps `heap` in the tracking allocator (ORE_MEM_TRACK
+// MemTrack_Init wraps `heap` in the tracking allocator (RAYZR_MEM_TRACK
 // builds; else returns it): use the result as context.allocator.
 MemTrack_Init :: proc(heap: mem.Allocator) -> mem.Allocator {
-	when ORE_MEM_TRACK {
+	when RAYZR_MEM_TRACK {
 		mem.tracking_allocator_init(&memTrackState, heap)
 		memTrackState.bad_free_callback = mem.tracking_allocator_bad_free_callback_add_to_array
 		memTrack = &memTrackState
@@ -43,14 +43,14 @@ MemTrack_Init :: proc(heap: mem.Allocator) -> mem.Allocator {
 }
 
 // MemTrack_Frame reports every MEM_TRACK_EVERY frames.
-@(disabled = !ORE_MEM_TRACK)
+@(disabled = !RAYZR_MEM_TRACK)
 MemTrack_Frame :: proc() {
 	memTrackFrame += 1
 	if memTrackFrame % MEM_TRACK_EVERY == 0 do MemTrack_Report(fmt.tprintf("frame %d", memTrackFrame))
 }
 
 // MemTrack_Shutdown reports what is still allocated and the bad frees.
-@(disabled = !ORE_MEM_TRACK)
+@(disabled = !RAYZR_MEM_TRACK)
 MemTrack_Shutdown :: proc() {
 	MemTrack_ReportLeaks()
 	if memTrack == nil do return

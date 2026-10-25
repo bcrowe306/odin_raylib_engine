@@ -216,7 +216,7 @@ PluginOverlays_Render :: proc(state: ^EditorState, drawList: ^imgui.DrawList, mo
 		ext.overlay = ov
 		L := p.mgr.L
 		lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(ov.ref))
-		lua.getglobal(L, "__Ore_Overlay_G")
+		lua.getglobal(L, "__Rayzr_Overlay_G")
 		lua.createtable(L, 0, 2)
 		lua.pushnumber(L, lua.Number(state.cameraZoom))
 		lua.setfield(L, -2, "zoom")
@@ -246,7 +246,7 @@ PluginOverlays_RegisterG :: proc(L: ^lua.State) {
 	reg(L, "rect", g_rect)
 	reg(L, "text", g_text)
 	reg(L, "handle", g_handle)
-	lua.setglobal(L, "__Ore_Overlay_G")
+	lua.setglobal(L, "__Rayzr_Overlay_G")
 }
 
 @(private = "file")
@@ -437,7 +437,7 @@ PluginImporters_Run :: proc(state: ^EditorState, name: string, data: []u8) -> (f
 				rel, _ := filepath.clean(string(lua.tostring(L, -2)), context.temp_allocator)
 				n: c.size_t
 				s := lua.tolstring(L, -1, &n)
-				if filepath.is_abs(rel) || rel == ".." || strings.has_prefix(rel, "../") || strings.has_prefix(rel, ".ore") {
+				if filepath.is_abs(rel) || rel == ".." || strings.has_prefix(rel, "../") || strings.has_prefix(rel, ".rayzr") || strings.has_prefix(rel, ".ore") {
 					lua.pop(L, 2) // (key, value: the results go with the defer)
 					return nil, fmt.tprintf("%s: %q is outside the project", p.name, rel), true
 				}

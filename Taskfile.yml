@@ -43,7 +43,7 @@ tasks:
         desc: Build the game runner the editor launches on Play
         cmds:
             - mkdir -p bin
-            - odin build . -out:bin/odin_raylib_engine
+            - odin build . -out:bin/rayzr
     bench:
         desc: Performance benchmarks (engine, uncapped rendering, editor frame phases); PARTS="engine rendering editor" picks some
         cmds:

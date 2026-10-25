@@ -15,7 +15,7 @@ import imgui "lib/imgui"
 // scanned once and re-scanned when the editor changes files
 // (Editor_InvalidateProjectFiles, called with Lua_MarkProjectTypesDirty)
 // or every second (PROJECT_FILES_TTL) for changes made outside the editor.
-// Hidden files and folders (.ore/, .luarc.json, ...) aren't listed.
+// Hidden files and folders (.rayzr/, .luarc.json, ...) aren't listed.
 // ============================================================================
 
 PROJECT_FILES_TTL :: time.Second
@@ -31,7 +31,7 @@ projectFiles: struct {
 	// lists while an edit (a move, a save) makes the next call re-scan.
 	retired:      [dynamic]string,
 	retiredFrame: i32,
-	// .ore packages next to the project folder (exports).
+	// .rayzr packages next to the project folder (exports).
 	packages:        [dynamic]string,
 	packagesScanned: time.Tick,
 	packagesValid:   bool,
@@ -43,7 +43,7 @@ Editor_InvalidateProjectFiles :: proc() {
 	projectFiles.packagesValid = false
 }
 
-// Editor_ParentPackages: the .ore files in the project's parent folder.
+// Editor_ParentPackages: the .rayzr files in the project's parent folder.
 Editor_ParentPackages :: proc(state: ^EditorState) -> []string {
 	if state.projectPath == "" do return nil
 	if !projectFiles.packagesValid || time.tick_since(projectFiles.packagesScanned) > PROJECT_FILES_TTL {
@@ -51,7 +51,7 @@ Editor_ParentPackages :: proc(state: ^EditorState) -> []string {
 		clear(&projectFiles.packages)
 		dir := filepath.dir(strings.trim_suffix(state.projectPath, "/"), context.temp_allocator)
 		if infos, err := os.read_all_directory_by_path(dir, context.temp_allocator); err == nil {
-			for fi in infos do if fi.type != .Directory && strings.has_suffix(fi.name, ".ore") do append(&projectFiles.packages, strings.clone(fi.name))
+			for fi in infos do if fi.type != .Directory && e.Is_PackagePath(fi.name) do append(&projectFiles.packages, strings.clone(fi.name))
 		}
 		slice.sort(projectFiles.packages[:])
 		projectFiles.packagesScanned = time.tick_now()

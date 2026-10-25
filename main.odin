@@ -99,7 +99,7 @@ main :: proc() {
 	}
 
 	rl.SetTraceLogLevel(.WARNING)
-	rl.InitWindow(WINDOW_SIZE[0], WINDOW_SIZE[1], "Odin Raylib Engine")
+	rl.InitWindow(WINDOW_SIZE[0], WINDOW_SIZE[1], "Rayzr")
 	defer rl.CloseWindow()
 
 	rl.SetTargetFPS(60)

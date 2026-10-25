@@ -6,7 +6,7 @@
 #   WINDOWS_CERTIFICATE_PASSWORD  its password
 # (Azure Trusted Signing works too: replace the signtool line with the
 # azure/trusted-signing-action step.)
-#   scripts/ci/sign_windows.sh dist/ore-editor-windows
+#   scripts/ci/sign_windows.sh dist/rayzr-editor-windows
 set -euo pipefail
 dir="$1"
 pfx="$RUNNER_TEMP/cert.pfx"

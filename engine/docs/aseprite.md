@@ -131,7 +131,7 @@ map in Aseprite (painting it here is overwritten by the next save).
 
 ## Exporting
 
-Aseprite files go into `game.ore` as they are and are read at runtime - the
+Aseprite files go into `game.rayzr` as they are and are read at runtime - the
 same on every platform, the web included.
 
 ## How it works

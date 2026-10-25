@@ -66,7 +66,7 @@ mixer_save :: proc(state: ^EditorState, structural := false) {
 	}
 }
 
-// MixerPanel_RemoteReply: the game's "@ore:mixer-peaks".
+// MixerPanel_RemoteReply: the game's "@rayzr:mixer-peaks".
 MixerPanel_RemoteReply :: proc(text: string) {
 	v, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
 	if err != .None do return

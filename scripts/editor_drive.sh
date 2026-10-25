@@ -21,7 +21,7 @@ cd "$(dirname "$0")/.."
 if [ "${1:-}" = --one ]; then
 	d="$2"
 	name="$(basename "$d" .drive)"
-	tmp="$(mktemp -d /tmp/ore_drive_${name}.XXXXXX)"
+	tmp="$(mktemp -d /tmp/rayzr_drive_${name}.XXXXXX)"
 	cp -R assets/demo_project "$tmp/project"
 	# Scratch "new_scene*" scenes made while using the editor on the demo
 	# project would shift the drives' expected default names: drop them
@@ -74,14 +74,14 @@ build() {
 	done
 	return 1
 }
-# EDITOR_DEFINES: extra build flags (e.g. -define:ORE_MEM_TRACK=true for leak reports).
+# EDITOR_DEFINES: extra build flags (e.g. -define:RAYZR_MEM_TRACK=true for leak reports).
 # EDITOR_BIN: where to build the editor (a second run can use its own binary).
 export EDITOR_BIN="${EDITOR_BIN:-bin/editor}"
 build editor -out:"$EDITOR_BIN" ${EDITOR_DEFINES:-} || exit 1
 # GAME_BIN: where to build the game Play runs (passed to the editor as
-# ORE_GAME_BIN); SKIP_GAME_BUILD=1 keeps the existing one.
-GAME_BIN="${GAME_BIN:-bin/odin_raylib_engine}"
-export ORE_GAME_BIN="$GAME_BIN"
+# RAYZR_GAME_BIN); SKIP_GAME_BUILD=1 keeps the existing one.
+GAME_BIN="${GAME_BIN:-bin/rayzr}"
+export RAYZR_GAME_BIN="$GAME_BIN"
 [ -n "${SKIP_GAME_BUILD:-}" ] || build . -out:"$GAME_BIN" || exit 1
 
 if [ $# -gt 0 ]; then
@@ -97,7 +97,7 @@ if [ -z "${JOBS:-}" ]; then
 	JOBS=$(( perf / 2 > 2 ? perf / 2 : 2 ))
 fi
 [ -n "${VISIBLE:-}" ] && JOBS=1 # (visible windows would fight over the focus)
-export RESULTS="$(mktemp -d /tmp/ore_drive_results.XXXXXX)"
+export RESULTS="$(mktemp -d /tmp/rayzr_drive_results.XXXXXX)"
 export VISIBLE="${VISIBLE:-}"
 if command -v caffeinate > /dev/null; then caffeinate -u -t 7200 & trap 'kill $! 2> /dev/null' EXIT; fi
 

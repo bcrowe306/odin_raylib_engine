@@ -193,8 +193,8 @@ Linux_AppRun :: proc(exeName: string) -> string {
 
 // Export_LinuxAppDir writes <dir>/<name>.AppDir: AppRun, <name>.desktop,
 // <name>.png (+ .DirIcon), usr/bin/<name> (the runner), its libraries,
-// game.ore and fonts/.
-Export_LinuxAppDir :: proc(dir, name: string, cfg: ^ProjectConfig, runner: string, libs: []string, ore, font, iconPng: string) -> (string, bool) {
+// game.rayzr and fonts/.
+Export_LinuxAppDir :: proc(dir, name: string, cfg: ^ProjectConfig, runner: string, libs: []string, rayzr, font, iconPng: string) -> (string, bool) {
 	appDir, _ := filepath.join({dir, strings.concatenate({name, ".AppDir"}, context.temp_allocator)}, context.temp_allocator)
 	_ = os.remove_all(appDir)
 	bin, _ := filepath.join({appDir, "usr", "bin"}, context.temp_allocator)
@@ -206,8 +206,8 @@ Export_LinuxAppDir :: proc(dir, name: string, cfg: ^ProjectConfig, runner: strin
 		dst, _ := filepath.join({bin, filepath.base(lib)}, context.temp_allocator)
 		_ = os.copy_file(dst, lib)
 	}
-	dstOre, _ := filepath.join({bin, "game.ore"}, context.temp_allocator)
-	if os.copy_file(dstOre, ore) != nil do return "", false
+	dstRayzr, _ := filepath.join({bin, "game.rayzr"}, context.temp_allocator)
+	if os.copy_file(dstRayzr, rayzr) != nil do return "", false
 	if font != "" {
 		fonts, _ := filepath.join({bin, "fonts"}, context.temp_allocator)
 		_ = os.make_directory_all(fonts)

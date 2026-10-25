@@ -12,7 +12,7 @@ import rl "vendor:raylib"
 // Lua API with a captured input calling on_done.
 @(test)
 test_input_rebinding :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({Engine_TempDir(), "ore_rebind_test"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_rebind_test"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	defer os.remove_all(dir)
 	Save_SetDirectory(dir)
@@ -109,7 +109,7 @@ conflicts = #Input.find_conflicts({key = "J"})
 // Input.listen (the captured input refreshes the buttons).
 @(test)
 test_controls_menu_template :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({Engine_TempDir(), "ore_controls_test"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_controls_test"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	defer os.remove_all(dir)
 	Save_SetDirectory(dir)

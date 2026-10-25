@@ -10,17 +10,17 @@ import "core:strings"
 import rl "vendor:raylib"
 
 // ============================================================================
-// Asset Manager (loose project files and .ore archive packages)
+// Asset Manager (loose project files and .rayzr archive packages)
 // ============================================================================
 
 // AssetManager is the file layer: it resolves project-relative paths
-// through a mounted .ore package or the project directory and reads files.
+// through a mounted .rayzr package or the project directory and reads files.
 // Loaded GPU/audio resources are cached in one place, the ResourceManager
 // (resource_manager.odin), which reads through this layer.
 AssetManager :: struct {
 	allocator:     mem.Allocator,
 	projectDir:    string,
-	package_:      ^OrePackage,
+	package_:      ^RayzrPackage,
 }
 
 AssetManager_Init :: proc(am: ^AssetManager, allocator := context.allocator) {
@@ -37,14 +37,14 @@ AssetManager_Destroy :: proc(am: ^AssetManager) {
 	}
 
 	if am.package_ != nil {
-		OrePackage_Close(am.package_)
+		RayzrPackage_Close(am.package_)
 		am.package_ = nil
 	}
 }
 
-AssetManager_MountPackage :: proc(am: ^AssetManager, pkg: ^OrePackage) {
+AssetManager_MountPackage :: proc(am: ^AssetManager, pkg: ^RayzrPackage) {
 	if am.package_ != nil && am.package_ != pkg {
-		OrePackage_Close(am.package_)
+		RayzrPackage_Close(am.package_)
 	}
 	am.package_ = pkg
 }
@@ -69,7 +69,7 @@ AssetManager_ResolveDiskPath :: proc(am: ^AssetManager, relPath: string, allocat
 AssetManager_ReadFileBytes :: proc(am: ^AssetManager, relPath: string, allocator := context.allocator) -> ([]byte, bool) {
 	// 1. Try mounted package
 	if am.package_ != nil {
-		data, ok := OrePackage_ReadFile(am.package_, relPath, allocator)
+		data, ok := RayzrPackage_ReadFile(am.package_, relPath, allocator)
 		if ok do return data, true
 	}
 

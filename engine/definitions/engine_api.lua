@@ -1,5 +1,5 @@
 ---@meta
---- Lua API Definitions for Odin Raylib Engine
+--- Lua API Definitions for Rayzr
 --- Language Server Protocol (LSP) stubs for autocomplete and type checking.
 
 ---@class RaycastHit
@@ -9181,23 +9181,32 @@ Log = LogModule
 
 
 ---@class ProjectModule
----Engine project management, data-driven scene serialization, and .ore package access.
+---Engine project management, data-driven scene serialization, and .rayzr package access.
 local ProjectModule = {}
 
----Loads a complete project either from a directory containing project.json or from an .ore package archive.
+---Loads a complete project either from a directory containing project.json or from a .rayzr package archive.
 ---
----Example: `local ok = Project.load("assets/demo_project.ore")`
----@param pathOrDir string Path to directory or .ore file
+---Example: `local ok = Project.load("assets/demo_project.rayzr")`
+---@param pathOrDir string Path to directory or .rayzr file
 ---@return boolean success
 function ProjectModule.load(pathOrDir) end
 
----Packages a loose project directory into a portable .ore container archive with zlib compression.
+---Packages a loose project directory into a portable .rayzr container archive with zlib compression.
 ---
----Example: `local ok = Project.export_ore("assets/demo_project", "bin/demo_project.ore")`
+---Example: `local ok = Project.export_rayzr("assets/demo_project", "bin/demo_project.rayzr")`
 ---@param projectDir string Source directory path
----@param outOrePath string Target output .ore file path
+---@param outRayzrPath string Target output .rayzr file path
 ---@return boolean success
-function ProjectModule.export_ore(projectDir, outOrePath) end
+function ProjectModule.export_rayzr(projectDir, outRayzrPath) end
+
+---The old name of export_rayzr (before the engine was renamed from Ore).
+---
+---Example: `Project.export_ore("assets/demo_project", "bin/demo_project.rayzr")`
+---@deprecated Use Project.export_rayzr
+---@param projectDir string
+---@param outRayzrPath string
+---@return boolean success
+function ProjectModule.export_ore(projectDir, outRayzrPath) end
 
 ---Serializes the currently active scene graph and node states to a JSON formatted string.
 ---
@@ -9205,14 +9214,14 @@ function ProjectModule.export_ore(projectDir, outOrePath) end
 ---@return string json
 function ProjectModule.serialize_scene() end
 
----Reads a text file either from the mounted .ore archive package or the loose project directory.
+---Reads a text file either from the mounted .rayzr archive package or the loose project directory.
 ---
 ---Example: `local text = Project.read_file("data/items.json"); if text then Log.info(text) end`
 ---@param relPath string Project-relative file path
 ---@return string? content File contents as a string, or nil if not found
 function ProjectModule.read_file(relPath) end
 
----Checks if a file exists in the active project (.ore archive or disk).
+---Checks if a file exists in the active project (.rayzr archive or disk).
 ---
 ---Example: `if Project.has_file("levels/level_2.json") then Scene.change_scene("level_2") end`
 ---@param relPath string Project-relative file path

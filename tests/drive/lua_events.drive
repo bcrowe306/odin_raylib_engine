@@ -2,10 +2,10 @@
 # the project's custom events (what scripts emit) in connect / emit, and a
 # script's on_<event> methods (its node's events + custom ones).
 wait 5
-wait-until file:.ore/definitions/project_types.lua contains ---@alias ProjectEvent timeout=600
-expect file:.ore/definitions/project_types.lua contains ---| "jumped"
-expect file:.ore/definitions/project_types.lua contains ---@field on_jumped? fun(self: PlayerShip, value: any) custom event (emit)
-expect file:.ore/definitions/engine_api.lua contains function TimerNode:connect(event, handler) end
+wait-until file:.rayzr/definitions/project_types.lua contains ---@alias ProjectEvent timeout=600
+expect file:.rayzr/definitions/project_types.lua contains ---| "jumped"
+expect file:.rayzr/definitions/project_types.lua contains ---@field on_jumped? fun(self: PlayerShip, value: any) custom event (emit)
+expect file:.rayzr/definitions/engine_api.lua contains function TimerNode:connect(event, handler) end
 dblclick @asset:scripts/player_ship.lua
 wait-until code.lsp == ready timeout=600
 key ctrl+g

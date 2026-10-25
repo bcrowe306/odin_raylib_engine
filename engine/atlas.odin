@@ -276,7 +276,7 @@ atlas_extrude :: proc(page: ^rl.Image, img: rl.Image, x, y: i32) {
 Atlas_Mount :: proc(rm: ^ResourceManager) -> bool {
 	Atlas_Unmount(rm)
 	if rm == nil || rm.package_ == nil do return false
-	data, ok := OrePackage_ReadFile(rm.package_, ATLAS_JSON, context.temp_allocator)
+	data, ok := RayzrPackage_ReadFile(rm.package_, ATLAS_JSON, context.temp_allocator)
 	if !ok do return false
 	return Atlas_Parse(&rm.atlas, string(data))
 }

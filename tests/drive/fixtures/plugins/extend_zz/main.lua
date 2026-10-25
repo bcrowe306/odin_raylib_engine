@@ -45,5 +45,5 @@ Editor.add_importer{
 
 Editor.add_command{
     id = "bad_g", label = "Bad G ZZ",
-    run = function() __Ore_Overlay_G.line(Vec2(0, 0), Vec2(1, 1)) end,
+    run = function() __Rayzr_Overlay_G.line(Vec2(0, 0), Vec2(1, 1)) end,
 }

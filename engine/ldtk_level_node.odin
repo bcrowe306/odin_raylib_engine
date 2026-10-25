@@ -215,7 +215,7 @@ LdtkLevelNode_CreateFromProject :: proc(
 }
 
 // ldtk_asset_reader reads project files from disk, else through the game's
-// asset manager (mounted .ore package).
+// asset manager (mounted .rayzr package).
 @(private = "file")
 ldtk_asset_reader :: proc(path: string, user: rawptr) -> ([]byte, bool) {
 	if data, err := os.read_entire_file(path, context.temp_allocator); err == nil do return data, true

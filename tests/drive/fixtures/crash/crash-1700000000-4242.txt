@@ -1,12 +1,12 @@
-Ore Editor crash report
+Rayzr Editor crash report
 version:  0.1.0-dev.240
 platform: macOS arm64
 time:     1700000000 (unix)
 reason:   SIGSEGV (invalid memory access)
 
 stack:
-  0  0x100face78  engine::Scene_Update + 80  (ore-editor+0x118e78)
-  1  0x100fccfb0  editor::editor_main + 532  (ore-editor+0x138fb0)
+  0  0x100face78  engine::Scene_Update + 80  (rayzr-editor+0x118e78)
+  1  0x100fccfb0  editor::editor_main + 532  (rayzr-editor+0x138fb0)
 
 recent:
   [Info] Opened scene scenes/main.scene.json

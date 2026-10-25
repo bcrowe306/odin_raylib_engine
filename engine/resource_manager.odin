@@ -39,7 +39,7 @@ AudioMusic :: struct {
 	fileName: string,
 	music: rl.Music,
 	refCount: int,
-	streamData: []byte, // in-memory stream source (assets from a .ore package)
+	streamData: []byte, // in-memory stream source (assets from a .rayzr package)
 	voice: Mixer_Voice_Handle, // Audio.play_music's voice (path-based music)
 	gain: f32, // import gain (asset_import.odin) as a factor
 }
@@ -62,8 +62,8 @@ ResourceManager :: struct {
 	unloadAudioMusic: proc(rm: ^ResourceManager, fileName: string),
 
 	// Exported games: resources missing on disk are read from the mounted
-	// .ore package (paths relative to projectDir).
-	package_: ^OrePackage,
+	// .rayzr package (paths relative to projectDir).
+	package_: ^RayzrPackage,
 	projectDir: string,
 	atlas: Atlas_Index, // the package's sprite atlas (atlas.odin)
 	aseprite: map[string]^Ase_Resource, // Aseprite files (aseprite_resource.odin)
@@ -122,7 +122,7 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 	rm.musicCount = 0
 }
 
-// resource_bytes reads a resource that isn't on disk from the mounted .ore
+// resource_bytes reads a resource that isn't on disk from the mounted .rayzr
 // package (exported games ship their assets inside it).
 resource_bytes :: proc(rm: ^ResourceManager, filePath: string) -> ([]byte, bool) {
 	if rm.package_ == nil do return nil, false
@@ -130,7 +130,7 @@ resource_bytes :: proc(rm: ^ResourceManager, filePath: string) -> ([]byte, bool)
 	if dir := rm.projectDir; dir != "" && len(rel) > len(dir) && rel[:len(dir)] == dir && rel[len(dir)] == '/' {
 		rel = rel[len(dir) + 1:]
 	}
-	return OrePackage_ReadFile(rm.package_, rel, context.allocator)
+	return RayzrPackage_ReadFile(rm.package_, rel, context.allocator)
 }
 
 @(private = "file")

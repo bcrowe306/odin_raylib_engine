@@ -33,7 +33,7 @@ expect log contains Exported windows (windows):
 expect log contains written when exporting on Windows
 expect log !contains building it once
 expect file:project.json contains "icon": "textures/Spaceship_1.png"
-exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/game.ore
+exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/game.rayzr
 exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/AppIcon.icns
 exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/fonts/OpenSans-Regular.ttf
 # (Lua is linked statically: no shared library to ship.)
@@ -41,7 +41,7 @@ exec test ! -e $PROJECT_standalone/macos/SpaceGame.app/Contents/Frameworks/liblu
 exec plutil -lint $PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist
 exec test -s $PROJECT_standalone/macos/THIRD_PARTY_NOTICES.txt
 expect abs-file:$PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist contains <string>SpaceGame</string>
-expect abs-file:$PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist contains com.ore.spacegame
+expect abs-file:$PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist contains com.rayzr.spacegame
 exec codesign --verify --deep --strict $PROJECT_standalone/macos/SpaceGame.app
 exec $PROJECT_standalone/macos/SpaceGame.app/Contents/MacOS/SpaceGame --frames 20 --dump-scene $SHOTS/standalone_scene.json
 expect abs-file:$SHOTS/standalone_scene.json contains "PlayerShip"
@@ -49,9 +49,9 @@ expect abs-file:$SHOTS/standalone_scene.json contains "PlayerShip"
 # Linux AppDir and Windows folder.
 exec test -x $PROJECT_standalone/linux/SpaceGame.AppDir/AppRun
 exec test -x $PROJECT_standalone/linux/SpaceGame.AppDir/usr/bin/SpaceGame
-exec test -s $PROJECT_standalone/linux/SpaceGame.AppDir/usr/bin/game.ore
+exec test -s $PROJECT_standalone/linux/SpaceGame.AppDir/usr/bin/game.rayzr
 exec test -s $PROJECT_standalone/linux/SpaceGame.AppDir/SpaceGame.png
 expect abs-file:$PROJECT_standalone/linux/SpaceGame.AppDir/SpaceGame.desktop contains Exec=SpaceGame
 exec test -s $PROJECT_standalone/windows/SpaceGame.exe
-exec test -s $PROJECT_standalone/windows/game.ore
+exec test -s $PROJECT_standalone/windows/game.rayzr
 exec rm -rf bin/runners/linux bin/runners/windows

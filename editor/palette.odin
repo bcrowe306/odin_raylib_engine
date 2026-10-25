@@ -182,7 +182,7 @@ palette_project_files :: proc(state: ^EditorState) {
 				continue
 			}
 			lower := strings.to_lower(fi.name, context.temp_allocator)
-			for ext in ([]string{".lua", ".json", ".ldtk", ".png", ".jpg", ".wav", ".ogg", ".mp3", ".ore"}) {
+			for ext in ([]string{".lua", ".json", ".ldtk", ".png", ".jpg", ".wav", ".ogg", ".mp3", ".rayzr", ".ore"}) {
 				if strings.has_suffix(lower, ext) {
 					append(&pal.files, strings.clone(childRel))
 					break

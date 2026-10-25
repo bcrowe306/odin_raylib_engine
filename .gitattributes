@@ -17,6 +17,7 @@
 *.qoa binary
 *.xm binary
 *.mod binary
+*.rayzr binary
 *.ore binary
 *.a binary
 *.lib binary

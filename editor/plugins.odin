@@ -16,7 +16,7 @@ import imgui "lib/imgui"
 // Editor plugins (design: docs/plugins.md): Lua that extends the editor.
 //
 // - Project plugins: <project>/plugins/<id>/; user plugins: the editor's
-//   config folder (.../ore_editor/plugins/<id>/). Each has a plugin.json
+//   config folder (.../rayzr_editor/plugins/<id>/). Each has a plugin.json
 //   (name, version, description, editor, main, permissions) and Lua files.
 // - Each running plugin has its own Lua state: the safe standard libraries
 //   (no io; os only for time; require from its own folder), the engine's
@@ -64,7 +64,7 @@ Plugin :: struct {
 }
 
 PLUGIN_LOG_MAX :: 200
-PLUGIN_REGISTRY_KEY :: "__Ore_Plugin"
+PLUGIN_REGISTRY_KEY :: "__Rayzr_Plugin"
 
 @(private = "file")
 plugins: struct {
@@ -83,7 +83,7 @@ Plugins_List :: proc() -> []^Plugin {
 Plugins_UserDir :: proc() -> string {
 	home, err := os.user_home_dir(context.temp_allocator)
 	if err != nil do return ""
-	p, _ := filepath.join({home, ".config", "ore_editor", "plugins"}, context.temp_allocator)
+	p, _ := filepath.join({home, ".config", "rayzr_editor", "plugins"}, context.temp_allocator)
 	return p
 }
 
@@ -284,8 +284,8 @@ plugin_start :: proc(state: ^EditorState, p: ^Plugin) {
 	p.error = ""
 	if p.editorReq != "" {
 		need := strings.trim_left(p.editorReq, ">= ")
-		if !e.Version_IsDev(e.ORE_RELEASE) && e.Version_Compare(e.ORE_RELEASE, need) < 0 {
-			plugin_fail(state, p, fmt.tprintf("needs Ore Editor %s or newer (this is %s)", need, e.ORE_RELEASE))
+		if !e.Version_IsDev(e.RAYZR_RELEASE) && e.Version_Compare(e.RAYZR_RELEASE, need) < 0 {
+			plugin_fail(state, p, fmt.tprintf("needs Rayzr Editor %s or newer (this is %s)", need, e.RAYZR_RELEASE))
 			return
 		}
 	}
@@ -585,13 +585,13 @@ Plugins_Create :: proc(state: ^EditorState, name: string) {
 PLUGIN_TEMPLATE_JSON :: `{
   "name": "$NAME",
   "version": "0.1.0",
-  "description": "$NAME - an Ore editor plugin",
+  "description": "$NAME - a Rayzr editor plugin",
   "main": "main.lua",
   "permissions": []
 }
 `
 
-PLUGIN_TEMPLATE_LUA :: `-- $NAME: an Ore editor plugin (editor/docs/plugins.md).
+PLUGIN_TEMPLATE_LUA :: `-- $NAME: a Rayzr editor plugin (editor/docs/plugins.md).
 -- Saving this file reloads the plugin; Settings > Plugins shows its log.
 
 local clicks = 0

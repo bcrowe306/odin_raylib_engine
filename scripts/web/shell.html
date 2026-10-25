@@ -19,7 +19,7 @@
 <script src="odin.js"></script>
 <script>
 // The web runner (engine/runner/web): odin.js gives the Odin side its
-// imports; emscripten runs raylib, Lua and Box2D. game.ore (next to this
+// imports; emscripten runs raylib, Lua and Box2D. game.rayzr (next to this
 // page) is fetched into the file system; saves live in /save, kept in the
 // browser (IndexedDB). Browsers only allow audio after a click, so the
 // game starts on the first click / key.
@@ -44,9 +44,9 @@ var Module = {
   },
   onRuntimeInitialized: async () => {
     try {
-      const res = await fetch("game.ore");
-      if (!res.ok) throw new Error("game.ore: " + res.status);
-      FS.writeFile("/game.ore", new Uint8Array(await res.arrayBuffer()));
+      const res = await fetch("game.rayzr");
+      if (!res.ok) throw new Error("game.rayzr: " + res.status);
+      FS.writeFile("/game.rayzr", new Uint8Array(await res.arrayBuffer()));
       // The UI font (fonts/ next to the page, like the desktop exports).
       const font = await fetch("fonts/OpenSans-Regular.ttf");
       if (font.ok) {

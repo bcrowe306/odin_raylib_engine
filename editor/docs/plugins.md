@@ -162,7 +162,7 @@ end}
   picking and the gizmo. Overlays don't draw while simulating.
 - Importers run for extensions the editor doesn't import itself; their
   extensions join the import dialog's filter. Files they return go into the
-  project (not `.ore/`), each gets `asset_imported`.
+  project (not `.rayzr/`), each gets `asset_imported`.
 
 ## Developer experience
 
@@ -171,7 +171,7 @@ The guide: [plugin_guide.md](plugin_guide.md); examples in
 
 
 - `editor_api.lua` definitions (generated like the engine's) in
-  `.ore/definitions/`: completion and hover docs for `Editor` and `ui` in the
+  `.rayzr/definitions/`: completion and hover docs for `Editor` and `ui` in the
   Code tab and any LuaLS editor
 - Tools > New Plugin writes a working plugin (a command, a panel, an event)
 - A guide with examples: align / distribute, batch rename, level stats panel,

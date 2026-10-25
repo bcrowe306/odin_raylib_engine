@@ -8,7 +8,7 @@ import "core:testing"
 
 @(test)
 test_editor_link :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({Engine_TempDir(), "ore_link_test"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_link_test"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	defer os.remove_all(dir)
 	write :: proc(dir, rel, text: string) {

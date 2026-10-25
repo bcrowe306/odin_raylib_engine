@@ -69,7 +69,7 @@ key ctrl+home
 key ctrl+shift+k
 key ctrl+shift+k
 key ctrl+shift+k
-expect code.line == -- Orbiting Drone Behavior Script (Odin Raylib Engine)
+expect code.line == -- Orbiting Drone Behavior Script (Rayzr)
 
 # Find and replace.
 key ctrl+f

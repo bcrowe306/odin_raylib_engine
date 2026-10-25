@@ -108,7 +108,7 @@ Scene.change_scene("world_2", {transition = "fade", loading = "loading"})
 
 - Preloading walks the scene file once and queues each asset.
 - **Textures** - usually most of the time - are read on the main thread
-  (packed `.ore` games read from one archive) and **decoded on two worker
+  (packed `.rayzr` games read from one archive) and **decoded on two worker
   threads** (PNG decoding is the expensive part); finished images are
   uploaded to the GPU on the main thread, up to 4 a frame. The game keeps
   running smoothly - a loading screen can animate.

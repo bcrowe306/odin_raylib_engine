@@ -23,13 +23,13 @@ import e "../engine"
 //      Current Scene); its stdout/stderr stream into the editor console.
 // ============================================================================
 
-// Editor_GameBinary: the game Play runs (temp) - ORE_GAME_BIN (drives running
+// Editor_GameBinary: the game Play runs (temp) - RAYZR_GAME_BIN (drives running
 // beside another run use their own build), else in a source checkout the
-// engine's game build (bin/odin_raylib_engine), else this platform's
+// engine's game build (bin/rayzr), else this platform's
 // prebuilt runner ("" = none).
 Editor_GameBinary :: proc() -> string {
-	if v := os.get_env("ORE_GAME_BIN", context.temp_allocator); v != "" do return v
-	if Resources_InCheckout() do return Resource_Path("bin", "odin_raylib_engine.exe" when ODIN_OS == .Windows else "odin_raylib_engine")
+	if v := os.get_env("RAYZR_GAME_BIN", context.temp_allocator); v != "" do return v
+	if Resources_InCheckout() do return Resource_Path("bin", "rayzr.exe" when ODIN_OS == .Windows else "rayzr")
 	return Editor_FindRunner(e.native_export_target())
 }
 // The game build's sources (in a source checkout).
@@ -446,7 +446,7 @@ Editor_DeleteSaveData :: proc(state: ^EditorState) {
 	Editor_Log(state, .Info, "Deleted %d save file(s) in %s", n, dir)
 }
 
-// Editor_RunPackage plays an exported .ore with the game runner.
+// Editor_RunPackage plays an exported .rayzr with the game runner.
 Editor_RunPackage :: proc(state: ^EditorState, pkgPath: string) {
 	if state.gameProcessRunning do return
 	saved := state.projectPath

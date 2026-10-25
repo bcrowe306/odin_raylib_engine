@@ -254,7 +254,7 @@ BottomPanel_RenderProfiler :: proc(state: ^EditorState) {
 		UI_DimText(fmt.tprintf("Editor frame time  %.2f ms  (%d FPS)%s", dt, fps, "  uncapped" if frameTiming.uncapped else ""))
 		ft := frameTiming.smooth
 		UI_DimText(fmt.tprintf("poll %.2f · ui %.2f · viewport %.2f · draw %.2f · present %.2f ms", ft[.Poll], ft[.UI], ft[.Viewport], ft[.Draw], ft[.Present]))
-		when e.ORE_PROF {
+		when e.RAYZR_PROF {
 			st := e.Prof_Last()
 			UI_DimText(fmt.tprintf("heap %d allocations (%.1f KB) · %d frees · temp arena %.1f KB per frame", st.allocs, f64(st.bytes) / 1024, st.frees, f64(st.tempBytes) / 1024))
 		}

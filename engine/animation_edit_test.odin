@@ -7,7 +7,7 @@ import "core:testing"
 
 @(test)
 test_animation_editing :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({Engine_TempDir(), "ore_anim_edit"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_anim_edit"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	_ = os.make_directory_all(dir)
 	defer os.remove_all(dir)
@@ -96,7 +96,7 @@ test_animation_editing :: proc(t: ^testing.T) {
 
 @(test)
 test_animation_manage :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({Engine_TempDir(), "ore_anim_manage"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_anim_manage"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	_ = os.make_directory_all(dir)
 	defer os.remove_all(dir)

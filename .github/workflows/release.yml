@@ -41,7 +41,7 @@ concurrency:
 
 env:
   ODIN_RELEASE: dev-2026-03
-  APP_NAME: Ore Editor
+  APP_NAME: Rayzr Editor
 
 jobs:
   version:
@@ -115,7 +115,7 @@ jobs:
       - if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
       - run: scripts/ci/setup_deps.sh
-      - run: scripts/build_runners.sh -define:ORE_RELEASE=${{ needs.version.outputs.version }}
+      - run: scripts/build_runners.sh -define:RAYZR_RELEASE=${{ needs.version.outputs.version }}
       # (A tarball: artifacts lose the executable bit.)
       - run: tar -C bin/runners -czf runners-${{ matrix.platform }}.tar.gz ${{ matrix.platform }}
       - uses: actions/upload-artifact@v4
@@ -138,7 +138,7 @@ jobs:
           release: ${{ env.ODIN_RELEASE }}
           token: ${{ secrets.GITHUB_TOKEN }}
       - uses: mymindstorm/setup-emsdk@v14
-      - run: scripts/build_web_runner.sh -define:ORE_RELEASE=${{ needs.version.outputs.version }}
+      - run: scripts/build_web_runner.sh -define:RAYZR_RELEASE=${{ needs.version.outputs.version }}
       - run: tar -C bin/runners -czf runners-web.tar.gz web
       - uses: actions/upload-artifact@v4
         with:
@@ -204,26 +204,26 @@ jobs:
         env:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: scripts/ci/sign_windows.sh dist/ore-editor-windows
+        run: scripts/ci/sign_windows.sh dist/rayzr-editor-windows
 
       - name: Archive
         run: |
-          base="ore-editor-$VERSION-${{ matrix.platform }}"
+          base="rayzr-editor-$VERSION-${{ matrix.platform }}"
           case "${{ matrix.platform }}" in
             macos)   hdiutil create -volname "$APP_NAME" -srcfolder "dist/$APP_NAME.app" -ov -format UDZO "$base.dmg" ;;
             linux)
-              tar -C dist -czf "$base.tar.gz" ore-editor-linux
+              tar -C dist -czf "$base.tar.gz" rayzr-editor-linux
               scripts/ci/appimage_editor.sh "$VERSION" dist
-              mv "dist/Ore_Editor-$VERSION-x86_64.AppImage" "$base-x86_64.AppImage"
+              mv "dist/Rayzr_Editor-$VERSION-x86_64.AppImage" "$base-x86_64.AppImage"
               scripts/ci/deb_editor.sh "$VERSION" dist
-              mv dist/ore-editor_*_amd64.deb "$base-amd64.deb" ;;
-            windows) (cd dist && 7z a -bd "../$base.zip" ore-editor-windows > /dev/null) ;;
+              mv dist/rayzr-editor_*_amd64.deb "$base-amd64.deb" ;;
+            windows) (cd dist && 7z a -bd "../$base.zip" rayzr-editor-windows > /dev/null) ;;
           esac
-          ls -la ore-editor-*
+          ls -la rayzr-editor-*
       - uses: actions/upload-artifact@v4
         with:
           name: editor-${{ matrix.platform }}
-          path: ore-editor-*
+          path: rayzr-editor-*
 
   publish:
     name: GitHub Release
@@ -236,13 +236,13 @@ jobs:
           pattern: editor-*
           path: release
           merge-multiple: true
-      - run: (cd release && sha256sum ore-editor-* > SHA256SUMS.txt && cat SHA256SUMS.txt)
+      - run: (cd release && sha256sum rayzr-editor-* > SHA256SUMS.txt && cat SHA256SUMS.txt)
       - uses: softprops/action-gh-release@v2
         with:
           # (A dev build's tag is made here, on its commit.)
           tag_name: v${{ needs.version.outputs.version }}
           target_commitish: ${{ needs.version.outputs.sha }}
-          name: Ore Editor ${{ needs.version.outputs.version }}
+          name: Rayzr Editor ${{ needs.version.outputs.version }}
           prerelease: ${{ needs.version.outputs.prerelease }}
           generate_release_notes: true
           files: release/*

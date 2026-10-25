@@ -1,7 +1,7 @@
 ---@meta
--- Ore editor plugin API (editor/docs/plugins.md) - for plugins only: these
+-- Rayzr editor plugin API (editor/docs/plugins.md) - for plugins only: these
 -- globals exist in a plugin's Lua state, not in game scripts. Written to
--- .ore/definitions/ when the project has a plugins/ folder.
+-- .rayzr/definitions/ when the project has a plugins/ folder.
 
 ---@class EditorPluginInfo
 ---@field id string The plugin's folder name

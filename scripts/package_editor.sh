@@ -2,15 +2,15 @@
 # Packages the editor as an installed app (editor/resources.odin's layout):
 # no Odin compiler, no source checkout, no Homebrew needed to run it.
 #
-#   scripts/package_editor.sh [--out dist] [--version 0.1.0] [--name "Ore Editor"]
+#   scripts/package_editor.sh [--out dist] [--version 0.1.0] [--name "Rayzr Editor"]
 #
 #   macOS    dist/<name>.app
-#              Contents/MacOS/ore-editor
+#              Contents/MacOS/rayzr-editor
 #              Contents/Frameworks/*.dylib        (the editor's shared libraries)
 #              Contents/Resources/runners/<platform>/, fonts/,
 #                                 lua-language-server/, templates/ (demo_project + the New Project templates)
-#   Linux,   dist/ore-editor-<platform>/
-#   Windows    ore-editor[.exe], its libraries, runners/, fonts/,
+#   Linux,   dist/rayzr-editor-<platform>/
+#   Windows    rayzr-editor[.exe], its libraries, runners/, fonts/,
 #              lua-language-server/, templates/ (demo_project + the New Project templates)
 #
 # Runners: this platform's is built if missing (scripts/build_runners.sh);
@@ -22,7 +22,7 @@ cd "$(dirname "$0")/.."
 
 out=dist
 version=0.0.0-dev
-name="Ore Editor"
+name="Rayzr Editor"
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--out) out="$2"; shift 2 ;;
@@ -33,9 +33,9 @@ while [ $# -gt 0 ]; do
 done
 
 case "$(uname -s)" in
-	Darwin) platform=macos; exe=ore-editor ;;
-	Linux) platform=linux; exe=ore-editor ;;
-	MINGW*|MSYS*|CYGWIN*) platform=windows; exe=ore-editor.exe ;;
+	Darwin) platform=macos; exe=rayzr-editor ;;
+	Linux) platform=linux; exe=rayzr-editor ;;
+	MINGW*|MSYS*|CYGWIN*) platform=windows; exe=rayzr-editor.exe ;;
 	*) echo "Unknown platform $(uname -s)" >&2; exit 1 ;;
 esac
 
@@ -52,22 +52,23 @@ if [ "$platform" = macos ]; then
 	res="$app/Contents/Resources"
 	mkdir -p "$bin" "$libs" "$res"
 	odin build editor -o:speed '-extra-linker-flags:-Wl,-rpath,@executable_path/../Frameworks' \
-		-define:ORE_RELEASE="$version" -out:"$bin/$exe"
+		-define:RAYZR_RELEASE="$version" -out:"$bin/$exe"
 elif [ "$platform" = windows ]; then
-	root="$out/ore-editor-$platform"
+	root="$out/rayzr-editor-$platform"
 	rm -rf "$root"
 	bin="$root"; libs="$root"; res="$root"
 	mkdir -p "$root"
 	# (-o:size when Odin crashes at -o:speed, as it has on Windows CI.)
-	odin build editor -o:speed -subsystem:windows $(scripts/odin_flags.sh) -define:ORE_RELEASE="$version" -out:"$bin/$exe" ||
-		odin build editor -o:size -subsystem:windows $(scripts/odin_flags.sh) -define:ORE_RELEASE="$version" -out:"$bin/$exe"
+	# (-resource: the icon, editor/assets/icon.res - scripts/branding/make_icons.odin)
+	odin build editor -o:speed -subsystem:windows -resource:editor/assets/icon.res $(scripts/odin_flags.sh) -define:RAYZR_RELEASE="$version" -out:"$bin/$exe" ||
+		odin build editor -o:size -subsystem:windows -resource:editor/assets/icon.res $(scripts/odin_flags.sh) -define:RAYZR_RELEASE="$version" -out:"$bin/$exe"
 	rm -f "$bin"/*.pdb
 else
-	root="$out/ore-editor-$platform"
+	root="$out/rayzr-editor-$platform"
 	rm -rf "$root"
 	bin="$root"; libs="$root"; res="$root"
 	mkdir -p "$root"
-	odin build editor -o:speed -define:ORE_RELEASE="$version" -out:"$bin/$exe" # (no bundled libraries: Lua and cmark are static)
+	odin build editor -o:speed -define:RAYZR_RELEASE="$version" -out:"$bin/$exe" # (no bundled libraries: Lua and cmark are static)
 fi
 
 # The editor's shared libraries that aren't the system's (none since Lua and
@@ -95,7 +96,7 @@ cp licenses/THIRD_PARTY_NOTICES.txt "$res/"
 cp engine/Open_Sans/static/OpenSans-Regular.ttf "$res/fonts/"
 # The demo project, without per-user editor state.
 cp -R assets/demo_project "$res/templates/demo_project"
-rm -rf "$res/templates/demo_project/.ore" "$res/templates/demo_project/.editor_settings.ini" "$res/templates/demo_project/.luarc.json"
+rm -rf "$res/templates/demo_project/.rayzr" "$res/templates/demo_project/.editor_settings.ini" "$res/templates/demo_project/.luarc.json"
 # The New Project templates (templates/: scripts/templates/make_templates.py).
 for t in templates/*/; do cp -R "${t%/}" "$res/templates/"; done
 # lua-language-server: what it runs (its generated meta files go to the user's
@@ -120,7 +121,7 @@ if [ "$platform" = macos ]; then
 	<dict>
 		<key>CFBundleName</key><string>$name</string>
 		<key>CFBundleDisplayName</key><string>$name</string>
-		<key>CFBundleIdentifier</key><string>com.bcrowe306.ore-editor</string>
+		<key>CFBundleIdentifier</key><string>com.bcrowe306.rayzr-editor</string>
 		<key>CFBundleExecutable</key><string>$exe</string>
 		<key>CFBundleIconFile</key><string>AppIcon</string>
 		<key>CFBundlePackageType</key><string>APPL</string>
@@ -131,12 +132,13 @@ if [ "$platform" = macos ]; then
 	</dict>
 	</plist>
 	EOF
-	# The icon (editor/assets/icon.png) as AppIcon.icns.
+	# The icon as AppIcon.icns (editor/assets/icon_macos.png: Apple's margins;
+	# scripts/branding/make_icons.odin makes it from branding/).
 	iconset="$out/AppIcon.iconset"
 	rm -rf "$iconset"; mkdir -p "$iconset"
 	for s in 16 32 128 256; do
-		sips -z $s $s editor/assets/icon.png --out "$iconset/icon_${s}x${s}.png" > /dev/null
-		sips -z $((s * 2)) $((s * 2)) editor/assets/icon.png --out "$iconset/icon_${s}x${s}@2x.png" > /dev/null
+		sips -z $s $s editor/assets/icon_macos.png --out "$iconset/icon_${s}x${s}.png" > /dev/null
+		sips -z $((s * 2)) $((s * 2)) editor/assets/icon_macos.png --out "$iconset/icon_${s}x${s}@2x.png" > /dev/null
 	done
 	iconutil -c icns "$iconset" -o "$res/AppIcon.icns"
 	rm -rf "$iconset"

@@ -1,5 +1,5 @@
 # Remembered folders: an import from a folder makes the next import dialog
-# open there; Export .ore asks where to write and the next export starts in
+# open there; Export .rayzr asks where to write and the next export starts in
 # that folder; the export Output Folder's Browse... starts there too; a new
 # project's location is remembered; all kept in settings.ini [paths].
 # drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
@@ -16,21 +16,21 @@ click @ctx:add-import
 wait 3
 expect dialog-start contains tests/drive/fixtures/import
 
-# Export .ore into a chosen folder; the next export opens there.
-exec mkdir -p $SHOTS/ore_out
-dialog-files $SHOTS/ore_out
+# Export .rayzr into a chosen folder; the next export opens there.
+exec mkdir -p $SHOTS/rayzr_out
+dialog-files $SHOTS/rayzr_out
 click @menu:File
 click @menu:File/Export
-click @menu:Export/.ore Package
+click @menu:Export/.rayzr Package
 wait 5
-expect abs-file:$SHOTS/ore_out/project.ore !=
-expect last-dir:export contains ore_out
+expect abs-file:$SHOTS/rayzr_out/project.rayzr !=
+expect last-dir:export contains rayzr_out
 dialog-files
 click @menu:File
 click @menu:File/Export
-click @menu:Export/.ore Package
+click @menu:Export/.rayzr Package
 wait 3
-expect dialog-start contains ore_out
+expect dialog-start contains rayzr_out
 
 # The standalone export's Output Folder: Browse... starts in that folder.
 click @toolbar.settings
@@ -39,7 +39,7 @@ click @settings.page:Export
 dialog-files
 click @settings.export-dir.browse
 wait 3
-expect dialog-start contains ore_out
+expect dialog-start contains rayzr_out
 click @settings.cancel
 
 # A new project's location is remembered (and the Welcome window starts there).
@@ -50,6 +50,6 @@ click @welcome.name
 key cmd+a
 type Drive Remember Zq
 click @welcome.create
-expect last-dir:projects contains ore_drive_remember_dirs
+expect last-dir:projects contains rayzr_drive_remember_dirs
 expect file:.editor_settings.ini contains [paths]
 expect file:.editor_settings.ini contains tests/drive/fixtures/import

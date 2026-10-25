@@ -13,13 +13,13 @@ import rlgl "vendor:raylib/rlgl"
 
 // ============================================================================
 // Generic game runner: plays a data-only project (a project directory or a
-// packaged .ore) - scenes, scripts, assets - with no game-specific code.
+// packaged .rayzr) - scenes, scripts, assets - with no game-specific code.
 // Used by the demo binary (`--project`) and by the standalone runner/
-// program that "Export Standalone Game" ships next to a game's .ore.
+// program that "Export Standalone Game" ships next to a game's .rayzr.
 // ============================================================================
 
 Run_Options :: struct {
-	projectPath:    string, // project directory or .ore package
+	projectPath:    string, // project directory or .rayzr package
 	screenshotPath: string, // save a screenshot after a few frames, then quit
 	maxFrames:      int,
 	hidden:         bool,
@@ -153,7 +153,7 @@ Runner_ApplyInputEvent :: proc(input: ^InputSystem, ev: Input_Script_Event) {
 // --hidden, --dump-scene, --user-data, --bench, --uncapped and --no-render-cache. A bare argument is taken as the project.
 Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 	for a in args do if a == "--version" {
-		fmt.println(ORE_RELEASE)
+		fmt.println(RAYZR_RELEASE)
 		os.exit(0)
 	}
 	for i := 0; i < len(args); i += 1 {
@@ -200,7 +200,7 @@ Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 }
 
 // Engine_FindBundledProject looks for a game shipped next to the runner:
-// game.ore, any other .ore, or a project/ directory (exe dir, then cwd).
+// game.rayzr, any other .rayzr, or a project/ directory (exe dir, then cwd).
 Engine_FindBundledProject :: proc(exePath: string, allocator := context.allocator) -> string {
 	dirs := make([dynamic]string, context.temp_allocator)
 	exeDir := filepath.dir(exePath, context.temp_allocator)
@@ -209,7 +209,7 @@ Engine_FindBundledProject :: proc(exePath: string, allocator := context.allocato
 	append(&dirs, exeDir)
 	if cwd, err := os.get_working_directory(context.temp_allocator); err == nil do append(&dirs, cwd)
 	for dir in dirs {
-		game, _ := filepath.join({dir, "game.ore"}, context.temp_allocator)
+		game, _ := filepath.join({dir, "game.rayzr"}, context.temp_allocator)
 		if os.is_file(game) do return strings.clone(game, allocator)
 		proj, _ := filepath.join({dir, "project", "project.json"}, context.temp_allocator)
 		if os.is_file(proj) do return strings.clone(filepath.dir(proj, context.temp_allocator), allocator)
@@ -218,7 +218,7 @@ Engine_FindBundledProject :: proc(exePath: string, allocator := context.allocato
 		infos, _ := os.read_dir(h, -1, context.temp_allocator)
 		os.close(h)
 		for fi in infos {
-			if fi.type != .Directory && strings.has_suffix(fi.name, ".ore") {
+			if fi.type != .Directory && Is_PackagePath(fi.name) {
 				p, _ := filepath.join({dir, fi.name}, context.temp_allocator)
 				return strings.clone(p, allocator)
 			}
@@ -267,7 +267,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	// is loaded (its user-data folder).
 	context.assertion_failure_proc = Crash_AssertionFailure
 	context.logger = Crash_Logger(context.logger)
-	Crash_Install("Ore game")
+	Crash_Install("Rayzr game")
 	// Memory diagnostics builds (mem_track.odin): leaks and bad frees.
 	context.allocator = MemTrack_Init(context.allocator)
 	defer MemTrack_Shutdown()
@@ -306,10 +306,10 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 	video := ProjectConfig{vsync = true, resizable = true}
 
 	// Attempt to read project.json to configure window size and title before window creation
-	if strings.has_suffix(projectPath, ".ore") {
-		pkg, ok := OrePackage_Open(projectPath, context.temp_allocator)
+	if Is_PackagePath(projectPath) {
+		pkg, ok := RayzrPackage_Open(projectPath, context.temp_allocator)
 		if ok {
-			if b, bOk := OrePackage_ReadFile(pkg, "project.json", context.temp_allocator); bOk {
+			if b, bOk := RayzrPackage_ReadFile(pkg, "project.json", context.temp_allocator); bOk {
 				if cfg, pOk := Project_ParseConfig(b, context.temp_allocator); pOk {
 					if cfg.windowWidth > 0 do winW = i32(cfg.windowWidth)
 					if cfg.windowHeight > 0 do winH = i32(cfg.windowHeight)
@@ -318,7 +318,7 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 					video = cfg
 				}
 			}
-			OrePackage_Close(pkg)
+			RayzrPackage_Close(pkg)
 		}
 	} else {
 		jsonPath, _ := filepath.join({projectPath, "project.json"}, context.temp_allocator)
@@ -382,8 +382,8 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 		Crash_Install(video.windowTitle if video.windowTitle != "" else Save_GameName(), Save_CrashDir())
 	}
 	// A project saved by a newer editor may use what this runner lacks.
-	if !Version_IsDev(ORE_RELEASE) && !Version_IsDev(video.engineVersion) && Version_Compare(video.engineVersion, ORE_RELEASE) > 0 {
-		log.warnf("This project was saved by Ore %s; this runner is %s - update the editor (and re-export) if something is missing", video.engineVersion, ORE_RELEASE)
+	if !Version_IsDev(RAYZR_RELEASE) && !Version_IsDev(video.engineVersion) && Version_Compare(video.engineVersion, RAYZR_RELEASE) > 0 {
+		log.warnf("This project was saved by Rayzr %s; this runner is %s - update the editor (and re-export) if something is missing", video.engineVersion, RAYZR_RELEASE)
 	}
 	// (Loading the project applies its target FPS: uncapped runs undo it.)
 	if opts.uncapped do rl.SetTargetFPS(0)
@@ -539,7 +539,7 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 				whole := time.duration_milliseconds(rs.benchFrame) / n
 				fmt.printfln("[bench] %d frames: update+draw %.3f ms | whole frame (incl. GPU sync) %.3f ms (%.0f fps) | %d drawn, %d culled | %d tile chunks (%d built)",
 					opts.benchFrames, time.duration_milliseconds(rs.benchRun) / n, whole, 1000 / whole, renderStats.drawn, renderStats.culled, TileCache_Stats(), TileCache_Builds())
-				when ORE_PROF {
+				when RAYZR_PROF {
 					fmt.printfln("[bench] per frame: %.1f heap allocations (%.1f KB) | temp arena %.1f KB",
 						f64(rs.benchAllocs) / n, f64(rs.benchAllocBytes) / n / 1024, f64(rs.benchTempBytes) / n / 1024)
 				}

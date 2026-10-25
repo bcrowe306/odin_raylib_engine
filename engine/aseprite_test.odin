@@ -459,7 +459,7 @@ test_aseprite_tiles_match_the_render :: proc(t: ^testing.T) {
 // last release frees it.
 @(test)
 test_aseprite_resource_reload :: proc(t: ^testing.T) {
-	path, _ := filepath.join({ase_tmp_dir(), "ore_ase_reload.aseprite"}, context.temp_allocator)
+	path, _ := filepath.join({ase_tmp_dir(), "rayzr_ase_reload.aseprite"}, context.temp_allocator)
 	defer os.remove(path)
 	a, _ := os.read_entire_file(ASE_FIXTURES + "/animation.aseprite", context.temp_allocator)
 	b, _ := os.read_entire_file(ASE_FIXTURES + "/slices.aseprite", context.temp_allocator)
@@ -485,17 +485,17 @@ test_aseprite_resource_reload :: proc(t: ^testing.T) {
 	delete(rm.aseprite)
 }
 
-// An exported game: the .aseprite file read from inside game.ore (no file on
+// An exported game: the .aseprite file read from inside game.rayzr (no file on
 // disk), its tags playing (the TileMap path needs a window: runtime_tests.json).
 @(test)
 test_aseprite_from_a_package :: proc(t: ^testing.T) {
-	ore, _ := filepath.join({ase_tmp_dir(), "ore_ase_test.ore"}, context.temp_allocator)
-	defer os.remove(ore)
-	if !testing.expect(t, OrePackage_CreateFromDirectory("tests/aseprite/project", ore, true), "packaged") do return
+	rayzr, _ := filepath.join({ase_tmp_dir(), "rayzr_ase_test.rayzr"}, context.temp_allocator)
+	defer os.remove(rayzr)
+	if !testing.expect(t, RayzrPackage_CreateFromDirectory("tests/aseprite/project", rayzr, true), "packaged") do return
 	game := new(Game)
 	InitializeGame(game)
 	defer game->terminate()
-	if !testing.expect(t, game->loadProject(ore), "loads from the package") do return
+	if !testing.expect(t, game->loadProject(rayzr), "loads from the package") do return
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
 	scene := game.sceneManager.currentScene
 	if !testing.expect(t, scene != nil, "a scene") do return
@@ -503,7 +503,7 @@ test_aseprite_from_a_package :: proc(t: ^testing.T) {
 	if !testing.expect(t, walker != nil && walker.typeId == AsepriteNode, "the Aseprite node") do return
 	an := cast(^AsepriteNode)walker
 	size := AsepriteNode_Size(an)
-	testing.expect(t, an.res != nil && size == {8, 8}, "read from game.ore")
+	testing.expect(t, an.res != nil && size == {8, 8}, "read from game.rayzr")
 	AsepriteNode_Play(an, "walk")
 	for _ in 0 ..< 300 do AsepriteNode_Update(an, &game.gameContext, 0.001) // 300 ms: frame 4 (250 ms), then 3
 	testing.expect_value(t, an.frame, 3)

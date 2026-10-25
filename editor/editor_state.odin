@@ -111,7 +111,7 @@ EditorState :: struct {
 	pendingPlayMode:    Play_Mode,
 	pendingPlayScene:   string,
 	lastPlayedScene:    string, // what Restart plays again ("" = the project)
-	lastPlayPackage:    string, // an exported .ore played last (Restart replays it)
+	lastPlayPackage:    string, // an exported .rayzr played last (Restart replays it)
 	hasPlayed:          bool,
 	gameOutput:         ^os.File,
 	gameLineBuf:        [dynamic]u8,
@@ -259,6 +259,8 @@ Editor_Init :: proc(state: ^EditorState) {
 			e.Save_SetDirectory(state.userDataDir)
 		}
 	}
+	// A project from before the rename: its .ore/ folder becomes .rayzr/.
+	e.Project_MigrateLegacyDir(state.projectPath)
 	state.sceneBaselines = make(map[^e.Scene]string)
 	state.sceneVersion = make(map[^e.Scene]int)
 	state.savedVersion = make(map[^e.Scene]int)
@@ -326,7 +328,7 @@ Editor_Init :: proc(state: ^EditorState) {
 	// Lua event handlers only run while simulating (or in the game).
 	state.game.scriptManager.suspended = true
 	Editor_RegisterBuiltinComponents(state)
-	Editor_Log(state, .Info, "Odin Raylib Engine GUI Editor initialized")
+	Editor_Log(state, .Info, "Rayzr GUI Editor initialized")
 }
 
 Editor_Shutdown :: proc(state: ^EditorState) {

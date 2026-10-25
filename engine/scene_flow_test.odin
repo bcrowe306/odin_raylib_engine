@@ -77,7 +77,7 @@ w:set_pause_mode("always")
 
 @(test)
 test_scene_transitions_and_preload :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({Engine_TempDir(), "ore_flow_test"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_flow_test"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	defer os.remove_all(dir)
 	write :: proc(dir, rel, text: string) {

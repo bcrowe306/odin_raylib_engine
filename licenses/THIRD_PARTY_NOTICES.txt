@@ -1,4 +1,4 @@
-Third-party software in the Ore editor and in games exported with it
+Third-party software in the Rayzr editor and in games exported with it
 ====================================================================
 
 Linked into the editor and the game runners: raylib (with GLFW, miniaudio,

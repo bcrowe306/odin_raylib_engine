@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 case "$(uname -s)" in Darwin) platform=macos ;; Linux) platform=linux ;; *) platform=windows ;; esac
 runner="${1:-bin/runners/$platform/runner}"
 editor="${2:-bin/editor}"
-tmp="$(mktemp -d /tmp/ore_crash_test.XXXXXX)"
+tmp="$(mktemp -d /tmp/rayzr_crash_test.XXXXXX)"
 trap 'rm -rf "$tmp"' EXIT
 fails=0
 [ -x "$runner" ] && [ -x "$editor" ] || { echo "no runner / editor: build them (scripts/build_runners.sh, odin build editor -out:bin/editor)"; exit 1; }
@@ -44,7 +44,7 @@ code=$?
 report=$(ls "$ud"/crashes/crash-*.txt 2>/dev/null | head -1)
 check "editor: crashed (exit $code)" test "$code" -ne 0 -a "$code" -ne 142
 check "editor: a report" test -n "$report"
-[ -n "$report" ] && check "editor: Ore Editor's report" grep -q "^Ore Editor crash report" "$report"
+[ -n "$report" ] && check "editor: Rayzr Editor's report" grep -q "^Rayzr Editor crash report" "$report"
 [ -n "$report" ] && check "editor: the panic" grep -q "panic: crash test" "$report"
 run "$editor" --project "$tmp/project" --hidden --user-data "$ud" --drive tests/crash/reopen.drive --shots "$tmp/shots" --no-build > "$tmp/editor_reopen.log" 2>&1
 check "editor: the next start offers it (tests/crash/reopen.drive)" grep -q "reopen.drive: [0-9]* passed, 0 failed" "$tmp/editor_reopen.log"

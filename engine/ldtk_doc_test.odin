@@ -206,7 +206,7 @@ test_ldtk_doc_external_levels_save :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(doc.levels), 3)
 	testing.expect(t, doc.levels[1].extRoot != nil)
 	testing.expect(t, len(doc.levels[1].layers) > 0)
-	dir := fmt.tprintf("%s/ore_ldtk_doc_zz", Engine_TempDir())
+	dir := fmt.tprintf("%s/rayzr_ldtk_doc_zz", Engine_TempDir())
 	_ = os.make_directory(dir)
 	out := fmt.tprintf("%s/SeparateLevelFiles.ldtk", dir)
 	testing.expect(t, Ldtk_Doc_Save(doc, out))
@@ -234,7 +234,7 @@ test_ldtk_doc_external_levels_save :: proc(t: ^testing.T) {
 // (Ldtk_ParseProject) loads the result.
 @(test)
 test_ldtk_doc_new_project_defs_entities_levels :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_new.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_new.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -343,7 +343,7 @@ test_ldtk_doc_tile_data_animation_terrain :: proc(t: ^testing.T) {
 	_, one := Ldtk_ParseTileAnim("anim=5", context.temp_allocator)
 	testing.expect(t, !one)
 
-	doc, dok := Ldtk_Doc_New("/tmp/ore_zz_tiles.ldtk")
+	doc, dok := Ldtk_Doc_New("/tmp/rayzr_zz_tiles.ldtk")
 	testing.expect(t, dok)
 	if !dok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -407,7 +407,7 @@ test_ldtk_doc_tile_data_animation_terrain :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_world_layout :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_layout.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_layout.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -428,7 +428,7 @@ test_ldtk_doc_world_layout :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_selection_move_copy_delete :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_sel.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_sel.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -493,7 +493,7 @@ test_ldtk_doc_selection_move_copy_delete :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_clipboard :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_clip.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_clip.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -562,7 +562,7 @@ test_ldtk_doc_duplicate_and_order_levels :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_tile_stacking_saved_selections_override :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_tiles2.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_tiles2.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -614,7 +614,7 @@ test_ldtk_doc_tile_stacking_saved_selections_override :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_field_values_arrays_refs :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_fields.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_fields.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -702,7 +702,7 @@ test_ldtk_doc_field_values_arrays_refs :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_field_and_entity_def_ops :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_defops.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_defops.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -775,7 +775,7 @@ test_ldtk_doc_field_and_entity_def_ops :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_rules_edit_and_wizard :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_rulesed.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_rulesed.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -862,7 +862,7 @@ test_ldtk_doc_rules_edit_and_wizard :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_level_bounds_bg_worlds :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_levels.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_levels.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -947,7 +947,7 @@ test_ldtk_doc_level_bounds_bg_worlds :: proc(t: ^testing.T) {
 	testing.expect(t, !Ldtk_Doc_RemoveWorld(doc, 0)) // the last one
 	// the saved file reloads with its worlds
 	text, _, _ := Ldtk_Doc_Serialize(doc, context.temp_allocator)
-	re, rok := Ldtk_Doc_LoadFromMemory(text, "/tmp/ore_zz_levels.ldtk")
+	re, rok := Ldtk_Doc_LoadFromMemory(text, "/tmp/rayzr_zz_levels.ldtk")
 	testing.expect(t, rok)
 	if rok {
 		testing.expect(t, re.multiWorlds)
@@ -958,7 +958,7 @@ test_ldtk_doc_level_bounds_bg_worlds :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_layer_defs :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_layers.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_layers.ldtk")
 	testing.expect(t, ok)
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
@@ -1036,7 +1036,7 @@ test_ldtk_doc_layer_defs :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_project_options :: proc(t: ^testing.T) {
-	dir := fmt.tprintf("%s/ore_ldtk_proj_zz", Engine_TempDir())
+	dir := fmt.tprintf("%s/rayzr_ldtk_proj_zz", Engine_TempDir())
 	os.remove_all(dir)
 	_ = os.make_directory(dir)
 	defer os.remove_all(dir)
@@ -1103,7 +1103,7 @@ test_ldtk_doc_project_options :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_enums :: proc(t: ^testing.T) {
-	dir := fmt.tprintf("%s/ore_ldtk_enums_zz", Engine_TempDir())
+	dir := fmt.tprintf("%s/rayzr_ldtk_enums_zz", Engine_TempDir())
 	os.remove_all(dir)
 	_ = os.make_directory(dir)
 	defer os.remove_all(dir)
@@ -1185,7 +1185,7 @@ test_ldtk_doc_enums :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_enum_sync_unused :: proc(t: ^testing.T) {
-	dir := fmt.tprintf("%s/ore_ldtk_esync_zz", Engine_TempDir())
+	dir := fmt.tprintf("%s/rayzr_ldtk_esync_zz", Engine_TempDir())
 	os.remove_all(dir)
 	_ = os.make_directory(dir)
 	defer os.remove_all(dir)
@@ -1208,7 +1208,7 @@ test_ldtk_doc_enum_sync_unused :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_exports :: proc(t: ^testing.T) {
-	dir := fmt.tprintf("%s/ore_ldtk_export_zz", Engine_TempDir())
+	dir := fmt.tprintf("%s/rayzr_ldtk_export_zz", Engine_TempDir())
 	os.remove_all(dir)
 	_ = os.make_directory_all(fmt.tprintf("%s/atlas", dir))
 	defer os.remove_all(dir)
@@ -1280,7 +1280,7 @@ test_ldtk_doc_exports :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_select_empty_and_reload :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_conv.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_conv.ldtk")
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
 	g := doc.layerDefs[0].gridSize
@@ -1311,7 +1311,7 @@ test_ldtk_doc_select_empty_and_reload :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_tilesets :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_ts.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_ts.ldtk")
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
 	img := rl.GenImageColor(64, 64, {255, 255, 255, 255})
@@ -1361,7 +1361,7 @@ test_ldtk_doc_tilesets :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_auto_level_identifiers :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_autoid.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_autoid.ldtk")
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
 	a := doc.allocator
@@ -1392,7 +1392,7 @@ test_ldtk_doc_auto_level_identifiers :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_level_spots :: proc(t: ^testing.T) {
-	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_spots.ldtk")
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_spots.ldtk")
 	if !ok do return
 	defer Ldtk_Doc_Destroy(doc)
 	Ldtk_Doc_SetWorldLayout(doc, 0, "Free")

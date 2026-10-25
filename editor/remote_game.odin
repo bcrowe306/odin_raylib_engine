@@ -13,7 +13,7 @@ import imgui "lib/imgui"
 // ============================================================================
 // Play-in-editor link: the game started with Play runs with --editor-link
 // (engine/editor_link.odin). The editor writes commands to its stdin and
-// reads "@ore:" replies from its output.
+// reads "@rayzr:" replies from its output.
 //
 // The running game's scene tree shows in the Scene panel's Remote view
 // (Local / Remote switch while the game runs) and in the bottom panel's
@@ -58,9 +58,9 @@ remote: struct {
 	sentAt:     time.Tick,
 	treeAt:     time.Tick,
 	nodeAt:     time.Tick,
-	steps:      int, // "@ore:stepped" replies (drives)
-	reloads:    int, // "@ore:reloaded" replies
-	debugDraw:  string, // the last "@ore:debug-draw" reply (drives)
+	steps:      int, // "@rayzr:stepped" replies (drives)
+	reloads:    int, // "@rayzr:reloaded" replies
+	debugDraw:  string, // the last "@rayzr:debug-draw" reply (drives)
 	connected:  bool,
 	picking:    bool,
 	collapsed:  map[string]bool,
@@ -137,8 +137,8 @@ remote_clear_props :: proc() {
 // RemoteGame_HandleLine takes a line of game output; true when it was a
 // link reply (not shown in the console).
 RemoteGame_HandleLine :: proc(state: ^EditorState, line: string) -> bool {
-	if !strings.has_prefix(line, "@ore:") do return false
-	msg := line[5:]
+	if !strings.has_prefix(line, "@rayzr:") do return false
+	msg := line[len("@rayzr:"):]
 	kind, rest := msg, ""
 	if i := strings.index_byte(msg, ' '); i >= 0 do kind, rest = msg[:i], msg[i + 1:]
 	switch kind {

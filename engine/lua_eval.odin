@@ -9,7 +9,7 @@ import lua "lua54"
 // ============================================================================
 // Lua console: evaluate a line typed in the editor's Console - in the
 // editor's Lua state while simulating, in the game over the editor link
-// ("eval <code>" -> "@ore:eval {...}") while it runs. An expression shows
+// ("eval <code>" -> "@rayzr:eval {...}") while it runs. An expression shows
 // its value(s); a statement runs (`GameState.score = 10`).
 // ============================================================================
 

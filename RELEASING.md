@@ -43,12 +43,12 @@ The workflow builds:
 
 | Platform | Files |
 |---|---|
-| macOS (Apple silicon) | `ore-editor-<version>-macos.dmg` |
-| Windows (x64) | `ore-editor-<version>-windows.zip` |
-| Linux (x64) | `ore-editor-<version>-linux-x86_64.AppImage`, `-amd64.deb`, `.tar.gz` |
+| macOS (Apple silicon) | `rayzr-editor-<version>-macos.dmg` |
+| Windows (x64) | `rayzr-editor-<version>-windows.zip` |
+| Linux (x64) | `rayzr-editor-<version>-linux-x86_64.AppImage`, `-amd64.deb`, `.tar.gz` |
 
 The version (the tag without `v`) is built into the editor and the runners
-(`ORE_RELEASE`: the editor's title and `--version`, `project.json`'s
+(`RAYZR_RELEASE`: the editor's title and `--version`, `project.json`'s
 `engine_version`, the update check). A dry run without publishing: Actions >
 Release > Run workflow (a version, no tag), or push to `release-dryrun`.
 

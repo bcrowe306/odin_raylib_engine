@@ -140,7 +140,7 @@ FrameTiming_BenchReport :: proc(label: string) -> string {
 	n := f64(max(ft.benchFrames, 1))
 	whole := ft.benchWhole / n
 	allocs := ""
-	when e.ORE_PROF do allocs = fmt.tprintf(" | %.1f heap allocs, temp %.0f KB", f64(ft.benchAllocs) / n, f64(ft.benchTempBytes) / n / 1024)
+	when e.RAYZR_PROF do allocs = fmt.tprintf(" | %.1f heap allocs, temp %.0f KB", f64(ft.benchAllocs) / n, f64(ft.benchTempBytes) / n / 1024)
 	return fmt.tprintf("[bench] editor %-22s %d frames: whole frame %.3f ms (%.0f fps) | poll %.3f | ui %.3f | viewport %.3f | draw %.3f | present %.3f%s",
 		label, ft.benchFrames, whole, 1000 / whole, ft.benchSum[.Poll] / n, ft.benchSum[.UI] / n, ft.benchSum[.Viewport] / n, ft.benchSum[.Draw] / n, ft.benchSum[.Present] / n, allocs)
 }

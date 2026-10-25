@@ -690,12 +690,12 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			// Drag to reorder.
 			if imgui.BeginDragDropSource({}) {
 				idx := c.int(f)
-				imgui.SetDragDropPayload("ORE_ANIM_FRAME", &idx, size_of(c.int))
+				imgui.SetDragDropPayload("RAYZR_ANIM_FRAME", &idx, size_of(c.int))
 				imgui.TextUnformatted(fmt.ctprintf("Frame %d", f + 1))
 				imgui.EndDragDropSource()
 			}
 			if imgui.BeginDragDropTarget() {
-				if pl := imgui.AcceptDragDropPayload("ORE_ANIM_FRAME"); pl != nil {
+				if pl := imgui.AcceptDragDropPayload("RAYZR_ANIM_FRAME"); pl != nil {
 					from := int((cast(^c.int)pl.Data)^)
 					if from != f {
 						Editor_RecordUndo(state, "Move frame")

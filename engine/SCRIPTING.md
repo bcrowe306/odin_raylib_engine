@@ -1,16 +1,16 @@
 # Lua 5.4 Scripting Subsystem
 
-The **Odin Raylib Engine** features a fast, memory-safe, embeddable Lua 5.4 scripting architecture. Game designers and developers can write high-level gameplay logic, enemy AI, scripted cutscenes, and reactive behaviors directly in Lua, attached directly to engine nodes with zero friction.
+The **Rayzr** features a fast, memory-safe, embeddable Lua 5.4 scripting architecture. Game designers and developers can write high-level gameplay logic, enemy AI, scripted cutscenes, and reactive behaviors directly in Lua, attached directly to engine nodes with zero friction.
 
 ---
 
 > [!IMPORTANT]
 > ### Engine Development Standard: Mandatory Lua Bindings, Documentation & LSP Integration
 > Going forward, **any functionality, node type, subsystem, or gameplay feature added to the engine MUST include**:
-> 1. **Lua Bindings**: Full adjacent Lua bindings implemented in [`engine/script_bindings.odin`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/script_bindings.odin).
-> 2. **LSP Integration**: Complete EmmyLua / LuaCATS type definitions and documentation annotations in [`engine/definitions/engine_api.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/definitions/engine_api.lua) and verified in [`.luarc.json`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/.luarc.json).
-> 3. **Documentation**: Clear architectural guidance, lifecycle details, and API reference updated here in [`engine/SCRIPTING.md`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/SCRIPTING.md).
-> 4. **Automated Verification**: End-to-end unit tests in [`engine/script_test.odin`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/script_test.odin) with `mem.Tracking_Allocator` asserting zero memory leaks and zero bad frees.
+> 1. **Lua Bindings**: Full adjacent Lua bindings implemented in [`engine/script_bindings.odin`](script_bindings.odin).
+> 2. **LSP Integration**: Complete EmmyLua / LuaCATS type definitions and documentation annotations in [`engine/definitions/engine_api.lua`](definitions/engine_api.lua) and verified in [`.luarc.json`](../.luarc.json).
+> 3. **Documentation**: Clear architectural guidance, lifecycle details, and API reference updated here in [`engine/SCRIPTING.md`](SCRIPTING.md).
+> 4. **Automated Verification**: End-to-end unit tests in [`engine/script_test.odin`](script_test.odin) with `mem.Tracking_Allocator` asserting zero memory leaks and zero bad frees.
 
 ---
 
@@ -398,7 +398,7 @@ immediately run the new functions. Newly declared properties appear with
 their defaults; removed ones disappear. If the new file has a syntax or
 runtime error, the error is logged and the previous code keeps running.
 Files are checked twice a second (`ScriptManager_CheckForChanges`); exported
-`.ore` games don't hot-reload.
+`.rayzr` games don't hot-reload.
 
 ---
 
@@ -465,8 +465,8 @@ section, searchable) with the function's API entry on top and the section
 about it (`Audio.play_sound` -> the Audio module)
 (`lua_api_docs_test.odin` keeps it that way: a new binding needs both).
 
-- **Stubs definition file**: [`engine/definitions/engine_api.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/engine/definitions/engine_api.lua)
-- **Root configuration**: [`.luarc.json`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/.luarc.json)
+- **Stubs definition file**: [`engine/definitions/engine_api.lua`](definitions/engine_api.lua)
+- **Root configuration**: [`.luarc.json`](../.luarc.json)
 
 ```json
 {
@@ -1454,13 +1454,13 @@ Simulate in Editor. A standalone game writes them to its standard output.
 
 ### 9. Project Module (`Project`)
 
-The `Project` global table allows scripts, editor tools, and runtime launchers to inspect, load, serialize, and package portable `.ore` game archives directly from Lua:
+The `Project` global table allows scripts, editor tools, and runtime launchers to inspect, load, serialize, and package portable `.rayzr` game archives directly from Lua:
 
 ```lua
--- Load a complete project from loose directory or .ore file
-local success = Project.load("assets/demo_project.ore")
+-- Load a complete project from loose directory or .rayzr file
+local success = Project.load("assets/demo_project.rayzr")
 
--- Check if an asset exists in mounted .ore or project directory
+-- Check if an asset exists in mounted .rayzr or project directory
 if Project.has_file("assets/scripts/enemy.lua") then
     local content = Project.read_file("assets/scripts/enemy.lua")
 end
@@ -1468,8 +1468,8 @@ end
 -- Serialize currently active scene to JSON string
 local sceneJson = Project.serialize_scene()
 
--- Export loose directory to standalone compressed .ore package
-Project.export_ore("my_project", "exports/release_game.ore")
+-- Export loose directory to standalone compressed .rayzr package
+Project.export_rayzr("my_project", "exports/release_game.rayzr")
 ```
 
 ## Release Packaging & Virtual File System (VFS)
@@ -1495,7 +1495,7 @@ The VFS automatically resolves the module from embedded memory or disk search pa
 
 ## Demo Game Integration
 
-An autonomous Recon Drone behavior is integrated into the Asteroids demo game ([`asteroids/game.odin`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/asteroids/game.odin)) using [`assets/scripts/orbiting_drone.lua`](file:///Users/brandoncrowe/Documents/Git/odin_raylib_engine/assets/scripts/orbiting_drone.lua):
+An autonomous Recon Drone behavior is integrated into the Asteroids demo game ([`asteroids/game.odin`](../asteroids/game.odin)) using [`assets/scripts/orbiting_drone.lua`](../assets/scripts/orbiting_drone.lua):
 
 1. **Embedded at compile-time**:
    ```odin

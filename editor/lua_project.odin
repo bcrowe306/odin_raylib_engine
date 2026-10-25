@@ -8,17 +8,17 @@ import "core:strings"
 // Lua tooling files in the project.
 //
 // The engine's API definitions are compiled into the editor and written to
-// <project>/.ore/definitions/ (rewritten when the editor's copy changes),
+// <project>/.rayzr/definitions/ (rewritten when the editor's copy changes),
 // and <project>/.luarc.json points lua-language-server at them - so the
 // built-in code editor, and VS Code or any LuaLS editor opening the project
 // folder, get the same completion and hover. Hidden files and folders
-// (.ore/, .luarc.json, ...) are not packaged into games.
+// (.rayzr/, .luarc.json, ...) are not packaged into games.
 // ============================================================================
 
 ENGINE_API_LUA :: #load("../engine/definitions/engine_api.lua", string)
 EDITOR_API_LUA :: #load("definitions/editor_api.lua", string) // (plugins: editor/docs/plugins.md)
 
-LUA_DEFINITIONS_DIR :: ".ore/definitions"
+LUA_DEFINITIONS_DIR :: ".rayzr/definitions"
 
 // write_if_changed writes a file unless it already has exactly this content.
 @(private = "file")
@@ -68,7 +68,8 @@ Lua_ProjectSetup :: proc(state: ^EditorState) -> string {
 	// definitions); a hand-written one is left alone.
 	luarc, _ := filepath.join({root, ".luarc.json"}, context.temp_allocator)
 	existing, err := os.read_entire_file(luarc, context.temp_allocator)
-	if err != nil || strings.contains(string(existing), LUA_DEFINITIONS_DIR) {
+	// (".ore/definitions": ours, from before the rename.)
+	if err != nil || strings.contains(string(existing), LUA_DEFINITIONS_DIR) || strings.contains(string(existing), ".ore/definitions") {
 		write_if_changed(luarc, luarc_text())
 	}
 	Lua_WriteProjectTypes(state)

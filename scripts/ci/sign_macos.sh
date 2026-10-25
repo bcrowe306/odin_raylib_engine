@@ -7,7 +7,7 @@
 #   MACOS_SIGNING_IDENTITY       e.g. "Developer ID Application: Name (TEAMID)"
 #   MACOS_NOTARY_APPLE_ID, MACOS_NOTARY_TEAM_ID, MACOS_NOTARY_PASSWORD
 #                                (an app-specific password) for notarytool
-#   scripts/ci/sign_macos.sh "dist/Ore Editor.app"
+#   scripts/ci/sign_macos.sh "dist/Rayzr Editor.app"
 set -euo pipefail
 app="$1"
 

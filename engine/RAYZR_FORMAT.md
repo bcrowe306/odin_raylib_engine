@@ -1,16 +1,16 @@
-# Portable ORE Format Specification (`.ore`) & JSON Project Architecture
+# Rayzr Package Format Specification (`.rayzr`) & JSON Project Architecture
 
-The **Odin Raylib Engine (ORE)** format is a high-performance, single-file container and serialization standard designed for data-driven game development. It decouples game design from compiled Odin source code, allowing complete games, scenes, physics configurations, node graphs, assets, and Lua scripts to be declared in portable files and manipulated via visual GUI editors.
+The **Rayzr package** format (`.rayzr`; before the rename: `.ore`, magic `ORE1` - still read) is a high-performance, single-file container and serialization standard designed for data-driven game development. It decouples game design from compiled Odin source code, allowing complete games, scenes, physics configurations, node graphs, assets, and Lua scripts to be declared in portable files and manipulated via visual GUI editors.
 
 ---
 
 ## 1. Architectural Overview
 
 ```
-Development Mode (Loose Files)           Export / Distribution Mode (.ore)
+Development Mode (Loose Files)           Export / Distribution Mode (.rayzr)
 ┌─────────────────────────────────┐      ┌─────────────────────────────────┐
-│ my_game/                        │      │ release_game.ore                │
-│  ├── project.json               │ ───► │  ├── [ORE1 Header: 32 bytes]    │
+│ my_game/                        │      │ release_game.rayzr              │
+│  ├── project.json               │ ───► │  ├── [RYZ1 Header: 32 bytes]      │
 │  ├── scenes/                    │ Pack │  ├── [Contiguous Compressed     │
 │  │    ├── main.scene.json       │      │  │    Payloads: Textures, Audio,│
 │  │    └── level2.scene.json     │      │  │    JSON, Lua Scripts]        │
@@ -23,18 +23,18 @@ Development Mode (Loose Files)           Export / Distribution Mode (.ore)
 
 The engine provides seamless **dual-mode resolution**:
 1. **Loose Directory Mode (Git-Friendly Development)**: The engine reads loose files directly from disk (`project.json`, `scenes/*.scene.json`, loose PNG/WAV/Lua files). Fast iteration without re-packaging.
-2. **Packaged Container Mode (`.ore` Release)**: All assets, scenes, and project configurations are compressed into a single binary archive. Can be embedded directly into release game binaries with `#load` or loaded from disk as a standalone portable package.
+2. **Packaged Container Mode (`.rayzr` Release)**: All assets, scenes, and project configurations are compressed into a single binary archive. Can be embedded directly into release game binaries with `#load` or loaded from disk as a standalone portable package.
 
 ---
 
-## 2. Binary Container Specification (`ORE1`)
+## 2. Binary Container Specification (`RYZ1`)
 
-The `.ore` file format uses an append-friendly layout where data payloads precede the Table of Contents (TOC), allowing high-throughput streaming and memory mapping:
+The `.rayzr` file format uses an append-friendly layout where data payloads precede the Table of Contents (TOC), allowing high-throughput streaming and memory mapping:
 
 ```
 +-------------------------------------------------------------+
 | Header (32 bytes)                                           |
-|   magic: [4]u8 ('O', 'R', 'E', '1')                          |
+|   magic: [4]u8 ('R', 'Y', 'Z', '1')                          |
 |   version: u32 (1)                                          |
 |   fileCount: u32                                            |
 |   tocOffset: u64                                            |
@@ -196,11 +196,11 @@ Scenes define the active camera, debug boundaries, and hierarchical node graphs.
 // 1. Load project directly from loose folder during development
 game->loadProject("my_project_folder")
 
-// 2. Export folder into standalone .ore container package
-game.exportOre("my_project_folder", "exports/game.ore")
+// 2. Export folder into standalone .rayzr container package
+game.exportRayzr("my_project_folder", "exports/game.rayzr")
 
-// 3. Load project directly from .ore container package
-game->loadProject("exports/game.ore")
+// 3. Load project directly from .rayzr container package
+game->loadProject("exports/game.rayzr")
 
 // 4. Serialize active scene to JSON string (for editor save operations)
 jsonString := e.Scene_SerializeToJSON(activeScene)
@@ -211,10 +211,10 @@ jsonString := e.Scene_SerializeToJSON(activeScene)
 ## 7. Engine API Usage in Lua
 
 ```lua
--- Load a complete project (.ore or directory)
-Project.load("assets/demo_project.ore")
+-- Load a complete project (.rayzr or directory)
+Project.load("assets/demo_project.rayzr")
 
--- Read arbitrary asset file from mounted .ore archive or disk
+-- Read arbitrary asset file from mounted .rayzr archive or disk
 local scriptSource = Project.read_file("assets/scripts/orbiting_drone.lua")
 
 -- Check file existence
@@ -225,6 +225,6 @@ end
 -- Serialize current scene to JSON
 local jsonStr = Project.serialize_scene()
 
--- Pack loose project directory into .ore package
-Project.export_ore("assets/demo_project", "assets/demo_project.ore")
+-- Pack loose project directory into .rayzr package
+Project.export_rayzr("assets/demo_project", "assets/demo_project.rayzr")
 ```

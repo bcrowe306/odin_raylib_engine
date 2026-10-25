@@ -8,10 +8,11 @@ import "core:path/filepath"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
+import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
-// Editor settings (per user, not per project): ~/.config/ore_editor/
+// Editor settings (per user, not per project): ~/.config/rayzr_editor/
 // settings.ini - general options, code editor, theme, recent projects,
 // keymap, one [section] each. Edited in Settings > General / Code Editor.
 // An older settings.json is read once and replaced. Test drives use a file
@@ -155,6 +156,19 @@ Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 }
 
 // Editor_SettingsPath: where settings live (drives: inside the project copy).
+// Editor_MigrateLegacyConfig moves the editor's per-user folder from its
+// name before the rename (~/.config/ore_editor: settings, recent projects,
+// workspaces, plugins, crash reports) to ~/.config/rayzr_editor - once.
+// Not in test drives or with --user-data (they never touch the real one).
+Editor_MigrateLegacyConfig :: proc() {
+	for a in os.args do if a == "--drive" || a == "--user-data" || a == "--test-e2e" do return
+	home, err := os.user_home_dir(context.temp_allocator)
+	if err != nil do return
+	old, _ := filepath.join({home, ".config", "ore_editor"}, context.temp_allocator)
+	new_, _ := filepath.join({home, ".config", "rayzr_editor"}, context.temp_allocator)
+	e.Legacy_MigrateDir(old, new_)
+}
+
 Editor_SettingsFilePath :: proc(state: ^EditorState) -> string {
 	if GlobalDrive.enabled {
 		p, _ := filepath.join({state.projectPath, ".editor_settings.ini"}, context.allocator)
@@ -162,7 +176,7 @@ Editor_SettingsFilePath :: proc(state: ^EditorState) -> string {
 	}
 	home, err := os.user_home_dir(context.temp_allocator)
 	if err != nil do return strings.clone(".editor_settings.ini")
-	p, _ := filepath.join({home, ".config", "ore_editor", "settings.ini"}, context.allocator)
+	p, _ := filepath.join({home, ".config", "rayzr_editor", "settings.ini"}, context.allocator)
 	return p
 }
 
@@ -222,7 +236,7 @@ Editor_LoadSettings :: proc(state: ^EditorState) {
 Editor_RecentProjectsAtStartup :: proc() -> []string {
 	home, err := os.user_home_dir(context.temp_allocator)
 	if err != nil do return nil
-	path, _ := filepath.join({home, ".config", "ore_editor", "settings.ini"}, context.temp_allocator)
+	path, _ := filepath.join({home, ".config", "rayzr_editor", "settings.ini"}, context.temp_allocator)
 	data, rerr := os.read_entire_file(path, context.temp_allocator)
 	if rerr != nil do return nil
 	Editor_Settings_Destroy(&GlobalSettings)
@@ -414,7 +428,7 @@ jb :: proc(obj: json.Object, k: string, d: bool) -> bool {
 Editor_SaveSettings :: proc() -> bool {
 	s := &GlobalSettings
 	sb := strings.builder_make(context.temp_allocator)
-	strings.write_string(&sb, "; Ore editor settings (Settings in the editor writes this file)\n\n[general]\n")
+	strings.write_string(&sb, "; Rayzr editor settings (Settings in the editor writes this file)\n\n[general]\n")
 	fmt.sbprintf(&sb, "ui_scale = %.2f\nautosave_minutes = %d\ngrid_size = %.0f\n", s.uiScale, s.autosaveMinutes, s.gridSize)
 	fmt.sbprintf(&sb, "snap_to_grid = %t\nshow_grid = %t\nconfirm_quit = %t\nshow_welcome = %t\ncheck_updates = %t\n", s.snapToGrid, s.showGrid, s.confirmQuit, s.showWelcome, s.checkUpdates)
 	fmt.sbprintf(&sb, "show_tab_bars = %t\nauto_bottom_panel = %t\n", s.showTabBars, s.autoBottomPanel)

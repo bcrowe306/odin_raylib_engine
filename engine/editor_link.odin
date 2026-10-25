@@ -11,29 +11,29 @@ import rl "vendor:raylib"
 // ============================================================================
 // Editor link (--editor-link): the editor that launched the game drives it
 // through stdin, one command per line; answers are stdout lines starting
-// with "@ore:" (the editor reads them, its console hides them).
+// with "@rayzr:" (the editor reads them, its console hides them).
 //
 //   pause / resume              freeze the game (it is still drawn) / go on
 //   step [n]                    while paused: run n frames of 1/60 s
-//   tree [hash]                 -> @ore:tree {"frame", "frozen", "scene", "hash", "root"}, or
-//                                  @ore:tree-same {"frame", ...} when the tree's hash is still `hash`
-//   inspect <path>              -> @ore:node {"path", "props": [[name, value, kind, extra], ...]}
+//   tree [hash]                 -> @rayzr:tree {"frame", "frozen", "scene", "hash", "root"}, or
+//                                  @rayzr:tree-same {"frame", ...} when the tree's hash is still `hash`
+//   inspect <path>              -> @rayzr:node {"path", "props": [[name, value, kind, extra], ...]}
 //                                  kind: float int bool vec2 color enum bit_set string (ro = read-only);
 //                                  extra: enum names "A|B" or a range "min|max"
 //   highlight <path>            outline that node in the game ("" = none)
-//   pick                        the next click in the game picks the topmost node there -> @ore:picked <path>
-//   remove <path>               remove a node -> @ore:removed <path> true|false
+//   pick                        the next click in the game picks the topmost node there -> @rayzr:picked <path>
+//   remove <path>               remove a node -> @rayzr:removed <path> true|false
 //   set <path> <prop> <value>   change a property ("position" "10,20", "rotation", any reflected one)
 //   reload-scene <file>         re-read a scene file; restart it when it's the current scene
-//   eval <lua>                  -> @ore:eval {"ok", "code", "text"} (the Console's Lua line)
-//   sm <path>                   -> @ore:sm {status} (a state machine, live: state_machine_node.odin)
-//   mixer-peaks                 -> @ore:mixer-peaks [[bus, left, right, clip], ...]
+//   eval <lua>                  -> @rayzr:eval {"ok", "code", "text"} (the Console's Lua line)
+//   sm <path>                   -> @rayzr:sm {status} (a state machine, live: state_machine_node.odin)
+//   mixer-peaks                 -> @rayzr:mixer-peaks [[bus, left, right, clip], ...]
 //   mixer-set <bus> volume|pan|mute|solo <v> / mixer-fx <bus> <slot> <param> <v> /
 //   mixer-fx-enabled <bus> <slot> 0|1 / mixer-load <buses JSON>   the Mixer tab, live
-//   sm-break <path> <state> 0|1 pause when that machine enters that state (-> @ore:sm-break)
+//   sm-break <path> <state> 0|1 pause when that machine enters that state (-> @rayzr:sm-break)
 //   break-set <file> <l,l,...>  breakpoints in a script (break-clear: none); a hit
 //                               pauses the game in the script (lua_debugger.odin):
-//                               -> @ore:stopped {...}, then continue / step-* / locals
+//                               -> @rayzr:stopped {...}, then continue / step-* / locals
 //
 // Paths are node names from the scene root, '/'-separated ("Player/Gun").
 // Scripts and textures reload by themselves when their files change.
@@ -58,9 +58,9 @@ EditorLink_Enable :: proc(game: ^Game) {
 	editorLink.game = game
 	StateMachine_EnterHook = link_sm_enter
 	// Breakpoints: the debugger waits for commands on stdin while stopped.
-	LuaDebugger_Attach(game.scriptManager.L, link_wait_command, proc(kind, json: string) {fmt.printfln("@ore:%s %s", kind, json)})
+	LuaDebugger_Attach(game.scriptManager.L, link_wait_command, proc(kind, json: string) {fmt.printfln("@rayzr:%s %s", kind, json)})
 	luaDebugger.projectDir = game.assetManager.projectDir
-	fmt.println("@ore:hello")
+	fmt.println("@rayzr:hello")
 }
 
 // link_wait_command blocks until the editor sends a line (the game is
@@ -130,24 +130,24 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 	switch cmd {
 	case "pause":
 		game.linkPaused = true
-		fmt.println("@ore:paused")
+		fmt.println("@rayzr:paused")
 	case "resume":
 		game.linkPaused = false
 		editorLink.steps = 0
-		fmt.println("@ore:resumed")
+		fmt.println("@rayzr:resumed")
 	case "step":
 		n := 1
 		if v, ok := strconv.parse_int(rest); ok do n = max(v, 1)
 		game.linkPaused = true
 		editorLink.steps += n
-		fmt.printfln("@ore:stepped %d", n)
+		fmt.printfln("@rayzr:stepped %d", n)
 	case "tree":
 		// "tree <hash>": unchanged trees answer in a few bytes.
 		root, h := EditorLink_TreeRootJSON(game)
 		if rest != "" && rest == fmt.tprint(h) {
-			fmt.printfln("@ore:tree-same {{\"frame\": %d, \"frozen\": %t, \"paused\": %t}}", editorLink.frame, game.frozen, game.linkPaused)
+			fmt.printfln("@rayzr:tree-same {{\"frame\": %d, \"frozen\": %t, \"paused\": %t}}", editorLink.frame, game.frozen, game.linkPaused)
 		} else {
-			fmt.printfln("@ore:tree %s", EditorLink_TreeJSON(game, root, h))
+			fmt.printfln("@rayzr:tree %s", EditorLink_TreeJSON(game, root, h))
 		}
 	case "highlight":
 		delete(editorLink.highlight)
@@ -158,15 +158,15 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 		n := link_find(game, rest)
 		ok := n != nil && n != game.sceneManager.currentScene.rootNode
 		if ok do RemoveNode(game.sceneManager.currentScene.manager, n)
-		fmt.printfln("@ore:removed %s %t", rest, ok)
+		fmt.printfln("@rayzr:removed %s %t", rest, ok)
 	case "inspect":
-		fmt.printfln("@ore:node %s", EditorLink_NodeJSON(game, rest))
+		fmt.printfln("@rayzr:node %s", EditorLink_NodeJSON(game, rest))
 	case "set":
 		parts := strings.fields(rest, context.temp_allocator)
 		if len(parts) >= 3 {
 			value := strings.join(parts[2:], " ", context.temp_allocator)
 			ok := EditorLink_Set(game, parts[0], parts[1], value)
-			fmt.printfln("@ore:set %s %s %t", parts[0], parts[1], ok)
+			fmt.printfln("@rayzr:set %s %s %t", parts[0], parts[1], ok)
 		}
 	case "break-set":
 		LuaDebugger_Command(rest)
@@ -175,7 +175,7 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 	case "break-cond":
 		LuaDebugger_CondCommand(rest)
 	case "reload-scene":
-		fmt.printfln("@ore:reloaded %s %t", rest, Game_ReloadSceneFile(game, rest))
+		fmt.printfln("@rayzr:reloaded %s %t", rest, Game_ReloadSceneFile(game, rest))
 	case "sm":
 		n := link_find(game, rest)
 		if n == nil || n.typeId != StateMachineNode {
@@ -183,14 +183,14 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 			strings.write_string(&sb, "{\"path\": ")
 			link_str(&sb, rest)
 			strings.write_string(&sb, ", \"missing\": true}")
-			fmt.printfln("@ore:sm %s", strings.to_string(sb))
+			fmt.printfln("@rayzr:sm %s", strings.to_string(sb))
 		} else {
 			sm := cast(^StateMachineNode)n
 			sm.explain = true // the editor shows its ways out (from the next update)
-			fmt.printfln("@ore:sm %s", StateMachine_StatusJSON(sm, rest))
+			fmt.printfln("@rayzr:sm %s", StateMachine_StatusJSON(sm, rest))
 		}
 	case "mixer-peaks":
-		// -> @ore:mixer-peaks [[index, left, right, clip], ...] (the meters while the game plays)
+		// -> @rayzr:mixer-peaks [[index, left, right, clip], ...] (the meters while the game plays)
 		sb := strings.builder_make(context.temp_allocator)
 		strings.write_byte(&sb, '[')
 		for b, i in Mixer_Buses() {
@@ -198,7 +198,7 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 			fmt.sbprintf(&sb, "[%d, %.4f, %.4f, %d]", b.index, b.peak[0], b.peak[1], 1 if b.clip else 0)
 		}
 		strings.write_byte(&sb, ']')
-		fmt.printfln("@ore:mixer-peaks %s", strings.to_string(sb))
+		fmt.printfln("@rayzr:mixer-peaks %s", strings.to_string(sb))
 	case "mixer-set":
 		// mixer-set <bus> volume|pan|mute|solo <value>
 		parts := strings.fields(rest, context.temp_allocator)
@@ -251,11 +251,11 @@ EditorLink_Command :: proc(game: ^Game, line: string) {
 		link_str(&sb, rest)
 		strings.write_string(&sb, ", \"text\": ")
 		link_str(&sb, text)
-		fmt.printfln("@ore:eval %s}", strings.to_string(sb))
+		fmt.printfln("@rayzr:eval %s}", strings.to_string(sb))
 	case "debug-draw":
 		// Colliders, joints and areas drawn (the toolbar's Show Colliders).
 		game.physicsWorld.drawPhysicsDebug = rest == "true"
-		fmt.printfln("@ore:debug-draw %t", game.physicsWorld.drawPhysicsDebug)
+		fmt.printfln("@rayzr:debug-draw %t", game.physicsWorld.drawPhysicsDebug)
 	}
 }
 
@@ -605,8 +605,8 @@ link_sm_enter :: proc(sm: ^StateMachineNode, state: string) {
 		strings.write_string(&sb, ", \"state\": ")
 		link_str(&sb, state)
 		strings.write_byte(&sb, '}')
-		fmt.printfln("@ore:sm-break %s", strings.to_string(sb))
-		fmt.println("@ore:paused")
+		fmt.printfln("@rayzr:sm-break %s", strings.to_string(sb))
+		fmt.println("@rayzr:paused")
 		return
 	}
 }
@@ -710,5 +710,5 @@ EditorLink_UpdatePick :: proc(game: ^Game) {
 	scene := game.sceneManager.currentScene
 	n := EditorLink_Pick(game, rl.GetMousePosition())
 	path := link_path(scene.manager, scene.rootNode, n) if n != nil else ""
-	fmt.printfln("@ore:picked %s", path)
+	fmt.printfln("@rayzr:picked %s", path)
 }

@@ -73,7 +73,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		Drive_Item("menu:File/Export")
 		if exportOpen {
 			menuCurrent = "Export"
-			menu_action(state, "file.export", ".ore Package")
+			menu_action(state, "file.export", ".rayzr Package")
 			menu_action(state, "file.export_standalone", "Standalone Game")
 			menu_action(state, "file.open_web_export", "Open Web Export in Browser")
 			menuCurrent = "File"
@@ -227,7 +227,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		imgui.Separator()
 		menu_action(state, "help.report_bug")
 		menu_action(state, "help.crash_folder")
-		if menu_item("About") do Editor_Log(state, .Info, "Ore Editor %s - third-party notices: THIRD_PARTY_NOTICES.txt in the editor's folder", e.ORE_RELEASE)
+		if menu_item("About") do Editor_Log(state, .Info, "Rayzr Editor %s - third-party notices: THIRD_PARTY_NOTICES.txt in the editor's folder", e.RAYZR_RELEASE)
 		PluginAPI_MenuItems(state, "Help") // plugin commands placed here (plugin_api.odin)
 		imgui.EndMenu()
 	}

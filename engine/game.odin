@@ -89,12 +89,12 @@ Game :: struct {
 	createScene: proc(game: ^Game, name: string, next_scene: bool, setup: SceneSetupProc = nil) -> ^Scene,
 	changeScene: proc(game: ^Game, name: string),
 	loadProject: proc(game: ^Game, pathOrDir: string) -> bool,
-	exportOre:   proc(projectDir: string, outOrePath: string) -> bool,
+	exportRayzr:   proc(projectDir: string, outRayzrPath: string) -> bool,
 }
 
 
 InitializeGame :: proc(game: ^Game) {
-	game.scriptManager.hotReload = true // turned off for .ore packages
+	game.scriptManager.hotReload = true // turned off for .rayzr packages
 
 	log.info("Initializing game")
 	err := vmem.arena_init_growing(&game.arena)
@@ -119,7 +119,7 @@ InitializeGame :: proc(game: ^Game) {
 	game.createScene = GameCreateScene
 	game.changeScene = GameChangeScene
 	game.loadProject = Game_LoadProject
-	game.exportOre = Game_ExportOrePackage
+	game.exportRayzr = Game_ExportRayzrPackage
 
 	InputSystem_Init(&game.input)
 	PhysicsWorld_Init(&game.physicsWorld)
@@ -239,8 +239,8 @@ GameChangeScene :: proc(game: ^Game, name: string) {
 	ChangeScene_ByName(&game.sceneManager, name)
 }
 
-Game_ExportOrePackage :: proc(projectDir: string, outOrePath: string) -> bool {
-	return OrePackage_CreateFromDirectory(projectDir, outOrePath, true)
+Game_ExportRayzrPackage :: proc(projectDir: string, outRayzrPath: string) -> bool {
+	return RayzrPackage_CreateFromDirectory(projectDir, outRayzrPath, true)
 }
 
 // Use this to allocate resources that should share lifetime with the game

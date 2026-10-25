@@ -12,7 +12,7 @@ import e "../engine"
 //   Contents/Info.plist
 //   Contents/MacOS/<Name>              the runner
 //   Contents/Frameworks/*.dylib        the runner's libraries (liblua.dylib)
-//   Contents/Resources/game.ore
+//   Contents/Resources/game.rayzr
 //   Contents/Resources/fonts/OpenSans-Regular.ttf
 //   Contents/Resources/AppIcon.icns    from the project icon (PNG)
 //
@@ -29,7 +29,7 @@ Export_BundleId :: proc(cfg: ^e.ProjectConfig, exeName: string) -> string {
 		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' do strings.write_rune(&sb, r)
 	}
 	id := strings.to_string(sb)
-	return fmt.tprintf("com.ore.%s", id if id != "" else "game")
+	return fmt.tprintf("com.rayzr.%s", id if id != "" else "game")
 }
 
 @(private = "file")
@@ -102,7 +102,7 @@ run_tool :: proc(state: ^EditorState, cmd: []string) -> bool {
 
 // Export_MacApp builds <dir>/<name>.app from a runner (cfg: the project
 // settings with the preset's overrides).
-Export_MacApp :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, dir, name: string) -> (string, bool) {
+Export_MacApp :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, rayzr, dir, name: string) -> (string, bool) {
 	app, _ := filepath.join({dir, strings.concatenate({name, ".app"}, context.temp_allocator)}, context.temp_allocator)
 	_ = os.remove_all(app) // a fresh bundle (it's ours: <preset folder>/<name>.app)
 	contents, _ := filepath.join({app, "Contents"}, context.temp_allocator)
@@ -122,9 +122,9 @@ Export_MacApp :: proc(state: ^EditorState, cfg: ^e.ProjectConfig, runner, ore, d
 		dst, _ := filepath.join({frameworks, filepath.base(lib)}, context.temp_allocator)
 		_ = os.copy_file(dst, lib)
 	}
-	dstOre, _ := filepath.join({res, "game.ore"}, context.temp_allocator)
-	if err := os.copy_file(dstOre, ore); err != nil {
-		Editor_Log(state, .Error, "Could not write %s: %v", dstOre, err)
+	dstRayzr, _ := filepath.join({res, "game.rayzr"}, context.temp_allocator)
+	if err := os.copy_file(dstRayzr, rayzr); err != nil {
+		Editor_Log(state, .Error, "Could not write %s: %v", dstRayzr, err)
 		return "", false
 	}
 	if cfg.export.includeFont {

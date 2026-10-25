@@ -15,7 +15,7 @@ import imgui "lib/imgui"
 //
 // The server runs with the project as its workspace and the engine's API
 // definitions as a library (compiled into the editor and written to
-// <project>/.ore/definitions, see lua_project.odin), so completion, hover
+// <project>/.rayzr/definitions, see lua_project.odin), so completion, hover
 // and signature help know every engine global (Input, Scene, ...), the Node
 // methods, and the ScriptInstanceBase callbacks (ready, update, on_*).
 // Settings are passed through workspace/configuration (Client.settings).
@@ -88,7 +88,7 @@ code_lsp_start :: proc(state: ^EditorState) {
 	append(&cmd, server)
 	if !Resources_InCheckout() {
 		if cache, err := os.user_cache_dir(context.temp_allocator); err == nil {
-			append(&cmd, fmt.tprintf("--metapath=%s/ore_editor/luals/meta", cache), fmt.tprintf("--logpath=%s/ore_editor/luals/log", cache))
+			append(&cmd, fmt.tprintf("--metapath=%s/rayzr_editor/luals/meta", cache), fmt.tprintf("--logpath=%s/rayzr_editor/luals/log", cache))
 		}
 	}
 	if !lsp.client_start(&cm.client, cmd[:], root) {

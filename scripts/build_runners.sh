@@ -3,7 +3,7 @@
 # bin/runners/<platform>/ - runner (release) and runner-debug (debug info,
 # a console on Windows; export presets with "Debug" use it) - with the UI
 # font in bin/runners/. The editor's
-# Export Standalone Game copies it next to the game's .ore - no compiler
+# Export Standalone Game copies it next to the game's .rayzr - no compiler
 # needed when exporting. Run it on each platform you ship for and copy the
 # runners/<platform>/ folders next to the editor (or into bin/runners/).
 #   scripts/build_runners.sh            # release (-o:speed)

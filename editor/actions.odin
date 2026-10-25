@@ -115,7 +115,7 @@ Actions_Init :: proc() {
 	}})
 	add({id = "file.settings", category = "File", label = "Settings...", chords = k(ch(.Comma, P)), scope = .Global, run = proc(s: ^EditorState) {Settings_Open(s, .General)}})
 	add({id = "file.project_settings", category = "File", label = "Project Settings...", scope = .Global, run = ProjectSettingsDialog_Open})
-	add({id = "file.export", category = "File", label = "Export .ore Package...", scope = .Global, run = Toolbar_ExportOre})
+	add({id = "file.export", category = "File", label = "Export .rayzr Package...", scope = .Global, run = Toolbar_ExportRayzr})
 	add({id = "file.open_web_export", category = "File", label = "Open Web Export in Browser", scope = .Global, run = Editor_OpenWebExport, enabled = proc(s: ^EditorState) -> bool {return s.webExportDir != ""}})
 	add({id = "file.export_standalone", category = "File", label = "Export Standalone Game...", scope = .Global, run = proc(s: ^EditorState) {Editor_ExportStandalone(s)}, enabled = proc(s: ^EditorState) -> bool {return !s.buildRunning}})
 	add({id = "file.quit", category = "File", label = "Quit", chords = k(ch(.Q, P)), scope = .Global, run = proc(s: ^EditorState) {Editor_RequestQuit(s)}})

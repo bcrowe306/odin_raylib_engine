@@ -64,8 +64,8 @@ test_project_icon_and_runner_args :: proc(t: ^testing.T) {
 	defer ProjectConfig_Destroy(&c2)
 	testing.expect_value(t, c2.icon, "textures/icon.png")
 
-	opts := Engine_ParseRunArgs({"game.ore", "--user-data", "/tmp/saves", "--frames", "5"})
-	testing.expect_value(t, opts.projectPath, "game.ore")
+	opts := Engine_ParseRunArgs({"game.rayzr", "--user-data", "/tmp/saves", "--frames", "5"})
+	testing.expect_value(t, opts.projectPath, "game.rayzr")
 	testing.expect_value(t, opts.userDataDir, "/tmp/saves")
 	testing.expect_value(t, opts.maxFrames, 5)
 }
