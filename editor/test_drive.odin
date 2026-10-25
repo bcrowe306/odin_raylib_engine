@@ -7,6 +7,7 @@ import "core:path/filepath"
 import "core:strconv"
 import "core:strings"
 import "core:time"
+import "core:mem/virtual"
 import rl "vendor:raylib"
 import e "../engine"
 import imgui "lib/imgui"
@@ -70,6 +71,10 @@ TestDrive :: struct {
 	mouse:      [2]f32,
 	items:      map[string]Drive_Rect, // registered this frame
 	prevItems:  map[string]Drive_Rect, // registered last frame (used for lookups)
+	// The ids' copies: one arena per frame, swapped with the maps (a
+	// frame's ids live until the frame after it is done).
+	idArenas:   [2]virtual.Arena,
+	idArena:    int,
 	passed:     int,
 	failed:     int,
 	shotIndex:  int,
@@ -134,11 +139,17 @@ Drive_Item :: proc(id: string) {
 	mx := imgui.GetItemRectMax()
 	wp := imgui.GetWindowPos()
 	ws := imgui.GetWindowSize()
-	GlobalDrive.items[strings.clone(id, context.temp_allocator)] = {
+	GlobalDrive.items[drive_id(id)] = {
 		min = {mn.x, mn.y}, max = {mx.x, mx.y},
 		clipMin = {wp.x, wp.y}, clipMax = {wp.x + ws.x, wp.y + ws.y}, hasClip = true,
 		noScroll = driveNoScroll,
 	}
+}
+
+// drive_id: a copy of `id` that lives until the end of the next frame.
+@(private = "file")
+drive_id :: proc(id: string) -> string {
+	return strings.clone(id, virtual.arena_allocator(&GlobalDrive.idArenas[GlobalDrive.idArena]))
 }
 
 // Drive_ItemRect registers an explicit rectangle under `id`.
@@ -149,10 +160,10 @@ Drive_ItemRect :: proc(id: string, mn, mx: [2]f32, inWindow := false) {
 	if inWindow {
 		wp := imgui.GetWindowPos()
 		ws := imgui.GetWindowSize()
-		GlobalDrive.items[strings.clone(id, context.temp_allocator)] = {min = mn, max = mx, clipMin = {wp.x, wp.y}, clipMax = {wp.x + ws.x, wp.y + ws.y}, hasClip = true}
+		GlobalDrive.items[drive_id(id)] = {min = mn, max = mx, clipMin = {wp.x, wp.y}, clipMax = {wp.x + ws.x, wp.y + ws.y}, hasClip = true}
 		return
 	}
-	GlobalDrive.items[strings.clone(id, context.temp_allocator)] = {min = mn, max = mx}
+	GlobalDrive.items[drive_id(id)] = {min = mn, max = mx}
 }
 
 // TestDrive_BeginFrame runs before ImGui's NewFrame: it advances the script
@@ -195,13 +206,12 @@ TestDrive_BeginFrame :: proc(d: ^TestDrive, state: ^EditorState) -> (quit: bool)
 // screenshots see the finished frame.
 TestDrive_EndFrame :: proc(d: ^TestDrive) {
 	if !d.enabled do return
-	// This frame's registrations become the next frame's lookup table: owned
-	// copies, made now - the ids are temp-allocated and the temp arena is
-	// freed at the end of the frame (main.odin).
-	for k in d.prevItems do delete(k)
-	clear(&d.prevItems)
-	for k, v in d.items do d.prevItems[strings.clone(k)] = v
+	// This frame's registrations become the next frame's lookup table (their
+	// ids are in this frame's arena); the frame before's arena is reused.
+	d.items, d.prevItems = d.prevItems, d.items
 	clear(&d.items)
+	d.idArena = 1 - d.idArena
+	virtual.arena_free_all(&d.idArenas[d.idArena])
 	if d.pendingShot == "" do return
 	d.shotIndex += 1
 	path := fmt.tprintf("%s/%02d_%s.png", d.shotsDir, d.shotIndex, d.pendingShot)

@@ -1,7 +1,9 @@
 package engine
 
 import "base:runtime"
+import "core:fmt"
 import "core:log"
+import "core:slice"
 import "core:mem"
 import "core:prof/spall"
 import "core:strconv"
@@ -21,7 +23,9 @@ import "core:sync"
 // The runner and the editor take `--prof <file.spall>` (the trace),
 // `--prof-skip N` (frames before recording; default 30, the warm-up) and
 // `--prof-frames N` (frames recorded; default 300, 0 = until exit). A
-// build without ORE_PROF says so when --prof is given.
+// build without ORE_PROF says so when --prof is given. `--prof-alloc-sites`
+// also counts heap allocations by source line (from frame --prof-skip on)
+// and prints the busiest at exit.
 // ============================================================================
 
 ORE_PROF :: #config(ORE_PROF, false)
@@ -31,6 +35,12 @@ Prof_Frame_Stats :: struct {
 	frees:     int,
 	bytes:     int, // bytes requested from the heap this frame
 	tempBytes: int, // the temp arena's use at the end of the frame
+}
+
+Prof_Site :: struct {
+	file: rawptr, // (the location's path: a constant string)
+	line: i32,
+	loc:  runtime.Source_Code_Location,
 }
 
 Prof_State :: struct {
@@ -47,6 +57,9 @@ Prof_State :: struct {
 	counting:   Prof_Frame_Stats, // this frame so far
 	last:       Prof_Frame_Stats, // the last whole frame
 	totalAllocs: int,             // since Prof_Init
+	allocSites: bool,             // --prof-alloc-sites
+	mainThread: int,
+	sites:      map[Prof_Site]int,
 }
 
 prof: Prof_State
@@ -58,6 +71,7 @@ prof_buffer: spall.Buffer
 Prof_ParseArgs :: proc(args: []string) {
 	prof.skip = 30
 	prof.frames = 300
+	for a in args do if a == "--prof-alloc-sites" do prof.allocSites = true
 	for i := 0; i + 1 < len(args); i += 1 {
 		n, _ := strconv.parse_int(args[i + 1])
 		switch args[i] {
@@ -77,6 +91,8 @@ Prof_ParseArgs :: proc(args: []string) {
 Prof_Init :: proc(heap: mem.Allocator) -> mem.Allocator {
 	when ORE_PROF {
 		prof.backingAllocator = heap
+		prof.mainThread = sync.current_thread_id()
+		if prof.allocSites do prof.sites = make(map[Prof_Site]int, 256, heap)
 		if prof.path != "" {
 			ctx, ok := spall.context_create(prof.path)
 			if ok {
@@ -98,6 +114,17 @@ Prof_Init :: proc(heap: mem.Allocator) -> mem.Allocator {
 // Prof_Shutdown writes out and closes the trace.
 Prof_Shutdown :: proc() {
 	when ORE_PROF {
+		if prof.allocSites {
+			Row :: struct {site: Prof_Site, n: int}
+			rows := make([dynamic]Row, 0, len(prof.sites), prof.backingAllocator)
+			for k, n in prof.sites do append(&rows, Row{k, n})
+			slice.sort_by(rows[:], proc(a, b: Row) -> bool {return a.n > b.n})
+			frames := max(prof.frame - prof.skip, 1)
+			fmt.printfln("[prof] heap allocations by site, per frame (%d frames):", frames)
+			for r in rows[:min(len(rows), 25)] do fmt.printfln("  %9.1f  %s:%d %s", f64(r.n) / f64(frames), r.site.loc.file_path, r.site.loc.line, r.site.loc.procedure)
+			delete(rows)
+			delete(prof.sites)
+		}
 		if !prof.opened do return
 		spall.buffer_destroy(&prof.ctx, &prof_buffer)
 		spall.context_destroy(&prof.ctx)
@@ -173,6 +200,10 @@ when ORE_PROF {
 		case .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed:
 			sync.atomic_add(&prof.counting.allocs, 1)
 			sync.atomic_add(&prof.counting.bytes, size)
+			if prof.allocSites && prof.frame >= prof.skip && sync.current_thread_id() == prof.mainThread {
+				context.allocator = prof.backingAllocator
+				prof.sites[Prof_Site{raw_data(loc.file_path), loc.line, loc}] += 1
+			}
 		case .Free:
 			if old_memory != nil do sync.atomic_add(&prof.counting.frees, 1)
 		}

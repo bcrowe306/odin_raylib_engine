@@ -107,6 +107,14 @@ shutdown :: proc() {
 
 	io.Fonts.TexID = nil
 	delete(raylib_key_map)
+	for set in gpu.sets {
+		if set.vbo != 0 do rlgl.UnloadVertexBuffer(set.vbo)
+		if set.ebo != 0 do rlgl.UnloadVertexBuffer(set.ebo)
+		if set.vao != 0 do rlgl.UnloadVertexArray(set.vao)
+	}
+	delete(gpu.vtx)
+	delete(gpu.idx)
+	gpu = {}
 }
 
 new_frame :: proc() {
@@ -170,6 +178,10 @@ new_frame :: proc() {
 	}
 }
 
+// render_draw_data draws ImGui's lists: each list's vertices and indices go
+// to GPU buffers once, then one indexed draw per command (scissored). Where
+// vertex arrays aren't available it falls back to raylib's immediate mode
+// (a call per vertex), which is several times slower.
 render_draw_data :: proc(draw_data: ^imgui.DrawData) {
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableBackfaceCulling()
@@ -178,39 +190,169 @@ render_draw_data :: proc(draw_data: ^imgui.DrawData) {
 		draw_data.CmdLists.Data,
 		int(draw_data.CmdLists.Size),
 	)
-	for command_list in command_lists {
-		cmd_slice: []imgui.DrawCmd = mem.slice_ptr(
-			command_list.CmdBuffer.Data,
-			int(command_list.CmdBuffer.Size),
-		)
-		for i in 0 ..< command_list.CmdBuffer.Size {
-			cmd := cmd_slice[i]
-			enable_scissor(
-				cmd.ClipRect.x - draw_data.DisplayPos.x,
-				cmd.ClipRect.y,
-				cmd.ClipRect.z - (cmd.ClipRect.x - draw_data.DisplayPos.x),
-				cmd.ClipRect.w - (cmd.ClipRect.y - draw_data.DisplayPos.y),
-			)
-
-			if cmd.UserCallback != nil {
-				cmd.UserCallback(command_list, &cmd)
-				continue
+	if gpu_begin(command_lists) {
+		vtxBase, idxBase := 0, 0
+		for command_list in command_lists {
+			gpu_point_at(vtxBase)
+			cmd_slice: []imgui.DrawCmd = mem.slice_ptr(command_list.CmdBuffer.Data, int(command_list.CmdBuffer.Size))
+			for &cmd in cmd_slice {
+				if cmd.ElemCount == 0 do continue
+				enable_scissor(
+					cmd.ClipRect.x - draw_data.DisplayPos.x,
+					cmd.ClipRect.y,
+					cmd.ClipRect.z - (cmd.ClipRect.x - draw_data.DisplayPos.x),
+					cmd.ClipRect.w - (cmd.ClipRect.y - draw_data.DisplayPos.y),
+				)
+				if cmd.UserCallback != nil {
+					gpu_end()
+					cmd.UserCallback(command_list, &cmd)
+					gpu_rebind()
+					gpu_point_at(vtxBase)
+					continue
+				}
+				texture := transmute(^rl.Texture)cmd.TextureId
+				rlgl.EnableTexture(texture.id if texture != nil else rlgl.GetTextureIdDefault())
+				rlgl.DrawVertexArrayElements(c.int(idxBase + int(cmd.IdxOffset)), c.int(cmd.ElemCount), nil)
 			}
-
-			render_triangles(
-				cmd.ElemCount,
-				cmd.IdxOffset,
-				command_list.IdxBuffer,
-				command_list.VtxBuffer,
-				cmd.TextureId,
+			vtxBase += int(command_list.VtxBuffer.Size)
+			idxBase += int(command_list.IdxBuffer.Size)
+		}
+		gpu_end()
+	} else {
+		for command_list in command_lists {
+			cmd_slice: []imgui.DrawCmd = mem.slice_ptr(
+				command_list.CmdBuffer.Data,
+				int(command_list.CmdBuffer.Size),
 			)
-			rlgl.DrawRenderBatchActive()
+			for i in 0 ..< command_list.CmdBuffer.Size {
+				cmd := cmd_slice[i]
+				enable_scissor(
+					cmd.ClipRect.x - draw_data.DisplayPos.x,
+					cmd.ClipRect.y,
+					cmd.ClipRect.z - (cmd.ClipRect.x - draw_data.DisplayPos.x),
+					cmd.ClipRect.w - (cmd.ClipRect.y - draw_data.DisplayPos.y),
+				)
+
+				if cmd.UserCallback != nil {
+					cmd.UserCallback(command_list, &cmd)
+					continue
+				}
+
+				render_triangles(
+					cmd.ElemCount,
+					cmd.IdxOffset,
+					command_list.IdxBuffer,
+					command_list.VtxBuffer,
+					cmd.TextureId,
+				)
+				rlgl.DrawRenderBatchActive()
+			}
 		}
 	}
 
 	rlgl.SetTexture(0)
 	rlgl.DisableScissorTest()
 	rlgl.EnableBackfaceCulling()
+}
+
+// The GPU buffers: GPU_SETS vertex arrays, each with a vertex and an index
+// buffer, used in turn (a frame writes the set the GPU finished with
+// frames ago - rewriting buffers it is still drawing from stalls). A frame's
+// lists are uploaded together, once; each list's indices count from its own
+// first vertex, so the vertex attributes are pointed at it before its draws.
+GPU_SETS :: 3
+
+@(private)
+Gpu_Set :: struct {
+	vao, vbo, ebo:      u32,
+	vboBytes, eboBytes: int,
+}
+
+@(private)
+gpu: struct {
+	sets:        [GPU_SETS]Gpu_Set,
+	cur:         int,
+	vtx:         [dynamic]imgui.DrawVert, // the frame's lists, end to end
+	idx:         [dynamic]imgui.DrawIdx,
+	unsupported: bool,
+}
+
+// gpu_begin uploads the frame's lists to the next buffer set and binds it
+// with raylib's default shader; false: no vertex arrays (use the fallback).
+@(private)
+gpu_begin :: proc(lists: []^imgui.DrawList) -> bool {
+	if gpu.unsupported do return false
+	gpu.cur = (gpu.cur + 1) % GPU_SETS
+	set := &gpu.sets[gpu.cur]
+	if set.vao == 0 {
+		set.vao = rlgl.LoadVertexArray()
+		if set.vao == 0 {
+			gpu.unsupported = true
+			return false
+		}
+	}
+	clear(&gpu.vtx)
+	clear(&gpu.idx)
+	for list in lists {
+		append(&gpu.vtx, ..mem.slice_ptr(list.VtxBuffer.Data, int(list.VtxBuffer.Size)))
+		append(&gpu.idx, ..mem.slice_ptr(list.IdxBuffer.Data, int(list.IdxBuffer.Size)))
+	}
+	vtxBytes := len(gpu.vtx) * size_of(imgui.DrawVert)
+	idxBytes := len(gpu.idx) * size_of(imgui.DrawIdx)
+	rlgl.EnableVertexArray(set.vao)
+	if vtxBytes > set.vboBytes {
+		if set.vbo != 0 do rlgl.UnloadVertexBuffer(set.vbo)
+		set.vboBytes = max(256 * 1024, 2 * vtxBytes)
+		set.vbo = rlgl.LoadVertexBuffer(nil, c.int(set.vboBytes), true)
+		rlgl.EnableVertexAttribute(0) // vertexPosition
+		rlgl.EnableVertexAttribute(1) // vertexTexCoord
+		rlgl.EnableVertexAttribute(3) // vertexColor
+	}
+	if idxBytes > set.eboBytes {
+		if set.ebo != 0 do rlgl.UnloadVertexBuffer(set.ebo)
+		set.eboBytes = max(128 * 1024, 2 * idxBytes)
+		set.ebo = rlgl.LoadVertexBufferElement(nil, c.int(set.eboBytes), true)
+	}
+	if vtxBytes > 0 do rlgl.UpdateVertexBuffer(set.vbo, raw_data(gpu.vtx), c.int(vtxBytes), 0)
+	if idxBytes > 0 do rlgl.UpdateVertexBufferElements(set.ebo, raw_data(gpu.idx), c.int(idxBytes), 0)
+	gpu_rebind()
+	return true
+}
+
+// gpu_rebind binds the current set and the default shader (with the
+// current projection).
+@(private)
+gpu_rebind :: proc() {
+	set := &gpu.sets[gpu.cur]
+	rlgl.EnableVertexArray(set.vao)
+	rlgl.EnableVertexBuffer(set.vbo)
+	rlgl.EnableVertexBufferElement(set.ebo)
+	locs := rlgl.GetShaderLocsDefault()
+	rlgl.EnableShader(rlgl.GetShaderIdDefault())
+	mvp := rlgl.GetMatrixModelview() * rlgl.GetMatrixProjection() // (as rlgl draws its batch)
+	rlgl.SetUniformMatrix(locs[rl.ShaderLocationIndex.MATRIX_MVP], mvp)
+	white := [4]f32{1, 1, 1, 1}
+	rlgl.SetUniform(locs[rl.ShaderLocationIndex.COLOR_DIFFUSE], &white, c.int(rl.ShaderUniformDataType.VEC4), 1)
+	slot: c.int = 0
+	rlgl.SetUniform(locs[rl.ShaderLocationIndex.MAP_ALBEDO], &slot, c.int(rl.ShaderUniformDataType.INT), 1)
+	rlgl.ActiveTextureSlot(0)
+}
+
+// gpu_point_at points the vertex attributes at vertex `first` (a list's).
+@(private)
+gpu_point_at :: proc(first: int) {
+	stride := c.int(size_of(imgui.DrawVert))
+	base := c.int(first) * stride
+	rlgl.SetVertexAttribute(0, 2, rlgl.FLOAT, false, stride, base + c.int(offset_of(imgui.DrawVert, pos)))
+	rlgl.SetVertexAttribute(1, 2, rlgl.FLOAT, false, stride, base + c.int(offset_of(imgui.DrawVert, uv)))
+	rlgl.SetVertexAttribute(3, 4, rlgl.UNSIGNED_BYTE, true, stride, base + c.int(offset_of(imgui.DrawVert, col)))
+}
+
+@(private)
+gpu_end :: proc() {
+	rlgl.DisableVertexArray()
+	rlgl.DisableShader()
+	rlgl.DisableTexture()
 }
 
 @(private)

@@ -768,9 +768,12 @@ PreviewPanel_RenderScene :: proc(state: ^EditorState) {
 		imgui.TableHeadersRow()
 
 		if scene.manager != nil {
-			for n in scene.manager.nodes {
-				if n == nil do continue
-
+			// Only the rows on screen are built (a scene can have thousands).
+			rows := make([dynamic]^e.Node, 0, len(scene.manager.nodes), context.temp_allocator)
+			for n in scene.manager.nodes do if n != nil do append(&rows, n)
+			clipper: imgui.ListClipper
+			imgui.ListClipper_Begin(&clipper, c.int(len(rows)))
+			for imgui.ListClipper_Step(&clipper) do for n in rows[clipper.DisplayStart:clipper.DisplayEnd] {
 				imgui.TableNextRow()
 				isSelected := (n == state.selectedNode)
 				if isSelected {
@@ -784,7 +787,7 @@ PreviewPanel_RenderScene :: proc(state: ^EditorState) {
 				}
 
 				imgui.TableSetColumnIndex(1)
-				imgui.Text(fmt.ctprintf("%v", n.typeId))
+				imgui.TextUnformatted(fmt.ctprintf("%s", e.Node_TypeName(n)))
 
 				imgui.TableSetColumnIndex(2)
 				imgui.Text(fmt.ctprintf("%v", n.layer))
