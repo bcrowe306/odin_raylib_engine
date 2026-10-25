@@ -114,10 +114,10 @@ repo) and it exports to every desktop platform and the web from any of them;
 tagged versions build and publish themselves.
 
 Editor that runs anywhere:
-- [ ] D.1 Relocatable editor: resources found next to the executable (`Contents/Resources` in a .app) or in the source checkout; fonts and small files embedded (`#load`); no paths relative to the working directory
-- [ ] D.2 Play runs the prebuilt runner (the one export uses), no Odin compiler; the rebuild-on-change path only in a source checkout with `odin` installed
-- [ ] D.3 Lua 5.4 as a static library built from source (macOS uses Homebrew's dylib today), in the editor and the runners
-- [ ] D.4 (was R.1) libcmark for a released editor: the Scripting Reference's markdown (`editor/markdown_view.odin`, `vendor:commonmark`) links the system `libcmark` (`brew install cmark` on dev machines - `/opt/homebrew/opt/cmark/lib/libcmark.dylib`), which users won't have. Before shipping the editor, either
+- [x] D.1 Relocatable editor: resources found next to the executable (`Contents/Resources` in a .app) or in the source checkout; fonts and small files embedded (`#load`); no paths relative to the working directory
+- [x] D.2 Play runs the prebuilt runner (the one export uses), no Odin compiler; the rebuild-on-change path only in a source checkout with `odin` installed
+- [x] D.3 Lua 5.4 as a static library built from source (macOS uses Homebrew's dylib today), in the editor and the runners
+- [x] D.4 (was R.1) libcmark for a released editor: the Scripting Reference's markdown (`editor/markdown_view.odin`, `vendor:commonmark`) links the system `libcmark` (`brew install cmark` on dev machines - `/opt/homebrew/opt/cmark/lib/libcmark.dylib`), which users won't have. Before shipping the editor, either
   - a) bundle it as a dynamic lib: copy `libcmark.dylib` (`.so` / `cmark.dll`) next to the editor (macOS: into the .app's `Frameworks`, `install_name_tool -change` to `@rpath/libcmark.dylib`, `-Wl,-rpath,@executable_path/../Frameworks` as `scripts/build_runners.sh` does for the runners), or
   - b) build cmark as a static lib (cmake `-DBUILD_SHARED_LIBS=OFF`, per platform; the vendor's `build.bat` does this on Windows) and link it in, so the editor has no extra file.
   The game runner doesn't use cmark.

@@ -53,8 +53,9 @@ jobs:
       - name: Build
         run: |
           mkdir -p bin
-          odin build editor -out:bin/editor
-          odin build . -out:bin/odin_raylib_engine
+          ext=""; [ "$RUNNER_OS" = Windows ] && ext=.exe
+          odin build editor -out:bin/editor$ext
+          odin build . -out:bin/odin_raylib_engine$ext
           scripts/build_runners.sh
 
       - name: Unit tests

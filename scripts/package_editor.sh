@@ -68,8 +68,8 @@ else
 	odin build editor -o:speed '-extra-linker-flags:-Wl,-rpath,$ORIGIN' -define:ORE_RELEASE="$version" -out:"$bin/$exe"
 fi
 
-# The editor's shared libraries that aren't the system's (Homebrew's cmark
-# on macOS until it's linked statically or replaced: TODO D.4).
+# The editor's shared libraries that aren't the system's (none since Lua and
+# cmark are static; kept for a library linked dynamically later).
 if [ "$platform" = macos ]; then
 	for lib in $(otool -L "$bin/$exe" | awk 'NR > 1 {print $1}' | grep -E '^/(opt|usr/local)/'); do
 		base=$(basename "$lib")
@@ -80,11 +80,6 @@ if [ "$platform" = macos ]; then
 	done
 elif [ "$platform" = windows ]; then
 	: # (Lua and cmark are static)
-else
-	# Linux: cmark isn't on every distribution (found next to the editor: $ORIGIN).
-	for lib in $(ldd "$bin/$exe" | awk '/libcmark/ {print $3}'); do
-		cp "$lib" "$libs/"
-	done
 fi
 
 echo "== resources"
