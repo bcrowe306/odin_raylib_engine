@@ -1,7 +1,7 @@
 #+build windows
 package engine
 
-import "core:c/libc"
+import "base:intrinsics"
 import win "core:sys/windows"
 
 // Crash reports on Windows (crash_report.odin): an unhandled-exception
@@ -100,5 +100,6 @@ crash_pid_platform :: proc() -> int {
 
 @(private)
 crash_abort_platform :: proc() {
-	libc.abort()
+	// (Not libc's abort: core:c/libc links the static CRT, the build the DLL one.)
+	intrinsics.trap()
 }
