@@ -23,10 +23,7 @@ MainScene_Build :: proc(scene: ^e.Scene, ctx: ^e.GameContext) {
 	// 1. Spaceship (with child AnimationPlayer)
 	_ = CreateSpaceShip(scene, game)
 
-	// 2. In-Game HUD (ReturnToMenu button)
-	CreateInGameHUD(scene)
-
-	// 3. Particle Emitter Node
+	// 2. Particle Emitter Node
 	particleNode := e.ParticleEmitterNode_Create(scene, "Particle Emitter")
 	particleNode.position = {640, 360}
 	particleNode.emitter.amount = 50
@@ -41,7 +38,7 @@ MainScene_Build :: proc(scene: ^e.Scene, ctx: ^e.GameContext) {
 		}
 	}
 
-	// 4. Box2D Physics Nodes
+	// 3. Box2D Physics Nodes
 	// StaticBodyNode (Floor & Ramp shapes)
 	staticBody := e.StaticBodyNode_Create(scene, "StaticBody")
 	staticBody.position = {640, 620}
@@ -70,23 +67,28 @@ MainScene_Build :: proc(scene: ^e.Scene, ctx: ^e.GameContext) {
 	raycastNode.position = {330, 535}
 	raycastNode.direction = {1.0, 0.25}
 	raycastNode.length = 440.0
+
+	// 4. Lua 5.4 Scripted Recon Drone (demonstrating node script attachment & lifecycle)
+	droneNode := e.TextureNode_Create(scene, &game.resourceManager, "assets/graphics/Space Pack/Ships/Ship_2.png")
+	droneNode.name = "ReconDrone"
+	droneNode.origin = {droneNode.size.x * 0.5, droneNode.size.y * 0.5}
+	e.Script_AttachToNode(droneNode, "assets/scripts/orbiting_drone.lua", nil, &game.scriptManager)
 }
 
 GameSetup :: proc(game: ^e.Game) {
-	log.info("Setup")
-	uiState := e.GameCreateResource(game, AsteroidsUIState)
+	log.info("Setup Asteroids")
 
-	// 1. Create Main Playable Scene ("main") with scene builder
-	_ = game->createScene("main", false, MainScene_Build)
+	// Register embedded Lua scripts for standalone binary release packaging
+	e.ScriptVFS_RegisterEmbedded("assets/scripts/orbiting_drone.lua", #load("../assets/scripts/orbiting_drone.lua", string))
 
-	// 2. Create Battle Arena Scene ("battle_arena") with Starfield, Spaceships, Turrets, Camera & Combat HUD
+	// 1. Create Main Playable Scene ("main") as initial active scene
+	_ = game->createScene("main", true, MainScene_Build)
+
+	// 2. Create Battle Arena Scene ("battle_arena") with Starfield, Spaceships, Turrets, Camera
 	_ = game->createScene("battle_arena", false, BattleArenaScene_Build)
 
-	// 3. Create Settings Menu Scene ("settings") with full UI Widget & Container Showcase
-	_ = CreateSettingsMenuScene(game, uiState)
-
-	// 4. Create Title Menu Scene ("title_menu") as initial active scene
-	_ = CreateTitleMenuScene(game, true)
+	// 3. Create Deep Space Station Scene ("deep_space_station") loaded directly from LDtk Level Editor Project
+	_ = game->createScene("deep_space_station", false, DeepSpaceStationScene_Build)
 
 	game.state = .Ready
 	game.drawBounds = true

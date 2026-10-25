@@ -1,0 +1,28 @@
+{
+  "name": "AsteroidSmall",
+  "component": true,
+  "type": "DynamicBodyNode",
+  "position": [420.0, 540.0],
+  "scale": [0.30, 0.30],
+  "rotation": 45.0,
+  "layer": 1,
+  "physics": {
+    "gravity_scale": 0.0,
+    "shape": {
+      "type": "box",
+      "size": [48.0, 48.0],
+      "density": 0.8,
+      "friction": 0.1,
+      "restitution": 0.9
+    }
+  },
+  "script": {
+    "path": "scripts/asteroid.lua",
+    "properties": {
+      "asteroid_name": "Asteroid-Small",
+      "tumble_speed": 45.0,
+      "drift_vx": 60.0,
+      "drift_vy": -50.0
+    }
+  }
+}

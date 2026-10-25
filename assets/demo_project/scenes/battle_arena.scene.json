@@ -1,0 +1,264 @@
+{
+  "name": "battle_arena",
+  "draw_bounds": false,
+  "root": {
+    "type": "Node",
+    "name": "root",
+    "position": [0, 0],
+    "scale": [1, 1],
+    "rotation": 0,
+    "enabled": true,
+    "visible": true,
+    "layer": 0,
+    "children": [
+      {
+        "type": "ParticleEmitterNode",
+        "name": "StarfieldEmitter",
+        "position": [640, 360],
+        "scale": [1, 1],
+        "rotation": 0,
+        "enabled": true,
+        "visible": true,
+        "layer": 0,
+        "properties": {
+          "emitter.amount": 100,
+          "emitter.lifetime": 5,
+          "emitter.burst": 0.5,
+          "emitter.size": [5, 5],
+          "emitter.sizeVariance": 0,
+          "emitter.sizeSpread": 0,
+          "emitter.scaleStart": [1, 1],
+          "emitter.scaleEnd": [1, 1],
+          "emitter.rotation": 0,
+          "emitter.rotationVariance": 0,
+          "emitter.rotationSpread": 0,
+          "emitter.torque": 0,
+          "emitter.torqueVariance": 0,
+          "emitter.torqueSpread": 0,
+          "emitter.torqueAcceleration": 0,
+          "emitter.colorVariance": 0,
+          "emitter.spread": [0, 0],
+          "emitter.velocity": 45,
+          "emitter.velocityVariance": 0,
+          "emitter.velocitySpread": 0,
+          "emitter.velocityScale": 1,
+          "emitter.acceleration": 0,
+          "emitter.angle": 0,
+          "emitter.angleVariance": 0,
+          "emitter.angleSpread": 0,
+          "emitter.gravityDirection": [0, 1],
+          "emitter.gravityVelocity": 200,
+          "emitter.wind": [0, 0],
+          "emitter.collisionEnabled": false,
+          "emitter.elasticity": 0.7,
+          "emitter.shape": "Circle",
+          "emitter.emitting": true,
+          "emitter.continuous": true
+        }
+      },
+      {
+        "type": "TextureNode",
+        "name": "PlayerShip",
+        "position": [608, 352],
+        "scale": [0.2, 0.2],
+        "rotation": 0,
+        "enabled": true,
+        "visible": true,
+        "layer": 2,
+        "texture": "textures/Spaceship_1.png",
+        "origin": [269.5, 232.5],
+        "script": {
+          "path": "scripts/player_ship.lua",
+          "properties": {
+            "drag": 0.985,
+            "max_speed": 650,
+            "rotation_speed": 210,
+            "ship_name": "Vanguard-Interceptor",
+            "thrust_power": 520,
+            "weapon_cooldown": 0.22
+          }
+        },
+        "children": [
+          {
+            "type": "FrameAnimationNode",
+            "name": "EngineExhaust",
+            "position": [0, 140],
+            "scale": [1, 1],
+            "rotation": 0,
+            "enabled": true,
+            "visible": true,
+            "layer": 2,
+            "fps": 12,
+            "loop": true,
+            "origin": [392, 675.5],
+            "frames": ["textures/exhaust/Exhaust_1_1_005.png", "textures/exhaust/Exhaust_1_1_006.png", "textures/exhaust/Exhaust_1_1_007.png", "textures/exhaust/Exhaust_1_1_008.png", "textures/exhaust/Exhaust_1_1_009.png"]
+          }
+        ]
+      },
+      {
+        "type": "TextureNode",
+        "name": "PatrolDroneAlpha",
+        "position": [840, 360],
+        "scale": [0.35, 0.35],
+        "rotation": 0,
+        "enabled": true,
+        "visible": true,
+        "layer": 2,
+        "texture": "textures/Spaceship_2.png",
+        "origin": [198.5, 203.5],
+        "script": {
+          "path": "scripts/orbiting_drone.lua",
+          "properties": {
+            "center_x": 640,
+            "center_y": 360,
+            "drone_name": "OrbitalSentry",
+            "orbit_radius": 220,
+            "pulse_enabled": true,
+            "rotation_speed": 1.8
+          }
+        }
+      },
+      {
+        "type": "TextureNode",
+        "name": "Asteroid_Alpha",
+        "position": [240, 180],
+        "scale": [0.7, 0.7],
+        "rotation": 0,
+        "enabled": true,
+        "visible": true,
+        "layer": 1,
+        "texture": "textures/Asteroid_1.png",
+        "origin": [152, 150],
+        "script": {
+          "path": "scripts/asteroid.lua",
+          "properties": {
+            "asteroid_name": "Asteroid-Alpha",
+            "drift_vx": 30,
+            "drift_vy": 15,
+            "tumble_speed": 22
+          }
+        }
+      },
+      {
+        "type": "TextureNode",
+        "name": "Asteroid_Beta",
+        "position": [1040, 220],
+        "scale": [0.65, 0.65],
+        "rotation": 0,
+        "enabled": true,
+        "visible": true,
+        "layer": 1,
+        "texture": "textures/Asteroid_2.png",
+        "origin": [150, 148],
+        "script": {
+          "path": "scripts/asteroid.lua",
+          "properties": {
+            "asteroid_name": "Asteroid-Beta",
+            "drift_vx": -25,
+            "drift_vy": 20,
+            "tumble_speed": -18
+          }
+        }
+      },
+      {
+        "type": "TextureNode",
+        "name": "Asteroid_Gamma",
+        "position": [320, 560],
+        "scale": [0.6, 0.6],
+        "rotation": 0,
+        "enabled": true,
+        "visible": true,
+        "layer": 1,
+        "texture": "textures/Asteroid_3.png",
+        "origin": [140, 138],
+        "script": {
+          "path": "scripts/asteroid.lua",
+          "properties": {
+            "asteroid_name": "Asteroid-Gamma",
+            "drift_vx": 18,
+            "drift_vy": -22,
+            "tumble_speed": 16
+          }
+        }
+      },
+      {
+        "type": "TextureNode",
+        "name": "Asteroid_Delta",
+        "position": [980, 540],
+        "scale": [0.55, 0.55],
+        "rotation": 0,
+        "enabled": true,
+        "visible": true,
+        "layer": 1,
+        "texture": "textures/Asteroid_4.png",
+        "origin": [130, 128],
+        "script": {
+          "path": "scripts/asteroid.lua",
+          "properties": {
+            "asteroid_name": "Asteroid-Delta",
+            "drift_vx": -20,
+            "drift_vy": -15,
+            "tumble_speed": -25
+          }
+        }
+      },
+      {
+        "type": "CameraNode",
+        "name": "MainCamera",
+        "position": [0, 0],
+        "scale": [1, 1],
+        "rotation": 0,
+        "enabled": true,
+        "visible": true,
+        "layer": 0,
+        "properties": {
+          "isCurrent": true,
+          "followMode": "Manual",
+          "dragType": "SmoothDamp",
+          "targetPosition": [640, 360],
+          "smoothDrag": true,
+          "smoothDragSpeed": [0.2, 0.2],
+          "springConstant": 15,
+          "dampingRatio": 1,
+          "predictionTime": [0.5, 0.5],
+          "maxDistance": [100000, 100000],
+          "offset": [0, 0],
+          "smoothOffset": true,
+          "smoothOffsetSpeed": 0.2,
+          "screenOffset": [640, 360],
+          "targetRotation": 0,
+          "allowRotation": true,
+          "smoothRotation": true,
+          "smoothRotationSpeed": 0.2,
+          "zoom": 1,
+          "targetZoom": 1,
+          "smoothZoom": true,
+          "smoothZoomSpeed": 0.2,
+          "minZoom": 0.1,
+          "maxZoom": 10,
+          "autoZoom": true,
+          "zoomMargin": 0.1,
+          "hasLimits": false,
+          "smoothLimit": true,
+          "leftLimit": -1000000,
+          "rightLimit": 1000000,
+          "topLimit": -1000000,
+          "bottomLimit": 1000000,
+          "useHMargins": false,
+          "useVMargins": false,
+          "leftMargin": 0.25,
+          "rightMargin": 0.25,
+          "topMargin": 0.25,
+          "bottomMargin": 0.25,
+          "enableMouseFollow": false,
+          "mouseInfluence": [0.2, 0.2],
+          "shakePreset": "Custom",
+          "shakeTypes": ["Vertical", "Horizontal", "Random"],
+          "shakeSpeed": 15,
+          "shakeIntensity": 10,
+          "shakeTrauma": 1
+        }
+      }
+    ]
+  }
+}

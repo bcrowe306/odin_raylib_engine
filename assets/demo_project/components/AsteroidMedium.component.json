@@ -1,0 +1,28 @@
+{
+  "name": "AsteroidMedium",
+  "component": true,
+  "type": "DynamicBodyNode",
+  "position": [960.0, 180.0],
+  "scale": [0.45, 0.45],
+  "rotation": 15.0,
+  "layer": 1,
+  "physics": {
+    "gravity_scale": 0.0,
+    "shape": {
+      "type": "box",
+      "size": [75.0, 75.0],
+      "density": 1.0,
+      "friction": 0.2,
+      "restitution": 0.85
+    }
+  },
+  "script": {
+    "path": "scripts/asteroid.lua",
+    "properties": {
+      "asteroid_name": "Asteroid-Medium",
+      "tumble_speed": -28.0,
+      "drift_vx": -45.0,
+      "drift_vy": 30.0
+    }
+  }
+}

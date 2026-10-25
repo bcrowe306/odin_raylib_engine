@@ -1,0 +1,28 @@
+{
+  "name": "AsteroidLarge",
+  "component": true,
+  "type": "DynamicBodyNode",
+  "position": [220.0, 200.0],
+  "scale": [0.65, 0.65],
+  "rotation": 0.0,
+  "layer": 1,
+  "physics": {
+    "gravity_scale": 0.0,
+    "shape": {
+      "type": "box",
+      "size": [110.0, 110.0],
+      "density": 1.2,
+      "friction": 0.2,
+      "restitution": 0.8
+    }
+  },
+  "script": {
+    "path": "scripts/asteroid.lua",
+    "properties": {
+      "asteroid_name": "Asteroid-Large",
+      "tumble_speed": 18.0,
+      "drift_vx": 35.0,
+      "drift_vy": 22.0
+    }
+  }
+}

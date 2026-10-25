@@ -1,0 +1,44 @@
+{
+  "name": "Asteroids Space Combat (.ore)",
+  "version": "1.0.0",
+  "initial_scene": "scenes/new_scene.scene.json",
+  "window": {
+    "title": "Asteroids - Space Combat Simulator",
+    "width": 1280,
+    "height": 720,
+    "virtual_width": 1280.00,
+    "virtual_height": 720.00,
+    "target_fps": 60
+  },
+  "video": {"fullscreen": false, "vsync": true, "resizable": true, "msaa": false, "high_dpi": false, "sharp_scaling": false, "integer_scaling": false, "pixel_snap": false, "smooth_camera": false},
+  "audio": {"master_volume": 1.00, "music_volume": 1.00, "sfx_volume": 1.00, "buses": [
+    {"name": "Master", "volume": 1, "pan": 0},
+    {"name": "Music", "output": "Master", "volume": 1, "pan": 0},
+    {"name": "SFX", "output": "Master", "volume": 1.013, "pan": 0}
+  ]},
+  "physics": {
+    "gravity": [0.00, 1500.00],
+    "debug_draw": false
+  },
+  "input": {"actions": [
+    {"name": "move_up", "bindings": [{"key": "W"}, {"key": "UP"}, {"button": "LEFT_FACE_UP"}, {"axis": "LEFT_Y", "positive": false, "deadzone": 0.25}]},
+    {"name": "move_down", "bindings": [{"key": "S"}, {"key": "DOWN"}, {"button": "LEFT_FACE_DOWN"}, {"axis": "LEFT_Y", "positive": true, "deadzone": 0.25}]},
+    {"name": "move_left", "bindings": [{"key": "A"}, {"key": "LEFT"}, {"button": "LEFT_FACE_LEFT"}, {"axis": "LEFT_X", "positive": false, "deadzone": 0.25}]},
+    {"name": "move_right", "bindings": [{"key": "D"}, {"key": "RIGHT"}, {"button": "LEFT_FACE_RIGHT"}, {"axis": "LEFT_X", "positive": true, "deadzone": 0.25}]},
+    {"name": "jump", "bindings": [{"key": "SPACE"}, {"button": "RIGHT_FACE_DOWN"}]},
+    {"name": "secondary", "bindings": [{"mouse": "RIGHT"}, {"button": "RIGHT_FACE_RIGHT"}]},
+    {"name": "boost", "bindings": [{"key": "LEFT_SHIFT"}, {"key": "RIGHT_SHIFT"}, {"button": "LEFT_TRIGGER_1"}]},
+    {"name": "interact", "bindings": [{"key": "E"}, {"key": "F"}, {"button": "RIGHT_FACE_UP"}]},
+    {"name": "pause", "bindings": [{"key": "ESCAPE"}, {"key": "P"}, {"button": "MIDDLE_RIGHT"}]},
+    {"name": "confirm", "bindings": [{"key": "ENTER"}, {"key": "SPACE"}]},
+    {"name": "cancel", "bindings": [{"key": "ESCAPE"}, {"key": "BACKSPACE"}]},
+    {"name": "punch", "bindings": [{"key": "J"}]},
+    {"name": "kick", "bindings": [{"key": "K"}]}
+  ]},
+  "export": {"executable": "", "output_dir": "", "targets": ["macos"], "compress": true, "include_font": true},
+  "scenes": [
+    "scenes/main.scene.json",
+    "scenes/battle_arena.scene.json",
+    "scenes/new_scene.scene.json"
+  ]
+}

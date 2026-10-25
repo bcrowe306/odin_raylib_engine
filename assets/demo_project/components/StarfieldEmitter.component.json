@@ -1,0 +1,15 @@
+{
+  "name": "StarfieldEmitter",
+  "component": true,
+  "type": "ParticleEmitterNode",
+  "position": [640.0, 360.0],
+  "scale": [1.0, 1.0],
+  "layer": 0,
+  "particles": {
+    "amount": 80,
+    "lifetime": 4.5,
+    "velocity": 45.0,
+    "continuous": true,
+    "emitting": true
+  }
+}

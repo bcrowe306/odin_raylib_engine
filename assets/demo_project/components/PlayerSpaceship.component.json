@@ -1,0 +1,22 @@
+{
+  "name": "PlayerSpaceship",
+  "component": true,
+  "type": "TextureNode",
+  "position": [640.0, 360.0],
+  "scale": [0.45, 0.45],
+  "rotation": 0.0,
+  "layer": 2,
+  "texture": {
+    "path": "textures/Spaceship_1.png"
+  },
+  "script": {
+    "path": "scripts/player_ship.lua",
+    "properties": {
+      "ship_name": "Vanguard-Interceptor",
+      "thrust_power": 520.0,
+      "rotation_speed": 210.0,
+      "drag": 0.985,
+      "max_speed": 650.0
+    }
+  }
+}

@@ -2,6 +2,10 @@ package main
 
 import "core:log"
 import "core:math"
+import "core:os"
+import "core:path/filepath"
+import "core:strconv"
+import "core:strings"
 import rl "vendor:raylib"
 import "asteroids"
 import e "engine"
@@ -65,9 +69,56 @@ Editor_SyncWithCurrentScene :: proc(ed: ^Editor, game: ^e.Game) -> ^e.ParticleEm
 	return particleNode
 }
 
+// RunDataDrivenGame plays a project (directory or .ore) with the engine's
+// generic runner (engine/runner.odin; the standalone runner/ uses it too).
+RunDataDrivenGame :: proc(projectPath: string, screenshotPath: string = "", maxFrames: int = 0, isHidden: bool = false, startScene: string = "", dumpScenePath: string = "") {
+	e.Engine_RunProject({
+		projectPath    = projectPath,
+		screenshotPath = screenshotPath,
+		maxFrames      = maxFrames,
+		hidden         = isHidden,
+		startScene     = startScene,
+		dumpScenePath  = dumpScenePath,
+	})
+}
+
 main :: proc() {
 	logger := log.create_console_logger(.Info)
 	context.logger = logger
+
+	// Parse command line arguments
+	projectPath := ""
+	screenshotPath := ""
+	maxFrames := 0
+	isHidden := false
+	startScene := ""
+	dumpScenePath := ""
+
+	for i := 0; i < len(os.args); i += 1 {
+		arg := os.args[i]
+		if (arg == "--project" || arg == "-p") && i + 1 < len(os.args) {
+			projectPath = os.args[i + 1]
+		} else if strings.has_prefix(arg, "--project=") {
+			projectPath = arg[10:]
+		} else if arg == "--screenshot" && i + 1 < len(os.args) {
+			screenshotPath = os.args[i + 1]
+		} else if strings.has_prefix(arg, "--screenshot=") {
+			screenshotPath = arg[13:]
+		} else if arg == "--frames" && i + 1 < len(os.args) {
+			parsedFrames, _ := strconv.parse_int(os.args[i + 1]); maxFrames = int(parsedFrames)
+		} else if arg == "--hidden" {
+			isHidden = true
+		} else if arg == "--scene" && i + 1 < len(os.args) {
+			startScene = os.args[i + 1]
+		} else if arg == "--dump-scene" && i + 1 < len(os.args) {
+			dumpScenePath = os.args[i + 1]
+		}
+	}
+
+	if projectPath != "" {
+		RunDataDrivenGame(projectPath, screenshotPath, maxFrames, isHidden, startScene, dumpScenePath)
+		return
+	}
 
 	isTest := UITest_Init()
 	if isTest {
