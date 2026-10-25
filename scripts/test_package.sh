@@ -19,10 +19,14 @@ editor=$(cd "$(dirname "$editor")" && pwd)/$(basename "$editor")
 tmp=$(mktemp -d /tmp/ore_package_test.XXXXXX)
 cp -R assets/demo_project "$tmp/project"
 rm -rf "$tmp/project/.ore" "$tmp/project"/scenes/new_scene*.scene.json
-python3 -I - "$tmp/project/project.json" <<-'EOF'
+case "$(uname -s)" in Darwin) native=macos ;; Linux) native=linux ;; *) native=windows ;; esac
+python3 -I - "$tmp/project/project.json" "$native" <<-'EOF'
 	import json, sys
 	p = sys.argv[1]
 	cfg = json.load(open(p))
+	# Export for this platform (CI's packages have this platform's runner only).
+	cfg.setdefault("export", {})["targets"] = [sys.argv[2]]
+	cfg["export"].pop("presets", None)
 	cfg["scenes"] = [s for s in cfg.get("scenes", []) if not s.startswith("scenes/new_scene")]
 	if cfg.get("initial_scene", "").startswith("scenes/new_scene"):
 	    cfg["initial_scene"] = "scenes/main.scene.json"
