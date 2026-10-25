@@ -162,22 +162,30 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 	}
 
 	// 1. Poll and update Two-Tier Input System once per frame (before physics and game/scene update)
+	Prof_Begin("input")
 	InputSystem_Update(&game.input, deltaTime)
 	Mixer_Reap() // voices that ended
 	if game.scriptManager.L != nil do Input_RebindDispatch(&game.input, game.scriptManager.L) // Input.listen's on_done
 	if game.scriptManager.hotReload do Shader_CheckForChanges() // edited .fs files
+	Prof_End()
 
 	// 2. Process Scene Transitions (and load scenes' assets in the background)
+	Prof_Begin("scene.flow")
 	Scene_FlowUpdate(game, deltaTime)
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
 	Scene_FlowAfterChange(game)
 	game.gameContext.scene = game.sceneManager.currentScene
+	Prof_End()
 
 	// 3. Step Box2D Physics World (not while the game is paused)
-	if !game.treePaused do PhysicsWorld_Step(&game.physicsWorld, deltaTime, &game.gameContext)
+	if !game.treePaused {
+		Prof_Scope("physics")
+		PhysicsWorld_Step(&game.physicsWorld, deltaTime, &game.gameContext)
+	}
 
 	// 4. Run game update proc if defined
 	if game.update != nil {
+		Prof_Scope("game.update")
 		game->update(game.sceneManager.currentScene, deltaTime)
 	}
 

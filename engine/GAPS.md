@@ -218,44 +218,100 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 
 ## Performance baselines
 
-`scripts/bench.sh` runs every benchmark (engine: `bench_scene_hot_paths`,
-`bench_particles`, `bench_scripts`; rendering: the runner's `--bench 300`
-on the scenes of `scripts/make_bench_project.py`, with and without the
-render caches). Recorded 2026-10-22 on an Apple M2 Pro, `-o:speed`, after
-Phase 4. Rendering is CPU time per frame (update + draw submission); the
-whole frame is vsync-bound at ~16.8 ms.
+`scripts/bench.sh [engine|rendering|editor]` (`task bench`) runs every
+benchmark:
+
+- **engine** (no window): `bench_scene_hot_paths`, `bench_particles`,
+  `bench_scripts`, `bench_navigation` (`engine/perf_bench_test.odin`).
+- **rendering**: the runner's `--bench 300` (30 warm-up frames, then 300
+  uncapped: no vsync, no frame cap) on the scenes of
+  `scripts/make_bench_project.py`, with and without the render caches.
+- **editor**: `tests/bench/editor.drive` on the same project - the drive's
+  `bench <frames> <label>` times uncapped frames by phase
+  (`editor/frame_timing.odin`; the Profiler tab shows the same phases live).
+
+**Profiling** (`engine/profiling.odin`): build with `-define:ORE_PROF=true`
+(without it the zones compile to nothing) and pass `--prof trace.spall`
+(`--prof-skip N`, default 30; `--prof-frames N`, default 300, 0 = until
+exit) to the runner, the Play binary or the editor. Zones cover the frame
+(input, physics, scene update, transforms, render collect / cull / draw,
+lighting, present; the editor's phases and panels); open the trace in
+https://gravitymoth.com/spall/ or sum it with `scripts/spall_summary.py
+trace.spall`. The same builds count heap allocations and the temp arena per
+frame (the Profiler tab, the [bench] lines). E.g.:
+
+    odin build runner -o:speed -define:ORE_PROF=true -out:/tmp/prof_runner
+    /tmp/prof_runner /tmp/ore_bench --scene scenes/bench_ysort.scene.json --bench 300 --prof /tmp/ysort.spall
+    scripts/spall_summary.py /tmp/ysort.spall
+
+Recorded 2026-10-24 on an Apple M2 Pro (macOS), Odin dev-2026-03,
+`-o:speed`, at the start of the optimization branch. Two runs agree within
+~3% on CPU times (update+draw, editor phases); whole-frame times under 2 ms
+vary by up to ~25% (they include waiting for the GPU) - compare CPU times.
+
+Earlier baselines (2026-10-22) read the whole frame as "vsync-bound at
+~16.8 ms": it was the project's `target_fps` (60), applied when the project
+loads, after the runner had turned the cap off. The runner now turns it off
+again after loading (`--bench`, and `--uncapped` for playing uncapped with a
+frame-time readout). At 60 FPS the CPU also idles between frames and clocks
+down, so those CPU times read high too.
 
 | Engine (no window) | 500 nodes | 2000 nodes | 5000 nodes |
 |---|---|---|---|
-| Create plain nodes | 0.32 ms | 1.10 ms | 2.73 ms |
-| Create TextureNodes (registry) | 0.51 ms | 1.90 ms | 4.62 ms |
-| Destroy all | 0.12 ms | 0.53 ms | 1.61 ms |
-| Global transform pass | 0.003 ms | 0.013 ms | 0.036 ms |
-| RunScene frame (no window) | 0.026 ms | 0.080 ms | 0.207 ms |
+| Create plain nodes | 0.35 ms | 1.05 ms | 2.47 ms |
+| Create TextureNodes (registry) | 0.51 ms | 1.77 ms | 4.54 ms |
+| Destroy all | 0.13 ms | 0.45 ms | 1.47 ms |
+| Respawn | 0.14 ms | 0.60 ms | 1.66 ms |
+| Global transform pass | 0.004 ms | 0.019 ms | 0.044 ms |
+| RunScene frame (no window) | 0.035 ms | 0.093 ms | 0.288 ms |
+
+`size_of`: Node 440 B, TextureNode 488 B, DynamicBodyNode 752 B.
 
 | Scene JSON | 1000 nodes | 4000 nodes | 10000 nodes |
 |---|---|---|---|
-| Size | 237 KB | 950 KB | 2377 KB |
-| Serialize (save, undo snapshot) | 2.1 ms | 8.4 ms | 20.8 ms |
-| Load (open, undo restore) | 4.0 ms | 15.8 ms | 40.7 ms |
+| Size | 251 KB | 1006 KB | 2518 KB |
+| Serialize (save, undo snapshot) | 2.4 ms | 8.6 ms | 21.7 ms |
+| Load (open, undo restore) | 4.0 ms | 15.8 ms | 41.0 ms |
 
 | Simulation | Per frame |
 |---|---|
-| 5000 particles (83 emitted/frame) | 0.076 ms |
-| 1000 Lua scripts `update(dt)` (get/set position) | 0.33 ms (0.33 us each) |
-| A* path, 256x256 grid, 20% walls, corner to corner | 3.8 ms per path |
+| 5000 particles (83 emitted/frame) | 0.074 ms |
+| 1000 Lua scripts `update(dt)` (get/set position) | 0.49 ms (0.49 us each; 0.33 on 2026-10-22) |
+| A* path, 256x256 grid, 20% walls, corner to corner | 3.6 ms per path |
 
-| Rendering (runner `--bench`) | Cached | `--no-render-cache` |
+The Lua regression: every engine call from Lua now looks its script
+manager up in the registry by name (`Script_Context`, for the engine's
+allocator and logger); caching it measured 0.41 ms - about half of it.
+
+| Rendering (runner `--bench`), CPU update+draw / whole frame | Cached | `--no-render-cache` |
 |---|---|---|
-| 5000 sprites, 4 textures, separate | 0.93 ms | 7.90 ms |
-| 5000 sprites, 4 textures, overlapping | 3.94 ms | 8.51 ms |
-| 400x400 tile map at zoom 0.25 | 0.12 ms | 4.89 ms |
-| 5000 rectangle particles | 0.42 ms | 0.42 ms |
-| 5000 circle particles | 1.34 ms | 1.92 ms |
-| Demo main scene | 0.09 ms | 0.77 ms |
+| 5000 sprites, 4 textures, separate | 0.95 / 1.3 ms (750 fps) | 5.0 / 6.4 ms |
+| 5000 sprites, 4 textures, overlapping | 4.0 / 4.5 ms (220 fps) | 5.0 / 6.3 ms |
+| 400x400 tile map at zoom 0.25 | 0.12 / 1.4 ms (730 fps) | 4.3 / 5.5 ms |
+| 5000 rectangle particles | 0.41 / 0.9 ms (1100 fps) | 0.41 / 1.3 ms |
+| 5000 circle particles | 1.3 / 1.8 ms (570 fps) | 1.2 / 2.2 ms |
+| 24 shadow-casting lights, 300 static boxes | 4.1 / 4.6 ms (220 fps) | 7.1 / 8.2 ms |
+| 1000 dynamic bodies + sprites, falling into a pit | 1.8 / 3.0 ms (330 fps) | 2.0 / 3.0 ms |
+| 1000 sprites, each moved by a Lua `update(dt)` | 0.97 / 1.6 ms (640 fps) | 1.6 / 2.6 ms |
+| 3000 Lua-moved sprites in a y-sorted parent | 7.8 / 9.2 ms (110 fps) | 9.1 / 10.3 ms |
+| Demo main scene | 0.07 / 0.6 ms (1650 fps) | 0.18 / 1.1 ms |
 
 (`--no-render-cache` turns off draw reordering, tile chunks and multi-buffered
 batches - the pre-4.2 renderer, with the 4.3 particle fixes.)
+
+| Editor (`tests/bench/editor.drive`), ms per frame | Whole | Poll | UI | Viewport | Draw | Present |
+|---|---|---|---|---|---|---|
+| Demo main scene | 2.67 (375 fps) | 0.01 | 0.38 | 0.09 | 1.43 | 0.77 |
+| 5000 sprites | 13.4 (75 fps) | 0.03 | 9.64 | 0.45 | 1.74 | 1.56 |
+| 5000 sprites, Simulate | 13.3 (75 fps) | 0.03 | 9.67 | 0.54 | 1.74 | 1.37 |
+| 400x400 tile map | 2.67 (375 fps) | 0.01 | 0.36 | 0.16 | 1.41 | 0.73 |
+| 5000 particles, Simulate | 3.08 (325 fps) | 0.01 | 0.36 | 0.43 | 1.47 | 0.81 |
+
+UI is building the panels (ImGui) without the viewport; Draw is submitting
+ImGui's draw lists; Present is the swap (waiting for the GPU). Leads for
+the optimization work: UI with a 5000-node scene (only ~7 scene rows are on
+screen), Draw's ~1.4 ms even for an empty scene, the y-sort scene, the
+lights.
 
 | Code tab, 10,000-line Lua file (`code_big_file` drive, debug editor) | Per edit |
 |---|---|

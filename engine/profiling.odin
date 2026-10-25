@@ -1,0 +1,182 @@
+package engine
+
+import "base:runtime"
+import "core:log"
+import "core:mem"
+import "core:prof/spall"
+import "core:strconv"
+import "core:sync"
+
+// ============================================================================
+// Profiling (build with -define:ORE_PROF=true; without it every call below
+// compiles to nothing):
+//
+// - Zones: `Prof_Scope("name")` at the top of a block times it to the end of
+//   the block; the trace (spall format) opens in https://gravitymoth.com/spall/.
+//   Main thread only (other threads have no buffer and are skipped).
+// - Allocations: the heap allocator is wrapped to count allocations, frees
+//   and bytes per frame, and the temp arena's use is read before it's freed.
+//   The editor's Profiler tab and the [bench] lines show them.
+//
+// The runner and the editor take `--prof <file.spall>` (the trace),
+// `--prof-skip N` (frames before recording; default 30, the warm-up) and
+// `--prof-frames N` (frames recorded; default 300, 0 = until exit). A
+// build without ORE_PROF says so when --prof is given.
+// ============================================================================
+
+ORE_PROF :: #config(ORE_PROF, false)
+
+Prof_Frame_Stats :: struct {
+	allocs:    int, // heap allocations (and resizes) this frame
+	frees:     int,
+	bytes:     int, // bytes requested from the heap this frame
+	tempBytes: int, // the temp arena's use at the end of the frame
+}
+
+Prof_State :: struct {
+	ctx:        spall.Context,
+	backing:    []u8,
+	path:       string,
+	skip:       int,  // frames before recording
+	frames:     int,  // frames to record (0 = until shutdown)
+	frame:      int,  // frames seen
+	recording:  bool, // the trace is on (changed only between frames)
+	opened:     bool,
+	// The heap counter.
+	backingAllocator: mem.Allocator,
+	counting:   Prof_Frame_Stats, // this frame so far
+	last:       Prof_Frame_Stats, // the last whole frame
+	totalAllocs: int,             // since Prof_Init
+}
+
+prof: Prof_State
+
+@(thread_local)
+prof_buffer: spall.Buffer
+
+// Prof_ParseArgs reads --prof / --prof-skip / --prof-frames.
+Prof_ParseArgs :: proc(args: []string) {
+	prof.skip = 30
+	prof.frames = 300
+	for i := 0; i + 1 < len(args); i += 1 {
+		n, _ := strconv.parse_int(args[i + 1])
+		switch args[i] {
+		case "--prof":        prof.path = args[i + 1]
+		case "--prof-skip":   prof.skip = max(n, 0)
+		case "--prof-frames": prof.frames = max(n, 0)
+		}
+	}
+	when !ORE_PROF {
+		if prof.path != "" do log.warnf("--prof %s: this build has no profiling (build with -define:ORE_PROF=true)", prof.path)
+	}
+}
+
+// Prof_Init opens the trace (when --prof was given) and wraps the heap
+// allocator for the counters: call at the top of main, before anything
+// allocates, and use the returned allocator as context.allocator.
+Prof_Init :: proc(heap: mem.Allocator) -> mem.Allocator {
+	when ORE_PROF {
+		prof.backingAllocator = heap
+		if prof.path != "" {
+			ctx, ok := spall.context_create(prof.path)
+			if ok {
+				prof.ctx = ctx
+				prof.backing = make([]u8, spall.BUFFER_DEFAULT_SIZE, heap)
+				prof_buffer = spall.buffer_create(prof.backing, u32(sync.current_thread_id()))
+				prof.opened = true
+				log.infof("[prof] tracing frames %d..%d to %s", prof.skip, prof.skip + prof.frames if prof.frames > 0 else -1, prof.path)
+			} else {
+				log.errorf("[prof] cannot write %s", prof.path)
+			}
+		}
+		return {procedure = prof_allocator_proc, data = nil}
+	} else {
+		return heap
+	}
+}
+
+// Prof_Shutdown writes out and closes the trace.
+Prof_Shutdown :: proc() {
+	when ORE_PROF {
+		if !prof.opened do return
+		spall.buffer_destroy(&prof.ctx, &prof_buffer)
+		spall.context_destroy(&prof.ctx)
+		delete(prof.backing, prof.backingAllocator)
+		prof.opened = false
+		prof.recording = false
+		log.infof("[prof] wrote %s (%d heap allocations counted over %d frames)", prof.path, prof.totalAllocs, prof.frame)
+	}
+}
+
+// Prof_FrameEnd closes a frame: the counters roll over and the trace
+// starts / stops on its frame window. Call once per frame, outside every
+// zone (before freeing the temp arena).
+@(disabled = !ORE_PROF)
+Prof_FrameEnd :: proc() {
+	when ORE_PROF {
+		if context.temp_allocator.procedure == runtime.default_temp_allocator_proc && context.temp_allocator.data != nil {
+			ta := cast(^runtime.Default_Temp_Allocator)context.temp_allocator.data
+			prof.counting.tempBytes = int(ta.arena.total_used)
+		}
+		prof.last = prof.counting
+		prof.totalAllocs += prof.counting.allocs
+		prof.counting = {}
+		prof.frame += 1
+		if prof.opened {
+			start := prof.skip
+			stop := prof.skip + prof.frames
+			prof.recording = prof.frame >= start && (prof.frames == 0 || prof.frame < stop)
+			if prof.frames > 0 && prof.frame == stop do spall.buffer_flush(&prof.ctx, &prof_buffer)
+		}
+	}
+}
+
+// Prof_Last: the counters of the last whole frame (zeros without ORE_PROF).
+Prof_Last :: proc() -> Prof_Frame_Stats {
+	return prof.last
+}
+
+// Prof_Scope times the rest of the enclosing block as a zone named `name`
+// (a constant string: zones must not allocate).
+@(disabled = !ORE_PROF, deferred_none = prof_scope_end)
+Prof_Scope :: proc(name: string, loc := #caller_location) {
+	when ORE_PROF {
+		if prof.recording && len(prof_buffer.data) > 0 do spall._buffer_begin(&prof.ctx, &prof_buffer, name, "", loc)
+	}
+}
+
+// Prof_Begin / Prof_End: a zone that doesn't follow a block (must be paired).
+@(disabled = !ORE_PROF)
+Prof_Begin :: proc(name: string, loc := #caller_location) {
+	when ORE_PROF {
+		if prof.recording && len(prof_buffer.data) > 0 do spall._buffer_begin(&prof.ctx, &prof_buffer, name, "", loc)
+	}
+}
+
+@(disabled = !ORE_PROF)
+Prof_End :: proc() {
+	prof_scope_end()
+}
+
+@(private = "file", disabled = !ORE_PROF)
+prof_scope_end :: proc() {
+	when ORE_PROF {
+		if prof.recording && len(prof_buffer.data) > 0 do spall._buffer_end(&prof.ctx, &prof_buffer)
+	}
+}
+
+when ORE_PROF {
+	@(private = "file")
+	prof_allocator_proc :: proc(data: rawptr, mode: mem.Allocator_Mode, size, alignment: int, old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
+		// (Atomic: worker threads, e.g. async_decode, allocate too.)
+		#partial switch mode {
+		case .Alloc, .Alloc_Non_Zeroed, .Resize, .Resize_Non_Zeroed:
+			sync.atomic_add(&prof.counting.allocs, 1)
+			sync.atomic_add(&prof.counting.bytes, size)
+		case .Free:
+			if old_memory != nil do sync.atomic_add(&prof.counting.frees, 1)
+		}
+		b := prof.backingAllocator
+		return b.procedure(b.data, mode, size, alignment, old_memory, old_size, loc)
+	}
+}

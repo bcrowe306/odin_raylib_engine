@@ -243,10 +243,12 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	nodeManager := scene.manager
 
 	// Process Node Queues (any spawned or removed nodes)
+	Prof_Begin("scene.queues+ready")
 	ProcessNodeQueues(nodeManager, gameContext)
 
 	// Ensure any newly added nodes have their ready proc called before update
 	Scene_CallReady(scene, scene.rootNode, gameContext)
+	Prof_End()
 
 	frozen := gameContext != nil && gameContext.game != nil && gameContext.game.frozen
 	if scene.update != nil && !frozen {
@@ -258,7 +260,9 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	}
 
 	// Propagate initial global positions before hierarchy update
+	Prof_Begin("transforms")
 	Node_SetGlobalPositions(nodeManager, scene.rootNode)
+	Prof_End()
 
 	if !frozen {
 		// Update active dropdown popup first so it can capture clicks before underlying widgets
@@ -268,18 +272,28 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 		UI_UpdateFocusNavigation(scene, gameContext)
 
 		// Update hierarchy (calls update on each node)
+		Prof_Begin("scene.update")
 		Scene_UpdateNodeHirearchy(scene, scene.rootNode, gameContext, deltaTime)
+		Prof_End()
+		Prof_Begin("tweens")
 		if gameContext != nil && gameContext.game != nil do Tween_Update(&gameContext.game.tweens, deltaTime, &gameContext.game.scriptManager)
+		Prof_End()
 	}
 
 	// Update global positions after node updates & container layout
+	Prof_Begin("transforms")
 	Node_SetGlobalPositions(nodeManager, scene.rootNode)
+	Prof_End()
+	Prof_Begin("visibility+subtitles")
 	if !frozen do Visibility_Update(scene, gameContext) // on / off screen (visibility_notifier.odin)
 	if !frozen do Subtitles_Update(deltaTime)           // (subtitles.odin)
+	Prof_End()
 
 	// One traversal buckets renderable nodes by layer (hierarchy order is
 	// kept within a layer) instead of walking the whole tree per layer.
+	Prof_Begin("render.collect")
 	buckets := Scene_CollectRenderables(scene)
+	Prof_End()
 	renderStats = {}
 	// Lighting: the light map is built before the world layers draw and
 	// multiplied over them after the last one.
@@ -290,9 +304,14 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	lastWorld := -1
 	if scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent && rl.IsWindowReady() {
 		// Cached tile chunks in view (built before any layer draws).
+		Prof_Begin("tilecache.prepare")
 		TileCache_Prepare(scene, Camera2D_ViewRect(CameraNode_GetCamera2D(scene.camera, lightVW, lightVH), lightVW, lightVH), gameContext)
+		Prof_End()
 		for l in RenderLayer do if l in scene.camera.targetLayers do lastWorld = int(l)
-		if lastWorld >= 0 do Lighting_Prepare(scene, CameraNode_GetCamera2D(scene.camera, lightVW, lightVH), i32(lightVW), i32(lightVH))
+		if lastWorld >= 0 {
+			Prof_Scope("lighting.prepare")
+			Lighting_Prepare(scene, CameraNode_GetCamera2D(scene.camera, lightVW, lightVH), i32(lightVW), i32(lightVH))
+		}
 	}
 	// Smooth camera (pixel_perfect.odin): the world layers go to a texture a
 	// pixel larger on every side, the others to the frame (on top).
@@ -331,13 +350,19 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 			Render_SetView(Camera2D_ViewRect(CameraNode_GetCamera2D(scene.camera, vw, vh), vw, vh))
 		}
 
-		render_bucket(scene, buckets[layer][:], gameContext, deltaTime)
+		if len(buckets[layer]) > 0 {
+			Prof_Scope("render.layer")
+			render_bucket(scene, buckets[layer][:], gameContext, deltaTime)
+		}
 
 		if isWorldLayer && rl.IsWindowReady() {
 			Render_ClearView()
 			CameraNode_End()
 		}
-		if int(layer) == lastWorld do Lighting_Composite()
+		if int(layer) == lastWorld {
+			Prof_Scope("lighting.composite")
+			Lighting_Composite()
+		}
 	}
 	if inWorld {
 		rl.EndTextureMode()
@@ -466,6 +491,7 @@ Scene_RenderAllLayers :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTim
 // render_bucket draws one layer's nodes, skipping those outside the view.
 @(private = "file")
 render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, deltaTime: f32) {
+	Prof_Begin("render.cull+order")
 	visible := make([dynamic]^Node, 0, len(nodes), context.temp_allocator)
 	for node in nodes {
 		if renderView.active {
@@ -477,7 +503,10 @@ render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, 
 		append(&visible, node)
 	}
 	// Sprites sharing a texture drawn together (same picture: batching.odin).
-	for node in Render_BatchOrder(visible[:]) {
+	order := Render_BatchOrder(visible[:])
+	Prof_End()
+	Prof_Scope("render.draw")
+	for node in order {
 		renderStats.drawn += 1
 		withMaterial := node.material != nil && Material_Begin(node, gameContext)
 		scaled := node.isUI && access.uiScale != 1 && UI_BeginScaled(node) // (accessibility UI scale)

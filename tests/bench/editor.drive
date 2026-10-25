@@ -1,0 +1,32 @@
+# Editor frame-time benchmark (scripts/bench.sh): the project of
+# scripts/make_bench_project.py, each scene idle in the editor and while
+# Simulate runs. `bench` times uncapped frames by phase (frame_timing.odin).
+wait 30
+dblclick @asset:scenes/main.scene.json
+wait 60
+bench 300 main
+dblclick @asset:scenes/bench_sprites.scene.json
+wait 60
+screenshot sprites
+bench 300 sprites
+key f7
+wait 60
+expect simulating == true
+bench 300 sprites_simulate
+key f7
+wait 10
+expect simulating == false
+dblclick @asset:scenes/bench_tiles.scene.json
+wait 60
+screenshot tiles
+bench 300 tiles
+dblclick @asset:scenes/bench_particles.scene.json
+wait 10
+key f7
+wait 60
+expect simulating == true
+screenshot particles
+bench 300 particles_simulate
+key f7
+wait 10
+expect simulating == false

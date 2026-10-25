@@ -37,6 +37,7 @@ import imgui_rl "lib/imgui/imgui_impl_raylib"
 //   screenshot <name>                   save <shots>/<NN>_<name>.png
 //   drop-files <target> <path>...      files dropped from the OS at <target>
 //   dialog-files <path>...              answer for the next system file dialog
+//   bench <frames> [label]              time that many uncapped frames, print a [bench] line
 //   log <text> | quit
 // Targets: @<item-id>  @world:<x>,<y>  @node:<Name>  <x>,<y>
 // Expressions: <query> <op> <value>, op ∈ == != contains !contains ~= >= <=
@@ -445,6 +446,25 @@ drive_exec :: proc(d: ^TestDrive, state: ^EditorState, line: string) -> bool {
 		clear(&state.extraGameArgs)
 		for a in strings.fields(rest) do append(&state.extraGameArgs, a)
 		return true
+	case "bench":
+		// bench <frames> [label]: time that many uncapped frames (frame_timing.odin).
+		if d.step == 0 {
+			fields := strings.fields(rest, context.temp_allocator)
+			n := 300
+			if len(fields) > 0 do n, _ = strconv.parse_int(fields[0])
+			FrameTiming_SetUncapped(true, false)
+			FrameTiming_BenchStart(max(n, 1))
+			d.step = 1
+			return false
+		}
+		if !FrameTiming_BenchDone() do return false
+		label := "frame"
+		if fields := strings.fields(rest, context.temp_allocator); len(fields) > 1 do label = fields[1]
+		line := FrameTiming_BenchReport(label)
+		fmt.println(line)
+		append(&d.report, fmt.aprintf("`%s`", line))
+		FrameTiming_SetUncapped(false, false)
+		return true
 	case "log":
 		fmt.printfln("[DRIVE] %s", rest)
 		append(&d.report, fmt.aprintf("**%s**", rest))
@@ -691,6 +711,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		return strings.to_string(sb), true
 	case "selection-count": return fmt.tprint(len(state.selection)), true
 	case "quit-prompt": return "true" if state.quitRequested else "false", true
+	case "simulating": return "true" if state.isSimulating else "false", true
 	case "clipboard-nodes": return "true" if Editor_HasClipboardNodes() else "false", true
 	case "anim-preview": return "paused" if AnimationPanel_PreviewPaused() else "playing", true
 	case "slicer-selection": return Slicer_Selection(), true

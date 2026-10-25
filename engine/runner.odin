@@ -27,12 +27,13 @@ Run_Options :: struct {
 	dumpScenePath:  string, // write the running scene's JSON (tests)
 	userDataDir:    string, // Save data folder instead of the platform's
 	benchFrames:    int,    // --bench N: N uncapped frames, then print frame timings and quit
+	uncapped:       bool,   // --uncapped: no vsync, no frame cap, a frame time readout (also --bench)
 	noRenderCache:  bool,   // --no-render-cache: no tile chunk cache, no draw reordering (comparisons)
 	editorLink:     bool,   // --editor-link: driven by the editor over stdin/stdout (editor_link.odin)
 }
 
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
-// --hidden, --dump-scene, --user-data, --bench and --no-render-cache. A bare argument is taken as the project.
+// --hidden, --dump-scene, --user-data, --bench, --uncapped and --no-render-cache. A bare argument is taken as the project.
 Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
@@ -61,7 +62,9 @@ Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 		case arg == "--editor-link":
 			opts.editorLink = true
 		case arg == "--bench" && next != "":
-			n, _ := strconv.parse_int(next); opts.benchFrames = n; i += 1
+			n, _ := strconv.parse_int(next); opts.benchFrames = n; opts.uncapped = true; i += 1
+		case arg == "--uncapped":
+			opts.uncapped = true
 		case !strings.has_prefix(arg, "-") && opts.projectPath == "":
 			opts.projectPath = arg
 		}
@@ -123,12 +126,17 @@ Runner_State :: struct {
 	fixedStep:          bool,
 	benchRun:           time.Duration,
 	benchFrame:         time.Duration,
+	benchAllocs, benchAllocBytes, benchTempBytes: int, // (profiling builds)
 	windowOpen, audioOpen, fontsLoaded: bool,
 }
 
 // Engine_RunProject opens a window and plays the project until it quits.
 // Returns a process exit code.
 Engine_RunProject :: proc(opts: Run_Options) -> int {
+	// Profiling builds (profiling.odin): the trace and the heap counters.
+	Prof_ParseArgs(os.args[1:])
+	context.allocator = Prof_Init(context.allocator)
+	defer Prof_Shutdown()
 	rs, ok := Runner_Start(opts)
 	if !ok do return 1
 	for Runner_Frame(rs) {}
@@ -190,7 +198,7 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 	// Project Video settings.
 	flags: rl.ConfigFlags = {}
 	if video.resizable do flags += {.WINDOW_RESIZABLE}
-	if video.vsync && opts.benchFrames <= 0 do flags += {.VSYNC_HINT}
+	if video.vsync && !opts.uncapped do flags += {.VSYNC_HINT}
 	if video.msaa do flags += {.MSAA_4X_HINT}
 	if video.highDPI do flags += {.WINDOW_HIGHDPI}
 	if opts.hidden {
@@ -207,7 +215,7 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 	if video.fullscreen && !opts.hidden do game.fullscreenRequest = true
 	if !opts.noRenderCache do Render_InitBatching()
 
-	rl.SetTargetFPS(0 if opts.benchFrames > 0 else targetFPS)
+	rl.SetTargetFPS(0 if opts.uncapped else targetFPS)
 	when ODIN_OS == .JS do rl.SetTargetFPS(0) // (the page's requestAnimationFrame paces frames: raylib mustn't sleep)
 	rl.InitAudioDevice()
 	rs.audioOpen = true
@@ -223,6 +231,8 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 		return nil, false
 	}
 	if video.icon != "" do Runner_SetWindowIcon(game, video.icon)
+	// (Loading the project applies its target FPS: uncapped runs undo it.)
+	if opts.uncapped do rl.SetTargetFPS(0)
 
 	// --scene <file>: start in that scene instead of the project's initial
 	// scene (the editor's "Play Current Scene").
@@ -289,12 +299,16 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 		target := Runner_FrameTarget(i32(vw), i32(vh), video.sharpScaling)
 
 		frameStart := time.tick_now()
+		Prof_Begin("frame")
 		Render_SetFrameTarget(target)
 		rl.BeginTextureMode(target^)
 		// Smooth camera: the world gets its own texture; the frame holds the
 		// layers on top (transparent elsewhere).
 		rl.ClearBackground({0, 0, 0, 0} if renderPixel.smooth else Game_ClearColor(game))
-		game->run(dt)
+		{
+			Prof_Scope("game.run")
+			game->run(dt)
+		}
 		rl.EndTextureMode()
 		Render_SetFrameTarget(nil)
 		frame := target.texture
@@ -327,17 +341,31 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 			rlgl.EnableColorBlend()
 		}
 		if filtered do Colorblind_End()
+		if opts.uncapped && opts.benchFrames <= 0 do runner_draw_frame_time(rs)
+		Prof_Begin("present")
 		rl.EndDrawing()
+		Prof_End()
+		Prof_End() // frame
+		Prof_FrameEnd()
 		defer free_all(context.temp_allocator) // the frame's temp allocations (after the captures below)
 
 		rs.frameCount += 1
 		if opts.benchFrames > 0 && rs.frameCount > benchWarmup {
 			rs.benchRun += runTime
 			rs.benchFrame += time.tick_since(frameStart)
+			last := Prof_Last()
+			rs.benchAllocs += last.allocs
+			rs.benchAllocBytes += last.bytes
+			rs.benchTempBytes += last.tempBytes
 			if rs.frameCount >= benchWarmup + opts.benchFrames {
 				n := f64(opts.benchFrames)
-				fmt.printfln("[bench] %d frames: update+draw %.3f ms | whole frame (incl. GPU sync) %.3f ms | %d drawn, %d culled | %d tile chunks (%d built)",
-					opts.benchFrames, time.duration_milliseconds(rs.benchRun) / n, time.duration_milliseconds(rs.benchFrame) / n, renderStats.drawn, renderStats.culled, TileCache_Stats(), TileCache_Builds())
+				whole := time.duration_milliseconds(rs.benchFrame) / n
+				fmt.printfln("[bench] %d frames: update+draw %.3f ms | whole frame (incl. GPU sync) %.3f ms (%.0f fps) | %d drawn, %d culled | %d tile chunks (%d built)",
+					opts.benchFrames, time.duration_milliseconds(rs.benchRun) / n, whole, 1000 / whole, renderStats.drawn, renderStats.culled, TileCache_Stats(), TileCache_Builds())
+				when ORE_PROF {
+					fmt.printfln("[bench] per frame: %.1f heap allocations (%.1f KB) | temp arena %.1f KB",
+						f64(rs.benchAllocs) / n, f64(rs.benchAllocBytes) / n / 1024, f64(rs.benchTempBytes) / n / 1024)
+				}
 				return false
 			}
 		}
@@ -432,4 +460,23 @@ Runner_SetWindowIcon :: proc(game: ^Game, path: string) -> bool {
 	rl.ImageFormat(&img, .UNCOMPRESSED_R8G8B8A8) // what SetWindowIcon expects
 	rl.SetWindowIcon(img)
 	return true
+}
+
+// runner_draw_frame_time (--uncapped): the average frame time and FPS over
+// the last half second, top left.
+@(private = "file")
+runner_draw_frame_time :: proc(rs: ^Runner_State) {
+	@(static) frames: int
+	@(static) since: time.Tick
+	@(static) text: [64]u8
+	if since == {} do since = time.tick_now()
+	frames += 1
+	if elapsed := time.tick_since(since); elapsed >= 500 * time.Millisecond {
+		ms := time.duration_milliseconds(elapsed) / f64(frames)
+		text = {}
+		_ = fmt.bprintf(text[:len(text) - 1], "%.2f ms  %.0f fps", ms, 1000 / ms)
+		frames, since = 0, time.tick_now()
+	}
+	rl.DrawRectangle(4, 4, 170, 24, {0, 0, 0, 170})
+	rl.DrawText(cstring(&text[0]), 10, 9, 16, rl.LIME)
 }

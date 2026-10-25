@@ -36,6 +36,10 @@ tasks:
         cmds:
             - mkdir -p bin
             - odin build . -out:bin/odin_raylib_engine
+    bench:
+        desc: Performance benchmarks (engine, uncapped rendering, editor frame phases); PARTS="engine rendering editor" picks some
+        cmds:
+            - ./scripts/bench.sh {{.PARTS}}
     test:
         desc: Run all tests (engine lifecycle, UI unit tests, and UI showcase E2E automation)
         cmds:

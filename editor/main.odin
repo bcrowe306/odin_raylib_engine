@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:mem"
 import "core:log"
 import "core:os"
+import "core:time"
 import rl "vendor:raylib"
 import e "../engine"
 import imgui "lib/imgui"
@@ -28,7 +29,11 @@ main :: proc() {
 		context.allocator = mem.tracking_allocator(&track)
 		memTrack = &track
 	}
+	// Profiling builds (-define:ORE_PROF=true, engine/profiling.odin): --prof trace.spall.
+	e.Prof_ParseArgs(os.args[1:])
+	context.allocator = e.Prof_Init(context.allocator)
 	code := editor_main()
+	e.Prof_Shutdown()
 	// (Called here, not deferred: os.exit skips defers.)
 	when ORE_MEM_TRACK do MemTrack_ReportLeaks()
 	os.exit(code)
@@ -36,15 +41,14 @@ main :: proc() {
 
 editor_main :: proc() -> int {
 	isTestMode := false
+	uncapped := false // --uncapped: no vsync, no frame cap (measuring; frame_timing.odin)
 	for arg in os.args {
-		if arg == "--test-e2e" || arg == "--drive" {
-			isTestMode = true
-			break
-		}
+		if arg == "--test-e2e" || arg == "--drive" do isTestMode = true
+		if arg == "--uncapped" do uncapped = true
 	}
 
 	// 1. Configure and Initialize Raylib Window
-	if isTestMode {
+	if isTestMode || uncapped {
 		rl.SetConfigFlags({.WINDOW_RESIZABLE})
 	} else {
 		rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
@@ -54,6 +58,7 @@ editor_main :: proc() -> int {
 	e.Render_InitBatching() // fewer GPU stalls on batch flushes (batching.odin)
 	defer e.Render_ReleaseBatching()
 	rl.SetTargetFPS(60)
+	if uncapped do FrameTiming_SetUncapped(true, false)
 	rl.SetExitKey(.KEY_NULL) // Esc is an editor key (deselect, close popups), not "quit"
 
 	rl.InitAudioDevice()
@@ -97,6 +102,7 @@ editor_main :: proc() -> int {
 
 	// 5. Main Application Loop
 	for !GlobalEditor.quitConfirmed {
+		FrameTiming_Begin()
 		// The window's close button asks about unsaved work first.
 		if rl.WindowShouldClose() do Editor_RequestQuit(&GlobalEditor)
 		// Poll build / game processes, stream their output to the console
@@ -123,6 +129,7 @@ editor_main :: proc() -> int {
 			}
 		}
 
+		FrameTiming_Mark(.Poll)
 		imgui_rl.process_events()
 		imgui_rl.new_frame()
 		if TestDrive_BeginFrame(&GlobalDrive, &GlobalEditor) do break
@@ -202,12 +209,26 @@ editor_main :: proc() -> int {
 			// --------------------------------------------------------------------
 			// 5. Render Dockable Editor Panels & Dialogs
 			// --------------------------------------------------------------------
+			e.Prof_Begin("ui.assets")
 			AssetBrowser_Render(&GlobalEditor)
+			e.Prof_End()
+			viewportStart := time.tick_now()
+			e.Prof_Begin("viewport")
 			Viewport_UpdateAndRender(&GlobalEditor)
+			e.Prof_End()
+			FrameTiming_Viewport(viewportStart)
+			e.Prof_Begin("ui.code")
 			Code_Render(&GlobalEditor)
+			e.Prof_End()
+			e.Prof_Begin("ui.scene+inspector")
 			SceneInspector_Render(&GlobalEditor)
+			e.Prof_End()
+			e.Prof_Begin("ui.bottom")
 			BottomPanel_Render(&GlobalEditor)
+			e.Prof_End()
+			e.Prof_Begin("ui.preview")
 			PreviewPanel_Render(&GlobalEditor)
+			e.Prof_End()
 		}
 
 		// Modals & Popups
@@ -238,13 +259,18 @@ editor_main :: proc() -> int {
 		// --------------------------------------------------------------------
 
 		// End Frame and Draw
+		e.Prof_Begin("imgui.render")
 		imgui.Render()
+		e.Prof_End()
+		FrameTiming_Mark(.UI)
 
 		rl.BeginDrawing()
 		rl.ClearBackground(rl.Color{20, 23, 27, 255})
 		imgui_rl.render_draw_data(imgui.GetDrawData())
+		FrameTiming_Mark(.Draw)
 		TestDrive_EndFrame(&GlobalDrive)
 		rl.EndDrawing()
+		FrameTiming_End()
 		// Everything temp-allocated this frame (tprintf, temp clones) goes:
 		// without this the temp arena grew ~40 KB a frame, forever.
 		free_all(context.temp_allocator)

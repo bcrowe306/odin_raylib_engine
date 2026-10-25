@@ -249,7 +249,14 @@ BottomPanel_RenderProfiler :: proc(state: ^EditorState) {
 		imgui.TableSetupColumn("graph", {.WidthStretch}, 0.6)
 		imgui.TableSetupColumn("stats", {.WidthStretch}, 0.4)
 		imgui.TableNextColumn()
-		UI_DimText(fmt.tprintf("Editor frame time  %.2f ms  (%d FPS)", dt, fps))
+		UI_DimText(fmt.tprintf("Editor frame time  %.2f ms  (%d FPS)%s", dt, fps, "  uncapped" if frameTiming.uncapped else ""))
+		ft := frameTiming.smooth
+		UI_DimText(fmt.tprintf("poll %.2f · ui %.2f · viewport %.2f · draw %.2f · present %.2f ms", ft[.Poll], ft[.UI], ft[.Viewport], ft[.Draw], ft[.Present]))
+		when e.ORE_PROF {
+			st := e.Prof_Last()
+			UI_DimText(fmt.tprintf("heap %d allocations (%.1f KB) · %d frees · temp arena %.1f KB per frame", st.allocs, f64(st.bytes) / 1024, st.frees, f64(st.tempBytes) / 1024))
+		}
+		UI_Tooltip("Poll: file watchers and hot reloads. UI: the panels (ImGui), without the viewport. Viewport: the scene (Simulate's update and its render). Draw: ImGui's draw lists to the GPU. Present: the buffer swap, which waits for the GPU and for vsync / the frame cap (run with --uncapped to measure).")
 		imgui.PushStyleColorImVec4(.FrameBg, UI_BG_APP)
 		imgui.PushStyleColorImVec4(.PlotLines, UI_ACCENT)
 		imgui.PlotLines("##frametime", raw_data(state.fpsHistory[:]), c.int(len(state.fpsHistory)), c.int(state.fpsIdx), nil, 0, 33, {-1, 80})
