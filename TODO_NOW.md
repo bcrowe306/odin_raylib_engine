@@ -181,14 +181,14 @@ Common:
 - [x] 12 Scene transitions: (transitions + preload existed) loading screens (change_scene loading / min_time, Scene.loading_progress / loading_target, Game_ChangeSceneVia), textures decoded on worker threads (async_decode.odin; jobs owned by the decoder, abandon-safe), preload finds "texture" (it only read legacy "texture_path") and images named by properties; guide with a tutorial, tests, a real-game run
 
 Editor:
-- [ ] 13 Editor plugins in Lua - designed 2026-10-25: editor/docs/plugins.md (project + user plugins, trust prompt + permissions, editor-only)
+- [x] 13 Editor plugins in Lua - designed 2026-10-25, built 13.1-13.7: editor/docs/plugins.md (project + user plugins, trust prompt + permissions, editor-only)
   - [x] 13.1 Plugin host: discovery, plugin.json, a Lua state per plugin, protected calls, on_load / on_unload, hot reload, Settings > Plugins
   - [x] 13.2 Trust prompt + permissions (per project, remembered)
   - [x] 13.3 A: commands (menus, palette, keymap), selection, scene, Editor.edit undo, create / destroy, assets + Editor.fs, dialogs
   - [x] 13.4 B: dockable panels + the `ui` widget set
   - [x] 13.5 C: events (selection, save, import, before Play, after export, project opened)
   - [x] 13.6 editor_api.lua definitions, Tools > New Plugin, guide + examples, drives
-  - [ ] 13.7 D: inspectors, viewport overlays / handles, importers
+  - [x] 13.7 D: inspectors, viewport overlays / handles, importers
 - [x] 14 Live remote scene tree in Play: (the Game tab's tree / text props existed) the Scene panel's Local / Remote view and the Inspector on the running game's node; typed live properties (drags, check boxes, colours, enum lists incl. script enums, ranges; throttled while dragging); enabled / visible toggles, Remove from Game, Pick (click in the game window; topmost node per layer space), amber outline of the selection in the game, Apply to Scene (undoable, Node_SetFromText); trees re-sent only when their hash changed; README, tests, drive
 - [x] 15 Multiple open scenes as tabs: a tab per open scene / component document above the viewport (reorder, unsaved dot, tooltip, context menu), per-tab camera / selection / undo, close with Save / Don't Save / Cancel (unloads the scene, frees its undo entries; closed component documents reuse their scene), Cmd+W, Cmd+Alt+Right/Left, Ctrl+PageDown/Up, Ctrl+Tab; open tabs restored per project (.ore/open_scenes.json); README, drive
 - [x] 16 Animation editor depth: (easing presets and method / sound event tracks existed) custom key curves (cubic Bezier editor with handles and presets, saved as a 7th key element, drawn on the timeline rows), method keys with an argument and a method picker from the target script, the player's animation_event signal, onion skin in the viewport (before / after counts, opacity, follows the player's own tracks, wraps looping animations); toolbar wraps in narrow panels; guide with tutorials, test, drive

@@ -67,9 +67,15 @@ Plugin_Panel :: struct {
 @(private = "file")
 panels: [dynamic]^Plugin_Panel
 
-// The panel being drawn (ui widgets' drive ids).
+// The panel / inspector section being drawn (ui widgets' drive ids); "":
+// none (ui calls are errors).
 @(private = "file")
-drawing: ^Plugin_Panel
+drawing: string
+
+// PluginUI_Begin / End: the `ui` widgets work between them (a panel's draw,
+// an inspector section's); `id` prefixes their drive ids.
+PluginUI_Begin :: proc(id: string) {drawing = id}
+PluginUI_End :: proc() {drawing = ""}
 
 // PluginPanels_Forget drops a plugin's panels (it stops / reloads).
 PluginPanels_Forget :: proc(p: ^Plugin) {
@@ -98,14 +104,14 @@ PluginPanels_Render :: proc(state: ^EditorState) {
 		visible := imgui.Begin(fmt.ctprintf("%s###%s", pn.title, pn.id), &pn.open)
 		if visible {
 			imgui.PushID(fmt.ctprintf("%s", pn.id))
-			drawing = pn
+			PluginUI_Begin(pn.id)
 			start := time.tick_now()
 			L := p.mgr.L
 			lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(pn.refDraw))
 			lua.getglobal(L, "ui")
 			ok := Plugin_Call(state, p, 1, 0, fmt.tprintf("panel %s", pn.short))
 			ms := time.duration_milliseconds(time.tick_since(start))
-			drawing = nil
+			PluginUI_End()
 			imgui.PopID()
 			if ok && ms > PANEL_SLOW_MS && !pn.slowLogged {
 				pn.slowLogged = true
@@ -244,18 +250,18 @@ PluginPanels_RegisterUI :: proc(L: ^lua.State) {
 // whatever window is current).
 @(private = "file")
 ui_ok :: proc(L: ^lua.State) -> bool {
-	if drawing != nil do return true
-	lua.pushstring(L, "ui: widgets only work inside a panel's draw function")
+	if drawing != "" do return true
+	lua.pushstring(L, "ui: widgets only work inside a panel's (or an inspector's) draw function")
 	lua.error(L)
 	return false
 }
 
 @(private = "file")
 ui_item :: proc(label: string) {
-	if drawing == nil do return
+	if drawing == "" do return
 	name := label
 	if i := strings.index(label, "##"); i >= 0 do name = label[:i] if i > 0 else label[i + 2:]
-	Drive_Item(fmt.tprintf("panel:%s:%s", drawing.id, name))
+	Drive_Item(fmt.tprintf("panel:%s:%s", drawing, name))
 }
 
 @(private = "file")

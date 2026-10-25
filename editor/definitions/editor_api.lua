@@ -97,6 +97,67 @@ function Editor.add_panel(spec) end
 ---@param open? boolean Default true
 function Editor.show_panel(id, open) end
 
+---@class EditorInspector
+---@field id string Unique within the plugin
+---@field title? string The section's header (default: id)
+---@field type? string Only for this node type ("TextureNode", ...; default: every node)
+---@field draw fun(ui: EditorUI, node: Node) Draws the section, every frame the node is selected
+
+---Adds a section to the Inspector.
+---@param spec EditorInspector
+function Editor.add_inspector(spec) end
+
+---@class EditorOverlayView
+---@field zoom number The viewport's zoom
+---@field mouse Vec2 The mouse in world space
+
+---@class EditorOverlay
+---@field id string Unique within the plugin
+---@field title? string The undo step's name for handle drags (default: id)
+---@field draw fun(g: EditorOverlayDraw, view: EditorOverlayView) Draws over the viewport, every frame
+
+---Draws over the viewport (world space) with draggable handles.
+---@param spec EditorOverlay
+function Editor.add_overlay(spec) end
+
+---@class EditorImporter
+---@field ext string ".tsx": the extension it imports
+---@field import fun(name: string, data: string): table<string, string>?, string? Returns {["project/path"] = contents} (or nil, "why")
+
+---Imports a new file type (dropped or from Import Assets).
+---@param spec EditorImporter
+function Editor.add_importer(spec) end
+
+---World-space drawing in an overlay's draw. Colours: "#rrggbb" / "#rrggbbaa".
+---@class EditorOverlayDraw
+local EditorOverlayDraw = {}
+---@param a Vec2
+---@param b Vec2
+---@param color? string
+---@param width? number Pixels
+function EditorOverlayDraw.line(a, b, color, width) end
+---@param center Vec2
+---@param radius number World units
+---@param color? string
+---@param filled? boolean
+function EditorOverlayDraw.circle(center, radius, color, filled) end
+---@param min Vec2
+---@param max Vec2
+---@param color? string
+---@param filled? boolean
+function EditorOverlayDraw.rect(min, max, color, filled) end
+---@param pos Vec2
+---@param text string
+---@param color? string
+function EditorOverlayDraw.text(pos, text, color) end
+---A draggable point. While dragged: true and where it is now (change the scene
+---right away - the drag is one undo step).
+---@param id string Unique within the overlay
+---@param pos Vec2
+---@param color? string
+---@return boolean moved, Vec2 pos
+function EditorOverlayDraw.handle(id, pos, color) end
+
 ---Calls fn on an editor event.
 ---@param event EditorEvent
 ---@param fn function

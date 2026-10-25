@@ -661,6 +661,13 @@ Viewport_HandleInputAndGizmos :: proc(state: ^EditorState) {
 		return
 	}
 
+	// Plugin overlays (plugin_extend.odin): a handle under / held by the mouse owns it.
+	if !shapeOwnsMouse && PluginOverlays_Render(state, drawList, mouseWorld) {
+		state.activeHandle = .None
+		state.isDraggingGizmo = false
+		return
+	}
+
 	// Rulers and guides (and their mouse handling).
 	guidesOwn := shapeOwnsMouse ? false : Viewport_Guides(state, drawList, mouseScreen, mouseWorld)
 

@@ -124,15 +124,45 @@ Editor.on("after_export", function(preset, dir) ... end)
 Editor.on("project_opened", function(project) ... end)
 ```
 
-### D (next). Inspectors, viewport, importers
+### D. Inspectors, viewport, importers
 
-- `Editor.add_inspector{type = "PathNode" | script property type, draw = function(ui, node) ... end}`:
-  a section in the Inspector
-- `Editor.add_overlay{draw = function(g, view) ... end}` with world-space
-  drawing (lines, circles, text) and draggable handles that edit inside an
-  undo step
-- `Editor.add_importer{ext = ".tsx", import = function(path, out) ... end}`:
-  new file types become project assets
+```lua
+-- A section in the Inspector for the selected node (type: one node type, or any).
+Editor.add_inspector{id = "spawn", title = "Spawner", type = "Node",
+    draw = function(ui, node)
+        local changed, v = ui.drag("Rate", node:get_property("rate") or 1)
+        if changed then Editor.edit("Rate", function() node:set_property("rate", v) end) end
+    end}
+
+-- World-space drawing over the viewport; g.handle is a draggable point
+-- (a drag is one undo step, taken as it starts: change the scene directly).
+Editor.add_overlay{id = "move", title = "Move",
+    draw = function(g, view)            -- view.zoom, view.mouse (world)
+        for _, n in ipairs(Editor.selection()) do
+            g.circle(n.position, 30, "#ffcc00")
+            local moved, to = g.handle(n.name, n.position)
+            if moved then n.position = to end
+        end
+    end}
+
+-- A new file type: import gets the file's name and contents and returns the
+-- project files to write ({["path"] = contents}), or nil, "why".
+Editor.add_importer{ext = ".tsx", import = function(name, data)
+    return {["tilesets/" .. name:gsub("%.tsx$", ".json")] = convert(data)}
+end}
+```
+
+- Inspector sections follow the built-in ones; `ui` works as in panels
+  (drive ids `panel:<plugin.id.inspector id>:<label>`). `Editor.edit` with
+  the same label every frame of a drag is one undo step.
+- `g.line(a, b, color?, width?)`, `g.circle(center, radius, color?,
+  filled?)`, `g.rect(min, max, color?, filled?)`, `g.text(pos, text,
+  color?)`, `g.handle(id, pos, color?) -> moved, pos` (world positions as
+  Vec2, colours `"#rrggbb[aa]"`). A handle under the mouse takes it from
+  picking and the gizmo. Overlays don't draw while simulating.
+- Importers run for extensions the editor doesn't import itself; their
+  extensions join the import dialog's filter. Files they return go into the
+  project (not `.ore/`), each gets `asset_imported`.
 
 ## Developer experience
 
@@ -159,4 +189,4 @@ The guide: [plugin_guide.md](plugin_guide.md); examples in
 13.4 B: panels + the `ui` widget set
 13.5 C: events
 13.6 Definitions (editor_api.lua), New Plugin template, guide + examples, drives
-13.7 D: inspectors, viewport overlays / handles, importers
+13.7 D: inspectors, viewport overlays / handles, importers (done: plugin_extend.odin)

@@ -305,6 +305,7 @@ inspector_body :: proc(state: ^EditorState) {
 	if !isRoot do inspector_material(state, node)
 	if !isRoot do inspector_script(state, node)
 	if !isRoot do Inspector_Signals(state, node)
+	PluginInspectors_Render(state, node) // (plugin_extend.odin)
 
 	if !isRoot && UI_SectionHeader("Component", false) {
 		imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)

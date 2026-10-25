@@ -116,6 +116,14 @@ Editor.on("after_export", function(preset, dir)
 end)
 ```
 
+## Inspectors, overlays, importers
+
+`Editor.add_inspector` adds a section to the Inspector for one node type,
+`Editor.add_overlay` draws over the viewport with draggable handles,
+`Editor.add_importer` teaches the importer a new file type - see
+[plugins.md](plugins.md#d-inspectors-viewport-importers).
+`tests/drive/fixtures/plugins/extend_zz` uses all three.
+
 ## Testing a plugin
 
 Drives (`tests/drive/*.drive`) run plugin commands by id, read a plugin's

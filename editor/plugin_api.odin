@@ -62,6 +62,9 @@ PluginAPI_Register :: proc(L: ^lua.State, p: ^Plugin) {
 	reg(L, "add_panel", api_add_panel)   // (plugin_panels.odin)
 	reg(L, "show_panel", api_show_panel)
 	reg(L, "on", api_on)                 // (plugin_events.odin)
+	reg(L, "add_inspector", api_add_inspector) // (plugin_extend.odin)
+	reg(L, "add_overlay", api_add_overlay)
+	reg(L, "add_importer", api_add_importer)
 	lua.newtable(L)
 	reg(L, "read", api_fs_read)
 	reg(L, "write", api_fs_write)
@@ -77,6 +80,7 @@ PluginAPI_Register :: proc(L: ^lua.State, p: ^Plugin) {
 	lua.setfield(L, -2, "plugin")
 	lua.setglobal(L, "Editor")
 	PluginPanels_RegisterUI(L)
+	PluginOverlays_RegisterG(L)
 }
 
 // PluginAPI_Forget drops what a plugin registered (it stops / reloads).
@@ -95,6 +99,7 @@ PluginAPI_Forget :: proc(p: ^Plugin) {
 	if api.pickPlugin == p do api.pickPlugin = nil
 	PluginPanels_Forget(p)
 	PluginEvents_Forget(p)
+	PluginExtend_Forget(p)
 	for j in api.jobs do if j.plugin == p do j.plugin = nil // (finished, then dropped)
 }
 
@@ -294,7 +299,15 @@ api_edit :: proc "c" (L: ^lua.State) -> c.int {
 	lua.L_checktype(L, 2, c.int(lua.Type.FUNCTION))
 	if state.activeScene == nil do return api_fail(L, "edit: no scene is open")
 	if state.isSimulating do return api_fail(L, "edit: the scene can't be edited while simulating")
-	Editor_RecordUndo(state, label)
+	// A widget being dragged (an inspector's ui.drag / slider) edits every
+	// frame: one undo step for the drag.
+	frame := imgui.GetFrameCount()
+	if !(imgui.IsAnyItemActive() && label == api.lastEdit && frame - api.lastEditFrame <= 1) do Editor_RecordUndo(state, label)
+	if label != api.lastEdit {
+		delete(api.lastEdit)
+		api.lastEdit = strings.clone(label)
+	}
+	api.lastEditFrame = frame
 	lua.pushvalue(L, 2)
 	lua.call(L, 0, 0) // (an error propagates to whoever called the plugin)
 	e.ProcessNodeQueues(state.activeScene.manager, &state.game.gameContext)
@@ -487,6 +500,8 @@ api: struct {
 	jobs:       [dynamic]^Plugin_Job,
 	pickPlugin: ^Plugin, // the plugin a file dialog answers
 	pickRef:    c.int,
+	lastEdit:      string, // Editor.edit's last label and frame (a drag: one undo step)
+	lastEditFrame: i32,
 }
 
 @(private = "file")
