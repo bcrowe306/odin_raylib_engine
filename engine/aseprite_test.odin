@@ -459,8 +459,7 @@ test_aseprite_tiles_match_the_render :: proc(t: ^testing.T) {
 // last release frees it.
 @(test)
 test_aseprite_resource_reload :: proc(t: ^testing.T) {
-	tmp := os.get_env("TMPDIR", context.temp_allocator)
-	path, _ := filepath.join({tmp if tmp != "" else "/tmp", "ore_ase_reload.aseprite"}, context.temp_allocator)
+	path, _ := filepath.join({ase_tmp_dir(), "ore_ase_reload.aseprite"}, context.temp_allocator)
 	defer os.remove(path)
 	a, _ := os.read_entire_file(ASE_FIXTURES + "/animation.aseprite", context.temp_allocator)
 	b, _ := os.read_entire_file(ASE_FIXTURES + "/slices.aseprite", context.temp_allocator)
@@ -490,8 +489,7 @@ test_aseprite_resource_reload :: proc(t: ^testing.T) {
 // disk), its tags playing (the TileMap path needs a window: runtime_tests.json).
 @(test)
 test_aseprite_from_a_package :: proc(t: ^testing.T) {
-	tmp := os.get_env("TMPDIR", context.temp_allocator)
-	ore, _ := filepath.join({tmp if tmp != "" else "/tmp", "ore_ase_test.ore"}, context.temp_allocator)
+	ore, _ := filepath.join({ase_tmp_dir(), "ore_ase_test.ore"}, context.temp_allocator)
 	defer os.remove(ore)
 	if !testing.expect(t, OrePackage_CreateFromDirectory("tests/aseprite/project", ore, true), "packaged") do return
 	game := new(Game)
@@ -509,4 +507,12 @@ test_aseprite_from_a_package :: proc(t: ^testing.T) {
 	AsepriteNode_Play(an, "walk")
 	for _ in 0 ..< 300 do AsepriteNode_Update(an, &game.gameContext, 0.001) // 300 ms: frame 4 (250 ms), then 3
 	testing.expect_value(t, an.frame, 3)
+}
+
+// ase_tmp_dir: a writable temporary folder (TMPDIR, TEMP / TMP on Windows).
+@(private = "file")
+ase_tmp_dir :: proc() -> string {
+	for v in ([]string{"TMPDIR", "TEMP", "TMP"}) do if d := os.get_env(v, context.temp_allocator); d != "" do return d
+	_ = os.make_directory_all("build/tmp")
+	return "build/tmp"
 }
