@@ -20,7 +20,7 @@ utf16_contains :: proc(b: []u8, s: string) -> bool {
 
 @(test)
 test_export_formats :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({os.get_env("TMPDIR", context.temp_allocator), "ore_export_formats"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "ore_export_formats"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	_ = os.make_directory_all(dir)
 	defer os.remove_all(dir)

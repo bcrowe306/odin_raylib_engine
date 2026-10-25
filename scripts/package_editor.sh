@@ -68,8 +68,8 @@ else
 	odin build editor -o:speed '-extra-linker-flags:-Wl,-rpath,$ORIGIN' -define:ORE_RELEASE="$version" -out:"$bin/$exe"
 fi
 
-# The editor's shared libraries that aren't the system's (Homebrew's Lua and
-# cmark on macOS until they're linked statically: TODO D.3 / D.4).
+# The editor's shared libraries that aren't the system's (Homebrew's cmark
+# on macOS until it's linked statically or replaced: TODO D.4).
 if [ "$platform" = macos ]; then
 	for lib in $(otool -L "$bin/$exe" | awk 'NR > 1 {print $1}' | grep -E '^/(opt|usr/local)/'); do
 		base=$(basename "$lib")
@@ -79,7 +79,7 @@ if [ "$platform" = macos ]; then
 		install_name_tool -change "$lib" "@rpath/$base" "$bin/$exe"
 	done
 elif [ "$platform" = windows ]; then
-	cp "$(odin root)/vendor/lua/5.4/windows/lua54.dll" "$libs/" 2>/dev/null || true
+	: # (Lua and cmark are static)
 else
 	# Linux: cmark isn't on every distribution (found next to the editor: $ORIGIN).
 	for lib in $(ldd "$bin/$exe" | awk '/libcmark/ {print $3}'); do

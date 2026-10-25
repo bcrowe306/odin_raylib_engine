@@ -55,7 +55,7 @@ runes_to_string :: proc(rs: []rune) -> string {
 
 @(test)
 test_localization_and_text_nodes :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({os.get_env("TMPDIR", context.temp_allocator), "ore_locale_test"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "ore_locale_test"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	defer os.remove_all(dir)
 	locDir, _ := filepath.join({dir, "locale"}, context.temp_allocator)

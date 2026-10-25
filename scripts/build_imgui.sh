@@ -42,6 +42,9 @@ python3 - "$work/build.py" <<-'EOF'
 	p = sys.argv[1]
 	s = open(p).read()
 	s = re.sub(r'^wanted_backends = .*$', 'wanted_backends = []', s, count=1, flags=re.M)
+	# Windows: MSVC's environment is already set (a Developer prompt, or
+	# ilammy/msvc-dev-cmd in CI) - vcvarsall.bat isn't on PATH there.
+	s = s.replace('f"vcvarsall.bat x64 && {', 'f"{')
 	open(p, 'w').write(s)
 EOF
 # dear_bindings needs `ply`: a private virtual environment when it's missing.

@@ -214,6 +214,13 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 	when ODIN_OS == .JS do rl.SetTraceLogLevel(.WARNING) // (the browser console: shader / GL problems)
 	titleC := strings.clone_to_cstring(winTitle, context.temp_allocator)
 	rl.InitWindow(winW, winH, titleC)
+	if !rl.IsWindowReady() {
+		// (No OpenGL 3.3 context: a machine without a GPU / display - raylib
+		// would crash on the next window call.)
+		log.errorf("Could not open the game window (OpenGL 3.3 is needed)")
+		Runner_Stop(rs)
+		return nil, false
+	}
 	rs.windowOpen = true
 	// Fullscreen (project Video, Engine.set_fullscreen): applied from the
 	// first frames on (Runner_ApplyFullscreen); the frame scales to the window.

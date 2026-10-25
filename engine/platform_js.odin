@@ -59,6 +59,9 @@ Web_AllocatorProc :: proc(data: rawptr, mode: runtime.Allocator_Mode, size, alig
 
 Engine_HeapAllocator :: proc() -> runtime.Allocator {return {procedure = Web_AllocatorProc}}
 
+// Engine_TempDir: the virtual file system's /tmp (platform.odin on desktop).
+Engine_TempDir :: proc() -> string {return "/tmp"}
+
 @(private = "file")
 webTemp: runtime.Arena
 

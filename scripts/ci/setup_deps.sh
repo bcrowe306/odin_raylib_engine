@@ -4,17 +4,16 @@
 # after Odin itself (laytan/setup-odin). The official Odin release already
 # ships raylib for every platform, Lua for Windows / Linux and Box2D for
 # macOS / Windows; the rest comes from here:
-#   macOS    Lua 5.4 and cmark (Homebrew; linked dynamically until TODO D.3 / D.4)
+#   macOS    cmark (Homebrew; linked dynamically until TODO D.4)
 #   Linux    X11 / GL / ALSA headers, cmark, Box2D (built from source), ImGui
-#   Windows  cmark (built from source as a static library), ImGui
+#   Windows  cmark (built from source as a static library), Lua (static), ImGui
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 odin_root=$(odin root)
 
 case "$(uname -s)" in
 Darwin)
-	brew install lua@5.4 cmark > /dev/null
-	brew link --force lua@5.4 > /dev/null 2>&1 || true
+	brew install cmark > /dev/null
 	scripts/build_imgui.sh --if-missing
 	;;
 Linux)
@@ -37,6 +36,7 @@ MINGW*|MSYS*|CYGWIN*)
 		cp "$(find "$tmp/build" -name 'cmark.lib' | head -1)" "$cm/cmark_static.lib"
 	fi
 	scripts/build_imgui.sh --if-missing
+	scripts/build_lua.sh --if-missing
 	;;
 esac
 echo "Dependencies ready"

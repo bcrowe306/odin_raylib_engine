@@ -26,8 +26,12 @@ when LUA_SHARED {
 		foreign import lib "system:lua5.4"
 	}
 } else {
+	// Static: no Lua shared library ships with the editor or the runners
+	// (scripts/build_lua.sh builds lib/: macOS universal, in the repo; Windows in CI).
 	when ODIN_OS == .Windows {
-		foreign import lib "vendor:lua/5.4/windows/lua54dll.lib"
+		foreign import lib "lib/lua54_windows_x64.lib"
+	} else when ODIN_OS == .Darwin {
+		foreign import lib "lib/liblua54_darwin.a"
 	} else when ODIN_OS == .Linux && ODIN_ARCH == .amd64 {
 		foreign import lib "vendor:lua/5.4/linux/liblua54.a"
 	} else when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 {
