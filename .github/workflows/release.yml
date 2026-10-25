@@ -145,7 +145,10 @@ jobs:
           base="ore-editor-$VERSION-${{ matrix.platform }}"
           case "${{ matrix.platform }}" in
             macos)   hdiutil create -volname "$APP_NAME" -srcfolder "dist/$APP_NAME.app" -ov -format UDZO "$base.dmg" ;;
-            linux)   tar -C dist -czf "$base.tar.gz" ore-editor-linux ;;
+            linux)
+              tar -C dist -czf "$base.tar.gz" ore-editor-linux
+              scripts/ci/appimage_editor.sh "$VERSION" dist
+              mv "dist/Ore_Editor-$VERSION-x86_64.AppImage" "$base-x86_64.AppImage" ;;
             windows) (cd dist && 7z a -bd "../$base.zip" ore-editor-windows > /dev/null) ;;
           esac
           ls -la ore-editor-*

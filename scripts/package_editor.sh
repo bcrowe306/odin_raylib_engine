@@ -120,6 +120,7 @@ if [ "$platform" = macos ]; then
 		<key>CFBundleDisplayName</key><string>$name</string>
 		<key>CFBundleIdentifier</key><string>com.bcrowe306.ore-editor</string>
 		<key>CFBundleExecutable</key><string>$exe</string>
+		<key>CFBundleIconFile</key><string>AppIcon</string>
 		<key>CFBundlePackageType</key><string>APPL</string>
 		<key>CFBundleShortVersionString</key><string>$version</string>
 		<key>CFBundleVersion</key><string>$version</string>
@@ -128,6 +129,15 @@ if [ "$platform" = macos ]; then
 	</dict>
 	</plist>
 	EOF
+	# The icon (editor/assets/icon.png) as AppIcon.icns.
+	iconset="$out/AppIcon.iconset"
+	rm -rf "$iconset"; mkdir -p "$iconset"
+	for s in 16 32 128 256; do
+		sips -z $s $s editor/assets/icon.png --out "$iconset/icon_${s}x${s}.png" > /dev/null
+		sips -z $((s * 2)) $((s * 2)) editor/assets/icon.png --out "$iconset/icon_${s}x${s}@2x.png" > /dev/null
+	done
+	iconutil -c icns "$iconset" -o "$res/AppIcon.icns"
+	rm -rf "$iconset"
 	# Ad-hoc signatures (install_name_tool invalidated them); CI re-signs.
 	codesign --force --deep -s - "$app" > /dev/null 2>&1 || true
 	echo "Packaged $app"

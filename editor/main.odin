@@ -57,6 +57,15 @@ editor_main :: proc() -> int {
 	rl.SetConfigFlags(flags)
 	rl.InitWindow(1600, 900, strings.clone_to_cstring(fmt.tprintf("Ore Editor %s", e.ORE_RELEASE), context.temp_allocator))
 	defer rl.CloseWindow()
+	{
+		// The editor's icon (editor/assets/icon.png, embedded).
+		ICON :: #load("assets/icon.png")
+		icon := rl.LoadImageFromMemory(".png", raw_data(ICON), c.int(len(ICON)))
+		if icon.data != nil {
+			rl.SetWindowIcon(icon)
+			rl.UnloadImage(icon)
+		}
+	}
 	e.Render_InitBatching() // fewer GPU stalls on batch flushes (batching.odin)
 	// The engine's font (in-game UI text in the viewport), as the game loads it.
 	e.InitEngineFonts(strings.clone_to_cstring(Resources_EngineFont(), context.temp_allocator))

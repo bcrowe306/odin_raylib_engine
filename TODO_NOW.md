@@ -126,7 +126,7 @@ Editor that runs anywhere:
 - [ ] D.6 The editor ships the runners for every platform (`runners/{macos,windows,linux,web}`), so any editor exports every desktop target and the web
 - [x] D.7 One version string (from the git tag) in the editor, the runner and each `.ore`; the runner warns about a project from a newer version
 - [x] D.8 Third-party license notices bundled (raylib, Lua, Box2D, Dear ImGui, LuaLS, cmark, Open Sans, Font Awesome)
-- [ ] D.9 Check for updates against GitHub Releases (later: an auto-updater)
+- [x] D.9 Check for updates against GitHub Releases (Help > Check for Updates, at startup unless turned off; status bar link; later: an auto-updater)
 
 CI/CD (GitHub Actions):
 - [ ] C.1 CI on pushes / pull requests: build the editor, the runner and the Play binary, engine + ui unit tests, on macOS (arm64), Windows (x64) and Linux (x64)
@@ -134,7 +134,7 @@ CI/CD (GitHub Actions):
 - [ ] C.3 Release workflow on `v*` tags: build the editor and runners per platform, put every platform's runners in each editor package, publish a GitHub Release with checksums
 - [ ] C.4 macOS signing + notarization (Developer ID, hardened runtime, every dylib signed; certificates as repository secrets) - needs an Apple Developer account
 - [ ] C.5 Windows code signing (Azure Trusted Signing or an OV certificate) - optional for early releases (SmartScreen warns without it)
-- [ ] C.6 Linux builds on an old glibc (Ubuntu 20.04 container) so they run on older distributions
+- [x] C.6 Linux glibc baseline: built on Ubuntu 22.04 (glibc 2.35: Ubuntu 22.04+, Debian 12+, Fedora 36+); Ubuntu 20.04 is past its standard support, so no older container
 - [ ] C.7 Packages: .dmg (macOS), installer (Inno Setup) or zip (Windows), AppImage + .tar.gz (Linux)
 
 Export targets:
