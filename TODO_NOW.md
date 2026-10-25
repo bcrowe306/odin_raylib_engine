@@ -182,8 +182,8 @@ Common:
 
 Editor:
 - [ ] 13 Editor plugins in Lua - designed 2026-10-25: editor/docs/plugins.md (project + user plugins, trust prompt + permissions, editor-only)
-  - [ ] 13.1 Plugin host: discovery, plugin.json, a Lua state per plugin, protected calls, on_load / on_unload, hot reload, Settings > Plugins
-  - [ ] 13.2 Trust prompt + permissions (per project, remembered)
+  - [x] 13.1 Plugin host: discovery, plugin.json, a Lua state per plugin, protected calls, on_load / on_unload, hot reload, Settings > Plugins
+  - [x] 13.2 Trust prompt + permissions (per project, remembered)
   - [ ] 13.3 A: commands (menus, palette, keymap), selection, scene, Editor.edit undo, create / destroy, assets + Editor.fs, dialogs
   - [ ] 13.4 B: dockable panels + the `ui` widget set
   - [ ] 13.5 C: events (selection, save, import, before Play, after export, project opened)

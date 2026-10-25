@@ -706,6 +706,7 @@ fmt_vec :: proc(v: [2]f32) -> string {
 //     rotation scale visible enabled children script prop.<path> script.<prop>
 Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "code.") do return Code_DriveQuery(q)
+	if strings.has_prefix(q, "plugin:") do return Plugins_DriveQuery(q)
 	if strings.has_prefix(q, "import.") do return AssetImport_DriveQuery(q)
 	if strings.has_prefix(q, "ldtk.") do return LdtkPanel_DriveQuery(state, q)
 	if strings.has_prefix(q, "level.") do return LevelEditor_DriveQuery(state, q)

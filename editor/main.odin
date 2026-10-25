@@ -112,6 +112,8 @@ editor_main :: proc() -> int {
 	Editor_LoadSettings(&GlobalEditor)
 	Lua_ProjectSetup(&GlobalEditor) // .ore/definitions + .luarc.json for Lua tooling
 	defer Editor_Shutdown(&GlobalEditor)
+	Plugins_Load(&GlobalEditor) // project + user plugins (plugins.odin)
+	defer Plugins_Unload(&GlobalEditor)
 	UpdateCheck_Start() // a newer release? (update_check.odin; off in development builds)
 
 
@@ -126,6 +128,7 @@ editor_main :: proc() -> int {
 		Lua_UpdateProjectTypes(&GlobalEditor)
 		Code_ApplyPendingNodeProp(&GlobalEditor) // a node property dropped into a properties table
 		UpdateCheck_Poll(&GlobalEditor)
+		Plugins_Update(&GlobalEditor) // hot reload, failed plugins closed
 		e.MemTrack_Frame()
 		if n := e.Shader_CheckForChanges(); n > 0 do Editor_Log(&GlobalEditor, .Info, "Reloaded %d changed shader(s)", n)
 		e.ResourceManager_CheckForChanges(&GlobalEditor.game.resourceManager) // edited images
@@ -262,6 +265,7 @@ editor_main :: proc() -> int {
 		Signals_Render(&GlobalEditor)
 		NodeRefs_Render(&GlobalEditor) // update script references after a rename / move
 		AssetImport_Render(&GlobalEditor)
+		Plugins_TrustPrompt(&GlobalEditor)
 
 		// Files dropped from the OS (after the panels: their rects are current).
 		Editor_HandleFileDrops(&GlobalEditor)

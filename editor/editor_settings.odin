@@ -65,6 +65,8 @@ Editor_Settings :: struct {
 	lastProjectDir:   string,
 	// LDtk projects' custom commands: project iid -> allowed / blocked
 	ldtkTrust:        map[string]bool,
+	pluginTrust:      map[string]bool, // project folder -> its plugins allowed (true) / blocked (plugins.odin)
+	pluginsOff:       map[string]bool, // plugin folders turned off in Settings > Plugins
 }
 
 DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
@@ -115,6 +117,10 @@ Editor_Settings_Clone :: proc(s: ^Editor_Settings) -> Editor_Settings {
 	c.lastProjectDir = strings.clone(s.lastProjectDir)
 	c.ldtkTrust = make(map[string]bool)
 	for k, v in s.ldtkTrust do c.ldtkTrust[strings.clone(k)] = v
+	c.pluginTrust = make(map[string]bool)
+	for k, v in s.pluginTrust do c.pluginTrust[strings.clone(k)] = v
+	c.pluginsOff = make(map[string]bool)
+	for k, v in s.pluginsOff do c.pluginsOff[strings.clone(k)] = v
 	return c
 }
 
@@ -136,6 +142,12 @@ Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 	for k in s.ldtkTrust do delete(k)
 	delete(s.ldtkTrust)
 	s.ldtkTrust = nil
+	for k in s.pluginTrust do delete(k)
+	delete(s.pluginTrust)
+	s.pluginTrust = nil
+	for k in s.pluginsOff do delete(k)
+	delete(s.pluginsOff)
+	s.pluginsOff = nil
 }
 
 // Editor_SettingsPath: where settings live (drives: inside the project copy).
@@ -326,6 +338,14 @@ settings_from_ini :: proc(text: string) {
 	if lt, ok := m["ldtk_trust"]; ok {
 		for k, v in lt do s.ldtkTrust[strings.clone(k)] = v == "true"
 	}
+	if pt, ok := m["plugin_trust"]; ok {
+		if s.pluginTrust == nil do s.pluginTrust = make(map[string]bool)
+		for k, v in pt do s.pluginTrust[strings.clone(k)] = v == "true"
+	}
+	if po, ok := m["plugins_off"]; ok {
+		if s.pluginsOff == nil do s.pluginsOff = make(map[string]bool)
+		for k, v in po do if v == "true" do s.pluginsOff[strings.clone(k)] = true
+	}
 	if rp, ok := m["recent_projects"]; ok {
 		for i in 0 ..< len(rp) {
 			if v, has := rp[fmt.tprint(i)]; has && v != "" do append(&s.recentProjects, strings.clone(v))
@@ -406,6 +426,14 @@ Editor_SaveSettings :: proc() -> bool {
 	if len(s.ldtkTrust) > 0 {
 		strings.write_string(&sb, "\n[ldtk_trust]\n")
 		for k, v in s.ldtkTrust do fmt.sbprintf(&sb, "%s = %t\n", k, v)
+	}
+	if len(s.pluginTrust) > 0 {
+		strings.write_string(&sb, "\n[plugin_trust]\n")
+		for k, v in s.pluginTrust do fmt.sbprintf(&sb, "%s = %t\n", k, v)
+	}
+	if len(s.pluginsOff) > 0 {
+		strings.write_string(&sb, "\n[plugins_off]\n")
+		for k in s.pluginsOff do fmt.sbprintf(&sb, "%s = true\n", k)
 	}
 	strings.write_string(&sb, "\n[recent_projects]\n")
 	for r, i in s.recentProjects do fmt.sbprintf(&sb, "%d = %s\n", i, r)
