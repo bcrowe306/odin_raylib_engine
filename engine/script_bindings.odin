@@ -123,6 +123,7 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case NavigationAgentNode: typeName = "NavigationAgentNode"
 	case AdvancedCameraNode: typeName = "AdvancedCameraNode"
 	case SkeletonNode: typeName = "SkeletonNode"
+	case AsepriteNode: typeName = "AsepriteNode"
 	case BoneAttachmentNode: typeName = "BoneAttachmentNode"
 	case PostEffectNode: typeName = "PostEffectNode"
 	case TileMapNode: typeName = "TileMapNode"
@@ -4133,6 +4134,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		Script_RegisterNavNodeBindings(L) // nav_rebake, nav_set_blocked, agents (navigation_nodes.odin)
 		Script_RegisterAdvCamNodeBindings(L) // add_trauma, make_active, is_active, snap (advanced_camera.odin)
 		Script_RegisterSkeletonBindings(L) // skeleton_* (skeleton_node.odin)
+		Script_RegisterAsepriteBindings(L) // aseprite_* (aseprite_node.odin)
 		lua.pushcfunction(L, lua_node_get_property)
 		lua.setfield(L, -2, "get_property")
 		lua.pushcfunction(L, lua_node_set_collision_layer)

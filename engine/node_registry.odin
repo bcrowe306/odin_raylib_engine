@@ -30,6 +30,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"TextureNode", TextureNode, factory_texture, {"texture", "sprite"}},
 	{"FrameAnimationNode", FrameAnimationNode, factory_frame_animation, {"animationnode", "frameanimation", "animation"}},
 	{"AnimationPlayerNode", AnimationPlayerNode, factory_animation_player, {"animationplayer"}},
+	{"AsepriteNode", AsepriteNode, factory_aseprite, {"aseprite", "ase"}},
 	{"StateMachineNode", StateMachineNode, factory_state_machine, {"statemachine", "state_machine"}},
 	{"ParticleEmitterNode", ParticleEmitterNode, factory_particles, {"particle", "particles", "particleemitter"}},
 	{"SoundNode", SoundNode, factory_sound, {"sound"}},
@@ -273,6 +274,9 @@ factory_path_follow :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PathF
 
 @(private = "file")
 factory_skeleton :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return SkeletonNode_Create(scene, "Skeleton", parent)}
+
+@(private = "file")
+factory_aseprite :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return AsepriteNode_Create(scene, "Aseprite", parent)}
 
 @(private = "file")
 factory_bone_attachment :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return BoneAttachmentNode_Create(scene, "BoneAttachment", parent)}

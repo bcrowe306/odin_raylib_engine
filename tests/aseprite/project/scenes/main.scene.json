@@ -1,0 +1,8 @@
+{"name": "main", "background": [40, 40, 60, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "CameraNode", "name": "Camera", "position": [80, 45], "properties": {"isCurrent": true}},
+ {"type": "AsepriteNode", "name": "Walker", "position": [20, 20], "properties": {"file": "sprites/animation.aseprite", "animation": "walk", "autoplay": true, "speed": 1}},
+ {"type": "AsepriteNode", "name": "Spinner", "position": [40, 20], "properties": {"file": "sprites/animation.aseprite", "animation": "spin", "autoplay": true, "speed": 2}},
+ {"type": "AsepriteNode", "name": "Sliced", "position": [100, 45], "properties": {"file": "sprites/slices.aseprite", "pivotSlice": "feet", "autoplay": false}},
+ {"type": "TileMapNode", "name": "Ground", "position": [60, 60], "tilemap": {"tileset": "sprites/tilemap.aseprite", "tile_size": [8, 8], "map_size": [1, 1], "data": [[1, -1]]}, "properties": {"asepriteLayer": "Tiles", "solid": true}},
+ {"type": "TextureNode", "name": "Still", "position": [130, 20], "texture": "sprites/animation.aseprite"}
+]}}

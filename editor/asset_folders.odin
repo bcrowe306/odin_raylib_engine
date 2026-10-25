@@ -3,6 +3,7 @@ package editor
 import "core:fmt"
 import "core:path/filepath"
 import "core:strings"
+import e "../engine"
 import imgui "lib/imgui"
 import rl "vendor:raylib"
 
@@ -158,7 +159,7 @@ Asset_Thumbnail :: proc(full: string) -> ^rl.Texture2D {
 	thumbBudget -= 1
 	t := new(Thumb)
 	thumbs[strings.clone(full)] = t
-	img := rl.LoadImage(strings.clone_to_cstring(full, context.temp_allocator))
+	img := e.Ase_LoadFileImage(full) if e.Ase_IsPath(full) else rl.LoadImage(strings.clone_to_cstring(full, context.temp_allocator))
 	if img.data == nil do return nil
 	if img.width > THUMB_MAX || img.height > THUMB_MAX {
 		s := f32(THUMB_MAX) / f32(max(img.width, img.height))

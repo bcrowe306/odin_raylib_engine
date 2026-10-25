@@ -202,7 +202,7 @@ palette_open_file :: proc(state: ^EditorState, rel: string) {
 	case .Script, .Shader: Editor_OpenScript(state, rel)
 	case .Component: Editor_OpenComponent(state, rel)
 	case .Level: Editor_AddLevel(state, rel, state.cameraPos)
-	case .Texture, .Audio, .Package, .Other:
+	case .Texture, .Audio, .Package, .Aseprite, .Other:
 		if strings.has_suffix(rel, ".ldtk") {
 			Editor_OpenExternally(state, full)
 			return

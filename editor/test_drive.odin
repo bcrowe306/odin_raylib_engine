@@ -723,6 +723,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "code.") do return Code_DriveQuery(q)
 	if strings.has_prefix(q, "plugin:") do return Plugins_DriveQuery(q)
 	if strings.has_prefix(q, "crash-") do return CrashReports_DriveQuery(q)
+	if strings.has_prefix(q, "aseprite-") do return Aseprite_DriveQuery(q)
 	if strings.has_prefix(q, "panel-open:") do return "true" if PluginPanels_IsOpen(q[len("panel-open:"):]) else "false", true
 	if strings.has_prefix(q, "import.") do return AssetImport_DriveQuery(q)
 	if strings.has_prefix(q, "ldtk.") do return LdtkPanel_DriveQuery(state, q)

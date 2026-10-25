@@ -222,6 +222,30 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 			Editor_RecordUndo(state, "Set LDtk project")
 			e.LdtkLevelNode_SetProject(cast(^e.LdtkLevelNode)sel, e.Project_ResolveAssetPath(&state.game.gameContext, rel), "")
 		}
+	case .Aseprite:
+		if menu(ICON_FA_PLUS, "Add Sprite to Scene", "add-aseprite", hasScene) do Editor_DropAsset(state, rel, state.cameraPos)
+		if menu(ICON_FA_PERSON_RUNNING, "Use on Selected Aseprite Node", "use-aseprite", sel != nil && sel.typeId == e.AsepriteNode) {
+			Editor_RecordUndo(state, "Set Aseprite file")
+			an := cast(^e.AsepriteNode)sel
+			an.file = strings.clone(rel, an.allocator)
+		}
+		if menu(ICON_FA_TABLE_CELLS, "Use as Tileset of Selected Tile Map", "use-ase-tileset", sel != nil && sel.typeId == e.TileMapNode) {
+			// Its first tilemap layer becomes the map (TileMapNode_SyncAseprite).
+			Editor_RecordUndo(state, "Set tileset")
+			tm := cast(^e.TileMapNode)sel
+			e.TileMapNode_SetTileset(tm, rel, &state.game.gameContext)
+			if r := e.ResourceManager_LoadAseprite(&state.game.resourceManager, e.Project_ResolveAssetPath(&state.game.gameContext, rel)); r != nil {
+				for l in r.doc.layers do if l.kind == .Tilemap {
+					tm.asepriteLayer = strings.clone(l.name, tm.allocator)
+					break
+				}
+				e.ResourceManager_ReleaseAseprite(r)
+			}
+			tm.aseVersion = -2 // (sync again)
+			e.ResourceManager_ReleaseAseprite(tm.aseRes)
+			tm.aseRes = nil
+		}
+		if menu(ICON_FA_PEN_TO_SQUARE, "Edit in Aseprite", "edit-aseprite") do Aseprite_Edit(state, full)
 	case .Package, .Other:
 		if menu(ICON_FA_FOLDER_OPEN, "Open With Default App", "open-external") do Editor_OpenExternally(state, full)
 	}

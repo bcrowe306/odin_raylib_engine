@@ -1,0 +1,60 @@
+# Aseprite files (aseprite_editor.odin; engine/aseprite*.odin): they're
+# assets (an Aseprite section, first-frame thumbnails); dragged into the
+# viewport they make an AsepriteNode playing the first tag; the Inspector
+# picks the tag, previews it, toggles layers, picks the pivot slice; Edit in
+# Aseprite opens the file; a TileMap fed by an Aseprite tilemap layer.
+exec mkdir -p $PROJECT/sprites
+exec cp tests/aseprite/fixtures/animation.aseprite $PROJECT/sprites/anim_zz.aseprite
+exec cp tests/aseprite/fixtures/groups.aseprite $PROJECT/sprites/groups_zz.aseprite
+exec cp tests/aseprite/fixtures/slices.aseprite $PROJECT/sprites/slices_zz.aseprite
+exec cp tests/aseprite/fixtures/tilemap.aseprite $PROJECT/sprites/tiles_zz.aseprite
+wait 5
+wait-until item:asset:sprites/anim_zz.aseprite == visible timeout=600
+drag @asset:sprites/anim_zz.aseprite @world:700,250 12
+wait 2
+expect node:anim_zz.type == AsepriteNode
+expect node:anim_zz.prop.file == sprites/anim_zz.aseprite
+expect node:anim_zz.prop.animation == idle
+expect selected == anim_zz
+screenshot dropped
+# The tag, then the preview plays it in the viewport (walk: frames 2-4).
+click @insp.ase.tag
+click @insp.ase.tag:walk
+wait 1
+expect node:anim_zz.prop.animation == walk
+expect undo >= 2
+click @insp.ase.preview
+wait 30
+expect node:anim_zz.prop.frame >= 2
+expect node:anim_zz.prop.frame <= 4
+click @insp.ase.preview
+screenshot preview
+# Layers: hide the base layer of another file (an override on the node).
+drag @asset:sprites/groups_zz.aseprite @world:760,250 12
+wait 2
+expect node:groups_zz.type == AsepriteNode
+click @section:Aseprite Layers
+click @insp.ase.layer:Base
+expect node:groups_zz.prop.hideLayers == Base
+click @insp.ase.layer:Hidden
+expect node:groups_zz.prop.showLayers == Hidden
+screenshot layers
+# The pivot slice (slices_zz: "feet" has a pivot).
+drag @asset:sprites/slices_zz.aseprite @world:820,250 12
+wait 2
+click @insp.ase.pivot
+click @insp.ase.pivot:feet
+expect node:slices_zz.prop.pivotSlice == feet
+# Edit in Aseprite (drives: the file it would open).
+click @insp.ase.edit
+expect aseprite-open contains sprites/slices_zz.aseprite
+# A tile map from the file's tilemap layer.
+click @hier.add
+type tile map
+click @addnode.create
+expect node:TileMap.type == TileMapNode
+rclick @asset:sprites/tiles_zz.aseprite
+click @ctx:use-ase-tileset
+wait 2
+expect node:TileMap.prop.asepriteLayer == Tiles
+screenshot tilemap
