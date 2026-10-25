@@ -26,6 +26,7 @@ Prompt_Kind :: enum {
 	NewProject,
 	RenameAsset,
 	SaveWorkspace,
+	NewPlugin,
 }
 
 @(private = "file")
@@ -56,6 +57,7 @@ prompt_title :: proc(kind: Prompt_Kind) -> (title, hint: string) {
 	case .NewProject:      return "New Project", "Folder for the new project"
 	case .RenameAsset:     return "Rename Asset", "New file name"
 	case .SaveWorkspace:   return "Save Workspace", "Workspace name"
+	case .NewPlugin:       return "New Plugin", "Plugin name"
 	case .None:
 	}
 	return "", ""
@@ -104,6 +106,7 @@ prompt_apply :: proc(state: ^EditorState, kind: Prompt_Kind, text: string) {
 	case .NewProject:      Editor_NewProject(state, text)
 	case .RenameAsset: Asset_PromptApply(state, kind, text)
 	case .SaveWorkspace: Workspace_Save(state, text)
+	case .NewPlugin: Plugins_Create(state, text)
 	case .None:
 	}
 }

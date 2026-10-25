@@ -313,6 +313,7 @@ import_file :: proc(state: ^EditorState, src, sub: string) -> (string, bool) {
 	renamed := filepath.base(rel) != name
 	report_add(src, rel, .Imported, fmt.tprintf("renamed to %s (a different %s exists)", filepath.base(rel), name) if renamed else "")
 	Editor_Log(state, .Info, "Imported %s -> %s", name, rel)
+	_, _ = PluginEvents_Emit(state, "asset_imported", rel) // (plugin_events.odin)
 	return rel, true
 }
 

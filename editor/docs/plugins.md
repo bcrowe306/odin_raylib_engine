@@ -73,13 +73,17 @@ Editor.add_command{
 ```
 
 Commands go into the editor's action table: menus, the command palette and
-the keymap (rebindable like built-in actions). Also:
+the keymap (rebindable like built-in actions; ids become
+`plugin.<plugin id>.<id>`). Shortcuts: `"Primary+Shift+L"` (Primary = Cmd on
+macOS, Ctrl elsewhere), `"Alt+F3"`, ...; `scope = "scene"` keeps one off
+while typing code. Also:
 
 - `Editor.selection()`, `Editor.select(nodes)`, `Editor.scene()` (the open
   scene: root, find_node), `Editor.open_scene(path)`, `Editor.project()`
   (name, path, settings)
 - `Editor.edit(label, fn)`: changes inside are one undo step (the editor's
-  scene snapshot before `fn`); scene edits outside `edit` are refused
+  scene snapshot before `fn`); edits outside `edit` work but can't be undone
+  - always use it for scene changes
 - `Editor.create_node(type, parent)`, `node:destroy()` (inside `edit`)
 - Assets: `Editor.assets(folder?, ext?)`, `Editor.fs.read / write / exists /
   list / mkdir` (project and plugin folders only), `Editor.import(path)`
@@ -131,6 +135,10 @@ Editor.on("project_opened", function(project) ... end)
   new file types become project assets
 
 ## Developer experience
+
+The guide: [plugin_guide.md](plugin_guide.md); examples in
+[plugin_examples/](plugin_examples/).
+
 
 - `editor_api.lua` definitions (generated like the engine's) in
   `.ore/definitions/`: completion and hover docs for `Editor` and `ui` in the

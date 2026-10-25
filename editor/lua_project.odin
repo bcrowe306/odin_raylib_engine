@@ -16,6 +16,7 @@ import "core:strings"
 // ============================================================================
 
 ENGINE_API_LUA :: #load("../engine/definitions/engine_api.lua", string)
+EDITOR_API_LUA :: #load("definitions/editor_api.lua", string) // (plugins: editor/docs/plugins.md)
 
 LUA_DEFINITIONS_DIR :: ".ore/definitions"
 
@@ -58,6 +59,11 @@ Lua_ProjectSetup :: proc(state: ^EditorState) -> string {
 	defs, _ := filepath.join({root, LUA_DEFINITIONS_DIR}, context.temp_allocator)
 	api, _ := filepath.join({defs, "engine_api.lua"}, context.temp_allocator)
 	write_if_changed(api, ENGINE_API_LUA)
+	// The plugin API (only in projects with plugins: game scripts don't see Editor).
+	editorApi, _ := filepath.join({defs, "editor_api.lua"}, context.temp_allocator)
+	pluginsDir, _ := filepath.join({root, "plugins"}, context.temp_allocator)
+	if os.is_dir(pluginsDir) do write_if_changed(editorApi, EDITOR_API_LUA)
+	else if os.is_file(editorApi) do _ = os.remove(editorApi)
 	// .luarc.json: created, or refreshed when it's ours (points at our
 	// definitions); a hand-written one is left alone.
 	luarc, _ := filepath.join({root, ".luarc.json"}, context.temp_allocator)

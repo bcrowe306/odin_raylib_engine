@@ -1,0 +1,60 @@
+# The example plugins (editor/docs/plugin_examples, docs/plugin_guide.md):
+# align top + distribute (one undo step each), batch rename from a prompt,
+# the Level Stats panel, Export and Zip loads with its permission.
+exec mkdir -p $PROJECT/plugins
+exec cp -R editor/docs/plugin_examples/align_tools editor/docs/plugin_examples/batch_rename editor/docs/plugin_examples/level_stats editor/docs/plugin_examples/export_zip $PROJECT/plugins/
+wait 5
+click @toolbar.settings
+click @settings.tab:plugins
+click @plugins.rescan
+click @plugins.trust.toggle
+wait 3
+click @settings.cancel
+wait 3
+expect plugin:align_tools.state == running
+expect plugin:batch_rename.state == running
+expect plugin:level_stats.state == running
+expect plugin:export_zip.state == running
+expect plugin:align_tools.log !contains unknown shortcut
+# Align + distribute three asteroids (x 240, 1040, 320).
+click @hier:Asteroid_Alpha
+hold cmd
+click @hier:Asteroid_Beta
+click @hier:Asteroid_Gamma
+release
+expect selection-count == 3
+command plugin.align_tools.top
+expect node:Asteroid_Beta.position ~= 1040,180
+expect node:Asteroid_Gamma.position ~= 320,180
+command plugin.align_tools.distribute_h
+expect node:Asteroid_Gamma.position ~= 640,180
+expect node:Asteroid_Alpha.position ~= 240,180
+expect undo == 2
+# Batch rename.
+command plugin.batch_rename.rename
+wait 2
+expect item:plugin.dialog.input == visible
+key ctrl+a
+type Rock_#
+click @plugin.dialog.ok
+wait 2
+expect node:Rock_1.exists == true
+expect node:Rock_3.exists == true
+expect node:Asteroid_Alpha.exists == false
+# The Level Stats panel (View > Plugins: closed, then open in front).
+click @menu:View
+click @menu:View/Plugins
+click @menu:View/Plugins/Level Stats
+click @menu:View
+click @menu:View/Plugins
+click @menu:View/Plugins/Level Stats
+wait 3
+expect panel-open:plugin.level_stats.stats == true
+expect item:panel:plugin.level_stats.stats:Refresh == visible
+click @panel:plugin.level_stats.stats:Refresh
+wait 1
+expect plugin:level_stats.state == running
+screenshot examples
+# Export and Zip: a toggle command.
+command plugin.export_zip.toggle
+expect plugin:export_zip.state == running

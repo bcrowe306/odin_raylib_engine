@@ -80,7 +80,9 @@ Viewport_UpdateAndRender :: proc(state: ^EditorState) {
 	defer imgui.PopStyleVar()
 
 	viewportFlags: imgui.WindowFlags = {.NoScrollbar, .NoScrollWithMouse}
-	if imgui.Begin("Viewport###ViewportWindow", nil, viewportFlags) {
+	viewportOpen := imgui.Begin("Viewport###ViewportWindow", nil, viewportFlags)
+	Dock_Remember(.Center)
+	if viewportOpen {
 		driveNoScroll = true // the wheel zooms here: drives never "scroll" it
 		defer driveNoScroll = false
 		SceneTabs_Draw(state) // open scenes as tabs (scene_tabs.odin)

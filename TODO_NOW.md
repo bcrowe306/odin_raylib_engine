@@ -184,10 +184,10 @@ Editor:
 - [ ] 13 Editor plugins in Lua - designed 2026-10-25: editor/docs/plugins.md (project + user plugins, trust prompt + permissions, editor-only)
   - [x] 13.1 Plugin host: discovery, plugin.json, a Lua state per plugin, protected calls, on_load / on_unload, hot reload, Settings > Plugins
   - [x] 13.2 Trust prompt + permissions (per project, remembered)
-  - [ ] 13.3 A: commands (menus, palette, keymap), selection, scene, Editor.edit undo, create / destroy, assets + Editor.fs, dialogs
-  - [ ] 13.4 B: dockable panels + the `ui` widget set
-  - [ ] 13.5 C: events (selection, save, import, before Play, after export, project opened)
-  - [ ] 13.6 editor_api.lua definitions, Tools > New Plugin, guide + examples, drives
+  - [x] 13.3 A: commands (menus, palette, keymap), selection, scene, Editor.edit undo, create / destroy, assets + Editor.fs, dialogs
+  - [x] 13.4 B: dockable panels + the `ui` widget set
+  - [x] 13.5 C: events (selection, save, import, before Play, after export, project opened)
+  - [x] 13.6 editor_api.lua definitions, Tools > New Plugin, guide + examples, drives
   - [ ] 13.7 D: inspectors, viewport overlays / handles, importers
 - [x] 14 Live remote scene tree in Play: (the Game tab's tree / text props existed) the Scene panel's Local / Remote view and the Inspector on the running game's node; typed live properties (drags, check boxes, colours, enum lists incl. script enums, ranges; throttled while dragging); enabled / visible toggles, Remove from Game, Pick (click in the game window; topmost node per layer space), amber outline of the selection in the game, Apply to Scene (undoable, Node_SetFromText); trees re-sent only when their hash changed; README, tests, drive
 - [x] 15 Multiple open scenes as tabs: a tab per open scene / component document above the viewport (reorder, unsaved dot, tooltip, context menu), per-tab camera / selection / undo, close with Save / Don't Save / Cancel (unloads the scene, frees its undo entries; closed component documents reuse their scene), Cmd+W, Cmd+Alt+Right/Left, Ctrl+PageDown/Up, Ctrl+Tab; open tabs restored per project (.ore/open_scenes.json); README, drive

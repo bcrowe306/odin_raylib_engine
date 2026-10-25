@@ -154,6 +154,7 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false, only :
 	for &p in presets {
 		if dir, ok := export_preset(state, &p, outDir); ok {
 			Editor_Log(state, .Info, "Exported %s (%s%s): %s", p.name, e.export_target_name(p.target), ", debug" if p.debug else "", dir)
+			_, _ = PluginEvents_Emit(state, "after_export", p.name, dir) // (plugin_events.odin)
 			exported += 1
 		}
 	}

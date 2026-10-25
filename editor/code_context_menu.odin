@@ -107,7 +107,7 @@ item :: proc(state: ^EditorState, icon: string, id: string, enabled := true) {
 	a := Action_Find(id)
 	if a == nil do return
 	sc := Action_ShortcutText(a)
-	ok := enabled && (a.enabled == nil || a.enabled(state))
+	ok := enabled && Action_Enabled(state, a)
 	if imgui.MenuItem(fmt.ctprintf("%s  %s", icon, a.label), strings.clone_to_cstring(sc, context.temp_allocator) if sc != "" else nil, false, ok) {
 		Action_Run(state, a)
 		GlobalCode.focusRequest = true // typing goes back to the code

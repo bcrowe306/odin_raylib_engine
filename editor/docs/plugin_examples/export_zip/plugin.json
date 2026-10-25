@@ -1,0 +1,7 @@
+{
+  "name": "Export and Zip",
+  "version": "1.0.0",
+  "description": "Zips each export (macOS / Linux: needs zip)",
+  "main": "main.lua",
+  "permissions": ["process"]
+}

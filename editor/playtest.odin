@@ -51,6 +51,13 @@ Editor_PlayRequest :: proc(state: ^EditorState, mode: Play_Mode, scene := "") {
 		return
 	}
 
+	// Plugins may stop it (validation: before_play returning false, reason).
+	target := (scene if scene != "" else state.activeScenePath) if mode == .CurrentScene else state.projectConfig.initialScene
+	if ok, reason := PluginEvents_Emit(state, "before_play", target); !ok {
+		Editor_Log(state, .Warn, "Play cancelled: %s", reason)
+		return
+	}
+
 	// 1. Save every modified scene so the game sees the editor's state.
 	saved := Editor_SaveAllScenes(state)
 	if saved > 0 {
@@ -328,6 +335,7 @@ Editor_SaveSceneDocument :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 	// The running game picks the saved scene up (restarting it if current).
 	if RemoteGame_Connected() do RemoteGame_Send(fmt.tprintf("reload-scene %s", scene.filePath))
 	Editor_Log(state, .Info, "Saved %s", scene.filePath)
+	_, _ = PluginEvents_Emit(state, "scene_saved", scene.filePath) // (plugin_events.odin)
 	return true
 }
 

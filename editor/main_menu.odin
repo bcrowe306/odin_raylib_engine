@@ -83,6 +83,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "file.settings")
 		imgui.Separator()
 		menu_action(state, "file.quit")
+		PluginAPI_MenuItems(state, "File") // plugin commands placed here (plugin_api.odin)
 		imgui.EndMenu()
 	}
 
@@ -113,6 +114,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 			}
 			imgui.EndMenu()
 		}
+		PluginAPI_MenuItems(state, "Edit") // plugin commands placed here (plugin_api.odin)
 		imgui.EndMenu()
 	}
 
@@ -176,6 +178,8 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 			Workspace_RequestPreset(.Default)
 			Editor_Log(state, .Info, "Layout reset")
 		}
+		PluginPanels_ViewMenu(state) // View > Plugins: their panels
+		PluginAPI_MenuItems(state, "View") // plugin commands placed here (plugin_api.odin)
 		imgui.EndMenu()
 	}
 
@@ -187,6 +191,8 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "tool.pan", "Pan")
 		imgui.Separator()
 		menu_action(state, "tool.sprite_slicer")
+		menu_action(state, "tool.new_plugin")
+		PluginAPI_MenuItems(state, "Tools") // plugin commands placed here (plugin_api.odin)
 		imgui.EndMenu()
 	}
 
@@ -206,6 +212,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 			menu_action(state, "game.delete_save", "Delete Save Files")
 			imgui.EndMenu()
 		}
+		PluginAPI_MenuItems(state, "Game") // plugin commands placed here (plugin_api.odin)
 		imgui.EndMenu()
 	}
 
@@ -218,6 +225,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "palette.commands")
 		if menu_item("Check for Updates") do UpdateCheck_Start(manual = true)
 		if menu_item("About") do Editor_Log(state, .Info, "Ore Editor %s - third-party notices: THIRD_PARTY_NOTICES.txt in the editor's folder", e.ORE_RELEASE)
+		PluginAPI_MenuItems(state, "Help") // plugin commands placed here (plugin_api.odin)
 		imgui.EndMenu()
 	}
 

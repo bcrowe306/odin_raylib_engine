@@ -131,6 +131,8 @@ Plugins_Unload :: proc(state: ^EditorState) {
 
 // Plugins_Update: once a frame - hot reload (a plugin's files changed).
 Plugins_Update :: proc(state: ^EditorState) {
+	PluginAPI_Update(state) // finished jobs call back
+	PluginEvents_Update(state) // selection_changed
 	for p in plugins.list do if p.state == .Failed && p.mgr != nil do plugin_close(p)
 	if time.tick_since(plugins.lastCheck) < time.Second do return
 	plugins.lastCheck = time.tick_now()
@@ -325,6 +327,8 @@ plugin_start :: proc(state: ^EditorState, p: ^Plugin) {
 	p.state = .Running
 	if !Plugin_Call(state, p, 0, 0, p.main) do return
 	plugin_call_global(state, p, "on_load")
+	// (The project is open already: its handlers hear it now.)
+	PluginEvents_EmitTo(state, p, "project_opened", state.projectConfig.name)
 	if p.state == .Running do plugin_log(p, fmt.tprintf("started (%s)", p.version))
 }
 
@@ -534,3 +538,93 @@ Plugins_DriveQuery :: proc(q: string) -> (string, bool) {
 	}
 	return "missing", true
 }
+
+// Plugins_Create makes plugins/<id>/ from `name` (Tools > New Plugin): a
+// plugin.json and a main.lua with a command, a panel and an event, then
+// starts it (a plugin made here is trusted) and opens main.lua.
+Plugins_Create :: proc(state: ^EditorState, name: string) {
+	name := strings.trim_space(name)
+	if name == "" do return
+	sb := strings.builder_make(context.temp_allocator)
+	for r in strings.to_lower(name, context.temp_allocator) {
+		switch r {
+		case 'a' ..= 'z', '0' ..= '9': strings.write_rune(&sb, r)
+		case ' ', '-', '_': if strings.builder_len(sb) > 0 do strings.write_byte(&sb, '_')
+		}
+	}
+	id := strings.trim_right(strings.to_string(sb), "_")
+	if id == "" do id = "plugin"
+	project := state.projectPath
+	if abs, err := os.get_absolute_path(project, context.temp_allocator); err == nil do project = abs
+	dir, _ := filepath.join({project, "plugins", id}, context.temp_allocator)
+	if os.exists(dir) {
+		Editor_Log(state, .Error, "plugins/%s already exists", id)
+		return
+	}
+	if os.make_directory_all(dir) != nil {
+		Editor_Log(state, .Error, "Could not create %s", dir)
+		return
+	}
+	manifest, _ := strings.replace_all(PLUGIN_TEMPLATE_JSON, "$NAME", name, context.temp_allocator)
+	main, _ := strings.replace_all(PLUGIN_TEMPLATE_LUA, "$NAME", name, context.temp_allocator)
+	jsonPath, _ := filepath.join({dir, "plugin.json"}, context.temp_allocator)
+	mainPath, _ := filepath.join({dir, "main.lua"}, context.temp_allocator)
+	_ = os.write_entire_file(jsonPath, transmute([]u8)manifest)
+	_ = os.write_entire_file(mainPath, transmute([]u8)main)
+	// Made here: this project's plugins are trusted.
+	if k, ok := slice_key(GlobalSettings.pluginTrust, project); ok do GlobalSettings.pluginTrust[k] = true
+	else do GlobalSettings.pluginTrust[strings.clone(project)] = true
+	_ = Editor_SaveSettings()
+	Lua_ProjectSetup(state) // (editor_api.lua now that there's a plugins/ folder)
+	Plugins_Load(state, ask = false)
+	Editor_OpenScript(state, mainPath)
+	PluginPanels_Show(fmt.tprintf("plugin.%s.panel", id))
+	Editor_Log(state, .Info, "New plugin plugins/%s (Settings > Plugins; saving main.lua reloads it)", id)
+}
+
+PLUGIN_TEMPLATE_JSON :: `{
+  "name": "$NAME",
+  "version": "0.1.0",
+  "description": "$NAME - an Ore editor plugin",
+  "main": "main.lua",
+  "permissions": []
+}
+`
+
+PLUGIN_TEMPLATE_LUA :: `-- $NAME: an Ore editor plugin (editor/docs/plugins.md).
+-- Saving this file reloads the plugin; Settings > Plugins shows its log.
+
+local clicks = 0
+
+-- A command: Tools menu, the command palette (Cmd/Ctrl+Shift+P), the keymap.
+Editor.add_command{
+    id = "hello",
+    label = "Say Hello ($NAME)",
+    menu = "Tools",
+    run = function()
+        local names = {}
+        for _, n in ipairs(Editor.selection()) do names[#names + 1] = n.name end
+        Editor.notify("Hello! Selected: " .. (#names > 0 and table.concat(names, ", ") or "nothing"))
+    end,
+}
+
+-- A panel, docked next to the Inspector (View > Plugins).
+Editor.add_panel{
+    id = "panel",
+    title = "$NAME",
+    dock = "right",
+    draw = function(ui)
+        local scene = Editor.scene()
+        ui.text("Scene: " .. (scene and scene.name or "none"))
+        ui.text("Selected: " .. #Editor.selection())
+        if ui.button("Click me") then clicks = clicks + 1 end
+        ui.same_line()
+        ui.dim(clicks .. " clicks")
+    end,
+}
+
+-- An event.
+Editor.on("scene_saved", function(path)
+    print("saved " .. path)
+end)
+`

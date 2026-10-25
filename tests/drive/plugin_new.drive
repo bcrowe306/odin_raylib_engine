@@ -1,0 +1,21 @@
+# Tools > New Plugin (Plugins_Create, docs/plugins.md): writes plugins/<id>/
+# (plugin.json + main.lua with a command, a panel and an event), starts it
+# (trusted: made here), writes .ore/definitions/editor_api.lua, opens main.lua.
+wait 5
+click @menu:Tools
+click @menu:Tools/New Plugin...
+expect item:prompt.input == visible
+type Drive New ZZ
+key enter
+wait 3
+expect file:plugins/drive_new_zz/plugin.json contains "name": "Drive New ZZ"
+expect file:plugins/drive_new_zz/main.lua contains Editor.add_command
+expect file:.ore/definitions/editor_api.lua contains function Editor.add_panel
+expect plugin:drive_new_zz.state == running
+expect panel-open:plugin.drive_new_zz.panel == true
+expect code.file contains plugins/drive_new_zz/main.lua
+screenshot new_plugin
+# The template's command.
+command plugin.drive_new_zz.hello
+wait 1
+expect plugin:drive_new_zz.state == running

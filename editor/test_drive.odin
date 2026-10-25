@@ -39,6 +39,7 @@ import imgui_rl "lib/imgui/imgui_impl_raylib"
 //   drop-files <target> <path>...      files dropped from the OS at <target>
 //   dialog-files <path>...              answer for the next system file dialog
 //   bench <frames> [label]              time that many uncapped frames, print a [bench] line
+//   command <action id>                 run an editor action (a plugin's: plugin.<plugin>.<id>)
 //   log <text> | quit
 // Targets: @<item-id>  @world:<x>,<y>  @node:<Name>  <x>,<y>
 // Expressions: <query> <op> <value>, op ∈ == != contains !contains ~= >= <=
@@ -456,6 +457,15 @@ drive_exec :: proc(d: ^TestDrive, state: ^EditorState, line: string) -> bool {
 		clear(&state.extraGameArgs)
 		for a in strings.fields(rest) do append(&state.extraGameArgs, a)
 		return true
+	case "command":
+		// command <action id>: runs an editor action (plugins' too: plugin.<id>.<command>).
+		a := Action_Find(rest)
+		if a == nil {
+			drive_fail(d, fmt.tprintf("no action %q", rest))
+			return true
+		}
+		if !Action_Run(state, a) do drive_fail(d, fmt.tprintf("action %q is disabled", rest))
+		return true
 	case "bench":
 		// bench <frames> [label]: time that many uncapped frames (frame_timing.odin).
 		if d.step == 0 {
@@ -707,6 +717,7 @@ fmt_vec :: proc(v: [2]f32) -> string {
 Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "code.") do return Code_DriveQuery(q)
 	if strings.has_prefix(q, "plugin:") do return Plugins_DriveQuery(q)
+	if strings.has_prefix(q, "panel-open:") do return "true" if PluginPanels_IsOpen(q[len("panel-open:"):]) else "false", true
 	if strings.has_prefix(q, "import.") do return AssetImport_DriveQuery(q)
 	if strings.has_prefix(q, "ldtk.") do return LdtkPanel_DriveQuery(state, q)
 	if strings.has_prefix(q, "level.") do return LevelEditor_DriveQuery(state, q)

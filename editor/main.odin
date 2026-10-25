@@ -244,6 +244,7 @@ editor_main :: proc() -> int {
 			e.Prof_Begin("ui.preview")
 			PreviewPanel_Render(&GlobalEditor)
 			e.Prof_End()
+			PluginPanels_Render(&GlobalEditor) // plugins' panels (plugin_panels.odin)
 		}
 
 		// Modals & Popups
@@ -266,6 +267,7 @@ editor_main :: proc() -> int {
 		NodeRefs_Render(&GlobalEditor) // update script references after a rename / move
 		AssetImport_Render(&GlobalEditor)
 		Plugins_TrustPrompt(&GlobalEditor)
+		PluginAPI_Dialogs(&GlobalEditor)
 
 		// Files dropped from the OS (after the panels: their rects are current).
 		Editor_HandleFileDrops(&GlobalEditor)

@@ -1,0 +1,7 @@
+{
+  "name": "Batch Rename",
+  "version": "1.0.0",
+  "description": "Rename the selected nodes from a pattern",
+  "main": "main.lua",
+  "permissions": []
+}

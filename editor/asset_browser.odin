@@ -82,7 +82,9 @@ kind_icon :: proc(k: Asset_Kind) -> (string, imgui.Vec4) {
 
 AssetBrowser_Render :: proc(state: ^EditorState) {
 	defer imgui.End()
-	if !imgui.Begin("Assets###AssetBrowserWindow") do return
+	assetsOpen := imgui.Begin("Assets###AssetBrowserWindow")
+	Dock_Remember(.Left) // (plugin panels dock next to it: plugin_panels.odin)
+	if !assetsOpen do return
 	UI_PanelTitle(ICON_FA_FOLDER_OPEN, "Assets")
 	// View toggles and "+" at the right: import (system file dialog) or create.
 	UI_HeaderButtons(3)

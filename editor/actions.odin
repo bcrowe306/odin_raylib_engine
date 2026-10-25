@@ -1,5 +1,6 @@
 package editor
 
+import "core:c"
 import "core:fmt"
 import "core:strings"
 import imgui "lib/imgui"
@@ -42,6 +43,13 @@ Editor_Action :: struct {
 	enabled:  proc(state: ^EditorState) -> bool, // nil = always
 	checked:  proc(state: ^EditorState) -> bool, // nil = not a toggle
 	repeat:   bool, // fires on key repeat
+	// A plugin's command (plugin_api.odin): its Lua callbacks as registry
+	// references (NOREF: none), and where it goes in the menus ("Tools/Align").
+	plugin:     ^Plugin,
+	menu:       string,
+	refRun:     c.int,
+	refEnabled: c.int,
+	refChecked: c.int,
 }
 
 P :: Mods{.Primary}
@@ -297,6 +305,7 @@ Actions_Init :: proc() {
 	add({id = "code.font_bigger", category = "Code", label = "Increase Font Size", chords = k(ch(.Equal, P)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdFontSize(s, 1)}, repeat = true})
 	add({id = "code.font_smaller", category = "Code", label = "Decrease Font Size", chords = k(ch(.Minus, P)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdFontSize(s, -1)}, repeat = true})
 	add({id = "code.font_reset", category = "Code", label = "Reset Font Size", chords = k(ch(._0, P)), scope = .Code, run = proc(s: ^EditorState) {Code_CmdFontSize(s, 0)}})
+	add({id = "tool.new_plugin", category = "Tools", label = "New Plugin...", scope = .Global, run = proc(s: ^EditorState) {Prompt_Open(.NewPlugin, "My Plugin")}})
 	add({id = "code.new_script", category = "Code", label = "New Script", scope = .Global, run = proc(s: ^EditorState) {NewScriptDialog_Open(s)}})
 }
 
@@ -333,7 +342,14 @@ Action_Find :: proc(id: string) -> ^Editor_Action {
 }
 
 Action_Enabled :: proc(state: ^EditorState, a: ^Editor_Action) -> bool {
+	if a.plugin != nil do return PluginAPI_ActionEnabled(state, a)
 	return a.enabled == nil || a.enabled(state)
+}
+
+// Action_Checked: a toggle action's state (false for the others).
+Action_Checked :: proc(state: ^EditorState, a: ^Editor_Action) -> bool {
+	if a.plugin != nil do return PluginAPI_ActionChecked(state, a)
+	return a.checked != nil && a.checked(state)
 }
 
 // Action_Run runs an action (if enabled) and remembers it for the palette.
@@ -344,7 +360,8 @@ Action_Run :: proc(state: ^EditorState, a: ^Editor_Action) -> bool {
 	}
 	inject_at(&recentActions, 0, a.id)
 	if len(recentActions) > 12 do pop(&recentActions)
-	a.run(state)
+	if a.plugin != nil do PluginAPI_ActionRun(state, a)
+	else do a.run(state)
 	return true
 }
 
@@ -487,7 +504,7 @@ Actions_Dispatch :: proc(state: ^EditorState) {
 		}
 		// A disabled action doesn't shadow another on the same key (F8: next
 		// diagnostic in the code, continue while the debugger is paused).
-		if a.enabled != nil && !a.enabled(state) do continue
+		if !Action_Enabled(state, &a) do continue
 		for c in a.chords {
 			if !chord_pressed(c, a.repeat) do continue
 			// Code actions beat global/scene ones bound to the same chord.
@@ -507,7 +524,7 @@ Actions_MenuItem :: proc(state: ^EditorState, id: string, label: string = "") ->
 	a := Action_Find(id)
 	if a == nil do return false
 	text := label if label != "" else a.label
-	checked := a.checked != nil && a.checked(state)
+	checked := Action_Checked(state, a)
 	sc := Action_ShortcutText(a)
 	clicked := imgui.MenuItem(strings.clone_to_cstring(text, context.temp_allocator), strings.clone_to_cstring(sc, context.temp_allocator) if sc != "" else nil, checked, Action_Enabled(state, a))
 	if clicked do Action_Run(state, a)
