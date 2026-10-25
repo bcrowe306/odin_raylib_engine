@@ -196,12 +196,20 @@ Export_PatternMatch :: proc(pattern, path: string) -> bool {
 		if path == dir || strings.has_prefix(path, strings.concatenate({dir, "/"}, context.temp_allocator)) do return true
 		if strings.has_suffix(pat, "/") do return false
 	}
+	// (Segment by segment: package paths use "/" everywhere, filepath.match
+	// splits on the OS's separator - "\\" on Windows.)
 	if !strings.contains(pat, "/") {
-		if ok, _ := filepath.match(pat, filepath.base(path)); ok do return true
-		return false
+		base := path[strings.last_index_byte(path, '/') + 1:]
+		ok, _ := filepath.match(pat, base)
+		return ok
 	}
-	ok, _ := filepath.match(pat, path)
-	return ok
+	pats := strings.split(pat, "/", context.temp_allocator)
+	parts := strings.split(path, "/", context.temp_allocator)
+	if len(pats) != len(parts) do return false
+	for p, i in pats {
+		if ok, _ := filepath.match(p, parts[i]); !ok do return false
+	}
+	return true
 }
 
 // Export_PresetIncludes: whether a project file goes into the preset's

@@ -95,7 +95,10 @@ test_export_formats :: proc(t: ^testing.T) {
 	testing.expect_value(t, check(t, appDir, "usr/bin/game.ore"), "ORE")
 	_ = check(t, appDir, "usr/bin/SpaceGame")
 	appRun, _ := filepath.join({appDir, "AppRun"}, context.temp_allocator)
-	if info, err := os.stat(appRun, context.temp_allocator); err == nil {
-		testing.expect(t, .Execute_User in info.mode, "AppRun is executable")
+	// (Windows has no executable bit: an AppDir exported there needs chmod +x.)
+	when ODIN_OS != .Windows {
+		if info, err := os.stat(appRun, context.temp_allocator); err == nil {
+			testing.expect(t, .Execute_User in info.mode, "AppRun is executable")
+		}
 	}
 }

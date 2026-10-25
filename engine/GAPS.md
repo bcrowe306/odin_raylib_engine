@@ -188,7 +188,8 @@ single-layer map.
 7. **LDtk one-way platforms** assume gravity pointing down (+y): they block bodies coming from above. Top-down games should use Solid or Trigger.
 8. **LDtk world mode** loads every level of the world at once (no streaming of neighbours by camera distance); for large GridVania worlds load a level at a time and switch with `ldtk_level_at` / `ldtk_load_level`.
 9. **LDtk entity tiles from the embedded icon atlas** (LDtk's built-in icons) aren't drawn, in the Level tab or in the game (tilesets without an image path are skipped), and the Tiled export skips them.
-10. **Non-uniform scale on round shapes**: a circle takes the larger scale axis and a capsule its radius from x (Box2D has no ellipses); a rotated box under non-uniform node scale stays a rectangle (no skew).
+10. **Linux exports made on Windows**: Windows has no executable bit, so the AppDir's `AppRun` and the game need `chmod +x` on Linux (exports made on macOS / Linux keep it; an AppImage built on Linux has it). *Approach:* write the Linux export as a .tar.gz with file modes.
+11. **Non-uniform scale on round shapes**: a circle takes the larger scale axis and a capsule its radius from x (Box2D has no ellipses); a rotated box under non-uniform node scale stays a rectangle (no skew).
 
 ---
 
