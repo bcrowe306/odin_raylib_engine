@@ -74,8 +74,10 @@ drag @level.origin+344,56 @level.origin+376,88
 wait 2
 expect level.selected.px !=
 screenshot entity_moved
-# a level next to the active one
+# a level next to the active one (Shift+click: no spot to pick)
+hold shift
 click @level.add
+release shift
 wait 3
 expect level.levels == 4
 screenshot level_added

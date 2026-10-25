@@ -86,6 +86,7 @@ LevelEd :: struct {
 	hideDetails:  bool, // no level names / entity labels / field shapes
 	selectEmpty:  bool, // rectangle selections include empty cells
 	zen:          bool, // the canvas alone (Tab)
+	spotPick:     bool, // picking the spot of a new level (LevelSpotPicker)
 	dockPos:      [2]f32,
 	dockSize:     [2]f32,
 	// canvas
@@ -117,6 +118,7 @@ LevelEd :: struct {
 	selRectStart: [2]f32,
 	entDrag:      bool,
 	entResize:    bool,
+	entHandle:    Level_Handle, // the entity handle being dragged
 	entMoved:     bool,
 	entGrab:      [2]int,
 	levelDrag:    bool,
@@ -802,7 +804,11 @@ level_levels_panel :: proc(state: ^EditorState) {
 	UI_HeaderButtons(3)
 	if UI_HeaderButton(ICON_FA_CIRCLE_QUESTION, "level.help.levels", "") do LevelRef_Open("panel.levels")
 	level_tip("About the Levels panel", "panel.levels")
-	if UI_HeaderButton(ICON_FA_PLUS, "level.add", "") {
+	addClicked := UI_HeaderButton(ICON_FA_PLUS, "level.add", "")
+	if addClicked && !imgui.GetIO().KeyShift {
+		L.spotPick = true
+		Editor_Log(state, .Info, "Click where the new level goes (Esc cancels)")
+	} else if addClicked {
 		pos := [2]int{0, 0}
 		size := [2]int{e.Ldtk_Doc_WorldInt(doc, L.world, "defaultLevelWidth", 256), e.Ldtk_Doc_WorldInt(doc, L.world, "defaultLevelHeight", 256)}
 		step := LdtkJson_GridVania(doc) ? max(e.Ldtk_Doc_WorldInt(doc, L.world, "worldGridWidth", 256), 1) : 1
@@ -815,10 +821,11 @@ level_levels_panel :: proc(state: ^EditorState) {
 		pos = e.Ldtk_Doc_FreeLevelSpot(doc, L.world, pos, size, step)
 		e.Ldtk_Doc_Checkpoint(doc, -1, "Add Level")
 		li := e.Ldtk_Doc_AddLevel(doc, L.world, pos)
+		e.Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, L.world)
 		L.level = -1
 		LevelEditor_SetLevel(li)
 	}
-	level_tip("Add a level next to the active one, in a free spot", "panel.levels")
+	level_tip("Add a level: click where it goes in the canvas (Shift+click: right next to the active one)", "panel.levels")
 	if UI_HeaderButton(ICON_FA_TRASH, "level.remove", "") && level_world_count(L.world) > 1 {
 		e.Ldtk_Doc_Checkpoint(doc, -1, "Delete Level")
 		e.Ldtk_Doc_RemoveLevel(doc, L.level)
@@ -885,6 +892,14 @@ level_keep_world_level :: proc() {
 		}
 	}
 	L.world = L.doc.levels[L.level].world
+}
+
+// level_move_scope: the undo scope of a level move - the whole project when
+// automatic identifiers may rename other levels.
+level_move_scope :: proc() -> int {
+	L := &GlobalLevel
+	for &lv in L.doc.levels do if lv.world == L.world && e.LdtkJson_Bool(lv.obj, "useAutoIdentifier") do return -1
+	return L.level
 }
 
 // level_world_count: the number of levels in a world.
@@ -1556,24 +1571,39 @@ level_tab_level :: proc(state: ^EditorState) {
 		UI_PropLabel("Identifier")
 		nameBuf: [128]u8
 		copy(nameBuf[:len(nameBuf) - 1], e.LdtkJson_Str(lv.obj, "identifier"))
-		if imgui.InputText("##lvl_name", cstring(raw_data(nameBuf[:])), len(nameBuf), {.EnterReturnsTrue}) {
+		autoId := e.LdtkJson_Bool(lv.obj, "useAutoIdentifier")
+		imgui.BeginDisabled(autoId)
+		imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 70)
+		nameEntered := imgui.InputText("##lvl_name", cstring(raw_data(nameBuf[:])), len(nameBuf), {.EnterReturnsTrue})
+		Drive_Item("level.name")
+		imgui.EndDisabled()
+		level_tip(autoId ? "Automatic: the project's level name pattern (Project tab) - untick Auto to name it yourself" : "The level's identifier (unique; Enter applies)", "tab.level")
+		imgui.SameLine()
+		if imgui.Checkbox("Auto##lvl_auto", &autoId) {
+			e.Ldtk_Doc_Checkpoint(doc, -1, "Automatic Level Identifier")
+			e.Ldtk_Doc_SetLevelAutoIdentifier(doc, L.level, autoId)
+		}
+		Drive_Item("level.autoid")
+		level_tip("Name it from the project's level name pattern (%idx, %x, %gx, %depth...), renamed when levels move", "project.names")
+		if nameEntered {
 			name := string(cstring(raw_data(nameBuf[:])))
 			if name != e.LdtkJson_Str(lv.obj, "identifier") {
 				e.Ldtk_Doc_Checkpoint(doc, L.level, "Rename Level")
 				if !e.Ldtk_Doc_RenameLevel(doc, L.level, e.Ldtk_Doc_CleanIdentifier(doc, name)) do Editor_Log(state, .Warn, "A level is already called %s", name)
 			}
 		}
-		Drive_Item("level.name")
-		level_tip("The level's identifier (unique; Enter applies)", "tab.level")
 		p := e.Ldtk_Doc_LevelPos(doc, L.level)
 		s := e.Ldtk_Doc_LevelSize(doc, L.level)
 		UI_PropLabel("Position")
 		pos := [2]i32{i32(p.x), i32(p.y)}
 		if imgui.DragInt2("##lvl_pos", &pos, 1, 0, 0, "%d") {
-			e.Ldtk_Doc_CheckpointOnce(doc, L.level, "Move Level", lv.obj)
+			e.Ldtk_Doc_CheckpointOnce(doc, level_move_scope(), "Move Level", lv.obj)
 			e.Ldtk_Doc_MoveLevel(doc, L.level, {int(pos.x), int(pos.y)})
 		}
-		if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
+		if imgui.IsItemDeactivated() {
+			e.Ldtk_Doc_EndCoalesce(doc)
+			e.Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, L.world)
+		}
 		Drive_Item("level.pos")
 		level_tip("Its place in the world, in pixels (drag or type; linear layouts place levels themselves)", "tab.level")
 		UI_PropLabel("Size (px)")
@@ -1733,7 +1763,7 @@ level_entity_inspector :: proc(state: ^EditorState) {
 		if imgui.InputInt2("##ent_size", &size, {.EnterReturnsTrue}) && size.x > 0 && size.y > 0 {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Resize Entity")
 			r := e.Ldtk_Doc_EntityRect(ent)
-			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.selEntityLayer, ent, e.Ldtk_Doc_ConstrainEntitySize(doc, e.LdtkJson_Int(ent, "defUid", -1), {int(size.x), int(size.y)}, {r[2], r[3]}))
+			e.Ldtk_Doc_ResizeEntityAround(doc, L.level, L.selEntityLayer, ent, e.Ldtk_Doc_ConstrainEntitySize(doc, e.LdtkJson_Int(ent, "defUid", -1), {int(size.x), int(size.y)}, {r[2], r[3]}))
 		}
 		if !resizable do imgui.EndDisabled()
 		level_tip(resizable ? "Width, height (Enter applies; the definition's limits apply)" : "Its definition isn't resizable (Entities tab)", "tab.entities")
@@ -2127,6 +2157,9 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		return fmt.tprintf("%d cells, %d entities", len(L.sel.cells), len(L.sel.entities)), true
 	case "level.selected":
 		return L.selEntity != nil ? e.LdtkJson_Str(L.selEntity, "__identifier") : "", true
+	case "level.selected.size":
+		if L.selEntity == nil do return "", true
+		return fmt.tprintf("%d,%d", e.LdtkJson_Int(L.selEntity, "width"), e.LdtkJson_Int(L.selEntity, "height")), true
 	case "level.selected.px":
 		if L.selEntity == nil do return "", true
 		px := e.LdtkJson_Arr(L.selEntity, "px")

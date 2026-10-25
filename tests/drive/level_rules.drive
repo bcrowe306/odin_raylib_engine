@@ -40,6 +40,24 @@ click @defs.rule.perlin
 wait 1
 expect level.rule contains perlin
 screenshot rule_editor
+# a value group in a pattern cell (any value of the group)
+click @level.tab:Layers
+wait 1
+click @defs.layer:Collisions
+wait 1
+click @defs.valuegroup.add
+wait 1
+click @level.tab:Rules
+wait 1
+click @defs.rule:Front faces:0
+wait 1
+click @defs.rule.value:g1
+click @defs.rule.pattern
+wait 1
+expect level.rulepattern contains 2000
+key cmd+z
+wait 2
+expect level.rulepattern !contains 2000
 # rule menu: show matching cells, duplicate, delete
 rclick @defs.rule:Front faces:0
 click @ctx:Show matching cells

@@ -347,6 +347,30 @@ Ldtk_Doc_ResizeEntity :: proc(doc: ^Ldtk_Doc, li, layer: int, ent: ^LdtkJson, si
 	Ldtk_Doc_Touch(doc)
 }
 
+// Ldtk_Doc_ResizeEntityAround: ResizeTool / EntityInstanceEditor - a new
+// size around the pivot; the position moves only when the dragged side
+// (side.x: -1 left, 1 right; side.y: -1 top, 1 bottom) is the pivot's side.
+Ldtk_Doc_ResizeEntityAround :: proc(doc: ^Ldtk_Doc, li, layer: int, ent: ^LdtkJson, size: [2]int, side: [2]int = {}) {
+	a := doc.allocator
+	pv := LdtkJson_Arr(ent, "__pivot")
+	pvx, pvy := 0.0, 0.0
+	if len(pv) >= 2 do pvx, pvy = pv[0].num, pv[1].num
+	oldW, oldH := LdtkJson_Int(ent, "width", 16), LdtkJson_Int(ent, "height", 16)
+	w, h := max(size.x, 1), max(size.y, 1)
+	px := LdtkJson_Arr(ent, "px")
+	x, y := len(px) >= 2 ? int(px[0].num) : 0, len(px) >= 2 ? int(px[1].num) : 0
+	if side.x < 0 && pvx == 0 do x -= w - oldW
+	if side.x > 0 && pvx == 1 do x += w - oldW
+	if side.y < 0 && pvy == 0 do y -= h - oldH
+	if side.y > 0 && pvy == 1 do y += h - oldH
+	LdtkJson_SetInt(ent, "width", w, a)
+	LdtkJson_SetInt(ent, "height", h, a)
+	LdtkJson_Set(ent, "px", jarr(a, jint(x, a), jint(y, a)), a)
+	ldtk_entity_cached(doc, li, layer, ent)
+	doc.levels[li].dirty = true
+	Ldtk_Doc_Touch(doc)
+}
+
 Ldtk_Doc_RemoveEntity :: proc(doc: ^Ldtk_Doc, li, layer: int, ent: ^LdtkJson) -> bool {
 	list := LdtkJson_Get(doc.levels[li].layers[layer].obj, "entityInstances")
 	if list == nil do return false
@@ -435,7 +459,7 @@ Ldtk_Doc_UniqueLevelName :: proc(doc: ^Ldtk_Doc, world: int, allocator := contex
 	return strings.clone("Level", allocator)
 }
 
-@(private = "file")
+@(private)
 ldtk_external_rel :: proc(doc: ^Ldtk_Doc, identifier: string) -> string {
 	stem := strings.trim_suffix(filepath.base(doc.path), filepath.ext(doc.path))
 	return fmt.tprintf("%s/%s.ldtkl", stem, identifier)

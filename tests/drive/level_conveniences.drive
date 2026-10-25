@@ -11,6 +11,26 @@ wait 5
 click @level.zoom
 click @pick:100%
 wait 1
+# resizing an entity by its handles (the Door: pivot top-left, resizable)
+key v
+click @level.origin+170,118
+wait 1
+expect level.selected == Door
+expect level.selected.size == 32,16
+drag @level.entity.resize:Right @level.entity.resize:Right+16,0 6
+wait 1
+expect level.selected.size == 48,16
+expect level.selected.px == 160,112
+drag @level.entity.resize:Left @level.entity.resize:Left+-16,0 6
+wait 1
+expect level.selected.size == 64,16
+expect level.selected.px == 144,112
+screenshot entity_handles
+key cmd+z
+key cmd+z
+wait 1
+key escape
+key b
 # the palette: an entity by name, then an enum
 key cmd+k
 wait 1

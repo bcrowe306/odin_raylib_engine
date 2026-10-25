@@ -13,6 +13,20 @@ wait 1
 click @level.layer:Collisions
 expect level.level == World_Level_0
 expect level.size == 512,256
+# the automatic identifier: off to rename the level, on again
+click @level.tab:Level
+wait 1
+click @level.autoid
+wait 1
+click @level.name
+key cmd+a
+type Hub
+key enter
+wait 1
+expect level.level == Hub
+click @level.autoid
+wait 1
+expect level.level == World_Level_0
 # background image
 click @level.tab:Level
 wait 1
@@ -59,6 +73,13 @@ wait 2
 expect level.worlds == World,World2
 expect level.world == World2
 screenshot two_worlds
+# a second level, at a spot picked in the canvas (right of the first)
+click @level.add
+wait 1
+click @level.origin+300,100
+wait 2
+expect level.level == World2_Level_1
+expect level.pos == 256,-32
 # the new world's empty level shows its background image (contain, centred)
 click @level.tab:Level
 wait 1

@@ -1358,3 +1358,60 @@ test_ldtk_doc_tilesets :: proc(t: ^testing.T) {
 	testing.expect_value(t, doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, tl)].tilesetUid, -1)
 	testing.expect(t, LdtkJson_IsNull(Ldtk_Doc_EntityDef(doc, ent).obj, "tilesetId"))
 }
+
+@(test)
+test_ldtk_doc_auto_level_identifiers :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_autoid.ldtk")
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	a := doc.allocator
+	Ldtk_Doc_SetWorldLayout(doc, 0, "GridVania")
+	Ldtk_Doc_AddLevel(doc, 0, {256, 0})
+	Ldtk_Doc_AddLevel(doc, 0, {0, 256})
+	LdtkJson_SetStr(doc.root, "levelNamePattern", "Room_%gx_%gy", a)
+	for i in 0 ..< 3 do Ldtk_Doc_SetLevelAutoIdentifier(doc, i, true)
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 0), "Room_0_0")
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 1), "Room_1_0")
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 2), "Room_0_1")
+	// moving swaps names without clashing
+	Ldtk_Doc_MoveLevel(doc, 1, {0, 512})
+	Ldtk_Doc_MoveLevel(doc, 2, {256, 0})
+	Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, 0)
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 1), "Room_0_2")
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 2), "Room_1_0")
+	// the same name twice: counted up; a renamed level stops following
+	LdtkJson_SetStr(doc.root, "levelNamePattern", "Area", a)
+	Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, 0)
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 0), "Area")
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 1), "Area2")
+	Ldtk_Doc_RenameLevel(doc, 0, "Hub")
+	Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, 0)
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 0), "Hub")
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 1), "Area")
+}
+
+@(test)
+test_ldtk_doc_level_spots :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_spots.ldtk")
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	Ldtk_Doc_SetWorldLayout(doc, 0, "Free")
+	s0 := Ldtk_Doc_LevelSize(doc, 0)
+	// inside a level: no room
+	testing.expect(t, Ldtk_Doc_LevelSpot(doc, 0, {10, 10}).overlaps)
+	// just right of it: pushed out to touch its right side
+	sp := Ldtk_Doc_LevelSpot(doc, 0, {f64(s0.x) + 40, f64(s0.y) * 0.5}, 16)
+	testing.expect(t, sp.ok && !sp.overlaps)
+	testing.expect_value(t, int(sp.rect[0]), s0.x)
+	li := Ldtk_Doc_AddLevelAtSpot(doc, 0, sp, 2)
+	testing.expect_value(t, Ldtk_Doc_LevelPos(doc, li).x, s0.x)
+	testing.expect_value(t, LdtkJson_Int(doc.levels[li].obj, "worldDepth"), 2)
+	// linear: inserted before the nearest level
+	Ldtk_Doc_SetWorldLayout(doc, 0, "LinearHorizontal")
+	first := Ldtk_Doc_LevelName(doc, 0)
+	lsp := Ldtk_Doc_LevelSpot(doc, 0, {0, 0})
+	testing.expect_value(t, lsp.linearIndex, 0)
+	ni := Ldtk_Doc_AddLevelAtSpot(doc, 0, lsp)
+	testing.expect_value(t, ni, 0)
+	testing.expect_value(t, Ldtk_Doc_LevelName(doc, 1), first)
+}

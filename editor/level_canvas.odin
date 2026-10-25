@@ -137,6 +137,7 @@ canvas_draw :: proc() {
 	for li in order do draw_level(li, li == L.level)
 	if !L.hideDetails do draw_field_geometry()
 	draw_rule_preview()
+	draw_level_spot()
 	draw_selection()
 	draw_tool_preview()
 	draw_pick_hint()
@@ -404,10 +405,25 @@ canvas_overlay :: proc() {
 		draw_field_labels(dl)
 	}
 	draw_level_handles(dl)
-	if L.selEntity != nil {
-		// resize handle
-		if r, ok := selected_rect_screen(); ok && entity_resizable(L.selEntity) {
-			imgui.DrawList_AddRectFilled(dl, {r[2] - 4, r[3] - 4}, {r[2] + 4, r[3] + 4}, col_u32(UI_WARNING), 1, {})
+	if L.selEntity != nil && entity_resizable(L.selEntity) {
+		// resize handles (ResizeTool: the sides the definition allows)
+		m := imgui.GetIO().MousePos
+		for h in Level_Handle {
+			if !ent_handle_active(L.selEntity, h) do continue
+			mn, mx := ent_handle_rect(h)
+			over := m.x >= mn.x - 2 && m.y >= mn.y - 2 && m.x < mx.x + 2 && m.y < mx.y + 2
+			imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(over || L.entHandle == h ? UI_ACCENT : UI_WARNING), 1, {})
+			Drive_ItemRect(fmt.tprintf("level.entity.resize:%v", h), mn, mx, true)
+			if over && L.hovered && !L.entResize {
+				#partial switch h {
+				case .Left, .Right: imgui.SetMouseCursor(.ResizeEW)
+				case .Top, .Bottom: imgui.SetMouseCursor(.ResizeNS)
+				case .TopLeft, .BottomRight: imgui.SetMouseCursor(.ResizeNWSE)
+				case: imgui.SetMouseCursor(.ResizeNESW)
+				}
+				imgui.SetTooltip("Drag to resize (snaps to the grid; Shift: free; the pivot stays put)\n\nF1: more")
+				LevelRef_Hover("palette.entities")
+			}
 		}
 	}
 	ly, d := level_active_layer()
@@ -422,6 +438,7 @@ canvas_overlay :: proc() {
 	}
 	if d != nil && d.type == .AutoLayer do status = fmt.tprintf("%s   (auto layer: paint its source IntGrid layer)", status)
 	if hint := LevelCanvas_PickHintText(); hint != "" do status = hint
+	if L.spotPick do status = "Click where the new level goes (Esc or right click cancels)"
 	h := imgui.GetTextLineHeight()
 	pos := [2]f32{L.canvasMin.x + 8, L.canvasMin.y + L.canvasSize.y - h - 8}
 	tw := imgui.CalcTextSize(fmt.ctprintf("%s", status)).x
@@ -433,6 +450,40 @@ canvas_overlay :: proc() {
 entity_resizable :: proc(ent: ^e.LdtkJson) -> bool {
 	ed := e.Ldtk_Doc_EntityDef(GlobalLevel.doc, e.LdtkJson_Int(ent, "defUid", -1))
 	return ed != nil && (e.LdtkJson_Bool(ed.obj, "resizableX") || e.LdtkJson_Bool(ed.obj, "resizableY"))
+}
+
+// ent_handle_active: ResizeTool.isHandleActive - X-only entities get the side
+// handles, Y-only ones top / bottom, both every handle.
+@(private = "file")
+ent_handle_active :: proc(ent: ^e.LdtkJson, h: Level_Handle) -> bool {
+	ed := e.Ldtk_Doc_EntityDef(GlobalLevel.doc, e.LdtkJson_Int(ent, "defUid", -1))
+	if ed == nil || h == .None do return false
+	rx, ry := e.LdtkJson_Bool(ed.obj, "resizableX"), e.LdtkJson_Bool(ed.obj, "resizableY")
+	#partial switch h {
+	case .Left, .Right: return rx
+	case .Top, .Bottom: return ry
+	}
+	return rx && ry
+}
+
+@(private = "file")
+ent_handle_rect :: proc(h: Level_Handle) -> (mn, mx: [2]f32) {
+	r, _ := selected_rect_screen()
+	PAD :: 6
+	HS :: 4
+	c := [2]f32{(r[0] + r[2]) * 0.5, (r[1] + r[3]) * 0.5}
+	at: [2]f32
+	#partial switch h {
+	case .Top: at = {c.x, r[1] - PAD}
+	case .Bottom: at = {c.x, r[3] + PAD}
+	case .Left: at = {r[0] - PAD, c.y}
+	case .Right: at = {r[2] + PAD, c.y}
+	case .TopLeft: at = {r[0] - PAD, r[1] - PAD}
+	case .TopRight: at = {r[2] + PAD, r[1] - PAD}
+	case .BottomLeft: at = {r[0] - PAD, r[3] + PAD}
+	case .BottomRight: at = {r[2] + PAD, r[3] + PAD}
+	}
+	return at - HS, at + HS
 }
 
 // selected_rect_screen: the selected entity's box on screen (x0, y0, x1, y1).
@@ -478,6 +529,30 @@ canvas_input :: proc(state: ^EditorState) {
 		pick_input(state, pressL, pressR, mw)
 		return
 	}
+	// picking the spot of a new level
+	if L.spotPick {
+		if pressR || imgui.IsKeyPressed(.Escape) {
+			L.spotPick = false
+			return
+		}
+		if pressL {
+			sp := e.Ldtk_Doc_LevelSpot(doc, L.world, {f64(mw.x), f64(mw.y)}, max(e.LdtkJson_Int(doc.root, "defaultGridSize", 16), 1))
+			if sp.overlaps || !sp.ok {
+				Editor_Log(state, .Info, "No room there: pick an empty spot")
+				return
+			}
+			depth := len(doc.levels) > 0 ? e.LdtkJson_Int(doc.levels[L.level].obj, "worldDepth") : 0
+			e.Ldtk_Doc_Checkpoint(doc, -1, "Add Level")
+			li := e.Ldtk_Doc_AddLevelAtSpot(doc, L.world, sp, depth)
+			e.Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, L.world)
+			L.spotPick = false
+			if li >= 0 {
+				L.level = -1
+				LevelEditor_SetLevel(li)
+			}
+		}
+		return
+	}
 	if level_resize_input(state, pressL, mouse, mw) do return
 	// move levels
 	if L.tool == .Move_Level {
@@ -495,11 +570,15 @@ canvas_input :: proc(state: ^EditorState) {
 			np := [2]int{int(mw.x) - L.levelGrab.x, int(mw.y) - L.levelGrab.y}
 			np = {int(math.round(f32(np.x) / f32(snap.x))) * snap.x, int(math.round(f32(np.y) / f32(snap.y))) * snap.y}
 			if np != e.Ldtk_Doc_LevelPos(doc, L.level) {
-				if !L.levelMoved do e.Ldtk_Doc_Checkpoint(doc, L.level, "Move Level")
+				if !L.levelMoved do e.Ldtk_Doc_Checkpoint(doc, level_move_scope(), "Move Level")
 				L.levelMoved = true
 				e.Ldtk_Doc_MoveLevel(doc, L.level, np)
 			}
-			if !imgui.IsMouseDown(.Left) do L.levelDrag = false
+			if !imgui.IsMouseDown(.Left) {
+				L.levelDrag = false
+				// automatic level identifiers follow the positions (WorldTool)
+				if L.levelMoved do e.Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, L.world)
+			}
 		}
 		return
 	}
@@ -627,6 +706,7 @@ level_resize_input :: proc(state: ^EditorState, pressL: bool, mouse, mw: [2]f32)
 				if b[2] >= b[0] + g && b[3] >= b[1] + g {
 					e.Ldtk_Doc_Checkpoint(doc, -1, "Resize Level")
 					n := e.Ldtk_Doc_ResizeLevelBounds(doc, L.level, b[0], b[1], b[2] - b[0], b[3] - b[1])
+					e.Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, L.world)
 					level_clear_selection()
 					if n > 0 do Editor_Log(state, .Warn, "%d entit%s outside the level deleted", n, n == 1 ? "y" : "ies")
 				} else do Editor_Log(state, .Info, "A level can't be smaller than one cell")
@@ -1052,33 +1132,71 @@ selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
 	doc := L.doc
 	io := imgui.GetIO()
 	selectMode := L.tool == .Select || io.KeyAlt
-	// resizing the single selected entity (its corner handle)
+	// resizing the selected entity by a handle (ResizeTool): the handle follows
+	// the mouse, the entity grows around its pivot
 	if L.entResize {
 		ent := L.selEntity
 		if ent == nil {
-			L.entResize = false
+			L.entResize, L.entHandle = false, .None
 			return true
 		}
 		ed := e.Ldtk_Doc_EntityDef(doc, e.LdtkJson_Int(ent, "defUid", -1))
 		ld := e.Ldtk_Doc_LayerDef(doc, &doc.levels[L.level].layers[L.selEntityLayer])
 		g := ld != nil ? ld.gridSize : 16
 		o := layer_origin_of(L.selEntityLayer)
-		lp := [2]int{int(math.floor(mw.x - o.x)), int(math.floor(mw.y - o.y))}
+		m := [2]f64{f64(mw.x - o.x), f64(mw.y - o.y)}
+		px := e.LdtkJson_Arr(ent, "px")
+		pos := [2]f64{len(px) >= 2 ? px[0].num : 0, len(px) >= 2 ? px[1].num : 0}
+		pv := e.LdtkJson_Arr(ent, "__pivot")
+		piv := [2]f64{len(pv) >= 2 ? pv[0].num : 0, len(pv) >= 2 ? pv[1].num : 0}
 		r := e.Ldtk_Doc_EntityRect(ent)
-		size := [2]int{lp.x - r[0], lp.y - r[1]}
-		if !io.KeyShift do size = {max(int(math.round(f32(size.x) / f32(g))), 1) * g, max(int(math.round(f32(size.y) / f32(g))), 1) * g}
+		size := [2]int{r[2], r[3]}
+		side := [2]int{}
+		h := L.entHandle
+		#partial switch h {
+		case .Left, .TopLeft, .BottomLeft:
+			side.x = -1
+			size.x = piv.x > 0 ? int((pos.x - m.x) / piv.x) : int(f64(r[0] + r[2]) - m.x)
+		case .Right, .TopRight, .BottomRight:
+			side.x = 1
+			size.x = piv.x < 1 ? int((m.x - pos.x) / (1 - piv.x)) : int(m.x - f64(r[0]))
+		}
+		#partial switch h {
+		case .Top, .TopLeft, .TopRight:
+			side.y = -1
+			size.y = piv.y > 0 ? int((pos.y - m.y) / piv.y) : int(f64(r[1] + r[3]) - m.y)
+		case .Bottom, .BottomLeft, .BottomRight:
+			side.y = 1
+			size.y = piv.y < 1 ? int((m.y - pos.y) / (1 - piv.y)) : int(m.y - f64(r[1]))
+		}
+		// the grid (Shift: free)
+		if !io.KeyShift {
+			if side.x != 0 do size.x = max(int(math.round(f32(size.x) / f32(g))), 1) * g
+			if side.y != 0 do size.y = max(int(math.round(f32(size.y) / f32(g))), 1) * g
+		}
 		if ed != nil {
-			if !e.LdtkJson_Bool(ed.obj, "resizableX") do size.x = r[2]
-			if !e.LdtkJson_Bool(ed.obj, "resizableY") do size.y = r[3]
-			size = e.Ldtk_Doc_ConstrainEntitySize(doc, ed.uid, size, {r[2], r[3]})
+			// keep the aspect ratio like ResizeTool: top / bottom drive the width,
+			// the others the height
+			if e.LdtkJson_Bool(ed.obj, "keepAspectRatio") && e.LdtkJson_Bool(ed.obj, "resizableX") && e.LdtkJson_Bool(ed.obj, "resizableY") && ed.size.x > 0 {
+				ar := f64(ed.size.y) / f64(ed.size.x)
+				if side.x == 0 do size.x = int(math.round(f64(size.y) / ar))
+				else do size.y = int(math.round(f64(size.x) * ar))
+			}
+			lim :: proc(o: ^e.LdtkJson, key: string, v: int, isMin: bool) -> int {
+				x := e.LdtkJson_Get(o, key)
+				if x == nil || x.kind != .Number do return v
+				return isMin ? max(v, int(x.num)) : min(v, int(x.num))
+			}
+			size.x = lim(ed.obj, "maxWidth", lim(ed.obj, "minWidth", size.x, true), false)
+			size.y = lim(ed.obj, "maxHeight", lim(ed.obj, "minHeight", size.y, true), false)
 		}
 		size = {max(size.x, 1), max(size.y, 1)}
 		if size.x != r[2] || size.y != r[3] {
 			if !L.entMoved do e.Ldtk_Doc_Checkpoint(doc, L.level, "Resize Entity")
 			L.entMoved = true
-			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.selEntityLayer, ent, size)
+			e.Ldtk_Doc_ResizeEntityAround(doc, L.level, L.selEntityLayer, ent, size, side)
 		}
-		if !imgui.IsMouseDown(.Left) do L.entResize = false
+		if !imgui.IsMouseDown(.Left) do L.entResize, L.entHandle = false, .None
 		return true
 	}
 	// dragging the selection: a ghost follows, the move happens on release
@@ -1115,12 +1233,16 @@ selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
 		return true
 	}
 	if !pressL do return false
-	// the corner handle of a single resizable entity
-	if r, ok := selected_rect_screen(); ok && entity_resizable(L.selEntity) {
+	// a handle of the selected resizable entity
+	if L.selEntity != nil && entity_resizable(L.selEntity) {
 		m := io.MousePos
-		if abs(m.x - r[2]) <= 6 && abs(m.y - r[3]) <= 6 {
-			L.entResize, L.entMoved = true, false
-			return true
+		for h in Level_Handle {
+			if !ent_handle_active(L.selEntity, h) do continue
+			mn, mx := ent_handle_rect(h)
+			if m.x >= mn.x - 2 && m.y >= mn.y - 2 && m.x < mx.x + 2 && m.y < mx.y + 2 {
+				L.entResize, L.entMoved, L.entHandle = true, false, h
+				return true
+			}
 		}
 	}
 	startMove :: proc(mw: [2]f32) {
@@ -1189,6 +1311,21 @@ selection_input :: proc(state: ^EditorState, pressL: bool, mw: [2]f32) -> bool {
 
 @(private = "file")
 linalg_len :: proc(v: [2]f32) -> f32 {return math.sqrt(v.x * v.x + v.y * v.y)}
+
+// draw_level_spot: where a new level would go (green) or can't (red).
+@(private = "file")
+draw_level_spot :: proc() {
+	L := &GlobalLevel
+	if !L.spotPick || !L.hovered do return
+	m := imgui.GetIO().MousePos
+	mw := to_world({m.x, m.y})
+	sp := e.Ldtk_Doc_LevelSpot(L.doc, L.world, {f64(mw.x), f64(mw.y)}, max(e.LdtkJson_Int(L.doc.root, "defaultGridSize", 16), 1))
+	if !sp.ok do return
+	r := rl.Rectangle{f32(sp.rect[0]), f32(sp.rect[1]), f32(sp.rect[2]), f32(sp.rect[3])}
+	col := sp.overlaps ? rl.Color{240, 90, 90, 255} : rl.Color{90, 220, 120, 255}
+	rl.DrawRectangleRec(r, {col.r, col.g, col.b, 50})
+	rl.DrawRectangleLinesEx(r, 2 / L.zoom, col)
+}
 
 // draw_rule_preview: the cells where the rule picked in the Rules tab matches.
 @(private = "file")

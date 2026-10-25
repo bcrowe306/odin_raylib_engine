@@ -197,6 +197,212 @@ Ldtk_Doc_SetWorldInt :: proc(doc: ^Ldtk_Doc, world: int, key: string, v: int) {
 }
 
 // ----------------------------------------------------------------------------
+// New level spots (LDtk's LevelSpotPicker)
+// ----------------------------------------------------------------------------
+
+Ldtk_LevelSpot :: struct {
+	rect:        [4]f64, // x, y, w, h in the world (linear layouts: a marker)
+	overlaps:    bool,   // no room there
+	linearIndex: int,    // linear layouts: the new level's index in the world (-1 otherwise)
+	ok:          bool,
+}
+
+// Ldtk_Doc_LevelSpot: LevelSpotPicker.getLevelInsertBounds - a level of the
+// world's default size around a world point, pushed out of the levels it
+// overlaps (Free, GridVania; snapped to the world grid / `grid`), or the
+// nearest insertion point in linear layouts.
+Ldtk_Doc_LevelSpot :: proc(doc: ^Ldtk_Doc, world: int, m: [2]f64, grid := 0) -> Ldtk_LevelSpot {
+	w := f64(Ldtk_Doc_WorldInt(doc, world, "defaultLevelWidth", 256))
+	h := f64(Ldtk_Doc_WorldInt(doc, world, "defaultLevelHeight", 256))
+	layout := Ldtk_Doc_WorldStr(doc, world, "worldLayout", "Free")
+	sp := Ldtk_LevelSpot{rect = {m.x - w * 0.5, m.y - h * 0.5, w, h}, linearIndex = -1, ok = true}
+	overlap :: proc(doc: ^Ldtk_Doc, li: int, r: [4]f64) -> bool {
+		p := Ldtk_Doc_LevelPos(doc, li)
+		s := Ldtk_Doc_LevelSize(doc, li)
+		return r[0] < f64(p.x + s.x) && r[0] + r[2] > f64(p.x) && r[1] < f64(p.y + s.y) && r[1] + r[3] > f64(p.y)
+	}
+	switch layout {
+	case "LinearHorizontal", "LinearVertical":
+		horiz := layout == "LinearHorizontal"
+		best, bestD := -1, max(f64)
+		idx := 0
+		coord := 0.0
+		last := -1
+		for &lv, i in doc.levels {
+			if lv.world != world do continue
+			p := Ldtk_Doc_LevelPos(doc, i)
+			c := f64(horiz ? p.x : p.y)
+			if d := abs((horiz ? m.x : m.y) - c); d < bestD {
+				bestD, best, coord = d, idx, c
+			}
+			idx += 1
+			last = i
+		}
+		if last >= 0 {
+			p := Ldtk_Doc_LevelPos(doc, last)
+			s := Ldtk_Doc_LevelSize(doc, last)
+			c := f64(horiz ? p.x + s.x : p.y + s.y)
+			if d := abs((horiz ? m.x : m.y) - c); d < bestD do best, coord = idx, c
+		}
+		if best < 0 do return {ok = false}
+		sp.linearIndex = best
+		if horiz do sp.rect = {coord - w * 0.5, -h * 0.1, w, h * 1.2}
+		else do sp.rect = {-w * 0.1, coord - h * 0.5, w * 1.2, h}
+	case:
+		if Ldtk_Doc_LevelAt(doc, world, {int(math.floor(m.x)), int(math.floor(m.y))}) >= 0 {
+			sp.overlaps = true
+		} else {
+			// push it out of the levels it overlaps (the side its centre faces)
+			for &lv, i in doc.levels {
+				if lv.world != world || !overlap(doc, i, sp.rect) do continue
+				p := Ldtk_Doc_LevelPos(doc, i)
+				s := Ldtk_Doc_LevelSize(doc, i)
+				cx, cy := f64(p.x) + f64(s.x) * 0.5, f64(p.y) + f64(s.y) * 0.5
+				dx := sp.rect[0] + w * 0.5 - cx
+				slope := dx != 0 ? (sp.rect[1] + h * 0.5 - cy) / dx : max(f64)
+				if slope * f64(s.x) * 0.5 >= -f64(s.y) * 0.5 && slope * f64(s.x) * 0.5 <= f64(s.y) * 0.5 {
+					sp.rect[0] = sp.rect[0] < cx ? f64(p.x) - w : f64(p.x + s.x)
+				} else {
+					sp.rect[1] = sp.rect[1] < cy ? f64(p.y) - h : f64(p.y + s.y)
+				}
+			}
+			for &lv, i in doc.levels do if lv.world == world && overlap(doc, i, sp.rect) do sp.overlaps = true
+		}
+		if layout == "GridVania" {
+			gw := f64(max(Ldtk_Doc_WorldInt(doc, world, "worldGridWidth", 256), 1))
+			gh := f64(max(Ldtk_Doc_WorldInt(doc, world, "worldGridHeight", 256), 1))
+			sp.rect[0] = math.round(sp.rect[0] / gw) * gw
+			sp.rect[1] = math.round(sp.rect[1] / gh) * gh
+		} else if grid > 0 {
+			sp.rect[0] = math.round(sp.rect[0] / f64(grid)) * f64(grid)
+			sp.rect[1] = math.round(sp.rect[1] / f64(grid)) * f64(grid)
+		}
+	}
+	return sp
+}
+
+// Ldtk_Doc_AddLevelAtSpot: LevelSpotPicker.tryToCreateLevelAt - a new level
+// at the spot (at `depth`), or inserted at the spot's index in linear
+// layouts. Returns its index (-1: no room).
+Ldtk_Doc_AddLevelAtSpot :: proc(doc: ^Ldtk_Doc, world: int, sp: Ldtk_LevelSpot, depth := 0) -> int {
+	if !sp.ok || sp.overlaps do return -1
+	if sp.linearIndex >= 0 {
+		li := Ldtk_Doc_AddLevel(doc, world, {0, 0})
+		// it was appended: move it to its index
+		count := 0
+		for &lv in doc.levels do if lv.world == world do count += 1
+		for _ in 0 ..< count - 1 - sp.linearIndex do li = Ldtk_Doc_MoveLevelOrder(doc, li, -1)
+		return li
+	}
+	li := Ldtk_Doc_AddLevel(doc, world, {int(math.round(sp.rect[0])), int(math.round(sp.rect[1]))}, {int(sp.rect[2]), int(sp.rect[3])})
+	if depth != 0 do Ldtk_Doc_SetLevelDepth(doc, li, depth)
+	return li
+}
+
+// ----------------------------------------------------------------------------
+// Automatic level identifiers
+// ----------------------------------------------------------------------------
+
+// ldtk_level_set_identifier: a level's identifier (its external file too),
+// keeping useAutoIdentifier.
+@(private = "file")
+ldtk_level_set_identifier :: proc(doc: ^Ldtk_Doc, li: int, name: string) {
+	lv := &doc.levels[li]
+	a := doc.allocator
+	if LdtkJson_Str(lv.obj, "identifier") == name do return
+	LdtkJson_SetStr(lv.obj, "identifier", name, a)
+	if lv.extRoot != nil {
+		LdtkJson_SetStr(lv.extRoot, "identifier", name, a)
+		old := LdtkJson_Str(lv.obj, "externalRelPath")
+		rel := ldtk_external_rel(doc, name)
+		if old != rel && !strings.has_prefix(name, "#") {
+			if old != "" do append(&doc.removedFiles, strings.clone(old, doc.heap))
+			LdtkJson_SetStr(lv.obj, "externalRelPath", rel, a)
+		}
+	}
+	lv.dirty = true
+}
+
+// Ldtk_Doc_ApplyAutoLevelIdentifiers: World.applyAutoLevelIdentifiers - the
+// world's levels with an automatic identifier get the project's level name
+// pattern again: %idx / %idx1 (their index in the world), %world, %depth /
+// %d, %x / %y (Free and GridVania), %gx / %gy (GridVania cells).
+Ldtk_Doc_ApplyAutoLevelIdentifiers :: proc(doc: ^Ldtk_Doc, world: int) {
+	pattern := LdtkJson_Str(doc.root, "levelNamePattern", "Level_%idx")
+	layout := Ldtk_Doc_WorldStr(doc, world, "worldLayout", "Free")
+	gw := max(Ldtk_Doc_WorldInt(doc, world, "worldGridWidth", 256), 1)
+	gh := max(Ldtk_Doc_WorldInt(doc, world, "worldGridHeight", 256), 1)
+	left, top := max(int), max(int)
+	for &lv, i in doc.levels do if lv.world == world {
+		p := Ldtk_Doc_LevelPos(doc, i)
+		left, top = min(left, p.x), min(top, p.y)
+	}
+	// free the automatic names first (they swap places)
+	uniq := 0
+	for &lv, i in doc.levels do if lv.world == world && LdtkJson_Bool(lv.obj, "useAutoIdentifier") {
+		ldtk_level_set_identifier(doc, i, fmt.tprintf("#%d", uniq))
+		uniq += 1
+	}
+	idx := 0
+	changed := false
+	for &lv, i in doc.levels {
+		if lv.world != world do continue
+		defer idx += 1
+		if !LdtkJson_Bool(lv.obj, "useAutoIdentifier") do continue
+		p := Ldtk_Doc_LevelPos(doc, i)
+		depth := LdtkJson_Int(lv.obj, "worldDepth")
+		free := layout == "Free" || layout == "GridVania"
+		id := pattern
+		rep :: proc(s, key, v: string) -> string {
+			out, _ := strings.replace_all(s, key, v, context.temp_allocator)
+			return out
+		}
+		id = rep(id, "%depth", fmt.tprint(depth))
+		id = rep(id, "%world", Ldtk_Doc_WorldName(doc, world))
+		id = rep(id, "%idx1", fmt.tprint(idx + 1))
+		id = rep(id, "%idx", fmt.tprint(idx))
+		id = rep(id, "%gx", layout == "GridVania" ? fmt.tprint((p.x - left) / gw) : "")
+		id = rep(id, "%gy", layout == "GridVania" ? fmt.tprint((p.y - top) / gh) : "")
+		id = rep(id, "%x", free ? fmt.tprint(p.x) : "")
+		id = rep(id, "%y", free ? fmt.tprint(p.y) : "")
+		id = rep(id, "%d", fmt.tprint(depth))
+		// Project.fixUniqueIdStr among every level
+		base := Ldtk_Doc_CleanIdentifier(doc, id)
+		used :: proc(doc: ^Ldtk_Doc, id: string, except: int) -> bool {
+			for &l, k in doc.levels do if k != except && LdtkJson_Str(l.obj, "identifier") == id do return true
+			return false
+		}
+		name := base
+		if used(doc, name, i) {
+			stem, n := ldtk_name_stem(base)
+			for {
+				name = fmt.tprintf("%s%d", stem, n)
+				if !used(doc, name, i) do break
+				n += 1
+			}
+		}
+		ldtk_level_set_identifier(doc, i, name)
+		changed = true
+	}
+	if changed {
+		Ldtk_Doc_UpdateToc(doc)
+		Ldtk_Doc_Touch(doc)
+	}
+}
+
+// Ldtk_Doc_SetLevelAutoIdentifier turns a level's automatic identifier on /
+// off (on: the pattern applies at once).
+Ldtk_Doc_SetLevelAutoIdentifier :: proc(doc: ^Ldtk_Doc, li: int, on: bool) {
+	lv := &doc.levels[li]
+	a := doc.allocator
+	LdtkJson_SetBool(lv.obj, "useAutoIdentifier", on, a)
+	if lv.extRoot != nil do LdtkJson_SetBool(lv.extRoot, "useAutoIdentifier", on, a)
+	lv.dirty = true
+	if on do Ldtk_Doc_ApplyAutoLevelIdentifiers(doc, lv.world)
+	Ldtk_Doc_Touch(doc)
+}
+
+// ----------------------------------------------------------------------------
 // Resizing
 // ----------------------------------------------------------------------------
 

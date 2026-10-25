@@ -294,7 +294,7 @@ LevelProject_Page :: proc(state: ^EditorState) {
 				e.LdtkJson_SetStr(root, "levelNamePattern", name != "" ? name : "Level_%idx", a)
 				e.Ldtk_Doc_Touch(doc)
 			}
-			level_tip("New levels' names: %idx = a free number, %world = the world's name", "project.names")
+			level_tip("Levels' automatic names: %idx / %idx1 (index in the world), %world, %depth, %x / %y (position), %gx / %gy (GridVania cell)", "project.names")
 			UI_EndProps()
 		}
 		if UI_SectionHeader("Defaults") && UI_BeginProps("##proj_defaults") {

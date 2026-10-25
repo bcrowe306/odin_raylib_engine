@@ -267,7 +267,16 @@ mini_pattern :: proc(dl: ^imgui.DrawList, p: [2]f32, cell: f32, size: int, patte
 			fill := imgui.Vec4{0.15, 0.16, 0.19, 1}
 			if v == e.LDTK_AUTO_LAYER_ANYTHING do fill = {0.8, 0.8, 0.8, 1}
 			else if v == -e.LDTK_AUTO_LAYER_ANYTHING do fill = {0.05, 0.05, 0.05, 1}
-			else if v != 0 {
+			else if v != 0 && abs(v) >= 1000 {
+				// a value group: its colour (grey without one)
+				fill = {0.75, 0.75, 0.8, 1}
+				for g in e.LdtkJson_Arr(sd.obj, "intGridValuesGroups") do if (e.LdtkJson_Int(g, "uid") + 1) * 1000 == abs(v) {
+					if hex := e.LdtkJson_Str(g, "color"); hex != "" {
+						c := e.Ldtk_ParseHexColor(hex)
+						fill = {f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255, 1}
+					}
+				}
+			} else if v != 0 {
 				iv := e.Ldtk_Doc_IntValue(sd, abs(v))
 				c := iv != nil ? iv.color : rl.MAGENTA
 				fill = {f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255, 1}
@@ -559,7 +568,7 @@ rule_editor :: proc(state: ^EditorState, layerUid: int, robj: ^e.LdtkJson) {
 	// value palette for the pattern
 	UI_DimText("Paint the pattern with:")
 	level_tip("Left click: require it; right click: forbid it; middle click: clear", "tab.rules")
-	if lr.patValue != 0 && e.Ldtk_Doc_IntValue(sd, lr.patValue) == nil do lr.patValue = len(sd.values) > 0 ? sd.values[0].value : 0
+	if lr.patValue != 0 && lr.patValue < 1000 && e.Ldtk_Doc_IntValue(sd, lr.patValue) == nil do lr.patValue = len(sd.values) > 0 ? sd.values[0].value : 0
 	for v in sd.values {
 		imgui.SameLine()
 		c := v.color
@@ -568,6 +577,19 @@ rule_editor :: proc(state: ^EditorState, layerUid: int, robj: ^e.LdtkJson) {
 		imgui.PopStyleColor()
 		Drive_Item(fmt.tprintf("defs.rule.value:%d", v.value))
 		level_tip(fmt.tprintf("Value %d (%s)", v.value, v.identifier), "tab.rules")
+	}
+	// value groups: any value of the group (LDtk: (group uid + 1) * 1000)
+	for g in e.LdtkJson_Arr(sd.obj, "intGridValuesGroups") {
+		guid := e.LdtkJson_Int(g, "uid")
+		gv := (guid + 1) * 1000
+		gname := e.LdtkJson_Str(g, "identifier", fmt.tprintf("group %d", guid))
+		imgui.SameLine()
+		c := e.Ldtk_ParseHexColor(e.LdtkJson_Str(g, "color", "#BFBFCC"))
+		imgui.PushStyleColorImVec4(.Button, {f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255, lr.patValue == gv ? 1 : 0.45})
+		if imgui.Button(fmt.ctprintf("G%d##pg%d", guid, guid), {30, 22}) do lr.patValue = gv
+		imgui.PopStyleColor()
+		Drive_Item(fmt.tprintf("defs.rule.value:g%d", guid))
+		level_tip(fmt.tprintf("Any value of the group \"%s\"", gname), "tab.rules")
 	}
 	imgui.SameLine()
 	if UI_IconButton("*", "defs.rule.value:any", "", lr.patValue == 0, 24) do lr.patValue = 0
@@ -1165,6 +1187,15 @@ LevelRules_Query :: proc(q: string) -> (string, bool) {
 			return strings.to_string(b), true
 		}
 		return "", true
+	case "level.rulepattern":
+		r, _, _ := e.Ldtk_Doc_FindRule(doc, lr.ruleUid)
+		if r == nil do return "", true
+		b := strings.builder_make(context.temp_allocator)
+		for v, i in e.LdtkJson_Arr(r, "pattern") {
+			if i > 0 do strings.write_byte(&b, ',')
+			fmt.sbprintf(&b, "%d", int(v.num))
+		}
+		return strings.to_string(b), true
 	case "level.rulematches":
 		if levelRulePreview == 0 || len(doc.levels) == 0 do return "0", true
 		return fmt.tprint(len(e.Ldtk_Doc_RuleMatchCells(doc, GlobalLevel.level, levelRulePreview))), true

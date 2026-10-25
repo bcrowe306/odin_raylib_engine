@@ -111,9 +111,16 @@ come from the order in the Levels panel.
 <!-- topic: panel.levels -->
 
 The active world's levels. Click one to open it, and double-click to frame
-it. **+** adds a level next to the active one, in a free spot. The bin
-deletes the active level. Right-click a level for more: rename, duplicate,
-delete, and frame it.
+it. The filter box keeps only the levels whose name contains its text.
+
+**+** adds a level: click where it goes in the canvas. A preview follows
+the mouse, pushed out of the levels it would overlap: green means free,
+red means no room. In linear layouts the preview marks where the level is
+inserted. Esc or a right click cancels. **Shift**+click on **+** adds it
+right next to the active level instead.
+
+The bin deletes the active level (not a world's last level). Right-click a
+level for more: open, frame, rename, duplicate, move up / down, delete.
 
 ## Layers panel
 <!-- topic: panel.layers -->
@@ -209,8 +216,15 @@ to the layer's tileset.
 <!-- topic: palette.entities -->
 
 The project's entities. Pick one, then click in the level with the Brush.
-Use the **Select** tool to move or resize entities, and **Delete** to
-remove them. Right-click an entity to edit its definition.
+Use the **Select** tool to move entities, and **Delete** to remove them.
+Right-click an entity to edit its definition.
+
+A selected resizable entity shows handles (LDtk's resize tool): on its left
+and right sides when it resizes horizontally, top and bottom when it
+resizes vertically, and every side and corner when both. Dragging a handle
+snaps to the grid (hold **Shift** for free sizes). The entity grows around
+its pivot; its position only moves when you drag the side its pivot is on.
+Its definition's minimum / maximum sizes and aspect ratio apply.
 
 ## Auto-layer rules (palette)
 <!-- topic: palette.auto -->
@@ -288,8 +302,9 @@ rectangle), so games can draw it the way the editor does.
 ## Level tab
 <!-- topic: tab.level -->
 
-The active level's identifier, position, size (Enter applies), depth,
-background colour and image, and its level fields. With an entity
+The active level's identifier (or **Auto**: named from the project's level
+name pattern), position, size (Enter applies), depth, background colour
+and image, and its level fields. With an entity
 selected, it shows the entity instead: position, size, layer, iid and
 fields.
 
@@ -613,9 +628,10 @@ Click a row to edit it. Right-click a row to:
 
 **The rule editor**:
 
-- **Pattern**: pick a value above the grid (**\*** means any value). Left
-  click requires it, right click forbids it, and middle click clears the
-  cell. The yellow cell is the one that gets the tile. **Size**: odd
+- **Pattern**: pick a value above the grid. **G1**, **G2**... stand for
+  any value of an IntGrid value group, and **\*** for any value at all.
+  Left click requires it, right click forbids it, and middle click clears
+  the cell. The yellow cell is the one that gets the tile. **Size**: odd
   numbers, up to 9.
 - **Tiles**: individual tiles (one at random per match) or rectangles
   (stamps placed as a block, around the **pivot**). **Use picked tiles**
@@ -784,8 +800,17 @@ values, layers, entities, tilesets, worlds and levels. It asks first, and
 undo brings the old names back. Characters other than letters, digits and
 `_` always become `_`.
 
-**Level names**: the pattern for new levels' names. `%idx` is a free
-number and `%world` is the world's name.
+**Level names**: the pattern for levels' automatic identifiers:
+
+- `%idx` / `%idx1`: the level's index in its world (from 0 / from 1);
+- `%world`: the world's name;
+- `%depth` (or `%d`): its world depth;
+- `%x` / `%y`: its position (Free and GridVania layouts);
+- `%gx` / `%gy`: its GridVania cell.
+
+Levels whose **Auto** box is ticked (Level tab) are renamed with it when
+they move, are resized from the left / top, or are added. Untick Auto to
+name a level yourself (renaming it unticks it too).
 
 ## Defaults
 <!-- topic: project.defaults -->
