@@ -32,7 +32,9 @@ undo_on_activate :: proc(state: ^EditorState, label: string) {
 
 PropertyInspector_RenderWindow :: proc(state: ^EditorState) {
 	defer imgui.End()
-	if !imgui.Begin("Inspector###InspectorWindow") do return
+	inspectorOpen := imgui.Begin("Inspector###InspectorWindow")
+	Dock_Remember(.Right)
+	if !inspectorOpen do return
 	helpH: f32 = INSPECTOR_HELP_HEIGHT if state.showInspectorHelp else 0
 	if imgui.BeginChild("##inspbody", {0, -helpH}, {}, {}) do inspector_body(state)
 	imgui.EndChild()
@@ -303,6 +305,7 @@ inspector_body :: proc(state: ^EditorState) {
 	if !isRoot do inspector_material(state, node)
 	if !isRoot do inspector_script(state, node)
 	if !isRoot do Inspector_Signals(state, node)
+	PluginInspectors_Render(state, node) // (plugin_extend.odin)
 
 	if !isRoot && UI_SectionHeader("Component", false) {
 		imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)

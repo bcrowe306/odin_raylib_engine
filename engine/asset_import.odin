@@ -291,7 +291,7 @@ Image_EncodeQOI :: proc(path: string, allocator := context.allocator) -> ([]byte
 	if img.data == nil do return nil, false
 	defer rl.UnloadImage(img)
 	if img.format != .UNCOMPRESSED_R8G8B8A8 && img.format != .UNCOMPRESSED_R8G8B8 do rl.ImageFormat(&img, .UNCOMPRESSED_R8G8B8A8)
-	tmp := fmt.tprintf("%s/ore_qoi_%d.qoi", os.get_env("TMPDIR", context.temp_allocator) if os.get_env("TMPDIR", context.temp_allocator) != "" else "/tmp", rl.GetRandomValue(0, 1 << 30))
+	tmp := fmt.tprintf("%s/ore_qoi_%d.qoi", Engine_TempDir(), rl.GetRandomValue(0, 1 << 30))
 	if !rl.ExportImage(img, fmt.ctprint(tmp)) do return nil, false
 	defer os.remove(tmp)
 	data, err := os.read_entire_file(tmp, allocator)

@@ -1,0 +1,39 @@
+# Editor plugins (plugins.odin, docs/plugins.md): project plugins wait for the
+# project's trust, then run (on_load, print, require from their folder, the
+# scene being edited, no io / os.execute); an error stops only that plugin;
+# changing a plugin's file reloads it; Settings > Plugins turns one off.
+exec mkdir -p $PROJECT/plugins
+exec cp -R tests/drive/fixtures/plugins/hello_zz $PROJECT/plugins/
+exec cp -R tests/drive/fixtures/plugins/broken_zz $PROJECT/plugins/
+wait 5
+click @toolbar.settings
+click @settings.tab:plugins
+wait 2
+click @plugins.rescan
+wait 3
+expect plugin:count == 2
+expect plugin:hello_zz.state == untrusted
+expect plugin:broken_zz.state == untrusted
+click @plugins.trust.toggle
+wait 3
+expect plugin:hello_zz.state == running
+expect plugin:hello_zz.log contains hello from a plugin 1.2.3
+expect plugin:hello_zz.log contains sandbox io=nil exec=nil clock=function
+expect plugin:hello_zz.log contains scene ship=true
+expect plugin:hello_zz.log contains required from the plugin folder
+expect log contains [Hello ZZ] hello from a plugin
+expect plugin:broken_zz.state == failed
+expect plugin:broken_zz.error contains boom
+screenshot plugins
+# A changed file reloads the plugin (on_unload, then on_load again).
+exec cp tests/drive/fixtures/plugins/hello_zz_v2/main.lua $PROJECT/plugins/hello_zz/main.lua
+wait-until plugin:hello_zz.log contains reloaded timeout=600
+expect plugin:hello_zz.log contains bye
+expect plugin:hello_zz.state == running
+# Off: stopped and remembered.
+click @plugins.item:hello_zz
+click @plugins.enabled
+expect plugin:hello_zz.state == off
+click @plugins.enabled
+expect plugin:hello_zz.state == running
+click @settings.cancel

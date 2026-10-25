@@ -26,6 +26,7 @@ Settings_Tab :: enum {
 	General,
 	Code,
 	Project,
+	Plugins,
 }
 
 @(private = "file")
@@ -34,6 +35,7 @@ Settings_State :: struct {
 	selectTab:  bool,
 	generalPage: int, // 0 Basic, 1 Keymap, 2 Theme
 	projectPage: int, // 0 General, 1 Input, 2 Video, 3 Audio, 4 Export
+	pluginSel:   int, // Plugins: the selected plugin
 	editor:     Editor_Settings,
 	project:    e.ProjectConfig,
 	open:       bool,
@@ -183,6 +185,10 @@ ProjectSettingsDialog_Render :: proc(state: ^EditorState) {
 			settings_project(state, bodyH - 40)
 			imgui.EndTabItem()
 		}
+		if tab(fmt.ctprintf("%s  Plugins###st_plugins", ICON_FA_CODE), "settings.tab:plugins", .Plugins) {
+			settings_plugins(state, bodyH - 40)
+			imgui.EndTabItem()
+		}
 		st.selectTab = false
 		imgui.EndTabBar()
 	}
@@ -254,6 +260,7 @@ settings_general :: proc(state: ^EditorState, h: f32) {
 				Drive_Item("settings.autosave")
 				UI_Tooltip("Save modified scenes and scripts every N minutes (0 = off)")
 				check("settings.confirm-quit", "Ask Before Quitting", &s.confirmQuit, "Ask about unsaved scenes and scripts when quitting")
+				check("settings.check-updates", "Check for Updates", &s.checkUpdates, "At startup, look for a newer Ore Editor release (GitHub) and show it in the status bar")
 				check("settings.auto-bottom-panel", "Bottom Panel Follows Selection", &s.autoBottomPanel, "Selecting an AnimationPlayer, particle emitter or LDtk level shows its tab in the bottom panel; selecting something else goes back to the tab you had")
 				UI_EndProps()
 			}
@@ -1038,4 +1045,91 @@ export_default_name :: proc(d: ^e.ProjectConfig) -> string {
 	n, _ = strings.remove_all(n, ")", context.temp_allocator)
 	n, _ = strings.remove_all(n, ".", context.temp_allocator)
 	return n if n != "" else "Game"
+}
+
+// --- Plugins (plugins.odin) - changes here apply at once -------------------------
+
+@(private = "file")
+settings_plugins :: proc(state: ^EditorState, h: f32) {
+	list := Plugins_List()
+	// This project's trust.
+	switch v in Plugins_Trusted() {
+	case bool:
+		UI_DimText("This project's plugins are allowed to run." if v else "This project's plugins are blocked.")
+		imgui.SameLine()
+		if UI_Button("Block" if v else "Allow", "plugins.trust.toggle") do Plugins_SetTrust(state, !v)
+	case:
+		UI_DimText("This project's plugins haven't been allowed yet.")
+		imgui.SameLine()
+		if UI_Button("Allow", "plugins.trust.toggle") do Plugins_SetTrust(state, true)
+	}
+	imgui.SameLine()
+	if UI_Button(fmt.tprintf("%s  Rescan", ICON_FA_ROTATE_RIGHT), "plugins.rescan") do Plugins_Load(state, ask = false)
+	UI_Tooltip("Find plugins again (after adding or removing a plugin folder)")
+	imgui.SameLine()
+	if UI_Button(fmt.tprintf("%s  User Plugins Folder", ICON_FA_FOLDER_OPEN), "plugins.user-folder") {
+		dir := Plugins_UserDir()
+		_ = os.make_directory_all(dir)
+		Editor_OpenExternally(state, dir)
+	}
+	UI_Tooltip("Plugins here run in every project (one folder each, with a plugin.json)")
+	imgui.Spacing()
+	h := h - imgui.GetFrameHeightWithSpacing() - 8
+	if len(list) == 0 {
+		UI_DimText("No plugins. A plugin is a folder with a plugin.json and Lua files, in the project's plugins/ folder or the user plugins folder.")
+		return
+	}
+	st.pluginSel = clamp(st.pluginSel, 0, len(list) - 1)
+	if imgui.BeginChild("##plug_list", {220, h}, {.Borders}, {}) {
+		for p, i in list {
+			mark := ICON_FA_CIRCLE_CHECK
+			col := UI_SUCCESS
+			#partial switch p.state {
+			case .Off, .Untrusted: mark, col = ICON_FA_CIRCLE, UI_TEXT_FAINT
+			case .Failed: mark, col = ICON_FA_CIRCLE_XMARK, UI_DANGER
+			}
+			imgui.TextColored(col, "%s", fmt.ctprintf("%s", mark))
+			imgui.SameLine()
+			if imgui.Selectable(fmt.ctprintf("%s##plug%d", p.name, i), st.pluginSel == i) do st.pluginSel = i
+			Drive_Item(fmt.tprintf("plugins.item:%s", p.id))
+		}
+	}
+	imgui.EndChild()
+	imgui.SameLine(0, UI_SPACE * 2)
+	if imgui.BeginChild("##plug_body", {0, h}, {}, {}) {
+		p := list[st.pluginSel]
+		imgui.PushFont(GlobalFonts.semibold)
+		imgui.TextUnformatted(fmt.ctprintf("%s  %s", p.name, p.version))
+		imgui.PopFont()
+		UI_DimText(fmt.tprintf("%s plugin - %s", "Project" if p.scope == .Project else "User", p.dir))
+		if p.description != "" do imgui.TextWrapped("%s", fmt.ctprintf("%s", p.description))
+		if p.permissions != {} {
+			perms := make([dynamic]string, context.temp_allocator)
+			if .Process in p.permissions do append(&perms, "runs programs")
+			if .Network in p.permissions do append(&perms, "uses the network")
+			UI_DimText(fmt.tprintf("Permissions: %s", strings.join(perms[:], ", ", context.temp_allocator)))
+		}
+		switch p.state {
+		case .Running:   imgui.TextColored(UI_SUCCESS, "Running")
+		case .Off:       imgui.TextColored(UI_TEXT_FAINT, "Off")
+		case .Untrusted: imgui.TextColored(UI_TEXT_FAINT, "Waiting: this project's plugins aren't allowed")
+		case .Failed:    imgui.TextColored(UI_DANGER, "%s", fmt.ctprintf("Stopped: %s", p.error))
+		}
+		Drive_Item("plugins.state")
+		on := p.state != .Off
+		if imgui.Checkbox("Enabled##plug_on", &on) do Plugin_SetOff(state, p, !on)
+		Drive_Item("plugins.enabled")
+		imgui.SameLine()
+		if UI_Button(fmt.tprintf("%s  Reload", ICON_FA_ROTATE), "plugins.reload") && p.state != .Off && p.state != .Untrusted do Plugin_Reload(state, p)
+		UI_Tooltip("Stop and start it again (saving its files reloads it too)")
+		imgui.SameLine()
+		if UI_Button(fmt.tprintf("%s  Open Folder", ICON_FA_FOLDER_OPEN), "plugins.folder") do Editor_OpenExternally(state, p.dir)
+		imgui.SeparatorText("Log")
+		if imgui.BeginChild("##plug_log", {0, 0}, {.Borders}, {}) {
+			for l in p.log do imgui.TextWrapped("%s", fmt.ctprintf("%s", l))
+			if imgui.GetScrollY() >= imgui.GetScrollMaxY() do imgui.SetScrollHereY(1)
+		}
+		imgui.EndChild()
+	}
+	imgui.EndChild()
 }

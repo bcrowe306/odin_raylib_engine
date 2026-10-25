@@ -1,0 +1,47 @@
+# Plugin extension points (plugin_extend.odin): an inspector section for one
+# node type whose button edits (one undo step), an overlay handle dragging a
+# node (one undo step), an importer for a new extension (and its error).
+exec mkdir -p $PROJECT/plugins
+exec cp -R tests/drive/fixtures/plugins/extend_zz $PROJECT/plugins/
+wait 5
+click @toolbar.settings
+click @settings.tab:plugins
+click @plugins.rescan
+click @plugins.trust.toggle
+wait 3
+click @settings.cancel
+wait 3
+expect plugin:extend_zz.state == running
+# The inspector section (TextureNode only).
+click @hier:PlayerShip
+wait 2
+expect item:section:Extend ZZ == visible
+expect item:section:Plain ZZ == missing
+click @panel:plugin.extend_zz.info:Spin
+wait 1
+expect node:PlayerShip.rotation ~= 90
+expect undo == 1
+screenshot inspector
+# The overlay's handle: a drag is one undo step.
+drag @node:PlayerShip @node:PlayerShip+60,0 12
+wait 2
+expect node:PlayerShip.position ~= 700,360
+expect undo == 2
+expect selected == PlayerShip
+screenshot overlay
+command edit.undo
+wait 1
+expect node:PlayerShip.position ~= 640,360
+# The importer.
+drop-files @asset.search tests/drive/fixtures/import/level_zz.zzdata
+wait 3
+expect file:data/level_zz.json contains "speed": "10"
+expect file:data/level_zz.json contains "name": "bob"
+drop-files @asset.search tests/drive/fixtures/import/empty_zz.zzdata
+wait 3
+expect file:data/empty_zz.json !contains {
+# g outside an overlay's draw: an error.
+command plugin.extend_zz.bad_g
+wait 2
+expect plugin:extend_zz.state == failed
+expect plugin:extend_zz.error contains only works inside an overlay

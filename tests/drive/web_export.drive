@@ -2,6 +2,7 @@
 # others (the prebuilt web runner, game.ore, the font, the page titled);
 # File > Export > Open Web Export in Browser serves it on localhost, and the
 # game runs there in headless Chrome (screenshot).
+# drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 exec bash scripts/web/ensure_runner.sh
 wait 5
 click @toolbar.settings

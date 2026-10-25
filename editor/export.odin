@@ -47,6 +47,7 @@ Editor_RunnersDirs :: proc() -> []string {
 		for q in out do if q == p do return
 		append(out, p)
 	}
+	add(&out, Resources_RunnersDir())                                   // this editor's (resources.odin)
 	add(&out, exeDir, "runners")                                        // shipped editor
 	add(&out, filepath.dir(exeDir, context.temp_allocator), "runners") // macOS .app: Contents/MacOS/..
 	add(&out, exeDir, "bin", "runners")                                 // editor binary at the repo root
@@ -76,12 +77,22 @@ runner_libraries :: proc(runner: string) -> []string {
 	return out[:]
 }
 
+NOTICES_FILE :: "THIRD_PARTY_NOTICES.txt"
+
+// runner_notices: the third-party notices shipped with the runners (or the
+// checkout's licenses/) - "" when missing.
+runner_notices :: proc(runner: string) -> string {
+	p, _ := filepath.join({filepath.dir(filepath.dir(runner, context.temp_allocator), context.temp_allocator), NOTICES_FILE}, context.temp_allocator)
+	if os.is_file(p) do return p
+	if dev := Resource_Path("licenses", NOTICES_FILE); os.is_file(dev) do return dev
+	return ""
+}
+
 // runner_font: the UI font shipped with runners (or the engine's copy).
 runner_font :: proc(runner: string) -> string {
 	p, _ := filepath.join({filepath.dir(filepath.dir(runner, context.temp_allocator), context.temp_allocator), RUNNER_FONT}, context.temp_allocator)
 	if os.is_file(p) do return p
-	dev :: "engine/Open_Sans/static/OpenSans-Regular.ttf"
-	if os.is_file(dev) do return dev
+	if f := Resources_EngineFont(); os.is_file(f) do return f
 	return ""
 }
 
@@ -122,11 +133,15 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false, only :
 			Editor_Log(state, .Error, "The runner was built but isn't in any of: %s", strings.join(Editor_RunnersDirs(), ", ", context.temp_allocator))
 			return
 		}
-		dst, _ := filepath.join({"bin", "runners", e.export_target_name(native), runner_file_name(native)}, context.temp_allocator)
+		if !Resources_InCheckout() {
+			Editor_Log(state, .Error, "No %s runner: it ships in runners/%s/ next to the editor - reinstall the editor", e.export_target_name(native), e.export_target_name(native))
+			return
+		}
+		dst := Resource_Path("bin", "runners", e.export_target_name(native), runner_file_name(native))
 		_ = os.make_directory_all(filepath.dir(dst, context.temp_allocator))
 		// The script also builds the debug runner and ships the runner's
-		// libraries (Lua on macOS / Windows).
-		cmd := []string{"bash", "scripts/build_runners.sh"} if os.is_file("scripts/build_runners.sh") else []string{"odin", "build", "runner", "-o:speed", strings.concatenate({"-out:", dst}, context.temp_allocator)}
+		// libraries (Lua on macOS / Windows). (Builds run in the checkout.)
+		cmd := []string{"bash", "scripts/build_runners.sh"} if os.is_file(Resource_Path("scripts", "build_runners.sh")) else []string{"odin", "build", "runner", "-o:speed", strings.concatenate({"-out:", dst}, context.temp_allocator)}
 		if !Editor_StartBuild(state, cmd, .Standalone) {
 			Editor_Log(state, .Error, "No prebuilt %s runner, and it couldn't be built (is `odin` on PATH?)", e.export_target_name(native))
 			return
@@ -139,6 +154,7 @@ Editor_ExportStandalone :: proc(state: ^EditorState, afterBuild := false, only :
 	for &p in presets {
 		if dir, ok := export_preset(state, &p, outDir); ok {
 			Editor_Log(state, .Info, "Exported %s (%s%s): %s", p.name, e.export_target_name(p.target), ", debug" if p.debug else "", dir)
+			_, _ = PluginEvents_Emit(state, "after_export", p.name, dir) // (plugin_events.odin)
 			exported += 1
 		}
 	}
@@ -185,6 +201,12 @@ export_preset :: proc(state: ^EditorState, p: ^e.Export_Preset, outDir: string) 
 		return "", false
 	}
 	defer os.remove(ore)
+	// The third-party notices the engine's licenses ask for (Lua, Box2D, ...),
+	// next to what was exported.
+	if notices := runner_notices(runner); notices != "" {
+		dst, _ := filepath.join({dir, NOTICES_FILE}, context.temp_allocator)
+		_ = os.copy_file(dst, notices)
+	}
 
 	switch t {
 	case .MacOS:   return Export_MacApp(state, &pc, runner, ore, dir, name)

@@ -172,18 +172,24 @@ Causes: every child lookup scanned one flat relationship array (O(n²) per frame
 
 ### P2 — features
 
-1. **First-time node creation** still reserves a virtual-memory arena per node (~3.5 µs; respawns reuse arenas and cost ~0.3 µs). *Approach:* a per-NodeManager pool allocator instead of per-node arenas.
-2. **List-like UI widgets' items** (dropdown/list/table rows) aren't editable in the Inspector; they keep their factory defaults or are set from Lua.
-3. **Tile maps have one layer and no auto-tiling**; use several TileMapNodes, or LDtk for rule-based maps.
-4. **Property tracks interpolate linearly per frame**; no easing curves or method-call tracks.
-5. **Animation timeline**: sprite-sheet animations show their frame range but can't be reordered (frame animations can).
-6. **Export targets**: only the runner for the platform the editor runs on is built; other targets need a build on that platform (the `.ore` package itself is portable).
-7. **Renaming or deleting an asset** doesn't update scenes, scripts or components that reference it (the scene list in project.json is updated).
-8. **Native file dialogs** are used for importing assets (macOS verified; Linux zenity/kdialog and Windows PowerShell untested); Open Project still uses the editor's own folder browser.
-9. **LDtk one-way platforms** assume gravity pointing down (+y): they block bodies coming from above. Top-down games should use Solid or Trigger.
-10. **LDtk world mode** loads every level of the world at once (no streaming of neighbours by camera distance); for large GridVania worlds load a level at a time and switch with `ldtk_level_at` / `ldtk_load_level`.
-11. **LDtk level data is read-only in the editor** by design (edit in LDtk; saving reloads). Entity tiles from LDtk's embedded icon atlas aren't drawn.
-12. **Non-uniform scale on round shapes**: a circle takes the larger scale axis and a capsule its radius from x (Box2D has no ellipses); a rotated box under non-uniform node scale stays a rectangle (no skew).
+Re-checked against the code on 2026-10-25. Closed since the audit: easing
+curves, custom Bezier keys and method / audio tracks on animation tracks;
+asset rename / move rewrites references (Find Usages too); LDtk levels are
+edited and saved in the Level tab; tile maps with several layers and
+auto-tiling are the Level tab's job (LDtk), so TileMapNode stays a simple
+single-layer map.
+
+1. **Node arenas**: every node still owns a virtual-memory arena (`Node.arena`). It's reserved only on the node's first allocation and recycled through a pool when nodes are destroyed, so most nodes never pay for it. *Approach (if creation shows up in profiles):* one pool allocator per NodeManager.
+2. **List-like UI widgets' items** (UIDropdownNode `items`, UIListViewNode `items`, UITableNode `columns` / `rows`) aren't editable in the Inspector; they keep their factory defaults or are set from Lua. *Approach:* a dynamic-array property kind (the script-list editor in `inspector_script_lists.odin` already does this for script properties).
+3. **Sprite-sheet animation frames** can be deleted, inserted and pasted, but not reordered (`Animation_MoveFrame` and the timeline's drag handle only work on frame animations); cut and paste is the workaround.
+4. **Deleting an asset** leaves references to it dangling, and the delete prompt doesn't say where it's used (rename and move do update references). *Approach:* run Find Usages in the delete prompt.
+5. **Export targets**: only the runner for the platform the editor runs on is built (plus the prebuilt web runner); other targets need a build on that platform. The `.ore` package itself is portable.
+6. **Open Project** uses the editor's own folder browser; native dialogs (macOS verified; Linux zenity / kdialog and Windows PowerShell untested) are used for import, export and settings folders and new project locations.
+7. **LDtk one-way platforms** assume gravity pointing down (+y): they block bodies coming from above. Top-down games should use Solid or Trigger.
+8. **LDtk world mode** loads every level of the world at once (no streaming of neighbours by camera distance); for large GridVania worlds load a level at a time and switch with `ldtk_level_at` / `ldtk_load_level`.
+9. **LDtk entity tiles from the embedded icon atlas** (LDtk's built-in icons) aren't drawn, in the Level tab or in the game (tilesets without an image path are skipped), and the Tiled export skips them.
+10. **Linux exports made on Windows**: Windows has no executable bit, so the AppDir's `AppRun` and the game need `chmod +x` on Linux (exports made on macOS / Linux keep it; an AppImage built on Linux has it). *Approach:* write the Linux export as a .tar.gz with file modes.
+11. **Non-uniform scale on round shapes**: a circle takes the larger scale axis and a capsule its radius from x (Box2D has no ellipses); a rotated box under non-uniform node scale stays a rectangle (no skew).
 
 ---
 

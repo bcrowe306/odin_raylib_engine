@@ -34,6 +34,7 @@ Editor_Settings :: struct {
 	showGrid:         bool,
 	confirmQuit:      bool,
 	showWelcome:      bool, // the Welcome window at startup
+	checkUpdates:     bool, // look for a newer release at startup (update_check.odin)
 	showTabBars:      bool, // View > Show Tab Bars: every docked window keeps its tab
 	autoBottomPanel:  bool, // the bottom panel shows the selected node's tool tab
 	// Code Editor
@@ -64,6 +65,8 @@ Editor_Settings :: struct {
 	lastProjectDir:   string,
 	// LDtk projects' custom commands: project iid -> allowed / blocked
 	ldtkTrust:        map[string]bool,
+	pluginTrust:      map[string]bool, // project folder -> its plugins allowed (true) / blocked (plugins.odin)
+	pluginsOff:       map[string]bool, // plugin folders turned off in Settings > Plugins
 }
 
 DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
@@ -74,6 +77,7 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 	showGrid        = true,
 	confirmQuit     = true,
 	showWelcome     = true,
+	checkUpdates    = true,
 	autoBottomPanel = true,
 	codeFontSize    = CODE_FONT_SIZE,
 	tabWidth        = 4,
@@ -113,6 +117,10 @@ Editor_Settings_Clone :: proc(s: ^Editor_Settings) -> Editor_Settings {
 	c.lastProjectDir = strings.clone(s.lastProjectDir)
 	c.ldtkTrust = make(map[string]bool)
 	for k, v in s.ldtkTrust do c.ldtkTrust[strings.clone(k)] = v
+	c.pluginTrust = make(map[string]bool)
+	for k, v in s.pluginTrust do c.pluginTrust[strings.clone(k)] = v
+	c.pluginsOff = make(map[string]bool)
+	for k, v in s.pluginsOff do c.pluginsOff[strings.clone(k)] = v
 	return c
 }
 
@@ -134,6 +142,12 @@ Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 	for k in s.ldtkTrust do delete(k)
 	delete(s.ldtkTrust)
 	s.ldtkTrust = nil
+	for k in s.pluginTrust do delete(k)
+	delete(s.pluginTrust)
+	s.pluginTrust = nil
+	for k in s.pluginsOff do delete(k)
+	delete(s.pluginsOff)
+	s.pluginsOff = nil
 }
 
 // Editor_SettingsPath: where settings live (drives: inside the project copy).
@@ -196,6 +210,23 @@ Editor_LoadSettings :: proc(state: ^EditorState) {
 	Editor_ApplySettings(state)
 	Editor_AddRecentProject(state.projectPath)
 	_ = Editor_SaveSettings()
+}
+
+// Editor_RecentProjectsAtStartup: the recent projects (temp), read before
+// the project opens (resources.odin: the default project) - the settings
+// are loaded properly later (Editor_LoadSettings).
+Editor_RecentProjectsAtStartup :: proc() -> []string {
+	home, err := os.user_home_dir(context.temp_allocator)
+	if err != nil do return nil
+	path, _ := filepath.join({home, ".config", "ore_editor", "settings.ini"}, context.temp_allocator)
+	data, rerr := os.read_entire_file(path, context.temp_allocator)
+	if rerr != nil do return nil
+	Editor_Settings_Destroy(&GlobalSettings)
+	GlobalSettings = Editor_DefaultSettings()
+	settings_from_ini(string(data))
+	out := make([]string, len(GlobalSettings.recentProjects), context.temp_allocator)
+	for r, i in GlobalSettings.recentProjects do out[i] = strings.clone(r, context.temp_allocator)
+	return out
 }
 
 @(private = "file")
@@ -264,6 +295,7 @@ settings_from_ini :: proc(text: string) {
 	s.showGrid = b(m, "general", "show_grid", s.showGrid)
 	s.confirmQuit = b(m, "general", "confirm_quit", s.confirmQuit)
 	s.showWelcome = b(m, "general", "show_welcome", s.showWelcome)
+	s.checkUpdates = b(m, "general", "check_updates", s.checkUpdates)
 	s.showTabBars = b(m, "general", "show_tab_bars", s.showTabBars)
 	s.autoBottomPanel = b(m, "general", "auto_bottom_panel", s.autoBottomPanel)
 	s.codeFontSize = f(m, "code", "font_size", s.codeFontSize)
@@ -305,6 +337,14 @@ settings_from_ini :: proc(text: string) {
 	}
 	if lt, ok := m["ldtk_trust"]; ok {
 		for k, v in lt do s.ldtkTrust[strings.clone(k)] = v == "true"
+	}
+	if pt, ok := m["plugin_trust"]; ok {
+		if s.pluginTrust == nil do s.pluginTrust = make(map[string]bool)
+		for k, v in pt do s.pluginTrust[strings.clone(k)] = v == "true"
+	}
+	if po, ok := m["plugins_off"]; ok {
+		if s.pluginsOff == nil do s.pluginsOff = make(map[string]bool)
+		for k, v in po do if v == "true" do s.pluginsOff[strings.clone(k)] = true
 	}
 	if rp, ok := m["recent_projects"]; ok {
 		for i in 0 ..< len(rp) {
@@ -368,7 +408,7 @@ Editor_SaveSettings :: proc() -> bool {
 	sb := strings.builder_make(context.temp_allocator)
 	strings.write_string(&sb, "; Ore editor settings (Settings in the editor writes this file)\n\n[general]\n")
 	fmt.sbprintf(&sb, "ui_scale = %.2f\nautosave_minutes = %d\ngrid_size = %.0f\n", s.uiScale, s.autosaveMinutes, s.gridSize)
-	fmt.sbprintf(&sb, "snap_to_grid = %t\nshow_grid = %t\nconfirm_quit = %t\nshow_welcome = %t\n", s.snapToGrid, s.showGrid, s.confirmQuit, s.showWelcome)
+	fmt.sbprintf(&sb, "snap_to_grid = %t\nshow_grid = %t\nconfirm_quit = %t\nshow_welcome = %t\ncheck_updates = %t\n", s.snapToGrid, s.showGrid, s.confirmQuit, s.showWelcome, s.checkUpdates)
 	fmt.sbprintf(&sb, "show_tab_bars = %t\nauto_bottom_panel = %t\n", s.showTabBars, s.autoBottomPanel)
 	strings.write_string(&sb, "\n[code]\n")
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
@@ -386,6 +426,14 @@ Editor_SaveSettings :: proc() -> bool {
 	if len(s.ldtkTrust) > 0 {
 		strings.write_string(&sb, "\n[ldtk_trust]\n")
 		for k, v in s.ldtkTrust do fmt.sbprintf(&sb, "%s = %t\n", k, v)
+	}
+	if len(s.pluginTrust) > 0 {
+		strings.write_string(&sb, "\n[plugin_trust]\n")
+		for k, v in s.pluginTrust do fmt.sbprintf(&sb, "%s = %t\n", k, v)
+	}
+	if len(s.pluginsOff) > 0 {
+		strings.write_string(&sb, "\n[plugins_off]\n")
+		for k in s.pluginsOff do fmt.sbprintf(&sb, "%s = true\n", k)
 	}
 	strings.write_string(&sb, "\n[recent_projects]\n")
 	for r, i in s.recentProjects do fmt.sbprintf(&sb, "%d = %s\n", i, r)

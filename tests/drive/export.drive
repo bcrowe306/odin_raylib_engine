@@ -1,4 +1,5 @@
 # Export a portable .ore package and run the game from it.
+# drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 wait 5
 click @hier:PlayerShip
 dblclick @insp.name

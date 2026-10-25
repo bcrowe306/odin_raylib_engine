@@ -3,12 +3,12 @@ package editor
 import "core:fmt"
 import vmem "core:mem/virtual"
 import "core:strings"
-import cm "vendor:commonmark"
+import cm "lib/cmark"
 import syn "../odin_editor/syntax"
 import imgui "lib/imgui"
 
 // ============================================================================
-// Markdown view: CommonMark (vendor:commonmark, the system libcmark) parsed
+// Markdown view: CommonMark (lib/cmark: cmark linked statically) parsed
 // once into blocks - headings, paragraphs with styled inline text (strong,
 // emphasis, `code`, links), fenced code, bullet / numbered lists, quotes,
 // rules - plus GitHub-style pipe tables (not CommonMark: read from the

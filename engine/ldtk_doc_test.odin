@@ -206,7 +206,7 @@ test_ldtk_doc_external_levels_save :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(doc.levels), 3)
 	testing.expect(t, doc.levels[1].extRoot != nil)
 	testing.expect(t, len(doc.levels[1].layers) > 0)
-	dir := fmt.tprintf("%s/ore_ldtk_doc_zz", os.get_env("TMPDIR", context.temp_allocator))
+	dir := fmt.tprintf("%s/ore_ldtk_doc_zz", Engine_TempDir())
 	_ = os.make_directory(dir)
 	out := fmt.tprintf("%s/SeparateLevelFiles.ldtk", dir)
 	testing.expect(t, Ldtk_Doc_Save(doc, out))
@@ -1036,7 +1036,7 @@ test_ldtk_doc_layer_defs :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_project_options :: proc(t: ^testing.T) {
-	dir := fmt.tprintf("%s/ore_ldtk_proj_zz", os.get_env("TMPDIR", context.temp_allocator))
+	dir := fmt.tprintf("%s/ore_ldtk_proj_zz", Engine_TempDir())
 	os.remove_all(dir)
 	_ = os.make_directory(dir)
 	defer os.remove_all(dir)
@@ -1103,7 +1103,7 @@ test_ldtk_doc_project_options :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_enums :: proc(t: ^testing.T) {
-	dir := fmt.tprintf("%s/ore_ldtk_enums_zz", os.get_env("TMPDIR", context.temp_allocator))
+	dir := fmt.tprintf("%s/ore_ldtk_enums_zz", Engine_TempDir())
 	os.remove_all(dir)
 	_ = os.make_directory(dir)
 	defer os.remove_all(dir)
@@ -1185,7 +1185,7 @@ test_ldtk_doc_enums :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_enum_sync_unused :: proc(t: ^testing.T) {
-	dir := fmt.tprintf("%s/ore_ldtk_esync_zz", os.get_env("TMPDIR", context.temp_allocator))
+	dir := fmt.tprintf("%s/ore_ldtk_esync_zz", Engine_TempDir())
 	os.remove_all(dir)
 	_ = os.make_directory(dir)
 	defer os.remove_all(dir)
@@ -1208,7 +1208,7 @@ test_ldtk_doc_enum_sync_unused :: proc(t: ^testing.T) {
 
 @(test)
 test_ldtk_doc_exports :: proc(t: ^testing.T) {
-	dir := fmt.tprintf("%s/ore_ldtk_export_zz", os.get_env("TMPDIR", context.temp_allocator))
+	dir := fmt.tprintf("%s/ore_ldtk_export_zz", Engine_TempDir())
 	os.remove_all(dir)
 	_ = os.make_directory_all(fmt.tprintf("%s/atlas", dir))
 	defer os.remove_all(dir)

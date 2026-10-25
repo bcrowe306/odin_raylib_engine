@@ -1,5 +1,6 @@
 package editor
 
+import "core:c"
 import "core:fmt"
 import "core:os"
 import "core:strings"
@@ -62,14 +63,44 @@ ui_fa_ranges: [3]imgui.Wchar = {0xE000, 0xF8FF, 0}
 // Latin-1 plus punctuation (– — · … “ ”) and arrows.
 ui_text_ranges: [7]imgui.Wchar = {0x0020, 0x00FF, 0x2000, 0x206F, 0x2190, 0x21FF, 0}
 
+// The editor's UI fonts, embedded (no files: the editor runs from anywhere).
+@(private = "file")
+FONT_REGULAR := #load("../engine/Open_Sans/static/OpenSans-Regular.ttf")
+@(private = "file")
+FONT_SEMIBOLD := #load("../engine/Open_Sans/static/OpenSans-SemiBold.ttf")
+@(private = "file")
+FONT_MEDIUM := #load("../engine/Open_Sans/static/OpenSans-Medium.ttf")
+@(private = "file")
+FONT_ICONS := #load("../ui/fonts/fa-solid-900.ttf")
+
+// ui_font_config: ImGui's ImFontConfig defaults, the data kept by us (it's
+// in the executable: the atlas must not free it).
+@(private = "file")
+ui_font_config :: proc() -> imgui.FontConfig {
+	return {
+		FontDataOwnedByAtlas = false,
+		OversampleH = 2,
+		OversampleV = 1,
+		GlyphMaxAdvanceX = max(f32),
+		RasterizerMultiply = 1.0,
+		RasterizerDensity = 1.0,
+		EllipsisChar = max(u16),
+	}
+}
+
+@(private = "file")
+ui_add_font :: proc(io: ^imgui.IO, data: []u8, size: f32, cfg: ^imgui.FontConfig, ranges: ^imgui.Wchar) -> ^imgui.Font {
+	return imgui.FontAtlas_AddFontFromMemoryTTF(io.Fonts, raw_data(data), c.int(len(data)), size, cfg, ranges)
+}
+
 // UI_LoadFonts loads Open Sans (regular/semibold/small) with Font Awesome
 // icons merged into each.
 UI_LoadFonts :: proc() {
 	io := imgui.GetIO()
-	add :: proc(io: ^imgui.IO, path: cstring, size: f32) -> ^imgui.Font {
-		font := imgui.FontAtlas_AddFontFromFileTTF(io.Fonts, path, size, nil, &ui_text_ranges[0])
-		cfg: imgui.FontConfig
-		cfg.FontDataOwnedByAtlas = true
+	add :: proc(io: ^imgui.IO, data: []u8, size: f32) -> ^imgui.Font {
+		text := ui_font_config()
+		font := ui_add_font(io, data, size, &text, &ui_text_ranges[0])
+		cfg := ui_font_config()
 		cfg.OversampleH = 2
 		cfg.OversampleV = 1
 		cfg.RasterizerMultiply = 1.0
@@ -78,13 +109,14 @@ UI_LoadFonts :: proc() {
 		cfg.MergeMode = true
 		cfg.GlyphMinAdvanceX = size
 		cfg.GlyphOffset = {0, 0.5}
-		imgui.FontAtlas_AddFontFromFileTTF(io.Fonts, "ui/fonts/fa-solid-900.ttf", size * 0.86, &cfg, &ui_fa_ranges[0])
+		ui_add_font(io, FONT_ICONS, size * 0.86, &cfg, &ui_fa_ranges[0])
 		return font
 	}
-	GlobalFonts.regular = add(io, "engine/Open_Sans/static/OpenSans-Regular.ttf", 15)
-	GlobalFonts.semibold = add(io, "engine/Open_Sans/static/OpenSans-SemiBold.ttf", 15)
-	GlobalFonts.small = add(io, "engine/Open_Sans/static/OpenSans-Medium.ttf", 12.5)
-	GlobalFonts.ruler = imgui.FontAtlas_AddFontFromFileTTF(io.Fonts, "engine/Open_Sans/static/OpenSans-SemiBold.ttf", 11, nil, &ui_text_ranges[0])
+	GlobalFonts.regular = add(io, FONT_REGULAR, 15)
+	GlobalFonts.semibold = add(io, FONT_SEMIBOLD, 15)
+	GlobalFonts.small = add(io, FONT_MEDIUM, 12.5)
+	ruler := ui_font_config()
+	GlobalFonts.ruler = ui_add_font(io, FONT_SEMIBOLD, 11, &ruler, &ui_text_ranges[0])
 	for path in ([]cstring{"/System/Library/Fonts/SFNSMono.ttf", "/System/Library/Fonts/Menlo.ttc", "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", "C:/Windows/Fonts/consola.ttf"}) {
 		if os.exists(string(path)) {
 			GlobalFonts.mono = imgui.FontAtlas_AddFontFromFileTTF(io.Fonts, path, CODE_FONT_SIZE)

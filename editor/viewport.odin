@@ -80,7 +80,9 @@ Viewport_UpdateAndRender :: proc(state: ^EditorState) {
 	defer imgui.PopStyleVar()
 
 	viewportFlags: imgui.WindowFlags = {.NoScrollbar, .NoScrollWithMouse}
-	if imgui.Begin("Viewport###ViewportWindow", nil, viewportFlags) {
+	viewportOpen := imgui.Begin("Viewport###ViewportWindow", nil, viewportFlags)
+	Dock_Remember(.Center)
+	if viewportOpen {
 		driveNoScroll = true // the wheel zooms here: drives never "scroll" it
 		defer driveNoScroll = false
 		SceneTabs_Draw(state) // open scenes as tabs (scene_tabs.odin)
@@ -654,6 +656,13 @@ Viewport_HandleInputAndGizmos :: proc(state: ^EditorState) {
 	shapeOwnsMouse := Viewport_ShapeEdit(state, drawList, mouseScreen, mouseWorld)
 	// A selected path's points and handles.
 	if !shapeOwnsMouse && Viewport_PathEdit(state, drawList, mouseScreen, mouseWorld) {
+		state.activeHandle = .None
+		state.isDraggingGizmo = false
+		return
+	}
+
+	// Plugin overlays (plugin_extend.odin): a handle under / held by the mouse owns it.
+	if !shapeOwnsMouse && PluginOverlays_Render(state, drawList, mouseWorld) {
 		state.activeHandle = .None
 		state.isDraggingGizmo = false
 		return

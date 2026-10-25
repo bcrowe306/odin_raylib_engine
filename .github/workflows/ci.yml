@@ -1,0 +1,90 @@
+# Builds the editor, the runner and the Play binary and runs the unit tests
+# on macOS (Apple silicon), Linux (x64) and Windows (x64); smoke-tests the
+# runner and the packaged editor where there's an OpenGL context (macOS,
+# Linux under Xvfb). Editor drives (tests/drive) stay local: they're long
+# and need a real GPU session.
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ODIN_RELEASE: dev-2026-03
+
+jobs:
+  build-test:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # (macOS runners have no GPU: no OpenGL window, so the smoke tests run on Linux under Xvfb.)
+          - { name: macOS arm64, os: macos-14, platform: macos, smoke: false }
+          - { name: Linux x64, os: ubuntu-22.04, platform: linux, smoke: true }
+          - { name: Windows x64, os: windows-2022, platform: windows, smoke: false }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Submodules (not lua-language-server)
+        run: git submodule update --init --depth 1 ui odin_editor ldtk
+
+      - uses: laytan/setup-odin@v2
+        with:
+          release: ${{ env.ODIN_RELEASE }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Dependencies
+        run: scripts/ci/setup_deps.sh
+
+      - name: Build
+        run: |
+          mkdir -p bin
+          ext=""; [ "$RUNNER_OS" = Windows ] && ext=.exe
+          odin build editor $(scripts/odin_flags.sh) -out:bin/editor$ext
+          odin build . $(scripts/odin_flags.sh) -out:bin/odin_raylib_engine$ext
+          scripts/build_runners.sh
+
+      - name: Unit tests
+        run: |
+          odin test engine -define:ODIN_TEST_THREADS=1 $(scripts/odin_flags.sh)
+          odin test ui -define:ODIN_TEST_THREADS=1 $(scripts/odin_flags.sh)
+
+      - name: Smoke test (the runner plays the demo project)
+        if: matrix.smoke
+        run: |
+          cmd=(bin/runners/${{ matrix.platform }}/runner assets/demo_project --frames 60 --hidden
+            --screenshot "$RUNNER_TEMP/runner.png" --dump-scene "$RUNNER_TEMP/scene.json")
+          if [ "$RUNNER_OS" = Linux ]; then xvfb-run -a "${cmd[@]}"; else "${cmd[@]}"; fi
+          test -s "$RUNNER_TEMP/runner.png" && grep -q '"root"' "$RUNNER_TEMP/scene.json"
+
+      - name: Package and smoke-test the editor
+        if: matrix.smoke
+        run: |
+          scripts/ci/fetch_luals.sh
+          scripts/package_editor.sh --out dist --version "0.0.0-ci.${{ github.run_number }}"
+          if [ "$RUNNER_OS" = Linux ]; then xvfb-run -a scripts/test_package.sh dist; else scripts/test_package.sh dist; fi
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-${{ matrix.platform }}
+          path: |
+            ${{ runner.temp }}/runner.png
+            /tmp/ore_package_test.*/shots
+            /tmp/ore_package_test.*/editor.log
+          if-no-files-found: ignore
+          retention-days: 7

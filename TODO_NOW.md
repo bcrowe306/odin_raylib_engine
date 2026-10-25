@@ -26,8 +26,7 @@ out of scope here.
 - [x] 3.1 Prebuilt runners per platform shipped with the editor; export copies the runner + `.ore` (no compiler needed), name and icon
 - [x] 3.2 macOS `.app` bundle (Info.plist, icon, `.ore` in Resources, universal binary); optional codesign/notarize step
 - [x] 3.3 Windows packaging (icon, version info, no console in release); Linux AppImage
-- [ ] 3.4 Web (emscripten): raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio
-  - **Blocked (2026-10-22), needs your go-ahead:** emscripten isn't installed (and the vendored `raylib/wasm` folder is empty, so raylib and Lua need web builds from source); `core:os` panics on js/wasm, so the engine needs a filesystem layer for its ~80 `os.` calls; and the engine imports `ui/`, whose `native_dialog.odin` uses `posix.popen` (not on wasm) - that file needs a `#+build !js` tag or a wasm stub, which is your code.
+- [x] 3.4 Web (emscripten): raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio (done as roadmap 5: the prebuilt web runner; `web_export` drive)
 - [x] 3.5 Export presets per target (icon, version, window, include/exclude, debug/release) in `project.json`
 
 ## Phase 4 — Performance (single-threaded)
@@ -108,12 +107,46 @@ Docs in place
 - [x] 8.25 Every API function documented in `engine_api.lua` (description + example) for hover
 - [x] 8.26 F1 on an API symbol opens its section of the scripting reference in the editor
 
-## Release packaging (editor)
+## Phase 12 — Distribution, CI/CD and export targets (2026-10-25)
 
-- [ ] R.1 libcmark for a released editor: the Scripting Reference's markdown (`editor/markdown_view.odin`, `vendor:commonmark`) links the system `libcmark` (`brew install cmark` on dev machines - `/opt/homebrew/opt/cmark/lib/libcmark.dylib`), which users won't have. Before shipping the editor, either
+Goal: users install the editor like any app (no compiler, no Homebrew, no
+repo) and it exports to every desktop platform and the web from any of them;
+tagged versions build and publish themselves.
+
+Editor that runs anywhere:
+- [x] D.1 Relocatable editor: resources found next to the executable (`Contents/Resources` in a .app) or in the source checkout; fonts and small files embedded (`#load`); no paths relative to the working directory
+- [x] D.2 Play runs the prebuilt runner (the one export uses), no Odin compiler; the rebuild-on-change path only in a source checkout with `odin` installed
+- [x] D.3 Lua 5.4 as a static library built from source (macOS uses Homebrew's dylib today), in the editor and the runners
+- [x] D.4 (was R.1) libcmark for a released editor: the Scripting Reference's markdown (`editor/markdown_view.odin`, `vendor:commonmark`) links the system `libcmark` (`brew install cmark` on dev machines - `/opt/homebrew/opt/cmark/lib/libcmark.dylib`), which users won't have. Before shipping the editor, either
   - a) bundle it as a dynamic lib: copy `libcmark.dylib` (`.so` / `cmark.dll`) next to the editor (macOS: into the .app's `Frameworks`, `install_name_tool -change` to `@rpath/libcmark.dylib`, `-Wl,-rpath,@executable_path/../Frameworks` as `scripts/build_runners.sh` does for the runners), or
   - b) build cmark as a static lib (cmake `-DBUILD_SHARED_LIBS=OFF`, per platform; the vendor's `build.bat` does this on Windows) and link it in, so the editor has no extra file.
   The game runner doesn't use cmark.
+  Or c) replace it: the markdown view uses a subset; a small Odin renderer removes the dependency.
+- [x] D.5 lua-language-server built per platform and bundled (the Code tab's completion / diagnostics)
+- [x] D.6 The editor ships the runners for every platform (`runners/{macos,windows,linux,web}`), so any editor exports every desktop target and the web
+- [x] D.7 One version string (from the git tag) in the editor, the runner and each `.ore`; the runner warns about a project from a newer version
+- [x] D.8 Third-party license notices bundled (raylib, Lua, Box2D, Dear ImGui, LuaLS, cmark, Open Sans, Font Awesome)
+- [x] D.9 Check for updates against GitHub Releases (Help > Check for Updates, at startup unless turned off; status bar link; later: an auto-updater)
+
+CI/CD (GitHub Actions):
+- [x] C.1 CI on pushes / pull requests: build the editor, the runner and the Play binary, engine + ui unit tests, on macOS (arm64), Windows (x64) and Linux (x64)
+- [x] C.2 Smoke test in CI: the runner plays the demo project and the packaged editor plays, exports and starts its language server (scripts/test_package.sh) - on Linux under Xvfb (hosted macOS runners have no GPU); editor drives stay local
+- [x] C.3 Release workflow on `v*` tags: build the editor and runners per platform, put every platform's runners in each editor package, publish a GitHub Release with checksums
+- [ ] C.4 macOS signing + notarization (Developer ID, hardened runtime, every dylib signed; certificates as repository secrets) - needs an Apple Developer account
+- [ ] C.5 Windows code signing (Azure Trusted Signing or an OV certificate) - optional for early releases (SmartScreen warns without it)
+- [x] C.6 Linux glibc baseline: built on Ubuntu 22.04 (glibc 2.35: Ubuntu 22.04+, Debian 12+, Fedora 36+); Ubuntu 20.04 is past its standard support, so no older container
+- [x] C.7 Packages: .dmg (macOS), .zip (Windows; an installer later if wanted), AppImage + .deb + .tar.gz (Linux) - checked with a dry run (release-dryrun branch): the CI-built app carries all four runners and passes scripts/test_package.sh
+
+Export targets:
+- [x] X.1 Linux .deb of the editor in releases (scripts/ci/deb_editor.sh; with the AppImage and .tar.gz). Not .rpm / Flatpak: the AppImage and .tar.gz run on those distributions, and games export as AppImages
+- [x] X.2 Web polish: no worker threads on the web (textures decode on the main thread: async_decode.odin), so no COOP / COEP headers are needed; the runner is 3.2 MB of wasm (1.24 MB gzip, 0.98 MB brotli - hosts like itch.io serve it compressed)
+- [ ] X.3 Steam (roadmap 19): Steamworks as a Lua module (achievements, overlay, cloud saves); Steam Deck (gamepad-first UI, 1280x800; the Linux runner, or Windows under Proton)
+- [ ] X.4 Android (roadmap 18): NDK build, touch input, app lifecycle (pause / resume, GL context loss), assets read from the APK, signed AAB
+- [ ] X.5 iOS (roadmap 18): raylib has no official iOS backend (a fork or Metal path), Xcode project, provisioning, App Store review
+- [ ] X.6 Consoles (PS5, Xbox, Switch): not now - devkits under NDA, a renderer port per console (no raylib backends), unofficial Odin toolchains; keep the platform layer contained and the C dependencies portable
+
+Testing:
+- [x] T.1 Editor drives in the background and in parallel: hidden windows that never take the focus (editor and game `--hidden`), JOBS at a time, `# drive: serial` drives after the others (`scripts/editor_drive.sh`, VISIBLE=1 to watch)
 
 ## Phase 10 — State machines for gameplay (2026-10-23)
 
@@ -148,7 +181,14 @@ Common:
 - [x] 12 Scene transitions: (transitions + preload existed) loading screens (change_scene loading / min_time, Scene.loading_progress / loading_target, Game_ChangeSceneVia), textures decoded on worker threads (async_decode.odin; jobs owned by the decoder, abandon-safe), preload finds "texture" (it only read legacy "texture_path") and images named by properties; guide with a tutorial, tests, a real-game run
 
 Editor:
-- [ ] 13 (later - to be designed) Editor extensions / plugins in Lua
+- [x] 13 Editor plugins in Lua - designed 2026-10-25, built 13.1-13.7: editor/docs/plugins.md (project + user plugins, trust prompt + permissions, editor-only)
+  - [x] 13.1 Plugin host: discovery, plugin.json, a Lua state per plugin, protected calls, on_load / on_unload, hot reload, Settings > Plugins
+  - [x] 13.2 Trust prompt + permissions (per project, remembered)
+  - [x] 13.3 A: commands (menus, palette, keymap), selection, scene, Editor.edit undo, create / destroy, assets + Editor.fs, dialogs
+  - [x] 13.4 B: dockable panels + the `ui` widget set
+  - [x] 13.5 C: events (selection, save, import, before Play, after export, project opened)
+  - [x] 13.6 editor_api.lua definitions, Tools > New Plugin, guide + examples, drives
+  - [x] 13.7 D: inspectors, viewport overlays / handles, importers
 - [x] 14 Live remote scene tree in Play: (the Game tab's tree / text props existed) the Scene panel's Local / Remote view and the Inspector on the running game's node; typed live properties (drags, check boxes, colours, enum lists incl. script enums, ranges; throttled while dragging); enabled / visible toggles, Remove from Game, Pick (click in the game window; topmost node per layer space), amber outline of the selection in the game, Apply to Scene (undoable, Node_SetFromText); trees re-sent only when their hash changed; README, tests, drive
 - [x] 15 Multiple open scenes as tabs: a tab per open scene / component document above the viewport (reorder, unsaved dot, tooltip, context menu), per-tab camera / selection / undo, close with Save / Don't Save / Cancel (unloads the scene, frees its undo entries; closed component documents reuse their scene), Cmd+W, Cmd+Alt+Right/Left, Ctrl+PageDown/Up, Ctrl+Tab; open tabs restored per project (.ore/open_scenes.json); README, drive
 - [x] 16 Animation editor depth: (easing presets and method / sound event tracks existed) custom key curves (cubic Bezier editor with handles and presets, saved as a 7th key element, drawn on the timeline rows), method keys with an argument and a method picker from the target script, the player's animation_event signal, onion skin in the viewport (before / after counts, opacity, follows the player's own tracks, wraps looping animations); toolbar wraps in narrow panels; guide with tutorials, test, drive

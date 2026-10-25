@@ -64,7 +64,9 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 	animTimelineFocused = false // set again by the Animation tab when it has focus
 	stateGraphFocused = false   // ... and the State Machine tab
 	defer imgui.End()
-	if !imgui.Begin("Console###BottomPanelWindow") do return
+	bottomOpen := imgui.Begin("Console###BottomPanelWindow")
+	Dock_Remember(.Bottom)
+	if !bottomOpen do return
 	bottom_follow_selection(state)
 	// Tab requests (the old per-tab flags too).
 	if animTabRequest {bottomTabRequest = .Animation; animTabRequest = false}

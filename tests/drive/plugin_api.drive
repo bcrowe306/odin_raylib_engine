@@ -1,0 +1,63 @@
+# The plugin API (plugin_api.odin, docs/plugins.md): commands (menus,
+# `command`), selection, Editor.edit as one undo step, create_node, assets
+# and fs (project only), permissions, prompt dialogs; an error in a command
+# stops the plugin and removes its commands.
+exec mkdir -p $PROJECT/plugins
+exec cp -R tests/drive/fixtures/plugins/tools_zz $PROJECT/plugins/
+wait 5
+click @toolbar.settings
+click @settings.tab:plugins
+click @plugins.rescan
+click @plugins.trust.toggle
+wait 3
+expect plugin:tools_zz.state == running
+click @settings.cancel
+wait 2
+# The menus.
+click @menu:Tools
+expect item:menu:Tools/Align ZZ == visible
+key escape
+# Selection + an edit (one undo step).
+command plugin.tools_zz.select_two
+expect selection-count == 2
+command plugin.tools_zz.align_left
+command plugin.tools_zz.report
+expect plugin:tools_zz.log contains selected=2 same=true
+expect modified == true
+expect undo == 1
+command edit.undo
+# (Undo rebuilds the scene: select the two again.)
+command plugin.tools_zz.select_two
+command plugin.tools_zz.report
+expect plugin:tools_zz.log contains selected=2 same=false
+# Nodes.
+command plugin.tools_zz.add_marker
+expect node:MarkerZZ.exists == true
+expect node:MarkerZZ.position ~= 10,20
+expect selected == MarkerZZ
+# Files and permissions.
+command plugin.tools_zz.files
+expect plugin:tools_zz.log contains scenes>0=true first=scenes/
+expect plugin:tools_zz.log contains read=written by a plugin
+expect file:plugin_out_zz.txt == written by a plugin
+expect plugin:tools_zz.log contains escape=false
+expect plugin:tools_zz.log contains run=false
+expect plugin:tools_zz.log contains project=
+# A prompt.
+command plugin.tools_zz.ask
+wait 2
+expect item:plugin.dialog.input == visible
+screenshot prompt
+key ctrl+a
+type Alice
+click @plugin.dialog.ok
+wait 2
+expect plugin:tools_zz.log contains prompt=Alice
+# An error stops the plugin; its commands go.
+command plugin.tools_zz.boom
+wait 2
+expect plugin:tools_zz.state == failed
+expect plugin:tools_zz.error contains command boom
+click @menu:Tools
+expect item:menu:Tools/Align ZZ == missing
+key escape

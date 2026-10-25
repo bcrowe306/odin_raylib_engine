@@ -13,7 +13,7 @@ import lua "lua54"
 // dialogue in Subtitles mode (by itself, events), and the Lua API.
 @(test)
 test_accessibility :: proc(t: ^testing.T) {
-	dir, _ := filepath.join({os.get_env("TMPDIR", context.temp_allocator), "ore_access_test_zz"}, context.temp_allocator)
+	dir, _ := filepath.join({Engine_TempDir(), "ore_access_test_zz"}, context.temp_allocator)
 	_ = os.remove_all(dir)
 	defer os.remove_all(dir)
 	Save_SetDirectory(dir)

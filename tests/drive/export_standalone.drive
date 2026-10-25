@@ -1,7 +1,8 @@
 # Standalone export with a prebuilt runner (no compiler at export time):
 # a project icon, the executable name, Save and Export, then the exported
-# macOS app (bundle, Info.plist, icon, bundled Lua library, signature)
+# macOS app (bundle, Info.plist, icon, signature, third-party notices)
 # runs and finds its game in Resources.
+# drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 exec scripts/build_runners.sh --if-missing
 # Stand-in Linux / Windows runners (the macOS one copied) to exercise their
 # packaging here; removed at the end.
@@ -35,8 +36,10 @@ expect file:project.json contains "icon": "textures/Spaceship_1.png"
 exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/game.ore
 exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/AppIcon.icns
 exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Resources/fonts/OpenSans-Regular.ttf
-exec test -s $PROJECT_standalone/macos/SpaceGame.app/Contents/Frameworks/liblua.dylib
+# (Lua is linked statically: no shared library to ship.)
+exec test ! -e $PROJECT_standalone/macos/SpaceGame.app/Contents/Frameworks/liblua.dylib
 exec plutil -lint $PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist
+exec test -s $PROJECT_standalone/macos/THIRD_PARTY_NOTICES.txt
 expect abs-file:$PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist contains <string>SpaceGame</string>
 expect abs-file:$PROJECT_standalone/macos/SpaceGame.app/Contents/Info.plist contains com.ore.spacegame
 exec codesign --verify --deep --strict $PROJECT_standalone/macos/SpaceGame.app

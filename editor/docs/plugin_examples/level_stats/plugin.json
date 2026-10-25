@@ -1,0 +1,7 @@
+{
+  "name": "Level Stats",
+  "version": "1.0.0",
+  "description": "A panel counting the scene's nodes by type",
+  "main": "main.lua",
+  "permissions": []
+}

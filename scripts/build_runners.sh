@@ -14,11 +14,11 @@
 # ships with the game: next to the executable, or in Contents/Frameworks
 # of a macOS .app.
 #
-# macOS: Lua comes from Homebrew as a shared library; it's copied next to
-# the runner and referenced as @rpath/liblua.dylib (found next to the
-# executable or in the .app's Frameworks). The runner is universal
-# (arm64 + x86_64) when the x86_64 libraries (raylib, Box2D, Lua) are
-# installed; otherwise it's built for this Mac's architecture only.
+# Lua is linked statically (engine/lua54/lib: scripts/build_lua.sh). macOS:
+# the runner is universal (arm64 + x86_64) when the x86_64 libraries
+# (raylib, Box2D) are installed; otherwise it's built for this Mac's
+# architecture only. (A shared Lua library, if one is ever linked, is still
+# copied next to it as @rpath/liblua.dylib.)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 case "$(uname -s)" in
@@ -72,15 +72,18 @@ if [ "$platform" = macos ]; then
 	fi
 	rm -rf "$out"/*.dSYM
 elif [ "$platform" = windows ]; then
-	odin build runner -o:speed -subsystem:windows -out:"$out/$exe" "$@"
-	odin build runner -debug -out:"$out/runner-debug.exe" "$@"
+	# (Odin dev-2026-03 has crashed optimizing the runner with -o:speed on
+	# Windows CI: -o:size then.)
+	odin build runner -o:speed -subsystem:windows $(scripts/odin_flags.sh) -out:"$out/$exe" "$@" ||
+		{ echo "odin crashed at -o:speed: building with -o:size"; odin build runner -o:size -subsystem:windows $(scripts/odin_flags.sh) -out:"$out/$exe" "$@"; }
+	odin build runner -debug $(scripts/odin_flags.sh) -out:"$out/runner-debug.exe" "$@"
 	rm -f "$out"/*.pdb
-	cp "$(odin root)/vendor/lua/5.4/windows/lua54.dll" "$out/"
 else
 	odin build runner -o:speed -out:"$out/$exe" "$@"
 	odin build runner -debug -out:"$out/runner-debug" "$@"
 fi
 cp engine/Open_Sans/static/OpenSans-Regular.ttf bin/runners/
+cp licenses/THIRD_PARTY_NOTICES.txt bin/runners/ # (exports copy it next to the game)
 echo "Built $out/$exe"
 # The web runner too when emscripten is installed (scripts/build_web_runner.sh).
 if command -v emcc >/dev/null; then

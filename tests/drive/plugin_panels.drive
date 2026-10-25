@@ -1,0 +1,37 @@
+# Plugin panels (plugin_panels.odin): a panel docks on the right, its ui
+# widgets work (button, checkbox), View > Plugins lists it, show_panel hides
+# it; ui outside a panel's draw is an error that stops the plugin.
+exec mkdir -p $PROJECT/plugins
+exec cp -R tests/drive/fixtures/plugins/panel_zz $PROJECT/plugins/
+wait 5
+click @toolbar.settings
+click @settings.tab:plugins
+click @plugins.rescan
+click @plugins.trust.toggle
+wait 3
+click @settings.cancel
+wait 5
+expect plugin:panel_zz.state == running
+expect panel-open:plugin.panel_zz.stats == true
+# (Docked as a tab behind the Inspector: show_panel brings it to the front.)
+command plugin.panel_zz.show
+wait 3
+expect item:panel:plugin.panel_zz.stats:Count == visible
+click @panel:plugin.panel_zz.stats:Count
+click @panel:plugin.panel_zz.stats:Count
+wait 2
+expect plugin:panel_zz.log contains count=2
+click @panel:plugin.panel_zz.stats:Show
+wait 2
+expect plugin:panel_zz.log contains show=false
+screenshot panel
+click @menu:View
+expect item:menu:View/Plugins == visible
+key escape
+command plugin.panel_zz.hide
+wait 2
+expect panel-open:plugin.panel_zz.stats == false
+command plugin.panel_zz.bad_ui
+wait 2
+expect plugin:panel_zz.state == failed
+expect plugin:panel_zz.error contains only work inside a panel

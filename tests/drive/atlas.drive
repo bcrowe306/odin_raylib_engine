@@ -1,6 +1,7 @@
 # Sprite atlas: Atlas ticked in a texture's import settings (saved next to
 # it); exporting the .ore packs it into an atlas page; the exported game
 # runs from the package and shows the ship.
+# drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 wait 5
 click @asset:textures/Spaceship_1.png
 click @preview.import.atlas

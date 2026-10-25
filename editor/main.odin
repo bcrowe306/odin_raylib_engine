@@ -5,6 +5,8 @@ import "core:fmt"
 import "core:mem"
 import "core:log"
 import "core:os"
+import "core:slice"
+import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
 import e "../engine"
@@ -34,22 +36,40 @@ main :: proc() {
 }
 
 editor_main :: proc() -> int {
+	if slice.contains(os.args, "--version") {
+		fmt.println(e.ORE_RELEASE)
+		return 0
+	}
+	Resources_Init() // where the editor's own files are (resources.odin)
 	isTestMode := false
 	uncapped := false // --uncapped: no vsync, no frame cap (measuring; frame_timing.odin)
+	hidden := false   // --hidden: no visible window, never focused (background test drives)
 	for arg in os.args {
 		if arg == "--test-e2e" || arg == "--drive" do isTestMode = true
 		if arg == "--uncapped" do uncapped = true
+		if arg == "--hidden" do hidden = true
 	}
 
 	// 1. Configure and Initialize Raylib Window
-	if isTestMode || uncapped {
-		rl.SetConfigFlags({.WINDOW_RESIZABLE})
-	} else {
-		rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
-	}
-	rl.InitWindow(1600, 900, "Odin Raylib Engine - Game Editor")
+	flags: rl.ConfigFlags = {.WINDOW_RESIZABLE}
+	if !isTestMode && !uncapped do flags += {.VSYNC_HINT}
+	if hidden do flags += {.WINDOW_HIDDEN, .WINDOW_UNFOCUSED}
+	rl.SetConfigFlags(flags)
+	rl.InitWindow(1600, 900, strings.clone_to_cstring(fmt.tprintf("Ore Editor %s", e.ORE_RELEASE), context.temp_allocator))
 	defer rl.CloseWindow()
+	{
+		// The editor's icon (editor/assets/icon.png, embedded).
+		ICON :: #load("assets/icon.png")
+		icon := rl.LoadImageFromMemory(".png", raw_data(ICON), c.int(len(ICON)))
+		if icon.data != nil {
+			rl.SetWindowIcon(icon)
+			rl.UnloadImage(icon)
+		}
+	}
 	e.Render_InitBatching() // fewer GPU stalls on batch flushes (batching.odin)
+	// The engine's font (in-game UI text in the viewport), as the game loads it.
+	e.InitEngineFonts(strings.clone_to_cstring(Resources_EngineFont(), context.temp_allocator))
+	defer e.UnloadEngineFonts()
 	defer e.Render_ReleaseBatching()
 	rl.SetTargetFPS(60)
 	if uncapped do FrameTiming_SetUncapped(true, false)
@@ -92,6 +112,9 @@ editor_main :: proc() -> int {
 	Editor_LoadSettings(&GlobalEditor)
 	Lua_ProjectSetup(&GlobalEditor) // .ore/definitions + .luarc.json for Lua tooling
 	defer Editor_Shutdown(&GlobalEditor)
+	Plugins_Load(&GlobalEditor) // project + user plugins (plugins.odin)
+	defer Plugins_Unload(&GlobalEditor)
+	UpdateCheck_Start() // a newer release? (update_check.odin; off in development builds)
 
 
 	// 5. Main Application Loop
@@ -104,6 +127,8 @@ editor_main :: proc() -> int {
 		NativeDialog_Poll(&GlobalEditor)
 		Lua_UpdateProjectTypes(&GlobalEditor)
 		Code_ApplyPendingNodeProp(&GlobalEditor) // a node property dropped into a properties table
+		UpdateCheck_Poll(&GlobalEditor)
+		Plugins_Update(&GlobalEditor) // hot reload, failed plugins closed
 		e.MemTrack_Frame()
 		if n := e.Shader_CheckForChanges(); n > 0 do Editor_Log(&GlobalEditor, .Info, "Reloaded %d changed shader(s)", n)
 		e.ResourceManager_CheckForChanges(&GlobalEditor.game.resourceManager) // edited images
@@ -219,6 +244,7 @@ editor_main :: proc() -> int {
 			e.Prof_Begin("ui.preview")
 			PreviewPanel_Render(&GlobalEditor)
 			e.Prof_End()
+			PluginPanels_Render(&GlobalEditor) // plugins' panels (plugin_panels.odin)
 		}
 
 		// Modals & Popups
@@ -240,6 +266,8 @@ editor_main :: proc() -> int {
 		Signals_Render(&GlobalEditor)
 		NodeRefs_Render(&GlobalEditor) // update script references after a rename / move
 		AssetImport_Render(&GlobalEditor)
+		Plugins_TrustPrompt(&GlobalEditor)
+		PluginAPI_Dialogs(&GlobalEditor)
 
 		// Files dropped from the OS (after the panels: their rects are current).
 		Editor_HandleFileDrops(&GlobalEditor)

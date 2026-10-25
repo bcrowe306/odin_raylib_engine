@@ -1,0 +1,6 @@
+{
+  "name": "Hello ZZ",
+  "version": "1.2.3",
+  "description": "A test plugin (tests/drive/plugins.drive)",
+  "main": "main.lua"
+}

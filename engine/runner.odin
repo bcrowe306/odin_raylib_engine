@@ -35,6 +35,10 @@ Run_Options :: struct {
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
 // --hidden, --dump-scene, --user-data, --bench, --uncapped and --no-render-cache. A bare argument is taken as the project.
 Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
+	for a in args do if a == "--version" {
+		fmt.println(ORE_RELEASE)
+		os.exit(0)
+	}
 	for i := 0; i < len(args); i += 1 {
 		arg := args[i]
 		next := args[i + 1] if i + 1 < len(args) else ""
@@ -110,7 +114,9 @@ runner_font_path :: proc() -> cstring {
 	exeDir := filepath.dir(os.args[0], context.temp_allocator)
 	nextTo, _ := filepath.join({exeDir, "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
 	inApp, _ := filepath.join({exeDir, "..", "Resources", "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
-	for f in ([]string{nextTo, inApp}) do if os.is_file(f) do return strings.clone_to_cstring(f, context.temp_allocator)
+	// (The editor's runners/<platform>/runner, played from the editor: the font is in runners/.)
+	inRunners, _ := filepath.join({exeDir, "..", "OpenSans-Regular.ttf"}, context.temp_allocator)
+	for f in ([]string{nextTo, inApp, inRunners}) do if os.is_file(f) do return strings.clone_to_cstring(f, context.temp_allocator)
 	return dev
 }
 
@@ -205,13 +211,20 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 	if video.msaa do flags += {.MSAA_4X_HINT}
 	if video.highDPI do flags += {.WINDOW_HIGHDPI}
 	if opts.hidden {
-		flags += {.WINDOW_HIDDEN}
+		flags += {.WINDOW_HIDDEN, .WINDOW_UNFOCUSED} // (never takes the focus)
 	}
 	rl.SetConfigFlags(flags)
 	rl.SetTraceLogLevel(.ERROR) // raylib warns once per oversized icon glyph (thousands of lines)
 	when ODIN_OS == .JS do rl.SetTraceLogLevel(.WARNING) // (the browser console: shader / GL problems)
 	titleC := strings.clone_to_cstring(winTitle, context.temp_allocator)
 	rl.InitWindow(winW, winH, titleC)
+	if !rl.IsWindowReady() {
+		// (No OpenGL 3.3 context: a machine without a GPU / display - raylib
+		// would crash on the next window call.)
+		log.errorf("Could not open the game window (OpenGL 3.3 is needed)")
+		Runner_Stop(rs)
+		return nil, false
+	}
 	rs.windowOpen = true
 	// Fullscreen (project Video, Engine.set_fullscreen): applied from the
 	// first frames on (Runner_ApplyFullscreen); the frame scales to the window.
@@ -234,6 +247,10 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 		return nil, false
 	}
 	if video.icon != "" do Runner_SetWindowIcon(game, video.icon)
+	// A project saved by a newer editor may use what this runner lacks.
+	if !Version_IsDev(ORE_RELEASE) && !Version_IsDev(video.engineVersion) && Version_Compare(video.engineVersion, ORE_RELEASE) > 0 {
+		log.warnf("This project was saved by Ore %s; this runner is %s - update the editor (and re-export) if something is missing", video.engineVersion, ORE_RELEASE)
+	}
 	// (Loading the project applies its target FPS: uncapped runs undo it.)
 	if opts.uncapped do rl.SetTargetFPS(0)
 

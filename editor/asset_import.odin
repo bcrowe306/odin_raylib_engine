@@ -130,7 +130,13 @@ Asset_IsHighlighted :: proc(rel: string) -> bool {
 // Asset_OpenImportDialog: system file dialog for assets (multi-select).
 // `only` limits the filter to one kind's extensions (e.g. {"ldtk"}).
 Asset_OpenImportDialog :: proc(state: ^EditorState, only: []string = nil, title := "Import Assets") {
-	exts := only if len(only) > 0 else IMPORT_EXTS
+	exts := only
+	if len(exts) == 0 {
+		all := make([dynamic]string, context.temp_allocator)
+		append(&all, ..IMPORT_EXTS)
+		append(&all, ..PluginImporters_Exts()) // (plugin_extend.odin)
+		exts = all[:]
+	}
 	// Opens where the last import came from.
 	NativeDialog_Open(state, {title = title, filter = "Assets", exts = exts, multiple = true, start = Editor_StartDir(.Import)}, proc(state: ^EditorState, paths: []string) {
 		Editor_RememberDir(.Import, paths[0])
@@ -273,6 +279,23 @@ import_folder :: proc(state: ^EditorState, dir, sub: string, out: ^[dynamic]stri
 import_file :: proc(state: ^EditorState, src, sub: string) -> (string, bool) {
 	name := filepath.base(src)
 	dir, supported := Asset_ImportDir(name)
+	if !supported && os.exists(src) {
+		// A plugin's importer (plugin_extend.odin)?
+		data, rerr := os.read_entire_file(src, context.temp_allocator)
+		if rerr != nil do return fail(state, src, fmt.tprintf("could not read (%v)", rerr))
+		if files, why, found := PluginImporters_Run(state, name, data); found {
+			if why != "" do return fail(state, src, why)
+			for f in files {
+				full, _ := filepath.join({state.projectPath, f.rel}, context.temp_allocator)
+				_ = os.make_directory_all(filepath.dir(full, context.temp_allocator))
+				if werr := os.write_entire_file(full, f.data); werr != nil do return fail(state, src, fmt.tprintf("could not write %s (%v)", f.rel, werr))
+				report_add(src, f.rel, .Imported, "")
+				Editor_Log(state, .Info, "Imported %s -> %s", name, f.rel)
+				_, _ = PluginEvents_Emit(state, "asset_imported", f.rel)
+			}
+			return files[0].rel, true
+		}
+	}
 	if !supported {
 		ext := filepath.ext(name)
 		return fail(state, src, fmt.tprintf("unsupported file type (%s)", ext if ext != "" else "no extension"))
@@ -313,6 +336,7 @@ import_file :: proc(state: ^EditorState, src, sub: string) -> (string, bool) {
 	renamed := filepath.base(rel) != name
 	report_add(src, rel, .Imported, fmt.tprintf("renamed to %s (a different %s exists)", filepath.base(rel), name) if renamed else "")
 	Editor_Log(state, .Info, "Imported %s -> %s", name, rel)
+	_, _ = PluginEvents_Emit(state, "asset_imported", rel) // (plugin_events.odin)
 	return rel, true
 }
 

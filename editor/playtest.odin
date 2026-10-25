@@ -3,6 +3,7 @@ package editor
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
+import "core:slice"
 import "core:strings"
 import "core:time"
 import e "../engine"
@@ -13,21 +14,25 @@ import e "../engine"
 //
 // Play always runs what is in the editor:
 //   1. every modified scene is saved first (the game reads scene files);
-//   2. if any engine/game source is newer than the game binary, the binary is
-//      rebuilt first (`odin build .`), asynchronously, with progress in the
-//      console - so code changes are never silently ignored either;
+//   2. the game is this platform's prebuilt runner (the one export ships;
+//      no compiler needed). In a source checkout it's the engine's game
+//      build instead, rebuilt first (`odin build .`, asynchronously, with
+//      progress in the console) when an engine source is newer - so engine
+//      changes are never silently ignored either;
 //   3. the game starts with `--project <dir>` (+ `--scene <file>` for Play
 //      Current Scene); its stdout/stderr stream into the editor console.
 // ============================================================================
 
-GAME_BINARY :: "bin/odin_raylib_engine"
-
-// Editor_GameBinary: the game Play runs (ORE_GAME_BIN overrides: drives
-// running beside another run use their own build).
+// Editor_GameBinary: the game Play runs (temp) - ORE_GAME_BIN (drives running
+// beside another run use their own build), else in a source checkout the
+// engine's game build (bin/odin_raylib_engine), else this platform's
+// prebuilt runner ("" = none).
 Editor_GameBinary :: proc() -> string {
 	if v := os.get_env("ORE_GAME_BIN", context.temp_allocator); v != "" do return v
-	return GAME_BINARY
+	if Resources_InCheckout() do return Resource_Path("bin", "odin_raylib_engine.exe" when ODIN_OS == .Windows else "odin_raylib_engine")
+	return Editor_FindRunner(e.native_export_target())
 }
+// The game build's sources (in a source checkout).
 GAME_SOURCE_DIRS :: [?]string{".", "engine", "asteroids"}
 
 Play_Mode :: enum {
@@ -43,6 +48,13 @@ Editor_PlayRequest :: proc(state: ^EditorState, mode: Play_Mode, scene := "") {
 	}
 	if state.buildRunning {
 		Editor_Log(state, .Warn, "Build already in progress...")
+		return
+	}
+
+	// Plugins may stop it (validation: before_play returning false, reason).
+	target := (scene if scene != "" else state.activeScenePath) if mode == .CurrentScene else state.projectConfig.initialScene
+	if ok, reason := PluginEvents_Emit(state, "before_play", target); !ok {
+		Editor_Log(state, .Warn, "Play cancelled: %s", reason)
 		return
 	}
 
@@ -72,12 +84,14 @@ Editor_PlayRequest :: proc(state: ^EditorState, mode: Play_Mode, scene := "") {
 
 // Editor_GameBinaryIsStale reports whether the game binary is missing or
 // older than any .odin source it is built from.
+// (Only in a source checkout: an installed editor plays its runner as is.)
 Editor_GameBinaryIsStale :: proc() -> (reason: string, stale: bool) {
+	if !Resources_InCheckout() do return "", false
 	binInfo, err := os.stat(Editor_GameBinary(), context.temp_allocator)
 	if err != nil do return "binary missing", true
 	binTime := binInfo.modification_time
 	for dir in GAME_SOURCE_DIRS {
-		h, oerr := os.open(dir)
+		h, oerr := os.open(Resource_Path(dir))
 		if oerr != nil do continue
 		infos, _ := os.read_dir(h, -1, context.temp_allocator)
 		os.close(h)
@@ -92,7 +106,7 @@ Editor_GameBinaryIsStale :: proc() -> (reason: string, stale: bool) {
 }
 
 Editor_StartGameBuild :: proc(state: ^EditorState) -> bool {
-	_ = os.make_directory("bin")
+	_ = os.make_directory(Resource_Path("bin"))
 	return Editor_StartBuild(state, {"odin", "build", ".", strings.concatenate({"-out:", Editor_GameBinary()}, context.temp_allocator)}, .Game)
 }
 
@@ -106,6 +120,8 @@ Editor_StartBuild :: proc(state: ^EditorState, command: []string, kind: Build_Ki
 		command = command,
 		stdout  = w,
 		stderr  = w,
+		// (Builds only happen in a source checkout: its sources and scripts.)
+		working_dir = editorResources.root if Resources_InCheckout() else "",
 	}
 	p, err := os.process_start(desc)
 	os.close(w)
@@ -157,13 +173,15 @@ Editor_UpdatePlaytest :: proc(state: ^EditorState) {
 
 Editor_LaunchGame :: proc(state: ^EditorState) {
 	exePath := Editor_GameBinary()
-	if !os.exists(exePath) && os.exists("./odin_raylib_engine") {
-		exePath = "./odin_raylib_engine"
+	if exePath == "" || !os.exists(exePath) {
+		Editor_Log(state, .Error, "No %s runner to play the game with: it ships in runners/%s/ next to the editor (scripts/build_runners.sh builds one)", e.export_target_name(e.native_export_target()), e.export_target_name(e.native_export_target()))
+		return
 	}
 	CodeRuntime_Clear() // the last run's script problems
 	cmd := make([dynamic]string, context.temp_allocator)
 	append(&cmd, exePath, "--project", state.projectPath, "--editor-link")
 	if state.userDataDir != "" do append(&cmd, "--user-data", state.userDataDir)
+	if slice.contains(os.args, "--hidden") do append(&cmd, "--hidden") // (a background test drive: the game hidden too)
 	if state.pendingPlayScene != "" {
 		append(&cmd, "--scene", state.pendingPlayScene)
 	}
@@ -317,6 +335,7 @@ Editor_SaveSceneDocument :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 	// The running game picks the saved scene up (restarting it if current).
 	if RemoteGame_Connected() do RemoteGame_Send(fmt.tprintf("reload-scene %s", scene.filePath))
 	Editor_Log(state, .Info, "Saved %s", scene.filePath)
+	_, _ = PluginEvents_Emit(state, "scene_saved", scene.filePath) // (plugin_events.odin)
 	return true
 }
 

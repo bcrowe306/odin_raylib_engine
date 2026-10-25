@@ -1,0 +1,7 @@
+{
+  "name": "Align Tools",
+  "version": "1.0.0",
+  "description": "Align and distribute the selected nodes",
+  "main": "main.lua",
+  "permissions": []
+}

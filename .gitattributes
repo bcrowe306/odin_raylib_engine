@@ -1,0 +1,28 @@
+# Text files keep LF line endings on every platform (a Windows checkout with
+# core.autocrlf would turn them into CRLF: byte-for-byte round trips, #load-ed
+# files and shell scripts break).
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.qoi binary
+*.ttf binary
+*.otf binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.flac binary
+*.qoa binary
+*.xm binary
+*.mod binary
+*.ore binary
+*.a binary
+*.lib binary
+*.dll binary
+*.dylib binary
+*.so binary
+*.icns binary
+*.ico binary
+*.wasm binary
