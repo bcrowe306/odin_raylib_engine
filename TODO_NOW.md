@@ -26,8 +26,7 @@ out of scope here.
 - [x] 3.1 Prebuilt runners per platform shipped with the editor; export copies the runner + `.ore` (no compiler needed), name and icon
 - [x] 3.2 macOS `.app` bundle (Info.plist, icon, `.ore` in Resources, universal binary); optional codesign/notarize step
 - [x] 3.3 Windows packaging (icon, version info, no console in release); Linux AppImage
-- [ ] 3.4 Web (emscripten): raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio
-  - **Blocked (2026-10-22), needs your go-ahead:** emscripten isn't installed (and the vendored `raylib/wasm` folder is empty, so raylib and Lua need web builds from source); `core:os` panics on js/wasm, so the engine needs a filesystem layer for its ~80 `os.` calls; and the engine imports `ui/`, whose `native_dialog.odin` uses `posix.popen` (not on wasm) - that file needs a `#+build !js` tag or a wasm stub, which is your code.
+- [x] 3.4 Web (emscripten): raylib + Box2D + Lua to wasm, `.ore` preloaded, click-to-start audio (done as roadmap 5: the prebuilt web runner; `web_export` drive)
 - [x] 3.5 Export presets per target (icon, version, window, include/exclude, debug/release) in `project.json`
 
 ## Phase 4 — Performance (single-threaded)
