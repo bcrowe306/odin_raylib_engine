@@ -72,8 +72,8 @@ if [ "$platform" = macos ]; then
 	fi
 	rm -rf "$out"/*.dSYM
 elif [ "$platform" = windows ]; then
-	odin build runner -o:speed -subsystem:windows -out:"$out/$exe" "$@"
-	odin build runner -debug -out:"$out/runner-debug.exe" "$@"
+	odin build runner -o:speed -subsystem:windows $(scripts/odin_flags.sh) -out:"$out/$exe" "$@"
+	odin build runner -debug $(scripts/odin_flags.sh) -out:"$out/runner-debug.exe" "$@"
 	rm -f "$out"/*.pdb
 else
 	odin build runner -o:speed -out:"$out/$exe" "$@"

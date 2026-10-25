@@ -54,14 +54,14 @@ jobs:
         run: |
           mkdir -p bin
           ext=""; [ "$RUNNER_OS" = Windows ] && ext=.exe
-          odin build editor -out:bin/editor$ext
-          odin build . -out:bin/odin_raylib_engine$ext
+          odin build editor $(scripts/odin_flags.sh) -out:bin/editor$ext
+          odin build . $(scripts/odin_flags.sh) -out:bin/odin_raylib_engine$ext
           scripts/build_runners.sh
 
       - name: Unit tests
         run: |
-          odin test engine -define:ODIN_TEST_THREADS=1
-          odin test ui -define:ODIN_TEST_THREADS=1
+          odin test engine -define:ODIN_TEST_THREADS=1 $(scripts/odin_flags.sh)
+          odin test ui -define:ODIN_TEST_THREADS=1 $(scripts/odin_flags.sh)
 
       - name: Smoke test (the runner plays the demo project)
         if: matrix.smoke

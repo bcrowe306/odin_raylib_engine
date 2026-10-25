@@ -17,9 +17,6 @@
 // project/ directory) next to the executable.
 package main
 
-// (vendor:raylib first: on Windows raylib.lib must come before User32.lib on the
-// link line, or rl.CloseWindow / ShowCursor resolve to Win32's and collide.)
-@(require) import "vendor:raylib"
 import "core:fmt"
 import "core:log"
 import os "../engine/osx"

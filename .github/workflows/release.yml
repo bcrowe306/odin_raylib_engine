@@ -104,8 +104,9 @@ jobs:
         shell: bash
     env:
       VERSION: ${{ needs.version.outputs.version }}
-      # (Secrets can't be tested in a step's `if`: a flag.)
+      # (Secrets can't be tested in a step's `if`: flags.)
       HAS_MACOS_CERT: ${{ secrets.MACOS_CERTIFICATE != '' }}
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE != '' }}
     steps:
       - uses: actions/checkout@v4
       - run: git submodule update --init --depth 1 ui odin_editor ldtk
@@ -140,6 +141,13 @@ jobs:
           MACOS_NOTARY_PASSWORD: ${{ secrets.MACOS_NOTARY_PASSWORD }}
         run: scripts/ci/sign_macos.sh "dist/$APP_NAME.app"
 
+      - name: Sign (Windows, with a code-signing certificate)
+        if: runner.os == 'Windows' && env.HAS_WINDOWS_CERT == 'true'
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: scripts/ci/sign_windows.sh dist/ore-editor-windows
+
       - name: Archive
         run: |
           base="ore-editor-$VERSION-${{ matrix.platform }}"
@@ -148,7 +156,9 @@ jobs:
             linux)
               tar -C dist -czf "$base.tar.gz" ore-editor-linux
               scripts/ci/appimage_editor.sh "$VERSION" dist
-              mv "dist/Ore_Editor-$VERSION-x86_64.AppImage" "$base-x86_64.AppImage" ;;
+              mv "dist/Ore_Editor-$VERSION-x86_64.AppImage" "$base-x86_64.AppImage"
+              scripts/ci/deb_editor.sh "$VERSION" dist
+              mv dist/ore-editor_*_amd64.deb "$base-amd64.deb" ;;
             windows) (cd dist && 7z a -bd "../$base.zip" ore-editor-windows > /dev/null) ;;
           esac
           ls -la ore-editor-*

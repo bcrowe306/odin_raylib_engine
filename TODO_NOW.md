@@ -138,8 +138,8 @@ CI/CD (GitHub Actions):
 - [ ] C.7 Packages: .dmg (macOS), installer (Inno Setup) or zip (Windows), AppImage + .tar.gz (Linux)
 
 Export targets:
-- [ ] X.1 Linux .deb / .rpm / Flatpak (low priority: AppImage + .tar.gz cover games)
-- [ ] X.2 Web polish: download size; worker threads need cross-origin isolation (COOP / COEP headers): fall back to decoding on the main thread
+- [x] X.1 Linux .deb of the editor in releases (scripts/ci/deb_editor.sh; with the AppImage and .tar.gz). Not .rpm / Flatpak: the AppImage and .tar.gz run on those distributions, and games export as AppImages
+- [x] X.2 Web polish: no worker threads on the web (textures decode on the main thread: async_decode.odin), so no COOP / COEP headers are needed; the runner is 3.2 MB of wasm (1.24 MB gzip, 0.98 MB brotli - hosts like itch.io serve it compressed)
 - [ ] X.3 Steam (roadmap 19): Steamworks as a Lua module (achievements, overlay, cloud saves); Steam Deck (gamepad-first UI, 1280x800; the Linux runner, or Windows under Proton)
 - [ ] X.4 Android (roadmap 18): NDK build, touch input, app lifecycle (pause / resume, GL context loss), assets read from the APK, signed AAB
 - [ ] X.5 iOS (roadmap 18): raylib has no official iOS backend (a fork or Metal path), Xcode project, provisioning, App Store review

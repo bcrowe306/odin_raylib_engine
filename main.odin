@@ -1,13 +1,11 @@
 package main
 
-// (vendor:raylib first: on Windows raylib.lib must come before User32.lib on the
-// link line, or rl.CloseWindow / ShowCursor resolve to Win32's and collide.)
-import rl "vendor:raylib"
 import "core:log"
 import "core:math"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
+import rl "vendor:raylib"
 import "asteroids"
 import e "engine"
 
