@@ -1,0 +1,13 @@
+{"name": "main", "background": [30, 30, 40, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "Node", "name": "Game", "script": {"path": "scripts/players.lua"}},
+ {"type": "CameraNode", "name": "Camera", "position": [160, 90], "properties": {"isCurrent": true}},
+ {"type": "TextNode", "name": "Log", "position": [10, 10], "properties": {"text": "", "fontSize": 16}},
+ {"type": "TextNode", "name": "Jumps", "position": [10, 30], "properties": {"text": "", "fontSize": 16}},
+ {"type": "TextNode", "name": "Dashes", "position": [10, 50], "properties": {"text": "", "fontSize": 16}},
+ {"type": "TextNode", "name": "Stick", "position": [10, 70], "properties": {"text": "", "fontSize": 16}},
+ {"type": "TextNode", "name": "Rumble", "position": [10, 90], "properties": {"text": "", "fontSize": 16}},
+ {"type": "TextNode", "name": "Devices", "position": [10, 110], "properties": {"text": "", "fontSize": 16}},
+ {"type": "TextNode", "name": "Count", "position": [10, 130], "properties": {"text": "", "fontSize": 16}},
+ {"type": "TextureNode", "name": "Prompt", "position": [240, 60]},
+ {"type": "TextureNode", "name": "Prompt1", "position": [240, 130]}
+]}}

@@ -207,7 +207,7 @@ REBIND_AXIS_PUSH :: 0.6
 Input_RebindUpdate :: proc(input: ^InputSystem) -> (done: bool) {
 	if !rl.IsWindowReady() do return false
 	pad := input.gamepadIndex
-	padOk := rl.IsGamepadAvailable(pad)
+	padOk := pad >= 0 && pad < MAX_PADS && rl.IsGamepadAvailable(pad)
 	// The last device (for prompts / glyphs).
 	if rl.IsMouseButtonPressed(.LEFT) do input.rebind.lastDevice = .Keyboard_Mouse
 	else do for k in 32 ..< 350 do if rl.IsKeyPressed(rl.KeyboardKey(k)) {input.rebind.lastDevice = .Keyboard_Mouse; break}
@@ -440,7 +440,6 @@ Input_DeleteUserBindings :: proc() {
 // Input.listen(action [, {slot, device, conflicts, cancel, on_done}]) / Input.is_listening() / Input.cancel_listen()
 // Input.reset_bindings([action]) / Input.save_bindings() / Input.find_conflicts(binding) / Input.last_device()
 
-@(private = "file")
 lua_input :: proc(L: ^lua.State) -> ^InputSystem {
 	sm := get_script_manager(L)
 	return &sm.game.input if sm != nil && sm.game != nil else nil

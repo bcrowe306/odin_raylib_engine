@@ -170,7 +170,16 @@ texture_load :: proc(rm: ^ResourceManager, filePath: string, own: bool) -> (text
 	}
 
 	texture2d: rl.Texture2D
-	if Ase_IsPath(filePath) {
+	if strings.has_prefix(filePath, PROMPTS_PREFIX) {
+		// A button prompt (input_glyphs.odin).
+		img, ok := Prompt_Image(filePath)
+		if !ok {
+			log.errorf("No button prompt %s", filePath)
+			return nil, false
+		}
+		if rl.IsWindowReady() do texture2d = rl.LoadTextureFromImage(img)
+		rl.UnloadImage(img)
+	} else if Ase_IsPath(filePath) {
 		// An Aseprite file: its first frame (aseprite_resource.odin).
 		img, ok := ase_texture_image(rm, filePath)
 		if !ok do return nil, false

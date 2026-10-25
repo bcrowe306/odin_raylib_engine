@@ -79,6 +79,8 @@ jobs:
           xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner
           # Aseprite files played by the runner (AsepriteNode, Aseprite tilemaps).
           xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/aseprite/runtime_tests.json
+          # Gamepads (simulated): players, hot-plug, rumble, prompts.
+          xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/gamepads/runtime_tests.json
 
       - name: Crash reports (the runner and the editor crash for real)
         if: matrix.smoke

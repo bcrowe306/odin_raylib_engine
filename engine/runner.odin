@@ -35,12 +35,21 @@ Run_Options :: struct {
 	trace:          string, // --trace <node name>: print "@trace <frame> <scene> <x> <y>" every frame (game tests, bots)
 }
 
-// An --input-script event: `key` goes down / up at `frame`.
+// An --input-script event: `key` goes down / up at `frame`; pad events
+// (pad >= 0) press a button, move an axis, or plug a simulated pad in / out.
 Input_Script_Event :: struct {
-	frame: int,
-	key:   rl.KeyboardKey,
-	down:  bool,
+	frame:  int,
+	key:    rl.KeyboardKey,
+	down:   bool,
+	pad:    i32, // -1: a key
+	kind:   Input_Script_Pad,
+	button: rl.GamepadButton,
+	axis:   rl.GamepadAxis,
+	value:  f32,
+	name:   string, // connect
 }
+
+Input_Script_Pad :: enum u8 {Button, Axis, Connect, Disconnect}
 
 // Runner_LoadInputScript reads an input script - one event per line:
 //
@@ -49,7 +58,14 @@ Input_Script_Event :: struct {
 //   90       RIGHT  up
 //   100      SPACE  tap 8        (down at 100, up 8 frames later; default 2)
 //
-// Keys are raylib key names as in project.json bindings (SPACE, LEFT, A, ...).
+//   # gamepads (simulated): pad1..pad4
+//   5        pad2   connect Xbox Wireless Controller   (the name: the rest)
+//   20       pad2   RIGHT_FACE_DOWN tap 5               (buttons: down / up / tap)
+//   30       pad2   LEFT_X 1.0                           (axes: a value, kept)
+//   60       pad2   disconnect
+//
+// Keys are raylib key names as in project.json bindings (SPACE, LEFT, A, ...),
+// pad buttons / axes raylib's (RIGHT_FACE_DOWN, LEFT_X, ...).
 // The frames are the runner's (fixed 1/60 s steps with --frames /
 // --dump-scene / --screenshot), so a script plays the same every time.
 Runner_LoadInputScript :: proc(text: string, allocator := context.allocator) -> (events: [dynamic]Input_Script_Event, err: string) {
@@ -61,19 +77,76 @@ Runner_LoadInputScript :: proc(text: string, allocator := context.allocator) -> 
 		f := strings.fields(line, context.temp_allocator)
 		if len(f) < 3 do return events, fmt.tprintf("line %d: want <frame> <key> down|up|tap", n + 1)
 		frame, fok := strconv.parse_int(f[0])
+		if !fok do return events, fmt.tprintf("line %d: bad frame %q", n + 1, f[0])
+		if lower := strings.to_lower(f[1], context.temp_allocator); len(lower) == 4 && strings.has_prefix(lower, "pad") && lower[3] >= '1' && lower[3] <= '4' {
+			pad := i32(lower[3] - '1')
+			ev := Input_Script_Event{frame = frame, pad = pad}
+			switch {
+			case f[2] == "connect":
+				ev.kind = .Connect
+				name := "Simulated Gamepad"
+				if len(f) >= 4 do name = strings.trim_space(line[strings.index(line, "connect") + len("connect"):])
+				ev.name = strings.clone(name, allocator)
+				append(&events, ev)
+			case f[2] == "disconnect":
+				ev.kind = .Disconnect
+				append(&events, ev)
+			case:
+				if b, ok := enum_parse(rl.GamepadButton, f[2]); ok {
+					ev.kind, ev.button = .Button, b
+					if len(f) < 4 do return events, fmt.tprintf("line %d: want down|up|tap after %s", n + 1, f[2])
+					switch f[3] {
+					case "down": ev.down = true; append(&events, ev)
+					case "up": append(&events, ev)
+					case "tap":
+						hold := 2
+						if len(f) >= 5 do hold, _ = strconv.parse_int(f[4])
+						ev.down = true
+						append(&events, ev)
+						ev.down = false
+						ev.frame = frame + max(hold, 1)
+						append(&events, ev)
+					case: return events, fmt.tprintf("line %d: %q is not down / up / tap", n + 1, f[3])
+					}
+				} else if a, aok := enum_parse(rl.GamepadAxis, f[2]); aok {
+					if len(f) < 4 do return events, fmt.tprintf("line %d: want a value after %s", n + 1, f[2])
+					v, vok := strconv.parse_f32(f[3])
+					if !vok do return events, fmt.tprintf("line %d: bad axis value %q", n + 1, f[3])
+					ev.kind, ev.axis, ev.value = .Axis, a, v
+					append(&events, ev)
+				} else {
+					return events, fmt.tprintf("line %d: %q is not connect / disconnect / a pad button or axis", n + 1, f[2])
+				}
+			}
+			continue
+		}
 		key, kok := parse_keyboard_key(strings.to_upper(f[1], context.temp_allocator))
-		if !fok || !kok do return events, fmt.tprintf("line %d: bad frame or key %q", n + 1, f[1])
+		if !kok do return events, fmt.tprintf("line %d: bad frame or key %q", n + 1, f[1])
 		switch f[2] {
-		case "down": append(&events, Input_Script_Event{frame, key, true})
-		case "up": append(&events, Input_Script_Event{frame, key, false})
+		case "down": append(&events, Input_Script_Event{frame = frame, key = key, down = true, pad = -1})
+		case "up": append(&events, Input_Script_Event{frame = frame, key = key, down = false, pad = -1})
 		case "tap":
 			hold := 2
 			if len(f) >= 4 do hold, _ = strconv.parse_int(f[3])
-			append(&events, Input_Script_Event{frame, key, true}, Input_Script_Event{frame + max(hold, 1), key, false})
+			append(&events, Input_Script_Event{frame = frame, key = key, down = true, pad = -1}, Input_Script_Event{frame = frame + max(hold, 1), key = key, down = false, pad = -1})
 		case: return events, fmt.tprintf("line %d: %q is not down / up / tap", n + 1, f[2])
 		}
 	}
 	return events, ""
+}
+
+// Runner_ApplyInputEvent plays an --input-script event.
+Runner_ApplyInputEvent :: proc(input: ^InputSystem, ev: Input_Script_Event) {
+	if ev.pad < 0 {
+		Input_SetSimulatedKey(input, ev.key, ev.down)
+		return
+	}
+	switch ev.kind {
+	case .Connect: Input_SimulatePad(input, ev.pad, true, ev.name)
+	case .Disconnect: Input_SimulatePad(input, ev.pad, false)
+	case .Button: Input_SimulatePadButton(input, ev.pad, ev.button, ev.down)
+	case .Axis: Input_SimulatePadAxis(input, ev.pad, ev.axis, ev.value)
+	}
 }
 
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
@@ -374,7 +447,7 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 	if game.shouldQuit do return false
 	{
 		dt := 1.0 / 60 if rs.fixedStep else rl.GetFrameTime()
-		for ev in rs.inputEvents do if ev.frame == rs.frameCount do Input_SetSimulatedKey(&game.input, ev.key, ev.down)
+		for ev in rs.inputEvents do if ev.frame == rs.frameCount do Runner_ApplyInputEvent(&game.input, ev)
 		EditorLink_BeginFrame(game)
 		if game.linkPaused && !game.frozen do dt = 1.0 / 60 // a step
 
@@ -496,6 +569,7 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 // Runner_Stop frees the game, its window and everything the runner made.
 Runner_Stop :: proc(rs: ^Runner_State) {
 	if rs == nil do return
+	for ev in rs.inputEvents do if ev.kind == .Connect && ev.pad >= 0 do delete(ev.name)
 	delete(rs.inputEvents)
 	Pixel_Release()
 	if rs.fontsLoaded do UnloadEngineFonts()

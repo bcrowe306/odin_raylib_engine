@@ -48,6 +48,38 @@ Settings_State :: struct {
 	listening:  bool, // capturing a key for the selected action
 	pickDevice: e.InputDeviceType,
 	pickFilter: [32]u8,
+	promptFamily: int, // the pad whose button prompts are shown (PROMPT_FAMILIES)
+}
+
+@(private = "file")
+PROMPT_FAMILIES := [?]string{"xbox", "playstation", "switch", "steamdeck"}
+
+// The button prompts shown next to bindings (engine input_glyphs.odin),
+// loaded once.
+@(private = "file")
+promptTextures: map[string]rl.Texture2D
+
+@(private = "file")
+prompt_icon :: proc(b: e.InputBinding, size: f32) {
+	family := "keyboard" if b.deviceType == .KeyboardKey || b.deviceType == .MouseButton else PROMPT_FAMILIES[clamp(st.promptFamily, 0, len(PROMPT_FAMILIES) - 1)]
+	path := e.Binding_Glyph(b, family)
+	tex, ok := promptTextures[path]
+	if !ok && path != "" {
+		if img, found := e.Prompt_Image(path); found {
+			tex = rl.LoadTextureFromImage(img)
+			rl.SetTextureFilter(tex, .BILINEAR)
+			rl.UnloadImage(img)
+		}
+		if promptTextures == nil do promptTextures = make(map[string]rl.Texture2D)
+		promptTextures[strings.clone(path)] = tex
+	}
+	if tex.id == 0 {
+		imgui.Dummy({size, size})
+		return
+	}
+	imgui.Image(transmute(imgui.TextureID)&promptTextures[path], {size, size})
+	Drive_Item(fmt.tprintf("settings.prompt:%s", path))
+	UI_Tooltip(path)
 }
 
 @(private = "file")
@@ -690,9 +722,18 @@ project_input :: proc(state: ^EditorState) {
 			a := &d.actions[st.action]
 			UI_PanelTitle(ICON_FA_BOLT, a.name)
 			imgui.Dummy({0, 4})
+			imgui.AlignTextToFramePadding()
+			UI_DimText("Prompts")
+			imgui.SameLine(0, 6)
+			imgui.SetNextItemWidth(140)
+			if idx, changed := UI_Combo("settings.prompt-family", st.promptFamily, []string{"Xbox", "PlayStation", "Switch", "Steam Deck"}); changed do st.promptFamily = idx
+			UI_Tooltip("The button images games get from Input.glyph(action) - for this pad (and the keyboard)")
+			imgui.Dummy({0, 4})
 			remove := -1
 			for &b, bi in a.bindings {
 				imgui.PushIDInt(c.int(bi))
+				prompt_icon(b, 26)
+				imgui.SameLine(0, 6)
 				names := []string{"None", "Key", "Mouse", "Gamepad Button", "Gamepad Axis"}
 				imgui.SetNextItemWidth(140)
 				if idx, changed := UI_Combo(fmt.tprintf("settings.binding-device:%d", bi), int(b.deviceType), names); changed {

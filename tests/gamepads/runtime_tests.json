@@ -1,0 +1,264 @@
+[
+ {
+  "name": "hot-plug: connected / disconnected events per player, devices by name",
+  "project": "tests/gamepads/project",
+  "frames": 34,
+  "input": [
+   "5 pad2 connect DualSense Wireless Controller",
+   "10 pad2 RIGHT_FACE_DOWN tap 3",
+   "12 pad2 LEFT_X -1",
+   "14 pad2 RIGHT_FACE_RIGHT tap 3",
+   "16 K tap 2",
+   "20 pad3 connect Xbox Wireless Controller",
+   "22 pad3 RIGHT_FACE_DOWN tap 3",
+   "30 pad3 disconnect"
+  ],
+  "expect": [
+   [
+    "Log",
+    "text",
+    "==",
+    "+2:playstation +3:xbox -3 "
+   ],
+   [
+    "Devices",
+    "text",
+    "==",
+    "keyboard playstation none none"
+   ],
+   [
+    "Count",
+    "text",
+    "==",
+    "2"
+   ]
+  ]
+ },
+ {
+  "name": "each player's pad drives only that player (built-in + project actions; the keyboard is player 1's)",
+  "project": "tests/gamepads/project",
+  "frames": 34,
+  "input": [
+   "5 pad2 connect DualSense Wireless Controller",
+   "10 pad2 RIGHT_FACE_DOWN tap 3",
+   "12 pad2 LEFT_X -1",
+   "14 pad2 RIGHT_FACE_RIGHT tap 3",
+   "16 K tap 2",
+   "20 pad3 connect Xbox Wireless Controller",
+   "22 pad3 RIGHT_FACE_DOWN tap 3",
+   "30 pad3 disconnect"
+  ],
+  "expect": [
+   [
+    "Jumps",
+    "text",
+    "==",
+    "0 1 1 0"
+   ],
+   [
+    "Dashes",
+    "text",
+    "==",
+    "1 1 0 0"
+   ]
+  ]
+ },
+ {
+  "name": "player 2's stick: get_vector / get_axis with a player",
+  "project": "tests/gamepads/project",
+  "frames": 34,
+  "input": [
+   "5 pad2 connect DualSense Wireless Controller",
+   "10 pad2 RIGHT_FACE_DOWN tap 3",
+   "12 pad2 LEFT_X -1",
+   "14 pad2 RIGHT_FACE_RIGHT tap 3",
+   "16 K tap 2",
+   "20 pad3 connect Xbox Wireless Controller",
+   "22 pad3 RIGHT_FACE_DOWN tap 3",
+   "30 pad3 disconnect"
+  ],
+  "expect": [
+   [
+    "Stick",
+    "text",
+    "==",
+    "-1.0 0.0 -1.0"
+   ]
+  ]
+ },
+ {
+  "name": "rumble: player 2's jump vibrates its pad for 0.25 s",
+  "project": "tests/gamepads/project",
+  "frames": 18,
+  "input": [
+   "5 pad2 connect DualSense Wireless Controller",
+   "10 pad2 RIGHT_FACE_DOWN tap 3",
+   "12 pad2 LEFT_X -1",
+   "14 pad2 RIGHT_FACE_RIGHT tap 3",
+   "16 K tap 2",
+   "20 pad3 connect Xbox Wireless Controller",
+   "22 pad3 RIGHT_FACE_DOWN tap 3",
+   "30 pad3 disconnect"
+  ],
+  "expect": [
+   [
+    "Rumble",
+    "text",
+    "==",
+    "0.50 1.00"
+   ]
+  ]
+ },
+ {
+  "name": "rumble stops after its seconds",
+  "project": "tests/gamepads/project",
+  "frames": 34,
+  "input": [
+   "5 pad2 connect DualSense Wireless Controller",
+   "10 pad2 RIGHT_FACE_DOWN tap 3",
+   "12 pad2 LEFT_X -1",
+   "14 pad2 RIGHT_FACE_RIGHT tap 3",
+   "16 K tap 2",
+   "20 pad3 connect Xbox Wireless Controller",
+   "22 pad3 RIGHT_FACE_DOWN tap 3",
+   "30 pad3 disconnect"
+  ],
+  "expect": [
+   [
+    "Rumble",
+    "text",
+    "==",
+    "0.00 0.00"
+   ]
+  ]
+ },
+ {
+  "name": "prompts: player 2's jump on a DualSense (Cross), player 1 on the keyboard (Space)",
+  "project": "tests/gamepads/project",
+  "frames": 34,
+  "input": [
+   "5 pad2 connect DualSense Wireless Controller",
+   "10 pad2 RIGHT_FACE_DOWN tap 3",
+   "12 pad2 LEFT_X -1",
+   "14 pad2 RIGHT_FACE_RIGHT tap 3",
+   "16 K tap 2",
+   "20 pad3 connect Xbox Wireless Controller",
+   "22 pad3 RIGHT_FACE_DOWN tap 3",
+   "30 pad3 disconnect"
+  ],
+  "expect": [
+   [
+    "Prompt",
+    "texture",
+    "==",
+    "prompts:playstation/playstation_button_cross"
+   ],
+   [
+    "Prompt1",
+    "texture",
+    "==",
+    "prompts:keyboard/keyboard_space"
+   ]
+  ]
+ },
+ {
+  "name": "player 1 picks up a Switch pad: its prompts (B is the bottom button); a key: the keyboard's again",
+  "project": "tests/gamepads/project",
+  "frames": 20,
+  "input": [
+   "3 pad1 connect Nintendo Switch Pro Controller",
+   "6 pad1 RIGHT_FACE_DOWN tap 3"
+  ],
+  "expect": [
+   [
+    "Prompt1",
+    "texture",
+    "==",
+    "prompts:switch/switch_button_b"
+   ],
+   [
+    "Devices",
+    "text",
+    "==",
+    "switch none none none"
+   ],
+   [
+    "Jumps",
+    "text",
+    "==",
+    "1 0 0 0"
+   ]
+  ]
+ },
+ {
+  "name": "... and back to the keyboard prompt after a key",
+  "project": "tests/gamepads/project",
+  "frames": 20,
+  "input": [
+   "3 pad1 connect Nintendo Switch Pro Controller",
+   "6 pad1 RIGHT_FACE_DOWN tap 3",
+   "12 SPACE tap 2"
+  ],
+  "expect": [
+   [
+    "Prompt1",
+    "texture",
+    "==",
+    "prompts:keyboard/keyboard_space"
+   ],
+   [
+    "Devices",
+    "text",
+    "==",
+    "keyboard none none none"
+   ]
+  ]
+ },
+ {
+  "name": "a template's menus with a controller: the Adventure title, D-pad down + A (Continue: no save yet)",
+  "project": "templates/adventure",
+  "frames": 60,
+  "input": [
+   "2 pad1 connect Xbox Wireless Controller",
+   "10 pad1 LEFT_FACE_DOWN tap",
+   "20 pad1 RIGHT_FACE_DOWN tap"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "title"
+   ],
+   [
+    "Item2",
+    "text",
+    "contains",
+    "no save yet"
+   ]
+  ]
+ },
+ {
+  "name": "... and A on New game starts level 1",
+  "project": "templates/adventure",
+  "frames": 90,
+  "input": [
+   "2 pad1 connect Xbox Wireless Controller",
+   "10 pad1 RIGHT_FACE_DOWN tap"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "level1"
+   ],
+   [
+    "Player",
+    "exists",
+    "==",
+    true
+   ]
+  ]
+ }
+]
