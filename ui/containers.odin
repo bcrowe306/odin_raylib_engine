@@ -232,8 +232,8 @@ RenderTabContainer :: proc(
 
 			// Tab Text
 			tColor := rl.WHITE if isActive else rl.Color{170, 175, 190, 255}
-			textW := MeasureTextStr(tabNames[i], 13).x
-			DrawTextStr(tabNames[i], tabR.x + (tabR.width - textW) * 0.5, tabR.y + (tabSize - 13) * 0.5, 13, tColor)
+			textW := MeasureTextStr(tabNames[i], 15).x
+			DrawTextStr(tabNames[i], tabR.x + (tabR.width - textW) * 0.5, tabR.y + (tabSize - 15) * 0.5, 15, tColor)
 		}
 
 		contentRect.y += tabSize
@@ -267,7 +267,7 @@ RenderTabContainer :: proc(
 
 			// Tab Text
 			tColor := rl.WHITE if isActive else rl.Color{170, 175, 190, 255}
-			DrawTextStr(tabNames[i], tabR.x + 14, tabR.y + (tabH - 13) * 0.5, 13, tColor)
+			DrawTextStr(tabNames[i], tabR.x + 14, tabR.y + (tabH - 15) * 0.5, 15, tColor)
 		}
 
 		contentRect.x += tabSize
@@ -306,11 +306,14 @@ GuiTabBar :: proc(
 		tabW := bounds.width / f32(max(tabCount, 1))
 		for i := 0; i < tabCount; i += 1 {
 			tabR := rl.Rectangle{bounds.x + f32(i) * tabW, bounds.y, tabW, tabSize}
-			if isClick && PointInRect(mousePos, tabR) {
-				ImmediateNav_SetFocus(key)
-				if activeTab^ != i {
-					activeTab^ = i
-					changed = true
+			if PointInRect(mousePos, tabR) {
+				SetUICursor(.POINTING_HAND, .Hover)
+				if isClick {
+					ImmediateNav_SetFocus(key)
+					if activeTab^ != i {
+						activeTab^ = i
+						changed = true
+					}
 				}
 			}
 		}
@@ -322,11 +325,14 @@ GuiTabBar :: proc(
 		tabH := min(bounds.height / f32(max(tabCount, 1)), 44.0)
 		for i := 0; i < tabCount; i += 1 {
 			tabR := rl.Rectangle{bounds.x, bounds.y + f32(i) * tabH, tabSize, tabH}
-			if isClick && PointInRect(mousePos, tabR) {
-				ImmediateNav_SetFocus(key)
-				if activeTab^ != i {
-					activeTab^ = i
-					changed = true
+			if PointInRect(mousePos, tabR) {
+				SetUICursor(.POINTING_HAND, .Hover)
+				if isClick {
+					ImmediateNav_SetFocus(key)
+					if activeTab^ != i {
+						activeTab^ = i
+						changed = true
+					}
 				}
 			}
 		}

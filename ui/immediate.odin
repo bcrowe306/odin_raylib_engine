@@ -206,8 +206,11 @@ GuiButton :: proc(
 	inClip := IsMouseInClipRect(mousePt)
 	blocked := IsBlockedByImmediateDropdown(0, mousePt)
 	hovered := inClip && !blocked && PointInRect(mousePt, rect)
-	if hovered && IsUIMouseButtonPressed(.LEFT) {
-		ImmediateNav_SetFocus(key)
+	if hovered {
+		SetUICursor(.POINTING_HAND, .Hover)
+		if IsUIMouseButtonPressed(.LEFT) {
+			ImmediateNav_SetFocus(key)
+		}
 	}
 	isDown := hovered && IsUIMouseButtonDown(.LEFT)
 	keyTrigger := isFocused && (IsUIKeyPressed(.ENTER) || IsUIKeyPressed(.KP_ENTER) || IsUIKeyPressed(.SPACE))
@@ -219,7 +222,7 @@ GuiButton :: proc(
 	borderCol := rl.Color{110, 168, 254, 255} if (isSelected || isFocused) else rl.Color{68, 73, 86, 255}
 	textCol := rl.Color{240, 242, 248, 255}
 
-	fontSize: f32 = clamp(rect.height - 6, 12, 15)
+	fontSize: f32 = DEFAULT_FONT_SIZE if rect.height >= 26 else DEFAULT_FONT_SIZE_SM
 	RenderButton(
 		rect,
 		string(text),
@@ -273,7 +276,7 @@ GuiSlider :: proc(
 		if labelWidth > 0 {
 			lw = labelWidth
 		} else if labelWidth == 0 {
-			lw = MeasureText(labelLeft, 13).x + 12
+			lw = MeasureText(labelLeft, DEFAULT_FONT_SIZE).x + 12
 		}
 	}
 
@@ -283,11 +286,11 @@ GuiSlider :: proc(
 
 	if hasLabel {
 		if labelWidth < 0 {
-			measured := MeasureText(labelLeft, 13)
+			measured := MeasureText(labelLeft, DEFAULT_FONT_SIZE)
 			labelX := rect.x - measured.x - 8
-			DrawText(labelLeft, labelX, rect.y + (rect.height - 13) * 0.5, 13, rl.Color{205, 210, 222, 255})
+			DrawText(labelLeft, labelX, rect.y + (rect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{205, 210, 222, 255})
 		} else {
-			DrawText(labelLeft, rect.x + 2, rect.y + (rect.height - 13) * 0.5, 13, rl.Color{205, 210, 222, 255})
+			DrawText(labelLeft, rect.x + 2, rect.y + (rect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{205, 210, 222, 255})
 		}
 	}
 
@@ -296,7 +299,17 @@ GuiSlider :: proc(
 		ImmediateNav_SetFocus(key)
 	}
 
-	shiftHeld := IsUIKeyDown(.LEFT_SHIFT) || IsUIKeyDown(.RIGHT_SHIFT)
+	if st.isDragging {
+		SetUICursor(.RESIZE_EW, .Dragging)
+	} else if inClip && !blocked {
+		if PointInRect(mousePt, valBoxRect) {
+			SetUICursor(.IBEAM, .Hover)
+		} else if PointInRect(mousePt, trackRect) || (showReset && PointInRect(mousePt, resetRect)) {
+			SetUICursor(.POINTING_HAND, .Hover)
+		}
+	}
+
+		shiftHeld := IsUIKeyDown(.LEFT_SHIFT) || IsUIKeyDown(.RIGHT_SHIFT)
 	ctrlHeld := rl.IsKeyDown(.LEFT_CONTROL) || rl.IsKeyDown(.RIGHT_CONTROL)
 	fineMode := shiftHeld && (st.isDragging || hovered)
 
@@ -375,8 +388,9 @@ GuiSlider :: proc(
 		} else if PointInRect(mousePt, trackRect) {
 			st.isDragging = true
 			st.dragLastMouseX = mousePt.x
-			if !shiftHeld && trackRect.width > 1 {
-				t := clamp((mousePt.x - trackRect.x) / trackRect.width, 0.0, 1.0)
+			usableWidth := max(trackRect.width - 4.0, 1.0)
+			if !shiftHeld && usableWidth > 1 {
+				t := clamp((mousePt.x - (trackRect.x + 2.0)) / usableWidth, 0.0, 1.0)
 				v := minValue + t * (maxValue - minValue)
 				if isInteger do v = math.round(v)
 				value^ = clamp(v, minValue, maxValue)
@@ -388,20 +402,23 @@ GuiSlider :: proc(
 	if st.isDragging {
 		if !IsUIMouseButtonDown(.LEFT) || IsUIMouseButtonReleased(.LEFT) {
 			st.isDragging = false
-		} else if trackRect.width > 1 {
-			dx := mousePt.x - st.dragLastMouseX
-			st.dragLastMouseX = mousePt.x
-			if abs(dx) > 0.0001 {
-				range := maxValue - minValue
-				v := value^
-				if shiftHeld {
-					v += (dx / trackRect.width) * range * 0.1
-				} else {
-					t := clamp((mousePt.x - trackRect.x) / trackRect.width, 0.0, 1.0)
-					v = minValue + t * range
+		} else {
+			usableWidth := max(trackRect.width - 4.0, 1.0)
+			if usableWidth > 1 {
+				dx := mousePt.x - st.dragLastMouseX
+				st.dragLastMouseX = mousePt.x
+				if abs(dx) > 0.0001 {
+					range := maxValue - minValue
+					v := value^
+					if shiftHeld {
+						v += (dx / usableWidth) * range * 0.1
+					} else {
+						t := clamp((mousePt.x - (trackRect.x + 2.0)) / usableWidth, 0.0, 1.0)
+						v = minValue + t * range
+					}
+					if isInteger do v = math.round(v)
+					value^ = clamp(v, minValue, maxValue)
 				}
-				if isInteger do v = math.round(v)
-				value^ = clamp(v, minValue, maxValue)
 			}
 		}
 	}
@@ -422,6 +439,9 @@ GuiSlider :: proc(
 		st.isEditingText,
 		string(st.editBuffer[:st.editLen]),
 		focused = isFocused,
+		customTrackRect = trackRect,
+		customValBoxRect = valBoxRect,
+		customResetRect = resetRect,
 	)
 
 	return abs(value^ - oldVal) > 0.00001
@@ -443,10 +463,11 @@ GuiCheckBox :: proc(rect: rl.Rectangle, text: cstring, checked: ^bool, idKey: ui
 	blocked := IsBlockedByImmediateDropdown(key, mousePt)
 
 	labelStr := string(text) if text != nil else ""
-	labelW := MeasureText(text, 13).x + 12 if (text != nil && len(text) > 0) else 0
+	labelW := MeasureText(text, DEFAULT_FONT_SIZE).x + 12 if (text != nil && len(text) > 0) else 0
 	hitRect := rl.Rectangle{rect.x, rect.y, rect.width + labelW, max(rect.height, 18)}
 
 	hovered := inClip && !blocked && PointInRect(mousePt, hitRect)
+	if hovered do SetUICursor(.POINTING_HAND, .Hover)
 	toggled := false
 	if hovered && IsUIMouseButtonPressed(.LEFT) {
 		ImmediateNav_SetFocus(key)
@@ -457,7 +478,8 @@ GuiCheckBox :: proc(rect: rl.Rectangle, text: cstring, checked: ^bool, idKey: ui
 		toggled = true
 	}
 
-	RenderCheckbox(rect, labelStr, checked^, hovered, {59, 130, 246, 255}, min(rect.width, rect.height), focused = isFocused)
+	t := GetTheme()
+	RenderCheckbox(rect, labelStr, checked^, hovered, t.accent, 14, focused = isFocused)
 	return toggled
 }
 
@@ -506,6 +528,7 @@ GuiDropdownBox :: proc(
 
 	isOpen := immediateDropdown.active && immediateDropdown.key == key
 	hovered := inClip && !blocked && PointInRect(mousePt, rect)
+	if hovered || isOpen do SetUICursor(.POINTING_HAND, .Hover)
 	clickedBox := false
 
 	if isFocused {
@@ -846,15 +869,16 @@ GuiToggleSwitch :: proc(bounds: rl.Rectangle, text: cstring, active: ^bool, idKe
 	isFocused := ImmediateNav_IsFocused(key)
 
 	mousePos := GetUIMousePosition()
-	trackH := min(bounds.height, 22.0)
-	trackW := trackH * 1.8
+	trackW: f32 = 28.0
+	labelW := MeasureText(text, DEFAULT_FONT_SIZE).x + 12 if (text != nil && len(text) > 0) else 0
 	clickableRect := rl.Rectangle{
 		bounds.x,
 		bounds.y,
-		trackW + (MeasureText(text, 14).x + 8 if text != nil else 0),
+		max(bounds.width, trackW + labelW + 8),
 		bounds.height,
 	}
 	hovered := PointInRect(mousePos, clickableRect)
+	if hovered do SetUICursor(.POINTING_HAND, .Hover)
 
 	clicked := false
 	if hovered && IsUIMouseButtonPressed(.LEFT) {
@@ -1065,7 +1089,7 @@ GuiListView :: proc(
 
 		txtCol := rl.WHITE if isSelected else rl.Color{215, 220, 230, 255}
 		cstr := fmt.ctprint(items[i])
-		DrawText(cstr, itemRect.x + 8, itemRect.y + (itemHeight - 13) * 0.5, 13, txtCol)
+		DrawText(cstr, itemRect.x + 8, itemRect.y + (itemHeight - 15) * 0.5, 15, txtCol)
 	}
 
 	if isFocused {
@@ -1244,6 +1268,7 @@ GuiTextInput :: proc(
 	inClip := IsMouseInClipRect(mousePt)
 	blocked := IsBlockedByImmediateDropdown(key, mousePt)
 	hovered := inClip && !blocked && PointInRect(mousePt, rect)
+	if hovered || isFocused do SetUICursor(.IBEAM, .Interact)
 
 	if hovered && IsUIMouseButtonPressed(.LEFT) {
 		ImmediateNav_SetFocus(key)
@@ -1784,5 +1809,68 @@ GuiNotchedSlider :: proc(
 
 	labelStr := string(label) if label != nil else ""
 	RenderNotchedSlider(rect, labelStr, value^, minValue, maxValue, numNotches, notchLabels, orientation, hovered, isDragging, focused = isFocused, fineMode = fineAdjust, snappedNotch = snappedNotch)
+	return changed
+}
+
+
+// ============================================================================
+// 12. Custom Immediate-Mode Radio Group
+// ============================================================================
+GuiRadioGroup :: proc(
+	rect: rl.Rectangle,
+	label: string,
+	options: []string,
+	selectedIndex: ^int,
+	horizontal: bool = false,
+	idKey: uintptr = 0,
+) -> bool {
+	if !rl.IsWindowReady() || selectedIndex == nil do return false
+	key := idKey if idKey != 0 else uintptr(selectedIndex)
+	ImmediateNav_RegisterFocusable(key, rect)
+	isFocused := ImmediateNav_IsFocused(key)
+
+	changed := false
+	count := len(options)
+	mousePos := GetUIMousePosition()
+	mp := [2]f32{mousePos.x, mousePos.y}
+
+	hoveredOpt := -1
+	for i in 0..<count {
+		optRect := GetRadioGroupOptionRect(rect, label != "", 110, count, horizontal, i)
+		if PointInRect(mp, optRect) {
+			hoveredOpt = i
+			if IsUIMouseButtonPressed(.LEFT) {
+				ImmediateNav_SetFocus(key)
+				if selectedIndex^ != i {
+					selectedIndex^ = i
+					changed = true
+				}
+			}
+		}
+	}
+
+	if hoveredOpt != -1 do SetUICursor(.POINTING_HAND, .Hover)
+
+	if isFocused && count > 0 {
+		if horizontal {
+			if IsUIKeyPressed(.LEFT) {
+				selectedIndex^ = (selectedIndex^ - 1 + count) % count
+				changed = true
+			} else if IsUIKeyPressed(.RIGHT) {
+				selectedIndex^ = (selectedIndex^ + 1) % count
+				changed = true
+			}
+		} else {
+			if IsUIKeyPressed(.UP) {
+				selectedIndex^ = (selectedIndex^ - 1 + count) % count
+				changed = true
+			} else if IsUIKeyPressed(.DOWN) {
+				selectedIndex^ = (selectedIndex^ + 1) % count
+				changed = true
+			}
+		}
+	}
+
+	RenderRadioGroup(rect, label, 110, options, selectedIndex^, hoveredOpt, horizontal, isFocused)
 	return changed
 }

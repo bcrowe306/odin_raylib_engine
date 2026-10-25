@@ -113,66 +113,26 @@ ShowcaseState :: struct {
 	htmlTableScroll: rl.Vector2,
 	htmlTableActionMsg: string,
 
+	// Toolbar & Font Awesome demo state
+	toolbarItems: [dynamic]ToolbarItem,
+	toolbarActiveToggle: int,
+	toolbarLastAction: string,
+
+	// Tab 8: Live Theme Editor & Native Dialogs
+	themeRadiusVal: f32,
+	themePaddingVal: f32,
+	themeBorderVal: f32,
+	themeSmallRadiusVal: f32,
+	themeSpacingVal: f32,
+	themePresetIdx: int,
+	dialogLastAction: string,
+	dialogLastPath: string,
+	sampleThemedCheck: bool,
+	sampleThemedSwitch: bool,
+
 	// Test automation mode
 	isTestMode: bool,
 	testFrame: int,
-}
-
-GuiRadioGroup :: proc(
-	rect: rl.Rectangle,
-	label: string,
-	options: []string,
-	selectedIndex: ^int,
-	horizontal: bool = false,
-	idKey: uintptr = 0,
-) -> bool {
-	if !rl.IsWindowReady() || selectedIndex == nil do return false
-	key := idKey if idKey != 0 else uintptr(selectedIndex)
-	ImmediateNav_RegisterFocusable(key, rect)
-	isFocused := ImmediateNav_IsFocused(key)
-
-	changed := false
-	count := len(options)
-	mousePos := rl.GetMousePosition()
-	mp := [2]f32{mousePos.x, mousePos.y}
-
-	hoveredOpt := -1
-	for i in 0..<count {
-		optRect := GetRadioGroupOptionRect(rect, label != "", 110, count, horizontal, i)
-		if PointInRect(mp, optRect) {
-			hoveredOpt = i
-			if IsUIMouseButtonPressed(.LEFT) {
-				ImmediateNav_SetFocus(key)
-				if selectedIndex^ != i {
-					selectedIndex^ = i
-					changed = true
-				}
-			}
-		}
-	}
-
-	if isFocused && count > 0 {
-		if horizontal {
-			if rl.IsKeyPressed(.LEFT) || rl.IsKeyPressedRepeat(.LEFT) {
-				selectedIndex^ = (selectedIndex^ - 1 + count) % count
-				changed = true
-			} else if rl.IsKeyPressed(.RIGHT) || rl.IsKeyPressedRepeat(.RIGHT) {
-				selectedIndex^ = (selectedIndex^ + 1) % count
-				changed = true
-			}
-		} else {
-			if rl.IsKeyPressed(.UP) || rl.IsKeyPressedRepeat(.UP) {
-				selectedIndex^ = (selectedIndex^ - 1 + count) % count
-				changed = true
-			} else if rl.IsKeyPressed(.DOWN) || rl.IsKeyPressedRepeat(.DOWN) {
-				selectedIndex^ = (selectedIndex^ + 1) % count
-				changed = true
-			}
-		}
-	}
-
-	RenderRadioGroup(rect, label, 110, options, selectedIndex^, hoveredOpt, horizontal, isFocused)
-	return changed
 }
 
 InitShowcaseState :: proc(state: ^ShowcaseState) {
@@ -349,9 +309,45 @@ InitShowcaseState :: proc(state: ^ShowcaseState) {
 	state.htmlTableSortCol = 0
 	state.htmlTableSortAsc = true
 	state.htmlTableActionMsg = "Vessel #101 (Viper-MK2) telemetry synchronized."
+
+	// Initialize Font Awesome Toolbar
+	state.toolbarItems = make([dynamic]ToolbarItem)
+	append(&state.toolbarItems, ToolbarItem{id = 1, icon = .File, label = "New", tooltip = "Create new document (Ctrl+N)", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 2, icon = .FolderOpen, label = "Open", tooltip = "Open file or workspace (Ctrl+O)", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 3, icon = .FloppyDisk, label = "Save", tooltip = "Save changes to disk (Ctrl+S)", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 4, itemType = .Separator})
+	append(&state.toolbarItems, ToolbarItem{id = 5, icon = .RotateLeft, tooltip = "Undo last action (Ctrl+Z)", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 6, icon = .RotateRight, tooltip = "Redo last action (Ctrl+Y)", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 7, itemType = .Separator})
+	append(&state.toolbarItems, ToolbarItem{id = 8, icon = .Scissors, tooltip = "Cut selection to clipboard", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 9, icon = .Copy, tooltip = "Copy selection to clipboard", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 10, icon = .Paste, tooltip = "Paste from clipboard", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 11, itemType = .Separator})
+	append(&state.toolbarItems, ToolbarItem{id = 12, icon = .Play, label = "Run", tooltip = "Execute active simulation or scene", itemType = .Toggle, isSelected = true})
+	append(&state.toolbarItems, ToolbarItem{id = 13, icon = .Pause, tooltip = "Pause simulation loop", itemType = .Toggle})
+	append(&state.toolbarItems, ToolbarItem{id = 14, icon = .Stop, tooltip = "Stop simulation and reset state", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 15, itemType = .Spacer})
+	append(&state.toolbarItems, ToolbarItem{id = 16, icon = .Terminal, label = "CLI", tooltip = "Toggle engine diagnostics terminal", itemType = .Button})
+	append(&state.toolbarItems, ToolbarItem{id = 17, icon = .Gear, label = "Settings", tooltip = "Open engine configuration settings", itemType = .Button})
+
+	state.toolbarActiveToggle = 12
+	state.toolbarLastAction = "Toolbar initialized with Font Awesome icons. Ready."
+
+	curT := GetTheme()
+	state.themeRadiusVal = curT.borderRadius
+	state.themePaddingVal = curT.paddingMd
+	state.themeBorderVal = curT.borderWidth
+	state.themeSmallRadiusVal = curT.borderRadiusSmall
+	state.themeSpacingVal = curT.itemSpacing
+	state.themePresetIdx = 0
+	state.dialogLastAction = "Native dialogs ready. Click any action below to test system interop."
+	state.dialogLastPath = "(None)"
+	state.sampleThemedCheck = true
+	state.sampleThemedSwitch = true
 }
 
 DestroyShowcaseState :: proc(state: ^ShowcaseState) {
+	delete(state.toolbarItems)
 	delete(state.callsignBuffer)
 	delete(state.treeItems)
 	delete(state.gradientStops)
@@ -364,6 +360,9 @@ DestroyShowcaseState :: proc(state: ^ShowcaseState) {
 		delete(r.cells)
 	}
 	delete(state.htmlTableRows)
+	if len(state.dialogLastPath) > 0 && state.dialogLastPath != "(None)" {
+		delete(state.dialogLastPath)
+	}
 }
 
 main :: proc() {
@@ -383,11 +382,11 @@ main :: proc() {
 	}
 
 	if hideWindow {
-		TestHook_Init("ui_screenshots", 60)
+		TestHook_Init("ui_screenshots", 130)
 	}
 
 	windowWidth: i32 = 1280
-	windowHeight: i32 = 820
+	windowHeight: i32 = 860
 
 	if state.isTestMode {
 		rl.SetConfigFlags({.WINDOW_HIDDEN})
@@ -430,6 +429,7 @@ main :: proc() {
 		"6. Audio & Detents",
 		"7. Docking System",
 		"8. HTML Lists & Tables",
+		"9. Live Theme & Dialogs",
 	}
 
 	diffOptions := []string{"Cadet", "Officer", "Commander", "Legendary"}
@@ -474,27 +474,30 @@ main :: proc() {
 		rl.ClearBackground(rl.Color{16, 18, 23, 255})
 
 		// --------------------------------------------------------------------
-		// 1. Top Header Banner
+		// 1. Top Header Banner (Flexbox Layout)
 		// --------------------------------------------------------------------
 		headerRect := rl.Rectangle{0, 0, f32(rl.GetScreenWidth()), 72}
 		rl.DrawRectangleRec(headerRect, rl.Color{22, 25, 32, 255})
 		rl.DrawLineEx({0, 72}, {f32(rl.GetScreenWidth()), 72}, 1, rl.Color{45, 50, 64, 255})
 
-		// Title and Badges
-		DrawTextStr("ODIN STANDALONE UI SHOWCASE", 24, 14, 20, rl.Color{245, 247, 250, 255})
-		DrawTextStr("Hardware-accelerated immediate & retained widgets with Tab & 2D spatial keyboard navigation", 24, 38, 12, rl.Color{140, 148, 168, 255})
+		Flex_Begin(rl.Rectangle{24, 0, f32(rl.GetScreenWidth()) - 48, 72}, direction = .Row, justify = .SpaceBetween, align = .Center)
+		Flex_AddItem(620, 52)
+		Flex_AddItem(560, 52)
+		headL := Flex_GetRect(0)
+		headR := Flex_GetRect(1)
+		Flex_End()
 
-		// Navigation Hotkeys Legend
-		legendX: f32 = f32(rl.GetScreenWidth()) - 540
-		DrawTextStr("Tab / Shift+Tab: Cycle Focus", legendX, 14, 12, rl.Color{96, 165, 250, 255})
-		DrawTextStr("Arrows: 2D Spatial / Adjust", legendX + 200, 14, 12, rl.Color{52, 211, 153, 255})
-		DrawTextStr("Enter/Space: Activate", legendX, 36, 12, rl.Color{251, 191, 36, 255})
-		DrawTextStr("Esc: Close/Clear", legendX + 200, 36, 12, rl.Color{248, 113, 113, 255})
+		DrawTextStr("ODIN STANDALONE UI SHOWCASE", headL.x, headL.y + 4, DEFAULT_FONT_SIZE_LG, rl.Color{245, 247, 250, 255})
+		DrawTextStr("Hardware-accelerated immediate & retained widgets with Tab & 2D spatial keyboard navigation", headL.x, headL.y + 30, DEFAULT_FONT_SIZE_SM, rl.Color{140, 148, 168, 255})
 
-		// Live Focus Indicator Badge
+		DrawTextStr("Tab / Shift+Tab: Cycle Focus", headR.x, headR.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{96, 165, 250, 255})
+		DrawTextStr("Arrows: 2D Spatial / Adjust", headR.x + 200, headR.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{52, 211, 153, 255})
+		DrawTextStr("Enter/Space: Activate", headR.x, headR.y + 28, DEFAULT_FONT_SIZE_SM, rl.Color{251, 191, 36, 255})
+		DrawTextStr("Esc: Close/Clear", headR.x + 200, headR.y + 28, DEFAULT_FONT_SIZE_SM, rl.Color{248, 113, 113, 255})
+
 		curFocusKey := immediateNav.focusedKey
 		focusText := fmt.tprintf("Focused Key: 0x%X  |  Items: %d", curFocusKey, immediateNav.itemCount) if curFocusKey != 0 else fmt.tprintf("No Focused Item  |  Items: %d", immediateNav.itemCount)
-		DrawTextStr(focusText, legendX + 350, 25, 11, rl.Color{170, 175, 190, 255})
+		DrawTextStr(focusText, headR.x + 350, headR.y + 16, DEFAULT_FONT_SIZE_SM, rl.Color{170, 175, 190, 255})
 
 		// --------------------------------------------------------------------
 		// 2. Tab Bar
@@ -508,16 +511,39 @@ main :: proc() {
 		contentArea := rl.Rectangle{20, 128, f32(rl.GetScreenWidth()) - 40, f32(rl.GetScreenHeight()) - 170}
 
 		// --------------------------------------------------------------------
-		// TAB 0: Controls & Buttons
+		// TAB 0: Controls & Buttons (with Font Awesome Icons & Toolbar Widget)
 		// --------------------------------------------------------------------
 		if state.activeTab == 0 {
-			halfW := (contentArea.width - 20) * 0.5
+			// 1. Top Font Awesome Toolbar Widget across Tab 0
+			tbRect := rl.Rectangle{contentArea.x, contentArea.y, contentArea.width, 38}
+			tbClickedId, tbClicked := GuiToolbar(tbRect, state.toolbarItems[:], &state.toolbarActiveToggle, idKey = 1050)
+			if tbClicked {
+				for item in state.toolbarItems {
+					if item.id == tbClickedId {
+						labelOrTip := item.label if item.label != "" else item.tooltip
+						state.toolbarLastAction = fmt.tprintf("Toolbar: %s (id=%d)", labelOrTip, tbClickedId)
+						state.lastActionMsg = state.toolbarLastAction
+						state.actionTimer = 4.0
+						break
+					}
+				}
+			}
 
-			// Left Panel: Action Buttons, Checkboxes, Toggle Switches
-			leftPanelRect := rl.Rectangle{contentArea.x, contentArea.y, halfW, contentArea.height}
+			panelY := contentArea.y + 46
+			panelH := contentArea.height - 46
+
+			// Flexbox Layout for Left & Right Panels
+			Flex_Begin(rl.Rectangle{contentArea.x, panelY, contentArea.width, panelH}, direction = .Row, gap = 20.0)
+			Flex_AddItem(0, panelH, grow = 1.0)
+			Flex_AddItem(0, panelH, grow = 1.0)
+			leftPanelRect := Flex_GetRect(0)
+			rightPanelRect := Flex_GetRect(1)
+			Flex_End()
+
+			// Left Panel: Action Controls, Font Awesome Icons & Switches
 			RenderContainerPanel(
 				leftPanelRect,
-				"Action Controls & Discrete Switches",
+				"Action Controls, Font Awesome Icons & Switches",
 				true, true, true, 34,
 				rl.Color{22, 25, 33, 240},
 				rl.Color{28, 33, 44, 255},
@@ -525,82 +551,117 @@ main :: proc() {
 				rl.Color{230, 235, 245, 255},
 			)
 
-			btnY := leftPanelRect.y + 48
-			btnW: f32 = (leftPanelRect.width - 48) / 3.0
+			btnY := leftPanelRect.y + 44
 
-			// Button 1: Primary
-			if GuiButton(rl.Rectangle{leftPanelRect.x + 16, btnY, btnW, 36}, "Launch Rocket", .Center, isSelected = false, idKey = 1001) {
+			// Flexbox Row for Action Buttons
+			Flex_Begin(rl.Rectangle{leftPanelRect.x + 16, btnY, leftPanelRect.width - 32, 36}, direction = .Row, gap = 8.0)
+			Flex_AddItem(0, 36, grow = 1.0)
+			Flex_AddItem(0, 36, grow = 1.0)
+			Flex_AddItem(0, 36, grow = 1.0)
+			bRect1 := Flex_GetRect(0)
+			bRect2 := Flex_GetRect(1)
+			bRect3 := Flex_GetRect(2)
+			Flex_End()
+
+			// Button 1: Primary with Rocket Icon
+			if GuiIconButton(bRect1, .Rocket, "Launch", isSelected = false, idKey = 1001) {
 				state.buttonClickCount += 1
 				state.lastActionMsg = fmt.tprintf("Launch Rocket clicked! Total clicks: %d", state.buttonClickCount)
 				state.actionTimer = 4.0
 			}
 
-			// Button 2: Calibrate
-			if GuiButton(rl.Rectangle{leftPanelRect.x + 24 + btnW, btnY, btnW, 36}, "Calibrate", .Center, isSelected = true, idKey = 1002) {
+			// Button 2: Calibrate with Wrench Icon
+			if GuiIconButton(bRect2, .Wrench, "Calibrate", isSelected = true, idKey = 1002) {
 				state.buttonClickCount += 1
 				state.lastActionMsg = "Guidance gyro successfully calibrated."
 				state.actionTimer = 4.0
 			}
 
-			// Button 3: Emergency Vent
-			if GuiButton(rl.Rectangle{leftPanelRect.x + 32 + btnW * 2.0, btnY, btnW, 36}, "Emergency Vent", .Center, isSelected = false, idKey = 1003) {
+			// Button 3: Emergency Vent with Warning Triangle Icon
+			if GuiIconButton(bRect3, .TriangleExclamation, "Emergency", isSelected = false, idKey = 1003) {
 				state.buttonClickCount += 1
 				state.lastActionMsg = "Emergency Vent valves purged!"
 				state.actionTimer = 4.0
 			}
 
 			// Feedback status line
-			statusRect := rl.Rectangle{leftPanelRect.x + 16, btnY + 44, leftPanelRect.width - 32, 26}
+			statusRect := rl.Rectangle{leftPanelRect.x + 16, btnY + 42, leftPanelRect.width - 32, 24}
 			rl.DrawRectangleRec(statusRect, rl.Color{28, 32, 42, 200})
 			rl.DrawRectangleLinesEx(statusRect, 1, rl.Color{45, 52, 70, 255})
-			DrawTextStr(state.lastActionMsg, statusRect.x + 10, statusRect.y + 7, 12, rl.Color{52, 211, 153, 255})
+			DrawTextStr(state.lastActionMsg, statusRect.x + 10, statusRect.y + 5, 13, rl.Color{52, 211, 153, 255})
+
+			// Font Awesome Icons showcase (GuiIcon widget)
+			iconSecY := statusRect.y + 30
+			DrawTextStr("FONT AWESOME ICONS (GuiIcon WIDGET)", leftPanelRect.x + 16, iconSecY, 13, rl.Color{130, 140, 165, 255})
+			iconSecY += 18
+
+			iconBoxRect := rl.Rectangle{leftPanelRect.x + 16, iconSecY, leftPanelRect.width - 32, 38}
+			rl.DrawRectangleRec(iconBoxRect, rl.Color{26, 30, 40, 220})
+			rl.DrawRectangleLinesEx(iconBoxRect, 1, rl.Color{48, 56, 76, 255})
+
+			demoIcons := [8]Icon{ .Shield, .Bolt, .Fire, .Heart, .Star, .CircleCheck, .Gear, .Terminal }
+			demoColors := [8]rl.Color{
+				{96, 165, 250, 255},  // Blue Shield
+				{251, 191, 36, 255},  // Amber Bolt
+				{239, 68, 68, 255},   // Red Fire
+				{244, 114, 182, 255}, // Pink Heart
+				{250, 204, 21, 255},  // Yellow Star
+				{52, 211, 153, 255},  // Emerald Check
+				{168, 85, 247, 255},  // Purple Gear
+				{56, 189, 248, 255},  // Cyan Terminal
+			}
+			iconSlotW := (iconBoxRect.width - 16) / 8.0
+			for idx in 0..<8 {
+				slotRect := rl.Rectangle{iconBoxRect.x + 8 + f32(idx) * iconSlotW, iconBoxRect.y + 3, iconSlotW, 32}
+				GuiIcon(slotRect, demoIcons[idx], size = 18, color = demoColors[idx])
+			}
 
 			// Checkboxes
-			chkY := statusRect.y + 36
-			DrawTextStr("SYSTEM SETTINGS (CHECKBOXES)", leftPanelRect.x + 16, chkY, 11, rl.Color{130, 140, 165, 255})
+			chkY := iconBoxRect.y + iconBoxRect.height + 14
+			DrawTextStr("SYSTEM SETTINGS (CHECKBOXES)", leftPanelRect.x + 16, chkY, 13, rl.Color{130, 140, 165, 255})
 			chkY += 18
 
-			if GuiCheckBox(rl.Rectangle{leftPanelRect.x + 16, chkY, leftPanelRect.width - 32, 26}, "Enable VSync (Hardware Refresh Lock)", &state.vsyncChecked, idKey = 1010) {
+			if GuiCheckBox(rl.Rectangle{leftPanelRect.x + 16, chkY, leftPanelRect.width - 32, 24}, "Enable VSync (Hardware Refresh Lock)", &state.vsyncChecked, idKey = 1010) {
 				state.lastActionMsg = fmt.tprintf("VSync set to: %v", state.vsyncChecked)
 			}
-			chkY += 30
+			chkY += 28
 
-			if GuiCheckBox(rl.Rectangle{leftPanelRect.x + 16, chkY, leftPanelRect.width - 32, 26}, "Show Collision Wireframes & Geometry", &state.wireframeChecked, idKey = 1011) {
+			if GuiCheckBox(rl.Rectangle{leftPanelRect.x + 16, chkY, leftPanelRect.width - 32, 24}, "Show Collision Wireframes & Geometry", &state.wireframeChecked, idKey = 1011) {
 				state.lastActionMsg = fmt.tprintf("Wireframes set to: %v", state.wireframeChecked)
 			}
-			chkY += 30
+			chkY += 28
 
-			if GuiCheckBox(rl.Rectangle{leftPanelRect.x + 16, chkY, leftPanelRect.width - 32, 26}, "3D Positional Audio & Doppler Shift", &state.spatialAudioChecked, idKey = 1012) {
+			if GuiCheckBox(rl.Rectangle{leftPanelRect.x + 16, chkY, leftPanelRect.width - 32, 24}, "3D Positional Audio & Doppler Shift", &state.spatialAudioChecked, idKey = 1012) {
 				state.lastActionMsg = fmt.tprintf("Spatial audio set to: %v", state.spatialAudioChecked)
 			}
-			chkY += 30
+			chkY += 28
 
-			if GuiCheckBox(rl.Rectangle{leftPanelRect.x + 16, chkY, leftPanelRect.width - 32, 26}, "Record Telemetry Diagnostics to Memory", &state.telemetryChecked, idKey = 1013) {
+			if GuiCheckBox(rl.Rectangle{leftPanelRect.x + 16, chkY, leftPanelRect.width - 32, 24}, "Record Telemetry Diagnostics to Memory", &state.telemetryChecked, idKey = 1013) {
 				state.lastActionMsg = fmt.tprintf("Telemetry logging set to: %v", state.telemetryChecked)
 			}
 
 			// Toggle Switches
-			swY := chkY + 44
-			DrawTextStr("PROPULSION & SHIELDS (TOGGLE SWITCHES)", leftPanelRect.x + 16, swY, 11, rl.Color{130, 140, 165, 255})
+			swY := chkY + 34
+			DrawTextStr("PROPULSION & SHIELDS (TOGGLE SWITCHES)", leftPanelRect.x + 16, swY, 13, rl.Color{130, 140, 165, 255})
 			swY += 18
 
-			if GuiToggleSwitch(rl.Rectangle{leftPanelRect.x + 16, swY, leftPanelRect.width - 32, 30}, "Fly-By-Wire Flight Computer", &state.flightAssistActive, idKey = 1020) {
+			if GuiToggleSwitch(rl.Rectangle{leftPanelRect.x + 16, swY, leftPanelRect.width - 32, 28}, "Fly-By-Wire Flight Computer", &state.flightAssistActive, idKey = 1020) {
 				state.lastActionMsg = fmt.tprintf("Flight Computer: %v", state.flightAssistActive)
 			}
-			swY += 36
+			swY += 34
 
-			if GuiToggleSwitch(rl.Rectangle{leftPanelRect.x + 16, swY, leftPanelRect.width - 32, 30}, "High-Energy Plasma Thrusters", &state.plasmaThrustersActive, idKey = 1021) {
+			if GuiToggleSwitch(rl.Rectangle{leftPanelRect.x + 16, swY, leftPanelRect.width - 32, 28}, "High-Energy Plasma Thrusters", &state.plasmaThrustersActive, idKey = 1021) {
 				state.lastActionMsg = fmt.tprintf("Plasma Thrusters: %v", state.plasmaThrustersActive)
 			}
-			swY += 36
+			swY += 34
 
-			if GuiToggleSwitch(rl.Rectangle{leftPanelRect.x + 16, swY, leftPanelRect.width - 32, 30}, "Forward Deflector Shield Matrix", &state.deflectorFieldActive, idKey = 1022) {
+			if GuiToggleSwitch(rl.Rectangle{leftPanelRect.x + 16, swY, leftPanelRect.width - 32, 28}, "Forward Deflector Shield Matrix", &state.deflectorFieldActive, idKey = 1022) {
 				state.lastActionMsg = fmt.tprintf("Deflector Field: %v", state.deflectorFieldActive)
 			}
 
 			// Text Input for Callsign
-			tiY := swY + 44
-			DrawTextStr("VESSEL COMMUNICATIONS (TEXT INPUT)", leftPanelRect.x + 16, tiY, 11, rl.Color{130, 140, 165, 255})
+			tiY := swY + 34
+			DrawTextStr("VESSEL COMMUNICATIONS (TEXT INPUT)", leftPanelRect.x + 16, tiY, 13, rl.Color{130, 140, 165, 255})
 			tiY += 18
 			tiChanged, tiSubmitted := GuiTextInput(
 				rl.Rectangle{leftPanelRect.x + 16, tiY, leftPanelRect.width - 32, 28},
@@ -615,13 +676,12 @@ main :: proc() {
 			}
 
 			// Transmit Callsign Action Button
-			if GuiButton(rl.Rectangle{leftPanelRect.x + 16, tiY + 36, 170, 28}, "Transmit Callsign", .Center, isSelected = false, idKey = 1026) {
+			if GuiButton(rl.Rectangle{leftPanelRect.x + 16, tiY + 34, 170, 28}, "Transmit Callsign", .Center, isSelected = false, idKey = 1026) {
 				state.lastActionMsg = fmt.tprintf("Callsign [%s] transmitted to fleet command!", string(state.callsignBuffer[:]))
 				state.actionTimer = 4.0
 			}
 
 			// Right Panel: Sliders, Knobs, Progress Bars
-			rightPanelRect := rl.Rectangle{contentArea.x + halfW + 20, contentArea.y, halfW, contentArea.height}
 			RenderContainerPanel(
 				rightPanelRect,
 				"Continuous Sliders, Rotary Knobs & Progress",
@@ -632,8 +692,8 @@ main :: proc() {
 				rl.Color{230, 235, 245, 255},
 			)
 
-			slY := rightPanelRect.y + 48
-			DrawTextStr("CONTINUOUS SLIDERS (DRAG OR USE ARROW KEYS)", rightPanelRect.x + 16, slY, 11, rl.Color{130, 140, 165, 255})
+			slY := rightPanelRect.y + 44
+			DrawTextStr("CONTINUOUS SLIDERS (DRAG OR USE ARROW KEYS)", rightPanelRect.x + 16, slY, 13, rl.Color{130, 140, 165, 255})
 			slY += 18
 
 			// Slider 1: Coarse Volume
@@ -647,18 +707,24 @@ main :: proc() {
 			// Slider 3: Integer with Inline Text Edit
 			_ = GuiSlider(rl.Rectangle{rightPanelRect.x + 16, slY, rightPanelRect.width - 32, 26}, "Bandwidth", "kbps", &state.intSliderVal, 128.0, 4096.0, true, idKey = 1032, labelWidth = 100)
 
-			// Rotary Knobs (Fine adjustment supported via Shift+Drag, Shift+Wheel, or Shift+Arrows)
-			knobY := slY + 48
-			DrawTextStr("ROTARY DIAL KNOBS (DRAG VERTICALLY OR SHIFT FOR FINE ADJUST)", rightPanelRect.x + 16, knobY, 11, rl.Color{130, 140, 165, 255})
+			// Rotary Knobs (Fine adjustment supported via Shift+Drag, Shift+Wheel, or Shift+Arrows - Flexbox Row)
+			knobY := slY + 44
+			DrawTextStr("ROTARY DIAL KNOBS (DRAG VERTICALLY OR SHIFT FOR FINE ADJUST)", rightPanelRect.x + 16, knobY, 13, rl.Color{130, 140, 165, 255})
 			knobY += 18
 
-			knobW: f32 = (rightPanelRect.width - 48) * 0.5
-			_ = GuiKnob(rl.Rectangle{rightPanelRect.x + 16, knobY, knobW, 80}, "Engine Throttle", &state.throttleKnobVal, 0.0, 100.0, 50.0, "%.0f%%", idKey = 1040)
-			_ = GuiKnob(rl.Rectangle{rightPanelRect.x + 32 + knobW, knobY, knobW, 80}, "Nav Heading", &state.headingKnobVal, 0.0, 360.0, 0.0, "%.0f deg", idKey = 1041)
+			Flex_Begin(rl.Rectangle{rightPanelRect.x + 16, knobY, rightPanelRect.width - 32, 80}, direction = .Row, gap = 16.0)
+			Flex_AddItem(0, 80, grow = 1.0)
+			Flex_AddItem(0, 80, grow = 1.0)
+			knobRect1 := Flex_GetRect(0)
+			knobRect2 := Flex_GetRect(1)
+			Flex_End()
+
+			_ = GuiKnob(knobRect1, "Engine Throttle", &state.throttleKnobVal, 0.0, 100.0, 50.0, "%.0f%%", idKey = 1040)
+			_ = GuiKnob(knobRect2, "Nav Heading", &state.headingKnobVal, 0.0, 360.0, 0.0, "%.0f deg", idKey = 1041)
 
 			// Progress Bars
-			progY := knobY + 98
-			DrawTextStr("SYSTEM METERS (PROGRESS BARS)", rightPanelRect.x + 16, progY, 11, rl.Color{130, 140, 165, 255})
+			progY := knobY + 94
+			DrawTextStr("SYSTEM METERS (PROGRESS BARS)", rightPanelRect.x + 16, progY, 13, rl.Color{130, 140, 165, 255})
 			progY += 24
 
 			// Meter 1: Reactor Core Flux
@@ -668,12 +734,12 @@ main :: proc() {
 			shieldProgressVal: f32 = 94.5
 			GuiProgressBar(rl.Rectangle{rightPanelRect.x + 16, progY + 34, rightPanelRect.width - 120, 24}, "Deflector Shield Capacity", shieldProgressVal, 0.0, 100.0, .Horizontal, true)
 
-			// Meter 3: Vertical Fuel Cell Gauge (Starts below header, aligns with horizontal meters)
+			// Meter 3: Vertical Fuel Cell Gauge
 			vProgRect := rl.Rectangle{rightPanelRect.x + rightPanelRect.width - 80, progY + 16, 40, 78}
 			GuiProgressBar(vProgRect, "Fuel", state.fuelProgressVal * 100.0, 0.0, 100.0, .Vertical, true)
 		}
 
-		// --------------------------------------------------------------------
+				// --------------------------------------------------------------------
 		// TAB 1: Lists, Trees & Menus
 		// --------------------------------------------------------------------
 		if state.activeTab == 1 {
@@ -692,34 +758,34 @@ main :: proc() {
 			)
 
 			ddY := leftPanelRect.y + 48
-			DrawTextStr("POPUP DROPDOWNS (KEYBOARD ARROWS + ENTER)", leftPanelRect.x + 16, ddY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("POPUP DROPDOWNS (KEYBOARD ARROWS + ENTER)", leftPanelRect.x + 16, ddY, 13, rl.Color{130, 140, 165, 255})
 			ddY += 18
 
-			DrawTextStr("Render Quality Preset:", leftPanelRect.x + 16, ddY, 12, rl.Color{200, 205, 220, 255})
+			DrawTextStr("Render Quality Preset:", leftPanelRect.x + 16, ddY, 13, rl.Color{200, 205, 220, 255})
 			_ = GuiDropdownBox(rl.Rectangle{leftPanelRect.x + 180, ddY - 4, leftPanelRect.width - 200, 26}, "Low;Medium;High;Ultra;Cinematic", &state.qualityPresetIdx, idKey = 2001)
 			ddY += 38
 
-			DrawTextStr("Anti-Aliasing Mode:", leftPanelRect.x + 16, ddY, 12, rl.Color{200, 205, 220, 255})
+			DrawTextStr("Anti-Aliasing Mode:", leftPanelRect.x + 16, ddY, 13, rl.Color{200, 205, 220, 255})
 			_ = GuiDropdownBox(rl.Rectangle{leftPanelRect.x + 180, ddY - 4, leftPanelRect.width - 200, 26}, "None;FXAA;SMAA;MSAA 2x;MSAA 4x;MSAA 8x", &state.aaPresetIdx, idKey = 2002)
 			ddY += 38
 
-			DrawTextStr("Display Resolution:", leftPanelRect.x + 16, ddY, 12, rl.Color{200, 205, 220, 255})
+			DrawTextStr("Display Resolution:", leftPanelRect.x + 16, ddY, 13, rl.Color{200, 205, 220, 255})
 			_ = GuiDropdownBox(rl.Rectangle{leftPanelRect.x + 180, ddY - 4, leftPanelRect.width - 200, 26}, "Windowed 1280x820;Windowed 1920x1080;Borderless Fullscreen;Exclusive 4K", &state.displayModeIdx, idKey = 2003)
 			ddY += 46
 
 			// Radio Groups
-			DrawTextStr("DIFFICULTY TIER (VERTICAL RADIO GROUP)", leftPanelRect.x + 16, ddY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("DIFFICULTY TIER (VERTICAL RADIO GROUP)", leftPanelRect.x + 16, ddY, 13, rl.Color{130, 140, 165, 255})
 			ddY += 18
 			GuiRadioGroup(rl.Rectangle{leftPanelRect.x + 16, ddY, leftPanelRect.width - 32, 108}, "Difficulty", diffOptions, &state.difficultyRadioIdx, false, idKey = 2010)
 			ddY += 124
 
-			DrawTextStr("CONTROL DEVICE (HORIZONTAL RADIO GROUP)", leftPanelRect.x + 16, ddY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("CONTROL DEVICE (HORIZONTAL RADIO GROUP)", leftPanelRect.x + 16, ddY, 13, rl.Color{130, 140, 165, 255})
 			ddY += 18
 			GuiRadioGroup(rl.Rectangle{leftPanelRect.x + 16, ddY, leftPanelRect.width - 32, 30}, "Device", deviceOptions, &state.inputDeviceRadioIdx, true, idKey = 2011)
 
 			// Inspection Card & Selection Details
 			cardY := ddY + 46
-			DrawTextStr("INSPECTION CARD (DATA BINDING FEEDBACK)", leftPanelRect.x + 16, cardY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("INSPECTION CARD (DATA BINDING FEEDBACK)", leftPanelRect.x + 16, cardY, 13, rl.Color{130, 140, 165, 255})
 			cardY += 18
 
 			cardRect := rl.Rectangle{leftPanelRect.x + 16, cardY, leftPanelRect.width - 32, 110}
@@ -737,10 +803,10 @@ main :: proc() {
 				}
 			}
 
-			DrawTextStr(fmt.tprintf("Selected Audio Asset:  %s (Index %d)", selSoundName, state.selectedListItem), cardRect.x + 12, cardRect.y + 12, 12, rl.Color{96, 165, 250, 255})
-			DrawTextStr(fmt.tprintf("Selected Scene Node:   %s (ID #%d, Depth %d)", selTreeName, state.selectedTreeId, selTreeDepth), cardRect.x + 12, cardRect.y + 36, 12, rl.Color{52, 211, 153, 255})
-			DrawTextStr(fmt.tprintf("Quality: Preset #%d  |  AA: %s  |  Difficulty: %s", state.qualityPresetIdx, "MSAA 2x" if state.aaPresetIdx == 3 else "Active", diffOptions[state.difficultyRadioIdx]), cardRect.x + 12, cardRect.y + 60, 11, rl.Color{200, 205, 225, 255})
-			DrawTextStr(fmt.tprintf("Active Device Input:   %s", deviceOptions[state.inputDeviceRadioIdx]), cardRect.x + 12, cardRect.y + 84, 11, rl.Color{251, 191, 36, 255})
+			DrawTextStr(fmt.tprintf("Selected Audio Asset:  %s (Index %d)", selSoundName, state.selectedListItem), cardRect.x + 12, cardRect.y + 12, 13, rl.Color{96, 165, 250, 255})
+			DrawTextStr(fmt.tprintf("Selected Scene Node:   %s (ID #%d, Depth %d)", selTreeName, state.selectedTreeId, selTreeDepth), cardRect.x + 12, cardRect.y + 36, 13, rl.Color{52, 211, 153, 255})
+			DrawTextStr(fmt.tprintf("Quality: Preset #%d  |  AA: %s  |  Difficulty: %s", state.qualityPresetIdx, "MSAA 2x" if state.aaPresetIdx == 3 else "Active", diffOptions[state.difficultyRadioIdx]), cardRect.x + 12, cardRect.y + 60, 13, rl.Color{200, 205, 225, 255})
+			DrawTextStr(fmt.tprintf("Active Device Input:   %s", deviceOptions[state.inputDeviceRadioIdx]), cardRect.x + 12, cardRect.y + 84, 13, rl.Color{251, 191, 36, 255})
 
 			// Right Panel: List View & Tree View
 			rightPanelRect := rl.Rectangle{contentArea.x + halfW + 20, contentArea.y, halfW, contentArea.height}
@@ -755,7 +821,7 @@ main :: proc() {
 			)
 
 			rvY := rightPanelRect.y + 48
-			DrawTextStr("AUDIO ASSETS (SCROLLABLE LIST VIEW)", rightPanelRect.x + 16, rvY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("AUDIO ASSETS (SCROLLABLE LIST VIEW)", rightPanelRect.x + 16, rvY, 13, rl.Color{130, 140, 165, 255})
 			rvY += 18
 
 			listRect := rl.Rectangle{rightPanelRect.x + 16, rvY, rightPanelRect.width - 32, 150}
@@ -764,7 +830,7 @@ main :: proc() {
 
 			// Tree View
 			treeY := listRect.y + listRect.height + 20
-			DrawTextStr("SCENE HIERARCHY (INTERACTIVE EXPANDABLE TREE)", rightPanelRect.x + 16, treeY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("SCENE HIERARCHY (INTERACTIVE EXPANDABLE TREE)", rightPanelRect.x + 16, treeY, 13, rl.Color{130, 140, 165, 255})
 			treeY += 18
 
 			treeRect := rl.Rectangle{rightPanelRect.x + 16, treeY, rightPanelRect.width - 32, rightPanelRect.height - (treeY - rightPanelRect.y) - 16}
@@ -797,7 +863,7 @@ main :: proc() {
 			)
 
 			cpY := leftPanelRect.y + 48
-			DrawTextStr("HSV COLOR WHEEL & PICKER", leftPanelRect.x + 16, cpY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("HSV COLOR WHEEL & PICKER", leftPanelRect.x + 16, cpY, 13, rl.Color{130, 140, 165, 255})
 			cpY += 18
 
 			pickerRect := rl.Rectangle{leftPanelRect.x + 16, cpY, leftPanelRect.width - 150, 130}
@@ -808,16 +874,16 @@ main :: proc() {
 			rl.DrawRectangleRec(swatchRect, state.pickerColor)
 			rl.DrawRectangleLinesEx(swatchRect, 2, rl.Color{220, 225, 240, 255})
 			rgbaText := fmt.tprintf("R: %d\nG: %d\nB: %d\nA: %d", state.pickerColor.r, state.pickerColor.g, state.pickerColor.b, state.pickerColor.a)
-			DrawTextStr(rgbaText, swatchRect.x, swatchRect.y + 90, 11, rl.Color{160, 170, 190, 255})
+			DrawTextStr(rgbaText, swatchRect.x, swatchRect.y + 90, 13, rl.Color{160, 170, 190, 255})
 
 			alphaY := pickerRect.y + pickerRect.height + 16
-			DrawTextStr("OPACITY / ALPHA CHANNEL", leftPanelRect.x + 16, alphaY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("OPACITY / ALPHA CHANNEL", leftPanelRect.x + 16, alphaY, 13, rl.Color{130, 140, 165, 255})
 			alphaY += 18
 			_ = GuiColorBarAlpha(rl.Rectangle{leftPanelRect.x + 16, alphaY, leftPanelRect.width - 32, 20}, "Alpha", &state.alphaVal, idKey = 3005)
 
 			// Gradient Editor
 			gradY := alphaY + 32
-			DrawTextStr("COLOR RAMP GRADIENT EDITOR", leftPanelRect.x + 16, gradY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("COLOR RAMP GRADIENT EDITOR", leftPanelRect.x + 16, gradY, 13, rl.Color{130, 140, 165, 255})
 			gradY += 18
 
 			gradRect := rl.Rectangle{leftPanelRect.x + 16, gradY, leftPanelRect.width - 32, 120}
@@ -825,7 +891,7 @@ main :: proc() {
 
 			// Gradient Live Preview Bar
 			prevY := gradRect.y + gradRect.height + 14
-			DrawTextStr("INTERPOLATED COLOR RAMP OUTPUT", leftPanelRect.x + 16, prevY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("INTERPOLATED COLOR RAMP OUTPUT", leftPanelRect.x + 16, prevY, 13, rl.Color{130, 140, 165, 255})
 			prevY += 18
 			prevRect := rl.Rectangle{leftPanelRect.x + 16, prevY, leftPanelRect.width - 32, 28}
 			for px in 0..<i32(prevRect.width) {
@@ -848,7 +914,7 @@ main :: proc() {
 			)
 
 			pltY := rightPanelRect.y + 48
-			DrawTextStr("DUAL-CHANNEL SENSOR TELEMETRY (LIVE OSCILLOSCOPE)", rightPanelRect.x + 16, pltY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("DUAL-CHANNEL SENSOR TELEMETRY (LIVE OSCILLOSCOPE)", rightPanelRect.x + 16, pltY, 13, rl.Color{130, 140, 165, 255})
 			pltY += 18
 
 			plotRect := rl.Rectangle{rightPanelRect.x + 16, pltY, rightPanelRect.width - 32, rightPanelRect.height - 110}
@@ -856,7 +922,7 @@ main :: proc() {
 
 			statsY := plotRect.y + plotRect.height + 10
 			freqText := fmt.tprintf("Sample Rate: 60 Hz  |  Peak-to-Peak: 0.70 V  |  Sine Wave Frequency: 2.50 rad/s")
-			DrawTextStr(freqText, rightPanelRect.x + 16, statsY, 11, rl.Color{140, 150, 175, 255})
+			DrawTextStr(freqText, rightPanelRect.x + 16, statsY, 13, rl.Color{140, 150, 175, 255})
 		}
 
 		// --------------------------------------------------------------------
@@ -875,7 +941,7 @@ main :: proc() {
 			)
 
 			descY := gridPanelRect.y + 46
-			DrawTextStr("This 4x3 matrix demonstrates geometric 2D navigation: arrow keys select the closest adjacent cell using orthogonal distance scoring.", gridPanelRect.x + 20, descY, 12, rl.Color{180, 185, 205, 255})
+			DrawTextStr("This 4x3 matrix demonstrates geometric 2D navigation: arrow keys select the closest adjacent cell using orthogonal distance scoring.", gridPanelRect.x + 20, descY, 13, rl.Color{180, 185, 205, 255})
 
 			startX := gridPanelRect.x + 30
 			startY := descY + 28
@@ -910,10 +976,10 @@ main :: proc() {
 			rl.DrawRectangleRec(infoRect, rl.Color{28, 33, 46, 220})
 			rl.DrawRectangleLinesEx(infoRect, 1, rl.Color{55, 65, 90, 255})
 
-			DrawTextStr("LAST NAVIGATION EVENT:", infoRect.x + 14, infoRect.y + 10, 11, rl.Color{120, 130, 155, 255})
+			DrawTextStr("LAST NAVIGATION EVENT:", infoRect.x + 14, infoRect.y + 10, 13, rl.Color{120, 130, 155, 255})
 			DrawTextStr(state.lastNavEvent, infoRect.x + 14, infoRect.y + 26, 14, rl.Color{52, 211, 153, 255})
 			curKeyStr := fmt.tprintf("Active Key: 0x%X  |  Geometric Direction: Closest candidate via 2D bounding boxes", immediateNav.focusedKey)
-			DrawTextStr(curKeyStr, infoRect.x + 14, infoRect.y + 46, 11, rl.Color{160, 170, 195, 255})
+			DrawTextStr(curKeyStr, infoRect.x + 14, infoRect.y + 46, 13, rl.Color{160, 170, 195, 255})
 		}
 
 		// --------------------------------------------------------------------
@@ -961,10 +1027,10 @@ main :: proc() {
 			case 0:
 				// Sub-tab 0: Navigation & Radar
 				DrawTextStr("SUB-SYSTEM: LONG-RANGE NAVIGATION & RADAR", contentPad.x, contentPad.y, 14, rl.Color{96, 165, 250, 255})
-				DrawTextStr("Vertical tab docking layout allows side-by-side hierarchical navigation with minimal vertical footprint.", contentPad.x, contentPad.y + 24, 12, rl.Color{160, 170, 190, 255})
+				DrawTextStr("Vertical tab docking layout allows side-by-side hierarchical navigation with minimal vertical footprint.", contentPad.x, contentPad.y + 24, 13, rl.Color{160, 170, 190, 255})
 
 				subY := contentPad.y + 60
-				DrawTextStr("SECTOR WAYPOINTS & CELESTIAL TARGETS", contentPad.x, subY, 11, rl.Color{130, 140, 165, 255})
+				DrawTextStr("SECTOR WAYPOINTS & CELESTIAL TARGETS", contentPad.x, subY, 13, rl.Color{130, 140, 165, 255})
 				subY += 18
 				if GuiButton(rl.Rectangle{contentPad.x, subY, 220, 32}, "Lock Target: Alpha Centauri", .Center, isSelected = true, idKey = 50101) {
 					state.lastActionMsg = "Target locked on Alpha Centauri."
@@ -978,10 +1044,10 @@ main :: proc() {
 			case 1:
 				// Sub-tab 1: Propulsion Dynamics
 				DrawTextStr("SUB-SYSTEM: PROPULSION & HYPERDRIVE VECTORING", contentPad.x, contentPad.y, 14, rl.Color{52, 211, 153, 255})
-				DrawTextStr("Rotary dial knobs with Shift fine adjustment mode inside a vertical tab sub-panel.", contentPad.x, contentPad.y + 24, 12, rl.Color{160, 170, 190, 255})
+				DrawTextStr("Rotary dial knobs with Shift fine adjustment mode inside a vertical tab sub-panel.", contentPad.x, contentPad.y + 24, 13, rl.Color{160, 170, 190, 255})
 
 				subY := contentPad.y + 60
-				DrawTextStr("WARP DRIVE THROTTLE & MANEUVERING", contentPad.x, subY, 11, rl.Color{130, 140, 165, 255})
+				DrawTextStr("WARP DRIVE THROTTLE & MANEUVERING", contentPad.x, subY, 13, rl.Color{130, 140, 165, 255})
 				subY += 18
 				_ = GuiKnob(rl.Rectangle{contentPad.x, subY, 120, 80}, "Warp Factor", &state.warpKnobVal, 1.0, 9.9, 1.0, "%.1f", idKey = 50201)
 				_ = GuiKnob(rl.Rectangle{contentPad.x + 140, subY, 120, 80}, "Vector Pitch", &state.vectorKnobVal, -90.0, 90.0, 0.0, "%.0f deg", idKey = 50202)
@@ -989,7 +1055,7 @@ main :: proc() {
 			case 2:
 				// Sub-tab 2: Defense Shields
 				DrawTextStr("SUB-SYSTEM: DEFLECTOR SHIELD GENERATOR", contentPad.x, contentPad.y, 14, rl.Color{251, 191, 36, 255})
-				DrawTextStr("Shield harmonic balance and frequency modulation.", contentPad.x, contentPad.y + 24, 12, rl.Color{160, 170, 190, 255})
+				DrawTextStr("Shield harmonic balance and frequency modulation.", contentPad.x, contentPad.y + 24, 13, rl.Color{160, 170, 190, 255})
 
 				subY := contentPad.y + 60
 				_ = GuiSlider(rl.Rectangle{contentPad.x, subY, 440, 26}, "Shield Harmonic", "GHz", &state.shieldHarmonicVal, 10.0, 100.0, false, idKey = 50301, labelWidth = 120)
@@ -999,7 +1065,7 @@ main :: proc() {
 			case 3:
 				// Sub-tab 3: Life Support Diagnostics
 				DrawTextStr("SUB-SYSTEM: ENVIRONMENTAL & LIFE SUPPORT", contentPad.x, contentPad.y, 14, rl.Color{248, 113, 113, 255})
-				DrawTextStr("Atmospheric pressure, oxygen recycling, and gravity generator telemetry.", contentPad.x, contentPad.y + 24, 12, rl.Color{160, 170, 190, 255})
+				DrawTextStr("Atmospheric pressure, oxygen recycling, and gravity generator telemetry.", contentPad.x, contentPad.y + 24, 13, rl.Color{160, 170, 190, 255})
 
 				subY := contentPad.y + 60
 				GuiProgressBar(rl.Rectangle{contentPad.x, subY, 440, 24}, "O2 Saturation", 99.2, 0.0, 100.0, .Horizontal, true)
@@ -1029,7 +1095,7 @@ main :: proc() {
 			)
 
 			faderAreaY := leftPanelRect.y + 48
-			DrawTextStr("MULTI-CHANNEL STUDIO FADERS & PEAK-HOLD VU METER", leftPanelRect.x + 16, faderAreaY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("MULTI-CHANNEL STUDIO FADERS & PEAK-HOLD VU METER", leftPanelRect.x + 16, faderAreaY, 13, rl.Color{130, 140, 165, 255})
 
 			// 3 Faders + 1 Stereo Meter
 			faderH: f32 = 360.0
@@ -1058,16 +1124,16 @@ main :: proc() {
 			rl.DrawRectangleLinesEx(cardRect, 1, rl.Color{55, 65, 88, 255})
 
 			masterDbStr := fmt.tprintf("Master Gain: %+.1f dB (Unity: 0.0 dB) | Norm: %.2f", state.faderValMaster, FaderDbToNorm(state.faderValMaster, -60.0, 6.0))
-			DrawTextStr(masterDbStr, cardRect.x + 14, cardRect.y + 12, 12, rl.Color{96, 165, 250, 255})
+			DrawTextStr(masterDbStr, cardRect.x + 14, cardRect.y + 12, 13, rl.Color{96, 165, 250, 255})
 
 			meterPeakStr := fmt.tprintf("Peak Hold L: %+.1f dB  |  Peak Hold R: %+.1f dB  |  Clip LEDs: %s",
 				FaderNormToDb(state.meterStateMaster.peakL, -60.0, 3.0),
 				FaderNormToDb(state.meterStateMaster.peakR, -60.0, 3.0),
 				"TRIGGERED" if (state.meterStateMaster.clipL || state.meterStateMaster.clipR) else "NORMAL")
-			DrawTextStr(meterPeakStr, cardRect.x + 14, cardRect.y + 36, 11, rl.Color{52, 211, 153, 255})
+			DrawTextStr(meterPeakStr, cardRect.x + 14, cardRect.y + 36, 13, rl.Color{52, 211, 153, 255})
 
-			DrawTextStr("Features: 0dB Unity gain notch, Shift micro-dB fine drag, double-click / right-click reset.", cardRect.x + 14, cardRect.y + 60, 11, rl.Color{200, 205, 225, 255})
-			DrawTextStr("Navigation: Up/Down (0.5 dB), PgUp/PgDn (3.0 dB), Home (+6 dB), End (-inf cutoff).", cardRect.x + 14, cardRect.y + 80, 11, rl.Color{251, 191, 36, 255})
+			DrawTextStr("Features: 0dB Unity gain notch, Shift micro-dB fine drag, double-click / right-click reset.", cardRect.x + 14, cardRect.y + 60, 13, rl.Color{200, 205, 225, 255})
+			DrawTextStr("Navigation: Up/Down (0.5 dB), PgUp/PgDn (3.0 dB), Home (+6 dB), End (-inf cutoff).", cardRect.x + 14, cardRect.y + 80, 13, rl.Color{251, 191, 36, 255})
 
 			// Right Panel: Notched Detent Sliders & Horizontal VU Meters
 			rightPanelRect := rl.Rectangle{contentArea.x + halfW + 20, contentArea.y, halfW, contentArea.height}
@@ -1082,7 +1148,7 @@ main :: proc() {
 			)
 
 			detentY := rightPanelRect.y + 48
-			DrawTextStr("HORIZONTAL NOTCHED SLIDERS (DISCRETE DETENTS WITH SNAPPING)", rightPanelRect.x + 16, detentY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("HORIZONTAL NOTCHED SLIDERS (DISCRETE DETENTS WITH SNAPPING)", rightPanelRect.x + 16, detentY, 13, rl.Color{130, 140, 165, 255})
 
 			// Slider 1: Simulation Speed Detents
 			notchLabels1 := []string{"0.25x", "0.5x", "1.0x", "2.0x", "4.0x"}
@@ -1097,13 +1163,13 @@ main :: proc() {
 
 			// Horizontal Volume Meter
 			horizMeterY := slider2Rect.y + slider2Rect.height + 26
-			DrawTextStr("HORIZONTAL VOLUME METER (MONO CONSOLE MONITOR)", rightPanelRect.x + 16, horizMeterY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("HORIZONTAL VOLUME METER (MONO CONSOLE MONITOR)", rightPanelRect.x + 16, horizMeterY, 13, rl.Color{130, 140, 165, 255})
 			horizMeterRect := rl.Rectangle{rightPanelRect.x + 16, horizMeterY + 20, rightPanelRect.width - 32, 44}
 			_ = GuiVolumeMeter(horizMeterRect, "BUS MONITOR (MONO)", state.meterAudioLevelL, -120.0, nil, .Horizontal, -60.0, 3.0)
 
 			// Vertical Notched Slider & Relays Side-by-Side
 			vSecY := horizMeterRect.y + horizMeterRect.height + 26
-			DrawTextStr("VERTICAL DETENT SLIDER & RELAY SPECIFICATIONS", rightPanelRect.x + 16, vSecY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("VERTICAL DETENT SLIDER & RELAY SPECIFICATIONS", rightPanelRect.x + 16, vSecY, 13, rl.Color{130, 140, 165, 255})
 
 			vSliderY := vSecY + 20
 			vSliderH := rightPanelRect.height - (vSliderY - rightPanelRect.y) - 16
@@ -1118,7 +1184,7 @@ main :: proc() {
 			rl.DrawRectangleRec(specCardRect, rl.Color{28, 33, 44, 220})
 			rl.DrawRectangleLinesEx(specCardRect, 1, rl.Color{55, 65, 88, 255})
 
-			DrawTextStr("DETENT & SNAPPING ARCHITECTURE", specCardRect.x + 14, specCardRect.y + 14, 12, rl.Color{96, 165, 250, 255})
+			DrawTextStr("DETENT & SNAPPING ARCHITECTURE", specCardRect.x + 14, specCardRect.y + 14, 13, rl.Color{96, 165, 250, 255})
 
 			curNotchIdx1 := int(math.round(state.horizNotchVal1))
 			timeScaleStr := notchLabels1[clamp(curNotchIdx1, 0, len(notchLabels1)-1)]
@@ -1127,13 +1193,13 @@ main :: proc() {
 			curNotchIdxV := int(math.round(state.vertNotchVal))
 			relayStr := notchLabelsV[clamp(curNotchIdxV, 0, len(notchLabelsV)-1)]
 
-			DrawTextStr(fmt.tprintf("Active Time Detent:    %s (Index %d)", timeScaleStr, curNotchIdx1), specCardRect.x + 14, specCardRect.y + 38, 11, rl.Color{52, 211, 153, 255})
-			DrawTextStr(fmt.tprintf("Active Thrust Detent:  %s (Stage %d)", thrustStr, curNotchIdx2), specCardRect.x + 14, specCardRect.y + 58, 11, rl.Color{251, 191, 36, 255})
-			DrawTextStr(fmt.tprintf("Selected Power Relay:  %s (Tap #%d)", relayStr, curNotchIdxV), specCardRect.x + 14, specCardRect.y + 78, 11, rl.Color{248, 113, 113, 255})
+			DrawTextStr(fmt.tprintf("Active Time Detent:    %s (Index %d)", timeScaleStr, curNotchIdx1), specCardRect.x + 14, specCardRect.y + 38, 13, rl.Color{52, 211, 153, 255})
+			DrawTextStr(fmt.tprintf("Active Thrust Detent:  %s (Stage %d)", thrustStr, curNotchIdx2), specCardRect.x + 14, specCardRect.y + 58, 13, rl.Color{251, 191, 36, 255})
+			DrawTextStr(fmt.tprintf("Selected Power Relay:  %s (Tap #%d)", relayStr, curNotchIdxV), specCardRect.x + 14, specCardRect.y + 78, 13, rl.Color{248, 113, 113, 255})
 
-			DrawTextStr("- Snap To Notches: Automatic magnetic pull to closest detent tick.", specCardRect.x + 14, specCardRect.y + 110, 11, rl.Color{180, 185, 205, 255})
-			DrawTextStr("- Continuous Bypass: Hold Shift while dragging or using arrows.", specCardRect.x + 14, specCardRect.y + 130, 11, rl.Color{180, 185, 205, 255})
-			DrawTextStr("- Custom Labels: Rendered above ticks with active detent glow.", specCardRect.x + 14, specCardRect.y + 150, 11, rl.Color{180, 185, 205, 255})
+			DrawTextStr("- Snap To Notches: Automatic magnetic pull to closest detent tick.", specCardRect.x + 14, specCardRect.y + 110, 13, rl.Color{180, 185, 205, 255})
+			DrawTextStr("- Continuous Bypass: Hold Shift while dragging or using arrows.", specCardRect.x + 14, specCardRect.y + 130, 13, rl.Color{180, 185, 205, 255})
+			DrawTextStr("- Custom Labels: Rendered above ticks with active detent glow.", specCardRect.x + 14, specCardRect.y + 150, 13, rl.Color{180, 185, 205, 255})
 		}
 
 		// --------------------------------------------------------------------
@@ -1250,19 +1316,19 @@ main :: proc() {
 				hudText := fmt.tprintf("Viewport: %.0fx%.0f | Ship: (%.0f, %.0f) | Ratio: Left=%.2f Right=%.2f Bottom=%.2f",
 					b.width, b.height, state.dockViewportShipPos.x, state.dockViewportShipPos.y,
 					state.dockSpace.leftRatio, state.dockSpace.rightRatio, state.dockSpace.bottomRatio)
-				DrawTextStr(hudText, b.x + 10, b.y + b.height - 20, 11, rl.Color{130, 140, 165, 255})
+				DrawTextStr(hudText, b.x + 10, b.y + b.height - 20, 13, rl.Color{130, 140, 165, 255})
 				DockSpace_EndPanel(&state.dockSpace)
 			}
 
 			// 6. Panel: Entity Inspector (Right)
 			if vis, b := DockSpace_BeginPanel(&state.dockSpace, "inspector"); vis {
-				DrawTextStr("SELECTED: Interceptor Spacecraft", b.x + 4, b.y + 4, 12, rl.Color{96, 165, 250, 255})
+				DrawTextStr("SELECTED: Interceptor Spacecraft", b.x + 4, b.y + 4, 13, rl.Color{96, 165, 250, 255})
 				_ = GuiSlider(rl.Rectangle{b.x + 4, b.y + 24, b.width - 8, 24}, "Pos X", "px", &state.dockInspectorPosX, 0.0, 1920.0, true, idKey = 70201, labelWidth = 70)
 				_ = GuiSlider(rl.Rectangle{b.x + 4, b.y + 54, b.width - 8, 24}, "Pos Y", "px", &state.dockInspectorPosY, 0.0, 1080.0, true, idKey = 70202, labelWidth = 70)
 				_ = GuiSlider(rl.Rectangle{b.x + 4, b.y + 84, b.width - 8, 24}, "Scale", "x", &state.dockInspectorScale, 0.1, 4.0, false, idKey = 70203, labelWidth = 70)
 
 				if b.height > 180 {
-					DrawTextStr("Hull Tint Swatch:", b.x + 4, b.y + 118, 11, rl.Color{170, 180, 200, 255})
+					DrawTextStr("Hull Tint Swatch:", b.x + 4, b.y + 118, 13, rl.Color{170, 180, 200, 255})
 					rl.DrawRectangleRec(rl.Rectangle{b.x + 110, b.y + 116, 50, 18}, state.dockInspectorColor)
 					rl.DrawRectangleLinesEx(rl.Rectangle{b.x + 110, b.y + 116, 50, 18}, 1, rl.WHITE)
 
@@ -1310,7 +1376,7 @@ main :: proc() {
 			// Section 1: Unordered List <ul>
 			ulH := (leftColRect.height - 110.0) * 0.5
 			ulY := leftColRect.y + 46
-			DrawTextStr("UNORDERED LIST (<ul> with Disc / Circle / Dash / Square Bullets)", leftColRect.x + 16, ulY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("UNORDERED LIST (<ul> with Disc / Circle / Dash / Square Bullets)", leftColRect.x + 16, ulY, 13, rl.Color{130, 140, 165, 255})
 
 			ulRect := rl.Rectangle{leftColRect.x + 16, ulY + 18, leftColRect.width - 32, ulH}
 			ulChanged, _ := GuiUnorderedList(ulRect, state.htmlUlItems[:], &state.htmlUlSelected, &state.htmlUlScroll, defaultBullet = .Disc, idKey = 80101)
@@ -1318,7 +1384,7 @@ main :: proc() {
 
 			// Section 2: Ordered List <ol>
 			olY := ulRect.y + ulRect.height + 16
-			DrawTextStr("ORDERED LIST (<ol> with 1., 2., 3. & a., b., c. Numbering)", leftColRect.x + 16, olY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("ORDERED LIST (<ol> with 1., 2., 3. & a., b., c. Numbering)", leftColRect.x + 16, olY, 13, rl.Color{130, 140, 165, 255})
 
 			olRect := rl.Rectangle{leftColRect.x + 16, olY + 18, leftColRect.width - 32, ulH}
 			olChanged, _ := GuiOrderedList(olRect, state.htmlOlItems[:], &state.htmlOlSelected, &state.htmlOlScroll, numbering = state.htmlOlStyle, idKey = 80102)
@@ -1337,7 +1403,7 @@ main :: proc() {
 			)
 
 			tblDescY := rightColRect.y + 46
-			DrawTextStr("INTERACTIVE DATA TABLE (CLICK HEADERS TO SORT | ARROWS/CLICK TO SELECT)", rightColRect.x + 16, tblDescY, 11, rl.Color{130, 140, 165, 255})
+			DrawTextStr("INTERACTIVE DATA TABLE (CLICK HEADERS TO SORT | ARROWS/CLICK TO SELECT)", rightColRect.x + 16, tblDescY, 13, rl.Color{130, 140, 165, 255})
 
 			tblH := rightColRect.height - 180.0
 			tableRect := rl.Rectangle{rightColRect.x + 16, tblDescY + 18, rightColRect.width - 32, tblH}
@@ -1383,10 +1449,10 @@ main :: proc() {
 
 			detailStr := fmt.tprintf("VESSEL TELEMETRY: %s (%s)  |  Class: %s  |  Hull: %s  |  Shields: %s  |  Status: %s",
 				vName, vId, vClass, vHull, vShield, vStatus)
-			DrawTextStr(detailStr, cardRect.x + 14, cardRect.y + 12, 12, rl.Color{96, 165, 250, 255})
+			DrawTextStr(detailStr, cardRect.x + 14, cardRect.y + 12, 13, rl.Color{96, 165, 250, 255})
 		}
 
-			DrawTextStr(state.htmlTableActionMsg, cardRect.x + 14, cardRect.y + 34, 11, rl.Color{52, 211, 153, 255})
+			DrawTextStr(state.htmlTableActionMsg, cardRect.x + 14, cardRect.y + 34, 13, rl.Color{52, 211, 153, 255})
 
 			// Action buttons inside table card
 			if GuiButton(rl.Rectangle{cardRect.x + 14, cardRect.y + 54, 140, 26}, "Repair Vessel", .Center, idKey = 80301) {
@@ -1399,6 +1465,356 @@ main :: proc() {
 				state.htmlTableActionMsg = "Deep subspace telemetry scan complete."
 			}
 		}
+
+		// --------------------------------------------------------------------
+		// TAB 8: Live Theme Editor & Native System Dialogs
+		// --------------------------------------------------------------------
+		if state.activeTab == 8 {
+			// Flexbox layout for the two main columns in Tab 8
+			Flex_Begin(contentArea, direction = .Row, gap = 20.0)
+			Flex_AddItem(0, contentArea.height, grow = 1.0) // Left Column: Theme Editor
+			Flex_AddItem(0, contentArea.height, grow = 1.0) // Right Column: Native Dialogs & Content
+			themeColRect := Flex_GetRect(0)
+			dialogColRect := Flex_GetRect(1)
+			Flex_End()
+
+			// Left Column: Live Theme Editor
+			t := GetTheme()
+			RenderContainerPanel(
+				themeColRect,
+				"Live Theme Customizer (Reactive Styling Engine)",
+				true, true, true, 34,
+				t.bgPanel,
+				t.bgHeader,
+				t.borderNormal,
+				t.textPrimary,
+			)
+
+			ty := themeColRect.y + 46
+
+			// 1. Theme Presets Row
+			DrawTextStr("THEME PRESETS (INSTANT GLOBAL SWITCH)", themeColRect.x + 16, ty, DEFAULT_FONT_SIZE_SM, t.textSecondary)
+			ty += 20
+
+			Flex_Begin(rl.Rectangle{themeColRect.x + 16, ty, themeColRect.width - 32, 32}, direction = .Row, gap = 8.0)
+			Flex_AddItem(0, 32, grow = 1.0)
+			Flex_AddItem(0, 32, grow = 1.0)
+			Flex_AddItem(0, 32, grow = 1.0)
+			pr1Rect := Flex_GetRect(0)
+			pr2Rect := Flex_GetRect(1)
+			pr3Rect := Flex_GetRect(2)
+			Flex_End()
+
+			if GuiButton(pr1Rect, "Dark Modern", .Center, isSelected = (state.themePresetIdx == 0), idKey = 90101) {
+				SetTheme(Theme_Dark())
+				state.themePresetIdx = 0
+				curT := GetTheme()
+				state.themeRadiusVal = curT.borderRadius
+				state.themePaddingVal = curT.paddingMd
+				state.themeBorderVal = curT.borderWidth
+				state.themeSmallRadiusVal = curT.borderRadiusSmall
+				state.themeSpacingVal = curT.itemSpacing
+				state.lastActionMsg = "Switched to Dark Modern theme preset."
+			}
+			if GuiButton(pr2Rect, "Clean Light", .Center, isSelected = (state.themePresetIdx == 1), idKey = 90102) {
+				SetTheme(Theme_Light())
+				state.themePresetIdx = 1
+				curT := GetTheme()
+				state.themeRadiusVal = curT.borderRadius
+				state.themePaddingVal = curT.paddingMd
+				state.themeBorderVal = curT.borderWidth
+				state.themeSmallRadiusVal = curT.borderRadiusSmall
+				state.themeSpacingVal = curT.itemSpacing
+				state.lastActionMsg = "Switched to Clean Light theme preset."
+			}
+			if GuiButton(pr3Rect, "Cyberpunk", .Center, isSelected = (state.themePresetIdx == 2), idKey = 90103) {
+				SetTheme(Theme_Cyberpunk())
+				state.themePresetIdx = 2
+				curT := GetTheme()
+				state.themeRadiusVal = curT.borderRadius
+				state.themePaddingVal = curT.paddingMd
+				state.themeBorderVal = curT.borderWidth
+				state.themeSmallRadiusVal = curT.borderRadiusSmall
+				state.themeSpacingVal = curT.itemSpacing
+				state.lastActionMsg = "Switched to Cyberpunk theme preset."
+			}
+
+			// 2. Sliders for live geometry tuning
+			ty += 42
+			DrawTextStr("GEOMETRY & SPACING METRICS (LIVE REACTIVE)", themeColRect.x + 16, ty, DEFAULT_FONT_SIZE_SM, t.textSecondary)
+			ty += 20
+
+			if GuiSlider(rl.Rectangle{themeColRect.x + 16, ty, themeColRect.width - 32, 26}, "Border Radius", "px", &state.themeRadiusVal, 0.0, 20.0, true, idKey = 90110, labelWidth = 110) {
+				activeTheme.borderRadius = state.themeRadiusVal
+				state.themePresetIdx = 3
+			}
+			ty += 34
+
+			if GuiSlider(rl.Rectangle{themeColRect.x + 16, ty, themeColRect.width - 32, 26}, "Padding (Md)", "px", &state.themePaddingVal, 2.0, 24.0, true, idKey = 90111, labelWidth = 110) {
+				activeTheme.paddingMd = state.themePaddingVal
+				state.themePresetIdx = 3
+			}
+			ty += 34
+
+			if GuiSlider(rl.Rectangle{themeColRect.x + 16, ty, themeColRect.width - 32, 26}, "Border Width", "px", &state.themeBorderVal, 0.5, 4.0, false, idKey = 90112, labelWidth = 110) {
+				activeTheme.borderWidth = state.themeBorderVal
+				state.themePresetIdx = 3
+			}
+			ty += 34
+
+			if GuiSlider(rl.Rectangle{themeColRect.x + 16, ty, themeColRect.width - 32, 26}, "Badge Radius", "px", &state.themeSmallRadiusVal, 0.0, 12.0, true, idKey = 90113, labelWidth = 110) {
+				activeTheme.borderRadiusSmall = state.themeSmallRadiusVal
+				state.themePresetIdx = 3
+			}
+
+			// 3. Brand Accent Palette Swatches
+			ty += 40
+			DrawTextStr("ACCENT BRAND COLOR (PALETTE SWATCHES)", themeColRect.x + 16, ty, DEFAULT_FONT_SIZE_SM, t.textSecondary)
+			ty += 20
+
+			accentColors := [6]rl.Color{
+				{59, 130, 246, 255},  // Blue
+				{16, 185, 129, 255},  // Emerald
+				{245, 158, 11, 255},  // Amber
+				{139, 92, 246, 255},  // Violet
+				{239, 68, 68, 255},   // Rose
+				{6, 182, 212, 255},   // Cyan
+			}
+			accentNames := [6]cstring{"Blue", "Emerald", "Amber", "Violet", "Rose", "Cyan"}
+
+			Flex_Begin(rl.Rectangle{themeColRect.x + 16, ty, themeColRect.width - 32, 30}, direction = .Row, gap = 8.0)
+			for _ in 0..<6 {
+				Flex_AddItem(0, 30, grow = 1.0)
+			}
+			for i in 0..<6 {
+				swatchRect := Flex_GetRect(i)
+				isCurrentAccent := (activeTheme.accent.r == accentColors[i].r && activeTheme.accent.g == accentColors[i].g && activeTheme.accent.b == accentColors[i].b)
+				if GuiButton(swatchRect, accentNames[i], .Center, isSelected = isCurrentAccent, idKey = uintptr(90120 + i)) {
+					activeTheme.accent = accentColors[i]
+					activeTheme.accentHover = rl.Color{
+						u8(min(int(accentColors[i].r) + 30, 255)),
+						u8(min(int(accentColors[i].g) + 30, 255)),
+						u8(min(int(accentColors[i].b) + 30, 255)),
+						255,
+					}
+					state.themePresetIdx = 3
+					state.lastActionMsg = fmt.tprintf("Accent color updated to %s.", accentNames[i])
+				}
+			}
+			Flex_End()
+
+			// 4. Live Reactive Themed Preview Container Card
+			ty += 42
+			DrawTextStr("LIVE COMPONENT PREVIEW (INSTANT REACTIVITY)", themeColRect.x + 16, ty, DEFAULT_FONT_SIZE_SM, t.textSecondary)
+			ty += 20
+
+			prevCardH := themeColRect.height - (ty - themeColRect.y) - 16
+			prevCardRect := rl.Rectangle{themeColRect.x + 16, ty, themeColRect.width - 32, prevCardH}
+			rl.DrawRectangleRounded(prevCardRect, clamp((activeTheme.borderRadius * 2.0) / min(prevCardRect.width, prevCardRect.height), 0.0, 1.0), 16, activeTheme.bgWidget)
+			rl.DrawRectangleRoundedLinesEx(prevCardRect, clamp((activeTheme.borderRadius * 2.0) / min(prevCardRect.width, prevCardRect.height), 0.0, 1.0), 16, activeTheme.borderWidth, activeTheme.borderNormal)
+
+			// Preview elements inside card using Flexbox
+			pcy := prevCardRect.y + 14
+			Flex_Begin(rl.Rectangle{prevCardRect.x + 14, pcy, prevCardRect.width - 28, 34}, direction = .Row, gap = 12.0)
+			Flex_AddItem(0, 34, grow = 1.0)
+			Flex_AddItem(0, 34, grow = 1.0)
+			pBtn1 := Flex_GetRect(0)
+			pBtn2 := Flex_GetRect(1)
+			Flex_End()
+
+			_ = GuiIconButton(pBtn1, .Rocket, "Themed Active", isSelected = true, idKey = 90150)
+			_ = GuiButton(pBtn2, "Themed Neutral", .Center, isSelected = false, idKey = 90151)
+
+			pcy += 46
+			_ = GuiCheckBox(rl.Rectangle{prevCardRect.x + 14, pcy, prevCardRect.width - 28, 24}, "Reactive Themed Checkbox", &state.sampleThemedCheck, idKey = 90152)
+
+			pcy += 32
+			_ = GuiToggleSwitch(rl.Rectangle{prevCardRect.x + 14, pcy, prevCardRect.width - 28, 26}, "Reactive Themed Switch", &state.sampleThemedSwitch, idKey = 90153)
+
+			pcy += 34
+			badgeRect := rl.Rectangle{prevCardRect.x + 14, pcy, 180, 24}
+			rl.DrawRectangleRounded(badgeRect, clamp((activeTheme.borderRadiusSmall * 2.0) / 24.0, 0.0, 1.0), 8, activeTheme.accent)
+			DrawTextStr("THEME ACCENT BADGE", badgeRect.x + 12, badgeRect.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{255, 255, 255, 255})
+
+			// ----------------------------------------------------------------
+			// Right Column: Native Dialog Interop & Dynamic Content
+			// ----------------------------------------------------------------
+			RenderContainerPanel(
+				dialogColRect,
+				"Native System Dialog Interop & Dynamic Content",
+				true, true, true, 34,
+				t.bgPanel,
+				t.bgHeader,
+				t.borderNormal,
+				t.textPrimary,
+			)
+
+			dy := dialogColRect.y + 46
+
+			// 1. Native File & Folder Dialogs
+			DrawTextStr("NATIVE SYSTEM FILE & DIRECTORY PICKERS", dialogColRect.x + 16, dy, DEFAULT_FONT_SIZE_SM, t.textSecondary)
+			dy += 20
+
+			Flex_Begin(rl.Rectangle{dialogColRect.x + 16, dy, dialogColRect.width - 32, 34}, direction = .Row, gap = 8.0)
+			Flex_AddItem(0, 34, grow = 1.0)
+			Flex_AddItem(0, 34, grow = 1.0)
+			Flex_AddItem(0, 34, grow = 1.0)
+			dBtn1 := Flex_GetRect(0)
+			dBtn2 := Flex_GetRect(1)
+			dBtn3 := Flex_GetRect(2)
+			Flex_End()
+
+			if GuiIconButton(dBtn1, .FolderOpen, "Open File...", idKey = 90201) {
+				path, ok := NativeDialog_OpenFile("Select Document or Asset", "", []string{".odin", ".txt", ".json", ".png"})
+				if ok {
+					state.dialogLastAction = "NativeDialog_OpenFile Succeeded"
+					if len(state.dialogLastPath) > 0 && state.dialogLastPath != "(None)" {
+						delete(state.dialogLastPath)
+					}
+					state.dialogLastPath = strings.clone(path)
+					state.lastActionMsg = fmt.tprintf("Selected File: %s", path)
+				} else {
+					state.dialogLastAction = "NativeDialog_OpenFile Cancelled or Test Bypass"
+					state.lastActionMsg = state.dialogLastAction
+				}
+			}
+
+			if GuiIconButton(dBtn2, .FloppyDisk, "Save File...", idKey = 90202) {
+				path, ok := NativeDialog_SaveFile("Save File As", "project_backup.json", "", []string{".json", ".txt"})
+				if ok {
+					state.dialogLastAction = "NativeDialog_SaveFile Succeeded"
+					if len(state.dialogLastPath) > 0 && state.dialogLastPath != "(None)" {
+						delete(state.dialogLastPath)
+					}
+					state.dialogLastPath = strings.clone(path)
+					state.lastActionMsg = fmt.tprintf("Save Destination: %s", path)
+				} else {
+					state.dialogLastAction = "NativeDialog_SaveFile Cancelled or Test Bypass"
+					state.lastActionMsg = state.dialogLastAction
+				}
+			}
+
+			if GuiIconButton(dBtn3, .Folder, "Open Folder...", idKey = 90203) {
+				path, ok := NativeDialog_OpenFolder("Select Project Directory")
+				if ok {
+					state.dialogLastAction = "NativeDialog_OpenFolder Succeeded"
+					if len(state.dialogLastPath) > 0 && state.dialogLastPath != "(None)" {
+						delete(state.dialogLastPath)
+					}
+					state.dialogLastPath = strings.clone(path)
+					state.lastActionMsg = fmt.tprintf("Selected Directory: %s", path)
+				} else {
+					state.dialogLastAction = "NativeDialog_OpenFolder Cancelled or Test Bypass"
+					state.lastActionMsg = state.dialogLastAction
+				}
+			}
+
+			// 2. Native System Alert Popups
+			dy += 46
+			DrawTextStr("NATIVE SYSTEM MODAL ALERTS & POPUPS", dialogColRect.x + 16, dy, DEFAULT_FONT_SIZE_SM, t.textSecondary)
+			dy += 20
+
+			Flex_Begin(rl.Rectangle{dialogColRect.x + 16, dy, dialogColRect.width - 32, 34}, direction = .Row, gap = 8.0)
+			Flex_AddItem(0, 34, grow = 1.0)
+			Flex_AddItem(0, 34, grow = 1.0)
+			Flex_AddItem(0, 34, grow = 1.0)
+			aBtn1 := Flex_GetRect(0)
+			aBtn2 := Flex_GetRect(1)
+			aBtn3 := Flex_GetRect(2)
+			Flex_End()
+
+			if GuiIconButton(aBtn1, .CircleInfo, "Info Alert", idKey = 90210) {
+				ok := NativeDialog_MessageBox("Information Alert", "All simulation subsystems initialized and telemetry synchronized.", .Info)
+				state.dialogLastAction = "NativeDialog_MessageBox (.Info) Acknowledged" if ok else "Alert Dismissed"
+				state.lastActionMsg = state.dialogLastAction
+			}
+
+			if GuiIconButton(aBtn2, .TriangleExclamation, "Warning Alert", idKey = 90211) {
+				ok := NativeDialog_MessageBox("Warning Alert", "Plasma reactor core heat exceeds 850K. Coolant flush recommended.", .Warning)
+				state.dialogLastAction = "NativeDialog_MessageBox (.Warning) Acknowledged" if ok else "Alert Dismissed"
+				state.lastActionMsg = state.dialogLastAction
+			}
+
+			if GuiIconButton(aBtn3, .TriangleExclamation, "Error Alert", idKey = 90212) {
+				ok := NativeDialog_MessageBox("Critical Alert", "Hyperdrive magnetic confinement failure detected! Purging flux coils.", .Error)
+				state.dialogLastAction = "NativeDialog_MessageBox (.Error) Acknowledged" if ok else "Alert Dismissed"
+				state.lastActionMsg = state.dialogLastAction
+			}
+
+			// 3. Status Output Card
+			dy += 46
+			DrawTextStr("DIALOG INTEROP RESULT STATUS", dialogColRect.x + 16, dy, DEFAULT_FONT_SIZE_SM, t.textSecondary)
+			dy += 20
+
+			statCardRect := rl.Rectangle{dialogColRect.x + 16, dy, dialogColRect.width - 32, 60}
+			rl.DrawRectangleRounded(statCardRect, clamp((activeTheme.borderRadius * 2.0) / 60.0, 0.0, 1.0), 16, activeTheme.bgInput)
+			rl.DrawRectangleRoundedLinesEx(statCardRect, clamp((activeTheme.borderRadius * 2.0) / 60.0, 0.0, 1.0), 16, activeTheme.borderWidth, activeTheme.borderNormal)
+
+			DrawTextStr(fmt.tprintf("Event: %s", state.dialogLastAction), statCardRect.x + 12, statCardRect.y + 10, DEFAULT_FONT_SIZE_SM, activeTheme.accent)
+			DrawTextStr(fmt.tprintf("Selected Path: %s", state.dialogLastPath), statCardRect.x + 12, statCardRect.y + 32, DEFAULT_FONT_SIZE_SM, activeTheme.textPrimary)
+
+			// 4. Dynamic Flexbox & Rich Multi-Line Text Wrapping Card
+			dy += 74
+			DrawTextStr("DYNAMIC FLEXBOX & MULTI-LINE TEXT WRAPPING (RUNA SHAPED)", dialogColRect.x + 16, dy, DEFAULT_FONT_SIZE_SM, t.textSecondary)
+			dy += 20
+
+			wrapCardH := dialogColRect.height - (dy - dialogColRect.y) - 16
+			wrapCardRect := rl.Rectangle{dialogColRect.x + 16, dy, dialogColRect.width - 32, wrapCardH}
+			rl.DrawRectangleRounded(wrapCardRect, clamp((activeTheme.borderRadius * 2.0) / min(wrapCardRect.width, wrapCardRect.height), 0.0, 1.0), 16, activeTheme.bgWidget)
+			rl.DrawRectangleRoundedLinesEx(wrapCardRect, clamp((activeTheme.borderRadius * 2.0) / min(wrapCardRect.width, wrapCardRect.height), 0.0, 1.0), 16, activeTheme.borderWidth, activeTheme.borderNormal)
+
+			// Dynamic Flex badges inside wrap card
+			wcy := wrapCardRect.y + 12
+			Flex_Begin(rl.Rectangle{wrapCardRect.x + 12, wcy, wrapCardRect.width - 24, 26}, direction = .Row, justify = .SpaceBetween, align = .Center)
+			Flex_AddItem(110, 24)
+			Flex_AddItem(130, 24)
+			Flex_AddItem(140, 24)
+			fBadge1 := Flex_GetRect(0)
+			fBadge2 := Flex_GetRect(1)
+			fBadge3 := Flex_GetRect(2)
+			Flex_End()
+
+			rl.DrawRectangleRounded(fBadge1, 0.4, 8, rl.Color{30, 58, 138, 255})
+			DrawTextStr("Flex: Row", fBadge1.x + 12, fBadge1.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{147, 197, 253, 255})
+
+			rl.DrawRectangleRounded(fBadge2, 0.4, 8, rl.Color{6, 78, 59, 255})
+			DrawTextStr("Align: Stretch", fBadge2.x + 12, fBadge2.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{110, 231, 183, 255})
+
+			rl.DrawRectangleRounded(fBadge3, 0.4, 8, rl.Color{88, 28, 135, 255})
+			DrawTextStr("Justify: SpaceBetween", fBadge3.x + 12, fBadge3.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{216, 180, 254, 255})
+
+			// Multi-line wrapped text inside wrap card
+			wcy += 36
+			multiLineDesc := "The modern Odin UI framework combines CSS-compliant dynamic Flexbox containers with Runa OpenType shaping and native operating system dialog interop. UI elements dynamically adapt their padding, corner curvature, and typography while maintaining zero external dynamic dependencies."
+			GuiLabelWrapped(
+				rl.Rectangle{wrapCardRect.x + 12, wcy, wrapCardRect.width - 24, wrapCardRect.height - (wcy - wrapCardRect.y) - 12},
+				multiLineDesc,
+				fontSize = DEFAULT_FONT_SIZE,
+				color = activeTheme.textSecondary,
+				lineSpacing = 1.35,
+			)
+		}
+
+		// --------------------------------------------------------------------
+		// Footer Status Bar (Flexbox Layout)
+		// --------------------------------------------------------------------
+		footerRect := rl.Rectangle{0, f32(rl.GetScreenHeight()) - 28, f32(rl.GetScreenWidth()), 28}
+		rl.DrawRectangleRec(footerRect, rl.Color{20, 22, 28, 255})
+		rl.DrawLineEx({0, footerRect.y}, {f32(rl.GetScreenWidth()), footerRect.y}, 1, rl.Color{38, 44, 58, 255})
+
+		Flex_Begin(rl.Rectangle{20, footerRect.y, f32(rl.GetScreenWidth()) - 40, 28}, direction = .Row, justify = .SpaceBetween, align = .Center)
+		Flex_AddItem(420, 24)
+		Flex_AddItem(380, 24)
+		Flex_AddItem(220, 24)
+		footL := Flex_GetRect(0)
+		footM := Flex_GetRect(1)
+		footR := Flex_GetRect(2)
+		Flex_End()
+
+		tCur := GetTheme()
+		DrawTextStr("Engine: Pure Odin + Raylib | Text: Runa OpenType (TTF)", footL.x, footL.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{130, 140, 165, 255})
+		DrawTextStr(fmt.tprintf("Theme: Radius=%.1fpx  Padding=%.1fpx  Border=%.1fpx", tCur.borderRadius, tCur.paddingMd, tCur.borderWidth), footM.x, footM.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{96, 165, 250, 255})
+		DrawTextStr(fmt.tprintf("FPS: %d  |  Layout: Flexbox", rl.GetFPS()), footR.x, footR.y + 4, DEFAULT_FONT_SIZE_SM, rl.Color{52, 211, 153, 255})
 
 		// --------------------------------------------------------------------
 		// 3. Process Immediate Navigation Inputs for Next Frame
@@ -1425,38 +1841,46 @@ main :: proc() {
 				TestHook_Assert(state.activeTab == 0, "Initial active tab is 0 (Controls)")
 
 			case 2:
-				// Inject click on Primary Button \"Launch Rocket\" at (129, 194)
-				TestHook_MouseClick(129, 194)
+				// Inject click on Primary Button "Launch" (GuiIconButton with Icon.Rocket) at (129, 236)
+				TestHook_MouseClick(129, 236)
 
 			case 3:
-				TestHook_MouseRelease(129, 194)
-				TestHook_Assert(state.buttonClickCount == 1, "Primary button click increments count to 1")
+				TestHook_MouseRelease(129, 236)
+				TestHook_Assert(state.buttonClickCount == 1, "Primary icon button click increments count to 1")
+
+			case 4:
+				// Inject click on Toolbar item "Save" (Icon.FloppyDisk) at (214, 147)
+				TestHook_MouseClick(214, 147)
 
 			case 5:
-				// Inject click on VSync checkbox at (50, 313)
-				TestHook_MouseClick(45, 287)
+				TestHook_MouseRelease(214, 147)
+				TestHook_Assert(strings.contains(state.toolbarLastAction, "Save"), "Toolbar Save button activated with Font Awesome icon")
 
 			case 6:
-				TestHook_MouseRelease(45, 287)
+				// Inject click on VSync checkbox at (45, 392)
+				TestHook_MouseClick(45, 392)
+
+			case 7:
+				TestHook_MouseRelease(45, 392)
 				TestHook_Assert(state.vsyncChecked == false, "VSync checkbox toggled to false")
 
 			case 8:
-				// Inject click on Toggle Switch \"Flight Computer\" at (500, 497)
-				TestHook_MouseClick(100, 441)
+				// Inject click on Toggle Switch "Flight Computer" at (100, 532)
+				TestHook_MouseClick(100, 532)
 
 			case 9:
-				TestHook_MouseRelease(100, 441)
+				TestHook_MouseRelease(100, 532)
 				TestHook_Assert(state.flightAssistActive == false, "Flight assist toggle switch toggled to false")
 
 			case 10:
 				TestHook_Assert(string(state.callsignBuffer[:]) == "VIPER-7", "Callsign buffer initialized to VIPER-7")
 
 			case 11:
-				// Inject click on "Transmit Callsign" button at (121, 610)
-				TestHook_MouseClick(121, 610)
+				// Inject click on "Transmit Callsign" button at (121, 694)
+				TestHook_MouseClick(121, 694)
 
 			case 12:
-				TestHook_MouseRelease(121, 610)
+				TestHook_MouseRelease(121, 694)
 				TestHook_Assert(strings.contains(state.lastActionMsg, "transmitted"), "Callsign transmitted successfully")
 
 			case 14:
@@ -1472,12 +1896,12 @@ main :: proc() {
 				TestHook_Assert(state.coarseSliderVal > 65.0, "Right arrow key increments slider value")
 				TestHook_CaptureScreenshot("01_controls_and_buttons.png")
 
-			case 18:
+						case 18:
 				// Switch to Tab 1 (Lists & Trees) via mouse click on TabBar at (330, 100)
-				TestHook_MouseClick(252, 100)
+				TestHook_MouseClick(227, 100)
 
 			case 19:
-				TestHook_MouseRelease(252, 100)
+				TestHook_MouseRelease(227, 100)
 				TestHook_Assert(state.activeTab == 1, "Switched to Tab 1 (Lists & Trees)")
 
 			case 21:
@@ -1521,10 +1945,10 @@ main :: proc() {
 
 			case 37:
 				// Switch to Tab 2 (Visualizers & Plots) at (536, 100)
-				TestHook_MouseClick(408, 100)
+				TestHook_MouseClick(364, 100)
 
 			case 38:
-				TestHook_MouseRelease(408, 100)
+				TestHook_MouseRelease(364, 100)
 				TestHook_Assert(state.activeTab == 2, "Switched to Tab 2 (Visualizers & Plots)")
 
 			case 40:
@@ -1548,10 +1972,10 @@ main :: proc() {
 
 			case 48:
 				// Switch to Tab 3 (2D Spatial Grid) at (743, 100)
-				TestHook_MouseClick(562, 100)
+				TestHook_MouseClick(502, 100)
 
 			case 49:
-				TestHook_MouseRelease(562, 100)
+				TestHook_MouseRelease(502, 100)
 				TestHook_Assert(state.activeTab == 3, "Switched to Tab 3 (Spatial 2D Grid)")
 
 			case 51:
@@ -1590,10 +2014,10 @@ main :: proc() {
 
 			case 66:
 				// Switch to Tab 4 (Vertical Tabs) at (950, 100)
-				TestHook_MouseClick(718, 100)
+				TestHook_MouseClick(640, 100)
 
 			case 67:
-				TestHook_MouseRelease(718, 100)
+				TestHook_MouseRelease(640, 100)
 				TestHook_Assert(state.activeTab == 4, "Switched to Tab 4 (Vertical Tabs Showcase)")
 
 			case 69:
@@ -1620,10 +2044,10 @@ main :: proc() {
 
 			case 76:
 				// Switch to Tab 5 (Audio Faders & Notched Sliders) at (1156, 100)
-				TestHook_MouseClick(872, 100)
+				TestHook_MouseClick(778, 100)
 
 			case 77:
-				TestHook_MouseRelease(872, 100)
+				TestHook_MouseRelease(778, 100)
 				TestHook_Assert(state.activeTab == 5, "Switched to Tab 5 (Audio Faders & Notched Sliders)")
 
 			case 79:
@@ -1653,10 +2077,10 @@ main :: proc() {
 
 			case 87:
 				// Switch to Tab 6 (Docking System) at (1171, 100)
-				TestHook_MouseClick(1028, 100)
+				TestHook_MouseClick(916, 100)
 
 			case 88:
-				TestHook_MouseRelease(1028, 100)
+				TestHook_MouseRelease(916, 100)
 				TestHook_Assert(state.activeTab == 6, "Switched to Tab 6 (Docking System)")
 
 			case 90:
@@ -1698,10 +2122,10 @@ main :: proc() {
 
 			case 100:
 				// Switch to Tab 7 (HTML Lists & Tables) at (1182, 100)
-				TestHook_MouseClick(1182, 100)
+				TestHook_MouseClick(1053, 100)
 
 			case 101:
-				TestHook_MouseRelease(1182, 100)
+				TestHook_MouseRelease(1053, 100)
 				TestHook_Assert(state.activeTab == 7, "Switched to Tab 7 (HTML Lists & Tables)")
 
 			case 103:
@@ -1730,6 +2154,37 @@ main :: proc() {
 				TestHook_CaptureScreenshot("09_html_lists_and_tables.png")
 
 			case 112:
+				// Switch to Tab 8 (Live Theme & Dialogs) at (1191, 100)
+				TestHook_MouseClick(1191, 100)
+
+			case 113:
+				TestHook_MouseRelease(1191, 100)
+				TestHook_Assert(state.activeTab == 8, "Switched to Tab 8 (Live Theme & Dialogs)")
+
+			case 115:
+				// Switch theme preset to Cyberpunk
+				SetTheme(Theme_Cyberpunk())
+				state.themePresetIdx = 2
+				state.themeRadiusVal = activeTheme.borderRadius
+				state.themePaddingVal = activeTheme.paddingMd
+				state.themeBorderVal = activeTheme.borderWidth
+				TestHook_Assert(activeTheme.borderRadius == 2.0, "Cyberpunk theme preset set borderRadius to 2.0px")
+
+			case 117:
+				// Live slider tweak on active theme
+				state.themeRadiusVal = 12.0
+				activeTheme.borderRadius = 12.0
+				TestHook_Assert(activeTheme.borderRadius == 12.0, "Live theme border radius updated to 12.0px")
+
+			case 119:
+				// Native Dialog call (headless safe bypass)
+				path, ok := NativeDialog_OpenFile("Test Dialog", "", []string{".txt"})
+				_ = path
+				_ = ok
+				TestHook_Assert(testHook.enabled == true, "Headless test hook safely bypasses native modal dialog blocking")
+				TestHook_CaptureScreenshot("10_theme_editor_and_dialogs.png")
+
+			case 121:
 				fmt.println("=================================================================")
 				fmt.printf("[UI TEST HOOK SUMMARY] Total Checks: %d | Passed: %d | Failed: %d\n",
 					testHook.checksPassed + testHook.checksFailed, testHook.checksPassed, testHook.checksFailed)

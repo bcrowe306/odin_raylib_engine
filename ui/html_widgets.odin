@@ -173,6 +173,7 @@ GuiUnorderedList :: proc(
 		isSel := (selectedIndex != nil && selectedIndex^ == i)
 
 		// Interaction
+		if isHovered do SetUICursor(.POINTING_HAND, .Hover)
 		if isHovered && IsUIMouseButtonPressed(.LEFT) {
 			ImmediateNav_SetFocus(key)
 			clickedIndex = i
@@ -215,8 +216,8 @@ GuiUnorderedList :: proc(
 		// Text label
 		textX := markerX + 16.0
 		textCol := rl.WHITE if isSel else (rl.Color{235, 240, 250, 255} if item.isHeader else rl.Color{205, 212, 228, 255})
-		fontSize: f32 = 13.0 if !item.isHeader else 14
-		DrawTextStr(item.text, textX, centerY - 6, fontSize, textCol)
+		fontSize: f32 = 15.0 if !item.isHeader else 16.0
+		DrawTextStr(item.text, textX, centerY - 7, fontSize, textCol)
 
 		// Optional Badge / Chip Tag
 		if item.badge != "" {
@@ -340,14 +341,14 @@ GuiOrderedList :: proc(
 		markerCol := rl.Color{96, 165, 250, 255} if isSel else rl.Color{160, 175, 205, 255}
 
 		// Draw ordered marker
-		markerW := MeasureTextStr(markerStr, 12).x
-		DrawTextStr(markerStr, markerX, centerY - 6, 12, markerCol)
+		markerW := MeasureTextStr(markerStr, 14).x
+		DrawTextStr(markerStr, markerX, centerY - 7, 14, markerCol)
 
 		// Text label
 		textX := markerX + markerW + 8.0
 		textCol := rl.WHITE if isSel else (rl.Color{235, 240, 250, 255} if item.isHeader else rl.Color{205, 212, 228, 255})
-		fontSize: f32 = 13.0 if !item.isHeader else 14
-		DrawTextStr(item.text, textX, centerY - 6, fontSize, textCol)
+		fontSize: f32 = 15.0 if !item.isHeader else 16.0
+		DrawTextStr(item.text, textX, centerY - 7, fontSize, textCol)
 
 		// Optional Badge / Chip Tag
 		if item.badge != "" {
@@ -439,6 +440,7 @@ GuiTable :: proc(
 
 		isHdrHover := PointInRect(mousePos, cRect)
 		if isHdrHover && col.sortable {
+			SetUICursor(.POINTING_HAND, .Hover)
 			rl.DrawRectangleRec(cRect, rl.Color{38, 46, 62, 255})
 			if IsUIMouseButtonPressed(.LEFT) {
 				headerClicked = i
@@ -470,7 +472,7 @@ GuiTable :: proc(
 			txtX = colX + cw - titleW - 12.0
 		}
 
-		DrawTextStr(col.title, txtX, bounds.y + (headerHeight - 12) * 0.5, 12, rl.Color{230, 235, 248, 255})
+		DrawTextStr(col.title, txtX, bounds.y + (headerHeight - 14) * 0.5, 14, rl.Color{230, 235, 248, 255})
 
 		// Sort Indicator (▲ / ▼)
 		if sortColumn != nil && sortColumn^ == i {
@@ -518,6 +520,7 @@ GuiTable :: proc(
 		isRowHovered := inBody && PointInRect(mousePos, rowRect)
 		isRowSel := (selectedRow != nil && selectedRow^ == r)
 
+		if isRowHovered do SetUICursor(.POINTING_HAND, .Hover)
 		if isRowHovered && IsUIMouseButtonPressed(.LEFT) {
 			ImmediateNav_SetFocus(key)
 			rowClicked = r
@@ -569,7 +572,7 @@ GuiTable :: proc(
 				DrawTextStr(cell.badge, bRect.x + 5, bRect.y + 2, 10, bCol)
 			} else if cell.text != "" {
 				txtCol := rl.WHITE if isRowSel else (cell.color if cell.color.a > 0 else rl.Color{210, 216, 230, 255})
-				txtW := MeasureTextStr(cell.text, 12).x
+				txtW := MeasureTextStr(cell.text, 14).x
 
 				txtX := cellColX + 8.0
 				switch columns[c].align {
@@ -580,7 +583,7 @@ GuiTable :: proc(
 				case .End, .Stretch:
 					txtX = cellColX + cw - txtW - 10.0
 				}
-				DrawTextStr(cell.text, txtX, centerY, 12, txtCol)
+				DrawTextStr(cell.text, txtX, centerY - 1, 14, txtCol)
 			}
 
 			cellColX += cw

@@ -201,7 +201,14 @@ RenderFocusRing :: proc(
 		rect.width + padding * 2.0,
 		rect.height + padding * 2.0,
 	}
-	rl.DrawRectangleLinesEx(ringRect, thickness, color)
+	t := GetTheme()
+	if t.borderRadius > 0.5 {
+		minDim := min(ringRect.width, ringRect.height)
+		roundness := clamp(((t.borderRadius + padding) * 2.0) / minDim, 0.0, 1.0)
+		rl.DrawRectangleRoundedLinesEx(ringRect, roundness, 20, thickness, color)
+	} else {
+		rl.DrawRectangleLinesEx(ringRect, thickness, color)
+	}
 }
 
 // ============================================================================
@@ -220,6 +227,7 @@ immediateNav: ImmediateNavState
 
 ImmediateNav_BeginFrame :: proc() {
 	immediateNav.itemCount = 0
+	Cursor_BeginFrame()
 }
 
 ImmediateNav_RegisterFocusable :: proc(key: uintptr, rect: rl.Rectangle) {
@@ -249,6 +257,7 @@ ImmediateNav_ProcessKeyInput :: proc(input: NavKeyInput) {
 
 ImmediateNav_Update :: proc() {
 	if !rl.IsWindowReady() do return
+	Cursor_Update()
 	action := GetNavActionFromRaylib()
 	ImmediateNav_HandleAction(action)
 }

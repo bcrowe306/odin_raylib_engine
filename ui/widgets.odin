@@ -39,6 +39,8 @@ WidgetType :: enum {
 	UnorderedList,
 	OrderedList,
 	Table,
+	Icon,
+	Toolbar,
 }
 
 SliderOrientation :: enum {
@@ -87,8 +89,8 @@ Alignment :: enum {
 RenderLabel :: proc(
 	rect: rl.Rectangle,
 	text: string,
-	fontSize: f32,
-	textColor: rl.Color,
+	fontSize: f32 = DEFAULT_FONT_SIZE,
+	textColor: rl.Color = {238, 240, 246, 255},
 	align: TextAlign = .Left,
 	drawBackground: bool = false,
 	backgroundColor: rl.Color = {30, 32, 38, 200},
@@ -139,8 +141,8 @@ RenderLabel :: proc(
 RenderButton :: proc(
 	rect: rl.Rectangle,
 	text: string,
-	fontSize: f32,
-	hovered: bool,
+	fontSize: f32 = DEFAULT_FONT_SIZE,
+	hovered: bool = false,
 	isPressed: bool,
 	normalColor: rl.Color = {35, 39, 49, 255},
 	hoverColor: rl.Color = {50, 56, 72, 255},
@@ -164,12 +166,13 @@ RenderButton :: proc(
 		border = rl.Color{110, 168, 254, 255}
 	}
 
-	rl.DrawRectangleRec(rect, bg)
-	rl.DrawRectangleLinesEx(rect, 1, border)
+	t := GetTheme()
+	DrawThemeRect(rect, bg, border)
 
 	// Left subtle accent bar when hovered, pressed, or focused
 	if hovered || isPressed || focused {
-		rl.DrawRectangleRec({rect.x, rect.y, 3, rect.height}, rl.Color{110, 168, 254, 255})
+		accentRec := rl.Rectangle{rect.x, rect.y, 3, rect.height}
+		DrawThemeRect(accentRec, border, rl.Color{0, 0, 0, 0}, radius = t.borderRadiusSmall)
 	}
 
 	if focused {
@@ -245,34 +248,49 @@ RenderSlider :: proc(
 	isEditingText: bool,
 	editText: string,
 	focused: bool = false,
+	customTrackRect: rl.Rectangle = {},
+	customValBoxRect: rl.Rectangle = {},
+	customResetRect: rl.Rectangle = {},
 ) {
 	if !rl.IsWindowReady() do return
-	trackRect, valBoxRect, resetRect := GetSliderSubRects(rect, label != "", labelWidth, showResetButton)
+	trackRect, valBoxRect, resetRect: rl.Rectangle
+	if customTrackRect.width > 0 {
+		trackRect = customTrackRect
+		valBoxRect = customValBoxRect
+		resetRect = customResetRect
+	} else {
+		trackRect, valBoxRect, resetRect = GetSliderSubRects(rect, label != "", labelWidth, showResetButton)
+	}
+
+	t := GetTheme()
 
 	// 1. Label
 	if label != "" {
-		DrawText(fmt.ctprint(label), rect.x + 2, rect.y + (rect.height - 14) * 0.5, 14, rl.Color{215, 220, 230, 255})
+		DrawText(fmt.ctprint(label), rect.x + 2, rect.y + (rect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, t.textPrimary)
 	}
 
 	// 2. Slider Track & Fill
-	rl.DrawRectangleRec(trackRect, rl.Color{24, 27, 34, 255})
+	trackBorder := t.warning if fineModeActive else (t.borderFocused if (hovered || isDragging || focused) else t.borderNormal)
+	DrawThemeRect(trackRect, t.bgInput, trackBorder, radius = t.borderRadiusSmall)
+
 	range := max(maxValue - minValue, 0.0001)
 	norm := clamp((value - minValue) / range, 0.0, 1.0)
-	fillW := (trackRect.width - 4) * norm
-	fillColor := rl.Color{245, 158, 11, 220} if fineModeActive else rl.Color{59, 130, 246, 210}
+	usableWidth := max(trackRect.width - 4.0, 1.0)
+	fillW := usableWidth * norm
+	fillColor := t.warning if fineModeActive else t.accent
 	if fillW > 0 {
-		rl.DrawRectangleRec({trackRect.x + 2, trackRect.y + 2, fillW, trackRect.height - 4}, fillColor)
+		fillRec := rl.Rectangle{trackRect.x + 2, trackRect.y + 2, fillW, trackRect.height - 4}
+		DrawThemeRect(fillRec, fillColor, rl.Color{0, 0, 0, 0}, radius = t.borderRadiusSmall)
 	}
 
-	// Grab handle
-	grabX := trackRect.x + 2 + clamp(fillW - 4, 0, max(trackRect.width - 10, 0))
-	rl.DrawRectangleRec({grabX, trackRect.y + 1, 8, trackRect.height - 2}, rl.Color{230, 236, 248, 255})
-
-	trackBorder := rl.Color{245, 158, 11, 255} if fineModeActive else (rl.Color{110, 168, 254, 255} if (hovered || isDragging || focused) else rl.Color{62, 68, 82, 255})
-	rl.DrawRectangleLinesEx(trackRect, 1, trackBorder)
+	// Grab handle centered right on value point
+	handleW: f32 = 8.0
+	grabX := clamp(trackRect.x + 2 + fillW - handleW * 0.5, trackRect.x + 2, trackRect.x + trackRect.width - 2 - handleW)
+	handleRec := rl.Rectangle{grabX, trackRect.y + 1, handleW, trackRect.height - 2}
+	DrawThemeRect(handleRec, t.textPrimary, rl.Color{0, 0, 0, 0}, radius = t.borderRadiusSmall)
 
 	if fineModeActive {
-		DrawText("FINE", trackRect.x + 6, trackRect.y + (trackRect.height - 11) * 0.5, 11, rl.Color{255, 235, 180, 255})
+		DrawText("FINE", trackRect.x + 6, trackRect.y + (trackRect.height - 12) * 0.5, 12, rl.Color{255, 235, 180, 255})
 	}
 
 	// Focus Ring around active track or box
@@ -281,10 +299,9 @@ RenderSlider :: proc(
 	}
 
 	// 3. Editable Value Box
-	valBg := rl.Color{18, 20, 26, 255} if isEditingText else rl.Color{30, 33, 41, 255}
-	valBorder := rl.Color{110, 168, 254, 255} if (isEditingText || (focused && isEditingText)) else rl.Color{68, 74, 88, 255}
-	rl.DrawRectangleRec(valBoxRect, valBg)
-	rl.DrawRectangleLinesEx(valBoxRect, 1, valBorder)
+	valBg := t.bgApp if isEditingText else t.bgWidget
+	valBorder := t.borderFocused if (isEditingText || (focused && isEditingText)) else t.borderNormal
+	DrawThemeRect(valBoxRect, valBg, valBorder, radius = t.borderRadiusSmall)
 
 	valText: cstring
 	if isEditingText {
@@ -294,18 +311,17 @@ RenderSlider :: proc(
 	} else {
 		valText = fmt.ctprintf("%.2f", value)
 	}
-	measured := MeasureText(valText, 13)
-	DrawText(valText, valBoxRect.x + (valBoxRect.width - measured.x) * 0.5, valBoxRect.y + (valBoxRect.height - 13) * 0.5, 13, rl.Color{235, 238, 245, 255})
+	measured := MeasureText(valText, 14)
+	DrawText(valText, valBoxRect.x + (valBoxRect.width - measured.x) * 0.5, valBoxRect.y + (valBoxRect.height - 14) * 0.5, 14, t.textPrimary)
 
 	// 4. Reset Button [R]
 	if showResetButton {
 		isModified := abs(value - defaultValue) > 0.001
-		rBg := rl.Color{46, 52, 66, 255} if isModified else rl.Color{28, 30, 36, 255}
-		rBorder := rl.Color{110, 168, 254, 255} if isModified else rl.Color{55, 60, 70, 255}
-		rTextCol := rl.Color{235, 240, 255, 255} if isModified else rl.Color{120, 125, 135, 255}
-		rl.DrawRectangleRec(resetRect, rBg)
-		rl.DrawRectangleLinesEx(resetRect, 1, rBorder)
-		DrawText("R", resetRect.x + (resetRect.width - 8) * 0.5, resetRect.y + (resetRect.height - 13) * 0.5, 13, rTextCol)
+		rBg := t.bgWidgetHover if isModified else t.bgWidget
+		rBorder := t.borderFocused if isModified else t.borderNormal
+		rTextCol := t.textPrimary if isModified else t.textDisabled
+		DrawThemeRect(resetRect, rBg, rBorder, radius = t.borderRadiusSmall)
+		DrawText("R", resetRect.x + (resetRect.width - 8) * 0.5, resetRect.y + (resetRect.height - 14) * 0.5, 14, rTextCol)
 	}
 }
 
@@ -317,35 +333,34 @@ RenderCheckbox :: proc(
 	label: string,
 	checked: bool,
 	hovered: bool,
-	accentColor: rl.Color = {59, 130, 246, 255},
-	boxSize: f32 = 18,
+	accentColor: rl.Color = {0, 0, 0, 0},
+	boxSize: f32 = 14,
 	focused: bool = false,
 ) {
 	if !rl.IsWindowReady() do return
 
-	boxRect := rl.Rectangle{rect.x + 2, rect.y + (rect.height - boxSize) * 0.5, boxSize, boxSize}
+	t := GetTheme()
+	actCol := accentColor if accentColor.a > 0 else t.accent
+	actualBoxSize := boxSize if boxSize > 0 else 14.0
+	boxRect := rl.Rectangle{rect.x + 2, rect.y + (rect.height - actualBoxSize) * 0.5, actualBoxSize, actualBoxSize}
 
-	bg := accentColor if checked else rl.Color{28, 31, 38, 255}
-	border := rl.Color{110, 168, 254, 255} if (hovered || checked || focused) else rl.Color{72, 78, 92, 255}
-	rl.DrawRectangleRec(boxRect, bg)
-	rl.DrawRectangleLinesEx(boxRect, 1, border)
+	bg := actCol if checked else t.bgInput
+	border := t.borderFocused if focused else (actCol if checked else (t.borderHover if hovered else t.borderNormal))
+	borderW: f32 = 1.5 if focused else 1.0
+	DrawThemeRect(boxRect, bg, border, radius = min(t.borderRadiusSmall, 3.0), borderWidth = borderW)
 
 	if checked {
-		// Draw crisp checkmark lines inside boxRect
-		scale := boxSize / 18.0
-		p1 := rl.Vector2{boxRect.x + 4 * scale, boxRect.y + 9 * scale}
-		p2 := rl.Vector2{boxRect.x + 8 * scale, boxRect.y + 13 * scale}
-		p3 := rl.Vector2{boxRect.x + 14 * scale, boxRect.y + 5 * scale}
-		rl.DrawLineEx(p1, p2, 2.0, rl.WHITE)
-		rl.DrawLineEx(p2, p3, 2.0, rl.WHITE)
-	}
-
-	if focused {
-		RenderFocusRing(boxRect, true, 2.0)
+		scale := actualBoxSize / 14.0
+		p1 := rl.Vector2{boxRect.x + 3.0 * scale, boxRect.y + 7.0 * scale}
+		p2 := rl.Vector2{boxRect.x + 5.8 * scale, boxRect.y + 10.2 * scale}
+		p3 := rl.Vector2{boxRect.x + 11.2 * scale, boxRect.y + 3.8 * scale}
+		rl.DrawLineEx(p1, p2, 1.8 * scale, rl.WHITE)
+		rl.DrawLineEx(p2, p3, 1.8 * scale, rl.WHITE)
 	}
 
 	if label != "" {
-		DrawText(fmt.ctprint(label), boxRect.x + boxSize + 10, rect.y + (rect.height - 14) * 0.5, 14, rl.Color{225, 228, 236, 255})
+		textY := rect.y + (rect.height - DEFAULT_FONT_SIZE) * 0.5
+		DrawTextStr(label, boxRect.x + actualBoxSize + 8, textY, DEFAULT_FONT_SIZE, t.textPrimary)
 	}
 }
 
@@ -366,15 +381,14 @@ RenderTextInput :: proc(
 	lw := labelWidth if label != "" else 0
 
 	if label != "" {
-		DrawText(fmt.ctprint(label), rect.x + 2, rect.y + (rect.height - 14) * 0.5, 14, rl.Color{215, 220, 230, 255})
+		DrawText(fmt.ctprint(label), rect.x + 2, rect.y + (rect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{215, 220, 230, 255})
 	}
 
 	boxRect := rl.Rectangle{rect.x + lw, rect.y + 2, max(rect.width - lw, 60), rect.height - 4}
-	bg := rl.Color{18, 20, 26, 255} if focused else rl.Color{26, 29, 36, 255}
-	border := rl.Color{110, 168, 254, 255} if (focused || hovered) else rl.Color{66, 72, 86, 255}
-
-	rl.DrawRectangleRec(boxRect, bg)
-	rl.DrawRectangleLinesEx(boxRect, 1, border)
+	t := GetTheme()
+	bg := t.bgApp if focused else t.bgInput
+	border := t.borderFocused if (focused || hovered) else t.borderNormal
+	DrawThemeRect(boxRect, bg, border, radius = t.borderRadiusSmall)
 
 	if focused {
 		RenderFocusRing(boxRect, true, 2.0)
@@ -383,12 +397,12 @@ RenderTextInput :: proc(
 	if len(text) > 0 {
 		showCursor := focused && (int(blinkTimer * 2.0) % 2 == 0)
 		displayStr := fmt.ctprintf("%s%s", text, "|" if showCursor else "")
-		DrawText(displayStr, boxRect.x + 8, boxRect.y + (boxRect.height - 14) * 0.5, 14, rl.Color{235, 238, 245, 255})
+		DrawText(displayStr, boxRect.x + 8, boxRect.y + (boxRect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{235, 238, 245, 255})
 	} else if focused {
 		showCursor := (int(blinkTimer * 2.0) % 2 == 0)
-		DrawText("|" if showCursor else "", boxRect.x + 8, boxRect.y + (boxRect.height - 14) * 0.5, 14, rl.Color{110, 168, 254, 255})
+		DrawText("|" if showCursor else "", boxRect.x + 8, boxRect.y + (boxRect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{110, 168, 254, 255})
 	} else {
-		DrawText(fmt.ctprint(placeholder), boxRect.x + 8, boxRect.y + (boxRect.height - 14) * 0.5, 14, rl.Color{115, 120, 134, 255})
+		DrawText(fmt.ctprint(placeholder), boxRect.x + 8, boxRect.y + (boxRect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{115, 120, 134, 255})
 	}
 }
 
@@ -407,21 +421,21 @@ RenderDropdownBox :: proc(
 	if !rl.IsWindowReady() do return
 
 	if label != "" {
-		DrawText(fmt.ctprint(label), rect.x + 2, rect.y + (rect.height - 14) * 0.5, 14, rl.Color{215, 220, 230, 255})
+		DrawText(fmt.ctprint(label), rect.x + 2, rect.y + (rect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{215, 220, 230, 255})
 	}
 
-	bg := rl.Color{36, 40, 50, 255} if (hovered || isOpen) else rl.Color{28, 31, 38, 255}
-	border := rl.Color{110, 168, 254, 255} if (hovered || isOpen || focused) else rl.Color{66, 72, 86, 255}
-	rl.DrawRectangleRec(boxRect, bg)
-	rl.DrawRectangleLinesEx(boxRect, 1, border)
+	t := GetTheme()
+	bg := t.bgWidgetHover if (hovered || isOpen) else t.bgWidget
+	border := t.borderFocused if (hovered || isOpen || focused) else t.borderNormal
+	DrawThemeRect(boxRect, bg, border, radius = t.borderRadiusSmall)
 
 	if focused {
 		RenderFocusRing(boxRect, true, 2.0)
 	}
 
-	DrawText(fmt.ctprint(selectedText), boxRect.x + 8, boxRect.y + (boxRect.height - 14) * 0.5, 14, rl.Color{235, 238, 245, 255})
+	DrawText(fmt.ctprint(selectedText), boxRect.x + 8, boxRect.y + (boxRect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{235, 238, 245, 255})
 	arrowStr: cstring = "^" if isOpen else "v"
-	DrawText(arrowStr, boxRect.x + boxRect.width - 18, boxRect.y + (boxRect.height - 14) * 0.5, 14, rl.Color{150, 160, 180, 255})
+	DrawText(arrowStr, boxRect.x + boxRect.width - 18, boxRect.y + (boxRect.height - DEFAULT_FONT_SIZE) * 0.5, DEFAULT_FONT_SIZE, rl.Color{150, 160, 180, 255})
 }
 
 RenderDropdownPopup :: proc(
@@ -444,7 +458,7 @@ RenderDropdownPopup :: proc(
 		} else if idx == selectedIndex {
 			rl.DrawRectangleRec(itemRect, rl.Color{37, 99, 235, 90})
 		}
-		DrawText(fmt.ctprint(item), itemRect.x + 8, itemRect.y + (itemH - 14) * 0.5, 14, rl.Color{238, 240, 246, 255})
+		DrawText(fmt.ctprint(item), itemRect.x + 8, itemRect.y + (itemH - 15) * 0.5, 15, rl.Color{238, 240, 246, 255})
 	}
 }
 
@@ -467,7 +481,7 @@ GetRadioGroupOptionRect :: proc(
 		optW := availW / f32(count)
 		return rl.Rectangle{rect.x + lw + f32(index) * optW, rect.y + 2, optW - 4, rect.height - 4}
 	} else {
-		rowH: f32 = 24
+		rowH: f32 = 22
 		return rl.Rectangle{rect.x + lw, rect.y + f32(index) * rowH, availW, rowH - 2}
 	}
 }
@@ -484,29 +498,29 @@ RenderRadioGroup :: proc(
 ) {
 	if !rl.IsWindowReady() do return
 
-	if label != "" {
-		DrawText(fmt.ctprint(label), rect.x + 2, rect.y + 6, 14, rl.Color{215, 220, 230, 255})
-	}
+	t := GetTheme()
 
-	if focused {
-		RenderFocusRing(rect, true, 2.0)
+	if label != "" {
+		DrawTextStr(label, rect.x + 2, rect.y + 4, DEFAULT_FONT_SIZE, t.textSecondary)
 	}
 
 	for opt, i in options {
 		optRect := GetRadioGroupOptionRect(rect, label != "", labelWidth, len(options), horizontal, i)
-		cx := optRect.x + 10
+		cx := optRect.x + 9.0
 		cy := optRect.y + optRect.height * 0.5
 		isSelected := (i == selectedIndex)
 		isHovered := (i == hoveredOption)
 
-		ringColor := rl.Color{110, 168, 254, 255} if (isSelected || isHovered) else rl.Color{90, 96, 112, 255}
-		rl.DrawCircleV({cx, cy}, 8, rl.Color{26, 29, 36, 255})
-		rl.DrawCircleLinesV({cx, cy}, 8, ringColor)
+		ringColor := t.borderFocused if (isSelected && focused) else (t.accent if isSelected else (t.borderHover if isHovered else t.borderNormal))
+		rl.DrawCircleSector({cx, cy}, 7.0, 0, 360, 24, t.bgInput)
+		rl.DrawCircleSectorLines({cx, cy}, 7.0, 0, 360, 24, ringColor)
+
 		if isSelected {
-			rl.DrawCircleV({cx, cy}, 4.5, rl.Color{59, 130, 246, 255})
+			rl.DrawCircleSector({cx, cy}, 3.5, 0, 360, 24, t.accent)
 		}
 
-		DrawText(fmt.ctprint(opt), cx + 14, optRect.y + (optRect.height - 13) * 0.5, 13, rl.Color{230, 234, 242, 255})
+		textY := optRect.y + (optRect.height - DEFAULT_FONT_SIZE) * 0.5
+		DrawTextStr(opt, cx + 12.0, textY, DEFAULT_FONT_SIZE, t.textPrimary)
 	}
 }
 
@@ -723,13 +737,14 @@ RenderContainerPanel :: proc(
 ) {
 	if !rl.IsWindowReady() do return
 
+	t := GetTheme()
 	if drawBackground {
-		rl.DrawRectangleRec(rect, backgroundColor)
+		DrawThemeRect(rect, backgroundColor, borderColor if drawBorder else rl.Color{0, 0, 0, 0}, radius = t.borderRadius)
 	}
 
 	if showHeader {
 		headerRect := rl.Rectangle{rect.x, rect.y, rect.width, headerHeight}
-		rl.DrawRectangleRec(headerRect, headerColor)
+		DrawThemeRect(headerRect, headerColor, rl.Color{0, 0, 0, 0}, radius = t.borderRadius)
 		rl.DrawLineEx(
 			{rect.x, rect.y + headerHeight},
 			{rect.x + rect.width, rect.y + headerHeight},
@@ -737,7 +752,8 @@ RenderContainerPanel :: proc(
 			borderColor,
 		)
 		// Top accent stripe on panel header
-		rl.DrawRectangleRec({rect.x, rect.y, rect.width, 2}, rl.Color{59, 130, 246, 255})
+		stripeRec := rl.Rectangle{rect.x, rect.y, rect.width, 2}
+		DrawThemeRect(stripeRec, t.accent, rl.Color{0, 0, 0, 0}, radius = t.borderRadius)
 
 		if title != "" {
 			cstr := fmt.ctprint(title)
@@ -746,7 +762,7 @@ RenderContainerPanel :: proc(
 	}
 
 	if drawBorder {
-		rl.DrawRectangleLinesEx(rect, 1, borderColor)
+		DrawThemeRect(rect, rl.Color{0, 0, 0, 0}, borderColor, radius = t.borderRadius)
 	}
 }
 
@@ -780,45 +796,53 @@ RenderToggleSwitch :: proc(
 	active: bool,
 	hovered: bool = false,
 	disabled: bool = false,
-	activeColor: rl.Color = {59, 130, 246, 255},
-	inactiveColor: rl.Color = {50, 55, 68, 255},
+	activeColor: rl.Color = {0, 0, 0, 0},
+	inactiveColor: rl.Color = {0, 0, 0, 0},
 	thumbColor: rl.Color = rl.WHITE,
 	focused: bool = false,
 ) {
 	if !rl.IsWindowReady() do return
 
-	trackH := min(rect.height, 22.0)
-	trackW := trackH * 1.8
-	trackRect := rl.Rectangle{rect.x, rect.y + (rect.height - trackH) * 0.5, trackW, trackH}
+	t := GetTheme()
+	actCol := activeColor if activeColor.a > 0 else t.accent
+	inactCol := inactiveColor if inactiveColor.a > 0 else t.bgWidget
 
-	trackCol := activeColor if active else inactiveColor
+	trackH: f32 = 16.0
+	trackW: f32 = 28.0
+	trackRect := rl.Rectangle{rect.x + 2, rect.y + (rect.height - trackH) * 0.5, trackW, trackH}
+
+	trackCol := actCol if active else inactCol
 	if disabled {
 		trackCol = rl.Color{40, 42, 50, 200}
 	} else if hovered {
-		trackCol = activeColor if active else rl.Color{65, 72, 88, 255}
+		trackCol = t.accentHover if active else t.borderHover
 	}
 
-	rl.DrawRectangleRounded(trackRect, 0.9, 8, trackCol)
-	borderCol := rl.Color{110, 168, 254, 255} if focused else rl.Color{75, 85, 105, 255}
-	rl.DrawRectangleRoundedLinesEx(trackRect, 0.9, 8, 1, borderCol)
+	borderCol := t.borderFocused if focused else (actCol if active else t.borderNormal)
 
-	if focused {
-		RenderFocusRing(trackRect, true, 2.0)
+	if active {
+		rl.DrawRectangleRounded(trackRect, 1.0, 24, trackCol)
+		if focused {
+			rl.DrawRectangleRoundedLinesEx(trackRect, 1.0, 24, 1.5, t.borderFocused)
+		}
+	} else {
+		rl.DrawRectangleRounded(trackRect, 1.0, 24, borderCol)
+		innerRect := rl.Rectangle{trackRect.x + 1, trackRect.y + 1, trackRect.width - 2, trackRect.height - 2}
+		rl.DrawRectangleRounded(innerRect, 1.0, 24, trackCol)
 	}
 
 	thumbPadding: f32 = 2.0
-	thumbRadius := (trackH - thumbPadding * 2.0) * 0.5
+	thumbRadius: f32 = 6.0
 	thumbX := trackRect.x + thumbPadding + thumbRadius if !active else trackRect.x + trackW - thumbPadding - thumbRadius
 	thumbY := trackRect.y + trackH * 0.5
 
-	rl.DrawCircle(i32(math.round(thumbX)), i32(math.round(thumbY)), thumbRadius, thumbColor)
+	rl.DrawCircleSector({thumbX, thumbY}, thumbRadius, 0, 360, 24, thumbColor)
 
 	if label != "" {
 		labelX := trackRect.x + trackW + 8
-		labelY := rect.y + (rect.height - 14) * 0.5
-		lblColor := rl.Color{220, 225, 235, 255} if !disabled else rl.Color{120, 125, 135, 255}
-		cstr := fmt.ctprint(label)
-		DrawText(cstr, labelX, labelY, 14, lblColor)
+		textY := rect.y + (rect.height - DEFAULT_FONT_SIZE) * 0.5
+		lblColor := t.textPrimary if !disabled else t.textDisabled
+		DrawTextStr(label, labelX, textY, DEFAULT_FONT_SIZE, lblColor)
 	}
 }
 
@@ -909,15 +933,15 @@ RenderKnob :: proc(
 
 	valStr := fmt.tprintf(format, value)
 	valCStr := fmt.ctprint(valStr)
-	valW := MeasureText(valCStr, 12).x
+	valW := MeasureText(valCStr, 13).x
 	valY := center.y + radius + 4
-	DrawText(valCStr, center.x - valW * 0.5, valY, 12, rl.Color{230, 235, 245, 255})
+	DrawText(valCStr, center.x - valW * 0.5, valY, 13, rl.Color{230, 235, 245, 255})
 
 	if label != "" {
 		lblCStr := fmt.ctprint(label)
-		lblW := MeasureText(lblCStr, 12).x
-		lblY := valY + 14
-		DrawText(lblCStr, center.x - lblW * 0.5, lblY, 12, labelColor)
+		lblW := MeasureText(lblCStr, 14).x
+		lblY := valY + 16
+		DrawText(lblCStr, center.x - lblW * 0.5, lblY, 14, labelColor)
 	}
 }
 
@@ -962,7 +986,7 @@ RenderListView :: proc(
 
 		txtCol := rl.WHITE if i == selectedIndex else rl.Color{215, 220, 230, 255}
 		cstr := fmt.ctprint(items[i])
-		DrawText(cstr, itemRect.x + 8, itemRect.y + (itemHeight - 13) * 0.5, 13, txtCol)
+		DrawText(cstr, itemRect.x + 8, itemRect.y + (itemHeight - 15) * 0.5, 15, txtCol)
 	}
 }
 
@@ -1019,7 +1043,7 @@ RenderTreeNode :: proc(
 	txtCol := rl.WHITE if item.isSelected else rl.Color{215, 220, 232, 255}
 
 	fullTxt := fmt.ctprint(item.icon, item.label) if item.icon != "" else fmt.ctprint(item.label)
-	DrawText(fullTxt, txtX, txtY, 13, txtCol)
+	DrawText(fullTxt, txtX, txtY, 15, txtCol)
 }
 
 

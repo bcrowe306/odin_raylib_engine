@@ -315,6 +315,13 @@ DockSpace_UpdateLayout :: proc(space: ^DockSpace, bounds: rl.Rectangle) {
 	}
 
 	if space.draggingSplitter != .None {
+		switch space.draggingSplitter {
+		case .LeftSplitter, .RightSplitter:
+			SetUICursor(.RESIZE_EW, .Dragging)
+		case .BottomSplitter:
+			SetUICursor(.RESIZE_NS, .Dragging)
+		case .None: // pass
+		}
 		if IsUIMouseButtonDown(.LEFT) {
 			switch space.draggingSplitter {
 			case .LeftSplitter:
@@ -330,6 +337,14 @@ DockSpace_UpdateLayout :: proc(space: ^DockSpace, bounds: rl.Rectangle) {
 			}
 		} else {
 			space.draggingSplitter = .None
+		}
+	}
+
+	if space.draggingSplitter == .None {
+		if (hasLeft && PointInRect(mousePos, space.leftSplitterRect)) || (hasRight && PointInRect(mousePos, space.rightSplitterRect)) {
+			SetUICursor(.RESIZE_EW, .Interact)
+		} else if hasBottom && PointInRect(mousePos, space.bottomSplitterRect) {
+			SetUICursor(.RESIZE_NS, .Interact)
 		}
 	}
 
@@ -471,6 +486,7 @@ DockSpace_UpdateLayout :: proc(space: ^DockSpace, bounds: rl.Rectangle) {
 
 	// 5. Handle panel header dragging & dock targeting
 	if space.draggingPanelId != "" {
+		SetUICursor(.RESIZE_ALL, .Dragging)
 		if IsUIMouseButtonDown(.LEFT) {
 			dp := DockSpace_FindPanel(space, space.draggingPanelId)
 			if dp != nil {
@@ -533,6 +549,7 @@ DockSpace_BeginPanel :: proc(space: ^DockSpace, id: string) -> (visible: bool, c
 
 	// 2. Draw Header
 	isHeaderHovered := PointInRect(mousePos, p.headerRect)
+	if isHeaderHovered do SetUICursor(.POINTING_HAND, .Hover)
 	hdrCol := space.headerActiveBg if isHeaderHovered else space.headerBgColor
 	rl.DrawRectangleRec(p.headerRect, hdrCol)
 	rl.DrawLineEx(
@@ -558,7 +575,7 @@ DockSpace_BeginPanel :: proc(space: ^DockSpace, id: string) -> (visible: bool, c
 	}
 
 	titleText := fmt.tprintf("%s  %s", p.title, slotBadge)
-	DrawTextStr(titleText, p.headerRect.x + 10, p.headerRect.y + (p.headerRect.height - 12) * 0.5, 12, rl.Color{230, 235, 245, 255})
+	DrawTextStr(titleText, p.headerRect.x + 10, p.headerRect.y + (p.headerRect.height - 14) * 0.5, 14, rl.Color{230, 235, 245, 255})
 
 	// 3. Header Action Buttons (Dock, Float, Close)
 	btnW: f32 = 18.0

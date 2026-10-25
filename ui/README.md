@@ -9,10 +9,14 @@ Designed for game development tools, editor workspaces, simulation interfaces, a
 ## Table of Contents
 
 1. [Architecture & Design Philosophy](#architecture--design-philosophy)
-2. [Quickstart Example](#quickstart-example)
-3. [Keyboard & 2D Spatial Navigation](#keyboard--2d-spatial-navigation)
-4. [Widget Reference & Examples](#widget-reference--examples)
-   - [Buttons & Switches](#buttons--switches)
+2. [Targeted Example Apps](#targeted-example-apps)
+3. [Theming Engine & Visual Styling](#theming-engine--visual-styling)
+4. [Automatic Cursor Management](#automatic-cursor-management)
+5. [Keyboard & 2D Spatial Navigation](#keyboard--2d-spatial-navigation)
+6. [Widget Reference & Examples](#widget-reference--examples)
+   - [Buttons, Icons & Switches](#buttons-icons--switches)
+   - [Font Awesome Vector Icons (`GuiIcon`)](#font-awesome-vector-icons-guiicon)
+   - [Application Toolbar & Icon Buttons](#application-toolbar--icon-buttons)
    - [Sliders & Rotary Knobs](#sliders--rotary-knobs)
    - [Audio Faders & Volume Meters](#audio-faders--volume-meters)
    - [Notched Sliders](#notched-sliders)
@@ -21,65 +25,152 @@ Designed for game development tools, editor workspaces, simulation interfaces, a
    - [Color Pickers & Gradient Editors](#color-pickers--gradient-editors)
    - [Plots & Waveforms](#plots--waveforms)
    - [HTML-Style Lists & Tables](#html-style-lists--tables)
-5. [Layout & Container Engines](#layout--container-engines)
-6. [Window-Resize Invariant Docking System](#window-resize-invariant-docking-system)
-7. [Automated Testing & Input Injection Hooks](#automated-testing--input-injection-hooks)
+7. [Modern Text Engine (`Runa` Integration)](#modern-text-engine-runa-integration)
+8. [Dynamic Content: CSS Flexbox Layout Engine](#dynamic-content-css-flexbox-layout-engine)
+9. [Cross-Platform Native Dialog Interop](#cross-platform-native-dialog-interop)
+10. [Rich Multi-Line Text Wrapping](#rich-multi-line-text-wrapping)
+11. [Layout & Container Engines](#layout--container-engines)
+12. [Window-Resize Invariant Docking System](#window-resize-invariant-docking-system)
+13. [Automated Testing & Input Injection Hooks](#automated-testing--input-injection-hooks)
 
 ---
 
 ## Architecture & Design Philosophy
 
 - **Dual-Layer Design**:
-  - **Immediate-Mode Layer (`immediate.odin`)**: High-level, ergonomic state-mutating functions (`GuiButton`, `GuiSlider`, `GuiVolumeFader`, `GuiDockSpace`) that register focus, handle keyboard/mouse/gamepad navigation, and manage interaction state.
-  - **Retained / Rendering Layer (`widgets.odin`)**: Pure rendering procedures (`RenderSlider`, `RenderVolumeMeter`, `RenderKnob`) that draw primitives with smooth bilinear anti-aliasing and zero side effects.
+  - **Immediate-Mode Layer (`immediate.odin`)**: High-level, ergonomic state-mutating functions (`GuiButton`, `GuiSlider`, `GuiVolumeFader`, `GuiDockSpace`) that register focus, handle keyboard/mouse/gamepad navigation, update mouse cursors, and manage interaction state.
+  - **Retained / Rendering Layer (`widgets.odin`)**: Pure rendering procedures (`RenderButton`, `RenderSlider`, `RenderVolumeMeter`, `RenderKnob`) that draw primitives using active theme metrics and rounded rectangle shaders with zero side effects.
 - **Window-Resize Invariance**: Containers, tab docks, and the multi-zone `DockSpace` compute layout positions using **normalized proportional split ratios** rather than fixed pixel offsets. When the host window or parent container is resized, panel layouts, splitters, and floating windows scale smoothly and remain within viewport bounds without clipping.
-- **Crisp High-DPI Font Rendering**: Font glyphs are pre-rasterized using Odin's font atlas pipeline (`font.odin`) with Bilinear texture filtering enabled (`rl.SetTextureFilter(..., .BILINEAR)`), eliminating pixelation and artifacting across arbitrary UI scales.
+- **Crisp High-DPI Font Rendering & Typography Scale**: Font glyphs are pre-rasterized using Odin's font atlas pipeline (`font.odin`) with extended codepoint coverage (ASCII, Latin-1 Supplement, typographical symbols, bullets, arrows), dynamic mipmaps (`rl.GenTextureMipmaps`), and Bilinear texture filtering enabled (`rl.SetTextureFilter(..., .BILINEAR)`), eliminating shimmering and pixelation across arbitrary UI scales. Standard typography constants: `DEFAULT_FONT_SIZE` (18px), `DEFAULT_FONT_SIZE_SM` (14px), and `DEFAULT_FONT_SIZE_LG` (22px).
 
 ---
 
-## Quickstart Example
+## Targeted Example Apps
+
+To get started quickly, self-contained example applications are located in `ui/examples/`:
+
+### 1. Settings & Preferences Dialog (`ui/examples/settings_dialog`)
+Demonstrates building standard dialog forms with:
+- Dynamic theme switching (Dark, Light, Cyberpunk)
+- Pixel-accurate audio sliders with integer value displays
+- Fullscreen toggle switch and VSync checkbox
+- Commander callsign text input field
+- Simulation difficulty radio button groups
+- Icon action buttons (Reset Defaults, Save Preferences)
+
+```bash
+# Run interactively
+odin run ui/examples/settings_dialog
+
+# Run in headless test mode (ideal for CI)
+odin run ui/examples/settings_dialog -- --test
+```
+
+### 2. Studio Operations Dashboard (`ui/examples/dashboard`)
+Demonstrates productivity tool and editor layouts with:
+- Font Awesome vector icon toolbar (`GuiToolbar`)
+- Structured system task lists with status badges (`GuiUnorderedList`)
+- Telemetry dial knobs (`GuiKnob`) and vertical logarithmic audio faders (`GuiVolumeFader`)
+- Interactive multi-column data table (`GuiTable`) with sorting and row selection
+
+```bash
+# Run interactively
+odin run ui/examples/dashboard
+
+# Run in headless test mode
+odin run ui/examples/dashboard -- --test
+```
+
+---
+
+## Theming Engine & Visual Styling
+
+The library features a centralized, hierarchical theming system (`ui/theme.odin`) controlling padding, margins, rounded corner radii, and semantic color palettes across all widgets.
+
+### Theme Structure
 
 ```odin
-package main
+Theme :: struct {
+    // Spacing & Geometry Metrics
+    paddingSm:         f32, // default 4px
+    paddingMd:         f32, // default 8px
+    paddingLg:         f32, // default 16px
+    marginSm:          f32, // default 4px
+    marginMd:          f32, // default 8px
+    itemSpacing:       f32, // default 8px
+    borderRadius:      f32, // default 5.0px for buttons, inputs, panels
+    borderRadiusSmall: f32, // default 3.0px for chips, badges, tags
+    borderWidth:       f32, // default 1.0px
 
-import "core:fmt"
-import rl "vendor:raylib"
-import "ui"
+    // Colors - Backgrounds & Surfaces
+    bgApp:            rl.Color,
+    bgPanel:          rl.Color,
+    bgHeader:         rl.Color,
+    bgWidget:         rl.Color,
+    bgWidgetHover:    rl.Color,
+    bgWidgetPressed:  rl.Color,
+    bgWidgetSelected: rl.Color,
+    bgInput:          rl.Color,
 
-main :: proc() {
-    rl.InitWindow(1280, 720, "Odin UI Quickstart")
-    defer rl.CloseWindow()
-    rl.SetTargetFPS(60)
+    // Colors - Borders
+    borderNormal:     rl.Color,
+    borderHover:      rl.Color,
+    borderFocused:    rl.Color,
 
-    ui.InitFonts("engine/Open_Sans/static/OpenSans-Regular.ttf")
-    defer ui.UnloadFonts()
+    // Colors - Typography
+    textPrimary:      rl.Color,
+    textSecondary:    rl.Color,
+    textDisabled:     rl.Color,
 
-    sliderVal: f32 = 50.0
-    toggleState: bool = true
-
-    for !rl.WindowShouldClose() {
-        // 1. Begin UI frame & navigation pass
-        ui.ImmediateNav_BeginFrame()
-
-        rl.BeginDrawing()
-        rl.ClearBackground(rl.Color{18, 20, 26, 255})
-
-        // 2. Render UI widgets
-        if ui.GuiButton(rl.Rectangle{40, 40, 160, 36}, "Click Me", idKey = 100) {
-            fmt.println("Button was clicked!")
-        }
-
-        ui.GuiSlider(rl.Rectangle{40, 90, 240, 26}, "Volume", "%", &sliderVal, 0.0, 100.0, idKey = 101)
-        ui.GuiToggleSwitch(rl.Rectangle{40, 130, 240, 30}, "Flight Assist", &toggleState, idKey = 102)
-
-        // 3. Process navigation & dropdown overlays
-        ui.ImmediateNav_Update()
-        ui.RenderImmediateDropdownOverlay()
-
-        rl.EndDrawing()
-    }
+    // Colors - Accents & Status
+    accent:           rl.Color,
+    accentHover:      rl.Color,
+    success:          rl.Color,
+    warning:          rl.Color,
+    danger:           rl.Color,
+    info:             rl.Color,
 }
 ```
+
+### Presets and Switching
+
+Three built-in theme presets are provided out of the box:
+- `Theme_Dark()`: Modern dark-slate developer interface (default).
+- `Theme_Light()`: Clean, high-contrast crisp light theme.
+- `Theme_Cyberpunk()`: Neon cyan and magenta dark futuristic aesthetic.
+
+```odin
+// Set active global theme
+ui.SetTheme(ui.Theme_Light())
+
+// Or push temporary theme overrides
+ui.PushTheme(ui.Theme_Cyberpunk())
+// ... render specialized HUD elements ...
+ui.PopTheme()
+
+// Query current theme
+t := ui.GetTheme()
+
+// Draw custom geometry matching active theme corners & borders
+ui.DrawThemeRect(rect, t.bgPanel, t.borderNormal, radius = t.borderRadius, borderWidth = 1.0)
+```
+
+---
+
+## Automatic Cursor Management
+
+The cursor system (`ui/cursor.odin`) dynamically updates the OS mouse pointer every frame based on the active or hovered widget:
+
+| Cursor Type | Context / Triggered By |
+| :--- | :--- |
+| `POINTING_HAND` | Hovering buttons, icon buttons, checkboxes, toggle switches, tabs, dropdowns, and toolbar items. |
+| `IBEAM` | Hovering text inputs, search boxes, and editable numeric inputs. |
+| `RESIZE_EW` (Horizontal) | Hovering vertical splitters or dragging horizontal sliders/faders. |
+| `RESIZE_NS` (Vertical) | Hovering horizontal splitters or dragging vertical volume faders. |
+| `RESIZE_ALL` | Hovering dock panel title bars or dragging floating dock panels. |
+| `DEFAULT` | Default fallback when cursor is over neutral canvas areas. |
+
+Cursor requests support priority levels (`System` > `Drag` > `Hover` > `Default`), ensuring active drags maintain their appropriate cursor even if the mouse pointer transiently crosses other widgets.
 
 ---
 
@@ -100,13 +191,21 @@ All interactive widgets register their bounding boxes with `ImmediateNav` every 
 
 ## Widget Reference & Examples
 
-### Buttons & Switches
+### Buttons, Icons & Switches
 
 ```odin
-// Standard Action Button
-if ui.GuiButton(rect, "Launch Rocket", .Center, isSelected = false, idKey = 1001) {
+// Standard Action Button (Uses active Theme.borderRadius)
+if ui.GuiButton(rect, "Launch Rocket", align = .Center, isSelected = false, idKey = 1001) {
     // Action triggered
 }
+
+// Icon Button with Font Awesome Icon and Text
+if ui.GuiIconButton(rect, .Rocket, "Launch", isSelected = false, idKey = 1002) {
+    // Action triggered
+}
+
+// Standalone Font Awesome Icon
+ui.GuiIcon(rect, .Shield, size = 20, color = rl.Color{96, 165, 250, 255})
 
 // Checkbox
 ui.GuiCheckBox(rect, "Enable VSync", &vsyncChecked, idKey = 1010)
@@ -118,7 +217,47 @@ ui.GuiToggleSwitch(rect, "Plasma Shield", &shieldActive, idKey = 1020)
 changed, submitted := ui.GuiTextInput(rect, "Callsign", &buffer, "Enter text...", idKey = 1030)
 ```
 
+### Font Awesome Vector Icons (`GuiIcon`)
+
+The UI library bundles the entire **Font Awesome 6 Solid** vector icon library (1,402 icons) directly into the compiled executable via Odin's `#load(...)` directive.
+- **Zero runtime dependencies**: Does not require external font files or assets at runtime.
+- **Strongly-typed `Icon` enum**: Reference any icon with autocomplete via `ui.Icon.Play`, `ui.Icon.Gear`, `ui.Icon.Rocket`, `ui.Icon.Save`, etc.
+- **High-DPI Glyphs**: Dynamically rasterized with Bilinear filtering at crisp resolution.
+
+```odin
+// Draw a standalone Font Awesome icon
+ui.GuiIcon(rect, .Rocket, size = 20, color = rl.Color{96, 165, 250, 255})
+
+// Measure icon bounding box
+dimensions := ui.MeasureIcon(.Gear, size = 18)
+
+// Convert icon enum to rune or string
+r := ui.Icon_ToRune(.Play)
+str := ui.Icon_ToString(.FloppyDisk)
+```
+
+### Application Toolbar & Icon Buttons
+
+High-performance application toolbars supporting buttons, toggles, separators, and spacers, with automatic tooltip popups and keyboard arrow navigation:
+
+```odin
+items: [5]ui.ToolbarItem = {
+    {id = 1, icon = .File, label = "New", tooltip = "Create file (Ctrl+N)", itemType = .Button},
+    {id = 2, icon = .FolderOpen, label = "Open", tooltip = "Open workspace (Ctrl+O)", itemType = .Button},
+    {id = 3, icon = .FloppyDisk, label = "Save", tooltip = "Save changes (Ctrl+S)", itemType = .Button},
+    {id = 4, itemType = .Separator},
+    {id = 5, icon = .Play, label = "Run", tooltip = "Execute simulation", itemType = .Toggle, isSelected = true},
+}
+
+clickedId, clicked := ui.GuiToolbar(toolbarRect, items[:], idKey = 1050)
+if clicked {
+    fmt.printf("Toolbar item #%d clicked!\n", clickedId)
+}
+```
+
 ### Sliders & Rotary Knobs
+
+The slider system features pixel-accurate track hit-testing: clicking anywhere on the track immediately centers the handle under the mouse pointer, eliminating coordinate drift.
 
 ```odin
 // Continuous Slider with Unit Suffix and Shift-Fine Mode
@@ -148,24 +287,6 @@ ui.GuiVolumeFader(faderRect, "MASTER BUS", &masterDbVal, minDb = -60.0, maxDb = 
 // - Automatically updates timers using rl.GetFrameTime()
 meterState: ui.VolumeMeterState
 ui.GuiVolumeMeter(meterRect, "OUTPUT VU", audioLevelL, audioLevelR, &meterState, orientation = .Vertical)
-
-// Horizontal Mono Console Monitor
-ui.GuiVolumeMeter(horizMeterRect, "BUS MONITOR", audioLevelMono, -120.0, nil, orientation = .Horizontal)
-```
-
-### Notched Sliders
-
-Sliders featuring discrete detents/ticks with magnetic snapping:
-
-```odin
-// Horizontal Detented Slider (5 Discrete Gear Stages)
-notchLabels := []string{"0.25x", "0.5x", "1.0x", "2.0x", "4.0x"}
-ui.GuiNotchedSlider(rect, "Simulation Speed", &speedIdx, 0.0, 4.0, 5, notchLabels, snapToNotches = true, orientation = .Horizontal, idKey = 4001)
-
-// Vertical Detented Power Relay
-// Note: Holding Shift allows continuous micro-positioning bypass without snapping
-relayLabels := []string{"AUX 1", "AUX 2", "AUX 3", "MAIN"}
-ui.GuiNotchedSlider(vRect, "Relay Tap", &relayIdx, 0.0, 3.0, 4, relayLabels, snapToNotches = true, orientation = .Vertical, idKey = 4002)
 ```
 
 ### Dropdowns & Menus
@@ -177,102 +298,31 @@ Dropdown menus render an inline button and automatically defer their popup list 
 ui.GuiDropdownBox(rect, "Low;Medium;High;Ultra;Cinematic", &qualityPresetIdx, idKey = 5001)
 
 // Radio Selector Group (Horizontal or Vertical)
-options := []string{"Cadet", "Officer", "Commander"}
-ui.GuiRadioGroup(rect, "Difficulty", options, &difficultyIdx, horizontal = true, idKey = 5002)
-```
-
-### Lists & Hierarchical Trees
-
-```odin
-// Scrollable List View
-soundList := []string{"Laser Fire", "Plasma Torpedo", "Shield Pulse"}
-ui.GuiListView(rect, soundList, &selectedIdx, &listScroll, itemHeight = 24, idKey = 6001)
-
-// Interactive Expandable Tree View
-// Returns clicked node index and toggled collapse index
-clickedIdx, toggledIdx := ui.GuiTreeView(rect, treeItems[:], &selectedNodeId, &treeScroll, itemHeight = 22)
-```
-
-### Color Pickers & Gradient Editors
-
-```odin
-// HSV Hue Circle + Saturation-Value Matrix
-ui.GuiColorPicker(rect, "Tint Color", &selectedColor)
-
-// Alpha Channel Bar
-ui.GuiColorBarAlpha(rect, "Alpha", &alphaVal, idKey = 7001)
-
-// Multi-Stop Gradient Ramp Editor
-// Supports adding stops on click, dragging stops, and interpolating output
-ui.GuiGradientEditor(rect, &gradientStops, &selectedStopIdx, &isDraggingStop, showAlphaBar = true)
-colorAtT := ui.EvaluateGradient(gradientStops[:], 0.75)
-```
-
-### Plots & Waveforms
-
-```odin
-// Live Oscilloscope / XY Telemetry Plot
-ui.GuiXYPlot(
-    plotRect,
-    "Sensor Telemetry",
-    series1Points[:], // [][2]f32
-    series2Points[:],
-    minVal = {0, 0},
-    maxVal = {1, 1},
-    showGrid = true,
-)
+options := []string{"Casual", "Standard", "Hardcore"}
+ui.GuiRadioGroup(rect, "Difficulty", options, &difficultyIdx, horizontal = false, idKey = 5002)
 ```
 
 ### HTML-Style Lists & Tables
 
-Widgets that replicate HTML document semantics with immediate-mode reactivity and keyboard navigation:
-
 #### HTML Unordered List (`<ul>`)
-Renders items with customizable bullet graphics (`.Disc`, `.Circle`, `.Square`, `.Dash`, `.Arrow`), indentation levels, and optional badge chips:
-
 ```odin
 ulItems := []ui.ListItem{
     {text = "Deep Space Arsenal", depth = 0, isHeader = true},
     {text = "Sub-light Ion Thruster Array", depth = 0, bullet = .Disc, badge = "ONLINE"},
-    {text = "Dual High-Yield Plasma Cannons", depth = 0, bullet = .Disc, badge = "ARMED"},
     {text = "Forward Deflector Shield Matrix", depth = 0, bullet = .Dash, badge = "98%"},
-    {text = "Auxiliary Sub-Systems", depth = 1, bullet = .Circle},
-    {text = "Hyperdrive Jump Core", depth = 1, bullet = .Circle, badge = "CHARGED"},
 }
 
 changed, clickedIdx := ui.GuiUnorderedList(rect, ulItems, &selectedIdx, &scrollPos, defaultBullet = .Disc)
 ```
 
-#### HTML Ordered List (`<ol>`)
-Renders sequenced items with numerical or alphabetical markers (`.Decimal`, `.AlphaLower`, `.AlphaUpper`, `.RomanLower`, `.RomanUpper`):
-
-```odin
-olItems := []ui.ListItem{
-    {text = "Pre-Flight Launch Checklist", depth = 0, isHeader = true},
-    {text = "Initialize main reactor core flux", depth = 0, number = 1, badge = "DONE"},
-    {text = "Establish quantum telemetry comm link", depth = 0, number = 2, badge = "ACTIVE"},
-    {text = "Calibrate guidance gyroscopes", depth = 0, number = 3},
-    {text = "Confirm magnetic clamp release", depth = 1, number = 1, badge = "VERIFIED"},
-    {text = "Fire cold-gas attitude RCS thrusters", depth = 1, number = 2, badge = "NOMINAL"},
-}
-
-changed, clickedIdx := ui.GuiOrderedList(rect, olItems, &selectedIdx, &scrollPos, numbering = .Decimal)
-```
-
 #### HTML Data Table (`<table>`)
-Full-featured table with `<thead>`, `<tbody>`, zebra striping, sticky headers, interactive sorting, and row selection:
-
 ```odin
 columns := []ui.TableColumn{
     {title = "ID", width = 55.0, align = .Center, sortable = true},
     {title = "Entity Vessel", width = 0.30, align = .Start, sortable = true},
-    {title = "Class / Type", width = 0.22, align = .Start, sortable = true},
     {title = "Hull", width = 80.0, align = .End, sortable = true},
-    {title = "Shields", width = 80.0, align = .End, sortable = true},
-    {title = "Status", width = 95.0, align = .Center, sortable = true},
 }
 
-// Renders table with automatic column sizing, header click sorting, and keyboard arrow row navigation
 rowClicked, headerClicked := ui.GuiTable(
     tableRect,
     columns,
@@ -281,33 +331,117 @@ rowClicked, headerClicked := ui.GuiTable(
     &sortColIdx,
     &isAscending,
     &tableScroll,
-    headerHeight = 32.0,
-    rowHeight = 28.0,
 )
 ```
 
 ---
 
-## Layout & Container Engines
+---
 
-The library provides layout calculators that position dynamic child elements without heap allocations:
+## Modern Text Engine (`Runa` Integration)
 
-- `ComputeVerticalLayout`: Stacks child elements vertically with `.Start`, `.Center`, `.End`, or `.Stretch` alignments.
-- `ComputeHorizontalLayout`: Places child elements side-by-side horizontally.
-- `ComputeGridLayout`: Places child elements into responsive multi-column matrices.
-- `RenderContainerPanel`: Renders a structured panel with dark glass background, subtle 1px border, and top title header with accent strip.
+The UI library integrates [Runa](https://github.com/BuLEEto/Runa), a pure-Odin modern text engine providing advanced OpenType typography:
+- **OpenType Shaping (GSUB/GPOS)**: Full font kerning pairs, ligatures (e.g., `!=`, `->`, `fi`), and contextual glyph substitutions.
+- **Two-Tier Caching**: High-performance shape cache (`(font, text, size) -> glyphs`) and dynamic GPU atlas slot cache (`(glyph_id, size) -> slot`).
+- **Dirty-Rect GPU Updates**: Updates only modified sub-rectangles via `rl.UpdateTextureRec` rather than re-uploading full textures.
+- **Zero Configuration**: Automatically boots upon calling `ui.InitFonts()`.
+
+```odin
+// Runa renders shaped, kerned text with zero allocations on cache hits
+ui.DrawTextStr("Transmitting Telemetry -> Status: ONLINE", 40, 100, size = 16, color = rl.WHITE)
+
+// Accurate shaped measurement
+textWidth := ui.MeasureTextStr("Viper-MK2", 16).x
+```
 
 ---
 
+## Dynamic Content: CSS Flexbox Layout Engine
+
+The `ui/flexbox.odin` module provides a full, CSS-compliant Flexbox layout engine for responsive and dynamic UI compositions:
+- **Flex Directions**: `.Row`, `.Column`, `.RowReverse`, `.ColumnReverse`
+- **Flex Justify**: `.FlexStart`, `.Center`, `.FlexEnd`, `.SpaceBetween`, `.SpaceAround`, `.SpaceEvenly`
+- **Flex Align**: `.FlexStart`, `.Center`, `.FlexEnd`, `.Stretch`
+- **Proportional Flex Distribution**: Supports `grow`, `shrink`, and `basis`.
+
+```odin
+// Immediate-mode Flexbox container
+ui.Flex_Begin(containerRect, direction = .Row, gap = 12.0, justify = .SpaceBetween, align = .Center)
+
+// Item 1: Fixed-width avatar (grow = 0, shrink = 0)
+slot0 := ui.Flex_AddItem(width = 40, height = 40, grow = 0.0, shrink = 0.0)
+// Item 2: Flexible main title (grow = 1, expands to fill remaining space)
+slot1 := ui.Flex_AddItem(width = 120, height = 24, grow = 1.0, shrink = 1.0)
+// Item 3: Action button
+slot2 := ui.Flex_AddItem(width = 80, height = 30, grow = 0.0, shrink = 0.0)
+
+// Retrieve computed geometry
+rectAvatar := ui.Flex_GetRect(slot0)
+rectTitle  := ui.Flex_GetRect(slot1)
+rectButton := ui.Flex_GetRect(slot2)
+
+ui.Flex_End()
+```
+
+---
+
+## Cross-Platform Native Dialog Interop
+
+`ui/native_dialog.odin` enables invoking native OS file selection, folder picking, and alert message boxes:
+- **macOS**: Native Cocoa/Finder file dialogs via `/usr/bin/osascript`.
+- **Windows**: Native Win32 Common Dialogs (`GetOpenFileNameW`, `GetSaveFileNameW`).
+- **Linux**: Desktop portal / `zenity` / `kdialog`.
+- **Headless Safety**: Automatically returns non-blocking empty states during automated testing (`--test`).
+
+```odin
+// 1. Open File Dialog with file extensions filter
+if filePath, ok := ui.NativeDialog_OpenFile("Select Asset", filterExts = {"png", "jpg", "wav"}); ok {
+    fmt.println("User selected file:", filePath)
+}
+
+// 2. Save File Dialog with default filename
+if savePath, ok := ui.NativeDialog_SaveFile("Export Preset", defaultName = "preset.json"); ok {
+    fmt.println("Saving preset to:", savePath)
+}
+
+// 3. Folder Pick Dialog
+if folderPath, ok := ui.NativeDialog_OpenFolder("Choose Project Root"); ok {
+    fmt.println("Selected folder:", folderPath)
+}
+
+// 4. Native Message Box Alert
+ui.NativeDialog_MessageBox("Success", "Project saved successfully!", alertType = .Info)
+```
+
+---
+
+## Rich Multi-Line Text Wrapping
+
+`ui/text_wrap.odin` provides unicode and whitespace-aware multi-line text wrapping:
+- **Intrinsically Measured Heights**: Measures total vertical height consumed to automatically push downstream elements down in Flexbox and cards.
+- **Max-Line Truncation & Ellipsis**: Truncates paragraphs at `maxLines` and appends `...`.
+- **Wrapped Label Widget**: `ui.GuiLabelWrapped` directly renders multi-line paragraphs.
+
+```odin
+longBio := "The Viper-MK2 is a heavy interceptor equipped with twin plasma accelerators, deflector shield matrices, and advanced jump telemetry."
+
+// Immediate-mode wrapped label that returns height consumed
+heightConsumed := ui.GuiLabelWrapped(
+    rl.Rectangle{x = 24, y = 80, width = 280, height = 200},
+    longBio,
+    fontSize = 14,
+    color = rl.Color{220, 225, 235, 255},
+    lineSpacing = 4.0,
+    maxLines = 4, // 0 for unlimited
+)
+
+// Downstream items push down dynamically using heightConsumed
+nextWidgetY := 80 + heightConsumed + 16.0
+```
+
 ## Window-Resize Invariant Docking System
 
-The `DockSpace` engine partitions a rectangular workspace into docked zones (`Left`, `Right`, `Top`, `Bottom`, `Center`) and `Floating` windows.
-
-### Why Proportional Ratios?
-
-Traditional docking engines store pixel offsets for panels (e.g. `panelWidth = 250px`). When a user resizes the application window from `1280x820` to `1920x1080` or `960x540`, fixed-pixel panels either consume too much screen real estate or cause center viewports to collapse entirely.
-
-`DockSpace` stores **normalized proportional ratios** (`leftRatio = 0.24`, `rightRatio = 0.26`, `bottomRatio = 0.28`). On every frame, `DockSpace_UpdateLayout` computes exact pixel boundaries while respecting strict min/max constraints. Floating windows store normalized anchor coordinates (`floatRelPos`), keeping them clamped safely within the window bounds upon resize.
+The `DockSpace` engine partitions a rectangular workspace into docked zones (`Left`, `Right`, `Top`, `Bottom`, `Center`) and `Floating` windows using normalized proportional split ratios (`leftRatio`, `rightRatio`, `bottomRatio`).
 
 ### DockSpace Usage Example
 
@@ -321,42 +455,21 @@ defer ui.DockSpace_Destroy(&dockSpace)
 ui.DockSpace_AddPanel(&dockSpace, "scene", "Scene Hierarchy", .Left, {40, 80}, {280, 360})
 ui.DockSpace_AddPanel(&dockSpace, "viewport", "2D Viewport", .Center, {340, 80}, {600, 360})
 ui.DockSpace_AddPanel(&dockSpace, "inspector", "Properties Inspector", .Right, {960, 80}, {300, 360})
-ui.DockSpace_AddPanel(&dockSpace, "console", "Diagnostics Console", .Bottom, {40, 460}, {800, 200})
 
 // 3. Frame Update & Rendering Loop
 for !rl.WindowShouldClose() {
     rl.BeginDrawing()
     rl.ClearBackground(rl.Color{16, 18, 24, 255})
 
-    // Dynamically update bounds to current window size
     hostRect := rl.Rectangle{0, 60, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()) - 60}
     ui.DockSpace_UpdateLayout(&dockSpace, hostRect)
 
-    // Render Panel: Scene Hierarchy
     if visible, bounds := ui.DockSpace_BeginPanel(&dockSpace, "scene"); visible {
         ui.GuiButton(rl.Rectangle{bounds.x + 10, bounds.y + 10, bounds.width - 20, 30}, "Add Entity")
         ui.DockSpace_EndPanel(&dockSpace)
     }
 
-    // Render Panel: Viewport
-    if visible, bounds := ui.DockSpace_BeginPanel(&dockSpace, "viewport"); visible {
-        rl.DrawRectangleRec(bounds, rl.Color{10, 12, 16, 255})
-        ui.DockSpace_EndPanel(&dockSpace)
-    }
-
-    // Render Panel: Inspector
-    if visible, bounds := ui.DockSpace_BeginPanel(&dockSpace, "inspector"); visible {
-        ui.DockSpace_EndPanel(&dockSpace)
-    }
-
-    // Render Panel: Console
-    if visible, bounds := ui.DockSpace_BeginPanel(&dockSpace, "console"); visible {
-        ui.DockSpace_EndPanel(&dockSpace)
-    }
-
-    // Render interactive splitters & drag-and-drop dock target overlays
     ui.DockSpace_RenderOverlays(&dockSpace)
-
     rl.EndDrawing()
 }
 ```
@@ -364,11 +477,11 @@ for !rl.WindowShouldClose() {
 ### Docking Interaction Features
 
 1. **Draggable Splitters**: Click and drag the borders between docked panels to adjust split ratios in real-time.
-2. **Interactive Header Drag & Drop with Automatic Panel Displacement**: Drag a panel's title bar to undock it into a floating window. Dragging near any screen edge highlights a translucent blue preview rectangle indicating the target slot and any displaced panel (`DOCK LEFT (MOVES Scene Hierarchy)`). When dropped onto an already occupied slot, the existing panel is automatically moved out (cleanly swapped with the incoming panel's origin slot or moved to an unoccupied slot), preventing any visual overlap.
-3. **Zero-Overlap Layout Guarantee**: Even in scenarios where multiple panels share a slot, `DockSpace_UpdateLayout` automatically tiles/partitions them proportionally rather than stacking, ensuring panels never overlap.
+2. **Interactive Header Drag & Drop with Automatic Panel Displacement**: Drag a panel's title bar to undock it into a floating window. Dragging near any screen edge highlights a translucent preview rectangle indicating the target slot. When dropped onto an already occupied slot, the existing panel is automatically displaced and swapped into the source slot or an available adjacent slot, preventing visual overlap.
+3. **Zero-Overlap Layout Guarantee**: Multiple panels sharing a slot are tiled proportionally rather than stacked.
 4. **Quick Action Header Buttons**:
    - `>`: Cycles dock slots (`Left` -> `Right` -> `Bottom` -> `Center` -> `Left`).
-   - `F` / `D`: Toggles between Floating window and docked slot (remembering the previous dock slot).
+   - `F` / `D`: Toggles between Floating window and docked slot.
    - `x`: Hides / closes the panel.
 
 ---
@@ -380,15 +493,13 @@ The library includes a deterministic input injection framework (`test_hook.odin`
 ```bash
 # Run the automated UI test suite and capture screenshot artifacts
 ./scripts/test_ui_showcase.sh
-# or via Taskfile:
-task ui:e2e
 ```
 
 ### Injection API
 
 ```odin
 // Initialize test harness (saves screenshots to ./ui_screenshots/)
-ui.TestHook_Init("ui_screenshots", 60)
+ui.TestHook_Init("ui_screenshots", 130)
 
 // Simulate mouse click & release
 ui.TestHook_MouseClick(120, 200)
@@ -405,3 +516,4 @@ ui.TestHook_Assert(state.activeTab == 2, "Tab successfully switched")
 // Capture PNG screenshot of current frame buffer
 ui.TestHook_CaptureScreenshot("test_state.png")
 ```
+
