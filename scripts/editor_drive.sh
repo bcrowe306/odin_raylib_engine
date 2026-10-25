@@ -44,7 +44,12 @@ if [ "${1:-}" = --one ]; then
 	hidden=--hidden
 	[ -n "${VISIBLE:-}" ] && hidden=
 	start=$(date +%s)
-	if perl -e 'alarm 600; exec @ARGV' "./$EDITOR_BIN" --project "$tmp/project" --drive "$d" --shots "$shots" --no-build --user-data "$tmp/userdata" $hidden > "$tmp/editor.log" 2>&1; then
+	editor="$EDITOR_BIN"
+	case "$editor" in /*) ;; *) editor="./$editor" ;; esac
+	# A pass needs the drive's own summary with 0 failures (an editor that
+	# didn't start, or crashed, is a failure; perl's exec dies if it can't run).
+	if perl -e 'alarm 600; exec @ARGV or die "cannot run $ARGV[0]: $!\n"' "$editor" --project "$tmp/project" --drive "$d" --shots "$shots" --no-build --user-data "$tmp/userdata" $hidden > "$tmp/editor.log" 2>&1 &&
+		grep -q "^\[DRIVE\] $name.drive: [0-9]* passed, 0 failed" "$tmp/editor.log"; then
 		cp "$tmp/editor.log" "$shots/editor.log" 2>/dev/null # kept (memory reports, ...)
 		line="PASS  $name"
 	else
