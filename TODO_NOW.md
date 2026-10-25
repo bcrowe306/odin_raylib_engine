@@ -107,6 +107,38 @@ Docs in place
 - [x] 8.25 Every API function documented in `engine_api.lua` (description + example) for hover
 - [x] 8.26 F1 on an API symbol opens its section of the scripting reference in the editor
 
+## Phase 13 — Engine improvements (2026-10-25)
+
+Brainstormed 2026-10-25, most important first (export targets left out).
+Decisions (2026-10-25): E.1 reports go to a prefilled GitHub issue (no
+server; games: local crash log + a developer hook). E.2/E.4 art: CC0 packs
+(Kenney); docs on GitHub Pages. E.3 is our own reader from the spec (the
+aseprite/ source is EULA-licensed: reference only, never copied or linked).
+E.4 starts with a time-boxed raylib-on-SDL trial (all drives on macOS), the
+native rumble layer (XInput / GameController / evdev) as the fallback.
+Each item's PR is merged once local tests + CI pass.
+Each item: a feature branch, tests + drives, docs, a PR merged when CI is
+green (its dev build: RELEASING.md).
+
+High impact (now):
+- [x] E.1 Crash and bug reports (roadmap 22): editor panics / Lua errors write a crash file (version, platform, stack, log tail, recent actions), offered on the next start (a prefilled GitHub issue); exported games write crash logs to the user-data folder, with an optional developer hook - done: engine/crash_report*.odin (panics, signals, Windows exceptions; unwinder stacks, recent lines), editor/crash_reports.odin (offered on the next start, Report on GitHub, Help > Report a Bug), the Crash Lua module, scripts/test_crash.sh (CI), crash_report drive, engine/docs/crash_reports.md
+- [ ] E.2 Starter templates, sample games, docs site: New Project templates (platformer, top-down RPG, shmup, puzzle), 2-3 larger samples, guides + the Lua API reference published by CI
+- [ ] E.3 Aseprite import (aseprite/ submodule as the reference, format: aseprite/docs/ase-file-specs.md): .ase / .aseprite read directly - every chunk (layers incl. groups / blend modes / opacity, cels incl. linked / compressed / tilemap cels, tags with direction / repeat, frame durations, slices with 9-patch / pivot, palettes, tilesets, user data); tags become animations, re-import on save
+- [ ] E.4 Full gamepad support (roadmap 20): several controllers with player assignment, hot-plug, rumble, controller-specific button prompts (Input.glyph)
+
+Next:
+- [ ] E.5 Automated tests for game code: a headless test runner stepping scenes, a Lua test API (press, step, expect), input record / replay, run in CI
+- [ ] E.6 In-game developer console (debug builds): Lua console + registered commands, perf overlay, debug-draw toggles, slow motion / frame step
+- [ ] E.7 Editor auto-updater: download the newer package, verify the checksum, replace and restart
+- [ ] E.8 Team-friendly scenes: stable node ids + sorted keys (small diffs), a scene merge tool, a git panel
+
+Later:
+- [ ] E.9 Multiplayer (roadmap 21): local co-op first, then client-server (replicated nodes, RPCs); rollback separately
+- [ ] E.10 Runtime mods: sandboxed Lua in exported games, mod folders, asset overrides (reuses the plugin host)
+- [ ] E.11 Multithreading: a job system for physics / particles / animation / culling, when a real game needs it
+- [ ] E.12 Plugin and template registry: browse community plugins / templates in the editor (a GitHub index)
+- [ ] E.13 Single-binary exports: game.ore + font appended to the runner on Windows / Linux (a footer: offset + magic; Windows signed after appending), macOS keeps the .app (Resources: signing-safe); an export option
+
 ## Phase 12 — Distribution, CI/CD and export targets (2026-10-25)
 
 Goal: users install the editor like any app (no compiler, no Homebrew, no

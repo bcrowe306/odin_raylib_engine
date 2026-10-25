@@ -30,6 +30,7 @@ Run_Options :: struct {
 	uncapped:       bool,   // --uncapped: no vsync, no frame cap, a frame time readout (also --bench)
 	noRenderCache:  bool,   // --no-render-cache: no tile chunk cache, no draw reordering (comparisons)
 	editorLink:     bool,   // --editor-link: driven by the editor over stdin/stdout (editor_link.odin)
+	crashTest:      string, // --crash-test panic | segv | abort: crash once loaded (crash report tests)
 }
 
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
@@ -63,6 +64,8 @@ Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 			opts.userDataDir = next; i += 1
 		case arg == "--no-render-cache":
 			opts.noRenderCache = true
+		case arg == "--crash-test" && next != "":
+			opts.crashTest = next; i += 1
 		case arg == "--editor-link":
 			opts.editorLink = true
 		case arg == "--bench" && next != "":
@@ -139,6 +142,11 @@ Runner_State :: struct {
 // Engine_RunProject opens a window and plays the project until it quits.
 // Returns a process exit code.
 Engine_RunProject :: proc(opts: Run_Options) -> int {
+	// Crash reports (crash_report.odin): the folder is set once the project
+	// is loaded (its user-data folder).
+	context.assertion_failure_proc = Crash_AssertionFailure
+	context.logger = Crash_Logger(context.logger)
+	Crash_Install("Ore game")
 	// Memory diagnostics builds (mem_track.odin): leaks and bad frees.
 	context.allocator = MemTrack_Init(context.allocator)
 	defer MemTrack_Shutdown()
@@ -148,6 +156,7 @@ Engine_RunProject :: proc(opts: Run_Options) -> int {
 	defer Prof_Shutdown()
 	rs, ok := Runner_Start(opts)
 	if !ok do return 1
+	if opts.crashTest != "" do Crash_TestCrash(opts.crashTest)
 	for Runner_Frame(rs) {}
 	Runner_Stop(rs)
 	return 0
@@ -247,6 +256,10 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 		return nil, false
 	}
 	if video.icon != "" do Runner_SetWindowIcon(game, video.icon)
+	// Crash reports go to the game's user-data folder (crash_report.odin).
+	when ODIN_OS != .JS {
+		Crash_Install(video.windowTitle if video.windowTitle != "" else Save_GameName(), Save_CrashDir())
+	}
 	// A project saved by a newer editor may use what this runner lacks.
 	if !Version_IsDev(ORE_RELEASE) && !Version_IsDev(video.engineVersion) && Version_Compare(video.engineVersion, ORE_RELEASE) > 0 {
 		log.warnf("This project was saved by Ore %s; this runner is %s - update the editor (and re-export) if something is missing", video.engineVersion, ORE_RELEASE)

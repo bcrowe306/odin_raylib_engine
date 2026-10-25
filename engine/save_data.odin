@@ -66,6 +66,15 @@ safe_name :: proc(name: string, allocator := context.temp_allocator) -> string {
 	return s if s != "" else "OreGame"
 }
 
+// Save_GameName: the game's name (the user-data folder's).
+Save_GameName :: proc() -> string {return save.gameName}
+
+// Save_CrashDir: <user data>/crashes (crash reports: crash_report.odin).
+Save_CrashDir :: proc(allocator := context.temp_allocator) -> string {
+	p, _ := filepath.join({Save_UserDataDir(save.gameName), "crashes"}, allocator)
+	return p
+}
+
 // Save_UserDataDir: the folder save files for `gameName` go in.
 Save_UserDataDir :: proc(gameName: string, allocator := context.temp_allocator) -> string {
 	if save.dir != "" do return strings.clone(save.dir, allocator)

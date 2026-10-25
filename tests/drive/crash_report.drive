@@ -1,0 +1,26 @@
+# Crash and bug reports (crash_reports.odin): a report from a crashed run is
+# offered (the dialog shows it); Report on GitHub builds a prefilled issue
+# (drives don't open the browser) and the report isn't offered again;
+# Help > Report a Bug builds one with the console's tail.
+wait 3
+exec cp tests/drive/fixtures/crash/crash-1700000000-4242.txt $CRASHDIR/
+crash-rescan
+wait 2
+expect crash-pending == 1
+expect item:crash.report == visible
+expect item:crash.text == visible
+screenshot crash_dialog
+click @crash.report
+wait 1
+expect crash-url contains https://github.com/bcrowe306/odin_raylib_engine/issues/new?title=Crash%3A%20SIGSEGV
+expect crash-url contains labels=crash
+expect crash-url contains Scene_Update
+expect crash-pending == 0
+expect item:crash.report == missing
+expect abs-file:$CRASHDIR/crash-1700000000-4242.seen contains SIGSEGV
+# Report a Bug.
+click @menu:Help
+click @menu:Help/Report a Bug...
+wait 1
+expect crash-url contains labels=bug
+expect crash-url contains Ore%20Editor

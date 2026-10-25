@@ -1,0 +1,11 @@
+# (scripts/test_crash.sh) The editor crashed in the previous run (--crash-test
+# panic): this start offers the report, and reporting it builds the issue.
+wait 3
+expect crash-pending == 1
+expect item:crash.report == visible
+screenshot reopened
+click @crash.report
+wait 1
+expect crash-url contains issues/new?title=Crash%3A%20panic
+expect crash-url contains Crash_TestCrash
+expect crash-pending == 0

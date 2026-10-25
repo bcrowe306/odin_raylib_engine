@@ -7543,6 +7543,45 @@ function SaveModule.path() end
 
 -- ============================================================================
 
+---@class CrashReport
+---@field path string The report file
+---@field text string Its contents (version, platform, reason, stack, recent log lines)
+
+---@class CrashModule
+---Crash reports from earlier runs of this game. A crash (an engine error, a
+---failed check, invalid memory access) writes a report to the player's
+---user-data folder (`<user data>/crashes`). Read them at startup and send
+---them where you like (Editor-free: your own server, a "send report?" menu).
+local CrashModule = {}
+
+---The reports from earlier runs not yet dismissed (oldest first).
+---
+---Example: `for _, r in ipairs(Crash.pending()) do show_report_dialog(r.text); Crash.dismiss(r.path) end`
+---@return CrashReport[]
+function CrashModule.pending() end
+
+---Stops offering a report (it stays in the folder as .seen).
+---
+---Example: `Crash.dismiss(report.path)`
+---@param path string A path from Crash.pending()
+---@return boolean ok
+function CrashModule.dismiss(path) end
+
+---Adds a line to the next crash report's "recent" list (what the game was
+---doing: "entered level 3", "boss fight"). The last 48 lines are kept.
+---
+---Example: `Crash.note("loaded " .. level_name)`
+---@param text string
+function CrashModule.note(text) end
+
+---The crash folder.
+---
+---Example: `print("crash reports in " .. Crash.dir())`
+---@return string
+function CrashModule.dir() end
+
+-- ============================================================================
+
 ---@class EngineModule
 ---Core engine statistics, frame timing, and display information.
 local EngineModule = {}
@@ -8778,6 +8817,9 @@ Subtitles = SubtitlesModule
 
 ---@type SaveModule
 Save = SaveModule
+
+---@type CrashModule
+Crash = CrashModule
 
 ---@class NavigationModule
 local NavigationModule = {}
