@@ -134,6 +134,7 @@ CI/CD (GitHub Actions):
 - [x] C.3 Release workflow on `v*` tags: build the editor and runners per platform, put every platform's runners in each editor package, publish a GitHub Release with checksums
 - [ ] C.4 macOS signing + notarization (Developer ID, hardened runtime, every dylib signed; certificates as repository secrets) - needs an Apple Developer account
 - [ ] C.5 Windows code signing (Azure Trusted Signing or an OV certificate) - optional for early releases (SmartScreen warns without it)
+- [x] C.8 Dev builds: every push to main that passes CI publishes a pre-release v<VERSION>-dev.<commit count> for every platform (release.yml on workflow_run; VERSION = the next release); dev-build editors check for newer dev builds; pre-release versions compare part by part (dev.10 > dev.9) - RELEASING.md
 - [x] C.6 Linux glibc baseline: built on Ubuntu 22.04 (glibc 2.35: Ubuntu 22.04+, Debian 12+, Fedora 36+); Ubuntu 20.04 is past its standard support, so no older container
 - [x] C.7 Packages: .dmg (macOS), .zip (Windows; an installer later if wanted), AppImage + .deb + .tar.gz (Linux) - checked with a dry run (release-dryrun branch): the CI-built app carries all four runners and passes scripts/test_package.sh
 

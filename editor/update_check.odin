@@ -14,11 +14,15 @@ import imgui "lib/imgui"
 // default) and from Help > Check for Updates, the latest GitHub Release is
 // read (curl, on a thread) and compared with this editor's version
 // (ORE_RELEASE). A newer one shows in the status bar (click: its page) and
-// the console. Not in development builds or test drives (ORE_UPDATE_URL
+// the console. Dev builds (0.1.0-dev.<n>, one per merge to main: release.yml)
+// look at every release, so a newer dev build is offered too; releases only
+// at releases. Not in local builds (0.0.0-dev) or test drives (ORE_UPDATE_URL
 // points it elsewhere: tests).
 // ============================================================================
 
 UPDATE_RELEASES_URL :: "https://api.github.com/repos/bcrowe306/odin_raylib_engine/releases/latest"
+// (Pre-releases too, newest first: what a dev build compares with.)
+UPDATE_ALL_RELEASES_URL :: "https://api.github.com/repos/bcrowe306/odin_raylib_engine/releases?per_page=30"
 
 @(private = "file")
 Update_Job :: struct {
@@ -44,7 +48,7 @@ UpdateCheck_Start :: proc(manual := false) {
 	url := os.get_env("ORE_UPDATE_URL", context.temp_allocator)
 	if url == "" {
 		if !manual && (e.Version_IsDev(e.ORE_RELEASE) || GlobalDrive.enabled || !GlobalSettings.checkUpdates) do return
-		url = UPDATE_RELEASES_URL
+		url = UPDATE_ALL_RELEASES_URL if e.Version_IsPrerelease(e.ORE_RELEASE) else UPDATE_RELEASES_URL
 	}
 	update.manual = manual
 	job := new(Update_Job)
@@ -97,14 +101,27 @@ UpdateCheck_Available :: proc() -> (version, page: string) {
 	return update.version, update.page
 }
 
-// update_parse reads a GitHub release: its tag and page.
+// update_parse reads a GitHub release (its tag and page) or a list of them
+// (the newest version; drafts skipped).
 @(private = "file")
 update_parse :: proc(text: string) -> (tag, page: string, ok: bool) {
 	v, err := json.parse_string(text, allocator = context.temp_allocator)
 	if err != nil do return
-	o := v.(json.Object) or_return
-	tag = o["tag_name"].(json.String) or_return
-	page = o["html_url"].(json.String) or_else ""
+	#partial switch r in v {
+	case json.Object:
+		tag = r["tag_name"].(json.String) or_return
+		page = r["html_url"].(json.String) or_else ""
+	case json.Array:
+		for item in r {
+			o := item.(json.Object) or_continue
+			if o["draft"].(json.Boolean) or_else false do continue
+			t := o["tag_name"].(json.String) or_continue
+			if tag == "" || e.Version_Compare(t, tag) > 0 {
+				tag = t
+				page = o["html_url"].(json.String) or_else ""
+			}
+		}
+	}
 	return tag, page, tag != ""
 }
 
