@@ -166,6 +166,7 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 	InputSystem_Update(&game.input, deltaTime)
 	Mixer_Reap() // voices that ended
 	if game.scriptManager.L != nil do Input_RebindDispatch(&game.input, game.scriptManager.L) // Input.listen's on_done
+	Input_DispatchPadEvents(&game.input, &game.scriptManager) // on_gamepad_connected / _disconnected
 	if game.scriptManager.hotReload do Shader_CheckForChanges() // edited .fs files
 	Prof_End()
 

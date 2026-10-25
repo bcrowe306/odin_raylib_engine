@@ -1,0 +1,23 @@
+# Gamepads (TODO E.4): Project Settings > Input shows each binding's button
+# prompt (what Input.glyph gives games) for the chosen pad.
+wait 5
+key ctrl+comma
+expect project-settings-open == true
+click @settings.tab:project
+click @settings.page:Input
+click @settings.action:jump
+expect item:settings.prompt:prompts:keyboard/keyboard_space == visible
+expect item:settings.prompt:prompts:xbox/xbox_button_a == visible
+screenshot gamepads_prompts_xbox
+click @settings.prompt-family
+click @pick:PlayStation
+expect item:settings.prompt:prompts:playstation/playstation_button_cross == visible
+click @settings.prompt-family
+click @pick:Switch
+expect item:settings.prompt:prompts:switch/switch_button_b == visible
+click @settings.action:move_left
+expect item:settings.prompt:prompts:switch/switch_stick_l_left == visible
+expect item:settings.prompt:prompts:keyboard/keyboard_a == visible
+screenshot gamepads_prompts_switch
+click @settings.cancel
+expect project-settings-open == false

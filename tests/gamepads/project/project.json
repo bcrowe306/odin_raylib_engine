@@ -1,0 +1,2 @@
+{"name": "Gamepad Test", "initial_scene": "scenes/main.scene.json", "window": {"title": "Gamepad Test", "width": 320, "height": 180, "virtual_width": 320, "virtual_height": 180}, "scenes": ["scenes/main.scene.json"],
+ "input": {"actions": [{"name": "dash", "bindings": [{"key": "K"}, {"button": "RIGHT_FACE_RIGHT"}]}]}}

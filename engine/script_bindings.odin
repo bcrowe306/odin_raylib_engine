@@ -2175,7 +2175,7 @@ lua_input_is_action_pressed :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	st, _ := Input_ActionStateByName(&sm.game.input, string(actStr))
+	st, _ := Input_PlayerActionState(&sm.game.input, string(actStr), lua_player_arg(L, 2))
 	lua.pushboolean(L, b32(st.pressed))
 	return 1
 }
@@ -2189,7 +2189,7 @@ lua_input_is_action_down :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	st, _ := Input_ActionStateByName(&sm.game.input, string(actStr))
+	st, _ := Input_PlayerActionState(&sm.game.input, string(actStr), lua_player_arg(L, 2))
 	lua.pushboolean(L, b32(st.down))
 	return 1
 }
@@ -2203,7 +2203,7 @@ lua_input_is_action_released :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	st, _ := Input_ActionStateByName(&sm.game.input, string(actStr))
+	st, _ := Input_PlayerActionState(&sm.game.input, string(actStr), lua_player_arg(L, 2))
 	lua.pushboolean(L, b32(st.released))
 	return 1
 }
@@ -2218,8 +2218,9 @@ lua_input_get_axis :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnumber(L, 0)
 		return 1
 	}
-	neg, _ := Input_ActionStateByName(&sm.game.input, string(negStr))
-	pos, _ := Input_ActionStateByName(&sm.game.input, string(posStr))
+	player := lua_player_arg(L, 3)
+	neg, _ := Input_PlayerActionState(&sm.game.input, string(negStr), player)
+	pos, _ := Input_PlayerActionState(&sm.game.input, string(posStr), player)
 	lua.pushnumber(L, lua.Number(pos.value - neg.value))
 	return 1
 }
@@ -2233,16 +2234,23 @@ lua_input_get_vector :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnumber(L, 0)
 		return 2
 	}
-	lStr := lua.tostring(L, 1)
-	rStr := lua.tostring(L, 2)
-	uStr := lua.tostring(L, 3)
-	dStr := lua.tostring(L, 4)
+	// (left, right, up, down[, player]) or (player): the names are optional.
+	names := [4]string{"move_left", "move_right", "move_up", "move_down"}
+	player := 1
+	ni := 0
+	for i in c.int(1) ..= lua.gettop(L) {
+		#partial switch lua.type(L, i) {
+		case .NUMBER: player = int(lua.tointeger(L, i))
+		case .STRING: if ni < 4 {names[ni] = string(lua.tostring(L, i)); ni += 1}
+		case: ni += 1 // (nil: the default)
+		}
+	}
 
 	inp := &sm.game.input
-	l, _ := Input_ActionStateByName(inp, string(lStr) if lStr != nil else "move_left")
-	r, _ := Input_ActionStateByName(inp, string(rStr) if rStr != nil else "move_right")
-	u, _ := Input_ActionStateByName(inp, string(uStr) if uStr != nil else "move_up")
-	d, _ := Input_ActionStateByName(inp, string(dStr) if dStr != nil else "move_down")
+	l, _ := Input_PlayerActionState(inp, names[0], player)
+	r, _ := Input_PlayerActionState(inp, names[1], player)
+	u, _ := Input_PlayerActionState(inp, names[2], player)
+	d, _ := Input_PlayerActionState(inp, names[3], player)
 	vec := [2]f32{r.value - l.value, d.value - u.value}
 	if l2 := vec.x * vec.x + vec.y * vec.y; l2 > 1 {
 		inv := 1 / math.sqrt(l2)
@@ -4424,6 +4432,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.pushcfunction(L, lua_input_get_mouse_wheel_move)
 	lua.setfield(L, -2, "get_mouse_wheel_move")
 	Script_RegisterRebindBindings(L) // get_bindings, listen, ... (input_rebind.odin)
+	Script_RegisterPlayerBindings(L) // players, gamepads, vibrate, glyph (input_players_lua.odin)
 	lua.setglobal(L, "Input")
 
 	// 4. Global "Audio" table

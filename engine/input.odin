@@ -81,6 +81,9 @@ InputSystem :: struct {
 	// Project-defined actions (input_actions.odin).
 	named: [dynamic]Named_Action,
 
+	// Players 2-4, gamepads, hot-plug, rumble (input_players.odin).
+	pads: Input_Pads,
+
 	// Player rebinding (input_rebind.odin).
 	rebind: Input_Rebind,
 	// (Older UIs read these: they mirror `rebind` for built-in actions.)
@@ -97,6 +100,7 @@ InputSystem_Init :: proc(input: ^InputSystem) {
 	input.enabled = true
 	input.gamepadIndex = 0
 	input.useSimulatedInput = false
+	Input_PadsInit(input)
 	Input_ResetDefaultBindings(input)
 }
 
@@ -106,6 +110,7 @@ InputSystem_Destroy :: proc(input: ^InputSystem) {
 	delete(input.named)
 	input.named = nil
 	Input_RebindDestroy(input)
+	Input_PadsDestroy(input)
 	if input.simulatedKeysDown != nil {
 		delete(input.simulatedKeysDown)
 		input.simulatedKeysDown = nil
@@ -354,11 +359,18 @@ Input_ClearSimulatedInputs :: proc(input: ^InputSystem) {
 // ============================================================================
 
 Input_EvaluateBinding :: proc(input: ^InputSystem, bind: InputBinding) -> (isDown: bool, strength: f32) {
+	return Input_EvaluateBindingFor(input, bind, input.gamepadIndex, true)
+}
+
+// Input_EvaluateBindingFor: a binding for a player's pad (-1: none) and,
+// for player 1, the keyboard + mouse.
+Input_EvaluateBindingFor :: proc(input: ^InputSystem, bind: InputBinding, pad: i32, keyboard: bool) -> (isDown: bool, strength: f32) {
 	switch bind.deviceType {
 	case .None:
 		return false, 0.0
 
 	case .KeyboardKey:
+		if !keyboard do return false, 0
 		if input.useSimulatedInput && input.simulatedKeysDown != nil {
 			if down, ok := input.simulatedKeysDown[bind.key]; ok && down {
 				return true, 1.0
@@ -369,6 +381,7 @@ Input_EvaluateBinding :: proc(input: ^InputSystem, bind: InputBinding) -> (isDow
 		}
 
 	case .MouseButton:
+		if !keyboard do return false, 0
 		if input.useSimulatedInput && input.simulatedMouseDown != nil {
 			if down, ok := input.simulatedMouseDown[bind.mouseButton]; ok && down {
 				return true, 1.0
@@ -379,15 +392,13 @@ Input_EvaluateBinding :: proc(input: ^InputSystem, bind: InputBinding) -> (isDow
 		}
 
 	case .GamepadButton:
-		if rl.IsWindowReady() && rl.IsGamepadAvailable(input.gamepadIndex) {
-			if rl.IsGamepadButtonDown(input.gamepadIndex, bind.gamepadButton) {
-				return true, 1.0
-			}
+		if Input_PadButtonDown(input, pad, bind.gamepadButton) {
+			return true, 1.0
 		}
 
 	case .GamepadAxis:
-		if rl.IsWindowReady() && rl.IsGamepadAvailable(input.gamepadIndex) {
-			rawVal := rl.GetGamepadAxisMovement(input.gamepadIndex, bind.gamepadAxis)
+		if Input_PadConnected(input, pad) {
+			rawVal := Input_PadAxis(input, pad, bind.gamepadAxis)
 			dz := bind.axisDeadzone if bind.axisDeadzone > 0 else 0.25
 			if bind.axisPositive && rawVal > dz {
 				norm := clamp((rawVal - dz) / (1.0 - dz), 0.0, 1.0)
@@ -450,6 +461,7 @@ InputSystem_Update :: proc(input: ^InputSystem, deltaTime: f32) {
 		input.states[action] = newState
 	}
 	Input_UpdateNamed(input, deltaTime)
+	Input_UpdatePlayers(input, deltaTime)
 }
 
 // ============================================================================

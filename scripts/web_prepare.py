@@ -29,7 +29,7 @@ def copy_tree(src, dst, skip_tests=False):
         for f in files:
             if skip_tests and f.endswith("_test.odin"):
                 continue
-            if f.endswith((".odin", ".lua", ".ttf", ".png", ".fs", ".vs", ".txt")):
+            if f.endswith((".odin", ".lua", ".ttf", ".png", ".fs", ".vs", ".txt", ".xml")):
                 shutil.copy2(os.path.join(root, f), os.path.join(out, f))
 
 

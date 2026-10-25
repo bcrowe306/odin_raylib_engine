@@ -354,6 +354,7 @@ uiPad: struct {
 	fire:    [4]bool, // up, down, left, right: move this frame
 	held:    [4]f32,  // seconds held
 	confirm: bool,
+	aDown:   bool, // A held last frame (confirm: when it goes down)
 }
 
 UI_PAD_REPEAT_DELAY :: 0.4
@@ -363,17 +364,20 @@ UI_PAD_REPEAT_EVERY :: 0.12
 ui_update_pad :: proc(gameContext: ^GameContext) {
 	uiPad.fire, uiPad.confirm = {}, false
 	if gameContext == nil || gameContext.game == nil || !rl.IsWindowReady() do return
-	pad := gameContext.game.input.gamepadIndex
-	if !rl.IsGamepadAvailable(pad) {
+	// (Player 1's pad, real or simulated: input_players.odin.)
+	input := &gameContext.game.input
+	pad := input.gamepadIndex
+	if !Input_PadConnected(input, pad) {
 		uiPad.held = {}
+		uiPad.aDown = false
 		return
 	}
-	lx, ly := rl.GetGamepadAxisMovement(pad, .LEFT_X), rl.GetGamepadAxisMovement(pad, .LEFT_Y)
+	lx, ly := Input_PadAxis(input, pad, .LEFT_X), Input_PadAxis(input, pad, .LEFT_Y)
 	down := [4]bool{
-		rl.IsGamepadButtonDown(pad, .LEFT_FACE_UP) || ly < -0.5,
-		rl.IsGamepadButtonDown(pad, .LEFT_FACE_DOWN) || ly > 0.5,
-		rl.IsGamepadButtonDown(pad, .LEFT_FACE_LEFT) || lx < -0.5,
-		rl.IsGamepadButtonDown(pad, .LEFT_FACE_RIGHT) || lx > 0.5,
+		Input_PadButtonDown(input, pad, .LEFT_FACE_UP) || ly < -0.5,
+		Input_PadButtonDown(input, pad, .LEFT_FACE_DOWN) || ly > 0.5,
+		Input_PadButtonDown(input, pad, .LEFT_FACE_LEFT) || lx < -0.5,
+		Input_PadButtonDown(input, pad, .LEFT_FACE_RIGHT) || lx > 0.5,
 	}
 	dt := rl.GetFrameTime()
 	for i in 0 ..< 4 {
@@ -391,7 +395,9 @@ ui_update_pad :: proc(gameContext: ^GameContext) {
 			uiPad.fire[i] = n1 != n0
 		}
 	}
-	uiPad.confirm = rl.IsGamepadButtonPressed(pad, .RIGHT_FACE_DOWN)
+	a := Input_PadButtonDown(input, pad, .RIGHT_FACE_DOWN)
+	uiPad.confirm = a && !uiPad.aDown
+	uiPad.aDown = a
 }
 
 UI_UpdateFocusNavigation :: proc(scene: ^Scene, gameContext: ^GameContext) {

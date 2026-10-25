@@ -7865,47 +7865,57 @@ function EngineModule.is_fullscreen() end
 ---built-in names (move_up, move_down, move_left, move_right, jump, fire,
 ---secondary, boost, interact, pause, confirm, cancel, custom1..4) plus any
 ---the project adds, each bound to keys, mouse buttons or gamepad input.
+---
+---Players: up to 4. Player 1 is the keyboard + mouse and the first
+---gamepad; players 2-4 each have a gamepad (the 2nd, 3rd, 4th plugged in).
+---Action queries take an optional player (default 1). Scripts get
+---on_gamepad_connected(player, name) / on_gamepad_disconnected(player).
 local InputModule = {}
 
 ---Checks if an action was pressed this frame (just triggered).
 ---
 ---Example: `if Input.is_action_pressed("jump") then self.vy = -self.jump_speed end`
 ---@param action InputAction Action name from the project's Input settings (e.g. "move_up", "fire", "jump", "dash")
+---@param player? integer 1-4 (default 1)
 ---@return boolean
-function InputModule.is_action_pressed(action) end
+function InputModule.is_action_pressed(action, player) end
 
 ---Checks if an action is currently held down.
 ---
----Example: `if Input.is_action_down("fire") then self:shoot() end`
+---Example: `if Input.is_action_down("fire", self.player) then self:shoot() end`
 ---@param action InputAction
+---@param player? integer 1-4 (default 1)
 ---@return boolean
-function InputModule.is_action_down(action) end
+function InputModule.is_action_down(action, player) end
 
 ---Checks if an action was released this frame.
 ---
 ---Example: `if Input.is_action_released("jump") and self.vy < 0 then self.vy = self.vy * 0.5 end`
 ---@param action InputAction
+---@param player? integer 1-4 (default 1)
 ---@return boolean
-function InputModule.is_action_released(action) end
+function InputModule.is_action_released(action, player) end
 
 ---Calculates a 1D axis value between -1.0 and 1.0 from negative and positive action names.
 ---
 ---Example: `local dir = Input.get_axis("move_left", "move_right"); self.vx = dir * self.speed`
 ---@param neg_action InputAction Action name representing negative direction (e.g. "move_left")
 ---@param pos_action InputAction Action name representing positive direction (e.g. "move_right")
+---@param player? integer 1-4 (default 1)
 ---@return number axis Value from -1.0 to 1.0
-function InputModule.get_axis(neg_action, pos_action) end
+function InputModule.get_axis(neg_action, pos_action, player) end
 
 ---Calculates a normalized 2D direction vector from 4 directional action inputs.
 ---
----Example: `local dx, dy = Input.get_vector("move_left", "move_right", "move_up", "move_down")`
----@param left? InputAction
+---Example: `local dx, dy = Input.get_vector("move_left", "move_right", "move_up", "move_down")` - or `Input.get_vector(2)`: player 2's move_* actions.
+---@param left? InputAction|integer The action, or the player (the move_* actions)
 ---@param right? InputAction
 ---@param up? InputAction
 ---@param down? InputAction
+---@param player? integer 1-4 (default 1)
 ---@return number x Normalized X axis
 ---@return number y Normalized Y axis
-function InputModule.get_vector(left, right, up, down) end
+function InputModule.get_vector(left, right, up, down, player) end
 
 -- key names begin (generated: lua_keys_definitions_test.odin)
 ---Keyboard keys (raylib names; also RETURN, ESC, SHIFT, CTRL, ALT and "0"-"9").
@@ -8182,6 +8192,86 @@ function InputModule.last_device() end
 ---Example: `for _, name in ipairs(Input.get_actions()) do print(name, Input.binding_text(name)) end`
 ---@return string[]
 function InputModule.get_actions() end
+
+---Rumbles a player's gamepad. low: the heavy (left) motor, high: the light (right) one, 0-1 each. False when the player has no gamepad. (Windows: XInput pads; Linux: pads with force feedback; macOS: controllers with haptics; the web: where the browser has it.)
+---
+---Example: `Input.vibrate(0.4, 0.8, 0.25, self.player)`
+---@param low number 0-1
+---@param high? number 0-1 (default: low)
+---@param seconds? number Default 0.2
+---@param player? integer 1-4 (default 1)
+---@return boolean
+function InputModule.vibrate(low, high, seconds, player) end
+
+---Stops a player's rumble.
+---
+---Example: `Input.stop_vibration(2)`
+---@param player? integer 1-4 (default 1)
+function InputModule.stop_vibration(player) end
+
+---The rumble a player's gamepad has now (0, 0: none).
+---
+---Example: `local low, high = Input.get_vibration()`
+---@param player? integer 1-4 (default 1)
+---@return number low
+---@return number high
+function InputModule.get_vibration(player) end
+
+---The button prompt image for an action: its first binding on the device the player uses now (a key on the keyboard; A / Cross / B... on a pad). Use it as any image path (set_texture, UI images). nil when the action has nothing on that device.
+---
+---Example: `self.node:get_node("Prompt"):set_texture(Input.glyph("jump"))` - "prompts:xbox/xbox_button_a"
+---@param action InputAction
+---@param player? integer 1-4 (default 1)
+---@param device? "keyboard"|"xbox"|"playstation"|"switch"|"steamdeck" Instead of the player's device
+---@return string?
+function InputModule.glyph(action, player, device) end
+
+---The device a player uses now: "keyboard" (player 1, last used the keyboard / mouse or has no pad), the gamepad's kind (from its name), or "none".
+---
+---Example: `if Input.device() == "playstation" then hint.text = "Press Cross" end`
+---@param player? integer 1-4 (default 1)
+---@return "keyboard"|"xbox"|"playstation"|"switch"|"steamdeck"|"generic"|"none"
+function InputModule.device(player) end
+
+---Does the player have a gamepad connected?
+---
+---Example: `if not Input.is_gamepad_connected(2) then label.text = "P2: connect a controller" end`
+---@param player? integer 1-4 (default 1)
+---@return boolean
+function InputModule.is_gamepad_connected(player) end
+
+---The name of a player's gamepad (nil: none).
+---
+---Example: `print(Input.gamepad_name(1))` - "Xbox Wireless Controller"
+---@param player? integer 1-4 (default 1)
+---@return string?
+function InputModule.gamepad_name(player) end
+
+---The gamepad (1-4) a player has (nil: none).
+---
+---Example: `local pad = Input.get_player_gamepad(2)`
+---@param player integer 1-4
+---@return integer?
+function InputModule.get_player_gamepad(player) end
+
+---Gives a player a gamepad (nil: none). A player that had it gets this player's old one, so two players never share a pad - a "press A to join" screen.
+---
+---Example: `for _, p in ipairs(Input.gamepads()) do if not p.player then Input.set_player_gamepad(next_free, p.pad) end end`
+---@param player integer 1-4
+---@param pad? integer 1-4
+function InputModule.set_player_gamepad(player, pad) end
+
+---The connected gamepads.
+---
+---Example: `for _, p in ipairs(Input.gamepads()) do print(p.pad, p.name, p.device, p.player) end`
+---@return {pad: integer, name: string, device: string, player: integer?}[]
+function InputModule.gamepads() end
+
+---How many players: player 1 plus every other player with a gamepad.
+---
+---Example: `for p = 1, Input.player_count() do self:spawn_player(p) end`
+---@return integer
+function InputModule.player_count() end
 
 
 ---@class AudioModule
@@ -9157,3 +9247,5 @@ Project = ProjectModule
 ---@field on_value_changed? fun(self: self, value: any) Event (UI inputs): the value changed.
 ---@field on_submitted? fun(self: self, text: string) Event (UITextInputNode): Enter pressed.
 ---@field on_selected? fun(self: self, index: integer) Event (UI lists): selection changed.
+---@field on_gamepad_connected? fun(self: self, player: integer, name: string) Event (every script): a player's gamepad was plugged in.
+---@field on_gamepad_disconnected? fun(self: self, player: integer) Event (every script): a player's gamepad was unplugged.
