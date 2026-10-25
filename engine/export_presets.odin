@@ -197,7 +197,7 @@ Export_PatternMatch :: proc(pattern, path: string) -> bool {
 		if strings.has_suffix(pat, "/") do return false
 	}
 	// (Segment by segment: package paths use "/" everywhere, filepath.match
-	// splits on the OS's separator - "\\" on Windows.)
+	// splits on the OS's separator - a backslash on Windows.)
 	if !strings.contains(pat, "/") {
 		base := path[strings.last_index_byte(path, '/') + 1:]
 		ok, _ := filepath.match(pat, base)
