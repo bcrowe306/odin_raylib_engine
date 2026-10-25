@@ -24,7 +24,8 @@ git clone -q --depth 1 --branch "$VERSION" https://github.com/commonmark/cmark.g
 flags=(-DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DCMAKE_POSITION_INDEPENDENT_CODE=ON)
 case "$(uname -s)" in
 	Darwin) flags+=("-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=11.0) ;;
-	MINGW*|MSYS*|CYGWIN*) flags+=(-DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded) ;;
+	# (The static CRT, as Odin links; cmark's CMakeLists predates policy CMP0091.)
+	MINGW*|MSYS*|CYGWIN*) flags+=(-DCMAKE_POLICY_DEFAULT_CMP0091=NEW -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded) ;;
 esac
 cmake -S "$tmp/cmark" -B "$tmp/build" "${flags[@]}" > /dev/null
 cmake --build "$tmp/build" --config Release > /dev/null

@@ -1,5 +1,8 @@
 package editor
 
+// (vendor:raylib first: on Windows raylib.lib must come before User32.lib on the
+// link line, or rl.CloseWindow / ShowCursor resolve to Win32's and collide.)
+import rl "vendor:raylib"
 import "core:c"
 import "core:fmt"
 import "core:mem"
@@ -8,7 +11,6 @@ import "core:os"
 import "core:slice"
 import "core:strings"
 import "core:time"
-import rl "vendor:raylib"
 import e "../engine"
 import imgui "lib/imgui"
 import imgui_rl "lib/imgui/imgui_impl_raylib"

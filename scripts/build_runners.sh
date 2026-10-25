@@ -72,12 +72,9 @@ if [ "$platform" = macos ]; then
 	fi
 	rm -rf "$out"/*.dSYM
 elif [ "$platform" = windows ]; then
-	# raylib as a DLL on Windows: linked statically, its CloseWindow / ShowCursor
-	# collide with user32's (core:os imports core:sys/windows).
-	odin build runner -o:speed -subsystem:windows -define:RAYLIB_SHARED=true -out:"$out/$exe" "$@"
-	odin build runner -debug -define:RAYLIB_SHARED=true -out:"$out/runner-debug.exe" "$@"
+	odin build runner -o:speed -subsystem:windows -out:"$out/$exe" "$@"
+	odin build runner -debug -out:"$out/runner-debug.exe" "$@"
 	rm -f "$out"/*.pdb
-	cp "$(odin root)/vendor/raylib/windows/raylib.dll" "$out/"
 else
 	odin build runner -o:speed -out:"$out/$exe" "$@"
 	odin build runner -debug -out:"$out/runner-debug" "$@"

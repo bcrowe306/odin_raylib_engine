@@ -58,10 +58,8 @@ elif [ "$platform" = windows ]; then
 	rm -rf "$root"
 	bin="$root"; libs="$root"; res="$root"
 	mkdir -p "$root"
-	# (raylib as a DLL: statically, its CloseWindow / ShowCursor collide with user32's.)
-	odin build editor -o:speed -subsystem:windows -define:RAYLIB_SHARED=true -define:ORE_RELEASE="$version" -out:"$bin/$exe"
+	odin build editor -o:speed -subsystem:windows -define:ORE_RELEASE="$version" -out:"$bin/$exe"
 	rm -f "$bin"/*.pdb
-	cp "$(odin root)/vendor/raylib/windows/raylib.dll" "$bin/"
 else
 	root="$out/ore-editor-$platform"
 	rm -rf "$root"
