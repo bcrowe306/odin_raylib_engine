@@ -12,6 +12,8 @@ name: Release
 on:
   push:
     tags: ["v*"]
+    # A dry run: everything but the GitHub Release (push to this branch).
+    branches: [release-dryrun]
   workflow_dispatch:
     inputs:
       version:
@@ -35,7 +37,10 @@ jobs:
     steps:
       - id: v
         run: |
-          if [ "${{ github.event_name }}" = push ]; then v="${GITHUB_REF_NAME#v}"; else v="${{ inputs.version }}"; fi
+          case "$GITHUB_REF" in
+            refs/tags/v*) v="${GITHUB_REF_NAME#v}" ;;
+            *) v="${{ inputs.version }}"; [ -n "$v" ] || v="0.0.0-dryrun.${{ github.run_number }}" ;;
+          esac
           echo "version=$v" >> "$GITHUB_OUTPUT"
           case "$v" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
 
@@ -170,7 +175,7 @@ jobs:
   publish:
     name: GitHub Release
     needs: [version, package]
-    if: github.event_name == 'push'
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/download-artifact@v4
