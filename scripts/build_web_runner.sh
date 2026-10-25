@@ -5,6 +5,7 @@
 # odin. Ship the editor with runners/web/ and web exports work anywhere.
 #
 #   scripts/build_web_runner.sh            (deps are built once into bin/web_deps)
+#   scripts/build_web_runner.sh -define:ORE_RELEASE=1.2.3   (extra odin flags)
 #
 # Dependencies built with emcc: raylib 5.5 (WebGL 2), Lua 5.4.7, Box2D 3.1.1
 # (the versions Odin's bindings expect). Sources: the official release
@@ -47,7 +48,7 @@ fi
 
 echo "Compiling the engine (js_wasm32)"
 python3 scripts/web_prepare.py "$ROOT" "$BUILD/src" "$ODIN_ROOT" >/dev/null
-odin build "$BUILD/src/runner/web" -target:js_wasm32 -build-mode:obj -define:RAYLIB_WASM_LIB=env.o -default-to-panic-allocator -o:speed -out:"$BUILD/game.wasm.o"
+odin build "$BUILD/src/runner/web" -target:js_wasm32 -build-mode:obj -define:RAYLIB_WASM_LIB=env.o -default-to-panic-allocator -o:speed -out:"$BUILD/game.wasm.o" "$@"
 
 echo "Linking (emcc)"
 cp "$ODIN_ROOT/core/sys/wasm/js/odin.js" "$OUT/odin.js"
