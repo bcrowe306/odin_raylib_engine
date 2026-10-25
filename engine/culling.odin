@@ -98,6 +98,13 @@ Node_RenderBounds :: proc(node: ^Node) -> (rect: rl.Rectangle, ok: bool) {
 		size := tn.size * tn.globalScale
 		origin := Node_OriginPx(tn, tn.size) * tn.globalScale
 		return rect_aabb(tn.globalPosition, {abs(size.x), abs(size.y)}, {abs(origin.x), abs(origin.y)}, tn.globalRotation), true
+	case AsepriteNode:
+		an := cast(^AsepriteNode)node
+		if an.res == nil do return {}, false
+		sz := AsepriteNode_Size(an)
+		size := sz * an.globalScale
+		origin := Node_OriginPx(an, sz) * an.globalScale
+		return rect_aabb(an.globalPosition, {abs(size.x), abs(size.y)}, {abs(origin.x), abs(origin.y)}, an.globalRotation), true
 	case TextNode:
 		if !rl.IsWindowReady() do return {}, false
 		return TextNode_Bounds(cast(^TextNode)node, nil), true

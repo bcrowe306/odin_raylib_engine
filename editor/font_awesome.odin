@@ -170,3 +170,4 @@ ICON_FA_ROCKET                    :: ""
 ICON_FA_LOCATION_ARROW            :: "\uF124" // Navigation Agent
 ICON_FA_PAPERCLIP                     :: "\uF0C6" // Bone Attachment
 ICON_FA_MAP_LOCATION_DOT              :: "\uF5A0" // Navigation Region
+ICON_FA_PALETTE                   :: "\uF53F" // Aseprite Sprite

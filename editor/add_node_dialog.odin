@@ -449,6 +449,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		description = "Tabbed pages container.",
 		typeName    = "UITabContainerNode",
 	},
+	{
+		name        = "Aseprite Sprite",
+		category    = "Animation & Effects",
+		icon        = ICON_FA_PALETTE,
+		description = "An Aseprite file (.aseprite / .ase) played as Aseprite does: tags, directions, repeats, frame durations; layers on / off, slices and user data for scripts. Saving in Aseprite updates it live.",
+		typeName    = "AsepriteNode",
+	},
 }
 
 AddNodeDialog_Open :: proc() {

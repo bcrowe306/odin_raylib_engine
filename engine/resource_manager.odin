@@ -66,6 +66,7 @@ ResourceManager :: struct {
 	package_: ^OrePackage,
 	projectDir: string,
 	atlas: Atlas_Index, // the package's sprite atlas (atlas.odin)
+	aseprite: map[string]^Ase_Resource, // Aseprite files (aseprite_resource.odin)
 }
 
 ResourceManager_Init :: proc(rm: ^ResourceManager) {
@@ -94,6 +95,7 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 		}
 	}
 	delete(rm.textures)
+	Ase_ReleaseAll(rm)
 	rm.textures = nil
 	Atlas_Unmount(rm) // (its pages)
 
@@ -168,7 +170,13 @@ texture_load :: proc(rm: ^ResourceManager, filePath: string, own: bool) -> (text
 	}
 
 	texture2d: rl.Texture2D
-	if os.is_file(filePath) {
+	if Ase_IsPath(filePath) {
+		// An Aseprite file: its first frame (aseprite_resource.odin).
+		img, ok := ase_texture_image(rm, filePath)
+		if !ok do return nil, false
+		if rl.IsWindowReady() do texture2d = rl.LoadTextureFromImage(img)
+		rl.UnloadImage(img)
+	} else if os.is_file(filePath) {
 		if rl.IsWindowReady() do texture2d = rl.LoadTexture(fmt.ctprint(filePath))
 	} else if bytes, found := resource_bytes(rm, filePath); found {
 		defer delete(bytes)
@@ -421,12 +429,24 @@ textureCheck: time.Tick
 ResourceManager_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 	if rm == nil || !rl.IsWindowReady() || time.tick_since(textureCheck) < 500 * time.Millisecond do return 0
 	textureCheck = time.tick_now()
-	n := 0
+	n := Ase_CheckForChanges(rm) // (Aseprite files: aseprite_resource.odin)
 	for t in rm.textures {
 		if t == nil || t.modTime == {} || t.page > 0 do continue
 		info, err := os.stat(t.filePath, context.temp_allocator)
 		if err != nil || time.diff(t.modTime, info.modification_time) <= 0 do continue
-		fresh := rl.LoadTexture(strings.clone_to_cstring(t.filePath, context.temp_allocator))
+		fresh: rl.Texture2D
+		if Ase_IsPath(t.filePath) {
+			data, rerr := os.read_entire_file(t.filePath, context.temp_allocator)
+			if rerr != nil do continue
+			doc, _ := Ase_Load(data)
+			if doc == nil do continue
+			img := Ase_FrameImage(doc, 0)
+			fresh = rl.LoadTextureFromImage(img)
+			rl.UnloadImage(img)
+			Ase_Destroy(doc)
+		} else {
+			fresh = rl.LoadTexture(strings.clone_to_cstring(t.filePath, context.temp_allocator))
+		}
 		if fresh.id == 0 do continue // half-written: try again later
 		t.modTime = info.modification_time
 		rl.UnloadTexture(t.texture)

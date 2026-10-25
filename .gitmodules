@@ -10,3 +10,6 @@
 [submodule "odin_editor"]
 	path = odin_editor
 	url = https://github.com/bcrowe306/odin_editor.git
+[submodule "aseprite"]
+	path = aseprite
+	url = https://github.com/aseprite/aseprite.git

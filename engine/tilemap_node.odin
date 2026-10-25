@@ -26,6 +26,11 @@ TileMapNode :: struct {
 	mapSize:     [2]int, // cells
 	solid:       bool `gui:"true"`,                      // build colliders for painted tiles
 	tint:        rl.Color `gui:"true"`,
+	// The tileset is an Aseprite file: the map is this tilemap layer of it
+	// (its first frame), kept in sync when the file is saved (aseprite_tilemap).
+	asepriteLayer: string `gui:"true"`,
+	aseRes:        ^Ase_Resource,
+	aseVersion:    int,
 	tiles:       [dynamic]i32,
 	staticBody:  ^StaticBodyNode,
 	builtSize:   [2]int, // mapSize the tiles array was laid out for
@@ -127,7 +132,9 @@ TileMapNode_TileCount :: proc(tm: ^TileMapNode) -> int {
 	return TileMapNode_Columns(tm) * max(int(Texture_Size(tm.tileset).y) / tm.tileSize.y, 1)
 }
 
-// TileMapNode_SetTileset loads the tileset image (project-relative path).
+// TileMapNode_SetTileset loads the tileset image (project-relative path;
+// an Aseprite file with Aseprite Layer set: that tilemap layer, see
+// TileMapNode_SyncAseprite).
 TileMapNode_SetTileset :: proc(tm: ^TileMapNode, path: string, ctx: ^GameContext) {
 	rm := Node_ResourceManager(tm)
 	if tm.tileset != nil && rm != nil do ResourceManager_ReleaseTexture(rm, tm.tileset)
@@ -236,6 +243,7 @@ TileMapNode_PrepareChunks :: proc(tm: ^TileMapNode, view: rl.Rectangle) {
 
 TileMapNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	tm := cast(^TileMapNode)node
+	TileMapNode_SyncAseprite(tm)
 	if !tm.renderable || tm.tileset == nil do return
 	TileMapNode_Layout(tm)
 	cols := TileMapNode_Columns(tm)
@@ -305,6 +313,7 @@ TileMapNode_BuildColliders :: proc(tm: ^TileMapNode, ctx: ^GameContext) {
 
 TileMapNode_Ready :: proc(node: ^Node, ctx: ^GameContext) {
 	tm := cast(^TileMapNode)node
+	TileMapNode_SyncAseprite(tm)
 	if tm.solid do TileMapNode_BuildColliders(tm, ctx)
 }
 
@@ -316,6 +325,8 @@ TileMapNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 		if rm := Node_ResourceManager(tm); rm != nil do ResourceManager_ReleaseTexture(rm, tm.tileset)
 		tm.tileset = nil
 	}
+	ResourceManager_ReleaseAseprite(tm.aseRes)
+	tm.aseRes = nil
 }
 
 // TileMapNode_EncodeRLE writes the tiles as [[count, tile], ...].
@@ -334,4 +345,87 @@ TileMapNode_EncodeRLE :: proc(tm: ^TileMapNode, sb: ^strings.Builder) {
 		i = j
 	}
 	strings.write_byte(sb, ']')
+}
+
+// TileMapNode_SyncAseprite: with an Aseprite file as the tileset and an
+// Aseprite Layer, the map is that tilemap layer (frame 1): its tile size,
+// its cells (from the cel's position), and a tileset texture made from the
+// layer's tileset - flipped tiles (X / Y / diagonal) baked in as extra
+// tiles. Again whenever the file is saved. True when it (re)built.
+TileMapNode_SyncAseprite :: proc(tm: ^TileMapNode) -> bool {
+	if tm.asepriteLayer == "" || !Ase_IsPath(tm.tilesetPath) do return false
+	rm := Node_ResourceManager(tm)
+	if rm == nil || !rl.IsWindowReady() do return false
+	if tm.aseRes == nil {
+		tm.aseRes = ResourceManager_LoadAseprite(rm, Project_ResolveAssetPath(tm.gameContext, tm.tilesetPath))
+		if tm.aseRes == nil do return false
+		tm.aseVersion = -1
+	}
+	if tm.aseVersion == tm.aseRes.version do return false
+	tm.aseVersion = tm.aseRes.version
+	doc := tm.aseRes.doc
+	li := Ase_FindLayer(doc, tm.asepriteLayer)
+	if li < 0 || doc.layers[li].kind != .Tilemap || doc.layers[li].tileset >= len(doc.tilesets) || len(doc.frames) == 0 {
+		log_tilemap_warn("TileMap %s: %s has no tilemap layer %q", tm.name, tm.tilesetPath, tm.asepriteLayer)
+		return false
+	}
+	ts := &doc.tilesets[doc.layers[li].tileset]
+	cel: ^Ase_Cel
+	for &c in doc.frames[0].cels do if c.layer == li do cel = &c
+	tw, th := ts.tile_w, ts.tile_h
+	// The tiles the map uses, flips included: each becomes one of ours.
+	Key :: struct {index: u32, x, y, d: bool}
+	ids := make(map[Key]i32, allocator = context.temp_allocator)
+	order := make([dynamic]Key, context.temp_allocator)
+	zeroEmpty := ts.flags & 4 != 0
+	if cel != nil do for t in cel.tiles {
+		if (zeroEmpty && t.index == 0) || int(t.index) >= ts.count do continue
+		k := Key{t.index, t.xflip, t.yflip, t.dflip}
+		if k not_in ids {
+			ids[k] = i32(len(order))
+			append(&order, k)
+		}
+	}
+	// The tileset texture: those tiles in a grid.
+	n := max(len(order), 1)
+	cols := 1
+	for cols * cols < n do cols += 1
+	rows := (n + cols - 1) / cols
+	img := rl.GenImageColor(i32(cols * tw), i32(rows * th), {0, 0, 0, 0})
+	defer rl.UnloadImage(img)
+	dst := ([^]u8)(img.data)
+	one := make([]u8, tw * th * 4, context.temp_allocator)
+	for k, i in order {
+		Ase_TileImage(doc, ts, int(k.index), k.x, k.y, k.d, one)
+		ox, oy := (i % cols) * tw, (i / cols) * th
+		for y in 0 ..< th do copy(dst[((oy + y) * cols * tw + ox) * 4:][:tw * 4], one[y * tw * 4:][:tw * 4])
+	}
+	if tm.tileset != nil do ResourceManager_ReleaseTexture(rm, tm.tileset)
+	key := fmt.tprintf("%s#tileset:%s:%d", tm.tilesetPath, tm.asepriteLayer, tm.aseVersion)
+	tm.tileset = ResourceManager_TextureFromImage(rm, key, img)
+	if tm.tileset != nil do rl.SetTextureFilter(tm.tileset.texture, .POINT)
+	// The map: the cel's tiles, offset by its position.
+	ox, oy := 0, 0
+	w, h := 1, 1
+	if cel != nil {
+		ox, oy = max(cel.x / max(tw, 1), 0), max(cel.y / max(th, 1), 0)
+		w, h = cel.w + ox, cel.h + oy
+	}
+	tm.tileSize = {tw, th}
+	tm.mapSize = {w, h}
+	tm.builtSize = {}
+	clear(&tm.tiles)
+	TileMapNode_Layout(tm)
+	if cel != nil do for ty in 0 ..< cel.h do for tx in 0 ..< cel.w {
+		t := cel.tiles[ty * cel.w + tx]
+		if id, ok := ids[Key{t.index, t.xflip, t.yflip, t.dflip}]; ok do tm.tiles[(ty + oy) * w + tx + ox] = id
+	}
+	TileMapNode_Changed(tm)
+	if tm.solid && tm.isReady && tm.gameContext != nil do TileMapNode_BuildColliders(tm, tm.gameContext)
+	return true
+}
+
+@(private = "file")
+log_tilemap_warn :: proc(format: string, args: ..any) {
+	Script_Problem(.Warning, format, ..args)
 }

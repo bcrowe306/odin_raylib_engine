@@ -1,0 +1,156 @@
+[
+ {
+  "name": "a reverse tag plays (walk: 4 3 2 4 ...)",
+  "project": "tests/aseprite/project",
+  "frames": 50,
+  "expect": [
+   [
+    "Walker",
+    "frame",
+    "==",
+    4
+   ],
+   [
+    "Walker",
+    "animation",
+    "==",
+    "walk"
+   ]
+  ]
+ },
+ {
+  "name": "ping-pong reverse at 2x speed (spin)",
+  "project": "tests/aseprite/project",
+  "frames": 50,
+  "expect": [
+   [
+    "Spinner",
+    "frame",
+    "==",
+    3
+   ]
+  ]
+ },
+ {
+  "name": "a reverse x2 tag stops on its last frame",
+  "project": "tests/aseprite/project",
+  "frames": 120,
+  "expect": [
+   [
+    "Walker",
+    "frame",
+    "==",
+    2
+   ]
+  ]
+ },
+ {
+  "name": "a TileMap from an Aseprite tilemap layer (4x4, flipped tiles baked: 9 kinds)",
+  "project": "tests/aseprite/project",
+  "frames": 5,
+  "expect": [
+   [
+    "Ground",
+    "tilemap.map_size",
+    "==",
+    [
+     4,
+     4
+    ]
+   ],
+   [
+    "Ground",
+    "tilemap.tile_size",
+    "==",
+    [
+     4,
+     4
+    ]
+   ],
+   [
+    "Ground",
+    "tilemap.data",
+    "==",
+    [
+     [
+      1,
+      -1
+     ],
+     [
+      1,
+      0
+     ],
+     [
+      1,
+      1
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      1,
+      4
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      1,
+      5
+     ],
+     [
+      1,
+      6
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      1,
+      7
+     ],
+     [
+      1,
+      2
+     ],
+     [
+      1,
+      -1
+     ],
+     [
+      1,
+      3
+     ],
+     [
+      1,
+      8
+     ]
+    ]
+   ]
+  ]
+ },
+ {
+  "name": "an Aseprite file as a texture",
+  "project": "tests/aseprite/project",
+  "frames": 5,
+  "expect": [
+   [
+    "Still",
+    "texture",
+    "==",
+    "sprites/animation.aseprite"
+   ]
+  ]
+ }
+]

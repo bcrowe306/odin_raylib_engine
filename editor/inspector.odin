@@ -364,6 +364,12 @@ prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
 	if (node.typeId == e.NineSliceNode || node.typeId == e.ParallaxNode) && name == "texturePath" do return false
 	// Fonts are picked in the Font section.
 	if (node.typeId == e.TextNode || node.typeId == e.DialogueNode) && name == "font" do return false
+	// (The Aseprite section edits these.)
+	if node.typeId == e.AsepriteNode {
+		switch name {
+		case "file", "animation", "hideLayers", "showLayers", "pivotSlice": return false
+		}
+	}
 	// A joint shows only its type's parameters.
 	if node.typeId == e.JointNode && strings.has_prefix(name, "joint.") && name != "joint.type" {
 		jt := e.JointType_FieldName((cast(^e.JointNode)node).joint.type)
@@ -778,6 +784,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_path(state, cast(^e.PathNode)node)
 	case e.SkeletonNode:
 		inspector_skeleton(state, cast(^e.SkeletonNode)node)
+	case e.AsepriteNode:
+		inspector_aseprite(state, cast(^e.AsepriteNode)node) // (aseprite_editor.odin)
 	case e.AdvancedCameraNode:
 		inspector_adv_camera(state, cast(^e.AdvancedCameraNode)node)
 	case e.NavigationRegionNode:
@@ -1237,6 +1245,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.NavigationAgentNode: return ICON_FA_PERSON_RUNNING
 	case e.AdvancedCameraNode: return ICON_FA_CAMERA
 	case e.SkeletonNode: return ICON_FA_BONE
+	case e.AsepriteNode: return ICON_FA_PALETTE
 	case e.BoneAttachmentNode: return ICON_FA_LINK
 	case e.PostEffectNode: return ICON_FA_FILTER
 	case e.LdtkLevelNode: return ICON_FA_TABLE_CELLS

@@ -51,6 +51,11 @@ def field(node, key):
         return node.get("position", [0, 0])[0]
     if key == "y":
         return node.get("position", [0, 0])[1]
+    if "." in key and key.split(".")[0] in node:  # (a nested value: "tilemap.map_size")
+        v = node
+        for part in key.split("."):
+            v = v.get(part) if isinstance(v, dict) else None
+        return v
     if key in node:
         return node[key]
     return node.get("properties", {}).get(key, node.get("script", {}).get("properties", {}).get(key))
@@ -70,7 +75,7 @@ def check(op, got, want):
 
 def run_test(runner, tid, test, tmp):
     proj = os.path.join(tmp, "project")
-    shutil.copytree(os.path.join(ROOT, "templates", tid), proj)
+    shutil.copytree(os.path.join(ROOT, test.get("project", os.path.join("templates", tid))), proj)
     cfg = json.load(open(os.path.join(proj, "project.json")))
     scene_rel = test.get("scene", cfg["initial_scene"])
     if test.get("patch"):
@@ -121,10 +126,19 @@ def main():
     if "--previews" in args:
         previews = True
         args.remove("--previews")
-    ids = args or sorted(f[:-5] for f in os.listdir(TESTS) if f.endswith(".json"))
+    # --suite file.json: tests of other projects (each test's "project": a
+    # folder in the repository; e.g. tests/aseprite/runtime_tests.json).
+    suites = []
+    if "--suite" in args:
+        i = args.index("--suite")
+        suites.append(args[i + 1])
+        del args[i:i + 2]
+    ids = args or ([] if suites else sorted(f[:-5] for f in os.listdir(TESTS) if f.endswith(".json")))
     total = failed = 0
-    for tid in ids:
-        tests = json.load(open(os.path.join(TESTS, tid + ".json")))
+    for tid in ids + suites:
+        path = tid if tid.endswith(".json") else os.path.join(TESTS, tid + ".json")
+        tests = json.load(open(path if os.path.isabs(path) or not tid.endswith(".json") else os.path.join(ROOT, path)))
+        tid = os.path.basename(tid)[:-5] if tid.endswith(".json") else tid
         if previews:
             # The Welcome window's picture: the first test's start, full size.
             tests = [{"name": "preview", "frames": 20, "expect": [], "screenshot": os.path.join(ROOT, "templates", tid, "preview.png")}] + tests

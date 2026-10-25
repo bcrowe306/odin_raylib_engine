@@ -53,6 +53,7 @@ Editor_Settings :: struct {
 	formatOnSave:     bool,
 	lspEnabled:       bool,
 	luaServerPath:    string, // "" = lua-language-server/ in the engine checkout
+	asepritePath:     string, // the Aseprite program ("" = found: aseprite_editor.odin)
 	// General > Keymap: action id -> chords (replaces the defaults)
 	keymap:           map[string][3]Chord,
 	// File > Open Recent (absolute project paths, most recent first)
@@ -107,6 +108,7 @@ settingsPath: string
 Editor_Settings_Clone :: proc(s: ^Editor_Settings) -> Editor_Settings {
 	c := s^
 	c.luaServerPath = strings.clone(s.luaServerPath)
+	c.asepritePath = strings.clone(s.asepritePath)
 	c.keymap = make(map[string][3]Chord)
 	for k, v in s.keymap do c.keymap[strings.clone(k)] = v
 	c.recentProjects = make([dynamic]string)
@@ -126,6 +128,7 @@ Editor_Settings_Clone :: proc(s: ^Editor_Settings) -> Editor_Settings {
 
 Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 	delete(s.luaServerPath)
+	delete(s.asepritePath)
 	for k in s.keymap do delete(k)
 	delete(s.keymap)
 	s.keymap = nil
@@ -133,6 +136,7 @@ Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 	delete(s.recentProjects)
 	s.recentProjects = nil
 	s.luaServerPath = ""
+	s.asepritePath = ""
 	delete(s.theme.name)
 	s.theme.name = ""
 	delete(s.lastImportDir)
@@ -319,6 +323,10 @@ settings_from_ini :: proc(text: string) {
 	s.formatOnSave = b(m, "code", "format_on_save", s.formatOnSave)
 	s.lspEnabled = b(m, "code", "lsp_enabled", s.lspEnabled)
 	if v, ok := m["code"]["lua_server_path"]; ok && v != "" do s.luaServerPath = strings.clone(v)
+	// (Look the section up first: chaining through a missing one crashed.)
+	if tools, has := m["tools"]; has {
+		if v, ok := tools["aseprite_path"]; ok && v != "" do s.asepritePath = strings.clone(v)
+	}
 	if th, ok := m["theme"]; ok {
 		if name, has := th["name"]; has && name != "" {
 			delete(s.theme.name)
@@ -418,6 +426,8 @@ Editor_SaveSettings :: proc() -> bool {
 	wsNames := [Show_Whitespace]string{.None = "none", .Selection = "selection", .All = "all"}
 	fmt.sbprintf(&sb, "show_whitespace = %s\n", wsNames[s.showWhitespace])
 	fmt.sbprintf(&sb, "lua_server_path = %s\n", s.luaServerPath)
+	strings.write_string(&sb, "\n[tools]\n")
+	fmt.sbprintf(&sb, "aseprite_path = %s\n", s.asepritePath)
 	strings.write_string(&sb, "\n[theme]\n")
 	fmt.sbprintf(&sb, "name = %s\n", s.theme.name)
 	for k in Theme_Color do fmt.sbprintf(&sb, "%s = %s\n", THEME_COLOR_INFO[k].key, theme_color_text(s.theme.colors[k]))

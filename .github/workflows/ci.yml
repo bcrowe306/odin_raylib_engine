@@ -77,6 +77,8 @@ jobs:
           python3 scripts/templates/make_templates.py
           git diff --exit-code -- templates ':!templates/*/preview.png' || { echo "::error::templates/ differ from scripts/templates/make_templates.py's output: run it and commit"; exit 1; }
           xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner
+          # Aseprite files played by the runner (AsepriteNode, Aseprite tilemaps).
+          xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/aseprite/runtime_tests.json
 
       - name: Crash reports (the runner and the editor crash for real)
         if: matrix.smoke

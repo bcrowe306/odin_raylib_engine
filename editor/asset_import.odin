@@ -30,7 +30,7 @@ TEXTURE_EXTS := []string{".png", ".jpg", ".jpeg", ".bmp", ".tga"}
 AUDIO_EXTS := []string{".wav", ".ogg", ".mp3"}
 
 // Extensions the importer accepts (for dialog filters), without dots.
-IMPORT_EXTS := []string{"png", "jpg", "jpeg", "bmp", "tga", "wav", "ogg", "mp3", "lua", "json", "ldtk", "fs", "glsl", "frag"}
+IMPORT_EXTS := []string{"png", "jpg", "jpeg", "bmp", "tga", "aseprite", "ase", "wav", "ogg", "mp3", "lua", "json", "ldtk", "fs", "glsl", "frag"}
 
 Import_Status :: enum {
 	Imported,
@@ -69,6 +69,7 @@ Asset_ImportDir :: proc(name: string) -> (dir: string, ok: bool) {
 	case .Component: return "components", true
 	case .Level:     return "levels", true
 	case .Shader:    return "shaders", true
+	case .Aseprite:  return "sprites", true
 	case .Package, .Other:
 	}
 	return "", false
@@ -203,7 +204,7 @@ Editor_HandleFileDrops :: proc(state: ^EditorState) {
 		placed := 0
 		for rel in imported {
 			#partial switch Asset_KindOf(rel) {
-			case .Texture, .Audio, .Component, .Level:
+			case .Texture, .Audio, .Component, .Level, .Aseprite:
 				Editor_DropAsset(state, rel, world + {f32(placed) * 24, f32(placed) * 24})
 				placed += 1
 			}
@@ -370,6 +371,12 @@ validate :: proc(name: string, data: []byte) -> (why: string, ok: bool) {
 	if len(data) == 0 do return "the file is empty", false
 	lower := strings.to_lower(name, context.temp_allocator)
 	switch Asset_KindOf(lower) {
+	case .Aseprite:
+		// The header's magic number (0xA5E0 at byte 4), then a full read.
+		if len(data) < 128 || data[4] != 0xE0 || data[5] != 0xA5 do return "not an Aseprite file", false
+		doc, why := e.Ase_Load(data)
+		if doc == nil do return fmt.tprintf("can't be read: %s", why), false
+		e.Ase_Destroy(doc)
 	case .Texture:
 		img := rl.LoadImageFromMemory(strings.clone_to_cstring(filepath.ext(lower), context.temp_allocator), raw_data(data), i32(len(data)))
 		if img.data == nil do return "not a readable image (corrupt, or a format the engine can't load)", false

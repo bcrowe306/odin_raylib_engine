@@ -133,6 +133,10 @@ local SkeletonNode = {}
 ---@class BoneAttachmentNode : Node
 local BoneAttachmentNode = {}
 
+---An Aseprite file (.aseprite / .ase) shown and played as Aseprite does: tags with their direction and repeat count, per-frame durations, layers hidden / shown per node, the origin following a slice's pivot; its slices and user data for scripts. Saving the file in Aseprite updates it live. Events: "animation_finished"(tag), "animation_looped"(tag), "frame_changed"(frame).
+---@class AsepriteNode : Node
+local AsepriteNode = {}
+
 ---A virtual camera: follow modes (Glued, Simple, Group, Path, Framed), limits (incl. the LDtk level the target is in), trauma shake; the scene's camera shows the highest priority one and blends on a switch. "became_active" / "became_inactive".
 ---@class AdvancedCameraNode : Node
 local AdvancedCameraNode = {}
@@ -467,18 +471,25 @@ function Node:emit(event, value) end
 function TimerNode:connect(event, handler) end
 
 ---@alias FrameAnimationNodeEvent NodeTreeEvent|"animation_finished"|ProjectEvent
----Connects a handler to one of this node's events: animation_finished (A non-looping animation ended); the tree events; custom ones.
+---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)); the tree events; custom ones.
 ---@param event FrameAnimationNodeEvent|string
 ---@param handler fun(value: any, source: FrameAnimationNode)
 ---@return integer id Connection id for `disconnect`
 function FrameAnimationNode:connect(event, handler) end
 
 ---@alias AnimationPlayerNodeEvent NodeTreeEvent|"animation_finished"|"animation_event"|ProjectEvent
----Connects a handler to one of this node's events: animation_finished (A non-looping animation ended), animation_event (A Method key of the animation fired (its method name)); the tree events; custom ones.
+---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)), animation_event (A Method key of the animation fired (its method name)); the tree events; custom ones.
 ---@param event AnimationPlayerNodeEvent|string
 ---@param handler fun(value: any, source: AnimationPlayerNode)
 ---@return integer id Connection id for `disconnect`
 function AnimationPlayerNode:connect(event, handler) end
+
+---@alias AsepriteNodeEvent NodeTreeEvent|"animation_finished"|"animation_looped"|"frame_changed"|ProjectEvent
+---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)), animation_looped (An Aseprite tag started again (a repeat or a ping-pong turn)), frame_changed (The Aseprite node shows another frame (0-based)); the tree events; custom ones.
+---@param event AsepriteNodeEvent|string
+---@param handler fun(value: any, source: AsepriteNode)
+---@return integer id Connection id for `disconnect`
+function AsepriteNode:connect(event, handler) end
 
 ---@alias StateMachineNodeEvent NodeTreeEvent|"state_changed"|ProjectEvent
 ---Connects a handler to one of this node's events: state_changed (The state machine entered a state); the tree events; custom ones.
@@ -544,7 +555,7 @@ function RaycastNode:connect(event, handler) end
 function VisibilityNotifierNode:connect(event, handler) end
 
 ---@alias SkeletonNodeEvent NodeTreeEvent|"animation_finished"|"skeleton_event"|ProjectEvent
----Connects a handler to one of this node's events: animation_finished (A non-looping animation ended), skeleton_event (An event key of the skeleton's animation fired (its name)); the tree events; custom ones.
+---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)), skeleton_event (An event key of the skeleton's animation fired (its name)); the tree events; custom ones.
 ---@param event SkeletonNodeEvent|string
 ---@param handler fun(value: any, source: SkeletonNode)
 ---@return integer id Connection id for `disconnect`
@@ -1180,6 +1191,105 @@ function AnimationPlayerNode:get_property(path) end
 ---@overload fun(self: AnimationPlayerNode, path: "fps", value: number)
 ---@overload fun(self: AnimationPlayerNode, path: "defaultAnimation", value: string)
 function AnimationPlayerNode:set_property(path, value, y) end
+
+---@class AsepriteNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field origin Vec2 Where in the image the position is, and what it rotates and scales around: a fraction o...
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field file string The Aseprite file (.aseprite / .ase, project-relative). Saving it in Aseprite updates t...
+---@field animation string The tag played (its direction and repeat count as set in Aseprite); empty = every frame...
+---@field autoplay boolean Start the animation when the node becomes ready.
+---@field loop boolean Tags without a repeat count loop; off: they play once.
+---@field speed number Playback speed (1 = the frame durations set in Aseprite).
+---@field frame integer The frame shown (0-based): where playing starts, or where it stopped.
+---@field hideLayers string Layers not drawn (names, comma separated; a group hides its layers).
+---@field showLayers string Layers hidden in the file but drawn anyway (names, comma separated).
+---@field pivotSlice string A slice with a pivot (set in Aseprite): the node's origin follows it, frame by frame. E...
+---@field tint number[] Multiplies the sprite's colours.
+
+---@alias AsepriteNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "origin" # Vec2 - Where in the image the position is, and what it rotates and scales around: a fraction o...
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "file" # string - The Aseprite file (.aseprite / .ase, project-relative). Saving it in Aseprite updates t...
+---| "animation" # string - The tag played (its direction and repeat count as set in Aseprite); empty = every frame...
+---| "autoplay" # boolean - Start the animation when the node becomes ready.
+---| "loop" # boolean - Tags without a repeat count loop; off: they play once.
+---| "speed" # number - Playback speed (1 = the frame durations set in Aseprite).
+---| "frame" # integer - The frame shown (0-based): where playing starts, or where it stopped.
+---| "hideLayers" # string - Layers not drawn (names, comma separated; a group hides its layers).
+---| "showLayers" # string - Layers hidden in the file but drawn anyway (names, comma separated).
+---| "pivotSlice" # string - A slice with a pivot (set in Aseprite): the node's origin follows it, frame by frame. E...
+---| "tint" # number[] - Multiplies the sprite's colours.
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---@param path AsepriteNodeProperty|string
+---@return any
+---@overload fun(self: AsepriteNode, path: "position"): Vec2
+---@overload fun(self: AsepriteNode, path: "scale"): Vec2
+---@overload fun(self: AsepriteNode, path: "rotation"): number
+---@overload fun(self: AsepriteNode, path: "origin"): Vec2
+---@overload fun(self: AsepriteNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: AsepriteNode, path: "zIndex"): integer
+---@overload fun(self: AsepriteNode, path: "ySort"): boolean
+---@overload fun(self: AsepriteNode, path: "ySortOffset"): number
+---@overload fun(self: AsepriteNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: AsepriteNode, path: "paused"): boolean
+---@overload fun(self: AsepriteNode, path: "enabled"): boolean
+---@overload fun(self: AsepriteNode, path: "file"): string
+---@overload fun(self: AsepriteNode, path: "animation"): string
+---@overload fun(self: AsepriteNode, path: "autoplay"): boolean
+---@overload fun(self: AsepriteNode, path: "loop"): boolean
+---@overload fun(self: AsepriteNode, path: "speed"): number
+---@overload fun(self: AsepriteNode, path: "frame"): integer
+---@overload fun(self: AsepriteNode, path: "hideLayers"): string
+---@overload fun(self: AsepriteNode, path: "showLayers"): string
+---@overload fun(self: AsepriteNode, path: "pivotSlice"): string
+---@overload fun(self: AsepriteNode, path: "tint"): number[]
+function AsepriteNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---@param path AsepriteNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: AsepriteNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AsepriteNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AsepriteNode, path: "rotation", value: number)
+---@overload fun(self: AsepriteNode, path: "origin", x: number|Vec2|number[], y?: number)
+---@overload fun(self: AsepriteNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: AsepriteNode, path: "zIndex", value: integer)
+---@overload fun(self: AsepriteNode, path: "ySort", value: boolean)
+---@overload fun(self: AsepriteNode, path: "ySortOffset", value: number)
+---@overload fun(self: AsepriteNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: AsepriteNode, path: "paused", value: boolean)
+---@overload fun(self: AsepriteNode, path: "enabled", value: boolean)
+---@overload fun(self: AsepriteNode, path: "file", value: string)
+---@overload fun(self: AsepriteNode, path: "animation", value: string)
+---@overload fun(self: AsepriteNode, path: "autoplay", value: boolean)
+---@overload fun(self: AsepriteNode, path: "loop", value: boolean)
+---@overload fun(self: AsepriteNode, path: "speed", value: number)
+---@overload fun(self: AsepriteNode, path: "frame", value: integer)
+---@overload fun(self: AsepriteNode, path: "hideLayers", value: string)
+---@overload fun(self: AsepriteNode, path: "showLayers", value: string)
+---@overload fun(self: AsepriteNode, path: "pivotSlice", value: string)
+---@overload fun(self: AsepriteNode, path: "tint", value: number[])
+function AsepriteNode:set_property(path, value, y) end
 
 ---@class ParticleEmitterNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -2784,6 +2894,7 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field solid boolean Build static colliders for the painted tiles.
 ---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
+---@field asepriteLayer string With an Aseprite file as the tileset: the tilemap layer the map comes from (its tiles, ...
 
 ---@alias TileMapNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -2798,6 +2909,7 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "solid" # boolean - Build static colliders for the painted tiles.
 ---| "tint" # number[] - Multiplies the texture's colours (white = unchanged; alpha fades it).
+---| "asepriteLayer" # string - With an Aseprite file as the tileset: the tilemap layer the map comes from (its tiles, ...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---@param path TileMapNodeProperty|string
@@ -2814,6 +2926,7 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@overload fun(self: TileMapNode, path: "enabled"): boolean
 ---@overload fun(self: TileMapNode, path: "solid"): boolean
 ---@overload fun(self: TileMapNode, path: "tint"): number[]
+---@overload fun(self: TileMapNode, path: "asepriteLayer"): string
 function TileMapNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -2832,6 +2945,7 @@ function TileMapNode:get_property(path) end
 ---@overload fun(self: TileMapNode, path: "enabled", value: boolean)
 ---@overload fun(self: TileMapNode, path: "solid", value: boolean)
 ---@overload fun(self: TileMapNode, path: "tint", value: number[])
+---@overload fun(self: TileMapNode, path: "asepriteLayer", value: string)
 function TileMapNode:set_property(path, value, y) end
 
 ---@class LightNode
@@ -6162,6 +6276,106 @@ function NavigationAgentNode:nav_get_path() end
 ---Example: `if agent:nav_distance_left() < 64 then self:slow_down() end`
 ---@return number
 function NavigationAgentNode:nav_distance_left() end
+
+---@class AsepriteTag
+---@field name string
+---@field from integer First frame (0-based)
+---@field to integer Last frame
+---@field direction "Forward"|"Reverse"|"Ping_Pong"|"Ping_Pong_Reverse"
+---@field repeats integer 0 = loops (or once, with loop off)
+---@field user AsepriteUserData
+
+---@class AsepriteUserData
+---@field text string
+---@field color? integer[] {r, g, b, a} 0-255
+---@field properties table<string, any> Aseprite's user properties (numbers, strings, booleans, points {x, y}, sizes {width, height}, rects, lists, maps)
+
+---@class AsepriteInfo
+---@field width integer
+---@field height integer
+---@field frames integer[] Each frame's duration (ms)
+---@field tags AsepriteTag[]
+---@field layers string[] Layer names, bottom first
+---@field user AsepriteUserData The sprite's user data
+
+---@class AsepriteSlice
+---@field x integer
+---@field y integer
+---@field width integer
+---@field height integer
+---@field center? {x: integer, y: integer, width: integer, height: integer} 9-patch centre (relative to the slice)
+---@field pivot? {x: integer, y: integer} Relative to the slice's origin
+---@field user AsepriteUserData
+
+---Plays a tag (its direction and repeats as set in Aseprite) from its first frame; nil / "" = every frame. No argument: the node's Animation.
+---
+---Example: `sprite:aseprite_play("run")`
+---@param tag? string
+function AsepriteNode:aseprite_play(tag) end
+
+---Stops on the current frame.
+---
+---Example: `sprite:aseprite_stop()`
+function AsepriteNode:aseprite_stop() end
+
+---Goes on from where it stopped.
+---
+---Example: `if paused_menu_closed then sprite:aseprite_resume() end`
+function AsepriteNode:aseprite_resume() end
+
+---A tag is playing (false after its repeats are done, or stopped).
+---
+---Example: `if not sprite:aseprite_is_playing() then sprite:aseprite_play("idle") end`
+---@return boolean
+function AsepriteNode:aseprite_is_playing() end
+
+---The frame shown (0-based).
+---
+---Example: `if sprite:aseprite_frame() == 3 then shoot() end`
+---@return integer
+function AsepriteNode:aseprite_frame() end
+
+---Shows a frame (0-based); a playing tag goes on from it.
+---
+---Example: `sprite:aseprite_set_frame(0)`
+---@param frame integer
+function AsepriteNode:aseprite_set_frame(frame) end
+
+---The file: size, frame durations, tags, layers, the sprite's user data.
+---
+---Example: `for _, tag in ipairs(sprite:aseprite_info().tags) do print(tag.name, tag.direction) end`
+---@return AsepriteInfo?
+function AsepriteNode:aseprite_info() end
+
+---A slice in a frame (default: the frame shown) - hitboxes, spawn points, 9-patch panels drawn in Aseprite. nil if it isn't there.
+---
+---Example: `local hit = sprite:aseprite_slice("hitbox")`
+---@param name string
+---@param frame? integer
+---@return AsepriteSlice?
+function AsepriteNode:aseprite_slice(name, frame) end
+
+---A layer's user data (text, colour, properties set in Aseprite's layer properties).
+---
+---Example: `local damage = sprite:aseprite_layer_data("Weapon").properties.damage`
+---@param layer string
+---@return AsepriteUserData?
+function AsepriteNode:aseprite_layer_data(layer) end
+
+---A cel's user data (a layer in a frame; default: the frame shown).
+---
+---Example: `if sprite:aseprite_cel_data("Body").properties.footstep then play_step() end`
+---@param layer string
+---@param frame? integer
+---@return AsepriteUserData?
+function AsepriteNode:aseprite_cel_data(layer, frame) end
+
+---Shows or hides a layer (by name; a group: its layers) - outfits, equipment, damage.
+---
+---Example: `sprite:aseprite_set_layer_visible("Helmet", has_helmet)`
+---@param layer string
+---@param visible boolean
+function AsepriteNode:aseprite_set_layer_visible(layer, visible) end
 
 ---Plays an animation (crossfading over `mix` seconds; default: the node's Mix Time). False when the skeleton has no such animation.
 ---

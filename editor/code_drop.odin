@@ -28,7 +28,7 @@ import rl "vendor:raylib"
 // Script_AssetKind: the script property type for an asset path.
 Script_AssetKind :: proc(rel: string) -> string {
 	switch Asset_KindOf(rel) {
-	case .Texture:   return "texture"
+	case .Texture, .Aseprite: return "texture" // (an Aseprite path is an image too: its first frame)
 	case .Audio:     return "audio"
 	case .Scene:     return "scene"
 	case .Script:    return "script"
@@ -479,7 +479,7 @@ code_asset_use :: proc(state: ^EditorState, doc: ^Code_Doc, rel: string) -> stri
 	case .Audio:   return fmt.tprintf("Audio.play_sound(%q)", rel)
 	case .Scene:   return fmt.tprintf("Scene.change_scene(%q)", Asset_DisplayName(rel))
 	case .Texture: return fmt.tprintf("self.node:set_texture(%q)", rel)
-	case .Component, .Script, .Level, .Shader, .Package, .Other:
+	case .Component, .Script, .Level, .Shader, .Package, .Aseprite, .Other:
 	}
 	return ""
 }

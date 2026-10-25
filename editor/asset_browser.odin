@@ -45,6 +45,7 @@ Asset_Kind :: enum {
 	Level,   // LDtk project (.ldtk)
 	Shader,  // fragment shader (.fs / .glsl / .frag)
 	Package,
+	Aseprite, // .aseprite / .ase (aseprite_editor.odin)
 }
 
 Asset_KindOf :: proc(path: string) -> Asset_Kind {
@@ -55,6 +56,7 @@ Asset_KindOf :: proc(path: string) -> Asset_Kind {
 	case strings.has_suffix(lower, ".lua"): return .Script
 	case strings.has_suffix(lower, ".ldtk"): return .Level
 	case strings.has_suffix(lower, ".ore"): return .Package
+	case strings.has_suffix(lower, ".aseprite"), strings.has_suffix(lower, ".ase"): return .Aseprite
 	case strings.has_suffix(lower, ".fs"), strings.has_suffix(lower, ".glsl"), strings.has_suffix(lower, ".frag"): return .Shader
 	}
 	ext := filepath.ext(lower)
@@ -75,6 +77,7 @@ kind_icon :: proc(k: Asset_Kind) -> (string, imgui.Vec4) {
 	case .Level: return ICON_FA_TABLE_CELLS, {0.35, 0.82, 0.86, 1}
 	case .Shader: return ICON_FA_WAND_MAGIC_SPARKLES, {0.92, 0.55, 0.95, 1}
 	case .Package: return ICON_FA_BOX_ARCHIVE, UI_TEXT_DIM
+	case .Aseprite: return ICON_FA_PALETTE, {0.98, 0.55, 0.55, 1}
 	case .Other: return ICON_FA_FILE, UI_TEXT_DIM
 	}
 	return ICON_FA_FILE, UI_TEXT_DIM
@@ -116,6 +119,7 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 		section_components(state, filter)
 		section_files(state, "Scripts", Editor_ListProjectFiles(state, "scripts", {".lua"}), filter)
 		section_files(state, "Textures", Editor_ListProjectFiles(state, "textures", TEXTURE_EXTS), filter)
+		section_files(state, "Aseprite", Editor_ListProjectFiles(state, "", {".aseprite", ".ase"}), filter)
 		section_files(state, "Audio", Editor_ListProjectFiles(state, "audio", AUDIO_EXTS), filter)
 		section_files(state, "Levels", Editor_ListProjectFiles(state, "", {".ldtk"}), filter)
 		section_files(state, "Shaders", Editor_ListProjectFiles(state, "", SHADER_EXTS), filter)
@@ -247,6 +251,7 @@ asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, n
 		case .Script: Editor_OpenScript(state, rel)
 		case .Level: Editor_AddLevel(state, rel, state.cameraPos)
 		case .Shader: Editor_OpenScript(state, rel)
+		case .Aseprite: Aseprite_Edit(state, full)
 		}
 	}
 	UI_Tooltip(asset_tooltip(kind, rel))
@@ -269,7 +274,7 @@ asset_tile :: proc(state: ^EditorState, rel: string) {
 	dl := imgui.GetWindowDrawList()
 	box := [2]f32{TILE - 12, TILE - 12}
 	origin := [2]f32{mn.x + 6, mn.y + 4}
-	if tex := Asset_Thumbnail(full) if kind == .Texture else nil; tex != nil {
+	if tex := Asset_Thumbnail(full) if kind == .Texture || kind == .Aseprite else nil; tex != nil {
 		s := min(box.x / f32(tex.width), box.y / f32(tex.height))
 		size := [2]f32{f32(tex.width), f32(tex.height)} * s
 		p0 := origin + (box - size) * 0.5
@@ -303,6 +308,7 @@ asset_tooltip :: proc(k: Asset_Kind, rel: string) -> string {
 	case .Audio: return fmt.tprintf("%s - drag into the viewport to add a sound", rel)
 	case .Script: return fmt.tprintf("%s - drag onto a node in the viewport to attach (or right-click > Make Global)", rel)
 	case .Level: return fmt.tprintf("%s - LDtk project: double-click or drag into the viewport to add a level", rel)
+	case .Aseprite: return fmt.tprintf("%s - Aseprite: drag into the viewport to add (its tags play); double-click to edit in Aseprite", rel)
 	}
 	return rel
 }
@@ -388,6 +394,21 @@ AssetBrowser_HandleViewportDrop :: proc(state: ^EditorState, worldPos: [2]f32) {
 // Editor_DropAsset adds an asset to the scene at a world position.
 Editor_DropAsset :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) {
 	switch Asset_KindOf(rel) {
+	case .Aseprite:
+		saved := state.cameraPos
+		state.cameraPos = worldPos
+		state.selectedNode = nil
+		node := Editor_CreateNode(state, "AsepriteNode", filepath.stem(rel))
+		state.cameraPos = saved
+		if node != nil {
+			an := cast(^e.AsepriteNode)node
+			an.file = strings.clone(rel, an.allocator)
+			// The first tag (if any) plays.
+			if r := e.ResourceManager_LoadAseprite(&state.game.resourceManager, e.Project_ResolveAssetPath(&state.game.gameContext, rel)); r != nil {
+				if len(r.doc.tags) > 0 do an.animation = strings.clone(r.doc.tags[0].name, an.allocator)
+				e.ResourceManager_ReleaseAseprite(r)
+			}
+		}
 	case .Texture:
 		saved := state.cameraPos
 		state.cameraPos = worldPos

@@ -781,6 +781,16 @@ the game is still drawn). Saving a scene while the game runs reloads it
 there (the current scene restarts with the saved version); edited scripts
 and images reload by themselves, in the game and in the editor.
 
+### Aseprite files
+
+`.aseprite` / `.ase` files are assets as they are: an *Aseprite* section in
+Assets (first-frame thumbnails); drag one into the viewport for an *Aseprite
+Sprite* playing its first tag; the Inspector's Aseprite section picks the tag,
+previews it, toggles layers, picks a pivot slice and opens the file in
+Aseprite (Settings > General > Aseprite: the program). Saving in Aseprite
+updates the editor at once. A TileMap can take its map from a tilemap layer.
+Details: [engine/docs/aseprite.md](../engine/docs/aseprite.md).
+
 ### Crash and bug reports
 
 If the editor crashes, the next start shows **Ore Editor Crashed** with the

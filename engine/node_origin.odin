@@ -18,7 +18,7 @@ package engine
 Node_HasOrigin :: proc(node: ^Node) -> bool {
 	if node == nil do return false
 	switch node.typeId {
-	case TextureNode, FrameAnimationNode, AnimationPlayerNode, NineSliceNode, TextNode: return true
+	case TextureNode, FrameAnimationNode, AnimationPlayerNode, AsepriteNode, NineSliceNode, TextNode: return true
 	}
 	return false
 }
@@ -38,6 +38,8 @@ Node_OriginSize :: proc(node: ^Node, ctx: ^GameContext = nil) -> [2]f32 {
 	case AnimationPlayerNode:
 		apn := cast(^AnimationPlayerNode)node
 		return Animation_FrameSize(AnimationPlayerNode_GetAnimation(apn), apn.currentFrame)
+	case AsepriteNode:
+		return AsepriteNode_Size(cast(^AsepriteNode)node)
 	case NineSliceNode:
 		return (cast(^NineSliceNode)node).size
 	case TextNode:
@@ -53,6 +55,7 @@ Node_OriginPx :: proc(node: ^Node, size: [2]f32) -> [2]f32 {
 	if node.typeId == TextureNode {
 		if o := (cast(^TextureNode)node).origin; o != {0, 0} do return o // the pixel override
 	}
+	if node.typeId == AsepriteNode do return AsepriteNode_Origin(cast(^AsepriteNode)node) // (its pivot slice)
 	return node.pivot * size
 }
 
