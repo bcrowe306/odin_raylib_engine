@@ -1308,3 +1308,53 @@ test_ldtk_doc_select_empty_and_reload :: proc(t: ^testing.T) {
 	testing.expect_value(t, tsd.cHei, 3)
 	testing.expect(t, Ldtk_Doc_TileOpaque(tsd, 5))
 }
+
+@(test)
+test_ldtk_doc_tilesets :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/ore_zz_ts.ldtk")
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	img := rl.GenImageColor(64, 64, {255, 255, 255, 255})
+	defer rl.UnloadImage(img)
+	ts := Ldtk_Doc_AddTileset(doc, "atlas/t_zz.png", {64, 64}, 16, &img) // 4x4 tiles
+	tl := Ldtk_Doc_AddLayerDef(doc, .Tiles, "Ground", ts)
+	layer := -1
+	for &ly, i in doc.levels[0].layers do if d := Ldtk_Doc_LayerDef(doc, &ly); d != nil && d.uid == tl do layer = i
+	Ldtk_Doc_SetTile(doc, 0, layer, 0, 0, 5) // tile (1, 1)
+	Ldtk_Doc_SetTile(doc, 0, layer, 1, 0, 3) // tile (3, 0)
+	// grid 16 -> 8: 8 columns; tiles keep their column / row (LDtk's remap)
+	testing.expect(t, Ldtk_Doc_SetTilesetGrid(doc, ts, 8, &img))
+	tiles := Ldtk_Doc_TilesAt(&doc.levels[0].layers[layer], 0, 0)
+	testing.expect_value(t, len(tiles), 1)
+	if len(tiles) == 1 do testing.expect_value(t, tiles[0].t, i32(1 + 1 * 8))
+	// back to 32: 2 columns - (3, 0) is lost
+	testing.expect(t, !Ldtk_Doc_SetTilesetGrid(doc, ts, 32, &img))
+	testing.expect_value(t, len(Ldtk_Doc_TilesAt(&doc.levels[0].layers[layer], 1, 0)), 0)
+	testing.expect_value(t, Ldtk_Doc_TilesAt(&doc.levels[0].layers[layer], 0, 0)[0].t, i32(1 + 1 * 2))
+	Ldtk_Doc_SetTilesetGrid(doc, ts, 16, &img)
+	// a wider image: ids keep their place (2 more columns)
+	wide := rl.GenImageColor(96, 64, {255, 255, 255, 255})
+	defer rl.UnloadImage(wide)
+	testing.expect_value(t, Ldtk_Doc_SetTilesetImage(doc, ts, "atlas/t2_zz.png", &wide), Ldtk_TilesetImageResult.Remapped)
+	tsd := Ldtk_Doc_Tileset(doc, ts)
+	testing.expect_value(t, tsd.relPath, "atlas/t2_zz.png")
+	testing.expect_value(t, tsd.cWid, 6)
+	testing.expect_value(t, Ldtk_Doc_TilesAt(&doc.levels[0].layers[layer], 0, 0)[0].t, i32(1 + 1 * 6))
+	// rename, duplicate, reorder, tags
+	Ldtk_Doc_RenameTileset(doc, ts, "Ground tiles")
+	testing.expect_value(t, Ldtk_Doc_Tileset(doc, ts).identifier, "Ground_tiles")
+	dup := Ldtk_Doc_DuplicateTileset(doc, ts)
+	testing.expect_value(t, Ldtk_Doc_Tileset(doc, dup).identifier, "Ground_tiles2")
+	testing.expect(t, Ldtk_Doc_MoveTileset(doc, dup, -1))
+	testing.expect_value(t, doc.tilesets[0].uid, dup)
+	en := Ldtk_Doc_AddEnum(doc, "Kind")
+	Ldtk_Doc_SetTilesetTagEnum(doc, ts, en)
+	testing.expect_value(t, LdtkJson_Int(Ldtk_Doc_Tileset(doc, ts).obj, "tagsSourceEnumUid"), en)
+	// removing it: the layer and an entity lose it
+	ent := Ldtk_Doc_AddEntityDef(doc, "Chest")
+	Ldtk_Doc_SetEntityTile(doc, ent, ts, {0, 0, 16, 16})
+	Ldtk_Doc_RemoveTileset(doc, ts)
+	testing.expect(t, Ldtk_Doc_Tileset(doc, ts) == nil)
+	testing.expect_value(t, doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, tl)].tilesetUid, -1)
+	testing.expect(t, LdtkJson_IsNull(Ldtk_Doc_EntityDef(doc, ent).obj, "tilesetId"))
+}

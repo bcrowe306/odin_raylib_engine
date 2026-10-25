@@ -110,6 +110,7 @@ LevelRules_Page :: proc(state: ^EditorState) {
 			LevelDefs_SelectLayer(layerUid)
 			LevelEditor_ShowTab(.Layers)
 		}
+		level_tip("Its tileset and source in the Layers tab", "tab.layers")
 		imgui.EndGroup()
 		rules_windows(state)
 		return
@@ -907,6 +908,7 @@ rename_popup :: proc(state: ^EditorState) {
 	}
 	imgui.SameLine()
 	if UI_Button("Cancel", "defs.group.rename.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+	level_tip("Close without changing anything", "tab.rules")
 }
 
 @(private = "file")
@@ -950,6 +952,7 @@ remap_popup :: proc(state: ^EditorState) {
 	imgui.SetNextItemWidth(300)
 	imgui.InputText("##rname", cstring(raw_data(lr.remapName[:])), len(lr.remapName), {})
 	Drive_Item("defs.remap.name")
+	level_tip("The copy's name", "rules.remap")
 	if UI_BeginProps("##remap_t") {
 		for from, i in lr.remapFrom {
 			UI_PropLabel(fmt.tprintf("Value %d becomes", from))
@@ -978,6 +981,7 @@ remap_popup :: proc(state: ^EditorState) {
 	}
 	imgui.SameLine()
 	if UI_Button("Cancel", "defs.remap.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+	level_tip("Close without changing anything", "tab.rules")
 }
 
 // ----------------------------------------------------------------------------
@@ -1125,6 +1129,7 @@ wizard_window :: proc(state: ^EditorState) {
 	level_tip("Write the rule group", "rules.wizard")
 	imgui.SameLine()
 	if UI_Button("Cancel", "wiz.cancel") do lr.wizOpen = false
+	level_tip("Close the Assistant without changing the rules", "rules.wizard")
 }
 
 // LevelRules_Query answers the drive's rules questions:

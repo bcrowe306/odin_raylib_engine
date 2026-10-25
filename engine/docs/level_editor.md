@@ -165,6 +165,14 @@ save (PNGs per layer / per level, the simplified format, Tiled maps) and
 **custom commands** (manual - Cmd+R -, after loading, before / after saving;
 asked once per project before they run).
 
+### Tilesets
+
+Bottom panel > **Tilesets**: copy / paste / duplicate / reorder / delete
+tilesets (references are cleared); identifier, image (change / reload; tile
+ids remapped when its size changes, as in LDtk), tile size (remapped),
+spacing, padding, tags; per tile: custom data, animation, and enum tags
+painted over the tile grid.
+
 ### Search, view modes, navigation
 
 **Cmd+K** searches levels, layers, entities (also by field value) and
@@ -320,6 +328,7 @@ e.Ldtk_Doc_Save(doc)
 | `Ldtk_ParseExternalEnums`, `Ldtk_Doc_ExternalEnumDiff` / `ApplyEnumSync` (`Ldtk_EnumSync`), `ExternalEnumSources`, `RemoveExternalEnumSource`, `Ldtk_Md5Hex` | external enums |
 | `Ldtk_Doc_SetExternalLevels`, `LevelFileRel`, `FixLevelFiles`, `SetIdentifierStyle` / `IdentifierStyle` / `CleanIdentifier`, `SetProjectFlag` (`LDTK_PROJECT_FLAGS`), `Backup` / `BackupDir` | project options |
 | `Ldtk_Doc_RunExports`, `ExportImages`, `ExportSimplified` / `SimplifiedJson`, `ExportTiled`; `RenderLayer`, `RenderIntGridMap`, `RenderLevelBg` (CPU images); `PngFileName`, `ExternalDir` | exports |
+| `Ldtk_Doc_SetTilesetImage` (`Ldtk_TilesetImageResult`), `SetTilesetGrid`, `SetTilesetSpacing`, `RenameTileset`, `RemoveTileset`, `TilesetText` / `PasteTileset` / `DuplicateTileset`, `MoveTileset`, `SetTilesetTags`, `SetTilesetTagEnum`, `TilesetHasTags`, `TilesetCWid` | tileset definitions |
 | `Ldtk_Doc_ReloadTilesetImage`; `Ldtk_Doc_SelectRect(..., includeEmpty)` | file watching, select empty spaces |
 | `Ldtk_Doc_SetMultiWorlds`, `AddWorld`, `RenameWorld`, `RemoveWorld`, `WorldInt` / `WorldStr` / `SetWorldInt`, `WorldName`; `SetFlag` / `HasFlag` | worlds and project flags |
 | `Ldtk_Doc_SetIntGrid`, `SetTile`, `TilesAt`, `GetIntGrid` | cells |

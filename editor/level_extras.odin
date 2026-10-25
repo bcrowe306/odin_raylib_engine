@@ -197,6 +197,7 @@ LevelExtras_Palette :: proc(state: ^EditorState) {
 	imgui.SetNextItemWidth(-1)
 	imgui.InputTextWithHint("##q", fmt.ctprintf("%s  Search levels, layers, entities, definitions...", ICON_FA_MAGNIFYING_GLASS), cstring(raw_data(lx.buf[:])), len(lx.buf), {})
 	Drive_Item("palette.query")
+	level_tip("Part of a name, an iid or a field value; arrows pick, Enter goes there", "search")
 	q := strings.to_lower(strings.trim_space(string(cstring(raw_data(lx.buf[:])))), context.temp_allocator)
 	items := palette_items(q)
 	if imgui.IsKeyPressed(.DownArrow, true) do lx.sel = min(lx.sel + 1, len(items) - 1)
@@ -219,6 +220,7 @@ LevelExtras_Palette :: proc(state: ^EditorState) {
 				imgui.CloseCurrentPopup()
 			}
 			Drive_Item(fmt.tprintf("palette:%d", i))
+			level_tip(fmt.tprintf("%s - %s", it.label, it.detail), "search")
 			if i == lx.sel && (imgui.IsKeyPressed(.DownArrow, true) || imgui.IsKeyPressed(.UpArrow, true)) do imgui.SetScrollHereY()
 			// the detail, right-aligned on the row
 			w := imgui.CalcTextSize(fmt.ctprintf("%s", it.detail)).x

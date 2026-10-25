@@ -157,21 +157,41 @@ value_widget :: proc(state: ^EditorState, fd: ^e.LdtkJson, fi: ^e.LdtkJson, idx,
 	}
 	rowW := imgui.GetContentRegionAvail().x - (inArray ? 3 * 24 : 0)
 	imgui.SetNextItemWidth(rowW)
+	// the value's tooltip: the field's doc and what it takes
+	tip := e.LdtkJson_Str(fd, "doc")
+	hint := ""
+	#partial switch kind {
+	case .Int, .Float:
+		hint = "A number (Enter applies)"
+		if mn := e.LdtkJson_Get(fd, "min"); mn != nil && mn.kind == .Number do hint = fmt.tprintf("%s, from %v", hint, mn.num)
+		if mx := e.LdtkJson_Get(fd, "max"); mx != nil && mx.kind == .Number do hint = fmt.tprintf("%s, up to %v", hint, mx.num)
+	case .Bool: hint = "On / off"
+	case .Color: hint = "A colour"
+	case .Enum: hint = "One of the enum's values"
+	case .String: hint = "Text (Enter applies)"
+	case .Text: hint = "Several lines of text"
+	case .Path: hint = "A file of the project (relative to the .ldtk)"
+	case .Point: hint = "A cell of the level: cx,cy (or pick it)"
+	}
+	valueTip := tip != "" ? fmt.tprintf("%s\n\n%s", tip, hint) : fmt.tprintf("%s: %s", name, hint)
 	switch kind {
 	case .Bool:
 		b := cur == "true"
 		if imgui.Checkbox("##f", &b) do set(state, fi, idx, i, mirror, owner, b ? "true" : "false")
+		level_tip(valueTip, "fields")
 	case .Int, .Float:
 		v, _ := strconv.parse_f64(cur)
 		buf: [64]u8
 		copy(buf[:63], isNull ? "" : cur)
 		if imgui.InputTextWithHint("##f", isNull ? "(empty)" : "", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue, .CharsScientific}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
+		level_tip(valueTip, "fields")
 		_ = v
 	case .Color:
 		c := e.Ldtk_ParseHexColor(cur)
 		col := [3]f32{f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255}
 		if imgui.ColorEdit3("##f", &col, {.NoInputs}) do set(state, fi, idx, i, mirror, owner, e.Ldtk_ColorHex({u8(col[0] * 255 + 0.5), u8(col[1] * 255 + 0.5), u8(col[2] * 255 + 0.5), 255}), true)
 		if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
+		level_tip(valueTip, "fields")
 		if isNull {
 			imgui.SameLine()
 			UI_DimText("(empty)")
@@ -187,20 +207,24 @@ value_widget :: proc(state: ^EditorState, fd: ^e.LdtkJson, fi: ^e.LdtkJson, idx,
 			}
 			imgui.EndCombo()
 		}
+		level_tip(valueTip, "fields")
 	case .String, .Text:
 		buf: [1024]u8
 		copy(buf[:len(buf) - 1], cur)
 		if kind == .Text {
 			if imgui.InputTextMultiline("##f", cstring(raw_data(buf[:])), len(buf), {rowW, 60}, {}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))), true)
 			if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
+			level_tip(valueTip, "fields")
 		} else {
 			if imgui.InputTextWithHint("##f", isNull ? "(empty)" : "", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
+			level_tip(valueTip, "fields")
 		}
 	case .Path:
 		buf: [512]u8
 		copy(buf[:len(buf) - 1], cur)
 		imgui.SetNextItemWidth(rowW - 28)
 		if imgui.InputTextWithHint("##f", "(no file)", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
+		level_tip(valueTip, "fields")
 		imgui.SameLine(0, 2)
 		if UI_IconButton(ICON_FA_FOLDER_OPEN, fmt.tprintf("level.field.file:%s:%d", name, idx), "", false, 24) do imgui.OpenPopup("##pickfile")
 		level_tip("Pick a project file (paths are relative to the .ldtk)", "fields")
@@ -215,6 +239,7 @@ value_widget :: proc(state: ^EditorState, fd: ^e.LdtkJson, fi: ^e.LdtkJson, idx,
 					relDoc, err := filepath.rel(doc.dir, level_abs(state, rel), context.temp_allocator)
 					set(state, fi, idx, i, mirror, owner, err != nil ? rel : relDoc)
 				}
+				level_tip("Use this file", "fields")
 				Drive_Item(fmt.tprintf("pick:%s", rel))
 			}
 			if count == 0 do UI_DimText("No project file of an accepted type.")
@@ -225,6 +250,7 @@ value_widget :: proc(state: ^EditorState, fd: ^e.LdtkJson, fi: ^e.LdtkJson, idx,
 		copy(buf[:63], cur)
 		imgui.SetNextItemWidth(rowW - 28)
 		if imgui.InputTextWithHint("##f", "cx,cy", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
+		level_tip(valueTip, "fields")
 		imgui.SameLine(0, 2)
 		picking := levelPick.active && levelPick.fi == fi && levelPick.idx == idx
 		if UI_IconButton(ICON_FA_LOCATION_CROSSHAIRS, fmt.tprintf("level.field.pick:%s:%d", name, idx), "", picking, 24) {

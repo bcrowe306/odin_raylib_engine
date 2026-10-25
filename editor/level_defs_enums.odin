@@ -496,6 +496,7 @@ enum_dialogs :: proc(state: ^EditorState) {
 		}
 		imgui.SameLine()
 		if UI_Button("Cancel", "deleteenum.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without changing anything", "tab.enums")
 		imgui.EndPopup()
 	}
 	if le.valueReq {
@@ -513,6 +514,7 @@ enum_dialogs :: proc(state: ^EditorState) {
 		}
 		imgui.SameLine()
 		if UI_Button("Cancel", "removeenumvalue.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without changing anything", "tab.enums")
 		imgui.EndPopup()
 	}
 	if le.syncReq {
@@ -569,7 +571,9 @@ enum_dialogs :: proc(state: ^EditorState) {
 			Editor_Log(state, .Info, "%s: enums updated", filepath.base(le.syncPath))
 			imgui.CloseCurrentPopup()
 		}
+		level_tip("Apply the file's enums with these choices", "enums.external")
 		imgui.SameLine()
 		if UI_Button("Cancel", "sync.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without changing anything", "tab.enums")
 	}
 }

@@ -244,19 +244,26 @@ LevelCommands_Window :: proc(state: ^EditorState) {
 		UI_DimText("Only allow them if you trust where the project comes from.")
 		UI_DimText("(Your choice is remembered; the Project tab can reset it.)")
 		iid := strings.clone(e.LdtkJson_Str(doc.root, "iid"))
-		if UI_PrimaryButton("Allow", "trust.allow") {
+		allow := UI_PrimaryButton("Allow", "trust.allow")
+		level_tip("Run this project's commands (now and later)", "project.commands")
+		imgui.SameLine()
+		block := UI_Button("Block", "trust.block")
+		level_tip("Never run this project's commands", "project.commands")
+		imgui.SameLine()
+		cancel := UI_Button("Cancel", "trust.cancel")
+		level_tip("Not now (asks again next time)", "project.commands")
+		if allow {
 			GlobalSettings.ldtkTrust[iid] = true
 			Editor_SaveSettings()
 			imgui.CloseCurrentPopup()
 			LevelCommands_Run(state, lc.pendWhen, lc.pendThen)
-		} else if UI_Button("Block", "trust.block") {
+		} else if block {
 			GlobalSettings.ldtkTrust[iid] = false
 			Editor_SaveSettings()
 			imgui.CloseCurrentPopup()
 			command_then(state, lc.pendThen)
 		} else {
-			imgui.SameLine()
-			if UI_Button("Cancel", "trust.cancel") || imgui.IsKeyPressed(.Escape) {
+			if cancel || imgui.IsKeyPressed(.Escape) {
 				delete(iid)
 				imgui.CloseCurrentPopup()
 				command_then(state, lc.pendThen)

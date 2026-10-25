@@ -296,10 +296,40 @@ fields.
 ## Tilesets tab
 <!-- topic: tab.tilesets -->
 
-Add tilesets from project images and set tile size, spacing and padding.
-Click a tile in the grid to edit its **custom data**, its **animation** and
-its **enum tags**. The **tag enum** decides which enum's values can tag
-tiles.
+**Add from an image...** makes a tileset from an image of the project. The
+list groups tilesets by their first tag, and has a filter box. Right-click a
+tileset to copy, cut, paste after, duplicate, move, reload its image or
+delete it. Deleting a used tileset asks first: layers, entities, Tile
+fields and enum / IntGrid icons using it lose it. LDtk's embedded icon
+atlas is listed as *[embedded]*; it is kept but can't be drawn here.
+
+The form has the **identifier**, the **image**, the **tile size**,
+**spacing / padding**, **tags** and the **tag enum** (see *Tileset images*
+and *Tile tags*). Below it is the tile grid: click a tile to edit its
+**custom data** (dots mark tiles that have some; green ones are animated),
+its **animation** and its **tags**.
+
+## Tileset images
+<!-- topic: tileset.image -->
+
+- **Image**: pick another image of the project, or **reload** the file.
+  The editor also reloads it when it changes on disk. When the image's
+  size changes, painted tiles, rules, saved tile groups, tags and custom
+  data keep their place in the image: their tile ids are remapped, as in
+  LDtk. A smaller image can lose tiles; when it is smaller by exactly its
+  padding, the padding is reduced instead.
+- **Tile size**: changing it remaps the tile ids the same way (a bigger
+  size can lose tiles; undo brings them back).
+- **Spacing / padding**: the pixels between tiles and around the image.
+
+## Tile tags
+<!-- topic: tileset.tags -->
+
+A tileset can tag its tiles with the values of one enum: its **tag enum**.
+Games read the tags (for example "water", "damage"), and a tile can have
+several. Click a value above the tile grid, then click tiles to tag or
+untag them; coloured bars show each tile's tags. The hand button goes back
+to picking tiles. Changing the tag enum forgets the tags (it asks first).
 
 ## Animated tiles
 <!-- topic: tile.animation -->

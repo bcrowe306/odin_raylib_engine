@@ -602,6 +602,7 @@ level_start_page :: proc(state: ^EditorState) {
 			UI_SectionHeader("Project levels")
 			for rel in files {
 				if UI_Button(fmt.tprintf("%s  %s", ICON_FA_TABLE_CELLS, rel), fmt.tprintf("level.open:%s", rel)) do LevelEditor_Open(state, rel)
+				level_tip(fmt.tprintf("Open %s", rel), "overview")
 			}
 			imgui.Dummy({0, 8})
 		}
@@ -609,6 +610,7 @@ level_start_page :: proc(state: ^EditorState) {
 			L.newPrompt = true
 			copy(L.nameBuf[:], "levels/world.ldtk\x00")
 		}
+		level_tip("A new LDtk project file in this project (one level, an IntGrid layer)", "overview")
 		imgui.Unindent(24)
 	}
 	imgui.End()
@@ -633,6 +635,7 @@ level_prompts :: proc(state: ^EditorState) {
 		if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
 		enter := imgui.InputText("##level_new_path", cstring(raw_data(L.nameBuf[:])), len(L.nameBuf), {.EnterReturnsTrue})
 		Drive_Item("level.new.path")
+		level_tip("Relative to the game project (.ldtk is added)", "overview")
 		rel := strings.trim_space(string(cstring(raw_data(L.nameBuf[:]))))
 		if !strings.has_suffix(rel, ".ldtk") do rel = fmt.tprintf("%s.ldtk", rel)
 		exists := os.exists(level_abs(state, rel))
@@ -649,8 +652,10 @@ level_prompts :: proc(state: ^EditorState) {
 			}
 			imgui.CloseCurrentPopup()
 		}
+		level_tip("Create the file and open it", "overview")
 		imgui.SameLine()
 		if UI_Button("Cancel", "level.new.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without creating a file", "overview")
 		imgui.EndPopup()
 	}
 	if L.closePrompt {
@@ -672,14 +677,17 @@ level_prompts :: proc(state: ^EditorState) {
 		if UI_PrimaryButton("Save", "level.close.save") {
 			if LevelEditor_Save(state) do finish(state, next)
 		}
+		level_tip("Save the changes, then close", "saving")
 		imgui.SameLine()
 		if UI_Button("Don't Save", "level.close.discard") do finish(state, next)
+		level_tip("Close and lose the changes", "saving")
 		imgui.SameLine()
 		if UI_Button("Cancel", "level.close.cancel") || imgui.IsKeyPressed(.Escape) {
 			delete(L.closeThen)
 			L.closeThen = ""
 			imgui.CloseCurrentPopup()
 		}
+		level_tip("Keep editing", "saving")
 		imgui.EndPopup()
 	}
 }
@@ -832,6 +840,7 @@ level_levels_panel :: proc(state: ^EditorState) {
 				break
 			}
 		}
+		level_tip("The world whose levels the list and the canvas show", "worlds")
 	}
 	imgui.Separator()
 	filter := level_filter_box("levels", "Filter levels")
@@ -957,7 +966,7 @@ level_rename_popup :: proc(state: ^EditorState) {
 	if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
 	enter := imgui.InputText("##rename_level", cstring(raw_data(L.renameBuf[:])), len(L.renameBuf), {.EnterReturnsTrue})
 	Drive_Item("level.rename.name")
-	UI_Tooltip("Letters, digits and _ (other characters become _)")
+	level_tip("Letters, digits and _ (other characters become _)", "panel.levels")
 	if UI_PrimaryButton("Rename", "level.rename.ok") || enter {
 		if L.renameLevel >= 0 && L.renameLevel < len(doc.levels) {
 			name := e.Ldtk_Doc_CleanIdentifier(doc, string(cstring(raw_data(L.renameBuf[:]))))
@@ -966,8 +975,10 @@ level_rename_popup :: proc(state: ^EditorState) {
 		}
 		imgui.CloseCurrentPopup()
 	}
+	level_tip("Rename the level (its external file too)", "panel.levels")
 	imgui.SameLine()
 	if UI_Button("Cancel", "level.rename.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+	level_tip("Keep the name", "panel.levels")
 }
 
 LdtkJson_GridVania :: proc(doc: ^e.Ldtk_Doc) -> bool {
@@ -1434,6 +1445,7 @@ level_layer_menu :: proc(state: ^EditorState, i: int, uid: int, visible: bool) -
 	if d.type != .Entities && len(doc.tilesets) > 0 {
 		menuOpen := imgui.BeginMenu(fmt.ctprintf("%s  Tileset in this level", ICON_FA_TABLE_CELLS))
 		Drive_Item("ctx:Tileset in this level")
+		level_tip("Paint this level's layer with another tileset (same grid)", "layer.tileset.override")
 		if menuOpen {
 			ly := &doc.levels[L.level].layers[i]
 			cur := e.Ldtk_Doc_LayerTileset(doc, ly)
@@ -1537,6 +1549,9 @@ level_tab_level :: proc(state: ^EditorState) {
 		return
 	}
 	UI_PanelTitle(ICON_FA_MAP, e.LdtkJson_Str(lv.obj, "identifier"), "level")
+	UI_HeaderButtons(1)
+	if UI_HeaderButton(ICON_FA_CIRCLE_QUESTION, "level.help.level", "") do LevelRef_Open("tab.level")
+	level_tip("The Level tab in the reference", "tab.level")
 	if UI_BeginProps("##level_props") {
 		UI_PropLabel("Identifier")
 		nameBuf: [128]u8
@@ -1549,6 +1564,7 @@ level_tab_level :: proc(state: ^EditorState) {
 			}
 		}
 		Drive_Item("level.name")
+		level_tip("The level's identifier (unique; Enter applies)", "tab.level")
 		p := e.Ldtk_Doc_LevelPos(doc, L.level)
 		s := e.Ldtk_Doc_LevelSize(doc, L.level)
 		UI_PropLabel("Position")
@@ -1559,11 +1575,12 @@ level_tab_level :: proc(state: ^EditorState) {
 		}
 		if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
 		Drive_Item("level.pos")
+		level_tip("Its place in the world, in pixels (drag or type; linear layouts place levels themselves)", "tab.level")
 		UI_PropLabel("Size (px)")
 		sizeEdit := [2]i32{i32(s.x), i32(s.y)}
 		entered := imgui.InputInt2("##lvl_size", &sizeEdit, {.EnterReturnsTrue})
 		Drive_Item("level.size")
-		UI_Tooltip("Width, height in pixels (Enter applies)")
+		level_tip("Width, height in pixels (Enter applies; resized from the top-left - drag the handles around the level for the other sides)", "level.resize")
 		if entered && sizeEdit.x > 0 && sizeEdit.y > 0 && (int(sizeEdit.x) != s.x || int(sizeEdit.y) != s.y) {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Resize Level")
 			e.Ldtk_Doc_ResizeLevel(doc, L.level, {int(sizeEdit.x), int(sizeEdit.y)})
@@ -1574,6 +1591,7 @@ level_tab_level :: proc(state: ^EditorState) {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Level Depth")
 			e.Ldtk_Doc_SetLevelDepth(doc, L.level, int(depth))
 		}
+		level_tip("World depth: levels overlapping at another depth are drawn above / below (PageUp / PageDown)", "navigation")
 		UI_PropLabel("Background")
 		c := e.Ldtk_ParseHexColor(e.LdtkJson_Str(lv.obj, "__bgColor", "#696A79"))
 		col := [3]f32{f32(c.r) / 255, f32(c.g) / 255, f32(c.b) / 255}
@@ -1581,12 +1599,14 @@ level_tab_level :: proc(state: ^EditorState) {
 			e.Ldtk_Doc_CheckpointOnce(doc, L.level, "Level Colour", &lv.obj)
 			e.Ldtk_Doc_SetLevelBgColor(doc, L.level, e.Ldtk_ColorHex({u8(col[0] * 255 + 0.5), u8(col[1] * 255 + 0.5), u8(col[2] * 255 + 0.5), 255}))
 		}
+		level_tip("The level's background colour (default: the project's)", "tab.level")
 		if !e.LdtkJson_IsNull(lv.obj, "bgColor") {
 			imgui.SameLine()
 			if UI_Button("Default", "level.bg.default") {
 				e.Ldtk_Doc_Checkpoint(doc, L.level, "Level Colour")
 				e.Ldtk_Doc_SetLevelBgColor(doc, L.level, "")
 			}
+			level_tip("Use the project's default background colour", "tab.level")
 		}
 		level_bg_image_props(state)
 		UI_EndProps()
@@ -1607,8 +1627,10 @@ level_tab_level :: proc(state: ^EditorState) {
 		UI_DimText(fmt.tprintf("%d levels, %d layer defs, %d entities, %d tilesets", len(doc.levels), len(doc.layerDefs), len(doc.entityDefs), len(doc.tilesets)))
 		UI_DimText(fmt.tprintf("World layout: %s%s", e.Ldtk_Doc_WorldStr(doc, L.world, "worldLayout"), doc.external ? ", external level files" : ""))
 		if UI_Button(fmt.tprintf("%s  Open in LDtk", ICON_FA_UP_RIGHT_FROM_SQUARE), "level.open_ldtk") do Editor_OpenExternally(state, level_abs(state, L.rel))
+		level_tip("Open the file with the system's application for .ldtk files (LDtk); save first", "saving")
 		imgui.SameLine()
 		if UI_Button(fmt.tprintf("%s  Close", ICON_FA_FOLDER_OPEN), "level.close") do LevelEditor_Close(state)
+		level_tip("Close the project (asks when there are unsaved changes)", "saving")
 	}
 }
 
@@ -1683,7 +1705,9 @@ level_entity_inspector :: proc(state: ^EditorState) {
 		return
 	}
 	UI_PanelTitle(ICON_FA_CUBE, e.LdtkJson_Str(ent, "__identifier"), "entity")
-	UI_HeaderButtons(1)
+	UI_HeaderButtons(2)
+	if UI_HeaderButton(ICON_FA_CIRCLE_QUESTION, "level.help.entity", "") do LevelRef_Open("palette.entities")
+	level_tip("Entities in the reference", "palette.entities")
 	if UI_HeaderButton(ICON_FA_TRASH, "level.entity.remove", "Delete (Delete)") {
 		e.Ldtk_Doc_Checkpoint(doc, L.level, "Delete Entity")
 		e.Ldtk_Doc_RemoveEntity(doc, L.level, L.selEntityLayer, ent)
@@ -1701,6 +1725,7 @@ level_entity_inspector :: proc(state: ^EditorState) {
 			e.Ldtk_Doc_MoveEntity(doc, L.level, L.selEntityLayer, ent, {int(pos.x), int(pos.y)})
 		}
 		if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
+		level_tip("Its position in the level (pixels; the pivot point)", "palette.entities")
 		UI_PropLabel("Size")
 		size := [2]i32{i32(e.LdtkJson_Int(ent, "width", 16)), i32(e.LdtkJson_Int(ent, "height", 16))}
 		resizable := ed != nil && (e.LdtkJson_Bool(ed.obj, "resizableX") || e.LdtkJson_Bool(ed.obj, "resizableY"))
@@ -1711,6 +1736,7 @@ level_entity_inspector :: proc(state: ^EditorState) {
 			e.Ldtk_Doc_ResizeEntity(doc, L.level, L.selEntityLayer, ent, e.Ldtk_Doc_ConstrainEntitySize(doc, e.LdtkJson_Int(ent, "defUid", -1), {int(size.x), int(size.y)}, {r[2], r[3]}))
 		}
 		if !resizable do imgui.EndDisabled()
+		level_tip(resizable ? "Width, height (Enter applies; the definition's limits apply)" : "Its definition isn't resizable (Entities tab)", "tab.entities")
 		// another Entities layer of the level (LDtk: move entities between layers)
 		UI_PropLabel("Layer")
 		lv := &doc.levels[L.level]
@@ -1775,6 +1801,7 @@ LevelEditor_Toolbar :: proc(state: ^EditorState, width: f32, play: proc(state: ^
 	canRedo := L.doc != nil && e.Ldtk_Doc_CanRedo(L.doc)
 	if !canUndo do imgui.BeginDisabled(true)
 	if UI_IconButton(ICON_FA_ROTATE_LEFT, "level.undo", "Undo (Cmd+Z)") do level_undo(state)
+	level_tip("", "undo")
 	if !canUndo do imgui.EndDisabled()
 	imgui.SameLine()
 	if !canRedo do imgui.BeginDisabled(true)
@@ -1793,6 +1820,7 @@ LevelEditor_Toolbar :: proc(state: ^EditorState, width: f32, play: proc(state: ^
 	if UI_IconButton(ICON_FA_WAND_MAGIC_SPARKLES, "level.autorender", "Draw auto-layer tiles (Alt+R; off: their IntGrid values show)", !L.hideAuto) do L.hideAuto = !L.hideAuto
 	imgui.SameLine()
 	if UI_IconButton(ICON_FA_TAG, "level.details", "Show level names, entity labels and field shapes (Shift+H)", !L.hideDetails) do L.hideDetails = !L.hideDetails
+	level_tip("", "view")
 	imgui.SameLine()
 	if UI_IconButton(ICON_FA_EXPAND, "level.fit", "Fit the level (Home)") do L.fitRequest = true
 	imgui.SameLine()
@@ -1801,6 +1829,7 @@ LevelEditor_Toolbar :: proc(state: ^EditorState, width: f32, play: proc(state: ^
 	if imgui.BeginCombo("##level_zoom", fmt.ctprintf("%.0f%%", L.zoom * 100)) {
 		for z in ([]f32{0.5, 1, 2, 3, 4}) {
 			if imgui.Selectable(fmt.ctprintf("%.0f%%", z * 100), abs(L.zoom - z) < 0.001) do LevelCanvas_SetZoom(z)
+			level_tip("Canvas zoom (the mouse wheel zooms too)", "canvas")
 			Drive_Item(fmt.tprintf("pick:%.0f%%", z * 100))
 		}
 		imgui.EndCombo()
@@ -2188,6 +2217,25 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 	}
 	if q == "level.commandoutput" do return LevelCommands_Output(), true
 	if q == "level.levelfile" do return e.LdtkJson_Str(doc.levels[L.level].obj, "externalRelPath"), true
+	// level.tilesets -> identifiers; level.tilesetprop:<tileset>.<key> -> JSON
+	if q == "level.tilesets" {
+		b := strings.builder_make(context.temp_allocator)
+		for &ts, i in doc.tilesets {
+			if i > 0 do strings.write_byte(&b, ',')
+			strings.write_string(&b, ts.identifier)
+		}
+		return strings.to_string(b), true
+	}
+	if strings.has_prefix(q, "level.tilesetprop:") {
+		rest := q[len("level.tilesetprop:"):]
+		dot := strings.index_byte(rest, '.')
+		if dot < 0 do return "<need tileset.key>", true
+		for &ts in doc.tilesets do if ts.identifier == rest[:dot] {
+			v := e.LdtkJson_Get(ts.obj, rest[dot + 1:])
+			return v != nil ? e.LdtkJson_ToString(v, .Minified, context.temp_allocator) : "<none>", true
+		}
+		return "<no tileset>", true
+	}
 	// level.layerprop:<layer>.<key> -> a layer definition's JSON value
 	if strings.has_prefix(q, "level.layerprop:") {
 		rest := q[len("level.layerprop:"):]

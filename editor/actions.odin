@@ -133,6 +133,7 @@ Actions_Init :: proc() {
 	add({id = "help.welcome", category = "Help", label = "Welcome", scope = .Global, run = Welcome_Open})
 	add({id = "help.reference", category = "Help", label = "Scripting Reference", scope = .Global, run = proc(s: ^EditorState) {ScriptReference_Open()}})
 	add({id = "help.level_reference", category = "Help", label = "Level Editor Reference", scope = .Global, run = proc(s: ^EditorState) {LevelRef_Open("overview")}})
+	add({id = "help.level_shortcuts", category = "Help", label = "Level Editor Shortcuts", scope = .Global, run = proc(s: ^EditorState) {LevelRef_Open("shortcuts")}})
 	add({id = "help.shortcuts", category = "Help", label = "Keyboard Shortcuts", chords = k(ch(.K, PS)), scope = .Global, run = proc(s: ^EditorState) {showShortcutsWindow = true}})
 
 	// --- Scene editing ---

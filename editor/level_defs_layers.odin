@@ -837,6 +837,7 @@ layer_dialogs :: proc(state: ^EditorState) {
 		if isInt && UI_Button("Bake, then empty the original", "bake.empty") do bake(state, .Empty_Original)
 		if UI_Button("Keep both", "bake.keep") do bake(state, .Keep_Both)
 		if UI_Button("Cancel", "bake.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without changing anything", "tab.layers")
 		imgui.EndPopup()
 	}
 	if ll.moveReq {
@@ -874,12 +875,14 @@ layer_dialogs :: proc(state: ^EditorState) {
 		UI_DimText("Move, in every level:")
 		imgui.SetNextItemWidth(300)
 		if pick, ch := UI_Combo("move.filter", ll.moveFilter, filters[:]); ch do ll.moveFilter = pick
+		level_tip("Which entities move: all, one kind, or those with a tag", "tab.layers")
 		UI_DimText("to the layer:")
 		if len(targets) == 0 {
 			UI_DimText("(no other Entities layer)")
 		} else {
 			imgui.SetNextItemWidth(300)
 			if pick, ch := UI_Combo("move.target", ll.moveTarget, targets[:]); ch do ll.moveTarget = pick
+			level_tip("The Entities layer they go to (its tags must accept them)", "tab.layers")
 		}
 		if UI_PrimaryButton("Move", "move.ok") && len(targets) > 0 {
 			defs_checkpoint("Move Entities Between Layers")
@@ -891,6 +894,7 @@ layer_dialogs :: proc(state: ^EditorState) {
 		}
 		imgui.SameLine()
 		if UI_Button("Cancel", "move.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without changing anything", "tab.layers")
 		imgui.EndPopup()
 	}
 	if ll.deleteReq {
@@ -910,6 +914,7 @@ layer_dialogs :: proc(state: ^EditorState) {
 		}
 		imgui.SameLine()
 		if UI_Button("Cancel", "deletelayer.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without changing anything", "tab.layers")
 		imgui.EndPopup()
 	}
 	if ll.valueRmReq {
@@ -928,6 +933,7 @@ layer_dialogs :: proc(state: ^EditorState) {
 		}
 		imgui.SameLine()
 		if UI_Button("Cancel", "removevalue.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without changing anything", "tab.layers")
 		imgui.EndPopup()
 	}
 	if ll.groupReq {
@@ -950,6 +956,7 @@ layer_dialogs :: proc(state: ^EditorState) {
 		}
 		imgui.SameLine()
 		if UI_Button("Cancel", "valuegroup.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+		level_tip("Close without changing anything", "tab.layers")
 		imgui.EndPopup()
 	}
 }

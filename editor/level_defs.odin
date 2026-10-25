@@ -33,9 +33,7 @@ defs: struct {
 	layerUid:  int,
 	entityUid: int,
 	enumUid:   int,
-	tilesetUid: int,
 	ruleUid:   int,
-	tileId:    int,
 }
 
 // text_edit: a text field bound to `key` of `obj`; returns the new text
@@ -60,7 +58,7 @@ LevelDefs_Page :: proc(state: ^EditorState, page: Level_Panel_Tab) {
 	if GlobalLevel.doc == nil do return
 	#partial switch page {
 	case .World: page_world(state)
-	case .Tilesets: page_tilesets(state)
+	case .Tilesets: LevelTilesets_Page(state)
 	case .Entities: LevelDefs_EntitiesPage(state)
 	case .Enums: LevelEnums_Page(state)
 	case .Layers: LevelLayers_Page(state)
@@ -101,7 +99,7 @@ newLayer: struct {
 // Rules and Entities tabs show.
 LevelDefs_SelectLayer :: proc(uid: int) {defs.layerUid = uid}
 LevelDefs_SelectedLayer :: proc() -> int {return defs.layerUid}
-LevelDefs_SelectTileset :: proc(uid: int) {defs.tilesetUid = uid}
+LevelDefs_SelectTileset :: proc(uid: int) {LevelTilesets_Select(uid)}
 LevelDefs_SelectRulesLayer :: proc(uid: int) {LevelRules_SelectLayer(uid)}
 LevelDefs_SelectEntity :: proc(uid: int) {defs.entityUid = uid}
 LevelDefs_SelectedEntity :: proc() -> int {return defs.entityUid}
@@ -142,11 +140,14 @@ LevelDefs_NewLayerDialog :: proc(state: ^EditorState) {
 			}
 			newLayer.type = e.LdtkLayerType(t)
 		}
+		level_tip("IntGrid: painted values (collisions, terrain) that rules can turn into tiles. Entities: objects. Tiles: painted tiles. Auto layer: tiles from another layer's values.", "layer.new")
 		UI_PropLabel("Identifier")
 		imgui.InputText("##nl_name", cstring(raw_data(newLayer.name[:])), len(newLayer.name), {})
 		Drive_Item("defs.newlayer.name")
+		level_tip("Its name (letters, digits, _)", "layer.new")
 		UI_PropLabel("Grid size")
 		imgui.InputInt("##nl_grid", &newLayer.grid, 1, 8)
+		level_tip("Cell size in pixels", "layer.new")
 		newLayer.grid = max(newLayer.grid, 1)
 		if newLayer.type != .Entities {
 			UI_PropLabel("Tileset")
@@ -154,6 +155,7 @@ LevelDefs_NewLayerDialog :: proc(state: ^EditorState) {
 			tn[0] = "(none)"
 			for ts, i in doc.tilesets do tn[i + 1] = ts.identifier
 			newLayer.tileset, _ = UI_Combo("defs.newlayer.tileset", clamp(newLayer.tileset, 0, len(tn) - 1), tn)
+			level_tip("The tileset it paints from (Tiles) or its rules place (IntGrid, Auto)", "layer.new")
 		}
 		if newLayer.type == .AutoLayer {
 			UI_PropLabel("Rules read")
@@ -168,6 +170,7 @@ LevelDefs_NewLayerDialog :: proc(state: ^EditorState) {
 				append(&su, d.uid)
 			}
 			if pick, changed := UI_Combo("defs.newlayer.source", cur, sn[:]); changed do newLayer.source = su[pick]
+			level_tip("The IntGrid layer whose values its rules read", "layer.new")
 		}
 	}
 	if newLayer.type == .AutoLayer && (newLayer.tileset == 0 || newLayer.source < 0) do UI_DimText("Auto layers need a tileset and an IntGrid layer to read.")
@@ -199,8 +202,10 @@ LevelDefs_NewLayerDialog :: proc(state: ^EditorState) {
 		level_after_defs()
 		imgui.CloseCurrentPopup()
 	}
+	level_tip("Add the layer (on top) to every level", "layer.new")
 	imgui.SameLine()
 	if UI_Button("Cancel", "defs.newlayer.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+	level_tip("Close without adding a layer", "layer.new")
 }
 
 // ----------------------------------------------------------------------------
@@ -209,6 +214,7 @@ LevelDefs_NewLayerDialog :: proc(state: ^EditorState) {
 
 @(private = "file")
 world_ui: struct {
+	mapCtx:    int, // the map's level under the right click
 	renameReq: bool,
 	renameIdx: int,
 	renameBuf: [128]u8,
@@ -364,6 +370,7 @@ world_rename_popup :: proc(state: ^EditorState) {
 	if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
 	enter := imgui.InputText("##wrename", cstring(raw_data(world_ui.renameBuf[:])), len(world_ui.renameBuf), {.EnterReturnsTrue})
 	Drive_Item("defs.world.rename.name")
+	level_tip("The world's new identifier", "worlds")
 	if UI_PrimaryButton("Rename", "defs.world.rename.ok") || enter {
 		defs_checkpoint("Rename World")
 		e.Ldtk_Doc_RenameWorld(doc, world_ui.renameIdx, string(cstring(raw_data(world_ui.renameBuf[:]))))
@@ -371,6 +378,7 @@ world_rename_popup :: proc(state: ^EditorState) {
 	}
 	imgui.SameLine()
 	if UI_Button("Cancel", "defs.world.rename.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+	level_tip("Keep the name", "worlds")
 }
 
 @(private = "file")
@@ -426,7 +434,42 @@ page_world :: proc(state: ^EditorState) {
 					LevelEditor_SetLevel(i)
 					L.fitRequest = true
 				}
+				if over {
+					imgui.SetTooltip("%s", fmt.ctprintf("%s (%dx%d): click to open it; right-click for more", name, s.x, s.y))
+					LevelRef_Hover("tab.world")
+					if imgui.IsMouseClicked(.Right) {
+						world_ui.mapCtx = i
+						imgui.OpenPopup("##mapctx")
+					}
+				}
 			}
+		}
+		if imgui.BeginPopup("##mapctx") {
+			li := world_ui.mapCtx
+			if li >= 0 && li < len(doc.levels) {
+				UI_DimText(e.Ldtk_Doc_LevelName(doc, li))
+				if ctx_item(ICON_FA_FOLDER_OPEN, "Open", "Make it the active level") do LevelEditor_SetLevel(li)
+				if ctx_item(ICON_FA_EXPAND, "Frame", "Open it and fit it in the canvas") {
+					LevelEditor_SetLevel(li)
+					L.fitRequest = true
+				}
+				if ctx_item(ICON_FA_CLONE, "Duplicate", "Copy the level with its content, next to it") {
+					e.Ldtk_Doc_Checkpoint(doc, -1, "Duplicate Level")
+					if ni := e.Ldtk_Doc_DuplicateLevel(doc, li); ni >= 0 {
+						L.level = -1
+						LevelEditor_SetLevel(ni)
+					}
+				}
+				if ctx_item(ICON_FA_TRASH, "Delete", "Delete the level (undo brings it back; not a world's last level)", level_world_count(doc.levels[li].world) > 1) {
+					e.Ldtk_Doc_Checkpoint(doc, -1, "Delete Level")
+					e.Ldtk_Doc_RemoveLevel(doc, li)
+					level_keep_world_level()
+					level_clear_selection()
+				}
+				imgui.Separator()
+				if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "The World tab in the reference") do LevelRef_Open("tab.world")
+			}
+			imgui.EndPopup()
 		}
 	}
 	imgui.EndChild()
@@ -471,245 +514,4 @@ picked_tile_rect :: proc() -> (int, [4]int, bool) {
 	if ts == nil do return -1, {}, false
 	src := e.Ldtk_Doc_TileSrc(ts, int(L.tileSel[0]))
 	return ts.uid, {int(src.x), int(src.y), ts.gridSize * L.tileSelW, ts.gridSize * L.tileSelH}, true
-}
-
-// ----------------------------------------------------------------------------
-// Enums / tilesets / level fields
-// ----------------------------------------------------------------------------
-
-@(private = "file")
-page_tilesets :: proc(state: ^EditorState) {
-	L := &GlobalLevel
-	doc := L.doc
-	avail := imgui.GetContentRegionAvail()
-	if imgui.BeginChild("##tileset_list", {220, avail.y}, {.Borders}, {}) {
-		UI_DimText("Add from a project image:")
-		images := Editor_ListProjectFiles(state, "", {".png"})
-		imgui.SetNextItemWidth(-1)
-		if imgui.BeginCombo("##add_tileset", "Pick an image...") {
-			for rel in images {
-				if imgui.Selectable(fmt.ctprintf("%s", rel)) do add_tileset(state, rel)
-				Drive_Item(fmt.tprintf("pick:%s", rel))
-			}
-			imgui.EndCombo()
-		}
-		Drive_Item("defs.tileset.add")
-		filter := level_filter_box("tilesets", "Filter tilesets")
-		imgui.Separator()
-		for &ts in doc.tilesets {
-			if !level_filter_hit(filter, ts.identifier) do continue
-			if imgui.Selectable(fmt.ctprintf("%s##tsl%d", ts.identifier, ts.uid), defs.tilesetUid == ts.uid, {}, {0, 22}) do defs.tilesetUid = ts.uid
-			Drive_Item(fmt.tprintf("defs.tileset:%s", ts.identifier))
-		}
-	}
-	imgui.EndChild()
-	imgui.SameLine(0, 8)
-	if imgui.BeginChild("##tileset_props", {0, avail.y}, {}, {}) {
-		ts := e.Ldtk_Doc_Tileset(doc, defs.tilesetUid)
-		if ts == nil {
-			UI_DimText("Pick a tileset, or add one from an image.")
-		} else {
-			uid := ts.uid
-			obj := ts.obj
-			UI_PanelTitle(ICON_FA_TABLE_CELLS, ts.identifier, ts.relPath)
-			if UI_BeginProps("##ts_t") {
-				changed := false
-				num :: proc(label, key: string, obj: ^e.LdtkJson, minv: int) -> bool {
-					UI_PropLabel(label)
-					v := i32(e.LdtkJson_Int(obj, key))
-					if imgui.InputInt(fmt.ctprintf("##%s", key), &v, 1, 8, {.EnterReturnsTrue}) && int(v) >= minv {
-						defs_checkpoint("Tileset")
-						e.LdtkJson_SetInt(obj, key, int(v), GlobalLevel.doc.allocator)
-						return true
-					}
-					Drive_Item(fmt.tprintf("defs.tileset.%s", key))
-					return false
-				}
-				changed |= num("Tile size", "tileGridSize", obj, 1)
-				changed |= num("Spacing", "spacing", obj, 0)
-				changed |= num("Padding", "padding", obj, 0)
-				if changed {
-					UI_EndProps()
-					tileset_changed(state, uid)
-					imgui.EndChild()
-					return // (definitions rebuilt per layer: this frame's pointers are stale)
-				}
-				UI_EndProps()
-			}
-			UI_DimText(fmt.tprintf("%dx%d px, %dx%d tiles", ts.pxSize.x, ts.pxSize.y, ts.cWid, ts.cHei))
-			tile_data_editor(state, uid)
-		}
-	}
-	imgui.EndChild()
-}
-
-// add_tileset adds a project image (path made relative to the .ldtk).
-@(private = "file")
-add_tileset :: proc(state: ^EditorState, rel: string) {
-	L := &GlobalLevel
-	doc := L.doc
-	abs := level_abs(state, rel)
-	img := rl.LoadImage(strings.clone_to_cstring(abs, context.temp_allocator))
-	if img.data == nil {
-		Editor_Log(state, .Error, "Could not read %s", rel)
-		return
-	}
-	defer rl.UnloadImage(img)
-	relToDoc, err := filepath.rel(doc.dir, abs, context.temp_allocator)
-	if err != nil do relToDoc = rel
-	relToDoc, _ = strings.replace_all(relToDoc, "\\", "/", context.temp_allocator)
-	grid := e.LdtkJson_Int(doc.root, "defaultGridSize", 16)
-	defs_checkpoint("Add Tileset")
-	defs.tilesetUid = e.Ldtk_Doc_AddTileset(doc, relToDoc, {int(img.width), int(img.height)}, grid, &img)
-}
-
-// tileset_changed: grid / spacing / padding changed - the cached sizes,
-// opaque tiles and every tile's source follow.
-@(private = "file")
-tileset_changed :: proc(state: ^EditorState, uid: int) {
-	L := &GlobalLevel
-	doc := L.doc
-	ts := e.Ldtk_Doc_Tileset(doc, uid)
-	if ts == nil do return
-	a := doc.allocator
-	obj := ts.obj
-	grid := max(e.LdtkJson_Int(obj, "tileGridSize", 16), 1)
-	sp := e.LdtkJson_Int(obj, "spacing")
-	pad := e.LdtkJson_Int(obj, "padding")
-	step := grid + sp
-	e.LdtkJson_SetInt(obj, "__cWid", (ts.pxSize.x - pad * 2 + step - 1) / step, a)
-	e.LdtkJson_SetInt(obj, "__cHei", (ts.pxSize.y - pad * 2 + step - 1) / step, a)
-	abs, _ := filepath.join({doc.dir, ts.relPath}, context.temp_allocator)
-	img := rl.LoadImage(strings.clone_to_cstring(abs, context.temp_allocator))
-	if img.data != nil {
-		e.LdtkJson_Set(obj, "cachedPixelData", e.Ldtk_TilesetPixelData(&img, grid, sp, pad, a), a)
-		rl.UnloadImage(img)
-	}
-	e.Ldtk_Doc_RefreshDefs(doc)
-	for &d in doc.layerDefs do if d.tilesetUid == uid do e.Ldtk_Doc_LayerDefChanged(doc, d.uid)
-}
-
-// tile_data_editor: the tileset's tiles; the picked tile's custom data,
-// animation and enum tags.
-@(private = "file")
-tile_data_editor :: proc(state: ^EditorState, uid: int) {
-	L := &GlobalLevel
-	doc := L.doc
-	ts := e.Ldtk_Doc_Tileset(doc, uid)
-	a := doc.allocator
-	// tag enum
-	if UI_BeginProps("##ts_tags") {
-		UI_PropLabel("Tag enum")
-		enums := e.LdtkJson_Arr(e.LdtkJson_Get(doc.root, "defs"), "enums")
-		names := make([]string, len(enums) + 1, context.temp_allocator)
-		names[0] = "(none)"
-		cur := 0
-		src := e.LdtkJson_Int(ts.obj, "tagsSourceEnumUid", -1)
-		for en, i in enums {
-			names[i + 1] = e.LdtkJson_Str(en, "identifier")
-			if e.LdtkJson_Int(en, "uid") == src do cur = i + 1
-		}
-		if pick, changed := UI_Combo("defs.tileset.tagenum", cur, names); changed {
-			defs_checkpoint("Tag Enum")
-			if pick == 0 do e.LdtkJson_SetNull(ts.obj, "tagsSourceEnumUid", a)
-			else do e.LdtkJson_SetInt(ts.obj, "tagsSourceEnumUid", e.LdtkJson_Int(enums[pick - 1], "uid"), a)
-			e.Ldtk_Doc_Touch(doc)
-		}
-		UI_EndProps()
-	}
-	UI_SectionHeader("Tiles")
-	ptr := level_texture_ptr(uid)
-	if ptr == nil {
-		UI_DimText("Image not found.")
-		return
-	}
-	tex := ptr^
-	avail := imgui.GetContentRegionAvail()
-	z := clamp(min(avail.x / f32(max(tex.width, 1)), 320 / f32(max(tex.height, 1))), 0.25, 3)
-	w, h := f32(tex.width) * z, f32(tex.height) * z
-	{ // (drawn inline: a scrolling child here would take the page's wheel)
-		p := imgui.GetCursorScreenPos()
-		dl := imgui.GetWindowDrawList()
-		imgui.InvisibleButton("##tiles", {w, h})
-		Drive_ItemRect("defs.tiles", {p.x, p.y}, {p.x + 1, p.y + 1}, true)
-		imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)ptr, p, {p.x + w, p.y + h})
-		step := f32(ts.gridSize + ts.spacing) * z
-		pad := f32(ts.padding) * z
-		gs := f32(ts.gridSize) * z
-		for cd in e.LdtkJson_Arr(ts.obj, "customData") {
-			tid := e.LdtkJson_Int(cd, "tileId")
-			x, y := tid % max(ts.cWid, 1), tid / max(ts.cWid, 1)
-			c := imgui.Vec2{p.x + pad + f32(x) * step + gs - 5, p.y + pad + f32(y) * step + 5}
-			isAnim := i32(tid) in ts.anims
-			imgui.DrawList_AddCircleFilled(dl, c, 3, col_u32(isAnim ? UI_SUCCESS : UI_WARNING))
-		}
-		if imgui.IsItemActivated() {
-			m := imgui.GetIO().MousePos
-			cx := int((m.x - p.x - pad) / step)
-			cy := int((m.y - p.y - pad) / step)
-			if cx >= 0 && cy >= 0 && cx < ts.cWid && cy < ts.cHei do defs.tileId = cx + cy * ts.cWid
-		}
-		x, y := defs.tileId % max(ts.cWid, 1), defs.tileId / max(ts.cWid, 1)
-		imgui.DrawList_AddRect(dl, {p.x + pad + f32(x) * step, p.y + pad + f32(y) * step}, {p.x + pad + f32(x) * step + gs, p.y + pad + f32(y) * step + gs}, col_u32(UI_ACCENT), 0, {}, 2)
-	}
-	UI_DimText("Dots: tiles with custom data (green: animated).")
-	tid := defs.tileId
-	UI_SectionHeader(fmt.tprintf("Tile %d", tid))
-	// custom data (live; one undo step per edit)
-	cur := e.Ldtk_Doc_TileCustomData(doc, uid, tid)
-	buf: [1024]u8
-	copy(buf[:len(buf) - 1], cur)
-	if imgui.InputTextMultiline("##tile_custom", cstring(raw_data(buf[:])), len(buf), {-1, 70}, {}) {
-		e.Ldtk_Doc_CheckpointOnce(doc, -1, "Tile Data", rawptr(uintptr(uid * 100003 + tid + 1)))
-		e.Ldtk_Doc_SetTileCustomData(doc, uid, tid, string(cstring(raw_data(buf[:]))))
-	}
-	if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
-	Drive_Item("defs.tile.custom")
-	UI_Tooltip("Free text for your scripts (node:ldtk_get_tile(layer, x, y).custom_data); \"anim=\" / \"fps=\" lines animate the tile")
-	// animation
-	anim, animated := e.Ldtk_Doc_TileAnimation(doc, uid, tid)
-	if animated {
-		b := strings.builder_make(context.temp_allocator)
-		for f, i in anim.frames {
-			if i > 0 do strings.write_string(&b, ", ")
-			fmt.sbprintf(&b, "%d", f)
-		}
-		UI_DimText(fmt.tprintf("Animated: %s at %v fps", strings.to_string(b), anim.fps))
-	}
-	if UI_Button(fmt.tprintf("%s  Animate with picked tiles", ICON_FA_PLAY), "defs.tile.animate") {
-		if len(L.tileSel) >= 2 {
-			defs_checkpoint("Tile Animation")
-			e.Ldtk_Doc_SetTileAnimation(doc, uid, tid, L.tileSel[:], animated ? anim.fps : e.LDTK_TILE_ANIM_DEFAULT_FPS)
-		} else do Editor_Log(state, .Info, "Pick two or more tiles (the frames, in order) in the Layers panel's tileset first")
-	}
-	UI_Tooltip("The frames: tiles picked in the Layers panel's tileset, left to right, top to bottom")
-	if animated {
-		imgui.SameLine()
-		imgui.SetNextItemWidth(80)
-		fps := anim.fps
-		if imgui.InputFloat("fps##tile_fps", &fps, 0, 0, "%.1f", {.EnterReturnsTrue}) && fps > 0 {
-			defs_checkpoint("Tile Animation")
-			e.Ldtk_Doc_SetTileAnimation(doc, uid, tid, anim.frames, fps)
-		}
-		imgui.SameLine()
-		if UI_Button("Stop", "defs.tile.animate.stop") {
-			defs_checkpoint("Tile Animation")
-			e.Ldtk_Doc_SetTileAnimation(doc, uid, tid, nil, 0)
-		}
-	}
-	// enum tags
-	src := e.LdtkJson_Int(ts.obj, "tagsSourceEnumUid", -1)
-	if en := e.Ldtk_Doc_EnumDef(doc, src); en != nil {
-		UI_DimText("Tags:")
-		for v in e.LdtkJson_Arr(en, "values") {
-			id := e.LdtkJson_Str(v, "id")
-			on := e.Ldtk_Doc_TileHasTag(doc, uid, tid, id)
-			imgui.SameLine()
-			if imgui.Checkbox(fmt.ctprintf("%s##tag", id), &on) {
-				defs_checkpoint("Tile Tag")
-				e.Ldtk_Doc_SetTileTag(doc, uid, tid, id, on)
-			}
-			Drive_Item(fmt.tprintf("defs.tile.tag:%s", id))
-		}
-	}
 }

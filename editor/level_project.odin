@@ -196,7 +196,35 @@ LevelProject_Page :: proc(state: ^EditorState) {
 						e.Ldtk_Doc_Touch(doc)
 					}
 					Drive_Item(fmt.tprintf("defs.command:%d", i))
-					level_tip("The command (quotes group arguments; Enter applies)", "project.commands")
+					level_tip("The command (quotes group arguments; Enter applies). Right-click for more.", "project.commands")
+					if imgui.BeginPopupContextItem("##cmdctx") {
+						moved := false
+						if ctx_item(ICON_FA_ARROW_UP, "Move up", "Run earlier", i > 0) {
+							defs_checkpoint("Move Custom Command")
+							cmds.items[i], cmds.items[i - 1] = cmds.items[i - 1], cmds.items[i]
+							e.Ldtk_Doc_Touch(doc)
+							moved = true
+						}
+						if ctx_item(ICON_FA_ARROW_DOWN, "Move down", "Run later", i + 1 < len(cmds.items)) {
+							defs_checkpoint("Move Custom Command")
+							cmds.items[i], cmds.items[i + 1] = cmds.items[i + 1], cmds.items[i]
+							e.Ldtk_Doc_Touch(doc)
+							moved = true
+						}
+						if ctx_item(ICON_FA_TRASH, "Remove", "Remove the command") {
+							defs_checkpoint("Remove Custom Command")
+							ordered_remove(&cmds.items, i)
+							e.Ldtk_Doc_Touch(doc)
+							moved = true
+						}
+						imgui.Separator()
+						if ctx_item(ICON_FA_CIRCLE_QUESTION, "Help", "Custom commands in the reference") do LevelRef_Open("project.commands")
+						imgui.EndPopup()
+						if moved {
+							imgui.PopID()
+							break
+						}
+					}
 					imgui.SameLine()
 					imgui.SetNextItemWidth(140)
 					cur := 0
@@ -424,4 +452,5 @@ style_popup :: proc(state: ^EditorState) {
 	}
 	imgui.SameLine()
 	if UI_Button("Cancel", "style.cancel") || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+	level_tip("Close without changing anything", "tab.project")
 }

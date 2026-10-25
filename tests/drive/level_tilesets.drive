@@ -1,0 +1,67 @@
+# Level editor tilesets (Tilesets tab): renamed; tile size 16 -> 8 keeps the
+# painted tiles (remapped; undo); tags group the list; an enum tag painted
+# on a tile; duplicate / delete from the menu; deleting a used tileset asks.
+exec cp -R tests/drive/fixtures/ldtk $PROJECT/ts_zz
+wait 90
+click @root.level
+wait 3
+click @level.open:ts_zz/topdown.ldtk
+wait 5
+click @level.layer:Custom_floor
+wait 1
+click @level.tab:Tilesets
+wait 1
+click @defs.tileset:TopDown_by_deepnight
+wait 1
+screenshot tileset_form
+click @defs.tileset.name
+key cmd+a
+type Dungeon
+key enter
+wait 1
+expect level.tilesets contains Dungeon
+# the tile size: painted tiles are remapped, none lost going smaller
+expect level.gridtiles >= 1
+click @defs.tileset.tileGridSize
+key cmd+a
+type 8
+key enter
+wait 2
+expect level.tilesetprop:Dungeon.tileGridSize == 8
+expect log contains remapped
+key cmd+z
+wait 2
+expect level.tilesetprop:Dungeon.tileGridSize == 16
+# tags
+click @defs.tileset.tags
+type dungeon
+key enter
+wait 1
+expect level.tilesetprop:Dungeon.tags contains dungeon
+# an enum tag painted on the first tile
+click @defs.tileset.tagenum
+click @pick:Item
+wait 1
+click @defs.tile.painttag:Wood
+wait 1
+click @defs.tiles+8,8
+wait 1
+expect level.tilesetprop:Dungeon.enumTags contains Wood
+screenshot tile_tags
+# duplicate, then delete the copy (unused: no question)
+rclick @defs.tileset:Dungeon
+click @ctx:Duplicate
+wait 1
+expect level.tilesets contains Dungeon2
+rclick @defs.tileset:Dungeon2
+click @ctx:Delete
+wait 1
+expect level.tilesets !contains Dungeon2
+# deleting the used one asks
+rclick @defs.tileset:Dungeon
+click @ctx:Delete
+wait 1
+screenshot delete_question
+click @deletetileset.cancel
+wait 1
+expect level.tilesets contains Dungeon

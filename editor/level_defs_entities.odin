@@ -576,6 +576,9 @@ field_form :: proc(state: ^EditorState, fd: ^e.LdtkJson) {
 	for f in e.LdtkJson_Arr(e.LdtkJson_Get(doc.root, "defs"), "levelFields") do if f == fd do forLevel = true
 	topic := "fields"
 	UI_PanelTitle(ICON_FA_PEN_TO_SQUARE, e.LdtkJson_Str(fd, "identifier"), e.LdtkJson_Str(fd, "__type"))
+	UI_HeaderButtons(1)
+	if UI_HeaderButton(ICON_FA_CIRCLE_QUESTION, "defs.field.help", "") do LevelRef_Open("fields.defs")
+	level_tip("Field definitions in the reference", "fields.defs")
 	changed := false
 	if !UI_BeginProps("##field_t") do return
 	defer {

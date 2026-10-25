@@ -177,6 +177,7 @@ LevelRef_Render :: proc(state: ^EditorState) {
 		imgui.SetNextItemWidth(-1)
 		imgui.InputTextWithHint("##lref_search", fmt.ctprintf("%s  Search", ICON_FA_MAGNIFYING_GLASS), cstring(raw_data(lref.search[:])), len(lref.search), {})
 		Drive_Item("lref.search")
+		if imgui.IsItemHovered() do UI_Tooltip("Show only the sections mentioning this")
 		q := strings.to_lower(string(cstring(raw_data(lref.search[:]))), context.temp_allocator)
 		for s, i in lref.sections {
 			if q != "" && !strings.contains(strings.to_lower(s.title, context.temp_allocator), q) && !strings.contains(strings.to_lower(s.body, context.temp_allocator), q) do continue
@@ -186,6 +187,7 @@ LevelRef_Render :: proc(state: ^EditorState) {
 				lref.scrollTo = true
 			}
 			Drive_Item(fmt.tprintf("lref.section:%s", s.title))
+			if imgui.IsItemHovered() do UI_Tooltip(fmt.tprintf("Go to \"%s\"", s.title))
 			imgui.Unindent(f32(max(s.level - 1, 0)) * 12)
 		}
 	}
