@@ -1,26 +1,28 @@
 package editor
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
+import "core:slice"
 import "core:strings"
 import e "../engine"
 import rl "vendor:raylib"
 
 // ============================================================================
-// New-project templates (the Welcome window; File > New Project uses Empty):
-//   Empty       a camera
-//   Platformer  a player (CharacterMover: arrows / A-D to run, Space to jump),
-//               ground and one-way platforms, a camera that follows
-//   Top-down    a player moved by a script with the move_* input actions
-//   Menu        a title and a Play button that opens the game scene
-// Images are plain placeholder shapes, generated so the project is complete.
+// New-project templates (the Welcome window; File > New Project uses Empty).
+//
+// Built in (made here): Empty (a camera) and Menu (a title screen whose Play
+// button opens the game scene). The others are complete small games kept as
+// project folders - templates/<id>/ in the editor's resources (the repo's
+// templates/, built by scripts/templates/make_templates.py): Platformer,
+// Top-down RPG, Shoot 'em up, Puzzle, each with a template.json (name,
+// description, icon, order) and a preview.png. Samples are bigger projects
+// to look at (the Asteroids demo).
 // ============================================================================
 
 Project_Template :: enum {
 	Empty,
-	Platformer,
-	TopDown,
 	Menu,
 }
 
@@ -29,10 +31,120 @@ Template_Info :: struct {
 }
 
 PROJECT_TEMPLATES := [Project_Template]Template_Info {
-	.Empty      = {"Empty", ICON_FA_FILE, "A scene with a camera."},
-	.Platformer = {"Platformer", ICON_FA_PERSON_RUNNING, "A player that runs and jumps (built-in character controller), ground, one-way platforms, a camera that follows."},
-	.TopDown    = {"Top-down", ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT, "A player moved in four directions by a short Lua script."},
-	.Menu       = {"Menu", ICON_FA_HAND_POINTER, "A title screen whose Play button opens the game scene."},
+	.Empty = {"Empty", ICON_FA_FILE, "A scene with a camera."},
+	.Menu  = {"Menu", ICON_FA_HAND_POINTER, "A title screen whose Play button opens the game scene."},
+}
+
+// Template_Entry: one choice in the Welcome window.
+Template_Entry :: struct {
+	name, icon, description: string,
+	order:   int,
+	builtin: Project_Template, // dir == "": made by Project_CreateFromTemplate
+	dir:     string,           // a template / sample folder (copied)
+	preview: string,           // its preview.png ("" = none)
+	sample:  bool,
+}
+
+// Templates_List: the built-in templates, then the template folders (by
+// order), then the samples (temp).
+Templates_List :: proc() -> []Template_Entry {
+	out := make([dynamic]Template_Entry, context.temp_allocator)
+	for t in Project_Template {
+		info := PROJECT_TEMPLATES[t]
+		append(&out, Template_Entry{name = info.name, icon = info.icon, description = info.description, order = -10 + int(t), builtin = t})
+	}
+	root := Resource_Path("templates")
+	if infos, err := os.read_all_directory_by_path(root, context.temp_allocator); err == nil {
+		for fi in infos {
+			if fi.type != .Directory do continue
+			dir, _ := filepath.join({root, fi.name}, context.temp_allocator)
+			meta, _ := filepath.join({dir, "template.json"}, context.temp_allocator)
+			data, rerr := os.read_entire_file(meta, context.temp_allocator)
+			if rerr != nil do continue
+			v, jerr := json.parse(data, allocator = context.temp_allocator)
+			if jerr != nil do continue
+			o, ok := v.(json.Object)
+			if !ok do continue
+			e := Template_Entry{dir = dir}
+			e.name, _ = o["name"].(json.String)
+			e.description, _ = o["description"].(json.String)
+			if f, isNum := o["order"].(json.Float); isNum do e.order = int(f)
+			e.sample = (o["kind"].(json.String) or_else "") == "sample"
+			icon, _ := o["icon"].(json.String)
+			e.icon = template_icon(icon)
+			pv, _ := filepath.join({dir, "preview.png"}, context.temp_allocator)
+			if os.is_file(pv) do e.preview = pv
+			if e.name == "" do e.name = fi.name
+			append(&out, e)
+		}
+	}
+	// The demo project: a sample (the repo's own in a checkout).
+	demo := "assets/demo_project" if Resources_InCheckout() else Resource_Path("templates", "demo_project")
+	if os.is_dir(demo) {
+		pv, _ := filepath.join({demo, "preview.png"}, context.temp_allocator)
+		append(&out, Template_Entry{name = "Asteroids (sample)", icon = ICON_FA_ROCKET, order = 100, dir = demo, sample = true,
+			description = "The demo: a space shooter using most of the engine - physics, particles, lighting, state machines, components, scripts.",
+			preview = pv if os.is_file(pv) else ""})
+	}
+	slice.sort_by(out[:], proc(a, b: Template_Entry) -> bool {
+		if a.sample != b.sample do return !a.sample
+		return a.order < b.order
+	})
+	return out[:]
+}
+
+@(private = "file")
+template_icon :: proc(name: string) -> string {
+	switch name {
+	case "person-running": return ICON_FA_PERSON_RUNNING
+	case "dungeon": return ICON_FA_DUNGEON
+	case "jet-fighter": return ICON_FA_JET_FIGHTER
+	case "puzzle-piece": return ICON_FA_PUZZLE_PIECE
+	case "rocket": return ICON_FA_ROCKET
+	case "gamepad": return ICON_FA_GAMEPAD
+	}
+	return ICON_FA_FILE
+}
+
+// Project_CreateFromEntry makes a project from a Welcome choice: a built-in
+// is generated, a folder is copied (its project.json renamed). False when
+// `dir` holds a project already.
+Project_CreateFromEntry :: proc(dir, name: string, entry: Template_Entry) -> bool {
+	if entry.dir == "" do return Project_CreateFromTemplate(dir, name, entry.builtin)
+	pj, _ := filepath.join({dir, "project.json"}, context.temp_allocator)
+	if os.is_file(pj) do return false
+	if !template_copy(entry.dir, dir) do return false
+	// The project's own name and window title.
+	data, rerr := os.read_entire_file(pj, context.temp_allocator)
+	if rerr != nil do return false
+	cfg, ok := e.Project_ParseConfig(data, context.temp_allocator)
+	if !ok do return false
+	cfg.name = name
+	cfg.windowTitle = name
+	return e.Project_SaveConfigToFile(dir, &cfg)
+}
+
+// template_copy: the folder, without the template's own files (template.json,
+// preview.png) and editor / tool leftovers (.ore, .editor_settings.ini).
+@(private = "file")
+template_copy :: proc(src, dst: string) -> bool {
+	if os.make_directory_all(dst) != nil do return false
+	infos, err := os.read_all_directory_by_path(src, context.temp_allocator)
+	if err != nil do return false
+	for fi in infos {
+		switch fi.name {
+		case "template.json", "preview.png", ".ore", ".editor_settings.ini", ".luarc.json", ".DS_Store": continue
+		}
+		from, _ := filepath.join({src, fi.name}, context.temp_allocator)
+		to, _ := filepath.join({dst, fi.name}, context.temp_allocator)
+		if fi.type == .Directory {
+			if !template_copy(from, to) do return false
+		} else {
+			data, rerr := os.read_entire_file(from, context.temp_allocator)
+			if rerr != nil || os.write_entire_file(to, data) != nil do return false
+		}
+	}
+	return true
 }
 
 @(private = "file")
@@ -77,55 +189,6 @@ Project_CreateFromTemplate :: proc(dir, name: string, tmpl: Project_Template) ->
 	switch tmpl {
 	case .Empty:
 		ok = write_text(dir, "scenes/main.scene.json", fmt.tprintf(`{{"name": "main", "root": {{"type": "Node", "name": "root", "children": [%s]}}}}`, CAMERA_JSON))
-	case .Platformer:
-		write_box_png(dir, "textures/player.png", 32, 48, {92, 141, 255, 255})
-		write_box_png(dir, "textures/ground.png", 1280, 40, {74, 160, 96, 255})
-		write_box_png(dir, "textures/platform.png", 200, 16, {150, 120, 80, 255})
-		ok = write_text(dir, "scenes/main.scene.json", `{"name": "main", "background": [24, 28, 40, 255], "root": {"type": "Node", "name": "root", "children": [
-  {"type": "CameraNode", "name": "Camera", "position": [640, 360], "follow": "../Player", "properties": {"isCurrent": true}},
-  {"type": "StaticBodyNode", "name": "Ground", "position": [640, 680],
-   "shapes": [{"type": "Box", "size": [1280, 40]}],
-   "children": [{"type": "TextureNode", "name": "Sprite", "texture": "textures/ground.png"}]},
-  {"type": "StaticBodyNode", "name": "Platform", "position": [420, 540], "properties": {"oneWay": true},
-   "shapes": [{"type": "Box", "size": [200, 16]}],
-   "children": [{"type": "TextureNode", "name": "Sprite", "texture": "textures/platform.png"}]},
-  {"type": "StaticBodyNode", "name": "Platform2", "position": [820, 420], "properties": {"oneWay": true},
-   "shapes": [{"type": "Box", "size": [200, 16]}],
-   "children": [{"type": "TextureNode", "name": "Sprite", "texture": "textures/platform.png"}]},
-  {"type": "CharacterMoverNode", "name": "Player", "position": [200, 600],
-   "properties": {"radius": 16, "height": 48, "enableKeyboardInput": true},
-   "children": [{"type": "TextureNode", "name": "Sprite", "texture": "textures/player.png"}]}
-]}}`)
-	case .TopDown:
-		cfg.gravity = {0, 0}
-		write_box_png(dir, "textures/player.png", 32, 32, {92, 141, 255, 255})
-		write_box_png(dir, "textures/rock.png", 64, 64, {120, 110, 100, 255})
-		ok = write_text(dir, "scripts/player.lua", `---@class Player
-local Player = {}
-
-Player.properties = {
-    speed = { type = "float", default = 220, min = 20, max = 1000, label = "Speed" },
-}
-
--- Arrows / WASD (the project's move_* input actions).
-function Player:update(dt)
-    local dx, dy = 0, 0
-    if Input.is_action_pressed("move_left") then dx = dx - 1 end
-    if Input.is_action_pressed("move_right") then dx = dx + 1 end
-    if Input.is_action_pressed("move_up") then dy = dy - 1 end
-    if Input.is_action_pressed("move_down") then dy = dy + 1 end
-    if dx ~= 0 and dy ~= 0 then dx, dy = dx * 0.7071, dy * 0.7071 end
-    local x, y = self.node:get_position()
-    self.node:set_position(x + dx * self.speed * dt, y + dy * self.speed * dt)
-end
-
-return Player
-`) && write_text(dir, "scenes/main.scene.json", `{"name": "main", "background": [30, 36, 30, 255], "root": {"type": "Node", "name": "root", "children": [
-  {"type": "CameraNode", "name": "Camera", "position": [640, 360], "follow": "../Player", "properties": {"isCurrent": true}},
-  {"type": "TextureNode", "name": "Rock", "position": [420, 260], "texture": "textures/rock.png"},
-  {"type": "TextureNode", "name": "Rock2", "position": [880, 480], "texture": "textures/rock.png"},
-  {"type": "TextureNode", "name": "Player", "position": [640, 360], "texture": "textures/player.png", "script": {"path": "scripts/player.lua"}}
-]}}`)
 	case .Menu:
 		cfg.initialScene = "scenes/menu.scene.json"
 		clear(&cfg.scenes)

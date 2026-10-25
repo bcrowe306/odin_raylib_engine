@@ -279,12 +279,21 @@ lua_node_set_texture :: proc "c" (L: ^lua.State) -> c.int {
 	}
 	tn := cast(^TextureNode)node
 	rm := Node_ResourceManager(node)
+	ctx := node.gameContext
+	// (A node made this frame - Scene.create_node - joins the game at the
+	// end of the frame: the script's game has what it needs.)
+	if rm == nil || ctx == nil {
+		if sm := get_script_manager(L); sm != nil && sm.game != nil {
+			rm = &sm.game.resourceManager
+			ctx = &sm.game.gameContext
+		}
+	}
 	path := string(lua.tostring(L, 2))
 	if rm == nil {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	tex, loaded := rm.loadTexture(rm, Project_ResolveAssetPath(node.gameContext, path))
+	tex, loaded := rm.loadTexture(rm, Project_ResolveAssetPath(ctx, path))
 	if loaded && tex != nil {
 		TextureNode_SetTexture(tn, tex)
 		tn.filePath = strings.clone(path, tn.allocator)
@@ -2118,7 +2127,6 @@ lua_engine_get_virtual_size :: proc "c" (L: ^lua.State) -> c.int {
 
 // parse_keyboard_key: any raylib key name ("Z", "F5", "KP_1", "LEFT_ALT"),
 // plus a few short forms (RETURN, ESC, SHIFT, CTRL, ALT, 0-9).
-@(private="file")
 parse_keyboard_key :: proc(name: string) -> (rl.KeyboardKey, bool) {
 	upper := strings.to_upper(name, context.temp_allocator)
 	switch upper {
@@ -3011,6 +3019,9 @@ lua_node_set_property :: proc "c" (L: ^lua.State) -> c.int {
 			if lua.type(L, -1) == .NUMBER do a = f32(lua.tonumber(L, -1))
 			lua.pop(L, 1)
 			(^rl.Color)(p.ptr)^ = {ch(tbl(L, 1)), ch(tbl(L, 2)), ch(tbl(L, 3)), ch(a)}
+		} else if lua.type(L, 3) == .STRING {
+			// "#rrggbb" / "#rrggbbaa", as in scene files.
+			if c, ok := Color_FromHex(string(lua.tostring(L, 3))); ok do (^rl.Color)(p.ptr)^ = c
 		}
 	case .Enum:
 		if s := lua.tostring(L, 3); s != nil {
@@ -3712,7 +3723,6 @@ lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 	typeStrC := lua.tostring(L, 1)
 	nameC := lua.tostring(L, 2)
 	parent, pOk := to_node_userdata(L, 3)
-	log.infof("[lua_scene_create_node] type=%s, name=%s, parent=%v, pOk=%v, top=%d", typeStrC, nameC, parent, pOk, lua.gettop(L))
 
 	typeStr := string(typeStrC) if typeStrC != nil else "Node"
 	nodeName := string(nameC) if nameC != nil else ""

@@ -725,7 +725,7 @@ function UIToolbarNode:connect(event, handler) end
 ---@overload fun(self: Node, path: "enabled"): boolean
 function Node:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path NodeProperty|string
 ---@param value any
 ---@param y? number
@@ -921,7 +921,7 @@ function Node:set_property(path, value, y) end
 ---@overload fun(self: CameraNode, path: "shakeTrauma"): number
 function CameraNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path CameraNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1029,7 +1029,7 @@ function CameraNode:set_property(path, value, y) end
 ---@overload fun(self: TextureNode, path: "tint"): number[]
 function TextureNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path TextureNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1089,7 +1089,7 @@ function TextureNode:set_property(path, value, y) end
 ---@overload fun(self: FrameAnimationNode, path: "enabled"): boolean
 function FrameAnimationNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path FrameAnimationNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1160,7 +1160,7 @@ function FrameAnimationNode:set_property(path, value, y) end
 ---@overload fun(self: AnimationPlayerNode, path: "defaultAnimation"): string
 function AnimationPlayerNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path AnimationPlayerNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1294,7 +1294,7 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.continuous"): boolean
 function ParticleEmitterNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path ParticleEmitterNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1413,7 +1413,7 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@overload fun(self: SoundNode, path: "maxDistance"): number
 function SoundNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path SoundNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1504,7 +1504,7 @@ function SoundNode:set_property(path, value, y) end
 ---@overload fun(self: MusicNode, path: "isPaused"): boolean
 function MusicNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path MusicNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1574,7 +1574,7 @@ function MusicNode:set_property(path, value, y) end
 ---@overload fun(self: StaticBodyNode, path: "oneWay"): boolean
 function StaticBodyNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path StaticBodyNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1667,7 +1667,7 @@ function StaticBodyNode:set_property(path, value, y) end
 ---@overload fun(self: DynamicBodyNode, path: "debugColor"): number[]
 function DynamicBodyNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path DynamicBodyNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1776,7 +1776,7 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---@overload fun(self: CharacterMoverNode, path: "controlMode"): "BuiltIn"|"Script"
 function CharacterMoverNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path CharacterMoverNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1857,7 +1857,7 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---@overload fun(self: AreaNode, path: "activeColor"): number[]
 function AreaNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path AreaNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -1943,7 +1943,7 @@ function AreaNode:set_property(path, value, y) end
 ---@overload fun(self: RaycastNode, path: "hitColor"): number[]
 function RaycastNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path RaycastNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2019,7 +2019,7 @@ function RaycastNode:set_property(path, value, y) end
 ---@overload fun(self: VisibilityNotifierNode, path: "onScreen"): boolean
 function VisibilityNotifierNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path VisibilityNotifierNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2111,7 +2111,7 @@ function VisibilityNotifierNode:set_property(path, value, y) end
 ---@overload fun(self: SkeletonNode, path: "showBones"): boolean
 function SkeletonNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path SkeletonNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2186,7 +2186,7 @@ function SkeletonNode:set_property(path, value, y) end
 ---@overload fun(self: BoneAttachmentNode, path: "followScale"): boolean
 function BoneAttachmentNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path BoneAttachmentNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2331,7 +2331,7 @@ function BoneAttachmentNode:set_property(path, value, y) end
 ---@overload fun(self: AdvancedCameraNode, path: "active"): boolean
 function AdvancedCameraNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path AdvancedCameraNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2427,7 +2427,7 @@ function AdvancedCameraNode:set_property(path, value, y) end
 ---@overload fun(self: PathNode, path: "color"): number[]
 function PathNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path PathNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2501,7 +2501,7 @@ function PathNode:set_property(path, value, y) end
 ---@overload fun(self: NavigationRegionNode, path: "useLdtk"): boolean
 function NavigationRegionNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path NavigationRegionNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2585,7 +2585,7 @@ function NavigationRegionNode:set_property(path, value, y) end
 ---@overload fun(self: NavigationAgentNode, path: "velocity"): Vec2
 function NavigationAgentNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path NavigationAgentNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2663,7 +2663,7 @@ function NavigationAgentNode:set_property(path, value, y) end
 ---@overload fun(self: PathFollowNode, path: "sideOffset"): number
 function PathFollowNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path PathFollowNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2747,7 +2747,7 @@ function PathFollowNode:set_property(path, value, y) end
 ---@overload fun(self: LdtkLevelNode, path: "drawDebugEntities"): boolean
 function LdtkLevelNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path LdtkLevelNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2816,7 +2816,7 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@overload fun(self: TileMapNode, path: "tint"): number[]
 function TileMapNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path TileMapNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2894,7 +2894,7 @@ function TileMapNode:set_property(path, value, y) end
 ---@overload fun(self: LightNode, path: "shadows"): boolean
 function LightNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path LightNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3109,7 +3109,7 @@ function LightNode:set_property(path, value, y) end
 ---@overload fun(self: JointNode, path: "debugColor"): number[]
 function JointNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path JointNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3276,7 +3276,7 @@ function JointNode:set_property(path, value, y) end
 ---@overload fun(self: TextNode, path: "revealSpeed"): number
 function TextNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path TextNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3379,7 +3379,7 @@ function TextNode:set_property(path, value, y) end
 ---@overload fun(self: DialogueNode, path: "mode"): "Box"|"Subtitles"
 function DialogueNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path DialogueNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3464,7 +3464,7 @@ function DialogueNode:set_property(path, value, y) end
 ---@overload fun(self: NineSliceNode, path: "tint"): number[]
 function NineSliceNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path NineSliceNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3543,7 +3543,7 @@ function NineSliceNode:set_property(path, value, y) end
 ---@overload fun(self: ParallaxNode, path: "tint"): number[]
 function ParallaxNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path ParallaxNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3616,7 +3616,7 @@ function ParallaxNode:set_property(path, value, y) end
 ---@overload fun(self: LineNode, path: "rounded"): boolean
 function LineNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path LineNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3693,7 +3693,7 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: TrailNode, path: "emitting"): boolean
 function TrailNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path TrailNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3811,7 +3811,7 @@ function TrailNode:set_property(path, value, y) end
 ---@overload fun(self: UIContainerNode, path: "titleColor"): number[]
 function UIContainerNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIContainerNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -3906,7 +3906,7 @@ function UIContainerNode:set_property(path, value, y) end
 ---@overload fun(self: UILabelNode, path: "backgroundColor"): number[]
 function UILabelNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UILabelNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4001,7 +4001,7 @@ function UILabelNode:set_property(path, value, y) end
 ---@overload fun(self: UIButtonNode, path: "align"): "Left"|"Center"|"Right"
 function UIButtonNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIButtonNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4097,7 +4097,7 @@ function UIButtonNode:set_property(path, value, y) end
 ---@overload fun(self: UISliderNode, path: "labelWidth"): number
 function UISliderNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UISliderNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4180,7 +4180,7 @@ function UISliderNode:set_property(path, value, y) end
 ---@overload fun(self: UICheckboxNode, path: "boxSize"): number
 function UICheckboxNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UICheckboxNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4265,7 +4265,7 @@ function UICheckboxNode:set_property(path, value, y) end
 ---@overload fun(self: UIProgressBarNode, path: "showText"): boolean
 function UIProgressBarNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIProgressBarNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4340,7 +4340,7 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---@overload fun(self: UITextInputNode, path: "maxLength"): integer
 function UITextInputNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UITextInputNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4417,7 +4417,7 @@ function UITextInputNode:set_property(path, value, y) end
 ---@overload fun(self: UIDropdownNode, path: "isOpen"): boolean
 function UIDropdownNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIDropdownNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4496,7 +4496,7 @@ function UIDropdownNode:set_property(path, value, y) end
 ---@overload fun(self: UIRadioGroupNode, path: "horizontal"): boolean
 function UIRadioGroupNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIRadioGroupNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4566,7 +4566,7 @@ function UIRadioGroupNode:set_property(path, value, y) end
 ---@overload fun(self: UIToggleSwitchNode, path: "active"): boolean
 function UIToggleSwitchNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIToggleSwitchNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4642,7 +4642,7 @@ function UIToggleSwitchNode:set_property(path, value, y) end
 ---@overload fun(self: UIKnobNode, path: "defaultValue"): number
 function UIKnobNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIKnobNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4727,7 +4727,7 @@ function UIKnobNode:set_property(path, value, y) end
 ---@overload fun(self: UINotchedSliderNode, path: "orientation"): "Horizontal"|"Vertical"
 function UINotchedSliderNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UINotchedSliderNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4808,7 +4808,7 @@ function UINotchedSliderNode:set_property(path, value, y) end
 ---@overload fun(self: UIVolumeFaderNode, path: "defaultDb"): number
 function UIVolumeFaderNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIVolumeFaderNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4890,7 +4890,7 @@ function UIVolumeFaderNode:set_property(path, value, y) end
 ---@overload fun(self: UIVolumeMeterNode, path: "orientation"): "Vertical"|"Horizontal"
 function UIVolumeMeterNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIVolumeMeterNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4961,7 +4961,7 @@ function UIVolumeMeterNode:set_property(path, value, y) end
 ---@overload fun(self: UISeparatorNode, path: "lineColor"): number[]
 function UISeparatorNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UISeparatorNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5058,7 +5058,7 @@ function UISeparatorNode:set_property(path, value, y) end
 ---@overload fun(self: UIXYPlotNode, path: "gridColor"): number[]
 function UIXYPlotNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIXYPlotNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5135,7 +5135,7 @@ function UIXYPlotNode:set_property(path, value, y) end
 ---@overload fun(self: UIListViewNode, path: "itemHeight"): number
 function UIListViewNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIListViewNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5202,7 +5202,7 @@ function UIListViewNode:set_property(path, value, y) end
 ---@overload fun(self: UITreeViewNode, path: "itemHeight"): number
 function UITreeViewNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UITreeViewNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5272,7 +5272,7 @@ function UITreeViewNode:set_property(path, value, y) end
 ---@overload fun(self: UIUnorderedListNode, path: "itemHeight"): number
 function UIUnorderedListNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIUnorderedListNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5346,7 +5346,7 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---@overload fun(self: UIOrderedListNode, path: "itemHeight"): number
 function UIOrderedListNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIOrderedListNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5424,7 +5424,7 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---@overload fun(self: UITableNode, path: "rowHeight"): number
 function UITableNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UITableNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5500,7 +5500,7 @@ function UITableNode:set_property(path, value, y) end
 ---@overload fun(self: UIIconNode, path: "align"): "Left"|"Center"|"Right"
 function UIIconNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIIconNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5572,7 +5572,7 @@ function UIIconNode:set_property(path, value, y) end
 ---@overload fun(self: UIToolbarNode, path: "spacing"): number
 function UIToolbarNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UIToolbarNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -5697,7 +5697,7 @@ function UIToolbarNode:set_property(path, value, y) end
 ---@overload fun(self: UITabContainerNode, path: "tabSize"): number
 function UITabContainerNode:get_property(path) end
 
----Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1; enums by name; "script.<name>" a field of the node's script.
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---@param path UITabContainerNodeProperty|string
 ---@param value any
 ---@param y? number

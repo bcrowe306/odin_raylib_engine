@@ -1445,11 +1445,12 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.zIndex = i32(sj_int(inst, "z_index", int(node.zIndex)))
 	node.ySort = sj_bool(inst, "y_sort", node.ySort)
 	node.ySortOffset = sj_float(inst, "y_sort_offset", node.ySortOffset)
-	node.pauseMode = Pause_ModeParse(sj_string(inst, "pause_mode", ""))
-	node.paused = sj_bool(inst, "paused", false)
+	// (The component's own pause mode and tags unless the instance sets them.)
+	if "pause_mode" in inst do node.pauseMode = Pause_ModeParse(sj_string(inst, "pause_mode", ""))
+	node.paused = sj_bool(inst, "paused", node.paused)
 	node.editorLocked = sj_bool(inst, "editor_locked", false)
 	node.editorHidden = sj_bool(inst, "editor_hidden", false)
-	read_tags(node, inst)
+	if "tags" in inst do read_tags(node, inst)
 	if sj_obj_has(inst, "connections") do read_connections(node, inst)
 	return node
 }

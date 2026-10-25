@@ -1,0 +1,505 @@
+{
+ "name": "game",
+ "background": [
+  140,
+  214,
+  225,
+  255
+ ],
+ "root": {
+  "type": "Node",
+  "name": "root",
+  "children": [
+   {
+    "type": "CameraNode",
+    "name": "Camera",
+    "position": [
+     160,
+     90
+    ],
+    "properties": {
+     "isCurrent": true
+    }
+   },
+   {
+    "type": "TileMapNode",
+    "name": "Sea",
+    "position": [
+     0,
+     -6
+    ],
+    "layer": 0,
+    "z_index": 0,
+    "tilemap": {
+     "tileset": "textures/tiles.png",
+     "tile_size": [
+      16,
+      16
+     ],
+     "map_size": [
+      40,
+      12
+     ],
+     "data": [
+      [
+       42,
+       42
+      ],
+      [
+       1,
+       37
+      ],
+      [
+       1,
+       38
+      ],
+      [
+       1,
+       39
+      ],
+      [
+       17,
+       42
+      ],
+      [
+       1,
+       37
+      ],
+      [
+       1,
+       38
+      ],
+      [
+       1,
+       39
+      ],
+      [
+       17,
+       42
+      ],
+      [
+       1,
+       49
+      ],
+      [
+       1,
+       50
+      ],
+      [
+       1,
+       51
+      ],
+      [
+       1,
+       39
+      ],
+      [
+       16,
+       42
+      ],
+      [
+       1,
+       49
+      ],
+      [
+       1,
+       50
+      ],
+      [
+       1,
+       51
+      ],
+      [
+       1,
+       39
+      ],
+      [
+       16,
+       42
+      ],
+      [
+       1,
+       61
+      ],
+      [
+       1,
+       62
+      ],
+      [
+       1,
+       63
+      ],
+      [
+       1,
+       51
+      ],
+      [
+       16,
+       42
+      ],
+      [
+       1,
+       61
+      ],
+      [
+       1,
+       62
+      ],
+      [
+       1,
+       63
+      ],
+      [
+       1,
+       51
+      ],
+      [
+       17,
+       42
+      ],
+      [
+       1,
+       61
+      ],
+      [
+       1,
+       62
+      ],
+      [
+       1,
+       63
+      ],
+      [
+       17,
+       42
+      ],
+      [
+       1,
+       61
+      ],
+      [
+       1,
+       62
+      ],
+      [
+       1,
+       63
+      ],
+      [
+       65,
+       42
+      ],
+      [
+       1,
+       37
+      ],
+      [
+       1,
+       38
+      ],
+      [
+       1,
+       39
+      ],
+      [
+       17,
+       42
+      ],
+      [
+       1,
+       37
+      ],
+      [
+       1,
+       38
+      ],
+      [
+       1,
+       39
+      ],
+      [
+       17,
+       42
+      ],
+      [
+       1,
+       49
+      ],
+      [
+       1,
+       50
+      ],
+      [
+       1,
+       51
+      ],
+      [
+       1,
+       39
+      ],
+      [
+       16,
+       42
+      ],
+      [
+       1,
+       49
+      ],
+      [
+       1,
+       50
+      ],
+      [
+       1,
+       51
+      ],
+      [
+       1,
+       39
+      ],
+      [
+       16,
+       42
+      ],
+      [
+       1,
+       61
+      ],
+      [
+       1,
+       62
+      ],
+      [
+       1,
+       63
+      ],
+      [
+       1,
+       51
+      ],
+      [
+       16,
+       42
+      ],
+      [
+       1,
+       61
+      ],
+      [
+       1,
+       62
+      ],
+      [
+       1,
+       63
+      ],
+      [
+       1,
+       51
+      ],
+      [
+       17,
+       42
+      ],
+      [
+       1,
+       61
+      ],
+      [
+       1,
+       62
+      ],
+      [
+       1,
+       63
+      ],
+      [
+       17,
+       42
+      ],
+      [
+       1,
+       61
+      ],
+      [
+       1,
+       62
+      ],
+      [
+       1,
+       63
+      ],
+      [
+       85,
+       42
+      ]
+     ]
+    },
+    "properties": {
+     "solid": false
+    },
+    "script": {
+     "path": "scripts/scroll.lua",
+     "properties": {
+      "speed": 20,
+      "wrap": 320
+     }
+    }
+   },
+   {
+    "type": "Node",
+    "name": "Player",
+    "position": [
+     40,
+     90
+    ],
+    "tags": [
+     "player"
+    ],
+    "script": {
+     "path": "scripts/player.lua"
+    },
+    "children": [
+     {
+      "type": "AnimationPlayerNode",
+      "name": "Sprite",
+      "position": [
+       0,
+       0
+      ],
+      "pivot": [
+       0.5,
+       0.5
+      ],
+      "layer": 2,
+      "z_index": 0,
+      "fps": 8,
+      "animation": "idle",
+      "default_animation": "idle",
+      "animations": [
+       {
+        "name": "idle",
+        "loop": true,
+        "fps": 1,
+        "sheet": "textures/ships.png",
+        "grid": [
+         4,
+         6
+        ],
+        "cells": [
+         1
+        ],
+        "start": 0,
+        "end": 0
+       }
+      ],
+      "properties": {
+       "autoplay": true
+      },
+      "rotation": -90
+     }
+    ]
+   },
+   {
+    "type": "Node",
+    "name": "Spawner",
+    "script": {
+     "path": "scripts/spawner.lua"
+    }
+   },
+   {
+    "type": "Node",
+    "name": "Shots"
+   },
+   {
+    "type": "Node",
+    "name": "HUD",
+    "script": {
+     "path": "scripts/hud.lua"
+    },
+    "children": [
+     {
+      "type": "TextNode",
+      "name": "Score",
+      "position": [
+       6,
+       2
+      ],
+      "pivot": [
+       0,
+       0
+      ],
+      "layer": 7,
+      "properties": {
+       "text": "Score 0",
+       "font": "fonts/kenney_pixel.ttf",
+       "fontSize": 16,
+       "align": "Left",
+       "color": "#1d3b4cff"
+      }
+     },
+     {
+      "type": "TextNode",
+      "name": "High",
+      "position": [
+       314,
+       2
+      ],
+      "pivot": [
+       1,
+       0
+      ],
+      "layer": 7,
+      "properties": {
+       "text": "Best 0",
+       "font": "fonts/kenney_pixel.ttf",
+       "fontSize": 16,
+       "align": "Right",
+       "color": "#1d3b4cff"
+      }
+     },
+     {
+      "type": "TextNode",
+      "name": "Lives",
+      "position": [
+       6,
+       162
+      ],
+      "pivot": [
+       0,
+       0
+      ],
+      "layer": 7,
+      "properties": {
+       "text": "Lives 3",
+       "font": "fonts/kenney_pixel.ttf",
+       "fontSize": 16,
+       "align": "Left",
+       "color": "#1d3b4cff"
+      }
+     },
+     {
+      "type": "TextNode",
+      "name": "Message",
+      "position": [
+       160,
+       80
+      ],
+      "pivot": [
+       0.5,
+       0.5
+      ],
+      "layer": 7,
+      "properties": {
+       "text": "",
+       "font": "fonts/kenney_pixel.ttf",
+       "fontSize": 32,
+       "align": "Center",
+       "color": "#1d3b4cff"
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

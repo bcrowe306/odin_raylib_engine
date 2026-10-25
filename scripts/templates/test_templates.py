@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"""Plays the New Project templates (templates/<id>/) in the runner with
+scripted input and checks the result (TODO E.2):
+
+    python3 scripts/templates/test_templates.py [--runner bin/runners/macos/runner] [platformer ...]
+    python3 scripts/templates/test_templates.py --previews    # also writes templates/<id>/preview.png
+
+Tests: scripts/templates/tests/<id>.json, a list of
+    {"name": "...", "frames": 120,
+     "input": ["10 RIGHT down", "40 SPACE tap 12"],        # runner --input-script lines
+     "patch": {"Player": {"position": [900, 100], "script.lives": 1}},  # optional: a copy's node fields / script properties
+     "scene": "scenes/level1.scene.json",                  # optional: the scene patched / started
+     "expect": [["Coins", "text", "==", "Coins 1 / 11"],   # node, field, op, value
+                ["Player", "x", "<", 120],                  # x / y: position; others: properties
+                ["Enemy1", "exists", "==", false]]}
+Each runs on a fresh copy of the template (--user-data in it), with fixed
+1/60 s frames: the same every time. Linux CI runs it under xvfb-run.
+"""
+import json
+import os
+import platform
+import shutil
+import subprocess
+import sys
+import tempfile
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+TESTS = os.path.join(os.path.dirname(__file__), "tests")
+
+
+def default_runner():
+    plat = {"Darwin": "macos", "Linux": "linux", "Windows": "windows"}[platform.system()]
+    exe = "runner.exe" if plat == "windows" else "runner"
+    return os.path.join(ROOT, "bin", "runners", plat, exe)
+
+
+def find(node, name):
+    if node.get("name") == name:
+        return node
+    for c in node.get("children", []):
+        f = find(c, name)
+        if f:
+            return f
+    return None
+
+
+def field(node, key):
+    if node is None:
+        return None
+    if key == "x":
+        return node.get("position", [0, 0])[0]
+    if key == "y":
+        return node.get("position", [0, 0])[1]
+    if key in node:
+        return node[key]
+    return node.get("properties", {}).get(key, node.get("script", {}).get("properties", {}).get(key))
+
+
+def check(op, got, want):
+    if op == "==":
+        return got == want
+    if op == "!=":
+        return got != want
+    if op == "contains":
+        return isinstance(got, str) and want in got
+    if got is None:
+        return False
+    return {"<": got < want, ">": got > want, "<=": got <= want, ">=": got >= want}[op]
+
+
+def run_test(runner, tid, test, tmp):
+    proj = os.path.join(tmp, "project")
+    shutil.copytree(os.path.join(ROOT, "templates", tid), proj)
+    cfg = json.load(open(os.path.join(proj, "project.json")))
+    scene_rel = test.get("scene", cfg["initial_scene"])
+    if test.get("patch"):
+        sp = os.path.join(proj, scene_rel)
+        sc = json.load(open(sp))
+        for name, fields in test["patch"].items():
+            n = find(sc["root"], name)
+            assert n, f"patch: no node {name}"
+            for k, v in fields.items():
+                if k in ("position", "scale", "rotation", "enabled", "visible"):
+                    n[k] = v
+                elif k.startswith("script."):
+                    n.setdefault("script", {}).setdefault("properties", {})[k[7:]] = v
+                else:
+                    n.setdefault("properties", {})[k] = v
+        json.dump(sc, open(sp, "w"))
+    inp = os.path.join(tmp, "input.txt")
+    open(inp, "w").write("\n".join(test.get("input", [])) + "\n")
+    dump = os.path.join(tmp, "dump.json")
+    cmd = [runner, proj, "--hidden", "--user-data", os.path.join(tmp, "userdata"), "--frames", str(test["frames"]),
+           "--input-script", inp, "--dump-scene", dump, "--scene", scene_rel]
+    if test.get("screenshot"):
+        cmd += ["--screenshot", test["screenshot"]]
+    log = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if not os.path.isfile(dump):
+        return [f"no scene dump (exit {log.returncode}): {log.stderr[-600:]}"]
+    top = json.load(open(dump))
+    root = top["root"]
+    fails = []
+    for name, key, op, want in test["expect"]:
+        node = top if name == "@scene" else find(root, name)  # (@scene: the running scene - its "name")
+        got = (node is not None) if key == "exists" else field(node, key)
+        if not check(op, got, want):
+            fails.append(f"{name}.{key} {op} {want!r}: got {got!r}")
+    errors = [l for l in log.stderr.splitlines() + log.stdout.splitlines() if "[ERROR]" in l or "Lua error" in l]
+    fails += [f"log: {e}" for e in errors[:5]]
+    return fails
+
+
+def main():
+    args = sys.argv[1:]
+    runner = default_runner()
+    previews = False
+    if "--runner" in args:
+        i = args.index("--runner")
+        runner = os.path.abspath(args[i + 1])
+        del args[i:i + 2]
+    if "--previews" in args:
+        previews = True
+        args.remove("--previews")
+    ids = args or sorted(f[:-5] for f in os.listdir(TESTS) if f.endswith(".json"))
+    total = failed = 0
+    for tid in ids:
+        tests = json.load(open(os.path.join(TESTS, tid + ".json")))
+        if previews:
+            # The Welcome window's picture: the first test's start, full size.
+            tests = [{"name": "preview", "frames": 20, "expect": [], "screenshot": os.path.join(ROOT, "templates", tid, "preview.png")}] + tests
+        for test in tests:
+            total += 1
+            with tempfile.TemporaryDirectory(prefix=f"ore_tpl_{tid}_") as tmp:
+                fails = run_test(runner, tid, test, tmp)
+            if fails:
+                failed += 1
+                print(f"FAIL {tid}: {test['name']}")
+                for f in fails:
+                    print(f"     {f}")
+            else:
+                print(f"ok   {tid}: {test['name']}")
+    print(f"{total - failed} passed, {failed} failed")
+    sys.exit(1 if failed else 0)
+
+
+if __name__ == "__main__":
+    main()

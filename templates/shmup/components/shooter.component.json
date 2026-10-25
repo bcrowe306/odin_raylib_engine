@@ -1,0 +1,57 @@
+{
+ "type": "Node",
+ "name": "Shooter",
+ "tags": [
+  "enemy"
+ ],
+ "script": {
+  "path": "scripts/enemy.lua",
+  "properties": {
+   "speed": 35,
+   "wobble": 6,
+   "hp": 3,
+   "shoots": true,
+   "points": 300
+  }
+ },
+ "children": [
+  {
+   "type": "AnimationPlayerNode",
+   "name": "Sprite",
+   "position": [
+    0,
+    0
+   ],
+   "pivot": [
+    0.5,
+    0.5
+   ],
+   "layer": 2,
+   "z_index": 0,
+   "fps": 8,
+   "animation": "idle",
+   "default_animation": "idle",
+   "animations": [
+    {
+     "name": "idle",
+     "loop": true,
+     "fps": 1,
+     "sheet": "textures/ships.png",
+     "grid": [
+      4,
+      6
+     ],
+     "cells": [
+      21
+     ],
+     "start": 0,
+     "end": 0
+    }
+   ],
+   "properties": {
+    "autoplay": true
+   },
+   "rotation": 90
+  }
+ ]
+}

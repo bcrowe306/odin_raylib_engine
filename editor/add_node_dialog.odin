@@ -50,7 +50,7 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 	{
 		name        = "Bone Attachment",
 		category    = "Animation & Effects",
-		icon        = ICON_FA_LINK,
+		icon        = ICON_FA_PAPERCLIP,
 		description = "Under a Skeleton: follows one of its bones - put a weapon, a light or particles under it.",
 		typeName    = "BoneAttachmentNode",
 	},
@@ -261,14 +261,14 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 	{
 		name        = "Navigation Region",
 		category    = "Physics & Collision",
-		icon        = ICON_FA_MAP,
+		icon        = ICON_FA_MAP_LOCATION_DOT,
 		description = "An area agents find paths in: baked into a grid from static bodies, solid tile maps and LDtk Solid cells. Bake in the Inspector; scripts can block cells (doors).",
 		typeName    = "NavigationRegionNode",
 	},
 	{
 		name        = "Navigation Agent",
 		category    = "Physics & Collision",
-		icon        = ICON_FA_ROUTE,
+		icon        = ICON_FA_LOCATION_ARROW,
 		description = "Put it under a character: give it a target and it walks there along a path, around walls and other agents (moves a CharacterMover, a DynamicBody or any node).",
 		typeName    = "NavigationAgentNode",
 	},

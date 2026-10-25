@@ -54,7 +54,7 @@ test_lua_node_properties_definitions :: proc(t: ^testing.T) {
 			if ty := lua_prop_type(p); ty != "" do fmt.sbprintf(&sb, "---@overload fun(self: %s, path: %q): %s\n", cls, p.name, ty)
 		}
 		fmt.sbprintf(&sb, "function %s:get_property(path) end\n", cls)
-		fmt.sbprintf(&sb, "\n---Sets an Inspector property by its path: vectors as {{x, y}} or x, y; colours as {{r, g, b[, a]}} 0..1; enums by name; \"script.<name>\" a field of the node's script.\n---@param path %sProperty|string\n---@param value any\n---@param y? number\n", cls)
+		fmt.sbprintf(&sb, "\n---Sets an Inspector property by its path: vectors as {{x, y}} or x, y; colours as {{r, g, b[, a]}} 0..1 or \"#rrggbb[aa]\"; enums by name; \"script.<name>\" a field of the node's script.\n---@param path %sProperty|string\n---@param value any\n---@param y? number\n", cls)
 		for p in props {
 			ty := lua_prop_type(p)
 			if ty == "" do continue

@@ -3,6 +3,7 @@ package engine
 import "base:runtime"
 import "core:c"
 import "core:log"
+import "core:math"
 import "core:strings"
 import lua "lua54"
 
@@ -265,6 +266,10 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 				if Script_IsJsonKind(prop.assetKind) {
 					val = {type = .String, valString = overrideVal.valString if overrideVal.valString != "" else prop.defaultVal.valString}
 				}
+				// Numbers take the declared type (JSON has one number type:
+				// an "int" property set to 3 in a scene is the integer 3).
+				if prop.type == .Int && val.type == .Float do val = {type = .Int, valInt = i64(math.round(val.valFloat))}
+				if prop.type == .Float && val.type == .Int do val = {type = .Float, valFloat = f32(val.valInt)}
 			}
 		}
 		if val.type != .String do val.valString = "" // (a list override's text, temp)

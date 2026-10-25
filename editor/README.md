@@ -88,15 +88,25 @@ Assets: drag textures, audio, components or scripts into the viewport.
 
 The **Welcome** window opens at startup (untick *Show at startup* to stop
 it; **Help > Welcome** brings it back): recent projects, **Open
-Project...**, a few first steps, and **New Project** from a template -
-**Empty** (a camera), **Platformer** (a player that runs and jumps with the
-built-in character controller, ground, one-way platforms, a following
-camera), **Top-down** (a player moved by a short Lua script with the
-`move_*` actions) or **Menu** (a title screen whose Play button opens the
-game scene). Templates come with placeholder images, so they play right
-away. Every node type has its own icon (Add Node, scene tree, Inspector),
-and empty places say what to do (an empty scene in the tree and viewport,
-the console).
+Project...**, a few first steps, and **New Project** from a template:
+
+| Template | |
+|---|---|
+| **Empty** | A scene with a camera |
+| **Menu** | A title screen whose Play button opens the game scene |
+| **Platformer** | Run, jump (coyote time, jump buffer), coins, spikes, an enemy to stomp, a door; parallax, a HUD |
+| **Top-down RPG** | Eight-way movement, a sword, slimes, a wizard with dialogue, a chest, a key, a locked door; hearts |
+| **Shoot 'em up** | Waves of enemies, pooled bullets, explosions, lives, a saved best score |
+| **Puzzle (Sokoban)** | Levels typed as text, undo, restart, a move counter |
+
+The game templates are small, complete games with pixel art (Kenney, CC0)
+and a README saying what's where and what to change first. **Samples** are
+bigger projects to explore: *Platformer Adventure* (title screen, two
+levels, saved progress, a pause menu) and *Asteroids* (the demo). The
+templates are built by `scripts/templates/make_templates.py` and played by
+`scripts/templates/test_templates.py` (CI). Every node type has its own icon
+(Add Node, scene tree, Inspector), and empty places say what to do (an empty
+scene in the tree and viewport, the console).
 
 ### Workspaces
 

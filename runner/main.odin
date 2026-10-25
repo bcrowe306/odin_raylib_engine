@@ -13,6 +13,9 @@
 //        [--bench N]          (N uncapped frames, then frame timings; scripts/make_bench_project.py)
 //        [--uncapped]         (no vsync, no frame cap, frame time / FPS top left)
 //        [--no-render-cache]  (no tile chunk cache / draw reordering, for comparisons)
+//        [--input-script f]   (keys pressed on given frames - "30 RIGHT down", "40 SPACE tap 8"; fixed 1/60 s frames)
+//        [--trace <node>]     (prints "@trace <frame> <scene> <x> <y>" every frame: game tests, bots)
+//        [--crash-test kind]  (panic | segv | abort once loaded: crash report tests)
 // With no project argument it looks for game.ore (or any .ore, or a
 // project/ directory) next to the executable.
 package main

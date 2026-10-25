@@ -71,6 +71,13 @@ jobs:
           if [ "$RUNNER_OS" = Linux ]; then xvfb-run -a "${cmd[@]}"; else "${cmd[@]}"; fi
           test -s "$RUNNER_TEMP/runner.png" && grep -q '"root"' "$RUNNER_TEMP/scene.json"
 
+      - name: Templates (generated from scripts/templates, and their games play)
+        if: matrix.smoke
+        run: |
+          python3 scripts/templates/make_templates.py
+          git diff --exit-code -- templates ':!templates/*/preview.png' || { echo "::error::templates/ differ from scripts/templates/make_templates.py's output: run it and commit"; exit 1; }
+          xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner
+
       - name: Crash reports (the runner and the editor crash for real)
         if: matrix.smoke
         run: |

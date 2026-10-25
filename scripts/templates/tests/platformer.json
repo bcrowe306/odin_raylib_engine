@@ -1,0 +1,174 @@
+[
+ {
+  "name": "runs and jumps for a coin",
+  "frames": 90,
+  "input": [
+   "10 RIGHT down",
+   "40 SPACE tap 12"
+  ],
+  "expect": [
+   [
+    "Coins",
+    "text",
+    "==",
+    "Coins 1 / 11"
+   ],
+   [
+    "Player",
+    "x",
+    ">",
+    150
+   ]
+  ]
+ },
+ {
+  "name": "an enemy hurts from the side",
+  "frames": 150,
+  "input": [
+   "10 RIGHT down"
+  ],
+  "expect": [
+   [
+    "Message",
+    "text",
+    "==",
+    "Ouch!"
+   ]
+  ]
+ },
+ {
+  "name": "after dying the level starts again",
+  "frames": 240,
+  "input": [
+   "10 RIGHT down"
+  ],
+  "expect": [
+   [
+    "Message",
+    "text",
+    "==",
+    ""
+   ],
+   [
+    "Player",
+    "x",
+    "<",
+    120
+   ],
+   [
+    "Coins",
+    "text",
+    "==",
+    "Coins 0 / 11"
+   ]
+  ]
+ },
+ {
+  "name": "stomping an enemy",
+  "frames": 170,
+  "input": [
+   "10 RIGHT down",
+   "110 SPACE tap 14"
+  ],
+  "expect": [
+   [
+    "Enemy1",
+    "exists",
+    "==",
+    false
+   ],
+   [
+    "Message",
+    "text",
+    "==",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "spikes hurt",
+  "frames": 60,
+  "patch": {
+   "Player": {
+    "position": [
+     490,
+     140
+    ]
+   }
+  },
+  "input": [
+   "5 RIGHT down"
+  ],
+  "expect": [
+   [
+    "Message",
+    "text",
+    "==",
+    "Ouch!"
+   ]
+  ]
+ },
+ {
+  "name": "falling out of the level",
+  "frames": 90,
+  "patch": {
+   "Player": {
+    "position": [
+     594,
+     100
+    ]
+   }
+  },
+  "expect": [
+   [
+    "Message",
+    "text",
+    "==",
+    "Ouch!"
+   ]
+  ]
+ },
+ {
+  "name": "the door finishes the level",
+  "frames": 60,
+  "patch": {
+   "Player": {
+    "position": [
+     1000,
+     110
+    ]
+   }
+  },
+  "input": [
+   "5 RIGHT down"
+  ],
+  "expect": [
+   [
+    "Message",
+    "text",
+    "==",
+    "Level complete!"
+   ]
+  ]
+ },
+ {
+  "name": "the level can be finished (found by find_route.py)",
+  "frames": 580,
+  "input": [
+   "5 RIGHT down",
+   "136 SPACE tap 16",
+   "264 SPACE tap 16",
+   "315 SPACE tap 16",
+   "363 SPACE tap 16",
+   "517 SPACE tap 16"
+  ],
+  "expect": [
+   [
+    "Message",
+    "text",
+    "==",
+    "Level complete!"
+   ]
+  ]
+ }
+]

@@ -1,0 +1,7 @@
+{
+  "name": "Platformer Adventure (sample)",
+  "description": "The platformer grown into a small game: a title screen, two levels, saved progress, a pause menu - how the pieces fit together.",
+  "icon": "gamepad",
+  "order": 50,
+  "kind": "sample"
+}

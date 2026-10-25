@@ -1,0 +1,385 @@
+{
+ "name": "title",
+ "background": [
+  223,
+  246,
+  245,
+  255
+ ],
+ "root": {
+  "type": "Node",
+  "name": "root",
+  "children": [
+   {
+    "type": "CameraNode",
+    "name": "Camera",
+    "position": [
+     160,
+     90
+    ],
+    "properties": {
+     "isCurrent": true
+    }
+   },
+   {
+    "type": "TileMapNode",
+    "name": "Backdrop",
+    "position": [
+     0,
+     84
+    ],
+    "layer": 0,
+    "z_index": 0,
+    "tilemap": {
+     "tileset": "textures/backgrounds.png",
+     "tile_size": [
+      24,
+      24
+     ],
+     "map_size": [
+      15,
+      4
+     ],
+     "data": [
+      [
+       1,
+       9
+      ],
+      [
+       1,
+       11
+      ],
+      [
+       1,
+       9
+      ],
+      [
+       1,
+       11
+      ],
+      [
+       1,
+       9
+      ],
+      [
+       1,
+       11
+      ],
+      [
+       1,
+       9
+      ],
+      [
+       1,
+       11
+      ],
+      [
+       1,
+       9
+      ],
+      [
+       1,
+       11
+      ],
+      [
+       1,
+       9
+      ],
+      [
+       1,
+       11
+      ],
+      [
+       1,
+       9
+      ],
+      [
+       1,
+       11
+      ],
+      [
+       1,
+       9
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ],
+      [
+       1,
+       19
+      ],
+      [
+       1,
+       16
+      ],
+      [
+       1,
+       17
+      ],
+      [
+       1,
+       18
+      ]
+     ]
+    },
+    "properties": {
+     "solid": false
+    }
+   },
+   {
+    "type": "Node",
+    "name": "Menu",
+    "layer": 7,
+    "script": {
+     "path": "scripts/menu.lua",
+     "properties": {
+      "kind": "title"
+     }
+    },
+    "children": [
+     {
+      "type": "TextNode",
+      "name": "Title",
+      "position": [
+       160,
+       40
+      ],
+      "pivot": [
+       0.5,
+       0.5
+      ],
+      "layer": 7,
+      "properties": {
+       "text": "Platformer Adventure",
+       "font": "fonts/kenney_pixel.ttf",
+       "fontSize": 32,
+       "align": "Center",
+       "color": "#3c3c5aff"
+      }
+     },
+     {
+      "type": "TextNode",
+      "name": "Item1",
+      "position": [
+       160,
+       88
+      ],
+      "pivot": [
+       0.5,
+       0.5
+      ],
+      "layer": 7,
+      "properties": {
+       "text": "New game",
+       "font": "fonts/kenney_pixel.ttf",
+       "fontSize": 16,
+       "align": "Center",
+       "color": "#3c3c5aff"
+      }
+     },
+     {
+      "type": "TextNode",
+      "name": "Item2",
+      "position": [
+       160,
+       106
+      ],
+      "pivot": [
+       0.5,
+       0.5
+      ],
+      "layer": 7,
+      "properties": {
+       "text": "Continue",
+       "font": "fonts/kenney_pixel.ttf",
+       "fontSize": 16,
+       "align": "Center",
+       "color": "#3c3c5aff"
+      }
+     },
+     {
+      "type": "TextNode",
+      "name": "Hint",
+      "position": [
+       160,
+       160
+      ],
+      "pivot": [
+       0.5,
+       0.5
+      ],
+      "layer": 7,
+      "properties": {
+       "text": "",
+       "font": "fonts/kenney_pixel.ttf",
+       "fontSize": 16,
+       "align": "Center",
+       "color": "#3c3c5a99"
+      }
+     }
+    ]
+   }
+  ]
+ }
+}
