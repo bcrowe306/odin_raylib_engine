@@ -66,3 +66,33 @@ return S
 	testing.expect_value(t, i2.properties["speeds"].valString, "[4, 5]")
 	testing.expect_value(t, i2.properties["mode"].valString, "Run")
 }
+
+// Numbers from a scene file take the declared type: an "int" property set
+// to 3 is the Lua integer 3 ("Level 3", not "Level 3.0").
+@(test)
+test_script_int_property_from_scene_is_an_integer :: proc(t: ^testing.T) {
+	ScriptVFS_RegisterEmbedded("int_prop.lua", `
+local S = {}
+S.properties = { level = { type = "int", default = 1 }, speed = { type = "float", default = 1.5 } }
+function S:ready() int_prop_got = math.type(self.level) .. " " .. tostring(self.level) .. " " .. math.type(self.speed) end
+return S
+`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("ints", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	n := Node_CreateByTypeName(scene, "Node")
+	n.gameContext = &game.gameContext
+	overrides := make(map[string]ScriptValue, context.temp_allocator)
+	overrides["level"] = {type = .Float, valFloat = 3} // (what a scene file's 3 reads as)
+	overrides["speed"] = {type = .Int, valInt = 2}
+	_ = Script_AttachToNode(n, "int_prop.lua", overrides, &game.scriptManager)
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	game->run(0.016)
+	L := game.scriptManager.L
+	lua.getglobal(L, "int_prop_got")
+	testing.expect_value(t, string(lua.tostring(L, -1)), "integer 3 float")
+	lua.pop(L, 1)
+}

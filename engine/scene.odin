@@ -5,6 +5,7 @@ import "core:log"
 import "core:strings"
 import b2 "vendor:box2d"
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 
 SceneSetupProc :: proc(scene: ^Scene, gameContext: ^GameContext)
 SceneUpdateProc :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32)
@@ -351,7 +352,17 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 
 		if len(buckets[layer]) > 0 {
 			Prof_Scope("render.layer")
+			// Smooth camera: the layers over the world go into a transparent
+			// frame, composited later. Plain alpha blending would square the
+			// alpha of anti-aliased edges there (washed-out UI text): keep the
+			// alpha as drawn (the frame holds premultiplied colour).
+			over := smooth && !isWorldLayer
+			if over {
+				rlgl.SetBlendFactorsSeparate(rlgl.SRC_ALPHA, rlgl.ONE_MINUS_SRC_ALPHA, rlgl.ONE, rlgl.ONE_MINUS_SRC_ALPHA, rlgl.FUNC_ADD, rlgl.FUNC_ADD)
+				rl.BeginBlendMode(.CUSTOM_SEPARATE)
+			}
 			render_bucket(scene, buckets[layer][:], gameContext, deltaTime)
+			if over do rl.EndBlendMode()
 		}
 
 		if isWorldLayer && rl.IsWindowReady() {

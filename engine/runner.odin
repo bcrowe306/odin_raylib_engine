@@ -31,6 +31,49 @@ Run_Options :: struct {
 	noRenderCache:  bool,   // --no-render-cache: no tile chunk cache, no draw reordering (comparisons)
 	editorLink:     bool,   // --editor-link: driven by the editor over stdin/stdout (editor_link.odin)
 	crashTest:      string, // --crash-test panic | segv | abort: crash once loaded (crash report tests)
+	inputScript:    string, // --input-script <file>: keys pressed on given frames (Runner_LoadInputScript; game tests)
+	trace:          string, // --trace <node name>: print "@trace <frame> <scene> <x> <y>" every frame (game tests, bots)
+}
+
+// An --input-script event: `key` goes down / up at `frame`.
+Input_Script_Event :: struct {
+	frame: int,
+	key:   rl.KeyboardKey,
+	down:  bool,
+}
+
+// Runner_LoadInputScript reads an input script - one event per line:
+//
+//   # frame  key    down | up | tap [frames]
+//   30       RIGHT  down
+//   90       RIGHT  up
+//   100      SPACE  tap 8        (down at 100, up 8 frames later; default 2)
+//
+// Keys are raylib key names as in project.json bindings (SPACE, LEFT, A, ...).
+// The frames are the runner's (fixed 1/60 s steps with --frames /
+// --dump-scene / --screenshot), so a script plays the same every time.
+Runner_LoadInputScript :: proc(text: string, allocator := context.allocator) -> (events: [dynamic]Input_Script_Event, err: string) {
+	events = make([dynamic]Input_Script_Event, allocator)
+	for raw, n in strings.split_lines(text, context.temp_allocator) {
+		line := strings.trim_space(raw)
+		if i := strings.index_byte(line, '#'); i >= 0 do line = strings.trim_space(line[:i])
+		if line == "" do continue
+		f := strings.fields(line, context.temp_allocator)
+		if len(f) < 3 do return events, fmt.tprintf("line %d: want <frame> <key> down|up|tap", n + 1)
+		frame, fok := strconv.parse_int(f[0])
+		key, kok := parse_keyboard_key(strings.to_upper(f[1], context.temp_allocator))
+		if !fok || !kok do return events, fmt.tprintf("line %d: bad frame or key %q", n + 1, f[1])
+		switch f[2] {
+		case "down": append(&events, Input_Script_Event{frame, key, true})
+		case "up": append(&events, Input_Script_Event{frame, key, false})
+		case "tap":
+			hold := 2
+			if len(f) >= 4 do hold, _ = strconv.parse_int(f[3])
+			append(&events, Input_Script_Event{frame, key, true}, Input_Script_Event{frame + max(hold, 1), key, false})
+		case: return events, fmt.tprintf("line %d: %q is not down / up / tap", n + 1, f[2])
+		}
+	}
+	return events, ""
 }
 
 // Engine_ParseRunArgs reads --project/-p, --scene, --screenshot, --frames,
@@ -64,6 +107,10 @@ Engine_ParseRunArgs :: proc(args: []string) -> (opts: Run_Options) {
 			opts.userDataDir = next; i += 1
 		case arg == "--no-render-cache":
 			opts.noRenderCache = true
+		case arg == "--trace" && next != "":
+			opts.trace = next; i += 1
+		case arg == "--input-script" && next != "":
+			opts.inputScript = next; i += 1
 		case arg == "--crash-test" && next != "":
 			opts.crashTest = next; i += 1
 		case arg == "--editor-link":
@@ -137,6 +184,7 @@ Runner_State :: struct {
 	benchFrame:         time.Duration,
 	benchAllocs, benchAllocBytes, benchTempBytes: int, // (profiling builds)
 	windowOpen, audioOpen, fontsLoaded: bool,
+	inputEvents:        [dynamic]Input_Script_Event, // --input-script
 }
 
 // Engine_RunProject opens a window and plays the project until it quits.
@@ -296,7 +344,18 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 
 	rs.targetCaptureFrame = max(25, opts.maxFrames) if opts.maxFrames > 0 else 30
 	// Captures for tests step a fixed 1/60 s, so runs are comparable.
-	rs.fixedStep = opts.screenshotPath != "" || opts.dumpScenePath != ""
+	rs.fixedStep = opts.screenshotPath != "" || opts.dumpScenePath != "" || opts.inputScript != ""
+	if opts.inputScript != "" {
+		text, rerr := os.read_entire_file(opts.inputScript, context.temp_allocator)
+		if rerr != nil {
+			log.errorf("--input-script %s: %v", opts.inputScript, rerr)
+		} else {
+			events, why := Runner_LoadInputScript(string(text))
+			rs.inputEvents = events
+			game.input.useSimulatedInput = len(events) > 0
+			if why != "" do log.errorf("--input-script %s: %s", opts.inputScript, why)
+		}
+	}
 	return rs, true
 }
 
@@ -315,6 +374,7 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 	if game.shouldQuit do return false
 	{
 		dt := 1.0 / 60 if rs.fixedStep else rl.GetFrameTime()
+		for ev in rs.inputEvents do if ev.frame == rs.frameCount do Input_SetSimulatedKey(&game.input, ev.key, ev.down)
 		EditorLink_BeginFrame(game)
 		if game.linkPaused && !game.frozen do dt = 1.0 / 60 // a step
 
@@ -363,7 +423,10 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 				if effects := Scene_PostEffects(game.sceneManager.currentScene); len(effects) > 0 do world = Post_Process(effects, world, &game.gameContext)
 				Pixel_DrawWorld(world, dest, vw, vh)
 			}
+			// (Premultiplied: scene.odin draws the layers over the world so.)
+			rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
 			rl.DrawTexturePro(target.texture, {0, 0, f32(target.texture.width), -f32(target.texture.height)}, dest, {0, 0}, 0, rl.WHITE)
+			rl.EndBlendMode()
 		} else {
 			// Copied as is: blending would let the bars' black through where the
 			// frame's alpha dropped (anti-aliased text, translucent sprites).
@@ -384,6 +447,13 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 		defer free_all(context.temp_allocator) // the frame's temp allocations (after the captures below)
 
 		rs.frameCount += 1
+		if opts.trace != "" {
+			if scene := game.sceneManager.currentScene; scene != nil {
+				if n := Scene_FindNodeByName(scene, opts.trace); n != nil {
+					fmt.printfln("@trace %d %s %.1f %.1f", rs.frameCount, scene.name, n.globalPosition.x, n.globalPosition.y)
+				}
+			}
+		}
 		if opts.benchFrames > 0 && rs.frameCount > benchWarmup {
 			rs.benchRun += runTime
 			rs.benchFrame += time.tick_since(frameStart)
@@ -426,6 +496,7 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 // Runner_Stop frees the game, its window and everything the runner made.
 Runner_Stop :: proc(rs: ^Runner_State) {
 	if rs == nil do return
+	delete(rs.inputEvents)
 	Pixel_Release()
 	if rs.fontsLoaded do UnloadEngineFonts()
 	if rs.audioOpen do rl.CloseAudioDevice()

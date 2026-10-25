@@ -1,10 +1,11 @@
 # Welcome window and templates: every node type has its own icon; Help >
-# Welcome; a Platformer, a Top-down and a Menu project created from their
-# templates - each one plays (the game binary runs it headless and dumps the
-# scene); an empty scene shows what to do first.
+# Welcome; a project from every template (Platformer, Top-down RPG, Shoot 'em
+# up, Puzzle, Menu) - each one plays (the game binary runs it headless and
+# dumps the scene) - and from the Asteroids sample; an empty scene shows what
+# to do first. (The templates' gameplay: scripts/templates/test_templates.py.)
 # drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 wait 5
-expect node-icons == 51/51
+expect node-icons == 59/59
 click @menu:Help
 click @menu:Help/Welcome
 expect item:welcome.create == visible
@@ -17,19 +18,43 @@ click @welcome.create
 expect log contains Created Platformer project
 expect log contains Would open project
 expect abs-file:$PROJECT/../Drive_Plat_Zq/project.json contains "name": "Drive Plat Zq"
+expect abs-file:$PROJECT/../Drive_Plat_Zq/project.json contains "jump"
+expect abs-file:$PROJECT/../Drive_Plat_Zq/template.json == 
+expect abs-file:$PROJECT/../Drive_Plat_Zq/README.md contains Platformer
 exec bin/odin_raylib_engine --project $PROJECT/../Drive_Plat_Zq --frames 40 --hidden --dump-scene $SHOTS/plat.json
 expect abs-file:$SHOTS/plat.json contains "type": "CharacterMoverNode"
-expect abs-file:$SHOTS/plat.json contains "name": "Ground"
+expect abs-file:$SHOTS/plat.json contains "name": "Level"
 
 click @menu:Help
 click @menu:Help/Welcome
-click @welcome.template:Top-down
+click @welcome.template:Top-down RPG
 click @welcome.name
 key cmd+a
 type Drive Top Zq
 click @welcome.create
 exec bin/odin_raylib_engine --project $PROJECT/../Drive_Top_Zq --frames 40 --hidden --dump-scene $SHOTS/top.json
 expect abs-file:$SHOTS/top.json contains "scripts/player.lua"
+expect abs-file:$SHOTS/top.json contains "DialogueNode"
+
+click @menu:Help
+click @menu:Help/Welcome
+click @welcome.template:Shoot 'em up
+click @welcome.name
+key cmd+a
+type Drive Shmup Zq
+click @welcome.create
+exec bin/odin_raylib_engine --project $PROJECT/../Drive_Shmup_Zq --frames 40 --hidden --dump-scene $SHOTS/shmup.json
+expect abs-file:$SHOTS/shmup.json contains "name": "Spawner"
+
+click @menu:Help
+click @menu:Help/Welcome
+click @welcome.template:Puzzle (Sokoban)
+click @welcome.name
+key cmd+a
+type Drive Puzzle Zq
+click @welcome.create
+exec bin/odin_raylib_engine --project $PROJECT/../Drive_Puzzle_Zq --frames 40 --hidden --dump-scene $SHOTS/puzzle.json
+expect abs-file:$SHOTS/puzzle.json contains "name": "Crate"
 
 click @menu:Help
 click @menu:Help/Welcome
@@ -40,6 +65,18 @@ type Drive Menu Zq
 click @welcome.create
 exec bin/odin_raylib_engine --project $PROJECT/../Drive_Menu_Zq --frames 40 --hidden --dump-scene $SHOTS/menu.json
 expect abs-file:$SHOTS/menu.json contains "name": "PlayButton"
+
+# A sample is copied like a template.
+click @menu:Help
+click @menu:Help/Welcome
+click @welcome.template:Asteroids (sample)
+screenshot welcome_sample
+click @welcome.name
+key cmd+a
+type Drive Sample Zq
+click @welcome.create
+expect abs-file:$PROJECT/../Drive_Sample_Zq/project.json contains "name": "Drive Sample Zq"
+expect abs-file:$PROJECT/../Drive_Sample_Zq/scenes/main.scene.json contains PlayerShip
 
 # An empty scene says what to do.
 click @asset.new-scene

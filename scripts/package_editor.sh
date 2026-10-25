@@ -8,10 +8,10 @@
 #              Contents/MacOS/ore-editor
 #              Contents/Frameworks/*.dylib        (the editor's shared libraries)
 #              Contents/Resources/runners/<platform>/, fonts/,
-#                                 lua-language-server/, templates/demo_project/
+#                                 lua-language-server/, templates/ (demo_project + the New Project templates)
 #   Linux,   dist/ore-editor-<platform>/
 #   Windows    ore-editor[.exe], its libraries, runners/, fonts/,
-#              lua-language-server/, templates/demo_project/
+#              lua-language-server/, templates/ (demo_project + the New Project templates)
 #
 # Runners: this platform's is built if missing (scripts/build_runners.sh);
 # every runners/<platform>/ folder already in bin/runners (other platforms'
@@ -96,6 +96,8 @@ cp engine/Open_Sans/static/OpenSans-Regular.ttf "$res/fonts/"
 # The demo project, without per-user editor state.
 cp -R assets/demo_project "$res/templates/demo_project"
 rm -rf "$res/templates/demo_project/.ore" "$res/templates/demo_project/.editor_settings.ini" "$res/templates/demo_project/.luarc.json"
+# The New Project templates (templates/: scripts/templates/make_templates.py).
+for t in templates/*/; do cp -R "${t%/}" "$res/templates/"; done
 # lua-language-server: what it runs (its generated meta files go to the user's
 # cache folder: editor/code_editor_lsp.odin).
 luals="lua-language-server"

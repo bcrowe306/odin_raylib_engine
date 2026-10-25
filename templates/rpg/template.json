@@ -1,0 +1,6 @@
+{
+  "name": "Top-down RPG",
+  "description": "Explore a small dungeon: talk to a wizard, fight slimes with a sword, find the key in a chest, unlock the door and escape. Hearts, a potion, dialogue.",
+  "icon": "dungeon",
+  "order": 2
+}

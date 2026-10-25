@@ -117,6 +117,7 @@ editor_main :: proc() -> int {
 	Editor_LoadSettings(&GlobalEditor)
 	Lua_ProjectSetup(&GlobalEditor) // .ore/definitions + .luarc.json for Lua tooling
 	defer Editor_Shutdown(&GlobalEditor)
+	defer Welcome_Shutdown() // (its preview textures)
 	Plugins_Load(&GlobalEditor) // project + user plugins (plugins.odin)
 	defer Plugins_Unload(&GlobalEditor)
 	UpdateCheck_Start() // a newer release? (update_check.odin; off in development builds)

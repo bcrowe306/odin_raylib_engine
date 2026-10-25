@@ -1,0 +1,49 @@
+# The documentation site (GitHub Pages: https://bcrowe306.github.io/odin_raylib_engine/):
+# scripts/docs/build_site.py gathers the guides, the templates and the Lua API
+# reference, MkDocs builds them (strict: a broken link fails). Pull requests
+# build it; pushes to main publish it.
+name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install mkdocs-material
+      - run: python3 scripts/docs/build_site.py
+      - run: mkdocs build --strict -f build/docs_src/mkdocs.yml
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/docs_site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-22.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

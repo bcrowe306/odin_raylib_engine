@@ -1,0 +1,116 @@
+{
+ "name": "puzzle",
+ "background": [
+  229,
+  207,
+  167,
+  255
+ ],
+ "root": {
+  "type": "Node",
+  "name": "root",
+  "children": [
+   {
+    "type": "CameraNode",
+    "name": "Camera",
+    "position": [
+     640,
+     360
+    ],
+    "properties": {
+     "isCurrent": true
+    }
+   },
+   {
+    "type": "Node",
+    "name": "Board",
+    "script": {
+     "path": "scripts/puzzle.lua",
+     "properties": {
+      "start_level": 1
+     }
+    }
+   },
+   {
+    "type": "TextNode",
+    "name": "Level",
+    "position": [
+     24,
+     16
+    ],
+    "pivot": [
+     0,
+     0
+    ],
+    "layer": 7,
+    "properties": {
+     "text": "Level 1",
+     "font": "fonts/kenney_pixel.ttf",
+     "fontSize": 32,
+     "align": "Left",
+     "color": "#3b2a20ff"
+    }
+   },
+   {
+    "type": "TextNode",
+    "name": "Moves",
+    "position": [
+     1256,
+     16
+    ],
+    "pivot": [
+     1,
+     0
+    ],
+    "layer": 7,
+    "properties": {
+     "text": "Moves 0",
+     "font": "fonts/kenney_pixel.ttf",
+     "fontSize": 32,
+     "align": "Right",
+     "color": "#3b2a20ff"
+    }
+   },
+   {
+    "type": "TextNode",
+    "name": "Help",
+    "position": [
+     640,
+     690
+    ],
+    "pivot": [
+     0.5,
+     1
+    ],
+    "layer": 7,
+    "properties": {
+     "text": "Arrows / WASD move   Z undo   R restart",
+     "font": "fonts/kenney_pixel.ttf",
+     "fontSize": 32,
+     "align": "Center",
+     "color": "#3b2a20aa"
+    }
+   },
+   {
+    "type": "TextNode",
+    "name": "Message",
+    "position": [
+     640,
+     80
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "layer": 7,
+    "properties": {
+     "text": "",
+     "font": "fonts/kenney_pixel.ttf",
+     "fontSize": 48,
+     "align": "Center",
+     "color": "#3b2a20ff"
+    }
+   }
+  ]
+ }
+}

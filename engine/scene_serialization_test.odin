@@ -706,3 +706,26 @@ test_component_instances_add_and_remove_children :: proc(t: ^testing.T) {
 	testing.expect(t, strings.contains(full, `"Shield"`) && !strings.contains(full, `"Gun"`) && !strings.contains(full, `"overrides"`), "instance baked to a component")
 	_ = a
 }
+
+// A component's own tags and pause mode come with every instance (the
+// instance JSON only replaces them when it sets its own).
+@(test)
+test_component_instances_keep_their_tags :: proc(t: ^testing.T) {
+	dir :: "test_component_tags_project"
+	defer os.remove_all(dir)
+	_ = os.make_directory_all(dir + "/components")
+	_ = os.write_entire_file(dir + "/components/enemy.component.json", transmute([]u8)string(`{"type": "Node", "name": "Enemy", "tags": ["enemy", "flying"], "pause_mode": "always"}`))
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	AssetManager_SetProjectDir(&game.assetManager, dir)
+	scene := game->createScene("tags", true)
+	a := Scene_InstantiateComponent(scene, "components/enemy.component.json", nil, &game.gameContext)
+	testing.expect(t, a != nil, "instance")
+	if a == nil do return
+	testing.expect(t, Node_HasTag(a, "enemy") && Node_HasTag(a, "flying"), "the component's tags")
+	testing.expect_value(t, a.pauseMode, Pause_Mode.Always)
+	// An instance that sets its own tags replaces them.
+	b := Scene_InstantiateNodeFromJSON(scene, transmute([]u8)string(`{"name": "Boss", "component": "components/enemy.component.json", "tags": ["boss"]}`), nil, &game.gameContext)
+	testing.expect(t, b != nil && Node_HasTag(b, "boss") && !Node_HasTag(b, "enemy"), "the instance's own tags")
+}

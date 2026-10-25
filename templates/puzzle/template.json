@@ -1,0 +1,6 @@
+{
+  "name": "Puzzle (Sokoban)",
+  "description": "Push every crate onto a target. Three levels written as text in a script, undo, restart, a move counter, smooth moves. Add levels by typing them.",
+  "icon": "puzzle-piece",
+  "order": 4
+}

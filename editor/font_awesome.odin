@@ -161,3 +161,12 @@ ICON_FA_OBJECT_UNGROUP    :: "" // Selection
 ICON_FA_PEN_TO_SQUARE     :: "" // Edit
 ICON_FA_LOCATION_CROSSHAIRS :: "" // Point
 ICON_FA_FILE_EXPORT       :: "" // Export
+
+// Templates (project_templates.odin)
+ICON_FA_DUNGEON                   :: ""
+ICON_FA_JET_FIGHTER               :: ""
+ICON_FA_PUZZLE_PIECE              :: ""
+ICON_FA_ROCKET                    :: ""
+ICON_FA_LOCATION_ARROW            :: "\uF124" // Navigation Agent
+ICON_FA_PAPERCLIP                     :: "\uF0C6" // Bone Attachment
+ICON_FA_MAP_LOCATION_DOT              :: "\uF5A0" // Navigation Region

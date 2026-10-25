@@ -1,0 +1,192 @@
+[
+ {
+  "name": "new game starts level 1",
+  "frames": 90,
+  "input": [
+   "10 ENTER tap"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "level1"
+   ],
+   [
+    "Player",
+    "exists",
+    "==",
+    true
+   ]
+  ]
+ },
+ {
+  "name": "continue needs a save",
+  "frames": 60,
+  "input": [
+   "10 DOWN tap",
+   "20 ENTER tap"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "title"
+   ],
+   [
+    "Item2",
+    "text",
+    "contains",
+    "no save yet"
+   ]
+  ]
+ },
+ {
+  "name": "pause stops the game",
+  "frames": 90,
+  "scene": "scenes/level1.scene.json",
+  "input": [
+   "20 ESCAPE tap",
+   "25 RIGHT down"
+  ],
+  "expect": [
+   [
+    "PauseMenu",
+    "visible",
+    "==",
+    true
+   ],
+   [
+    "Player",
+    "x",
+    "<",
+    40
+   ]
+  ]
+ },
+ {
+  "name": "resume plays on",
+  "frames": 110,
+  "scene": "scenes/level1.scene.json",
+  "input": [
+   "20 ESCAPE tap",
+   "40 ENTER tap",
+   "50 RIGHT down"
+  ],
+  "expect": [
+   [
+    "PauseMenu",
+    "visible",
+    "==",
+    false
+   ],
+   [
+    "Player",
+    "x",
+    ">",
+    60
+   ]
+  ]
+ },
+ {
+  "name": "the pause menu goes back to the title",
+  "frames": 130,
+  "scene": "scenes/level1.scene.json",
+  "input": [
+   "20 ESCAPE tap",
+   "30 DOWN tap",
+   "40 DOWN tap",
+   "50 ENTER tap"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "title"
+   ]
+  ]
+ },
+ {
+  "name": "the door leads to level 2",
+  "frames": 220,
+  "scene": "scenes/level1.scene.json",
+  "patch": {
+   "Player": {
+    "position": [
+     1000,
+     110
+    ]
+   }
+  },
+  "input": [
+   "5 RIGHT down",
+   "20 RIGHT up"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "level2"
+   ],
+   [
+    "Coins",
+    "text",
+    "==",
+    "Coins 0 / 14"
+   ]
+  ]
+ },
+ {
+  "name": "level 1 played through leads to level 2",
+  "frames": 700,
+  "scene": "scenes/level1.scene.json",
+  "input": [
+   "5 RIGHT down",
+   "136 SPACE tap 16",
+   "264 SPACE tap 16",
+   "315 SPACE tap 16",
+   "363 SPACE tap 16",
+   "517 SPACE tap 16"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "level2"
+   ]
+  ]
+ },
+ {
+  "name": "level 2 played through ends the game (back at the title)",
+  "frames": 800,
+  "scene": "scenes/level2.scene.json",
+  "input": [
+   "5 RIGHT down",
+   "97 SPACE tap 16",
+   "159 SPACE tap 16",
+   "276 SPACE tap 16",
+   "384 SPACE tap 16",
+   "473 SPACE tap 16",
+   "521 SPACE tap 16",
+   "591 SPACE tap 16"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "title"
+   ],
+   [
+    "Hint",
+    "text",
+    "contains",
+    "You finished it"
+   ]
+  ]
+ }
+]

@@ -1,8 +1,8 @@
 # The installed editor (scripts/test_package.sh runs it from outside the
 # source checkout, on a copy of the demo project): Play runs the bundled
 # runner (no compiler), export uses the bundled runners, the Code tab's
-# language server starts from the bundle, and the update check sees a newer
-# release.
+# language server starts from the bundle, the update check sees a newer
+# release, and the New Project templates are there.
 wait 5
 expect scene == scenes/main.scene.json
 
@@ -35,3 +35,15 @@ expect log contains Ore Editor 99.0.0 is available
 dblclick @asset:scripts/orbiting_drone.lua
 wait-until code.lsp == ready timeout=900
 screenshot installed
+
+# The New Project templates are installed: a Platformer project from them.
+click @menu:Help
+click @menu:Help/Welcome
+click @welcome.template:Platformer
+click @welcome.name
+key ctrl+a
+key cmd+a
+type Pkg Plat Zq
+click @welcome.create
+expect log contains Created Platformer project
+expect abs-file:$PROJECT/../Pkg_Plat_Zq/scripts/player.lua contains coyote

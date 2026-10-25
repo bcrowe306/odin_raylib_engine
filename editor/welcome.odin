@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:path/filepath"
 import "core:strings"
 import imgui "lib/imgui"
+import rl "vendor:raylib"
 
 // ============================================================================
 // Welcome window (at startup unless turned off; Help > Welcome): recent
@@ -15,7 +16,8 @@ import imgui "lib/imgui"
 welcome: struct {
 	open:      bool,
 	shown:     bool, // opened at startup already
-	template:  Project_Template,
+	template:  string,                      // the chosen entry's name ("" = the first)
+	previews:  map[string]^rl.Texture2D,    // preview.png per template folder (heap: the draw list keeps the address)
 	nameBuf:   [128]u8,
 	whereBuf:  [512]u8,
 }
@@ -42,7 +44,7 @@ Welcome_Render :: proc(state: ^EditorState) {
 	if !welcome.open do return
 	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
 	imgui.SetNextWindowPos(center, .Appearing, {0.5, 0.5})
-	imgui.SetNextWindowSize({820, 520}, .Appearing)
+	imgui.SetNextWindowSize({860, 620}, .Appearing)
 	// Its own surface (lighter than the panels: two steps on dark themes)
 	// and an accent edge, so it
 	// stands out above the editor.
@@ -107,18 +109,22 @@ Welcome_Render :: proc(state: ^EditorState) {
 	// --- right: new project ---
 	if imgui.BeginChild("##welcome_new", {0, -40}, {.Borders}, {}) {
 		UI_SectionHeader("New Project")
-		for t in Project_Template {
-			info := PROJECT_TEMPLATES[t]
-			selected := welcome.template == t
-			if imgui.Selectable(fmt.ctprintf("##tmpl_%v", t), selected, {}, {0, 46}) do welcome.template = t
-			Drive_Item(fmt.tprintf("welcome.template:%s", info.name))
-			mn := imgui.GetItemRectMin()
-			dl := imgui.GetWindowDrawList()
-			imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.regular, 22, {mn.x + 8, mn.y + 11}, col_u32(UI_ACCENT if selected else UI_TEXT_DIM), strings.clone_to_cstring(info.icon, context.temp_allocator))
-			imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.semibold, 15, {mn.x + 44, mn.y + 4}, col_u32(UI_TEXT), strings.clone_to_cstring(info.name, context.temp_allocator))
-			clip := imgui.Vec4{mn.x, mn.y, mn.x + imgui.GetContentRegionAvail().x, mn.y + 46}
-			imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12.5, {mn.x + 44, mn.y + 24}, col_u32(UI_TEXT_DIM), strings.clone_to_cstring(info.description, context.temp_allocator), nil, 0, &clip)
+		entries := Templates_List()
+		chosen := entries[0]
+		for e in entries do if e.name == welcome.template do chosen = e
+		// (Templates scroll; the form below stays.)
+		if imgui.BeginChild("##welcome_templates", {0, -150}, {}, {}) {
+			lastSample := false
+			for e in entries {
+				if e.sample && !lastSample {
+					imgui.Dummy({0, 4})
+					UI_DimText("Samples - complete projects to explore")
+				}
+				lastSample = e.sample
+				welcome_card(e, e.name == chosen.name)
+			}
 		}
+		imgui.EndChild()
 		imgui.Dummy({0, 6})
 		if UI_BeginProps("##newproj") {
 			UI_PropLabel("Name")
@@ -144,8 +150,8 @@ Welcome_Render :: proc(state: ^EditorState) {
 		dir, _ := filepath.join({location, folder}, context.temp_allocator)
 		UI_DimText(dir)
 		if UI_PrimaryButton(fmt.tprintf("%s  Create Project", ICON_FA_PLUS), "welcome.create", {-1, 0}) && name != "" {
-			if Project_CreateFromTemplate(dir, name, welcome.template) {
-				Editor_Log(state, .Info, "Created %s project %s", PROJECT_TEMPLATES[welcome.template].name, dir)
+			if Project_CreateFromEntry(dir, name, chosen) {
+				Editor_Log(state, .Info, "Created %s project %s", chosen.name, dir)
 				welcome.open = false
 				Editor_SwitchProject(state, strings.clone(dir, context.temp_allocator))
 			} else {
@@ -158,4 +164,51 @@ Welcome_Render :: proc(state: ^EditorState) {
 	if imgui.Checkbox("Show at startup", &GlobalSettings.showWelcome) do _ = Editor_SaveSettings()
 	imgui.SameLine(imgui.GetWindowWidth() - 120)
 	if UI_Button("Close", "welcome.close", {100, 0}) do welcome.open = false
+}
+
+// welcome_card: one template / sample (icon, name, description, preview).
+@(private = "file")
+welcome_card :: proc(e: Template_Entry, selected: bool) {
+	H :: 58
+	if imgui.Selectable(fmt.ctprintf("##tmpl_%s", e.name), selected, {}, {0, H}) {
+		delete(welcome.template)
+		welcome.template = strings.clone(e.name)
+	}
+	Drive_Item(fmt.tprintf("welcome.template:%s", e.name))
+	UI_Tooltip(e.description)
+	mn := imgui.GetItemRectMin()
+	w := imgui.GetItemRectSize().x
+	dl := imgui.GetWindowDrawList()
+	textRight := mn.x + w - 4
+	if e.preview != "" {
+		tex, ok := welcome.previews[e.preview]
+		if !ok {
+			tex = new(rl.Texture2D)
+			tex^ = rl.LoadTexture(strings.clone_to_cstring(e.preview, context.temp_allocator))
+			if tex.id != 0 do rl.SetTextureFilter(tex^, .BILINEAR)
+			welcome.previews[strings.clone(e.preview)] = tex
+		}
+		if tex.id != 0 {
+			pw: f32 = 89 // 16:9 in the card's height
+			ph: f32 = H - 8
+			at := imgui.Vec2{mn.x + w - pw - 4, mn.y + 4}
+			imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)tex, at, at + {pw, ph})
+			textRight = at.x - 6
+		}
+	}
+	imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.regular, 22, {mn.x + 8, mn.y + 16}, col_u32(UI_ACCENT if selected else UI_TEXT_DIM), strings.clone_to_cstring(e.icon, context.temp_allocator))
+	imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.semibold, 15, {mn.x + 44, mn.y + 4}, col_u32(UI_TEXT), strings.clone_to_cstring(e.name, context.temp_allocator))
+	clip := imgui.Vec4{mn.x, mn.y, textRight, mn.y + H}
+	imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12.5, {mn.x + 44, mn.y + 24}, col_u32(UI_TEXT_DIM), strings.clone_to_cstring(e.description, context.temp_allocator), nil, textRight - mn.x - 44, &clip)
+}
+
+// Welcome_Shutdown frees the preview textures.
+Welcome_Shutdown :: proc() {
+	for k, tex in welcome.previews {
+		if tex.id != 0 do rl.UnloadTexture(tex^)
+		free(tex)
+		delete(k)
+	}
+	delete(welcome.previews)
+	delete(welcome.template)
 }

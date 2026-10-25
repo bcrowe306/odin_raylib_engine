@@ -1,0 +1,54 @@
+{
+ "type": "Node",
+ "name": "EnemyBullet",
+ "tags": [
+  "enemy_bullet"
+ ],
+ "script": {
+  "path": "scripts/bullet.lua",
+  "properties": {
+   "speed": 110,
+   "dir_x": -1,
+   "radius": 3
+  }
+ },
+ "children": [
+  {
+   "type": "AnimationPlayerNode",
+   "name": "Sprite",
+   "position": [
+    0,
+    0
+   ],
+   "pivot": [
+    0.5,
+    0.5
+   ],
+   "layer": 3,
+   "z_index": 0,
+   "fps": 8,
+   "animation": "idle",
+   "default_animation": "idle",
+   "animations": [
+    {
+     "name": "idle",
+     "loop": true,
+     "fps": 1,
+     "sheet": "textures/tiles.png",
+     "grid": [
+      12,
+      10
+     ],
+     "cells": [
+      3
+     ],
+     "start": 0,
+     "end": 0
+    }
+   ],
+   "properties": {
+    "autoplay": true
+   }
+  }
+ ]
+}
