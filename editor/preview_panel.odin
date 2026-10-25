@@ -282,7 +282,7 @@ PreviewPanel_Render :: proc(state: ^EditorState) {
 PreviewPanel_RenderTexture :: proc(state: ^EditorState) {
 	// Fallback check: if no texture loaded yet, attempt to load selected asset or default ship texture
 	if !state.previewTextureLoaded {
-		fallback := "assets/demo_project/textures/Spaceship_1.png"
+		fallback := preview_project_path(state, "textures/Spaceship_1.png")
 		if state.selectedAssetPath != "" && strings.has_suffix(state.selectedAssetPath, ".png") {
 			fallback = state.selectedAssetPath
 		}
@@ -292,7 +292,7 @@ PreviewPanel_RenderTexture :: proc(state: ^EditorState) {
 	}
 
 	// Quick Selector Combo for all textures
-	texDir := "assets/demo_project/textures"
+	texDir := preview_project_path(state, "textures")
 	if os.is_dir(texDir) {
 		if h, err := os.open(texDir); err == nil {
 			fis, _ := os.read_dir(h, -1, context.temp_allocator)
@@ -404,7 +404,7 @@ PreviewPanel_RenderTexture :: proc(state: ^EditorState) {
 PreviewPanel_RenderAudio :: proc(state: ^EditorState) {
 	// Fallback check: if no sound loaded yet, load cannon-gunshot-1.wav
 	if !state.previewSoundLoaded {
-		fallback := "assets/demo_project/audio/cannon-gunshot-1.wav"
+		fallback := preview_project_path(state, "audio/cannon-gunshot-1.wav")
 		if state.selectedAssetPath != "" && strings.has_suffix(state.selectedAssetPath, ".wav") {
 			fallback = state.selectedAssetPath
 		}
@@ -414,7 +414,7 @@ PreviewPanel_RenderAudio :: proc(state: ^EditorState) {
 	}
 
 	// Quick Selector Combo for all audio clips
-	audioDir := "assets/demo_project/audio"
+	audioDir := preview_project_path(state, "audio")
 	if os.is_dir(audioDir) {
 		if h, err := os.open(audioDir); err == nil {
 			fis, _ := os.read_dir(h, -1, context.temp_allocator)
@@ -566,7 +566,7 @@ PreviewPanel_RenderAudio :: proc(state: ^EditorState) {
 PreviewPanel_RenderAnimation :: proc(state: ^EditorState) {
 	// Auto-load exhaust animation frames if empty
 	if len(state.previewAnimFrames) == 0 {
-		exhaustFolder := "assets/demo_project/textures/exhaust"
+		exhaustFolder := preview_project_path(state, "textures/exhaust")
 		if os.is_dir(exhaustFolder) {
 			PreviewPanel_LoadAnimationFromFolder(state, exhaustFolder)
 		}
@@ -576,8 +576,8 @@ PreviewPanel_RenderAnimation :: proc(state: ^EditorState) {
 	curAnimName := state.previewAnimLoadedPath
 	imgui.SetNextItemWidth(260)
 	if imgui.BeginCombo("##AnimSetCombo", fmt.ctprintf("%s %s", ICON_FA_FILM, curAnimName)) {
-		if imgui.Selectable("Engine Exhaust (5 frames)", curAnimName == "assets/demo_project/textures/exhaust") {
-			PreviewPanel_LoadAnimationFromFolder(state, "assets/demo_project/textures/exhaust")
+		if imgui.Selectable("Engine Exhaust (5 frames)", curAnimName == preview_project_path(state, "textures/exhaust")) {
+			PreviewPanel_LoadAnimationFromFolder(state, preview_project_path(state, "textures/exhaust"))
 		}
 		if state.activeScene != nil && state.activeScene.rootNode != nil {
 			if imgui.Selectable("Active Scene Exhaust Node", curAnimName == "Active FrameAnimationNode") {
@@ -818,11 +818,11 @@ PreviewPanel_RenderScene :: proc(state: ^EditorState) {
 PreviewPanel_RenderScript :: proc(state: ^EditorState) {
 	// Fallback to player_ship.lua if nothing selected
 	if state.previewScriptPath == "" {
-		state.previewScriptPath = "assets/demo_project/scripts/player_ship.lua"
+		state.previewScriptPath = strings.clone(preview_project_path(state, "scripts/player_ship.lua")) // (owned, as the other assignments)
 	}
 
 	// Quick Selector Combo for all Lua scripts in project
-	scriptsDir := "assets/demo_project/scripts"
+	scriptsDir := preview_project_path(state, "scripts")
 	if os.is_dir(scriptsDir) {
 		if h, err := os.open(scriptsDir); err == nil {
 			fis, _ := os.read_dir(h, -1, context.temp_allocator)
@@ -1028,7 +1028,7 @@ PreviewPanel_FindScriptReferences :: proc(state: ^EditorState, scriptBaseName: s
 	}
 
 	// 2. Scan Project Scene Files on Disk
-	scenesDir := "assets/demo_project/scenes"
+	scenesDir := preview_project_path(state, "scenes")
 	if os.is_dir(scenesDir) {
 		if h, err := os.open(scenesDir); err == nil {
 			fis, _ := os.read_dir(h, -1, context.temp_allocator)
@@ -1056,7 +1056,7 @@ PreviewPanel_FindScriptReferences :: proc(state: ^EditorState, scriptBaseName: s
 	}
 
 	// 3. Scan Components on Disk
-	compDir := "assets/demo_project/components"
+	compDir := preview_project_path(state, "components")
 	if os.is_dir(compDir) {
 		if h, err := os.open(compDir); err == nil {
 			fis, _ := os.read_dir(h, -1, context.temp_allocator)
@@ -1271,4 +1271,12 @@ preview_audio_import :: proc(state: ^EditorState) {
 		preview_save_import(state, state.previewSoundPath, rel, imp)
 		Editor_Log(state, .Info, "Import settings of %s: gain %+.1f dB%s", rel, imp.gainDb, fmt.tprintf(", bus %s", imp.bus) if imp.bus != "" else "")
 	}
+}
+
+// preview_project_path: a path in the open project (the previews' defaults
+// and their folder lists: the demo project's names when it's open).
+@(private = "file")
+preview_project_path :: proc(state: ^EditorState, rel: string) -> string {
+	p, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	return p
 }

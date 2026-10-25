@@ -198,6 +198,23 @@ Editor_LoadSettings :: proc(state: ^EditorState) {
 	_ = Editor_SaveSettings()
 }
 
+// Editor_RecentProjectsAtStartup: the recent projects (temp), read before
+// the project opens (resources.odin: the default project) - the settings
+// are loaded properly later (Editor_LoadSettings).
+Editor_RecentProjectsAtStartup :: proc() -> []string {
+	home, err := os.user_home_dir(context.temp_allocator)
+	if err != nil do return nil
+	path, _ := filepath.join({home, ".config", "ore_editor", "settings.ini"}, context.temp_allocator)
+	data, rerr := os.read_entire_file(path, context.temp_allocator)
+	if rerr != nil do return nil
+	Editor_Settings_Destroy(&GlobalSettings)
+	GlobalSettings = Editor_DefaultSettings()
+	settings_from_ini(string(data))
+	out := make([]string, len(GlobalSettings.recentProjects), context.temp_allocator)
+	for r, i in GlobalSettings.recentProjects do out[i] = strings.clone(r, context.temp_allocator)
+	return out
+}
+
 @(private = "file")
 settings_from_json :: proc(data: []u8) {
 	err: os.Error

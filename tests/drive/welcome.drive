@@ -2,6 +2,7 @@
 # Welcome; a Platformer, a Top-down and a Menu project created from their
 # templates - each one plays (the game binary runs it headless and dumps the
 # scene); an empty scene shows what to do first.
+# drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 wait 5
 expect node-icons == 51/51
 click @menu:Help

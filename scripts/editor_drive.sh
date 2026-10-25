@@ -5,39 +5,21 @@
 #   scripts/editor_drive.sh                 # all drives
 #   scripts/editor_drive.sh playtest nodes  # selected drives
 # Screenshots + a report per drive: editor_screenshots/drive/<name>/index.md
+#
+# Drives run in the background: hidden windows that never take the focus
+# (the editor's and the game's --hidden), JOBS at a time (default: half the
+# performance cores, at least 2). Drives marked "# drive: serial" (they touch
+# bin/runners or other shared files) run one at a time after the others.
+#   JOBS=1 scripts/editor_drive.sh          # one at a time
+#   VISIBLE=1 scripts/editor_drive.sh nodes # watch it (a visible window)
+# macOS: the display must be awake (raylib's InitWindow fails on a sleeping
+# one); caffeinate keeps it awake while drives run.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
-mkdir -p bin
-# The Odin compiler very occasionally stalls; time out and retry.
-build() {
-	for attempt in 1 2 3; do
-		perl -e 'alarm 90; exec @ARGV' odin build "$@" && return 0
-		echo "odin build $* failed or stalled (attempt $attempt), retrying..." >&2
-		pkill -f "odin build $1" 2>/dev/null
-	done
-	return 1
-}
-# EDITOR_DEFINES: extra build flags (e.g. -define:ORE_MEM_TRACK=true for leak reports).
-# EDITOR_BIN: where to build the editor (a second run can use its own binary).
-EDITOR_BIN="${EDITOR_BIN:-bin/editor}"
-build editor -out:"$EDITOR_BIN" ${EDITOR_DEFINES:-} || exit 1
-# GAME_BIN: where to build the game Play runs (passed to the editor as
-# ORE_GAME_BIN); SKIP_GAME_BUILD=1 keeps the existing one.
-GAME_BIN="${GAME_BIN:-bin/odin_raylib_engine}"
-export ORE_GAME_BIN="$GAME_BIN"
-[ -n "${SKIP_GAME_BUILD:-}" ] || build . -out:"$GAME_BIN" || exit 1
-
-if [ $# -gt 0 ]; then
-	drives=()
-	for n in "$@"; do drives+=("tests/drive/$n.drive"); done
-else
-	drives=(tests/drive/*.drive)
-fi
-
-fail=0
-summary=()
-for d in "${drives[@]}"; do
+# --- one drive (run by the parallel scheduler below) ------------------------
+if [ "${1:-}" = --one ]; then
+	d="$2"
 	name="$(basename "$d" .drive)"
 	tmp="$(mktemp -d /tmp/ore_drive_${name}.XXXXXX)"
 	cp -R assets/demo_project "$tmp/project"
@@ -59,14 +41,83 @@ for d in "${drives[@]}"; do
 	EOF
 	shots="editor_screenshots/drive/$name"
 	rm -rf "$shots"
-	if perl -e 'alarm 600; exec @ARGV' "./$EDITOR_BIN" --project "$tmp/project" --drive "$d" --shots "$shots" --no-build --user-data "$tmp/userdata" > "$tmp/editor.log" 2>&1; then
+	hidden=--hidden
+	[ -n "${VISIBLE:-}" ] && hidden=
+	start=$(date +%s)
+	if perl -e 'alarm 600; exec @ARGV' "./$EDITOR_BIN" --project "$tmp/project" --drive "$d" --shots "$shots" --no-build --user-data "$tmp/userdata" $hidden > "$tmp/editor.log" 2>&1; then
 		cp "$tmp/editor.log" "$shots/editor.log" 2>/dev/null # kept (memory reports, ...)
-		summary+=("PASS  $name")
+		line="PASS  $name"
 	else
-		summary+=("FAIL  $name   (log: $tmp/editor.log)")
-		fail=1
+		line="FAIL  $name   (log: $tmp/editor.log)"
+	fi
+	{
+		echo "$line"
 		grep "\[DRIVE\] FAIL" "$tmp/editor.log" | sed 's/^/      /'
+	} > "$RESULTS/$name"
+	printf '%s  (%ds)\n' "$line" $(( $(date +%s) - start ))
+	exit 0
+fi
+
+# --- build --------------------------------------------------------------------
+mkdir -p bin
+# The Odin compiler very occasionally stalls; time out and retry.
+build() {
+	for attempt in 1 2 3; do
+		perl -e 'alarm 90; exec @ARGV' odin build "$@" && return 0
+		echo "odin build $* failed or stalled (attempt $attempt), retrying..." >&2
+		pkill -f "odin build $1" 2>/dev/null
+	done
+	return 1
+}
+# EDITOR_DEFINES: extra build flags (e.g. -define:ORE_MEM_TRACK=true for leak reports).
+# EDITOR_BIN: where to build the editor (a second run can use its own binary).
+export EDITOR_BIN="${EDITOR_BIN:-bin/editor}"
+build editor -out:"$EDITOR_BIN" ${EDITOR_DEFINES:-} || exit 1
+# GAME_BIN: where to build the game Play runs (passed to the editor as
+# ORE_GAME_BIN); SKIP_GAME_BUILD=1 keeps the existing one.
+GAME_BIN="${GAME_BIN:-bin/odin_raylib_engine}"
+export ORE_GAME_BIN="$GAME_BIN"
+[ -n "${SKIP_GAME_BUILD:-}" ] || build . -out:"$GAME_BIN" || exit 1
+
+if [ $# -gt 0 ]; then
+	drives=()
+	for n in "$@"; do drives+=("tests/drive/$n.drive"); done
+else
+	drives=(tests/drive/*.drive)
+fi
+
+# --- run ----------------------------------------------------------------------
+if [ -z "${JOBS:-}" ]; then
+	perf=$(sysctl -n hw.perflevel0.physicalcpu 2>/dev/null || nproc 2>/dev/null || echo 4)
+	JOBS=$(( perf / 2 > 2 ? perf / 2 : 2 ))
+fi
+[ -n "${VISIBLE:-}" ] && JOBS=1 # (visible windows would fight over the focus)
+export RESULTS="$(mktemp -d /tmp/ore_drive_results.XXXXXX)"
+export VISIBLE="${VISIBLE:-}"
+if command -v caffeinate > /dev/null; then caffeinate -u -t 7200 & trap 'kill $! 2> /dev/null' EXIT; fi
+
+parallel=()
+serial=()
+for d in "${drives[@]}"; do
+	if grep -q '^# drive: serial' "$d"; then serial+=("$d"); else parallel+=("$d"); fi
+done
+started=$(date +%s)
+echo "${#drives[@]} drives: ${#parallel[@]} in parallel ($JOBS at a time), ${#serial[@]} serial"
+[ ${#parallel[@]} -gt 0 ] && printf '%s\n' "${parallel[@]}" | xargs -P "$JOBS" -I{} "$0" --one {}
+for d in ${serial[@]+"${serial[@]}"}; do "$0" --one "$d"; done
+
+# --- summary (in the drives' order) -------------------------------------------
+fail=0
+echo
+for d in "${drives[@]}"; do
+	r="$RESULTS/$(basename "$d" .drive)"
+	if [ -f "$r" ]; then
+		cat "$r"
+		grep -q '^FAIL' "$r" && fail=1
+	else
+		echo "FAIL  $(basename "$d" .drive)   (no result)"
+		fail=1
 	fi
 done
-printf '%s\n' "${summary[@]}"
+echo "$(( $(date +%s) - started )) s"
 exit $fail

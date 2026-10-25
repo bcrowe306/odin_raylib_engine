@@ -110,7 +110,9 @@ runner_font_path :: proc() -> cstring {
 	exeDir := filepath.dir(os.args[0], context.temp_allocator)
 	nextTo, _ := filepath.join({exeDir, "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
 	inApp, _ := filepath.join({exeDir, "..", "Resources", "fonts", "OpenSans-Regular.ttf"}, context.temp_allocator)
-	for f in ([]string{nextTo, inApp}) do if os.is_file(f) do return strings.clone_to_cstring(f, context.temp_allocator)
+	// (The editor's runners/<platform>/runner, played from the editor: the font is in runners/.)
+	inRunners, _ := filepath.join({exeDir, "..", "OpenSans-Regular.ttf"}, context.temp_allocator)
+	for f in ([]string{nextTo, inApp, inRunners}) do if os.is_file(f) do return strings.clone_to_cstring(f, context.temp_allocator)
 	return dev
 }
 
@@ -205,7 +207,7 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 	if video.msaa do flags += {.MSAA_4X_HINT}
 	if video.highDPI do flags += {.WINDOW_HIGHDPI}
 	if opts.hidden {
-		flags += {.WINDOW_HIDDEN}
+		flags += {.WINDOW_HIDDEN, .WINDOW_UNFOCUSED} // (never takes the focus)
 	}
 	rl.SetConfigFlags(flags)
 	rl.SetTraceLogLevel(.ERROR) // raylib warns once per oversized icon glyph (thousands of lines)

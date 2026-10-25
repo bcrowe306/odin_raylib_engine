@@ -4,6 +4,7 @@ import "core:c"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
+import "core:slice"
 import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
@@ -245,7 +246,8 @@ Editor_Init :: proc(state: ^EditorState) {
 	state.game = new(e.Game)
 	e.InitializeGame(state.game)
 
-	state.projectPath = "assets/demo_project"
+	state.projectPath = ""
+	if !slice.contains(os.args, "--project") do state.projectPath = strings.clone(Resources_DefaultProject()) // (resources.odin)
 	for i := 0; i < len(os.args); i += 1 {
 		if os.args[i] == "--project" && i + 1 < len(os.args) do state.projectPath = os.args[i + 1]
 		if os.args[i] == "--no-build" do state.skipGameBuild = true

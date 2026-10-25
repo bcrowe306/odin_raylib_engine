@@ -23,33 +23,11 @@ import imgui "lib/imgui"
 
 CODE_LUA_GLOBALS :: []string{"Engine", "Input", "Audio", "Camera", "Physics", "Scene", "Log", "Project", "Tween", "Save", "Navigation", "Locale", "tr"}
 
-// code_repo_root finds the engine checkout (lua-language-server/ and
-// engine/definitions/ live there): the working directory, or the
-// executable's parent (bin/editor).
-@(private = "file")
-code_repo_root :: proc() -> string {
-	candidates := make([dynamic]string, context.temp_allocator)
-	if cwd, err := os.get_working_directory(context.temp_allocator); err == nil do append(&candidates, cwd)
-	exeDir := filepath.dir(os.args[0], context.temp_allocator)
-	if !filepath.is_abs(exeDir) {
-		if cwd, err := os.get_working_directory(context.temp_allocator); err == nil {
-			exeDir, _ = filepath.join({cwd, exeDir}, context.temp_allocator)
-		}
-	}
-	append(&candidates, exeDir, filepath.dir(exeDir, context.temp_allocator))
-	for c in candidates {
-		p, _ := filepath.join({c, "lua-language-server", "bin", "lua-language-server"}, context.temp_allocator)
-		if os.is_file(p) do return c
-	}
-	return ""
-}
-
 // Code_LuaServerPath is the lua-language-server binary ("" if not found):
-// next to the editor (a shipped editor), or in the engine checkout.
+// in the editor's resources (resources.odin: next to an installed editor,
+// or the source checkout's lua-language-server/).
 Code_LuaServerPath :: proc() -> string {
-	root := code_repo_root()
-	if root == "" do return ""
-	p, _ := filepath.join({root, "lua-language-server", "bin", "lua-language-server"}, context.temp_allocator)
+	p := Resource_Path("lua-language-server", "bin", "lua-language-server.exe" when ODIN_OS == .Windows else "lua-language-server")
 	return p if os.is_file(p) else ""
 }
 
@@ -104,7 +82,16 @@ code_lsp_start :: proc(state: ^EditorState) {
 		cwd, _ := os.get_working_directory(context.temp_allocator)
 		root, _ = filepath.join({cwd, root}, context.temp_allocator)
 	}
-	if !lsp.client_start(&cm.client, {server}, root) {
+	// An installed editor's lua-language-server is read-only (a signed .app):
+	// its generated meta files and logs go to the user's cache folder.
+	cmd := make([dynamic]string, context.temp_allocator)
+	append(&cmd, server)
+	if !Resources_InCheckout() {
+		if cache, err := os.user_cache_dir(context.temp_allocator); err == nil {
+			append(&cmd, fmt.tprintf("--metapath=%s/ore_editor/luals/meta", cache), fmt.tprintf("--logpath=%s/ore_editor/luals/log", cache))
+		}
+	}
+	if !lsp.client_start(&cm.client, cmd[:], root) {
 		cm.lspState = .Failed
 		cm.lspMessage = "lua-language-server failed to start"
 		Editor_Log(state, .Warn, "Could not start %s", server)

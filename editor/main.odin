@@ -5,6 +5,7 @@ import "core:fmt"
 import "core:mem"
 import "core:log"
 import "core:os"
+import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
 import e "../engine"
@@ -34,22 +35,27 @@ main :: proc() {
 }
 
 editor_main :: proc() -> int {
+	Resources_Init() // where the editor's own files are (resources.odin)
 	isTestMode := false
 	uncapped := false // --uncapped: no vsync, no frame cap (measuring; frame_timing.odin)
+	hidden := false   // --hidden: no visible window, never focused (background test drives)
 	for arg in os.args {
 		if arg == "--test-e2e" || arg == "--drive" do isTestMode = true
 		if arg == "--uncapped" do uncapped = true
+		if arg == "--hidden" do hidden = true
 	}
 
 	// 1. Configure and Initialize Raylib Window
-	if isTestMode || uncapped {
-		rl.SetConfigFlags({.WINDOW_RESIZABLE})
-	} else {
-		rl.SetConfigFlags({.WINDOW_RESIZABLE, .VSYNC_HINT})
-	}
+	flags: rl.ConfigFlags = {.WINDOW_RESIZABLE}
+	if !isTestMode && !uncapped do flags += {.VSYNC_HINT}
+	if hidden do flags += {.WINDOW_HIDDEN, .WINDOW_UNFOCUSED}
+	rl.SetConfigFlags(flags)
 	rl.InitWindow(1600, 900, "Odin Raylib Engine - Game Editor")
 	defer rl.CloseWindow()
 	e.Render_InitBatching() // fewer GPU stalls on batch flushes (batching.odin)
+	// The engine's font (in-game UI text in the viewport), as the game loads it.
+	e.InitEngineFonts(strings.clone_to_cstring(Resources_EngineFont(), context.temp_allocator))
+	defer e.UnloadEngineFonts()
 	defer e.Render_ReleaseBatching()
 	rl.SetTargetFPS(60)
 	if uncapped do FrameTiming_SetUncapped(true, false)

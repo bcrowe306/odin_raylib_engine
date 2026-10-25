@@ -2,6 +2,7 @@
 # a project icon, the executable name, Save and Export, then the exported
 # macOS app (bundle, Info.plist, icon, bundled Lua library, signature)
 # runs and finds its game in Resources.
+# drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 exec scripts/build_runners.sh --if-missing
 # Stand-in Linux / Windows runners (the macOS one copied) to exercise their
 # packaging here; removed at the end.

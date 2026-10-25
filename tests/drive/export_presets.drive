@@ -1,6 +1,7 @@
 # Export presets: turn the targets into presets, add a debug demo preset
 # with its own name, version, window title and excluded files, export only
 # that preset, and check what it wrote.
+# drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 exec scripts/build_runners.sh --if-missing
 wait 5
 click @toolbar.settings

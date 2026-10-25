@@ -2,6 +2,7 @@
 # open there; Export .ore asks where to write and the next export starts in
 # that folder; the export Output Folder's Browse... starts there too; a new
 # project's location is remembered; all kept in settings.ini [paths].
+# drive: serial (touches bin/runners or other shared files; runs after the parallel drives)
 wait 5
 click @asset.add
 dialog-files tests/drive/fixtures/import/crate.png

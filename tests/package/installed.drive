@@ -1,0 +1,32 @@
+# The installed editor (scripts/test_package.sh runs it from outside the
+# source checkout, on a copy of the demo project): Play runs the bundled
+# runner (no compiler), export uses the bundled runners, and the Code tab's
+# language server starts from the bundle.
+wait 5
+expect scene == scenes/main.scene.json
+
+# Play: edit, then the game (the bundled runner) plays the edit.
+click @hier:PlayerShip
+dblclick @insp.name
+key ctrl+a
+type InstalledShip
+key enter
+game-args --frames 30 --dump-scene $SHOTS/played.json
+click @toolbar.play
+wait-until game == stopped timeout=900
+expect abs-file:$SHOTS/played.json contains "InstalledShip"
+expect log !contains Building game
+
+# Export: the bundled runner, nothing built.
+click @toolbar.settings
+click @settings.page:Export
+click @settings.export-now
+wait 10
+expect log contains Standalone game ready
+expect log !contains building it once
+key escape
+
+# The Code tab: lua-language-server from the bundle.
+dblclick @asset:scripts/orbiting_drone.lua
+wait-until code.lsp == ready timeout=900
+screenshot installed

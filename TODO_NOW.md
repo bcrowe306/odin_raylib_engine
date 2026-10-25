@@ -107,12 +107,46 @@ Docs in place
 - [x] 8.25 Every API function documented in `engine_api.lua` (description + example) for hover
 - [x] 8.26 F1 on an API symbol opens its section of the scripting reference in the editor
 
-## Release packaging (editor)
+## Phase 12 — Distribution, CI/CD and export targets (2026-10-25)
 
-- [ ] R.1 libcmark for a released editor: the Scripting Reference's markdown (`editor/markdown_view.odin`, `vendor:commonmark`) links the system `libcmark` (`brew install cmark` on dev machines - `/opt/homebrew/opt/cmark/lib/libcmark.dylib`), which users won't have. Before shipping the editor, either
+Goal: users install the editor like any app (no compiler, no Homebrew, no
+repo) and it exports to every desktop platform and the web from any of them;
+tagged versions build and publish themselves.
+
+Editor that runs anywhere:
+- [ ] D.1 Relocatable editor: resources found next to the executable (`Contents/Resources` in a .app) or in the source checkout; fonts and small files embedded (`#load`); no paths relative to the working directory
+- [ ] D.2 Play runs the prebuilt runner (the one export uses), no Odin compiler; the rebuild-on-change path only in a source checkout with `odin` installed
+- [ ] D.3 Lua 5.4 as a static library built from source (macOS uses Homebrew's dylib today), in the editor and the runners
+- [ ] D.4 (was R.1) libcmark for a released editor: the Scripting Reference's markdown (`editor/markdown_view.odin`, `vendor:commonmark`) links the system `libcmark` (`brew install cmark` on dev machines - `/opt/homebrew/opt/cmark/lib/libcmark.dylib`), which users won't have. Before shipping the editor, either
   - a) bundle it as a dynamic lib: copy `libcmark.dylib` (`.so` / `cmark.dll`) next to the editor (macOS: into the .app's `Frameworks`, `install_name_tool -change` to `@rpath/libcmark.dylib`, `-Wl,-rpath,@executable_path/../Frameworks` as `scripts/build_runners.sh` does for the runners), or
   - b) build cmark as a static lib (cmake `-DBUILD_SHARED_LIBS=OFF`, per platform; the vendor's `build.bat` does this on Windows) and link it in, so the editor has no extra file.
   The game runner doesn't use cmark.
+  Or c) replace it: the markdown view uses a subset; a small Odin renderer removes the dependency.
+- [ ] D.5 lua-language-server built per platform and bundled (the Code tab's completion / diagnostics)
+- [ ] D.6 The editor ships the runners for every platform (`runners/{macos,windows,linux,web}`), so any editor exports every desktop target and the web
+- [ ] D.7 One version string (from the git tag) in the editor, the runner and each `.ore`; the runner warns about a project from a newer version
+- [ ] D.8 Third-party license notices bundled (raylib, Lua, Box2D, Dear ImGui, LuaLS, cmark, Open Sans, Font Awesome)
+- [ ] D.9 Check for updates against GitHub Releases (later: an auto-updater)
+
+CI/CD (GitHub Actions):
+- [ ] C.1 CI on pushes / pull requests: build the editor, the runner and the Play binary, engine + ui unit tests, on macOS (arm64), Windows (x64) and Linux (x64)
+- [ ] C.2 Smoke test in CI: export the demo project and run the runner (`--frames 60 --screenshot`); editor drives stay local (they need a GPU session)
+- [ ] C.3 Release workflow on `v*` tags: build the editor and runners per platform, put every platform's runners in each editor package, publish a GitHub Release with checksums
+- [ ] C.4 macOS signing + notarization (Developer ID, hardened runtime, every dylib signed; certificates as repository secrets) - needs an Apple Developer account
+- [ ] C.5 Windows code signing (Azure Trusted Signing or an OV certificate) - optional for early releases (SmartScreen warns without it)
+- [ ] C.6 Linux builds on an old glibc (Ubuntu 20.04 container) so they run on older distributions
+- [ ] C.7 Packages: .dmg (macOS), installer (Inno Setup) or zip (Windows), AppImage + .tar.gz (Linux)
+
+Export targets:
+- [ ] X.1 Linux .deb / .rpm / Flatpak (low priority: AppImage + .tar.gz cover games)
+- [ ] X.2 Web polish: download size; worker threads need cross-origin isolation (COOP / COEP headers): fall back to decoding on the main thread
+- [ ] X.3 Steam (roadmap 19): Steamworks as a Lua module (achievements, overlay, cloud saves); Steam Deck (gamepad-first UI, 1280x800; the Linux runner, or Windows under Proton)
+- [ ] X.4 Android (roadmap 18): NDK build, touch input, app lifecycle (pause / resume, GL context loss), assets read from the APK, signed AAB
+- [ ] X.5 iOS (roadmap 18): raylib has no official iOS backend (a fork or Metal path), Xcode project, provisioning, App Store review
+- [ ] X.6 Consoles (PS5, Xbox, Switch): not now - devkits under NDA, a renderer port per console (no raylib backends), unofficial Odin toolchains; keep the platform layer contained and the C dependencies portable
+
+Testing:
+- [x] T.1 Editor drives in the background and in parallel: hidden windows that never take the focus (editor and game `--hidden`), JOBS at a time, `# drive: serial` drives after the others (`scripts/editor_drive.sh`, VISIBLE=1 to watch)
 
 ## Phase 10 — State machines for gameplay (2026-10-23)
 
