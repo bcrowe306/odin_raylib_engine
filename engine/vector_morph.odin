@@ -220,7 +220,6 @@ trim_range :: proc(subs: []Sub, lens: []f32, a, b: f32, out: ^Vector_Path) {
 	}
 }
 
-@(private = "file")
 vector_path_append :: proc(out, src: ^Vector_Path) {
 	append(&out.cmds, ..src.cmds[:])
 	append(&out.pts, ..src.pts[:])

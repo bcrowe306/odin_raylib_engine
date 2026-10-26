@@ -4230,6 +4230,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		Script_RegisterEventBindings(L) // connect / disconnect / emit
 		Script_RegisterLdtkBindings(L)
 		Script_RegisterPathBindings(L) // path_* / follow_* (path_node.odin)
+		Script_RegisterVectorColliderBindings(L) // vector_cut / vector_point_at / ... (vector_collider.odin)
 
 		// DynamicBodyNode Physics
 		lua.pushcfunction(L, lua_node_apply_force)

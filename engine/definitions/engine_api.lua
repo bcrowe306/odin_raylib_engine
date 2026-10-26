@@ -4094,6 +4094,11 @@ function LineNode:set_property(path, value, y) end
 ---@field warpTopRight Vec2 Four-corner warp: how far the top-right corner moves (px).
 ---@field warpBottomLeft Vec2 Four-corner warp: how far the bottom-left corner moves (px).
 ---@field warpBottomRight Vec2 Four-corner warp: how far the bottom-right corner moves (px).
+---@field collider "None"|"Solid"|"Outline" Collision from the art: Solid makes convex pieces (any body), Outline edge loops (smoot...
+---@field colliderDetail number How closely the collider follows the art (its units): bigger means fewer corners, faste...
+---@field colliderFriction number The collider's friction (0 ice ... 1 rubber).
+---@field colliderBounce number The collider's restitution (0 no bounce ... 1 full bounce).
+---@field colliderDensity number The collider's density: the mass it gives a Dynamic Body.
 
 ---@alias VectorShapeNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -4141,6 +4146,11 @@ function LineNode:set_property(path, value, y) end
 ---| "warpTopRight" # Vec2 - Four-corner warp: how far the top-right corner moves (px).
 ---| "warpBottomLeft" # Vec2 - Four-corner warp: how far the bottom-left corner moves (px).
 ---| "warpBottomRight" # Vec2 - Four-corner warp: how far the bottom-right corner moves (px).
+---| "collider" # "None"|"Solid"|"Outline" - Collision from the art: Solid makes convex pieces (any body), Outline edge loops (smoot...
+---| "colliderDetail" # number - How closely the collider follows the art (its units): bigger means fewer corners, faste...
+---| "colliderFriction" # number - The collider's friction (0 ice ... 1 rubber).
+---| "colliderBounce" # number - The collider's restitution (0 no bounce ... 1 full bounce).
+---| "colliderDensity" # number - The collider's density: the mass it gives a Dynamic Body.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -4192,6 +4202,11 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: VectorShapeNode, path: "warpTopRight"): Vec2
 ---@overload fun(self: VectorShapeNode, path: "warpBottomLeft"): Vec2
 ---@overload fun(self: VectorShapeNode, path: "warpBottomRight"): Vec2
+---@overload fun(self: VectorShapeNode, path: "collider"): "None"|"Solid"|"Outline"
+---@overload fun(self: VectorShapeNode, path: "colliderDetail"): number
+---@overload fun(self: VectorShapeNode, path: "colliderFriction"): number
+---@overload fun(self: VectorShapeNode, path: "colliderBounce"): number
+---@overload fun(self: VectorShapeNode, path: "colliderDensity"): number
 function VectorShapeNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -4245,6 +4260,11 @@ function VectorShapeNode:get_property(path) end
 ---@overload fun(self: VectorShapeNode, path: "warpTopRight", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: VectorShapeNode, path: "warpBottomLeft", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: VectorShapeNode, path: "warpBottomRight", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "collider", value: "None"|"Solid"|"Outline")
+---@overload fun(self: VectorShapeNode, path: "colliderDetail", value: number)
+---@overload fun(self: VectorShapeNode, path: "colliderFriction", value: number)
+---@overload fun(self: VectorShapeNode, path: "colliderBounce", value: number)
+---@overload fun(self: VectorShapeNode, path: "colliderDensity", value: number)
 function VectorShapeNode:set_property(path, value, y) end
 
 ---@class TrailNode
@@ -7487,6 +7507,56 @@ function VectorShapeNode:vector_swap(name) end
 ---Example: `for i, name in ipairs(self.node:vector_frames()) do Log.info(i - 1 .. " " .. name) end`
 ---@return string[] names
 function VectorShapeNode:vector_frames() end
+
+---Carves a circle out of the art (world position and radius): every shape keeps its paint, and a collider follows - destructible terrain, bites, bullet holes. The node draws its own carved copy until `vector_reset`.
+---
+---Example: `ground:vector_cut(bomb.position, 48)`
+---@overload fun(self: VectorShapeNode, x: number, y: number, radius: number)
+---@param pos Vec2
+---@param radius number
+function VectorShapeNode:vector_cut(pos, radius) end
+
+---Carves a polygon (world points) out of the art, like `vector_cut`.
+---
+---Example: `wall:vector_cut_polygon({Vec2(100, 0), Vec2(140, 0), Vec2(120, 60)})`
+---@param points Vec2[]
+function VectorShapeNode:vector_cut_polygon(points) end
+
+---Brings carved art (and its collider) back as it was.
+---
+---Example: `ground:vector_reset()`
+function VectorShapeNode:vector_reset() end
+
+---The length of the art's paths, one after another (world units).
+---
+---Example: `local len = self.node:vector_length()`
+---@return number
+function VectorShapeNode:vector_length() end
+
+---The point (world) and direction (unit) at a distance along the art's paths, one after another - move things along an SVG path.
+---
+---Example: `local pos, dir = track:vector_point_at(self.d); self.node.position = pos`
+---@param distance number
+---@return Vec2 pos
+---@return Vec2 dir
+function VectorShapeNode:vector_point_at(distance) end
+
+---The point on the art's paths nearest to a world position, and its distance along them.
+---
+---Example: `local d, at = rail:vector_closest(player.position)`
+---@overload fun(self: VectorShapeNode, x: number, y: number): number, Vec2
+---@param pos Vec2
+---@return number distance
+---@return Vec2 at
+function VectorShapeNode:vector_closest(pos) end
+
+---Whether a world point is on the art (its fills and strokes, holes left out).
+---
+---Example: `local wx, wy = Camera.screen_to_world(Input.get_mouse_position()); if balloon:vector_contains(wx, wy) then pop() end`
+---@overload fun(self: VectorShapeNode, x: number, y: number): boolean
+---@param pos Vec2
+---@return boolean
+function VectorShapeNode:vector_contains(pos) end
 
 ---Plays a voice (default: the node's sound) and moves the mouth with its Rhubarb cues (the sound's .json / .tsv beside it, or the node's cues file). Returns false when there are no cues.
 ---

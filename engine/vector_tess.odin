@@ -499,7 +499,6 @@ Vector_IsConvex :: proc(pts: [][2]f32) -> bool {
 
 // vector_dash: the flattened contours cut into dashes (open pieces) by the
 // pattern; a closed contour's closing edge is dashed too.
-@(private = "file")
 vector_dash :: proc(src, dst: ^Vector_Flat, dash: Vector_Dash) {
 	clear(&dst.pts)
 	clear(&dst.contours)

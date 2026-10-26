@@ -12,7 +12,7 @@ in milestones:
 | M2 | Vector assets: SVG import (Inkscape, Illustrator, Affinity, Figma), assets shared and reloaded on save, the editor's workflow, picking, culling, background tessellation | **done** |
 | M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | **done** |
 | M5 | Shape tweens and trim paths, filters and line scaling, vector skinning on skeletons and warps | **done** |
-| M6 | Boolean path operations, collision from shapes | |
+| M6 | Boolean path operations, carving, collision from shapes, path queries | **done** |
 | M4 | Drawing tools in the editor | |
 | M7 | Crisp text, Adobe Animate import, a sample character | |
 
@@ -286,6 +286,81 @@ Tween.to(body, "warpTopLeft", Vec2(0, 0), 0.25, "out_back")
 Tween.to(body, "warpTopRight", Vec2(0, 0), 0.25, "out_back")
 ```
 
+## Collision from the art
+
+Give a Vector Shape a **Collider** and the art is solid: physics bodies
+hit exactly what's drawn (fills and outlines, holes left open).
+
+| Collider | What it makes | Use it for |
+|---|---|---|
+| **Solid** | convex pieces (at most 8 corners each) | anything: crates, props, characters - dynamic bodies too |
+| **Outline** | edge loops round the outline (Box2D chains) | terrain and walls: bodies slide along it without catching on seams |
+
+- **Where it goes**: on the nearest Static Body, Dynamic Body or Area above
+  the Vector Shape (its collision events, mass and layers are that body's),
+  or on a static body of its own when there's none - so a Vector Shape on
+  its own is already ground. Under an Area it becomes a sensor.
+- **Collider Detail** (its units) is how closely it follows the art:
+  bigger means fewer corners and faster physics. **Collider Friction**,
+  **Bounce** and **Density** set the material.
+- It's remade when the art changes - a new file, a frame, a morph, a cut -
+  not every frame; moving the node only moves the body.
+- With the physics debug view on (Project Settings > Physics, or
+  `Physics.set_debug_draw(true)`) the pieces / loops are drawn over the art,
+  in the editor too.
+
+```
+Crate (Dynamic Body)
+└── Art (Vector Shape: crate.svg, Collider Solid)   -- the crate's shape is its drawing
+```
+
+### Carving: destructible art
+
+`vector_cut` removes a circle, `vector_cut_polygon` any shape, from the
+art - each shape keeps its paint (a gradient fill stays a gradient, a
+stroke stays its colour) - and the collider follows on the next frame:
+worms-style terrain, bites out of a cookie, bullet holes.
+
+```lua
+-- A bomb blows a crater where it lands.
+function Bomb:on_collision_started(other)
+    local ground = Scene.find_node("Terrain")
+    ground:vector_cut(self.node.position, 48)
+    self.node:queue_free()
+end
+```
+
+`vector_reset()` brings the art back. Each cut re-tessellates the node's own
+copy of its shapes (curves become short lines where cut).
+
+### Path queries
+
+The art's paths, one after another, can be measured like a Path:
+`vector_length()`, `vector_point_at(d)` (a point and direction),
+`vector_closest(pos)` and `vector_contains(pos)`. A **Path Follow** under a
+Vector Shape rides its outline - draw a race track or a patrol route in
+your vector app.
+
+```lua
+-- Move along an SVG path at 120 px/s.
+function Car:update(dt)
+    self.d = (self.d or 0) + 120 * dt
+    local pos, dir = self.track:vector_point_at(self.d % self.track:vector_length())
+    self.node.position = pos
+    self.node.rotation = math.deg(math.atan(dir.y, dir.x))
+end
+```
+
+### Path operations (from Odin)
+
+`engine/vector_ops.odin`: boolean union / subtract / intersect / exclude
+of shapes or polygons (`Vector_ShapesBoolean`, `Vector_PolysBoolean`),
+offsets (grow / shrink), outline stroke to fill (`Vector_StrokeOutline`),
+simplify, flatten, the covered area of a drawing (`Vector_ShapesArea`:
+fill rules, strokes, clip paths), cutting a drawing (`Vector_ShapesCut`),
+convex decomposition - all on Clipper2, also in the web build. The Boolean
+buttons in the editor come with M4's drawing tools.
+
 ## Using it with presets
 
 A Vector Shape without a file draws its **Preset**: a star, a ring (a shape
@@ -458,6 +533,17 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
   list, the Bend with picker (bones toggled, all bones, undo), saving.
 - `scenes/skin.scene.json` (golden, both drawing paths): a limb at rest,
   bent rigid and smooth, flipped and rotated; warps.
+- `engine/vector_ops_test.odin`: booleans, offsets (mitred / round),
+  stroke outlines (caps, dashes, closed), fill rules, clip paths,
+  simplifying, flattening, cutting with paints kept, convex pieces, the
+  measured polylines; collision - a ball on Solid and Outline ground, a crate
+  shaped by its art on its Dynamic Body, a Lua crater it falls into, a
+  ring's pieces round its hole, re-made only when needed, path queries and
+  a Path Follow on the outline, the Lua methods.
+- `tests/drive/vector_collider.drive`: the Collider setting and overlay,
+  detail, undo, saving, a ball landing in Simulate.
+- `scenes/collide.scene.json` (golden): carved hills, a star, a crate,
+  balls settling, a rider on a ring.
 - `tests/drive/vector_filters.drive`: saturation, blur and hue edited in
   the Inspector and drawn in the viewport, undo, saving.
 - `scenes/filters.scene.json` (golden): each filter alone, a flipped

@@ -204,6 +204,23 @@
   }
  },
  {
+  "name": "collision from vector art: rolling hills (Outline loops) carved from Lua (a circle and a polygon; paints kept), a star (Solid pieces), a crate shaped by its art, balls settling; a Path Follow on a ring's outline",
+  "project": "tests/vector/project",
+  "scene": "scenes/collide.scene.json",
+  "frames": 120,
+  "expect": [
+   ["CraterBall", "y", ">", 440],
+   ["Ball", "y", "<", 460],
+   ["Crate", "y", "<", 400],
+   ["Crate", "y", ">", 330]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/collide.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
   "name": "100 spinning characters run (the benchmark scene)",
   "project": "tests/vector/project",
   "scene": "scenes/bench.scene.json",

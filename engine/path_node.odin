@@ -130,24 +130,7 @@ PathNode_Length :: proc(p: ^PathNode) -> f32 {
 // the direction it goes there (unit), local to the path.
 PathNode_SampleLocal :: proc(p: ^PathNode, dist: f32) -> (pos, dir: [2]f32) {
 	PathNode_Bake(p)
-	n := len(p.baked)
-	if n == 0 do return {}, {1, 0}
-	if n == 1 do return p.baked[0], {1, 0}
-	d := clamp(dist, 0, p.bakedLen[n - 1])
-	// The baked segment holding d (binary search on the lengths).
-	lo, hi := 0, n - 1
-	for hi - lo > 1 {
-		mid := (lo + hi) / 2
-		if p.bakedLen[mid] <= d do lo = mid
-		else do hi = mid
-	}
-	seg := p.bakedLen[hi] - p.bakedLen[lo]
-	t := (d - p.bakedLen[lo]) / seg if seg > 0 else 0
-	a, b := p.baked[lo], p.baked[hi]
-	pos = a + (b - a) * t
-	l := linalg_len(b - a)
-	dir = (b - a) / l if l > 0 else {1, 0}
-	return
+	return Polyline_Sample(p.baked[:], p.bakedLen[:], dist) // (polyline.odin: shared with vector shapes)
 }
 
 // PathNode_ToWorld: a local point of the path in world space.
@@ -164,19 +147,7 @@ PathNode_ClosestOffset :: proc(p: ^PathNode, world: [2]f32) -> f32 {
 	s := p.globalScale
 	local := rotate_vec(world - p.globalPosition, -p.globalRotation)
 	local = {local.x / s.x if s.x != 0 else local.x, local.y / s.y if s.y != 0 else local.y}
-	best, bestD := f32(0), max(f32)
-	for i in 0 ..< len(p.baked) - 1 {
-		a, b := p.baked[i], p.baked[i + 1]
-		ab := b - a
-		ll := ab.x * ab.x + ab.y * ab.y
-		t := clamp(((local.x - a.x) * ab.x + (local.y - a.y) * ab.y) / ll, 0, 1) if ll > 0 else 0
-		q := a + ab * t
-		d := (local.x - q.x) * (local.x - q.x) + (local.y - q.y) * (local.y - q.y)
-		if d < bestD {
-			bestD = d
-			best = p.bakedLen[i] + (p.bakedLen[i + 1] - p.bakedLen[i]) * t
-		}
-	}
+	best, _ := Polyline_Closest(p.baked[:], p.bakedLen[:], local)
 	return best
 }
 
@@ -229,11 +200,33 @@ PathFollowNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 	DestroySubject(&f.onLooped)
 }
 
-// PathFollowNode_Path: the PathNode it follows (its parent), or nil.
-PathFollowNode_Path :: proc(f: ^PathFollowNode, m: ^NodeManager) -> ^PathNode {
+// PathFollowNode_Path: the curve it follows - its parent, a PathNode or a
+// VectorShapeNode (along the drawing's paths, one after another) - or nil.
+PathFollowNode_Path :: proc(f: ^PathFollowNode, m: ^NodeManager) -> ^Node {
 	if m == nil do return nil
-	if p := GetParent(m, f); p != nil && p.typeId == PathNode do return cast(^PathNode)p
+	if p := GetParent(m, f); p != nil && (p.typeId == PathNode || p.typeId == VectorShapeNode) do return p
 	return nil
+}
+
+// Curve_Polyline: a followable node's measured curve, local to it.
+Curve_Polyline :: proc(n: ^Node) -> (pts: [][2]f32, lens: []f32) {
+	if n == nil do return
+	if n.typeId == PathNode {
+		p := cast(^PathNode)n
+		PathNode_Bake(p)
+		return p.baked[:], p.bakedLen[:]
+	}
+	if n.typeId == VectorShapeNode {
+		pl := VectorShapeNode_Polyline(cast(^VectorShapeNode)n)
+		return pl.pts[:], pl.lens[:]
+	}
+	return
+}
+
+// Curve_Length: a followable node's curve length (local units).
+Curve_Length :: proc(n: ^Node) -> f32 {
+	pts, lens := Curve_Polyline(n)
+	return Polyline_Length(pts, lens)
 }
 
 PathFollowNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
@@ -242,7 +235,7 @@ PathFollowNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	path := PathFollowNode_Path(f, m)
 	if path == nil do return
 	if f.direction == 0 do f.direction = 1
-	length := PathNode_Length(path)
+	length := Curve_Length(path)
 	if f.speed != 0 && length > 0 && !f.finished {
 		f.progress += f.speed * f.direction * dt
 		switch f.loop {
@@ -274,8 +267,9 @@ PathFollowNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 }
 
 // PathFollowNode_Place puts the follower at its progress (local to the path).
-PathFollowNode_Place :: proc(f: ^PathFollowNode, path: ^PathNode) {
-	pos, dir := PathNode_SampleLocal(path, f.progress)
+PathFollowNode_Place :: proc(f: ^PathFollowNode, path: ^Node) {
+	pts, lens := Curve_Polyline(path)
+	pos, dir := Polyline_Sample(pts, lens, f.progress)
 	travel := dir * (f.direction if f.speed >= 0 else -f.direction)
 	side := [2]f32{-dir.y, dir.x} * f.sideOffset
 	f.position = pos + side
@@ -396,7 +390,7 @@ lua_path_clear :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 @(private = "file")
-lua_follow_arg :: proc(L: ^lua.State) -> (^PathFollowNode, ^PathNode) {
+lua_follow_arg :: proc(L: ^lua.State) -> (^PathFollowNode, ^Node) {
 	n, ok := to_node_userdata(L, 1)
 	if !ok || n.typeId != PathFollowNode do return nil, nil
 	f := cast(^PathFollowNode)n
@@ -409,7 +403,7 @@ lua_follow_arg :: proc(L: ^lua.State) -> (^PathFollowNode, ^PathNode) {
 lua_follow_ratio :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	f, p := lua_follow_arg(L)
-	l := PathNode_Length(p) if p != nil else 0
+	l := Curve_Length(p)
 	lua.pushnumber(L, lua.Number(f.progress / l if f != nil && l > 0 else 0))
 	return 1
 }
@@ -419,7 +413,7 @@ lua_follow_set_ratio :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	f, p := lua_follow_arg(L)
 	if f == nil || p == nil do return 0
-	f.progress = clamp(f32(lua.tonumber(L, 2)), 0, 1) * PathNode_Length(p)
+	f.progress = clamp(f32(lua.tonumber(L, 2)), 0, 1) * Curve_Length(p)
 	PathFollowNode_Place(f, p)
 	return 0
 }

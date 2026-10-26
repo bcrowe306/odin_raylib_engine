@@ -57,6 +57,18 @@ VectorShapeNode :: struct {
 	warpTopRight:    [2]f32 `gui:"true" min:"-500" max:"500"`,
 	warpBottomLeft:  [2]f32 `gui:"true" min:"-500" max:"500"`,
 	warpBottomRight: [2]f32 `gui:"true" min:"-500" max:"500"`,
+	// Collision from the art (vector_collider.odin): a shape on the body above it (or its own static body).
+	collider:         Vector_Collider `gui:"true"`, // None, Solid (convex pieces), Outline (edge loops: terrain)
+	colliderDetail:   f32 `gui:"true" min:"0.1" max:"16"`, // how closely it follows the art (its units; bigger: fewer corners)
+	colliderFriction: f32 `gui:"true" min:"0" max:"2"`,
+	colliderBounce:   f32 `gui:"true" min:"0" max:"1"`,
+	colliderDensity:  f32 `gui:"true" min:"0" max:"100"`,
+	collision:    Vector_Collision,
+	// Carving (vector_cut): its own copy of the shapes, cut.
+	carved:       [dynamic]Vector_Shape,
+	carving:      bool,
+	carveVersion: int,
+	carveOffset:  [2]f32,
 	skinning:     Vector_Skin,
 	filter:       Vector_Filter_State,
 	shapes:      [dynamic]Vector_Shape,
@@ -79,6 +91,7 @@ Vector_Fx_Key :: struct {
 	version, part, target:  int,
 	start, end, offset, t:  f32,
 	lineK:                  f32,
+	carve:                  int,
 	each:                   bool,
 	built:                  bool,
 }
@@ -105,6 +118,11 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 	v.saturation = 1
 	v.contrast = 1
 	v.skinSmooth = 24
+	v.colliderDetail = 1
+	v.colliderFriction = 0.6
+	v.colliderBounce = 0.1
+	v.colliderDensity = 1
+	v.update = VectorShapeNode_Update
 	// (Meshes are rebuilt on zoom: the heap, not the node's arena.)
 	v.shapes = make([dynamic]Vector_Shape, Engine_HeapAllocator())
 	v.fx = make([dynamic]Vector_Shape, Engine_HeapAllocator())
@@ -119,6 +137,9 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 		Vector_Cache_Destroy(&v.fxCache)
 		Vector_FilterRelease(v)
 		Vector_Skin_Destroy(&v.skinning)
+		Vector_Collision_Destroy(&v.collision)
+		VectorShapeNode_ResetCuts(v)
+		delete(v.carved)
 		ResourceManager_ReleaseVector(v.res)
 		v.res = nil
 		delete(v.loadedPath, Engine_HeapAllocator())
@@ -235,7 +256,7 @@ vector_color_effect :: proc(v: ^VectorShapeNode) -> (mul: rl.Color, add: [4]f32)
 // what it draws (then it tessellates its own copy when they change).
 VectorShapeNode_FxActive :: proc(v: ^VectorShapeNode) -> bool {
 	// (Skinned: its own mesh, which carries its weights.)
-	return v.trimStart > 0 || v.trimEnd < 1 || (v.morph > 0 && v.morphTo != "") || v.lineScale == .Constant || VectorShapeNode_SkinTarget(v) != nil
+	return v.trimStart > 0 || v.trimEnd < 1 || (v.morph > 0 && v.morphTo != "") || v.lineScale == .Constant || v.carving || VectorShapeNode_SkinTarget(v) != nil
 }
 
 // VectorShapeNode_SkinTarget: the Skeleton it bends with - the nearest
@@ -301,6 +322,7 @@ vector_fx_build :: proc(v: ^VectorShapeNode, r: ^Vector_Resource, part: int) {
 		sc := max(abs(v.globalScale.x), abs(v.globalScale.y), 1e-3)
 		key.lineK = 1 / (math.round(sc * 100) / 100 if sc >= 0.01 else sc)
 	}
+	key.carve = v.carveVersion
 	if r != nil {
 		base = Vector_PartShapes(r, part)
 		key.version = r.version
@@ -310,6 +332,7 @@ vector_fx_build :: proc(v: ^VectorShapeNode, r: ^Vector_Resource, part: int) {
 			key.t = clamp(v.morph, 0, 1)
 		}
 	}
+	if v.carving do base = v.carved[:] // (cut: its own copy)
 	if key == v.fxKey do return
 	v.fxKey = key
 	context.allocator = Engine_HeapAllocator()
@@ -380,6 +403,8 @@ VectorShapeNode_Mesh :: proc(v: ^VectorShapeNode, pixel: f32) -> (cache: ^Vector
 VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	v := cast(^VectorShapeNode)node
 	if !rl.IsWindowReady() do return
+	// The collider over the art, with the physics debug view.
+	defer if v.collider != .None && ctx != nil && ctx.game != nil && ctx.game.physicsWorld.drawPhysicsDebug do VectorShapeNode_DrawCollider(v)
 	// Filters: the texture the prepare pass made (vector_filters.odin).
 	if Vector_FiltersActive(v) && Vector_FilterDraw(v) do return
 	cache, offset, ok := VectorShapeNode_Mesh(v, Vector_ScreenPixel(v.globalScale))

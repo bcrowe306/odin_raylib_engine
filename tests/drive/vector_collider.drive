@@ -1,0 +1,51 @@
+# Collision from vector art in the editor (Phase 14 V.16): a Vector Shape's
+# Collider (Solid / Outline) shown as an overlay in the viewport, its
+# detail editable (fewer corners), undoable; the scene saves it; in Simulate
+# a ball dropped from Lua lands on the art.
+exec mkdir -p $PROJECT/vectors
+exec cp tests/vector/svg/hills.svg $PROJECT/vectors/hills_zz.svg
+wait 5
+wait-until item:asset:vectors/hills_zz.svg == visible timeout=600
+drag @asset:vectors/hills_zz.svg @world:640,560 12
+wait 2
+expect node:hills_zz.type == VectorShapeNode
+expect node:hills_zz.prop.collider == None
+click @insp.prop:collider
+click @pick:Outline
+wait 2
+expect node:hills_zz.prop.collider == Outline
+screenshot outline
+click @insp.prop:collider
+click @pick:Solid
+wait 2
+expect node:hills_zz.prop.collider == Solid
+screenshot solid
+dblclick @insp.prop:colliderDetail
+key ctrl+a
+type 8
+key enter
+wait 2
+expect node:hills_zz.prop.colliderDetail == 8
+screenshot coarse
+key cmd+z
+wait 1
+expect node:hills_zz.prop.colliderDetail == 1
+key cmd+s
+wait 2
+expect file:scenes/main.scene.json contains "collider": "Solid"
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 30
+click @bottom:console
+click @console.lua
+type local h = Scene.find_node("hills_zz"); local b = Scene.create_node("DynamicBodyNode", "DropBall"); b.position = Vec2(h.position.x, h.position.y - 150); local a = Scene.create_node("VectorShapeNode", "DropArt", b); a.preset = "Ring"; a.scale = Vec2(0.1, 0.1); a.collider = "Solid"; Log.info("VCOL start")
+key enter
+wait 120
+type local b = Scene.find_node("DropBall"); local h = Scene.find_node("hills_zz"); print("VCOL landed=" .. tostring(b.position.y < h.position.y and b.position.y > h.position.y - 120))
+key enter
+wait 3
+expect log contains VCOL landed=true
+screenshot simulating
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

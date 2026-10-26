@@ -370,6 +370,11 @@ prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
 		if name == "file" || name == "group" || name == "morphTo" || name == "skinBones" do return false
 		// (Skinning only means something under a Skeleton.)
 		if name == "skinSmooth" && e.VectorShapeNode_SkinTarget(cast(^e.VectorShapeNode)node) == nil do return false
+		// (Collider settings only with a collider.)
+		switch name {
+		case "colliderDetail", "colliderFriction", "colliderBounce", "colliderDensity":
+			if (cast(^e.VectorShapeNode)node).collider == .None do return false
+		}
 		if (cast(^e.VectorShapeNode)node).file != "" {
 			switch name {
 			case "preset", "fillColor", "strokeColor", "strokeWidth": return false
