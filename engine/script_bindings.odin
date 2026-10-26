@@ -1254,6 +1254,62 @@ lua_node_animation_get_current :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 // ----------------------------------------------------------------------------
+// VectorShapeNode Methods (vector_node.odin: part swapping)
+// ----------------------------------------------------------------------------
+
+@(private="file")
+lua_node_vector_swap :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != VectorShapeNode || lua.type(L, 2) != .STRING {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(VectorShapeNode_Swap(cast(^VectorShapeNode)node, string(lua.tostring(L, 2)))))
+	return 1
+}
+
+@(private="file")
+lua_node_vector_frames :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	lua.newtable(L)
+	if !ok || node.typeId != VectorShapeNode do return 1
+	for f, i in VectorShapeNode_Frames(cast(^VectorShapeNode)node) {
+		lua.pushstring(L, strings.clone_to_cstring(f, context.temp_allocator))
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
+@(private="file")
+lua_node_lipsync_play :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != LipSyncNode {lua.pushboolean(L, false); return 1}
+	l := cast(^LipSyncNode)node
+	sound := string(lua.tostring(L, 2)) if lua.type(L, 2) == .STRING else l.sound
+	lua.pushboolean(L, b32(LipSyncNode_Play(l, sound)))
+	return 1
+}
+
+@(private="file")
+lua_node_lipsync_stop :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if ok && node.typeId == LipSyncNode do LipSyncNode_Stop(cast(^LipSyncNode)node)
+	return 0
+}
+
+@(private="file")
+lua_node_lipsync_is_playing :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	lua.pushboolean(L, b32(ok && node.typeId == LipSyncNode && (cast(^LipSyncNode)node).playing))
+	return 1
+}
+
+// ----------------------------------------------------------------------------
 // TimerNode Methods
 // ----------------------------------------------------------------------------
 
@@ -4300,6 +4356,20 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "animation_set_fps")
 		lua.pushcfunction(L, lua_node_animation_get_current)
 		lua.setfield(L, -2, "animation_get_current")
+
+		// VectorShapeNode
+		lua.pushcfunction(L, lua_node_vector_swap)
+		lua.setfield(L, -2, "vector_swap")
+		lua.pushcfunction(L, lua_node_vector_frames)
+		lua.setfield(L, -2, "vector_frames")
+
+		// LipSyncNode
+		lua.pushcfunction(L, lua_node_lipsync_play)
+		lua.setfield(L, -2, "lipsync_play")
+		lua.pushcfunction(L, lua_node_lipsync_stop)
+		lua.setfield(L, -2, "lipsync_stop")
+		lua.pushcfunction(L, lua_node_lipsync_is_playing)
+		lua.setfield(L, -2, "lipsync_is_playing")
 
 		// TimerNode
 		lua.pushcfunction(L, lua_node_timer_start)

@@ -390,3 +390,177 @@ test_vector_background_tessellation :: proc(t: ^testing.T) {
 	Vector_JobsShutdown() // joins, installs, releases: freed now
 	testing.expect_value(t, Vector_ResourceCount(rm), 0)
 }
+
+@(private = "file")
+SVG_PARTS :: #load("../tests/vector/svg/character_parts.svg", string)
+
+// Symbols and part swapping (M3): a node draws one group of a file; frame
+// picks one of its child groups (by index or name); the origin box stays the
+// group's, so swapping never moves the part; meshes are per part.
+@(test)
+test_vector_symbols_swapping :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("vsym", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_vector_parts_test"}, context.temp_allocator)
+	_ = os.make_directory_all(dir)
+	path := strings.concatenate({dir, "/hero.svg"}, context.temp_allocator)
+	_ = os.write_entire_file(path, transmute([]u8)SVG_PARTS)
+	mouth := cast(^VectorShapeNode)Node_CreateByTypeName(scene, "VectorShapeNode")
+	mouth.gameContext = &game.gameContext
+	mouth.file = path
+	mouth.group = "mouth"
+	r := VectorShapeNode_Asset(mouth)
+	testing.expect(t, r != nil, "loaded")
+	frames := VectorShapeNode_Frames(mouth)
+	testing.expect_value(t, len(frames), 9)
+	testing.expect(t, frames[0] == "X" && frames[1] == "A" && frames[8] == "H", "Rhubarb's mouth shapes in order")
+	// frame -1 draws every mouth; the box is the whole mouth group.
+	part, boxMin, boxSize, ok := VectorShapeNode_Part(mouth, r)
+	testing.expect(t, ok && part == Vector_ResourceGroup(r, "mouth"), "the group")
+	// Swapping by name keeps the box (the origin doesn't jump).
+	testing.expect(t, VectorShapeNode_Swap(mouth, "O") == false, "no O")
+	testing.expect(t, VectorShapeNode_Swap(mouth, "D"), "D")
+	testing.expect_value(t, mouth.frame, 4)
+	part2, boxMin2, boxSize2, ok2 := VectorShapeNode_Part(mouth, r)
+	testing.expect(t, ok2 && part2 != part && r.doc.groups[part2].name == "D", "frame D")
+	testing.expect(t, boxMin2 == boxMin && boxSize2 == boxSize, "the same box for every frame")
+	// A frame past the end: nothing drawn (no crash).
+	mouth.frame = 20
+	_, _, _, ok3 := VectorShapeNode_Part(mouth, r)
+	testing.expect(t, !ok3, "no such frame")
+	mouth.frame = -1
+	// Nested names: "head/eyes" and a bare "eyes" find the same group.
+	testing.expect_value(t, Vector_ResourceGroup(r, "head/eyes"), Vector_ResourceGroup(r, "eyes"))
+	testing.expect_value(t, Vector_ResourceGroup(r, "nope"), -2)
+	// Size: the group's box; the whole file without a group.
+	testing.expect(t, VectorShapeNode_Size(mouth).x < 50, "the mouth is small")
+	mouth.group = ""
+	testing.expect_value(t, VectorShapeNode_Size(mouth), [2]f32{240, 320})
+	// Per-part meshes: two parts, two caches (each the part's shapes only).
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	head := Vector_ResourceGroup(r, "head")
+	arm := Vector_ResourceGroup(r, "arm_l")
+	ch := Vector_ResourceMesh(r, &tess, 1, part = head)
+	ca := Vector_ResourceMesh(r, &tess, 1, part = arm)
+	testing.expect(t, ch != ca && len(ch.mesh.idx) > len(ca.mesh.idx), "separate part meshes")
+	// Hidden groups (display:none) are frames: left out of what contains
+	// them, drawn when picked themselves.
+	mg := Vector_ResourceGroup(r, "mouth")
+	dg := Vector_ResourceGroup(r, "D")
+	testing.expect(t, r.doc.groups[dg].hidden && !r.doc.groups[Vector_ResourceGroup(r, "X")].hidden, "hidden frames")
+	testing.expect_value(t, len(Vector_PartShapes(r, mg)), 1) // (only X shows)
+	testing.expect_value(t, len(Vector_PartShapes(r, dg)), 2) // (D picked: its two shapes)
+	testing.expect(t, len(Vector_PartShapes(r, -1)) < len(r.doc.shapes), "the whole file skips them")
+	eyes := Vector_ResourceGroup(r, "eyes")
+	testing.expect_value(t, len(Vector_PartShapes(r, eyes)), 2) // (open; closed is hidden)
+	// The rescaled document keeps the hidden frames out.
+	Vector_DocScale(&r.doc, 2)
+	testing.expect_value(t, len(Vector_PartShapes(r, mg)), 1)
+	testing.expect_value(t, Vector_PartShapes(r, dg)[0].style.fillColor, r.doc.shapes[r.doc.groups[dg].first].style.fillColor)
+}
+
+// Lip-sync (M3): Rhubarb cues (TSV / JSON), shapes over time, frame mapping
+// and fallbacks, a LipSyncNode moving a mouth part to the end, a dialogue
+// line's voice driving it.
+@(test)
+test_vector_lipsync :: proc(t: ^testing.T) {
+	cues := make([dynamic]Lip_Cue)
+	defer delete(cues)
+	testing.expect(t, Lip_ParseCues("0.00\tX\n0.05\tD\n0.27\tC\n0.45\tX\n", &cues), "TSV")
+	testing.expect_value(t, len(cues), 4)
+	testing.expect_value(t, Lip_CueAt(cues[:], 0.1), 'D')
+	testing.expect_value(t, Lip_CueAt(cues[:], 0.3), 'C')
+	testing.expect_value(t, Lip_CueAt(cues[:], 9), 'X')
+	testing.expect(t, Lip_ParseCues(`{"metadata": {}, "mouthCues": [{"start": 0.00, "end": 0.10, "value": "X"}, {"start": 0.10, "end": 0.30, "value": "B"}]}`, &cues), "JSON")
+	testing.expect_value(t, Lip_CueAt(cues[:], 0.2), 'B')
+	testing.expect(t, !Lip_ParseCues("not cues", &cues), "junk")
+	frames := []string{"X", "A", "B", "C", "D", "E", "F"}
+	testing.expect_value(t, Lip_FrameFor(frames, "", 'D'), 4)
+	testing.expect_value(t, Lip_FrameFor(frames, "", 'G'), 2) // (no G: B)
+	testing.expect_value(t, Lip_FrameFor(frames, "", 'H'), 3) // (no H: C)
+	blair := []string{"rest", "MBP", "etc", "E", "AI", "O", "U"}
+	testing.expect_value(t, Lip_FrameFor(blair, "A=MBP,B=etc,C=E,D=AI,E=O,F=U,X=rest", 'A'), 1)
+	testing.expect_value(t, Lip_FrameFor(blair, "A=MBP,B=etc,C=E,D=AI,E=O,F=U,X=rest", 'X'), 0)
+	testing.expect_value(t, Lip_FrameFor(blair, "", 'D'), -1)
+	// Keyed swaps on the timeline hold until the next key (no tween through the frames between).
+	track := Property_Track{property = "frame"}
+	defer delete(track.keys)
+	Track_SetKey(&track, 0, {1, 0, 0, 0})
+	Track_SetKey(&track, 10, {4, 0, 0, 0})
+	v, _ := Track_Sample(&track, 9)
+	testing.expect_value(t, v[0], 1)
+	v, _ = Track_Sample(&track, 10)
+	testing.expect_value(t, v[0], 4)
+
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("vlips", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_vector_lips_test"}, context.temp_allocator)
+	_ = os.make_directory_all(dir)
+	svg := strings.concatenate({dir, "/hero.svg"}, context.temp_allocator)
+	_ = os.write_entire_file(svg, transmute([]u8)SVG_PARTS)
+	// A short silent WAV and its cues beside it.
+	wav := strings.concatenate({dir, "/hello.wav"}, context.temp_allocator)
+	write_silent_wav(wav, 0.5)
+	_ = os.write_entire_file(strings.concatenate({dir, "/hello.tsv"}, context.temp_allocator), transmute([]u8)string("0.00\tX\n0.05\tD\n0.20\tA\n0.30\tX\n"))
+	head := Node_CreateByTypeName(scene, "Node")
+	head.name = "Head"
+	head.gameContext = &game.gameContext
+	mouth := cast(^VectorShapeNode)Node_CreateByTypeName(scene, "VectorShapeNode", head)
+	mouth.name = "Mouth"
+	mouth.gameContext = &game.gameContext
+	mouth.file = svg
+	mouth.group = "mouth"
+	lips := cast(^LipSyncNode)Node_CreateByTypeName(scene, "LipSyncNode", head)
+	lips.gameContext = &game.gameContext
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	testing.expect(t, LipSyncNode_Mouth(lips) == mouth, "../Mouth found")
+	finished := 0
+	lips.onFinished->subscribe(proc(src: rawptr, v: EventValue, ctx: ^GameContext, ud: rawptr) {(cast(^int)ud)^ += 1}, &finished)
+	testing.expect(t, LipSyncNode_Follow(lips, wav, {}), "cues beside the sound")
+	LipSyncNode_Update(lips, &game.gameContext, 0.1) // t = 0.1: D
+	testing.expect_value(t, mouth.frame, 4)
+	LipSyncNode_Update(lips, &game.gameContext, 0.12) // t = 0.22: A
+	testing.expect_value(t, mouth.frame, 1)
+	LipSyncNode_Update(lips, &game.gameContext, 0.5) // past the end: rest (X)
+	testing.expect(t, !lips.playing, "finished")
+	testing.expect_value(t, mouth.frame, 0)
+	testing.expect_value(t, finished, 1)
+	// No cues: refuses.
+	testing.expect(t, !LipSyncNode_Follow(lips, strings.concatenate({dir, "/none.wav"}, context.temp_allocator), {}), "no cues")
+	// A dialogue line with that voice moves the mouth.
+	d := cast(^DialogueNode)Node_CreateByTypeName(scene, "DialogueNode", head)
+	d.gameContext = &game.gameContext
+	d.lipSync = "../LipSync"
+	lips.name = "LipSync"
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	DialogueNode_Show(d, {{"Hero", "Hello", wav}})
+	game->run(0.016)
+	testing.expect(t, lips.playing, "the line's voice drives it")
+	DialogueNode_Close(d, &game.gameContext)
+	testing.expect(t, !lips.playing, "closing the dialogue rests the mouth")
+}
+
+// write_silent_wav: a mono 16-bit 48 kHz WAV of silence.
+@(private = "file")
+write_silent_wav :: proc(path: string, seconds: f32) {
+	n := int(48000 * seconds)
+	b := make([dynamic]u8, context.temp_allocator)
+	u32le :: proc(b: ^[dynamic]u8, v: u32) {append(b, u8(v), u8(v >> 8), u8(v >> 16), u8(v >> 24))}
+	u16le :: proc(b: ^[dynamic]u8, v: u16) {append(b, u8(v), u8(v >> 8))}
+	append(&b, ..transmute([]u8)string("RIFF"))
+	u32le(&b, u32(36 + n * 2))
+	append(&b, ..transmute([]u8)string("WAVEfmt "))
+	u32le(&b, 16); u16le(&b, 1); u16le(&b, 1); u32le(&b, 48000); u32le(&b, 96000); u16le(&b, 2); u16le(&b, 16)
+	append(&b, ..transmute([]u8)string("data"))
+	u32le(&b, u32(n * 2))
+	for _ in 0 ..< n * 2 do append(&b, 0)
+	_ = os.write_entire_file(path, b[:])
+}

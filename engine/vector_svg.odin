@@ -38,6 +38,7 @@ Vector_Group :: struct {
 	parent: int,    // -1: the document
 	first:  int,    // its shapes: [first, first + count) (children's included)
 	count:  int,
+	hidden: bool,   // display:none / visibility:hidden - drawn only when picked (a swap frame)
 }
 
 Vector_Doc :: struct {
@@ -48,6 +49,7 @@ Vector_Doc :: struct {
 	size:     [2]f32,
 	drawn:    [4]f32, // what the shapes cover, strokes included (min x, min y, max x, max y)
 	warnings: [dynamic]string,
+	visible:  [][]Vector_Shape, // per part + 1: its shapes without hidden groups inside it (nil: all of its range)
 }
 
 Vector_Doc_Destroy :: proc(doc: ^Vector_Doc) {
@@ -155,8 +157,49 @@ Vector_LoadSVG :: proc(text: string, doc: ^Vector_Doc) -> (ok: bool) {
 		st.xf = {s, 0, 0, s, tx, ty}
 	}
 	walk(&p, root, st)
-	doc.drawn = Vector_ShapesBounds(doc.shapes[:])
+	vector_doc_visible(doc)
+	doc.drawn = Vector_ShapesBounds(Vector_DocShapes(doc, -1))
 	return true
+}
+
+// Vector_DocShapes: what a part draws (-1: the document) - its shapes less
+// the hidden groups inside it (a hidden group drawn as the part itself
+// shows: swap frames hidden in the file).
+Vector_DocShapes :: proc(doc: ^Vector_Doc, part: int) -> []Vector_Shape {
+	if part + 1 < len(doc.visible) && doc.visible[part + 1] != nil do return doc.visible[part + 1]
+	if part < 0 || part >= len(doc.groups) do return doc.shapes[:]
+	g := doc.groups[part]
+	return doc.shapes[g.first:g.first + g.count]
+}
+
+// vector_doc_visible: the parts with hidden groups inside get their shapes
+// without them (copies sharing the paths; made again after a rescale).
+@(private = "file")
+vector_doc_visible :: proc(doc: ^Vector_Doc) {
+	doc.visible = nil
+	any := false
+	for g in doc.groups do any ||= g.hidden
+	if !any do return
+	context.allocator = vmem.arena_allocator(&doc.arena)
+	doc.visible = make([][]Vector_Shape, len(doc.groups) + 1)
+	inside :: proc(doc: ^Vector_Doc, g, part: int) -> bool {
+		for p := doc.groups[g].parent; p >= 0; p = doc.groups[p].parent do if p == part do return true
+		return part < 0
+	}
+	for part in -1 ..< len(doc.groups) {
+		first, count := 0, len(doc.shapes)
+		if part >= 0 do first, count = doc.groups[part].first, doc.groups[part].count
+		skip := make([]bool, count, context.temp_allocator)
+		n := 0
+		for g, gi in doc.groups do if g.hidden && gi != part && inside(doc, gi, part) {
+			for i in g.first ..< g.first + g.count do if !skip[i - first] {skip[i - first] = true; n += 1}
+		}
+		if n == 0 do continue
+		out := make([]Vector_Shape, count - n)
+		k := 0
+		for i in 0 ..< count do if !skip[i] {out[k] = doc.shapes[first + i]; k += 1}
+		doc.visible[part + 1] = out
+	}
 }
 
 // Vector_DocScale scales a document (an import's vector_scale): points,
@@ -184,14 +227,16 @@ Vector_DocScale :: proc(doc: ^Vector_Doc, s: f32) {
 	doc.min *= s
 	doc.size *= s
 	doc.drawn *= s
+	vector_doc_visible(doc) // (the copies have the old styles)
 }
 
 // Vector_ShapesBounds: the box the shapes' points cover, widened by half
-// their stroke widths (control points included: a little generous).
-Vector_ShapesBounds :: proc(shapes: []Vector_Shape) -> [4]f32 {
+// their stroke widths (control points included: a little generous);
+// strokes = false: the geometry only.
+Vector_ShapesBounds :: proc(shapes: []Vector_Shape, strokes := true) -> [4]f32 {
 	b := [4]f32{max(f32), max(f32), min(f32), min(f32)}
 	for &s in shapes {
-		pad := s.style.strokeWidth * 0.5 * max(s.style.miterLimit, 1) if s.style.stroke else 0
+		pad := s.style.strokeWidth * 0.5 * max(s.style.miterLimit, 1) if s.style.stroke && strokes else 0
 		for pt in s.path.pts {
 			b[0] = min(b[0], pt.x - pad); b[1] = min(b[1], pt.y - pad)
 			b[2] = max(b[2], pt.x + pad); b[3] = max(b[3], pt.y + pad)
@@ -237,7 +282,13 @@ walk :: proc(p: ^Svg_Parser, id: xml.Element_ID, parent: Svg_State) {
 		return
 	}
 	st := style_of(p, el, parent)
-	if !st.visible do return
+	hiddenGroup := false
+	if !st.visible {
+		// A hidden group is kept (a swap frame: shown when picked); other hidden elements are dropped.
+		if tag != "g" do return
+		hiddenGroup = true
+		st.visible = true
+	}
 	if t, has := attr(el, "transform"); has do st.xf = xf_mul(parent.xf, parse_transform(t))
 	switch tag {
 	case "svg", "g", "a", "switch":
@@ -251,7 +302,7 @@ walk :: proc(p: ^Svg_Parser, id: xml.Element_ID, parent: Svg_State) {
 			name := attr_or(el, "inkscape:label", "")
 			if name == "" do name = attr_or(el, "data-name", "")
 			if name == "" do name = attr_or(el, "id", "")
-			append(&p.doc.groups, Vector_Group{name = strings.clone(name), parent = parent.group, first = len(p.doc.shapes)})
+			append(&p.doc.groups, Vector_Group{name = strings.clone(name), parent = parent.group, first = len(p.doc.shapes), hidden = hiddenGroup})
 			st.group = gi
 		}
 		// A clip-path on a group clips everything in it (Figma exports do this).

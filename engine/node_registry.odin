@@ -54,6 +54,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"JointNode", JointNode, factory_joint, {"joint", "physicsjoint"}},
 	{"TextNode", TextNode, factory_text, {"text", "label2d", "textlabel"}},
 	{"DialogueNode", DialogueNode, factory_dialogue, {"dialogue", "dialoguebox"}},
+	{"LipSyncNode", LipSyncNode, factory_lipsync, {"lipsync", "lip sync", "mouth", "rhubarb"}},
 	{"NineSliceNode", NineSliceNode, factory_nine_slice, {"nineslice", "ninepatch"}},
 	{"ParallaxNode", ParallaxNode, factory_parallax, {"parallax", "parallaxlayer"}},
 	{"LineNode", LineNode, factory_line, {"line", "line2d"}},
@@ -177,6 +178,9 @@ factory_post_effect :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return PostE
 factory_text :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return TextNode_Create(scene, "Text", parent)
 }
+
+@(private = "file")
+factory_lipsync :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return LipSyncNode_Create(scene, "LipSync", parent)}
 
 @(private = "file")
 factory_dialogue :: proc(scene: ^Scene, parent: ^Node) -> ^Node {

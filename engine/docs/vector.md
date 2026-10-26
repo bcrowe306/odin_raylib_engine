@@ -10,8 +10,8 @@ in milestones:
 | M0 | The renderer: tessellation, anti-aliasing, cached GPU meshes, the Vector Shape node with built-in shapes; proven in the game, the editor and the web | **done** |
 | M1 | Shapes in full: fill rules and self-intersections (Clipper2), gradients, dashes, opacity, clip paths; drawing from Lua (`on_draw` + the `Vector` module) | **done** |
 | M2 | Vector assets: SVG import (Inkscape, Illustrator, Affinity, Figma), assets shared and reloaded on save, the editor's workflow, picking, culling, background tessellation | **done** |
-| M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | next |
-| M5 | Shape tweens, vector skinning on skeletons, filters | |
+| M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | **done** |
+| M5 | Shape tweens, vector skinning on skeletons, filters | next |
 | M6 | Boolean path operations, collision from shapes | |
 | M4 | Drawing tools in the editor | |
 | M7 | Crisp text, Adobe Animate import, a sample character | |
@@ -60,6 +60,82 @@ markers, and a radial gradient's separate focal point.
 | Illustrator | *Export As > SVG*: Styling *Internal CSS* or *Presentation Attributes* (both read); Font *Convert to Outlines*; Images *Link* (they're skipped anyway). |
 | Affinity Designer | *Export > SVG*: "Flatten transforms" off is fine; rasterise nothing; text as curves. |
 | Figma | *Export > SVG* on a frame; "Outline text" on. Clip content (frames) is kept. |
+
+## Characters: symbols, part swapping and lip-sync
+
+Build a character the way Flash animators did: draw it in layers (or
+groups) in your vector app, then animate the layers as parts.
+
+### Symbols
+
+Every named group of an SVG - an Inkscape layer (its label), an
+Illustrator or Affinity layer or group (its name), any `<g id="...">` - is a
+**symbol**: a Vector Shape's **Symbol** (`group`) draws only that group.
+Nested groups are named by path, `head/mouth`; a bare name finds the group
+anywhere. One file can hold a whole character, or a sheet of props.
+
+- **Instances**: any number of nodes can draw the same symbol, each with
+  its own transform, **tint** (multiply), **brightness** (-1 black ... 1
+  white) and **colour offset** (`colorAdd`: added to every colour - a hit
+  flash). The meshes are shared: one tessellation per symbol per zoom.
+- **Editing the symbol updates every instance**: save the SVG.
+- **A symbol with its own timeline** is a component: make a component
+  (prefab) of a node tree drawing parts, give it an Animation Player, and
+  instance it - each instance plays (or holds) its own animation.
+
+### Explode into Parts
+
+The Inspector's **Explode into Parts** replaces a Vector Shape with a Node
+in its place (same name, transform and children) holding a Vector Shape
+per child group - the layers of a whole file, or the groups inside a
+symbol - each with its pivot at the part's centre, where it was drawn.
+Move, rotate and key the parts; reparent them to build a hierarchy (the arm
+under the body). Shapes that sit outside any child group are left out (a
+warning says how many): group them in the vector app. Undo puts the
+original back.
+
+### Part swapping
+
+A symbol whose child groups are alternatives - mouth shapes, hands, eyes
+open / closed - shows one at a time with **Frame**: the child group's
+index (-1 shows them all). The Inspector lists the frames by name. The
+box the node's origin sits in is the symbol's (all frames together), so
+swapping never makes the part jump.
+
+```lua
+local mouth = self.node:get_node("Mouth")
+mouth:vector_swap("O")              -- by name; false when there's none
+print(#mouth:vector_frames())       -- the frame names, in order
+mouth.frame = 2                     -- by index
+```
+
+On the animation timeline, `frame` is an ordinary property: key it and
+the keys **hold** until the next one (new `frame` keys use the Constant
+ease), so swaps step instead of tweening. Brightness, colour offset, tint,
+position, rotation, scale and draw order (`zIndex`) key and tween with the
+usual eases and curves; hold keys and "on twos" are Constant keys.
+
+### Lip-sync
+
+A **Lip Sync** node moves a mouth with a voice. Run the recording through
+[Rhubarb Lip Sync](https://github.com/DanielSWolf/rhubarb-lip-sync) (free,
+MIT) and save its output (TSV, or JSON with `-f json`) beside the sound
+with the same name (`hello.wav` -> `hello.tsv` / `hello.json`), or point
+**cues** at it.
+
+- **mouth**: the mouth's path from the Lip Sync node (default `../Mouth`) -
+  a Vector Shape whose symbol's child groups are the mouth shapes.
+- Name the shapes after Rhubarb's: `A` (M B P), `B` (most consonants),
+  `C` (E), `D` (A), `E` (O), `F` (U W), and optionally `G` (F V), `H` (L),
+  `X` (rest). Missing ones fall back as Rhubarb's do (G -> B, H -> C,
+  X -> A). Other names (a Preston Blair chart): **mapping**
+  `A=MBP,B=etc,C=E,D=AI,E=O,F=U,X=rest`.
+- **sound** + **autoplay**, or from Lua `node:lipsync_play("voice/hello.wav")`,
+  `lipsync_stop()`, `lipsync_is_playing()`; `finished` fires at the end and
+  the mouth rests.
+- **Dialogue**: set a Dialogue node's **lipSync** to the Lip Sync node's
+  path and every line with a voice moves the mouth, timed by the voice's
+  playback position (no drift); closing or skipping the line rests it.
 
 ## Using it with presets
 
@@ -205,12 +281,19 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
   colours, transforms, units, CSS, gradients, clips, groups, warnings) on
   fixtures shaped like Inkscape / Illustrator / Affinity / Figma exports
   (`tests/vector/svg`), assets (sharing, reloads, bounds, hit tests),
-  import settings, background tessellation.
+  import settings, background tessellation, symbols and part swapping
+  (paths, frames, the stable box, colour effects), lip-sync (TSV / JSON
+  cues, mappings and fallbacks, a Lip Sync node and a Dialogue line moving
+  a mouth), held `frame` keys.
 - `tests/drive/vector_shape.drive`: the editor - Add Node, editing the
   preset and stroke, the viewport zoomed in, saving.
 - `tests/drive/vector_svg.drive`: SVG assets - thumbnails, dropping into
   the viewport and onto a Vector Shape (undo), warnings, a reload on save,
   saving the scene.
+- `tests/drive/vector_symbols.drive`: the Symbol and Frame pickers (undo),
+  Explode into Parts and its undo.
+- `scenes/symbols.scene.json` (golden): symbols alone, brightness, a
+  colour offset, swaps from Lua, a mouth's nine frames.
 - `scripts/web/test_project.sh tests/vector/project out.png`: the same scene
   in the web runner (headless Chrome).
 
@@ -226,3 +309,6 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
 - SVG text, images, filters, masks, patterns and markers aren't imported
   (see above); group opacity is applied to each shape (overlapping shapes
   in a half-transparent group show through each other).
+- Hidden layers (`display:none`) aren't imported, so keep swap frames
+  visible in the file; a whole-file instance draws every frame at once
+  (explode it, or pick the symbol).

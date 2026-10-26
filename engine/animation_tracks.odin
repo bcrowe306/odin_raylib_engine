@@ -135,7 +135,8 @@ Track_SetKey :: proc(track: ^Property_Track, frame: f32, value: [4]f32) {
 			return
 		}
 	}
-	append(&track.keys, Track_Key{frame = frame, value = value})
+	// (Frame indices - part swaps, sprite frames - hold until the next key.)
+	append(&track.keys, Track_Key{frame = frame, value = value, ease = .Constant if track.property == "frame" else .Linear})
 	slice.sort_by(track.keys[:], proc(a, b: Track_Key) -> bool {return a.frame < b.frame})
 }
 

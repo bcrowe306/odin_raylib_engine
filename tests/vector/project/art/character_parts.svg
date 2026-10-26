@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A character in parts, Inkscape-style (test fixture): layers for the body,
+     head and arms; a mouth group whose child groups are mouth shapes
+     (Rhubarb's A-H, X); eyes open / closed. The alternatives are hidden
+     (display:none, as Inkscape saves hidden layers): swap frames. -->
+<svg width="240" height="320" viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg"
+     xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape">
+  <g inkscape:groupmode="layer" inkscape:label="arm_l" id="arm_l">
+    <path d="M70 170 C40 190 35 230 50 260" fill="none" stroke="#f2c29b" stroke-width="16" stroke-linecap="round"/>
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="body" id="body">
+    <path d="M70 160 C60 220 70 270 90 290 H150 C170 270 180 220 170 160 C150 145 90 145 70 160 Z" fill="#3f7fd8" stroke="#1b3d70" stroke-width="4"/>
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="arm_r" id="arm_r">
+    <path d="M170 170 C200 190 205 230 190 260" fill="none" stroke="#f2c29b" stroke-width="16" stroke-linecap="round"/>
+  </g>
+  <g inkscape:groupmode="layer" inkscape:label="head" id="head">
+    <circle cx="120" cy="95" r="62" fill="#f6d0ae" stroke="#7a4a2a" stroke-width="4"/>
+    <g id="eyes">
+      <g id="open">
+        <ellipse cx="98" cy="88" rx="9" ry="12" fill="#1a1a1a"/>
+        <ellipse cx="142" cy="88" rx="9" ry="12" fill="#1a1a1a"/>
+      </g>
+      <g id="closed" style="display:none">
+        <path d="M88 90 Q98 96 108 90 M132 90 Q142 96 152 90" fill="none" stroke="#1a1a1a" stroke-width="4" stroke-linecap="round"/>
+      </g>
+    </g>
+    <g id="mouth">
+      <g id="X"><path d="M105 125 H135" stroke="#5a1a1a" stroke-width="4" stroke-linecap="round"/></g>
+      <g id="A" style="display:none"><path d="M104 122 Q120 126 136 122 Q120 128 104 122 Z" fill="#5a1a1a"/></g>
+      <g id="B" style="display:none"><path d="M102 120 Q120 132 138 120 Z" fill="#5a1a1a"/></g>
+      <g id="C" style="display:none"><ellipse cx="120" cy="126" rx="15" ry="8" fill="#5a1a1a"/></g>
+      <g id="D" style="display:none"><ellipse cx="120" cy="128" rx="17" ry="13" fill="#5a1a1a"/><path d="M106 124 Q120 120 134 124" fill="none" stroke="#ffffff" stroke-width="3"/></g>
+      <g id="E" style="display:none"><ellipse cx="120" cy="127" rx="11" ry="10" fill="#5a1a1a"/></g>
+      <g id="F" style="display:none"><ellipse cx="120" cy="126" rx="7" ry="8" fill="#5a1a1a"/></g>
+      <g id="G" style="display:none"><path d="M106 122 H134 L130 132 H110 Z" fill="#5a1a1a"/><path d="M108 124 H132" stroke="#ffffff" stroke-width="3"/></g>
+      <g id="H" style="display:none"><ellipse cx="120" cy="127" rx="14" ry="11" fill="#5a1a1a"/><ellipse cx="120" cy="132" rx="8" ry="4" fill="#d05050"/></g>
+    </g>
+  </g>
+</svg>

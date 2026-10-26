@@ -24,18 +24,24 @@ Vector_Resource :: struct {
 	refs:    int,
 	version: int, // +1 per reload
 	modTime: time.Time,
-	caches:  [VECTOR_BUCKETS_KEPT]Vector_Resource_Cache,
+	caches:  [dynamic]Vector_Resource_Cache, // per part, up to VECTOR_BUCKETS_KEPT buckets each
 	frame:   u64, // a draw counter (which bucket was used last)
 	owner:   ^ResourceManager,
 	pending: int, // background tessellations running (vector_jobs.odin)
-	waiting: [VECTOR_BUCKETS_KEPT]f32, // buckets queued (0: none)
+	waiting: [dynamic][2]f32, // (part, bucket) queued for a worker
 }
 
+// A part: the whole document (-1) or one of its groups (a symbol, a swap
+// frame) - its shapes, drawn in document coordinates.
 Vector_Resource_Cache :: struct {
 	cache:    Vector_Cache,
-	used:     u64, // r.frame when last drawn (0: free)
+	part:     int,
+	used:     u64, // r.frame when last drawn
 	version:  int,
 }
+
+// Vector_PartShapes: a part's shapes (-1: all of them).
+Vector_PartShapes :: proc(r: ^Vector_Resource, part: int) -> []Vector_Shape {return Vector_DocShapes(&r.doc, part)}
 
 // Vector_IsPath: a vector asset's path (.svg).
 Vector_IsPath :: proc(path: string) -> bool {
@@ -89,6 +95,8 @@ ResourceManager_ReleaseVector :: proc(r: ^Vector_Resource) {
 vector_resource_free :: proc(r: ^Vector_Resource) {
 	context.allocator = Engine_HeapAllocator()
 	for &c in r.caches do Vector_Cache_Destroy(&c.cache)
+	delete(r.caches)
+	delete(r.waiting)
 	Vector_Doc_Destroy(&r.doc)
 	delete(r.path)
 	free(r)
@@ -147,12 +155,13 @@ Vector_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 	return n
 }
 
-// Vector_ResourceMesh: the cached mesh for drawing at a screen-pixel size.
-// A bucket not cached yet: with `background`, the nearest cached bucket is
-// drawn meanwhile and a worker tessellates the new one (vector_jobs.odin);
-// otherwise (or when nothing is cached) it is tessellated now. The least
-// recently used bucket is replaced.
-Vector_ResourceMesh :: proc(r: ^Vector_Resource, t: ^Vector_Tess, pixel: f32, background := false) -> ^Vector_Cache {
+// Vector_ResourceMesh: a part's cached mesh (part -1: the whole document)
+// for drawing at a screen-pixel size. A bucket not cached yet: with
+// `background`, the part's nearest cached bucket is drawn meanwhile and a
+// worker tessellates the new one (vector_jobs.odin); otherwise (or when
+// nothing is cached) it is tessellated now. A part keeps its
+// VECTOR_BUCKETS_KEPT most recently used buckets.
+Vector_ResourceMesh :: proc(r: ^Vector_Resource, t: ^Vector_Tess, pixel: f32, background := false, part := -1) -> ^Vector_Cache {
 	context.allocator = Engine_HeapAllocator()
 	// (Finished background meshes, once a frame - also where the game loop
 	// doesn't run: the editor's viewport.)
@@ -161,47 +170,112 @@ Vector_ResourceMesh :: proc(r: ^Vector_Resource, t: ^Vector_Tess, pixel: f32, ba
 		lastPump = now
 		Vector_JobPump()
 	}
+	if r.caches == nil do r.caches = make([dynamic]Vector_Resource_Cache)
 	r.frame += 1
 	b := Vector_PixelBucket(pixel)
 	slot := -1
-	for &c, i in r.caches do if c.used != 0 && c.cache.bucket == b && c.version == r.version {slot = i; break}
+	for &c, i in r.caches do if c.part == part && c.cache.bucket == b && c.version == r.version {slot = i; break}
 	if slot < 0 && background {
-		// The nearest bucket that is ready (current version, a mesh).
+		// The part's nearest bucket that is ready (current version, a mesh).
 		near := -1
 		best := max(f32)
 		for c, i in r.caches {
-			if c.used == 0 || c.version != r.version || c.cache.dirty || len(c.cache.mesh.idx) == 0 do continue
+			if c.part != part || c.version != r.version || c.cache.dirty || len(c.cache.mesh.idx) == 0 do continue
 			d := abs(c.cache.bucket / b - 1) if c.cache.bucket > b else abs(b / c.cache.bucket - 1)
 			if d < best {best = d; near = i}
 		}
 		if near >= 0 {
 			queued := false
-			for w in r.waiting do if w == b do queued = true
+			for w in r.waiting do if int(w[0]) == part && w[1] == b do queued = true
 			if !queued {
-				for &w in r.waiting do if w == 0 {
-					w = b
-					vector_job_submit(r, b)
-					break
-				}
+				if r.waiting == nil do r.waiting = make([dynamic][2]f32)
+				append(&r.waiting, [2]f32{f32(part), b})
+				vector_job_submit(r, b, part)
 			}
 			c := &r.caches[near]
 			c.used = r.frame
-			Vector_Cache_Ensure(&c.cache, t, r.doc.shapes[:], c.cache.bucket) // (uploads it if needed)
+			Vector_Cache_Ensure(&c.cache, t, Vector_PartShapes(r, part), c.cache.bucket) // (uploads it if needed)
 			return &c.cache
 		}
 	}
-	if slot < 0 {
-		// The free or least recently used slot.
-		oldest := max(u64)
-		for c, i in r.caches do if c.used < oldest {oldest = c.used; slot = i}
-		Vector_Cache_Destroy(&r.caches[slot].cache)
-		r.caches[slot] = {}
-	}
+	if slot < 0 do slot = vector_part_slot(r, part)
 	c := &r.caches[slot]
 	if c.version != r.version {c.cache.dirty = true; c.version = r.version}
 	c.used = r.frame
-	Vector_Cache_Ensure(&c.cache, t, r.doc.shapes[:], b)
+	Vector_Cache_Ensure(&c.cache, t, Vector_PartShapes(r, part), b)
 	return &c.cache
+}
+
+// vector_part_slot: a fresh cache slot for a part - a new one, or its least
+// recently used when it has VECTOR_BUCKETS_KEPT already.
+@(private = "file")
+vector_part_slot :: proc(r: ^Vector_Resource, part: int) -> int {
+	n, oldest, slot := 0, max(u64), -1
+	for c, i in r.caches do if c.part == part {
+		n += 1
+		if c.used < oldest {oldest = c.used; slot = i}
+	}
+	if n < VECTOR_BUCKETS_KEPT {
+		append(&r.caches, Vector_Resource_Cache{part = part})
+		return len(r.caches) - 1
+	}
+	Vector_Cache_Destroy(&r.caches[slot].cache)
+	r.caches[slot] = {part = part}
+	return slot
+}
+
+// Vector_ResourceGroup: a group's index by name ("" -> -1, the whole
+// document; "a/b": b inside a); -2 when there's none of that name.
+Vector_ResourceGroup :: proc(r: ^Vector_Resource, name: string) -> int {
+	if name == "" do return -1
+	if name == "." do return -1
+	parts := strings.split(name, "/", context.temp_allocator)
+	parent := -1
+	found := -2
+	for p in parts {
+		found = -2
+		for g, i in r.doc.groups do if g.parent == parent && g.name == p {found = i; break}
+		if found == -2 && len(parts) == 1 {
+			// (A bare name matches a group anywhere.)
+			for g, i in r.doc.groups do if g.name == p {found = i; break}
+		}
+		if found == -2 do return -2
+		parent = found
+	}
+	return found
+}
+
+// Vector_GroupPath: the path naming a group from the top ("head/mouth"),
+// what Vector_ResourceGroup finds it by ("" for -1).
+Vector_GroupPath :: proc(r: ^Vector_Resource, group: int, allocator := context.temp_allocator) -> string {
+	names := make([dynamic]string, context.temp_allocator)
+	for g := group; g >= 0 && g < len(r.doc.groups); g = r.doc.groups[g].parent do inject_at(&names, 0, r.doc.groups[g].name)
+	return strings.join(names[:], "/", allocator)
+}
+
+// Vector_GroupLoose: how many of a group's shapes are in none of its child
+// groups (exploding it into parts leaves those out).
+Vector_GroupLoose :: proc(r: ^Vector_Resource, group: int) -> int {
+	total := len(r.doc.shapes) if group < 0 else r.doc.groups[group].count
+	for k in Vector_GroupChildren(r, group) do total -= r.doc.groups[k].count
+	return total
+}
+
+// Vector_GroupChildren: a group's direct child groups (-1: the top level).
+Vector_GroupChildren :: proc(r: ^Vector_Resource, group: int, allocator := context.temp_allocator) -> []int {
+	out := make([dynamic]int, allocator)
+	for g, i in r.doc.groups do if g.parent == group do append(&out, i)
+	return out[:]
+}
+
+// Vector_PartBox: a part's box in document coordinates - its shapes'
+// points (the whole document: its box).
+Vector_PartBox :: proc(r: ^Vector_Resource, part: int) -> (min, size: [2]f32) {
+	if part < 0 do return r.doc.min, r.doc.size
+	// (Every frame's shapes, hidden ones too: the box doesn't change with the frame shown.)
+	g := r.doc.groups[part]
+	b := Vector_ShapesBounds(r.doc.shapes[g.first:g.first + g.count], false)
+	return {b[0], b[1]}, {b[2] - b[0], b[3] - b[1]}
 }
 
 // Vector_ResourceBounds: the document's box (its origin rectangle).
@@ -234,7 +308,7 @@ Vector_DocImage :: proc(doc: ^Vector_Doc, maxSize: i32) -> rl.Image {
 	defer Vector_Cache_Destroy(&cache)
 	{
 		context.allocator = Engine_HeapAllocator()
-		Vector_Cache_Ensure(&cache, &tess, doc.shapes[:], 1 / s)
+		Vector_Cache_Ensure(&cache, &tess, Vector_DocShapes(doc, -1), 1 / s)
 	}
 	rl.BeginTextureMode(rt)
 	rl.ClearBackground({0, 0, 0, 0})
@@ -245,19 +319,21 @@ Vector_DocImage :: proc(doc: ^Vector_Doc, maxSize: i32) -> rl.Image {
 	return img
 }
 
-// vector_resource_install: a finished background mesh into the bucket's
-// cache slot (main thread; vector_jobs.odin).
-vector_resource_install :: proc(r: ^Vector_Resource, bucket: f32, mesh: ^Vector_Mesh) {
-	for &w in r.waiting do if w == bucket do w = 0
-	slot := -1
-	for c, i in r.caches do if c.used != 0 && c.cache.bucket == bucket {slot = i; break}
-	if slot < 0 {
-		oldest := max(u64)
-		for c, i in r.caches do if c.used < oldest {oldest = c.used; slot = i}
+// vector_resource_install: a finished background mesh into its part's
+// bucket slot (main thread; vector_jobs.odin).
+vector_resource_install :: proc(r: ^Vector_Resource, part: int, bucket: f32, mesh: ^Vector_Mesh) {
+	context.allocator = Engine_HeapAllocator()
+	for w, i in r.waiting do if int(w[0]) == part && w[1] == bucket {
+		unordered_remove(&r.waiting, i)
+		break
 	}
+	slot := -1
+	for c, i in r.caches do if c.part == part && c.cache.bucket == bucket {slot = i; break}
+	if slot < 0 do slot = vector_part_slot(r, part)
 	c := &r.caches[slot]
 	Vector_Cache_Destroy(&c.cache)
 	c.cache = {}
+	c.part = part
 	c.cache.mesh = mesh^
 	mesh^ = {}
 	c.cache.bucket = bucket

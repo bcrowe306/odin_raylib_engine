@@ -40,6 +40,7 @@ DialogueNode :: struct {
 	advanceAction: string `gui:"true"`,                 // input action that advances ("confirm")
 	localized:     bool `gui:"true"`,                   // lines are locale keys
 	mode:          Dialogue_Mode `gui:"true"`,          // a box, or the subtitle track
+	lipSync:       string `gui:"true"`,                 // a LipSyncNode (path) moving a mouth with the voices
 
 	lines:         [dynamic]Dialogue_Line,
 	current:       int,  // index into lines; -1 = closed
@@ -115,6 +116,7 @@ line_start :: proc(d: ^DialogueNode, ctx: ^GameContext) {
 			length = f32(len(s.pcm) / 2) / MIXER_RATE
 			if Audio_Ready() do d.voice = Mixer_PlaySound(s.pcm, Audio_BusFor(rm, s.filePath, "SFX"), owner = s)
 		}
+		if ls := dialogue_lipsync(d); ls != nil do LipSyncNode_Follow(ls, l.voice, d.voice)
 	}
 	if d.mode == .Subtitles {
 		speaker, text := line_text(d, ctx)
@@ -128,6 +130,7 @@ line_start :: proc(d: ^DialogueNode, ctx: ^GameContext) {
 // line_end: stops the line's voice and takes its subtitle down.
 @(private = "file")
 line_end :: proc(d: ^DialogueNode) {
+	if ls := dialogue_lipsync(d); ls != nil && ls.playing do LipSyncNode_Stop(ls)
 	Mixer_StopVoice(d.voice)
 	d.voice = {}
 	if d.voiceSound != nil {
@@ -232,4 +235,13 @@ DialogueNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 		p := [2]f32{rect.x + rect.width - d.padding, rect.y + rect.height - d.padding + bob}
 		rl.DrawTriangle(p + {-12, -10}, p + {-6, 0}, p + {0, -10}, d.borderColor)
 	}
+}
+
+// dialogue_lipsync: the Lip Sync node `lipSync` names (nil: none).
+@(private = "file")
+dialogue_lipsync :: proc(d: ^DialogueNode) -> ^LipSyncNode {
+	if d.lipSync == "" || d.gameContext == nil || d.gameContext.scene == nil do return nil
+	n := Node_ResolvePath(d.gameContext.scene.manager, d, d.lipSync)
+	if n == nil || n.typeId != LipSyncNode do return nil
+	return cast(^LipSyncNode)n
 }

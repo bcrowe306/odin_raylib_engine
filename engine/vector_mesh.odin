@@ -58,6 +58,8 @@ Vector_Cache :: struct {
 vectorMaterial: rl.Material
 @(private = "file")
 vectorMaterialReady: bool
+@(private = "file")
+vectorAddLoc: i32 = -1
 
 // The vector shader: solid vertices use their colour; gradient vertices
 // (mode > 0) look their colour up in the mesh's gradient texture at the
@@ -89,6 +91,7 @@ in vec2 fragMode;
 in vec4 fragColor;
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
+uniform vec4 colAdd;
 out vec4 finalColor;
 void main() {
     vec4 c = fragColor;
@@ -104,6 +107,7 @@ void main() {
         c = vec4(g.rgb, g.a * fragColor.a);
     }
     finalColor = c * colDiffuse;
+    finalColor.rgb = min(finalColor.rgb + colAdd.rgb, vec3(1.0)); // (straight alpha)
 }
 `
 
@@ -232,7 +236,8 @@ Vector_ScreenPixel :: proc(nodeScale: [2]f32) -> f32 {
 
 // Vector_Cache_Draw draws the cached mesh at a transform (degrees), tinted.
 // offset moves the mesh in its own units first (an asset's origin).
-Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [2]f32, tint: rl.Color = rl.WHITE, offset: [2]f32 = {}) {
+// add is a colour offset (0..1, alpha unused) added after the tint.
+Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [2]f32, tint: rl.Color = rl.WHITE, offset: [2]f32 = {}, add: [4]f32 = {}) {
 	if !rl.IsWindowReady() || len(c.mesh.idx) == 0 do return
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableBackfaceCulling() // (the tessellator doesn't keep one winding)
@@ -244,9 +249,14 @@ Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [
 		if !vectorMaterialReady {
 			vectorMaterial = rl.LoadMaterialDefault()
 			vectorMaterial.shader = rl.LoadShaderFromMemory(Shader_Port(VECTOR_VS), Shader_Port(VECTOR_FS))
+			vectorAddLoc = rl.GetShaderLocation(vectorMaterial.shader, "colAdd")
 			vectorMaterialReady = true
 		}
 		vectorMaterial.maps[rl.MaterialMapIndex.ALBEDO].color = tint
+		if vectorAddLoc >= 0 {
+			a := add
+			rl.SetShaderValue(vectorMaterial.shader, rl.ShaderLocationIndex(vectorAddLoc), &a, .VEC4)
+		}
 		vectorMaterial.maps[rl.MaterialMapIndex.ALBEDO].texture = c.gradTex if c.gradTex.id != 0 else rl.Texture2D{id = rlgl.GetTextureIdDefault(), width = 1, height = 1, mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8}
 		xf := rl.MatrixTranslate(pos.x, pos.y, 0) * rl.MatrixRotateZ(rotation * rl.DEG2RAD) * rl.MatrixScale(scale.x, scale.y, 1) * rl.MatrixTranslate(offset.x, offset.y, 0)
 		for m in c.gpu do rl.DrawMesh(m, vectorMaterial, xf)
@@ -266,6 +276,10 @@ Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [
 			v := m.idx[i + k]
 			col := m.cols[v]
 			if m.gi[v].y > 0 do col = vector_vertex_gradient(m, v) // (per vertex: an approximation)
+			if add != {} {
+				// (The colour offset, premultiplied by the vertex alpha like the shader.)
+				for ch in 0 ..< 3 do col[ch] = u8(min(f32(col[ch]) + add[ch] * 255, 255))
+			}
 			rlgl.Color4ub(u8(u32(col.r) * tr / 255), u8(u32(col.g) * tg / 255), u8(u32(col.b) * tb / 255), u8(u32(col.a) * ta / 255))
 			rlgl.Vertex2f(m.verts[v].x, m.verts[v].y)
 		}
