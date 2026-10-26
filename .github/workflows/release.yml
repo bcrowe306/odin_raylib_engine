@@ -267,6 +267,7 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }} # (the CDN cache purge)
         run: |
           pip install --quiet boto3
           python3 src/scripts/ci/publish_r2.py --version "${{ needs.version.outputs.version }}" \
