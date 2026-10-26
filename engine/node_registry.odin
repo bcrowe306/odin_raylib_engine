@@ -57,6 +57,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"NineSliceNode", NineSliceNode, factory_nine_slice, {"nineslice", "ninepatch"}},
 	{"ParallaxNode", ParallaxNode, factory_parallax, {"parallax", "parallaxlayer"}},
 	{"LineNode", LineNode, factory_line, {"line", "line2d"}},
+	{"VectorShapeNode", VectorShapeNode, factory_vector_shape, {"vector", "vectorshape", "svg", "shape"}},
 	{"TrailNode", TrailNode, factory_trail, {"trail"}},
 	{"PostEffectNode", PostEffectNode, factory_post_effect, {"posteffect", "post_effect"}},
 	{"UIContainerNode", UIContainerNode, factory_ui_container, {"uicontainer", "uipanel", "uipanelnode"}},
@@ -165,6 +166,8 @@ factory_nine_slice :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return NineSl
 factory_parallax :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return ParallaxNode_Create(scene, "Parallax", parent)}
 @(private = "file")
 factory_line :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return LineNode_Create(scene, "Line", parent)}
+@(private = "file")
+factory_vector_shape :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return VectorShapeNode_Create(scene, "VectorShape", parent)}
 @(private = "file")
 factory_trail :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return TrailNode_Create(scene, "Trail", parent)}
 @(private = "file")

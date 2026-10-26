@@ -113,6 +113,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "LineNode",
 	},
 	{
+		name        = "Vector Shape",
+		category    = "Graphics & Rendering",
+		icon        = ICON_FA_BEZIER_CURVE,
+		description = "Vector art: crisp at any zoom, anti-aliased, cached as a mesh (preview: built-in shapes; SVG import comes next).",
+		typeName    = "VectorShapeNode",
+	},
+	{
 		name        = "Path",
 		category    = "Animation & Effects",
 		icon        = ICON_FA_BEZIER_CURVE,

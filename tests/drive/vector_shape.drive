@@ -1,0 +1,33 @@
+# Vector art in the editor (Phase 14 M0): a Vector Shape from Add Node draws
+# in the viewport, its preset and colours edit live, it saves, and it stays
+# crisp when the viewport zooms in (re-tessellated for the zoom).
+wait 5
+key escape
+click @hier.add
+expect add-node-open == true
+type vector
+screenshot add_node_vector
+click @addnode.create
+expect add-node-open == false
+expect selected == VectorShape
+expect node:VectorShape.type == VectorShapeNode
+expect node:VectorShape.prop.preset == Star
+screenshot vector_star
+click @insp.prop:preset
+click @pick:Character
+expect node:VectorShape.prop.preset == Character
+dblclick @insp.prop:strokeWidth
+key cmd+a
+type 2
+key enter
+expect node:VectorShape.prop.strokeWidth == 2
+screenshot vector_character
+key f
+wait 3
+scroll @viewport 6
+wait 3
+screenshot vector_zoomed
+key cmd+s
+wait 2
+expect file:scenes/main.scene.json contains VectorShapeNode
+expect file:scenes/main.scene.json contains "preset": "Character"

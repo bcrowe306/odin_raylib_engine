@@ -10,6 +10,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 | [Level editor](level_editor.md) | The **Level** tab: LDtk projects edited in place - worlds, levels, IntGrid / Tiles / Auto layers with LDtk's rule engine, entities and fields, definitions, terrains, per-tile data and animated tiles; the `Ldtk_Doc` API - with tutorials. |
 | [Aseprite](aseprite.md) | .aseprite files used as they are: tags played as Aseprite plays them, layers on / off per node, slices (pivots, hitboxes), user data, tilemap layers as TileMaps; live reload when you save - with a tutorial. |
 | [Skeletal animation](skeletal_animation.md) | Spine and DragonBones exports on the engine's own runtime: Skeleton and Bone Attachment nodes, crossfades, skins, IK, events, bone overrides - with a tutorial. |
+| [Vector art](vector.md) | Vector shapes crisp at any zoom: tessellation, anti-aliasing, cached GPU meshes, the Vector Shape node - the start of Flash-style vector characters (Phase 14). |
 | [Animation editing](animation_editing.md) | Custom key curves (cubic Bezier), method events with arguments and the animation_event signal, onion skin - with tutorials. |
 | [Draw order](draw_order.md) | Layers, Z index, Y-sort (top-down / isometric depth). |
 | [Navigation](navigation.md) | Path finding on tile maps, LDtk levels and Navigation Regions; agents that walk there (radius, avoidance, doors) - with tutorials. |
