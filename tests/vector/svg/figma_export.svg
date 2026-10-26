@@ -1,0 +1,17 @@
+<svg width="160" height="120" viewBox="0 0 160 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+<!-- The shape of a Figma export (test fixture) -->
+<g clip-path="url(#clip0_1_2)">
+<rect width="160" height="120" rx="16" fill="url(#paint0_linear_1_2)"/>
+<path fill-rule="evenodd" clip-rule="evenodd" d="M80 20C102.091 20 120 37.9086 120 60C120 82.0914 102.091 100 80 100C57.9086 100 40 82.0914 40 60C40 37.9086 57.9086 20 80 20ZM80 40C68.9543 40 60 48.9543 60 60C60 71.0457 68.9543 80 80 80C91.0457 80 100 71.0457 100 60C100 48.9543 91.0457 40 80 40Z" fill="white" fill-opacity="0.9"/>
+<path d="M10 110L150 10" stroke="#FFD54F" stroke-width="4" stroke-linecap="round" stroke-dasharray="8 6"/>
+</g>
+<defs>
+<linearGradient id="paint0_linear_1_2" x1="0" y1="0" x2="160" y2="120" gradientUnits="userSpaceOnUse">
+<stop stop-color="#7B61FF"/>
+<stop offset="1" stop-color="#00C2FF"/>
+</linearGradient>
+<clipPath id="clip0_1_2">
+<rect width="160" height="120" rx="16" fill="white"/>
+</clipPath>
+</defs>
+</svg>
