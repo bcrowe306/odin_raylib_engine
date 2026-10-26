@@ -16,7 +16,9 @@ import rl "vendor:raylib"
 //
 // Saved as reflected properties (solid, tint) plus "tilemap": {"tileset",
 // "tile_size", "map_size", "data": [[count, tile], ...]} (run-length
-// encoded, row-major).
+// encoded, row-major over the map - or over "data_origin" / "data_size"
+// when tiles were painted beyond it). Changing the map size never drops
+// tiles: the storage covers the map and anything painted outside it.
 // ============================================================================
 
 TileMapNode :: struct {
@@ -32,9 +34,15 @@ TileMapNode :: struct {
 	asepriteLayer: string `gui:"true"`,
 	aseRes:        ^Ase_Resource,
 	aseVersion:    int,
+	// The painted cells: a dense grid of dataSize cells whose first cell is
+	// dataOrigin (it may be negative). It always covers the map (0..mapSize)
+	// and grows to take tiles painted outside it, so changing the map size
+	// never loses tiles; mapSize is the map's outline / default area.
 	tiles:       [dynamic]i32,
+	dataOrigin:  [2]int,
+	dataSize:    [2]int,
 	staticBody:  ^StaticBodyNode,
-	builtSize:   [2]int, // mapSize the tiles array was laid out for
+	builtSize:   [2]int, // mapSize the storage was last made to cover
 	// Chunk cache (tile_cache.odin): bumped when the tiles change; chunkVer
 	// per chunk for single-cell edits.
 	cacheVersion: u64,
@@ -59,44 +67,134 @@ TileMapNode_Create :: proc(scene: ^Scene, name: string = "TileMap", parent: ^Nod
 	return tm
 }
 
-// TileMapNode_Layout resizes the tile array to mapSize, keeping the
-// overlapping cells (call after changing mapSize).
+// TileMapNode_Layout makes the storage cover the map (call after changing
+// mapSize). Tiles are never dropped: outside the new map they're kept.
 TileMapNode_Layout :: proc(tm: ^TileMapNode) {
 	w, h := max(tm.mapSize.x, 1), max(tm.mapSize.y, 1)
 	tm.mapSize = {w, h}
-	if tm.builtSize == tm.mapSize && len(tm.tiles) == w * h do return
-	old := make([]i32, len(tm.tiles), context.temp_allocator)
-	copy(old, tm.tiles[:])
-	ow, oh := tm.builtSize.x, tm.builtSize.y
-	resize(&tm.tiles, w * h)
-	tm.cacheVersion += 1
-	for i in 0 ..< w * h do tm.tiles[i] = -1
-	for y in 0 ..< min(h, oh) {
-		for x in 0 ..< min(w, ow) {
-			if y * ow + x < len(old) do tm.tiles[y * w + x] = old[y * ow + x]
-		}
+	if tm.builtSize == tm.mapSize && len(tm.tiles) == tm.dataSize.x * tm.dataSize.y && len(tm.tiles) > 0 do return
+	if len(tm.tiles) == 0 || len(tm.tiles) != tm.dataSize.x * tm.dataSize.y {
+		// (New / reset: just the map.)
+		tilemap_restore(tm, {0, 0}, tm.mapSize)
+	} else {
+		TileMapNode_Compact(tm)
 	}
 	tm.builtSize = tm.mapSize
 }
 
-TileMapNode_Get :: proc(tm: ^TileMapNode, x, y: int) -> i32 {
-	TileMapNode_Layout(tm)
-	if x < 0 || y < 0 || x >= tm.mapSize.x || y >= tm.mapSize.y do return -1
-	return tm.tiles[y * tm.mapSize.x + x]
+// TileMapNode_Compact trims the storage to the map plus whatever is painted
+// outside it (empty margins go; saving does this).
+TileMapNode_Compact :: proc(tm: ^TileMapNode) {
+	lo, hi := [2]int{0, 0}, tm.mapSize
+	if cmin, cmax, any := tilemap_content(tm); any {
+		lo = {min(lo.x, cmin.x), min(lo.y, cmin.y)}
+		hi = {max(hi.x, cmax.x), max(hi.y, cmax.y)}
+	}
+	tilemap_restore(tm, lo, hi - lo)
 }
 
-// TileMapNode_Set paints one cell (-1 erases). Returns true if it changed.
+// TileMapNode_Reset empties the map: storage = the map, every cell empty.
+TileMapNode_Reset :: proc(tm: ^TileMapNode) {
+	clear(&tm.tiles)
+	tm.dataOrigin, tm.dataSize = {}, {}
+	tm.builtSize = {}
+	TileMapNode_Layout(tm)
+}
+
+// TileMapNode_SetDataArea lays the storage out over an area (loading a
+// map with tiles beyond it); the map stays covered.
+TileMapNode_SetDataArea :: proc(tm: ^TileMapNode, origin, size: [2]int) {
+	TileMapNode_Layout(tm)
+	lo := [2]int{min(origin.x, 0), min(origin.y, 0)}
+	hi := [2]int{max(origin.x + size.x, tm.mapSize.x), max(origin.y + size.y, tm.mapSize.y)}
+	tilemap_restore(tm, lo, hi - lo)
+}
+
+// tilemap_content: the painted cells' bounds (max exclusive).
+@(private = "file")
+tilemap_content :: proc(tm: ^TileMapNode) -> (lo, hi: [2]int, any: bool) {
+	w := tm.dataSize.x
+	for t, i in tm.tiles {
+		if t < 0 do continue
+		c := tm.dataOrigin + {i % w, i / w}
+		if !any {lo, hi, any = c, c + 1, true; continue}
+		lo = {min(lo.x, c.x), min(lo.y, c.y)}
+		hi = {max(hi.x, c.x + 1), max(hi.y, c.y + 1)}
+	}
+	return
+}
+
+// tilemap_restore re-lays the storage out as size cells from origin,
+// keeping every tile inside it.
+@(private = "file")
+tilemap_restore :: proc(tm: ^TileMapNode, origin, size: [2]int) {
+	size := [2]int{max(size.x, 1), max(size.y, 1)}
+	if origin == tm.dataOrigin && size == tm.dataSize && len(tm.tiles) == size.x * size.y do return
+	old := make([]i32, len(tm.tiles), context.temp_allocator)
+	copy(old, tm.tiles[:])
+	oo, os_ := tm.dataOrigin, tm.dataSize
+	if tm.tiles.allocator.procedure == nil do tm.tiles = make([dynamic]i32, tm.allocator)
+	resize(&tm.tiles, size.x * size.y)
+	for &t in tm.tiles do t = -1
+	if len(old) == os_.x * os_.y {
+		for y in 0 ..< os_.y do for x in 0 ..< os_.x {
+			c := oo + {x, y} - origin
+			if c.x >= 0 && c.y >= 0 && c.x < size.x && c.y < size.y do tm.tiles[c.y * size.x + c.x] = old[y * os_.x + x]
+		}
+	}
+	tm.dataOrigin, tm.dataSize = origin, size
+	tm.cacheVersion += 1
+}
+
+// tilemap_index: a cell's slot in the storage (false: outside it).
+tilemap_index :: #force_inline proc(tm: ^TileMapNode, x, y: int) -> (int, bool) {
+	lx, ly := x - tm.dataOrigin.x, y - tm.dataOrigin.y
+	if lx < 0 || ly < 0 || lx >= tm.dataSize.x || ly >= tm.dataSize.y do return 0, false
+	return ly * tm.dataSize.x + lx, true
+}
+
+// TileMapNode_Extent: the cells that can hold tiles now - the map and
+// anything painted beyond it (min, max exclusive).
+TileMapNode_Extent :: proc(tm: ^TileMapNode) -> (lo, hi: [2]int) {
+	TileMapNode_Layout(tm)
+	return tm.dataOrigin, tm.dataOrigin + tm.dataSize
+}
+
+TileMapNode_Get :: proc(tm: ^TileMapNode, x, y: int) -> i32 {
+	TileMapNode_Layout(tm)
+	i, ok := tilemap_index(tm, x, y)
+	return tm.tiles[i] if ok else -1
+}
+
+// TileMapNode_Set paints one cell (-1 erases), inside or outside the map
+// (the storage grows to take it). Returns true if it changed.
 TileMapNode_Set :: proc(tm: ^TileMapNode, x, y: int, tile: i32) -> bool {
 	TileMapNode_Layout(tm)
-	if x < 0 || y < 0 || x >= tm.mapSize.x || y >= tm.mapSize.y do return false
-	i := y * tm.mapSize.x + x
+	i, ok := tilemap_index(tm, x, y)
+	if !ok {
+		if tile < 0 do return false
+		// Grow by a margin (a stroke outward doesn't re-lay out every cell).
+		m := 8
+		lo := [2]int{min(tm.dataOrigin.x, x - (m if x < tm.dataOrigin.x else 0)), min(tm.dataOrigin.y, y - (m if y < tm.dataOrigin.y else 0))}
+		hi0 := tm.dataOrigin + tm.dataSize
+		hi := [2]int{max(hi0.x, x + 1 + (m if x >= hi0.x else 0)), max(hi0.y, y + 1 + (m if y >= hi0.y else 0))}
+		tilemap_restore(tm, lo, hi - lo)
+		i, _ = tilemap_index(tm, x, y)
+	}
 	if tm.tiles[i] == tile do return false
 	tm.tiles[i] = tile
 	cs := tilemap_chunk_cells(tm)
-	c := [2]i32{i32(x / cs.x), i32(y / cs.y)}
+	c := [2]i32{i32(floor_div(x, cs.x)), i32(floor_div(y, cs.y))}
 	if tm.chunkVer == nil do tm.chunkVer = make(map[[2]i32]u64, tm.allocator)
 	tm.chunkVer[c] = tm.chunkVer[c] + 1
 	return true
+}
+
+@(private = "file")
+floor_div :: #force_inline proc(a, b: int) -> int {
+	q := a / b
+	if (a % b != 0) && ((a < 0) != (b < 0)) do q -= 1
+	return q
 }
 
 // TileMapNode_Changed: call after writing tm.tiles directly.
@@ -105,10 +203,13 @@ TileMapNode_Changed :: proc(tm: ^TileMapNode) {
 }
 
 // TileMapNode_Fill flood-fills the region of equal tiles around (x, y).
+// Started inside the map it stays in the map; outside, it's bounded by
+// what's painted beyond the map (empty space outside is endless).
 TileMapNode_Fill :: proc(tm: ^TileMapNode, x, y: int, tile: i32) -> int {
-	TileMapNode_Layout(tm)
+	lo, hi := TileMapNode_Extent(tm)
+	if x >= 0 && y >= 0 && x < tm.mapSize.x && y < tm.mapSize.y do lo, hi = {0, 0}, tm.mapSize
 	target := TileMapNode_Get(tm, x, y)
-	if x < 0 || y < 0 || x >= tm.mapSize.x || y >= tm.mapSize.y || target == tile do return 0
+	if x < lo.x || y < lo.y || x >= hi.x || y >= hi.y || target == tile do return 0
 	stack := make([dynamic][2]int, context.temp_allocator)
 	append(&stack, [2]int{x, y})
 	n := 0
@@ -117,10 +218,10 @@ TileMapNode_Fill :: proc(tm: ^TileMapNode, x, y: int, tile: i32) -> int {
 		if TileMapNode_Get(tm, p.x, p.y) != target do continue
 		TileMapNode_Set(tm, p.x, p.y, tile)
 		n += 1
-		if p.x > 0 do append(&stack, [2]int{p.x - 1, p.y})
-		if p.y > 0 do append(&stack, [2]int{p.x, p.y - 1})
-		if p.x < tm.mapSize.x - 1 do append(&stack, [2]int{p.x + 1, p.y})
-		if p.y < tm.mapSize.y - 1 do append(&stack, [2]int{p.x, p.y + 1})
+		if p.x > lo.x do append(&stack, [2]int{p.x - 1, p.y})
+		if p.y > lo.y do append(&stack, [2]int{p.x, p.y - 1})
+		if p.x < hi.x - 1 do append(&stack, [2]int{p.x + 1, p.y})
+		if p.y < hi.y - 1 do append(&stack, [2]int{p.x, p.y + 1})
 	}
 	return n
 }
@@ -174,16 +275,17 @@ TileMapNode_CellCorner :: proc(tm: ^TileMapNode, cell: [2]int) -> [2]f32 {
 // ones: all).
 @(private = "file")
 tilemap_visible_cells :: proc(tm: ^TileMapNode, view: rl.Rectangle, hasView: bool) -> (x0, y0, x1, y1: int) {
-	x0, y0, x1, y1 = 0, 0, tm.mapSize.x, tm.mapSize.y
+	lo, hi := tm.dataOrigin, tm.dataOrigin + tm.dataSize // (the map and tiles beyond it)
+	x0, y0, x1, y1 = lo.x, lo.y, hi.x, hi.y
 	tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
 	sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
 	sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
 	if hasView && tm.globalRotation == 0 && sx > 0 && sy > 0 {
 		o := TileMapNode_CellCorner(tm, {0, 0})
-		x0 = clamp(int(math.floor((view.x - o.x) / (tw * sx))), 0, tm.mapSize.x)
-		y0 = clamp(int(math.floor((view.y - o.y) / (th * sy))), 0, tm.mapSize.y)
-		x1 = clamp(int(math.ceil((view.x + view.width - o.x) / (tw * sx))), 0, tm.mapSize.x)
-		y1 = clamp(int(math.ceil((view.y + view.height - o.y) / (th * sy))), 0, tm.mapSize.y)
+		x0 = clamp(int(math.floor((view.x - o.x) / (tw * sx))), lo.x, hi.x)
+		y0 = clamp(int(math.floor((view.y - o.y) / (th * sy))), lo.y, hi.y)
+		x1 = clamp(int(math.ceil((view.x + view.width - o.x) / (tw * sx))), lo.x, hi.x)
+		y1 = clamp(int(math.ceil((view.y + view.height - o.y) / (th * sy))), lo.y, hi.y)
 	}
 	return
 }
@@ -207,7 +309,9 @@ draw_cells :: proc(tm: ^TileMapNode, cols, x0, y0, x1, y1: int, local: bool, ori
 	sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
 	for y in y0 ..< y1 {
 		for x in x0 ..< x1 {
-			t := tm.tiles[y * tm.mapSize.x + x]
+			i, ok := tilemap_index(tm, x, y)
+			if !ok do continue
+			t := tm.tiles[i]
 			if t < 0 do continue
 			src := Texture_Src(tm.tileset, {f32(int(t) % cols) * tw, f32(int(t) / cols) * th, tw, th})
 			if local {
@@ -234,11 +338,11 @@ TileMapNode_PrepareChunks :: proc(tm: ^TileMapNode, view: rl.Rectangle) {
 		tm := cast(^TileMapNode)data
 		cs := tilemap_chunk_cells(tm)
 		o := [2]int{int(key.cx) * cs.x, int(key.cy) * cs.y}
-		draw_cells(tm, TileMapNode_Columns(tm), o.x, o.y, min(o.x + cs.x, tm.mapSize.x), min(o.y + cs.y, tm.mapSize.y), true, o)
+		draw_cells(tm, TileMapNode_Columns(tm), o.x, o.y, o.x + cs.x, o.y + cs.y, true, o)
 	}
 	if x1 <= x0 || y1 <= y0 do return
-	for cy in y0 / cs.y ..= (y1 - 1) / cs.y {
-		for cx in x0 / cs.x ..= (x1 - 1) / cs.x {
+	for cy in floor_div(y0, cs.y) ..= floor_div(y1 - 1, cs.y) {
+		for cx in floor_div(x0, cs.x) ..= floor_div(x1 - 1, cs.x) {
 			c := [2]i32{i32(cx), i32(cy)}
 			TileCache_Ensure({tm, tm, 0, c.x, c.y}, tilemap_chunk_version(tm, c), size, build, tm)
 		}
@@ -265,11 +369,12 @@ TileMapNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	cs := tilemap_chunk_cells(tm)
 	missing := make([dynamic][2]int, context.temp_allocator)
 	TileCache_BeginDraw()
-	for cy in y0 / cs.y ..= (y1 - 1) / cs.y {
-		for cx in x0 / cs.x ..= (x1 - 1) / cs.x {
+	dataHi := tm.dataOrigin + tm.dataSize
+	for cy in floor_div(y0, cs.y) ..= floor_div(y1 - 1, cs.y) {
+		for cx in floor_div(x0, cs.x) ..= floor_div(x1 - 1, cs.x) {
 			c := [2]i32{i32(cx), i32(cy)}
 			o := [2]int{cx * cs.x, cy * cs.y}
-			w, h := min(cs.x, tm.mapSize.x - o.x), min(cs.y, tm.mapSize.y - o.y)
+			w, h := min(cs.x, dataHi.x - o.x), min(cs.y, dataHi.y - o.y)
 			p := TileMapNode_CellCorner(tm, o)
 			src := rl.Rectangle{0, 0, f32(w) * tw, f32(h) * th}
 			dst := rl.Rectangle{p.x, p.y, f32(w) * tw * sx, f32(h) * th * sy}
@@ -279,7 +384,7 @@ TileMapNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	TileCache_EndDraw()
 	// Chunks of a map don't overlap: the rest can follow.
 	for o in missing {
-		draw_cells(tm, cols, max(o.x, x0), max(o.y, y0), min(o.x + cs.x, x1, tm.mapSize.x), min(o.y + cs.y, y1, tm.mapSize.y), false)
+		draw_cells(tm, cols, max(o.x, x0), max(o.y, y0), min(o.x + cs.x, x1), min(o.y + cs.y, y1), false)
 	}
 }
 
@@ -297,17 +402,17 @@ TileMapNode_BuildColliders :: proc(tm: ^TileMapNode, ctx: ^GameContext) {
 	tm.staticBody.position = {0, 0}
 	tm.staticBody.transient = true
 	tm.staticBody.gameContext = ctx
-	TileMapNode_Layout(tm)
+	lo, hi := TileMapNode_Extent(tm) // (tiles beyond the map are solid too)
 	tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
-	for y in 0 ..< tm.mapSize.y {
-		x := 0
-		for x < tm.mapSize.x {
-			if tm.tiles[y * tm.mapSize.x + x] < 0 {
+	for y in lo.y ..< hi.y {
+		x := lo.x
+		for x < hi.x {
+			if TileMapNode_Get(tm, x, y) < 0 {
 				x += 1
 				continue
 			}
 			start := x
-			for x < tm.mapSize.x && tm.tiles[y * tm.mapSize.x + x] >= 0 do x += 1
+			for x < hi.x && TileMapNode_Get(tm, x, y) >= 0 do x += 1
 			w := f32(x - start) * tw
 			shape := MakeBoxPhysicsShape(w, th, {f32(start) * tw + w * 0.5, f32(y) * th + th * 0.5}, 0)
 			StaticBodyNode_AddShape(tm.staticBody, shape, ctx)
@@ -417,9 +522,7 @@ TileMapNode_SyncAseprite :: proc(tm: ^TileMapNode) -> bool {
 	}
 	tm.tileSize = {tw, th}
 	tm.mapSize = {w, h}
-	tm.builtSize = {}
-	clear(&tm.tiles)
-	TileMapNode_Layout(tm)
+	TileMapNode_Reset(tm)
 	if cel != nil do for ty in 0 ..< cel.h do for tx in 0 ..< cel.w {
 		t := cel.tiles[ty * cel.w + tx]
 		if id, ok := ids[Key{t.index, t.xflip, t.yflip, t.dflip}]; ok do tm.tiles[(ty + oy) * w + tx + ox] = id

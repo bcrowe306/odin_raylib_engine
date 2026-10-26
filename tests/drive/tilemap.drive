@@ -37,6 +37,25 @@ key ctrl+z
 expect node:TileMap.tiles == 0
 key ctrl+y
 expect node:TileMap.tiles >= 5
+# Shrinking the map keeps the tiles; growing it back shows them.
+dblclick @tile.map-w
+key cmd+a
+type 2
+key enter
+expect node:TileMap.tiles >= 5
+screenshot shrunk_map_keeps_tiles
+wait 3
+dblclick @tile.map-w
+key cmd+a
+type 20
+key enter
+expect node:TileMap.tiles >= 5
+expect selected == TileMap
+# Painting outside the map (left of it).
+drag @world:520,300 @world:600,300
+expect node:TileMap.tiles >= 7
+screenshot painted_outside
+key ctrl+z
 # Flood fill the rest of the map.
 click @tile.fill
 click @world:700,400

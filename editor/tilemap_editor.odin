@@ -460,9 +460,9 @@ Viewport_TilePaint :: proc(state: ^EditorState, drawList: ^imgui.DrawList, mouse
 	a := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, {0, 0}))
 	b := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, tm.mapSize))
 	imgui.DrawList_AddRect(drawList, {min(a.x, b.x), min(a.y, b.y)}, {max(a.x, b.x), max(a.y, b.y)}, col_u32({1, 1, 1, 0.35}))
+	// (Tiles can go outside the map too: the map is the outline, not a limit.)
 	cell := e.TileMapNode_CellAt(tm, mouseWorld)
-	inside := cell.x >= 0 && cell.y >= 0 && cell.x < tm.mapSize.x && cell.y < tm.mapSize.y
-	if inside && state.viewportHovered {
+	if state.viewportHovered {
 		p := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, cell))
 		q := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, cell + 1))
 		col := UI_DANGER if ts.tool == .Erase || imgui.IsMouseDown(.Right) else UI_ACCENT
@@ -475,7 +475,6 @@ Viewport_TilePaint :: proc(state: ^EditorState, drawList: ^imgui.DrawList, mouse
 		ts.stroke = false
 		return true
 	}
-	if !inside do return true
 	if !ts.stroke {
 		Editor_RecordUndo(state, "Paint tiles")
 		ts.stroke = true
