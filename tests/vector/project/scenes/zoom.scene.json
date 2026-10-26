@@ -1,0 +1,4 @@
+{"name": "zoom", "background": [34, 38, 52, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "CameraNode", "name": "Camera", "position": [0, -60], "properties": {"isCurrent": true, "zoom": 6, "targetZoom": 6, "smoothZoom": false}},
+ {"type": "VectorShapeNode", "name": "Character", "position": [0, 0], "properties": {"preset": "Character", "fillColor": "#7e57c2ff", "strokeWidth": 3}}
+]}}

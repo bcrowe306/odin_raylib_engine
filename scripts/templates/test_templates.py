@@ -15,6 +15,13 @@ Tests: scripts/templates/tests/<id>.json, a list of
                 ["Enemy1", "exists", "==", false]]}
 Each runs on a fresh copy of the template (--user-data in it), with fixed
 1/60 s frames: the same every time. Linux CI runs it under xvfb-run.
+
+Render tests: "golden": {"image": "tests/vector/expected/x.png",
+"max_pixels": 0.01, "threshold": 48} screenshots the last frame and fails
+when more than max_pixels (a fraction) of its pixels differ from the image
+by more than threshold (0-255) - room for GPUs' anti-aliasing differences
+(png_diff.py). --update-goldens writes the images instead (tests with an
+"env" are variants compared with the default's image: skipped then).
 """
 import json
 import os
@@ -23,6 +30,11 @@ import shutil
 import subprocess
 import sys
 import tempfile
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import png_diff  # noqa: E402
+
+UPDATE_GOLDENS = False
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 TESTS = os.path.join(os.path.dirname(__file__), "tests")
@@ -97,9 +109,16 @@ def run_test(runner, tid, test, tmp):
     dump = os.path.join(tmp, "dump.json")
     cmd = [runner, proj, "--hidden", "--user-data", os.path.join(tmp, "userdata"), "--frames", str(test["frames"]),
            "--input-script", inp, "--dump-scene", dump, "--scene", scene_rel]
-    if test.get("screenshot"):
-        cmd += ["--screenshot", test["screenshot"]]
-    log = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    shot = test.get("screenshot")
+    golden = test.get("golden")
+    if golden:
+        shot = os.path.join(ROOT, golden["image"]) if UPDATE_GOLDENS else os.path.join(tmp, "shot.png")
+        if UPDATE_GOLDENS:
+            os.makedirs(os.path.dirname(shot), exist_ok=True)
+    if shot:
+        cmd += ["--screenshot", shot]
+    env = dict(os.environ, **test.get("env", {}))  # ("env": extra environment variables)
+    log = subprocess.run(cmd, capture_output=True, text=True, timeout=120, env=env)
     if not os.path.isfile(dump):
         return [f"no scene dump (exit {log.returncode}): {log.stderr[-600:]}"]
     top = json.load(open(dump))
@@ -110,6 +129,19 @@ def run_test(runner, tid, test, tmp):
         got = (node is not None) if key == "exists" else field(node, key)
         if not check(op, got, want):
             fails.append(f"{name}.{key} {op} {want!r}: got {got!r}")
+    if golden and not UPDATE_GOLDENS:
+        ref = os.path.join(ROOT, golden["image"])
+        if not os.path.isfile(shot):
+            fails.append("no screenshot")
+        elif not os.path.isfile(ref):
+            fails.append(f"no golden image {golden['image']} (--update-goldens writes it)")
+        else:
+            frac, mean = png_diff.diff(shot, ref, golden.get("threshold", 48))
+            if frac > golden.get("max_pixels", 0.01):
+                keep = os.path.join(ROOT, "build", "golden_failures", os.path.basename(golden["image"]))
+                os.makedirs(os.path.dirname(keep), exist_ok=True)
+                shutil.copyfile(shot, keep)
+                fails.append(f"render differs from {golden['image']}: {frac:.2%} of pixels (mean {mean:.1f}); got: {keep}")
     errors = [l for l in log.stderr.splitlines() + log.stdout.splitlines() if "[ERROR]" in l or "Lua error" in l]
     fails += [f"log: {e}" for e in errors[:5]]
     return fails
@@ -123,6 +155,10 @@ def main():
         i = args.index("--runner")
         runner = os.path.abspath(args[i + 1])
         del args[i:i + 2]
+    global UPDATE_GOLDENS
+    if "--update-goldens" in args:
+        UPDATE_GOLDENS = True
+        args.remove("--update-goldens")
     if "--previews" in args:
         previews = True
         args.remove("--previews")
@@ -143,6 +179,8 @@ def main():
             # The Welcome window's picture: the first test's start, full size.
             tests = [{"name": "preview", "frames": 20, "expect": [], "screenshot": os.path.join(ROOT, "templates", tid, "preview.png")}] + tests
         for test in tests:
+            if UPDATE_GOLDENS and test.get("env"):
+                continue
             total += 1
             with tempfile.TemporaryDirectory(prefix=f"rayzr_tpl_{tid}_") as tmp:
                 fails = run_test(runner, tid, test, tmp)
