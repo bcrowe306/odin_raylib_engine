@@ -30,11 +30,57 @@ VectorShapeNode :: struct {
 	tint:        rl.Color `gui:"true"`,
 	brightness:  f32 `gui:"true" min:"-1" max:"1"`, // -1 black ... 0 ... 1 white (Flash's brightness)
 	colorAdd:    rl.Color `gui:"true"`, // added to the colours (Flash's advanced colour offset; alpha ignored)
+	trimStart:   f32 `gui:"true" min:"0" max:"1"`, // trim paths: the part of each path drawn (0..1 of its length)
+	trimEnd:     f32 `gui:"true" min:"0" max:"1"`,
+	trimOffset:  f32 `gui:"true" min:"-1" max:"1"`, // moves the drawn part along (wraps round)
+	trimEach:    bool `gui:"true"`, // trim every subpath on its own (a ring's circles together), not one after another
+	morphTo:     string `gui:"true"`, // shape tween: another group of the file to morph towards
+	morph:       f32 `gui:"true" min:"0" max:"1"`, // 0: this group ... 1: morphTo
+	lineScale:   Vector_Line_Scale `gui:"true"`, // outlines scale with the node, or keep their width
+	// Filters (vector_filters.odin; Flash's): drawn through a texture made when they change.
+	shadowColor:  rl.Color `gui:"true"`, // a drop shadow (alpha 0: none)
+	shadowOffset: [2]f32 `gui:"true" min:"-64" max:"64"`,
+	shadowBlur:   f32 `gui:"true" min:"0" max:"64"`,
+	glowColor:    rl.Color `gui:"true"`, // an outer glow (alpha 0: none)
+	glowSize:     f32 `gui:"true" min:"0" max:"64"`,
+	glowStrength: f32 `gui:"true" min:"0" max:"8"`,
+	outlineColor: rl.Color `gui:"true"`, // an outline round the whole drawing (alpha 0: none)
+	outlineWidth: f32 `gui:"true" min:"0" max:"32"`,
+	blur:         f32 `gui:"true" min:"0" max:"64"`, // blurs the drawing itself (px on screen)
+	saturation:   f32 `gui:"true" min:"0" max:"3"`, // 0 grey, 1 as drawn, 2 vivid
+	contrast:     f32 `gui:"true" min:"0" max:"3"`,
+	hue:          f32 `gui:"true" min:"-180" max:"180"`, // degrees round the colour wheel
+	// Skinning and warp (vector_skin.odin): bend with a Skeleton's bones; squash / stretch.
+	skinBones:    string `gui:"true"`, // a Skeleton ancestor's bones it bends with ("a, b"; "*" = all; "" = none)
+	skinSmooth:   f32 `gui:"true" min:"0" max:"200"`, // px round each joint where neighbouring bones blend (0: rigid parts)
+	warpTopLeft:     [2]f32 `gui:"true" min:"-500" max:"500"`, // corner offsets of a four-corner warp (px)
+	warpTopRight:    [2]f32 `gui:"true" min:"-500" max:"500"`,
+	warpBottomLeft:  [2]f32 `gui:"true" min:"-500" max:"500"`,
+	warpBottomRight: [2]f32 `gui:"true" min:"-500" max:"500"`,
+	skinning:     Vector_Skin,
+	filter:       Vector_Filter_State,
 	shapes:      [dynamic]Vector_Shape,
 	cache:       Vector_Cache,
-	built:       struct {preset: Vector_Preset, fill, stroke: rl.Color, width: f32, ok: bool},
+	built:       struct {preset: Vector_Preset, fill, stroke: rl.Color, width: f32, ok: bool, version: int},
 	res:         ^Vector_Resource, // the file's (shared)
 	loadedPath:  string,
+	fx:          [dynamic]Vector_Shape, // trimmed / morphed shapes (only while those are used)
+	fxCache:     Vector_Cache,
+	fxKey:       Vector_Fx_Key,
+}
+
+Vector_Line_Scale :: enum u8 {
+	Scale,    // outlines get thicker / thinner with the node's scale
+	Constant, // outlines keep their width (Flash's line scaling "None")
+}
+
+Vector_Fx_Key :: struct {
+	res:                    ^Vector_Resource,
+	version, part, target:  int,
+	start, end, offset, t:  f32,
+	lineK:                  f32,
+	each:                   bool,
+	built:                  bool,
 }
 
 // The main thread's tessellation scratch (worker threads get their own in M2).
@@ -50,14 +96,29 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 	v.strokeWidth = 4
 	v.tint = rl.WHITE
 	v.frame = -1
+	v.trimEnd = 1
+	v.shadowOffset = {6, 6}
+	v.shadowBlur = 6
+	v.glowSize = 8
+	v.glowStrength = 1.5
+	v.outlineWidth = 3
+	v.saturation = 1
+	v.contrast = 1
+	v.skinSmooth = 24
 	// (Meshes are rebuilt on zoom: the heap, not the node's arena.)
 	v.shapes = make([dynamic]Vector_Shape, Engine_HeapAllocator())
+	v.fx = make([dynamic]Vector_Shape, Engine_HeapAllocator())
 	v.render = VectorShapeNode_Render
 	v.onDestroy = proc(n: ^Node, ctx: ^GameContext) {
 		v := cast(^VectorShapeNode)n
 		vector_shapes_free(&v.shapes)
 		delete(v.shapes)
 		Vector_Cache_Destroy(&v.cache)
+		vector_shapes_free(&v.fx)
+		delete(v.fx)
+		Vector_Cache_Destroy(&v.fxCache)
+		Vector_FilterRelease(v)
+		Vector_Skin_Destroy(&v.skinning)
 		ResourceManager_ReleaseVector(v.res)
 		v.res = nil
 		delete(v.loadedPath, Engine_HeapAllocator())
@@ -86,7 +147,7 @@ VectorShapeNode_Build :: proc(v: ^VectorShapeNode) {
 	fill := [4]u8{v.fillColor.r, v.fillColor.g, v.fillColor.b, v.fillColor.a}
 	line := [4]u8{v.strokeColor.r, v.strokeColor.g, v.strokeColor.b, v.strokeColor.a}
 	Vector_PresetShapes(v.preset, fill, line, v.strokeWidth, &v.shapes)
-	v.built = {v.preset, v.fillColor, v.strokeColor, v.strokeWidth, true}
+	v.built = {v.preset, v.fillColor, v.strokeColor, v.strokeWidth, true, v.built.version + 1}
 	v.cache.dirty = true
 }
 
@@ -155,7 +216,6 @@ VectorShapeNode_Swap :: proc(v: ^VectorShapeNode, name: string) -> bool {
 
 // vector_color_effect: the tint (multiply) and offset (add, 0..1) after
 // brightness: Flash's colour effects.
-@(private = "file")
 vector_color_effect :: proc(v: ^VectorShapeNode) -> (mul: rl.Color, add: [4]f32) {
 	mul = v.tint
 	add = {f32(v.colorAdd.r) / 255, f32(v.colorAdd.g) / 255, f32(v.colorAdd.b) / 255, 0}
@@ -171,32 +231,197 @@ vector_color_effect :: proc(v: ^VectorShapeNode) -> (mul: rl.Color, add: [4]f32)
 	return
 }
 
-VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
-	v := cast(^VectorShapeNode)node
-	if !rl.IsWindowReady() do return
-	mul, add := vector_color_effect(v)
-	if r := VectorShapeNode_Asset(v); r != nil {
-		part, boxMin, boxSize, ok := VectorShapeNode_Part(v, r)
-		if !ok do return
-		cache: ^Vector_Cache
+// VectorShapeNode_FxActive: whether trim paths or a shape tween change
+// what it draws (then it tessellates its own copy when they change).
+VectorShapeNode_FxActive :: proc(v: ^VectorShapeNode) -> bool {
+	// (Skinned: its own mesh, which carries its weights.)
+	return v.trimStart > 0 || v.trimEnd < 1 || (v.morph > 0 && v.morphTo != "") || v.lineScale == .Constant || VectorShapeNode_SkinTarget(v) != nil
+}
+
+// VectorShapeNode_SkinTarget: the Skeleton it bends with - the nearest
+// Skeleton ancestor, when skinBones names bones (nil: not skinned).
+VectorShapeNode_SkinTarget :: proc(v: ^VectorShapeNode) -> ^SkeletonNode {
+	if v.skinBones == "" do return nil
+	return VectorShapeNode_Skeleton(v)
+}
+
+// VectorShapeNode_Skeleton: its nearest Skeleton ancestor (nil: none).
+VectorShapeNode_Skeleton :: proc(v: ^VectorShapeNode) -> ^SkeletonNode {
+	for p := v.parent; p != nil; p = p.parent {
+		if p.typeId == SkeletonNode do return cast(^SkeletonNode)p
+	}
+	return nil
+}
+
+// VectorShapeNode_Warped: whether a warp corner moved.
+VectorShapeNode_Warped :: proc(v: ^VectorShapeNode) -> bool {
+	return v.warpTopLeft != {} || v.warpTopRight != {} || v.warpBottomLeft != {} || v.warpBottomRight != {}
+}
+
+// VectorShapeNode_Deformed: whether it's drawn bent (skinned or warped).
+VectorShapeNode_Deformed :: proc(v: ^VectorShapeNode) -> bool {
+	return VectorShapeNode_Warped(v) || VectorShapeNode_SkinTarget(v) != nil
+}
+
+// VectorShapeNode_Deform: how its mesh (cache, drawn with offset) is bent
+// now - the warp over its box, the skin from its Skeleton's pose (bound /
+// re-bound when needed); ok = false: drawn as it is.
+VectorShapeNode_Deform :: proc(v: ^VectorShapeNode, cache: ^Vector_Cache, offset: [2]f32) -> (d: Vector_Deform, ok: bool) {
+	if VectorShapeNode_Warped(v) {
+		vector_node_warp(v, &cache.mesh, &d)
+		ok = d.box[2] > 0 && d.box[3] > 0
+	}
+	sn := VectorShapeNode_SkinTarget(v)
+	if sn == nil || sn.data == nil || len(sn.pose.bones) != len(sn.data.bones) || len(cache.mesh.verts) == 0 do return d, ok
+	// Mesh space -> the skeleton's space: the local transforms up to it.
+	bind := Vector_AffineTRS(offset, 0, {1, 1})
+	for n: ^Node = v; n != nil && n != sn; n = n.parent {
+		bind = Vector_AffineMul(Vector_AffineTRS(n.position, n.rotation, n.scale), bind)
+	}
+	if Vector_SkinBind(&v.skinning, sn.data, cache, v.skinBones, v.skinSmooth, bind) {
+
+
+		Vector_Cache_SetSkin(cache, v.skinning.ids[:], v.skinning.weights[:])
+	}
+	if len(v.skinning.bones) == 0 do return d, ok
+	d.bones = Vector_SkinPose(&v.skinning, &sn.pose)
+
+	return d, true
+}
+
+// vector_fx_build remakes the trimmed / morphed shapes when anything they
+// depend on changed; false when there's nothing to draw.
+@(private = "file")
+vector_fx_build :: proc(v: ^VectorShapeNode, r: ^Vector_Resource, part: int) {
+	base := v.shapes[:]
+	target := -2
+	key := Vector_Fx_Key{res = r, version = v.built.version, part = part, target = -2, start = v.trimStart, end = v.trimEnd, offset = v.trimOffset, each = v.trimEach, built = true, lineK = 1}
+	if v.lineScale == .Constant {
+		// (Quantised: re-tessellated when the scale changes by a percent.)
+		sc := max(abs(v.globalScale.x), abs(v.globalScale.y), 1e-3)
+		key.lineK = 1 / (math.round(sc * 100) / 100 if sc >= 0.01 else sc)
+	}
+	if r != nil {
+		base = Vector_PartShapes(r, part)
+		key.version = r.version
+		if v.morph > 0 && v.morphTo != "" do target = Vector_ResourceGroup(r, v.morphTo)
+		if target != -2 {
+			key.target = target
+			key.t = clamp(v.morph, 0, 1)
+		}
+	}
+	if key == v.fxKey do return
+	v.fxKey = key
+	context.allocator = Engine_HeapAllocator()
+	vector_shapes_free(&v.fx)
+	src := base
+	if target != -2 {
+		morphed := make([dynamic]Vector_Shape, context.temp_allocator)
 		{
-			context.allocator = Engine_HeapAllocator()
+			context.allocator = context.temp_allocator
+			Vector_ShapesMorph(base, Vector_PartShapes(r, target), key.t, &morphed)
+		}
+		src = morphed[:]
+	}
+	for &sh in src {
+		out := sh
+		Vector_Path_Init(&out.path)
+		Vector_PathTrim(&sh.path, v.trimStart, v.trimEnd, v.trimOffset, &out.path, v.trimEach)
+		out.style.strokeWidth *= key.lineK
+		append(&v.fx, out)
+	}
+	v.fxCache.dirty = true
+}
+
+// VectorShapeNode_FxShapes: the trimmed / morphed shapes it draws (built
+// when out of date).
+VectorShapeNode_FxShapes :: proc(v: ^VectorShapeNode) -> []Vector_Shape {
+	if r := VectorShapeNode_Asset(v); r != nil {
+		part, _, _, ok := VectorShapeNode_Part(v, r)
+		if !ok do return nil
+		vector_fx_build(v, r, part)
+	} else {
+		if !v.built.ok do VectorShapeNode_Build(v)
+		vector_fx_build(v, nil, -1)
+	}
+	return v.fx[:]
+}
+
+// VectorShapeNode_Mesh: the mesh it draws at a screen-pixel size (made /
+// updated as needed) and the offset its origin needs; ok = false: nothing.
+VectorShapeNode_Mesh :: proc(v: ^VectorShapeNode, pixel: f32) -> (cache: ^Vector_Cache, offset: [2]f32, ok: bool) {
+	context.allocator = Engine_HeapAllocator()
+	if r := VectorShapeNode_Asset(v); r != nil {
+		part, boxMin, boxSize, found := VectorShapeNode_Part(v, r)
+		if !found do return nil, {}, false
+		if VectorShapeNode_FxActive(v) {
+			vector_fx_build(v, r, part)
+			Vector_Cache_Ensure(&v.fxCache, &vectorTess, v.fx[:], pixel)
+			cache = &v.fxCache
+		} else {
 			// (A new zoom: drawn from the nearest mesh while a worker makes the new one.)
-			cache = Vector_ResourceMesh(r, &vectorTess, Vector_ScreenPixel(v.globalScale), background = true, part = part)
+			cache = Vector_ResourceMesh(r, &vectorTess, pixel, background = true, part = part)
 		}
 		// The origin (a fraction of the part's box) sits at the position.
-		offset := -boxMin - Node_OriginPx(v, boxSize)
-		Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, mul, offset, add)
-		return
+		return cache, -boxMin - Node_OriginPx(v, boxSize), true
 	}
 	if !v.built.ok || v.built.preset != v.preset || v.built.fill != v.fillColor || v.built.stroke != v.strokeColor || v.built.width != v.strokeWidth {
 		VectorShapeNode_Build(v)
 	}
-	{
-		context.allocator = Engine_HeapAllocator()
-		Vector_Cache_Ensure(&v.cache, &vectorTess, v.shapes[:], Vector_ScreenPixel(v.globalScale))
+	if VectorShapeNode_FxActive(v) {
+		vector_fx_build(v, nil, -1)
+		Vector_Cache_Ensure(&v.fxCache, &vectorTess, v.fx[:], pixel)
+		return &v.fxCache, {}, true
 	}
-	Vector_Cache_Draw(&v.cache, v.globalPosition, v.globalRotation, v.globalScale, mul, {}, add)
+	Vector_Cache_Ensure(&v.cache, &vectorTess, v.shapes[:], pixel)
+	return &v.cache, {}, true
+}
+
+VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
+	v := cast(^VectorShapeNode)node
+	if !rl.IsWindowReady() do return
+	// Filters: the texture the prepare pass made (vector_filters.odin).
+	if Vector_FiltersActive(v) && Vector_FilterDraw(v) do return
+	cache, offset, ok := VectorShapeNode_Mesh(v, Vector_ScreenPixel(v.globalScale))
+	if !ok do return
+	mul, add := vector_color_effect(v)
+	if VectorShapeNode_Deformed(v) {
+		if d, bent := VectorShapeNode_Deform(v, cache, offset); bent {
+			Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, mul, offset, add, &d)
+			return
+		}
+	}
+	Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, mul, offset, add)
+}
+
+// vector_node_warp: the warp's corners and box (mesh space) - an asset
+// part's box (stable across frames and swaps), else the mesh's.
+@(private = "file")
+vector_node_warp :: proc(v: ^VectorShapeNode, mesh: ^Vector_Mesh, d: ^Vector_Deform) {
+	box := mesh.bounds
+	if r := VectorShapeNode_Asset(v); r != nil {
+		if _, bmin, bsize, found := VectorShapeNode_Part(v, r); found do box = {bmin.x, bmin.y, bmin.x + bsize.x, bmin.y + bsize.y}
+	}
+	d.box = {box[0], box[1], box[2] - box[0], box[3] - box[1]}
+	d.warp = {v.warpTopLeft, v.warpTopRight, v.warpBottomLeft, v.warpBottomRight}
+}
+
+// vector_deformed_bounds: a box (mesh space) through a deform - its
+// corners widened by the warp, then through every bone (generous).
+@(private = "file")
+vector_deformed_bounds :: proc(d: ^Vector_Deform, b: [4]f32) -> [4]f32 {
+	pad: f32 = 0
+	for w in d.warp do pad = max(pad, abs(w.x), abs(w.y))
+	b := [4]f32{b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad}
+	if len(d.bones) == 0 do return b
+	out := [4]f32{max(f32), max(f32), -max(f32), -max(f32)}
+	for m in d.bones {
+		for c in ([4][2]f32{{b[0], b[1]}, {b[2], b[1]}, {b[0], b[3]}, {b[2], b[3]}}) {
+			p := Vector_AffineApply(m, c)
+			out = {min(out[0], p.x), min(out[1], p.y), max(out[2], p.x), max(out[3], p.y)}
+		}
+	}
+	return out
 }
 
 // VectorShapeNode_LocalBounds: what the node draws in its own space (before
@@ -207,10 +432,25 @@ VectorShapeNode_LocalBounds :: proc(v: ^VectorShapeNode) -> (b: [4]f32, ok: bool
 		if !ok do return {}, false
 		off := -boxMin - Node_OriginPx(v, boxSize)
 		d := r.doc.drawn if part < 0 else Vector_ShapesBounds(Vector_PartShapes(r, part))
-		return {d[0] + off.x, d[1] + off.y, d[2] + off.x, d[3] + off.y}, d != {}
+		if VectorShapeNode_FxActive(v) && len(v.fx) > 0 do d = Vector_ShapesBounds(v.fx[:])
+		if d == {} do return {}, false
+		if VectorShapeNode_Deformed(v) do d = vector_node_bent_bounds(v, d)
+		return {d[0] + off.x, d[1] + off.y, d[2] + off.x, d[3] + off.y}, true
 	}
-	if len(v.cache.mesh.verts) == 0 do return {}, false
-	return v.cache.mesh.bounds, true
+	c := &v.fxCache if VectorShapeNode_FxActive(v) else &v.cache
+	if len(c.mesh.verts) == 0 do return {}, false
+	if VectorShapeNode_Deformed(v) do return vector_node_bent_bounds(v, c.mesh.bounds), true
+	return c.mesh.bounds, true
+}
+
+// vector_node_bent_bounds: drawn bounds (mesh space) under the warp and
+// the skin's last pose.
+@(private = "file")
+vector_node_bent_bounds :: proc(v: ^VectorShapeNode, b: [4]f32) -> [4]f32 {
+	d: Vector_Deform
+	if VectorShapeNode_Warped(v) do d.warp = {v.warpTopLeft, v.warpTopRight, v.warpBottomLeft, v.warpBottomRight}
+	if VectorShapeNode_SkinTarget(v) != nil && v.skinning.valid do d.bones = v.skinning.mats[:]
+	return vector_deformed_bounds(&d, b)
 }
 
 // VectorShapeNode_HitTest: whether a world point is on the drawn shape
@@ -228,13 +468,31 @@ VectorShapeNode_HitTest :: proc(v: ^VectorShapeNode, world: [2]f32) -> bool {
 		part, boxMin, boxSize, ok := VectorShapeNode_Part(v, res)
 		if !ok do return false
 		q += boxMin + Node_OriginPx(v, boxSize)
-		for &rc in res.caches do if rc.part == part && len(rc.cache.mesh.idx) > 0 {mesh = &rc.cache.mesh; break}
+		if VectorShapeNode_FxActive(v) do mesh = &v.fxCache.mesh
+		else do for &rc in res.caches do if rc.part == part && len(rc.cache.mesh.idx) > 0 {mesh = &rc.cache.mesh; break}
 	} else {
-		mesh = &v.cache.mesh
+		mesh = &v.cache.mesh if !VectorShapeNode_FxActive(v) else &v.fxCache.mesh
 	}
 	if mesh == nil || len(mesh.idx) == 0 do return false
+	// Bent art: the triangles as drawn (the warp, the skin's last pose).
+	bent: Vector_Deform
+	deformed := VectorShapeNode_Deformed(v)
+	skinned := false
+	if deformed {
+		if VectorShapeNode_Warped(v) do vector_node_warp(v, mesh, &bent)
+		if VectorShapeNode_SkinTarget(v) != nil && v.skinning.valid && len(v.skinning.ids) == len(mesh.verts) {
+			bent.bones = v.skinning.mats[:]
+			skinned = true
+		}
+	}
+	vert :: proc(m: ^Vector_Mesh, i: u32, d: ^Vector_Deform, deformed, skinned: bool, s: ^Vector_Skin) -> [2]f32 {
+		if !deformed do return m.verts[i]
+		return Vector_DeformPoint(d, m.verts[i], s.ids[i] if skinned else {}, s.weights[i] if skinned else {})
+	}
 	for i := 0; i < len(mesh.idx); i += 3 {
-		a, b, cc := mesh.verts[mesh.idx[i]], mesh.verts[mesh.idx[i + 1]], mesh.verts[mesh.idx[i + 2]]
+		a := vert(mesh, mesh.idx[i], &bent, deformed, skinned, &v.skinning)
+		b := vert(mesh, mesh.idx[i + 1], &bent, deformed, skinned, &v.skinning)
+		cc := vert(mesh, mesh.idx[i + 2], &bent, deformed, skinned, &v.skinning)
 		d1 := (q.x - b.x) * (a.y - b.y) - (a.x - b.x) * (q.y - b.y)
 		d2 := (q.x - cc.x) * (b.y - cc.y) - (b.x - cc.x) * (q.y - cc.y)
 		d3 := (q.x - a.x) * (cc.y - a.y) - (cc.x - a.x) * (q.y - a.y)

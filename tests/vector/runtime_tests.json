@@ -132,6 +132,78 @@
   }
  },
  {
+  "name": "path effects: shape tweens (circle -> star with colour, outline and gradient blends) and trim paths (start / end / offset wrapping, presets drawn on)",
+  "project": "tests/vector/project",
+  "scene": "scenes/fx.scene.json",
+  "frames": 6,
+  "expect": [
+   [
+    "Morph2",
+    "morph",
+    "==",
+    0.5
+   ]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/fx.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
+  "name": "filters: drop shadow, glow, outline, blur, saturation / hue / contrast, combined; a flipped rotated instance; constant line width",
+  "project": "tests/vector/project",
+  "scene": "scenes/filters.scene.json",
+  "frames": 6,
+  "expect": [
+   [
+    "Combined",
+    "exists",
+    "==",
+    true
+   ]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/filters.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
+  "name": "skinning: a limb on a two-bone rig at rest, bent rigid and smooth, flipped and rotated; four-corner warps (GPU shader)",
+  "project": "tests/vector/project",
+  "scene": "scenes/skin.scene.json",
+  "frames": 6,
+  "expect": [
+   [
+    "SmoothLimb",
+    "exists",
+    "==",
+    true
+   ]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/skin.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
+  "name": "skinning: the immediate path bends the same on the CPU",
+  "project": "tests/vector/project",
+  "scene": "scenes/skin.scene.json",
+  "frames": 6,
+  "env": {
+   "RAYZR_VECTOR_MODE": "immediate"
+  },
+  "expect": [],
+  "golden": {
+   "image": "tests/vector/expected/skin.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
   "name": "100 spinning characters run (the benchmark scene)",
   "project": "tests/vector/project",
   "scene": "scenes/bench.scene.json",
@@ -153,6 +225,20 @@
   "expect": [
    [
     "A99",
+    "exists",
+    "==",
+    true
+   ]
+  ]
+ },
+ {
+  "name": "100 skinned limbs bending with their skeletons' animation run",
+  "project": "tests/vector/project",
+  "scene": "scenes/bench_skin.scene.json",
+  "frames": 30,
+  "expect": [
+   [
+    "Limb99",
     "exists",
     "==",
     true

@@ -11,7 +11,7 @@ in milestones:
 | M1 | Shapes in full: fill rules and self-intersections (Clipper2), gradients, dashes, opacity, clip paths; drawing from Lua (`on_draw` + the `Vector` module) | **done** |
 | M2 | Vector assets: SVG import (Inkscape, Illustrator, Affinity, Figma), assets shared and reloaded on save, the editor's workflow, picking, culling, background tessellation | **done** |
 | M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | **done** |
-| M5 | Shape tweens, vector skinning on skeletons, filters | next |
+| M5 | Shape tweens and trim paths, filters and line scaling, vector skinning on skeletons and warps | **done** |
 | M6 | Boolean path operations, collision from shapes | |
 | M4 | Drawing tools in the editor | |
 | M7 | Crisp text, Adobe Animate import, a sample character | |
@@ -136,6 +136,155 @@ with the same name (`hello.wav` -> `hello.tsv` / `hello.json`), or point
 - **Dialogue**: set a Dialogue node's **lipSync** to the Lip Sync node's
   path and every line with a voice moves the mouth, timed by the voice's
   playback position (no drift); closing or skipping the line rests it.
+
+## Path effects: shape tweens and trim paths
+
+### Shape tweens
+
+Flash's shape tweens: a Vector Shape drawing a group morphs into another
+group of the same file. Pick it in the Inspector's **Morph to** (or set
+`morphTo`), then key **morph** from 0 (the group) to 1 (the target) on the
+timeline, or tween it from Lua:
+
+```lua
+local blob = self.node:get_node("Blob")
+blob.morphTo = "star"
+Tween.to(blob, "morph", 1, 0.6, "in_out_sine")
+```
+
+- Shapes pair up in order (the first shape of one with the first of the
+  other); extra shapes shrink to their centres and fade out (or grow and
+  fade in).
+- Paths are compared as curves: missing segments are made by splitting the
+  longest ones, closed outlines are turned the same way and started at the
+  closest points (an automatic shape hint), so a circle becomes a star
+  without twisting.
+- Colours, outline widths, opacity and gradients blend - a solid colour into
+  a gradient too; a missing fill or outline fades in.
+- Morphing tessellates the node's own copy whenever the value changes
+  (0.2-1 ms for a detailed part): fine for a few at a time; hold it at 0 or 1
+  and it costs nothing extra.
+
+For the best results draw both shapes with the same number of points, in
+the same order, from the same starting corner.
+
+### Trim paths
+
+**trimStart** / **trimEnd** (0..1 of each path's length) draw part of every
+path, and **trimOffset** moves that part along, wrapping round - keyed, they
+draw lines on, make progress rings and running dashes. Paths are trimmed one
+after another (the whole drawing as one line); **trimEach** trims every
+subpath on its own (both circles of a ring at once). Filled shapes fill
+what's left of their outline. It works on presets too.
+
+```lua
+-- Draw a signature on over a second.
+local sig = self.node:get_node("Signature")
+sig.trimEnd = 0
+Tween.to(sig, "trimEnd", 1, 1.0)
+```
+
+## Filters and line scaling
+
+### Filters
+
+Flash's per-instance filters, set on any Vector Shape in the Inspector (or
+from Lua, or keyed on the timeline):
+
+| Filter | Properties |
+|---|---|
+| Drop shadow | **shadowColor** (alpha 0: off), **shadowOffset**, **shadowBlur** |
+| Glow | **glowColor** (alpha 0: off), **glowSize**, **glowStrength** |
+| Outline | **outlineColor** (alpha 0: off), **outlineWidth** - one line round the whole drawing (cel-shading, a selected character) |
+| Blur | **blur** - the art itself |
+| Colour | **saturation** (0 grey, 1 as drawn), **contrast**, **hue** (degrees) |
+
+Sizes are screen pixels. They combine: shadow, glow and outline are drawn
+behind the art, the colour filter applies to the art.
+
+```lua
+-- Highlight the character under the mouse; grey it out when it's dead.
+local hero = self.node:get_node("Hero")
+hero.glowColor = {255, 210, 63, 255}
+hero.glowSize = 12
+hero.saturation = 0
+```
+
+How it works (`engine/vector_filters.odin`): a filtered shape is drawn at
+screen resolution into a texture with room round it, blurred / tinted /
+adjusted by shader passes into the node's own texture, and that is drawn as
+one quad (rotated and flipped with the node). The texture is remade only
+when something it shows changes - the art, the zoom, the node's scale, a
+filter setting or the colour effects - so an idle filtered character costs
+one textured quad, and moving or rotating it costs nothing extra. Animating
+a filter value or the scale remakes the texture each frame (a few shader
+passes: fine for a handful of characters). Textures are at most 2048 px a
+side (bigger art gets a coarser texture).
+
+### Line scaling
+
+**lineScale** is Flash's line scaling: *Scale* (the default) thickens
+outlines as the node grows; *Constant* keeps their width whatever the node's
+scale - a character scaled up 2x keeps 4 px outlines. Constant re-tessellates
+the node's own copy when its scale changes by more than a percent.
+
+## Bending with bones: vector skinning
+
+Put a Vector Shape under a [Skeleton](skeletal_animation.md) and it can
+**bend with the skeleton's bones** - a sleeve that curves round the elbow
+instead of two rigid pieces meeting at a joint, a tail that swishes, a
+belly that squashes.
+
+1. Rig the bones in Spine (or DragonBones) and export the `.json` - **bones
+   only is fine**: no images, no atlas. Draw the art in your vector app.
+2. Add a **Skeleton** with that file, and a **Vector Shape** with the SVG
+   as its child. Place the art over the bones as they stand in the setup
+   pose (the skeleton's rest pose - clear its Animation to see it).
+3. In the Inspector's Vector section, **Bend with**: pick the bones
+   (*All bones*, or tick the ones this part follows).
+4. **Skin Smooth** sets how far round each joint (px) neighbouring bones
+   blend: 0 makes rigid parts (each point follows its nearest bone), 30-60
+   bends a limb round a soft elbow.
+
+Then anything that moves the bones moves the art: the skeleton's
+animations and crossfades, **IK** constraints, and scripts
+(`skeleton_set_bone_rotation` to aim an arm).
+
+```lua
+-- A tentacle that follows the mouse with IK, skinned smoothly.
+local rig = self.node:get_node("Tentacle")   -- a Skeleton
+local art = rig:get_node("Art")              -- its Vector Shape
+art.skinBones = "*"
+art.skinSmooth = 50
+```
+
+How it works (`engine/vector_skin.odin`): the art is bound once, in the
+skeleton's setup pose - every vertex of its tessellated mesh gets up to
+four bones, weighted by its distance to each bone (from its joint to its
+tip); long triangles are split first so bends have vertices to bend at.
+The weights ride in the mesh; each frame only the bones' matrices go to
+the GPU and the vector shader blends them per vertex - posing never
+re-tessellates or re-uploads. 100 skinned limbs animating cost 1.3 ms a
+frame (`scenes/bench_skin.scene.json`). It's re-bound when the bones, the
+smoothing, the part's place on the skeleton or its tessellation (a new
+zoom) change. Up to 64 bones per Vector Shape.
+
+### Squash and stretch: the four-corner warp
+
+Any Vector Shape (with a skeleton or not) can be warped by moving its four
+corners: **warpTopLeft**, **warpTopRight**, **warpBottomLeft**,
+**warpBottomRight** (px). The art stretches between them, like a free-form
+deformer: key them for a squash on landing, a lean, a taper. The warp
+happens in the vertex shader too (on the shared mesh: no copy).
+
+```lua
+-- Squash on landing and spring back.
+local body = self.node:get_node("Body")
+body.warpTopLeft = Vec2(-20, 30)
+body.warpTopRight = Vec2(20, 30)
+Tween.to(body, "warpTopLeft", Vec2(0, 0), 0.25, "out_back")
+Tween.to(body, "warpTopRight", Vec2(0, 0), 0.25, "out_back")
+```
 
 ## Using it with presets
 
@@ -290,6 +439,30 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
 - `tests/drive/vector_svg.drive`: SVG assets - thumbnails, dropping into
   the viewport and onto a Vector Shape (undo), warnings, a reload on save,
   saving the scene.
+- `engine/vector_morph_test.odin`: trim lengths (mid-segment cuts, offsets
+  wrapping, subpaths in turn or each), morphs (ends, alignment of reversed
+  outlines, missing subpaths), style blends (gradients, solid to gradient,
+  strokes fading in), the node rebuilding only when values change.
+- `tests/drive/vector_fx.drive`: the Morph to picker, morph and trim edits,
+  undo, saving.
+- `scenes/fx.scene.json` (golden): a circle-to-star strip, trimmed
+  squiggles (offset wrapping), presets drawn on, a gradient morph.
+- `test_vector_line_scale_filters` (`engine/vector_morph_test.odin`):
+  constant line width (rebuilt only when the scale changes), filters
+  switching on, nothing prepared without a window.
+- `engine/vector_skin_test.odin`: weights (rigid and smooth joints, the
+  nearest bones), the pose's matrices matching the bones, binding through
+  the node's place on the skeleton, re-binding only when needed, picking
+  the bent art, the warp; leak-checked.
+- `tests/drive/vector_skin.drive`: a bones-only rig in the Skeleton's file
+  list, the Bend with picker (bones toggled, all bones, undo), saving.
+- `scenes/skin.scene.json` (golden, both drawing paths): a limb at rest,
+  bent rigid and smooth, flipped and rotated; warps.
+- `tests/drive/vector_filters.drive`: saturation, blur and hue edited in
+  the Inspector and drawn in the viewport, undo, saving.
+- `scenes/filters.scene.json` (golden): each filter alone, a flipped
+  rotated instance with two filters, constant vs scaled line width, all
+  filters combined.
 - `tests/drive/vector_symbols.drive`: the Symbol and Frame pickers (undo),
   Explode into Parts and its undo.
 - `scenes/symbols.scene.json` (golden): symbols alone, brightness, a
@@ -301,7 +474,13 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
 
 - Stroke ends with butt caps have no anti-aliasing fringe on the end edge.
 - A clip inside a clip replaces it (no intersection of nested clips yet);
-  soft (alpha) masks come with the filters (M5).
+  no soft (alpha) masks yet.
+- Filters apply to one Vector Shape: an exploded character's parts each get
+  their own (a shadow per part, not one for the whole character). Bent
+  (skinned or warped) art skips its filters.
+- Skinning binds by distance to the bones (no painted weights yet); outlines
+  bend with the art, so a strongly bent stroke gets a little thinner on the
+  inside of the bend.
 - Radial gradients have no separate focal point yet (Flash's focal ratio,
   SVG's fx / fy).
 - The immediate drawing path (`RAYZR_VECTOR_MODE=immediate`) evaluates

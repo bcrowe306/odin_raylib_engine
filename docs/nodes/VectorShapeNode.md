@@ -27,3 +27,22 @@ voice.
 local mouth = self.node:get_node("Mouth")
 mouth:vector_swap("O")   -- by name; false when there's no such frame
 ```
+
+**Shape tweens and trim paths**: **morphTo** + **morph** (0..1) morph the
+group into another group of the file - paths, colours, outlines and
+gradients; **trimStart** / **trimEnd** / **trimOffset** draw part of each
+path (draw-on lines, progress rings). Key them, or tween them from Lua.
+
+**Filters** (Flash's): a drop shadow (**shadowColor**, **shadowOffset**,
+**shadowBlur**), a **glow**, an **outline** round the whole drawing,
+**blur**, and **saturation** / **contrast** / **hue**. A colour's alpha 0
+turns its filter off. The art is drawn through a texture remade only when
+something changes. **lineScale** *Constant* keeps outlines the same width
+whatever the node's scale (Flash's line scaling *None*). See
+[filters](../../engine/docs/vector.md#filters-and-line-scaling).
+
+**Bending with bones**: under a Skeleton, **skinBones** (the Inspector's
+*Bend with*) names the bones the art bends with and **skinSmooth** how
+softly it bends round the joints - see
+[vector skinning](../../engine/docs/vector.md#bending-with-bones-vector-skinning).
+The four **warp** corners squash and stretch any Vector Shape.

@@ -8,6 +8,7 @@ asteroids/asteroids
 *.exe
 *.bin
 *.out
+*.env
 
 # Build output (runners, web builds, editor builds)
 /bin/

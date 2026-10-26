@@ -4069,6 +4069,31 @@ function LineNode:set_property(path, value, y) end
 ---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
 ---@field brightness number Darken (-1 black) or lighten (1 white) the art (Flash's brightness effect).
 ---@field colorAdd number[] A colour added to the art's colours (Flash's advanced colour offset): flash white on a ...
+---@field trimStart number Trim paths: where along each path drawing starts (0..1 of its length). Key Start / End ...
+---@field trimEnd number Trim paths: where along each path drawing stops (1 = the end; 0.5 draws the first half).
+---@field trimOffset number Trim paths: moves the drawn part along the path, wrapping round (animate it for a runni...
+---@field trimEach boolean Trim every subpath on its own (a ring's circles drawn on together) instead of one after...
+---@field morphTo string Shape tween: another group of the same file to morph into (Flash's shape tweens).
+---@field morph number Shape tween: 0 draws the group, 1 draws Morph To, between interpolates paths, colours, ...
+---@field lineScale "Scale"|"Constant" Scale: outlines get thicker / thinner with the node's scale. Constant: they keep their ...
+---@field shadowColor number[] Drop shadow filter: its colour (alpha 0: no shadow). Filters draw the art through a tex...
+---@field shadowOffset Vec2 Drop shadow: how far the shadow sits from the art (screen px).
+---@field shadowBlur number Drop shadow: how soft its edge is (screen px).
+---@field glowColor number[] Glow filter: an outer glow's colour (alpha 0: no glow).
+---@field glowSize number Glow: how far it spreads (screen px).
+---@field glowStrength number Glow: how strong it is (1 = the blurred coverage; more: brighter, harder).
+---@field outlineColor number[] Outline filter: a line round the whole drawing (cel-shading, selection); alpha 0: none.
+---@field outlineWidth number Outline: its thickness (screen px).
+---@field blur number Blur filter: blurs the art itself (screen px); 0 = sharp.
+---@field saturation number Colour filter: 0 grey, 1 as drawn, 2 vivid.
+---@field contrast number Colour filter: 1 as drawn; less: flatter, more: punchier.
+---@field hue number Colour filter: turns the colours round the colour wheel (degrees).
+---@field skinBones string Vector skinning: the bones of a Skeleton above it that the art bends with ("upper, lowe...
+---@field skinSmooth number Vector skinning: how far round each joint (px) neighbouring bones blend - 0 makes rigid...
+---@field warpTopLeft Vec2 Four-corner warp (squash and stretch): how far the art's top-left corner moves (px); th...
+---@field warpTopRight Vec2 Four-corner warp: how far the top-right corner moves (px).
+---@field warpBottomLeft Vec2 Four-corner warp: how far the bottom-left corner moves (px).
+---@field warpBottomRight Vec2 Four-corner warp: how far the bottom-right corner moves (px).
 
 ---@alias VectorShapeNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -4091,6 +4116,31 @@ function LineNode:set_property(path, value, y) end
 ---| "tint" # number[] - Multiplies the texture's colours (white = unchanged; alpha fades it).
 ---| "brightness" # number - Darken (-1 black) or lighten (1 white) the art (Flash's brightness effect).
 ---| "colorAdd" # number[] - A colour added to the art's colours (Flash's advanced colour offset): flash white on a ...
+---| "trimStart" # number - Trim paths: where along each path drawing starts (0..1 of its length). Key Start / End ...
+---| "trimEnd" # number - Trim paths: where along each path drawing stops (1 = the end; 0.5 draws the first half).
+---| "trimOffset" # number - Trim paths: moves the drawn part along the path, wrapping round (animate it for a runni...
+---| "trimEach" # boolean - Trim every subpath on its own (a ring's circles drawn on together) instead of one after...
+---| "morphTo" # string - Shape tween: another group of the same file to morph into (Flash's shape tweens).
+---| "morph" # number - Shape tween: 0 draws the group, 1 draws Morph To, between interpolates paths, colours, ...
+---| "lineScale" # "Scale"|"Constant" - Scale: outlines get thicker / thinner with the node's scale. Constant: they keep their ...
+---| "shadowColor" # number[] - Drop shadow filter: its colour (alpha 0: no shadow). Filters draw the art through a tex...
+---| "shadowOffset" # Vec2 - Drop shadow: how far the shadow sits from the art (screen px).
+---| "shadowBlur" # number - Drop shadow: how soft its edge is (screen px).
+---| "glowColor" # number[] - Glow filter: an outer glow's colour (alpha 0: no glow).
+---| "glowSize" # number - Glow: how far it spreads (screen px).
+---| "glowStrength" # number - Glow: how strong it is (1 = the blurred coverage; more: brighter, harder).
+---| "outlineColor" # number[] - Outline filter: a line round the whole drawing (cel-shading, selection); alpha 0: none.
+---| "outlineWidth" # number - Outline: its thickness (screen px).
+---| "blur" # number - Blur filter: blurs the art itself (screen px); 0 = sharp.
+---| "saturation" # number - Colour filter: 0 grey, 1 as drawn, 2 vivid.
+---| "contrast" # number - Colour filter: 1 as drawn; less: flatter, more: punchier.
+---| "hue" # number - Colour filter: turns the colours round the colour wheel (degrees).
+---| "skinBones" # string - Vector skinning: the bones of a Skeleton above it that the art bends with ("upper, lowe...
+---| "skinSmooth" # number - Vector skinning: how far round each joint (px) neighbouring bones blend - 0 makes rigid...
+---| "warpTopLeft" # Vec2 - Four-corner warp (squash and stretch): how far the art's top-left corner moves (px); th...
+---| "warpTopRight" # Vec2 - Four-corner warp: how far the top-right corner moves (px).
+---| "warpBottomLeft" # Vec2 - Four-corner warp: how far the bottom-left corner moves (px).
+---| "warpBottomRight" # Vec2 - Four-corner warp: how far the bottom-right corner moves (px).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -4117,6 +4167,31 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: VectorShapeNode, path: "tint"): number[]
 ---@overload fun(self: VectorShapeNode, path: "brightness"): number
 ---@overload fun(self: VectorShapeNode, path: "colorAdd"): number[]
+---@overload fun(self: VectorShapeNode, path: "trimStart"): number
+---@overload fun(self: VectorShapeNode, path: "trimEnd"): number
+---@overload fun(self: VectorShapeNode, path: "trimOffset"): number
+---@overload fun(self: VectorShapeNode, path: "trimEach"): boolean
+---@overload fun(self: VectorShapeNode, path: "morphTo"): string
+---@overload fun(self: VectorShapeNode, path: "morph"): number
+---@overload fun(self: VectorShapeNode, path: "lineScale"): "Scale"|"Constant"
+---@overload fun(self: VectorShapeNode, path: "shadowColor"): number[]
+---@overload fun(self: VectorShapeNode, path: "shadowOffset"): Vec2
+---@overload fun(self: VectorShapeNode, path: "shadowBlur"): number
+---@overload fun(self: VectorShapeNode, path: "glowColor"): number[]
+---@overload fun(self: VectorShapeNode, path: "glowSize"): number
+---@overload fun(self: VectorShapeNode, path: "glowStrength"): number
+---@overload fun(self: VectorShapeNode, path: "outlineColor"): number[]
+---@overload fun(self: VectorShapeNode, path: "outlineWidth"): number
+---@overload fun(self: VectorShapeNode, path: "blur"): number
+---@overload fun(self: VectorShapeNode, path: "saturation"): number
+---@overload fun(self: VectorShapeNode, path: "contrast"): number
+---@overload fun(self: VectorShapeNode, path: "hue"): number
+---@overload fun(self: VectorShapeNode, path: "skinBones"): string
+---@overload fun(self: VectorShapeNode, path: "skinSmooth"): number
+---@overload fun(self: VectorShapeNode, path: "warpTopLeft"): Vec2
+---@overload fun(self: VectorShapeNode, path: "warpTopRight"): Vec2
+---@overload fun(self: VectorShapeNode, path: "warpBottomLeft"): Vec2
+---@overload fun(self: VectorShapeNode, path: "warpBottomRight"): Vec2
 function VectorShapeNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -4145,6 +4220,31 @@ function VectorShapeNode:get_property(path) end
 ---@overload fun(self: VectorShapeNode, path: "tint", value: number[])
 ---@overload fun(self: VectorShapeNode, path: "brightness", value: number)
 ---@overload fun(self: VectorShapeNode, path: "colorAdd", value: number[])
+---@overload fun(self: VectorShapeNode, path: "trimStart", value: number)
+---@overload fun(self: VectorShapeNode, path: "trimEnd", value: number)
+---@overload fun(self: VectorShapeNode, path: "trimOffset", value: number)
+---@overload fun(self: VectorShapeNode, path: "trimEach", value: boolean)
+---@overload fun(self: VectorShapeNode, path: "morphTo", value: string)
+---@overload fun(self: VectorShapeNode, path: "morph", value: number)
+---@overload fun(self: VectorShapeNode, path: "lineScale", value: "Scale"|"Constant")
+---@overload fun(self: VectorShapeNode, path: "shadowColor", value: number[])
+---@overload fun(self: VectorShapeNode, path: "shadowOffset", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "shadowBlur", value: number)
+---@overload fun(self: VectorShapeNode, path: "glowColor", value: number[])
+---@overload fun(self: VectorShapeNode, path: "glowSize", value: number)
+---@overload fun(self: VectorShapeNode, path: "glowStrength", value: number)
+---@overload fun(self: VectorShapeNode, path: "outlineColor", value: number[])
+---@overload fun(self: VectorShapeNode, path: "outlineWidth", value: number)
+---@overload fun(self: VectorShapeNode, path: "blur", value: number)
+---@overload fun(self: VectorShapeNode, path: "saturation", value: number)
+---@overload fun(self: VectorShapeNode, path: "contrast", value: number)
+---@overload fun(self: VectorShapeNode, path: "hue", value: number)
+---@overload fun(self: VectorShapeNode, path: "skinBones", value: string)
+---@overload fun(self: VectorShapeNode, path: "skinSmooth", value: number)
+---@overload fun(self: VectorShapeNode, path: "warpTopLeft", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "warpTopRight", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "warpBottomLeft", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "warpBottomRight", x: number|Vec2|number[], y?: number)
 function VectorShapeNode:set_property(path, value, y) end
 
 ---@class TrailNode

@@ -49,6 +49,7 @@ inspector_vector :: proc(state: ^EditorState, v: ^e.VectorShapeNode) {
 	if UI_IconButton(ICON_FA_PEN_TO_SQUARE, "insp.vec.edit", "Edit in your vector app (saving there updates it here)", false, 26) && v.file != "" {
 		Vector_EditExternal(state, e.Project_ResolveAssetPath(&state.game.gameContext, v.file))
 	}
+	vector_skin_picker(state, v)
 	UI_EndProps()
 	if v.file == "" {
 		UI_DimText("Draws its preset. Pick an SVG, or drag one from Assets into the viewport.")
@@ -115,6 +116,30 @@ inspector_vector :: proc(state: ^EditorState, v: ^e.VectorShapeNode) {
 		Drive_Item("insp.vec.frame")
 		UI_Tooltip("Show one child group at a time (part swapping); the box stays the group's, so frames never jump. Scripts: node:swap(\"name\")")
 	}
+	// Shape tween: morph toward another group (keys on Morph animate it).
+	UI_PropLabel("Morph to")
+	imgui.SetNextItemWidth(field_width())
+	morphShown := v.morphTo if v.morphTo != "" else "None"
+	if v.morphTo != "" && e.Vector_ResourceGroup(r, v.morphTo) == -2 do morphShown = fmt.tprintf("%s (missing)", v.morphTo)
+	if imgui.BeginCombo("##vecmorph", strings.clone_to_cstring(morphShown, context.temp_allocator), {.HeightLarge}) {
+		if imgui.Selectable("None", v.morphTo == "") && v.morphTo != "" {
+			Editor_RecordUndo(state, "Vector morph")
+			v.morphTo = ""
+		}
+		Drive_Item("pick:vec-morph:")
+		for grp, i in doc.groups {
+			path := e.Vector_GroupPath(r, i)
+			if imgui.Selectable(fmt.ctprintf("%s##m%d", path, i), path == v.morphTo) && path != v.morphTo {
+				Editor_RecordUndo(state, "Vector morph")
+				v.morphTo = strings.clone(path, v.allocator)
+				if v.morph == 0 do v.morph = 0.5 // (show it at once)
+			}
+			Drive_Item(fmt.tprintf("pick:vec-morph:%s", path))
+		}
+		imgui.EndCombo()
+	}
+	Drive_Item("insp.vec.morph")
+	UI_Tooltip("Shape tween: the group this one morphs into as Morph goes 0 -> 1 (paths, colours, outlines, gradients)")
 	UI_EndProps()
 	if g != -2 && len(e.Vector_GroupChildren(r, g)) > 0 {
 		if UI_Button(fmt.tprintf("%s  Explode into Parts", ICON_FA_OBJECT_UNGROUP), "insp.vec.explode", {field_width() + 80, 0}) {
@@ -122,6 +147,66 @@ inspector_vector :: proc(state: ^EditorState, v: ^e.VectorShapeNode) {
 		}
 		UI_Tooltip("Replace this node with a Node holding a Vector Shape per child group (pivots at their centres), to move and animate the parts apart")
 	}
+}
+
+// vector_skin_picker: under a Skeleton, the bones the art bends with
+// (vector skinning, V.10) - none, all, or any set, kept in the skeleton's
+// bone order.
+@(private = "file")
+vector_skin_picker :: proc(state: ^EditorState, v: ^e.VectorShapeNode) {
+	sn := e.VectorShapeNode_Skeleton(v)
+	if sn == nil do return
+	UI_PropLabel("Bend with")
+	imgui.SetNextItemWidth(field_width())
+	shown := v.skinBones
+	switch strings.trim_space(v.skinBones) {
+	case "": shown = "No bones (moves as one)"
+	case "*": shown = "All bones"
+	}
+	if imgui.BeginCombo("##vecskin", strings.clone_to_cstring(shown, context.temp_allocator), {.HeightLarge}) {
+		if imgui.Selectable("No bones (moves as one)", v.skinBones == "") do vector_set_skin(state, v, "")
+		Drive_Item("pick:vec-skin:")
+		if imgui.Selectable("All bones", strings.trim_space(v.skinBones) == "*") do vector_set_skin(state, v, "*")
+		Drive_Item("pick:vec-skin:*")
+		if sn.data == nil {
+			UI_DimText("The skeleton has no file loaded.")
+		} else {
+			imgui.Separator()
+			chosen := make([dynamic]int, context.temp_allocator)
+			e.Vector_SkinBoneList(sn.data, v.skinBones, &chosen)
+			for b, i in sn.data.bones {
+				on := false
+				for c in chosen do if c == i {on = true; break}
+				depth := 0
+				for p := b.parent; p >= 0; p = sn.data.bones[p].parent do depth += 1
+				label := fmt.ctprintf("%s %*s%s##b%d", ICON_FA_CHECK if on else "   ", depth * 2, "", b.name, i)
+				if imgui.Selectable(label, on, {.NoAutoClosePopups}) {
+					// Toggle it; the list stays in the skeleton's order.
+					sb := strings.builder_make(context.temp_allocator)
+					for bb, j in sn.data.bones {
+						in_list := false
+						for c in chosen do if c == j {in_list = true; break}
+						if j == i do in_list = !on
+						if !in_list do continue
+						if strings.builder_len(sb) > 0 do strings.write_string(&sb, ", ")
+						strings.write_string(&sb, bb.name)
+					}
+					vector_set_skin(state, v, strings.to_string(sb))
+				}
+				Drive_Item(fmt.tprintf("pick:vec-skin:%s", b.name))
+			}
+		}
+		imgui.EndCombo()
+	}
+	Drive_Item("insp.vec.skin")
+	UI_Tooltip(fmt.tprintf("Vector skinning: the art bends with these bones of %s (in its setup pose, each point follows the bones nearest it; Skin Smooth blends them round the joints)", sn.name))
+}
+
+@(private = "file")
+vector_set_skin :: proc(state: ^EditorState, v: ^e.VectorShapeNode, list: string) {
+	if list == v.skinBones do return
+	Editor_RecordUndo(state, "Vector skin bones")
+	v.skinBones = strings.clone(list, v.allocator)
 }
 
 @(private = "file")

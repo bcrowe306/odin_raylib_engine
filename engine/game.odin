@@ -225,6 +225,8 @@ GameTerminate :: proc(game: ^Game) {
 	Shader_UnloadAll()
 	Lighting_Unload()
 	Vector_ShutdownScratch()
+	Vector_FiltersShutdown()
+	Vector_DeformShutdown()
 	Vector_Canvas_ShutdownScratch()
 	InputSystem_Destroy(&game.input)
 	Node_ReleaseArenaPool()
