@@ -55,7 +55,7 @@
       "group": "Graphics & animation",
       "icon": "pen",
       "docs": "guides/vector",
-      "description": "Vector shapes crisp at any zoom: anti-aliased, cached on the GPU - 100 detailed characters in under 2 ms. Flash-style characters are on the way."
+      "description": "Vector shapes crisp at any zoom: gradients, dashes, clip paths, exact fill rules, cached on the GPU (100 detailed characters in under 2 ms) - and drawing from Lua with on_draw. Flash-style characters are on the way."
     },
     {
       "title": "Audio mixer",
