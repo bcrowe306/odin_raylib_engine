@@ -7,7 +7,10 @@ served at https://downloads.rayzr.app) and keeps only the newest ones.
 
 Credentials come from the environment (repository secrets in CI):
 R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY (and R2_BUCKET,
-default rayzr-downloads).
+default rayzr-downloads). With CLOUDFLARE_API_TOKEN (and CLOUDFLARE_ZONE_ID,
+default rayzr.app's zone) the CDN cache is purged for the new manifest and
+every deleted file - otherwise downloads.rayzr.app keeps serving cached
+copies of deleted versions (they are cached for a year: versioned paths).
 
 Layout in the bucket (under --prefix, "" in production):
 
@@ -43,6 +46,7 @@ import sys
 REPO = "https://github.com/bcrowe306/rayzr"
 DEFAULT_BUCKET = "rayzr-downloads"
 DEFAULT_BASE_URL = "https://downloads.rayzr.app"
+DEFAULT_ZONE_ID = "003ff4bb3641f16d5f54ebb7b441d7b8"  # rayzr.app
 
 
 # --- versions ---------------------------------------------------------------------------
@@ -208,6 +212,29 @@ class Bucket:
             self.c.delete_objects(Bucket=self.name, Delete={"Objects": [{"Key": k} for k in batch], "Quiet": True})
 
 
+def make_purger(token, zone_id, log=print):
+    """purge(urls): Cloudflare's cache purge by URL (30 per request); a
+    failure is a warning (the files are already gone from the bucket)."""
+    import urllib.request
+
+    def purge(urls):
+        for i in range(0, len(urls), 30):
+            req = urllib.request.Request(
+                f"https://api.cloudflare.com/client/v4/zones/{zone_id}/purge_cache",
+                data=json.dumps({"files": urls[i:i + 30]}).encode(), method="POST",
+                headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"})
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    ok = json.load(r).get("success")
+            except Exception as e:  # (HTTP errors, network)
+                ok, e_msg = False, str(e)
+            else:
+                e_msg = ""
+            if not ok:
+                log(f"warning: cache purge failed {e_msg}".rstrip())
+    return purge
+
+
 def make_client():
     import boto3  # (pip install boto3; only needed for real runs)
     missing = [v for v in ("R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY") if not os.environ.get(v)]
@@ -222,7 +249,7 @@ def make_client():
 # --- publishing -------------------------------------------------------------------------
 
 def publish(bucket, version, directory, *, commit="", keep=3, prefix="", base_url=DEFAULT_BASE_URL,
-            date=None, dry_run=False, log=print):
+            date=None, dry_run=False, log=print, purge=None):
     """Uploads `directory`'s files as `version`, updates the manifest and
     deletes what it no longer lists. Returns the new manifest."""
     parse_version(version)  # (validates)
@@ -257,6 +284,9 @@ def publish(bucket, version, directory, *, commit="", keep=3, prefix="", base_ur
         log(f"delete {k}")
     if stale and not dry_run:
         bucket.delete(stale)
+    # The CDN: the new manifest at once, and no cached copies of deleted files.
+    if purge and not dry_run:
+        purge([f"{base_url}/{prefix}manifest.json"] + [f"{base_url}/{k}" for k in stale])
     return manifest
 
 
@@ -274,8 +304,12 @@ def main(argv=None):
     if a.prefix and not a.prefix.endswith("/"):
         a.prefix += "/"
     bucket = Bucket(make_client(), a.bucket)
+    token = os.environ.get("CLOUDFLARE_API_TOKEN")
+    purge = make_purger(token, os.environ.get("CLOUDFLARE_ZONE_ID", DEFAULT_ZONE_ID)) if token else None
+    if not purge:
+        print("publish_r2: no CLOUDFLARE_API_TOKEN - the CDN cache isn't purged")
     publish(bucket, a.version, a.dir, commit=a.commit, keep=a.keep, prefix=a.prefix,
-            base_url=a.base_url, dry_run=a.dry_run)
+            base_url=a.base_url, dry_run=a.dry_run, purge=purge)
     return 0
 
 

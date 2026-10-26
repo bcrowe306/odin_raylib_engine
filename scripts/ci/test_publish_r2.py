@@ -206,6 +206,19 @@ class PublishTests(unittest.TestCase):
         i_delete = max(i for i, o in enumerate(order) if o[0] == "delete")
         self.assertLess(i_manifest, i_delete)
 
+    def test_purges_manifest_and_deleted_files(self):
+        purged = []
+        for v in ["0.1.0", "0.2.0", "0.3.0"]:
+            self.publish(v, purge=purged.extend)
+        self.assertEqual(purged, ["https://downloads.rayzr.app/manifest.json"] * 3)
+        purged.clear()
+        self.publish("0.4.0", purge=purged.extend)
+        self.assertEqual(purged[0], "https://downloads.rayzr.app/manifest.json")
+        self.assertEqual(sorted(purged[1:]), sorted(f"https://downloads.rayzr.app/releases/v0.1.0/{n}" for n in os.listdir(os.path.join(self.tmp, "0.1.0"))))
+        purged.clear()
+        self.publish("0.5.0", purge=purged.extend, dry_run=True)
+        self.assertEqual(purged, [])
+
     def test_empty_dir_fails(self):
         d = os.path.join(self.tmp, "empty")
         os.makedirs(d, exist_ok=True)
