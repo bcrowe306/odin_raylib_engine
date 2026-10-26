@@ -1,6 +1,7 @@
 package engine
 
 import "core:math"
+import clip "clipper"
 
 // ============================================================================
 // Vector tessellation: shapes -> one triangle mesh (positions, colours,
@@ -15,32 +16,60 @@ import "core:math"
 // stays near the one it was made for (vector_mesh.odin re-tessellates when
 // it changes by more than ~2x).
 //
-// Fills: each closed contour's nesting depth decides outer / hole (even /
-// odd); holes are cut from the smallest outer around them, then earcut
-// triangulates (vector_earcut.odin). Self-intersecting outlines and the
-// non-zero rule's overlapping same-direction contours are normalized by the
-// polygon clipper in M1 (TODO Phase 14).
+// Fills: the contours are normalized under the shape's fill rule by
+// Clipper2 (engine/clipper: self-intersections, overlaps, holes assigned to
+// their outer rings), then earcut triangulates (vector_earcut.odin).
 // ============================================================================
 
 Vector_Mesh :: struct {
-	verts:  [dynamic][2]f32,
-	cols:   [dynamic][4]u8,
-	idx:    [dynamic]u32,
-	bounds: [4]f32, // min x, min y, max x, max y
+	verts:     [dynamic][2]f32,
+	cols:      [dynamic][4]u8,
+	gc:        [dynamic][2]f32, // gradient coordinates (vector_path.odin Vector_PaintCoord)
+	gi:        [dynamic][2]f32, // gradient row, mode (0: solid; 1 + kind * 4 + spread)
+	idx:       [dynamic]u32,
+	gradients: [dynamic][256][4]u8, // one baked row per gradient paint
+	bounds:    [4]f32, // min x, min y, max x, max y
+	// (While tessellating: the paint new vertices take.)
+	curPaint:  ^Vector_Paint,
+	curRow:    int,
 }
 
 Vector_Mesh_Clear :: proc(m: ^Vector_Mesh) {
 	clear(&m.verts)
 	clear(&m.cols)
+	clear(&m.gc)
+	clear(&m.gi)
 	clear(&m.idx)
+	clear(&m.gradients)
 	m.bounds = {}
+	m.curPaint = nil
 }
 
 Vector_Mesh_Destroy :: proc(m: ^Vector_Mesh) {
 	delete(m.verts)
 	delete(m.cols)
+	delete(m.gc)
+	delete(m.gi)
 	delete(m.idx)
+	delete(m.gradients)
 	m^ = {}
+}
+
+// vector_mesh_paint: what the next vertices are painted with; returns the
+// colour to give them (a gradient: white with the coverage / opacity in
+// alpha; solid: the colour faded by the opacity).
+@(private = "file")
+vector_mesh_paint :: proc(m: ^Vector_Mesh, paint: ^Vector_Paint, solid: [4]u8, opacity: f32) -> [4]u8 {
+	if paint.kind == .Solid || paint.stopCount == 0 {
+		m.curPaint = nil
+		return {solid.r, solid.g, solid.b, u8(f32(solid.a) * opacity + 0.5)}
+	}
+	row: [256][4]u8
+	for i in 0 ..< 256 do row[i] = Vector_PaintColorAt(paint, f32(i) / 255)
+	append(&m.gradients, row)
+	m.curPaint = paint
+	m.curRow = len(m.gradients) - 1
+	return {255, 255, 255, u8(255 * opacity + 0.5)}
 }
 
 // Vector_Tess: scratch buffers kept between tessellations (no allocation per
@@ -56,6 +85,12 @@ Vector_Tess :: struct {
 	area:    [dynamic]f32,
 	tri:     [dynamic]u32,
 	ec:      Earcut,
+	cxy:     [dynamic]f64, // contours for the clipper
+	ccounts: [dynamic]i32,
+	dashed:  Vector_Flat, // a dashed stroke's pieces
+	clipFlat: Vector_Flat, // the shape's clip, flattened
+	kxy:     [dynamic]f64, // the clip's contours for the clipper
+	kcounts: [dynamic]i32,
 }
 
 Vector_Tess_Destroy :: proc(t: ^Vector_Tess) {
@@ -68,6 +103,12 @@ Vector_Tess_Destroy :: proc(t: ^Vector_Tess) {
 	delete(t.parent)
 	delete(t.area)
 	delete(t.tri)
+	delete(t.cxy)
+	delete(t.ccounts)
+	Vector_Flat_Destroy(&t.dashed)
+	Vector_Flat_Destroy(&t.clipFlat)
+	delete(t.kxy)
+	delete(t.kcounts)
 	Earcut_Destroy(&t.ec)
 	t^ = {}
 }
@@ -79,9 +120,30 @@ Vector_Tessellate :: proc(t: ^Vector_Tess, shapes: []Vector_Shape, pixel: f32, m
 	for &s in shapes {
 		Vector_Flatten(&s.path, px * 0.25, &t.flat)
 		if len(t.flat.contours) == 0 do continue
-		if s.style.fill && s.style.fillColor.a > 0 do tess_fill(t, s.style, px, mesh)
-		if s.style.stroke && s.style.strokeColor.a > 0 && s.style.strokeWidth > 0 do tess_stroke(t, s.style, px, mesh)
+		opacity := s.style.opacity if s.style.opacity > 0 else 1
+		clipped := s.clip != nil
+		if clipped {
+			Vector_Flatten(&s.clip.path, px * 0.25, &t.clipFlat)
+			clear(&t.kxy); clear(&t.kcounts)
+			for c in t.clipFlat.contours do if c.count >= 3 {
+				for p in Vector_Contour_Points(&t.clipFlat, c) do append(&t.kxy, f64(p.x), f64(p.y))
+				append(&t.kcounts, i32(c.count))
+			}
+			if len(t.kcounts) == 0 do continue // (an empty clip hides everything)
+		}
+		if s.style.fill && (s.style.fillColor.a > 0 || s.style.fillPaint.kind != .Solid) {
+			col := vector_mesh_paint(mesh, &s.style.fillPaint, s.style.fillColor, opacity)
+			tess_fill(t, s.style, col, px, mesh, s.clip)
+		}
+		if s.style.stroke && (s.style.strokeColor.a > 0 || s.style.strokePaint.kind != .Solid) && s.style.strokeWidth > 0 {
+			col := vector_mesh_paint(mesh, &s.style.strokePaint, s.style.strokeColor, opacity)
+			if s.style.dash.count > 0 do vector_dash(&t.flat, &t.dashed, s.style.dash)
+			lines := &t.dashed if s.style.dash.count > 0 else &t.flat
+			if clipped do tess_stroke_clipped(t, s.style, col, px, mesh, lines, s.clip)
+			else do tess_stroke(t, s.style, col, px, mesh, lines)
+		}
 	}
+	mesh.curPaint = nil
 	if len(mesh.verts) > 0 {
 		b := [4]f32{max(f32), max(f32), min(f32), min(f32)}
 		for v in mesh.verts {
@@ -96,6 +158,14 @@ Vector_Tessellate :: proc(t: ^Vector_Tess, shapes: []Vector_Shape, pixel: f32, m
 add_vert :: #force_inline proc(m: ^Vector_Mesh, p: [2]f32, c: [4]u8) -> u32 {
 	append(&m.verts, p)
 	append(&m.cols, c)
+	if m.curPaint != nil {
+		append(&m.gc, Vector_PaintCoord(m.curPaint, p))
+		mode := 1 + (0 if m.curPaint.kind == .Linear else 4) + int(m.curPaint.spread)
+		append(&m.gi, [2]f32{f32(m.curRow), f32(mode)})
+	} else {
+		append(&m.gc, [2]f32{})
+		append(&m.gi, [2]f32{})
+	}
 	return u32(len(m.verts) - 1)
 }
 
@@ -136,75 +206,127 @@ miter :: #force_inline proc(n0, n1: [2]f32) -> [2]f32 {
 }
 
 @(private = "file")
-tess_fill :: proc(t: ^Vector_Tess, style: Vector_Style, px: f32, mesh: ^Vector_Mesh) {
+tess_fill :: proc(t: ^Vector_Tess, style: Vector_Style, col: [4]u8, px: f32, mesh: ^Vector_Mesh, clipRegion: ^Vector_Clip) {
 	f := &t.flat
-	nc := len(f.contours)
-	clear(&t.depth); clear(&t.parent); clear(&t.area)
+	// Normalize: the area the contours cover under the fill rule, as simple
+	// outer rings with their holes (Clipper2: self-intersections, overlaps,
+	// either rule). Open contours are filled as if closed (like SVG).
+	clear(&t.cxy); clear(&t.ccounts)
 	for c in f.contours {
-		append(&t.area, Vector_SignedArea(Vector_Contour_Points(f, c)))
-		append(&t.depth, 0)
-		append(&t.parent, -1)
+		if c.count < 3 do continue
+		for p in Vector_Contour_Points(f, c) do append(&t.cxy, f64(p.x), f64(p.y))
+		append(&t.ccounts, i32(c.count))
 	}
-	// Nesting: how many contours contain each one (its first point), and the
-	// smallest of them.
-	for i in 0 ..< nc {
-		ci := f.contours[i]
-		if ci.count < 3 do continue
-		probe := f.pts[ci.first]
-		best := f32(max(f32))
-		for j in 0 ..< nc {
-			if i == j || f.contours[j].count < 3 do continue
-			cj := Vector_Contour_Points(f, f.contours[j])
-			if abs(t.area[j]) <= abs(t.area[i]) do continue
-			if Vector_PointInPolygon(cj, probe) {
-				t.depth[i] += 1
-				if abs(t.area[j]) < best {best = abs(t.area[j]); t.parent[i] = j}
+	if len(t.ccounts) == 0 do return
+	// Fast path: one convex outline (ellipses, eyes, buttons - most shapes)
+	// needs no normalizing under either rule.
+	if len(t.ccounts) == 1 && clipRegion == nil {
+		for c in f.contours do if c.count >= 3 {
+			pts := Vector_Contour_Points(f, c)
+			if Vector_IsConvex(pts) {
+				clear(&t.poly); clear(&t.holes)
+				base := u32(len(mesh.verts))
+				append_fill_ring(t, pts, 1 if Vector_SignedArea(pts) > 0 else -1, px * 0.5, col, mesh)
+				clear(&t.tri)
+				if Earcut_Triangulate(&t.ec, t.poly[:], nil, &t.tri) {
+					for v in t.tri do append(&mesh.idx, base + v)
+				}
+				return
 			}
 		}
 	}
-	col := style.fillColor
+	// (Decimal places: a twentieth of a pixel.)
+	precision := i32(clamp(math.ceil(-math.log10(f64(px) * 0.05)), 1, 8))
+	res: clip.Paths
+	rule: clip.Fill_Rule = .NonZero if style.fillRule == .NonZero else .EvenOdd
+	if clipRegion != nil {
+		// (Subject and clip share a rule in the clipper: the clip's own rule
+		// first makes it simple, then the intersection uses the shape's.)
+		if !clip_region(t, clipRegion, precision) do return
+		if clip.boolean(.Intersection, raw_data(t.cxy), raw_data(t.ccounts), i32(len(t.ccounts)), raw_data(t.kxy), raw_data(t.kcounts), i32(len(t.kcounts)), rule, precision, &res) == 0 do return
+	} else {
+		if clip.normalize(raw_data(t.cxy), raw_data(t.ccounts), i32(len(t.ccounts)), rule, precision, &res) == 0 do return
+	}
+	defer clip.free_paths(&res)
+	tess_fill_paths(t, &res, col, px, mesh)
+}
+
+// clip_region: the clip's contours (t.kxy) normalized by its own rule, so
+// the intersection can use the subject's rule.
+@(private = "file")
+clip_region :: proc(t: ^Vector_Tess, region: ^Vector_Clip, precision: i32) -> bool {
+	res: clip.Paths
+	rule: clip.Fill_Rule = .NonZero if region.rule == .NonZero else .EvenOdd
+	if clip.normalize(raw_data(t.kxy), raw_data(t.kcounts), i32(len(t.kcounts)), rule, precision, &res) == 0 do return false
+	defer clip.free_paths(&res)
+	clear(&t.kxy); clear(&t.kcounts)
+	for i in 0 ..< int(res.points) do append(&t.kxy, res.xy[i * 2], res.xy[i * 2 + 1])
+	for i in 0 ..< int(res.contours) do append(&t.kcounts, i32(res.counts[i]))
+	return len(t.kcounts) > 0
+}
+
+// tess_stroke_clipped: a clipped stroke - its outline as polygons (the
+// clipper's offset: open pieces with their caps, closed contours on both
+// sides), intersected with the clip, then filled with fringes.
+@(private = "file")
+tess_stroke_clipped :: proc(t: ^Vector_Tess, style: Vector_Style, col: [4]u8, px: f32, mesh: ^Vector_Mesh, f: ^Vector_Flat, clipRegion: ^Vector_Clip) {
+	precision := i32(clamp(math.ceil(-math.log10(f64(px) * 0.05)), 1, 8))
+	if !clip_region(t, clipRegion, precision) do return
+	join: clip.Join = .Round if style.join == .Round else (.Bevel if style.join == .Bevel else .Miter)
+	end: clip.End = .Round if style.cap == .Round else (.Square if style.cap == .Square else .Butt)
+	hw := f64(max(style.strokeWidth, px) * 0.5)
+	// The outline of the open and the closed contours (two offsets).
+	outline := make([dynamic]f64, context.temp_allocator)
+	counts := make([dynamic]i32, context.temp_allocator)
+	for kind in ([]i32{0, 2}) {
+		clear(&t.cxy); clear(&t.ccounts)
+		for c in f.contours {
+			if c.count < 2 || (kind == 2) != (c.closed && c.count > 2) do continue
+			for p in Vector_Contour_Points(f, c) do append(&t.cxy, f64(p.x), f64(p.y))
+			append(&t.ccounts, i32(c.count))
+		}
+		if len(t.ccounts) == 0 do continue
+		res: clip.Paths
+		if clip.offset(raw_data(t.cxy), raw_data(t.ccounts), i32(len(t.ccounts)), kind, hw, join, end, f64(style.miterLimit), f64(px) * 0.25, precision, &res) == 0 do continue
+		for i in 0 ..< int(res.points) do append(&outline, res.xy[i * 2], res.xy[i * 2 + 1])
+		for i in 0 ..< int(res.contours) do append(&counts, i32(res.counts[i]))
+		clip.free_paths(&res)
+	}
+	if len(counts) == 0 do return
+	res: clip.Paths
+	if clip.boolean(.Intersection, raw_data(outline), raw_data(counts), i32(len(counts)), raw_data(t.kxy), raw_data(t.kcounts), i32(len(t.kcounts)), .NonZero, precision, &res) == 0 do return
+	defer clip.free_paths(&res)
+	tess_fill_paths(t, &res, col, px, mesh)
+}
+
+// tess_fill_paths: simple polygons with their holes (a clipper result) as
+// earcut triangles inside one-pixel fringes.
+@(private = "file")
+tess_fill_paths :: proc(t: ^Vector_Tess, res: ^clip.Paths, col: [4]u8, px: f32, mesh: ^Vector_Mesh) {
+	// The result as f32 rings.
+	clear(&t.ring)
+	starts := make([]int, int(res.contours) + 1, context.temp_allocator)
+	for i in 0 ..< int(res.points) do append(&t.ring, [2]f32{f32(res.xy[i * 2]), f32(res.xy[i * 2 + 1])})
+	for i in 0 ..< int(res.contours) do starts[i + 1] = starts[i] + int(res.counts[i])
+	contour :: proc(t: ^Vector_Tess, starts: []int, i: int) -> [][2]f32 {return t.ring[starts[i]:starts[i + 1]]}
 	half := px * 0.5
-	for i in 0 ..< nc {
-		ci := f.contours[i]
-		if ci.count < 3 || t.depth[i] % 2 == 1 do continue // a hole: cut below
+	for i in 0 ..< int(res.contours) {
+		if res.parents[i] >= 0 || res.counts[i] < 3 do continue // (holes: with their outer)
 		// The outer ring inset by half a pixel, then its holes (each inset too:
-		// moved away from the filled area).
+		// moved away from the filled area); fringes around all of them.
 		clear(&t.poly); clear(&t.holes)
+		vmap := make([dynamic]u32, 0, int(res.counts[i]), context.temp_allocator)
+		pts := contour(t, starts, i)
 		base := u32(len(mesh.verts))
-		append_ring :: proc(t: ^Vector_Tess, pts: [][2]f32, outward: f32, half: f32, col: [4]u8, mesh: ^Vector_Mesh) {
-			ring_normals(pts, outward, &t.normals)
-			first := u32(len(mesh.verts))
-			n := u32(len(pts))
-			for p, k in pts {
-				inner := p - t.normals[k] * half
-				append(&t.poly, inner)
-				add_vert(mesh, inner, col)
-			}
-			// The fringe: inner (solid) -> outer (transparent).
-			outer0 := u32(len(mesh.verts))
-			for p, k in pts do add_vert(mesh, p + t.normals[k] * half, fade(col))
-			for k in 0 ..< n {
-				k1 := (k + 1) % n
-				a, b := first + k, first + k1
-				c, d := outer0 + k, outer0 + k1
-				append(&mesh.idx, a, b, d, a, d, c)
-			}
-		}
-		pts := Vector_Contour_Points(f, ci)
-		append_ring(t, pts, 1 if t.area[i] > 0 else -1, half, col, mesh)
-		ring_len := len(pts)
-		// Fill vertices: the inset outer is mesh[base ..< base+ring_len], each
-		// hole's inset ring follows its fringe; map polygon indices to mesh.
-		vmap := make([dynamic]u32, 0, ring_len, context.temp_allocator)
-		for k in 0 ..< ring_len do append(&vmap, base + u32(k))
-		for j in 0 ..< nc {
-			if t.parent[j] != i || t.depth[j] % 2 == 0 do continue
-			cj := f.contours[j]
-			hpts := Vector_Contour_Points(f, cj)
+		append_fill_ring(t, pts, 1 if Vector_SignedArea(pts) > 0 else -1, half, col, mesh)
+		for k in 0 ..< len(pts) do append(&vmap, base + u32(k))
+		for j in 0 ..< int(res.contours) {
+			if int(res.parents[j]) != i || res.counts[j] < 3 do continue
+			hpts := contour(t, starts, j)
 			append(&t.holes, len(t.poly))
 			hbase := u32(len(mesh.verts))
 			// (A hole's fill edge moves into the hole: its outward is away from the fill.)
-			append_ring(t, hpts, -1 if t.area[j] > 0 else 1, half, col, mesh)
+			append_fill_ring(t, hpts, -1 if Vector_SignedArea(hpts) > 0 else 1, half, col, mesh)
 			for k in 0 ..< len(hpts) do append(&vmap, hbase + u32(k))
 		}
 		clear(&t.tri)
@@ -214,10 +336,31 @@ tess_fill :: proc(t: ^Vector_Tess, style: Vector_Style, px: f32, mesh: ^Vector_M
 	}
 }
 
+// append_fill_ring: a ring inset by `half` (its points join t.poly, the
+// polygon earcut fills) and its fringe, solid inside to transparent outside.
 @(private = "file")
-tess_stroke :: proc(t: ^Vector_Tess, style: Vector_Style, px: f32, mesh: ^Vector_Mesh) {
-	f := &t.flat
-	col := style.strokeColor
+append_fill_ring :: proc(t: ^Vector_Tess, pts: [][2]f32, outward: f32, half: f32, col: [4]u8, mesh: ^Vector_Mesh) {
+	ring_normals(pts, outward, &t.normals)
+	first := u32(len(mesh.verts))
+	n := u32(len(pts))
+	for p, k in pts {
+		inner := p - t.normals[k] * half
+		append(&t.poly, inner)
+		add_vert(mesh, inner, col)
+	}
+	outer0 := u32(len(mesh.verts))
+	for p, k in pts do add_vert(mesh, p + t.normals[k] * half, fade(col))
+	for k in 0 ..< n {
+		k1 := (k + 1) % n
+		a, b := first + k, first + k1
+		c, d := outer0 + k, outer0 + k1
+		append(&mesh.idx, a, b, d, a, d, c)
+	}
+}
+
+@(private = "file")
+tess_stroke :: proc(t: ^Vector_Tess, style: Vector_Style, col_: [4]u8, px: f32, mesh: ^Vector_Mesh, f: ^Vector_Flat) {
+	col := col_
 	w := style.strokeWidth
 	// Thinner than a pixel: a pixel-wide line, fainter.
 	if w < px {
@@ -332,5 +475,79 @@ stroke_round_cap :: proc(mesh: ^Vector_Mesh, p, dir: [2]f32, hw, solid, edge: f3
 		i0, o0 := first + k * 2, first + k * 2 + 1
 		i1, o1 := first + (k + 1) * 2, first + (k + 1) * 2 + 1
 		append(&mesh.idx, center, i0, i1, i0, o0, o1, i0, o1, i1)
+	}
+}
+
+// Vector_IsConvex: a simple convex polygon (every turn the same way, one
+// full turn - so no self-intersection).
+Vector_IsConvex :: proc(pts: [][2]f32) -> bool {
+	n := len(pts)
+	if n < 3 do return false
+	sign: f32
+	turn: f32
+	for i in 0 ..< n {
+		a, b, c := pts[i], pts[(i + 1) % n], pts[(i + 2) % n]
+		d1, d2 := b - a, c - b
+		cr := d1.x * d2.y - d1.y * d2.x
+		if abs(cr) < 1e-9 do continue
+		if sign == 0 do sign = cr
+		else if (cr > 0) != (sign > 0) do return false
+		turn += math.atan2(cr, d1.x * d2.x + d1.y * d2.y)
+	}
+	return sign != 0 && abs(abs(turn) - 2 * math.PI) < 0.01
+}
+
+// vector_dash: the flattened contours cut into dashes (open pieces) by the
+// pattern; a closed contour's closing edge is dashed too.
+@(private = "file")
+vector_dash :: proc(src, dst: ^Vector_Flat, dash: Vector_Dash) {
+	clear(&dst.pts)
+	clear(&dst.contours)
+	n := int(dash.count)
+	total: f32
+	for i in 0 ..< n do total += max(dash.values[i], 0)
+	if total <= 1e-6 do return
+	for c in src.contours {
+		pts := Vector_Contour_Points(src, c)
+		segs := len(pts) if c.closed else len(pts) - 1
+		// Where in the pattern the contour starts (the offset shifts it).
+		pos := dash.offset - total * math.floor(dash.offset / total)
+		k := 0
+		for pos >= max(dash.values[k], 0) {
+			pos -= max(dash.values[k], 0)
+			k = (k + 1) % n
+		}
+		left := max(dash.values[k], 0) - pos // of the current dash / gap
+		on := k % 2 == 0
+		cur := Vector_Contour{first = len(dst.pts)}
+		if on {append(&dst.pts, pts[0]); cur.count = 1}
+		for i in 0 ..< segs {
+			a, b := pts[i], pts[(i + 1) % len(pts)]
+			d := b - a
+			l := math.sqrt(d.x * d.x + d.y * d.y)
+			at: f32 = 0
+			for l - at > left {
+				at += left
+				q := a + d * (at / l)
+				if on {
+					append(&dst.pts, q); cur.count += 1
+					if cur.count >= 2 do append(&dst.contours, cur)
+					cur = {first = len(dst.pts)}
+				} else {
+					append(&dst.pts, q)
+					cur = {first = len(dst.pts) - 1, count = 1}
+				}
+				on = !on
+				k = (k + 1) % n
+				left = max(dash.values[k], 0)
+				if left <= 0 {
+					// (A zero-length dash: a dot, drawn by the caps.)
+					continue
+				}
+			}
+			left -= l - at
+			if on {append(&dst.pts, b); cur.count += 1}
+		}
+		if on && cur.count >= 2 do append(&dst.contours, cur)
 	}
 }

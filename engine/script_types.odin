@@ -105,4 +105,6 @@ ScriptInstance :: struct {
 	registryRef:   c.int, // Reference to self table in Lua LUA_REGISTRYINDEX
 	properties:    map[string]ScriptValue,
 	isReady:       bool,
+	drawState:     u8,     // on_draw: 0 not looked up, 1 none, 2 defined (vector_canvas.odin)
+	canvas:        rawptr, // ^Vector_Canvas: what on_draw draws
 }

@@ -31,6 +31,7 @@ The **Rayzr** features a fast, memory-safe, embeddable Lua 5.4 scripting archite
    - [Scene Module](#7-scene-module-scene)
    - [Log Module](#8-log-module-log--print)
    - [Project Module](#9-project-module-project)
+   - [Vector Module](#10-vector-module-vector)
 8. [Release Packaging & Virtual File System (VFS)](#release-packaging--virtual-file-system-vfs)
 9. [Demo Game Integration](#demo-game-integration)
 
@@ -61,6 +62,7 @@ Each attached script has a private instance table (`self`) with `self.node` poin
 |---|---|---|
 | `ready` | `function M:ready(self)` | Invoked once when the node enters the active scene and becomes ready. |
 | `update` | `function M:update(self, dt)` | Invoked each frame with delta time in seconds. |
+| `on_draw` | `function M:on_draw(self)` | Invoked when the node draws (its layer / Z index / Y-sort order): draw vector shapes with the [`Vector` module](#10-vector-module-vector) in the node's local space. |
 | `on_destroy` | `function M:on_destroy(self)` | Invoked just before the node or script instance is destroyed. |
 
 ```lua
@@ -1471,6 +1473,48 @@ local sceneJson = Project.serialize_scene()
 -- Export loose directory to standalone compressed .rayzr package
 Project.export_rayzr("my_project", "exports/release_game.rayzr")
 ```
+
+### 10. Vector Module (`Vector`)
+
+Draws vector shapes - crisp at any zoom, anti-aliased - from a script's
+`on_draw()`, in the node's local space (its position, rotation and scale
+apply). It works like an HTML canvas: build a path, then `fill()` or
+`stroke()` it with the current style. What a node draws is tessellated once
+and reused while the drawing stays the same, so static art costs nothing per
+frame; drawing that changes every frame is re-tessellated (fine for
+hundreds of curves). The [vector art guide](docs/vector.md) explains how.
+
+```lua
+local Gauge = {}
+Gauge.properties = { value = { type = "range", min = 0, max = 1, default = 0.6 } }
+
+function Gauge:on_draw()
+    -- The track and the filled part, as arcs with round caps.
+    Vector.line_cap("round")
+    Vector.stroke_width(12)
+    Vector.stroke_color("#37474f")
+    Vector.begin_path()
+    Vector.arc(0, 0, 40, 135, 405)
+    Vector.stroke()
+    Vector.stroke_paint(Vector.linear_gradient(-40, 0, 40, 0, { {0, "#66bb6a"}, {1, "#ef5350"} }))
+    Vector.begin_path()
+    Vector.arc(0, 0, 40, 135, 135 + 270 * self.value)
+    Vector.stroke()
+end
+
+return Gauge
+```
+
+| Group | Functions |
+|---|---|
+| Paths | `begin_path`, `move_to`, `line_to`, `quad_to`, `cubic_to`, `arc`, `close_path`, `rect`, `circle`, `ellipse` |
+| Drawing | `fill`, `stroke`, `clip` (until `restore`) |
+| Style | `fill_color`, `stroke_color`, `fill_paint`, `stroke_paint`, `stroke_width`, `line_join`, `line_cap`, `miter_limit`, `dash`, `fill_rule`, `opacity` |
+| Gradients | `linear_gradient(x0, y0, x1, y1, stops, spread)`, `radial_gradient(cx, cy, r, stops, spread)` - stops `{ {0, "#fff"}, {1, {0, 0, 1, 1}} }` |
+| Transform | `save`, `restore`, `translate`, `rotate` (degrees), `scale` |
+
+Colours are `"#rrggbb[aa]"`, `{r, g, b[, a]}` (0..1) or `r, g, b[, a]`.
+Calling `Vector` outside `on_draw` is an error.
 
 ## Release Packaging & Virtual File System (VFS)
 

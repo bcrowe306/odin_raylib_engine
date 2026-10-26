@@ -4,6 +4,7 @@ import "core:log"
 import "core:math"
 import "core:testing"
 import "core:time"
+import lua "lua54"
 
 // Phase 14 M0: vector paths, flattening, earcut, tessellation (fills with
 // holes, strokes, anti-aliasing fringes), the cache's scale buckets and the
@@ -285,4 +286,306 @@ test_vector_tessellation_cost :: proc(t: ^testing.T) {
 		log.infof("[vector] character at pixel %v: %v triangles, %v vertices, %.3f ms", px, len(m.idx) / 3, len(m.verts), ms)
 		testing.expectf(t, ms < 50, "tessellation took %v ms", ms)
 	}
+}
+
+// Fill rules (M1: Clipper2 normalization): self-intersections, overlapping
+// contours, nesting in the same direction - each rule as SVG / Flash fill.
+@(test)
+test_vector_fill_rules :: proc(t: ^testing.T) {
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	m: Vector_Mesh
+	defer Vector_Mesh_Destroy(&m)
+	s := Vector_Shape{style = VECTOR_STYLE_DEFAULT}
+	Vector_Path_Init(&s.path)
+	defer Vector_Path_Destroy(&s.path)
+	shapes := []Vector_Shape{s}
+	fill :: proc(tess: ^Vector_Tess, shapes: []Vector_Shape, rule: Vector_Fill_Rule, m: ^Vector_Mesh) {
+		shapes[0].style.fillRule = rule
+		Vector_Tessellate(tess, shapes, 1, m)
+	}
+	// A bowtie (one self-intersecting contour): both lobes, either rule.
+	p := &shapes[0].path
+	Vector_MoveTo(p, {0, 0}); Vector_LineTo(p, {100, 100}); Vector_LineTo(p, {100, 0}); Vector_LineTo(p, {0, 100}); Vector_Close(p)
+	for rule in Vector_Fill_Rule {
+		fill(&tess, shapes, rule, &m)
+		testing.expectf(t, covered(&m, {20, 50}) && covered(&m, {80, 50}), "%v: both lobes", rule)
+		testing.expectf(t, !covered(&m, {50, 20}), "%v: not between them", rule)
+	}
+	// Two overlapping squares, same direction: non-zero unites, even-odd cuts the overlap.
+	Vector_Path_Clear(p)
+	Vector_Rect(p, {0, 0}, {60, 60})
+	Vector_Rect(p, {40, 40}, {100, 100})
+	fill(&tess, shapes, .NonZero, &m)
+	testing.expect(t, covered(&m, {50, 50}), "non-zero: the overlap is filled")
+	testing.expect(t, covered(&m, {10, 10}) && covered(&m, {90, 90}), "non-zero: both squares")
+	fill(&tess, shapes, .EvenOdd, &m)
+	testing.expect(t, !covered(&m, {50, 50}), "even-odd: the overlap is empty")
+	testing.expect(t, covered(&m, {10, 10}) && covered(&m, {90, 90}), "even-odd: both squares")
+	// Concentric circles drawn the same way: non-zero fills the middle, even-odd makes a ring.
+	Vector_Path_Clear(p)
+	Vector_Ellipse(p, {0, 0}, {100, 100})
+	Vector_Ellipse(p, {0, 0}, {50, 50})
+	fill(&tess, shapes, .NonZero, &m)
+	testing.expect(t, covered(&m, {0, 0}), "non-zero: same-direction inner circle filled")
+	fill(&tess, shapes, .EvenOdd, &m)
+	testing.expect(t, !covered(&m, {0, 0}) && covered(&m, {75, 0}), "even-odd: a ring")
+	// An island in a hole in an outer (three levels).
+	Vector_Ellipse(p, {0, 0}, {20, 20})
+	fill(&tess, shapes, .EvenOdd, &m)
+	testing.expect(t, covered(&m, {0, 0}) && !covered(&m, {35, 0}) && covered(&m, {75, 0}), "even-odd: island, hole, ring")
+}
+
+@(test)
+test_vector_is_convex :: proc(t: ^testing.T) {
+	testing.expect(t, Vector_IsConvex([][2]f32{{0, 0}, {10, 0}, {10, 10}, {0, 10}}), "square")
+	testing.expect(t, Vector_IsConvex([][2]f32{{0, 0}, {0, 10}, {10, 10}, {10, 0}}), "square, other way")
+	testing.expect(t, !Vector_IsConvex([][2]f32{{0, 0}, {10, 0}, {5, 2}, {10, 10}, {0, 10}}), "a dent")
+	testing.expect(t, !Vector_IsConvex([][2]f32{{0, 0}, {100, 100}, {100, 0}, {0, 100}}), "a bowtie")
+	// A pentagram traced point to point turns the same way but twice round.
+	star := make([dynamic][2]f32, context.temp_allocator)
+	for i in 0 ..< 5 {
+		a := f32(i * 2) * math.PI * 2 / 5
+		append(&star, [2]f32{math.cos(a), math.sin(a)} * 50)
+	}
+	testing.expect(t, !Vector_IsConvex(star[:]), "a self-crossing pentagram")
+}
+
+// Paints (M1): gradient coordinates, colours, spreads, transforms; the mesh's
+// baked rows and per-vertex modes; dashes; opacity.
+@(test)
+test_vector_paints :: proc(t: ^testing.T) {
+	stops := []Vector_Stop{{0, {0, 0, 0, 255}}, {1, {255, 255, 255, 255}}}
+	lin := Vector_LinearGradient({0, 0}, {100, 0}, stops)
+	testing.expect_value(t, Vector_PaintCoord(&lin, {50, 30}).x, 0.5)
+	testing.expect_value(t, Vector_PaintCoord(&lin, {150, 0}).x, 1.5)
+	c := Vector_PaintColorAt(&lin, 0.5)
+	testing.expect(t, c.r >= 127 && c.r <= 128 && c.a == 255, "halfway grey")
+	testing.expect_value(t, Vector_PaintSpread(.Pad, 1.5), 1)
+	testing.expect_value(t, Vector_PaintSpread(.Repeat, 1.25), 0.25)
+	testing.expect_value(t, Vector_PaintSpread(.Reflect, 1.25), 0.75)
+	testing.expect_value(t, Vector_PaintSpread(.Reflect, -0.25), 0.25)
+	rad := Vector_RadialGradient({10, 10}, 20, stops)
+	g := Vector_PaintCoord(&rad, {30, 10})
+	testing.expect(t, abs(g.x - 1) < 1e-5 && abs(g.y) < 1e-5, "radial: one radius out")
+	// A transform moves the gradient: its centre is now at (110, 10).
+	rad.transform = {1, 0, 0, 1, 100, 0}
+	g = Vector_PaintCoord(&rad, {110, 10})
+	testing.expect(t, abs(g.x) < 1e-5 && abs(g.y) < 1e-5, "transformed centre")
+	// Scaled 2x: one radius is 40 units.
+	rad.transform = {2, 0, 0, 2, 0, 0}
+	g = Vector_PaintCoord(&rad, {60, 20})
+	testing.expect(t, abs(g.x - 1) < 1e-5, "scaled gradient")
+	// Multi-stop interpolation.
+	three := Vector_LinearGradient({0, 0}, {1, 0}, {{0, {255, 0, 0, 255}}, {0.5, {0, 255, 0, 255}}, {1, {0, 0, 255, 255}}})
+	testing.expect_value(t, Vector_PaintColorAt(&three, 0.5), [4]u8{0, 255, 0, 255})
+	testing.expect_value(t, Vector_PaintColorAt(&three, 0.75), [4]u8{0, 128, 128, 255})
+
+	// The preset: rows baked, gradient vertices tagged, dashes cut, opacity applied.
+	shapes := make([dynamic]Vector_Shape)
+	defer {
+		for &s in shapes do Vector_Path_Destroy(&s.path)
+		delete(shapes)
+	}
+	Vector_PresetShapes(.Gradients, {255, 200, 0, 255}, {40, 20, 10, 255}, 3, &shapes)
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	m: Vector_Mesh
+	defer Vector_Mesh_Destroy(&m)
+	Vector_Tessellate(&tess, shapes[:], 1, &m)
+	testing.expect_value(t, len(m.gradients), 3) // sky, stripes, orb
+	testing.expect_value(t, len(m.gc), len(m.verts))
+	testing.expect_value(t, len(m.gi), len(m.verts))
+	modes: [16]int
+	for gi in m.gi do modes[int(gi.y)] += 1
+	testing.expect(t, modes[0] > 0, "solid vertices (strokes, the glass)")
+	testing.expect(t, modes[1 + 0 + int(Vector_Spread.Pad)] > 0, "linear pad (the sky)")
+	testing.expect(t, modes[1 + 0 + int(Vector_Spread.Reflect)] > 0, "linear reflect (the stripes)")
+	testing.expect(t, modes[1 + 4 + int(Vector_Spread.Pad)] > 0, "radial (the orb)")
+	// The sky's row: dark blue at the top, warm at the bottom.
+	testing.expect(t, m.gradients[0][0].b > 150 && m.gradients[0][255].r > 250, "baked sky row")
+	// The glass: 35% opacity.
+	testing.expect(t, covered(&m, {80, -80}), "the glass is drawn")
+	found := false
+	for col, i in m.cols do if m.verts[i] == {20 + 0.5, -90 + 0.5} || (abs(m.verts[i].x - 20.5) < 0.01 && abs(m.verts[i].y + 89.5) < 0.01) {
+		testing.expectf(t, col.a == 89, "opacity alpha %v", col.a)
+		found = true
+	}
+	testing.expect(t, found, "a glass corner vertex")
+}
+
+@(test)
+test_vector_dashes :: proc(t: ^testing.T) {
+	s := Vector_Shape{style = VECTOR_STYLE_DEFAULT}
+	Vector_Path_Init(&s.path)
+	defer Vector_Path_Destroy(&s.path)
+	s.style.fill = false
+	s.style.stroke = true
+	s.style.strokeWidth = 4
+	s.style.cap = .Butt
+	s.style.dash = {count = 2, values = {10, 10, 0, 0, 0, 0, 0, 0}}
+	Vector_MoveTo(&s.path, {0, 0}); Vector_LineTo(&s.path, {100, 0})
+	shapes := []Vector_Shape{s}
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	m: Vector_Mesh
+	defer Vector_Mesh_Destroy(&m)
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect_value(t, len(tess.dashed.contours), 5) // 0-10, 20-30, ... 80-90
+	testing.expect(t, covered(&m, {5, 0}) && covered(&m, {25, 0}) && covered(&m, {85, 0}), "dashes")
+	testing.expect(t, !covered(&m, {15, 0}) && !covered(&m, {35, 0}) && !covered(&m, {95, 0}), "gaps")
+	// Offset 5: starts halfway through a dash.
+	shapes[0].style.dash.offset = 5
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {2, 0}) && !covered(&m, {8, 0}) && covered(&m, {18, 0}), "offset shifts the pattern")
+	// A closed square's dashes go round the corner.
+	Vector_Path_Clear(&shapes[0].path)
+	Vector_Rect(&shapes[0].path, {0, 0}, {40, 40})
+	shapes[0].style.dash = {count = 2, values = {30, 10, 0, 0, 0, 0, 0, 0}}
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect_value(t, len(tess.dashed.contours), 4)
+	testing.expect(t, covered(&m, {40, 15}), "a dash turned the corner")
+}
+
+// The Lua drawing API (M1 V.3): on_draw records paths and styles in the
+// node's local space; transforms, gradients, dashes; the same drawing
+// twice isn't re-tessellated; Vector.* outside on_draw is an error.
+@(test)
+test_vector_lua_on_draw :: proc(t: ^testing.T) {
+	ScriptVFS_RegisterEmbedded("vector_draw.lua", `
+local D = {}
+D.properties = { wave = { type = "float", default = 0 } }
+function D:on_draw()
+    Vector.fill_color("#ff8800")
+    Vector.rect(-50, -20, 100, 40)
+    Vector.fill()
+    Vector.save()
+    Vector.translate(200, 0)
+    Vector.scale(2)
+    Vector.begin_path()
+    Vector.circle(0, 0, 10 + self.wave)
+    Vector.fill_paint(Vector.radial_gradient(0, 0, 10, { {0, "#ffffff"}, {1, {0, 0, 1, 1}} }))
+    Vector.fill()
+    Vector.stroke_color(0, 0, 0, 1)
+    Vector.stroke_width(3)
+    Vector.dash({4, 2})
+    Vector.stroke()
+    Vector.restore()
+    Vector.begin_path()
+    Vector.move_to(0, 50)
+    Vector.arc(0, 50, 30, 0, 180)
+    Vector.line_join("round")
+    Vector.line_cap("round")
+    Vector.stroke()
+end
+return D
+`)
+	ScriptVFS_RegisterEmbedded("vector_outside.lua", `
+local O = {}
+function O:ready()
+    ok_outside, err_outside = pcall(function() Vector.rect(0, 0, 1, 1) end)
+end
+return O
+`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("vectordraw", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	n := Node_CreateByTypeName(scene, "Node")
+	n.gameContext = &game.gameContext
+	Script_AttachToNode(n, "vector_draw.lua", nil, &game.scriptManager)
+	o := Node_CreateByTypeName(scene, "Node")
+	o.gameContext = &game.gameContext
+	Script_AttachToNode(o, "vector_outside.lua", nil, &game.scriptManager)
+	game->run(0.016)
+
+	testing.expect(t, Script_HasDraw(n, &game.scriptManager), "on_draw found")
+	testing.expect(t, !Script_HasDraw(o, &game.scriptManager), "no on_draw")
+	cv := Script_RunDraw(n, &game.gameContext)
+	testing.expect(t, cv != nil, "recorded")
+	shapes := Vector_CanvasShapes(cv)
+	testing.expect_value(t, len(shapes), 4) // rect fill, circle fill, circle stroke, arc stroke
+	testing.expect_value(t, shapes[0].style.fillColor, [4]u8{255, 136, 0, 255})
+	testing.expect(t, shapes[0].style.fill && !shapes[0].style.stroke, "a fill")
+	// The circle: translated 200 and scaled 2 -> its points around (200, 0), radius 20.
+	maxX: f32
+	for p in shapes[1].path.pts do maxX = max(maxX, p.x)
+	testing.expect(t, abs(maxX - 220) < 0.01, "transformed points")
+	testing.expect_value(t, shapes[1].style.fillPaint.kind, Vector_Paint_Kind.Radial)
+	testing.expect_value(t, shapes[1].style.fillPaint.stopCount, 2)
+	// The stroke scaled with the transform (3 * 2), the dash too.
+	testing.expect_value(t, shapes[2].style.strokeWidth, 6)
+	testing.expect_value(t, shapes[2].style.dash.values[0], 8)
+	// After restore: back to the identity, round joins.
+	testing.expect_value(t, shapes[3].style.join, Vector_Join.Round)
+	testing.expect_value(t, shapes[3].style.strokeWidth, 1)
+	// The same drawing: the cache isn't dirtied; a change is.
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	Vector_Cache_Ensure(&cv.cache, &tess, shapes, 1)
+	before := cv.cache.stats.tessellations
+	cv = Script_RunDraw(n, &game.gameContext)
+	Vector_Cache_Ensure(&cv.cache, &tess, Vector_CanvasShapes(cv), 1)
+	testing.expect_value(t, cv.cache.stats.tessellations, before)
+	ScriptInstance_SetProperty(cast(^ScriptInstance)n.scriptInstance, "wave", ScriptValue{type = .Float, valFloat = 5}, &game.scriptManager)
+	cv = Script_RunDraw(n, &game.gameContext)
+	Vector_Cache_Ensure(&cv.cache, &tess, Vector_CanvasShapes(cv), 1)
+	testing.expect_value(t, cv.cache.stats.tessellations, before + 1)
+	// Outside on_draw: an error.
+	L := game.scriptManager.L
+	lua.getglobal(L, "ok_outside")
+	testing.expect(t, !bool(lua.toboolean(L, -1)), "Vector outside on_draw fails")
+	lua.pop(L, 1)
+}
+
+// Clip paths (M1): fills and strokes cut to a region (its own fill rule),
+// from Odin and from Lua (Vector.clip until restore).
+@(test)
+test_vector_clip :: proc(t: ^testing.T) {
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	m: Vector_Mesh
+	defer Vector_Mesh_Destroy(&m)
+	k: Vector_Clip
+	Vector_Path_Init(&k.path)
+	defer Vector_Path_Destroy(&k.path)
+	Vector_Ellipse(&k.path, {0, 0}, {50, 50})
+	s := Vector_Shape{style = VECTOR_STYLE_DEFAULT, clip = &k}
+	Vector_Path_Init(&s.path)
+	defer Vector_Path_Destroy(&s.path)
+	Vector_Rect(&s.path, {-100, -10}, {100, 10})
+	shapes := []Vector_Shape{s}
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {0, 0}) && covered(&m, {45, 0}), "inside the clip")
+	testing.expect(t, !covered(&m, {60, 0}) && !covered(&m, {-80, 0}), "cut outside it")
+	// A stroke is clipped too (its outline: open line, round caps).
+	shapes[0].style.fill = false
+	shapes[0].style.stroke = true
+	shapes[0].style.strokeWidth = 8
+	Vector_Path_Clear(&shapes[0].path)
+	Vector_MoveTo(&shapes[0].path, {-100, 30}); Vector_LineTo(&shapes[0].path, {100, 30})
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {0, 30}) && covered(&m, {0, 33}), "stroke inside")
+	testing.expect(t, !covered(&m, {48, 30}) && !covered(&m, {-90, 30}), "stroke cut at the circle")
+	// A closed stroke (a ring) clipped to the right half.
+	Vector_Path_Clear(&k.path)
+	Vector_Rect(&k.path, {0, -100}, {100, 100})
+	Vector_Path_Clear(&shapes[0].path)
+	Vector_Ellipse(&shapes[0].path, {0, 0}, {40, 40})
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {40, 0}) && !covered(&m, {-40, 0}), "half a ring")
+	testing.expect(t, !covered(&m, {20, 0}), "the ring's middle stays empty")
+	// The clip's own rule: an even-odd ring clip leaves its hole out.
+	Vector_Path_Clear(&k.path)
+	Vector_Ellipse(&k.path, {0, 0}, {60, 60})
+	Vector_Ellipse(&k.path, {0, 0}, {30, 30})
+	k.rule = .EvenOdd
+	shapes[0].style.fill = true
+	shapes[0].style.stroke = false
+	Vector_Path_Clear(&shapes[0].path)
+	Vector_Rect(&shapes[0].path, {-100, -100}, {100, 100})
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {45, 0}) && !covered(&m, {0, 0}) && !covered(&m, {80, 0}), "a ring-shaped clip")
 }

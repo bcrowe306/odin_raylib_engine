@@ -46,16 +46,143 @@ Vector_Cap :: enum u8 {
 	Square,
 }
 
+// Paints: a solid colour (the style's fillColor / strokeColor) or a
+// gradient. Gradients are defined in their own space, mapped onto the
+// shape by `transform` (a 2x3 affine matrix: x' = a*x + c*y + e,
+// y' = b*x + d*y + f - Flash's gradient transform tool, SVG's
+// gradientTransform): linear from p0 to p1, radial around center with
+// radius. Up to 16 stops (Flash allows 15), offsets 0..1 ascending.
+Vector_Paint_Kind :: enum u8 {
+	Solid,
+	Linear,
+	Radial,
+}
+
+Vector_Spread :: enum u8 {
+	Pad,     // the end colours continue
+	Reflect, // back and forth
+	Repeat,  // over again
+}
+
+Vector_Stop :: struct {
+	offset: f32,
+	color:  [4]u8,
+}
+
+VECTOR_MAX_STOPS :: 16
+
+Vector_Paint :: struct {
+	kind:      Vector_Paint_Kind,
+	spread:    Vector_Spread,
+	stopCount: u8,
+	stops:     [VECTOR_MAX_STOPS]Vector_Stop,
+	p0, p1:    [2]f32, // linear: from, to
+	center:    [2]f32, // radial
+	radius:    f32,
+	transform: [6]f32, // a, b, c, d, e, f (zero: identity)
+}
+
+// Vector_Dash: a dash pattern (on, off, on, off... in the shape's units;
+// up to 8 values) shifted by offset; count 0 = a solid line.
+Vector_Dash :: struct {
+	count:  u8,
+	values: [8]f32,
+	offset: f32,
+}
+
 Vector_Style :: struct {
 	fill:        bool,
 	fillColor:   [4]u8,
 	fillRule:    Vector_Fill_Rule,
+	fillPaint:   Vector_Paint, // (kind .Solid: fillColor)
 	stroke:      bool,
 	strokeColor: [4]u8,
 	strokeWidth: f32,
+	strokePaint: Vector_Paint,
 	join:        Vector_Join,
 	cap:         Vector_Cap,
 	miterLimit:  f32,
+	dash:        Vector_Dash,
+	opacity:     f32, // the whole shape (0: treated as 1)
+}
+
+// Vector_LinearGradient / Vector_RadialGradient: a paint from stops
+// (offsets 0..1).
+Vector_LinearGradient :: proc(p0, p1: [2]f32, stops: []Vector_Stop, spread := Vector_Spread.Pad) -> Vector_Paint {
+	p := Vector_Paint{kind = .Linear, spread = spread, p0 = p0, p1 = p1}
+	vector_paint_stops(&p, stops)
+	return p
+}
+
+Vector_RadialGradient :: proc(center: [2]f32, radius: f32, stops: []Vector_Stop, spread := Vector_Spread.Pad) -> Vector_Paint {
+	p := Vector_Paint{kind = .Radial, spread = spread, center = center, radius = radius}
+	vector_paint_stops(&p, stops)
+	return p
+}
+
+@(private = "file")
+vector_paint_stops :: proc(p: ^Vector_Paint, stops: []Vector_Stop) {
+	n := min(len(stops), VECTOR_MAX_STOPS)
+	for i in 0 ..< n do p.stops[i] = stops[i]
+	p.stopCount = u8(n)
+}
+
+// Vector_PaintColorAt: the gradient's colour at t (0..1 along it, after
+// the spread), interpolated between stops (the CPU side of the shader).
+Vector_PaintColorAt :: proc(p: ^Vector_Paint, t: f32) -> [4]u8 {
+	n := int(p.stopCount)
+	if n == 0 do return {0, 0, 0, 0}
+	if t <= p.stops[0].offset do return p.stops[0].color
+	for i in 1 ..< n {
+		a, b := p.stops[i - 1], p.stops[i]
+		if t <= b.offset {
+			span := b.offset - a.offset
+			k := (t - a.offset) / span if span > 1e-6 else 1
+			c: [4]u8
+			for ch in 0 ..< 4 do c[ch] = u8(f32(a.color[ch]) + (f32(b.color[ch]) - f32(a.color[ch])) * k + 0.5)
+			return c
+		}
+	}
+	return p.stops[n - 1].color
+}
+
+// Vector_PaintSpread applies the spread mode to a raw gradient position.
+Vector_PaintSpread :: proc(spread: Vector_Spread, t: f32) -> f32 {
+	switch spread {
+	case .Pad: return clamp(t, 0, 1)
+	case .Reflect:
+		m := t - 2 * math.floor(t / 2)
+		return 1 - abs(m - 1)
+	case .Repeat: return t - math.floor(t)
+	}
+	return t
+}
+
+// Vector_PaintCoord: a point's gradient coordinates - linear: (t along
+// p0->p1, 0); radial: the offset from the centre in radii (length = t).
+Vector_PaintCoord :: proc(p: ^Vector_Paint, pt: [2]f32) -> [2]f32 {
+	q := pt
+	if p.transform != {} {
+		// The inverse of the gradient transform.
+		a, b, c, d, e, f := p.transform[0], p.transform[1], p.transform[2], p.transform[3], p.transform[4], p.transform[5]
+		det := a * d - b * c
+		if abs(det) > 1e-12 {
+			x, y := pt.x - e, pt.y - f
+			q = {(d * x - c * y) / det, (-b * x + a * y) / det}
+		}
+	}
+	switch p.kind {
+	case .Linear:
+		dir := p.p1 - p.p0
+		l2 := dir.x * dir.x + dir.y * dir.y
+		if l2 < 1e-12 do return {0, 0}
+		return {((q.x - p.p0.x) * dir.x + (q.y - p.p0.y) * dir.y) / l2, 0}
+	case .Radial:
+		r := max(p.radius, 1e-6)
+		return (q - p.center) / r
+	case .Solid:
+	}
+	return {}
 }
 
 VECTOR_STYLE_DEFAULT :: Vector_Style {
@@ -64,11 +191,20 @@ VECTOR_STYLE_DEFAULT :: Vector_Style {
 	strokeColor = {0, 0, 0, 255},
 	strokeWidth = 1,
 	miterLimit  = 4,
+	opacity     = 1,
 }
 
 Vector_Shape :: struct {
 	path:  Vector_Path,
 	style: Vector_Style,
+	clip:  ^Vector_Clip, // only what lies inside it is drawn (nil: no clip; not owned)
+}
+
+// Vector_Clip: a clipping region - a path filled by its own rule (SVG
+// clipPath / clip-rule, Flash masks of plain shapes).
+Vector_Clip :: struct {
+	path: Vector_Path,
+	rule: Vector_Fill_Rule,
 }
 
 Vector_Path_Init :: proc(p: ^Vector_Path, allocator := context.allocator) {

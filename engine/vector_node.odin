@@ -15,6 +15,7 @@ Vector_Preset :: enum u8 {
 	Ring,
 	Badge,
 	Character,
+	Gradients,
 }
 
 VectorShapeNode :: struct {
@@ -145,6 +146,8 @@ Vector_PresetShapes :: proc(preset: Vector_Preset, fill, line: [4]u8, width: f32
 		Vector_Ellipse(dot, {0, -10}, {28, 28})
 	case .Character:
 		character(out, fill, line, width)
+	case .Gradients:
+		gradients(out, fill, line, width)
 	}
 }
 
@@ -233,4 +236,53 @@ character :: proc(out: ^[dynamic]Vector_Shape, fill, line: [4]u8, width: f32) {
 		y := 5 + math.cos(fi * 78.233) * 38
 		Vector_Ellipse(shape(out, {255, 255, 255, 90}, {}, 0), {x, y}, {2.5 + math.abs(math.sin(fi)) * 2, 2.5})
 	}
+}
+
+// gradients: paints and dashes - a radial orb, a linear sky, reflected
+// stripes, a dashed ring.
+@(private = "file")
+gradients :: proc(out: ^[dynamic]Vector_Shape, fill, line: [4]u8, width: f32) {
+	add :: proc(out: ^[dynamic]Vector_Shape) -> ^Vector_Shape {
+		s := Vector_Shape{style = VECTOR_STYLE_DEFAULT}
+		Vector_Path_Init(&s.path)
+		append(out, s)
+		return &out[len(out) - 1]
+	}
+	// A sky: a linear gradient top to bottom.
+	sky := add(out)
+	Vector_Rect(&sky.path, {-100, -100}, {100, 0})
+	sky.style.fillPaint = Vector_LinearGradient({0, -100}, {0, 0}, {{0, {30, 60, 160, 255}}, {0.6, {240, 120, 80, 255}}, {1, {255, 210, 120, 255}}})
+	// Stripes: a short linear gradient reflected across the band.
+	band := add(out)
+	Vector_Rect(&band.path, {-100, 0}, {100, 30})
+	band.style.fillPaint = Vector_LinearGradient({-100, 0}, {-80, 0}, {{0, fill}, {1, line}}, .Reflect)
+	// An orb: a radial gradient with an offset highlight (the gradient moved by its transform).
+	orb := add(out)
+	Vector_Ellipse(&orb.path, {0, -40}, {45, 45})
+	orb.style.fillPaint = Vector_RadialGradient({0, 0}, 60, {{0, {255, 255, 255, 255}}, {0.35, {120, 200, 255, 255}}, {1, {10, 40, 120, 255}}})
+	orb.style.fillPaint.transform = {1, 0, 0, 1, -15, -55}
+	orb.style.stroke = true
+	orb.style.strokeWidth = max(width, 1)
+	orb.style.strokeColor = {10, 30, 80, 255}
+	// A dashed ring (round caps) and a dotted line.
+	ring := add(out)
+	Vector_Ellipse(&ring.path, {0, 70}, {60, 25})
+	ring.style.fill = false
+	ring.style.stroke = true
+	ring.style.strokeWidth = 6
+	ring.style.strokeColor = line
+	ring.style.cap = .Round
+	ring.style.dash = {count = 2, values = {18, 10, 0, 0, 0, 0, 0, 0}}
+	dots := add(out)
+	Vector_MoveTo(&dots.path, {-90, 110}); Vector_LineTo(&dots.path, {90, 110})
+	dots.style.fill = false
+	dots.style.stroke = true
+	dots.style.strokeWidth = 4
+	dots.style.strokeColor = fill
+	dots.style.dash = {count = 2, values = {8, 8, 0, 0, 0, 0, 0, 0}, offset = 4}
+	// A half-transparent overlay (shape opacity).
+	glass := add(out)
+	Vector_Rect(&glass.path, {20, -90}, {90, -20})
+	glass.style.fillColor = {255, 255, 255, 255}
+	glass.style.opacity = 0.35
 }

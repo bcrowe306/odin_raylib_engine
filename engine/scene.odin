@@ -454,6 +454,7 @@ Scene_RenderNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^Game
 	children := GetChildrenView(scene.manager, node)
 	if node.renderable && node.layer == layer {
 		if node.render != nil do node->render(gameContext, deltaTime)
+		if node.scriptInstance != nil do Script_DrawNode(node, gameContext)
 
 		if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
 	}
@@ -521,6 +522,7 @@ render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, 
 		withMaterial := node.material != nil && Material_Begin(node, gameContext)
 		scaled := node.isUI && access.uiScale != 1 && UI_BeginScaled(node) // (accessibility UI scale)
 		if node.render != nil do node->render(gameContext, deltaTime)
+		if node.scriptInstance != nil do Script_DrawNode(node, gameContext) // (on_draw: vector_canvas.odin)
 		if scaled do UI_EndScaled()
 		if withMaterial do Material_End(node)
 		if scene.drawBounds && node.drawBounds != nil do node->drawBounds(gameContext, deltaTime)
@@ -570,7 +572,7 @@ render_walk :: proc(c: ^Render_Collect, m: ^NodeManager, node: ^Node, z: i32, ke
 	if Render_HideEditorHidden && node.editorHidden do return
 	z := z + node.zIndex
 	if z != 0 do c.anyZ = true
-	if node.renderable && (node.render != nil || node.drawBounds != nil) {
+	if node.renderable && (node.render != nil || node.drawBounds != nil || Script_HasDraw(node, nil)) {
 		append(&c.items[node.layer], Render_Item{node, z, key})
 	}
 	if !node.ySort {

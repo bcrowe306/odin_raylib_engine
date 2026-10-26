@@ -134,6 +134,7 @@ ScriptManager_ReloadModule :: proc(mgr: ^ScriptManager, path: string, quiet := f
 	// Instances: add new properties (defaults), drop removed ones.
 	for inst in mgr.instances {
 		if inst.modulePath != mod.path do continue
+		inst.drawState = 0 // (on_draw may have come or gone)
 		for prop in mod.properties {
 			if _, has := inst.properties[prop.name]; !has {
 				ScriptInstance_SetProperty(inst, prop.name, prop.defaultVal, mgr)
