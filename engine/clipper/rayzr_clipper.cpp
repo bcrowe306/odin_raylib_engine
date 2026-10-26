@@ -119,15 +119,16 @@ int rz_boolean(int op, const double *sxy, const int *scounts, int sn, const doub
 	}
 }
 
-// rz_offset: grows (delta > 0) or shrinks closed contours, or outlines open
-// ones (closed = 0): join 0 square, 1 bevel, 2 round, 3 miter; end (open
-// contours) 2 butt, 3 square, 4 round.
+// rz_offset: kind 1 grows (delta > 0) or shrinks closed contours (areas);
+// kind 2 outlines closed contours on both sides (a closed stroke); kind 0
+// outlines open ones with ends: join 0 square, 1 bevel, 2 round, 3 miter;
+// end 2 butt, 3 square, 4 round.
 int rz_offset(const double *xy, const int *counts, int n, int closed, double delta, int join, int end, double miter_limit,
 		double arc_tolerance, int precision, rz_paths *out) {
 	std::memset(out, 0, sizeof(*out));
 	try {
 		JoinType jt = join == 0 ? JoinType::Square : join == 1 ? JoinType::Bevel : join == 2 ? JoinType::Round : JoinType::Miter;
-		EndType et = closed ? EndType::Polygon : end == 3 ? EndType::Square : end == 4 ? EndType::Round : EndType::Butt;
+		EndType et = closed == 1 ? EndType::Polygon : closed == 2 ? EndType::Joined : end == 3 ? EndType::Square : end == 4 ? EndType::Round : EndType::Butt;
 		PathsD grown = InflatePaths(to_paths(xy, counts, n), delta, jt, et, miter_limit, precision, arc_tolerance);
 		ClipperD c(precision);
 		c.AddSubject(grown);

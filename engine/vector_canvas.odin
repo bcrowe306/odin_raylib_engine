@@ -25,6 +25,7 @@ import rl "vendor:raylib"
 Vector_Canvas_State :: struct {
 	style: Vector_Style,
 	xf:    [6]f32, // a, b, c, d, e, f
+	clip:  ^Vector_Clip, // Vector.clip(): what drawing is cut to (until restore)
 }
 
 Vector_Canvas :: struct {
@@ -35,6 +36,8 @@ Vector_Canvas :: struct {
 	stack:    [dynamic]Vector_Canvas_State,
 	cache:    Vector_Cache,
 	lastHash: u64,
+	clips:    [dynamic]^Vector_Clip, // pool: the first `clipCount` are this frame's
+	clipCount: int,
 }
 
 @(private = "file")
@@ -51,6 +54,7 @@ Vector_Canvas_Create :: proc() -> ^Vector_Canvas {
 	cv := new(Vector_Canvas)
 	cv.shapes = make([dynamic]Vector_Shape)
 	cv.stack = make([dynamic]Vector_Canvas_State)
+	cv.clips = make([dynamic]^Vector_Clip)
 	Vector_Path_Init(&cv.path)
 	return cv
 }
@@ -61,6 +65,11 @@ Vector_Canvas_Destroy :: proc(cv: ^Vector_Canvas) {
 	for &s in cv.shapes do Vector_Path_Destroy(&s.path)
 	delete(cv.shapes)
 	delete(cv.stack)
+	for k in cv.clips {
+		Vector_Path_Destroy(&k.path)
+		free(k)
+	}
+	delete(cv.clips)
 	Vector_Path_Destroy(&cv.path)
 	Vector_Cache_Destroy(&cv.cache)
 	free(cv)
@@ -69,6 +78,7 @@ Vector_Canvas_Destroy :: proc(cv: ^Vector_Canvas) {
 // Vector_Canvas_Begin starts a frame's drawing (a fresh default state).
 Vector_Canvas_Begin :: proc(cv: ^Vector_Canvas) {
 	cv.count = 0
+	cv.clipCount = 0
 	clear(&cv.stack)
 	Vector_Path_Clear(&cv.path)
 	cv.state = {style = VECTOR_STYLE_DEFAULT, xf = XF_IDENTITY}
@@ -117,6 +127,12 @@ vector_canvas_hash :: proc(cv: ^Vector_Canvas) -> u64 {
 		mix(&h, mem.slice_to_bytes(s.path.cmds[:]))
 		mix(&h, mem.slice_to_bytes(s.path.pts[:]))
 		mix(&h, mem.ptr_to_bytes(&s.style))
+		if s.clip != nil {
+			mix(&h, mem.slice_to_bytes(s.clip.path.cmds[:]))
+			mix(&h, mem.slice_to_bytes(s.clip.path.pts[:]))
+			rule := s.clip.rule
+			mix(&h, mem.ptr_to_bytes(&rule))
+		}
 	}
 	return h
 }
@@ -158,6 +174,7 @@ canvas_commit :: proc(cv: ^Vector_Canvas, fill: bool) {
 	append(&s.path.cmds, ..cv.path.cmds[:])
 	append(&s.path.pts, ..cv.path.pts[:])
 	s.style = cv.state.style
+	s.clip = cv.state.clip
 	s.style.fill = fill
 	s.style.stroke = !fill
 	k := xf_scale(cv.state.xf)
@@ -237,6 +254,25 @@ Vector_Canvas_Ellipse :: proc(cv: ^Vector_Canvas, c, r: [2]f32) {
 }
 
 Vector_Canvas_Fill :: proc(cv: ^Vector_Canvas) {canvas_commit(cv, true)}
+
+// Vector_Canvas_Clip: the current path (by the fill rule) cuts what is drawn
+// next, until restore (a clip inside a clip replaces it).
+Vector_Canvas_Clip :: proc(cv: ^Vector_Canvas) {
+	if len(cv.path.cmds) == 0 do return
+	context.allocator = Engine_HeapAllocator()
+	if cv.clipCount == len(cv.clips) {
+		k := new(Vector_Clip)
+		Vector_Path_Init(&k.path)
+		append(&cv.clips, k)
+	}
+	k := cv.clips[cv.clipCount]
+	cv.clipCount += 1
+	Vector_Path_Clear(&k.path)
+	append(&k.path.cmds, ..cv.path.cmds[:])
+	append(&k.path.pts, ..cv.path.pts[:])
+	k.rule = cv.state.style.fillRule
+	cv.state.clip = k
+}
 Vector_Canvas_Stroke :: proc(cv: ^Vector_Canvas) {canvas_commit(cv, false)}
 Vector_Canvas_BeginPath :: proc(cv: ^Vector_Canvas) {Vector_Path_Clear(&cv.path)}
 
@@ -456,6 +492,8 @@ lv_fill :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); Vecto
 @(private = "file")
 lv_stroke :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); Vector_Canvas_Stroke(canvas_or_error(L)); return 0}
 @(private = "file")
+lv_clip :: proc "c" (L: ^lua.State) -> c.int {context = Script_Context(L); Vector_Canvas_Clip(canvas_or_error(L)); return 0}
+@(private = "file")
 lv_fill_color :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	cv := canvas_or_error(L)
@@ -589,6 +627,7 @@ Script_RegisterVectorModule :: proc(L: ^lua.State) {
 	reg(L, "ellipse", lv_ellipse)
 	reg(L, "fill", lv_fill)
 	reg(L, "stroke", lv_stroke)
+	reg(L, "clip", lv_clip)
 	reg(L, "fill_color", lv_fill_color)
 	reg(L, "stroke_color", lv_stroke_color)
 	reg(L, "fill_paint", lv_fill_paint)

@@ -1,4 +1,4 @@
 {"name": "canvas", "background": [34, 38, 52, 255], "root": {"type": "Node", "name": "root", "children": [
  {"type": "CameraNode", "name": "Camera", "position": [480, 270], "properties": {"isCurrent": true}},
- {"type": "Node", "name": "Drawing", "position": [430, 270], "scale": [1.2, 1.2], "script": {"path": "scripts/canvas.lua"}}
+ {"type": "Node", "name": "Drawing", "position": [430, 220], "scale": [1.1, 1.1], "script": {"path": "scripts/canvas.lua"}}
 ]}}

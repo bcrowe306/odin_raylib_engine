@@ -63,6 +63,23 @@ function Canvas:on_draw()
     Vector.stroke()
     Vector.restore()
 
+    -- A porthole: diagonal stripes clipped to a circle (Vector.clip until restore).
+    Vector.save()
+    Vector.translate(0, 150)
+    Vector.begin_path()
+    Vector.circle(0, 0, 45)
+    Vector.clip()
+    for i = -6, 6 do
+        Vector.begin_path()
+        Vector.save()
+        Vector.rotate(35)
+        Vector.rect(i * 14 - 4, -80, 8, 160)
+        Vector.restore()
+        Vector.fill_color(i % 2 == 0 and "#26c6da" or "#00838f")
+        Vector.fill()
+    end
+    Vector.restore()
+
     -- A dashed, rounded wave.
     Vector.save()
     Vector.translate(140, 0)

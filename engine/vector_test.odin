@@ -539,3 +539,53 @@ return O
 	testing.expect(t, !bool(lua.toboolean(L, -1)), "Vector outside on_draw fails")
 	lua.pop(L, 1)
 }
+
+// Clip paths (M1): fills and strokes cut to a region (its own fill rule),
+// from Odin and from Lua (Vector.clip until restore).
+@(test)
+test_vector_clip :: proc(t: ^testing.T) {
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	m: Vector_Mesh
+	defer Vector_Mesh_Destroy(&m)
+	k: Vector_Clip
+	Vector_Path_Init(&k.path)
+	defer Vector_Path_Destroy(&k.path)
+	Vector_Ellipse(&k.path, {0, 0}, {50, 50})
+	s := Vector_Shape{style = VECTOR_STYLE_DEFAULT, clip = &k}
+	Vector_Path_Init(&s.path)
+	defer Vector_Path_Destroy(&s.path)
+	Vector_Rect(&s.path, {-100, -10}, {100, 10})
+	shapes := []Vector_Shape{s}
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {0, 0}) && covered(&m, {45, 0}), "inside the clip")
+	testing.expect(t, !covered(&m, {60, 0}) && !covered(&m, {-80, 0}), "cut outside it")
+	// A stroke is clipped too (its outline: open line, round caps).
+	shapes[0].style.fill = false
+	shapes[0].style.stroke = true
+	shapes[0].style.strokeWidth = 8
+	Vector_Path_Clear(&shapes[0].path)
+	Vector_MoveTo(&shapes[0].path, {-100, 30}); Vector_LineTo(&shapes[0].path, {100, 30})
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {0, 30}) && covered(&m, {0, 33}), "stroke inside")
+	testing.expect(t, !covered(&m, {48, 30}) && !covered(&m, {-90, 30}), "stroke cut at the circle")
+	// A closed stroke (a ring) clipped to the right half.
+	Vector_Path_Clear(&k.path)
+	Vector_Rect(&k.path, {0, -100}, {100, 100})
+	Vector_Path_Clear(&shapes[0].path)
+	Vector_Ellipse(&shapes[0].path, {0, 0}, {40, 40})
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {40, 0}) && !covered(&m, {-40, 0}), "half a ring")
+	testing.expect(t, !covered(&m, {20, 0}), "the ring's middle stays empty")
+	// The clip's own rule: an even-odd ring clip leaves its hole out.
+	Vector_Path_Clear(&k.path)
+	Vector_Ellipse(&k.path, {0, 0}, {60, 60})
+	Vector_Ellipse(&k.path, {0, 0}, {30, 30})
+	k.rule = .EvenOdd
+	shapes[0].style.fill = true
+	shapes[0].style.stroke = false
+	Vector_Path_Clear(&shapes[0].path)
+	Vector_Rect(&shapes[0].path, {-100, -100}, {100, 100})
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {45, 0}) && !covered(&m, {0, 0}) && !covered(&m, {80, 0}), "a ring-shaped clip")
+}

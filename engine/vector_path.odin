@@ -197,6 +197,14 @@ VECTOR_STYLE_DEFAULT :: Vector_Style {
 Vector_Shape :: struct {
 	path:  Vector_Path,
 	style: Vector_Style,
+	clip:  ^Vector_Clip, // only what lies inside it is drawn (nil: no clip; not owned)
+}
+
+// Vector_Clip: a clipping region - a path filled by its own rule (SVG
+// clipPath / clip-rule, Flash masks of plain shapes).
+Vector_Clip :: struct {
+	path: Vector_Path,
+	rule: Vector_Fill_Rule,
 }
 
 Vector_Path_Init :: proc(p: ^Vector_Path, allocator := context.allocator) {

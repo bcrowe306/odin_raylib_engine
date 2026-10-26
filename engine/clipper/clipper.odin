@@ -66,8 +66,9 @@ foreign lib {
 	normalize :: proc(xy: [^]f64, counts: [^]c.int, n: c.int, rule: Fill_Rule, precision: c.int, out: ^Paths) -> c.int ---
 	@(link_name = "rz_boolean")
 	boolean :: proc(op: Op, sxy: [^]f64, scounts: [^]c.int, sn: c.int, cxy: [^]f64, ccounts: [^]c.int, cn: c.int, rule: Fill_Rule, precision: c.int, out: ^Paths) -> c.int ---
+	// kind: 0 open contours (ends), 1 closed areas (grow / shrink), 2 closed outlines (both sides)
 	@(link_name = "rz_offset")
-	offset :: proc(xy: [^]f64, counts: [^]c.int, n: c.int, closed: c.int, delta: f64, join: Join, end: End, miter_limit, arc_tolerance: f64, precision: c.int, out: ^Paths) -> c.int ---
+	offset :: proc(xy: [^]f64, counts: [^]c.int, n: c.int, kind: c.int, delta: f64, join: Join, end: End, miter_limit, arc_tolerance: f64, precision: c.int, out: ^Paths) -> c.int ---
 	@(link_name = "rz_free")
 	free_paths :: proc(p: ^Paths) ---
 }

@@ -9701,6 +9701,11 @@ function VectorModule.fill() end
 ---Example: `Vector.stroke_width(4); Vector.circle(0, 0, 20); Vector.stroke()`
 function VectorModule.stroke() end
 
+---Makes the current path (by the fill rule) the clip: what is drawn next only shows inside it, until restore() (a clip inside a clip replaces it).
+---
+---Example: `Vector.save(); Vector.circle(0, 0, 40); Vector.clip(); Vector.begin_path(); Vector.rect(-60, -10, 120, 20); Vector.fill(); Vector.restore()`
+function VectorModule.clip() end
+
 ---Sets the fill colour (and drops a fill paint).
 ---
 ---Example: `Vector.fill_color("#ff8800")`
