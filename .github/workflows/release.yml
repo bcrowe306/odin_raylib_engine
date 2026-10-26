@@ -9,7 +9,11 @@
 #   2. the editor packaged on each platform with every platform's runners in
 #      it (any editor exports every desktop target and the web);
 #   3. a GitHub Release with the packages and their SHA-256 checksums
-#      (a pre-release when the version has a suffix, e.g. -beta.1).
+#      (a pre-release when the version has a suffix, e.g. -beta.1);
+#   4. the website: the packages uploaded to its downloads (R2; the newest 3
+#      releases and the latest dev build kept), then rayzr.app rebuilt with
+#      the docs of those versions, deployed and verified
+#      (bcrowe306/rayzr_website's site.yml).
 # Signing: macOS packages are ad-hoc signed unless the MACOS_* secrets are
 # set (Developer ID + notarization: TODO C.4); Windows ones are unsigned
 # (TODO C.5).
@@ -246,3 +250,34 @@ jobs:
           prerelease: ${{ needs.version.outputs.prerelease }}
           generate_release_notes: true
           files: release/*
+
+      # The website's downloads (https://rayzr.app/download): the packages on
+      # R2 (downloads.rayzr.app), the newest 3 releases and the latest dev
+      # build kept (scripts/ci/publish_r2.py).
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+          path: src
+          sparse-checkout: scripts/ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Publish to the website's downloads (R2)
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+        run: |
+          pip install --quiet boto3
+          python3 src/scripts/ci/publish_r2.py --version "${{ needs.version.outputs.version }}" \
+            --dir release --commit "${{ needs.version.outputs.sha }}"
+
+  website:
+    name: Website (rayzr.app)
+    needs: [version, publish]
+    # (The site's docs and downloads follow every published build.)
+    uses: bcrowe306/rayzr_website/.github/workflows/site.yml@main
+    with:
+      deploy: true
+      reason: "Rayzr ${{ needs.version.outputs.version }} published"
+    secrets: inherit

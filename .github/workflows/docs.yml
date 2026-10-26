@@ -1,7 +1,12 @@
-# The documentation site (GitHub Pages: https://bcrowe306.github.io/rayzr/):
-# scripts/docs/build_site.py gathers the guides, the templates and the Lua API
-# reference, MkDocs builds them (strict: a broken link fails). Pull requests
-# build it; pushes to main publish it.
+# The documentation (published at https://rayzr.app/docs by the website,
+# github.com/bcrowe306/rayzr_website; docs/contributing/docs.md):
+#   - check: the docs are complete and in step with the code
+#     (scripts/docs/check_docs.py; nodes.json freshness is checked in ci.yml,
+#     which builds the editor), the exporter's and the R2 publisher's tests;
+#   - site (pull requests): the website built and tested with this pull
+#     request's docs as the dev version (its link check, end-to-end tests),
+#     deployed to a preview URL. Production deploys come from release.yml
+#     after every build.
 name: Docs
 
 on:
@@ -12,38 +17,28 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: docs-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-22.04
+  check:
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install mkdocs-material
-      - run: python3 scripts/docs/build_site.py
-      - run: mkdocs build --strict -f build/docs_src/mkdocs.yml
-        env:
-          NO_MKDOCS_2_WARNING: "1"
-      - if: github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/docs_site
+      - run: python3 scripts/docs/check_docs.py
+      - run: python3 scripts/docs/test_export_site.py
+      - run: python3 scripts/ci/test_publish_r2.py
 
-  deploy:
-    if: github.event_name != 'pull_request'
-    needs: build
-    runs-on: ubuntu-22.04
-    environment:
-      name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
-    steps:
-      - id: deploy
-        uses: actions/deploy-pages@v4
+  site:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    needs: check
+    uses: bcrowe306/rayzr_website/.github/workflows/site.yml@main
+    with:
+      engine_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      reason: "Docs preview for ${{ github.event.pull_request.html_url || github.sha }}"
+    secrets: inherit
