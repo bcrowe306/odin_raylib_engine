@@ -39,8 +39,8 @@ the scene; the script only declares the defaults.
 ## 4. Change the level
 
 1. Select the **Level** tile map in the Scene panel.
-2. In the viewport, paint with the tile brush (Inspector > *Tile Map* picks
-   the tile); right-drag erases.
+2. The bottom panel's **Tile Map** tab opens: click a tile there, then
+   paint in the viewport with the brush; right-drag erases.
 3. To add more coins, select a coin and press **Cmd+D** (Ctrl+D on Windows
    and Linux) to duplicate it, then drag the copy where you want it.
 

@@ -1,17 +1,34 @@
-# Tile map painting: add a TileMap, pick a tileset and a tile, paint and
-# erase in the viewport, flood fill, undo, save.
+# Tile map painting: add a TileMap - the bottom panel's Tile Map tab opens
+# (settings row, tools, the tileset's tiles); pick a tileset and a tile,
+# paint and erase in the viewport, flood fill, undo, save.
 wait 5
+# The bottom panel starts 100 px tall: the Animation workspace gives its
+# tools room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
 key escape
 key ctrl+a
 type tile map
 key enter
 expect selected == TileMap
 expect node:TileMap.tiles == 0
+wait 2
+expect bottom-tab == TileMap
+expect item:insp.tile.open == visible
+screenshot empty_tab
 click @tile.tileset
 click @pick:textures/Asteroid_1.png
+wait 2
 click @tile.palette:6
 expect item:tile.paint == visible
+expect item:tile.zoom == visible
 screenshot palette
+click @tile.zoom-in
+click @tile.grid
+wait 1
+screenshot palette_zoomed_grid
 # Paint a stroke (one undo step).
 drag @world:660,380 @world:820,380
 expect node:TileMap.tiles >= 5
@@ -22,7 +39,7 @@ key ctrl+y
 expect node:TileMap.tiles >= 5
 # Flood fill the rest of the map.
 click @tile.fill
-click @world:700,520
+click @world:700,400
 expect node:TileMap.tiles == 240
 screenshot filled
 # Erase with the right button... and with the eraser tool.
@@ -47,7 +64,7 @@ click @toolbar.zoom
 click @pick:25%
 wait 2
 click @tile.fill
-click @world:1000,1000
+click @world:1500,600
 expect node:TileMap.tiles >= 6300
 # Zoomed out: the whole map in view (enough tiles to use the chunk cache).
 key cmd+minus

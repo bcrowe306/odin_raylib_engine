@@ -7,7 +7,8 @@ import rl "vendor:raylib"
 
 // ============================================================================
 // TileMapNode: a grid of tiles from one tileset image, painted in the
-// editor (Inspector "Tile Map" section + viewport brush). Tile indices
+// editor (the bottom panel's Tile Map tab + viewport brush); components can
+// be painted on the same grid too (tilemap_components.odin). Tile indices
 // count left-to-right, top-to-bottom in the tileset; -1 is empty.
 //
 // With `solid` on, ready() builds static colliders for every painted tile
@@ -38,6 +39,9 @@ TileMapNode :: struct {
 	// per chunk for single-cell edits.
 	cacheVersion: u64,
 	chunkVer:     map[[2]i32]u64,
+	// Components on the grid (tilemap_components.odin): their footprints in
+	// cells, measured once per component and tile size.
+	compFootprints: map[string][2]int,
 }
 
 TileMapNode_Create :: proc(scene: ^Scene, name: string = "TileMap", parent: ^Node = nil) -> ^TileMapNode {

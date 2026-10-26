@@ -691,10 +691,26 @@ with the node (and its parents), like everything else drawn by it.
 
 ### Tile maps
 
-Add a **Tile Map** node, pick a tileset and tile size in the Inspector,
-choose a tile in the palette and paint in the viewport (brush, eraser, flood
-fill; right button erases; one undo step per stroke). Turn on `solid` for
-colliders.
+Add a **Tile Map** node: the bottom panel's **Tile Map** tab opens (the
+Inspector's *Edit in Tile Map Tab* button too). Its top row sets the
+tileset, tile size and map size; the toolbar below has the brush, eraser and
+flood fill, the picked tile, and the tile view's zoom and grid; under it the
+tileset's tiles are laid out as in the image - click one, then paint in the
+viewport (right button erases; one undo step per stroke). Turn on `solid`
+for colliders.
+
+The toolbar's **Components** layer paints components on the same grid:
+pick one from the project's components (cards with a picture), then the
+brush puts a linked instance of it on each cell - one per cell, centred; a
+component bigger than a cell takes its whole footprint (its drawn size in
+cells) and replaces what it covers. **Shift**-click places one off the grid;
+the eraser, the right button and flood fill work on this layer too. The
+instances are ordinary children of the tile map, saved with the scene:
+select one to nudge it or override its properties, and editing the
+component file updates every painted copy. Their colliders are their own
+(`solid` only builds colliders for tiles). Scripts:
+`map:tilemap_component_at(x, y)`, `map:tilemap_set_component(x, y, path)`,
+`map:tilemap_clear_component(x, y)` (0-based cells).
 
 ### LDtk levels
 

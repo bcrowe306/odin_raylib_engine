@@ -44,6 +44,7 @@ BottomTab :: enum {
 	Search, // find in files (code_search.odin)
 	StateGraph, // state machine graph (state_machine_graph.odin)
 	Mixer,      // audio mixer console (mixer_panel.odin)
+	TileMap,    // tile map painting: settings, tools, tiles (tilemap_editor.odin)
 }
 
 ViewportTab :: enum {
