@@ -40,3 +40,9 @@ turns its filter off. The art is drawn through a texture remade only when
 something changes. **lineScale** *Constant* keeps outlines the same width
 whatever the node's scale (Flash's line scaling *None*). See
 [filters](../../engine/docs/vector.md#filters-and-line-scaling).
+
+**Bending with bones**: under a Skeleton, **skinBones** (the Inspector's
+*Bend with*) names the bones the art bends with and **skinSmooth** how
+softly it bends round the joints - see
+[vector skinning](../../engine/docs/vector.md#bending-with-bones-vector-skinning).
+The four **warp** corners squash and stretch any Vector Shape.

@@ -1,0 +1,59 @@
+# Vector skinning in the editor (Phase 14 V.10; vector_editor.odin): a
+# Vector Shape under a Skeleton (a bones-only Spine rig, listed without an
+# atlas) gets the Inspector's Bend with picker - all bones, or bones toggled
+# one by one, undoable; it bends with the skeleton's pose in the viewport;
+# the scene saves it.
+exec mkdir -p $PROJECT/rig_zz
+exec cp tests/vector/project/art/arm_rig.json $PROJECT/rig_zz/arm_rig_zz.json
+exec cp tests/vector/svg/limb.svg $PROJECT/rig_zz/limb_zz.svg
+wait 5
+key escape
+key ctrl+a
+type skeleton
+key enter
+wait 3
+expect node:Skeleton.type == SkeletonNode
+wait 90
+click @insp.skel.file
+wait 2
+click @pick:rig_zz/arm_rig_zz.json
+wait 3
+click @insp.skel.animation
+click @pick:bent
+wait 2
+expect node:Skeleton.prop.animation == bent
+key ctrl+a
+type vector
+key enter
+wait 3
+expect node:VectorShape.parent == Skeleton
+click @insp.vec.file
+wait 2
+click @pick:rig_zz/limb_zz.svg
+wait 3
+expect item:insp.vec.skin == visible
+scroll @viewport 3
+wait 2
+screenshot not_skinned
+click @insp.vec.skin
+wait 1
+click @pick:vec-skin:upper
+wait 1
+click @pick:vec-skin:lower
+wait 1
+click @insp.vec.skin
+wait 1
+expect node:VectorShape.prop.skinBones == upper, lower
+screenshot bent
+key cmd+z
+wait 1
+expect node:VectorShape.prop.skinBones == upper
+click @insp.vec.skin
+wait 1
+click @pick:vec-skin:*
+wait 1
+expect node:VectorShape.prop.skinBones == *
+screenshot all_bones
+key cmd+s
+wait 3
+expect file:scenes/main.scene.json contains "skinBones": "*"

@@ -1,0 +1,11 @@
+{"name": "skin", "background": [44, 52, 70, 255], "root": {"type": "Node", "name": "root", "children": [{"type": "CameraNode", "name": "Camera", "position": [480, 270], "properties": {"isCurrent": true}},
+ {"type": "SkeletonNode", "name": "RestRig", "position": [50, 140], "properties": {"file": "art/arm_rig.json", "showBones": true}, "children": [
+  {"type": "VectorShapeNode", "name": "RestLimb", "position": [100, 0], "properties": {"file": "art/limb.svg", "skinBones": "upper, lower", "skinSmooth": 40}}]},
+ {"type": "SkeletonNode", "name": "RigidRig", "position": [350, 110], "properties": {"file": "art/arm_rig.json", "animation": "bent"}, "children": [
+  {"type": "VectorShapeNode", "name": "RigidLimb", "position": [100, 0], "properties": {"file": "art/limb.svg", "skinBones": "upper, lower", "skinSmooth": 0}}]},
+ {"type": "SkeletonNode", "name": "SmoothRig", "position": [650, 110], "properties": {"file": "art/arm_rig.json", "animation": "bent", "showBones": true}, "children": [
+  {"type": "VectorShapeNode", "name": "SmoothLimb", "position": [100, 0], "properties": {"file": "art/limb.svg", "skinBones": "*", "skinSmooth": 60}}]},
+ {"type": "SkeletonNode", "name": "FlippedRig", "position": [300, 350], "rotation": 15, "scale": [-1, 1], "properties": {"file": "art/arm_rig.json", "animation": "bent"}, "children": [
+  {"type": "VectorShapeNode", "name": "FlippedLimb", "position": [100, 0], "properties": {"file": "art/limb.svg", "skinBones": "upper, lower", "skinSmooth": 40, "tint": "#a0d8ffff"}}]},
+ {"type": "VectorShapeNode", "name": "WarpedStar", "position": [520, 400], "scale": [0.8, 0.8], "properties": {"preset": "Star", "warpTopLeft": [80, -30], "warpTopRight": [80, -30], "warpBottomLeft": [-30, 0], "warpBottomRight": [30, 0]}},
+ {"type": "VectorShapeNode", "name": "Squashed", "position": [780, 420], "scale": [0.55, 0.55], "properties": {"file": "art/character_parts.svg", "warpTopLeft": [-50, 90], "warpTopRight": [50, 90], "warpBottomLeft": [-40, 0], "warpBottomRight": [40, 0]}}]}}

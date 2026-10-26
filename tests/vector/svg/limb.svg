@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- A limb for vector skinning tests (Phase 14 V.10): a striped tube, 200 x 40,
+     drawn along x so a two-bone rig (upper 0..100, lower 100..200) bends it. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="40" viewBox="0 0 200 40">
+  <g id="limb">
+    <rect x="2" y="2" width="196" height="36" rx="18" fill="#f4b183" stroke="#5b3a29" stroke-width="3"/>
+    <g fill="none" stroke="#c0504d" stroke-width="4" stroke-linecap="round">
+      <path d="M25 6 V34 M50 6 V34 M75 6 V34 M100 6 V34 M125 6 V34 M150 6 V34 M175 6 V34"/>
+    </g>
+    <path d="M10 20 H190" fill="none" stroke="#5b3a29" stroke-width="2" stroke-dasharray="6 6"/>
+  </g>
+</svg>

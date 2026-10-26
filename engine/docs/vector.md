@@ -11,7 +11,7 @@ in milestones:
 | M1 | Shapes in full: fill rules and self-intersections (Clipper2), gradients, dashes, opacity, clip paths; drawing from Lua (`on_draw` + the `Vector` module) | **done** |
 | M2 | Vector assets: SVG import (Inkscape, Illustrator, Affinity, Figma), assets shared and reloaded on save, the editor's workflow, picking, culling, background tessellation | **done** |
 | M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | **done** |
-| M5 | Shape tweens and trim paths (**done**), filters and line scaling (**done**), vector skinning on skeletons | in progress |
+| M5 | Shape tweens and trim paths, filters and line scaling, vector skinning on skeletons and warps | **done** |
 | M6 | Boolean path operations, collision from shapes | |
 | M4 | Drawing tools in the editor | |
 | M7 | Crisp text, Adobe Animate import, a sample character | |
@@ -228,6 +228,64 @@ outlines as the node grows; *Constant* keeps their width whatever the node's
 scale - a character scaled up 2x keeps 4 px outlines. Constant re-tessellates
 the node's own copy when its scale changes by more than a percent.
 
+## Bending with bones: vector skinning
+
+Put a Vector Shape under a [Skeleton](skeletal_animation.md) and it can
+**bend with the skeleton's bones** - a sleeve that curves round the elbow
+instead of two rigid pieces meeting at a joint, a tail that swishes, a
+belly that squashes.
+
+1. Rig the bones in Spine (or DragonBones) and export the `.json` - **bones
+   only is fine**: no images, no atlas. Draw the art in your vector app.
+2. Add a **Skeleton** with that file, and a **Vector Shape** with the SVG
+   as its child. Place the art over the bones as they stand in the setup
+   pose (the skeleton's rest pose - clear its Animation to see it).
+3. In the Inspector's Vector section, **Bend with**: pick the bones
+   (*All bones*, or tick the ones this part follows).
+4. **Skin Smooth** sets how far round each joint (px) neighbouring bones
+   blend: 0 makes rigid parts (each point follows its nearest bone), 30-60
+   bends a limb round a soft elbow.
+
+Then anything that moves the bones moves the art: the skeleton's
+animations and crossfades, **IK** constraints, and scripts
+(`skeleton_set_bone_rotation` to aim an arm).
+
+```lua
+-- A tentacle that follows the mouse with IK, skinned smoothly.
+local rig = self.node:get_node("Tentacle")   -- a Skeleton
+local art = rig:get_node("Art")              -- its Vector Shape
+art.skinBones = "*"
+art.skinSmooth = 50
+```
+
+How it works (`engine/vector_skin.odin`): the art is bound once, in the
+skeleton's setup pose - every vertex of its tessellated mesh gets up to
+four bones, weighted by its distance to each bone (from its joint to its
+tip); long triangles are split first so bends have vertices to bend at.
+The weights ride in the mesh; each frame only the bones' matrices go to
+the GPU and the vector shader blends them per vertex - posing never
+re-tessellates or re-uploads. 100 skinned limbs animating cost 1.3 ms a
+frame (`scenes/bench_skin.scene.json`). It's re-bound when the bones, the
+smoothing, the part's place on the skeleton or its tessellation (a new
+zoom) change. Up to 64 bones per Vector Shape.
+
+### Squash and stretch: the four-corner warp
+
+Any Vector Shape (with a skeleton or not) can be warped by moving its four
+corners: **warpTopLeft**, **warpTopRight**, **warpBottomLeft**,
+**warpBottomRight** (px). The art stretches between them, like a free-form
+deformer: key them for a squash on landing, a lean, a taper. The warp
+happens in the vertex shader too (on the shared mesh: no copy).
+
+```lua
+-- Squash on landing and spring back.
+local body = self.node:get_node("Body")
+body.warpTopLeft = Vec2(-20, 30)
+body.warpTopRight = Vec2(20, 30)
+Tween.to(body, "warpTopLeft", Vec2(0, 0), 0.25, "out_back")
+Tween.to(body, "warpTopRight", Vec2(0, 0), 0.25, "out_back")
+```
+
 ## Using it with presets
 
 A Vector Shape without a file draws its **Preset**: a star, a ring (a shape
@@ -392,6 +450,14 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
 - `test_vector_line_scale_filters` (`engine/vector_morph_test.odin`):
   constant line width (rebuilt only when the scale changes), filters
   switching on, nothing prepared without a window.
+- `engine/vector_skin_test.odin`: weights (rigid and smooth joints, the
+  nearest bones), the pose's matrices matching the bones, binding through
+  the node's place on the skeleton, re-binding only when needed, picking
+  the bent art, the warp; leak-checked.
+- `tests/drive/vector_skin.drive`: a bones-only rig in the Skeleton's file
+  list, the Bend with picker (bones toggled, all bones, undo), saving.
+- `scenes/skin.scene.json` (golden, both drawing paths): a limb at rest,
+  bent rigid and smooth, flipped and rotated; warps.
 - `tests/drive/vector_filters.drive`: saturation, blur and hue edited in
   the Inspector and drawn in the viewport, undo, saving.
 - `scenes/filters.scene.json` (golden): each filter alone, a flipped
@@ -410,7 +476,11 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
 - A clip inside a clip replaces it (no intersection of nested clips yet);
   no soft (alpha) masks yet.
 - Filters apply to one Vector Shape: an exploded character's parts each get
-  their own (a shadow per part, not one for the whole character).
+  their own (a shadow per part, not one for the whole character). Bent
+  (skinned or warped) art skips its filters.
+- Skinning binds by distance to the bones (no painted weights yet); outlines
+  bend with the art, so a strongly bent stroke gets a little thinner on the
+  inside of the bend.
 - Radial gradients have no separate focal point yet (Flash's focal ratio,
   SVG's fx / fy).
 - The immediate drawing path (`RAYZR_VECTOR_MODE=immediate`) evaluates

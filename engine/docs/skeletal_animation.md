@@ -40,6 +40,15 @@ looping if **Loop** is on.
 | **Preview** | Play / pause and scrub in the viewport (editing only). |
 | **Bones** | Every bone, indented by hierarchy. Hover one: it lights up in the viewport. The link button adds a **Bone Attachment** following it. |
 
+## Vector art on a skeleton
+
+A skeleton doesn't need images: export just the bones (a Spine `.json`
+with no atlas is listed too) and put Vector Shapes under the Skeleton.
+A part that should stay rigid goes under a **Bone Attachment**; a part
+that should **bend** with the bones (a sleeve, a tail) uses the Vector
+Shape's *Bend with* - see
+[vector skinning](vector.md#bending-with-bones-vector-skinning).
+
 ## Bone Attachments
 
 A **Bone Attachment** node under a Skeleton follows one of its bones - put

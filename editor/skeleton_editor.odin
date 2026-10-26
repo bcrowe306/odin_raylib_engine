@@ -23,7 +23,8 @@ skelPreview: struct {
 }
 
 // skeleton_files: project .json files that are skeleton exports (a Spine
-// .json next to its .atlas, or a DragonBones _ske.json).
+// .json next to its .atlas, or a DragonBones _ske.json), and Spine files
+// without an atlas (bones only: rigs for vector skinning).
 @(private = "file")
 skeleton_files :: proc(state: ^EditorState) -> []string {
 	out := make([dynamic]string, context.temp_allocator)
@@ -32,11 +33,37 @@ skeleton_files :: proc(state: ^EditorState) -> []string {
 			append(&out, f)
 			continue
 		}
+		if strings.has_suffix(f, ".scene.json") || strings.has_suffix(f, ".import.json") || f == "project.json" do continue
 		base := strings.trim_suffix(f, ".json")
 		full, _ := filepath.join({state.projectPath, strings.concatenate({base, ".atlas"}, context.temp_allocator)}, context.temp_allocator)
-		if os.is_file(full) do append(&out, f)
+		if os.is_file(full) || skeleton_rig_only(state, f) do append(&out, f)
 	}
 	return out[:]
+}
+
+// skeleton_rig_only: whether a .json is a Spine skeleton (its start has
+// "skeleton" and "bones"), remembered per file and modification time.
+@(private = "file")
+skelRigCache: map[string]struct {mtime: i64, rig: bool}
+
+@(private = "file")
+skeleton_rig_only :: proc(state: ^EditorState, rel: string) -> bool {
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	mtime: i64
+	if fi, err := os.stat(full, context.temp_allocator); err == nil do mtime = fi.modification_time._nsec
+	if c, ok := skelRigCache[full]; ok && c.mtime == mtime do return c.rig
+	rig := false
+	if fh, err := os.open(full); err == nil {
+		buf: [512]u8
+		n, _ := os.read(fh, buf[:])
+		os.close(fh)
+		head := string(buf[:max(n, 0)])
+		rig = strings.contains(head, "\"skeleton\"") && strings.contains(head, "\"bones\"")
+	}
+	if skelRigCache == nil do skelRigCache = make(map[string]struct {mtime: i64, rig: bool})
+	if _, ok := skelRigCache[full]; !ok do full = strings.clone(full)
+	skelRigCache[full] = {mtime, rig}
+	return rig
 }
 
 inspector_skeleton :: proc(state: ^EditorState, sn: ^e.SkeletonNode) {

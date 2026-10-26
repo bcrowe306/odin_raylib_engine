@@ -50,6 +50,14 @@ VectorShapeNode :: struct {
 	saturation:   f32 `gui:"true" min:"0" max:"3"`, // 0 grey, 1 as drawn, 2 vivid
 	contrast:     f32 `gui:"true" min:"0" max:"3"`,
 	hue:          f32 `gui:"true" min:"-180" max:"180"`, // degrees round the colour wheel
+	// Skinning and warp (vector_skin.odin): bend with a Skeleton's bones; squash / stretch.
+	skinBones:    string `gui:"true"`, // a Skeleton ancestor's bones it bends with ("a, b"; "*" = all; "" = none)
+	skinSmooth:   f32 `gui:"true" min:"0" max:"200"`, // px round each joint where neighbouring bones blend (0: rigid parts)
+	warpTopLeft:     [2]f32 `gui:"true" min:"-500" max:"500"`, // corner offsets of a four-corner warp (px)
+	warpTopRight:    [2]f32 `gui:"true" min:"-500" max:"500"`,
+	warpBottomLeft:  [2]f32 `gui:"true" min:"-500" max:"500"`,
+	warpBottomRight: [2]f32 `gui:"true" min:"-500" max:"500"`,
+	skinning:     Vector_Skin,
 	filter:       Vector_Filter_State,
 	shapes:      [dynamic]Vector_Shape,
 	cache:       Vector_Cache,
@@ -96,6 +104,7 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 	v.outlineWidth = 3
 	v.saturation = 1
 	v.contrast = 1
+	v.skinSmooth = 24
 	// (Meshes are rebuilt on zoom: the heap, not the node's arena.)
 	v.shapes = make([dynamic]Vector_Shape, Engine_HeapAllocator())
 	v.fx = make([dynamic]Vector_Shape, Engine_HeapAllocator())
@@ -109,6 +118,7 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 		delete(v.fx)
 		Vector_Cache_Destroy(&v.fxCache)
 		Vector_FilterRelease(v)
+		Vector_Skin_Destroy(&v.skinning)
 		ResourceManager_ReleaseVector(v.res)
 		v.res = nil
 		delete(v.loadedPath, Engine_HeapAllocator())
@@ -224,7 +234,59 @@ vector_color_effect :: proc(v: ^VectorShapeNode) -> (mul: rl.Color, add: [4]f32)
 // VectorShapeNode_FxActive: whether trim paths or a shape tween change
 // what it draws (then it tessellates its own copy when they change).
 VectorShapeNode_FxActive :: proc(v: ^VectorShapeNode) -> bool {
-	return v.trimStart > 0 || v.trimEnd < 1 || (v.morph > 0 && v.morphTo != "") || v.lineScale == .Constant
+	// (Skinned: its own mesh, which carries its weights.)
+	return v.trimStart > 0 || v.trimEnd < 1 || (v.morph > 0 && v.morphTo != "") || v.lineScale == .Constant || VectorShapeNode_SkinTarget(v) != nil
+}
+
+// VectorShapeNode_SkinTarget: the Skeleton it bends with - the nearest
+// Skeleton ancestor, when skinBones names bones (nil: not skinned).
+VectorShapeNode_SkinTarget :: proc(v: ^VectorShapeNode) -> ^SkeletonNode {
+	if v.skinBones == "" do return nil
+	return VectorShapeNode_Skeleton(v)
+}
+
+// VectorShapeNode_Skeleton: its nearest Skeleton ancestor (nil: none).
+VectorShapeNode_Skeleton :: proc(v: ^VectorShapeNode) -> ^SkeletonNode {
+	for p := v.parent; p != nil; p = p.parent {
+		if p.typeId == SkeletonNode do return cast(^SkeletonNode)p
+	}
+	return nil
+}
+
+// VectorShapeNode_Warped: whether a warp corner moved.
+VectorShapeNode_Warped :: proc(v: ^VectorShapeNode) -> bool {
+	return v.warpTopLeft != {} || v.warpTopRight != {} || v.warpBottomLeft != {} || v.warpBottomRight != {}
+}
+
+// VectorShapeNode_Deformed: whether it's drawn bent (skinned or warped).
+VectorShapeNode_Deformed :: proc(v: ^VectorShapeNode) -> bool {
+	return VectorShapeNode_Warped(v) || VectorShapeNode_SkinTarget(v) != nil
+}
+
+// VectorShapeNode_Deform: how its mesh (cache, drawn with offset) is bent
+// now - the warp over its box, the skin from its Skeleton's pose (bound /
+// re-bound when needed); ok = false: drawn as it is.
+VectorShapeNode_Deform :: proc(v: ^VectorShapeNode, cache: ^Vector_Cache, offset: [2]f32) -> (d: Vector_Deform, ok: bool) {
+	if VectorShapeNode_Warped(v) {
+		vector_node_warp(v, &cache.mesh, &d)
+		ok = d.box[2] > 0 && d.box[3] > 0
+	}
+	sn := VectorShapeNode_SkinTarget(v)
+	if sn == nil || sn.data == nil || len(sn.pose.bones) != len(sn.data.bones) || len(cache.mesh.verts) == 0 do return d, ok
+	// Mesh space -> the skeleton's space: the local transforms up to it.
+	bind := Vector_AffineTRS(offset, 0, {1, 1})
+	for n: ^Node = v; n != nil && n != sn; n = n.parent {
+		bind = Vector_AffineMul(Vector_AffineTRS(n.position, n.rotation, n.scale), bind)
+	}
+	if Vector_SkinBind(&v.skinning, sn.data, cache, v.skinBones, v.skinSmooth, bind) {
+
+
+		Vector_Cache_SetSkin(cache, v.skinning.ids[:], v.skinning.weights[:])
+	}
+	if len(v.skinning.bones) == 0 do return d, ok
+	d.bones = Vector_SkinPose(&v.skinning, &sn.pose)
+
+	return d, true
 }
 
 // vector_fx_build remakes the trimmed / morphed shapes when anything they
@@ -323,7 +385,43 @@ VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	cache, offset, ok := VectorShapeNode_Mesh(v, Vector_ScreenPixel(v.globalScale))
 	if !ok do return
 	mul, add := vector_color_effect(v)
+	if VectorShapeNode_Deformed(v) {
+		if d, bent := VectorShapeNode_Deform(v, cache, offset); bent {
+			Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, mul, offset, add, &d)
+			return
+		}
+	}
 	Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, mul, offset, add)
+}
+
+// vector_node_warp: the warp's corners and box (mesh space) - an asset
+// part's box (stable across frames and swaps), else the mesh's.
+@(private = "file")
+vector_node_warp :: proc(v: ^VectorShapeNode, mesh: ^Vector_Mesh, d: ^Vector_Deform) {
+	box := mesh.bounds
+	if r := VectorShapeNode_Asset(v); r != nil {
+		if _, bmin, bsize, found := VectorShapeNode_Part(v, r); found do box = {bmin.x, bmin.y, bmin.x + bsize.x, bmin.y + bsize.y}
+	}
+	d.box = {box[0], box[1], box[2] - box[0], box[3] - box[1]}
+	d.warp = {v.warpTopLeft, v.warpTopRight, v.warpBottomLeft, v.warpBottomRight}
+}
+
+// vector_deformed_bounds: a box (mesh space) through a deform - its
+// corners widened by the warp, then through every bone (generous).
+@(private = "file")
+vector_deformed_bounds :: proc(d: ^Vector_Deform, b: [4]f32) -> [4]f32 {
+	pad: f32 = 0
+	for w in d.warp do pad = max(pad, abs(w.x), abs(w.y))
+	b := [4]f32{b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad}
+	if len(d.bones) == 0 do return b
+	out := [4]f32{max(f32), max(f32), -max(f32), -max(f32)}
+	for m in d.bones {
+		for c in ([4][2]f32{{b[0], b[1]}, {b[2], b[1]}, {b[0], b[3]}, {b[2], b[3]}}) {
+			p := Vector_AffineApply(m, c)
+			out = {min(out[0], p.x), min(out[1], p.y), max(out[2], p.x), max(out[3], p.y)}
+		}
+	}
+	return out
 }
 
 // VectorShapeNode_LocalBounds: what the node draws in its own space (before
@@ -335,11 +433,24 @@ VectorShapeNode_LocalBounds :: proc(v: ^VectorShapeNode) -> (b: [4]f32, ok: bool
 		off := -boxMin - Node_OriginPx(v, boxSize)
 		d := r.doc.drawn if part < 0 else Vector_ShapesBounds(Vector_PartShapes(r, part))
 		if VectorShapeNode_FxActive(v) && len(v.fx) > 0 do d = Vector_ShapesBounds(v.fx[:])
-		return {d[0] + off.x, d[1] + off.y, d[2] + off.x, d[3] + off.y}, d != {}
+		if d == {} do return {}, false
+		if VectorShapeNode_Deformed(v) do d = vector_node_bent_bounds(v, d)
+		return {d[0] + off.x, d[1] + off.y, d[2] + off.x, d[3] + off.y}, true
 	}
 	c := &v.fxCache if VectorShapeNode_FxActive(v) else &v.cache
 	if len(c.mesh.verts) == 0 do return {}, false
+	if VectorShapeNode_Deformed(v) do return vector_node_bent_bounds(v, c.mesh.bounds), true
 	return c.mesh.bounds, true
+}
+
+// vector_node_bent_bounds: drawn bounds (mesh space) under the warp and
+// the skin's last pose.
+@(private = "file")
+vector_node_bent_bounds :: proc(v: ^VectorShapeNode, b: [4]f32) -> [4]f32 {
+	d: Vector_Deform
+	if VectorShapeNode_Warped(v) do d.warp = {v.warpTopLeft, v.warpTopRight, v.warpBottomLeft, v.warpBottomRight}
+	if VectorShapeNode_SkinTarget(v) != nil && v.skinning.valid do d.bones = v.skinning.mats[:]
+	return vector_deformed_bounds(&d, b)
 }
 
 // VectorShapeNode_HitTest: whether a world point is on the drawn shape
@@ -363,8 +474,25 @@ VectorShapeNode_HitTest :: proc(v: ^VectorShapeNode, world: [2]f32) -> bool {
 		mesh = &v.cache.mesh if !VectorShapeNode_FxActive(v) else &v.fxCache.mesh
 	}
 	if mesh == nil || len(mesh.idx) == 0 do return false
+	// Bent art: the triangles as drawn (the warp, the skin's last pose).
+	bent: Vector_Deform
+	deformed := VectorShapeNode_Deformed(v)
+	skinned := false
+	if deformed {
+		if VectorShapeNode_Warped(v) do vector_node_warp(v, mesh, &bent)
+		if VectorShapeNode_SkinTarget(v) != nil && v.skinning.valid && len(v.skinning.ids) == len(mesh.verts) {
+			bent.bones = v.skinning.mats[:]
+			skinned = true
+		}
+	}
+	vert :: proc(m: ^Vector_Mesh, i: u32, d: ^Vector_Deform, deformed, skinned: bool, s: ^Vector_Skin) -> [2]f32 {
+		if !deformed do return m.verts[i]
+		return Vector_DeformPoint(d, m.verts[i], s.ids[i] if skinned else {}, s.weights[i] if skinned else {})
+	}
 	for i := 0; i < len(mesh.idx); i += 3 {
-		a, b, cc := mesh.verts[mesh.idx[i]], mesh.verts[mesh.idx[i + 1]], mesh.verts[mesh.idx[i + 2]]
+		a := vert(mesh, mesh.idx[i], &bent, deformed, skinned, &v.skinning)
+		b := vert(mesh, mesh.idx[i + 1], &bent, deformed, skinned, &v.skinning)
+		cc := vert(mesh, mesh.idx[i + 2], &bent, deformed, skinned, &v.skinning)
 		d1 := (q.x - b.x) * (a.y - b.y) - (a.x - b.x) * (q.y - b.y)
 		d2 := (q.x - cc.x) * (b.y - cc.y) - (b.x - cc.x) * (q.y - cc.y)
 		d3 := (q.x - a.x) * (cc.y - a.y) - (cc.x - a.x) * (q.y - a.y)

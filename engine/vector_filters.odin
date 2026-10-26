@@ -181,6 +181,7 @@ Vector_FiltersPrepared :: proc() -> int {return vfilt.prepared}
 
 // Vector_FiltersActive: whether the node draws through filters.
 Vector_FiltersActive :: proc(v: ^VectorShapeNode) -> bool {
+	if VectorShapeNode_Deformed(v) do return false // (bent art draws as a mesh: filters skip it)
 	return v.shadowColor.a > 0 || v.glowColor.a > 0 || v.outlineColor.a > 0 || v.blur > 0 || v.saturation != 1 || v.contrast != 1 || v.hue != 0
 }
 

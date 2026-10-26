@@ -765,7 +765,13 @@
         {"name": "blur", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": 0, "max": 64, "doc": "Blur filter: blurs the art itself (screen px); 0 = sharp."},
         {"name": "saturation", "kind": "number", "owner": "VectorShapeNode", "default": 1, "min": 0, "max": 3, "doc": "Colour filter: 0 grey, 1 as drawn, 2 vivid."},
         {"name": "contrast", "kind": "number", "owner": "VectorShapeNode", "default": 1, "min": 0, "max": 3, "doc": "Colour filter: 1 as drawn; less: flatter, more: punchier."},
-        {"name": "hue", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": -180, "max": 180, "doc": "Colour filter: turns the colours round the colour wheel (degrees)."}
+        {"name": "hue", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": -180, "max": 180, "doc": "Colour filter: turns the colours round the colour wheel (degrees)."},
+        {"name": "skinBones", "kind": "string", "owner": "VectorShapeNode", "default": "", "doc": "Vector skinning: the bones of a Skeleton above it that the art bends with (\"upper, lower\"; \"*\" = all; empty = none). Bound in the skeleton's setup pose."},
+        {"name": "skinSmooth", "kind": "number", "owner": "VectorShapeNode", "default": 24, "min": 0, "max": 200, "doc": "Vector skinning: how far round each joint (px) neighbouring bones blend - 0 makes rigid parts, 30-60 bends a limb round a soft elbow."},
+        {"name": "warpTopLeft", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp (squash and stretch): how far the art's top-left corner moves (px); the art stretches between the corners. Key it."},
+        {"name": "warpTopRight", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp: how far the top-right corner moves (px)."},
+        {"name": "warpBottomLeft", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp: how far the bottom-left corner moves (px)."},
+        {"name": "warpBottomRight", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp: how far the bottom-right corner moves (px)."}
       ]
     },
     {

@@ -52,6 +52,11 @@ Vector_Cache :: struct {
 	dirty:    bool,
 	uploaded: bool,
 	stats:    struct {tessellations: int},
+	// Skinning (vector_skin.odin): per-vertex bones and weights uploaded with
+	// the mesh (not owned; cleared when it's re-tessellated).
+	skinIds:      [][4]u8,
+	skinWeights:  [][4]f32,
+	skinUploaded: bool,
 }
 
 @(private = "file")
@@ -60,6 +65,15 @@ vectorMaterial: rl.Material
 vectorMaterialReady: bool
 @(private = "file")
 vectorAddLoc: i32 = -1
+
+// The deforming variant (skin + warp; vector_skin.odin).
+@(private = "file")
+vskin: struct {
+	material:                    rl.Material,
+	ready:                       bool,
+	add, bones, skinOn:          i32,
+	warpBox, warpA, warpB:       i32,
+}
 
 // The vector shader: solid vertices use their colour; gradient vertices
 // (mode > 0) look their colour up in the mesh's gradient texture at the
@@ -81,6 +95,60 @@ void main() {
     fragMode = vertexTexCoord2;
     fragColor = vertexColor;
     gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+`
+
+// The vertex shader that bends: a four-corner warp over a box (bilinear),
+// then up to four bones per vertex (ids packed in the normal: id0 + id1 *
+// 256, id2 + id3 * 256; weights in the tangent), each bone two vec4s (a b c
+// d, tx ty).
+@(private = "file")
+VECTOR_SKIN_VS :: `#version 330
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec2 vertexTexCoord2;
+in vec4 vertexColor;
+in vec3 vertexNormal;
+in vec4 vertexTangent;
+uniform mat4 mvp;
+uniform vec4 bones[128];
+uniform float skinOn;
+uniform vec4 warpBox;
+uniform vec4 warpA;
+uniform vec4 warpB;
+out vec2 fragGrad;
+out vec2 fragMode;
+out vec4 fragColor;
+vec2 bone(float i, vec2 p) {
+    int k = int(i + 0.5) * 2;
+    vec4 m = bones[k];
+    vec4 t = bones[k + 1];
+    return vec2(m.x * p.x + m.y * p.y + t.x, m.z * p.x + m.w * p.y + t.y);
+}
+void main() {
+    fragGrad = vertexTexCoord;
+    fragMode = vertexTexCoord2;
+    fragColor = vertexColor;
+    vec2 p = vertexPosition.xy;
+    if (warpBox.z > 0.0 && warpBox.w > 0.0) {
+        vec2 u = (p - warpBox.xy) / warpBox.zw;
+        vec2 top = mix(warpA.xy, warpA.zw, u.x);
+        vec2 bot = mix(warpB.xy, warpB.zw, u.x);
+        p += mix(top, bot, u.y);
+    }
+    if (skinOn > 0.5) {
+        float i1 = floor(vertexNormal.x / 256.0);
+        float i0 = vertexNormal.x - i1 * 256.0;
+        float i3 = floor(vertexNormal.y / 256.0);
+        float i2 = vertexNormal.y - i3 * 256.0;
+        vec4 w = vertexTangent;
+        vec2 q = bone(i0, p) * w.x;
+        if (w.y > 0.0) q += bone(i1, p) * w.y;
+        if (w.z > 0.0) q += bone(i2, p) * w.z;
+        if (w.w > 0.0) q += bone(i3, p) * w.w;
+        p = q;
+    }
+    gl_Position = mvp * vec4(p, 0.0, 1.0);
 }
 `
 
@@ -141,6 +209,8 @@ free_mesh_cpu :: proc(m: ^rl.Mesh) {
 	rl.MemFree(m.texcoords)
 	rl.MemFree(m.texcoords2)
 	rl.MemFree(m.indices)
+	rl.MemFree(m.normals)
+	rl.MemFree(m.tangents)
 	m^ = {}
 }
 
@@ -158,6 +228,7 @@ Vector_Cache_Ensure :: proc(c: ^Vector_Cache, t: ^Vector_Tess, shapes: []Vector_
 		c.bucket = b
 		c.dirty = false
 		c.stats.tessellations += 1
+		c.skinIds, c.skinWeights = nil, nil // (for the old vertices)
 		vector_cache_unload(c)
 	}
 	if Vector_DrawModeNow() == .GPU && !c.uploaded && rl.IsWindowReady() do vector_cache_upload(c)
@@ -169,7 +240,9 @@ Vector_Cache_Ensure :: proc(c: ^Vector_Cache, t: ^Vector_Tess, shapes: []Vector_
 @(private = "file")
 vector_cache_upload :: proc(c: ^Vector_Cache) {
 	m := &c.mesh
+	c.skinUploaded = false
 	if len(m.idx) == 0 {c.uploaded = true; return}
+	skinned := len(c.skinIds) == len(m.verts) && len(c.skinWeights) == len(m.verts)
 	// The gradient rows as a texture (rows = gradients; sampled at row centres).
 	rows := len(m.gradients)
 	if rows > 0 {
@@ -188,6 +261,8 @@ vector_cache_upload :: proc(c: ^Vector_Cache) {
 		gc := make([dynamic][2]f32, context.temp_allocator)
 		gi := make([dynamic][2]f32, context.temp_allocator)
 		idx := make([dynamic]u16, context.temp_allocator)
+		normals := make([dynamic][3]f32, context.temp_allocator)
+		tangents := make([dynamic][4]f32, context.temp_allocator)
 		for tri < ntri {
 			if len(verts) + 3 > 65535 do break
 			for k in 0 ..< 3 {
@@ -201,6 +276,11 @@ vector_cache_upload :: proc(c: ^Vector_Cache) {
 					g := m.gi[v]
 					if g.y > 0 do g.x = (g.x + 0.5) / f32(max(rows, 1))
 					append(&gi, g)
+					if skinned {
+						ids := c.skinIds[v]
+						append(&normals, [3]f32{f32(ids[0]) + f32(ids[1]) * 256, f32(ids[2]) + f32(ids[3]) * 256, 0})
+						append(&tangents, c.skinWeights[v])
+					}
 				}
 				append(&idx, u16(remap[v]))
 			}
@@ -219,10 +299,27 @@ vector_cache_upload :: proc(c: ^Vector_Cache) {
 		copy((cast([^][2]f32)mesh.texcoords)[:len(gc)], gc[:])
 		copy((cast([^][2]f32)mesh.texcoords2)[:len(gi)], gi[:])
 		copy(mesh.indices[:len(idx)], idx[:])
+		if skinned {
+			mesh.normals = cast([^]f32)rl.MemAlloc(u32(len(normals) * 12))
+			mesh.tangents = cast([^]f32)rl.MemAlloc(u32(len(tangents) * 16))
+			copy((cast([^][3]f32)mesh.normals)[:len(normals)], normals[:])
+			copy((cast([^][4]f32)mesh.tangents)[:len(tangents)], tangents[:])
+		}
 		rl.UploadMesh(&mesh, false)
 		append(&c.gpu, mesh)
 	}
 	c.uploaded = true
+	c.skinUploaded = skinned
+}
+
+// Vector_Cache_SetSkin gives the mesh per-vertex bones and weights (one
+// per vertex; kept by the caller) and uploads it again with them.
+Vector_Cache_SetSkin :: proc(c: ^Vector_Cache, ids: [][4]u8, weights: [][4]f32) {
+	c.skinIds, c.skinWeights = ids, weights
+	if c.uploaded {
+		vector_cache_unload(c)
+		if Vector_DrawModeNow() == .GPU && rl.IsWindowReady() do vector_cache_upload(c)
+	}
 }
 
 // Vector_ScreenPixel: the size of a screen pixel in a node's local units now
@@ -237,13 +334,18 @@ Vector_ScreenPixel :: proc(nodeScale: [2]f32) -> f32 {
 // Vector_Cache_Draw draws the cached mesh at a transform (degrees), tinted.
 // offset moves the mesh in its own units first (an asset's origin).
 // add is a colour offset (0..1, alpha unused) added after the tint.
-Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [2]f32, tint: rl.Color = rl.WHITE, offset: [2]f32 = {}, add: [4]f32 = {}) {
+// deform bends it first (a warp, bones: vector_skin.odin).
+Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [2]f32, tint: rl.Color = rl.WHITE, offset: [2]f32 = {}, add: [4]f32 = {}, deform: ^Vector_Deform = nil) {
 	if !rl.IsWindowReady() || len(c.mesh.idx) == 0 do return
 	rlgl.DrawRenderBatchActive()
 	rlgl.DisableBackfaceCulling() // (the tessellator doesn't keep one winding)
 	defer {
 		rlgl.DrawRenderBatchActive()
 		rlgl.EnableBackfaceCulling()
+	}
+	if deform != nil && Vector_DrawModeNow() == .GPU && c.uploaded {
+		vector_draw_deformed(c, pos, rotation, scale, tint, offset, add, deform)
+		return
 	}
 	if Vector_DrawModeNow() == .GPU && c.uploaded {
 		if !vectorMaterialReady {
@@ -281,11 +383,66 @@ Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [
 				for ch in 0 ..< 3 do col[ch] = u8(min(f32(col[ch]) + add[ch] * 255, 255))
 			}
 			rlgl.Color4ub(u8(u32(col.r) * tr / 255), u8(u32(col.g) * tg / 255), u8(u32(col.b) * tb / 255), u8(u32(col.a) * ta / 255))
-			rlgl.Vertex2f(m.verts[v].x, m.verts[v].y)
+			p := m.verts[v]
+			if deform != nil {
+				skinned := len(c.skinIds) == len(m.verts) && len(c.skinWeights) == len(m.verts)
+				p = Vector_DeformPoint(deform, p, c.skinIds[v] if skinned else {}, c.skinWeights[v] if skinned else {})
+			}
+			rlgl.Vertex2f(p.x, p.y)
 		}
 	}
 	rlgl.End()
 	rlgl.PopMatrix()
+}
+
+// vector_draw_deformed: the GPU path through the bending shader.
+@(private = "file")
+vector_draw_deformed :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [2]f32, tint: rl.Color, offset: [2]f32, add: [4]f32, d: ^Vector_Deform) {
+	if !vskin.ready {
+		vskin.material = rl.LoadMaterialDefault()
+		sh := rl.LoadShaderFromMemory(Shader_Port(VECTOR_SKIN_VS), Shader_Port(VECTOR_FS))
+		vskin.material.shader = sh
+		vskin.add = rl.GetShaderLocation(sh, "colAdd")
+		vskin.bones = rl.GetShaderLocation(sh, "bones")
+		vskin.skinOn = rl.GetShaderLocation(sh, "skinOn")
+		vskin.warpBox = rl.GetShaderLocation(sh, "warpBox")
+		vskin.warpA = rl.GetShaderLocation(sh, "warpA")
+		vskin.warpB = rl.GetShaderLocation(sh, "warpB")
+		vskin.ready = true
+	}
+	sh := vskin.material.shader
+	vskin.material.maps[rl.MaterialMapIndex.ALBEDO].color = tint
+	vskin.material.maps[rl.MaterialMapIndex.ALBEDO].texture = c.gradTex if c.gradTex.id != 0 else rl.Texture2D{id = rlgl.GetTextureIdDefault(), width = 1, height = 1, mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8}
+	a := add
+	if vskin.add >= 0 do rl.SetShaderValue(sh, rl.ShaderLocationIndex(vskin.add), &a, .VEC4)
+	on: f32 = 1 if c.skinUploaded && len(d.bones) > 0 else 0
+	if vskin.skinOn >= 0 do rl.SetShaderValue(sh, rl.ShaderLocationIndex(vskin.skinOn), &on, .FLOAT)
+	if on > 0 && vskin.bones >= 0 {
+		n := min(len(d.bones), VECTOR_SKIN_MAX_BONES)
+		packed: [VECTOR_SKIN_MAX_BONES * 2][4]f32
+		for m, i in d.bones[:n] {
+			packed[i * 2] = {m[0], m[1], m[2], m[3]}
+			packed[i * 2 + 1] = {m[4], m[5], 0, 0}
+		}
+		rl.SetShaderValueV(sh, rl.ShaderLocationIndex(vskin.bones), &packed, .VEC4, i32(n * 2))
+	}
+	box := [4]f32{d.box[0], d.box[1], d.box[2], d.box[3]}
+	wa := [4]f32{d.warp[0].x, d.warp[0].y, d.warp[1].x, d.warp[1].y}
+	wb := [4]f32{d.warp[2].x, d.warp[2].y, d.warp[3].x, d.warp[3].y}
+	if vskin.warpBox >= 0 do rl.SetShaderValue(sh, rl.ShaderLocationIndex(vskin.warpBox), &box, .VEC4)
+	if vskin.warpA >= 0 do rl.SetShaderValue(sh, rl.ShaderLocationIndex(vskin.warpA), &wa, .VEC4)
+	if vskin.warpB >= 0 do rl.SetShaderValue(sh, rl.ShaderLocationIndex(vskin.warpB), &wb, .VEC4)
+	xf := rl.MatrixTranslate(pos.x, pos.y, 0) * rl.MatrixRotateZ(rotation * rl.DEG2RAD) * rl.MatrixScale(scale.x, scale.y, 1) * rl.MatrixTranslate(offset.x, offset.y, 0)
+	for m in c.gpu do rl.DrawMesh(m, vskin.material, xf)
+}
+
+// Vector_DeformShutdown frees the bending shader (engine shutdown).
+Vector_DeformShutdown :: proc() {
+	if !vskin.ready do return
+	// (Not UnloadMaterial: its albedo may be a cache's gradient texture.)
+	if rl.IsWindowReady() do rl.UnloadShader(vskin.material.shader)
+	rl.MemFree(vskin.material.maps)
+	vskin = {}
 }
 
 // vector_vertex_gradient: a gradient vertex's colour on the CPU (the

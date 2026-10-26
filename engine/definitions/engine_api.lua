@@ -4088,6 +4088,12 @@ function LineNode:set_property(path, value, y) end
 ---@field saturation number Colour filter: 0 grey, 1 as drawn, 2 vivid.
 ---@field contrast number Colour filter: 1 as drawn; less: flatter, more: punchier.
 ---@field hue number Colour filter: turns the colours round the colour wheel (degrees).
+---@field skinBones string Vector skinning: the bones of a Skeleton above it that the art bends with ("upper, lowe...
+---@field skinSmooth number Vector skinning: how far round each joint (px) neighbouring bones blend - 0 makes rigid...
+---@field warpTopLeft Vec2 Four-corner warp (squash and stretch): how far the art's top-left corner moves (px); th...
+---@field warpTopRight Vec2 Four-corner warp: how far the top-right corner moves (px).
+---@field warpBottomLeft Vec2 Four-corner warp: how far the bottom-left corner moves (px).
+---@field warpBottomRight Vec2 Four-corner warp: how far the bottom-right corner moves (px).
 
 ---@alias VectorShapeNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -4129,6 +4135,12 @@ function LineNode:set_property(path, value, y) end
 ---| "saturation" # number - Colour filter: 0 grey, 1 as drawn, 2 vivid.
 ---| "contrast" # number - Colour filter: 1 as drawn; less: flatter, more: punchier.
 ---| "hue" # number - Colour filter: turns the colours round the colour wheel (degrees).
+---| "skinBones" # string - Vector skinning: the bones of a Skeleton above it that the art bends with ("upper, lowe...
+---| "skinSmooth" # number - Vector skinning: how far round each joint (px) neighbouring bones blend - 0 makes rigid...
+---| "warpTopLeft" # Vec2 - Four-corner warp (squash and stretch): how far the art's top-left corner moves (px); th...
+---| "warpTopRight" # Vec2 - Four-corner warp: how far the top-right corner moves (px).
+---| "warpBottomLeft" # Vec2 - Four-corner warp: how far the bottom-left corner moves (px).
+---| "warpBottomRight" # Vec2 - Four-corner warp: how far the bottom-right corner moves (px).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -4174,6 +4186,12 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: VectorShapeNode, path: "saturation"): number
 ---@overload fun(self: VectorShapeNode, path: "contrast"): number
 ---@overload fun(self: VectorShapeNode, path: "hue"): number
+---@overload fun(self: VectorShapeNode, path: "skinBones"): string
+---@overload fun(self: VectorShapeNode, path: "skinSmooth"): number
+---@overload fun(self: VectorShapeNode, path: "warpTopLeft"): Vec2
+---@overload fun(self: VectorShapeNode, path: "warpTopRight"): Vec2
+---@overload fun(self: VectorShapeNode, path: "warpBottomLeft"): Vec2
+---@overload fun(self: VectorShapeNode, path: "warpBottomRight"): Vec2
 function VectorShapeNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -4221,6 +4239,12 @@ function VectorShapeNode:get_property(path) end
 ---@overload fun(self: VectorShapeNode, path: "saturation", value: number)
 ---@overload fun(self: VectorShapeNode, path: "contrast", value: number)
 ---@overload fun(self: VectorShapeNode, path: "hue", value: number)
+---@overload fun(self: VectorShapeNode, path: "skinBones", value: string)
+---@overload fun(self: VectorShapeNode, path: "skinSmooth", value: number)
+---@overload fun(self: VectorShapeNode, path: "warpTopLeft", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "warpTopRight", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "warpBottomLeft", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "warpBottomRight", x: number|Vec2|number[], y?: number)
 function VectorShapeNode:set_property(path, value, y) end
 
 ---@class TrailNode

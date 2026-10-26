@@ -122,7 +122,8 @@ Skeleton_LoadFile :: proc(game: ^Game, file, atlas, armature: string) -> ^Skelet
 		} else {
 			atlasText, _ = read(game, atlasPath)
 		}
-		lc := Skel_Load_Ctx{game, filepath.dir(atlasPath, context.temp_allocator)}
+		// (No atlas - bones only, e.g. a rig for vector skinning: pages beside the file.)
+		lc := Skel_Load_Ctx{game, filepath.dir(atlasPath if atlasPath != "" else file, context.temp_allocator)}
 		d, ok = Skeleton_LoadSpine(text, atlasText, skel_load_page, &lc)
 	}
 	if !ok || d == nil {

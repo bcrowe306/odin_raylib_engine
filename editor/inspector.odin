@@ -367,7 +367,9 @@ prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
 	if (node.typeId == e.TextNode || node.typeId == e.DialogueNode) && name == "font" do return false
 	// (The Vector section picks the file; the preset's style only applies without one.)
 	if node.typeId == e.VectorShapeNode {
-		if name == "file" || name == "group" || name == "morphTo" do return false
+		if name == "file" || name == "group" || name == "morphTo" || name == "skinBones" do return false
+		// (Skinning only means something under a Skeleton.)
+		if name == "skinSmooth" && e.VectorShapeNode_SkinTarget(cast(^e.VectorShapeNode)node) == nil do return false
 		if (cast(^e.VectorShapeNode)node).file != "" {
 			switch name {
 			case "preset", "fillColor", "strokeColor", "strokeWidth": return false
