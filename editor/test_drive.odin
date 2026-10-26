@@ -1000,6 +1000,9 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 			count := 0
 			for t in tm.tiles do if t >= 0 do count += 1
 			return fmt.tprint(count), true
+		case "tile-components":
+			if n.typeId != e.TileMapNode do return "<not a tile map>", true
+			return fmt.tprint(len(e.TileMapNode_Components(cast(^e.TileMapNode)n))), true
 		case "connections":
 			sb := strings.builder_make(context.temp_allocator)
 			for c, i in n.signalConnections {

@@ -17,7 +17,7 @@ bottomTabRequest: Maybe(BottomTab) // select this tab next frame
 
 // Following the selection (Settings > General: Bottom Panel Follows
 // Selection): an AnimationPlayer shows the Animation tab, a particle emitter
-// Particles, an LDtk level LDtk; selecting something else returns to the tab
+// Particles, an LDtk level LDtk, a Tile Map the Tile Map tab; selecting something else returns to the tab
 // shown before. Picking a tab by hand stops the return.
 @(private = "file")
 follow: struct {
@@ -35,6 +35,7 @@ bottom_tab_for :: proc(node: ^e.Node) -> (BottomTab, bool) {
 	case e.ParticleEmitterNode: return .Particles, true
 	case e.LdtkLevelNode:       return .Ldtk, true
 	case e.StateMachineNode:    return .StateGraph, true
+	case e.TileMapNode:         return .TileMap, true
 	}
 	return {}, false
 }
@@ -117,6 +118,12 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:ldtk")
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Tile Map###TileMapTab", ICON_FA_TABLE_CELLS_LARGE), nil, flags(.TileMap, req, hasReq)) {
+			state.bottomTab = .TileMap
+			TileMapPanel_Render(state)
+			imgui.EndTabItem()
+		}
+		Drive_Item("bottom:tilemap")
 		if imgui.BeginTabItem(fmt.ctprintf("%s  State Machine###StateGraphTab", ICON_FA_DIAGRAM_PROJECT), nil, flags(.StateGraph, req, hasReq)) {
 			state.bottomTab = .StateGraph
 			StateGraph_Render(state)

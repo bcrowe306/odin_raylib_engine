@@ -1,0 +1,49 @@
+# Components on a tile map (the Tile Map tab's Components layer): pick a
+# component, paint a stroke (one linked instance per cell, one undo step),
+# erase with the right button, place one off the grid with Shift, flood
+# fill, save; the instances are linked children of the map.
+wait 5
+# The bottom panel starts 100 px tall: the Animation workspace gives its
+# tools room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+key escape
+key ctrl+a
+type tile map
+key enter
+expect selected == TileMap
+wait 2
+expect bottom-tab == TileMap
+click @tile.layer:Components
+wait 1
+screenshot components_palette
+click @tile.comp:components/OrbitingDrone.component.json
+expect item:tile.paint == visible
+# A stroke along a row: an instance per cell.
+drag @world:660,380 @world:820,380
+expect node:TileMap.tile-components >= 4
+screenshot painted
+key ctrl+z
+expect node:TileMap.tile-components == 0
+key ctrl+y
+expect node:TileMap.tile-components >= 4
+# Right button erases on this layer.
+rclick @world:676,368
+expect node:TileMap.tile-components >= 3
+# Shift: one off the grid.
+hold shift
+click @world:900,500
+release
+screenshot off_grid
+# Fill the rest of the map's empty cells.
+click @tile.fill
+click @world:980,400
+expect node:TileMap.tile-components >= 200
+screenshot filled
+# The tiles layer is untouched.
+expect node:TileMap.tiles == 0
+key cmd+s
+wait 2
+expect file:scenes/main.scene.json contains "component": "components/OrbitingDrone.component.json"

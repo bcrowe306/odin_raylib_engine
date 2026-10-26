@@ -7508,6 +7508,31 @@ function VectorShapeNode:vector_swap(name) end
 ---@return string[] names
 function VectorShapeNode:vector_frames() end
 
+---The component instance painted on a cell of the tile map's Components layer (0-based cells; a big component covers every cell of its footprint), or nil.
+---
+---Example: `local coin = map:tilemap_component_at(3, 5)`
+---@param x integer
+---@param y integer
+---@return Node?
+function TileMapNode:tilemap_component_at(x, y) end
+
+---Paints a component on a cell: a linked instance at the cell's centre (a bigger one over its footprint), replacing what it covers. Returns the instance.
+---
+---Example: `map:tilemap_set_component(4, 2, "components/Coin.component.json")`
+---@param x integer
+---@param y integer
+---@param component string
+---@return Node?
+function TileMapNode:tilemap_set_component(x, y, component) end
+
+---Removes the component instance covering a cell; false when there is none.
+---
+---Example: `map:tilemap_clear_component(4, 2)`
+---@param x integer
+---@param y integer
+---@return boolean
+function TileMapNode:tilemap_clear_component(x, y) end
+
 ---Carves a circle out of the art (world position and radius): every shape keeps its paint, and a collider follows - destructible terrain, bites, bullet holes. The node draws its own carved copy until `vector_reset`.
 ---
 ---Example: `ground:vector_cut(bomb.position, 48)`

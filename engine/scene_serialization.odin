@@ -1471,6 +1471,8 @@ Scene_RefreshComponentInstances :: proc(scene: ^Scene, compPath: string, ctx: ^G
 	for n in scene.manager.nodes {
 		if n != nil && n.componentPath == compPath do append(&targets, n)
 	}
+	// (Tile maps measure painted components again: their size may have changed.)
+	for n in scene.manager.nodes do if n != nil && n.typeId == TileMapNode do TileMapNode_ForgetFootprints(cast(^TileMapNode)n)
 	count := 0
 	for old in targets {
 		parent := GetParent(scene.manager, old)

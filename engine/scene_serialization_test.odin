@@ -5,6 +5,7 @@ import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import "core:testing"
+import lua "lua54"
 import rl "vendor:raylib"
 import b2 "vendor:box2d"
 
@@ -660,6 +661,90 @@ test_tilemap_paint_fill_save_and_colliders :: proc(t: ^testing.T) {
 	TileMapNode_BuildColliders(tm, &game.gameContext)
 	testing.expect(t, tm.staticBody != nil && tm.staticBody.transient, "transient collider body")
 	testing.expect(t, len(tm.staticBody.shapes) >= 4, "merged runs")
+}
+
+// Components painted on a tile map: one per cell, a 2 x 2 one over its
+// footprint (replacing what it covers), off-grid placement, erase, flood
+// fill, saved as linked instances and found again after a reload, Lua.
+@(test)
+test_tilemap_components :: proc(t: ^testing.T) {
+	dir :: "test_tilemap_components_zz"
+	defer os.remove_all(dir)
+	_ = os.make_directory_all(dir + "/components")
+	// A coin (a 20 px circle: one cell) and a crate (a 64 px box: 2 x 2 on 32 px tiles).
+	_ = os.write_entire_file(dir + "/components/coin.component.json", transmute([]u8)string(`{"type": "AreaNode", "name": "Coin", "physics": {"shape": {"type": "circle", "radius": 10}}}`))
+	_ = os.write_entire_file(dir + "/components/crate.component.json", transmute([]u8)string(`{"type": "StaticBodyNode", "name": "Crate", "physics": {"shape": {"type": "box", "size": [64, 64]}}}`))
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	AssetManager_SetProjectDir(&game.assetManager, dir)
+	scene := game->createScene("tcomp", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	tm := cast(^TileMapNode)Node_CreateByTypeName(scene, "TileMapNode")
+	tm.name = "Map"
+	tm.gameContext = &game.gameContext
+	tm.mapSize = {8, 6}
+	tm.tileSize = {32, 32}
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	COIN :: "components/coin.component.json"
+	CRATE :: "components/crate.component.json"
+
+	coin := TileMapNode_PlaceComponent(tm, {1, 1}, COIN)
+	testing.expect(t, coin != nil && coin.componentPath == COIN && coin.parent == tm, "a linked instance under the map")
+	if coin == nil do return
+	testing.expectf(t, coin.position == {48, 48}, "at the cell's centre (%v)", coin.position)
+	testing.expect_value(t, coin.name, "coin_1_1")
+	testing.expect(t, TileMapNode_ComponentAt(tm, {1, 1}) == coin && TileMapNode_ComponentAt(tm, {2, 1}) == nil, "one cell")
+	// The same cell again: replaced (one per cell).
+	coin2 := TileMapNode_PlaceComponent(tm, {1, 1}, COIN)
+	testing.expect(t, len(TileMapNode_Components(tm)) == 1 && TileMapNode_ComponentAt(tm, {1, 1}) == coin2, "one per cell")
+	// A crate on (2, 1): 2 x 2 from there; then one on (1, 1) covers the coin.
+	crate := TileMapNode_PlaceComponent(tm, {2, 1}, CRATE)
+	testing.expect(t, TileMapNode_ComponentFootprint(tm, CRATE) == {2, 2}, "measured: 2 x 2")
+	testing.expectf(t, crate != nil && crate.position == {96, 64}, "centred on its footprint (%v)", crate.position if crate != nil else [2]f32{})
+	for c in ([][2]int{{2, 1}, {3, 1}, {2, 2}, {3, 2}}) do testing.expectf(t, TileMapNode_ComponentAt(tm, c) == crate, "the crate covers %v", c)
+	crate2 := TileMapNode_PlaceComponent(tm, {1, 1}, CRATE)
+	testing.expect(t, len(TileMapNode_Components(tm)) == 1 && TileMapNode_ComponentAt(tm, {2, 2}) == crate2, "the coin and the overlapping crate replaced")
+	// At the map's edge: kept inside.
+	edge := TileMapNode_PlaceComponent(tm, {7, 5}, CRATE)
+	testing.expect(t, edge != nil && TileMapNode_ComponentAt(tm, {6, 4}) == edge, "clamped inside the map")
+	// Off the grid: where asked, covering the nearest footprint.
+	off := TileMapNode_PlaceComponent(tm, {5, 0}, COIN, true, {170, 20})
+	testing.expect(t, off != nil && off.position == {170, 20} && TileMapNode_ComponentAt(tm, {5, 0}) == off, "off-grid coin")
+	// Erase.
+	testing.expect(t, TileMapNode_RemoveComponentAt(tm, {2, 2}) && TileMapNode_ComponentAt(tm, {1, 1}) == nil, "erased the whole crate")
+	testing.expect(t, !TileMapNode_RemoveComponentAt(tm, {0, 5}), "nothing there")
+	// Flood fill: the empty cells (48 - the edge crate's 4 - the off-grid coin's 1).
+	n := TileMapNode_FillComponents(tm, {0, 0}, COIN)
+	testing.expect_value(t, n, 43)
+	testing.expect_value(t, len(TileMapNode_Components(tm)), 45)
+
+	// Saved as linked instances; the layer is found again after a reload.
+	text := Scene_SerializeToJSON(scene, context.temp_allocator)
+	testing.expect(t, strings.contains(text, `"component": "components/coin.component.json"`), "saved linked")
+	copy1 := reload_scene(game, text, "tcomp2")
+	m2 := cast(^TileMapNode)Scene_FindNodeByName(copy1, "Map")
+	if m2 == nil do testing.fail_now(t, "no map")
+	m2.gameContext = &game.gameContext
+	game.gameContext.scene = copy1
+	Node_SetGlobalPositions(copy1.manager, copy1.rootNode)
+	testing.expect_value(t, len(TileMapNode_Components(m2)), 45)
+	testing.expect(t, TileMapNode_ComponentAt(m2, {6, 4}) != nil && TileMapNode_ComponentAt(m2, {6, 4}).componentPath == CRATE, "the crate's footprint after a reload")
+	game.gameContext.scene = scene
+
+	// Lua.
+	L := game.scriptManager.L
+	if lua.L_dostring(L, `
+local m = Scene.find_node("Map")
+m:tilemap_clear_component(0, 0)
+empty = m:tilemap_component_at(0, 0) == nil
+local c = m:tilemap_set_component(0, 0, "components/crate.component.json")
+placed = c ~= nil and m:tilemap_component_at(1, 1) ~= nil
+`) != 0 {
+		testing.fail_now(t, string(lua.tostring(L, -1)))
+	}
+	getb :: proc(L: ^lua.State, n: cstring) -> bool {lua.getglobal(L, n); defer lua.pop(L, 1); return bool(lua.toboolean(L, -1))}
+	testing.expect(t, getb(L, "empty") && getb(L, "placed"), "Lua: clear, at, set")
 }
 
 @(test)
