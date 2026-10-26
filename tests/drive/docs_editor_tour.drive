@@ -1,0 +1,46 @@
+# Docs screenshots: the editor tour (docs/editor/tour.md). Each `annotate`
+# adds a numbered callout to the next screenshot; scripts/docs/screenshots.sh
+# copies the shots and their .annotations.json into docs/images/.
+wait 8
+key escape
+
+# --- The whole window ---
+click @hier:PlayerShip
+wait 3
+annotate @window:toolbar Toolbar: tools, Play / Pause / Stop, grid and snapping, save, export, settings
+annotate @window:scene Scene: the node tree of the open scene (drag to re-parent, right-click for more)
+annotate @window:viewport Viewport: the scene; select, move, rotate and scale nodes
+annotate @window:inspector Inspector: the selected node's properties, script and signals
+annotate @window:assets Assets: the project's scenes, scripts, textures, sounds and components
+annotate @window:console Bottom panel: Console, Animation, Particles, Mixer, Profiler and more
+annotate @window:statusbar Status bar: project, scene, selection, background tasks
+annotate @window:preview Preview: the selected asset (import settings, sounds, animations)
+annotate @window:roottabs Game / Level: the scene editor or the LDtk level editor (Cmd+Shift+1 / 2)
+screenshot editor_overview
+
+# --- The toolbar ---
+annotate @toolbar.select Select tool (Q)
+annotate @toolbar.move Move (W), Rotate (E) and Scale (R) tools
+annotate @toolbar.play Play the project (F5)
+annotate @toolbar.play-scene Play the current scene (F6)
+annotate @toolbar.grid Grid and snapping
+annotate @toolbar.save Save the scene (Cmd+S)
+annotate @toolbar.export Export a .rayzr package (the project in one file)
+annotate @toolbar.settings Project settings
+screenshot editor_toolbar
+
+# --- A selected node: viewport, tree, Inspector ---
+annotate @node:PlayerShip The selected node in the viewport: drag to move, handles to scale
+annotate @hier:PlayerShip The same node in the scene tree
+annotate @insp.name The Inspector: its name, enabled / visible toggles, type and properties
+annotate @window:statusbar The selection and the cursor's world position
+screenshot editor_selection
+
+# --- Add Node ---
+click @hier.add
+expect add-node-open == true
+type camera
+wait 3
+screenshot editor_add_node
+key escape
+expect add-node-open == false

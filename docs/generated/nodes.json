@@ -1,0 +1,1155 @@
+{
+  "schema": 1,
+  "common": [
+    {"name": "position", "kind": "vec2", "owner": "Node", "default": [0, 0], "doc": "Position relative to the parent, in pixels (+y is down)."},
+    {"name": "rotation", "kind": "number", "owner": "Node", "default": 0, "doc": "Rotation relative to the parent, in degrees (clockwise)."},
+    {"name": "scale", "kind": "vec2", "owner": "Node", "default": [1, 1], "doc": "Size multiplier relative to the parent (1, 1 = as is; negative flips)."},
+    {"name": "origin", "kind": "vec2", "owner": "Node", "default": [0.5, 0.5], "doc": "Where in the image the position is, and what it rotates and scales around: a fraction of its size (0.5, 0.5 = the centre, 0, 0 = the top-left, 0.5, 1 = the bottom centre)."},
+    {"name": "layer", "kind": "enum", "owner": "Node", "default": "Layer1", "values": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8"], "doc": "Drawing layer: higher layers draw over lower ones (Layer8 is for UI)."},
+    {"name": "zIndex", "kind": "integer", "owner": "Node", "default": 0, "doc": "Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...); equal ones keep the tree order."},
+    {"name": "ySort", "kind": "boolean", "owner": "Node", "default": false, "doc": "Draw the children by their Y position (lower on screen = in front), each with its children: top-down and isometric depth."},
+    {"name": "ySortOffset", "kind": "number", "owner": "Node", "default": 0, "doc": "Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g. half the sprite's height)."},
+    {"name": "pauseMode", "kind": "enum", "owner": "Node", "default": "Inherit", "values": ["Inherit", "Pausable", "Always"], "doc": "Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e.g. pause menus)."},
+    {"name": "paused", "kind": "boolean", "owner": "Node", "default": false, "doc": "Pauses this node and its children (except Always ones) while the game runs."},
+    {"name": "enabled", "kind": "boolean", "owner": "Node", "default": true, "doc": "Disabled nodes (and their children) neither update nor draw."}
+  ],
+  "nodes": [
+    {
+      "type": "Node",
+      "name": "Empty Node",
+      "category": "Core & 2D",
+      "description": "Basic 2D transform node with position, rotation, scale, and hierarchy grouping.",
+      "aliases": ["node", "empty"],
+      "hasOrigin": false,
+      "properties": []
+    },
+    {
+      "type": "CameraNode",
+      "name": "Camera 2D",
+      "category": "Core & 2D",
+      "description": "2D Camera viewport controller supporting target tracking, zoom levels, rotation, and screen offsets.",
+      "aliases": ["camera"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "isCurrent", "kind": "boolean", "owner": "CameraNode", "default": true, "doc": "The camera the game renders through (one per scene)."},
+        {"name": "followMode", "kind": "enum", "owner": "CameraNode", "default": "SingleTarget", "values": ["Static", "SingleTarget", "MultiTarget", "Manual"], "doc": "Static: stays put. Single Target: follows its Follow Target. Multi Target: frames all targets. Manual: moved by scripts."},
+        {"name": "dragType", "kind": "enum", "owner": "CameraNode", "default": "SmoothDamp", "values": ["None", "SmoothDamp", "SpringDamp", "LookAhead", "AutoSpeed"], "doc": "How the camera catches up with its target: none (locked), smooth damp, spring, look-ahead (leads by the target's velocity) or auto speed."},
+        {"name": "targetPosition", "kind": "vec2", "owner": "CameraNode", "default": [0, 0], "doc": "Where the camera is heading (world px)."},
+        {"name": "currentPosition", "kind": "vec2", "owner": "CameraNode", "default": [0, 0], "runtime": true, "doc": "Where the camera is now (world px)."},
+        {"name": "smoothDrag", "kind": "boolean", "owner": "CameraNode", "default": true, "doc": "Ease towards the target instead of snapping."},
+        {"name": "smoothDragSpeed", "kind": "vec2", "owner": "CameraNode", "default": [0.2, 0.2], "doc": "Smooth-damp time per axis (s): higher lags more."},
+        {"name": "springConstant", "kind": "number", "owner": "CameraNode", "default": 15, "min": 1, "max": 100, "doc": "Spring Damp: stiffness pulling the camera to the target."},
+        {"name": "dampingRatio", "kind": "number", "owner": "CameraNode", "default": 1, "min": 0.1, "max": 5, "doc": "Spring Damp: 1 settles without overshoot, lower wobbles."},
+        {"name": "predictionTime", "kind": "vec2", "owner": "CameraNode", "default": [0.5, 0.5], "doc": "Look Ahead: how far ahead of the target to aim, in seconds of its velocity."},
+        {"name": "maxDistance", "kind": "vec2", "owner": "CameraNode", "default": [100000, 100000], "doc": "Reserved (not used yet)."},
+        {"name": "offset", "kind": "vec2", "owner": "CameraNode", "default": [0, 0], "doc": "Added to the target position (world px)."},
+        {"name": "smoothOffset", "kind": "boolean", "owner": "CameraNode", "default": true, "doc": "Ease offset changes in."},
+        {"name": "smoothOffsetSpeed", "kind": "number", "owner": "CameraNode", "default": 0.2, "min": 0.1, "max": 20, "doc": "How fast offset changes ease in."},
+        {"name": "screenOffset", "kind": "vec2", "owner": "CameraNode", "default": [640, 360], "doc": "Where on screen the camera's position appears (px; half the window = centred)."},
+        {"name": "currentRotation", "kind": "number", "owner": "CameraNode", "default": 0, "min": -360, "max": 360, "runtime": true, "doc": "The camera's rotation now (degrees)."},
+        {"name": "targetRotation", "kind": "number", "owner": "CameraNode", "default": 0, "min": -360, "max": 360, "doc": "Rotation the camera turns to (degrees)."},
+        {"name": "allowRotation", "kind": "boolean", "owner": "CameraNode", "default": true, "doc": "Let the camera rotate (else it stays upright)."},
+        {"name": "smoothRotation", "kind": "boolean", "owner": "CameraNode", "default": true, "doc": "Ease rotation changes in."},
+        {"name": "smoothRotationSpeed", "kind": "number", "owner": "CameraNode", "default": 0.2, "min": 0.1, "max": 20, "doc": "How fast rotation eases in."},
+        {"name": "zoom", "kind": "number", "owner": "CameraNode", "default": 1, "min": 0.01, "max": 50, "doc": "Zoom now (1 = 100%, 2 = everything twice as big)."},
+        {"name": "targetZoom", "kind": "number", "owner": "CameraNode", "default": 1, "min": 0.01, "max": 50, "doc": "Zoom the camera eases to."},
+        {"name": "smoothZoom", "kind": "boolean", "owner": "CameraNode", "default": true, "doc": "Ease zoom changes in."},
+        {"name": "smoothZoomSpeed", "kind": "number", "owner": "CameraNode", "default": 0.2, "min": 0.1, "max": 20, "doc": "How fast zoom eases in."},
+        {"name": "minZoom", "kind": "number", "owner": "CameraNode", "default": 0.1, "min": 0.01, "max": 10, "doc": "Smallest zoom (auto zoom and scripts)."},
+        {"name": "maxZoom", "kind": "number", "owner": "CameraNode", "default": 10, "min": 0.1, "max": 50, "doc": "Largest zoom (auto zoom and scripts)."},
+        {"name": "autoZoom", "kind": "boolean", "owner": "CameraNode", "default": true, "doc": "Multi Target: zoom out to keep every target on screen."},
+        {"name": "zoomMargin", "kind": "number", "owner": "CameraNode", "default": 0.1, "min": 0, "max": 1, "doc": "Auto zoom: extra space around the targets (0.1 = 10%)."},
+        {"name": "hasLimits", "kind": "boolean", "owner": "CameraNode", "default": false, "doc": "Keep the view inside the left / right / top / bottom limits."},
+        {"name": "smoothLimit", "kind": "boolean", "owner": "CameraNode", "default": true, "doc": "Ease into the limits instead of stopping hard."},
+        {"name": "leftLimit", "kind": "number", "owner": "CameraNode", "default": -1000000, "doc": "Left edge the view may not pass (world px)."},
+        {"name": "rightLimit", "kind": "number", "owner": "CameraNode", "default": 1000000, "doc": "Right edge the view may not pass (world px)."},
+        {"name": "topLimit", "kind": "number", "owner": "CameraNode", "default": -1000000, "doc": "Top edge the view may not pass (world px)."},
+        {"name": "bottomLimit", "kind": "number", "owner": "CameraNode", "default": 1000000, "doc": "Bottom edge the view may not pass (world px)."},
+        {"name": "useHMargins", "kind": "boolean", "owner": "CameraNode", "default": false, "doc": "Dead zone: the target moves freely between the left / right margins before the camera follows."},
+        {"name": "useVMargins", "kind": "boolean", "owner": "CameraNode", "default": false, "doc": "Dead zone: the target moves freely between the top / bottom margins before the camera follows."},
+        {"name": "leftMargin", "kind": "number", "owner": "CameraNode", "default": 0.25, "min": 0, "max": 0.5, "doc": "Left dead-zone margin (fraction of the screen)."},
+        {"name": "rightMargin", "kind": "number", "owner": "CameraNode", "default": 0.25, "min": 0, "max": 0.5, "doc": "Right dead-zone margin (fraction of the screen)."},
+        {"name": "topMargin", "kind": "number", "owner": "CameraNode", "default": 0.25, "min": 0, "max": 0.5, "doc": "Top dead-zone margin (fraction of the screen)."},
+        {"name": "bottomMargin", "kind": "number", "owner": "CameraNode", "default": 0.25, "min": 0, "max": 0.5, "doc": "Bottom dead-zone margin (fraction of the screen)."},
+        {"name": "enableMouseFollow", "kind": "boolean", "owner": "CameraNode", "default": false, "doc": "Nudge the camera towards the mouse."},
+        {"name": "mouseInfluence", "kind": "vec2", "owner": "CameraNode", "default": [0.2, 0.2], "doc": "How much the mouse pulls the camera per axis (0-1)."},
+        {"name": "shakePreset", "kind": "enum", "owner": "CameraNode", "default": "Custom", "values": ["Custom", "Gunshot", "Earthquake", "Handheld", "Explosion", "Impact", "Rumble", "Vibration", "Wobbly"], "doc": "Ready-made shake (gunshot, earthquake...); Custom uses the settings below."},
+        {"name": "shakeTypes", "kind": "flags", "owner": "CameraNode", "default": ["Vertical", "Horizontal", "Random"], "values": ["Vertical", "Horizontal", "Random", "Perlin", "Rotate", "Circular", "Zoom"], "doc": "Custom shake: which motions combine."},
+        {"name": "isShaking", "kind": "boolean", "owner": "CameraNode", "default": false, "runtime": true, "doc": "A shake is running."},
+        {"name": "shakeSpeed", "kind": "number", "owner": "CameraNode", "default": 15, "doc": "Custom shake: how fast it shakes."},
+        {"name": "shakeIntensity", "kind": "number", "owner": "CameraNode", "default": 10, "doc": "Custom shake: how far it moves (px)."},
+        {"name": "shakeTrauma", "kind": "number", "owner": "CameraNode", "default": 1, "doc": "Shake strength now (0-1); decays over time."}
+      ]
+    },
+    {
+      "type": "TimerNode",
+      "name": "Timer",
+      "category": "Core & 2D",
+      "description": "Periodic and one-shot countdown timer node for delayed actions and recurring intervals.",
+      "aliases": ["timer"],
+      "hasOrigin": false,
+      "properties": []
+    },
+    {
+      "type": "ScriptNode",
+      "name": "Lua Script Node",
+      "category": "Core & 2D",
+      "description": "Dedicated Lua scripted node that automatically executes lifecycle callbacks (ready, update, render).",
+      "aliases": ["script"],
+      "hasOrigin": false,
+      "properties": []
+    },
+    {
+      "type": "TextureNode",
+      "name": "Texture Sprite",
+      "category": "Graphics & Rendering",
+      "description": "2D textured sprite quad with texture mapping, tinting, origin offsets, and flipping.",
+      "aliases": ["texture", "sprite"],
+      "hasOrigin": true,
+      "properties": [
+        {"name": "tint", "kind": "color", "owner": "TextureNode", "default": "#ffffffff", "doc": "Multiplies the texture's colours (white = unchanged; alpha fades it)."}
+      ]
+    },
+    {
+      "type": "FrameAnimationNode",
+      "name": "Frame Animator",
+      "category": "Animation & Effects",
+      "description": "Sprite sheet frame-by-frame animator with configurable frame durations, loops, and ping-pong modes.",
+      "aliases": ["animationnode", "frameanimation", "animation"],
+      "hasOrigin": true,
+      "properties": []
+    },
+    {
+      "type": "AnimationPlayerNode",
+      "name": "Animation Player",
+      "category": "Animation & Effects",
+      "description": "Keyframe animation sequencer supporting property tracks, transitions, and timeline scrubbing.",
+      "aliases": ["animationplayer"],
+      "hasOrigin": true,
+      "properties": [
+        {"name": "reverse", "kind": "boolean", "owner": "AnimationPlayerNode", "default": false, "doc": "Play the animation backwards."},
+        {"name": "autoplay", "kind": "boolean", "owner": "AnimationPlayerNode", "default": false, "doc": "Start playing the current animation when the node becomes ready."}
+      ]
+    },
+    {
+      "type": "AsepriteNode",
+      "name": "Aseprite Sprite",
+      "category": "Animation & Effects",
+      "description": "An Aseprite file (.aseprite / .ase) played as Aseprite does: tags, directions, repeats, frame durations; layers on / off, slices and user data for scripts. Saving in Aseprite updates it live.",
+      "aliases": ["aseprite", "ase"],
+      "hasOrigin": true,
+      "properties": [
+        {"name": "file", "kind": "string", "owner": "AsepriteNode", "default": "", "doc": "The Aseprite file (.aseprite / .ase, project-relative). Saving it in Aseprite updates the node, in the editor and in a running game."},
+        {"name": "animation", "kind": "string", "owner": "AsepriteNode", "default": "", "doc": "The tag played (its direction and repeat count as set in Aseprite); empty = every frame in order."},
+        {"name": "autoplay", "kind": "boolean", "owner": "AsepriteNode", "default": true, "doc": "Start the animation when the node becomes ready."},
+        {"name": "loop", "kind": "boolean", "owner": "AsepriteNode", "default": true, "doc": "Tags without a repeat count loop; off: they play once."},
+        {"name": "speed", "kind": "number", "owner": "AsepriteNode", "default": 1, "min": 0, "max": 5, "doc": "Playback speed (1 = the frame durations set in Aseprite)."},
+        {"name": "frame", "kind": "integer", "owner": "AsepriteNode", "default": 0, "min": 0, "max": 0, "doc": "The frame shown (0-based): where playing starts, or where it stopped."},
+        {"name": "hideLayers", "kind": "string", "owner": "AsepriteNode", "default": "", "doc": "Layers not drawn (names, comma separated; a group hides its layers)."},
+        {"name": "showLayers", "kind": "string", "owner": "AsepriteNode", "default": "", "doc": "Layers hidden in the file but drawn anyway (names, comma separated)."},
+        {"name": "pivotSlice", "kind": "string", "owner": "AsepriteNode", "default": "", "doc": "A slice with a pivot (set in Aseprite): the node's origin follows it, frame by frame. Empty = the node's pivot."},
+        {"name": "tint", "kind": "color", "owner": "AsepriteNode", "default": "#ffffffff", "doc": "Multiplies the sprite's colours."}
+      ]
+    },
+    {
+      "type": "StateMachineNode",
+      "name": "State Machine",
+      "category": "Animation & Effects",
+      "description": "States, transitions and conditions on parameters; each state can play an animation on an AnimationPlayer. Scripts get on_enter_<state> / on_exit_<state>.",
+      "aliases": ["statemachine", "state_machine"],
+      "hasOrigin": false,
+      "properties": []
+    },
+    {
+      "type": "ParticleEmitterNode",
+      "name": "Particle Emitter",
+      "category": "Animation & Effects",
+      "description": "2D particle burst and fountain generator with customizable speed, spread, lifetime, and colors.",
+      "aliases": ["particle", "particles", "particleemitter"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "emitter.amount", "kind": "integer", "owner": "ParticleEmitter", "default": 100, "min": 1, "max": 5000, "doc": "Particles alive at once (the pool size)."},
+        {"name": "emitter.lifetime", "kind": "number", "owner": "ParticleEmitter", "default": 2, "min": 0.01, "max": 5, "doc": "Seconds each particle lives."},
+        {"name": "emitter.position", "kind": "vec2", "owner": "ParticleEmitter", "default": [0, 0], "min": 0, "max": 1280, "runtime": true, "doc": "Emitter position (follows the node)."},
+        {"name": "emitter.burst", "kind": "number", "owner": "ParticleEmitter", "default": 0.5, "min": 0, "max": 1, "doc": "0 spreads emission evenly over the lifetime, 1 releases every particle at once."},
+        {"name": "emitter.size", "kind": "vec2", "owner": "ParticleEmitter", "default": [5, 5], "min": 0.01, "max": 100, "doc": "Particle size (px)."},
+        {"name": "emitter.sizeVariance", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 1, "doc": "How much of Size Spread is applied at random (0-1)."},
+        {"name": "emitter.sizeSpread", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 50, "doc": "Largest random size change (px)."},
+        {"name": "emitter.scaleStart", "kind": "vec2", "owner": "ParticleEmitter", "default": [1, 1], "min": 0, "max": 1, "doc": "Scale at birth (multiplies Size)."},
+        {"name": "emitter.scaleEnd", "kind": "vec2", "owner": "ParticleEmitter", "default": [1, 1], "min": 0, "max": 1, "doc": "Scale at death; it interpolates over the lifetime."},
+        {"name": "emitter.rotation", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 359, "doc": "Starting rotation (degrees)."},
+        {"name": "emitter.rotationVariance", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 1, "doc": "How much of Rotation Spread is applied at random (0-1)."},
+        {"name": "emitter.rotationSpread", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 359, "doc": "Largest random rotation change (degrees)."},
+        {"name": "emitter.torque", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": -2000, "max": 2000, "doc": "Spin speed (degrees/s)."},
+        {"name": "emitter.torqueVariance", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 1, "doc": "How much of Torque Spread is applied at random (0-1)."},
+        {"name": "emitter.torqueSpread", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 2000, "doc": "Largest random spin change (degrees/s)."},
+        {"name": "emitter.torqueAcceleration", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": -2000, "max": 2000, "doc": "Change in spin speed per second."},
+        {"name": "emitter.useColorRamp", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Colour over the lifetime from the colour ramp (else Particle Color to Color End)."},
+        {"name": "emitter.particleColor", "kind": "color", "owner": "ParticleEmitter", "default": "#ffffffff", "doc": "Colour at birth."},
+        {"name": "emitter.colorEnd", "kind": "color", "owner": "ParticleEmitter", "default": "#ffffffff", "doc": "Colour at death."},
+        {"name": "emitter.colorVariance", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 1, "doc": "Random colour variation (0-1)."},
+        {"name": "emitter.spread", "kind": "vec2", "owner": "ParticleEmitter", "default": [0, 0], "min": 0, "max": 1280, "doc": "Particles start anywhere within ± this box around the emitter (px)."},
+        {"name": "emitter.velocity", "kind": "number", "owner": "ParticleEmitter", "default": 100, "min": 0, "max": 2000, "doc": "Starting speed (px/s)."},
+        {"name": "emitter.velocityVariance", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 1, "doc": "How much of Velocity Spread is applied at random (0-1)."},
+        {"name": "emitter.velocitySpread", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 2000, "doc": "Largest random speed change (px/s)."},
+        {"name": "emitter.velocityScale", "kind": "number", "owner": "ParticleEmitter", "default": 1, "min": 0, "max": 10, "doc": "Multiplies every particle's movement (slow motion < 1)."},
+        {"name": "emitter.acceleration", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": -2000, "max": 2000, "doc": "Change in speed per second along the direction of travel."},
+        {"name": "emitter.angle", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 359, "doc": "Emission direction (degrees; 0 = right, 90 = down)."},
+        {"name": "emitter.angleVariance", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 1, "doc": "How much of Angle Spread is applied at random (0-1)."},
+        {"name": "emitter.angleSpread", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 360, "doc": "Largest random change to the angle (± degrees; 180 = all round)."},
+        {"name": "emitter.gravityDirection", "kind": "vec2", "owner": "ParticleEmitter", "default": [0, 1], "min": -1, "max": 1, "doc": "Direction gravity pulls particles."},
+        {"name": "emitter.gravityVelocity", "kind": "number", "owner": "ParticleEmitter", "default": 200, "min": -2000, "max": 2000, "doc": "Strength of that gravity (px/s²)."},
+        {"name": "emitter.wind", "kind": "vec2", "owner": "ParticleEmitter", "default": [0, 0], "min": -1000, "max": 1000, "doc": "Constant drift added to every particle (px/s)."},
+        {"name": "emitter.collisionEnabled", "kind": "boolean", "owner": "ParticleEmitter", "default": false, "doc": "Particles bounce off physics colliders."},
+        {"name": "emitter.elasticity", "kind": "number", "owner": "ParticleEmitter", "default": 0.7, "min": 0, "max": 1, "doc": "Bounciness when colliding (0 stops, 1 keeps all speed)."},
+        {"name": "emitter.shape", "kind": "enum", "owner": "ParticleEmitter", "default": "Circle", "min": 0, "max": 2000, "values": ["Circle", "Ellipse", "Rectangle", "Pixel", "Line", "Texture", "Custom"], "doc": "Shape each particle is drawn as."},
+        {"name": "emitter.emitting", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Emit new particles (existing ones finish their lives)."},
+        {"name": "emitter.continuous", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Keep emitting (else one cycle, then stop)."}
+      ]
+    },
+    {
+      "type": "SoundNode",
+      "name": "Sound Effect",
+      "category": "Audio & Sound",
+      "description": "Audio emitter for one-shot and recurring sound effects (.wav, .ogg) with volume and pitch control.",
+      "aliases": ["sound"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "volume", "kind": "number", "owner": "SoundNode", "default": 1, "min": 0, "max": 1, "doc": "Volume (0-1), before the bus and master volumes."},
+        {"name": "pitch", "kind": "number", "owner": "SoundNode", "default": 1, "min": 0.1, "max": 3, "doc": "Playback speed / pitch (1 = normal)."},
+        {"name": "bus", "kind": "string", "owner": "SoundNode", "default": "", "doc": "The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output apply."},
+        {"name": "caption", "kind": "string", "owner": "SoundNode", "default": "", "doc": "Shown on the subtitle track when it plays, for players with sound captions on (e.g. \"[door creaks]\")."},
+        {"name": "autoplay", "kind": "boolean", "owner": "SoundNode", "default": false, "doc": "Play once when the node becomes ready."},
+        {"name": "voices", "kind": "integer", "owner": "SoundNode", "default": 1, "min": 1, "max": 8, "doc": "Plays over itself up to this many times (1: a new play restarts it)."},
+        {"name": "positional", "kind": "boolean", "owner": "SoundNode", "default": false, "doc": "Volume and pan follow the node's distance and side from the listener (the current camera)."},
+        {"name": "minDistance", "kind": "number", "owner": "SoundNode", "default": 100, "min": 0, "max": 4000, "doc": "Positional: full volume within this distance (px)."},
+        {"name": "maxDistance", "kind": "number", "owner": "SoundNode", "default": 900, "min": 1, "max": 8000, "doc": "Positional: silent beyond this distance (px)."}
+      ]
+    },
+    {
+      "type": "MusicNode",
+      "name": "Music Streamer",
+      "category": "Audio & Sound",
+      "description": "Background streaming music player with seamless looping, crossfading, and volume attenuation.",
+      "aliases": ["music"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "volume", "kind": "number", "owner": "MusicNode", "default": 1, "min": 0, "max": 1, "doc": "Volume (0-1), before the bus and master volumes."},
+        {"name": "pitch", "kind": "number", "owner": "MusicNode", "default": 1, "min": 0.1, "max": 3, "doc": "Playback speed / pitch (1 = normal)."},
+        {"name": "pan", "kind": "number", "owner": "MusicNode", "default": 0.5, "min": 0, "max": 1, "doc": "Stereo position: 0 left, 0.5 centre, 1 right."},
+        {"name": "bus", "kind": "string", "owner": "MusicNode", "default": "", "doc": "The mixer bus it plays into (the Mixer tab; empty = Music): its fader, effects and output apply."},
+        {"name": "caption", "kind": "string", "owner": "MusicNode", "default": "", "doc": "Shown on the subtitle track when it starts, for players with sound captions on (e.g. \"[calm music]\")."},
+        {"name": "looping", "kind": "boolean", "owner": "MusicNode", "default": true, "doc": "Start again at the end."},
+        {"name": "autoplay", "kind": "boolean", "owner": "MusicNode", "default": false, "doc": "Start playing when the node becomes ready."},
+        {"name": "isPlaying", "kind": "boolean", "owner": "MusicNode", "default": false, "runtime": true, "doc": "Playing now."},
+        {"name": "isPaused", "kind": "boolean", "owner": "MusicNode", "default": false, "runtime": true, "doc": "Paused now."}
+      ]
+    },
+    {
+      "type": "StaticBodyNode",
+      "name": "Static Platform",
+      "category": "Physics & Collision",
+      "description": "Static immovable collision body that dynamic bodies collide with; perfect for ground, walls, and terrain.",
+      "aliases": ["staticbody", "static_body"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "debugColor", "kind": "color", "owner": "StaticBodyNode", "default": "#4ade80ff", "doc": "Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug draw)."},
+        {"name": "oneWay", "kind": "boolean", "owner": "StaticBodyNode", "default": false, "doc": "Jump-through platform: bodies pass from below and land on top."}
+      ]
+    },
+    {
+      "type": "DynamicBodyNode",
+      "name": "Dynamic Physics Box",
+      "category": "Physics & Collision",
+      "description": "Box2D dynamic rigid body affected by gravity, physical impulses, forces, friction, and bounce.",
+      "aliases": ["dynamicbody", "dynamic_body"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "linearVelocity", "kind": "vec2", "owner": "DynamicBodyNode", "default": [0, 0], "min": -1000, "max": 1000, "doc": "Velocity (px/s)."},
+        {"name": "angularVelocity", "kind": "number", "owner": "DynamicBodyNode", "default": 0, "min": -360, "max": 360, "doc": "Spin (degrees/s)."},
+        {"name": "linearDamping", "kind": "number", "owner": "DynamicBodyNode", "default": 0.05, "min": 0, "max": 20, "doc": "Slows movement over time (air drag)."},
+        {"name": "angularDamping", "kind": "number", "owner": "DynamicBodyNode", "default": 0.05, "min": 0, "max": 20, "doc": "Slows spin over time."},
+        {"name": "gravityScale", "kind": "number", "owner": "DynamicBodyNode", "default": 1, "min": -5, "max": 5, "doc": "Multiplies the world's gravity for this body (0 floats, negative rises)."},
+        {"name": "sleepThreshold", "kind": "number", "owner": "DynamicBodyNode", "default": 1.5, "min": 0, "max": 100, "doc": "Below this speed the body may sleep (px/s)."},
+        {"name": "enableSleep", "kind": "boolean", "owner": "DynamicBodyNode", "default": true, "doc": "Let the body sleep when at rest (saves time; contacts wake it)."},
+        {"name": "isAwake", "kind": "boolean", "owner": "DynamicBodyNode", "default": true, "doc": "Awake (simulated) now."},
+        {"name": "fixedRotation", "kind": "boolean", "owner": "DynamicBodyNode", "default": false, "doc": "Never rotate (characters, upright crates)."},
+        {"name": "isBullet", "kind": "boolean", "owner": "DynamicBodyNode", "default": false, "doc": "Continuous collision against other moving bodies (fast projectiles)."},
+        {"name": "allowFastRotation", "kind": "boolean", "owner": "DynamicBodyNode", "default": false, "doc": "Allow very fast spin (wheels); can be less stable."},
+        {"name": "debugColor", "kind": "color", "owner": "DynamicBodyNode", "default": "#60a5faff", "doc": "Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug draw)."}
+      ]
+    },
+    {
+      "type": "CharacterMoverNode",
+      "name": "Character Mover",
+      "category": "Physics & Collision",
+      "description": "Kinematic character controller with smooth velocity integration, slope climbing, and ground snapping.",
+      "aliases": ["charactermover", "character_mover"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "radius", "kind": "number", "owner": "CharacterMoverNode", "default": 14, "min": 2, "max": 200, "doc": "Capsule radius (px)."},
+        {"name": "height", "kind": "number", "owner": "CharacterMoverNode", "default": 28, "min": 2, "max": 400, "doc": "Capsule height (px)."},
+        {"name": "velocity", "kind": "vec2", "owner": "CharacterMoverNode", "default": [0, 0], "min": -1000, "max": 1000, "runtime": true, "doc": "Velocity now (px/s)."},
+        {"name": "targetSpeedX", "kind": "number", "owner": "CharacterMoverNode", "default": 0, "min": -600, "max": 600, "runtime": true, "doc": "Horizontal speed the built-in movement accelerates to (px/s)."},
+        {"name": "maxSpeed", "kind": "number", "owner": "CharacterMoverNode", "default": 240, "min": 10, "max": 1000, "doc": "Top running speed (px/s)."},
+        {"name": "acceleration", "kind": "number", "owner": "CharacterMoverNode", "default": 1200, "min": 10, "max": 5000, "doc": "How quickly it reaches top speed (px/s²)."},
+        {"name": "jumpSpeed", "kind": "number", "owner": "CharacterMoverNode", "default": 320, "min": 10, "max": 1200, "doc": "Upward speed of a jump (px/s)."},
+        {"name": "gravityScale", "kind": "number", "owner": "CharacterMoverNode", "default": 1, "min": 0, "max": 5, "doc": "Multiplies the world's gravity for the character."},
+        {"name": "pushLimit", "kind": "number", "owner": "CharacterMoverNode", "default": 500, "min": 0, "max": 1000, "doc": "Most push per step from overlapping bodies (px/s; 0 = unlimited)."},
+        {"name": "clipVelocity", "kind": "boolean", "owner": "CharacterMoverNode", "default": true, "doc": "Remove velocity into walls and floors it hits (slide along them)."},
+        {"name": "enableKeyboardInput", "kind": "boolean", "owner": "CharacterMoverNode", "default": true, "doc": "Built-in movement: the move / jump input actions drive it."},
+        {"name": "isGrounded", "kind": "boolean", "owner": "CharacterMoverNode", "default": false, "runtime": true, "doc": "Standing on something now."},
+        {"name": "categoryLayers", "kind": "flags", "owner": "CharacterMoverNode", "default": ["Layer1"], "values": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "doc": "Collision layers this object is on (names in Project Settings > Physics)."},
+        {"name": "maskLayers", "kind": "flags", "owner": "CharacterMoverNode", "default": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "values": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "doc": "Collision layers this object collides with."},
+        {"name": "debugColor", "kind": "color", "owner": "CharacterMoverNode", "default": "#facc15ff", "doc": "Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug draw)."},
+        {"name": "controlMode", "kind": "enum", "owner": "CharacterMoverNode", "default": "BuiltIn", "values": ["BuiltIn", "Script"], "doc": "Built-in movement, or Script: the script moves it (character_move_and_slide)."}
+      ]
+    },
+    {
+      "type": "AreaNode",
+      "name": "Trigger Area",
+      "category": "Physics & Collision",
+      "description": "Physics detection volume that triggers onEnter and onExit overlap events without rigid collisions.",
+      "aliases": ["area"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "overlapCount", "kind": "integer", "owner": "AreaNode", "default": 0, "min": 0, "max": 100, "runtime": true, "doc": "Bodies overlapping now."},
+        {"name": "hasOverlaps", "kind": "boolean", "owner": "AreaNode", "default": false, "runtime": true, "doc": "Anything overlapping now."},
+        {"name": "debugColor", "kind": "color", "owner": "AreaNode", "default": "#a855f7ff", "doc": "Outline colour when nothing overlaps."},
+        {"name": "activeColor", "kind": "color", "owner": "AreaNode", "default": "#ec4899ff", "doc": "Outline colour while something overlaps."}
+      ]
+    },
+    {
+      "type": "RaycastNode",
+      "name": "Raycast Sensor",
+      "category": "Physics & Collision",
+      "description": "Directional line-of-sight raycaster detecting intersection points, surface normals, and hit fractions.",
+      "aliases": ["raycast"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "direction", "kind": "vec2", "owner": "RaycastNode", "default": [1, 0.5], "min": -1, "max": 1, "doc": "Direction of the ray (rotated with the node)."},
+        {"name": "length", "kind": "number", "owner": "RaycastNode", "default": 450, "min": 1, "max": 2000, "doc": "Length of the ray (px)."},
+        {"name": "collideWithSensors", "kind": "boolean", "owner": "RaycastNode", "default": false, "doc": "Sensor shapes (areas) also stop the ray."},
+        {"name": "categoryLayers", "kind": "flags", "owner": "RaycastNode", "default": ["Layer1"], "values": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "doc": "Collision layers this object is on (names in Project Settings > Physics)."},
+        {"name": "maskLayers", "kind": "flags", "owner": "RaycastNode", "default": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "values": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "doc": "Collision layers this object collides with."},
+        {"name": "isColliding", "kind": "boolean", "owner": "RaycastNode", "default": false, "runtime": true, "doc": "The ray hit something this frame."},
+        {"name": "hitFraction", "kind": "number", "owner": "RaycastNode", "default": 0, "min": 0, "max": 1, "runtime": true, "doc": "Where along the ray it hit (0 start, 1 end)."},
+        {"name": "hitPoint", "kind": "vec2", "owner": "RaycastNode", "default": [0, 0], "min": 0, "max": 1280, "runtime": true, "doc": "World point of the hit (px)."},
+        {"name": "hitNormal", "kind": "vec2", "owner": "RaycastNode", "default": [0, 0], "min": -1, "max": 1, "runtime": true, "doc": "Surface direction at the hit."},
+        {"name": "rayColor", "kind": "color", "owner": "RaycastNode", "default": "#38bdf8ff", "doc": "Ray colour when it hits nothing."},
+        {"name": "hitColor", "kind": "color", "owner": "RaycastNode", "default": "#f87171ff", "doc": "Ray colour when it hits."}
+      ]
+    },
+    {
+      "type": "VisibilityNotifierNode",
+      "name": "Visibility Notifier",
+      "category": "Physics & Collision",
+      "description": "Knows when the camera sees a rectangle: screen_entered / screen_exited, and can pause, disable or remove its parent off screen (enemies wake up, bullets despawn).",
+      "aliases": ["visibility", "on screen", "notifier"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "VisibilityNotifierNode", "default": [64, 64], "min": 1, "max": 4096, "doc": "The rectangle (centred on the node, scaled with it) the camera has to see."},
+        {"name": "margin", "kind": "number", "owner": "VisibilityNotifierNode", "default": 0, "min": 0, "max": 1024, "doc": "Grows the camera's view by this many pixels: fires a little before it really shows."},
+        {"name": "action", "kind": "enum", "owner": "VisibilityNotifierNode", "default": "None", "values": ["None", "Pause_Parent", "Disable_Parent", "Remove_Parent"], "doc": "What happens to the parent off screen: Pause (stops updating, resumes when seen), Disable (also stops drawing), Remove (freed once it was seen and left)."},
+        {"name": "onScreen", "kind": "boolean", "owner": "VisibilityNotifierNode", "default": false, "runtime": true, "doc": "The camera sees it now (runtime, read-only)."}
+      ]
+    },
+    {
+      "type": "SkeletonNode",
+      "name": "Skeleton",
+      "category": "Animation & Effects",
+      "description": "Skeletal (cutout) animation from Spine or DragonBones exports: bones, meshes, skins, IK, events; crossfades; scripts can turn bones.",
+      "aliases": ["skeleton", "spine", "dragonbones", "bones", "rig", "cutout"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "file", "kind": "string", "owner": "SkeletonNode", "default": "", "doc": "The skeleton: a Spine .json export or a DragonBones _ske.json (project-relative)."},
+        {"name": "atlas", "kind": "string", "owner": "SkeletonNode", "default": "", "doc": "Its texture atlas; empty = next to it (name.atlas for Spine, name_tex.json for DragonBones)."},
+        {"name": "armature", "kind": "string", "owner": "SkeletonNode", "default": "", "doc": "DragonBones: the armature to show (empty = the first)."},
+        {"name": "animation", "kind": "string", "owner": "SkeletonNode", "default": "", "doc": "The animation played when the scene starts (and shown in the editor)."},
+        {"name": "skin", "kind": "string", "owner": "SkeletonNode", "default": "", "doc": "The skin (attachment set); empty = the default skin."},
+        {"name": "loop", "kind": "boolean", "owner": "SkeletonNode", "default": true, "doc": "Play the animation over and over."},
+        {"name": "autoplay", "kind": "boolean", "owner": "SkeletonNode", "default": true, "doc": "Start the animation when the node becomes ready."},
+        {"name": "speed", "kind": "number", "owner": "SkeletonNode", "default": 1, "min": 0, "max": 5, "doc": "Playback speed (1 = as authored)."},
+        {"name": "mixTime", "kind": "number", "owner": "SkeletonNode", "default": 0.15, "min": 0, "max": 2, "doc": "Seconds to crossfade from one animation to the next."},
+        {"name": "tint", "kind": "color", "owner": "SkeletonNode", "default": "#ffffffff", "doc": "Multiplies every slot's colour."},
+        {"name": "showBones", "kind": "boolean", "owner": "SkeletonNode", "default": false, "doc": "Draw the bones over the art (also in the game, for debugging)."}
+      ]
+    },
+    {
+      "type": "BoneAttachmentNode",
+      "name": "Bone Attachment",
+      "category": "Animation & Effects",
+      "description": "Under a Skeleton: follows one of its bones - put a weapon, a light or particles under it.",
+      "aliases": ["bone attachment", "attach to bone"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "bone", "kind": "string", "owner": "BoneAttachmentNode", "default": "", "doc": "The parent skeleton's bone this node follows (its children ride along: a weapon in the hand)."},
+        {"name": "followRotation", "kind": "boolean", "owner": "BoneAttachmentNode", "default": true, "doc": "Turn with the bone."},
+        {"name": "followScale", "kind": "boolean", "owner": "BoneAttachmentNode", "default": false, "doc": "Scale with the bone."}
+      ]
+    },
+    {
+      "type": "AdvancedCameraNode",
+      "name": "Advanced Camera",
+      "category": "Core & 2D",
+      "description": "A virtual camera (Phantom Camera style): follow modes (glued, damped with look-ahead, group with auto-zoom, path, dead zone), limits incl. the LDtk level the target is in, trauma shake. The highest priority one is shown; switching blends.",
+      "aliases": ["advanced camera", "virtual camera", "phantom", "cinemachine"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "priority", "kind": "integer", "owner": "AdvancedCameraNode", "default": 0, "min": -100, "max": 100, "doc": "The host camera shows the enabled advanced camera with the highest priority (a tie: the one added last); raise it to switch."},
+        {"name": "followMode", "kind": "enum", "owner": "AdvancedCameraNode", "default": "Simple", "values": ["None", "Glued", "Simple", "Group", "Path", "Framed"], "doc": "None (stays where placed), Glued (exactly on the target), Simple (offset, damping, look-ahead), Group (frames all targets, auto-zoom), Path (on a PathNode, closest to the target), Framed (moves only when the target leaves the dead zone)."},
+        {"name": "followTarget", "kind": "string", "owner": "AdvancedCameraNode", "default": "", "doc": "The node it follows (a path like Player or ../Hero)."},
+        {"name": "followTargets", "kind": "string", "owner": "AdvancedCameraNode", "default": "", "doc": "Group: more nodes to frame, comma separated."},
+        {"name": "followPath", "kind": "string", "owner": "AdvancedCameraNode", "default": "", "doc": "Path: the PathNode the camera rides along."},
+        {"name": "followOffset", "kind": "vec2", "owner": "AdvancedCameraNode", "default": [0, 0], "min": -2000, "max": 2000, "doc": "Added to the target's position (px)."},
+        {"name": "damping", "kind": "number", "owner": "AdvancedCameraNode", "default": 0, "min": 0, "max": 5, "doc": "Smoothing time in seconds: 0 locks on, 0.2-0.5 feels smooth."},
+        {"name": "axisLock", "kind": "enum", "owner": "AdvancedCameraNode", "default": "None", "values": ["None", "X", "Y", "XY"], "doc": "Don't follow along these axes (e.g. Y for a side-scroller that never moves vertically)."},
+        {"name": "lookahead", "kind": "number", "owner": "AdvancedCameraNode", "default": 0, "min": 0, "max": 2, "doc": "Looks ahead of a moving target by this many seconds of its velocity."},
+        {"name": "deadZone", "kind": "vec2", "owner": "AdvancedCameraNode", "default": [0.3, 0.3], "min": 0, "max": 1, "doc": "Framed: the part of the view (fraction of width / height) the target can move in without the camera moving."},
+        {"name": "zoom", "kind": "number", "owner": "AdvancedCameraNode", "default": 1, "min": 0.05, "max": 20, "doc": "Zoom (2 = twice as close)."},
+        {"name": "autoZoom", "kind": "boolean", "owner": "AdvancedCameraNode", "default": false, "doc": "Group: zoom so every target fits, between Auto Zoom Min and Max."},
+        {"name": "autoZoomMin", "kind": "number", "owner": "AdvancedCameraNode", "default": 0.25, "min": 0.05, "max": 20, "doc": "Group auto zoom: farthest out."},
+        {"name": "autoZoomMax", "kind": "number", "owner": "AdvancedCameraNode", "default": 2, "min": 0.05, "max": 20, "doc": "Group auto zoom: closest in."},
+        {"name": "autoZoomMargin", "kind": "number", "owner": "AdvancedCameraNode", "default": 120, "min": 0, "max": 2000, "doc": "Group auto zoom: space kept around the targets (px)."},
+        {"name": "limitMode", "kind": "enum", "owner": "AdvancedCameraNode", "default": "None", "values": ["None", "Rect", "Node", "LdtkLevel"], "doc": "Keeps the view inside: None, Rect (Limit Rect), Node (a TileMap / LDtk level / Navigation Region / StaticBody's bounds), Ldtk Level (the LDtk level the target is in - changes as it walks into linked levels)."},
+        {"name": "limitNode", "kind": "string", "owner": "AdvancedCameraNode", "default": "", "doc": "Node limits: the node whose bounds the view stays in."},
+        {"name": "limitMargin", "kind": "number", "owner": "AdvancedCameraNode", "default": 0, "min": -500, "max": 500, "doc": "Shrinks (+) or grows (-) the limits (px)."},
+        {"name": "limitBlend", "kind": "number", "owner": "AdvancedCameraNode", "default": 0.4, "min": 0, "max": 5, "doc": "Seconds to glide to new limits (moving into another LDtk level); 0 = at once."},
+        {"name": "blendTime", "kind": "number", "owner": "AdvancedCameraNode", "default": 0.8, "min": 0, "max": 10, "doc": "Seconds the host takes to move from the previous camera to this one when it becomes active."},
+        {"name": "blendEase", "kind": "enum", "owner": "AdvancedCameraNode", "default": "In_Out_Sine", "values": ["Linear", "In_Sine", "Out_Sine", "In_Out_Sine", "In_Quad", "Out_Quad", "In_Out_Quad", "In_Cubic", "Out_Cubic", "In_Out_Cubic", "In_Quart", "Out_Quart", "In_Out_Quart", "In_Expo", "Out_Expo", "In_Out_Expo", "In_Back", "Out_Back", "In_Out_Back", "In_Elastic", "Out_Elastic", "In_Out_Elastic", "In_Bounce", "Out_Bounce", "In_Out_Bounce", "Constant"], "doc": "The easing of that blend."},
+        {"name": "snapToPixel", "kind": "boolean", "owner": "AdvancedCameraNode", "default": false, "doc": "Round the position to whole pixels (pixel art)."},
+        {"name": "shakeIntensity", "kind": "number", "owner": "AdvancedCameraNode", "default": 24, "min": 0, "max": 500, "doc": "Shake offset at full trauma (px)."},
+        {"name": "shakeRotation", "kind": "number", "owner": "AdvancedCameraNode", "default": 2, "min": 0, "max": 45, "doc": "Shake rotation at full trauma (degrees)."},
+        {"name": "shakeDecay", "kind": "number", "owner": "AdvancedCameraNode", "default": 1.5, "min": 0, "max": 20, "doc": "Trauma lost per second."},
+        {"name": "shakeFrequency", "kind": "number", "owner": "AdvancedCameraNode", "default": 12, "min": 0.1, "max": 100, "doc": "How fast the shake moves (noise speed)."},
+        {"name": "traumaExponent", "kind": "number", "owner": "AdvancedCameraNode", "default": 2, "min": 1, "max": 4, "doc": "Shake = trauma ^ exponent: 2-3 makes small hits subtle and big ones strong."},
+        {"name": "trauma", "kind": "number", "owner": "AdvancedCameraNode", "default": 0, "runtime": true, "doc": "Current trauma 0..1 (add_trauma stacks it; runtime)."},
+        {"name": "active", "kind": "boolean", "owner": "AdvancedCameraNode", "default": false, "runtime": true, "doc": "The host camera shows this one now (runtime, read-only)."}
+      ]
+    },
+    {
+      "type": "PathNode",
+      "name": "Path",
+      "category": "Animation & Effects",
+      "description": "A curve through points with Bézier handles, edited in the viewport: routes, rails, moving platforms' tracks, camera paths. Add a Path Follow under it.",
+      "aliases": ["path", "curve", "bezier", "route", "rail"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "closed", "kind": "boolean", "owner": "PathNode", "default": false, "doc": "Join the last point back to the first (a loop)."},
+        {"name": "bakeInterval", "kind": "number", "owner": "PathNode", "default": 6, "min": 1, "max": 64, "doc": "Distance between the points the curve is turned into (px): smaller follows the curve more closely."},
+        {"name": "lineWidth", "kind": "number", "owner": "PathNode", "default": 0, "min": 0, "max": 64, "doc": "Draw the path in the game this wide (rails, ropes); 0 = invisible (the editor always shows it)."},
+        {"name": "color", "kind": "color", "owner": "PathNode", "default": "#7dd3fcff", "doc": "Colour of the drawn path (and of its outline in the editor)."}
+      ]
+    },
+    {
+      "type": "NavigationRegionNode",
+      "name": "Navigation Region",
+      "category": "Physics & Collision",
+      "description": "An area agents find paths in: baked into a grid from static bodies, solid tile maps and LDtk Solid cells. Bake in the Inspector; scripts can block cells (doors).",
+      "aliases": ["navigation", "nav region", "navmesh", "pathfinding"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "NavigationRegionNode", "default": [1280, 720], "min": 16, "max": 20000, "doc": "The area agents find paths in, from the node's position (px)."},
+        {"name": "cellSize", "kind": "number", "owner": "NavigationRegionNode", "default": 16, "min": 2, "max": 256, "doc": "Size of a grid cell (px): smaller follows walls more closely, larger finds paths faster."},
+        {"name": "usePhysics", "kind": "boolean", "owner": "NavigationRegionNode", "default": true, "doc": "Static bodies' collision shapes inside the area block."},
+        {"name": "useTileMaps", "kind": "boolean", "owner": "NavigationRegionNode", "default": true, "doc": "Solid tile maps' painted tiles block."},
+        {"name": "useLdtk", "kind": "boolean", "owner": "NavigationRegionNode", "default": true, "doc": "LDtk IntGrid cells with a Solid collision rule block."}
+      ]
+    },
+    {
+      "type": "NavigationAgentNode",
+      "name": "Navigation Agent",
+      "category": "Physics & Collision",
+      "description": "Put it under a character: give it a target and it walks there along a path, around walls and other agents (moves a CharacterMover, a DynamicBody or any node).",
+      "aliases": ["nav agent", "agent", "pathfinding agent"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "speed", "kind": "number", "owner": "NavigationAgentNode", "default": 120, "min": 0, "max": 2000, "doc": "How fast it moves along its path (px/s)."},
+        {"name": "radius", "kind": "number", "owner": "NavigationAgentNode", "default": 10, "min": 0, "max": 500, "doc": "Its size: paths keep this far from walls, and agents keep this far apart."},
+        {"name": "arriveDistance", "kind": "number", "owner": "NavigationAgentNode", "default": 6, "min": 1, "max": 200, "doc": "How close to the target counts as arrived (px)."},
+        {"name": "repathInterval", "kind": "number", "owner": "NavigationAgentNode", "default": 0.5, "min": 0, "max": 10, "doc": "Seconds between new paths while moving (a moving target, opened doors); 0 = only when the target changes."},
+        {"name": "navMap", "kind": "string", "owner": "NavigationAgentNode", "default": "", "doc": "The NavigationRegion, TileMap or LDtk level to find paths in (a node path); empty = the region it stands in."},
+        {"name": "moveParent", "kind": "boolean", "owner": "NavigationAgentNode", "default": true, "doc": "Move the parent along the path (a CharacterMover, a DynamicBody or any node); off: read `velocity` in a script."},
+        {"name": "avoidance", "kind": "boolean", "owner": "NavigationAgentNode", "default": true, "doc": "Steer away from other agents (their radius)."},
+        {"name": "velocity", "kind": "vec2", "owner": "NavigationAgentNode", "default": [0, 0], "runtime": true, "doc": "The velocity it wants this frame (px/s; read-only)."}
+      ]
+    },
+    {
+      "type": "PathFollowNode",
+      "name": "Path Follow",
+      "category": "Animation & Effects",
+      "description": "Travels along its parent Path: speed, loop / ping-pong / stop, faces the way it goes. Put a sprite, a platform or an enemy under it.",
+      "aliases": ["path follow", "follower", "moving platform"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "progress", "kind": "number", "owner": "PathFollowNode", "default": 0, "min": 0, "max": 10000, "doc": "Distance travelled along the parent path (px). Set it to place the follower; scripts can animate it."},
+        {"name": "speed", "kind": "number", "owner": "PathFollowNode", "default": 0, "min": -2000, "max": 2000, "doc": "Pixels per second it moves along the path by itself (negative: backwards; 0: only scripts move it)."},
+        {"name": "loop", "kind": "enum", "owner": "PathFollowNode", "default": "Stop", "values": ["Stop", "Loop", "PingPong"], "doc": "At the end: Stop (path_finished), Loop (start again) or Ping Pong (turn back)."},
+        {"name": "rotate", "kind": "boolean", "owner": "PathFollowNode", "default": true, "doc": "Turn to face the direction it travels."},
+        {"name": "sideOffset", "kind": "number", "owner": "PathFollowNode", "default": 0, "min": -500, "max": 500, "doc": "Pixels to the side of the path (positive: to the right of the travel direction) - lanes, offsets."}
+      ]
+    },
+    {
+      "type": "LdtkLevelNode",
+      "name": "LDtk Tilemap Level",
+      "category": "Graphics & Rendering",
+      "description": "Full LDtk level renderer for grid-based tile layers, auto-layering, and entity placement.",
+      "aliases": ["ldtk", "ldtklevel"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "enablePhysics", "kind": "boolean", "owner": "LdtkLevelNode", "default": true, "doc": "Build colliders from IntGrid cells whose collision rule is Solid / One Way."},
+        {"name": "spawnEntities", "kind": "boolean", "owner": "LdtkLevelNode", "default": true, "doc": "Spawn the level's entities (mapped to components) when ready."},
+        {"name": "parallax", "kind": "boolean", "owner": "LdtkLevelNode", "default": true, "doc": "Apply the LDtk layers' parallax factors."},
+        {"name": "drawBackground", "kind": "boolean", "owner": "LdtkLevelNode", "default": true, "doc": "Draw the level's background colour / image."},
+        {"name": "drawEntityTiles", "kind": "boolean", "owner": "LdtkLevelNode", "default": false, "doc": "Draw entities' LDtk tiles (editor visuals for unspawned entities)."},
+        {"name": "tintColor", "kind": "color", "owner": "LdtkLevelNode", "default": "#ffffffff", "doc": "Multiplies every layer's colours."},
+        {"name": "drawDebugColliders", "kind": "boolean", "owner": "LdtkLevelNode", "default": false, "doc": "Outline the generated colliders."},
+        {"name": "drawDebugEntities", "kind": "boolean", "owner": "LdtkLevelNode", "default": false, "doc": "Outline entity bounds with their names."}
+      ]
+    },
+    {
+      "type": "TileMapNode",
+      "name": "Tile Map",
+      "category": "Graphics & Rendering",
+      "description": "Grid of tiles from a tileset image, painted in the viewport; optional colliders.",
+      "aliases": ["tilemap"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "solid", "kind": "boolean", "owner": "TileMapNode", "default": false, "doc": "Build static colliders for the painted tiles."},
+        {"name": "tint", "kind": "color", "owner": "TileMapNode", "default": "#ffffffff", "doc": "Multiplies the texture's colours (white = unchanged; alpha fades it)."},
+        {"name": "asepriteLayer", "kind": "string", "owner": "TileMapNode", "default": "", "doc": "With an Aseprite file as the tileset: the tilemap layer the map comes from (its tiles, flips and tileset; kept in sync when the file is saved). Empty: paint the map here."}
+      ]
+    },
+    {
+      "type": "LightNode",
+      "name": "Light",
+      "category": "Graphics & Rendering",
+      "description": "2D point or spot light with colour, energy, radius and falloff; casts shadows from physics shapes. Set the scene's Ambient to darken unlit areas.",
+      "aliases": ["light", "pointlight", "spotlight"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "kind", "kind": "enum", "owner": "LightNode", "default": "Point", "values": ["Point", "Spot"], "doc": "Point: shines all round. Spot: a cone along the node's rotation."},
+        {"name": "color", "kind": "color", "owner": "LightNode", "default": "#ffecc8ff", "doc": "Colour of the light."},
+        {"name": "energy", "kind": "number", "owner": "LightNode", "default": 1, "min": 0, "max": 8, "doc": "Brightness multiplier."},
+        {"name": "radius", "kind": "number", "owner": "LightNode", "default": 256, "min": 1, "max": 4000, "doc": "Reach of the light (px)."},
+        {"name": "falloff", "kind": "number", "owner": "LightNode", "default": 2, "min": 0.1, "max": 8, "doc": "Fade towards the edge: 1 linear, 2 smooth, higher = tighter."},
+        {"name": "spread", "kind": "number", "owner": "LightNode", "default": 35, "min": 1, "max": 180, "doc": "Spot: half-angle of the cone (degrees)."},
+        {"name": "shadows", "kind": "boolean", "owner": "LightNode", "default": true, "doc": "Cast shadows from the scene's physics shapes (bodies, LDtk and tile map colliders; not sensors)."}
+      ]
+    },
+    {
+      "type": "JointNode",
+      "name": "Joint",
+      "category": "Physics & Collision",
+      "description": "Connects two bodies: hinge (revolute), distance, slider (prismatic), weld, wheel or motor; motors, springs and limits. Pick Body A (default: parent) and Body B.",
+      "aliases": ["joint", "physicsjoint"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "joint.type", "kind": "enum", "owner": "PhysicsJoint", "default": "Revolute", "values": ["Distance", "Filter", "Motor", "Mouse", "Prismatic", "Revolute", "Weld", "Wheel"], "doc": "Kind of joint; only that kind's settings are shown."},
+        {"name": "joint.distance.localAnchorA", "kind": "vec2", "owner": "DistanceJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body A, relative to its origin (px)."},
+        {"name": "joint.distance.localAnchorB", "kind": "vec2", "owner": "DistanceJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body B, relative to its origin (px)."},
+        {"name": "joint.distance.length", "kind": "number", "owner": "DistanceJoint", "default": 100, "min": 1, "max": 1000, "doc": "Rest distance between the anchors (px)."},
+        {"name": "joint.distance.enableSpring", "kind": "boolean", "owner": "DistanceJoint", "default": false, "doc": "Make the joint springy instead of rigid."},
+        {"name": "joint.distance.hertz", "kind": "number", "owner": "DistanceJoint", "default": 4, "min": 0, "max": 60, "doc": "Spring stiffness as an oscillation frequency (Hz); 0 = no spring."},
+        {"name": "joint.distance.dampingRatio", "kind": "number", "owner": "DistanceJoint", "default": 0.5, "min": 0, "max": 10, "doc": "Spring damping: 0 bounces forever, 1 settles without overshoot."},
+        {"name": "joint.distance.enableLimit", "kind": "boolean", "owner": "DistanceJoint", "default": false, "doc": "Clamp the joint's travel to the lower / upper limits."},
+        {"name": "joint.distance.minLength", "kind": "number", "owner": "DistanceJoint", "default": 20, "min": 0, "max": 1000, "doc": "Shortest the joint may get (px; with the limit on)."},
+        {"name": "joint.distance.maxLength", "kind": "number", "owner": "DistanceJoint", "default": 200, "min": 1, "max": 1000, "doc": "Longest the joint may get (px; with the limit on)."},
+        {"name": "joint.distance.enableMotor", "kind": "boolean", "owner": "DistanceJoint", "default": false, "doc": "Drive the joint at Motor Speed, up to the maximum force / torque."},
+        {"name": "joint.distance.maxMotorForce", "kind": "number", "owner": "DistanceJoint", "default": 100000, "min": 0, "max": 100000000, "doc": "Strongest push the motor applies (pixel-scale bodies are heavy: mass ~ area in px²)."},
+        {"name": "joint.distance.motorSpeed", "kind": "number", "owner": "DistanceJoint", "default": 0, "min": -500, "max": 500, "doc": "Speed the motor lengthens (+) or shortens (-) the joint (px/s)."},
+        {"name": "joint.distance.collideConnected", "kind": "boolean", "owner": "DistanceJoint", "default": false, "doc": "Let the two connected bodies collide with each other."},
+        {"name": "joint.motor.linearOffset", "kind": "vec2", "owner": "MotorJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Where body B is driven to, relative to body A (px)."},
+        {"name": "joint.motor.angularOffset", "kind": "number", "owner": "MotorJoint", "default": 0, "min": 0, "max": 360, "doc": "Angle body B is driven to, relative to body A (degrees)."},
+        {"name": "joint.motor.maxForce", "kind": "number", "owner": "MotorJoint", "default": 100000, "min": 0, "max": 100000000, "doc": "Strongest pull towards the offset (pixel-scale bodies are heavy)."},
+        {"name": "joint.motor.maxTorque", "kind": "number", "owner": "MotorJoint", "default": 5000000, "min": 0, "max": 100000000, "doc": "Strongest twist towards the angle (pixel-scale bodies are heavy)."},
+        {"name": "joint.motor.correctionFactor", "kind": "number", "owner": "MotorJoint", "default": 0.3, "min": 0, "max": 1, "doc": "How quickly position errors are corrected (0-1)."},
+        {"name": "joint.motor.collideConnected", "kind": "boolean", "owner": "MotorJoint", "default": false, "doc": "Let the two connected bodies collide with each other."},
+        {"name": "joint.mouse.target", "kind": "vec2", "owner": "MouseJoint", "default": [0, 0], "min": 0, "max": 1280, "doc": "World point the body is pulled to (px)."},
+        {"name": "joint.mouse.hertz", "kind": "number", "owner": "MouseJoint", "default": 4, "min": 0.1, "max": 60, "doc": "Stiffness of the pull (Hz)."},
+        {"name": "joint.mouse.dampingRatio", "kind": "number", "owner": "MouseJoint", "default": 1, "min": 0, "max": 10, "doc": "Damping of the pull: 1 = no overshoot."},
+        {"name": "joint.mouse.maxForce", "kind": "number", "owner": "MouseJoint", "default": 1000, "min": 0, "max": 50000, "doc": "Strongest pull applied."},
+        {"name": "joint.mouse.collideConnected", "kind": "boolean", "owner": "MouseJoint", "default": false, "doc": "Let the two connected bodies collide with each other."},
+        {"name": "joint.prismatic.localAnchorA", "kind": "vec2", "owner": "PrismaticJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body A, relative to its origin (px)."},
+        {"name": "joint.prismatic.localAnchorB", "kind": "vec2", "owner": "PrismaticJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body B, relative to its origin (px)."},
+        {"name": "joint.prismatic.localAxisA", "kind": "vec2", "owner": "PrismaticJoint", "default": [1, 0], "min": -1, "max": 1, "doc": "Direction body B slides along, in body A's space."},
+        {"name": "joint.prismatic.referenceAngle", "kind": "number", "owner": "PrismaticJoint", "default": 0, "min": 0, "max": 360, "doc": "Body B's angle relative to body A that counts as zero (degrees)."},
+        {"name": "joint.prismatic.targetTranslation", "kind": "number", "owner": "PrismaticJoint", "default": 0, "min": -500, "max": 500, "doc": "Position the spring pulls to along the axis (px)."},
+        {"name": "joint.prismatic.enableSpring", "kind": "boolean", "owner": "PrismaticJoint", "default": false, "doc": "Make the joint springy instead of rigid."},
+        {"name": "joint.prismatic.hertz", "kind": "number", "owner": "PrismaticJoint", "default": 4, "min": 0, "max": 60, "doc": "Spring stiffness as an oscillation frequency (Hz); 0 = no spring."},
+        {"name": "joint.prismatic.dampingRatio", "kind": "number", "owner": "PrismaticJoint", "default": 0.5, "min": 0, "max": 10, "doc": "Spring damping: 0 bounces forever, 1 settles without overshoot."},
+        {"name": "joint.prismatic.enableLimit", "kind": "boolean", "owner": "PrismaticJoint", "default": false, "doc": "Clamp the joint's travel to the lower / upper limits."},
+        {"name": "joint.prismatic.lowerTranslation", "kind": "number", "owner": "PrismaticJoint", "default": -100, "min": -500, "max": 500, "doc": "Furthest back along the axis (px; with the limit on)."},
+        {"name": "joint.prismatic.upperTranslation", "kind": "number", "owner": "PrismaticJoint", "default": 100, "min": -500, "max": 500, "doc": "Furthest forward along the axis (px; with the limit on)."},
+        {"name": "joint.prismatic.enableMotor", "kind": "boolean", "owner": "PrismaticJoint", "default": false, "doc": "Drive the joint at Motor Speed, up to the maximum force / torque."},
+        {"name": "joint.prismatic.maxMotorForce", "kind": "number", "owner": "PrismaticJoint", "default": 100000, "min": 0, "max": 100000000, "doc": "Strongest push the motor applies (pixel-scale bodies are heavy)."},
+        {"name": "joint.prismatic.motorSpeed", "kind": "number", "owner": "PrismaticJoint", "default": 0, "min": -500, "max": 500, "doc": "Sliding speed the motor drives (px/s)."},
+        {"name": "joint.prismatic.collideConnected", "kind": "boolean", "owner": "PrismaticJoint", "default": false, "doc": "Let the two connected bodies collide with each other."},
+        {"name": "joint.revolute.localAnchorA", "kind": "vec2", "owner": "RevoluteJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body A, relative to its origin (px)."},
+        {"name": "joint.revolute.localAnchorB", "kind": "vec2", "owner": "RevoluteJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body B, relative to its origin (px)."},
+        {"name": "joint.revolute.referenceAngle", "kind": "number", "owner": "RevoluteJoint", "default": 0, "min": 0, "max": 360, "doc": "Body B's angle relative to body A that counts as zero (degrees)."},
+        {"name": "joint.revolute.targetAngle", "kind": "number", "owner": "RevoluteJoint", "default": 0, "min": -360, "max": 360, "doc": "Angle the spring pulls to (degrees)."},
+        {"name": "joint.revolute.enableSpring", "kind": "boolean", "owner": "RevoluteJoint", "default": false, "doc": "Make the joint springy instead of rigid."},
+        {"name": "joint.revolute.hertz", "kind": "number", "owner": "RevoluteJoint", "default": 4, "min": 0, "max": 60, "doc": "Spring stiffness as an oscillation frequency (Hz); 0 = no spring."},
+        {"name": "joint.revolute.dampingRatio", "kind": "number", "owner": "RevoluteJoint", "default": 0.5, "min": 0, "max": 10, "doc": "Spring damping: 0 bounces forever, 1 settles without overshoot."},
+        {"name": "joint.revolute.enableLimit", "kind": "boolean", "owner": "RevoluteJoint", "default": false, "doc": "Clamp the joint's travel to the lower / upper limits."},
+        {"name": "joint.revolute.lowerAngle", "kind": "number", "owner": "RevoluteJoint", "default": -45, "min": -360, "max": 360, "doc": "Smallest angle (degrees; with the limit on)."},
+        {"name": "joint.revolute.upperAngle", "kind": "number", "owner": "RevoluteJoint", "default": 45, "min": -360, "max": 360, "doc": "Largest angle (degrees; with the limit on)."},
+        {"name": "joint.revolute.enableMotor", "kind": "boolean", "owner": "RevoluteJoint", "default": false, "doc": "Drive the joint at Motor Speed, up to the maximum force / torque."},
+        {"name": "joint.revolute.maxMotorTorque", "kind": "number", "owner": "RevoluteJoint", "default": 5000000, "min": 0, "max": 100000000, "doc": "Strongest twist the motor applies (pixel-scale bodies are heavy)."},
+        {"name": "joint.revolute.motorSpeed", "kind": "number", "owner": "RevoluteJoint", "default": 0, "min": -50, "max": 50, "doc": "Spin speed the motor drives (radians/s)."},
+        {"name": "joint.revolute.collideConnected", "kind": "boolean", "owner": "RevoluteJoint", "default": false, "doc": "Let the two connected bodies collide with each other."},
+        {"name": "joint.weld.localAnchorA", "kind": "vec2", "owner": "WeldJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body A, relative to its origin (px)."},
+        {"name": "joint.weld.localAnchorB", "kind": "vec2", "owner": "WeldJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body B, relative to its origin (px)."},
+        {"name": "joint.weld.referenceAngle", "kind": "number", "owner": "WeldJoint", "default": 0, "min": 0, "max": 360, "doc": "Body B's angle relative to body A that counts as zero (degrees)."},
+        {"name": "joint.weld.linearHertz", "kind": "number", "owner": "WeldJoint", "default": 0, "min": 0, "max": 60, "doc": "Positional softness (Hz); 0 = rigid."},
+        {"name": "joint.weld.angularHertz", "kind": "number", "owner": "WeldJoint", "default": 0, "min": 0, "max": 60, "doc": "Angular softness (Hz); 0 = rigid."},
+        {"name": "joint.weld.linearDampingRatio", "kind": "number", "owner": "WeldJoint", "default": 0, "min": 0, "max": 10, "doc": "Damping of the positional softness."},
+        {"name": "joint.weld.angularDampingRatio", "kind": "number", "owner": "WeldJoint", "default": 0, "min": 0, "max": 10, "doc": "Damping of the angular softness."},
+        {"name": "joint.weld.collideConnected", "kind": "boolean", "owner": "WeldJoint", "default": false, "doc": "Let the two connected bodies collide with each other."},
+        {"name": "joint.wheel.localAnchorA", "kind": "vec2", "owner": "WheelJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body A, relative to its origin (px)."},
+        {"name": "joint.wheel.localAnchorB", "kind": "vec2", "owner": "WheelJoint", "default": [0, 0], "min": -500, "max": 500, "doc": "Anchor on body B, relative to its origin (px)."},
+        {"name": "joint.wheel.localAxisA", "kind": "vec2", "owner": "WheelJoint", "default": [0, 1], "min": -1, "max": 1, "doc": "Suspension direction, in body A's space."},
+        {"name": "joint.wheel.enableSpring", "kind": "boolean", "owner": "WheelJoint", "default": true, "doc": "Springy suspension along the axis."},
+        {"name": "joint.wheel.hertz", "kind": "number", "owner": "WheelJoint", "default": 1, "min": 0, "max": 60, "doc": "Spring stiffness as an oscillation frequency (Hz); 0 = no spring."},
+        {"name": "joint.wheel.dampingRatio", "kind": "number", "owner": "WheelJoint", "default": 0.7, "min": 0, "max": 10, "doc": "Spring damping: 0 bounces forever, 1 settles without overshoot."},
+        {"name": "joint.wheel.enableLimit", "kind": "boolean", "owner": "WheelJoint", "default": false, "doc": "Clamp the joint's travel to the lower / upper limits."},
+        {"name": "joint.wheel.lowerTranslation", "kind": "number", "owner": "WheelJoint", "default": -50, "min": -500, "max": 500, "doc": "Suspension's lowest travel (px; with the limit on)."},
+        {"name": "joint.wheel.upperTranslation", "kind": "number", "owner": "WheelJoint", "default": 50, "min": -500, "max": 500, "doc": "Suspension's highest travel (px; with the limit on)."},
+        {"name": "joint.wheel.enableMotor", "kind": "boolean", "owner": "WheelJoint", "default": false, "doc": "Drive the joint at Motor Speed, up to the maximum force / torque."},
+        {"name": "joint.wheel.maxMotorTorque", "kind": "number", "owner": "WheelJoint", "default": 5000000, "min": 0, "max": 100000000, "doc": "Strongest twist the wheel motor applies (pixel-scale bodies are heavy)."},
+        {"name": "joint.wheel.motorSpeed", "kind": "number", "owner": "WheelJoint", "default": 0, "min": -50, "max": 50, "doc": "Wheel spin speed the motor drives (radians/s)."},
+        {"name": "joint.wheel.collideConnected", "kind": "boolean", "owner": "WheelJoint", "default": false, "doc": "Let the two connected bodies collide with each other."},
+        {"name": "debugColor", "kind": "color", "owner": "JointNode", "default": "#facc15ff", "doc": "Colour of the line drawn between the anchors."}
+      ]
+    },
+    {
+      "type": "TextNode",
+      "name": "Text",
+      "category": "Graphics & Rendering",
+      "description": "Text in the world: any project font (or SDF for crisp scaling), wrapping, alignment, rich text ([color=..] [size=..] [wave] [shake]), localization keys and a typewriter reveal.",
+      "aliases": ["text", "label2d", "textlabel"],
+      "hasOrigin": true,
+      "properties": [
+        {"name": "text", "kind": "string", "owner": "TextNode", "default": "Text", "doc": "The text; rich text markup when Rich Text is on, a locale key when Localized."},
+        {"name": "font", "kind": "string", "owner": "TextNode", "default": "", "doc": "Project font (.ttf / .otf / .fnt; \"\" = the engine font)."},
+        {"name": "fontSize", "kind": "number", "owner": "TextNode", "default": 24, "min": 4, "max": 256, "doc": "Text size (px)."},
+        {"name": "color", "kind": "color", "owner": "TextNode", "default": "#ffffffff", "doc": "Text colour (rich text [color] overrides it)."},
+        {"name": "align", "kind": "enum", "owner": "TextNode", "default": "Left", "values": ["Left", "Center", "Right"], "doc": "Alignment of the lines within the text block."},
+        {"name": "maxWidth", "kind": "number", "owner": "TextNode", "default": 0, "min": 0, "max": 4000, "doc": "Wrap lines at this width (px); 0 = only at line breaks."},
+        {"name": "lineSpacing", "kind": "number", "owner": "TextNode", "default": 1.2, "min": 0.5, "max": 3, "doc": "Line height as a multiple of the font size."},
+        {"name": "richText", "kind": "boolean", "owner": "TextNode", "default": true, "doc": "Interpret [color=..] [size=..] [wave] [shake] tags."},
+        {"name": "localized", "kind": "boolean", "owner": "TextNode", "default": false, "doc": "The text is a key in the locale tables; shows the current language's translation."},
+        {"name": "sdf", "kind": "boolean", "owner": "TextNode", "default": false, "doc": "Signed-distance-field rendering: stays sharp when scaled or zoomed (vector fonts)."},
+        {"name": "revealSpeed", "kind": "number", "owner": "TextNode", "default": 0, "min": 0, "max": 500, "doc": "Typewriter: characters per second (0 = all at once); emits \"revealed\" when done."}
+      ]
+    },
+    {
+      "type": "DialogueNode",
+      "name": "Dialogue Box",
+      "category": "UI & Interface",
+      "description": "A dialogue box: lines with a speaker type out and advance with the confirm action. Scripts: box:dialogue_show({...}); events line_shown / finished.",
+      "aliases": ["dialogue", "dialoguebox"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [900, 170], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "font", "kind": "string", "owner": "DialogueNode", "default": "", "doc": "Project font (\"\" = the engine font)."},
+        {"name": "fontSize", "kind": "number", "owner": "DialogueNode", "default": 24, "min": 8, "max": 96, "doc": "Text size (px)."},
+        {"name": "textColor", "kind": "color", "owner": "DialogueNode", "default": "#eef0f6ff", "doc": "Colour of the line's text."},
+        {"name": "speakerColor", "kind": "color", "owner": "DialogueNode", "default": "#facc15ff", "doc": "Colour of the speaker's name."},
+        {"name": "panelColor", "kind": "color", "owner": "DialogueNode", "default": "#0f121ce6", "doc": "Fill colour of the box."},
+        {"name": "borderColor", "kind": "color", "owner": "DialogueNode", "default": "#5c8dffff", "doc": "Colour of the box's border."},
+        {"name": "padding", "kind": "number", "owner": "DialogueNode", "default": 20, "min": 0, "max": 100, "doc": "Space between the border and the text (px)."},
+        {"name": "revealSpeed", "kind": "number", "owner": "DialogueNode", "default": 40, "min": 0, "max": 500, "doc": "Typewriter speed in characters per second (0 = whole lines)."},
+        {"name": "advanceAction", "kind": "string", "owner": "DialogueNode", "default": "confirm", "doc": "Input action that shows the rest of the line, then the next (\"confirm\")."},
+        {"name": "localized", "kind": "boolean", "owner": "DialogueNode", "default": false, "doc": "Lines are keys in the locale tables (locale/*.csv)."},
+        {"name": "mode", "kind": "enum", "owner": "DialogueNode", "default": "Box", "values": ["Box", "Subtitles"], "doc": "Box: a dialogue box the player advances. Subtitles: the lines go on the subtitle track (no box), each for its voice's length or reading time, then the next by itself - cutscenes, barks."}
+      ]
+    },
+    {
+      "type": "NineSliceNode",
+      "name": "Nine Slice Sprite",
+      "category": "Graphics & Rendering",
+      "description": "A texture stretched to any size while its borders keep their size (panels, buttons, frames).",
+      "aliases": ["nineslice", "ninepatch"],
+      "hasOrigin": true,
+      "properties": [
+        {"name": "texturePath", "kind": "string", "owner": "NineSliceNode", "default": "", "doc": "Texture to slice."},
+        {"name": "size", "kind": "vec2", "owner": "NineSliceNode", "default": [200, 100], "min": 1, "max": 4000, "doc": "Drawn size (px); the borders keep their size, the middle stretches."},
+        {"name": "marginsLT", "kind": "vec2", "owner": "NineSliceNode", "default": [16, 16], "min": 0, "max": 512, "doc": "Left and top border widths (texture px)."},
+        {"name": "marginsRB", "kind": "vec2", "owner": "NineSliceNode", "default": [16, 16], "min": 0, "max": 512, "doc": "Right and bottom border widths (texture px)."},
+        {"name": "tint", "kind": "color", "owner": "NineSliceNode", "default": "#ffffffff", "doc": "Multiplies the texture's colours (white = unchanged; alpha fades it)."}
+      ]
+    },
+    {
+      "type": "ParallaxNode",
+      "name": "Parallax Background",
+      "category": "Graphics & Rendering",
+      "description": "A background that moves with the camera at a factor (0 = fixed, 1 = world), repeating and optionally drifting.",
+      "aliases": ["parallax", "parallaxlayer"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "texturePath", "kind": "string", "owner": "ParallaxNode", "default": "", "doc": "Background texture."},
+        {"name": "factor", "kind": "vec2", "owner": "ParallaxNode", "default": [0.5, 0.5], "min": 0, "max": 2, "doc": "Movement relative to the camera: 1 moves with the world, 0 stays fixed on screen."},
+        {"name": "repeatX", "kind": "boolean", "owner": "ParallaxNode", "default": true, "doc": "Tile horizontally to fill the view."},
+        {"name": "repeatY", "kind": "boolean", "owner": "ParallaxNode", "default": false, "doc": "Tile vertically to fill the view."},
+        {"name": "scrollSpeed", "kind": "vec2", "owner": "ParallaxNode", "default": [0, 0], "min": -1000, "max": 1000, "doc": "Drifts by itself (px/s; clouds)."},
+        {"name": "tint", "kind": "color", "owner": "ParallaxNode", "default": "#ffffffff", "doc": "Multiplies the texture's colours (white = unchanged; alpha fades it)."}
+      ]
+    },
+    {
+      "type": "LineNode",
+      "name": "Line",
+      "category": "Graphics & Rendering",
+      "description": "A polyline through local points: width, colour, closed, rounded joints (lasers, ropes, outlines).",
+      "aliases": ["line", "line2d"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "width", "kind": "number", "owner": "LineNode", "default": 4, "min": 0.5, "max": 100, "doc": "Line thickness (px)."},
+        {"name": "color", "kind": "color", "owner": "LineNode", "default": "#ffffffff", "doc": "Line colour."},
+        {"name": "closed", "kind": "boolean", "owner": "LineNode", "default": false, "doc": "Join the last point to the first."},
+        {"name": "rounded", "kind": "boolean", "owner": "LineNode", "default": true, "doc": "Round joints and caps."}
+      ]
+    },
+    {
+      "type": "TrailNode",
+      "name": "Trail",
+      "category": "Animation & Effects",
+      "description": "A fading, tapering ribbon behind a moving node (place it as a child): lifetime, width, colours.",
+      "aliases": ["trail"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "lifetime", "kind": "number", "owner": "TrailNode", "default": 0.5, "min": 0.05, "max": 10, "doc": "Seconds a point of the trail lasts."},
+        {"name": "width", "kind": "number", "owner": "TrailNode", "default": 12, "min": 0.5, "max": 200, "doc": "Width at the head (it tapers to the tail; px)."},
+        {"name": "color", "kind": "color", "owner": "TrailNode", "default": "#ffffffdc", "doc": "Colour at the head."},
+        {"name": "endColor", "kind": "color", "owner": "TrailNode", "default": "#ffffff00", "doc": "Colour at the tail (fades to it)."},
+        {"name": "minDistance", "kind": "number", "owner": "TrailNode", "default": 4, "min": 0.5, "max": 100, "doc": "Distance the parent must move before a new point is recorded (px)."},
+        {"name": "emitting", "kind": "boolean", "owner": "TrailNode", "default": true, "doc": "Record new points (off: the trail fades away)."}
+      ]
+    },
+    {
+      "type": "PostEffectNode",
+      "name": "Post Effect",
+      "category": "Graphics & Rendering",
+      "description": "Applies its Material shader to the whole screen: built-in vignette, CRT, pixelate, chromatic aberration, or your own. Several chain in order.",
+      "aliases": ["posteffect", "post_effect"],
+      "hasOrigin": false,
+      "properties": []
+    },
+    {
+      "type": "UIContainerNode",
+      "name": "UI Container",
+      "category": "UI & Interface",
+      "description": "Flexbox-style responsive layout container with horizontal/vertical flow, padding, and alignment.",
+      "aliases": ["uicontainer", "uipanel", "uipanelnode"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [320, 240], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "title", "kind": "string", "owner": "UIContainerNode", "default": "Panel", "doc": "Header text."},
+        {"name": "direction", "kind": "enum", "owner": "UIContainerNode", "default": "Vertical", "values": ["Vertical", "Horizontal", "Grid"], "doc": "Children are laid out in a column, a row or a grid."},
+        {"name": "alignment", "kind": "enum", "owner": "UIContainerNode", "default": "Stretch", "values": ["Start", "Center", "End", "Stretch"], "doc": "Where children sit across the layout direction."},
+        {"name": "spacing", "kind": "number", "owner": "UIContainerNode", "default": 8, "min": 0, "max": 64, "doc": "Gap between items (px)."},
+        {"name": "paddingTop", "kind": "number", "owner": "UIContainerNode", "default": 14, "min": 0, "max": 100, "doc": "Space above the children (px)."},
+        {"name": "paddingBottom", "kind": "number", "owner": "UIContainerNode", "default": 14, "min": 0, "max": 100, "doc": "Space below the children (px)."},
+        {"name": "paddingLeft", "kind": "number", "owner": "UIContainerNode", "default": 14, "min": 0, "max": 100, "doc": "Space left of the children (px)."},
+        {"name": "paddingRight", "kind": "number", "owner": "UIContainerNode", "default": 14, "min": 0, "max": 100, "doc": "Space right of the children (px)."},
+        {"name": "columns", "kind": "integer", "owner": "UIContainerNode", "default": 0, "min": 1, "max": 12, "doc": "Grid layout: columns per row."},
+        {"name": "autoSizeHeight", "kind": "boolean", "owner": "UIContainerNode", "default": false, "doc": "Grow to fit the children."},
+        {"name": "drawBackground", "kind": "boolean", "owner": "UIContainerNode", "default": true, "doc": "Fill the background."},
+        {"name": "drawBorder", "kind": "boolean", "owner": "UIContainerNode", "default": true, "doc": "Draw a border."},
+        {"name": "showHeader", "kind": "boolean", "owner": "UIContainerNode", "default": true, "doc": "Draw a header with the title."},
+        {"name": "headerHeight", "kind": "number", "owner": "UIContainerNode", "default": 36, "min": 20, "max": 64, "doc": "Height of the header (px)."},
+        {"name": "backgroundColor", "kind": "color", "owner": "UIContainerNode", "default": "#16181ef0", "doc": "Fill colour of the background."},
+        {"name": "headerColor", "kind": "color", "owner": "UIContainerNode", "default": "#1c202aff", "doc": "Header fill colour."},
+        {"name": "borderColor", "kind": "color", "owner": "UIContainerNode", "default": "#373e4eff", "doc": "Colour of the border."},
+        {"name": "titleColor", "kind": "color", "owner": "UIContainerNode", "default": "#eef0f6ff", "doc": "Title text colour."}
+      ]
+    },
+    {
+      "type": "UILabelNode",
+      "name": "UI Label",
+      "category": "UI & Interface",
+      "description": "Clean text renderer with font sizing, color styling, and multi-line wrapping.",
+      "aliases": ["uilabel"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [240, 26], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "text", "kind": "string", "owner": "UILabelNode", "default": "Label", "doc": "Label text."},
+        {"name": "fontSize", "kind": "number", "owner": "UILabelNode", "default": 18, "min": 8, "max": 72, "doc": "Text size (px)."},
+        {"name": "textColor", "kind": "color", "owner": "UILabelNode", "default": "#eef0f6ff", "doc": "Colour of the text."},
+        {"name": "align", "kind": "enum", "owner": "UILabelNode", "default": "Left", "values": ["Left", "Center", "Right"], "doc": "Horizontal text alignment."},
+        {"name": "drawBackground", "kind": "boolean", "owner": "UILabelNode", "default": false, "doc": "Fill the background."},
+        {"name": "backgroundColor", "kind": "color", "owner": "UILabelNode", "default": "#1e2026c8", "doc": "Fill colour of the background."}
+      ]
+    },
+    {
+      "type": "UIButtonNode",
+      "name": "UI Button",
+      "category": "UI & Interface",
+      "description": "Interactive clickable button with hovered, normal, and pressed visual feedback and event callbacks.",
+      "aliases": ["uibutton"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [200, 36], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "text", "kind": "string", "owner": "UIButtonNode", "default": "Button", "doc": "Button caption."},
+        {"name": "fontSize", "kind": "number", "owner": "UIButtonNode", "default": 18, "min": 8, "max": 48, "doc": "Text size (px)."},
+        {"name": "icon", "kind": "enum", "owner": "UIButtonNode", "default": "None", "values": ["None", "Digit0", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "A", "AddressBook", "AddressCard", "AlignCenter", "AlignJustify", "AlignLeft", "AlignRight", "Anchor", "AnchorCircleCheck", "AnchorCircleExclamation", "AnchorCircleXmark", "AnchorLock", "AngleDown", "AngleLeft", "AngleRight", "AngleUp", "AnglesDown", "AnglesLeft", "AnglesRight", "AnglesUp", "Ankh", "AppleWhole", "Archway", "ArrowDown", "ArrowDown19", "ArrowDown91", "ArrowDownAZ", "ArrowDownLong", "ArrowDownShortWide", "ArrowDownUpAcrossLine", "ArrowDownUpLock", "ArrowDownWideShort", "ArrowDownZA", "ArrowLeft", "ArrowLeftLong", "ArrowPointer", "ArrowRight", "ArrowRightArrowLeft", "ArrowRightFromBracket", "ArrowRightLong", "ArrowRightToBracket", "ArrowRightToCity", "ArrowRotateLeft", "ArrowRotateRight", "ArrowTrendDown", "ArrowTrendUp", "ArrowTurnDown", "ArrowTurnUp", "ArrowUp", "ArrowUp19", "ArrowUp91", "ArrowUpAZ", "ArrowUpFromBracket", "ArrowUpFromGroundWater", "ArrowUpFromWaterPump", "ArrowUpLong", "ArrowUpRightDots", "ArrowUpRightFromSquare", "ArrowUpShortWide", "ArrowUpWideShort", "ArrowUpZA", "ArrowsDownToLine", "ArrowsDownToPeople", "ArrowsLeftRight", "ArrowsLeftRightToLine", "ArrowsRotate", "ArrowsSpin", "ArrowsSplitUpAndLeft", "ArrowsToCircle", "ArrowsToDot", "ArrowsToEye", "ArrowsTurnRight", "ArrowsTurnToDots", "ArrowsUpDown", "ArrowsUpDownLeftRight", "ArrowsUpToLine", "Asterisk", "At", "Atom", "AudioDescription", "AustralSign", "Award", "B", "Baby", "BabyCarriage", "Backward", "BackwardFast", "BackwardStep", "Bacon", "Bacteria", "Bacterium", "BagShopping", "Bahai", "BahtSign", "Ban", "BanSmoking", "Bandage", "BangladeshiTakaSign", "Barcode", "Bars", "BarsProgress", "BarsStaggered", "Baseball", "BaseballBatBall", "BasketShopping", "Basketball", "Bath", "BatteryEmpty", "BatteryFull", "BatteryHalf", "BatteryQuarter", "BatteryThreeQuarters", "Bed", "BedPulse", "BeerMugEmpty", "Bell", "BellConcierge", "BellSlash", "BezierCurve", "Bicycle", "Binoculars", "Biohazard", "BitcoinSign", "Blender", "BlenderPhone", "Blog", "Bold", "Bolt", "BoltLightning", "Bomb", "Bone", "Bong", "Book", "BookAtlas", "BookBible", "BookBookmark", "BookJournalWhills", "BookMedical", "BookOpen", "BookOpenReader", "BookQuran", "BookSkull", "BookTanakh", "Bookmark", "BorderAll", "BorderNone", "BorderTopLeft", "BoreHole", "BottleDroplet", "BottleWater", "BowlFood", "BowlRice", "BowlingBall", "Box", "BoxArchive", "BoxOpen", "BoxTissue", "BoxesPacking", "BoxesStacked", "Braille", "Brain", "BrazilianRealSign", "BreadSlice", "Bridge", "BridgeCircleCheck", "BridgeCircleExclamation", "BridgeCircleXmark", "BridgeLock", "BridgeWater", "Briefcase", "BriefcaseMedical", "Broom", "BroomBall", "Brush", "Bucket", "Bug", "BugSlash", "Bugs", "Building", "BuildingCircleArrowRight", "BuildingCircleCheck", "BuildingCircleExclamation", "BuildingCircleXmark", "BuildingColumns", "BuildingFlag", "BuildingLock", "BuildingNgo", "BuildingShield", "BuildingUn", "BuildingUser", "BuildingWheat", "Bullhorn", "Bullseye", "Burger", "Burst", "Bus", "BusSimple", "BusinessTime", "C", "CableCar", "CakeCandles", "Calculator", "Calendar", "CalendarCheck", "CalendarDay", "CalendarDays", "CalendarMinus", "CalendarPlus", "CalendarWeek", "CalendarXmark", "Camera", "CameraRetro", "CameraRotate", "Campground", "CandyCane", "Cannabis", "Capsules", "Car", "CarBattery", "CarBurst", "CarOn", "CarRear", "CarSide", "CarTunnel", "Caravan", "CaretDown", "CaretLeft", "CaretRight", "CaretUp", "Carrot", "CartArrowDown", "CartFlatbed", "CartFlatbedSuitcase", "CartPlus", "CartShopping", "CashRegister", "Cat", "CediSign", "CentSign", "Certificate", "Chair", "Chalkboard", "ChalkboardUser", "ChampagneGlasses", "ChargingStation", "ChartArea", "ChartBar", "ChartColumn", "ChartDiagram", "ChartGantt", "ChartLine", "ChartPie", "ChartSimple", "Check", "CheckDouble", "CheckToSlot", "Cheese", "Chess", "ChessBishop", "ChessBoard", "ChessKing", "ChessKnight", "ChessPawn", "ChessQueen", "ChessRook", "ChevronDown", "ChevronLeft", "ChevronRight", "ChevronUp", "Child", "ChildCombatant", "ChildDress", "ChildReaching", "Children", "Church", "Circle", "CircleArrowDown", "CircleArrowLeft", "CircleArrowRight", "CircleArrowUp", "CircleCheck", "CircleChevronDown", "CircleChevronLeft", "CircleChevronRight", "CircleChevronUp", "CircleDollarToSlot", "CircleDot", "CircleDown", "CircleExclamation", "CircleH", "CircleHalfStroke", "CircleInfo", "CircleLeft", "CircleMinus", "CircleNodes", "CircleNotch", "CirclePause", "CirclePlay", "CirclePlus", "CircleQuestion", "CircleRadiation", "CircleRight", "CircleStop", "CircleUp", "CircleUser", "CircleXmark", "City", "Clapperboard", "Clipboard", "ClipboardCheck", "ClipboardList", "ClipboardQuestion", "ClipboardUser", "Clock", "ClockRotateLeft", "Clone", "ClosedCaptioning", "Cloud", "CloudArrowDown", "CloudArrowUp", "CloudBolt", "CloudMeatball", "CloudMoon", "CloudMoonRain", "CloudRain", "CloudShowersHeavy", "CloudShowersWater", "CloudSun", "CloudSunRain", "Clover", "Code", "CodeBranch", "CodeCommit", "CodeCompare", "CodeFork", "CodeMerge", "CodePullRequest", "Coins", "ColonSign", "Comment", "CommentDollar", "CommentDots", "CommentMedical", "CommentNodes", "CommentSlash", "CommentSms", "Comments", "CommentsDollar", "CompactDisc", "Compass", "CompassDrafting", "Compress", "Computer", "ComputerMouse", "Cookie", "CookieBite", "Copy", "Copyright", "Couch", "Cow", "CreditCard", "Crop", "CropSimple", "Cross", "Crosshairs", "Crow", "Crown", "Crutch", "CruzeiroSign", "Cube", "Cubes", "CubesStacked", "D", "Database", "DeleteLeft", "Democrat", "Desktop", "Dharmachakra", "DiagramNext", "DiagramPredecessor", "DiagramProject", "DiagramSuccessor", "Diamond", "DiamondTurnRight", "Dice", "DiceD20", "DiceD6", "DiceFive", "DiceFour", "DiceOne", "DiceSix", "DiceThree", "DiceTwo", "Disease", "Display", "Divide", "Dna", "Dog", "DollarSign", "Dolly", "DongSign", "DoorClosed", "DoorOpen", "Dove", "DownLeftAndUpRightToCenter", "DownLong", "Download", "Dragon", "DrawPolygon", "Droplet", "DropletSlash", "Drum", "DrumSteelpan", "DrumstickBite", "Dumbbell", "Dumpster", "DumpsterFire", "Dungeon", "E", "EarDeaf", "EarListen", "EarthAfrica", "EarthAmericas", "EarthAsia", "EarthEurope", "EarthOceania", "Egg", "Eject", "Elevator", "Ellipsis", "EllipsisVertical", "Envelope", "EnvelopeCircleCheck", "EnvelopeOpen", "EnvelopeOpenText", "EnvelopesBulk", "Equals", "Eraser", "Ethernet", "EuroSign", "Exclamation", "Expand", "Explosion", "Eye", "EyeDropper", "EyeLowVision", "EyeSlash", "F", "FaceAngry", "FaceDizzy", "FaceFlushed", "FaceFrown", "FaceFrownOpen", "FaceGrimace", "FaceGrin", "FaceGrinBeam", "FaceGrinBeamSweat", "FaceGrinHearts", "FaceGrinSquint", "FaceGrinSquintTears", "FaceGrinStars", "FaceGrinTears", "FaceGrinTongue", "FaceGrinTongueSquint", "FaceGrinTongueWink", "FaceGrinWide", "FaceGrinWink", "FaceKiss", "FaceKissBeam", "FaceKissWinkHeart", "FaceLaugh", "FaceLaughBeam", "FaceLaughSquint", "FaceLaughWink", "FaceMeh", "FaceMehBlank", "FaceRollingEyes", "FaceSadCry", "FaceSadTear", "FaceSmile", "FaceSmileBeam", "FaceSmileWink", "FaceSurprise", "FaceTired", "Fan", "Faucet", "FaucetDrip", "Fax", "Feather", "FeatherPointed", "Ferry", "File", "FileArrowDown", "FileArrowUp", "FileAudio", "FileCircleCheck", "FileCircleExclamation", "FileCircleMinus", "FileCirclePlus", "FileCircleQuestion", "FileCircleXmark", "FileCode", "FileContract", "FileCsv", "FileExcel", "FileExport", "FileFragment", "FileHalfDashed", "FileImage", "FileImport", "FileInvoice", "FileInvoiceDollar", "FileLines", "FileMedical", "FilePdf", "FilePen", "FilePowerpoint", "FilePrescription", "FileShield", "FileSignature", "FileVideo", "FileWaveform", "FileWord", "FileZipper", "Fill", "FillDrip", "Film", "Filter", "FilterCircleDollar", "FilterCircleXmark", "Fingerprint", "Fire", "FireBurner", "FireExtinguisher", "FireFlameCurved", "FireFlameSimple", "Fish", "FishFins", "Flag", "FlagCheckered", "FlagUsa", "Flask", "FlaskVial", "FloppyDisk", "FlorinSign", "Folder", "FolderClosed", "FolderMinus", "FolderOpen", "FolderPlus", "FolderTree", "Font", "FontAwesome", "Football", "Forward", "ForwardFast", "ForwardStep", "FrancSign", "Frog", "Futbol", "G", "Gamepad", "GasPump", "Gauge", "GaugeHigh", "GaugeSimple", "GaugeSimpleHigh", "Gavel", "Gear", "Gears", "Gem", "Genderless", "Ghost", "Gift", "Gifts", "GlassWater", "GlassWaterDroplet", "Glasses", "Globe", "GolfBallTee", "Gopuram", "GraduationCap", "GreaterThan", "GreaterThanEqual", "Grip", "GripLines", "GripLinesVertical", "GripVertical", "GroupArrowsRotate", "GuaraniSign", "Guitar", "Gun", "H", "Hammer", "Hamsa", "Hand", "HandBackFist", "HandDots", "HandFist", "HandHolding", "HandHoldingDollar", "HandHoldingDroplet", "HandHoldingHand", "HandHoldingHeart", "HandHoldingMedical", "HandLizard", "HandMiddleFinger", "HandPeace", "HandPointDown", "HandPointLeft", "HandPointRight", "HandPointUp", "HandPointer", "HandScissors", "HandSparkles", "HandSpock", "Handcuffs", "Hands", "HandsAslInterpreting", "HandsBound", "HandsBubbles", "HandsClapping", "HandsHolding", "HandsHoldingChild", "HandsHoldingCircle", "HandsPraying", "Handshake", "HandshakeAngle", "HandshakeSimple", "HandshakeSimpleSlash", "HandshakeSlash", "Hanukiah", "HardDrive", "Hashtag", "HatCowboy", "HatCowboySide", "HatWizard", "HeadSideCough", "HeadSideCoughSlash", "HeadSideMask", "HeadSideVirus", "Heading", "Headphones", "HeadphonesSimple", "Headset", "Heart", "HeartCircleBolt", "HeartCircleCheck", "HeartCircleExclamation", "HeartCircleMinus", "HeartCirclePlus", "HeartCircleXmark", "HeartCrack", "HeartPulse", "Helicopter", "HelicopterSymbol", "HelmetSafety", "HelmetUn", "HexagonNodes", "HexagonNodesBolt", "Highlighter", "HillAvalanche", "HillRockslide", "Hippo", "HockeyPuck", "HollyBerry", "Horse", "HorseHead", "Hospital", "HospitalUser", "HotTubPerson", "Hotdog", "Hotel", "Hourglass", "HourglassEnd", "HourglassHalf", "HourglassStart", "House", "HouseChimney", "HouseChimneyCrack", "HouseChimneyMedical", "HouseChimneyUser", "HouseChimneyWindow", "HouseCircleCheck", "HouseCircleExclamation", "HouseCircleXmark", "HouseCrack", "HouseFire", "HouseFlag", "HouseFloodWater", "HouseFloodWaterCircleArrowRight", "HouseLaptop", "HouseLock", "HouseMedical", "HouseMedicalCircleCheck", "HouseMedicalCircleExclamation", "HouseMedicalCircleXmark", "HouseMedicalFlag", "HouseSignal", "HouseTsunami", "HouseUser", "HryvniaSign", "Hurricane", "I", "ICursor", "IceCream", "Icicles", "Icons", "IdBadge", "IdCard", "IdCardClip", "Igloo", "Image", "ImagePortrait", "Images", "Inbox", "Indent", "IndianRupeeSign", "Industry", "Infinity", "Info", "Italic", "J", "Jar", "JarWheat", "Jedi", "JetFighter", "JetFighterUp", "Joint", "JugDetergent", "K", "Kaaba", "Key", "Keyboard", "Khanda", "KipSign", "KitMedical", "KitchenSet", "KiwiBird", "L", "LandMineOn", "Landmark", "LandmarkDome", "LandmarkFlag", "Language", "Laptop", "LaptopCode", "LaptopFile", "LaptopMedical", "LariSign", "LayerGroup", "Leaf", "LeftLong", "LeftRight", "Lemon", "LessThan", "LessThanEqual", "LifeRing", "Lightbulb", "LinesLeaning", "Link", "LinkSlash", "LiraSign", "List", "ListCheck", "ListOl", "ListUl", "LitecoinSign", "LocationArrow", "LocationCrosshairs", "LocationDot", "LocationPin", "LocationPinLock", "Lock", "LockOpen", "Locust", "Lungs", "LungsVirus", "M", "Magnet", "MagnifyingGlass", "MagnifyingGlassArrowRight", "MagnifyingGlassChart", "MagnifyingGlassDollar", "MagnifyingGlassLocation", "MagnifyingGlassMinus", "MagnifyingGlassPlus", "ManatSign", "Map", "MapLocation", "MapLocationDot", "MapPin", "Marker", "Mars", "MarsAndVenus", "MarsAndVenusBurst", "MarsDouble", "MarsStroke", "MarsStrokeRight", "MarsStrokeUp", "MartiniGlass", "MartiniGlassCitrus", "MartiniGlassEmpty", "Mask", "MaskFace", "MaskVentilator", "MasksTheater", "MattressPillow", "Maximize", "Medal", "Memory", "Menorah", "Mercury", "Message", "Meteor", "Microchip", "Microphone", "MicrophoneLines", "MicrophoneLinesSlash", "MicrophoneSlash", "Microscope", "MillSign", "Minimize", "Minus", "Mitten", "Mobile", "MobileButton", "MobileRetro", "MobileScreen", "MobileScreenButton", "MoneyBill", "MoneyBill1", "MoneyBill1Wave", "MoneyBillTransfer", "MoneyBillTrendUp", "MoneyBillWave", "MoneyBillWheat", "MoneyBills", "MoneyCheck", "MoneyCheckDollar", "Monument", "Moon", "MortarPestle", "Mosque", "Mosquito", "MosquitoNet", "Motorcycle", "Mound", "Mountain", "MountainCity", "MountainSun", "MugHot", "MugSaucer", "Music", "N", "NairaSign", "NetworkWired", "Neuter", "Newspaper", "NotEqual", "Notdef", "NoteSticky", "NotesMedical", "O", "ObjectGroup", "ObjectUngroup", "OilCan", "OilWell", "Om", "Otter", "Outdent", "P", "Pager", "PaintRoller", "Paintbrush", "Palette", "Pallet", "Panorama", "PaperPlane", "Paperclip", "ParachuteBox", "Paragraph", "Passport", "Paste", "Pause", "Paw", "Peace", "Pen", "PenClip", "PenFancy", "PenNib", "PenRuler", "PenToSquare", "Pencil", "PeopleArrows", "PeopleCarryBox", "PeopleGroup", "PeopleLine", "PeoplePulling", "PeopleRobbery", "PeopleRoof", "PepperHot", "Percent", "Person", "PersonArrowDownToLine", "PersonArrowUpFromLine", "PersonBiking", "PersonBooth", "PersonBreastfeeding", "PersonBurst", "PersonCane", "PersonChalkboard", "PersonCircleCheck", "PersonCircleExclamation", "PersonCircleMinus", "PersonCirclePlus", "PersonCircleQuestion", "PersonCircleXmark", "PersonDigging", "PersonDotsFromLine", "PersonDress", "PersonDressBurst", "PersonDrowning", "PersonFalling", "PersonFallingBurst", "PersonHalfDress", "PersonHarassing", "PersonHiking", "PersonMilitaryPointing", "PersonMilitaryRifle", "PersonMilitaryToPerson", "PersonPraying", "PersonPregnant", "PersonRays", "PersonRifle", "PersonRunning", "PersonShelter", "PersonSkating", "PersonSkiing", "PersonSkiingNordic", "PersonSnowboarding", "PersonSwimming", "PersonThroughWindow", "PersonWalking", "PersonWalkingArrowLoopLeft", "PersonWalkingArrowRight", "PersonWalkingDashedLineArrowRight", "PersonWalkingLuggage", "PersonWalkingWithCane", "PesetaSign", "PesoSign", "Phone", "PhoneFlip", "PhoneSlash", "PhoneVolume", "PhotoFilm", "PiggyBank", "Pills", "PizzaSlice", "PlaceOfWorship", "Plane", "PlaneArrival", "PlaneCircleCheck", "PlaneCircleExclamation", "PlaneCircleXmark", "PlaneDeparture", "PlaneLock", "PlaneSlash", "PlaneUp", "PlantWilt", "PlateWheat", "Play", "Plug", "PlugCircleBolt", "PlugCircleCheck", "PlugCircleExclamation", "PlugCircleMinus", "PlugCirclePlus", "PlugCircleXmark", "Plus", "PlusMinus", "Podcast", "Poo", "PooStorm", "Poop", "PowerOff", "Prescription", "PrescriptionBottle", "PrescriptionBottleMedical", "Print", "PumpMedical", "PumpSoap", "PuzzlePiece", "Q", "Qrcode", "Question", "QuoteLeft", "QuoteRight", "R", "Radiation", "Radio", "Rainbow", "RankingStar", "Receipt", "RecordVinyl", "RectangleAd", "RectangleList", "RectangleXmark", "Recycle", "Registered", "Repeat", "Reply", "ReplyAll", "Republican", "Restroom", "Retweet", "Ribbon", "RightFromBracket", "RightLeft", "RightLong", "RightToBracket", "Ring", "Road", "RoadBarrier", "RoadBridge", "RoadCircleCheck", "RoadCircleExclamation", "RoadCircleXmark", "RoadLock", "RoadSpikes", "Robot", "Rocket", "Rotate", "RotateLeft", "RotateRight", "Route", "Rss", "RubleSign", "Rug", "Ruler", "RulerCombined", "RulerHorizontal", "RulerVertical", "RupeeSign", "RupiahSign", "S", "SackDollar", "SackXmark", "Sailboat", "Satellite", "SatelliteDish", "ScaleBalanced", "ScaleUnbalanced", "ScaleUnbalancedFlip", "School", "SchoolCircleCheck", "SchoolCircleExclamation", "SchoolCircleXmark", "SchoolFlag", "SchoolLock", "Scissors", "Screwdriver", "ScrewdriverWrench", "Scroll", "ScrollTorah", "SdCard", "Section", "Seedling", "Server", "Shapes", "Share", "ShareFromSquare", "ShareNodes", "SheetPlastic", "ShekelSign", "Shield", "ShieldCat", "ShieldDog", "ShieldHalved", "ShieldHeart", "ShieldVirus", "Ship", "Shirt", "ShoePrints", "Shop", "ShopLock", "ShopSlash", "Shower", "Shrimp", "Shuffle", "ShuttleSpace", "SignHanging", "Signal", "Signature", "SignsPost", "SimCard", "Sink", "Sitemap", "Skull", "SkullCrossbones", "Slash", "Sleigh", "Sliders", "Smog", "Smoking", "Snowflake", "Snowman", "Snowplow", "Soap", "Socks", "SolarPanel", "Sort", "SortDown", "SortUp", "Spa", "SpaghettiMonsterFlying", "SpellCheck", "Spider", "Spinner", "Splotch", "Spoon", "SprayCan", "SprayCanSparkles", "Square", "SquareArrowUpRight", "SquareBinary", "SquareCaretDown", "SquareCaretLeft", "SquareCaretRight", "SquareCaretUp", "SquareCheck", "SquareEnvelope", "SquareFull", "SquareH", "SquareMinus", "SquareNfi", "SquareParking", "SquarePen", "SquarePersonConfined", "SquarePhone", "SquarePhoneFlip", "SquarePlus", "SquarePollHorizontal", "SquarePollVertical", "SquareRootVariable", "SquareRss", "SquareShareNodes", "SquareUpRight", "SquareVirus", "SquareXmark", "StaffSnake", "Stairs", "Stamp", "Stapler", "Star", "StarAndCrescent", "StarHalf", "StarHalfStroke", "StarOfDavid", "StarOfLife", "SterlingSign", "Stethoscope", "Stop", "Stopwatch", "Stopwatch20", "Store", "StoreSlash", "StreetView", "Strikethrough", "Stroopwafel", "Subscript", "Suitcase", "SuitcaseMedical", "SuitcaseRolling", "Sun", "SunPlantWilt", "Superscript", "Swatchbook", "Synagogue", "Syringe", "T", "Table", "TableCells", "TableCellsColumnLock", "TableCellsLarge", "TableCellsRowLock", "TableCellsRowUnlock", "TableColumns", "TableList", "TableTennisPaddleBall", "Tablet", "TabletButton", "TabletScreenButton", "Tablets", "TachographDigital", "Tag", "Tags", "Tape", "Tarp", "TarpDroplet", "Taxi", "Teeth", "TeethOpen", "TemperatureArrowDown", "TemperatureArrowUp", "TemperatureEmpty", "TemperatureFull", "TemperatureHalf", "TemperatureHigh", "TemperatureLow", "TemperatureQuarter", "TemperatureThreeQuarters", "TengeSign", "Tent", "TentArrowDownToLine", "TentArrowLeftRight", "TentArrowTurnLeft", "TentArrowsDown", "Tents", "Terminal", "TextHeight", "TextSlash", "TextWidth", "Thermometer", "ThumbsDown", "ThumbsUp", "Thumbtack", "ThumbtackSlash", "Ticket", "TicketSimple", "Timeline", "ToggleOff", "ToggleOn", "Toilet", "ToiletPaper", "ToiletPaperSlash", "ToiletPortable", "ToiletsPortable", "Toolbox", "Tooth", "ToriiGate", "Tornado", "TowerBroadcast", "TowerCell", "TowerObservation", "Tractor", "Trademark", "TrafficLight", "Trailer", "Train", "TrainSubway", "TrainTram", "Transgender", "Trash", "TrashArrowUp", "TrashCan", "TrashCanArrowUp", "Tree", "TreeCity", "TriangleExclamation", "Trophy", "Trowel", "TrowelBricks", "Truck", "TruckArrowRight", "TruckDroplet", "TruckFast", "TruckField", "TruckFieldUn", "TruckFront", "TruckMedical", "TruckMonster", "TruckMoving", "TruckPickup", "TruckPlane", "TruckRampBox", "Tty", "TurkishLiraSign", "TurnDown", "TurnUp", "Tv", "U", "Umbrella", "UmbrellaBeach", "Underline", "UniversalAccess", "Unlock", "UnlockKeyhole", "UpDown", "UpDownLeftRight", "UpLong", "UpRightAndDownLeftFromCenter", "UpRightFromSquare", "Upload", "User", "UserAstronaut", "UserCheck", "UserClock", "UserDoctor", "UserGear", "UserGraduate", "UserGroup", "UserInjured", "UserLarge", "UserLargeSlash", "UserLock", "UserMinus", "UserNinja", "UserNurse", "UserPen", "UserPlus", "UserSecret", "UserShield", "UserSlash", "UserTag", "UserTie", "UserXmark", "Users", "UsersBetweenLines", "UsersGear", "UsersLine", "UsersRays", "UsersRectangle", "UsersSlash", "UsersViewfinder", "Utensils", "V", "VanShuttle", "Vault", "VectorSquare", "Venus", "VenusDouble", "VenusMars", "Vest", "VestPatches", "Vial", "VialCircleCheck", "VialVirus", "Vials", "Video", "VideoSlash", "Vihara", "Virus", "VirusCovid", "VirusCovidSlash", "VirusSlash", "Viruses", "Voicemail", "Volcano", "Volleyball", "VolumeHigh", "VolumeLow", "VolumeOff", "VolumeXmark", "VrCardboard", "W", "WalkieTalkie", "Wallet", "WandMagic", "WandMagicSparkles", "WandSparkles", "Warehouse", "Water", "WaterLadder", "WaveSquare", "WebAwesome", "WeightHanging", "WeightScale", "WheatAwn", "WheatAwnCircleExclamation", "Wheelchair", "WheelchairMove", "WhiskeyGlass", "Wifi", "Wind", "WindowMaximize", "WindowMinimize", "WindowRestore", "WineBottle", "WineGlass", "WineGlassEmpty", "WonSign", "Worm", "Wrench", "X", "XRay", "Xmark", "XmarksLines", "Y", "YenSign", "YinYang", "Z", "Search", "Save", "Settings", "Cog", "Home", "Edit", "Close", "Cancel", "Refresh", "Warning", "CheckCircle", "TimesCircle", "VolumeMute", "Cut", "Undo", "Redo", "StepForward", "StepBackward", "Pin", "ZoomIn", "ZoomOut"], "doc": "Icon shown (Font Awesome)."},
+        {"name": "iconSize", "kind": "number", "owner": "UIButtonNode", "default": 0, "min": 0, "max": 64, "doc": "Icon size (px)."},
+        {"name": "normalColor", "kind": "color", "owner": "UIButtonNode", "default": "#232731ff", "doc": "Fill colour at rest."},
+        {"name": "hoverColor", "kind": "color", "owner": "UIButtonNode", "default": "#323848ff", "doc": "Fill colour under the mouse."},
+        {"name": "pressedColor", "kind": "color", "owner": "UIButtonNode", "default": "#2563ebff", "doc": "Fill colour while pressed."},
+        {"name": "borderColor", "kind": "color", "owner": "UIButtonNode", "default": "#4b5366ff", "doc": "Colour of the border."},
+        {"name": "textColor", "kind": "color", "owner": "UIButtonNode", "default": "#eef0f6ff", "doc": "Colour of the text."},
+        {"name": "align", "kind": "enum", "owner": "UIButtonNode", "default": "Center", "values": ["Left", "Center", "Right"], "doc": "Horizontal text alignment."}
+      ]
+    },
+    {
+      "type": "UISliderNode",
+      "name": "UI Slider",
+      "category": "UI & Interface",
+      "description": "Draggable continuous value slider for settings, volume, and numeric input.",
+      "aliases": ["uislider"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 28], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UISliderNode", "default": "Value", "doc": "Caption shown next to the control."},
+        {"name": "value", "kind": "number", "owner": "UISliderNode", "default": 0.5, "min": -1000, "max": 1000, "doc": "Current value (between min and max)."},
+        {"name": "minValue", "kind": "number", "owner": "UISliderNode", "default": 0, "min": -10000, "max": 10000, "doc": "Lowest value."},
+        {"name": "maxValue", "kind": "number", "owner": "UISliderNode", "default": 1, "min": -10000, "max": 10000, "doc": "Highest value."},
+        {"name": "defaultValue", "kind": "number", "owner": "UISliderNode", "default": 0.5, "min": -10000, "max": 10000, "doc": "Value restored by reset (double-click)."},
+        {"name": "fineScale", "kind": "number", "owner": "UISliderNode", "default": 0.1, "min": 0.01, "max": 0.5, "doc": "Drag speed with Shift held (fine adjustment)."},
+        {"name": "isInteger", "kind": "boolean", "owner": "UISliderNode", "default": false, "doc": "Snap to whole numbers."},
+        {"name": "showResetButton", "kind": "boolean", "owner": "UISliderNode", "default": true, "doc": "Show a button that restores the default value."},
+        {"name": "labelWidth", "kind": "number", "owner": "UISliderNode", "default": 110, "min": 0, "max": 300, "doc": "Width reserved for the label (px); 0 = none."}
+      ]
+    },
+    {
+      "type": "UICheckboxNode",
+      "name": "UI Checkbox",
+      "category": "UI & Interface",
+      "description": "Toggle checkbox widget for boolean options and feature flags.",
+      "aliases": ["uicheckbox"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [260, 26], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UICheckboxNode", "default": "Checkbox", "doc": "Caption shown next to the control."},
+        {"name": "checked", "kind": "boolean", "owner": "UICheckboxNode", "default": false, "doc": "Ticked now."},
+        {"name": "defaultChecked", "kind": "boolean", "owner": "UICheckboxNode", "default": false, "doc": "State restored by reset."},
+        {"name": "accentColor", "kind": "color", "owner": "UICheckboxNode", "default": "#3b82f6ff", "doc": "Tick and fill colour."},
+        {"name": "boxSize", "kind": "number", "owner": "UICheckboxNode", "default": 14, "min": 12, "max": 40, "doc": "Box size (px)."}
+      ]
+    },
+    {
+      "type": "UIProgressBarNode",
+      "name": "UI Progress Bar",
+      "category": "UI & Interface",
+      "description": "Horizontal progress percentage visualizer for health bars, loading indicators, and gauges.",
+      "aliases": ["uiprogressbar"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 22], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UIProgressBarNode", "default": "Progress", "doc": "Caption shown next to the control."},
+        {"name": "value", "kind": "number", "owner": "UIProgressBarNode", "default": 0.5, "min": 0, "max": 100, "doc": "Progress (between min and max)."},
+        {"name": "minValue", "kind": "number", "owner": "UIProgressBarNode", "default": 0, "min": 0, "max": 100, "doc": "Lowest value."},
+        {"name": "maxValue", "kind": "number", "owner": "UIProgressBarNode", "default": 1, "min": 1, "max": 1000, "doc": "Highest value."},
+        {"name": "fillColor", "kind": "color", "owner": "UIProgressBarNode", "default": "#10b981ff", "doc": "Colour of the filled part."},
+        {"name": "direction", "kind": "enum", "owner": "UIProgressBarNode", "default": "Horizontal", "values": ["Horizontal", "Vertical"], "doc": "Direction the bar fills."},
+        {"name": "showText", "kind": "boolean", "owner": "UIProgressBarNode", "default": true, "doc": "Show the percentage."}
+      ]
+    },
+    {
+      "type": "UITextInputNode",
+      "name": "UI Text Input",
+      "category": "UI & Interface",
+      "description": "Single-line text field with placeholder; raises submitted and value_changed.",
+      "aliases": ["uitextinput"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 28], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UITextInputNode", "default": "Input", "doc": "Caption shown next to the control."},
+        {"name": "labelWidth", "kind": "number", "owner": "UITextInputNode", "default": 130, "min": 0, "max": 300, "doc": "Width reserved for the label (px); 0 = none."},
+        {"name": "maxLength", "kind": "integer", "owner": "UITextInputNode", "default": 64, "min": 1, "max": 255, "doc": "Most characters accepted."}
+      ]
+    },
+    {
+      "type": "UIDropdownNode",
+      "name": "UI Dropdown",
+      "category": "UI & Interface",
+      "description": "Drop-down selector over a list of options.",
+      "aliases": ["uidropdown"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 28], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UIDropdownNode", "default": "Select", "doc": "Caption shown next to the control."},
+        {"name": "selectedIndex", "kind": "integer", "owner": "UIDropdownNode", "default": 0, "min": 0, "max": 32, "doc": "Index of the selected item (-1 = none)."},
+        {"name": "defaultIndex", "kind": "integer", "owner": "UIDropdownNode", "default": 0, "min": 0, "max": 32, "doc": "Index restored by reset."},
+        {"name": "labelWidth", "kind": "number", "owner": "UIDropdownNode", "default": 130, "min": 0, "max": 300, "doc": "Width reserved for the label (px); 0 = none."},
+        {"name": "isOpen", "kind": "boolean", "owner": "UIDropdownNode", "default": false, "doc": "List open now."}
+      ]
+    },
+    {
+      "type": "UIRadioGroupNode",
+      "name": "UI Radio Group",
+      "category": "UI & Interface",
+      "description": "Mutually exclusive options.",
+      "aliases": ["uiradiogroup"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 82], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UIRadioGroupNode", "default": "Option", "doc": "Caption shown next to the control."},
+        {"name": "labelWidth", "kind": "number", "owner": "UIRadioGroupNode", "default": 110, "min": 0, "max": 300, "doc": "Width reserved for the label (px); 0 = none."},
+        {"name": "selectedIndex", "kind": "integer", "owner": "UIRadioGroupNode", "default": 0, "min": 0, "max": 16, "doc": "Index of the selected item (-1 = none)."},
+        {"name": "defaultIndex", "kind": "integer", "owner": "UIRadioGroupNode", "default": 0, "min": 0, "max": 16, "doc": "Index restored by reset."},
+        {"name": "horizontal", "kind": "boolean", "owner": "UIRadioGroupNode", "default": false, "doc": "Options in a row (else a column)."}
+      ]
+    },
+    {
+      "type": "UIToggleSwitchNode",
+      "name": "UI Toggle Switch",
+      "category": "UI & Interface",
+      "description": "On/off switch.",
+      "aliases": ["uitoggleswitch"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [140, 24], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UIToggleSwitchNode", "default": "Toggle", "doc": "Caption shown next to the control."},
+        {"name": "active", "kind": "boolean", "owner": "UIToggleSwitchNode", "default": false, "doc": "Switched on."}
+      ]
+    },
+    {
+      "type": "UIKnobNode",
+      "name": "UI Knob",
+      "category": "UI & Interface",
+      "description": "Rotary value control.",
+      "aliases": ["uiknob"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [64, 80], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UIKnobNode", "default": "Volume", "doc": "Caption shown next to the control."},
+        {"name": "value", "kind": "number", "owner": "UIKnobNode", "default": 50, "min": 0, "max": 100, "doc": "Current value (between min and max)."},
+        {"name": "minValue", "kind": "number", "owner": "UIKnobNode", "default": 0, "min": 0, "max": 100, "doc": "Lowest value."},
+        {"name": "maxValue", "kind": "number", "owner": "UIKnobNode", "default": 100, "min": 1, "max": 1000, "doc": "Highest value."},
+        {"name": "defaultValue", "kind": "number", "owner": "UIKnobNode", "default": 50, "doc": "Value restored by reset (double-click)."}
+      ]
+    },
+    {
+      "type": "UINotchedSliderNode",
+      "name": "UI Notched Slider",
+      "category": "UI & Interface",
+      "description": "Slider that snaps to detents.",
+      "aliases": ["uinotchedslider"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 48], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UINotchedSliderNode", "default": "Detents", "doc": "Caption shown next to the control."},
+        {"name": "value", "kind": "number", "owner": "UINotchedSliderNode", "default": 0, "doc": "Current value."},
+        {"name": "minValue", "kind": "number", "owner": "UINotchedSliderNode", "default": 0, "doc": "Lowest value."},
+        {"name": "maxValue", "kind": "number", "owner": "UINotchedSliderNode", "default": 4, "doc": "Highest value."},
+        {"name": "numNotches", "kind": "integer", "owner": "UINotchedSliderNode", "default": 5, "min": 2, "max": 32, "doc": "Number of notch marks."},
+        {"name": "snapToNotches", "kind": "boolean", "owner": "UINotchedSliderNode", "default": true, "doc": "Snap the value to the notches."},
+        {"name": "orientation", "kind": "enum", "owner": "UINotchedSliderNode", "default": "Horizontal", "values": ["Horizontal", "Vertical"], "doc": "Horizontal or vertical."}
+      ]
+    },
+    {
+      "type": "UIVolumeFaderNode",
+      "name": "UI Volume Fader",
+      "category": "UI & Interface",
+      "description": "Audio fader in decibels.",
+      "aliases": ["uivolumefader"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [96, 320], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UIVolumeFaderNode", "default": "Master", "doc": "Caption shown next to the control."},
+        {"name": "valueDb", "kind": "number", "owner": "UIVolumeFaderNode", "default": 0, "min": -60, "max": 6, "doc": "Level (dB)."},
+        {"name": "minDb", "kind": "number", "owner": "UIVolumeFaderNode", "default": -60, "min": -100, "max": 0, "doc": "Bottom of the fader (dB)."},
+        {"name": "maxDb", "kind": "number", "owner": "UIVolumeFaderNode", "default": 6, "min": 0, "max": 24, "doc": "Top of the fader (dB)."},
+        {"name": "defaultDb", "kind": "number", "owner": "UIVolumeFaderNode", "default": 0, "min": -60, "max": 6, "doc": "Level restored by reset (dB)."}
+      ]
+    },
+    {
+      "type": "UIVolumeMeterNode",
+      "name": "UI Volume Meter",
+      "category": "UI & Interface",
+      "description": "Stereo level meter.",
+      "aliases": ["uivolumemeter"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [120, 320], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UIVolumeMeterNode", "default": "VU", "doc": "Caption shown next to the control."},
+        {"name": "levelL", "kind": "number", "owner": "UIVolumeMeterNode", "default": -60, "min": -60, "max": 3, "doc": "Left channel level (dB)."},
+        {"name": "levelR", "kind": "number", "owner": "UIVolumeMeterNode", "default": -120, "min": -120, "max": 3, "doc": "Right channel level (dB)."},
+        {"name": "minDb", "kind": "number", "owner": "UIVolumeMeterNode", "default": -60, "min": -100, "max": 0, "doc": "Bottom of the meter (dB)."},
+        {"name": "maxDb", "kind": "number", "owner": "UIVolumeMeterNode", "default": 3, "min": 0, "max": 12, "doc": "Top of the meter (dB)."},
+        {"name": "orientation", "kind": "enum", "owner": "UIVolumeMeterNode", "default": "Vertical", "values": ["Vertical", "Horizontal"], "doc": "Horizontal or vertical."}
+      ]
+    },
+    {
+      "type": "UISeparatorNode",
+      "name": "UI Separator",
+      "category": "UI & Interface",
+      "description": "Horizontal divider with an optional label.",
+      "aliases": ["uiseparator"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 10], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "label", "kind": "string", "owner": "UISeparatorNode", "default": "", "doc": "Text in the middle of the line (\"\" = a plain line)."},
+        {"name": "lineColor", "kind": "color", "owner": "UISeparatorNode", "default": "#3e4452ff", "doc": "Colour of the line."}
+      ]
+    },
+    {
+      "type": "UIXYPlotNode",
+      "name": "UI XY Plot",
+      "category": "UI & Interface",
+      "description": "Line plot of streaming values.",
+      "aliases": ["uixyplot"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [380, 180], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "xMin", "kind": "number", "owner": "UIXYPlotNode", "default": 0, "doc": "Left end of the X axis."},
+        {"name": "xMax", "kind": "number", "owner": "UIXYPlotNode", "default": 10, "doc": "Right end of the X axis."},
+        {"name": "yMin", "kind": "number", "owner": "UIXYPlotNode", "default": -1.5, "doc": "Bottom of the Y axis."},
+        {"name": "yMax", "kind": "number", "owner": "UIXYPlotNode", "default": 1.5, "doc": "Top of the Y axis."},
+        {"name": "autoScaleX", "kind": "boolean", "owner": "UIXYPlotNode", "default": false, "doc": "Fit the X axis to the data."},
+        {"name": "autoScaleY", "kind": "boolean", "owner": "UIXYPlotNode", "default": false, "doc": "Fit the Y axis to the data."},
+        {"name": "showGrid", "kind": "boolean", "owner": "UIXYPlotNode", "default": true, "doc": "Draw grid lines."},
+        {"name": "showPoints", "kind": "boolean", "owner": "UIXYPlotNode", "default": true, "doc": "Mark each data point."},
+        {"name": "showCrosshair", "kind": "boolean", "owner": "UIXYPlotNode", "default": true, "doc": "Crosshair with the value under the mouse."},
+        {"name": "lineColor", "kind": "color", "owner": "UIXYPlotNode", "default": "#3b82f6ff", "doc": "Colour of the line."},
+        {"name": "secondaryLineColor", "kind": "color", "owner": "UIXYPlotNode", "default": "#f59e0bff", "doc": "Colour of the second series."},
+        {"name": "gridColor", "kind": "color", "owner": "UIXYPlotNode", "default": "#282c37ff", "doc": "Grid line colour."}
+      ]
+    },
+    {
+      "type": "UIListViewNode",
+      "name": "UI List View",
+      "category": "UI & Interface",
+      "description": "Scrollable selectable list; raises selected.",
+      "aliases": ["uilistview"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [200, 160], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "selectedIndex", "kind": "integer", "owner": "UIListViewNode", "default": 0, "min": -1, "max": 100, "doc": "Index of the selected item (-1 = none)."},
+        {"name": "itemHeight", "kind": "number", "owner": "UIListViewNode", "default": 24, "min": 16, "max": 48, "doc": "Height of each row (px)."}
+      ]
+    },
+    {
+      "type": "UITreeViewNode",
+      "name": "UI Tree View",
+      "category": "UI & Interface",
+      "description": "Hierarchical expandable tree.",
+      "aliases": ["uitreeview"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [220, 200], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "selectedId", "kind": "integer", "owner": "UITreeViewNode", "default": -1, "min": -1, "max": 1000, "doc": "Id of the selected item (-1 = none)."},
+        {"name": "itemHeight", "kind": "number", "owner": "UITreeViewNode", "default": 22, "min": 16, "max": 48, "doc": "Height of each row (px)."}
+      ]
+    },
+    {
+      "type": "UIUnorderedListNode",
+      "name": "UI Bullet List",
+      "category": "UI & Interface",
+      "description": "HTML-style unordered list.",
+      "aliases": ["uiunorderedlist"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [320, 220], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "selectedIndex", "kind": "integer", "owner": "UIUnorderedListNode", "default": 0, "doc": "Index of the selected item (-1 = none)."},
+        {"name": "defaultBullet", "kind": "enum", "owner": "UIUnorderedListNode", "default": "Disc", "values": ["Disc", "Circle", "Square", "Dash", "Arrow"], "doc": "Bullet style for items without their own."},
+        {"name": "itemHeight", "kind": "number", "owner": "UIUnorderedListNode", "default": 24, "min": 16, "max": 48, "doc": "Height of each row (px)."}
+      ]
+    },
+    {
+      "type": "UIOrderedListNode",
+      "name": "UI Numbered List",
+      "category": "UI & Interface",
+      "description": "HTML-style ordered list.",
+      "aliases": ["uiorderedlist"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [320, 220], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "selectedIndex", "kind": "integer", "owner": "UIOrderedListNode", "default": 0, "doc": "Index of the selected item (-1 = none)."},
+        {"name": "numbering", "kind": "enum", "owner": "UIOrderedListNode", "default": "Decimal", "values": ["Decimal", "AlphaLower", "AlphaUpper", "RomanLower", "RomanUpper"], "doc": "Numbering style (1, a, i...)."},
+        {"name": "startNumber", "kind": "integer", "owner": "UIOrderedListNode", "default": 1, "min": 1, "max": 100, "doc": "Number of the first item."},
+        {"name": "itemHeight", "kind": "number", "owner": "UIOrderedListNode", "default": 24, "min": 16, "max": 48, "doc": "Height of each row (px)."}
+      ]
+    },
+    {
+      "type": "UITableNode",
+      "name": "UI Table",
+      "category": "UI & Interface",
+      "description": "Sortable data table; raises row_selected and sorted.",
+      "aliases": ["uitable"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [540, 280], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "selectedRow", "kind": "integer", "owner": "UITableNode", "default": 0, "doc": "Index of the selected row."},
+        {"name": "sortColumn", "kind": "integer", "owner": "UITableNode", "default": 0, "doc": "Column the rows are sorted by."},
+        {"name": "sortAscending", "kind": "boolean", "owner": "UITableNode", "default": true, "doc": "Sort ascending (else descending)."},
+        {"name": "headerHeight", "kind": "number", "owner": "UITableNode", "default": 32, "min": 20, "max": 60, "doc": "Height of the header (px)."},
+        {"name": "rowHeight", "kind": "number", "owner": "UITableNode", "default": 28, "min": 18, "max": 48, "doc": "Height of each row (px)."}
+      ]
+    },
+    {
+      "type": "UIIconNode",
+      "name": "UI Icon",
+      "category": "UI & Interface",
+      "description": "Vector icon.",
+      "aliases": ["uiicon"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [28, 28], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "icon", "kind": "enum", "owner": "UIIconNode", "default": "None", "values": ["None", "Digit0", "Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6", "Digit7", "Digit8", "Digit9", "A", "AddressBook", "AddressCard", "AlignCenter", "AlignJustify", "AlignLeft", "AlignRight", "Anchor", "AnchorCircleCheck", "AnchorCircleExclamation", "AnchorCircleXmark", "AnchorLock", "AngleDown", "AngleLeft", "AngleRight", "AngleUp", "AnglesDown", "AnglesLeft", "AnglesRight", "AnglesUp", "Ankh", "AppleWhole", "Archway", "ArrowDown", "ArrowDown19", "ArrowDown91", "ArrowDownAZ", "ArrowDownLong", "ArrowDownShortWide", "ArrowDownUpAcrossLine", "ArrowDownUpLock", "ArrowDownWideShort", "ArrowDownZA", "ArrowLeft", "ArrowLeftLong", "ArrowPointer", "ArrowRight", "ArrowRightArrowLeft", "ArrowRightFromBracket", "ArrowRightLong", "ArrowRightToBracket", "ArrowRightToCity", "ArrowRotateLeft", "ArrowRotateRight", "ArrowTrendDown", "ArrowTrendUp", "ArrowTurnDown", "ArrowTurnUp", "ArrowUp", "ArrowUp19", "ArrowUp91", "ArrowUpAZ", "ArrowUpFromBracket", "ArrowUpFromGroundWater", "ArrowUpFromWaterPump", "ArrowUpLong", "ArrowUpRightDots", "ArrowUpRightFromSquare", "ArrowUpShortWide", "ArrowUpWideShort", "ArrowUpZA", "ArrowsDownToLine", "ArrowsDownToPeople", "ArrowsLeftRight", "ArrowsLeftRightToLine", "ArrowsRotate", "ArrowsSpin", "ArrowsSplitUpAndLeft", "ArrowsToCircle", "ArrowsToDot", "ArrowsToEye", "ArrowsTurnRight", "ArrowsTurnToDots", "ArrowsUpDown", "ArrowsUpDownLeftRight", "ArrowsUpToLine", "Asterisk", "At", "Atom", "AudioDescription", "AustralSign", "Award", "B", "Baby", "BabyCarriage", "Backward", "BackwardFast", "BackwardStep", "Bacon", "Bacteria", "Bacterium", "BagShopping", "Bahai", "BahtSign", "Ban", "BanSmoking", "Bandage", "BangladeshiTakaSign", "Barcode", "Bars", "BarsProgress", "BarsStaggered", "Baseball", "BaseballBatBall", "BasketShopping", "Basketball", "Bath", "BatteryEmpty", "BatteryFull", "BatteryHalf", "BatteryQuarter", "BatteryThreeQuarters", "Bed", "BedPulse", "BeerMugEmpty", "Bell", "BellConcierge", "BellSlash", "BezierCurve", "Bicycle", "Binoculars", "Biohazard", "BitcoinSign", "Blender", "BlenderPhone", "Blog", "Bold", "Bolt", "BoltLightning", "Bomb", "Bone", "Bong", "Book", "BookAtlas", "BookBible", "BookBookmark", "BookJournalWhills", "BookMedical", "BookOpen", "BookOpenReader", "BookQuran", "BookSkull", "BookTanakh", "Bookmark", "BorderAll", "BorderNone", "BorderTopLeft", "BoreHole", "BottleDroplet", "BottleWater", "BowlFood", "BowlRice", "BowlingBall", "Box", "BoxArchive", "BoxOpen", "BoxTissue", "BoxesPacking", "BoxesStacked", "Braille", "Brain", "BrazilianRealSign", "BreadSlice", "Bridge", "BridgeCircleCheck", "BridgeCircleExclamation", "BridgeCircleXmark", "BridgeLock", "BridgeWater", "Briefcase", "BriefcaseMedical", "Broom", "BroomBall", "Brush", "Bucket", "Bug", "BugSlash", "Bugs", "Building", "BuildingCircleArrowRight", "BuildingCircleCheck", "BuildingCircleExclamation", "BuildingCircleXmark", "BuildingColumns", "BuildingFlag", "BuildingLock", "BuildingNgo", "BuildingShield", "BuildingUn", "BuildingUser", "BuildingWheat", "Bullhorn", "Bullseye", "Burger", "Burst", "Bus", "BusSimple", "BusinessTime", "C", "CableCar", "CakeCandles", "Calculator", "Calendar", "CalendarCheck", "CalendarDay", "CalendarDays", "CalendarMinus", "CalendarPlus", "CalendarWeek", "CalendarXmark", "Camera", "CameraRetro", "CameraRotate", "Campground", "CandyCane", "Cannabis", "Capsules", "Car", "CarBattery", "CarBurst", "CarOn", "CarRear", "CarSide", "CarTunnel", "Caravan", "CaretDown", "CaretLeft", "CaretRight", "CaretUp", "Carrot", "CartArrowDown", "CartFlatbed", "CartFlatbedSuitcase", "CartPlus", "CartShopping", "CashRegister", "Cat", "CediSign", "CentSign", "Certificate", "Chair", "Chalkboard", "ChalkboardUser", "ChampagneGlasses", "ChargingStation", "ChartArea", "ChartBar", "ChartColumn", "ChartDiagram", "ChartGantt", "ChartLine", "ChartPie", "ChartSimple", "Check", "CheckDouble", "CheckToSlot", "Cheese", "Chess", "ChessBishop", "ChessBoard", "ChessKing", "ChessKnight", "ChessPawn", "ChessQueen", "ChessRook", "ChevronDown", "ChevronLeft", "ChevronRight", "ChevronUp", "Child", "ChildCombatant", "ChildDress", "ChildReaching", "Children", "Church", "Circle", "CircleArrowDown", "CircleArrowLeft", "CircleArrowRight", "CircleArrowUp", "CircleCheck", "CircleChevronDown", "CircleChevronLeft", "CircleChevronRight", "CircleChevronUp", "CircleDollarToSlot", "CircleDot", "CircleDown", "CircleExclamation", "CircleH", "CircleHalfStroke", "CircleInfo", "CircleLeft", "CircleMinus", "CircleNodes", "CircleNotch", "CirclePause", "CirclePlay", "CirclePlus", "CircleQuestion", "CircleRadiation", "CircleRight", "CircleStop", "CircleUp", "CircleUser", "CircleXmark", "City", "Clapperboard", "Clipboard", "ClipboardCheck", "ClipboardList", "ClipboardQuestion", "ClipboardUser", "Clock", "ClockRotateLeft", "Clone", "ClosedCaptioning", "Cloud", "CloudArrowDown", "CloudArrowUp", "CloudBolt", "CloudMeatball", "CloudMoon", "CloudMoonRain", "CloudRain", "CloudShowersHeavy", "CloudShowersWater", "CloudSun", "CloudSunRain", "Clover", "Code", "CodeBranch", "CodeCommit", "CodeCompare", "CodeFork", "CodeMerge", "CodePullRequest", "Coins", "ColonSign", "Comment", "CommentDollar", "CommentDots", "CommentMedical", "CommentNodes", "CommentSlash", "CommentSms", "Comments", "CommentsDollar", "CompactDisc", "Compass", "CompassDrafting", "Compress", "Computer", "ComputerMouse", "Cookie", "CookieBite", "Copy", "Copyright", "Couch", "Cow", "CreditCard", "Crop", "CropSimple", "Cross", "Crosshairs", "Crow", "Crown", "Crutch", "CruzeiroSign", "Cube", "Cubes", "CubesStacked", "D", "Database", "DeleteLeft", "Democrat", "Desktop", "Dharmachakra", "DiagramNext", "DiagramPredecessor", "DiagramProject", "DiagramSuccessor", "Diamond", "DiamondTurnRight", "Dice", "DiceD20", "DiceD6", "DiceFive", "DiceFour", "DiceOne", "DiceSix", "DiceThree", "DiceTwo", "Disease", "Display", "Divide", "Dna", "Dog", "DollarSign", "Dolly", "DongSign", "DoorClosed", "DoorOpen", "Dove", "DownLeftAndUpRightToCenter", "DownLong", "Download", "Dragon", "DrawPolygon", "Droplet", "DropletSlash", "Drum", "DrumSteelpan", "DrumstickBite", "Dumbbell", "Dumpster", "DumpsterFire", "Dungeon", "E", "EarDeaf", "EarListen", "EarthAfrica", "EarthAmericas", "EarthAsia", "EarthEurope", "EarthOceania", "Egg", "Eject", "Elevator", "Ellipsis", "EllipsisVertical", "Envelope", "EnvelopeCircleCheck", "EnvelopeOpen", "EnvelopeOpenText", "EnvelopesBulk", "Equals", "Eraser", "Ethernet", "EuroSign", "Exclamation", "Expand", "Explosion", "Eye", "EyeDropper", "EyeLowVision", "EyeSlash", "F", "FaceAngry", "FaceDizzy", "FaceFlushed", "FaceFrown", "FaceFrownOpen", "FaceGrimace", "FaceGrin", "FaceGrinBeam", "FaceGrinBeamSweat", "FaceGrinHearts", "FaceGrinSquint", "FaceGrinSquintTears", "FaceGrinStars", "FaceGrinTears", "FaceGrinTongue", "FaceGrinTongueSquint", "FaceGrinTongueWink", "FaceGrinWide", "FaceGrinWink", "FaceKiss", "FaceKissBeam", "FaceKissWinkHeart", "FaceLaugh", "FaceLaughBeam", "FaceLaughSquint", "FaceLaughWink", "FaceMeh", "FaceMehBlank", "FaceRollingEyes", "FaceSadCry", "FaceSadTear", "FaceSmile", "FaceSmileBeam", "FaceSmileWink", "FaceSurprise", "FaceTired", "Fan", "Faucet", "FaucetDrip", "Fax", "Feather", "FeatherPointed", "Ferry", "File", "FileArrowDown", "FileArrowUp", "FileAudio", "FileCircleCheck", "FileCircleExclamation", "FileCircleMinus", "FileCirclePlus", "FileCircleQuestion", "FileCircleXmark", "FileCode", "FileContract", "FileCsv", "FileExcel", "FileExport", "FileFragment", "FileHalfDashed", "FileImage", "FileImport", "FileInvoice", "FileInvoiceDollar", "FileLines", "FileMedical", "FilePdf", "FilePen", "FilePowerpoint", "FilePrescription", "FileShield", "FileSignature", "FileVideo", "FileWaveform", "FileWord", "FileZipper", "Fill", "FillDrip", "Film", "Filter", "FilterCircleDollar", "FilterCircleXmark", "Fingerprint", "Fire", "FireBurner", "FireExtinguisher", "FireFlameCurved", "FireFlameSimple", "Fish", "FishFins", "Flag", "FlagCheckered", "FlagUsa", "Flask", "FlaskVial", "FloppyDisk", "FlorinSign", "Folder", "FolderClosed", "FolderMinus", "FolderOpen", "FolderPlus", "FolderTree", "Font", "FontAwesome", "Football", "Forward", "ForwardFast", "ForwardStep", "FrancSign", "Frog", "Futbol", "G", "Gamepad", "GasPump", "Gauge", "GaugeHigh", "GaugeSimple", "GaugeSimpleHigh", "Gavel", "Gear", "Gears", "Gem", "Genderless", "Ghost", "Gift", "Gifts", "GlassWater", "GlassWaterDroplet", "Glasses", "Globe", "GolfBallTee", "Gopuram", "GraduationCap", "GreaterThan", "GreaterThanEqual", "Grip", "GripLines", "GripLinesVertical", "GripVertical", "GroupArrowsRotate", "GuaraniSign", "Guitar", "Gun", "H", "Hammer", "Hamsa", "Hand", "HandBackFist", "HandDots", "HandFist", "HandHolding", "HandHoldingDollar", "HandHoldingDroplet", "HandHoldingHand", "HandHoldingHeart", "HandHoldingMedical", "HandLizard", "HandMiddleFinger", "HandPeace", "HandPointDown", "HandPointLeft", "HandPointRight", "HandPointUp", "HandPointer", "HandScissors", "HandSparkles", "HandSpock", "Handcuffs", "Hands", "HandsAslInterpreting", "HandsBound", "HandsBubbles", "HandsClapping", "HandsHolding", "HandsHoldingChild", "HandsHoldingCircle", "HandsPraying", "Handshake", "HandshakeAngle", "HandshakeSimple", "HandshakeSimpleSlash", "HandshakeSlash", "Hanukiah", "HardDrive", "Hashtag", "HatCowboy", "HatCowboySide", "HatWizard", "HeadSideCough", "HeadSideCoughSlash", "HeadSideMask", "HeadSideVirus", "Heading", "Headphones", "HeadphonesSimple", "Headset", "Heart", "HeartCircleBolt", "HeartCircleCheck", "HeartCircleExclamation", "HeartCircleMinus", "HeartCirclePlus", "HeartCircleXmark", "HeartCrack", "HeartPulse", "Helicopter", "HelicopterSymbol", "HelmetSafety", "HelmetUn", "HexagonNodes", "HexagonNodesBolt", "Highlighter", "HillAvalanche", "HillRockslide", "Hippo", "HockeyPuck", "HollyBerry", "Horse", "HorseHead", "Hospital", "HospitalUser", "HotTubPerson", "Hotdog", "Hotel", "Hourglass", "HourglassEnd", "HourglassHalf", "HourglassStart", "House", "HouseChimney", "HouseChimneyCrack", "HouseChimneyMedical", "HouseChimneyUser", "HouseChimneyWindow", "HouseCircleCheck", "HouseCircleExclamation", "HouseCircleXmark", "HouseCrack", "HouseFire", "HouseFlag", "HouseFloodWater", "HouseFloodWaterCircleArrowRight", "HouseLaptop", "HouseLock", "HouseMedical", "HouseMedicalCircleCheck", "HouseMedicalCircleExclamation", "HouseMedicalCircleXmark", "HouseMedicalFlag", "HouseSignal", "HouseTsunami", "HouseUser", "HryvniaSign", "Hurricane", "I", "ICursor", "IceCream", "Icicles", "Icons", "IdBadge", "IdCard", "IdCardClip", "Igloo", "Image", "ImagePortrait", "Images", "Inbox", "Indent", "IndianRupeeSign", "Industry", "Infinity", "Info", "Italic", "J", "Jar", "JarWheat", "Jedi", "JetFighter", "JetFighterUp", "Joint", "JugDetergent", "K", "Kaaba", "Key", "Keyboard", "Khanda", "KipSign", "KitMedical", "KitchenSet", "KiwiBird", "L", "LandMineOn", "Landmark", "LandmarkDome", "LandmarkFlag", "Language", "Laptop", "LaptopCode", "LaptopFile", "LaptopMedical", "LariSign", "LayerGroup", "Leaf", "LeftLong", "LeftRight", "Lemon", "LessThan", "LessThanEqual", "LifeRing", "Lightbulb", "LinesLeaning", "Link", "LinkSlash", "LiraSign", "List", "ListCheck", "ListOl", "ListUl", "LitecoinSign", "LocationArrow", "LocationCrosshairs", "LocationDot", "LocationPin", "LocationPinLock", "Lock", "LockOpen", "Locust", "Lungs", "LungsVirus", "M", "Magnet", "MagnifyingGlass", "MagnifyingGlassArrowRight", "MagnifyingGlassChart", "MagnifyingGlassDollar", "MagnifyingGlassLocation", "MagnifyingGlassMinus", "MagnifyingGlassPlus", "ManatSign", "Map", "MapLocation", "MapLocationDot", "MapPin", "Marker", "Mars", "MarsAndVenus", "MarsAndVenusBurst", "MarsDouble", "MarsStroke", "MarsStrokeRight", "MarsStrokeUp", "MartiniGlass", "MartiniGlassCitrus", "MartiniGlassEmpty", "Mask", "MaskFace", "MaskVentilator", "MasksTheater", "MattressPillow", "Maximize", "Medal", "Memory", "Menorah", "Mercury", "Message", "Meteor", "Microchip", "Microphone", "MicrophoneLines", "MicrophoneLinesSlash", "MicrophoneSlash", "Microscope", "MillSign", "Minimize", "Minus", "Mitten", "Mobile", "MobileButton", "MobileRetro", "MobileScreen", "MobileScreenButton", "MoneyBill", "MoneyBill1", "MoneyBill1Wave", "MoneyBillTransfer", "MoneyBillTrendUp", "MoneyBillWave", "MoneyBillWheat", "MoneyBills", "MoneyCheck", "MoneyCheckDollar", "Monument", "Moon", "MortarPestle", "Mosque", "Mosquito", "MosquitoNet", "Motorcycle", "Mound", "Mountain", "MountainCity", "MountainSun", "MugHot", "MugSaucer", "Music", "N", "NairaSign", "NetworkWired", "Neuter", "Newspaper", "NotEqual", "Notdef", "NoteSticky", "NotesMedical", "O", "ObjectGroup", "ObjectUngroup", "OilCan", "OilWell", "Om", "Otter", "Outdent", "P", "Pager", "PaintRoller", "Paintbrush", "Palette", "Pallet", "Panorama", "PaperPlane", "Paperclip", "ParachuteBox", "Paragraph", "Passport", "Paste", "Pause", "Paw", "Peace", "Pen", "PenClip", "PenFancy", "PenNib", "PenRuler", "PenToSquare", "Pencil", "PeopleArrows", "PeopleCarryBox", "PeopleGroup", "PeopleLine", "PeoplePulling", "PeopleRobbery", "PeopleRoof", "PepperHot", "Percent", "Person", "PersonArrowDownToLine", "PersonArrowUpFromLine", "PersonBiking", "PersonBooth", "PersonBreastfeeding", "PersonBurst", "PersonCane", "PersonChalkboard", "PersonCircleCheck", "PersonCircleExclamation", "PersonCircleMinus", "PersonCirclePlus", "PersonCircleQuestion", "PersonCircleXmark", "PersonDigging", "PersonDotsFromLine", "PersonDress", "PersonDressBurst", "PersonDrowning", "PersonFalling", "PersonFallingBurst", "PersonHalfDress", "PersonHarassing", "PersonHiking", "PersonMilitaryPointing", "PersonMilitaryRifle", "PersonMilitaryToPerson", "PersonPraying", "PersonPregnant", "PersonRays", "PersonRifle", "PersonRunning", "PersonShelter", "PersonSkating", "PersonSkiing", "PersonSkiingNordic", "PersonSnowboarding", "PersonSwimming", "PersonThroughWindow", "PersonWalking", "PersonWalkingArrowLoopLeft", "PersonWalkingArrowRight", "PersonWalkingDashedLineArrowRight", "PersonWalkingLuggage", "PersonWalkingWithCane", "PesetaSign", "PesoSign", "Phone", "PhoneFlip", "PhoneSlash", "PhoneVolume", "PhotoFilm", "PiggyBank", "Pills", "PizzaSlice", "PlaceOfWorship", "Plane", "PlaneArrival", "PlaneCircleCheck", "PlaneCircleExclamation", "PlaneCircleXmark", "PlaneDeparture", "PlaneLock", "PlaneSlash", "PlaneUp", "PlantWilt", "PlateWheat", "Play", "Plug", "PlugCircleBolt", "PlugCircleCheck", "PlugCircleExclamation", "PlugCircleMinus", "PlugCirclePlus", "PlugCircleXmark", "Plus", "PlusMinus", "Podcast", "Poo", "PooStorm", "Poop", "PowerOff", "Prescription", "PrescriptionBottle", "PrescriptionBottleMedical", "Print", "PumpMedical", "PumpSoap", "PuzzlePiece", "Q", "Qrcode", "Question", "QuoteLeft", "QuoteRight", "R", "Radiation", "Radio", "Rainbow", "RankingStar", "Receipt", "RecordVinyl", "RectangleAd", "RectangleList", "RectangleXmark", "Recycle", "Registered", "Repeat", "Reply", "ReplyAll", "Republican", "Restroom", "Retweet", "Ribbon", "RightFromBracket", "RightLeft", "RightLong", "RightToBracket", "Ring", "Road", "RoadBarrier", "RoadBridge", "RoadCircleCheck", "RoadCircleExclamation", "RoadCircleXmark", "RoadLock", "RoadSpikes", "Robot", "Rocket", "Rotate", "RotateLeft", "RotateRight", "Route", "Rss", "RubleSign", "Rug", "Ruler", "RulerCombined", "RulerHorizontal", "RulerVertical", "RupeeSign", "RupiahSign", "S", "SackDollar", "SackXmark", "Sailboat", "Satellite", "SatelliteDish", "ScaleBalanced", "ScaleUnbalanced", "ScaleUnbalancedFlip", "School", "SchoolCircleCheck", "SchoolCircleExclamation", "SchoolCircleXmark", "SchoolFlag", "SchoolLock", "Scissors", "Screwdriver", "ScrewdriverWrench", "Scroll", "ScrollTorah", "SdCard", "Section", "Seedling", "Server", "Shapes", "Share", "ShareFromSquare", "ShareNodes", "SheetPlastic", "ShekelSign", "Shield", "ShieldCat", "ShieldDog", "ShieldHalved", "ShieldHeart", "ShieldVirus", "Ship", "Shirt", "ShoePrints", "Shop", "ShopLock", "ShopSlash", "Shower", "Shrimp", "Shuffle", "ShuttleSpace", "SignHanging", "Signal", "Signature", "SignsPost", "SimCard", "Sink", "Sitemap", "Skull", "SkullCrossbones", "Slash", "Sleigh", "Sliders", "Smog", "Smoking", "Snowflake", "Snowman", "Snowplow", "Soap", "Socks", "SolarPanel", "Sort", "SortDown", "SortUp", "Spa", "SpaghettiMonsterFlying", "SpellCheck", "Spider", "Spinner", "Splotch", "Spoon", "SprayCan", "SprayCanSparkles", "Square", "SquareArrowUpRight", "SquareBinary", "SquareCaretDown", "SquareCaretLeft", "SquareCaretRight", "SquareCaretUp", "SquareCheck", "SquareEnvelope", "SquareFull", "SquareH", "SquareMinus", "SquareNfi", "SquareParking", "SquarePen", "SquarePersonConfined", "SquarePhone", "SquarePhoneFlip", "SquarePlus", "SquarePollHorizontal", "SquarePollVertical", "SquareRootVariable", "SquareRss", "SquareShareNodes", "SquareUpRight", "SquareVirus", "SquareXmark", "StaffSnake", "Stairs", "Stamp", "Stapler", "Star", "StarAndCrescent", "StarHalf", "StarHalfStroke", "StarOfDavid", "StarOfLife", "SterlingSign", "Stethoscope", "Stop", "Stopwatch", "Stopwatch20", "Store", "StoreSlash", "StreetView", "Strikethrough", "Stroopwafel", "Subscript", "Suitcase", "SuitcaseMedical", "SuitcaseRolling", "Sun", "SunPlantWilt", "Superscript", "Swatchbook", "Synagogue", "Syringe", "T", "Table", "TableCells", "TableCellsColumnLock", "TableCellsLarge", "TableCellsRowLock", "TableCellsRowUnlock", "TableColumns", "TableList", "TableTennisPaddleBall", "Tablet", "TabletButton", "TabletScreenButton", "Tablets", "TachographDigital", "Tag", "Tags", "Tape", "Tarp", "TarpDroplet", "Taxi", "Teeth", "TeethOpen", "TemperatureArrowDown", "TemperatureArrowUp", "TemperatureEmpty", "TemperatureFull", "TemperatureHalf", "TemperatureHigh", "TemperatureLow", "TemperatureQuarter", "TemperatureThreeQuarters", "TengeSign", "Tent", "TentArrowDownToLine", "TentArrowLeftRight", "TentArrowTurnLeft", "TentArrowsDown", "Tents", "Terminal", "TextHeight", "TextSlash", "TextWidth", "Thermometer", "ThumbsDown", "ThumbsUp", "Thumbtack", "ThumbtackSlash", "Ticket", "TicketSimple", "Timeline", "ToggleOff", "ToggleOn", "Toilet", "ToiletPaper", "ToiletPaperSlash", "ToiletPortable", "ToiletsPortable", "Toolbox", "Tooth", "ToriiGate", "Tornado", "TowerBroadcast", "TowerCell", "TowerObservation", "Tractor", "Trademark", "TrafficLight", "Trailer", "Train", "TrainSubway", "TrainTram", "Transgender", "Trash", "TrashArrowUp", "TrashCan", "TrashCanArrowUp", "Tree", "TreeCity", "TriangleExclamation", "Trophy", "Trowel", "TrowelBricks", "Truck", "TruckArrowRight", "TruckDroplet", "TruckFast", "TruckField", "TruckFieldUn", "TruckFront", "TruckMedical", "TruckMonster", "TruckMoving", "TruckPickup", "TruckPlane", "TruckRampBox", "Tty", "TurkishLiraSign", "TurnDown", "TurnUp", "Tv", "U", "Umbrella", "UmbrellaBeach", "Underline", "UniversalAccess", "Unlock", "UnlockKeyhole", "UpDown", "UpDownLeftRight", "UpLong", "UpRightAndDownLeftFromCenter", "UpRightFromSquare", "Upload", "User", "UserAstronaut", "UserCheck", "UserClock", "UserDoctor", "UserGear", "UserGraduate", "UserGroup", "UserInjured", "UserLarge", "UserLargeSlash", "UserLock", "UserMinus", "UserNinja", "UserNurse", "UserPen", "UserPlus", "UserSecret", "UserShield", "UserSlash", "UserTag", "UserTie", "UserXmark", "Users", "UsersBetweenLines", "UsersGear", "UsersLine", "UsersRays", "UsersRectangle", "UsersSlash", "UsersViewfinder", "Utensils", "V", "VanShuttle", "Vault", "VectorSquare", "Venus", "VenusDouble", "VenusMars", "Vest", "VestPatches", "Vial", "VialCircleCheck", "VialVirus", "Vials", "Video", "VideoSlash", "Vihara", "Virus", "VirusCovid", "VirusCovidSlash", "VirusSlash", "Viruses", "Voicemail", "Volcano", "Volleyball", "VolumeHigh", "VolumeLow", "VolumeOff", "VolumeXmark", "VrCardboard", "W", "WalkieTalkie", "Wallet", "WandMagic", "WandMagicSparkles", "WandSparkles", "Warehouse", "Water", "WaterLadder", "WaveSquare", "WebAwesome", "WeightHanging", "WeightScale", "WheatAwn", "WheatAwnCircleExclamation", "Wheelchair", "WheelchairMove", "WhiskeyGlass", "Wifi", "Wind", "WindowMaximize", "WindowMinimize", "WindowRestore", "WineBottle", "WineGlass", "WineGlassEmpty", "WonSign", "Worm", "Wrench", "X", "XRay", "Xmark", "XmarksLines", "Y", "YenSign", "YinYang", "Z", "Search", "Save", "Settings", "Cog", "Home", "Edit", "Close", "Cancel", "Refresh", "Warning", "CheckCircle", "TimesCircle", "VolumeMute", "Cut", "Undo", "Redo", "StepForward", "StepBackward", "Pin", "ZoomIn", "ZoomOut"], "doc": "Icon shown (Font Awesome)."},
+        {"name": "iconSize", "kind": "number", "owner": "UIIconNode", "default": 0, "min": 8, "max": 128, "doc": "Icon size (px)."},
+        {"name": "color", "kind": "color", "owner": "UIIconNode", "default": "#eef0f6ff", "doc": "Icon colour."},
+        {"name": "align", "kind": "enum", "owner": "UIIconNode", "default": "Center", "values": ["Left", "Center", "Right"], "doc": "Horizontal text alignment."}
+      ]
+    },
+    {
+      "type": "UIToolbarNode",
+      "name": "UI Toolbar",
+      "category": "UI & Interface",
+      "description": "Row of icon buttons; raises item_clicked.",
+      "aliases": ["uitoolbar"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [600, 42], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "activeToggleId", "kind": "integer", "owner": "UIToolbarNode", "default": -1, "doc": "Id of the pressed toggle button."},
+        {"name": "buttonSize", "kind": "vec2", "owner": "UIToolbarNode", "default": [34, 32], "doc": "Size of each button (px)."},
+        {"name": "spacing", "kind": "number", "owner": "UIToolbarNode", "default": 4, "min": 0, "max": 32, "doc": "Gap between items (px)."}
+      ]
+    },
+    {
+      "type": "UITabContainerNode",
+      "name": "UI Tab Container",
+      "category": "UI & Interface",
+      "description": "Tabbed pages container.",
+      "aliases": ["uitabcontainer"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [440, 400], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "title", "kind": "string", "owner": "UIContainerNode", "default": "", "doc": "Header text."},
+        {"name": "direction", "kind": "enum", "owner": "UIContainerNode", "default": "Vertical", "values": ["Vertical", "Horizontal", "Grid"], "doc": "Children are laid out in a column, a row or a grid."},
+        {"name": "alignment", "kind": "enum", "owner": "UIContainerNode", "default": "Stretch", "values": ["Start", "Center", "End", "Stretch"], "doc": "Where children sit across the layout direction."},
+        {"name": "spacing", "kind": "number", "owner": "UIContainerNode", "default": 8, "min": 0, "max": 64, "doc": "Gap between items (px)."},
+        {"name": "paddingTop", "kind": "number", "owner": "UIContainerNode", "default": 12, "min": 0, "max": 100, "doc": "Space above the children (px)."},
+        {"name": "paddingBottom", "kind": "number", "owner": "UIContainerNode", "default": 12, "min": 0, "max": 100, "doc": "Space below the children (px)."},
+        {"name": "paddingLeft", "kind": "number", "owner": "UIContainerNode", "default": 14, "min": 0, "max": 100, "doc": "Space left of the children (px)."},
+        {"name": "paddingRight", "kind": "number", "owner": "UIContainerNode", "default": 14, "min": 0, "max": 100, "doc": "Space right of the children (px)."},
+        {"name": "columns", "kind": "integer", "owner": "UIContainerNode", "default": 0, "min": 1, "max": 12, "doc": "Grid layout: columns per row."},
+        {"name": "autoSizeHeight", "kind": "boolean", "owner": "UIContainerNode", "default": false, "doc": "Grow to fit the children."},
+        {"name": "drawBackground", "kind": "boolean", "owner": "UIContainerNode", "default": true, "doc": "Fill the background."},
+        {"name": "drawBorder", "kind": "boolean", "owner": "UIContainerNode", "default": true, "doc": "Draw a border."},
+        {"name": "showHeader", "kind": "boolean", "owner": "UIContainerNode", "default": false, "doc": "Draw a header with the title."},
+        {"name": "headerHeight", "kind": "number", "owner": "UIContainerNode", "default": 0, "min": 20, "max": 64, "doc": "Height of the header (px)."},
+        {"name": "backgroundColor", "kind": "color", "owner": "UIContainerNode", "default": "#16181ef2", "doc": "Fill colour of the background."},
+        {"name": "headerColor", "kind": "color", "owner": "UIContainerNode", "default": "#00000000", "doc": "Header fill colour."},
+        {"name": "borderColor", "kind": "color", "owner": "UIContainerNode", "default": "#373e4eff", "doc": "Colour of the border."},
+        {"name": "titleColor", "kind": "color", "owner": "UIContainerNode", "default": "#00000000", "doc": "Title text colour."},
+        {"name": "tabDirection", "kind": "enum", "owner": "UITabContainerNode", "default": "Horizontal", "values": ["Horizontal", "Vertical"], "doc": "Tabs along the top or the side."},
+        {"name": "activeTab", "kind": "integer", "owner": "UITabContainerNode", "default": 0, "min": 0, "max": 16, "doc": "Index of the shown tab (child)."},
+        {"name": "tabSize", "kind": "number", "owner": "UITabContainerNode", "default": 30, "min": 20, "max": 64, "doc": "Tab height (or width when vertical; px)."}
+      ]
+    }
+  ]
+}

@@ -23,6 +23,7 @@ StatusBar_Render :: proc(state: ^EditorState, width, displayH, barHeight: f32) {
 	}
 	defer imgui.End()
 	if !imgui.Begin("StatusBar###FixedStatusBarWindow", nil, flags) do return
+	Drive_Window("statusbar") // (annotated docs screenshots)
 	imgui.PushFont(GlobalFonts.small)
 	defer imgui.PopFont()
 

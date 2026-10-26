@@ -1,0 +1,15 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Toolbar: tools, Play / Pause / Stop, grid and snapping, save, export, settings", "x": 0, "y": 29, "w": 1280, "h": 44},
+    {"label": "Scene: the node tree of the open scene (drag to re-parent, right-click for more)", "x": 1025, "y": 103, "w": 255, "h": 293},
+    {"label": "Viewport: the scene; select, move, rotate and scale nodes", "x": 258, "y": 103, "w": 764, "h": 486},
+    {"label": "Inspector: the selected node's properties, script and signals", "x": 1025, "y": 399, "w": 255, "h": 293},
+    {"label": "Assets: the project's scenes, scripts, textures, sounds and components", "x": 0, "y": 103, "w": 255, "h": 375},
+    {"label": "Bottom panel: Console, Animation, Particles, Mixer, Profiler and more", "x": 258, "y": 592, "w": 764, "h": 100},
+    {"label": "Status bar: project, scene, selection, background tasks", "x": 0, "y": 692, "w": 1280, "h": 32},
+    {"label": "Preview: the selected asset (import settings, sounds, animations)", "x": 0, "y": 481, "w": 255, "h": 211},
+    {"label": "Game / Level: the scene editor or the LDtk level editor (Cmd+Shift+1 / 2)", "x": 0, "y": 73, "w": 1280, "h": 32}
+  ]
+}

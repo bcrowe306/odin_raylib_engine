@@ -1,0 +1,85 @@
+{
+  "$comment": "The documentation site's navigation (rayzr.app/docs). scripts/docs/export_site.py turns these pages into the site's docs for a version; scripts/docs/check_docs.py fails when a guide in engine/docs/ or editor/docs/ is missing here. 'generated' entries are built from the code: nodes (docs/generated/nodes.json), lua-api (engine/definitions/engine_api.lua), plugin-api (editor/definitions/editor_api.lua), templates (templates/*/README.md).",
+  "sections": [
+    {
+      "label": "Start here",
+      "items": [
+        { "file": "docs/index.md", "slug": "" },
+        { "file": "docs/getting-started/installation.md", "slug": "getting-started/installation" },
+        { "file": "docs/getting-started/first-game.md", "slug": "getting-started/first-game" },
+        { "generated": "templates", "file": "templates/README.md", "slug": "getting-started/templates", "label": "Templates" }
+      ]
+    },
+    {
+      "label": "Editor",
+      "items": [
+        { "file": "docs/editor/tour.md", "slug": "editor/tour" },
+        { "file": "editor/README.md", "slug": "editor/manual", "label": "Editor manual" },
+        { "file": "editor/CODE_EDITOR.md", "slug": "editor/code", "label": "Code tab" },
+        { "file": "engine/docs/level_editor.md", "slug": "editor/level-editor" },
+        { "file": "engine/docs/level_editor_reference.md", "slug": "editor/level-editor-reference", "label": "Level editor reference" },
+        { "file": "engine/docs/animation_editing.md", "slug": "editor/animation" },
+        { "file": "engine/docs/import_settings.md", "slug": "editor/import-settings" },
+        { "file": "editor/docs/plugin_guide.md", "slug": "editor/plugins", "label": "Plugins: guide" },
+        { "file": "editor/docs/plugins.md", "slug": "editor/plugins-design", "label": "Plugins: design" }
+      ]
+    },
+    {
+      "label": "Engine guides",
+      "items": [
+        { "file": "engine/docs/README.md", "slug": "guides", "label": "Overview" },
+        { "file": "engine/docs/scene_flow.md", "slug": "guides/scene-flow" },
+        { "file": "engine/docs/draw_order.md", "slug": "guides/draw-order" },
+        { "file": "engine/docs/advanced_camera.md", "slug": "guides/advanced-camera" },
+        { "file": "engine/docs/paths.md", "slug": "guides/paths" },
+        { "file": "engine/docs/navigation.md", "slug": "guides/navigation" },
+        { "file": "engine/docs/visibility.md", "slug": "guides/visibility" },
+        { "file": "engine/docs/pooling.md", "slug": "guides/pooling" },
+        { "file": "engine/docs/aseprite.md", "slug": "guides/aseprite" },
+        { "file": "engine/docs/skeletal_animation.md", "slug": "guides/skeletal-animation" },
+        { "file": "engine/docs/pixel_perfect.md", "slug": "guides/pixel-perfect" },
+        { "file": "engine/docs/atlas.md", "slug": "guides/atlas" },
+        { "file": "engine/docs/audio_mixer.md", "slug": "guides/audio-mixer" },
+        { "file": "engine/docs/input_rebinding.md", "slug": "guides/input" },
+        { "file": "engine/docs/gamepads.md", "slug": "guides/gamepads" },
+        { "file": "engine/docs/accessibility.md", "slug": "guides/accessibility" },
+        { "file": "engine/docs/crash_reports.md", "slug": "guides/crash-reports" },
+        { "file": "engine/docs/web_export.md", "slug": "guides/web-export" }
+      ]
+    },
+    {
+      "label": "Scripting",
+      "items": [
+        { "file": "engine/SCRIPTING.md", "slug": "scripting", "label": "Scripting guide" }
+      ]
+    },
+    {
+      "label": "Reference",
+      "items": [
+        { "generated": "nodes", "file": "docs/generated/nodes.json", "slug": "reference/nodes", "label": "Nodes" },
+        { "generated": "lua-api", "file": "engine/definitions/engine_api.lua", "slug": "reference/lua", "label": "Lua API" },
+        { "generated": "plugin-api", "file": "editor/definitions/editor_api.lua", "slug": "reference/editor-plugins", "label": "Editor plugin API" },
+        { "file": "engine/LDTK.md", "slug": "reference/ldtk", "label": "LDtk format" },
+        { "file": "engine/RAYZR_FORMAT.md", "slug": "reference/rayzr-package", "label": "The .rayzr package" }
+      ]
+    },
+    {
+      "label": "Contributing",
+      "items": [
+        { "file": "docs/contributing/index.md", "slug": "contributing" },
+        { "file": "RELEASING.md", "slug": "contributing/releasing", "label": "Releases and dev builds" },
+        { "file": "editor/TEST_DRIVE.md", "slug": "contributing/test-drives", "label": "Editor test drives" },
+        { "file": "docs/contributing/docs.md", "slug": "contributing/docs" }
+      ]
+    }
+  ],
+  "baseline": {
+    "$comment": "Known gaps check_docs.py tolerates; lower them as they are filled (CI fails if they grow).",
+    "lua_missing_examples": 145,
+    "plugin_missing_descriptions": 29
+  },
+  "exclude": [
+    "editor/PROJECT_SETTINGS_AND_PROCESS_SPAWNING.md",
+    "engine/GAPS.md"
+  ]
+}

@@ -39,7 +39,8 @@ The workflow builds:
 1. the game runners on macOS, Linux and Windows, and the web runner;
 2. the editor on each platform, with **every** platform's runners inside (any
    editor exports macOS, Windows, Linux and web games);
-3. a GitHub Release with the packages and `SHA256SUMS.txt`:
+3. a GitHub Release with the packages and `SHA256SUMS.txt` (and the same
+   files on the website's download page, below):
 
 | Platform | Files |
 |---|---|
@@ -51,6 +52,32 @@ The version (the tag without `v`) is built into the editor and the runners
 (`RAYZR_RELEASE`: the editor's title and `--version`, `project.json`'s
 `engine_version`, the update check). A dry run without publishing: Actions >
 Release > Run workflow (a version, no tag), or push to `release-dryrun`.
+
+## The website (rayzr.app)
+
+After the GitHub Release, the same workflow updates
+[rayzr.app](https://rayzr.app):
+
+1. `scripts/ci/publish_r2.py` uploads the packages to the downloads bucket
+   (Cloudflare R2, served at `downloads.rayzr.app`): releases under
+   `releases/v<version>/`, dev builds under `dev/v<version>/`, and
+   `manifest.json`. It keeps the **3 newest releases** (semver order) and
+   the **latest dev build**; older ones are deleted (they stay on GitHub).
+2. It calls the website's workflow (`bcrowe306/rayzr_website`,
+   `.github/workflows/site.yml`): the site syncs the manifest, builds the
+   docs of every kept version from that version's tag (dev: `main`) with
+   the tag's own `scripts/docs/export_site.py`, runs its tests, deploys to
+   Cloudflare Pages and verifies the live site (`scripts/verify-deploy.mjs`).
+
+So a tag puts the release on the download page and its docs at
+`rayzr.app/docs/` (the previous release moves to `/docs/v<version>/`), and
+every merge refreshes the dev build and `/docs/dev/`. Pull requests build
+the site with their docs and deploy a preview (`.github/workflows/docs.yml`).
+The docs themselves: [docs/contributing/docs.md](docs/contributing/docs.md).
+
+Repository secrets: `R2_ENDPOINT`, `R2_ACCESS_KEY_ID`,
+`R2_SECRET_ACCESS_KEY` (the upload) and `CLOUDFLARE_API_TOKEN`,
+`CLOUDFLARE_ACCOUNT_ID` (the deploy, also set in the website repository).
 
 Every push and pull request runs CI (`.github/workflows/ci.yml`): the editor,
 runner and Play binary build, and the unit tests run, on all three platforms;

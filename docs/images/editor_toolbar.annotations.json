@@ -1,0 +1,14 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Select tool (Q)", "x": 280, "y": 36, "w": 30, "h": 30},
+    {"label": "Move (W), Rotate (E) and Scale (R) tools", "x": 312, "y": 36, "w": 30, "h": 30},
+    {"label": "Play the project (F5)", "x": 543, "y": 36, "w": 30, "h": 30},
+    {"label": "Play the current scene (F6)", "x": 575, "y": 36, "w": 30, "h": 30},
+    {"label": "Grid and snapping", "x": 906, "y": 36, "w": 30, "h": 30},
+    {"label": "Save the scene (Cmd+S)", "x": 1174, "y": 36, "w": 30, "h": 30},
+    {"label": "Export a game", "x": 1206, "y": 36, "w": 30, "h": 30},
+    {"label": "Project settings", "x": 1238, "y": 36, "w": 30, "h": 30}
+  ]
+}

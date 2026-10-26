@@ -1,0 +1,61 @@
+# Writing documentation
+
+The documentation at [rayzr.app/docs](https://rayzr.app/docs/) is built
+from this repository on every release and every merge to `main`, so it
+always matches the code. Most of it you edit as Markdown; the reference is
+generated.
+
+## Where pages come from
+
+| Source | Becomes |
+|---|---|
+| `docs/*.md` | Getting started, the editor tour, these pages |
+| `engine/docs/*.md` | The engine guides (one per feature, each with a tutorial) |
+| `editor/README.md`, `editor/CODE_EDITOR.md`, `editor/docs/*.md` | The editor manual, Code tab and plugin guides |
+| `engine/SCRIPTING.md` | The scripting guide |
+| `engine/definitions/engine_api.lua` | **Generated**: the Lua API reference (descriptions and `Example:` lines) |
+| `editor/definitions/editor_api.lua` | **Generated**: the editor plugin API |
+| `engine/node_registry.odin`, the Add Node catalog, `engine/property_docs.odin` | **Generated**: the node reference, via `docs/generated/nodes.json` |
+| `docs/nodes/<NodeType>.md` | Extra text and examples on that node's reference page |
+| `templates/*/README.md` | The templates page |
+
+`docs/site.json` is the navigation: sections and the pages in them. A new
+guide must be listed there - CI fails otherwise.
+
+## Checks (CI)
+
+`python3 scripts/docs/check_docs.py` runs on every pull request. It fails
+when:
+
+- `docs/generated/nodes.json` is out of date (regenerate it with
+  `bin/editor --dump-docs docs/generated/nodes.json` or `task docs:nodes`);
+- a node type has no Add Node description, or a property has no help line;
+- a guide in `engine/docs/` or `editor/docs/` isn't in `docs/site.json`;
+- a page links to a file that doesn't exist, or an image is missing;
+- a Lua API function has no description.
+
+The website then builds the pages and checks every link between them.
+
+## Screenshots with callouts
+
+Screenshots come from editor test drives, so they stay current:
+
+1. Write or extend a drive in `tests/drive/docs_*.drive`. Before a
+   `screenshot <name>` line, add `annotate <target> <label>` lines - a
+   target is a drive item (`@toolbar.play`, `@hier:Player`), a panel
+   (`@window:inspector`, `@window:viewport`, `@window:scene`, `@window:assets`,
+   `@window:console`, `@window:toolbar`, `@window:statusbar`,
+   `@window:preview`) or a node (`@node:Player`).
+2. Run `scripts/docs/screenshots.sh` (needs a display). It copies the shots
+   and their `.annotations.json` into `docs/images/`.
+3. Use the image in a page on a line of its own:
+   `![The toolbar](../images/editor_toolbar.png)`. The site draws a numbered
+   marker on each callout and lists the labels under the image.
+
+## Preview the site locally
+
+```sh
+python3 scripts/docs/export_site.py --out build/docs_bundle   # this checkout's docs
+# then, in a checkout of github.com/bcrowe306/rayzr_website:
+ENGINE_DIR=../rayzr npm run sync && npm run dev
+```
