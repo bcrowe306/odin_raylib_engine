@@ -1,0 +1,49 @@
+# Symbols and part swapping in the editor (Phase 14 M3; vector_editor.odin):
+# a layered SVG's Inspector shows a Symbol picker (its named groups) and,
+# for a group with child groups, a Frame picker (part swapping: mouth
+# shapes); Explode into Parts replaces the shape with a Node holding a Vector
+# Shape per layer, in place, undoably; the scene saves group / frame.
+exec mkdir -p $PROJECT/vectors
+exec cp tests/vector/svg/character_parts.svg $PROJECT/vectors/parts_zz.svg
+wait 5
+wait-until item:asset:vectors/parts_zz.svg == visible timeout=600
+drag @asset:vectors/parts_zz.svg @world:600,300 12
+wait 2
+expect node:parts_zz.type == VectorShapeNode
+expect item:insp.vec.group == visible
+screenshot whole_character
+# The mouth symbol: its frames are the mouth shapes.
+click @insp.vec.group
+wait 1
+click @pick:vec-group:head/mouth
+wait 1
+expect node:parts_zz.prop.group == head/mouth
+expect item:insp.vec.frame == visible
+click @insp.vec.frame
+wait 1
+click @pick:vec-frame:D
+wait 1
+expect node:parts_zz.prop.frame == 4
+screenshot mouth_frame_D
+key cmd+z
+wait 1
+expect node:parts_zz.prop.frame == -1
+# Back to the whole file, then explode it into its layers.
+click @insp.vec.group
+wait 1
+click @pick:vec-group:
+wait 1
+expect node:parts_zz.prop.group == 
+click @insp.vec.explode
+wait 2
+expect node:parts_zz.type == Node
+expect node:parts_zz.children == 4
+expect node:arm_l.type == VectorShapeNode
+expect node:arm_l.prop.group == arm_l
+screenshot exploded
+key cmd+z
+wait 2
+expect node:parts_zz.type == VectorShapeNode
+key cmd+s
+wait 2
+expect file:scenes/main.scene.json contains vectors/parts_zz.svg

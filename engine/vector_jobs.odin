@@ -25,6 +25,7 @@ VECTOR_THREADS :: 2
 
 Vector_Job :: struct {
 	res:     ^Vector_Resource,
+	part:    int, // -1: the whole document, else a group
 	bucket:  f32,
 	version: int,
 	mesh:    Vector_Mesh, // the result (heap; moved into the cache)
@@ -42,7 +43,7 @@ vjobs: struct {
 Vector_JobsRunning :: proc() -> int {return vjobs.running}
 
 // vector_job_submit queues a bucket of a resource for tessellation.
-vector_job_submit :: proc(r: ^Vector_Resource, bucket: f32) {
+vector_job_submit :: proc(r: ^Vector_Resource, bucket: f32, part := -1) {
 	a := Engine_HeapAllocator()
 	if !vjobs.started {
 		when ODIN_OS != .JS {
@@ -52,7 +53,7 @@ vector_job_submit :: proc(r: ^Vector_Resource, bucket: f32) {
 		vjobs.started = true
 	}
 	j := new(Vector_Job, a)
-	j.res, j.bucket, j.version = r, bucket, r.version
+	j.res, j.bucket, j.version, j.part = r, bucket, r.version, part
 	r.refs += 1 // (the job's)
 	r.pending += 1
 	vjobs.running += 1
@@ -72,7 +73,7 @@ vector_task :: proc(t: thread.Task) {
 	context.allocator = Engine_HeapAllocator()
 	j := cast(^Vector_Job)t.data
 	tess: Vector_Tess
-	Vector_Tessellate(&tess, j.res.doc.shapes[:], j.bucket, &j.mesh)
+	Vector_Tessellate(&tess, Vector_PartShapes(j.res, j.part), j.bucket, &j.mesh)
 	Vector_Tess_Destroy(&tess)
 	free_all(context.temp_allocator)
 	sync.atomic_thread_fence(.Release)
@@ -103,7 +104,7 @@ vector_job_finish :: proc(j: ^Vector_Job) {
 	vjobs.running -= 1
 	r.pending -= 1
 	if j.version == r.version {
-		vector_resource_install(r, j.bucket, &j.mesh)
+		vector_resource_install(r, j.part, j.bucket, &j.mesh)
 	} else {
 		Vector_Mesh_Destroy(&j.mesh)
 	}

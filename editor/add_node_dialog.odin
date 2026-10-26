@@ -113,6 +113,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "LineNode",
 	},
 	{
+		name        = "Lip Sync",
+		category    = "Graphics & Rendering",
+		icon        = ICON_FA_WAVE_SQUARE,
+		description = "Moves a vector mouth with a voice: Rhubarb Lip Sync cues (A-H, X) pick the mouth's frames while the sound plays - its own or a dialogue line's.",
+		typeName    = "LipSyncNode",
+	},
+	{
 		name        = "Vector Shape",
 		category    = "Graphics & Rendering",
 		icon        = ICON_FA_PAINTBRUSH,

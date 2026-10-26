@@ -21,11 +21,15 @@ Vector_Preset :: enum u8 {
 VectorShapeNode :: struct {
 	using node:  Node,
 	file:        string `gui:"true"`, // an .svg (project-relative); "" = the preset
+	group:       string `gui:"true"`, // a symbol: one named group of the file ("a/b": nested); "" = all of it
+	frame:       int `gui:"true" min:"-1"`, // part swapping: only this child group of `group` (-1 = all)
 	preset:      Vector_Preset `gui:"true"`,
 	fillColor:   rl.Color `gui:"true"`,
 	strokeColor: rl.Color `gui:"true"`,
 	strokeWidth: f32 `gui:"true" min:"0" max:"64"`,
 	tint:        rl.Color `gui:"true"`,
+	brightness:  f32 `gui:"true" min:"-1" max:"1"`, // -1 black ... 0 ... 1 white (Flash's brightness)
+	colorAdd:    rl.Color `gui:"true"`, // added to the colours (Flash's advanced colour offset; alpha ignored)
 	shapes:      [dynamic]Vector_Shape,
 	cache:       Vector_Cache,
 	built:       struct {preset: Vector_Preset, fill, stroke: rl.Color, width: f32, ok: bool},
@@ -45,6 +49,7 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 	v.strokeColor = {40, 24, 8, 255}
 	v.strokeWidth = 4
 	v.tint = rl.WHITE
+	v.frame = -1
 	// (Meshes are rebuilt on zoom: the heap, not the node's arena.)
 	v.shapes = make([dynamic]Vector_Shape, Engine_HeapAllocator())
 	v.render = VectorShapeNode_Render
@@ -102,23 +107,86 @@ VectorShapeNode_Asset :: proc(v: ^VectorShapeNode) -> ^Vector_Resource {
 // VectorShapeNode_Size: the drawn size (an asset's document box; presets:
 // {} - they draw around the position).
 VectorShapeNode_Size :: proc(v: ^VectorShapeNode) -> [2]f32 {
-	if r := VectorShapeNode_Asset(v); r != nil do return r.doc.size
+	if r := VectorShapeNode_Asset(v); r != nil {
+		_, _, size, _ := VectorShapeNode_Part(v, r)
+		return size
+	}
 	return {}
+}
+
+// VectorShapeNode_Part: what the node draws of its file - (the part: -1
+// the whole document or a group index; the box its origin is in: the
+// group's, so swapping frames never moves it). ok = false: a group or frame
+// that doesn't exist (nothing drawn).
+VectorShapeNode_Part :: proc(v: ^VectorShapeNode, r: ^Vector_Resource) -> (part: int, boxMin, boxSize: [2]f32, ok: bool) {
+	g := Vector_ResourceGroup(r, v.group)
+	if g == -2 do return -1, {}, {}, false
+	boxMin, boxSize = Vector_PartBox(r, g)
+	part = g
+	if v.frame >= 0 {
+		kids := Vector_GroupChildren(r, g)
+		if v.frame >= len(kids) do return -1, boxMin, boxSize, false
+		part = kids[v.frame]
+	}
+	return part, boxMin, boxSize, true
+}
+
+// VectorShapeNode_Frames: the names of the frames `frame` picks from (the
+// group's child groups).
+VectorShapeNode_Frames :: proc(v: ^VectorShapeNode, allocator := context.temp_allocator) -> []string {
+	r := VectorShapeNode_Asset(v)
+	if r == nil do return nil
+	g := Vector_ResourceGroup(r, v.group)
+	if g == -2 do return nil
+	out := make([dynamic]string, allocator)
+	for k in Vector_GroupChildren(r, g) do append(&out, r.doc.groups[k].name)
+	return out[:]
+}
+
+// VectorShapeNode_Swap shows the frame of that name (part swapping);
+// false when the group has no such frame.
+VectorShapeNode_Swap :: proc(v: ^VectorShapeNode, name: string) -> bool {
+	for f, i in VectorShapeNode_Frames(v) do if f == name {
+		v.frame = i
+		return true
+	}
+	return false
+}
+
+// vector_color_effect: the tint (multiply) and offset (add, 0..1) after
+// brightness: Flash's colour effects.
+@(private = "file")
+vector_color_effect :: proc(v: ^VectorShapeNode) -> (mul: rl.Color, add: [4]f32) {
+	mul = v.tint
+	add = {f32(v.colorAdd.r) / 255, f32(v.colorAdd.g) / 255, f32(v.colorAdd.b) / 255, 0}
+	b := clamp(v.brightness, -1, 1)
+	if b > 0 {
+		k := 1 - b
+		mul = {u8(f32(mul.r) * k), u8(f32(mul.g) * k), u8(f32(mul.b) * k), mul.a}
+		add += {b, b, b, 0}
+	} else if b < 0 {
+		k := 1 + b
+		mul = {u8(f32(mul.r) * k), u8(f32(mul.g) * k), u8(f32(mul.b) * k), mul.a}
+	}
+	return
 }
 
 VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	v := cast(^VectorShapeNode)node
 	if !rl.IsWindowReady() do return
+	mul, add := vector_color_effect(v)
 	if r := VectorShapeNode_Asset(v); r != nil {
+		part, boxMin, boxSize, ok := VectorShapeNode_Part(v, r)
+		if !ok do return
 		cache: ^Vector_Cache
 		{
 			context.allocator = Engine_HeapAllocator()
 			// (A new zoom: drawn from the nearest mesh while a worker makes the new one.)
-			cache = Vector_ResourceMesh(r, &vectorTess, Vector_ScreenPixel(v.globalScale), background = true)
+			cache = Vector_ResourceMesh(r, &vectorTess, Vector_ScreenPixel(v.globalScale), background = true, part = part)
 		}
-		// The origin (a fraction of the document box) sits at the position.
-		offset := -r.doc.min - Node_OriginPx(v, r.doc.size)
-		Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, v.tint, offset)
+		// The origin (a fraction of the part's box) sits at the position.
+		offset := -boxMin - Node_OriginPx(v, boxSize)
+		Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, mul, offset, add)
 		return
 	}
 	if !v.built.ok || v.built.preset != v.preset || v.built.fill != v.fillColor || v.built.stroke != v.strokeColor || v.built.width != v.strokeWidth {
@@ -128,15 +196,17 @@ VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 		context.allocator = Engine_HeapAllocator()
 		Vector_Cache_Ensure(&v.cache, &vectorTess, v.shapes[:], Vector_ScreenPixel(v.globalScale))
 	}
-	Vector_Cache_Draw(&v.cache, v.globalPosition, v.globalRotation, v.globalScale, v.tint)
+	Vector_Cache_Draw(&v.cache, v.globalPosition, v.globalRotation, v.globalScale, mul, {}, add)
 }
 
 // VectorShapeNode_LocalBounds: what the node draws in its own space (before
 // position / rotation / scale), ok = false when it hasn't drawn yet.
 VectorShapeNode_LocalBounds :: proc(v: ^VectorShapeNode) -> (b: [4]f32, ok: bool) {
 	if r := VectorShapeNode_Asset(v); r != nil {
-		off := -r.doc.min - Node_OriginPx(v, r.doc.size)
-		d := r.doc.drawn
+		part, boxMin, boxSize, ok := VectorShapeNode_Part(v, r)
+		if !ok do return {}, false
+		off := -boxMin - Node_OriginPx(v, boxSize)
+		d := r.doc.drawn if part < 0 else Vector_ShapesBounds(Vector_PartShapes(r, part))
 		return {d[0] + off.x, d[1] + off.y, d[2] + off.x, d[3] + off.y}, d != {}
 	}
 	if len(v.cache.mesh.verts) == 0 do return {}, false
@@ -155,8 +225,10 @@ VectorShapeNode_HitTest :: proc(v: ^VectorShapeNode, world: [2]f32) -> bool {
 	q /= v.globalScale
 	mesh: ^Vector_Mesh
 	if res := VectorShapeNode_Asset(v); res != nil {
-		q += res.doc.min + Node_OriginPx(v, res.doc.size)
-		for &rc in res.caches do if rc.used != 0 && len(rc.cache.mesh.idx) > 0 {mesh = &rc.cache.mesh; break}
+		part, boxMin, boxSize, ok := VectorShapeNode_Part(v, res)
+		if !ok do return false
+		q += boxMin + Node_OriginPx(v, boxSize)
+		for &rc in res.caches do if rc.part == part && len(rc.cache.mesh.idx) > 0 {mesh = &rc.cache.mesh; break}
 	} else {
 		mesh = &v.cache.mesh
 	}

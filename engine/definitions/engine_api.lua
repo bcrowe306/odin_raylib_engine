@@ -30,6 +30,14 @@ local NavGrid = {}
 ---@class CameraNode : Node
 local CameraNode = {}
 
+---Vector art: an SVG (or one group of it: a symbol, a swappable part) or a built-in shape, crisp at any zoom.
+---@class VectorShapeNode : Node
+local VectorShapeNode = {}
+
+---Moves a vector mouth with a voice (Rhubarb Lip Sync cues).
+---@class LipSyncNode : Node
+local LipSyncNode = {}
+
 ---Counts down and raises "timeout".
 ---@class TimerNode : Node
 local TimerNode = {}
@@ -642,6 +650,15 @@ function TextNode:connect(event, handler) end
 ---@param handler fun(value: any, source: DialogueNode)
 ---@return integer id Connection id for `disconnect`
 function DialogueNode:connect(event, handler) end
+
+---@alias LipSyncNodeEvent NodeTreeEvent|"finished"|ProjectEvent
+---Connects a handler to one of this node's events: finished (Playback (or the dialogue) ended); the tree events; custom ones.
+---
+---Example: `self.node:connect("finished", function(value, source) Log.info("finished") end)`
+---@param event LipSyncNodeEvent|string
+---@param handler fun(value: any, source: LipSyncNode)
+---@return integer id Connection id for `disconnect`
+function LipSyncNode:connect(event, handler) end
 
 ---@alias UIButtonNodeEvent NodeTreeEvent|"clicked"|ProjectEvent
 ---Connects a handler to one of this node's events: clicked (The button was clicked); the tree events; custom ones.
@@ -3615,6 +3632,7 @@ function TextNode:set_property(path, value, y) end
 ---@field advanceAction string Input action that shows the rest of the line, then the next ("confirm").
 ---@field localized boolean Lines are keys in the locale tables (locale/*.csv).
 ---@field mode "Box"|"Subtitles" Box: a dialogue box the player advances. Subtitles: the lines go on the subtitle track ...
+---@field lipSync string A Lip Sync node (path) whose mouth moves with each voiced line.
 
 ---@alias DialogueNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -3639,6 +3657,7 @@ function TextNode:set_property(path, value, y) end
 ---| "advanceAction" # string - Input action that shows the rest of the line, then the next ("confirm").
 ---| "localized" # boolean - Lines are keys in the locale tables (locale/*.csv).
 ---| "mode" # "Box"|"Subtitles" - Box: a dialogue box the player advances. Subtitles: the lines go on the subtitle track ...
+---| "lipSync" # string - A Lip Sync node (path) whose mouth moves with each voiced line.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -3667,6 +3686,7 @@ function TextNode:set_property(path, value, y) end
 ---@overload fun(self: DialogueNode, path: "advanceAction"): string
 ---@overload fun(self: DialogueNode, path: "localized"): boolean
 ---@overload fun(self: DialogueNode, path: "mode"): "Box"|"Subtitles"
+---@overload fun(self: DialogueNode, path: "lipSync"): string
 function DialogueNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -3697,7 +3717,95 @@ function DialogueNode:get_property(path) end
 ---@overload fun(self: DialogueNode, path: "advanceAction", value: string)
 ---@overload fun(self: DialogueNode, path: "localized", value: boolean)
 ---@overload fun(self: DialogueNode, path: "mode", value: "Box"|"Subtitles")
+---@overload fun(self: DialogueNode, path: "lipSync", value: string)
 function DialogueNode:set_property(path, value, y) end
+
+---@class LipSyncNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field mouth string The mouth: a Vector Shape whose group's frames are mouth shapes (path from this node, e...
+---@field sound string The voice it plays (with Play, autoplay or lipsync_play).
+---@field cues string Rhubarb Lip Sync's output (TSV or JSON); empty: the sound's .json / .tsv beside it.
+---@field mapping string Mouth frame names per Rhubarb shape ("A=MBP,B=etc,X=rest"); empty: frames named A-H and...
+---@field autoplay boolean Play the sound when the scene starts.
+---@field playing boolean A voice is moving the mouth now.
+---@field time number Seconds into the voice.
+
+---@alias LipSyncNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "mouth" # string - The mouth: a Vector Shape whose group's frames are mouth shapes (path from this node, e...
+---| "sound" # string - The voice it plays (with Play, autoplay or lipsync_play).
+---| "cues" # string - Rhubarb Lip Sync's output (TSV or JSON); empty: the sound's .json / .tsv beside it.
+---| "mapping" # string - Mouth frame names per Rhubarb shape ("A=MBP,B=etc,X=rest"); empty: frames named A-H and...
+---| "autoplay" # boolean - Play the sound when the scene starts.
+---| "playing" # boolean (runtime) - A voice is moving the mouth now.
+---| "time" # number (runtime) - Seconds into the voice.
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---
+---Example: `local value = self.node:get_property("mouth")`
+---@param path LipSyncNodeProperty|string
+---@return any
+---@overload fun(self: LipSyncNode, path: "position"): Vec2
+---@overload fun(self: LipSyncNode, path: "scale"): Vec2
+---@overload fun(self: LipSyncNode, path: "rotation"): number
+---@overload fun(self: LipSyncNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: LipSyncNode, path: "zIndex"): integer
+---@overload fun(self: LipSyncNode, path: "ySort"): boolean
+---@overload fun(self: LipSyncNode, path: "ySortOffset"): number
+---@overload fun(self: LipSyncNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: LipSyncNode, path: "paused"): boolean
+---@overload fun(self: LipSyncNode, path: "enabled"): boolean
+---@overload fun(self: LipSyncNode, path: "mouth"): string
+---@overload fun(self: LipSyncNode, path: "sound"): string
+---@overload fun(self: LipSyncNode, path: "cues"): string
+---@overload fun(self: LipSyncNode, path: "mapping"): string
+---@overload fun(self: LipSyncNode, path: "autoplay"): boolean
+---@overload fun(self: LipSyncNode, path: "playing"): boolean
+---@overload fun(self: LipSyncNode, path: "time"): number
+function LipSyncNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---
+---Example: `self.node:set_property("mouth", "text")`
+---@param path LipSyncNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: LipSyncNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: LipSyncNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: LipSyncNode, path: "rotation", value: number)
+---@overload fun(self: LipSyncNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: LipSyncNode, path: "zIndex", value: integer)
+---@overload fun(self: LipSyncNode, path: "ySort", value: boolean)
+---@overload fun(self: LipSyncNode, path: "ySortOffset", value: number)
+---@overload fun(self: LipSyncNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: LipSyncNode, path: "paused", value: boolean)
+---@overload fun(self: LipSyncNode, path: "enabled", value: boolean)
+---@overload fun(self: LipSyncNode, path: "mouth", value: string)
+---@overload fun(self: LipSyncNode, path: "sound", value: string)
+---@overload fun(self: LipSyncNode, path: "cues", value: string)
+---@overload fun(self: LipSyncNode, path: "mapping", value: string)
+---@overload fun(self: LipSyncNode, path: "autoplay", value: boolean)
+---@overload fun(self: LipSyncNode, path: "playing", value: boolean)
+---@overload fun(self: LipSyncNode, path: "time", value: number)
+function LipSyncNode:set_property(path, value, y) end
 
 ---@class NineSliceNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -3952,11 +4060,15 @@ function LineNode:set_property(path, value, y) end
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field file string The SVG it draws (project path); empty: the preset. Reloads when the file is saved.
+---@field group string A symbol: draw only this named group of the file (Inkscape layer, Illustrator group; "a...
+---@field frame integer Part swapping: show only this child group of the group (mouths, hands, eyes); -1 shows ...
 ---@field preset "Star"|"Ring"|"Badge"|"Character"|"Gradients" The built-in shape it draws when it has no file.
 ---@field fillColor number[] The shape's fill colour.
 ---@field strokeColor number[] The outline's colour.
 ---@field strokeWidth number Outline thickness (px, in the shape's own scale); 0 = no outline.
 ---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
+---@field brightness number Darken (-1 black) or lighten (1 white) the art (Flash's brightness effect).
+---@field colorAdd number[] A colour added to the art's colours (Flash's advanced colour offset): flash white on a ...
 
 ---@alias VectorShapeNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -3970,11 +4082,15 @@ function LineNode:set_property(path, value, y) end
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "file" # string - The SVG it draws (project path); empty: the preset. Reloads when the file is saved.
+---| "group" # string - A symbol: draw only this named group of the file (Inkscape layer, Illustrator group; "a...
+---| "frame" # integer - Part swapping: show only this child group of the group (mouths, hands, eyes); -1 shows ...
 ---| "preset" # "Star"|"Ring"|"Badge"|"Character"|"Gradients" - The built-in shape it draws when it has no file.
 ---| "fillColor" # number[] - The shape's fill colour.
 ---| "strokeColor" # number[] - The outline's colour.
 ---| "strokeWidth" # number - Outline thickness (px, in the shape's own scale); 0 = no outline.
 ---| "tint" # number[] - Multiplies the texture's colours (white = unchanged; alpha fades it).
+---| "brightness" # number - Darken (-1 black) or lighten (1 white) the art (Flash's brightness effect).
+---| "colorAdd" # number[] - A colour added to the art's colours (Flash's advanced colour offset): flash white on a ...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -3992,11 +4108,15 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: VectorShapeNode, path: "paused"): boolean
 ---@overload fun(self: VectorShapeNode, path: "enabled"): boolean
 ---@overload fun(self: VectorShapeNode, path: "file"): string
+---@overload fun(self: VectorShapeNode, path: "group"): string
+---@overload fun(self: VectorShapeNode, path: "frame"): integer
 ---@overload fun(self: VectorShapeNode, path: "preset"): "Star"|"Ring"|"Badge"|"Character"|"Gradients"
 ---@overload fun(self: VectorShapeNode, path: "fillColor"): number[]
 ---@overload fun(self: VectorShapeNode, path: "strokeColor"): number[]
 ---@overload fun(self: VectorShapeNode, path: "strokeWidth"): number
 ---@overload fun(self: VectorShapeNode, path: "tint"): number[]
+---@overload fun(self: VectorShapeNode, path: "brightness"): number
+---@overload fun(self: VectorShapeNode, path: "colorAdd"): number[]
 function VectorShapeNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -4016,11 +4136,15 @@ function VectorShapeNode:get_property(path) end
 ---@overload fun(self: VectorShapeNode, path: "paused", value: boolean)
 ---@overload fun(self: VectorShapeNode, path: "enabled", value: boolean)
 ---@overload fun(self: VectorShapeNode, path: "file", value: string)
+---@overload fun(self: VectorShapeNode, path: "group", value: string)
+---@overload fun(self: VectorShapeNode, path: "frame", value: integer)
 ---@overload fun(self: VectorShapeNode, path: "preset", value: "Star"|"Ring"|"Badge"|"Character"|"Gradients")
 ---@overload fun(self: VectorShapeNode, path: "fillColor", value: number[])
 ---@overload fun(self: VectorShapeNode, path: "strokeColor", value: number[])
 ---@overload fun(self: VectorShapeNode, path: "strokeWidth", value: number)
 ---@overload fun(self: VectorShapeNode, path: "tint", value: number[])
+---@overload fun(self: VectorShapeNode, path: "brightness", value: number)
+---@overload fun(self: VectorShapeNode, path: "colorAdd", value: number[])
 function VectorShapeNode:set_property(path, value, y) end
 
 ---@class TrailNode
@@ -7250,6 +7374,37 @@ function AnimationPlayerNode:animation_get_current() end
 -- ----------------------------------------------------------------------------
 -- TimerNode Methods
 -- ----------------------------------------------------------------------------
+
+---Part swapping: shows the frame (a child group of the node's group) of that name - a mouth shape, a hand pose, eyes open or closed. Returns false when there is none.
+---
+---Example: `self.node:get_node("Mouth"):vector_swap("D")`
+---@param name string
+---@return boolean ok
+function VectorShapeNode:vector_swap(name) end
+
+---The names of the frames the node's `frame` picks from (its group's child groups), in order.
+---
+---Example: `for i, name in ipairs(self.node:vector_frames()) do Log.info(i - 1 .. " " .. name) end`
+---@return string[] names
+function VectorShapeNode:vector_frames() end
+
+---Plays a voice (default: the node's sound) and moves the mouth with its Rhubarb cues (the sound's .json / .tsv beside it, or the node's cues file). Returns false when there are no cues.
+---
+---Example: `self.node:get_node("LipSync"):lipsync_play("voices/hello.wav")`
+---@param sound? string
+---@return boolean ok
+function LipSyncNode:lipsync_play(sound) end
+
+---Stops the voice and rests the mouth.
+---
+---Example: `self.node:get_node("LipSync"):lipsync_stop()`
+function LipSyncNode:lipsync_stop() end
+
+---Whether a voice is moving the mouth now.
+---
+---Example: `if not lips:lipsync_is_playing() then lips:lipsync_play() end`
+---@return boolean
+function LipSyncNode:lipsync_is_playing() end
 
 ---Starts or restarts the timer from zero.
 ---

@@ -101,6 +101,37 @@
   }
  },
  {
+  "name": "symbols: named groups drawn alone, a mouth's frames (part swapping, also from Lua), brightness and colour offset",
+  "project": "tests/vector/project",
+  "scene": "scenes/symbols.scene.json",
+  "frames": 6,
+  "expect": [
+   [
+    "Eyes",
+    "frame",
+    "==",
+    1
+   ],
+   [
+    "Mouth",
+    "frame",
+    "==",
+    5
+   ],
+   [
+    "Mouth8",
+    "frame",
+    "==",
+    8
+   ]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/symbols.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
   "name": "100 spinning characters run (the benchmark scene)",
   "project": "tests/vector/project",
   "scene": "scenes/bench.scene.json",
