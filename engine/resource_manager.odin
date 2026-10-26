@@ -67,6 +67,7 @@ ResourceManager :: struct {
 	projectDir: string,
 	atlas: Atlas_Index, // the package's sprite atlas (atlas.odin)
 	aseprite: map[string]^Ase_Resource, // Aseprite files (aseprite_resource.odin)
+	vectors:  map[string]^Vector_Resource, // SVG files (vector_asset.odin)
 }
 
 ResourceManager_Init :: proc(rm: ^ResourceManager) {
@@ -96,6 +97,7 @@ ResourceManager_Terminate :: proc(rm: ^ResourceManager) {
 	}
 	delete(rm.textures)
 	Ase_ReleaseAll(rm)
+	Vector_ReleaseAll(rm)
 	rm.textures = nil
 	Atlas_Unmount(rm) // (its pages)
 
@@ -439,6 +441,7 @@ ResourceManager_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 	if rm == nil || !rl.IsWindowReady() || time.tick_since(textureCheck) < 500 * time.Millisecond do return 0
 	textureCheck = time.tick_now()
 	n := Ase_CheckForChanges(rm) // (Aseprite files: aseprite_resource.odin)
+	n += Vector_CheckForChanges(rm) // (SVG files: vector_asset.odin)
 	for t in rm.textures {
 		if t == nil || t.modTime == {} || t.page > 0 do continue
 		info, err := os.stat(t.filePath, context.temp_allocator)

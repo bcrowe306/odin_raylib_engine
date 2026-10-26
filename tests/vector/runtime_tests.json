@@ -82,6 +82,25 @@
   }
  },
  {
+  "name": "SVG assets: Inkscape / Illustrator / Affinity / Figma exports drawn by VectorShapeNode (origin centred, a shared asset drawn twice)",
+  "project": "tests/vector/project",
+  "scene": "scenes/svg.scene.json",
+  "frames": 6,
+  "expect": [
+   [
+    "Figma",
+    "exists",
+    "==",
+    true
+   ]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/svg.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
   "name": "100 spinning characters run (the benchmark scene)",
   "project": "tests/vector/project",
   "scene": "scenes/bench.scene.json",
@@ -89,6 +108,20 @@
   "expect": [
    [
     "C99",
+    "exists",
+    "==",
+    true
+   ]
+  ]
+ },
+ {
+  "name": "100 spinning SVG assets (four files shared by 25 nodes each) run",
+  "project": "tests/vector/project",
+  "scene": "scenes/bench_svg.scene.json",
+  "frames": 30,
+  "expect": [
+   [
+    "A99",
     "exists",
     "==",
     true

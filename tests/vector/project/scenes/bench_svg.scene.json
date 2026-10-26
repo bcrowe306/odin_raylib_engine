@@ -1,0 +1,1833 @@
+{
+ "name": "bench_svg",
+ "background": [
+  34,
+  38,
+  52,
+  255
+ ],
+ "root": {
+  "type": "Node",
+  "name": "root",
+  "children": [
+   {
+    "type": "CameraNode",
+    "name": "Camera",
+    "position": [
+     480,
+     270
+    ],
+    "properties": {
+     "isCurrent": true
+    }
+   },
+   {
+    "type": "Node",
+    "name": "Spinner",
+    "script": {
+     "path": "scripts/spin.lua"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A0",
+    "position": [
+     48,
+     30
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A1",
+    "position": [
+     144,
+     30
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A2",
+    "position": [
+     240,
+     30
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A3",
+    "position": [
+     336,
+     30
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A4",
+    "position": [
+     432,
+     30
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A5",
+    "position": [
+     528,
+     30
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A6",
+    "position": [
+     624,
+     30
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A7",
+    "position": [
+     720,
+     30
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A8",
+    "position": [
+     816,
+     30
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A9",
+    "position": [
+     912,
+     30
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A10",
+    "position": [
+     48,
+     82
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A11",
+    "position": [
+     144,
+     82
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A12",
+    "position": [
+     240,
+     82
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A13",
+    "position": [
+     336,
+     82
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A14",
+    "position": [
+     432,
+     82
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A15",
+    "position": [
+     528,
+     82
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A16",
+    "position": [
+     624,
+     82
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A17",
+    "position": [
+     720,
+     82
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A18",
+    "position": [
+     816,
+     82
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A19",
+    "position": [
+     912,
+     82
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A20",
+    "position": [
+     48,
+     134
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A21",
+    "position": [
+     144,
+     134
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A22",
+    "position": [
+     240,
+     134
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A23",
+    "position": [
+     336,
+     134
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A24",
+    "position": [
+     432,
+     134
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A25",
+    "position": [
+     528,
+     134
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A26",
+    "position": [
+     624,
+     134
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A27",
+    "position": [
+     720,
+     134
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A28",
+    "position": [
+     816,
+     134
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A29",
+    "position": [
+     912,
+     134
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A30",
+    "position": [
+     48,
+     186
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A31",
+    "position": [
+     144,
+     186
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A32",
+    "position": [
+     240,
+     186
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A33",
+    "position": [
+     336,
+     186
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A34",
+    "position": [
+     432,
+     186
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A35",
+    "position": [
+     528,
+     186
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A36",
+    "position": [
+     624,
+     186
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A37",
+    "position": [
+     720,
+     186
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A38",
+    "position": [
+     816,
+     186
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A39",
+    "position": [
+     912,
+     186
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A40",
+    "position": [
+     48,
+     238
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A41",
+    "position": [
+     144,
+     238
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A42",
+    "position": [
+     240,
+     238
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A43",
+    "position": [
+     336,
+     238
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A44",
+    "position": [
+     432,
+     238
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A45",
+    "position": [
+     528,
+     238
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A46",
+    "position": [
+     624,
+     238
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A47",
+    "position": [
+     720,
+     238
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A48",
+    "position": [
+     816,
+     238
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A49",
+    "position": [
+     912,
+     238
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A50",
+    "position": [
+     48,
+     290
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A51",
+    "position": [
+     144,
+     290
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A52",
+    "position": [
+     240,
+     290
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A53",
+    "position": [
+     336,
+     290
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A54",
+    "position": [
+     432,
+     290
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A55",
+    "position": [
+     528,
+     290
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A56",
+    "position": [
+     624,
+     290
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A57",
+    "position": [
+     720,
+     290
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A58",
+    "position": [
+     816,
+     290
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A59",
+    "position": [
+     912,
+     290
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A60",
+    "position": [
+     48,
+     342
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A61",
+    "position": [
+     144,
+     342
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A62",
+    "position": [
+     240,
+     342
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A63",
+    "position": [
+     336,
+     342
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A64",
+    "position": [
+     432,
+     342
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A65",
+    "position": [
+     528,
+     342
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A66",
+    "position": [
+     624,
+     342
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A67",
+    "position": [
+     720,
+     342
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A68",
+    "position": [
+     816,
+     342
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A69",
+    "position": [
+     912,
+     342
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A70",
+    "position": [
+     48,
+     394
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A71",
+    "position": [
+     144,
+     394
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A72",
+    "position": [
+     240,
+     394
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A73",
+    "position": [
+     336,
+     394
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A74",
+    "position": [
+     432,
+     394
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A75",
+    "position": [
+     528,
+     394
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A76",
+    "position": [
+     624,
+     394
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A77",
+    "position": [
+     720,
+     394
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A78",
+    "position": [
+     816,
+     394
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A79",
+    "position": [
+     912,
+     394
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A80",
+    "position": [
+     48,
+     446
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A81",
+    "position": [
+     144,
+     446
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A82",
+    "position": [
+     240,
+     446
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A83",
+    "position": [
+     336,
+     446
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A84",
+    "position": [
+     432,
+     446
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A85",
+    "position": [
+     528,
+     446
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A86",
+    "position": [
+     624,
+     446
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A87",
+    "position": [
+     720,
+     446
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A88",
+    "position": [
+     816,
+     446
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A89",
+    "position": [
+     912,
+     446
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A90",
+    "position": [
+     48,
+     498
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A91",
+    "position": [
+     144,
+     498
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A92",
+    "position": [
+     240,
+     498
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A93",
+    "position": [
+     336,
+     498
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A94",
+    "position": [
+     432,
+     498
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A95",
+    "position": [
+     528,
+     498
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A96",
+    "position": [
+     624,
+     498
+    ],
+    "scale": [
+     0.12,
+     0.12
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/inkscape_character.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A97",
+    "position": [
+     720,
+     498
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/illustrator_css.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A98",
+    "position": [
+     816,
+     498
+    ],
+    "scale": [
+     0.3,
+     0.3
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/affinity_presentation.svg"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "A99",
+    "position": [
+     912,
+     498
+    ],
+    "scale": [
+     0.35,
+     0.35
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "file": "art/figma_export.svg"
+    }
+   }
+  ]
+ }
+}

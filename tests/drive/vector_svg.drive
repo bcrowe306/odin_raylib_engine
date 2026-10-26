@@ -1,0 +1,39 @@
+# SVG files in the editor (Phase 14 M2; vector_editor.odin): they're assets
+# (thumbnails rendered offscreen); dragged into the viewport they make a
+# Vector Shape drawing the file (origin centred); the Inspector's Vector
+# section shows the file, its size and the importer's warnings; dropped onto
+# a Vector Shape they replace its file; picking hits the shape, not its box;
+# saving the file reloads it; the scene saves the path.
+exec mkdir -p $PROJECT/vectors
+exec cp tests/vector/svg/figma_export.svg $PROJECT/vectors/card_zz.svg
+exec cp tests/vector/svg/inkscape_character.svg $PROJECT/vectors/hero_zz.svg
+wait 5
+wait-until item:asset:vectors/card_zz.svg == visible timeout=600
+screenshot assets_thumbnail
+drag @asset:vectors/card_zz.svg @world:500,250 12
+wait 2
+expect node:card_zz.type == VectorShapeNode
+expect node:card_zz.prop.file == vectors/card_zz.svg
+expect selected == card_zz
+expect item:insp.vec.info == visible
+screenshot dropped_card
+# The Inkscape file: its warnings (text, focal point) show in the Inspector.
+drag @asset:vectors/hero_zz.svg @world:850,250 12
+wait 2
+expect node:hero_zz.type == VectorShapeNode
+screenshot dropped_hero_warnings
+# Dropped onto the card: the card now draws the hero (undoable).
+drag @asset:vectors/hero_zz.svg @world:500,250 12
+wait 2
+expect node:card_zz.prop.file == vectors/hero_zz.svg
+key cmd+z
+wait 1
+expect node:card_zz.prop.file == vectors/card_zz.svg
+# Saving the SVG elsewhere reloads it (a different file copied over it).
+exec cp tests/vector/svg/affinity_presentation.svg $PROJECT/vectors/card_zz.svg
+wait 60
+screenshot reloaded
+key cmd+s
+wait 2
+expect file:scenes/main.scene.json contains "file": "vectors/card_zz.svg"
+expect file:scenes/main.scene.json contains VectorShapeNode

@@ -20,6 +20,7 @@ Vector_Preset :: enum u8 {
 
 VectorShapeNode :: struct {
 	using node:  Node,
+	file:        string `gui:"true"`, // an .svg (project-relative); "" = the preset
 	preset:      Vector_Preset `gui:"true"`,
 	fillColor:   rl.Color `gui:"true"`,
 	strokeColor: rl.Color `gui:"true"`,
@@ -28,6 +29,8 @@ VectorShapeNode :: struct {
 	shapes:      [dynamic]Vector_Shape,
 	cache:       Vector_Cache,
 	built:       struct {preset: Vector_Preset, fill, stroke: rl.Color, width: f32, ok: bool},
+	res:         ^Vector_Resource, // the file's (shared)
+	loadedPath:  string,
 }
 
 // The main thread's tessellation scratch (worker threads get their own in M2).
@@ -50,6 +53,9 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 		vector_shapes_free(&v.shapes)
 		delete(v.shapes)
 		Vector_Cache_Destroy(&v.cache)
+		ResourceManager_ReleaseVector(v.res)
+		v.res = nil
+		delete(v.loadedPath, Engine_HeapAllocator())
 	}
 	scene->addNode(v, parent)
 	return v
@@ -79,9 +85,42 @@ VectorShapeNode_Build :: proc(v: ^VectorShapeNode) {
 	v.cache.dirty = true
 }
 
+// VectorShapeNode_Asset: the node's file (loaded / reloaded when `file`
+// changed); nil when it has none or it can't be read.
+VectorShapeNode_Asset :: proc(v: ^VectorShapeNode) -> ^Vector_Resource {
+	if v.file == v.loadedPath do return v.res
+	ResourceManager_ReleaseVector(v.res)
+	v.res = nil
+	delete(v.loadedPath, Engine_HeapAllocator())
+	v.loadedPath = clone_name(v.file, Engine_HeapAllocator())
+	if v.file == "" || v.gameContext == nil || v.gameContext.game == nil do return nil
+	rm := &v.gameContext.game.resourceManager
+	v.res = ResourceManager_LoadVector(rm, Project_ResolveAssetPath(v.gameContext, v.file))
+	return v.res
+}
+
+// VectorShapeNode_Size: the drawn size (an asset's document box; presets:
+// {} - they draw around the position).
+VectorShapeNode_Size :: proc(v: ^VectorShapeNode) -> [2]f32 {
+	if r := VectorShapeNode_Asset(v); r != nil do return r.doc.size
+	return {}
+}
+
 VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	v := cast(^VectorShapeNode)node
 	if !rl.IsWindowReady() do return
+	if r := VectorShapeNode_Asset(v); r != nil {
+		cache: ^Vector_Cache
+		{
+			context.allocator = Engine_HeapAllocator()
+			// (A new zoom: drawn from the nearest mesh while a worker makes the new one.)
+			cache = Vector_ResourceMesh(r, &vectorTess, Vector_ScreenPixel(v.globalScale), background = true)
+		}
+		// The origin (a fraction of the document box) sits at the position.
+		offset := -r.doc.min - Node_OriginPx(v, r.doc.size)
+		Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, v.tint, offset)
+		return
+	}
 	if !v.built.ok || v.built.preset != v.preset || v.built.fill != v.fillColor || v.built.stroke != v.strokeColor || v.built.width != v.strokeWidth {
 		VectorShapeNode_Build(v)
 	}
@@ -90,6 +129,46 @@ VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 		Vector_Cache_Ensure(&v.cache, &vectorTess, v.shapes[:], Vector_ScreenPixel(v.globalScale))
 	}
 	Vector_Cache_Draw(&v.cache, v.globalPosition, v.globalRotation, v.globalScale, v.tint)
+}
+
+// VectorShapeNode_LocalBounds: what the node draws in its own space (before
+// position / rotation / scale), ok = false when it hasn't drawn yet.
+VectorShapeNode_LocalBounds :: proc(v: ^VectorShapeNode) -> (b: [4]f32, ok: bool) {
+	if r := VectorShapeNode_Asset(v); r != nil {
+		off := -r.doc.min - Node_OriginPx(v, r.doc.size)
+		d := r.doc.drawn
+		return {d[0] + off.x, d[1] + off.y, d[2] + off.x, d[3] + off.y}, d != {}
+	}
+	if len(v.cache.mesh.verts) == 0 do return {}, false
+	return v.cache.mesh.bounds, true
+}
+
+// VectorShapeNode_HitTest: whether a world point is on the drawn shape
+// (its triangles, not its box: picking in the editor).
+VectorShapeNode_HitTest :: proc(v: ^VectorShapeNode, world: [2]f32) -> bool {
+	// The point in the node's (mesh's) space.
+	d := world - v.globalPosition
+	r := -v.globalRotation * math.RAD_PER_DEG
+	c, s := math.cos(r), math.sin(r)
+	q := [2]f32{d.x * c - d.y * s, d.x * s + d.y * c}
+	if abs(v.globalScale.x) < 1e-6 || abs(v.globalScale.y) < 1e-6 do return false
+	q /= v.globalScale
+	mesh: ^Vector_Mesh
+	if res := VectorShapeNode_Asset(v); res != nil {
+		q += res.doc.min + Node_OriginPx(v, res.doc.size)
+		for &rc in res.caches do if rc.used != 0 && len(rc.cache.mesh.idx) > 0 {mesh = &rc.cache.mesh; break}
+	} else {
+		mesh = &v.cache.mesh
+	}
+	if mesh == nil || len(mesh.idx) == 0 do return false
+	for i := 0; i < len(mesh.idx); i += 3 {
+		a, b, cc := mesh.verts[mesh.idx[i]], mesh.verts[mesh.idx[i + 1]], mesh.verts[mesh.idx[i + 2]]
+		d1 := (q.x - b.x) * (a.y - b.y) - (a.x - b.x) * (q.y - b.y)
+		d2 := (q.x - cc.x) * (b.y - cc.y) - (b.x - cc.x) * (q.y - cc.y)
+		d3 := (q.x - a.x) * (cc.y - a.y) - (cc.x - a.x) * (q.y - a.y)
+		if !((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)) do return true
+	}
+	return false
 }
 
 // Vector_ShutdownScratch frees the main thread's tessellation buffers

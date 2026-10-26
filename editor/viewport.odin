@@ -297,6 +297,13 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 		}
 	}
 	switch node.typeId {
+	case e.VectorShapeNode:
+		// (Assets: the origin rectangle above; presets: what they drew.)
+		if !have {
+			if b, ok := e.VectorShapeNode_LocalBounds(cast(^e.VectorShapeNode)node); ok {
+				lo, hi, have = [2]f32{b[0], b[1]} * scl, [2]f32{b[2], b[3]} * scl, true
+			}
+		}
 	case e.LineNode:
 		l := cast(^e.LineNode)node
 		for p, i in l.points {
@@ -1013,6 +1020,8 @@ Viewport_PickNode :: proc(state: ^EditorState, worldPos: [2]f32) -> ^e.Node {
 		if Editor_ViewLocked(state, node) || Editor_ViewHidden(state, node) do continue
 		q, _ := Node_Bounds(state, node)
 		if !point_in_quad(worldPos, q) do continue
+		// Vector shapes: on the shape itself, not just its box.
+		if node.typeId == e.VectorShapeNode && !e.VectorShapeNode_HitTest(cast(^e.VectorShapeNode)node, worldPos) do continue
 		// A level covers everything: picked only when nothing else is there.
 		if node.typeId == e.LdtkLevelNode {
 			if level == nil do level = node

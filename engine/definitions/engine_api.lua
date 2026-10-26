@@ -3951,7 +3951,8 @@ function LineNode:set_property(path, value, y) end
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
----@field preset "Star"|"Ring"|"Badge"|"Character"|"Gradients" Which built-in shape it draws (vector assets come with SVG import).
+---@field file string The SVG it draws (project path); empty: the preset. Reloads when the file is saved.
+---@field preset "Star"|"Ring"|"Badge"|"Character"|"Gradients" The built-in shape it draws when it has no file.
 ---@field fillColor number[] The shape's fill colour.
 ---@field strokeColor number[] The outline's colour.
 ---@field strokeWidth number Outline thickness (px, in the shape's own scale); 0 = no outline.
@@ -3968,7 +3969,8 @@ function LineNode:set_property(path, value, y) end
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "preset" # "Star"|"Ring"|"Badge"|"Character"|"Gradients" - Which built-in shape it draws (vector assets come with SVG import).
+---| "file" # string - The SVG it draws (project path); empty: the preset. Reloads when the file is saved.
+---| "preset" # "Star"|"Ring"|"Badge"|"Character"|"Gradients" - The built-in shape it draws when it has no file.
 ---| "fillColor" # number[] - The shape's fill colour.
 ---| "strokeColor" # number[] - The outline's colour.
 ---| "strokeWidth" # number - Outline thickness (px, in the shape's own scale); 0 = no outline.
@@ -3976,7 +3978,7 @@ function LineNode:set_property(path, value, y) end
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
----Example: `local value = self.node:get_property("preset")`
+---Example: `local value = self.node:get_property("file")`
 ---@param path VectorShapeNodeProperty|string
 ---@return any
 ---@overload fun(self: VectorShapeNode, path: "position"): Vec2
@@ -3989,6 +3991,7 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: VectorShapeNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: VectorShapeNode, path: "paused"): boolean
 ---@overload fun(self: VectorShapeNode, path: "enabled"): boolean
+---@overload fun(self: VectorShapeNode, path: "file"): string
 ---@overload fun(self: VectorShapeNode, path: "preset"): "Star"|"Ring"|"Badge"|"Character"|"Gradients"
 ---@overload fun(self: VectorShapeNode, path: "fillColor"): number[]
 ---@overload fun(self: VectorShapeNode, path: "strokeColor"): number[]
@@ -3998,7 +4001,7 @@ function VectorShapeNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
----Example: `self.node:set_property("preset", "Ring")`
+---Example: `self.node:set_property("file", "text")`
 ---@param path VectorShapeNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -4012,6 +4015,7 @@ function VectorShapeNode:get_property(path) end
 ---@overload fun(self: VectorShapeNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: VectorShapeNode, path: "paused", value: boolean)
 ---@overload fun(self: VectorShapeNode, path: "enabled", value: boolean)
+---@overload fun(self: VectorShapeNode, path: "file", value: string)
 ---@overload fun(self: VectorShapeNode, path: "preset", value: "Star"|"Ring"|"Badge"|"Character"|"Gradients")
 ---@overload fun(self: VectorShapeNode, path: "fillColor", value: number[])
 ---@overload fun(self: VectorShapeNode, path: "strokeColor", value: number[])

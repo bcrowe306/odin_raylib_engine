@@ -93,3 +93,13 @@ own file.
 - QOI is detected by its header, so a QOI file stored under `.png` loads
   through the same paths (the background decoder too).
 - Export converts on the editor's side; the game never sees the PNG.
+
+## Vector art (SVG)
+
+| Key | | |
+|---|---|---|
+| `vector_scale` | `1` | Document units to pixels for every Vector Shape drawing the file (`0.5`: art drawn at twice the needed size). Changing it reloads the file. |
+| `origin` | centre | The origin (`[x, y]`, a fraction of the document box) new Vector Shapes of the file get; each node's Origin row can still change it. |
+
+Set them in the Preview panel when the SVG is selected in Assets
+([vector art](vector.md)).

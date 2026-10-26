@@ -365,6 +365,15 @@ prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
 	if (node.typeId == e.NineSliceNode || node.typeId == e.ParallaxNode) && name == "texturePath" do return false
 	// Fonts are picked in the Font section.
 	if (node.typeId == e.TextNode || node.typeId == e.DialogueNode) && name == "font" do return false
+	// (The Vector section picks the file; the preset's style only applies without one.)
+	if node.typeId == e.VectorShapeNode {
+		if name == "file" do return false
+		if (cast(^e.VectorShapeNode)node).file != "" {
+			switch name {
+			case "preset", "fillColor", "strokeColor", "strokeWidth": return false
+			}
+		}
+	}
 	// (The Aseprite section edits these.)
 	if node.typeId == e.AsepriteNode {
 		switch name {
@@ -787,6 +796,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_skeleton(state, cast(^e.SkeletonNode)node)
 	case e.AsepriteNode:
 		inspector_aseprite(state, cast(^e.AsepriteNode)node) // (aseprite_editor.odin)
+	case e.VectorShapeNode:
+		inspector_vector(state, cast(^e.VectorShapeNode)node) // (vector_editor.odin)
 	case e.AdvancedCameraNode:
 		inspector_adv_camera(state, cast(^e.AdvancedCameraNode)node)
 	case e.NavigationRegionNode:
@@ -1238,6 +1249,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.NineSliceNode: return ICON_FA_VECTOR_SQUARE
 	case e.ParallaxNode: return ICON_FA_MOUNTAIN
 	case e.LineNode: return ICON_FA_DRAW_POLYGON
+	case e.VectorShapeNode: return ICON_FA_PAINTBRUSH
 	case e.TrailNode: return ICON_FA_WIND
 	case e.VisibilityNotifierNode: return ICON_FA_EYE
 	case e.PathNode: return ICON_FA_BEZIER_CURVE

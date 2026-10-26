@@ -295,6 +295,7 @@ preload_is_image :: proc(path: string) -> bool {
 Scene_PreloadStep :: proc(game: ^Game, budget: time.Duration = 4 * time.Millisecond) {
 	rm := &game.resourceManager
 	Decode_Pump(rm) // finished decodes -> textures (also for abandoned preloads)
+	Vector_JobPump() // finished vector tessellations -> their assets (vector_jobs.odin)
 	if len(game.preloads) == 0 do return
 	start := time.tick_now()
 	ctx := &game.gameContext
@@ -404,4 +405,5 @@ Scene_FlowShutdown :: proc(game: ^Game) {
 	delete(game.preloads)
 	game.preloads = nil
 	Decode_Shutdown()
+	Vector_JobsShutdown()
 }

@@ -35,7 +35,7 @@ PreviewPanel_OnAssetSelected :: proc(state: ^EditorState, fullPath: string) {
 	ext := strings.to_lower(filepath.ext(fullPath), context.temp_allocator)
 
 	switch ext {
-	case ".png", ".jpg", ".jpeg", ".bmp", ".tga":
+	case ".png", ".jpg", ".jpeg", ".bmp", ".tga", ".svg":
 		PreviewPanel_LoadTexture(state, fullPath)
 		if state.previewAutoSwitch {
 			state.previewTab = .Texture
@@ -118,7 +118,18 @@ PreviewPanel_LoadTexture :: proc(state: ^EditorState, fullPath: string) {
 	}
 
 	pathC := strings.clone_to_cstring(fullPath, context.temp_allocator)
-	tex := rl.LoadTexture(pathC)
+	tex: rl.Texture2D
+	if e.Vector_IsPath(fullPath) {
+		// Vector art: rendered to fit 512 px (vector_editor.odin).
+		img := e.Vector_FileImage(fullPath, 512)
+		if img.data != nil {
+			tex = rl.LoadTextureFromImage(img)
+			rl.UnloadImage(img)
+			rl.SetTextureFilter(tex, .BILINEAR)
+		}
+	} else {
+		tex = rl.LoadTexture(pathC)
+	}
 	if tex.id > 0 {
 		state.previewTexture = tex
 		state.previewTextureLoaded = true
@@ -335,7 +346,8 @@ PreviewPanel_RenderTexture :: proc(state: ^EditorState) {
 
 	imgui.SameLine()
 	imgui.Checkbox("Fit", &state.previewTextureFit)
-	preview_texture_import(state)
+	if e.Vector_IsPath(state.previewTexturePath) do Vector_ImportRows(state, state.previewTexturePath)
+	else do preview_texture_import(state)
 
 	imgui.Separator()
 
