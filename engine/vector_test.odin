@@ -349,3 +349,99 @@ test_vector_is_convex :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, !Vector_IsConvex(star[:]), "a self-crossing pentagram")
 }
+
+// Paints (M1): gradient coordinates, colours, spreads, transforms; the mesh's
+// baked rows and per-vertex modes; dashes; opacity.
+@(test)
+test_vector_paints :: proc(t: ^testing.T) {
+	stops := []Vector_Stop{{0, {0, 0, 0, 255}}, {1, {255, 255, 255, 255}}}
+	lin := Vector_LinearGradient({0, 0}, {100, 0}, stops)
+	testing.expect_value(t, Vector_PaintCoord(&lin, {50, 30}).x, 0.5)
+	testing.expect_value(t, Vector_PaintCoord(&lin, {150, 0}).x, 1.5)
+	c := Vector_PaintColorAt(&lin, 0.5)
+	testing.expect(t, c.r >= 127 && c.r <= 128 && c.a == 255, "halfway grey")
+	testing.expect_value(t, Vector_PaintSpread(.Pad, 1.5), 1)
+	testing.expect_value(t, Vector_PaintSpread(.Repeat, 1.25), 0.25)
+	testing.expect_value(t, Vector_PaintSpread(.Reflect, 1.25), 0.75)
+	testing.expect_value(t, Vector_PaintSpread(.Reflect, -0.25), 0.25)
+	rad := Vector_RadialGradient({10, 10}, 20, stops)
+	g := Vector_PaintCoord(&rad, {30, 10})
+	testing.expect(t, abs(g.x - 1) < 1e-5 && abs(g.y) < 1e-5, "radial: one radius out")
+	// A transform moves the gradient: its centre is now at (110, 10).
+	rad.transform = {1, 0, 0, 1, 100, 0}
+	g = Vector_PaintCoord(&rad, {110, 10})
+	testing.expect(t, abs(g.x) < 1e-5 && abs(g.y) < 1e-5, "transformed centre")
+	// Scaled 2x: one radius is 40 units.
+	rad.transform = {2, 0, 0, 2, 0, 0}
+	g = Vector_PaintCoord(&rad, {60, 20})
+	testing.expect(t, abs(g.x - 1) < 1e-5, "scaled gradient")
+	// Multi-stop interpolation.
+	three := Vector_LinearGradient({0, 0}, {1, 0}, {{0, {255, 0, 0, 255}}, {0.5, {0, 255, 0, 255}}, {1, {0, 0, 255, 255}}})
+	testing.expect_value(t, Vector_PaintColorAt(&three, 0.5), [4]u8{0, 255, 0, 255})
+	testing.expect_value(t, Vector_PaintColorAt(&three, 0.75), [4]u8{0, 128, 128, 255})
+
+	// The preset: rows baked, gradient vertices tagged, dashes cut, opacity applied.
+	shapes := make([dynamic]Vector_Shape)
+	defer {
+		for &s in shapes do Vector_Path_Destroy(&s.path)
+		delete(shapes)
+	}
+	Vector_PresetShapes(.Gradients, {255, 200, 0, 255}, {40, 20, 10, 255}, 3, &shapes)
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	m: Vector_Mesh
+	defer Vector_Mesh_Destroy(&m)
+	Vector_Tessellate(&tess, shapes[:], 1, &m)
+	testing.expect_value(t, len(m.gradients), 3) // sky, stripes, orb
+	testing.expect_value(t, len(m.gc), len(m.verts))
+	testing.expect_value(t, len(m.gi), len(m.verts))
+	modes: [16]int
+	for gi in m.gi do modes[int(gi.y)] += 1
+	testing.expect(t, modes[0] > 0, "solid vertices (strokes, the glass)")
+	testing.expect(t, modes[1 + 0 + int(Vector_Spread.Pad)] > 0, "linear pad (the sky)")
+	testing.expect(t, modes[1 + 0 + int(Vector_Spread.Reflect)] > 0, "linear reflect (the stripes)")
+	testing.expect(t, modes[1 + 4 + int(Vector_Spread.Pad)] > 0, "radial (the orb)")
+	// The sky's row: dark blue at the top, warm at the bottom.
+	testing.expect(t, m.gradients[0][0].b > 150 && m.gradients[0][255].r > 250, "baked sky row")
+	// The glass: 35% opacity.
+	testing.expect(t, covered(&m, {80, -80}), "the glass is drawn")
+	found := false
+	for col, i in m.cols do if m.verts[i] == {20 + 0.5, -90 + 0.5} || (abs(m.verts[i].x - 20.5) < 0.01 && abs(m.verts[i].y + 89.5) < 0.01) {
+		testing.expectf(t, col.a == 89, "opacity alpha %v", col.a)
+		found = true
+	}
+	testing.expect(t, found, "a glass corner vertex")
+}
+
+@(test)
+test_vector_dashes :: proc(t: ^testing.T) {
+	s := Vector_Shape{style = VECTOR_STYLE_DEFAULT}
+	Vector_Path_Init(&s.path)
+	defer Vector_Path_Destroy(&s.path)
+	s.style.fill = false
+	s.style.stroke = true
+	s.style.strokeWidth = 4
+	s.style.cap = .Butt
+	s.style.dash = {count = 2, values = {10, 10, 0, 0, 0, 0, 0, 0}}
+	Vector_MoveTo(&s.path, {0, 0}); Vector_LineTo(&s.path, {100, 0})
+	shapes := []Vector_Shape{s}
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	m: Vector_Mesh
+	defer Vector_Mesh_Destroy(&m)
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect_value(t, len(tess.dashed.contours), 5) // 0-10, 20-30, ... 80-90
+	testing.expect(t, covered(&m, {5, 0}) && covered(&m, {25, 0}) && covered(&m, {85, 0}), "dashes")
+	testing.expect(t, !covered(&m, {15, 0}) && !covered(&m, {35, 0}) && !covered(&m, {95, 0}), "gaps")
+	// Offset 5: starts halfway through a dash.
+	shapes[0].style.dash.offset = 5
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect(t, covered(&m, {2, 0}) && !covered(&m, {8, 0}) && covered(&m, {18, 0}), "offset shifts the pattern")
+	// A closed square's dashes go round the corner.
+	Vector_Path_Clear(&shapes[0].path)
+	Vector_Rect(&shapes[0].path, {0, 0}, {40, 40})
+	shapes[0].style.dash = {count = 2, values = {30, 10, 0, 0, 0, 0, 0, 0}}
+	Vector_Tessellate(&tess, shapes, 1, &m)
+	testing.expect_value(t, len(tess.dashed.contours), 4)
+	testing.expect(t, covered(&m, {40, 15}), "a dash turned the corner")
+}

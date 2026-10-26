@@ -47,6 +47,7 @@ Vector_DrawModeNow :: proc() -> Vector_Draw_Mode {
 Vector_Cache :: struct {
 	mesh:     Vector_Mesh,
 	gpu:      [dynamic]rl.Mesh,
+	gradTex:  rl.Texture2D, // the mesh's gradient rows (none: solid only)
 	bucket:   f32, // the screen-pixel size it was tessellated for (0: never)
 	dirty:    bool,
 	uploaded: bool,
@@ -58,6 +59,54 @@ vectorMaterial: rl.Material
 @(private = "file")
 vectorMaterialReady: bool
 
+// The vector shader: solid vertices use their colour; gradient vertices
+// (mode > 0) look their colour up in the mesh's gradient texture at the
+// position their gradient coordinates give (linear: x; radial: the length),
+// after the spread (pad / reflect / repeat); alpha carries the edge fringe
+// and opacity either way.
+@(private = "file")
+VECTOR_VS :: `#version 330
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec2 vertexTexCoord2;
+in vec4 vertexColor;
+uniform mat4 mvp;
+out vec2 fragGrad;
+out vec2 fragMode;
+out vec4 fragColor;
+void main() {
+    fragGrad = vertexTexCoord;
+    fragMode = vertexTexCoord2;
+    fragColor = vertexColor;
+    gl_Position = mvp * vec4(vertexPosition, 1.0);
+}
+`
+
+@(private = "file")
+VECTOR_FS :: `#version 330
+in vec2 fragGrad;
+in vec2 fragMode;
+in vec4 fragColor;
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+out vec4 finalColor;
+void main() {
+    vec4 c = fragColor;
+    if (fragMode.y > 0.5) {
+        float mode = floor(fragMode.y + 0.5) - 1.0;
+        float kind = floor(mode / 4.0);
+        float spread = mode - kind * 4.0;
+        float t = kind < 0.5 ? fragGrad.x : length(fragGrad);
+        if (spread < 0.5) t = clamp(t, 0.0, 1.0);
+        else if (spread < 1.5) t = 1.0 - abs(mod(t, 2.0) - 1.0);
+        else t = fract(t);
+        vec4 g = texture(texture0, vec2((t * 255.0 + 0.5) / 256.0, fragMode.x));
+        c = vec4(g.rgb, g.a * fragColor.a);
+    }
+    finalColor = c * colDiffuse;
+}
+`
+
 // Vector_Cache_Destroy frees the mesh and its GPU buffers.
 Vector_Cache_Destroy :: proc(c: ^Vector_Cache) {
 	vector_cache_unload(c)
@@ -68,6 +117,8 @@ Vector_Cache_Destroy :: proc(c: ^Vector_Cache) {
 
 @(private = "file")
 vector_cache_unload :: proc(c: ^Vector_Cache) {
+	if c.gradTex.id != 0 && rl.IsWindowReady() do rl.UnloadTexture(c.gradTex)
+	c.gradTex = {}
 	for &m in c.gpu {
 		if rl.IsWindowReady() do rl.UnloadMesh(m)
 		else {
@@ -83,6 +134,8 @@ vector_cache_unload :: proc(c: ^Vector_Cache) {
 free_mesh_cpu :: proc(m: ^rl.Mesh) {
 	rl.MemFree(m.vertices)
 	rl.MemFree(m.colors)
+	rl.MemFree(m.texcoords)
+	rl.MemFree(m.texcoords2)
 	rl.MemFree(m.indices)
 	m^ = {}
 }
@@ -113,6 +166,14 @@ Vector_Cache_Ensure :: proc(c: ^Vector_Cache, t: ^Vector_Tess, shapes: []Vector_
 vector_cache_upload :: proc(c: ^Vector_Cache) {
 	m := &c.mesh
 	if len(m.idx) == 0 {c.uploaded = true; return}
+	// The gradient rows as a texture (rows = gradients; sampled at row centres).
+	rows := len(m.gradients)
+	if rows > 0 {
+		img := rl.Image{data = raw_data(m.gradients), width = 256, height = i32(rows), mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8}
+		c.gradTex = rl.LoadTextureFromImage(img)
+		rl.SetTextureFilter(c.gradTex, .BILINEAR)
+		rl.SetTextureWrap(c.gradTex, .CLAMP)
+	}
 	remap := make([]i32, len(m.verts), context.temp_allocator)
 	tri := 0
 	ntri := len(m.idx) / 3
@@ -120,6 +181,8 @@ vector_cache_upload :: proc(c: ^Vector_Cache) {
 		for &r in remap do r = -1
 		verts := make([dynamic][3]f32, context.temp_allocator)
 		cols := make([dynamic][4]u8, context.temp_allocator)
+		gc := make([dynamic][2]f32, context.temp_allocator)
+		gi := make([dynamic][2]f32, context.temp_allocator)
 		idx := make([dynamic]u16, context.temp_allocator)
 		for tri < ntri {
 			if len(verts) + 3 > 65535 do break
@@ -129,6 +192,11 @@ vector_cache_upload :: proc(c: ^Vector_Cache) {
 					remap[v] = i32(len(verts))
 					append(&verts, [3]f32{m.verts[v].x, m.verts[v].y, 0})
 					append(&cols, m.cols[v])
+					append(&gc, m.gc[v])
+					// (The row index as a texture coordinate at the row's centre.)
+					g := m.gi[v]
+					if g.y > 0 do g.x = (g.x + 0.5) / f32(max(rows, 1))
+					append(&gi, g)
 				}
 				append(&idx, u16(remap[v]))
 			}
@@ -140,8 +208,12 @@ vector_cache_upload :: proc(c: ^Vector_Cache) {
 		mesh.vertices = cast([^]f32)rl.MemAlloc(u32(len(verts) * 12))
 		mesh.colors = cast([^]u8)rl.MemAlloc(u32(len(cols) * 4))
 		mesh.indices = cast([^]u16)rl.MemAlloc(u32(len(idx) * 2))
+		mesh.texcoords = cast([^]f32)rl.MemAlloc(u32(len(gc) * 8))
+		mesh.texcoords2 = cast([^]f32)rl.MemAlloc(u32(len(gi) * 8))
 		copy((cast([^][3]f32)mesh.vertices)[:len(verts)], verts[:])
 		copy((cast([^][4]u8)mesh.colors)[:len(cols)], cols[:])
+		copy((cast([^][2]f32)mesh.texcoords)[:len(gc)], gc[:])
+		copy((cast([^][2]f32)mesh.texcoords2)[:len(gi)], gi[:])
 		copy(mesh.indices[:len(idx)], idx[:])
 		rl.UploadMesh(&mesh, false)
 		append(&c.gpu, mesh)
@@ -170,9 +242,11 @@ Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [
 	if Vector_DrawModeNow() == .GPU && c.uploaded {
 		if !vectorMaterialReady {
 			vectorMaterial = rl.LoadMaterialDefault()
+			vectorMaterial.shader = rl.LoadShaderFromMemory(Shader_Port(VECTOR_VS), Shader_Port(VECTOR_FS))
 			vectorMaterialReady = true
 		}
 		vectorMaterial.maps[rl.MaterialMapIndex.ALBEDO].color = tint
+		vectorMaterial.maps[rl.MaterialMapIndex.ALBEDO].texture = c.gradTex if c.gradTex.id != 0 else rl.Texture2D{id = rlgl.GetTextureIdDefault(), width = 1, height = 1, mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8}
 		xf := rl.MatrixTranslate(pos.x, pos.y, 0) * rl.MatrixRotateZ(rotation * rl.DEG2RAD) * rl.MatrixScale(scale.x, scale.y, 1)
 		for m in c.gpu do rl.DrawMesh(m, vectorMaterial, xf)
 		return
@@ -189,10 +263,26 @@ Vector_Cache_Draw :: proc(c: ^Vector_Cache, pos: [2]f32, rotation: f32, scale: [
 		for k in 0 ..< 3 {
 			v := m.idx[i + k]
 			col := m.cols[v]
+			if m.gi[v].y > 0 do col = vector_vertex_gradient(m, v) // (per vertex: an approximation)
 			rlgl.Color4ub(u8(u32(col.r) * tr / 255), u8(u32(col.g) * tg / 255), u8(u32(col.b) * tb / 255), u8(u32(col.a) * ta / 255))
 			rlgl.Vertex2f(m.verts[v].x, m.verts[v].y)
 		}
 	}
 	rlgl.End()
 	rlgl.PopMatrix()
+}
+
+// vector_vertex_gradient: a gradient vertex's colour on the CPU (the
+// immediate path; the shader does this per pixel).
+@(private = "file")
+vector_vertex_gradient :: proc(m: ^Vector_Mesh, v: u32) -> [4]u8 {
+	g := m.gi[v]
+	row := clamp(int(g.x), 0, len(m.gradients) - 1)
+	mode := int(g.y + 0.5) - 1
+	kind, spread := mode / 4, Vector_Spread(mode % 4)
+	gc := m.gc[v]
+	t := gc.x if kind == 0 else math.sqrt(gc.x * gc.x + gc.y * gc.y)
+	t = Vector_PaintSpread(spread, t)
+	c := m.gradients[row][clamp(int(t * 255 + 0.5), 0, 255)]
+	return {c.r, c.g, c.b, u8(u32(c.a) * u32(m.cols[v].a) / 255)}
 }

@@ -22,24 +22,54 @@ import clip "clipper"
 // ============================================================================
 
 Vector_Mesh :: struct {
-	verts:  [dynamic][2]f32,
-	cols:   [dynamic][4]u8,
-	idx:    [dynamic]u32,
-	bounds: [4]f32, // min x, min y, max x, max y
+	verts:     [dynamic][2]f32,
+	cols:      [dynamic][4]u8,
+	gc:        [dynamic][2]f32, // gradient coordinates (vector_path.odin Vector_PaintCoord)
+	gi:        [dynamic][2]f32, // gradient row, mode (0: solid; 1 + kind * 4 + spread)
+	idx:       [dynamic]u32,
+	gradients: [dynamic][256][4]u8, // one baked row per gradient paint
+	bounds:    [4]f32, // min x, min y, max x, max y
+	// (While tessellating: the paint new vertices take.)
+	curPaint:  ^Vector_Paint,
+	curRow:    int,
 }
 
 Vector_Mesh_Clear :: proc(m: ^Vector_Mesh) {
 	clear(&m.verts)
 	clear(&m.cols)
+	clear(&m.gc)
+	clear(&m.gi)
 	clear(&m.idx)
+	clear(&m.gradients)
 	m.bounds = {}
+	m.curPaint = nil
 }
 
 Vector_Mesh_Destroy :: proc(m: ^Vector_Mesh) {
 	delete(m.verts)
 	delete(m.cols)
+	delete(m.gc)
+	delete(m.gi)
 	delete(m.idx)
+	delete(m.gradients)
 	m^ = {}
+}
+
+// vector_mesh_paint: what the next vertices are painted with; returns the
+// colour to give them (a gradient: white with the coverage / opacity in
+// alpha; solid: the colour faded by the opacity).
+@(private = "file")
+vector_mesh_paint :: proc(m: ^Vector_Mesh, paint: ^Vector_Paint, solid: [4]u8, opacity: f32) -> [4]u8 {
+	if paint.kind == .Solid || paint.stopCount == 0 {
+		m.curPaint = nil
+		return {solid.r, solid.g, solid.b, u8(f32(solid.a) * opacity + 0.5)}
+	}
+	row: [256][4]u8
+	for i in 0 ..< 256 do row[i] = Vector_PaintColorAt(paint, f32(i) / 255)
+	append(&m.gradients, row)
+	m.curPaint = paint
+	m.curRow = len(m.gradients) - 1
+	return {255, 255, 255, u8(255 * opacity + 0.5)}
 }
 
 // Vector_Tess: scratch buffers kept between tessellations (no allocation per
@@ -57,6 +87,7 @@ Vector_Tess :: struct {
 	ec:      Earcut,
 	cxy:     [dynamic]f64, // contours for the clipper
 	ccounts: [dynamic]i32,
+	dashed:  Vector_Flat, // a dashed stroke's pieces
 }
 
 Vector_Tess_Destroy :: proc(t: ^Vector_Tess) {
@@ -71,6 +102,7 @@ Vector_Tess_Destroy :: proc(t: ^Vector_Tess) {
 	delete(t.tri)
 	delete(t.cxy)
 	delete(t.ccounts)
+	Vector_Flat_Destroy(&t.dashed)
 	Earcut_Destroy(&t.ec)
 	t^ = {}
 }
@@ -82,9 +114,18 @@ Vector_Tessellate :: proc(t: ^Vector_Tess, shapes: []Vector_Shape, pixel: f32, m
 	for &s in shapes {
 		Vector_Flatten(&s.path, px * 0.25, &t.flat)
 		if len(t.flat.contours) == 0 do continue
-		if s.style.fill && s.style.fillColor.a > 0 do tess_fill(t, s.style, px, mesh)
-		if s.style.stroke && s.style.strokeColor.a > 0 && s.style.strokeWidth > 0 do tess_stroke(t, s.style, px, mesh)
+		opacity := s.style.opacity if s.style.opacity > 0 else 1
+		if s.style.fill && (s.style.fillColor.a > 0 || s.style.fillPaint.kind != .Solid) {
+			col := vector_mesh_paint(mesh, &s.style.fillPaint, s.style.fillColor, opacity)
+			tess_fill(t, s.style, col, px, mesh)
+		}
+		if s.style.stroke && (s.style.strokeColor.a > 0 || s.style.strokePaint.kind != .Solid) && s.style.strokeWidth > 0 {
+			col := vector_mesh_paint(mesh, &s.style.strokePaint, s.style.strokeColor, opacity)
+			if s.style.dash.count > 0 do vector_dash(&t.flat, &t.dashed, s.style.dash)
+			tess_stroke(t, s.style, col, px, mesh, &t.dashed if s.style.dash.count > 0 else &t.flat)
+		}
 	}
+	mesh.curPaint = nil
 	if len(mesh.verts) > 0 {
 		b := [4]f32{max(f32), max(f32), min(f32), min(f32)}
 		for v in mesh.verts {
@@ -99,6 +140,14 @@ Vector_Tessellate :: proc(t: ^Vector_Tess, shapes: []Vector_Shape, pixel: f32, m
 add_vert :: #force_inline proc(m: ^Vector_Mesh, p: [2]f32, c: [4]u8) -> u32 {
 	append(&m.verts, p)
 	append(&m.cols, c)
+	if m.curPaint != nil {
+		append(&m.gc, Vector_PaintCoord(m.curPaint, p))
+		mode := 1 + (0 if m.curPaint.kind == .Linear else 4) + int(m.curPaint.spread)
+		append(&m.gi, [2]f32{f32(m.curRow), f32(mode)})
+	} else {
+		append(&m.gc, [2]f32{})
+		append(&m.gi, [2]f32{})
+	}
 	return u32(len(m.verts) - 1)
 }
 
@@ -139,7 +188,7 @@ miter :: #force_inline proc(n0, n1: [2]f32) -> [2]f32 {
 }
 
 @(private = "file")
-tess_fill :: proc(t: ^Vector_Tess, style: Vector_Style, px: f32, mesh: ^Vector_Mesh) {
+tess_fill :: proc(t: ^Vector_Tess, style: Vector_Style, col: [4]u8, px: f32, mesh: ^Vector_Mesh) {
 	f := &t.flat
 	// Normalize: the area the contours cover under the fill rule, as simple
 	// outer rings with their holes (Clipper2: self-intersections, overlaps,
@@ -159,7 +208,7 @@ tess_fill :: proc(t: ^Vector_Tess, style: Vector_Style, px: f32, mesh: ^Vector_M
 			if Vector_IsConvex(pts) {
 				clear(&t.poly); clear(&t.holes)
 				base := u32(len(mesh.verts))
-				append_fill_ring(t, pts, 1 if Vector_SignedArea(pts) > 0 else -1, px * 0.5, style.fillColor, mesh)
+				append_fill_ring(t, pts, 1 if Vector_SignedArea(pts) > 0 else -1, px * 0.5, col, mesh)
 				clear(&t.tri)
 				if Earcut_Triangulate(&t.ec, t.poly[:], nil, &t.tri) {
 					for v in t.tri do append(&mesh.idx, base + v)
@@ -180,7 +229,6 @@ tess_fill :: proc(t: ^Vector_Tess, style: Vector_Style, px: f32, mesh: ^Vector_M
 	for i in 0 ..< int(res.points) do append(&t.ring, [2]f32{f32(res.xy[i * 2]), f32(res.xy[i * 2 + 1])})
 	for i in 0 ..< int(res.contours) do starts[i + 1] = starts[i] + int(res.counts[i])
 	contour :: proc(t: ^Vector_Tess, starts: []int, i: int) -> [][2]f32 {return t.ring[starts[i]:starts[i + 1]]}
-	col := style.fillColor
 	half := px * 0.5
 	for i in 0 ..< int(res.contours) {
 		if res.parents[i] >= 0 || res.counts[i] < 3 do continue // (holes: with their outer)
@@ -231,9 +279,8 @@ append_fill_ring :: proc(t: ^Vector_Tess, pts: [][2]f32, outward: f32, half: f32
 }
 
 @(private = "file")
-tess_stroke :: proc(t: ^Vector_Tess, style: Vector_Style, px: f32, mesh: ^Vector_Mesh) {
-	f := &t.flat
-	col := style.strokeColor
+tess_stroke :: proc(t: ^Vector_Tess, style: Vector_Style, col_: [4]u8, px: f32, mesh: ^Vector_Mesh, f: ^Vector_Flat) {
+	col := col_
 	w := style.strokeWidth
 	// Thinner than a pixel: a pixel-wide line, fainter.
 	if w < px {
@@ -368,4 +415,59 @@ Vector_IsConvex :: proc(pts: [][2]f32) -> bool {
 		turn += math.atan2(cr, d1.x * d2.x + d1.y * d2.y)
 	}
 	return sign != 0 && abs(abs(turn) - 2 * math.PI) < 0.01
+}
+
+// vector_dash: the flattened contours cut into dashes (open pieces) by the
+// pattern; a closed contour's closing edge is dashed too.
+@(private = "file")
+vector_dash :: proc(src, dst: ^Vector_Flat, dash: Vector_Dash) {
+	clear(&dst.pts)
+	clear(&dst.contours)
+	n := int(dash.count)
+	total: f32
+	for i in 0 ..< n do total += max(dash.values[i], 0)
+	if total <= 1e-6 do return
+	for c in src.contours {
+		pts := Vector_Contour_Points(src, c)
+		segs := len(pts) if c.closed else len(pts) - 1
+		// Where in the pattern the contour starts (the offset shifts it).
+		pos := dash.offset - total * math.floor(dash.offset / total)
+		k := 0
+		for pos >= max(dash.values[k], 0) {
+			pos -= max(dash.values[k], 0)
+			k = (k + 1) % n
+		}
+		left := max(dash.values[k], 0) - pos // of the current dash / gap
+		on := k % 2 == 0
+		cur := Vector_Contour{first = len(dst.pts)}
+		if on {append(&dst.pts, pts[0]); cur.count = 1}
+		for i in 0 ..< segs {
+			a, b := pts[i], pts[(i + 1) % len(pts)]
+			d := b - a
+			l := math.sqrt(d.x * d.x + d.y * d.y)
+			at: f32 = 0
+			for l - at > left {
+				at += left
+				q := a + d * (at / l)
+				if on {
+					append(&dst.pts, q); cur.count += 1
+					if cur.count >= 2 do append(&dst.contours, cur)
+					cur = {first = len(dst.pts)}
+				} else {
+					append(&dst.pts, q)
+					cur = {first = len(dst.pts) - 1, count = 1}
+				}
+				on = !on
+				k = (k + 1) % n
+				left = max(dash.values[k], 0)
+				if left <= 0 {
+					// (A zero-length dash: a dot, drawn by the caps.)
+					continue
+				}
+			}
+			left -= l - at
+			if on {append(&dst.pts, b); cur.count += 1}
+		}
+		if on && cur.count >= 2 do append(&dst.contours, cur)
+	}
 }

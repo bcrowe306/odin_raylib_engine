@@ -1,0 +1,5 @@
+{"name": "paints", "background": [34, 38, 52, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "CameraNode", "name": "Camera", "position": [480, 270], "properties": {"isCurrent": true}},
+ {"type": "VectorShapeNode", "name": "Paints", "position": [260, 270], "scale": [1.8, 1.8], "properties": {"preset": "Gradients", "fillColor": "#ffc107ff", "strokeColor": "#3e2723ff", "strokeWidth": 3}},
+ {"type": "VectorShapeNode", "name": "PaintsSmall", "position": [740, 270], "scale": [1.0, 1.0], "rotation": 15, "properties": {"preset": "Gradients", "fillColor": "#e91e63ff", "strokeColor": "#ffffffff", "strokeWidth": 2}}
+]}}
