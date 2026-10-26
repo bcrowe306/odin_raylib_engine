@@ -1,0 +1,170 @@
+package engine
+
+import "core:log"
+import os "osx"
+import "core:strings"
+import "core:time"
+import rl "vendor:raylib"
+
+// ============================================================================
+// Vector assets (Phase 14 V.4 / V.5): an SVG file loaded once per path
+// (counted) and reloaded when it changes (ResourceManager_CheckForChanges:
+// saving in Inkscape / Illustrator / Affinity shows up in the editor and in
+// a running game). Its tessellations are shared by every node drawing it -
+// one cached mesh per scale bucket, the most recent few kept - so a hundred
+// copies of a character cost one tessellation and a hundred draw calls of
+// the same GPU mesh.
+// ============================================================================
+
+VECTOR_BUCKETS_KEPT :: 3
+
+Vector_Resource :: struct {
+	path:    string,
+	doc:     Vector_Doc,
+	refs:    int,
+	version: int, // +1 per reload
+	modTime: time.Time,
+	caches:  [VECTOR_BUCKETS_KEPT]Vector_Resource_Cache,
+	frame:   u64, // a draw counter (which bucket was used last)
+	owner:   ^ResourceManager,
+}
+
+Vector_Resource_Cache :: struct {
+	cache:    Vector_Cache,
+	used:     u64, // r.frame when last drawn (0: free)
+	version:  int,
+}
+
+// Vector_IsPath: a vector asset's path (.svg).
+Vector_IsPath :: proc(path: string) -> bool {
+	lower := strings.to_lower(path, context.temp_allocator)
+	return strings.has_suffix(lower, ".svg")
+}
+
+// ResourceManager_LoadVector: the file's resource (a reference taken); nil
+// when it can't be read or isn't an SVG (the reasons are logged).
+ResourceManager_LoadVector :: proc(rm: ^ResourceManager, path: string) -> ^Vector_Resource {
+	if rm.vectors != nil {
+		if r, ok := rm.vectors[path]; ok {
+			r.refs += 1
+			return r
+		}
+	}
+	data, found := vector_bytes(rm, path)
+	if !found {
+		log.errorf("Vector file not found: %s", path)
+		return nil
+	}
+	defer delete(data, Engine_HeapAllocator())
+	r := new(Vector_Resource, Engine_HeapAllocator())
+	if !Vector_LoadSVG(string(data), &r.doc) {
+		log.errorf("Can't read the SVG %s: %s", path, strings.join(r.doc.warnings[:], "; ", context.temp_allocator))
+		Vector_Doc_Destroy(&r.doc)
+		free(r, Engine_HeapAllocator())
+		return nil
+	}
+	for w in r.doc.warnings do log.warnf("%s: %s", path, w)
+	r.path = strings.clone(path, Engine_HeapAllocator())
+	r.refs = 1
+	r.owner = rm
+	if info, err := os.stat(path, context.temp_allocator); err == nil do r.modTime = info.modification_time
+	if rm.vectors == nil do rm.vectors = make(map[string]^Vector_Resource, allocator = Engine_HeapAllocator())
+	rm.vectors[r.path] = r
+	return r
+}
+
+// ResourceManager_ReleaseVector drops a reference (the last frees it).
+ResourceManager_ReleaseVector :: proc(r: ^Vector_Resource) {
+	if r == nil do return
+	r.refs -= 1
+	if r.refs > 0 do return
+	if r.owner != nil && r.owner.vectors != nil do delete_key(&r.owner.vectors, r.path)
+	vector_resource_free(r)
+}
+
+@(private = "file")
+vector_resource_free :: proc(r: ^Vector_Resource) {
+	context.allocator = Engine_HeapAllocator()
+	for &c in r.caches do Vector_Cache_Destroy(&c.cache)
+	Vector_Doc_Destroy(&r.doc)
+	delete(r.path)
+	free(r)
+}
+
+// Vector_ReleaseAll frees a resource manager's vector files (its shutdown).
+Vector_ReleaseAll :: proc(rm: ^ResourceManager) {
+	for _, r in rm.vectors do vector_resource_free(r)
+	delete(rm.vectors)
+	rm.vectors = nil
+}
+
+// Vector_ResourceCount: files loaded now (tests).
+Vector_ResourceCount :: proc(rm: ^ResourceManager) -> int {return len(rm.vectors)}
+
+@(private = "file")
+vector_bytes :: proc(rm: ^ResourceManager, path: string) -> ([]u8, bool) {
+	if os.is_file(path) {
+		data, err := os.read_entire_file(path, Engine_HeapAllocator())
+		return data, err == nil
+	}
+	if rm != nil {
+		if b, ok := resource_bytes(rm, path); ok {
+			defer delete(b)
+			c := make([]u8, len(b), Engine_HeapAllocator())
+			copy(c, b)
+			return c, true
+		}
+	}
+	return nil, false
+}
+
+// Vector_CheckForChanges reloads the files changed on disk; the number reloaded.
+Vector_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
+	n := 0
+	for _, r in rm.vectors {
+		if r.modTime == {} do continue
+		info, err := os.stat(r.path, context.temp_allocator)
+		if err != nil || time.diff(r.modTime, info.modification_time) <= 0 do continue
+		data, rerr := os.read_entire_file(r.path, context.temp_allocator)
+		if rerr != nil do continue
+		doc: Vector_Doc
+		if !Vector_LoadSVG(string(data), &doc) {
+			Vector_Doc_Destroy(&doc) // (half-written: next time)
+			continue
+		}
+		Vector_Doc_Destroy(&r.doc)
+		r.doc = doc
+		r.modTime = info.modification_time
+		r.version += 1
+		for &c in r.caches do c.cache.dirty = true
+		log.infof("Reloaded %s", r.path)
+		n += 1
+	}
+	return n
+}
+
+// Vector_ResourceMesh: the cached mesh for drawing at a screen-pixel size
+// (tessellated now when that bucket isn't cached; the least recently used
+// bucket is replaced).
+Vector_ResourceMesh :: proc(r: ^Vector_Resource, t: ^Vector_Tess, pixel: f32) -> ^Vector_Cache {
+	context.allocator = Engine_HeapAllocator()
+	r.frame += 1
+	b := Vector_PixelBucket(pixel)
+	slot := -1
+	for &c, i in r.caches do if c.used != 0 && c.cache.bucket == b {slot = i; break}
+	if slot < 0 {
+		// The free or least recently used slot.
+		oldest := max(u64)
+		for c, i in r.caches do if c.used < oldest {oldest = c.used; slot = i}
+		Vector_Cache_Destroy(&r.caches[slot].cache)
+		r.caches[slot] = {}
+	}
+	c := &r.caches[slot]
+	if c.version != r.version {c.cache.dirty = true; c.version = r.version}
+	c.used = r.frame
+	Vector_Cache_Ensure(&c.cache, t, r.doc.shapes[:], b)
+	return &c.cache
+}
+
+// Vector_ResourceBounds: the document's box (its origin rectangle).
+Vector_ResourceBounds :: proc(r: ^Vector_Resource) -> (min, size: [2]f32) {return r.doc.min, r.doc.size}

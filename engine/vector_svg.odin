@@ -46,6 +46,7 @@ Vector_Doc :: struct {
 	groups:   [dynamic]Vector_Group,
 	min:      [2]f32, // the document's box (after its viewBox mapping)
 	size:     [2]f32,
+	drawn:    [4]f32, // what the shapes cover, strokes included (min x, min y, max x, max y)
 	warnings: [dynamic]string,
 }
 
@@ -154,7 +155,23 @@ Vector_LoadSVG :: proc(text: string, doc: ^Vector_Doc) -> (ok: bool) {
 		st.xf = {s, 0, 0, s, tx, ty}
 	}
 	walk(&p, root, st)
+	doc.drawn = Vector_ShapesBounds(doc.shapes[:])
 	return true
+}
+
+// Vector_ShapesBounds: the box the shapes' points cover, widened by half
+// their stroke widths (control points included: a little generous).
+Vector_ShapesBounds :: proc(shapes: []Vector_Shape) -> [4]f32 {
+	b := [4]f32{max(f32), max(f32), min(f32), min(f32)}
+	for &s in shapes {
+		pad := s.style.strokeWidth * 0.5 * max(s.style.miterLimit, 1) if s.style.stroke else 0
+		for pt in s.path.pts {
+			b[0] = min(b[0], pt.x - pad); b[1] = min(b[1], pt.y - pad)
+			b[2] = max(b[2], pt.x + pad); b[3] = max(b[3], pt.y + pad)
+		}
+	}
+	if b[0] > b[2] do return {}
+	return b
 }
 
 // --- warnings -----------------------------------------------------------------------

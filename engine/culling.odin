@@ -108,6 +108,12 @@ Node_RenderBounds :: proc(node: ^Node) -> (rect: rl.Rectangle, ok: bool) {
 	case TextNode:
 		if !rl.IsWindowReady() do return {}, false
 		return TextNode_Bounds(cast(^TextNode)node, nil), true
+	case VectorShapeNode:
+		v := cast(^VectorShapeNode)node
+		b := VectorShapeNode_LocalBounds(v) or_return
+		size := [2]f32{b[2] - b[0], b[3] - b[1]} * v.globalScale
+		origin := [2]f32{-b[0], -b[1]} * v.globalScale
+		return rect_aabb(v.globalPosition, {abs(size.x), abs(size.y)}, {abs(origin.x), abs(origin.y)}, v.globalRotation), true
 	case TileMapNode:
 		tm := cast(^TileMapNode)node
 		a := TileMapNode_CellCorner(tm, {0, 0})

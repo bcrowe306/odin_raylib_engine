@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- The shape of an Affinity Designer export (test fixture) -->
+<svg width="100%" height="100%" viewBox="0 0 300 200" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g id="Artboard1" transform="matrix(1,0,0,1,-20,-10)">
+        <rect x="20" y="10" width="300" height="200" style="fill:none;"/>
+        <g id="Leaf" serif:id="Leaf" transform="matrix(0.8,0.2,-0.2,0.8,90,40)">
+            <path d="M100,20C150,20 180,60 180,100C180,140 140,170 100,170C60,170 20,140 20,100C20,60 50,20 100,20ZM100,60C80,60 60,80 60,100C60,120 80,140 100,140C120,140 140,120 140,100C140,80 120,60 100,60Z" style="fill:rgb(76,175,80);stroke:rgb(27,94,32);stroke-width:4px;"/>
+        </g>
+        <path d="M240,150L280,150L260,180L240,150Z" style="fill:rgb(255,193,7);fill-opacity:0.8;"/>
+    </g>
+</svg>

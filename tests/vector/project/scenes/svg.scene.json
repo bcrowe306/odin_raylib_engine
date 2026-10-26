@@ -1,0 +1,8 @@
+{"name": "svg", "background": [34, 38, 52, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "CameraNode", "name": "Camera", "position": [480, 270], "properties": {"isCurrent": true}},
+ {"type": "VectorShapeNode", "name": "Inkscape", "position": [150, 150], "scale": [0.35, 0.35], "properties": {"file": "art/inkscape_character.svg"}},
+ {"type": "VectorShapeNode", "name": "Illustrator", "position": [460, 140], "scale": [1.2, 1.2], "properties": {"file": "art/illustrator_css.svg"}},
+ {"type": "VectorShapeNode", "name": "Affinity", "position": [180, 410], "scale": [1.0, 1.0], "properties": {"file": "art/affinity_presentation.svg"}},
+ {"type": "VectorShapeNode", "name": "Figma", "position": [520, 400], "scale": [1.3, 1.3], "rotation": -8, "properties": {"file": "art/figma_export.svg"}},
+ {"type": "VectorShapeNode", "name": "FigmaCopy", "position": [820, 400], "scale": [0.6, 0.6], "properties": {"file": "art/figma_export.svg"}}
+]}}

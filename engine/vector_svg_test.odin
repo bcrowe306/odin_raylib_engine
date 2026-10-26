@@ -1,6 +1,8 @@
 package engine
 
 import "core:math"
+import os "osx"
+import "core:path/filepath"
 import "core:strings"
 import "core:testing"
 
@@ -237,4 +239,71 @@ test_svg_rejects :: proc(t: ^testing.T) {
 	Vector_Doc_Destroy(&doc)
 	// A <use> loop doesn't hang.
 	testing.expect(t, Vector_LoadSVG(`<svg xmlns="http://www.w3.org/2000/svg"><g id="a"><use href="#a"/></g></svg>`, &doc), "loop")
+}
+
+// Vector assets (M2): shared per path, reloaded when the file changes, the
+// node's file / origin / bounds / hit test, culling bounds.
+@(test)
+test_vector_asset_resource :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("vasset", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_vector_asset_test"}, context.temp_allocator)
+	_ = os.make_directory_all(dir)
+	path := strings.concatenate({dir, "/ring.svg"}, context.temp_allocator)
+	write :: proc(path, text: string) {_ = os.write_entire_file(path, transmute([]u8)text)}
+	write(path, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path fill-rule="evenodd" fill="#f00" d="M0 0H100V100H0Z M30 30V70H70V30Z"/></svg>`)
+	a := cast(^VectorShapeNode)Node_CreateByTypeName(scene, "VectorShapeNode")
+	b := cast(^VectorShapeNode)Node_CreateByTypeName(scene, "VectorShapeNode")
+	a.gameContext, b.gameContext = &game.gameContext, &game.gameContext
+	a.file, b.file = path, path
+	ra, rb := VectorShapeNode_Asset(a), VectorShapeNode_Asset(b)
+	testing.expect(t, ra != nil && ra == rb, "one shared resource")
+	testing.expect_value(t, ra.refs, 2)
+	testing.expect_value(t, Vector_ResourceCount(&game.resourceManager), 1)
+	testing.expect_value(t, VectorShapeNode_Size(a), [2]f32{100, 100})
+	testing.expect(t, Node_HasOrigin(a), "an origin with a file")
+	// Bounds: centred on the node (origin 0.5, 0.5).
+	lb, ok := VectorShapeNode_LocalBounds(a)
+	testing.expect(t, ok && lb == {-50, -50, 50, 50}, "local bounds centred")
+	a.globalPosition = {200, 100}
+	a.globalScale = {2, 2}
+	cr, cok := Node_RenderBounds(a)
+	testing.expect(t, cok && cr.x == 100 && cr.y == 0 && cr.width == 200, "culling bounds")
+	// Hit test: on the frame, not in the hole (a mesh is needed: tessellate one).
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	_ = Vector_ResourceMesh(ra, &tess, 0.5)
+	testing.expect(t, VectorShapeNode_HitTest(a, {110, 10}), "on the frame")
+	testing.expect(t, !VectorShapeNode_HitTest(a, {200, 100}), "in the hole")
+	testing.expect(t, !VectorShapeNode_HitTest(a, {500, 500}), "outside")
+	// Buckets: a second zoom adds a cache, the same zoom reuses it.
+	_ = Vector_ResourceMesh(ra, &tess, 2)
+	_ = Vector_ResourceMesh(ra, &tess, 0.5)
+	used := 0
+	for c in ra.caches do if c.used != 0 do used += 1
+	testing.expect_value(t, used, 2)
+	// A change on disk reloads it (the version bumps; caches go dirty).
+	write(path, `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50"><circle cx="25" cy="25" r="25" fill="blue"/></svg>`)
+	ra.modTime._nsec = 1 // (force the check: same-second writes)
+	testing.expect_value(t, Vector_CheckForChanges(&game.resourceManager), 1)
+	testing.expect_value(t, ra.version, 1)
+	testing.expect_value(t, VectorShapeNode_Size(a), [2]f32{50, 50})
+	// Releasing both frees it.
+	b.file = ""
+	_ = VectorShapeNode_Asset(b)
+	testing.expect_value(t, ra.refs, 1)
+	// A missing / broken file: no resource, no crash.
+	c := cast(^VectorShapeNode)Node_CreateByTypeName(scene, "VectorShapeNode")
+	c.gameContext = &game.gameContext
+	c.file = strings.concatenate({dir, "/nope.svg"}, context.temp_allocator)
+	{
+		context.logger = {} // (the "not found" error is the point here)
+		testing.expect(t, VectorShapeNode_Asset(c) == nil, "missing file")
+	}
+	write(path, "<html/>")
+	ra.modTime._nsec = 1
+	testing.expect_value(t, Vector_CheckForChanges(&game.resourceManager), 0) // (kept the last good one)
 }

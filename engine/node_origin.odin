@@ -19,6 +19,7 @@ Node_HasOrigin :: proc(node: ^Node) -> bool {
 	if node == nil do return false
 	switch node.typeId {
 	case TextureNode, FrameAnimationNode, AnimationPlayerNode, AsepriteNode, NineSliceNode, TextNode: return true
+	case VectorShapeNode: return (cast(^VectorShapeNode)node).file != "" // (presets draw around the position)
 	}
 	return false
 }
@@ -45,6 +46,8 @@ Node_OriginSize :: proc(node: ^Node, ctx: ^GameContext = nil) -> [2]f32 {
 	case TextNode:
 		_, size, _ := TextNode_Layout(cast(^TextNode)node, ctx)
 		return size
+	case VectorShapeNode:
+		return VectorShapeNode_Size(cast(^VectorShapeNode)node)
 	}
 	return {}
 }
