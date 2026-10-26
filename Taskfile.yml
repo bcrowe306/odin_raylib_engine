@@ -5,6 +5,13 @@ version: '3'
 vars:
   GREETING: Hello, world!
 
+# The editor's own tasks (editor/Taskfile.yml) as editor:build, editor:run,
+# editor:check, editor:drive, editor:package, ...
+includes:
+  editor:
+    taskfile: ./editor/Taskfile.yml
+    dir: ./editor # (its tasks' `dir: ..` is then the repo root)
+
 tasks:
     run:
         desc: Run the game engine application
@@ -14,31 +21,10 @@ tasks:
         desc: Run the standalone Dear ImGui Game Engine Editor
         cmds:
             - odin run editor
-    editor:build:
-        desc: Build the standalone Game Engine Editor binary
-        cmds:
-            - mkdir -p bin
-            - odin build editor -out:bin/editor
-    editor:check:
-        desc: Run type-checking on editor package
-        cmds:
-            - odin check editor
     editor:e2e:
         desc: Run the editor UI test-drives (alias of editor:drive)
         cmds:
             - task: editor:drive
-    editor:drive:
-        desc: Editor UI test-drives in the background (hidden windows, JOBS in parallel; SUITE="a b" for some, VISIBLE=1 to watch)
-        cmds:
-            - ./scripts/editor_drive.sh {{.SUITE}}
-    editor:package:
-        desc: Package the editor as an installed app in dist/ (macOS .app, Linux / Windows folder); VERSION=1.2.3
-        cmds:
-            - ./scripts/package_editor.sh --out dist --version {{.VERSION | default "0.0.0-dev"}}
-    editor:package:test:
-        desc: Smoke-test the packaged editor in dist/ from outside the checkout (Play, export, the language server)
-        cmds:
-            - ./scripts/test_package.sh dist
     game:build:
         desc: Build the game runner the editor launches on Play
         cmds:

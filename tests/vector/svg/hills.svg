@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Terrain for vector collision tests (Phase 14 V.16): rolling hills, 960 x 160,
+     a grass stroke along the top. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="160" viewBox="0 0 960 160">
+  <defs>
+    <linearGradient id="soil" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a0703c"/>
+      <stop offset="1" stop-color="#5a3c1e"/>
+    </linearGradient>
+  </defs>
+  <g id="hills">
+    <path d="M0 70 C120 20 220 20 320 60 S520 110 640 60 S860 10 960 50 L960 160 L0 160 Z" fill="url(#soil)"/>
+    <path d="M0 70 C120 20 220 20 320 60 S520 110 640 60 S860 10 960 50" fill="none" stroke="#5f9e2f" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>

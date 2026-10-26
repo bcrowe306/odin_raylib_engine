@@ -478,7 +478,7 @@
       "type": "PathFollowNode",
       "name": "Path Follow",
       "category": "Animation & Effects",
-      "description": "Travels along its parent Path: speed, loop / ping-pong / stop, faces the way it goes. Put a sprite, a platform or an enemy under it.",
+      "description": "Travels along its parent Path (or a Vector Shape's outline): speed, loop / ping-pong / stop, faces the way it goes. Put a sprite, a platform or an enemy under it.",
       "aliases": ["path follow", "follower", "moving platform"],
       "hasOrigin": false,
       "properties": [
@@ -771,7 +771,12 @@
         {"name": "warpTopLeft", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp (squash and stretch): how far the art's top-left corner moves (px); the art stretches between the corners. Key it."},
         {"name": "warpTopRight", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp: how far the top-right corner moves (px)."},
         {"name": "warpBottomLeft", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp: how far the bottom-left corner moves (px)."},
-        {"name": "warpBottomRight", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp: how far the bottom-right corner moves (px)."}
+        {"name": "warpBottomRight", "kind": "vec2", "owner": "VectorShapeNode", "default": [0, 0], "min": -500, "max": 500, "doc": "Four-corner warp: how far the bottom-right corner moves (px)."},
+        {"name": "collider", "kind": "enum", "owner": "VectorShapeNode", "default": "None", "values": ["None", "Solid", "Outline"], "doc": "Collision from the art: Solid makes convex pieces (any body), Outline edge loops (smooth terrain). On the Body above it, or a static body of its own."},
+        {"name": "colliderDetail", "kind": "number", "owner": "VectorShapeNode", "default": 1, "min": 0.1, "max": 16, "doc": "How closely the collider follows the art (its units): bigger means fewer corners, faster physics."},
+        {"name": "colliderFriction", "kind": "number", "owner": "VectorShapeNode", "default": 0.6, "min": 0, "max": 2, "doc": "The collider's friction (0 ice ... 1 rubber)."},
+        {"name": "colliderBounce", "kind": "number", "owner": "VectorShapeNode", "default": 0.1, "min": 0, "max": 1, "doc": "The collider's restitution (0 no bounce ... 1 full bounce)."},
+        {"name": "colliderDensity", "kind": "number", "owner": "VectorShapeNode", "default": 1, "min": 0, "max": 100, "doc": "The collider's density: the mass it gives a Dynamic Body."}
       ]
     },
     {

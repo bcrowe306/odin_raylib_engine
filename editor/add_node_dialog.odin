@@ -137,7 +137,7 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		name        = "Path Follow",
 		category    = "Animation & Effects",
 		icon        = ICON_FA_ROUTE,
-		description = "Travels along its parent Path: speed, loop / ping-pong / stop, faces the way it goes. Put a sprite, a platform or an enemy under it.",
+		description = "Travels along its parent Path (or a Vector Shape's outline): speed, loop / ping-pong / stop, faces the way it goes. Put a sprite, a platform or an enemy under it.",
 		typeName    = "PathFollowNode",
 	},
 	{

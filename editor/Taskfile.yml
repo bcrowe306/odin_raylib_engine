@@ -1,0 +1,185 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+#
+# Editor tasks: build, run, check, test. Run from this folder (`task build`)
+# or from the repo root (`task -d editor build`). Every task runs from the
+# repo root (`dir: ..`: relative to this folder, also when included),
+# because the editor imports ../engine and the scripts use repo-root paths
+# (bin/editor, tests/drive). `task --list` shows them all.
+# The root Taskfile includes this file: `task editor:build` etc. there.
+
+version: '3'
+
+vars:
+  EDITOR_BIN: bin/editor
+  GAME_BIN: bin/rayzr
+  # (Builds add $(./scripts/odin_flags.sh): extra link flags this platform
+  # needs - empty on macOS / Linux; Windows links raylib whole.)
+
+tasks:
+  default:
+    desc: List the editor tasks
+    silent: true
+    dir: ..
+    cmds:
+      - task --list --taskfile editor/Taskfile.yml
+
+  # --- build ------------------------------------------------------------------
+
+  build:
+    desc: Build the editor (bin/editor)
+    dir: ..
+    cmds:
+      - mkdir -p bin
+      - odin build editor -out:{{.EDITOR_BIN}} $(./scripts/odin_flags.sh)
+
+  build:debug:
+    desc: Build the editor with debug info (bin/editor-debug; for a debugger)
+    dir: ..
+    cmds:
+      - mkdir -p bin
+      - odin build editor -debug -out:bin/editor-debug $(./scripts/odin_flags.sh)
+
+  build:release:
+    desc: Build an optimized editor (-o:speed)
+    dir: ..
+    cmds:
+      - mkdir -p bin
+      - odin build editor -o:speed -out:{{.EDITOR_BIN}} $(./scripts/odin_flags.sh)
+
+  build:memtrack:
+    desc: Build the editor with memory tracking (leak / bad-free report on exit)
+    dir: ..
+    cmds:
+      - mkdir -p bin
+      - odin build editor -define:RAYZR_MEM_TRACK=true -out:{{.EDITOR_BIN}} $(./scripts/odin_flags.sh)
+
+  build:game:
+    desc: Build the game the editor launches on Play (bin/rayzr)
+    dir: ..
+    cmds:
+      - mkdir -p bin
+      - odin build . -out:{{.GAME_BIN}} $(./scripts/odin_flags.sh)
+
+  build:runners:
+    desc: Build the prebuilt game runners Export uses (bin/runners/<platform>)
+    dir: ..
+    cmds:
+      - ./scripts/build_runners.sh
+
+  build:all:
+    desc: Build the editor, the Play game and the export runners
+    cmds:
+      - task: build
+      - task: build:game
+      - task: build:runners
+
+  # --- run --------------------------------------------------------------------
+
+  run:
+    desc: Build and run the editor (PROJECT=path opens a project; otherwise the Welcome window)
+    dir: ..
+    deps: [build, build:game]
+    cmds:
+      - RAYZR_GAME_BIN={{.GAME_BIN}} ./{{.EDITOR_BIN}} {{if .PROJECT}}--project "{{.PROJECT}}"{{end}} {{.CLI_ARGS}}
+
+  run:demo:
+    desc: Build and run the editor on the demo project (assets/demo_project)
+    cmds:
+      - task: run
+        vars: {PROJECT: assets/demo_project}
+
+  run:nobuild:
+    desc: Run the last built editor without rebuilding (PROJECT=path optional)
+    dir: ..
+    cmds:
+      - RAYZR_GAME_BIN={{.GAME_BIN}} ./{{.EDITOR_BIN}} {{if .PROJECT}}--project "{{.PROJECT}}"{{end}} {{.CLI_ARGS}}
+
+  # --- check ------------------------------------------------------------------
+
+  check:
+    desc: Type-check the editor package
+    dir: ..
+    cmds:
+      - odin check editor -no-entry-point
+
+  check:vet:
+    desc: Type-check the editor with unused imports reported
+    dir: ..
+    cmds:
+      - odin check editor -no-entry-point -vet-unused-imports
+
+  check:all:
+    desc: Type-check everything the editor builds on (editor, engine, ui, the game)
+    dir: ..
+    cmds:
+      - odin check editor -no-entry-point
+      - odin check engine -no-entry-point
+      - odin check ui -no-entry-point
+      - odin check .
+
+  # --- test -------------------------------------------------------------------
+
+  test:
+    desc: Engine unit and leak tests (the editor's engine), then the editor drives
+    cmds:
+      - task: test:engine
+      - task: drive
+
+  test:engine:
+    desc: Engine unit and memory-leak tests
+    dir: ..
+    cmds:
+      - odin test engine -define:ODIN_TEST_THREADS=1 $(./scripts/odin_flags.sh)
+
+  drive:
+    desc: Editor UI test-drives, hidden and in parallel (SUITE="vector_skin path" for some; JOBS=n, VISIBLE=1 to watch)
+    dir: ..
+    cmds:
+      - ./scripts/editor_drive.sh {{.SUITE}}
+
+  drive:visible:
+    desc: One or more drives in a visible window, one at a time (SUITE="name ...")
+    dir: ..
+    cmds:
+      - VISIBLE=1 ./scripts/editor_drive.sh {{.SUITE}}
+
+  test:vector:
+    desc: Vector art render tests in the runner (golden images; builds the runner first)
+    dir: ..
+    deps: [build:runners]
+    cmds:
+      - python3 scripts/templates/test_templates.py --suite tests/vector/runtime_tests.json
+
+  # --- docs and packaging -----------------------------------------------------
+
+  docs:nodes:
+    desc: Regenerate the node reference (docs/generated/nodes.json) from the editor
+    dir: ..
+    deps: [build]
+    cmds:
+      - ./{{.EDITOR_BIN}} --dump-docs docs/generated/nodes.json
+
+  docs:check:
+    desc: Check the docs are complete and in step with the code
+    dir: ..
+    deps: [build]
+    cmds:
+      - python3 scripts/docs/check_docs.py --editor {{.EDITOR_BIN}}
+
+  package:
+    desc: Package the editor as an installed app in dist/ (VERSION=1.2.3)
+    dir: ..
+    cmds:
+      - ./scripts/package_editor.sh --out dist --version {{.VERSION | default "0.0.0-dev"}}
+
+  package:test:
+    desc: Smoke-test the packaged editor in dist/
+    dir: ..
+    cmds:
+      - ./scripts/test_package.sh dist
+
+  clean:
+    desc: Remove the editor and game builds (bin/editor*, bin/rayzr)
+    dir: ..
+    cmds:
+      - rm -rf {{.EDITOR_BIN}} bin/editor-debug bin/editor.dSYM bin/editor-debug.dSYM {{.GAME_BIN}}

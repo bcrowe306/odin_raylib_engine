@@ -46,3 +46,10 @@ whatever the node's scale (Flash's line scaling *None*). See
 softly it bends round the joints - see
 [vector skinning](../../engine/docs/vector.md#bending-with-bones-vector-skinning).
 The four **warp** corners squash and stretch any Vector Shape.
+
+**Collision**: **collider** *Solid* (convex pieces) or *Outline* (edge
+loops: terrain) makes the art solid, on the body above it or a static body
+of its own. `vector_cut(pos, radius)` carves it (destructible terrain), and
+`vector_point_at` / `vector_closest` measure its paths - a Path Follow can
+ride them. See
+[collision from the art](../../engine/docs/vector.md#collision-from-the-art).
