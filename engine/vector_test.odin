@@ -286,3 +286,66 @@ test_vector_tessellation_cost :: proc(t: ^testing.T) {
 		testing.expectf(t, ms < 50, "tessellation took %v ms", ms)
 	}
 }
+
+// Fill rules (M1: Clipper2 normalization): self-intersections, overlapping
+// contours, nesting in the same direction - each rule as SVG / Flash fill.
+@(test)
+test_vector_fill_rules :: proc(t: ^testing.T) {
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	m: Vector_Mesh
+	defer Vector_Mesh_Destroy(&m)
+	s := Vector_Shape{style = VECTOR_STYLE_DEFAULT}
+	Vector_Path_Init(&s.path)
+	defer Vector_Path_Destroy(&s.path)
+	shapes := []Vector_Shape{s}
+	fill :: proc(tess: ^Vector_Tess, shapes: []Vector_Shape, rule: Vector_Fill_Rule, m: ^Vector_Mesh) {
+		shapes[0].style.fillRule = rule
+		Vector_Tessellate(tess, shapes, 1, m)
+	}
+	// A bowtie (one self-intersecting contour): both lobes, either rule.
+	p := &shapes[0].path
+	Vector_MoveTo(p, {0, 0}); Vector_LineTo(p, {100, 100}); Vector_LineTo(p, {100, 0}); Vector_LineTo(p, {0, 100}); Vector_Close(p)
+	for rule in Vector_Fill_Rule {
+		fill(&tess, shapes, rule, &m)
+		testing.expectf(t, covered(&m, {20, 50}) && covered(&m, {80, 50}), "%v: both lobes", rule)
+		testing.expectf(t, !covered(&m, {50, 20}), "%v: not between them", rule)
+	}
+	// Two overlapping squares, same direction: non-zero unites, even-odd cuts the overlap.
+	Vector_Path_Clear(p)
+	Vector_Rect(p, {0, 0}, {60, 60})
+	Vector_Rect(p, {40, 40}, {100, 100})
+	fill(&tess, shapes, .NonZero, &m)
+	testing.expect(t, covered(&m, {50, 50}), "non-zero: the overlap is filled")
+	testing.expect(t, covered(&m, {10, 10}) && covered(&m, {90, 90}), "non-zero: both squares")
+	fill(&tess, shapes, .EvenOdd, &m)
+	testing.expect(t, !covered(&m, {50, 50}), "even-odd: the overlap is empty")
+	testing.expect(t, covered(&m, {10, 10}) && covered(&m, {90, 90}), "even-odd: both squares")
+	// Concentric circles drawn the same way: non-zero fills the middle, even-odd makes a ring.
+	Vector_Path_Clear(p)
+	Vector_Ellipse(p, {0, 0}, {100, 100})
+	Vector_Ellipse(p, {0, 0}, {50, 50})
+	fill(&tess, shapes, .NonZero, &m)
+	testing.expect(t, covered(&m, {0, 0}), "non-zero: same-direction inner circle filled")
+	fill(&tess, shapes, .EvenOdd, &m)
+	testing.expect(t, !covered(&m, {0, 0}) && covered(&m, {75, 0}), "even-odd: a ring")
+	// An island in a hole in an outer (three levels).
+	Vector_Ellipse(p, {0, 0}, {20, 20})
+	fill(&tess, shapes, .EvenOdd, &m)
+	testing.expect(t, covered(&m, {0, 0}) && !covered(&m, {35, 0}) && covered(&m, {75, 0}), "even-odd: island, hole, ring")
+}
+
+@(test)
+test_vector_is_convex :: proc(t: ^testing.T) {
+	testing.expect(t, Vector_IsConvex([][2]f32{{0, 0}, {10, 0}, {10, 10}, {0, 10}}), "square")
+	testing.expect(t, Vector_IsConvex([][2]f32{{0, 0}, {0, 10}, {10, 10}, {10, 0}}), "square, other way")
+	testing.expect(t, !Vector_IsConvex([][2]f32{{0, 0}, {10, 0}, {5, 2}, {10, 10}, {0, 10}}), "a dent")
+	testing.expect(t, !Vector_IsConvex([][2]f32{{0, 0}, {100, 100}, {100, 0}, {0, 100}}), "a bowtie")
+	// A pentagram traced point to point turns the same way but twice round.
+	star := make([dynamic][2]f32, context.temp_allocator)
+	for i in 0 ..< 5 {
+		a := f32(i * 2) * math.PI * 2 / 5
+		append(&star, [2]f32{math.cos(a), math.sin(a)} * 50)
+	}
+	testing.expect(t, !Vector_IsConvex(star[:]), "a self-crossing pentagram")
+}

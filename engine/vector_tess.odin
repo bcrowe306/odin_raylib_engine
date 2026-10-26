@@ -1,6 +1,7 @@
 package engine
 
 import "core:math"
+import clip "clipper"
 
 // ============================================================================
 // Vector tessellation: shapes -> one triangle mesh (positions, colours,
@@ -15,11 +16,9 @@ import "core:math"
 // stays near the one it was made for (vector_mesh.odin re-tessellates when
 // it changes by more than ~2x).
 //
-// Fills: each closed contour's nesting depth decides outer / hole (even /
-// odd); holes are cut from the smallest outer around them, then earcut
-// triangulates (vector_earcut.odin). Self-intersecting outlines and the
-// non-zero rule's overlapping same-direction contours are normalized by the
-// polygon clipper in M1 (TODO Phase 14).
+// Fills: the contours are normalized under the shape's fill rule by
+// Clipper2 (engine/clipper: self-intersections, overlaps, holes assigned to
+// their outer rings), then earcut triangulates (vector_earcut.odin).
 // ============================================================================
 
 Vector_Mesh :: struct {
@@ -56,6 +55,8 @@ Vector_Tess :: struct {
 	area:    [dynamic]f32,
 	tri:     [dynamic]u32,
 	ec:      Earcut,
+	cxy:     [dynamic]f64, // contours for the clipper
+	ccounts: [dynamic]i32,
 }
 
 Vector_Tess_Destroy :: proc(t: ^Vector_Tess) {
@@ -68,6 +69,8 @@ Vector_Tess_Destroy :: proc(t: ^Vector_Tess) {
 	delete(t.parent)
 	delete(t.area)
 	delete(t.tri)
+	delete(t.cxy)
+	delete(t.ccounts)
 	Earcut_Destroy(&t.ec)
 	t^ = {}
 }
@@ -138,79 +141,92 @@ miter :: #force_inline proc(n0, n1: [2]f32) -> [2]f32 {
 @(private = "file")
 tess_fill :: proc(t: ^Vector_Tess, style: Vector_Style, px: f32, mesh: ^Vector_Mesh) {
 	f := &t.flat
-	nc := len(f.contours)
-	clear(&t.depth); clear(&t.parent); clear(&t.area)
+	// Normalize: the area the contours cover under the fill rule, as simple
+	// outer rings with their holes (Clipper2: self-intersections, overlaps,
+	// either rule). Open contours are filled as if closed (like SVG).
+	clear(&t.cxy); clear(&t.ccounts)
 	for c in f.contours {
-		append(&t.area, Vector_SignedArea(Vector_Contour_Points(f, c)))
-		append(&t.depth, 0)
-		append(&t.parent, -1)
+		if c.count < 3 do continue
+		for p in Vector_Contour_Points(f, c) do append(&t.cxy, f64(p.x), f64(p.y))
+		append(&t.ccounts, i32(c.count))
 	}
-	// Nesting: how many contours contain each one (its first point), and the
-	// smallest of them.
-	for i in 0 ..< nc {
-		ci := f.contours[i]
-		if ci.count < 3 do continue
-		probe := f.pts[ci.first]
-		best := f32(max(f32))
-		for j in 0 ..< nc {
-			if i == j || f.contours[j].count < 3 do continue
-			cj := Vector_Contour_Points(f, f.contours[j])
-			if abs(t.area[j]) <= abs(t.area[i]) do continue
-			if Vector_PointInPolygon(cj, probe) {
-				t.depth[i] += 1
-				if abs(t.area[j]) < best {best = abs(t.area[j]); t.parent[i] = j}
+	if len(t.ccounts) == 0 do return
+	// Fast path: one convex outline (ellipses, eyes, buttons - most shapes)
+	// needs no normalizing under either rule.
+	if len(t.ccounts) == 1 {
+		for c in f.contours do if c.count >= 3 {
+			pts := Vector_Contour_Points(f, c)
+			if Vector_IsConvex(pts) {
+				clear(&t.poly); clear(&t.holes)
+				base := u32(len(mesh.verts))
+				append_fill_ring(t, pts, 1 if Vector_SignedArea(pts) > 0 else -1, px * 0.5, style.fillColor, mesh)
+				clear(&t.tri)
+				if Earcut_Triangulate(&t.ec, t.poly[:], nil, &t.tri) {
+					for v in t.tri do append(&mesh.idx, base + v)
+				}
+				return
 			}
 		}
 	}
+	// (Decimal places: a twentieth of a pixel.)
+	precision := i32(clamp(math.ceil(-math.log10(f64(px) * 0.05)), 1, 8))
+	res: clip.Paths
+	rule: clip.Fill_Rule = .NonZero if style.fillRule == .NonZero else .EvenOdd
+	if clip.normalize(raw_data(t.cxy), raw_data(t.ccounts), i32(len(t.ccounts)), rule, precision, &res) == 0 do return
+	defer clip.free_paths(&res)
+	// The result as f32 rings.
+	clear(&t.ring)
+	starts := make([]int, int(res.contours) + 1, context.temp_allocator)
+	for i in 0 ..< int(res.points) do append(&t.ring, [2]f32{f32(res.xy[i * 2]), f32(res.xy[i * 2 + 1])})
+	for i in 0 ..< int(res.contours) do starts[i + 1] = starts[i] + int(res.counts[i])
+	contour :: proc(t: ^Vector_Tess, starts: []int, i: int) -> [][2]f32 {return t.ring[starts[i]:starts[i + 1]]}
 	col := style.fillColor
 	half := px * 0.5
-	for i in 0 ..< nc {
-		ci := f.contours[i]
-		if ci.count < 3 || t.depth[i] % 2 == 1 do continue // a hole: cut below
+	for i in 0 ..< int(res.contours) {
+		if res.parents[i] >= 0 || res.counts[i] < 3 do continue // (holes: with their outer)
 		// The outer ring inset by half a pixel, then its holes (each inset too:
-		// moved away from the filled area).
+		// moved away from the filled area); fringes around all of them.
 		clear(&t.poly); clear(&t.holes)
+		vmap := make([dynamic]u32, 0, int(res.counts[i]), context.temp_allocator)
+		pts := contour(t, starts, i)
 		base := u32(len(mesh.verts))
-		append_ring :: proc(t: ^Vector_Tess, pts: [][2]f32, outward: f32, half: f32, col: [4]u8, mesh: ^Vector_Mesh) {
-			ring_normals(pts, outward, &t.normals)
-			first := u32(len(mesh.verts))
-			n := u32(len(pts))
-			for p, k in pts {
-				inner := p - t.normals[k] * half
-				append(&t.poly, inner)
-				add_vert(mesh, inner, col)
-			}
-			// The fringe: inner (solid) -> outer (transparent).
-			outer0 := u32(len(mesh.verts))
-			for p, k in pts do add_vert(mesh, p + t.normals[k] * half, fade(col))
-			for k in 0 ..< n {
-				k1 := (k + 1) % n
-				a, b := first + k, first + k1
-				c, d := outer0 + k, outer0 + k1
-				append(&mesh.idx, a, b, d, a, d, c)
-			}
-		}
-		pts := Vector_Contour_Points(f, ci)
-		append_ring(t, pts, 1 if t.area[i] > 0 else -1, half, col, mesh)
-		ring_len := len(pts)
-		// Fill vertices: the inset outer is mesh[base ..< base+ring_len], each
-		// hole's inset ring follows its fringe; map polygon indices to mesh.
-		vmap := make([dynamic]u32, 0, ring_len, context.temp_allocator)
-		for k in 0 ..< ring_len do append(&vmap, base + u32(k))
-		for j in 0 ..< nc {
-			if t.parent[j] != i || t.depth[j] % 2 == 0 do continue
-			cj := f.contours[j]
-			hpts := Vector_Contour_Points(f, cj)
+		append_fill_ring(t, pts, 1 if Vector_SignedArea(pts) > 0 else -1, half, col, mesh)
+		for k in 0 ..< len(pts) do append(&vmap, base + u32(k))
+		for j in 0 ..< int(res.contours) {
+			if int(res.parents[j]) != i || res.counts[j] < 3 do continue
+			hpts := contour(t, starts, j)
 			append(&t.holes, len(t.poly))
 			hbase := u32(len(mesh.verts))
 			// (A hole's fill edge moves into the hole: its outward is away from the fill.)
-			append_ring(t, hpts, -1 if t.area[j] > 0 else 1, half, col, mesh)
+			append_fill_ring(t, hpts, -1 if Vector_SignedArea(hpts) > 0 else 1, half, col, mesh)
 			for k in 0 ..< len(hpts) do append(&vmap, hbase + u32(k))
 		}
 		clear(&t.tri)
 		if Earcut_Triangulate(&t.ec, t.poly[:], t.holes[:], &t.tri) {
 			for v in t.tri do append(&mesh.idx, vmap[v])
 		}
+	}
+}
+
+// append_fill_ring: a ring inset by `half` (its points join t.poly, the
+// polygon earcut fills) and its fringe, solid inside to transparent outside.
+@(private = "file")
+append_fill_ring :: proc(t: ^Vector_Tess, pts: [][2]f32, outward: f32, half: f32, col: [4]u8, mesh: ^Vector_Mesh) {
+	ring_normals(pts, outward, &t.normals)
+	first := u32(len(mesh.verts))
+	n := u32(len(pts))
+	for p, k in pts {
+		inner := p - t.normals[k] * half
+		append(&t.poly, inner)
+		add_vert(mesh, inner, col)
+	}
+	outer0 := u32(len(mesh.verts))
+	for p, k in pts do add_vert(mesh, p + t.normals[k] * half, fade(col))
+	for k in 0 ..< n {
+		k1 := (k + 1) % n
+		a, b := first + k, first + k1
+		c, d := outer0 + k, outer0 + k1
+		append(&mesh.idx, a, b, d, a, d, c)
 	}
 }
 
@@ -333,4 +349,23 @@ stroke_round_cap :: proc(mesh: ^Vector_Mesh, p, dir: [2]f32, hw, solid, edge: f3
 		i1, o1 := first + (k + 1) * 2, first + (k + 1) * 2 + 1
 		append(&mesh.idx, center, i0, i1, i0, o0, o1, i0, o1, i1)
 	}
+}
+
+// Vector_IsConvex: a simple convex polygon (every turn the same way, one
+// full turn - so no self-intersection).
+Vector_IsConvex :: proc(pts: [][2]f32) -> bool {
+	n := len(pts)
+	if n < 3 do return false
+	sign: f32
+	turn: f32
+	for i in 0 ..< n {
+		a, b, c := pts[i], pts[(i + 1) % n], pts[(i + 2) % n]
+		d1, d2 := b - a, c - b
+		cr := d1.x * d2.y - d1.y * d2.x
+		if abs(cr) < 1e-9 do continue
+		if sign == 0 do sign = cr
+		else if (cr > 0) != (sign > 0) do return false
+		turn += math.atan2(cr, d1.x * d2.x + d1.y * d2.y)
+	}
+	return sign != 0 && abs(abs(turn) - 2 * math.PI) < 0.01
 }
