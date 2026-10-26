@@ -36,6 +36,21 @@ VectorShapeNode :: struct {
 	trimEach:    bool `gui:"true"`, // trim every subpath on its own (a ring's circles together), not one after another
 	morphTo:     string `gui:"true"`, // shape tween: another group of the file to morph towards
 	morph:       f32 `gui:"true" min:"0" max:"1"`, // 0: this group ... 1: morphTo
+	lineScale:   Vector_Line_Scale `gui:"true"`, // outlines scale with the node, or keep their width
+	// Filters (vector_filters.odin; Flash's): drawn through a texture made when they change.
+	shadowColor:  rl.Color `gui:"true"`, // a drop shadow (alpha 0: none)
+	shadowOffset: [2]f32 `gui:"true" min:"-64" max:"64"`,
+	shadowBlur:   f32 `gui:"true" min:"0" max:"64"`,
+	glowColor:    rl.Color `gui:"true"`, // an outer glow (alpha 0: none)
+	glowSize:     f32 `gui:"true" min:"0" max:"64"`,
+	glowStrength: f32 `gui:"true" min:"0" max:"8"`,
+	outlineColor: rl.Color `gui:"true"`, // an outline round the whole drawing (alpha 0: none)
+	outlineWidth: f32 `gui:"true" min:"0" max:"32"`,
+	blur:         f32 `gui:"true" min:"0" max:"64"`, // blurs the drawing itself (px on screen)
+	saturation:   f32 `gui:"true" min:"0" max:"3"`, // 0 grey, 1 as drawn, 2 vivid
+	contrast:     f32 `gui:"true" min:"0" max:"3"`,
+	hue:          f32 `gui:"true" min:"-180" max:"180"`, // degrees round the colour wheel
+	filter:       Vector_Filter_State,
 	shapes:      [dynamic]Vector_Shape,
 	cache:       Vector_Cache,
 	built:       struct {preset: Vector_Preset, fill, stroke: rl.Color, width: f32, ok: bool, version: int},
@@ -46,10 +61,16 @@ VectorShapeNode :: struct {
 	fxKey:       Vector_Fx_Key,
 }
 
+Vector_Line_Scale :: enum u8 {
+	Scale,    // outlines get thicker / thinner with the node's scale
+	Constant, // outlines keep their width (Flash's line scaling "None")
+}
+
 Vector_Fx_Key :: struct {
 	res:                    ^Vector_Resource,
 	version, part, target:  int,
 	start, end, offset, t:  f32,
+	lineK:                  f32,
 	each:                   bool,
 	built:                  bool,
 }
@@ -68,6 +89,13 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 	v.tint = rl.WHITE
 	v.frame = -1
 	v.trimEnd = 1
+	v.shadowOffset = {6, 6}
+	v.shadowBlur = 6
+	v.glowSize = 8
+	v.glowStrength = 1.5
+	v.outlineWidth = 3
+	v.saturation = 1
+	v.contrast = 1
 	// (Meshes are rebuilt on zoom: the heap, not the node's arena.)
 	v.shapes = make([dynamic]Vector_Shape, Engine_HeapAllocator())
 	v.fx = make([dynamic]Vector_Shape, Engine_HeapAllocator())
@@ -80,6 +108,7 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 		vector_shapes_free(&v.fx)
 		delete(v.fx)
 		Vector_Cache_Destroy(&v.fxCache)
+		Vector_FilterRelease(v)
 		ResourceManager_ReleaseVector(v.res)
 		v.res = nil
 		delete(v.loadedPath, Engine_HeapAllocator())
@@ -177,7 +206,6 @@ VectorShapeNode_Swap :: proc(v: ^VectorShapeNode, name: string) -> bool {
 
 // vector_color_effect: the tint (multiply) and offset (add, 0..1) after
 // brightness: Flash's colour effects.
-@(private = "file")
 vector_color_effect :: proc(v: ^VectorShapeNode) -> (mul: rl.Color, add: [4]f32) {
 	mul = v.tint
 	add = {f32(v.colorAdd.r) / 255, f32(v.colorAdd.g) / 255, f32(v.colorAdd.b) / 255, 0}
@@ -196,7 +224,7 @@ vector_color_effect :: proc(v: ^VectorShapeNode) -> (mul: rl.Color, add: [4]f32)
 // VectorShapeNode_FxActive: whether trim paths or a shape tween change
 // what it draws (then it tessellates its own copy when they change).
 VectorShapeNode_FxActive :: proc(v: ^VectorShapeNode) -> bool {
-	return v.trimStart > 0 || v.trimEnd < 1 || (v.morph > 0 && v.morphTo != "")
+	return v.trimStart > 0 || v.trimEnd < 1 || (v.morph > 0 && v.morphTo != "") || v.lineScale == .Constant
 }
 
 // vector_fx_build remakes the trimmed / morphed shapes when anything they
@@ -205,7 +233,12 @@ VectorShapeNode_FxActive :: proc(v: ^VectorShapeNode) -> bool {
 vector_fx_build :: proc(v: ^VectorShapeNode, r: ^Vector_Resource, part: int) {
 	base := v.shapes[:]
 	target := -2
-	key := Vector_Fx_Key{res = r, version = v.built.version, part = part, target = -2, start = v.trimStart, end = v.trimEnd, offset = v.trimOffset, each = v.trimEach, built = true}
+	key := Vector_Fx_Key{res = r, version = v.built.version, part = part, target = -2, start = v.trimStart, end = v.trimEnd, offset = v.trimOffset, each = v.trimEach, built = true, lineK = 1}
+	if v.lineScale == .Constant {
+		// (Quantised: re-tessellated when the scale changes by a percent.)
+		sc := max(abs(v.globalScale.x), abs(v.globalScale.y), 1e-3)
+		key.lineK = 1 / (math.round(sc * 100) / 100 if sc >= 0.01 else sc)
+	}
 	if r != nil {
 		base = Vector_PartShapes(r, part)
 		key.version = r.version
@@ -232,6 +265,7 @@ vector_fx_build :: proc(v: ^VectorShapeNode, r: ^Vector_Resource, part: int) {
 		out := sh
 		Vector_Path_Init(&out.path)
 		Vector_PathTrim(&sh.path, v.trimStart, v.trimEnd, v.trimOffset, &out.path, v.trimEach)
+		out.style.strokeWidth *= key.lineK
 		append(&v.fx, out)
 	}
 	v.fxCache.dirty = true
@@ -251,44 +285,45 @@ VectorShapeNode_FxShapes :: proc(v: ^VectorShapeNode) -> []Vector_Shape {
 	return v.fx[:]
 }
 
-VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
-	v := cast(^VectorShapeNode)node
-	if !rl.IsWindowReady() do return
-	mul, add := vector_color_effect(v)
+// VectorShapeNode_Mesh: the mesh it draws at a screen-pixel size (made /
+// updated as needed) and the offset its origin needs; ok = false: nothing.
+VectorShapeNode_Mesh :: proc(v: ^VectorShapeNode, pixel: f32) -> (cache: ^Vector_Cache, offset: [2]f32, ok: bool) {
+	context.allocator = Engine_HeapAllocator()
 	if r := VectorShapeNode_Asset(v); r != nil {
-		part, boxMin, boxSize, ok := VectorShapeNode_Part(v, r)
-		if !ok do return
-		cache: ^Vector_Cache
+		part, boxMin, boxSize, found := VectorShapeNode_Part(v, r)
+		if !found do return nil, {}, false
 		if VectorShapeNode_FxActive(v) {
 			vector_fx_build(v, r, part)
-			context.allocator = Engine_HeapAllocator()
-			Vector_Cache_Ensure(&v.fxCache, &vectorTess, v.fx[:], Vector_ScreenPixel(v.globalScale))
+			Vector_Cache_Ensure(&v.fxCache, &vectorTess, v.fx[:], pixel)
 			cache = &v.fxCache
 		} else {
-			context.allocator = Engine_HeapAllocator()
 			// (A new zoom: drawn from the nearest mesh while a worker makes the new one.)
-			cache = Vector_ResourceMesh(r, &vectorTess, Vector_ScreenPixel(v.globalScale), background = true, part = part)
+			cache = Vector_ResourceMesh(r, &vectorTess, pixel, background = true, part = part)
 		}
 		// The origin (a fraction of the part's box) sits at the position.
-		offset := -boxMin - Node_OriginPx(v, boxSize)
-		Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, mul, offset, add)
-		return
+		return cache, -boxMin - Node_OriginPx(v, boxSize), true
 	}
 	if !v.built.ok || v.built.preset != v.preset || v.built.fill != v.fillColor || v.built.stroke != v.strokeColor || v.built.width != v.strokeWidth {
 		VectorShapeNode_Build(v)
 	}
 	if VectorShapeNode_FxActive(v) {
 		vector_fx_build(v, nil, -1)
-		context.allocator = Engine_HeapAllocator()
-		Vector_Cache_Ensure(&v.fxCache, &vectorTess, v.fx[:], Vector_ScreenPixel(v.globalScale))
-		Vector_Cache_Draw(&v.fxCache, v.globalPosition, v.globalRotation, v.globalScale, mul, {}, add)
-		return
+		Vector_Cache_Ensure(&v.fxCache, &vectorTess, v.fx[:], pixel)
+		return &v.fxCache, {}, true
 	}
-	{
-		context.allocator = Engine_HeapAllocator()
-		Vector_Cache_Ensure(&v.cache, &vectorTess, v.shapes[:], Vector_ScreenPixel(v.globalScale))
-	}
-	Vector_Cache_Draw(&v.cache, v.globalPosition, v.globalRotation, v.globalScale, mul, {}, add)
+	Vector_Cache_Ensure(&v.cache, &vectorTess, v.shapes[:], pixel)
+	return &v.cache, {}, true
+}
+
+VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
+	v := cast(^VectorShapeNode)node
+	if !rl.IsWindowReady() do return
+	// Filters: the texture the prepare pass made (vector_filters.odin).
+	if Vector_FiltersActive(v) && Vector_FilterDraw(v) do return
+	cache, offset, ok := VectorShapeNode_Mesh(v, Vector_ScreenPixel(v.globalScale))
+	if !ok do return
+	mul, add := vector_color_effect(v)
+	Vector_Cache_Draw(cache, v.globalPosition, v.globalRotation, v.globalScale, mul, offset, add)
 }
 
 // VectorShapeNode_LocalBounds: what the node draws in its own space (before

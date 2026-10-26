@@ -11,7 +11,7 @@ in milestones:
 | M1 | Shapes in full: fill rules and self-intersections (Clipper2), gradients, dashes, opacity, clip paths; drawing from Lua (`on_draw` + the `Vector` module) | **done** |
 | M2 | Vector assets: SVG import (Inkscape, Illustrator, Affinity, Figma), assets shared and reloaded on save, the editor's workflow, picking, culling, background tessellation | **done** |
 | M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | **done** |
-| M5 | Shape tweens and trim paths (**done**), vector skinning on skeletons, filters | in progress |
+| M5 | Shape tweens and trim paths (**done**), filters and line scaling (**done**), vector skinning on skeletons | in progress |
 | M6 | Boolean path operations, collision from shapes | |
 | M4 | Drawing tools in the editor | |
 | M7 | Crisp text, Adobe Animate import, a sample character | |
@@ -184,6 +184,50 @@ sig.trimEnd = 0
 Tween.to(sig, "trimEnd", 1, 1.0)
 ```
 
+## Filters and line scaling
+
+### Filters
+
+Flash's per-instance filters, set on any Vector Shape in the Inspector (or
+from Lua, or keyed on the timeline):
+
+| Filter | Properties |
+|---|---|
+| Drop shadow | **shadowColor** (alpha 0: off), **shadowOffset**, **shadowBlur** |
+| Glow | **glowColor** (alpha 0: off), **glowSize**, **glowStrength** |
+| Outline | **outlineColor** (alpha 0: off), **outlineWidth** - one line round the whole drawing (cel-shading, a selected character) |
+| Blur | **blur** - the art itself |
+| Colour | **saturation** (0 grey, 1 as drawn), **contrast**, **hue** (degrees) |
+
+Sizes are screen pixels. They combine: shadow, glow and outline are drawn
+behind the art, the colour filter applies to the art.
+
+```lua
+-- Highlight the character under the mouse; grey it out when it's dead.
+local hero = self.node:get_node("Hero")
+hero.glowColor = {255, 210, 63, 255}
+hero.glowSize = 12
+hero.saturation = 0
+```
+
+How it works (`engine/vector_filters.odin`): a filtered shape is drawn at
+screen resolution into a texture with room round it, blurred / tinted /
+adjusted by shader passes into the node's own texture, and that is drawn as
+one quad (rotated and flipped with the node). The texture is remade only
+when something it shows changes - the art, the zoom, the node's scale, a
+filter setting or the colour effects - so an idle filtered character costs
+one textured quad, and moving or rotating it costs nothing extra. Animating
+a filter value or the scale remakes the texture each frame (a few shader
+passes: fine for a handful of characters). Textures are at most 2048 px a
+side (bigger art gets a coarser texture).
+
+### Line scaling
+
+**lineScale** is Flash's line scaling: *Scale* (the default) thickens
+outlines as the node grows; *Constant* keeps their width whatever the node's
+scale - a character scaled up 2x keeps 4 px outlines. Constant re-tessellates
+the node's own copy when its scale changes by more than a percent.
+
 ## Using it with presets
 
 A Vector Shape without a file draws its **Preset**: a star, a ring (a shape
@@ -345,6 +389,14 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
   undo, saving.
 - `scenes/fx.scene.json` (golden): a circle-to-star strip, trimmed
   squiggles (offset wrapping), presets drawn on, a gradient morph.
+- `test_vector_line_scale_filters` (`engine/vector_morph_test.odin`):
+  constant line width (rebuilt only when the scale changes), filters
+  switching on, nothing prepared without a window.
+- `tests/drive/vector_filters.drive`: saturation, blur and hue edited in
+  the Inspector and drawn in the viewport, undo, saving.
+- `scenes/filters.scene.json` (golden): each filter alone, a flipped
+  rotated instance with two filters, constant vs scaled line width, all
+  filters combined.
 - `tests/drive/vector_symbols.drive`: the Symbol and Frame pickers (undo),
   Explode into Parts and its undo.
 - `scenes/symbols.scene.json` (golden): symbols alone, brightness, a
@@ -356,7 +408,9 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
 
 - Stroke ends with butt caps have no anti-aliasing fringe on the end edge.
 - A clip inside a clip replaces it (no intersection of nested clips yet);
-  soft (alpha) masks come with the filters (M5).
+  no soft (alpha) masks yet.
+- Filters apply to one Vector Shape: an exploded character's parts each get
+  their own (a shadow per part, not one for the whole character).
 - Radial gradients have no separate focal point yet (Flash's focal ratio,
   SVG's fx / fy).
 - The immediate drawing path (`RAYZR_VECTOR_MODE=immediate`) evaluates

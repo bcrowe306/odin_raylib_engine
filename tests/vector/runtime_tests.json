@@ -151,6 +151,25 @@
   }
  },
  {
+  "name": "filters: drop shadow, glow, outline, blur, saturation / hue / contrast, combined; a flipped rotated instance; constant line width",
+  "project": "tests/vector/project",
+  "scene": "scenes/filters.scene.json",
+  "frames": 6,
+  "expect": [
+   [
+    "Combined",
+    "exists",
+    "==",
+    true
+   ]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/filters.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
   "name": "100 spinning characters run (the benchmark scene)",
   "project": "tests/vector/project",
   "scene": "scenes/bench.scene.json",

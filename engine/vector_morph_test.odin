@@ -175,3 +175,41 @@ test_vector_node_fx :: proc(t: ^testing.T) {
 	v.morph = 0.5
 	_ = VectorShapeNode_FxShapes(v)
 }
+
+// Constant line width (V.11): outlines thinned by the node's scale,
+// re-tessellated only when the scale changes; filters switch on by setting.
+@(test)
+test_vector_line_scale_filters :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("vls", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	v := cast(^VectorShapeNode)Node_CreateByTypeName(scene, "VectorShapeNode")
+	v.gameContext = &game.gameContext
+	v.preset = .Star
+	v.strokeWidth = 4
+	v.globalScale = {2, 2}
+	v.lineScale = .Constant
+	testing.expect(t, VectorShapeNode_FxActive(v), "constant width uses the node's own mesh")
+	fx := VectorShapeNode_FxShapes(v)
+	testing.expect(t, len(fx) > 0 && near(fx[0].style.strokeWidth, 2, 0.01), "4 px at scale 2: 2 units")
+	key := v.fxKey
+	v.globalScale = {2.001, 2.001}
+	_ = VectorShapeNode_FxShapes(v)
+	testing.expect(t, v.fxKey == key, "a tiny scale change: not rebuilt")
+	v.globalScale = {4, 4}
+	fx = VectorShapeNode_FxShapes(v)
+	testing.expect(t, near(fx[0].style.strokeWidth, 1, 0.01), "scale 4: 1 unit")
+	// Filters: off by default, on by any setting; no window: nothing prepared.
+	testing.expect(t, !Vector_FiltersActive(v), "no filters")
+	v.glowColor = {255, 255, 0, 255}
+	testing.expect(t, Vector_FiltersActive(v), "a glow")
+	v.glowColor = {}
+	v.saturation = 0
+	testing.expect(t, Vector_FiltersActive(v), "greyscale")
+	before := Vector_FiltersPrepared()
+	Vector_FiltersPrepare(scene, 1)
+	testing.expect_value(t, Vector_FiltersPrepared(), before)
+	testing.expect(t, !Vector_FilterDraw(v), "nothing to draw yet")
+}

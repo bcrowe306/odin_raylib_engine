@@ -1,0 +1,11 @@
+{"name": "filters", "background": [60, 68, 92, 255], "root": {"type": "Node", "name": "root", "children": [{"type": "CameraNode", "name": "Camera", "position": [480, 270], "properties": {"isCurrent": true}},
+ {"type": "VectorShapeNode", "name": "Shadow", "position": [90, 140], "scale": [0.6, 0.6], "properties": {"file": "art/character_parts.svg", "shadowColor": "#000000a0", "shadowOffset": [10, 10], "shadowBlur": 8}},
+ {"type": "VectorShapeNode", "name": "Glow", "position": [250, 140], "scale": [0.6, 0.6], "properties": {"file": "art/character_parts.svg", "glowColor": "#ffd23fff", "glowSize": 14, "glowStrength": 2}},
+ {"type": "VectorShapeNode", "name": "Outline", "position": [410, 140], "scale": [0.6, 0.6], "properties": {"file": "art/character_parts.svg", "outlineColor": "#ffffffff", "outlineWidth": 4}},
+ {"type": "VectorShapeNode", "name": "Blur", "position": [570, 140], "scale": [0.6, 0.6], "properties": {"file": "art/character_parts.svg", "blur": 6}},
+ {"type": "VectorShapeNode", "name": "Grey", "position": [730, 140], "scale": [0.6, 0.6], "properties": {"file": "art/character_parts.svg", "saturation": 0}},
+ {"type": "VectorShapeNode", "name": "Hue", "position": [880, 140], "scale": [0.6, 0.6], "properties": {"file": "art/character_parts.svg", "hue": 120, "contrast": 1.4}},
+ {"type": "VectorShapeNode", "name": "Turned", "position": [120, 400], "scale": [-0.6, 0.6], "properties": {"file": "art/character_parts.svg", "shadowColor": "#000000a0", "shadowOffset": [10, 10], "shadowBlur": 4, "outlineColor": "#3bceacff", "outlineWidth": 3}, "rotation": 20},
+ {"type": "VectorShapeNode", "name": "Thin", "position": [330, 400], "scale": [1.4, 1.4], "properties": {"file": "art/character_parts.svg", "group": "arm_l", "lineScale": "Constant"}},
+ {"type": "VectorShapeNode", "name": "Thick", "position": [470, 400], "scale": [1.4, 1.4], "properties": {"file": "art/character_parts.svg", "group": "arm_l"}},
+ {"type": "VectorShapeNode", "name": "Combined", "position": [700, 400], "scale": [0.75, 0.75], "properties": {"file": "art/character_parts.svg", "shadowColor": "#00000080", "shadowOffset": [8, 12], "shadowBlur": 10, "glowColor": "#ee4266ff", "glowSize": 8, "glowStrength": 1.5, "saturation": 1.6}}]}}

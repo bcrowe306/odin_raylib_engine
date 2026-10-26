@@ -298,8 +298,8 @@ test_vector_fill_rules :: proc(t: ^testing.T) {
 	defer Vector_Mesh_Destroy(&m)
 	s := Vector_Shape{style = VECTOR_STYLE_DEFAULT}
 	Vector_Path_Init(&s.path)
-	defer Vector_Path_Destroy(&s.path)
 	shapes := []Vector_Shape{s}
+	defer Vector_Path_Destroy(&shapes[0].path) // (the copy that grows)
 	fill :: proc(tess: ^Vector_Tess, shapes: []Vector_Shape, rule: Vector_Fill_Rule, m: ^Vector_Mesh) {
 		shapes[0].style.fillRule = rule
 		Vector_Tessellate(tess, shapes, 1, m)
@@ -554,9 +554,9 @@ test_vector_clip :: proc(t: ^testing.T) {
 	Vector_Ellipse(&k.path, {0, 0}, {50, 50})
 	s := Vector_Shape{style = VECTOR_STYLE_DEFAULT, clip = &k}
 	Vector_Path_Init(&s.path)
-	defer Vector_Path_Destroy(&s.path)
 	Vector_Rect(&s.path, {-100, -10}, {100, 10})
 	shapes := []Vector_Shape{s}
+	defer Vector_Path_Destroy(&shapes[0].path) // (the copy that grows)
 	Vector_Tessellate(&tess, shapes, 1, &m)
 	testing.expect(t, covered(&m, {0, 0}) && covered(&m, {45, 0}), "inside the clip")
 	testing.expect(t, !covered(&m, {60, 0}) && !covered(&m, {-80, 0}), "cut outside it")

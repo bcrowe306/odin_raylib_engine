@@ -1,0 +1,40 @@
+# Filters in the editor (Phase 14 V.11; vector_filters.odin): a Vector
+# Shape's Blur / Saturation / Hue edited in the Inspector draw it through a
+# filter texture in the viewport (made before the frame), undoably; the
+# scene saves them.
+exec mkdir -p $PROJECT/vectors
+exec cp tests/vector/svg/character_parts.svg $PROJECT/vectors/filters_zz.svg
+wait 5
+wait-until item:asset:vectors/filters_zz.svg == visible timeout=600
+drag @asset:vectors/filters_zz.svg @world:600,300 12
+wait 2
+expect node:filters_zz.type == VectorShapeNode
+expect node:filters_zz.prop.saturation == 1
+screenshot plain
+dblclick @insp.prop:saturation
+key ctrl+a
+type 0
+key enter
+wait 1
+expect node:filters_zz.prop.saturation == 0
+screenshot greyscale
+dblclick @insp.prop:blur
+key ctrl+a
+type 6
+key enter
+wait 1
+expect node:filters_zz.prop.blur == 6
+screenshot grey_blurred
+key cmd+z
+wait 1
+expect node:filters_zz.prop.blur == 0
+dblclick @insp.prop:hue
+key ctrl+a
+type 120
+key enter
+wait 1
+expect node:filters_zz.prop.hue == 120
+screenshot hue_turned
+key cmd+s
+wait 2
+expect file:scenes/main.scene.json contains "hue": 120

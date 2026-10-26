@@ -188,6 +188,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 		}
 		if viewportLighting do lit = e.Lighting_Prepare(state.activeScene, cam, i32(state.viewportSize.x), i32(state.viewportSize.y))
 		e.TileCache_Prepare(state.activeScene, e.Camera2D_ViewRect(cam, state.viewportSize.x, state.viewportSize.y), ctx)
+		e.Vector_FiltersPrepare(state.activeScene, cam.zoom) // (filtered vector art: textures made before the frame)
 	}
 
 	rl.BeginTextureMode(state.renderTexture)

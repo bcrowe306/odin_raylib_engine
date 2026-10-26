@@ -302,6 +302,13 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 		lightVW, lightVH = gameContext.game.virtualSize.x, gameContext.game.virtualSize.y
 	}
 	lastWorld := -1
+	// Filtered vector art: its textures, made before any layer draws (vector_filters.odin).
+	if rl.IsWindowReady() {
+		zoom: f32 = 1
+		if scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent do zoom = CameraNode_GetCamera2D(scene.camera, lightVW, lightVH).zoom
+		Prof_Scope("vector.filters")
+		Vector_FiltersPrepare(scene, zoom)
+	}
 	if scene.camera != nil && scene.camera.enabled && scene.camera.isCurrent && rl.IsWindowReady() {
 		// Cached tile chunks in view (built before any layer draws).
 		Prof_Begin("tilecache.prepare")

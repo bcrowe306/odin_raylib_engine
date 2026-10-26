@@ -752,7 +752,20 @@
         {"name": "trimOffset", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": -1, "max": 1, "doc": "Trim paths: moves the drawn part along the path, wrapping round (animate it for a running dash)."},
         {"name": "trimEach", "kind": "boolean", "owner": "VectorShapeNode", "default": false, "doc": "Trim every subpath on its own (a ring's circles drawn on together) instead of one after another."},
         {"name": "morphTo", "kind": "string", "owner": "VectorShapeNode", "default": "", "doc": "Shape tween: another group of the same file to morph into (Flash's shape tweens)."},
-        {"name": "morph", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": 0, "max": 1, "doc": "Shape tween: 0 draws the group, 1 draws Morph To, between interpolates paths, colours, outlines and gradients. Key it."}
+        {"name": "morph", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": 0, "max": 1, "doc": "Shape tween: 0 draws the group, 1 draws Morph To, between interpolates paths, colours, outlines and gradients. Key it."},
+        {"name": "lineScale", "kind": "enum", "owner": "VectorShapeNode", "default": "Scale", "values": ["Scale", "Constant"], "doc": "Scale: outlines get thicker / thinner with the node's scale. Constant: they keep their width (Flash's line scaling None)."},
+        {"name": "shadowColor", "kind": "color", "owner": "VectorShapeNode", "default": "#00000000", "doc": "Drop shadow filter: its colour (alpha 0: no shadow). Filters draw the art through a texture remade only when it changes."},
+        {"name": "shadowOffset", "kind": "vec2", "owner": "VectorShapeNode", "default": [6, 6], "min": -64, "max": 64, "doc": "Drop shadow: how far the shadow sits from the art (screen px)."},
+        {"name": "shadowBlur", "kind": "number", "owner": "VectorShapeNode", "default": 6, "min": 0, "max": 64, "doc": "Drop shadow: how soft its edge is (screen px)."},
+        {"name": "glowColor", "kind": "color", "owner": "VectorShapeNode", "default": "#00000000", "doc": "Glow filter: an outer glow's colour (alpha 0: no glow)."},
+        {"name": "glowSize", "kind": "number", "owner": "VectorShapeNode", "default": 8, "min": 0, "max": 64, "doc": "Glow: how far it spreads (screen px)."},
+        {"name": "glowStrength", "kind": "number", "owner": "VectorShapeNode", "default": 1.5, "min": 0, "max": 8, "doc": "Glow: how strong it is (1 = the blurred coverage; more: brighter, harder)."},
+        {"name": "outlineColor", "kind": "color", "owner": "VectorShapeNode", "default": "#00000000", "doc": "Outline filter: a line round the whole drawing (cel-shading, selection); alpha 0: none."},
+        {"name": "outlineWidth", "kind": "number", "owner": "VectorShapeNode", "default": 3, "min": 0, "max": 32, "doc": "Outline: its thickness (screen px)."},
+        {"name": "blur", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": 0, "max": 64, "doc": "Blur filter: blurs the art itself (screen px); 0 = sharp."},
+        {"name": "saturation", "kind": "number", "owner": "VectorShapeNode", "default": 1, "min": 0, "max": 3, "doc": "Colour filter: 0 grey, 1 as drawn, 2 vivid."},
+        {"name": "contrast", "kind": "number", "owner": "VectorShapeNode", "default": 1, "min": 0, "max": 3, "doc": "Colour filter: 1 as drawn; less: flatter, more: punchier."},
+        {"name": "hue", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": -180, "max": 180, "doc": "Colour filter: turns the colours round the colour wheel (degrees)."}
       ]
     },
     {

@@ -55,7 +55,7 @@
       "group": "Graphics & animation",
       "icon": "pen",
       "docs": "guides/vector",
-      "description": "SVGs from Inkscape, Illustrator, Affinity or Figma, crisp at any zoom and reloaded when you save: gradients, dashes, clip paths, exact fill rules, cached on the GPU (100 assets in under 1 ms); characters from layers - symbols, part swapping, lip-sync from Rhubarb cues, brightness and colour effects - plus drawing from Lua with on_draw."
+      "description": "SVGs from Inkscape, Illustrator, Affinity or Figma, crisp at any zoom and reloaded when you save: gradients, dashes, clip paths, exact fill rules, cached on the GPU (100 assets in under 1 ms); characters from layers - symbols, part swapping, lip-sync from Rhubarb cues, brightness and colour effects - shape tweens, trim paths, Flash-style filters (drop shadow, glow, outline, blur, colour adjust) and constant-width outlines, plus drawing from Lua with on_draw."
     },
     {
       "title": "Audio mixer",
