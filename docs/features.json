@@ -51,11 +51,11 @@
       "description": "Spine and DragonBones exports on the engine's own runtime: meshes, skins, IK, events and crossfades."
     },
     {
-      "title": "Vector art (preview)",
+      "title": "Vector art",
       "group": "Graphics & animation",
       "icon": "pen",
       "docs": "guides/vector",
-      "description": "Vector shapes crisp at any zoom: gradients, dashes, clip paths, exact fill rules, cached on the GPU (100 detailed characters in under 2 ms) - and drawing from Lua with on_draw. Flash-style characters are on the way."
+      "description": "SVGs from Inkscape, Illustrator, Affinity or Figma, crisp at any zoom and reloaded when you save: gradients, dashes, clip paths, exact fill rules, cached on the GPU (100 assets in under 1 ms) - plus drawing from Lua with on_draw."
     },
     {
       "title": "Audio mixer",

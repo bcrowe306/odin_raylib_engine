@@ -9,18 +9,63 @@ in milestones:
 |---|---|---|
 | M0 | The renderer: tessellation, anti-aliasing, cached GPU meshes, the Vector Shape node with built-in shapes; proven in the game, the editor and the web | **done** |
 | M1 | Shapes in full: fill rules and self-intersections (Clipper2), gradients, dashes, opacity, clip paths; drawing from Lua (`on_draw` + the `Vector` module) | **done** |
-| M2 | Vector assets: SVG import, the node drawing assets, picking, culling, instancing | next |
-| M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | |
+| M2 | Vector assets: SVG import (Inkscape, Illustrator, Affinity, Figma), assets shared and reloaded on save, the editor's workflow, picking, culling, background tessellation | **done** |
+| M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | next |
 | M5 | Shape tweens, vector skinning on skeletons, filters | |
 | M6 | Boolean path operations, collision from shapes | |
 | M4 | Drawing tools in the editor | |
 | M7 | Crisp text, Adobe Animate import, a sample character | |
 
-## Using it now
+## Vector art from SVG files
 
-Add a **Vector Shape** (Add Node > Graphics & Rendering) and pick its
-**Preset**: a star, a ring (a shape with a hole), a badge, or a detailed
-cartoon character. **Fill Color**, **Stroke Color** and **Stroke Width**
+Draw in **Inkscape, Illustrator, Affinity Designer or Figma**, export an
+SVG into the project (or drop it on the editor), and drag it from Assets
+into the viewport: a Vector Shape draws it, centred on its position, crisp
+at any zoom.
+
+- **Saving reloads it**: keep the SVG open in your vector app; every save
+  updates the editor and a running game. Double-click the asset (or the
+  Inspector's edit button) to open it in the system's vector app.
+- **One file, many nodes**: every node drawing a file shares its loaded
+  document and its tessellated meshes - 100 copies cost one tessellation.
+- **The Inspector's Vector section** shows the file, its size, how many
+  shapes and groups it has, and anything the importer couldn't use.
+- **Import settings** (Preview panel, saved in `<file>.import.json`):
+  *Scale* (document units to pixels: 0.5 for art drawn at twice the size
+  you need) and the *Origin* new Vector Shapes of the file get (centre, top
+  left, bottom centre - each node's Origin row can still change it).
+- **Picking** in the viewport follows the shape, not its box: clicking a
+  hole or empty corner selects what's behind.
+
+### What the importer reads
+
+| | |
+|---|---|
+| Elements | `path` (every command, arcs too), `rect` (rounded), `circle`, `ellipse`, `line`, `polyline`, `polygon`, `g`, `use` / `symbol`, nested `svg` |
+| Styles | presentation attributes, `style=""`, `<style>` blocks (tag, `.class` and `#id` selectors), inheritance |
+| Paint | colours (hex, `rgb()`, `hsl()`, named), `none`, `currentColor`, linear and radial gradients (`gradientUnits`, `gradientTransform`, `spreadMethod`, stops inherited through `href`), opacity / fill-opacity / stroke-opacity |
+| Strokes | width, joins, caps, miter limit, dash array and offset |
+| Other | `fill-rule`, `clip-path` (on shapes and groups), transforms (`matrix`, `translate`, `scale`, `rotate`, `skewX`, `skewY`), units (px, pt, mm, cm, in, %), `display` / `visibility` |
+| Groups | kept by name (Inkscape layer labels, Illustrator `data-name`, ids) for symbols and part swapping |
+
+Not read (a warning each in the Inspector and the console): **text**
+(convert it to outlines), embedded images, filters, masks, patterns,
+markers, and a radial gradient's separate focal point.
+
+### Exporting from your tool
+
+| Tool | How |
+|---|---|
+| Inkscape | *Save As > Inkscape SVG* or *Plain SVG*; *Path > Object to Path* on text first. Layers become named groups. |
+| Illustrator | *Export As > SVG*: Styling *Internal CSS* or *Presentation Attributes* (both read); Font *Convert to Outlines*; Images *Link* (they're skipped anyway). |
+| Affinity Designer | *Export > SVG*: "Flatten transforms" off is fine; rasterise nothing; text as curves. |
+| Figma | *Export > SVG* on a frame; "Outline text" on. Clip content (frames) is kept. |
+
+## Using it with presets
+
+A Vector Shape without a file draws its **Preset**: a star, a ring (a shape
+with a hole), a badge, a detailed cartoon character, or a gradients and
+dashes sampler. **Fill Color**, **Stroke Color** and **Stroke Width**
 style it; **Tint** multiplies everything (fade it with the alpha). Scale it,
 rotate it, zoom the camera in: it stays sharp.
 
@@ -132,9 +177,17 @@ On an Apple M-series Mac, optimized build:
 |---|---|
 | Tessellating the benchmark character (198 shapes, ~300 curves) | 0.16 ms (zoomed out) to 0.57 ms (zoomed in 4x); 6,000-16,000 triangles |
 | 100 of those characters spinning, cached GPU meshes | **1.7 ms per frame** (~580 fps) |
+| 100 nodes drawing four imported SVGs (25 each), spinning | **0.86 ms per frame** (~1160 fps): each file tessellated once, shared |
 | The same, sent through raylib's batch every frame | 56 ms per frame (18 fps) - why meshes are cached on the GPU |
 
 `RAYZR_VECTOR_MODE=immediate` switches to the batch path (for comparison).
+
+**Zooming**: an asset keeps up to three scale buckets cached. A new zoom
+draws the nearest one (slightly soft for a frame or two) while a worker
+thread tessellates the new bucket, so zooming across dozens of different
+characters doesn't hitch; the web build tessellates at once (no threads).
+Repeated copies share one GPU mesh (one draw call each) rather than
+hardware instancing - fast enough for hundreds per frame.
 The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
 (`runner tests/vector/project --scene scenes/bench.scene.json --bench 300`).
 
@@ -148,8 +201,16 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
   the screenshots are compared with `tests/vector/expected/` (both drawing
   paths, a 6x zoom, gradients / dashes / opacity, Lua drawing with a clip),
   and the benchmark scene runs.
+- `engine/vector_svg_test.odin`: the SVG importer (path grammar, arcs,
+  colours, transforms, units, CSS, gradients, clips, groups, warnings) on
+  fixtures shaped like Inkscape / Illustrator / Affinity / Figma exports
+  (`tests/vector/svg`), assets (sharing, reloads, bounds, hit tests),
+  import settings, background tessellation.
 - `tests/drive/vector_shape.drive`: the editor - Add Node, editing the
   preset and stroke, the viewport zoomed in, saving.
+- `tests/drive/vector_svg.drive`: SVG assets - thumbnails, dropping into
+  the viewport and onto a Vector Shape (undo), warnings, a reload on save,
+  saving the scene.
 - `scripts/web/test_project.sh tests/vector/project out.png`: the same scene
   in the web runner (headless Chrome).
 
@@ -162,5 +223,6 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
   SVG's fx / fy).
 - The immediate drawing path (`RAYZR_VECTOR_MODE=immediate`) evaluates
   gradients per vertex (an approximation); the default GPU path is exact.
-- The node draws presets only; vector assets come with SVG import (M2).
-- Selection bounds and picking in the viewport come in M2.
+- SVG text, images, filters, masks, patterns and markers aren't imported
+  (see above); group opacity is applied to each shape (overlapping shapes
+  in a half-transparent group show through each other).
