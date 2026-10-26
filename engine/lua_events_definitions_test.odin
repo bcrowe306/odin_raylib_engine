@@ -29,6 +29,7 @@ test_lua_node_events_definitions :: proc(t: ^testing.T) {
 		list := make([dynamic]string, context.temp_allocator)
 		for e in evs do append(&list, fmt.tprintf("%s (%s)", e.name, e.doc) if e.doc != "" else e.name)
 		fmt.sbprintf(&sb, "---Connects a handler to one of this node's events: %s; the tree events; custom ones.\n", strings.join(list[:], ", ", context.temp_allocator))
+		fmt.sbprintf(&sb, "---\n---Example: `self.node:connect(%q, function(value, source) Log.info(%q) end)`\n", evs[0].name, evs[0].name)
 		fmt.sbprintf(&sb, "---@param event %sEvent|string\n---@param handler fun(value: any, source: %s)\n---@return integer id Connection id for `disconnect`\nfunction %s:connect(event, handler) end\n", info.name, info.name, info.name)
 	}
 	strings.write_string(&sb, "-- node events end\n")

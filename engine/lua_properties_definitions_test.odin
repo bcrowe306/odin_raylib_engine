@@ -49,12 +49,17 @@ test_lua_node_properties_definitions :: proc(t: ^testing.T) {
 			if len(doc) > 90 do doc = strings.concatenate({doc[:87], "..."}, context.temp_allocator)
 			fmt.sbprintf(&sb, "---| %q # %s%s%s\n", p.name, ty, " (runtime)" if p.runtime else "", fmt.tprintf(" - %s", doc) if doc != "" else "")
 		}
-		fmt.sbprintf(&sb, "\n---Reads an Inspector property by its path (vectors and colours as tables); \"script.<name>\" reads a field of the node's script.\n---@param path %sProperty|string\n---@return any\n", cls)
+		// The examples use the class's own first scriptable property (else position).
+		ex := Node_Property{name = "position", kind = .Vec2}
+		for p in own {
+			if lua_prop_type(p) != "" && !p.runtime && !strings.contains(p.name, ".") {ex = p; break}
+		}
+		fmt.sbprintf(&sb, "\n---Reads an Inspector property by its path (vectors and colours as tables); \"script.<name>\" reads a field of the node's script.\n---\n---Example: `local value = self.node:get_property(%q)`\n---@param path %sProperty|string\n---@return any\n", ex.name, cls)
 		for p in props {
 			if ty := lua_prop_type(p); ty != "" do fmt.sbprintf(&sb, "---@overload fun(self: %s, path: %q): %s\n", cls, p.name, ty)
 		}
 		fmt.sbprintf(&sb, "function %s:get_property(path) end\n", cls)
-		fmt.sbprintf(&sb, "\n---Sets an Inspector property by its path: vectors as {{x, y}} or x, y; colours as {{r, g, b[, a]}} 0..1 or \"#rrggbb[aa]\"; enums by name; \"script.<name>\" a field of the node's script.\n---@param path %sProperty|string\n---@param value any\n---@param y? number\n", cls)
+		fmt.sbprintf(&sb, "\n---Sets an Inspector property by its path: vectors as {{x, y}} or x, y; colours as {{r, g, b[, a]}} 0..1 or \"#rrggbb[aa]\"; enums by name; \"script.<name>\" a field of the node's script.\n---\n---Example: `self.node:set_property(%q, %s)`\n---@param path %sProperty|string\n---@param value any\n---@param y? number\n", ex.name, lua_example_value(ex), cls)
 		for p in props {
 			ty := lua_prop_type(p)
 			if ty == "" do continue
@@ -76,6 +81,23 @@ test_lua_node_properties_definitions :: proc(t: ^testing.T) {
 		fmt.println("---- end ----")
 	}
 	testing.expect(t, have == want, "engine_api.lua's per-class property declarations match the engine")
+}
+
+// lua_example_value: a sample value of a property's type for the examples.
+@(private = "file")
+lua_example_value :: proc(p: Node_Property) -> string {
+	#partial switch p.kind {
+	case .Float:  return "1.5"
+	case .Int:    return "2"
+	case .Bool:   return "true"
+	case .Vec2:   return "100, 50"
+	case .Color:  return "\"#ff8800\""
+	case .String: return "\"text\""
+	case .Enum:
+		names := Property_EnumNames(p)
+		if len(names) > 0 do return fmt.tprintf("%q", names[len(names) > 1 ? 1 : 0])
+	}
+	return "nil"
 }
 
 // lua_prop_type: the Lua type of a property's value ("" = not scriptable).

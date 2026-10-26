@@ -75,8 +75,8 @@
   ],
   "baseline": {
     "$comment": "Known gaps check_docs.py tolerates; lower them as they are filled (CI fails if they grow).",
-    "lua_missing_examples": 145,
-    "plugin_missing_descriptions": 29
+    "lua_missing_examples": 0,
+    "plugin_missing_descriptions": 0
   },
   "exclude": [
     "editor/PROJECT_SETTINGS_AND_PROCESS_SPAWNING.md",
