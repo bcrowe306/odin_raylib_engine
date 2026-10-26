@@ -1,0 +1,10 @@
+{"name": "main", "background": [34, 38, 52, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "CameraNode", "name": "Camera", "position": [480, 270], "properties": {"isCurrent": true}},
+ {"type": "VectorShapeNode", "name": "Star", "position": [140, 140], "scale": [0.9, 0.9], "properties": {"preset": "Star", "strokeWidth": 5}},
+ {"type": "VectorShapeNode", "name": "Ring", "position": [370, 140], "scale": [0.9, 0.9], "properties": {"preset": "Ring", "fillColor": "#4fc3f7ff", "strokeColor": "#0d3b66ff", "strokeWidth": 4}},
+ {"type": "VectorShapeNode", "name": "Badge", "position": [600, 140], "rotation": 12, "scale": [0.9, 0.9], "properties": {"preset": "Badge", "fillColor": "#ef5350ff", "strokeWidth": 6}},
+ {"type": "VectorShapeNode", "name": "Hairline", "position": [820, 140], "scale": [0.9, 0.9], "properties": {"preset": "Star", "fillColor": "#00000000", "strokeColor": "#ffffffff", "strokeWidth": 0.5}},
+ {"type": "VectorShapeNode", "name": "Character", "position": [180, 400], "properties": {"preset": "Character", "fillColor": "#7e57c2ff", "strokeWidth": 3}},
+ {"type": "VectorShapeNode", "name": "Big", "position": [560, 420], "scale": [1.6, 1.6], "properties": {"preset": "Character", "fillColor": "#26a69aff", "strokeWidth": 3}},
+ {"type": "VectorShapeNode", "name": "Small", "position": [860, 420], "scale": [0.35, 0.35], "rotation": -20, "properties": {"preset": "Character", "fillColor": "#ffa726ff", "strokeWidth": 3}}
+]}}

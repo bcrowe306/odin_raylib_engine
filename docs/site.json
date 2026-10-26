@@ -37,6 +37,7 @@
         { "file": "engine/docs/pooling.md", "slug": "guides/pooling" },
         { "file": "engine/docs/aseprite.md", "slug": "guides/aseprite" },
         { "file": "engine/docs/skeletal_animation.md", "slug": "guides/skeletal-animation" },
+        { "file": "engine/docs/vector.md", "slug": "guides/vector" },
         { "file": "engine/docs/pixel_perfect.md", "slug": "guides/pixel-perfect" },
         { "file": "engine/docs/atlas.md", "slug": "guides/atlas" },
         { "file": "engine/docs/audio_mixer.md", "slug": "guides/audio-mixer" },

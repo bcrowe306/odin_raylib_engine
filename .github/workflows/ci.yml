@@ -85,6 +85,8 @@ jobs:
           xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/aseprite/runtime_tests.json
           # Gamepads (simulated): players, hot-plug, rumble, prompts.
           xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/gamepads/runtime_tests.json
+          # Vector art (Phase 14): renders compared with tests/vector/expected (both draw paths, a zoom), the benchmark scene.
+          xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/vector/runtime_tests.json
 
       - name: Crash reports (the runner and the editor crash for real)
         if: matrix.smoke

@@ -1,52 +1,188 @@
 {
   "$comment": "The website's features (rayzr.app/features and the landing page's highlights). Add one when a feature lands: title, a one-sentence description, a Starlight icon name, its docs page (a docs/site.json slug), a group, and highlight: true for the landing page (keep about six). Optional: image (under docs/, e.g. images/editor_overview.png). scripts/docs/check_docs.py validates this file.",
-  "groups": ["Editor", "Scripting", "Graphics & animation", "Gameplay", "Audio & input", "Shipping"],
+  "groups": [
+    "Editor",
+    "Scripting",
+    "Graphics & animation",
+    "Gameplay",
+    "Audio & input",
+    "Shipping"
+  ],
   "features": [
-    { "title": "A real editor", "group": "Editor", "icon": "laptop", "highlight": true, "docs": "editor/tour", "image": "images/editor_overview.png",
-      "description": "Dockable panels, scene tabs, multi-select, gizmos with snapping, undo for every edit, a command palette and rebindable shortcuts." },
-    { "title": "Lua that reloads live", "group": "Scripting", "icon": "seti:lua", "highlight": true, "docs": "scripting",
-      "description": "Gameplay in Lua 5.4: scripts reload while the game runs, with completion, hover docs, rename and a debugger in the built-in Code tab." },
-    { "title": "LDtk level editor built in", "group": "Editor", "icon": "puzzle", "highlight": true, "docs": "editor/level-editor",
-      "description": "Edit .ldtk projects in place: worlds, IntGrid, tiles, LDtk's auto-layer rule engine, entities and fields - byte-exact round trips with LDtk." },
-    { "title": "Export everywhere", "group": "Shipping", "icon": "rocket", "highlight": true, "docs": "guides/web-export",
-      "description": "Standalone games for macOS, Windows, Linux and the web from any editor - no compiler, no SDKs to install." },
-    { "title": "Skeletal animation", "group": "Graphics & animation", "icon": "random", "highlight": true, "docs": "guides/skeletal-animation",
-      "description": "Spine and DragonBones exports on the engine's own runtime: meshes, skins, IK, events and crossfades." },
-    { "title": "Audio mixer", "group": "Audio & input", "icon": "signal", "highlight": true, "docs": "guides/audio-mixer",
-      "description": "Buses with faders, pan, mute / solo and effects - EQ, filters, compressor, delay, reverb - and a DAW-style Mixer tab." },
-    { "title": "Nodes for everything 2D", "group": "Gameplay", "icon": "list-format", "docs": "reference/nodes",
-      "description": "Sprites, tile maps, cameras, Box2D physics bodies and joints, particles, lights, text, dialogue, UI widgets - 60 node types." },
-    { "title": "Animation timeline", "group": "Graphics & animation", "icon": "clock", "docs": "editor/animation",
-      "description": "Frame and property tracks with Bezier key curves, method and sound events, and onion skinning in the viewport." },
-    { "title": "Aseprite files as they are", "group": "Graphics & animation", "icon": "pencil", "docs": "guides/aseprite",
-      "description": "Drop in .aseprite files: tags, layers, slices and tilemaps are read directly and reload when you save." },
-    { "title": "Virtual cameras", "group": "Gameplay", "icon": "window", "docs": "guides/advanced-camera",
-      "description": "Priorities and blends, group, path and dead-zone following, LDtk room limits and trauma-based shake." },
-    { "title": "Navigation", "group": "Gameplay", "icon": "right-arrow", "docs": "guides/navigation",
-      "description": "Path finding on tile maps, LDtk levels and baked regions; agents with radius, avoidance and doors." },
-    { "title": "Paths and followers", "group": "Gameplay", "icon": "pen", "docs": "guides/paths",
-      "description": "Bezier paths edited in the viewport for moving platforms, patrols and rails." },
-    { "title": "State machines", "group": "Scripting", "icon": "code-branch", "docs": "editor/manual",
-      "description": "A visual state graph with transition guards, driving animations and gameplay from Lua." },
-    { "title": "Pixel-perfect rendering", "group": "Graphics & animation", "icon": "star", "docs": "guides/pixel-perfect",
-      "description": "Integer scaling, pixel snapping and a smooth sub-pixel camera for crisp pixel art." },
-    { "title": "Gamepads and local co-op", "group": "Audio & input", "icon": "puzzle", "docs": "guides/gamepads",
-      "description": "Four players, hot-plug, native rumble and button prompts that match the controller." },
-    { "title": "Input rebinding", "group": "Audio & input", "icon": "setting", "docs": "guides/input",
-      "description": "Actions players can rebind in game, with conflict handling, saving and gamepad-navigable menus." },
-    { "title": "Accessibility", "group": "Shipping", "icon": "heart", "docs": "guides/accessibility",
-      "description": "UI scale, colour-blind filters, subtitles and captions, and screen-shake scaling - per player." },
-    { "title": "Live game inspection", "group": "Editor", "icon": "magnifier", "docs": "editor/manual",
-      "description": "See and edit the running game's scene tree and properties from the editor, then apply changes back to the scene." },
-    { "title": "Editor plugins", "group": "Editor", "icon": "add-document", "docs": "editor/plugins",
-      "description": "Extend the editor in Lua: commands, dockable panels, inspectors, viewport overlays and importers." },
-    { "title": "Object pooling", "group": "Gameplay", "icon": "database", "docs": "guides/pooling",
-      "description": "Reuse bullets and effects with Pool.take, spawn / despawn hooks, prewarming and caps." },
-    { "title": "Sprite atlases", "group": "Shipping", "icon": "document", "docs": "guides/atlas",
-      "description": "Textures packed into atlas pages on export for fewer draw calls - without changing your project." },
-    { "title": "Crash reports", "group": "Shipping", "icon": "warning", "docs": "guides/crash-reports",
-      "description": "Crashes write a report with the stack and recent log; the editor offers to file it as a GitHub issue." },
-    { "title": "Templates", "group": "Editor", "icon": "open-book", "docs": "getting-started/templates",
-      "description": "Start from a complete small game: platformer, top-down RPG, shoot 'em up or Sokoban puzzle." }
+    {
+      "title": "A real editor",
+      "group": "Editor",
+      "icon": "laptop",
+      "highlight": true,
+      "docs": "editor/tour",
+      "image": "images/editor_overview.png",
+      "description": "Dockable panels, scene tabs, multi-select, gizmos with snapping, undo for every edit, a command palette and rebindable shortcuts."
+    },
+    {
+      "title": "Lua that reloads live",
+      "group": "Scripting",
+      "icon": "seti:lua",
+      "highlight": true,
+      "docs": "scripting",
+      "description": "Gameplay in Lua 5.4: scripts reload while the game runs, with completion, hover docs, rename and a debugger in the built-in Code tab."
+    },
+    {
+      "title": "LDtk level editor built in",
+      "group": "Editor",
+      "icon": "puzzle",
+      "highlight": true,
+      "docs": "editor/level-editor",
+      "description": "Edit .ldtk projects in place: worlds, IntGrid, tiles, LDtk's auto-layer rule engine, entities and fields - byte-exact round trips with LDtk."
+    },
+    {
+      "title": "Export everywhere",
+      "group": "Shipping",
+      "icon": "rocket",
+      "highlight": true,
+      "docs": "guides/web-export",
+      "description": "Standalone games for macOS, Windows, Linux and the web from any editor - no compiler, no SDKs to install."
+    },
+    {
+      "title": "Skeletal animation",
+      "group": "Graphics & animation",
+      "icon": "random",
+      "highlight": true,
+      "docs": "guides/skeletal-animation",
+      "description": "Spine and DragonBones exports on the engine's own runtime: meshes, skins, IK, events and crossfades."
+    },
+    {
+      "title": "Vector art (preview)",
+      "group": "Graphics & animation",
+      "icon": "pen",
+      "docs": "guides/vector",
+      "description": "Vector shapes crisp at any zoom: anti-aliased, cached on the GPU - 100 detailed characters in under 2 ms. Flash-style characters are on the way."
+    },
+    {
+      "title": "Audio mixer",
+      "group": "Audio & input",
+      "icon": "signal",
+      "highlight": true,
+      "docs": "guides/audio-mixer",
+      "description": "Buses with faders, pan, mute / solo and effects - EQ, filters, compressor, delay, reverb - and a DAW-style Mixer tab."
+    },
+    {
+      "title": "Nodes for everything 2D",
+      "group": "Gameplay",
+      "icon": "list-format",
+      "docs": "reference/nodes",
+      "description": "Sprites, tile maps, cameras, Box2D physics bodies and joints, particles, lights, text, dialogue, UI widgets - 60 node types."
+    },
+    {
+      "title": "Animation timeline",
+      "group": "Graphics & animation",
+      "icon": "clock",
+      "docs": "editor/animation",
+      "description": "Frame and property tracks with Bezier key curves, method and sound events, and onion skinning in the viewport."
+    },
+    {
+      "title": "Aseprite files as they are",
+      "group": "Graphics & animation",
+      "icon": "pencil",
+      "docs": "guides/aseprite",
+      "description": "Drop in .aseprite files: tags, layers, slices and tilemaps are read directly and reload when you save."
+    },
+    {
+      "title": "Virtual cameras",
+      "group": "Gameplay",
+      "icon": "window",
+      "docs": "guides/advanced-camera",
+      "description": "Priorities and blends, group, path and dead-zone following, LDtk room limits and trauma-based shake."
+    },
+    {
+      "title": "Navigation",
+      "group": "Gameplay",
+      "icon": "right-arrow",
+      "docs": "guides/navigation",
+      "description": "Path finding on tile maps, LDtk levels and baked regions; agents with radius, avoidance and doors."
+    },
+    {
+      "title": "Paths and followers",
+      "group": "Gameplay",
+      "icon": "pen",
+      "docs": "guides/paths",
+      "description": "Bezier paths edited in the viewport for moving platforms, patrols and rails."
+    },
+    {
+      "title": "State machines",
+      "group": "Scripting",
+      "icon": "code-branch",
+      "docs": "editor/manual",
+      "description": "A visual state graph with transition guards, driving animations and gameplay from Lua."
+    },
+    {
+      "title": "Pixel-perfect rendering",
+      "group": "Graphics & animation",
+      "icon": "star",
+      "docs": "guides/pixel-perfect",
+      "description": "Integer scaling, pixel snapping and a smooth sub-pixel camera for crisp pixel art."
+    },
+    {
+      "title": "Gamepads and local co-op",
+      "group": "Audio & input",
+      "icon": "puzzle",
+      "docs": "guides/gamepads",
+      "description": "Four players, hot-plug, native rumble and button prompts that match the controller."
+    },
+    {
+      "title": "Input rebinding",
+      "group": "Audio & input",
+      "icon": "setting",
+      "docs": "guides/input",
+      "description": "Actions players can rebind in game, with conflict handling, saving and gamepad-navigable menus."
+    },
+    {
+      "title": "Accessibility",
+      "group": "Shipping",
+      "icon": "heart",
+      "docs": "guides/accessibility",
+      "description": "UI scale, colour-blind filters, subtitles and captions, and screen-shake scaling - per player."
+    },
+    {
+      "title": "Live game inspection",
+      "group": "Editor",
+      "icon": "magnifier",
+      "docs": "editor/manual",
+      "description": "See and edit the running game's scene tree and properties from the editor, then apply changes back to the scene."
+    },
+    {
+      "title": "Editor plugins",
+      "group": "Editor",
+      "icon": "add-document",
+      "docs": "editor/plugins",
+      "description": "Extend the editor in Lua: commands, dockable panels, inspectors, viewport overlays and importers."
+    },
+    {
+      "title": "Object pooling",
+      "group": "Gameplay",
+      "icon": "database",
+      "docs": "guides/pooling",
+      "description": "Reuse bullets and effects with Pool.take, spawn / despawn hooks, prewarming and caps."
+    },
+    {
+      "title": "Sprite atlases",
+      "group": "Shipping",
+      "icon": "document",
+      "docs": "guides/atlas",
+      "description": "Textures packed into atlas pages on export for fewer draw calls - without changing your project."
+    },
+    {
+      "title": "Crash reports",
+      "group": "Shipping",
+      "icon": "warning",
+      "docs": "guides/crash-reports",
+      "description": "Crashes write a report with the stack and recent log; the editor offers to file it as a GitHub issue."
+    },
+    {
+      "title": "Templates",
+      "group": "Editor",
+      "icon": "open-book",
+      "docs": "getting-started/templates",
+      "description": "Start from a complete small game: platformer, top-down RPG, shoot 'em up or Sokoban puzzle."
+    }
   ]
 }

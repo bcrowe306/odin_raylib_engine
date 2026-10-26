@@ -3940,6 +3940,85 @@ function LineNode:get_property(path) end
 ---@overload fun(self: LineNode, path: "rounded", value: boolean)
 function LineNode:set_property(path, value, y) end
 
+---@class VectorShapeNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field preset "Star"|"Ring"|"Badge"|"Character" Which built-in shape it draws (vector assets come with SVG import).
+---@field fillColor number[] The shape's fill colour.
+---@field strokeColor number[] The outline's colour.
+---@field strokeWidth number Outline thickness (px, in the shape's own scale); 0 = no outline.
+---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
+
+---@alias VectorShapeNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "preset" # "Star"|"Ring"|"Badge"|"Character" - Which built-in shape it draws (vector assets come with SVG import).
+---| "fillColor" # number[] - The shape's fill colour.
+---| "strokeColor" # number[] - The outline's colour.
+---| "strokeWidth" # number - Outline thickness (px, in the shape's own scale); 0 = no outline.
+---| "tint" # number[] - Multiplies the texture's colours (white = unchanged; alpha fades it).
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---
+---Example: `local value = self.node:get_property("preset")`
+---@param path VectorShapeNodeProperty|string
+---@return any
+---@overload fun(self: VectorShapeNode, path: "position"): Vec2
+---@overload fun(self: VectorShapeNode, path: "scale"): Vec2
+---@overload fun(self: VectorShapeNode, path: "rotation"): number
+---@overload fun(self: VectorShapeNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: VectorShapeNode, path: "zIndex"): integer
+---@overload fun(self: VectorShapeNode, path: "ySort"): boolean
+---@overload fun(self: VectorShapeNode, path: "ySortOffset"): number
+---@overload fun(self: VectorShapeNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: VectorShapeNode, path: "paused"): boolean
+---@overload fun(self: VectorShapeNode, path: "enabled"): boolean
+---@overload fun(self: VectorShapeNode, path: "preset"): "Star"|"Ring"|"Badge"|"Character"
+---@overload fun(self: VectorShapeNode, path: "fillColor"): number[]
+---@overload fun(self: VectorShapeNode, path: "strokeColor"): number[]
+---@overload fun(self: VectorShapeNode, path: "strokeWidth"): number
+---@overload fun(self: VectorShapeNode, path: "tint"): number[]
+function VectorShapeNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---
+---Example: `self.node:set_property("preset", "Ring")`
+---@param path VectorShapeNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: VectorShapeNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: VectorShapeNode, path: "rotation", value: number)
+---@overload fun(self: VectorShapeNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: VectorShapeNode, path: "zIndex", value: integer)
+---@overload fun(self: VectorShapeNode, path: "ySort", value: boolean)
+---@overload fun(self: VectorShapeNode, path: "ySortOffset", value: number)
+---@overload fun(self: VectorShapeNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: VectorShapeNode, path: "paused", value: boolean)
+---@overload fun(self: VectorShapeNode, path: "enabled", value: boolean)
+---@overload fun(self: VectorShapeNode, path: "preset", value: "Star"|"Ring"|"Badge"|"Character")
+---@overload fun(self: VectorShapeNode, path: "fillColor", value: number[])
+---@overload fun(self: VectorShapeNode, path: "strokeColor", value: number[])
+---@overload fun(self: VectorShapeNode, path: "strokeWidth", value: number)
+---@overload fun(self: VectorShapeNode, path: "tint", value: number[])
+function VectorShapeNode:set_property(path, value, y) end
+
 ---@class TrailNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).

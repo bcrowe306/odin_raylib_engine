@@ -1,0 +1,32 @@
+[
+ {
+  "name": "presets and characters render like the reference (GPU meshes): fills, a hole, strokes, a hairline, scales, rotation",
+  "project": "tests/vector/project",
+  "frames": 6,
+  "expect": [["Character", "exists", "==", true]],
+  "golden": {"image": "tests/vector/expected/main.png", "max_pixels": 0.02, "threshold": 64}
+ },
+ {
+  "name": "the immediate path draws the same picture",
+  "project": "tests/vector/project",
+  "frames": 6,
+  "env": {"RAYZR_VECTOR_MODE": "immediate"},
+  "expect": [],
+  "golden": {"image": "tests/vector/expected/main.png", "max_pixels": 0.02, "threshold": 64}
+ },
+ {
+  "name": "zoomed in 6x: re-tessellated, curves stay smooth",
+  "project": "tests/vector/project",
+  "scene": "scenes/zoom.scene.json",
+  "frames": 6,
+  "expect": [],
+  "golden": {"image": "tests/vector/expected/zoom.png", "max_pixels": 0.02, "threshold": 64}
+ },
+ {
+  "name": "100 spinning characters run (the benchmark scene)",
+  "project": "tests/vector/project",
+  "scene": "scenes/bench.scene.json",
+  "frames": 30,
+  "expect": [["C99", "exists", "==", true]]
+ }
+]

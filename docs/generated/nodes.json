@@ -712,6 +712,21 @@
       ]
     },
     {
+      "type": "VectorShapeNode",
+      "name": "Vector Shape",
+      "category": "Graphics & Rendering",
+      "description": "Vector art: crisp at any zoom, anti-aliased, cached as a mesh (preview: built-in shapes; SVG import comes next).",
+      "aliases": ["vector", "vectorshape", "svg", "shape"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "preset", "kind": "enum", "owner": "VectorShapeNode", "default": "Star", "values": ["Star", "Ring", "Badge", "Character"], "doc": "Which built-in shape it draws (vector assets come with SVG import)."},
+        {"name": "fillColor", "kind": "color", "owner": "VectorShapeNode", "default": "#ffc440ff", "doc": "The shape's fill colour."},
+        {"name": "strokeColor", "kind": "color", "owner": "VectorShapeNode", "default": "#281808ff", "doc": "The outline's colour."},
+        {"name": "strokeWidth", "kind": "number", "owner": "VectorShapeNode", "default": 4, "min": 0, "max": 64, "doc": "Outline thickness (px, in the shape's own scale); 0 = no outline."},
+        {"name": "tint", "kind": "color", "owner": "VectorShapeNode", "default": "#ffffffff", "doc": "Multiplies the texture's colours (white = unchanged; alpha fades it)."}
+      ]
+    },
+    {
       "type": "TrailNode",
       "name": "Trail",
       "category": "Animation & Effects",

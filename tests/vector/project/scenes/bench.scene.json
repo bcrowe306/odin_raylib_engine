@@ -1,0 +1,2033 @@
+{
+ "name": "bench",
+ "background": [
+  34,
+  38,
+  52,
+  255
+ ],
+ "root": {
+  "type": "Node",
+  "name": "root",
+  "children": [
+   {
+    "type": "CameraNode",
+    "name": "Camera",
+    "position": [
+     480,
+     270
+    ],
+    "properties": {
+     "isCurrent": true
+    }
+   },
+   {
+    "type": "Node",
+    "name": "Spinner",
+    "script": {
+     "path": "scripts/spin.lua"
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C0",
+    "position": [
+     48,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C1",
+    "position": [
+     144,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C2",
+    "position": [
+     240,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C3",
+    "position": [
+     336,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C4",
+    "position": [
+     432,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C5",
+    "position": [
+     528,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C6",
+    "position": [
+     624,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C7",
+    "position": [
+     720,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C8",
+    "position": [
+     816,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C9",
+    "position": [
+     912,
+     40
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C10",
+    "position": [
+     48,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C11",
+    "position": [
+     144,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C12",
+    "position": [
+     240,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C13",
+    "position": [
+     336,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C14",
+    "position": [
+     432,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C15",
+    "position": [
+     528,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C16",
+    "position": [
+     624,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C17",
+    "position": [
+     720,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C18",
+    "position": [
+     816,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C19",
+    "position": [
+     912,
+     92
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C20",
+    "position": [
+     48,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C21",
+    "position": [
+     144,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C22",
+    "position": [
+     240,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C23",
+    "position": [
+     336,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C24",
+    "position": [
+     432,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C25",
+    "position": [
+     528,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C26",
+    "position": [
+     624,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C27",
+    "position": [
+     720,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C28",
+    "position": [
+     816,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C29",
+    "position": [
+     912,
+     144
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C30",
+    "position": [
+     48,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C31",
+    "position": [
+     144,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C32",
+    "position": [
+     240,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C33",
+    "position": [
+     336,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C34",
+    "position": [
+     432,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C35",
+    "position": [
+     528,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C36",
+    "position": [
+     624,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C37",
+    "position": [
+     720,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C38",
+    "position": [
+     816,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C39",
+    "position": [
+     912,
+     196
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C40",
+    "position": [
+     48,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C41",
+    "position": [
+     144,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C42",
+    "position": [
+     240,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C43",
+    "position": [
+     336,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C44",
+    "position": [
+     432,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C45",
+    "position": [
+     528,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C46",
+    "position": [
+     624,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C47",
+    "position": [
+     720,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C48",
+    "position": [
+     816,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C49",
+    "position": [
+     912,
+     248
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C50",
+    "position": [
+     48,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C51",
+    "position": [
+     144,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C52",
+    "position": [
+     240,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C53",
+    "position": [
+     336,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C54",
+    "position": [
+     432,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C55",
+    "position": [
+     528,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C56",
+    "position": [
+     624,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C57",
+    "position": [
+     720,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C58",
+    "position": [
+     816,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C59",
+    "position": [
+     912,
+     300
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C60",
+    "position": [
+     48,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C61",
+    "position": [
+     144,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C62",
+    "position": [
+     240,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C63",
+    "position": [
+     336,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C64",
+    "position": [
+     432,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C65",
+    "position": [
+     528,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C66",
+    "position": [
+     624,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C67",
+    "position": [
+     720,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C68",
+    "position": [
+     816,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C69",
+    "position": [
+     912,
+     352
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C70",
+    "position": [
+     48,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C71",
+    "position": [
+     144,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C72",
+    "position": [
+     240,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C73",
+    "position": [
+     336,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C74",
+    "position": [
+     432,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C75",
+    "position": [
+     528,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C76",
+    "position": [
+     624,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C77",
+    "position": [
+     720,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C78",
+    "position": [
+     816,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C79",
+    "position": [
+     912,
+     404
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C80",
+    "position": [
+     48,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C81",
+    "position": [
+     144,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C82",
+    "position": [
+     240,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C83",
+    "position": [
+     336,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C84",
+    "position": [
+     432,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C85",
+    "position": [
+     528,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C86",
+    "position": [
+     624,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C87",
+    "position": [
+     720,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C88",
+    "position": [
+     816,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C89",
+    "position": [
+     912,
+     456
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C90",
+    "position": [
+     48,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C91",
+    "position": [
+     144,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C92",
+    "position": [
+     240,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C93",
+    "position": [
+     336,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C94",
+    "position": [
+     432,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C95",
+    "position": [
+     528,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#7e57c2ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C96",
+    "position": [
+     624,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#26a69aff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C97",
+    "position": [
+     720,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ffa726ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C98",
+    "position": [
+     816,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#ef5350ff",
+     "strokeWidth": 3
+    }
+   },
+   {
+    "type": "VectorShapeNode",
+    "name": "C99",
+    "position": [
+     912,
+     508
+    ],
+    "scale": [
+     0.5,
+     0.5
+    ],
+    "tags": [
+     "spin"
+    ],
+    "properties": {
+     "preset": "Character",
+     "fillColor": "#42a5f5ff",
+     "strokeWidth": 3
+    }
+   }
+  ]
+ }
+}
