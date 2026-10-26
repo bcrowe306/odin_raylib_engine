@@ -697,7 +697,10 @@ tileset, tile size and map size; the toolbar below has the brush, eraser and
 flood fill, the picked tile, and the tile view's zoom and grid; under it the
 tileset's tiles are laid out as in the image - click one, then paint in the
 viewport (right button erases; one undo step per stroke). Turn on `solid`
-for colliders.
+for colliders. The map size is the map's outline, not a limit: tiles can be
+painted outside it (they're saved and solid too), and shrinking the map
+never deletes tiles - grow it back and they're still there. A flood fill
+started inside the map stays inside it.
 
 The toolbar's **Components** layer paints components on the same grid:
 pick one from the project's components (cards with a picture), then the

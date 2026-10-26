@@ -81,7 +81,8 @@ Nav_GridFor :: proc(n: ^Node, opts: Nav_Options = {}) -> ^Nav_Grid {
 		if g.key != key || g.w != tm.mapSize.x || g.h != tm.mapSize.y {
 			g.clearKey = 0
 			grid_alloc(g, tm.mapSize.x, tm.mapSize.y)
-			for t, i in tm.tiles do g.blocked[i] = (t < 0) == painted
+			// (The map's cells; tiles painted beyond it aren't on the grid.)
+			for i in 0 ..< tm.mapSize.x * tm.mapSize.y do g.blocked[i] = (TileMapNode_Get(tm, i % tm.mapSize.x, i / tm.mapSize.x) < 0) == painted
 			g.key = key
 		}
 		sx := tm.globalScale.x if tm.globalScale.x != 0 else 1

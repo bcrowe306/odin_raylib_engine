@@ -182,9 +182,10 @@ region_block_shape :: proc(r: ^NavigationRegionNode, n: ^Node, s: ^PhysicsShape)
 region_block_tilemap :: proc(r: ^NavigationRegionNode, tm: ^TileMapNode) {
 	if !tm.solid do return
 	ts := [2]f32{f32(tm.tileSize.x), f32(tm.tileSize.y)} * tm.globalScale
+	TileMapNode_Layout(tm)
 	for t, i in tm.tiles {
 		if t < 0 do continue
-		mn := TileMapNode_CellCorner(tm, {i % max(tm.mapSize.x, 1), i / max(tm.mapSize.x, 1)})
+		mn := TileMapNode_CellCorner(tm, tm.dataOrigin + {i % max(tm.dataSize.x, 1), i / max(tm.dataSize.x, 1)})
 		region_block_rect(r, mn, mn + ts)
 	}
 }

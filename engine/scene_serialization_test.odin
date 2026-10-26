@@ -661,6 +661,37 @@ test_tilemap_paint_fill_save_and_colliders :: proc(t: ^testing.T) {
 	TileMapNode_BuildColliders(tm, &game.gameContext)
 	testing.expect(t, tm.staticBody != nil && tm.staticBody.transient, "transient collider body")
 	testing.expect(t, len(tm.staticBody.shapes) >= 4, "merged runs")
+
+	// Shrinking the map keeps its tiles; growing it back shows them again
+	// (also one cell at a time, like dragging the field).
+	for w := 7; w >= 1; w -= 1 {tm.mapSize = {w, 4}; TileMapNode_Layout(tm)}
+	for h := 3; h >= 1; h -= 1 {tm.mapSize = {1, h}; TileMapNode_Layout(tm)}
+	testing.expect_value(t, TileMapNode_Get(tm, 1, 1), 3)
+	tm.mapSize = {8, 4}
+	TileMapNode_Layout(tm)
+	testing.expect(t, TileMapNode_Get(tm, 1, 1) == 3 && TileMapNode_Get(tm, 4, 3) == 7, "all back after shrinking and growing")
+
+	// Tiles outside the map: above-left (negative cells) and beyond the right edge.
+	testing.expect(t, TileMapNode_Set(tm, -3, -2, 9), "paint above-left of the map")
+	testing.expect(t, TileMapNode_Set(tm, 12, 1, 4), "paint right of the map")
+	testing.expect(t, TileMapNode_Get(tm, -3, -2) == 9 && TileMapNode_Get(tm, 12, 1) == 4 && TileMapNode_Get(tm, 1, 1) == 3, "kept, with the map's tiles")
+	testing.expect(t, !TileMapNode_Set(tm, -40, 0, -1), "erasing empty space outside: nothing to do")
+	// A fill inside the map stays inside it.
+	TileMapNode_Set(tm, 2, 2, -1)
+	testing.expect_value(t, TileMapNode_Fill(tm, 2, 2, 5), 1)
+	testing.expect_value(t, TileMapNode_Get(tm, 9, 2), -1)
+	// Saved with the data's own area; reloaded in place.
+	text = Scene_SerializeToJSON(scene, context.temp_allocator)
+	testing.expect(t, strings.contains(text, `"data_origin": [-3, -2]`), "the data area is saved")
+	copy2 := reload_scene(game, text, "tiles3")
+	m3 := cast(^TileMapNode)Scene_FindNodeByName(copy2, "Map")
+	if m3 == nil do testing.fail_now(t, "no map")
+	testing.expectf(t, TileMapNode_Get(m3, -3, -2) == 9 && TileMapNode_Get(m3, 12, 1) == 4 && TileMapNode_Get(m3, 1, 1) == 3 && m3.mapSize == {8, 4}, "outside tiles reloaded (%d, %d, %d)", TileMapNode_Get(m3, -3, -2), TileMapNode_Get(m3, 12, 1), TileMapNode_Get(m3, 1, 1))
+	// Outside tiles are solid too.
+	TileMapNode_BuildColliders(tm, &game.gameContext)
+	hasFar := false
+	for s in tm.staticBody.shapes do if s.offset.x > 8 * 16 do hasFar = true
+	testing.expect(t, hasFar, "a collider for the tile right of the map")
 }
 
 // Components painted on a tile map: one per cell, a 2 x 2 one over its

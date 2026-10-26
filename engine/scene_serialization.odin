@@ -371,6 +371,12 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		strings.write_string(&w.sb, "{\"tileset\": ")
 		Json_String(w, asset_rel(node, tm.tilesetPath))
 		fmt.sbprintf(&w.sb, ", \"tile_size\": [%d, %d], \"map_size\": [%d, %d]", tm.tileSize.x, tm.tileSize.y, tm.mapSize.x, tm.mapSize.y)
+		// (Tiles painted beyond the map: the data's own area, row-major.)
+		TileMapNode_Layout(tm)
+		TileMapNode_Compact(tm)
+		if tm.dataOrigin != {0, 0} || tm.dataSize != tm.mapSize {
+			fmt.sbprintf(&w.sb, ", \"data_origin\": [%d, %d], \"data_size\": [%d, %d]", tm.dataOrigin.x, tm.dataOrigin.y, tm.dataSize.x, tm.dataSize.y)
+		}
 		strings.write_string(&w.sb, ", \"data\": ")
 		TileMapNode_EncodeRLE(tm, &w.sb)
 		strings.write_byte(&w.sb, '}')
@@ -1034,10 +1040,14 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 			ms := sj_vec2(tmObj, "map_size", {f32(tm.mapSize.x), f32(tm.mapSize.y)})
 			tm.tileSize = {max(int(ts.x), 1), max(int(ts.y), 1)}
 			tm.mapSize = {max(int(ms.x), 1), max(int(ms.y), 1)}
-			// Start from an empty map of that size.
-			tm.builtSize = {}
-			clear(&tm.tiles)
-			TileMapNode_Layout(tm)
+			// Start from an empty map of that size (or the data's own area:
+			// tiles painted beyond the map).
+			TileMapNode_Reset(tm)
+			if _, hasArea := sj_arr(tmObj, "data_size"); hasArea {
+				o := sj_vec2(tmObj, "data_origin", {0, 0})
+				sz := sj_vec2(tmObj, "data_size", {f32(tm.mapSize.x), f32(tm.mapSize.y)})
+				TileMapNode_SetDataArea(tm, {int(o.x), int(o.y)}, {int(sz.x), int(sz.y)})
+			}
 			if ts := sj_string(tmObj, "tileset", ""); ts != "" do TileMapNode_SetTileset(tm, ts, ctx)
 			if data, has := sj_arr(tmObj, "data"); has {
 				i := 0
