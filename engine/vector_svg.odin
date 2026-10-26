@@ -159,6 +159,33 @@ Vector_LoadSVG :: proc(text: string, doc: ^Vector_Doc) -> (ok: bool) {
 	return true
 }
 
+// Vector_DocScale scales a document (an import's vector_scale): points,
+// stroke widths, dashes, gradients, clips and its box.
+Vector_DocScale :: proc(doc: ^Vector_Doc, s: f32) {
+	if s == 1 || s <= 0 do return
+	seen := make(map[^Vector_Clip]bool, allocator = context.temp_allocator)
+	scale_paint :: proc(p: ^Vector_Paint, s: f32) {
+		if p.kind == .Solid do return
+		t := p.transform if p.transform != {} else [6]f32{1, 0, 0, 1, 0, 0}
+		p.transform = {t[0] * s, t[1] * s, t[2] * s, t[3] * s, t[4] * s, t[5] * s}
+	}
+	for &sh in doc.shapes {
+		for &pt in sh.path.pts do pt *= s
+		sh.style.strokeWidth *= s
+		for i in 0 ..< int(sh.style.dash.count) do sh.style.dash.values[i] *= s
+		sh.style.dash.offset *= s
+		scale_paint(&sh.style.fillPaint, s)
+		scale_paint(&sh.style.strokePaint, s)
+		if sh.clip != nil && sh.clip not_in seen {
+			seen[sh.clip] = true
+			for &pt in sh.clip.path.pts do pt *= s
+		}
+	}
+	doc.min *= s
+	doc.size *= s
+	doc.drawn *= s
+}
+
 // Vector_ShapesBounds: the box the shapes' points cover, widened by half
 // their stroke widths (control points included: a little generous).
 Vector_ShapesBounds :: proc(shapes: []Vector_Shape) -> [4]f32 {

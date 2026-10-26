@@ -34,7 +34,7 @@ Script_AssetKind :: proc(rel: string) -> string {
 	case .Script:    return "script"
 	case .Component: return "component"
 	case .Level:     return "level"
-	case .Shader:    return "file"
+	case .Shader, .Vector: return "file"
 	case .Package, .Other:
 	}
 	if strings.has_suffix(strings.to_lower(rel, context.temp_allocator), ".ldtk") do return "level"
@@ -479,7 +479,7 @@ code_asset_use :: proc(state: ^EditorState, doc: ^Code_Doc, rel: string) -> stri
 	case .Audio:   return fmt.tprintf("Audio.play_sound(%q)", rel)
 	case .Scene:   return fmt.tprintf("Scene.change_scene(%q)", Asset_DisplayName(rel))
 	case .Texture: return fmt.tprintf("self.node:set_texture(%q)", rel)
-	case .Component, .Script, .Level, .Shader, .Package, .Aseprite, .Other:
+	case .Component, .Script, .Level, .Shader, .Package, .Aseprite, .Vector, .Other:
 	}
 	return ""
 }

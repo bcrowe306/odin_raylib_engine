@@ -307,3 +307,37 @@ test_vector_asset_resource :: proc(t: ^testing.T) {
 	ra.modTime._nsec = 1
 	testing.expect_value(t, Vector_CheckForChanges(&game.resourceManager), 0) // (kept the last good one)
 }
+
+// Vector import settings (M2): vector_scale / origin parse, round-trip and
+// scale the document (points, strokes, gradients, clips, box).
+@(test)
+test_vector_import_settings :: proc(t: ^testing.T) {
+	imp: Asset_Import
+	Asset_ImportParse(`{"vector_scale": 0.5, "origin": [0.5, 1]}`, &imp, context.temp_allocator)
+	testing.expect_value(t, imp.vectorScale, 0.5)
+	testing.expect(t, imp.hasOrigin && imp.origin == {0.5, 1}, "origin")
+	testing.expect(t, !Asset_ImportIsDefault(imp), "not default")
+	text := Asset_ImportToJSON(imp, context.temp_allocator)
+	back: Asset_Import
+	Asset_ImportParse(text, &back, context.temp_allocator)
+	testing.expect(t, back.vectorScale == 0.5 && back.origin == {0.5, 1}, "round trip")
+	testing.expect(t, Asset_ImportIsDefault({vectorScale = 1}), "scale 1 is the default")
+
+	doc: Vector_Doc
+	defer Vector_Doc_Destroy(&doc)
+	testing.expect(t, Vector_LoadSVG(SVG_ILLUSTRATOR, &doc), "loaded")
+	before := doc.shapes[1].style.strokeWidth
+	firstPt := doc.shapes[0].path.pts[0]
+	Vector_DocScale(&doc, 0.5)
+	testing.expect_value(t, doc.size, [2]f32{120, 80})
+	testing.expect_value(t, doc.shapes[1].style.strokeWidth, before * 0.5)
+	testing.expect_value(t, doc.shapes[0].path.pts[0], firstPt * 0.5)
+	// The gradient follows: its start (170, 100) is now at (85, 50).
+	g := &doc.shapes[4].style.fillPaint
+	testing.expect(t, abs(Vector_PaintCoord(g, {85, 50}).x) < 1e-4, "scaled gradient")
+	// The clip too (a 60 px square -> 30).
+	k := doc.shapes[3].clip
+	maxX: f32
+	for q in k.path.pts do maxX = max(maxX, q.x)
+	testing.expect_value(t, maxX, 80)
+}

@@ -24,6 +24,9 @@ import vmem "core:mem/virtual"
 //              faster than PNG, a bigger file)
 //   audio      gain (dB, applied when decoded / to the stream), the bus it
 //              plays into when the node / call names none
+//   vector art (.svg) vector_scale (document units -> px, e.g. 0.5 for art
+//              drawn twice as big), origin (the pivot new Vector Shapes get,
+//              a fraction of the document box)
 //
 // Read when an asset loads (and cached per path, misses too - one lookup
 // per path); the editor writes them and forgets the cached entry. Older
@@ -52,6 +55,10 @@ Asset_Import :: struct {
 	// Audio.
 	gainDb:   f32,
 	bus:      string,
+	// Vector art.
+	vectorScale: f32,    // 0 = 1
+	origin:      [2]f32, // the default pivot (hasOrigin)
+	hasOrigin:   bool,
 	// A file was found (else the defaults).
 	found:    bool,
 }
@@ -172,11 +179,21 @@ Asset_ImportParse :: proc(text: string, e: ^Asset_Import, allocator := context.a
 	if c, isStr := o["compress"].(json.String); isStr do e.compress = .QOI if c == "qoi" else .Keep
 	if g, ok := num(o, "gain_db"); ok do e.gainDb = clamp(f32(g), -60, 24)
 	if b, isStr := o["bus"].(json.String); isStr do e.bus = strings.clone(b, allocator)
+	if s, ok := num(o, "vector_scale"); ok && s > 0 do e.vectorScale = clamp(f32(s), 0.001, 1000)
+	if arr, isArr := o["origin"].(json.Array); isArr && len(arr) >= 2 {
+		for i in 0 ..< 2 {
+			#partial switch x in arr[i] {
+			case json.Float: e.origin[i] = f32(x)
+			case json.Integer: e.origin[i] = f32(x)
+			}
+		}
+		e.hasOrigin = true
+	}
 }
 
 // Asset_ImportIsDefault: nothing worth a file.
 Asset_ImportIsDefault :: proc(e: Asset_Import) -> bool {
-	return e.filter == .Point && e.wrap == .Repeat && !e.mipmaps && e.slice == {} && !e.atlas && e.compress == .Keep && e.gainDb == 0 && e.bus == ""
+	return e.filter == .Point && e.wrap == .Repeat && !e.mipmaps && e.slice == {} && !e.atlas && e.compress == .Keep && e.gainDb == 0 && e.bus == "" && (e.vectorScale == 0 || e.vectorScale == 1) && !e.hasOrigin
 }
 
 // Asset_ImportToJSON: a settings file's text (only what differs from the
@@ -201,6 +218,8 @@ Asset_ImportToJSON :: proc(e: Asset_Import, allocator := context.allocator) -> s
 	if e.compress == .QOI {sep(&sb, &n); strings.write_string(&sb, "\"compress\": \"qoi\"")}
 	if e.gainDb != 0 {sep(&sb, &n); fmt.sbprintf(&sb, "\"gain_db\": %.1f", e.gainDb)}
 	if e.bus != "" {sep(&sb, &n); fmt.sbprintf(&sb, "\"bus\": %q", e.bus)}
+	if e.vectorScale != 0 && e.vectorScale != 1 {sep(&sb, &n); fmt.sbprintf(&sb, "\"vector_scale\": %g", e.vectorScale)}
+	if e.hasOrigin {sep(&sb, &n); fmt.sbprintf(&sb, "\"origin\": [%g, %g]", e.origin.x, e.origin.y)}
 	strings.write_string(&sb, "\n}\n" if n > 0 else "}\n")
 	return strings.to_string(sb)
 }

@@ -246,6 +246,14 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 			tm.aseRes = nil
 		}
 		if menu(ICON_FA_PEN_TO_SQUARE, "Edit in Aseprite", "edit-aseprite") do Aseprite_Edit(state, full)
+	case .Vector:
+		if menu(ICON_FA_PLUS, "Add Vector Shape to Scene", "add-vector", hasScene) do Editor_DropAsset(state, rel, state.cameraPos)
+		if menu(ICON_FA_PAINTBRUSH, "Use on Selected Vector Shape", "use-vector", sel != nil && sel.typeId == e.VectorShapeNode) {
+			Editor_RecordUndo(state, "Set vector file")
+			v := cast(^e.VectorShapeNode)sel
+			v.file = strings.clone(rel, v.allocator)
+		}
+		if menu(ICON_FA_PEN_TO_SQUARE, "Edit in Vector App", "edit-vector") do Vector_EditExternal(state, full)
 	case .Package, .Other:
 		if menu(ICON_FA_FOLDER_OPEN, "Open With Default App", "open-external") do Editor_OpenExternally(state, full)
 	}

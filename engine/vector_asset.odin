@@ -64,6 +64,7 @@ ResourceManager_LoadVector :: proc(rm: ^ResourceManager, path: string) -> ^Vecto
 		return nil
 	}
 	for w in r.doc.warnings do log.warnf("%s: %s", path, w)
+	if imp := Asset_ImportGet(rm, path); imp.vectorScale > 0 do Vector_DocScale(&r.doc, imp.vectorScale)
 	r.path = strings.clone(path, Engine_HeapAllocator())
 	r.refs = 1
 	r.owner = rm
@@ -132,6 +133,7 @@ Vector_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 			Vector_Doc_Destroy(&doc) // (half-written: next time)
 			continue
 		}
+		if imp := Asset_ImportGet(rm, r.path); imp.vectorScale > 0 do Vector_DocScale(&doc, imp.vectorScale)
 		Vector_Doc_Destroy(&r.doc)
 		r.doc = doc
 		r.modTime = info.modification_time
@@ -168,3 +170,41 @@ Vector_ResourceMesh :: proc(r: ^Vector_Resource, t: ^Vector_Tess, pixel: f32) ->
 
 // Vector_ResourceBounds: the document's box (its origin rectangle).
 Vector_ResourceBounds :: proc(r: ^Vector_Resource) -> (min, size: [2]f32) {return r.doc.min, r.doc.size}
+
+// Vector_FileImage: an SVG file rendered into an image fitting max x max px
+// (asset thumbnails and previews; needs a window; the caller unloads it; no
+// data when the file can't be read).
+Vector_FileImage :: proc(path: string, maxSize: i32) -> rl.Image {
+	if !rl.IsWindowReady() do return {}
+	data, err := os.read_entire_file(path, context.temp_allocator)
+	if err != nil do return {}
+	doc: Vector_Doc
+	defer Vector_Doc_Destroy(&doc)
+	if !Vector_LoadSVG(string(data), &doc) do return {}
+	return Vector_DocImage(&doc, maxSize)
+}
+
+// Vector_DocImage: a document rendered into an image fitting max x max px
+// (transparent around it).
+Vector_DocImage :: proc(doc: ^Vector_Doc, maxSize: i32) -> rl.Image {
+	if !rl.IsWindowReady() || doc.size.x <= 0 || doc.size.y <= 0 do return {}
+	s := f32(maxSize) / max(doc.size.x, doc.size.y)
+	w, h := max(i32(doc.size.x * s + 0.5), 1), max(i32(doc.size.y * s + 0.5), 1)
+	rt := rl.LoadRenderTexture(w, h)
+	defer rl.UnloadRenderTexture(rt)
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	cache: Vector_Cache
+	defer Vector_Cache_Destroy(&cache)
+	{
+		context.allocator = Engine_HeapAllocator()
+		Vector_Cache_Ensure(&cache, &tess, doc.shapes[:], 1 / s)
+	}
+	rl.BeginTextureMode(rt)
+	rl.ClearBackground({0, 0, 0, 0})
+	Vector_Cache_Draw(&cache, {0, 0}, 0, {s, s}, rl.WHITE, -doc.min)
+	rl.EndTextureMode()
+	img := rl.LoadImageFromTexture(rt.texture)
+	rl.ImageFlipVertical(&img) // (render textures are upside down)
+	return img
+}

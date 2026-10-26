@@ -116,7 +116,7 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		name        = "Vector Shape",
 		category    = "Graphics & Rendering",
 		icon        = ICON_FA_PAINTBRUSH,
-		description = "Vector art: crisp at any zoom, anti-aliased, cached as a mesh (preview: built-in shapes; SVG import comes next).",
+		description = "Vector art from an SVG (Inkscape, Illustrator, Affinity, Figma) or a built-in shape: crisp at any zoom, anti-aliased, cached on the GPU.",
 		typeName    = "VectorShapeNode",
 	},
 	{

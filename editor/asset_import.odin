@@ -70,6 +70,7 @@ Asset_ImportDir :: proc(name: string) -> (dir: string, ok: bool) {
 	case .Level:     return "levels", true
 	case .Shader:    return "shaders", true
 	case .Aseprite:  return "sprites", true
+	case .Vector:    return "vectors", true
 	case .Package, .Other:
 	}
 	return "", false
@@ -204,7 +205,7 @@ Editor_HandleFileDrops :: proc(state: ^EditorState) {
 		placed := 0
 		for rel in imported {
 			#partial switch Asset_KindOf(rel) {
-			case .Texture, .Audio, .Component, .Level, .Aseprite:
+			case .Texture, .Audio, .Component, .Level, .Aseprite, .Vector:
 				Editor_DropAsset(state, rel, world + {f32(placed) * 24, f32(placed) * 24})
 				placed += 1
 			}
@@ -377,6 +378,10 @@ validate :: proc(name: string, data: []byte) -> (why: string, ok: bool) {
 		doc, why := e.Ase_Load(data)
 		if doc == nil do return fmt.tprintf("can't be read: %s", why), false
 		e.Ase_Destroy(doc)
+	case .Vector:
+		doc: e.Vector_Doc
+		defer e.Vector_Doc_Destroy(&doc)
+		if !e.Vector_LoadSVG(string(data), &doc) do return fmt.tprintf("not a readable SVG: %s", strings.join(doc.warnings[:], "; ", context.temp_allocator)), false
 	case .Texture:
 		img := rl.LoadImageFromMemory(strings.clone_to_cstring(filepath.ext(lower), context.temp_allocator), raw_data(data), i32(len(data)))
 		if img.data == nil do return "not a readable image (corrupt, or a format the engine can't load)", false

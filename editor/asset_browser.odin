@@ -46,6 +46,7 @@ Asset_Kind :: enum {
 	Shader,  // fragment shader (.fs / .glsl / .frag)
 	Package,
 	Aseprite, // .aseprite / .ase (aseprite_editor.odin)
+	Vector,   // .svg (vector_editor.odin)
 }
 
 Asset_KindOf :: proc(path: string) -> Asset_Kind {
@@ -57,6 +58,7 @@ Asset_KindOf :: proc(path: string) -> Asset_Kind {
 	case strings.has_suffix(lower, ".ldtk"): return .Level
 	case e.Is_PackagePath(lower): return .Package
 	case strings.has_suffix(lower, ".aseprite"), strings.has_suffix(lower, ".ase"): return .Aseprite
+	case strings.has_suffix(lower, ".svg"): return .Vector
 	case strings.has_suffix(lower, ".fs"), strings.has_suffix(lower, ".glsl"), strings.has_suffix(lower, ".frag"): return .Shader
 	}
 	ext := filepath.ext(lower)
@@ -78,6 +80,7 @@ kind_icon :: proc(k: Asset_Kind) -> (string, imgui.Vec4) {
 	case .Shader: return ICON_FA_WAND_MAGIC_SPARKLES, {0.92, 0.55, 0.95, 1}
 	case .Package: return ICON_FA_BOX_ARCHIVE, UI_TEXT_DIM
 	case .Aseprite: return ICON_FA_PALETTE, {0.98, 0.55, 0.55, 1}
+	case .Vector: return ICON_FA_PAINTBRUSH, {0.55, 0.85, 0.65, 1}
 	case .Other: return ICON_FA_FILE, UI_TEXT_DIM
 	}
 	return ICON_FA_FILE, UI_TEXT_DIM
@@ -121,6 +124,7 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 		section_files(state, "Scripts", Editor_ListProjectFiles(state, "scripts", {".lua"}), filter)
 		section_files(state, "Textures", Editor_ListProjectFiles(state, "textures", TEXTURE_EXTS), filter)
 		section_files(state, "Aseprite", Editor_ListProjectFiles(state, "", {".aseprite", ".ase"}), filter)
+		section_files(state, "Vector Art", Editor_ListProjectFiles(state, "", {".svg"}), filter)
 		section_files(state, "Audio", Editor_ListProjectFiles(state, "audio", AUDIO_EXTS), filter)
 		section_files(state, "Levels", Editor_ListProjectFiles(state, "", {".ldtk"}), filter)
 		section_files(state, "Shaders", Editor_ListProjectFiles(state, "", SHADER_EXTS), filter)
@@ -253,6 +257,7 @@ asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, n
 		case .Level: Editor_AddLevel(state, rel, state.cameraPos)
 		case .Shader: Editor_OpenScript(state, rel)
 		case .Aseprite: Aseprite_Edit(state, full)
+		case .Vector: Vector_EditExternal(state, full)
 		}
 	}
 	UI_Tooltip(asset_tooltip(kind, rel))
@@ -275,7 +280,7 @@ asset_tile :: proc(state: ^EditorState, rel: string) {
 	dl := imgui.GetWindowDrawList()
 	box := [2]f32{TILE - 12, TILE - 12}
 	origin := [2]f32{mn.x + 6, mn.y + 4}
-	if tex := Asset_Thumbnail(full) if kind == .Texture || kind == .Aseprite else nil; tex != nil {
+	if tex := Asset_Thumbnail(full) if kind == .Texture || kind == .Aseprite || kind == .Vector else nil; tex != nil {
 		s := min(box.x / f32(tex.width), box.y / f32(tex.height))
 		size := [2]f32{f32(tex.width), f32(tex.height)} * s
 		p0 := origin + (box - size) * 0.5
@@ -310,6 +315,7 @@ asset_tooltip :: proc(k: Asset_Kind, rel: string) -> string {
 	case .Script: return fmt.tprintf("%s - drag onto a node in the viewport to attach (or right-click > Make Global)", rel)
 	case .Level: return fmt.tprintf("%s - LDtk project: double-click or drag into the viewport to add a level", rel)
 	case .Aseprite: return fmt.tprintf("%s - Aseprite: drag into the viewport to add (its tags play); double-click to edit in Aseprite", rel)
+	case .Vector: return fmt.tprintf("%s - vector art (SVG): drag into the viewport to add, or onto a Vector Shape to use it; double-click to edit it in your vector app", rel)
 	}
 	return rel
 }
@@ -409,6 +415,26 @@ Editor_DropAsset :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) {
 				if len(r.doc.tags) > 0 do an.animation = strings.clone(r.doc.tags[0].name, an.allocator)
 				e.ResourceManager_ReleaseAseprite(r)
 			}
+		}
+	case .Vector:
+		// Onto a Vector Shape: it draws this file; elsewhere: a new one.
+		if target := Viewport_PickNode(state, worldPos); target != nil && target.typeId == e.VectorShapeNode {
+			Editor_RecordUndo(state, "Vector file")
+			v := cast(^e.VectorShapeNode)target
+			v.file = strings.clone(rel, v.allocator)
+			state.selectedNode = target
+			return
+		}
+		saved := state.cameraPos
+		state.cameraPos = worldPos
+		state.selectedNode = nil
+		node := Editor_CreateNode(state, "VectorShapeNode", filepath.stem(rel))
+		state.cameraPos = saved
+		if node != nil {
+			v := cast(^e.VectorShapeNode)node
+			v.file = strings.clone(rel, v.allocator)
+			full := e.Project_ResolveAssetPath(&state.game.gameContext, rel)
+			if imp := e.Asset_ImportGet(&state.game.resourceManager, full); imp.hasOrigin do v.pivot = imp.origin
 		}
 	case .Texture:
 		saved := state.cameraPos
