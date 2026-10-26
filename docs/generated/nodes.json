@@ -746,7 +746,13 @@
         {"name": "strokeWidth", "kind": "number", "owner": "VectorShapeNode", "default": 4, "min": 0, "max": 64, "doc": "Outline thickness (px, in the shape's own scale); 0 = no outline."},
         {"name": "tint", "kind": "color", "owner": "VectorShapeNode", "default": "#ffffffff", "doc": "Multiplies the texture's colours (white = unchanged; alpha fades it)."},
         {"name": "brightness", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": -1, "max": 1, "doc": "Darken (-1 black) or lighten (1 white) the art (Flash's brightness effect)."},
-        {"name": "colorAdd", "kind": "color", "owner": "VectorShapeNode", "default": "#00000000", "doc": "A colour added to the art's colours (Flash's advanced colour offset): flash white on a hit, tint toward a colour."}
+        {"name": "colorAdd", "kind": "color", "owner": "VectorShapeNode", "default": "#00000000", "doc": "A colour added to the art's colours (Flash's advanced colour offset): flash white on a hit, tint toward a colour."},
+        {"name": "trimStart", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": 0, "max": 1, "doc": "Trim paths: where along each path drawing starts (0..1 of its length). Key Start / End for draw-on lines."},
+        {"name": "trimEnd", "kind": "number", "owner": "VectorShapeNode", "default": 1, "min": 0, "max": 1, "doc": "Trim paths: where along each path drawing stops (1 = the end; 0.5 draws the first half)."},
+        {"name": "trimOffset", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": -1, "max": 1, "doc": "Trim paths: moves the drawn part along the path, wrapping round (animate it for a running dash)."},
+        {"name": "trimEach", "kind": "boolean", "owner": "VectorShapeNode", "default": false, "doc": "Trim every subpath on its own (a ring's circles drawn on together) instead of one after another."},
+        {"name": "morphTo", "kind": "string", "owner": "VectorShapeNode", "default": "", "doc": "Shape tween: another group of the same file to morph into (Flash's shape tweens)."},
+        {"name": "morph", "kind": "number", "owner": "VectorShapeNode", "default": 0, "min": 0, "max": 1, "doc": "Shape tween: 0 draws the group, 1 draws Morph To, between interpolates paths, colours, outlines and gradients. Key it."}
       ]
     },
     {

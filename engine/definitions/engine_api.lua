@@ -4069,6 +4069,12 @@ function LineNode:set_property(path, value, y) end
 ---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
 ---@field brightness number Darken (-1 black) or lighten (1 white) the art (Flash's brightness effect).
 ---@field colorAdd number[] A colour added to the art's colours (Flash's advanced colour offset): flash white on a ...
+---@field trimStart number Trim paths: where along each path drawing starts (0..1 of its length). Key Start / End ...
+---@field trimEnd number Trim paths: where along each path drawing stops (1 = the end; 0.5 draws the first half).
+---@field trimOffset number Trim paths: moves the drawn part along the path, wrapping round (animate it for a runni...
+---@field trimEach boolean Trim every subpath on its own (a ring's circles drawn on together) instead of one after...
+---@field morphTo string Shape tween: another group of the same file to morph into (Flash's shape tweens).
+---@field morph number Shape tween: 0 draws the group, 1 draws Morph To, between interpolates paths, colours, ...
 
 ---@alias VectorShapeNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -4091,6 +4097,12 @@ function LineNode:set_property(path, value, y) end
 ---| "tint" # number[] - Multiplies the texture's colours (white = unchanged; alpha fades it).
 ---| "brightness" # number - Darken (-1 black) or lighten (1 white) the art (Flash's brightness effect).
 ---| "colorAdd" # number[] - A colour added to the art's colours (Flash's advanced colour offset): flash white on a ...
+---| "trimStart" # number - Trim paths: where along each path drawing starts (0..1 of its length). Key Start / End ...
+---| "trimEnd" # number - Trim paths: where along each path drawing stops (1 = the end; 0.5 draws the first half).
+---| "trimOffset" # number - Trim paths: moves the drawn part along the path, wrapping round (animate it for a runni...
+---| "trimEach" # boolean - Trim every subpath on its own (a ring's circles drawn on together) instead of one after...
+---| "morphTo" # string - Shape tween: another group of the same file to morph into (Flash's shape tweens).
+---| "morph" # number - Shape tween: 0 draws the group, 1 draws Morph To, between interpolates paths, colours, ...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -4117,6 +4129,12 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: VectorShapeNode, path: "tint"): number[]
 ---@overload fun(self: VectorShapeNode, path: "brightness"): number
 ---@overload fun(self: VectorShapeNode, path: "colorAdd"): number[]
+---@overload fun(self: VectorShapeNode, path: "trimStart"): number
+---@overload fun(self: VectorShapeNode, path: "trimEnd"): number
+---@overload fun(self: VectorShapeNode, path: "trimOffset"): number
+---@overload fun(self: VectorShapeNode, path: "trimEach"): boolean
+---@overload fun(self: VectorShapeNode, path: "morphTo"): string
+---@overload fun(self: VectorShapeNode, path: "morph"): number
 function VectorShapeNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -4145,6 +4163,12 @@ function VectorShapeNode:get_property(path) end
 ---@overload fun(self: VectorShapeNode, path: "tint", value: number[])
 ---@overload fun(self: VectorShapeNode, path: "brightness", value: number)
 ---@overload fun(self: VectorShapeNode, path: "colorAdd", value: number[])
+---@overload fun(self: VectorShapeNode, path: "trimStart", value: number)
+---@overload fun(self: VectorShapeNode, path: "trimEnd", value: number)
+---@overload fun(self: VectorShapeNode, path: "trimOffset", value: number)
+---@overload fun(self: VectorShapeNode, path: "trimEach", value: boolean)
+---@overload fun(self: VectorShapeNode, path: "morphTo", value: string)
+---@overload fun(self: VectorShapeNode, path: "morph", value: number)
 function VectorShapeNode:set_property(path, value, y) end
 
 ---@class TrailNode

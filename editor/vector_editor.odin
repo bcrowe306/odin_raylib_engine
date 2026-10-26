@@ -115,6 +115,30 @@ inspector_vector :: proc(state: ^EditorState, v: ^e.VectorShapeNode) {
 		Drive_Item("insp.vec.frame")
 		UI_Tooltip("Show one child group at a time (part swapping); the box stays the group's, so frames never jump. Scripts: node:swap(\"name\")")
 	}
+	// Shape tween: morph toward another group (keys on Morph animate it).
+	UI_PropLabel("Morph to")
+	imgui.SetNextItemWidth(field_width())
+	morphShown := v.morphTo if v.morphTo != "" else "None"
+	if v.morphTo != "" && e.Vector_ResourceGroup(r, v.morphTo) == -2 do morphShown = fmt.tprintf("%s (missing)", v.morphTo)
+	if imgui.BeginCombo("##vecmorph", strings.clone_to_cstring(morphShown, context.temp_allocator), {.HeightLarge}) {
+		if imgui.Selectable("None", v.morphTo == "") && v.morphTo != "" {
+			Editor_RecordUndo(state, "Vector morph")
+			v.morphTo = ""
+		}
+		Drive_Item("pick:vec-morph:")
+		for grp, i in doc.groups {
+			path := e.Vector_GroupPath(r, i)
+			if imgui.Selectable(fmt.ctprintf("%s##m%d", path, i), path == v.morphTo) && path != v.morphTo {
+				Editor_RecordUndo(state, "Vector morph")
+				v.morphTo = strings.clone(path, v.allocator)
+				if v.morph == 0 do v.morph = 0.5 // (show it at once)
+			}
+			Drive_Item(fmt.tprintf("pick:vec-morph:%s", path))
+		}
+		imgui.EndCombo()
+	}
+	Drive_Item("insp.vec.morph")
+	UI_Tooltip("Shape tween: the group this one morphs into as Morph goes 0 -> 1 (paths, colours, outlines, gradients)")
 	UI_EndProps()
 	if g != -2 && len(e.Vector_GroupChildren(r, g)) > 0 {
 		if UI_Button(fmt.tprintf("%s  Explode into Parts", ICON_FA_OBJECT_UNGROUP), "insp.vec.explode", {field_width() + 80, 0}) {

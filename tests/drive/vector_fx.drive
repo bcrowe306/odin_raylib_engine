@@ -1,0 +1,49 @@
+# Path effects in the editor (Phase 14 M5; vector_editor.odin): the
+# Inspector's Morph to picker (a shape tween toward another group, shown
+# half way at once, undoable) and the Morph / Trim properties editing a
+# Vector Shape live; the scene saves them.
+exec mkdir -p $PROJECT/vectors
+exec cp tests/vector/svg/morph_shapes.svg $PROJECT/vectors/morph_zz.svg
+wait 5
+wait-until item:asset:vectors/morph_zz.svg == visible timeout=600
+drag @asset:vectors/morph_zz.svg @world:600,300 12
+wait 2
+expect node:morph_zz.type == VectorShapeNode
+click @insp.vec.group
+wait 1
+click @pick:vec-group:circle
+wait 1
+click @insp.vec.morph
+wait 1
+click @pick:vec-morph:star
+wait 1
+expect node:morph_zz.prop.morphTo == star
+expect node:morph_zz.prop.morph == 0.5
+screenshot morph_half
+dblclick @insp.prop:morph
+key ctrl+a
+type 0.75
+key enter
+wait 1
+expect node:morph_zz.prop.morph == 0.75
+screenshot morph_most
+key cmd+z
+wait 1
+key cmd+z
+wait 1
+expect node:morph_zz.prop.morphTo == 
+# Trim: the squiggle drawn on to half.
+click @insp.vec.group
+wait 1
+click @pick:vec-group:squiggle
+wait 1
+dblclick @insp.prop:trimEnd
+key ctrl+a
+type 0.5
+key enter
+wait 1
+expect node:morph_zz.prop.trimEnd == 0.5
+screenshot trimmed
+key cmd+s
+wait 2
+expect file:scenes/main.scene.json contains "trimEnd": 0.5

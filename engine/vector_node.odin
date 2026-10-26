@@ -30,11 +30,28 @@ VectorShapeNode :: struct {
 	tint:        rl.Color `gui:"true"`,
 	brightness:  f32 `gui:"true" min:"-1" max:"1"`, // -1 black ... 0 ... 1 white (Flash's brightness)
 	colorAdd:    rl.Color `gui:"true"`, // added to the colours (Flash's advanced colour offset; alpha ignored)
+	trimStart:   f32 `gui:"true" min:"0" max:"1"`, // trim paths: the part of each path drawn (0..1 of its length)
+	trimEnd:     f32 `gui:"true" min:"0" max:"1"`,
+	trimOffset:  f32 `gui:"true" min:"-1" max:"1"`, // moves the drawn part along (wraps round)
+	trimEach:    bool `gui:"true"`, // trim every subpath on its own (a ring's circles together), not one after another
+	morphTo:     string `gui:"true"`, // shape tween: another group of the file to morph towards
+	morph:       f32 `gui:"true" min:"0" max:"1"`, // 0: this group ... 1: morphTo
 	shapes:      [dynamic]Vector_Shape,
 	cache:       Vector_Cache,
-	built:       struct {preset: Vector_Preset, fill, stroke: rl.Color, width: f32, ok: bool},
+	built:       struct {preset: Vector_Preset, fill, stroke: rl.Color, width: f32, ok: bool, version: int},
 	res:         ^Vector_Resource, // the file's (shared)
 	loadedPath:  string,
+	fx:          [dynamic]Vector_Shape, // trimmed / morphed shapes (only while those are used)
+	fxCache:     Vector_Cache,
+	fxKey:       Vector_Fx_Key,
+}
+
+Vector_Fx_Key :: struct {
+	res:                    ^Vector_Resource,
+	version, part, target:  int,
+	start, end, offset, t:  f32,
+	each:                   bool,
+	built:                  bool,
 }
 
 // The main thread's tessellation scratch (worker threads get their own in M2).
@@ -50,14 +67,19 @@ VectorShapeNode_Create :: proc(scene: ^Scene, name: string = "VectorShape", pare
 	v.strokeWidth = 4
 	v.tint = rl.WHITE
 	v.frame = -1
+	v.trimEnd = 1
 	// (Meshes are rebuilt on zoom: the heap, not the node's arena.)
 	v.shapes = make([dynamic]Vector_Shape, Engine_HeapAllocator())
+	v.fx = make([dynamic]Vector_Shape, Engine_HeapAllocator())
 	v.render = VectorShapeNode_Render
 	v.onDestroy = proc(n: ^Node, ctx: ^GameContext) {
 		v := cast(^VectorShapeNode)n
 		vector_shapes_free(&v.shapes)
 		delete(v.shapes)
 		Vector_Cache_Destroy(&v.cache)
+		vector_shapes_free(&v.fx)
+		delete(v.fx)
+		Vector_Cache_Destroy(&v.fxCache)
 		ResourceManager_ReleaseVector(v.res)
 		v.res = nil
 		delete(v.loadedPath, Engine_HeapAllocator())
@@ -86,7 +108,7 @@ VectorShapeNode_Build :: proc(v: ^VectorShapeNode) {
 	fill := [4]u8{v.fillColor.r, v.fillColor.g, v.fillColor.b, v.fillColor.a}
 	line := [4]u8{v.strokeColor.r, v.strokeColor.g, v.strokeColor.b, v.strokeColor.a}
 	Vector_PresetShapes(v.preset, fill, line, v.strokeWidth, &v.shapes)
-	v.built = {v.preset, v.fillColor, v.strokeColor, v.strokeWidth, true}
+	v.built = {v.preset, v.fillColor, v.strokeColor, v.strokeWidth, true, v.built.version + 1}
 	v.cache.dirty = true
 }
 
@@ -171,6 +193,64 @@ vector_color_effect :: proc(v: ^VectorShapeNode) -> (mul: rl.Color, add: [4]f32)
 	return
 }
 
+// VectorShapeNode_FxActive: whether trim paths or a shape tween change
+// what it draws (then it tessellates its own copy when they change).
+VectorShapeNode_FxActive :: proc(v: ^VectorShapeNode) -> bool {
+	return v.trimStart > 0 || v.trimEnd < 1 || (v.morph > 0 && v.morphTo != "")
+}
+
+// vector_fx_build remakes the trimmed / morphed shapes when anything they
+// depend on changed; false when there's nothing to draw.
+@(private = "file")
+vector_fx_build :: proc(v: ^VectorShapeNode, r: ^Vector_Resource, part: int) {
+	base := v.shapes[:]
+	target := -2
+	key := Vector_Fx_Key{res = r, version = v.built.version, part = part, target = -2, start = v.trimStart, end = v.trimEnd, offset = v.trimOffset, each = v.trimEach, built = true}
+	if r != nil {
+		base = Vector_PartShapes(r, part)
+		key.version = r.version
+		if v.morph > 0 && v.morphTo != "" do target = Vector_ResourceGroup(r, v.morphTo)
+		if target != -2 {
+			key.target = target
+			key.t = clamp(v.morph, 0, 1)
+		}
+	}
+	if key == v.fxKey do return
+	v.fxKey = key
+	context.allocator = Engine_HeapAllocator()
+	vector_shapes_free(&v.fx)
+	src := base
+	if target != -2 {
+		morphed := make([dynamic]Vector_Shape, context.temp_allocator)
+		{
+			context.allocator = context.temp_allocator
+			Vector_ShapesMorph(base, Vector_PartShapes(r, target), key.t, &morphed)
+		}
+		src = morphed[:]
+	}
+	for &sh in src {
+		out := sh
+		Vector_Path_Init(&out.path)
+		Vector_PathTrim(&sh.path, v.trimStart, v.trimEnd, v.trimOffset, &out.path, v.trimEach)
+		append(&v.fx, out)
+	}
+	v.fxCache.dirty = true
+}
+
+// VectorShapeNode_FxShapes: the trimmed / morphed shapes it draws (built
+// when out of date).
+VectorShapeNode_FxShapes :: proc(v: ^VectorShapeNode) -> []Vector_Shape {
+	if r := VectorShapeNode_Asset(v); r != nil {
+		part, _, _, ok := VectorShapeNode_Part(v, r)
+		if !ok do return nil
+		vector_fx_build(v, r, part)
+	} else {
+		if !v.built.ok do VectorShapeNode_Build(v)
+		vector_fx_build(v, nil, -1)
+	}
+	return v.fx[:]
+}
+
 VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	v := cast(^VectorShapeNode)node
 	if !rl.IsWindowReady() do return
@@ -179,7 +259,12 @@ VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 		part, boxMin, boxSize, ok := VectorShapeNode_Part(v, r)
 		if !ok do return
 		cache: ^Vector_Cache
-		{
+		if VectorShapeNode_FxActive(v) {
+			vector_fx_build(v, r, part)
+			context.allocator = Engine_HeapAllocator()
+			Vector_Cache_Ensure(&v.fxCache, &vectorTess, v.fx[:], Vector_ScreenPixel(v.globalScale))
+			cache = &v.fxCache
+		} else {
 			context.allocator = Engine_HeapAllocator()
 			// (A new zoom: drawn from the nearest mesh while a worker makes the new one.)
 			cache = Vector_ResourceMesh(r, &vectorTess, Vector_ScreenPixel(v.globalScale), background = true, part = part)
@@ -191,6 +276,13 @@ VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	}
 	if !v.built.ok || v.built.preset != v.preset || v.built.fill != v.fillColor || v.built.stroke != v.strokeColor || v.built.width != v.strokeWidth {
 		VectorShapeNode_Build(v)
+	}
+	if VectorShapeNode_FxActive(v) {
+		vector_fx_build(v, nil, -1)
+		context.allocator = Engine_HeapAllocator()
+		Vector_Cache_Ensure(&v.fxCache, &vectorTess, v.fx[:], Vector_ScreenPixel(v.globalScale))
+		Vector_Cache_Draw(&v.fxCache, v.globalPosition, v.globalRotation, v.globalScale, mul, {}, add)
+		return
 	}
 	{
 		context.allocator = Engine_HeapAllocator()
@@ -207,10 +299,12 @@ VectorShapeNode_LocalBounds :: proc(v: ^VectorShapeNode) -> (b: [4]f32, ok: bool
 		if !ok do return {}, false
 		off := -boxMin - Node_OriginPx(v, boxSize)
 		d := r.doc.drawn if part < 0 else Vector_ShapesBounds(Vector_PartShapes(r, part))
+		if VectorShapeNode_FxActive(v) && len(v.fx) > 0 do d = Vector_ShapesBounds(v.fx[:])
 		return {d[0] + off.x, d[1] + off.y, d[2] + off.x, d[3] + off.y}, d != {}
 	}
-	if len(v.cache.mesh.verts) == 0 do return {}, false
-	return v.cache.mesh.bounds, true
+	c := &v.fxCache if VectorShapeNode_FxActive(v) else &v.cache
+	if len(c.mesh.verts) == 0 do return {}, false
+	return c.mesh.bounds, true
 }
 
 // VectorShapeNode_HitTest: whether a world point is on the drawn shape
@@ -228,9 +322,10 @@ VectorShapeNode_HitTest :: proc(v: ^VectorShapeNode, world: [2]f32) -> bool {
 		part, boxMin, boxSize, ok := VectorShapeNode_Part(v, res)
 		if !ok do return false
 		q += boxMin + Node_OriginPx(v, boxSize)
-		for &rc in res.caches do if rc.part == part && len(rc.cache.mesh.idx) > 0 {mesh = &rc.cache.mesh; break}
+		if VectorShapeNode_FxActive(v) do mesh = &v.fxCache.mesh
+		else do for &rc in res.caches do if rc.part == part && len(rc.cache.mesh.idx) > 0 {mesh = &rc.cache.mesh; break}
 	} else {
-		mesh = &v.cache.mesh
+		mesh = &v.cache.mesh if !VectorShapeNode_FxActive(v) else &v.fxCache.mesh
 	}
 	if mesh == nil || len(mesh.idx) == 0 do return false
 	for i := 0; i < len(mesh.idx); i += 3 {

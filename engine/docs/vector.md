@@ -11,7 +11,7 @@ in milestones:
 | M1 | Shapes in full: fill rules and self-intersections (Clipper2), gradients, dashes, opacity, clip paths; drawing from Lua (`on_draw` + the `Vector` module) | **done** |
 | M2 | Vector assets: SVG import (Inkscape, Illustrator, Affinity, Figma), assets shared and reloaded on save, the editor's workflow, picking, culling, background tessellation | **done** |
 | M3 | Characters: symbols and instances, part swapping, lip-sync, timeline keys | **done** |
-| M5 | Shape tweens, vector skinning on skeletons, filters | next |
+| M5 | Shape tweens and trim paths (**done**), vector skinning on skeletons, filters | in progress |
 | M6 | Boolean path operations, collision from shapes | |
 | M4 | Drawing tools in the editor | |
 | M7 | Crisp text, Adobe Animate import, a sample character | |
@@ -136,6 +136,53 @@ with the same name (`hello.wav` -> `hello.tsv` / `hello.json`), or point
 - **Dialogue**: set a Dialogue node's **lipSync** to the Lip Sync node's
   path and every line with a voice moves the mouth, timed by the voice's
   playback position (no drift); closing or skipping the line rests it.
+
+## Path effects: shape tweens and trim paths
+
+### Shape tweens
+
+Flash's shape tweens: a Vector Shape drawing a group morphs into another
+group of the same file. Pick it in the Inspector's **Morph to** (or set
+`morphTo`), then key **morph** from 0 (the group) to 1 (the target) on the
+timeline, or tween it from Lua:
+
+```lua
+local blob = self.node:get_node("Blob")
+blob.morphTo = "star"
+Tween.to(blob, "morph", 1, 0.6, "in_out_sine")
+```
+
+- Shapes pair up in order (the first shape of one with the first of the
+  other); extra shapes shrink to their centres and fade out (or grow and
+  fade in).
+- Paths are compared as curves: missing segments are made by splitting the
+  longest ones, closed outlines are turned the same way and started at the
+  closest points (an automatic shape hint), so a circle becomes a star
+  without twisting.
+- Colours, outline widths, opacity and gradients blend - a solid colour into
+  a gradient too; a missing fill or outline fades in.
+- Morphing tessellates the node's own copy whenever the value changes
+  (0.2-1 ms for a detailed part): fine for a few at a time; hold it at 0 or 1
+  and it costs nothing extra.
+
+For the best results draw both shapes with the same number of points, in
+the same order, from the same starting corner.
+
+### Trim paths
+
+**trimStart** / **trimEnd** (0..1 of each path's length) draw part of every
+path, and **trimOffset** moves that part along, wrapping round - keyed, they
+draw lines on, make progress rings and running dashes. Paths are trimmed one
+after another (the whole drawing as one line); **trimEach** trims every
+subpath on its own (both circles of a ring at once). Filled shapes fill
+what's left of their outline. It works on presets too.
+
+```lua
+-- Draw a signature on over a second.
+local sig = self.node:get_node("Signature")
+sig.trimEnd = 0
+Tween.to(sig, "trimEnd", 1, 1.0)
+```
 
 ## Using it with presets
 
@@ -290,6 +337,14 @@ The benchmark: `tests/vector/project`, scene `scenes/bench.scene.json`
 - `tests/drive/vector_svg.drive`: SVG assets - thumbnails, dropping into
   the viewport and onto a Vector Shape (undo), warnings, a reload on save,
   saving the scene.
+- `engine/vector_morph_test.odin`: trim lengths (mid-segment cuts, offsets
+  wrapping, subpaths in turn or each), morphs (ends, alignment of reversed
+  outlines, missing subpaths), style blends (gradients, solid to gradient,
+  strokes fading in), the node rebuilding only when values change.
+- `tests/drive/vector_fx.drive`: the Morph to picker, morph and trim edits,
+  undo, saving.
+- `scenes/fx.scene.json` (golden): a circle-to-star strip, trimmed
+  squiggles (offset wrapping), presets drawn on, a gradient morph.
 - `tests/drive/vector_symbols.drive`: the Symbol and Frame pickers (undo),
   Explode into Parts and its undo.
 - `scenes/symbols.scene.json` (golden): symbols alone, brightness, a

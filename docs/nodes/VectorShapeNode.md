@@ -27,3 +27,8 @@ voice.
 local mouth = self.node:get_node("Mouth")
 mouth:vector_swap("O")   -- by name; false when there's no such frame
 ```
+
+**Shape tweens and trim paths**: **morphTo** + **morph** (0..1) morph the
+group into another group of the file - paths, colours, outlines and
+gradients; **trimStart** / **trimEnd** / **trimOffset** draw part of each
+path (draw-on lines, progress rings). Key them, or tween them from Lua.

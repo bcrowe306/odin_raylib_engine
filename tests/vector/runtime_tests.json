@@ -132,6 +132,25 @@
   }
  },
  {
+  "name": "path effects: shape tweens (circle -> star with colour, outline and gradient blends) and trim paths (start / end / offset wrapping, presets drawn on)",
+  "project": "tests/vector/project",
+  "scene": "scenes/fx.scene.json",
+  "frames": 6,
+  "expect": [
+   [
+    "Morph2",
+    "morph",
+    "==",
+    0.5
+   ]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/fx.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
   "name": "100 spinning characters run (the benchmark scene)",
   "project": "tests/vector/project",
   "scene": "scenes/bench.scene.json",
