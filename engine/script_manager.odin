@@ -491,6 +491,8 @@ ScriptInstance_Destroy :: proc(inst: ^ScriptInstance, sm: ^ScriptManager = nil) 
 		}
 	}
 
+	Vector_Canvas_Destroy(cast(^Vector_Canvas)inst.canvas)
+	inst.canvas = nil
 	delete(inst.modulePath)
 	for k, v in inst.properties {
 		delete(k)

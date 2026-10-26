@@ -4590,6 +4590,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "set_draw_bounds")
 	lua.setglobal(L, "Scene")
 	Script_RegisterTweenModule(L)
+	Script_RegisterVectorModule(L)
 	Script_RegisterPoolModule(L)
 	Script_RegisterAccessibilityModules(L) // Accessibility, Subtitles (accessibility.odin)
 	Script_RegisterSaveModule(L)

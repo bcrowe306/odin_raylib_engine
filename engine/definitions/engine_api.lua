@@ -3951,7 +3951,7 @@ function LineNode:set_property(path, value, y) end
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
----@field preset "Star"|"Ring"|"Badge"|"Character" Which built-in shape it draws (vector assets come with SVG import).
+---@field preset "Star"|"Ring"|"Badge"|"Character"|"Gradients" Which built-in shape it draws (vector assets come with SVG import).
 ---@field fillColor number[] The shape's fill colour.
 ---@field strokeColor number[] The outline's colour.
 ---@field strokeWidth number Outline thickness (px, in the shape's own scale); 0 = no outline.
@@ -3968,7 +3968,7 @@ function LineNode:set_property(path, value, y) end
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "preset" # "Star"|"Ring"|"Badge"|"Character" - Which built-in shape it draws (vector assets come with SVG import).
+---| "preset" # "Star"|"Ring"|"Badge"|"Character"|"Gradients" - Which built-in shape it draws (vector assets come with SVG import).
 ---| "fillColor" # number[] - The shape's fill colour.
 ---| "strokeColor" # number[] - The outline's colour.
 ---| "strokeWidth" # number - Outline thickness (px, in the shape's own scale); 0 = no outline.
@@ -3989,7 +3989,7 @@ function LineNode:set_property(path, value, y) end
 ---@overload fun(self: VectorShapeNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: VectorShapeNode, path: "paused"): boolean
 ---@overload fun(self: VectorShapeNode, path: "enabled"): boolean
----@overload fun(self: VectorShapeNode, path: "preset"): "Star"|"Ring"|"Badge"|"Character"
+---@overload fun(self: VectorShapeNode, path: "preset"): "Star"|"Ring"|"Badge"|"Character"|"Gradients"
 ---@overload fun(self: VectorShapeNode, path: "fillColor"): number[]
 ---@overload fun(self: VectorShapeNode, path: "strokeColor"): number[]
 ---@overload fun(self: VectorShapeNode, path: "strokeWidth"): number
@@ -4012,7 +4012,7 @@ function VectorShapeNode:get_property(path) end
 ---@overload fun(self: VectorShapeNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: VectorShapeNode, path: "paused", value: boolean)
 ---@overload fun(self: VectorShapeNode, path: "enabled", value: boolean)
----@overload fun(self: VectorShapeNode, path: "preset", value: "Star"|"Ring"|"Badge"|"Character")
+---@overload fun(self: VectorShapeNode, path: "preset", value: "Star"|"Ring"|"Badge"|"Character"|"Gradients")
 ---@overload fun(self: VectorShapeNode, path: "fillColor", value: number[])
 ---@overload fun(self: VectorShapeNode, path: "strokeColor", value: number[])
 ---@overload fun(self: VectorShapeNode, path: "strokeWidth", value: number)
@@ -9600,11 +9600,242 @@ function ProjectModule.has_file(relPath) end
 ---@type ProjectModule
 Project = ProjectModule
 
+---A gradient made by Vector.linear_gradient / Vector.radial_gradient (pass it to fill_paint / stroke_paint).
+---@class VectorPaint
+---@field kind "linear"|"radial"
+---@field stops {[1]: number, [2]: string|number[]}[] Offsets 0..1 and colours
+---@field spread? "pad"|"reflect"|"repeat"
+
+---Draws vector shapes from a script's on_draw() in the node's local space: crisp at any zoom, anti-aliased, cached while the drawing stays the same (engine/docs/vector.md). Colours: "#rrggbb[aa]", {r, g, b[, a]} 0..1, or r, g, b[, a].
+---@class VectorModule
+local VectorModule = {}
+
+---Starts a new path (forgets the current one; fill / stroke keep what they drew).
+---
+---Example: `Vector.begin_path(); Vector.circle(0, 0, 10); Vector.fill()`
+function VectorModule.begin_path() end
+
+---Starts a subpath at a point.
+---
+---Example: `Vector.move_to(0, 0); Vector.line_to(100, 0); Vector.stroke()`
+---@param x number
+---@param y number
+function VectorModule.move_to(x, y) end
+
+---A straight line from the current point.
+---
+---Example: `Vector.move_to(0, 0); Vector.line_to(50, 80); Vector.stroke()`
+---@param x number
+---@param y number
+function VectorModule.line_to(x, y) end
+
+---A quadratic Bezier curve (one control point) from the current point.
+---
+---Example: `Vector.move_to(0, 0); Vector.quad_to(50, -60, 100, 0); Vector.stroke()`
+---@param cx number Control point x
+---@param cy number Control point y
+---@param x number End x
+---@param y number End y
+function VectorModule.quad_to(cx, cy, x, y) end
+
+---A cubic Bezier curve (two control points) from the current point.
+---
+---Example: `Vector.move_to(0, 0); Vector.cubic_to(30, -50, 70, 50, 100, 0); Vector.stroke()`
+---@param c1x number
+---@param c1y number
+---@param c2x number
+---@param c2y number
+---@param x number
+---@param y number
+function VectorModule.cubic_to(c1x, c1y, c2x, c2y, x, y) end
+
+---A circular arc around (cx, cy) from angle a0 to a1 in degrees (clockwise on screen; ccw = true for the other way), joined to the current point by a line.
+---
+---Example: `Vector.begin_path(); Vector.move_to(0, 0); Vector.arc(0, 0, 40, -30, 30); Vector.close_path(); Vector.fill()`
+---@param cx number
+---@param cy number
+---@param r number
+---@param a0 number Start angle (degrees)
+---@param a1 number End angle (degrees)
+---@param ccw? boolean
+function VectorModule.arc(cx, cy, r, a0, a1, ccw) end
+
+---Closes the current subpath (a line back to its start; joins instead of caps).
+---
+---Example: `Vector.move_to(0, 0); Vector.line_to(40, 0); Vector.line_to(20, 30); Vector.close_path(); Vector.fill()`
+function VectorModule.close_path() end
+
+---Adds a rectangle subpath.
+---
+---Example: `Vector.fill_color("#3366ff"); Vector.rect(-50, -25, 100, 50); Vector.fill()`
+---@param x number
+---@param y number
+---@param w number
+---@param h number
+function VectorModule.rect(x, y, w, h) end
+
+---Adds a circle subpath.
+---
+---Example: `Vector.fill_color(1, 0.8, 0); Vector.circle(0, 0, 30); Vector.fill()`
+---@param x number Centre x
+---@param y number Centre y
+---@param r number Radius
+function VectorModule.circle(x, y, r) end
+
+---Adds an ellipse subpath.
+---
+---Example: `Vector.ellipse(0, 0, 60, 30); Vector.stroke()`
+---@param x number Centre x
+---@param y number Centre y
+---@param rx number
+---@param ry number
+function VectorModule.ellipse(x, y, rx, ry) end
+
+---Fills the current path with the fill colour or paint (the fill rule decides holes).
+---
+---Example: `Vector.circle(0, 0, 20); Vector.fill()`
+function VectorModule.fill() end
+
+---Outlines the current path with the stroke colour or paint, width, joins, caps and dash.
+---
+---Example: `Vector.stroke_width(4); Vector.circle(0, 0, 20); Vector.stroke()`
+function VectorModule.stroke() end
+
+---Sets the fill colour (and drops a fill paint).
+---
+---Example: `Vector.fill_color("#ff8800")`
+---@param color string|number[]|number "#rrggbb[aa]", {r, g, b[, a]} or r, g, b[, a] (0..1)
+---@param g? number
+---@param b? number
+---@param a? number
+function VectorModule.fill_color(color, g, b, a) end
+
+---Sets the stroke colour (and drops a stroke paint).
+---
+---Example: `Vector.stroke_color(0, 0, 0, 0.5)`
+---@param color string|number[]|number
+---@param g? number
+---@param b? number
+---@param a? number
+function VectorModule.stroke_color(color, g, b, a) end
+
+---Fills with a gradient (in the coordinates in effect when fill() is called).
+---
+---Example: `Vector.fill_paint(Vector.linear_gradient(0, -50, 0, 50, { {0, "#3060c0"}, {1, "#ffd080"} }))`
+---@param paint VectorPaint
+function VectorModule.fill_paint(paint) end
+
+---Strokes with a gradient.
+---
+---Example: `Vector.stroke_paint(Vector.radial_gradient(0, 0, 40, { {0, "#ffffff"}, {1, "#0040ff"} }))`
+---@param paint VectorPaint
+function VectorModule.stroke_paint(paint) end
+
+---A linear gradient from (x0, y0) to (x1, y1): stops are {offset 0..1, colour}; spread "pad" (default), "reflect" or "repeat".
+---
+---Example: `local sky = Vector.linear_gradient(0, -100, 0, 0, { {0, "#203c90"}, {1, "#f08050"} })`
+---@param x0 number
+---@param y0 number
+---@param x1 number
+---@param y1 number
+---@param stops {[1]: number, [2]: string|number[]}[]
+---@param spread? "pad"|"reflect"|"repeat"
+---@return VectorPaint
+function VectorModule.linear_gradient(x0, y0, x1, y1, stops, spread) end
+
+---A radial gradient around (cx, cy) with radius r.
+---
+---Example: `local orb = Vector.radial_gradient(0, 0, 40, { {0, "#ffffff"}, {0.4, "#78c8ff"}, {1, "#0a2878"} })`
+---@param cx number
+---@param cy number
+---@param r number
+---@param stops {[1]: number, [2]: string|number[]}[]
+---@param spread? "pad"|"reflect"|"repeat"
+---@return VectorPaint
+function VectorModule.radial_gradient(cx, cy, r, stops, spread) end
+
+---Sets the stroke width (scaled by the current transform).
+---
+---Example: `Vector.stroke_width(6)`
+---@param w number
+function VectorModule.stroke_width(w) end
+
+---How stroke corners join: "miter" (default), "round" or "bevel".
+---
+---Example: `Vector.line_join("round")`
+---@param join "miter"|"round"|"bevel"
+function VectorModule.line_join(join) end
+
+---How open strokes end: "butt" (default), "round" or "square".
+---
+---Example: `Vector.line_cap("round")`
+---@param cap "butt"|"round"|"square"
+function VectorModule.line_cap(cap) end
+
+---How far a miter corner may reach (in half widths) before it is beveled (default 4).
+---
+---Example: `Vector.miter_limit(10)`
+---@param limit number
+function VectorModule.miter_limit(limit) end
+
+---A dash pattern (on, off, ... lengths; an odd list repeats) and its offset; an empty table = solid.
+---
+---Example: `Vector.dash({12, 6}); Vector.circle(0, 0, 40); Vector.stroke()`
+---@param pattern number[]
+---@param offset? number
+function VectorModule.dash(pattern, offset) end
+
+---The fill rule: "nonzero" (default) or "evenodd" (overlaps alternate filled / empty).
+---
+---Example: `Vector.fill_rule("evenodd"); Vector.circle(0, 0, 40); Vector.circle(0, 0, 20); Vector.fill()`
+---@param rule "nonzero"|"evenodd"
+function VectorModule.fill_rule(rule) end
+
+---The opacity of what is drawn next (0..1).
+---
+---Example: `Vector.opacity(0.5); Vector.rect(0, 0, 50, 50); Vector.fill()`
+---@param a number
+function VectorModule.opacity(a) end
+
+---Saves the style and transform (restore brings them back).
+---
+---Example: `Vector.save(); Vector.rotate(45); Vector.rect(-10, -10, 20, 20); Vector.fill(); Vector.restore()`
+function VectorModule.save() end
+
+---Restores the last saved style and transform.
+---
+---Example: `Vector.restore()`
+function VectorModule.restore() end
+
+---Moves what is drawn next.
+---
+---Example: `Vector.translate(100, 0)`
+---@param x number
+---@param y number
+function VectorModule.translate(x, y) end
+
+---Rotates what is drawn next (degrees, clockwise on screen).
+---
+---Example: `Vector.rotate(self.angle)`
+---@param degrees number
+function VectorModule.rotate(degrees) end
+
+---Scales what is drawn next (one number: both axes).
+---
+---Example: `Vector.scale(2)`
+---@param sx number
+---@param sy? number
+function VectorModule.scale(sx, sy) end
+
+---@type VectorModule
+Vector = VectorModule
+
 ---@class ScriptInstanceBase
 ---@field node Node The node this script is attached to.
 ---@field properties table<string, any> Custom exported script properties table.
 ---@field ready? fun(self: self) Lifecycle callback invoked when the node enters the scene.
 ---@field update? fun(self: self, dt: number) Lifecycle callback invoked each frame with delta time in seconds.
+---@field on_draw? fun(self: self) Draw callback: draw with the Vector module in the node's local space, in the node's draw order (engine/docs/vector.md).
 ---@field on_destroy? fun(self: self) Lifecycle callback invoked when the node is destroyed.
 ---@field on_entered_tree? fun(self: self) Event: the node joined the scene.
 ---@field on_exited_tree? fun(self: self) Event: the node is being removed.

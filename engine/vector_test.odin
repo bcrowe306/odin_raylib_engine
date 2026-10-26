@@ -4,6 +4,7 @@ import "core:log"
 import "core:math"
 import "core:testing"
 import "core:time"
+import lua "lua54"
 
 // Phase 14 M0: vector paths, flattening, earcut, tessellation (fills with
 // holes, strokes, anti-aliasing fringes), the cache's scale buckets and the
@@ -444,4 +445,97 @@ test_vector_dashes :: proc(t: ^testing.T) {
 	Vector_Tessellate(&tess, shapes, 1, &m)
 	testing.expect_value(t, len(tess.dashed.contours), 4)
 	testing.expect(t, covered(&m, {40, 15}), "a dash turned the corner")
+}
+
+// The Lua drawing API (M1 V.3): on_draw records paths and styles in the
+// node's local space; transforms, gradients, dashes; the same drawing
+// twice isn't re-tessellated; Vector.* outside on_draw is an error.
+@(test)
+test_vector_lua_on_draw :: proc(t: ^testing.T) {
+	ScriptVFS_RegisterEmbedded("vector_draw.lua", `
+local D = {}
+D.properties = { wave = { type = "float", default = 0 } }
+function D:on_draw()
+    Vector.fill_color("#ff8800")
+    Vector.rect(-50, -20, 100, 40)
+    Vector.fill()
+    Vector.save()
+    Vector.translate(200, 0)
+    Vector.scale(2)
+    Vector.begin_path()
+    Vector.circle(0, 0, 10 + self.wave)
+    Vector.fill_paint(Vector.radial_gradient(0, 0, 10, { {0, "#ffffff"}, {1, {0, 0, 1, 1}} }))
+    Vector.fill()
+    Vector.stroke_color(0, 0, 0, 1)
+    Vector.stroke_width(3)
+    Vector.dash({4, 2})
+    Vector.stroke()
+    Vector.restore()
+    Vector.begin_path()
+    Vector.move_to(0, 50)
+    Vector.arc(0, 50, 30, 0, 180)
+    Vector.line_join("round")
+    Vector.line_cap("round")
+    Vector.stroke()
+end
+return D
+`)
+	ScriptVFS_RegisterEmbedded("vector_outside.lua", `
+local O = {}
+function O:ready()
+    ok_outside, err_outside = pcall(function() Vector.rect(0, 0, 1, 1) end)
+end
+return O
+`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("vectordraw", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	n := Node_CreateByTypeName(scene, "Node")
+	n.gameContext = &game.gameContext
+	Script_AttachToNode(n, "vector_draw.lua", nil, &game.scriptManager)
+	o := Node_CreateByTypeName(scene, "Node")
+	o.gameContext = &game.gameContext
+	Script_AttachToNode(o, "vector_outside.lua", nil, &game.scriptManager)
+	game->run(0.016)
+
+	testing.expect(t, Script_HasDraw(n, &game.scriptManager), "on_draw found")
+	testing.expect(t, !Script_HasDraw(o, &game.scriptManager), "no on_draw")
+	cv := Script_RunDraw(n, &game.gameContext)
+	testing.expect(t, cv != nil, "recorded")
+	shapes := Vector_CanvasShapes(cv)
+	testing.expect_value(t, len(shapes), 4) // rect fill, circle fill, circle stroke, arc stroke
+	testing.expect_value(t, shapes[0].style.fillColor, [4]u8{255, 136, 0, 255})
+	testing.expect(t, shapes[0].style.fill && !shapes[0].style.stroke, "a fill")
+	// The circle: translated 200 and scaled 2 -> its points around (200, 0), radius 20.
+	maxX: f32
+	for p in shapes[1].path.pts do maxX = max(maxX, p.x)
+	testing.expect(t, abs(maxX - 220) < 0.01, "transformed points")
+	testing.expect_value(t, shapes[1].style.fillPaint.kind, Vector_Paint_Kind.Radial)
+	testing.expect_value(t, shapes[1].style.fillPaint.stopCount, 2)
+	// The stroke scaled with the transform (3 * 2), the dash too.
+	testing.expect_value(t, shapes[2].style.strokeWidth, 6)
+	testing.expect_value(t, shapes[2].style.dash.values[0], 8)
+	// After restore: back to the identity, round joins.
+	testing.expect_value(t, shapes[3].style.join, Vector_Join.Round)
+	testing.expect_value(t, shapes[3].style.strokeWidth, 1)
+	// The same drawing: the cache isn't dirtied; a change is.
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	Vector_Cache_Ensure(&cv.cache, &tess, shapes, 1)
+	before := cv.cache.stats.tessellations
+	cv = Script_RunDraw(n, &game.gameContext)
+	Vector_Cache_Ensure(&cv.cache, &tess, Vector_CanvasShapes(cv), 1)
+	testing.expect_value(t, cv.cache.stats.tessellations, before)
+	ScriptInstance_SetProperty(cast(^ScriptInstance)n.scriptInstance, "wave", ScriptValue{type = .Float, valFloat = 5}, &game.scriptManager)
+	cv = Script_RunDraw(n, &game.gameContext)
+	Vector_Cache_Ensure(&cv.cache, &tess, Vector_CanvasShapes(cv), 1)
+	testing.expect_value(t, cv.cache.stats.tessellations, before + 1)
+	// Outside on_draw: an error.
+	L := game.scriptManager.L
+	lua.getglobal(L, "ok_outside")
+	testing.expect(t, !bool(lua.toboolean(L, -1)), "Vector outside on_draw fails")
+	lua.pop(L, 1)
 }

@@ -63,6 +63,25 @@
   }
  },
  {
+  "name": "Lua drawing: on_draw with the Vector module (transforms, gradients, arcs, dashes, caps)",
+  "project": "tests/vector/project",
+  "scene": "scenes/canvas.scene.json",
+  "frames": 6,
+  "expect": [
+   [
+    "Drawing",
+    "exists",
+    "==",
+    true
+   ]
+  ],
+  "golden": {
+   "image": "tests/vector/expected/canvas.png",
+   "max_pixels": 0.02,
+   "threshold": 64
+  }
+ },
+ {
   "name": "100 spinning characters run (the benchmark scene)",
   "project": "tests/vector/project",
   "scene": "scenes/bench.scene.json",
