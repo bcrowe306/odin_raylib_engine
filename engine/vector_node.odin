@@ -113,7 +113,8 @@ VectorShapeNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 		cache: ^Vector_Cache
 		{
 			context.allocator = Engine_HeapAllocator()
-			cache = Vector_ResourceMesh(r, &vectorTess, Vector_ScreenPixel(v.globalScale))
+			// (A new zoom: drawn from the nearest mesh while a worker makes the new one.)
+			cache = Vector_ResourceMesh(r, &vectorTess, Vector_ScreenPixel(v.globalScale), background = true)
 		}
 		// The origin (a fraction of the document box) sits at the position.
 		offset := -r.doc.min - Node_OriginPx(v, r.doc.size)

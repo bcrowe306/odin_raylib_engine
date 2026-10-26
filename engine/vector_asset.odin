@@ -27,6 +27,8 @@ Vector_Resource :: struct {
 	caches:  [VECTOR_BUCKETS_KEPT]Vector_Resource_Cache,
 	frame:   u64, // a draw counter (which bucket was used last)
 	owner:   ^ResourceManager,
+	pending: int, // background tessellations running (vector_jobs.odin)
+	waiting: [VECTOR_BUCKETS_KEPT]f32, // buckets queued (0: none)
 }
 
 Vector_Resource_Cache :: struct {
@@ -123,7 +125,7 @@ vector_bytes :: proc(rm: ^ResourceManager, path: string) -> ([]u8, bool) {
 Vector_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 	n := 0
 	for _, r in rm.vectors {
-		if r.modTime == {} do continue
+		if r.modTime == {} || r.pending > 0 do continue // (jobs read the document: next check)
 		info, err := os.stat(r.path, context.temp_allocator)
 		if err != nil || time.diff(r.modTime, info.modification_time) <= 0 do continue
 		data, rerr := os.read_entire_file(r.path, context.temp_allocator)
@@ -145,15 +147,49 @@ Vector_CheckForChanges :: proc(rm: ^ResourceManager) -> int {
 	return n
 }
 
-// Vector_ResourceMesh: the cached mesh for drawing at a screen-pixel size
-// (tessellated now when that bucket isn't cached; the least recently used
-// bucket is replaced).
-Vector_ResourceMesh :: proc(r: ^Vector_Resource, t: ^Vector_Tess, pixel: f32) -> ^Vector_Cache {
+// Vector_ResourceMesh: the cached mesh for drawing at a screen-pixel size.
+// A bucket not cached yet: with `background`, the nearest cached bucket is
+// drawn meanwhile and a worker tessellates the new one (vector_jobs.odin);
+// otherwise (or when nothing is cached) it is tessellated now. The least
+// recently used bucket is replaced.
+Vector_ResourceMesh :: proc(r: ^Vector_Resource, t: ^Vector_Tess, pixel: f32, background := false) -> ^Vector_Cache {
 	context.allocator = Engine_HeapAllocator()
+	// (Finished background meshes, once a frame - also where the game loop
+	// doesn't run: the editor's viewport.)
+	@(static) lastPump: f64 = -1
+	if now := rl.GetTime(); now != lastPump {
+		lastPump = now
+		Vector_JobPump()
+	}
 	r.frame += 1
 	b := Vector_PixelBucket(pixel)
 	slot := -1
-	for &c, i in r.caches do if c.used != 0 && c.cache.bucket == b {slot = i; break}
+	for &c, i in r.caches do if c.used != 0 && c.cache.bucket == b && c.version == r.version {slot = i; break}
+	if slot < 0 && background {
+		// The nearest bucket that is ready (current version, a mesh).
+		near := -1
+		best := max(f32)
+		for c, i in r.caches {
+			if c.used == 0 || c.version != r.version || c.cache.dirty || len(c.cache.mesh.idx) == 0 do continue
+			d := abs(c.cache.bucket / b - 1) if c.cache.bucket > b else abs(b / c.cache.bucket - 1)
+			if d < best {best = d; near = i}
+		}
+		if near >= 0 {
+			queued := false
+			for w in r.waiting do if w == b do queued = true
+			if !queued {
+				for &w in r.waiting do if w == 0 {
+					w = b
+					vector_job_submit(r, b)
+					break
+				}
+			}
+			c := &r.caches[near]
+			c.used = r.frame
+			Vector_Cache_Ensure(&c.cache, t, r.doc.shapes[:], c.cache.bucket) // (uploads it if needed)
+			return &c.cache
+		}
+	}
 	if slot < 0 {
 		// The free or least recently used slot.
 		oldest := max(u64)
@@ -207,4 +243,25 @@ Vector_DocImage :: proc(doc: ^Vector_Doc, maxSize: i32) -> rl.Image {
 	img := rl.LoadImageFromTexture(rt.texture)
 	rl.ImageFlipVertical(&img) // (render textures are upside down)
 	return img
+}
+
+// vector_resource_install: a finished background mesh into the bucket's
+// cache slot (main thread; vector_jobs.odin).
+vector_resource_install :: proc(r: ^Vector_Resource, bucket: f32, mesh: ^Vector_Mesh) {
+	for &w in r.waiting do if w == bucket do w = 0
+	slot := -1
+	for c, i in r.caches do if c.used != 0 && c.cache.bucket == bucket {slot = i; break}
+	if slot < 0 {
+		oldest := max(u64)
+		for c, i in r.caches do if c.used < oldest {oldest = c.used; slot = i}
+	}
+	c := &r.caches[slot]
+	Vector_Cache_Destroy(&c.cache)
+	c.cache = {}
+	c.cache.mesh = mesh^
+	mesh^ = {}
+	c.cache.bucket = bucket
+	c.cache.stats.tessellations = 1
+	c.version = r.version
+	c.used = r.frame
 }

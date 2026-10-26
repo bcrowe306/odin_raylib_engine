@@ -5,6 +5,7 @@ import os "osx"
 import "core:path/filepath"
 import "core:strings"
 import "core:testing"
+import "core:time"
 
 // SVG import (Phase 14 M2): the path grammar, arcs, colours, transforms,
 // units, CSS, inheritance, gradients, clips, groups and warnings - on
@@ -340,4 +341,52 @@ test_vector_import_settings :: proc(t: ^testing.T) {
 	maxX: f32
 	for q in k.path.pts do maxX = max(maxX, q.x)
 	testing.expect_value(t, maxX, 80)
+}
+
+// Background tessellation (M2): a new zoom draws the nearest mesh while a
+// worker makes the new one; the pump installs it; a reload waits for jobs;
+// shutting down joins them.
+@(test)
+test_vector_background_tessellation :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	rm := &game.resourceManager
+	dir, _ := filepath.join({Engine_TempDir(), "rayzr_vector_jobs_test"}, context.temp_allocator)
+	_ = os.make_directory_all(dir)
+	path := strings.concatenate({dir, "/card.svg"}, context.temp_allocator)
+	_ = os.write_entire_file(path, transmute([]u8)SVG_FIGMA)
+	r := ResourceManager_LoadVector(rm, path)
+	testing.expect(t, r != nil, "loaded")
+	tess: Vector_Tess
+	defer Vector_Tess_Destroy(&tess)
+	// Nothing cached: tessellated at once even in background mode.
+	c1 := Vector_ResourceMesh(r, &tess, 1, background = true)
+	testing.expect(t, c1.bucket == 1 && len(c1.mesh.idx) > 0, "first mesh made now")
+	// Zoomed in 4x: drawn from bucket 1 while a job runs.
+	c2 := Vector_ResourceMesh(r, &tess, 0.25, background = true)
+	testing.expect_value(t, c2.bucket, 1)
+	testing.expect_value(t, r.pending, 1)
+	testing.expect_value(t, r.refs, 2) // (the job's reference)
+	// Asking again doesn't queue it twice.
+	_ = Vector_ResourceMesh(r, &tess, 0.25, background = true)
+	testing.expect_value(t, r.pending, 1)
+	// A reload waits while the job runs.
+	r.modTime._nsec = 1
+	testing.expect_value(t, Vector_CheckForChanges(rm), 0)
+	// Wait for the worker, pump: the new bucket is installed.
+	for i := 0; i < 2000 && Vector_JobsRunning() > 0; i += 1 {
+		Vector_JobPump()
+		time.sleep(time.Millisecond)
+	}
+	testing.expect_value(t, r.pending, 0)
+	testing.expect_value(t, r.refs, 1)
+	c3 := Vector_ResourceMesh(r, &tess, 0.25, background = true)
+	testing.expect(t, c3.bucket == 0.25 && len(c3.mesh.idx) > len(c1.mesh.idx), "the finer mesh")
+	// A job outliving its asset's last user doesn't touch freed memory.
+	_ = Vector_ResourceMesh(r, &tess, 4, background = true)
+	ResourceManager_ReleaseVector(r) // (the job still holds it)
+	testing.expect_value(t, Vector_ResourceCount(rm), 1)
+	Vector_JobsShutdown() // joins, installs, releases: freed now
+	testing.expect_value(t, Vector_ResourceCount(rm), 0)
 }

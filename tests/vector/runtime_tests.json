@@ -113,5 +113,19 @@
     true
    ]
   ]
+ },
+ {
+  "name": "100 spinning SVG assets (four files shared by 25 nodes each) run",
+  "project": "tests/vector/project",
+  "scene": "scenes/bench_svg.scene.json",
+  "frames": 30,
+  "expect": [
+   [
+    "A99",
+    "exists",
+    "==",
+    true
+   ]
+  ]
  }
 ]
