@@ -8,8 +8,8 @@
 #   scripts/build_web_runner.sh -define:RAYZR_RELEASE=1.2.3   (extra odin flags)
 #
 # Dependencies built with emcc: raylib 5.5 (WebGL 2), Lua 5.4.7, Box2D 3.1.1
-# (the versions Odin's bindings expect). Sources: the official release
-# tarballs.
+# (the versions Odin's bindings expect), Clipper2 2.0.1 (scripts/build_clipper.sh
+# --web). Sources: the official release tarballs / tags.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
@@ -46,14 +46,19 @@ if [ ! -f "$DEPS/box2d-3.1.1/libbox2d.a" ]; then
 		emcc -O2 -std=gnu17 -D_POSIX_C_SOURCE=199309L -Iinclude -Isrc -DNDEBUG -DBOX2D_DISABLE_SIMD -c "$f" -o "${f%.c}.o"; done && emar rcs libbox2d.a src/*.o )
 fi
 
+if [ ! -f "$DEPS/clipper/libclipper.a" ]; then
+	echo "Building Clipper2 (web)"
+	scripts/build_clipper.sh --web > /dev/null
+fi
+
 echo "Compiling the engine (js_wasm32)"
 python3 scripts/web_prepare.py "$ROOT" "$BUILD/src" "$ODIN_ROOT" >/dev/null
 odin build "$BUILD/src/runner/web" -target:js_wasm32 -build-mode:obj -define:RAYLIB_WASM_LIB=env.o -default-to-panic-allocator -o:speed -out:"$BUILD/game.wasm.o" "$@"
 
-echo "Linking (emcc)"
+echo "Linking (em++: Clipper2 needs the C++ runtime)"
 cp "$ODIN_ROOT/core/sys/wasm/js/odin.js" "$OUT/odin.js"
-emcc -o "$OUT/index.html" "$BUILD/game.wasm.o" \
-	"$DEPS/raylib-5.5/src/libraylib.a" "$DEPS/lua-5.4.7/src/liblua.a" "$DEPS/box2d-3.1.1/libbox2d.a" \
+em++ -o "$OUT/index.html" "$BUILD/game.wasm.o" \
+	"$DEPS/raylib-5.5/src/libraylib.a" "$DEPS/lua-5.4.7/src/liblua.a" "$DEPS/box2d-3.1.1/libbox2d.a" "$DEPS/clipper/libclipper.a" \
 	--shell-file scripts/web/shell.html \
 	-O2 -sUSE_GLFW=3 -sUSE_ZLIB=1 -sWARN_ON_UNDEFINED_SYMBOLS=0 -sALLOW_MEMORY_GROWTH=1 \
 	-sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sSTACK_SIZE=2MB \

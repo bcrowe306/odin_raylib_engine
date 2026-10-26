@@ -4,9 +4,9 @@
 # after Odin itself (laytan/setup-odin). The official Odin release already
 # ships raylib for every platform, Lua for Windows / Linux and Box2D for
 # macOS / Windows; the rest comes from here:
-#   macOS    nothing (ImGui, Lua and cmark static libraries are in the repo)
-#   Linux    X11 / GL / ALSA headers, Box2D (built from source), ImGui, cmark (static)
-#   Windows  ImGui, Lua and cmark (static, MSVC)
+#   macOS    nothing (ImGui, Lua, cmark and Clipper2 static libraries are in the repo)
+#   Linux    X11 / GL / ALSA headers, Box2D (built from source), ImGui, cmark, Clipper2 (static)
+#   Windows  ImGui, Lua, cmark and Clipper2 (static, MSVC)
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 odin_root=$(odin root)
@@ -15,6 +15,7 @@ case "$(uname -s)" in
 Darwin)
 	scripts/build_imgui.sh --if-missing
 	scripts/build_cmark.sh --if-missing
+	scripts/build_clipper.sh --if-missing
 	;;
 Linux)
 	sudo apt-get update -qq
@@ -25,11 +26,13 @@ Linux)
 	fi
 	scripts/build_imgui.sh --if-missing
 	scripts/build_cmark.sh --if-missing
+	scripts/build_clipper.sh --if-missing
 	;;
 MINGW*|MSYS*|CYGWIN*)
 	scripts/build_imgui.sh --if-missing
 	scripts/build_lua.sh --if-missing
 	scripts/build_cmark.sh --if-missing
+	scripts/build_clipper.sh --if-missing
 	;;
 esac
 echo "Dependencies ready"
