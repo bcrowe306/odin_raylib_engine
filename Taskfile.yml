@@ -79,3 +79,29 @@ tasks:
             - odin test engine -define:ODIN_TEST_THREADS=1
             - odin test ui -define:ODIN_TEST_THREADS=1
             - task: editor:e2e
+    docs:nodes:
+        desc: Regenerate the node reference (docs/generated/nodes.json) from the editor
+        cmds:
+            - mkdir -p bin
+            - odin build editor -out:bin/editor
+            - bin/editor --dump-docs docs/generated/nodes.json
+    docs:check:
+        desc: Check the docs are complete and in step with the code (CI runs it)
+        cmds:
+            - python3 scripts/docs/check_docs.py --editor bin/editor
+            - python3 scripts/docs/test_export_site.py
+            - python3 scripts/ci/test_publish_r2.py
+    docs:export:
+        desc: Export this checkout's docs as the website's bundle (build/docs_bundle)
+        cmds:
+            - python3 scripts/docs/export_site.py --out build/docs_bundle
+    docs:shots:
+        desc: Refresh the docs' annotated screenshots (docs_*.drive; needs a display)
+        cmds:
+            - scripts/docs/screenshots.sh
+    docs:site:
+        desc: "Preview rayzr.app with this checkout's docs (needs ../rayzr_website: github.com/bcrowe306/rayzr_website)"
+        dir: ../rayzr_website
+        cmds:
+            - ENGINE_DIR={{.ROOT_DIR}} npm run sync
+            - npm run dev

@@ -53,6 +53,13 @@ Drive_Rect :: struct {
 	noScroll:           bool,   // in a window the wheel doesn't scroll (the viewport zooms): never scroll it into view
 }
 
+// Drive_Callout: a labelled rectangle (screen points) for the docs' annotated
+// screenshots (`annotate`; the docs site draws the numbered markers).
+Drive_Callout :: struct {
+	label:    string,
+	min, max: [2]f32,
+}
+
 Drive_Step :: enum {
 	Start,
 	Pressed,
@@ -81,6 +88,7 @@ TestDrive :: struct {
 	shotIndex:  int,
 	report:     [dynamic]string,
 	pendingShot: string,
+	callouts:   [dynamic]Drive_Callout, // `annotate`: written beside the next screenshot
 	finished:   bool,
 	dragFrom, dragTo: [2]f32,
 	dragSteps:  int,
@@ -222,6 +230,7 @@ TestDrive_EndFrame :: proc(d: ^TestDrive) {
 	rl.UnloadImage(img)
 	append(&d.report, fmt.aprintf("![%s](%s)", d.pendingShot, filepath.base(path)))
 	fmt.printfln("[DRIVE] screenshot %s", path)
+	if len(d.callouts) > 0 do drive_write_callouts(d, path)
 	d.pendingShot = ""
 }
 
@@ -413,6 +422,15 @@ drive_exec :: proc(d: ^TestDrive, state: ^EditorState, line: string) -> bool {
 	case "screenshot":
 		d.pendingShot = strings.clone(rest if rest != "" else "shot")
 		return true
+	case "annotate":
+		// annotate <target> <label...>: a numbered callout on the next
+		// screenshot (its <name>.annotations.json; the docs site draws it).
+		// Targets: @<item id>, @window:<panel>, @node:<name>.
+		target, _, label := strings.partition(rest, " ")
+		r, ok := drive_target_rect(d, state, target)
+		if !ok {drive_fail(d, fmt.tprintf("annotate: target not found: %s", target)); return true}
+		append(&d.callouts, Drive_Callout{label = strings.clone(strings.trim_space(label)), min = r.min, max = r.max})
+		return true
 	case "exec":
 		// Run a command to completion (e.g. the game on an exported .rayzr).
 		desc := os.Process_Desc{command = strings.fields(rest, context.temp_allocator)}
@@ -562,6 +580,47 @@ key_by_name :: proc(name: string) -> (imgui.Key, bool) {
 }
 
 // drive_target resolves a target to window pixels.
+// Drive_Window registers the current window's rectangle as "window:<id>"
+// (annotated screenshots point at whole panels).
+Drive_Window :: proc(id: string) {
+	if !GlobalDrive.enabled do return
+	wp := imgui.GetWindowPos()
+	ws := imgui.GetWindowSize()
+	Drive_ItemRect(fmt.tprintf("window:%s", id), {wp.x, wp.y}, {wp.x + ws.x, wp.y + ws.y})
+}
+
+// drive_target_rect: a target's rectangle - a registered item / window, or a
+// node's position (a small box around it).
+@(private = "file")
+drive_target_rect :: proc(d: ^TestDrive, state: ^EditorState, t: string) -> (r: Drive_Rect, ok: bool) {
+	if strings.has_prefix(t, "@") && !strings.has_prefix(t, "@node:") && !strings.has_prefix(t, "@world:") {
+		r, ok = d.prevItems[t[1:]]
+		return
+	}
+	p := drive_target(d, state, t) or_return
+	return Drive_Rect{min = p - 28, max = p + 28}, true
+}
+
+// drive_write_callouts writes <shot>.annotations.json: the window size and
+// each callout's rectangle (points; the PNG may be larger on HiDPI screens).
+@(private = "file")
+drive_write_callouts :: proc(d: ^TestDrive, png: string) {
+	w: e.Json_Writer
+	w.sb = strings.builder_make(context.temp_allocator)
+	fmt.sbprintf(&w.sb, "{{\n  \"width\": %d,\n  \"height\": %d,\n  \"callouts\": [", rl.GetScreenWidth(), rl.GetScreenHeight())
+	for c, i in d.callouts {
+		strings.write_string(&w.sb, "," if i > 0 else "")
+		strings.write_string(&w.sb, "\n    {\"label\": ")
+		e.Json_String(&w, c.label)
+		fmt.sbprintf(&w.sb, ", \"x\": %.0f, \"y\": %.0f, \"w\": %.0f, \"h\": %.0f}}", c.min.x, c.min.y, c.max.x - c.min.x, c.max.y - c.min.y)
+		delete(c.label)
+	}
+	strings.write_string(&w.sb, "\n  ]\n}\n")
+	clear(&d.callouts)
+	path := fmt.tprintf("%s.annotations.json", strings.trim_suffix(png, ".png"))
+	_ = os.write_entire_file(path, transmute([]u8)strings.to_string(w.sb))
+}
+
 @(private = "file")
 drive_target :: proc(d: ^TestDrive, state: ^EditorState, t_in: string) -> ([2]f32, bool) {
 	// "+dx,dy" offsets any target by screen pixels (e.g. @node:Ship+80,0).

@@ -43,6 +43,8 @@ editor_main :: proc() -> int {
 		fmt.println(e.RAYZR_RELEASE)
 		return 0
 	}
+	// --dump-docs <file.json>: the node reference for the docs site (docs_dump.odin).
+	for i := 1; i + 1 < len(os.args); i += 1 do if os.args[i] == "--dump-docs" do return DocsDump_Run(os.args[i + 1])
 	Editor_MigrateLegacyConfig() // ~/.config/ore_editor -> rayzr_editor (editor_settings.odin)
 	CrashReports_Install() // crash reports (crash_reports.odin)
 	defer CrashReports_Shutdown()

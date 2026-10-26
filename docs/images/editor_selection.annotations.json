@@ -1,0 +1,10 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The selected node in the viewport: drag to move, handles to scale", "x": 612, "y": 334, "w": 56, "h": 56},
+    {"label": "The same node in the scene tree", "x": 1037, "y": 234, "w": 221, "h": 23},
+    {"label": "The Inspector: its name, enabled / visible toggles, type and properties", "x": 1060, "y": 409, "w": 134, "h": 25},
+    {"label": "The selection and the cursor's world position", "x": 0, "y": 692, "w": 1280, "h": 32}
+  ]
+}

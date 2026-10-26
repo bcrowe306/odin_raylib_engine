@@ -65,6 +65,7 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 	stateGraphFocused = false   // ... and the State Machine tab
 	defer imgui.End()
 	bottomOpen := imgui.Begin("Console###BottomPanelWindow")
+	Drive_Window("console") // (annotated docs screenshots)
 	Dock_Remember(.Bottom)
 	if !bottomOpen do return
 	bottom_follow_selection(state)

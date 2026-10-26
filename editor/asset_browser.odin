@@ -86,6 +86,7 @@ kind_icon :: proc(k: Asset_Kind) -> (string, imgui.Vec4) {
 AssetBrowser_Render :: proc(state: ^EditorState) {
 	defer imgui.End()
 	assetsOpen := imgui.Begin("Assets###AssetBrowserWindow")
+	Drive_Window("assets") // (annotated docs screenshots)
 	Dock_Remember(.Left) // (plugin panels dock next to it: plugin_panels.odin)
 	if !assetsOpen do return
 	UI_PanelTitle(ICON_FA_FOLDER_OPEN, "Assets")

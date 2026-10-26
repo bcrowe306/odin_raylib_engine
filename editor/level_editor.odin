@@ -486,6 +486,7 @@ RootTabs_Render :: proc(state: ^EditorState, width, posY: f32) {
 	}
 	defer imgui.End()
 	if !imgui.Begin("RootTabs###RootTabsWindow", nil, flags) do return
+	Drive_Window("roottabs") // (annotated docs screenshots)
 	tab :: proc(label: string, id: string, active: bool) -> bool {
 		imgui.PushStyleVarImVec2(.FramePadding, {14, 4})
 		if active {

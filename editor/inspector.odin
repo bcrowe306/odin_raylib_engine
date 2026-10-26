@@ -33,6 +33,7 @@ undo_on_activate :: proc(state: ^EditorState, label: string) {
 PropertyInspector_RenderWindow :: proc(state: ^EditorState) {
 	defer imgui.End()
 	inspectorOpen := imgui.Begin("Inspector###InspectorWindow")
+	Drive_Window("inspector") // (annotated docs screenshots)
 	Dock_Remember(.Right)
 	if !inspectorOpen do return
 	helpH: f32 = INSPECTOR_HELP_HEIGHT if state.showInspectorHelp else 0

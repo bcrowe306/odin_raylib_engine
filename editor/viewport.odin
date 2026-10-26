@@ -81,6 +81,7 @@ Viewport_UpdateAndRender :: proc(state: ^EditorState) {
 
 	viewportFlags: imgui.WindowFlags = {.NoScrollbar, .NoScrollWithMouse}
 	viewportOpen := imgui.Begin("Viewport###ViewportWindow", nil, viewportFlags)
+	Drive_Window("viewport") // (annotated docs screenshots)
 	Dock_Remember(.Center)
 	if viewportOpen {
 		driveNoScroll = true // the wheel zooms here: drives never "scroll" it

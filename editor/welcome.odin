@@ -65,6 +65,7 @@ Welcome_Render :: proc(state: ^EditorState) {
 	imgui.PopStyleVar(2)
 	imgui.PopStyleColor(4)
 	if !visible do return
+	Drive_Window("welcome") // (annotated docs screenshots)
 	// Cards and inputs one step brighter than the window.
 	imgui.PushStyleColorImVec4(.FrameBg, UI_BG_PANEL if UI_THEME_LIGHT else UI_BG_ACTIVE)
 	imgui.PushStyleColorImVec4(.Button, UI_BG_PANEL if UI_THEME_LIGHT else UI_BG_ACTIVE)

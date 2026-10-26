@@ -8,7 +8,7 @@ The **Rayzr** features a fast, memory-safe, embeddable Lua 5.4 scripting archite
 > ### Engine Development Standard: Mandatory Lua Bindings, Documentation & LSP Integration
 > Going forward, **any functionality, node type, subsystem, or gameplay feature added to the engine MUST include**:
 > 1. **Lua Bindings**: Full adjacent Lua bindings implemented in [`engine/script_bindings.odin`](script_bindings.odin).
-> 2. **LSP Integration**: Complete EmmyLua / LuaCATS type definitions and documentation annotations in [`engine/definitions/engine_api.lua`](definitions/engine_api.lua) and verified in [`.luarc.json`](../.luarc.json).
+> 2. **LSP Integration**: Complete EmmyLua / LuaCATS type definitions and documentation annotations in [`engine/definitions/engine_api.lua`](definitions/engine_api.lua) and checked by a `.luarc.json` like the one below.
 > 3. **Documentation**: Clear architectural guidance, lifecycle details, and API reference updated here in [`engine/SCRIPTING.md`](SCRIPTING.md).
 > 4. **Automated Verification**: End-to-end unit tests in [`engine/script_test.odin`](script_test.odin) with `mem.Tracking_Allocator` asserting zero memory leaks and zero bad frees.
 
@@ -466,7 +466,7 @@ about it (`Audio.play_sound` -> the Audio module)
 (`lua_api_docs_test.odin` keeps it that way: a new binding needs both).
 
 - **Stubs definition file**: [`engine/definitions/engine_api.lua`](definitions/engine_api.lua)
-- **Root configuration**: [`.luarc.json`](../.luarc.json)
+- **Root configuration**: `.luarc.json` (per user, not committed), for example:
 
 ```json
 {
