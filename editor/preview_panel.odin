@@ -148,6 +148,8 @@ PreviewPanel_LoadAudio :: proc(state: ^EditorState, fullPath: string) {
 		rl.UnloadSound(state.previewSound)
 		state.previewSoundLoaded = false
 	}
+	delete(state.previewSoundPath)
+	state.previewSoundPath = ""
 
 	if !rl.IsAudioDeviceReady() {
 		rl.InitAudioDevice()
@@ -415,11 +417,14 @@ PreviewPanel_RenderTexture :: proc(state: ^EditorState) {
 // ----------------------------------------------------------------------------
 
 PreviewPanel_RenderAudio :: proc(state: ^EditorState) {
-	// Fallback check: if no sound loaded yet, load cannon-gunshot-1.wav
+	// Fallback check: if no sound loaded yet, load cannon-gunshot-1.wav or selected audio asset
 	if !state.previewSoundLoaded {
 		fallback := preview_project_path(state, "audio/cannon-gunshot-1.wav")
-		if state.selectedAssetPath != "" && strings.has_suffix(state.selectedAssetPath, ".wav") {
-			fallback = state.selectedAssetPath
+		if state.selectedAssetPath != "" {
+			ext := strings.to_lower(filepath.ext(state.selectedAssetPath), context.temp_allocator)
+			if ext == ".wav" || ext == ".ogg" || ext == ".mp3" || ext == ".flac" {
+				fallback = state.selectedAssetPath
+			}
 		}
 		if os.exists(fallback) {
 			PreviewPanel_LoadAudio(state, fallback)
@@ -467,21 +472,24 @@ PreviewPanel_RenderAudio :: proc(state: ^EditorState) {
 	imgui.PushStyleVarImVec2(imgui.StyleVar.ItemSpacing, imgui.Vec2{8, 4})
 
 	// Play button
-	if state.previewAudioPlaying {
+	wasPlaying := state.previewAudioPlaying
+	if wasPlaying {
 		imgui.PushStyleColorImVec4(imgui.Col.Button, imgui.Vec4{0.0, 0.65, 0.50, 1.0})
 	}
 	if imgui.Button(fmt.ctprintf("%s Play###AudioPlayBtn", ICON_FA_PLAY), imgui.Vec2{72, 28}) {
 		PreviewPanel_PlayAudio(state)
 	}
-	if state.previewAudioPlaying {
+	if wasPlaying {
 		imgui.PopStyleColor()
 	}
+	Drive_Item("preview.audio.play")
 
 	// Stop button
 	imgui.SameLine()
 	if imgui.Button(fmt.ctprintf("%s Stop###AudioStopBtn", ICON_FA_STOP), imgui.Vec2{72, 28}) {
 		PreviewPanel_StopAudio(state)
 	}
+	Drive_Item("preview.audio.stop")
 
 	// Loop toggle
 	imgui.SameLine()
@@ -1292,4 +1300,40 @@ preview_audio_import :: proc(state: ^EditorState) {
 preview_project_path :: proc(state: ^EditorState, rel: string) -> string {
 	p, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	return p
+}
+
+
+// PreviewPanel_Shutdown cleans up any assets and buffers held by the preview panel.
+PreviewPanel_Shutdown :: proc(state: ^EditorState) {
+	if state == nil do return
+	if state.previewTextureLoaded {
+		rl.UnloadTexture(state.previewTexture)
+		state.previewTextureLoaded = false
+	}
+	delete(state.previewTexturePath)
+	state.previewTexturePath = ""
+
+	if state.previewSoundLoaded {
+		if state.previewAudioPlaying {
+			rl.StopSound(state.previewSound)
+			state.previewAudioPlaying = false
+		}
+		rl.UnloadSound(state.previewSound)
+		state.previewSoundLoaded = false
+	}
+	delete(state.previewSoundPath)
+	state.previewSoundPath = ""
+
+	for &tex in state.previewAnimFrames {
+		rl.UnloadTexture(tex)
+	}
+	clear(&state.previewAnimFrames)
+	clear(&state.previewAnimPaths)
+	delete(state.previewAnimLoadedPath)
+	state.previewAnimLoadedPath = ""
+
+	delete(state.previewScenePath)
+	state.previewScenePath = ""
+	delete(state.previewScriptPath)
+	state.previewScriptPath = ""
 }

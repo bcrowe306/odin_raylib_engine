@@ -348,6 +348,7 @@ Editor_Shutdown :: proc(state: ^EditorState) {
 	Palette_Shutdown()
 	AnimationPanel_Shutdown()
 	InspectorFields_Shutdown()
+	PreviewPanel_Shutdown(state)
 	delete(state.selection)
 	delete(state.dragOthers)
 	if state.gameProcessRunning {
