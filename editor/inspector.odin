@@ -191,6 +191,7 @@ inspector_body :: proc(state: ^EditorState) {
 				mo := multi_begin(state, node, moField)
 				if vec2_edit(state, "insp.origin", &node.pivot, 0.005, "Edit origin", {0.5, 0.5}, mo.mixed) {
 					if node.typeId == e.TextureNode do (cast(^e.TextureNode)node).origin = {} // the fraction rules now
+					else if node.typeId == e.AtlasSpriteNode do (cast(^e.AtlasSpriteNode)node).origin = {}
 				}
 				multi_end(&mo)
 				size := e.Node_OriginSize(node, &state.game.gameContext)
@@ -486,6 +487,7 @@ origin_presets :: proc(state: ^EditorState, node: ^e.Node) {
 					for n in targets do if e.Node_HasOrigin(n) {
 						n.pivot = p
 						if n.typeId == e.TextureNode do (cast(^e.TextureNode)n).origin = {}
+						else if n.typeId == e.AtlasSpriteNode do (cast(^e.AtlasSpriteNode)n).origin = {}
 					}
 					imgui.CloseCurrentPopup()
 				}
@@ -658,6 +660,23 @@ Editor_SetTexture :: proc(state: ^EditorState, tn: ^e.TextureNode, rel: string) 
 	}
 }
 
+Editor_SetAtlasTexture :: proc(state: ^EditorState, an: ^e.AtlasSpriteNode, rel: string) {
+	an.filePath = strings.clone(rel, an.allocator)
+	e.AtlasSpriteNode_SetTexture(an, nil)
+	an.size = {0, 0}
+	if rel == "" do return
+	ctx := &state.game.gameContext
+	rm := &state.game.resourceManager
+	tex, ok := rm.loadTexture(rm, e.Project_ResolveAssetPath(ctx, rel))
+	if ok && tex != nil {
+		an.texture = tex
+		if an.region.width <= 0 || an.region.height <= 0 {
+			an.region = {0, 0, f32(tex.texture.width), f32(tex.texture.height)}
+		}
+		an.size = {an.region.width, an.region.height}
+	}
+}
+
 @(private = "file")
 inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 	ctx := &state.game.gameContext
@@ -687,6 +706,51 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 				w := min(imgui.GetContentRegionAvail().x, 160)
 				h := w * tn.size.y / max(tn.size.x, 1)
 				imgui.Image(transmute(imgui.TextureID)&tn.texture.texture, {w, h})
+			}
+		}
+	case e.AtlasSpriteNode:
+		an := cast(^e.AtlasSpriteNode)node
+		if UI_SectionHeader("Atlas Sprite") {
+			if UI_BeginProps("##atlas_sprite") {
+				UI_PropLabel("Texture")
+				imgui.SetNextItemWidth(field_width())
+				if path, ok := asset_picker("insp.texture", an.filePath, Editor_ListProjectFiles(state, "textures", TEXTURE_EXTS)); ok {
+					Editor_RecordUndo(state, "Set texture")
+					Editor_SetAtlasTexture(state, an, path)
+				}
+				if field_reset("insp.texture", an.filePath != "") {
+					Editor_RecordUndo(state, "Clear texture")
+					Editor_SetAtlasTexture(state, an, "")
+				}
+				if an.texture != nil {
+					UI_PropLabel("Texture Size")
+					UI_DimText(fmt.tprintf("%d × %d px", an.texture.texture.width, an.texture.texture.height))
+					UI_PropLabel("Region")
+					r := [4]f32{an.region.x, an.region.y, an.region.width, an.region.height}
+					imgui.SetNextItemWidth(field_width())
+					if imgui.DragFloat4("##atlas_region", &r, 1, 0, 8192, "%.0f") {
+						Editor_RecordUndo(state, "Edit Atlas Region")
+						e.AtlasSpriteNode_SetRegion(an, rl.Rectangle{r[0], r[1], r[2], r[3]})
+					}
+					Drive_Item("insp.atlas.region")
+					UI_PropLabel("Region Size")
+					UI_DimText(fmt.tprintf("%.0f × %.0f px", an.region.width, an.region.height))
+				}
+				UI_EndProps()
+			}
+			if an.texture != nil {
+				if UI_Button(fmt.tprintf("%s  Edit Region...", ICON_FA_CROP), "insp.atlas.edit", {-1, 0}) {
+					AtlasRegion_Open(state, an)
+				}
+				tw := f32(an.texture.texture.width)
+				th := f32(an.texture.texture.height)
+				if tw > 0 && th > 0 && an.region.width > 0 && an.region.height > 0 {
+					w := min(imgui.GetContentRegionAvail().x, 160)
+					h := w * an.region.height / max(an.region.width, 1)
+					uv0 := [2]f32{an.region.x / tw, an.region.y / th}
+					uv1 := [2]f32{(an.region.x + an.region.width) / tw, (an.region.y + an.region.height) / th}
+					imgui.Image(transmute(imgui.TextureID)&an.texture.texture, {w, h}, uv0, uv1)
+				}
 			}
 		}
 	case e.FrameAnimationNode:
@@ -1244,7 +1308,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	switch node.typeId {
 	case e.CameraNode: return ICON_FA_VIDEO
 	case e.LightNode: return ICON_FA_LIGHTBULB
-	case e.TextureNode, e.FrameAnimationNode, e.AnimationPlayerNode: return ICON_FA_IMAGE
+	case e.TextureNode, e.AtlasSpriteNode, e.FrameAnimationNode, e.AnimationPlayerNode: return ICON_FA_IMAGE
 	case e.SoundNode, e.MusicNode: return ICON_FA_MUSIC
 	case e.StaticBodyNode, e.DynamicBodyNode, e.CharacterMoverNode, e.AreaNode, e.RaycastNode: return ICON_FA_CUBES
 	case e.ParticleEmitterNode: return ICON_FA_WAND_MAGIC_SPARKLES

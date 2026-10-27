@@ -195,6 +195,18 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		if tn.origin != {0, 0} {
 			Json_Key(w, "origin", &first); Json_Vec2(w, tn.origin)
 		}
+	case AtlasSpriteNode:
+		an := cast(^AtlasSpriteNode)node
+		if an.filePath != "" {
+			Json_Key(w, "texture", &first); Json_String(w, asset_rel(node, an.filePath))
+		}
+		if an.origin != {0, 0} {
+			Json_Key(w, "origin", &first); Json_Vec2(w, an.origin)
+		}
+		if an.region.width > 0 && an.region.height > 0 {
+			Json_Key(w, "region", &first)
+			Json_Rect(w, an.region)
+		}
 	case FrameAnimationNode:
 		fan := cast(^FrameAnimationNode)node
 		Json_Key(w, "fps", &first); Json_Float(w, fan.ticker.framesPerSecond)
@@ -794,6 +806,34 @@ resource_manager :: proc(ctx: ^GameContext) -> ^ResourceManager {
 }
 
 @(private = "file")
+load_atlas_texture_into :: proc(an: ^AtlasSpriteNode, path: string, ctx: ^GameContext) {
+	an.filePath = strings.clone(path, an.allocator)
+	rm := resource_manager(ctx)
+	if rm == nil || !rl.IsWindowReady() do return
+	tex, ok := rm.loadTexture(rm, Project_ResolveAssetPath(ctx, path))
+	if ok && tex != nil {
+		an.texture = tex
+		if an.region.width > 0 && an.region.height > 0 {
+			an.size = {an.region.width, an.region.height}
+		} else {
+			an.size = Texture_Size(tex)
+		}
+	}
+}
+
+@(private = "file")
+sj_rect :: proc(obj: json.Object, key: string) -> rl.Rectangle {
+	if arr, ok := obj[key].(json.Array); ok && len(arr) >= 4 {
+		x, okx := json_number(arr[0])
+		y, oky := json_number(arr[1])
+		w, okw := json_number(arr[2])
+		h, okh := json_number(arr[3])
+		if okx && oky && okw && okh do return {x, y, w, h}
+	}
+	return {}
+}
+
+@(private = "file")
 load_texture_into :: proc(tn: ^TextureNode, path: string, ctx: ^GameContext) {
 	tn.filePath = strings.clone(path, tn.allocator)
 	rm := resource_manager(ctx)
@@ -856,6 +896,12 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	case TextureNode:
 		tn := cast(^TextureNode)node
 		if path := sj_texture_path(obj); path != "" do load_texture_into(tn, path, ctx)
+	case AtlasSpriteNode:
+		an := cast(^AtlasSpriteNode)node
+		if path := sj_texture_path(obj); path != "" do load_atlas_texture_into(an, path, ctx)
+		if r := sj_rect(obj, "region"); r.width > 0 && r.height > 0 {
+			AtlasSpriteNode_SetRegion(an, r)
+		}
 	case FrameAnimationNode:
 		fan := cast(^FrameAnimationNode)node
 		fan.loop = sj_bool(obj, "loop", true)
@@ -1176,7 +1222,7 @@ read_origin :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
 		return
 	}
 	switch node.typeId {
-	case TextureNode, FrameAnimationNode:
+	case TextureNode, AtlasSpriteNode, FrameAnimationNode:
 		if legacyPx == {0, 0} do return // the centre
 		size := Node_OriginSize(node, ctx)
 		if size.x > 0 && size.y > 0 {

@@ -274,7 +274,7 @@ lua_node_get_node :: proc "c" (L: ^lua.State) -> c.int {
 lua_node_set_texture :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
-	if !ok || node.typeId != TextureNode || lua.type(L, 2) != .STRING {
+	if !ok || (node.typeId != TextureNode && node.typeId != AtlasSpriteNode) || lua.type(L, 2) != .STRING {
 		lua.pushboolean(L, false)
 		return 1
 	}
@@ -296,9 +296,15 @@ lua_node_set_texture :: proc "c" (L: ^lua.State) -> c.int {
 	}
 	tex, loaded := rm.loadTexture(rm, Project_ResolveAssetPath(ctx, path))
 	if loaded && tex != nil {
-		TextureNode_SetTexture(tn, tex)
-		tn.filePath = strings.clone(path, tn.allocator)
-		tn.size = Texture_Size(tex)
+		if node.typeId == AtlasSpriteNode {
+			an := cast(^AtlasSpriteNode)node
+			AtlasSpriteNode_SetTexture(an, tex)
+			an.filePath = strings.clone(path, an.allocator)
+		} else {
+			TextureNode_SetTexture(tn, tex)
+			tn.filePath = strings.clone(path, tn.allocator)
+			tn.size = Texture_Size(tex)
+		}
 	}
 	lua.pushboolean(L, b32(loaded))
 	return 1
@@ -1150,6 +1156,40 @@ lua_node_particle_set_lifetime :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+
+@(private="file")
+lua_node_atlas_set_region :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AtlasSpriteNode do return 0
+	x := f32(lua.tonumber(L, 2))
+	y := f32(lua.tonumber(L, 3))
+	w := f32(lua.tonumber(L, 4))
+	h := f32(lua.tonumber(L, 5))
+	an := cast(^AtlasSpriteNode)node
+	AtlasSpriteNode_SetRegion(an, {x, y, w, h})
+	return 0
+}
+
+@(private="file")
+lua_node_atlas_get_region :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AtlasSpriteNode {
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		lua.pushnumber(L, 0)
+		return 4
+	}
+	an := cast(^AtlasSpriteNode)node
+	lua.pushnumber(L, lua.Number(an.region.x))
+	lua.pushnumber(L, lua.Number(an.region.y))
+	lua.pushnumber(L, lua.Number(an.region.width))
+	lua.pushnumber(L, lua.Number(an.region.height))
+	return 4
+}
+
 // ----------------------------------------------------------------------------
 // TextureNode Methods
 // ----------------------------------------------------------------------------
@@ -1158,7 +1198,7 @@ lua_node_particle_set_lifetime :: proc "c" (L: ^lua.State) -> c.int {
 lua_node_texture_get_size :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
-	if !ok || node.typeId != TextureNode {
+	if !ok || (node.typeId != TextureNode && node.typeId != AtlasSpriteNode) {
 		lua.pushnumber(L, 0)
 		lua.pushnumber(L, 0)
 		return 2
@@ -1173,7 +1213,7 @@ lua_node_texture_get_size :: proc "c" (L: ^lua.State) -> c.int {
 lua_node_texture_set_origin :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
-	if !ok || node.typeId != TextureNode do return 0
+	if !ok || (node.typeId != TextureNode && node.typeId != AtlasSpriteNode) do return 0
 	ox, oy := arg_xy(L, 2) // two numbers or a vector
 	tex := cast(^TextureNode)node
 	Node_SetOriginPx(tex, {ox, oy}, tex.size) // pixels -> the node's origin
@@ -1184,7 +1224,7 @@ lua_node_texture_set_origin :: proc "c" (L: ^lua.State) -> c.int {
 lua_node_texture_get_path :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
-	if !ok || node.typeId != TextureNode {
+	if !ok || (node.typeId != TextureNode && node.typeId != AtlasSpriteNode) {
 		lua.pushstring(L, "")
 		return 1
 	}
@@ -4423,6 +4463,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		// TextureNode
 		lua.pushcfunction(L, lua_node_texture_get_size)
 		lua.setfield(L, -2, "texture_get_size")
+		lua.pushcfunction(L, lua_node_atlas_set_region)
+		lua.setfield(L, -2, "atlas_set_region")
+		lua.pushcfunction(L, lua_node_atlas_get_region)
+		lua.setfield(L, -2, "atlas_get_region")
 		lua.pushcfunction(L, lua_node_texture_set_origin)
 		lua.setfield(L, -2, "texture_set_origin")
 		lua.pushcfunction(L, lua_node_texture_get_path)

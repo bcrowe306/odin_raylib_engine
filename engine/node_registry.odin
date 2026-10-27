@@ -28,6 +28,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"TimerNode", TimerNode, factory_timer, {"timer"}},
 	{"ScriptNode", ScriptNode, factory_script, {"script"}},
 	{"TextureNode", TextureNode, factory_texture, {"texture", "sprite"}},
+	{"AtlasSpriteNode", AtlasSpriteNode, factory_atlas_sprite, {"atlassprite", "atlas", "subtexture", "spritesheet"}},
 	{"FrameAnimationNode", FrameAnimationNode, factory_frame_animation, {"animationnode", "frameanimation", "animation"}},
 	{"AnimationPlayerNode", AnimationPlayerNode, factory_animation_player, {"animationplayer"}},
 	{"AsepriteNode", AsepriteNode, factory_aseprite, {"aseprite", "ase"}},
@@ -213,6 +214,13 @@ factory_texture :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	tn := CreateNode(scene.manager, TextureNode)
 	TextureNode_Init(tn)
 	return tn
+}
+
+@(private = "file")
+factory_atlas_sprite :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	an := CreateNode(scene.manager, AtlasSpriteNode)
+	AtlasSpriteNode_Init(an)
+	return an
 }
 
 @(private = "file")
