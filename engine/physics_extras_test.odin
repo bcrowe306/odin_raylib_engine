@@ -121,3 +121,85 @@ kind = h:get_property("joint.type")
 	j2 := cast(^JointNode)Scene_FindNodeByName(s2, "Hinge")
 	testing.expect(t, j2 != nil && j2.bodyB == "../Wheel" && j2.joint.revolute.motorSpeed == 3 && j2.joint.revolute.enableMotor, "joint loaded")
 }
+
+@(test)
+test_raycast_parent_transform :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("raycast_parent", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+
+	parent := CreateNodeScene(scene, Node, true)
+	parent.name = "Parent"
+	parent.position = {500, 300}
+
+	rc := RaycastNode_Create(scene, "ChildRaycast", parent)
+	rc.position = {20, 10}
+	rc.direction = {0, 1}
+	rc.length = 150.0
+
+	// Static obstacle placed below the parent + raycast position: (520, 390)
+	obstacle := StaticBodyNode_Create(scene, "Obstacle")
+	obstacle.position = {520, 390}
+	box: PhysicsShape
+	PhysicsShape_InitDefault(&box, .Box)
+	box.size = {100, 20} // Extends from y = 380 to 400, x = 470 to 570
+	StaticBodyNode_AddShape(obstacle, box)
+
+	// Step 2 frames to initialize transforms and physics bodies
+	game->run(1.0 / 60)
+	game->run(1.0 / 60)
+
+	// Origin should be parent.globalPosition + local position: (520, 310)
+	origin := RaycastNode_GetOrigin(rc)
+	testing.expectf(t, abs(origin.x - 520) < 0.1 && abs(origin.y - 310) < 0.1, "origin should transform with parent position: got %v, want (520, 310)", origin)
+
+	// Raycast should hit the top surface of the obstacle at y = 380
+	testing.expect(t, rc.isColliding, "raycast should hit obstacle below parent")
+	testing.expectf(t, abs(rc.hitPoint.x - 520) < 0.5 && abs(rc.hitPoint.y - 380) < 0.5, "hitPoint should be at obstacle top (520, 380), got %v", rc.hitPoint)
+	testing.expect(t, rc.hitNode == cast(^Node)obstacle, "hitNode should be obstacle")
+
+	// Now move parent to a new position where there is no obstacle
+	parent.position = {700, 300}
+	game->run(1.0 / 60)
+
+	origin = RaycastNode_GetOrigin(rc)
+	testing.expectf(t, abs(origin.x - 720) < 0.1 && abs(origin.y - 310) < 0.1, "origin should move with parent: got %v, want (720, 310)", origin)
+	testing.expect(t, !rc.isColliding, "raycast should no longer collide when parent moves away")
+	testing.expectf(t, abs(rc.hitPoint.x - 720) < 0.5 && abs(rc.hitPoint.y - 460) < 0.5, "hitPoint should be at ray tip when not colliding: got %v", rc.hitPoint)
+
+	// Test parent rotation
+	parent.position = {520, 380}
+	parent.rotation = 90 // Rotated 90 degrees clockwise
+	rc.position = {0, 0}
+	rc.direction = {1, 0} // Local right, rotated 90 deg clockwise becomes world down (0, 1)
+	rc.length = 100.0
+	// Obstacle is at (520, 430) (box height 20 -> top surface at y = 420)
+	obstacle.position = {520, 430}
+	// Re-sync obstacle body transform
+	b2.Body_SetTransform(obstacle.bodyId, obstacle.position, DegreesToRot(obstacle.rotation))
+
+	game->run(1.0 / 60)
+	trans := RaycastNode_GetTranslation(rc)
+	testing.expectf(t, abs(trans.x) < 0.1 && abs(trans.y - 100) < 0.1, "translation should rotate with parent: got %v, want (0, 100)", trans)
+	testing.expect(t, rc.isColliding, "rotated raycast should hit obstacle below")
+	testing.expectf(t, abs(rc.hitPoint.y - 420) < 0.5, "rotated raycast hitPoint.y should be 420: got %v", rc.hitPoint.y)
+
+	// Test parent scale flip (e.g. character facing left)
+	parent.rotation = 0
+	parent.scale = {-1, 1}
+	parent.position = {500, 300}
+	rc.position = {0, 0}
+	rc.direction = {1, 0} // Local right, with scale.x = -1 points world left (-1, 0)
+	rc.length = 100.0
+	// Place obstacle to the left at (440, 300)
+	obstacle.position = {440, 300}
+	b2.Body_SetTransform(obstacle.bodyId, obstacle.position, DegreesToRot(obstacle.rotation))
+
+	game->run(1.0 / 60)
+	trans = RaycastNode_GetTranslation(rc)
+	testing.expectf(t, abs(trans.x - (-100)) < 0.1 && abs(trans.y) < 0.1, "translation should flip with parent scale.x: got %v, want (-100, 0)", trans)
+	testing.expect(t, rc.isColliding, "flipped raycast should hit obstacle to the left")
+}
