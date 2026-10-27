@@ -38,7 +38,6 @@ Editor_SyncSelection :: proc(state: ^EditorState) {
 	}
 }
 
-@(private = "file")
 node_in_scene :: proc(state: ^EditorState, n: ^e.Node) -> bool {
 	if state.activeScene == nil || state.activeScene.manager == nil do return false
 	return slice.contains(state.activeScene.manager.nodes[:], n)
