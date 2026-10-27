@@ -185,6 +185,43 @@ Code_AddSignalHandler :: proc(state: ^EditorState, scriptRel, method, sourceName
 	return true
 }
 
+// Code_AddAnimationMethod writes an animation callback method into a script (unless it
+// exists), shows it in the code editor, and saves if the file had no other unsaved edits.
+Code_AddAnimationMethod :: proc(state: ^EditorState, scriptRel, method: string) -> bool {
+	doc := code_doc_for_script(state, scriptRel, true)
+	if doc == nil do return false
+	b := &doc.buffer
+	wasDirty := doc.buffer.version != doc.savedVersion
+	text := buf.buffer_to_string(b, context.temp_allocator)
+	cls := Script_ClassName(text)
+	if cls == "" {
+		Editor_Log(state, .Warn, "%s doesn't end with `return <Module>`; add %s yourself", scriptRel, method)
+		return false
+	}
+	if first, _, _, found := Script_FindMethod(b, cls, method); found {
+		Editor_OpenScript(state, scriptRel, first + 1, 4)
+		return true
+	}
+	insertLine := buf.buffer_line_count(b)
+	for ln := buf.buffer_line_count(b) - 1; ln >= 0; ln -= 1 {
+		if strings.trim_space(buf.buffer_line_str(b, ln)) == fmt.tprintf("return %s", cls) {
+			insertLine = ln
+			break
+		}
+	}
+	indent := "\t" if doc.useTabs else "    "
+	code := fmt.tprintf("function %s:%s(arg)\n%s-- Called by animation event\nend\n", cls, method, indent)
+	prefix := ""
+	if insertLine > 0 && strings.trim_space(buf.buffer_line_str(b, insertLine - 1)) != "" do prefix = "\n"
+	group := buf.buffer_next_group(b)
+	buf.buffer_insert_text(b, {insertLine, 0}, strings.concatenate({prefix, code, "\n"}, context.temp_allocator), group)
+	code_set_single_cursor(b, {insertLine + (1 if prefix != "" else 0) + 1, len(indent)}, false)
+	doc.scrollToCursor = true
+	if !wasDirty do Code_SaveDoc(state, doc)
+	Editor_Log(state, .Info, "Added %s:%s to %s", cls, method, scriptRel)
+	return true
+}
+
 // Code_RemoveSignalHandler deletes a generated handler (and its comment
 // block). With `force` false, a handler that contains code asks first.
 Code_RemoveSignalHandler :: proc(state: ^EditorState, scriptRel, method: string, force := false) -> bool {

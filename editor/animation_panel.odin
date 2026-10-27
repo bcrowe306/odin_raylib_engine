@@ -549,8 +549,10 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	// --- timeline: one column per source frame; the range starts at `base` ---
 	avail := imgui.GetContentRegionAvail()
 	hasAudioPanel := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Audio
+	hasMethodPanel := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Method
+	hasSidePanel := hasAudioPanel || hasMethodPanel
 	sideW: f32 = 0
-	if hasAudioPanel {
+	if hasSidePanel {
 		sideW = 320 if avail.x >= 720 else (PREVIEW_W if avail.x >= 540 else 0)
 	} else if avail.x >= 640 {
 		sideW = PREVIEW_W
@@ -560,6 +562,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		imgui.EndChild()
 		if sideW > 0 {
 			if hasAudioPanel do anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
+			else if hasMethodPanel do anim_method_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
 			else do anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
 		}
 		return
@@ -781,7 +784,11 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		target: ^e.Node = apn
 		if tr.target != "." && tr.target != "" do target = e.Node_ResolvePath(mgr, apn, tr.target)
 		prop := tr.property
-		if tr.kind == .Method do prop = "calls()"
+		if tr.kind == .Method {
+			scriptRel := node_script_rel(state, target)
+			if scriptRel != "" do prop = fmt.tprintf("calls() -> %s", filepath.base(scriptRel))
+			else do prop = "calls() (no script!)"
+		}
 		if tr.kind == .Audio {
 			if tr.name != "" do prop = tr.name
 			else if tr.property == "@audio" do prop = "sounds"
@@ -793,10 +800,12 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		if isSelectedTrack {
 			imgui.DrawList_AddRect(dl, {origin.x + scrollX, y}, {colX(x0, cols), y + ROW_H - 2}, col_u32(UI_ACCENT), 3, thickness = 1.5)
 		}
-		label(dl, origin.x + scrollX, y + 6, name, UI_TEXT if target != nil else UI_DANGER)
+		labelCol := UI_TEXT if target != nil else UI_DANGER
+		if target != nil && tr.kind == .Method && node_script_rel(state, target) == "" do labelCol = UI_WARNING
+		label(dl, origin.x + scrollX, y + 6, name, labelCol)
 		imgui.PushIDInt(c.int(ti) + 1000)
 		// Row buttons (fixed at the left).
-		btnStart := LABEL_W - (80 if tr.kind == .Audio else 56)
+		btnStart := LABEL_W - (80 if (tr.kind == .Audio || tr.kind == .Method) else 56)
 		imgui.SetCursorScreenPos({origin.x + scrollX + btnStart, y + 2})
 		keyTip := "Key the current value at the playhead"
 		if tr.kind == .Method do keyTip = "Call a method at the playhead (right-click the key to name it)"
@@ -808,6 +817,9 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			if tr.kind == .Audio {
 				audio := Editor_ListProjectFiles(state, "", AUDIO_EXTS)
 				text = audio[0] if len(audio) > 0 else ""
+				panel.selectedTrack = ti
+			} else if tr.kind == .Method {
+				if methods := Script_ListMethods(state, target); len(methods) > 0 do text = methods[0]
 				panel.selectedTrack = ti
 			}
 			// The previous key's text is the likely next one.
@@ -826,6 +838,11 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		if tr.kind == .Audio {
 			imgui.SameLine(0, 2)
 			if UI_IconButton(ICON_FA_SLIDERS, fmt.tprintf("anim.track-settings:%s", tr.property), "Sound Track Settings", isSelectedTrack, size = 24) {
+				panel.selectedTrack = ti if panel.selectedTrack != ti else -1
+			}
+		} else if tr.kind == .Method {
+			imgui.SameLine(0, 2)
+			if UI_IconButton(ICON_FA_CODE, fmt.tprintf("anim.track-settings:%s", tr.property), "Script Call Settings", isSelectedTrack, size = 24) {
 				panel.selectedTrack = ti if panel.selectedTrack != ti else -1
 			}
 		}
@@ -869,11 +886,11 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				}
 				if imgui.IsMouseClicked(.Left) {
 					scrub(state, apn, anim, int(k.frame))
-					if tr.kind == .Audio do panel.selectedTrack = ti
+					if tr.kind == .Audio || tr.kind == .Method do panel.selectedTrack = ti
 				}
 				if imgui.IsMouseClicked(.Right) {
 					keyMenu = {ti, k.frame}
-					if tr.kind == .Audio do panel.selectedTrack = ti
+					if tr.kind == .Audio || tr.kind == .Method do panel.selectedTrack = ti
 					imgui.OpenPopup("##key_ctx")
 				}
 			}
@@ -918,6 +935,9 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 					if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
 					Drive_Item("anim.event-arg")
 					UI_DimText("Called on the target's script: method(argument) - a number when it reads as one. The player also emits animation_event(method).")
+					if imgui.MenuItem(fmt.ctprintf("%s  Script Call Settings...", ICON_FA_SLIDERS)) {
+						panel.selectedTrack = ti
+					}
 				} else if tr.kind == .Audio {
 					if path, ok := asset_picker("anim.event-sound", key.text, Editor_ListProjectFiles(state, "", AUDIO_EXTS), allowNone = false); ok {
 						Editor_RecordUndo(state, "Event key")
@@ -966,6 +986,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	imgui.EndChild()
 	if sideW > 0 {
 		if hasAudioPanel do anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
+		else if hasMethodPanel do anim_method_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
 		else do anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
 	}
 }
@@ -1218,5 +1239,215 @@ anim_sound_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNo
 		}
 	} else {
 		UI_DimText("No sounds placed on track yet")
+	}
+}
+
+// anim_method_settings_panel: defines target node, attached script info, autogenerating
+// or attaching scripts, method picker, argument fields, and open script shortcut (Issue #29).
+@(private = "file")
+anim_method_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, tr: ^e.Property_Track, size: [2]f32) {
+	imgui.SameLine(0, UI_SPACE)
+	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
+	defer imgui.PopStyleColor()
+	if !imgui.BeginChild("##anim_method_settings", size, {}, {}) {
+		imgui.EndChild()
+		return
+	}
+	defer imgui.EndChild()
+
+	mgr := state.activeScene.manager if state.activeScene != nil else nil
+	target: ^e.Node = apn
+	if tr.target != "." && tr.target != "" && mgr != nil do target = e.Node_ResolvePath(mgr, apn, tr.target)
+
+	// Title bar with close button
+	imgui.TextUnformatted(fmt.ctprintf("%s  Script Call Settings", ICON_FA_CODE))
+	availW := imgui.GetContentRegionAvail().x
+	imgui.SameLine(availW - 10)
+	if UI_IconButton(ICON_FA_XMARK, "anim.method-close", "Close script settings", size = 20) {
+		panel.selectedTrack = -1
+		return
+	}
+	imgui.Separator()
+
+	// Target Node Info
+	UI_DimText("TARGET NODE")
+	targetName := target.name if target != nil else "(Node not found)"
+	targetPath := tr.target if tr.target != "" else "."
+	imgui.TextUnformatted(fmt.ctprintf("%s (%s)", targetName, targetPath))
+
+	// Target Node Switcher
+	if mgr != nil && len(mgr.nodes) > 1 {
+		imgui.SetNextItemWidth(-1)
+		if imgui.BeginCombo("##target_pick", strings.clone_to_cstring(fmt.tprintf("Change Target: %s", targetName), context.temp_allocator)) {
+			for n in mgr.nodes {
+				if n == nil do continue
+				relPath := e.Node_RelativePath(mgr, apn, n)
+				isSelected := relPath == tr.target || (relPath == "." && tr.target == "")
+				if imgui.Selectable(strings.clone_to_cstring(fmt.tprintf("%s (%s)", n.name, relPath), context.temp_allocator), isSelected) {
+					Editor_RecordUndo(state, "Change track target")
+					tr.target = strings.clone(relPath, apn.allocator)
+					target = n
+				}
+			}
+			imgui.EndCombo()
+		}
+	}
+
+	imgui.Spacing()
+	UI_DimText("ATTACHED SCRIPT")
+
+	scriptRel := node_script_rel(state, target)
+	if scriptRel != "" {
+		imgui.PushStyleColorImVec4(.Text, UI_SUCCESS)
+		imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_FILE_CODE, filepath.base(scriptRel)))
+		imgui.PopStyleColor()
+		UI_DimText(scriptRel)
+
+		if UI_Button(fmt.tprintf("%s  Open / Edit Script", ICON_FA_PEN_TO_SQUARE), "anim.open-script", {-1, 24}) {
+			Editor_OpenScript(state, scriptRel)
+		}
+
+		scripts := Editor_ListProjectFiles(state, "", {".lua"})
+		if len(scripts) > 0 {
+			imgui.SetNextItemWidth(-1)
+			if imgui.BeginCombo("##change_script", "Switch script...") {
+				for s in scripts {
+					if imgui.Selectable(strings.clone_to_cstring(s, context.temp_allocator), s == scriptRel) {
+						Editor_RecordUndo(state, "Attach script")
+						e.Script_AttachToNode(target, s, nil, &state.game.scriptManager)
+					}
+				}
+				imgui.EndCombo()
+			}
+		}
+	} else {
+		imgui.PushStyleColorImVec4(.Text, UI_WARNING)
+		imgui.TextUnformatted(fmt.ctprintf("%s  No script attached to node!", ICON_FA_TRIANGLE_EXCLAMATION))
+		imgui.PopStyleColor()
+		UI_DimText("Calls events require a script on the target node to invoke methods.")
+
+		imgui.Spacing()
+		if target != nil {
+			if UI_PrimaryButton(fmt.tprintf("%s  Create New Script for %s", ICON_FA_PLUS, target.name), "anim.create-script", {-1, 26}) {
+				NewScriptDialog_Open(state, target)
+			}
+		}
+
+		scripts := Editor_ListProjectFiles(state, "", {".lua"})
+		if len(scripts) > 0 {
+			imgui.SetNextItemWidth(-1)
+			if imgui.BeginCombo("##attach_script", "Attach existing script...") {
+				for s in scripts {
+					if imgui.Selectable(strings.clone_to_cstring(s, context.temp_allocator)) {
+						Editor_RecordUndo(state, "Attach script")
+						if target != nil do e.Script_AttachToNode(target, s, nil, &state.game.scriptManager)
+					}
+				}
+				imgui.EndCombo()
+			}
+		}
+	}
+
+	imgui.Spacing()
+	imgui.Separator()
+	UI_DimText("METHOD & ARGUMENTS")
+
+	curRelFrame := f32(apn.currentFrame - anim.startFrame)
+	key: ^e.Track_Key
+	for &k in tr.keys {
+		if abs(k.frame - curRelFrame) < 0.001 {
+			key = &k
+			break
+		}
+	}
+
+	if key != nil {
+		imgui.TextUnformatted(fmt.ctprintf("Key at Frame %d", int(key.frame) + 1))
+
+		UI_DimText("Method Name:")
+		methodBuf: [128]u8
+		copy(methodBuf[:len(methodBuf) - 1], key.text)
+		imgui.SetNextItemWidth(-1)
+		if imgui.InputTextWithHint("##method_name_panel", "e.g. on_hit", cstring(raw_data(methodBuf[:])), len(methodBuf)) {
+			Editor_RecordUndo(state, "Edit method name")
+			key.text = strings.clone(string(cstring(raw_data(methodBuf[:]))), apn.allocator)
+		}
+
+		methods := Script_ListMethods(state, target)
+		if len(methods) > 0 {
+			imgui.SetNextItemWidth(-1)
+			if imgui.BeginCombo("##method_pick_panel", strings.clone_to_cstring(fmt.tprintf("Pick method (%d available)", len(methods)), context.temp_allocator)) {
+				for m in methods {
+					if imgui.Selectable(strings.clone_to_cstring(m, context.temp_allocator), m == key.text) {
+						Editor_RecordUndo(state, "Pick method")
+						key.text = strings.clone(m, apn.allocator)
+					}
+				}
+				imgui.EndCombo()
+			}
+		}
+
+		UI_DimText("Argument (empty: passes frame number):")
+		argBuf: [128]u8
+		copy(argBuf[:len(argBuf) - 1], key.arg)
+		imgui.SetNextItemWidth(-1)
+		if imgui.InputTextWithHint("##arg_panel", "e.g. 2.5 or heavy", cstring(raw_data(argBuf[:])), len(argBuf)) {
+			Editor_RecordUndo(state, "Edit method argument")
+			key.arg = strings.clone(string(cstring(raw_data(argBuf[:]))), apn.allocator)
+		}
+
+		if scriptRel != "" && key.text != "" {
+			methodExists := false
+			for m in methods do if m == key.text { methodExists = true; break }
+			if !methodExists {
+				imgui.Spacing()
+				imgui.PushStyleColorImVec4(.Text, UI_WARNING)
+				imgui.TextUnformatted(fmt.ctprintf("Method '%s' not in script yet", key.text))
+				imgui.PopStyleColor()
+				if UI_Button(fmt.tprintf("%s  Generate %s in Script", ICON_FA_PLUS, key.text), "anim.gen-method", {-1, 24}) {
+					Code_AddAnimationMethod(state, scriptRel, key.text)
+				}
+			}
+		}
+
+		if target != nil && key.text != "" {
+			imgui.Spacing()
+			if UI_Button(fmt.tprintf("%s  Test Call: %s()", ICON_FA_PLAY, key.text), "anim.test-call", {-1, 24}) {
+				ctx := &state.game.gameContext
+				if ctx.scriptManager != nil {
+					e.Script_CallMethod(ctx.scriptManager, target, key.text, e.Track_EventArg(key^, int(key.frame)), quiet = false)
+					Editor_Log(state, .Info, "Called %s:%s()", target.name, key.text)
+				}
+			}
+		}
+	} else {
+		imgui.TextUnformatted(fmt.ctprintf("No key at playhead (Frame %d)", int(curRelFrame) + 1))
+		UI_DimText("Scrub to a frame with a key, or click below to add one at the playhead.")
+		imgui.Spacing()
+		if UI_Button(fmt.tprintf("%s  Add Method Key at Frame %d", ICON_FA_PLUS, int(curRelFrame) + 1), "anim.add-method-key", {-1, 26}) {
+			Editor_RecordUndo(state, "Add method key")
+			text := "on_animation_event"
+			for k in tr.keys do if k.frame < curRelFrame && k.text != "" do text = k.text
+			e.Track_SetEventKey(tr, curRelFrame, text, apn.allocator)
+		}
+	}
+
+	if target != nil && target.scriptInstance != nil {
+		inst := cast(^e.ScriptInstance)target.scriptInstance
+		if len(inst.properties) > 0 {
+			imgui.Spacing()
+			imgui.Separator()
+			UI_DimText("SCRIPT PROPERTIES")
+			for name, prop in inst.properties {
+				#partial switch prop.type {
+				case .Float:   imgui.TextUnformatted(fmt.ctprintf("  %s = %.2f", name, prop.valFloat))
+				case .Int:     imgui.TextUnformatted(fmt.ctprintf("  %s = %d", name, prop.valInt))
+				case .Boolean: imgui.TextUnformatted(fmt.ctprintf("  %s = %t", name, prop.valBool))
+				case .String:  imgui.TextUnformatted(fmt.ctprintf("  %s = %q", name, prop.valString))
+				case .Vector2: imgui.TextUnformatted(fmt.ctprintf("  %s = (%.2f, %.2f)", name, prop.valVec2.x, prop.valVec2.y))
+				case:          imgui.TextUnformatted(fmt.ctprintf("  %s", name))
+				}
+			}
+		}
 	}
 }
