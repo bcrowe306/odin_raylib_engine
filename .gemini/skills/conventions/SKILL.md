@@ -18,7 +18,7 @@ This skill defines the standardized end-to-end lifecycle for discovering, troubl
        ↓
 4. Implement Minimal & Robust Fix
        ↓
-5. Full Verification Suite (odin test, odin check, task test)
+5. Full Verification Suite (odin test, odin check, task test, test-drive for UI)
        ↓
 6. Branch, Commit, Push
        ↓
@@ -106,6 +106,21 @@ Always execute the following verification steps in sequence before committing:
    task test
    ```
    *Verify UI headless test hook passes with 0 failures.*
+
+### Automated UI Testing via Test-Drive Process
+> [!IMPORTANT]
+> **Automated UI Testing**: When making any UI changes in the editor, there is a **test-drive process** in this repo (`tests/drive/*.drive`) to help you automatically test any UI changes. It allows you to automate UI events (clicks, drags, keyboard inputs, shortcuts) in a background window to test changes and verify editor state without manual interaction.
+>
+> **Running Test-Drives**:
+> ```bash
+> # Run all test-drives
+> ./scripts/editor_drive.sh
+> # Or run a specific test drive
+> ./scripts/editor_drive.sh <drive_name>
+> # Or via task
+> task editor:drive
+> ```
+> Each drive operates against a fresh copy of `assets/demo_project` in `/tmp`, records step-by-step checks, and outputs numbered screenshots and reports to `editor_screenshots/drive/<name>/`. Always run the relevant test-drive or add a new test-drive script when modifying editor UI panels, menus, dialogs, or inspector widgets.
 
 ---
 

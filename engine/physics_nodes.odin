@@ -364,6 +364,7 @@ CharacterMoverNode :: struct {
 	pushLimit: f32 `gui:"true" min:"0" max:"1000"`,
 	clipVelocity: bool `gui:"true"`,
 	enableKeyboardInput: bool `gui:"true"`,
+	playerIndex: int `gui:"true" min:"0" max:"4"`,
 	isGrounded: bool `gui:"true" save:"false"`,
 	categoryLayers: CollisionLayerSet `gui:"true"`,
 	maskLayers: CollisionLayerSet `gui:"true"`,
@@ -412,7 +413,40 @@ CharacterMoverNode_Create :: proc(scene: ^Scene, name: string = "CharacterMover"
 	cm.gravityScale = 1.0
 	cm.pushLimit = 500.0
 	cm.clipVelocity = true
-	cm.enableKeyboardInput = true
+
+	// Check if the scene already has an input-enabled player mover.
+	// If so, default this new mover to disabled input and playerIndex 0 (NPC/Enemy/Secondary).
+	hasPlayer := false
+	if scene != nil && scene.manager != nil {
+		for n in scene.manager.nodes {
+			if n.typeId == typeid_of(CharacterMoverNode) && n != &cm.node {
+				other := cast(^CharacterMoverNode)n
+				if other.enableKeyboardInput && other.playerIndex > 0 {
+					hasPlayer = true
+					break
+				}
+			}
+		}
+		if !hasPlayer {
+			for n in scene.manager.addition {
+				if n.typeId == typeid_of(CharacterMoverNode) && n != &cm.node {
+					other := cast(^CharacterMoverNode)n
+					if other.enableKeyboardInput && other.playerIndex > 0 {
+						hasPlayer = true
+						break
+					}
+				}
+			}
+		}
+	}
+	if hasPlayer {
+		cm.enableKeyboardInput = false
+		cm.playerIndex = 0
+	} else {
+		cm.enableKeyboardInput = true
+		cm.playerIndex = 1
+	}
+
 	cm.isGrounded = false
 	cm.categoryLayers = {CollisionLayer.Layer1}
 	cm.maskLayers = DEFAULT_COLLISION_MASK
@@ -549,14 +583,18 @@ CharacterMoverNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 	// Script mode: the script moves the node (character_move_and_slide).
 	if cm.controlMode == .Script do return
 
+	// If a script is attached and no player is assigned, the script controls this node (e.g. enemy/AI);
+	// do not process built-in player keyboard actions.
+	if cm.node.scriptInstance != nil && cm.playerIndex == 0 do return
+
 	// Query Logical Actions via the Two-Tier Input System (MoveLeft, MoveRight, Jump)
 	desiredVX := cm.targetSpeedX
-	if cm.enableKeyboardInput {
-		moveAxis := GetActionAxis(gameContext, .MoveLeft, .MoveRight)
+	if cm.enableKeyboardInput && cm.playerIndex > 0 && cm.playerIndex <= MAX_PLAYERS {
+		moveAxis := GetPlayerActionAxis(gameContext, .MoveLeft, .MoveRight, cm.playerIndex)
 		if moveAxis != 0.0 {
 			desiredVX = moveAxis * cm.maxSpeed
 		}
-		if IsActionPressed(gameContext, .Jump) && cm.isGrounded {
+		if IsPlayerActionPressed(gameContext, .Jump, cm.playerIndex) && cm.isGrounded {
 			cm.velocity.y = -cm.jumpSpeed
 			cm.isGrounded = false
 		}

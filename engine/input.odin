@@ -486,6 +486,25 @@ IsActionPressed :: proc {
 	IsActionPressed_Context,
 }
 
+IsPlayerActionPressed_Input :: proc(input: ^InputSystem, action: InputAction, player: int) -> bool {
+	if input == nil || player < 1 || player > MAX_PLAYERS do return false
+	if player == 1 do return input.states[action].pressed
+	return input.pads.players[player - 1].states[action].pressed
+}
+IsPlayerActionPressed_Game :: proc(game: ^Game, action: InputAction, player: int) -> bool {
+	if game == nil do return false
+	return IsPlayerActionPressed_Input(&game.input, action, player)
+}
+IsPlayerActionPressed_Context :: proc(ctx: ^GameContext, action: InputAction, player: int) -> bool {
+	if ctx == nil || ctx.game == nil do return false
+	return IsPlayerActionPressed_Input(&ctx.game.input, action, player)
+}
+IsPlayerActionPressed :: proc {
+	IsPlayerActionPressed_Input,
+	IsPlayerActionPressed_Game,
+	IsPlayerActionPressed_Context,
+}
+
 IsActionDown_Input :: proc(input: ^InputSystem, action: InputAction) -> bool {
 	if input == nil do return false
 	return input.states[action].down
@@ -575,6 +594,28 @@ GetActionAxis :: proc {
 	GetActionAxis_Input,
 	GetActionAxis_Game,
 	GetActionAxis_Context,
+}
+
+GetPlayerActionAxis_Input :: proc(input: ^InputSystem, negativeAction, positiveAction: InputAction, player: int) -> f32 {
+	if input == nil || player < 1 || player > MAX_PLAYERS do return 0.0
+	if player == 1 {
+		return clamp(input.states[positiveAction].value - input.states[negativeAction].value, -1.0, 1.0)
+	}
+	p := &input.pads.players[player - 1]
+	return clamp(p.states[positiveAction].value - p.states[negativeAction].value, -1.0, 1.0)
+}
+GetPlayerActionAxis_Game :: proc(game: ^Game, negativeAction, positiveAction: InputAction, player: int) -> f32 {
+	if game == nil do return 0.0
+	return GetPlayerActionAxis_Input(&game.input, negativeAction, positiveAction, player)
+}
+GetPlayerActionAxis_Context :: proc(ctx: ^GameContext, negativeAction, positiveAction: InputAction, player: int) -> f32 {
+	if ctx == nil || ctx.game == nil do return 0.0
+	return GetPlayerActionAxis_Input(&ctx.game.input, negativeAction, positiveAction, player)
+}
+GetPlayerActionAxis :: proc {
+	GetPlayerActionAxis_Input,
+	GetPlayerActionAxis_Game,
+	GetPlayerActionAxis_Context,
 }
 
 // Returns a 2D vector from 4 directional actions (e.g., .MoveLeft, .MoveRight, .MoveUp, .MoveDown)

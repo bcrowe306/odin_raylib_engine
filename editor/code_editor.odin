@@ -1998,7 +1998,7 @@ Editor_NewScriptForNode :: proc(state: ^EditorState, node: ^e.Node, template := 
 	tp, ok := e.Script_TemplateById(id)
 	if !ok do tp, _ = e.Script_TemplateById("empty")
 	rel := Editor_NewScript(state, base, tp.text)
-	if rel != "" && node.typeId == e.CharacterMoverNode && (id == "platformer" || id == "top_down") {
+	if rel != "" && node.typeId == e.CharacterMoverNode {
 		(cast(^e.CharacterMoverNode)node).controlMode = .Script
 		Editor_Log(state, .Info, "%s uses the %s template; %s now moves by script", rel, tp.label, node.name)
 	}

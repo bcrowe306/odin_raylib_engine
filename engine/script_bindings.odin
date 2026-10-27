@@ -806,6 +806,30 @@ lua_node_character_set_jump_speed :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 @(private="file")
+lua_node_character_get_player_index :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode {
+		lua.pushinteger(L, 0)
+		return 1
+	}
+	cm := cast(^CharacterMoverNode)node
+	lua.pushinteger(L, lua.Integer(cm.playerIndex))
+	return 1
+}
+
+@(private="file")
+lua_node_character_set_player_index :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != CharacterMoverNode do return 0
+	idx := int(lua.tointeger(L, 2))
+	cm := cast(^CharacterMoverNode)node
+	cm.playerIndex = clamp(idx, 0, MAX_PLAYERS)
+	return 0
+}
+
+@(private="file")
 mover_arg :: proc(L: ^lua.State) -> ^CharacterMoverNode {
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CharacterMoverNode do return nil
@@ -4353,6 +4377,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "character_set_gravity_scale")
 		lua.pushcfunction(L, lua_node_character_set_control_mode)
 		lua.setfield(L, -2, "character_set_control_mode")
+		lua.pushcfunction(L, lua_node_character_get_player_index)
+		lua.setfield(L, -2, "character_get_player_index")
+		lua.pushcfunction(L, lua_node_character_set_player_index)
+		lua.setfield(L, -2, "character_set_player_index")
 
 		// AreaNode
 		lua.pushcfunction(L, lua_node_area_is_overlapping)

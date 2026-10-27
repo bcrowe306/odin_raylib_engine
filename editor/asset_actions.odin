@@ -103,6 +103,9 @@ Editor_AttachScript :: proc(state: ^EditorState, n: ^e.Node, rel: string) -> boo
 		Editor_Log(state, .Error, "Could not attach %s to %s (see errors above)", rel, n.name)
 		return false
 	}
+	if n.typeId == e.CharacterMoverNode {
+		(cast(^e.CharacterMoverNode)n).controlMode = .Script
+	}
 	Editor_Log(state, .Info, "Attached %s to %s", rel, n.name)
 	return true
 }
