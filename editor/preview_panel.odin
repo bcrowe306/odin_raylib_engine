@@ -260,6 +260,9 @@ PreviewPanel_Render :: proc(state: ^EditorState) {
 	assetName := "Nothing selected"
 	if state.selectedAssetPath != "" {
 		assetName = filepath.base(state.selectedAssetPath)
+		if len(state.selectedAssetPaths) > 1 {
+			assetName = fmt.tprintf("%s (+%d selected)", assetName, len(state.selectedAssetPaths) - 1)
+		}
 	} else if state.selectedNode != nil {
 		assetName = state.selectedNode.name
 	}
