@@ -1,0 +1,9 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The AnimationPlayer the states play on (Auto: a sibling or child)", "x": 413, "y": 498, "w": 325, "h": 25},
+    {"label": "The state it starts in", "x": 413, "y": 531, "w": 325, "h": 25},
+    {"label": "Start by itself when the game starts", "x": 413, "y": 564, "w": 25, "h": 25}
+  ]
+}

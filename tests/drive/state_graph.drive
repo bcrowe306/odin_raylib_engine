@@ -1,7 +1,8 @@
 # State machine graph: the tab follows a selected State Machine; right-click
 # adds states (gameplay ones), drag a state's dot onto another for a
-# transition, the side panel renames / edits, Delete removes, saved with
-# positions.
+# transition (Manual by default), the side panel renames / edits, a pair
+# both ways curves apart so each arrow can be clicked, Delete removes, saved
+# with positions.
 wait 5
 click @menu:View
 click @menu:View/Workspaces
@@ -44,7 +45,24 @@ expect item:insp.sm.cond-op:0.0 == visible
 key cmd+s
 wait 3
 expect file:scenes/main.scene.json contains "name": "patrol", "pos": [
-expect file:scenes/main.scene.json contains "from": "patrol", "to": "chase"
+expect file:scenes/main.scene.json contains "from": "patrol", "to": "chase", "mode": "manual"
+# The way back: the two arrows curve apart; each is picked on its own curve.
+hover @smg.canvas
+key f
+wait 2
+drag @smg.handle:chase @smg.state:patrol 10
+wait 2
+expect smg-selected == transition 1
+click @smg.state:patrol
+click @smg.tr:0
+wait 2
+expect smg-selected == transition 0
+click @smg.tr:1
+wait 2
+expect smg-selected == transition 1
+screenshot two_way
+key delete
+wait 2
 # Delete removes the selected arrow.
 click @smg.tr:0
 key delete

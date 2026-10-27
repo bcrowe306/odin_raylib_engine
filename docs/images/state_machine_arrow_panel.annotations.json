@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Manual or Automatic", "x": 699, "y": 551, "w": 115, "h": 25},
+    {"label": "Conditions (for Manual arrows: checked when a script asks)", "x": 699, "y": 582, "w": 87, "h": 25}
+  ]
+}

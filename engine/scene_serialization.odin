@@ -1521,12 +1521,16 @@ Node_ComponentRoot :: proc(manager: ^NodeManager, node: ^Node) -> ^Node {
 
 // --- StateMachineNode ------------------------------------------------------------
 // "state_machine": {"initial", "player", "autostart",
-//   "params": [[name, value], ...],
-//   "states": [{"name", "animation", "child", "pos": [x, y],
+//   "params": [[name, value, "float"|"int"|"bool"], ...],
+//   "triggers": [[name, buffer seconds], ...],
+//   "states": [{"name", "animation", "child", "pos": [x, y], "retrigger": true,
 //               "min_time", "interruptible": false, "leave_when": [...], "enter_when": [...]}, ...],
-//   "transitions": [{"from", "to", "blend", "when": [[op, param, value], ...]}, ...]}
-// Conditions: ["true"|"false"|"trigger", param], ["=="|"!="|">"|"<", param, value],
+//   "transitions": [{"from", "to", "mode": "manual", "blend", "when": [[op, param, value], ...]}, ...]}
+// Conditions: ["true"|"false", param], ["trigger", trigger], ["=="|"!="|">"|"<", param, value],
 // ["finished"], ["after", seconds], ["call", method], ["or"] (starts another group).
+// An arrow without "mode" is automatic (scenes saved before modes existed).
+// Scenes without "triggers" (older ones): the parameters that "trigger"
+// conditions test become triggers.
 
 @(private = "file")
 write_sm_conditions :: proc(w: ^Json_Writer, conds: []SM_Condition) {
@@ -1582,6 +1586,18 @@ write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
 		Json_String(w, p.name)
 		strings.write_string(&w.sb, ", ")
 		Json_Float(w, p.value)
+		strings.write_string(&w.sb, ", ")
+		Json_String(w, SM_PARAM_TYPE_NAMES[p.type])
+		strings.write_byte(&w.sb, ']')
+	}
+	strings.write_string(&w.sb, "],")
+	Json_NewLine(w); strings.write_string(&w.sb, "\"triggers\": [")
+	for t, i in sm.triggers {
+		if i > 0 do strings.write_string(&w.sb, ", ")
+		strings.write_byte(&w.sb, '[')
+		Json_String(w, t.name)
+		strings.write_string(&w.sb, ", ")
+		Json_Float(w, t.buffer)
 		strings.write_byte(&w.sb, ']')
 	}
 	strings.write_string(&w.sb, "],")
@@ -1598,6 +1614,7 @@ write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
 		strings.write_string(&w.sb, ", ")
 		Json_Float(w, s.pos.y)
 		strings.write_byte(&w.sb, ']')
+		if s.allowRetrigger do strings.write_string(&w.sb, ", \"retrigger\": true")
 		if s.minTime > 0 {strings.write_string(&w.sb, ", \"min_time\": "); Json_Float(w, s.minTime)}
 		if s.noInterrupt do strings.write_string(&w.sb, ", \"interruptible\": false")
 		if len(s.leaveWhen) > 0 {strings.write_string(&w.sb, ", \"leave_when\": "); write_sm_conditions(w, s.leaveWhen[:])}
@@ -1614,6 +1631,7 @@ write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
 		Json_NewLine(w)
 		strings.write_string(&w.sb, "{\"from\": "); Json_String(w, t.from)
 		strings.write_string(&w.sb, ", \"to\": "); Json_String(w, t.to)
+		strings.write_string(&w.sb, ", \"mode\": "); Json_String(w, SM_MODE_NAMES[t.mode])
 		if t.blend > 0 {strings.write_string(&w.sb, ", \"blend\": "); Json_Float(w, t.blend)}
 		strings.write_string(&w.sb, ", \"when\": ")
 		write_sm_conditions(w, t.conditions[:])
@@ -1627,11 +1645,38 @@ write_state_machine :: proc(w: ^Json_Writer, sm: ^StateMachineNode) {
 	strings.write_byte(&w.sb, '}')
 }
 
+// sm_migrate_triggers: a scene saved before triggers were their own thing -
+// the parameters that "trigger" conditions test become triggers (removed
+// from the parameters unless other conditions compare them too).
+@(private = "file")
+sm_migrate_triggers :: proc(sm: ^StateMachineNode) {
+	names := make(map[string]bool, allocator = context.temp_allocator)
+	usedAsParam := make(map[string]bool, allocator = context.temp_allocator)
+	scan :: proc(list: []SM_Condition, names, usedAsParam: ^map[string]bool) {
+		for c in list {
+			if c.op == .Trigger && c.param != "" do names[c.param] = true
+			else if SM_Op_UsesParam(c.op) && c.op != .Call do usedAsParam[c.param] = true
+		}
+	}
+	for t in sm.transitions do scan(t.conditions[:], &names, &usedAsParam)
+	for s in sm.states {
+		scan(s.leaveWhen[:], &names, &usedAsParam)
+		scan(s.enterWhen[:], &names, &usedAsParam)
+	}
+	// (Kept in the parameters' order.)
+	for p in sm.params do if names[p.name] do StateMachine_AddTrigger(sm, p.name)
+	for name in names do StateMachine_AddTrigger(sm, name)
+	for i := len(sm.params) - 1; i >= 0; i -= 1 {
+		if names[sm.params[i].name] && !usedAsParam[sm.params[i].name] do ordered_remove(&sm.params, i)
+	}
+}
+
 @(private = "file")
 read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
 	clear(&sm.states)
 	clear(&sm.transitions)
 	clear(&sm.params)
+	clear(&sm.triggers)
 	sm.autostart = sj_bool(obj, "autostart", true)
 	if pa, pok := sj_arr(obj, "any_pos"); pok && len(pa) == 2 {
 		x, _ := json_number(pa[0])
@@ -1647,11 +1692,27 @@ read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
 			name, nok := p[0].(json.String)
 			if !nok do continue
 			val: f32
+			type := SM_Param_Type.Float
 			if len(p) > 1 {
 				if f, fok := json_number(p[1]); fok do val = f
-				else if b, bok := p[1].(json.Boolean); bok do val = 1 if b else 0
+				else if b, bok := p[1].(json.Boolean); bok {val = 1 if b else 0; type = .Bool}
 			}
-			StateMachine_SetParam(sm, name, val)
+			if len(p) > 2 {
+				if s, sok := p[2].(json.String); sok do type, _ = SM_Param_Type_Parse(s)
+			}
+			StateMachine_EnsureParam(sm, name, val, type)
+		}
+	}
+	_, hasTriggers := sj_arr(obj, "triggers")
+	if arr, ok := sj_arr(obj, "triggers"); ok {
+		for v in arr {
+			tr, tok := v.(json.Array)
+			if !tok || len(tr) < 1 do continue
+			name, nok := tr[0].(json.String)
+			if !nok do continue
+			buffer: f32
+			if len(tr) > 1 do buffer, _ = json_number(tr[1])
+			StateMachine_AddTrigger(sm, name, buffer)
 		}
 	}
 	if arr, ok := sj_arr(obj, "states"); ok {
@@ -1668,6 +1729,7 @@ read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
 				sm.states[i].pos = {x, y}
 			}
 			st := &sm.states[i]
+			st.allowRetrigger = sj_bool(so, "retrigger", false)
 			st.minTime = sj_float(so, "min_time", 0)
 			st.noInterrupt = !sj_bool(so, "interruptible", true)
 			if a, aok := sj_arr(so, "leave_when"); aok do read_sm_conditions(sm, &st.leaveWhen, a)
@@ -1678,11 +1740,14 @@ read_state_machine :: proc(sm: ^StateMachineNode, obj: json.Object) {
 		for v in arr {
 			to, tok := v.(json.Object)
 			if !tok do continue
-			t := StateMachine_AddTransition(sm, sj_string(to, "from", SM_ANY), sj_string(to, "to", ""), sj_float(to, "blend", 0))
+			// (No mode: saved before modes existed - automatic, as it behaved then.)
+			mode, _ := SM_Mode_Parse(sj_string(to, "mode", "auto"))
+			t := StateMachine_AddTransition(sm, sj_string(to, "from", SM_ANY), sj_string(to, "to", ""), sj_float(to, "blend", 0), mode)
 			when_arr, _ := sj_arr(to, "when")
 			read_sm_conditions(sm, &t.conditions, when_arr)
 		}
 	}
+	if !hasTriggers do sm_migrate_triggers(sm)
 	sm.initial = ""
 	if init := sj_string(obj, "initial", ""); init != "" {
 		if i := StateMachine_FindState(sm, init); i >= 0 do sm.initial = sm.states[i].name

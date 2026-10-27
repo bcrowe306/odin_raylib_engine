@@ -1,0 +1,24 @@
+{"name": "enemy", "background": [30, 30, 40, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "CameraNode", "name": "Camera", "position": [160, 90], "properties": {"isCurrent": true}},
+ {"type": "TextNode", "name": "Probe", "position": [4, 4], "properties": {"text": "", "fontSize": 10}, "script": {"path": "scripts/probe.lua", "properties": {"machine": "Brain"}}},
+ {"type": "Node", "name": "Player", "position": [400, 100]},
+ {"type": "Node", "name": "Enemy", "position": [100, 100],
+  "script": {"path": "scripts/enemy_brain.lua"},
+  "children": [
+   {"type": "StateMachineNode", "name": "Brain", "state_machine": {
+     "initial": "patrol", "player": "", "autostart": true,
+     "params": [], "triggers": [],
+     "states": [
+      {"name": "patrol", "pos": [160, 40]},
+      {"name": "chase", "pos": [360, 40]},
+      {"name": "attack", "pos": [560, 40], "min_time": 0.5},
+      {"name": "stunned", "pos": [360, 200]}],
+     "transitions": [
+      {"from": "patrol", "to": "chase", "mode": "manual", "when": []},
+      {"from": "chase", "to": "patrol", "mode": "manual", "when": []},
+      {"from": "chase", "to": "attack", "mode": "manual", "when": []},
+      {"from": "attack", "to": "chase", "mode": "manual", "when": []},
+      {"from": "*", "to": "stunned", "mode": "manual", "when": []},
+      {"from": "stunned", "to": "patrol", "mode": "auto", "when": [["after", 1]]}]}}
+  ]}
+]}}

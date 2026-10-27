@@ -1,0 +1,9 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "A parameter's type: bool, int or float", "x": 375, "y": 584, "w": 75, "h": 25},
+    {"label": "Its starting value", "x": 463, "y": 584, "w": 114, "h": 25},
+    {"label": "Buffer: how long a trigger waits for an arrow it can open", "x": 849, "y": 599, "w": 141, "h": 25}
+  ]
+}

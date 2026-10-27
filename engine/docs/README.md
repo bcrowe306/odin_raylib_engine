@@ -12,6 +12,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 | [Skeletal animation](skeletal_animation.md) | Spine and DragonBones exports on the engine's own runtime: Skeleton and Bone Attachment nodes, crossfades, skins, IK, events, bone overrides - with a tutorial. |
 | [Vector art](vector.md) | Vector shapes crisp at any zoom: tessellation, anti-aliasing, cached GPU meshes, the Vector Shape node - the start of Flash-style vector characters (Phase 14). |
 | [Animation editing](animation_editing.md) | Custom key curves (cubic Bezier), method events with arguments and the animation_event signal, onion skin - with tutorials. |
+| [State machines](state_machine.md) | States, arrows (Manual / Automatic), conditions, parameters and buffered triggers, guards, callbacks in order, child machines; the State Machine tab (Graph, Parameters & Triggers, Settings) and its live view; `sm_transition` - with tutorials (platformer with input buffering, enemy AI, combo chain) and moving from `sm_request` / `sm_travel`. |
 | [Draw order](draw_order.md) | Layers, Z index, Y-sort (top-down / isometric depth). |
 | [Navigation](navigation.md) | Path finding on tile maps, LDtk levels and Navigation Regions; agents that walk there (radius, avoidance, doors) - with tutorials. |
 | [Accessibility](accessibility.md) | UI scale, colour-blind filters (and an editor preview), subtitles from dialogue and sound captions, screen shake scale; the Accessibility Menu template - with a tutorial. |

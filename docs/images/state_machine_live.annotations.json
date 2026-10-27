@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The current state, lit; the bar is the time in it", "x": 489, "y": 556, "w": 72, "h": 30},
+    {"label": "Ways out: what each arrow waits for, or what blocks it", "x": 695, "y": 790, "w": 328, "h": 21}
+  ]
+}

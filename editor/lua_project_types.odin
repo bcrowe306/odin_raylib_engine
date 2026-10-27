@@ -28,7 +28,7 @@ import lsp "../odin_editor/lsp"
 //   script's self.node is <Script>Node_, whose get_node completes the paths
 //   from it in its scenes / components, each returning that node's type
 //   global scripts (Project Settings > Globals) as globals
-//   AnimationName, StateMachineParam / State (and on_enter_ / on_update_ /
+//   AnimationName, StateMachineParam / Trigger / State (and on_enter_ / on_update_ /
 //   on_exit_ / can_exit_ / can_enter_<state> on the script classes), SaveKey, LocaleKey,
 //   Language, CollisionLayer   names the project uses (animation_play,
 //   sm_*, Save.*, tr / Locale.set, set_collision_layer complete them)
@@ -336,15 +336,17 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	anims := make([dynamic]string, context.temp_allocator)
 	smParams := make([dynamic]string, context.temp_allocator)
 	smStates := make([dynamic]string, context.temp_allocator)
+	smTriggers := make([dynamic]string, context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "", {".scene.json", ".component.json"}) {
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
-			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None do scene_names(val, &anims, &smParams, &smStates)
+			if val, perr := json.parse(data, allocator = context.temp_allocator); perr == .None do scene_names(val, &anims, &smParams, &smStates, &smTriggers)
 		}
 	}
 	alias(&sb, "AnimationName", "Animations of the project's AnimationPlayers (animation_play)", sorted_unique(&anims))
-	alias(&sb, "StateMachineParam", "State machine parameters (sm_set / sm_get / sm_trigger)", sorted_unique(&smParams))
-	alias(&sb, "StateMachineState", "State machine states (sm_travel)", sorted_unique(&smStates))
+	alias(&sb, "StateMachineParam", "State machine parameters (sm_set / sm_get)", sorted_unique(&smParams))
+	alias(&sb, "StateMachineTrigger", "State machine triggers (sm_trigger / sm_trigger_pending / sm_clear_trigger)", sorted_unique(&smTriggers))
+	alias(&sb, "StateMachineState", "State machine states (sm_transition / sm_can_transition / sm_start)", sorted_unique(&smStates))
 	saveKeys := make([dynamic]string, context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "", {".lua"}) {
 		if strings.has_prefix(rel, ".") do continue
@@ -470,19 +472,27 @@ Lua_WriteProjectTypes :: proc(state: ^EditorState) {
 // scene_names collects animation names and state machine parameters /
 // states of a scene / component JSON.
 @(private = "file")
-scene_names :: proc(v: json.Value, anims, params, states: ^[dynamic]string) {
+scene_names :: proc(v: json.Value, anims, params, states, triggers: ^[dynamic]string) {
 	#partial switch x in v {
 	case json.Object:
 		if arr, ok := x["animations"].(json.Array); ok {
 			for a in arr do if o, isObj := a.(json.Object); isObj do if n, has := o["name"].(json.String); has do append(anims, string(n))
 		}
 		if sm, ok := x["state_machine"].(json.Object); ok {
-			if arr, has := sm["params"].(json.Array); has do for a in arr do if o, isObj := a.(json.Object); isObj do if n, hasN := o["name"].(json.String); hasN do append(params, string(n))
+			// params / triggers: [[name, ...], ...]; states: [{"name"}, ...].
+			first :: proc(a: json.Value) -> (name: string, ok: bool) {
+				arr := a.(json.Array) or_return
+				if len(arr) == 0 do return
+				n := arr[0].(json.String) or_return
+				return string(n), true
+			}
+			if arr, has := sm["params"].(json.Array); has do for a in arr do if n, ok := first(a); ok do append(params, n)
+			if arr, has := sm["triggers"].(json.Array); has do for a in arr do if n, ok := first(a); ok do append(triggers, n)
 			if arr, has := sm["states"].(json.Array); has do for a in arr do if o, isObj := a.(json.Object); isObj do if n, hasN := o["name"].(json.String); hasN do append(states, string(n))
 		}
-		for _, child in x do scene_names(child, anims, params, states)
+		for _, child in x do scene_names(child, anims, params, states, triggers)
 	case json.Array:
-		for child in x do scene_names(child, anims, params, states)
+		for child in x do scene_names(child, anims, params, states, triggers)
 	}
 }
 

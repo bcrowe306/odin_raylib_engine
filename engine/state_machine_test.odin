@@ -40,16 +40,17 @@ return H
 	StateMachine_AddState(sm, "idle", "idle")
 	StateMachine_AddState(sm, "run", "run")
 	StateMachine_AddState(sm, "jump", "jump")
-	tr := StateMachine_AddTransition(sm, "idle", "run", 0.1)
+	tr := StateMachine_AddTransition(sm, "idle", "run", 0.1, .Automatic)
 	StateMachine_AddCondition(sm, tr, .Greater, "speed", 10)
-	tr = StateMachine_AddTransition(sm, "run", "idle")
+	tr = StateMachine_AddTransition(sm, "run", "idle", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .Less, "speed", 1)
-	tr = StateMachine_AddTransition(sm, SM_ANY, "jump")
+	tr = StateMachine_AddTransition(sm, SM_ANY, "jump", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .Trigger, "jump")
-	tr = StateMachine_AddTransition(sm, "jump", "idle")
+	tr = StateMachine_AddTransition(sm, "jump", "idle", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .Finished)
 	testing.expect_value(t, sm.initial, "idle")
-	testing.expect_value(t, len(sm.params), 2) // speed, jump
+	testing.expect_value(t, len(sm.params), 1) // speed
+	testing.expect_value(t, len(sm.triggers), 1) // jump
 
 	// Starts in the initial state on the first update, playing its animation.
 	game->run(0.016)
@@ -74,7 +75,7 @@ m:sm_set("speed", 20)
 	_ = lua.L_dostring(L, `Scene.find_node("Machine"):sm_trigger("jump")`)
 	game->run(0.016)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "jump")
-	testing.expect_value(t, StateMachine_GetParam(sm, "jump"), 0)
+	testing.expect(t, !StateMachine_TriggerPending(sm, "jump"), "the trigger is used up")
 	_ = lua.L_dostring(L, `state_seen = Scene.find_node("Machine"):sm_state() .. "/" .. Scene.find_node("Machine"):sm_previous()`)
 	lua.getglobal(L, "state_seen")
 	testing.expect_value(t, string(lua.tostring(L, -1)), "jump/run")
@@ -88,10 +89,10 @@ m:sm_set("speed", 20)
 	game->run(0.016)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "run")
 
-	// Travel ignores conditions; "after" counts time in the state.
-	StateMachine_Travel(sm, "idle")
+	// A forced transition ignores conditions; "after" counts time in the state.
+	testing.expect_value(t, StateMachine_Transition(sm, "idle", force = true), SM_Block.None)
 	StateMachine_SetParam(sm, "speed", 0)
-	tr = StateMachine_AddTransition(sm, "idle", "jump")
+	tr = StateMachine_AddTransition(sm, "idle", "jump", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .After, "", 0.5)
 	game->run(0.3)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "idle")
@@ -106,7 +107,7 @@ m:sm_set("speed", 20)
 	// Saved and loaded.
 	text := Scene_SerializeToJSON(scene, context.temp_allocator)
 	testing.expect(t, strings.contains(text, `"when": [[">", "speed", 10]]`), "condition saved")
-	testing.expect(t, strings.contains(text, `{"from": "*", "to": "jump", "when": [["trigger", "jump"]]}`), "any-state trigger saved")
+	testing.expect(t, strings.contains(text, `{"from": "*", "to": "jump", "mode": "auto", "when": [["trigger", "jump"]]}`), "any-state trigger saved")
 	s2 := game->createScene("sm2", true)
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
 	Scene_InstantiateFromJSON(s2, transmute([]u8)text, &game.gameContext)
@@ -154,18 +155,18 @@ return G
 	combat.gameContext = &game.gameContext
 	StateMachine_AddState(combat, "aim")
 	StateMachine_AddState(combat, "shoot")
-	tr := StateMachine_AddTransition(combat, "aim", "shoot")
+	tr := StateMachine_AddTransition(combat, "aim", "shoot", mode = .Automatic)
 	StateMachine_AddCondition(combat, tr, .After, "", 0.05)
 
 	StateMachine_AddState(sm, "patrol")
 	fight := StateMachine_AddState(sm, "fight")
 	sm.states[fight].child = strings.clone("Combat", sm.allocator)
 	// patrol -> fight when the script says so OR alarm is set.
-	tr = StateMachine_AddTransition(sm, "patrol", "fight")
+	tr = StateMachine_AddTransition(sm, "patrol", "fight", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .Call, "sees_player")
 	StateMachine_AddCondition(sm, tr, .Or)
 	StateMachine_AddCondition(sm, tr, .Is_True, "alarm")
-	tr = StateMachine_AddTransition(sm, "fight", "patrol")
+	tr = StateMachine_AddTransition(sm, "fight", "patrol", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .Is_False, "alarm")
 	StateMachine_AddCondition(sm, tr, .Call, "calm") // missing method: false -> stays
 	ProcessNodeQueues(scene.manager, &game.gameContext)
@@ -188,7 +189,7 @@ return G
 	StateMachine_SetParam(sm, "alarm", 0)
 	game->run(0.016)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "fight")
-	StateMachine_Travel(sm, "patrol")
+	StateMachine_Transition(sm, "patrol", force = true)
 	testing.expect(t, !combat.running, "child stopped with its state")
 	// The script's condition: patrol -> fight.
 	r := lua.L_dostring(L, "alert = true")
@@ -196,7 +197,7 @@ return G
 	game->run(0.016)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "fight")
 	hist := StateMachine_History(sm)
-	testing.expect(t, len(hist) == 4 && hist[0].why == "start" && hist[2].why == "travel" && hist[3].to == "fight", "history")
+	testing.expect(t, len(hist) == 4 && hist[0].why == "start" && hist[2].why == "forced" && hist[3].to == "fight", "history")
 	status := StateMachine_StatusJSON(sm, "Guard/Brain")
 	testing.expect(t, strings.contains(status, `"current": "fight"`) && strings.contains(status, `["patrol", "fight", `) && strings.contains(status, `"why"`) == false, status)
 
@@ -233,13 +234,14 @@ return G
 	sm.states[attack].minTime = 0.1
 	sm.states[attack].noInterrupt = true
 	StateMachine_AddConditionTo(sm, &sm.states[dash].enterWhen, .Greater, "stamina", 20)
-	tr := StateMachine_AddTransition(sm, "idle", "attack")
+	tr := StateMachine_AddTransition(sm, "idle", "attack", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .Trigger, "attack")
-	tr = StateMachine_AddTransition(sm, SM_ANY, "hurt")
+	tr = StateMachine_AddTransition(sm, SM_ANY, "hurt", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .Trigger, "hit")
-	StateMachine_AddTransition(sm, "attack", "idle") // always (after the guards)
-	StateMachine_AddTransition(sm, "idle", "dash")   // only by request
-	tr = StateMachine_AddTransition(sm, "hurt", "idle")
+	StateMachine_AddTrigger(sm, "hit").buffer = 1 // (buffered: waits while attack refuses)
+	StateMachine_AddTransition(sm, "attack", "idle", mode = .Automatic) // always (after the guards)
+	StateMachine_AddTransition(sm, "idle", "dash", mode = .Automatic)   // only by request
+	tr = StateMachine_AddTransition(sm, "hurt", "idle", mode = .Automatic)
 	StateMachine_AddCondition(sm, tr, .After, "", 0.03)
 	ProcessNodeQueues(scene.manager, &game.gameContext)
 	sm.explain = true
@@ -257,13 +259,13 @@ return G
 	}
 	testing.expect(t, found, "the dash way is listed")
 	// attack: minTime, and Any-state "hit" can't interrupt it.
-	StateMachine_SetParam(sm, "attack", 1)
+	StateMachine_FireTrigger(sm, "attack")
 	game->run(0.016)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "attack")
-	StateMachine_SetParam(sm, "hit", 1)
+	StateMachine_FireTrigger(sm, "hit")
 	game->run(0.016)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "attack")
-	testing.expect(t, StateMachine_GetParam(sm, "hit") == 1, "a blocked trigger stays set")
+	testing.expect(t, StateMachine_TriggerPending(sm, "hit"), "a buffered trigger stays set while blocked")
 	// The script's can_exit_attack holds it once the time is up.
 	lua.L_dostring(game.scriptManager.L, "locked = true")
 	for _ in 0 ..< 8 do game->run(0.016)
@@ -271,7 +273,7 @@ return G
 	lua.getglobal(game.scriptManager.L, "asked")
 	testing.expect_value(t, string(lua.tostring(game.scriptManager.L, -1)), "idle")
 	lua.pop(game.scriptManager.L, 1)
-	b := StateMachine_Request(sm, "idle")
+	b := StateMachine_Transition(sm, "idle")
 	testing.expect_value(t, b, SM_Block.Can_Exit)
 	lua.L_dostring(game.scriptManager.L, "locked = false")
 	game->run(0.016)
@@ -280,21 +282,21 @@ return G
 	game->run(0.016)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "hurt")
 	// Requests: no arrow hurt -> dash; then from idle the enter guard, then ok.
-	testing.expect_value(t, StateMachine_Request(sm, "dash"), SM_Block.No_Transition)
+	testing.expect_value(t, StateMachine_Transition(sm, "dash"), SM_Block.No_Transition)
 	for _ in 0 ..< 4 do game->run(0.016)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "idle")
-	testing.expect_value(t, StateMachine_Request(sm, "dash"), SM_Block.Enter_When)
+	testing.expect_value(t, StateMachine_Transition(sm, "dash"), SM_Block.Enter_When)
 	StateMachine_SetParam(sm, "stamina", 50)
-	testing.expect_value(t, StateMachine_Request(sm, "dash"), SM_Block.None)
+	testing.expect_value(t, StateMachine_Transition(sm, "dash"), SM_Block.None)
 	testing.expect_value(t, StateMachine_CurrentName(sm), "dash")
 	hist := StateMachine_History(sm)
-	testing.expect_value(t, hist[len(hist) - 1].why, "request")
+	testing.expect_value(t, hist[len(hist) - 1].why, "manual")
 	testing.expect(t, strings.contains(StateMachine_BlockText(sm, .Min_Time, "attack", "idle", 0.05), "leave after 0.1s"), StateMachine_BlockText(sm, .Min_Time, "attack", "idle", 0.05))
-	// Lua: sm_request returns ok, reason.
-	r := lua.L_dostring(game.scriptManager.L, `local m = Scene.find_node("Brain"); req_ok, req_why = m:sm_request("attack")`)
+	// Lua: sm_transition returns ok, reason.
+	r := lua.L_dostring(game.scriptManager.L, `local m = Scene.find_node("Brain"); req_ok, req_why = m:sm_transition("attack")`)
 	testing.expect_value(t, r, i32(0))
 	lua.getglobal(game.scriptManager.L, "req_why")
-	testing.expect_value(t, string(lua.tostring(game.scriptManager.L, -1)), "no transition from dash to attack")
+	testing.expect_value(t, string(lua.tostring(game.scriptManager.L, -1)), "no arrow from dash to attack")
 	lua.pop(game.scriptManager.L, 1)
 
 	// Saved and read back.

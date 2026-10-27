@@ -1,6 +1,6 @@
 # State guards: a state's Leave After, Any State Interrupts and Can enter
 # when (side panel), saved; the lock on its box; in Simulate the live Ways
-# out says which guard blocks an arrow, and sm_request says why not.
+# out says which guard blocks an arrow, and sm_transition says why not.
 wait 5
 click @menu:View
 click @menu:View/Workspaces
@@ -11,7 +11,10 @@ key ctrl+a
 type state machine
 key enter
 wait 3
-click @insp.sm.add-param
+click @smg.page:params
+click @smg.add-param
+click @smg.page:graph
+wait 2
 rclick @smg.canvas+-150,-20
 click @ctx:smg-add-state
 click @smg.state-name
@@ -31,9 +34,13 @@ wait 2
 # idle -> attack when param; attack -> idle always (but guarded).
 drag @smg.handle:idle @smg.state:attack 10
 wait 2
+click @insp.sm.tr-mode:0
+click @pick:Automatic
 click @insp.sm.add-cond:0
 drag @smg.handle:attack @smg.state:idle 10
 wait 2
+click @insp.sm.tr-mode:1
+click @pick:Automatic
 # attack: leave after 30 s, Any state can't interrupt it.
 click @smg.state:attack
 wait 2
@@ -66,7 +73,7 @@ type Scene.find_node("StateMachine"):sm_set("param", true)
 key enter
 wait 20
 expect node:StateMachine.state == attack/2
-type print(Scene.find_node("StateMachine"):sm_request("idle"))
+type print(Scene.find_node("StateMachine"):sm_transition("idle"))
 key enter
 wait 5
 expect log contains attack: leave after 30s

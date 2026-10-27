@@ -229,7 +229,7 @@ exported `vector2` script properties are Vec2 too.
 String arguments complete from the project: input actions
 (`Input.is_action_pressed`), scenes, textures, sounds, components, node
 names and tags, animation names (`animation_play`), state machine
-parameters and states (`sm_set`, `sm_travel`), save keys the scripts use
+parameters, triggers and states (`sm_set`, `sm_trigger`, `sm_transition`), save keys the scripts use
 (`Save.get`), locale keys and languages (`tr`, `Locale.set`), collision
 layers, LDtk levels / layers / entities, and every keyboard key
 (`Input.is_key_pressed("F5")` - any raylib key name works, plus RETURN,
@@ -952,174 +952,106 @@ Guide with examples: [`docs/visibility.md`](docs/visibility.md).
 
 #### State machines (StateMachineNode)
 
-A **StateMachine** node holds named states and transitions between them -
-for **gameplay** (AI, player modes, doors, menus) as much as animation:
+A **StateMachine** node holds named states and arrows between them - for
+**gameplay** (AI, player modes, doors, menus) as much as animation. Full
+guide with tutorials (platformer with input buffering, enemy AI, combo
+chain) and pitfalls: [`docs/state_machine.md`](docs/state_machine.md).
 
 - **States** can play an animation on an AnimationPlayer (a sibling or
   child unless one is picked) - or none: a **gameplay state** whose logic is
-  in its script callbacks. A state can also run a **child state machine**
-  while it is current (sub-states: `fight` runs `Combat` with `aim` ->
-  `shoot`); the child starts when the state is entered and stops when it is
-  left (a child doesn't start by itself).
-- **Transitions** go from a state (or *any state*) to another when their
-  conditions hold; they can crossfade (`blend`). Conditions: a parameter
-  `is true` / `is false` / `==` / `!=` / `>` / `<` a value, a `trigger`
-  (a parameter set by `sm_trigger`, reset when the arrow fires; see
-  *Triggers* below),
-  the state's animation `finished`, `after` N seconds in the state, or
-  **`script says`**: a method of the machine's script (else its parent's)
-  that returns true (`function Guard:sees_player() return ... end`).
-  Conditions are ANDed; an **`or`** row starts another group (the
-  transition fires when any group holds). No conditions = at once.
-  Transitions are checked in order, one per frame.
-- **Script callbacks** (on the machine's script and its parent's, when
-  defined): `on_enter_<state>(previous)`, `on_update_<state>(dt)` every
-  frame while in the state, `on_exit_<state>(next)`. The editor's generated
-  types list these for every state in the project, so the code editor (and
-  lua-language-server) complete `function Cls:on_enter_` with the names.
-- **Guards** (on a state): an arrow says the machine *may* go there (and
-  its conditions say when it goes by itself); a state can also refuse.
-  - **Leave after** N seconds: no arrow leaves it sooner (an attack that
-    can't be cancelled).
-  - **Any state interrupts** (on by default): off, arrows from *Any state*
-    don't fire while in it (dead, a cutscene).
-  - **Can leave when** / **Can enter when**: condition lists like an
-    arrow's (parameters, `script says`, `or`); empty = any time. *Can enter
-    when* holds for every way in (Dash only with `stamina > 20`, from Idle,
-    Run or Any).
-  - Script guards: `can_exit_<state>(next)` and `can_enter_<state>(previous)`
-    on the machine's script (else its parent's); returning `false` refuses.
+  in its script callbacks. A state can run a **child state machine** while
+  it is current (it starts when the state is entered and stops when it is
+  left). **Allow Retrigger** lets a state go to itself (re-entered: on_exit,
+  on_enter and the animation again).
+- **Arrows** say which changes are possible, from a state (or *Any state*)
+  to another, with a crossfade `blend`, and a **mode**:
+  - **Manual** (the default for new arrows): only a script takes it, with
+    `sm_transition(state)`.
+  - **Automatic**: the machine takes it on its update when its conditions
+    hold (no conditions = at once). Checked in order, at most one change per
+    update.
 
-  A change happens only when the current state lets it leave and the target
-  lets it in. A blocked arrow doesn't fire (its triggers stay set) and the
-  next arrow is tried. `on_exit_` can't refuse: it runs after the change is
-  decided. Guards apply to arrows, *Any state* and `sm_request`;
-  `sm_travel` ignores them (a forced switch).
+  Arrows from scenes saved before modes existed load as Automatic.
+- **Conditions**: a parameter `is true` / `is false` / `==` / `!=` / `>` /
+  `<` a value, a **trigger** is set, the state's animation `finished`,
+  `after` N seconds in the state, or **`script says`**: a method of the
+  machine's script (else its parent's) that returns true. Rows are ANDed; an
+  **`or`** row starts another group.
+- **Parameters** are typed values scripts set (`bool`, `int`, `float`).
+  **Triggers** are one-shot events, separate from parameters: `sm_trigger`
+  sets one; the first Automatic arrow it opens uses it up; otherwise it is
+  cleared after the machine's next update - or, with a **buffer** (seconds,
+  per trigger), once it has waited that long (input buffering: a jump
+  pressed just before landing). Triggers never take Manual arrows.
+- **Guards** (on a state) refuse changes: **Leave After** N seconds, **Any
+  State Interrupts** off, **Can leave when** / **Can enter when** condition
+  lists, and the script guards `can_exit_<state>(next)` /
+  `can_enter_<state>(previous)` returning false. They apply to Automatic
+  arrows and `sm_transition`; `sm_transition(state, {force = true})` skips
+  them.
+- **Script callbacks** (on the machine's script, then its parent's, when
+  defined), in this order: entering runs `on_enter_<state>(previous)`
+  first, then the child machine starts and the animation plays;
+  `on_update_<state>(dt)` runs every update while the state is current
+  (also on the update it was entered); leaving stops the child machine,
+  then `on_exit_<state>(next)` runs last (`next` is `""` on `sm_stop`). The
+  editor's generated types list these for every state in the project, so
+  the code editor completes `function Cls:on_enter_` with the names.
 - The machine keeps the **last 32 changes** (`sm_history()`); the editor's
   State Machine tab shows them live, in Simulate and in the running game,
-  and can **break on entering** a state. While it runs, **Ways out** lists
-  each arrow from the current state with every condition's result and the
-  guard that blocks it ("blocked: attack: leave after 0.4s (0.12s so far)").
+  with **Ways out** (each arrow from the current state, every condition's
+  result and what blocks it) and pending triggers, and can **break on
+  entering** a state.
 
-Build it in the **State Machine** tab of the bottom panel (a graph; see the
-editor README) or the Inspector. A gameplay example - a guard that patrols
-until it sees the player:
-
-```lua
----@class Guard : ScriptInstanceBase
-local Guard = {}
-
-function Guard:sees_player()        -- a "script says" condition
-    local p = Scene.find_node("Player")
-    return p ~= nil and self.node.position:distance(p.position) < 200
-end
-
-function Guard:on_update_patrol(dt) self:walk_route(dt) end
-function Guard:on_enter_chase(previous) self.node:get_child("Alert"):sound_play() end
-function Guard:on_update_chase(dt) self:move_towards(Scene.find_node("Player"), dt) end
-
-return Guard
-```
-
-Scripts can also feed it parameters:
+Build it in the **State Machine** tab of the bottom panel: **Graph**,
+**Parameters & Triggers**, **Settings** (the Inspector shows a summary).
+A player feeding the machine, and an enemy deciding for itself:
 
 ```lua
 function Player:update(dt)
     local sm = self.node:get_child("StateMachine")
     local vx, vy = self.node:character_get_velocity()
-    sm:sm_set("speed", math.abs(vx))
+    sm:sm_set("speed", math.abs(vx))                           -- parameters: how things are
     sm:sm_set("on_floor", self.node:character_is_on_floor())
-    if Input.is_action_pressed("jump") then sm:sm_trigger("jump") end
+    if Input.is_action_pressed("jump") then sm:sm_trigger("jump") end  -- a trigger: what just happened
 end
 
--- Called on the machine's script and on its parent's (when defined).
 function Player:on_enter_jump(previous) self.node:get_child("JumpSound"):sound_play() end
-function Player:on_exit_attack(next) self.node:get_child("Hitbox"):set_enabled(false) end
+function Player:can_enter_dash(previous) return self.stamina > 20 end  -- a guard
 
--- Guards: false refuses the change.
-function Player:can_exit_attack(next) return next == "hurt" or self.combo_done end
-function Player:can_enter_dash(previous) return self.stamina > 20 end
+function Enemy:on_update_patrol(dt)
+    if self:sees_player() then
+        local ok, why = self.brain:sm_transition("chase")      -- along a Manual arrow
+        if not ok then Log.info(why) end                       -- e.g. "patrol: leave after 1s (0.40s so far)"
+    end
+end
 
--- Ask instead of forcing: along an arrow, if the guards agree.
-local ok, why = sm:sm_request("dash")
-if not ok then print(why) end   -- e.g. "dash: its enter conditions don't hold"
+function Enemy:stun() self.brain:sm_transition("stunned", { force = true }) end
 ```
-
-##### Triggers: one-shot events (a button press, a hit)
-
-A **trigger** is not a separate kind of parameter: it is an ordinary
-parameter that a condition tests with the **`trigger`** operator.
-`sm_trigger(name)` sets the parameter to 1; a `trigger` condition holds while
-it isn't 0; when the transition testing it fires, the machine resets it to 0.
-So a trigger is a press the machine remembers until it is used - you never
-clear it yourself. (`sm_set(name, true)` + `is true` is different: the value
-stays 1 until your script sets it back.)
-
-Example: Idle -> Punch only when a button is pressed, back to Idle when the
-punch animation ends.
-
-1. Select the State Machine node; in the Inspector's **Parameters**, click
-   **Add Parameter** and rename it `punch` (keep the starting value **0**).
-   A non-zero starting value counts as already triggered: the arrow would
-   fire at once. Nothing marks it as a trigger - step 2 does.
-2. Select the **Idle -> Punch** arrow and click **+ Condition**. The row
-   reads `when <parameter> <operator>`: pick `punch` in the first dropdown,
-   then **`trigger`** in the second (the operator; it starts as *is true*).
-   The value box goes away - triggers have no value. The graph labels the
-   arrow `punch!`.
-3. Add a **Punch -> Idle** arrow with the condition **animation finished**
-   (the Punch animation must not loop), or **after (s)** with the punch's
-   length.
-4. Set the trigger from a script:
-
-   ```lua
-   function Player:update(dt)
-       if Input.is_action_pressed("fire") then
-           self.node:get_child("StateMachine"):sm_trigger("punch")
-       end
-   end
-   ```
-
-Things to know:
-
-- **An arrow with no conditions fires at once.** To go somewhere only when
-  a script says so, give the arrow a condition - a trigger is the usual one.
-- A trigger **stays set while the change is blocked** (Punch has *Leave
-  after*, a guard refuses, the arrow isn't from the current state): pressing
-  during the end of an attack buffers the next one. Clear it yourself with
-  `sm_set("punch", 0)` if you don't want that.
-- One trigger can be tested by several arrows (Idle -> Punch, Run -> Punch)
-  and from **Any state** (`* -> hurt` on trigger `hit`, unless the current
-  state turns off *Any state interrupts*). It is reset by whichever fires.
-- Triggers combine with other conditions: `punch` trigger **and**
-  `on_floor` *is true* fires only on the floor (the trigger waits until
-  then).
-- `sm_trigger` adds the parameter if the machine doesn't have it, but add
-  it in the editor anyway: the condition's dropdown lists only existing
-  parameters.
-- Alternatives: `sm_request("Punch")` follows an arrow from the current
-  state when the guards agree, without checking the arrow's own conditions
-  (the arrow still needs one, or it goes by itself); `sm_travel("Punch")`
-  switches unconditionally.
 
 | Method | Arguments | Returns | Description |
 |---|---|---|---|
-| `sm_set(name, value)` | number or boolean | - | Sets a parameter. |
-| `sm_get(name)` | `name` | number | A parameter's value. |
-| `sm_trigger(name)` | `name` | - | Sets a trigger (the parameter becomes 1) for conditions using the `trigger` operator; reset to 0 when a transition testing it fires, kept while blocked. See *Triggers* above. |
-| `sm_travel(state [, blend])` | state name | boolean | Switches now, ignoring conditions and guards. |
-| `sm_request(state [, blend])` | state name | boolean, reason | Goes there if an arrow leads there from the current state (or Any state) and the guards agree; the arrow's own conditions aren't checked. `reason` says why not. |
+| `sm_set(name, value)` | number or boolean | - | Sets a parameter (converted to its type; added as a float when missing). |
+| `sm_get(name)` | `name` | boolean / integer / number / nil | A parameter's value, typed; nil when missing. |
+| `sm_trigger(name)` | `name` | boolean | Sets a trigger (drives Automatic arrows). False and a warning (once) for an unknown name. |
+| `sm_trigger_pending(name)` | `name` | boolean | The trigger is set and not used up yet. |
+| `sm_clear_trigger(name)` | `name` | - | Un-sets a trigger (forget a buffered press). |
+| `sm_transition(state [, {force, blend}])` | state name | boolean, reason | Goes there now along an arrow (Manual or Automatic) from the current state or Any state: guards and the arrow's conditions checked (when it has any); `force = true` skips both. `reason` says why not. |
+| `sm_can_transition(state [, {force}])` | state name | boolean, reason | Whether `sm_transition` would work now, without changing anything. |
 | `sm_state()` / `sm_previous()` | - | string | Current / previous state. |
 | `sm_time()` | - | number | Seconds in the current state. |
-| `sm_history()` | - | table | The last changes, oldest first: `{from, to, time, why}` (`why`: `start`, `travel`, `request`, `transition N`). |
-| `sm_start([state])` / `sm_stop()` | - | - | Start (initial state by default) / stop checking transitions. |
+| `sm_history()` | - | table | The last changes, oldest first: `{from, to, time, why}` (`why`: `start`, `manual`, `forced`, `transition N`). |
+| `sm_start([state])` / `sm_stop()` | - | - | Start (initial state by default; pending triggers cleared) / stop (runs the current state's `on_exit_` with `""`). |
 
-The machine emits `state_changed`(state) for signal connections. Saved in
-the scene as `"state_machine": {"initial", "player", "autostart", "any_pos",
-"params", "states": [{"name", "animation", "child", "pos", "min_time",
-"interruptible", "leave_when", "enter_when"}], "transitions":
-[{"from", "to", "blend", "when": [["call", "sees_player"], ["or"], ["true",
-"alarm"]]}]}`.
+`sm_request` and `sm_travel` were removed: use `sm_transition(state)` and
+`sm_transition(state, {force = true})` (see *Moving from sm_request /
+sm_travel* in the guide). The machine emits `state_changed`(state) for
+signal connections. Saved in the scene as `"state_machine": {"initial",
+"player", "autostart", "params": [[name, value, "float"|"int"|"bool"]],
+"triggers": [[name, buffer]], "states": [{"name", "animation", "child",
+"pos", "retrigger", "min_time", "interruptible", "leave_when",
+"enter_when"}], "transitions": [{"from", "to", "mode": "manual"|"auto",
+"blend", "when": [["call", "sees_player"], ["or"], ["true", "alarm"]]}]}`.
 
 #### Lighting (LightNode, scene ambient)
 
