@@ -1,0 +1,57 @@
+# Animation Track Settings: Sound and Script Method tracks.
+# Verify that clicking track settings opens the side panel, clicking a second
+# time closes it without crashing (Issue #38), the close X button works, and
+# track properties can be configured.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+expect node:AnimationPlayer.type == AnimationPlayerNode
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+
+# Add a Sound track
+click @anim.add-track
+click @anim.track-sounds
+wait 2
+# Opening the sound track settings panel
+expect item:anim.sound-close == visible
+screenshot sound_track_settings_open
+
+# Clicking track settings a second time toggles it closed (Issue #38 reproducer)
+click @anim.track-settings:@audio
+wait 2
+expect item:anim.sound-close == missing
+screenshot sound_track_settings_closed
+
+# Open it again via the row icon
+click @anim.track-settings:@audio
+wait 2
+expect item:anim.sound-close == visible
+
+# Close it via the X close button inside the side panel
+click @anim.sound-close
+wait 2
+expect item:anim.sound-close == missing
+
+# Add a Script Calls track
+click @anim.add-track
+click @anim.track-methods
+wait 2
+# Click settings on method track
+click @anim.track-settings:@call
+wait 2
+expect item:anim.method-close == visible
+screenshot script_call_settings_open
+
+# Toggle it closed
+click @anim.track-settings:@call
+wait 2
+expect item:anim.method-close == missing
