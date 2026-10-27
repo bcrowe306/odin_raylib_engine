@@ -1,0 +1,37 @@
+# Node Rename: verify that renaming a node in the scene notifies the user
+# of all instances in the scene referencing that node (Camera follow target,
+# animation tracks, etc.), shows them in the prompt window, and updates
+# the references when confirmed.
+wait 5
+click @asset.new-scene
+click @hier.add
+type sprite
+click @addnode.create
+expect selected == TextureSprite
+click @hier:Camera
+expect selected == Camera
+expect item:insp.camera.follow == visible
+click @insp.camera.follow
+click @pick:TextureSprite
+expect log contains Camera follows TextureSprite
+screenshot follow_picked
+
+# Rename TextureSprite via F2
+click @hier:TextureSprite
+key f2
+wait 2
+expect item:rename.input == visible
+key ctrl+a
+type Spaceship
+key enter
+wait 3
+
+# Notification window opens showing the reference to update
+expect refs-pending == 1
+screenshot rename_references_dialog
+click @refs.update
+wait 2
+
+# Verify camera follow target was updated to Spaceship
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "follow": "../Spaceship"

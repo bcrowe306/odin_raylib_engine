@@ -64,7 +64,7 @@ test_inline_node_rename_commit :: proc(t: ^testing.T) {
 	child2.name = strings.clone("Enemy", child2.allocator)
 	e.AddChild(scene.manager, root, child2)
 
-	// Rename child2 to "Player" -> should generate unique child name "Player_1" or similar
+	// Rename child2 to "Player" -> should generate unique child name "Player2"
 	Editor_BeginInlineRename(&state, child2)
 	testing.expect(t, inlineRenameNode == child2)
 
@@ -89,4 +89,82 @@ test_inline_node_rename_commit :: proc(t: ^testing.T) {
 	inlineRenameNode = nil
 
 	testing.expect_value(t, child1.name, "Spaceship")
+}
+
+@test
+test_node_rename_scene_references :: proc(t: ^testing.T) {
+	state: EditorState
+	scene := new(e.Scene)
+	e.InitializeScene(scene)
+	state.activeScene = scene
+	defer {
+		for &u in state.undoStack {
+			Undo_Release(u.json)
+			delete(u.label)
+			delete(u.selected)
+		}
+		delete(state.undoStack)
+		delete(state.sceneVersion)
+		Undo_ClearStore()
+		NodeRefs_Clear()
+		e.TerminateScene(scene)
+		free(scene)
+	}
+	root := scene.rootNode
+
+	// Create target node to be renamed
+	target := cast(^e.Node)e.Node_CreateByTypeName(scene, "Node", root)
+	target.name = strings.clone("HeroShip", target.allocator)
+
+	// 1. Camera node following target
+	cam := cast(^e.CameraNode)e.Node_CreateByTypeName(scene, "CameraNode", root)
+	cam.name = strings.clone("MainCam", cam.allocator)
+	cam.followTarget = strings.clone("../HeroShip", cam.allocator)
+
+	// 2. Animation player with track targeting target
+	apn := cast(^e.AnimationPlayerNode)e.Node_CreateByTypeName(scene, "AnimationPlayerNode", root)
+	apn.name = strings.clone("AnimPlayer", apn.allocator)
+	anim := e.AnimationPlayerNode_AddFrameAnimation(apn, nil, "Fly", nil)
+	tr := e.Animation_AddTrack(apn, anim, "../HeroShip", "position")
+	testing.expect(t, tr != nil)
+
+	// 3. Button node with signal connection to target
+	btn := cast(^e.Node)e.Node_CreateByTypeName(scene, "Node", root)
+	btn.name = strings.clone("FireButton", btn.allocator)
+	e.Node_AddConnection(btn, "pressed", "../HeroShip", "on_fire")
+
+	e.ProcessNodeQueues(scene.manager, nil)
+
+	// Verify all 3 point to target before rename
+	testing.expect_value(t, e.Node_ResolvePath(scene.manager, cam, cam.followTarget), target)
+	testing.expect_value(t, e.Node_ResolvePath(scene.manager, apn, tr.target), target)
+	testing.expect_value(t, e.Node_ResolvePath(scene.manager, btn, btn.signalConnections[0].target), target)
+
+	// Capture snapshot before rename
+	snap := NodeRefs_Capture(&state)
+	testing.expect(t, len(snap.sceneItems) >= 3, "should capture camera, anim track, and signal")
+
+	// Rename target to "PlayerOne"
+	target.name = strings.clone("PlayerOne", target.allocator)
+
+	// Recompute references after rename
+	NodeRefs_AfterChange(&state, snap)
+
+	testing.expect(t, NodeRefs_IsOpen(), "refs dialog should open")
+	edits := NodeRefs_SceneEdits()
+	testing.expect_value(t, len(edits), 3)
+	testing.expect_value(t, edits[0].newPath, "../PlayerOne")
+	testing.expect_value(t, edits[1].newPath, "../PlayerOne")
+	testing.expect_value(t, edits[2].newPath, "../PlayerOne")
+
+	// Apply scene edits
+	nScene, _ := NodeRefs_Apply(&state)
+	testing.expect_value(t, nScene, 3)
+
+	// Verify scene node paths are updated to PlayerOne
+	testing.expect_value(t, cam.followTarget, "../PlayerOne")
+	testing.expect_value(t, tr.target, "../PlayerOne")
+	testing.expect_value(t, btn.signalConnections[0].target, "../PlayerOne")
+
+	NodeRefs_Clear()
 }

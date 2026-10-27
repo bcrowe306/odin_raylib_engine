@@ -410,7 +410,9 @@ Rename_Render :: proc(state: ^EditorState) {
 		if name != "" && name != renameTarget.name {
 			Editor_RecordUndo(state, "Rename")
 			parent := e.GetParent(state.activeScene.manager, renameTarget)
+			snap := NodeRefs_Capture(state)
 			renameTarget.name = strings.clone(Editor_UniqueChildName(state, parent, name, renameTarget), renameTarget.allocator)
+			NodeRefs_AfterChange(state, snap)
 		}
 		imgui.CloseCurrentPopup()
 	}
