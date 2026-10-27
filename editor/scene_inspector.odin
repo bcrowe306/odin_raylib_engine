@@ -27,6 +27,18 @@ SceneInspector_Render :: proc(state: ^EditorState) {
 
 hierarchyFilterBuf: [128]u8
 hierarchyPendingFocus: ^e.Node
+inlineRenameNode: ^e.Node
+inlineRenameBuf: [128]u8
+inlineRenameFocus: bool
+
+Editor_BeginInlineRename :: proc(state: ^EditorState, node: ^e.Node) {
+	if node == nil || state.activeScene == nil || node == state.activeScene.rootNode do return
+	if node.editorLocked || Editor_NodeLocked(state, node) do return
+	inlineRenameNode = node
+	inlineRenameBuf = {}
+	copy(inlineRenameBuf[:len(inlineRenameBuf) - 1], node.name)
+	inlineRenameFocus = true
+}
 
 SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 	defer imgui.End()
@@ -38,8 +50,12 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 		return
 	}
 	if state.activeScene == nil {
+		inlineRenameNode = nil
 		UI_DimText("No scene open")
 		return
+	}
+	if inlineRenameNode != nil && (!e.Node_IsAlive(inlineRenameNode) || !node_in_scene(state, inlineRenameNode)) {
+		inlineRenameNode = nil
 	}
 
 	// Header: scene name (+ modified dot) and actions on the right.
@@ -172,7 +188,7 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 	path := node.name if parentPath == "" else fmt.tprintf("%s/%s", parentPath, node.name)
 	children := e.GetChildrenTemp(mgr, node)
 
-	flags: imgui.TreeNodeFlags = {.SpanAvailWidth, .OpenOnArrow, .OpenOnDoubleClick, .FramePadding}
+	flags: imgui.TreeNodeFlags = {.SpanAvailWidth, .OpenOnArrow, .FramePadding}
 	if len(children) == 0 do flags += {.Leaf, .NoTreePushOnOpen}
 	else do flags += {.DefaultOpen}
 	if filter != "" do imgui.SetNextItemOpen(true)
@@ -184,9 +200,47 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 	else if Editor_NodeLocked(state, node) do rowColor = {0.75, 0.62, 1.0, 0.55}
 	imgui.PushStyleColorImVec4(.Text, rowColor)
 	imgui.SetNextItemAllowOverlap() // the visibility button sits on the row
-	open := imgui.TreeNodeEx(fmt.ctprintf("%s   %s###n%p", Editor_NodeIcon(node), node.name, node), flags)
+
+	isRenaming := inlineRenameNode == node
+	label := fmt.ctprintf("%s###n%p", Editor_NodeIcon(node), node) if isRenaming else fmt.ctprintf("%s   %s###n%p", Editor_NodeIcon(node), node.name, node)
+	open := imgui.TreeNodeEx(label, flags)
 	imgui.PopStyleColor()
 	Drive_Item(fmt.tprintf("hier:%s", path))
+
+	if isRenaming {
+		imgui.SameLine(0, 6)
+		if inlineRenameFocus {
+			imgui.SetKeyboardFocusHere()
+			inlineRenameFocus = false
+		}
+		imgui.PushStyleVarImVec2(.FramePadding, {2, 1})
+		avail := imgui.GetWindowContentRegionMax().x - imgui.GetCursorPosX() - 50
+		imgui.SetNextItemWidth(max(60, avail))
+		enter := imgui.InputText("##inline_rename", cstring(raw_data(inlineRenameBuf[:])), len(inlineRenameBuf), {.EnterReturnsTrue, .AutoSelectAll})
+		Drive_Item("hier.inline_rename")
+		deactivated := imgui.IsItemDeactivatedAfterEdit()
+		escape := imgui.IsKeyPressed(.Escape, false)
+		if escape {
+			inlineRenameNode = nil
+		} else if enter || deactivated {
+			name := strings.trim_space(string(cstring(raw_data(inlineRenameBuf[:]))))
+			if name != "" && name != node.name && e.Node_IsAlive(node) {
+				Editor_RecordUndo(state, "Rename")
+				parent := e.GetParent(state.activeScene.manager, node)
+				node.name = strings.clone(Editor_UniqueChildName(state, parent, name, node), node.allocator)
+			}
+			inlineRenameNode = nil
+		} else if imgui.IsMouseClicked(.Left) && !imgui.IsItemHovered() {
+			name := strings.trim_space(string(cstring(raw_data(inlineRenameBuf[:]))))
+			if name != "" && name != node.name && e.Node_IsAlive(node) {
+				Editor_RecordUndo(state, "Rename")
+				parent := e.GetParent(state.activeScene.manager, node)
+				node.name = strings.clone(Editor_UniqueChildName(state, parent, name, node), node.allocator)
+			}
+			inlineRenameNode = nil
+		}
+		imgui.PopStyleVar()
+	}
 
 	// Select on release, not press: dragging a row (onto the Inspector, e.g.
 	// a camera's Follow Target) mustn't select it and swap the Inspector.
@@ -202,8 +256,9 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 		}
 		hierPress = {}
 	}
-	if imgui.IsItemHovered() && imgui.IsMouseDoubleClicked(.Left) {
+	if imgui.IsItemHovered() && imgui.IsMouseDoubleClicked(.Left) && !isRenaming {
 		state.cameraPos = node.globalPosition
+		Editor_BeginInlineRename(state, node)
 	}
 	if node == hierarchyPendingFocus {
 		imgui.SetScrollHereY(0.5)
