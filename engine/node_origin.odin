@@ -18,7 +18,7 @@ package engine
 Node_HasOrigin :: proc(node: ^Node) -> bool {
 	if node == nil do return false
 	switch node.typeId {
-	case TextureNode, FrameAnimationNode, AnimationPlayerNode, AsepriteNode, NineSliceNode, TextNode: return true
+	case TextureNode, AtlasSpriteNode, FrameAnimationNode, AnimationPlayerNode, AsepriteNode, NineSliceNode, TextNode: return true
 	case VectorShapeNode: return (cast(^VectorShapeNode)node).file != "" // (presets draw around the position)
 	}
 	return false
@@ -30,6 +30,8 @@ Node_OriginSize :: proc(node: ^Node, ctx: ^GameContext = nil) -> [2]f32 {
 	switch node.typeId {
 	case TextureNode:
 		return (cast(^TextureNode)node).size
+	case AtlasSpriteNode:
+		return (cast(^AtlasSpriteNode)node).size
 	case FrameAnimationNode:
 		fan := cast(^FrameAnimationNode)node
 		if len(fan.frames) == 0 do return {}
@@ -58,6 +60,9 @@ Node_OriginPx :: proc(node: ^Node, size: [2]f32) -> [2]f32 {
 	if node.typeId == TextureNode {
 		if o := (cast(^TextureNode)node).origin; o != {0, 0} do return o // the pixel override
 	}
+	if node.typeId == AtlasSpriteNode {
+		if o := (cast(^AtlasSpriteNode)node).origin; o != {0, 0} do return o
+	}
 	if node.typeId == AsepriteNode do return AsepriteNode_Origin(cast(^AsepriteNode)node) // (its pivot slice)
 	return node.pivot * size
 }
@@ -66,4 +71,5 @@ Node_OriginPx :: proc(node: ^Node, size: [2]f32) -> [2]f32 {
 Node_SetOriginPx :: proc(node: ^Node, px: [2]f32, size: [2]f32) {
 	node.pivot = {px.x / size.x if size.x != 0 else 0.5, px.y / size.y if size.y != 0 else 0.5}
 	if node.typeId == TextureNode do (cast(^TextureNode)node).origin = {}
+	if node.typeId == AtlasSpriteNode do (cast(^AtlasSpriteNode)node).origin = {}
 }

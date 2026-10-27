@@ -224,9 +224,13 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		}
 	case .Texture:
 		if menu(ICON_FA_PLUS, "Add Sprite to Scene", "add-sprite", hasScene) do Editor_DropAsset(state, rel, state.cameraPos)
-		if menu(ICON_FA_IMAGE, "Use on Selected Sprite", "use-texture", sel != nil && sel.typeId == e.TextureNode) {
+		if menu(ICON_FA_IMAGE, "Use on Selected Sprite", "use-texture", sel != nil && (sel.typeId == e.TextureNode || sel.typeId == e.AtlasSpriteNode)) {
 			Editor_RecordUndo(state, "Set texture")
-			Editor_SetTexture(state, cast(^e.TextureNode)sel, rel)
+			if sel.typeId == e.TextureNode {
+				Editor_SetTexture(state, cast(^e.TextureNode)sel, rel)
+			} else {
+				Editor_SetAtlasTexture(state, cast(^e.AtlasSpriteNode)sel, rel)
+			}
 		}
 		if menu(ICON_FA_TABLE_CELLS, "Slice Sprite Sheet...", "slice-sheet") do Slicer_Open(state, rel)
 		if menu(ICON_FA_TABLE_CELLS, "Use as Tileset of Selected Tile Map", "use-tileset", sel != nil && sel.typeId == e.TileMapNode) {

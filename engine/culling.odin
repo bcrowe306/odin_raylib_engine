@@ -98,6 +98,12 @@ Node_RenderBounds :: proc(node: ^Node) -> (rect: rl.Rectangle, ok: bool) {
 		size := tn.size * tn.globalScale
 		origin := Node_OriginPx(tn, tn.size) * tn.globalScale
 		return rect_aabb(tn.globalPosition, {abs(size.x), abs(size.y)}, {abs(origin.x), abs(origin.y)}, tn.globalRotation), true
+	case AtlasSpriteNode:
+		an := cast(^AtlasSpriteNode)node
+		if an.texture == nil do return {}, false
+		size := an.size * an.globalScale
+		origin := Node_OriginPx(an, an.size) * an.globalScale
+		return rect_aabb(an.globalPosition, {abs(size.x), abs(size.y)}, {abs(origin.x), abs(origin.y)}, an.globalRotation), true
 	case AsepriteNode:
 		an := cast(^AsepriteNode)node
 		if an.res == nil do return {}, false

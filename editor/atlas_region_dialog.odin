@@ -1,0 +1,352 @@
+package editor
+
+import "core:c"
+import "core:fmt"
+import "core:math"
+import "core:strings"
+import e "../engine"
+import imgui "lib/imgui"
+import rl "vendor:raylib"
+
+// ============================================================================
+// Atlas Region Editor Dialog
+// Visual popup dialog allowing selection and adjustment of the sub-region
+// (x, y, width, height) of an AtlasSpriteNode's texture.
+// ============================================================================
+
+@(private = "file")
+atlasDialog: struct {
+	open:         bool,
+	node:         ^e.AtlasSpriteNode,
+	origRegion:   rl.Rectangle,
+	region:       rl.Rectangle,
+	// Grid snapping
+	enableGrid:   bool,
+	gridCols:     c.int,
+	gridRows:     c.int,
+	cellSize:     [2]c.int,
+	// View & Zoom
+	zoom:         f32,
+	// Interactive dragging state
+	dragging:     bool,
+	dragStart:    [2]f32,
+}
+
+AtlasRegion_Open :: proc(state: ^EditorState, node: ^e.AtlasSpriteNode) {
+	if node == nil || state == nil do return
+	atlasDialog.open = true
+	atlasDialog.node = node
+	atlasDialog.origRegion = node.region
+	atlasDialog.region = node.region
+	atlasDialog.dragging = false
+	atlasDialog.zoom = 0 // 0 = fit
+	if atlasDialog.gridCols <= 0 do atlasDialog.gridCols = 4
+	if atlasDialog.gridRows <= 0 do atlasDialog.gridRows = 4
+	if node.texture != nil {
+		tw := f32(node.texture.texture.width)
+		th := f32(node.texture.texture.height)
+		if atlasDialog.region.width <= 0 || atlasDialog.region.height <= 0 {
+			atlasDialog.region = {0, 0, tw, th}
+		}
+		if atlasDialog.cellSize[0] <= 0 do atlasDialog.cellSize[0] = c.int(tw / max(f32(atlasDialog.gridCols), 1))
+		if atlasDialog.cellSize[1] <= 0 do atlasDialog.cellSize[1] = c.int(th / max(f32(atlasDialog.gridRows), 1))
+	}
+}
+
+AtlasRegion_IsOpen :: proc() -> bool {
+	return atlasDialog.open
+}
+
+AtlasRegion_Close :: proc() {
+	atlasDialog.open = false
+	atlasDialog.node = nil
+}
+
+@(private = "file")
+ATLAS_ZOOM_MIN :: f32(0.05)
+@(private = "file")
+ATLAS_ZOOM_MAX :: f32(32)
+
+@(private = "file")
+atlas_fit_scale :: proc(texW, texH: f32, avail: [2]f32) -> f32 {
+	if texW <= 0 || texH <= 0 do return 1
+	s := min((avail.x - 16) / texW, (avail.y - 16) / texH)
+	return clamp(s, ATLAS_ZOOM_MIN, 8)
+}
+
+AtlasRegion_Render :: proc(state: ^EditorState) {
+	if !atlasDialog.open || atlasDialog.node == nil do return
+
+	imgui.SetNextWindowSize({820, 560}, .FirstUseEver)
+	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
+	imgui.SetNextWindowPos(center, .FirstUseEver, {0.5, 0.5})
+	defer imgui.End()
+	if !imgui.Begin(fmt.ctprintf("%s  Atlas Region Editor###AtlasRegionEditor", ICON_FA_CROP), &atlasDialog.open, {.NoCollapse}) {
+		return
+	}
+
+	// --- Left Settings Column ---
+	if imgui.BeginChild("##atlas_side", {270, 0}, {}, {}) {
+		if atlasDialog.node.texture == nil {
+			UI_DimText("No texture assigned to this node.")
+		} else {
+			tw := f32(atlasDialog.node.texture.texture.width)
+			th := f32(atlasDialog.node.texture.texture.height)
+
+			UI_DimText(fmt.tprintf("Texture: %d × %d px", int(tw), int(th)))
+			if atlasDialog.node.filePath != "" {
+				UI_DimText(fmt.tprintf("File: %s", atlasDialog.node.filePath))
+			}
+
+			imgui.Separator()
+			if UI_BeginProps("##atlas_props") {
+				UI_PropLabel("X")
+				imgui.DragFloat("##at_x", &atlasDialog.region.x, 1, 0, tw, "%.0f")
+				Drive_Item("atlas.x")
+
+				UI_PropLabel("Y")
+				imgui.DragFloat("##at_y", &atlasDialog.region.y, 1, 0, th, "%.0f")
+				Drive_Item("atlas.y")
+
+				UI_PropLabel("Width")
+				imgui.DragFloat("##at_w", &atlasDialog.region.width, 1, 1, tw, "%.0f")
+				Drive_Item("atlas.w")
+
+				UI_PropLabel("Height")
+				imgui.DragFloat("##at_h", &atlasDialog.region.height, 1, 1, th, "%.0f")
+				Drive_Item("atlas.h")
+				UI_EndProps()
+			}
+
+			// Clamp region
+			atlasDialog.region.x = clamp(atlasDialog.region.x, 0, tw)
+			atlasDialog.region.y = clamp(atlasDialog.region.y, 0, th)
+			atlasDialog.region.width = clamp(atlasDialog.region.width, 1, tw - atlasDialog.region.x)
+			atlasDialog.region.height = clamp(atlasDialog.region.height, 1, th - atlasDialog.region.y)
+
+			if UI_Button("Full Texture", "atlas.full") {
+				atlasDialog.region = {0, 0, tw, th}
+			}
+			imgui.SameLine()
+			if UI_Button("Reset", "atlas.reset") {
+				atlasDialog.region = atlasDialog.origRegion
+			}
+
+			imgui.Separator()
+			imgui.Checkbox("Snap to Grid##at", &atlasDialog.enableGrid)
+			Drive_Item("atlas.grid_snap")
+			if atlasDialog.enableGrid {
+				if UI_BeginProps("##atlas_grid_props") {
+					UI_PropLabel("Columns")
+					if imgui.DragInt("##at_cols", &atlasDialog.gridCols, 0.1, 1, 256) {
+						if atlasDialog.gridCols > 0 do atlasDialog.cellSize[0] = c.int(tw / f32(atlasDialog.gridCols))
+					}
+					Drive_Item("atlas.cols")
+
+					UI_PropLabel("Rows")
+					if imgui.DragInt("##at_rows", &atlasDialog.gridRows, 0.1, 1, 256) {
+						if atlasDialog.gridRows > 0 do atlasDialog.cellSize[1] = c.int(th / f32(atlasDialog.gridRows))
+					}
+					Drive_Item("atlas.rows")
+
+					UI_PropLabel("Cell Size")
+					if imgui.DragInt2("##at_cellsize", &atlasDialog.cellSize, 0.2, 1, 4096) {
+						if atlasDialog.cellSize[0] > 0 do atlasDialog.gridCols = max(1, c.int(tw / f32(atlasDialog.cellSize[0])))
+						if atlasDialog.cellSize[1] > 0 do atlasDialog.gridRows = max(1, c.int(th / f32(atlasDialog.cellSize[1])))
+					}
+					Drive_Item("atlas.cell_size")
+					UI_EndProps()
+				}
+			}
+
+			imgui.Separator()
+			UI_DimText(fmt.tprintf("Selected Region: %.0f × %.0f px", atlasDialog.region.width, atlasDialog.region.height))
+
+			// Cropped preview box
+			previewBoxW: f32 = 250
+			previewBoxH: f32 = 120
+			if atlasDialog.region.width > 0 && atlasDialog.region.height > 0 && tw > 0 && th > 0 {
+				scaleW := previewBoxW / atlasDialog.region.width
+				scaleH := previewBoxH / atlasDialog.region.height
+				s := min(scaleW, scaleH)
+				s = min(s, 2.0)
+				pw := atlasDialog.region.width * s
+				ph := atlasDialog.region.height * s
+				cur := imgui.GetCursorScreenPos()
+				dl := imgui.GetWindowDrawList()
+				imgui.DrawList_AddRectFilled(dl, cur, cur + {previewBoxW, previewBoxH}, col32(24, 28, 36, 255))
+				imgui.DrawList_AddRect(dl, cur, cur + {previewBoxW, previewBoxH}, col32(50, 56, 70, 255))
+				off := [2]f32{(previewBoxW - pw) * 0.5, (previewBoxH - ph) * 0.5}
+				uv0 := [2]f32{atlasDialog.region.x / tw, atlasDialog.region.y / th}
+				uv1 := [2]f32{(atlasDialog.region.x + atlasDialog.region.width) / tw, (atlasDialog.region.y + atlasDialog.region.height) / th}
+				imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)&atlasDialog.node.texture.texture, cur + off, cur + off + {pw, ph}, uv0, uv1)
+				imgui.Dummy({previewBoxW, previewBoxH})
+			}
+
+			imgui.Separator()
+			if UI_PrimaryButton(fmt.tprintf("%s  Apply", ICON_FA_CHECK), "atlas.apply", {120, 0}) {
+				Editor_RecordUndo(state, "Edit Atlas Region")
+				e.AtlasSpriteNode_SetRegion(atlasDialog.node, atlasDialog.region)
+				atlasDialog.open = false
+			}
+			imgui.SameLine()
+			if UI_Button("Cancel", "atlas.cancel", {120, 0}) {
+				atlasDialog.open = false
+			}
+		}
+	}
+	imgui.EndChild()
+	imgui.SameLine()
+
+	// --- Right Interactive Canvas Column ---
+	if imgui.BeginChild("##atlas_sheet", {0, 0}, {.Borders}, {.HorizontalScrollbar}) {
+		if atlasDialog.node.texture == nil {
+			UI_DimText("No texture to display.")
+		} else {
+			atlas_canvas(state)
+		}
+	}
+	imgui.EndChild()
+}
+
+@(private = "file")
+atlas_canvas :: proc(state: ^EditorState) {
+	node := atlasDialog.node
+	if node.texture == nil do return
+	tw := f32(node.texture.texture.width)
+	th := f32(node.texture.texture.height)
+	if tw <= 0 || th <= 0 do return
+
+	io := imgui.GetIO()
+
+	// --- Zoom Bar ---
+	avail := imgui.GetContentRegionAvail()
+	fitScale := atlas_fit_scale(tw, th, avail - {0, 36})
+	scale := atlasDialog.zoom if atlasDialog.zoom > 0 else fitScale
+	zoomTo := f32(-1)
+
+	if UI_IconButton(ICON_FA_MINUS, "atlas.zoom-out", "Zoom out", size = 24) do zoomTo = scale / 1.25
+	imgui.SameLine(0, 2)
+	imgui.SetNextItemWidth(64)
+	pct := scale * 100
+	if imgui.DragFloat("##atlas_zoom", &pct, 1, ATLAS_ZOOM_MIN * 100, ATLAS_ZOOM_MAX * 100, "%.0f%%") do zoomTo = pct / 100
+	Drive_Item("atlas.zoom")
+	imgui.SameLine(0, 2)
+	if UI_IconButton(ICON_FA_PLUS, "atlas.zoom-in", "Zoom in", size = 24) do zoomTo = scale * 1.25
+	imgui.SameLine(0, UI_SPACE)
+	if UI_Button("Fit", "atlas.zoom-fit") do atlasDialog.zoom = 0
+	imgui.SameLine(0, 2)
+	if UI_Button("1:1", "atlas.zoom-1") do zoomTo = 1
+	imgui.SameLine(0, UI_SPACE)
+	imgui.AlignTextToFramePadding()
+	UI_DimText("Cmd+wheel zooms · drag across to select region")
+
+	// --- Canvas Viewport ---
+	canvasOpen := imgui.BeginChild("##atlas_canvas", {0, 0}, {}, {.HorizontalScrollbar, .NoScrollWithMouse})
+	defer imgui.EndChild()
+	if !canvasOpen do return
+
+	canvasMn := imgui.GetWindowPos()
+	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
+	canvasHovered := imgui.IsWindowHovered({})
+	if canvasHovered {
+		if io.MouseWheel != 0 && (io.KeySuper || io.KeyCtrl) {
+			zoomTo = scale * (1.15 if io.MouseWheel > 0 else 1 / 1.15)
+		} else if io.MouseWheel != 0 || io.MouseWheelH != 0 {
+			dx, dy := io.MouseWheelH, io.MouseWheel
+			if io.KeyShift && dx == 0 do dx, dy = dy, 0
+			imgui.SetScrollX(imgui.GetScrollX() - dx * 40)
+			imgui.SetScrollY(imgui.GetScrollY() - dy * 40)
+		}
+	}
+	if canvasHovered && imgui.IsMouseDragging(.Middle) {
+		d := io.MouseDelta
+		imgui.SetScrollX(imgui.GetScrollX() - d.x)
+		imgui.SetScrollY(imgui.GetScrollY() - d.y)
+	}
+	if zoomTo > 0 {
+		zoomTo = clamp(zoomTo, ATLAS_ZOOM_MIN, ATLAS_ZOOM_MAX)
+		anchor := mouse - canvasMn if canvasHovered else imgui.GetWindowSize() * 0.5
+		content := ([2]f32{imgui.GetScrollX(), imgui.GetScrollY()} + anchor) / scale
+		atlasDialog.zoom = zoomTo
+		scale = zoomTo
+		imgui.SetScrollX(max(content.x * scale - anchor.x, 0))
+		imgui.SetScrollY(max(content.y * scale - anchor.y, 0))
+	}
+	if atlasDialog.zoom == 0 do scale = fitScale
+
+	imgSize := [2]f32{tw, th} * scale
+	p0 := imgui.GetCursorScreenPos()
+	dl := imgui.GetWindowDrawList()
+
+	// Background and Image
+	imgui.DrawList_AddRectFilled(dl, p0, p0 + imgSize, col32(30, 34, 44, 255))
+	imgui.Image(transmute(imgui.TextureID)&node.texture.texture, imgSize, {0, 0}, {1, 1}, {1, 1, 1, 1}, {0, 0, 0, 0})
+	Drive_ItemRect("atlas.canvas", p0, p0 + imgSize, inWindow = true)
+	hovered := imgui.IsItemHovered()
+
+	// Grid lines if enabled
+	if atlasDialog.enableGrid {
+		cols := max(atlasDialog.gridCols, 1)
+		rows := max(atlasDialog.gridRows, 1)
+		cellW := tw / f32(cols)
+		cellH := th / f32(rows)
+		for c in 0 ..= cols {
+			x := p0.x + f32(c) * cellW * scale
+			imgui.DrawList_AddLine(dl, {x, p0.y}, {x, p0.y + imgSize.y}, col32(255, 255, 255, 45), 1)
+		}
+		for r in 0 ..= rows {
+			y := p0.y + f32(r) * cellH * scale
+			imgui.DrawList_AddLine(dl, {p0.x, y}, {p0.x + imgSize.x, y}, col32(255, 255, 255, 45), 1)
+		}
+	}
+
+	// Interactive Selection
+	texelMouse := (mouse - p0) / scale
+	snapCoord :: proc(v: f32, step: f32) -> f32 {
+		if step <= 0 do return v
+		return math.round(v / step) * step
+	}
+
+	if hovered && imgui.IsMouseClicked(.Left) {
+		atlasDialog.dragging = true
+		pt := texelMouse
+		if atlasDialog.enableGrid {
+			cols := max(atlasDialog.gridCols, 1)
+			rows := max(atlasDialog.gridRows, 1)
+			pt.x = snapCoord(pt.x, tw / f32(cols))
+			pt.y = snapCoord(pt.y, th / f32(rows))
+		}
+		atlasDialog.dragStart = pt
+	}
+
+	if atlasDialog.dragging {
+		if imgui.IsMouseDown(.Left) {
+			pt := texelMouse
+			if atlasDialog.enableGrid {
+				cols := max(atlasDialog.gridCols, 1)
+				rows := max(atlasDialog.gridRows, 1)
+				pt.x = snapCoord(pt.x, tw / f32(cols))
+				pt.y = snapCoord(pt.y, th / f32(rows))
+			}
+			x0 := clamp(min(atlasDialog.dragStart.x, pt.x), 0, tw)
+			y0 := clamp(min(atlasDialog.dragStart.y, pt.y), 0, th)
+			x1 := clamp(max(atlasDialog.dragStart.x, pt.x), 0, tw)
+			y1 := clamp(max(atlasDialog.dragStart.y, pt.y), 0, th)
+			atlasDialog.region = {x0, y0, max(x1 - x0, 1), max(y1 - y0, 1)}
+		} else {
+			atlasDialog.dragging = false
+		}
+	}
+
+	// Draw Region Highlight
+	rMn := p0 + [2]f32{atlasDialog.region.x, atlasDialog.region.y} * scale
+	rMx := rMn + [2]f32{atlasDialog.region.width, atlasDialog.region.height} * scale
+	imgui.DrawList_AddRectFilled(dl, rMn, rMx, col32(0, 206, 201, 75))
+	imgui.DrawList_AddRect(dl, rMn, rMx, col32(0, 206, 201, 230), 0, {}, 2)
+	Drive_ItemRect("atlas.region_rect", rMn, rMx, inWindow = true)
+
+	// Label above region
+	label := fmt.ctprintf("%.0f, %.0f (%0.f × %.0f)", atlasDialog.region.x, atlasDialog.region.y, atlasDialog.region.width, atlasDialog.region.height)
+	imgui.DrawList_AddText(dl, rMn + {4, 3}, col32(255, 255, 255, 240), label)
+}

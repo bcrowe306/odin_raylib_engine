@@ -141,6 +141,27 @@ Slicer_Apply :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) -> ^e.Ani
 	return target
 }
 
+// Slicer_ExportAtlas creates AtlasSpriteNode(s) for the selected cell(s) in activeScene.
+Slicer_ExportAtlas :: proc(state: ^EditorState) {
+	if len(slicer.selection) == 0 || slicer.texRel == "" || state.activeScene == nil do return
+	Editor_RecordUndo(state, "Create Atlas Sprite from Slice")
+	base := filepath.stem(filepath.base(slicer.texRel))
+	created: ^e.Node = nil
+	for c in slicer.selection {
+		name := base if len(slicer.selection) == 1 else fmt.tprintf("%s_cell%d", base, c)
+		n := Editor_CreateNode(state, "AtlasSpriteNode", name)
+		if n == nil do continue
+		an := cast(^e.AtlasSpriteNode)n
+		Editor_SetAtlasTexture(state, an, slicer.texRel)
+		e.AtlasSpriteNode_SetRegion(an, cell_rect(c))
+		created = n
+	}
+	if created != nil {
+		state.selectedNode = created
+		Editor_Log(state, .Info, "Created %d AtlasSpriteNode(s) from %s", len(slicer.selection), slicer.texRel)
+	}
+}
+
 Slicer_Render :: proc(state: ^EditorState) {
 	if !slicer.open do return
 	imgui.SetNextWindowSize({760, 520}, .FirstUseEver)
@@ -221,6 +242,12 @@ Slicer_Render :: proc(state: ^EditorState) {
 					cells := make([dynamic]int, context.temp_allocator)
 					for col in 0 ..< cols do append(&cells, row * cols + col)
 					add_anim(fmt.tprintf("row%d", row + 1), cells[:])
+				}
+			}
+			if len(slicer.selection) > 0 {
+				label := "Create Atlas Sprite" if len(slicer.selection) == 1 else fmt.tprintf("Create Atlas Sprites (%d)", len(slicer.selection))
+				if UI_Button(fmt.tprintf("%s  %s", ICON_FA_IMAGE, label), "slicer.create-atlas", {-1, 0}) {
+					Slicer_ExportAtlas(state)
 				}
 			}
 			imgui.Separator()

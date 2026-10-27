@@ -78,6 +78,15 @@ PreviewPanel_OnNodeSelected :: proc(state: ^EditorState, node: ^e.Node) {
 				state.previewTab = .Texture
 			}
 		}
+	} else if node.typeId == typeid_of(e.AtlasSpriteNode) {
+		an := cast(^e.AtlasSpriteNode)node
+		if an.filePath != "" {
+			resolved := e.Project_ResolveAssetPath(&state.game.gameContext, an.filePath)
+			PreviewPanel_LoadTexture(state, resolved)
+			if state.previewAutoSwitch {
+				state.previewTab = .Texture
+			}
+		}
 	} else if node.typeId == typeid_of(e.FrameAnimationNode) {
 		PreviewPanel_LoadAnimationFromNode(state, cast(^e.FrameAnimationNode)node)
 		if state.previewAutoSwitch {

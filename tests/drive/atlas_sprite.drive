@@ -1,0 +1,46 @@
+# AtlasSpriteNode: creating an AtlasSpriteNode, picking a texture, editing
+# the atlas sub-region via the visual editor dialog, verifying region bounds
+# and serialization, and exporting slices directly from the Sprite Sheet Slicer.
+wait 5
+key escape
+
+# --- Add an AtlasSpriteNode via Add Node dialog ---
+click @hier.add
+expect add-node-open == true
+type atlas
+click @addnode.create
+expect add-node-open == false
+expect selected == AtlasSprite
+expect node:AtlasSprite.type == AtlasSpriteNode
+
+# Pick texture
+click @insp.texture
+click @pick:textures/Asteroid_2.png
+
+# Open visual region editor dialog
+click @insp.atlas.edit
+dblclick @atlas.w
+key ctrl+a
+type 48
+key enter
+dblclick @atlas.h
+key ctrl+a
+type 48
+key enter
+click @atlas.apply
+
+# Save scene and verify serialized region
+key ctrl+s
+expect file:scenes/main.scene.json contains "AtlasSpriteNode"
+expect file:scenes/main.scene.json contains "region": [
+
+# --- Test Sprite Slicer export to AtlasSpriteNode ---
+click @menu:Tools
+click @menu:Tools/Sprite Sheet Slicer...
+click @slicer.texture
+click @pick:textures/Asteroid_2.png
+click @slicer.cell:0
+click @slicer.create-atlas
+expect selected == Asteroid_2
+expect node:Asteroid_2.type == AtlasSpriteNode
+key ctrl+s

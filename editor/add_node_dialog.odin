@@ -85,6 +85,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "TextureNode",
 	},
 	{
+		name        = "Atlas Sprite",
+		category    = "Graphics & Rendering",
+		icon        = ICON_FA_CROP,
+		description = "2D textured sprite displaying a sub-region (atlas / sheet slice) of a texture.",
+		typeName    = "AtlasSpriteNode",
+	},
+	{
 		name        = "Text",
 		category    = "Graphics & Rendering",
 		icon        = ICON_FA_FONT,

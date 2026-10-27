@@ -486,6 +486,18 @@ Json_Vec2 :: proc(w: ^Json_Writer, v: [2]f32) {
 	strings.write_byte(&w.sb, ']')
 }
 
+Json_Rect :: proc(w: ^Json_Writer, r: rl.Rectangle) {
+	strings.write_byte(&w.sb, '[')
+	Json_Float(w, r.x)
+	strings.write_string(&w.sb, ", ")
+	Json_Float(w, r.y)
+	strings.write_string(&w.sb, ", ")
+	Json_Float(w, r.width)
+	strings.write_string(&w.sb, ", ")
+	Json_Float(w, r.height)
+	strings.write_byte(&w.sb, ']')
+}
+
 // Json_Key starts `"key": ` on a new line, preceded by a comma unless first.
 Json_Key :: proc(w: ^Json_Writer, key: string, first: ^bool) {
 	if !first^ do strings.write_byte(&w.sb, ',')
