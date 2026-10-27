@@ -34,7 +34,7 @@ import imgui "lib/imgui"
 // ============================================================================
 
 CELL_W :: f32(34)
-LABEL_W :: f32(190)
+LABEL_W :: f32(230)
 ROW_H :: f32(30)
 THUMB_H :: f32(40)
 
@@ -561,8 +561,10 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	if !imgui.BeginChild("##anim_timeline", {avail.x - sideW - (UI_SPACE if sideW > 0 else 0), max(avail.y, 40)}, {}, {.HorizontalScrollbar}) {
 		imgui.EndChild()
 		if sideW > 0 {
-			if hasAudioPanel do anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
-			else if hasMethodPanel do anim_method_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
+			showAudio := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Audio
+			showMethod := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Method
+			if showAudio do anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
+			else if showMethod do anim_method_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
 			else do anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
 		}
 		return
@@ -802,10 +804,23 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		}
 		labelCol := UI_TEXT if target != nil else UI_DANGER
 		if target != nil && tr.kind == .Method && node_script_rel(state, target) == "" do labelCol = UI_WARNING
+		btnStart := LABEL_W - (82 if (tr.kind == .Audio || tr.kind == .Method) else 58)
+
+		// Clip label text before btnStart so text never bleeds over the buttons
+		imgui.DrawList_PushClipRect(dl, {origin.x + scrollX, y}, {origin.x + scrollX + btnStart - 4, y + ROW_H}, true)
 		label(dl, origin.x + scrollX, y + 6, name, labelCol)
+		imgui.DrawList_PopClipRect(dl)
+
+		// Hover tooltip over track header showing full track name
+		headerMn := [2]f32{origin.x + scrollX, y}
+		headerMx := [2]f32{origin.x + scrollX + btnStart - 4, y + ROW_H}
+		mousePos := imgui.GetMousePos()
+		if mousePos.x >= headerMn.x && mousePos.x <= headerMx.x && mousePos.y >= headerMn.y && mousePos.y <= headerMx.y {
+			imgui.SetTooltip("%s", fmt.ctprintf("%s (%s)", name, tr.property))
+		}
+
 		imgui.PushIDInt(c.int(ti) + 1000)
 		// Row buttons (fixed at the left).
-		btnStart := LABEL_W - (80 if (tr.kind == .Audio || tr.kind == .Method) else 56)
 		imgui.SetCursorScreenPos({origin.x + scrollX + btnStart, y + 2})
 		keyTip := "Key the current value at the playhead"
 		if tr.kind == .Method do keyTip = "Call a method at the playhead (right-click the key to name it)"
@@ -985,9 +1000,15 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	imgui.DrawList_AddLine(dl, {px, origin.y}, {px, ty + f32(nTracks) * ROW_H}, col_u32(UI_ACCENT), 2)
 	imgui.EndChild()
 	if sideW > 0 {
-		if hasAudioPanel do anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
-		else if hasMethodPanel do anim_method_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
-		else do anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
+		showAudio := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Audio
+		showMethod := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Method
+		if showAudio {
+			anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
+		} else if showMethod {
+			anim_method_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
+		} else {
+			anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
+		}
 	}
 }
 
@@ -1066,6 +1087,7 @@ rename_state_machine_refs :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNo
 // positional 2D attenuation, voices, and SFX node target for an audio track (Issues #24 & #27).
 @(private = "file")
 anim_sound_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, tr: ^e.Property_Track, size: [2]f32) {
+	if tr == nil do return
 	imgui.SameLine(0, UI_SPACE)
 	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
 	defer imgui.PopStyleColor()
@@ -1079,8 +1101,8 @@ anim_sound_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNo
 
 	// Title bar with close button
 	imgui.TextUnformatted(fmt.ctprintf("%s  Sound Track Settings", ICON_FA_MUSIC))
-	availW := imgui.GetContentRegionAvail().x
-	imgui.SameLine(availW - 10)
+	winW := imgui.GetWindowWidth()
+	imgui.SameLine(max(winW - 28, 120))
 	if UI_IconButton(ICON_FA_XMARK, "anim.sound-close", "Close sound settings", size = 20) {
 		panel.selectedTrack = -1
 		return
@@ -1146,45 +1168,42 @@ anim_sound_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNo
 	UI_DimText("VOLUME & PITCH")
 
 	// Volume Min & Max
-	imgui.SetNextItemWidth(80)
+	imgui.TextUnformatted("Volume (Min / Max)")
+	imgui.SetNextItemWidth(84)
 	if imgui.DragFloat("##vol_min", &cfg.volumeMin, 0.01, 0, 2, "Min: %.2f") {
 		Editor_RecordUndo(state, "Change volume min")
 	}
 	imgui.SameLine()
-	imgui.SetNextItemWidth(80)
+	imgui.SetNextItemWidth(84)
 	if imgui.DragFloat("##vol_max", &cfg.volumeMax, 0.01, 0, 2, "Max: %.2f") {
 		Editor_RecordUndo(state, "Change volume max")
 	}
-	imgui.SameLine()
-	imgui.TextUnformatted("Volume")
 	UI_Tooltip("Volume range (equal for static volume, or range for randomized volume)")
 
 	// Pitch Min & Max
-	imgui.SetNextItemWidth(80)
+	imgui.TextUnformatted("Pitch (Min / Max)")
+	imgui.SetNextItemWidth(84)
 	if imgui.DragFloat("##pitch_min", &cfg.pitchMin, 0.01, 0.1, 3, "Min: %.2f") {
 		Editor_RecordUndo(state, "Change pitch min")
 	}
 	imgui.SameLine()
-	imgui.SetNextItemWidth(80)
+	imgui.SetNextItemWidth(84)
 	if imgui.DragFloat("##pitch_max", &cfg.pitchMax, 0.01, 0.1, 3, "Max: %.2f") {
 		Editor_RecordUndo(state, "Change pitch max")
 	}
-	imgui.SameLine()
-	imgui.TextUnformatted("Pitch")
 	UI_Tooltip("Pitch range (equal for static pitch, or range for randomized pitch)")
 
 	// Pan Min & Max
-	imgui.SetNextItemWidth(80)
+	imgui.TextUnformatted("Stereo Pan (Min / Max)")
+	imgui.SetNextItemWidth(84)
 	if imgui.DragFloat("##pan_min", &cfg.panMin, 0.02, -1, 1, "Min: %.2f") {
 		Editor_RecordUndo(state, "Change pan min")
 	}
 	imgui.SameLine()
-	imgui.SetNextItemWidth(80)
+	imgui.SetNextItemWidth(84)
 	if imgui.DragFloat("##pan_max", &cfg.panMax, 0.02, -1, 1, "Max: %.2f") {
 		Editor_RecordUndo(state, "Change pan max")
 	}
-	imgui.SameLine()
-	imgui.TextUnformatted("Pan")
 	UI_Tooltip("Stereo panning range (-1.0 Left to +1.0 Right)")
 
 	imgui.Spacing()
@@ -1246,6 +1265,7 @@ anim_sound_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNo
 // or attaching scripts, method picker, argument fields, and open script shortcut (Issue #29).
 @(private = "file")
 anim_method_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, tr: ^e.Property_Track, size: [2]f32) {
+	if tr == nil do return
 	imgui.SameLine(0, UI_SPACE)
 	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
 	defer imgui.PopStyleColor()
@@ -1261,8 +1281,8 @@ anim_method_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 
 	// Title bar with close button
 	imgui.TextUnformatted(fmt.ctprintf("%s  Script Call Settings", ICON_FA_CODE))
-	availW := imgui.GetContentRegionAvail().x
-	imgui.SameLine(availW - 10)
+	winW := imgui.GetWindowWidth()
+	imgui.SameLine(max(winW - 28, 120))
 	if UI_IconButton(ICON_FA_XMARK, "anim.method-close", "Close script settings", size = 20) {
 		panel.selectedTrack = -1
 		return
