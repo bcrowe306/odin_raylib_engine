@@ -394,7 +394,7 @@ prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
 	}
 	if node.typeId == e.CharacterMoverNode && (cast(^e.CharacterMoverNode)node).controlMode == .Script {
 		switch name {
-		case "targetSpeedX", "maxSpeed", "acceleration", "jumpSpeed", "enableKeyboardInput": return false
+		case "targetSpeedX", "maxSpeed", "acceleration", "jumpSpeed", "enableKeyboardInput", "playerIndex": return false
 		}
 	}
 	return true

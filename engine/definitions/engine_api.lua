@@ -1954,6 +1954,7 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---@field pushLimit number Most push per step from overlapping bodies (px/s; 0 = unlimited).
 ---@field clipVelocity boolean Remove velocity into walls and floors it hits (slide along them).
 ---@field enableKeyboardInput boolean Built-in movement: the move / jump input actions drive it.
+---@field playerIndex integer Player whose actions drive this mover (1..4; 0 = none / NPC / AI).
 ---@field isGrounded boolean Standing on something now.
 ---@field debugColor number[] Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug...
 ---@field controlMode "BuiltIn"|"Script" Built-in movement, or Script: the script moves it (character_move_and_slide).
@@ -1980,6 +1981,7 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---| "pushLimit" # number - Most push per step from overlapping bodies (px/s; 0 = unlimited).
 ---| "clipVelocity" # boolean - Remove velocity into walls and floors it hits (slide along them).
 ---| "enableKeyboardInput" # boolean - Built-in movement: the move / jump input actions drive it.
+---| "playerIndex" # integer - Player whose actions drive this mover (1..4; 0 = none / NPC / AI).
 ---| "isGrounded" # boolean (runtime) - Standing on something now.
 ---| "debugColor" # number[] - Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug...
 ---| "controlMode" # "BuiltIn"|"Script" - Built-in movement, or Script: the script moves it (character_move_and_slide).
@@ -2010,6 +2012,7 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---@overload fun(self: CharacterMoverNode, path: "pushLimit"): number
 ---@overload fun(self: CharacterMoverNode, path: "clipVelocity"): boolean
 ---@overload fun(self: CharacterMoverNode, path: "enableKeyboardInput"): boolean
+---@overload fun(self: CharacterMoverNode, path: "playerIndex"): integer
 ---@overload fun(self: CharacterMoverNode, path: "isGrounded"): boolean
 ---@overload fun(self: CharacterMoverNode, path: "debugColor"): number[]
 ---@overload fun(self: CharacterMoverNode, path: "controlMode"): "BuiltIn"|"Script"
@@ -2042,6 +2045,7 @@ function CharacterMoverNode:get_property(path) end
 ---@overload fun(self: CharacterMoverNode, path: "pushLimit", value: number)
 ---@overload fun(self: CharacterMoverNode, path: "clipVelocity", value: boolean)
 ---@overload fun(self: CharacterMoverNode, path: "enableKeyboardInput", value: boolean)
+---@overload fun(self: CharacterMoverNode, path: "playerIndex", value: integer)
 ---@overload fun(self: CharacterMoverNode, path: "isGrounded", value: boolean)
 ---@overload fun(self: CharacterMoverNode, path: "debugColor", value: number[])
 ---@overload fun(self: CharacterMoverNode, path: "controlMode", value: "BuiltIn"|"Script")
@@ -7348,6 +7352,18 @@ function CharacterMoverNode:character_set_speed(speed) end
 ---Example: `self.node:character_set_jump_speed(400)`
 ---@param speed number
 function CharacterMoverNode:character_set_jump_speed(speed) end
+
+---BuiltIn mode: gets the player index (1..4; 0 = none / NPC / AI) whose actions drive this mover.
+---
+---Example: `local p = self.node:character_get_player_index()`
+---@return integer
+function CharacterMoverNode:character_get_player_index() end
+
+---BuiltIn mode: sets the player index (1..4; 0 = none / NPC / AI) whose actions drive this mover.
+---
+---Example: `self.node:character_set_player_index(1)`
+---@param index integer
+function CharacterMoverNode:character_set_player_index(index) end
 
 -- ----------------------------------------------------------------------------
 -- AreaNode (Sensor Trigger) Methods

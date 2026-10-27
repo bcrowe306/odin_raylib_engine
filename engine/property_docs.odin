@@ -318,6 +318,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"CharacterMoverNode.pushLimit", "Most push per step from overlapping bodies (px/s; 0 = unlimited)."},
 	{"CharacterMoverNode.clipVelocity", "Remove velocity into walls and floors it hits (slide along them)."},
 	{"CharacterMoverNode.enableKeyboardInput", "Built-in movement: the move / jump input actions drive it."},
+	{"CharacterMoverNode.playerIndex", "Player whose actions drive this mover (1..4; 0 = none / NPC / AI)."},
 	{"CharacterMoverNode.isGrounded", "Standing on something now."},
 	{"CharacterMoverNode.controlMode", "Built-in movement, or Script: the script moves it (character_move_and_slide)."},
 	{"AreaNode.overlapCount", "Bodies overlapping now."},

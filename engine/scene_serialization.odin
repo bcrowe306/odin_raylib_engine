@@ -1142,6 +1142,12 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 				(cast(^ScriptNode)node).scriptPath = strings.clone(scriptPath, node.allocator)
 			}
 			_ = Script_AttachToNode(node, scriptPath, overrides, sm)
+			if node.typeId == CharacterMoverNode {
+				cm := cast(^CharacterMoverNode)node
+				if cm.playerIndex == 0 {
+					cm.controlMode = .Script
+				}
+			}
 		}
 	}
 
