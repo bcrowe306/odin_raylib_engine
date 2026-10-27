@@ -4,6 +4,7 @@ import "core:c"
 import "core:fmt"
 import "core:path/filepath"
 import "core:math"
+import "core:math/rand"
 import "core:slice"
 import "core:strings"
 import "core:time"
@@ -64,6 +65,7 @@ Anim_Panel :: struct {
 	miniPaused: bool,
 	miniAccum:  f32,
 	miniTick:   time.Tick,
+	selectedTrack: int,
 }
 
 PREVIEW_W :: f32(200)
@@ -497,7 +499,8 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			UI_Tooltip("Keys call a method on this node's script when playback reaches them")
 			if imgui.MenuItem(fmt.ctprintf("%s  Play Sounds", ICON_FA_MUSIC)) {
 				Editor_RecordUndo(state, "Add track")
-				e.Animation_AddEventTrack(apn, anim, target, .Audio)
+				tr := e.Animation_AddEventTrack(apn, anim, target, .Audio)
+				panel.selectedTrack = len(anim.tracks) - 1
 			}
 			Drive_Item("anim.track-sounds")
 		}
@@ -508,6 +511,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	if panel.selAnim != anim {
 		clear(&panel.sel)
 		panel.selAnim = anim
+		panel.selectedTrack = -1
 	}
 	srcCount := e.Animation_SourceCount(anim)
 
@@ -544,10 +548,20 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 
 	// --- timeline: one column per source frame; the range starts at `base` ---
 	avail := imgui.GetContentRegionAvail()
-	previewW := PREVIEW_W if avail.x >= 640 else 0 // the preview at the right, when there's room
-	if !imgui.BeginChild("##anim_timeline", {avail.x - previewW - (UI_SPACE if previewW > 0 else 0), max(avail.y, 40)}, {}, {.HorizontalScrollbar}) {
+	hasAudioPanel := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Audio
+	sideW: f32 = 0
+	if hasAudioPanel {
+		sideW = 320 if avail.x >= 720 else (PREVIEW_W if avail.x >= 540 else 0)
+	} else if avail.x >= 640 {
+		sideW = PREVIEW_W
+	}
+
+	if !imgui.BeginChild("##anim_timeline", {avail.x - sideW - (UI_SPACE if sideW > 0 else 0), max(avail.y, 40)}, {}, {.HorizontalScrollbar}) {
 		imgui.EndChild()
-		if previewW > 0 do anim_preview(state, apn, anim, {previewW, max(avail.y, 40)})
+		if sideW > 0 {
+			if hasAudioPanel do anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
+			else do anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
+		}
 		return
 	}
 	dl := imgui.GetWindowDrawList()
@@ -768,12 +782,22 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		if tr.target != "." && tr.target != "" do target = e.Node_ResolvePath(mgr, apn, tr.target)
 		prop := tr.property
 		if tr.kind == .Method do prop = "calls()"
-		if tr.kind == .Audio do prop = "sounds"
+		if tr.kind == .Audio {
+			if tr.name != "" do prop = tr.name
+			else if tr.property == "@audio" do prop = "sounds"
+			else if strings.has_prefix(tr.property, "@audio_") do prop = fmt.tprintf("sounds %s", tr.property[len("@audio_"):])
+			else do prop = "sounds"
+		}
 		name := prop if tr.target == "." else fmt.tprintf("%s.%s", tr.target, prop)
+		isSelectedTrack := panel.selectedTrack == ti
+		if isSelectedTrack {
+			imgui.DrawList_AddRect(dl, {origin.x + scrollX, y}, {colX(x0, cols), y + ROW_H - 2}, col_u32(UI_ACCENT), 3, thickness = 1.5)
+		}
 		label(dl, origin.x + scrollX, y + 6, name, UI_TEXT if target != nil else UI_DANGER)
 		imgui.PushIDInt(c.int(ti) + 1000)
 		// Row buttons (fixed at the left).
-		imgui.SetCursorScreenPos({origin.x + scrollX + LABEL_W - 56, y + 2})
+		btnStart := LABEL_W - (80 if tr.kind == .Audio else 56)
+		imgui.SetCursorScreenPos({origin.x + scrollX + btnStart, y + 2})
 		keyTip := "Key the current value at the playhead"
 		if tr.kind == .Method do keyTip = "Call a method at the playhead (right-click the key to name it)"
 		if tr.kind == .Audio do keyTip = "Play a sound at the playhead (right-click the key to pick it)"
@@ -784,6 +808,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			if tr.kind == .Audio {
 				audio := Editor_ListProjectFiles(state, "", AUDIO_EXTS)
 				text = audio[0] if len(audio) > 0 else ""
+				panel.selectedTrack = ti
 			}
 			// The previous key's text is the likely next one.
 			for k in tr.keys do if k.frame < f32(rel) && k.text != "" do text = k.text
@@ -798,8 +823,17 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				}
 			}
 		}
+		if tr.kind == .Audio {
+			imgui.SameLine(0, 2)
+			if UI_IconButton(ICON_FA_SLIDERS, fmt.tprintf("anim.track-settings:%s", tr.property), "Sound Track Settings", isSelectedTrack, size = 24) {
+				panel.selectedTrack = ti if panel.selectedTrack != ti else -1
+			}
+		}
 		imgui.SameLine(0, 2)
-		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("anim.remove-track:%s", tr.property), "Remove track", size = 24) do removeTrack = ti
+		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("anim.remove-track:%s", tr.property), "Remove track", size = 24) {
+			removeTrack = ti
+			if panel.selectedTrack == ti do panel.selectedTrack = -1
+		}
 		// The curves between keys (eased / custom ones).
 		Key_X :: struct {x0: f32, base: int}
 		kx := Key_X{x0, base}
@@ -833,9 +867,13 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: calls %s:%s(%s)  (right-click: edit, delete)", int(k.frame) + 1, tr.target, k.text, k.arg if k.arg != "" else "frame"))
 				case .Audio:    imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: plays %s  (right-click: edit, delete)", int(k.frame) + 1, k.text))
 				}
-				if imgui.IsMouseClicked(.Left) do scrub(state, apn, anim, int(k.frame))
+				if imgui.IsMouseClicked(.Left) {
+					scrub(state, apn, anim, int(k.frame))
+					if tr.kind == .Audio do panel.selectedTrack = ti
+				}
 				if imgui.IsMouseClicked(.Right) {
 					keyMenu = {ti, k.frame}
+					if tr.kind == .Audio do panel.selectedTrack = ti
 					imgui.OpenPopup("##key_ctx")
 				}
 			}
@@ -885,6 +923,9 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 						Editor_RecordUndo(state, "Event key")
 						key.text = strings.clone(path, apn.allocator)
 					}
+					if imgui.MenuItem(fmt.ctprintf("%s  Sound Settings...", ICON_FA_SLIDERS)) {
+						panel.selectedTrack = ti
+					}
 				}
 				if tr.kind == .Property && imgui.BeginMenu(fmt.ctprintf("%s  Easing: %s", ICON_FA_WAVE_SQUARE, e.Ease_Name(key.ease))) {
 					for ease in e.Ease {
@@ -923,7 +964,10 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	px := x0 + (f32(base + rel) + 0.5) * CELL_W
 	imgui.DrawList_AddLine(dl, {px, origin.y}, {px, ty + f32(nTracks) * ROW_H}, col_u32(UI_ACCENT), 2)
 	imgui.EndChild()
-	if previewW > 0 do anim_preview(state, apn, anim, {previewW, max(avail.y, 40)})
+	if sideW > 0 {
+		if hasAudioPanel do anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
+		else do anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
+	}
 }
 
 // anim_preview: the animation playing in a box right of the timeline - its
@@ -994,5 +1038,185 @@ rename_state_machine_refs :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNo
 		sm := cast(^e.StateMachineNode)n
 		if e.StateMachine_Player(sm, mgr) != apn do continue
 		for &s in sm.states do if s.animation == old do s.animation = strings.clone(name, sm.allocator)
+	}
+}
+
+// anim_sound_settings_panel: controls routing, volume range, pitch range, pan range,
+// positional 2D attenuation, voices, and SFX node target for an audio track (Issues #24 & #27).
+@(private = "file")
+anim_sound_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, tr: ^e.Property_Track, size: [2]f32) {
+	imgui.SameLine(0, UI_SPACE)
+	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
+	defer imgui.PopStyleColor()
+	if !imgui.BeginChild("##anim_sound_settings", size, {}, {}) {
+		imgui.EndChild()
+		return
+	}
+	defer imgui.EndChild()
+
+	cfg := &tr.audioSettings
+
+	// Title bar with close button
+	imgui.TextUnformatted(fmt.ctprintf("%s  Sound Track Settings", ICON_FA_MUSIC))
+	availW := imgui.GetContentRegionAvail().x
+	imgui.SameLine(availW - 10)
+	if UI_IconButton(ICON_FA_XMARK, "anim.sound-close", "Close sound settings", size = 20) {
+		panel.selectedTrack = -1
+		return
+	}
+	imgui.Separator()
+
+	// Track Name
+	UI_DimText("TRACK NAME")
+	nameBuf: [64]u8
+	curName := tr.name if tr.name != "" else "sounds"
+	copy(nameBuf[:len(nameBuf) - 1], curName)
+	imgui.SetNextItemWidth(-1)
+	if imgui.InputTextWithHint("##sound_track_name", "Track Name (e.g. Footsteps)", cstring(raw_data(nameBuf[:])), len(nameBuf)) {
+		Editor_RecordUndo(state, "Rename audio track")
+		tr.name = strings.clone(string(cstring(raw_data(nameBuf[:]))), apn.allocator)
+	}
+	UI_Tooltip("Custom name for this sound track in the timeline")
+
+	imgui.Spacing()
+	UI_DimText("ROUTING")
+
+	// Bus Picker
+	buses := e.Mixer_Buses()
+	curBus := cfg.bus if cfg.bus != "" else "SFX"
+	imgui.SetNextItemWidth(140)
+	if imgui.BeginCombo("Bus", strings.clone_to_cstring(curBus, context.temp_allocator)) {
+		for b in buses {
+			if imgui.Selectable(strings.clone_to_cstring(b.name, context.temp_allocator), b.name == curBus) {
+				Editor_RecordUndo(state, "Change audio bus")
+				cfg.bus = strings.clone(b.name, apn.allocator)
+			}
+		}
+		imgui.EndCombo()
+	}
+
+	// SFX Node Target (optional SoundNode in scene)
+	sfxNodes := make([dynamic]string, context.temp_allocator)
+	append(&sfxNodes, "")
+	if state.activeScene != nil && state.activeScene.manager != nil {
+		for node in state.activeScene.manager.nodes {
+			if node != nil && node.typeId == typeid_of(e.SoundNode) {
+				path := e.Node_RelativePath(state.activeScene.manager, apn, node)
+				append(&sfxNodes, path)
+			}
+		}
+	}
+
+	curSfx := cfg.sfxNode if cfg.sfxNode != "" else "(Direct playback)"
+	imgui.SetNextItemWidth(140)
+	if imgui.BeginCombo("SFX Node", strings.clone_to_cstring(curSfx, context.temp_allocator)) {
+		for path in sfxNodes {
+			label := "(Direct playback)" if path == "" else path
+			if imgui.Selectable(strings.clone_to_cstring(label, context.temp_allocator), path == cfg.sfxNode) {
+				Editor_RecordUndo(state, "Change SFX node target")
+				cfg.sfxNode = strings.clone(path, apn.allocator)
+			}
+		}
+		imgui.EndCombo()
+	}
+	UI_Tooltip("Optionally route playback through an existing SoundNode in the scene")
+
+	imgui.Spacing()
+	UI_DimText("VOLUME & PITCH")
+
+	// Volume Min & Max
+	imgui.SetNextItemWidth(80)
+	if imgui.DragFloat("##vol_min", &cfg.volumeMin, 0.01, 0, 2, "Min: %.2f") {
+		Editor_RecordUndo(state, "Change volume min")
+	}
+	imgui.SameLine()
+	imgui.SetNextItemWidth(80)
+	if imgui.DragFloat("##vol_max", &cfg.volumeMax, 0.01, 0, 2, "Max: %.2f") {
+		Editor_RecordUndo(state, "Change volume max")
+	}
+	imgui.SameLine()
+	imgui.TextUnformatted("Volume")
+	UI_Tooltip("Volume range (equal for static volume, or range for randomized volume)")
+
+	// Pitch Min & Max
+	imgui.SetNextItemWidth(80)
+	if imgui.DragFloat("##pitch_min", &cfg.pitchMin, 0.01, 0.1, 3, "Min: %.2f") {
+		Editor_RecordUndo(state, "Change pitch min")
+	}
+	imgui.SameLine()
+	imgui.SetNextItemWidth(80)
+	if imgui.DragFloat("##pitch_max", &cfg.pitchMax, 0.01, 0.1, 3, "Max: %.2f") {
+		Editor_RecordUndo(state, "Change pitch max")
+	}
+	imgui.SameLine()
+	imgui.TextUnformatted("Pitch")
+	UI_Tooltip("Pitch range (equal for static pitch, or range for randomized pitch)")
+
+	// Pan Min & Max
+	imgui.SetNextItemWidth(80)
+	if imgui.DragFloat("##pan_min", &cfg.panMin, 0.02, -1, 1, "Min: %.2f") {
+		Editor_RecordUndo(state, "Change pan min")
+	}
+	imgui.SameLine()
+	imgui.SetNextItemWidth(80)
+	if imgui.DragFloat("##pan_max", &cfg.panMax, 0.02, -1, 1, "Max: %.2f") {
+		Editor_RecordUndo(state, "Change pan max")
+	}
+	imgui.SameLine()
+	imgui.TextUnformatted("Pan")
+	UI_Tooltip("Stereo panning range (-1.0 Left to +1.0 Right)")
+
+	imgui.Spacing()
+	UI_DimText("SPATIAL & VOICES")
+
+	if imgui.Checkbox("Positional 2D Sound", &cfg.positional) {
+		Editor_RecordUndo(state, "Toggle positional sound")
+	}
+	if cfg.positional {
+		imgui.SetNextItemWidth(90)
+		if imgui.DragFloat("Min Dist", &cfg.minDistance, 10, 0, 4000, "%.0f px") do Editor_RecordUndo(state, "Change min distance")
+		imgui.SetNextItemWidth(90)
+		if imgui.DragFloat("Max Dist", &cfg.maxDistance, 10, 1, 8000, "%.0f px") do Editor_RecordUndo(state, "Change max distance")
+	}
+
+	voices := i32(cfg.voices)
+	imgui.SetNextItemWidth(100)
+	if imgui.SliderInt("Voices", &voices, 1, e.AUDIO_MAX_VOICES) {
+		Editor_RecordUndo(state, "Change voice limit")
+		cfg.voices = int(voices)
+	}
+	UI_Tooltip("Max concurrent overlapping sounds for this track")
+
+	imgui.Spacing()
+	imgui.Separator()
+
+	// Test Sound Button
+	firstSound := ""
+	for k in tr.keys {
+		if k.text != "" {
+			firstSound = k.text
+			break
+		}
+	}
+	if firstSound != "" {
+		if UI_Button(fmt.tprintf("%s  Test (%s)", ICON_FA_PLAY, filepath.base(firstSound)), "anim.test-sound") {
+			ctx := &state.game.gameContext
+			rm := &state.game.resourceManager
+			if s, ok := rm.loadAudioSound(rm, e.Project_ResolveAssetPath(ctx, firstSound)); ok {
+				bus := e.Audio_BusFor(rm, s.filePath, "SFX")
+				if cfg.bus != "" {
+					if b := e.Mixer_BusIndex(cfg.bus); b >= 0 do bus = b
+				}
+				vol := cfg.volumeMin
+				if cfg.volumeMax > cfg.volumeMin do vol = rand.float32_range(cfg.volumeMin, cfg.volumeMax)
+				pitch := cfg.pitchMin
+				if cfg.pitchMax > cfg.pitchMin do pitch = rand.float32_range(cfg.pitchMin, cfg.pitchMax)
+				pan := cfg.panMin
+				if cfg.panMax > cfg.panMin do pan = rand.float32_range(cfg.panMin, cfg.panMax)
+				e.Mixer_PlaySound(s.pcm, bus, vol, pan, pitch, owner = s)
+			}
+		}
+	} else {
+		UI_DimText("No sounds placed on track yet")
 	}
 }
