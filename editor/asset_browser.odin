@@ -116,6 +116,23 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 	imgui.PushStyleVarImVec2(.ItemSpacing, {6, 2})
 	defer imgui.PopStyleVar()
 	if imgui.BeginChild("##assets", {0, 0}, {}, {}) {
+		if imgui.IsWindowHovered() && imgui.IsMouseClicked(.Left) && !imgui.IsAnyItemHovered() {
+			Editor_ClearAssetSelection(state)
+		}
+		io := imgui.GetIO()
+		if (imgui.IsWindowFocused() || imgui.IsWindowHovered()) && !io.WantTextInput && (imgui.IsKeyPressed(.Delete) || imgui.IsKeyPressed(.Backspace)) {
+			if Editor_AssetSelectedCount(state) > 1 {
+				rels := make([dynamic]string, context.temp_allocator)
+				for f in state.selectedAssetPaths {
+					rel := strings.trim_prefix(strings.trim_prefix(f, state.projectPath), "/")
+					append(&rels, rel)
+				}
+				Asset_BeginDeleteMulti(rels[:])
+			} else if state.selectedAssetPath != "" {
+				rel := strings.trim_prefix(strings.trim_prefix(state.selectedAssetPath, state.projectPath), "/")
+				Asset_BeginDelete(rel)
+			}
+		}
 		if assetView == .Folders {
 			Asset_FoldersView(state, filter)
 		} else {
@@ -167,24 +184,24 @@ section_files :: proc(state: ^EditorState, title: string, files: []string, filte
 // Asset_Items draws files as rows, or as a grid of tiles (assetGrid).
 Asset_Items :: proc(state: ^EditorState, files: []string, labelBase := false) {
 	if !assetGrid {
-		for f in files do asset_row(state, f, filepath.base(f) if labelBase else "")
+		for f in files do asset_row(state, f, filepath.base(f) if labelBase else "", files)
 		return
 	}
 	TILE :: 76
 	perRow := max(1, int((imgui.GetContentRegionAvail().x + 6) / (TILE + 6)))
 	for f, i in files {
 		if i % perRow != 0 do imgui.SameLine(0, 6)
-		asset_tile(state, f)
+		asset_tile(state, f, files)
 	}
 }
 
 // asset_row draws one file row; returns true when double-clicked.
 @(private = "file")
-asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool {
+asset_row :: proc(state: ^EditorState, rel: string, label: string = "", files: []string = nil) -> bool {
 	kind := Asset_KindOf(rel)
 	icon, col := kind_icon(kind)
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
-	selected := state.selectedAssetPath == full
+	selected := Editor_AssetIsSelected(state, full)
 	isActive := kind == .Scene && state.activeScenePath == rel
 
 	name := label if label != "" else rel
@@ -204,7 +221,7 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 	imgui.PushStyleColorImVec4(.Text, col)
 	clicked := imgui.Selectable(fmt.ctprintf("%s##a_%s", icon, rel), selected || isActive, {.AllowDoubleClick}, {0, 24})
 	imgui.PopStyleColor()
-	dbl := asset_events(state, rel, kind, full, name, icon, clicked)
+	dbl := asset_events(state, rel, kind, full, name, icon, clicked, files)
 	imgui.SameLine(x0 + 32)
 	imgui.PushStyleColorImVec4(.Text, UI_ACCENT if isActive else UI_TEXT)
 	imgui.TextUnformatted(fmt.ctprintf("%s%s", name, suffix))
@@ -225,12 +242,25 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "") -> bool 
 // select, double-click to open, context menu, drag (into the viewport or
 // onto a folder), tooltip, import highlight.
 @(private = "file")
-asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, name, icon: string, clicked: bool) -> bool {
+asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, name, icon: string, clicked: bool, files: []string = nil) -> bool {
 	Drive_Item(fmt.tprintf("asset:%s", rel))
 	rowMin, rowMax := imgui.GetItemRectMin(), imgui.GetItemRectMax()
 	dbl := imgui.IsItemHovered() && imgui.IsMouseDoubleClicked(.Left)
+
+	// If right-clicked on an unselected item, select it alone before context menu.
+	// If right-clicked on an already-selected item, preserve multi-selection!
+	if imgui.IsItemClicked(.Right) {
+		if !Editor_AssetIsSelected(state, full) {
+			Editor_SelectAsset(state, full)
+		}
+	}
+
 	if imgui.BeginPopupContextItem(fmt.ctprintf("ctx_%s", rel)) {
-		Asset_ContextMenu(state, rel)
+		if Editor_AssetSelectedCount(state) > 1 && Editor_AssetIsSelected(state, full) {
+			Asset_MultiContextMenu(state)
+		} else {
+			Asset_ContextMenu(state, rel)
+		}
 		imgui.EndPopup()
 	}
 	// Drag into the viewport, or onto a folder (Folders view).
@@ -238,10 +268,23 @@ asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, n
 		p: Asset_Payload
 		p.len = copy(p.path[:], rel)
 		imgui.SetDragDropPayload(ASSET_PAYLOAD, &p, size_of(Asset_Payload))
-		imgui.TextUnformatted(fmt.ctprintf("%s  %s", icon, name))
+		if Editor_AssetSelectedCount(state) > 1 && Editor_AssetIsSelected(state, full) {
+			imgui.TextUnformatted(fmt.ctprintf("%s  %s (+%d more)", icon, name, Editor_AssetSelectedCount(state) - 1))
+		} else {
+			imgui.TextUnformatted(fmt.ctprintf("%s  %s", icon, name))
+		}
 		imgui.EndDragDropSource()
 	}
-	if clicked do Editor_SelectAsset(state, full)
+	if clicked {
+		io := imgui.GetIO()
+		if io.KeyShift {
+			Editor_SelectAssetRange(state, full, files)
+		} else if io.KeyCtrl || io.KeySuper {
+			Editor_ToggleAssetSelection(state, full)
+		} else {
+			Editor_SelectAsset(state, full)
+		}
+	}
 	if Asset_IsHighlighted(rel) {
 		imgui.DrawList_AddRectFilled(imgui.GetWindowDrawList(), rowMin, rowMax, col_u32(UI_ACCENT_SOFT), 4)
 		if importHighlight.focus {
@@ -267,16 +310,17 @@ asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, n
 // asset_tile: one grid cell - a thumbnail (images) or a large icon, and
 // the name.
 @(private = "file")
-asset_tile :: proc(state: ^EditorState, rel: string) {
+asset_tile :: proc(state: ^EditorState, rel: string, files: []string = nil) {
 	TILE :: 76
 	kind := Asset_KindOf(rel)
 	icon, col := kind_icon(kind)
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	selected := Editor_AssetIsSelected(state, full)
 	isActive := kind == .Scene && state.activeScenePath == rel
 	name := Asset_DisplayName(rel)
-	clicked := imgui.Selectable(fmt.ctprintf("##t_%s", rel), state.selectedAssetPath == full || isActive, {.AllowDoubleClick}, {TILE, TILE + 18})
+	clicked := imgui.Selectable(fmt.ctprintf("##t_%s", rel), selected || isActive, {.AllowDoubleClick}, {TILE, TILE + 18})
 	mn, mx := imgui.GetItemRectMin(), imgui.GetItemRectMax()
-	asset_events(state, rel, kind, full, name, icon, clicked)
+	asset_events(state, rel, kind, full, name, icon, clicked, files)
 	dl := imgui.GetWindowDrawList()
 	box := [2]f32{TILE - 12, TILE - 12}
 	origin := [2]f32{mn.x + 6, mn.y + 4}
@@ -329,7 +373,7 @@ section_components :: proc(state: ^EditorState, filter: string) {
 	if filter != "" && n == 0 do return
 	if !asset_folder_header("Components", n, state = state) do return
 	for f in files {
-		if matches(f, filter) do asset_row(state, f)
+		if matches(f, filter) do asset_row(state, f, "", files)
 	}
 	// Built-in templates.
 	for &comp, idx in state.components {
@@ -395,7 +439,17 @@ AssetBrowser_HandleViewportDrop :: proc(state: ^EditorState, worldPos: [2]f32) {
 	if payload == nil do return
 	p := (^Asset_Payload)(payload.Data)
 	rel := strings.clone(string(p.path[:p.len]), context.temp_allocator)
-	Editor_DropAsset(state, rel, worldPos)
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	if Editor_AssetIsSelected(state, full) && Editor_AssetSelectedCount(state) > 1 {
+		offset: [2]f32 = 0
+		for f in state.selectedAssetPaths {
+			r := strings.trim_prefix(strings.trim_prefix(f, state.projectPath), "/")
+			Editor_DropAsset(state, r, worldPos + offset)
+			offset += {16, 16}
+		}
+	} else {
+		Editor_DropAsset(state, rel, worldPos)
+	}
 }
 
 // Editor_DropAsset adds an asset to the scene at a world position.
@@ -489,13 +543,134 @@ Editor_DropAsset :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) {
 	}
 }
 
-// Editor_SelectAsset selects a file in the Assets panel and previews it.
+Editor_AssetIsSelected :: proc(state: ^EditorState, full: string) -> bool {
+	if full == "" do return false
+	if len(state.selectedAssetPaths) == 0 {
+		return state.selectedAssetPath == full
+	}
+	for p in state.selectedAssetPaths {
+		if p == full do return true
+	}
+	return false
+}
+
+Editor_AssetSelectedCount :: proc(state: ^EditorState) -> int {
+	if len(state.selectedAssetPaths) > 0 {
+		return len(state.selectedAssetPaths)
+	}
+	return 1 if state.selectedAssetPath != "" else 0
+}
+
+Editor_ClearAssetSelection :: proc(state: ^EditorState) {
+	for p in state.selectedAssetPaths do delete(p)
+	delete(state.selectedAssetPaths)
+	state.selectedAssetPaths = nil
+	delete(state.selectedAssetPath)
+	state.selectedAssetPath = ""
+	delete(state.assetAnchorPath)
+	state.assetAnchorPath = ""
+	PreviewPanel_OnAssetSelected(state, "")
+}
+
+// Editor_SelectAsset selects a file in the Assets panel (clearing multi-selection) and previews it.
 Editor_SelectAsset :: proc(state: ^EditorState, full: string) {
+	for p in state.selectedAssetPaths do delete(p)
+	clear(&state.selectedAssetPaths)
+	if full != "" {
+		append(&state.selectedAssetPaths, strings.clone(full))
+	}
 	if state.selectedAssetPath != full {
 		delete(state.selectedAssetPath)
-		state.selectedAssetPath = strings.clone(full)
+		state.selectedAssetPath = strings.clone(full) if full != "" else ""
 	}
+	delete(state.assetAnchorPath)
+	state.assetAnchorPath = strings.clone(full) if full != "" else ""
 	PreviewPanel_OnAssetSelected(state, full)
+}
+
+// Editor_ToggleAssetSelection toggles an individual asset (Control / Command click).
+Editor_ToggleAssetSelection :: proc(state: ^EditorState, full: string) {
+	if full == "" do return
+	if len(state.selectedAssetPaths) == 0 && state.selectedAssetPath != "" {
+		append(&state.selectedAssetPaths, strings.clone(state.selectedAssetPath))
+	}
+
+	foundIdx := -1
+	for p, i in state.selectedAssetPaths {
+		if p == full {
+			foundIdx = i
+			break
+		}
+	}
+
+	if foundIdx >= 0 {
+		delete(state.selectedAssetPaths[foundIdx])
+		ordered_remove(&state.selectedAssetPaths, foundIdx)
+		if state.selectedAssetPath == full {
+			delete(state.selectedAssetPath)
+			if len(state.selectedAssetPaths) > 0 {
+				state.selectedAssetPath = strings.clone(state.selectedAssetPaths[len(state.selectedAssetPaths) - 1])
+			} else {
+				state.selectedAssetPath = ""
+			}
+			PreviewPanel_OnAssetSelected(state, state.selectedAssetPath)
+		}
+	} else {
+		append(&state.selectedAssetPaths, strings.clone(full))
+		delete(state.selectedAssetPath)
+		state.selectedAssetPath = strings.clone(full)
+		PreviewPanel_OnAssetSelected(state, full)
+	}
+
+	delete(state.assetAnchorPath)
+	state.assetAnchorPath = strings.clone(full)
+}
+
+// Editor_SelectAssetRange selects a continuous range between the anchor and clicked item (Shift click).
+Editor_SelectAssetRange :: proc(state: ^EditorState, clickedFull: string, files: []string) {
+	if clickedFull == "" do return
+	if len(files) == 0 {
+		Editor_SelectAsset(state, clickedFull)
+		return
+	}
+
+	clickedIdx := -1
+	anchorIdx := -1
+	for f, i in files {
+		fFull, _ := filepath.join({state.projectPath, f}, context.temp_allocator)
+		if fFull == clickedFull do clickedIdx = i
+		if state.assetAnchorPath != "" && fFull == state.assetAnchorPath do anchorIdx = i
+	}
+
+	if clickedIdx == -1 {
+		Editor_SelectAsset(state, clickedFull)
+		return
+	}
+
+	if anchorIdx == -1 {
+		anchorIdx = clickedIdx
+	}
+
+	savedAnchor := strings.clone(state.assetAnchorPath, context.temp_allocator) if state.assetAnchorPath != "" else strings.clone(clickedFull, context.temp_allocator)
+
+	for p in state.selectedAssetPaths do delete(p)
+	clear(&state.selectedAssetPaths)
+
+	low := min(anchorIdx, clickedIdx)
+	high := max(anchorIdx, clickedIdx)
+
+	for i in low..=high {
+		fFull, _ := filepath.join({state.projectPath, files[i]}, context.temp_allocator)
+		append(&state.selectedAssetPaths, strings.clone(fFull))
+	}
+
+	delete(state.selectedAssetPath)
+	state.selectedAssetPath = strings.clone(clickedFull)
+
+	delete(state.assetAnchorPath)
+	state.assetAnchorPath = strings.clone(savedAnchor)
+
+	PreviewPanel_OnAssetSelected(state, clickedFull)
 }
 
 // Kept for callers of the previous API.

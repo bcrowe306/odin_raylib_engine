@@ -104,6 +104,8 @@ EditorState :: struct {
 	activeScene:       ^e.Scene,
 	selectedNode:      ^e.Node,
 	selectedAssetPath: string,
+	selectedAssetPaths: [dynamic]string,
+	assetAnchorPath:    string,
 
 	// Separate Game Process Management (see playtest.odin)
 	gameProcess:        os.Process,
@@ -351,6 +353,11 @@ Editor_Shutdown :: proc(state: ^EditorState) {
 	PreviewPanel_Shutdown(state)
 	delete(state.selection)
 	delete(state.dragOthers)
+	delete(state.selectedAssetPath)
+	delete(state.assetAnchorPath)
+	for p in state.selectedAssetPaths do delete(p)
+	delete(state.selectedAssetPaths)
+	AssetActions_Shutdown()
 	if state.gameProcessRunning {
 		Editor_StopGameProcess(state)
 	}

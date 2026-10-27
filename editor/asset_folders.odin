@@ -72,8 +72,24 @@ folder_row :: proc(state: ^EditorState, dir, label: string) -> bool {
 		if payload := imgui.AcceptDragDropPayload(ASSET_PAYLOAD); payload != nil {
 			p := (^Asset_Payload)(payload.Data)
 			src := strings.clone(string(p.path[:p.len]), context.temp_allocator)
-			dst, _ := filepath.join({dir, filepath.base(src)}, context.temp_allocator)
-			if dir_of(src) != dir && Asset_Move(state, src, dst) do assetFolderOpen[strings.clone(dir)] = true
+			srcFull, _ := filepath.join({state.projectPath, src}, context.temp_allocator)
+			if Editor_AssetIsSelected(state, srcFull) && len(state.selectedAssetPaths) > 1 {
+				movedAny := false
+				for f in state.selectedAssetPaths {
+					r := strings.trim_prefix(strings.trim_prefix(f, state.projectPath), "/")
+					dst, _ := filepath.join({dir, filepath.base(r)}, context.temp_allocator)
+					if dir_of(r) != dir && Asset_Move(state, r, dst) {
+						movedAny = true
+					}
+				}
+				if movedAny {
+					assetFolderOpen[strings.clone(dir)] = true
+					Editor_ClearAssetSelection(state)
+				}
+			} else {
+				dst, _ := filepath.join({dir, filepath.base(src)}, context.temp_allocator)
+				if dir_of(src) != dir && Asset_Move(state, src, dst) do assetFolderOpen[strings.clone(dir)] = true
+			}
 		}
 		imgui.EndDragDropTarget()
 	}

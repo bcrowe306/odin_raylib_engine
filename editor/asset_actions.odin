@@ -20,6 +20,8 @@ assetClipboard: string // project-relative path of the copied asset
 @(private = "file")
 pendingDelete: string
 @(private = "file")
+pendingDeleteMulti: [dynamic]string
+@(private = "file")
 pendingRename: string
 
 // Asset_BeginRename / Asset_BeginDelete: ask for a new name / confirm
@@ -33,6 +35,29 @@ Asset_BeginRename :: proc(rel: string) {
 Asset_BeginDelete :: proc(rel: string) {
 	delete(pendingDelete)
 	pendingDelete = strings.clone(rel)
+	for s in pendingDeleteMulti do delete(s)
+	clear(&pendingDeleteMulti)
+}
+
+Asset_BeginDeleteMulti :: proc(rels: []string) {
+	delete(pendingDelete)
+	pendingDelete = ""
+	for s in pendingDeleteMulti do delete(s)
+	clear(&pendingDeleteMulti)
+	for r in rels {
+		append(&pendingDeleteMulti, strings.clone(r))
+	}
+}
+
+AssetActions_Shutdown :: proc() {
+	delete(pendingDelete)
+	pendingDelete = ""
+	delete(pendingRename)
+	pendingRename = ""
+	delete(assetClipboard)
+	assetClipboard = ""
+	for s in pendingDeleteMulti do delete(s)
+	delete(pendingDeleteMulti)
 }
 
 Asset_HasClipboard :: proc() -> bool {return assetClipboard != ""}
@@ -275,6 +300,64 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 	if menu(ICON_FA_FOLDER_OPEN, "Reveal in Finder" when ODIN_OS == .Darwin else "Show in Folder", "reveal") do Editor_OpenExternally(state, filepath.dir(full, context.temp_allocator))
 }
 
+// Asset_MultiContextMenu: actions when multiple assets are selected.
+// Single-asset actions (rename, edit, play, attach, make global, slice) are excluded.
+Asset_MultiContextMenu :: proc(state: ^EditorState) {
+	count := Editor_AssetSelectedCount(state)
+	UI_DimText(fmt.tprintf("%d assets selected", count))
+	imgui.Separator()
+
+	hasScene := state.activeScene != nil
+	if hasScene {
+		if menu(ICON_FA_PLUS, fmt.tprintf("Add All to Scene (%d)", count), "add-all-to-scene") {
+			offset: [2]f32 = 0
+			for f in state.selectedAssetPaths {
+				rel := strings.trim_prefix(strings.trim_prefix(f, state.projectPath), "/")
+				Editor_DropAsset(state, rel, state.cameraPos + offset)
+				offset += {16, 16}
+			}
+		}
+	}
+
+	if menu(ICON_FA_CLONE, fmt.tprintf("Duplicate (%d items)", count), "duplicate-multi") {
+		rels := make([dynamic]string, context.temp_allocator)
+		for f in state.selectedAssetPaths {
+			rel := strings.trim_prefix(strings.trim_prefix(f, state.projectPath), "/")
+			append(&rels, rel)
+		}
+		for r in rels {
+			Asset_Duplicate(state, r, filepath.dir(r, context.temp_allocator))
+		}
+	}
+
+	if menu(ICON_FA_TRASH, fmt.tprintf("Delete (%d items)...", count), "delete-multi") {
+		rels := make([dynamic]string, context.temp_allocator)
+		for f in state.selectedAssetPaths {
+			rel := strings.trim_prefix(strings.trim_prefix(f, state.projectPath), "/")
+			append(&rels, rel)
+		}
+		Asset_BeginDeleteMulti(rels[:])
+	}
+
+	imgui.Separator()
+
+	if menu(ICON_FA_LINK, "Copy Paths", "copy-paths-multi") {
+		sb := strings.builder_make(context.temp_allocator)
+		for f, i in state.selectedAssetPaths {
+			rel := strings.trim_prefix(strings.trim_prefix(f, state.projectPath), "/")
+			if i > 0 do strings.write_byte(&sb, '\n')
+			strings.write_string(&sb, rel)
+		}
+		imgui.SetClipboardText(strings.clone_to_cstring(strings.to_string(sb), context.temp_allocator))
+	}
+
+	if menu(ICON_FA_FOLDER_OPEN, "Reveal in Finder" when ODIN_OS == .Darwin else "Show in Folder", "reveal-multi") {
+		if len(state.selectedAssetPaths) > 0 {
+			Editor_OpenExternally(state, filepath.dir(state.selectedAssetPaths[0], context.temp_allocator))
+		}
+	}
+}
+
 // Asset_FolderContextMenu: actions for a folder header in the Assets panel.
 Asset_FolderContextMenu :: proc(state: ^EditorState, title: string) {
 	folder := strings.to_lower(title, context.temp_allocator)
@@ -404,35 +487,73 @@ Asset_AddMenu :: proc(state: ^EditorState) {
 	if menu(ICON_FA_WAND_MAGIC_SPARKLES, "New Shader", "add-new-shader") do Editor_NewShader(state)
 }
 
-// AssetDelete_Render: the delete confirmation.
+// AssetDelete_Render: the delete confirmation (single or multi).
 AssetDelete_Render :: proc(state: ^EditorState) {
-	if pendingDelete != "" && !imgui.IsPopupOpen("Delete Asset###DeleteAsset") do imgui.OpenPopup("Delete Asset###DeleteAsset")
+	hasSingle := pendingDelete != ""
+	hasMulti := len(pendingDeleteMulti) > 0
+	if !hasSingle && !hasMulti do return
+
+	if !imgui.IsPopupOpen("Delete Asset###DeleteAsset") do imgui.OpenPopup("Delete Asset###DeleteAsset")
 	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
 	imgui.SetNextWindowPos(center, .Appearing, {0.5, 0.5})
 	if !imgui.BeginPopupModal("Delete Asset###DeleteAsset", nil, {.NoTitleBar, .AlwaysAutoResize}) do return
-	UI_PanelTitle(ICON_FA_TRASH, "Delete asset?")
-	imgui.Dummy({0, 4})
-	full, _ := filepath.join({state.projectPath, pendingDelete}, context.temp_allocator)
-	if os.is_dir(full) {
-		n := 0
-		for f in Editor_ProjectFiles(state) do if strings.has_prefix(f, strings.concatenate({pendingDelete, "/"}, context.temp_allocator)) do n += 1
-		imgui.TextUnformatted(fmt.ctprintf("The folder %s and the %d file(s) in it will be deleted.", pendingDelete, n))
+
+	if hasMulti {
+		UI_PanelTitle(ICON_FA_TRASH, fmt.tprintf("Delete %d assets?", len(pendingDeleteMulti)))
+		imgui.Dummy({0, 4})
+		imgui.TextUnformatted(fmt.ctprintf("Are you sure you want to delete these %d assets from the project?", len(pendingDeleteMulti)))
+		imgui.Dummy({0, 2})
+		maxShow := min(len(pendingDeleteMulti), 6)
+		for i := 0; i < maxShow; i += 1 {
+			UI_DimText(fmt.tprintf("  • %s", pendingDeleteMulti[i]))
+		}
+		if len(pendingDeleteMulti) > maxShow {
+			UI_DimText(fmt.tprintf("  ... and %d more", len(pendingDeleteMulti) - maxShow))
+		}
+		imgui.Dummy({0, 4})
+		UI_DimText("Scenes, scripts or components that use them will show them as missing.")
+		imgui.Dummy({0, 6})
+		if UI_PrimaryButton("Delete", "delete.ok", {96, 0}) {
+			for r in pendingDeleteMulti {
+				Asset_Delete(state, r)
+				delete(r)
+			}
+			clear(&pendingDeleteMulti)
+			Editor_ClearAssetSelection(state)
+			imgui.CloseCurrentPopup()
+		}
+		imgui.SameLine()
+		if UI_Button("Cancel", "delete.cancel", {96, 0}) || imgui.IsKeyPressed(.Escape, false) {
+			for r in pendingDeleteMulti do delete(r)
+			clear(&pendingDeleteMulti)
+			imgui.CloseCurrentPopup()
+		}
 	} else {
-		imgui.TextUnformatted(fmt.ctprintf("%s will be deleted from the project folder.", pendingDelete))
-	}
-	UI_DimText("Scenes, scripts or components that use it will show it as missing.")
-	imgui.Dummy({0, 6})
-	if UI_PrimaryButton("Delete", "delete.ok", {96, 0}) {
-		Asset_Delete(state, pendingDelete)
-		delete(pendingDelete)
-		pendingDelete = ""
-		imgui.CloseCurrentPopup()
-	}
-	imgui.SameLine()
-	if UI_Button("Cancel", "delete.cancel", {96, 0}) || imgui.IsKeyPressed(.Escape, false) {
-		delete(pendingDelete)
-		pendingDelete = ""
-		imgui.CloseCurrentPopup()
+		UI_PanelTitle(ICON_FA_TRASH, "Delete asset?")
+		imgui.Dummy({0, 4})
+		full, _ := filepath.join({state.projectPath, pendingDelete}, context.temp_allocator)
+		if os.is_dir(full) {
+			n := 0
+			for f in Editor_ProjectFiles(state) do if strings.has_prefix(f, strings.concatenate({pendingDelete, "/"}, context.temp_allocator)) do n += 1
+			imgui.TextUnformatted(fmt.ctprintf("The folder %s and the %d file(s) in it will be deleted.", pendingDelete, n))
+		} else {
+			imgui.TextUnformatted(fmt.ctprintf("%s will be deleted from the project folder.", pendingDelete))
+		}
+		UI_DimText("Scenes, scripts or components that use it will show it as missing.")
+		imgui.Dummy({0, 6})
+		if UI_PrimaryButton("Delete", "delete.ok", {96, 0}) {
+			Asset_Delete(state, pendingDelete)
+			delete(pendingDelete)
+			pendingDelete = ""
+			Editor_ClearAssetSelection(state)
+			imgui.CloseCurrentPopup()
+		}
+		imgui.SameLine()
+		if UI_Button("Cancel", "delete.cancel", {96, 0}) || imgui.IsKeyPressed(.Escape, false) {
+			delete(pendingDelete)
+			pendingDelete = ""
+			imgui.CloseCurrentPopup()
+		}
 	}
 	imgui.EndPopup()
 }
