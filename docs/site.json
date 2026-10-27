@@ -33,6 +33,7 @@
         { "file": "engine/docs/advanced_camera.md", "slug": "guides/advanced-camera" },
         { "file": "engine/docs/paths.md", "slug": "guides/paths" },
         { "file": "engine/docs/navigation.md", "slug": "guides/navigation" },
+        { "file": "engine/docs/state_machine.md", "slug": "guides/state-machine" },
         { "file": "engine/docs/visibility.md", "slug": "guides/visibility" },
         { "file": "engine/docs/pooling.md", "slug": "guides/pooling" },
         { "file": "engine/docs/aseprite.md", "slug": "guides/aseprite" },

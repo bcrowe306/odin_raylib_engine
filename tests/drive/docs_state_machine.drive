@@ -1,0 +1,170 @@
+# Docs screenshots: the State Machine tab (engine/docs/state_machine.md).
+# A player with idle / run / jump: idle <-> run Automatic on speed (a pair
+# both ways, curved apart), run -> jump Manual, a buffered jump trigger.
+# scripts/docs/screenshots.sh copies the shots into docs/images/.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 5
+
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+click @bottom:animation
+click @anim.new
+click @anim.new
+click @hier:PlayerShip
+key ctrl+a
+key ctrl+a
+type state machine
+key enter
+wait 3
+expect bottom-tab == StateGraph
+
+# Parameters & Triggers.
+click @smg.page:params
+wait 2
+click @smg.add-param
+click @smg.param-name:0
+key cmd+a
+type speed
+key enter
+click @smg.param-type:0
+click @pick:float
+click @smg.add-param
+click @smg.param-name:1
+key cmd+a
+type on_floor
+key enter
+click @smg.add-trigger
+click @smg.trigger-name:0
+key cmd+a
+type jump
+key enter
+dblclick @smg.trigger-buffer:0
+key ctrl+a
+type 0.15
+key enter
+wait 2
+annotate @smg.param-type:0 A parameter's type: bool, int or float
+annotate @smg.param-value:0 Its starting value
+annotate @smg.trigger-buffer:0 Buffer: how long a trigger waits for an arrow it can open
+screenshot state_machine_parameters
+
+# Graph: three states.
+click @smg.page:graph
+wait 2
+rclick @smg.canvas+-200,-30
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type idle
+key enter
+click @smg.state-anim
+click @pick:anim_1
+rclick @smg.canvas+60,-30
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type run
+key enter
+click @smg.state-anim
+click @pick:anim_2
+hover @smg.canvas
+key f
+wait 2
+rclick @smg.canvas+-200,60
+click @ctx:smg-add-state
+click @smg.state-name
+key cmd+a
+type jump
+key enter
+wait 2
+hover @smg.canvas
+key f
+wait 2
+# idle -> run when speed > 1 (Automatic) and back when speed < 1.
+drag @smg.handle:idle @smg.state:run 10
+wait 2
+click @insp.sm.tr-mode:0
+click @pick:Automatic
+click @insp.sm.add-cond:0
+click @insp.sm.cond-param:0.0
+click @pick:speed
+click @insp.sm.cond-op:0.0
+click @pick:>
+dblclick @insp.sm.cond-value:0.0
+key ctrl+a
+type 1
+key enter
+drag @smg.handle:run @smg.state:idle 10
+wait 2
+click @insp.sm.tr-mode:1
+click @pick:Automatic
+click @insp.sm.add-cond:1
+click @insp.sm.cond-param:1.0
+click @pick:speed
+click @insp.sm.cond-op:1.0
+click @pick:<
+dblclick @insp.sm.cond-value:1.0
+key ctrl+a
+type 1
+key enter
+# run -> jump: Manual (a script calls sm_transition("jump")).
+drag @smg.handle:run @smg.state:jump 10
+wait 2
+click @smg.canvas+150,80
+wait 2
+annotate @smg.tr:0 Automatic arrows are solid; a pair both ways curves apart
+annotate @smg.tr:2 Manual arrows are dashed: only sm_transition takes them
+annotate @smg.state:idle A state: its name, its animation (or "gameplay")
+annotate @smg.handle:jump Drag a state's dot onto another state to add an arrow
+screenshot state_machine_graph
+
+click @smg.state:run
+wait 2
+annotate @smg.state-retrigger Allow Retrigger: the state may go to itself
+annotate @smg.state-break Break on Enter: pause when it's entered (Simulate and Play)
+screenshot state_machine_state_panel
+
+click @smg.tr:2
+wait 2
+annotate @insp.sm.tr-mode:2 Manual or Automatic
+annotate @insp.sm.add-cond:2 Conditions (for Manual arrows: checked when a script asks)
+screenshot state_machine_arrow_panel
+
+# Settings.
+click @smg.page:settings
+wait 2
+annotate @smg.player The AnimationPlayer the states play on (Auto: a sibling or child)
+annotate @smg.initial The state it starts in
+annotate @smg.autostart Start by itself when the game starts
+screenshot state_machine_settings
+
+# Live: Simulate, speed raised from the Lua line - idle -> run.
+key cmd+s
+wait 3
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+expect node:StateMachine.state == idle/3
+click @bottom:console
+click @console.lua
+type Scene.find_node("StateMachine"):sm_set("speed", 4)
+key enter
+wait 20
+expect node:StateMachine.state == run/3
+click @bottom:stategraph
+wait 2
+click @smg.page:graph
+wait 2
+click @smg.state:run
+wait 5
+annotate @smg.state:run The current state, lit; the bar is the time in it
+annotate @smg.way:jump Ways out: what each arrow waits for, or what blocks it
+screenshot state_machine_live
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5

@@ -2822,7 +2822,9 @@ lua_light_get_energy :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
-// --- StateMachineNode: sm_set / sm_get / sm_trigger / sm_travel / sm_request / sm_state / sm_previous / sm_time / sm_start / sm_stop
+// --- StateMachineNode: sm_set / sm_get / sm_trigger / sm_trigger_pending / sm_clear_trigger /
+// sm_transition / sm_can_transition / sm_state / sm_previous / sm_time / sm_history / sm_start / sm_stop
+// (the guide: engine/docs/state_machine.md)
 
 @(private="file")
 sm_arg :: proc(L: ^lua.State) -> ^StateMachineNode {
@@ -2852,57 +2854,108 @@ lua_sm_set :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
-// machine:sm_get(param) -> number
+// machine:sm_get(param) -> boolean (bool parameters) / integer (int) / number (float); nil when there's none
 @(private="file")
 lua_sm_get :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	sm := sm_arg(L)
 	name := lua.tostring(L, 2)
-	lua.pushnumber(L, lua.Number(StateMachine_GetParam(sm, string(name)) if sm != nil && name != nil else 0))
+	if sm == nil || name == nil {lua.pushnil(L); return 1}
+	i := StateMachine_FindParam(sm, string(name))
+	if i < 0 {lua.pushnil(L); return 1}
+	p := sm.params[i]
+	switch p.type {
+	case .Bool:  lua.pushboolean(L, b32(p.value != 0))
+	case .Int:   lua.pushinteger(L, lua.Integer(p.value))
+	case .Float: lua.pushnumber(L, lua.Number(p.value))
+	}
 	return 1
 }
 
-// machine:sm_trigger(name): sets a trigger, consumed by the transition it fires
+// machine:sm_trigger(name) -> bool: sets a trigger (false + a warning: no such trigger)
 @(private="file")
 lua_sm_trigger :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	sm := sm_arg(L)
 	name := lua.tostring(L, 2)
-	if sm != nil && name != nil do StateMachine_SetParam(sm, string(name), 1)
-	return 0
-}
-
-// machine:sm_travel(state [, blend]) -> bool: switch now, no conditions
-@(private="file")
-lua_sm_travel :: proc "c" (L: ^lua.State) -> c.int {
-	context = Script_Context(L)
-	sm := sm_arg(L)
-	name := lua.tostring(L, 2)
-	ok := false
-	if sm != nil && name != nil do ok = StateMachine_Travel(sm, string(name), f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else 0, sm_ctx(L))
-	lua.pushboolean(L, b32(ok))
+	lua.pushboolean(L, b32(sm != nil && name != nil && StateMachine_FireTrigger(sm, string(name))))
 	return 1
 }
 
-// machine:sm_request(state [, blend]) -> ok, reason: along an arrow, if the
-// guards allow it (the arrow's conditions aren't checked)
+// machine:sm_trigger_pending(name) -> bool: set and not used up yet
 @(private="file")
-lua_sm_request :: proc "c" (L: ^lua.State) -> c.int {
+lua_sm_trigger_pending :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := sm_arg(L)
+	name := lua.tostring(L, 2)
+	lua.pushboolean(L, b32(sm != nil && name != nil && StateMachine_TriggerPending(sm, string(name))))
+	return 1
+}
+
+// machine:sm_clear_trigger(name): un-sets a trigger
+@(private="file")
+lua_sm_clear_trigger :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := sm_arg(L)
+	name := lua.tostring(L, 2)
+	if sm != nil && name != nil do StateMachine_ClearTrigger(sm, string(name))
+	return 0
+}
+
+// sm_transition_opts: {force = bool, blend = seconds} (the optional table at idx).
+@(private="file")
+sm_transition_opts :: proc(L: ^lua.State, idx: c.int) -> (force: bool, blend: f32) {
+	blend = -1
+	if lua.type(L, idx) != .TABLE do return
+	lua.getfield(L, idx, "force")
+	force = bool(lua.toboolean(L, -1))
+	lua.pop(L, 1)
+	lua.getfield(L, idx, "blend")
+	if lua.type(L, -1) == .NUMBER do blend = f32(lua.tonumber(L, -1))
+	lua.pop(L, 1)
+	return
+}
+
+// sm_push_result: true, or false + why (for the state the call asked for).
+@(private="file")
+sm_push_result :: proc(L: ^lua.State, sm: ^StateMachineNode, block: SM_Block, from, to: string, secs: f32) -> c.int {
+	lua.pushboolean(L, b32(block == .None))
+	if block == .None do lua.pushnil(L)
+	else do lua.pushstring(L, strings.clone_to_cstring(StateMachine_BlockText(sm, block, from, to, secs), context.temp_allocator))
+	return 2
+}
+
+// machine:sm_transition(state [, {force = true, blend = s}]) -> ok, reason
+@(private="file")
+lua_sm_transition :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	sm := sm_arg(L)
 	name := lua.tostring(L, 2)
 	if sm == nil || name == nil {
 		lua.pushboolean(L, false)
-		lua.pushstring(L, "no such state machine or state")
+		lua.pushstring(L, "sm_transition needs a state machine and a state name")
 		return 2
 	}
+	force, blend := sm_transition_opts(L, 3)
 	from := StateMachine_CurrentName(sm)
 	secs := sm.timeInState
-	block := StateMachine_Request(sm, string(name), f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else -1, sm_ctx(L))
-	lua.pushboolean(L, b32(block == .None))
-	if block == .None do lua.pushnil(L)
-	else do lua.pushstring(L, strings.clone_to_cstring(StateMachine_BlockText(sm, block, from, string(name), secs), context.temp_allocator))
-	return 2
+	return sm_push_result(L, sm, StateMachine_Transition(sm, string(name), force, blend, sm_ctx(L)), from, string(name), secs)
+}
+
+// machine:sm_can_transition(state [, {force = true}]) -> ok, reason (changes nothing)
+@(private="file")
+lua_sm_can_transition :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := sm_arg(L)
+	name := lua.tostring(L, 2)
+	if sm == nil || name == nil {
+		lua.pushboolean(L, false)
+		lua.pushstring(L, "sm_can_transition needs a state machine and a state name")
+		return 2
+	}
+	force, _ := sm_transition_opts(L, 3)
+	block, _ := StateMachine_CanTransition(sm, string(name), force)
+	return sm_push_result(L, sm, block, StateMachine_CurrentName(sm), string(name), sm.timeInState)
 }
 
 @(private="file")
@@ -4211,10 +4264,14 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "sm_get")
 		lua.pushcfunction(L, lua_sm_trigger)
 		lua.setfield(L, -2, "sm_trigger")
-		lua.pushcfunction(L, lua_sm_travel)
-		lua.setfield(L, -2, "sm_travel")
-		lua.pushcfunction(L, lua_sm_request)
-		lua.setfield(L, -2, "sm_request")
+		lua.pushcfunction(L, lua_sm_trigger_pending)
+		lua.setfield(L, -2, "sm_trigger_pending")
+		lua.pushcfunction(L, lua_sm_clear_trigger)
+		lua.setfield(L, -2, "sm_clear_trigger")
+		lua.pushcfunction(L, lua_sm_transition)
+		lua.setfield(L, -2, "sm_transition")
+		lua.pushcfunction(L, lua_sm_can_transition)
+		lua.setfield(L, -2, "sm_can_transition")
 		lua.pushcfunction(L, lua_sm_state)
 		lua.setfield(L, -2, "sm_state")
 		lua.pushcfunction(L, lua_sm_previous)

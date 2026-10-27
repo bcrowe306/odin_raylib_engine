@@ -469,63 +469,65 @@ viewport.
 
 ### State machines
 
-**State Machine tab** (bottom panel; it follows a selected State Machine):
-the machine as a graph - states as boxes (a flag marks the initial one, a
-film its animation, otherwise *gameplay*; a child machine is named), the
-**Any state** box, transitions as arrows labelled with their conditions
-(`speed > 10`, `jump!`, `sees_player()`, `a | b` for or-groups).
+Guide with tutorials: [`engine/docs/state_machine.md`](../engine/docs/state_machine.md).
+
+Add a **State Machine** (Animation & Effects) next to an AnimationPlayer
+and edit it in the **State Machine tab** (bottom panel; it follows a
+selected State Machine). The Inspector shows only a summary and **Edit in
+State Machine Tab**. The tab has three sub-tabs:
+
+**Graph** - states as boxes (a flag marks the initial one, a film its
+animation, otherwise *gameplay*; a child machine is named), the **Any
+state** box, arrows labelled with their conditions (`speed > 10`, `jump!`
+for a trigger, `sees_player()`, `a | b` for or-groups). **Manual** arrows
+(only a script's `sm_transition` takes them - the default for new arrows)
+are drawn dashed, **Automatic** ones (taken when their conditions hold)
+solid; a two-way pair curves apart.
 
 - Right-click empty space: **Add State** (a gameplay state) or **Add State
   for Animation**; right-click a state: Set as Initial, Break on Enter,
   **Add Script Callbacks** (writes `on_enter_` / `on_update_` / `on_exit_`
-  into the machine's or its parent's script), Delete. Every state in the
-  project is also in the generated types (`.rayzr/definitions/project_types.lua`),
-  so typing `function Cls:on_update_` completes the state names.
+  into the machine's or its parent's script), **Add Guard Callbacks**
+  (`can_exit_<state>(next)` / `can_enter_<state>(previous)` returning
+  true), Delete. Every state in the project is also in the generated types
+  (`.rayzr/definitions/project_types.lua`), so typing
+  `function Cls:on_update_` completes the state names.
 - Drag a box to move it (positions are saved); drag a box's **dot** onto
-  another box for a transition; click an arrow or a box to edit it in the
-  side panel (name, animation or none, **child machine**, initial, break on
-  enter; a transition's from / to, blend and conditions - including
-  *script says* and *or*); Delete removes the selection. The wheel (or the
+  another box for an arrow; Delete removes the selection. The wheel (or the
   middle button) pans, Shift+wheel sideways, **Cmd/Ctrl+wheel zooms**, F
   frames everything.
+- The **side panel** edits the selection: a state's name, animation or
+  none, **child machine**, Initial, **Allow Retrigger** (it may go to
+  itself), Break on Enter, its **guards** - **Leave After** (seconds before
+  it can be left), **Any State Interrupts** (off: Any-state arrows don't
+  fire while in it), **Can leave when** / **Can enter when** (condition
+  rows; empty = any time) - and its script callbacks; an arrow's from / to,
+  **Mode** (Manual / Automatic), blend and conditions (including *script
+  says* and *or*). A guarded state shows a **lock**.
 - **Live**: in Simulate *and* while the game plays (Play: the running
   game's machine, polled over the editor link) the current state is lit
-  (with a bar for its time), the transition that fired flashes, and the side
-  panel lists the **history** of changes.
-- **Guards** (a state's side panel, *Guards*): **Leave After** (seconds
-  before any arrow can leave it), **Any State Interrupts** (off: arrows from
-  Any state don't fire while in it), **Can leave when** and **Can enter
-  when** (condition rows like an arrow's; empty = any time). A guarded state
-  shows a **lock** (hover it for the guards). *Add Guard Callbacks* (menu or
-  side panel) writes `can_exit_<state>(next)` / `can_enter_<state>(previous)`
-  returning true into the script. The rule: an arrow allows a change, its
-  conditions say when it goes by itself, the states' guards can refuse it.
-- **Ways out (live)**: with the current state selected (or nothing), each
-  arrow out of it - *fires*, *waiting for speed > 10*, or *blocked: attack:
-  leave after 0.4s (0.12s so far)*; a selected arrow marks each condition
-  green / red, and an arrow that would fire but is blocked is drawn red.
+  (with a bar for its time), the arrow that fired flashes, and the side
+  panel lists **Ways out** (each arrow out of the current state - *fires*,
+  *waiting for speed > 10*, *manual: a script calls sm_transition(...)*,
+  or *blocked: attack: leave after 0.4s (0.12s so far)*; a selected arrow
+  marks each condition green / red), the **history** of changes and the
+  **pending triggers**.
 - **Break on Enter** (a state's menu or side panel; a red dot): entering
   that state pauses Simulate, or the running game (its toolbar shows
   Paused; Resume / Step as usual). Kept by the editor (not saved in the
   scene) and sent to every game Play starts.
 
-The Inspector still edits everything as lists.
-Add a **State Machine** (Animation & Effects) next to an AnimationPlayer.
-The Inspector edits its **Player** (Auto finds a sibling or child),
-**Initial State** and **Autostart**; **States** (name + the animation it
-plays; **From Animations** adds one per animation); **Parameters** (name
-and starting value); and **Transitions** (from / any state -> to, crossfade
-**blend**, and conditions: parameter compared with a value, trigger,
-animation finished, after N seconds). While simulating, the current state
-is marked with a play icon. Scripts: `sm_set`, `sm_trigger`, `sm_travel`,
-`on_enter_<state>` / `on_exit_<state>` (see `engine/SCRIPTING.md`).
+**Parameters & Triggers** - typed parameters (bool / int / float) with
+their starting values, and triggers (one-shot events, separate from
+parameters) with an optional **buffer** time; live values and pending
+triggers while running.
 
-**Triggers** have no list of their own: a trigger is a parameter (Add
-Parameter, starting value 0) that a condition tests with the **trigger**
-operator - the condition row's second dropdown (`when <parameter>
-<operator>`; it starts as *is true*). The graph labels it `name!`. A script's
-`sm_trigger("name")` sets it; the arrow that uses it resets it. Step by
-step: *Triggers* in `engine/SCRIPTING.md`.
+**Settings** - the **Animation Player** (Auto finds a sibling or child),
+**Initial State** and **Autostart**.
+
+Scripts: `sm_set`, `sm_trigger`, `sm_transition(state [, {force = true}])`,
+`on_enter_<state>` / `on_update_<state>` / `on_exit_<state>` (see the
+guide and `engine/SCRIPTING.md`).
 
 ### Materials & shaders
 

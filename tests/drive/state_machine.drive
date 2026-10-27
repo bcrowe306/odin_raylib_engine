@@ -1,6 +1,12 @@
-# State machine: a StateMachine next to an AnimationPlayer, states made
-# from its animations, a parameter, a transition with a condition, saving,
-# and simulating in the editor (the parameter edited live switches state).
+# State machine: a StateMachine next to an AnimationPlayer; the Inspector
+# shows a summary and opens the State Machine tab; states made from the
+# player's animations (Settings), a typed parameter (Parameters & Triggers),
+# an Automatic arrow with a condition, a trigger with a buffer, saving, and
+# simulating in the editor (the parameter edited live switches state).
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
 wait 5
 click @hier:PlayerShip
 key ctrl+a
@@ -20,16 +26,54 @@ key enter
 expect node:StateMachine.type == StateMachineNode
 expect node:StateMachine.parent == PlayerShip
 expect node:StateMachine.state == /0
-click @insp.sm.from-anims
-expect node:StateMachine.state == /2
-expect item:insp.sm.state-name:1 == visible
+wait 3
+# The Inspector: a summary and a way to the tab.
+click @bottom:console
+click @insp.sm.edit
+wait 3
+expect bottom-tab == StateGraph
+screenshot inspector
 
-# speed > 5: anim_1 -> anim_2.
-click @insp.sm.add-param
-click @insp.sm.param-name:0
+# Settings: a state per animation.
+click @smg.page:settings
+wait 2
+click @smg.from-anims
+expect node:StateMachine.state == /2
+screenshot settings
+
+# Parameters & Triggers: speed (float), jump (buffered 0.2 s).
+click @smg.page:params
+wait 2
+click @smg.add-param
+click @smg.param-name:0
+key cmd+a
 type speed
 key enter
-click @insp.sm.add-transition
+click @smg.param-type:0
+click @pick:float
+click @smg.add-trigger
+click @smg.trigger-name:0
+key cmd+a
+type jump
+key enter
+dblclick @smg.trigger-buffer:0
+key ctrl+a
+type 0.2
+key enter
+wait 2
+screenshot parameters
+
+# Graph: anim_1 -> anim_2, Automatic, when speed > 5.
+click @smg.page:graph
+wait 2
+hover @smg.canvas
+key f
+wait 2
+drag @smg.handle:anim_1 @smg.state:anim_2 10
+wait 2
+expect smg-selected == transition 0
+click @insp.sm.tr-mode:0
+click @pick:Automatic
 click @insp.sm.add-cond:0
 click @insp.sm.cond-op:0.0
 click @pick:>
@@ -37,18 +81,24 @@ dblclick @insp.sm.cond-value:0.0
 key ctrl+a
 type 5
 key enter
-screenshot inspector
+wait 2
+screenshot graph
 click @toolbar.save
 expect file:scenes/main.scene.json contains "type": "StateMachineNode"
-expect file:scenes/main.scene.json contains "params": [["speed", 0]]
-expect file:scenes/main.scene.json contains {"from": "anim_1", "to": "anim_2", "when": [[">", "speed", 5]]}
+expect file:scenes/main.scene.json contains "params": [["speed", 0, "float"]]
+expect file:scenes/main.scene.json contains "triggers": [["jump", 0.2]]
+expect file:scenes/main.scene.json contains {"from": "anim_1", "to": "anim_2", "mode": "auto", "when": [[">", "speed", 5]]}
 
 # Simulate: starts in the initial state; raising speed switches.
 click @menu:Game
 click @menu:Game/Simulate in Editor
 wait 10
 expect node:StateMachine.state == anim_1/2
-dblclick @insp.sm.param-value:0
+click @hier:PlayerShip/StateMachine
+wait 2
+click @smg.page:params
+wait 2
+dblclick @smg.param-value:0
 key ctrl+a
 type 10
 key enter

@@ -1,0 +1,27 @@
+{"name": "combo", "background": [30, 30, 40, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "CameraNode", "name": "Camera", "position": [160, 90], "properties": {"isCurrent": true}},
+ {"type": "TextNode", "name": "Probe", "position": [4, 4], "properties": {"text": "", "fontSize": 10}, "script": {"path": "scripts/probe.lua", "properties": {"machine": "Combo"}}},
+ {"type": "Node", "name": "Fighter", "position": [160, 90],
+  "script": {"path": "scripts/combo_fighter.lua"},
+  "children": [
+   {"type": "AnimationPlayerNode", "name": "Sprite", "fps": 12, "animations": [
+     {"name": "idle", "loop": true}, {"name": "attack1", "loop": false},
+     {"name": "attack2", "loop": false}, {"name": "attack3", "loop": false}]},
+   {"type": "StateMachineNode", "name": "Combo", "state_machine": {
+     "initial": "idle", "player": "", "autostart": true,
+     "params": [],
+     "triggers": [["attack", 0.3]],
+     "states": [
+      {"name": "idle", "animation": "idle", "pos": [160, 120]},
+      {"name": "attack1", "animation": "attack1", "pos": [360, 40]},
+      {"name": "attack2", "animation": "attack2", "pos": [560, 40]},
+      {"name": "attack3", "animation": "attack3", "pos": [760, 40]}],
+     "transitions": [
+      {"from": "idle", "to": "attack1", "mode": "auto", "when": [["trigger", "attack"]]},
+      {"from": "attack1", "to": "attack2", "mode": "auto", "when": [["trigger", "attack"], ["finished"]]},
+      {"from": "attack2", "to": "attack3", "mode": "auto", "when": [["trigger", "attack"], ["finished"]]},
+      {"from": "attack1", "to": "idle", "mode": "auto", "blend": 0.1, "when": [["finished"]]},
+      {"from": "attack2", "to": "idle", "mode": "auto", "blend": 0.1, "when": [["finished"]]},
+      {"from": "attack3", "to": "idle", "mode": "auto", "blend": 0.1, "when": [["finished"]]}]}}
+  ]}
+]}}

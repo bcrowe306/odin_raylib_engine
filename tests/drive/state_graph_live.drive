@@ -11,7 +11,10 @@ key ctrl+a
 type state machine
 key enter
 wait 3
-click @insp.sm.add-param
+click @smg.page:params
+click @smg.add-param
+click @smg.page:graph
+wait 2
 rclick @smg.canvas+-150,-20
 click @ctx:smg-add-state
 click @smg.state-name
@@ -28,6 +31,8 @@ wait 2
 click @smg.state-break
 drag @smg.handle:idle @smg.state:moving 10
 wait 2
+click @insp.sm.tr-mode:0
+click @pick:Automatic
 click @insp.sm.add-cond:0
 wait 2
 key cmd+s

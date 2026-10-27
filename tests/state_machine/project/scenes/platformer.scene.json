@@ -1,0 +1,33 @@
+{"name": "platformer", "background": [30, 30, 40, 255], "root": {"type": "Node", "name": "root", "children": [
+ {"type": "CameraNode", "name": "Camera", "position": [160, 90], "properties": {"isCurrent": true}},
+ {"type": "TextNode", "name": "Probe", "position": [4, 4], "properties": {"text": "", "fontSize": 10}, "script": {"path": "scripts/probe.lua", "properties": {"machine": "StateMachine"}}},
+ {"type": "StaticBodyNode", "name": "Floor", "position": [160, 170], "shapes": [{"type": "Box", "size": [600, 20]}]},
+ {"type": "CharacterMoverNode", "name": "Player", "position": [160, 60],
+  "shapes": [{"type": "Capsule", "radius": 8, "size": [16, 8]}],
+  "properties": {"controlMode": "Script"},
+  "script": {"path": "scripts/platformer_player.lua"},
+  "children": [
+   {"type": "AnimationPlayerNode", "name": "Sprite", "fps": 8, "animations": [
+     {"name": "idle", "loop": true}, {"name": "run", "loop": true},
+     {"name": "jump", "loop": false}, {"name": "fall", "loop": true}]},
+   {"type": "StateMachineNode", "name": "StateMachine", "state_machine": {
+     "initial": "idle", "player": "", "autostart": true,
+     "params": [["speed", 0, "float"], ["on_floor", 0, "bool"], ["vy", 0, "float"]],
+     "triggers": [["jump", 0.15]],
+     "states": [
+      {"name": "idle", "animation": "idle", "pos": [160, 40]},
+      {"name": "run", "animation": "run", "pos": [360, 40]},
+      {"name": "jump", "animation": "jump", "pos": [160, 200]},
+      {"name": "fall", "animation": "fall", "pos": [360, 200]}],
+     "transitions": [
+      {"from": "idle", "to": "jump", "mode": "auto", "when": [["trigger", "jump"], ["true", "on_floor"]]},
+      {"from": "run", "to": "jump", "mode": "auto", "when": [["trigger", "jump"], ["true", "on_floor"]]},
+      {"from": "idle", "to": "fall", "mode": "auto", "when": [["false", "on_floor"]]},
+      {"from": "run", "to": "fall", "mode": "auto", "when": [["false", "on_floor"]]},
+      {"from": "idle", "to": "run", "mode": "auto", "blend": 0.1, "when": [[">", "speed", 10]]},
+      {"from": "run", "to": "idle", "mode": "auto", "blend": 0.1, "when": [["<", "speed", 10]]},
+      {"from": "jump", "to": "fall", "mode": "auto", "when": [[">", "vy", 0]]},
+      {"from": "fall", "to": "jump", "mode": "auto", "when": [["trigger", "jump"], ["true", "on_floor"]]},
+      {"from": "fall", "to": "idle", "mode": "auto", "when": [["true", "on_floor"]]}]}}
+  ]}
+]}}

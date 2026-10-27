@@ -87,6 +87,8 @@ jobs:
           xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/gamepads/runtime_tests.json
           # Vector art (Phase 14): renders compared with tests/vector/expected (both draw paths, a zoom), the benchmark scene.
           xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/vector/runtime_tests.json
+          # State machines: the guide's tutorial scenes and scripts (engine/docs/state_machine.md) played by the runner.
+          xvfb-run -a python3 scripts/templates/test_templates.py --runner bin/runners/linux/runner --suite tests/state_machine/runtime_tests.json
 
       - name: Crash reports (the runner and the editor crash for real)
         if: matrix.smoke

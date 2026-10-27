@@ -1,5 +1,5 @@
 # Project names complete in API calls: animation names (animation_play),
-# state machine states (sm_travel), save keys (Save.get), locale keys and
+# state machine states (sm_transition), save keys (Save.get), locale keys and
 # languages (tr, Locale.set) and every keyboard key (Input.is_key_pressed).
 wait 5
 exec mkdir -p $PROJECT/locale
@@ -20,7 +20,10 @@ key ctrl+a
 key ctrl+a
 type state machine
 key enter
-click @insp.sm.from-anims
+wait 3
+click @smg.page:settings
+wait 2
+click @smg.from-anims
 key ctrl+s
 wait 2
 dblclick @asset:scripts/player_ship.lua

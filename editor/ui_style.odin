@@ -313,6 +313,15 @@ UI_DimText :: proc(text: string) {
 	imgui.PopStyleColor()
 }
 
+// UI_DimTextWrapped: UI_DimText wrapped at the edge of the window (help lines).
+UI_DimTextWrapped :: proc(text: string) {
+	imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
+	imgui.PushTextWrapPos(0)
+	imgui.TextUnformatted(strings.clone_to_cstring(text, context.temp_allocator))
+	imgui.PopTextWrapPos()
+	imgui.PopStyleColor()
+}
+
 // UI_VerticalDivider draws a short, faint divider in a horizontal toolbar.
 UI_VerticalDivider :: proc(height: f32 = 20) {
 	imgui.SameLine(0, UI_SPACE)

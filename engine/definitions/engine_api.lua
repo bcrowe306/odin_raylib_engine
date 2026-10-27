@@ -7106,53 +7106,90 @@ function Node:set_collision_mask(...) end
 -- ----------------------------------------------------------------------------
 -- StateMachineNode Methods
 --
--- States, transitions and conditions are set up in the Inspector. Entering a
--- state plays its animation on the AnimationPlayer; the machine's and its
--- parent's scripts get on_enter_<state>(previous) / on_exit_<state>(next),
--- and the machine emits "state_changed"(state).
+-- A state machine has states, arrows between them, parameters and triggers.
+-- The full guide, with tutorials: engine/docs/state_machine.md.
+--
+-- Arrows are Manual (the default: only sm_transition takes them) or
+-- Automatic (the machine takes them when their conditions hold).
+--
+-- Callbacks your script defines (on the machine's own script, then on its
+-- parent's), in the order they run:
+--   on_enter_<state>(previous)  the first thing when a state is entered
+--                               (before its child machine starts and its
+--                               animation plays); previous is "" on start
+--   on_update_<state>(dt)       every update while the state is current
+--   on_exit_<state>(next)       the last thing before the state is left
+--                               (after its child machine stopped); next is
+--                               "" when the machine is stopped
+--   can_exit_<state>(next) -> boolean      a guard: false refuses to leave
+--   can_enter_<state>(previous) -> boolean a guard: false refuses to enter
+-- Right-click a state in the State Machine tab > Add Script Callbacks writes
+-- them for you. The machine also emits "state_changed"(state).
 -- ----------------------------------------------------------------------------
 
----Sets a parameter that transition conditions test (booleans become 1 / 0).
+---Sets a parameter: a value the arrows' conditions compare (`speed > 10`, `on_floor is true`). The value is converted to the parameter's type: a **bool** parameter stores true / false (numbers: non-zero is true), an **int** rounds to a whole number, a **float** keeps it. A parameter the machine doesn't have yet is added as a float.
 ---
----Example: `local sm = self.node:get_node("StateMachine"); sm:sm_set("on_floor", true)`
----@param name StateMachineParam|string
+---Use it every update to feed the machine what the game knows (speed, health, whether the player is on the floor); Automatic arrows react to it. For one-shot events (a button press, a hit) use a trigger instead (`sm_trigger`).
+---
+---Example: `local sm = self.node:get_node("StateMachine"); sm:sm_set("speed", math.abs(vx)); sm:sm_set("on_floor", self.node:character_is_on_floor())`
+---@param name StateMachineParam|string The parameter (State Machine tab > Parameters & Triggers)
 ---@param value number|boolean
 function StateMachineNode:sm_set(name, value) end
 
----Gets the value of a state machine parameter.
+---Gets a parameter's value, typed: a **bool** parameter returns true / false, an **int** an integer, a **float** a number. Returns nil when the machine has no parameter of that name.
 ---
----Example: `local speed = self.node:get_node("StateMachine"):sm_get("speed")`
+---Example: `local lives = self.node:get_node("StateMachine"):sm_get("lives")  -- an integer`
 ---@param name StateMachineParam|string
----@return number value
+---@return number|boolean|nil value
 function StateMachineNode:sm_get(name) end
 
----Sets a trigger: a one-shot event such as a button press. A trigger is a parameter
----(Inspector > Parameters, starting value 0) that a condition tests with the
----`trigger` operator (the condition row's second dropdown). This sets it to 1; it
----stays set (also while a guard blocks the change) until a transition testing it
----fires, which resets it to 0. An arrow with no conditions fires at once, so give an
----arrow a trigger condition to change state only when the script says.
+---Sets a trigger: a one-shot event such as a button press or a hit. An **Automatic** arrow with a `trigger` condition fires when it's set (and the arrow's other conditions and the guards agree); the arrow that fires uses it up. If no arrow out of the current state can use it, it is cleared after the machine's next update - so a press can't fire much later from another state. Give the trigger a **buffer** (State Machine tab > Parameters & Triggers) to keep it waiting longer: a jump pressed 0.1 s before landing still happens on landing.
 ---
----Example: `if Input.is_action_pressed("fire") then self.node:get_node("StateMachine"):sm_trigger("punch") end`
----@param name StateMachineParam|string
+---Triggers only drive Automatic arrows; to take a Manual arrow, call `sm_transition`.
+---
+---Example: `if Input.is_action_just_pressed("jump") then self.node:get_node("StateMachine"):sm_trigger("jump") end`
+---@param name StateMachineTrigger|string The trigger (State Machine tab > Parameters & Triggers)
+---@return boolean ok false (and a warning) when the machine has no trigger of that name
 function StateMachineNode:sm_trigger(name) end
 
----Switches to a state now, ignoring conditions.
+---Whether a trigger is set and not used up yet (waiting for an arrow, or in its buffer time).
 ---
----Example: `local ok = self.node:get_node("StateMachine"):sm_travel("hurt", 0.1)`
----@param state StateMachineState|string
----@param blend? number Crossfade seconds for the state's animation
----@return boolean ok false when there is no such state
-function StateMachineNode:sm_travel(state, blend) end
+---Example: `if sm:sm_trigger_pending("attack") then self:show_combo_hint() end`
+---@param name StateMachineTrigger|string
+---@return boolean pending
+function StateMachineNode:sm_trigger_pending(name) end
 
----Asks to go to a state: allowed when an arrow leads there from the current state (or from Any state) and the guards agree (the current state's leave rules - leave after, interruptible, its leave conditions, can_exit_<state> - and the target's enter conditions and can_enter_<state>). The arrow's own conditions are not checked: the script decides when.
+---Un-sets a trigger, so a buffered press doesn't fire later (e.g. the player let go, or a cutscene started).
 ---
----Example: `local ok, why = self.node:get_node("StateMachine"):sm_request("dash")`
+---Example: `self.node:get_node("StateMachine"):sm_clear_trigger("jump")`
+---@param name StateMachineTrigger|string
+function StateMachineNode:sm_clear_trigger(name) end
+
+---@class SM_TransitionOptions
+---@field force? boolean Skip the guards and the arrow's conditions (an arrow is still needed)
+---@field blend? number Crossfade seconds for the new state's animation (default: the arrow's)
+
+---Goes to another state now - the way scripts change state. It needs an arrow from the current state (or from Any state) to that state, Manual or Automatic. It checks the guards (the current state's Leave After / interruptible / can leave when / `can_exit_<state>`, the target's can enter when / `can_enter_<state>`) and the arrow's conditions when it has any; `{force = true}` skips both. A state can go to itself only when it has **Allow Retrigger** on.
+---
+---The change happens inside the call: `on_exit_<old>`, then `on_enter_<new>` run before it returns, so code after it sees the new state. It is refused (with a warning) when called from inside a guard, a `script says` condition or an `on_exit_` callback, and when more than 8 changes have been chained from callbacks (two states sending each other back).
+---
+---Use it for decisions your script makes: an enemy that sees the player chases, a menu button opens a page, a door opens when the key is used.
+---
+---Example: `local ok, why = self.node:get_node("Brain"):sm_transition("chase"); if not ok then Log.info(why) end`
 ---@param state StateMachineState|string
----@param blend? number Crossfade seconds (default: the arrow's)
+---@param options? SM_TransitionOptions
 ---@return boolean ok true when it changed state
----@return string? reason why not (e.g. "attack: leave after 0.4s (0.12s so far)")
-function StateMachineNode:sm_request(state, blend) end
+---@return string? reason why not, e.g. "attack: leave after 0.4s (0.12s so far)", "no arrow from idle to dash"
+function StateMachineNode:sm_transition(state, options) end
+
+---Whether `sm_transition` to a state would work now, and why not - without changing anything. Use it to grey out a button or to pick between options.
+---
+---Example: `local can = sm:sm_can_transition("dash"); self.dash_icon:set_property("tint", can and "#ffffff" or "#666666")`
+---@param state StateMachineState|string
+---@param options? SM_TransitionOptions Only `force` is used
+---@return boolean ok
+---@return string? reason why not
+function StateMachineNode:sm_can_transition(state, options) end
 
 ---Gets the name of the current state.
 ---
@@ -7163,16 +7200,16 @@ function StateMachineNode:sm_state() end
 ---Gets the name of the state before the current one.
 ---
 ---Example: `local prev = self.node:get_node("StateMachine"):sm_previous()`
----@return string state The state before the current one
+---@return string state The state before the current one ("" at the start)
 function StateMachineNode:sm_previous() end
 
 ---@class SM_Change
 ---@field from string The state left ("" when it started)
 ---@field to string The state entered
 ---@field time number Seconds the machine had run
----@field why string "start", "travel" or "transition N"
+---@field why string How: "start", "manual" (sm_transition), "forced" (sm_transition with force) or "transition N" (automatic arrow N)
 
----The last state changes (up to 32), oldest first.
+---The last state changes (up to 32), oldest first. Handy for debugging and for "what did the player just do" logic (e.g. a combo that needs attack1 then attack2).
 ---
 ---Example: `for _, c in ipairs(self.node:get_node("Brain"):sm_history()) do Log.info(c.from, "->", c.to, c.why) end`
 ---@return SM_Change[] changes
@@ -7184,15 +7221,15 @@ function StateMachineNode:sm_history() end
 ---@return number seconds Time spent in the current state
 function StateMachineNode:sm_time() end
 
----Starts (or restarts) in a state, or in the initial state.
+---Starts the machine in a state, or in its initial state. A running machine leaves its current state first (its `on_exit_` runs); pending triggers are cleared. A machine with Autostart starts by itself on its first update; a child machine starts when its parent's state is entered.
 ---
 ---Example: `self.node:get_node("StateMachine"):sm_start("idle")`
----@param state? string
+---@param state? StateMachineState|string
 function StateMachineNode:sm_start(state) end
 
----Stops checking transitions (the current state stays).
+---Stops the machine: the current state's child machine stops, then its `on_exit_<state>("")` runs. The state stays current (`sm_state` still returns it); nothing changes state until `sm_start`.
 ---
----Example: `self.node:get_node("StateMachine"):sm_stop()`
+---Example: `self.node:get_node("StateMachine"):sm_stop()  -- e.g. when the enemy dies`
 function StateMachineNode:sm_stop() end
 
 -- ----------------------------------------------------------------------------

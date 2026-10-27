@@ -1,0 +1,41 @@
+[
+ {
+  "name": "platformer (guide tutorial 1): falls, lands, jumps on the floor",
+  "project": "tests/state_machine/project",
+  "scene": "scenes/platformer.scene.json",
+  "frames": 115,
+  "input": ["60 SPACE tap 1"],
+  "expect": [["Probe", "text", "==", "idle>fall>idle>jump>fall>idle"]]
+ },
+ {
+  "name": "platformer: jump pressed 0.1 s before landing (buffered 0.15 s) jumps on landing",
+  "project": "tests/state_machine/project",
+  "scene": "scenes/platformer.scene.json",
+  "frames": 115,
+  "input": ["60 SPACE tap 1", "101 SPACE tap 1"],
+  "expect": [["Probe", "text", "==", "idle>fall>idle>jump>fall>jump"]]
+ },
+ {
+  "name": "platformer: pressed 0.28 s before landing - longer than the buffer - lands in idle",
+  "project": "tests/state_machine/project",
+  "scene": "scenes/platformer.scene.json",
+  "frames": 115,
+  "input": ["60 SPACE tap 1", "90 SPACE tap 1"],
+  "expect": [["Probe", "text", "==", "idle>fall>idle>jump>fall>idle"]]
+ },
+ {
+  "name": "enemy (guide tutorial 2): far from the player it keeps patrolling",
+  "project": "tests/state_machine/project",
+  "scene": "scenes/enemy.scene.json",
+  "frames": 120,
+  "expect": [["Probe", "text", "==", "patrol"]]
+ },
+ {
+  "name": "enemy: the script sees the player, chases (sm_transition) and attacks in reach",
+  "project": "tests/state_machine/project",
+  "scene": "scenes/enemy.scene.json",
+  "frames": 120,
+  "patch": {"Player": {"position": [190, 100]}},
+  "expect": [["Probe", "text", "==", "patrol>chase>attack"]]
+ }
+]

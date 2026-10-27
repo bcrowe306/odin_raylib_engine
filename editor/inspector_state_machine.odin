@@ -6,9 +6,11 @@ import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
-// Inspector: StateMachineNode - the AnimationPlayer it drives, its states
-// (each optionally playing an animation), parameters, and transitions with
-// their conditions. While simulating, the current state is highlighted.
+// Inspector: StateMachineNode - a summary (player, initial state, counts, the
+// live state) and "Edit in State Machine Tab". Everything is edited in the
+// State Machine bottom tab (state_machine_graph.odin); the editors it shares
+// live here: SM_TransitionEditor (from / to, mode, blend, conditions),
+// SM_ConditionList, SM_NameField, SM_StateCombo.
 // ============================================================================
 
 @(private = "file")
@@ -26,10 +28,9 @@ OP_LABELS := [e.SM_Op]string {
 	.Or        = "-- or --",
 }
 
-// name_field: an InputText for a string held in the node's arena; returns
+// SM_NameField: an InputText for a string held in the node's arena; returns
 // the new text when an edit is committed (Enter or focus lost).
-@(private = "file")
-name_field :: proc(state: ^EditorState, id, value: string, width: f32, hint: cstring = "") -> (string, bool) {
+SM_NameField :: proc(state: ^EditorState, id, value: string, width: f32, hint: cstring = "") -> (string, bool) {
 	@(static) buf: [128]u8
 	@(static) editing: string
 	key := id
@@ -53,8 +54,8 @@ name_field :: proc(state: ^EditorState, id, value: string, width: f32, hint: cst
 	return "", false
 }
 
-@(private = "file")
-state_combo :: proc(id: string, sm: ^e.StateMachineNode, cur: string, allowAny: bool) -> (string, bool) {
+// SM_StateCombo: pick a state (or Any state); (the pick, changed).
+SM_StateCombo :: proc(id: string, sm: ^e.StateMachineNode, cur: string, allowAny: bool) -> (string, bool) {
 	preview := "Any state" if cur == e.SM_ANY else cur
 	result, changed := cur, false
 	if imgui.BeginCombo(fmt.ctprintf("##%s", id), strings.clone_to_cstring(preview, context.temp_allocator)) {
@@ -74,191 +75,34 @@ state_combo :: proc(id: string, sm: ^e.StateMachineNode, cur: string, allowAny: 
 
 inspector_state_machine :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 	if !UI_SectionHeader("State Machine") do return
-	mgr := state.activeScene.manager
-	player := e.StateMachine_Player(sm, mgr)
-	clone :: proc(sm: ^e.StateMachineNode, s: string) -> string {return strings.clone(s, sm.allocator)}
-
+	player := e.StateMachine_Player(sm, state.activeScene.manager)
 	if UI_BeginProps("##statemachine") {
-		// The AnimationPlayer: automatic (sibling / child) or a picked node.
 		UI_PropLabel("Player")
-		preview := "None found"
-		if sm.player == "" && player != nil do preview = fmt.tprintf("Auto (%s)", player.name)
-		else if sm.player != "" do preview = player.name if player != nil else fmt.tprintf("missing: %s", sm.player)
-		imgui.SetNextItemWidth(field_width())
-		if imgui.BeginCombo("##smplayer", strings.clone_to_cstring(preview, context.temp_allocator)) {
-			if imgui.Selectable("Auto", sm.player == "") {
-				Editor_RecordUndo(state, "State machine player")
-				sm.player = ""
-				sm.playerNode = nil
-			}
-			Drive_Item("pick:Auto")
-			for n in mgr.nodes {
-				if n == nil || n.typeId != e.AnimationPlayerNode || n.transient do continue
-				if imgui.Selectable(fmt.ctprintf("%s  %s##%p", ICON_FA_FILM, n.name, n), n == player && sm.player != "") {
-					Editor_RecordUndo(state, "State machine player")
-					sm.player = clone(sm, e.Node_RelativePath(mgr, sm, n))
-					sm.playerNode = nil
-				}
-				Drive_Item(fmt.tprintf("pick:%s", n.name))
-			}
-			imgui.EndCombo()
+		switch {
+		case player != nil: imgui.TextUnformatted(fmt.ctprintf("%s%s", "Auto: " if sm.player == "" else "", player.name))
+		case sm.player != "": imgui.TextColored(UI_WARNING, "%s", fmt.ctprintf("missing: %s", sm.player))
+		case: UI_DimText("none (gameplay states only)")
 		}
-		Drive_Item("insp.sm.player")
-		UI_Tooltip("The AnimationPlayer whose animations the states play (Auto: a sibling, else a child)")
-
 		UI_PropLabel("Initial State")
-		imgui.SetNextItemWidth(field_width())
-		if v, ok := state_combo("insp.sm.initial", sm, sm.initial, false); ok {
-			Editor_RecordUndo(state, "Initial state")
-			sm.initial = v
-		}
-		UI_PropLabel("Autostart")
-		imgui.Checkbox("##smautostart", &sm.autostart)
-		undo_on_activate(state, "Toggle autostart")
-		Drive_Item("insp.sm.autostart")
-		UI_Tooltip("Enter the initial state when the game starts (else call machine:sm_start())")
+		imgui.TextUnformatted(fmt.ctprintf("%s", sm.initial if sm.initial != "" else "-"))
+		UI_PropLabel("Contents")
+		UI_DimText(fmt.tprintf("%d states, %d arrows, %d parameters, %d triggers", len(sm.states), len(sm.transitions), len(sm.params), len(sm.triggers)))
 		if sm.running {
 			UI_PropLabel("Current")
-			imgui.TextColored(UI_ACCENT, fmt.ctprintf("%s  (%.1fs)", e.StateMachine_CurrentName(sm), sm.timeInState))
+			imgui.TextColored(UI_ACCENT, "%s", fmt.ctprintf("%s  %s  (%.1fs)", ICON_FA_PLAY, e.StateMachine_CurrentName(sm), sm.timeInState))
 		}
 		UI_EndProps()
 	}
-
-	// --- States -------------------------------------------------------------
-	imgui.SeparatorText("States")
-	animNames := make([dynamic]string, context.temp_allocator)
-	append(&animNames, "(none)")
-	if player != nil do for a in player.animations do if a != nil do append(&animNames, a.name)
-	avail := imgui.GetContentRegionAvail().x
-	removeState := -1
-	for &s, i in sm.states {
-		imgui.PushIDInt(i32(i))
-		isCurrent := sm.running && sm.current == i
-		if isCurrent do imgui.TextColored(UI_ACCENT, ICON_FA_PLAY)
-		else if s.name == sm.initial do imgui.TextDisabled(ICON_FA_FLAG)
-		else do imgui.TextDisabled(" ")
-		if s.name == sm.initial do UI_Tooltip("Initial state")
-		imgui.SameLine()
-		if v, ok := name_field(state, fmt.tprintf("insp.sm.state-name:%d", i), s.name, avail * 0.42); ok {
-			if e.StateMachine_FindState(sm, v) >= 0 {
-				Editor_Log(state, .Warn, "A state named %s already exists", v)
-			} else {
-				Editor_RecordUndo(state, "Rename state")
-				e.StateMachine_RenameState(sm, i, v)
-			}
-		}
-		imgui.SameLine()
-		cur := 0
-		for n, k in animNames do if k > 0 && n == s.animation do cur = k
-		if s.animation != "" && cur == 0 {
-			append(&animNames, s.animation) // not on the player (yet)
-			cur = len(animNames) - 1
-		}
-		imgui.SetNextItemWidth(avail * 0.42)
-		if k, changed := UI_Combo(fmt.tprintf("insp.sm.state-anim:%d", i), cur, animNames[:]); changed {
-			Editor_RecordUndo(state, "State animation")
-			s.animation = clone(sm, animNames[k]) if k > 0 else ""
-		}
-		UI_Tooltip("Animation played on entering the state")
-		imgui.SameLine()
-		if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("insp.sm.state-del:%d", i), "Remove the state and its transitions", size = 24) do removeState = i
-		imgui.PopID()
-	}
-	if removeState >= 0 {
-		Editor_RecordUndo(state, "Remove state")
-		e.StateMachine_RemoveState(sm, removeState)
-	}
-	if len(sm.states) == 0 do UI_DimText("No states yet")
-	if UI_Button(fmt.tprintf("%s  Add State", ICON_FA_PLUS), "insp.sm.add-state") {
-		Editor_RecordUndo(state, "Add state")
-		name := "state"
-		for k := 2; e.StateMachine_FindState(sm, name) >= 0; k += 1 do name = fmt.tprintf("state_%d", k)
-		e.StateMachine_AddState(sm, name)
-	}
-	if player != nil && len(player.animations) > 0 {
-		imgui.SameLine()
-		if UI_Button(fmt.tprintf("%s  From Animations", ICON_FA_FILM), "insp.sm.from-anims") {
-			Editor_RecordUndo(state, "States from animations")
-			for a in player.animations do if a != nil && e.StateMachine_FindState(sm, a.name) < 0 do e.StateMachine_AddState(sm, a.name, a.name)
-		}
-		UI_Tooltip(fmt.tprintf("A state for each animation of %s", player.name))
-	}
-
-	// --- Parameters ---------------------------------------------------------
-	imgui.SeparatorText("Parameters")
-	removeParam := -1
-	for &p, i in sm.params {
-		imgui.PushIDInt(i32(i))
-		if v, ok := name_field(state, fmt.tprintf("insp.sm.param-name:%d", i), p.name, avail * 0.5); ok {
-			Editor_RecordUndo(state, "Rename parameter")
-			old := p.name
-			p.name = clone(sm, v)
-			for &t in sm.transitions do for &c in t.conditions do if c.param == old do c.param = p.name
-		}
-		imgui.SameLine()
-		imgui.SetNextItemWidth(avail * 0.34)
-		imgui.DragFloat("##pv", &p.value, 0.1, 0, 0, "%.3g")
-		undo_on_activate(state, "Edit parameter")
-		Drive_Item(fmt.tprintf("insp.sm.param-value:%d", i))
-		UI_Tooltip("Starting value (booleans: 0 / 1). Scripts: machine:sm_set(name, value)")
-		imgui.SameLine()
-		if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("insp.sm.param-del:%d", i), "Remove parameter", size = 24) do removeParam = i
-		imgui.PopID()
-	}
-	if removeParam >= 0 {
-		Editor_RecordUndo(state, "Remove parameter")
-		ordered_remove(&sm.params, removeParam)
-	}
-	if UI_Button(fmt.tprintf("%s  Add Parameter", ICON_FA_PLUS), "insp.sm.add-param") {
-		Editor_RecordUndo(state, "Add parameter")
-		name := "param"
-		for k := 2; ; k += 1 {
-			found := false
-			for p in sm.params do if p.name == name do found = true
-			if !found do break
-			name = fmt.tprintf("param_%d", k)
-		}
-		e.StateMachine_EnsureParam(sm, name)
-	}
-
-	// --- Transitions --------------------------------------------------------
-	imgui.SeparatorText("Transitions")
-	paramNames := make([dynamic]string, context.temp_allocator)
-	for p in sm.params do append(&paramNames, p.name)
-	removeTr := -1
-	for &t, i in sm.transitions {
-		imgui.PushIDInt(i32(i))
-		from := "Any state" if t.from == e.SM_ANY else t.from
-		label := fmt.ctprintf("%s  %s  %s##tr", from, ICON_FA_ARROW_RIGHT, t.to)
-		open := imgui.TreeNodeEx(label, {.DefaultOpen, .SpanAvailWidth})
-		Drive_Item(fmt.tprintf("insp.sm.tr:%d", i))
-		if len(t.conditions) == 0 do UI_Tooltip("No conditions: fires at once")
-		if open {
-			if SM_TransitionEditor(state, sm, &t, i, avail) do removeTr = i
-			imgui.TreePop()
-		}
-		imgui.PopID()
-	}
-	if removeTr >= 0 {
-		Editor_RecordUndo(state, "Remove transition")
-		ordered_remove(&sm.transitions, removeTr)
-	}
-	if len(sm.transitions) == 0 do UI_DimText("No transitions yet")
-	if UI_Button(fmt.tprintf("%s  Add Transition", ICON_FA_PLUS), "insp.sm.add-transition") {
-		Editor_RecordUndo(state, "Add transition")
-		from := sm.states[0].name if len(sm.states) > 0 else e.SM_ANY
-		to := sm.states[1].name if len(sm.states) > 1 else from
-		e.StateMachine_AddTransition(sm, from, to)
-	}
-	UI_DimText("Scripts: on_enter_<state>(previous) / on_exit_<state>(next) on the machine's or its parent's script")
+	if UI_Button(fmt.tprintf("%s  Edit in State Machine Tab", ICON_FA_DIAGRAM_PROJECT), "insp.sm.edit", {-1, 0}) do bottomTabRequest = .StateGraph
+	UI_Tooltip("States, arrows, parameters, triggers and settings are edited in the State Machine tab of the bottom panel")
 }
 
-// SM_TransitionEditor: from / to, blend and the conditions of a transition
-// (the Inspector and the graph's side panel); true = remove it.
+// SM_TransitionEditor: from / to, mode, blend and the conditions of a
+// transition (the graph's side panel); true = remove it.
 SM_TransitionEditor :: proc(state: ^EditorState, sm: ^e.StateMachineNode, t: ^e.SM_Transition, i: int, avail: f32, live: u32 = 0, hasLive := false) -> (remove: bool) {
 	w := avail * 0.36
 	imgui.SetNextItemWidth(w)
-	if v, ok := state_combo(fmt.tprintf("insp.sm.tr-from:%d", i), sm, t.from, true); ok {
+	if v, ok := SM_StateCombo(fmt.tprintf("insp.sm.tr-from:%d", i), sm, t.from, true); ok {
 		Editor_RecordUndo(state, "Transition from")
 		t.from = v
 	}
@@ -266,31 +110,42 @@ SM_TransitionEditor :: proc(state: ^EditorState, sm: ^e.StateMachineNode, t: ^e.
 	imgui.TextUnformatted(ICON_FA_ARROW_RIGHT)
 	imgui.SameLine()
 	imgui.SetNextItemWidth(w)
-	if v, ok := state_combo(fmt.tprintf("insp.sm.tr-to:%d", i), sm, t.to, false); ok {
+	if v, ok := SM_StateCombo(fmt.tprintf("insp.sm.tr-to:%d", i), sm, t.to, false); ok {
 		Editor_RecordUndo(state, "Transition to")
 		t.to = v
 	}
 	imgui.SameLine()
 	if UI_IconButton(ICON_FA_TRASH, fmt.tprintf("insp.sm.tr-del:%d", i), "Remove transition", size = 24) do remove = true
+	MODES :: [?]string{"Manual", "Automatic"}
+	modes := MODES
+	imgui.SetNextItemWidth(w)
+	if k, changed := UI_Combo(fmt.tprintf("insp.sm.tr-mode:%d", i), int(t.mode), modes[:]); changed {
+		Editor_RecordUndo(state, "Transition mode")
+		t.mode = e.SM_Mode(k)
+	}
+	UI_Tooltip("Manual: only a script takes it - sm_transition(\"state\"); its conditions (if any) must hold then.\nAutomatic: the machine takes it by itself when its conditions hold (no conditions: at once).")
+	imgui.SameLine()
 	imgui.SetNextItemWidth(w)
 	imgui.DragFloat("##blend", &t.blend, 0.01, 0, 5, "blend %.2fs")
 	undo_on_activate(state, "Transition blend")
 	Drive_Item(fmt.tprintf("insp.sm.tr-blend:%d", i))
 	UI_Tooltip("Crossfade time into the target state's animation")
-
 	SM_ConditionList(state, sm, &t.conditions, "insp.sm", i, avail, live = live, hasLive = hasLive)
 	return
 }
 
 // SM_ConditionList edits a list of conditions (an arrow's, a state's leave /
 // enter guards): rows "when <param> <op> <value>", "and ...", "-- or --",
-// and the + Condition / Or buttons. Drive ids are "<ids>.cond-op:<key>.<j>",
+// and the + Condition / Or buttons. A trigger condition picks a trigger, the
+// others a parameter. Drive ids are "<ids>.cond-op:<key>.<j>",
 // "<ids>.add-cond:<key>", ... With hasLive each row starts with a green or
 // red mark (bit j of live = condition j holds now).
 SM_ConditionList :: proc(state: ^EditorState, sm: ^e.StateMachineNode, conds: ^[dynamic]e.SM_Condition, ids: string, key: int, avail: f32, firstWord: cstring = "when", live: u32 = 0, hasLive := false) {
 	clone :: proc(sm: ^e.StateMachineNode, s: string) -> string {return strings.clone(s, sm.allocator)}
 	paramNames := make([dynamic]string, context.temp_allocator)
 	for p in sm.params do append(&paramNames, p.name)
+	triggerNames := make([dynamic]string, context.temp_allocator)
+	for t in sm.triggers do append(&triggerNames, t.name)
 	i := key
 	removeCond := -1
 	for &c, j in conds {
@@ -316,20 +171,22 @@ SM_ConditionList :: proc(state: ^EditorState, sm: ^e.StateMachineNode, conds: ^[
 		imgui.SameLine()
 		if c.op == .Call {
 			// A script method that says yes / no.
-			if v, ok := name_field(state, fmt.tprintf("%s.cond-call:%d.%d", ids, i, j), c.param, avail * 0.34, "method_name"); ok {
+			if v, ok := SM_NameField(state, fmt.tprintf("%s.cond-call:%d.%d", ids, i, j), c.param, avail * 0.34, "method_name"); ok {
 				Editor_RecordUndo(state, "Condition method")
 				c.param = clone(sm, v)
 			}
 			UI_Tooltip("A method of the machine's script (else its parent's), e.g. function Guard:sees_player() return ... end; holds when it returns true")
 			imgui.SameLine()
 		} else if e.SM_Op_UsesParam(c.op) {
+			names := triggerNames[:] if c.op == .Trigger else paramNames[:]
 			imgui.SetNextItemWidth(avail * 0.34)
 			pi := -1
-			for n, k in paramNames do if n == c.param do pi = k
-			if k, changed := UI_Combo(fmt.tprintf("%s.cond-param:%d.%d", ids, i, j), pi, paramNames[:]); changed {
+			for n, k in names do if n == c.param do pi = k
+			if k, changed := UI_Combo(fmt.tprintf("%s.cond-param:%d.%d", ids, i, j), pi, names); changed {
 				Editor_RecordUndo(state, "Condition parameter")
-				c.param = clone(sm, paramNames[k])
+				c.param = clone(sm, names[k])
 			}
+			if c.op == .Trigger && len(names) == 0 do UI_Tooltip("No triggers yet: add one in Parameters & Triggers")
 			imgui.SameLine()
 		}
 		opNames := make([]string, len(e.SM_Op), context.temp_allocator)
@@ -337,8 +194,14 @@ SM_ConditionList :: proc(state: ^EditorState, sm: ^e.StateMachineNode, conds: ^[
 		imgui.SetNextItemWidth(avail * 0.22)
 		if k, changed := UI_Combo(fmt.tprintf("%s.cond-op:%d.%d", ids, i, j), int(c.op), opNames); changed {
 			Editor_RecordUndo(state, "Condition")
+			wasTrigger := c.op == .Trigger
 			c.op = e.SM_Op(k)
-			if e.SM_Op_UsesParam(c.op) && c.op != .Call && c.param == "" && len(paramNames) > 0 do c.param = clone(sm, paramNames[0])
+			// Switching between a trigger and a parameter: pick one of the right kind.
+			if c.op == .Trigger {
+				if e.StateMachine_FindTrigger(sm, c.param) < 0 do c.param = clone(sm, triggerNames[0] if len(triggerNames) > 0 else "")
+			} else if e.SM_Op_UsesParam(c.op) && c.op != .Call {
+				if wasTrigger || e.StateMachine_FindParam(sm, c.param) < 0 do c.param = clone(sm, paramNames[0] if len(paramNames) > 0 else "")
+			}
 		}
 		if e.SM_Op_UsesValue(c.op) {
 			imgui.SameLine()
@@ -360,6 +223,7 @@ SM_ConditionList :: proc(state: ^EditorState, sm: ^e.StateMachineNode, conds: ^[
 	if UI_Button(fmt.tprintf("%s  Condition##%s", ICON_FA_PLUS, ids), fmt.tprintf("%s.add-cond:%d", ids, i)) {
 		Editor_RecordUndo(state, "Add condition")
 		if len(paramNames) > 0 do e.StateMachine_AddConditionTo(sm, conds, .Is_True, paramNames[0])
+		else if len(triggerNames) > 0 do e.StateMachine_AddConditionTo(sm, conds, .Trigger, triggerNames[0])
 		else do e.StateMachine_AddConditionTo(sm, conds, .Finished)
 	}
 	if len(conds) > 0 {

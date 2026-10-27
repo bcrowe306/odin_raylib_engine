@@ -22,6 +22,7 @@ AnimationPlayerNode :: struct {
 	// without a script method of that name).
 	onEvent: EventSubject,
 	finishedNotified: bool,
+	loopsDone:        int, // times a looping animation wrapped since it started (state machines' "animation finished")
 	// Animations added with AddFrameAnimation/AddSheetAnimation are owned
 	// (freed with the node); AddAnimation keeps caller-owned ones as is.
 	owned: [dynamic]^Animation,
@@ -104,6 +105,7 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 		if apn.currentFrame <= auto_cast a.startFrame {
 			if a.loop {
 				apn.currentFrame = a.endFrame
+				apn.loopsDone += 1
 			}
 		}
 		else {
@@ -114,6 +116,7 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 		if apn.currentFrame >= auto_cast a.endFrame {
 			if a.loop {
 				apn.currentFrame = a.startFrame
+				apn.loopsDone += 1
 			}
 		}
 		else {
@@ -228,6 +231,7 @@ AnimationPlayerNode_Render :: proc(node: ^Node, gameContext: ^GameContext, delta
 
 AnimationPlayerNode_Start :: proc(apn: ^AnimationPlayerNode) {
 	apn.finishedNotified = false
+	apn.loopsDone = 0
 	apply_fps(apn)
 	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
 		apn.currentFrame = a.endFrame if AnimationPlayerNode_IsReversed(apn, a) else a.startFrame

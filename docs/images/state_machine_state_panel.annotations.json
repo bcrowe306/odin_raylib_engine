@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Allow Retrigger: the state may go to itself", "x": 821, "y": 689, "w": 25, "h": 25},
+    {"label": "Break on Enter: pause when it's entered (Simulate and Play)", "x": 821, "y": 656, "w": 25, "h": 25}
+  ]
+}

@@ -28,7 +28,10 @@ key ctrl+a
 key ctrl+a
 type state machine
 key enter
-click @insp.sm.from-anims
+wait 3
+click @smg.page:settings
+wait 2
+click @smg.from-anims
 click @hier:PlayerShip/AnimationPlayer
 click @bottom:animation
 click @anim.select
@@ -78,4 +81,4 @@ key cmd+s
 wait 2
 expect file:scenes/main.scene.json contains "default_animation": "walk"
 expect file:scenes/main.scene.json contains "name": "walk_copy"
-expect file:scenes/main.scene.json contains {"name": "anim_1", "animation": "walk"}
+expect file:scenes/main.scene.json contains {"name": "anim_1", "animation": "walk", "pos": [

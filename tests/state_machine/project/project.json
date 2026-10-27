@@ -1,0 +1,5 @@
+{"name": "State Machine Guide", "initial_scene": "scenes/platformer.scene.json",
+ "window": {"title": "State Machine Guide", "width": 320, "height": 180, "virtual_width": 320, "virtual_height": 180},
+ "scenes": ["scenes/platformer.scene.json", "scenes/enemy.scene.json", "scenes/combo.scene.json"],
+ "physics": {"gravity": [0, 980]},
+ "input": {"actions": [{"name": "attack", "bindings": [{"key": "J"}]}]}}

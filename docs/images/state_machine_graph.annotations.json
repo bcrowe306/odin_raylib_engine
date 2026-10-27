@@ -1,0 +1,10 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Automatic arrows are solid; a pair both ways curves apart", "x": 453, "y": 591, "w": 10, "h": 10},
+    {"label": "Manual arrows are dashed: only sm_transition takes them", "x": 450, "y": 603, "w": 10, "h": 10},
+    {"label": "A state: its name, its animation (or \"gameplay\")", "x": 342, "y": 556, "w": 72, "h": 30},
+    {"label": "Drag a state's dot onto another state to add an arrow", "x": 415, "y": 638, "w": 12, "h": 12}
+  ]
+}
