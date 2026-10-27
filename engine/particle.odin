@@ -270,6 +270,14 @@ particle_rng :: proc() -> runtime.Random_Generator {
 	return runtime.default_random_generator(&particleRandom.state)
 }
 
+@(private = "file")
+safe_float32_range :: proc(a, b: f32) -> f32 {
+	low := min(a, b)
+	high := max(a, b)
+	if low >= high do return low
+	return rand.float32_range(low, high)
+}
+
 ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	context.random_generator = particle_rng()
 
@@ -280,16 +288,18 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	emitter.head = (emitter.head + 1) % len(emitter.particles)
 
 	// Position
-	xpos := rand.float32_range(emitter.position[0] - emitter.spread[0], emitter.position[0] + emitter.spread[0])
-	ypos := rand.float32_range(emitter.position[1] - emitter.spread[1], emitter.position[1] + emitter.spread[1])
+	spread_x := math.abs(emitter.spread[0])
+	spread_y := math.abs(emitter.spread[1])
+	xpos := safe_float32_range(emitter.position[0] - spread_x, emitter.position[0] + spread_x)
+	ypos := safe_float32_range(emitter.position[1] - spread_y, emitter.position[1] + spread_y)
 	p.position = {xpos, ypos}
 	p.shape = emitter.shape
 
 	// Size
-	sizeSpread := emitter.sizeSpread * emitter.sizeVariance
+	sizeSpread := math.abs(emitter.sizeSpread * emitter.sizeVariance)
 	p.size = {
-		emitter.size[0] + rand.float32_range(-sizeSpread, sizeSpread),
-		emitter.size[1] + rand.float32_range(-sizeSpread, sizeSpread),
+		emitter.size[0] + safe_float32_range(-sizeSpread, sizeSpread),
+		emitter.size[1] + safe_float32_range(-sizeSpread, sizeSpread),
 	}
 
 	// Scale
@@ -297,22 +307,22 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	p.scaleEnd = emitter.scaleEnd
 
 	// Rotation
-	rotationSpread := emitter.rotationSpread * emitter.rotationVariance
-	p.rotation = emitter.rotation + rand.float32_range(-rotationSpread, rotationSpread)
+	rotationSpread := math.abs(emitter.rotationSpread * emitter.rotationVariance)
+	p.rotation = emitter.rotation + safe_float32_range(-rotationSpread, rotationSpread)
 
 	// Angle
-	baseSpread := emitter.angleSpread * emitter.angleVariance
-	angle := emitter.angle + rand.float32_range(-baseSpread, baseSpread)
+	baseSpread := math.abs(emitter.angleSpread * emitter.angleVariance)
+	angle := emitter.angle + safe_float32_range(-baseSpread, baseSpread)
 	angle_rad := math.to_radians(angle)
 
 	// Torque
-	torqueSpread := emitter.torqueSpread * emitter.torqueVariance
-	p.torque = emitter.torque + rand.float32_range(-torqueSpread, torqueSpread)
+	torqueSpread := math.abs(emitter.torqueSpread * emitter.torqueVariance)
+	p.torque = emitter.torque + safe_float32_range(-torqueSpread, torqueSpread)
 	p.torqueAcceleration = emitter.torqueAcceleration
 
 	// Velocity
-	velSpread := emitter.velocitySpread * emitter.velocityVariance
-	velocity := emitter.velocity + rand.float32_range(-velSpread, velSpread)
+	velSpread := math.abs(emitter.velocitySpread * emitter.velocityVariance)
+	velocity := emitter.velocity + safe_float32_range(-velSpread, velSpread)
 	p.velocity = {math.cos(angle_rad) * velocity, math.sin(angle_rad) * velocity}
 
 	// Texture
@@ -324,11 +334,12 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	p.agePercent = 0
 
 	// Color Jitter
-	if emitter.colorVariance > 0 {
+	cVar := math.abs(emitter.colorVariance)
+	if cVar > 0 {
 		p.colorJitter = {
-			rand.float32_range(-emitter.colorVariance, emitter.colorVariance) * 255,
-			rand.float32_range(-emitter.colorVariance, emitter.colorVariance) * 255,
-			rand.float32_range(-emitter.colorVariance, emitter.colorVariance) * 255,
+			safe_float32_range(-cVar, cVar) * 255,
+			safe_float32_range(-cVar, cVar) * 255,
+			safe_float32_range(-cVar, cVar) * 255,
 		}
 	} else {
 		p.colorJitter = {0, 0, 0}
