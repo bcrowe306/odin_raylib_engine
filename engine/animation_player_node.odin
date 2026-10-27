@@ -101,6 +101,7 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 	if len(apn.animations) == 0 do return
 	a := apn.animations[apn.animationIndex]
 	reversed := AnimationPlayerNode_IsReversed(apn, a)
+	prevFrame := apn.currentFrame
 	if reversed {
 		if apn.currentFrame <= auto_cast a.startFrame {
 			if a.loop {
@@ -123,7 +124,8 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 			apn.currentFrame += 1
 		}
 	}
-	if a.tracks != nil do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
+	moved := apn.currentFrame != prevFrame
+	if a.tracks != nil && (moved || a.loop) do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
 	// A non-looping animation that reached its last frame finishes once.
 	atEnd := apn.currentFrame <= a.startFrame if reversed else apn.currentFrame >= a.endFrame
 	if !a.loop && atEnd && !apn.finishedNotified {
@@ -234,7 +236,8 @@ AnimationPlayerNode_Start :: proc(apn: ^AnimationPlayerNode) {
 	apn.loopsDone = 0
 	apply_fps(apn)
 	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
-		apn.currentFrame = a.endFrame if AnimationPlayerNode_IsReversed(apn, a) else a.startFrame
+		reversed := AnimationPlayerNode_IsReversed(apn, a)
+		apn.currentFrame = a.endFrame if reversed else a.startFrame
 		if a.tracks != nil do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
 	}
 	apn.ticker->start(true)

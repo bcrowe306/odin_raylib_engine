@@ -153,3 +153,46 @@ return A
 	testing.expect(t, a2 != nil && a2.tracks[0].keys[0].hasCurve && a2.tracks[0].keys[0].curve == io, "curve loaded")
 	testing.expect(t, a2 != nil && a2.tracks[1].keys[1].arg == "heavy", "argument loaded")
 }
+
+
+@(test)
+test_animation_single_frame_event_plays_once :: proc(t: ^testing.T) {
+	ScriptVFS_RegisterEmbedded("anim_single.lua", `
+local A = {}
+A.properties = {}
+function A:ready() calls = "" end
+function A:on_single(frame) calls = calls .. "hit" .. frame .. ";" end
+return A
+`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("single_frame_events", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	apn := cast(^AnimationPlayerNode)Node_CreateByTypeName(scene, "AnimationPlayerNode")
+	apn.name = "Player"
+	apn.gameContext = &game.gameContext
+	hero := Node_CreateByTypeName(scene, "Node", apn)
+	hero.name = "Hero"
+	hero.gameContext = &game.gameContext
+	Script_AttachToNode(hero, "anim_single.lua", nil, &game.scriptManager)
+
+	single := AnimationPlayerNode_AddFrameAnimation(apn, nil, "single", nil)
+	single.startFrame = 0
+	single.endFrame = 0
+	single.loop = false
+	calls := Animation_AddEventTrack(apn, single, "Hero", .Method)
+	Track_SetEventKey(calls, 0, "on_single", apn.allocator)
+	game->run(0.016)
+
+	// Play single frame animation
+	AnimationPlayerNode_Play(apn, "single")
+	AnimationPlayerNode_AdvanceFrame(apn)
+
+	L := game.scriptManager.L
+	lua.getglobal(L, "calls")
+	val := string(lua.tostring(L, -1))
+	lua.pop(L, 1)
+	testing.expect_value(t, val, "hit0;")
+}
