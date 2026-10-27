@@ -227,7 +227,9 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 			if name != "" && name != node.name && e.Node_IsAlive(node) {
 				Editor_RecordUndo(state, "Rename")
 				parent := e.GetParent(state.activeScene.manager, node)
+				snap := NodeRefs_Capture(state)
 				node.name = strings.clone(Editor_UniqueChildName(state, parent, name, node), node.allocator)
+				NodeRefs_AfterChange(state, snap)
 			}
 			inlineRenameNode = nil
 		} else if imgui.IsMouseClicked(.Left) && !imgui.IsItemHovered() {
@@ -235,7 +237,9 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 			if name != "" && name != node.name && e.Node_IsAlive(node) {
 				Editor_RecordUndo(state, "Rename")
 				parent := e.GetParent(state.activeScene.manager, node)
+				snap := NodeRefs_Capture(state)
 				node.name = strings.clone(Editor_UniqueChildName(state, parent, name, node), node.allocator)
+				NodeRefs_AfterChange(state, snap)
 			}
 			inlineRenameNode = nil
 		}

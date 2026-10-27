@@ -110,3 +110,8 @@ Undo_StoreBytes :: proc() -> int {
 	for _, c in undoChunks do n += len(c.data)
 	return n
 }
+
+Undo_ClearStore :: proc() {
+	delete(undoChunks)
+	undoChunks = nil
+}

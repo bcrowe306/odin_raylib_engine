@@ -9,35 +9,72 @@ import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
-// Rename-safe references. Renaming or moving a node can break what scripts
-// say about it: `self.node:get_node("...")` paths (from each script's node),
-// `self.node:get_child("Name")` and `Scene.find_node("Name")`, and node-
-// reference properties (type = "node"). Before the change NodeRefs_Capture
-// records what each of those points at; NodeRefs_AfterChange recomputes
-// them: node properties are updated at once, script text edits are offered
-// in a prompt (open scripts are edited in place, others on disk).
+// Rename-safe references. Renaming or moving a node can break what scene
+// objects and scripts say about it:
+// 1. Scene references: AnimationPlayer tracks, Camera follow targets,
+//    AdvancedCamera targets/paths/limits, JointNode bodies, Signal connections,
+//    StateMachine player/sub-machines, NavigationAgent map, Dialogue/LipSync,
+//    and script node-reference properties.
+// 2. Script references: `self.node:get_node("...")`, `self.node:get_child("...")`,
+//    and `Scene.find_node("...")`.
+// Before the change NodeRefs_Capture records what each of those points at;
+// NodeRefs_AfterChange recomputes them: when paths or names change, a prompt
+// notifies the user and offers to update all scene and script references.
 // ============================================================================
+
+Ref_Scene_Kind :: enum {
+	AnimTrack,
+	CameraFollow,
+	AdvCamTarget,
+	AdvCamPath,
+	AdvCamLimit,
+	JointBodyA,
+	JointBodyB,
+	Signal,
+	StateMachinePlayer,
+	StateMachineChild,
+	NavMap,
+	DialogueLipSync,
+	LipSyncMouth,
+	ScriptProp,
+}
+
+Ref_Scene_Item :: struct {
+	kind:      Ref_Scene_Kind,
+	owner:     ^e.Node,
+	target:    ^e.Node,
+	oldPath:   string,
+	extraIdx:  int,
+	extraIdx2: int,
+	propName:  string,
+	label:     string,
+}
+
+Ref_Scene_Edit :: struct {
+	kind:        Ref_Scene_Kind,
+	owner:       ^e.Node,
+	target:      ^e.Node,
+	oldPath:     string,
+	newPath:     string,
+	extraIdx:    int,
+	extraIdx2:   int,
+	propName:    string,
+	description: string,
+}
 
 @(private = "file")
 Ref_Literal :: struct {
 	script: string, // project-relative
-	call:   string, // the text before the literal: `self.node:get_node(`
+	call:   string, // the text before the literal: e.g. `self.node:get_node(`
 	old:    string,
 	owner:  ^e.Node,
 	target: ^e.Node,
 	byName: bool, // find_node / get_child: the name, not a path
 }
 
-@(private = "file")
-Ref_Prop :: struct {
-	inst:   ^e.ScriptInstance,
-	name:   string,
-	target: ^e.Node,
-}
-
 Ref_Snapshot :: struct {
-	lits:  [dynamic]Ref_Literal,
-	props: [dynamic]Ref_Prop,
+	lits:       [dynamic]Ref_Literal,
+	sceneItems: [dynamic]Ref_Scene_Item,
 }
 
 Ref_Edit :: struct {
@@ -46,8 +83,9 @@ Ref_Edit :: struct {
 
 @(private = "file")
 refs: struct {
-	edits: [dynamic]Ref_Edit, // waiting for the prompt (heap)
-	open:  bool,
+	sceneEdits:  [dynamic]Ref_Scene_Edit, // waiting for the prompt (heap)
+	scriptEdits: [dynamic]Ref_Edit,       // waiting for the prompt (heap)
+	open:        bool,
 }
 
 @(private = "file")
@@ -78,13 +116,230 @@ literals :: proc(text, call: string) -> []string {
 	return out[:]
 }
 
-// NodeRefs_Capture records what scripts and node properties point at now
+// NodeRefs_Capture records what scene objects, properties, and scripts point at now
 // (temp-allocated; pass to NodeRefs_AfterChange the same frame).
 NodeRefs_Capture :: proc(state: ^EditorState) -> (snap: Ref_Snapshot) {
 	snap.lits = make([dynamic]Ref_Literal, context.temp_allocator)
-	snap.props = make([dynamic]Ref_Prop, context.temp_allocator)
+	snap.sceneItems = make([dynamic]Ref_Scene_Item, context.temp_allocator)
 	if state.activeScene == nil do return
 	mgr := state.activeScene.manager
+
+	// 1. Capture scene node references
+	nodes := make([dynamic]^e.Node, context.temp_allocator)
+	for n in mgr.nodes do append(&nodes, n)
+	for n in mgr.addition do append(&nodes, n)
+
+	for n in nodes {
+		if n == nil || n.removing do continue
+
+		switch n.typeId {
+		case e.AnimationPlayerNode:
+			apn := cast(^e.AnimationPlayerNode)n
+			for anim, ai in apn.animations { if anim == nil do continue
+				for &tr, ti in anim.tracks {
+					if tr.target != "." && tr.target != "" {
+						if target := e.Node_ResolvePath(mgr, apn, tr.target); target != nil {
+							append(&snap.sceneItems, Ref_Scene_Item{
+								kind = .AnimTrack,
+								owner = n,
+								target = target,
+								oldPath = strings.clone(tr.target, context.temp_allocator),
+								extraIdx = ai,
+								extraIdx2 = ti,
+								label = strings.clone(fmt.tprintf("Animation [%s] track '%s'", anim.name, tr.property), context.temp_allocator),
+							})
+						}
+					}
+				}
+			}
+
+		case e.CameraNode:
+			cam := cast(^e.CameraNode)n
+			if cam.followTarget != "" {
+				if target := e.Node_ResolvePath(mgr, cam, cam.followTarget); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .CameraFollow,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(cam.followTarget, context.temp_allocator),
+						label = "Follow Target",
+					})
+				}
+			}
+
+		case e.AdvancedCameraNode:
+			ac := cast(^e.AdvancedCameraNode)n
+			if ac.followTarget != "" {
+				if target := e.Node_ResolvePath(mgr, ac, ac.followTarget); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .AdvCamTarget,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(ac.followTarget, context.temp_allocator),
+						label = "Follow Target",
+					})
+				}
+			}
+			if ac.followPath != "" {
+				if target := e.Node_ResolvePath(mgr, ac, ac.followPath); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .AdvCamPath,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(ac.followPath, context.temp_allocator),
+						label = "Follow Path",
+					})
+				}
+			}
+			if ac.limitNode != "" {
+				if target := e.Node_ResolvePath(mgr, ac, ac.limitNode); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .AdvCamLimit,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(ac.limitNode, context.temp_allocator),
+						label = "Limit Node",
+					})
+				}
+			}
+
+		case e.JointNode:
+			j := cast(^e.JointNode)n
+			if j.bodyA != "" {
+				if target := e.Node_ResolvePath(mgr, j, j.bodyA); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .JointBodyA,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(j.bodyA, context.temp_allocator),
+						label = "Body A",
+					})
+				}
+			}
+			if j.bodyB != "" {
+				if target := e.Node_ResolvePath(mgr, j, j.bodyB); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .JointBodyB,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(j.bodyB, context.temp_allocator),
+						label = "Body B",
+					})
+				}
+			}
+
+		case e.StateMachineNode:
+			sm := cast(^e.StateMachineNode)n
+			if sm.player != "" {
+				if target := e.Node_ResolvePath(mgr, sm, sm.player); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .StateMachinePlayer,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(sm.player, context.temp_allocator),
+						label = "Player Node",
+					})
+				}
+			}
+			for &st, si in sm.states {
+				if st.child != "" {
+					if target := e.Node_ResolvePath(mgr, sm, st.child); target != nil {
+						append(&snap.sceneItems, Ref_Scene_Item{
+							kind = .StateMachineChild,
+							owner = n,
+							target = target,
+							oldPath = strings.clone(st.child, context.temp_allocator),
+							extraIdx = si,
+							label = strings.clone(fmt.tprintf("State '%s' Sub-Machine", st.name), context.temp_allocator),
+						})
+					}
+				}
+			}
+
+		case e.NavigationAgentNode:
+			nav := cast(^e.NavigationAgentNode)n
+			if nav.navMap != "" {
+				if target := e.Node_ResolvePath(mgr, nav, nav.navMap); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .NavMap,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(nav.navMap, context.temp_allocator),
+						label = "Navigation Map",
+					})
+				}
+			}
+
+		case e.DialogueNode:
+			d := cast(^e.DialogueNode)n
+			if d.lipSync != "" {
+				if target := e.Node_ResolvePath(mgr, d, d.lipSync); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .DialogueLipSync,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(d.lipSync, context.temp_allocator),
+						label = "LipSync Node",
+					})
+				}
+			}
+
+		case e.LipSyncNode:
+			l := cast(^e.LipSyncNode)n
+			if l.mouth != "" {
+				if target := e.Node_ResolvePath(mgr, l, l.mouth); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .LipSyncMouth,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(l.mouth, context.temp_allocator),
+						label = "Mouth Node",
+					})
+				}
+			}
+		}
+
+		// Signal connections on this node
+		for &c, ci in n.signalConnections {
+			if c.target != "" {
+				if target := e.Node_ResolvePath(mgr, n, c.target); target != nil {
+					append(&snap.sceneItems, Ref_Scene_Item{
+						kind = .Signal,
+						owner = n,
+						target = target,
+						oldPath = strings.clone(c.target, context.temp_allocator),
+						extraIdx = ci,
+						label = strings.clone(fmt.tprintf("Signal '%s' -> %s", c.signal, c.method), context.temp_allocator),
+					})
+				}
+			}
+		}
+
+		// Script component node-reference properties
+		if n.scriptInstance != nil {
+			inst := cast(^e.ScriptInstance)n.scriptInstance
+			mod, ok := state.game.scriptManager.modules[e.ScriptVFS_NormalizePath(inst.modulePath)]
+			if ok && mod != nil {
+				for p in mod.properties {
+					if p.assetKind != "node" do continue
+					v := inst.properties[p.name] or_else {}
+					if v.valString == "" do continue
+					if target := e.Node_ResolvePath(mgr, n, v.valString); target != nil {
+						append(&snap.sceneItems, Ref_Scene_Item{
+							kind = .ScriptProp,
+							owner = n,
+							target = target,
+							oldPath = strings.clone(v.valString, context.temp_allocator),
+							propName = strings.clone(p.name, context.temp_allocator),
+							label = strings.clone(fmt.tprintf("Script property '%s'", p.name), context.temp_allocator),
+						})
+					}
+				}
+			}
+		}
+	}
+
+	// 2. Capture script text calls on scene node scripts
 	for owner in mgr.nodes {
 		if owner == nil || owner.scriptInstance == nil do continue
 		inst := cast(^e.ScriptInstance)owner.scriptInstance
@@ -102,98 +357,283 @@ NodeRefs_Capture :: proc(state: ^EditorState) -> (snap: Ref_Snapshot) {
 				if target != nil do append(&snap.lits, Ref_Literal{rel, call, lit, owner, target, byName})
 			}
 		}
-		// Node-reference properties.
-		mod, ok := state.game.scriptManager.modules[e.ScriptVFS_NormalizePath(inst.modulePath)]
-		if !ok || mod == nil do continue
-		for p in mod.properties {
-			if p.assetKind != "node" do continue
-			v := inst.properties[p.name] or_else {}
-			if v.valString == "" do continue
-			if t := e.Node_ResolvePath(mgr, owner, v.valString); t != nil do append(&snap.props, Ref_Prop{inst, p.name, t})
+	}
+
+	// Also capture Scene.find_node in all project scripts
+	for rel in Editor_ListProjectFiles(state, "", {".lua"}) {
+		text := script_text(state, rel)
+		for lit in literals(text, "Scene.find_node(") {
+			if target := e.Scene_FindNodeByName(state.activeScene, lit); target != nil {
+				dup := false
+				for l in snap.lits do if l.script == rel && l.call == "Scene.find_node(" && l.old == lit do dup = true
+				if !dup do append(&snap.lits, Ref_Literal{rel, "Scene.find_node(", lit, nil, target, true})
+			}
 		}
 	}
+
 	return
 }
 
-// NodeRefs_AfterChange updates node properties and offers the script edits
-// that keep pointing at the same nodes.
+// NodeRefs_AfterChange collects scene and script edits that keep pointing at the same nodes.
 NodeRefs_AfterChange :: proc(state: ^EditorState, snap: Ref_Snapshot) {
 	if state.activeScene == nil do return
 	mgr := state.activeScene.manager
-	for p in snap.props {
-		if !e.Node_IsAlive(p.target) || p.inst.node == nil do continue
-		path := e.Node_RelativePath(mgr, p.inst.node, p.target)
-		if path != (p.inst.properties[p.name] or_else {}).valString {
-			e.ScriptInstance_SetProperty(p.inst, p.name, {type = .String, valString = path}, &state.game.scriptManager)
-		}
+
+	// 1. Check scene references
+	sceneEdits := make([dynamic]Ref_Scene_Edit, context.temp_allocator)
+	for item in snap.sceneItems {
+		if item.owner == nil || item.owner.removing || item.target == nil || item.target.removing do continue
+		newPath := e.Node_RelativePath(mgr, item.owner, item.target)
+		if newPath == item.oldPath do continue
+		desc := fmt.tprintf("%s on '%s'", item.label, item.owner.name)
+		append(&sceneEdits, Ref_Scene_Edit{
+			kind = item.kind,
+			owner = item.owner,
+			target = item.target,
+			oldPath = item.oldPath,
+			newPath = newPath,
+			extraIdx = item.extraIdx,
+			extraIdx2 = item.extraIdx2,
+			propName = item.propName,
+			description = desc,
+		})
 	}
-	edits := make([dynamic]Ref_Edit, context.temp_allocator)
+
+	// 2. Check script references
+	scriptEdits := make([dynamic]Ref_Edit, context.temp_allocator)
 	for l in snap.lits {
-		if !e.Node_IsAlive(l.target) || !e.Node_IsAlive(l.owner) do continue
+		if l.target == nil || l.target.removing do continue
+		if !l.byName && (l.owner == nil || l.owner.removing) do continue
 		new := l.target.name if l.byName else e.Node_RelativePath(mgr, l.owner, l.target)
-		if l.call == "self.node:get_child(" && e.GetParent(mgr, l.target) != l.owner do continue // not a child any more
+		if l.call == "self.node:get_child(" && l.owner != nil && e.GetParent(mgr, l.target) != l.owner do continue // not a child any more
 		if new == l.old do continue
 		dup := false
-		for x in edits do if x.script == l.script && x.call == l.call && x.old == l.old do dup = true
-		if !dup do append(&edits, Ref_Edit{l.script, l.call, l.old, new})
+		for x in scriptEdits do if x.script == l.script && x.call == l.call && x.old == l.old do dup = true
+		if !dup do append(&scriptEdits, Ref_Edit{l.script, l.call, l.old, new})
 	}
-	if len(edits) == 0 do return
-	for x in refs.edits {delete(x.script); delete(x.call); delete(x.old); delete(x.new)}
-	clear(&refs.edits)
-	for x in edits do append(&refs.edits, Ref_Edit{strings.clone(x.script), strings.clone(x.call), strings.clone(x.old), strings.clone(x.new)})
+
+	if len(sceneEdits) == 0 && len(scriptEdits) == 0 do return
+
+	clear_all_edits()
+	for s in sceneEdits {
+		append(&refs.sceneEdits, Ref_Scene_Edit{
+			kind = s.kind,
+			owner = s.owner,
+			target = s.target,
+			oldPath = strings.clone(s.oldPath),
+			newPath = strings.clone(s.newPath),
+			extraIdx = s.extraIdx,
+			extraIdx2 = s.extraIdx2,
+			propName = strings.clone(s.propName),
+			description = strings.clone(s.description),
+		})
+	}
+	for x in scriptEdits {
+		append(&refs.scriptEdits, Ref_Edit{
+			script = strings.clone(x.script),
+			call = strings.clone(x.call),
+			old = strings.clone(x.old),
+			new = strings.clone(x.new),
+		})
+	}
 	refs.open = true
 }
 
-// NodeRefs_Pending: script edits waiting for an answer (drives).
-NodeRefs_Pending :: proc() -> int {return len(refs.edits)}
+// NodeRefs_Pending: reference edits waiting for an answer (drives).
+NodeRefs_Pending :: proc() -> int {
+	return len(refs.sceneEdits) + len(refs.scriptEdits)
+}
+NodeRefs_IsOpen :: proc() -> bool {
+	return refs.open
+}
 
-// NodeRefs_Render: the "update script references" prompt.
+NodeRefs_SceneEdits :: proc() -> []Ref_Scene_Edit {
+	return refs.sceneEdits[:]
+}
+
+NodeRefs_ScriptEdits :: proc() -> []Ref_Edit {
+	return refs.scriptEdits[:]
+}
+
+NodeRefs_Apply :: proc(state: ^EditorState) -> (sceneCount, scriptCount: int) {
+	sceneCount = apply_scene_edits(state)
+	scriptCount = apply_script_edits(state)
+	return
+}
+
+NodeRefs_Clear :: proc() {
+	clear_all_edits()
+}
+
+
+// NodeRefs_Render: the "update references" prompt window.
 NodeRefs_Render :: proc(state: ^EditorState) {
 	if refs.open {
-		imgui.OpenPopup("Update Script References###NodeRefs")
+		imgui.OpenPopup("Update References###NodeRefs")
 		refs.open = false
 	}
 	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5
 	imgui.SetNextWindowPos(center, .Appearing, {0.5, 0.5})
-	if !imgui.BeginPopupModal("Update Script References###NodeRefs", nil, {.AlwaysAutoResize, .NoTitleBar}) do return
+	if !imgui.BeginPopupModal("Update References###NodeRefs", nil, {.AlwaysAutoResize, .NoTitleBar}) do return
 	defer imgui.EndPopup()
+
 	imgui.PushFont(GlobalFonts.semibold)
-	imgui.TextUnformatted(fmt.ctprintf("%s  Update script references?", ICON_FA_CODE))
+	imgui.TextUnformatted(fmt.ctprintf("%s  Update node references?", ICON_FA_PEN))
 	imgui.PopFont()
 	UI_DimText("The node moved or was renamed; these still point at the old place:")
-	imgui.Dummy({0, 4})
-	for x in refs.edits {
-		imgui.TextUnformatted(fmt.ctprintf("%s", x.script))
-		imgui.SameLine(0, 8)
-		UI_DimText(fmt.tprintf("%s\"%s\")  %s  %s\"%s\")", x.call, x.old, ICON_FA_ARROW_RIGHT, x.call, x.new))
-	}
 	imgui.Dummy({0, 6})
-	if UI_PrimaryButton(fmt.tprintf("%s  Update", ICON_FA_CHECK), "refs.update", {120, 30}) { // no Enter: the rename's Enter would answer it
-		n := apply_edits(state)
-		Editor_Log(state, .Info, "Updated %d script reference(s)", n)
-		clear_edits()
+
+	// Scene references section
+	if len(refs.sceneEdits) > 0 {
+		imgui.PushFont(GlobalFonts.semibold)
+		UI_DimText(fmt.tprintf("Scene References (%d):", len(refs.sceneEdits)))
+		imgui.PopFont()
+		for s in refs.sceneEdits {
+			imgui.TextUnformatted(strings.clone_to_cstring(s.description, context.temp_allocator))
+			imgui.SameLine(0, 8)
+			UI_DimText(fmt.tprintf("%q  %s  %q", s.oldPath, ICON_FA_ARROW_RIGHT, s.newPath))
+		}
+		imgui.Dummy({0, 4})
+	}
+
+	// Script references section
+	if len(refs.scriptEdits) > 0 {
+		imgui.PushFont(GlobalFonts.semibold)
+		UI_DimText(fmt.tprintf("Script References (%d):", len(refs.scriptEdits)))
+		imgui.PopFont()
+		for x in refs.scriptEdits {
+			imgui.TextUnformatted(strings.clone_to_cstring(x.script, context.temp_allocator))
+			imgui.SameLine(0, 8)
+			UI_DimText(fmt.tprintf("%s%q)  %s  %s%q)", x.call, x.old, ICON_FA_ARROW_RIGHT, x.call, x.new))
+		}
+		imgui.Dummy({0, 6})
+	}
+
+	if UI_PrimaryButton(fmt.tprintf("%s  Update", ICON_FA_CHECK), "refs.update", {120, 30}) {
+		nScene := apply_scene_edits(state)
+		nScript := apply_script_edits(state)
+		Editor_Log(state, .Info, "Updated %d scene reference(s) and %d script reference(s)", nScene, nScript)
+		clear_all_edits()
 		imgui.CloseCurrentPopup()
 	}
 	imgui.SameLine()
 	if UI_Button("Skip", "refs.skip", {90, 30}) || imgui.IsKeyPressed(.Escape) {
-		clear_edits()
+		clear_all_edits()
 		imgui.CloseCurrentPopup()
 	}
 }
 
 @(private = "file")
-clear_edits :: proc() {
-	for x in refs.edits {delete(x.script); delete(x.call); delete(x.old); delete(x.new)}
-	clear(&refs.edits)
+clear_all_edits :: proc() {
+	for x in refs.scriptEdits {
+		delete(x.script)
+		delete(x.call)
+		delete(x.old)
+		delete(x.new)
+	}
+	delete(refs.scriptEdits)
+	refs.scriptEdits = {}
+	for s in refs.sceneEdits {
+		delete(s.oldPath)
+		delete(s.newPath)
+		delete(s.propName)
+		delete(s.description)
+	}
+	delete(refs.sceneEdits)
+	refs.sceneEdits = {}
+	refs.open = false
 }
 
-// apply_edits rewrites `call"old")` to `call"new")` (either quote): in open
+// apply_scene_edits applies all captured scene property and connection updates.
+@(private = "file")
+apply_scene_edits :: proc(state: ^EditorState) -> int {
+	if state.activeScene == nil do return 0
+	count := 0
+	Editor_RecordUndo(state, "Update scene references")
+	for s in refs.sceneEdits {
+		if s.owner == nil || s.owner.removing do continue
+		switch s.kind {
+		case .AnimTrack:
+			apn := cast(^e.AnimationPlayerNode)s.owner
+			if s.extraIdx >= 0 && s.extraIdx < len(apn.animations) {
+				anim := apn.animations[s.extraIdx]
+				if anim != nil && s.extraIdx2 >= 0 && s.extraIdx2 < len(anim.tracks) {
+					tr := &anim.tracks[s.extraIdx2]
+					tr.target = strings.clone(s.newPath, apn.allocator)
+					count += 1
+				}
+			}
+		case .CameraFollow:
+			cam := cast(^e.CameraNode)s.owner
+			cam.followTarget = strings.clone(s.newPath, cam.allocator)
+			count += 1
+		case .AdvCamTarget:
+			ac := cast(^e.AdvancedCameraNode)s.owner
+			ac.followTarget = strings.clone(s.newPath, ac.allocator)
+			count += 1
+		case .AdvCamPath:
+			ac := cast(^e.AdvancedCameraNode)s.owner
+			ac.followPath = strings.clone(s.newPath, ac.allocator)
+			count += 1
+		case .AdvCamLimit:
+			ac := cast(^e.AdvancedCameraNode)s.owner
+			ac.limitNode = strings.clone(s.newPath, ac.allocator)
+			count += 1
+		case .JointBodyA:
+			j := cast(^e.JointNode)s.owner
+			j.bodyA = strings.clone(s.newPath, j.allocator)
+			count += 1
+		case .JointBodyB:
+			j := cast(^e.JointNode)s.owner
+			j.bodyB = strings.clone(s.newPath, j.allocator)
+			count += 1
+		case .Signal:
+			if s.extraIdx >= 0 && s.extraIdx < len(s.owner.signalConnections) {
+				conn := &s.owner.signalConnections[s.extraIdx]
+				conn.target = strings.clone(s.newPath, s.owner.allocator)
+				count += 1
+			}
+		case .StateMachinePlayer:
+			sm := cast(^e.StateMachineNode)s.owner
+			sm.player = strings.clone(s.newPath, sm.allocator)
+			count += 1
+		case .StateMachineChild:
+			sm := cast(^e.StateMachineNode)s.owner
+			if s.extraIdx >= 0 && s.extraIdx < len(sm.states) {
+				st := &sm.states[s.extraIdx]
+				st.child = strings.clone(s.newPath, sm.allocator)
+				count += 1
+			}
+		case .NavMap:
+			nav := cast(^e.NavigationAgentNode)s.owner
+			nav.navMap = strings.clone(s.newPath, nav.allocator)
+			count += 1
+		case .DialogueLipSync:
+			d := cast(^e.DialogueNode)s.owner
+			d.lipSync = strings.clone(s.newPath, d.allocator)
+			count += 1
+		case .LipSyncMouth:
+			l := cast(^e.LipSyncNode)s.owner
+			l.mouth = strings.clone(s.newPath, l.allocator)
+			count += 1
+		case .ScriptProp:
+			if s.owner.scriptInstance != nil {
+				inst := cast(^e.ScriptInstance)s.owner.scriptInstance
+				e.ScriptInstance_SetProperty(inst, s.propName, {type = .String, valString = s.newPath}, &state.game.scriptManager)
+				count += 1
+			}
+		}
+	}
+	return count
+}
+
+// apply_script_edits rewrites `call"old")` to `call"new")` (either quote): in open
 // scripts as one undo step, other files on disk.
 @(private = "file")
-apply_edits :: proc(state: ^EditorState) -> int {
+apply_script_edits :: proc(state: ^EditorState) -> int {
 	count := 0
 	scripts := make(map[string]bool, allocator = context.temp_allocator)
-	for x in refs.edits do scripts[x.script] = true
+	for x in refs.scriptEdits do scripts[x.script] = true
 	for rel in scripts {
 		abs := code_abs_path(state, rel)
 		var_doc: ^Code_Doc
@@ -201,7 +641,7 @@ apply_edits :: proc(state: ^EditorState) -> int {
 		if var_doc != nil {
 			b := &var_doc.buffer
 			group := buf.buffer_next_group(b)
-			for x in refs.edits {
+			for x in refs.scriptEdits {
 				if x.script != rel do continue
 				for q in ([]string{"\"", "'"}) {
 					from := strings.concatenate({x.call, q, x.old, q}, context.temp_allocator)
@@ -223,7 +663,7 @@ apply_edits :: proc(state: ^EditorState) -> int {
 		data, err := os.read_entire_file(abs, context.temp_allocator)
 		if err != nil do continue
 		text := string(data)
-		for x in refs.edits {
+		for x in refs.scriptEdits {
 			if x.script != rel do continue
 			for q in ([]string{"\"", "'"}) {
 				from := strings.concatenate({x.call, q, x.old, q}, context.temp_allocator)
@@ -238,6 +678,5 @@ apply_edits :: proc(state: ^EditorState) -> int {
 		_ = os.write_entire_file(abs, transmute([]u8)text)
 	}
 	_ = filepath.base
-	Lua_MarkProjectTypesDirty()
 	return count
 }
