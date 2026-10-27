@@ -319,6 +319,23 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 					Json_String(w, tr.property)
 					if tr.kind == .Method do strings.write_string(&w.sb, ", \"kind\": \"method\"")
 					if tr.kind == .Audio do strings.write_string(&w.sb, ", \"kind\": \"audio\"")
+					if tr.name != "" {
+						strings.write_string(&w.sb, ", \"name\": ")
+						Json_String(w, tr.name)
+					}
+					if tr.kind == .Audio {
+						strings.write_string(&w.sb, ", \"audio_settings\": {")
+						fmt.sbprintf(&w.sb, "\"bus\": \"%s\", \"vol_min\": %.4g, \"vol_max\": %.4g, \"pitch_min\": %.4g, \"pitch_max\": %.4g, \"pan_min\": %.4g, \"pan_max\": %.4g, \"positional\": %t, \"min_dist\": %.4g, \"max_dist\": %.4g, \"voices\": %d, \"sfx_node\": \"%s\"}",
+							tr.audioSettings.bus,
+							tr.audioSettings.volumeMin, tr.audioSettings.volumeMax,
+							tr.audioSettings.pitchMin, tr.audioSettings.pitchMax,
+							tr.audioSettings.panMin, tr.audioSettings.panMax,
+							tr.audioSettings.positional,
+							tr.audioSettings.minDistance, tr.audioSettings.maxDistance,
+							tr.audioSettings.voices,
+							tr.audioSettings.sfxNode,
+						)
+					}
 					strings.write_string(&w.sb, ", \"keys\": [")
 					for k, ki in tr.keys {
 						if ki > 0 do strings.write_string(&w.sb, ", ")
@@ -971,6 +988,23 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 						switch sj_string(to, "kind", "") {
 						case "method": track.kind = .Method
 						case "audio":  track.kind = .Audio
+						}
+						if trName := sj_string(to, "name", ""); trName != "" {
+							track.name = strings.clone(trName, apn.allocator)
+						}
+						if asObj, hasAs := sj_obj(to, "audio_settings"); hasAs {
+							track.audioSettings.bus = strings.clone(sj_string(asObj, "bus", ""), apn.allocator)
+							track.audioSettings.volumeMin = sj_float(asObj, "vol_min", 1.0)
+							track.audioSettings.volumeMax = sj_float(asObj, "vol_max", 1.0)
+							track.audioSettings.pitchMin = sj_float(asObj, "pitch_min", 1.0)
+							track.audioSettings.pitchMax = sj_float(asObj, "pitch_max", 1.0)
+							track.audioSettings.panMin = sj_float(asObj, "pan_min", 0.0)
+							track.audioSettings.panMax = sj_float(asObj, "pan_max", 0.0)
+							track.audioSettings.positional = sj_bool(asObj, "positional", false)
+							track.audioSettings.minDistance = sj_float(asObj, "min_dist", 100)
+							track.audioSettings.maxDistance = sj_float(asObj, "max_dist", 900)
+							track.audioSettings.voices = int(sj_float(asObj, "voices", 1))
+							track.audioSettings.sfxNode = strings.clone(sj_string(asObj, "sfx_node", ""), apn.allocator)
 						}
 						keys, _ := sj_arr(to, "keys")
 						for kv in keys {

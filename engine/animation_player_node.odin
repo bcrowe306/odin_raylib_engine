@@ -262,6 +262,16 @@ AnimationPlayerNode_Play :: proc(apn: ^AnimationPlayerNode, name: string, blend:
 }
 AnimationPlayerNode_Stop :: proc(apn: ^AnimationPlayerNode) {
 	apn.ticker->stop()
+	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
+		for &tr in a.tracks {
+			if tr.kind == .Audio {
+				for &h in tr.voiceHandles {
+					if Mixer_VoicePlaying(h) do Mixer_StopVoice(h)
+					h = {}
+				}
+			}
+		}
+	}
 }
 AnimationPlayerNode_Reset :: proc(apn: ^AnimationPlayerNode) {
 	apn.ticker->reset()

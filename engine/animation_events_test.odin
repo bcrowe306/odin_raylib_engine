@@ -196,3 +196,89 @@ return A
 	lua.pop(L, 1)
 	testing.expect_value(t, val, "hit0;")
 }
+
+@(test)
+test_animation_multiple_audio_tracks_and_settings :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("multi_audio_tracks", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+
+	apn := cast(^AnimationPlayerNode)Node_CreateByTypeName(scene, "AnimationPlayerNode")
+	apn.name = "Player"
+	apn.gameContext = &game.gameContext
+
+	anim := AnimationPlayerNode_AddFrameAnimation(apn, nil, "action", nil)
+	anim.endFrame = 4
+
+	// Add first audio track
+	tr1 := Animation_AddEventTrack(apn, anim, ".", .Audio)
+	testing.expect(t, tr1 != nil, "first audio track added")
+	testing.expect_value(t, tr1.property, "@audio")
+	testing.expect_value(t, tr1.name, "sounds")
+	tr1.name = strings.clone("Footsteps", apn.allocator)
+	tr1.audioSettings.bus = strings.clone("SFX", apn.allocator)
+	tr1.audioSettings.volumeMin = 0.6
+	tr1.audioSettings.volumeMax = 0.9
+	tr1.audioSettings.pitchMin = 0.8
+	tr1.audioSettings.pitchMax = 1.2
+	tr1.audioSettings.positional = true
+	tr1.audioSettings.minDistance = 80
+	tr1.audioSettings.maxDistance = 500
+	tr1.audioSettings.voices = 3
+	Track_SetEventKey(tr1, 0, "step.wav", apn.allocator)
+
+	// Add second audio track (Issue #27)
+	tr2 := Animation_AddEventTrack(apn, anim, ".", .Audio)
+	testing.expect(t, tr2 != nil, "second audio track added")
+	testing.expect(t, tr1 != tr2, "two distinct audio tracks on the same animation")
+	testing.expect_value(t, tr2.property, "@audio_2")
+	testing.expect_value(t, tr2.name, "sounds 2")
+	tr2.name = strings.clone("Voices", apn.allocator)
+	tr2.audioSettings.bus = strings.clone("SFX", apn.allocator)
+	tr2.audioSettings.volumeMin = 1.0
+	tr2.audioSettings.volumeMax = 1.0
+	Track_SetEventKey(tr2, 2, "grunt.wav", apn.allocator)
+
+	testing.expect_value(t, len(anim.tracks), 2)
+
+	// Serialize to JSON
+	text := Scene_SerializeToJSON(scene, context.temp_allocator)
+	testing.expect(t, strings.contains(text, `"@audio_2"`), "second audio track serialized")
+	testing.expect(t, strings.contains(text, `"Footsteps"`), "first track name serialized")
+	testing.expect(t, strings.contains(text, `"Voices"`), "second track name serialized")
+	testing.expect(t, strings.contains(text, `"audio_settings"`), "audio settings serialized")
+	testing.expect(t, strings.contains(text, `"positional": true`), "positional setting serialized")
+
+	// Instantiate in a second scene
+	s2 := game->createScene("multi_audio_tracks_2", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	Scene_InstantiateFromJSON(s2, transmute([]u8)text, &game.gameContext)
+	ProcessNodeQueues(s2.manager, &game.gameContext)
+
+	p2 := cast(^AnimationPlayerNode)Scene_FindNodeByName(s2, "Player")
+	testing.expect(t, p2 != nil, "Player node found in instantiated scene")
+	a2: ^Animation
+	if p2 != nil do for a in p2.animations do if a.name == "action" do a2 = a
+	if testing.expect(t, a2 != nil, "action animation loaded") {
+		if testing.expect_value(t, len(a2.tracks), 2) {
+			t1_loaded := &a2.tracks[0]
+			t2_loaded := &a2.tracks[1]
+			testing.expect_value(t, t1_loaded.name, "Footsteps")
+			testing.expect_value(t, t1_loaded.property, "@audio")
+			testing.expect_value(t, t1_loaded.audioSettings.positional, true)
+			testing.expect_value(t, t1_loaded.audioSettings.voices, 3)
+			testing.expect_value(t, t1_loaded.audioSettings.minDistance, 80)
+			testing.expect_value(t, t1_loaded.audioSettings.maxDistance, 500)
+			testing.expect_value(t, len(t1_loaded.keys), 1)
+			testing.expect_value(t, t1_loaded.keys[0].text, "step.wav")
+
+			testing.expect_value(t, t2_loaded.name, "Voices")
+			testing.expect_value(t, t2_loaded.property, "@audio_2")
+			testing.expect_value(t, len(t2_loaded.keys), 1)
+			testing.expect_value(t, t2_loaded.keys[0].text, "grunt.wav")
+		}
+	}
+}
