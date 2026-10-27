@@ -991,16 +991,38 @@ Raycast_Callback :: proc "c" (shapeId: b2.ShapeId, point: b2.Vec2, normal: b2.Ve
 	return fraction // Clip ray to closest hit
 }
 
+RaycastNode_GetOrigin :: proc(rc: ^RaycastNode) -> [2]f32 {
+	if rc == nil do return {}
+	if rc.parent != nil {
+		parentPos := rc.parent.globalPosition if rc.parent.globalScale != {} else rc.parent.position
+		parentRot := rc.parent.globalRotation if rc.parent.globalScale != {} else rc.parent.rotation
+		parentScale := rc.parent.globalScale if rc.parent.globalScale != {} else (rc.parent.scale if rc.parent.scale != {} else [2]f32{1, 1})
+		return parentPos + rotate_vec(rc.position * parentScale, parentRot)
+	}
+	return rc.globalPosition if rc.globalScale != {} else rc.position
+}
+
 RaycastNode_GetTranslation :: proc(rc: ^RaycastNode) -> [2]f32 {
+	if rc == nil do return {}
 	dir := rc.direction
 	if b2.LengthSquared(dir) > 0.0001 {
 		dir = b2.Normalize(dir)
 	} else {
 		dir = {0, 1}
 	}
-	rot := DegreesToRot(rc.rotation)
-	worldDir := b2.RotateVector(rot, dir)
-	return worldDir * max(rc.length, 1.0)
+	rot: f32 = rc.rotation
+	scl: [2]f32 = rc.scale if rc.scale != {} else [2]f32{1, 1}
+	if rc.parent != nil {
+		parentRot := rc.parent.globalRotation if rc.parent.globalScale != {} else rc.parent.rotation
+		parentScale := rc.parent.globalScale if rc.parent.globalScale != {} else (rc.parent.scale if rc.parent.scale != {} else [2]f32{1, 1})
+		rot = parentRot + rc.rotation
+		scl = parentScale * scl
+	} else if rc.globalScale != {} {
+		rot = rc.globalRotation
+		scl = rc.globalScale
+	}
+	localVec := dir * max(rc.length, 1.0)
+	return rotate_vec(localVec * scl, rot)
 }
 
 RaycastNode_CastNow :: proc(rc: ^RaycastNode, worldId: b2.WorldId) {
@@ -1011,7 +1033,7 @@ RaycastNode_CastNow :: proc(rc: ^RaycastNode, worldId: b2.WorldId) {
 
 	if !b2.World_IsValid(worldId) do return
 
-	origin := rc.globalPosition if (rc.globalPosition.x != 0 || rc.globalPosition.y != 0) else rc.position
+	origin := RaycastNode_GetOrigin(rc)
 	translation := RaycastNode_GetTranslation(rc)
 	rc.hitPoint = origin + translation
 	rc.hitNormal = {0, 0}
@@ -1051,7 +1073,7 @@ RaycastNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 		return
 	}
 
-	origin := rc.position
+	origin := RaycastNode_GetOrigin(rc)
 	endPt := origin + RaycastNode_GetTranslation(rc)
 
 	rl.DrawCircleV(origin, 4.0, rc.rayColor)
