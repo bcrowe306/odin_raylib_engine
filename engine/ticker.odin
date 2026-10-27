@@ -76,7 +76,11 @@ Ticker_Resume :: proc(ticker: ^Ticker) {
 Ticker_SetFPS :: proc(ticker: ^Ticker, framesPerSecond: f32) {
 	framesPerSecond := clamp(framesPerSecond, 0, 120)
 	ticker.framesPerSecond = framesPerSecond
-	ticker.secondsPerFrame = time.Duration( f32( time.Second ) * ( 1 / ticker.framesPerSecond ) )
+	// In f64: periods over ~2.1 s (fps < ~0.47) overflow an f32 -> i64
+	// conversion, which wraps negative on x86-64 (a tick every frame). 0 fps:
+	// never ticks.
+	if framesPerSecond <= 0 do ticker.secondsPerFrame = max(time.Duration)
+	else do ticker.secondsPerFrame = time.Duration(f64(time.Second) / f64(framesPerSecond))
 }
 
 Ticker_Reset :: proc(ticker: ^Ticker) {
