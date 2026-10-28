@@ -867,6 +867,11 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	switch q {
 	case "selected":
 		return state.selectedNode.name if state.selectedNode != nil else "", true
+	case "selection-alive":
+		// Every selected node is a live node of the active scene (no stale pointers).
+		if state.selectedNode != nil && !node_in_scene(state, state.selectedNode) do return "false", true
+		for n in state.selection do if !node_in_scene(state, n) do return "false", true
+		return "true", true
 	case "scene":
 		return state.activeScenePath, true
 	case "scene-tabs":

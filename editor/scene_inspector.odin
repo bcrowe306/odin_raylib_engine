@@ -535,7 +535,9 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 		if hier_menu(ICON_FA_CLONE, "Save as New Component...", "save-new-component") do Prompt_Open(.SaveComponentAs, fmt.tprintf("%s_variant", inst.name), inst)
 		if hier_menu(ICON_FA_ROTATE_LEFT, "Revert Overrides" if node == inst else "Revert This Node", "revert-overrides") {
 			Editor_RecordUndo(state, "Revert overrides")
-			if fresh := e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext); fresh != nil do state.selectedNode = fresh
+			sel := Editor_SaveSelection(state) // (the instance is rebuilt: #74)
+			e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext)
+			Editor_RestoreSelection(state, sel)
 		}
 		if hier_menu(ICON_FA_LINK_SLASH, "Unlink", "unlink-component", node == inst) {
 			Editor_RecordUndo(state, "Unlink component")
