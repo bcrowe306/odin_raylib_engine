@@ -308,13 +308,14 @@ script_property_value :: proc(prop: ScriptProperty, overrides: map[string]Script
 
 // script_apply_properties sets every property the module declares on the
 // Lua table at tableIdx (default or override) and records the values in
-// props (which owns its keys and strings). Node references are set to nil:
-// they are resolved before ready(), once the tree is built.
+// props (which owns its keys and strings). Node references and resources
+// are set to nil: they are resolved before ready(), once the tree is built
+// (and so edit mode never loads resources or runs their on_load).
 script_apply_properties :: proc(L: ^lua.State, tableIdx: c.int, mod: ^ScriptModule, overrides: map[string]ScriptValue, props: ^map[string]ScriptValue) {
 	for prop in mod.properties {
 		val := script_property_value(prop, overrides)
 		props[strings.clone(prop.name)] = val
-		if val.type == .String && prop.assetKind == "node" {
+		if val.type == .String && (prop.assetKind == "node" || Script_IsResourceProp(prop)) {
 			lua.pushnil(L)
 		} else {
 			script_push_value(L, val, prop.assetKind)
@@ -358,6 +359,14 @@ script_prop_kind :: proc(inst: ^ScriptInstance, name: string, mgr: ^ScriptManage
 	if !ok || mod == nil do return ""
 	for p in mod.properties do if p.name == name do return p.assetKind
 	return ""
+}
+
+// script_prop_decl: a script property's declaration (nil when unknown).
+script_prop_decl :: proc(inst: ^ScriptInstance, name: string, mgr: ^ScriptManager) -> ^ScriptProperty {
+	mod, ok := mgr.modules[ScriptVFS_NormalizePath(inst.modulePath)]
+	if !ok || mod == nil do return nil
+	for &p in mod.properties do if p.name == name do return &p
+	return nil
 }
 
 // script_node_prop: whether a script property is a node reference.
@@ -407,6 +416,7 @@ ScriptInstance_CallReady :: proc(inst: ^ScriptInstance, sm: ^ScriptManager = nil
 
 	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef)) // push self
 	script_resolve_node_props(L, inst, mgr) // self.<node property> = the node
+	script_resolve_resource_props(L, inst, mgr) // self.<resource property> = its table
 	lua.getfield(L, -1, "ready")
 	if lua.type(L, -1) == .FUNCTION {
 		lua.pushvalue(L, -2) // pass self as first arg
@@ -542,8 +552,13 @@ ScriptInstance_SetProperty :: proc(inst: ^ScriptInstance, name: string, val: Scr
 	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef)) // push self
 	propNameC := strings.clone_to_cstring(name, context.temp_allocator)
 
+	decl := script_prop_decl(inst, name, mgr)
 	if val.type == .String && script_node_prop(inst, name, mgr) {
 		script_push_node_prop(L, inst, name, val.valString)
+	} else if val.type == .String && decl != nil && Script_IsResourceProp(decl^) {
+		// Resolved once the script runs (ready); until then nil.
+		if inst.isReady do script_push_resource_prop(L, mgr, inst, decl^, val.valString)
+		else do lua.pushnil(L)
 	} else {
 		script_push_value(L, val, script_prop_kind(inst, name, mgr) if val.type == .String else "")
 	}
@@ -607,9 +622,10 @@ Script_ParseProperties :: proc(L: ^lua.State, moduleIdx: c.int) -> [dynamic]Scri
 					case "enum", "array", "curve", "gradient":
 						prop.type = .String
 						prop.assetKind = strings.clone(string(typeStr))
-					case "texture", "audio", "scene", "script", "component", "level", "file", "node":
+					case "texture", "audio", "scene", "script", "component", "level", "file", "node", "resource":
 						// Asset paths - and node references ("node": a path from
-						// the script's node, the node itself in Lua).
+						// the script's node, the node itself in Lua) and resources
+						// (a .resource.json path, its table in Lua).
 						prop.type = .String
 						prop.assetKind = strings.clone(string(typeStr))
 					case:                   prop.type = .Float
@@ -693,6 +709,10 @@ Script_ParseProperties :: proc(L: ^lua.State, moduleIdx: c.int) -> [dynamic]Scri
 				if prop.assetKind == "array" && prop.elem == "" do prop.elem = strings.clone("string")
 				prop.group = str_field(L, "group")
 				prop.tooltip = str_field(L, "tooltip")
+				prop.resourceClass = str_field(L, "class")
+				lua.getfield(L, -1, "local_copy")
+				if lua.type(L, -1) == .BOOLEAN do prop.resourceLocal = .Local if lua.toboolean(L, -1) else .Shared
+				lua.pop(L, 1)
 				lua.getfield(L, -1, "slider")
 				if lua.toboolean(L, -1) do prop.slider = true
 				lua.pop(L, 1)

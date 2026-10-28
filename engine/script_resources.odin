@@ -154,12 +154,71 @@ script_parse_resource_marker :: proc(L: ^lua.State, idx: c.int, modPath: string)
 	return false, false
 }
 
-// script_warn_resource_props: node properties mean nothing on a resource.
+// script_warn_resource_props: node properties mean nothing on a resource,
+// and resources inside resources aren't supported yet.
 script_warn_resource_props :: proc(mod: ^ScriptModule) {
 	for p in mod.properties {
 		if p.assetKind == "node" || (p.assetKind == "array" && p.elem == "node") {
 			Script_Problem(.Warning, "[Resource] %s: property %s is a node reference; a resource has no node (ignored)", mod.path, p.name)
+		} else if Script_IsResourceProp(p) {
+			Script_Problem(.Warning, "[Resource] %s: property %s is a resource; resources inside resources aren't supported yet (it stays nil - use Resource.load in on_load)", mod.path, p.name)
 		}
+	}
+}
+
+// --- resource properties of node scripts ------------------------------------------
+
+// Script_ResolveResource: the table a node script's resource property gets
+// for a path - shared, or the copy of the script's scope when the property
+// (or else the class) says local_copy. nil for "", a problem (reported) or
+// a file of another class than the property's `class`.
+Script_ResolveResource :: proc(mgr: ^ScriptManager, inst: ^ScriptInstance, prop: ScriptProperty, path: string) -> ^ResourceInstance {
+	if path == "" do return nil
+	file, ok := Resource_ReadFile(mgr, path)
+	if !ok {
+		Script_Problem(.Warning, "%s: property %s: can't load %s", inst.modulePath, prop.name, path)
+		return nil
+	}
+	if prop.resourceClass != "" && ScriptVFS_NormalizePath(prop.resourceClass) != ScriptVFS_NormalizePath(file.script) {
+		Script_Problem(.Warning, "%s: property %s takes %s resources; %s is a %s", inst.modulePath, prop.name, prop.resourceClass, path, file.script)
+		return nil
+	}
+	mod, _ := ScriptManager_LoadModule(file.script, mgr)
+	localCopy := prop.resourceLocal == .Local || (prop.resourceLocal == .Default && mod != nil && mod.resourceLocalCopy)
+	scope: rawptr = Resource_ScopeOf(inst.node) if localCopy && inst.node != nil else nil
+	return Resource_Load(mgr, path, scope, true)
+}
+
+// script_push_resource_prop pushes a resource property's Lua value: the
+// resource's table, or for a list (of = "resource") a table of them
+// (holes where an item has a problem).
+script_push_resource_prop :: proc(L: ^lua.State, mgr: ^ScriptManager, inst: ^ScriptInstance, prop: ScriptProperty, value: string) {
+	if prop.assetKind != "array" {
+		Resource_Push(L, Script_ResolveResource(mgr, inst, prop, value))
+		return
+	}
+	val, err := json.parse(transmute([]u8)value, allocator = context.temp_allocator)
+	items, _ := val.(json.Array)
+	lua.createtable(L, c.int(len(items)), 0)
+	if err != .None do return
+	for item, i in items {
+		path, _ := item.(json.String)
+		res := Script_ResolveResource(mgr, inst, prop, string(path))
+		if res == nil do continue
+		Resource_Push(L, res)
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+}
+
+// script_resolve_resource_props sets self's resource properties to their
+// tables (self at the top of the stack; before ready()).
+script_resolve_resource_props :: proc(L: ^lua.State, inst: ^ScriptInstance, mgr: ^ScriptManager) {
+	mod, ok := mgr.modules[ScriptVFS_NormalizePath(inst.modulePath)]
+	if !ok || mod == nil do return
+	for p in mod.properties {
+		if !Script_IsResourceProp(p) do continue
+		script_push_resource_prop(L, mgr, inst, p, (inst.properties[p.name] or_else {}).valString)
+		lua.setfield(L, -2, strings.clone_to_cstring(p.name, context.temp_allocator))
 	}
 }
 

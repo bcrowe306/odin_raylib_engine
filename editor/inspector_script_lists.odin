@@ -113,7 +113,7 @@ script_array_field :: proc(state: ^EditorState, owner: ^e.Node, id, elem, text: 
 		case "node":
 			cur := string(item.(json.String) or_else "")
 			if path, ok := node_ref_field(state, owner, iid, cur); ok {item = json.String(path); changed = true}
-		case "texture", "audio", "scene", "script", "component", "level", "file":
+		case "texture", "audio", "scene", "script", "component", "level", "file", "resource":
 			cur := string(item.(json.String) or_else "")
 			if path, ok := asset_picker(iid, cur, Script_AssetFiles(state, elem), allowNone = true); ok && path != cur {item = json.String(path); changed = true}
 		case:

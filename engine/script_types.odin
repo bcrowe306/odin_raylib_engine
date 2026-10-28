@@ -47,6 +47,22 @@ ScriptProperty :: struct {
 	slider:     bool,            // a slider between min and max (type = "range" or slider = true)
 	group:      string,          // Inspector group header
 	tooltip:    string,          // Inspector help
+	// type = "resource" (or an array of = "resource"): a .resource.json path,
+	// the resource's table in Lua (script_resources.odin).
+	resourceClass: string,             // `class`: the script its files must use ("" = any)
+	resourceLocal: Resource_LocalMode, // `local_copy` on the property
+}
+
+// Resource_LocalMode: a resource property's `local_copy`.
+Resource_LocalMode :: enum u8 {
+	Default, // the class's `resource.local_copy`
+	Shared,  // local_copy = false: the one shared table
+	Local,   // local_copy = true: one copy per component instance
+}
+
+// Script_IsResourceProp: a property holding resources (one, or a list).
+Script_IsResourceProp :: proc(p: ScriptProperty) -> bool {
+	return p.assetKind == "resource" || (p.assetKind == "array" && p.elem == "resource")
 }
 
 // Script_IsJsonKind: a property kind stored as JSON text (a Lua table).
@@ -62,6 +78,7 @@ ScriptProperty_Destroy :: proc(p: ^ScriptProperty) {
 	delete(p.elem)
 	delete(p.group)
 	delete(p.tooltip)
+	delete(p.resourceClass)
 }
 
 // ScriptValue_Equal: same type and value (strings by content).
