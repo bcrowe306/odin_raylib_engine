@@ -53,6 +53,7 @@ Editor_HasMultiSelection :: proc(state: ^EditorState) -> bool {
 
 // Editor_SelectNode selects `n`; `additive` toggles it in the selection.
 Editor_SelectNode :: proc(state: ^EditorState, n: ^e.Node, additive := false) {
+	state.inspectResource = false // the Inspector goes back to nodes
 	if !additive || n == nil {
 		clear(&state.selection)
 		if n != nil do append(&state.selection, n)

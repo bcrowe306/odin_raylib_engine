@@ -202,13 +202,13 @@ Memory: every string in `ResourceInstance` is owned by the script manager's allo
 - `script_templates.odin`: add a "Resource class" template (marker, `properties`, `on_load`).
 
 ### Asset Inspector (`editor/inspector.odin`)
-- New state `state.inspectedResource: string`. It's set when you click a `.resource.json` in Assets and cleared when you select a node. `inspector_body` shows the resource when it's set: a header with the file, the class (link to open it) and a missing-class warning, followed by the properties.
+- `state.inspectResource` / `inspectResourceNode`: set by `Editor_SelectAsset` for a `.resource.json`, cleared by `Editor_SelectNode`. The Inspector shows the resource while one resource is the asset selection and the node selection hasn't changed since. The resource Inspector lives in `editor/inspector_resource.odin`. `inspector_body` shows the resource when it's set: a header with the file, the class (link to open it) and a missing-class warning, followed by the properties.
 - Refactor the property widgets in `inspector_script` into one shared editor that works on `(mod, ^map[string]ScriptValue)`, so node scripts and resources draw identical controls (groups, tooltips, help pane, curves...).
 - A "Reset to default" item on each property removes its key from the file.
-- Resource-typed properties on node scripts: an asset picker filtered to `resources/` and, when `class` is set, to instances of that class. Assets can be dropped onto the field. There's also an "Open" button that inspects the resource.
+- Resource-typed properties on node scripts (and list items): an asset picker filtered to `resources/` and, when `class` is set, to instances of that class (`Resource_FilesOfClass`, re-read at most once a second). Node-reference rows show a note instead of a picker on a resource (it has no node). *Not done yet:* dropping an asset onto the field and an "Open" button.
 
 ### Saving (save on commit)
-- Text and drag fields write on `IsItemDeactivatedAfterEdit`. Checkboxes, combos and pickers write as soon as they change. Curve and gradient editors write when the mouse is released.
+- An edit marks the values pending; they're written once no widget is active (`imgui.IsAnyItemActive()`). So drags and typing write once when let go, and checkboxes, combos, pickers and resets write on the next frame. Undo/redo and leaving the resource write a pending edit first (`ResourceInspector_Flush`).
 - Write with `Resource_WriteFile`, then log `Saved resources/x.resource.json` to the Console. A running game or Simulate picks the change up through hot reload.
 - There's no unsaved state, so the quit prompt, tab dots and save-before-Play don't change.
 
@@ -216,7 +216,9 @@ Memory: every string in `ResourceInstance` is owned by the script manager's allo
 - `Undo_Entry` gains `kind: enum {Scene, Resource}` and `resourcePath: string`. For `.Resource`, `json` holds the file text **before** the edit (an `Undo_Snapshot`).
 - `Editor_RecordResourceUndo(state, path, label)` is called on `IsItemActivated` (as `undo_on_activate` does), with the same "unchanged snapshot = no new step" rule.
 - `undo_redo`: take the most recent entry that is `.Resource` **or** belongs to the active scene. Today it only accepts the active scene. For a resource entry, write the file back, push the opposite entry, refresh the Inspector if it's showing that file, and log `Undo: <label> (resource x)`.
-- `Editor_RecordResourceUndo` doesn't record while Simulate is running, matching `Editor_RecordUndo`.
+- `Editor_RecordResourceUndo` **does** record while Simulate is running (unlike scenes): resource edits are saved to the file and aren't rolled back when the simulation stops, so they need to stay undoable.
+- Moving or renaming a resource (or its folder) updates its undo entries' paths (`Undo_ResourceMoved`).
+- `vec2_edit` takes an optional undo hook (`Vec2_Undo`), so vector rows on resources record resource undo instead of scene undo.
 
 ### Completion (`editor/lua_project_types.odin`, `lua_types/`)
 - `ResourceBase` class: `resource_path`, `duplicate()`, `on_load()`.

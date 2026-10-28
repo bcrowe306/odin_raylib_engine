@@ -50,6 +50,12 @@ inspector_body :: proc(state: ^EditorState) {
 		RemoteProps_Render(state)
 		return
 	}
+	// A resource picked in Assets (until a node is selected).
+	if state.inspectResource && state.inspectResourceNode == state.selectedNode && Editor_AssetSelectedCount(state) == 1 && Asset_KindOf(state.selectedAssetPath) == .Resource {
+		ResourceInspector_Render(state, strings.trim_prefix(strings.trim_prefix(state.selectedAssetPath, state.projectPath), "/"))
+		return
+	}
+	ResourceInspector_Flush(state) // (an edit made just before switching away)
 	node := state.selectedNode
 	if node == nil || state.activeScene == nil {
 		imgui.Dummy({0, 24})

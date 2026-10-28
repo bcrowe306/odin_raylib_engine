@@ -593,6 +593,9 @@ Editor_SelectAsset :: proc(state: ^EditorState, full: string) {
 	delete(state.assetAnchorPath)
 	state.assetAnchorPath = strings.clone(full) if full != "" else ""
 	PreviewPanel_OnAssetSelected(state, full)
+	// A resource opens in the Inspector (until a node is selected).
+	state.inspectResource = full != "" && Asset_KindOf(full) == .Resource
+	state.inspectResourceNode = state.selectedNode
 }
 
 // Editor_ToggleAssetSelection toggles an individual asset (Control / Command click).

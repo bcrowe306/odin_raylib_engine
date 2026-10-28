@@ -148,6 +148,10 @@ EditorState :: struct {
 	pendingProject:     string, // reopen the editor on this project after quitting
 	undoStack:          [dynamic]Undo_Entry,
 	redoStack:          [dynamic]Undo_Entry,
+	// The Inspector shows the selected resource asset (inspector_resource.odin)
+	// while this is set and the node selection hasn't changed since.
+	inspectResource:     bool,
+	inspectResourceNode: ^e.Node,
 
 	// Tools & Viewport
 	toolMode:         ToolMode,

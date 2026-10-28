@@ -91,6 +91,11 @@ script_prop_row :: proc(state: ^EditorState, t: ^Script_PropsTarget, name: strin
 		t.set(state, t, name, val)
 	}
 	imgui.SetNextItemWidth(field_width())
+	// Node references need a node (a resource has none).
+	if t.owner == nil && info != nil && (info.assetKind == "node" || (info.assetKind == "array" && info.elem == "node")) {
+		UI_DimText("(a node reference: not on a resource)")
+		return
+	}
 	// Enum, lists (array / curve / gradient), sliders.
 	if info != nil && val.type == .String && (info.assetKind == "enum" || e.Script_IsJsonKind(info.assetKind)) {
 		newText := val.valString
@@ -100,7 +105,7 @@ script_prop_row :: proc(state: ^EditorState, t: ^Script_PropsTarget, name: strin
 			idx := -1
 			for v, i in info.values do if v == val.valString do idx = i
 			if picked, ok := UI_Combo(id, idx, info.values[:]); ok && picked >= 0 do newText, edited = info.values[picked], true
-		case "array":    newText, edited = script_array_field(state, t.owner, id, info.elem, val.valString)
+		case "array":    newText, edited = script_array_field(state, t.owner, id, info.elem, val.valString, info.resourceClass)
 		case "curve":    newText, edited = script_curve_field(id, val.valString)
 		case "gradient": newText, edited = script_gradient_field(id, val.valString)
 		}
@@ -125,8 +130,11 @@ script_prop_row :: proc(state: ^EditorState, t: ^Script_PropsTarget, name: strin
 		return
 	}
 	if val.type == .Vector2 {
-		// (vec2_edit snapshots the scene for undo itself.)
-		if vec2_edit(state, id, &val.valVec2, 0.5, edit, defVal.valVec2 if hasDef else {}) {
+		undo :: proc(state: ^EditorState, label: string, data: rawptr) {
+			t := (^Script_PropsTarget)(data)
+			t.record_undo(state, t, label)
+		}
+		if vec2_edit(state, id, &val.valVec2, 0.5, edit, defVal.valVec2 if hasDef else {}, undo = undo, undoData = t) {
 			t.set(state, t, name, val)
 		}
 		return
@@ -151,7 +159,9 @@ script_prop_row :: proc(state: ^EditorState, t: ^Script_PropsTarget, name: strin
 			if field_reset(id, val.valString != "") do reset(state, t, name, {type = .String})
 			return
 		} else if kind != "" {
-			if path, ok := asset_picker(id, val.valString, Script_AssetFiles(state, kind), allowNone = true); ok && path != val.valString {
+			// Resources: only files of the property's `class`.
+			files := Resource_FilesOfClass(state, info.resourceClass) if kind == "resource" else Script_AssetFiles(state, kind)
+			if path, ok := asset_picker(id, val.valString, files, allowNone = true); ok && path != val.valString {
 				t.record_undo(state, t, edit)
 				val.valString = path
 				t.set(state, t, name, val)
