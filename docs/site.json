@@ -35,6 +35,7 @@
         { "file": "engine/docs/navigation.md", "slug": "guides/navigation" },
         { "file": "engine/docs/state_machine.md", "slug": "guides/state-machine" },
         { "file": "engine/docs/visibility.md", "slug": "guides/visibility" },
+        { "file": "engine/docs/components.md", "slug": "guides/components" },
         { "file": "engine/docs/resources.md", "slug": "guides/resources" },
         { "file": "engine/docs/pooling.md", "slug": "guides/pooling" },
         { "file": "engine/docs/aseprite.md", "slug": "guides/aseprite" },

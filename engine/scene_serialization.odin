@@ -147,6 +147,7 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 
 	Json_Key(w, "type", &first); Json_String(w, Node_TypeName(node))
 	Json_Key(w, "name", &first); Json_String(w, node.name)
+	if uid := node_written_uid(node); uid != "" {Json_Key(w, "uid", &first); Json_String(w, uid)}
 	Json_Key(w, "position", &first); Json_Vec2(w, node.position)
 	Json_Key(w, "scale", &first); Json_Vec2(w, node.scale)
 	Json_Key(w, "rotation", &first); Json_Float(w, node.rotation)
@@ -868,6 +869,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.gameContext = ctx
 
 	node.name = strings.clone(sj_string(obj, "name", typeStr), node.allocator)
+	if uid := sj_string(obj, "uid", ""); uid != "" do node.uid = strings.clone(uid, node.allocator)
 	node.position = sj_vec2(obj, "position", {0, 0})
 	node.scale = sj_vec2(obj, "scale", {1, 1})
 	node.rotation = sj_float(obj, "rotation", 0)
@@ -1537,6 +1539,9 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.componentPath = strings.clone(compPath, node.allocator)
 	node.componentBase = strings.clone(baseText, node.allocator)
 	node.name = strings.clone(sj_string(inst, "name", node.name), node.allocator)
+	// The instance's own uid in the document holding it (a component nesting
+	// it); the component's root uid stays in its base. "" in scenes.
+	node.uid = strings.clone(sj_string(inst, "uid", ""), node.allocator)
 	node.position = sj_vec2(inst, "position", node.position)
 	node.scale = sj_vec2(inst, "scale", node.scale)
 	node.rotation = sj_float(inst, "rotation", node.rotation)

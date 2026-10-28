@@ -88,6 +88,11 @@ Node :: struct {
 	// instantiated from ("" = not an instance). Its subtree comes from that
 	// file; the scene stores only the instance's name and transform.
 	componentPath: string,
+	// Stable id in the component file (or component document) the node was
+	// loaded from: 8 base-36 characters, unique in that file; "" for plain
+	// scene nodes. Instance overrides refer to nodes by uid paths
+	// (component_overrides.odin).
+	uid: string,
 	// The (normalized) component JSON the instance was built from; overrides
 	// are what differs from it (component_overrides.odin).
 	componentBase: string,
