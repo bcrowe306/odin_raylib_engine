@@ -162,9 +162,9 @@ inspector_body :: proc(state: ^EditorState) {
 				imgui.SameLine()
 				if UI_Button(fmt.tprintf("%s  Revert", ICON_FA_ROTATE_LEFT), "insp.revert-overrides") {
 					Editor_RecordUndo(state, "Revert overrides")
-					if fresh := e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext); fresh != nil {
-						state.selectedNode = fresh
-					}
+					sel := Editor_SaveSelection(state) // (the instance is rebuilt: #74)
+					e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext)
+					Editor_RestoreSelection(state, sel)
 					cachedFor = nil
 				}
 				UI_Tooltip("Drop this node's overrides (all of the instance's, on its root)")

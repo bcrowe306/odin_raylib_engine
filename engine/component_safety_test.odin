@@ -31,6 +31,37 @@ safety_load :: proc(game: ^Game, text, name: string) -> ^Scene {
 	return s
 }
 
+// #74: rebuilding an instance keeps its place among its siblings, its name,
+// transform and overrides, and returns the new root.
+@(test)
+test_component_rebuild_instance :: proc(t: ^testing.T) {
+	defer os.remove_all(SAFETY_DIR)
+	game := safety_game()
+	defer game->terminate()
+	defer Component_ClearCaches()
+	scene := game->createScene("rebuild", true)
+	before := Node_CreateByTypeName(scene, "Node")
+	before.name = "Before"
+	inst := Scene_InstantiateComponent(scene, "components/crate.component.json", nil, &game.gameContext)
+	after := Node_CreateByTypeName(scene, "Node")
+	after.name = "After"
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	inst.name = strings.clone("CrateA", inst.allocator)
+	inst.position = {7, 8}
+	Scene_FindNodeByName(scene, "Lid").position = {0, -42}
+
+	fresh := Scene_RebuildInstance(scene, inst, "", &game.gameContext)
+	testing.expect(t, fresh != nil && fresh != inst, "a new root")
+	if fresh == nil do return
+	kids := GetChildrenView(scene.manager, scene.rootNode)
+	idx := -1
+	for c, i in kids do if c == fresh do idx = i
+	testing.expect_value(t, idx, 1) // between Before and After
+	testing.expect(t, fresh.name == "CrateA" && fresh.position == {7, 8}, "name and transform")
+	lid := Scene_FindNodeByName(scene, "Lid")
+	testing.expect(t, lid != nil && lid.position == {0, -42}, "override kept")
+}
+
 // #72: a scene whose component file is missing keeps the instance's link,
 // transform and overrides when saved; when the file is back, it loads again.
 @(test)

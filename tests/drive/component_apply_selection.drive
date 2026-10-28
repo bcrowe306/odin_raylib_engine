@@ -1,0 +1,33 @@
+# #74: Apply Changes to Component rebuilds every instance of the file; the
+# selection must point at the rebuilt nodes, not freed ones - editing the
+# selection right after works, and the other instances get the change.
+wait 5
+click @hier:PlayerShip
+rclick @hier:PlayerShip
+click @ctx:save-component
+# A second instance of it.
+key escape
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip2
+expect selection-alive == true
+
+# Change the first instance (an override), then apply it to the component.
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+expect node:ParticleEmitter.parent == PlayerShip
+click @hier:PlayerShip
+rclick @hier:PlayerShip
+click @ctx:apply-component
+wait 2
+expect selected == PlayerShip
+expect selection-alive == true
+# Every instance has the applied child; the selection can be edited.
+expect node:PlayerShip2.children == 1
+dblclick @insp.name
+key ctrl+a
+type ShipOne
+key enter
+expect node:ShipOne.exists == true
+expect selection-alive == true
