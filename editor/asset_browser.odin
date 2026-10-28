@@ -123,7 +123,10 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 			Editor_ClearAssetSelection(state)
 		}
 		io := imgui.GetIO()
-		if (imgui.IsWindowFocused() || imgui.IsWindowHovered()) && !io.WantTextInput && (imgui.IsKeyPressed(.Delete) || imgui.IsKeyPressed(.Backspace)) {
+		// (Not while typing in the Code tab: its text area doesn't set
+		// WantTextInput, and Backspace there with the mouse over Assets
+		// asked to delete the selected asset - issue #60.)
+		if (imgui.IsWindowFocused() || imgui.IsWindowHovered()) && !io.WantTextInput && !Code_HasFocus() && (imgui.IsKeyPressed(.Delete) || imgui.IsKeyPressed(.Backspace)) {
 			if Editor_AssetSelectedCount(state) > 1 {
 				rels := make([dynamic]string, context.temp_allocator)
 				for f in state.selectedAssetPaths {

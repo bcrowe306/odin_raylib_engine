@@ -20,6 +20,8 @@ type [
 expect code.line == x = (1)[]
 key backspace
 expect code.line == x = (1)
+# Backspace in the code never asks to delete the selected asset (#60).
+expect item:delete.ok == missing
 type "
 type a
 type "

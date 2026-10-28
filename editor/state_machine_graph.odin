@@ -747,7 +747,7 @@ smg_canvas :: proc(state: ^EditorState, sm: ^e.StateMachineNode) {
 		}
 	}
 	// Delete the selection.
-	if (imgui.IsWindowFocused() || hovered) && !io.WantTextInput && (imgui.IsKeyPressed(.Delete) || imgui.IsKeyPressed(.Backspace)) {
+	if (imgui.IsWindowFocused() || hovered) && !io.WantTextInput && !Code_HasFocus() && (imgui.IsKeyPressed(.Delete) || imgui.IsKeyPressed(.Backspace)) {
 		smg_delete_selection(state, sm)
 	}
 	// Right-click: on a state its actions, elsewhere add a state.
