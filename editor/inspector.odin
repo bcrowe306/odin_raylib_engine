@@ -426,15 +426,7 @@ float_format :: proc(v: f32) -> cstring {
 	return "%.0f" if abs(v) >= 1000 else "%.3g"
 }
 
-// script_prop_label: the property's `label` from the script, else its name.
-@(private = "file")
-script_prop_label :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: string) -> string {
-	sm := &state.game.scriptManager
-	if mod, ok := sm.modules[e.ScriptVFS_NormalizePath(inst.modulePath)]; ok && mod != nil {
-		for p in mod.properties do if p.name == name && p.label != "" do return p.label
-	}
-	return pretty_name(name)
-}
+
 
 // node_ref_field: a node-reference script property - a combo of the
 // scene's nodes and a drop target for nodes from the tree; returns the
@@ -1147,145 +1139,20 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 			return
 		}
 
-		// Stable order (map order is random): ungrouped first, then by group.
-		keys := make([dynamic]string, context.temp_allocator)
-		for k in inst.properties do append(&keys, k)
-		group_of :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: string) -> string {
-			if p := Script_PropInfo(state, inst, name); p != nil do return p.group
-			return ""
+		mod := sm.modules[e.ScriptVFS_NormalizePath(inst.modulePath)] or_else nil
+		target := Script_PropsTarget{
+			mod         = mod,
+			modulePath  = inst.modulePath,
+			values      = &inst.properties,
+			owner       = node,
+			idPrefix    = "insp.script",
+			data        = inst,
+			set         = proc(state: ^EditorState, t: ^Script_PropsTarget, name: string, val: e.ScriptValue) {
+				e.ScriptInstance_SetProperty((^e.ScriptInstance)(t.data), name, val, &state.game.scriptManager)
+			},
+			record_undo = proc(state: ^EditorState, t: ^Script_PropsTarget, label: string) {Editor_RecordUndo(state, label)},
 		}
-		Keyed :: struct {group, name: string}
-		keyed := make([dynamic]Keyed, context.temp_allocator)
-		for k in keys do append(&keyed, Keyed{group_of(state, inst, k), k})
-		slice.sort_by(keyed[:], proc(a, b: Keyed) -> bool {return a.group < b.group if a.group != b.group else a.name < b.name})
-		lastGroup := ""
-		for kk in keyed {
-			name := kk.name
-			if kk.group != lastGroup {
-				lastGroup = kk.group
-				UI_PropLabel("")
-				imgui.PushStyleColorImVec4(.Text, UI_ACCENT)
-				imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_LAYER_GROUP, kk.group))
-				imgui.PopStyleColor()
-				Drive_Item(fmt.tprintf("insp.script-group:%s", kk.group))
-			}
-			val := inst.properties[name]
-			info := Script_PropInfo(state, inst, name)
-			propLabel := script_prop_label(state, inst, name)
-			prop_label(propLabel, node, fmt.tprintf("script.%s", name), script_lua_value(val))
-			TIP :: imgui.HoveredFlags_DelayNormal | imgui.HoveredFlags_Stationary
-			if imgui.IsItemHovered() {
-				// Help: `tooltip = "..."`, else the `---` comment above it in the script.
-				help := info.tooltip if info != nil else ""
-				if help == "" {
-					path := code_abs_path(state, asset_rel_editor(state, inst.modulePath))
-					if data, err := os.read_entire_file(path, context.temp_allocator); err == nil do help = Script_PropComment(string(data), name)
-				}
-				script_prop_help(node, inst, name, propLabel, val, imgui.IsItemHovered(TIP), help)
-			}
-			id := fmt.tprintf("insp.script:%s", name)
-			label := fmt.ctprintf("##%s", id)
-			changed := false
-			defVal, hasDef := script_prop_default(state, inst, name)
-			imgui.SetNextItemWidth(field_width())
-			// Enum, lists (array / curve / gradient), sliders.
-			if info != nil && val.type == .String && (info.assetKind == "enum" || e.Script_IsJsonKind(info.assetKind)) {
-				newText := val.valString
-				edited := false
-				switch info.assetKind {
-				case "enum":
-					idx := -1
-					for v, i in info.values do if v == val.valString do idx = i
-					if picked, ok := UI_Combo(id, idx, info.values[:]); ok && picked >= 0 do newText, edited = info.values[picked], true
-				case "array":    newText, edited = script_array_field(state, node, id, info.elem, val.valString)
-				case "curve":    newText, edited = script_curve_field(id, val.valString)
-				case "gradient": newText, edited = script_gradient_field(id, val.valString)
-				}
-				if edited && newText != val.valString {
-					Editor_RecordUndo(state, fmt.tprintf("Edit %s", name))
-					e.ScriptInstance_SetProperty(inst, name, {type = .String, valString = newText}, sm)
-				}
-				if field_reset(id, hasDef && !script_value_equal(val, defVal)) {
-					Editor_RecordUndo(state, fmt.tprintf("Reset %s", name))
-					e.ScriptInstance_SetProperty(inst, name, defVal, sm)
-				}
-				continue
-			}
-			if info != nil && info.slider && info.max > info.min && (val.type == .Float || val.type == .Int) {
-				if val.type == .Float {
-					changed = imgui.SliderFloat(label, &val.valFloat, info.min, info.max, "%.2f")
-				} else {
-					iv := c.int(val.valInt)
-					if imgui.SliderInt(label, &iv, c.int(info.min), c.int(info.max)) {val.valInt = i64(iv); changed = true}
-				}
-				undo_on_activate(state, fmt.tprintf("Edit %s", name))
-				Drive_Item(id)
-				if changed do e.ScriptInstance_SetProperty(inst, name, val, sm)
-				if field_reset(id, hasDef && !script_value_equal(val, defVal)) {
-					Editor_RecordUndo(state, fmt.tprintf("Reset %s", name))
-					e.ScriptInstance_SetProperty(inst, name, defVal, sm)
-				}
-				continue
-			}
-			if val.type == .Vector2 {
-				if vec2_edit(state, id, &val.valVec2, 0.5, fmt.tprintf("Edit %s", name), defVal.valVec2 if hasDef else {}) {
-					e.ScriptInstance_SetProperty(inst, name, val, sm)
-				}
-				continue
-			}
-			switch val.type {
-			case .Float:
-				changed = imgui.DragFloat(label, &val.valFloat, 0.1, 0, 0, float_format(val.valFloat))
-			case .Int:
-				iv := c.int(val.valInt)
-				if imgui.DragInt(label, &iv, 0.2, 0, 0) {val.valInt = i64(iv); changed = true}
-			case .Boolean:
-				changed = imgui.Checkbox(label, &val.valBool)
-			case .String:
-				if kind := Script_PropAssetKind(state, inst, name); kind == "node" {
-					// A node reference: a picker (or drop a node from the tree), saved as a path.
-					if path, ok := node_ref_field(state, node, id, val.valString); ok && path != val.valString {
-						Editor_RecordUndo(state, fmt.tprintf("Edit %s", name))
-						val.valString = path
-						e.ScriptInstance_SetProperty(inst, name, val, sm)
-					}
-					if field_reset(id, val.valString != "") {
-						Editor_RecordUndo(state, fmt.tprintf("Reset %s", name))
-						e.ScriptInstance_SetProperty(inst, name, {type = .String}, sm)
-					}
-					continue
-				} else if kind != "" {
-					if path, ok := asset_picker(id, val.valString, Script_AssetFiles(state, kind), allowNone = true); ok && path != val.valString {
-						Editor_RecordUndo(state, fmt.tprintf("Edit %s", name))
-						val.valString = path
-						e.ScriptInstance_SetProperty(inst, name, val, sm)
-					}
-					if field_reset(id, hasDef && !script_value_equal(val, defVal)) {
-						Editor_RecordUndo(state, fmt.tprintf("Reset %s", name))
-						e.ScriptInstance_SetProperty(inst, name, defVal, sm)
-					}
-					continue
-				}
-				buf: [256]u8
-				copy(buf[:len(buf) - 1], val.valString)
-				if imgui.InputText(label, cstring(raw_data(buf[:])), len(buf), {}) {
-					val.valString = strings.clone(string(cstring(raw_data(buf[:]))))
-					changed = true
-				}
-			case .Vector2:
-				changed = imgui.DragFloat2(label, &val.valVec2, 0.5, 0, 0, "%.2f")
-			case .Color:
-				changed = imgui.ColorEdit4(label, &val.valColor, {.AlphaBar})
-			}
-			undo_on_activate(state, fmt.tprintf("Edit %s", name))
-			Drive_Item(id)
-			if changed do e.ScriptInstance_SetProperty(inst, name, val, sm)
-			if field_reset(id, hasDef && !script_value_equal(val, defVal)) {
-				Editor_RecordUndo(state, fmt.tprintf("Reset %s", name))
-				e.ScriptInstance_SetProperty(inst, name, defVal, sm)
-			}
-		}
-		if len(keyed) == 0 {
+		if script_props_editor(state, &target) == 0 {
 			UI_PropLabel("")
 			UI_DimText("No exported properties")
 		}
@@ -1458,13 +1325,7 @@ inspector_scene_settings :: proc(state: ^EditorState, scene: ^e.Scene) {
 	UI_Tooltip("Draw node bounds when the game runs (debug)")
 }
 
-// script_prop_default: the default a script declares for a property.
-script_prop_default :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: string) -> (e.ScriptValue, bool) {
-	mod, ok := state.game.scriptManager.modules[e.ScriptVFS_NormalizePath(inst.modulePath)]
-	if !ok || mod == nil do return {}, false
-	for p in mod.properties do if p.name == name do return p.defaultVal, true
-	return {}, false
-}
+
 
 script_value_equal :: proc(a, b: e.ScriptValue) -> bool {
 	if a.type != b.type do return false

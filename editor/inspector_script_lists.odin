@@ -44,13 +44,6 @@ Script_PropComment :: proc(scriptText, name: string) -> string {
 	return ""
 }
 
-// Script_PropInfo: a script property's declaration (nil when unknown).
-Script_PropInfo :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: string) -> ^e.ScriptProperty {
-	mod, ok := state.game.scriptManager.modules[e.ScriptVFS_NormalizePath(inst.modulePath)]
-	if !ok || mod == nil do return nil
-	for &p in mod.properties do if p.name == name do return &p
-	return nil
-}
 
 @(private = "file")
 num :: proc(v: json.Value) -> f64 {
