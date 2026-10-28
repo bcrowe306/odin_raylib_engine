@@ -89,17 +89,30 @@ Editor_SaveComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 	}
 	json := e.Node_SerializeToJSON(children[0], scene.manager, context.temp_allocator)
 	disk, _ := filepath.join({state.projectPath, scene.filePath}, context.temp_allocator)
+	// Undo puts the file (and so the instances) back (#76).
+	Editor_RecordFileUndo(state, scene.filePath, fmt.tprintf("Save %s", scene.filePath))
 	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(disk, transmute([]u8)json) != nil {
 		Editor_Log(state, .Error, "Failed to write %s", disk)
 		return false
 	}
 	Editor_SetSceneBaseline(state, scene)
-	refreshed := 0
-	for _, other in state.game.sceneManager.scenes {
-		if other == nil || other == scene || !other.isLoaded || Editor_IsComponentDoc(state, other) do continue
-		refreshed += e.Scene_RefreshComponentInstances(other, scene.filePath, &state.game.gameContext)
-	}
+	sel := Editor_SaveSelection(state) // (Save All: the active scene may have instances)
+	refreshed := Editor_RefreshComponentInstances(state, scene.filePath)
+	Editor_RestoreSelection(state, sel)
 	Editor_Log(state, .Info, "Saved component %s (%d instance(s) updated)", scene.filePath, refreshed)
 	return true
+}
+
+// Editor_RefreshComponentInstances rebuilds the instances of a component
+// file in every open scene (not component documents, nor `skip`). Returns
+// how many were rebuilt. When the active scene is refreshed, the caller
+// keeps the selection (Editor_SaveSelection before any rebuild, #74).
+Editor_RefreshComponentInstances :: proc(state: ^EditorState, rel: string, skip: ^e.Scene = nil) -> int {
+	n := 0
+	for _, s in state.game.sceneManager.scenes {
+		if s == nil || s == skip || !s.isLoaded || Editor_IsComponentDoc(state, s) do continue
+		n += e.Scene_RefreshComponentInstances(s, rel, &state.game.gameContext)
+	}
+	return n
 }

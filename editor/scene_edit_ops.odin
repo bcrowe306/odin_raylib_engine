@@ -17,59 +17,64 @@ import e "../engine"
 
 UNDO_LIMIT :: 100
 
-// One undo stack for everything: scene edits (the active scene's apply)
-// and resource file edits (inspector_resource.odin; they apply whatever
-// scene is active).
+// One undo stack for everything: scene edits (the active scene's apply,
+// with the project file the same step wrote, e.g. Apply to Component) and
+// edits of a project file alone (a resource in the Inspector, a saved
+// component document; they apply whatever scene is active).
 Undo_Kind :: enum u8 {
 	Scene,
-	Resource,
+	File,
 }
 
 Undo_Entry :: struct {
 	kind:     Undo_Kind,
 	scene:    ^e.Scene,
-	json:     Undo_Snapshot, // the scene's JSON / the resource file's text, in shared chunks (undo_store.odin)
+	json:     Undo_Snapshot, // .Scene: the scene's JSON, in shared chunks (undo_store.odin)
 	label:    string,
 	selected: string, // child-index path of the selected node ("2/0"), "" = none
 	version:  int,    // the scene's edit version this entry restores
-	resource: string, // .Resource: the file (project-relative)
+	file:     string, // the project file (project-relative) the step wrote: always for .File, "" for most .Scene steps
+	fileText: Undo_Snapshot, // its text before the step
 }
 
-// Editor_RecordResourceUndo snapshots a resource file before a change.
-// (Recorded during Simulate too: resource edits are saved to the file, not
-// rolled back when the simulation stops.)
-Editor_RecordResourceUndo :: proc(state: ^EditorState, rel, label: string) {
+// Editor_RecordFileUndo snapshots a project file before a change that
+// writes only the file (a resource edit, saving a component document).
+// (Recorded during Simulate too: these are saved to the file, not rolled
+// back when the simulation stops.)
+Editor_RecordFileUndo :: proc(state: ^EditorState, rel, label: string) {
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	data, err := os.read_entire_file(full, context.temp_allocator)
 	if err != nil do return
 	snap := Undo_Pack(string(data))
-	for &r in state.redoStack do undo_entry_destroy(&r)
+	for &r in state.redoStack do Undo_EntryDestroy(&r)
 	clear(&state.redoStack)
 	// Unchanged since the last step for this file: one step, not two.
-	if n := len(state.undoStack); n > 0 && state.undoStack[n - 1].kind == .Resource && state.undoStack[n - 1].resource == rel && Undo_Same(state.undoStack[n - 1].json, snap) {
+	if n := len(state.undoStack); n > 0 && state.undoStack[n - 1].kind == .File && state.undoStack[n - 1].file == rel && Undo_Same(state.undoStack[n - 1].fileText, snap) {
 		Undo_Release(snap)
 		return
 	}
-	append(&state.undoStack, Undo_Entry{kind = .Resource, json = snap, label = strings.clone(label), resource = strings.clone(rel)})
+	append(&state.undoStack, Undo_Entry{kind = .File, label = strings.clone(label), file = strings.clone(rel), fileText = snap})
 	if len(state.undoStack) > UNDO_LIMIT {
 		old := state.undoStack[0]
-		undo_entry_destroy(&old)
+		Undo_EntryDestroy(&old)
 		ordered_remove(&state.undoStack, 0)
 	}
 }
 
-// Editor_RecordUndo snapshots the active scene before a change.
-Editor_RecordUndo :: proc(state: ^EditorState, label: string) {
+// Editor_RecordUndo snapshots the active scene before a change. `file`: a
+// project file the change also writes (project-relative), snapshotted too,
+// so one Undo restores both.
+Editor_RecordUndo :: proc(state: ^EditorState, label: string, file := "") {
 	if state.activeScene == nil || state.isSimulating do return
 	state.modifiedCacheFrames = 0
 	state.modifiedCountFrames = 0
 	snap := Undo_Pack(e.Scene_SerializeToJSON(state.activeScene, context.temp_allocator))
 	// Nothing changed since the last snapshot (e.g. a double-click
 	// activating a field twice): one undo step, not two.
-	if n := len(state.undoStack); n > 0 && state.undoStack[n - 1].scene == state.activeScene && Undo_Same(state.undoStack[n - 1].json, snap) {
+	if n := len(state.undoStack); file == "" && n > 0 && state.undoStack[n - 1].scene == state.activeScene && Undo_Same(state.undoStack[n - 1].json, snap) {
 		Undo_Release(snap)
 		// A change follows: what was undone can't be redone over it.
-		for &r in state.redoStack do undo_entry_destroy(&r)
+		for &r in state.redoStack do Undo_EntryDestroy(&r)
 		clear(&state.redoStack)
 		return
 	}
@@ -80,23 +85,31 @@ Editor_RecordUndo :: proc(state: ^EditorState, label: string) {
 		selected = Editor_NodePath(state, state.selectedNode),
 		version  = state.sceneVersion[state.activeScene],
 	})
+	if file != "" {
+		full, _ := filepath.join({state.projectPath, file}, context.temp_allocator)
+		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil {
+			top := &state.undoStack[len(state.undoStack) - 1]
+			top.file = strings.clone(file)
+			top.fileText = Undo_Pack(string(data))
+		}
+	}
 	state.nextVersion += 1
 	state.sceneVersion[state.activeScene] = state.nextVersion
 	if len(state.undoStack) > UNDO_LIMIT {
 		old := state.undoStack[0]
-		undo_entry_destroy(&old)
+		Undo_EntryDestroy(&old)
 		ordered_remove(&state.undoStack, 0)
 	}
-	for &r in state.redoStack do undo_entry_destroy(&r)
+	for &r in state.redoStack do Undo_EntryDestroy(&r)
 	clear(&state.redoStack)
 }
 
-@(private = "file")
-undo_entry_destroy :: proc(u: ^Undo_Entry) {
+Undo_EntryDestroy :: proc(u: ^Undo_Entry) {
 	Undo_Release(u.json)
+	Undo_Release(u.fileText)
 	delete(u.label)
 	delete(u.selected)
-	delete(u.resource)
+	delete(u.file)
 }
 
 Editor_Undo :: proc(state: ^EditorState) -> bool {
@@ -110,41 +123,71 @@ Editor_Redo :: proc(state: ^EditorState) -> bool {
 @(private = "file")
 undo_redo :: proc(state: ^EditorState, from, to: ^[dynamic]Undo_Entry, verb: string) -> bool {
 	ResourceInspector_Flush(state) // (an edit not written yet comes first)
-	// Entries for the active scene apply, and resource entries.
+	// Entries for the active scene apply, and file entries.
 	for i := len(from) - 1; i >= 0; i -= 1 {
-		if from[i].kind == .Resource {
-			entry := from[i]
-			ordered_remove(from, i)
-			full, _ := filepath.join({state.projectPath, entry.resource}, context.temp_allocator)
-			current, _ := os.read_entire_file(full, context.temp_allocator)
-			append(to, Undo_Entry{kind = .Resource, json = Undo_Pack(string(current)), label = strings.clone(entry.label), resource = strings.clone(entry.resource)})
-			if os.write_entire_file(full, transmute([]u8)Undo_Unpack(entry.json)) != nil {
-				Editor_Log(state, .Error, "%s: could not write %s", verb, entry.resource)
-			} else {
-				Editor_Log(state, .Info, "%s: %s (%s)", verb, entry.label, entry.resource)
-			}
-			ResourceInspector_FileChanged(entry.resource)
-			undo_entry_destroy(&entry)
-			return true
-		}
-		if from[i].scene != state.activeScene do continue
+		if from[i].kind == .Scene && from[i].scene != state.activeScene do continue
 		entry := from[i]
 		ordered_remove(from, i)
-		append(to, Undo_Entry{
-			scene    = state.activeScene,
-			json     = Undo_Pack(e.Scene_SerializeToJSON(state.activeScene, context.temp_allocator)),
-			label    = strings.clone(entry.label),
-			selected = Editor_NodePath(state, state.selectedNode),
-			version  = state.sceneVersion[state.activeScene],
-		})
-		Editor_RestoreSceneJSON(state, state.activeScene, Undo_Unpack(entry.json))
-		state.sceneVersion[state.activeScene] = entry.version
-		state.selectedNode = Editor_NodeAtPath(state, entry.selected)
-		Editor_Log(state, .Info, "%s: %s", verb, entry.label)
-		undo_entry_destroy(&entry)
+		defer Undo_EntryDestroy(&entry)
+		// The opposite step: the file and the scene as they are now.
+		back := Undo_Entry{kind = entry.kind, label = strings.clone(entry.label)}
+		full: string
+		if entry.file != "" {
+			full, _ = filepath.join({state.projectPath, entry.file}, context.temp_allocator)
+			current, _ := os.read_entire_file(full, context.temp_allocator)
+			back.file = strings.clone(entry.file)
+			back.fileText = Undo_Pack(string(current))
+		}
+		if entry.kind == .Scene {
+			back.scene = state.activeScene
+			back.json = Undo_Pack(e.Scene_SerializeToJSON(state.activeScene, context.temp_allocator))
+			back.selected = Editor_NodePath(state, state.selectedNode)
+			back.version = state.sceneVersion[state.activeScene]
+		}
+		append(to, back)
+		// The file first: the scene's instances load from it.
+		if entry.file != "" && os.write_entire_file(full, transmute([]u8)Undo_Unpack(entry.fileText)) != nil {
+			Editor_Log(state, .Error, "%s: could not write %s", verb, entry.file)
+		}
+		if entry.kind == .Scene {
+			Editor_RestoreSceneJSON(state, state.activeScene, Undo_Unpack(entry.json))
+			state.sceneVersion[state.activeScene] = entry.version
+			state.selectedNode = Editor_NodeAtPath(state, entry.selected)
+		}
+		if entry.file != "" do undo_file_restored(state, entry.file, Undo_Unpack(entry.fileText), entry.kind == .Scene)
+		if entry.kind == .File {
+			Editor_Log(state, .Info, "%s: %s (%s)", verb, entry.label, entry.file)
+		} else {
+			Editor_Log(state, .Info, "%s: %s", verb, entry.label)
+		}
 		return true
 	}
 	return false
+}
+
+// undo_file_restored: what follows a file undo / redo wrote. A component's
+// instances are rebuilt in the open scenes (the active one too unless it was
+// just restored with the file), and its open document is unsaved unless it
+// matches the file.
+@(private = "file")
+undo_file_restored :: proc(state: ^EditorState, rel, text: string, sceneRestored: bool) {
+	ResourceInspector_FileChanged(rel)
+	if Asset_KindOf(rel) != .Component do return
+	if sceneRestored {
+		Editor_RefreshComponentInstances(state, rel, state.activeScene)
+	} else {
+		sel := Editor_SaveSelection(state)
+		Editor_RefreshComponentInstances(state, rel)
+		Editor_RestoreSelection(state, sel)
+	}
+	for doc in state.componentDocs {
+		if doc == nil || doc.filePath != rel do continue
+		kids := e.GetChildrenView(doc.manager, doc.rootNode)
+		same := len(kids) > 0 && e.Node_SerializeToJSON(kids[0], doc.manager, context.temp_allocator) == text
+		state.savedVersion[doc] = state.sceneVersion[doc] if same else -1
+		state.modifiedCacheFrames = 0
+		state.modifiedCountFrames = 0
+	}
 }
 
 // Editor_RestoreSceneJSON rebuilds a scene's nodes from JSON, in place.
@@ -420,24 +463,21 @@ Editor_ApplyInstanceToComponent :: proc(state: ^EditorState, inst: ^e.Node) -> b
 	rel := strings.clone(inst.componentPath, context.temp_allocator)
 	json := e.Component_InstanceJSON(inst, state.activeScene.manager, context.temp_allocator)
 	disk, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	// One undo step for the scene and the file (#76), taken before the file
+	// changes.
+	Editor_RecordUndo(state, "Apply to component", rel)
 	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(disk, transmute([]u8)json) != nil {
 		Editor_Log(state, .Error, "Failed to write %s", disk)
 		return false
 	}
-	Editor_RecordUndo(state, "Apply to component")
 	// Every instance of the file is rebuilt (this one too): the selection is
 	// kept as paths, not pointers to freed nodes (#74).
 	sel := Editor_SaveSelection(state)
 	defer Editor_RestoreSelection(state, sel)
 	inst.componentBase = ""
 	e.Scene_RevertComponentOverrides(state.activeScene, inst, &state.game.gameContext)
-	n := 0
-	for _, other in state.game.sceneManager.scenes {
-		if other == nil || other == state.activeScene || !other.isLoaded || Editor_IsComponentDoc(state, other) do continue
-		n += e.Scene_RefreshComponentInstances(other, rel, &state.game.gameContext)
-	}
-	n += e.Scene_RefreshComponentInstances(state.activeScene, rel, &state.game.gameContext)
+	n := Editor_RefreshComponentInstances(state, rel)
 	Editor_Log(state, .Info, "Applied changes to %s (%d instance(s) updated)", rel, n)
 	return true
 }

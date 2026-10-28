@@ -1,0 +1,64 @@
+# #76: writing a component file is part of the undo step. Undo after Apply
+# Changes to Component puts the file and the other instances back (the
+# applied instance gets its override back); Redo applies again. Undo after
+# saving a component document puts the file and the instances back too.
+wait 5
+click @hier:PlayerShip
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip2
+expect node:PlayerShip2.children == 0
+
+# Apply an added child to the component; both instances have it.
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+expect node:ParticleEmitter.parent == PlayerShip
+click @hier:PlayerShip
+rclick @hier:PlayerShip
+click @ctx:apply-component
+wait 2
+expect file:components/PlayerShip.component.json contains "ParticleEmitter"
+expect node:PlayerShip2.children == 1
+
+# Undo: the file and the other instance are back; this one keeps its child
+# as an override, as before Apply.
+key ctrl+z
+wait 2
+expect file:components/PlayerShip.component.json !contains "ParticleEmitter"
+expect node:PlayerShip2.children == 0
+expect node:PlayerShip/ParticleEmitter.exists == true
+expect selection-alive == true
+screenshot apply_undone
+
+# Redo applies it again.
+key ctrl+shift+z
+wait 2
+expect file:components/PlayerShip.component.json contains "ParticleEmitter"
+expect node:PlayerShip2.children == 1
+expect selection-alive == true
+
+# Save the component document, then undo in the scene: the file and the
+# instances are back.
+rclick @asset:components/PlayerShip.component.json
+click @ctx:edit-component
+expect scene == components/PlayerShip.component.json
+click @hier:PlayerShip
+key ctrl+a
+type timer
+key enter
+expect node:Timer.parent == PlayerShip
+key ctrl+s
+expect file:components/PlayerShip.component.json contains "Timer"
+dblclick @asset:scenes/main.scene.json
+expect node:PlayerShip2.children == 2
+key ctrl+z
+wait 2
+expect file:components/PlayerShip.component.json !contains "Timer"
+expect file:components/PlayerShip.component.json contains "ParticleEmitter"
+expect node:PlayerShip2.children == 1
+expect selection-alive == true
+screenshot save_undone
