@@ -89,6 +89,9 @@ ScriptManager_Destroy :: proc(sm: ^ScriptManager = nil) {
 	Script_ReleaseAllConnections(mgr)
 	globals_clear(mgr)
 	delete(mgr.globals)
+	Resource_ClearAll(mgr)
+	delete(mgr.resources)
+	mgr.resources = nil
 
 	// Destroy all active instances
 	for len(mgr.instances) > 0 {
@@ -192,6 +195,8 @@ ScriptManager_LoadModule :: proc(path: string, sm: ^ScriptManager = nil) -> (^Sc
 	lua.getfield(L, lua.REGISTRYINDEX, moduleRefKey)
 	delete(mod.properties)
 	mod.properties = Script_ParseProperties(L, lua.gettop(L))
+	mod.isResourceClass, mod.resourceLocalCopy = script_parse_resource_marker(L, lua.gettop(L), mod.path)
+	if mod.isResourceClass do script_warn_resource_props(mod)
 	lua.pop(L, 1) // module table
 	ScriptModule_TrackFile(mgr, mod)
 

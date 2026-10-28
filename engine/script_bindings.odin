@@ -4795,6 +4795,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	Script_RegisterPoolModule(L)
 	Script_RegisterAccessibilityModules(L) // Accessibility, Subtitles (accessibility.odin)
 	Script_RegisterSaveModule(L)
+	Script_RegisterResourceModule(L) // Resource, ResourceBase (script_resources.odin)
 	Script_RegisterCrashModule(L) // (crash_report.odin)
 	lua.newtable(L)
 	lua.pushcfunction(L, lua_navigation_find_path)

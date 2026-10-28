@@ -262,6 +262,8 @@ Node_Terminate :: proc(node: ^Node) {
 	}
 	// Lua: drop connections to/from this node; references become nil.
 	Script_ForgetNode(node)
+	// Resource copies local to this node (a component instance / tree root).
+	Resource_ForgetScope(node)
 	Node_Unregister(node)
 	// Recycle the arena (keeps its first block reserved).
 	if node.arena.total_reserved == 0 {
