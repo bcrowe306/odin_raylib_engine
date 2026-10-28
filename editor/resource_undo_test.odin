@@ -9,7 +9,7 @@ import "core:testing"
 // skipped, resource entries are not; a renamed file's entries follow it.
 @(test)
 test_resource_undo_redo :: proc(t: ^testing.T) {
-	dir, _ := filepath.abs("test_resource_undo", context.temp_allocator)
+	dir :: "test_resource_undo"
 	resDir, _ := filepath.join({dir, "resources"}, context.temp_allocator)
 	_ = os.make_directory_all(resDir)
 	defer os.remove_all(dir)
