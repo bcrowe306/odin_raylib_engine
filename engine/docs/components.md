@@ -54,7 +54,8 @@ The file is a node object, the same as a node in a scene file, with a
                "k3j9x0ab":          {"properties": {"emitter.amount": 40}},
                "k3j9x0ab/p0q9zz11": {"visible": false},
                "$removed":          ["7c1lz4ee"],
-               "$added":            {".": [{"type": "Node", "name": "Shield"}]}}}
+               "$added":            {".": [{"type": "Node", "name": "Shield"}]},
+               "$order":            {".": ["+Shield", "k3j9x0ab"]}}}
 ```
 
 - The instance root stores its name, transform, `enabled`, `visible`,
@@ -68,6 +69,15 @@ The file is a node object, the same as a node in a scene file, with a
 - **`$added`**: nodes added to this instance, in full, under the path of
   their parent. They are scene data, not nodes of the component, so they
   are saved without uids.
+- **`$order`**: a parent's children in this instance's order, by path of
+  the parent. It is only saved where the order isn't the natural one (the
+  component's children in the component's order, then the added nodes).
+  Component children are listed by segment (uid), added nodes by `+` and
+  their name. Children it doesn't list (added to the component since) come
+  after, in the component's order. Instances that didn't reorder follow the
+  component's order when it changes. In the editor, Move Up / Move Down and
+  dragging within the same parent work inside an instance; Revert on the
+  parent drops its order.
 - Renaming a child inside an instance isn't an override; the name comes
   from the component file.
 
@@ -87,4 +97,4 @@ Component files and scenes saved before uids keep loading unchanged:
 
 - Overrides inside a nested instance are stored as that nested link's whole
   `overrides` object; per-node merging across nested links comes with #79.
-- The order of an instance's children isn't saved as an override (#78).
+- Nodes inside an instance can change order but not parent.

@@ -252,11 +252,16 @@ strip_uids :: proc(v: ^json.Value) {
 }
 
 @(private = "file")
-diff_tree :: proc(base, inst: json.Object, path: string, out: ^json.Object, added: ^json.Object, removed: ^json.Array) {
+diff_tree :: proc(base, inst: json.Object, path: string, out: ^json.Object, added: ^json.Object, removed: ^json.Array, order: ^json.Object) {
 	if d, changed := diff_node(base, inst, path == "."); changed do out[path] = d
 	instKids, _ := inst["children"].(json.Array)
 	baseKids, _ := base["children"].(json.Array)
 	matched := make([]bool, len(baseKids), context.temp_allocator)
+	// The children's order: kept when it isn't the natural one (the
+	// component's children in its order, then the added ones).
+	segments := make(json.Array, 0, len(instKids), context.temp_allocator)
+	natural := true
+	lastBase, seenAdded := -1, false
 	for &c in instKids {
 		co, isObj := c.(json.Object)
 		if !isObj do continue
@@ -269,12 +274,19 @@ diff_tree :: proc(base, inst: json.Object, path: string, out: ^json.Object, adde
 			if list == nil do list = make(json.Array, context.temp_allocator)
 			append(&list, co)
 			added[path] = list
+			name, _ := co["name"].(json.String)
+			append(&segments, json.String(strings.concatenate({ORDER_ADDED_PREFIX, string(name)}, context.temp_allocator)))
+			seenAdded = true
 			continue
 		}
+		if seenAdded || i < lastBase do natural = false
+		lastBase = i
 		matched[i] = true
 		bc := baseKids[i].(json.Object)
-		diff_tree(bc, co, join_path(path, node_segment(bc)), out, added, removed)
+		append(&segments, json.String(node_segment(bc)))
+		diff_tree(bc, co, join_path(path, node_segment(bc)), out, added, removed, order)
 	}
+	if !natural do order[path] = segments
 	// Component children removed from this instance.
 	for c, i in baseKids {
 		co, isObj := c.(json.Object)
@@ -426,9 +438,11 @@ Component_OverridesJSON :: proc(node: ^Node, manager: ^NodeManager) -> string {
 	out := make(json.Object, 0, context.temp_allocator)
 	added := make(json.Object, 0, context.temp_allocator)
 	removed := make(json.Array, 0, context.temp_allocator)
-	diff_tree(base, inst, ".", &out, &added, &removed)
+	order := make(json.Object, 0, context.temp_allocator)
+	diff_tree(base, inst, ".", &out, &added, &removed, &order)
 	if len(added) > 0 do out[OVERRIDE_ADDED] = added
 	if len(removed) > 0 do out[OVERRIDE_REMOVED] = removed
+	if len(order) > 0 do out[OVERRIDE_ORDER] = order
 	if len(out) == 0 do return ""
 	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
 	Json_WriteValue(&w, out)
@@ -491,6 +505,13 @@ Component_PrepareBase :: proc(obj: ^json.Object, ctx: ^GameContext) -> string {
 // Keys of the structural changes in an "overrides" block.
 OVERRIDE_ADDED :: "$added"     // {"parent/path": [node, ...]}: nodes added to the instance
 OVERRIDE_REMOVED :: "$removed" // ["child/path", ...]: component nodes removed from it
+// {"parent/path": [segment, ...]}: a parent's children in the instance's
+// order, where it isn't the natural one (component children, then added
+// ones). Component children by segment (uid / name), added ones by
+// "+" + name.
+OVERRIDE_ORDER :: "$order"
+@(private = "file")
+ORDER_ADDED_PREFIX :: "+"
 
 // find_node_obj: the node object at an override path ("." = the root;
 // segments are uids or names: child_index).
@@ -529,11 +550,14 @@ Component_ApplyOverrides :: proc(base: ^json.Object, overrides: json.Object) {
 		}
 	}
 	for path, ov in overrides {
-		if path == OVERRIDE_ADDED || path == OVERRIDE_REMOVED do continue
+		if path == OVERRIDE_ADDED || path == OVERRIDE_REMOVED || path == OVERRIDE_ORDER do continue
 		ovo, isObj := ov.(json.Object)
 		if !isObj do continue
 		if target := find_node_obj(base, path); target != nil do merge_node(target, ovo)
 	}
+	// Added nodes go after the component's children, then $order puts them
+	// (and moved ones) in place.
+	baseCount := make(map[string]int, allocator = context.temp_allocator)
 	if added, ok := overrides[OVERRIDE_ADDED].(json.Object); ok {
 		for parentPath, list in added {
 			parent := find_node_obj(base, parentPath)
@@ -541,10 +565,55 @@ Component_ApplyOverrides :: proc(base: ^json.Object, overrides: json.Object) {
 			if parent == nil || !isArr do continue
 			kids, _ := parent["children"].(json.Array)
 			if kids == nil do kids = make(json.Array, context.temp_allocator)
+			baseCount[parentPath] = len(kids)
 			for n in nodes do append(&kids, n)
 			parent["children"] = kids
 		}
 	}
+	if order, ok := overrides[OVERRIDE_ORDER].(json.Object); ok {
+		for parentPath, list in order {
+			parent := find_node_obj(base, parentPath)
+			segments, isArr := list.(json.Array)
+			if parent == nil || !isArr do continue
+			kids, _ := parent["children"].(json.Array)
+			nBase, hasAdded := baseCount[parentPath]
+			if !hasAdded do nBase = len(kids)
+			parent["children"] = order_children(kids, nBase, segments)
+		}
+	}
+}
+
+// order_children: `kids` (the component's first `nBase`, then the added
+// ones) in the order `segments` lists; children it doesn't list (new in
+// the component since) follow in their own order.
+@(private = "file")
+order_children :: proc(kids: json.Array, nBase: int, segments: json.Array) -> json.Array {
+	used := make([]bool, len(kids), context.temp_allocator)
+	out := make(json.Array, 0, len(kids), context.temp_allocator)
+	pick :: proc(kids: json.Array, used: []bool, from, to: int, key, want: string) -> int {
+		for i in from ..< to {
+			co, isObj := kids[i].(json.Object)
+			if !isObj || used[i] do continue
+			if v, _ := co[key].(json.String); v != "" && string(v) == want do return i
+		}
+		return -1
+	}
+	for sv in segments {
+		s, isStr := sv.(json.String)
+		if !isStr do continue
+		i := -1
+		if strings.has_prefix(string(s), ORDER_ADDED_PREFIX) {
+			i = pick(kids, used, nBase, len(kids), "name", string(s)[len(ORDER_ADDED_PREFIX):])
+		} else {
+			i = pick(kids, used, 0, nBase, "uid", string(s))
+			if i < 0 do i = pick(kids, used, 0, nBase, "name", string(s))
+		}
+		if i < 0 do continue
+		used[i] = true
+		append(&out, kids[i])
+	}
+	for k, i in kids do if !used[i] do append(&out, k)
+	return out
 }
 
 // Node_HasComponentOverrides: does this node (inside an instance) differ
@@ -583,6 +652,7 @@ Node_ComponentOverrides :: proc(manager: ^NodeManager, node: ^Node) -> []string 
 		}
 		if n > 0 do append(&out, fmt.tprintf("-%d child(ren)", n))
 	}
+	if order, ok := obj[OVERRIDE_ORDER].(json.Object); ok && path in order do append(&out, "child order")
 	entry, has := obj[path].(json.Object)
 	if !has do return out[:]
 	for k, v in entry {
@@ -621,6 +691,10 @@ Scene_RevertComponentOverrides :: proc(scene: ^Scene, node: ^Node, ctx: ^GameCon
 			if added, ok := ov[OVERRIDE_ADDED].(json.Object); ok {
 				delete_key(&added, path)
 				ov[OVERRIDE_ADDED] = added
+			}
+			if order, ok := ov[OVERRIDE_ORDER].(json.Object); ok {
+				delete_key(&order, path)
+				ov[OVERRIDE_ORDER] = order
 			}
 			if removed, ok := ov[OVERRIDE_REMOVED].(json.Array); ok {
 				kept := make(json.Array, 0, context.temp_allocator)

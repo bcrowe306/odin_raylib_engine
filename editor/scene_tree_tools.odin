@@ -52,8 +52,11 @@ Editor_InsertNodeAt :: proc(state: ^EditorState, node, target: ^e.Node, after: b
 	parent := e.GetParent(mgr, target)
 	if parent == nil do return false
 	for p := target; p != nil; p = e.GetParent(mgr, p) do if p == node do return false // no cycles
-	if Editor_NodeLocked(state, node) || Editor_NodeLocked(state, target) {
-		Editor_Log(state, .Warn, "Nodes inside a component keep their place: move them in the component")
+	// Inside an instance, children can change order (an override, #78) but
+	// not parent.
+	reorder := e.GetParent(mgr, node) == parent
+	if !reorder && (Editor_NodeLocked(state, node) || Editor_NodeLocked(state, target)) {
+		Editor_Log(state, .Warn, "Nodes inside a component keep their parent: move them in the component")
 		return false
 	}
 	Editor_RecordUndo(state, fmt.tprintf("Move %s", node.name))
