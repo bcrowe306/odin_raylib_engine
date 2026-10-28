@@ -87,7 +87,7 @@ Editor_SaveComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 		Editor_Log(state, .Error, "Component document is empty")
 		return false
 	}
-	json := e.Node_SerializeToJSON(children[0], scene.manager, context.temp_allocator)
+	json := e.Component_FileJSON(children[0], scene.manager, context.temp_allocator) // (every node gets a uid: #77)
 	disk, _ := filepath.join({state.projectPath, scene.filePath}, context.temp_allocator)
 	// Undo puts the file (and so the instances) back (#76).
 	Editor_RecordFileUndo(state, scene.filePath, fmt.tprintf("Save %s", scene.filePath))

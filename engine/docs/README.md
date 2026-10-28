@@ -26,6 +26,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 | [Changing scenes](scene_flow.md) | Transitions, preloading, loading screens (background texture decoding) - with a loading screen tutorial. |
 | [Paths and followers](paths.md) | Bézier paths edited in the viewport; followers for moving platforms, patrols, rails - with tutorials. |
 | [Pixel-perfect rendering](pixel_perfect.md) | Integer scaling, pixel snap, smooth sub-pixel camera - recipes for pixel art. |
+| [Components](components.md) | Linked component (prefab) instances: the component file, stable node ids (`uid`), instance overrides and older files. |
 | [Resources](resources.md) | Data assets of a Lua class: properties edited in the Inspector per `.resource.json`, methods any script can call; shared or one per component instance, `on_load`, hot reload - with a tutorial (per-enemy health). |
 | [Object pooling](pooling.md) | Reuse bullets, effects, pickups: `Pool.take`, `on_spawn` / `on_despawn`, prewarm, caps - with a tutorial. |
 | [Crash reports](crash_reports.md) | What a crash writes (reason, stack, recent lines), where, the editor's "report on GitHub", and the `Crash` Lua module for games. |

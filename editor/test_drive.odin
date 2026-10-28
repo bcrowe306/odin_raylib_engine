@@ -1019,6 +1019,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 			return strings.to_string(sb), true
 		case "overrides":
 			return strings.join(e.Node_ComponentOverrides(state.activeScene.manager, n), ",", context.temp_allocator), true
+		case "uid":
+			return n.uid, true
 		case "script":
 			if n.scriptInstance == nil do return "", true
 			return (cast(^e.ScriptInstance)n.scriptInstance).modulePath, true

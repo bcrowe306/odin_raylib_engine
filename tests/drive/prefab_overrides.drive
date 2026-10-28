@@ -12,6 +12,10 @@ key escape
 dblclick @asset:components/PlayerShip.component.json
 expect selected == PlayerShip2
 
+# Saving the component gave its nodes uids (#77).
+expect file:components/PlayerShip.component.json contains "uid": "
+expect node:PlayerShip2/ParticleEmitter.uid != 
+
 # Edit a child of the instance.
 click @hier:PlayerShip2/ParticleEmitter
 expect node:PlayerShip2/ParticleEmitter.overrides ==
@@ -24,8 +28,11 @@ expect node:PlayerShip2/ParticleEmitter.overrides == position
 expect item:insp.overrides == visible
 screenshot child_override
 key ctrl+s
-expect file:scenes/main.scene.json contains "overrides": {"ParticleEmitter": {"position": [25,
-expect file:scenes/main.scene.json !contains "name": "ParticleEmitter"
+# The override refers to the child by its uid, not its name.
+expect file:scenes/main.scene.json contains "overrides": {"
+expect file:scenes/main.scene.json contains : {"position": [25,
+expect file:scenes/main.scene.json !contains "ParticleEmitter"
+expect file:scenes/main.scene.json !contains "uid"
 
 # The other instance is unaffected.
 expect node:PlayerShip/ParticleEmitter.position !contains 25.0,

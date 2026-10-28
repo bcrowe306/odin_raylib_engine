@@ -4,6 +4,7 @@ import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
 import "core:math"
+import "core:math/rand"
 import "core:slice"
 import "core:strings"
 
@@ -15,10 +16,17 @@ import "core:strings"
 //
 //   {"name": "Ship2", "position": [..], "component": "components/ship.component.json",
 //    "overrides": {".":        {"script": {"properties": {"speed": 300}}},
-//                  "Thruster": {"properties": {"color": [255, 0, 0, 255]}},
-//                  "Thruster/Flame": {"visible": false}}}
+//                  "k3j9x0ab": {"properties": {"color": [255, 0, 0, 255]}},
+//                  "k3j9x0ab/p0q9zz11": {"visible": false}}}
 //
-// Keys are child paths by name from the instance root ("." = the root).
+// Every node in a component file has a "uid" (8 base-36 characters, unique
+// in the file, given when the file is written: Component_InstanceJSON /
+// Component_FileJSON). Keys are child paths from the instance root ("." =
+// the root), one segment per node: its uid, or its name for nodes without
+// one (files written before uids; they get uids when next written). A
+// segment matches a child by uid first, then by name, so old name-based
+// scenes keep loading and switch to uids when saved. Renaming a node in the
+// file or giving siblings the same name keeps each override on its node.
 // On load the overrides are merged into the component's JSON before the
 // nodes are built, so a changed component file still flows into every
 // instance except for the values the instance overrides. "properties" and
@@ -30,10 +38,23 @@ import "core:strings"
 // Set while serializing an instance in full (to diff it against its file).
 @(private)
 serializeFullInstance: ^Node
+// The uid written for this node instead of its own: the root of a component
+// file being written (Component_InstanceJSON).
+@(private = "file")
+serializeRootUidNode: ^Node
+@(private = "file")
+serializeRootUid: string
+
+// node_written_uid: the "uid" a node is saved with ("" = none).
+@(private)
+node_written_uid :: proc(node: ^Node) -> string {
+	if node == serializeRootUidNode && serializeRootUid != "" do return serializeRootUid
+	return node.uid
+}
 
 // Root keys an instance stores directly (not as overrides).
 @(private = "file")
-ROOT_DIRECT_KEYS :: []string{"type", "name", "position", "scale", "rotation", "enabled", "visible", "layer", "component", "overrides", "children", "connections"}
+ROOT_DIRECT_KEYS :: []string{"type", "name", "uid", "position", "scale", "rotation", "enabled", "visible", "layer", "component", "overrides", "children", "connections"}
 
 @(private = "file")
 contains_str :: proc(list: []string, s: string) -> bool {
@@ -134,7 +155,7 @@ diff_keywise :: proc(base, inst: json.Object) -> (json.Object, bool) {
 diff_node :: proc(base, inst: json.Object, isRoot: bool) -> (json.Object, bool) {
 	out := make(json.Object, 0, context.temp_allocator)
 	for k, v in inst {
-		if k == "children" || k == "type" do continue
+		if k == "children" || k == "type" || k == "uid" do continue
 		if isRoot && contains_str(ROOT_DIRECT_KEYS, k) do continue
 		if !isRoot && k == "name" do continue
 		bv, has := base[k]
@@ -163,52 +184,102 @@ diff_node :: proc(base, inst: json.Object, isRoot: bool) -> (json.Object, bool) 
 		}
 	}
 	for k in base {
-		if k == "children" || k == "type" || (isRoot && contains_str(ROOT_DIRECT_KEYS, k)) || (!isRoot && k == "name") do continue
+		if k == "children" || k == "type" || k == "uid" || (isRoot && contains_str(ROOT_DIRECT_KEYS, k)) || (!isRoot && k == "name") do continue
 		if _, has := inst[k]; !has do out[k] = json.Null{}
 	}
 	return out, len(out) > 0
 }
 
+// node_segment: a node's path segment in override keys (its uid, else its name).
 @(private = "file")
-child_by_name :: proc(obj: json.Object, name: string) -> (json.Object, bool) {
-	arr, ok := obj["children"].(json.Array)
-	if !ok do return nil, false
-	for c in arr {
+node_segment :: proc(obj: json.Object) -> string {
+	if u, _ := obj["uid"].(json.String); u != "" do return string(u)
+	n, _ := obj["name"].(json.String)
+	return string(n)
+}
+
+@(private = "file")
+join_path :: proc(parent, segment: string) -> string {
+	return segment if parent == "." else fmt.tprintf("%s/%s", parent, segment)
+}
+
+// child_index: the child an override segment refers to - by uid, else by
+// name (-1: none).
+@(private = "file")
+child_index :: proc(kids: json.Array, segment: string) -> int {
+	for c, i in kids {
 		co, isObj := c.(json.Object)
 		if !isObj do continue
-		if n, _ := co["name"].(json.String); n == name do return co, true
+		if u, _ := co["uid"].(json.String); u != "" && string(u) == segment do return i
 	}
-	return nil, false
+	for c, i in kids {
+		co, isObj := c.(json.Object)
+		if !isObj do continue
+		if n, _ := co["name"].(json.String); string(n) == segment do return i
+	}
+	return -1
+}
+
+// match_base_child: the component child an instance child was built from
+// (-1: added to the instance). By uid when the component child has one,
+// else by name; each component child matches once (a copy of a node made
+// inside the instance has the original's uid, and is an added node).
+@(private = "file")
+match_base_child :: proc(baseKids: json.Array, co: json.Object, matched: []bool) -> int {
+	uid, _ := co["uid"].(json.String)
+	name, _ := co["name"].(json.String)
+	for c, i in baseKids {
+		bo, isObj := c.(json.Object)
+		if !isObj || matched[i] do continue
+		bu, _ := bo["uid"].(json.String)
+		if bu != "" {
+			if bu == uid do return i
+		} else if bn, _ := bo["name"].(json.String); bn == name {
+			return i
+		}
+	}
+	return -1
+}
+
+// strip_uids: an added node is scene data, not a node of the component
+// file: it is saved without uids (they are given when it's applied).
+@(private = "file")
+strip_uids :: proc(v: ^json.Value) {
+	o, ok := &v.(json.Object)
+	if !ok do return
+	delete_key(o, "uid")
+	if kids, has := o["children"].(json.Array); has do for &k in kids do strip_uids(&k)
 }
 
 @(private = "file")
 diff_tree :: proc(base, inst: json.Object, path: string, out: ^json.Object, added: ^json.Object, removed: ^json.Array) {
 	if d, changed := diff_node(base, inst, path == "."); changed do out[path] = d
 	instKids, _ := inst["children"].(json.Array)
-	for c in instKids {
+	baseKids, _ := base["children"].(json.Array)
+	matched := make([]bool, len(baseKids), context.temp_allocator)
+	for &c in instKids {
 		co, isObj := c.(json.Object)
 		if !isObj do continue
-		name, _ := co["name"].(json.String)
-		bc, found := child_by_name(base, string(name))
-		if !found {
+		i := match_base_child(baseKids, co, matched)
+		if i < 0 {
 			// A node added to this instance: saved in full under its parent.
+			strip_uids(&c)
+			co = c.(json.Object)
 			list, _ := added[path].(json.Array)
 			if list == nil do list = make(json.Array, context.temp_allocator)
 			append(&list, co)
 			added[path] = list
 			continue
 		}
-		childPath := string(name) if path == "." else fmt.tprintf("%s/%s", path, name)
-		diff_tree(bc, co, childPath, out, added, removed)
+		matched[i] = true
+		bc := baseKids[i].(json.Object)
+		diff_tree(bc, co, join_path(path, node_segment(bc)), out, added, removed)
 	}
 	// Component children removed from this instance.
-	baseKids, _ := base["children"].(json.Array)
-	for c in baseKids {
+	for c, i in baseKids {
 		co, isObj := c.(json.Object)
-		if !isObj do continue
-		name, _ := co["name"].(json.String)
-		if _, stillThere := child_by_name(inst, string(name)); stillThere do continue
-		append(removed, json.String(string(name) if path == "." else fmt.tprintf("%s/%s", path, name)))
+		if !isObj || matched[i] do continue
+		append(removed, json.String(join_path(path, node_segment(co))))
 	}
 }
 
@@ -421,7 +492,8 @@ Component_PrepareBase :: proc(obj: ^json.Object, ctx: ^GameContext) -> string {
 OVERRIDE_ADDED :: "$added"     // {"parent/path": [node, ...]}: nodes added to the instance
 OVERRIDE_REMOVED :: "$removed" // ["child/path", ...]: component nodes removed from it
 
-// find_node_obj: the node object at a name path ("." = the root).
+// find_node_obj: the node object at an override path ("." = the root;
+// segments are uids or names: child_index).
 @(private = "file")
 find_node_obj :: proc(root: ^json.Object, path: string) -> ^json.Object {
 	target := root
@@ -429,18 +501,12 @@ find_node_obj :: proc(root: ^json.Object, path: string) -> ^json.Object {
 	for part in strings.split(path, "/", context.temp_allocator) {
 		arr, has := target["children"].(json.Array)
 		if !has do return nil
-		found := false
-		for &c in arr {
-			co, cIsObj := c.(json.Object)
-			if !cIsObj do continue
-			if n, _ := co["name"].(json.String); string(n) == part {
-				// json.Object is a map: the pointer we write through is the same map.
-				target = &c.(json.Object)
-				found = true
-				break
-			}
-		}
-		if !found do return nil
+		i := child_index(arr, part)
+		if i < 0 do return nil
+		// json.Object is a map: the pointer we write through is the same map.
+		co, cIsObj := &arr[i].(json.Object)
+		if !cIsObj do return nil
+		target = co
 	}
 	return target
 }
@@ -454,19 +520,11 @@ Component_ApplyOverrides :: proc(base: ^json.Object, overrides: json.Object) {
 			p := string(path)
 			slash := strings.last_index_byte(p, '/')
 			parentPath := p[:slash] if slash >= 0 else "."
-			name := p[slash + 1:]
 			parent := find_node_obj(base, parentPath)
 			if parent == nil do continue
 			kids, has := parent["children"].(json.Array)
 			if !has do continue
-			for c, i in kids {
-				co, cIsObj := c.(json.Object)
-				if !cIsObj do continue
-				if n, _ := co["name"].(json.String); string(n) == name {
-					ordered_remove(&kids, i)
-					break
-				}
-			}
+			if i := child_index(kids, p[slash + 1:]); i >= 0 do ordered_remove(&kids, i)
 			parent["children"] = kids
 		}
 	}
@@ -496,7 +554,7 @@ Node_ComponentOverridePath :: proc(manager: ^NodeManager, node: ^Node) -> (root:
 	if root == nil do return nil, ""
 	if root == node do return root, "."
 	parts := make([dynamic]string, context.temp_allocator)
-	for n := node; n != nil && n != root; n = GetParent(manager, n) do inject_at(&parts, 0, n.name)
+	for n := node; n != nil && n != root; n = GetParent(manager, n) do inject_at(&parts, 0, n.uid if n.uid != "" else n.name)
 	return root, strings.join(parts[:], "/", context.temp_allocator)
 }
 
@@ -598,10 +656,89 @@ Component_ClearCaches :: proc() {
 }
 
 // Component_InstanceJSON: an instance's whole subtree as a component file
-// (its link and overrides baked in).
+// (its link and overrides baked in; Apply, Save as Component). Every node
+// gets a uid unique in the file: the ones it has are kept (the root keeps
+// the component's root uid); the others are given now, on the live nodes.
 Component_InstanceJSON :: proc(node: ^Node, manager: ^NodeManager, allocator := context.allocator) -> string {
+	rootUid := node.uid
+	if node.componentPath != "" {
+		// (The instance's own uid belongs to the document holding it.)
+		base: json.Object
+		if node.componentBase != "" {
+			val, _ := json.parse(transmute([]u8)node.componentBase, allocator = context.temp_allocator)
+			base, _ = val.(json.Object)
+		} else {
+			base, _ = component_base_json(node.gameContext, node.componentPath)
+		}
+		u, _ := base["uid"].(json.String)
+		rootUid = string(u)
+	}
+	if rootUid == "" do rootUid = Component_NewUid(context.temp_allocator)
+	seen := make(map[string]bool, allocator = context.temp_allocator)
+	seen[rootUid] = true
+	for c in GetChildrenView(manager, node) do assign_uids(manager, c, &seen)
+
+	prevNode, prevUid := serializeRootUidNode, serializeRootUid
+	serializeRootUidNode, serializeRootUid = node, rootUid
 	prev := serializeFullInstance
 	serializeFullInstance = node
-	defer serializeFullInstance = prev
+	defer {
+		serializeFullInstance = prev
+		serializeRootUidNode, serializeRootUid = prevNode, prevUid
+	}
 	return Node_SerializeToJSON(node, manager, allocator)
+}
+
+// Component_FileJSON: a component document's root as its file, with a uid
+// on every node (given now to the nodes without one, or with one another
+// node of the file has already).
+Component_FileJSON :: proc(root: ^Node, manager: ^NodeManager, allocator := context.allocator) -> string {
+	seen := make(map[string]bool, allocator = context.temp_allocator)
+	assign_uids(manager, root, &seen)
+	return Node_SerializeToJSON(root, manager, allocator)
+}
+
+// Node_ForgetCopiedUids: a pasted or duplicated subtree keeps a uid only
+// when no other node of the scene has it - a cut and pasted node keeps its
+// identity (instances' overrides stay on it); a copy is a new node (given a
+// uid when its component file is written).
+Node_ForgetCopiedUids :: proc(manager: ^NodeManager, copy: ^Node) {
+	if manager == nil || copy == nil do return
+	mine := make(map[^Node]bool, allocator = context.temp_allocator)
+	collect :: proc(manager: ^NodeManager, n: ^Node, into: ^map[^Node]bool) {
+		into[n] = true
+		// (A linked instance's own nodes have its file's uids, like every
+		// other instance of that file.)
+		if n.componentPath != "" do return
+		for c in GetChildrenView(manager, n) do collect(manager, c, into)
+	}
+	collect(manager, copy, &mine)
+	taken := make(map[string]bool, allocator = context.temp_allocator)
+	for n in manager.nodes do if n != nil && n.uid != "" && n not_in mine do taken[n.uid] = true
+	for n in mine do if n.uid in taken do n.uid = ""
+}
+
+// Component_NewUid: 8 random base-36 characters.
+Component_NewUid :: proc(allocator := context.allocator) -> string {
+	digits := "0123456789abcdefghijklmnopqrstuvwxyz"
+	buf: [8]u8
+	for &b in buf do b = digits[rand.int_max(len(digits))]
+	return strings.clone(string(buf[:]), allocator)
+}
+
+// assign_uids: a uid for `n` and the nodes of the file below it (a nested
+// instance's own nodes come from its file, so it stops there).
+@(private = "file")
+assign_uids :: proc(manager: ^NodeManager, n: ^Node, seen: ^map[string]bool) {
+	if n.uid == "" || n.uid in seen^ {
+		u := Component_NewUid(context.temp_allocator)
+		for {
+			if u not_in seen^ do break
+			u = Component_NewUid(context.temp_allocator)
+		}
+		n.uid = strings.clone(u, n.allocator)
+	}
+	seen[n.uid] = true
+	if n.componentPath != "" do return
+	for c in GetChildrenView(manager, n) do assign_uids(manager, c, seen)
 }

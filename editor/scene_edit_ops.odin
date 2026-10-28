@@ -343,6 +343,7 @@ Editor_DuplicateNode :: proc(state: ^EditorState, node: ^e.Node) -> ^e.Node {
 	offset := state.gridSize if state.gridSize > 0 else 16
 	copy.position += {offset, offset}
 	e.ProcessNodeQueues(mgr, &state.game.gameContext)
+	e.Node_ForgetCopiedUids(mgr, copy) // (a new node, not the original: #77)
 	e.Node_SetGlobalPositions(mgr, state.activeScene.rootNode)
 	state.selectedNode = copy
 	return copy
@@ -449,6 +450,7 @@ Editor_SaveComponent :: proc(state: ^EditorState, node: ^e.Node, name: string = 
 	sel := Editor_SaveSelection(state) // (the node is rebuilt as an instance: #74)
 	node.componentPath = strings.clone(asset_rel_editor(state, path), node.allocator)
 	node.componentBase = ""
+	node.uid = "" // (its uid is the component root's now, in the file)
 	e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext)
 	Editor_RestoreSelection(state, sel)
 	Editor_Log(state, .Info, "Saved component %s (this node is now linked to it)", path)

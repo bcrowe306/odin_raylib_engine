@@ -199,6 +199,7 @@ Editor_InstantiateNodes :: proc(state: ^EditorState, json: string, _: int, offse
 		state.selectedNode = n
 	}
 	e.ProcessNodeQueues(mgr, &state.game.gameContext)
+	for n in state.selection do e.Node_ForgetCopiedUids(mgr, n) // (copies are new nodes: #77)
 	e.Node_SetGlobalPositions(mgr, state.activeScene.rootNode)
 	return len(state.selection)
 }
@@ -265,6 +266,7 @@ Editor_PasteNodesInto :: proc(state: ^EditorState, parent: ^e.Node) {
 		state.selectedNode = n
 	}
 	e.ProcessNodeQueues(mgr, &state.game.gameContext)
+	for n in state.selection do e.Node_ForgetCopiedUids(mgr, n) // (copies are new nodes: #77)
 	e.Node_SetGlobalPositions(mgr, state.activeScene.rootNode)
 }
 
