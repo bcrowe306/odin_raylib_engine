@@ -1,0 +1,23 @@
+# #73: saving a node as a component never replaces an existing component -
+# a second "PlayerShip" becomes PlayerShip_2, and the first one's file and
+# instances are unchanged.
+wait 5
+click @hier:PlayerShip
+rclick @hier:PlayerShip
+click @ctx:save-component
+expect file:components/PlayerShip.component.json contains textures/Spaceship_1.png
+
+# Another node saved under the same name.
+click @hier:Asteroid_Beta
+rclick @hier:Asteroid_Beta
+click @ctx:save-component-named
+key ctrl+a
+type PlayerShip
+expect item:prompt.component-path == visible
+screenshot name_taken
+click @prompt.ok
+wait 2
+expect file:components/PlayerShip_2.component.json contains Asteroid
+expect file:components/PlayerShip.component.json contains textures/Spaceship_1.png
+expect node:PlayerShip.component == components/PlayerShip.component.json
+expect node:Asteroid_Beta.component == components/PlayerShip_2.component.json

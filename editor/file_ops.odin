@@ -78,8 +78,15 @@ Prompt_Render :: proc(state: ^EditorState) {
 	imgui.SetNextItemWidth(420)
 	enter := imgui.InputTextWithHint("##prompt", strings.clone_to_cstring(hint, context.temp_allocator), cstring(raw_data(prompt.text[:])), len(prompt.text), {.EnterReturnsTrue, .AutoSelectAll})
 	Drive_Item("prompt.input")
-	imgui.Dummy({0, 6})
 	text := strings.trim_space(string(cstring(raw_data(prompt.text[:]))))
+	if prompt.kind == .SaveComponentAs && text != "" {
+		// A taken name gets _2, _3... (an existing component is never replaced).
+		rel := Component_FreePath(state, text)
+		if filepath.stem(filepath.stem(rel)) != Component_SafeName(text) do UI_DimText(fmt.tprintf("%s exists - creates %s", Component_SafeName(text), rel))
+		else do UI_DimText(rel)
+		Drive_Item("prompt.component-path")
+	}
+	imgui.Dummy({0, 6})
 	if (enter || UI_PrimaryButton("OK", "prompt.ok", {96, 0})) && text != "" {
 		prompt_apply(state, prompt.kind, strings.clone(text, context.temp_allocator))
 		imgui.CloseCurrentPopup()
@@ -196,7 +203,7 @@ Editor_SaveComponentAs :: proc(state: ^EditorState, node: ^e.Node, name: string)
 	if Editor_IsComponentDoc(state, scene) && node == nil {
 		// A component document: write a new file and open it.
 		json := e.Component_InstanceJSON(target, scene.manager, context.temp_allocator)
-		rel := fmt.tprintf("components/%s.component.json", name)
+		rel := Component_FreePath(state, name) // (never replaces a component: #73)
 		disk, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 		_ = os.make_directory_all(filepath.dir(disk, context.temp_allocator))
 		Editor_InvalidateProjectFiles() // the asset lists rescan

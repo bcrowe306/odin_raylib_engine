@@ -354,6 +354,35 @@ Editor_ComponentsDir :: proc(state: ^EditorState) -> string {
 	return p
 }
 
+// Component_SafeName: a component name as a file name on every platform
+// (/ \ : * ? " < > | and control characters become _, no leading or
+// trailing spaces or dots).
+Component_SafeName :: proc(name: string) -> string {
+	b := make([]u8, len(name), context.temp_allocator)
+	for i in 0 ..< len(name) {
+		ch := name[i]
+		switch ch {
+		case '/', '\\', ':', '*', '?', '"', '<', '>', '|': ch = '_'
+		case: if ch < 0x20 do ch = '_'
+		}
+		b[i] = ch
+	}
+	out := strings.trim(string(b), " .")
+	return out if out != "" else "Component"
+}
+
+// Component_FreePath: components/<name>.component.json, or <name>_2, _3...
+// when taken (project-relative, temp allocated).
+Component_FreePath :: proc(state: ^EditorState, name: string) -> string {
+	base := Component_SafeName(name)
+	for i := 1; ; i += 1 {
+		stem := base if i == 1 else fmt.tprintf("%s_%d", base, i)
+		rel := fmt.tprintf("components/%s.component.json", stem)
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if !os.exists(full) do return rel
+	}
+}
+
 // Editor_SaveComponent writes a node subtree to components/<name>.component.json
 // (name "" = the node's name) and links the node to it. An instance is
 // saved with its overrides baked in (Save as New Component).
@@ -361,11 +390,10 @@ Editor_SaveComponent :: proc(state: ^EditorState, node: ^e.Node, name: string = 
 	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	if node == nil || state.activeScene == nil do return "", false
 	mgr := state.activeScene.manager
-	dir := Editor_ComponentsDir(state)
-	_ = os.make_directory_all(dir)
-	base := name if name != "" else node.name
-	safe, _ := strings.replace_all(base, "/", "_", context.temp_allocator)
-	path, _ := filepath.join({dir, fmt.tprintf("%s.component.json", safe)}, context.temp_allocator)
+	_ = os.make_directory_all(Editor_ComponentsDir(state))
+	// Never replaces an existing component: a free name (Enemy_2...) (#73).
+	rel := Component_FreePath(state, name if name != "" else node.name)
+	path, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 	// The file holds the full subtree (not a link to itself).
 	json := e.Component_InstanceJSON(node, mgr, context.temp_allocator)
 	Editor_InvalidateProjectFiles() // the asset lists rescan
