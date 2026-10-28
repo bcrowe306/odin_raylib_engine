@@ -1595,23 +1595,32 @@ Scene_RefreshComponentInstances :: proc(scene: ^Scene, compPath: string, ctx: ^G
 	for n in scene.manager.nodes do if n != nil && n.typeId == TileMapNode do TileMapNode_ForgetFootprints(cast(^TileMapNode)n)
 	count := 0
 	for old in targets {
-		parent := GetParent(scene.manager, old)
-		if parent == nil do continue
-		index := 0
-		for c, i in GetChildrenView(scene.manager, parent) {
-			if c == old {index = i; break}
-		}
-		// The instance's own state is its JSON (link + transform).
-		instJson := Node_SerializeToJSON(old, scene.manager, context.temp_allocator)
-		RemoveNode(scene.manager, old)
-		ProcessNodeQueues(scene.manager, ctx)
-		fresh := Scene_InstantiateNodeFromJSON(scene, transmute([]u8)instJson, parent, ctx)
-		if fresh == nil do continue
-		MoveChild(scene.manager, parent, fresh, index)
-		count += 1
+		if Scene_RebuildInstance(scene, old, "", ctx) != nil do count += 1
 	}
-	ProcessNodeQueues(scene.manager, ctx)
 	return count
+}
+
+// Scene_RebuildInstance replaces an instance with one built again from its
+// JSON ("" = its current JSON: link, overrides, transform), at the same
+// place among its parent's children. Returns the new root (nil: failed;
+// the old one is gone either way). Every pointer to the old subtree is
+// stale afterwards - callers holding nodes (the editor's selection) keep
+// paths instead.
+Scene_RebuildInstance :: proc(scene: ^Scene, old: ^Node, instJson: string, ctx: ^GameContext) -> ^Node {
+	if scene == nil || old == nil do return nil
+	mgr := scene.manager
+	parent := GetParent(mgr, old)
+	if parent == nil do return nil
+	index := 0
+	for c, i in GetChildrenView(mgr, parent) do if c == old {index = i; break}
+	text := instJson if instJson != "" else Node_SerializeToJSON(old, mgr, context.temp_allocator)
+	RemoveNode(mgr, old)
+	ProcessNodeQueues(mgr, ctx)
+	fresh := Scene_InstantiateNodeFromJSON(scene, transmute([]u8)text, parent, ctx)
+	if fresh == nil do return nil
+	MoveChild(mgr, parent, fresh, index)
+	ProcessNodeQueues(mgr, ctx)
+	return fresh
 }
 
 // Node_UnlinkComponent turns an instance into ordinary nodes.

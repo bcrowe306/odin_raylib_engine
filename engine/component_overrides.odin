@@ -550,10 +550,6 @@ Scene_RevertComponentOverrides :: proc(scene: ^Scene, node: ^Node, ctx: ^GameCon
 	mgr := scene.manager
 	root, path := Node_ComponentOverridePath(mgr, node)
 	if root == nil do return nil
-	parent := GetParent(mgr, root)
-	if parent == nil do return nil
-	index := 0
-	for c, i in GetChildrenView(mgr, parent) do if c == root {index = i; break}
 	instJson := Node_SerializeToJSON(root, mgr, context.temp_allocator)
 	val, err := json.parse(transmute([]u8)instJson, allocator = context.temp_allocator)
 	if err != .None do return nil
@@ -583,13 +579,7 @@ Scene_RevertComponentOverrides :: proc(scene: ^Scene, node: ^Node, ctx: ^GameCon
 	}
 	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
 	Json_WriteValue(&w, obj)
-	RemoveNode(mgr, root)
-	ProcessNodeQueues(mgr, ctx)
-	fresh := Scene_InstantiateNodeFromJSON(scene, transmute([]u8)strings.to_string(w.sb), parent, ctx)
-	if fresh == nil do return nil
-	MoveChild(mgr, parent, fresh, index)
-	ProcessNodeQueues(mgr, ctx)
-	return fresh
+	return Scene_RebuildInstance(scene, root, strings.to_string(w.sb), ctx)
 }
 
 @(private = "file")

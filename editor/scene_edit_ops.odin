@@ -403,11 +403,11 @@ Editor_SaveComponent :: proc(state: ^EditorState, node: ^e.Node, name: string = 
 	}
 	// The node becomes a linked instance of the component it was saved as.
 	Editor_RecordUndo(state, "Save as component")
+	sel := Editor_SaveSelection(state) // (the node is rebuilt as an instance: #74)
 	node.componentPath = strings.clone(asset_rel_editor(state, path), node.allocator)
 	node.componentBase = ""
-	if fresh := e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext); fresh != nil {
-		state.selectedNode = fresh
-	}
+	e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext)
+	Editor_RestoreSelection(state, sel)
 	Editor_Log(state, .Info, "Saved component %s (this node is now linked to it)", path)
 	return path, true
 }
@@ -426,10 +426,12 @@ Editor_ApplyInstanceToComponent :: proc(state: ^EditorState, inst: ^e.Node) -> b
 		return false
 	}
 	Editor_RecordUndo(state, "Apply to component")
+	// Every instance of the file is rebuilt (this one too): the selection is
+	// kept as paths, not pointers to freed nodes (#74).
+	sel := Editor_SaveSelection(state)
+	defer Editor_RestoreSelection(state, sel)
 	inst.componentBase = ""
-	if fresh := e.Scene_RevertComponentOverrides(state.activeScene, inst, &state.game.gameContext); fresh != nil {
-		state.selectedNode = fresh
-	}
+	e.Scene_RevertComponentOverrides(state.activeScene, inst, &state.game.gameContext)
 	n := 0
 	for _, other in state.game.sceneManager.scenes {
 		if other == nil || other == state.activeScene || !other.isLoaded || Editor_IsComponentDoc(state, other) do continue
