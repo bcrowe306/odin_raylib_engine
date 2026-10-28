@@ -50,6 +50,7 @@ Script_AssetFiles :: proc(state: ^EditorState, kind: string) -> []string {
 	case "script":    return Editor_ListProjectFiles(state, "", {".lua"})
 	case "component": return Editor_ListProjectFiles(state, "", {".component.json"})
 	case "level":     return Editor_ListProjectFiles(state, "", {".ldtk"})
+	case "resource":  return Editor_ListProjectFiles(state, "resources", {e.RESOURCE_EXT})
 	}
 	return Editor_ListProjectFiles(state, "", {".png", ".jpg", ".wav", ".ogg", ".mp3", ".json", ".lua", ".ldtk"})
 }

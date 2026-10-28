@@ -175,6 +175,7 @@ lua_type_of :: proc(p: e.ScriptProperty) -> string {
 	case "level":     return "LevelPath"
 	case "script":    return "ScriptPath"
 	case "node":      return "Node? # a node (set in the Inspector)"
+	case "resource":  return "table? # a resource (set in the Inspector)"
 	case "curve":     return "number[][] # a curve: {{t, v}, ...} (Curve.sample)"
 	case "gradient":  return "number[][] # a gradient: {{t, r, g, b, a}, ...} (Gradient.sample)"
 	case "enum":
@@ -190,6 +191,7 @@ lua_type_of :: proc(p: e.ScriptProperty) -> string {
 		case "bool", "boolean":  el = "boolean"
 		case "color", "vector2", "vec2": el = "number[]"
 		case "node":             el = "Node"
+		case "resource":         el = "table"
 		}
 		return fmt.tprintf("%s[]", el)
 	}
