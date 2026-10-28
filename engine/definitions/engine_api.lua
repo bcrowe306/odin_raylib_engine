@@ -8575,6 +8575,48 @@ function SubtitlesModule.count() end
 
 -- ============================================================================
 
+---@class ResourceBase
+---What every resource table has (engine/docs/resources.md): its class's
+---properties as fields (the values from its .resource.json), the class's
+---methods, and these. Changes made at runtime are never written to the file.
+---@field resource_path string The resource file ("resources/sword.resource.json").
+---@field on_load? fun(self: self) Called once per table, after its property values are set.
+local ResourceBase = {}
+
+---A copy of this resource as it is now: its tables are copied too (other
+---resources it holds stay shared). Owned by the calling script's component
+---instance; on_load is not called.
+---
+---Example: `local mine = self.stats:duplicate(); mine.speed = mine.speed * 2`
+---@generic T
+---@param self T
+---@return T copy
+function ResourceBase:duplicate() end
+
+---@class ResourceModule
+---Resources: data assets of a Lua class (resources/*.resource.json). A
+---script usually gets one through a `type = "resource"` property; these
+---load one by path.
+local ResourceModule = {}
+
+---The shared table of a resource file - the same table everywhere (loaded,
+---and on_load called, the first time). nil when the file or its class has
+---a problem (a warning says what).
+---
+---Example: `local sword = Resource.load("resources/sword.resource.json"); Log.info(sword.damage)`
+---@param path ResourcePath|string
+---@return ResourceBase?
+function ResourceModule.load(path) end
+
+---A fresh table of a resource file (its values from the file, on_load
+---called), owned by the calling script's component instance and released
+---with it.
+---
+---Example: `self.ammo = Resource.new("resources/clip.resource.json")`
+---@param path ResourcePath|string
+---@return ResourceBase?
+function ResourceModule.new(path) end
+
 ---@alias SaveValue nil|boolean|number|string|table
 
 ---@class SaveModule
@@ -10011,6 +10053,9 @@ Subtitles = SubtitlesModule
 
 ---@type SaveModule
 Save = SaveModule
+
+---@type ResourceModule
+Resource = ResourceModule
 
 ---@type CrashModule
 Crash = CrashModule

@@ -106,6 +106,12 @@ Scripts declare exposed properties in a `properties` table. These properties are
   node itself (resolved just before `ready()`; nil, with a warning, when it
   points at nothing). Dropping a node into the code's `properties` table
   adds one, set to that node when you save the script.
+- `resource`: a **resource** - `weapon = { type = "resource", class = "scripts/weapon.lua" }`.
+  Saved as a `.resource.json` path; `self.weapon` is the resource's table
+  (its values and its class's methods), set just before `ready()` - the
+  shared one, or this component instance's own copy with `local_copy`.
+  The picker lists the files of `class`. Lists: `{ type = "array", of = "resource" }`.
+  See [Resources](#resources).
 - `enum`: one of `values` - `mode = { type = "enum", values = {"Idle", "Run"}, default = "Idle" }`;
   a combo in the Inspector, the chosen string in Lua (typed as the union).
 - `range`: a number between `min` and `max` edited with a slider (any
@@ -205,6 +211,34 @@ Log.info("score", GameState.score)
 
 `GameState` completes in every script with the script's own fields and
 methods (the generated types declare it as `require` of its file).
+
+## Resources
+
+A resource is a data asset of a Lua class: the class script declares
+`properties` and methods, and each `resources/<name>.resource.json` holds one
+set of values, edited in the Inspector. The full guide (shared tables vs one
+per component instance, hot reload, a tutorial) is
+[docs/resources.md](docs/resources.md).
+
+```lua
+-- scripts/weapon.lua: a class (the `resource` marker makes it one)
+---@class Weapon : ResourceBase
+local Weapon = {}
+Weapon.resource = { local_copy = false }
+Weapon.properties = { damage = { type = "int", default = 10 } }
+function Weapon:on_load() end               -- once per table, after its values
+function Weapon:damage_at(d) return math.max(1, self.damage - d * 0.05) end
+return Weapon
+
+-- any script
+Player.properties = { weapon = { type = "resource", class = "scripts/weapon.lua" } }
+local hit = self.weapon:damage_at(40)
+local sword = Resource.load("resources/sword.resource.json")  -- the shared table
+local mine = Resource.new("resources/sword.resource.json")    -- a fresh one, owned by this instance
+local copy = sword:duplicate()                                -- its current state, copied
+```
+
+Changes made at runtime are never written back to the file.
 
 ## Vectors
 

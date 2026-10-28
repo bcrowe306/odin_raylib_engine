@@ -1,0 +1,25 @@
+# Generated Lua types for resources: a ResourcePath alias of the project's
+# resource files, Resource.load / new returning each file's class, resource
+# classes deriving from ResourceBase, and a script's resource property typed
+# as its class.
+exec cp tests/drive/fixtures/drive_res_health.lua $PROJECT/scripts/drive_res_health.lua
+exec cp tests/drive/fixtures/drive_res_user.lua $PROJECT/scripts/drive_res_user.lua
+wait 5
+# (the file list picks up files copied in within a second)
+click @asset.search
+type drive_res_health
+wait-until item:asset:scripts/drive_res_health.lua == visible timeout=600
+
+# Creating a resource rewrites the project types.
+click @asset.add
+click @ctx:add-new-resource
+click @newresource.class:scripts/drive_res_health.lua
+click @newresource.create
+wait-until file:.rayzr/definitions/project_types.lua contains ---| "resources/new_resource.resource.json" timeout=600
+expect file:.rayzr/definitions/project_types.lua contains ---@alias ResourcePath
+expect file:.rayzr/definitions/project_types.lua contains ---@overload fun(path: "resources/new_resource.resource.json"): DriveResHealth
+expect file:.rayzr/definitions/project_types.lua contains function ResourceModule.load(path) end
+expect file:.rayzr/definitions/project_types.lua contains ---@class DriveResHealth : ResourceBase
+# (a resource has no node: no node events on its class)
+expect file:.rayzr/definitions/project_types.lua !contains fun(self: DriveResHealth, value: any)
+expect file:.rayzr/definitions/project_types.lua contains ---@field health DriveResHealth? a DriveResHealth resource

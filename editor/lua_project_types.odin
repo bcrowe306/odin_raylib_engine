@@ -282,6 +282,11 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		}
 	}
 	typed_lookups(&sb, &types, classOf)
+	// Resources: their files, and Resource.load / new typed by each file's class.
+	resourceFiles := make([dynamic]string, context.temp_allocator)
+	for rel in Editor_ListProjectFiles(state, "resources", {e.RESOURCE_EXT}) do append(&resourceFiles, rel)
+	alias(&sb, "ResourcePath", "Resource files (Resource.load, resource properties)", sorted_unique(&resourceFiles))
+	resource_overloads(&sb, state, sorted_unique(&resourceFiles), classOf)
 	list :: proc(state: ^EditorState, exts: []string) -> []string {
 		l := make([dynamic]string, context.temp_allocator)
 		for f in Editor_ListProjectFiles(state, "", exts) do append(&l, f)
@@ -406,8 +411,15 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		mod, ok := e.ScriptManager_LoadModule(rel, sm)
 		nodeType := types.byScript[rel] or_else ""
 		if (!ok || mod == nil || len(mod.properties) == 0) && nodeType == "" do continue
-		fmt.sbprintf(&sb, "\n-- %s\n---@class %s\n", rel, cls)
-		if paths, has := pathsOf[rel]; has && len(paths) > 0 {
+		isResource := ok && mod != nil && mod.isResourceClass
+		if isResource {
+			// A resource has no node: no node, events or state machine callbacks.
+			fmt.sbprintf(&sb, "\n-- %s (a resource class)\n---@class %s : ResourceBase\n", rel, cls)
+		} else {
+			fmt.sbprintf(&sb, "\n-- %s\n---@class %s\n", rel, cls)
+		}
+		if isResource {
+		} else if paths, has := pathsOf[rel]; has && len(paths) > 0 {
 			// Its node's own class: get_node completes the paths from it.
 			fmt.sbprintf(&sb, "---@field node %s The node this script is attached to.\n", script_node_class(cls))
 			append(&nodeClasses, Script_Node_Class{cls, nodeType if nodeType != "" else "Node", paths}) // written after the script classes
@@ -416,11 +428,11 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		}
 		// Its node's own events (the tree ones are on ScriptInstanceBase) and
 		// the project's custom events as optional methods.
-		for ev in node_type_events(nodeType)[6:] do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) %s event of its node\n", ev, cls, ev)
-		for ev in customEvents do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) custom event (emit)\n", ev, cls)
+		if !isResource do for ev in node_type_events(nodeType)[6:] do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) %s event of its node\n", ev, cls, ev)
+		if !isResource do for ev in customEvents do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) custom event (emit)\n", ev, cls)
 		// State machine callbacks for the project's states (on the machine's
 		// script or its parent's).
-		for st in sorted_unique(&smStates) {
+		if !isResource do for st in sorted_unique(&smStates) {
 			fmt.sbprintf(&sb, "---@field on_enter_%s? fun(self: %s, previous: string) state machine: entered %s\n", st, cls, st)
 			fmt.sbprintf(&sb, "---@field on_update_%s? fun(self: %s, dt: number) state machine: every frame in %s\n", st, cls, st)
 			fmt.sbprintf(&sb, "---@field on_exit_%s? fun(self: %s, next: string) state machine: left %s\n", st, cls, st)
@@ -430,6 +442,12 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		if !ok || mod == nil do continue
 		for p in mod.properties {
 			t := lua_type_of(p)
+			// A resource of a known class: typed as that class.
+			if e.Script_IsResourceProp(p) && p.resourceClass != "" {
+				if rc, has := classOf[e.ScriptVFS_NormalizePath(p.resourceClass)]; has {
+					t = fmt.tprintf("%s? # a %s resource (set in the Inspector)", rc, rc) if p.assetKind == "resource" else fmt.tprintf("%s[]", rc)
+				}
+			}
 			doc := p.tooltip
 			if doc == "" do doc = Script_PropComment(string(data), p.name)
 			if doc == "" do doc = p.label
@@ -633,6 +651,28 @@ script_node_block :: proc(sb: ^strings.Builder, cls, nodeType: string, paths: ma
 
 // component_overloads: Scene.instantiate per component file, returning its
 // root node's type.
+// resource_overloads: Resource.load / Resource.new return each file's class.
+@(private = "file")
+resource_overloads :: proc(sb: ^strings.Builder, state: ^EditorState, files: []string, classOf: map[string]string) {
+	if len(files) == 0 do return
+	lines := make([dynamic]string, context.temp_allocator)
+	for rel in files {
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		data, err := os.read_entire_file(full, context.temp_allocator)
+		if err != nil do continue
+		file, ok := e.Resource_ParseText(rel, string(data), quiet = true)
+		if !ok do continue
+		cls := classOf[e.ScriptVFS_NormalizePath(file.script)] or_else "ResourceBase"
+		append(&lines, fmt.tprintf("---@overload fun(path: %q): %s\n", rel, cls))
+	}
+	if len(lines) == 0 do return
+	strings.write_string(sb, "\n-- Resources by path: Resource.load / new return the file's class.\n---@class ResourceModule\nlocal ResourceModule = {}\n")
+	for fn in ([]string{"load", "new"}) {
+		for l in lines do strings.write_string(sb, l)
+		fmt.sbprintf(sb, "---@param path ResourcePath|string\n---@return ResourceBase?\nfunction ResourceModule.%s(path) end\n", fn)
+	}
+}
+
 @(private = "file")
 component_overloads :: proc(sb: ^strings.Builder, state: ^EditorState, comps: []string) {
 	if len(comps) == 0 do return
