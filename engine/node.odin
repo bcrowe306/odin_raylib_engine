@@ -96,6 +96,7 @@ Node :: struct {
 	// "overrides" JSON as they were, so saving doesn't lose them (#72).
 	componentMissing:      bool,
 	componentRawOverrides: string,
+	componentProblem:      string, // why it couldn't be loaded (for the Inspector)
 	// Saved signal connections from this node's events to script methods
 	// (signals.odin).
 	signalConnections: [dynamic]Signal_Connection,

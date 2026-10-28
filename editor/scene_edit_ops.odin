@@ -446,9 +446,14 @@ Editor_ApplyInstanceToComponent :: proc(state: ^EditorState, inst: ^e.Node) -> b
 // file (project-relative path) at a world position.
 Editor_InstantiateComponentFile :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) -> ^e.Node {
 	if state.activeScene == nil do return nil
-	if Editor_IsComponentDoc(state, state.activeScene) && state.activeScene.filePath == rel {
-		Editor_Log(state, .Warn, "A component can't contain itself")
-		return nil
+	// A component can't contain itself, directly or through the components
+	// it contains (A -> B -> A) (#75).
+	if Editor_IsComponentDoc(state, state.activeScene) {
+		doc := state.activeScene.filePath
+		if doc == rel || e.Component_Contains(&state.game.gameContext, rel, doc) {
+			Editor_Log(state, .Warn, "%s can't go inside %s: it would contain itself", filepath.base(rel), filepath.base(doc))
+			return nil
+		}
 	}
 	Editor_RecordUndo(state, fmt.tprintf("Instantiate %s", rel))
 	parent := Editor_InsertionParent(state)
