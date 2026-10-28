@@ -27,6 +27,7 @@ ICON_FA_FOLDER                    :: "\uF07B" // Folder
 ICON_FA_FOLDER_OPEN               :: "\uF07C" // Folder Open
 ICON_FA_FILE                      :: "\uF15B" // File
 ICON_FA_CUBES                     :: "\uF1B3" // Prefab
+ICON_FA_GEM                       :: "\uF3A5" // Resource
 ICON_FA_CODE                      :: "\uF121" // Script
 ICON_FA_IMAGE                     :: "\uF03E" // Texture
 ICON_FA_MUSIC                     :: "\uF001" // Audio

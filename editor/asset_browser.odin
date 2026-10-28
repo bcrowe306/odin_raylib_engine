@@ -47,6 +47,7 @@ Asset_Kind :: enum {
 	Package,
 	Aseprite, // .aseprite / .ase (aseprite_editor.odin)
 	Vector,   // .svg (vector_editor.odin)
+	Resource, // .resource.json: data of a Lua resource class (engine/script_resources.odin)
 }
 
 Asset_KindOf :: proc(path: string) -> Asset_Kind {
@@ -54,6 +55,7 @@ Asset_KindOf :: proc(path: string) -> Asset_Kind {
 	switch {
 	case strings.has_suffix(lower, ".scene.json"): return .Scene
 	case strings.has_suffix(lower, ".component.json"): return .Component
+	case strings.has_suffix(lower, e.RESOURCE_EXT): return .Resource
 	case strings.has_suffix(lower, ".lua"): return .Script
 	case strings.has_suffix(lower, ".ldtk"): return .Level
 	case e.Is_PackagePath(lower): return .Package
@@ -81,6 +83,7 @@ kind_icon :: proc(k: Asset_Kind) -> (string, imgui.Vec4) {
 	case .Package: return ICON_FA_BOX_ARCHIVE, UI_TEXT_DIM
 	case .Aseprite: return ICON_FA_PALETTE, {0.98, 0.55, 0.55, 1}
 	case .Vector: return ICON_FA_PAINTBRUSH, {0.55, 0.85, 0.65, 1}
+	case .Resource: return ICON_FA_GEM, {0.98, 0.80, 0.30, 1}
 	case .Other: return ICON_FA_FILE, UI_TEXT_DIM
 	}
 	return ICON_FA_FILE, UI_TEXT_DIM
@@ -139,6 +142,7 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 		section_files(state, "Scenes", Editor_ListProjectFiles(state, "scenes", {".scene.json"}), filter)
 		section_components(state, filter)
 		section_files(state, "Scripts", Editor_ListProjectFiles(state, "scripts", {".lua"}), filter)
+		section_files(state, "Resources", Editor_ListProjectFiles(state, "resources", {e.RESOURCE_EXT}), filter)
 		section_files(state, "Textures", Editor_ListProjectFiles(state, "textures", TEXTURE_EXTS), filter)
 		section_files(state, "Aseprite", Editor_ListProjectFiles(state, "", {".aseprite", ".ase"}), filter)
 		section_files(state, "Vector Art", Editor_ListProjectFiles(state, "", {".svg"}), filter)
@@ -158,7 +162,7 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 // (keepDir: keep the folders before it).
 Asset_DisplayName :: proc(path: string, keepDir := false) -> string {
 	name := path if keepDir else filepath.base(path)
-	for suffix in ([]string{".scene.json", ".component.json"}) {
+	for suffix in ([]string{".scene.json", ".component.json", e.RESOURCE_EXT}) {
 		if strings.has_suffix(name, suffix) do return name[:len(name) - len(suffix)]
 	}
 	return name
@@ -174,7 +178,7 @@ section_files :: proc(state: ^EditorState, title: string, files: []string, filte
 	n := 0
 	for f in files do if matches(f, filter) do n += 1
 	if filter != "" && n == 0 do return
-	open := asset_folder_header(title, n, add_scene = title == "Scenes", add_script = title == "Scripts", state = state)
+	open := asset_folder_header(title, n, add_scene = title == "Scenes", add_script = title == "Scripts", add_resource = title == "Resources", state = state)
 	if !open do return
 	shown := make([dynamic]string, context.temp_allocator)
 	for f in files do if matches(f, filter) do append(&shown, f)
@@ -360,6 +364,7 @@ asset_tooltip :: proc(k: Asset_Kind, rel: string) -> string {
 	case .Level: return fmt.tprintf("%s - LDtk project: double-click or drag into the viewport to add a level", rel)
 	case .Aseprite: return fmt.tprintf("%s - Aseprite: drag into the viewport to add (its tags play); double-click to edit in Aseprite", rel)
 	case .Vector: return fmt.tprintf("%s - vector art (SVG): drag into the viewport to add, or onto a Vector Shape to use it; double-click to edit it in your vector app", rel)
+	case .Resource: return fmt.tprintf("%s - a resource: data of a Lua resource class; pick it in a script's resource property, or Resource.load it", rel)
 	}
 	return rel
 }
@@ -539,6 +544,8 @@ Editor_DropAsset :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) {
 		e.Material_SetShader(target, rel)
 		state.selectedNode = target
 		Editor_Log(state, .Info, "%s uses %s", target.name, rel)
+	case .Resource:
+		Editor_Log(state, .Info, "A resource goes in a script's resource property (or Resource.load in code), not the scene")
 	case .Scene, .Package, .Other:
 	}
 }
@@ -685,7 +692,7 @@ assetFolderClosed: map[string]bool
 // closed folder when collapsed (no tree arrow). Click toggles. The Scenes
 // folder gets a "+" (new scene) button at its right edge.
 @(private = "file")
-asset_folder_header :: proc(title: string, count: int, default_open := true, add_scene := false, add_script := false, state: ^EditorState = nil) -> bool {
+asset_folder_header :: proc(title: string, count: int, default_open := true, add_scene := false, add_script := false, add_resource := false, state: ^EditorState = nil) -> bool {
 	if title not_in assetFolderClosed do assetFolderClosed[strings.clone(title)] = !default_open
 	open := !assetFolderClosed[title]
 
@@ -724,6 +731,10 @@ asset_folder_header :: proc(title: string, count: int, default_open := true, add
 	if add_script && state != nil {
 		imgui.SetCursorScreenPos({rowMax.x - 26, rowMin.y})
 		if UI_IconButton(ICON_FA_PLUS, "asset.new-script", "New Lua script (from a template)", size = 26) do NewScriptDialog_Open(state)
+	}
+	if add_resource && state != nil {
+		imgui.SetCursorScreenPos({rowMax.x - 26, rowMin.y})
+		if UI_IconButton(ICON_FA_PLUS, "asset.new-resource", "New resource (data of a resource class)", size = 26) do NewResourceDialog_Open(state)
 	}
 	imgui.SetCursorScreenPos({rowMin.x, rowMax.y + 2})
 	imgui.Dummy({0, 0})

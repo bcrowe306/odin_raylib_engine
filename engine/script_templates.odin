@@ -18,6 +18,7 @@ Script_Template :: struct {
 @(private = "file")
 script_templates := [?]Script_Template{
 	{"empty", "Empty", "ready() and update(dt) with one property.", SCRIPT_TEMPLATE_EMPTY, nil},
+	{"resource", "Resource Class", "A data asset type: its properties are edited per resource file (Assets > Resources), its methods called by any script holding one. on_load runs once per table.", SCRIPT_TEMPLATE_RESOURCE, nil},
 	{"platformer", "Platformer Character", "Run, jump (coyote time, jump buffer), wall slide - for a CharacterMover.", CHARACTER_PLATFORMER_TEMPLATE, {CharacterMoverNode}},
 	{"top_down", "Top-Down Character", "Eight-way movement with acceleration and friction - for a CharacterMover.", SCRIPT_TEMPLATE_TOP_DOWN, {CharacterMoverNode}},
 	{"enemy_patrol", "Enemy Patrol", "Walks back and forth, waits at the ends, chases a target that comes close.", SCRIPT_TEMPLATE_ENEMY_PATROL, nil},
@@ -43,6 +44,32 @@ Script_TemplateById :: proc(id: string) -> (Script_Template, bool) {
 	for tp in Script_Templates() do if tp.id == id do return tp, true
 	return {}, false
 }
+
+SCRIPT_TEMPLATE_RESOURCE :: `-- $NAME$: a resource class. Make resources of it with Assets > Resources > +.
+---@class $CLASS$
+local $CLASS$ = {}
+
+-- Marks this script as a resource class. local_copy = true gives each
+-- component instance its own copy (health, inventory); false shares one
+-- table everywhere (item stats, settings).
+$CLASS$.resource = { local_copy = false }
+
+-- Edited in the Inspector, per resource file.
+$CLASS$.properties = {
+    value = { type = "float", default = 1.0, label = "Value" },
+}
+
+-- Once per table, after its properties are set.
+function $CLASS$:on_load()
+end
+
+-- Methods: any script holding this resource can call them.
+function $CLASS$:describe()
+    return "value " .. self.value
+end
+
+return $CLASS$
+`
 
 SCRIPT_TEMPLATE_EMPTY :: `-- $NAME$
 ---@class $CLASS$ : ScriptInstanceBase
