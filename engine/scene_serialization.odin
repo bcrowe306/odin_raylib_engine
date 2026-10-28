@@ -175,7 +175,9 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	// instance root comes from the component file.
 	if node.componentPath != "" && node != serializeFullInstance {
 		Json_Key(w, "component", &first); Json_String(w, node.componentPath)
-		if ov := Component_OverridesJSON(node, manager); ov != "" {
+		// A placeholder (file missing) writes its overrides back as they were.
+		ov := node.componentRawOverrides if node.componentMissing else Component_OverridesJSON(node, manager)
+		if ov != "" {
 			Json_Key(w, "overrides", &first); strings.write_string(&w.sb, ov)
 		}
 		write_connections(w, node, &first)
@@ -854,6 +856,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	// then apply the instance's own name and transform.
 	if compPath := sj_string(obj, "component", ""); compPath != "" {
 		if inst := read_component_instance(scene, compPath, obj, parent, ctx); inst != nil do return inst
+		return read_missing_component(scene, compPath, obj, parent, ctx)
 	}
 	typeStr := sj_string(obj, "type", "Node")
 	node := Node_CreateByTypeName(scene, typeStr, parent)
@@ -1513,12 +1516,12 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 		return nil
 	}
 	data, ok := Component_ReadFile(ctx, compPath)
-	if !ok {
-		log.errorf("[SceneLoader] Component file not found: %s", compPath)
+	if !ok do return nil // (the caller keeps a placeholder and warns)
+	val, err := json.parse(data, allocator = context.temp_allocator)
+	if err != .None {
+		log.warnf("[SceneLoader] Component %s is not valid JSON (%v)", compPath, err)
 		return nil
 	}
-	val, err := json.parse(data, allocator = context.temp_allocator)
-	if err != .None do return nil
 	obj, isObj := val.(json.Object)
 	if !isObj do return nil
 	if inner, has := sj_obj(obj, "node"); has do obj = inner
@@ -1548,6 +1551,27 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.editorHidden = sj_bool(inst, "editor_hidden", false)
 	if "tags" in inst do read_tags(node, inst)
 	if sj_obj_has(inst, "connections") do read_connections(node, inst)
+	return node
+}
+
+// read_missing_component: an instance whose component file can't be loaded
+// becomes a placeholder - a node of its root's type with the instance's
+// name, transform and connections, keeping its link and its overrides
+// (raw JSON) so saving the scene writes them back unchanged (#72).
+@(private = "file")
+read_missing_component :: proc(scene: ^Scene, compPath: string, obj: json.Object, parent: ^Node, ctx: ^GameContext) -> ^Node {
+	plain := make(json.Object, len(obj), context.temp_allocator)
+	for k, v in obj do if k != "component" && k != "overrides" && k != "children" do plain[k] = v
+	node := read_node(scene, plain, parent, ctx)
+	if node == nil do return nil
+	node.componentPath = strings.clone(compPath, node.allocator)
+	node.componentMissing = true
+	if ov, has := obj["overrides"]; has {
+		w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+		Json_WriteValue(&w, ov)
+		node.componentRawOverrides = strings.clone(strings.to_string(w.sb), node.allocator)
+	}
+	log.warnf("[SceneLoader] %s: component %s is missing - kept as a placeholder (its link and overrides are saved unchanged)", node.name, compPath)
 	return node
 }
 

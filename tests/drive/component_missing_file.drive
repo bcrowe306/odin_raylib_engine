@@ -1,0 +1,31 @@
+# #72: an instance whose component file is missing loads as a placeholder
+# (red in the tree, explained in the Inspector) and saving the scene keeps its
+# link - it isn't turned into a plain node and lost.
+wait 5
+click @hier:PlayerShip
+rclick @hier:PlayerShip
+click @ctx:save-component
+key ctrl+s
+expect file:scenes/main.scene.json contains "component": "components/PlayerShip.component.json"
+
+# The component file goes missing; the scene is read from disk again.
+exec rm $PROJECT/components/PlayerShip.component.json
+click @hier:Asteroid_Beta
+key delete
+click @menu:File
+click @menu:File/Revert Scene
+wait 2
+expect node:PlayerShip.exists == true
+expect node:PlayerShip.component == components/PlayerShip.component.json
+expect node:PlayerShip.component-missing == true
+
+click @hier:PlayerShip
+expect item:insp.component-missing == visible
+wait 3
+screenshot placeholder
+
+# Saving keeps the link.
+click @hier:Asteroid_Beta
+key delete
+key ctrl+s
+expect file:scenes/main.scene.json contains "component": "components/PlayerShip.component.json"

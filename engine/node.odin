@@ -91,6 +91,11 @@ Node :: struct {
 	// The (normalized) component JSON the instance was built from; overrides
 	// are what differs from it (component_overrides.odin).
 	componentBase: string,
+	// The component file couldn't be loaded (missing, unreadable, or a loop):
+	// this node is a placeholder that keeps the instance's link and its
+	// "overrides" JSON as they were, so saving doesn't lose them (#72).
+	componentMissing:      bool,
+	componentRawOverrides: string,
 	// Saved signal connections from this node's events to script methods
 	// (signals.odin).
 	signalConnections: [dynamic]Signal_Connection,

@@ -127,8 +127,15 @@ inspector_body :: proc(state: ^EditorState) {
 			imgui.PushStyleColorImVec4(.Text, {0.75, 0.62, 1.0, 1})
 			imgui.TextUnformatted(fmt.ctprintf("%s  %s", ICON_FA_CUBES, compRoot.componentPath))
 			imgui.PopStyleColor()
+			if compRoot.componentMissing {
+				imgui.PushStyleColorImVec4(.Text, UI_DANGER)
+				imgui.TextWrapped("%s", fmt.ctprintf("%s  The component file is missing. This placeholder keeps the instance's link and overrides; restore the file (or rename it back) and reopen the scene.", ICON_FA_TRIANGLE_EXCLAMATION))
+				imgui.PopStyleColor()
+				Drive_Item("insp.component-missing")
+			} else {
 			UI_DimText("Part of a component instance. Changes are saved as overrides on this instance." if locked else "Linked component instance. Contents come from the file; changes are saved as overrides.")
-			if UI_Button(fmt.tprintf("%s  Edit Component", ICON_FA_CUBES), "insp.edit-component") {
+			}
+			if !compRoot.componentMissing && UI_Button(fmt.tprintf("%s  Edit Component", ICON_FA_CUBES), "insp.edit-component") {
 				Editor_OpenComponent(state, compRoot.componentPath)
 			}
 			// Overridden values (refreshed a few times a second).
