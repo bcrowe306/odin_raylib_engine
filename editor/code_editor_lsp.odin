@@ -380,7 +380,9 @@ Snippet_Stop :: struct {
 }
 
 // code_expand_snippet turns LSP snippet syntax into plain text and returns
-// its tab stops in visiting order ($1, $2, ..., then $0).
+// its tab stops in visiting order ($1, $2, ..., then $0). Optional call
+// parameters (lua-language-server's `${3:player?}`) are left out with their
+// separator: accepting a call doesn't leave `player?` (invalid Lua) behind.
 code_expand_snippet :: proc(snippet: string) -> (text: string, stops: [dynamic]Snippet_Stop) {
 	sb := strings.builder_make(context.temp_allocator)
 	stops = make([dynamic]Snippet_Stop, context.temp_allocator)
@@ -412,6 +414,14 @@ code_expand_snippet :: proc(snippet: string) -> (text: string, stops: [dynamic]S
 					k = m
 				}
 				for k < len(snippet) && snippet[k] != '}' do k += 1
+				if n > 0 && len(placeholder) > 1 && strings.has_suffix(placeholder, "?") {
+					if strings.has_suffix(strings.to_string(sb), ", ") {
+						strings.pop_byte(&sb)
+						strings.pop_byte(&sb)
+					}
+					i = k + 1
+					continue
+				}
 				append(&stops, Snippet_Stop{n, strings.builder_len(sb), len(placeholder)})
 				strings.write_string(&sb, placeholder)
 				i = k + 1

@@ -6,7 +6,7 @@ dblclick @asset:scripts/orbiting_drone.lua
 wait-until code.lsp == ready timeout=600
 key enter
 key up
-type local axis = Input.get_a
+type local axis = Input.get_ax
 wait-until code.completion contains get_axis timeout=600
 wait-until item:code.overlay:completion-doc == visible timeout=600
 expect code.overlays contains ok

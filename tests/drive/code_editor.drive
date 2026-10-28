@@ -16,7 +16,7 @@ screenshot code_tab_open
 # Completion for the engine's Input API.
 key enter
 key up
-type local axis = Input.get_a
+type local axis = Input.get_ax
 wait-until code.completion contains get_axis timeout=600
 wait-until code.completion-doc != timeout=600
 screenshot completion
