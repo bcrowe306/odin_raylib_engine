@@ -60,13 +60,13 @@ ScriptVFS_RegisterEmbedded :: proc(path: string, code: string) {
 
 	alloc := Engine_HeapAllocator()
 	norm := ScriptVFS_NormalizePath(path)
-	for k, v in vfsGlobal.embedded {
-		if k == norm {
-			delete(k, alloc)
-			delete(v, alloc)
-			delete_key(&vfsGlobal.embedded, k)
-			break
-		}
+	// Replace an earlier registration: remove it from the map first, then free
+	// its strings (freeing the key before delete_key hashed freed memory, left
+	// the entry behind and freed it twice later).
+	if norm in vfsGlobal.embedded {
+		oldKey, oldCode := delete_key(&vfsGlobal.embedded, norm)
+		delete(oldKey, alloc)
+		delete(oldCode, alloc)
 	}
 	vfsGlobal.embedded[strings.clone(norm, alloc)] = strings.clone(code, alloc)
 }
