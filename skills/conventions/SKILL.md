@@ -106,6 +106,15 @@ Always execute the following verification steps in sequence before committing:
    task test
    ```
    *Verify UI headless test hook passes with 0 failures.*
+5. **Docs In Step With The Code** (CI runs this on Linux; it fails when a
+   node type or reflected property changed and the node reference wasn't
+   regenerated):
+   ```bash
+   task docs:nodes      # regenerate docs/generated/nodes.json (commit it)
+   task docs:check
+   ```
+6. **Wait for CI before merging**: a PR is merged only when its CI run is
+   green (`gh pr checks <n> --watch`). A red `main` means no dev build.
 
 ### Automated UI Testing via Test-Drive Process
 > [!IMPORTANT]
