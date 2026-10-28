@@ -256,57 +256,7 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 	inst.isReady = false
 
 	// 4. Initialize instance properties with defaults, applying any overrides
-	for prop in mod.properties {
-		val := prop.defaultVal
-		if overrides != nil {
-			if overrideVal, hasOverride := overrides[prop.name]; hasOverride {
-				val = overrideVal
-				// A list kept as JSON: the saved array's text (overrides read
-				// short arrays as vectors / colours otherwise).
-				if Script_IsJsonKind(prop.assetKind) {
-					val = {type = .String, valString = overrideVal.valString if overrideVal.valString != "" else prop.defaultVal.valString}
-				}
-				// Numbers take the declared type (JSON has one number type:
-				// an "int" property set to 3 in a scene is the integer 3).
-				if prop.type == .Int && val.type == .Float do val = {type = .Int, valInt = i64(math.round(val.valFloat))}
-				if prop.type == .Float && val.type == .Int do val = {type = .Float, valFloat = f32(val.valInt)}
-			}
-		}
-		if val.type != .String do val.valString = "" // (a list override's text, temp)
-		// The instance owns its strings (the default belongs to the module,
-		// overrides are often temp-allocated): sharing them double-freed.
-		if val.type == .String do val.valString = strings.clone(val.valString)
-		inst.properties[strings.clone(prop.name)] = val
-
-		// Push value to self[prop.name]
-		propNameC := strings.clone_to_cstring(prop.name, context.temp_allocator)
-		switch val.type {
-		case .Float:
-			lua.pushnumber(L, lua.Number(val.valFloat))
-		case .Int:
-			lua.pushinteger(L, lua.Integer(val.valInt))
-		case .String:
-			if prop.assetKind == "node" {
-				lua.pushnil(L) // resolved to the node before ready() (the tree may not be built yet)
-			} else if Script_IsJsonKind(prop.assetKind) {
-				Lua_PushJSONText(L, val.valString) // a list: a table
-			} else {
-				sC := strings.clone_to_cstring(val.valString, context.temp_allocator)
-				lua.pushstring(L, sC)
-			}
-		case .Boolean:
-			lua.pushboolean(L, b32(val.valBool))
-		case .Color:
-			lua.createtable(L, 4, 0)
-			lua.pushnumber(L, lua.Number(val.valColor.r)); lua.rawseti(L, -2, 1)
-			lua.pushnumber(L, lua.Number(val.valColor.g)); lua.rawseti(L, -2, 2)
-			lua.pushnumber(L, lua.Number(val.valColor.b)); lua.rawseti(L, -2, 3)
-			lua.pushnumber(L, lua.Number(val.valColor.a)); lua.rawseti(L, -2, 4)
-		case .Vector2:
-			Lua_PushVec2(L, val.valVec2) // a Vec2 (v.x / v[1])
-		}
-		lua.setfield(L, instanceTableIdx, propNameC)
-	}
+	script_apply_properties(L, instanceTableIdx, mod, overrides, &inst.properties)
 
 	// 5. Save self table into registry to keep it alive
 	inst.registryRef = lua.L_ref(L, lua.REGISTRYINDEX)
@@ -324,6 +274,77 @@ Script_AttachToNode :: proc(node: ^Node, scriptPath: string, overrides: map[stri
 
 // Alias for Script_AttachToNode
 Node_AttachScript :: Script_AttachToNode
+
+// script_property_value: a declared property's starting value - its
+// default, or the override (coerced to the declared type). Strings are
+// cloned: the caller owns the result.
+script_property_value :: proc(prop: ScriptProperty, overrides: map[string]ScriptValue) -> ScriptValue {
+	val := prop.defaultVal
+	if overrides != nil {
+		if overrideVal, hasOverride := overrides[prop.name]; hasOverride {
+			val = overrideVal
+			// A list kept as JSON: the saved array's text (overrides read
+			// short arrays as vectors / colours otherwise).
+			if Script_IsJsonKind(prop.assetKind) {
+				val = {type = .String, valString = overrideVal.valString if overrideVal.valString != "" else prop.defaultVal.valString}
+			}
+			// Numbers take the declared type (JSON has one number type:
+			// an "int" property set to 3 in a scene is the integer 3).
+			if prop.type == .Int && val.type == .Float do val = {type = .Int, valInt = i64(math.round(val.valFloat))}
+			if prop.type == .Float && val.type == .Int do val = {type = .Float, valFloat = f32(val.valInt)}
+		}
+	}
+	if val.type != .String do val.valString = "" // (a list override's text, temp)
+	// The owner keeps its own strings (the default belongs to the module,
+	// overrides are often temp-allocated): sharing them double-freed.
+	if val.type == .String do val.valString = strings.clone(val.valString)
+	return val
+}
+
+// script_apply_properties sets every property the module declares on the
+// Lua table at tableIdx (default or override) and records the values in
+// props (which owns its keys and strings). Node references are set to nil:
+// they are resolved before ready(), once the tree is built.
+script_apply_properties :: proc(L: ^lua.State, tableIdx: c.int, mod: ^ScriptModule, overrides: map[string]ScriptValue, props: ^map[string]ScriptValue) {
+	for prop in mod.properties {
+		val := script_property_value(prop, overrides)
+		props[strings.clone(prop.name)] = val
+		if val.type == .String && prop.assetKind == "node" {
+			lua.pushnil(L)
+		} else {
+			script_push_value(L, val, prop.assetKind)
+		}
+		lua.setfield(L, tableIdx, strings.clone_to_cstring(prop.name, context.temp_allocator))
+	}
+}
+
+// script_push_value pushes a property value as its Lua value: JSON list
+// kinds (array / curve / gradient) as tables, colours as {r, g, b, a},
+// vectors as Vec2. Node references are the caller's (they need the owner).
+script_push_value :: proc(L: ^lua.State, val: ScriptValue, assetKind: string) {
+	switch val.type {
+	case .Float:
+		lua.pushnumber(L, lua.Number(val.valFloat))
+	case .Int:
+		lua.pushinteger(L, lua.Integer(val.valInt))
+	case .String:
+		if Script_IsJsonKind(assetKind) {
+			Lua_PushJSONText(L, val.valString) // a list: a table
+		} else {
+			lua.pushstring(L, strings.clone_to_cstring(val.valString, context.temp_allocator))
+		}
+	case .Boolean:
+		lua.pushboolean(L, b32(val.valBool))
+	case .Color:
+		lua.createtable(L, 4, 0)
+		lua.pushnumber(L, lua.Number(val.valColor.r)); lua.rawseti(L, -2, 1)
+		lua.pushnumber(L, lua.Number(val.valColor.g)); lua.rawseti(L, -2, 2)
+		lua.pushnumber(L, lua.Number(val.valColor.b)); lua.rawseti(L, -2, 3)
+		lua.pushnumber(L, lua.Number(val.valColor.a)); lua.rawseti(L, -2, 4)
+	case .Vector2:
+		Lua_PushVec2(L, val.valVec2) // a Vec2 (v.x / v[1])
+	}
+}
 
 // script_prop_kind: a script property's kind (assetKind: "node", "enum",
 // "array"..., "" for plain values).
@@ -516,32 +537,10 @@ ScriptInstance_SetProperty :: proc(inst: ^ScriptInstance, name: string, val: Scr
 	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef)) // push self
 	propNameC := strings.clone_to_cstring(name, context.temp_allocator)
 
-	isNode := val.type == .String && script_node_prop(inst, name, mgr)
-	isJson := val.type == .String && Script_IsJsonKind(script_prop_kind(inst, name, mgr))
-	switch val.type {
-	case .Float:
-		lua.pushnumber(L, lua.Number(val.valFloat))
-	case .Int:
-		lua.pushinteger(L, lua.Integer(val.valInt))
-	case .String:
-		if isNode {
-			script_push_node_prop(L, inst, name, val.valString)
-		} else if isJson {
-			Lua_PushJSONText(L, val.valString)
-		} else {
-			sC := strings.clone_to_cstring(val.valString, context.temp_allocator)
-			lua.pushstring(L, sC)
-		}
-	case .Boolean:
-		lua.pushboolean(L, b32(val.valBool))
-	case .Color:
-		lua.createtable(L, 4, 0)
-		lua.pushnumber(L, lua.Number(val.valColor.r)); lua.rawseti(L, -2, 1)
-		lua.pushnumber(L, lua.Number(val.valColor.g)); lua.rawseti(L, -2, 2)
-		lua.pushnumber(L, lua.Number(val.valColor.b)); lua.rawseti(L, -2, 3)
-		lua.pushnumber(L, lua.Number(val.valColor.a)); lua.rawseti(L, -2, 4)
-	case .Vector2:
-		Lua_PushVec2(L, val.valVec2)
+	if val.type == .String && script_node_prop(inst, name, mgr) {
+		script_push_node_prop(L, inst, name, val.valString)
+	} else {
+		script_push_value(L, val, script_prop_kind(inst, name, mgr) if val.type == .String else "")
 	}
 	lua.setfield(L, -2, propNameC)
 	lua.pop(L, 1) // pop self

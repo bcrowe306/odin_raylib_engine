@@ -54,14 +54,7 @@ Script_AssetFiles :: proc(state: ^EditorState, kind: string) -> []string {
 	return Editor_ListProjectFiles(state, "", {".png", ".jpg", ".wav", ".ogg", ".mp3", ".json", ".lua", ".ldtk"})
 }
 
-// Script_PropAssetKind: the asset kind of a script property ("" if plain).
-Script_PropAssetKind :: proc(state: ^EditorState, inst: ^e.ScriptInstance, name: string) -> string {
-	sm := &state.game.scriptManager
-	mod, ok := sm.modules[e.ScriptVFS_NormalizePath(inst.modulePath)]
-	if !ok || mod == nil do return ""
-	for p in mod.properties do if p.name == name do return p.assetKind
-	return ""
-}
+
 
 @(private = "file")
 snake_ident :: proc(s: string) -> string {
