@@ -36,6 +36,20 @@ loaded_scenes :: proc(state: ^EditorState) -> []^e.Scene {
 	return out[:]
 }
 
+// Undo_ResourceMoved: resource undo entries follow their file when it (or
+// its folder) moves.
+Undo_ResourceMoved :: proc(state: ^EditorState, oldRel, newRel: string, isFolder: bool) {
+	for stack in ([]^[dynamic]Undo_Entry{&state.undoStack, &state.redoStack}) {
+		for &entry in stack {
+			if entry.kind != .Resource do continue
+			if entry.resource != oldRel && !(isFolder && strings.has_prefix(entry.resource, strings.concatenate({oldRel, "/"}, context.temp_allocator))) do continue
+			moved := strings.concatenate({newRel, entry.resource[len(oldRel):]})
+			delete(entry.resource)
+			entry.resource = moved
+		}
+	}
+}
+
 // Asset_FindUsages: the files that reference an asset (or anything in a
 // folder). A scene with unsaved edits is checked as it is in the editor.
 Asset_FindUsages :: proc(state: ^EditorState, rel: string, isFolder: bool) -> []Asset_Usage {
@@ -135,6 +149,7 @@ Asset_Move :: proc(state: ^EditorState, oldRel, newRel: string) -> bool {
 			}
 		}
 	}
+	Undo_ResourceMoved(state, oldRel, newRel, isFolder)
 	for stack in ([]^[dynamic]Undo_Entry{&state.undoStack, &state.redoStack}) {
 		for &entry in stack {
 			text, n := e.AssetPath_Rewrite(Undo_Unpack(entry.json), oldRel, newRel, isFolder, context.temp_allocator)

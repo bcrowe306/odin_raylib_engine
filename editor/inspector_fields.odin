@@ -76,7 +76,15 @@ field_reset :: proc(id: string, modified: bool) -> bool {
 
 // vec2_edit: X/Y drag fields with coloured markers, a link toggle and a
 // reset button (to `def`). Returns true when the value changed.
-vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoLabel: string, def: [2]f32 = {0, 0}, mixed := [2]bool{}) -> bool {
+// undo: records an undo step before a change (nil = the active scene's
+// snapshot, Editor_RecordUndo).
+Vec2_Undo :: proc(state: ^EditorState, label: string, data: rawptr)
+
+vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoLabel: string, def: [2]f32 = {0, 0}, mixed := [2]bool{}, undo: Vec2_Undo = nil, undoData: rawptr = nil) -> bool {
+	record :: proc(state: ^EditorState, label: string, undo: Vec2_Undo, data: rawptr) {
+		if undo != nil do undo(state, label, data)
+		else do Editor_RecordUndo(state, label)
+	}
 	if id not_in linkedFields do linkedFields[strings.clone(id)] = strings.contains(id, "scale")
 	linked := linkedFields[id]
 	avail := imgui.GetContentRegionAvail().x
@@ -95,7 +103,7 @@ vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoL
 		changed = true
 		if linked do v.y = old.y * (v.x / old.x) if old.x != 0 else v.y + (v.x - old.x)
 	}
-	undo_on_activate(state, undoLabel)
+	if imgui.IsItemActivated() do record(state, undoLabel, undo, undoData)
 	Drive_Item(fmt.tprintf("%s.x", id))
 	imgui.SameLine(0, UI_SPACE)
 	axis(UI_SUCCESS)
@@ -104,7 +112,7 @@ vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoL
 		changed = true
 		if linked do v.x = old.x * (v.y / old.y) if old.y != 0 else v.x + (v.y - old.y)
 	}
-	undo_on_activate(state, undoLabel)
+	if imgui.IsItemActivated() do record(state, undoLabel, undo, undoData)
 	Drive_Item(fmt.tprintf("%s.y", id))
 	imgui.SameLine(0, 2)
 	imgui.PushStyleVarImVec2(.FramePadding, {3, 3})
@@ -113,7 +121,7 @@ vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoL
 	}
 	imgui.PopStyleVar()
 	if field_reset(id, v^ != def) {
-		Editor_RecordUndo(state, fmt.tprintf("Reset %s", undoLabel))
+		record(state, fmt.tprintf("Reset %s", undoLabel), undo, undoData)
 		v^ = def
 		changed = true
 	}

@@ -17,12 +17,45 @@ import e "../engine"
 
 UNDO_LIMIT :: 100
 
+// One undo stack for everything: scene edits (the active scene's apply)
+// and resource file edits (inspector_resource.odin; they apply whatever
+// scene is active).
+Undo_Kind :: enum u8 {
+	Scene,
+	Resource,
+}
+
 Undo_Entry :: struct {
+	kind:     Undo_Kind,
 	scene:    ^e.Scene,
-	json:     Undo_Snapshot, // the scene's JSON, in shared chunks (undo_store.odin)
+	json:     Undo_Snapshot, // the scene's JSON / the resource file's text, in shared chunks (undo_store.odin)
 	label:    string,
 	selected: string, // child-index path of the selected node ("2/0"), "" = none
 	version:  int,    // the scene's edit version this entry restores
+	resource: string, // .Resource: the file (project-relative)
+}
+
+// Editor_RecordResourceUndo snapshots a resource file before a change.
+// (Recorded during Simulate too: resource edits are saved to the file, not
+// rolled back when the simulation stops.)
+Editor_RecordResourceUndo :: proc(state: ^EditorState, rel, label: string) {
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	data, err := os.read_entire_file(full, context.temp_allocator)
+	if err != nil do return
+	snap := Undo_Pack(string(data))
+	for &r in state.redoStack do undo_entry_destroy(&r)
+	clear(&state.redoStack)
+	// Unchanged since the last step for this file: one step, not two.
+	if n := len(state.undoStack); n > 0 && state.undoStack[n - 1].kind == .Resource && state.undoStack[n - 1].resource == rel && Undo_Same(state.undoStack[n - 1].json, snap) {
+		Undo_Release(snap)
+		return
+	}
+	append(&state.undoStack, Undo_Entry{kind = .Resource, json = snap, label = strings.clone(label), resource = strings.clone(rel)})
+	if len(state.undoStack) > UNDO_LIMIT {
+		old := state.undoStack[0]
+		undo_entry_destroy(&old)
+		ordered_remove(&state.undoStack, 0)
+	}
 }
 
 // Editor_RecordUndo snapshots the active scene before a change.
@@ -63,6 +96,7 @@ undo_entry_destroy :: proc(u: ^Undo_Entry) {
 	Undo_Release(u.json)
 	delete(u.label)
 	delete(u.selected)
+	delete(u.resource)
 }
 
 Editor_Undo :: proc(state: ^EditorState) -> bool {
@@ -75,8 +109,24 @@ Editor_Redo :: proc(state: ^EditorState) -> bool {
 
 @(private = "file")
 undo_redo :: proc(state: ^EditorState, from, to: ^[dynamic]Undo_Entry, verb: string) -> bool {
-	// Only entries for the active scene apply.
+	ResourceInspector_Flush(state) // (an edit not written yet comes first)
+	// Entries for the active scene apply, and resource entries.
 	for i := len(from) - 1; i >= 0; i -= 1 {
+		if from[i].kind == .Resource {
+			entry := from[i]
+			ordered_remove(from, i)
+			full, _ := filepath.join({state.projectPath, entry.resource}, context.temp_allocator)
+			current, _ := os.read_entire_file(full, context.temp_allocator)
+			append(to, Undo_Entry{kind = .Resource, json = Undo_Pack(string(current)), label = strings.clone(entry.label), resource = strings.clone(entry.resource)})
+			if os.write_entire_file(full, transmute([]u8)Undo_Unpack(entry.json)) != nil {
+				Editor_Log(state, .Error, "%s: could not write %s", verb, entry.resource)
+			} else {
+				Editor_Log(state, .Info, "%s: %s (%s)", verb, entry.label, entry.resource)
+			}
+			ResourceInspector_FileChanged(entry.resource)
+			undo_entry_destroy(&entry)
+			return true
+		}
 		if from[i].scene != state.activeScene do continue
 		entry := from[i]
 		ordered_remove(from, i)

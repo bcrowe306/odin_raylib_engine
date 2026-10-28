@@ -84,7 +84,7 @@ num_array :: proc(vals: ..f64) -> json.Value {
 
 // script_array_field: one row per item (its editor per element type),
 // a remove button each and "+ Add".
-script_array_field :: proc(state: ^EditorState, owner: ^e.Node, id, elem, text: string) -> (out: string, changed: bool) {
+script_array_field :: proc(state: ^EditorState, owner: ^e.Node, id, elem, text: string, class := "") -> (out: string, changed: bool) {
 	items := parse_list(text)
 	remove := -1
 	w := field_width() - 28
@@ -115,7 +115,8 @@ script_array_field :: proc(state: ^EditorState, owner: ^e.Node, id, elem, text: 
 			if path, ok := node_ref_field(state, owner, iid, cur); ok {item = json.String(path); changed = true}
 		case "texture", "audio", "scene", "script", "component", "level", "file", "resource":
 			cur := string(item.(json.String) or_else "")
-			if path, ok := asset_picker(iid, cur, Script_AssetFiles(state, elem), allowNone = true); ok && path != cur {item = json.String(path); changed = true}
+			files := Resource_FilesOfClass(state, class) if elem == "resource" else Script_AssetFiles(state, elem)
+			if path, ok := asset_picker(iid, cur, files, allowNone = true); ok && path != cur {item = json.String(path); changed = true}
 		case:
 			bufT: [256]u8
 			copy(bufT[:len(bufT) - 1], string(item.(json.String) or_else ""))

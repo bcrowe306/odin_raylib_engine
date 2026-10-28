@@ -1,0 +1,62 @@
+# Resource Inspector: selecting a resource in Assets shows its class's
+# properties; an edit is saved when the field is let go (only values that
+# differ from the defaults); undo / redo rewrite the file; selecting a node
+# goes back to it. A node script's resource property lists only resources of
+# its class.
+exec mkdir -p $PROJECT/resources
+exec cp tests/drive/fixtures/drive_res_health.lua $PROJECT/scripts/drive_res_health.lua
+exec cp tests/drive/fixtures/drive_res_item.lua $PROJECT/scripts/drive_res_item.lua
+exec cp tests/drive/fixtures/drive_res_user.lua $PROJECT/scripts/drive_res_user.lua
+exec cp tests/drive/fixtures/drive_boss.resource.json $PROJECT/resources/drive_boss.resource.json
+exec cp tests/drive/fixtures/drive_sword.resource.json $PROJECT/resources/drive_sword.resource.json
+wait 5
+
+# (filter Assets so the row is on screen)
+# (the file list picks up files copied in within a second)
+click @asset.search
+type drive_boss
+wait-until item:asset:resources/drive_boss.resource.json == visible timeout=600
+click @asset:resources/drive_boss.resource.json
+expect item:insp.resource-name == visible
+expect item:insp.resource-class == visible
+expect item:insp.resource:max == visible
+expect item:insp.resource:kind == visible
+expect item:insp.resource-group:Recovery == visible
+screenshot resource_inspector
+
+# Typing: written once, when the field is let go.
+dblclick @insp.resource:max
+key ctrl+a
+type 250
+key enter
+wait 2
+expect file:resources/drive_boss.resource.json contains "max": 250
+expect file:resources/drive_boss.resource.json !contains regen
+expect log contains Saved resources/drive_boss.resource.json
+
+# Undo / redo rewrite the file.
+key ctrl+z
+wait 2
+expect file:resources/drive_boss.resource.json !contains max
+key ctrl+shift+z
+wait 2
+expect file:resources/drive_boss.resource.json contains "max": 250
+
+# Reset to the default drops the value from the file.
+click @insp.resource:max.reset
+wait 2
+expect file:resources/drive_boss.resource.json !contains max
+screenshot after_reset
+
+# A node goes back to the node Inspector; its script's resource property
+# lists only files of its class.
+click @hier:PatrolDroneAlpha
+expect item:insp.resource-name == missing
+click @insp.script-attach
+click @pick:scripts/drive_res_user.lua
+click @insp.script:health
+expect item:pick:resources/drive_boss.resource.json == visible
+expect item:pick:resources/drive_sword.resource.json == missing
+screenshot class_filtered_picker
+click @pick:resources/drive_boss.resource.json
+expect node:PatrolDroneAlpha.script.health == resources/drive_boss.resource.json

@@ -246,23 +246,24 @@ Resource_ReadFile :: proc(mgr: ^ScriptManager, path: string) -> (file: Resource_
 	return Resource_ParseText(norm, text)
 }
 
-// Resource_ParseText parses a resource file's text (temp allocated).
-Resource_ParseText :: proc(path, text: string) -> (file: Resource_File, ok: bool) {
+// Resource_ParseText parses a resource file's text (temp allocated);
+// problems are reported unless quiet.
+Resource_ParseText :: proc(path, text: string, quiet := false) -> (file: Resource_File, ok: bool) {
 	val, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
 	obj, isObj := val.(json.Object)
 	if err != .None || !isObj {
-		Script_Problem(.Warning, "[Resource] %s: not a resource file (invalid JSON)", path)
+		if !quiet do Script_Problem(.Warning, "[Resource] %s: not a resource file (invalid JSON)", path)
 		return
 	}
 	if t, has := obj["type"]; has {
 		if s, isStr := t.(json.String); !isStr || s != "resource" {
-			Script_Problem(.Warning, "[Resource] %s: \"type\" is not \"resource\"", path)
+			if !quiet do Script_Problem(.Warning, "[Resource] %s: \"type\" is not \"resource\"", path)
 			return
 		}
 	}
 	script, isStr := obj["script"].(json.String)
 	if !isStr || script == "" {
-		Script_Problem(.Warning, "[Resource] %s: no \"script\" (its class)", path)
+		if !quiet do Script_Problem(.Warning, "[Resource] %s: no \"script\" (its class)", path)
 		return
 	}
 	file.script = string(script)
