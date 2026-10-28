@@ -1,5 +1,6 @@
 package editor
 
+import "core:encoding/json"
 import "core:fmt"
 import "core:os"
 import "core:path/filepath"
@@ -286,6 +287,11 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 			v.file = strings.clone(rel, v.allocator)
 		}
 		if menu(ICON_FA_PEN_TO_SQUARE, "Edit in Vector App", "edit-vector") do Vector_EditExternal(state, full)
+	case .Resource:
+		class := resource_class_of(state, rel)
+		if menu(ICON_FA_CODE, "Edit Class Script", "edit-resource-class", class != "") do Editor_OpenScript(state, class)
+		if class != "" do UI_Tooltip(class)
+		if menu(ICON_FA_GEM, "New Resource of This Class...", "new-resource-same", class != "") do NewResourceDialog_Open(state, class)
 	case .Package, .Other:
 		if menu(ICON_FA_FOLDER_OPEN, "Open With Default App", "open-external") do Editor_OpenExternally(state, full)
 	}
@@ -305,6 +311,18 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 	imgui.Separator()
 	if menu(ICON_FA_LINK, "Copy Path", "copy-path") do imgui.SetClipboardText(strings.clone_to_cstring(rel, context.temp_allocator))
 	if menu(ICON_FA_FOLDER_OPEN, "Reveal in Finder" when ODIN_OS == .Darwin else "Show in Folder", "reveal") do Editor_OpenExternally(state, filepath.dir(full, context.temp_allocator))
+}
+
+// resource_class_of: the class script a resource file names ("" = unreadable).
+@(private = "file")
+resource_class_of :: proc(state: ^EditorState, rel: string) -> string {
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	data, err := os.read_entire_file(full, context.temp_allocator)
+	if err != nil do return ""
+	val, perr := json.parse(data, allocator = context.temp_allocator)
+	if perr != .None do return ""
+	obj, _ := val.(json.Object)
+	return string(obj["script"].(json.String) or_else "")
 }
 
 // Asset_MultiContextMenu: actions when multiple assets are selected.
@@ -371,6 +389,9 @@ Asset_FolderContextMenu :: proc(state: ^EditorState, title: string) {
 	switch title {
 	case "Scenes": if menu(ICON_FA_PLUS, "New Scene", "new-scene") do Toolbar_NewScene(state)
 	case "Scripts": if menu(ICON_FA_PLUS, "New Script...", "new-script") do NewScriptDialog_Open(state)
+	case "Resources":
+		if menu(ICON_FA_PLUS, "New Resource...", "new-resource") do NewResourceDialog_Open(state)
+		if menu(ICON_FA_FILE_CODE, "New Resource Class...", "new-resource-class") do NewScriptDialog_Open(state, nil, "resource", "new_resource_class")
 	case "Levels": if menu(ICON_FA_FILE_IMPORT, "Import LDtk Project...", "import-level") do Asset_OpenImportDialog(state, {"ldtk"}, "Import LDtk Project")
 	}
 	// Import with this folder's file types in the dialog filter.
@@ -491,6 +512,8 @@ Asset_AddMenu :: proc(state: ^EditorState) {
 	imgui.Separator()
 	if menu(ICON_FA_CLAPPERBOARD, "New Scene", "add-new-scene") do Toolbar_NewScene(state)
 	if menu(ICON_FA_FILE_CODE, "New Script...", "add-new-script") do NewScriptDialog_Open(state)
+	if menu(ICON_FA_GEM, "New Resource...", "add-new-resource") do NewResourceDialog_Open(state)
+	UI_Tooltip("A data asset of a resource class (a script with a `resource` marker)")
 	if menu(ICON_FA_WAND_MAGIC_SPARKLES, "New Shader", "add-new-shader") do Editor_NewShader(state)
 }
 

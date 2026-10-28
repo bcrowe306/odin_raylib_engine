@@ -1,0 +1,37 @@
+# Resources in Assets: with no resource class yet, New Resource offers New
+# Resource Class (the New Script dialog on the Resource Class template); a
+# resource of that class is created in resources/, listed with its own kind,
+# and its context menu opens the class script.
+wait 5
+click @asset.add
+click @ctx:add-new-resource
+expect item:newresource.new-class == visible
+screenshot no_classes
+click @newresource.new-class
+wait 2
+expect item:newscript.create == visible
+screenshot class_template
+click @newscript.create
+wait 2
+expect file:scripts/new_resource_class.lua contains .resource = { local_copy = false }
+expect file:scripts/new_resource_class.lua contains :on_load()
+
+# A resource of the new class, from the Resources section's +.
+click @asset.new-resource
+expect item:newresource.class:scripts/new_resource_class.lua == visible
+screenshot pick_class
+click @newresource.create
+wait 2
+expect file:resources/new_resource.resource.json contains "type": "resource"
+expect file:resources/new_resource.resource.json contains "script": "scripts/new_resource_class.lua"
+expect log contains Created resources/new_resource.resource.json
+expect item:asset:resources/new_resource.resource.json == visible
+screenshot resource_listed
+
+# Its context menu opens the class.
+rclick @asset:resources/new_resource.resource.json
+expect item:ctx:edit-resource-class == visible
+screenshot context_menu
+click @ctx:edit-resource-class
+wait 2
+expect code.file == scripts/new_resource_class.lua

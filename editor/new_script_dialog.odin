@@ -30,7 +30,7 @@ dlg: New_Script_Dialog
 
 // NewScriptDialog_Open opens the dialog; with a node, the script is attached
 // to it and named after it.
-NewScriptDialog_Open :: proc(state: ^EditorState, node: ^e.Node = nil) {
+NewScriptDialog_Open :: proc(state: ^EditorState, node: ^e.Node = nil, template := "", name := "") {
 	dlg = {}
 	dlg.open = true
 	dlg.focus = true
@@ -41,6 +41,8 @@ NewScriptDialog_Open :: proc(state: ^EditorState, node: ^e.Node = nil) {
 		if s := strings.to_snake_case(node.name, context.temp_allocator); s != "" do base = s
 		id = e.Script_TemplateFor(node.typeId)
 	}
+	if template != "" do id = template
+	if name != "" do base = name
 	copy(dlg.name[:len(dlg.name) - 1], base)
 	for tp, i in e.Script_Templates() do if tp.id == id do dlg.template = i
 }
