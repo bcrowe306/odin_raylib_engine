@@ -60,7 +60,7 @@ jobs:
 
       - name: Unit tests
         run: |
-          odin test engine -define:ODIN_TEST_THREADS=1 $(scripts/odin_flags.sh)
+          odin test engine -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true $(scripts/odin_flags.sh)
           odin test ui -define:ODIN_TEST_THREADS=1 $(scripts/odin_flags.sh)
 
       - name: Smoke test (the runner plays the demo project)
