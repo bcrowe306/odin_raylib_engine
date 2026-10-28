@@ -115,13 +115,19 @@ scene_tabs_close :: proc(state: ^EditorState, scene: ^e.Scene) {
 		SceneTabs_Activate(state, next)
 	}
 	ordered_remove(&tabs.open, idx)
-	// Its undo / redo entries.
+	// Its undo / redo entries. A step that also wrote a file (Apply to
+	// Component) keeps undoing the file.
 	for stack in ([]^[dynamic]Undo_Entry{&state.undoStack, &state.redoStack}) {
 		for i := len(stack) - 1; i >= 0; i -= 1 {
 			if stack[i].scene != scene do continue
-			Undo_Release(stack[i].json)
-			delete(stack[i].label)
-			delete(stack[i].selected)
+			if stack[i].file != "" {
+				Undo_Release(stack[i].json)
+				stack[i].json = nil
+				stack[i].kind = .File
+				stack[i].scene = nil
+				continue
+			}
+			Undo_EntryDestroy(&stack[i])
 			ordered_remove(stack, i)
 		}
 	}
