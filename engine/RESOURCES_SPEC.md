@@ -96,7 +96,7 @@ Enemy.properties = {
 | Shared | `(nil, path)` | Until the script manager resets: game shutdown, Simulate stop, project change |
 | Local | `(scope, path)` | Until the scope is destroyed |
 
-**Scope** (`Resource_ScopeOf(node)`): walk from the node up through its parents. The scope is the first node with `componentPath != ""` (the **nearest** component instance root, so a nested component gets its own scope). If there's none, the scope is the node's scene.
+**Scope** (`Resource_ScopeOf(node)`): walk from the node up through its parents. The scope is the first node with `componentPath != ""` (the **nearest** component instance root, so a nested component gets its own scope). If there's none, the scope is the root of the node's tree (the scene's root node). A scope is always a `^Node`, and `Node_Terminate` releases the copies it owns (`Resource_ForgetScope`), so unloading a scene releases its scene-scoped copies too.
 
 So:
 - Two `Enemy` instances each get their own `Health`.
@@ -109,9 +109,9 @@ A local copy is **reloaded from the file** (file values + `on_load`). It is **no
 ### The Lua table
 
 - Fields: one per declared property, plus `resource_path` (string, read-only by convention).
-- Metatable `__index` is the class module, so methods and hot-reloaded functions work exactly like node scripts.
-- `ResourceBase` methods (engine-provided, reached through the class's metatable chain or injected fields):
-  - `res:duplicate()` returns a new table with a **deep copy of the current state** (arrays, curves and gradients copied). It's owned by the caller's scope and does **not** call `on_load`.
+- The metatable's `__index` looks up the class module first, then `ResourceBase`. Methods and hot-reloaded functions work exactly like node scripts, and nothing is injected into the user's module table.
+- `ResourceBase` methods:
+  - `res:duplicate()` returns a new table with a **deep copy of the current state**: nested tables are copied (cycles and metatables kept), while other resources stay shared references. It's owned by the caller's scope and does **not** call `on_load`.
 - Scripts can write fields at runtime. Writes are never saved.
 
 ### Lua API
@@ -119,7 +119,7 @@ A local copy is **reloaded from the file** (file values + `on_load`). It is **no
 | Call | Returns |
 |---|---|
 | `Resource.load(path)` | The shared table (loaded on first use). |
-| `Resource.new(path)` | A fresh local table scoped to the **calling script's** scope (released with it). |
+| `Resource.new(path)` | A fresh local table scoped to the **calling script's** scope (released with it). Inside `on_load` it uses the loading resource's scope; from global scripts it's owned by the manager. |
 | `self.<resource prop>` | Resolved before `ready()`: shared or scoped-local, depending on `local_copy`. |
 
 Errors: a missing file, a script that isn't a resource class, or a `class` mismatch all give `nil` plus a `Script_Problem` warning (shown as a squiggle at the call site / property, as with `get_node`).
@@ -159,17 +159,23 @@ Resource_Key :: struct { scope: rawptr, path: string }
 // ScriptProperty gains:   resourceClass: string, resourceLocal: enum {Default, Shared, Local}
 // ScriptManager gains:    resources: map[Resource_Key]^ResourceInstance, resourceFiles (mtimes)
 
-Resource_Load        :: proc(mgr: ^ScriptManager, path: string, scope: rawptr) -> ^ResourceInstance
+Resource_Load        :: proc(mgr: ^ScriptManager, path: string, scope: rawptr, cached := true) -> ^ResourceInstance
 Resource_Push        :: proc(L: ^lua.State, res: ^ResourceInstance)
 Resource_ScopeOf     :: proc(node: ^Node) -> rawptr
-Resource_ReleaseScope:: proc(mgr: ^ScriptManager, scope: rawptr)  // node destroy (instance roots) / scene unload
-Resource_ClearAll    :: proc(mgr: ^ScriptManager)                 // Simulate stop, shutdown
-Resource_ReloadFile  :: proc(mgr: ^ScriptManager, path: string)   // hot reload of a .resource.json
-Resource_ReadFile    :: proc(path: string, allocator := context.allocator) -> (script: string, values: map[string]ScriptValue, ok: bool)
-Resource_WriteFile   :: proc(path, script: string, values: map[string]ScriptValue, mod: ^ScriptModule) -> bool // non-defaults, sorted
+Resource_ReleaseScope:: proc(mgr: ^ScriptManager, scope: rawptr)
+Resource_ForgetScope :: proc(node: ^Node)                         // Node_Terminate
+Resource_ClearAll    :: proc(mgr: ^ScriptManager)                 // ScriptManager_RestoreGlobals (Simulate stop), shutdown
+Resource_ReloadFile  :: proc(mgr: ^ScriptManager, path: string) -> bool // hot reload of a .resource.json
+Resource_ReadFile    :: proc(mgr: ^ScriptManager, path: string) -> (Resource_File, bool) // temp allocated
+Resource_ParseText   :: proc(path, text: string) -> (Resource_File, bool)
+Resource_FileText    :: proc(script: string, values: map[string]ScriptValue, mod: ^ScriptModule, extra: map[string]string = nil, allocator := context.allocator) -> string // non-defaults + undeclared raw keys, sorted
+// Resource_File :: struct { script: string, values: map[string]ScriptValue, raw: map[string]string }
+// The editor writes the file itself (PR 5) with Resource_FileText.
 ```
 
-Refactors (behaviour-preserving, done first):
+Lua side: the `Resource` global (`load`, `new`) and, in the registry, `ResourceBase`, a weak set of resource tables, and two Lua helpers (the metatable factory and the deep copy for `duplicate`). They're registered from `RegisterEngineLuaBindings` (`Script_RegisterResourceModule`).
+
+Refactors (behaviour-preserving, done first in #47):
 - Move the property-application loop out of `Script_AttachToNode` (steps 4–5) into `script_apply_properties(L, tableIdx, mod, overrides, &props)`, used by both node scripts and resources.
 - Extend `Script_ParseProperties` with `"resource"` (`prop.type = .String`, `assetKind = "resource"`, plus `class` and `local_copy`), and with `of = "resource"` for arrays.
 - Extend `script_resolve_node_props` (or add a sibling `script_resolve_resource_props`) so resource properties resolve before `ready()`.

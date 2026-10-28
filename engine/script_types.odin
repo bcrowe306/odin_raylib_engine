@@ -64,12 +64,30 @@ ScriptProperty_Destroy :: proc(p: ^ScriptProperty) {
 	delete(p.tooltip)
 }
 
+// ScriptValue_Equal: same type and value (strings by content).
+ScriptValue_Equal :: proc(a, b: ScriptValue) -> bool {
+	if a.type != b.type do return false
+	switch a.type {
+	case .Float:   return a.valFloat == b.valFloat
+	case .Int:     return a.valInt == b.valInt
+	case .Boolean: return a.valBool == b.valBool
+	case .String:  return a.valString == b.valString
+	case .Vector2: return a.valVec2 == b.valVec2
+	case .Color:   return a.valColor == b.valColor
+	}
+	return true
+}
+
 ScriptModule :: struct {
 	path:        string,
 	properties:  [dynamic]ScriptProperty,
 	isLoaded:    bool,
 	diskPath:    string,    // file the module was loaded from ("" = embedded)
 	modTime:     time.Time, // its modification time at the last (re)load
+	// A resource class (script_resources.odin): the script sets
+	// `Class.resource = { local_copy = bool }`.
+	isResourceClass:   bool,
+	resourceLocalCopy: bool, // its resources are local to each component instance by default
 }
 
 // Forward declaration of ScriptManager
@@ -96,6 +114,10 @@ ScriptManager :: struct {
 	lastHotReloadCheck: time.Tick,
 	hotReload:          bool, // poll script files and reload changed ones
 	globals:            [dynamic]Global_Script, // loaded global scripts (script_globals.odin)
+	// Live resource tables (script_resources.odin) and the one whose
+	// on_load is running (its Resource.new copies share its scope).
+	resources:          [dynamic]^ResourceInstance,
+	loadingResource:    ^ResourceInstance,
 }
 
 ScriptInstance :: struct {

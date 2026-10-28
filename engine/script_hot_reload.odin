@@ -39,7 +39,7 @@ script_disk_path :: proc(mgr: ^ScriptManager, normPath: string) -> string {
 	return ""
 }
 
-@(private = "file")
+@(private)
 file_mtime :: proc(path: string) -> time.Time {
 	if path == "" do return {}
 	info, err := os.stat(path, context.temp_allocator)
@@ -69,6 +69,7 @@ ScriptManager_CheckForChanges :: proc(mgr: ^ScriptManager, force := false) -> in
 			if ScriptManager_ReloadModule(mgr, path) do reloaded += 1
 		}
 	}
+	reloaded += resources_check_for_changes(mgr)
 	return reloaded
 }
 
@@ -126,10 +127,13 @@ ScriptManager_ReloadModule :: proc(mgr: ^ScriptManager, path: string, quiet := f
 
 	// New property declarations.
 	newProps := Script_ParseProperties(L, oldIdx)
+	isClass, localCopy := script_parse_resource_marker(L, oldIdx, mod.path)
 	lua.pop(L, 2) // old (now updated) table, new table
 	for &p in mod.properties do ScriptProperty_Destroy(&p)
 	delete(mod.properties)
 	mod.properties = newProps
+	mod.isResourceClass, mod.resourceLocalCopy = isClass, localCopy
+	if isClass do script_warn_resource_props(mod)
 
 	// Instances: add new properties (defaults), drop removed ones.
 	for inst in mgr.instances {
@@ -152,6 +156,8 @@ ScriptManager_ReloadModule :: proc(mgr: ^ScriptManager, path: string, quiet := f
 			delete(k)
 		}
 	}
+	// Resources of this class: new properties get their values.
+	resources_module_reloaded(mgr, mod)
 	if !quiet do log.infof("[HotReload] Reloaded %s", mod.path)
 	return true
 }
@@ -224,6 +230,8 @@ ScriptManager_RestoreGlobals :: proc(mgr: ^ScriptManager) -> bool {
 	lua.pop(L, 2) // _G, snapshot
 	lua.pushnil(L)
 	lua.setfield(L, lua.REGISTRYINDEX, SIM_GLOBALS_KEY)
+	// Resources the simulation loaded (and changed) start over.
+	Resource_ClearAll(mgr)
 	// Fresh module-level state.
 	paths := make([dynamic]string, context.temp_allocator)
 	for path in mgr.modules do append(&paths, path)
