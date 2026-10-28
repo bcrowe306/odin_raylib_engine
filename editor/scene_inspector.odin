@@ -469,11 +469,12 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 		count = len(kids)
 		for k, i in kids do if k == node do index = i
 	}
-	if hier_menu(ICON_FA_ARROW_UP, "Move Up", "move-up", parent != nil && index > 0 && !locked) {
+	// (Inside an instance too: its order is saved as an override, #78.)
+	if hier_menu(ICON_FA_ARROW_UP, "Move Up", "move-up", parent != nil && index > 0) {
 		Editor_RecordUndo(state, "Move up")
 		e.MoveChild(mgr, parent, node, index - 1)
 	}
-	if hier_menu(ICON_FA_ARROW_DOWN, "Move Down", "move-down", parent != nil && index < count - 1 && !locked) {
+	if hier_menu(ICON_FA_ARROW_DOWN, "Move Down", "move-down", parent != nil && index < count - 1) {
 		Editor_RecordUndo(state, "Move down")
 		e.MoveChild(mgr, parent, node, index + 1)
 	}
