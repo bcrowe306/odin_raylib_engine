@@ -8,6 +8,8 @@ import rl "vendor:raylib"
 test_particle_emitter_negative_spread_and_variance :: proc(t: ^testing.T) {
 	emitter: ParticleEmitter
 	ParticleEmitter_Init(&emitter)
+	// No node owns it (no arena): its particles are freed here.
+	defer ParticleEmitter_Destroy(&emitter)
 
 	// Inverted/negative parameters that previously triggered Odin's rand.float32_range assertion (Issue #21)
 	emitter.spread = {-100, -200}
@@ -39,10 +41,7 @@ test_particle_emitter_negative_spread_and_variance :: proc(t: ^testing.T) {
 test_particle_emitter_node_lifecycle_negative_props :: proc(t: ^testing.T) {
 	game := new(Game)
 	InitializeGame(game)
-	defer {
-		game->terminate()
-		free(game)
-	}
+	defer game->terminate() // (frees the game too)
 
 	scene := game->createScene("emitter_test", true)
 	testing.expect(t, scene != nil, "Scene created")

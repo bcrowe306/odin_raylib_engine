@@ -93,9 +93,9 @@ Always execute the following verification steps in sequence before committing:
    ```
 2. **Run Full Engine Unit Test Suite**:
    ```bash
-   odin test engine -define:ODIN_TEST_THREADS=1
+   odin test engine -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
    ```
-   *Verify 0 failures and 0 memory leaks.*
+   *Verify 0 failures and 0 memory leaks (a leak or bad free fails the run).*
 3. **Type Check Root & Packages**:
    ```bash
    odin check .

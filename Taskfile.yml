@@ -37,13 +37,13 @@ tasks:
     test:
         desc: Run all tests (engine lifecycle, UI unit tests, and UI showcase E2E automation)
         cmds:
-            - odin test engine -define:ODIN_TEST_THREADS=1
+            - odin test engine -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
             - odin test ui -define:ODIN_TEST_THREADS=1
             - cd ui && ./scripts/test_showcase.sh
     test:engine:
         desc: Run engine package unit & memory leak tests
         cmds:
-            - odin test engine -define:ODIN_TEST_THREADS=1
+            - odin test engine -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
     test:ui:
         desc: Run standalone ui package unit tests
         cmds:
@@ -62,7 +62,7 @@ tasks:
             - odin check .
             - odin check ui
             - odin check editor
-            - odin test engine -define:ODIN_TEST_THREADS=1
+            - odin test engine -define:ODIN_TEST_THREADS=1 -define:ODIN_TEST_FAIL_ON_BAD_MEMORY=true
             - odin test ui -define:ODIN_TEST_THREADS=1
             - task: editor:e2e
     docs:nodes:
