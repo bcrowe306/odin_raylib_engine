@@ -111,6 +111,17 @@
       ]
     },
     {
+      "type": "AtlasSpriteNode",
+      "name": "Atlas Sprite",
+      "category": "Graphics & Rendering",
+      "description": "2D textured sprite displaying a sub-region (atlas / sheet slice) of a texture.",
+      "aliases": ["atlassprite", "atlas", "subtexture", "spritesheet"],
+      "hasOrigin": true,
+      "properties": [
+        {"name": "tint", "kind": "color", "owner": "AtlasSpriteNode", "default": "#ffffffff", "doc": "Multiplies the texture's colours (white = unchanged; alpha fades it)."}
+      ]
+    },
+    {
       "type": "FrameAnimationNode",
       "name": "Frame Animator",
       "category": "Animation & Effects",
@@ -298,6 +309,7 @@
         {"name": "pushLimit", "kind": "number", "owner": "CharacterMoverNode", "default": 500, "min": 0, "max": 1000, "doc": "Most push per step from overlapping bodies (px/s; 0 = unlimited)."},
         {"name": "clipVelocity", "kind": "boolean", "owner": "CharacterMoverNode", "default": true, "doc": "Remove velocity into walls and floors it hits (slide along them)."},
         {"name": "enableKeyboardInput", "kind": "boolean", "owner": "CharacterMoverNode", "default": true, "doc": "Built-in movement: the move / jump input actions drive it."},
+        {"name": "playerIndex", "kind": "integer", "owner": "CharacterMoverNode", "default": 1, "min": 0, "max": 4, "doc": "Player whose actions drive this mover (1..4; 0 = none / NPC / AI)."},
         {"name": "isGrounded", "kind": "boolean", "owner": "CharacterMoverNode", "default": false, "runtime": true, "doc": "Standing on something now."},
         {"name": "categoryLayers", "kind": "flags", "owner": "CharacterMoverNode", "default": ["Layer1"], "values": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "doc": "Collision layers this object is on (names in Project Settings > Physics)."},
         {"name": "maskLayers", "kind": "flags", "owner": "CharacterMoverNode", "default": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "values": ["Layer1", "Layer2", "Layer3", "Layer4", "Layer5", "Layer6", "Layer7", "Layer8", "Layer9", "Layer10", "Layer11", "Layer12", "Layer13", "Layer14", "Layer15", "Layer16"], "doc": "Collision layers this object collides with."},
