@@ -46,7 +46,7 @@ Script_TemplateById :: proc(id: string) -> (Script_Template, bool) {
 }
 
 SCRIPT_TEMPLATE_RESOURCE :: `-- $NAME$: a resource class. Make resources of it with Assets > Resources > +.
----@class $CLASS$
+---@class $CLASS$ : ResourceBase
 local $CLASS$ = {}
 
 -- Marks this script as a resource class. local_copy = true gives each

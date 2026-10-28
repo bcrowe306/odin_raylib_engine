@@ -94,6 +94,8 @@ Engine API
 - [x] 8.17 Property-style access (`self.node.position = ...`), old methods kept
 - [x] 8.18 Spawning: `Scene.instantiate(component, parent, x, y)` (typed root), `node:queue_free()`
 - [x] 8.19 Global scripts (autoloads) in Project Settings, reachable from every script; globe marker in the asset browser
+- [x] 8.27 Resources (#46): data assets of a Lua class (`Class.resource = {...}` marker, `resources/*.resource.json`); `type = "resource"` properties, `Resource.load` / `new`, `duplicate`, `on_load`; shared or one per component instance (`local_copy`); hot reload; Assets section, New Resource, Resource Class template; Inspector editing saved on release with undo; typed completion - engine/docs/resources.md
+- [ ] 8.28 Resources, next: drop a resource onto a property field, an Open button, help-pane text; resources inside resources; resources embedded in scenes; per-instance values without a second file
 - (on hold) coroutines (`wait` / `await` / `tween`) - not wanted yet; (not chosen) lifecycle hooks
 
 Script authoring

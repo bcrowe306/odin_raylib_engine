@@ -9,7 +9,7 @@ import "core:time"
 import lua "lua54"
 
 // ============================================================================
-// Resources: data assets whose behaviour comes from Lua (engine/RESOURCES_SPEC.md).
+// Resources: data assets whose behaviour comes from Lua (engine/docs/resources.md).
 //
 // A class is a script marked `Class.resource = { local_copy = bool }` with
 // `properties` and methods. An instance is a file
