@@ -6,6 +6,7 @@ import "core:fmt"
 import "core:log"
 import "core:math"
 import os "osx"
+import "core:slice"
 import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
@@ -181,11 +182,15 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		if ov != "" {
 			Json_Key(w, "overrides", &first); strings.write_string(&w.sb, ov)
 		}
-		write_connections(w, node, &first)
-		w.indent -= 1
-		Json_NewLine(w)
-		strings.write_byte(&w.sb, '}')
-		return
+		// Nested in an instance serialized in full to diff it: its nodes in
+		// full too (overrides cross nested links, #79).
+		if !(serializeExpandNested && !node.componentMissing) {
+			write_connections(w, node, &first)
+			w.indent -= 1
+			Json_NewLine(w)
+			strings.write_byte(&w.sb, '}')
+			return
+		}
 	}
 
 	// Type-specific resources.
@@ -855,10 +860,23 @@ componentDepth: int
 componentStack: [16]string
 
 @(private = "file")
-read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameContext) -> ^Node {
+read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameContext, asPlain := false) -> ^Node {
 	// Linked component instance: build the subtree from the component file,
 	// then apply the instance's own name and transform.
-	if compPath := sj_string(obj, "component", ""); compPath != "" {
+	if compPath := sj_string(obj, "component", ""); compPath != "" && !asPlain {
+		// Nested in a component being built, already expanded (#79): its
+		// tree is here, with the outer levels' overrides applied.
+		if base, pre := obj[COMPONENT_EXPANDED].(json.String); pre {
+			if componentDepth >= len(componentStack) do return nil
+			componentStack[componentDepth] = compPath
+			componentDepth += 1
+			node := read_node(scene, obj, parent, ctx, true)
+			componentDepth -= 1
+			if node == nil do return nil
+			node.componentPath = strings.clone(compPath, node.allocator)
+			node.componentBase = strings.clone(string(base), node.allocator)
+			return node
+		}
 		inst, problem := read_component_instance(scene, compPath, obj, parent, ctx)
 		if inst != nil do return inst
 		return read_missing_component(scene, compPath, obj, parent, ctx, problem)
@@ -1518,18 +1536,11 @@ Component_ReadFile :: proc(ctx: ^GameContext, compPath: string) -> ([]byte, bool
 @(private = "file")
 read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Object, parent: ^Node, ctx: ^GameContext) -> (^Node, string) {
 	// A component inside itself (A -> B -> A): the inner one isn't built (#75).
-	for p in componentStack[:componentDepth] do if p == compPath {
-		return nil, fmt.tprintf("the component contains itself (%s)", strings.join(componentStack[:componentDepth], " -> ", context.temp_allocator))
-	}
-	if componentDepth >= len(componentStack) do return nil, "components nest too deep"
-	data, ok := Component_ReadFile(ctx, compPath)
-	if !ok do return nil, "the component file is missing"
-	val, err := json.parse(data, allocator = context.temp_allocator)
-	if err != .None do return nil, fmt.tprintf("the component file is not valid JSON (%v)", err)
-	obj, isObj := val.(json.Object)
-	if !isObj do return nil, "the component file is not a node"
-	if inner, has := sj_obj(obj, "node"); has do obj = inner
-	baseText := Component_PrepareBase(&obj, ctx)
+	// Its nested instances expanded in place (#79).
+	stack := make([dynamic]string, context.temp_allocator)
+	append(&stack, ..componentStack[:componentDepth])
+	obj, baseText, problem := Component_Expand(ctx, compPath, &stack)
+	if problem != "" do return nil, problem
 	if ov, has := sj_obj(inst, "overrides"); has do Component_ApplyOverrides(&obj, ov)
 	componentStack[componentDepth] = compPath
 	componentDepth += 1
@@ -1633,9 +1644,15 @@ Scene_InstantiateComponent :: proc(scene: ^Scene, compPath: string, parent: ^Nod
 // name, transform and place in the hierarchy. Returns how many it rebuilt.
 Scene_RefreshComponentInstances :: proc(scene: ^Scene, compPath: string, ctx: ^GameContext) -> int {
 	if scene == nil || scene.manager == nil do return 0
+	// The outermost instance holding each one is rebuilt: its overrides are
+	// diffed against the base it was built from, so a nested file's change
+	// isn't pinned as an override (#79).
 	targets := make([dynamic]^Node, context.temp_allocator)
 	for n in scene.manager.nodes {
-		if n != nil && n.componentPath == compPath do append(&targets, n)
+		if n == nil || n.componentPath != compPath do continue
+		outer := n
+		for p := GetParent(scene.manager, n); p != nil; p = GetParent(scene.manager, p) do if p.componentPath != "" do outer = p
+		if !slice.contains(targets[:], outer) do append(&targets, outer)
 	}
 	// (Tile maps measure painted components again: their size may have changed.)
 	for n in scene.manager.nodes do if n != nil && n.typeId == TileMapNode do TileMapNode_ForgetFootprints(cast(^TileMapNode)n)

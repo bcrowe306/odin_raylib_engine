@@ -105,13 +105,14 @@ Editor_SaveComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 }
 
 // Editor_RefreshComponentInstances rebuilds the instances of a component
-// file in every open scene (not component documents, nor `skip`). Returns
-// how many were rebuilt. When the active scene is refreshed, the caller
-// keeps the selection (Editor_SaveSelection before any rebuild, #74).
+// file in every open document - scenes and component documents nesting it
+// (#79) - except `skip`. Returns how many were rebuilt. When the active
+// scene is refreshed, the caller keeps the selection (Editor_SaveSelection
+// before any rebuild, #74).
 Editor_RefreshComponentInstances :: proc(state: ^EditorState, rel: string, skip: ^e.Scene = nil) -> int {
 	n := 0
 	for _, s in state.game.sceneManager.scenes {
-		if s == nil || s == skip || !s.isLoaded || Editor_IsComponentDoc(state, s) do continue
+		if s == nil || s == skip || !s.isLoaded do continue
 		n += e.Scene_RefreshComponentInstances(s, rel, &state.game.gameContext)
 	}
 	return n

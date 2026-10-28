@@ -41,7 +41,8 @@ The file is a node object, the same as a node in a scene file, with a
   one keep it. A node without one, or with a uid another node of the file
   already has, gets a new one.
 - A nested instance (a node with `"component"`) has a uid in this file too.
-  The nodes inside it have uids in *its* file.
+  The nodes inside it have uids in *its* file. The nested link's
+  `"overrides"` follow the same rules as an instance in a scene (below).
 - A copied or duplicated node is a new node: it has no uid until its file
   is written. A node that is cut and pasted keeps its uid.
 
@@ -81,6 +82,33 @@ The file is a node object, the same as a node in a scene file, with a
 - Renaming a child inside an instance isn't an override; the name comes
   from the component file.
 
+### Nested instances
+
+Paths cross nested instances. A component A nesting B (uid `bina0000`),
+which nests C (uid `cinb0000`), and an instance of A overriding a node of
+C (uid `1eaf0000`):
+
+```json
+"overrides": {"bina0000/cinb0000/1eaf0000": {"position": [5, 5]}}
+```
+
+Each level (B's link to C, A's link to B, the instance of A) keeps its own
+entry for the node, and they merge per node: the outermost level wins for
+a value it sets, and values no level sets follow C. So changing C, B or A
+reaches every instance except where an outer level overrides that value.
+
+- An instance's overrides live on the outermost instance whose component
+  contains the node. An instance *added* to another instance is saved in
+  `$added` as a link with its own `overrides`.
+- Saving a component updates its instances in every open document: scenes,
+  and component documents that nest it.
+- If a nested component's file is missing, entries for nodes inside it are
+  kept in that nested link's `overrides`, so they come back with the file.
+- Older scenes stored a nested instance's changes as one whole
+  `"overrides"` object on the nested node (`{"bina0000": {"overrides":
+  {...}}}`). These still load (applied on top of the nested levels) and are
+  saved per node from then on.
+
 ### Older files (no uids)
 
 Component files and scenes saved before uids keep loading unchanged:
@@ -95,6 +123,4 @@ Component files and scenes saved before uids keep loading unchanged:
 
 ## Limits
 
-- Overrides inside a nested instance are stored as that nested link's whole
-  `overrides` object; per-node merging across nested links comes with #79.
 - Nodes inside an instance can change order but not parent.
