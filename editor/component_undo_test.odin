@@ -106,3 +106,66 @@ test_component_file_undo :: proc(t: ^testing.T) {
 	testing.expect_value(t, lid_y(scene, "CrateB"), -77)
 	testing.expect(t, !Editor_SceneIsModified(&state, doc), "the document matches its file")
 }
+
+// #79: saving a component updates its instances inside other open component
+// documents too, without marking them unsaved.
+@(test)
+test_component_save_refreshes_documents :: proc(t: ^testing.T) {
+	dir :: "test_component_doc_refresh"
+	comps, _ := filepath.join({dir, "components"}, context.temp_allocator)
+	_ = os.make_directory_all(comps)
+	defer os.remove_all(dir)
+	CRATE :: `{"type": "Node", "name": "Crate", "uid": "cr000000", "children": [{"type": "Node", "name": "Lid", "uid": "1id00000", "position": [0, -10]}]}`
+	SHELF :: `{"type": "Node", "name": "Shelf", "uid": "sh000000", "children": [{"type": "Node", "name": "Crate", "uid": "cris0000", "component": "components/crate.component.json"}]}`
+	crateFull, _ := filepath.join({comps, "crate.component.json"}, context.temp_allocator)
+	shelfFull, _ := filepath.join({comps, "shelf.component.json"}, context.temp_allocator)
+	_ = os.write_entire_file(crateFull, transmute([]u8)string(CRATE))
+	_ = os.write_entire_file(shelfFull, transmute([]u8)string(SHELF))
+
+	game := new(e.Game)
+	e.InitializeGame(game)
+	e.AssetManager_SetProjectDir(&game.assetManager, dir)
+	state: EditorState
+	state.game = game
+	state.projectPath = dir
+	defer {
+		for stack in ([]^[dynamic]Undo_Entry{&state.undoStack, &state.redoStack}) {
+			for &u in stack do Undo_EntryDestroy(&u)
+			delete(stack^)
+		}
+		for l in state.logs {
+			delete(l.time)
+			delete(l.message)
+		}
+		delete(state.logs)
+		delete(state.selection)
+		delete(state.sceneVersion)
+		delete(state.savedVersion)
+		for _, b in state.sceneBaselines do delete(b)
+		delete(state.sceneBaselines)
+		delete(state.componentDocs)
+		Undo_ClearStore()
+		game->terminate()
+		e.Component_ClearCaches()
+	}
+	open_doc :: proc(state: ^EditorState, game: ^e.Game, name, rel, text: string) -> ^e.Scene {
+		doc := game->createScene(name, false)
+		doc.isLoaded = true
+		doc.filePath = rel
+		state.componentDocs[doc] = true
+		e.Scene_InstantiateNodeFromJSON(doc, transmute([]u8)text, doc.rootNode, &game.gameContext)
+		e.ProcessNodeQueues(doc.manager, &game.gameContext)
+		Editor_SetSceneBaseline(state, doc)
+		return doc
+	}
+	shelf := open_doc(&state, game, "shelf_doc", "components/shelf.component.json", SHELF)
+	crate := open_doc(&state, game, "crate_doc", "components/crate.component.json", CRATE)
+	state.activeScene = crate
+	testing.expect_value(t, e.Scene_FindNodeByName(shelf, "Lid").position.y, -10)
+
+	e.Scene_FindNodeByName(crate, "Lid").position = {0, -55}
+	testing.expect(t, Editor_SaveComponentDoc(&state, crate), "save the crate")
+	lid := e.Scene_FindNodeByName(shelf, "Lid")
+	testing.expect(t, lid != nil && lid.position.y == -55, "the shelf document's crate follows")
+	testing.expect(t, !Editor_SceneIsModified(&state, shelf), "the shelf document isn't unsaved")
+}

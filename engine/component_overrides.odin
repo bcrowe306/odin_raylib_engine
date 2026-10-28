@@ -38,6 +38,10 @@ import "core:strings"
 // Set while serializing an instance in full (to diff it against its file).
 @(private)
 serializeFullInstance: ^Node
+// ...with the instances nested in it in full as well (their link and own
+// overrides too, for nodes added to an instance: to_link_form).
+@(private)
+serializeExpandNested: bool
 // The uid written for this node instead of its own: the root of a component
 // file being written (Component_InstanceJSON).
 @(private = "file")
@@ -107,6 +111,14 @@ json_equal :: proc(a, b: json.Value) -> bool {
 // Json_WriteValue writes a JSON value with sorted object keys (stable
 // output: scene "modified" checks compare serialized text).
 Json_WriteValue :: proc(w: ^Json_Writer, v: json.Value) {
+	json_write_value(w, v, false)
+}
+
+// json_write_value: Json_WriteValue; `noMarkers` writes the expansion
+// markers of nested instances (COMPONENT_EXPANDED) as `true`, without the
+// nested base text they carry while an instance is built.
+@(private = "file")
+json_write_value :: proc(w: ^Json_Writer, v: json.Value, noMarkers: bool) {
 	switch x in v {
 	case json.Null:    strings.write_string(&w.sb, "null")
 	case json.Integer: fmt.sbprintf(&w.sb, "%d", x)
@@ -117,7 +129,7 @@ Json_WriteValue :: proc(w: ^Json_Writer, v: json.Value) {
 		strings.write_byte(&w.sb, '[')
 		for item, i in x {
 			if i > 0 do strings.write_string(&w.sb, ", ")
-			Json_WriteValue(w, item)
+			json_write_value(w, item, noMarkers)
 		}
 		strings.write_byte(&w.sb, ']')
 	case json.Object:
@@ -129,7 +141,11 @@ Json_WriteValue :: proc(w: ^Json_Writer, v: json.Value) {
 			if i > 0 do strings.write_string(&w.sb, ", ")
 			Json_String(w, k)
 			strings.write_string(&w.sb, ": ")
-			Json_WriteValue(w, x[k])
+			if noMarkers && k == COMPONENT_EXPANDED {
+				strings.write_string(&w.sb, "true")
+			} else {
+				json_write_value(w, x[k], noMarkers)
+			}
 		}
 		strings.write_byte(&w.sb, '}')
 	case:
@@ -154,8 +170,15 @@ diff_keywise :: proc(base, inst: json.Object) -> (json.Object, bool) {
 @(private = "file")
 diff_node :: proc(base, inst: json.Object, isRoot: bool) -> (json.Object, bool) {
 	out := make(json.Object, 0, context.temp_allocator)
+	// A nested instance expanded in the base: its nodes are diffed one by one
+	// (paths cross the link), not its link or "overrides" (#79). One that
+	// couldn't be expanded (file missing) keeps "overrides" as a whole.
+	_, expanded := base[COMPONENT_EXPANDED]
+	skip :: proc(k: string, expanded: bool) -> bool {
+		return k == "children" || k == "type" || k == "uid" || k == "component" || strings.has_prefix(k, "$") || (expanded && k == "overrides")
+	}
 	for k, v in inst {
-		if k == "children" || k == "type" || k == "uid" do continue
+		if skip(k, expanded) do continue
 		if isRoot && contains_str(ROOT_DIRECT_KEYS, k) do continue
 		if !isRoot && k == "name" do continue
 		bv, has := base[k]
@@ -184,7 +207,7 @@ diff_node :: proc(base, inst: json.Object, isRoot: bool) -> (json.Object, bool) 
 		}
 	}
 	for k in base {
-		if k == "children" || k == "type" || k == "uid" || (isRoot && contains_str(ROOT_DIRECT_KEYS, k)) || (!isRoot && k == "name") do continue
+		if skip(k, expanded) || (isRoot && contains_str(ROOT_DIRECT_KEYS, k)) || (!isRoot && k == "name") do continue
 		if _, has := inst[k]; !has do out[k] = json.Null{}
 	}
 	return out, len(out) > 0
@@ -251,6 +274,25 @@ strip_uids :: proc(v: ^json.Value) {
 	if kids, has := o["children"].(json.Array); has do for &k in kids do strip_uids(&k)
 }
 
+// The keys of an instance saved as a link (write_node's link form).
+@(private = "file")
+LINK_FORM_KEYS :: []string{"type", "name", "uid", "position", "scale", "rotation", "pivot", "enabled", "visible", "layer", "z_index", "y_sort", "y_sort_offset", "pause_mode", "paused", "editor_locked", "editor_hidden", "tags", "component", "overrides", "connections"}
+
+// to_link_form: instances inside a node added to an instance are saved as
+// links with their own overrides (the full serialization expands them).
+@(private = "file")
+to_link_form :: proc(v: ^json.Value) {
+	o, ok := &v.(json.Object)
+	if !ok do return
+	if _, isLink := o["component"]; isLink {
+		drop := make([dynamic]string, context.temp_allocator)
+		for k in o do if !contains_str(LINK_FORM_KEYS, k) do append(&drop, k)
+		for k in drop do delete_key(o, k)
+		return
+	}
+	if kids, has := o["children"].(json.Array); has do for &k in kids do to_link_form(&k)
+}
+
 @(private = "file")
 diff_tree :: proc(base, inst: json.Object, path: string, out: ^json.Object, added: ^json.Object, removed: ^json.Array, order: ^json.Object) {
 	if d, changed := diff_node(base, inst, path == "."); changed do out[path] = d
@@ -269,6 +311,7 @@ diff_tree :: proc(base, inst: json.Object, path: string, out: ^json.Object, adde
 		if i < 0 {
 			// A node added to this instance: saved in full under its parent.
 			strip_uids(&c)
+			to_link_form(&c)
 			co = c.(json.Object)
 			list, _ := added[path].(json.Array)
 			if list == nil do list = make(json.Array, context.temp_allocator)
@@ -306,6 +349,82 @@ component_base_json :: proc(ctx: ^GameContext, compPath: string) -> (json.Object
 	if !isObj do return nil, false
 	if inner, has := obj["node"].(json.Object); has do obj = inner
 	return obj, true
+}
+
+// --- nested instances ---------------------------------------------------------------
+// A component's JSON is used with the instances it nests *expanded*: each
+// nested link object becomes the nested component's tree (normalized, its
+// own nested instances expanded, the link's overrides applied), with the
+// link's own keys (name, uid, transform...) on top and COMPONENT_EXPANDED
+// set. So override paths cross nested links ("bina0000/cinb0000/1eaf0000")
+// and every level's override of a node merges per node (#79). The tree is
+// built as is (read_node), and each nested root gets the base text stored
+// under the marker.
+
+// Set on an expanded nested link object: its base text while building, `true`
+// in stored base text.
+COMPONENT_EXPANDED :: "$expanded"
+
+// Component_Expand: the component file's node JSON, normalized, its nested
+// instances expanded; and its base text (what instances diff against).
+// `stack`: the components being expanded / built around it (loops: #75).
+@(private)
+Component_Expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]string) -> (obj: json.Object, baseText: string, problem: string) {
+	for p in stack do if p == compPath {
+		chain := make([dynamic]string, context.temp_allocator)
+		append(&chain, ..stack[:])
+		append(&chain, compPath)
+		return nil, "", fmt.tprintf("the component contains itself (%s)", strings.join(chain[:], " -> ", context.temp_allocator))
+	}
+	if len(stack) >= 16 do return nil, "", "components nest too deep"
+	data, ok := Component_ReadFile(ctx, compPath)
+	if !ok do return nil, "", "the component file is missing"
+	val, err := json.parse(data, allocator = context.temp_allocator)
+	if err != .None do return nil, "", fmt.tprintf("the component file is not valid JSON (%v)", err)
+	isObj: bool
+	obj, isObj = val.(json.Object)
+	if !isObj do return nil, "", "the component file is not a node"
+	if inner, has := obj["node"].(json.Object); has do obj = inner
+	normalize_base(&obj, ctx)
+	append(stack, compPath)
+	expand_links(ctx, &obj, stack)
+	pop(stack)
+	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	json_write_value(&w, obj, true)
+	return obj, strings.to_string(w.sb), ""
+}
+
+// expand_links expands the nested instances below `obj` (in place). One
+// that can't be expanded stays a link (it loads as a placeholder).
+@(private = "file")
+expand_links :: proc(ctx: ^GameContext, obj: ^json.Object, stack: ^[dynamic]string) {
+	kids, has := obj["children"].(json.Array)
+	if !has do return
+	for &c in kids {
+		co, isObj := &c.(json.Object)
+		if !isObj do continue
+		path, _ := co["component"].(json.String)
+		if path == "" {
+			expand_links(ctx, co, stack)
+			continue
+		}
+		nested, nestedBase, problem := Component_Expand(ctx, string(path), stack)
+		if problem != "" do continue
+		if ov, hasOv := co["overrides"].(json.Object); hasOv do Component_ApplyOverrides(&nested, ov)
+		// The link's keys on top (an instance's own lock / hide flags only).
+		delete_key(&nested, "editor_locked")
+		delete_key(&nested, "editor_hidden")
+		for k, v in co^ do if k != "overrides" && k != "children" && k != "type" do nested[k] = v
+		nested[COMPONENT_EXPANDED] = json.String(nestedBase)
+		c = nested
+	}
+}
+
+// is_expanded_link: a nested link object expanded in place.
+@(private = "file")
+is_expanded_link :: proc(obj: json.Object) -> bool {
+	_, ok := obj[COMPONENT_EXPANDED]
+	return ok
 }
 
 // --- base normalization ------------------------------------------------------------
@@ -422,15 +541,16 @@ Component_OverridesJSON :: proc(node: ^Node, manager: ^NodeManager) -> string {
 		if err != .None do return ""
 		base, _ = val.(json.Object)
 	} else {
-		ok: bool
-		base, ok = component_base_json(node.gameContext, node.componentPath)
-		if !ok do return ""
-		normalize_base(&base, node.gameContext)
+		stack := make([dynamic]string, context.temp_allocator)
+		problem: string
+		base, _, problem = Component_Expand(node.gameContext, node.componentPath, &stack)
+		if problem != "" do return ""
 	}
-	prev := serializeFullInstance
-	serializeFullInstance = node
+	// In full, nested instances expanded too (their nodes diff one by one).
+	prev, prevExpand := serializeFullInstance, serializeExpandNested
+	serializeFullInstance, serializeExpandNested = node, true
 	full := Node_SerializeToJSON(node, manager, context.temp_allocator)
-	serializeFullInstance = prev
+	serializeFullInstance, serializeExpandNested = prev, prevExpand
 	val, err := json.parse(transmute([]u8)full, allocator = context.temp_allocator)
 	if err != .None do return ""
 	inst, isObj := val.(json.Object)
@@ -491,14 +611,6 @@ merge_node :: proc(target: ^json.Object, ov: json.Object) {
 	}
 }
 
-// Component_PrepareBase normalizes a component's node JSON (in place) and
-// returns it as text, to remember as the instance's base.
-Component_PrepareBase :: proc(obj: ^json.Object, ctx: ^GameContext) -> string {
-	normalize_base(obj, ctx)
-	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
-	Json_WriteValue(&w, obj^)
-	return strings.to_string(w.sb)
-}
 
 // Component_ApplyOverrides merges an instance's overrides into the
 // component's node JSON (in place).
@@ -532,20 +644,97 @@ find_node_obj :: proc(root: ^json.Object, path: string) -> ^json.Object {
 	return target
 }
 
+// resolve_path: the node object at an override path, or - when the path
+// goes into a nested instance that isn't expanded (its file is missing) -
+// that link object and the rest of the path inside it ("." = its root;
+// `structural`: a path naming the link itself refers to its children).
+@(private = "file")
+resolve_path :: proc(root: ^json.Object, path: string, structural := false) -> (target: ^json.Object, link: ^json.Object, rest: string) {
+	target = root
+	if path == "." || path == "" do return
+	parts := strings.split(path, "/", context.temp_allocator)
+	for part, n in parts {
+		if _, isLink := target["component"]; isLink && !is_expanded_link(target^) && target != root {
+			return nil, target, strings.join(parts[n:], "/", context.temp_allocator)
+		}
+		arr, has := target["children"].(json.Array)
+		if !has do return nil, nil, ""
+		i := child_index(arr, part)
+		if i < 0 do return nil, nil, ""
+		co, cIsObj := &arr[i].(json.Object)
+		if !cIsObj do return nil, nil, ""
+		target = co
+	}
+	if _, isLink := target["component"]; structural && isLink && !is_expanded_link(target^) do return nil, target, "."
+	return
+}
+
+// link_overrides: an unexpanded link's own "overrides" (created if none);
+// write it back with link["overrides"] = ... after changing it.
+@(private = "file")
+link_overrides :: proc(link: ^json.Object) -> json.Object {
+	ov, _ := link["overrides"].(json.Object)
+	if ov == nil do ov = make(json.Object, 0, context.temp_allocator)
+	return ov
+}
+
+// merge_override_entry merges one override entry into another (the later
+// one wins; nulls are kept: they remove the value from the component).
+@(private = "file")
+merge_override_entry :: proc(target: ^json.Object, ov: json.Object) {
+	for k, v in ov {
+		vo, vIsObj := v.(json.Object)
+		to, tIsObj := target[k].(json.Object)
+		switch {
+		case k == "properties" && vIsObj && tIsObj:
+			for pk, pv in vo do to[pk] = pv
+			target[k] = to
+		case k == "script" && vIsObj && tIsObj:
+			for sk, sv in vo {
+				svo, svIsObj := sv.(json.Object)
+				tpo, tpIsObj := to[sk].(json.Object)
+				if sk == "properties" && svIsObj && tpIsObj {
+					for pk, pv in svo do tpo[pk] = pv
+					to[sk] = tpo
+				} else {
+					to[sk] = sv
+				}
+			}
+			target[k] = to
+		case:
+			target[k] = v
+		}
+	}
+}
+
+// parent_and_last splits "a/b/c" into "a/b" and "c" ("." for the root).
+@(private = "file")
+parent_and_last :: proc(p: string) -> (string, string) {
+	slash := strings.last_index_byte(p, '/')
+	return p[:slash] if slash >= 0 else ".", p[slash + 1:]
+}
+
 Component_ApplyOverrides :: proc(base: ^json.Object, overrides: json.Object) {
 	// Removed nodes first (paths refer to the component's structure).
 	if removed, ok := overrides[OVERRIDE_REMOVED].(json.Array); ok {
 		for rv in removed {
 			path, isStr := rv.(json.String)
 			if !isStr do continue
-			p := string(path)
-			slash := strings.last_index_byte(p, '/')
-			parentPath := p[:slash] if slash >= 0 else "."
-			parent := find_node_obj(base, parentPath)
+			parentPath, last := parent_and_last(string(path))
+			parent, link, rest := resolve_path(base, parentPath, true)
+			if link != nil {
+				lov := link_overrides(link)
+				list, _ := lov[OVERRIDE_REMOVED].(json.Array)
+				if list == nil do list = make(json.Array, context.temp_allocator)
+				append(&list, json.String(join_path(rest, last)))
+				lov[OVERRIDE_REMOVED] = list
+				link["overrides"] = lov
+				continue
+			}
 			if parent == nil do continue
 			kids, has := parent["children"].(json.Array)
 			if !has do continue
-			if i := child_index(kids, p[slash + 1:]); i >= 0 do ordered_remove(&kids, i)
+			if i := child_index(kids, last); i >= 0 do ordered_remove(&kids, i)
 			parent["children"] = kids
 		}
 	}
@@ -553,16 +742,44 @@ Component_ApplyOverrides :: proc(base: ^json.Object, overrides: json.Object) {
 		if path == OVERRIDE_ADDED || path == OVERRIDE_REMOVED || path == OVERRIDE_ORDER do continue
 		ovo, isObj := ov.(json.Object)
 		if !isObj do continue
-		if target := find_node_obj(base, path); target != nil do merge_node(target, ovo)
+		target, link, rest := resolve_path(base, path)
+		if link != nil {
+			lov := link_overrides(link)
+			entry, _ := lov[rest].(json.Object)
+			if entry == nil do entry = make(json.Object, 0, context.temp_allocator)
+			merge_override_entry(&entry, ovo)
+			lov[rest] = entry
+			link["overrides"] = lov
+			continue
+		}
+		if target == nil do continue
+		// (Saved before #79: a nested instance's whole "overrides" object.)
+		if inner, has := ovo["overrides"].(json.Object); has && is_expanded_link(target^) {
+			Component_ApplyOverrides(target, inner)
+			local := make(json.Object, len(ovo), context.temp_allocator)
+			for k, v in ovo do if k != "overrides" do local[k] = v
+			ovo = local
+		}
+		merge_node(target, ovo)
 	}
 	// Added nodes go after the component's children, then $order puts them
 	// (and moved ones) in place.
 	baseCount := make(map[string]int, allocator = context.temp_allocator)
 	if added, ok := overrides[OVERRIDE_ADDED].(json.Object); ok {
 		for parentPath, list in added {
-			parent := find_node_obj(base, parentPath)
+			parent, link, rest := resolve_path(base, parentPath, true)
 			nodes, isArr := list.(json.Array)
-			if parent == nil || !isArr do continue
+			if !isArr do continue
+			if link != nil {
+				lov := link_overrides(link)
+				lad, _ := lov[OVERRIDE_ADDED].(json.Object)
+				if lad == nil do lad = make(json.Object, 0, context.temp_allocator)
+				lad[rest] = list
+				lov[OVERRIDE_ADDED] = lad
+				link["overrides"] = lov
+				continue
+			}
+			if parent == nil do continue
 			kids, _ := parent["children"].(json.Array)
 			if kids == nil do kids = make(json.Array, context.temp_allocator)
 			baseCount[parentPath] = len(kids)
@@ -572,8 +789,17 @@ Component_ApplyOverrides :: proc(base: ^json.Object, overrides: json.Object) {
 	}
 	if order, ok := overrides[OVERRIDE_ORDER].(json.Object); ok {
 		for parentPath, list in order {
-			parent := find_node_obj(base, parentPath)
+			parent, link, rest := resolve_path(base, parentPath, true)
 			segments, isArr := list.(json.Array)
+			if link != nil && isArr {
+				lov := link_overrides(link)
+				lor, _ := lov[OVERRIDE_ORDER].(json.Object)
+				if lor == nil do lor = make(json.Object, 0, context.temp_allocator)
+				lor[rest] = list
+				lov[OVERRIDE_ORDER] = lor
+				link["overrides"] = lov
+				continue
+			}
 			if parent == nil || !isArr do continue
 			kids, _ := parent["children"].(json.Array)
 			nBase, hasAdded := baseCount[parentPath]
@@ -618,13 +844,47 @@ order_children :: proc(kids: json.Array, nBase: int, segments: json.Array) -> js
 
 // Node_HasComponentOverrides: does this node (inside an instance) differ
 // from the component file?
+// The instance holding its overrides is the outermost one whose component
+// contains the node (through nested instances, #79); an instance added to
+// another keeps its own.
 Node_ComponentOverridePath :: proc(manager: ^NodeManager, node: ^Node) -> (root: ^Node, path: string) {
 	root = Node_ComponentRoot(manager, node)
 	if root == nil do return nil, ""
+	for {
+		parent := GetParent(manager, root)
+		outer := Node_ComponentRoot(manager, parent) if parent != nil else nil
+		if outer == nil || !component_nests(outer, node_path_below(manager, root, outer)) do break
+		root = outer
+	}
 	if root == node do return root, "."
+	return root, node_path_below(manager, node, root)
+}
+
+// node_path_below: the override path of `node` from its ancestor `root`.
+@(private = "file")
+node_path_below :: proc(manager: ^NodeManager, node, root: ^Node) -> string {
 	parts := make([dynamic]string, context.temp_allocator)
 	for n := node; n != nil && n != root; n = GetParent(manager, n) do inject_at(&parts, 0, n.uid if n.uid != "" else n.name)
-	return root, strings.join(parts[:], "/", context.temp_allocator)
+	return strings.join(parts[:], "/", context.temp_allocator)
+}
+
+// component_nests: is the node at `path` in instance `outer` a nested
+// instance of its component (expanded in its base), not one added to it?
+@(private = "file")
+component_nests :: proc(outer: ^Node, path: string) -> bool {
+	base: json.Object
+	if outer.componentBase != "" {
+		val, err := json.parse(transmute([]u8)outer.componentBase, allocator = context.temp_allocator)
+		if err != .None do return false
+		base, _ = val.(json.Object)
+	} else {
+		stack := make([dynamic]string, context.temp_allocator)
+		problem: string
+		base, _, problem = Component_Expand(outer.gameContext, outer.componentPath, &stack)
+		if problem != "" do return false
+	}
+	target := find_node_obj(&base, path)
+	return target != nil && is_expanded_link(target^)
 }
 
 // Node_ComponentOverrides returns the override keys of a node inside an
@@ -687,6 +947,27 @@ Scene_RevertComponentOverrides :: proc(scene: ^Scene, node: ^Node, ctx: ^GameCon
 			delete_key(&obj, "overrides")
 		} else {
 			delete_key(&ov, path)
+			// A nested instance: everything inside it too.
+			if node.componentPath != "" {
+				inside := strings.concatenate({path, "/"}, context.temp_allocator)
+				drop :: proc(o: ^json.Object, prefix: string) {
+					keys := make([dynamic]string, context.temp_allocator)
+					for k in o do if strings.has_prefix(k, prefix) do append(&keys, k)
+					for k in keys do delete_key(o, k)
+				}
+				drop(&ov, inside)
+				for key in ([]string{OVERRIDE_ADDED, OVERRIDE_ORDER}) {
+					if sub, ok := ov[key].(json.Object); ok {
+						drop(&sub, inside)
+						ov[key] = sub
+					}
+				}
+				if removed, ok := ov[OVERRIDE_REMOVED].(json.Array); ok {
+					kept := make(json.Array, 0, context.temp_allocator)
+					for rv in removed do if p, _ := rv.(json.String); !strings.has_prefix(string(p), inside) do append(&kept, rv)
+					ov[OVERRIDE_REMOVED] = kept
+				}
+			}
 			// ...and the children added under / removed from this node.
 			if added, ok := ov[OVERRIDE_ADDED].(json.Object); ok {
 				delete_key(&added, path)
@@ -754,10 +1035,11 @@ Component_InstanceJSON :: proc(node: ^Node, manager: ^NodeManager, allocator := 
 
 	prevNode, prevUid := serializeRootUidNode, serializeRootUid
 	serializeRootUidNode, serializeRootUid = node, rootUid
-	prev := serializeFullInstance
-	serializeFullInstance = node
+	// (Nested instances are written as links: their overrides baked in.)
+	prev, prevExpand := serializeFullInstance, serializeExpandNested
+	serializeFullInstance, serializeExpandNested = node, false
 	defer {
-		serializeFullInstance = prev
+		serializeFullInstance, serializeExpandNested = prev, prevExpand
 		serializeRootUidNode, serializeRootUid = prevNode, prevUid
 	}
 	return Node_SerializeToJSON(node, manager, allocator)
