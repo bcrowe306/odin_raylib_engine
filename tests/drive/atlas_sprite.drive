@@ -17,8 +17,20 @@ expect node:AtlasSprite.type == AtlasSpriteNode
 click @insp.texture
 click @pick:textures/Asteroid_2.png
 
-# Open visual region editor dialog
+# Open visual region editor dialog and drag on the canvas without moving the floating window
 click @insp.atlas.edit
+expect atlas.open == true
+drag @atlas.canvas+-30,-30 @atlas.canvas+30,30
+expect atlas.win-moved == false
+expect atlas.region != 0,0,96,96
+dblclick @atlas.x
+key ctrl+a
+type 0
+key enter
+dblclick @atlas.y
+key ctrl+a
+type 0
+key enter
 dblclick @atlas.w
 key ctrl+a
 type 48
@@ -29,7 +41,10 @@ type 48
 key enter
 click @atlas.apply
 
-# Save scene and verify serialized region
+# Undo/redo and save scene: verify no bogus child Sprite TextureNode is created
+key ctrl+z
+key ctrl+y
+expect node:AtlasSprite.children == 0
 key ctrl+s
 expect file:scenes/main.scene.json contains "AtlasSpriteNode"
 expect file:scenes/main.scene.json contains "region": [
