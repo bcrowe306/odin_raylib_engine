@@ -960,6 +960,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		if n == nil do return "<no node>", true
 		switch field {
 		case "type": return e.Node_TypeName(n), true
+		case "component": return n.componentPath, true // its component file ("" = not an instance root)
+		case "component-missing": return "true" if n.componentMissing else "false", true
 		case "parent":
 			p := e.GetParent(state.activeScene.manager, n)
 			return p.name if p != nil else "", true
