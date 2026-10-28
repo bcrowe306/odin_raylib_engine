@@ -100,3 +100,40 @@ test_component_missing_file_keeps_instance :: proc(t: ^testing.T) {
 	l2 := Scene_FindNodeByName(back, "Lid")
 	testing.expect(t, l2 != nil && l2.position == {0, -99}, "its override applies")
 }
+
+// #75: components that contain each other (A -> B -> A) are found, and
+// loading one doesn't build a deep broken tree: the instance that closes
+// the loop is a placeholder (its link kept) with a clear reason.
+@(test)
+test_component_loops :: proc(t: ^testing.T) {
+	defer os.remove_all(SAFETY_DIR)
+	game := safety_game()
+	defer game->terminate()
+	defer Component_ClearCaches()
+	a :: SAFETY_DIR + "/components/a.component.json"
+	b :: SAFETY_DIR + "/components/b.component.json"
+	c :: SAFETY_DIR + "/components/c.component.json"
+	_ = os.write_entire_file(a, transmute([]u8)string(`{"type": "Node", "name": "A", "children": [{"type": "Node", "name": "B", "component": "components/b.component.json"}]}`))
+	_ = os.write_entire_file(b, transmute([]u8)string(`{"type": "Node", "name": "B", "children": [{"type": "Node", "name": "Inner", "children": [{"type": "Node", "name": "A", "component": "components/a.component.json"}]}]}`))
+	_ = os.write_entire_file(c, transmute([]u8)string(`{"type": "Node", "name": "C", "children": [{"type": "Node", "name": "Crate", "component": "components/crate.component.json"}]}`))
+	ctx := &game.gameContext
+
+	testing.expect(t, Component_Contains(ctx, "components/a.component.json", "components/b.component.json"), "A contains B")
+	testing.expect(t, Component_Contains(ctx, "components/a.component.json", "components/a.component.json"), "A contains A (through B)")
+	testing.expect(t, Component_Contains(ctx, "components/c.component.json", "components/crate.component.json"), "C contains Crate")
+	testing.expect(t, !Component_Contains(ctx, "components/c.component.json", "components/a.component.json"), "C doesn't contain A")
+	testing.expect(t, !Component_Contains(ctx, "components/crate.component.json", "components/c.component.json"), "Crate doesn't contain C")
+
+	scene := game->createScene("loops", true)
+	inst := Scene_InstantiateComponent(scene, "components/a.component.json", nil, ctx)
+	testing.expect(t, inst != nil, "A loads")
+	ProcessNodeQueues(scene.manager, ctx)
+	count := 0
+	for n in scene.manager.nodes do if n != nil do count += 1
+	// root, A, B, Inner, and the placeholder for the inner A: no deeper.
+	testing.expectf(t, count == 5, "one level of the loop, not 8 (%d nodes)", count)
+	ph: ^Node
+	for n in scene.manager.nodes do if n != nil && n.componentMissing do ph = n
+	testing.expect(t, ph != nil && ph.componentPath == "components/a.component.json", "the inner A is a placeholder that keeps its link")
+	testing.expect(t, ph != nil && strings.contains(ph.componentProblem, "contains itself"), "with the reason")
+}

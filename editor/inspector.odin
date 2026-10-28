@@ -129,7 +129,7 @@ inspector_body :: proc(state: ^EditorState) {
 			imgui.PopStyleColor()
 			if compRoot.componentMissing {
 				imgui.PushStyleColorImVec4(.Text, UI_DANGER)
-				imgui.TextWrapped("%s", fmt.ctprintf("%s  The component file is missing. This placeholder keeps the instance's link and overrides; restore the file (or rename it back) and reopen the scene.", ICON_FA_TRIANGLE_EXCLAMATION))
+				imgui.TextWrapped("%s", fmt.ctprintf("%s  Can't load the component: %s. This placeholder keeps the instance's link and overrides; fix the file and reopen the scene.", ICON_FA_TRIANGLE_EXCLAMATION, compRoot.componentProblem if compRoot.componentProblem != "" else "the file is missing"))
 				imgui.PopStyleColor()
 				Drive_Item("insp.component-missing")
 			} else {
