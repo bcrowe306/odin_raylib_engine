@@ -228,7 +228,8 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 benchmark:
 
 - **engine** (no window): `bench_scene_hot_paths`, `bench_particles`,
-  `bench_scripts`, `bench_navigation` (`engine/perf_bench_test.odin`).
+  `bench_scripts`, `bench_navigation` (`engine/perf_bench_test.odin`),
+  `bench_components` (`engine/component_bench_test.odin`).
 - **rendering**: the runner's `--bench 300` (30 warm-up frames, then 300
   uncapped: no vsync, no frame cap) on the scenes of
   `scripts/make_bench_project.py`, with and without the render caches.
@@ -286,6 +287,21 @@ down, so those CPU times read high too.
 | Size | 251 KB | 1006 KB | 2518 KB |
 | Serialize (save, undo snapshot) | 2.4 ms | 8.6 ms | 21.7 ms |
 | Load (open, undo restore) | 4.0 ms | 15.8 ms | 41.0 ms |
+
+`bench_components` (`engine/component_bench_test.odin`): instances of a
+12-node component nesting a 3-node one, before / after the prepared
+component cache (#80, 2026-10-28):
+
+| Component instances | 10 | 100 | 1000 | 1000 in a game (no bases) |
+|---|---|---|---|---|
+| Instantiate | 2.1 / 1.8 ms | 14.8 / 9.8 ms | 131 / 88 ms | 82 ms |
+| Save (undo snapshot) | 1.3 ms | 10.1 ms | 96 ms | 127 ms |
+| Load | 1.7 / 1.1 ms | 14.5 / 9.3 ms | 136 / 91 ms | 90 ms |
+| `componentBase` kept | 20 KB | 206 KB | 2066 KB | 0 |
+
+Saving diffs every instance in full (about 10x a plain scene of the same
+size), and without a base it reads the file again - the editor keeps
+bases for that; games rarely save scenes.
 
 | Simulation | Per frame |
 |---|---|

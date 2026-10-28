@@ -7,6 +7,8 @@ import "core:math"
 import "core:math/rand"
 import "core:slice"
 import "core:strings"
+import "core:time"
+import os "osx"
 
 // ============================================================================
 // Per-node overrides for linked component (prefab) instances.
@@ -365,11 +367,125 @@ component_base_json :: proc(ctx: ^GameContext, compPath: string) -> (json.Object
 // in stored base text.
 COMPONENT_EXPANDED :: "$expanded"
 
+// Component_KeepBases: instances remember the component JSON they were
+// built from (componentBase), to diff against it after the file changes -
+// the editor. A game (Engine_RunProject) turns it off: its files don't
+// change while it runs, so overrides are diffed against the file (#80).
+Component_KeepBases := true
+
+// --- prepared components cache (#80) -----------------------------------------------
+// Expanding a component (read, parse, normalize, expand what it nests) is
+// done once per path; instances are built from a parse of the cached text.
+// An entry lists every file it read (the component and what it nests, also
+// missing ones) with its size and time, and is dropped when one differs;
+// writers that may write twice within the time resolution call
+// Component_ForgetPrepared.
+
+@(private = "file")
+Prepared_Dep :: struct {
+	path:   string,
+	exists: bool,
+	size:   i64,
+	mod:    time.Time,
+}
+
+@(private = "file")
+Prepared :: struct {
+	text: string, // the expanded tree (nested base texts under their markers)
+	base: string,
+	deps: []Prepared_Dep,
+}
+
+@(private = "file")
+preparedCache: map[string]Prepared
+// The files read by the expansion being cached (nil: not caching).
+@(private = "file")
+preparedDeps: ^[dynamic]string
+
+// Component_ForgetPrepared drops every prepared component (a component file
+// was written).
+Component_ForgetPrepared :: proc() {
+	heap := runtime_heap()
+	for k, p in preparedCache {
+		delete(k, heap)
+		delete(p.text, heap)
+		delete(p.base, heap)
+		for d in p.deps do delete(d.path, heap)
+		delete(p.deps, heap)
+	}
+	delete(preparedCache)
+	preparedCache = nil
+}
+
+// Component_PreparedCount: how many prepared components are cached.
+Component_PreparedCount :: proc() -> int {
+	return len(preparedCache)
+}
+
+@(private = "file")
+prepared_dep :: proc(ctx: ^GameContext, path: string) -> Prepared_Dep {
+	d := Prepared_Dep{path = path}
+	disk := path
+	if ctx != nil && ctx.game != nil {
+		// (Files in a mounted .rayzr don't change.)
+		if ctx.game.assetManager.package_ != nil && RayzrPackage_HasFile(ctx.game.assetManager.package_, path) {
+			d.exists = true
+			return d
+		}
+		disk = AssetManager_ResolveDiskPath(&ctx.game.assetManager, path)
+	}
+	if info, err := os.stat(disk, context.temp_allocator); err == nil {
+		d.exists, d.size, d.mod = true, info.size, info.modification_time
+	}
+	return d
+}
+
 // Component_Expand: the component file's node JSON, normalized, its nested
 // instances expanded; and its base text (what instances diff against).
 // `stack`: the components being expanded / built around it (loops: #75).
+// Outside any other component (an empty stack) it comes from the cache.
 @(private)
 Component_Expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]string) -> (obj: json.Object, baseText: string, problem: string) {
+	if len(stack) > 0 || preparedDeps != nil do return component_expand(ctx, compPath, stack)
+	if p, cached := preparedCache[compPath]; cached {
+		fresh := true
+		for d in p.deps {
+			now := prepared_dep(ctx, d.path)
+			if now.exists != d.exists || now.size != d.size || now.mod != d.mod {fresh = false; break}
+		}
+		if fresh {
+			val, err := json.parse(transmute([]u8)p.text, allocator = context.temp_allocator)
+			if o, isObj := val.(json.Object); err == .None && isObj do return o, p.base, ""
+		}
+		heap := runtime_heap()
+		key, _ := delete_key(&preparedCache, compPath)
+		delete(key, heap)
+		delete(p.text, heap)
+		delete(p.base, heap)
+		for d in p.deps do delete(d.path, heap)
+		delete(p.deps, heap)
+	}
+	deps := make([dynamic]string, context.temp_allocator)
+	preparedDeps = &deps
+	obj, baseText, problem = component_expand(ctx, compPath, stack)
+	preparedDeps = nil
+	if problem != "" do return // (a missing / broken file isn't cached: it may come back)
+	heap := runtime_heap()
+	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	json_write_value(&w, obj, false)
+	entry := Prepared{text = strings.clone(strings.to_string(w.sb), heap), base = strings.clone(baseText, heap), deps = make([]Prepared_Dep, len(deps), heap)}
+	for path, i in deps {
+		entry.deps[i] = prepared_dep(ctx, path)
+		entry.deps[i].path = strings.clone(path, heap)
+	}
+	if preparedCache == nil do preparedCache = make(map[string]Prepared, 16, heap)
+	preparedCache[strings.clone(compPath, heap)] = entry
+	return
+}
+
+@(private = "file")
+component_expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]string) -> (obj: json.Object, baseText: string, problem: string) {
+	if preparedDeps != nil do append(preparedDeps, compPath)
 	for p in stack do if p == compPath {
 		chain := make([dynamic]string, context.temp_allocator)
 		append(&chain, ..stack[:])
@@ -408,7 +524,7 @@ expand_links :: proc(ctx: ^GameContext, obj: ^json.Object, stack: ^[dynamic]stri
 			expand_links(ctx, co, stack)
 			continue
 		}
-		nested, nestedBase, problem := Component_Expand(ctx, string(path), stack)
+		nested, nestedBase, problem := component_expand(ctx, string(path), stack)
 		if problem != "" do continue
 		if ov, hasOv := co["overrides"].(json.Object); hasOv do Component_ApplyOverrides(&nested, ov)
 		// The link's keys on top (an instance's own lock / hide flags only).
@@ -1008,6 +1124,7 @@ Component_ClearCaches :: proc() {
 	}
 	delete(typeDefaults)
 	typeDefaults = nil
+	Component_ForgetPrepared()
 }
 
 // Component_InstanceJSON: an instance's whole subtree as a component file
