@@ -85,6 +85,12 @@ Prompt_Render :: proc(state: ^EditorState) {
 		if filepath.stem(filepath.stem(rel)) != Component_SafeName(text) do UI_DimText(fmt.tprintf("%s exists - creates %s", Component_SafeName(text), rel))
 		else do UI_DimText(rel)
 		Drive_Item("prompt.component-path")
+	} else if prompt.kind == .RenameAsset && text != "" && Asset_PendingRename() != "" {
+		full, _ := filepath.join({state.projectPath, Asset_PendingRename()}, context.temp_allocator)
+		normalized := Asset_NormalizedRename(Asset_PendingRename(), text, os.is_dir(full))
+		if normalized != text {
+			UI_DimText(fmt.tprintf("-> %s", normalized))
+		}
 	}
 	imgui.Dummy({0, 6})
 	if (enter || UI_PrimaryButton("OK", "prompt.ok", {96, 0})) && text != "" {
@@ -98,8 +104,7 @@ Prompt_Render :: proc(state: ^EditorState) {
 
 @(private = "file")
 with_suffix :: proc(text, dir, suffix: string) -> string {
-	t := text
-	if !strings.has_suffix(t, suffix) do t = strings.concatenate({t, suffix}, context.temp_allocator)
+	t := Asset_EnsureSuffix(text, suffix)
 	if !strings.contains(t, "/") do t = strings.concatenate({dir, "/", t}, context.temp_allocator)
 	return t
 }

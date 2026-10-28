@@ -33,6 +33,10 @@ Asset_BeginRename :: proc(rel: string) {
 	Prompt_Open(.RenameAsset, filepath.base(rel))
 }
 
+Asset_PendingRename :: proc() -> string {
+	return pendingRename
+}
+
 Asset_BeginDelete :: proc(rel: string) {
 	delete(pendingDelete)
 	pendingDelete = strings.clone(rel)
@@ -411,18 +415,73 @@ Asset_FolderContextMenu :: proc(state: ^EditorState, title: string) {
 
 // --- file operations ---------------------------------------------------------------
 
+// Asset_SuffixOf returns the canonical compound suffix (".scene.json",
+// ".component.json", ".resource.json") or file extension (".lua", ".png", ...)
+// of `path`.
+Asset_SuffixOf :: proc(path: string) -> string {
+	base := filepath.base(path)
+	lower := strings.to_lower(base, context.temp_allocator)
+	for suffix in ([]string{".scene.json", ".component.json", e.RESOURCE_EXT}) {
+		if strings.has_suffix(lower, suffix) do return suffix
+	}
+	return filepath.ext(base)
+}
+
+// Asset_EnsureSuffix strips any partial or duplicate suffix (e.g. ".scene",
+// ".json", or ".scene.json" when `suffix` is ".scene.json") and appends
+// `suffix` so forgetting part or all of the suffix never drops the asset type.
+Asset_EnsureSuffix :: proc(name, suffix: string) -> string {
+	t := strings.trim_right(strings.trim_space(name), ".")
+	if t == "" || suffix == "" do return t
+	lowerSuffix := strings.to_lower(suffix, context.temp_allocator)
+	lower := strings.to_lower(t, context.temp_allocator)
+	if strings.has_suffix(lower, lowerSuffix) {
+		t = strings.trim_right(t[:len(t) - len(suffix)], ".")
+	} else {
+		innerExt := filepath.ext(suffix)
+		midExt := suffix[:len(suffix) - len(innerExt)]
+		if midExt != "" {
+			lowerMid := strings.to_lower(midExt, context.temp_allocator)
+			lowerInner := strings.to_lower(innerExt, context.temp_allocator)
+			if strings.has_suffix(lower, lowerInner) {
+				t = strings.trim_right(t[:len(t) - len(innerExt)], ".")
+				lower = strings.to_lower(t, context.temp_allocator)
+			}
+			if strings.has_suffix(lower, lowerMid) {
+				t = strings.trim_right(t[:len(t) - len(midExt)], ".")
+			}
+		}
+	}
+	if t == "" do return ""
+	return strings.concatenate({t, suffix}, context.temp_allocator)
+}
+
+// Asset_NormalizedRename returns `newName` with the appropriate compound
+// suffix or file extension preserved from `oldRel` (unless `isFolder` is true).
+Asset_NormalizedRename :: proc(oldRel, newName: string, isFolder := false) -> string {
+	trimmed := strings.trim_space(newName)
+	if isFolder || trimmed == "" do return trimmed
+	suffix := Asset_SuffixOf(oldRel)
+	if suffix == "" do return trimmed
+	if suffix == ".scene.json" || suffix == ".component.json" || suffix == e.RESOURCE_EXT {
+		return Asset_EnsureSuffix(trimmed, suffix)
+	}
+	clean := strings.trim_right(trimmed, ".")
+	if clean == "" do return ""
+	oldKind := Asset_KindOf(oldRel)
+	if oldKind != .Other {
+		if Asset_KindOf(clean) == oldKind do return clean
+		return Asset_EnsureSuffix(clean, suffix)
+	}
+	if filepath.ext(clean) != "" do return clean
+	return Asset_EnsureSuffix(clean, suffix)
+}
+
 @(private = "file")
 unique_copy_name :: proc(state: ^EditorState, dir, base: string) -> string {
 	// "ship.png" -> "ship_copy.png", "ship_copy_2.png", ...
-	ext := ""
-	stem := base
-	for suffix in ([]string{".scene.json", ".component.json"}) {
-		if strings.has_suffix(base, suffix) {ext = suffix; stem = base[:len(base) - len(suffix)]}
-	}
-	if ext == "" {
-		ext = filepath.ext(base)
-		stem = base[:len(base) - len(ext)]
-	}
+	ext := Asset_SuffixOf(base)
+	stem := base[:len(base) - len(ext)]
 	for i := 1; ; i += 1 {
 		name := fmt.tprintf("%s_copy%s", stem, ext) if i == 1 else fmt.tprintf("%s_copy_%d%s", stem, i, ext)
 		rel, _ := filepath.join({dir, name}, context.temp_allocator)
@@ -463,7 +522,10 @@ Asset_Paste :: proc(state: ^EditorState, toDir: string) {
 }
 
 Asset_Rename :: proc(state: ^EditorState, rel, newName: string) -> bool {
-	dst, _ := filepath.join({filepath.dir(rel, context.temp_allocator), newName}, context.temp_allocator)
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	normalized := Asset_NormalizedRename(rel, newName, os.is_dir(full))
+	if normalized == "" do return false
+	dst, _ := filepath.join({filepath.dir(rel, context.temp_allocator), normalized}, context.temp_allocator)
 	return Asset_Move(state, rel, dst) // references follow (asset_refs.odin)
 }
 

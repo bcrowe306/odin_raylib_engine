@@ -92,6 +92,27 @@ click @ctx:delete-asset
 click @delete.ok
 expect item:asset:scripts/rock.lua == missing
 
+# Issue #70: renaming a scene without .scene.json or .json preserves its compound suffix
+rclick @asset:scenes/main.scene.json
+click @ctx:duplicate-asset
+expect item:asset:scenes/main_copy.scene.json == visible
+rclick @asset:scenes/main_copy.scene.json
+click @ctx:rename-asset
+key ctrl+a
+type sector_two
+key enter
+expect item:asset:scenes/sector_two.scene.json == visible
+rclick @asset:scenes/sector_two.scene.json
+click @ctx:rename-asset
+key ctrl+a
+type sector_three.scene
+key enter
+expect item:asset:scenes/sector_three.scene.json == visible
+rclick @asset:scenes/sector_three.scene.json
+click @ctx:delete-asset
+click @delete.ok
+expect item:asset:scenes/sector_three.scene.json == missing
+
 # --- context menus: scene tree copy / paste as child ---
 rclick @hier:Asteroid_Gamma
 click @ctx:copy

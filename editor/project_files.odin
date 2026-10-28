@@ -43,6 +43,25 @@ Editor_InvalidateProjectFiles :: proc() {
 	projectFiles.packagesValid = false
 }
 
+ProjectFiles_Shutdown :: proc() {
+	delete(projectFiles.root)
+	projectFiles.root = ""
+	for f in projectFiles.files do delete(f)
+	delete(projectFiles.files)
+	projectFiles.files = nil
+	for d in projectFiles.dirs do delete(d)
+	delete(projectFiles.dirs)
+	projectFiles.dirs = nil
+	for r in projectFiles.retired do delete(r)
+	delete(projectFiles.retired)
+	projectFiles.retired = nil
+	for p in projectFiles.packages do delete(p)
+	delete(projectFiles.packages)
+	projectFiles.packages = nil
+	projectFiles.valid = false
+	projectFiles.packagesValid = false
+}
+
 // Editor_ParentPackages: the .rayzr files in the project's parent folder.
 Editor_ParentPackages :: proc(state: ^EditorState) -> []string {
 	if state.projectPath == "" do return nil
@@ -62,7 +81,7 @@ Editor_ParentPackages :: proc(state: ^EditorState) -> []string {
 
 @(private = "file")
 scan_project :: proc(root: string) {
-	if frame := imgui.GetFrameCount(); frame != projectFiles.retiredFrame {
+	if frame := (imgui.GetFrameCount() if imgui.GetCurrentContext() != nil else 0); frame != projectFiles.retiredFrame {
 		for r in projectFiles.retired do delete(r)
 		clear(&projectFiles.retired)
 		projectFiles.retiredFrame = frame
