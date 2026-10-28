@@ -1,0 +1,28 @@
+# #75: a component can't contain itself through another one. B contains an
+# instance of A; adding B inside A's document is refused, with a message.
+wait 5
+click @hier:PlayerShip
+rclick @hier:PlayerShip
+click @ctx:save-component
+click @hier:Asteroid_Beta
+rclick @hier:Asteroid_Beta
+click @ctx:save-component
+expect file:components/Asteroid_Beta.component.json contains Asteroid_Beta
+
+# B (Asteroid_Beta) gets an instance of A (PlayerShip).
+rclick @asset:components/Asteroid_Beta.component.json
+click @ctx:edit-component
+expect scene == components/Asteroid_Beta.component.json
+dblclick @asset:components/PlayerShip.component.json
+key ctrl+s
+expect file:components/Asteroid_Beta.component.json contains "component": "components/PlayerShip.component.json"
+
+# A's document: adding B would make A contain itself.
+rclick @asset:components/PlayerShip.component.json
+click @ctx:edit-component
+expect scene == components/PlayerShip.component.json
+dblclick @asset:components/Asteroid_Beta.component.json
+wait 2
+expect log contains Asteroid_Beta.component.json can't go inside PlayerShip.component.json: it would contain itself
+expect node:Asteroid_Beta.exists == false
+screenshot refused

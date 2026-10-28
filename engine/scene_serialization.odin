@@ -849,14 +849,18 @@ load_texture_into :: proc(tn: ^TextureNode, path: string, ctx: ^GameContext) {
 
 @(private = "file")
 componentDepth: int
+// The components being built, outermost first (loops: #75).
+@(private = "file")
+componentStack: [16]string
 
 @(private = "file")
 read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameContext) -> ^Node {
 	// Linked component instance: build the subtree from the component file,
 	// then apply the instance's own name and transform.
 	if compPath := sj_string(obj, "component", ""); compPath != "" {
-		if inst := read_component_instance(scene, compPath, obj, parent, ctx); inst != nil do return inst
-		return read_missing_component(scene, compPath, obj, parent, ctx)
+		inst, problem := read_component_instance(scene, compPath, obj, parent, ctx)
+		if inst != nil do return inst
+		return read_missing_component(scene, compPath, obj, parent, ctx, problem)
 	}
 	typeStr := sj_string(obj, "type", "Node")
 	node := Node_CreateByTypeName(scene, typeStr, parent)
@@ -1510,27 +1514,26 @@ Component_ReadFile :: proc(ctx: ^GameContext, compPath: string) -> ([]byte, bool
 }
 
 @(private = "file")
-read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Object, parent: ^Node, ctx: ^GameContext) -> ^Node {
-	if componentDepth > 8 {
-		log.errorf("[SceneLoader] Component '%s' nests too deep (recursive?)", compPath)
-		return nil
+read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Object, parent: ^Node, ctx: ^GameContext) -> (^Node, string) {
+	// A component inside itself (A -> B -> A): the inner one isn't built (#75).
+	for p in componentStack[:componentDepth] do if p == compPath {
+		return nil, fmt.tprintf("the component contains itself (%s)", strings.join(componentStack[:componentDepth], " -> ", context.temp_allocator))
 	}
+	if componentDepth >= len(componentStack) do return nil, "components nest too deep"
 	data, ok := Component_ReadFile(ctx, compPath)
-	if !ok do return nil // (the caller keeps a placeholder and warns)
+	if !ok do return nil, "the component file is missing"
 	val, err := json.parse(data, allocator = context.temp_allocator)
-	if err != .None {
-		log.warnf("[SceneLoader] Component %s is not valid JSON (%v)", compPath, err)
-		return nil
-	}
+	if err != .None do return nil, fmt.tprintf("the component file is not valid JSON (%v)", err)
 	obj, isObj := val.(json.Object)
-	if !isObj do return nil
+	if !isObj do return nil, "the component file is not a node"
 	if inner, has := sj_obj(obj, "node"); has do obj = inner
 	baseText := Component_PrepareBase(&obj, ctx)
 	if ov, has := sj_obj(inst, "overrides"); has do Component_ApplyOverrides(&obj, ov)
+	componentStack[componentDepth] = compPath
 	componentDepth += 1
 	node := read_node(scene, obj, parent, ctx)
 	componentDepth -= 1
-	if node == nil do return nil
+	if node == nil do return nil, "its root node could not be created"
 	node.componentPath = strings.clone(compPath, node.allocator)
 	node.componentBase = strings.clone(baseText, node.allocator)
 	node.name = strings.clone(sj_string(inst, "name", node.name), node.allocator)
@@ -1551,7 +1554,7 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.editorHidden = sj_bool(inst, "editor_hidden", false)
 	if "tags" in inst do read_tags(node, inst)
 	if sj_obj_has(inst, "connections") do read_connections(node, inst)
-	return node
+	return node, ""
 }
 
 // read_missing_component: an instance whose component file can't be loaded
@@ -1559,7 +1562,7 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 // name, transform and connections, keeping its link and its overrides
 // (raw JSON) so saving the scene writes them back unchanged (#72).
 @(private = "file")
-read_missing_component :: proc(scene: ^Scene, compPath: string, obj: json.Object, parent: ^Node, ctx: ^GameContext) -> ^Node {
+read_missing_component :: proc(scene: ^Scene, compPath: string, obj: json.Object, parent: ^Node, ctx: ^GameContext, problem: string) -> ^Node {
 	plain := make(json.Object, len(obj), context.temp_allocator)
 	for k, v in obj do if k != "component" && k != "overrides" && k != "children" do plain[k] = v
 	node := read_node(scene, plain, parent, ctx)
@@ -1571,15 +1574,53 @@ read_missing_component :: proc(scene: ^Scene, compPath: string, obj: json.Object
 		Json_WriteValue(&w, ov)
 		node.componentRawOverrides = strings.clone(strings.to_string(w.sb), node.allocator)
 	}
-	log.warnf("[SceneLoader] %s: component %s is missing - kept as a placeholder (its link and overrides are saved unchanged)", node.name, compPath)
+	node.componentProblem = strings.clone(problem, node.allocator)
+	log.warnf("[SceneLoader] %s: component %s can't be loaded: %s - kept as a placeholder (its link and overrides are saved unchanged)", node.name, compPath, problem)
 	return node
+}
+
+// Component_Contains: does component `compPath` contain an instance of
+// `target` - directly or through components it contains? (Instances that
+// would contain themselves are refused: #75.)
+Component_Contains :: proc(ctx: ^GameContext, compPath, target: string) -> bool {
+	visited := make(map[string]bool, allocator = context.temp_allocator)
+	return component_contains(ctx, compPath, target, &visited)
+}
+
+@(private = "file")
+component_contains :: proc(ctx: ^GameContext, compPath, target: string, visited: ^map[string]bool) -> bool {
+	if compPath in visited do return false
+	visited[compPath] = true
+	data, ok := Component_ReadFile(ctx, compPath)
+	if !ok do return false
+	val, err := json.parse(data, allocator = context.temp_allocator)
+	if err != .None do return false
+	links := make([dynamic]string, context.temp_allocator)
+	collect :: proc(v: json.Value, links: ^[dynamic]string) {
+		obj, isObj := v.(json.Object)
+		if !isObj do return
+		if inner, has := obj["node"].(json.Object); has do collect(inner, links)
+		if c, has := obj["component"].(json.String); has && c != "" do append(links, string(c))
+		// (Children added to nested instances live in their overrides.)
+		if ov, has := obj["overrides"].(json.Object); has {
+			if added, ok := ov[OVERRIDE_ADDED].(json.Object); ok do for _, list in added do if arr, isArr := list.(json.Array); isArr do for n in arr do collect(n, links)
+		}
+		if kids, has := obj["children"].(json.Array); has do for k in kids do collect(k, links)
+	}
+	collect(val, &links)
+	for l in links {
+		if l == target do return true
+		if component_contains(ctx, l, target, visited) do return true
+	}
+	return false
 }
 
 // Scene_InstantiateComponent adds a linked instance of a component file.
 Scene_InstantiateComponent :: proc(scene: ^Scene, compPath: string, parent: ^Node, ctx: ^GameContext) -> ^Node {
 	inst := make(json.Object, 0, context.temp_allocator)
 	target := parent if parent != nil else scene.rootNode
-	return read_component_instance(scene, compPath, inst, target, ctx)
+	node, _ := read_component_instance(scene, compPath, inst, target, ctx)
+	return node
 }
 
 // Scene_RefreshComponentInstances rebuilds every linked instance of a
