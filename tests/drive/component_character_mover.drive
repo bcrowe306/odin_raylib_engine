@@ -1,0 +1,26 @@
+# Issue #50: saving a Character Mover (with a child) as a component crashed
+# the editor (SIGSEGV in CharacterMoverNode_Create) once a node had been
+# deleted from the scene - its free slot was read as a node.
+wait 5
+# A deleted node leaves a free slot in the scene.
+click @hier:Asteroid_Delta
+key delete
+expect node:Asteroid_Delta.exists == false
+# A Character Mover with a child.
+click @hier.add
+type character mover
+click @addnode.create
+expect node:CharacterMover.type == CharacterMoverNode
+key ctrl+a
+type particle
+key enter
+expect node:ParticleEmitter.parent == CharacterMover
+# Save it as a component: the subtree is rebuilt as an instance.
+click @hier:CharacterMover
+rclick @hier:CharacterMover
+click @ctx:save-component
+expect file:components/CharacterMover.component.json contains "CharacterMoverNode"
+expect file:components/CharacterMover.component.json contains "ParticleEmitter"
+expect node:CharacterMover.type == CharacterMoverNode
+expect node:CharacterMover.children == 1
+screenshot saved_as_component
