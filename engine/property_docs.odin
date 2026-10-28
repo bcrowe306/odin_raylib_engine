@@ -296,6 +296,9 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 
 	// --- Bodies, areas, rays ---
 	{"StaticBodyNode.oneWay", "Jump-through platform: bodies pass from below and land on top."},
+	{"KinematicBodyNode.linearVelocity", "Velocity (px/s)."},
+	{"KinematicBodyNode.angularVelocity", "Spin (degrees/s)."},
+	{"KinematicBodyNode.oneWay", "Jump-through platform: bodies pass from below and land on top."},
 	{"DynamicBodyNode.linearVelocity", "Velocity (px/s)."},
 	{"DynamicBodyNode.angularVelocity", "Spin (degrees/s)."},
 	{"DynamicBodyNode.linearDamping", "Slows movement over time (air drag)."},
@@ -321,10 +324,12 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"CharacterMoverNode.playerIndex", "Player whose actions drive this mover (1..4; 0 = none / NPC / AI)."},
 	{"CharacterMoverNode.isGrounded", "Standing on something now."},
 	{"CharacterMoverNode.controlMode", "Built-in movement, or Script: the script moves it (character_move_and_slide)."},
+	{"AreaNode.monitoring", "Detect overlapping bodies and emit body_entered / body_exited events."},
 	{"AreaNode.overlapCount", "Bodies overlapping now."},
 	{"AreaNode.hasOverlaps", "Anything overlapping now."},
 	{"AreaNode.debugColor", "Outline colour when nothing overlaps."},
 	{"AreaNode.activeColor", "Outline colour while something overlaps."},
+	{"RaycastNode.monitoring", "Cast the ray each frame and emit hit_started / hit_ended events."},
 	{"RaycastNode.direction", "Direction of the ray (rotated with the node)."},
 	{"RaycastNode.length", "Length of the ray (px)."},
 	{"RaycastNode.collideWithSensors", "Sensor shapes (areas) also stop the ray."},

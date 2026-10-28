@@ -291,6 +291,20 @@
       ]
     },
     {
+      "type": "KinematicBodyNode",
+      "name": "Kinematic Platform",
+      "category": "Physics & Collision",
+      "description": "Kinematic physics body moved by velocity or transform (moving platforms, elevators, doors) that carries characters and pushes dynamic bodies without being pushed back.",
+      "aliases": ["kinematicbody", "kinematic_body", "kinematicphysics", "kinematic_physics"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "linearVelocity", "kind": "vec2", "owner": "KinematicBodyNode", "default": [0, 0], "min": -1000, "max": 1000, "doc": "Velocity (px/s)."},
+        {"name": "angularVelocity", "kind": "number", "owner": "KinematicBodyNode", "default": 0, "min": -360, "max": 360, "doc": "Spin (degrees/s)."},
+        {"name": "oneWay", "kind": "boolean", "owner": "KinematicBodyNode", "default": false, "doc": "Jump-through platform: bodies pass from below and land on top."},
+        {"name": "debugColor", "kind": "color", "owner": "KinematicBodyNode", "default": "#38bdf8ff", "doc": "Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug draw)."}
+      ]
+    },
+    {
       "type": "CharacterMoverNode",
       "name": "Character Mover",
       "category": "Physics & Collision",
@@ -325,6 +339,7 @@
       "aliases": ["area"],
       "hasOrigin": false,
       "properties": [
+        {"name": "monitoring", "kind": "boolean", "owner": "AreaNode", "default": true, "doc": "Detect overlapping bodies and emit body_entered / body_exited events."},
         {"name": "overlapCount", "kind": "integer", "owner": "AreaNode", "default": 0, "min": 0, "max": 100, "runtime": true, "doc": "Bodies overlapping now."},
         {"name": "hasOverlaps", "kind": "boolean", "owner": "AreaNode", "default": false, "runtime": true, "doc": "Anything overlapping now."},
         {"name": "debugColor", "kind": "color", "owner": "AreaNode", "default": "#a855f7ff", "doc": "Outline colour when nothing overlaps."},
@@ -339,6 +354,7 @@
       "aliases": ["raycast"],
       "hasOrigin": false,
       "properties": [
+        {"name": "monitoring", "kind": "boolean", "owner": "RaycastNode", "default": true, "doc": "Cast the ray each frame and emit hit_started / hit_ended events."},
         {"name": "direction", "kind": "vec2", "owner": "RaycastNode", "default": [1, 0.5], "min": -1, "max": 1, "doc": "Direction of the ray (rotated with the node)."},
         {"name": "length", "kind": "number", "owner": "RaycastNode", "default": 450, "min": 1, "max": 2000, "doc": "Length of the ray (px)."},
         {"name": "collideWithSensors", "kind": "boolean", "owner": "RaycastNode", "default": false, "doc": "Sensor shapes (areas) also stop the ray."},

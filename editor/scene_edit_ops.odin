@@ -319,6 +319,7 @@ give_default_shape :: proc(node: ^e.Node) {
 	switch node.typeId {
 	case e.DynamicBodyNode: shapes = &(cast(^e.DynamicBodyNode)node).shapes
 	case e.StaticBodyNode: shapes = &(cast(^e.StaticBodyNode)node).shapes; size = {256, 32}
+	case e.KinematicBodyNode: shapes = &(cast(^e.KinematicBodyNode)node).shapes; size = {128, 32}
 	case e.AreaNode: shapes = &(cast(^e.AreaNode)node).shapes; size = {128, 128}; sensor = true
 	}
 	if shapes == nil || len(shapes) > 0 do return

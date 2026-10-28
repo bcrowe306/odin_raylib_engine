@@ -130,8 +130,18 @@ vec2_edit :: proc(state: ^EditorState, id: string, v: ^[2]f32, speed: f32, undoL
 
 // --- reflected properties ----------------------------------------------------------
 
+@(private = "file")
+defaultPhysicsShape: e.PhysicsShape
+
 // prop_default: the same property on a pristine node of the node's type.
 prop_default :: proc(node: ^e.Node, p: e.Node_Property) -> (e.Node_Property, bool) {
+	if p.owner == "PhysicsShape" {
+		e.PhysicsShape_InitDefault(&defaultPhysicsShape, .Box)
+		for sp in e.Struct_CollectProperties(e.PhysicsShape, &defaultPhysicsShape) {
+			if sp.name == p.name do return sp, true
+		}
+		return {}, false
+	}
 	d := Editor_DefaultNode(node)
 	if d == nil do return {}, false
 	return e.Node_FindProperty(d, p.name)

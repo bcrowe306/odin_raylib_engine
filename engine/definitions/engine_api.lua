@@ -81,6 +81,10 @@ local MusicNode = {}
 ---@class DynamicBodyNode : Node
 local DynamicBodyNode = {}
 
+---A kinematic physics body moved by velocity or transform (moving platforms, elevators, doors).
+---@class KinematicBodyNode : Node
+local KinematicBodyNode = {}
+
 ---A character controller (move and slide, floors, walls).
 ---@class CharacterMoverNode : Node
 local CharacterMoverNode = {}
@@ -556,6 +560,15 @@ function StaticBodyNode:connect(event, handler) end
 ---@param handler fun(value: any, source: DynamicBodyNode)
 ---@return integer id Connection id for `disconnect`
 function DynamicBodyNode:connect(event, handler) end
+
+---@alias KinematicBodyNodeEvent NodeTreeEvent|"collision_started"|"collision_ended"|ProjectEvent
+---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
+---
+---Example: `self.node:connect("collision_started", function(value, source) Log.info("collision_started") end)`
+---@param event KinematicBodyNodeEvent|string
+---@param handler fun(value: any, source: KinematicBodyNode)
+---@return integer id Connection id for `disconnect`
+function KinematicBodyNode:connect(event, handler) end
 
 ---@alias CharacterMoverNodeEvent NodeTreeEvent|"collision_started"|"collision_ended"|ProjectEvent
 ---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
@@ -2004,6 +2017,81 @@ function DynamicBodyNode:get_property(path) end
 ---@overload fun(self: DynamicBodyNode, path: "debugColor", value: number[])
 function DynamicBodyNode:set_property(path, value, y) end
 
+---@class KinematicBodyNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field linearVelocity Vec2 Velocity (px/s).
+---@field angularVelocity number Spin (degrees/s).
+---@field oneWay boolean Jump-through platform: bodies pass from below and land on top.
+---@field debugColor number[] Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug...
+
+---@alias KinematicBodyNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "linearVelocity" # Vec2 - Velocity (px/s).
+---| "angularVelocity" # number - Spin (degrees/s).
+---| "oneWay" # boolean - Jump-through platform: bodies pass from below and land on top.
+---| "debugColor" # number[] - Colour of the collider outline drawn with Show Bounds & Colliders (and the game's debug...
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---
+---Example: `local value = self.node:get_property("linearVelocity")`
+---@param path KinematicBodyNodeProperty|string
+---@return any
+---@overload fun(self: KinematicBodyNode, path: "position"): Vec2
+---@overload fun(self: KinematicBodyNode, path: "scale"): Vec2
+---@overload fun(self: KinematicBodyNode, path: "rotation"): number
+---@overload fun(self: KinematicBodyNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: KinematicBodyNode, path: "zIndex"): integer
+---@overload fun(self: KinematicBodyNode, path: "ySort"): boolean
+---@overload fun(self: KinematicBodyNode, path: "ySortOffset"): number
+---@overload fun(self: KinematicBodyNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: KinematicBodyNode, path: "paused"): boolean
+---@overload fun(self: KinematicBodyNode, path: "enabled"): boolean
+---@overload fun(self: KinematicBodyNode, path: "linearVelocity"): Vec2
+---@overload fun(self: KinematicBodyNode, path: "angularVelocity"): number
+---@overload fun(self: KinematicBodyNode, path: "oneWay"): boolean
+---@overload fun(self: KinematicBodyNode, path: "debugColor"): number[]
+function KinematicBodyNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---
+---Example: `self.node:set_property("linearVelocity", 100, 50)`
+---@param path KinematicBodyNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: KinematicBodyNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: KinematicBodyNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: KinematicBodyNode, path: "rotation", value: number)
+---@overload fun(self: KinematicBodyNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: KinematicBodyNode, path: "zIndex", value: integer)
+---@overload fun(self: KinematicBodyNode, path: "ySort", value: boolean)
+---@overload fun(self: KinematicBodyNode, path: "ySortOffset", value: number)
+---@overload fun(self: KinematicBodyNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: KinematicBodyNode, path: "paused", value: boolean)
+---@overload fun(self: KinematicBodyNode, path: "enabled", value: boolean)
+---@overload fun(self: KinematicBodyNode, path: "linearVelocity", x: number|Vec2|number[], y?: number)
+---@overload fun(self: KinematicBodyNode, path: "angularVelocity", value: number)
+---@overload fun(self: KinematicBodyNode, path: "oneWay", value: boolean)
+---@overload fun(self: KinematicBodyNode, path: "debugColor", value: number[])
+function KinematicBodyNode:set_property(path, value, y) end
+
 ---@class CharacterMoverNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
@@ -2134,6 +2222,7 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field monitoring boolean Detect overlapping bodies and emit body_entered / body_exited events.
 ---@field overlapCount integer Bodies overlapping now.
 ---@field hasOverlaps boolean Anything overlapping now.
 ---@field debugColor number[] Outline colour when nothing overlaps.
@@ -2150,6 +2239,7 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "monitoring" # boolean - Detect overlapping bodies and emit body_entered / body_exited events.
 ---| "overlapCount" # integer (runtime) - Bodies overlapping now.
 ---| "hasOverlaps" # boolean (runtime) - Anything overlapping now.
 ---| "debugColor" # number[] - Outline colour when nothing overlaps.
@@ -2157,7 +2247,7 @@ function CharacterMoverNode:set_property(path, value, y) end
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
----Example: `local value = self.node:get_property("debugColor")`
+---Example: `local value = self.node:get_property("monitoring")`
 ---@param path AreaNodeProperty|string
 ---@return any
 ---@overload fun(self: AreaNode, path: "position"): Vec2
@@ -2170,6 +2260,7 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---@overload fun(self: AreaNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: AreaNode, path: "paused"): boolean
 ---@overload fun(self: AreaNode, path: "enabled"): boolean
+---@overload fun(self: AreaNode, path: "monitoring"): boolean
 ---@overload fun(self: AreaNode, path: "overlapCount"): integer
 ---@overload fun(self: AreaNode, path: "hasOverlaps"): boolean
 ---@overload fun(self: AreaNode, path: "debugColor"): number[]
@@ -2178,7 +2269,7 @@ function AreaNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
----Example: `self.node:set_property("debugColor", "#ff8800")`
+---Example: `self.node:set_property("monitoring", true)`
 ---@param path AreaNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2192,6 +2283,7 @@ function AreaNode:get_property(path) end
 ---@overload fun(self: AreaNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: AreaNode, path: "paused", value: boolean)
 ---@overload fun(self: AreaNode, path: "enabled", value: boolean)
+---@overload fun(self: AreaNode, path: "monitoring", value: boolean)
 ---@overload fun(self: AreaNode, path: "overlapCount", value: integer)
 ---@overload fun(self: AreaNode, path: "hasOverlaps", value: boolean)
 ---@overload fun(self: AreaNode, path: "debugColor", value: number[])
@@ -2209,6 +2301,7 @@ function AreaNode:set_property(path, value, y) end
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field monitoring boolean Cast the ray each frame and emit hit_started / hit_ended events.
 ---@field direction Vec2 Direction of the ray (rotated with the node).
 ---@field length number Length of the ray (px).
 ---@field collideWithSensors boolean Sensor shapes (areas) also stop the ray.
@@ -2230,6 +2323,7 @@ function AreaNode:set_property(path, value, y) end
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "monitoring" # boolean - Cast the ray each frame and emit hit_started / hit_ended events.
 ---| "direction" # Vec2 - Direction of the ray (rotated with the node).
 ---| "length" # number - Length of the ray (px).
 ---| "collideWithSensors" # boolean - Sensor shapes (areas) also stop the ray.
@@ -2242,7 +2336,7 @@ function AreaNode:set_property(path, value, y) end
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
----Example: `local value = self.node:get_property("direction")`
+---Example: `local value = self.node:get_property("monitoring")`
 ---@param path RaycastNodeProperty|string
 ---@return any
 ---@overload fun(self: RaycastNode, path: "position"): Vec2
@@ -2255,6 +2349,7 @@ function AreaNode:set_property(path, value, y) end
 ---@overload fun(self: RaycastNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: RaycastNode, path: "paused"): boolean
 ---@overload fun(self: RaycastNode, path: "enabled"): boolean
+---@overload fun(self: RaycastNode, path: "monitoring"): boolean
 ---@overload fun(self: RaycastNode, path: "direction"): Vec2
 ---@overload fun(self: RaycastNode, path: "length"): number
 ---@overload fun(self: RaycastNode, path: "collideWithSensors"): boolean
@@ -2268,7 +2363,7 @@ function RaycastNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
----Example: `self.node:set_property("direction", 100, 50)`
+---Example: `self.node:set_property("monitoring", true)`
 ---@param path RaycastNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2282,6 +2377,7 @@ function RaycastNode:get_property(path) end
 ---@overload fun(self: RaycastNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: RaycastNode, path: "paused", value: boolean)
 ---@overload fun(self: RaycastNode, path: "enabled", value: boolean)
+---@overload fun(self: RaycastNode, path: "monitoring", value: boolean)
 ---@overload fun(self: RaycastNode, path: "direction", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: RaycastNode, path: "length", value: number)
 ---@overload fun(self: RaycastNode, path: "collideWithSensors", value: boolean)
@@ -6587,6 +6683,32 @@ function DynamicBodyNode:get_angular_velocity() end
 ---@param omega number Angular velocity in degrees/sec
 function DynamicBodyNode:set_angular_velocity(omega) end
 
+---Gets the linear velocity of the kinematic body in world units per second.
+---
+---Example: `local vx, vy = self.node:get_linear_velocity()`
+---@return number vx Linear velocity X
+---@return number vy Linear velocity Y
+function KinematicBodyNode:get_linear_velocity() end
+
+---Sets the linear velocity of the kinematic body directly.
+---
+---Example: `self.node:set_linear_velocity(120, 0)`
+---@param vx number Linear velocity X
+---@param vy number Linear velocity Y
+function KinematicBodyNode:set_linear_velocity(vx, vy) end
+
+---Gets the angular velocity of the kinematic body in degrees per second.
+---
+---Example: `local omega = self.node:get_angular_velocity()`
+---@return number omega Angular velocity in degrees/sec
+function KinematicBodyNode:get_angular_velocity() end
+
+---Sets the angular velocity of the kinematic body in degrees per second.
+---
+---Example: `self.node:set_angular_velocity(90)`
+---@param omega number Angular velocity in degrees/sec
+function KinematicBodyNode:set_angular_velocity(omega) end
+
 ---Gets the gravity scale multiplier for this physics body.
 ---
 ---Example: `local g = self.node:get_gravity_scale(); self.node:set_gravity_scale(g * 0.5)`
@@ -7459,6 +7581,18 @@ function AreaNode:area_get_overlap_count() end
 ---@return Node[]
 function AreaNode:area_get_overlapping_nodes() end
 
+---Enables or disables overlap monitoring on this sensor area.
+---
+---Example: `self.node:get_node("Hitbox"):area_set_monitoring(true)`
+---@param enabled boolean
+function AreaNode:area_set_monitoring(enabled) end
+
+---Returns whether overlap monitoring is currently enabled on this sensor area.
+---
+---Example: `if self.node:get_node("Hitbox"):area_is_monitoring() then ... end`
+---@return boolean
+function AreaNode:area_is_monitoring() end
+
 -- ----------------------------------------------------------------------------
 -- RaycastNode Methods
 -- ----------------------------------------------------------------------------
@@ -7512,6 +7646,18 @@ function RaycastNode:raycast_set_direction(dx, dy) end
 ---Example: `local ray = self.node:get_node("Ray"); ray:raycast_set_length(128)`
 ---@param length number
 function RaycastNode:raycast_set_length(length) end
+
+---Enables or disables automatic per-frame raycast checks on this node.
+---
+---Example: `self.node:get_node("Ray"):raycast_set_monitoring(false)`
+---@param enabled boolean
+function RaycastNode:raycast_set_monitoring(enabled) end
+
+---Returns whether automatic per-frame raycast checks are enabled on this node.
+---
+---Example: `if self.node:get_node("Ray"):raycast_is_monitoring() then ... end`
+---@return boolean
+function RaycastNode:raycast_is_monitoring() end
 
 -- ----------------------------------------------------------------------------
 -- ParticleEmitterNode Methods

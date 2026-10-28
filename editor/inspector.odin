@@ -980,6 +980,7 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		}
 		if remove >= 0 {
 			Editor_RecordUndo(state, "Remove shape")
+			e.PhysicsShape_Destroy(&shapes[remove])
 			ordered_remove(shapes, remove)
 		}
 		if UI_Button(fmt.tprintf("%s  Add Shape", ICON_FA_PLUS), "insp.add-shape", {-1, 0}) {
@@ -988,6 +989,17 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 			e.PhysicsShape_InitDefault(&s, .Box)
 			s.size = {64, 64}
 			s.isSensor = node.typeId == e.AreaNode
+			for {
+				conflict := false
+				for &existing in shapes {
+					if existing.offset == s.offset {
+						conflict = true
+						break
+					}
+				}
+				if !conflict do break
+				s.offset += {16, 16}
+			}
 			append(shapes, s)
 		}
 	}
@@ -1071,6 +1083,7 @@ node_shapes_editor :: proc(node: ^e.Node) -> ^[dynamic]e.PhysicsShape {
 	switch node.typeId {
 	case e.StaticBodyNode: return &(cast(^e.StaticBodyNode)node).shapes
 	case e.DynamicBodyNode: return &(cast(^e.DynamicBodyNode)node).shapes
+	case e.KinematicBodyNode: return &(cast(^e.KinematicBodyNode)node).shapes
 	case e.CharacterMoverNode: return &(cast(^e.CharacterMoverNode)node).shapes
 	case e.AreaNode: return &(cast(^e.AreaNode)node).shapes
 	}
@@ -1190,7 +1203,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.LightNode: return ICON_FA_LIGHTBULB
 	case e.TextureNode, e.AtlasSpriteNode, e.FrameAnimationNode, e.AnimationPlayerNode: return ICON_FA_IMAGE
 	case e.SoundNode, e.MusicNode: return ICON_FA_MUSIC
-	case e.StaticBodyNode, e.DynamicBodyNode, e.CharacterMoverNode, e.AreaNode, e.RaycastNode: return ICON_FA_CUBES
+	case e.StaticBodyNode, e.DynamicBodyNode, e.KinematicBodyNode, e.CharacterMoverNode, e.AreaNode, e.RaycastNode: return ICON_FA_CUBES
 	case e.ParticleEmitterNode: return ICON_FA_WAND_MAGIC_SPARKLES
 	case e.TimerNode: return ICON_FA_CLOCK
 	case e.StateMachineNode: return ICON_FA_DIAGRAM_PROJECT

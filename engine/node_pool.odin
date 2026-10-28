@@ -138,6 +138,12 @@ pool_bodies :: proc(m: ^NodeManager, n: ^Node, on: bool) {
 				db.linearVelocity, db.lastSyncedVel = {}, {}
 				db.angularVelocity, db.lastSyncedAngVel = 0, 0
 				db.lastSyncedPos, db.lastSyncedRot = db.globalPosition, db.globalRotation
+			} else if n.typeId == KinematicBodyNode {
+				kb := cast(^KinematicBodyNode)n
+				kb.linearVelocity, kb.lastSyncedVel = {}, {}
+				kb.angularVelocity, kb.lastSyncedAngVel = 0, 0
+				kb.lastSyncedPos, kb.lastSyncedRot = kb.globalPosition, kb.globalRotation
+				kb.targetTransformActive = false
 			}
 			if !n.bodyPaused do b2.Body_Enable(body)
 		} else {

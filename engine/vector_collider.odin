@@ -266,6 +266,7 @@ vector_collider_body :: proc(v: ^VectorShapeNode) -> (owner: ^Node, body: b2.Bod
 			switch {
 			case n.typeId == StaticBodyNode: bid = (cast(^StaticBodyNode)n).bodyId
 			case n.typeId == DynamicBodyNode: bid = (cast(^DynamicBodyNode)n).bodyId
+			case n.typeId == KinematicBodyNode: bid = (cast(^KinematicBodyNode)n).bodyId
 			case n.typeId == AreaNode: bid = (cast(^AreaNode)n).bodyId
 			case: is_body = false
 			}

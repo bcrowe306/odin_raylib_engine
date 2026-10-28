@@ -387,6 +387,7 @@ NavigationAgentNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 		// Stopped: a body it was driving stops too (once - then physics owns it).
 		if a.drove {
 			if body.typeId == DynamicBodyNode do (cast(^DynamicBodyNode)body).linearVelocity = {}
+			if body.typeId == KinematicBodyNode do (cast(^KinematicBodyNode)body).linearVelocity = {}
 			if body.typeId == CharacterMoverNode do (cast(^CharacterMoverNode)body).velocity = {}
 		}
 		a.drove = false
@@ -400,6 +401,8 @@ NavigationAgentNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 		if cm.controlMode == .Script do CharacterMoverNode_MoveAndSlide(cm, ctx, dt)
 	case DynamicBodyNode:
 		(cast(^DynamicBodyNode)body).linearVelocity = v
+	case KinematicBodyNode:
+		(cast(^KinematicBodyNode)body).linearVelocity = v
 	case:
 		body.position += Node_WorldToParent(m, body, pos + v * dt) - Node_WorldToParent(m, body, pos)
 	}

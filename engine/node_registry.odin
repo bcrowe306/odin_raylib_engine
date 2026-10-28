@@ -38,6 +38,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"MusicNode", MusicNode, factory_music, {"music"}},
 	{"StaticBodyNode", StaticBodyNode, factory_static_body, {"staticbody", "static_body"}},
 	{"DynamicBodyNode", DynamicBodyNode, factory_dynamic_body, {"dynamicbody", "dynamic_body"}},
+	{"KinematicBodyNode", KinematicBodyNode, factory_kinematic_body, {"kinematicbody", "kinematic_body", "kinematicphysics", "kinematic_physics"}},
 	{"CharacterMoverNode", CharacterMoverNode, factory_character, {"charactermover", "character_mover"}},
 	{"AreaNode", AreaNode, factory_area, {"area"}},
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
@@ -263,6 +264,11 @@ factory_static_body :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 @(private = "file")
 factory_dynamic_body :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return DynamicBodyNode_Create(scene, "DynamicBody", parent)
+}
+
+@(private = "file")
+factory_kinematic_body :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return KinematicBodyNode_Create(scene, "KinematicBody", parent)
 }
 
 @(private = "file")
