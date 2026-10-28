@@ -416,28 +416,16 @@ CharacterMoverNode_Create :: proc(scene: ^Scene, name: string = "CharacterMover"
 
 	// Check if the scene already has an input-enabled player mover.
 	// If so, default this new mover to disabled input and playerIndex 0 (NPC/Enemy/Secondary).
+	// (Slots of removed nodes are nil: issue #50.)
+	is_player :: proc(n, self: ^Node) -> bool {
+		if n == nil || n == self || n.typeId != typeid_of(CharacterMoverNode) do return false
+		other := cast(^CharacterMoverNode)n
+		return other.enableKeyboardInput && other.playerIndex > 0
+	}
 	hasPlayer := false
 	if scene != nil && scene.manager != nil {
-		for n in scene.manager.nodes {
-			if n.typeId == typeid_of(CharacterMoverNode) && n != &cm.node {
-				other := cast(^CharacterMoverNode)n
-				if other.enableKeyboardInput && other.playerIndex > 0 {
-					hasPlayer = true
-					break
-				}
-			}
-		}
-		if !hasPlayer {
-			for n in scene.manager.addition {
-				if n.typeId == typeid_of(CharacterMoverNode) && n != &cm.node {
-					other := cast(^CharacterMoverNode)n
-					if other.enableKeyboardInput && other.playerIndex > 0 {
-						hasPlayer = true
-						break
-					}
-				}
-			}
-		}
+		for n in scene.manager.nodes do if is_player(n, &cm.node) {hasPlayer = true; break}
+		if !hasPlayer do for n in scene.manager.addition do if is_player(n, &cm.node) {hasPlayer = true; break}
 	}
 	if hasPlayer {
 		cm.enableKeyboardInput = false
