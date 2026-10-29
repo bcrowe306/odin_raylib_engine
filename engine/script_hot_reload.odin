@@ -125,15 +125,27 @@ ScriptManager_ReloadModule :: proc(mgr: ^ScriptManager, path: string, quiet := f
 		lua.rawset(L, oldIdx)
 	}
 
-	// New property declarations.
+	// New property declarations (with its base's: `extends`).
+	script_extends_apply(mgr, mod, oldIdx, true)
 	newProps := Script_ParseProperties(L, oldIdx)
 	isClass, localCopy := script_parse_resource_marker(L, oldIdx, mod.path)
 	lua.pop(L, 2) // old (now updated) table, new table
+	mod.isResourceClass, mod.resourceLocalCopy = isClass, localCopy
+	script_module_set_properties(mgr, mod, newProps)
+	if isClass do script_warn_resource_props(mod)
+	// The scripts built on this one: its new properties.
+	script_extends_refresh(mgr, mod.path)
+	if !quiet do log.infof("[HotReload] Reloaded %s", mod.path)
+	return true
+}
+
+// script_module_set_properties replaces a module's property declarations;
+// its instances get the new properties (defaults) and lose removed ones.
+@(private)
+script_module_set_properties :: proc(mgr: ^ScriptManager, mod: ^ScriptModule, newProps: [dynamic]ScriptProperty) {
 	for &p in mod.properties do ScriptProperty_Destroy(&p)
 	delete(mod.properties)
 	mod.properties = newProps
-	mod.isResourceClass, mod.resourceLocalCopy = isClass, localCopy
-	if isClass do script_warn_resource_props(mod)
 
 	// Instances: add new properties (defaults), drop removed ones.
 	for inst in mgr.instances {
@@ -158,8 +170,6 @@ ScriptManager_ReloadModule :: proc(mgr: ^ScriptManager, path: string, quiet := f
 	}
 	// Resources of this class: new properties get their values.
 	resources_module_reloaded(mgr, mod)
-	if !quiet do log.infof("[HotReload] Reloaded %s", mod.path)
-	return true
 }
 
 // --- simulation sandbox ------------------------------------------------------------

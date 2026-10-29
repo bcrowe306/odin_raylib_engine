@@ -1205,7 +1205,7 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 	if UI_BeginProps("##script") {
 		UI_PropLabel("Module")
 		avail := imgui.GetContentRegionAvail().x
-		imgui.SetNextItemWidth(avail - 64)
+		imgui.SetNextItemWidth(avail - 94)
 		current := asset_rel_editor(state, inst.modulePath)
 		if path, ok := asset_picker("insp.script-change", current, scripts, allowNone = false); ok && path != current {
 			Editor_RecordUndo(state, "Change script")
@@ -1213,6 +1213,10 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 		}
 		imgui.SameLine(0, 4)
 		if UI_IconButton(ICON_FA_CODE, "insp.script-edit", "Edit script", size = 26) do Editor_OpenScript(state, current)
+		imgui.SameLine(0, 4)
+		if UI_IconButton(ICON_FA_CODE_BRANCH, "insp.script-extend", "Extend script: a new script built on this one (its methods and properties), attached instead, the node's values kept", size = 26) {
+			NewScriptDialog_Open(state, node, extends = current)
+		}
 		imgui.SameLine(0, 4)
 		if UI_IconButton(ICON_FA_TRASH, "insp.script-detach", "Detach script", size = 26) {
 			Editor_RecordUndo(state, "Detach script")

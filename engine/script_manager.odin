@@ -104,6 +104,7 @@ ScriptManager_Destroy :: proc(sm: ^ScriptManager = nil) {
 	for k, mod in mgr.modules {
 		delete(k)
 		delete(mod.diskPath)
+		if mod.extends != "" do delete(mod.extends)
 		for &p in mod.properties do ScriptProperty_Destroy(&p)
 		delete(mod.properties)
 		free(mod)
@@ -193,6 +194,7 @@ ScriptManager_LoadModule :: proc(path: string, sm: ^ScriptManager = nil) -> (^Sc
 
 	// Retrieve module table to inspect its properties
 	lua.getfield(L, lua.REGISTRYINDEX, moduleRefKey)
+	script_extends_apply(mgr, mod, lua.gettop(L), true) // (`extends`: its base's methods and properties)
 	delete(mod.properties)
 	mod.properties = Script_ParseProperties(L, lua.gettop(L))
 	mod.isResourceClass, mod.resourceLocalCopy = script_parse_resource_marker(L, lua.gettop(L), mod.path)

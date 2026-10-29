@@ -29,6 +29,7 @@ ICON_FA_FILE                      :: "\uF15B" // File
 ICON_FA_CUBES                     :: "\uF1B3" // Prefab
 ICON_FA_GEM                       :: "\uF3A5" // Resource
 ICON_FA_CODE                      :: "\uF121" // Script
+ICON_FA_CODE_BRANCH               :: "\uF126" // Extend script
 ICON_FA_IMAGE                     :: "\uF03E" // Texture
 ICON_FA_MUSIC                     :: "\uF001" // Audio
 ICON_FA_TERMINAL                  :: "\uF120" // Console
