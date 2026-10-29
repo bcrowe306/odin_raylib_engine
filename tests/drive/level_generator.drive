@@ -1,4 +1,4 @@
-# #142 (phase 2): the Level Generator window - a new generator from Assets'
+# #142 (phases 2, 4): the Level Generator window - a new generator from Assets'
 # + menu (the cave template), a node added from the canvas menu, linked
 # (a loop refused), undo / redo, a parameter, the seed, delete, save, and
 # Apply to a TileMap in the scene (undoable).
@@ -71,3 +71,15 @@ click @lge.apply
 wait 2
 expect log contains Generated new_level.levelgen.json into
 screenshot applied
+
+# #142 (phase 4): your own node - a Lua script from the template (opened in
+# the Code tab), computed with the rest.
+rclick @lge.canvas
+click @ctx:lge-add:script
+wait 2
+expect lge.nodes == 6
+click @lge.script-new
+wait 3
+expect file:levels/new_level_6.gen.lua contains return function(ctx)
+expect lge.errors == 0
+screenshot script

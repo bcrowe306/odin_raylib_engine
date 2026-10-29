@@ -173,6 +173,10 @@ test_level_gen_tilemap_and_lua :: proc(t: ^testing.T) {
 	_ = os.write_entire_file(dir + "/levels/ramp.levelgen.json", transmute([]u8)string(`{"size": [5, 2], "nodes": [
 		{"id": 1, "type": "gradient"},
 		{"id": 2, "type": "tile_output", "inputs": {"in": 1}, "rules": [{"min": 0.5, "max": 1, "tile": 7}]}]}`))
+	// A script node (the editor's template: stripes every 4 cells), its file read with the generator's.
+	_ = os.write_entire_file(dir + "/levels/stripes.gen.lua", transmute([]u8)string(GEN_SCRIPT_TEMPLATE))
+	_ = os.write_entire_file(dir + "/levels/scripted.levelgen.json", transmute([]u8)string(`{"size": [5, 1], "nodes": [
+		{"id": 1, "type": "script", "script": "levels/stripes.gen.lua"}]}`))
 	game := new(Game)
 	InitializeGame(game)
 	defer game->terminate()
@@ -203,6 +207,8 @@ done, why = LevelGen.generate("levels/ramp.levelgen.json", Scene.find_node("Grou
 local g = LevelGen.values("levels/ramp.levelgen.json")
 w, h, third = g.width, g.height, g.values[3]
 missing, missing_why = LevelGen.generate("levels/none.levelgen.json", Scene.find_node("Ground"))
+local s = LevelGen.values("levels/scripted.levelgen.json")
+stripes = s.values[1] + s.values[2] * 10 + s.values[5] * 100
 `)
 	testing.expectf(t, ok == 0, "lua: %s", lua.tostring(L, -1) if ok != 0 else "")
 	getv :: proc(L: ^lua.State, name: cstring) -> string {
@@ -222,6 +228,7 @@ missing, missing_why = LevelGen.generate("levels/none.levelgen.json", Scene.find
 	testing.expect_value(t, getv(L, "third"), "0.5")
 	testing.expect_value(t, getv(L, "missing"), "false")
 	testing.expect(t, strings.contains(getv(L, "missing_why"), "no file"), "why it failed")
+	testing.expect_value(t, getv(L, "stripes"), "101.0") // (cells 0 and 4 are stripes)
 }
 
 // Editing (the Generator window): add, connect (no cycles), duplicate,
@@ -417,4 +424,119 @@ test_level_gen_ldtk_intgrid :: proc(t: ^testing.T) {
 	testing.expect_value(t, Ldtk_Doc_GetIntGrid(ly, 10, 8), 0)
 	testing.expect_value(t, len(doc.undo), undo + 1)
 	testing.expect_value(t, Gen_ApplyIntGrid(&g, doc, li, other), "not an IntGrid layer")
+}
+
+// Phase 4: a Lua script node - its inputs, params, seeded random, the
+// returned or filled grid; the sandbox; errors (syntax, runtime, not a
+// function, no script, a loop that never ends); saved with its file.
+@(test)
+test_level_gen_script_node :: proc(t: ^testing.T) {
+	g := gen_parse(t, `{"size": [4, 2], "seed": 3, "nodes": [
+		{"id": 1, "type": "rect", "params": {"x": 0, "y": 0, "w": 2, "h": 2}},
+		{"id": 2, "type": "script", "inputs": {"a": 1}, "params": {"p1": 0.25}, "script": "gen/invert.lua"},
+		{"id": 3, "type": "script", "script": "gen/returns.lua"},
+		{"id": 4, "type": "script", "script": "gen/random.lua"},
+		{"id": 5, "type": "script", "params": {"seed": 1}, "script": "gen/random.lua"},
+		{"id": 6, "type": "script", "script": "gen/sandbox.lua"},
+		{"id": 7, "type": "script", "inputs": {"a": 1}, "params": {"p1": 3}, "script": "gen/template.lua"}]}`)
+	defer Gen_GraphDestroy(&g)
+	Gen_SetScriptSource(&g, "gen/invert.lua", `return function(ctx)
+		for i = 1, ctx.width * ctx.height do ctx.out[i] = 1 - ctx.a[i] + ctx.b[i] + ctx.params.p1 end
+	end`)
+	Gen_SetScriptSource(&g, "gen/returns.lua", `return function(ctx)
+		local t = {}
+		for y = 0, ctx.height - 1 do for x = 0, ctx.width - 1 do t[y * ctx.width + x + 1] = x + y * 10 end end
+		return t
+	end`)
+	Gen_SetScriptSource(&g, "gen/random.lua", `return function(ctx)
+		for y = 0, ctx.height - 1 do for x = 0, ctx.width - 1 do ctx.out[y * ctx.width + x + 1] = ctx.random(x, y) end end
+	end`)
+	Gen_SetScriptSource(&g, "gen/sandbox.lua", `return function(ctx)
+		ctx.out[1] = (io == nil and os == nil and dofile == nil and loadfile == nil and require == nil) and 1 or 0
+		ctx.out[2] = math.floor(2.5) + #string.rep("x", 3) -- (2 + 3)
+	end`)
+	testing.expect_value(t, gen_values(t, &g, 2), "0.25,0.25,1.25,1.25,0.25,0.25,1.25,1.25")
+	testing.expect_value(t, gen_values(t, &g, 3), "0,1,2,3,10,11,12,13")
+	r := gen_values(t, &g, 4)
+	testing.expect_value(t, gen_values(t, &g, 4), r) // (the same for a seed)
+	testing.expect(t, gen_values(t, &g, 4, 99) != r, "another seed, other numbers")
+	testing.expect(t, gen_values(t, &g, 5) != r, "the node's seed counts")
+	grid, _ := Gen_Evaluate(&g, 4, 0, context.temp_allocator)
+	for v in grid.v do testing.expect(t, v >= 0 && v < 1, "in [0, 1)")
+	testing.expect_value(t, gen_values(t, &g, 6), "1,5,0,0,0,0,0,0")
+	Gen_SetScriptSource(&g, "gen/template.lua", GEN_SCRIPT_TEMPLATE) // (stripes every p1 cells, over a)
+	testing.expect_value(t, gen_values(t, &g, 7), "1,1,0,1,1,1,0,1")
+
+	// Saved with its file; a copy keeps it.
+	text := Gen_GraphSerialize(&g, context.temp_allocator)
+	testing.expect(t, strings.contains(text, `"script": "gen/invert.lua"`), "saved")
+	back := gen_parse(t, text)
+	defer Gen_GraphDestroy(&back)
+	testing.expect_value(t, Gen_FindNode(&back, 2).script, "gen/invert.lua")
+	testing.expect_value(t, Gen_DuplicateNode(&g, 2).script, "gen/invert.lua")
+
+	fails :: proc(t: ^testing.T, src, want: string, script := "gen/bad.lua") {
+		g := gen_parse(t, fmt.tprintf(`{{"size": [2, 2], "nodes": [{{"id": 1, "type": "script", "script": %q}}]}}`, script))
+		defer Gen_GraphDestroy(&g)
+		if src != "" do Gen_SetScriptSource(&g, "gen/bad.lua", src)
+		_, err := Gen_Evaluate(&g, 1, 0, context.temp_allocator)
+		testing.expectf(t, strings.contains(err, want), "%q: got %q", want, err)
+	}
+	fails(t, `return function(ctx`, "gen/bad.lua:1")
+	fails(t, "return function(ctx)\n  error('no floor')\nend", "gen/bad.lua:2: no floor")
+	fails(t, `return 42`, "must return a function")
+	fails(t, "", "no such script")
+	fails(t, "", "pick its script", "")
+	budget := GEN_SCRIPT_BUDGET
+	GEN_SCRIPT_BUDGET = 100_000
+	defer GEN_SCRIPT_BUDGET = budget
+	fails(t, `return function(ctx) while true do end end`, "ran too long")
+}
+
+// Phase 4: node types registered from Odin - read and written by name,
+// evaluated with their inputs, parameters and seed; refused names; an
+// unregistered type in a file is an error.
+@(test)
+test_level_gen_custom_node :: proc(t: ^testing.T) {
+	checker :: proc(call: ^Gen_Custom_Call) -> string {
+		size := max(int(Gen_Param(call.node, "size")), 1)
+		if size > 100 do return "too big"
+		for y in 0 ..< call.out.h do for x in 0 ..< call.out.w {
+			i := y * call.out.w + x
+			call.out.v[i] = (1 if (x / size + y / size) % 2 == 0 else 0) * (1 - call.inputs[0].v[i])
+		}
+		return ""
+	}
+	info := Gen_Kind_Info{name = "test_checker", label = "Checker", inputs = {"mask"}, params = {{name = "size", default_ = 1, integer = true}}, doc = "A checkerboard"}
+	testing.expect_value(t, Gen_RegisterNode(info, checker), "")
+	defer Gen_UnregisterNode("test_checker")
+	testing.expect(t, Gen_RegisterNode({name = "noise", label = "x"}, checker) != "", "a built-in's name is refused")
+	testing.expect(t, Gen_RegisterNode({name = "custom", label = "x"}, checker) != "", "so is custom")
+	testing.expect(t, Gen_RegisterNode({name = "test_x", inputs = {"a", "b", "c"}}, checker) != "", "at most 2 inputs")
+	testing.expect_value(t, len(Gen_CustomKinds()) >= 1, true)
+
+	g := gen_parse(t, `{"size": [4, 2], "nodes": [
+		{"id": 1, "type": "rect", "params": {"x": 0, "y": 0, "w": 1, "h": 1}},
+		{"id": 2, "type": "test_checker", "inputs": {"mask": 1}, "params": {"size": 2}},
+		{"id": 3, "type": "test_checker", "params": {"size": 1000}}]}`)
+	defer Gen_GraphDestroy(&g)
+	n := Gen_FindNode(&g, 2)
+	testing.expect(t, n.kind == .Custom && n.custom == "test_checker" && Gen_NodeInfo(n).label == "Checker", "a custom node")
+	testing.expect_value(t, gen_values(t, &g, 2), "0,1,0,0,1,1,0,0") // (cell 0 masked out)
+	_, err := Gen_Evaluate(&g, 3, 0, context.temp_allocator)
+	testing.expect_value(t, err, "node 3 (test_checker): too big")
+
+	text := Gen_GraphSerialize(&g, context.temp_allocator)
+	testing.expect(t, strings.contains(text, `"type": "test_checker", "inputs": {"mask": 1}, "params": {"size": 2}`), "saved by name")
+	added := Gen_AddNode(&g, .Custom, {}, "test_checker")
+	testing.expect(t, added.custom == "test_checker" && Gen_Param(added, "size") == 1, "added with its defaults")
+	testing.expect(t, Gen_Connect(&g, added.id, 0, 1) && !Gen_Connect(&g, added.id, 1, 1), "one input")
+	testing.expect_value(t, Gen_DuplicateNode(&g, 2).custom, "test_checker")
+
+	Gen_UnregisterNode("test_checker")
+	_, err = Gen_Evaluate(&g, 2, 0, context.temp_allocator)
+	testing.expect(t, strings.contains(err, "no node type \"test_checker\" is registered"), "unregistered")
+	bad, perr := Gen_GraphParse(transmute([]u8)text)
+	defer Gen_GraphDestroy(&bad)
+	testing.expect(t, strings.contains(perr, "unknown node type \"test_checker\""), "a file needs it registered")
 }
