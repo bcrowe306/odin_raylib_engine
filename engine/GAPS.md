@@ -190,6 +190,8 @@ single-layer map.
 9. **LDtk entity tiles from the embedded icon atlas** (LDtk's built-in icons) aren't drawn, in the Level tab or in the game (tilesets without an image path are skipped), and the Tiled export skips them.
 10. **Linux exports made on Windows**: Windows has no executable bit, so the AppDir's `AppRun` and the game need `chmod +x` on Linux (exports made on macOS / Linux keep it; an AppImage built on Linux has it). *Approach:* write the Linux export as a .tar.gz with file modes.
 11. **Non-uniform scale on round shapes**: a circle takes the larger scale axis and a capsule its radius from x (Box2D has no ellipses); a rotated box under non-uniform node scale stays a rectangle (no skew).
+12. **Component variants**: a component that inherits another and changes a few values (a "red slime" from "slime") isn't supported; *Save as New Component...* makes an unlinked copy, so the variant stops following the base. *Approach:* a component file whose root is a link to its base plus overrides - an instance's format, saved as a file - with Edit Component on it editing the overrides (`engine/docs/components.md`, Limits).
+13. **Editing an instance in place** as its component (the scene shows the change on every instance while you edit, without opening the component document) isn't supported; edit the component document, or Apply from an instance. *Approach:* an "edit in place" mode on an instance root that routes edits to the component file and refreshes the other instances on each change.
 
 ---
 
