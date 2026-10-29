@@ -3818,13 +3818,101 @@ lua_scene_get_name :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// scene_transition_options reads Scene.change_scene's options table:
+// transition, duration, easing, color ({r, g, b[, a]} 0..1 or "#rrggbb"),
+// transition_in / duration_in / easing_in (the uncover half), pause. What
+// isn't given comes from the project's default transition.
+@(private="file")
+scene_transition_options :: proc(L: ^lua.State, idx: c.int, game: ^Game) -> Transition_Spec {
+	spec := game.defaultTransition if game.hasDefaultTransition else TRANSITION_DEFAULT
+	str :: proc(L: ^lua.State, idx: c.int, key: cstring) -> (string, bool) {
+		lua.getfield(L, idx, key)
+		defer lua.pop(L, 1)
+		if lua.type(L, -1) != .STRING do return "", false
+		return strings.clone(string(lua.tostring(L, -1)), context.temp_allocator), true
+	}
+	num :: proc(L: ^lua.State, idx: c.int, key: cstring) -> (f32, bool) {
+		lua.getfield(L, idx, key)
+		defer lua.pop(L, 1)
+		if lua.type(L, -1) != .NUMBER do return 0, false
+		return f32(lua.tonumber(L, -1)), true
+	}
+	kind :: proc(L: ^lua.State, game: ^Game, name: string) -> (Transition_Kind, string) {
+		k, shader, ok := Transition_Parse(game, name)
+		if !ok {
+			lua.L_where(L, 1)
+			where_ := strings.clone(string(lua.tostring(L, -1)), context.temp_allocator)
+			lua.pop(L, 1)
+			Script_Problem(.Warning, "%sScene.change_scene: no transition %q (a fade instead)", where_, name)
+		}
+		return k, shader
+	}
+	ease :: proc(L: ^lua.State, name: string, fallback: Ease) -> Ease {
+		if e, ok := Ease_Parse(name); ok do return e
+		Script_Problem(.Warning, "Scene.change_scene: no easing %q", name)
+		return fallback
+	}
+	if name, ok := str(L, idx, "transition"); ok do spec.kind, spec.shader = kind(L, game, name)
+	if d, ok := num(L, idx, "duration"); ok do spec.duration = d
+	if e, ok := str(L, idx, "easing"); ok do spec.ease = ease(L, e, spec.ease)
+	if name, ok := str(L, idx, "transition_in"); ok {
+		spec.hasIn = true
+		spec.inKind, _ = kind(L, game, name)
+	}
+	if d, ok := num(L, idx, "duration_in"); ok {
+		spec.hasIn = true
+		spec.inDuration = d
+	}
+	if e, ok := str(L, idx, "easing_in"); ok {
+		spec.hasIn = true
+		spec.inEase = ease(L, e, spec.ease)
+	}
+	if spec.hasIn {
+		// What the uncover half doesn't say: as the cover half.
+		if _, ok := str(L, idx, "transition_in"); !ok do spec.inKind = spec.kind
+		if _, ok := num(L, idx, "duration_in"); !ok do spec.inDuration = spec.duration
+		if _, ok := str(L, idx, "easing_in"); !ok do spec.inEase = spec.ease
+	}
+	lua.getfield(L, idx, "color")
+	#partial switch lua.type(L, -1) {
+	case .TABLE:
+		ch :: proc(L: ^lua.State, k: lua.Integer, fallback: u8) -> u8 {
+			lua.rawgeti(L, -1, k)
+			defer lua.pop(L, 1)
+			if lua.type(L, -1) != .NUMBER do return fallback
+			return u8(clamp(f32(lua.tonumber(L, -1)), 0, 1) * 255)
+		}
+		spec.color = {ch(L, 1, 0), ch(L, 2, 0), ch(L, 3, 0), ch(L, 4, 255)}
+	case .STRING:
+		spec.color = Ldtk_ParseHexColor(string(lua.tostring(L, -1)), spec.color) // "#rrggbb" / "#rrggbbaa"
+	}
+	lua.pop(L, 1)
+	lua.getfield(L, idx, "pause")
+	if lua.type(L, -1) == .BOOLEAN do spec.pause = bool(lua.toboolean(L, -1))
+	lua.pop(L, 1)
+	return spec
+}
+
+// Scene.register_transition(name, shader): a shader transition by name.
+@(private="file")
+lua_scene_register_transition :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || lua.type(L, 1) != .STRING || lua.type(L, 2) != .STRING {
+		lua.L_error(L, "usage: Scene.register_transition(name, \"shaders/my_transition.fs\")")
+		return 0
+	}
+	Transition_Register(sm.game, string(lua.tostring(L, 1)), string(lua.tostring(L, 2)))
+	return 0
+}
+
 @(private="file")
 lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	nameC := lua.tostring(L, 1)
 	sm := get_script_manager(L)
 	if nameC == nil || sm == nil || sm.game == nil do return 0
-	// Scene.change_scene(name [, {transition = "fade"|"wipe_left"|..|"circle", duration = 0.4, color = {r, g, b}}])
+	// Scene.change_scene(name [, {transition = "fade"|"crossfade"|"slide_left"|.., duration = 0.4, easing, color, transition_in, ..., pause, loading, min_time}])
 	// A scene name, or its file ("scenes/level_2.scene.json", e.g. a scene property).
 	scene, ok := sm.game.sceneManager.scenes[string(nameC)]
 	if !ok {
@@ -3835,23 +3923,7 @@ lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
 		return 0
 	}
 	if lua.type(L, 2) == .TABLE {
-		lua.getfield(L, 2, "transition")
-		kind := Transition_KindParse(string(lua.tostring(L, -1)) if lua.type(L, -1) == .STRING else "fade")
-		lua.pop(L, 1)
-		lua.getfield(L, 2, "duration")
-		duration := f32(lua.tonumber(L, -1)) if lua.type(L, -1) == .NUMBER else 0.4
-		lua.pop(L, 1)
-		color := rl.BLACK
-		lua.getfield(L, 2, "color")
-		if lua.type(L, -1) == .TABLE {
-			ch :: proc(L: ^lua.State, k: lua.Integer) -> u8 {
-				lua.rawgeti(L, -1, k)
-				defer lua.pop(L, 1)
-				return u8(clamp(f32(lua.tonumber(L, -1)), 0, 1) * 255)
-			}
-			color = {ch(L, 1), ch(L, 2), ch(L, 3), 255}
-		}
-		lua.pop(L, 1)
+		spec := scene_transition_options(L, 2, sm.game)
 		// loading = "<scene>": through a loading screen (min_time seconds at least).
 		lua.getfield(L, 2, "loading")
 		if lua.type(L, -1) == .STRING {
@@ -3863,17 +3935,23 @@ lua_scene_change_scene :: proc "c" (L: ^lua.State) -> c.int {
 			}
 			if !sok {
 				Script_Problem(.Error, "Scene.change_scene: no loading scene %q", name)
-				Game_ChangeSceneWith(sm.game, scene, kind, duration, color)
+				Game_ChangeSceneSpec(sm.game, scene, spec)
 				return 0
 			}
 			lua.getfield(L, 2, "min_time")
 			minTime := f32(lua.tonumber(L, -1)) if lua.type(L, -1) == .NUMBER else 0.5
 			lua.pop(L, 1)
-			Game_ChangeSceneVia(sm.game, scene, screen, kind, max(duration, 0.01), color, minTime)
+			spec.duration = max(spec.duration, 0.01)
+			Game_ChangeSceneViaSpec(sm.game, scene, screen, spec, minTime)
 			return 0
 		}
 		lua.pop(L, 1)
-		Game_ChangeSceneWith(sm.game, scene, kind, duration, color)
+		Game_ChangeSceneSpec(sm.game, scene, spec)
+		return 0
+	}
+	// No options: the project's default transition (Project Settings), if any.
+	if sm.game.hasDefaultTransition {
+		Game_ChangeSceneSpec(sm.game, scene, sm.game.defaultTransition)
 		return 0
 	}
 	ChangeScene_ByPtr(&sm.game.sceneManager, scene)
@@ -5080,6 +5158,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "loading_target")
 	lua.pushcfunction(L, lua_scene_is_transitioning)
 	lua.setfield(L, -2, "is_transitioning")
+	lua.pushcfunction(L, lua_scene_register_transition)
+	lua.setfield(L, -2, "register_transition")
 	lua.pushcfunction(L, lua_scene_reload)
 	lua.setfield(L, -2, "reload")
 	lua.pushcfunction(L, lua_scene_get_nodes)

@@ -9971,27 +9971,47 @@ function SceneModule.get_ambient() end
 ---@return string
 function SceneModule.get_name() end
 
----@alias TransitionKind "fade"|"wipe_left"|"wipe_right"|"wipe_up"|"wipe_down"|"circle"
+---@alias TransitionKind "fade"|"wipe_left"|"wipe_right"|"wipe_up"|"wipe_down"|"circle"|"crossfade"|"dissolve"|"pixelate"|"slide_left"|"slide_right"|"slide_up"|"slide_down"|"push_left"|"push_right"|"push_up"|"push_down"
 
 ---@class SceneTransition
----@field transition? TransitionKind Default "fade"
----@field duration? number Seconds for each half (cover, uncover); default 0.4
----@field color? number[] {r, g, b} 0..1; default black
+---@field transition? TransitionKind|string A built-in transition, a name given to Scene.register_transition, or a shader file ("shaders/swirl.fs"); default "fade" (or the project's default)
+---@field duration? number Seconds - each half of a cover transition (fade, wipe_*, circle: covering, uncovering), the whole of the others; default 0.4
+---@field easing? EaseName The curve (default "in_out_sine")
+---@field color? number[]|string {r, g, b[, a]} 0..1 or "#rrggbb": the cover's colour (dissolve: its burning rim); default black
+---@field transition_in? TransitionKind The uncover half of a cover transition (default: as covering)
+---@field duration_in? number Seconds of the uncover half (default: `duration`)
+---@field easing_in? EaseName The uncover half's curve (default: `easing`)
+---@field pause? boolean Pause the game (Engine.set_paused) while it runs - scripts and physics wait; "always" nodes still run
 ---@field loading? SceneName|ScenePath A loading screen scene shown while the scene loads in the background
 ---@field min_time? number Seconds the loading screen stays at least (default 0.5)
 
 ---Switches to another scene by name (or its file, e.g. a `scene` property) -
----at once, or behind a transition (the screen is covered, the scene switches
----once its assets are loaded, then it's uncovered).
+---at once (or with the project's default transition), or behind a
+---transition. Cover transitions (fade, wipe_*, circle) cover the screen,
+---switch once the new scene's assets are loaded, then uncover; the others
+---(crossfade, dissolve, pixelate, slide_*, push_*, shaders) show the old
+---scene's last frame with the new scene. Events on the global bus:
+---`transition_started`, `transition_midpoint`, `transition_finished` (the
+---scene's name). A change asked for during a transition waits for it.
 ---
 ---With `loading`, it goes through a loading screen: a transition into that
 ---scene, the target loading in the background (textures decoded on worker
 ---threads), then a transition into the target once it's loaded.
 ---
----Example: `Scene.change_scene("level_2", {transition = "fade", duration = 0.5, loading = "loading"})`
+---Example: `Scene.change_scene("level_2", {transition = "slide_left", duration = 0.6, easing = "out_cubic"})`
 ---@param name SceneName|ScenePath A scene's name, or its file
 ---@param transition? SceneTransition
 function SceneModule.change_scene(name, transition) end
+
+---Names a shader transition: a fragment shader whose `texture0` is the old
+---scene's last frame and `new_scene` the new scene, with `progress` (0 old ..
+---1 new), `resolution` and `transition_color` uniforms. Then
+---`Scene.change_scene(name, {transition = "<name>"})`.
+---
+---Example: `Scene.register_transition("swirl", "shaders/swirl.fs")`
+---@param name string
+---@param shader string A project .fs file (or "builtin:<name>")
+function SceneModule.register_transition(name, shader) end
 
 ---Starts loading a scene's assets in the background (a little each frame),
 ---so switching to it later is quick.
