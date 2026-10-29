@@ -30,7 +30,7 @@ fi
 if want rendering; then
 echo "== rendering"
 odin build runner -o:speed -out:/tmp/rayzr_bench_runner || exit 1
-for s in bench_sprites bench_sprites_overlap bench_tiles bench_particles bench_particles_circles bench_particles_20k bench_lights bench_physics bench_scripts bench_ysort main; do
+for s in bench_sprites bench_sprites_overlap bench_tiles bench_particles bench_particles_circles bench_particles_20k bench_particles_gpu_100k bench_lights bench_physics bench_scripts bench_ysort main; do
 	for flag in "" --no-render-cache; do
 		line=$(perl -e 'alarm 120; exec @ARGV' /tmp/rayzr_bench_runner /tmp/rayzr_bench --scene "scenes/$s.scene.json" --bench 300 $flag 2>&1 | grep '\[bench\]')
 		printf '%-24s %-18s %s\n' "$s" "${flag:-cached}" "${line#*frames: }"

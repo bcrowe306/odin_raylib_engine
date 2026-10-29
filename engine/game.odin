@@ -232,6 +232,7 @@ GameTerminate :: proc(game: ^Game) {
 	PhysicsWorld_Destroy(&game.physicsWorld)
 	Shader_UnloadAll()
 	Particles_Shutdown()
+	ParticleGPU_Shutdown()
 	Lighting_Unload()
 	Vector_ShutdownScratch()
 	Vector_FiltersShutdown()

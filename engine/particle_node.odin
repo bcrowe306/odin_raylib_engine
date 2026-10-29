@@ -113,6 +113,7 @@ ParticleEmitterNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	pen := cast(^ParticleEmitterNode)node
 	DestroySubject(&pen.onParticleHit)
 	DestroySubject(&pen.onFinished)
+	ParticleGPU_Release(&pen.emitter)
 	if pen.texture != nil {
 		if rm := Node_ResourceManager(pen); rm != nil do ResourceManager_ReleaseTexture(rm, pen.texture)
 		pen.texture, pen.emitter.texture = nil, nil

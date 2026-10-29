@@ -98,7 +98,9 @@ test_particle_visibility :: proc(t: ^testing.T) {
 	game, _, pen := control_game("visibility")
 	defer game->terminate()
 	pen.emitter.velocity, pen.emitter.gravityVelocity = 0, 0
+	pen.emitter.emitting = false
 	ParticleEmitterNode_EmitBurst(pen, 5)
+	ParticleEmitterNode_Update(pen, &game.gameContext, 0.001) // (as a frame: the update, then the draw)
 	// Auto: where the particles are (around 100, 100).
 	r, ok := Node_RenderBounds(pen)
 	testing.expect(t, ok, "has bounds")

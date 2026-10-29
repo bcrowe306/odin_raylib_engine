@@ -267,6 +267,21 @@ ParticleEmitter :: struct {
 	// already there); the same pattern every start (seed 0: random); what
 	// the view culling tests - Auto: the live particles' bounds, else
 	// visibilityRect around the emitter (in its space).
+	// GPU mode (#129): particles animated by the shader from their spawn
+	// records - 100k+ at almost no CPU cost; no collision, custom shapes or
+	// speed curve.
+	gpu: bool `gui:"true"`,
+	gpuData: ^Particle_GPU, // (runtime: records, clock, GL buffers)
+	gpuApplied: bool,       // (runtime: the mode the particles are in)
+	// (runtime) gravity and wind in the particles' space, worked out once per
+	// step rather than per particle.
+	stepGravity, stepWind: [2]f32,
+	stepForces: bool,
+	// (runtime) the live particles' extent from the last step, in their
+	// space: Auto visibility without another pass.
+	extentMin, extentMax: [2]f32,
+	extentSize: f32,
+	extentAny: bool,
 	prewarm: bool `gui:"true"`,
 	seed: int `gui:"true" min:"0" max:"100000"`,
 	autoVisibility: bool `gui:"true"`,
@@ -316,6 +331,14 @@ ParticleEmitter_Reserve :: proc(emitter: ^ParticleEmitter, n: int) {
 ParticleEmitter_Destroy :: proc(emitter: ^ParticleEmitter) {
 	if emitter.particles != nil && emitter.allocator.procedure == nil do delete(emitter.particles)
 	emitter.particles = nil
+	if g := emitter.gpuData; g != nil {
+		ParticleGPU_Release(emitter)
+		if emitter.allocator.procedure == nil {
+			delete(g.records)
+			free(g)
+		}
+		emitter.gpuData = nil
+	}
 }
 
 ParticleEmitter_Start :: proc(emitter: ^ParticleEmitter) {
@@ -438,11 +461,17 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	}
 	context.random_generator = gen
 
-	ParticleEmitter_Reserve(emitter, clamp(emitter.amount * 2 + 4, 16, PARTICLE_MAX))
-	if len(emitter.particles) == 0 do return
-	emitter.head %= len(emitter.particles)
-	p := &emitter.particles[emitter.head]
-	emitter.head = (emitter.head + 1) % len(emitter.particles)
+	// GPU mode (#129): the particle is made here as on the CPU, then kept as
+	// a spawn record the shader animates.
+	scratch: Particle
+	p := &scratch
+	if !emitter.gpu {
+		ParticleEmitter_Reserve(emitter, clamp(emitter.amount * 2 + 4, 16, PARTICLE_MAX))
+		if len(emitter.particles) == 0 do return
+		emitter.head %= len(emitter.particles)
+		p = &emitter.particles[emitter.head]
+		emitter.head = (emitter.head + 1) % len(emitter.particles)
+	}
 
 	// Position: an offset in the emitter's space (the spread box). Local
 	// particles keep it; world ones go through the owner's transform.
@@ -545,16 +574,15 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	}
 
 	p.alive = true
+	if emitter.gpu do ParticleGPU_Push(emitter, scratch)
 }
 
 // --- the owner's transform (#124) ----------------------------------------------------
 
-@(private = "file")
 particle_scale :: proc(emitter: ^ParticleEmitter) -> [2]f32 {
 	return emitter.originScale if emitter.originScale != {} else {1, 1}
 }
 
-@(private = "file")
 particle_rotate :: proc(v: [2]f32, deg: f32) -> [2]f32 {
 	if deg == 0 do return v
 	r := math.to_radians(deg)
@@ -589,7 +617,6 @@ particle_dir_to_local :: proc(emitter: ^ParticleEmitter, v: [2]f32) -> [2]f32 {
 // particle_forces: gravity and wind (world directions) in the particles'
 // space - for local particles, turned back and unscaled, so "down" stays
 // down on screen whatever the owner's rotation.
-@(private = "file")
 particle_forces :: proc(emitter: ^ParticleEmitter) -> (gravity, wind: [2]f32) {
 	grav_len_sq := emitter.gravityDirection.x * emitter.gravityDirection.x + emitter.gravityDirection.y * emitter.gravityDirection.y
 	if grav_len_sq > 0.0001 do gravity = emitter.gravityDirection / math.sqrt(grav_len_sq) * emitter.gravityVelocity
@@ -611,7 +638,8 @@ Particle_Update_Index :: proc(emitter: ^ParticleEmitter, index: int, deltaTime: 
 Particle_Update_Particle :: proc(emitter: ^ParticleEmitter, particle: ^Particle, deltaTime: f32) {
 	if !particle.alive do return
 	p := particle
-	gravity, wind := particle_forces(emitter)
+	gravity, wind := emitter.stepGravity, emitter.stepWind
+	if !emitter.stepForces do gravity, wind = particle_forces(emitter)
 	p.velocity += gravity * deltaTime
 	p.velocity += wind * deltaTime
 	p.velocity += p.acceleration * deltaTime
@@ -774,6 +802,14 @@ ParticleEmitter_DrawColorRampGui :: proc(emitter: ^ParticleEmitter, x: f32, next
 // ParticleEmitter_Update emits and moves the particles; with collision on,
 // they collide with `world`'s shapes (none: no collision).
 ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world := b2.WorldId{}) {
+	// Switched between CPU and GPU: the particles of the other mode go.
+	if emitter.gpu != emitter.gpuApplied {
+		for &p in emitter.particles do p.alive = false
+		ParticleGPU_Clear(emitter)
+		if !emitter.gpu do ParticleGPU_Release(emitter)
+		emitter.gpuApplied = emitter.gpu
+		emitter.cycleStarted = false // (a new cycle now, not after the old one's lifetime)
+	}
 	// Prewarm: a lifetime run at once (30 steps a second) before the first frame.
 	if emitter.prewarm && !emitter.prewarmed && emitter.emitting {
 		emitter.prewarmed = true
@@ -784,7 +820,8 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world 
 	before := emitter.aliveCount
 	particle_step(emitter, deltaTime, world)
 	n := 0
-	for &p in emitter.particles do if p.alive do n += 1
+	if emitter.gpu do n = ParticleGPU_AliveCount(emitter)
+	else do for &p in emitter.particles do if p.alive do n += 1
 	emitter.aliveCount = n
 	// A one-shot (or stopped) emitter's last particle died.
 	if before > 0 && n == 0 && !emitter.emitting && emitter.onFinished != nil do emitter.onFinished(emitter, emitter.onHitUser)
@@ -800,27 +837,24 @@ ParticleEmitter_EmitBurst :: proc(emitter: ^ParticleEmitter, n: int) {
 // emitter repeats its pattern).
 ParticleEmitter_Restart :: proc(emitter: ^ParticleEmitter) {
 	for &p in emitter.particles do p.alive = false
+	ParticleGPU_Clear(emitter)
 	emitter.aliveCount = 0
 	ParticleEmitter_Start(emitter)
 }
 
 // ParticleEmitter_VisibleBounds: the world rectangle the view culling tests.
-// (Auto: measured here - only when the view culling asks.)
 ParticleEmitter_VisibleBounds :: proc(emitter: ^ParticleEmitter) -> rl.Rectangle {
-	if emitter.autoVisibility {
-		mn, mx := [2]f32{max(f32), max(f32)}, [2]f32{min(f32), min(f32)}
-		any := false
-		for &p in emitter.particles do if p.alive {
-			any = true
-			q := Particle_QuadOf(emitter, p)
-			r := max(q.size.x, q.size.y) * 0.75 // (room for rotation)
-			mn = {min(mn.x, q.center.x - r), min(mn.y, q.center.y - r)}
-			mx = {max(mx.x, q.center.x + r), max(mx.y, q.center.y + r)}
-		}
-		if !any do return {emitter.position.x, emitter.position.y, 0, 0}
-		return {mn.x, mn.y, mx.x - mn.x, mx.y - mn.y}
-	}
 	r := emitter.visibilityRect
+	if emitter.autoVisibility {
+		// (The last step's extent - centres, then the largest particle
+		// around them: a circle's quad is twice its size, rotated corners
+		// reach ~0.75 of the quad.)
+		if !emitter.extentAny do return {emitter.position.x, emitter.position.y, 0, 0}
+		pad := emitter.extentSize * 1.5
+		lo, hi := emitter.extentMin - pad, emitter.extentMax + pad
+		if !emitter.localSpace do return {lo.x, lo.y, hi.x - lo.x, hi.y - lo.y}
+		r = {lo.x, lo.y, hi.x - lo.x, hi.y - lo.y} // (in its space: through the transform below)
+	}
 	pts := [4][2]f32{{r.x, r.y}, {r.x + r.width, r.y}, {r.x + r.width, r.y + r.height}, {r.x, r.y + r.height}}
 	mn, mx := [2]f32{max(f32), max(f32)}, [2]f32{min(f32), min(f32)}
 	for pt in pts {
@@ -857,7 +891,7 @@ particle_step :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world: b2.World
 					ParticleEmitter_Emit(emitter)
 					emitter.emittedInCycle += 1
 				}
-			} else if interval > 0.00001 {
+			} else if interval > 0 { // (bounded by the target count: GPU emitters reach 1e-5 s intervals)
 				emitter.timer += deltaTime
 				for emitter.timer >= interval && emitter.emittedInCycle < targetAmount {
 					ParticleEmitter_Emit(emitter)
@@ -874,13 +908,28 @@ particle_step :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world: b2.World
 		}
 	}
 
+	// GPU mode: the shader moves them; only its clock runs here.
+	if emitter.gpu {
+		ParticleGPU_Advance(emitter, deltaTime)
+		return
+	}
 	collide := emitter.collisionEnabled && b2.World_IsValid(world)
+	emitter.stepGravity, emitter.stepWind = particle_forces(emitter)
+	emitter.stepForces = true
+	defer emitter.stepForces = false
+	mn, mx := [2]f32{max(f32), max(f32)}, [2]f32{min(f32), min(f32)}
+	big: f32 = 0
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles[i].alive do continue
 		prev := emitter.particles[i].position
 		Particle_Update(emitter, i, deltaTime)
 		if collide && emitter.particles[i].alive do particle_collide(emitter, &emitter.particles[i], prev, world)
+		p := &emitter.particles[i]
+		if !p.alive do continue
+		mn, mx = {min(mn.x, p.position.x), min(mn.y, p.position.y)}, {max(mx.x, p.position.x), max(mx.y, p.position.y)}
+		big = max(big, max(p.size.x * abs(p.scale.x), p.size.y * abs(p.scale.y)))
 	}
+	emitter.extentMin, emitter.extentMax, emitter.extentSize, emitter.extentAny = mn, mx, big, mn.x <= mx.x
 }
 
 @(private = "file")
@@ -960,7 +1009,6 @@ PARTICLE_CHUNK :: 1024
 particleCircleTex: rl.Texture2D
 
 // particle_circle_texture: a white disc, anti-aliased edge, alpha outside.
-@(private = "file")
 particle_circle_texture :: proc() -> u32 {
 	if particleCircleTex.id != 0 do return particleCircleTex.id
 	N :: 64
@@ -1103,6 +1151,10 @@ Particle_QuadOf :: proc(emitter: ^ParticleEmitter, particle: Particle) -> Partic
 }
 
 ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
+	if emitter.gpu {
+		ParticleGPU_Render(emitter)
+		return
+	}
 	white := rlgl.GetTextureIdDefault()
 	circle := particle_circle_texture()
 	b: Particle_Batch
