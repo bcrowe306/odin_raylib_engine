@@ -20,6 +20,7 @@ PhysicsWorld :: struct {
 	enableWarmStarting: bool `gui:"true"`,
 	drawPhysicsDebug: bool `gui:"true"`,
 	paused: bool `gui:"true"`,
+	contactCounts: map[[2]rawptr]int,
 }
 
 PhysicsWorld_Init :: proc(pw: ^PhysicsWorld) {
@@ -110,19 +111,65 @@ PhysicsWorld_Step :: proc(pw: ^PhysicsWorld, deltaTime: f32, gameContext: ^GameC
 		}
 	}
 
-	// Contact begin/end -> "collision_started"/"collision_ended" on both bodies.
+	// Contact begin/end -> "collision_started"/"collision_ended" on both bodies (once per body pair, even with multiple shapes).
 	contactEvents := b2.World_GetContactEvents(pw.worldId)
 	for i in 0..<contactEvents.beginCount {
 		ev := contactEvents.beginEvents[i]
 		nodeA, nodeB := contact_nodes(ev.shapeIdA, ev.shapeIdB)
-		Node_NotifyCollision(nodeA, nodeB, true, gameContext)
-		Node_NotifyCollision(nodeB, nodeA, true, gameContext)
+		if nodeA != nil && nodeB != nil && nodeA != nodeB {
+			pair := ordered_node_pair(nodeA, nodeB)
+			prev := pw.contactCounts[pair]
+			pw.contactCounts[pair] = prev + 1
+			if prev == 0 {
+				Node_NotifyCollision(nodeA, nodeB, true, gameContext)
+				Node_NotifyCollision(nodeB, nodeA, true, gameContext)
+			}
+		} else {
+			Node_NotifyCollision(nodeA, nodeB, true, gameContext)
+			Node_NotifyCollision(nodeB, nodeA, true, gameContext)
+		}
 	}
 	for i in 0..<contactEvents.endCount {
 		ev := contactEvents.endEvents[i]
 		nodeA, nodeB := contact_nodes(ev.shapeIdA, ev.shapeIdB)
-		Node_NotifyCollision(nodeA, nodeB, false, gameContext)
-		Node_NotifyCollision(nodeB, nodeA, false, gameContext)
+		if nodeA != nil && nodeB != nil && nodeA != nodeB {
+			pair := ordered_node_pair(nodeA, nodeB)
+			prev := pw.contactCounts[pair]
+			if prev <= 1 {
+				delete_key(&pw.contactCounts, pair)
+				Node_NotifyCollision(nodeA, nodeB, false, gameContext)
+				Node_NotifyCollision(nodeB, nodeA, false, gameContext)
+			} else {
+				pw.contactCounts[pair] = prev - 1
+			}
+		} else {
+			Node_NotifyCollision(nodeA, nodeB, false, gameContext)
+			Node_NotifyCollision(nodeB, nodeA, false, gameContext)
+		}
+	}
+}
+
+@(private = "file")
+ordered_node_pair :: proc(a, b: ^Node) -> [2]rawptr {
+	ra := cast(rawptr)a
+	rb := cast(rawptr)b
+	if uintptr(ra) <= uintptr(rb) {
+		return {ra, rb}
+	}
+	return {rb, ra}
+}
+
+PhysicsWorld_ClearNodeContacts :: proc(pw: ^PhysicsWorld, node: ^Node) {
+	if pw == nil || node == nil || len(pw.contactCounts) == 0 do return
+	raw := cast(rawptr)node
+	toDelete := make([dynamic][2]rawptr, context.temp_allocator)
+	for pair in pw.contactCounts {
+		if pair[0] == raw || pair[1] == raw {
+			append(&toDelete, pair)
+		}
+	}
+	for pair in toDelete {
+		delete_key(&pw.contactCounts, pair)
 	}
 }
 
@@ -149,6 +196,9 @@ Node_NotifyCollision :: proc(node, other: ^Node, started: bool, gameContext: ^Ga
 	case StaticBodyNode:
 		sb := cast(^StaticBodyNode)node
 		subject = &sb.onCollisionStarted if started else &sb.onCollisionEnded
+	case KinematicBodyNode:
+		kb := cast(^KinematicBodyNode)node
+		subject = &kb.onCollisionStarted if started else &kb.onCollisionEnded
 	case CharacterMoverNode:
 		cm := cast(^CharacterMoverNode)node
 		subject = &cm.onCollisionStarted if started else &cm.onCollisionEnded
@@ -157,6 +207,8 @@ Node_NotifyCollision :: proc(node, other: ^Node, started: bool, gameContext: ^Ga
 }
 
 PhysicsWorld_Destroy :: proc(pw: ^PhysicsWorld) {
+	delete(pw.contactCounts)
+	pw.contactCounts = nil
 	if b2.World_IsValid(pw.worldId) {
 		b2.DestroyWorld(pw.worldId)
 		pw.worldId = b2.nullWorldId

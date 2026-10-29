@@ -170,6 +170,14 @@ groups_list :: proc(state: ^EditorState, layerUid: int) {
 		} else do Editor_Log(state, .Info, "Pick a 3x3 block of tiles (corners, edges, centre) in the Layers panel's tileset first")
 	}
 	level_tip("Terrain from the picked 3x3 tiles: corners, edges and centre over the picked value", "rules.terrain")
+	imgui.SameLine()
+	if UI_IconButton(ICON_FA_ROTATE, "defs.group.sync", "Sync groups from IntGrid", false, 24) {
+		cp("Sync Rule Groups")
+		n := e.Ldtk_Doc_SyncRuleGroupsFromIntGrid(doc, layerUid)
+		if n > 0 do Editor_Log(state, .Info, "Synced %d rule group(s) from IntGrid", n)
+		else do Editor_Log(state, .Info, "Rule groups are already in sync with IntGrid")
+	}
+	level_tip("Sync rule groups with IntGrid value groups/values (creates matching rule groups with colours)", "tab.rules")
 	if lr.clipGroup != "" {
 		imgui.SameLine()
 		if UI_IconButton(ICON_FA_PASTE, "defs.group.paste", "", false, 26) {
@@ -734,16 +742,16 @@ rule_editor :: proc(state: ^EditorState, layerUid: int, robj: ^e.LdtkJson) {
 	changed |= rule_bool("Flip Y", "defs.rule.flipy", robj, "flipY", "Also match it mirrored vertically")
 	UI_PropLabel("Chance")
 	chance := f32(r.chance * 100)
-	if imgui.InputFloat("##chance", &chance, 0, 0, "%.0f %%", {.EnterReturnsTrue}) {
+	if imgui.InputFloat("##chance", &chance, 0, 0, "%.0f %%") || imgui.IsItemDeactivatedAfterEdit() {
 		cp("Rule Chance")
 		e.LdtkJson_SetFloat(robj, "chance", f64(clamp(chance, 0, 100)) / 100, a)
 		changed = true
 	}
 	Drive_Item("defs.rule.chance")
-	level_tip("The percentage of matching cells that get tiles (Enter applies)", "tab.rules")
+	level_tip("The percentage of matching cells that get tiles", "tab.rules")
 	UI_PropLabel("Opacity")
 	alpha := f32(r.alpha)
-	if imgui.InputFloat("##alpha", &alpha, 0, 0, "%.2f", {.EnterReturnsTrue}) {
+	if imgui.InputFloat("##alpha", &alpha, 0, 0, "%.2f") || imgui.IsItemDeactivatedAfterEdit() {
 		cp("Rule Opacity")
 		e.LdtkJson_SetFloat(robj, "alpha", f64(clamp(alpha, 0, 1)), a)
 		changed = true
@@ -781,7 +789,7 @@ rule_editor :: proc(state: ^EditorState, layerUid: int, robj: ^e.LdtkJson) {
 	if r.perlin {
 		UI_PropLabel("Noise seed")
 		seed := i32(r.perlinSeed)
-		if imgui.InputInt("##pseed", &seed, 1, 100, {.EnterReturnsTrue}) {
+		if imgui.InputInt("##pseed", &seed, 1, 100) || imgui.IsItemDeactivatedAfterEdit() {
 			cp("Perlin Seed")
 			set_int(robj, "perlinSeed", int(seed))
 			changed = true
@@ -789,7 +797,7 @@ rule_editor :: proc(state: ^EditorState, layerUid: int, robj: ^e.LdtkJson) {
 		level_tip("Change it for another noise", "rules.perlin")
 		UI_PropLabel("Noise scale")
 		sc := f32(r.perlinScale)
-		if imgui.InputFloat("##pscale", &sc, 0.05, 0.1, "%.2f", {.EnterReturnsTrue}) {
+		if imgui.InputFloat("##pscale", &sc, 0.05, 0.1, "%.2f") || imgui.IsItemDeactivatedAfterEdit() {
 			cp("Perlin Scale")
 			e.LdtkJson_SetFloat(robj, "perlinScale", f64(max(sc, 0.01)), a)
 			changed = true
@@ -797,7 +805,7 @@ rule_editor :: proc(state: ^EditorState, layerUid: int, robj: ^e.LdtkJson) {
 		level_tip("Smaller: bigger patches", "rules.perlin")
 		UI_PropLabel("Octaves")
 		oc := i32(r.perlinOctaves)
-		if imgui.InputInt("##poct", &oc, 1, 1, {.EnterReturnsTrue}) {
+		if imgui.InputInt("##poct", &oc, 1, 1) || imgui.IsItemDeactivatedAfterEdit() {
 			cp("Perlin Octaves")
 			set_int(robj, "perlinOctaves", clamp(int(oc), 1, 8))
 			changed = true
@@ -839,11 +847,11 @@ rule_editor :: proc(state: ^EditorState, layerUid: int, robj: ^e.LdtkJson) {
 int_pair :: proc(id: string, v: ^[2]i32) -> bool {
 	w := (imgui.GetContentRegionAvail().x - 4) * 0.5
 	imgui.SetNextItemWidth(w)
-	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0, {.EnterReturnsTrue})
+	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(fmt.tprintf("%s.x", id))
 	imgui.SameLine(0, 4)
 	imgui.SetNextItemWidth(w)
-	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0, {.EnterReturnsTrue})
+	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(fmt.tprintf("%s.y", id))
 	return a || b
 }
@@ -921,7 +929,7 @@ rename_popup :: proc(state: ^EditorState) {
 	defer imgui.EndPopup()
 	imgui.SetNextItemWidth(300)
 	if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
-	enter := imgui.InputText("##gname", cstring(raw_data(lr.renameBuf[:])), len(lr.renameBuf), {.EnterReturnsTrue})
+	enter := imgui.InputText("##gname", cstring(raw_data(lr.renameBuf[:])), len(lr.renameBuf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item("defs.group.rename.name")
 	if UI_PrimaryButton("Rename", "defs.group.rename.ok") || enter {
 		cp("Rename Group")
@@ -1024,9 +1032,35 @@ wizard_open :: proc(layerUid: int, guid: int) {
 	} else {
 		lr.wizGroup = -1
 		di := e.Ldtk_Doc_LayerDefIndex(doc, layerUid)
-		if sd := src_def(doc, &doc.layerDefs[di]); sd != nil && len(sd.values) > 0 {
-			lr.wiz.mainValue = sd.values[0].value
-			copy(lr.wizName[:127], sd.values[0].identifier != "" ? sd.values[0].identifier : fmt.tprintf("Rules for #%d", sd.values[0].value))
+		if sd := src_def(doc, &doc.layerDefs[di]); sd != nil {
+			matched := false
+			if lr.groupUid >= 0 {
+				if g, _, _ := e.Ldtk_Doc_FindRuleGroup(doc, lr.groupUid); g != nil {
+					gname := e.LdtkJson_Str(g, "name")
+					for ig in e.LdtkJson_Arr(sd.obj, "intGridValuesGroups") {
+						if e.LdtkJson_Str(ig, "identifier") == gname {
+							lr.wiz.mainValue = (e.LdtkJson_Int(ig, "uid") + 1) * 1000
+							copy(lr.wizName[:127], gname)
+							matched = true
+							break
+						}
+					}
+					if !matched {
+						for v in sd.values {
+							if v.identifier == gname {
+								lr.wiz.mainValue = v.value
+								copy(lr.wizName[:127], gname)
+								matched = true
+								break
+							}
+						}
+					}
+				}
+			}
+			if !matched && len(sd.values) > 0 {
+				lr.wiz.mainValue = sd.values[0].value
+				copy(lr.wizName[:127], sd.values[0].identifier != "" ? sd.values[0].identifier : fmt.tprintf("Rules for #%d", sd.values[0].value))
+			}
 		}
 	}
 	lr.wizFrag = .Full
@@ -1062,26 +1096,51 @@ wizard_window :: proc(state: ^EditorState) {
 		Drive_Item("wiz.name")
 		level_tip("The rule group's name", "rules.wizard")
 		names := make([dynamic]string, context.temp_allocator)
+		val_ids := make([dynamic]int, context.temp_allocator)
 		cur := 0
-		if sd != nil do for v, k in sd.values {
-			if v.value == lr.wiz.mainValue do cur = k
-			append(&names, fmt.tprintf("%d %s", v.value, v.identifier))
+		if sd != nil {
+			for g in e.LdtkJson_Arr(sd.obj, "intGridValuesGroups") {
+				guid := e.LdtkJson_Int(g, "uid")
+				val := (guid + 1) * 1000
+				if val == lr.wiz.mainValue do cur = len(names)
+				gname := e.LdtkJson_Str(g, "identifier", fmt.tprintf("Group %d", guid))
+				append(&names, fmt.tprintf("Group: %s", gname))
+				append(&val_ids, val)
+			}
+			for v, k in sd.values {
+				if v.value == lr.wiz.mainValue do cur = len(names)
+				append(&names, fmt.tprintf("%d %s", v.value, v.identifier))
+				append(&val_ids, v.value)
+			}
 		}
 		UI_PropLabel("Value")
 		if len(names) > 0 {
-			if pick, ch := UI_Combo("wiz.value", cur, names[:]); ch do lr.wiz.mainValue = sd.values[pick].value
+			if pick, ch := UI_Combo("wiz.value", cur, names[:]); ch do lr.wiz.mainValue = val_ids[pick]
 		}
-		level_tip("The IntGrid value these walls draw over", "rules.wizard")
+		level_tip("The IntGrid value or group these walls draw over", "rules.wizard")
 		UI_PropLabel("Next to")
 		others := make([dynamic]string, context.temp_allocator)
+		other_ids := make([dynamic]int, context.temp_allocator)
 		append(&others, "anything else")
+		append(&other_ids, 0)
 		ocur := 0
-		if sd != nil do for v, k in sd.values {
-			if v.value == lr.wiz.otherValue do ocur = k + 1
-			append(&others, fmt.tprintf("%d %s", v.value, v.identifier))
+		if sd != nil {
+			for g in e.LdtkJson_Arr(sd.obj, "intGridValuesGroups") {
+				guid := e.LdtkJson_Int(g, "uid")
+				val := (guid + 1) * 1000
+				if val == lr.wiz.otherValue do ocur = len(others)
+				gname := e.LdtkJson_Str(g, "identifier", fmt.tprintf("Group %d", guid))
+				append(&others, fmt.tprintf("Group: %s", gname))
+				append(&other_ids, val)
+			}
+			for v, k in sd.values {
+				if v.value == lr.wiz.otherValue do ocur = len(others)
+				append(&others, fmt.tprintf("%d %s", v.value, v.identifier))
+				append(&other_ids, v.value)
+			}
 		}
-		if pick, ch := UI_Combo("wiz.other", ocur, others[:]); ch do lr.wiz.otherValue = pick == 0 ? 0 : sd.values[pick - 1].value
-		level_tip("What the edges are against: any other cell, or a specific value (e.g. walls next to water)", "rules.wizard")
+		if pick, ch := UI_Combo("wiz.other", ocur, others[:]); ch do lr.wiz.otherValue = other_ids[pick]
+		level_tip("What the edges are against: any other cell, or a specific value/group (e.g. walls next to water)", "rules.wizard")
 		UI_PropLabel("Break on match")
 		imgui.Checkbox("##wbreak", &lr.wiz.breakOnMatch)
 		level_tip("Later rules don't paint the cells these rules painted", "rules.wizard")

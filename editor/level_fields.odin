@@ -183,7 +183,7 @@ value_widget :: proc(state: ^EditorState, fd: ^e.LdtkJson, fi: ^e.LdtkJson, idx,
 		v, _ := strconv.parse_f64(cur)
 		buf: [64]u8
 		copy(buf[:63], isNull ? "" : cur)
-		if imgui.InputTextWithHint("##f", isNull ? "(empty)" : "", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue, .CharsScientific}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
+		if imgui.InputTextWithHint("##f", isNull ? "(empty)" : "", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue, .CharsScientific}) || imgui.IsItemDeactivatedAfterEdit() do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
 		level_tip(valueTip, "fields")
 		_ = v
 	case .Color:
@@ -216,14 +216,14 @@ value_widget :: proc(state: ^EditorState, fd: ^e.LdtkJson, fi: ^e.LdtkJson, idx,
 			if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
 			level_tip(valueTip, "fields")
 		} else {
-			if imgui.InputTextWithHint("##f", isNull ? "(empty)" : "", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
+			if imgui.InputTextWithHint("##f", isNull ? "(empty)" : "", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
 			level_tip(valueTip, "fields")
 		}
 	case .Path:
 		buf: [512]u8
 		copy(buf[:len(buf) - 1], cur)
 		imgui.SetNextItemWidth(rowW - 28)
-		if imgui.InputTextWithHint("##f", "(no file)", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
+		if imgui.InputTextWithHint("##f", "(no file)", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
 		level_tip(valueTip, "fields")
 		imgui.SameLine(0, 2)
 		if UI_IconButton(ICON_FA_FOLDER_OPEN, fmt.tprintf("level.field.file:%s:%d", name, idx), "", false, 24) do imgui.OpenPopup("##pickfile")
@@ -249,7 +249,7 @@ value_widget :: proc(state: ^EditorState, fd: ^e.LdtkJson, fi: ^e.LdtkJson, idx,
 		buf: [64]u8
 		copy(buf[:63], cur)
 		imgui.SetNextItemWidth(rowW - 28)
-		if imgui.InputTextWithHint("##f", "cx,cy", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
+		if imgui.InputTextWithHint("##f", "cx,cy", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() do set(state, fi, idx, i, mirror, owner, string(cstring(raw_data(buf[:]))))
 		level_tip(valueTip, "fields")
 		imgui.SameLine(0, 2)
 		picking := levelPick.active && levelPick.fi == fi && levelPick.idx == idx

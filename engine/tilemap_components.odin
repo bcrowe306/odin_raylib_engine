@@ -86,6 +86,7 @@ tilemap_subtree_bounds :: proc(m: ^NodeManager, n: ^Node) -> (b: [4]f32, have: b
 	switch n.typeId {
 	case StaticBodyNode: shapes = (cast(^StaticBodyNode)n).shapes[:]
 	case DynamicBodyNode: shapes = (cast(^DynamicBodyNode)n).shapes[:]
+	case KinematicBodyNode: shapes = (cast(^KinematicBodyNode)n).shapes[:]
 	case AreaNode: shapes = (cast(^AreaNode)n).shapes[:]
 	}
 	for &s in shapes {

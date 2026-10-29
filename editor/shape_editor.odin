@@ -370,7 +370,7 @@ Viewport_ShapeEdit :: proc(state: ^EditorState, dl: ^imgui.DrawList, mouseScreen
 			p := Viewport_WorldToScreen(state, hp.pos)
 			d := math.sqrt((p.x - mouseScreen.x) * (p.x - mouseScreen.x) + (p.y - mouseScreen.y) * (p.y - mouseScreen.y))
 			if hp.h.kind == .AddPoint do d += 2
-			if d < best {
+			if d <= best {
 				best = d
 				se.hover = hp.h
 			}

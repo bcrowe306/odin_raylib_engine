@@ -52,6 +52,7 @@ if [ "${1:-}" = --one ]; then
 		grep -q "^\[DRIVE\] $name.drive: [0-9]* passed, 0 failed" "$tmp/editor.log"; then
 		cp "$tmp/editor.log" "$shots/editor.log" 2>/dev/null # kept (memory reports, ...)
 		line="PASS  $name"
+		pass=1
 	else
 		line="FAIL  $name   (log: $tmp/editor.log)"
 	fi
@@ -60,6 +61,9 @@ if [ "${1:-}" = --one ]; then
 		grep "\[DRIVE\] FAIL" "$tmp/editor.log" | sed 's/^/      /'
 	} > "$RESULTS/$name"
 	printf '%s  (%ds)\n' "$line" $(( $(date +%s) - start ))
+	# A passing drive's scratch project goes (about 7 MB each; a full run
+	# makes ~170). A failing one stays for its log.
+	[ -n "${pass:-}" ] && rm -rf "$tmp"
 	exit 0
 fi
 

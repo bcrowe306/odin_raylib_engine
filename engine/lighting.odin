@@ -136,6 +136,7 @@ occluder_polygons :: proc(scene: ^Scene) -> [dynamic][dynamic][2]f32 {
 		switch n.typeId {
 		case StaticBodyNode:     shapes = (cast(^StaticBodyNode)n).shapes[:]
 		case DynamicBodyNode:    shapes = (cast(^DynamicBodyNode)n).shapes[:]
+		case KinematicBodyNode:  shapes = (cast(^KinematicBodyNode)n).shapes[:]
 		case CharacterMoverNode: shapes = (cast(^CharacterMoverNode)n).shapes[:]
 		}
 		for &s in shapes {

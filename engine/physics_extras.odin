@@ -94,12 +94,13 @@ CollisionLayer_Parse :: proc(s: string) -> (CollisionLayer, bool) {
 // --- bodies ---------------------------------------------------------------------------------
 
 // Physics_BodyOf: the Box2D body of a body node (static, dynamic,
-// character mover), or a null id.
+// kinematic, character mover), or a null id.
 Physics_BodyOf :: proc(n: ^Node) -> b2.BodyId {
 	if n == nil || !Node_IsAlive(n) do return b2.nullBodyId
 	switch n.typeId {
 	case StaticBodyNode:     return (cast(^StaticBodyNode)n).bodyId
 	case DynamicBodyNode:    return (cast(^DynamicBodyNode)n).bodyId
+	case KinematicBodyNode:  return (cast(^KinematicBodyNode)n).bodyId
 	case CharacterMoverNode: return (cast(^CharacterMoverNode)n).bodyId
 	}
 	return b2.nullBodyId
@@ -111,6 +112,7 @@ Physics_BodyShapes :: proc(n: ^Node) -> []PhysicsShape {
 	switch n.typeId {
 	case StaticBodyNode:     return (cast(^StaticBodyNode)n).shapes[:]
 	case DynamicBodyNode:    return (cast(^DynamicBodyNode)n).shapes[:]
+	case KinematicBodyNode:  return (cast(^KinematicBodyNode)n).shapes[:]
 	case CharacterMoverNode: return (cast(^CharacterMoverNode)n).shapes[:]
 	case AreaNode:           return (cast(^AreaNode)n).shapes[:]
 	}
@@ -119,5 +121,5 @@ Physics_BodyShapes :: proc(n: ^Node) -> []PhysicsShape {
 
 // b2_is_body_node: a node with a Box2D body a joint can attach to.
 b2_is_body_node :: proc(n: ^Node) -> bool {
-	return n.typeId == StaticBodyNode || n.typeId == DynamicBodyNode || n.typeId == CharacterMoverNode
+	return n.typeId == StaticBodyNode || n.typeId == DynamicBodyNode || n.typeId == KinematicBodyNode || n.typeId == CharacterMoverNode
 }

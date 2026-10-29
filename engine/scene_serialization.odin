@@ -115,6 +115,7 @@ node_shapes :: proc(node: ^Node) -> ^[dynamic]PhysicsShape {
 	switch node.typeId {
 	case StaticBodyNode: return &(cast(^StaticBodyNode)node).shapes
 	case DynamicBodyNode: return &(cast(^DynamicBodyNode)node).shapes
+	case KinematicBodyNode: return &(cast(^KinematicBodyNode)node).shapes
 	case CharacterMoverNode: return &(cast(^CharacterMoverNode)node).shapes
 	case AreaNode: return &(cast(^AreaNode)node).shapes
 	}

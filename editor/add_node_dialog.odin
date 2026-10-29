@@ -252,6 +252,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "StaticBodyNode",
 	},
 	{
+		name        = "Kinematic Platform",
+		category    = "Physics & Collision",
+		icon        = ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT,
+		description = "Kinematic physics body moved by velocity or transform (moving platforms, elevators, doors) that carries characters and pushes dynamic bodies without being pushed back.",
+		typeName    = "KinematicBodyNode",
+	},
+	{
 		name        = "Character Mover",
 		category    = "Physics & Collision",
 		icon        = ICON_FA_PERSON_RUNNING,

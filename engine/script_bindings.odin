@@ -103,6 +103,7 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case MusicNode: typeName = "MusicNode"
 	case DynamicBodyNode: typeName = "DynamicBodyNode"
 	case StaticBodyNode: typeName = "StaticBodyNode"
+	case KinematicBodyNode: typeName = "KinematicBodyNode"
 	case CharacterMoverNode: typeName = "CharacterMoverNode"
 	case AreaNode: typeName = "AreaNode"
 	case RaycastNode: typeName = "RaycastNode"
@@ -544,12 +545,16 @@ lua_node_get_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
 	}
 	if node.typeId == DynamicBodyNode {
 		dynBody := cast(^DynamicBodyNode)node
-		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
-			vel := b2.Body_GetLinearVelocity(dynBody.bodyId)
-			lua.pushnumber(L, lua.Number(vel.x))
-			lua.pushnumber(L, lua.Number(vel.y))
-			return 2
-		}
+		vel := b2.Body_GetLinearVelocity(dynBody.bodyId) if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) else dynBody.linearVelocity
+		lua.pushnumber(L, lua.Number(vel.x))
+		lua.pushnumber(L, lua.Number(vel.y))
+		return 2
+	} else if node.typeId == KinematicBodyNode {
+		kb := cast(^KinematicBodyNode)node
+		vel := b2.Body_GetLinearVelocity(kb.bodyId) if kb.bodyId.index1 != 0 && b2.Body_IsValid(kb.bodyId) else kb.linearVelocity
+		lua.pushnumber(L, lua.Number(vel.x))
+		lua.pushnumber(L, lua.Number(vel.y))
+		return 2
 	} else if node.typeId == CharacterMoverNode {
 		cm := cast(^CharacterMoverNode)node
 		lua.pushnumber(L, lua.Number(cm.velocity.x))
@@ -569,9 +574,18 @@ lua_node_set_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
 	vx, vy := arg_xy(L, 2) // two numbers or a vector
 	if node.typeId == DynamicBodyNode {
 		dynBody := cast(^DynamicBodyNode)node
+		dynBody.linearVelocity = {vx, vy}
+		dynBody.lastSyncedVel = {vx, vy}
 		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
 			b2.Body_SetLinearVelocity(dynBody.bodyId, [2]f32{vx, vy})
 			b2.Body_SetAwake(dynBody.bodyId, true)
+		}
+	} else if node.typeId == KinematicBodyNode {
+		kb := cast(^KinematicBodyNode)node
+		kb.linearVelocity = {vx, vy}
+		kb.lastSyncedVel = {vx, vy}
+		if kb.bodyId.index1 != 0 && b2.Body_IsValid(kb.bodyId) {
+			b2.Body_SetLinearVelocity(kb.bodyId, [2]f32{vx, vy})
 		}
 	} else if node.typeId == CharacterMoverNode {
 		cm := cast(^CharacterMoverNode)node
@@ -590,11 +604,14 @@ lua_node_get_angular_velocity :: proc "c" (L: ^lua.State) -> c.int {
 	}
 	if node.typeId == DynamicBodyNode {
 		dynBody := cast(^DynamicBodyNode)node
-		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
-			w := math.to_degrees(b2.Body_GetAngularVelocity(dynBody.bodyId))
-			lua.pushnumber(L, lua.Number(w))
-			return 1
-		}
+		w := math.to_degrees(b2.Body_GetAngularVelocity(dynBody.bodyId)) if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) else dynBody.angularVelocity
+		lua.pushnumber(L, lua.Number(w))
+		return 1
+	} else if node.typeId == KinematicBodyNode {
+		kb := cast(^KinematicBodyNode)node
+		w := math.to_degrees(b2.Body_GetAngularVelocity(kb.bodyId)) if kb.bodyId.index1 != 0 && b2.Body_IsValid(kb.bodyId) else kb.angularVelocity
+		lua.pushnumber(L, lua.Number(w))
+		return 1
 	}
 	lua.pushnumber(L, 0)
 	return 1
@@ -608,9 +625,18 @@ lua_node_set_angular_velocity :: proc "c" (L: ^lua.State) -> c.int {
 	w := f32(lua.tonumber(L, 2))
 	if node.typeId == DynamicBodyNode {
 		dynBody := cast(^DynamicBodyNode)node
+		dynBody.angularVelocity = w
+		dynBody.lastSyncedAngVel = w
 		if dynBody.bodyId.index1 != 0 && b2.Body_IsValid(dynBody.bodyId) {
 			b2.Body_SetAngularVelocity(dynBody.bodyId, math.to_radians(w))
 			b2.Body_SetAwake(dynBody.bodyId, true)
+		}
+	} else if node.typeId == KinematicBodyNode {
+		kb := cast(^KinematicBodyNode)node
+		kb.angularVelocity = w
+		kb.lastSyncedAngVel = w
+		if kb.bodyId.index1 != 0 && b2.Body_IsValid(kb.bodyId) {
+			b2.Body_SetAngularVelocity(kb.bodyId, math.to_radians(w))
 		}
 	}
 	return 0
@@ -1017,6 +1043,27 @@ lua_node_area_get_overlapping_nodes :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+@(private="file")
+lua_node_area_set_monitoring :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AreaNode do return 0
+	AreaNode_SetMonitoring(cast(^AreaNode)node, bool(lua.toboolean(L, 2)))
+	return 0
+}
+
+@(private="file")
+lua_node_area_is_monitoring :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != AreaNode {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(AreaNode_IsMonitoring(cast(^AreaNode)node)))
+	return 1
+}
+
 // ----------------------------------------------------------------------------
 // Physics: RaycastNode
 // ----------------------------------------------------------------------------
@@ -1121,6 +1168,27 @@ lua_node_raycast_set_length :: proc "c" (L: ^lua.State) -> c.int {
 	rc := cast(^RaycastNode)node
 	rc.length = lenVal
 	return 0
+}
+
+@(private="file")
+lua_node_raycast_set_monitoring :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode do return 0
+	RaycastNode_SetMonitoring(cast(^RaycastNode)node, bool(lua.toboolean(L, 2)))
+	return 0
+}
+
+@(private="file")
+lua_node_raycast_is_monitoring :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != RaycastNode {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	lua.pushboolean(L, b32(RaycastNode_IsMonitoring(cast(^RaycastNode)node)))
+	return 1
 }
 
 // ----------------------------------------------------------------------------
@@ -3324,6 +3392,15 @@ set_layers :: proc(L: ^lua.State, mask: bool) -> c.int {
 	if !ok do return 0
 	set, valid := layers_arg(L, 2)
 	if !valid do lua.L_error(L, "unknown collision layer (names from Project Settings > Physics, or 1-16)")
+	if node.typeId == CharacterMoverNode {
+		cm := cast(^CharacterMoverNode)node
+		if mask do cm.maskLayers = set
+		else do cm.categoryLayers = set
+	} else if node.typeId == RaycastNode {
+		rc := cast(^RaycastNode)node
+		if mask do rc.maskLayers = set
+		else do rc.categoryLayers = set
+	}
 	for &s in Physics_BodyShapes(node) {
 		if mask do s.maskLayers = set
 		else do s.categoryLayers = set
@@ -4079,6 +4156,9 @@ lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 	case "staticbodynode", "staticbody", "static_body":
 		sb := StaticBodyNode_Create(scene, nodeName, parent)
 		createdNode = sb
+	case "kinematicbodynode", "kinematicbody", "kinematic_body":
+		kb := KinematicBodyNode_Create(scene, nodeName, parent)
+		createdNode = kb
 	case "charactermovernode", "charactermover", "character_mover":
 		cm := CharacterMoverNode_Create(scene, nodeName, parent)
 		createdNode = cm
@@ -4570,6 +4650,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "area_get_overlap_count")
 		lua.pushcfunction(L, lua_node_area_get_overlapping_nodes)
 		lua.setfield(L, -2, "area_get_overlapping_nodes")
+		lua.pushcfunction(L, lua_node_area_set_monitoring)
+		lua.setfield(L, -2, "area_set_monitoring")
+		lua.pushcfunction(L, lua_node_area_is_monitoring)
+		lua.setfield(L, -2, "area_is_monitoring")
 
 		// RaycastNode
 		lua.pushcfunction(L, lua_node_raycast_cast)
@@ -4588,6 +4672,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "raycast_set_direction")
 		lua.pushcfunction(L, lua_node_raycast_set_length)
 		lua.setfield(L, -2, "raycast_set_length")
+		lua.pushcfunction(L, lua_node_raycast_set_monitoring)
+		lua.setfield(L, -2, "raycast_set_monitoring")
+		lua.pushcfunction(L, lua_node_raycast_is_monitoring)
+		lua.setfield(L, -2, "raycast_is_monitoring")
 
 		// ParticleEmitterNode
 		lua.pushcfunction(L, lua_node_particle_start)

@@ -198,10 +198,19 @@ Node_WorldBounds :: proc(n: ^Node, m: ^NodeManager) -> ([4]f32, bool) {
 	case StaticBodyNode:
 		sb := cast(^StaticBodyNode)n
 		if len(sb.shapes) == 0 do return {}, false
-		s := sb.shapes[0]
-		half := s.size * 0.5 * sb.globalScale if s.type == .Box || s.type == .RoundedBox else [2]f32{s.radius, s.radius} * sb.globalScale
-		c := sb.globalPosition + s.offset * sb.globalScale
-		return {c.x - abs(half.x), c.y - abs(half.y), c.x + abs(half.x), c.y + abs(half.y)}, true
+		rect: [4]f32
+		haveRect := false
+		for s in sb.shapes {
+			half := s.size * 0.5 * sb.globalScale if s.type == .Box || s.type == .RoundedBox else [2]f32{s.radius, s.radius} * sb.globalScale
+			c := sb.globalPosition + s.offset * sb.globalScale
+			sr := [4]f32{c.x - abs(half.x), c.y - abs(half.y), c.x + abs(half.x), c.y + abs(half.y)}
+			if !haveRect {
+				rect, haveRect = sr, true
+			} else {
+				rect = {min(rect[0], sr[0]), min(rect[1], sr[1]), max(rect[2], sr[2]), max(rect[3], sr[3])}
+			}
+		}
+		return rect, haveRect
 	}
 	return {}, false
 }

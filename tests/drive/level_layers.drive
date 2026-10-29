@@ -33,6 +33,9 @@ screenshot guide_grid
 click @defs.layer.grid
 key cmd+a
 type 8
+# (#99: applied when the field is left, not on each keystroke)
+wait 1
+expect level.layerprop:Collisions.gridSize == 16
 key enter
 wait 2
 expect level.layerprop:Collisions.gridSize == 8

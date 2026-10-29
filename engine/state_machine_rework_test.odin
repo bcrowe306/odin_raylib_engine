@@ -204,6 +204,34 @@ return S
 	testing.expect_value(t, lua_str(L, "enters"), "3") // (Any -> itself now allowed)
 }
 
+// Issue #67: retriggering a state whose (non-looping) animation already
+// finished plays it again from the start, frames advancing - through the
+// machine's own updates (an Any-state trigger), as in a game.
+@(test)
+test_sm_retrigger_replays_finished_animation :: proc(t: ^testing.T) {
+	f := sm_fixture("smr_retrigger_anim.lua", `local S = {} S.properties = {} return S`)
+	defer f.game->terminate()
+	sm := f.sm
+	a := AnimationPlayerNode_AddFrameAnimation(f.apn, nil, "attack", nil, loop = false)
+	a.endFrame = 3
+	a.fps = 60
+	hit := StateMachine_AddState(sm, "attack", "attack")
+	sm.states[hit].allowRetrigger = true
+	any := StateMachine_AddTransition(sm, SM_ANY, "attack", mode = .Automatic)
+	StateMachine_AddCondition(sm, any, .Trigger, "swing")
+	ProcessNodeQueues(f.scene.manager, &f.game.gameContext)
+	f.game->run(1.0 / 60) // starts in attack
+	// (the player's ticker runs on wall-clock time: frames are stepped here)
+	for _ in 0 ..< 5 do AnimationPlayerNode_AdvanceFrame(f.apn)
+	testing.expect(t, f.apn.finishedNotified && f.apn.currentFrame == 3 && !f.apn.ticker.running, "played to the end and finished")
+
+	StateMachine_FireTrigger(sm, "swing")
+	f.game->run(1.0 / 60)
+	testing.expectf(t, f.apn.currentFrame == 0 && !f.apn.finishedNotified && f.apn.ticker.running, "restarted and playing (frame %d, running %v)", f.apn.currentFrame, f.apn.ticker.running)
+	for _ in 0 ..< 5 do AnimationPlayerNode_AdvanceFrame(f.apn)
+	testing.expectf(t, f.apn.currentFrame == 3 && f.apn.finishedNotified, "played through again (frame %d)", f.apn.currentFrame)
+}
+
 // Scripts changing state from callbacks: a chain of changes stops at
 // SM_CHAIN_MAX; changing state from inside a guard, a condition or an
 // on_exit is refused; at most one automatic change per update.
