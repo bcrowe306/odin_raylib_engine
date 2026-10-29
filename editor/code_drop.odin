@@ -558,6 +558,7 @@ prop_label_menu :: proc(node: ^e.Node, path: string) {
 	if !imgui.BeginPopupContextItem(fmt.ctprintf("##propctx_%s", path)) do return
 	defer imgui.EndPopup()
 	state := code_state()
+	exposed_menu(state, node, path) // (a component document: #85)
 	if Inspector_IsOverridden(node, path) {
 		if imgui.MenuItem(fmt.ctprintf("%s  Revert to Component", ICON_FA_ROTATE_LEFT)) do inspector_queue_override(node, path, false)
 		Drive_Item("ctx:revert-override")

@@ -46,6 +46,36 @@ The file is a node object, the same as a node in a scene file, with a
 - A copied or duplicated node is a new node: it has no uid until its file
   is written. A node that is cut and pasted keeps its uid.
 
+### Exposed properties
+
+The root can list a few properties of the component's nodes that every
+instance shows on its root (speed, colour, team):
+
+```json
+"exposed": [
+  {"uid": "k3j9x0ab", "property": "emitter.amount", "label": "Thrust"},
+  {"uid": "7c1lz4ee/p0q9zz11", "property": "script.team", "label": ""}
+]
+```
+
+- **`uid`**: the node, by its uid in this file (`"."` is the root). A node
+  inside a nested instance is named by a path of uids through the nested
+  link.
+- **`property`**: a node key (`position`, `rotation`, `scale`, `origin`), a
+  reflected property (`emitter.amount`), or `script.<name>` for a script
+  property.
+- **`label`**: what instances show. When it's empty, they show the
+  property's name, after the node's name for a child.
+- The list belongs to the file. An instance never saves it, and Apply and
+  Save as Component keep it.
+- In the editor:
+  - In the component document, right-click a property's label and choose
+    **Expose on Instances** (or **Stop Exposing**).
+  - The root's **Exposed on Instances** section names entries and removes
+    them.
+  - An instance's root shows them in an **Instance** section.
+  - Editing a value there edits that node, which saves an ordinary override.
+
 ### Instance in a scene
 
 ```json
