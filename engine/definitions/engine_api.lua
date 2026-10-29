@@ -8956,6 +8956,32 @@ function PoolModule.stats(component) end
 
 -- ============================================================================
 
+---@class LevelGenModule
+---Procedural levels: a generator file (.levelgen.json) is a graph of nodes - noise, random fill, cellular caves, thresholds, combines... - whose tile output writes a level into a TileMap. The same generator and seed always give the same level. Guide: engine/docs/level_generator.md.
+local LevelGenModule = {}
+
+---Generates a level into a TileMap node: its map becomes the generator's size and its cells the tiles (colliders rebuilt when it is Solid). Emits `level_generated` (the tile map's name) on the event bus.
+---
+---Example: `local ok, why = LevelGen.generate("levels/caves.levelgen.json", self.node:get_node("Ground"), os.time())`
+---@param generator string A .levelgen.json file
+---@param tilemap TileMapNode
+---@param seed? integer The seed (default: the generator's)
+---@return boolean ok
+---@return string? why
+function LevelGenModule.generate(generator, tilemap, seed) end
+
+---A generator's values without a tile map (row-major, 0..1 usually) - to place things yourself; `node_id` reads any node's grid (default: the output).
+---
+---Example: `local g = LevelGen.values("levels/caves.levelgen.json", 42); local solid = g.values[y * g.width + x + 1] >= 0.5`
+---@param generator string A .levelgen.json file
+---@param seed? integer
+---@param node_id? integer
+---@return {width: integer, height: integer, values: number[]}? grid
+---@return string? why
+function LevelGenModule.values(generator, seed, node_id) end
+
+-- ============================================================================
+
 ---@class EventsModule
 ---The global event bus: named events any script (or engine code) can emit and any script can listen to, without a reference to the other side - gameplay telling the HUD the score changed, a level telling the game flow it's complete, audio or achievements reacting to gameplay. Handlers run in the order they were connected; they may emit, connect, disconnect or destroy nodes. Connections end with the script that made them (or `disconnect`, or the scope node). The bus lasts across scene changes. Node events (`node:connect` / `node:emit`) are separate.
 local EventsModule = {}
@@ -10594,6 +10620,9 @@ Pool = PoolModule
 
 ---@type EventsModule
 Events = EventsModule
+
+---@type LevelGenModule
+LevelGen = LevelGenModule
 
 ---@type AccessibilityModule
 Accessibility = AccessibilityModule
