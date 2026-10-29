@@ -23,6 +23,7 @@ expect atlas.open == true
 drag @atlas.canvas+-30,-30 @atlas.canvas+30,30
 expect atlas.win-moved == false
 expect atlas.region != 0,0,96,96
+screenshot region_editor_dragged
 dblclick @atlas.x
 key ctrl+a
 type 0
@@ -45,6 +46,7 @@ click @atlas.apply
 key ctrl+z
 key ctrl+y
 expect node:AtlasSprite.children == 0
+screenshot only_the_region
 key ctrl+s
 expect file:scenes/main.scene.json contains "AtlasSpriteNode"
 expect file:scenes/main.scene.json contains "region": [
