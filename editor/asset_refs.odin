@@ -32,7 +32,9 @@ reference_files :: proc(state: ^EditorState) -> []string {
 @(private = "file")
 loaded_scenes :: proc(state: ^EditorState) -> []^e.Scene {
 	out := make([dynamic]^e.Scene, context.temp_allocator)
-	for _, s in state.game.sceneManager.scenes do if s != nil && s.isLoaded do append(&out, s)
+	if state.game != nil {
+		for _, s in state.game.sceneManager.scenes do if s != nil && s.isLoaded do append(&out, s)
+	}
 	return out[:]
 }
 
@@ -133,9 +135,11 @@ Asset_Move :: proc(state: ^EditorState, oldRel, newRel: string) -> bool {
 	// Scenes loaded in the editor (and their history), then files on disk.
 	refs, files := 0, 0
 	selPath := Editor_NodePath(state, state.selectedNode)
-	for _, s in state.game.sceneManager.scenes {
-		if s == nil do continue
-		if inside(s.filePath, oldRel, isFolder) do s.filePath = strings.clone(moved(s.filePath, oldRel, newRel), state.game.sceneManager.allocator)
+	if state.game != nil {
+		for _, s in state.game.sceneManager.scenes {
+			if s == nil do continue
+			if inside(s.filePath, oldRel, isFolder) do s.filePath = strings.clone(moved(s.filePath, oldRel, newRel), state.game.sceneManager.allocator)
+		}
 	}
 	for s in loaded_scenes(state) {
 		text, n := e.AssetPath_Rewrite(e.Scene_SerializeToJSON(s, context.temp_allocator), oldRel, newRel, isFolder, context.temp_allocator)
