@@ -44,62 +44,13 @@ Game_SetPaused :: proc(game: ^Game, paused: bool) {
 	game.treePaused = paused
 }
 
-// --- transitions --------------------------------------------------------------------
-
-Transition_Kind :: enum {
-	Fade,
-	WipeLeft,  // the cover sweeps in from the right, leaving to the left
-	WipeRight,
-	WipeUp,
-	WipeDown,
-	Circle,    // an iris closing on the centre, then opening
-}
-
-Scene_Transition :: struct {
-	active:   bool,
-	kind:     Transition_Kind,
-	color:    rl.Color,
-	duration: f32, // each half (cover, uncover)
-	t:        f32,
-	covering: bool, // first half (else uncovering)
-	target:   ^Scene,
-}
-
-Transition_KindParse :: proc(s: string) -> Transition_Kind {
-	switch s {
-	case "wipe_left", "wipe":  return .WipeLeft
-	case "wipe_right":         return .WipeRight
-	case "wipe_up":            return .WipeUp
-	case "wipe_down":          return .WipeDown
-	case "circle", "iris":     return .Circle
-	}
-	return .Fade
-}
-
-// Game_ChangeSceneWith switches scenes behind a transition: the screen is
-// covered over `duration`, the scene switches (once its assets are
-// preloaded), then it's uncovered. duration <= 0: switch at once.
-Game_ChangeSceneWith :: proc(game: ^Game, scene: ^Scene, kind: Transition_Kind = .Fade, duration: f32 = 0.4, color: rl.Color = rl.BLACK) {
-	if scene == nil do return
-	if duration <= 0 {
-		ChangeScene_ByPtr(&game.sceneManager, scene)
-		return
-	}
-	Scene_PreloadBegin(game, scene)
-	game.transition = {active = true, kind = kind, color = color, duration = duration, covering = true, target = scene}
-}
-
-Scene_TransitionActive :: proc(game: ^Game) -> bool {return game.transition.active}
-
 // --- loading screens ----------------------------------------------------------------
 
 Scene_Loading :: struct {
 	active:   bool,
 	target:   ^Scene,  // the scene loading in the background
 	screen:   ^Scene,  // the loading screen shown meanwhile
-	kind:     Transition_Kind,
-	duration: f32,
-	color:    rl.Color,
+	spec:     Transition_Spec, // into the screen, then into the target (its shader owned)
 	minTime:  f32,     // seconds the screen stays at least (no flash on fast loads)
 	shown:    f32,     // seconds it has been fully shown
 }
@@ -111,14 +62,22 @@ Scene_Loading :: struct {
 // transition into the target. Scripts on the screen read the progress with
 // Scene.loading_progress().
 Game_ChangeSceneVia :: proc(game: ^Game, target, screen: ^Scene, kind: Transition_Kind = .Fade, duration: f32 = 0.4, color: rl.Color = rl.BLACK, minTime: f32 = 0.5) {
+	spec := TRANSITION_DEFAULT
+	spec.kind, spec.duration, spec.color = kind, duration, color
+	Game_ChangeSceneViaSpec(game, target, screen, spec, minTime)
+}
+
+// Game_ChangeSceneViaSpec: Game_ChangeSceneVia with every transition option.
+Game_ChangeSceneViaSpec :: proc(game: ^Game, target, screen: ^Scene, spec: Transition_Spec, minTime: f32 = 0.5) {
 	if target == nil do return
 	if screen == nil || screen == target {
-		Game_ChangeSceneWith(game, target, kind, duration, color)
+		Game_ChangeSceneSpec(game, target, spec)
 		return
 	}
 	Scene_PreloadBegin(game, target)
-	game.loading = {active = true, target = target, screen = screen, kind = kind, duration = duration, color = color, minTime = minTime}
-	Game_ChangeSceneWith(game, screen, kind, duration, color)
+	Transition_SpecFree(&game.loading.spec)
+	game.loading = {active = true, target = target, screen = screen, spec = Transition_SpecClone(spec), minTime = minTime}
+	Game_ChangeSceneSpec(game, screen, spec)
 }
 
 // Scene_LoadingProgress: how far the scene behind the loading screen has
@@ -136,64 +95,11 @@ loading_update :: proc(game: ^Game, dt: f32) {
 	ld.shown += dt
 	if ld.shown < ld.minTime || Scene_PreloadProgress(game, ld.target) < 1 do return
 	target := ld.target
+	spec := ld.spec
 	ld.active = false
-	Game_ChangeSceneWith(game, target, ld.kind, ld.duration, ld.color)
-}
-
-// Scene_TransitionUpdate advances the transition (call before the scene
-// change is processed).
-Scene_TransitionUpdate :: proc(game: ^Game, dt: f32) {
-	tr := &game.transition
-	if !tr.active do return
-	tr.t += dt
-	if tr.covering {
-		// Covered and loaded: switch.
-		if tr.t >= tr.duration && Scene_PreloadProgress(game, tr.target) >= 1 {
-			ChangeScene_ByPtr(&game.sceneManager, tr.target)
-			tr.covering = false
-			tr.t = 0
-		}
-	} else if tr.t >= tr.duration {
-		tr^ = {}
-	}
-}
-
-// Scene_TransitionAmount: how much of the screen is covered (0..1).
-Scene_TransitionAmount :: proc(game: ^Game) -> f32 {
-	tr := &game.transition
-	if !tr.active do return 0
-	k := clamp(tr.t / max(tr.duration, 0.0001), 0, 1)
-	k = k * k * (3 - 2 * k) // smoothstep
-	return k if tr.covering else 1 - k
-}
-
-// Scene_DrawTransition draws the cover over the screen (after the scene).
-Scene_DrawTransition :: proc(game: ^Game) {
-	tr := &game.transition
-	if !tr.active || !rl.IsWindowReady() do return
-	a := Scene_TransitionAmount(game)
-	w, h := f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight())
-	c := tr.color
-	switch tr.kind {
-	case .Fade:
-		rl.DrawRectangleRec({0, 0, w, h}, {c.r, c.g, c.b, u8(f32(c.a) * a)})
-	case .WipeLeft:
-		x := w * (1 - a) if tr.covering else 0
-		rl.DrawRectangleRec({x, 0, w * a, h}, c)
-	case .WipeRight:
-		x := 0 if tr.covering else w * (1 - a)
-		rl.DrawRectangleRec({x, 0, w * a, h}, c)
-	case .WipeUp:
-		y := h * (1 - a) if tr.covering else 0
-		rl.DrawRectangleRec({0, y, w, h * a}, c)
-	case .WipeDown:
-		y := 0 if tr.covering else h * (1 - a)
-		rl.DrawRectangleRec({0, y, w, h * a}, c)
-	case .Circle:
-		diag := math.sqrt(w * w + h * h) * 0.5 + 2
-		inner := diag * (1 - a)
-		rl.DrawRing({w * 0.5, h * 0.5}, inner, diag, 0, 360, 96, c)
-	}
+	ld.spec = {}
+	Game_ChangeSceneSpec(game, target, spec)
+	Transition_SpecFree(&spec)
 }
 
 // --- background loading -------------------------------------------------------------
@@ -404,6 +310,7 @@ Scene_FlowShutdown :: proc(game: ^Game) {
 	}
 	delete(game.preloads)
 	game.preloads = nil
+	Transition_Shutdown(game)
 	Decode_Shutdown()
 	Vector_JobsShutdown()
 }

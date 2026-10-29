@@ -3,23 +3,116 @@
 ## Transitions
 
 ```lua
-Scene.change_scene("level_2")                                       -- at once
-Scene.change_scene("level_2", {transition = "fade", duration = 0.4}) -- behind a fade
+Scene.change_scene("level_2")                                        -- at once (or the project's default)
+Scene.change_scene("level_2", {transition = "fade", duration = 0.4})  -- behind a fade
 Scene.change_scene("level_2", {transition = "circle", color = {1, 1, 1}})
+Scene.change_scene("level_2", {transition = "slide_left", duration = 0.6, easing = "out_cubic"})
+Scene.change_scene("level_2", {transition = "wipe_right", transition_in = "circle", duration_in = 0.6})
 ```
+
+There are two families:
+
+**Cover transitions** cover the screen with a colour, switch scenes
+underneath **once the new scene's assets are loaded**, then uncover:
+
+| `transition` | |
+|---|---|
+| `"fade"` | The colour fades in, then out. |
+| `"wipe_left"`, `"wipe_right"`, `"wipe_up"`, `"wipe_down"` | The colour sweeps across. |
+| `"circle"` | An iris closes on the centre, then opens. |
+
+**Scene transitions** show both scenes: the old scene keeps running while
+the new one loads, then its last frame is kept and drawn with the live new
+scene:
+
+| `transition` | |
+|---|---|
+| `"crossfade"` | The old frame fades out over the new scene. |
+| `"dissolve"` | The old frame burns away in noise (its rim in `color`). |
+| `"pixelate"` | The old frame breaks into blocks; the new scene comes back from blocks. |
+| `"slide_left"`, `"slide_right"`, `"slide_up"`, `"slide_down"` | The new scene slides in over the old one, towards that side. |
+| `"push_left"`, `"push_right"`, `"push_up"`, `"push_down"` | The new scene pushes the old one out. |
+| a shader | Your own (below). |
+
+They need the frame the game draws into, which the game and the editor's
+Play have; with the **smooth pixel camera** (Project Settings > Video) they
+fall back to a fade over the same time.
 
 | Option | |
 |---|---|
-| `transition` | `"fade"`, `"wipe_left"`, `"wipe_right"`, `"wipe_up"`, `"wipe_down"`, `"circle"` (an iris). |
-| `duration` | Seconds for each half - covering, then uncovering (default 0.4). |
-| `color` | `{r, g, b}` 0..1 (default black). |
+| `transition` | A name above, one given to `Scene.register_transition`, or a shader file. |
+| `duration` | Seconds: each half of a cover transition (covering, then uncovering), the whole of the others (default 0.4). |
+| `easing` | The curve, any [tween easing](../SCRIPTING.md) - `"linear"`, `"out_cubic"`, `"in_out_back"`... (default `"in_out_sine"`). |
+| `color` | `{r, g, b[, a]}` 0..1 or `"#rrggbb"`: the cover's colour, the dissolve's rim (default black). |
+| `transition_in`, `duration_in`, `easing_in` | The uncover half of a cover transition, when it differs (out with a wipe, in with a circle). |
+| `pause` | `true`: the game is paused while it runs (`Engine.set_paused`) - scripts and physics wait, nodes set to *Always* still run - and unpaused after. |
 | `loading` | A loading screen scene (below). |
 | `min_time` | Seconds the loading screen stays at least (default 0.5). |
 
-The screen is covered, the new scene switches in **once its assets are
-loaded**, then it's uncovered. `Scene.is_transitioning()` is true meanwhile
-(ignore input, don't start another change). The name can also be the
-scene's file (`"scenes/level_2.scene.json"`, e.g. from a scene property).
+`Scene.is_transitioning()` is true meanwhile. A change asked for while one
+runs **waits** for it (only the last one asked for is kept); asking for the
+same scene again is ignored. The name can also be the scene's file
+(`"scenes/level_2.scene.json"`, e.g. from a scene property).
+
+### Events
+
+On the global event bus ([`events.md`](events.md)), with the target scene's
+name: `transition_started`, `transition_midpoint` (the scenes switched -
+the new scene is loaded) and `transition_finished`.
+
+```lua
+-- A global script: knows when the scene changed.
+Events.connect("transition_midpoint", function(scene) Log.info("now in " .. scene) end)
+-- The new scene's script: start the level once it is fully on screen.
+Events.once("transition_finished", function() self:start_countdown() end, self.node)
+```
+
+### The project's default
+
+**Project Settings > General > Scene Transitions** picks a transition,
+duration and easing for `Scene.change_scene(name)` without options, and
+for the options a script leaves out. Saved in `project.json`:
+
+```json
+"scene_flow": {"transition": "crossfade", "duration": 0.5, "easing": "in_out_sine"}
+```
+
+"None" (the default) changes scenes at once, as before.
+
+### Your own transitions (shaders)
+
+A fragment shader blends the two scenes: `texture0` is the old scene's
+last frame, `new_scene` the new scene, `progress` goes from 0 (old) to 1
+(new). `resolution` (pixels) and `transition_color` (the `color` option)
+are there too.
+
+```glsl
+#version 330
+in vec2 fragTexCoord;
+out vec4 finalColor;
+uniform sampler2D texture0;   // the old scene
+uniform sampler2D new_scene;  // the new scene
+uniform float progress;       // 0 .. 1
+uniform vec2 resolution;
+
+void main() {
+    // A diagonal wipe with a soft edge.
+    float d = (fragTexCoord.x + (1.0 - fragTexCoord.y)) * 0.5;
+    float k = smoothstep(progress - 0.05, progress + 0.05, d);
+    finalColor = mix(texture(new_scene, fragTexCoord), texture(texture0, fragTexCoord), k);
+}
+```
+
+Save it in the project (`shaders/diagonal.fs`) and use its path, or give it
+a name once:
+
+```lua
+Scene.register_transition("diagonal", "shaders/diagonal.fs")
+Scene.change_scene("level_2", {transition = "diagonal", duration = 0.7})
+```
+
+The shader reloads when you save it. One that is missing or doesn't
+compile crossfades instead (with a warning in the log).
 
 ## Preloading
 
@@ -124,7 +217,14 @@ Scene.change_scene("world_2", {transition = "fade", loading = "loading"})
 
 ```odin
 Game_ChangeSceneWith(game, scene, .Fade, 0.4)                 // a transition
+spec := TRANSITION_DEFAULT                                     // every option
+spec.kind, spec.duration, spec.ease = .PushLeft, 0.6, .Out_Cubic
+Game_ChangeSceneSpec(game, scene, spec)
+Transition_Register(game, "diagonal", "shaders/diagonal.fs")  // a shader transition by name
 Game_ChangeSceneVia(game, scene, loadingScene, .Fade, 0.4, rl.BLACK, 0.8) // through a loading screen
 Scene_PreloadBegin(game, scene)
 progress := Scene_PreloadProgress(game, scene)
 ```
+
+The transitions are in `engine/scene_transition.odin`, preloading and
+loading screens in `engine/scene_flow.odin`.

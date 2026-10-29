@@ -49,6 +49,12 @@ Game :: struct {
 	linkPaused:      bool,
 	frozen:          bool,
 	transition:      Scene_Transition,
+	// Scene transitions (scene_transition.odin): names for shader
+	// transitions -> their shader; the project's default (Scene.change_scene
+	// without options).
+	transitionShaders:    map[string]string,
+	defaultTransition:    Transition_Spec,
+	hasDefaultTransition: bool,
 	loading:         Scene_Loading, // a loading screen shown while a scene loads (scene_flow.odin)
 	preloads:        map[^Scene]^Scene_Preload,
 
