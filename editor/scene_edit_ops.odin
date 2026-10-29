@@ -485,6 +485,44 @@ Editor_ApplyInstanceToComponent :: proc(state: ^EditorState, inst: ^e.Node) -> b
 	return true
 }
 
+// Editor_RevertOverride drops one overridden value of a node in an instance
+// (`key` as Node_ComponentOverrides lists it): it follows the component
+// file again (#84).
+Editor_RevertOverride :: proc(state: ^EditorState, node: ^e.Node, key: string) -> bool {
+	if state.activeScene == nil || node == nil do return false
+	Editor_RecordUndo(state, fmt.tprintf("Revert %s", key))
+	sel := Editor_SaveSelection(state) // (the instance is rebuilt: #74)
+	defer Editor_RestoreSelection(state, sel)
+	return e.Scene_RevertComponentOverride(state.activeScene, node, key, &state.game.gameContext) != nil
+}
+
+// Editor_ApplyOverride writes one overridden value of a node to the
+// component file of the instance holding the override, and updates every
+// instance (#84).
+Editor_ApplyOverride :: proc(state: ^EditorState, node: ^e.Node, key: string) -> bool {
+	if state.activeScene == nil || node == nil do return false
+	ctx := &state.game.gameContext
+	rel, json := e.Component_ApplyOverrideJSON(state.activeScene, node, key, ctx, context.temp_allocator)
+	if rel == "" do return false
+	disk, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	// One undo step for the scene and the file, taken before the file
+	// changes (#76).
+	Editor_RecordUndo(state, fmt.tprintf("Apply %s to component", key), rel)
+	Editor_InvalidateProjectFiles() // the asset lists rescan
+	if os.write_entire_file(disk, transmute([]u8)json) != nil {
+		Editor_Log(state, .Error, "Failed to write %s", disk)
+		return false
+	}
+	sel := Editor_SaveSelection(state) // (instances are rebuilt: #74)
+	defer Editor_RestoreSelection(state, sel)
+	// This instance drops the override (the file has the value now); the
+	// others follow the file unless they override it themselves.
+	e.Scene_RevertComponentOverride(state.activeScene, node, key, ctx)
+	n := Editor_RefreshComponentInstances(state, rel)
+	Editor_Log(state, .Info, "Applied %s to %s (%d instance(s) updated)", key, rel, n)
+	return true
+}
+
 // Editor_InstantiateComponentFile adds a *linked* instance of a component
 // file (project-relative path) at a world position.
 Editor_InstantiateComponentFile :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) -> ^e.Node {

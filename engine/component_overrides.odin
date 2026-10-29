@@ -1200,6 +1200,104 @@ Scene_RevertComponentOverrides :: proc(scene: ^Scene, node: ^Node, ctx: ^GameCon
 	return Scene_RebuildInstance(scene, root, strings.to_string(w.sb), ctx)
 }
 
+// take_override_key removes one value from a node's override entry (`key`
+// as Node_ComponentOverrides lists it: a node key, a reflected property, or
+// "script.<name>") and returns it as an entry of its own.
+@(private = "file")
+take_override_key :: proc(entry: ^json.Object, key: string) -> (single: json.Object, found: bool) {
+	single = make(json.Object, 0, context.temp_allocator)
+	// (Maps are written back after a change: their length is in the value.)
+	take :: proc(outer: ^json.Object, sub, key: string) -> (json.Value, bool) {
+		o, _ := outer[sub].(json.Object)
+		v, has := o[key]
+		if !has do return nil, false
+		delete_key(&o, key)
+		if len(o) == 0 do delete_key(outer, sub)
+		else do outer[sub] = o
+		return v, true
+	}
+	wrap :: proc(key: string, v: json.Value) -> json.Object {
+		o := make(json.Object, 0, context.temp_allocator)
+		o[key] = v
+		return o
+	}
+	if strings.has_prefix(key, "script.") {
+		so, _ := entry["script"].(json.Object)
+		v := take(&so, "properties", key[len("script."):]) or_return
+		if len(so) == 0 do delete_key(entry, "script")
+		else do entry["script"] = so
+		single["script"] = wrap("properties", wrap(key[len("script."):], v))
+		return single, true
+	}
+	if v, has := entry[key]; has && key != "properties" && key != "script" {
+		delete_key(entry, key)
+		single[key] = v
+		return single, true
+	}
+	v := take(entry, "properties", key) or_return
+	single["properties"] = wrap(key, v)
+	return single, true
+}
+
+// Scene_RevertComponentOverride drops one overridden value of a node in an
+// instance (`key` as Node_ComponentOverrides lists it) and rebuilds the
+// instance. Returns its new root (nil: the node has no such override).
+Scene_RevertComponentOverride :: proc(scene: ^Scene, node: ^Node, key: string, ctx: ^GameContext) -> ^Node {
+	mgr := scene.manager
+	root, path := Node_ComponentOverridePath(mgr, node)
+	if root == nil do return nil
+	instJson := Node_SerializeToJSON(root, mgr, context.temp_allocator)
+	val, err := json.parse(transmute([]u8)instJson, allocator = context.temp_allocator)
+	if err != .None do return nil
+	obj, _ := val.(json.Object)
+	ov, _ := obj["overrides"].(json.Object)
+	entry, has := ov[path].(json.Object)
+	if !has do return nil
+	if _, found := take_override_key(&entry, key); !found do return nil
+	if len(entry) == 0 do delete_key(&ov, path)
+	else do ov[path] = entry
+	if len(ov) == 0 do delete_key(&obj, "overrides")
+	else do obj["overrides"] = ov
+	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	Json_WriteValue(&w, obj)
+	return Scene_RebuildInstance(scene, root, strings.to_string(w.sb), ctx)
+}
+
+// Component_ApplyOverrideJSON: the component file of the instance holding
+// a node's override (`rel`, project-relative), with that one value (`key`
+// as Node_ComponentOverrides lists it) written into it - inside a nested
+// instance, into its link's overrides. ("", "": no such override.) It's
+// written like Apply: a scratch instance with only that override, removed
+// again.
+Component_ApplyOverrideJSON :: proc(scene: ^Scene, node: ^Node, key: string, ctx: ^GameContext, allocator := context.allocator) -> (rel, text: string) {
+	mgr := scene.manager
+	root, path := Node_ComponentOverridePath(mgr, node)
+	if root == nil || root.componentMissing do return "", ""
+	ovText := Component_OverridesJSON(root, mgr)
+	if ovText == "" do return "", ""
+	val, err := json.parse(transmute([]u8)ovText, allocator = context.temp_allocator)
+	if err != .None do return "", ""
+	ov, _ := val.(json.Object)
+	entry, has := ov[path].(json.Object)
+	if !has do return "", ""
+	single, found := take_override_key(&entry, key)
+	if !found do return "", ""
+	one := make(json.Object, 0, context.temp_allocator)
+	one[path] = single
+	link := make(json.Object, 0, context.temp_allocator)
+	link["component"] = json.String(root.componentPath)
+	link["overrides"] = one
+	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	Json_WriteValue(&w, link)
+	scratch := Scene_InstantiateNodeFromJSON(scene, transmute([]u8)strings.to_string(w.sb), GetParent(mgr, root), ctx)
+	if scratch == nil do return "", ""
+	ProcessNodeQueues(mgr, ctx)
+	text = Component_InstanceJSON(scratch, mgr, allocator)
+	RemoveNode(mgr, scratch)
+	ProcessNodeQueues(mgr, ctx)
+	return strings.clone(root.componentPath, allocator), text
+}
+
 @(private = "file")
 runtime_heap :: proc() -> runtime.Allocator {
 	return Engine_HeapAllocator()
