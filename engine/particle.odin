@@ -108,6 +108,21 @@ ParticleShape :: enum {
 	Custom,
 }
 
+// How particles are blended over what's behind them (#126).
+ParticleBlend :: enum {
+	Alpha,         // ordinary transparency
+	Additive,      // light adds up: fire, glow, sparks, magic
+	Multiply,      // darkens: shadows, soot
+	Premultiplied, // textures with premultiplied alpha
+}
+
+// Which frame of a sprite sheet a particle shows (#126).
+ParticleFrameMode :: enum {
+	OverLifetime, // the sheet once, from birth to death
+	Speed,        // frameSpeed frames per second, looping
+	Random,       // one frame per particle, picked at birth
+}
+
 // What a particle does when it hits the physics world (#123).
 ParticleCollisionMode :: enum {
 	Bounce, // reflected (elasticity), slowed along the surface (friction)
@@ -171,6 +186,15 @@ ParticleEmitter :: struct {
 	// emitted (smoke left behind). Local by default, also for scenes saved
 	// before the option (#124).
 	localSpace: bool `gui:"true"`,
+	// Look (#126): the blend mode; the texture (shape Texture) as a sprite
+	// sheet of columns x rows frames; particles turned to face where they
+	// move (rain, sparks, arrows; rotation adds to it).
+	blendMode: ParticleBlend `gui:"true"`,
+	sheetColumns: int `gui:"true" min:"1" max:"64"`,
+	sheetRows: int `gui:"true" min:"1" max:"64"`,
+	frameMode: ParticleFrameMode `gui:"true"`,
+	frameSpeed: f32 `gui:"true" min:"0" max:"60"`,
+	alignToVelocity: bool `gui:"true"`,
 	// The owner's global rotation (degrees) and scale, set each update:
 	// emission follows them; local particles are drawn through them.
 	originRotation: f32,
@@ -251,6 +275,9 @@ ParticleEmitter_Init :: proc(emitter: ^ParticleEmitter) {
 	emitter.continuous = true
 	emitter.localSpace = true
 	emitter.originScale = {1, 1}
+	emitter.sheetColumns = 1
+	emitter.sheetRows = 1
+	emitter.frameSpeed = 12
 	emitter.start = ParticleEmitter_Start
 	emitter.stop = ParticleEmitter_Stop
 	emitter.lifetimer = 0
@@ -281,6 +308,7 @@ Particle :: struct {
 	colorJitter: [3]f32,
 	color: rl.Color,
 	alive: bool,
+	frameSeed: u32, // a random number per particle (its sheet frame: Random)
 	shape: ParticleShape,
 	texture: ^rl.Texture2D,
 	customShapeProc: proc(p: ^Particle, deltaTime: f32),
@@ -364,8 +392,9 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	velocity := emitter.velocity + safe_float32_range(-velSpread, velSpread)
 	p.velocity = {math.cos(angle_rad) * velocity, math.sin(angle_rad) * velocity}
 
-	// Texture
-	p.texture = emitter.texture
+	// Texture (drawn with the emitter's: a particle doesn't keep a pointer
+	// that a texture change would leave dangling)
+	p.frameSeed = rand.uint32()
 
 	p.acceleration = {math.cos(angle_rad) * emitter.acceleration, math.sin(angle_rad) * emitter.acceleration}
 	if !emitter.localSpace {
@@ -838,19 +867,35 @@ Particle_Quad :: struct {
 	rotation: f32,
 	color:    rl.Color,
 	texture:  Particle_Quad_Texture,
+	uv:       [4]f32, // u0, v0, u1, v1 (a sprite sheet's frame)
+}
+
+// particle_frame: the sheet frame a particle shows now (0-based).
+Particle_Frame :: proc(emitter: ^ParticleEmitter, p: Particle) -> int {
+	n := max(emitter.sheetColumns, 1) * max(emitter.sheetRows, 1)
+	if n <= 1 do return 0
+	switch emitter.frameMode {
+	case .OverLifetime: return min(int(p.agePercent * f32(n)), n - 1)
+	case .Speed:        return int(p.age * max(emitter.frameSpeed, 0)) %% n
+	case .Random:       return int(p.frameSeed %% u32(n))
+	}
+	return 0
 }
 
 // Particle_QuadOf: how a live particle is drawn (local particles through
 // the owner's transform, #124).
 Particle_QuadOf :: proc(emitter: ^ParticleEmitter, particle: Particle) -> Particle_Quad {
 	p := particle
+	if emitter.alignToVelocity && (p.velocity.x != 0 || p.velocity.y != 0) {
+		p.rotation = math.to_degrees(math.atan2(p.velocity.y, p.velocity.x)) + emitter.rotation
+	}
 	if emitter.localSpace {
 		sc := particle_scale(emitter)
 		p.position = particle_to_world(emitter, p.position)
 		p.size *= {abs(sc.x), abs(sc.y)}
 		p.rotation += emitter.originRotation
 	}
-	q := Particle_Quad{center = p.position, rotation = p.rotation, color = p.color}
+	q := Particle_Quad{center = p.position, rotation = p.rotation, color = p.color, uv = {0, 0, 1, 1}}
 	switch p.shape {
 	case .Circle:
 		d := 2 * p.size[0] * p.scale[0]
@@ -865,7 +910,13 @@ Particle_QuadOf :: proc(emitter: ^ParticleEmitter, particle: Particle) -> Partic
 		q.size, q.texture = {p.size[0] * p.scale[0], max(p.scale[1], 0.01)}, .White
 	case .Texture:
 		q.size = {p.size[0] * p.scale[0], p.size[1] * p.scale[1]}
-		q.texture = .Texture if p.texture != nil && p.texture.id != 0 else .None
+		q.texture = .Texture if emitter.texture != nil && emitter.texture.id != 0 else .None
+		cols, rows := max(emitter.sheetColumns, 1), max(emitter.sheetRows, 1)
+		if cols * rows > 1 {
+			f := Particle_Frame(emitter, p)
+			c, r := f32(f %% cols), f32(f / cols)
+			q.uv = {c / f32(cols), r / f32(rows), (c + 1) / f32(cols), (r + 1) / f32(rows)}
+		}
 	case .Custom:
 		q.texture = .None
 	}
@@ -876,7 +927,17 @@ ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
 	white := rlgl.GetTextureIdDefault()
 	circle := particle_circle_texture()
 	b: Particle_Batch
-	defer batch_close(&b)
+	blend := emitter.blendMode != .Alpha
+	if blend {
+		switch emitter.blendMode {
+		case .Alpha:
+		case .Additive:      rl.BeginBlendMode(.ADDITIVE)
+		case .Multiply:      rl.BeginBlendMode(.MULTIPLIED)
+		case .Premultiplied: rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
+		}
+	}
+	defer if blend do rl.EndBlendMode()
+	defer batch_close(&b) // (runs first: the quads go out in the blend mode)
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles[i].alive do continue
 		p := &emitter.particles[i]
@@ -884,7 +945,7 @@ ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
 		switch q.texture {
 		case .White:   batch_use(&b, white)
 		case .Circle:  batch_use(&b, circle)
-		case .Texture: batch_use(&b, p.texture.id)
+		case .Texture: batch_use(&b, emitter.texture.id)
 		case .None:
 			// A Custom shape draws as it likes (the batch closed around it).
 			if p.shape == .Custom && p.customShapeProc != nil {
@@ -895,6 +956,6 @@ ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
 			}
 			continue
 		}
-		batch_quad(&b, q.center, q.size.x, q.size.y, q.rotation, q.color)
+		batch_quad(&b, q.center, q.size.x, q.size.y, q.rotation, q.color, q.uv)
 	}
 }

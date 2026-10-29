@@ -736,6 +736,14 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 	ctx := &state.game.gameContext
 	rm := &state.game.resourceManager
 	switch node.typeId {
+	case e.ParticleEmitterNode:
+		// (The rest of the look is in the Particles panel's Texture tab.)
+		if UI_SectionHeader("Particle Texture") {
+			if UI_BeginProps("##ptexture") {
+				ParticleTexture_Row(state, cast(^e.ParticleEmitterNode)node, "insp.particle-texture")
+				UI_EndProps()
+			}
+		}
 	case e.TextureNode:
 		tn := cast(^e.TextureNode)node
 		if UI_SectionHeader("Sprite") {

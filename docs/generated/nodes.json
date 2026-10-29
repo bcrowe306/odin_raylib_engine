@@ -219,7 +219,13 @@
         {"name": "emitter.shape", "kind": "enum", "owner": "ParticleEmitter", "default": "Circle", "min": 0, "max": 2000, "values": ["Circle", "Ellipse", "Rectangle", "Pixel", "Line", "Texture", "Custom"], "doc": "Shape each particle is drawn as."},
         {"name": "emitter.emitting", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Emit new particles (existing ones finish their lives)."},
         {"name": "emitter.continuous", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Keep emitting (else one cycle, then stop)."},
-        {"name": "emitter.localSpace", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Particles move, turn and scale with the node (an exhaust, an aura); off: they stay in the world where they were emitted (smoke left behind)."}
+        {"name": "emitter.localSpace", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Particles move, turn and scale with the node (an exhaust, an aura); off: they stay in the world where they were emitted (smoke left behind)."},
+        {"name": "emitter.blendMode", "kind": "enum", "owner": "ParticleEmitter", "default": "Alpha", "values": ["Alpha", "Additive", "Multiply", "Premultiplied"], "doc": "How particles mix with what's behind: Alpha (normal), Additive (fire, glow, sparks), Multiply (darkens), Premultiplied."},
+        {"name": "emitter.sheetColumns", "kind": "integer", "owner": "ParticleEmitter", "default": 1, "min": 1, "max": 64, "doc": "The texture as a sprite sheet: frames across (1: the whole texture)."},
+        {"name": "emitter.sheetRows", "kind": "integer", "owner": "ParticleEmitter", "default": 1, "min": 1, "max": 64, "doc": "The texture as a sprite sheet: frames down."},
+        {"name": "emitter.frameMode", "kind": "enum", "owner": "ParticleEmitter", "default": "OverLifetime", "values": ["OverLifetime", "Speed", "Random"], "doc": "Which sheet frame a particle shows: Over Lifetime (the sheet once), Speed (Frame Speed per second, looping), Random (one per particle)."},
+        {"name": "emitter.frameSpeed", "kind": "number", "owner": "ParticleEmitter", "default": 12, "min": 0, "max": 60, "doc": "Frames per second (Frame Mode: Speed)."},
+        {"name": "emitter.alignToVelocity", "kind": "boolean", "owner": "ParticleEmitter", "default": false, "doc": "Particles face where they move (rain, sparks, arrows); Rotation adds to it."}
       ]
     },
     {

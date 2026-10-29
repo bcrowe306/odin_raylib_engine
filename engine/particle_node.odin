@@ -9,6 +9,25 @@ ParticleEmitterNode :: struct {
 	using node: Node,
 	emitter: ParticleEmitter `gui:"true"`,
 	onParticleHit: EventSubject, // "particle_hit"(node): a particle hit a body (collision on)
+	// The particles' texture (shape Texture; #126): saved as
+	// "particle_texture" (not "texture": old files' texture on any node
+	// becomes a child sprite).
+	texturePath: string,
+	texture:     ^Texture,
+}
+
+// ParticleEmitterNode_SetTexture uses a project texture for the particles
+// ("" = none); the previous one is released.
+ParticleEmitterNode_SetTexture :: proc(pen: ^ParticleEmitterNode, path: string) {
+	rm := Node_ResourceManager(pen)
+	if pen.texture != nil && rm != nil do ResourceManager_ReleaseTexture(rm, pen.texture)
+	pen.texture, pen.emitter.texture = nil, nil
+	pen.texturePath = strings.clone(path, pen.allocator)
+	if path == "" || rm == nil || !rl.IsWindowReady() do return
+	if tex, ok := rm.loadTexture(rm, Project_ResolveAssetPath(pen.gameContext, path)); ok && tex != nil {
+		pen.texture = tex
+		pen.emitter.texture = &tex.texture
+	}
 }
 
 ParticleEmitterNode_Init :: proc(pen: ^ParticleEmitterNode) {
@@ -77,7 +96,12 @@ ParticleEmitterNode_Update :: proc(node: ^Node, gameContext: ^GameContext, delta
 }
 
 ParticleEmitterNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
-	DestroySubject(&(cast(^ParticleEmitterNode)node).onParticleHit)
+	pen := cast(^ParticleEmitterNode)node
+	DestroySubject(&pen.onParticleHit)
+	if pen.texture != nil {
+		if rm := Node_ResourceManager(pen); rm != nil do ResourceManager_ReleaseTexture(rm, pen.texture)
+		pen.texture, pen.emitter.texture = nil, nil
+	}
 }
 
 ParticleEmitterNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {

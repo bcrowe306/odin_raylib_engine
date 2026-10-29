@@ -1568,6 +1568,12 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "emitter.emitting" # boolean - Emit new particles (existing ones finish their lives).
 ---| "emitter.continuous" # boolean - Keep emitting (else one cycle, then stop).
 ---| "emitter.localSpace" # boolean - Particles move, turn and scale with the node (an exhaust, an aura); off: they stay in t...
+---| "emitter.blendMode" # "Alpha"|"Additive"|"Multiply"|"Premultiplied" - How particles mix with what's behind: Alpha (normal), Additive (fire, glow, sparks), Mu...
+---| "emitter.sheetColumns" # integer - The texture as a sprite sheet: frames across (1: the whole texture).
+---| "emitter.sheetRows" # integer - The texture as a sprite sheet: frames down.
+---| "emitter.frameMode" # "OverLifetime"|"Speed"|"Random" - Which sheet frame a particle shows: Over Lifetime (the sheet once), Speed (Frame Speed ...
+---| "emitter.frameSpeed" # number - Frames per second (Frame Mode: Speed).
+---| "emitter.alignToVelocity" # boolean - Particles face where they move (rain, sparks, arrows); Rotation adds to it.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -1624,6 +1630,12 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emitting"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.continuous"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.localSpace"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "emitter.blendMode"): "Alpha"|"Additive"|"Multiply"|"Premultiplied"
+---@overload fun(self: ParticleEmitterNode, path: "emitter.sheetColumns"): integer
+---@overload fun(self: ParticleEmitterNode, path: "emitter.sheetRows"): integer
+---@overload fun(self: ParticleEmitterNode, path: "emitter.frameMode"): "OverLifetime"|"Speed"|"Random"
+---@overload fun(self: ParticleEmitterNode, path: "emitter.frameSpeed"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.alignToVelocity"): boolean
 function ParticleEmitterNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -1682,6 +1694,12 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emitting", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.continuous", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.localSpace", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.blendMode", value: "Alpha"|"Additive"|"Multiply"|"Premultiplied")
+---@overload fun(self: ParticleEmitterNode, path: "emitter.sheetColumns", value: integer)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.sheetRows", value: integer)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.frameMode", value: "OverLifetime"|"Speed"|"Random")
+---@overload fun(self: ParticleEmitterNode, path: "emitter.frameSpeed", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.alignToVelocity", value: boolean)
 function ParticleEmitterNode:set_property(path, value, y) end
 
 ---@class SoundNode
@@ -7731,6 +7749,12 @@ function ParticleEmitterNode:particle_set_lifetime(lifetime) end
 ---@return number? ny
 ---@return Node? hit
 function ParticleEmitterNode:particle_get_last_hit() end
+
+---Sets the particles' texture (used by the Texture shape; a sprite sheet when Sheet Columns / Rows are set). "" or nil removes it.
+---
+---Example: `self.node:get_node("Sparks"):particle_set_texture("textures/spark.png")`
+---@param path TexturePath|string|nil
+function ParticleEmitterNode:particle_set_texture(path) end
 
 -- ----------------------------------------------------------------------------
 -- TextureNode Methods

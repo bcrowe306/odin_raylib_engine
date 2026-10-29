@@ -1250,6 +1250,17 @@ lua_node_particle_set_lifetime :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// particle_set_texture(path): the particles' texture ("" or nil: none; #126).
+@(private="file")
+lua_node_particle_set_texture :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	path := string(lua.tostring(L, 2)) if lua.isstring(L, 2) else ""
+	ParticleEmitterNode_SetTexture(cast(^ParticleEmitterNode)node, path)
+	return 0
+}
+
 // particle_get_last_hit -> x, y, nx, ny, node: where the last particle hit
 // a body (nil when none has yet; #123).
 @(private="file")
@@ -4711,6 +4722,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "particle_set_lifetime")
 		lua.pushcfunction(L, lua_node_particle_get_last_hit)
 		lua.setfield(L, -2, "particle_get_last_hit")
+		lua.pushcfunction(L, lua_node_particle_set_texture)
+		lua.setfield(L, -2, "particle_set_texture")
 
 		// TextureNode
 		lua.pushcfunction(L, lua_node_texture_get_size)
