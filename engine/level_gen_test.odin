@@ -256,3 +256,165 @@ test_level_gen_editing :: proc(t: ^testing.T) {
 	defer Gen_GraphDestroy(&back)
 	testing.expect_value(t, len(back.nodes), len(g.nodes))
 }
+
+// Phase 3 nodes: rooms & corridors, walker, scatter, surface.
+@(test)
+test_level_gen_rooms_walker_scatter_surface :: proc(t: ^testing.T) {
+	g := gen_parse(t, `{"size": [60, 40], "seed": 4, "nodes": [
+		{"id": 1, "type": "rooms", "params": {"min_size": 4, "max_size": 8}},
+		{"id": 2, "type": "walker", "params": {"steps": 300, "walkers": 2}},
+		{"id": 3, "type": "scatter", "params": {"chance": 0.3, "spacing": 5}},
+		{"id": 4, "type": "scatter", "inputs": {"in": 1}, "params": {"chance": 1, "spacing": 0}},
+		{"id": 5, "type": "rect", "params": {"x": 0, "y": 30, "w": 60, "h": 10}},
+		{"id": 6, "type": "surface", "inputs": {"in": 5}},
+		{"id": 7, "type": "surface", "inputs": {"in": 5}, "params": {"side": "bottom"}}]}`)
+	defer Gen_GraphDestroy(&g)
+	eval :: proc(t: ^testing.T, g: ^Gen_Graph, id: int) -> Gen_Grid {
+		grid, err := Gen_Evaluate(g, id, 0, context.temp_allocator)
+		testing.expectf(t, err == "", "node %d: %s", id, err)
+		return grid
+	}
+	count :: proc(g: Gen_Grid) -> int {
+		n := 0
+		for v in g.v do if v >= 0.5 do n += 1
+		return n
+	}
+	// Rooms: floor inside the level, never on its edge; several rooms joined
+	// (one flood fill reaches every floor cell).
+	rooms := eval(t, &g, 1)
+	floor := count(rooms)
+	testing.expectf(t, floor > 60 * 40 / 10 && floor < 60 * 40 * 9 / 10, "floor cells: %d", floor)
+	for x in 0 ..< 60 do testing.expect(t, Gen_GridAt(rooms, x, 0) == 0 && Gen_GridAt(rooms, x, 39) == 0, "the edge stays wall")
+	seen := make([]bool, len(rooms.v), context.temp_allocator)
+	stack := make([dynamic]int, context.temp_allocator)
+	for v, i in rooms.v do if v >= 0.5 {append(&stack, i); seen[i] = true; break}
+	reached := 0
+	for len(stack) > 0 {
+		i := pop(&stack)
+		reached += 1
+		x, y := i % 60, i / 60
+		for d in ([4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+			xx, yy := x + d.x, y + d.y
+			if xx < 0 || yy < 0 || xx >= 60 || yy >= 40 do continue
+			j := yy * 60 + xx
+			if !seen[j] && rooms.v[j] >= 0.5 {seen[j] = true; append(&stack, j)}
+		}
+	}
+	testing.expectf(t, reached == floor, "every room is reachable (%d of %d)", reached, floor)
+	// Walker: a connected tunnel through the centre.
+	walk := eval(t, &g, 2)
+	testing.expect(t, Gen_GridAt(walk, 30, 20) == 1 && count(walk) > 30, "walked from the centre")
+	// Scatter: points spaced at least 5 apart; masked: only on floor.
+	pts := eval(t, &g, 3)
+	for v, i in pts.v do if v >= 0.5 {
+		for w, j in pts.v do if w >= 0.5 && j != i {
+			testing.expect(t, max(abs(i % 60 - j % 60), abs(i / 60 - j / 60)) >= 5, "spaced")
+		}
+	}
+	testing.expect(t, count(pts) > 5, "some points")
+	masked := eval(t, &g, 4)
+	for v, i in masked.v do if v >= 0.5 do testing.expect(t, rooms.v[i] >= 0.5, "only on floor")
+	testing.expect_value(t, count(masked), floor) // (chance 1, no spacing: every floor cell)
+	// Surface: the row on top of the ground (y 29), and nothing for a ceiling.
+	top := eval(t, &g, 6)
+	testing.expect_value(t, count(top), 60)
+	for x in 0 ..< 60 do testing.expect(t, Gen_GridAt(top, x, 29) == 1, "on the ground")
+	testing.expect_value(t, count(eval(t, &g, 7)), 0)
+	// Deterministic.
+	testing.expect_value(t, gen_values(t, &g, 1), gen_values(t, &g, 1))
+}
+
+// Entity outputs: placements (capped by max), spawned under the TileMap
+// (regenerating replaces them), from Lua, and the component saved.
+@(test)
+test_level_gen_entities :: proc(t: ^testing.T) {
+	dir :: "test_level_gen_entities"
+	defer os.remove_all(dir)
+	_ = os.make_directory_all(dir + "/components")
+	_ = os.make_directory_all(dir + "/levels")
+	_ = os.write_entire_file(dir + "/components/coin.component.json", transmute([]u8)string(`{"type": "Node", "name": "Coin"}`))
+	text := `{"size": [10, 4], "nodes": [
+		{"id": 1, "type": "rect", "params": {"x": 0, "y": 3, "w": 10, "h": 1}},
+		{"id": 2, "type": "surface", "inputs": {"in": 1}},
+		{"id": 3, "type": "entity_output", "inputs": {"in": 2}, "params": {"max": 4}, "component": "components/coin.component.json"},
+		{"id": 4, "type": "tile_output", "inputs": {"in": 1}, "rules": [{"min": 0.5, "max": 1, "tile": 2}]}]}`
+	_ = os.write_entire_file(dir + "/levels/coins.levelgen.json", transmute([]u8)text)
+	g := gen_parse(t, text)
+	defer Gen_GraphDestroy(&g)
+	ents, err := Gen_Entities(&g, 0, context.temp_allocator)
+	testing.expect(t, err == "" && len(ents) == 4, "max 4 of the 10 ground cells")
+	for en in ents do testing.expect(t, en.cell.y == 2 && en.component == "components/coin.component.json", "on the ground")
+	again, _ := Gen_Entities(&g, 0, context.temp_allocator)
+	for en, i in ents do testing.expect(t, again[i].cell == en.cell, "the same cells for a seed")
+	testing.expect(t, strings.contains(Gen_GraphSerialize(&g, context.temp_allocator), `"component": "components/coin.component.json"`), "saved")
+	dup := Gen_DuplicateNode(&g, 3)
+	testing.expect_value(t, dup.component, "components/coin.component.json")
+
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	AssetManager_SetProjectDir(&game.assetManager, dir)
+	scene := game->createScene("ents", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	tm := cast(^TileMapNode)Node_CreateByTypeName(scene, "TileMapNode")
+	tm.name = "Ground"
+	tm.gameContext = &game.gameContext
+	tm.tileSize = {16, 16}
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	coins :: proc(scene: ^Scene, tm: ^Node) -> (int, [2]f32) {
+		ProcessNodeQueues(scene.manager, scene.rootNode.gameContext)
+		n, pos := 0, [2]f32{}
+		for c in GetChildrenTemp(scene.manager, tm) do if c != nil && !c.removing && c.name == "Coin" && Node_HasTag(c, GEN_ENTITY_TAG) {n += 1; pos = c.position}
+		return n, pos
+	}
+	game.gameContext.scene = scene
+	file, ferr := Gen_LoadFile(&game.gameContext, "levels/coins.levelgen.json")
+	testing.expect_value(t, ferr, "")
+	testing.expect_value(t, Gen_ApplyTileMap(&file, tm, 0, &game.gameContext, scene), "")
+	n, pos := coins(scene, tm)
+	testing.expect_value(t, n, 4)
+	testing.expect(t, pos.y == 2.5 * 16 && TileMapNode_Get(tm, 0, 3) == 2, "at a cell's centre; the tiles too")
+	testing.expect_value(t, Gen_ApplyTileMap(&file, tm, 0, &game.gameContext, scene), "")
+	n, _ = coins(scene, tm)
+	testing.expect_value(t, n, 4) // (replaced, not added)
+	Gen_GraphDestroy(&file)
+
+	L := game.scriptManager.L
+	ok := lua.L_dostring(L, `local list = LevelGen.entities("levels/coins.levelgen.json"); count = #list; first = list[1].component; y = list[1].y`)
+	testing.expectf(t, ok == 0, "lua: %s", lua.tostring(L, -1) if ok != 0 else "")
+	lua.getglobal(L, "count")
+	testing.expect_value(t, lua.tointeger(L, -1), lua.Integer(4))
+	lua.getglobal(L, "y")
+	testing.expect_value(t, lua.tointeger(L, -1), lua.Integer(2))
+	lua.pop(L, 2)
+}
+
+// LDtk output: the tiles go into an IntGrid layer as values (one undo step);
+// a layer of another type is refused.
+@(test)
+test_level_gen_ldtk_intgrid :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_Load("tests/drive/fixtures/ldtk/topdown.ldtk")
+	testing.expect(t, ok, "loaded")
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+	li, layer, other := 0, -1, -1
+	for &ly, j in doc.levels[0].layers {
+		d := Ldtk_Doc_LayerDef(doc, &ly)
+		if d != nil && d.type == .IntGrid && layer < 0 do layer = j
+		if d != nil && d.type == .Tiles do other = j
+	}
+	testing.expect(t, layer >= 0 && other >= 0, "an IntGrid and a Tiles layer")
+	if layer < 0 do return
+	g := gen_parse(t, `{"size": [32, 16], "nodes": [
+		{"id": 1, "type": "border", "params": {"width": 1}},
+		{"id": 2, "type": "tile_output", "inputs": {"in": 1}, "rules": [{"min": 0.5, "max": 1, "tile": 1}]}]}`)
+	defer Gen_GraphDestroy(&g)
+	undo := len(doc.undo)
+	testing.expect_value(t, Gen_ApplyIntGrid(&g, doc, li, layer), "")
+	ly := &doc.levels[li].layers[layer]
+	testing.expect(t, Ldtk_Doc_GetIntGrid(ly, 0, 0) == 1 && Ldtk_Doc_GetIntGrid(ly, 31, 15) == 1, "the border is 1")
+	testing.expect_value(t, Ldtk_Doc_GetIntGrid(ly, 10, 8), 0)
+	testing.expect_value(t, len(doc.undo), undo + 1)
+	testing.expect_value(t, Gen_ApplyIntGrid(&g, doc, li, other), "not an IntGrid layer")
+}
