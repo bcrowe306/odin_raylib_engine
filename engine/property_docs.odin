@@ -288,6 +288,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"ParticleEmitter.gravityDirection", "Direction gravity pulls particles."},
 	{"ParticleEmitter.gravityVelocity", "Strength of that gravity (px/s²)."},
 	{"ParticleEmitter.wind", "Constant drift added to every particle (px/s)."},
+	{"ParticleEmitter.localSpace", "Particles move, turn and scale with the node (an exhaust, an aura); off: they stay in the world where they were emitted (smoke left behind)."},
 	{"ParticleEmitter.collisionEnabled", "Particles collide with the physics world: bodies, tile maps, LDtk solids (not trigger areas)."},
 	{"ParticleEmitter.collisionMode", "On a hit: Bounce (elasticity, friction), Stop (rest there) or Kill. Each hit raises particle_hit."},
 	{"ParticleEmitter.collisionLayers", "The collision layers particles hit (bodies whose shapes are on one of them)."},

@@ -1567,6 +1567,7 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "emitter.shape" # "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom" - Shape each particle is drawn as.
 ---| "emitter.emitting" # boolean - Emit new particles (existing ones finish their lives).
 ---| "emitter.continuous" # boolean - Keep emitting (else one cycle, then stop).
+---| "emitter.localSpace" # boolean - Particles move, turn and scale with the node (an exhaust, an aura); off: they stay in t...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -1622,6 +1623,7 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.shape"): "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom"
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emitting"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.continuous"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "emitter.localSpace"): boolean
 function ParticleEmitterNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -1679,6 +1681,7 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.shape", value: "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom")
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emitting", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.continuous", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.localSpace", value: boolean)
 function ParticleEmitterNode:set_property(path, value, y) end
 
 ---@class SoundNode

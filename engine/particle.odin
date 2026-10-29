@@ -165,6 +165,15 @@ ParticleEmitter :: struct {
 	shape: ParticleShape `gui:"true" min:"0" max:"2000"`,
 	emitting: bool `gui:"true"`,
 	continuous: bool `gui:"true"`,
+	// Particles live in the emitter's space and move, turn and scale with
+	// it (an exhaust, an aura), or stay in the world where they were
+	// emitted (smoke left behind). Local by default, also for scenes saved
+	// before the option (#124).
+	localSpace: bool `gui:"true"`,
+	// The owner's global rotation (degrees) and scale, set each update:
+	// emission follows them; local particles are drawn through them.
+	originRotation: f32,
+	originScale: [2]f32,
 	start: proc(emitter: ^ParticleEmitter),
 	stop: proc(emitter: ^ParticleEmitter),
 	lifetimer: f32,
@@ -239,6 +248,8 @@ ParticleEmitter_Init :: proc(emitter: ^ParticleEmitter) {
 	emitter.friction = 0.1
 	emitter.emitting = true
 	emitter.continuous = true
+	emitter.localSpace = true
+	emitter.originScale = {1, 1}
 	emitter.start = ParticleEmitter_Start
 	emitter.stop = ParticleEmitter_Stop
 	emitter.lifetimer = 0
@@ -310,12 +321,12 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	p := &emitter.particles[emitter.head]
 	emitter.head = (emitter.head + 1) % len(emitter.particles)
 
-	// Position
+	// Position: an offset in the emitter's space (the spread box). Local
+	// particles keep it; world ones go through the owner's transform.
 	spread_x := math.abs(emitter.spread[0])
 	spread_y := math.abs(emitter.spread[1])
-	xpos := safe_float32_range(emitter.position[0] - spread_x, emitter.position[0] + spread_x)
-	ypos := safe_float32_range(emitter.position[1] - spread_y, emitter.position[1] + spread_y)
-	p.position = {xpos, ypos}
+	offset := [2]f32{safe_float32_range(-spread_x, spread_x), safe_float32_range(-spread_y, spread_y)}
+	p.position = offset if emitter.localSpace else particle_to_world(emitter, offset)
 	p.shape = emitter.shape
 
 	// Size
@@ -333,9 +344,13 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	rotationSpread := math.abs(emitter.rotationSpread * emitter.rotationVariance)
 	p.rotation = emitter.rotation + safe_float32_range(-rotationSpread, rotationSpread)
 
-	// Angle
+	// Angle (world particles: turned with the owner)
 	baseSpread := math.abs(emitter.angleSpread * emitter.angleVariance)
 	angle := emitter.angle + safe_float32_range(-baseSpread, baseSpread)
+	if !emitter.localSpace {
+		angle += emitter.originRotation
+		p.rotation += emitter.originRotation
+	}
 	angle_rad := math.to_radians(angle)
 
 	// Torque
@@ -352,6 +367,14 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	p.texture = emitter.texture
 
 	p.acceleration = {math.cos(angle_rad) * emitter.acceleration, math.sin(angle_rad) * emitter.acceleration}
+	if !emitter.localSpace {
+		// (Sizes and speeds scaled with the owner; local ones when drawn.)
+		sc := particle_scale(emitter)
+		p.size *= {abs(sc.x), abs(sc.y)}
+		uniform := (abs(sc.x) + abs(sc.y)) * 0.5
+		p.velocity *= uniform
+		p.acceleration *= uniform
+	}
 	p.lifetime = emitter.lifetime
 	p.age = 0
 	p.agePercent = 0
@@ -394,18 +417,66 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 	p.alive = true
 }
 
+// --- the owner's transform (#124) ----------------------------------------------------
+
+@(private = "file")
+particle_scale :: proc(emitter: ^ParticleEmitter) -> [2]f32 {
+	return emitter.originScale if emitter.originScale != {} else {1, 1}
+}
+
+@(private = "file")
+particle_rotate :: proc(v: [2]f32, deg: f32) -> [2]f32 {
+	if deg == 0 do return v
+	r := math.to_radians(deg)
+	c, s := math.cos(r), math.sin(r)
+	return {v.x * c - v.y * s, v.x * s + v.y * c}
+}
+
+// particle_to_world: a point in the emitter's space -> the world.
+particle_to_world :: proc(emitter: ^ParticleEmitter, local: [2]f32) -> [2]f32 {
+	return emitter.position + particle_rotate(local * particle_scale(emitter), emitter.originRotation)
+}
+
+// particle_to_local: a world point -> the emitter's space.
+particle_to_local :: proc(emitter: ^ParticleEmitter, world: [2]f32) -> [2]f32 {
+	sc := particle_scale(emitter)
+	v := particle_rotate(world - emitter.position, -emitter.originRotation)
+	return {v.x / (sc.x if sc.x != 0 else 1), v.y / (sc.y if sc.y != 0 else 1)}
+}
+
+@(private = "file")
+particle_dir_to_world :: proc(emitter: ^ParticleEmitter, v: [2]f32) -> [2]f32 {
+	return particle_rotate(v * particle_scale(emitter), emitter.originRotation)
+}
+
+@(private = "file")
+particle_dir_to_local :: proc(emitter: ^ParticleEmitter, v: [2]f32) -> [2]f32 {
+	sc := particle_scale(emitter)
+	w := particle_rotate(v, -emitter.originRotation)
+	return {w.x / (sc.x if sc.x != 0 else 1), w.y / (sc.y if sc.y != 0 else 1)}
+}
+
+// particle_forces: gravity and wind (world directions) in the particles'
+// space - for local particles, turned back and unscaled, so "down" stays
+// down on screen whatever the owner's rotation.
+@(private = "file")
+particle_forces :: proc(emitter: ^ParticleEmitter) -> (gravity, wind: [2]f32) {
+	grav_len_sq := emitter.gravityDirection.x * emitter.gravityDirection.x + emitter.gravityDirection.y * emitter.gravityDirection.y
+	if grav_len_sq > 0.0001 do gravity = emitter.gravityDirection / math.sqrt(grav_len_sq) * emitter.gravityVelocity
+	wind = emitter.wind
+	if emitter.localSpace {
+		gravity = particle_dir_to_local(emitter, gravity)
+		wind = particle_dir_to_local(emitter, wind)
+	}
+	return
+}
+
 Particle_Update_Index :: proc(emitter: ^ParticleEmitter, index: int, deltaTime: f32) {
 	p := &emitter.particles[index]
 	if p.alive {
-		// Gravity
-		grav_len_sq := emitter.gravityDirection.x * emitter.gravityDirection.x + emitter.gravityDirection.y * emitter.gravityDirection.y
-		if grav_len_sq > 0.0001 {
-			grav_dir := emitter.gravityDirection / math.sqrt(grav_len_sq)
-			p.velocity += grav_dir * emitter.gravityVelocity * deltaTime
-		}
-
-		// Wind
-		p.velocity += emitter.wind * deltaTime
+		gravity, wind := particle_forces(emitter)
+		p.velocity += gravity * deltaTime
+		p.velocity += wind * deltaTime
 
 		p.velocity += p.acceleration * deltaTime
 		p.torque += p.torqueAcceleration * deltaTime
@@ -443,15 +514,9 @@ Particle_Update_Index :: proc(emitter: ^ParticleEmitter, index: int, deltaTime: 
 
 Particle_Update_Particle :: proc(emitter: ^ParticleEmitter, particle: ^Particle, deltaTime: f32) {
 	if particle.alive {
-		// Gravity
-		grav_len_sq := emitter.gravityDirection.x * emitter.gravityDirection.x + emitter.gravityDirection.y * emitter.gravityDirection.y
-		if grav_len_sq > 0.0001 {
-			grav_dir := emitter.gravityDirection / math.sqrt(grav_len_sq)
-			particle.velocity += grav_dir * emitter.gravityVelocity * deltaTime
-		}
-
-		// Wind
-		particle.velocity += emitter.wind * deltaTime
+		gravity, wind := particle_forces(emitter)
+		particle.velocity += gravity * deltaTime
+		particle.velocity += wind * deltaTime
 
 		particle.velocity += particle.acceleration * deltaTime
 		particle.torque += particle.torqueAcceleration * deltaTime
@@ -632,8 +697,17 @@ particle_ray_callback :: proc "c" (shapeId: b2.ShapeId, point: b2.Vec2, normal: 
 // the way, it bounces off it, stops on it or dies there (collisionMode).
 // The whole move is cast, so fast particles don't pass through thin walls.
 @(private = "file")
-particle_collide :: proc(emitter: ^ParticleEmitter, p: ^Particle, prev: [2]f32, world: b2.WorldId) {
-	move := p.position - prev
+particle_collide :: proc(emitter: ^ParticleEmitter, p: ^Particle, prevIn: [2]f32, world: b2.WorldId) {
+	// (Local particles: cast in the world, the result brought back.)
+	prev, pos, vel := prevIn, p.position, p.velocity
+	if emitter.localSpace {
+		prev, pos, vel = particle_to_world(emitter, prevIn), particle_to_world(emitter, p.position), particle_dir_to_world(emitter, p.velocity)
+	}
+	defer if p.alive {
+		p.position = particle_to_local(emitter, pos) if emitter.localSpace else pos
+		p.velocity = particle_dir_to_local(emitter, vel) if emitter.localSpace else vel
+	}
+	move := pos - prev
 	if move.x * move.x + move.y * move.y < 1e-6 do return
 	hit: Particle_Ray_Hit
 	filter := b2.QueryFilter{categoryBits = ~u64(0), maskBits = CollisionLayerSet_ToBits(emitter.collisionLayers)}
@@ -644,15 +718,15 @@ particle_collide :: proc(emitter: ^ParticleEmitter, p: ^Particle, prev: [2]f32, 
 	case .Kill:
 		p.alive = false
 	case .Stop:
-		p.position = hit.point + n * 0.01
-		p.velocity = {}
+		pos = hit.point + n * 0.01
+		vel = {}
 		p.acceleration = {}
 	case .Bounce:
-		p.position = hit.point + n * 0.01
-		vn := p.velocity.x * n.x + p.velocity.y * n.y
+		pos = hit.point + n * 0.01
+		vn := vel.x * n.x + vel.y * n.y
 		if vn < 0 {
-			tangent := p.velocity - n * vn
-			p.velocity = tangent * (1 - math.clamp(emitter.friction, 0, 1)) - n * vn * math.clamp(emitter.elasticity, 0, 1)
+			tangent := vel - n * vn
+			vel = tangent * (1 - math.clamp(emitter.friction, 0, 1)) - n * vn * math.clamp(emitter.elasticity, 0, 1)
 		}
 	}
 	hitNode: ^Node
@@ -662,9 +736,17 @@ particle_collide :: proc(emitter: ^ParticleEmitter, p: ^Particle, prev: [2]f32, 
 }
 
 ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
+	// Local particles are drawn through the owner's transform (#124).
+	sc := particle_scale(emitter)
+	asc := [2]f32{abs(sc.x), abs(sc.y)}
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles[i].alive do continue
-		p := &emitter.particles[i]
+		p := emitter.particles[i] // (a copy: drawn in world terms)
+		if emitter.localSpace {
+			p.position = particle_to_world(emitter, p.position)
+			p.size *= asc
+			p.rotation += emitter.originRotation
+		}
 		switch p.shape {
 			case ParticleShape.Circle:
 				// Segments from the radius (0.5 px error): small particles
@@ -688,10 +770,7 @@ ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
 				yEnd := p.position[1] + halfLen * math.sin(rad)
 				rl.DrawLineEx({xStart, yStart}, {xEnd, yEnd}, 1 * p.scale[1], p.color)
 			case .Custom:
-				if p.customShapeProc != nil {
-					p_copy := p^
-					p.customShapeProc(&p_copy, deltaTime)
-				}
+				if p.customShapeProc != nil do p.customShapeProc(&p, deltaTime)
 			case .Texture:
 				if p.texture != nil {
 					w := p.size[0] * p.scale[0]

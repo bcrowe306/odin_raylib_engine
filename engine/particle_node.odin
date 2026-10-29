@@ -66,8 +66,11 @@ ParticleEmitterNode_Update :: proc(node: ^Node, gameContext: ^GameContext, delta
 	pen := cast(^ParticleEmitterNode)node
 	if !pen.enabled do return
 
-	// Sync emitter emission center with node's globalPosition in scene graph
+	// The node's global transform: emission follows it; local particles are
+	// drawn through it (#124).
 	pen.emitter.position = pen.globalPosition
+	pen.emitter.originRotation = pen.globalRotation
+	pen.emitter.originScale = pen.globalScale
 
 	world := gameContext.game.physicsWorld.worldId if gameContext != nil && gameContext.game != nil else b2.WorldId{}
 	ParticleEmitter_Update(&pen.emitter, deltaTime, world)
@@ -82,5 +85,6 @@ ParticleEmitterNode_Render :: proc(node: ^Node, gameContext: ^GameContext, delta
 	pen := cast(^ParticleEmitterNode)node
 	if !pen.renderable do return
 
+	pen.emitter.position, pen.emitter.originRotation, pen.emitter.originScale = pen.globalPosition, pen.globalRotation, pen.globalScale
 	ParticleEmitter_Render(&pen.emitter, deltaTime)
 }

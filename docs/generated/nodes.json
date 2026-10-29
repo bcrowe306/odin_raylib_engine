@@ -218,7 +218,8 @@
         {"name": "emitter.friction", "kind": "number", "owner": "ParticleEmitter", "default": 0.1, "min": 0, "max": 1, "doc": "Bounce: how much speed along the surface is lost (0 slides, 1 stops)."},
         {"name": "emitter.shape", "kind": "enum", "owner": "ParticleEmitter", "default": "Circle", "min": 0, "max": 2000, "values": ["Circle", "Ellipse", "Rectangle", "Pixel", "Line", "Texture", "Custom"], "doc": "Shape each particle is drawn as."},
         {"name": "emitter.emitting", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Emit new particles (existing ones finish their lives)."},
-        {"name": "emitter.continuous", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Keep emitting (else one cycle, then stop)."}
+        {"name": "emitter.continuous", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Keep emitting (else one cycle, then stop)."},
+        {"name": "emitter.localSpace", "kind": "boolean", "owner": "ParticleEmitter", "default": true, "doc": "Particles move, turn and scale with the node (an exhaust, an aura); off: they stay in the world where they were emitted (smoke left behind)."}
       ]
     },
     {

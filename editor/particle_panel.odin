@@ -100,7 +100,7 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 		}
 		imgui.EndChild()
 	}
-	section(state, node, "Emission", "particles.tab:emission", {"emitter.amount", "emitter.lifetime", "emitter.burst", "emitter.emitting", "emitter.continuous", "emitter.shape"})
+	section(state, node, "Emission", "particles.tab:emission", {"emitter.amount", "emitter.lifetime", "emitter.burst", "emitter.emitting", "emitter.continuous", "emitter.localSpace", "emitter.shape"})
 	section(state, node, "Shape", "particles.tab:shape", {"emitter.spread", "emitter.angle", "emitter.angleVariance", "emitter.angleSpread"})
 	section(state, node, "Motion", "particles.tab:motion", {"emitter.velocity", "emitter.velocityVariance", "emitter.velocitySpread", "emitter.velocityScale", "emitter.acceleration", "emitter.gravityDirection", "emitter.gravityVelocity", "emitter.wind"})
 	section(state, node, "Size & Rotation", "particles.tab:size", {"emitter.size", "emitter.sizeVariance", "emitter.sizeSpread", "emitter.scaleStart", "emitter.scaleEnd", "emitter.rotation", "emitter.rotationVariance", "emitter.rotationSpread", "emitter.torque", "emitter.torqueVariance", "emitter.torqueSpread", "emitter.torqueAcceleration"})
