@@ -1,0 +1,10 @@
+# GPU particles in a blend mode other than Alpha (Additive here) are drawn:
+# the blend switch flushed raylib's batch, which unbound the particle shader.
+wait 5
+exec cp tests/drive/fixtures/particle_blend_zz.scene.json $PROJECT/scenes/particle_blend_zz.scene.json
+wait-until item:asset:scenes/particle_blend_zz.scene.json == visible timeout=300
+dblclick @asset:scenes/particle_blend_zz.scene.json
+wait 30
+expect node:Glow.particles >= 1
+expect viewport.max-luma >= 240
+screenshot additive_gpu

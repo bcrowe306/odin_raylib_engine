@@ -801,6 +801,16 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		lo := u8(255)
 		for c in px do lo = min(lo, c.a)
 		return fmt.tprint(lo), true
+	case "viewport.max-luma":
+		// The brightest pixel in the viewport (0-255): whether bright things
+		// (additive particles, ...) were drawn at all.
+		if state.renderTexture.id == 0 do return "", false
+		img := rl.LoadImageFromTexture(state.renderTexture.texture)
+		defer rl.UnloadImage(img)
+		px := ([^]rl.Color)(img.data)[:img.width * img.height]
+		hi: int
+		for c in px do hi = max(hi, (int(c.r) * 299 + int(c.g) * 587 + int(c.b) * 114) / 1000)
+		return fmt.tprint(hi), true
 	case "selection":
 		sb := strings.builder_make(context.temp_allocator)
 		for n, i in state.selection {
