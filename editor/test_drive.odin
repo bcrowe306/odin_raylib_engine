@@ -942,6 +942,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "folder-open:") {
 		return "true" if assetFolderOpen[q[len("folder-open:"):]] else "false", true
 	}
+	if strings.has_prefix(q, "component-instances:") do return fmt.tprint(Editor_ComponentInstanceCount(state, q[len("component-instances:"):])), true
 	if strings.has_prefix(q, "item:") {
 		_, ok := GlobalDrive.prevItems[q[5:]]
 		return "visible" if ok else "missing", true

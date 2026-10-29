@@ -161,6 +161,18 @@ Component files and scenes saved before uids keep loading unchanged:
   its component file has uids. Until then, a name-keyed override follows
   the node's name, as it always did.
 
+## In the editor
+
+- **Edit Component** (the instance banner in the Inspector, or the
+  hierarchy's menu) opens the component document with the same node
+  selected. From the instance's root, or from a node added to the instance,
+  the component's root is selected.
+- **Select All Instances** selects every instance of the component in the
+  active scene, including nested ones. It's in an instance's menu in the
+  hierarchy and in the component's menu in Assets.
+- Assets shows how many instances of each component the open scenes and
+  documents use (`×3`).
+
 ## Performance
 
 - A component is prepared (read, parsed, defaults filled in, nested
