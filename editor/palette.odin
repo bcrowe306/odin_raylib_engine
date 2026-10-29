@@ -201,6 +201,7 @@ palette_open_file :: proc(state: ^EditorState, rel: string) {
 	case .Scene: Editor_OpenScene(state, rel)
 	case .Script, .Shader: Editor_OpenScript(state, rel)
 	case .Component: Editor_OpenComponent(state, rel)
+	case .CustomNode: Editor_AddCustomNode(state, rel, state.cameraPos)
 	case .Level: Editor_AddLevel(state, rel, state.cameraPos)
 	case .Generator: LevelGenEditor_Open(state, rel)
 	case .Texture, .Audio, .Package, .Aseprite, .Vector, .Resource, .Other:

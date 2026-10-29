@@ -1,0 +1,24 @@
+# #154: Save as Custom Node - a configured node (an Area with its shape and
+# a layer) made into a type from the hierarchy; the node becomes one.
+wait 5
+click @asset.new-scene
+wait 5
+click @hier.add
+type area
+click @addnode.create
+wait 5
+rclick @hier:TriggerArea
+click @ctx:save-custom-node
+wait 3
+key ctrl+a
+type Trapz
+wait 2
+screenshot save_as
+click @customnode.create
+wait 10
+expect file:nodes/Trapz.node.json contains "base": "AreaNode"
+expect node:TriggerArea.class == Trapz
+expect node:TriggerArea.custom-type == nodes/Trapz.node.json
+click @toolbar.save
+wait 5
+expect file:scenes/new_scene.scene.json contains "node_type": "nodes/Trapz.node.json"

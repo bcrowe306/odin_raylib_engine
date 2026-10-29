@@ -55,6 +55,7 @@ types: struct {
 // Lua_MarkProjectTypesDirty schedules a regeneration (debounced).
 Lua_MarkProjectTypesDirty :: proc() {
 	Editor_InvalidateProjectFiles() // files were added, saved, renamed or removed
+	e.CustomNodes_Forget()          // (custom node types: read again when next needed)
 	if !types.dirty do types.dirtySince = time.tick_now()
 	types.dirty = true
 }

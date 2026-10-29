@@ -1,0 +1,60 @@
+# #154: a custom node type made in the New Custom Node dialog (from Assets'
+# Custom Nodes section): its file and script written, listed in Assets,
+# added to the scene by double-click, saved with its link; a type based on
+# it (its script built on the first's); Add Node's Create Custom Node.
+wait 5
+click @asset.new-scene
+wait 5
+click @asset.new-custom-node
+wait 3
+expect item:customnode.name == visible
+type Spikez
+click @customnode.category
+type Hazards
+click @customnode.description
+type Hurts what touches it
+wait 2
+screenshot dialog
+click @customnode.create
+wait 10
+expect file:nodes/Spikez.node.json contains "base": "AreaNode"
+expect file:nodes/Spikez.node.json contains "category": "Hazards"
+expect file:nodes/Spikez.node.json contains "shapes"
+expect file:nodes/Spikez.node.json contains "script": "scripts/spikez.lua"
+expect file:scripts/spikez.lua contains return
+wait-until item:asset:nodes/Spikez.node.json == visible timeout=300
+dblclick @asset:nodes/Spikez.node.json
+wait 5
+expect node:Spikez.class == Spikez
+expect node:Spikez.type == AreaNode
+expect node:Spikez.custom-type == nodes/Spikez.node.json
+screenshot added
+click @toolbar.save
+wait 5
+expect file:scenes/new_scene.scene.json contains "node_type": "nodes/Spikez.node.json"
+
+# A type based on it.
+rclick @asset:nodes/Spikez.node.json
+click @ctx:new-custom-node-from
+wait 3
+key ctrl+a
+type BigSpikez
+wait 2
+screenshot based_on
+click @customnode.create
+wait 10
+expect file:nodes/BigSpikez.node.json contains "inherits": "nodes/Spikez.node.json"
+expect file:scripts/big_spikez.lua contains BigSpikez.extends = "scripts/spikez.lua"
+wait-until item:asset:nodes/BigSpikez.node.json == visible timeout=300
+dblclick @asset:nodes/BigSpikez.node.json
+wait 5
+expect node:BigSpikez.class == BigSpikez
+expect node:BigSpikez.type == AreaNode
+
+# Add Node: Create Custom Node opens the dialog.
+click @hier.add
+wait 3
+click @addnode.new-custom
+wait 3
+expect item:customnode.name == visible
+click @customnode.cancel

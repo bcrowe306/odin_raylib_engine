@@ -23,6 +23,12 @@ import "core:strings"
 // "defaults" are node keys as a scene writes them (on top of the base
 // type's own defaults and the script's property defaults).
 //
+// A type can build on another: "inherits": "nodes/Hurtbox.node.json" - its
+// base type is the parent's, its defaults go on top of the parent's (a
+// change to the parent reaches it), its script is the parent's unless it
+// gives its own (usually one that `extends` the parent's), and its nodes
+// are also of the parent's type (is()).
+//
 // A node of the type is saved as its base type, the link and only what
 // differs from the type ("linked defaults", like a component instance):
 //
@@ -58,6 +64,7 @@ CustomNodeType :: struct {
 	category:    string,
 	description: string,
 	defaults:    string, // JSON object: node keys the type starts with
+	inherits:    string, // the parent type's .node.json ("" = none; base is then the parent's)
 	canonical:   string, // (cache) the base type with the defaults, as a node writes it, without the script
 }
 
@@ -113,7 +120,7 @@ CustomNodes_Forget :: proc() {
 @(private = "file")
 free_custom_type :: proc(t: ^CustomNodeType) {
 	heap := Engine_HeapAllocator()
-	for s in ([]string{t.path, t.name, t.base, t.script, t.icon, t.color, t.category, t.description, t.defaults, t.canonical}) do delete(s, heap)
+	for s in ([]string{t.path, t.name, t.base, t.script, t.icon, t.color, t.category, t.description, t.defaults, t.inherits, t.canonical}) do delete(s, heap)
 	free(t, heap)
 }
 
@@ -138,10 +145,10 @@ CustomNode_Parse :: proc(path, text: string) -> (^CustomNodeType, string) {
 	obj, isObj := val.(json.Object)
 	if !isObj do return nil, "not a JSON object"
 	str :: proc(o: json.Object, k: string) -> string {s, _ := o[k].(json.String); return string(s)}
-	name, base := str(obj, "name"), str(obj, "base")
+	name, base, inherits := str(obj, "name"), str(obj, "base"), str(obj, "inherits")
 	if ok, problem := CustomNode_IsValidName(name); !ok do return nil, fmt.tprintf("its name: %s", problem)
 	if base == "" do base = "Node"
-	if _, known := Node_TypeInfoByName(base); !known && base != "Node" do return nil, fmt.tprintf("its base \"%s\" isn't a node type", base)
+	if _, known := Node_TypeInfoByName(base); !known && base != "Node" && inherits == "" do return nil, fmt.tprintf("its base \"%s\" isn't a node type", base)
 	defaults := "{}"
 	if d, has := obj["defaults"].(json.Object); has {
 		w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
@@ -159,8 +166,13 @@ CustomNode_Parse :: proc(path, text: string) -> (^CustomNodeType, string) {
 	t.category = strings.clone(str(obj, "category"), heap)
 	t.description = strings.clone(str(obj, "description"), heap)
 	t.defaults = strings.clone(defaults, heap)
+	t.inherits = strings.clone(inherits, heap)
 	return t, ""
 }
+
+// (Types being loaded through "inherits": loops.)
+@(private = "file")
+customGetDepth: int
 
 // CustomNode_Get: the type in a .node.json (read once; nil and why when it
 // can't be loaded).
@@ -172,6 +184,24 @@ CustomNode_Get :: proc(ctx: ^GameContext, path: string) -> (^CustomNodeType, str
 	t: ^CustomNodeType
 	problem := "the file can't be read"
 	if data, ok := Component_ReadFile(ctx, path); ok do t, problem = CustomNode_Parse(path, string(data))
+	// Built on another type: its base type is the parent's.
+	if t != nil && t.inherits != "" {
+		parent: ^CustomNodeType
+		why := "a loop of types inheriting each other"
+		if customGetDepth < 16 && t.inherits != path {
+			customGetDepth += 1
+			parent, why = CustomNode_Get(ctx, t.inherits)
+			customGetDepth -= 1
+		}
+		if parent == nil {
+			problem = fmt.tprintf("its parent type %s: %s", t.inherits, why)
+			free_custom_type(t)
+			t = nil
+		} else {
+			delete(t.base, heap)
+			t.base = strings.clone(parent.base, heap)
+		}
+	}
 	if t == nil {
 		reg.problems[strings.clone(path, heap)] = strings.clone(problem, heap)
 		return nil, problem
@@ -233,8 +263,18 @@ custom_node_files :: proc(ctx: ^GameContext) -> []string {
 custom_base :: proc(t: ^CustomNodeType, ctx: ^GameContext) -> json.Object {
 	// The defaults as a node of the base type writes them (every field of a
 	// shape, not just the ones the file gives): built once on a scratch node.
+	parent := custom_parent(t, ctx)
 	if t.canonical == "" {
-		base, ok := type_defaults(t.base)
+		base: json.Object
+		ok: bool
+		if parent != nil {
+			_ = custom_base(parent, ctx) // (its canonical)
+			val, err := json.parse(transmute([]u8)parent.canonical, allocator = context.temp_allocator)
+			base, ok = val.(json.Object)
+			ok = ok && err == .None
+		} else {
+			base, ok = type_defaults(t.base)
+		}
 		if !ok do base = make(json.Object, 0, context.temp_allocator)
 		if val, err := json.parse(transmute([]u8)t.defaults, allocator = context.temp_allocator); err == .None {
 			if d, isObj := val.(json.Object); isObj do merge_node(&base, d)
@@ -257,20 +297,60 @@ custom_base :: proc(t: ^CustomNodeType, ctx: ^GameContext) -> json.Object {
 	base, _ := val.(json.Object)
 	if err != .None || base == nil do base = make(json.Object, 0, context.temp_allocator)
 	delete_key(&base, "uid")
-	if t.script != "" {
+	if script := CustomNode_Script(t, ctx); script != "" {
 		so := make(json.Object, 0, context.temp_allocator)
-		if dv, derr := json.parse(transmute([]u8)t.defaults, allocator = context.temp_allocator); derr == .None {
-			if d, isObj := dv.(json.Object); isObj {
-				if ds, has := d["script"].(json.Object); has do for k, v in ds do so[k] = v
-			}
-		}
-		so["path"] = json.String(t.script)
+		so["properties"] = custom_script_defaults(t, ctx)
+		so["path"] = json.String(script)
 		base["script"] = so
 	}
 	base["type"] = json.String(t.base)
 	base["name"] = json.String(t.name)
 	normalize_base(&base, ctx) // (the script's property defaults)
 	return base
+}
+
+// custom_parent: the type `t` builds on (nil = none).
+@(private = "file")
+custom_parent :: proc(t: ^CustomNodeType, ctx: ^GameContext) -> ^CustomNodeType {
+	if t == nil || t.inherits == "" do return nil
+	p, _ := CustomNode_Get(ctx, t.inherits)
+	return p
+}
+
+// CustomNode_Script: the script a type's nodes run - its own, else its
+// parent's ("" = none).
+CustomNode_Script :: proc(t: ^CustomNodeType, ctx: ^GameContext) -> string {
+	for x, i := t, 0; x != nil && i < 16; x, i = custom_parent(x, ctx), i + 1 {
+		if x.script != "" do return x.script
+	}
+	return ""
+}
+
+// custom_script_defaults: the script property values the type (and the
+// types it builds on) set - the parent's, then its own. (Only those: the
+// rest are the script's own defaults.)
+@(private = "file")
+custom_script_defaults :: proc(t: ^CustomNodeType, ctx: ^GameContext, depth := 0) -> json.Object {
+	out := make(json.Object, 0, context.temp_allocator)
+	if parent := custom_parent(t, ctx); parent != nil && depth < 16 {
+		for k, v in custom_script_defaults(parent, ctx, depth + 1) do out[k] = v
+	}
+	if dv, err := json.parse(transmute([]u8)t.defaults, allocator = context.temp_allocator); err == .None {
+		if d, isObj := dv.(json.Object); isObj {
+			if ds, has := d["script"].(json.Object); has {
+				if dp, hasProps := ds["properties"].(json.Object); hasProps do for k, v in dp do out[k] = v
+			}
+		}
+	}
+	return out
+}
+
+// CustomNode_Inherits: is type `t` `ancestor`, or built on it (directly or not)?
+CustomNode_Inherits :: proc(t: ^CustomNodeType, ancestorName: string, ctx: ^GameContext) -> bool {
+	for x, i := t, 0; x != nil && i < 16; x, i = custom_parent(x, ctx), i + 1 {
+		if x.name == ancestorName do return true
+	}
+	return false
 }
 
 // read_custom_node builds a node of a type: the type's keys, the node's own
@@ -455,11 +535,13 @@ Node_ClassName :: proc(node: ^Node) -> string {
 Node_Is :: proc(node: ^Node, typeName: string) -> bool {
 	if node == nil do return false
 	if typeName == "Node" || typeName == Node_TypeName(node) do return true
-	if t := Node_CustomType(node); t != nil && t.name == typeName do return true
+	if t := Node_CustomType(node); t != nil && CustomNode_Inherits(t, typeName, node.gameContext) do return true
 	// A script built on a type's script (`extends`, #153): one of that type too.
 	if inst := cast(^ScriptInstance)node.scriptInstance; inst != nil && node.gameContext != nil && node.gameContext.game != nil {
-		if t := CustomNode_FindByName(node.gameContext, typeName); t != nil && t.script != "" {
-			return Script_Extends(&node.gameContext.game.scriptManager, inst.modulePath, t.script)
+		if t := CustomNode_FindByName(node.gameContext, typeName); t != nil {
+			if script := CustomNode_Script(t, node.gameContext); script != "" {
+				return Script_Extends(&node.gameContext.game.scriptManager, inst.modulePath, script)
+			}
 		}
 	}
 	return false
@@ -478,4 +560,95 @@ Scene_FindNodesOfType :: proc(scene: ^Scene, typeName: string, allocator := cont
 	}
 	walk(scene.manager, scene.rootNode, typeName, &out)
 	return out[:]
+}
+
+// CustomNode_Definition: what a .node.json says (CustomNode_DefinitionJSON
+// writes it).
+CustomNode_Definition :: struct {
+	name, base, inherits, script, icon, color, category, description: string,
+	defaults: string, // JSON object text ("" = none)
+}
+
+// CustomNode_DefinitionJSON: a type's file text (keys in a fixed order,
+// empty ones left out).
+CustomNode_DefinitionJSON :: proc(d: CustomNode_Definition, allocator := context.allocator) -> string {
+	w := Json_Writer{sb = strings.builder_make(allocator)}
+	strings.write_byte(&w.sb, '{')
+	w.indent += 1
+	first := true
+	field :: proc(w: ^Json_Writer, k, v: string, first: ^bool) {
+		if v == "" do return
+		Json_Key(w, k, first); Json_String(w, v)
+	}
+	field(&w, "name", d.name, &first)
+	if d.inherits != "" do field(&w, "inherits", d.inherits, &first)
+	else do field(&w, "base", d.base, &first)
+	field(&w, "script", d.script, &first)
+	field(&w, "icon", d.icon, &first)
+	field(&w, "color", d.color, &first)
+	field(&w, "category", d.category, &first)
+	field(&w, "description", d.description, &first)
+	if d.defaults != "" {
+		if val, err := json.parse(transmute([]u8)d.defaults, allocator = context.temp_allocator); err == .None {
+			if obj, isObj := val.(json.Object); isObj && len(obj) > 0 {
+				Json_Key(&w, "defaults", &first)
+				Json_WriteValue(&w, obj)
+			}
+		}
+	}
+	w.indent -= 1
+	Json_NewLine(&w)
+	strings.write_string(&w.sb, "}\n")
+	return strings.to_string(w.sb)
+}
+
+// CustomNode_DefaultsFromNode: a configured node's values as a type's
+// "defaults" (Save as Custom Node) - what differs from its built-in type's
+// defaults, without its name, place, children or script file (its script's
+// values are kept). JSON object text.
+CustomNode_DefaultsFromNode :: proc(node: ^Node, manager: ^NodeManager, allocator := context.allocator) -> string {
+	if node == nil do return "{}"
+	prev := serializeFullCustom
+	serializeFullCustom = node // (a custom node: all its values)
+	text := Node_SerializeToJSON(node, manager, context.temp_allocator)
+	serializeFullCustom = prev
+	val, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
+	inst, isObj := val.(json.Object)
+	if err != .None || !isObj do return strings.clone("{}", allocator)
+	base, ok := type_defaults(Node_TypeName(node))
+	if !ok do base = make(json.Object, 0, context.temp_allocator)
+	diff, _ := diff_node(base, inst, false)
+	out := make(json.Object, 0, context.temp_allocator)
+	for k, v in diff {
+		if Custom_IsDirectKey(k) || k == "tags" && v == nil do continue
+		if _, isNull := v.(json.Null); isNull do continue
+		if k == "script" {
+			// Its values, not its file (the type names its script).
+			// (Only those that differ from the script's own defaults.)
+			so, _ := inst["script"].(json.Object)
+			props, hasProps := so["properties"].(json.Object)
+			if !hasProps do continue
+			declared := make(json.Object, 1, context.temp_allocator)
+			ds := make(json.Object, 1, context.temp_allocator)
+			ds["path"] = so["path"]
+			declared["script"] = ds
+			normalize_base(&declared, node.gameContext)
+			defs, _ := declared["script"].(json.Object)["properties"].(json.Object)
+			changed := make(json.Object, 0, context.temp_allocator)
+			for pk, pv in props {
+				dv, has := defs[pk]
+				if !has || !json_equal(dv, pv) do changed[pk] = pv
+			}
+			if len(changed) > 0 {
+				s := make(json.Object, 1, context.temp_allocator)
+				s["properties"] = changed
+				out[k] = s
+			}
+			continue
+		}
+		out[k] = v
+	}
+	w := Json_Writer{sb = strings.builder_make(allocator)}
+	Json_WriteValue(&w, out)
+	return strings.to_string(w.sb)
 }

@@ -549,6 +549,8 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 	} else if !isRoot {
 		if hier_menu(ICON_FA_CUBES, "Save as Component", "save-component") do Editor_SaveComponent(state, node)
 		if hier_menu(ICON_FA_CLONE, "Save as Component Named...", "save-component-named") do Prompt_Open(.SaveComponentAs, node.name, node)
+		if hier_menu(ICON_FA_PUZZLE_PIECE, "Save as Custom Node...", "save-custom-node", node.customType == "") do CustomNodeDialog_OpenFromNode(state, node)
+		UI_Tooltip("A node type of your own from this node: its type, values and script (Add Node lists it); it becomes one")
 	}
 	imgui.Separator()
 	if cam := Editor_SceneCamera(state); cam != nil && node.typeId != e.CameraNode && !node.transient {
