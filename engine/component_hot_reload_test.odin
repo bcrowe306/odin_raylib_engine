@@ -52,8 +52,10 @@ test_component_hot_reload :: proc(t: ^testing.T) {
 	hot_find(scene, a, "Body").position = {7, 7} // an override of the outer one
 	testing.expect_value(t, Component_HotReload(game, force = true), 0) // nothing changed
 
-	// The nested file changes: the outer instance is rebuilt.
-	hot_write("lid.component.json", `{"type": "Node", "name": "LidRoot", "uid": "lr000000", "children": [{"type": "Node", "name": "Lid", "uid": "l1d00000", "position": [0, -99]}]}`)
+	// The nested file changes: the outer instance is rebuilt. (A change is
+	// told by size and time; written within the file time's resolution, as
+	// here, only the size differs - Windows.)
+	hot_write("lid.component.json", `{"type": "Node", "name": "LidRoot", "uid": "lr000000", "children": [{"type": "Node", "name": "Lid", "uid": "l1d00000", "position": [0, -999]}]}`)
 	testing.expect_value(t, Component_HotReload(game, force = true), 1)
 	kids := GetChildrenView(scene.manager, scene.rootNode)
 	testing.expect_value(t, len(kids), 2)
@@ -64,7 +66,7 @@ test_component_hot_reload :: proc(t: ^testing.T) {
 	lid := hot_find(scene, b, "Lid")
 	testing.expect(t, lid != nil, "the lid is there")
 	if lid != nil {
-		testing.expect_value(t, lid.position.y, -99) // the file's change
+		testing.expect_value(t, lid.position.y, -999) // the file's change
 		testing.expect_value(t, lid.rotation, 45) // the override stays
 	}
 	if body := hot_find(scene, b, "Body"); body != nil do testing.expect_value(t, body.position, [2]f32{7, 7})
@@ -82,5 +84,5 @@ test_component_hot_reload :: proc(t: ^testing.T) {
 	// Saved afterwards, the overrides are the same ones.
 	saved := Scene_SerializeToJSON(scene, context.temp_allocator)
 	testing.expectf(t, strings.contains(saved, `"t0p00000/l1d00000": {"rotation": 45}`), "the nested override: %s", saved)
-	testing.expectf(t, !strings.contains(saved, `-99`), "the file's value isn't pinned: %s", saved)
+	testing.expectf(t, !strings.contains(saved, `-999`), "the file's value isn't pinned: %s", saved)
 }
