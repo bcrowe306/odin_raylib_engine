@@ -1,0 +1,59 @@
+{
+ "name": "particle_blend_zz",
+ "background": [
+  90,
+  90,
+  90,
+  255
+ ],
+ "root": {
+  "type": "Node",
+  "name": "Root",
+  "position": [
+   0,
+   0
+  ],
+  "children": [
+   {
+    "type": "ParticleEmitterNode",
+    "name": "Glow",
+    "position": [
+     640,
+     300
+    ],
+    "scale": [
+     1,
+     1
+    ],
+    "rotation": 0,
+    "enabled": true,
+    "visible": true,
+    "layer": 0,
+    "properties": {
+     "emitter.amount": 6,
+     "emitter.lifetime": 1000,
+     "emitter.burst": 1,
+     "emitter.size": [
+      60,
+      60
+     ],
+     "emitter.velocity": 0,
+     "emitter.gravityVelocity": 0,
+     "emitter.spread": [
+      40,
+      40
+     ],
+     "emitter.particleColor": "#ffffffff",
+     "emitter.colorEnd": "#ffffffff",
+     "emitter.useColorRamp": false,
+     "emitter.shape": "Circle",
+     "emitter.blendMode": "Additive",
+     "emitter.gpu": true,
+     "emitter.emitting": true,
+     "emitter.continuous": false,
+     "emitter.seed": 3
+    }
+   }
+  ]
+ }
+}

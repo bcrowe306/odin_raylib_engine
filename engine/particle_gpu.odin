@@ -421,6 +421,16 @@ ParticleGPU_Render :: proc(emitter: ^ParticleEmitter) {
 		g.dirtyLo, g.dirtyHi = 0, 0
 	}
 
+	// The blend mode before the shader: switching it flushes raylib's batch,
+	// which unbinds the shader in use (the particles drew with none).
+	switch emitter.blendMode {
+	case .Alpha:
+	case .Additive:      rl.BeginBlendMode(.ADDITIVE)
+	case .Multiply:      rl.BeginBlendMode(.MULTIPLIED)
+	case .Premultiplied: rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
+	}
+	defer if emitter.blendMode != .Alpha do rl.EndBlendMode()
+
 	// The uniforms: what the CPU twin (ParticleGPU_Evaluate) reads.
 	rlgl.EnableShader(gpuShader.shader.id)
 	mvp := ParticleGPU_MVP(rlgl.GetMatrixModelview(), rlgl.GetMatrixProjection())
@@ -486,15 +496,8 @@ ParticleGPU_Render :: proc(emitter: ^ParticleEmitter) {
 	rlgl.EnableTexture(tex)
 	set_i("texture0", 0)
 
-	switch emitter.blendMode {
-	case .Alpha:
-	case .Additive:      rl.BeginBlendMode(.ADDITIVE)
-	case .Multiply:      rl.BeginBlendMode(.MULTIPLIED)
-	case .Premultiplied: rl.BeginBlendMode(.ALPHA_PREMULTIPLY)
-	}
 	rlgl.EnableVertexArray(g.vao)
 	rlgl.DrawVertexArrayInstanced(0, 6, i32(len(g.records)))
-	if emitter.blendMode != .Alpha do rl.EndBlendMode()
 	rlgl.DisableVertexArray()
 	rlgl.DisableTexture()
 	rlgl.DisableShader()
