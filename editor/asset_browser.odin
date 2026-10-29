@@ -242,6 +242,17 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "", files: [
 		Drive_Item(fmt.tprintf("asset.global:%s", rel))
 		UI_Tooltip(fmt.tprintf("Global script: every script can use %s (Project Settings > Globals)", global))
 	}
+	if kind == .Component {
+		// How many instances the open documents use (#86).
+		if n := Editor_ComponentInstanceCount(state, rel); n > 0 {
+			imgui.SameLine(0, 8)
+			imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)
+			imgui.TextUnformatted(fmt.ctprintf("×%d", n))
+			imgui.PopStyleColor()
+			Drive_Item(fmt.tprintf("asset.instances:%s", rel))
+			UI_Tooltip(fmt.tprintf("%d instance(s) in the open scenes (right-click: Select All Instances)", n))
+		}
+	}
 	return dbl
 }
 

@@ -531,7 +531,8 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 	// Components.
 	imgui.Separator()
 	if inst != nil {
-		if hier_menu(ICON_FA_CUBES, "Edit Component", "edit-component") do Editor_OpenComponent(state, inst.componentPath)
+		if hier_menu(ICON_FA_CUBES, "Edit Component", "edit-component") do Editor_EditComponentAt(state, node)
+		if hier_menu(ICON_FA_OBJECT_GROUP, "Select All Instances", "select-instances") do Editor_SelectAllInstances(state, strings.clone(inst.componentPath, context.temp_allocator))
 		if hier_menu(ICON_FA_FLOPPY_DISK, "Apply Changes to Component", "apply-component") do Editor_ApplyInstanceToComponent(state, inst)
 		if hier_menu(ICON_FA_CLONE, "Save as New Component...", "save-new-component") do Prompt_Open(.SaveComponentAs, fmt.tprintf("%s_variant", inst.name), inst)
 		if hier_menu(ICON_FA_ROTATE_LEFT, "Revert Overrides" if node == inst else "Revert This Node", "revert-overrides") {

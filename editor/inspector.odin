@@ -147,7 +147,7 @@ inspector_body :: proc(state: ^EditorState) {
 			UI_DimText("Part of a component instance. Changes are saved as overrides on this instance." if locked else "Linked component instance. Contents come from the file; changes are saved as overrides.")
 			}
 			if !compRoot.componentMissing && UI_Button(fmt.tprintf("%s  Edit Component", ICON_FA_CUBES), "insp.edit-component") {
-				Editor_OpenComponent(state, compRoot.componentPath)
+				Editor_EditComponentAt(state, node) // (this node selected there: #86)
 			}
 			// Overridden values (refreshed a few times a second).
 			@(static) cachedFor: ^e.Node
