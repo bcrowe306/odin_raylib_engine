@@ -7,9 +7,35 @@ and the **tile output** turns values into tiles and writes them into a
 TileMap. The same generator and **seed** always give the same level, on
 every platform - so a seed is a level you can share, replay or test.
 
-This is the first part of the feature (#142): the generator file, the
-nodes and the Lua module. The node-graph editor tab, entity placement,
-rooms and corridors, LDtk output and your own nodes follow.
+So far (#142): the generator file, the nodes, the Lua module and the
+**Level Generator** window in the editor. Entity placement, rooms and
+corridors, LDtk output and your own nodes follow.
+
+## In the editor
+
+**Assets > + > New Level Generator** creates `levels/new_level.levelgen.json`
+(a cave) and opens it in the **Level Generator** window; double-click any
+`.levelgen.json` to open it. The window docks like any panel.
+
+- **The canvas** shows the nodes, each with a thumbnail of its grid (a
+  tile output shows its tiles in colours; a red border: the node can't be
+  computed - its error is in the side panel). Drag a node by its title;
+  drag from a node's **output** (the green dot on its right) onto another's
+  **input** (a dot on its left) to connect them - a link that would make a
+  loop is refused; right-click an input to disconnect it. Right-click the
+  canvas to add a node; right-click a node to duplicate it, delete it or
+  use it as the output. Delete removes the selected node. The wheel pans,
+  Ctrl/Cmd+wheel zooms, F frames everything.
+- **The side panel**: the level's **size**, **seed** (the dice picks a new
+  one) and **output**; the selected node's parameters and, for a tile
+  output, its **rules** (a range and tiles: `3, 4` picks one of them per
+  cell); a large **preview** of the selected node (or the output).
+- **The toolbar**: **Save** (Ctrl/Cmd+S), **Undo** / **Redo**
+  (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z: every change), and **Apply to TileMap**,
+  which writes the level into the TileMap selected in the scene - baked
+  into the scene to paint over by hand; the scene's undo takes it back.
+
+Closing the window with unsaved changes asks first.
 
 ## A cave level
 

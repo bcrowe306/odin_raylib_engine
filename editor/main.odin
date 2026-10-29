@@ -265,6 +265,7 @@ editor_main :: proc() -> int {
 		LevelRef_Render(&GlobalEditor)
 		NodeReference_Render(&GlobalEditor)
 		FileBrowser_Render(&GlobalEditor) // (a dockable window, first floating)
+		LevelGenEditor_Render(&GlobalEditor) // (level_gen_editor.odin)
 		ProjectSettingsDialog_Render(&GlobalEditor)
 		Palette_Render(&GlobalEditor)
 		Shortcuts_Render(&GlobalEditor)

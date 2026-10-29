@@ -58,6 +58,8 @@ Gen_Param_Def :: struct {
 	default_: f64,
 	choices:  []string, // a choice parameter (saved by name; the value is its index)
 	doc:      string,
+	integer:  bool,     // whole numbers (the editor's widget)
+	toggle:   bool,     // on / off (saved as a number, read as true / false)
 }
 
 Gen_Kind_Info :: struct {
@@ -75,28 +77,28 @@ GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 	.Constant = {"constant", "Constant", {}, {{name = "value", default_ = 1, doc = "Every cell's value"}}, "The same value everywhere."},
 	.Noise = {"noise", "Noise", {}, {
 		{name = "scale", default_ = 16, doc = "Size of the features (cells)"},
-		{name = "octaves", default_ = 3, doc = "Layers of detail (1-8)"},
+		{name = "octaves", default_ = 3, doc = "Layers of detail (1-8)", integer = true},
 		{name = "persistence", default_ = 0.5, doc = "How much each finer layer adds"},
-		{name = "seed", default_ = 0, doc = "Added to the graph's seed"},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
 	}, "Smooth value noise (fBm), 0..1: hills, islands, caves before a threshold."},
 	.Random_Fill = {"random_fill", "Random Fill", {}, {
 		{name = "density", default_ = 0.45, doc = "Fraction of cells set to 1"},
-		{name = "seed", default_ = 0, doc = "Added to the graph's seed"},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
 	}, "Each cell 1 with a chance of `density`, else 0 (the start of cellular caves)."},
 	.Gradient = {"gradient", "Gradient", {}, {
 		{name = "direction", default_ = 0, choices = GEN_GRADIENT_DIRS, doc = "horizontal (0 left .. 1 right), vertical (0 top .. 1 bottom), radial (1 centre .. 0 corners)"},
 	}, "A ramp across the level (a ground line with a threshold, an island with radial)."},
-	.Border = {"border", "Border", {}, {{name = "width", default_ = 1, doc = "Cells from each edge"}}, "1 within `width` cells of the edge, else 0 (walls around a level)."},
+	.Border = {"border", "Border", {}, {{name = "width", default_ = 1, doc = "Cells from each edge", integer = true}}, "1 within `width` cells of the edge, else 0 (walls around a level)."},
 	.Rect = {"rect", "Rectangle", {}, {
-		{name = "x", default_ = 0, doc = "Left cell"},
-		{name = "y", default_ = 0, doc = "Top cell"},
-		{name = "w", default_ = 8, doc = "Width (cells)"},
-		{name = "h", default_ = 8, doc = "Height (cells)"},
+		{name = "x", default_ = 0, doc = "Left cell", integer = true},
+		{name = "y", default_ = 0, doc = "Top cell", integer = true},
+		{name = "w", default_ = 8, doc = "Width (cells)", integer = true},
+		{name = "h", default_ = 8, doc = "Height (cells)", integer = true},
 		{name = "value", default_ = 1, doc = "Inside (0 outside)"},
 	}, "A filled rectangle (a spawn room, a floor)."},
 	.Threshold = {"threshold", "Threshold", {"in"}, {
 		{name = "value", default_ = 0.5, doc = "Cells at or above it become 1, the rest 0"},
-		{name = "invert", default_ = 0, doc = "1: below becomes 1 instead"},
+		{name = "invert", default_ = 0, doc = "1: below becomes 1 instead", toggle = true},
 	}, "Turns values into solid (1) and empty (0)."},
 	.Invert = {"invert", "Invert", {"in"}, {}, "1 - value (solid <-> empty)."},
 	.Remap = {"remap", "Remap", {"in"}, {
@@ -105,20 +107,20 @@ GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 		{name = "to_min", default_ = 0, doc = ""},
 		{name = "to_max", default_ = 1, doc = ""},
 	}, "Maps one range of values onto another (clamped to it)."},
-	.Blur = {"blur", "Blur", {"in"}, {{name = "radius", default_ = 1, doc = "Cells averaged on each side"}}, "Averages each cell with its neighbours (smooths noise and edges)."},
+	.Blur = {"blur", "Blur", {"in"}, {{name = "radius", default_ = 1, doc = "Cells averaged on each side", integer = true}}, "Averages each cell with its neighbours (smooths noise and edges)."},
 	.Cellular = {"cellular", "Cellular Automaton", {"in"}, {
-		{name = "iterations", default_ = 4, doc = "Smoothing passes"},
-		{name = "birth", default_ = 5, doc = "An empty cell with at least this many solid neighbours (of 8) becomes solid"},
-		{name = "survive", default_ = 4, doc = "A solid cell with fewer solid neighbours becomes empty"},
-		{name = "edge_solid", default_ = 1, doc = "1: cells beyond the edge count as solid (closed caves)"},
+		{name = "iterations", default_ = 4, doc = "Smoothing passes", integer = true},
+		{name = "birth", default_ = 5, doc = "An empty cell with at least this many solid neighbours (of 8) becomes solid", integer = true},
+		{name = "survive", default_ = 4, doc = "A solid cell with fewer solid neighbours becomes empty", integer = true},
+		{name = "edge_solid", default_ = 1, doc = "1: cells beyond the edge count as solid (closed caves)", toggle = true},
 	}, "Cave smoothing: random fill becomes cave walls and open rooms."},
-	.Dilate = {"dilate", "Dilate", {"in"}, {{name = "iterations", default_ = 1, doc = ""}}, "Grows solid areas by a cell per iteration."},
-	.Erode = {"erode", "Erode", {"in"}, {{name = "iterations", default_ = 1, doc = ""}}, "Shrinks solid areas by a cell per iteration."},
+	.Dilate = {"dilate", "Dilate", {"in"}, {{name = "iterations", default_ = 1, doc = "", integer = true}}, "Grows solid areas by a cell per iteration."},
+	.Erode = {"erode", "Erode", {"in"}, {{name = "iterations", default_ = 1, doc = "", integer = true}}, "Shrinks solid areas by a cell per iteration."},
 	.Combine = {"combine", "Combine", {"a", "b"}, {
 		{name = "op", default_ = 0, choices = GEN_COMBINE_OPS, doc = "add, subtract, multiply, min, max, mask (a where b is solid), average"},
 	}, "Two grids into one."},
 	.Tile_Output = {"tile_output", "Tile Output", {"in"}, {
-		{name = "empty", default_ = -1, doc = "The tile for cells no rule takes (-1 = none)"},
+		{name = "empty", default_ = -1, doc = "The tile for cells no rule takes (-1 = none)", integer = true},
 	}, "Rules turn value ranges into tiles (a random one of each rule's tiles, the same for a seed); written into a TileMap."},
 }
 
@@ -324,6 +326,89 @@ Gen_GraphSerialize :: proc(g: ^Gen_Graph, allocator := context.allocator) -> str
 	}
 	strings.write_string(&w.sb, "\n]}\n")
 	return strings.to_string(w.sb)
+}
+
+// --- editing (the editor's Generator window) -------------------------------------------
+
+// GEN_TEMPLATE_CAVE: a new generator - a closed cave on 48 x 32 cells.
+GEN_TEMPLATE_CAVE :: `{"size": [48, 32], "seed": 1, "nodes": [
+  {"id": 1, "type": "random_fill", "params": {"density": 0.48}, "pos": [0, 0]},
+  {"id": 2, "type": "cellular", "inputs": {"in": 1}, "params": {"iterations": 5}, "pos": [220, 0]},
+  {"id": 3, "type": "border", "params": {"width": 1}, "pos": [220, 170]},
+  {"id": 4, "type": "combine", "inputs": {"a": 2, "b": 3}, "params": {"op": "max"}, "pos": [440, 60]},
+  {"id": 5, "type": "tile_output", "inputs": {"in": 4}, "rules": [{"min": 0.5, "max": 1, "tiles": [0]}], "pos": [660, 60]}
+]}
+`
+
+// Gen_AddNode adds a node of a kind (default parameters; a tile output gets
+// one rule for solid cells) with a new id.
+Gen_AddNode :: proc(g: ^Gen_Graph, kind: Gen_Kind, pos: [2]f32) -> ^Gen_Node {
+	id := 1
+	for n in g.nodes do id = max(id, n.id + 1)
+	n := Gen_NodeDefaults(kind, id)
+	n.pos = pos
+	if kind == .Tile_Output {
+		n.rules = make([dynamic]Gen_Tile_Rule, g.allocator)
+		r := Gen_Tile_Rule{min = 0.5, max = 1, tiles = make([dynamic]i32, g.allocator)}
+		append(&r.tiles, 0)
+		append(&n.rules, r)
+	}
+	append(&g.nodes, n)
+	return &g.nodes[len(g.nodes) - 1]
+}
+
+// Gen_DuplicateNode copies a node (parameters, rules; not its inputs).
+Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^Gen_Node {
+	src := Gen_FindNode(g, id)
+	if src == nil do return nil
+	copied := src^
+	n := Gen_AddNode(g, copied.kind, copied.pos + offset)
+	newId := n.id
+	Gen_NodeClearRules(n)
+	n^ = copied
+	n.id, n.pos, n.inputs = newId, copied.pos + offset, {}
+	n.rules = nil
+	if len(copied.rules) > 0 {
+		n.rules = make([dynamic]Gen_Tile_Rule, g.allocator)
+		for r in copied.rules {
+			c := Gen_Tile_Rule{min = r.min, max = r.max, tiles = make([dynamic]i32, g.allocator)}
+			append(&c.tiles, ..r.tiles[:])
+			append(&n.rules, c)
+		}
+	}
+	return n
+}
+
+// Gen_RemoveNode deletes a node; inputs that read it are disconnected.
+Gen_RemoveNode :: proc(g: ^Gen_Graph, id: int) -> bool {
+	for &n, i in g.nodes {
+		if n.id != id do continue
+		Gen_NodeClearRules(&n)
+		ordered_remove(&g.nodes, i)
+		for &o in g.nodes do for &src in o.inputs do if src == id do src = 0
+		if g.output == id do g.output = 0
+		return true
+	}
+	return false
+}
+
+// Gen_Reads: does node `id` read `src`, directly or through others?
+Gen_Reads :: proc(g: ^Gen_Graph, id, src: int, depth := 0) -> bool {
+	if id == src do return true
+	n := Gen_FindNode(g, id)
+	if n == nil || depth > 256 do return false
+	for i in n.inputs do if i != 0 && Gen_Reads(g, i, src, depth + 1) do return true
+	return false
+}
+
+// Gen_Connect links `src`'s output to input `port` of `dst` (0 = none);
+// refused when it would make a cycle or the port doesn't exist.
+Gen_Connect :: proc(g: ^Gen_Graph, dst: int, port: int, src: int) -> bool {
+	n := Gen_FindNode(g, dst)
+	if n == nil || port < 0 || port >= len(GEN_KINDS[n.kind].inputs) do return false
+	if src != 0 && (Gen_FindNode(g, src) == nil || Gen_Reads(g, src, dst)) do return false
+	n.inputs[port] = src
+	return true
 }
 
 // Gen_OutputNode: the node whose grid is the graph's result.

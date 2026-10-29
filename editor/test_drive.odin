@@ -786,6 +786,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "panel-open:") do return "true" if PluginPanels_IsOpen(q[len("panel-open:"):]) else "false", true
 	if strings.has_prefix(q, "import.") do return AssetImport_DriveQuery(q)
 	if strings.has_prefix(q, "fb.") do return FileBrowser_DriveQuery(q)
+	if strings.has_prefix(q, "lge.") do return LevelGenEditor_DriveQuery(q)
 	if strings.has_prefix(q, "ldtk.") do return LdtkPanel_DriveQuery(state, q)
 	if strings.has_prefix(q, "level.") do return LevelEditor_DriveQuery(state, q)
 	if strings.has_prefix(q, "shape") do return ShapeEdit_DriveQuery(state, q)
