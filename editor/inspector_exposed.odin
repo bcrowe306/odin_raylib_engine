@@ -78,19 +78,8 @@ exposed_row :: proc(state: ^EditorState, target: ^e.Node, prop, label: string) -
 		script_prop_one(state, &t, name, label)
 		return true
 	}
-	p: e.Node_Property
-	switch prop {
-	case "position": p = node_field(target, &target.position, "position", .Vec2, [2]f32)
-	case "scale":    p = node_field(target, &target.scale, "scale", .Vec2, [2]f32)
-	case "rotation": p = node_field(target, &target.rotation, "rotation", .Float, f32)
-	case "origin":
-		if !e.Node_HasOrigin(target) do return false
-		p = node_field(target, &target.pivot, "origin", .Vec2, [2]f32)
-	case:
-		ok: bool
-		p, ok = e.Node_FindProperty(target, prop)
-		if !ok || p.runtime do return false
-	}
+	p, ok := e.Node_FindProperty(target, prop) // (the Transform rows too)
+	if !ok || p.runtime do return false
 	prop_label(label, target, prop_script_path(target, p), prop_lua_value(p))
 	at := imgui.GetCursorScreenPos()
 	property_widget(state, target, p, false)
@@ -132,11 +121,19 @@ Inspector_ExposedList :: proc(state: ^EditorState, node: ^e.Node) {
 	}
 }
 
+// exposable: can the Instance section draw this row (exposed_row)?
+@(private = "file")
+exposable :: proc(node: ^e.Node, path: string) -> bool {
+	if strings.has_prefix(path, "script.") do return node.scriptInstance != nil
+	p, ok := e.Node_FindProperty(node, path) // (the Transform rows too)
+	return ok && !p.runtime
+}
+
 // exposed_menu: Expose on Instances / Stop Exposing in a property label's
 // menu, in a component document.
 exposed_menu :: proc(state: ^EditorState, node: ^e.Node, path: string) {
 	root := Editor_ComponentDocRoot(state, state.activeScene)
-	if root == nil do return
+	if root == nil || !exposable(node, path) do return
 	mgr := state.activeScene.manager
 	inside := false
 	for n := node; n != nil; n = e.GetParent(mgr, n) do if n == root {inside = true; break}
