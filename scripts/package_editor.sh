@@ -97,6 +97,9 @@ cp engine/Open_Sans/static/OpenSans-Regular.ttf "$res/runners/"
 cp licenses/THIRD_PARTY_NOTICES.txt "$res/runners/"
 cp licenses/THIRD_PARTY_NOTICES.txt "$res/"
 cp engine/Open_Sans/static/OpenSans-Regular.ttf "$res/fonts/"
+# The Node Reference's screenshots (editor/node_reference.odin; the pages
+# themselves are embedded).
+mkdir -p "$res/docs" && cp -R docs/images "$res/docs/"
 # The demo project, without per-user editor state.
 cp -R assets/demo_project "$res/templates/demo_project"
 rm -rf "$res/templates/demo_project/.rayzr" "$res/templates/demo_project/.editor_settings.ini" "$res/templates/demo_project/.luarc.json"

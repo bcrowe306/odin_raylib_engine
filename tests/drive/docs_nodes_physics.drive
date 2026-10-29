@@ -1,0 +1,11 @@
+# Screenshots for the physics nodes' pages (docs/nodes/*.md, #45):
+#   scripts/docs/screenshots.sh docs_nodes_physics
+wait 5
+click @asset.new-scene
+click @hier.add
+type trigger area
+click @addnode.create
+expect node:TriggerArea.type == AreaNode
+annotate @node:TriggerArea The area's shape (purple; pink while something overlaps)
+annotate @window:inspector Monitoring, colours and collision shapes
+screenshot node_AreaNode

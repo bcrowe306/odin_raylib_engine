@@ -269,7 +269,7 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		name        = "Trigger Area",
 		category    = "Physics & Collision",
 		icon        = ICON_FA_EXPAND,
-		description = "Physics detection volume that triggers onEnter and onExit overlap events without rigid collisions.",
+		description = "Region that reports bodies entering and leaving it (body_entered / body_exited) without colliding: pickups, triggers, hitboxes.",
 		typeName    = "AreaNode",
 	},
 	{
