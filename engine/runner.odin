@@ -293,6 +293,8 @@ Runner_Start :: proc(opts: Run_Options) -> (^Runner_State, bool) {
 	game := new(Game)
 	rs.game = game
 	InitializeGame(game)
+	// (Instances don't keep a copy of their component's JSON in a game: #80.)
+	Component_KeepBases = false
 	if opts.userDataDir != "" do Save_SetDirectory(opts.userDataDir)
 	if opts.noRenderCache {
 		TileCache_SetEnabled(false)

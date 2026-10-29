@@ -190,6 +190,8 @@ single-layer map.
 9. **LDtk entity tiles from the embedded icon atlas** (LDtk's built-in icons) aren't drawn, in the Level tab or in the game (tilesets without an image path are skipped), and the Tiled export skips them.
 10. **Linux exports made on Windows**: Windows has no executable bit, so the AppDir's `AppRun` and the game need `chmod +x` on Linux (exports made on macOS / Linux keep it; an AppImage built on Linux has it). *Approach:* write the Linux export as a .tar.gz with file modes.
 11. **Non-uniform scale on round shapes**: a circle takes the larger scale axis and a capsule its radius from x (Box2D has no ellipses); a rotated box under non-uniform node scale stays a rectangle (no skew).
+12. **Component variants**: a component that inherits another and changes a few values (a "red slime" from "slime") isn't supported; *Save as New Component...* makes an unlinked copy, so the variant stops following the base. *Approach:* a component file whose root is a link to its base plus overrides - an instance's format, saved as a file - with Edit Component on it editing the overrides (`engine/docs/components.md`, Limits).
+13. **Editing an instance in place** as its component (the scene shows the change on every instance while you edit, without opening the component document) isn't supported; edit the component document, or Apply from an instance. *Approach:* an "edit in place" mode on an instance root that routes edits to the component file and refreshes the other instances on each change.
 
 ---
 
@@ -228,7 +230,8 @@ odin test engine -define:ODIN_TEST_THREADS=1   # unit, round-trip, leak and benc
 benchmark:
 
 - **engine** (no window): `bench_scene_hot_paths`, `bench_particles`,
-  `bench_scripts`, `bench_navigation` (`engine/perf_bench_test.odin`).
+  `bench_scripts`, `bench_navigation` (`engine/perf_bench_test.odin`),
+  `bench_components` (`engine/component_bench_test.odin`).
 - **rendering**: the runner's `--bench 300` (30 warm-up frames, then 300
   uncapped: no vsync, no frame cap) on the scenes of
   `scripts/make_bench_project.py`, with and without the render caches.
@@ -286,6 +289,21 @@ down, so those CPU times read high too.
 | Size | 251 KB | 1006 KB | 2518 KB |
 | Serialize (save, undo snapshot) | 2.4 ms | 8.6 ms | 21.7 ms |
 | Load (open, undo restore) | 4.0 ms | 15.8 ms | 41.0 ms |
+
+`bench_components` (`engine/component_bench_test.odin`): instances of a
+12-node component nesting a 3-node one, before / after the prepared
+component cache (#80, 2026-10-28):
+
+| Component instances | 10 | 100 | 1000 | 1000 in a game (no bases) |
+|---|---|---|---|---|
+| Instantiate | 2.1 / 1.8 ms | 14.8 / 9.8 ms | 131 / 88 ms | 82 ms |
+| Save (undo snapshot) | 1.3 ms | 10.1 ms | 96 ms | 127 ms |
+| Load | 1.7 / 1.1 ms | 14.5 / 9.3 ms | 136 / 91 ms | 90 ms |
+| `componentBase` kept | 20 KB | 206 KB | 2066 KB | 0 |
+
+Saving diffs every instance in full (about 10x a plain scene of the same
+size), and without a base it reads the file again - the editor keeps
+bases for that; games rarely save scenes.
 
 | Simulation | Per frame |
 |---|---|

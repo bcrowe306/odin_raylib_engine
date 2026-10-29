@@ -1,0 +1,24 @@
+# #86: Select All Instances (an instance's menu in the hierarchy, or the
+# component's in Assets) selects every instance of it in the active scene.
+wait 5
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+dblclick @asset:components/PlayerShip.component.json
+wait 30
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip3
+
+click @hier:Asteroid_Alpha
+expect selection-count == 1
+rclick @hier:PlayerShip2
+click @ctx:select-instances
+expect selection-count == 3
+screenshot from_hierarchy
+
+click @hier:Asteroid_Alpha
+expect selection-count == 1
+rclick @asset:components/PlayerShip.component.json
+click @ctx:select-instances
+expect selection-count == 3
+expect selection-alive == true
