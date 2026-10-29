@@ -332,6 +332,49 @@ the console. A file already in the project (same contents) is skipped; a
 different file with a taken name is imported as `name_2.ext`. An LDtk
 project brings its external levels and the tileset/background images it
 references (into `textures/`, with the paths in the level rewritten).
+Fonts (ttf, otf, fnt) are copied to `fonts/` as they are. To look at files
+before importing them, use the **File Browser**.
+
+### File Browser
+
+**View > File Browser** (Cmd/Ctrl+Shift+B) opens a window for the files
+*outside* the project — asset packs, downloads, other projects — so you can
+preview them and load only the ones you want, without leaving the editor.
+It opens floating; drag its title bar onto a dock area to dock it like any
+panel. (The Assets panel shows what is already in the project.)
+
+- **Toolbar:** back / forward / up (Alt+Left, Alt+Right, Alt+Up or
+  Backspace), refresh, the folder's path (type a path and press Enter; a
+  file's path opens its folder with it selected; `~` is your home folder),
+  and the star to bookmark the folder.
+- **Sidebar:** bookmarks (right-click to remove), recent folders, and the
+  folder tree under Project, Home and the computer's root (each drive on
+  Windows). Folders are read when you open them, so big trees stay quick.
+  Bookmarks, recent folders and the last folder are the editor's (kept in
+  its settings), the same in every project.
+- **Files:** name, size and date; click to select, Cmd/Ctrl+click to add,
+  Shift+click for a range, double-click a folder to open it. Search filters
+  the folder; with **Sub-folders** on it looks through every folder below
+  (a few folders a frame: the editor keeps running). The type filter shows
+  images, audio, video, fonts or game assets only; the funnel menu sorts by
+  name, size, date or type and shows hidden files.
+- **Preview** of the selected file: images (PNG, JPG, BMP, TGA, GIF, QOI,
+  PSD, HDR; decoded in the background) fitted or 1:1, zoom with the wheel,
+  drag to pan, over a checkerboard; Aseprite files (the first frame) and
+  SVGs; sounds (WAV, OGG, MP3, FLAC, QOA, XM, MOD) with play / pause, stop,
+  a seek bar and volume; fonts (a sample in the font); text files (scripts,
+  JSON, LDtk, shaders...; the first 64 KB). Size, date, dimensions,
+  duration and sample rate show above. Video files show their details only:
+  the engine has no video decoder yet. Playback stops when the selection
+  changes or the window closes. Previewing never writes to the project.
+- **Load into Project** (the bottom bar, or right-click > Load) imports the
+  selected files and folders through the importer above. **To:** is the
+  folder for each file's type, or one project folder you pick (then any
+  file type is copied, as it is when the importer doesn't know it). When a
+  *different* file already has the name: import beside it (`name_2.ext`),
+  replace it, or skip it. Right-click > **Load into Folder** picks a folder
+  for one load. Rows also drag onto the Assets panel or the viewport, like
+  files from the OS file manager.
 
 ### Scene tabs
 

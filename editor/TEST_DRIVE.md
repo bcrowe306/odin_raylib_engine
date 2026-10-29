@@ -30,6 +30,7 @@ exits non-zero if any check fails.
 | `project.drive` | New scene, physics bodies, unsaved edits survive scene switches, Project Settings (gravity, startup scene), simulate a falling crate, Play starts in the new scene. |
 | `components.drive` | Save a subtree as a component from the context menu, instantiate it from Assets, built-in templates. |
 | `export.drive` | Export `.rayzr`, then run the game from the package (textures load from inside it). |
+| `file_browser.drive` | View > File Browser: a typed path, history (back / forward / up), a bookmark; image, sound (play / stop) and text previews; a search through sub-folders, the type filter; Load by type, a taken name skipped / replaced, into a chosen folder, several at once, a row dragged onto Assets; closing it stops the sound. |
 | `assets.drive` | Asset folders collapse/expand (folder icons); the Scenes folder's + creates a scene. |
 | `code_shortcuts.drive` | Zed-style code editing: auto-closing pairs, line operations, multi-cursor, find/replace, go to line, LSP rename (with its preview: Apply) and format, font size, Go to File, reopen tab, command palette, Keyboard Shortcuts window. |
 | `scene_editing.drive` | Multi-select (tree, box), align, nudge, copy/paste, multi-delete, F2 rename, select all, quit prompt. |

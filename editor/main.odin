@@ -264,6 +264,7 @@ editor_main :: proc() -> int {
 		ScriptReference_Render(&GlobalEditor)
 		LevelRef_Render(&GlobalEditor)
 		NodeReference_Render(&GlobalEditor)
+		FileBrowser_Render(&GlobalEditor) // (a dockable window, first floating)
 		ProjectSettingsDialog_Render(&GlobalEditor)
 		Palette_Render(&GlobalEditor)
 		Shortcuts_Render(&GlobalEditor)
