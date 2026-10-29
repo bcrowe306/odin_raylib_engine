@@ -260,6 +260,7 @@ editor_main :: proc() -> int {
 		// Modals & Popups
 		AddNodeDialog_Render(&GlobalEditor)
 		NewScriptDialog_Render(&GlobalEditor)
+		CustomNodeDialog_Render(&GlobalEditor)
 		NewResourceDialog_Render(&GlobalEditor)
 		ScriptReference_Render(&GlobalEditor)
 		LevelRef_Render(&GlobalEditor)

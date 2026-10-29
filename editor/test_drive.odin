@@ -990,6 +990,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		if n == nil do return "<no node>", true
 		switch field {
 		case "type": return e.Node_TypeName(n), true
+		case "class": return e.Node_ClassName(n), true // its custom node type's name, else its type
+		case "custom-type": return n.customType, true  // its custom node type's .node.json ("" = none)
 		case "component": return n.componentPath, true // its component file ("" = not an instance root)
 		case "component-missing": return "true" if n.componentMissing else "false", true
 		case "parent":

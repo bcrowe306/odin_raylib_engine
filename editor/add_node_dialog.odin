@@ -607,6 +607,13 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 
 	imgui.Dummy({0, 6})
 	if imgui.IsKeyPressed(.Enter) || imgui.IsKeyPressed(.KeypadEnter) do create = true
+	if UI_Button(fmt.tprintf("%s  Create Custom Node...", ICON_FA_PUZZLE_PIECE), "addnode.new-custom", {0, 30}) {
+		showAddNodeDialog = false
+		imgui.CloseCurrentPopup()
+		CustomNodeDialog_Open(state)
+	}
+	UI_Tooltip("A node type of your own: a base type, a script and default values")
+	imgui.SameLine(0, 0)
 	imgui.SetCursorPosX(imgui.GetWindowWidth() - 16 - 120 - 90 - UI_SPACE)
 	if UI_Button("Cancel", "addnode.cancel", {90, 30}) || imgui.IsKeyPressed(.Escape) {
 		showAddNodeDialog = false

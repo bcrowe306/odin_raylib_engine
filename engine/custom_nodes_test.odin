@@ -217,3 +217,91 @@ test_custom_node_lua :: proc(t: ^testing.T) {
 	testing.expect_value(t, get(L, `Scene.create_node("Hurtbox", "Named"):get_type()`), "Hurtbox")
 	testing.expect_value(t, get(L, `Scene.create("NoSuchType")`), "nil")
 }
+
+// #154: a type built on another ("inherits"): the parent's base, defaults
+// and script unless it gives its own; its nodes are of both types; a change
+// to the parent reaches it.
+@(test)
+test_custom_node_inherits :: proc(t: ^testing.T) {
+	game, scene := cn_setup("inherits")
+	defer cn_teardown(game)
+	ctx := &game.gameContext
+	ScriptVFS_RegisterEmbedded("scripts/cn_boss.lua", `
+local Boss = {}
+Boss.extends = "scripts/cn_hurtbox.lua"
+Boss.properties = { enrage = { type = "float", default = 4 } }
+return Boss
+`)
+	cn_write("nodes/BossHurtbox.node.json", CustomNode_DefinitionJSON({name = "BossHurtbox", inherits = "nodes/Hurtbox.node.json", script = "scripts/cn_boss.lua", defaults = `{"layer": 2}`}, context.temp_allocator))
+	cn_write("nodes/Loop1.node.json", `{"name": "Loop1", "inherits": "nodes/Loop2.node.json"}`)
+	cn_write("nodes/Loop2.node.json", `{"name": "Loop2", "inherits": "nodes/Loop1.node.json"}`)
+	boss := CustomNode_FindByName(ctx, "BossHurtbox")
+	if !testing.expect(t, boss != nil, "loaded") do return
+	testing.expect_value(t, boss.base, "AreaNode")
+	_, loopProblem := CustomNode_Get(ctx, "nodes/Loop1.node.json")
+	testing.expectf(t, loopProblem != "", "a loop isn't loaded: %s", loopProblem)
+
+	n := Scene_CreateCustomNode(scene, boss, nil, ctx)
+	ProcessNodeQueues(scene.manager, ctx)
+	if !testing.expect(t, n != nil, "created") do return
+	n.name = "Boss1"
+	testing.expect(t, (cast(^AreaNode)n).shapes[0].size == {32, 32}, "the parent's shape")
+	testing.expect_value(t, n.layer, RenderLayer(2))
+	inst := cast(^ScriptInstance)n.scriptInstance
+	testing.expect(t, inst != nil && inst.modulePath == "scripts/cn_boss.lua", "its own script")
+	mh, _ := ScriptInstance_GetProperty(inst, "max_health")
+	en, _ := ScriptInstance_GetProperty(inst, "enrage")
+	testing.expect_value(t, mh.valFloat, 5) // the parent type's value
+	testing.expect_value(t, en.valFloat, 4)
+	testing.expect(t, Node_Is(n, "BossHurtbox") && Node_Is(n, "Hurtbox") && Node_Is(n, "AreaNode"), "both types")
+	testing.expect_value(t, Node_ClassName(n), "BossHurtbox")
+
+	// The parent changes: the child type's node follows.
+	saved := Scene_SerializeToJSON(scene, context.temp_allocator)
+	bt := node_text(saved, "Boss1")
+	testing.expectf(t, !strings.contains(bt, "shapes") && !strings.contains(bt, "layer") && !strings.contains(bt, "script"), "nothing of its own: %s", bt)
+	changed, _ := strings.replace(HURTBOX_DEF, "[32, 32]", "[12, 12]", 1, context.temp_allocator)
+	cn_write("nodes/Hurtbox.node.json", changed)
+	CustomNodes_Forget()
+	again := game->createScene("inherits2", false)
+	_ = Scene_InstantiateFromJSON(again, transmute([]u8)saved, ctx)
+	ProcessNodeQueues(again.manager, ctx)
+	rb := cn_find(again, "Boss1")
+	if !testing.expect(t, rb != nil, "reloaded") do return
+	testing.expect_value(t, (cast(^AreaNode)rb).shapes[0].size, [2]f32{12, 12})
+}
+
+// #154: Save as Custom Node - a configured node's values as a type's
+// defaults, and the definition file.
+@(test)
+test_custom_node_from_node :: proc(t: ^testing.T) {
+	game, scene := cn_setup("from_node")
+	defer cn_teardown(game)
+	ctx := &game.gameContext
+	n := cast(^AreaNode)Node_CreateByTypeName(scene, "AreaNode")
+	n.gameContext = ctx
+	AreaNode_AddShape(n, MakeBoxPhysicsShape(24, 24), ctx)
+	n.layer = RenderLayer(3)
+	n.position = {500, 500}
+	Script_AttachToNode(n, "scripts/cn_hurtbox.lua", nil, &game.scriptManager)
+	ProcessNodeQueues(scene.manager, ctx)
+	ScriptInstance_SetProperty(cast(^ScriptInstance)n.scriptInstance, "armor", ScriptValue{type = .Float, valFloat = 2})
+
+	defaults := CustomNode_DefaultsFromNode(n, scene.manager, context.temp_allocator)
+	testing.expectf(t, strings.contains(defaults, `"shapes"`) && strings.contains(defaults, `"layer": 3`), "its values: %s", defaults)
+	testing.expectf(t, strings.contains(defaults, `"armor": 2`) && !strings.contains(defaults, "max_health"), "only the script values it changed: %s", defaults)
+	testing.expectf(t, !strings.contains(defaults, "position") && !strings.contains(defaults, `"path"`), "not its place or script file: %s", defaults)
+
+	text := CustomNode_DefinitionJSON({name = "Guard", base = "AreaNode", script = "scripts/cn_hurtbox.lua", category = "Combat", defaults = defaults}, context.temp_allocator)
+	def, problem := CustomNode_Parse("nodes/Guard.node.json", text)
+	if !testing.expectf(t, def != nil, "a valid file: %s\n%s", problem, text) do return
+	testing.expect_value(t, def.category, "Combat")
+	cn_write("nodes/Guard.node.json", text)
+	CustomNodes_Forget()
+	g := CustomNode_FindByName(ctx, "Guard")
+	made := Scene_CreateCustomNode(scene, g, nil, ctx)
+	ProcessNodeQueues(scene.manager, ctx)
+	testing.expect(t, made != nil && made.layer == RenderLayer(3) && (cast(^AreaNode)made).shapes[0].size == {24, 24}, "a new one: the node's values")
+	a, _ := ScriptInstance_GetProperty(cast(^ScriptInstance)made.scriptInstance, "armor")
+	testing.expect_value(t, a.valFloat, 2)
+}

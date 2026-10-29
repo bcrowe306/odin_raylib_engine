@@ -34,7 +34,7 @@ Script_AssetKind :: proc(rel: string) -> string {
 	case .Script:    return "script"
 	case .Component: return "component"
 	case .Level:     return "level"
-	case .Shader, .Vector: return "file"
+	case .Shader, .Vector, .CustomNode: return "file"
 	case .Resource:  return "resource"
 	case .Package, .Other:
 	}
@@ -475,6 +475,8 @@ code_asset_use :: proc(state: ^EditorState, doc: ^Code_Doc, rel: string) -> stri
 	case .Scene:   return fmt.tprintf("Scene.change_scene(%q)", Asset_DisplayName(rel))
 	case .Texture: return fmt.tprintf("self.node:set_texture(%q)", rel)
 	case .Resource: return fmt.tprintf("Resource.load(%q)", rel)
+	case .CustomNode:
+		if t, _ := e.CustomNode_Get(&state.game.gameContext, rel); t != nil do return fmt.tprintf("Scene.create(%q, self.node)", t.name)
 	case .Component, .Script, .Level, .Shader, .Package, .Aseprite, .Vector, .Other:
 	}
 	return ""

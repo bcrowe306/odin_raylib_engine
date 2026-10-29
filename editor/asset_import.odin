@@ -85,6 +85,7 @@ Asset_ImportDir :: proc(name: string) -> (dir: string, ok: bool) {
 	case .Aseprite:  return "sprites", true
 	case .Vector:    return "vectors", true
 	case .Resource:  return "resources", true
+	case .CustomNode: return "nodes", true
 	case .Package, .Other:
 	}
 	return "", false
@@ -448,7 +449,7 @@ validate :: proc(name: string, data: []byte) -> (why: string, ok: bool) {
 			mpeg := len(data) > 1 && data[0] == 0xFF && data[1] & 0xE0 == 0xE0
 			if !strings.has_prefix(s, "ID3") && !mpeg do return "not an MP3 file", false
 		}
-	case .Scene, .Component, .Level, .Resource:
+	case .Scene, .Component, .Level, .Resource, .CustomNode:
 		val, err := json.parse(data, parse_integers = false, allocator = context.temp_allocator)
 		if err != .None do return fmt.tprintf("invalid JSON (%v)", err), false
 		obj, isObj := val.(json.Object)
@@ -458,6 +459,7 @@ validate :: proc(name: string, data: []byte) -> (why: string, ok: bool) {
 		case .Level: if "defs" not_in obj do return "not an LDtk project (no \"defs\")", false
 		case .Component: if "type" not_in obj do return "not a component file (no \"type\")", false
 		case .Resource: if _, ok := obj["script"].(json.String); !ok do return "not a resource file (no \"script\": its class)", false
+		case .CustomNode: if _, ok := obj["name"].(json.String); !ok do return "not a custom node type (no \"name\")", false
 		}
 	case .Script, .Shader:
 		if !utf8_valid(data) do return "not a text file", false

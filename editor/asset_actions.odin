@@ -205,6 +205,17 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 			e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
 			Editor_Log(state, .Info, "Startup scene: %s", rel)
 		}
+	case .CustomNode:
+		if menu(ICON_FA_PLUS, "Add to Scene", "add-custom-node", hasScene) do Editor_AddCustomNode(state, rel, state.cameraPos)
+		if menu(ICON_FA_PLUS, "Add as Child of Selected", "add-custom-node-child", hasScene && sel != nil) {
+			Editor_AddCustomNode(state, rel, sel.globalPosition)
+		}
+		t, _ := e.CustomNode_Get(&state.game.gameContext, rel)
+		script := e.CustomNode_Script(t, &state.game.gameContext) if t != nil else ""
+		if menu(ICON_FA_CODE, "Edit Script", "edit-custom-node-script", script != "") do Editor_OpenScript(state, script)
+		if menu(ICON_FA_FILE_CODE, "Edit Definition", "edit-custom-node-file") do Editor_OpenScript(state, rel)
+		UI_Tooltip("The .node.json as text (name, base, icon, category, defaults)")
+		if menu(ICON_FA_PUZZLE_PIECE, "New Type Based on This...", "new-custom-node-from", t != nil) do CustomNodeDialog_Open(state, rel)
 	case .Component:
 		if menu(ICON_FA_CUBES, "Edit Component", "edit-component") do Editor_OpenComponent(state, rel)
 		if menu(ICON_FA_OBJECT_GROUP, "Select All Instances", "select-instances", hasScene && Editor_ComponentInstanceCount(state, rel) > 0) do Editor_SelectAllInstances(state, rel)
@@ -398,6 +409,7 @@ Asset_FolderContextMenu :: proc(state: ^EditorState, title: string) {
 		if menu(ICON_FA_PLUS, "New Resource...", "new-resource") do NewResourceDialog_Open(state)
 		if menu(ICON_FA_FILE_CODE, "New Resource Class...", "new-resource-class") do NewScriptDialog_Open(state, nil, "resource", "new_resource_class")
 	case "Levels": if menu(ICON_FA_FILE_IMPORT, "Import LDtk Project...", "import-level") do Asset_OpenImportDialog(state, {"ldtk"}, "Import LDtk Project")
+	case "Custom Nodes": if menu(ICON_FA_PLUS, "New Custom Node...", "new-custom-node") do CustomNodeDialog_Open(state)
 	}
 	// Import with this folder's file types in the dialog filter.
 	switch title {
@@ -576,6 +588,8 @@ Asset_AddMenu :: proc(state: ^EditorState) {
 	if menu(ICON_FA_CLAPPERBOARD, "New Scene", "add-new-scene") do Toolbar_NewScene(state)
 	if menu(ICON_FA_FILE_CODE, "New Script...", "add-new-script") do NewScriptDialog_Open(state)
 	if menu(ICON_FA_GEM, "New Resource...", "add-new-resource") do NewResourceDialog_Open(state)
+	if menu(ICON_FA_PUZZLE_PIECE, "New Custom Node...", "add-new-custom-node") do CustomNodeDialog_Open(state)
+	UI_Tooltip("A node type of your own (a Hurtbox: an Area, its script and a box), listed in Add Node")
 	UI_Tooltip("A data asset of a resource class (a script with a `resource` marker)")
 	if menu(ICON_FA_WAND_MAGIC_SPARKLES, "New Shader", "add-new-shader") do Editor_NewShader(state)
 }
