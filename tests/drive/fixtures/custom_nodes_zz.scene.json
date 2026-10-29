@@ -1,0 +1,12 @@
+{
+  "name": "custom_nodes_zz",
+  "root": {
+    "type": "Node",
+    "name": "Root",
+    "children": [
+      {"type": "AreaNode", "name": "HurtA", "node_type": "nodes/HurtboxZz.node.json", "position": [560, 360], "scale": [1, 1], "rotation": 0},
+      {"type": "AreaNode", "name": "HurtB", "node_type": "nodes/HurtboxZz.node.json", "position": [720, 360], "scale": [1, 1], "rotation": 0,
+       "script": {"properties": {"armor": 3}}}
+    ]
+  }
+}

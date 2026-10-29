@@ -1,0 +1,4 @@
+{"name": "HurtboxZz", "base": "AreaNode", "script": "scripts/custom_hurtbox_zz.lua",
+ "icon": "heart", "category": "Combat", "description": "Takes damage (drive fixture)",
+ "defaults": {"shapes": [{"type": "Box", "size": [32, 32], "isSensor": true, "enableSensorEvents": true}],
+              "script": {"properties": {"max_health": 5}}}}

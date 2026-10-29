@@ -1,0 +1,27 @@
+# #152: a scene with custom nodes (HurtboxZz: an Area, its script and a
+# 32x32 box) opens in the editor with the type's values, and is saved with
+# only what each node changes.
+wait 5
+exec mkdir -p $PROJECT/nodes
+exec cp tests/drive/fixtures/HurtboxZz.node.json $PROJECT/nodes/HurtboxZz.node.json
+exec cp tests/drive/fixtures/custom_hurtbox_zz.lua $PROJECT/scripts/custom_hurtbox_zz.lua
+exec cp tests/drive/fixtures/custom_nodes_zz.scene.json $PROJECT/scenes/custom_nodes_zz.scene.json
+wait-until item:asset:scenes/custom_nodes_zz.scene.json == visible timeout=300
+dblclick @asset:scenes/custom_nodes_zz.scene.json
+wait 10
+expect node:HurtA.type == AreaNode
+expect node:HurtA.script.max_health == 5
+expect node:HurtB.script.armor == 3
+click @hier:HurtA
+wait 5
+screenshot custom_nodes
+dblclick @insp.position.x
+key ctrl+a
+type 600
+key enter
+wait 1
+click @toolbar.save
+expect file:scenes/custom_nodes_zz.scene.json contains "node_type": "nodes/HurtboxZz.node.json"
+expect file:scenes/custom_nodes_zz.scene.json contains "position": [600, 360]
+expect file:scenes/custom_nodes_zz.scene.json !contains "max_health"
+expect file:scenes/custom_nodes_zz.scene.json contains "armor": 3

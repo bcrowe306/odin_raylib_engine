@@ -223,8 +223,23 @@ local SpawnerNode = {}
 ---Gets the concrete runtime type of the node (e.g. "Node", "TextureNode", "DynamicBodyNode", "CameraNode").
 ---
 ---Example: `if self.node:get_type() == "DynamicBodyNode" then Log.info("physics body") end`
+---A custom node type's own name ("Hurtbox"): see `get_base_type` for its built-in type.
 ---@return string
 function Node:get_type() end
+
+---Gets the node's built-in type, also for a custom node type: "AreaNode" for a Hurtbox
+---(an Area with its script); the same as `get_type()` for other nodes.
+---
+---Example: `if self.node:get_base_type() == "AreaNode" then Log.info("an area") end`
+---@return string
+function Node:get_base_type() end
+
+---Is the node of that type: its custom type ("Hurtbox"), its built-in type ("AreaNode"), or "Node" (every node)?
+---
+---Example: `if other:is("Hurtbox") then other:get_script():take_damage(2) end`
+---@param typeName string
+---@return boolean
+function Node:is(typeName) end
 
 ---Gets the display/debug name of the node.
 ---
@@ -10285,6 +10300,26 @@ function SceneModule.create_node(nodeType, name, parent) end
 ---@param properties? table<string, any>
 ---@return Node?
 function SceneModule.instantiate(component, parent, x, y, properties) end
+
+---Creates a node of a built-in type ("TimerNode") or one of the project's custom
+---node types ("Hurtbox": its base type, script and default values), under
+---`parent` (else the scene's root), at x, y local to it (two numbers or a Vec2). nil for an unknown type.
+---
+---Example: `local hurt = Scene.create("Hurtbox", self.node, 0, -8)`
+---@param typeName string
+---@param parent? Node
+---@param x? number|Vec2
+---@param y? number
+---@return Node?
+function SceneModule.create(typeName, parent, x, y) end
+
+---The current scene's nodes of a type - a custom node type ("Hurtbox"), a
+---built-in one ("AreaNode") or "Node" - in tree order (`node:is`).
+---
+---Example: `for _, h in ipairs(Scene.find_nodes_of_type("Hurtbox")) do h:get_script():heal(1) end`
+---@param typeName string
+---@return Node[]
+function SceneModule.find_nodes_of_type(typeName) end
 
 ---Checks if debug collider and bounds rendering is enabled on this scene.
 ---
