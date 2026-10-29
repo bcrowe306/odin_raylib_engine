@@ -411,6 +411,21 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	case ParticleEmitterNode:
 		pen := cast(^ParticleEmitterNode)node
 		if pen.texturePath != "" {Json_Key(w, "particle_texture", &first); Json_String(w, asset_rel(node, pen.texturePath))}
+		// Curves over life (#127): written when set.
+		for c in ([]struct {key: string, curve: ^ParticleCurve}{{"size_curve", &pen.emitter.sizeCurve}, {"alpha_curve", &pen.emitter.alphaCurve}, {"speed_curve", &pen.emitter.speedCurve}}) {
+			if c.curve.count == 0 do continue
+			Json_Key(w, c.key, &first)
+			strings.write_byte(&w.sb, '[')
+			for i in 0 ..< c.curve.count {
+				if i > 0 do strings.write_string(&w.sb, ", ")
+				strings.write_byte(&w.sb, '[')
+				Json_Float(w, c.curve.points[i].x)
+				strings.write_string(&w.sb, ", ")
+				Json_Float(w, c.curve.points[i].y)
+				strings.write_byte(&w.sb, ']')
+			}
+			strings.write_byte(&w.sb, ']')
+		}
 		ramp := &pen.emitter.colorRamp
 		Json_Key(w, "color_ramp", &first)
 		strings.write_byte(&w.sb, '[')
@@ -1168,6 +1183,9 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		if path := sj_string(obj, "particle_texture", ""); path != "" {
 			pen.gameContext = ctx
 			ParticleEmitterNode_SetTexture(pen, path)
+		}
+		for c in ([]struct {key: string, curve: ^ParticleCurve}{{"size_curve", &pen.emitter.sizeCurve}, {"alpha_curve", &pen.emitter.alphaCurve}, {"speed_curve", &pen.emitter.speedCurve}}) {
+			if arr, ok := sj_arr(obj, c.key); ok do ParticleCurve_FromJSON(c.curve, arr)
 		}
 		if stops, ok := sj_arr(obj, "color_ramp"); ok && len(stops) >= 1 {
 			ramp := &pen.emitter.colorRamp

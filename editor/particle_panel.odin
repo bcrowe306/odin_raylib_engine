@@ -1,8 +1,10 @@
 package editor
 
 import "core:c"
+import "core:encoding/json"
 import "core:fmt"
 import "core:math"
+import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
 import e "../engine"
@@ -100,14 +102,21 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 		}
 		imgui.EndChild()
 	}
-	section(state, node, "Emission", "particles.tab:emission", {"emitter.amount", "emitter.lifetime", "emitter.burst", "emitter.emitting", "emitter.continuous", "emitter.localSpace", "emitter.shape"})
-	section(state, node, "Shape", "particles.tab:shape", {"emitter.spread", "emitter.angle", "emitter.angleVariance", "emitter.angleSpread"})
-	section(state, node, "Motion", "particles.tab:motion", {"emitter.velocity", "emitter.velocityVariance", "emitter.velocitySpread", "emitter.velocityScale", "emitter.acceleration", "emitter.gravityDirection", "emitter.gravityVelocity", "emitter.wind"})
+	section(state, node, "Emission", "particles.tab:emission", {"emitter.amount", "emitter.lifetime", "emitter.lifetimeVariance", "emitter.burst", "emitter.emitting", "emitter.continuous", "emitter.localSpace", "emitter.shape"})
+	section(state, node, "Shape", "particles.tab:shape", {"emitter.emissionShape", "emitter.emissionRadius", "emitter.emissionInnerRadius", "emitter.emitAlongNormal", "emitter.spread", "emitter.angle", "emitter.angleVariance", "emitter.angleSpread"})
+	section(state, node, "Motion", "particles.tab:motion", {"emitter.velocity", "emitter.velocityVariance", "emitter.velocitySpread", "emitter.velocityScale", "emitter.acceleration", "emitter.gravityDirection", "emitter.gravityVelocity", "emitter.wind", "emitter.radialVelocity", "emitter.orbitVelocity", "emitter.damping"})
 	section(state, node, "Size & Rotation", "particles.tab:size", {"emitter.size", "emitter.sizeVariance", "emitter.sizeSpread", "emitter.scaleStart", "emitter.scaleEnd", "emitter.rotation", "emitter.rotationVariance", "emitter.rotationSpread", "emitter.torque", "emitter.torqueVariance", "emitter.torqueSpread", "emitter.torqueAcceleration"})
 	colorOpen := imgui.BeginTabItem("Color")
 	Drive_Item("particles.tab:color")
 	if colorOpen {
 		if imgui.BeginChild("##pcolor", {0, 0}, {}, {}) do particle_color(state, pen)
+		imgui.EndChild()
+		imgui.EndTabItem()
+	}
+	curvesOpen := imgui.BeginTabItem("Curves")
+	Drive_Item("particles.tab:curves")
+	if curvesOpen {
+		if imgui.BeginChild("##pcurves", {0, 0}, {}, {}) do particle_curves(state, pen)
 		imgui.EndChild()
 		imgui.EndTabItem()
 	}
@@ -385,5 +394,55 @@ ParticleTexture_Row :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode, id
 	if field_reset(id, pen.texturePath != "") {
 		Editor_RecordUndo(state, "Clear particle texture")
 		e.ParticleEmitterNode_SetTexture(pen, "")
+	}
+}
+
+// particle_curves: the Curves tab (#127) - size, alpha and speed over a
+// particle's life, each off (the linear settings) or a curve.
+@(private = "file")
+particle_curves :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode) {
+	if !UI_BeginProps("##pcurveprops") do return
+	defer UI_EndProps()
+	Curve_Row :: struct {
+		label, id, tip: string,
+		curve:          ^e.ParticleCurve,
+	}
+	rows := []Curve_Row{
+		{"Size over life", "particles.curve.size", "Scale over the particle's life (replaces Scale Start -> End): 1 = its size", &pen.emitter.sizeCurve},
+		{"Alpha over life", "particles.curve.alpha", "Opacity over its life, multiplying its colour's: 1 = as is, 0 = gone", &pen.emitter.alphaCurve},
+		{"Speed over life", "particles.curve.speed", "Movement over its life: 1 = as is, 0 = stopped, 2 = twice as fast", &pen.emitter.speedCurve},
+	}
+	for r in rows {
+		UI_PropLabel(r.label)
+		on := r.curve.count > 0
+		if imgui.Checkbox(fmt.ctprintf("##%s.on", r.id), &on) {
+			Editor_RecordUndo(state, fmt.tprintf("%s %s", "Use" if on else "Clear", r.label))
+			if on {
+				r.curve^ = {count = 2}
+				r.curve.points[0], r.curve.points[1] = {0, 1}, {1, 1}
+			} else {
+				r.curve.count = 0
+			}
+		}
+		Drive_Item(fmt.tprintf("%s.on", r.id))
+		UI_Tooltip(r.tip)
+		if r.curve.count == 0 do continue
+		UI_PropLabel("")
+		sb := strings.builder_make(context.temp_allocator)
+		strings.write_byte(&sb, '[')
+		for i in 0 ..< r.curve.count {
+			if i > 0 do strings.write_string(&sb, ", ")
+			fmt.sbprintf(&sb, "[%g, %g]", r.curve.points[i].x, r.curve.points[i].y)
+		}
+		strings.write_byte(&sb, ']')
+		@(static) dragging: string
+		if text, changed := script_curve_field(r.id, strings.to_string(sb)); changed {
+			if dragging != r.id do Editor_RecordUndo(state, fmt.tprintf("Edit %s", r.label)) // (one step per drag)
+			dragging = r.id
+			if v, err := json.parse_string(text, allocator = context.temp_allocator); err == .None {
+				if arr, ok := v.(json.Array); ok do e.ParticleCurve_FromJSON(r.curve, arr)
+			}
+		}
+		if !imgui.IsMouseDown(.Left) && dragging == r.id do dragging = ""
 	}
 }

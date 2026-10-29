@@ -1530,6 +1530,7 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "emitter.amount" # integer - Particles alive at once (the pool size).
 ---| "emitter.lifetime" # number - Seconds each particle lives.
+---| "emitter.lifetimeVariance" # number - Each particle's lifetime varies by up to this fraction (0.3: 70%..130% of Lifetime).
 ---| "emitter.position" # Vec2 (runtime) - Emitter position (follows the node).
 ---| "emitter.burst" # number - 0 spreads emission evenly over the lifetime, 1 releases every particle at once.
 ---| "emitter.size" # Vec2 - Particle size (px).
@@ -1574,6 +1575,13 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "emitter.frameMode" # "OverLifetime"|"Speed"|"Random" - Which sheet frame a particle shows: Over Lifetime (the sheet once), Speed (Frame Speed ...
 ---| "emitter.frameSpeed" # number - Frames per second (Frame Mode: Speed).
 ---| "emitter.alignToVelocity" # boolean - Particles face where they move (rain, sparks, arrows); Rotation adds to it.
+---| "emitter.emissionShape" # "Rectangle"|"Point"|"Circle"|"Ring"|"Line"|"RectangleEdge" - Where particles are born: Rectangle (the Spread box), Point, Circle, Ring, Line (along ...
+---| "emitter.emissionRadius" # number - Circle / Ring: the outer radius.
+---| "emitter.emissionInnerRadius" # number - Ring: the inner radius (no particles inside it).
+---| "emitter.emitAlongNormal" # boolean - Particles leave the shape outward (circle / ring: away from the centre; edges: out of t...
+---| "emitter.radialVelocity" # number - Speed away from the emitter (negative: towards it), px/s - bursts, implosions.
+---| "emitter.orbitVelocity" # number - Turning around the emitter, degrees/s - vortexes, magic circles.
+---| "emitter.damping" # number - Speed lost per second (drag): particles slow down and drift.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -1592,6 +1600,7 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "enabled"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.amount"): integer
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.lifetime"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.lifetimeVariance"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.position"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.burst"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.size"): Vec2
@@ -1636,6 +1645,13 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.frameMode"): "OverLifetime"|"Speed"|"Random"
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.frameSpeed"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.alignToVelocity"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionShape"): "Rectangle"|"Point"|"Circle"|"Ring"|"Line"|"RectangleEdge"
+---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionRadius"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionInnerRadius"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.emitAlongNormal"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "emitter.radialVelocity"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.orbitVelocity"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.damping"): number
 function ParticleEmitterNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -1656,6 +1672,7 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "enabled", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.amount", value: integer)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.lifetime", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.lifetimeVariance", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.burst", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.size", x: number|Vec2|number[], y?: number)
@@ -1700,6 +1717,13 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.frameMode", value: "OverLifetime"|"Speed"|"Random")
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.frameSpeed", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.alignToVelocity", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionShape", value: "Rectangle"|"Point"|"Circle"|"Ring"|"Line"|"RectangleEdge")
+---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionRadius", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionInnerRadius", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.emitAlongNormal", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.radialVelocity", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.orbitVelocity", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.damping", value: number)
 function ParticleEmitterNode:set_property(path, value, y) end
 
 ---@class SoundNode

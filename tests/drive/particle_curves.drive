@@ -1,0 +1,23 @@
+# #127: the Particles panel's Curves tab - size / alpha / speed over a
+# particle's life, each off (the linear settings) or a curve; saved with the
+# scene ("size_curve"...). (The Animation workspace gives the bottom panel
+# room.)
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:StarfieldEmitter
+click @bottom:particles
+click @particles.tab:curves
+expect item:particles.curve.size.on == visible
+click @particles.curve.size.on
+wait 2
+expect item:particles.curve.size.curve == visible
+click @particles.curve.alpha.on
+wait 30
+screenshot curves_tab
+click @toolbar.save
+expect file:scenes/main.scene.json contains "size_curve": [[0, 1], [1, 1]]
+expect file:scenes/main.scene.json contains "alpha_curve"
+expect file:scenes/main.scene.json !contains "speed_curve"

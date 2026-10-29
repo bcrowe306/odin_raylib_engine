@@ -7,6 +7,8 @@ import "core:math/rand"
 import "core:crypto"
 import "core:math"
 import "core:fmt"
+import "core:encoding/json"
+import "core:slice"
 import rl "vendor:raylib"
 import rlgl "vendor:raylib/rlgl"
 import ui "../ui"
@@ -123,6 +125,60 @@ ParticleFrameMode :: enum {
 	Random,       // one frame per particle, picked at birth
 }
 
+// Where particles are born (#127). Rectangle is the spread box (half sizes
+// `spread`); Line runs along the emitter's x (half length spread.x).
+ParticleEmissionShape :: enum {
+	Rectangle,
+	Point,
+	Circle,        // a filled disc (emissionRadius)
+	Ring,          // between emissionInnerRadius and emissionRadius
+	Line,
+	RectangleEdge, // the spread box's outline
+}
+
+// A value over a particle's life (#127): points (t 0..1, value), linear in
+// between; none = off.
+MAX_CURVE_POINTS :: 8
+
+ParticleCurve :: struct {
+	points: [MAX_CURVE_POINTS][2]f32,
+	count:  int,
+}
+
+// ParticleCurve_Sample: the value at t (0..1); `none` when the curve is off.
+ParticleCurve_Sample :: proc(c: ^ParticleCurve, t: f32, none: f32 = 1) -> f32 {
+	if c.count == 0 do return none
+	if t <= c.points[0].x do return c.points[0].y
+	for i in 1 ..< c.count {
+		a, b := c.points[i - 1], c.points[i]
+		if t <= b.x {
+			span := b.x - a.x
+			return a.y + (b.y - a.y) * ((t - a.x) / span if span > 0 else 0)
+		}
+	}
+	return c.points[c.count - 1].y
+}
+
+// ParticleCurve_FromJSON reads [[t, v], ...] (sorted by t, at most
+// MAX_CURVE_POINTS; the scene key and the curve editor's text).
+ParticleCurve_FromJSON :: proc(c: ^ParticleCurve, arr: json.Array) {
+	c.count = 0
+	for v in arr {
+		pt, ok := v.(json.Array)
+		if !ok || len(pt) < 2 || c.count >= MAX_CURVE_POINTS do continue
+		num :: proc(v: json.Value) -> f32 {
+			#partial switch x in v {
+			case json.Integer: return f32(x)
+			case json.Float:   return f32(x)
+			}
+			return 0
+		}
+		c.points[c.count] = {num(pt[0]), num(pt[1])}
+		c.count += 1
+	}
+	slice.sort_by(c.points[:c.count], proc(a, b: [2]f32) -> bool {return a.x < b.x})
+}
+
 // What a particle does when it hits the physics world (#123).
 ParticleCollisionMode :: enum {
 	Bounce, // reflected (elasticity), slowed along the surface (friction)
@@ -133,6 +189,7 @@ ParticleCollisionMode :: enum {
 ParticleEmitter :: struct {
 	amount: int `gui:"true" min:"1" max:"5000"`,
 	lifetime: f32 `gui:"true" min:".01" max:"5"`,
+	lifetimeVariance: f32 `gui:"true" min:"0" max:"1"`, // each particle's lifetime within lifetime x (1 +- this)
 	position: [2]f32 `gui:"true" min:"0" max:"1280" save:"false"`,
 	burst: f32 `gui:"true" min:"0" max:"1"`,
 	size: [2]f32 `gui:"true" min:".01" max:"100"`,
@@ -195,6 +252,17 @@ ParticleEmitter :: struct {
 	frameMode: ParticleFrameMode `gui:"true"`,
 	frameSpeed: f32 `gui:"true" min:"0" max:"60"`,
 	alignToVelocity: bool `gui:"true"`,
+	// Emission and motion (#127).
+	emissionShape: ParticleEmissionShape `gui:"true"`,
+	emissionRadius: f32 `gui:"true" min:"0" max:"1000"`,
+	emissionInnerRadius: f32 `gui:"true" min:"0" max:"1000"`,
+	emitAlongNormal: bool `gui:"true"`, // out of the shape (circle / ring: away from the centre; edges: outward)
+	radialVelocity: f32 `gui:"true" min:"-1000" max:"1000"`, // px/s away from the emitter (negative: towards)
+	orbitVelocity: f32 `gui:"true" min:"-720" max:"720"`,    // degrees/s around the emitter
+	damping: f32 `gui:"true" min:"0" max:"20"`,              // velocity lost per second (drag)
+	// Over lifetime (#127; none: off): size (replaces Scale Start -> End),
+	// alpha (multiplies the colour's) and speed (multiplies the movement).
+	sizeCurve, alphaCurve, speedCurve: ParticleCurve,
 	// The owner's global rotation (degrees) and scale, set each update:
 	// emission follows them; local particles are drawn through them.
 	originRotation: f32,
@@ -278,6 +346,7 @@ ParticleEmitter_Init :: proc(emitter: ^ParticleEmitter) {
 	emitter.sheetColumns = 1
 	emitter.sheetRows = 1
 	emitter.frameSpeed = 12
+	emitter.emissionRadius = 32
 	emitter.start = ParticleEmitter_Start
 	emitter.stop = ParticleEmitter_Stop
 	emitter.lifetimer = 0
@@ -352,9 +421,7 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 
 	// Position: an offset in the emitter's space (the spread box). Local
 	// particles keep it; world ones go through the owner's transform.
-	spread_x := math.abs(emitter.spread[0])
-	spread_y := math.abs(emitter.spread[1])
-	offset := [2]f32{safe_float32_range(-spread_x, spread_x), safe_float32_range(-spread_y, spread_y)}
+	offset, normal := particle_emission_point(emitter)
 	p.position = offset if emitter.localSpace else particle_to_world(emitter, offset)
 	p.shape = emitter.shape
 
@@ -375,7 +442,9 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 
 	// Angle (world particles: turned with the owner)
 	baseSpread := math.abs(emitter.angleSpread * emitter.angleVariance)
-	angle := emitter.angle + safe_float32_range(-baseSpread, baseSpread)
+	baseAngle := emitter.angle
+	if emitter.emitAlongNormal && normal != {} do baseAngle = math.to_degrees(math.atan2(normal.y, normal.x))
+	angle := baseAngle + safe_float32_range(-baseSpread, baseSpread)
 	if !emitter.localSpace {
 		angle += emitter.originRotation
 		p.rotation += emitter.originRotation
@@ -405,7 +474,8 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 		p.velocity *= uniform
 		p.acceleration *= uniform
 	}
-	p.lifetime = emitter.lifetime
+	lv := math.clamp(emitter.lifetimeVariance, 0, 1)
+	p.lifetime = max(emitter.lifetime * (1 + safe_float32_range(-lv, lv)), 0.01)
 	p.age = 0
 	p.agePercent = 0
 
@@ -502,84 +572,103 @@ particle_forces :: proc(emitter: ^ParticleEmitter) -> (gravity, wind: [2]f32) {
 }
 
 Particle_Update_Index :: proc(emitter: ^ParticleEmitter, index: int, deltaTime: f32) {
-	p := &emitter.particles[index]
-	if p.alive {
-		gravity, wind := particle_forces(emitter)
-		p.velocity += gravity * deltaTime
-		p.velocity += wind * deltaTime
+	Particle_Update_Particle(emitter, &emitter.particles[index], deltaTime)
+}
 
-		p.velocity += p.acceleration * deltaTime
-		p.torque += p.torqueAcceleration * deltaTime
-		p.rotation += p.torque * deltaTime
-		p.position += p.velocity * deltaTime * emitter.velocityScale
-		p.age += deltaTime
-		p.agePercent = math.clamp(p.age / p.lifetime, 0, 1)
-
-		xScale := math.lerp(p.scaleStart[0], p.scaleEnd[0], p.agePercent)
-		yScale := math.lerp(p.scaleStart[1], p.scaleEnd[1], p.agePercent)
-		p.scale = {xScale, yScale}
-
-		// Color update over lifespan
-		if emitter.useColorRamp {
-			baseColor := ColorRamp_Evaluate(&emitter.colorRamp, p.agePercent)
-			r := u8(math.clamp(f32(baseColor.r) + p.colorJitter.x, 0, 255))
-			g := u8(math.clamp(f32(baseColor.g) + p.colorJitter.y, 0, 255))
-			b := u8(math.clamp(f32(baseColor.b) + p.colorJitter.z, 0, 255))
-			p.color = {r, g, b, baseColor.a}
-		} else {
-			t := p.agePercent
-			r := u8(math.clamp(math.lerp(f32(p.colorStart.r), f32(p.colorEnd.r), t), 0, 255))
-			g := u8(math.clamp(math.lerp(f32(p.colorStart.g), f32(p.colorEnd.g), t), 0, 255))
-			b := u8(math.clamp(math.lerp(f32(p.colorStart.b), f32(p.colorEnd.b), t), 0, 255))
-			a := u8(math.clamp(math.lerp(f32(p.colorStart.a), f32(p.colorEnd.a), t), 0, 255))
-			p.color = {r, g, b, a}
+// Particle_Update_Particle moves a particle and ages it: forces (gravity,
+// wind, its acceleration), damping, radial / orbit motion around the
+// emitter, speed / size / alpha over life, colour.
+Particle_Update_Particle :: proc(emitter: ^ParticleEmitter, particle: ^Particle, deltaTime: f32) {
+	if !particle.alive do return
+	p := particle
+	gravity, wind := particle_forces(emitter)
+	p.velocity += gravity * deltaTime
+	p.velocity += wind * deltaTime
+	p.velocity += p.acceleration * deltaTime
+	if emitter.damping > 0 do p.velocity *= math.exp(-emitter.damping * deltaTime)
+	p.torque += p.torqueAcceleration * deltaTime
+	p.rotation += p.torque * deltaTime
+	t := math.clamp(p.age / p.lifetime, 0, 1) if p.lifetime > 0 else 1
+	speed := ParticleCurve_Sample(&emitter.speedCurve, t)
+	p.position += p.velocity * deltaTime * emitter.velocityScale * speed
+	// Around the emitter (its origin in its own space; local particles: 0, 0).
+	if emitter.radialVelocity != 0 || emitter.orbitVelocity != 0 {
+		center := [2]f32{} if emitter.localSpace else emitter.position
+		d := p.position - center
+		if emitter.orbitVelocity != 0 do d = particle_rotate(d, emitter.orbitVelocity * deltaTime * speed)
+		if emitter.radialVelocity != 0 {
+			l := math.sqrt(d.x * d.x + d.y * d.y)
+			if l > 0.0001 do d += d / l * emitter.radialVelocity * deltaTime * speed
 		}
+		p.position = center + d
+	}
+	p.age += deltaTime
+	p.agePercent = math.clamp(p.age / p.lifetime, 0, 1)
 
-		if p.age >= p.lifetime {
-			p.alive = false
-			p.agePercent = 1.0
-		}
+	if emitter.sizeCurve.count > 0 {
+		c := ParticleCurve_Sample(&emitter.sizeCurve, p.agePercent)
+		p.scale = {c, c}
+	} else {
+		p.scale = {math.lerp(p.scaleStart[0], p.scaleEnd[0], p.agePercent), math.lerp(p.scaleStart[1], p.scaleEnd[1], p.agePercent)}
+	}
+
+	// Color update over lifespan
+	if emitter.useColorRamp {
+		baseColor := ColorRamp_Evaluate(&emitter.colorRamp, p.agePercent)
+		r := u8(math.clamp(f32(baseColor.r) + p.colorJitter.x, 0, 255))
+		g := u8(math.clamp(f32(baseColor.g) + p.colorJitter.y, 0, 255))
+		b := u8(math.clamp(f32(baseColor.b) + p.colorJitter.z, 0, 255))
+		p.color = {r, g, b, baseColor.a}
+	} else {
+		k := p.agePercent
+		r := u8(math.clamp(math.lerp(f32(p.colorStart.r), f32(p.colorEnd.r), k), 0, 255))
+		g := u8(math.clamp(math.lerp(f32(p.colorStart.g), f32(p.colorEnd.g), k), 0, 255))
+		b := u8(math.clamp(math.lerp(f32(p.colorStart.b), f32(p.colorEnd.b), k), 0, 255))
+		a := u8(math.clamp(math.lerp(f32(p.colorStart.a), f32(p.colorEnd.a), k), 0, 255))
+		p.color = {r, g, b, a}
+	}
+	if emitter.alphaCurve.count > 0 {
+		p.color.a = u8(math.clamp(f32(p.color.a) * ParticleCurve_Sample(&emitter.alphaCurve, p.agePercent), 0, 255))
+	}
+
+	if p.age >= p.lifetime {
+		p.alive = false
+		p.agePercent = 1.0
 	}
 }
 
-Particle_Update_Particle :: proc(emitter: ^ParticleEmitter, particle: ^Particle, deltaTime: f32) {
-	if particle.alive {
-		gravity, wind := particle_forces(emitter)
-		particle.velocity += gravity * deltaTime
-		particle.velocity += wind * deltaTime
-
-		particle.velocity += particle.acceleration * deltaTime
-		particle.torque += particle.torqueAcceleration * deltaTime
-		particle.rotation += particle.torque * deltaTime
-		particle.position += particle.velocity * deltaTime * emitter.velocityScale
-		particle.age += deltaTime
-		particle.agePercent = math.clamp(particle.age / particle.lifetime, 0, 1)
-
-		xScale := math.lerp(particle.scaleStart[0], particle.scaleEnd[0], particle.agePercent)
-		yScale := math.lerp(particle.scaleStart[1], particle.scaleEnd[1], particle.agePercent)
-		particle.scale = {xScale, yScale}
-
-		// Color update over lifespan
-		if emitter.useColorRamp {
-			baseColor := ColorRamp_Evaluate(&emitter.colorRamp, particle.agePercent)
-			r := u8(math.clamp(f32(baseColor.r) + particle.colorJitter.x, 0, 255))
-			g := u8(math.clamp(f32(baseColor.g) + particle.colorJitter.y, 0, 255))
-			b := u8(math.clamp(f32(baseColor.b) + particle.colorJitter.z, 0, 255))
-			particle.color = {r, g, b, baseColor.a}
-		} else {
-			t := particle.agePercent
-			r := u8(math.clamp(math.lerp(f32(particle.colorStart.r), f32(particle.colorEnd.r), t), 0, 255))
-			g := u8(math.clamp(math.lerp(f32(particle.colorStart.g), f32(particle.colorEnd.g), t), 0, 255))
-			b := u8(math.clamp(math.lerp(f32(particle.colorStart.b), f32(particle.colorEnd.b), t), 0, 255))
-			a := u8(math.clamp(math.lerp(f32(particle.colorStart.a), f32(particle.colorEnd.a), t), 0, 255))
-			particle.color = {r, g, b, a}
-		}
-
-		if particle.age >= particle.lifetime {
-			particle.alive = false
-			particle.agePercent = 1.0
+// particle_emission_point: a birth point in the emitter's space (its
+// emission shape) and the shape's outward normal there ({} = none).
+@(private = "file")
+particle_emission_point :: proc(emitter: ^ParticleEmitter) -> (point, normal: [2]f32) {
+	sx, sy := math.abs(emitter.spread[0]), math.abs(emitter.spread[1])
+	switch emitter.emissionShape {
+	case .Rectangle:
+		point = {safe_float32_range(-sx, sx), safe_float32_range(-sy, sy)}
+	case .Point:
+	case .Circle, .Ring:
+		outer := math.abs(emitter.emissionRadius)
+		inner := math.clamp(math.abs(emitter.emissionInnerRadius), 0, outer) if emitter.emissionShape == .Ring else 0
+		a := rand.float32_range(0, math.TAU)
+		// (Uniform over the area: the radius from the square root.)
+		r := math.sqrt(safe_float32_range(inner * inner, outer * outer))
+		normal = {math.cos(a), math.sin(a)}
+		point = normal * r
+	case .Line:
+		point = {safe_float32_range(-sx, sx), 0}
+		normal = {0, -1}
+	case .RectangleEdge:
+		// An edge picked by its length, then a point along it.
+		w, h := 2 * sx, 2 * sy
+		k := rand.float32_range(0, max(2 * (w + h), 0.0001))
+		switch {
+		case k < w:         point, normal = {-sx + k, -sy}, {0, -1}
+		case k < w + h:     point, normal = {sx, -sy + (k - w)}, {1, 0}
+		case k < 2 * w + h: point, normal = {sx - (k - w - h), sy}, {0, 1}
+		case:               point, normal = {-sx, sy - (k - 2 * w - h)}, {-1, 0}
 		}
 	}
+	return
 }
 
 Particle_Update :: proc{Particle_Update_Index, Particle_Update_Particle}
