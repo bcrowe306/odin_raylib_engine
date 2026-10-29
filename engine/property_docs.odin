@@ -296,6 +296,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"ParticleEmitter.radialVelocity", "Speed away from the emitter (negative: towards it), px/s - bursts, implosions."},
 	{"ParticleEmitter.orbitVelocity", "Turning around the emitter, degrees/s - vortexes, magic circles."},
 	{"ParticleEmitter.damping", "Speed lost per second (drag): particles slow down and drift."},
+	{"ParticleEmitter.gpu", "Animate the particles on the GPU: 100k+ at almost no CPU cost. Not with collision, Lua custom shapes or the speed curve; radial / orbit motion is close to, not the same as, CPU mode; set Visibility Rect for culling."},
 	{"ParticleEmitter.prewarm", "Start as if it had already run a whole lifetime (smoke already there when the scene starts)."},
 	{"ParticleEmitter.seed", "The same pattern every start (a fixed seed); 0 = different each time."},
 	{"ParticleEmitter.autoVisibility", "Off-screen test from where the particles are (on), or from Visibility Rect (off: cheaper, set it to cover the effect)."},

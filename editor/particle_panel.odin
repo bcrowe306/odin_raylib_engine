@@ -46,9 +46,7 @@ ParticlePreview_Tick :: proc(state: ^EditorState, dt: f32) {
 // ParticleAlive: live particles of an emitter (drives).
 ParticleAlive :: proc(n: ^e.Node) -> int {
 	if n == nil || n.typeId != e.ParticleEmitterNode do return -1
-	alive := 0
-	for p in (cast(^e.ParticleEmitterNode)n).emitter.particles do if p.alive do alive += 1
-	return alive
+	return (cast(^e.ParticleEmitterNode)n).emitter.aliveCount // (CPU or GPU)
 }
 
 @(private = "file")
@@ -78,9 +76,7 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 	}
 	imgui.SameLine(0, UI_SPACE)
 	imgui.AlignTextToFramePadding()
-	alive := 0
-	for p in em.particles do if p.alive do alive += 1
-	UI_DimText(fmt.tprintf("%d particles alive · %d per cycle · %.1fs lifetime", alive, em.amount, em.lifetime))
+	UI_DimText(fmt.tprintf("%d particles alive%s · %d per cycle · %.1fs lifetime", em.aliveCount, " (GPU)" if em.gpu else "", em.amount, em.lifetime))
 
 	if !imgui.BeginTabBar("##particle_tabs", {}) do return
 	defer imgui.EndTabBar()
@@ -102,7 +98,7 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 		}
 		imgui.EndChild()
 	}
-	section(state, node, "Emission", "particles.tab:emission", {"emitter.amount", "emitter.lifetime", "emitter.lifetimeVariance", "emitter.burst", "emitter.emitting", "emitter.continuous", "emitter.localSpace", "emitter.prewarm", "emitter.seed", "emitter.autoVisibility", "emitter.visibilityRect", "emitter.shape"})
+	section(state, node, "Emission", "particles.tab:emission", {"emitter.gpu", "emitter.amount", "emitter.lifetime", "emitter.lifetimeVariance", "emitter.burst", "emitter.emitting", "emitter.continuous", "emitter.localSpace", "emitter.prewarm", "emitter.seed", "emitter.autoVisibility", "emitter.visibilityRect", "emitter.shape"})
 	section(state, node, "Shape", "particles.tab:shape", {"emitter.emissionShape", "emitter.emissionRadius", "emitter.emissionInnerRadius", "emitter.emitAlongNormal", "emitter.spread", "emitter.angle", "emitter.angleVariance", "emitter.angleSpread"})
 	section(state, node, "Motion", "particles.tab:motion", {"emitter.velocity", "emitter.velocityVariance", "emitter.velocitySpread", "emitter.velocityScale", "emitter.acceleration", "emitter.gravityDirection", "emitter.gravityVelocity", "emitter.wind", "emitter.radialVelocity", "emitter.orbitVelocity", "emitter.damping"})
 	section(state, node, "Size & Rotation", "particles.tab:size", {"emitter.size", "emitter.sizeVariance", "emitter.sizeSpread", "emitter.scaleStart", "emitter.scaleEnd", "emitter.rotation", "emitter.rotationVariance", "emitter.rotationSpread", "emitter.torque", "emitter.torqueVariance", "emitter.torqueSpread", "emitter.torqueAcceleration"})
@@ -127,7 +123,18 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 		imgui.EndChild()
 		imgui.EndTabItem()
 	}
-	section(state, node, "Collision", "particles.tab:collision", {"emitter.collisionEnabled", "emitter.collisionMode", "emitter.collisionLayers", "emitter.elasticity", "emitter.friction"})
+	if em.gpu {
+		// (GPU mode: no collision.)
+		colOpen := imgui.BeginTabItem("Collision")
+		Drive_Item("particles.tab:collision")
+		if colOpen {
+			imgui.Dummy({0, 6})
+			UI_DimText("   GPU mode: particles don't collide (turn GPU off in Emission to use collision).")
+			imgui.EndTabItem()
+		}
+	} else {
+		section(state, node, "Collision", "particles.tab:collision", {"emitter.collisionEnabled", "emitter.collisionMode", "emitter.collisionLayers", "emitter.elasticity", "emitter.friction"})
+	}
 }
 
 @(private = "file")
@@ -414,6 +421,10 @@ particle_curves :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode) {
 	}
 	for r in rows {
 		UI_PropLabel(r.label)
+		if pen.emitter.gpu && r.curve == &pen.emitter.speedCurve {
+			UI_DimText("not in GPU mode")
+			continue
+		}
 		on := r.curve.count > 0
 		if imgui.Checkbox(fmt.ctprintf("##%s.on", r.id), &on) {
 			Editor_RecordUndo(state, fmt.tprintf("%s %s", "Use" if on else "Clear", r.label))

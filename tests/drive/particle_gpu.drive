@@ -1,0 +1,20 @@
+# #129: GPU mode - the emitter's particles animated by the shader - in the
+# editor's viewport; collision isn't offered in GPU mode. (The Animation
+# workspace gives the bottom panel room.)
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:StarfieldEmitter
+click @bottom:particles
+click @particles.tab:emission
+click @insp.prop:emitter.gpu
+expect node:StarfieldEmitter.prop.emitter.gpu == true
+wait 60
+expect node:StarfieldEmitter.particles >= 1
+screenshot gpu_viewport
+click @particles.tab:collision
+screenshot gpu_no_collision
+click @toolbar.save
+expect file:scenes/main.scene.json contains "emitter.gpu": true

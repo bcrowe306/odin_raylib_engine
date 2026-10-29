@@ -123,7 +123,10 @@ Node_RenderBounds :: proc(node: ^Node) -> (rect: rl.Rectangle, ok: bool) {
 		return rect_aabb(v.globalPosition, {abs(size.x), abs(size.y)}, {abs(origin.x), abs(origin.y)}, v.globalRotation), true
 	case ParticleEmitterNode:
 		// Its particles (or Visibility Rect): off screen, not drawn (#128).
-		return ParticleEmitter_VisibleBounds(&(cast(^ParticleEmitterNode)node).emitter), true
+		// GPU mode with Auto: where they are is only known to the shader.
+		em := &(cast(^ParticleEmitterNode)node).emitter
+		if em.gpu && em.autoVisibility do return {}, false
+		return ParticleEmitter_VisibleBounds(em), true
 	case TileMapNode:
 		tm := cast(^TileMapNode)node
 		a := TileMapNode_CellCorner(tm, {0, 0})

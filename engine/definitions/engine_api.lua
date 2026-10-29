@@ -1582,6 +1582,7 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "emitter.radialVelocity" # number - Speed away from the emitter (negative: towards it), px/s - bursts, implosions.
 ---| "emitter.orbitVelocity" # number - Turning around the emitter, degrees/s - vortexes, magic circles.
 ---| "emitter.damping" # number - Speed lost per second (drag): particles slow down and drift.
+---| "emitter.gpu" # boolean - Animate the particles on the GPU: 100k+ at almost no CPU cost. Not with collision, Lua ...
 ---| "emitter.prewarm" # boolean - Start as if it had already run a whole lifetime (smoke already there when the scene sta...
 ---| "emitter.seed" # integer - The same pattern every start (a fixed seed); 0 = different each time.
 ---| "emitter.autoVisibility" # boolean - Off-screen test from where the particles are (on), or from Visibility Rect (off: cheape...
@@ -1655,6 +1656,7 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.radialVelocity"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.orbitVelocity"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.damping"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.gpu"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.prewarm"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.seed"): integer
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.autoVisibility"): boolean
@@ -1730,6 +1732,7 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.radialVelocity", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.orbitVelocity", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.damping", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.gpu", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.prewarm", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.seed", value: integer)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.autoVisibility", value: boolean)
