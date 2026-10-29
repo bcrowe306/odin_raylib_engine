@@ -456,6 +456,12 @@ Node_Is :: proc(node: ^Node, typeName: string) -> bool {
 	if node == nil do return false
 	if typeName == "Node" || typeName == Node_TypeName(node) do return true
 	if t := Node_CustomType(node); t != nil && t.name == typeName do return true
+	// A script built on a type's script (`extends`, #153): one of that type too.
+	if inst := cast(^ScriptInstance)node.scriptInstance; inst != nil && node.gameContext != nil && node.gameContext.game != nil {
+		if t := CustomNode_FindByName(node.gameContext, typeName); t != nil && t.script != "" {
+			return Script_Extends(&node.gameContext.game.scriptManager, inst.modulePath, t.script)
+		}
+	}
 	return false
 }
 

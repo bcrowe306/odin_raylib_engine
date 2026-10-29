@@ -1,0 +1,28 @@
+# #153: Extend Script in the Inspector - a new script built on the node's
+# (here a custom node's: HurtboxZz's script), attached instead, the node's
+# values kept; the file says what it extends; saved with the scene.
+wait 5
+exec mkdir -p $PROJECT/nodes
+exec cp tests/drive/fixtures/HurtboxZz.node.json $PROJECT/nodes/HurtboxZz.node.json
+exec cp tests/drive/fixtures/custom_hurtbox_zz.lua $PROJECT/scripts/custom_hurtbox_zz.lua
+exec cp tests/drive/fixtures/custom_nodes_zz.scene.json $PROJECT/scenes/custom_nodes_zz.scene.json
+wait-until item:asset:scenes/custom_nodes_zz.scene.json == visible timeout=300
+dblclick @asset:scenes/custom_nodes_zz.scene.json
+wait 10
+click @hier:HurtB
+wait 5
+expect node:HurtB.script.armor == 3
+click @insp.script-extend
+wait 5
+expect item:newscript.create == visible
+screenshot extend_dialog
+click @newscript.create
+wait 10
+expect file:scripts/hurt_b_custom_hurtbox_zz.lua contains HurtBCustomHurtboxZz.extends = "scripts/custom_hurtbox_zz.lua"
+expect file:scripts/hurt_b_custom_hurtbox_zz.lua contains HurtBCustomHurtboxZz.super.ready(self)
+expect node:HurtB.script.armor == 3
+expect node:HurtB.script.max_health == 5
+screenshot extended
+click @toolbar.save
+expect file:scenes/custom_nodes_zz.scene.json contains "path": "scripts/hurt_b_custom_hurtbox_zz.lua"
+expect file:scenes/custom_nodes_zz.scene.json contains "node_type": "nodes/HurtboxZz.node.json"

@@ -105,6 +105,9 @@ ScriptModule :: struct {
 	// `Class.resource = { local_copy = bool }`.
 	isResourceClass:   bool,
 	resourceLocalCopy: bool, // its resources are local to each component instance by default
+	// The script it builds on (`Class.extends`, normalized path; "" = none):
+	// script_extends.odin.
+	extends: string,
 }
 
 // Forward declaration of ScriptManager
