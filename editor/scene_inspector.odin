@@ -546,7 +546,7 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 			e.Node_UnlinkComponent(node)
 		}
 	} else if !isRoot {
-		if hier_menu(ICON_FA_CUBES, "Save as Component", "save-component") do Component_SaveNodeToFile(state, node)
+		if hier_menu(ICON_FA_CUBES, "Save as Component", "save-component") do Editor_SaveComponent(state, node)
 		if hier_menu(ICON_FA_CLONE, "Save as Component Named...", "save-component-named") do Prompt_Open(.SaveComponentAs, node.name, node)
 	}
 	imgui.Separator()

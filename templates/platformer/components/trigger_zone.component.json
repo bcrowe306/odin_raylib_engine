@@ -1,0 +1,15 @@
+{
+ "type": "AreaNode",
+ "name": "TriggerZone",
+ "uid": "trigr000",
+ "shapes": [
+  {
+   "type": "Box",
+   "size": [
+    128,
+    128
+   ],
+   "isSensor": true
+  }
+ ]
+}

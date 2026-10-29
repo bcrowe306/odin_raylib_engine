@@ -77,13 +77,6 @@ LogEntry :: struct {
 	message: string,
 }
 
-ComponentDef :: struct {
-	name:        string,
-	category:    string,
-	description: string,
-	jsonSnippet: string,
-}
-
 PreviewPanelTab :: enum {
 	Texture,
 	Audio,
@@ -203,8 +196,6 @@ EditorState :: struct {
 	consoleAutoScroll: bool,
 
 	// Reusable Components / Prefabs
-	components:       [dynamic]ComponentDef,
-	selectedCompIdx:  int,
 
 	// Status info
 	statusText:       string,
@@ -300,13 +291,11 @@ Editor_Init :: proc(state: ^EditorState) {
 	state.previewAnimLoop = true
 	state.previewAnimFrames = make([dynamic]rl.Texture)
 	state.previewAnimPaths = make([dynamic]string)
-	state.selectedCompIdx = -1
 	state.statusText = "Ready"
 	state.gameProcessRunning = false
 	state.showProjectSettings = false
 
 	state.logs = make([dynamic]LogEntry)
-	state.components = make([dynamic]ComponentDef)
 
 	// Create initial render texture
 	state.viewportSize = {1280, 720}
@@ -334,7 +323,6 @@ Editor_Init :: proc(state: ^EditorState) {
 
 	// Lua event handlers only run while simulating (or in the game).
 	state.game.scriptManager.suspended = true
-	Editor_RegisterBuiltinComponents(state)
 	Editor_Log(state, .Info, "Rayzr GUI Editor initialized")
 }
 
@@ -377,14 +365,6 @@ Editor_Shutdown :: proc(state: ^EditorState) {
 		delete(log.message)
 	}
 	delete(state.logs)
-
-	for &comp in state.components {
-		delete(comp.name)
-		delete(comp.category)
-		delete(comp.description)
-		delete(comp.jsonSnippet)
-	}
-	delete(state.components)
 
 	if state.snapshotJson != "" {
 		delete(state.snapshotJson)
@@ -450,142 +430,3 @@ Editor_Log :: proc(state: ^EditorState, level: LogLevel, format: string, args: .
 	}
 }
 
-Editor_RegisterBuiltinComponents :: proc(state: ^EditorState) {
-	append(&state.components, ComponentDef{
-		name        = strings.clone("Player Spaceship"),
-		category    = strings.clone("Gameplay"),
-		description = strings.clone("Inertial Asteroids ship controller with steer, thrust, and screen wrap"),
-		jsonSnippet = strings.clone(`{
-  "type": "TextureNode",
-  "name": "PlayerSpaceship",
-  "position": [640.0, 360.0],
-  "scale": [0.45, 0.45],
-  "layer": 2,
-  "texture": { "path": "textures/Spaceship_1.png" },
-  "script": {
-    "path": "assets/scripts/player_ship.lua",
-    "properties": { "ship_name": "Vanguard-Prime", "thrust_power": 520.0, "rotation_speed": 210.0, "drag": 0.985, "max_speed": 650.0 }
-  }
-}`),
-	})
-
-	append(&state.components, ComponentDef{
-		name        = strings.clone("Large Asteroid"),
-		category    = strings.clone("Physics"),
-		description = strings.clone("Box2D zero-gravity dynamic body with tumbling & drift vector"),
-		jsonSnippet = strings.clone(`{
-  "type": "DynamicBodyNode",
-  "name": "AsteroidLarge",
-  "position": [200.0, 200.0],
-  "scale": [0.65, 0.65],
-  "layer": 1,
-  "texture": { "path": "textures/Asteroid_1.png" },
-  "physics": {
-    "gravity_scale": 0.0,
-    "shape": { "type": "box", "size": [110.0, 110.0], "density": 1.2, "friction": 0.2, "restitution": 0.8 }
-  },
-  "script": {
-    "path": "assets/scripts/asteroid.lua",
-    "properties": { "asteroid_name": "Asteroid-Large", "tumble_speed": 18.0, "drift_vx": 35.0, "drift_vy": 22.0 }
-  }
-}`),
-	})
-
-	append(&state.components, ComponentDef{
-		name        = strings.clone("Medium Asteroid"),
-		category    = strings.clone("Physics"),
-		description = strings.clone("Box2D zero-gravity dynamic body with rapid counter-tumbling"),
-		jsonSnippet = strings.clone(`{
-  "type": "DynamicBodyNode",
-  "name": "AsteroidMedium",
-  "position": [400.0, 200.0],
-  "scale": [0.50, 0.50],
-  "layer": 1,
-  "texture": { "path": "textures/Asteroid_2.png" },
-  "physics": {
-    "gravity_scale": 0.0,
-    "shape": { "type": "box", "size": [80.0, 80.0], "density": 1.0, "friction": 0.2, "restitution": 0.85 }
-  },
-  "script": {
-    "path": "assets/scripts/asteroid.lua",
-    "properties": { "asteroid_name": "Asteroid-Medium", "tumble_speed": -28.0, "drift_vx": -40.0, "drift_vy": 28.0 }
-  }
-}`),
-	})
-
-	append(&state.components, ComponentDef{
-		name        = strings.clone("Cosmic Starfield"),
-		category    = strings.clone("Effects"),
-		description = strings.clone("Deep space drifting particle starfield emitter"),
-		jsonSnippet = strings.clone(`{
-  "type": "ParticleEmitterNode",
-  "name": "CosmicStarfield",
-  "position": [640.0, 360.0],
-  "scale": [1.0, 1.0],
-  "layer": 0,
-  "particles": { "amount": 100, "lifetime": 4.5, "velocity": 50.0, "continuous": true, "emitting": true }
-}`),
-	})
-
-	append(&state.components, ComponentDef{
-		name        = strings.clone("Orbiting Drone"),
-		category    = strings.clone("Gameplay"),
-		description = strings.clone("Node with orbiting_drone.lua script attached and exported properties"),
-		jsonSnippet = strings.clone(`{
-  "type": "Node",
-  "name": "OrbitingDrone",
-  "position": [640.0, 360.0],
-  "scale": [0.55, 0.55],
-  "texture": { "path": "textures/Spaceship_2.png" },
-  "script": {
-    "path": "assets/scripts/orbiting_drone.lua",
-    "properties": { "orbit_radius": 160.0, "rotation_speed": 2.2, "drone_name": "DroneUnit" }
-  }
-}`),
-	})
-
-	append(&state.components, ComponentDef{
-		name        = strings.clone("Physics Crate"),
-		category    = strings.clone("Physics"),
-		description = strings.clone("Dynamic Box2D rigid body box collider with mass & friction"),
-		jsonSnippet = strings.clone(`{
-  "type": "DynamicBodyNode",
-  "name": "PhysicsCrate",
-  "position": [0.0, 0.0],
-  "scale": [1.0, 1.0],
-  "physics": {
-    "gravity_scale": 1.0,
-    "shape": { "type": "box", "size": [64.0, 64.0], "density": 1.5, "friction": 0.4, "restitution": 0.2 }
-  }
-}`),
-	})
-
-	append(&state.components, ComponentDef{
-		name        = strings.clone("Static Platform"),
-		category    = strings.clone("Physics"),
-		description = strings.clone("Static collision barrier that objects collide against"),
-		jsonSnippet = strings.clone(`{
-  "type": "StaticBodyNode",
-  "name": "StaticPlatform",
-  "position": [0.0, 0.0],
-  "scale": [1.0, 1.0],
-  "physics": {
-    "shape": { "type": "box", "size": [400.0, 32.0], "density": 0.0, "friction": 0.8, "restitution": 0.0 }
-  }
-}`),
-	})
-
-	append(&state.components, ComponentDef{
-		name        = strings.clone("Trigger Sensor Zone"),
-		category    = strings.clone("Physics"),
-		description = strings.clone("Area sensor detecting overlapping bodies without physical collision"),
-		jsonSnippet = strings.clone(`{
-  "type": "AreaNode",
-  "name": "TriggerZone",
-  "position": [0.0, 0.0],
-  "area": {
-    "shape": { "type": "box", "size": [128.0, 128.0] }
-  }
-}`),
-	})
-}
