@@ -6,7 +6,6 @@ import "core:math/rand"
 import "core:slice"
 import "core:strconv"
 import "core:strings"
-import b2 "vendor:box2d"
 import rl "vendor:raylib"
 
 // ============================================================================
@@ -465,20 +464,17 @@ AnimationPlayerNode_FireEvents :: proc(apn: ^AnimationPlayerNode, frame: int) {
 				if ctx == nil || ctx.scene == nil || k.text == "" do continue
 				target := track_target(apn, &track)
 				parent := target.parent if (target != nil && target.parent != nil) else ctx.scene.rootNode
-				spawned := Scene_InstantiateComponent(ctx.scene, Project_ResolveAssetPath(ctx, k.text), parent, ctx)
+				// (The project-relative path, as Scene.instantiate takes it: it's
+				// the instance's link. Next to the target: in its parent's space.)
+				spawned := Scene_InstantiateComponent(ctx.scene, k.text, parent, ctx)
 				if spawned != nil && target != nil {
-					spawned.position = target.globalPosition
+					spawned.position = target.position
 				}
 			case .SetEnabled:
 				target := track_target(apn, &track)
 				if target == nil do continue
 				enable := k.text != "disable" && k.text != "false" && k.text != "off" && k.text != "0"
-				target.enabled = enable
-				if target.typeId == AreaNode {
-					area := cast(^AreaNode)target
-					if !enable && b2.Body_IsValid(area.bodyId) && b2.Body_IsEnabled(area.bodyId) do b2.Body_Disable(area.bodyId)
-					else if enable && b2.Body_IsValid(area.bodyId) && !b2.Body_IsEnabled(area.bodyId) do b2.Body_Enable(area.bodyId)
-				}
+				target.enabled = enable // (bodies, areas and rays follow it on their next update)
 			}
 		}
 	}

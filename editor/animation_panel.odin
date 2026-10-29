@@ -227,9 +227,10 @@ draw_frame_thumb :: proc(dl: ^imgui.DrawList, anim: ^e.Animation, frame: int, mn
 	}
 	if isEmpty {
 		imgui.DrawList_AddRect(dl, mn + {2, 2}, mx - {2, 2}, col_u32(UI_TEXT_DIM), 2)
-		cx := mn.x + (mx.x - mn.x) * 0.5 - 12
-		cy := mn.y + (mx.y - mn.y) * 0.5 - 6
-		imgui.DrawList_AddText(dl, {cx, cy}, col_u32(UI_TEXT_DIM), "empty")
+		// (A frame cell is too narrow for a word: a centred icon.)
+		label := strings.clone_to_cstring(ICON_FA_MINUS, context.temp_allocator)
+		ts := imgui.CalcTextSize(label)
+		imgui.DrawList_AddText(dl, (mn + mx) * 0.5 - ts * 0.5, col_u32(UI_TEXT_DIM), label)
 		return
 	}
 	if tex == nil || tex.id == 0 do return
@@ -884,6 +885,11 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			else if tr.property == "@audio" do prop = "sounds"
 			else if strings.has_prefix(tr.property, "@audio_") do prop = fmt.tprintf("sounds %s", tr.property[len("@audio_"):])
 			else do prop = "sounds"
+		}
+		#partial switch tr.kind {
+		case .EmitParticles:        prop = "particles (start)"
+		case .InstantiateComponent: prop = "spawn component"
+		case .SetEnabled:           prop = "enable / disable"
 		}
 		name := prop if tr.target == "." else fmt.tprintf("%s.%s", tr.target, prop)
 		isSelectedTrack := panel.selectedTrack == ti

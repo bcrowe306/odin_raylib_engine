@@ -99,6 +99,7 @@ click @anim.add-track
 click @anim.track-node:AnimationPlayer
 click @anim.track-enable
 expect item:anim.key:@enable == visible
+screenshot shortcut_tracks
 
 click @toolbar.save
 expect file:scenes/main.scene.json contains "kind": "particles"

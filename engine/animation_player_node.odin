@@ -166,7 +166,7 @@ AnimationPlayerNode_FPS :: proc(apn: ^AnimationPlayerNode) -> f32 {
 	return apn.fps if apn.fps > 0 else 12
 }
 
-@ (private = "file")
+@(private = "file")
 apply_fps :: proc(apn: ^AnimationPlayerNode) {
 	fps := AnimationPlayerNode_FPS(apn)
 	a := AnimationPlayerNode_GetAnimation(apn)

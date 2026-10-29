@@ -1,5 +1,6 @@
 package engine
 
+import os "osx"
 import "core:strings"
 import "core:testing"
 import "core:time"
@@ -318,4 +319,44 @@ test_animation_serialization_improvements :: proc(t: ^testing.T) {
 	testing.expect(t, anim2.tracks[0].kind == .EmitParticles, "particles track restored")
 	testing.expect(t, anim2.tracks[1].kind == .InstantiateComponent, "spawn track restored")
 	testing.expect(t, anim2.tracks[2].kind == .SetEnabled, "enable track restored")
+}
+
+// A spawn key instances a component next to the track's target: linked by
+// its project-relative path, in the target's parent's space.
+@(test)
+test_animation_spawn_track_fires :: proc(t: ^testing.T) {
+	DIR :: "test_anim_spawn_track"
+	_ = os.make_directory_all(DIR + "/components")
+	defer os.remove_all(DIR)
+	_ = os.write_entire_file(DIR + "/components/puff.component.json", transmute([]u8)string(`{"type": "Node", "name": "Puff", "uid": "puff0000"}`))
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	AssetManager_SetProjectDir(&game.assetManager, DIR)
+	scene := game->createScene("anim_spawn", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+
+	holder := Node_CreateByTypeName(scene, "Node")
+	holder.position = {500, 300}
+	apn := cast(^AnimationPlayerNode)Node_CreateByTypeName(scene, "AnimationPlayerNode", holder)
+	apn.name = "Player"
+	apn.position = {10, 20}
+	apn.gameContext = &game.gameContext
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	Node_SetGlobalPositions(scene.manager, scene.rootNode)
+
+	anim := AnimationPlayerNode_AddFrameAnimation(apn, nil, "smoke", nil)
+	tr := Animation_AddEventTrack(apn, anim, ".", .InstantiateComponent)
+	Track_SetEventKey(tr, 1, "components/puff.component.json", apn.allocator)
+	AnimationPlayerNode_FireEvents(apn, 1)
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+
+	puff: ^Node
+	for c in GetChildrenView(scene.manager, holder) do if c.name == "Puff" do puff = c
+	testing.expect(t, puff != nil, "spawned under the target's parent")
+	if puff != nil {
+		testing.expect_value(t, puff.componentPath, "components/puff.component.json")
+		testing.expect_value(t, puff.position, [2]f32{10, 20})
+	}
 }
