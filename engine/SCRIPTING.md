@@ -327,6 +327,32 @@ return Door
 - The editor doesn't dispatch events to scripts while editing; they run in
   *Simulate* and in the game.
 
+### Global events (Events)
+
+Events that belong to no node go through the **event bus**: any script
+emits, any script connects, without a reference to each other (gameplay ->
+HUD, a level -> the game flow).
+
+```lua
+-- Anywhere: the HUD
+self.conn = Events.connect("score_changed", function(score, source) self:show(score) end)
+-- Anywhere else: a coin
+Events.emit("score_changed", GameState.score)
+```
+
+- `Events.connect(event, fn [, scope])` / `Events.once(...)` -> id,
+  `Events.disconnect(id)`; handlers get `(value, source)` - the value as
+  emitted (tables too), and the emitting script's node (or the node passed
+  to `emit`).
+- `Events.emit(event [, value [, source]])` delivers now (handlers may emit
+  in turn); `Events.emit_deferred(...)` at the end of the frame.
+- Connections end with the connecting script's node (or the `scope` node);
+  a global script's last for the game. `Events.listener_count(event)`.
+- Engine code uses the same bus (`EventBus_Subscribe` / `EventBus_Publish`
+  on `game.events`).
+
+Guide with a tutorial: [`docs/events.md`](docs/events.md).
+
 ### Connections made in the editor (signals)
 
 The Inspector's **Signals** section connects an event of a node to a method

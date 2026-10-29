@@ -5096,6 +5096,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	Script_RegisterTweenModule(L)
 	Script_RegisterVectorModule(L)
 	Script_RegisterPoolModule(L)
+	Script_RegisterEventsModule(L) // global events (script_events.odin)
 	Script_RegisterAccessibilityModules(L) // Accessibility, Subtitles (accessibility.odin)
 	Script_RegisterSaveModule(L)
 	Script_RegisterResourceModule(L) // Resource, ResourceBase (script_resources.odin)

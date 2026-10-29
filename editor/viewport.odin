@@ -183,6 +183,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 			e.Tween_Update(&state.game.tweens, dt, &state.game.scriptManager)
 			e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
 			e.Visibility_Update(state.activeScene, ctx) // (the game camera's view, not the editor's)
+			e.EventBus_Flush(&state.game.events) // Events.emit_deferred
 		} else if !state.isSimulating {
 			ParticlePreview_Tick(state, rl.GetFrameTime()) // emitters animate while editing
 		}

@@ -276,6 +276,8 @@ Node_Terminate :: proc(node: ^Node) {
 	}
 	// Lua: drop connections to/from this node; references become nil.
 	Script_ForgetNode(node)
+	// Event bus subscriptions scoped to this node.
+	if node.gameContext != nil && node.gameContext.game != nil do EventBus_ForgetNode(&node.gameContext.game.events, node)
 	// Resource copies local to this node (a component instance / tree root).
 	Resource_ForgetScope(node)
 	Node_Unregister(node)
