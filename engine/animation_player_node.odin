@@ -1,7 +1,9 @@
 package engine
 
 import "core:log"
+import "core:math"
 import "core:strings"
+import "core:time"
 
 
 
@@ -126,6 +128,14 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 	}
 	moved := apn.currentFrame != prevFrame
 	if a.tracks != nil && (moved || a.loop) do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
+	if a != nil && len(a.frameDurations) > apn.currentFrame && a.frameDurations[apn.currentFrame] > 0 {
+		dur := a.frameDurations[apn.currentFrame]
+		apn.ticker.secondsPerFrame = time.Duration(math.round(f64(dur) * f64(time.Second)))
+	} else {
+		fps := AnimationPlayerNode_FPS(apn)
+		if fps <= 0 do apn.ticker.secondsPerFrame = max(time.Duration)
+		else do apn.ticker.secondsPerFrame = time.Duration(math.round(f64(time.Second) / f64(fps)))
+	}
 	// A non-looping animation that reached its last frame finishes once.
 	atEnd := apn.currentFrame <= a.startFrame if reversed else apn.currentFrame >= a.endFrame
 	if !a.loop && atEnd && !apn.finishedNotified {
@@ -156,10 +166,18 @@ AnimationPlayerNode_FPS :: proc(apn: ^AnimationPlayerNode) -> f32 {
 	return apn.fps if apn.fps > 0 else 12
 }
 
-@(private = "file")
+@ (private = "file")
 apply_fps :: proc(apn: ^AnimationPlayerNode) {
 	fps := AnimationPlayerNode_FPS(apn)
-	if apn.ticker.framesPerSecond != fps do apn.ticker->setFPS(fps)
+	a := AnimationPlayerNode_GetAnimation(apn)
+	apn.ticker.framesPerSecond = fps
+	if a != nil && len(a.frameDurations) > apn.currentFrame && a.frameDurations[apn.currentFrame] > 0 {
+		dur := a.frameDurations[apn.currentFrame]
+		apn.ticker.secondsPerFrame = time.Duration(math.round(f64(dur) * f64(time.Second)))
+	} else {
+		if fps <= 0 do apn.ticker.secondsPerFrame = max(time.Duration)
+		else do apn.ticker.secondsPerFrame = time.Duration(math.round(f64(time.Second) / f64(fps)))
+	}
 }
 
 AnimationPlayerNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
@@ -170,11 +188,13 @@ AnimationPlayerNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	for a in apn.owned {
 		if a.renderFrame == FA_RenderFrame {
 			fa := cast(^FrameAnimation)a
-			for f in fa.frames do ResourceManager_ReleaseTexture(rm, f)
+			for f in fa.frames do if f != nil do ResourceManager_ReleaseTexture(rm, f)
 			FrameAnimation_Destroy(fa)
 		} else if a.renderFrame == SSA_RenderFrame {
 			ssa := cast(^SpriteSheetAnimation)a
 			if ssa.spriteSheet != nil do ResourceManager_ReleaseTexture(rm, ssa.spriteSheet)
+			delete(ssa.cells)
+			delete(ssa.frameDurations)
 		}
 	}
 	clear(&apn.owned)
@@ -212,7 +232,7 @@ AnimationPlayerNode_AddSheetAnimation :: proc(apn: ^AnimationPlayerNode, rm: ^Re
 
 AnimationPlayerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	apn := cast(^AnimationPlayerNode)node
-	apn.ticker->process()
+	Ticker_ProcessDt(&apn.ticker, deltaTime)
 	if apn.blendFrom != nil {
 		apn.blendElapsed += deltaTime
 		if apn.blendElapsed >= apn.blendTime do apn.blendFrom = nil

@@ -325,7 +325,15 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 				strings.write_string(&w.sb, ", \"frames\": [")
 				for f, fi in fa.frames {
 					if fi > 0 do strings.write_string(&w.sb, ", ")
-					Json_String(w, asset_rel(node, f.filePath))
+					Json_String(w, asset_rel(node, f.filePath) if f != nil else "")
+				}
+				strings.write_byte(&w.sb, ']')
+			}
+			if len(a.frameDurations) > 0 {
+				strings.write_string(&w.sb, ", \"frame_durations\": [")
+				for d, di in a.frameDurations {
+					if di > 0 do strings.write_string(&w.sb, ", ")
+					Json_Float(w, d)
 				}
 				strings.write_byte(&w.sb, ']')
 			}
@@ -337,8 +345,14 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 					Json_String(w, tr.target)
 					strings.write_string(&w.sb, ", \"property\": ")
 					Json_String(w, tr.property)
-					if tr.kind == .Method do strings.write_string(&w.sb, ", \"kind\": \"method\"")
-					if tr.kind == .Audio do strings.write_string(&w.sb, ", \"kind\": \"audio\"")
+					switch tr.kind {
+					case .Method: strings.write_string(&w.sb, ", \"kind\": \"method\"")
+					case .Audio:  strings.write_string(&w.sb, ", \"kind\": \"audio\"")
+					case .EmitParticles: strings.write_string(&w.sb, ", \"kind\": \"particles\"")
+					case .InstantiateComponent: strings.write_string(&w.sb, ", \"kind\": \"spawn\"")
+					case .SetEnabled: strings.write_string(&w.sb, ", \"kind\": \"enable\"")
+					case .Property:
+					}
 					if tr.name != "" {
 						strings.write_string(&w.sb, ", \"name\": ")
 						Json_String(w, tr.name)
@@ -1037,30 +1051,52 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 					}
 					anim = ssa
 				} else {
-					paths := make([dynamic]string, context.temp_allocator)
+					fa := new(FrameAnimation, apn.allocator)
+					fa.frames = make([dynamic]^Texture, apn.allocator)
+					FrameAnimation_Init(fa, strings.clone(name, apn.allocator))
+					fa.loop = loop
 					if frames, has := sj_arr(ao, "frames"); has {
 						for f in frames {
-							if fs, is_str := f.(json.String); is_str do append(&paths, Project_ResolveAssetPath(ctx, fs))
+							if fs, is_str := f.(json.String); is_str {
+								if len(fs) == 0 {
+									append(&fa.frames, cast(^Texture)nil)
+								} else if rm != nil {
+									FrameAnimation_AddFrame(fa, rm, Project_ResolveAssetPath(ctx, string(fs)))
+								}
+							}
 						}
 					}
-					fa := AnimationPlayerNode_AddFrameAnimation(apn, rm, name, paths[:], loop)
 					if sj_obj_has(ao, "start") || sj_obj_has(ao, "end") {
 						Animation_SetRange(fa, sj_int(ao, "start", 0), sj_int(ao, "end", len(fa.frames) - 1))
 					}
+					append(&apn.owned, cast(^Animation)fa)
+					AnimationPlayerNode_AddAnimation(apn, fa)
 					anim = fa
 				}
 				anim.reverse = sj_bool(ao, "reverse", false)
 				anim.fps = sj_float(ao, "fps", 0)
 				anim.flipX = sj_bool(ao, "flip_x", false)
 				anim.flipY = sj_bool(ao, "flip_y", false)
+				if fdArr, hasFd := sj_arr(ao, "frame_durations"); hasFd {
+					anim.frameDurations = make([dynamic]f32, apn.allocator)
+					for v in fdArr {
+						#partial switch x in v {
+						case json.Integer: append(&anim.frameDurations, f32(x))
+						case json.Float:   append(&anim.frameDurations, f32(x))
+						}
+					}
+				}
 				if tracks, has := sj_arr(ao, "tracks"); has {
 					for tv in tracks {
 						to, isObj := tv.(json.Object)
 						if !isObj do continue
 						track := Animation_AddTrack(apn, anim, sj_string(to, "target", "."), sj_string(to, "property", ""))
 						switch sj_string(to, "kind", "") {
-						case "method": track.kind = .Method
-						case "audio":  track.kind = .Audio
+						case "method":    track.kind = .Method
+						case "audio":     track.kind = .Audio
+						case "particles": track.kind = .EmitParticles
+						case "spawn":     track.kind = .InstantiateComponent
+						case "enable":    track.kind = .SetEnabled
 						}
 						if trName := sj_string(to, "name", ""); trName != "" {
 							track.name = strings.clone(trName, apn.allocator)

@@ -52,6 +52,7 @@ Anim_Panel :: struct {
 	playing:    bool,
 	lastTick:   time.Tick,
 	accum:      f32,
+	accumTime:  f32,
 	trackNode:  ^e.Node, // Add Track dialog
 	trackOpen:  bool,
 	newName:    [64]u8,
@@ -200,20 +201,36 @@ frames_paste :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.
 draw_frame_thumb :: proc(dl: ^imgui.DrawList, anim: ^e.Animation, frame: int, mn, mx: [2]f32) {
 	tex: ^rl.Texture2D
 	uv0, uv1 := [2]f32{0, 0}, [2]f32{1, 1}
+	isEmpty := false
 	if anim.renderFrame == e.SSA_RenderFrame {
 		// `frame` is a source frame: a cell of the sheet.
 		ssa := cast(^e.SpriteSheetAnimation)anim
 		if ssa.spriteSheet == nil || ssa.grid.x <= 0 || ssa.grid.y <= 0 do return
-		tex = &ssa.spriteSheet.texture
 		cell := ssa.cells[frame] if frame >= 0 && frame < len(ssa.cells) else frame
-		size := [2]f32{f32(tex.width), f32(tex.height)}
-		r := e.SpriteSheet_CellRect(size, ssa.grid, ssa.margin, ssa.spacing, cell)
-		uv0 = {r.x / max(size.x, 1), r.y / max(size.y, 1)}
-		uv1 = uv0 + {r.width / max(size.x, 1), r.height / max(size.y, 1)}
+		if cell < 0 {
+			isEmpty = true
+		} else {
+			tex = &ssa.spriteSheet.texture
+			size := [2]f32{f32(tex.width), f32(tex.height)}
+			r := e.SpriteSheet_CellRect(size, ssa.grid, ssa.margin, ssa.spacing, cell)
+			uv0 = {r.x / max(size.x, 1), r.y / max(size.y, 1)}
+			uv1 = uv0 + {r.width / max(size.x, 1), r.height / max(size.y, 1)}
+		}
 	} else {
 		fa := cast(^e.FrameAnimation)anim
-		if frame < 0 || frame >= len(fa.frames) || fa.frames[frame] == nil do return
-		tex = &fa.frames[frame].texture
+		if frame < 0 || frame >= len(fa.frames) do return
+		if fa.frames[frame] == nil {
+			isEmpty = true
+		} else {
+			tex = &fa.frames[frame].texture
+		}
+	}
+	if isEmpty {
+		imgui.DrawList_AddRect(dl, mn + {2, 2}, mx - {2, 2}, col_u32(UI_TEXT_DIM), 2)
+		cx := mn.x + (mx.x - mn.x) * 0.5 - 12
+		cy := mn.y + (mx.y - mn.y) * 0.5 - 6
+		imgui.DrawList_AddText(dl, {cx, cy}, col_u32(UI_TEXT_DIM), "empty")
+		return
 	}
 	if tex == nil || tex.id == 0 do return
 	// Fit, keeping the aspect ratio.
@@ -455,6 +472,28 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	UI_SameLineOrWrap(80, UI_SPACE)
 	imgui.AlignTextToFramePadding()
 	UI_DimText(fmt.tprintf("Frame %d / %d", rel + 1, length))
+	UI_SameLineOrWrap(100, UI_SPACE)
+	selFrame := panel.anchor if len(panel.sel) > 0 else rel
+	frameDur := e.Animation_GetFrameDuration(anim, selFrame, e.AnimationPlayerNode_FPS(apn))
+	imgui.SetNextItemWidth(80)
+	if imgui.DragFloat("##frame_dur", &frameDur, 0.01, 0.01, 30.0, "%.2fs") {
+		Editor_RecordUndo(state, "Frame duration")
+		if len(panel.sel) > 0 {
+			for sf in panel.sel do e.Animation_SetFrameDuration(anim, sf, frameDur, apn.allocator)
+		} else {
+			e.Animation_SetFrameDuration(anim, selFrame, frameDur, apn.allocator)
+		}
+	}
+	Drive_Item("anim.frame-duration")
+	UI_Tooltip("Duration of the selected frame in seconds (right-click to reset to 1/fps)")
+	if imgui.IsItemHovered() && imgui.IsMouseClicked(.Right) {
+		Editor_RecordUndo(state, "Reset frame duration")
+		if len(panel.sel) > 0 {
+			for sf in panel.sel do e.Animation_SetFrameDuration(anim, sf, 0, apn.allocator)
+		} else {
+			e.Animation_SetFrameDuration(anim, selFrame, 0, apn.allocator)
+		}
+	}
 	UI_SameLineOrWrap(110, UI_SPACE)
 	if UI_Button(fmt.tprintf("%s  Add Track", ICON_FA_PLUS), "anim.add-track") {
 		panel.trackNode = apn
@@ -464,19 +503,24 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	mgr := state.activeScene.manager
 	if imgui.BeginPopup("##anim_add_track") {
 		UI_DimText("Animate a property of:")
-		// The player and its descendants.
+		// The player and any node in the scene.
 		draw :: proc(state: ^EditorState, mgr: ^e.NodeManager, n: ^e.Node, depth: int) {
 			if n.transient do return
 			if imgui.Selectable(fmt.ctprintf("%*s%s  %s###tn%p", depth * 3, "", Editor_NodeIcon(n), n.name, n), panel.trackNode == n, {.NoAutoClosePopups}) do panel.trackNode = n
 			Drive_Item(fmt.tprintf("anim.track-node:%s", n.name))
 			for c in e.GetChildrenView(mgr, n) do if c != nil do draw(state, mgr, c, depth + 1)
 		}
-		draw(state, mgr, apn, 0)
+		rootNode := state.activeScene.rootNode if state.activeScene != nil && state.activeScene.rootNode != nil else cast(^e.Node)apn
+		draw(state, mgr, rootNode, 0)
 		imgui.Separator()
 		if panel.trackNode != nil && e.Node_IsAlive(panel.trackNode) {
 			props := make([dynamic]string, context.temp_allocator)
-			append(&props, "position", "rotation", "scale")
-			for p in e.Node_CollectProperties(panel.trackNode) do if e.Track_IsAnimatable(p) && !p.runtime do append(&props, p.name)
+			append(&props, "position", "rotation", "scale", "origin", "zIndex", "enabled")
+			for p in e.Node_CollectProperties(panel.trackNode) do if e.Track_IsAnimatable(p) && !p.runtime {
+				found := false
+				for pr in props do if pr == p.name { found = true; break }
+				if !found do append(&props, p.name)
+			}
 			for pname in props {
 				if imgui.MenuItem(strings.clone_to_cstring(pname, context.temp_allocator)) {
 					Editor_RecordUndo(state, "Add track")
@@ -503,6 +547,27 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				panel.selectedTrack = len(anim.tracks) - 1
 			}
 			Drive_Item("anim.track-sounds")
+			if imgui.MenuItem(fmt.ctprintf("%s  Emit Particles", ICON_FA_WAND_MAGIC_SPARKLES)) {
+				Editor_RecordUndo(state, "Add track")
+				tr := e.Animation_AddEventTrack(apn, anim, target, .EmitParticles)
+				panel.selectedTrack = len(anim.tracks) - 1
+			}
+			Drive_Item("anim.track-particles")
+			UI_Tooltip("Keys trigger particle emission on this particle emitter")
+			if imgui.MenuItem(fmt.ctprintf("%s  Spawn Component", ICON_FA_CUBES)) {
+				Editor_RecordUndo(state, "Add track")
+				tr := e.Animation_AddEventTrack(apn, anim, target, .InstantiateComponent)
+				panel.selectedTrack = len(anim.tracks) - 1
+			}
+			Drive_Item("anim.track-spawn")
+			UI_Tooltip("Keys instantiate a component/prefab at this node's position")
+			if imgui.MenuItem(fmt.ctprintf("%s  Enable / Disable", ICON_FA_TOGGLE_ON)) {
+				Editor_RecordUndo(state, "Add track")
+				tr := e.Animation_AddEventTrack(apn, anim, target, .SetEnabled)
+				panel.selectedTrack = len(anim.tracks) - 1
+			}
+			Drive_Item("anim.track-enable")
+			UI_Tooltip("Keys enable or disable this node (e.g. AreaNode, RaycastNode)")
 		}
 		imgui.EndPopup()
 	}
@@ -534,10 +599,22 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	if panel.playing {
 		dt := f32(time.duration_seconds(time.tick_since(panel.lastTick)))
 		panel.lastTick = time.tick_now()
-		panel.accum += dt * max(e.AnimationPlayerNode_FPS(apn), 1)
-		if int(panel.accum) >= length {
-			if anim.loop do panel.accum -= f32(length)
-			else {panel.accum = f32(length - 1); panel.playing = false}
+		panel.accumTime += dt
+		curF := int(panel.accum)
+		dur := e.Animation_GetFrameDuration(anim, anim.startFrame + curF, e.AnimationPlayerNode_FPS(apn))
+		for panel.accumTime >= dur && length > 0 {
+			panel.accumTime -= dur
+			panel.accum += 1
+			if int(panel.accum) >= length {
+				if anim.loop do panel.accum = 0
+				else {
+					panel.accum = f32(length - 1)
+					panel.playing = false
+					break
+				}
+			}
+			curF = int(panel.accum)
+			dur = e.Animation_GetFrameDuration(anim, anim.startFrame + curF, e.AnimationPlayerNode_FPS(apn))
 		}
 		f := int(panel.accum)
 		if reversed do f = length - 1 - f
@@ -740,6 +817,17 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		if imgui.MenuItem(fmt.ctprintf("%s  Delete", ICON_FA_TRASH), "Del") do frames_delete(state, apn, anim, slice.clone(panel.sel[:], context.temp_allocator))
 		Drive_Item("anim.ctx-delete")
 		imgui.Separator()
+		if imgui.MenuItem(fmt.ctprintf("%s  Insert Empty Frame", ICON_FA_PLUS)) {
+			Editor_RecordUndo(state, "Insert empty frame")
+			e.Animation_InsertEmptyFrame(apn, anim, f)
+		}
+		Drive_Item("anim.ctx-insert-empty")
+		if imgui.MenuItem(fmt.ctprintf("%s  Append Empty Frame", ICON_FA_PLUS)) {
+			Editor_RecordUndo(state, "Append empty frame")
+			e.Animation_AddEmptyFrame(apn, anim)
+		}
+		Drive_Item("anim.ctx-add-empty")
+		imgui.Separator()
 		if imgui.MenuItem(fmt.ctprintf("Start the Range Here (frame %d)", f + 1)) {
 			Editor_RecordUndo(state, "Edit range")
 			e.Animation_SetRange(anim, f, max(anim.endFrame, f))
@@ -825,6 +913,9 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		keyTip := "Key the current value at the playhead"
 		if tr.kind == .Method do keyTip = "Call a method at the playhead (right-click the key to name it)"
 		if tr.kind == .Audio do keyTip = "Play a sound at the playhead (right-click the key to pick it)"
+		if tr.kind == .EmitParticles do keyTip = "Emit particles at the playhead (right-click to edit action)"
+		if tr.kind == .InstantiateComponent do keyTip = "Spawn component at the playhead (right-click to pick component)"
+		if tr.kind == .SetEnabled do keyTip = "Toggle enable/disable at the playhead"
 		keyClicked := UI_IconButton(ICON_FA_CIRCLE, fmt.tprintf("anim.key:%s", tr.property), keyTip, size = 24, tint = UI_WARNING)
 		if keyClicked && tr.kind != .Property {
 			Editor_RecordUndo(state, "Add event key")
@@ -836,6 +927,13 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			} else if tr.kind == .Method {
 				if methods := Script_ListMethods(state, target); len(methods) > 0 do text = methods[0]
 				panel.selectedTrack = ti
+			} else if tr.kind == .EmitParticles {
+				text = "burst"
+			} else if tr.kind == .InstantiateComponent {
+				comps := Editor_ListProjectFiles(state, "", {".component.json"})
+				text = comps[0] if len(comps) > 0 else ""
+			} else if tr.kind == .SetEnabled {
+				text = "disable"
 			}
 			// The previous key's text is the likely next one.
 			for k in tr.keys do if k.frame < f32(rel) && k.text != "" do text = k.text
@@ -898,6 +996,9 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 					imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %.2f %.2f %.2f %.2f\nTo the next key: %s  (right-click: easing, curve, delete)", int(k.frame) + 1, k.value[0], k.value[1], k.value[2], k.value[3], curve))
 				case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: calls %s:%s(%s)  (right-click: edit, delete)", int(k.frame) + 1, tr.target, k.text, k.arg if k.arg != "" else "frame"))
 				case .Audio:    imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: plays %s  (right-click: edit, delete)", int(k.frame) + 1, k.text))
+				case .EmitParticles:         imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: emit particles (%s)  (right-click: edit, delete)", int(k.frame) + 1, k.text))
+				case .InstantiateComponent:  imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: spawn component %s  (right-click: edit, delete)", int(k.frame) + 1, k.text))
+				case .SetEnabled:            imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %s %s  (right-click: edit, delete)", int(k.frame) + 1, k.text, tr.target))
 				}
 				if imgui.IsMouseClicked(.Left) {
 					scrub(state, apn, anim, int(k.frame))
@@ -961,6 +1062,28 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 					if imgui.MenuItem(fmt.ctprintf("%s  Sound Settings...", ICON_FA_SLIDERS)) {
 						panel.selectedTrack = ti
 					}
+				} else if tr.kind == .EmitParticles {
+					pbuf: [128]u8
+					copy(pbuf[:len(pbuf) - 1], key.text)
+					imgui.SetNextItemWidth(220)
+					if imgui.InputTextWithHint("##part_preset", "action (e.g. burst)", cstring(raw_data(pbuf[:])), len(pbuf), {.AutoSelectAll}) {
+						key.text = strings.clone(string(cstring(raw_data(pbuf[:]))), apn.allocator)
+					}
+					if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
+					Drive_Item("anim.event-particles")
+				} else if tr.kind == .InstantiateComponent {
+					if path, ok := asset_picker("anim.event-spawn", key.text, Editor_ListProjectFiles(state, "", {".component.json"}), allowNone = false); ok {
+						Editor_RecordUndo(state, "Event key")
+						key.text = strings.clone(path, apn.allocator)
+					}
+					Drive_Item("anim.event-spawn")
+				} else if tr.kind == .SetEnabled {
+					curEnabled := key.text != "disable" && key.text != "false" && key.text != "off" && key.text != "0"
+					if imgui.Checkbox("Enabled at this frame", &curEnabled) {
+						Editor_RecordUndo(state, "Event key")
+						key.text = strings.clone("enable" if curEnabled else "disable", apn.allocator)
+					}
+					Drive_Item("anim.event-enabled")
 				}
 				if tr.kind == .Property && imgui.BeginMenu(fmt.ctprintf("%s  Easing: %s", ICON_FA_WAVE_SQUARE, e.Ease_Name(key.ease))) {
 					for ease in e.Ease {

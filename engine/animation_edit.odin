@@ -106,12 +106,49 @@ Animation_RemoveFrames :: proc(apn: ^AnimationPlayerNode, a: ^Animation, indices
 			cells := sheet_cells(cast(^SpriteSheetAnimation)a, apn.allocator if apn != nil else context.allocator)
 			ordered_remove(cells, idx)
 		} else do continue
+		if idx < len(a.frameDurations) do ordered_remove(&a.frameDurations, idx)
 		removed += 1
 		if idx < start {start -= 1; end -= 1} else if idx <= end do end -= 1
 	}
 	Animation_SetRange(a, start, max(end, start))
 	if apn != nil do apn.currentFrame = clamp(apn.currentFrame, a.startFrame, a.endFrame)
 	return removed
+}
+
+// Animation_InsertEmptyFrame inserts a blank/empty frame at position `at`.
+Animation_InsertEmptyFrame :: proc(apn: ^AnimationPlayerNode, a: ^Animation, at: int) -> bool {
+	if a == nil do return false
+	allocator := apn.allocator if apn != nil else context.allocator
+	n := Animation_SourceCount(a)
+	pos := clamp(at, 0, n)
+	if a.renderFrame == FA_RenderFrame {
+		fa := cast(^FrameAnimation)a
+		if fa.frames == nil do fa.frames = make([dynamic]^Texture, allocator)
+		inject_at(&fa.frames, pos, cast(^Texture)nil)
+	} else if a.renderFrame == SSA_RenderFrame {
+		cells := sheet_cells(cast(^SpriteSheetAnimation)a, allocator)
+		inject_at(cells, pos, -1)
+	} else do return false
+
+	if a.frameDurations != nil && pos <= len(a.frameDurations) {
+		inject_at(&a.frameDurations, pos, 0.0)
+	}
+	start, end := a.startFrame, a.endFrame
+	if n == 0 {
+		start, end = 0, 0
+	} else if pos < start {
+		start += 1; end += 1
+	} else if pos <= end + 1 {
+		end += 1
+	}
+	Animation_SetRange(a, start, end)
+	return true
+}
+
+// Animation_AddEmptyFrame appends a blank/empty frame to the end.
+Animation_AddEmptyFrame :: proc(apn: ^AnimationPlayerNode, a: ^Animation) -> bool {
+	if a == nil do return false
+	return Animation_InsertEmptyFrame(apn, a, Animation_SourceCount(a))
 }
 
 // Animation_CopyFrames puts source frames (in order) on a clip.
@@ -282,6 +319,10 @@ AnimationPlayerNode_DuplicateAnimation :: proc(apn: ^AnimationPlayerNode, index:
 	} else do return nil
 	dup.name = strings.clone(name, apn.allocator)
 	dup.tracks = nil
+	if len(src.frameDurations) > 0 {
+		dup.frameDurations = make([dynamic]f32, apn.allocator)
+		append(&dup.frameDurations, ..src.frameDurations[:])
+	}
 	for tr in src.tracks {
 		nt := Animation_AddTrack(apn, dup, tr.target, tr.property)
 		nt.kind = tr.kind

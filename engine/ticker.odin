@@ -1,5 +1,6 @@
 package engine
 
+import "core:math"
 import "core:time"
 
 TickerCallBack :: proc(ticker: ^Ticker, currentTick: int, user_data: rawptr)
@@ -21,6 +22,7 @@ Ticker :: struct {
 	togglePause: proc(ticker: ^Ticker),
 	reset: proc(ticker: ^Ticker),
 	process: proc(ticker: ^Ticker),
+	processDt: proc(ticker: ^Ticker, dt: f32),
 	callback: proc(ticker: ^Ticker, currentTick: int, user_data: rawptr),
 }
 
@@ -29,15 +31,30 @@ Ticker_Process :: proc(ticker: ^Ticker) {
 	tick := time.tick_now()
 	ticker.elapsedTime += time.tick_diff(ticker.lastTick, tick)
 	ticker.lastTick = tick
-	if ticker.elapsedTime >= ticker.secondsPerFrame {
-		ticker.elapsedTime = 0
+	if ticker.secondsPerFrame <= 0 do return
+	for ticker.elapsedTime >= ticker.secondsPerFrame && ticker.running {
+		ticker.elapsedTime -= ticker.secondsPerFrame
 		ticker.currentTick += 1
 		if ticker.callback != nil do ticker.callback(ticker, ticker.currentTick, ticker.user_data)
+		if ticker.secondsPerFrame <= 0 do break
+	}
+}
+
+Ticker_ProcessDt :: proc(ticker: ^Ticker, dt: f32) {
+	if !ticker.running || dt <= 0 do return
+	ticker.elapsedTime += time.Duration(math.round(f64(dt) * f64(time.Second)))
+	if ticker.secondsPerFrame <= 0 do return
+	for ticker.elapsedTime >= ticker.secondsPerFrame && ticker.running {
+		ticker.elapsedTime -= ticker.secondsPerFrame
+		ticker.currentTick += 1
+		if ticker.callback != nil do ticker.callback(ticker, ticker.currentTick, ticker.user_data)
+		if ticker.secondsPerFrame <= 0 do break
 	}
 }
 
 Ticker_Init :: proc(ticker: ^Ticker, auto_start: bool = true) {
 	ticker.process = Ticker_Process
+	ticker.processDt = Ticker_ProcessDt
 	ticker.setFPS = Ticker_SetFPS
 	ticker.setCallback = Ticker_SetCallback
 	ticker.reset = Ticker_Reset
