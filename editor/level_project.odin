@@ -82,8 +82,7 @@ LevelProject_Page :: proc(state: ^EditorState) {
 			prop_bool("Backup on save", "defs.project.backup", root, "backupOnSave", "Before each save, a copy of the files as they were goes to the backup folder", "project.file")
 			if e.LdtkJson_Bool(root, "backupOnSave") {
 				UI_PropLabel("Backups kept")
-				lim := i32(e.LdtkJson_Int(root, "backupLimit", 10))
-				if imgui.InputInt("##blimit", &lim, 1, 5) || imgui.IsItemDeactivatedAfterEdit() {
+				if lim, set := level_input_int("##blimit", i32(e.LdtkJson_Int(root, "backupLimit", 10)), 1, 5); set {
 					defs_checkpoint("Backup Limit")
 					e.LdtkJson_SetInt(root, "backupLimit", int(clamp(lim, 3, 50)), a)
 					e.Ldtk_Doc_Touch(doc)

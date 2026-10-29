@@ -1627,10 +1627,9 @@ level_tab_level :: proc(state: ^EditorState) {
 		Drive_Item("level.pos")
 		level_tip("Its place in the world, in pixels (drag or type; linear layouts place levels themselves)", "tab.level")
 		UI_PropLabel("Size (px)")
-		sizeEdit := [2]i32{i32(s.x), i32(s.y)}
-		entered := imgui.InputInt2("##lvl_size", &sizeEdit) || imgui.IsItemDeactivatedAfterEdit()
+		sizeEdit, entered := level_input_int2("##lvl_size", {i32(s.x), i32(s.y)})
 		Drive_Item("level.size")
-		level_tip("Width, height in pixels (Enter applies; resized from the top-left - drag the handles around the level for the other sides)", "level.resize")
+		level_tip("Width, height in pixels (applied when you leave the field; resized from the top-left - drag the handles around the level for the other sides)", "level.resize")
 		if entered && sizeEdit.x > 0 && sizeEdit.y > 0 && (int(sizeEdit.x) != s.x || int(sizeEdit.y) != s.y) {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Resize Level")
 			e.Ldtk_Doc_ResizeLevel(doc, L.level, {int(sizeEdit.x), int(sizeEdit.y)})
@@ -2320,4 +2319,44 @@ LevelEditor_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool)
 		return strings.to_string(b), true
 	}
 	return "", false
+}
+
+// --- numbers applied when editing ends (#99) -----------------------------------------
+// Fields don't need Enter: a value is applied when editing ends (Enter,
+// Tab, a click elsewhere, a step button). These ones rebuild data (grid
+// sizes remap tiles, the level size crops, the backup limit deletes
+// backups), so they don't apply each keystroke on the way ("512" isn't
+// 5, then 51): the typed value waits until the field is left.
+
+@(private = "file")
+levelPendingInt: struct {
+	id: imgui.ID,
+	v:  [2]i32,
+}
+
+// level_input_int: an int field applied when editing ends; returns the new
+// value and whether it changed.
+level_input_int :: proc(label: cstring, cur: i32, step: i32 = 0, stepFast: i32 = 0) -> (i32, bool) {
+	id := imgui.GetID(label)
+	v := levelPendingInt.v[0] if levelPendingInt.id == id else cur
+	imgui.InputInt(label, &v, step, stepFast)
+	return level_pending_end(id, {v, 0}, {cur, 0}).x, imgui.IsItemDeactivatedAfterEdit() && v != cur
+}
+
+// level_input_int2: the same for a pair.
+level_input_int2 :: proc(label: cstring, cur: [2]i32) -> ([2]i32, bool) {
+	id := imgui.GetID(label)
+	v := levelPendingInt.v if levelPendingInt.id == id else cur
+	imgui.InputInt2(label, &v)
+	return level_pending_end(id, v, cur), imgui.IsItemDeactivatedAfterEdit() && v != cur
+}
+
+@(private = "file")
+level_pending_end :: proc(id: imgui.ID, v, cur: [2]i32) -> [2]i32 {
+	if imgui.IsItemActive() {
+		levelPendingInt = {id, v}
+		return cur
+	}
+	if levelPendingInt.id == id do levelPendingInt = {}
+	return v if imgui.IsItemDeactivatedAfterEdit() else cur
 }

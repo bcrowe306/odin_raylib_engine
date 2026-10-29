@@ -254,8 +254,8 @@ layer_form :: proc(state: ^EditorState, di: int) {
 		if d.type == .AutoLayer {
 			UI_DimText(fmt.tprintf("%d px (follows the layer it reads)", d.gridSize))
 		} else {
-			grid := i32(d.gridSize)
-			if (imgui.InputInt("##grid", &grid, 1, 8) || imgui.IsItemDeactivatedAfterEdit()) && grid >= 1 && int(grid) != d.gridSize {
+			grid, gridSet := level_input_int("##grid", i32(d.gridSize), 1, 8)
+			if gridSet && grid >= 1 && int(grid) != d.gridSize {
 				defs_checkpoint("Layer Grid")
 				e.Ldtk_Doc_SetLayerGrid(doc, uid, int(grid))
 				level_after_defs()

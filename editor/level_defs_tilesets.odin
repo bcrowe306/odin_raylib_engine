@@ -283,8 +283,8 @@ tileset_form :: proc(state: ^EditorState, uid: int) {
 		}
 	}
 	UI_PropLabel("Tile size")
-	grid := i32(ts.gridSize)
-	if (imgui.InputInt("##tsgrid", &grid, 1, 8) || imgui.IsItemDeactivatedAfterEdit()) && grid >= 2 && int(grid) != ts.gridSize {
+	grid, gridSet := level_input_int("##tsgrid", i32(ts.gridSize), 1, 8)
+	if gridSet && grid >= 2 && int(grid) != ts.gridSize {
 		img := img_for(ts)
 		defer if img.data != nil do rl.UnloadImage(img)
 		defs_checkpoint("Tileset Grid")
@@ -300,12 +300,13 @@ tileset_form :: proc(state: ^EditorState, uid: int) {
 	sp := [2]i32{i32(ts.spacing), i32(ts.padding)}
 	w := (imgui.GetContentRegionAvail().x - 4) * 0.5
 	imgui.SetNextItemWidth(w)
-	ch1 := imgui.InputInt("##tsspacing", &sp.x, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
+	ch1, ch2: bool
+	sp.x, ch1 = level_input_int("##tsspacing", sp.x)
 	Drive_Item("defs.tileset.spacing")
 	level_tip("Pixels between tiles", "tileset.image")
 	imgui.SameLine(0, 4)
 	imgui.SetNextItemWidth(w)
-	ch2 := imgui.InputInt("##tspadding", &sp.y, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
+	sp.y, ch2 = level_input_int("##tspadding", sp.y)
 	Drive_Item("defs.tileset.padding")
 	level_tip("Pixels around the whole image", "tileset.image")
 	if (ch1 || ch2) && sp.x >= 0 && sp.y >= 0 {
