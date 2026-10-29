@@ -395,7 +395,16 @@ Prepared :: struct {
 	text: string, // the expanded tree (nested base texts under their markers)
 	base: string,
 	deps: []Prepared_Dep,
+	// A file it read was modified just before it was made: written again
+	// in the same file time (same size), a change couldn't be told - so it's
+	// expanded again until its files are older (git's "racy clean").
+	racy: bool,
 }
+
+// RACY_WINDOW: how recently modified a file must be for an entry reading it
+// to be racy (file times are coarse on some systems).
+@(private = "file")
+RACY_WINDOW :: 2 * time.Second
 
 @(private = "file")
 preparedCache: map[string]Prepared
@@ -450,14 +459,14 @@ prepared_fresh :: proc(ctx: ^GameContext, p: Prepared) -> bool {
 	return true
 }
 
-// drop_prepared removes a stale entry. Without bases (a game), its base is
-// kept in staleBases: the instances built from it diff against it when
+// drop_prepared removes an entry. A stale one's base is kept in staleBases
+// without bases (a game): the instances built from it diff against it when
 // they're rebuilt (Component_HotReload).
 @(private = "file")
-drop_prepared :: proc(compPath: string) {
+drop_prepared :: proc(compPath: string, stale := true) {
 	heap := runtime_heap()
 	key, p := delete_key(&preparedCache, compPath)
-	if !Component_KeepBases && !(key in staleBases) {
+	if stale && !Component_KeepBases && !(key in staleBases) {
 		// (Gone stale twice before a rebuild: the first base is the one
 		// most instances were built from.)
 		if staleBases == nil do staleBases = make(map[string]string, 4, heap)
@@ -548,11 +557,12 @@ Component_HotReload :: proc(game: ^Game, force := false) -> int {
 Component_Expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]string) -> (obj: json.Object, baseText: string, problem: string) {
 	if len(stack) > 0 || preparedDeps != nil do return component_expand(ctx, compPath, stack)
 	if p, cached := preparedCache[compPath]; cached {
-		if prepared_fresh(ctx, p) {
+		fresh := prepared_fresh(ctx, p)
+		if fresh && !p.racy {
 			val, err := json.parse(transmute([]u8)p.text, allocator = context.temp_allocator)
 			if o, isObj := val.(json.Object); err == .None && isObj do return o, p.base, ""
 		}
-		drop_prepared(compPath)
+		drop_prepared(compPath, stale = !fresh)
 	}
 	deps := make([dynamic]string, context.temp_allocator)
 	preparedDeps = &deps
@@ -563,9 +573,11 @@ Component_Expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]s
 	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
 	json_write_value(&w, obj, false)
 	entry := Prepared{text = strings.clone(strings.to_string(w.sb), heap), base = strings.clone(baseText, heap), deps = make([]Prepared_Dep, len(deps), heap)}
+	now := time.now()
 	for path, i in deps {
 		entry.deps[i] = prepared_dep(ctx, path)
 		entry.deps[i].path = strings.clone(path, heap)
+		if d := entry.deps[i]; d.exists && time.diff(d.mod, now) < RACY_WINDOW do entry.racy = true
 	}
 	if preparedCache == nil do preparedCache = make(map[string]Prepared, 16, heap)
 	preparedCache[strings.clone(compPath, heap)] = entry

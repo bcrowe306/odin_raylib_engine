@@ -1,8 +1,10 @@
 package engine
 
+import cos "core:os"
 import os "osx"
 import "core:strings"
 import "core:testing"
+import "core:time"
 
 // #80: prepared components are cached per path; the cache follows the files
 // (the component and every file it nests), and games don't keep a copy of
@@ -93,4 +95,35 @@ test_component_without_bases :: proc(t: ^testing.T) {
 	saved = Scene_SerializeToJSON(scene, context.temp_allocator)
 	testing.expectf(t, strings.contains(saved, `"t0p00000/l1d00000": {"position": [0, -50]}`), "the override: %s", saved)
 	_ = inst
+}
+
+// A file rewritten in the same instant it was read (same size and file
+// time: Windows' file times in a test) isn't served from the cache: an
+// entry whose files were modified just before it was made is checked again.
+@(test)
+test_component_prepared_cache_racy :: proc(t: ^testing.T) {
+	_ = os.make_directory_all(CACHE_DIR + "/components")
+	defer os.remove_all(CACHE_DIR)
+	LID :: CACHE_DIR + "/components/lid.component.json"
+	cache_write("lid.component.json", `{"type": "Node", "name": "LidRoot", "uid": "lr000000", "children": [{"type": "Node", "name": "Lid", "uid": "l1d00000", "position": [0, -10]}]}`)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	AssetManager_SetProjectDir(&game.assetManager, CACHE_DIR)
+	ctx := &game.gameContext
+	scene := game->createScene("racy", false)
+	REL :: "components/lid.component.json"
+	// A whole second, set again after the rewrite: the same file time.
+	stamp := time.from_nanoseconds(time.to_unix_nanoseconds(time.now()) / 1e9 * 1e9)
+	testing.expect_value(t, cos.change_times(LID, stamp, stamp), nil)
+
+	a := Scene_InstantiateComponent(scene, REL, nil, ctx)
+	ProcessNodeQueues(scene.manager, ctx)
+	testing.expect_value(t, lid_y(scene, a), -10)
+	// The same size and time: only "just modified" tells.
+	cache_write("lid.component.json", `{"type": "Node", "name": "LidRoot", "uid": "lr000000", "children": [{"type": "Node", "name": "Lid", "uid": "l1d00000", "position": [0, -20]}]}`)
+	testing.expect_value(t, cos.change_times(LID, stamp, stamp), nil)
+	b := Scene_InstantiateComponent(scene, REL, nil, ctx)
+	ProcessNodeQueues(scene.manager, ctx)
+	testing.expect_value(t, lid_y(scene, b), -20)
 }
