@@ -81,6 +81,16 @@ The file is a node object, the same as a node in a scene file, with a
   parent drops its order.
 - Renaming a child inside an instance isn't an override; the name comes
   from the component file.
+- In the editor's Inspector, an overridden value of a node in an instance
+  is marked: its label is shown in the component colour with a bar beside
+  it. This applies to node properties, script properties and the
+  transform of children. Right-click the label:
+  - **Revert to Component** drops that one override, so the value follows
+    the file again.
+  - **Apply to Component** writes that one value to the component file.
+    Inside a nested instance, it goes into the nested link's overrides in
+    the outer file. Every instance without its own override gets the
+    value. Undo restores the file and the scene in one step.
 
 ### Nested instances
 

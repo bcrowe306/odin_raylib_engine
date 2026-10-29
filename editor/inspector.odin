@@ -56,6 +56,17 @@ inspector_body :: proc(state: ^EditorState) {
 		return
 	}
 	ResourceInspector_Flush(state) // (an edit made just before switching away)
+	// A row's Revert / Apply (#84), before anything draws the node: the
+	// instance is rebuilt.
+	if a := inspOverrideAction; a.node != nil {
+		inspOverrideAction = {}
+		if a.node == state.selectedNode && state.activeScene != nil {
+			if a.apply do Editor_ApplyOverride(state, a.node, a.key)
+			else do Editor_RevertOverride(state, a.node, a.key)
+		}
+		delete(a.key)
+	}
+	inspOverrideNode = nil
 	node := state.selectedNode
 	if node == nil || state.activeScene == nil {
 		imgui.Dummy({0, 24})
@@ -143,7 +154,7 @@ inspector_body :: proc(state: ^EditorState) {
 			@(static) cachedFrame: int
 			@(static) cachedUndo: int
 			@(static) wasEditing: bool
-			@(static) cached: [dynamic]string
+			cached := &inspOverrideKeys
 			frame := int(imgui.GetFrameCount())
 			// Also right after an edit finishes (a field released, Enter) or an
 			// undo step (gizmo drags, menus, undo/redo).
@@ -153,11 +164,12 @@ inspector_body :: proc(state: ^EditorState) {
 			if cachedFor != node || frame - cachedFrame > 15 || editDone || cachedUndo != len(state.undoStack) {
 				cachedUndo = len(state.undoStack)
 				for s in cached do delete(s)
-				clear(&cached)
-				for k in e.Node_ComponentOverrides(state.activeScene.manager, node) do append(&cached, strings.clone(k))
+				clear(cached)
+				for k in e.Node_ComponentOverrides(state.activeScene.manager, node) do append(cached, strings.clone(k))
 				cachedFor = node
 				cachedFrame = frame
 			}
+			inspOverrideNode = node // (the rows mark these: #84)
 			if len(cached) > 0 {
 				imgui.SameLine()
 				if UI_Button(fmt.tprintf("%s  Revert", ICON_FA_ROTATE_LEFT), "insp.revert-overrides") {
@@ -500,6 +512,39 @@ origin_presets :: proc(state: ^EditorState, node: ^e.Node) {
 		}
 		imgui.EndPopup()
 	}
+}
+
+// --- overridden values (#84) ---------------------------------------------------------
+// The inspected instance node's overridden values (keys as
+// Node_ComponentOverrides lists them), refreshed by the instance banner;
+// their rows are marked and get Revert / Apply in the label's menu.
+inspOverrideKeys: [dynamic]string
+inspOverrideNode: ^e.Node // (nil: not an instance node this frame)
+// A Revert / Apply picked in a row's menu: done at the start of the next
+// frame (the instance is rebuilt under the rows drawing it).
+inspOverrideAction: struct {
+	node:  ^e.Node,
+	key:   string,
+	apply: bool,
+}
+
+// override_key: the override key of an Inspector row's path (the origin is
+// saved as "pivot").
+override_key :: proc(path: string) -> string {
+	return "pivot" if path == "origin" else path
+}
+
+// Inspector_IsOverridden: is the row with this path an overridden value of
+// the inspected instance node?
+Inspector_IsOverridden :: proc(node: ^e.Node, path: string) -> bool {
+	if node == nil || path == "" || node != inspOverrideNode do return false
+	return slice.contains(inspOverrideKeys[:], override_key(path))
+}
+
+// inspector_queue_override: Revert / Apply one row's value (next frame).
+inspector_queue_override :: proc(node: ^e.Node, path: string, apply: bool) {
+	delete(inspOverrideAction.key)
+	inspOverrideAction = {node = node, key = strings.clone(override_key(path)), apply = apply}
 }
 
 // prop_row_label: a hand-drawn property row's label, with the help (pane and
