@@ -55,9 +55,10 @@ key ctrl+a
 type 55
 key enter
 expect undo >= 10
-# (Grows with what the demo scene saves: 30000 -> 32000 when particle
-# emitters gained their collision settings, #123.)
-expect undo-bytes <= 32000
+# (Grows with what the demo scene saves - particle emitters gain settings
+# through #131: 30000 -> 40000. Lost sharing between snapshots would cost
+# ~10x the scene, far above it.)
+expect undo-bytes <= 40000
 expect node:PlayerShip.position ~= 140,360
 expect node:PlayerShip.rotation ~= 55
 key cmd+z

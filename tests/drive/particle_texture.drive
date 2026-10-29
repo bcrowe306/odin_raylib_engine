@@ -1,0 +1,15 @@
+# #126: a particle texture picked in the Particles panel's Texture tab
+# and the Inspector (the shape switches to Texture), additive blending; saved with the scene
+# as "particle_texture" - not "texture" (that key on a node loads as a child
+# sprite: #97).
+wait 5
+click @hier:StarfieldEmitter
+click @insp.particle-texture
+click @pick:textures/Asteroid_1.png
+expect node:StarfieldEmitter.prop.emitter.shape == Texture
+click @particles.tab:texture
+wait 30
+screenshot texture_tab
+click @toolbar.save
+expect file:scenes/main.scene.json contains "particle_texture": "textures/Asteroid_1.png"
+expect node:StarfieldEmitter.children == 0

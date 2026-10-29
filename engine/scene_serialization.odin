@@ -410,6 +410,7 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		strings.write_byte(&w.sb, ']')
 	case ParticleEmitterNode:
 		pen := cast(^ParticleEmitterNode)node
+		if pen.texturePath != "" {Json_Key(w, "particle_texture", &first); Json_String(w, asset_rel(node, pen.texturePath))}
 		ramp := &pen.emitter.colorRamp
 		Json_Key(w, "color_ramp", &first)
 		strings.write_byte(&w.sb, '[')
@@ -1164,6 +1165,10 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		if a := AnimationPlayerNode_GetAnimation(apn); a != nil do apn.currentFrame = a.startFrame
 	case ParticleEmitterNode:
 		pen := cast(^ParticleEmitterNode)node
+		if path := sj_string(obj, "particle_texture", ""); path != "" {
+			pen.gameContext = ctx
+			ParticleEmitterNode_SetTexture(pen, path)
+		}
 		if stops, ok := sj_arr(obj, "color_ramp"); ok && len(stops) >= 1 {
 			ramp := &pen.emitter.colorRamp
 			ramp.count = 0

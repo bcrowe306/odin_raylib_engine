@@ -111,6 +111,13 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 		imgui.EndChild()
 		imgui.EndTabItem()
 	}
+	texOpen := imgui.BeginTabItem("Texture")
+	Drive_Item("particles.tab:texture")
+	if texOpen {
+		if imgui.BeginChild("##ptex", {0, 0}, {}, {}) do particle_texture(state, pen)
+		imgui.EndChild()
+		imgui.EndTabItem()
+	}
 	section(state, node, "Collision", "particles.tab:collision", {"emitter.collisionEnabled", "emitter.collisionMode", "emitter.collisionLayers", "emitter.elasticity", "emitter.friction"})
 }
 
@@ -330,4 +337,53 @@ particle_color :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode) {
 	imgui.Dummy({0, 8})
 	_ = math.PI
 	_ = c.int(0)
+}
+
+// particle_texture: the Texture tab (#126) - the texture (shape Texture),
+// its sprite sheet and frames, the blend mode, align to velocity.
+@(private = "file")
+particle_texture :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode) {
+	if !UI_BeginProps("##ptexprops") do return
+	ParticleTexture_Row(state, pen, "particles.texture")
+	if pen.emitter.shape != .Texture && pen.texturePath != "" {
+		UI_PropLabel("")
+		UI_DimText("Shown when Shape is Texture (Emission tab)")
+	}
+	for name in ([]string{"emitter.sheetColumns", "emitter.sheetRows", "emitter.frameMode", "emitter.frameSpeed", "emitter.blendMode", "emitter.alignToVelocity"}) {
+		p, ok := e.Node_FindProperty(pen, name)
+		if !ok do continue
+		UI_PropLabel(pretty_name(name))
+		property_widget(state, pen, p, false)
+	}
+	UI_EndProps()
+	if pen.texture != nil {
+		// The texture with its sheet's grid.
+		tex := &pen.texture.texture
+		w := min(imgui.GetContentRegionAvail().x, 200)
+		h := w * f32(tex.height) / max(f32(tex.width), 1)
+		p0 := imgui.GetCursorScreenPos()
+		imgui.Image(transmute(imgui.TextureID)tex, {w, h})
+		dl := imgui.GetWindowDrawList()
+		cols, rows := max(pen.emitter.sheetColumns, 1), max(pen.emitter.sheetRows, 1)
+		for c in 1 ..< cols do imgui.DrawList_AddLine(dl, {p0.x + w * f32(c) / f32(cols), p0.y}, {p0.x + w * f32(c) / f32(cols), p0.y + h}, col_u32(UI_ACCENT))
+		for r in 1 ..< rows do imgui.DrawList_AddLine(dl, {p0.x, p0.y + h * f32(r) / f32(rows)}, {p0.x + w, p0.y + h * f32(r) / f32(rows)}, col_u32(UI_ACCENT))
+	}
+}
+
+// ParticleTexture_Row: a props-table row picking a particle emitter's
+// texture (the Particles panel's Texture tab and the Inspector). Picking
+// one switches the shape to Texture.
+ParticleTexture_Row :: proc(state: ^EditorState, pen: ^e.ParticleEmitterNode, id: string) {
+	UI_PropLabel("Texture")
+	imgui.SetNextItemWidth(field_width())
+	if path, ok := asset_picker(id, pen.texturePath, Editor_ListProjectFiles(state, "textures", TEXTURE_EXTS)); ok {
+		Editor_RecordUndo(state, "Set particle texture")
+		pen.gameContext = &state.game.gameContext
+		e.ParticleEmitterNode_SetTexture(pen, path)
+		if pen.emitter.shape != .Texture do pen.emitter.shape = .Texture // (what a texture is for)
+	}
+	if field_reset(id, pen.texturePath != "") {
+		Editor_RecordUndo(state, "Clear particle texture")
+		e.ParticleEmitterNode_SetTexture(pen, "")
+	}
 }
