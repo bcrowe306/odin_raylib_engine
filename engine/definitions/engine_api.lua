@@ -166,6 +166,10 @@ local PathNode = {}
 ---@class PathFollowNode : Node
 local PathFollowNode = {}
 
+---Spawns components where it is (position, rotation, flip): mode Single / All / Random / Sequential / Shuffle over its list; spawned under the scene's root, its parent, itself or a path; count, chance, cooldown, maxAlive, totalLimit, spread, jitter, speed, auto spawn, pooling. "spawned" (the root) / "limit_reached" / "list_finished".
+---@class SpawnerNode : Node
+local SpawnerNode = {}
+
 ---@class PostEffectNode : Node
 
 ---@class UIContainerNode : Node
@@ -501,6 +505,15 @@ function Node:emit(event, value) end
 ---@param handler fun(value: any, source: TimerNode)
 ---@return integer id Connection id for `disconnect`
 function TimerNode:connect(event, handler) end
+
+---@alias SpawnerNodeEvent NodeTreeEvent|"spawned"|"limit_reached"|"list_finished"|ProjectEvent
+---Connects a handler to one of this node's events: spawned (The spawner made a node (the spawned root)), limit_reached (The spawner reached its Total Limit), list_finished (A Sequential spawner (Stop) spawned its last entry); the tree events; custom ones.
+---
+---Example: `self.node:connect("spawned", function(value, source) Log.info("spawned") end)`
+---@param event SpawnerNodeEvent|string
+---@param handler fun(value: any, source: SpawnerNode)
+---@return integer id Connection id for `disconnect`
+function SpawnerNode:connect(event, handler) end
 
 ---@alias FrameAnimationNodeEvent NodeTreeEvent|"animation_finished"|ProjectEvent
 ---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)); the tree events; custom ones.
@@ -1125,6 +1138,149 @@ function CameraNode:get_property(path) end
 ---@overload fun(self: CameraNode, path: "shakeIntensity", value: number)
 ---@overload fun(self: CameraNode, path: "shakeTrauma", value: number)
 function CameraNode:set_property(path, value, y) end
+
+---@class SpawnerNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field mode "Single"|"All"|"Random"|"Sequential"|"Shuffle" What one spawn makes: Single (the first entry), All (every entry), Random (one by weigh...
+---@field sequenceEnd "Loop"|"Ping_Pong"|"Stop" Sequential, after the last entry: Loop (the first again), Ping Pong (back down the list...
+---@field count integer How many picks one spawn makes (a burst): with Random, Sequential and Shuffle each pick...
+---@field parentMode "Scene_Root"|"Spawner_Parent"|"Spawner"|"Node_Path" Where spawned nodes go: the scene's root (they stay where spawned), the spawner's paren...
+---@field parentPath string With Parent Mode Node Path: the node they go under, as a path from the spawner ("../Bul...
+---@field offset Vec2 Where they appear, from the spawner (px, turning and flipping with it); each entry adds...
+---@field inheritRotation boolean Spawned nodes take the spawner's world rotation (else upright).
+---@field inheritScale boolean Spawned nodes take the spawner's world scale (a flipped spawner flips them).
+---@field spread number Random turn of each spawned node (and its velocity), in degrees around the facing: 360 ...
+---@field jitter Vec2 Random distance from the spawn point (px, either way on each axis).
+---@field speed number Velocity (px/s) along the facing for spawned dynamic and kinematic bodies; 0 = none.
+---@field autoSpawn boolean Spawn by itself every Interval seconds, after Start Delay.
+---@field startDelay number Auto Spawn: seconds before the first spawn.
+---@field interval number Auto Spawn: seconds between spawns.
+---@field intervalJitter number Auto Spawn: up to this many seconds added to each interval at random.
+---@field cooldown number Seconds after a spawn during which spawn() does nothing (fire rate).
+---@field chance number How likely a spawn is to happen (0..1): 1 always.
+---@field maxAlive integer At most this many spawned nodes in the scene at once (0 = no cap): spawning waits until...
+---@field totalLimit integer Spawns ever (0 = no cap); then limit_reached, and no more until spawn_reset().
+---@field usePool boolean Take instances from the scene's pool for each component (and return them when destroyed...
+---@field spawnedTotal integer Nodes spawned so far (runtime, read-only).
+
+---@alias SpawnerNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "mode" # "Single"|"All"|"Random"|"Sequential"|"Shuffle" - What one spawn makes: Single (the first entry), All (every entry), Random (one by weigh...
+---| "sequenceEnd" # "Loop"|"Ping_Pong"|"Stop" - Sequential, after the last entry: Loop (the first again), Ping Pong (back down the list...
+---| "count" # integer - How many picks one spawn makes (a burst): with Random, Sequential and Shuffle each pick...
+---| "parentMode" # "Scene_Root"|"Spawner_Parent"|"Spawner"|"Node_Path" - Where spawned nodes go: the scene's root (they stay where spawned), the spawner's paren...
+---| "parentPath" # string - With Parent Mode Node Path: the node they go under, as a path from the spawner ("../Bul...
+---| "offset" # Vec2 - Where they appear, from the spawner (px, turning and flipping with it); each entry adds...
+---| "inheritRotation" # boolean - Spawned nodes take the spawner's world rotation (else upright).
+---| "inheritScale" # boolean - Spawned nodes take the spawner's world scale (a flipped spawner flips them).
+---| "spread" # number - Random turn of each spawned node (and its velocity), in degrees around the facing: 360 ...
+---| "jitter" # Vec2 - Random distance from the spawn point (px, either way on each axis).
+---| "speed" # number - Velocity (px/s) along the facing for spawned dynamic and kinematic bodies; 0 = none.
+---| "autoSpawn" # boolean - Spawn by itself every Interval seconds, after Start Delay.
+---| "startDelay" # number - Auto Spawn: seconds before the first spawn.
+---| "interval" # number - Auto Spawn: seconds between spawns.
+---| "intervalJitter" # number - Auto Spawn: up to this many seconds added to each interval at random.
+---| "cooldown" # number - Seconds after a spawn during which spawn() does nothing (fire rate).
+---| "chance" # number - How likely a spawn is to happen (0..1): 1 always.
+---| "maxAlive" # integer - At most this many spawned nodes in the scene at once (0 = no cap): spawning waits until...
+---| "totalLimit" # integer - Spawns ever (0 = no cap); then limit_reached, and no more until spawn_reset().
+---| "usePool" # boolean - Take instances from the scene's pool for each component (and return them when destroyed...
+---| "spawnedTotal" # integer (runtime) - Nodes spawned so far (runtime, read-only).
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---
+---Example: `local value = self.node:get_property("mode")`
+---@param path SpawnerNodeProperty|string
+---@return any
+---@overload fun(self: SpawnerNode, path: "position"): Vec2
+---@overload fun(self: SpawnerNode, path: "scale"): Vec2
+---@overload fun(self: SpawnerNode, path: "rotation"): number
+---@overload fun(self: SpawnerNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: SpawnerNode, path: "zIndex"): integer
+---@overload fun(self: SpawnerNode, path: "ySort"): boolean
+---@overload fun(self: SpawnerNode, path: "ySortOffset"): number
+---@overload fun(self: SpawnerNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: SpawnerNode, path: "paused"): boolean
+---@overload fun(self: SpawnerNode, path: "enabled"): boolean
+---@overload fun(self: SpawnerNode, path: "mode"): "Single"|"All"|"Random"|"Sequential"|"Shuffle"
+---@overload fun(self: SpawnerNode, path: "sequenceEnd"): "Loop"|"Ping_Pong"|"Stop"
+---@overload fun(self: SpawnerNode, path: "count"): integer
+---@overload fun(self: SpawnerNode, path: "parentMode"): "Scene_Root"|"Spawner_Parent"|"Spawner"|"Node_Path"
+---@overload fun(self: SpawnerNode, path: "parentPath"): string
+---@overload fun(self: SpawnerNode, path: "offset"): Vec2
+---@overload fun(self: SpawnerNode, path: "inheritRotation"): boolean
+---@overload fun(self: SpawnerNode, path: "inheritScale"): boolean
+---@overload fun(self: SpawnerNode, path: "spread"): number
+---@overload fun(self: SpawnerNode, path: "jitter"): Vec2
+---@overload fun(self: SpawnerNode, path: "speed"): number
+---@overload fun(self: SpawnerNode, path: "autoSpawn"): boolean
+---@overload fun(self: SpawnerNode, path: "startDelay"): number
+---@overload fun(self: SpawnerNode, path: "interval"): number
+---@overload fun(self: SpawnerNode, path: "intervalJitter"): number
+---@overload fun(self: SpawnerNode, path: "cooldown"): number
+---@overload fun(self: SpawnerNode, path: "chance"): number
+---@overload fun(self: SpawnerNode, path: "maxAlive"): integer
+---@overload fun(self: SpawnerNode, path: "totalLimit"): integer
+---@overload fun(self: SpawnerNode, path: "usePool"): boolean
+---@overload fun(self: SpawnerNode, path: "spawnedTotal"): integer
+function SpawnerNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---
+---Example: `self.node:set_property("mode", "All")`
+---@param path SpawnerNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: SpawnerNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: SpawnerNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: SpawnerNode, path: "rotation", value: number)
+---@overload fun(self: SpawnerNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: SpawnerNode, path: "zIndex", value: integer)
+---@overload fun(self: SpawnerNode, path: "ySort", value: boolean)
+---@overload fun(self: SpawnerNode, path: "ySortOffset", value: number)
+---@overload fun(self: SpawnerNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: SpawnerNode, path: "paused", value: boolean)
+---@overload fun(self: SpawnerNode, path: "enabled", value: boolean)
+---@overload fun(self: SpawnerNode, path: "mode", value: "Single"|"All"|"Random"|"Sequential"|"Shuffle")
+---@overload fun(self: SpawnerNode, path: "sequenceEnd", value: "Loop"|"Ping_Pong"|"Stop")
+---@overload fun(self: SpawnerNode, path: "count", value: integer)
+---@overload fun(self: SpawnerNode, path: "parentMode", value: "Scene_Root"|"Spawner_Parent"|"Spawner"|"Node_Path")
+---@overload fun(self: SpawnerNode, path: "parentPath", value: string)
+---@overload fun(self: SpawnerNode, path: "offset", x: number|Vec2|number[], y?: number)
+---@overload fun(self: SpawnerNode, path: "inheritRotation", value: boolean)
+---@overload fun(self: SpawnerNode, path: "inheritScale", value: boolean)
+---@overload fun(self: SpawnerNode, path: "spread", value: number)
+---@overload fun(self: SpawnerNode, path: "jitter", x: number|Vec2|number[], y?: number)
+---@overload fun(self: SpawnerNode, path: "speed", value: number)
+---@overload fun(self: SpawnerNode, path: "autoSpawn", value: boolean)
+---@overload fun(self: SpawnerNode, path: "startDelay", value: number)
+---@overload fun(self: SpawnerNode, path: "interval", value: number)
+---@overload fun(self: SpawnerNode, path: "intervalJitter", value: number)
+---@overload fun(self: SpawnerNode, path: "cooldown", value: number)
+---@overload fun(self: SpawnerNode, path: "chance", value: number)
+---@overload fun(self: SpawnerNode, path: "maxAlive", value: integer)
+---@overload fun(self: SpawnerNode, path: "totalLimit", value: integer)
+---@overload fun(self: SpawnerNode, path: "usePool", value: boolean)
+---@overload fun(self: SpawnerNode, path: "spawnedTotal", value: integer)
+function SpawnerNode:set_property(path, value, y) end
 
 ---@class TextureNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -7020,6 +7176,58 @@ function LineNode:line_clear() end
 ---
 ---Example: `self.node:set_position(0, 0); self.node:get_node("Trail"):trail_clear()`
 function TrailNode:trail_clear() end
+
+---Spawns as the spawner's mode says (or entry `index`, 1-based, whatever the mode); returns the spawned roots - empty when held back (cooldown, maxAlive, totalLimit, chance, an empty list).
+---
+---Example: `for _, bullet in ipairs(self.node:get_node("Muzzle"):spawn()) do bullet:get_script().owner = self.node end`
+---@param index? integer An entry of the list (1-based)
+---@return Node[]
+function SpawnerNode:spawn(index) end
+
+---Spawns at a world position instead of the spawner's (its rotation and offsets still apply).
+---
+---Example: `self.node:get_node("Loot"):spawn_at(enemy.position)`
+---@param x number|Vec2
+---@param y? number
+---@param index? integer An entry of the list (1-based)
+---@return Node[]
+function SpawnerNode:spawn_at(x, y, index) end
+
+---Starts over: the sequence, the shuffle bag, spawned-so-far (totalLimit), the cooldown and the auto-spawn delay.
+---
+---Example: `self.node:get_node("Waves"):spawn_reset()`
+function SpawnerNode:spawn_reset() end
+
+---How many of the nodes it spawned are still in the scene (pooled ones until they go back to their pool).
+---
+---Example: `if spawner:spawn_alive_count() == 0 then self:next_wave() end`
+---@return integer
+function SpawnerNode:spawn_alive_count() end
+
+---The spawn list: {component, weight, count} per entry, in order.
+---
+---Example: `for i, e in ipairs(spawner:spawn_entries()) do Log.info(i, e.component, e.weight) end`
+---@return {component: ComponentPath|string, weight: number, count: integer}[]
+function SpawnerNode:spawn_entries() end
+
+---Adds a component to the end of the list.
+---
+---Example: `spawner:spawn_add("components/BossMinion.component.json", 0.5)`
+---@param component ComponentPath|string
+---@param weight? number Random mode: how likely (default 1)
+---@param count? integer Spawned each time it is picked (default 1)
+function SpawnerNode:spawn_add(component, weight, count) end
+
+---Removes the list's entry at `index` (1-based).
+---
+---Example: `spawner:spawn_remove(1)`
+---@param index integer
+function SpawnerNode:spawn_remove(index) end
+
+---Empties the list.
+---
+---Example: `spawner:spawn_clear()`
+function SpawnerNode:spawn_clear() end
 
 ---The path's length in pixels (along the curve).
 ---

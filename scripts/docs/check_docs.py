@@ -59,8 +59,13 @@ class Checker:
                     self.error(f"`{editor} --dump-docs` failed ({r.returncode}): {r.stderr.strip()}")
                 else:
                     with open(out) as f:
-                        if f.read() != committed:
-                            self.error("docs/generated/nodes.json is out of date: run `task docs:nodes` and commit it")
+                        fresh = f.read()
+                    if fresh != committed:
+                        self.error("docs/generated/nodes.json is out of date: run `task docs:nodes` and commit it")
+                        import difflib  # what differs (a hand-edited file can be fixed from the log)
+                        diff = difflib.unified_diff(committed.splitlines(), fresh.splitlines(), "committed", "generated", lineterm="", n=1)
+                        for line in list(diff)[:80]:
+                            print("    " + line)
         else:
             self.note("nodes.json freshness not checked (no --editor)")
         for n in data["nodes"]:

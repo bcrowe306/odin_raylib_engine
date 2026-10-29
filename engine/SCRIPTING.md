@@ -1010,6 +1010,18 @@ Pooled roots' scripts get `on_spawn()` (every take, before the next update)
 and `on_despawn()`. Also `Pool.prewarm`, `Pool.set_max`, `Pool.release`,
 `Pool.stats`. Guide and tutorial: [`docs/pooling.md`](docs/pooling.md).
 
+#### Spawning (SpawnerNode)
+
+A **Spawner** spawns components where it is - its world position, rotation
+and flip, plus offsets - from its list: Single, All, Random (weighted),
+Sequential (loop / ping-pong / stop) or Shuffle. Put it on a player and
+`self.node:get_node("Muzzle"):spawn()` fires from the hand (the bullet goes
+under the scene's root, so it doesn't follow). Also `spawn_at`,
+`spawn_reset`, `spawn_alive_count`, `spawn_entries`, `spawn_add`; Auto
+Spawn, cooldown, chance, max alive, total limit, spread, speed, pooling;
+events `spawned`, `limit_reached`, `list_finished`; a signal can call its
+`spawn` with no script. Node reference: Spawner.
+
 #### Visibility (VisibilityNotifierNode)
 
 A child rectangle that knows whether the camera sees it: events

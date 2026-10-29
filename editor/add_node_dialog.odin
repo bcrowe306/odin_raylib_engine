@@ -69,6 +69,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "TimerNode",
 	},
 	{
+		name        = "Spawner",
+		category    = "Core & 2D",
+		icon        = ICON_FA_CLONE,
+		description = "Spawns components where it is (position, rotation, flip): one, all, a random pick or the next in its list - on a call, a signal or a timer, with limits, spread and pooling. Put it on a player to fire bullets from the hand.",
+		typeName    = "SpawnerNode",
+	},
+	{
 		name        = "Lua Script Node",
 		category    = "Core & 2D",
 		icon        = ICON_FA_CODE,

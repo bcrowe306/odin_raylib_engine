@@ -91,6 +91,37 @@
       "properties": []
     },
     {
+      "type": "SpawnerNode",
+      "name": "Spawner",
+      "category": "Core & 2D",
+      "description": "Spawns components where it is (position, rotation, flip): one, all, a random pick or the next in its list - on a call, a signal or a timer, with limits, spread and pooling. Put it on a player to fire bullets from the hand.",
+      "aliases": ["spawner", "spawn"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "mode", "kind": "enum", "owner": "SpawnerNode", "default": "Single", "values": ["Single", "All", "Random", "Sequential", "Shuffle"], "doc": "What one spawn makes: Single (the first entry), All (every entry), Random (one by weight), Sequential (the next each time), Shuffle (random, all once before repeats)."},
+        {"name": "sequenceEnd", "kind": "enum", "owner": "SpawnerNode", "default": "Loop", "values": ["Loop", "Ping_Pong", "Stop"], "doc": "Sequential, after the last entry: Loop (the first again), Ping Pong (back down the list), Stop (no more; spawn_reset() starts over)."},
+        {"name": "count", "kind": "integer", "owner": "SpawnerNode", "default": 1, "min": 1, "max": 100, "doc": "How many picks one spawn makes (a burst): with Random, Sequential and Shuffle each pick is its own."},
+        {"name": "parentMode", "kind": "enum", "owner": "SpawnerNode", "default": "Scene_Root", "values": ["Scene_Root", "Spawner_Parent", "Spawner", "Node_Path"], "doc": "Where spawned nodes go: the scene's root (they stay where spawned), the spawner's parent or the spawner (they move with it), or the node at Parent Path."},
+        {"name": "parentPath", "kind": "string", "owner": "SpawnerNode", "default": "", "doc": "With Parent Mode Node Path: the node they go under, as a path from the spawner (\"../Bullets\")."},
+        {"name": "offset", "kind": "vec2", "owner": "SpawnerNode", "default": [0, 0], "min": -4096, "max": 4096, "doc": "Where they appear, from the spawner (px, turning and flipping with it); each entry adds its own."},
+        {"name": "inheritRotation", "kind": "boolean", "owner": "SpawnerNode", "default": true, "doc": "Spawned nodes take the spawner's world rotation (else upright)."},
+        {"name": "inheritScale", "kind": "boolean", "owner": "SpawnerNode", "default": false, "doc": "Spawned nodes take the spawner's world scale (a flipped spawner flips them)."},
+        {"name": "spread", "kind": "number", "owner": "SpawnerNode", "default": 0, "min": 0, "max": 360, "doc": "Random turn of each spawned node (and its velocity), in degrees around the facing: 360 = any direction."},
+        {"name": "jitter", "kind": "vec2", "owner": "SpawnerNode", "default": [0, 0], "min": 0, "max": 4096, "doc": "Random distance from the spawn point (px, either way on each axis)."},
+        {"name": "speed", "kind": "number", "owner": "SpawnerNode", "default": 0, "min": 0, "max": 10000, "doc": "Velocity (px/s) along the facing for spawned dynamic and kinematic bodies; 0 = none."},
+        {"name": "autoSpawn", "kind": "boolean", "owner": "SpawnerNode", "default": false, "doc": "Spawn by itself every Interval seconds, after Start Delay."},
+        {"name": "startDelay", "kind": "number", "owner": "SpawnerNode", "default": 0, "min": 0, "max": 3600, "doc": "Auto Spawn: seconds before the first spawn."},
+        {"name": "interval", "kind": "number", "owner": "SpawnerNode", "default": 1, "min": 0, "max": 3600, "doc": "Auto Spawn: seconds between spawns."},
+        {"name": "intervalJitter", "kind": "number", "owner": "SpawnerNode", "default": 0, "min": 0, "max": 3600, "doc": "Auto Spawn: up to this many seconds added to each interval at random."},
+        {"name": "cooldown", "kind": "number", "owner": "SpawnerNode", "default": 0, "min": 0, "max": 3600, "doc": "Seconds after a spawn during which spawn() does nothing (fire rate)."},
+        {"name": "chance", "kind": "number", "owner": "SpawnerNode", "default": 1, "min": 0, "max": 1, "doc": "How likely a spawn is to happen (0..1): 1 always."},
+        {"name": "maxAlive", "kind": "integer", "owner": "SpawnerNode", "default": 0, "min": 0, "max": 10000, "doc": "At most this many spawned nodes in the scene at once (0 = no cap): spawning waits until some are gone."},
+        {"name": "totalLimit", "kind": "integer", "owner": "SpawnerNode", "default": 0, "min": 0, "max": 100000, "doc": "Spawns ever (0 = no cap); then limit_reached, and no more until spawn_reset()."},
+        {"name": "usePool", "kind": "boolean", "owner": "SpawnerNode", "default": false, "doc": "Take instances from the scene's pool for each component (and return them when destroyed) instead of making new ones."},
+        {"name": "spawnedTotal", "kind": "integer", "owner": "SpawnerNode", "default": 0, "runtime": true, "doc": "Nodes spawned so far (runtime, read-only)."}
+      ]
+    },
+    {
       "type": "ScriptNode",
       "name": "Lua Script Node",
       "category": "Core & 2D",

@@ -283,6 +283,24 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	case StateMachineNode:
 		Json_Key(w, "state_machine", &first)
 		write_state_machine(w, cast(^StateMachineNode)node)
+	case SpawnerNode:
+		// {"entries": [{"component", "weight", "count", "offset"}]}
+		sp := cast(^SpawnerNode)node
+		Json_Key(w, "spawner", &first)
+		strings.write_string(&w.sb, "{\"entries\": [")
+		for en, i in sp.entries {
+			if i > 0 do strings.write_string(&w.sb, ", ")
+			strings.write_string(&w.sb, "{\"component\": ")
+			Json_String(w, asset_rel(node, en.component))
+			strings.write_string(&w.sb, ", \"weight\": ")
+			Json_Float(w, en.weight)
+			fmt.sbprintf(&w.sb, ", \"count\": %d, \"offset\": [", en.count)
+			Json_Float(w, en.offset.x)
+			strings.write_string(&w.sb, ", ")
+			Json_Float(w, en.offset.y)
+			strings.write_string(&w.sb, "]}")
+		}
+		strings.write_string(&w.sb, "]}")
 	case TimerNode:
 		tm := cast(^TimerNode)node
 		Json_Key(w, "timer", &first)
@@ -1022,6 +1040,23 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 					x, _ := json_number(pa[0])
 					y, _ := json_number(pa[1])
 					append(&ln.points, [2]f32{x, y})
+				}
+			}
+		}
+	case SpawnerNode:
+		sp := cast(^SpawnerNode)node
+		if spObj, ok := sj_obj(obj, "spawner"); ok {
+			if list, lok := sj_arr(spObj, "entries"); lok {
+				for len(sp.entries) > 0 do SpawnerNode_RemoveEntry(sp, len(sp.entries) - 1)
+				for v in list {
+					eo, eok := v.(json.Object)
+					if !eok do continue
+					off: [2]f32
+					if oa, ook := sj_arr(eo, "offset"); ook && len(oa) >= 2 {
+						off.x, _ = json_number(oa[0])
+						off.y, _ = json_number(oa[1])
+					}
+					SpawnerNode_AddEntry(sp, sj_string(eo, "component", ""), sj_float(eo, "weight", 1), int(sj_float(eo, "count", 1)), off)
 				}
 			}
 		}

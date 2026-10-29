@@ -386,6 +386,14 @@ Signals_Connect :: proc(state: ^EditorState, source: ^e.Node, signal: string, ta
 	if source == nil || target == nil || method == "" do return false
 	mgr := state.activeScene.manager
 	Editor_RecordUndo(state, fmt.tprintf("Connect %s", signal))
+	if target.typeId == e.SpawnerNode && method == "spawn" && target.scriptInstance == nil {
+		// The spawner's own spawn: no script, no handler.
+		if !e.Node_AddConnection(source, signal, e.Node_RelativePath(mgr, source, target), method) {
+			Editor_Log(state, .Info, "%s.%s is already connected to %s", source.name, signal, method)
+		}
+		Editor_Log(state, .Info, "Connected %s.%s to %s:spawn", source.name, signal, target.name)
+		return true
+	}
 	if target.scriptInstance == nil {
 		rel := Editor_NewScriptForNode(state, target, "platformer" if target.typeId == e.CharacterMoverNode else "empty")
 		if rel == "" do return false
@@ -447,7 +455,14 @@ Signals_Render :: proc(state: ^EditorState) {
 		imgui.SetNextItemWidth(-1)
 		imgui.InputText("##sig_method", cstring(raw_data(dlg.method[:])), len(dlg.method), {})
 		Drive_Item("signal.method")
-		if dlg.target != nil && dlg.target.scriptInstance == nil {
+		if dlg.target != nil && dlg.target.typeId == e.SpawnerNode && dlg.target.scriptInstance == nil {
+			if UI_Button("Spawn (no script)", "signal.spawn", {0, 0}) {
+				dlg.method = {}
+				copy(dlg.method[:], "spawn")
+			}
+			UI_Tooltip("Call the spawner's own spawn() when the event fires")
+		}
+		if dlg.target != nil && dlg.target.scriptInstance == nil && !(dlg.target.typeId == e.SpawnerNode && strings.trim_space(string(cstring(raw_data(dlg.method[:])))) == "spawn") {
 			imgui.PushStyleColorImVec4(.Text, UI_WARNING)
 			imgui.TextWrapped("%s", fmt.ctprintf("%s has no script: a new one will be created and attached.", dlg.target.name))
 			imgui.PopStyleColor()
