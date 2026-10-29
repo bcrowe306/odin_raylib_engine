@@ -28,6 +28,7 @@ editor overview is [`../../editor/README.md`](../../editor/README.md).
 | [Pixel-perfect rendering](pixel_perfect.md) | Integer scaling, pixel snap, smooth sub-pixel camera - recipes for pixel art. |
 | [Components](components.md) | Reusable node trees (prefabs) placed as linked instances: creating and editing them, overrides (marked in the Inspector; revert / apply per value), exposed properties, nesting, spawning from Lua (values, pools), hot reload, missing files, the file format - with a tutorial (an enemy with an exposed speed and its own health). |
 | [Resources](resources.md) | Data assets of a Lua class: properties edited in the Inspector per `.resource.json`, methods any script can call; shared or one per component instance, `on_load`, hot reload - with a tutorial (per-enemy health). |
+| [Global events](events.md) | The event bus: `Events.emit` / `Events.connect` between any scripts (and engine code) without references - gameplay to UI, levels to the game flow; deferred events, lifetimes - with a tutorial (a HUD that never looks for the player). |
 | [Object pooling](pooling.md) | Reuse bullets, effects, pickups: `Pool.take`, `on_spawn` / `on_despawn`, prewarm, caps - with a tutorial. |
 | [Crash reports](crash_reports.md) | What a crash writes (reason, stack, recent lines), where, the editor's "report on GitHub", and the `Crash` Lua module for games. |
 | [Visibility notifier](visibility.md) | On screen / off screen events; pause, disable or remove the parent off screen. |

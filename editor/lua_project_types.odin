@@ -393,7 +393,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 		if data, err := os.read_entire_file(full, context.temp_allocator); err == nil do emitted_events(string(data), &custom)
 	}
-	alias(&sb, "ProjectEvent", "Custom events the project's scripts emit (node:emit)", sorted_unique(&custom))
+	alias(&sb, "ProjectEvent", "Custom events the project's scripts emit (node:emit, Events.emit)", sorted_unique(&custom))
 	customEvents := sorted_unique(&custom)
 
 	// Script classes with their exported properties.
@@ -531,14 +531,20 @@ string_args :: proc(text, fn: string, out: ^[dynamic]string) {
 	}
 }
 
-// emitted_events: the names a script passes to emit("...") / :emit('...').
+// emitted_events: the names a script passes to emit("...") / :emit('...')
+// (node events and Events.emit) and Events.emit_deferred("...").
 @(private = "file")
 emitted_events :: proc(text: string, out: ^[dynamic]string) {
+	for call in ([]string{"emit(", "emit_deferred("}) do emitted_events_of(text, call, out)
+}
+
+@(private = "file")
+emitted_events_of :: proc(text, call: string, out: ^[dynamic]string) {
 	rest := text
 	for {
-		i := strings.index(rest, "emit(")
+		i := strings.index(rest, call)
 		if i < 0 do return
-		rest = rest[i + len("emit("):]
+		rest = rest[i + len(call):]
 		t := strings.trim_left_space(rest)
 		if len(t) < 2 || (t[0] != '"' && t[0] != '\'') do continue
 		q := t[0]

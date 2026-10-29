@@ -23,6 +23,12 @@ import lua "lua54"
 // Connections are released when either the connecting script or the source
 // node is destroyed, so handlers never run on dead objects and Lua function
 // references don't leak.
+//
+// Global events (the event bus, event_bus.odin) go through the Events table:
+//   local id = Events.connect("score_changed", function(value, source) ... end)
+//   Events.emit("score_changed", 120)
+// Their connections are released with the connecting script, or with the
+// node passed as their scope.
 // ============================================================================
 
 Lua_Connection :: struct {
@@ -31,6 +37,11 @@ Lua_Connection :: struct {
 	event:  string,          // owned
 	fnRef:  c.int,           // LUA_REGISTRYINDEX ref of the handler
 	owner:  ^ScriptInstance, // script that connected (nil = global code)
+	// Events.connect (event_bus.odin): a global event, not a node's (source
+	// is nil); scope = the node it ends with; once = released when it runs.
+	bus:    bool,
+	once:   bool,
+	scope:  ^Node,
 }
 
 @(private = "file")
@@ -157,7 +168,7 @@ Script_ForgetNode :: proc(node: ^Node) {
 	mgr := manager_for(node, nil)
 	if mgr == nil do return
 	for i := len(mgr.connections) - 1; i >= 0; i -= 1 {
-		if mgr.connections[i].source == node do release_connection(mgr, i)
+		if conn := mgr.connections[i]; conn.source == node || conn.scope == node do release_connection(mgr, i)
 	}
 }
 
@@ -242,4 +253,177 @@ Script_RegisterEventBindings :: proc(L: ^lua.State) {
 	lua.setfield(L, -2, "disconnect")
 	lua.pushcfunction(L, lua_node_emit)
 	lua.setfield(L, -2, "emit")
+}
+
+// --- Global events (Events, event_bus.odin) ------------------------------------------
+
+// Script_DispatchBusEvent delivers a global event to the handlers connected
+// with Events.connect, in connection order. luaRef: the published Lua value
+// (a table, ...) handlers get instead of `value` (0 = push `value`).
+Script_DispatchBusEvent :: proc(mgr: ^ScriptManager, name: string, value: EventValue, source: ^Node, luaRef: c.int) {
+	if mgr == nil || !mgr.isReady || mgr.L == nil || mgr.suspended || len(mgr.connections) == 0 do return
+	L := mgr.L
+	// Snapshot: handlers may (dis)connect, emit or destroy.
+	ids := make([dynamic]int, context.temp_allocator)
+	for conn in mgr.connections do if conn.bus && conn.event == name do append(&ids, conn.id)
+	for id in ids {
+		idx := connection_index(mgr, id)
+		if idx < 0 do continue // disconnected by an earlier handler
+		conn := mgr.connections[idx]
+		lua.pushcfunction(L, lua_traceback_error_handler)
+		errHandler := lua.gettop(L)
+		lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(conn.fnRef))
+		if conn.once do release_connection(mgr, idx) // (the function stays on the stack)
+		if luaRef != 0 do lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(luaRef))
+		else do push_event_value(L, value)
+		if Node_IsAlive(source) do push_node_userdata(L, source)
+		else do lua.pushnil(L)
+		prev := mgr.currentInstance
+		mgr.currentInstance = conn.owner
+		if lua.pcall(L, 2, 0, errHandler) != 0 {
+			Script_Problem(.Error, "[Script] Error in '%s' event handler: %s", name, lua.tostring(L, -1))
+			lua.pop(L, 1)
+		}
+		mgr.currentInstance = prev
+		lua.pop(L, 1) // errHandler
+	}
+}
+
+// Script_BusConnectionCount: the Lua handlers connected to a global event.
+Script_BusConnectionCount :: proc(mgr: ^ScriptManager, name: string) -> int {
+	if mgr == nil do return 0
+	n := 0
+	for conn in mgr.connections do if conn.bus && conn.event == name do n += 1
+	return n
+}
+
+@(private = "file")
+events_bus :: proc(L: ^lua.State) -> (^EventBus, ^ScriptManager) {
+	mgr := get_script_manager(L)
+	if mgr == nil || mgr.game == nil do return nil, mgr
+	return &mgr.game.events, mgr
+}
+
+@(private = "file")
+events_connect :: proc(L: ^lua.State, once: bool) -> c.int {
+	if lua.type(L, 1) != .STRING || lua.type(L, 2) != .FUNCTION {
+		lua.L_error(L, "usage: Events.connect(event_name, function(value, source) ... end [, scope_node])")
+		return 0
+	}
+	mgr := get_script_manager(L)
+	if mgr == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	scope, _ := to_node_userdata(L, 3)
+	lua.pushvalue(L, 2)
+	ref := lua.L_ref(L, lua.REGISTRYINDEX)
+	mgr.nextConnectionId += 1
+	append(&mgr.connections, Lua_Connection{
+		id    = mgr.nextConnectionId,
+		event = strings.clone(string(lua.tostring(L, 1)), Engine_HeapAllocator()),
+		fnRef = ref,
+		owner = mgr.currentInstance,
+		bus   = true,
+		once  = once,
+		scope = scope,
+	})
+	lua.pushinteger(L, lua.Integer(mgr.nextConnectionId))
+	return 1
+}
+
+// Events.connect(event, fn [, scope]) -> id
+@(private = "file")
+lua_events_connect :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	return events_connect(L, false)
+}
+
+// Events.once(event, fn [, scope]) -> id: released after its first call.
+@(private = "file")
+lua_events_once :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	return events_connect(L, true)
+}
+
+// Events.disconnect(id) -> bool
+@(private = "file")
+lua_events_disconnect :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	mgr := get_script_manager(L)
+	ok := false
+	if mgr != nil {
+		if i := connection_index(mgr, int(lua.tointeger(L, 1))); i >= 0 && mgr.connections[i].bus {
+			release_connection(mgr, i)
+			ok = true
+		}
+	}
+	lua.pushboolean(L, b32(ok))
+	return 1
+}
+
+@(private = "file")
+events_emit :: proc(L: ^lua.State, deferred: bool) {
+	bus, mgr := events_bus(L)
+	if bus == nil || lua.type(L, 1) != .STRING do return
+	name := strings.clone(string(lua.tostring(L, 1)), context.temp_allocator)
+	value := to_event_value(L, 2) // for Odin listeners
+	// The source: the given node, else the node of the script emitting.
+	source, ok := to_node_userdata(L, 3)
+	if !ok && mgr.currentInstance != nil do source = mgr.currentInstance.node
+	// Lua handlers get the Lua value itself (tables too).
+	ref: c.int
+	if !lua.isnoneornil(L, 2) {
+		lua.pushvalue(L, 2)
+		ref = lua.L_ref(L, lua.REGISTRYINDEX)
+	}
+	if deferred {
+		EventBus_PublishDeferredLua(bus, name, value, source, ref)
+		return
+	}
+	EventBus_PublishLua(bus, name, value, source, ref)
+	if ref != 0 do lua.L_unref(L, lua.REGISTRYINDEX, ref)
+}
+
+// Events.emit(event [, value [, source]]): delivered now.
+@(private = "file")
+lua_events_emit :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	events_emit(L, false)
+	return 0
+}
+
+// Events.emit_deferred(event [, value [, source]]): delivered at the end of the frame.
+@(private = "file")
+lua_events_emit_deferred :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	events_emit(L, true)
+	return 0
+}
+
+// Events.listener_count(event) -> integer
+@(private = "file")
+lua_events_listener_count :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	bus, _ := events_bus(L)
+	n := 0
+	if bus != nil && lua.type(L, 1) == .STRING do n = EventBus_ListenerCount(bus, string(lua.tostring(L, 1)))
+	lua.pushinteger(L, lua.Integer(n))
+	return 1
+}
+
+// Script_RegisterEventsModule creates the global Events table.
+Script_RegisterEventsModule :: proc(L: ^lua.State) {
+	lua.newtable(L)
+	reg :: proc(L: ^lua.State, name: cstring, fn: lua.CFunction) {
+		lua.pushcfunction(L, fn)
+		lua.setfield(L, -2, name)
+	}
+	reg(L, "connect", lua_events_connect)
+	reg(L, "once", lua_events_once)
+	reg(L, "disconnect", lua_events_disconnect)
+	reg(L, "emit", lua_events_emit)
+	reg(L, "emit_deferred", lua_events_emit_deferred)
+	reg(L, "listener_count", lua_events_listener_count)
+	lua.setglobal(L, "Events")
 }

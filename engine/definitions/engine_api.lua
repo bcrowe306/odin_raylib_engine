@@ -8745,6 +8745,60 @@ function PoolModule.stats(component) end
 
 -- ============================================================================
 
+---@class EventsModule
+---The global event bus: named events any script (or engine code) can emit and any script can listen to, without a reference to the other side - gameplay telling the HUD the score changed, a level telling the game flow it's complete, audio or achievements reacting to gameplay. Handlers run in the order they were connected; they may emit, connect, disconnect or destroy nodes. Connections end with the script that made them (or `disconnect`, or the scope node). The bus lasts across scene changes. Node events (`node:connect` / `node:emit`) are separate.
+local EventsModule = {}
+
+---Calls `handler(value, source)` every time `event` is emitted; `source` is the node of the script that emitted it (or the node passed to `emit`), nil from global code. Released when the connecting script's node is destroyed, or with `scope` when given (a global script's connections otherwise last for the game).
+---
+---Example: `self.scoreConn = Events.connect("score_changed", function(score) self.label.text = tostring(score) end)`
+---@param event ProjectEvent|string Event name (the project's custom events complete)
+---@param handler fun(value: any, source: Node?) Called with the emitted value and source
+---@param scope? Node The connection ends when this node is destroyed
+---@return integer id Connection id for `disconnect`
+function EventsModule.connect(event, handler, scope) end
+
+---Like `connect`, but the handler is released after its first call.
+---
+---Example: `Events.once("level_complete", function(level) Save.set("last_level", level) end)`
+---@param event ProjectEvent|string Event name
+---@param handler fun(value: any, source: Node?) Called once
+---@param scope? Node The connection ends when this node is destroyed
+---@return integer id Connection id for `disconnect`
+function EventsModule.once(event, handler, scope) end
+
+---Removes a connection made with `connect` or `once`.
+---
+---Example: `Events.disconnect(self.scoreConn)`
+---@param id integer Connection id
+---@return boolean removed false when it was already gone
+function EventsModule.disconnect(id) end
+
+---Emits a global event now: every handler runs before `emit` returns. The value can be anything, tables included (engine code listening gets numbers, strings, booleans and nodes). The source defaults to this script's node.
+---
+---Example: `Events.emit("score_changed", self.score)`
+---@param event ProjectEvent|string Event name
+---@param value? any Passed to the handlers
+---@param source? Node Defaults to the emitting script's node
+function EventsModule.emit(event, value, source) end
+
+---Emits a global event at the end of the frame (after every node has updated), in the order emitted - for events raised in the middle of an update that listeners shouldn't handle there. A source that is destroyed meanwhile arrives as nil.
+---
+---Example: `Events.emit_deferred("enemy_killed", { kind = "slime", points = 50 })`
+---@param event ProjectEvent|string Event name
+---@param value? any Passed to the handlers
+---@param source? Node Defaults to the emitting script's node
+function EventsModule.emit_deferred(event, value, source) end
+
+---How many handlers listen to an event (Lua connections and engine listeners).
+---
+---Example: `if Events.listener_count("player_died") == 0 then Log.warn("nobody handles player_died") end`
+---@param event ProjectEvent|string Event name
+---@return integer count
+function EventsModule.listener_count(event) end
+
+-- ============================================================================
+
 ---@alias AccessibilityKey "ui_scale"|"colorblind"|"colorblind_strength"|"colorblind_simulate"|"subtitles"|"captions"|"subtitle_scale"|"subtitle_background"|"screen_shake"
 
 ---@class AccessibilitySettings
@@ -10306,6 +10360,9 @@ Tween = TweenModule
 
 ---@type PoolModule
 Pool = PoolModule
+
+---@type EventsModule
+Events = EventsModule
 
 ---@type AccessibilityModule
 Accessibility = AccessibilityModule

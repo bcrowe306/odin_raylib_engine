@@ -35,6 +35,7 @@ Game :: struct {
 	backgroundColor: rl.Color `gui:"true"`,
 	resourceManager: ResourceManager,
 	tweens:          Tween_State,
+	events:          EventBus, // global events (event_bus.odin)
 	gameContext:     GameContext,
 	drawBounds:      bool `gui:"true"`,
 	shouldQuit:      bool,
@@ -133,6 +134,7 @@ InitializeGame :: proc(game: ^Game) {
 	game.gameContext.camera = nil
 	game.gameContext.scriptManager = &game.scriptManager
 	game.gameContext.assetManager = &game.assetManager
+	EventBus_Init(&game.events, &game.gameContext)
 	game.state = .Initialized
 }
 
@@ -210,11 +212,15 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 	// 5. Update and render active scene nodes
 	RunScene(game.sceneManager.currentScene, &game.gameContext, deltaTime)
 	Scene_DrawTransition(game)
+
+	// 6. Deliver the events published deferred this frame (Events.emit_deferred)
+	EventBus_Flush(&game.events)
 }
 
 GameTerminate :: proc(game: ^Game) {
 	if game == nil do return
 	Tween_Destroy(&game.tweens, game.scriptManager.L) // releases Lua callbacks: before the Lua state goes
+	EventBus_Destroy(&game.events, game.scriptManager.L) // (likewise: queued Lua values)
 	Scene_FlowShutdown(game)
 	if game.scriptManager.isReady do Save_Flush(game.scriptManager.L) // Save data is written on quit
 	Text_UnloadFonts()
