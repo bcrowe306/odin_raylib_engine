@@ -770,8 +770,10 @@ particle_circle_texture :: proc() -> u32 {
 }
 
 // Particles_Shutdown frees the shared drawing texture (engine shutdown).
+// The runner closes the window first: no GL context to free it in then
+// (Mesa crashes on it) - it went with the context.
 Particles_Shutdown :: proc() {
-	if particleCircleTex.id != 0 do rl.UnloadTexture(particleCircleTex)
+	if particleCircleTex.id != 0 && rl.IsWindowReady() do rl.UnloadTexture(particleCircleTex)
 	particleCircleTex = {}
 }
 
