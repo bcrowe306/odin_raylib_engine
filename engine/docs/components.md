@@ -121,6 +121,19 @@ Component files and scenes saved before uids keep loading unchanged:
   its component file has uids. Until then, a name-keyed override follows
   the node's name, as it always did.
 
+## Performance
+
+- A component is prepared (read, parsed, defaults filled in, nested
+  components expanded) once per path. Instances are built from that copy
+  until the component file or any file it nests changes (size or time), or
+  the editor writes a component.
+- In the editor, each instance remembers the component JSON it was built
+  from, so its overrides stay right when the file changes before the
+  instance is refreshed. A game doesn't keep that copy (about 2 KB per
+  instance of a 12-node component); saving there diffs against the file.
+- Numbers: `bench_components` in `scripts/bench.sh`; baselines in
+  `engine/GAPS.md`.
+
 ## Limits
 
 - Nodes inside an instance can change order but not parent.
