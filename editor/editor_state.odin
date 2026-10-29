@@ -332,6 +332,7 @@ Editor_Shutdown :: proc(state: ^EditorState) {
 	LevelEditor_Shutdown()
 	LevelRef_Shutdown()
 	NodeReference_Shutdown()
+	FileBrowser_Shutdown()
 	LevelRules_Shutdown()
 	LevelLayers_Shutdown()
 	LevelEnums_Shutdown()

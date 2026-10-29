@@ -69,6 +69,12 @@ Editor_Settings :: struct {
 	ldtkTrust:        map[string]bool,
 	pluginTrust:      map[string]bool, // project folder -> its plugins allowed (true) / blocked (plugins.odin)
 	pluginsOff:       map[string]bool, // plugin folders turned off in Settings > Plugins
+	// File Browser (file_browser.odin): open, its folder, bookmarked and
+	// recent folders (absolute, most recent first) - the same in every project.
+	fileBrowserOpen:      bool,
+	fileBrowserDir:       string,
+	fileBrowserBookmarks: [dynamic]string,
+	fileBrowserRecent:    [dynamic]string,
 }
 
 DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
@@ -124,6 +130,11 @@ Editor_Settings_Clone :: proc(s: ^Editor_Settings) -> Editor_Settings {
 	for k, v in s.pluginTrust do c.pluginTrust[strings.clone(k)] = v
 	c.pluginsOff = make(map[string]bool)
 	for k, v in s.pluginsOff do c.pluginsOff[strings.clone(k)] = v
+	c.fileBrowserDir = strings.clone(s.fileBrowserDir)
+	c.fileBrowserBookmarks = make([dynamic]string)
+	for b in s.fileBrowserBookmarks do append(&c.fileBrowserBookmarks, strings.clone(b))
+	c.fileBrowserRecent = make([dynamic]string)
+	for r in s.fileBrowserRecent do append(&c.fileBrowserRecent, strings.clone(r))
 	return c
 }
 
@@ -153,6 +164,14 @@ Editor_Settings_Destroy :: proc(s: ^Editor_Settings) {
 	for k in s.pluginsOff do delete(k)
 	delete(s.pluginsOff)
 	s.pluginsOff = nil
+	delete(s.fileBrowserDir)
+	s.fileBrowserDir = ""
+	for b in s.fileBrowserBookmarks do delete(b)
+	delete(s.fileBrowserBookmarks)
+	s.fileBrowserBookmarks = nil
+	for r in s.fileBrowserRecent do delete(r)
+	delete(s.fileBrowserRecent)
+	s.fileBrowserRecent = nil
 }
 
 // Editor_SettingsPath: where settings live (drives: inside the project copy).
@@ -373,6 +392,20 @@ settings_from_ini :: proc(text: string) {
 			if v, has := rp[fmt.tprint(i)]; has && v != "" do append(&s.recentProjects, strings.clone(v))
 		}
 	}
+	if fbm, ok := m["file_browser"]; ok {
+		s.fileBrowserOpen = (fbm["open"] or_else "") == "true"
+		if v := fbm["dir"] or_else ""; v != "" do s.fileBrowserDir = strings.clone(v)
+	}
+	if bm, ok := m["file_browser_bookmarks"]; ok {
+		for i in 0 ..< len(bm) {
+			if v, has := bm[fmt.tprint(i)]; has && v != "" do append(&s.fileBrowserBookmarks, strings.clone(v))
+		}
+	}
+	if fr, ok := m["file_browser_recent"]; ok {
+		for i in 0 ..< len(fr) {
+			if v, has := fr[fmt.tprint(i)]; has && v != "" do append(&s.fileBrowserRecent, strings.clone(v))
+		}
+	}
 	if km, ok := m["keymap"]; ok {
 		s.keymap = make(map[string][3]Chord)
 		for id, v in km {
@@ -461,6 +494,12 @@ Editor_SaveSettings :: proc() -> bool {
 	}
 	strings.write_string(&sb, "\n[recent_projects]\n")
 	for r, i in s.recentProjects do fmt.sbprintf(&sb, "%d = %s\n", i, r)
+	strings.write_string(&sb, "\n[file_browser]\n")
+	fmt.sbprintf(&sb, "open = %t\ndir = %s\n", s.fileBrowserOpen, s.fileBrowserDir)
+	strings.write_string(&sb, "\n[file_browser_bookmarks]\n")
+	for b, i in s.fileBrowserBookmarks do fmt.sbprintf(&sb, "%d = %s\n", i, b)
+	strings.write_string(&sb, "\n[file_browser_recent]\n")
+	for r, i in s.fileBrowserRecent do fmt.sbprintf(&sb, "%d = %s\n", i, r)
 	strings.write_string(&sb, "\n[keymap]\n")
 	ids := make([dynamic]string, context.temp_allocator)
 	for id in s.keymap do append(&ids, id)

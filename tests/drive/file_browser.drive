@@ -1,0 +1,160 @@
+# #140: View > File Browser - folders outside the project browsed (typed
+# path, history, tree, bookmarks), files previewed before they are imported
+# (an image, a sound played and stopped, text), searched through sub-folders
+# and filtered, then Loaded: by type, into a chosen folder, a taken name
+# skipped or replaced, several at once, and dragged onto the Assets panel.
+# Previewing writes nothing to the project.
+wait 5
+expect fb.open == false
+click @menu:View
+click @menu:View/File Browser
+wait 2
+expect fb.open == true
+expect file:.editor_settings.ini contains open = true
+
+# Type the fixtures' folder into the path bar.
+click @fb.path
+key ctrl+a
+type tests/drive/fixtures/import
+key enter
+wait 2
+expect fb.dir-name == import
+expect fb.rows contains crate.png
+expect fb.rows contains Pack
+screenshot folder
+
+# An image: decoded in the background, then shown.
+click @fb.row:crate.png
+wait-until fb.image-size == 32x32
+expect fb.preview == image
+expect fb.selected == crate.png
+expect item:fb.load == visible
+screenshot image_preview
+# Nothing was copied by previewing.
+expect file:textures/crate.png ==
+
+# A sound: play, then stop.
+click @fb.row:blip.wav
+wait 2
+expect fb.preview == audio
+expect fb.audio == stopped
+click @fb.play
+expect fb.audio == playing
+screenshot audio_preview
+click @fb.stop
+expect fb.audio == stopped
+
+# Text.
+click @fb.row:hello.lua
+wait 2
+expect fb.preview == text
+expect fb.text contains Imported by the asset importer drive.
+
+# Into a folder (double-click), back, forward, up.
+dblclick @fb.row:Pack
+wait 2
+expect fb.dir-name == Pack
+expect fb.rows contains gem.png
+expect fb.back == 1
+click @fb.back
+wait 2
+expect fb.dir-name == import
+expect fb.forward == 1
+click @fb.forward
+wait 2
+expect fb.dir-name == Pack
+click @fb.up
+wait 2
+expect fb.dir-name == import
+
+# A bookmark: kept in settings.ini, listed in the sidebar.
+click @fb.bookmark
+wait 2
+expect fb.bookmarks == import
+expect file:.editor_settings.ini contains [file_browser_bookmarks]
+expect item:fb.mark:import == visible
+
+# Search through the sub-folders: spark.png is two folders down.
+click @fb.search
+type spark
+click @fb.recursive
+wait-until fb.search-done == true
+expect fb.rows contains spark.png
+screenshot search
+click @fb.recursive
+click @fb.search
+key ctrl+a
+key backspace
+wait 2
+
+# The type filter: Audio shows the sound (and the folders) only.
+click @fb.filter
+click @pick:Audio
+wait 2
+expect fb.rows contains blip.wav
+expect fb.rows !contains crate.png
+click @fb.filter
+click @pick:All files
+wait 2
+
+# Load by type: the image goes to textures/.
+click @fb.row:crate.png
+wait 2
+click @fb.load
+wait 3
+expect import.imported == 1
+expect item:asset:textures/crate.png == visible
+
+# A different file with the same name: skipped, then replaced.
+exec cp tests/drive/fixtures/import/Pack/gem.png $PROJECT/textures/crate.png
+click @fb.conflict
+click @pick:Name taken: skip it
+click @fb.load
+wait 3
+expect import.skipped == 1
+expect fb.conflict == Skip
+click @fb.conflict
+click @pick:Name taken: replace it
+click @fb.load
+wait 3
+expect import.imported == 1
+expect log contains Replaced crate.png -> textures/crate.png
+
+# Into a chosen folder: any type (the notes file the importer doesn't know).
+click @fb.dest
+click @pick:scripts
+expect fb.dest == scripts
+click @fb.row:notes.txt
+click @fb.load
+wait 3
+expect import.imported == 1
+expect file:scripts/notes.txt contains unsupported
+click @fb.dest
+click @pick:by-type
+expect fb.dest ==
+
+# Several at once (ctrl+click), then a row dragged onto the Assets panel.
+click @fb.row:hello.lua
+hold ctrl
+click @fb.row:blip.wav
+release
+expect fb.selected == hello.lua,blip.wav
+screenshot multi_select
+click @fb.load
+wait 3
+expect item:asset:scripts/hello.lua == visible
+expect item:asset:audio/blip.wav == visible
+dblclick @fb.row:Pack
+wait 2
+drag @fb.row:gem.png @asset.search
+wait 3
+expect item:asset:textures/gem.png == visible
+screenshot dragged
+
+# Closing it from the View menu stops any sound and is remembered.
+click @menu:View
+click @menu:View/File Browser
+wait 2
+expect fb.open == false
+expect fb.audio == none
+expect file:.editor_settings.ini contains open = false

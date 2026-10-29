@@ -32,6 +32,19 @@ AUDIO_EXTS := []string{".wav", ".ogg", ".mp3"}
 // Extensions the importer accepts (for dialog filters), without dots.
 IMPORT_EXTS := []string{"png", "jpg", "jpeg", "bmp", "tga", "aseprite", "ase", "wav", "ogg", "mp3", "lua", "json", "ldtk", "fs", "glsl", "frag"}
 
+// Import_Options: where files go and what happens to a taken name (the
+// File Browser's Load; everything else imports with the defaults).
+Import_Options :: struct {
+	dest:     string,          // project folder ("sprites/enemies"); "" = the folder for its type
+	conflict: Import_Conflict, // a different file already has the name
+}
+
+Import_Conflict :: enum {
+	Rename,    // import beside it ("ship_2.png")
+	Overwrite, // replace it
+	Skip,      // keep it, import nothing
+}
+
 Import_Status :: enum {
 	Imported,
 	Skipped, // already in the project
@@ -79,7 +92,9 @@ Asset_ImportDir :: proc(name: string) -> (dir: string, ok: bool) {
 
 // Asset_ImportFiles imports files and folders (absolute or cwd-relative
 // paths); returns the project-relative paths now in the project, in order.
-Asset_ImportFiles :: proc(state: ^EditorState, paths: []string) -> []string {
+// With opts.dest, every file goes to that folder (any file type: copied as
+// it is when the importer doesn't know it).
+Asset_ImportFiles :: proc(state: ^EditorState, paths: []string, opts := Import_Options{}) -> []string {
 	Lua_MarkProjectTypesDirty() // generated Lua types follow the project
 	report_clear()
 	out := make([dynamic]string, context.temp_allocator)
@@ -88,8 +103,8 @@ Asset_ImportFiles :: proc(state: ^EditorState, paths: []string) -> []string {
 		if aerr != nil do abs = p
 		abs = strings.trim_right(abs, "/\\")
 		if os.is_dir(abs) {
-			import_folder(state, abs, filepath.base(abs), &out, 0)
-		} else if rel, ok := import_file(state, abs, ""); ok {
+			import_folder(state, abs, filepath.base(abs), &out, 0, opts)
+		} else if rel, ok := import_file(state, abs, "", opts); ok {
 			append(&out, rel)
 		}
 	}
@@ -109,7 +124,7 @@ Asset_ImportFiles :: proc(state: ^EditorState, paths: []string) -> []string {
 	clear(&importHighlight.rels)
 	for rel in out {
 		append(&importHighlight.rels, strings.clone(rel))
-		if dir, ok := Asset_ImportDir(rel); ok {
+		if dir, ok := Asset_ImportDir(rel); ok && opts.dest == "" {
 			title := strings.to_upper(dir[:1], context.temp_allocator)
 			title = strings.concatenate({title, dir[1:]}, context.temp_allocator)
 			if title in assetFolderClosed do assetFolderClosed[title] = false
@@ -158,10 +173,19 @@ Asset_OpenImportFolderDialog :: proc(state: ^EditorState) {
 
 // --- OS drag & drop ----------------------------------------------------------------
 
-// Dropped files injected by a test drive (`drop-files`), at a position.
+// Dropped files injected by a test drive (`drop-files`) or queued by
+// Editor_QueueFileDrop, at a position.
 driveDrop: struct {
 	paths: [dynamic]string,
 	pos:   [2]f32,
+}
+
+// Editor_QueueFileDrop: files dropped at a screen position as if from the
+// OS file manager (the File Browser's drags) - handled with the next
+// Editor_HandleFileDrops.
+Editor_QueueFileDrop :: proc(paths: []string, pos: [2]f32) {
+	for p in paths do append(&driveDrop.paths, strings.clone(p))
+	driveDrop.pos = pos
 }
 
 // Rect of the Assets panel when last drawn (screen space) and the frame.
@@ -253,7 +277,7 @@ fail :: proc(state: ^EditorState, src, why: string) -> (string, bool) {
 // import_folder walks a dropped/picked folder; `sub` is the folder's
 // layout below the type folder ("Space Pack/Box").
 @(private = "file")
-import_folder :: proc(state: ^EditorState, dir, sub: string, out: ^[dynamic]string, depth: int) {
+import_folder :: proc(state: ^EditorState, dir, sub: string, out: ^[dynamic]string, depth: int, opts: Import_Options) {
 	if depth > 8 do return
 	infos, err := os.read_all_directory_by_path(dir, context.temp_allocator)
 	if err != nil {
@@ -270,19 +294,27 @@ import_folder :: proc(state: ^EditorState, dir, sub: string, out: ^[dynamic]stri
 			ldtk, _ := filepath.join({dir, fmt.tprintf("%s.ldtk", fi.name)}, context.temp_allocator)
 			if os.exists(ldtk) do continue
 			child, _ := filepath.join({sub, fi.name}, context.temp_allocator)
-			import_folder(state, full, child, out, depth + 1)
+			import_folder(state, full, child, out, depth + 1, opts)
 			continue
 		}
-		if rel, ok := import_file(state, full, sub); ok do append(out, rel)
+		if rel, ok := import_file(state, full, sub, opts); ok do append(out, rel)
 	}
 }
 
 // import_file copies one file into the project; returns its project path.
 @(private = "file")
-import_file :: proc(state: ^EditorState, src, sub: string) -> (string, bool) {
+import_file :: proc(state: ^EditorState, src, sub: string, opts: Import_Options) -> (string, bool) {
 	name := filepath.base(src)
 	dir, supported := Asset_ImportDir(name)
-	if !supported && os.exists(src) {
+	known := supported
+	if opts.dest != "" {
+		dir = opts.dest
+		supported = true // (any file goes to a chosen folder)
+	} else if raw, ok := import_raw_dir(name); ok {
+		dir = raw
+		supported = true
+	}
+	if !known && os.exists(src) {
 		// A plugin's importer (plugin_extend.odin)?
 		data, rerr := os.read_entire_file(src, context.temp_allocator)
 		if rerr != nil do return fail(state, src, fmt.tprintf("could not read (%v)", rerr))
@@ -314,17 +346,27 @@ import_file :: proc(state: ^EditorState, src, sub: string) -> (string, bool) {
 
 	data, rerr := os.read_entire_file(src, context.temp_allocator)
 	if rerr != nil do return fail(state, src, fmt.tprintf("could not read (%v)", rerr))
-	if why, ok := validate(name, data); !ok do return fail(state, src, why)
+	if known do if why, ok := validate(name, data); !ok do return fail(state, src, why)
 
 	rel, _ := filepath.join({dir, sub, name}, context.temp_allocator)
 	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	replaced := false
 	if os.exists(full) {
 		if existing, err := os.read_entire_file(full, context.temp_allocator); err == nil && slice.equal(existing, data) {
 			report_add(src, rel, .Skipped, "already in the project")
 			return rel, true
 		}
-		rel = free_name(state, rel) // keep the existing file, import beside it
-		full, _ = filepath.join({state.projectPath, rel}, context.temp_allocator)
+		switch opts.conflict {
+		case .Rename:
+			rel = free_name(state, rel) // keep the existing file, import beside it
+			full, _ = filepath.join({state.projectPath, rel}, context.temp_allocator)
+		case .Overwrite:
+			replaced = true
+		case .Skip:
+			report_add(src, rel, .Skipped, "a different file has the name (kept)")
+			Editor_Log(state, .Info, "Skipped %s: %s exists", name, rel)
+			return "", false
+		}
 	}
 
 	if Asset_KindOf(name) == .Level do data = import_ldtk_deps(state, src, rel, data)
@@ -332,15 +374,25 @@ import_file :: proc(state: ^EditorState, src, sub: string) -> (string, bool) {
 	_ = os.make_directory_all(filepath.dir(full, context.temp_allocator))
 	if werr := os.write_entire_file(full, data); werr != nil do return fail(state, src, fmt.tprintf("could not write %s (%v)", rel, werr))
 
-	if Asset_KindOf(rel) == .Scene {
+	if Asset_KindOf(rel) == .Scene && !slice.contains(state.projectConfig.scenes[:], rel) {
 		append(&state.projectConfig.scenes, strings.clone(rel))
 		e.Project_SaveConfigToFile(state.projectPath, &state.projectConfig)
 	}
 	renamed := filepath.base(rel) != name
-	report_add(src, rel, .Imported, fmt.tprintf("renamed to %s (a different %s exists)", filepath.base(rel), name) if renamed else "")
-	Editor_Log(state, .Info, "Imported %s -> %s", name, rel)
+	report_add(src, rel, .Imported, fmt.tprintf("renamed to %s (a different %s exists)", filepath.base(rel), name) if renamed else "replaced the file there" if replaced else "")
+	Editor_Log(state, .Info, "%s %s -> %s", "Replaced" if replaced else "Imported", name, rel)
 	_, _ = PluginEvents_Emit(state, "asset_imported", rel) // (plugin_events.odin)
 	return rel, true
+}
+
+// import_raw_dir: the folder for files copied as they are, with no asset
+// type of their own (fonts: UI and text nodes name them by path).
+@(private = "file")
+import_raw_dir :: proc(name: string) -> (string, bool) {
+	switch strings.to_lower(filepath.ext(name), context.temp_allocator) {
+	case ".ttf", ".otf", ".fnt": return "fonts", true
+	}
+	return "", false
 }
 
 // path_inside: is `path` inside `root`? (and the relative path)

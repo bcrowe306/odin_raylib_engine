@@ -209,6 +209,7 @@ Actions_Init :: proc() {
 	add({id = "view.clear_guides", category = "View", label = "Clear Guides", scope = .Scene, run = Editor_ClearGuides, enabled = proc(s: ^EditorState) -> bool {return s.activeScene != nil && s.activeScene.guideCount > 0}})
 	add({id = "view.smart_snap", category = "View", label = "Smart Snapping", scope = .Scene, run = proc(s: ^EditorState) {s.smartSnap = !s.smartSnap}, checked = proc(s: ^EditorState) -> bool {return s.smartSnap}})
 	add({id = "view.colliders", category = "View", label = "Show All Colliders", scope = .Scene, run = proc(s: ^EditorState) {s.showAllColliders = !s.showAllColliders}, checked = proc(s: ^EditorState) -> bool {return s.showAllColliders}})
+	add({id = "view.file_browser", category = "View", label = "File Browser", chords = k(ch(.B, PS)), run = proc(s: ^EditorState) {FileBrowser_Toggle()}, checked = proc(s: ^EditorState) -> bool {return FileBrowser_IsOpen()}})
 	add({id = "view.inspector_help", category = "View", label = "Inspector Help", run = proc(s: ^EditorState) {s.showInspectorHelp = !s.showInspectorHelp}, checked = proc(s: ^EditorState) -> bool {return s.showInspectorHelp}})
 	add({id = "view.tab_bars", category = "View", label = "Show Tab Bars", run = proc(s: ^EditorState) {
 		GlobalSettings.showTabBars = !GlobalSettings.showTabBars

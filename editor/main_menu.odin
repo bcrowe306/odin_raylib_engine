@@ -128,6 +128,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "view.rulers")
 		menu_action(state, "view.clear_guides")
 		menu_action(state, "view.inspector_help")
+		menu_action(state, "view.file_browser")
 		imgui.Separator()
 		menu_action(state, "view.vision_protanopia")
 		menu_action(state, "view.vision_deuteranopia")
