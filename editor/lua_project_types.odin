@@ -104,6 +104,8 @@ Node_Types_Seen :: struct {
 	byName:       map[string]string,
 	byScript:     map[string]string,
 	scriptByName: map[string]string, // node name -> its script ("" once two differ)
+	customClass:  map[string]string, // custom node type (.node.json) -> its Lua class (HurtboxNode)
+	customBase:   map[string]string, // that class -> its built-in type (events)
 }
 
 @(private = "file")
@@ -126,6 +128,10 @@ node_names :: proc(v: json.Value, out: ^[dynamic]string, tags: ^[dynamic]string,
 	if types != nil {
 		t := string(obj["type"].(json.String) or_else "Node")
 		if info, found := e.Node_TypeInfoByName(t); found do t = info.name
+		// A custom node type's node: its class.
+		if path, isCustom := obj[e.CUSTOM_NODE_KEY].(json.String); isCustom {
+			if cls, known := types.customClass[string(path)]; known do t = cls
+		}
 		if hasName do note_type(&types.byName, string(name), t)
 		if sc, isObj := obj["script"].(json.Object); isObj {
 			if path, isStr := sc["path"].(json.String); isStr {
@@ -232,6 +238,16 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 	types.byName = make(map[string]string, allocator = context.temp_allocator)
 	types.byScript = make(map[string]string, allocator = context.temp_allocator)
 	types.scriptByName = make(map[string]string, allocator = context.temp_allocator)
+	types.customClass = make(map[string]string, allocator = context.temp_allocator)
+	types.customBase = make(map[string]string, allocator = context.temp_allocator)
+	// Custom node types (#156): a class each, <Name>Node; a type's script
+	// runs on its nodes (self.node is one).
+	for t in e.CustomNodes_All(&state.game.gameContext) {
+		cls := custom_node_class(t.name)
+		types.customClass[strings.clone(t.path, context.temp_allocator)] = cls
+		types.customBase[cls] = strings.clone(t.base, context.temp_allocator)
+		if script := e.CustomNode_Script(t, &state.game.gameContext); script != "" do note_type(&types.byScript, strings.clone(script, context.temp_allocator), cls)
+	}
 	// get_node paths per script: path -> type ("Node" once two differ).
 	pathsOf := make(map[string]map[string]string, allocator = context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "", {".scene.json"}) {
@@ -283,6 +299,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		}
 	}
 	typed_lookups(&sb, &types, classOf)
+	custom_node_types(&sb, state, &types, classOf)
 	// Resources: their files, and Resource.load / new typed by each file's class.
 	resourceFiles := make([dynamic]string, context.temp_allocator)
 	for rel in Editor_ListProjectFiles(state, "resources", {e.RESOURCE_EXT}) do append(&resourceFiles, rel)
@@ -429,7 +446,7 @@ Lua_ProjectTypesText :: proc(state: ^EditorState) -> string {
 		}
 		// Its node's own events (the tree ones are on ScriptInstanceBase) and
 		// the project's custom events as optional methods.
-		if !isResource do for ev in node_type_events(nodeType)[6:] do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) %s event of its node\n", ev, cls, ev)
+		if !isResource do for ev in node_type_events(types.customBase[nodeType] or_else nodeType)[6:] do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) %s event of its node\n", ev, cls, ev)
 		if !isResource do for ev in customEvents do fmt.sbprintf(&sb, "---@field on_%s? fun(self: %s, value: any) custom event (emit)\n", ev, cls)
 		// State machine callbacks for the project's states (on the machine's
 		// script or its parent's).
@@ -742,4 +759,41 @@ typed_lookups :: proc(sb: ^strings.Builder, types: ^Node_Types_Seen, classOf: ma
 	strings.write_string(sb, "\n---@class Node\nlocal Node = {}\n")
 	for n in names do fmt.sbprintf(sb, "---@overload fun(self: Node, name: %q): %s\n", n, returns[n])
 	strings.write_string(sb, "---@param name NodeName|string\n---@return Node?\nfunction Node:get_child(name) end\n")
+}
+
+// custom_node_class: a custom node type's Lua class ("Hurtbox" ->
+// HurtboxNode: the type's script usually has the class Hurtbox).
+custom_node_class :: proc(name: string) -> string {return fmt.tprintf("%sNode", name)}
+
+// custom_node_types: the custom node types' classes (#156) - built on their
+// base type (or parent type), get_script() returning their script's class -
+// and Scene.create / Scene.find_nodes_of_type returning them by name.
+@(private = "file")
+custom_node_types :: proc(sb: ^strings.Builder, state: ^EditorState, types: ^Node_Types_Seen, classOf: map[string]string) {
+	ctx := &state.game.gameContext
+	all := e.CustomNodes_All(ctx)
+	if len(all) == 0 do return
+	names := make([dynamic]string, context.temp_allocator)
+	strings.write_string(sb, "\n-- Custom node types (nodes/*.node.json): <Name>Node classes.\n")
+	for t in all {
+		cls := custom_node_class(t.name)
+		parent := t.base
+		if t.inherits != "" {
+			if p, _ := e.CustomNode_Get(ctx, t.inherits); p != nil do parent = custom_node_class(p.name)
+		}
+		desc := t.description if t.description != "" else fmt.tprintf("A %s (%s): a custom node type", t.name, t.base)
+		fmt.sbprintf(sb, "\n---%s\n---@class %s : %s\nlocal %s = {{}}\n", desc, cls, parent, cls)
+		if script := e.CustomNode_Script(t, ctx); script != "" {
+			if sc, ok := classOf[script]; ok {
+				fmt.sbprintf(sb, "---The node's script instance (%s): its fields and methods.\n---@return %s\nfunction %s:get_script() end\n", sc, sc, cls)
+			}
+		}
+		append(&names, strings.clone(t.name, context.temp_allocator))
+	}
+	alias(sb, "CustomNodeType", "The project's custom node types (Scene.create, node:is)", sorted_unique(&names))
+	strings.write_string(sb, "\n---@class SceneModule\nlocal SceneModule = {}\n")
+	for n in names do fmt.sbprintf(sb, "---@overload fun(typeName: %q, parent?: Node, x?: number|Vec2, y?: number): %s\n", n, custom_node_class(n))
+	strings.write_string(sb, "---@param typeName CustomNodeType|string\n---@param parent? Node\n---@param x? number|Vec2\n---@param y? number\n---@return Node?\nfunction SceneModule.create(typeName, parent, x, y) end\n")
+	for n in names do fmt.sbprintf(sb, "---@overload fun(typeName: %q): %s[]\n", n, custom_node_class(n))
+	strings.write_string(sb, "---@param typeName CustomNodeType|string\n---@return Node[]\nfunction SceneModule.find_nodes_of_type(typeName) end\n")
 }

@@ -33,7 +33,14 @@ node_matches :: proc(node: ^e.Node, filter: string) -> bool {
 			want := term[strings.index_byte(term, ':') + 1:]
 			typeName := e.Node_TypeName(node)
 			label, _ := node_type_description(typeName)
-			if !strings.contains(strings.to_lower(typeName, context.temp_allocator), want) &&
+			// (A custom node type's name too, and the types it's built on: #156.)
+			custom := false
+			for t, i := e.Node_CustomType(node), 0; t != nil && i < 16; i += 1 {
+				if strings.contains(strings.to_lower(t.name, context.temp_allocator), want) {custom = true; break}
+				if t.inherits == "" do break
+				t, _ = e.CustomNode_Get(node.gameContext, t.inherits)
+			}
+			if !custom && !strings.contains(strings.to_lower(typeName, context.temp_allocator), want) &&
 			   !strings.contains(strings.to_lower(label, context.temp_allocator), want) {
 				return false
 			}

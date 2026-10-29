@@ -496,7 +496,41 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 AddNodeDialog_Open :: proc() {
 	showAddNodeDialog = true
 	nodeSearchBuf = [64]u8{}
-	selectedCatalogIdx = 0
+	selectedCatalogIdx = -1 // (the first built-in type: Empty Node)
+}
+
+// add_node_entries: the project's custom node types (#156), by category,
+// then the built-in catalogue. `customCount`: how many come first. A custom
+// entry's typeName is its .node.json.
+@(private = "file")
+add_node_entries :: proc(state: ^EditorState) -> (entries: []NodeCatalogEntry, customCount: int) {
+	out := make([dynamic]NodeCatalogEntry, context.temp_allocator)
+	custom := make([dynamic]NodeCatalogEntry, context.temp_allocator)
+	for t in e.CustomNodes_All(&state.game.gameContext) {
+		desc := t.description if t.description != "" else fmt.tprintf("A %s of your project: %s with its script and values.", t.name, t.base)
+		append(&custom, NodeCatalogEntry{
+			name        = strings.clone(t.name, context.temp_allocator),
+			category    = strings.clone(t.category if t.category != "" else "Project", context.temp_allocator),
+			icon        = CustomNode_Icon(t),
+			description = strings.clone(desc, context.temp_allocator),
+			typeName    = strings.clone(t.path, context.temp_allocator),
+		})
+	}
+	// (Grouped by category, A-Z; by name within one.)
+	for i in 1 ..< len(custom) {
+		for j := i; j > 0 && (custom[j].category < custom[j - 1].category || (custom[j].category == custom[j - 1].category && custom[j].name < custom[j - 1].name)); j -= 1 {
+			custom[j], custom[j - 1] = custom[j - 1], custom[j]
+		}
+	}
+	append(&out, ..custom[:])
+	append(&out, ..NODE_CATALOG[:])
+	return out[:], len(custom)
+}
+
+// add_node_is_custom: an entry for a custom node type.
+@(private = "file")
+add_node_is_custom :: proc(entry: NodeCatalogEntry) -> bool {
+	return strings.has_suffix(entry.typeName, e.CUSTOM_NODE_SUFFIX)
 }
 
 @(private = "file")
@@ -530,6 +564,8 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 	imgui.InputTextWithHint("##NodeSearchFilter", fmt.ctprintf("%s  Search node types", ICON_FA_MAGNIFYING_GLASS), cstring(raw_data(nodeSearchBuf[:])), len(nodeSearchBuf), {})
 	Drive_Item("addnode.search")
 	filter := strings.to_lower(string(cstring(raw_data(nodeSearchBuf[:]))), context.temp_allocator)
+	entries, customCount := add_node_entries(state)
+	if selectedCatalogIdx < 0 do selectedCatalogIdx = customCount // (Empty Node)
 
 	// Keep the selection on a visible entry; when the search changes, prefer
 	// one whose name matches ("joint" picks Joint, not Line's "round joints").
@@ -538,7 +574,7 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 		lastFilter = {}
 		copy(lastFilter[:len(lastFilter) - 1], filter)
 		best := -1
-		for item, i in NODE_CATALOG {
+		for item, i in entries {
 			if filter != "" && (strings.contains(strings.to_lower(item.name, context.temp_allocator), filter) || strings.contains(strings.to_lower(item.typeName, context.temp_allocator), filter)) {
 				best = i
 				break
@@ -546,16 +582,16 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 		}
 		if best >= 0 do selectedCatalogIdx = best
 	}
-	if selectedCatalogIdx < 0 || selectedCatalogIdx >= len(NODE_CATALOG) || !catalog_matches(NODE_CATALOG[selectedCatalogIdx], filter) {
-		for item, i in NODE_CATALOG {
+	if selectedCatalogIdx < 0 || selectedCatalogIdx >= len(entries) || !catalog_matches(entries[selectedCatalogIdx], filter) {
+		for item, i in entries {
 			if catalog_matches(item, filter) {selectedCatalogIdx = i; break}
 		}
 	}
 	if imgui.IsKeyPressed(.DownArrow) || imgui.IsKeyPressed(.UpArrow) {
 		dir := 1 if imgui.IsKeyPressed(.DownArrow) else -1
-		for k := 1; k < len(NODE_CATALOG); k += 1 {
-			i := (selectedCatalogIdx + dir * k + len(NODE_CATALOG) * 2) % len(NODE_CATALOG)
-			if catalog_matches(NODE_CATALOG[i], filter) {selectedCatalogIdx = i; break}
+		for k := 1; k < len(entries); k += 1 {
+			i := (selectedCatalogIdx + dir * k + len(entries) * 2) % len(entries)
+			if catalog_matches(entries[i], filter) {selectedCatalogIdx = i; break}
 		}
 	}
 
@@ -565,13 +601,13 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 	imgui.PushStyleColorImVec4(.ChildBg, UI_BG_APP)
 	if imgui.BeginChild("##catalog", {360, listH}, {}, {}) {
 		lastCat := ""
-		for item, i in NODE_CATALOG {
+		for item, i in entries {
 			if !catalog_matches(item, filter) do continue
 			if item.category != lastCat {
 				imgui.Dummy({0, 2})
 				imgui.PushFont(GlobalFonts.small)
 				imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)
-				imgui.TextUnformatted(fmt.ctprintf("  %s", strings.to_upper(item.category, context.temp_allocator)))
+				imgui.TextUnformatted(fmt.ctprintf("  %s%s", strings.to_upper(item.category, context.temp_allocator), "  ·  YOUR PROJECT" if add_node_is_custom(item) else ""))
 				imgui.PopStyleColor()
 				imgui.PopFont()
 				lastCat = item.category
@@ -591,8 +627,8 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 
 	imgui.SameLine(0, 16)
 	if imgui.BeginChild("##detail", {0, listH}, {}, {}) {
-		if selectedCatalogIdx >= 0 && selectedCatalogIdx < len(NODE_CATALOG) {
-			sel := NODE_CATALOG[selectedCatalogIdx]
+		if selectedCatalogIdx >= 0 && selectedCatalogIdx < len(entries) {
+			sel := entries[selectedCatalogIdx]
 			imgui.PushStyleColorImVec4(.Text, UI_ACCENT)
 			imgui.PushFont(GlobalFonts.semibold)
 			imgui.TextUnformatted(fmt.ctprintf("%s  %s", sel.icon, sel.name))
@@ -631,9 +667,15 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 
 AddNodeDialog_CreateSelected :: proc(state: ^EditorState) {
 	if state.activeScene == nil do return
-	if selectedCatalogIdx < 0 || selectedCatalogIdx >= len(NODE_CATALOG) do return
+	entries, _ := add_node_entries(state)
+	if selectedCatalogIdx < 0 || selectedCatalogIdx >= len(entries) do return
 
-	entry := NODE_CATALOG[selectedCatalogIdx]
+	entry := entries[selectedCatalogIdx]
+	if add_node_is_custom(entry) {
+		// A custom node type (#156): its node, under the selection, at the view's centre.
+		_ = Editor_AddCustomNode(state, entry.typeName, state.cameraPos)
+		return
+	}
 	newNode := Editor_CreateNode(state, entry.typeName, strings.trim_space(strings.concatenate({entry.name}, context.temp_allocator)))
 	if newNode != nil {
 		Editor_Log(state, .Info, "Created new node: %s (%s)", newNode.name, entry.name)
