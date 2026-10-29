@@ -284,7 +284,7 @@ tileset_form :: proc(state: ^EditorState, uid: int) {
 	}
 	UI_PropLabel("Tile size")
 	grid := i32(ts.gridSize)
-	if imgui.InputInt("##tsgrid", &grid, 1, 8, {.EnterReturnsTrue}) && grid >= 2 && int(grid) != ts.gridSize {
+	if (imgui.InputInt("##tsgrid", &grid, 1, 8) || imgui.IsItemDeactivatedAfterEdit()) && grid >= 2 && int(grid) != ts.gridSize {
 		img := img_for(ts)
 		defer if img.data != nil do rl.UnloadImage(img)
 		defs_checkpoint("Tileset Grid")
@@ -300,12 +300,12 @@ tileset_form :: proc(state: ^EditorState, uid: int) {
 	sp := [2]i32{i32(ts.spacing), i32(ts.padding)}
 	w := (imgui.GetContentRegionAvail().x - 4) * 0.5
 	imgui.SetNextItemWidth(w)
-	ch1 := imgui.InputInt("##tsspacing", &sp.x, 0, 0, {.EnterReturnsTrue})
+	ch1 := imgui.InputInt("##tsspacing", &sp.x, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item("defs.tileset.spacing")
 	level_tip("Pixels between tiles", "tileset.image")
 	imgui.SameLine(0, 4)
 	imgui.SetNextItemWidth(w)
-	ch2 := imgui.InputInt("##tspadding", &sp.y, 0, 0, {.EnterReturnsTrue})
+	ch2 := imgui.InputInt("##tspadding", &sp.y, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item("defs.tileset.padding")
 	level_tip("Pixels around the whole image", "tileset.image")
 	if (ch1 || ch2) && sp.x >= 0 && sp.y >= 0 {
@@ -326,7 +326,7 @@ tileset_form :: proc(state: ^EditorState, uid: int) {
 		}
 		buf: [256]u8
 		copy(buf[:255], strings.to_string(cur))
-		if imgui.InputTextWithHint("##tstags", "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+		if imgui.InputTextWithHint("##tstags", "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 			defs_checkpoint("Tileset Tags")
 			e.Ldtk_Doc_SetTilesetTags(doc, uid, strings.split(string(cstring(raw_data(buf[:]))), ",", context.temp_allocator))
 		}
@@ -489,7 +489,7 @@ tile_data_editor :: proc(state: ^EditorState, uid: int) {
 		imgui.SameLine()
 		imgui.SetNextItemWidth(80)
 		fps := anim.fps
-		if imgui.InputFloat("fps##tile_fps", &fps, 0, 0, "%.1f", {.EnterReturnsTrue}) && fps > 0 {
+		if (imgui.InputFloat("fps##tile_fps", &fps, 0, 0, "%.1f") || imgui.IsItemDeactivatedAfterEdit()) && fps > 0 {
 			defs_checkpoint("Tile Animation")
 			e.Ldtk_Doc_SetTileAnimation(doc, uid, tid, anim.frames, fps)
 		}

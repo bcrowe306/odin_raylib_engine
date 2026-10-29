@@ -636,7 +636,7 @@ level_prompts :: proc(state: ^EditorState) {
 		UI_DimText("Project-relative path of the new .ldtk file:")
 		imgui.SetNextItemWidth(360)
 		if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
-		enter := imgui.InputText("##level_new_path", cstring(raw_data(L.nameBuf[:])), len(L.nameBuf), {.EnterReturnsTrue})
+		enter := imgui.InputText("##level_new_path", cstring(raw_data(L.nameBuf[:])), len(L.nameBuf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit()
 		Drive_Item("level.new.path")
 		level_tip("Relative to the game project (.ldtk is added)", "overview")
 		rel := strings.trim_space(string(cstring(raw_data(L.nameBuf[:]))))
@@ -980,7 +980,7 @@ level_rename_popup :: proc(state: ^EditorState) {
 	defer imgui.EndPopup()
 	imgui.SetNextItemWidth(300)
 	if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
-	enter := imgui.InputText("##rename_level", cstring(raw_data(L.renameBuf[:])), len(L.renameBuf), {.EnterReturnsTrue})
+	enter := imgui.InputText("##rename_level", cstring(raw_data(L.renameBuf[:])), len(L.renameBuf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item("level.rename.name")
 	level_tip("Letters, digits and _ (other characters become _)", "panel.levels")
 	if UI_PrimaryButton("Rename", "level.rename.ok") || enter {
@@ -1044,6 +1044,8 @@ level_layers_panel :: proc(state: ^EditorState) {
 	lv := &doc.levels[L.level]
 	ROW :: 26
 	dropAt := -1 // drag: the row the dragged layer goes to
+	targetY: f32 = -1
+	targetX0, targetX1: f32
 	m := imgui.GetIO().MousePos
 	for &ly, i in lv.layers {
 		d := e.Ldtk_Doc_LayerDef(doc, &ly)
@@ -1091,13 +1093,30 @@ level_layers_panel :: proc(state: ^EditorState) {
 		}
 		level_tip(visible ? "Hide the layer in this level (saved, like LDtk)" : "Show the layer", "panel.layers")
 		rowMax := [2]f32{rowMin.x + rowW, imgui.GetItemRectMax().y}
-		if L.layerDrag >= 0 && m.y >= rowMin.y && m.y < rowMax.y + imgui.GetStyle().ItemSpacing.y do dropAt = i
+		if L.layerDrag >= 0 && m.y >= rowMin.y && m.y < rowMax.y + imgui.GetStyle().ItemSpacing.y {
+			dropAt = i
+			if dropAt > L.layerDrag {
+				targetY = rowMax.y + imgui.GetStyle().ItemSpacing.y * 0.5
+				targetX0, targetX1 = rowMin.x, rowMax.x
+			} else if dropAt < L.layerDrag {
+				targetY = rowMin.y - imgui.GetStyle().ItemSpacing.y * 0.5
+				targetX0, targetX1 = rowMin.x, rowMax.x
+			}
+		}
 		if L.layerDrag == i {
 			imgui.DrawList_AddRect(imgui.GetWindowDrawList(), rowMin, rowMax, col_u32(UI_ACCENT), 3, {}, 1)
 		}
 		imgui.PopID()
 	}
 	if L.layerDrag >= 0 {
+		// Draw blue insertion line at the exact position where the dragged layer will land
+		if targetY >= 0 {
+			dl := imgui.GetWindowDrawList()
+			lineCol := col_u32(UI_ACCENT)
+			imgui.DrawList_AddLine(dl, {targetX0, targetY}, {targetX1, targetY}, lineCol, 3.0)
+			imgui.DrawList_AddCircleFilled(dl, {targetX0, targetY}, 4.0, lineCol)
+			imgui.DrawList_AddCircleFilled(dl, {targetX1, targetY}, 4.0, lineCol)
+		}
 		// where it would land
 		if dropAt >= 0 && dropAt != L.layerDrag {
 			imgui.SetMouseCursor(.ResizeNS)
@@ -1575,7 +1594,7 @@ level_tab_level :: proc(state: ^EditorState) {
 		autoId := e.LdtkJson_Bool(lv.obj, "useAutoIdentifier")
 		imgui.BeginDisabled(autoId)
 		imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 70)
-		nameEntered := imgui.InputText("##lvl_name", cstring(raw_data(nameBuf[:])), len(nameBuf), {.EnterReturnsTrue})
+		nameEntered := imgui.InputText("##lvl_name", cstring(raw_data(nameBuf[:])), len(nameBuf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit()
 		Drive_Item("level.name")
 		imgui.EndDisabled()
 		level_tip(autoId ? "Automatic: the project's level name pattern (Project tab) - untick Auto to name it yourself" : "The level's identifier (unique; Enter applies)", "tab.level")
@@ -1609,7 +1628,7 @@ level_tab_level :: proc(state: ^EditorState) {
 		level_tip("Its place in the world, in pixels (drag or type; linear layouts place levels themselves)", "tab.level")
 		UI_PropLabel("Size (px)")
 		sizeEdit := [2]i32{i32(s.x), i32(s.y)}
-		entered := imgui.InputInt2("##lvl_size", &sizeEdit, {.EnterReturnsTrue})
+		entered := imgui.InputInt2("##lvl_size", &sizeEdit) || imgui.IsItemDeactivatedAfterEdit()
 		Drive_Item("level.size")
 		level_tip("Width, height in pixels (Enter applies; resized from the top-left - drag the handles around the level for the other sides)", "level.resize")
 		if entered && sizeEdit.x > 0 && sizeEdit.y > 0 && (int(sizeEdit.x) != s.x || int(sizeEdit.y) != s.y) {
@@ -1761,7 +1780,7 @@ level_entity_inspector :: proc(state: ^EditorState) {
 		size := [2]i32{i32(e.LdtkJson_Int(ent, "width", 16)), i32(e.LdtkJson_Int(ent, "height", 16))}
 		resizable := ed != nil && (e.LdtkJson_Bool(ed.obj, "resizableX") || e.LdtkJson_Bool(ed.obj, "resizableY"))
 		if !resizable do imgui.BeginDisabled(true)
-		if imgui.InputInt2("##ent_size", &size, {.EnterReturnsTrue}) && size.x > 0 && size.y > 0 {
+		if (imgui.InputInt2("##ent_size", &size) || imgui.IsItemDeactivatedAfterEdit()) && size.x > 0 && size.y > 0 {
 			e.Ldtk_Doc_Checkpoint(doc, L.level, "Resize Entity")
 			r := e.Ldtk_Doc_EntityRect(ent)
 			e.Ldtk_Doc_ResizeEntityAround(doc, L.level, L.selEntityLayer, ent, e.Ldtk_Doc_ConstrainEntitySize(doc, e.LdtkJson_Int(ent, "defUid", -1), {int(size.x), int(size.y)}, {r[2], r[3]}))

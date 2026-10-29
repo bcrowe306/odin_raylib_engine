@@ -170,7 +170,7 @@ prop_opt_int :: proc(label, id: string, obj: ^e.LdtkJson, key: string, tip, topi
 	buf: [32]u8
 	cur := e.LdtkJson_Get(obj, key)
 	if cur != nil && cur.kind == .Number do copy(buf[:31], fmt.tprintf("%v", cur.num))
-	entered := imgui.InputTextWithHint(fmt.ctprintf("##%s", id), "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue, .CharsScientific})
+	entered := imgui.InputTextWithHint(fmt.ctprintf("##%s", id), "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue, .CharsScientific}) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(id)
 	level_tip(tip, topic)
 	if !entered do return false
@@ -230,7 +230,7 @@ prop_tags :: proc(label, id: string, obj: ^e.LdtkJson, key: string, tip, topic: 
 	}
 	buf: [256]u8
 	copy(buf[:255], strings.to_string(cur))
-	entered := imgui.InputTextWithHint(fmt.ctprintf("##%s", id), "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue})
+	entered := imgui.InputTextWithHint(fmt.ctprintf("##%s", id), "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(id)
 	level_tip(tip, topic)
 	if !entered do return false
@@ -311,7 +311,7 @@ entity_form :: proc(state: ^EditorState, uid: int) {
 			}
 			buf: [256]u8
 			copy(buf[:255], strings.to_string(b))
-			if imgui.InputText("##etags", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+			if imgui.InputText("##etags", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 				defs_checkpoint("Entity Tags")
 				tags := e.LdtkJson_New(.Array, a)
 				for t in strings.split(string(cstring(raw_data(buf[:]))), ",", context.temp_allocator) {
@@ -325,14 +325,14 @@ entity_form :: proc(state: ^EditorState, uid: int) {
 		}
 		UI_PropLabel("Size")
 		size := [2]i32{i32(ed.size.x), i32(ed.size.y)}
-		if imgui.InputInt2("##esize", &size, {.EnterReturnsTrue}) && size.x > 0 && size.y > 0 {
+		if (imgui.InputInt2("##esize", &size) || imgui.IsItemDeactivatedAfterEdit()) && size.x > 0 && size.y > 0 {
 			defs_checkpoint("Entity Size")
 			e.LdtkJson_SetInt(obj, "width", int(size.x), a)
 			e.LdtkJson_SetInt(obj, "height", int(size.y), a)
 			changed = true
 		}
 		Drive_Item("defs.entity.size")
-		level_tip("Width, height in pixels (Enter applies)", "tab.entities")
+		level_tip("Width, height in pixels", "tab.entities")
 		changed |= prop_bool("Resizable X", "defs.entity.resizex", obj, "resizableX", "Instances can be resized horizontally (the corner handle)", "tab.entities")
 		changed |= prop_bool("Resizable Y", "defs.entity.resizey", obj, "resizableY", "Instances can be resized vertically", "tab.entities")
 		if e.LdtkJson_Bool(obj, "resizableX") || e.LdtkJson_Bool(obj, "resizableY") {
@@ -359,13 +359,53 @@ entity_form :: proc(state: ^EditorState, uid: int) {
 		if imgui.IsItemDeactivated() do e.Ldtk_Doc_EndCoalesce(doc)
 		level_tip("Its colour in the editor (fields can override it: smart colour)", "tab.entities")
 		changed |= prop_enum("Render", "defs.entity.render", obj, "renderMode", ENTITY_RENDER_MODES[:], ENTITY_RENDER_MODES[:], "How the editor draws it: a rectangle, an ellipse, its tile, a cross", "tab.entities")
-		UI_PropLabel("Tile")
-		if ed.tileRect[2] > 0 {
-			if ptr := level_texture_ptr(ed.tilesetUid); ptr != nil {
-				tw, th := f32(ptr.width), f32(ptr.height)
-				imgui.Image(transmute(imgui.TextureID)ptr, {24, 24}, {f32(ed.tileRect[0]) / tw, f32(ed.tileRect[1]) / th}, {f32(ed.tileRect[0] + ed.tileRect[2]) / tw, f32(ed.tileRect[1] + ed.tileRect[3]) / th})
-				imgui.SameLine()
+		UI_PropLabel("Tileset")
+		{
+			names := make([]string, len(doc.tilesets) + 1, context.temp_allocator)
+			names[0] = "No tileset"
+			cur := 0
+			for ts, i in doc.tilesets {
+				names[i + 1] = ts.identifier
+				if ts.uid == ed.tilesetUid do cur = i + 1
 			}
+			if pick, ch := UI_Combo("defs.entity.tileset", cur, names); ch {
+				defs_checkpoint("Entity Tileset")
+				if pick == 0 {
+					e.Ldtk_Doc_SetEntityTile(doc, uid, -1, {})
+				} else {
+					ts := doc.tilesets[pick - 1]
+					rect := ed.tileRect[2] > 0 ? ed.tileRect : [4]int{0, 0, ts.gridSize, ts.gridSize}
+					e.Ldtk_Doc_SetEntityTile(doc, uid, ts.uid, rect)
+				}
+				changed = true
+			}
+			level_tip("The tileset this entity's tile/icon comes from", "tab.entities")
+		}
+		UI_PropLabel("Tile")
+		activeTs := ed.tilesetUid >= 0 ? ed.tilesetUid : (len(doc.tilesets) > 0 ? doc.tilesets[0].uid : -1)
+		if activeTs >= 0 {
+			ts := e.Ldtk_Doc_Tileset(doc, activeTs)
+			if ed.tileRect[2] > 0 && ed.tilesetUid == activeTs {
+				if ptr := level_texture_ptr(ed.tilesetUid); ptr != nil {
+					tw, th := f32(ptr.width), f32(ptr.height)
+					if imgui.ImageButton("##enttileimg", transmute(imgui.TextureID)ptr, {24, 24}, {f32(ed.tileRect[0]) / tw, f32(ed.tileRect[1]) / th}, {f32(ed.tileRect[0] + ed.tileRect[2]) / tw, f32(ed.tileRect[1] + ed.tileRect[3]) / th}) {
+						imgui.OpenPopup("##enttilepick")
+					}
+					level_tip("Click to pick another tile from this tileset", "tab.entities")
+					imgui.SameLine()
+				}
+			}
+			if UI_Button("Pick tile...", "defs.entity.tile.pick") {
+				imgui.OpenPopup("##enttilepick")
+			}
+			level_tip("Pick a tile from the selected tileset", "tab.entities")
+			if tid, ok := tile_pick_popup("##enttilepick", activeTs); ok && ts != nil {
+				src := e.Ldtk_Doc_TileSrc(ts, tid)
+				defs_checkpoint("Entity Tile")
+				e.Ldtk_Doc_SetEntityTile(doc, uid, activeTs, {int(src.x), int(src.y), ts.gridSize, ts.gridSize})
+				changed = true
+			}
+			imgui.SameLine()
 		}
 		if UI_Button("Use picked tile", "defs.entity.tile") {
 			if ts, rect, ok := picked_tile_rect(); ok {
@@ -389,7 +429,7 @@ entity_form :: proc(state: ^EditorState, uid: int) {
 				nb := e.LdtkJson_Arr(obj, "nineSliceBorders")
 				v := [4]i32{}
 				for x, i in nb do if i < 4 do v[i] = i32(x.num)
-				if imgui.InputInt4("##nine", &v, {.EnterReturnsTrue}) {
+				if imgui.InputInt4("##nine", &v) || imgui.IsItemDeactivatedAfterEdit() {
 					defs_checkpoint("9-slice Borders")
 					arr := e.LdtkJson_New(.Array, a)
 					for x in v do append(&arr.items, e.LdtkJson_NewInt(int(max(x, 0)), a))
@@ -406,7 +446,7 @@ entity_form :: proc(state: ^EditorState, uid: int) {
 		changed |= prop_bool("Show name", "defs.entity.showname", obj, "showName", "Its name above it in the canvas", "tab.entities", true)
 		UI_PropLabel("Max count")
 		mc := i32(e.LdtkJson_Int(obj, "maxCount"))
-		if imgui.InputInt("##maxcount", &mc, 1, 1, {.EnterReturnsTrue}) && mc >= 0 {
+		if (imgui.InputInt("##maxcount", &mc, 1, 1) || imgui.IsItemDeactivatedAfterEdit()) && mc >= 0 {
 			defs_checkpoint("Max Count")
 			e.LdtkJson_SetInt(obj, "maxCount", int(mc), a)
 			changed = true
@@ -625,7 +665,7 @@ field_form :: proc(state: ^EditorState, fd: ^e.LdtkJson) {
 		text, isNull := e.Ldtk_Doc_FieldDefault(doc, fd)
 		buf: [256]u8
 		if !isNull do copy(buf[:255], text)
-		if imgui.InputTextWithHint("##fdefault", isNull ? "(none)" : "", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+		if imgui.InputTextWithHint("##fdefault", isNull ? "(none)" : "", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 			defs_checkpoint("Field Default")
 			if !e.Ldtk_Doc_FieldDefDefaultSet(doc, fd, string(cstring(raw_data(buf[:])))) do Editor_Log(state, .Warn, "That default doesn't fit the field")
 		}
@@ -649,7 +689,7 @@ field_form :: proc(state: ^EditorState, fd: ^e.LdtkJson) {
 		}
 		buf: [256]u8
 		copy(buf[:255], strings.to_string(b))
-		if imgui.InputTextWithHint("##ftypes", "any file", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+		if imgui.InputTextWithHint("##ftypes", "any file", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 			defs_checkpoint("File Types")
 			arr := e.LdtkJson_New(.Array, a)
 			for t in strings.split(string(cstring(raw_data(buf[:]))), ",", context.temp_allocator) do if c := strings.trim_space(t); c != "" do append(&arr.items, e.LdtkJson_NewString(c, a))
@@ -703,7 +743,7 @@ field_form :: proc(state: ^EditorState, fd: ^e.LdtkJson) {
 			}
 			buf: [256]u8
 			copy(buf[:255], strings.to_string(b))
-			if imgui.InputText("##reftags", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+			if imgui.InputText("##reftags", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 				defs_checkpoint("Reference Tags")
 				arr := e.LdtkJson_New(.Array, a)
 				for t in strings.split(string(cstring(raw_data(buf[:]))), ",", context.temp_allocator) do if c := strings.trim_space(t); c != "" do append(&arr.items, e.LdtkJson_NewString(c, a))

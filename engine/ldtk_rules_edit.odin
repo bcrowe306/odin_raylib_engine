@@ -643,3 +643,68 @@ Ldtk_Doc_RuleMatchCells :: proc(doc: ^Ldtk_Doc, li: int, ruleUid: int, allocator
 	ldtk_rule_cells(doc, lv, ly, ruleUid, &out)
 	return out[:]
 }
+
+// Ldtk_Doc_SyncRuleGroupsFromIntGrid syncs rule groups in layerUid from its source IntGrid groups (or values).
+Ldtk_Doc_SyncRuleGroupsFromIntGrid :: proc(doc: ^Ldtk_Doc, layerUid: int) -> int {
+	di := Ldtk_Doc_LayerDefIndex(doc, layerUid)
+	if di < 0 do return 0
+	d := &doc.layerDefs[di]
+	srcUid := layerUid
+	if d.type == .AutoLayer {
+		srcUid = LdtkJson_Int(d.obj, "autoSourceLayerDefUid", -1)
+		if srcUid < 0 do return 0
+	}
+	sdi := Ldtk_Doc_LayerDefIndex(doc, srcUid)
+	if sdi < 0 do return 0
+	sd := &doc.layerDefs[sdi]
+	if sd.type != .IntGrid do return 0
+
+	created := 0
+	intGroups := LdtkJson_Arr(sd.obj, "intGridValuesGroups")
+	if len(intGroups) > 0 {
+		for g in intGroups {
+			name := LdtkJson_Str(g, "identifier")
+			if name == "" do name = fmt.tprintf("Group %d", LdtkJson_Int(g, "uid"))
+			color := LdtkJson_Str(g, "color")
+			found := false
+			for rg in d.groups {
+				if rg.name == name {
+					found = true
+					if color != "" do Ldtk_Doc_SetRuleGroupColor(doc, rg.uid, color)
+					break
+				}
+			}
+			if !found {
+				guid := Ldtk_Doc_AddRuleGroup(doc, layerUid, name)
+				if color != "" do Ldtk_Doc_SetRuleGroupColor(doc, guid, color)
+				created += 1
+			}
+		}
+	} else {
+		vals := LdtkJson_Arr(sd.obj, "intGridValues")
+		for v in vals {
+			name := LdtkJson_Str(v, "identifier")
+			val := LdtkJson_Int(v, "value")
+			if name == "" do name = fmt.tprintf("Value %d", val)
+			color := LdtkJson_Str(v, "color")
+			found := false
+			for rg in d.groups {
+				if rg.name == name {
+					found = true
+					if color != "" do Ldtk_Doc_SetRuleGroupColor(doc, rg.uid, color)
+					break
+				}
+			}
+			if !found {
+				guid := Ldtk_Doc_AddRuleGroup(doc, layerUid, name)
+				if color != "" do Ldtk_Doc_SetRuleGroupColor(doc, guid, color)
+				created += 1
+			}
+		}
+	}
+	if created > 0 {
+		Ldtk_Doc_RefreshDefs(doc)
+		Ldtk_Doc_Touch(doc)
+	}
+	return created
+}

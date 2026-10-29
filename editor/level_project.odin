@@ -83,7 +83,7 @@ LevelProject_Page :: proc(state: ^EditorState) {
 			if e.LdtkJson_Bool(root, "backupOnSave") {
 				UI_PropLabel("Backups kept")
 				lim := i32(e.LdtkJson_Int(root, "backupLimit", 10))
-				if imgui.InputInt("##blimit", &lim, 1, 5, {.EnterReturnsTrue}) {
+				if imgui.InputInt("##blimit", &lim, 1, 5) || imgui.IsItemDeactivatedAfterEdit() {
 					defs_checkpoint("Backup Limit")
 					e.LdtkJson_SetInt(root, "backupLimit", int(clamp(lim, 3, 50)), a)
 					e.Ldtk_Doc_Touch(doc)
@@ -149,7 +149,7 @@ LevelProject_Page :: proc(state: ^EditorState) {
 				buf: [256]u8
 				pat := e.LdtkJson_Str(root, "pngFilePattern")
 				copy(buf[:255], pat != "" ? pat : e.Ldtk_Doc_DefaultPngPattern(doc))
-				if imgui.InputText("##pngpat", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+				if imgui.InputText("##pngpat", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 					t := strings.trim_space(string(cstring(raw_data(buf[:]))))
 					defs_checkpoint("PNG File Names")
 					if t == "" || t == e.Ldtk_Doc_DefaultPngPattern(doc) do e.LdtkJson_SetNull(root, "pngFilePattern", a)
@@ -190,7 +190,7 @@ LevelProject_Page :: proc(state: ^EditorState) {
 					buf: [512]u8
 					copy(buf[:511], e.LdtkJson_Str(c, "command"))
 					imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 210)
-					if imgui.InputTextWithHint("##cmd", "command and arguments", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+					if imgui.InputTextWithHint("##cmd", "command and arguments", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 						defs_checkpoint("Custom Command")
 						e.LdtkJson_SetStr(c, "command", string(cstring(raw_data(buf[:]))), a)
 						e.Ldtk_Doc_Touch(doc)
@@ -300,7 +300,7 @@ LevelProject_Page :: proc(state: ^EditorState) {
 		if UI_SectionHeader("Defaults") && UI_BeginProps("##proj_defaults") {
 			UI_PropLabel("Grid size")
 			g := i32(e.LdtkJson_Int(root, "defaultGridSize", 16))
-			if imgui.InputInt("##pgrid", &g, 1, 8, {.EnterReturnsTrue}) && g > 0 {
+			if (imgui.InputInt("##pgrid", &g, 1, 8) || imgui.IsItemDeactivatedAfterEdit()) && g > 0 {
 				defs_checkpoint("Default Grid")
 				e.LdtkJson_SetInt(root, "defaultGridSize", int(clamp(g, 1, 1024)), a)
 				e.Ldtk_Doc_Touch(doc)
@@ -378,11 +378,11 @@ LevelProject_Page :: proc(state: ^EditorState) {
 project_pair :: proc(id: string, v: ^[2]i32) -> bool {
 	w := (imgui.GetContentRegionAvail().x - 4) * 0.5
 	imgui.SetNextItemWidth(w)
-	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0, {.EnterReturnsTrue})
+	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(fmt.tprintf("%s.x", id))
 	imgui.SameLine(0, 4)
 	imgui.SetNextItemWidth(w)
-	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0, {.EnterReturnsTrue})
+	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(fmt.tprintf("%s.y", id))
 	return a || b
 }
