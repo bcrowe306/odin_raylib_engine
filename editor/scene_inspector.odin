@@ -552,6 +552,13 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 		if hier_menu(ICON_FA_PUZZLE_PIECE, "Save as Custom Node...", "save-custom-node", node.customType == "") do CustomNodeDialog_OpenFromNode(state, node)
 		UI_Tooltip("A node type of your own from this node: its type, values and script (Add Node lists it); it becomes one")
 	}
+	if node.customType != "" && !node.customMissing && Editor_IsCustomNodeDoc(state, state.activeScene) {
+		if hier_menu(ICON_FA_SHUFFLE, "Change Base Type...", "rebase-custom-node") do CustomNodeRebase_Open(state, node.customType)
+	}
+	if node.customType != "" && !node.customMissing && !Editor_IsCustomNodeDoc(state, state.activeScene) {
+		if hier_menu(ICON_FA_PEN_TO_SQUARE, fmt.tprintf("Edit the %s Type", e.Node_ClassName(node)), "edit-custom-type") do Editor_OpenCustomNodeType(state, node.customType)
+		UI_Tooltip("Its type's default values (every node of it that doesn't change them follows)")
+	}
 	imgui.Separator()
 	if cam := Editor_SceneCamera(state); cam != nil && node.typeId != e.CameraNode && !node.transient {
 		following := cam.followTarget != "" && e.Node_ResolvePath(state.activeScene.manager, cam, cam.followTarget) == node

@@ -142,6 +142,10 @@ Editor_SaveAsActive :: proc(state: ^EditorState) {
 	}
 	scene := state.activeScene
 	if scene == nil do return
+	if Editor_IsCustomNodeDoc(state, scene) {
+		CustomNodeDialog_Open(state, scene.filePath) // (another type: based on this one)
+		return
+	}
 	if Editor_IsComponentDoc(state, scene) {
 		Prompt_Open(.SaveComponentAs, fmt.tprintf("%s_copy", filepath.stem(filepath.stem(scene.filePath))))
 		return
@@ -231,7 +235,9 @@ Editor_RevertScene :: proc(state: ^EditorState) {
 		return
 	}
 	Editor_RecordUndo(state, "Revert")
-	if Editor_IsComponentDoc(state, scene) {
+	if Editor_IsCustomNodeDoc(state, scene) {
+		Editor_RevertCustomNodeDoc(state, scene)
+	} else if Editor_IsComponentDoc(state, scene) {
 		e.Scene_Unload(scene, &state.game.gameContext)
 		node := e.Scene_InstantiateNodeFromJSON(scene, data, scene.rootNode, &state.game.gameContext)
 		if node != nil do node.position = {0, 0}

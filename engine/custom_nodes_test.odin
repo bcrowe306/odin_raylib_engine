@@ -305,3 +305,69 @@ test_custom_node_from_node :: proc(t: ^testing.T) {
 	a, _ := ScriptInstance_GetProperty(cast(^ScriptInstance)made.scriptInstance, "armor")
 	testing.expect_value(t, a.valFloat, 2)
 }
+
+// #155: a type's file changing (edited, undone) after its nodes were built:
+// they don't pin the old values when saved, and a refresh gives them the
+// new ones - except what each node changed.
+@(test)
+test_custom_node_type_changes_under_nodes :: proc(t: ^testing.T) {
+	game, scene := cn_setup("changes")
+	defer cn_teardown(game)
+	ctx := &game.gameContext
+	h := CustomNode_FindByName(ctx, "Hurtbox")
+	a := Scene_CreateCustomNode(scene, h, nil, ctx)
+	b := Scene_CreateCustomNode(scene, h, nil, ctx)
+	ProcessNodeQueues(scene.manager, ctx)
+	a.name, b.name = "Plain", "Own"
+	(cast(^AreaNode)b).shapes[0].size = {70, 70}
+
+	// The file changes (the registry forgets: read again).
+	changed, _ := strings.replace(HURTBOX_DEF, "[32, 32]", "[48, 48]", 1, context.temp_allocator)
+	changed, _ = strings.replace(changed, `"max_health": 5`, `"max_health": 8`, 1, context.temp_allocator)
+	cn_write("nodes/Hurtbox.node.json", changed)
+	CustomNodes_Forget()
+	saved := Scene_SerializeToJSON(scene, context.temp_allocator)
+	pt := node_text(saved, "Plain")
+	testing.expectf(t, !strings.contains(pt, "shapes") && !strings.contains(pt, "script"), "the old values aren't pinned: %s", pt)
+
+	// Refreshed: the new values, B's own shape kept.
+	n := Scene_RefreshCustomNodes(scene, "nodes/Hurtbox.node.json", ctx)
+	testing.expect_value(t, n, 2)
+	ra, rb := cn_find(scene, "Plain"), cn_find(scene, "Own")
+	if !testing.expect(t, ra != nil && rb != nil, "rebuilt") do return
+	testing.expect_value(t, (cast(^AreaNode)ra).shapes[0].size, [2]f32{48, 48})
+	testing.expect_value(t, (cast(^AreaNode)rb).shapes[0].size, [2]f32{70, 70})
+	mh, _ := ScriptInstance_GetProperty(cast(^ScriptInstance)ra.scriptInstance, "max_health")
+	testing.expect_value(t, mh.valFloat, 8)
+
+	// A type's document: the defaults relative to its parent type.
+	cn_write("nodes/Boss.node.json", `{"name": "Boss", "inherits": "nodes/Hurtbox.node.json", "defaults": {"layer": 4}}`)
+	CustomNodes_Forget()
+	boss := CustomNode_FindByName(ctx, "Boss")
+	bn := Scene_CreateCustomNode(scene, boss, nil, ctx)
+	ProcessNodeQueues(scene.manager, ctx)
+	bn.renderable = false
+	parent, _ := CustomNode_Get(ctx, boss.inherits)
+	d := CustomNode_DefaultsFromNode(bn, scene.manager, context.temp_allocator, parent)
+	testing.expectf(t, strings.contains(d, `"layer": 4`) && strings.contains(d, `"visible": false`), "its own values: %s", d)
+	testing.expectf(t, !strings.contains(d, "shapes") && !strings.contains(d, "max_health"), "not the parent's: %s", d)
+}
+
+// #155: a type's base changed - its values for the new base, and what
+// doesn't carry over.
+@(test)
+test_custom_node_rebase :: proc(t: ^testing.T) {
+	game, _ := cn_setup("rebase")
+	defer cn_teardown(game)
+	ctx := &game.gameContext
+	cn_write("nodes/Glow.node.json", `{"name": "Glow", "base": "AreaNode", "defaults": {"layer": 2, "shapes": [{"type": "Box", "size": [20, 20]}]}}`)
+	glow := CustomNode_FindByName(ctx, "Glow")
+	if !testing.expect(t, glow != nil, "type") do return
+	defaults, dropped := CustomNode_Rebase(glow, "StaticBodyNode", ctx, context.temp_allocator)
+	testing.expectf(t, strings.contains(defaults, `"shapes"`) && strings.contains(defaults, `"layer": 2`), "a body keeps the shape and the layer: %s", defaults)
+	defaults, dropped = CustomNode_Rebase(glow, "TimerNode", ctx, context.temp_allocator)
+	testing.expectf(t, !strings.contains(defaults, "shapes") && strings.contains(defaults, `"layer": 2`), "a timer: the layer only: %s", defaults)
+	found := false
+	for d in dropped do if d == "shapes" do found = true
+	testing.expectf(t, found, "the shapes are dropped: %v", dropped)
+}

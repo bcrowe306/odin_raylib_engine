@@ -1,0 +1,40 @@
+# #155: a custom node type opened as a document (the hierarchy's Edit the
+# Type), a default changed there and saved: the type's file has it, the
+# scene's nodes that didn't change it follow, and HurtB keeps its own armor.
+wait 5
+exec mkdir -p $PROJECT/nodes
+exec cp tests/drive/fixtures/HurtboxZz.node.json $PROJECT/nodes/HurtboxZz.node.json
+exec cp tests/drive/fixtures/custom_hurtbox_zz.lua $PROJECT/scripts/custom_hurtbox_zz.lua
+exec cp tests/drive/fixtures/custom_nodes_zz.scene.json $PROJECT/scenes/custom_nodes_zz.scene.json
+wait-until item:asset:scenes/custom_nodes_zz.scene.json == visible timeout=300
+dblclick @asset:scenes/custom_nodes_zz.scene.json
+wait 10
+expect node:HurtA.script.max_health == 5
+rclick @hier:HurtA
+click @ctx:edit-custom-type
+wait 10
+expect node:HurtboxZz.class == HurtboxZz
+expect item:scenetab:nodes/HurtboxZz.node.json == visible
+screenshot type_doc
+dblclick @insp.script:max_health
+key ctrl+a
+type 9
+key enter
+wait 2
+click @toolbar.save
+wait 10
+expect file:nodes/HurtboxZz.node.json contains "max_health": 9
+expect file:nodes/HurtboxZz.node.json contains "category": "Combat"
+expect file:nodes/HurtboxZz.node.json contains "shapes"
+click @scenetab:scenes/custom_nodes_zz.scene.json
+wait 10
+expect node:HurtA.script.max_health == 9
+expect node:HurtB.script.max_health == 9
+expect node:HurtB.script.armor == 3
+screenshot scene_after
+
+# Undo puts the type's file back, and the nodes with it.
+key ctrl+z
+wait 10
+expect file:nodes/HurtboxZz.node.json contains "max_health": 5
+expect node:HurtA.script.max_health == 5

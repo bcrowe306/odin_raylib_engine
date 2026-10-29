@@ -18,7 +18,7 @@ import imgui "lib/imgui"
 // Editor_ComponentDocRoot: the component's node in a component document
 // (nil: not one).
 Editor_ComponentDocRoot :: proc(state: ^EditorState, scene: ^e.Scene) -> ^e.Node {
-	if !Editor_IsComponentDoc(state, scene) do return nil
+	if !Editor_IsComponentDoc(state, scene) || Editor_IsCustomNodeDoc(state, scene) do return nil
 	kids := e.GetChildrenView(scene.manager, scene.rootNode)
 	return kids[0] if len(kids) > 0 else nil
 }
