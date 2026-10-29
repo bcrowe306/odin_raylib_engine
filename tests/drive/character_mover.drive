@@ -34,3 +34,12 @@ wait 20
 expect log !contains Error in scripts/drive_hero.lua
 click @menu:Game
 click @menu:Game/Simulate in Editor
+
+# #98: the mover draws the shape it has (a box here), not always a capsule.
+click @hier:DriveHero
+click @insp.shape0.type
+click @pick:Box
+expect shape:DriveHero:0:type == Box
+key ctrl+1
+wait 2
+screenshot box_shape

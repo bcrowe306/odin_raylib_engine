@@ -339,7 +339,7 @@
       "aliases": ["area"],
       "hasOrigin": false,
       "properties": [
-        {"name": "monitoring", "kind": "boolean", "owner": "AreaNode", "default": true, "doc": "Detect overlapping bodies and emit body_entered / body_exited events."},
+        {"name": "monitoring", "kind": "boolean", "owner": "AreaNode", "default": true, "doc": "Detect overlapping bodies and emit body_entered / body_exited. Off: no events or overlaps (a hitbox only others react to); raycasts still find it."},
         {"name": "overlapCount", "kind": "integer", "owner": "AreaNode", "default": 0, "min": 0, "max": 100, "runtime": true, "doc": "Bodies overlapping now."},
         {"name": "hasOverlaps", "kind": "boolean", "owner": "AreaNode", "default": false, "runtime": true, "doc": "Anything overlapping now."},
         {"name": "debugColor", "kind": "color", "owner": "AreaNode", "default": "#a855f7ff", "doc": "Outline colour when nothing overlaps."},

@@ -225,4 +225,17 @@ test_kinematic_body_and_monitoring :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(area.overlappingNodes), 0)
 	testing.expect_value(t, ray.isColliding, false)
 	testing.expect_value(t, ray.hitNode, nil)
+
+	// An area that doesn't monitor (a quiet hitbox) is still a shape:
+	// a raycast that collides with sensors finds it.
+	seer := RaycastNode_Create(scene, "SensorSeer")
+	seer.position = {700, 230}
+	seer.direction = {0, 1}
+	seer.length = 60
+	seer.collideWithSensors = true
+	seer.gameContext = &game.gameContext
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	for _ in 0 ..< 3 do game->run(1.0 / 60.0)
+	testing.expect_value(t, len(area.overlappingNodes), 0)
+	testing.expect_value(t, seer.hitNode, cast(^Node)area)
 }

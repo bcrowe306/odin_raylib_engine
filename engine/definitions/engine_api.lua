@@ -2234,7 +2234,7 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
----@field monitoring boolean Detect overlapping bodies and emit body_entered / body_exited events.
+---@field monitoring boolean Detect overlapping bodies and emit body_entered / body_exited. Off: no events or overla...
 ---@field overlapCount integer Bodies overlapping now.
 ---@field hasOverlaps boolean Anything overlapping now.
 ---@field debugColor number[] Outline colour when nothing overlaps.
@@ -2251,7 +2251,7 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
----| "monitoring" # boolean - Detect overlapping bodies and emit body_entered / body_exited events.
+---| "monitoring" # boolean - Detect overlapping bodies and emit body_entered / body_exited. Off: no events or overla...
 ---| "overlapCount" # integer (runtime) - Bodies overlapping now.
 ---| "hasOverlaps" # boolean (runtime) - Anything overlapping now.
 ---| "debugColor" # number[] - Outline colour when nothing overlaps.

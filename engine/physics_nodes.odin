@@ -948,7 +948,6 @@ CharacterMoverNode_MoveAndSlide :: proc(cm: ^CharacterMoverNode, gameContext: ^G
 			cm.floorNormal = n
 		case n.y > 0.5:
 			cm.isOnCeiling = true
-			cm.floorNormal = cm.floorNormal
 		case:
 			cm.isOnWall = true
 			cm.wallNormal = n
@@ -1041,7 +1040,11 @@ AreaNode :: struct {
 	using node: Node,
 	bodyId: b2.BodyId,
 	shapes: [dynamic]PhysicsShape,
+	// Reports bodies entering / leaving (false: no body_entered / body_exited,
+	// no overlaps - a hitbox that only others react to). It stays a shape
+	// raycasts and queries can find.
 	monitoring: bool `gui:"true"`,
+	monitoringApplied: bool,
 	overlappingNodes: [dynamic]^Node,
 	overlappingCounts: [dynamic]int,
 	overlapCount: int `gui:"true" min:"0" max:"100" save:"false"`,
@@ -1078,19 +1081,37 @@ AreaNode_Create :: proc(scene: ^Scene, name: string = "Area", parent: ^Node = ni
 AreaNode_SetMonitoring :: proc(area: ^AreaNode, enabled: bool) {
 	if area == nil do return
 	area.monitoring = enabled
-	if !enabled {
+	area_apply_monitoring(area)
+}
+
+// area_apply_monitoring: the shapes' sensor events follow `monitoring`.
+// Turned off, the overlaps are forgotten (no body_exited for them); turned
+// on, the bodies already inside enter now (Box2D keeps tracking overlaps
+// without events, so it won't report them).
+@(private = "file")
+area_apply_monitoring :: proc(area: ^AreaNode) {
+	if !area.monitoring {
 		clear(&area.overlappingNodes)
 		clear(&area.overlappingCounts)
 		area.overlapCount = 0
 		area.hasOverlaps = false
-		if b2.Body_IsValid(area.bodyId) && b2.Body_IsEnabled(area.bodyId) {
-			b2.Body_Disable(area.bodyId)
-		}
-	} else if area.enabled {
-		if b2.Body_IsValid(area.bodyId) && !b2.Body_IsEnabled(area.bodyId) {
-			b2.Body_Enable(area.bodyId)
+	}
+	for &shape in area.shapes {
+		shape.enableSensorEvents = area.monitoring
+		if !b2.Shape_IsValid(shape.shapeId) do continue
+		b2.Shape_EnableSensorEvents(shape.shapeId, area.monitoring)
+		if !area.monitoring || !area.enabled do continue
+		capacity := b2.Shape_GetSensorCapacity(shape.shapeId)
+		if capacity <= 0 do continue
+		overlaps := make([]b2.ShapeId, capacity, context.temp_allocator)
+		n := b2.Shape_GetSensorOverlaps(shape.shapeId, raw_data(overlaps), capacity)
+		for visitor in overlaps[:n] {
+			if !b2.Shape_IsValid(visitor) do continue
+			body := b2.Shape_GetBody(visitor)
+			if b2.Body_IsValid(body) do AreaNode_HandleEnter(area, cast(^Node)b2.Body_GetUserData(body), area.gameContext)
 		}
 	}
+	area.monitoringApplied = area.monitoring
 }
 
 AreaNode_IsMonitoring :: proc(area: ^AreaNode) -> bool {
@@ -1117,18 +1138,17 @@ AreaNode_EnsureBody :: proc(area: ^AreaNode, gameContext: ^GameContext) {
 
 	for &shape in area.shapes {
 		shape.isSensor = true
-		shape.enableSensorEvents = true
+		shape.enableSensorEvents = area.monitoring
 		PhysicsShape_AttachToBody(&shape, area.bodyId, cast(rawptr)(cast(^Node)area), area.globalScale)
 	}
-	if !area.enabled || !area.monitoring {
-		b2.Body_Disable(area.bodyId)
-	}
+	area.monitoringApplied = area.monitoring
+	if !area.enabled do b2.Body_Disable(area.bodyId)
 }
 
 AreaNode_AddShape :: proc(area: ^AreaNode, shape: PhysicsShape, gameContext: ^GameContext = nil) -> ^PhysicsShape {
 	s := shape
 	s.isSensor = true
-	s.enableSensorEvents = true
+	s.enableSensorEvents = area.monitoring
 	if gameContext != nil {
 		AreaNode_EnsureBody(area, gameContext)
 	}
@@ -1226,13 +1246,8 @@ AreaNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) 
 	}
 	area.overlapCount = len(area.overlappingNodes)
 	area.hasOverlaps = area.overlapCount > 0
-	if !area.enabled || !area.monitoring {
-		if !area.monitoring {
-			clear(&area.overlappingNodes)
-			clear(&area.overlappingCounts)
-			area.overlapCount = 0
-			area.hasOverlaps = false
-		}
+	if area.monitoring != area.monitoringApplied do area_apply_monitoring(area) // (set from the Inspector or Lua)
+	if !area.enabled {
 		if b2.Body_IsValid(area.bodyId) && b2.Body_IsEnabled(area.bodyId) {
 			b2.Body_Disable(area.bodyId)
 		}
@@ -1492,9 +1507,7 @@ Node_SetPhysicsEnabled :: proc(node: ^Node, enabled: bool) {
 	} else if node.onDestroy == CharacterMoverNode_Destroy {
 		bodyId = (cast(^CharacterMoverNode)node).bodyId
 	} else if node.onDestroy == AreaNode_Destroy {
-		area := cast(^AreaNode)node
-		if !area.monitoring do return
-		bodyId = area.bodyId
+		bodyId = (cast(^AreaNode)node).bodyId
 	}
 	if b2.Body_IsValid(bodyId) {
 		if enabled && node.enabled {

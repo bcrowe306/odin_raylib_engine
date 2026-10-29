@@ -71,11 +71,6 @@ PhysicsWorld_Step :: proc(pw: ^PhysicsWorld, deltaTime: f32, gameContext: ^GameC
 		return
 	}
 
-	if gameContext != nil && gameContext.scene != nil && gameContext.scene.manager != nil && gameContext.scene.rootNode != nil && gameContext.scene.isLoaded {
-		ProcessNodeQueues(gameContext.scene.manager, gameContext)
-		Scene_CallReady(gameContext.scene, gameContext.scene.rootNode, gameContext)
-	}
-
 	subSteps := c.int(max(pw.subStepCount, 1))
 	b2.World_Step(pw.worldId, deltaTime, subSteps)
 

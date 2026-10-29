@@ -324,7 +324,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"CharacterMoverNode.playerIndex", "Player whose actions drive this mover (1..4; 0 = none / NPC / AI)."},
 	{"CharacterMoverNode.isGrounded", "Standing on something now."},
 	{"CharacterMoverNode.controlMode", "Built-in movement, or Script: the script moves it (character_move_and_slide)."},
-	{"AreaNode.monitoring", "Detect overlapping bodies and emit body_entered / body_exited events."},
+	{"AreaNode.monitoring", "Detect overlapping bodies and emit body_entered / body_exited. Off: no events or overlaps (a hitbox only others react to); raycasts still find it."},
 	{"AreaNode.overlapCount", "Bodies overlapping now."},
 	{"AreaNode.hasOverlaps", "Anything overlapping now."},
 	{"AreaNode.debugColor", "Outline colour when nothing overlaps."},
