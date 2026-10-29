@@ -1,7 +1,6 @@
 package engine
 
 import "core:fmt"
-import "core:math"
 import os "osx"
 import "core:strings"
 import "core:testing"
@@ -17,13 +16,18 @@ gen_parse :: proc(t: ^testing.T, text: string) -> Gen_Graph {
 	return g
 }
 
-// The values of a node's grid as text ("0,1,...", rounded to 2 decimals).
+// The values of a node's grid as text ("0,1,...", to 2 decimals).
 @(private = "file")
 gen_values :: proc(t: ^testing.T, g: ^Gen_Graph, id: int, seed: u64 = 0) -> string {
 	grid, err := Gen_Evaluate(g, id, seed, context.temp_allocator)
 	testing.expectf(t, err == "", "evaluate %d: %s", id, err)
 	parts := make([dynamic]string, context.temp_allocator)
-	for v in grid.v do append(&parts, fmt.tprintf("%v", math.round(v * 100) / 100))
+	for v in grid.v {
+		text := fmt.tprintf("%.2f", v) // (2 decimals, trailing zeros trimmed: "0.5", "1")
+		text = strings.trim_right(text, "0")
+		text = strings.trim_suffix(text, ".")
+		append(&parts, text if text != "-0" && text != "" else "0")
+	}
 	return strings.join(parts[:], ",", context.temp_allocator)
 }
 
