@@ -25,6 +25,7 @@ import rl "vendor:raylib"
 //   "type", "name", "position", "scale", "rotation", "pivot" (the origin, nodes
 //   that draw a rectangle), "enabled", "visible", "layer"
 //   optional: "pause_mode", "paused", "tags", "editor_locked", "editor_hidden" (editor only)
+//   a component's root: "exposed": [{"uid", "property", "label"}] (component_exposed.odin)
 //   "properties": { <reflected gui:"true" fields> }        (see node_properties.odin)
 //   resources by type: "texture"/"origin" (TextureNode), "frames"/"fps"/"loop"/"origin"
 //   (FrameAnimationNode), "audio" (Sound/Music), "timer" {duration, auto_start, loop},
@@ -192,6 +193,9 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 			return
 		}
 	}
+
+	// (A component's root: written with the node, not on an instance's link.)
+	if len(node.componentExposed) > 0 do write_exposed(w, node, &first)
 
 	// Type-specific resources.
 	switch node.typeId {
@@ -902,6 +906,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.editorLocked = sj_bool(obj, "editor_locked", false)
 	node.editorHidden = sj_bool(obj, "editor_hidden", false)
 	read_tags(node, obj)
+	read_exposed(node, obj)
 
 	read_legacy_blocks(node, obj, ctx)
 
@@ -1690,6 +1695,7 @@ Scene_RebuildInstance :: proc(scene: ^Scene, old: ^Node, instJson: string, ctx: 
 Node_UnlinkComponent :: proc(node: ^Node) {
 	node.componentPath = ""
 	node.componentBase = ""
+	node.componentExposed = nil // (an ordinary node now)
 }
 
 // Node_ComponentRoot returns the linked instance a node belongs to (the

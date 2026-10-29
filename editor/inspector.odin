@@ -200,6 +200,8 @@ inspector_body :: proc(state: ^EditorState) {
 
 	imgui.Dummy({0, 4})
 	if isRoot do inspector_scene_settings(state, state.activeScene)
+	Inspector_InstanceSection(state, node) // exposed properties (#85)
+	Inspector_ExposedList(state, node)
 	if !isRoot && UI_SectionHeader("Transform") {
 		if UI_BeginProps("##transform") {
 			// Each field edits every selected node (mixed values show "—").
