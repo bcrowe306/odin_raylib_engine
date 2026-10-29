@@ -225,6 +225,44 @@ void main() {
 		return SHADER_HEADER + `
 void main() { finalColor = texture(texture0, fragTexCoord) * colDiffuse * fragColor; }
 `
+	// Scene transitions (scene_transition.odin): texture0 = the old scene's
+	// frame, new_scene = the new one's; progress 0 (old) .. 1 (new).
+	case "builtin:transition_dissolve":
+		return SHADER_HEADER + `
+uniform float progress;
+uniform vec2 resolution;
+uniform vec4 transition_color;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y);
+}
+void main() {
+    vec2 px = fragTexCoord * resolution;
+    float n = noise(px / 28.0) * 0.7 + noise(px / 6.0) * 0.3;
+    float t = progress * 1.08; // (all of it gone at 1)
+    if (n < t) discard;
+    vec4 c = texture(texture0, fragTexCoord);
+    float edge = 1.0 - smoothstep(t, t + 0.06, n); // a burning rim in the colour
+    finalColor = vec4(mix(c.rgb, transition_color.rgb, edge * transition_color.a * step(0.001, progress)), 1.0);
+}
+`
+	case "builtin:transition_pixelate":
+		return SHADER_HEADER + `
+uniform float progress;
+uniform vec2 resolution;
+uniform sampler2D new_scene;
+void main() {
+    float k = 1.0 - abs(progress * 2.0 - 1.0); // 0 -> 1 (halfway) -> 0
+    float block = max(1.0, floor(k * 48.0));
+    vec2 cell = block / resolution;
+    vec2 uv = (floor(fragTexCoord / cell) + 0.5) * cell;
+    vec4 c = progress < 0.5 ? texture(texture0, uv) : texture(new_scene, uv);
+    finalColor = vec4(c.rgb, 1.0);
+}
+`
 	}
 	return ""
 }
@@ -322,6 +360,14 @@ shader_entry :: proc(path: string, ctx: ^GameContext) -> ^Shader_Entry {
 	}
 	shaderCache[strings.clone(path)] = en
 	return en
+}
+
+// Shader_Get: a shader by path (a project file or "builtin:<name>"), loaded
+// on first use and cached (project files reload when saved).
+Shader_Get :: proc(path: string, ctx: ^GameContext) -> (rl.Shader, bool) {
+	en := shader_entry(path, ctx)
+	if en == nil || !shader_ensure_loaded(en) do return {}, false
+	return en.shader, true
 }
 
 // Shader_Uniforms: the editable uniforms of a shader (for the Inspector).

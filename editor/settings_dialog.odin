@@ -249,6 +249,7 @@ settings_save :: proc(state: ^EditorState) {
 	state.projectConfig = e.ProjectConfig_Clone(d)
 	e.Physics_SetLayerNames(state.projectConfig.collisionLayers[:])
 	state.game.physicsWorld.gravity = d.gravity
+	e.Transition_SetDefault(state.game, d.transition, d.transitionDuration, d.transitionEasing)
 	if d.virtualWidth > 0 do state.game.virtualSize = {d.virtualWidth, d.virtualHeight}
 	state.game.musicVolume = d.musicVolume
 	state.game.sfxVolume = d.sfxVolume
@@ -567,6 +568,50 @@ project_general :: proc(state: ^EditorState) {
 			d.icon = strings.clone(path)
 		}
 		UI_Tooltip("PNG used as the game window's icon and the exported app's (512x512 or 1024x1024 works best)")
+		UI_EndProps()
+	}
+	if UI_SectionHeader("Scene Transitions", false) && UI_BeginProps("##transitions") {
+		// The default for Scene.change_scene(name) without options (and the
+		// options a script leaves out).
+		UI_PropLabel("Default")
+		imgui.SetNextItemWidth(-1)
+		current := d.transition if d.transition != "" else "none"
+		if imgui.BeginCombo("##transition", strings.clone_to_cstring(current == "none" ? "None (change at once)" : current, context.temp_allocator)) {
+			names := make([dynamic]string, context.temp_allocator)
+			append(&names, "none")
+			for k in e.Transition_Kind do if k != .Shader do append(&names, e.TRANSITION_NAMES[k])
+			for n in names {
+				label := "None (change at once)" if n == "none" else n
+				if imgui.Selectable(strings.clone_to_cstring(label, context.temp_allocator), n == current) {
+					delete(d.transition)
+					d.transition = strings.clone(n) if n != "none" else ""
+				}
+				Drive_Item(fmt.tprintf("pick:%s", n))
+			}
+			imgui.EndCombo()
+		}
+		Drive_Item("settings.transition")
+		UI_Tooltip("How Scene.change_scene(name) changes scenes when the script gives no options (a shader file's path works too: type it in project.json)")
+		imgui.BeginDisabled(d.transition == "")
+		UI_PropLabel("Duration")
+		if d.transitionDuration <= 0 do d.transitionDuration = 0.4
+		imgui.DragFloat("##transition_duration", &d.transitionDuration, 0.01, 0.05, 5, "%.2f s")
+		Drive_Item("settings.transition-duration")
+		UI_Tooltip("Seconds: each half of a cover transition (fade, wipe, circle), the whole of the others")
+		UI_PropLabel("Easing")
+		imgui.SetNextItemWidth(-1)
+		easing := d.transitionEasing if d.transitionEasing != "" else "in_out_sine"
+		if imgui.BeginCombo("##transition_easing", strings.clone_to_cstring(easing, context.temp_allocator)) {
+			for ez in e.Ease do if ez != .Constant {
+				n := e.Ease_Name(ez)
+				if imgui.Selectable(strings.clone_to_cstring(n, context.temp_allocator), n == easing) {
+					delete(d.transitionEasing)
+					d.transitionEasing = strings.clone(n)
+				}
+			}
+			imgui.EndCombo()
+		}
+		imgui.EndDisabled()
 		UI_EndProps()
 	}
 	if UI_SectionHeader("Physics") && UI_BeginProps("##physics") {

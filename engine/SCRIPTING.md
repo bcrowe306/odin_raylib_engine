@@ -761,6 +761,8 @@ save files.
 
 ```lua
 Scene.change_scene("level2", {transition = "circle", duration = 0.5})  -- or "fade", "wipe_left", ...
+Scene.change_scene("level2", {transition = "slide_left", easing = "out_cubic"}) -- both scenes on screen
+Scene.register_transition("swirl", "shaders/swirl.fs")  -- your own (a shader)
 Scene.preload("level3")                       -- load its assets a little each frame
 if Scene.preload_progress("level3") >= 1 then ... end
 
@@ -770,7 +772,13 @@ self.node:set_paused(true)                     -- pause just this node and its c
 ```
 
 During a transition the scene switches once its assets are loaded (the
-screen stays covered until then). Preloading loads textures, sounds, music
+screen stays covered until then). Besides the cover transitions (fade,
+wipe_*, circle) there are crossfade, dissolve, pixelate, slide_* and push_*,
+which show the old scene's last frame with the new scene, and shader
+transitions of your own; options for easing, the uncover half and pausing
+meanwhile; events `transition_started` / `_midpoint` / `_finished` on the
+global bus; a project-wide default (Project Settings). Guide:
+[`docs/scene_flow.md`](docs/scene_flow.md). Preloading loads textures, sounds, music
 and fonts - also those of the components the scene uses - within about 4
 ms a frame, and hands them to the scene when it loads. Paused nodes skip
 `update` (scripts, animations, timers, particles, tweens) and their
@@ -1001,6 +1009,18 @@ reuses parked instances; `node:destroy()` on a pooled node returns it.
 Pooled roots' scripts get `on_spawn()` (every take, before the next update)
 and `on_despawn()`. Also `Pool.prewarm`, `Pool.set_max`, `Pool.release`,
 `Pool.stats`. Guide and tutorial: [`docs/pooling.md`](docs/pooling.md).
+
+#### Spawning (SpawnerNode)
+
+A **Spawner** spawns components where it is - its world position, rotation
+and flip, plus offsets - from its list: Single, All, Random (weighted),
+Sequential (loop / ping-pong / stop) or Shuffle. Put it on a player and
+`self.node:get_node("Muzzle"):spawn()` fires from the hand (the bullet goes
+under the scene's root, so it doesn't follow). Also `spawn_at`,
+`spawn_reset`, `spawn_alive_count`, `spawn_entries`, `spawn_add`; Auto
+Spawn, cooldown, chance, max alive, total limit, spread, speed, pooling;
+events `spawned`, `limit_reached`, `list_finished`; a signal can call its
+`spawn` with no script. Node reference: Spawner.
 
 #### Visibility (VisibilityNotifierNode)
 

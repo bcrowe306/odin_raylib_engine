@@ -78,6 +78,9 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "became_active":       return "", "The host camera switched to this advanced camera"
 	case "became_inactive":     return "", "Another advanced camera took over"
 	case "path_looped":        return "", "The follower wrapped round or turned back (Loop / Ping Pong)"
+	case "spawned":            return "node", "The spawner made a node (the spawned root)"
+	case "limit_reached":      return "", "The spawner reached its Total Limit"
+	case "list_finished":      return "", "A Sequential spawner (Stop) spawned its last entry"
 	}
 	return "value", ""
 }
@@ -247,17 +250,43 @@ Signals_Dispatch :: proc(mgr: ^ScriptManager, owner: ^Node, name: string, value:
 	for c in owner.signalConnections do if c.signal == name do append(&conns, Signal_Connection{strings.clone(c.signal, context.temp_allocator), strings.clone(c.target, context.temp_allocator), strings.clone(c.method, context.temp_allocator), c.node})
 	for c in conns {
 		if !Node_IsAlive(owner) do return
-		if c.node != nil {
-			if Node_IsAlive(c.node) do script_call_method(mgr, c.node, c.method, value, owner)
-			continue
-		}
-		target := Node_ResolvePath(nodes, owner, c.target)
+		target := c.node
 		if target == nil {
-			log.warnf("[Signals] %s.%s: target '%s' not found", owner.name, name, c.target)
+			target = Node_ResolvePath(nodes, owner, c.target)
+			if target == nil {
+				log.warnf("[Signals] %s.%s: target '%s' not found", owner.name, name, c.target)
+				continue
+			}
+		} else if !Node_IsAlive(target) {
 			continue
 		}
+		if signals_builtin(mgr, target, c.method, gc) do continue
 		script_call_method(mgr, target, c.method, value, owner)
 	}
+}
+
+// script_has_method: does the node's script define `method`?
+@(private = "file")
+script_has_method :: proc(mgr: ^ScriptManager, target: ^Node, method: string) -> bool {
+	if mgr == nil || mgr.L == nil || target.scriptInstance == nil do return false
+	inst := cast(^ScriptInstance)target.scriptInstance
+	L := mgr.L
+	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef))
+	lua.getfield(L, -1, strings.clone_to_cstring(method, context.temp_allocator))
+	found := lua.type(L, -1) == .FUNCTION
+	lua.pop(L, 2)
+	return found
+}
+
+// signals_builtin: connections to a node's own method, no script needed
+// (a spawner's `spawn` - unless its script defines its own).
+@(private = "file")
+signals_builtin :: proc(mgr: ^ScriptManager, target: ^Node, method: string, ctx: ^GameContext) -> bool {
+	if target.typeId == SpawnerNode && method == "spawn" && !script_has_method(mgr, target, method) {
+		SpawnerNode_Spawn(cast(^SpawnerNode)target, ctx)
+		return true
+	}
+	return false
 }
 
 // Signal_HandlerName: default method name for a connection, Godot style

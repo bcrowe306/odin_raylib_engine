@@ -35,6 +35,11 @@ ProjectConfig :: struct {
 	scenes:        [dynamic]string,
 	icon:          string, // project-relative PNG: the game window's icon (and the exported app's)
 	language:      string, // starting language of the locale/ tables ("" = their first)
+	// The default scene transition (Scene.change_scene without options;
+	// "scene_flow"; scene_transition.odin): "" = changes are at once.
+	transition:         string,
+	transitionDuration: f32,
+	transitionEasing:   string,
 
 	// Video
 	fullscreen:    bool,
@@ -97,6 +102,8 @@ ProjectConfig_Destroy :: proc(cfg: ^ProjectConfig, allocator := context.allocato
 	if cfg.windowTitle != "" do delete(cfg.windowTitle, allocator)
 	if cfg.icon != "" do delete(cfg.icon, allocator)
 	if cfg.language != "" do delete(cfg.language, allocator)
+	if cfg.transition != "" do delete(cfg.transition, allocator)
+	if cfg.transitionEasing != "" do delete(cfg.transitionEasing, allocator)
 	if cfg.mixerBuses != "" do delete(cfg.mixerBuses, allocator)
 	if cfg.accessibility != "" do delete(cfg.accessibility, allocator)
 	for n in cfg.collisionLayers do if n != "" do delete(n, allocator)
@@ -131,6 +138,8 @@ ProjectConfig_Clone :: proc(src: ^ProjectConfig, allocator := context.allocator)
 	c.windowTitle = strings.clone(src.windowTitle, allocator)
 	c.icon = strings.clone(src.icon, allocator)
 	c.language = strings.clone(src.language, allocator)
+	c.transition = strings.clone(src.transition, allocator) if src.transition != "" else ""
+	c.transitionEasing = strings.clone(src.transitionEasing, allocator) if src.transitionEasing != "" else ""
 	c.mixerBuses = strings.clone(src.mixerBuses, allocator) if src.mixerBuses != "" else ""
 	c.accessibility = strings.clone(src.accessibility, allocator) if src.accessibility != "" else ""
 	for n, i in src.collisionLayers do c.collisionLayers[i] = strings.clone(n, allocator) if n != "" else ""
@@ -318,6 +327,11 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 	cfg.initialScene = strings.clone(json_get_string(rootObj, "initial_scene", cfg.initialScene), allocator)
 	cfg.icon = strings.clone(json_get_string(rootObj, "icon", ""), allocator)
 	cfg.language = strings.clone(json_get_string(rootObj, "language", ""), allocator)
+	if flow, ok := json_get_obj(rootObj, "scene_flow"); ok {
+		if t := json_get_string(flow, "transition", ""); t != "" do cfg.transition = strings.clone(t, allocator)
+		cfg.transitionDuration = json_get_float(flow, "duration", 0)
+		if e := json_get_string(flow, "easing", ""); e != "" do cfg.transitionEasing = strings.clone(e, allocator)
+	}
 	cfg.textureImport = make([dynamic]Texture_Import, allocator)
 	texture_imports_read(rootObj, &cfg.textureImport, allocator)
 
@@ -461,6 +475,12 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	strings.write_string(&sb, ",\n  \"initial_scene\": "); jstr(&sb, cfg.initialScene)
 	if cfg.icon != "" {strings.write_string(&sb, ",\n  \"icon\": "); jstr(&sb, cfg.icon)}
 	if cfg.language != "" {strings.write_string(&sb, ",\n  \"language\": "); jstr(&sb, cfg.language)}
+	if cfg.transition != "" {
+		strings.write_string(&sb, ",\n  \"scene_flow\": {\"transition\": "); jstr(&sb, cfg.transition)
+		if cfg.transitionDuration > 0 do fmt.sbprintf(&sb, ", \"duration\": %.2f", cfg.transitionDuration)
+		if cfg.transitionEasing != "" {strings.write_string(&sb, ", \"easing\": "); jstr(&sb, cfg.transitionEasing)}
+		strings.write_string(&sb, "}")
+	}
 	strings.write_string(&sb, ",\n  \"window\": {\n    \"title\": "); jstr(&sb, cfg.windowTitle)
 	fmt.sbprintf(&sb, ",\n    \"width\": %d,\n", cfg.windowWidth)
 	fmt.sbprintf(&sb, "    \"height\": %d,\n", cfg.windowHeight)
@@ -568,6 +588,7 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	Save_SetGameName(cfg.name) // Save data folder
 	Locale_Reset()
 	Locale_SetLanguage(cfg.language)
+	Transition_SetDefault(game, cfg.transition, cfg.transitionDuration, cfg.transitionEasing)
 
 	if cfg.virtualWidth > 0 && cfg.virtualHeight > 0 {
 		game.virtualSize = {cfg.virtualWidth, cfg.virtualHeight}
