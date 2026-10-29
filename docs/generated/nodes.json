@@ -181,6 +181,7 @@
       "properties": [
         {"name": "emitter.amount", "kind": "integer", "owner": "ParticleEmitter", "default": 100, "min": 1, "max": 5000, "doc": "Particles alive at once (the pool size)."},
         {"name": "emitter.lifetime", "kind": "number", "owner": "ParticleEmitter", "default": 2, "min": 0.01, "max": 5, "doc": "Seconds each particle lives."},
+        {"name": "emitter.lifetimeVariance", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 1, "doc": "Each particle's lifetime varies by up to this fraction (0.3: 70%..130% of Lifetime)."},
         {"name": "emitter.position", "kind": "vec2", "owner": "ParticleEmitter", "default": [0, 0], "min": 0, "max": 1280, "runtime": true, "doc": "Emitter position (follows the node)."},
         {"name": "emitter.burst", "kind": "number", "owner": "ParticleEmitter", "default": 0.5, "min": 0, "max": 1, "doc": "0 spreads emission evenly over the lifetime, 1 releases every particle at once."},
         {"name": "emitter.size", "kind": "vec2", "owner": "ParticleEmitter", "default": [5, 5], "min": 0.01, "max": 100, "doc": "Particle size (px)."},
@@ -225,7 +226,14 @@
         {"name": "emitter.sheetRows", "kind": "integer", "owner": "ParticleEmitter", "default": 1, "min": 1, "max": 64, "doc": "The texture as a sprite sheet: frames down."},
         {"name": "emitter.frameMode", "kind": "enum", "owner": "ParticleEmitter", "default": "OverLifetime", "values": ["OverLifetime", "Speed", "Random"], "doc": "Which sheet frame a particle shows: Over Lifetime (the sheet once), Speed (Frame Speed per second, looping), Random (one per particle)."},
         {"name": "emitter.frameSpeed", "kind": "number", "owner": "ParticleEmitter", "default": 12, "min": 0, "max": 60, "doc": "Frames per second (Frame Mode: Speed)."},
-        {"name": "emitter.alignToVelocity", "kind": "boolean", "owner": "ParticleEmitter", "default": false, "doc": "Particles face where they move (rain, sparks, arrows); Rotation adds to it."}
+        {"name": "emitter.alignToVelocity", "kind": "boolean", "owner": "ParticleEmitter", "default": false, "doc": "Particles face where they move (rain, sparks, arrows); Rotation adds to it."},
+        {"name": "emitter.emissionShape", "kind": "enum", "owner": "ParticleEmitter", "default": "Rectangle", "values": ["Rectangle", "Point", "Circle", "Ring", "Line", "RectangleEdge"], "doc": "Where particles are born: Rectangle (the Spread box), Point, Circle, Ring, Line (along x, Spread x long), Rectangle Edge."},
+        {"name": "emitter.emissionRadius", "kind": "number", "owner": "ParticleEmitter", "default": 32, "min": 0, "max": 1000, "doc": "Circle / Ring: the outer radius."},
+        {"name": "emitter.emissionInnerRadius", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 1000, "doc": "Ring: the inner radius (no particles inside it)."},
+        {"name": "emitter.emitAlongNormal", "kind": "boolean", "owner": "ParticleEmitter", "default": false, "doc": "Particles leave the shape outward (circle / ring: away from the centre; edges: out of the box) instead of along Angle; Angle Spread still varies it."},
+        {"name": "emitter.radialVelocity", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": -1000, "max": 1000, "doc": "Speed away from the emitter (negative: towards it), px/s - bursts, implosions."},
+        {"name": "emitter.orbitVelocity", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": -720, "max": 720, "doc": "Turning around the emitter, degrees/s - vortexes, magic circles."},
+        {"name": "emitter.damping", "kind": "number", "owner": "ParticleEmitter", "default": 0, "min": 0, "max": 20, "doc": "Speed lost per second (drag): particles slow down and drift."}
       ]
     },
     {
