@@ -436,10 +436,11 @@ function Node:queue_free() end
 ---| "tick"               # TimerNode: every frame while running, value: elapsed seconds
 ---| "body_entered"       # AreaNode: value: the Node that entered
 ---| "body_exited"        # AreaNode: value: the Node that left (nil if it was destroyed)
----| "collision_started"  # Static/Dynamic body, CharacterMover: value: the other Node
----| "collision_ended"    # Static/Dynamic body, CharacterMover: value: the other Node
+---| "collision_started"  # Static/Dynamic/Kinematic body, CharacterMover: value: the other Node
+---| "collision_ended"    # Static/Dynamic/Kinematic body, CharacterMover: value: the other Node
 ---| "hit_started"        # RaycastNode: value: the Node the ray started hitting
 ---| "hit_ended"          # RaycastNode: value: the Node it stopped hitting
+---| "particle_hit"       # ParticleEmitterNode (collision on): value: the Node a particle hit (particle_get_last_hit: where)
 ---| "animation_finished" # FrameAnimationNode / AnimationPlayerNode (non-looping); value: animation name
 ---| "state_changed"      # StateMachineNode: value: the state entered
 ---| "finished"           # SoundNode / MusicNode: playback ended
@@ -536,6 +537,15 @@ function AsepriteNode:connect(event, handler) end
 ---@param handler fun(value: any, source: StateMachineNode)
 ---@return integer id Connection id for `disconnect`
 function StateMachineNode:connect(event, handler) end
+
+---@alias ParticleEmitterNodeEvent NodeTreeEvent|"particle_hit"|ProjectEvent
+---Connects a handler to one of this node's events: particle_hit (A particle hit a body (collision on; particle_get_last_hit: where)); the tree events; custom ones.
+---
+---Example: `self.node:connect("particle_hit", function(value, source) Log.info("particle_hit") end)`
+---@param event ParticleEmitterNodeEvent|string
+---@param handler fun(value: any, source: ParticleEmitterNode)
+---@return integer id Connection id for `disconnect`
+function ParticleEmitterNode:connect(event, handler) end
 
 ---@alias SoundNodeEvent NodeTreeEvent|"finished"|ProjectEvent
 ---Connects a handler to one of this node's events: finished (Playback (or the dialogue) ended); the tree events; custom ones.
@@ -1550,8 +1560,10 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "emitter.gravityDirection" # Vec2 - Direction gravity pulls particles.
 ---| "emitter.gravityVelocity" # number - Strength of that gravity (px/s²).
 ---| "emitter.wind" # Vec2 - Constant drift added to every particle (px/s).
----| "emitter.collisionEnabled" # boolean - Particles bounce off physics colliders.
----| "emitter.elasticity" # number - Bounciness when colliding (0 stops, 1 keeps all speed).
+---| "emitter.collisionEnabled" # boolean - Particles collide with the physics world: bodies, tile maps, LDtk solids (not trigger a...
+---| "emitter.collisionMode" # "Bounce"|"Stop"|"Kill" - On a hit: Bounce (elasticity, friction), Stop (rest there) or Kill. Each hit raises par...
+---| "emitter.elasticity" # number - Bounce: how much speed off the surface is kept (0 stops, 1 keeps it all).
+---| "emitter.friction" # number - Bounce: how much speed along the surface is lost (0 slides, 1 stops).
 ---| "emitter.shape" # "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom" - Shape each particle is drawn as.
 ---| "emitter.emitting" # boolean - Emit new particles (existing ones finish their lives).
 ---| "emitter.continuous" # boolean - Keep emitting (else one cycle, then stop).
@@ -1604,7 +1616,9 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.gravityVelocity"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.wind"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.collisionEnabled"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "emitter.collisionMode"): "Bounce"|"Stop"|"Kill"
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.elasticity"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.friction"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.shape"): "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom"
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emitting"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.continuous"): boolean
@@ -1659,7 +1673,9 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.gravityVelocity", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.wind", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.collisionEnabled", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.collisionMode", value: "Bounce"|"Stop"|"Kill")
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.elasticity", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.friction", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.shape", value: "Circle"|"Ellipse"|"Rectangle"|"Pixel"|"Line"|"Texture"|"Custom")
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emitting", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.continuous", value: boolean)
@@ -7702,6 +7718,16 @@ function ParticleEmitterNode:particle_set_amount(amount) end
 ---Example: `self.node:get_node("Sparks"):particle_set_lifetime(1.5)`
 ---@param lifetime number
 function ParticleEmitterNode:particle_set_lifetime(lifetime) end
+
+---Where the last particle hit a body (collision on): the world point, the surface normal and the node hit. Returns nil when no particle has hit anything yet. Use it in a `particle_hit` handler.
+---
+---Example: `local x, y = self.node:particle_get_last_hit(); if x then Scene.instantiate("components/Splash.component.json", nil, x, y) end`
+---@return number? x
+---@return number? y
+---@return number? nx
+---@return number? ny
+---@return Node? hit
+function ParticleEmitterNode:particle_get_last_hit() end
 
 -- ----------------------------------------------------------------------------
 -- TextureNode Methods
