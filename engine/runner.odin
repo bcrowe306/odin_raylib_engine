@@ -477,6 +477,8 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 			Prof_Scope("game.run")
 			game->run(dt)
 		}
+		// (Drawn over the black letterbox below: soft edges would darken.)
+		if !renderPixel.smooth && Game_ClearColor(game).a == 255 do Render_MakeOpaque(vw, vh)
 		rl.EndTextureMode()
 		Render_SetFrameTarget(nil)
 		frame := target.texture

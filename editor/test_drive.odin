@@ -791,6 +791,16 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "atlas.") do return AtlasRegion_DriveQuery(q)
 	switch q {
 	case "palette.open": return "true" if Palette_IsOpen() else "false", true
+	case "viewport.min-alpha":
+		// The lowest alpha in the viewport's texture: 255 when it's opaque
+		// (soft edges don't let the panel behind show through).
+		if state.renderTexture.id == 0 do return "", false
+		img := rl.LoadImageFromTexture(state.renderTexture.texture)
+		defer rl.UnloadImage(img)
+		px := ([^]rl.Color)(img.data)[:img.width * img.height]
+		lo := u8(255)
+		for c in px do lo = min(lo, c.a)
+		return fmt.tprint(lo), true
 	case "selection":
 		sb := strings.builder_make(context.temp_allocator)
 		for n, i in state.selection {

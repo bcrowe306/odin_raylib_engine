@@ -405,3 +405,20 @@ Render_FrameTarget :: proc() -> ^rl.RenderTexture2D {return frameTarget}
 Render_RestoreFrameTarget :: proc() {
 	if frameTarget != nil do rl.BeginTextureMode(frameTarget^)
 }
+
+// Render_MakeOpaque sets the alpha of the render texture being drawn to 1,
+// its colours untouched. Alpha blending (SRC_ALPHA, ONE_MINUS_SRC_ALPHA on
+// all four channels) lowers the texture's own alpha under soft edges
+// (anti-aliased circles, sprites' edges): shown with blending over something
+// dark (the editor's panel, the runner's black letterbox), they got a dark
+// rim. For frames meant to be opaque, before EndTextureMode.
+Render_MakeOpaque :: proc(width, height: f32) {
+	rlgl.DrawRenderBatchActive()
+	rlgl.SetBlendFactorsSeparate(rlgl.ZERO, rlgl.ONE, rlgl.ONE, rlgl.ZERO, rlgl.FUNC_ADD, rlgl.FUNC_ADD)
+	rl.BeginBlendMode(.CUSTOM_SEPARATE)
+	rlgl.PushMatrix()
+	rlgl.LoadIdentity() // (the texture's own pixels: not through a camera)
+	rl.DrawRectangleRec({0, 0, width, height}, rl.WHITE)
+	rlgl.PopMatrix()
+	rl.EndBlendMode()
+}
