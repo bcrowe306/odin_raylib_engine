@@ -263,6 +263,20 @@ ParticleEmitter :: struct {
 	// Over lifetime (#127; none: off): size (replaces Scale Start -> End),
 	// alpha (multiplies the colour's) and speed (multiplies the movement).
 	sizeCurve, alphaCurve, speedCurve: ParticleCurve,
+	// Control (#128): start as if it had run a lifetime already (smoke
+	// already there); the same pattern every start (seed 0: random); what
+	// the view culling tests - Auto: the live particles' bounds, else
+	// visibilityRect around the emitter (in its space).
+	prewarm: bool `gui:"true"`,
+	seed: int `gui:"true" min:"0" max:"100000"`,
+	autoVisibility: bool `gui:"true"`,
+	visibilityRect: rl.Rectangle `gui:"true"`,
+	// (runtime) how many live, prewarm done, the seeded generator, a
+	// one-shot's finished event.
+	aliveCount:  int,
+	prewarmed:   bool,
+	rngState:    rand.Default_Random_State,
+	onFinished:  proc(emitter: ^ParticleEmitter, user: rawptr),
 	// The owner's global rotation (degrees) and scale, set each update:
 	// emission follows them; local particles are drawn through them.
 	originRotation: f32,
@@ -305,6 +319,8 @@ ParticleEmitter_Destroy :: proc(emitter: ^ParticleEmitter) {
 }
 
 ParticleEmitter_Start :: proc(emitter: ^ParticleEmitter) {
+	if emitter.seed != 0 do emitter.rngState = rand.create(u64(emitter.seed)) // (the same pattern every start)
+	emitter.prewarmed = false
 	emitter.emitting = true
 	emitter.cycleStarted = false
 	emitter.lifetimer = 0
@@ -347,6 +363,8 @@ ParticleEmitter_Init :: proc(emitter: ^ParticleEmitter) {
 	emitter.sheetRows = 1
 	emitter.frameSpeed = 12
 	emitter.emissionRadius = 32
+	emitter.autoVisibility = true
+	emitter.visibilityRect = {-128, -128, 256, 256}
 	emitter.start = ParticleEmitter_Start
 	emitter.stop = ParticleEmitter_Stop
 	emitter.lifetimer = 0
@@ -411,7 +429,14 @@ safe_float32_range :: proc(a, b: f32) -> f32 {
 }
 
 ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
-	context.random_generator = particle_rng()
+	// (Picked first, set at this scope: a context change inside a block is
+	// undone when the block ends.)
+	gen := particle_rng()
+	if emitter.seed != 0 {
+		if emitter.rngState == {} do emitter.rngState = rand.create(u64(emitter.seed))
+		gen = runtime.default_random_generator(&emitter.rngState)
+	}
+	context.random_generator = gen
 
 	ParticleEmitter_Reserve(emitter, clamp(emitter.amount * 2 + 4, 16, PARTICLE_MAX))
 	if len(emitter.particles) == 0 do return
@@ -432,9 +457,14 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 		emitter.size[1] + safe_float32_range(-sizeSpread, sizeSpread),
 	}
 
-	// Scale
+	// Scale (as it starts: drawn right away, before its first update)
 	p.scaleStart = emitter.scaleStart
 	p.scaleEnd = emitter.scaleEnd
+	p.scale = p.scaleStart
+	if emitter.sizeCurve.count > 0 {
+		c := ParticleCurve_Sample(&emitter.sizeCurve, 0)
+		p.scale = {c, c}
+	}
 
 	// Rotation
 	rotationSpread := math.abs(emitter.rotationSpread * emitter.rotationVariance)
@@ -744,6 +774,66 @@ ParticleEmitter_DrawColorRampGui :: proc(emitter: ^ParticleEmitter, x: f32, next
 // ParticleEmitter_Update emits and moves the particles; with collision on,
 // they collide with `world`'s shapes (none: no collision).
 ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world := b2.WorldId{}) {
+	// Prewarm: a lifetime run at once (30 steps a second) before the first frame.
+	if emitter.prewarm && !emitter.prewarmed && emitter.emitting {
+		emitter.prewarmed = true
+		steps := int(max(emitter.lifetime, 0) * 30)
+		for _ in 0 ..< steps do particle_step(emitter, 1.0 / 30, world)
+	}
+	emitter.prewarmed = true
+	before := emitter.aliveCount
+	particle_step(emitter, deltaTime, world)
+	n := 0
+	for &p in emitter.particles do if p.alive do n += 1
+	emitter.aliveCount = n
+	// A one-shot (or stopped) emitter's last particle died.
+	if before > 0 && n == 0 && !emitter.emitting && emitter.onFinished != nil do emitter.onFinished(emitter, emitter.onHitUser)
+}
+
+// ParticleEmitter_EmitBurst emits n particles now (hits, explosions),
+// whether it's emitting or not.
+ParticleEmitter_EmitBurst :: proc(emitter: ^ParticleEmitter, n: int) {
+	for _ in 0 ..< max(n, 0) do ParticleEmitter_Emit(emitter)
+}
+
+// ParticleEmitter_Restart clears the particles and starts again (a seeded
+// emitter repeats its pattern).
+ParticleEmitter_Restart :: proc(emitter: ^ParticleEmitter) {
+	for &p in emitter.particles do p.alive = false
+	emitter.aliveCount = 0
+	ParticleEmitter_Start(emitter)
+}
+
+// ParticleEmitter_VisibleBounds: the world rectangle the view culling tests.
+// (Auto: measured here - only when the view culling asks.)
+ParticleEmitter_VisibleBounds :: proc(emitter: ^ParticleEmitter) -> rl.Rectangle {
+	if emitter.autoVisibility {
+		mn, mx := [2]f32{max(f32), max(f32)}, [2]f32{min(f32), min(f32)}
+		any := false
+		for &p in emitter.particles do if p.alive {
+			any = true
+			q := Particle_QuadOf(emitter, p)
+			r := max(q.size.x, q.size.y) * 0.75 // (room for rotation)
+			mn = {min(mn.x, q.center.x - r), min(mn.y, q.center.y - r)}
+			mx = {max(mx.x, q.center.x + r), max(mx.y, q.center.y + r)}
+		}
+		if !any do return {emitter.position.x, emitter.position.y, 0, 0}
+		return {mn.x, mn.y, mx.x - mn.x, mx.y - mn.y}
+	}
+	r := emitter.visibilityRect
+	pts := [4][2]f32{{r.x, r.y}, {r.x + r.width, r.y}, {r.x + r.width, r.y + r.height}, {r.x, r.y + r.height}}
+	mn, mx := [2]f32{max(f32), max(f32)}, [2]f32{min(f32), min(f32)}
+	for pt in pts {
+		w := particle_to_world(emitter, pt)
+		mn = {min(mn.x, w.x), min(mn.y, w.y)}
+		mx = {max(mx.x, w.x), max(mx.y, w.y)}
+	}
+	return {mn.x, mn.y, mx.x - mn.x, mx.y - mn.y}
+}
+
+// particle_step: one simulation step (emission, motion, collision).
+@(private = "file")
+particle_step :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world: b2.WorldId) {
 	if emitter.emitting {
 		targetAmount := max(emitter.amount, 0)
 		cycleDuration := max(emitter.lifetime, 0.0001)

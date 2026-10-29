@@ -1250,6 +1250,38 @@ lua_node_particle_set_lifetime :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// particle_emit(n): n particles now (a burst on demand; #128).
+@(private="file")
+lua_node_particle_emit :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	ParticleEmitterNode_EmitBurst(cast(^ParticleEmitterNode)node, int(lua.L_optinteger(L, 2, 1)))
+	return 0
+}
+
+// particle_restart(): clears the particles and starts again.
+@(private="file")
+lua_node_particle_restart :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	ParticleEmitter_Restart(&(cast(^ParticleEmitterNode)node).emitter)
+	return 0
+}
+
+// particle_get_alive_count() -> integer
+@(private="file")
+lua_node_particle_get_alive_count :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	n := 0
+	for p in (cast(^ParticleEmitterNode)node).emitter.particles do if p.alive do n += 1
+	lua.pushinteger(L, lua.Integer(n))
+	return 1
+}
+
 // particle_set_texture(path): the particles' texture ("" or nil: none; #126).
 @(private="file")
 lua_node_particle_set_texture :: proc "c" (L: ^lua.State) -> c.int {
@@ -4724,6 +4756,12 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "particle_get_last_hit")
 		lua.pushcfunction(L, lua_node_particle_set_texture)
 		lua.setfield(L, -2, "particle_set_texture")
+		lua.pushcfunction(L, lua_node_particle_emit)
+		lua.setfield(L, -2, "particle_emit")
+		lua.pushcfunction(L, lua_node_particle_restart)
+		lua.setfield(L, -2, "particle_restart")
+		lua.pushcfunction(L, lua_node_particle_get_alive_count)
+		lua.setfield(L, -2, "particle_get_alive_count")
 
 		// TextureNode
 		lua.pushcfunction(L, lua_node_texture_get_size)
