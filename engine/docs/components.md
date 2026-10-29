@@ -134,6 +134,23 @@ Component files and scenes saved before uids keep loading unchanged:
 - Numbers: `bench_components` in `scripts/bench.sh`; baselines in
   `engine/GAPS.md`.
 
+## Hot reload
+
+- A running game (Play in the editor or a project folder, not a `.rayzr`
+  package) checks the component files its instances use twice a second.
+  When one changes, or a file it nests changes, each instance of it in the
+  loaded scenes is rebuilt in place. The outermost instance holding it is
+  the one rebuilt. Its overrides, transform and place among its parent's
+  children are kept.
+- The overrides are diffed against the component JSON the instance was
+  built from (kept only until the rebuild), so values the instance never
+  changed follow the new file.
+- A rebuilt instance is made of new nodes: its scripts start again
+  (`ready()`), and a script holding one of its old nodes holds a removed
+  node. Look the nodes up again (`get_node`, `Scene.find_node`).
+- The editor refreshes the instances in its own documents when it saves a
+  component; this check is for the running game.
+
 ## Limits
 
 - Nodes inside an instance can change order but not parent.
