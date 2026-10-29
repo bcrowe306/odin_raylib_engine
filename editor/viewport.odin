@@ -342,7 +342,7 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 	case e.VisibilityNotifierNode:
 		v := cast(^e.VisibilityNotifierNode)node
 		lo, hi, have = -v.size * 0.5 * {abs(scl.x), abs(scl.y)}, v.size * 0.5 * {abs(scl.x), abs(scl.y)}, true
-	case e.StaticBodyNode, e.DynamicBodyNode, e.CharacterMoverNode, e.AreaNode:
+	case e.StaticBodyNode, e.DynamicBodyNode, e.KinematicBodyNode, e.CharacterMoverNode, e.AreaNode:
 		// Every shape (rotated, any type), scaled with the node.
 		if shapes := node_shapes_editor(node); shapes != nil && len(shapes) > 0 {
 			lo, hi, have = ShapeEdit_LocalBounds(node, shapes[:])

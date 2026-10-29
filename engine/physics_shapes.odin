@@ -74,16 +74,18 @@ physics_shape_hash :: proc(shape: ^PhysicsShape, scale: [2]f32 = {1, 1}) -> u64 
 		size: [2]f32,
 		cornerRadius: f32,
 		point1, point2: [2]f32,
-		density, friction, restitution: f32,
-		sensorEv, contactEv, hitEv, preSolveEv: bool,
+		density, friction, restitution, rollingResistance, tangentSpeed: f32,
+		isSensor, sensorEv, contactEv, hitEv, preSolveEv: bool,
 		category, mask: u64,
 		group: int,
 	}
+	sc := scale
+	if sc.x == 0 && sc.y == 0 do sc = {1, 1}
 	p := Params{
-		scale, shape.vertexCount, shape.vertices, len(shape.chainPoints), shape.isLoop,
+		sc, shape.vertexCount, shape.vertices, len(shape.chainPoints), shape.isLoop,
 		shape.type, shape.offset, shape.rotation, shape.radius, shape.size, shape.cornerRadius,
-		shape.point1, shape.point2, shape.density, shape.friction, shape.restitution,
-		shape.enableSensorEvents, shape.enableContactEvents, shape.enableHitEvents, shape.enablePreSolveEvents,
+		shape.point1, shape.point2, shape.density, shape.friction, shape.restitution, shape.rollingResistance, shape.tangentSpeed,
+		shape.isSensor, shape.enableSensorEvents, shape.enableContactEvents, shape.enableHitEvents, shape.enablePreSolveEvents,
 		CollisionLayerSet_ToBits(shape.categoryLayers), CollisionLayerSet_ToBits(shape.maskLayers), shape.groupIndex,
 	}
 	h := hash.fnv64a(mem.ptr_to_bytes(&p))
@@ -265,6 +267,7 @@ PhysicsShape_SyncToBox2D :: proc(shape: ^PhysicsShape, bodyId: b2.BodyId, userDa
 			case .polygonShape: kindOk = shape.type == .Box || shape.type == .RoundedBox || shape.type == .Polygon
 			case .segmentShape: kindOk = shape.type == .Segment
 			}
+			if b2.Shape_IsSensor(shape.shapeId) != shape.isSensor do kindOk = false
 		}
 		if !kindOk || shape.type == .Chain || b2.Chain_IsValid(shape.chainId) {
 			PhysicsShape_AttachToBody(shape, bodyId, userData, scale)

@@ -179,9 +179,16 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 	game.gameContext.scene = game.sceneManager.currentScene
 	Prof_End()
 
-	// 3. Step Box2D Physics World (not while the game is paused)
+	// 3. Step Box2D Physics World (not while the game is paused). Nodes
+	// added since the last frame get ready() first: their scripts' signal
+	// handlers are connected before the step reports contacts and sensor
+	// events for them (an area entered on its first frame).
 	if !game.treePaused {
 		Prof_Scope("physics")
+		if s := game.sceneManager.currentScene; s != nil && s.isLoaded && s.manager != nil && s.rootNode != nil {
+			ProcessNodeQueues(s.manager, &game.gameContext)
+			Scene_CallReady(s, s.rootNode, &game.gameContext)
+		}
 		PhysicsWorld_Step(&game.physicsWorld, deltaTime, &game.gameContext)
 	}
 

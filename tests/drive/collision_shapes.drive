@@ -59,3 +59,18 @@ expect shape.edit == false
 expect selected == StaticPlatform
 key escape
 expect selected ==
+
+# KinematicPlatform and multi-shape editing (Issue #98):
+# Adding a second shape nudges its offset so it doesn't stack invisibly on shape 0.
+click @hier.add
+type kinematic platform
+click @addnode.create
+expect selected == KinematicPlatform
+expect shape:KinematicPlatform:0:count == 1
+expect shape:KinematicPlatform:0:size == 128.0,32.0
+expect shape:KinematicPlatform:0:offset == 0.0,0.0
+click @insp.add-shape
+expect shape:KinematicPlatform:0:count == 2
+expect shape:KinematicPlatform:1:offset == 16.0,16.0
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "KinematicBodyNode"

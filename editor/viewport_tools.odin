@@ -427,6 +427,7 @@ Viewport_DrawAllColliders :: proc(state: ^EditorState) {
 		col := rl.Color{74, 222, 128, 220}
 		switch n.typeId {
 		case e.DynamicBodyNode: col = {96, 165, 250, 220}
+		case e.KinematicBodyNode: col = {56, 189, 248, 220}
 		case e.AreaNode: col = {250, 204, 21, 200}
 		}
 		for &sh in shapes^ do e.PhysicsShape_DrawDebug(&sh, n.globalPosition, n.globalRotation, col, n.globalScale)
