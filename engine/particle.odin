@@ -9,6 +9,7 @@ import "core:math"
 import "core:fmt"
 import rl "vendor:raylib"
 import ui "../ui"
+import b2 "vendor:box2d"
 
 MAX_COLOR_STOPS :: 8
 
@@ -106,6 +107,13 @@ ParticleShape :: enum {
 	Custom,
 }
 
+// What a particle does when it hits the physics world (#123).
+ParticleCollisionMode :: enum {
+	Bounce, // reflected (elasticity), slowed along the surface (friction)
+	Stop,   // rests where it hit
+	Kill,   // dies
+}
+
 ParticleEmitter :: struct {
 	amount: int `gui:"true" min:"1" max:"5000"`,
 	lifetime: f32 `gui:"true" min:".01" max:"5"`,
@@ -140,8 +148,20 @@ ParticleEmitter :: struct {
 	gravityDirection: [2]f32 `gui:"true" min:"-1" max:"1"`,
 	gravityVelocity: f32 `gui:"true" min:"-2000" max:"2000"`,
 	wind: [2]f32 `gui:"true" min:"-1000" max:"1000"`,
+	// Collision with the physics world (static / kinematic / dynamic bodies,
+	// tile maps, LDtk solids; not trigger areas), on the layers in
+	// collisionLayers (#123).
 	collisionEnabled: bool `gui:"true"`,
+	collisionMode: ParticleCollisionMode `gui:"true"`,
+	collisionLayers: CollisionLayerSet `gui:"true"`,
 	elasticity: f32 `gui:"true" min:"0" max:"1"`,
+	friction: f32 `gui:"true" min:"0" max:"1"`,
+	// The last hit (world point, surface normal, the node hit) and who is
+	// told about each hit (the node: its particle_hit event).
+	lastHitPoint, lastHitNormal: [2]f32,
+	lastHitNode: ^Node,
+	onHit: proc(emitter: ^ParticleEmitter, hit: ^Node, user: rawptr),
+	onHitUser: rawptr,
 	shape: ParticleShape `gui:"true" min:"0" max:"2000"`,
 	emitting: bool `gui:"true"`,
 	continuous: bool `gui:"true"`,
@@ -213,7 +233,10 @@ ParticleEmitter_Init :: proc(emitter: ^ParticleEmitter) {
 	emitter.gravityVelocity = 200
 	emitter.wind = {0, 0}
 	emitter.collisionEnabled = false
+	emitter.collisionMode = .Bounce
+	emitter.collisionLayers = DEFAULT_COLLISION_MASK
 	emitter.elasticity = 0.7
+	emitter.friction = 0.1
 	emitter.emitting = true
 	emitter.continuous = true
 	emitter.start = ParticleEmitter_Start
@@ -466,76 +489,6 @@ Particle_Update_Particle :: proc(emitter: ^ParticleEmitter, particle: ^Particle,
 
 Particle_Update :: proc{Particle_Update_Index, Particle_Update_Particle}
 
-ParticleEmitter_HandleCollisions :: proc(emitter: ^ParticleEmitter) {
-	count := len(emitter.particles)
-
-	// Particle vs Particle collision (fast point/size circle-circle using 1st dimension index)
-	for i in 0..<count {
-		if !emitter.particles[i].alive do continue
-
-		scale_xi := emitter.particles[i].scale[0]
-		r_i := (emitter.particles[i].size[0] * (scale_xi if scale_xi > 0 else 1.0)) * 0.5
-		if r_i <= 0.01 do r_i = 1.0
-
-		for j in (i + 1)..<count {
-			if !emitter.particles[j].alive do continue
-
-			scale_xj := emitter.particles[j].scale[0]
-			r_j := (emitter.particles[j].size[0] * (scale_xj if scale_xj > 0 else 1.0)) * 0.5
-			if r_j <= 0.01 do r_j = 1.0
-
-			min_dist := r_i + r_j
-			delta := emitter.particles[j].position - emitter.particles[i].position
-			dist_sq := delta.x * delta.x + delta.y * delta.y
-
-			if dist_sq < min_dist * min_dist && dist_sq > 0.0001 {
-				dist := math.sqrt(dist_sq)
-				normal := delta / dist
-				overlap := min_dist - dist
-
-				// Separate particles to resolve penetration
-				emitter.particles[i].position -= normal * (overlap * 0.5)
-				emitter.particles[j].position += normal * (overlap * 0.5)
-
-				// Elastic collision response
-				rel_vel := emitter.particles[j].velocity - emitter.particles[i].velocity
-				vel_along_normal := rel_vel.x * normal.x + rel_vel.y * normal.y
-
-				if vel_along_normal < 0 {
-					elasticity := emitter.elasticity
-					impulse := -(1.0 + elasticity) * vel_along_normal * 0.5
-					emitter.particles[i].velocity -= normal * impulse
-					emitter.particles[j].velocity += normal * impulse
-				}
-			}
-		}
-
-		// Boundary collision (screen borders)
-		if rl.IsWindowReady() {
-			screen_w := f32(rl.GetScreenWidth())
-			screen_h := f32(rl.GetScreenHeight())
-			pos := &emitter.particles[i].position
-			vel := &emitter.particles[i].velocity
-
-			if pos.x - r_i < 0 {
-				pos.x = r_i
-				vel.x = -vel.x * emitter.elasticity
-			} else if pos.x + r_i > screen_w {
-				pos.x = screen_w - r_i
-				vel.x = -vel.x * emitter.elasticity
-			}
-
-			if pos.y - r_i < 0 {
-				pos.y = r_i
-				vel.y = -vel.y * emitter.elasticity
-			} else if pos.y + r_i > screen_h {
-				pos.y = screen_h - r_i
-				vel.y = -vel.y * emitter.elasticity
-			}
-		}
-	}
-}
-
 ParticleEmitter_DrawColorRampGui :: proc(emitter: ^ParticleEmitter, x: f32, nextY: ^f32, width: f32, selectedStop: ^int, draggingStop: ^bool, view: rl.Rectangle) {
 	ramp := &emitter.colorRamp
 
@@ -604,7 +557,9 @@ ParticleEmitter_DrawColorRampGui :: proc(emitter: ^ParticleEmitter, x: f32, next
 	nextY^ = ctrlY + 26
 }
 
-ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
+// ParticleEmitter_Update emits and moves the particles; with collision on,
+// they collide with `world`'s shapes (none: no collision).
+ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world := b2.WorldId{}) {
 	if emitter.emitting {
 		targetAmount := max(emitter.amount, 0)
 		cycleDuration := max(emitter.lifetime, 0.0001)
@@ -645,14 +600,65 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32) {
 		}
 	}
 
+	collide := emitter.collisionEnabled && b2.World_IsValid(world)
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles[i].alive do continue
+		prev := emitter.particles[i].position
 		Particle_Update(emitter, i, deltaTime)
+		if collide && emitter.particles[i].alive do particle_collide(emitter, &emitter.particles[i], prev, world)
 	}
+}
 
-	if emitter.collisionEnabled {
-		ParticleEmitter_HandleCollisions(emitter)
+@(private = "file")
+Particle_Ray_Hit :: struct {
+	hit:      bool,
+	point:    [2]f32,
+	normal:   [2]f32,
+	fraction: f32,
+	shape:    b2.ShapeId,
+}
+
+// particle_ray_callback: the closest solid shape along the move (trigger
+// areas - sensors - don't stop particles).
+@(private = "file")
+particle_ray_callback :: proc "c" (shapeId: b2.ShapeId, point: b2.Vec2, normal: b2.Vec2, fraction: f32, ctx: rawptr) -> f32 {
+	if b2.Shape_IsSensor(shapeId) do return -1
+	r := cast(^Particle_Ray_Hit)ctx
+	r^ = {true, point, normal, fraction, shapeId}
+	return fraction
+}
+
+// particle_collide: the particle moved from `prev`; if a solid shape was in
+// the way, it bounces off it, stops on it or dies there (collisionMode).
+// The whole move is cast, so fast particles don't pass through thin walls.
+@(private = "file")
+particle_collide :: proc(emitter: ^ParticleEmitter, p: ^Particle, prev: [2]f32, world: b2.WorldId) {
+	move := p.position - prev
+	if move.x * move.x + move.y * move.y < 1e-6 do return
+	hit: Particle_Ray_Hit
+	filter := b2.QueryFilter{categoryBits = ~u64(0), maskBits = CollisionLayerSet_ToBits(emitter.collisionLayers)}
+	_ = b2.World_CastRay(world, prev, move, filter, particle_ray_callback, &hit)
+	if !hit.hit do return
+	n := hit.normal
+	switch emitter.collisionMode {
+	case .Kill:
+		p.alive = false
+	case .Stop:
+		p.position = hit.point + n * 0.01
+		p.velocity = {}
+		p.acceleration = {}
+	case .Bounce:
+		p.position = hit.point + n * 0.01
+		vn := p.velocity.x * n.x + p.velocity.y * n.y
+		if vn < 0 {
+			tangent := p.velocity - n * vn
+			p.velocity = tangent * (1 - math.clamp(emitter.friction, 0, 1)) - n * vn * math.clamp(emitter.elasticity, 0, 1)
+		}
 	}
+	hitNode: ^Node
+	if body := b2.Shape_GetBody(hit.shape); b2.Body_IsValid(body) do hitNode = cast(^Node)b2.Body_GetUserData(body)
+	emitter.lastHitPoint, emitter.lastHitNormal, emitter.lastHitNode = hit.point, n, hitNode
+	if emitter.onHit != nil do emitter.onHit(emitter, hitNode, emitter.onHitUser)
 }
 
 ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {

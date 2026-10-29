@@ -51,6 +51,7 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "collision_ended":    return "other", "Contact with another body ended"
 	case "hit_started":        return "other", "The ray started hitting a node"
 	case "hit_ended":          return "other", "The ray stopped hitting a node"
+	case "particle_hit":       return "other", "A particle hit a body (collision on; particle_get_last_hit: where)"
 	case "animation_finished": return "name", "A non-looping animation ended (Aseprite: a tag's repeats are done)"
 	case "animation_looped":   return "name", "An Aseprite tag started again (a repeat or a ping-pong turn)"
 	case "frame_changed":      return "frame", "The Aseprite node shows another frame (0-based)"
