@@ -1,0 +1,17 @@
+{
+ "type": "DynamicBodyNode",
+ "name": "PhysicsCrate",
+ "uid": "crate000",
+ "shapes": [
+  {
+   "type": "Box",
+   "size": [
+    64,
+    64
+   ],
+   "density": 1.5,
+   "friction": 0.4,
+   "restitution": 0.2
+  }
+ ]
+}

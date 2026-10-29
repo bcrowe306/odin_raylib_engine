@@ -507,10 +507,19 @@ prop_label :: proc(label: string, node: ^e.Node, path, value: string) {
 	}
 	imgui.TableNextColumn()
 	imgui.AlignTextToFramePadding()
-	imgui.PushStyleColorImVec4(.Text, UI_TEXT_DIM)
+	// An overridden value of an instance node: a bar and the component
+	// colour (right-click: Revert / Apply, #84).
+	overridden := Inspector_IsOverridden(node, path)
+	if overridden {
+		p := imgui.GetCursorScreenPos()
+		imgui.DrawList_AddRectFilled(imgui.GetWindowDrawList(), {p.x, p.y + 3}, {p.x + 3, p.y + imgui.GetFrameHeight() - 3}, col_u32(UI_COMPONENT), 1)
+		imgui.SetCursorScreenPos({p.x + 8, p.y})
+	}
+	imgui.PushStyleColorImVec4(.Text, UI_COMPONENT if overridden else UI_TEXT_DIM)
 	imgui.TextUnformatted(strings.clone_to_cstring(label, context.temp_allocator))
 	imgui.PopStyleColor()
 	if path != "" do Drive_Item(fmt.tprintf("insp.proplabel:%s", path))
+	if overridden do Drive_Item(fmt.tprintf("insp.overridden:%s", path))
 	prop_label_drag(node, path, value)
 	prop_label_menu(node, path)
 	imgui.TableNextColumn()
@@ -549,6 +558,16 @@ prop_label_menu :: proc(node: ^e.Node, path: string) {
 	if !imgui.BeginPopupContextItem(fmt.ctprintf("##propctx_%s", path)) do return
 	defer imgui.EndPopup()
 	state := code_state()
+	exposed_menu(state, node, path) // (a component document: #85)
+	if Inspector_IsOverridden(node, path) {
+		if imgui.MenuItem(fmt.ctprintf("%s  Revert to Component", ICON_FA_ROTATE_LEFT)) do inspector_queue_override(node, path, false)
+		Drive_Item("ctx:revert-override")
+		UI_Tooltip("Drop this override: the value follows the component file again")
+		if imgui.MenuItem(fmt.ctprintf("%s  Apply to Component", ICON_FA_FLOPPY_DISK)) do inspector_queue_override(node, path, true)
+		Drive_Item("ctx:apply-override")
+		UI_Tooltip("Write this value to the component file (every instance without its own override gets it)")
+		imgui.Separator()
+	}
 	if strings.has_prefix(path, "script.") && node.scriptInstance != nil {
 		if imgui.MenuItem(fmt.ctprintf("%s  Find in Script", ICON_FA_CODE)) {
 			Code_FindScriptProperty(state, (cast(^e.ScriptInstance)node.scriptInstance).modulePath, path[len("script."):])

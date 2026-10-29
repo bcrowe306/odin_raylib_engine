@@ -89,8 +89,15 @@ Pool_Take :: proc(scene: ^Scene, pool: ^Node_Pool, parent: ^Node, pos: [2]f32, c
 		if pool.max > 0 && pool.created >= pool.max do return nil
 		n = pool_make(scene, pool, parent, ctx)
 		if n == nil do return nil
-	} else if GetParent(scene.manager, n) != parent {
-		AddChild(scene.manager, parent, n)
+	} else {
+		if GetParent(scene.manager, n) != parent {
+			AddChild(scene.manager, parent, n)
+		}
+		// Reused instance: reload local resource copies and re-resolve resource properties (#82).
+		sm := ctx.scriptManager if ctx != nil else nil
+		if sm != nil {
+			Resource_ReloadScope(sm, Resource_ScopeOf(n), n)
+		}
 	}
 	n.position = pos
 	n.enabled = true

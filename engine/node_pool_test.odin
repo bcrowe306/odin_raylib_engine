@@ -99,6 +99,113 @@ active, parked, made = Pool.stats("components/shot.component.json")`)
 	testing.expect(t, len(scene.pools) == 0, "pools freed on unload")
 }
 
+// Issue #82: pooled instances keep stale local resource copies.
+// Test: damage a pooled instance's health, return it, take it again,
+// and health is back to max (reloaded from file + on_load re-executed).
+@(test)
+test_pooled_instance_resource_reload :: proc(t: ^testing.T) {
+	dir :: "test_pool_resource_project"
+	defer os.remove_all(dir)
+	_ = os.make_directory_all(dir + "/components")
+	_ = os.make_directory_all(dir + "/scripts")
+	_ = os.make_directory_all(dir + "/resources")
+
+	healthClass := `
+local Health = {}
+Health.resource = { local_copy = true }
+Health.properties = { max = { type = "int", default = 100 } }
+function Health:on_load() self.current = self.max end
+function Health:damage(n) self.current = self.current - n return self.current end
+return Health
+`
+	_ = os.write_entire_file(dir + "/scripts/health.lua", transmute([]u8)healthClass)
+
+	enemyScript := `
+local Enemy = {}
+Enemy.properties = {
+    health = { type = "resource", class = "scripts/health.lua" },
+}
+return Enemy
+`
+	_ = os.write_entire_file(dir + "/scripts/enemy.lua", transmute([]u8)enemyScript)
+
+	bossRes := `{"type": "resource", "script": "scripts/health.lua", "properties": {"max": 250}}`
+	_ = os.write_entire_file(dir + "/resources/enemy_health.resource.json", transmute([]u8)bossRes)
+
+	enemyComp := `{
+  "type": "Node",
+  "name": "Enemy",
+  "script": { "path": "scripts/enemy.lua", "properties": { "health": "resources/enemy_health.resource.json" } }
+}`
+	_ = os.write_entire_file(dir + "/components/enemy.component.json", transmute([]u8)enemyComp)
+
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	AssetManager_SetProjectDir(&game.assetManager, dir)
+
+	scene := game->createScene("pool_res", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	L := game.scriptManager.L
+
+	// Prewarm 1 enemy into the pool
+	ok := lua.L_dostring(L, `Pool.prewarm("components/enemy.component.json", 1)`)
+	if ok != 0 do testing.fail_now(t, string(lua.tostring(L, -1)))
+	game->run(0.016)
+
+	// Take the enemy: health should start at 250 (from on_load)
+	ok = lua.L_dostring(L, `
+e1 = Pool.take("components/enemy.component.json")
+e1_script = e1:get_script()
+h_init = e1_script.health.current
+`)
+	if ok != 0 do testing.fail_now(t, string(lua.tostring(L, -1)))
+	game->run(0.016)
+
+	lua.getglobal(L, "h_init")
+	testing.expect_value(t, int(lua.tointeger(L, -1)), 250)
+	lua.pop(L, 1)
+
+	// Damage the enemy: health reduces to 150
+	ok = lua.L_dostring(L, `
+e1_script.health:damage(100)
+h_damaged = e1_script.health.current
+`)
+	if ok != 0 do testing.fail_now(t, string(lua.tostring(L, -1)))
+	lua.getglobal(L, "h_damaged")
+	testing.expect_value(t, int(lua.tointeger(L, -1)), 150)
+	lua.pop(L, 1)
+
+	// Return to pool (destroy)
+	ok = lua.L_dostring(L, `e1:destroy()`)
+	if ok != 0 do testing.fail_now(t, string(lua.tostring(L, -1)))
+	game->run(0.016)
+
+	// Take again from the pool (same node reused)
+	ok = lua.L_dostring(L, `
+e2 = Pool.take("components/enemy.component.json")
+e2_script = e2:get_script()
+h_retaken = e2_script.health.current
+`)
+	if ok != 0 do testing.fail_now(t, string(lua.tostring(L, -1)))
+	game->run(0.016)
+
+	lua.getglobal(L, "e1")
+	n1, ok1 := to_node_userdata(L, -1)
+	lua.pop(L, 1)
+
+	lua.getglobal(L, "e2")
+	n2, ok2 := to_node_userdata(L, -1)
+	lua.pop(L, 1)
+
+	testing.expect(t, ok1 && ok2 && n1 == n2, "pooled node pointer reused")
+
+	lua.getglobal(L, "h_retaken")
+	testing.expect_value(t, int(lua.tointeger(L, -1)), 250) // Reset to 250!
+	lua.pop(L, 1)
+}
+
 @(private = "file")
 contains_str :: proc(s, sub: string) -> bool {
 	for i := 0; i + len(sub) <= len(s); i += 1 do if s[i:i + len(sub)] == sub do return true
