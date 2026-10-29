@@ -1250,6 +1250,27 @@ lua_node_particle_set_lifetime :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// particle_get_last_hit -> x, y, nx, ny, node: where the last particle hit
+// a body (nil when none has yet; #123).
+@(private="file")
+lua_node_particle_get_last_hit :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != ParticleEmitterNode do return 0
+	em := &(cast(^ParticleEmitterNode)node).emitter
+	if em.lastHitNormal == {} {
+		lua.pushnil(L)
+		return 1
+	}
+	lua.pushnumber(L, lua.Number(em.lastHitPoint.x))
+	lua.pushnumber(L, lua.Number(em.lastHitPoint.y))
+	lua.pushnumber(L, lua.Number(em.lastHitNormal.x))
+	lua.pushnumber(L, lua.Number(em.lastHitNormal.y))
+	if em.lastHitNode != nil && Node_IsAlive(em.lastHitNode) do push_node_userdata(L, em.lastHitNode)
+	else do lua.pushnil(L)
+	return 5
+}
+
 
 @(private="file")
 lua_node_atlas_set_region :: proc "c" (L: ^lua.State) -> c.int {
@@ -4688,6 +4709,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "particle_set_amount")
 		lua.pushcfunction(L, lua_node_particle_set_lifetime)
 		lua.setfield(L, -2, "particle_set_lifetime")
+		lua.pushcfunction(L, lua_node_particle_get_last_hit)
+		lua.setfield(L, -2, "particle_get_last_hit")
 
 		// TextureNode
 		lua.pushcfunction(L, lua_node_texture_get_size)

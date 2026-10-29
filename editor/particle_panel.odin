@@ -111,7 +111,7 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 		imgui.EndChild()
 		imgui.EndTabItem()
 	}
-	section(state, node, "Collision", "particles.tab:collision", {"emitter.collisionEnabled", "emitter.elasticity"})
+	section(state, node, "Collision", "particles.tab:collision", {"emitter.collisionEnabled", "emitter.collisionMode", "emitter.collisionLayers", "emitter.elasticity", "emitter.friction"})
 }
 
 @(private = "file")

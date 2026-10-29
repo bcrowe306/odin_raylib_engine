@@ -1,19 +1,28 @@
 package engine
 
 import "core:strings"
+import b2 "vendor:box2d"
 import rl "vendor:raylib"
 
 
 ParticleEmitterNode :: struct {
 	using node: Node,
 	emitter: ParticleEmitter `gui:"true"`,
+	onParticleHit: EventSubject, // "particle_hit"(node): a particle hit a body (collision on)
 }
 
 ParticleEmitterNode_Init :: proc(pen: ^ParticleEmitterNode) {
 	InitializeNode(pen)
 	pen.update = ParticleEmitterNode_Update
 	pen.render = ParticleEmitterNode_Render
+	pen.onDestroy = ParticleEmitterNode_Destroy
 	pen.resource = &pen.emitter
+	InitializeSubject(&pen.onParticleHit, "particle_hit", pen)
+	pen.emitter.onHitUser = pen
+	pen.emitter.onHit = proc(emitter: ^ParticleEmitter, hit: ^Node, user: rawptr) {
+		pen := cast(^ParticleEmitterNode)user
+		pen.onParticleHit->notify(pen, hit, pen.gameContext)
+	}
 
 	ParticleEmitter_Init(&pen.emitter)
 	pen.emitter.allocator = pen.allocator
@@ -60,7 +69,12 @@ ParticleEmitterNode_Update :: proc(node: ^Node, gameContext: ^GameContext, delta
 	// Sync emitter emission center with node's globalPosition in scene graph
 	pen.emitter.position = pen.globalPosition
 
-	ParticleEmitter_Update(&pen.emitter, deltaTime)
+	world := gameContext.game.physicsWorld.worldId if gameContext != nil && gameContext.game != nil else b2.WorldId{}
+	ParticleEmitter_Update(&pen.emitter, deltaTime, world)
+}
+
+ParticleEmitterNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
+	DestroySubject(&(cast(^ParticleEmitterNode)node).onParticleHit)
 }
 
 ParticleEmitterNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {

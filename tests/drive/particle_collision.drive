@@ -1,0 +1,41 @@
+# #123: with collision on, particles collide with the physics world wherever
+# they are - here in negative space, on a static platform - instead of being
+# clamped to the window's size in world coordinates.
+wait 5
+click @asset.new-scene
+click @hier.add
+type static platform
+click @addnode.create
+dblclick @insp.position.x
+key ctrl+a
+type -350
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type -230
+key enter
+# (top level, not under the platform)
+key escape
+click @hier.add
+type particle emitter
+click @addnode.create
+expect node:ParticleEmitter.type == ParticleEmitterNode
+dblclick @insp.position.x
+key ctrl+a
+type -400
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type -300
+key enter
+click @particles.tab:collision
+click @insp.prop:emitter.collisionEnabled
+expect node:ParticleEmitter.prop.emitter.collisionEnabled == true
+key f
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 90
+expect node:ParticleEmitter.particles != 0
+screenshot negative_space_collision
+click @menu:Game
+click @menu:Game/Simulate in Editor
