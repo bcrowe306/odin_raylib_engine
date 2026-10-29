@@ -788,6 +788,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "ldtk.") do return LdtkPanel_DriveQuery(state, q)
 	if strings.has_prefix(q, "level.") do return LevelEditor_DriveQuery(state, q)
 	if strings.has_prefix(q, "shape") do return ShapeEdit_DriveQuery(state, q)
+	if strings.has_prefix(q, "atlas.") do return AtlasRegion_DriveQuery(q)
 	switch q {
 	case "palette.open": return "true" if Palette_IsOpen() else "false", true
 	case "selection":

@@ -30,6 +30,22 @@ atlasDialog: struct {
 	// Interactive dragging state
 	dragging:     bool,
 	dragStart:    [2]f32,
+	openWinPos:   [2]f32,
+	winPos:       [2]f32,
+}
+
+AtlasRegion_DriveQuery :: proc(q: string) -> (string, bool) {
+	switch q {
+	case "atlas.open":
+		return "true" if atlasDialog.open else "false", true
+	case "atlas.region":
+		return fmt.tprintf("%.0f,%.0f,%.0f,%.0f", atlasDialog.region.x, atlasDialog.region.y, atlasDialog.region.width, atlasDialog.region.height), true
+	case "atlas.win-pos":
+		return fmt.tprintf("%.0f,%.0f", atlasDialog.winPos.x, atlasDialog.winPos.y), true
+	case "atlas.win-moved":
+		return "true" if atlasDialog.openWinPos != {} && atlasDialog.winPos != atlasDialog.openWinPos else "false", true
+	}
+	return "", false
 }
 
 AtlasRegion_Open :: proc(state: ^EditorState, node: ^e.AtlasSpriteNode) {
@@ -39,6 +55,8 @@ AtlasRegion_Open :: proc(state: ^EditorState, node: ^e.AtlasSpriteNode) {
 	atlasDialog.origRegion = node.region
 	atlasDialog.region = node.region
 	atlasDialog.dragging = false
+	atlasDialog.openWinPos = {}
+	atlasDialog.winPos = {}
 	atlasDialog.zoom = 0 // 0 = fit
 	if atlasDialog.gridCols <= 0 do atlasDialog.gridCols = 4
 	if atlasDialog.gridRows <= 0 do atlasDialog.gridRows = 4
@@ -84,6 +102,8 @@ AtlasRegion_Render :: proc(state: ^EditorState) {
 	if !imgui.Begin(fmt.ctprintf("%s  Atlas Region Editor###AtlasRegionEditor", ICON_FA_CROP), &atlasDialog.open, {.NoCollapse}) {
 		return
 	}
+	atlasDialog.winPos = imgui.GetWindowPos()
+	if atlasDialog.openWinPos == {} do atlasDialog.openWinPos = atlasDialog.winPos
 
 	// --- Left Settings Column ---
 	if imgui.BeginChild("##atlas_side", {270, 0}, {}, {}) {
@@ -199,7 +219,7 @@ AtlasRegion_Render :: proc(state: ^EditorState) {
 	imgui.SameLine()
 
 	// --- Right Interactive Canvas Column ---
-	if imgui.BeginChild("##atlas_sheet", {0, 0}, {.Borders}, {.HorizontalScrollbar}) {
+	if imgui.BeginChild("##atlas_sheet", {0, 0}, {.Borders}, {.HorizontalScrollbar, .NoMove}) {
 		if atlasDialog.node.texture == nil {
 			UI_DimText("No texture to display.")
 		} else {
@@ -242,7 +262,7 @@ atlas_canvas :: proc(state: ^EditorState) {
 	UI_DimText("Cmd+wheel zooms · drag across to select region")
 
 	// --- Canvas Viewport ---
-	canvasOpen := imgui.BeginChild("##atlas_canvas", {0, 0}, {}, {.HorizontalScrollbar, .NoScrollWithMouse})
+	canvasOpen := imgui.BeginChild("##atlas_canvas", {0, 0}, {}, {.HorizontalScrollbar, .NoScrollWithMouse, .NoMove})
 	defer imgui.EndChild()
 	if !canvasOpen do return
 
@@ -281,9 +301,11 @@ atlas_canvas :: proc(state: ^EditorState) {
 
 	// Background and Image
 	imgui.DrawList_AddRectFilled(dl, p0, p0 + imgSize, col32(30, 34, 44, 255))
-	imgui.Image(transmute(imgui.TextureID)&node.texture.texture, imgSize, {0, 0}, {1, 1}, {1, 1, 1, 1}, {0, 0, 0, 0})
-	Drive_ItemRect("atlas.canvas", p0, p0 + imgSize, inWindow = true)
+	imgui.InvisibleButton("##atlas_canvas_hit", {max(imgSize.x, 1), max(imgSize.y, 1)}, {.MouseButtonLeft, .MouseButtonMiddle})
 	hovered := imgui.IsItemHovered()
+	active := imgui.IsItemActive()
+	imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)&node.texture.texture, p0, p0 + imgSize, {0, 0}, {1, 1}, col32(255, 255, 255, 255))
+	Drive_ItemRect("atlas.canvas", p0, p0 + imgSize, inWindow = true)
 
 	// Grid lines if enabled
 	if atlasDialog.enableGrid {
@@ -308,7 +330,7 @@ atlas_canvas :: proc(state: ^EditorState) {
 		return math.round(v / step) * step
 	}
 
-	if hovered && imgui.IsMouseClicked(.Left) {
+	if (hovered || active) && imgui.IsMouseClicked(.Left) {
 		atlasDialog.dragging = true
 		pt := texelMouse
 		if atlasDialog.enableGrid {
