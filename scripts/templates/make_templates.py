@@ -345,6 +345,16 @@ def platformer():
     t.json("project.json", project("Platformer", ["scenes/level1.scene.json"], PLATFORMER_ACTIONS))
     for s_ in PLATFORMER_SCRIPTS:
         t.script(s_)
+    # Starter physics components (they were snippets built into the editor: #87).
+    t.json("components/physics_crate.component.json", {
+        "type": "DynamicBodyNode", "name": "PhysicsCrate", "uid": "crate000",
+        "shapes": [{"type": "Box", "size": [64, 64], "density": 1.5, "friction": 0.4, "restitution": 0.2}]})
+    t.json("components/static_platform.component.json", {
+        "type": "StaticBodyNode", "name": "StaticPlatform", "uid": "platf000",
+        "shapes": [{"type": "Box", "size": [400, 32], "density": 0, "friction": 0.8, "restitution": 0}]})
+    t.json("components/trigger_zone.component.json", {
+        "type": "AreaNode", "name": "TriggerZone", "uid": "trigr000",
+        "shapes": [{"type": "Box", "size": [128, 128], "isSensor": True}]})
     with open(os.path.join(SCRIPTS, "platformer", "README.md")) as f:
         t.write("README.md", f.read())
     return t

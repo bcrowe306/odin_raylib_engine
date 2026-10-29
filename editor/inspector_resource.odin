@@ -18,7 +18,7 @@ import imgui "lib/imgui"
 // a drag or typing writes once at the end, a checkbox or a pick at once.
 // The file keeps only values that differ from the class's defaults, plus
 // keys the class doesn't declare. Every edit is an undo step in the one
-// undo stack (Editor_RecordResourceUndo). A running game / Simulate picks
+// undo stack (Editor_RecordFileUndo). A running game / Simulate picks
 // the file up through hot reload.
 // ============================================================================
 
@@ -92,7 +92,7 @@ ResourceInspector_Render :: proc(state: ^EditorState, rel: string) {
 		},
 		record_undo = proc(state: ^EditorState, t: ^Script_PropsTarget, label: string) {
 			ResourceInspector_Flush(state)
-			Editor_RecordResourceUndo(state, ri.path, label)
+			Editor_RecordFileUndo(state, ri.path, label)
 		},
 	}
 	if script_props_editor(state, &target) == 0 {

@@ -6,6 +6,7 @@ import "core:fmt"
 import "core:log"
 import "core:math"
 import os "osx"
+import "core:slice"
 import "core:strings"
 import "core:time"
 import rl "vendor:raylib"
@@ -24,6 +25,7 @@ import rl "vendor:raylib"
 //   "type", "name", "position", "scale", "rotation", "pivot" (the origin, nodes
 //   that draw a rectangle), "enabled", "visible", "layer"
 //   optional: "pause_mode", "paused", "tags", "editor_locked", "editor_hidden" (editor only)
+//   a component's root: "exposed": [{"uid", "property", "label"}] (component_exposed.odin)
 //   "properties": { <reflected gui:"true" fields> }        (see node_properties.odin)
 //   resources by type: "texture"/"origin" (TextureNode), "frames"/"fps"/"loop"/"origin"
 //   (FrameAnimationNode), "audio" (Sound/Music), "timer" {duration, auto_start, loop},
@@ -147,6 +149,7 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 
 	Json_Key(w, "type", &first); Json_String(w, Node_TypeName(node))
 	Json_Key(w, "name", &first); Json_String(w, node.name)
+	if uid := node_written_uid(node); uid != "" {Json_Key(w, "uid", &first); Json_String(w, uid)}
 	Json_Key(w, "position", &first); Json_Vec2(w, node.position)
 	Json_Key(w, "scale", &first); Json_Vec2(w, node.scale)
 	Json_Key(w, "rotation", &first); Json_Float(w, node.rotation)
@@ -175,15 +178,24 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	// instance root comes from the component file.
 	if node.componentPath != "" && node != serializeFullInstance {
 		Json_Key(w, "component", &first); Json_String(w, node.componentPath)
-		if ov := Component_OverridesJSON(node, manager); ov != "" {
+		// A placeholder (file missing) writes its overrides back as they were.
+		ov := node.componentRawOverrides if node.componentMissing else Component_OverridesJSON(node, manager)
+		if ov != "" {
 			Json_Key(w, "overrides", &first); strings.write_string(&w.sb, ov)
 		}
-		write_connections(w, node, &first)
-		w.indent -= 1
-		Json_NewLine(w)
-		strings.write_byte(&w.sb, '}')
-		return
+		// Nested in an instance serialized in full to diff it: its nodes in
+		// full too (overrides cross nested links, #79).
+		if !(serializeExpandNested && !node.componentMissing) {
+			write_connections(w, node, &first)
+			w.indent -= 1
+			Json_NewLine(w)
+			strings.write_byte(&w.sb, '}')
+			return
+		}
 	}
+
+	// (A component's root: written with the node, not on an instance's link.)
+	if len(node.componentExposed) > 0 do write_exposed(w, node, &first)
 
 	// Type-specific resources.
 	switch node.typeId {
@@ -847,13 +859,31 @@ load_texture_into :: proc(tn: ^TextureNode, path: string, ctx: ^GameContext) {
 
 @(private = "file")
 componentDepth: int
+// The components being built, outermost first (loops: #75).
+@(private = "file")
+componentStack: [16]string
 
 @(private = "file")
-read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameContext) -> ^Node {
+read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameContext, asPlain := false) -> ^Node {
 	// Linked component instance: build the subtree from the component file,
 	// then apply the instance's own name and transform.
-	if compPath := sj_string(obj, "component", ""); compPath != "" {
-		if inst := read_component_instance(scene, compPath, obj, parent, ctx); inst != nil do return inst
+	if compPath := sj_string(obj, "component", ""); compPath != "" && !asPlain {
+		// Nested in a component being built, already expanded (#79): its
+		// tree is here, with the outer levels' overrides applied.
+		if base, pre := obj[COMPONENT_EXPANDED].(json.String); pre {
+			if componentDepth >= len(componentStack) do return nil
+			componentStack[componentDepth] = compPath
+			componentDepth += 1
+			node := read_node(scene, obj, parent, ctx, true)
+			componentDepth -= 1
+			if node == nil do return nil
+			node.componentPath = strings.clone(compPath, node.allocator)
+			if Component_KeepBases do node.componentBase = strings.clone(string(base), node.allocator)
+			return node
+		}
+		inst, problem := read_component_instance(scene, compPath, obj, parent, ctx)
+		if inst != nil do return inst
+		return read_missing_component(scene, compPath, obj, parent, ctx, problem)
 	}
 	typeStr := sj_string(obj, "type", "Node")
 	node := Node_CreateByTypeName(scene, typeStr, parent)
@@ -861,6 +891,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.gameContext = ctx
 
 	node.name = strings.clone(sj_string(obj, "name", typeStr), node.allocator)
+	if uid := sj_string(obj, "uid", ""); uid != "" do node.uid = strings.clone(uid, node.allocator)
 	node.position = sj_vec2(obj, "position", {0, 0})
 	node.scale = sj_vec2(obj, "scale", {1, 1})
 	node.rotation = sj_float(obj, "rotation", 0)
@@ -875,6 +906,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.editorLocked = sj_bool(obj, "editor_locked", false)
 	node.editorHidden = sj_bool(obj, "editor_hidden", false)
 	read_tags(node, obj)
+	read_exposed(node, obj)
 
 	read_legacy_blocks(node, obj, ctx)
 
@@ -1167,7 +1199,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	}
 
 	// Old files put a texture on any node: show it with a child sprite.
-	if node.typeId != TextureNode && node.typeId != FrameAnimationNode {
+	if node.typeId != TextureNode && node.typeId != AtlasSpriteNode && node.typeId != FrameAnimationNode {
 		if path := sj_texture_path(obj); path != "" {
 			tn := cast(^TextureNode)Node_CreateByTypeName(scene, "TextureNode", node)
 			tn.name = strings.clone("Sprite", tn.allocator)
@@ -1202,8 +1234,16 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	read_material(node, obj)
 
 	if children, ok := sj_arr(obj, "children"); ok {
+		atlasTex := sj_texture_path(obj) if node.typeId == AtlasSpriteNode else ""
 		for c in children {
-			if co, is_obj := c.(json.Object); is_obj do _ = read_node(scene, co, node, ctx)
+			if co, is_obj := c.(json.Object); is_obj {
+				if atlasTex != "" && sj_string(co, "type", "") == "TextureNode" && sj_string(co, "name", "") == "Sprite" &&
+				   sj_texture_path(co) == atlasTex && sj_vec2(co, "position", {0, 0}) == {0, 0} &&
+				   !sj_obj_has(co, "children") && !sj_obj_has(co, "script") {
+					continue
+				}
+				_ = read_node(scene, co, node, ctx)
+			}
 		}
 	}
 	return node
@@ -1219,6 +1259,7 @@ read_origin :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
 	if _, has := obj["pivot"]; has {
 		node.pivot = sj_vec2(obj, "pivot", {0.5, 0.5})
 		if node.typeId == TextureNode && legacyPx != {0, 0} do (cast(^TextureNode)node).origin = legacyPx // the pixel override
+		if node.typeId == AtlasSpriteNode && legacyPx != {0, 0} do (cast(^AtlasSpriteNode)node).origin = legacyPx
 		return
 	}
 	switch node.typeId {
@@ -1229,6 +1270,8 @@ read_origin :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
 			node.pivot = legacyPx / size
 		} else if node.typeId == TextureNode {
 			(cast(^TextureNode)node).origin = legacyPx // no texture loaded (headless): keep the pixels
+		} else if node.typeId == AtlasSpriteNode {
+			(cast(^AtlasSpriteNode)node).origin = legacyPx
 		}
 	case AnimationPlayerNode:
 		node.pivot = {0, 0}
@@ -1507,30 +1550,25 @@ Component_ReadFile :: proc(ctx: ^GameContext, compPath: string) -> ([]byte, bool
 }
 
 @(private = "file")
-read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Object, parent: ^Node, ctx: ^GameContext) -> ^Node {
-	if componentDepth > 8 {
-		log.errorf("[SceneLoader] Component '%s' nests too deep (recursive?)", compPath)
-		return nil
-	}
-	data, ok := Component_ReadFile(ctx, compPath)
-	if !ok {
-		log.errorf("[SceneLoader] Component file not found: %s", compPath)
-		return nil
-	}
-	val, err := json.parse(data, allocator = context.temp_allocator)
-	if err != .None do return nil
-	obj, isObj := val.(json.Object)
-	if !isObj do return nil
-	if inner, has := sj_obj(obj, "node"); has do obj = inner
-	baseText := Component_PrepareBase(&obj, ctx)
+read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Object, parent: ^Node, ctx: ^GameContext) -> (^Node, string) {
+	// A component inside itself (A -> B -> A): the inner one isn't built (#75).
+	// Its nested instances expanded in place (#79).
+	stack := make([dynamic]string, context.temp_allocator)
+	append(&stack, ..componentStack[:componentDepth])
+	obj, baseText, problem := Component_Expand(ctx, compPath, &stack)
+	if problem != "" do return nil, problem
 	if ov, has := sj_obj(inst, "overrides"); has do Component_ApplyOverrides(&obj, ov)
+	componentStack[componentDepth] = compPath
 	componentDepth += 1
 	node := read_node(scene, obj, parent, ctx)
 	componentDepth -= 1
-	if node == nil do return nil
+	if node == nil do return nil, "its root node could not be created"
 	node.componentPath = strings.clone(compPath, node.allocator)
-	node.componentBase = strings.clone(baseText, node.allocator)
+	if Component_KeepBases do node.componentBase = strings.clone(baseText, node.allocator)
 	node.name = strings.clone(sj_string(inst, "name", node.name), node.allocator)
+	// The instance's own uid in the document holding it (a component nesting
+	// it); the component's root uid stays in its base. "" in scenes.
+	node.uid = strings.clone(sj_string(inst, "uid", ""), node.allocator)
 	node.position = sj_vec2(inst, "position", node.position)
 	node.scale = sj_vec2(inst, "scale", node.scale)
 	node.rotation = sj_float(inst, "rotation", node.rotation)
@@ -1548,14 +1586,73 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	node.editorHidden = sj_bool(inst, "editor_hidden", false)
 	if "tags" in inst do read_tags(node, inst)
 	if sj_obj_has(inst, "connections") do read_connections(node, inst)
+	return node, ""
+}
+
+// read_missing_component: an instance whose component file can't be loaded
+// becomes a placeholder - a node of its root's type with the instance's
+// name, transform and connections, keeping its link and its overrides
+// (raw JSON) so saving the scene writes them back unchanged (#72).
+@(private = "file")
+read_missing_component :: proc(scene: ^Scene, compPath: string, obj: json.Object, parent: ^Node, ctx: ^GameContext, problem: string) -> ^Node {
+	plain := make(json.Object, len(obj), context.temp_allocator)
+	for k, v in obj do if k != "component" && k != "overrides" && k != "children" do plain[k] = v
+	node := read_node(scene, plain, parent, ctx)
+	if node == nil do return nil
+	node.componentPath = strings.clone(compPath, node.allocator)
+	node.componentMissing = true
+	if ov, has := obj["overrides"]; has {
+		w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+		Json_WriteValue(&w, ov)
+		node.componentRawOverrides = strings.clone(strings.to_string(w.sb), node.allocator)
+	}
+	node.componentProblem = strings.clone(problem, node.allocator)
+	log.warnf("[SceneLoader] %s: component %s can't be loaded: %s - kept as a placeholder (its link and overrides are saved unchanged)", node.name, compPath, problem)
 	return node
+}
+
+// Component_Contains: does component `compPath` contain an instance of
+// `target` - directly or through components it contains? (Instances that
+// would contain themselves are refused: #75.)
+Component_Contains :: proc(ctx: ^GameContext, compPath, target: string) -> bool {
+	visited := make(map[string]bool, allocator = context.temp_allocator)
+	return component_contains(ctx, compPath, target, &visited)
+}
+
+@(private = "file")
+component_contains :: proc(ctx: ^GameContext, compPath, target: string, visited: ^map[string]bool) -> bool {
+	if compPath in visited do return false
+	visited[compPath] = true
+	data, ok := Component_ReadFile(ctx, compPath)
+	if !ok do return false
+	val, err := json.parse(data, allocator = context.temp_allocator)
+	if err != .None do return false
+	links := make([dynamic]string, context.temp_allocator)
+	collect :: proc(v: json.Value, links: ^[dynamic]string) {
+		obj, isObj := v.(json.Object)
+		if !isObj do return
+		if inner, has := obj["node"].(json.Object); has do collect(inner, links)
+		if c, has := obj["component"].(json.String); has && c != "" do append(links, string(c))
+		// (Children added to nested instances live in their overrides.)
+		if ov, has := obj["overrides"].(json.Object); has {
+			if added, ok := ov[OVERRIDE_ADDED].(json.Object); ok do for _, list in added do if arr, isArr := list.(json.Array); isArr do for n in arr do collect(n, links)
+		}
+		if kids, has := obj["children"].(json.Array); has do for k in kids do collect(k, links)
+	}
+	collect(val, &links)
+	for l in links {
+		if l == target do return true
+		if component_contains(ctx, l, target, visited) do return true
+	}
+	return false
 }
 
 // Scene_InstantiateComponent adds a linked instance of a component file.
 Scene_InstantiateComponent :: proc(scene: ^Scene, compPath: string, parent: ^Node, ctx: ^GameContext) -> ^Node {
 	inst := make(json.Object, 0, context.temp_allocator)
 	target := parent if parent != nil else scene.rootNode
-	return read_component_instance(scene, compPath, inst, target, ctx)
+	node, _ := read_component_instance(scene, compPath, inst, target, ctx)
+	return node
 }
 
 // Scene_RefreshComponentInstances rebuilds every linked instance of a
@@ -1563,37 +1660,53 @@ Scene_InstantiateComponent :: proc(scene: ^Scene, compPath: string, parent: ^Nod
 // name, transform and place in the hierarchy. Returns how many it rebuilt.
 Scene_RefreshComponentInstances :: proc(scene: ^Scene, compPath: string, ctx: ^GameContext) -> int {
 	if scene == nil || scene.manager == nil do return 0
+	// The outermost instance holding each one is rebuilt: its overrides are
+	// diffed against the base it was built from, so a nested file's change
+	// isn't pinned as an override (#79).
 	targets := make([dynamic]^Node, context.temp_allocator)
 	for n in scene.manager.nodes {
-		if n != nil && n.componentPath == compPath do append(&targets, n)
+		if n == nil || n.componentPath != compPath do continue
+		outer := n
+		for p := GetParent(scene.manager, n); p != nil; p = GetParent(scene.manager, p) do if p.componentPath != "" do outer = p
+		if !slice.contains(targets[:], outer) do append(&targets, outer)
 	}
 	// (Tile maps measure painted components again: their size may have changed.)
 	for n in scene.manager.nodes do if n != nil && n.typeId == TileMapNode do TileMapNode_ForgetFootprints(cast(^TileMapNode)n)
 	count := 0
 	for old in targets {
-		parent := GetParent(scene.manager, old)
-		if parent == nil do continue
-		index := 0
-		for c, i in GetChildrenView(scene.manager, parent) {
-			if c == old {index = i; break}
-		}
-		// The instance's own state is its JSON (link + transform).
-		instJson := Node_SerializeToJSON(old, scene.manager, context.temp_allocator)
-		RemoveNode(scene.manager, old)
-		ProcessNodeQueues(scene.manager, ctx)
-		fresh := Scene_InstantiateNodeFromJSON(scene, transmute([]u8)instJson, parent, ctx)
-		if fresh == nil do continue
-		MoveChild(scene.manager, parent, fresh, index)
-		count += 1
+		if Scene_RebuildInstance(scene, old, "", ctx) != nil do count += 1
 	}
-	ProcessNodeQueues(scene.manager, ctx)
 	return count
+}
+
+// Scene_RebuildInstance replaces an instance with one built again from its
+// JSON ("" = its current JSON: link, overrides, transform), at the same
+// place among its parent's children. Returns the new root (nil: failed;
+// the old one is gone either way). Every pointer to the old subtree is
+// stale afterwards - callers holding nodes (the editor's selection) keep
+// paths instead.
+Scene_RebuildInstance :: proc(scene: ^Scene, old: ^Node, instJson: string, ctx: ^GameContext) -> ^Node {
+	if scene == nil || old == nil do return nil
+	mgr := scene.manager
+	parent := GetParent(mgr, old)
+	if parent == nil do return nil
+	index := 0
+	for c, i in GetChildrenView(mgr, parent) do if c == old {index = i; break}
+	text := instJson if instJson != "" else Node_SerializeToJSON(old, mgr, context.temp_allocator)
+	RemoveNode(mgr, old)
+	ProcessNodeQueues(mgr, ctx)
+	fresh := Scene_InstantiateNodeFromJSON(scene, transmute([]u8)text, parent, ctx)
+	if fresh == nil do return nil
+	MoveChild(mgr, parent, fresh, index)
+	ProcessNodeQueues(mgr, ctx)
+	return fresh
 }
 
 // Node_UnlinkComponent turns an instance into ordinary nodes.
 Node_UnlinkComponent :: proc(node: ^Node) {
 	node.componentPath = ""
 	node.componentBase = ""
+	node.componentExposed = nil // (an ordinary node now)
 }
 
 // Node_ComponentRoot returns the linked instance a node belongs to (the

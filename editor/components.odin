@@ -5,29 +5,15 @@ import "core:os"
 import "core:path/filepath"
 import "core:strings"
 import e "../engine"
+import imgui "lib/imgui"
 
 // ============================================================================
 // Components (prefabs). A component file holds a node subtree; scenes keep
 // *linked* instances of it (the scene stores only the instance's link, name
 // and transform). "Edit Component" opens the file as its own document;
 // saving it refreshes every instance in the open scenes.
-// Built-in templates are snippets that are copied, not linked.
 // ============================================================================
 
-Component_Instantiate :: proc(state: ^EditorState, comp: ^ComponentDef, targetPos: [2]f32) -> ^e.Node {
-	if state == nil || comp == nil do return nil
-	return Editor_InstantiateComponentJSON(state, transmute([]u8)comp.jsonSnippet, targetPos, comp.name)
-}
-
-Component_InstantiateFromFile :: proc(state: ^EditorState, filePath: string, targetPos: [2]f32) -> ^e.Node {
-	if state == nil do return nil
-	return Editor_InstantiateComponentFile(state, asset_rel_editor(state, filePath), targetPos)
-}
-
-Component_SaveNodeToFile :: proc(state: ^EditorState, node: ^e.Node, outPath: string = "") -> bool {
-	_, ok := Editor_SaveComponent(state, node)
-	return ok
-}
 
 Editor_IsComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 	return scene != nil && state.componentDocs[scene]
@@ -87,19 +73,89 @@ Editor_SaveComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 		Editor_Log(state, .Error, "Component document is empty")
 		return false
 	}
-	json := e.Node_SerializeToJSON(children[0], scene.manager, context.temp_allocator)
+	json := e.Component_FileJSON(children[0], scene.manager, context.temp_allocator) // (every node gets a uid: #77)
 	disk, _ := filepath.join({state.projectPath, scene.filePath}, context.temp_allocator)
+	// Undo puts the file (and so the instances) back (#76).
+	Editor_RecordFileUndo(state, scene.filePath, fmt.tprintf("Save %s", scene.filePath))
 	Editor_InvalidateProjectFiles() // the asset lists rescan
 	if os.write_entire_file(disk, transmute([]u8)json) != nil {
 		Editor_Log(state, .Error, "Failed to write %s", disk)
 		return false
 	}
 	Editor_SetSceneBaseline(state, scene)
-	refreshed := 0
-	for _, other in state.game.sceneManager.scenes {
-		if other == nil || other == scene || !other.isLoaded || Editor_IsComponentDoc(state, other) do continue
-		refreshed += e.Scene_RefreshComponentInstances(other, scene.filePath, &state.game.gameContext)
-	}
+	sel := Editor_SaveSelection(state) // (Save All: the active scene may have instances)
+	refreshed := Editor_RefreshComponentInstances(state, scene.filePath)
+	Editor_RestoreSelection(state, sel)
 	Editor_Log(state, .Info, "Saved component %s (%d instance(s) updated)", scene.filePath, refreshed)
 	return true
+}
+
+// Editor_RefreshComponentInstances rebuilds the instances of a component
+// file in every open document - scenes and component documents nesting it
+// (#79) - except `skip`. Returns how many were rebuilt. When the active
+// scene is refreshed, the caller keeps the selection (Editor_SaveSelection
+// before any rebuild, #74).
+Editor_RefreshComponentInstances :: proc(state: ^EditorState, rel: string, skip: ^e.Scene = nil) -> int {
+	n := 0
+	for _, s in state.game.sceneManager.scenes {
+		if s == nil || s == skip || !s.isLoaded do continue
+		n += e.Scene_RefreshComponentInstances(s, rel, &state.game.gameContext)
+	}
+	return n
+}
+
+// --- conveniences (#86) ---------------------------------------------------------------
+
+// Editor_EditComponentAt opens the component of the instance holding
+// `node`, with that node selected in the document (its root when the node
+// was added to the instance, not part of the component).
+Editor_EditComponentAt :: proc(state: ^EditorState, node: ^e.Node) -> bool {
+	if state.activeScene == nil || node == nil do return false
+	mgr := state.activeScene.manager
+	inst := e.Node_ComponentRoot(mgr, node)
+	if inst == nil || inst.componentMissing do return false
+	path := strings.clone(e.Node_UidPathBelow(mgr, node, inst), context.temp_allocator)
+	rel := strings.clone(inst.componentPath, context.temp_allocator)
+	if !Editor_OpenComponent(state, rel) do return false
+	root := Editor_ComponentDocRoot(state, state.activeScene)
+	target := e.Node_FindByUidPath(state.activeScene.manager, root, path) if path != "" else nil
+	Editor_SelectNode(state, target if target != nil else root)
+	return true
+}
+
+// Editor_SelectAllInstances selects every instance of a component file in
+// the active scene (nested ones too). Returns how many.
+Editor_SelectAllInstances :: proc(state: ^EditorState, rel: string) -> int {
+	if state.activeScene == nil do return 0
+	Editor_SelectNode(state, nil)
+	n := 0
+	for node in state.activeScene.manager.nodes {
+		if node == nil || node.componentPath != rel || !e.Node_IsAlive(node) do continue
+		Editor_SelectNode(state, node, additive = true)
+		n += 1
+	}
+	Editor_Log(state, .Info, "Selected %d instance(s) of %s", n, rel)
+	return n
+}
+
+// Editor_ComponentInstanceCount: how many instances of a component file the
+// open documents hold (nested ones too), counted a few times a second.
+Editor_ComponentInstanceCount :: proc(state: ^EditorState, rel: string) -> int {
+	@(static) counts: map[string]int
+	@(static) counted: i32 = -1000
+	now := imgui.GetFrameCount()
+	if now - counted > 20 || now < counted {
+		counted = now
+		for k in counts do delete(k)
+		clear(&counts)
+		for _, s in state.game.sceneManager.scenes {
+			if s == nil || !s.isLoaded || s.manager == nil do continue
+			for n in s.manager.nodes {
+				if n == nil || n.componentPath == "" do continue
+				if n.componentPath in counts do counts[n.componentPath] += 1
+				else do counts[strings.clone(n.componentPath)] = 1
+			}
+		}
+	}
+	return counts[rel]
 }

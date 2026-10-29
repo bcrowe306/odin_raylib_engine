@@ -196,7 +196,8 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 
 	dim := !node.enabled || !node.renderable || node.editorHidden
 	rowColor := UI_TEXT_FAINT if dim else UI_TEXT
-	if node.componentPath != "" do rowColor = {0.75, 0.62, 1.0, 1} // component instance
+	if node.componentMissing do rowColor = UI_DANGER // its component file is missing (a placeholder)
+	else if node.componentPath != "" do rowColor = {0.75, 0.62, 1.0, 1} // component instance
 	else if Editor_NodeLocked(state, node) do rowColor = {0.75, 0.62, 1.0, 0.55}
 	imgui.PushStyleColorImVec4(.Text, rowColor)
 	imgui.SetNextItemAllowOverlap() // the visibility button sits on the row
@@ -468,11 +469,12 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 		count = len(kids)
 		for k, i in kids do if k == node do index = i
 	}
-	if hier_menu(ICON_FA_ARROW_UP, "Move Up", "move-up", parent != nil && index > 0 && !locked) {
+	// (Inside an instance too: its order is saved as an override, #78.)
+	if hier_menu(ICON_FA_ARROW_UP, "Move Up", "move-up", parent != nil && index > 0) {
 		Editor_RecordUndo(state, "Move up")
 		e.MoveChild(mgr, parent, node, index - 1)
 	}
-	if hier_menu(ICON_FA_ARROW_DOWN, "Move Down", "move-down", parent != nil && index < count - 1 && !locked) {
+	if hier_menu(ICON_FA_ARROW_DOWN, "Move Down", "move-down", parent != nil && index < count - 1) {
 		Editor_RecordUndo(state, "Move down")
 		e.MoveChild(mgr, parent, node, index + 1)
 	}
@@ -529,19 +531,22 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 	// Components.
 	imgui.Separator()
 	if inst != nil {
-		if hier_menu(ICON_FA_CUBES, "Edit Component", "edit-component") do Editor_OpenComponent(state, inst.componentPath)
+		if hier_menu(ICON_FA_CUBES, "Edit Component", "edit-component") do Editor_EditComponentAt(state, node)
+		if hier_menu(ICON_FA_OBJECT_GROUP, "Select All Instances", "select-instances") do Editor_SelectAllInstances(state, strings.clone(inst.componentPath, context.temp_allocator))
 		if hier_menu(ICON_FA_FLOPPY_DISK, "Apply Changes to Component", "apply-component") do Editor_ApplyInstanceToComponent(state, inst)
 		if hier_menu(ICON_FA_CLONE, "Save as New Component...", "save-new-component") do Prompt_Open(.SaveComponentAs, fmt.tprintf("%s_variant", inst.name), inst)
 		if hier_menu(ICON_FA_ROTATE_LEFT, "Revert Overrides" if node == inst else "Revert This Node", "revert-overrides") {
 			Editor_RecordUndo(state, "Revert overrides")
-			if fresh := e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext); fresh != nil do state.selectedNode = fresh
+			sel := Editor_SaveSelection(state) // (the instance is rebuilt: #74)
+			e.Scene_RevertComponentOverrides(state.activeScene, node, &state.game.gameContext)
+			Editor_RestoreSelection(state, sel)
 		}
 		if hier_menu(ICON_FA_LINK_SLASH, "Unlink", "unlink-component", node == inst) {
 			Editor_RecordUndo(state, "Unlink component")
 			e.Node_UnlinkComponent(node)
 		}
 	} else if !isRoot {
-		if hier_menu(ICON_FA_CUBES, "Save as Component", "save-component") do Component_SaveNodeToFile(state, node)
+		if hier_menu(ICON_FA_CUBES, "Save as Component", "save-component") do Editor_SaveComponent(state, node)
 		if hier_menu(ICON_FA_CLONE, "Save as Component Named...", "save-component-named") do Prompt_Open(.SaveComponentAs, node.name, node)
 	}
 	imgui.Separator()

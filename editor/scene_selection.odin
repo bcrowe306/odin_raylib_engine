@@ -69,6 +69,28 @@ Editor_SelectNode :: proc(state: ^EditorState, n: ^e.Node, additive := false) {
 	}
 }
 
+// Selection_Paths: the active scene's selection as child-index paths
+// (temp allocated) - it survives rebuilding nodes, which pointers don't.
+Selection_Paths :: struct {
+	primary: string,
+	all:     [dynamic]string,
+}
+
+Editor_SaveSelection :: proc(state: ^EditorState) -> Selection_Paths {
+	sp := Selection_Paths{primary = Editor_NodePath(state, state.selectedNode), all = make([dynamic]string, context.temp_allocator)}
+	for n in state.selection do append(&sp.all, Editor_NodePath(state, n))
+	return sp
+}
+
+// Editor_RestoreSelection selects the nodes now at the saved paths (after
+// instances were rebuilt: Apply / Revert / Save as Component, #74).
+Editor_RestoreSelection :: proc(state: ^EditorState, sp: Selection_Paths) {
+	clear(&state.selection)
+	for p in sp.all do if n := Editor_NodeAtPath(state, p); n != nil do append(&state.selection, n)
+	state.selectedNode = Editor_NodeAtPath(state, sp.primary) if sp.primary != "" else nil
+	if state.selectedNode != nil && len(state.selection) == 0 do append(&state.selection, state.selectedNode)
+}
+
 Editor_ClearSelection :: proc(state: ^EditorState) {
 	clear(&state.selection)
 	state.selectedNode = nil
@@ -177,6 +199,7 @@ Editor_InstantiateNodes :: proc(state: ^EditorState, json: string, _: int, offse
 		state.selectedNode = n
 	}
 	e.ProcessNodeQueues(mgr, &state.game.gameContext)
+	for n in state.selection do e.Node_ForgetCopiedUids(mgr, n) // (copies are new nodes: #77)
 	e.Node_SetGlobalPositions(mgr, state.activeScene.rootNode)
 	return len(state.selection)
 }
@@ -243,6 +266,7 @@ Editor_PasteNodesInto :: proc(state: ^EditorState, parent: ^e.Node) {
 		state.selectedNode = n
 	}
 	e.ProcessNodeQueues(mgr, &state.game.gameContext)
+	for n in state.selection do e.Node_ForgetCopiedUids(mgr, n) // (copies are new nodes: #77)
 	e.Node_SetGlobalPositions(mgr, state.activeScene.rootNode)
 }
 

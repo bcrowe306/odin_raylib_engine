@@ -788,6 +788,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "ldtk.") do return LdtkPanel_DriveQuery(state, q)
 	if strings.has_prefix(q, "level.") do return LevelEditor_DriveQuery(state, q)
 	if strings.has_prefix(q, "shape") do return ShapeEdit_DriveQuery(state, q)
+	if strings.has_prefix(q, "atlas.") do return AtlasRegion_DriveQuery(q)
 	switch q {
 	case "palette.open": return "true" if Palette_IsOpen() else "false", true
 	case "selection":
@@ -867,6 +868,11 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	switch q {
 	case "selected":
 		return state.selectedNode.name if state.selectedNode != nil else "", true
+	case "selection-alive":
+		// Every selected node is a live node of the active scene (no stale pointers).
+		if state.selectedNode != nil && !node_in_scene(state, state.selectedNode) do return "false", true
+		for n in state.selection do if !node_in_scene(state, n) do return "false", true
+		return "true", true
 	case "scene":
 		return state.activeScenePath, true
 	case "scene-tabs":
@@ -937,6 +943,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "folder-open:") {
 		return "true" if assetFolderOpen[q[len("folder-open:"):]] else "false", true
 	}
+	if strings.has_prefix(q, "component-instances:") do return fmt.tprint(Editor_ComponentInstanceCount(state, q[len("component-instances:"):])), true
 	if strings.has_prefix(q, "item:") {
 		_, ok := GlobalDrive.prevItems[q[5:]]
 		return "visible" if ok else "missing", true
@@ -960,6 +967,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 		if n == nil do return "<no node>", true
 		switch field {
 		case "type": return e.Node_TypeName(n), true
+		case "component": return n.componentPath, true // its component file ("" = not an instance root)
+		case "component-missing": return "true" if n.componentMissing else "false", true
 		case "parent":
 			p := e.GetParent(state.activeScene.manager, n)
 			return p.name if p != nil else "", true
@@ -1012,6 +1021,8 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 			return strings.to_string(sb), true
 		case "overrides":
 			return strings.join(e.Node_ComponentOverrides(state.activeScene.manager, n), ",", context.temp_allocator), true
+		case "uid":
+			return n.uid, true
 		case "script":
 			if n.scriptInstance == nil do return "", true
 			return (cast(^e.ScriptInstance)n.scriptInstance).modulePath, true

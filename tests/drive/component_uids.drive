@@ -1,0 +1,43 @@
+# #77: overrides refer to a component's nodes by uid. Renaming a child in
+# the component document keeps every instance's override on it.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip2
+
+# Override a child of the second instance.
+click @hier:PlayerShip2/ParticleEmitter
+dblclick @insp.position.x
+key ctrl+a
+type 25
+key enter
+expect node:PlayerShip2/ParticleEmitter.overrides == position
+key ctrl+s
+
+# Rename that child in the component, and save it.
+rclick @asset:components/PlayerShip.component.json
+click @ctx:edit-component
+expect scene == components/PlayerShip.component.json
+click @hier:PlayerShip/ParticleEmitter
+dblclick @insp.name
+key ctrl+a
+type Exhaust
+key enter
+expect node:PlayerShip/Exhaust.exists == true
+key ctrl+s
+expect file:components/PlayerShip.component.json contains "Exhaust"
+
+# Both instances have the renamed child; the override is still on it.
+dblclick @asset:scenes/main.scene.json
+expect node:PlayerShip2/Exhaust.position contains 25.0,
+expect node:PlayerShip2/Exhaust.overrides == position
+expect node:PlayerShip/Exhaust.position !contains 25.0,
+key ctrl+s
+expect file:scenes/main.scene.json !contains "ParticleEmitter"
+screenshot renamed_child_keeps_override

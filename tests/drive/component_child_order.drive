@@ -1,0 +1,46 @@
+# #78: the order of an instance's children is saved (an override): move a
+# child up and add one in the middle, save, revert to the file - same order;
+# the other instance keeps the component's order.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+rclick @hier:PlayerShip
+click @ctx:add-child
+type timer
+key enter
+expect node:PlayerShip.child-names == ParticleEmitter,Timer
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip2
+
+# Move Timer up in the second instance (allowed inside an instance now).
+rclick @hier:PlayerShip2/Timer
+click @ctx:move-up
+expect node:PlayerShip2.child-names == Timer,ParticleEmitter
+expect node:PlayerShip2.overrides == child order
+# Add a node and move it between the two.
+rclick @hier:PlayerShip2
+click @ctx:add-child
+type empty
+key enter
+expect node:PlayerShip2.child-names == Timer,ParticleEmitter,EmptyNode
+rclick @hier:PlayerShip2/EmptyNode
+click @ctx:move-up
+expect node:PlayerShip2.child-names == Timer,EmptyNode,ParticleEmitter
+key ctrl+s
+expect file:scenes/main.scene.json contains "$order"
+
+# Change something, then revert to the saved file: the order comes back.
+rclick @hier:PlayerShip2/EmptyNode
+click @ctx:move-up
+expect node:PlayerShip2.child-names == EmptyNode,Timer,ParticleEmitter
+click @menu:File
+click @menu:File/Revert Scene
+wait 2
+expect node:PlayerShip2.child-names == Timer,EmptyNode,ParticleEmitter
+expect node:PlayerShip.child-names == ParticleEmitter,Timer
+screenshot order_kept

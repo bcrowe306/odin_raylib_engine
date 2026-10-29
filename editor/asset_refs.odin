@@ -36,16 +36,16 @@ loaded_scenes :: proc(state: ^EditorState) -> []^e.Scene {
 	return out[:]
 }
 
-// Undo_ResourceMoved: resource undo entries follow their file when it (or
+// Undo_FileMoved: undo entries that restore a file follow it when it (or
 // its folder) moves.
-Undo_ResourceMoved :: proc(state: ^EditorState, oldRel, newRel: string, isFolder: bool) {
+Undo_FileMoved :: proc(state: ^EditorState, oldRel, newRel: string, isFolder: bool) {
 	for stack in ([]^[dynamic]Undo_Entry{&state.undoStack, &state.redoStack}) {
 		for &entry in stack {
-			if entry.kind != .Resource do continue
-			if entry.resource != oldRel && !(isFolder && strings.has_prefix(entry.resource, strings.concatenate({oldRel, "/"}, context.temp_allocator))) do continue
-			moved := strings.concatenate({newRel, entry.resource[len(oldRel):]})
-			delete(entry.resource)
-			entry.resource = moved
+			if entry.file == "" do continue
+			if entry.file != oldRel && !(isFolder && strings.has_prefix(entry.file, strings.concatenate({oldRel, "/"}, context.temp_allocator))) do continue
+			moved := strings.concatenate({newRel, entry.file[len(oldRel):]})
+			delete(entry.file)
+			entry.file = moved
 		}
 	}
 }
@@ -149,13 +149,15 @@ Asset_Move :: proc(state: ^EditorState, oldRel, newRel: string) -> bool {
 			}
 		}
 	}
-	Undo_ResourceMoved(state, oldRel, newRel, isFolder)
+	Undo_FileMoved(state, oldRel, newRel, isFolder)
 	for stack in ([]^[dynamic]Undo_Entry{&state.undoStack, &state.redoStack}) {
 		for &entry in stack {
-			text, n := e.AssetPath_Rewrite(Undo_Unpack(entry.json), oldRel, newRel, isFolder, context.temp_allocator)
-			if n == 0 do continue
-			Undo_Release(entry.json)
-			entry.json = Undo_Pack(text)
+			for snap in ([]^Undo_Snapshot{&entry.json, &entry.fileText}) {
+				text, n := e.AssetPath_Rewrite(Undo_Unpack(snap^), oldRel, newRel, isFolder, context.temp_allocator)
+				if n == 0 do continue
+				Undo_Release(snap^)
+				snap^ = Undo_Pack(text)
+			}
 		}
 	}
 	for f in reference_files(state) {

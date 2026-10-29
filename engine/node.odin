@@ -88,9 +88,23 @@ Node :: struct {
 	// instantiated from ("" = not an instance). Its subtree comes from that
 	// file; the scene stores only the instance's name and transform.
 	componentPath: string,
+	// Stable id in the component file (or component document) the node was
+	// loaded from: 8 base-36 characters, unique in that file; "" for plain
+	// scene nodes. Instance overrides refer to nodes by uid paths
+	// (component_overrides.odin).
+	uid: string,
 	// The (normalized) component JSON the instance was built from; overrides
 	// are what differs from it (component_overrides.odin).
 	componentBase: string,
+	// The component file couldn't be loaded (missing, unreadable, or a loop):
+	// this node is a placeholder that keeps the instance's link and its
+	// "overrides" JSON as they were, so saving doesn't lose them (#72).
+	componentMissing:      bool,
+	componentRawOverrides: string,
+	componentProblem:      string, // why it couldn't be loaded (for the Inspector)
+	// A component's root (in its file / document, and on its instances): the
+	// properties of its nodes shown on every instance (#85).
+	componentExposed: []Component_Exposed,
 	// Saved signal connections from this node's events to script methods
 	// (signals.odin).
 	signalConnections: [dynamic]Signal_Connection,
