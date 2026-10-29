@@ -411,6 +411,44 @@ Resource_ReleaseScope :: proc(mgr: ^ScriptManager, scope: rawptr) {
 	}
 }
 
+// Resource_ReloadScope reloads a scope's local resource copies from their files
+// and runs on_load again, then re-resolves resource properties on scripts in the
+// scope's subtree. Used when reusing pooled nodes (#82).
+Resource_ReloadScope :: proc(mgr: ^ScriptManager, scope: rawptr, rootNode: ^Node = nil) {
+	if mgr == nil || scope == nil do return
+	// 1. Reload the scope's resources from files and run on_load
+	for r in mgr.resources {
+		if r.scope != scope do continue
+		file, ok := Resource_ReadFile(mgr, r.path)
+		if !ok do continue
+		resource_refresh(mgr, r, file.values)
+		resource_call_on_load(mgr, r)
+	}
+
+	// 2. Re-resolve resource properties for scripts in the subtree
+	if rootNode != nil && mgr.L != nil && mgr.isReady {
+		resolve_node_resources(mgr, rootNode)
+	}
+}
+
+@(private = "file")
+resolve_node_resources :: proc(mgr: ^ScriptManager, n: ^Node) {
+	if n == nil || !Node_IsAlive(n) do return
+	if n.scriptInstance != nil {
+		inst := cast(^ScriptInstance)n.scriptInstance
+		if inst.registryRef != 0 {
+			lua.rawgeti(mgr.L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef))
+			script_resolve_resource_props(mgr.L, inst, mgr)
+			lua.pop(mgr.L, 1)
+		}
+	}
+	if n.gameContext != nil && n.gameContext.scene != nil && n.gameContext.scene.manager != nil {
+		for child in GetChildrenTemp(n.gameContext.scene.manager, n) {
+			resolve_node_resources(mgr, child)
+		}
+	}
+}
+
 // Resource_ForgetScope: a node is being destroyed (Node_Terminate).
 Resource_ForgetScope :: proc(node: ^Node) {
 	mgr := &scriptManager

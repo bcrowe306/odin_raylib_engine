@@ -3,10 +3,13 @@ package engine
 import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
+import "core:log"
 import "core:math"
 import "core:math/rand"
 import "core:slice"
 import "core:strings"
+import "core:time"
+import os "osx"
 
 // ============================================================================
 // Per-node overrides for linked component (prefab) instances.
@@ -365,11 +368,225 @@ component_base_json :: proc(ctx: ^GameContext, compPath: string) -> (json.Object
 // in stored base text.
 COMPONENT_EXPANDED :: "$expanded"
 
+// Component_KeepBases: instances remember the component JSON they were
+// built from (componentBase), to diff against it after the file changes -
+// the editor. A game (Engine_RunProject) turns it off: its files don't
+// change while it runs, so overrides are diffed against the file (#80).
+Component_KeepBases := true
+
+// --- prepared components cache (#80) -----------------------------------------------
+// Expanding a component (read, parse, normalize, expand what it nests) is
+// done once per path; instances are built from a parse of the cached text.
+// An entry lists every file it read (the component and what it nests, also
+// missing ones) with its size and time, and is dropped when one differs;
+// writers that may write twice within the time resolution call
+// Component_ForgetPrepared.
+
+@(private = "file")
+Prepared_Dep :: struct {
+	path:   string,
+	exists: bool,
+	size:   i64,
+	mod:    time.Time,
+}
+
+@(private = "file")
+Prepared :: struct {
+	text: string, // the expanded tree (nested base texts under their markers)
+	base: string,
+	deps: []Prepared_Dep,
+	// A file it read was modified just before it was made: written again
+	// in the same file time (same size), a change couldn't be told - so it's
+	// expanded again until its files are older (git's "racy clean").
+	racy: bool,
+}
+
+// RACY_WINDOW: how recently modified a file must be for an entry reading it
+// to be racy (file times are coarse on some systems).
+@(private = "file")
+RACY_WINDOW :: 2 * time.Second
+
+@(private = "file")
+preparedCache: map[string]Prepared
+// The files read by the expansion being cached (nil: not caching).
+@(private = "file")
+preparedDeps: ^[dynamic]string
+
+// Component_ForgetPrepared drops every prepared component (a component file
+// was written).
+Component_ForgetPrepared :: proc() {
+	heap := runtime_heap()
+	for k, p in preparedCache {
+		delete(k, heap)
+		delete(p.text, heap)
+		delete(p.base, heap)
+		for d in p.deps do delete(d.path, heap)
+		delete(p.deps, heap)
+	}
+	delete(preparedCache)
+	preparedCache = nil
+}
+
+// Component_PreparedCount: how many prepared components are cached.
+Component_PreparedCount :: proc() -> int {
+	return len(preparedCache)
+}
+
+@(private = "file")
+prepared_dep :: proc(ctx: ^GameContext, path: string) -> Prepared_Dep {
+	d := Prepared_Dep{path = path}
+	disk := path
+	if ctx != nil && ctx.game != nil {
+		// (Files in a mounted .rayzr don't change.)
+		if ctx.game.assetManager.package_ != nil && RayzrPackage_HasFile(ctx.game.assetManager.package_, path) {
+			d.exists = true
+			return d
+		}
+		disk = AssetManager_ResolveDiskPath(&ctx.game.assetManager, path)
+	}
+	if info, err := os.stat(disk, context.temp_allocator); err == nil {
+		d.exists, d.size, d.mod = true, info.size, info.modification_time
+	}
+	return d
+}
+
+@(private = "file")
+prepared_fresh :: proc(ctx: ^GameContext, p: Prepared) -> bool {
+	for d in p.deps {
+		now := prepared_dep(ctx, d.path)
+		if now.exists != d.exists || now.size != d.size || now.mod != d.mod do return false
+	}
+	return true
+}
+
+// drop_prepared removes an entry. A stale one's base is kept in staleBases
+// without bases (a game): the instances built from it diff against it when
+// they're rebuilt (Component_HotReload).
+@(private = "file")
+drop_prepared :: proc(compPath: string, stale := true) {
+	heap := runtime_heap()
+	key, p := delete_key(&preparedCache, compPath)
+	if stale && !Component_KeepBases && !(key in staleBases) {
+		// (Gone stale twice before a rebuild: the first base is the one
+		// most instances were built from.)
+		if staleBases == nil do staleBases = make(map[string]string, 4, heap)
+		staleBases[key] = p.base
+	} else {
+		delete(key, heap)
+		delete(p.base, heap)
+	}
+	delete(p.text, heap)
+	for d in p.deps do delete(d.path, heap)
+	delete(p.deps, heap)
+}
+
+// --- hot reload (#83) --------------------------------------------------------------
+// A game (development runs: scriptManager.hotReload) rebuilds the instances
+// of a component whose file changed - the outermost instance holding each,
+// with its overrides (diffed against the base it was built from, kept in
+// staleBases), transform and place in the tree. The editor (bases kept)
+// refreshes instances itself when it writes a component file.
+
+@(private = "file")
+staleBases: map[string]string
+@(private = "file")
+lastComponentCheck: time.Tick
+
+@(private = "file")
+forget_stale_bases :: proc() {
+	heap := runtime_heap()
+	for k, v in staleBases {
+		delete(k, heap)
+		delete(v, heap)
+	}
+	delete(staleBases)
+	staleBases = nil
+}
+
+// Component_HotReload checks the prepared components' files (every
+// HOT_RELOAD_INTERVAL unless `force`) and rebuilds the instances of the
+// changed ones in every loaded scene. Returns how many it rebuilt.
+Component_HotReload :: proc(game: ^Game, force := false) -> int {
+	if game == nil || Component_KeepBases do return 0
+	if !force && time.tick_since(lastComponentCheck) < HOT_RELOAD_INTERVAL do return 0
+	lastComponentCheck = time.tick_now()
+	ctx := &game.gameContext
+	stale := make([dynamic]string, context.temp_allocator)
+	for k, p in preparedCache do if !prepared_fresh(ctx, p) do append(&stale, k)
+	for k in stale do drop_prepared(k)
+	if len(staleBases) == 0 do return 0
+	defer forget_stale_bases()
+	count := 0
+	for _, scene in game.sceneManager.scenes {
+		if scene == nil || !scene.isLoaded || scene.manager == nil do continue
+		targets := make([dynamic]^Node, context.temp_allocator)
+		for n in scene.manager.nodes {
+			if n == nil || !(n.componentPath in staleBases) do continue
+			outer := n
+			for p := GetParent(scene.manager, n); p != nil; p = GetParent(scene.manager, p) do if p.componentPath != "" do outer = p
+			if !slice.contains(targets[:], outer) do append(&targets, outer)
+		}
+		rebuilt := 0
+		for old in targets {
+			base, has := staleBases[old.componentPath]
+			if !has {
+				// (Built before the cache knew it: its overrides can't be told
+				// from the file's old values.)
+				log.warnf("[HotReload] %s: instance %s kept as it is (restart to update it)", old.componentPath, old.name)
+				continue
+			}
+			if old.componentBase == "" do old.componentBase = strings.clone(base, old.allocator)
+			path := strings.clone(old.componentPath, context.temp_allocator)
+			if Scene_RebuildInstance(scene, old, "", ctx) != nil {
+				rebuilt += 1
+				log.infof("[HotReload] Rebuilt an instance of %s", path)
+			}
+		}
+		// (Tile maps measure painted components again: their size may have changed.)
+		if rebuilt > 0 do for n in scene.manager.nodes do if n != nil && n.typeId == TileMapNode do TileMapNode_ForgetFootprints(cast(^TileMapNode)n)
+		count += rebuilt
+	}
+	return count
+}
+
 // Component_Expand: the component file's node JSON, normalized, its nested
 // instances expanded; and its base text (what instances diff against).
 // `stack`: the components being expanded / built around it (loops: #75).
+// Outside any other component (an empty stack) it comes from the cache.
 @(private)
 Component_Expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]string) -> (obj: json.Object, baseText: string, problem: string) {
+	if len(stack) > 0 || preparedDeps != nil do return component_expand(ctx, compPath, stack)
+	if p, cached := preparedCache[compPath]; cached {
+		fresh := prepared_fresh(ctx, p)
+		if fresh && !p.racy {
+			val, err := json.parse(transmute([]u8)p.text, allocator = context.temp_allocator)
+			if o, isObj := val.(json.Object); err == .None && isObj do return o, p.base, ""
+		}
+		drop_prepared(compPath, stale = !fresh)
+	}
+	deps := make([dynamic]string, context.temp_allocator)
+	preparedDeps = &deps
+	obj, baseText, problem = component_expand(ctx, compPath, stack)
+	preparedDeps = nil
+	if problem != "" do return // (a missing / broken file isn't cached: it may come back)
+	heap := runtime_heap()
+	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	json_write_value(&w, obj, false)
+	entry := Prepared{text = strings.clone(strings.to_string(w.sb), heap), base = strings.clone(baseText, heap), deps = make([]Prepared_Dep, len(deps), heap)}
+	now := time.now()
+	for path, i in deps {
+		entry.deps[i] = prepared_dep(ctx, path)
+		entry.deps[i].path = strings.clone(path, heap)
+		if d := entry.deps[i]; d.exists && time.diff(d.mod, now) < RACY_WINDOW do entry.racy = true
+	}
+	if preparedCache == nil do preparedCache = make(map[string]Prepared, 16, heap)
+	preparedCache[strings.clone(compPath, heap)] = entry
+	return
+}
+
+@(private = "file")
+component_expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]string) -> (obj: json.Object, baseText: string, problem: string) {
+	if preparedDeps != nil do append(preparedDeps, compPath)
 	for p in stack do if p == compPath {
 		chain := make([dynamic]string, context.temp_allocator)
 		append(&chain, ..stack[:])
@@ -408,7 +625,7 @@ expand_links :: proc(ctx: ^GameContext, obj: ^json.Object, stack: ^[dynamic]stri
 			expand_links(ctx, co, stack)
 			continue
 		}
-		nested, nestedBase, problem := Component_Expand(ctx, string(path), stack)
+		nested, nestedBase, problem := component_expand(ctx, string(path), stack)
 		if problem != "" do continue
 		if ov, hasOv := co["overrides"].(json.Object); hasOv do Component_ApplyOverrides(&nested, ov)
 		// The link's keys on top (an instance's own lock / hide flags only).
@@ -995,6 +1212,104 @@ Scene_RevertComponentOverrides :: proc(scene: ^Scene, node: ^Node, ctx: ^GameCon
 	return Scene_RebuildInstance(scene, root, strings.to_string(w.sb), ctx)
 }
 
+// take_override_key removes one value from a node's override entry (`key`
+// as Node_ComponentOverrides lists it: a node key, a reflected property, or
+// "script.<name>") and returns it as an entry of its own.
+@(private = "file")
+take_override_key :: proc(entry: ^json.Object, key: string) -> (single: json.Object, found: bool) {
+	single = make(json.Object, 0, context.temp_allocator)
+	// (Maps are written back after a change: their length is in the value.)
+	take :: proc(outer: ^json.Object, sub, key: string) -> (json.Value, bool) {
+		o, _ := outer[sub].(json.Object)
+		v, has := o[key]
+		if !has do return nil, false
+		delete_key(&o, key)
+		if len(o) == 0 do delete_key(outer, sub)
+		else do outer[sub] = o
+		return v, true
+	}
+	wrap :: proc(key: string, v: json.Value) -> json.Object {
+		o := make(json.Object, 0, context.temp_allocator)
+		o[key] = v
+		return o
+	}
+	if strings.has_prefix(key, "script.") {
+		so, _ := entry["script"].(json.Object)
+		v := take(&so, "properties", key[len("script."):]) or_return
+		if len(so) == 0 do delete_key(entry, "script")
+		else do entry["script"] = so
+		single["script"] = wrap("properties", wrap(key[len("script."):], v))
+		return single, true
+	}
+	if v, has := entry[key]; has && key != "properties" && key != "script" {
+		delete_key(entry, key)
+		single[key] = v
+		return single, true
+	}
+	v := take(entry, "properties", key) or_return
+	single["properties"] = wrap(key, v)
+	return single, true
+}
+
+// Scene_RevertComponentOverride drops one overridden value of a node in an
+// instance (`key` as Node_ComponentOverrides lists it) and rebuilds the
+// instance. Returns its new root (nil: the node has no such override).
+Scene_RevertComponentOverride :: proc(scene: ^Scene, node: ^Node, key: string, ctx: ^GameContext) -> ^Node {
+	mgr := scene.manager
+	root, path := Node_ComponentOverridePath(mgr, node)
+	if root == nil do return nil
+	instJson := Node_SerializeToJSON(root, mgr, context.temp_allocator)
+	val, err := json.parse(transmute([]u8)instJson, allocator = context.temp_allocator)
+	if err != .None do return nil
+	obj, _ := val.(json.Object)
+	ov, _ := obj["overrides"].(json.Object)
+	entry, has := ov[path].(json.Object)
+	if !has do return nil
+	if _, found := take_override_key(&entry, key); !found do return nil
+	if len(entry) == 0 do delete_key(&ov, path)
+	else do ov[path] = entry
+	if len(ov) == 0 do delete_key(&obj, "overrides")
+	else do obj["overrides"] = ov
+	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	Json_WriteValue(&w, obj)
+	return Scene_RebuildInstance(scene, root, strings.to_string(w.sb), ctx)
+}
+
+// Component_ApplyOverrideJSON: the component file of the instance holding
+// a node's override (`rel`, project-relative), with that one value (`key`
+// as Node_ComponentOverrides lists it) written into it - inside a nested
+// instance, into its link's overrides. ("", "": no such override.) It's
+// written like Apply: a scratch instance with only that override, removed
+// again.
+Component_ApplyOverrideJSON :: proc(scene: ^Scene, node: ^Node, key: string, ctx: ^GameContext, allocator := context.allocator) -> (rel, text: string) {
+	mgr := scene.manager
+	root, path := Node_ComponentOverridePath(mgr, node)
+	if root == nil || root.componentMissing do return "", ""
+	ovText := Component_OverridesJSON(root, mgr)
+	if ovText == "" do return "", ""
+	val, err := json.parse(transmute([]u8)ovText, allocator = context.temp_allocator)
+	if err != .None do return "", ""
+	ov, _ := val.(json.Object)
+	entry, has := ov[path].(json.Object)
+	if !has do return "", ""
+	single, found := take_override_key(&entry, key)
+	if !found do return "", ""
+	one := make(json.Object, 0, context.temp_allocator)
+	one[path] = single
+	link := make(json.Object, 0, context.temp_allocator)
+	link["component"] = json.String(root.componentPath)
+	link["overrides"] = one
+	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	Json_WriteValue(&w, link)
+	scratch := Scene_InstantiateNodeFromJSON(scene, transmute([]u8)strings.to_string(w.sb), GetParent(mgr, root), ctx)
+	if scratch == nil do return "", ""
+	ProcessNodeQueues(mgr, ctx)
+	text = Component_InstanceJSON(scratch, mgr, allocator)
+	RemoveNode(mgr, scratch)
+	ProcessNodeQueues(mgr, ctx)
+	return strings.clone(root.componentPath, allocator), text
+}
+
 @(private = "file")
 runtime_heap :: proc() -> runtime.Allocator {
 	return Engine_HeapAllocator()
@@ -1008,6 +1323,8 @@ Component_ClearCaches :: proc() {
 	}
 	delete(typeDefaults)
 	typeDefaults = nil
+	Component_ForgetPrepared()
+	forget_stale_bases()
 }
 
 // Component_InstanceJSON: an instance's whole subtree as a component file

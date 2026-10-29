@@ -21,6 +21,7 @@ test_atlas_sprite_node :: proc(t: ^testing.T) {
 
 	an := cast(^AtlasSpriteNode)node
 	an.name = "AtlasPlayer"
+	an.filePath = strings.clone("textures/ship.png", an.allocator)
 
 	// Check default region and size
 	testing.expect_value(t, an.region, rl.Rectangle{})
@@ -62,9 +63,22 @@ test_atlas_sprite_node :: proc(t: ^testing.T) {
 	testing.expect_value(t, loaded.typeId, AtlasSpriteNode)
 
 	anLoaded := cast(^AtlasSpriteNode)loaded
+	testing.expect_value(t, anLoaded.filePath, "textures/ship.png")
+	testing.expect_value(t, anLoaded.children.len, i32(0))
 	testing.expect_value(t, anLoaded.region, rl.Rectangle{16, 32, 64, 48})
 	testing.expect_value(t, anLoaded.size, [2]f32{64, 48})
 	testing.expect_value(t, anLoaded.pivot, [2]f32{0.5, 0.5})
+
+	// 4b. Legacy scene healing: strip accidental auto-created "Sprite" child TextureNode with same texture
+	legacyJson := `{"root":{"children":[{"type":"AtlasSpriteNode","name":"HealMe","texture":"textures/ship.png","region":[0,0,32,32],"children":[{"type":"TextureNode","name":"Sprite","texture":"textures/ship.png"}]}]}}`
+	s3 := game->createScene("atlas_legacy_heal", false)
+	Scene_InstantiateFromJSON(s3, transmute([]u8)legacyJson, &game.gameContext)
+	ProcessNodeQueues(s3.manager, &game.gameContext)
+	healed := Scene_FindNodeByName(s3, "HealMe")
+	testing.expect(t, healed != nil, "found healed AtlasSpriteNode")
+	if healed != nil {
+		testing.expect_value(t, healed.children.len, i32(0))
+	}
 
 	// 5. Script Lua API
 	L := game.scriptManager.L

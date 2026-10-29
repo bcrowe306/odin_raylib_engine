@@ -1,0 +1,17 @@
+# #86: Assets shows how many instances of a component the open scenes use
+# (counted a few times a second: the waits).
+wait 5
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+wait 25
+expect component-instances:components/PlayerShip.component.json == 1
+expect item:asset.instances:components/PlayerShip.component.json == visible
+dblclick @asset:components/PlayerShip.component.json
+wait 25
+expect component-instances:components/PlayerShip.component.json == 2
+screenshot two_instances
+click @hier:PlayerShip2
+key delete
+wait 25
+expect component-instances:components/PlayerShip.component.json == 1

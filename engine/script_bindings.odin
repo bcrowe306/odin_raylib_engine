@@ -381,6 +381,32 @@ lua_node_set_visible :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 @(private="file")
+lua_node_get_component :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.componentPath == "" {
+		lua.pushnil(L)
+		return 1
+	}
+	nameC := strings.clone_to_cstring(node.componentPath, context.temp_allocator)
+	lua.pushstring(L, nameC)
+	return 1
+}
+
+@(private="file")
+lua_node_get_instance_root :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.gameContext == nil || node.gameContext.scene == nil || node.gameContext.scene.manager == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	root := Node_ComponentRoot(node.gameContext.scene.manager, node)
+	push_node_userdata(L, root)
+	return 1
+}
+
+@(private="file")
 lua_node_get_parent :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
@@ -3862,9 +3888,88 @@ lua_scene_get_nodes :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
-// Scene.instantiate(component, parent?, x?, y?): a component instance at
-// runtime (added to the parent, else the scene's root; the position is
-// local to the parent - two numbers or a vector). Returns its root node.
+@(private="file")
+apply_script_props_from_lua :: proc(L: ^lua.State, node: ^Node, tableIdx: c.int, sm: ^ScriptManager) {
+	if node == nil || node.scriptInstance == nil || lua.type(L, tableIdx) != .TABLE do return
+	inst := cast(^ScriptInstance)node.scriptInstance
+	tIdx := lua.absindex(L, tableIdx)
+
+	lua.pushnil(L)
+	for lua.next(L, tIdx) != 0 {
+		// Key is at -2, value is at -1
+		if lua.type(L, -2) == .STRING {
+			key := string(lua.tostring(L, -2))
+			val: ScriptValue
+			val.type = .Float
+			#partial switch lua.type(L, -1) {
+			case .BOOLEAN:
+				val = ScriptValue{type = .Boolean, valBool = bool(lua.toboolean(L, -1))}
+			case .NUMBER:
+				if lua.isinteger(L, -1) {
+					val = ScriptValue{type = .Int, valInt = i64(lua.tointeger(L, -1))}
+				} else {
+					val = ScriptValue{type = .Float, valFloat = f32(lua.tonumber(L, -1))}
+				}
+			case .STRING:
+				val = ScriptValue{type = .String, valString = string(lua.tostring(L, -1))}
+			case .TABLE:
+				decl := script_prop_decl(inst, key, sm)
+				assetKind := decl.assetKind if decl != nil else ""
+				if Script_IsJsonKind(assetKind) {
+					jsonText := lua_to_json(L, -1)
+					val = ScriptValue{type = .String, valString = jsonText}
+				} else if decl != nil && (decl.type == .Color || decl.type == .Vector2) {
+					// Check Color or Vector2 based on decl
+					if decl.type == .Vector2 {
+						vx, vy := arg_xy(L, -1)
+						val = ScriptValue{type = .Vector2, valVec2 = {vx, vy}}
+					} else {
+						// Color
+						cVal: [4]f32 = {1, 1, 1, 1}
+						for i in 0 ..< 4 {
+							lua.rawgeti(L, -1, lua.Integer(i + 1))
+							if lua.type(L, -1) == .NUMBER do cVal[i] = f32(lua.tonumber(L, -1))
+							lua.pop(L, 1)
+						}
+						val = ScriptValue{type = .Color, valColor = cVal}
+					}
+				} else {
+					// Fallback: check length or keys
+					lua.rawgeti(L, -1, 1)
+					has1 := !lua.isnil(L, -1)
+					lua.pop(L, 1)
+					if has1 {
+						// Array table: if 4 elements maybe color, if 2 elements maybe vec2, else JSON
+						lenT := lua.rawlen(L, -1)
+						if lenT == 2 {
+							vx, vy := arg_xy(L, -1)
+							val = ScriptValue{type = .Vector2, valVec2 = {vx, vy}}
+						} else {
+							jsonText := lua_to_json(L, -1)
+							val = ScriptValue{type = .String, valString = jsonText}
+						}
+					} else {
+						// Maybe a Vec2 or dictionary table
+						vx, vy := arg_xy(L, -1)
+						val = ScriptValue{type = .Vector2, valVec2 = {vx, vy}}
+					}
+				}
+			}
+			decl := script_prop_decl(inst, key, sm)
+			if decl != nil {
+				if decl.type == .Int && val.type == .Float do val = {type = .Int, valInt = i64(math.round(val.valFloat))}
+				if decl.type == .Float && val.type == .Int do val = {type = .Float, valFloat = f32(val.valInt)}
+			}
+			ScriptInstance_SetProperty(inst, key, val, sm)
+		}
+		lua.pop(L, 1) // pop value, keep key for lua.next
+	}
+}
+
+// Scene.instantiate(component, parent?, pos?, props?): a component instance at
+// runtime (added to the parent, else the scene's root; pos is
+// local to the parent - two numbers or a vector; props is an optional table of
+// property values applied before ready()). Returns its root node.
 @(private="file")
 lua_scene_instantiate :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
@@ -3885,10 +3990,42 @@ lua_scene_instantiate :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnil(L)
 		return 1
 	}
+
+	propsIdx: c.int = 0
 	if !lua.isnoneornil(L, 3) {
-		x, y := arg_xy(L, 3)
-		root.position = {x, y}
+		if lua.type(L, 3) == .NUMBER && lua.type(L, 4) == .NUMBER {
+			root.position = {f32(lua.tonumber(L, 3)), f32(lua.tonumber(L, 4))}
+			if lua.type(L, 5) == .TABLE do propsIdx = 5
+		} else if lua.type(L, 3) == .TABLE {
+			// Check if arg 3 is Vec2 / position, or props table
+			// A Vec2 has metatable with __name == "Vec2" or has "x" / "y" fields
+			isPos := false
+			lua.getfield(L, 3, "x")
+			if lua.type(L, -1) == .NUMBER do isPos = true
+			lua.pop(L, 1)
+			if !isPos {
+				lua.rawgeti(L, 3, 1)
+				if lua.type(L, -1) == .NUMBER {
+					lua.rawgeti(L, 3, 2)
+					if lua.type(L, -1) == .NUMBER && lua.rawlen(L, 3) == 2 do isPos = true
+					lua.pop(L, 1)
+				}
+				lua.pop(L, 1)
+			}
+			if isPos {
+				x, y := arg_xy(L, 3)
+				root.position = {x, y}
+				if lua.type(L, 4) == .TABLE do propsIdx = 4
+			} else {
+				propsIdx = 3
+			}
+		}
 	}
+
+	if propsIdx != 0 {
+		apply_script_props_from_lua(L, root, propsIdx, sm)
+	}
+
 	push_node_userdata(L, root)
 	return 1
 }
@@ -4246,6 +4383,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "get_tags")
 
 		// Hierarchy
+		lua.pushcfunction(L, lua_node_get_component)
+		lua.setfield(L, -2, "get_component")
+		lua.pushcfunction(L, lua_node_get_instance_root)
+		lua.setfield(L, -2, "get_instance_root")
 		lua.pushcfunction(L, lua_node_get_parent)
 		lua.setfield(L, -2, "get_parent")
 		lua.pushcfunction(L, lua_node_get_children)

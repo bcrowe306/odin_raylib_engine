@@ -1,0 +1,59 @@
+# #85: a component exposes a child's property (right-click its label in the
+# component document > Expose on Instances); every instance's root shows it
+# in an "Instance" section, and editing it there is an ordinary override.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip2
+expect item:insp.exposed:Thrust == missing
+
+# In the component document: expose the emitter's rotation, label it.
+rclick @asset:components/PlayerShip.component.json
+click @ctx:edit-component
+expect scene == components/PlayerShip.component.json
+click @hier:PlayerShip/ParticleEmitter
+rclick @insp.proplabel:rotation
+click @ctx:expose-property
+click @hier:PlayerShip
+expect item:insp.exposed-label:0 == visible
+click @insp.exposed-label:0
+type Thrust
+key enter
+screenshot document
+click @hier:PlayerShip/ParticleEmitter
+rclick @insp.proplabel:rotation
+expect item:ctx:unexpose-property == visible
+key escape
+wait 1
+expect modified == true
+# (Ctrl+S right after Escape closed a menu doesn't reach the editor: click first.)
+click @hier:PlayerShip
+key ctrl+s
+wait 1
+expect modified == false
+expect file:components/PlayerShip.component.json contains "exposed": [{"uid": "
+expect file:components/PlayerShip.component.json contains "property": "rotation", "label": "Thrust"
+
+# Back in the scene: the instance's root shows it.
+dblclick @asset:scenes/main.scene.json
+click @hier:PlayerShip2
+expect item:insp.exposed:Thrust == visible
+screenshot instance
+dblclick @insp.exposed:Thrust
+key ctrl+a
+type 30
+key enter
+wait 1
+expect node:PlayerShip2/ParticleEmitter.rotation == 30.0
+expect node:PlayerShip2/ParticleEmitter.overrides == rotation
+expect node:PlayerShip/ParticleEmitter.overrides ==
+key ctrl+s
+expect file:scenes/main.scene.json contains {"rotation": 30}
+expect file:scenes/main.scene.json !contains "exposed"
+screenshot edited

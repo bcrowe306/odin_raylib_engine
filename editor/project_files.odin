@@ -38,6 +38,7 @@ projectFiles: struct {
 }
 
 Editor_InvalidateProjectFiles :: proc() {
+	e.Component_ForgetPrepared() // (a component file may be written: #80)
 	assetThumbsStale = true // grid thumbnails reload
 	projectFiles.valid = false
 	projectFiles.packagesValid = false
