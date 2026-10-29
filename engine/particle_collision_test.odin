@@ -58,9 +58,10 @@ alive_particles :: proc(em: ^ParticleEmitter) -> (n: int, maxY, minX, maxX: f32)
 	maxY, minX, maxX = -1e9, 1e9, -1e9
 	for p in em.particles do if p.alive {
 		n += 1
-		maxY = max(maxY, p.position.y)
-		minX = min(minX, p.position.x)
-		maxX = max(maxX, p.position.x)
+		w := particle_to_world(em, p.position) // (local by default: #124)
+		maxY = max(maxY, w.y)
+		minX = min(minX, w.x)
+		maxX = max(maxX, w.x)
 	}
 	return
 }
@@ -83,7 +84,8 @@ test_particle_collision_physics_world :: proc(t: ^testing.T) {
 		r := collision_run(.Stop, DEFAULT_COLLISION_MASK, 1.5, "stop")
 		defer r.game->terminate()
 		for p in r.emitter.emitter.particles do if p.alive {
-			testing.expectf(t, p.position.y > -112 && p.position.y <= -109, "resting on the floor: %v", p.position.y)
+			w := particle_to_world(&r.emitter.emitter, p.position)
+			testing.expectf(t, w.y > -112 && w.y <= -109, "resting on the floor: %v", w.y)
 			testing.expectf(t, abs(p.velocity.y) < 10, "not moving: %v", p.velocity)
 		}
 	}

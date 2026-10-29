@@ -1,0 +1,23 @@
+# #124: an emitter inside a scaled, rotated node (the demo ship is scaled
+# 0.45): its particles are scaled and turned with it, and - Local space, the
+# default - move with it.
+wait 5
+# (The demo's starfield emitter sits at the ship's place: off, for clear shots.)
+click @hier:StarfieldEmitter
+click @insp.enabled
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+expect node:ParticleEmitter.parent == PlayerShip
+expect node:ParticleEmitter.prop.emitter.localSpace == true
+wait 400
+screenshot ship_upright
+click @hier:PlayerShip
+dblclick @insp.rotation
+key ctrl+a
+type 90
+key enter
+wait 400
+expect node:PlayerShip.rotation ~= 90
+screenshot ship_turned
