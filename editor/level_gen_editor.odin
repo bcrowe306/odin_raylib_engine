@@ -369,14 +369,32 @@ lge_toolbar :: proc(state: ^EditorState) {
 	imgui.BeginDisabled(tm == nil)
 	if UI_Button(fmt.tprintf("%s  Apply to TileMap", ICON_FA_TABLE_CELLS), "lge.apply") && tm != nil {
 		Editor_RecordUndo(state, "Generate level")
-		if err := e.Gen_ApplyTileMap(&lge.graph, cast(^e.TileMapNode)tm, 0, &state.game.gameContext); err != "" {
+		if err := e.Gen_ApplyTileMap(&lge.graph, cast(^e.TileMapNode)tm, 0, &state.game.gameContext, state.activeScene); err != "" {
 			Editor_Log(state, .Error, "Level Generator: %s", err)
 		} else {
 			Editor_Log(state, .Info, "Generated %s into %s (seed %d)", filepath.base(lge.path), tm.name, lge.graph.seed)
 		}
 	}
 	imgui.EndDisabled()
-	UI_Tooltip("Writes the level into the TileMap selected in the scene (Ctrl/Cmd+Z undoes it)" if tm != nil else "Select a TileMap in the scene to write the level into it")
+	UI_Tooltip("Writes the level (tiles and entities) into the TileMap selected in the scene (Ctrl/Cmd+Z undoes it)" if tm != nil else "Select a TileMap in the scene to write the level into it")
+	// The Level tab's current IntGrid layer (an LDtk level being edited).
+	imgui.SameLine(0, 4)
+	doc := GlobalLevel.doc
+	intGrid := doc != nil && GlobalLevel.level >= 0 && GlobalLevel.level < len(doc.levels) && GlobalLevel.layer >= 0 && GlobalLevel.layer < len(doc.levels[GlobalLevel.level].layers)
+	if intGrid {
+		ly := doc.levels[GlobalLevel.level].layers[GlobalLevel.layer]
+		intGrid = ly.def >= 0 && doc.layerDefs[ly.def].type == .IntGrid
+	}
+	imgui.BeginDisabled(!intGrid)
+	if UI_Button(fmt.tprintf("%s  Apply to LDtk Layer", ICON_FA_LAYER_GROUP), "lge.apply-ldtk") && intGrid {
+		if err := e.Gen_ApplyIntGrid(&lge.graph, doc, GlobalLevel.level, GlobalLevel.layer); err != "" {
+			Editor_Log(state, .Error, "Level Generator: %s", err)
+		} else {
+			Editor_Log(state, .Info, "Generated %s into the LDtk layer %s", filepath.base(lge.path), doc.layerDefs[doc.levels[GlobalLevel.level].layers[GlobalLevel.layer].def].identifier)
+		}
+	}
+	imgui.EndDisabled()
+	UI_Tooltip("Writes the tile output into the IntGrid layer picked in the Level tab: its tiles are the IntGrid values; the auto layers draw the rest (the Level tab's undo takes it back)" if intGrid else "Pick an IntGrid layer of a level in the Level tab")
 	imgui.SameLine(0, 10)
 	UI_DimText(fmt.tprintf("%d nodes · %d x %d cells", len(lge.graph.nodes), lge.graph.size.x, lge.graph.size.y))
 }
@@ -590,9 +608,9 @@ lge_canvas :: proc(state: ^EditorState) {
 				label: cstring,
 				kinds: []e.Gen_Kind,
 			}{
-				{"Generators", {.Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect}},
-				{"Modifiers", {.Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine}},
-				{"Output", {.Tile_Output}},
+				{"Generators", {.Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker}},
+				{"Modifiers", {.Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine, .Scatter, .Surface}},
+				{"Output", {.Tile_Output, .Entity_Output}},
 			}
 			for grp in groups {
 				imgui.SeparatorText(grp.label)
@@ -696,6 +714,18 @@ lge_side :: proc(state: ^EditorState) {
 				UI_EndProps()
 			}
 			if n.kind == .Tile_Output do lge_rules(n)
+			if n.kind == .Entity_Output {
+				imgui.SeparatorText("Component")
+				files := make([dynamic]string, context.temp_allocator)
+				for f in Editor_ListProjectFiles(state, "", {".component.json"}) do append(&files, f)
+				imgui.SetNextItemWidth(-1)
+				if path, ok := asset_picker("lge.component", n.component, files[:], false); ok {
+					lge_change()
+					e.Gen_SetComponent(g, n, path)
+				}
+				Drive_Item("lge.component")
+				if n.component == "" do imgui.TextColored(UI_WARNING, "Pick the component it places")
+			}
 		}
 	}
 	// The preview: the selected node's grid, else the output's.

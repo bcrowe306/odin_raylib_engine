@@ -7,9 +7,10 @@ and the **tile output** turns values into tiles and writes them into a
 TileMap. The same generator and **seed** always give the same level, on
 every platform - so a seed is a level you can share, replay or test.
 
-So far (#142): the generator file, the nodes, the Lua module and the
-**Level Generator** window in the editor. Entity placement, rooms and
-corridors, LDtk output and your own nodes follow.
+So far (#142): the generator file, the nodes (terrain, caves, rooms and
+corridors, walkers), placing entities, TileMap and LDtk output, the Lua
+module and the **Level Generator** window in the editor. Your own nodes and
+a runtime generator node follow.
 
 ## In the editor
 
@@ -108,6 +109,8 @@ is an error.
 | `gradient` | `direction`: `horizontal` (0 left .. 1 right), `vertical` (0 top .. 1 bottom), `radial` (1 centre .. 0 corners) | A ramp. |
 | `border` | `width` (1) | 1 within that many cells of the edge. |
 | `rect` | `x`, `y`, `w`, `h` (8), `value` (1) | A filled rectangle. |
+| `rooms` | `min_size` (4), `max_size` (10), `corridor` (1), `seed` (0) | A dungeon: the level split in two again and again (BSP), a room in each part, corridors joining every split - every room reachable. 1 = floor (invert it for walls). |
+| `walker` | `steps` (400), `walkers` (1), `brush` (1), `seed` (0) | Random walks from the centre ("drunkard's walk"): winding tunnels and caverns. 1 = walked. |
 
 **Modifiers** (input `in`, or `a` and `b`)
 
@@ -120,12 +123,39 @@ is an error.
 | `cellular` | `iterations` (4), `birth` (5), `survive` (4), `edge_solid` (true) | Cave smoothing: an empty cell with at least `birth` solid neighbours (of 8) becomes solid, a solid one with fewer than `survive` empties. |
 | `dilate` / `erode` | `iterations` (1) | Grow / shrink solid areas a cell at a time. |
 | `combine` | `op`: `add`, `subtract`, `multiply`, `min`, `max`, `mask` (a where b is solid), `average` | Two grids into one. |
+| `scatter` | `chance` (0.05), `spacing` (4), `seed` (0) | Random points (1), at least `spacing` cells apart - on the input's solid cells when it is connected, anywhere otherwise. |
+| `surface` | `side`: `top` (empty cells with solid below: ground to stand on), `bottom` (solid above: ceilings), `any` | Empty cells against the input's solid ones. |
 
 **Output**
 
 | Type | | |
 |---|---|---|
 | `tile_output` | `empty` (-1), `rules` | Each cell takes the first rule whose `min`..`max` holds its value: one of its `tiles` (or `tile`), picked by the cell and the seed. Cells no rule takes get `empty` (-1: none). |
+| `entity_output` | `max` (0 = all), `component` | Its component (a `.component.json`) on every point of its input (cells >= 0.5) - `max` of them picked by the seed. A graph can have several (enemies, coins, the player's start). |
+
+## Placing things
+
+Feed an **entity output** with points - a `scatter` of a `surface`, for
+coins on the ground:
+
+```json
+{"id": 6, "type": "surface", "inputs": {"in": 4}},
+{"id": 7, "type": "scatter", "inputs": {"in": 6}, "params": {"chance": 0.2, "spacing": 6}},
+{"id": 8, "type": "entity_output", "inputs": {"in": 7}, "params": {"max": 20},
+ "component": "components/coin.component.json"}
+```
+
+Generating into a TileMap places them as its children at their cells'
+centres (tagged `levelgen`); generating again replaces them. Scripts get
+the same placements with `LevelGen.entities`.
+
+## Into an LDtk level
+
+In the editor, pick an **IntGrid** layer of a level in the Level tab, then
+**Apply to LDtk Layer** in the Level Generator window: the tile output's
+tiles become the layer's IntGrid values (1, 2...; empty cells 0) and the
+layer's auto rules draw the tiles - the LDtk way of mapping values to art.
+The Level tab's undo takes it back. (Odin: `Gen_ApplyIntGrid`.)
 
 `seed` on a node adds to the graph's seed, so two noise nodes can differ.
 
@@ -133,8 +163,9 @@ is an error.
 
 | Function | |
 |---|---|
-| `LevelGen.generate(file, tilemap [, seed])` -> ok, why | Writes the level into a TileMap node; `level_generated` (the map's name) is emitted on the event bus. |
-| `LevelGen.values(file [, seed [, node_id]])` -> `{width, height, values}` | The grid without a tile map (row-major: `values[y * width + x + 1]`) - any node's with `node_id`. Place enemies, pickups or the player on it yourself until entity placement lands. |
+| `LevelGen.generate(file, tilemap [, seed])` -> ok, why | Writes the level into a TileMap node - tiles and entities; `level_generated` (the map's name) is emitted on the event bus. |
+| `LevelGen.values(file [, seed [, node_id]])` -> `{width, height, values}` | The grid without a tile map (row-major: `values[y * width + x + 1]`) - any node's with `node_id`. |
+| `LevelGen.entities(file [, seed])` -> `{{component, x, y}, ...}` | The entity outputs' placements (cells), to spawn yourself. |
 
 ```lua
 -- Put the player on the first open cell of the cave.
