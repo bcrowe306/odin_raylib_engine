@@ -788,6 +788,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "ldtk.") do return LdtkPanel_DriveQuery(state, q)
 	if strings.has_prefix(q, "level.") do return LevelEditor_DriveQuery(state, q)
 	if strings.has_prefix(q, "shape") do return ShapeEdit_DriveQuery(state, q)
+	if strings.has_prefix(q, "atlas.") do return AtlasRegion_DriveQuery(q)
 	switch q {
 	case "palette.open": return "true" if Palette_IsOpen() else "false", true
 	case "selection":
@@ -942,6 +943,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	if strings.has_prefix(q, "folder-open:") {
 		return "true" if assetFolderOpen[q[len("folder-open:"):]] else "false", true
 	}
+	if strings.has_prefix(q, "component-instances:") do return fmt.tprint(Editor_ComponentInstanceCount(state, q[len("component-instances:"):])), true
 	if strings.has_prefix(q, "item:") {
 		_, ok := GlobalDrive.prevItems[q[5:]]
 		return "visible" if ok else "missing", true

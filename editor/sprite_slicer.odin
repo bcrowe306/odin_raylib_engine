@@ -284,7 +284,7 @@ Slicer_Render :: proc(state: ^EditorState) {
 	imgui.SameLine()
 
 	// --- the sheet, cells and the preview ---
-	if imgui.BeginChild("##slicer_sheet", {0, 0}, {.Borders}, {.HorizontalScrollbar}) {
+	if imgui.BeginChild("##slicer_sheet", {0, 0}, {.Borders}, {.HorizontalScrollbar, .NoMove}) {
 		if slicer.tex.id == 0 {
 			UI_DimText("Pick a texture to slice.")
 		} else {
@@ -349,7 +349,7 @@ slicer_sheet :: proc(state: ^EditorState) {
 
 	// --- the sheet: scrolls when zoomed in ---
 	avail := imgui.GetContentRegionAvail()
-	canvasOpen := imgui.BeginChild("##slicer_canvas", {avail.x, max(avail.y - previewH - 6, 60)}, {}, {.HorizontalScrollbar, .NoScrollWithMouse})
+	canvasOpen := imgui.BeginChild("##slicer_canvas", {avail.x, max(avail.y - previewH - 6, 60)}, {}, {.HorizontalScrollbar, .NoScrollWithMouse, .NoMove})
 	defer imgui.EndChild()
 	if !canvasOpen do return
 	canvasMn := imgui.GetWindowPos()
@@ -387,8 +387,9 @@ slicer_sheet :: proc(state: ^EditorState) {
 	p0 := imgui.GetCursorScreenPos()
 	dl := imgui.GetWindowDrawList()
 	imgui.DrawList_AddRectFilled(dl, p0, p0 + size, col32(30, 34, 44, 255))
-	imgui.Image(transmute(imgui.TextureID)&slicer.tex, size, {0, 0}, {1, 1}, {1, 1, 1, 1}, {0, 0, 0, 0})
-	hovered := imgui.IsItemHovered()
+	imgui.InvisibleButton("##slicer_canvas_hit", {max(size.x, 1), max(size.y, 1)}, {.MouseButtonLeft, .MouseButtonMiddle})
+	hovered := imgui.IsItemHovered() || imgui.IsItemActive()
+	imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)&slicer.tex, p0, p0 + size, {0, 0}, {1, 1}, col32(255, 255, 255, 255))
 	if !imgui.IsMouseDown(.Left) do slicer.dragAdd = false
 	for cell in 0 ..< cell_count() {
 		r := cell_rect(cell)

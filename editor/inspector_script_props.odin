@@ -65,11 +65,18 @@ script_props_editor :: proc(state: ^EditorState, t: ^Script_PropsTarget) -> int 
 	return len(keyed)
 }
 
+// script_prop_one draws one property's row (an exposed property on a
+// component instance, #85); `label` = "" for its own.
+script_prop_one :: proc(state: ^EditorState, t: ^Script_PropsTarget, name: string, label := "") {
+	script_prop_row(state, t, name, label)
+}
+
 @(private = "file")
-script_prop_row :: proc(state: ^EditorState, t: ^Script_PropsTarget, name: string) {
+script_prop_row :: proc(state: ^EditorState, t: ^Script_PropsTarget, name: string, labelOverride := "") {
 	val := t.values[name]
 	info := Script_ModProp(t.mod, name)
 	propLabel := info.label if info != nil && info.label != "" else pretty_name(name)
+	if labelOverride != "" do propLabel = labelOverride
 	prop_label(propLabel, t.owner, fmt.tprintf("script.%s", name), script_lua_value(val))
 	TIP :: imgui.HoveredFlags_DelayNormal | imgui.HoveredFlags_Stationary
 	if imgui.IsItemHovered() {

@@ -102,6 +102,9 @@ Node :: struct {
 	componentMissing:      bool,
 	componentRawOverrides: string,
 	componentProblem:      string, // why it couldn't be loaded (for the Inspector)
+	// A component's root (in its file / document, and on its instances): the
+	// properties of its nodes shown on every instance (#85).
+	componentExposed: []Component_Exposed,
 	// Saved signal connections from this node's events to script methods
 	// (signals.odin).
 	signalConnections: [dynamic]Signal_Connection,
