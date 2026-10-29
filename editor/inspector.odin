@@ -93,7 +93,7 @@ inspector_body :: proc(state: ^EditorState) {
 		copy(inspectorNameBuf[:len(inspectorNameBuf) - 1], node.name)
 		inspectorNameNode = node
 	}
-	imgui.SetNextItemWidth(-1 if isRoot else imgui.GetContentRegionAvail().x - 2 * 30 - 4)
+	imgui.SetNextItemWidth(-1 if isRoot else imgui.GetContentRegionAvail().x - 3 * 30 - 6)
 	imgui.PushFont(GlobalFonts.semibold)
 	if imgui.InputText("##NodeName", cstring(raw_data(inspectorNameBuf[:])), len(inspectorNameBuf), {.EnterReturnsTrue, .AutoSelectAll}) || imgui.IsItemDeactivatedAfterEdit() {
 		newName := strings.trim_space(string(cstring(raw_data(inspectorNameBuf[:]))))
@@ -123,6 +123,8 @@ inspector_body :: proc(state: ^EditorState) {
 			for n in multi_selection(state) do n.renderable = on
 			node.renderable = on
 		}
+		imgui.SameLine(0, 2)
+		if UI_IconButton(ICON_FA_CIRCLE_QUESTION, "insp.node-docs", fmt.tprintf("%s documentation (Shift+F1)", e.Node_TypeName(node))) do NodeReference_Open(e.Node_TypeName(node))
 	}
 	imgui.PushFont(GlobalFonts.small)
 	UI_DimText(e.Node_TypeName(node))

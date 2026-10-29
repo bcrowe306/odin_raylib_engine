@@ -1,0 +1,32 @@
+# #45: a node's documentation opens in the editor - from its menu in the
+# hierarchy, the Inspector's ? button, Shift+F1 - and the index lists every
+# node; pages link to each other.
+wait 5
+expect noderef.open == false
+rclick @hier:PlayerShip
+click @ctx:node-docs
+expect noderef.open == true
+expect noderef.page == TextureNode
+screenshot texture_node_page
+click @noderef.index
+expect noderef.page ==
+screenshot index
+click @noderef.back
+expect noderef.page == TextureNode
+
+click @hier:StarfieldEmitter
+click @insp.node-docs
+expect noderef.page == ParticleEmitterNode
+
+click @hier:MainCamera
+key shift+f1
+expect noderef.page == CameraNode
+
+# A page with its hand-written part (docs/nodes/AreaNode.md).
+click @asset.new-scene
+click @hier.add
+type trigger area
+click @addnode.create
+key shift+f1
+expect noderef.page == AreaNode
+screenshot area_page

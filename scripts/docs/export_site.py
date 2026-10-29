@@ -270,6 +270,10 @@ class Exporter:
         categories = {}
         for n in data["nodes"]:
             categories.setdefault(n["category"], []).append(n)
+            # A node page's hand-written part (docs/nodes/<Type>.md) links to
+            # other nodes as `[Area](AreaNode.md)` (the editor's Node
+            # Reference follows them too): those go to the generated pages.
+            self.file_slugs[f"docs/nodes/{n['type']}.md"] = f"{base}/{kebab(n['type'])}"
 
         common_rows = props_table(data["common"])
         self.write_page(f"{base}/common", "Common properties (every node)",

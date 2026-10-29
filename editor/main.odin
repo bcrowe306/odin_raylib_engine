@@ -263,6 +263,7 @@ editor_main :: proc() -> int {
 		NewResourceDialog_Render(&GlobalEditor)
 		ScriptReference_Render(&GlobalEditor)
 		LevelRef_Render(&GlobalEditor)
+		NodeReference_Render(&GlobalEditor)
 		ProjectSettingsDialog_Render(&GlobalEditor)
 		Palette_Render(&GlobalEditor)
 		Shortcuts_Render(&GlobalEditor)
