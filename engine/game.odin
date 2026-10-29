@@ -247,6 +247,7 @@ GameTerminate :: proc(game: ^Game) {
 	InputSystem_Destroy(&game.input)
 	Node_ReleaseArenaPool()
 	Component_ClearCaches()
+	CustomNodes_Forget()
 	vmem.arena_destroy(&game.arena)
 	free(game)
 }

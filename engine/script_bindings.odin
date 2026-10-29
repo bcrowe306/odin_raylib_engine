@@ -90,6 +90,35 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushstring(L, "Unknown")
 		return 1
 	}
+	// A custom node type: its own name (get_base_type: the built-in one).
+	name := Node_ClassName(node) if node.customType != "" && !node.customMissing else script_base_type_name(node)
+	lua.pushstring(L, strings.clone_to_cstring(name, context.temp_allocator))
+	return 1
+}
+
+// get_base_type(): the node's built-in type, also for custom node types.
+lua_node_get_base_type :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok {
+		lua.pushstring(L, "Unknown")
+		return 1
+	}
+	lua.pushstring(L, strings.clone_to_cstring(script_base_type_name(node), context.temp_allocator))
+	return 1
+}
+
+// is(type): the node's custom type, its built-in type, or "Node".
+lua_node_is :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	name := lua.tostring(L, 2)
+	lua.pushboolean(L, b32(ok && name != nil && (Node_Is(node, string(name)) || string(name) == script_base_type_name(node))))
+	return 1
+}
+
+@(private = "file")
+script_base_type_name :: proc(node: ^Node) -> string {
 	typeName := "Node"
 	switch node.typeId {
 	case Node: typeName = "Node"
@@ -129,9 +158,7 @@ lua_node_get_type :: proc "c" (L: ^lua.State) -> c.int {
 	case PostEffectNode: typeName = "PostEffectNode"
 	case TileMapNode: typeName = "TileMapNode"
 	}
-	nameC := strings.clone_to_cstring(typeName, context.temp_allocator)
-	lua.pushstring(L, nameC)
-	return 1
+	return typeName
 }
 
 @(private="file")
@@ -4172,6 +4199,62 @@ lua_scene_instantiate :: proc "c" (L: ^lua.State) -> c.int {
 }
 
 @(private="file")
+// Scene.create(type, parent?, x?, y?): a new node of a built-in or custom
+// type (its defaults), under parent (the scene's root), at x, y.
+lua_scene_create :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil || lua.type(L, 1) != .STRING {
+		lua.pushnil(L)
+		return 1
+	}
+	scene := sm.game.sceneManager.currentScene
+	ctx := &sm.game.gameContext
+	typeName := strings.clone(string(lua.tostring(L, 1)), context.temp_allocator)
+	parent, _ := to_node_userdata(L, 2)
+	node: ^Node
+	if t := CustomNode_FindByName(ctx, typeName); t != nil {
+		node = Scene_CreateCustomNode(scene, t, parent, ctx)
+	} else if _, known := Node_TypeInfoByName(typeName); known || typeName == "Node" {
+		node = Node_CreateByTypeName(scene, typeName, parent)
+		if node != nil do node.gameContext = ctx
+	} else {
+		lua.L_where(L, 1)
+		where_ := strings.clone(string(lua.tostring(L, -1)), context.temp_allocator)
+		lua.pop(L, 1)
+		Script_Problem(.Warning, "%sScene.create: no node type \"%s\"", where_, typeName)
+	}
+	if node == nil {
+		lua.pushnil(L)
+		return 1
+	}
+	if lua.type(L, 3) == .NUMBER || lua.type(L, 3) == .TABLE || lua.type(L, 3) == .USERDATA {
+		x, y := arg_xy(L, 3)
+		node.position = {x, y}
+	}
+	push_node_userdata(L, node)
+	return 1
+}
+
+// Scene.find_nodes_of_type(type): the current scene's nodes of a type
+// (custom or built-in; node:is), in tree order.
+lua_scene_find_nodes_of_type :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := get_script_manager(L)
+	name := lua.tostring(L, 1)
+	if name == nil || sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil {
+		lua.newtable(L)
+		return 1
+	}
+	nodes := Scene_FindNodesOfType(sm.game.sceneManager.currentScene, string(name))
+	lua.createtable(L, c.int(len(nodes)), 0)
+	for n, i in nodes {
+		push_node_userdata(L, n)
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
 lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	sm := get_script_manager(L)
@@ -4235,6 +4318,13 @@ lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 	case:
 		// Any other registered type (UI widgets, paths, lights, ...; names
 		// and search aliases as in Add Node), placed by the registry.
+		if t := CustomNode_FindByName(&sm.game.gameContext, typeStr); t != nil {
+			n := Scene_CreateCustomNode(scene, t, parent, &sm.game.gameContext)
+			if n != nil && nodeName != "" do n.name = strings.clone(nodeName, n.allocator)
+			if n == nil do lua.pushnil(L)
+			else do push_node_userdata(L, n)
+			return 1
+		}
 		if _, known := Node_TypeInfoByName(typeStr); known {
 			n := Node_CreateByTypeName(scene, typeStr, parent)
 			if n == nil {
@@ -4472,6 +4562,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		// Type & Identity
 		lua.pushcfunction(L, lua_node_get_type)
 		lua.setfield(L, -2, "get_type")
+		lua.pushcfunction(L, lua_node_get_base_type)
+		lua.setfield(L, -2, "get_base_type")
+		lua.pushcfunction(L, lua_node_is)
+		lua.setfield(L, -2, "is")
 		lua.pushcfunction(L, lua_node_get_name)
 		lua.setfield(L, -2, "get_name")
 		lua.pushcfunction(L, lua_node_set_name)
@@ -5088,6 +5182,10 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "create_node")
 	lua.pushcfunction(L, lua_scene_instantiate)
 	lua.setfield(L, -2, "instantiate")
+	lua.pushcfunction(L, lua_scene_create)
+	lua.setfield(L, -2, "create")
+	lua.pushcfunction(L, lua_scene_find_nodes_of_type)
+	lua.setfield(L, -2, "find_nodes_of_type")
 	lua.pushcfunction(L, lua_scene_get_draw_bounds)
 	lua.setfield(L, -2, "get_draw_bounds")
 	lua.pushcfunction(L, lua_scene_set_draw_bounds)

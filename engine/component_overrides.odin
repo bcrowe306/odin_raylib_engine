@@ -170,7 +170,7 @@ diff_keywise :: proc(base, inst: json.Object) -> (json.Object, bool) {
 }
 
 // diff_node collects what `inst` changes relative to `base` (one node).
-@(private = "file")
+@(private)
 diff_node :: proc(base, inst: json.Object, isRoot: bool) -> (json.Object, bool) {
 	out := make(json.Object, 0, context.temp_allocator)
 	// A nested instance expanded in the base: its nodes are diffed one by one
@@ -653,7 +653,7 @@ is_expanded_link :: proc(obj: json.Object) -> bool {
 @(private = "file")
 typeDefaults: map[string]string // type name -> serialized default node
 
-@(private = "file")
+@(private)
 type_defaults :: proc(typeName: string) -> (json.Object, bool) {
 	text, cached := typeDefaults[typeName]
 	if !cached {
@@ -712,20 +712,25 @@ deep_fill :: proc(obj: ^json.Object, k: string, v: json.Value) {
 }
 
 // normalize_base fills defaults into a component node tree (in place).
-@(private = "file")
+@(private)
 normalize_base :: proc(obj: ^json.Object, ctx: ^GameContext) {
+	// A custom node is written as what differs from its type (custom_nodes.odin)
+	// on both sides of a diff: its defaults stay out (its children don't).
+	_, isCustom := obj[CUSTOM_NODE_KEY]
 	typeName, _ := obj["type"].(json.String)
 	if typeName == "" do typeName = "Node"
 	if _, isLink := obj["component"]; !isLink {
 		if defs, ok := type_defaults(string(typeName)); ok {
 			for k, v in defs {
 				if k == "children" || k == "name" do continue
+				// (A custom node: only the keys it always writes - scale, rotation.)
+				if isCustom && !Custom_IsDirectKey(k) do continue
 				deep_fill(obj, k, v)
 			}
 		}
 	}
 	// Script property defaults.
-	if so, has := obj["script"].(json.Object); has {
+	if so, has := obj["script"].(json.Object); has && !isCustom {
 		path, _ := so["path"].(json.String)
 		mgr := ctx.scriptManager if ctx != nil else nil
 		if path != "" && mgr != nil {
@@ -797,7 +802,7 @@ merge_keywise :: proc(target: ^json.Object, ov: json.Object) {
 	}
 }
 
-@(private = "file")
+@(private)
 merge_node :: proc(target: ^json.Object, ov: json.Object) {
 	for k, v in ov {
 		if _, isNull := v.(json.Null); isNull || v == nil {

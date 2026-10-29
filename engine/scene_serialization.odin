@@ -138,10 +138,15 @@ write_props :: proc(w: ^Json_Writer, props: []Node_Property) -> bool {
 	return !first
 }
 
-@(private = "file")
+@(private)
 write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	if node == nil {
 		strings.write_string(&w.sb, "null")
+		return
+	}
+	// A custom node: its link and what differs from its type (custom_nodes.odin).
+	if node.customType != "" && node != serializeFullCustom {
+		write_custom_node(w, node, manager)
 		return
 	}
 	strings.write_byte(&w.sb, '{')
@@ -894,8 +899,8 @@ componentDepth: int
 @(private = "file")
 componentStack: [16]string
 
-@(private = "file")
-read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameContext, asPlain := false) -> ^Node {
+@(private)
+read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameContext, asPlain := false, noCustom := false) -> ^Node {
 	// Linked component instance: build the subtree from the component file,
 	// then apply the instance's own name and transform.
 	if compPath := sj_string(obj, "component", ""); compPath != "" && !asPlain {
@@ -915,6 +920,10 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		inst, problem := read_component_instance(scene, compPath, obj, parent, ctx)
 		if inst != nil do return inst
 		return read_missing_component(scene, compPath, obj, parent, ctx, problem)
+	}
+	// A custom node: its type's defaults under its own values (custom_nodes.odin).
+	if typePath := sj_string(obj, CUSTOM_NODE_KEY, ""); typePath != "" && !noCustom {
+		return read_custom_node(scene, typePath, obj, parent, ctx)
 	}
 	typeStr := sj_string(obj, "type", "Node")
 	node := Node_CreateByTypeName(scene, typeStr, parent)
@@ -1524,7 +1533,7 @@ parse_script_overrides :: proc(propsObj: json.Object, allocator := context.temp_
 
 // --- JSON helpers (file-local; project_format.odin and ldtk.odin have their own) ---
 
-@(private = "file")
+@(private)
 sj_string :: proc(obj: json.Object, key: string, def: string = "") -> string {
 	if s, ok := obj[key].(json.String); ok do return s
 	return def

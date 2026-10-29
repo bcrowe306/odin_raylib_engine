@@ -105,6 +105,14 @@ Node :: struct {
 	// A component's root (in its file / document, and on its instances): the
 	// properties of its nodes shown on every instance (#85).
 	componentExposed: []Component_Exposed,
+	// A custom node type (custom_nodes.odin): the project-relative .node.json
+	// this node is one of ("" = none). Saved as its base type, the link, and
+	// only what differs from the type's defaults.
+	customType: string,
+	// The definition couldn't be loaded: the node is its base type, and its
+	// keys are saved back as they were loaded (customRaw, JSON).
+	customMissing: bool,
+	customRaw:     string,
 	// Saved signal connections from this node's events to script methods
 	// (signals.odin).
 	signalConnections: [dynamic]Signal_Connection,
