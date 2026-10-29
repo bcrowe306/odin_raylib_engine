@@ -6,6 +6,7 @@ import "core:strings"
 import cm "lib/cmark"
 import syn "../odin_editor/syntax"
 import imgui "lib/imgui"
+import rl "vendor:raylib"
 
 // ============================================================================
 // Markdown view: CommonMark (lib/cmark: cmark linked statically) parsed
@@ -14,8 +15,13 @@ import imgui "lib/imgui"
 // rules - plus GitHub-style pipe tables (not CommonMark: read from the
 // paragraph's lines). Drawn with ImGui, wrapped to the available width.
 // Lua (and Odin) code blocks and inline `code` are syntax highlighted with
-// the Code tab's tokenizer and colours.
+// the Code tab's tokenizer and colours. Links can be clicked (Md_Draw
+// returns the url); a paragraph that is only an image is drawn, fitted to
+// the width, from the textures a viewer's loader gives (mdImageLoader).
 // ============================================================================
+
+// mdImageLoader: the texture for an image url (nil: shown as its alt text).
+mdImageLoader: proc(url: string) -> ^rl.Texture2D
 
 Md_Style :: enum {
 	Strong,
@@ -27,6 +33,7 @@ Md_Style :: enum {
 Md_Span :: struct {
 	text:  string,
 	style: bit_set[Md_Style],
+	url:   string, // a link's target
 }
 
 Md_Block_Kind :: enum {
@@ -35,6 +42,7 @@ Md_Block_Kind :: enum {
 	Code,
 	Rule,
 	Table,
+	Image,
 }
 
 Md_Block :: struct {
@@ -48,6 +56,7 @@ Md_Block :: struct {
 	lines:  [dynamic]Md_Code_Line, // code block lines, tokenized (Lua / Odin)
 	rows:   [dynamic][dynamic][dynamic]Md_Span, // table: rows -> cells -> spans
 	plain:  string,    // the block's text (search / highlight)
+	url:    string,    // image
 }
 
 Md_Code_Line :: struct {
@@ -106,6 +115,13 @@ md_blocks :: proc(doc: ^Md_Doc, parent: ^cm.Node, indent: int, quote: bool, line
 			first := md_first_text(n)
 			if strings.has_prefix(strings.trim_space(first), "|") {
 				append(&doc.blocks, md_table(n, lines, indent))
+				continue
+			}
+			if img := cm.node_first_child(n); img != nil && cm.node_next(img) == nil && cm.node_get_type(img) == .Image {
+				b := Md_Block{kind = .Image, indent = indent, url = strings.clone(string(cm.node_get_url(img)))}
+				md_inlines(&b.spans, img, {})
+				b.plain = md_plain(b.spans[:])
+				append(&doc.blocks, b)
 				continue
 			}
 			b := Md_Block{kind = .Paragraph, indent = indent, bullet = bullet, quote = quote}
@@ -185,16 +201,17 @@ md_first_text :: proc(n: ^cm.Node) -> string {
 }
 
 @(private = "file")
-md_inlines :: proc(out: ^[dynamic]Md_Span, parent: ^cm.Node, style: bit_set[Md_Style]) {
+md_inlines :: proc(out: ^[dynamic]Md_Span, parent: ^cm.Node, style: bit_set[Md_Style], url := "") {
 	for n := cm.node_first_child(parent); n != nil; n = cm.node_next(n) {
 		#partial switch cm.node_get_type(n) {
-		case .Text: append(out, Md_Span{strings.clone(string(cm.node_get_literal(n))), style})
-		case .Code: append(out, Md_Span{strings.clone(string(cm.node_get_literal(n))), style + {.Code}})
-		case .Soft_Break: append(out, Md_Span{" ", style})
-		case .Line_Break: append(out, Md_Span{"\n", style})
-		case .Strong: md_inlines(out, n, style + {.Strong})
-		case .Emph: md_inlines(out, n, style + {.Emph})
-		case .Link, .Image: md_inlines(out, n, style + {.Link})
+		case .Text: append(out, Md_Span{strings.clone(string(cm.node_get_literal(n))), style, url})
+		case .Code: append(out, Md_Span{strings.clone(string(cm.node_get_literal(n))), style + {.Code}, url})
+		case .Soft_Break: append(out, Md_Span{" ", style, url})
+		case .Line_Break: append(out, Md_Span{"\n", style, url})
+		case .Strong: md_inlines(out, n, style + {.Strong}, url)
+		case .Emph: md_inlines(out, n, style + {.Emph}, url)
+		case .Link: md_inlines(out, n, style + {.Link}, strings.clone(string(cm.node_get_url(n))))
+		case .Image: md_inlines(out, n, style + {.Link}, url)
 		case .HTML_Inline: // not shown
 		}
 	}
@@ -259,7 +276,9 @@ md_split_cells :: proc(l: string) -> []string {
 
 // Md_Draw draws the document; blocks whose text contains highlight are
 // marked, and the first one is scrolled to when scrollTo is set.
-Md_Draw :: proc(doc: ^Md_Doc, highlight := "", scrollTo := false) {
+// Md_Draw draws the doc; returns the url of a link clicked this frame ("").
+Md_Draw :: proc(doc: ^Md_Doc, highlight := "", scrollTo := false) -> string {
+	mdClicked = ""
 	scrolled := false
 	for &b in doc.blocks {
 		hit := highlight != "" && strings.contains(b.plain, highlight)
@@ -269,7 +288,11 @@ Md_Draw :: proc(doc: ^Md_Doc, highlight := "", scrollTo := false) {
 		}
 		md_draw_block(&b, hit)
 	}
+	return mdClicked
 }
+
+@(private = "file")
+mdClicked: string
 
 @(private = "file")
 md_draw_block :: proc(b: ^Md_Block, hit: bool) {
@@ -324,6 +347,17 @@ md_draw_block :: proc(b: ^Md_Block, hit: bool) {
 		imgui.Dummy({0, 4})
 	case .Rule:
 		imgui.Separator()
+	case .Image:
+		tex := mdImageLoader(b.url) if mdImageLoader != nil else nil
+		if tex == nil || tex.id == 0 {
+			md_flow(b.spans[:], UI_TEXT_DIM) // (its alt text)
+			break
+		}
+		w := min(f32(tex.width), imgui.GetContentRegionAvail().x)
+		h := w * f32(tex.height) / max(f32(tex.width), 1)
+		imgui.Image(transmute(imgui.TextureID)tex, {w, h})
+		if alt := md_plain(b.spans[:]); alt != "" && imgui.IsItemHovered() do UI_Tooltip(alt)
+		imgui.Dummy({0, 4})
 	case .Table:
 		cols := 0
 		for r in b.rows do cols = max(cols, len(r))
@@ -402,6 +436,10 @@ md_flow :: proc(spans: []Md_Span, color: imgui.Vec4) {
 			if .Link in s.style {
 				mn, mx := imgui.GetItemRectMin(), imgui.GetItemRectMax()
 				imgui.DrawList_AddLine(dl, {mn.x, mx.y}, {mx.x, mx.y}, col_u32(UI_ACCENT_SOFT))
+				if s.url != "" && imgui.IsItemHovered() {
+					imgui.SetMouseCursor(.Hand)
+					if imgui.IsMouseClicked(.Left) do mdClicked = s.url
+				}
 			}
 			first = false
 		}

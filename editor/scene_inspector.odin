@@ -528,6 +528,7 @@ Node_ContextMenu :: proc(state: ^EditorState, node: ^e.Node) {
 			imgui.EndMenu()
 		}
 	}
+	if hier_menu(ICON_FA_BOOK, "Documentation", "node-docs", shortcut = "Shift+F1") do NodeReference_Open(e.Node_TypeName(node))
 	// Components.
 	imgui.Separator()
 	if inst != nil {

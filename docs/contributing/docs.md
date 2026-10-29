@@ -22,6 +22,39 @@ generated.
 `docs/site.json` is the navigation: sections and the pages in them. A new
 guide must be listed there - CI fails otherwise.
 
+## Node pages
+
+Every node type has a page: on the site's node reference, and in the
+editor's **Node Reference** window. It opens from a node's menu in the
+hierarchy (**Documentation**), the **?** button in the Inspector header,
+**Shift+F1** on the selected node, and **Help > Node Reference**.
+
+Both build the page the same way. The generated parts come from the code:
+the description and category from the Add Node catalog, the properties table
+from the node's Inspector properties and `engine/property_docs.odin`, and
+the Lua methods from `engine/definitions/engine_api.lua`. The hand-written
+part is `docs/nodes/<NodeType>.md`, which the editor embeds when it's built.
+Write it with these sections, leaving out the ones that don't apply:
+
+| Section | What goes in it |
+|---|---|
+| `## What it's for` | One paragraph: what the node does in a game. |
+| `## When to use it` | The situations it's for, and which node to use instead for nearby ones, linked by their file name (`KinematicBodyNode.md`). |
+| `## Using it` | The editor steps: adding it, its shapes or assets, the Inspector settings that matter. |
+| `## How it works` | Behaviour beyond the properties table: order of events, limits, performance. |
+| `## Signals` | Each event it raises, when, and its value (`body_entered`: the body). |
+| `## Example` | A complete script using it, ready to paste. |
+| `## Screenshot` | The image `../images/node_<NodeType>.png`, taken by a drive (below). |
+
+Don't repeat the properties table or the Lua method list: they're added
+under the hand-written part. Link other nodes as `<NodeType>.md` in the same
+folder; the editor and the site both turn that into the node's page.
+
+Node screenshots come from `tests/drive/docs_nodes_<category>.drive`. Each
+`screenshot node_<NodeType>` line becomes `docs/images/node_<NodeType>.png`
+(see "Screenshots with callouts" below). The installed editor ships
+`docs/images/`, so the screenshots show in the Node Reference too.
+
 ## Checks (CI)
 
 `python3 scripts/docs/check_docs.py` runs on every pull request. It fails

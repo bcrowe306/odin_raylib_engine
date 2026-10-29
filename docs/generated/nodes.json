@@ -353,7 +353,7 @@
       "type": "AreaNode",
       "name": "Trigger Area",
       "category": "Physics & Collision",
-      "description": "Physics detection volume that triggers onEnter and onExit overlap events without rigid collisions.",
+      "description": "Region that reports bodies entering and leaving it (body_entered / body_exited) without colliding: pickups, triggers, hitboxes.",
       "aliases": ["area"],
       "hasOrigin": false,
       "properties": [

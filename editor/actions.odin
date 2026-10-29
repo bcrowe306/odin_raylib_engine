@@ -141,6 +141,8 @@ Actions_Init :: proc() {
 	add({id = "debug.step_out", category = "Debug", label = "Step Out", chords = k(ch(.F11, SH)), scope = .Global, run = proc(s: ^EditorState) {Debug_Command("step-out")}, enabled = proc(s: ^EditorState) -> bool {return Debug_IsStopped()}})
 	add({id = "help.welcome", category = "Help", label = "Welcome", scope = .Global, run = Welcome_Open})
 	add({id = "help.reference", category = "Help", label = "Scripting Reference", scope = .Global, run = proc(s: ^EditorState) {ScriptReference_Open()}})
+	add({id = "help.node_reference", category = "Help", label = "Node Reference", scope = .Global, run = proc(s: ^EditorState) {NodeReference_Open(INDEX_PAGE)}})
+	add({id = "node.docs", category = "Help", label = "Documentation for the Selected Node", chords = k(ch(.F1, SH)), scope = .Scene, run = proc(s: ^EditorState) {NodeReference_Open(e.Node_TypeName(s.selectedNode))}, enabled = proc(s: ^EditorState) -> bool {return s.selectedNode != nil}})
 	add({id = "help.level_reference", category = "Help", label = "Level Editor Reference", scope = .Global, run = proc(s: ^EditorState) {LevelRef_Open("overview")}})
 	add({id = "help.level_shortcuts", category = "Help", label = "Level Editor Shortcuts", scope = .Global, run = proc(s: ^EditorState) {LevelRef_Open("shortcuts")}})
 	add({id = "help.report_bug", category = "Help", label = "Report a Bug...", scope = .Global, run = proc(s: ^EditorState) {CrashReports_ReportBug(s)}})

@@ -18,6 +18,7 @@ import "core:strings"
 //       lua-language-server/     the Code tab's language server
 //       fonts/                   the engine's font (OpenSans-Regular.ttf)
 //       templates/demo_project/  copied to Documents on the first start
+//       docs/images/             the Node Reference's screenshots
 //   RAYZR_EDITOR_RESOURCES overrides the folder.
 //
 // The editor's UI fonts are embedded (ui_style.odin): no file needed.
