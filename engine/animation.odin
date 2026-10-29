@@ -13,12 +13,31 @@ Animation :: struct {
 	fps:         f32,  // frames per second; 0 = the player's
 	flipX:       bool,
 	flipY:       bool,
-	source:      rl.Rectangle,
-	dest:        rl.Rectangle,
-	frameCount:  proc(animation: ^Animation) -> int,
+	source:         rl.Rectangle,
+	dest:           rl.Rectangle,
+	frameCount:     proc(animation: ^Animation) -> int,
 	// Keyframed property tracks (animation_tracks.odin).
-	tracks:      [dynamic]Property_Track,
-	renderFrame: proc(animation: ^Animation, frame: int, node: ^Node),
+	tracks:         [dynamic]Property_Track,
+	// Per-frame duration overrides in seconds (0 = use standard 1/fps).
+	frameDurations: [dynamic]f32,
+	renderFrame:    proc(animation: ^Animation, frame: int, node: ^Node),
+}
+
+Animation_SetFrameDuration :: proc(anim: ^Animation, frame: int, durationSec: f32, allocator := context.allocator) {
+	if anim == nil || frame < 0 do return
+	if anim.frameDurations == nil do anim.frameDurations = make([dynamic]f32, allocator)
+	for len(anim.frameDurations) <= frame {
+		append(&anim.frameDurations, 0)
+	}
+	anim.frameDurations[frame] = max(durationSec, 0)
+}
+
+Animation_GetFrameDuration :: proc(anim: ^Animation, frame: int, defaultFps: f32 = 12) -> f32 {
+	fps := anim.fps if (anim != nil && anim.fps > 0) else defaultFps
+	defaultDur := 1.0 / max(fps, 0.001)
+	if anim == nil || frame < 0 || frame >= len(anim.frameDurations) do return defaultDur
+	d := anim.frameDurations[frame]
+	return d if d > 0 else defaultDur
 }
 
 FrameAnimation :: struct {
@@ -40,7 +59,9 @@ FrameAnimation_Init :: proc(frameAnimation: ^FrameAnimation, name: string = "") 
 FrameAnimation_Destroy :: proc(frameAnimation: ^FrameAnimation) {
 	if frameAnimation == nil do return
 	delete(frameAnimation.frames)
+	delete(frameAnimation.frameDurations)
 	frameAnimation.frames = nil
+	frameAnimation.frameDurations = nil
 }
 
 FrameAnimation_AddFrame :: proc(
@@ -69,6 +90,7 @@ FA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	animation := cast(^FrameAnimation)animation
 	if len(animation.frames) == 0 || frame < 0 || frame >= len(animation.frames) do return
 	texture := animation.frames[frame]
+	if texture == nil do return
 	size := Texture_Size(texture)
 	animation.source = rl.Rectangle{0, 0, size.x, size.y}
 
@@ -158,6 +180,7 @@ SSA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	tex := animation.spriteSheet.texture
 	cell := frame
 	if len(animation.cells) > 0 do cell = animation.cells[clamp(frame, 0, len(animation.cells) - 1)]
+	if cell < 0 do return
 	animation.source = SpriteSheet_CellRect(Texture_Size(animation.spriteSheet), animation.grid, animation.margin, animation.spacing, cell)
 	frameSize := [2]f32{animation.source.width, animation.source.height}
 	animation.dest = rl.Rectangle {

@@ -70,7 +70,25 @@ end)
 **Play Sounds** tracks play a sound per key (into its import settings' bus,
 else SFX).
 
-Saved as `[frame, "method", "argument"]`.
+### Shortcut Event Tracks
+
+To keep scripting callbacks to a minimum, common gameplay actions can be triggered directly from timeline tracks under **Add Track > Events**:
+
+- **Emit Particles**: Triggers burst emission on a target `ParticleEmitterNode` without custom script callbacks.
+- **Spawn Component**: Instantiates a component or prefab scene at the target node's global position.
+- **Enable / Disable**: Directly activates or deactivates target nodes (such as hitboxes on `AreaNode` or collision checks on `RaycastNode`).
+
+Saved as `[frame, "action or path", "argument"]` with `"kind": "particles"`, `"spawn"`, or `"enable"`.
+
+## Frame durations & Empty frames
+
+- **Per-Frame Durations**: Individual frames can have custom durations in seconds via the toolbar or frame context menu. When set to `0` (or reset with right-click), the frame defaults to standard `1.0 / fps`.
+- **Empty / Rest Frames**: Ad-hoc empty frames (blank pauses without rendering) can be inserted or appended to frame animations and sprite sheets via right-click in the frame strip.
+- **Delta-Time Simulation**: Animation ticking advances deterministically based on frame simulation `dt` rather than wall clock time, ensuring animations pause, resume, and scale accurately with game speed.
+
+## Scene-Wide Property Animation
+
+Animation players can drive properties on any node in the scene tree (not just immediate children) using relative paths (e.g. `../../Enemy`). Reflective property tracks support float, integer, 2D vector, color, and boolean values (such as `enabled`, `zIndex`, `origin`, and component settings).
 
 ## Onion skin
 

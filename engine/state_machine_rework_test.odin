@@ -431,9 +431,11 @@ return S
 	once := AnimationPlayerNode_AddFrameAnimation(f.apn, nil, "attack", nil)
 	once.endFrame = 2
 	once.loop = false
+	once.fps = 1
 	looping := AnimationPlayerNode_AddFrameAnimation(f.apn, nil, "run", nil)
 	looping.endFrame = 2
 	looping.loop = true
+	looping.fps = 1
 	StateMachine_AddState(sm, "attack", "attack")
 	StateMachine_AddState(sm, "run", "run")
 	ProcessNodeQueues(f.scene.manager, &f.game.gameContext)

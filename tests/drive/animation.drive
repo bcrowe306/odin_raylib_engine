@@ -76,3 +76,32 @@ screenshot method_track
 click @anim.frame:1
 click @toolbar.save
 expect file:scenes/main.scene.json contains "property": "@call", "kind": "method", "keys": [[1, "on_footstep"]]
+
+# Frame duration: edit duration of selected frame
+click @anim.frame:2
+click @anim.frame-duration
+key ctrl+a
+type 0.5
+key enter
+
+# Ad-hoc empty frame: insert empty frame via context menu
+rclick @anim.frame:2
+click @anim.ctx-insert-empty
+expect anim == anim_1:2/4:2
+
+# Shortcut tracks: Add particles and enable tracks
+click @anim.add-track
+click @anim.track-node:AnimationPlayer
+click @anim.track-particles
+expect item:anim.key:@particles == visible
+
+click @anim.add-track
+click @anim.track-node:AnimationPlayer
+click @anim.track-enable
+expect item:anim.key:@enable == visible
+screenshot shortcut_tracks
+
+click @toolbar.save
+expect file:scenes/main.scene.json contains "kind": "particles"
+expect file:scenes/main.scene.json contains "kind": "enable"
+

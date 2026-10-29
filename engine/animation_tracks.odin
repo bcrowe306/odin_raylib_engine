@@ -74,17 +74,22 @@ Track_KeyCurve :: proc(k: Track_Key, u: f32) -> f32 {
 	return Curve_Eval(k.curve, u) if k.hasCurve else Ease_Apply(k.ease, u)
 }
 
-// Property tracks interpolate values; Method and Audio tracks fire their
-// keys when playback reaches the key's frame (a script method on the
-// target, or a sound).
+// Property tracks interpolate values; Method, Audio, Particle, Spawn and
+// Enable tracks fire their keys when playback reaches the key's frame.
 Track_Kind :: enum {
 	Property,
 	Method,
 	Audio,
+	EmitParticles,
+	InstantiateComponent,
+	SetEnabled,
 }
 
-TRACK_METHOD_PROPERTY :: "@call"
-TRACK_AUDIO_PROPERTY :: "@audio"
+TRACK_METHOD_PROPERTY    :: "@call"
+TRACK_AUDIO_PROPERTY     :: "@audio"
+TRACK_PARTICLES_PROPERTY :: "@particles"
+TRACK_SPAWN_PROPERTY     :: "@spawn"
+TRACK_ENABLE_PROPERTY    :: "@enable"
 
 Audio_Track_Settings :: struct {
 	bus:         string, // mixer bus ("" = SFX or asset import bus)
@@ -139,41 +144,63 @@ Animation_AddTrack :: proc(apn: ^AnimationPlayerNode, anim: ^Animation, target, 
 	return &anim.tracks[len(anim.tracks) - 1]
 }
 
-// Animation_AddEventTrack adds (or finds) a Method or Audio track for target.
+// Animation_AddEventTrack adds (or finds) an event track for target.
 // For Audio, if an audio track already exists for this target, a new numbered audio track
 // is created, allowing multiple audio tracks on the same animation (Issue #27).
 Animation_AddEventTrack :: proc(apn: ^AnimationPlayerNode, anim: ^Animation, target: string, kind: Track_Kind) -> ^Property_Track {
-	if kind == .Method {
+	switch kind {
+	case .Method:
 		prop := TRACK_METHOD_PROPERTY
 		tr := Animation_AddTrack(apn, anim, target, prop)
 		tr.kind = kind
 		return tr
-	}
-
-	prop := TRACK_AUDIO_PROPERTY
-	hasDefaultAudio := false
-	maxIndex := 1
-	for t in anim.tracks {
-		if t.target == target && (t.kind == .Audio || strings.has_prefix(t.property, "@audio")) {
-			if t.property == TRACK_AUDIO_PROPERTY {
-				hasDefaultAudio = true
-			} else if strings.has_prefix(t.property, "@audio_") {
-				if idx, ok := strconv.parse_int(t.property[len("@audio_"):]); ok {
-					maxIndex = max(maxIndex, idx)
+	case .EmitParticles:
+		prop := TRACK_PARTICLES_PROPERTY
+		tr := Animation_AddTrack(apn, anim, target, prop)
+		tr.kind = kind
+		if tr.name == "" do tr.name = strings.clone("particles", apn.allocator)
+		return tr
+	case .InstantiateComponent:
+		prop := TRACK_SPAWN_PROPERTY
+		tr := Animation_AddTrack(apn, anim, target, prop)
+		tr.kind = kind
+		if tr.name == "" do tr.name = strings.clone("spawn", apn.allocator)
+		return tr
+	case .SetEnabled:
+		prop := TRACK_ENABLE_PROPERTY
+		tr := Animation_AddTrack(apn, anim, target, prop)
+		tr.kind = kind
+		if tr.name == "" do tr.name = strings.clone("enable", apn.allocator)
+		return tr
+	case .Audio:
+		prop := TRACK_AUDIO_PROPERTY
+		hasDefaultAudio := false
+		maxIndex := 1
+		for t in anim.tracks {
+			if t.target == target && (t.kind == .Audio || strings.has_prefix(t.property, "@audio")) {
+				if t.property == TRACK_AUDIO_PROPERTY {
+					hasDefaultAudio = true
+				} else if strings.has_prefix(t.property, "@audio_") {
+					if idx, ok := strconv.parse_int(t.property[len("@audio_"):]); ok {
+						maxIndex = max(maxIndex, idx)
+					}
 				}
 			}
 		}
-	}
-	trackName := "sounds"
-	if hasDefaultAudio {
-		prop = fmt.tprintf("%s_%d", TRACK_AUDIO_PROPERTY, maxIndex + 1)
-		trackName = fmt.tprintf("sounds %d", maxIndex + 1)
-	}
+		trackName := "sounds"
+		if hasDefaultAudio {
+			prop = fmt.tprintf("%s_%d", TRACK_AUDIO_PROPERTY, maxIndex + 1)
+			trackName = fmt.tprintf("sounds %d", maxIndex + 1)
+		}
 
-	tr := Animation_AddTrack(apn, anim, target, prop)
-	tr.kind = .Audio
-	if tr.name == "" do tr.name = strings.clone(trackName, apn.allocator)
-	return tr
+		tr := Animation_AddTrack(apn, anim, target, prop)
+		tr.kind = .Audio
+		if tr.name == "" do tr.name = strings.clone(trackName, apn.allocator)
+		return tr
+	case .Property:
+		return nil
+	}
+	return nil
 }
 
 // Track_SetEventKey sets (or adds) an event key's text at `frame`.
@@ -252,6 +279,9 @@ Property_GetTrackValue :: proc(p: Node_Property) -> (v: [4]f32, ok: bool) {
 	case .Color:
 		c := (cast(^rl.Color)p.ptr)^
 		return {f32(c.r), f32(c.g), f32(c.b), f32(c.a)}, true
+	case .Bool:
+		v[0] = 1.0 if (cast(^bool)p.ptr)^ else 0.0
+		return v, true
 	}
 	return {}, false
 }
@@ -268,6 +298,8 @@ Property_SetTrackValue :: proc(p: Node_Property, v: [4]f32) {
 		(cast(^[2]f32)p.ptr)^ = {v[0], v[1]}
 	case .Color:
 		(cast(^rl.Color)p.ptr)^ = {u8(clamp(v[0], 0, 255)), u8(clamp(v[1], 0, 255)), u8(clamp(v[2], 0, 255)), u8(clamp(v[3], 0, 255))}
+	case .Bool:
+		(cast(^bool)p.ptr)^ = v[0] >= 0.5
 	}
 }
 
@@ -285,7 +317,7 @@ Track_FindProperty :: proc(node: ^Node, name: string) -> (Node_Property, bool) {
 // Track_IsAnimatable: kinds a track can drive.
 Track_IsAnimatable :: proc(p: Node_Property) -> bool {
 	#partial switch p.kind {
-	case .Float, .Int, .Vec2, .Color: return true
+	case .Float, .Int, .Vec2, .Color, .Bool: return true
 	}
 	return false
 }
@@ -303,6 +335,14 @@ resolve_path :: proc(apn: ^AnimationPlayerNode, path: string) -> ^Node {
 	if path == "" || path == "." do return apn
 	mgr: ^NodeManager
 	if apn.gameContext != nil && apn.gameContext.scene != nil do mgr = apn.gameContext.scene.manager
+	if mgr == nil {
+		for cur := cast(^Node)apn; cur != nil; cur = cur.parent {
+			if cur.gameContext != nil && cur.gameContext.scene != nil {
+				mgr = cur.gameContext.scene.manager
+				break
+			}
+		}
+	}
 	return Node_ResolvePath(mgr, apn, path) if mgr != nil else nil
 }
 
@@ -399,6 +439,42 @@ AnimationPlayerNode_FireEvents :: proc(apn: ^AnimationPlayerNode, frame: int) {
 					track.nextVoice = (slot + 1) % n
 					track.voiceHandles[slot] = Mixer_PlaySound(s.pcm, bus, vol, pan, pitch, owner = s)
 				}
+			case .EmitParticles:
+				target := track_target(apn, &track)
+				if target == nil do continue
+				pen: ^ParticleEmitterNode
+				if target.typeId == ParticleEmitterNode {
+					pen = cast(^ParticleEmitterNode)target
+				} else {
+					mgr := apn.gameContext.scene.manager if apn.gameContext != nil && apn.gameContext.scene != nil else nil
+					if mgr != nil {
+						for c in GetChildrenView(mgr, target) {
+							if c != nil && c.typeId == ParticleEmitterNode {
+								pen = cast(^ParticleEmitterNode)c
+								break
+							}
+						}
+					}
+				}
+				if pen != nil {
+					ParticleEmitterNode_Start(pen)
+				}
+			case .InstantiateComponent:
+				ctx := apn.gameContext
+				if ctx == nil || ctx.scene == nil || k.text == "" do continue
+				target := track_target(apn, &track)
+				parent := target.parent if (target != nil && target.parent != nil) else ctx.scene.rootNode
+				// (The project-relative path, as Scene.instantiate takes it: it's
+				// the instance's link. Next to the target: in its parent's space.)
+				spawned := Scene_InstantiateComponent(ctx.scene, k.text, parent, ctx)
+				if spawned != nil && target != nil {
+					spawned.position = target.position
+				}
+			case .SetEnabled:
+				target := track_target(apn, &track)
+				if target == nil do continue
+				enable := k.text != "disable" && k.text != "false" && k.text != "off" && k.text != "0"
+				target.enabled = enable // (bodies, areas and rays follow it on their next update)
 			}
 		}
 	}
