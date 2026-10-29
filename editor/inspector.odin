@@ -925,6 +925,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_line(state, cast(^e.LineNode)node)
 	case e.PathNode:
 		inspector_path(state, cast(^e.PathNode)node)
+	case e.SpawnerNode:
+		inspector_spawner(state, cast(^e.SpawnerNode)node)
 	case e.SkeletonNode:
 		inspector_skeleton(state, cast(^e.SkeletonNode)node)
 	case e.AsepriteNode:
@@ -1273,6 +1275,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.VectorShapeNode: return ICON_FA_PAINTBRUSH
 	case e.TrailNode: return ICON_FA_WIND
 	case e.VisibilityNotifierNode: return ICON_FA_EYE
+	case e.SpawnerNode: return ICON_FA_CLONE
 	case e.PathNode: return ICON_FA_BEZIER_CURVE
 	case e.PathFollowNode: return ICON_FA_ROUTE
 	case e.NavigationRegionNode: return ICON_FA_MAP
@@ -1577,6 +1580,92 @@ inspector_path :: proc(state: ^EditorState, p: ^e.PathNode) {
 		append(&p.points, e.Path_Point{pos = last + {80, 0}})
 	}
 	UI_Tooltip("A point 80 px after the last (or Ctrl+click in the viewport)")
+}
+
+// inspector_spawner: a spawner's list (components, weight, count, offset);
+// components drop in from Assets. In Simulate: spawn now, what is alive.
+@(private = "file")
+inspector_spawner :: proc(state: ^EditorState, s: ^e.SpawnerNode) {
+	if !UI_SectionHeader("Spawn List") do return
+	files := make([dynamic]string, context.temp_allocator)
+	for f in Editor_ListProjectFiles(state, "", {".json"}) do if strings.has_suffix(f, ".component.json") do append(&files, f)
+	if len(s.entries) == 0 do UI_DimTextWrapped("Add the components it spawns (or drop them here from Assets).")
+	remove, up := -1, -1
+	weights := s.mode == .Random
+	for &en, i in s.entries {
+		imgui.PushIDInt(i32(i))
+		UI_DimText(fmt.tprintf("%d", i + 1))
+		imgui.SameLine(24)
+		imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - (86 if len(s.entries) > 1 else 58))
+		if path, ok := asset_picker(fmt.tprintf("insp.spawner.component:%d", i), en.component, files[:], false); ok {
+			Editor_RecordUndo(state, "Spawner component")
+			delete(en.component, s.allocator)
+			en.component = strings.clone(path, s.allocator)
+		}
+		Drive_Item(fmt.tprintf("insp.spawner.component:%d", i))
+		if len(s.entries) > 1 {
+			imgui.SameLine()
+			imgui.BeginDisabled(i == 0)
+			if UI_IconButton(ICON_FA_ARROW_UP, fmt.tprintf("insp.spawner.up:%d", i), "Move up (the order Sequential spawns in)", size = 24) do up = i
+			imgui.EndDisabled()
+		}
+		imgui.SameLine()
+		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("insp.spawner.remove:%d", i), "Remove", size = 24) do remove = i
+		imgui.SetCursorPosX(imgui.GetCursorPosX() + 24)
+		w := (imgui.GetContentRegionAvail().x - 8) / 3
+		imgui.SetNextItemWidth(w)
+		imgui.BeginDisabled(!weights)
+		imgui.DragFloat("##weight", &en.weight, 0.05, 0, 1000, "weight %.2f")
+		imgui.EndDisabled()
+		undo_on_activate(state, "Spawner weight")
+		UI_Tooltip("Random mode: how likely this one is, relative to the others")
+		imgui.SameLine(0, 4)
+		imgui.SetNextItemWidth(w)
+		cnt := i32(en.count)
+		if imgui.DragInt("##count", &cnt, 0.1, 1, 100, "x%d") do en.count = max(int(cnt), 1)
+		undo_on_activate(state, "Spawner count")
+		UI_Tooltip("How many of it each time it is picked")
+		imgui.SameLine(0, 4)
+		imgui.SetNextItemWidth(-1)
+		imgui.DragFloat2("##offset", &en.offset, 1, -4096, 4096, "%.0f")
+		undo_on_activate(state, "Spawner offset")
+		UI_Tooltip("Its own offset from the spawn point (px, local to the spawner)")
+		imgui.PopID()
+	}
+	if up > 0 {
+		Editor_RecordUndo(state, "Reorder spawner list")
+		s.entries[up], s.entries[up - 1] = s.entries[up - 1], s.entries[up]
+	}
+	if remove >= 0 {
+		Editor_RecordUndo(state, "Remove from spawner")
+		e.SpawnerNode_RemoveEntry(s, remove)
+	}
+	if path, ok := asset_picker("insp.spawner.add", "", files[:], false); ok {
+		Editor_RecordUndo(state, "Add to spawner")
+		e.SpawnerNode_AddEntry(s, path)
+	}
+	Drive_Item("insp.spawner.add")
+	UI_Tooltip("Add a component to the list")
+	// Components dragged in from Assets.
+	if imgui.BeginDragDropTarget() {
+		if payload := imgui.AcceptDragDropPayload(ASSET_PAYLOAD); payload != nil {
+			p := (^Asset_Payload)(payload.Data)
+			rel := strings.clone(string(p.path[:p.len]), context.temp_allocator)
+			if strings.has_suffix(rel, ".component.json") {
+				Editor_RecordUndo(state, "Add to spawner")
+				e.SpawnerNode_AddEntry(s, rel)
+			}
+		}
+		imgui.EndDragDropTarget()
+	}
+	if state.isSimulating {
+		imgui.Dummy({0, 4})
+		if UI_Button(fmt.tprintf("%s  Spawn Now", ICON_FA_CLONE), "insp.spawner.spawn") do e.SpawnerNode_Spawn(s, &state.game.gameContext)
+		imgui.SameLine()
+		UI_DimText(fmt.tprintf("%d alive · %d spawned", e.SpawnerNode_AliveCount(s), s.spawnedTotal))
+	} else {
+		UI_DimTextWrapped("Spawning happens in Simulate and in the game (spawn(), a signal to `spawn`, or Auto Spawn).")
+	}
 }
 
 // inspector_line: a LineNode's points (local to the node).

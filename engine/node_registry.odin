@@ -26,6 +26,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"Node", Node, factory_node, {"node", "empty"}},
 	{"CameraNode", CameraNode, factory_camera, {"camera"}},
 	{"TimerNode", TimerNode, factory_timer, {"timer"}},
+	{"SpawnerNode", SpawnerNode, factory_spawner, {"spawner", "spawn"}},
 	{"ScriptNode", ScriptNode, factory_script, {"script"}},
 	{"TextureNode", TextureNode, factory_texture, {"texture", "sprite"}},
 	{"AtlasSpriteNode", AtlasSpriteNode, factory_atlas_sprite, {"atlassprite", "atlas", "subtexture", "spritesheet"}},
@@ -308,6 +309,11 @@ factory_adv_camera :: proc(scene: ^Scene, parent: ^Node) -> ^Node {return Advanc
 @(private = "file")
 factory_visibility :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return VisibilityNotifierNode_Create(scene, "VisibilityNotifier", parent)
+}
+
+@(private = "file")
+factory_spawner :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return SpawnerNode_Create(scene, "Spawner", parent)
 }
 
 @(private = "file")
