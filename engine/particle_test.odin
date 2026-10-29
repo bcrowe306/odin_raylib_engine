@@ -61,3 +61,44 @@ test_particle_emitter_node_lifecycle_negative_props :: proc(t: ^testing.T) {
 	game->run(0.05)
 	testing.expect(t, pen.emitter.count > 0, "Particles emitted successfully without crashing")
 }
+
+// #125: how particles are drawn - one quad each, the texture by shape, local
+// particles through the owner's transform.
+@(test)
+test_particle_quads :: proc(t: ^testing.T) {
+	emitter: ParticleEmitter
+	ParticleEmitter_Init(&emitter)
+	defer ParticleEmitter_Destroy(&emitter)
+	emitter.localSpace = false
+	p := Particle{position = {10, 20}, size = {3, 5}, scale = {2, 2}, rotation = 30, color = rl.RED, alive = true}
+
+	p.shape = .Circle
+	q := Particle_QuadOf(&emitter, p)
+	testing.expect_value(t, q.texture, Particle_Quad_Texture.Circle)
+	testing.expect_value(t, q.size, [2]f32{12, 12}) // (the radius doubled)
+	testing.expect_value(t, q.center, [2]f32{10, 20})
+	testing.expect_value(t, q.color, rl.RED)
+
+	p.shape = .Rectangle
+	q = Particle_QuadOf(&emitter, p)
+	testing.expect_value(t, q.texture, Particle_Quad_Texture.White)
+	testing.expect_value(t, q.size, [2]f32{6, 10})
+	testing.expect_value(t, q.rotation, 30)
+
+	p.shape = .Pixel
+	q = Particle_QuadOf(&emitter, p)
+	testing.expect_value(t, q.size, [2]f32{1, 1})
+	testing.expect_value(t, q.center, [2]f32{10.5, 20.5})
+
+	p.shape = .Texture // (no texture: not drawn)
+	testing.expect_value(t, Particle_QuadOf(&emitter, p).texture, Particle_Quad_Texture.None)
+
+	// Local: through the owner (at 100, 100, turned 90, scaled 2).
+	emitter.localSpace = true
+	emitter.position, emitter.originRotation, emitter.originScale = {100, 100}, 90, {2, 2}
+	p.shape = .Rectangle
+	q = Particle_QuadOf(&emitter, p)
+	testing.expectf(t, abs(q.center.x - 60) < 0.01 && abs(q.center.y - 120) < 0.01, "turned and scaled: %v", q.center)
+	testing.expect_value(t, q.size, [2]f32{12, 20})
+	testing.expect_value(t, q.rotation, 120)
+}

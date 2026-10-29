@@ -8,6 +8,7 @@ import "core:crypto"
 import "core:math"
 import "core:fmt"
 import rl "vendor:raylib"
+import rlgl "vendor:raylib/rlgl"
 import ui "../ui"
 import b2 "vendor:box2d"
 
@@ -735,55 +736,163 @@ particle_collide :: proc(emitter: ^ParticleEmitter, p: ^Particle, prevIn: [2]f32
 	if emitter.onHit != nil do emitter.onHit(emitter, hitNode, emitter.onHitUser)
 }
 
+// --- drawing (#125) --------------------------------------------------------------------
+// Every live particle of an emitter is one textured quad written straight
+// into rlgl's batch: circles and ellipses from a small anti-aliased circle
+// texture, rectangles / pixels / lines from the default white texel,
+// textured particles from their texture - one draw per texture, not a
+// raylib call (and for circles a triangle fan) per particle. Written in
+// chunks, each after making room in the batch (rlgl drops vertices past its
+// buffer instead of flushing).
+
+@(private = "file")
+PARTICLE_CHUNK :: 1024
+
+@(private = "file")
+particleCircleTex: rl.Texture2D
+
+// particle_circle_texture: a white disc, anti-aliased edge, alpha outside.
+@(private = "file")
+particle_circle_texture :: proc() -> u32 {
+	if particleCircleTex.id != 0 do return particleCircleTex.id
+	N :: 64
+	img := rl.GenImageColor(N, N, rl.BLANK)
+	defer rl.UnloadImage(img)
+	r := f32(N) * 0.5
+	for y in 0 ..< N do for x in 0 ..< N {
+		d := math.sqrt((f32(x) + 0.5 - r) * (f32(x) + 0.5 - r) + (f32(y) + 0.5 - r) * (f32(y) + 0.5 - r))
+		a := math.clamp(r - d, 0, 1)
+		if a > 0 do rl.ImageDrawPixel(&img, i32(x), i32(y), {255, 255, 255, u8(a * 255)})
+	}
+	particleCircleTex = rl.LoadTextureFromImage(img)
+	rl.SetTextureFilter(particleCircleTex, .BILINEAR)
+	return particleCircleTex.id
+}
+
+// Particles_Shutdown frees the shared drawing texture (engine shutdown).
+Particles_Shutdown :: proc() {
+	if particleCircleTex.id != 0 do rl.UnloadTexture(particleCircleTex)
+	particleCircleTex = {}
+}
+
+@(private = "file")
+Particle_Batch :: struct {
+	tex:  u32,
+	n:    int,
+	open: bool,
+}
+
+@(private = "file")
+batch_use :: proc(b: ^Particle_Batch, tex: u32) {
+	if b.open && b.tex == tex && b.n < PARTICLE_CHUNK do return
+	batch_close(b)
+	rlgl.CheckRenderBatchLimit(4 * PARTICLE_CHUNK)
+	rlgl.SetTexture(tex)
+	rlgl.Begin(rlgl.QUADS)
+	b^ = {tex = tex, open = true}
+}
+
+@(private = "file")
+batch_close :: proc(b: ^Particle_Batch) {
+	if !b.open do return
+	rlgl.End()
+	rlgl.SetTexture(0)
+	b.open = false
+}
+
+// batch_quad: a w x h quad centred on c, turned by rotDeg, the texture's
+// uv rectangle (u0, v0) - (u1, v1) on it.
+@(private = "file")
+batch_quad :: proc(b: ^Particle_Batch, c: [2]f32, w, h, rotDeg: f32, col: rl.Color, uv := [4]f32{0, 0, 1, 1}) {
+	hw, hh := w * 0.5, h * 0.5
+	ax, ay := [2]f32{hw, 0}, [2]f32{0, hh}
+	if rotDeg != 0 {
+		r := math.to_radians(rotDeg)
+		cs, sn := math.cos(r), math.sin(r)
+		ax, ay = {hw * cs, hw * sn}, {-hh * sn, hh * cs}
+	}
+	tl, bl, br, tr := c - ax - ay, c - ax + ay, c + ax + ay, c + ax - ay
+	rlgl.Color4ub(col.r, col.g, col.b, col.a)
+	rlgl.TexCoord2f(uv[0], uv[1]); rlgl.Vertex2f(tl.x, tl.y)
+	rlgl.TexCoord2f(uv[0], uv[3]); rlgl.Vertex2f(bl.x, bl.y)
+	rlgl.TexCoord2f(uv[2], uv[3]); rlgl.Vertex2f(br.x, br.y)
+	rlgl.TexCoord2f(uv[2], uv[1]); rlgl.Vertex2f(tr.x, tr.y)
+	b.n += 1
+}
+
+// What a particle is drawn with.
+Particle_Quad_Texture :: enum {
+	None,    // not drawn (no texture) or drawn by its own proc (Custom)
+	White,   // the default white texel
+	Circle,  // the anti-aliased disc
+	Texture, // its own texture
+}
+
+// Particle_Quad: one particle as drawn - a w x h quad centred on `center`,
+// turned by `rotation` degrees, in world terms.
+Particle_Quad :: struct {
+	center:   [2]f32,
+	size:     [2]f32,
+	rotation: f32,
+	color:    rl.Color,
+	texture:  Particle_Quad_Texture,
+}
+
+// Particle_QuadOf: how a live particle is drawn (local particles through
+// the owner's transform, #124).
+Particle_QuadOf :: proc(emitter: ^ParticleEmitter, particle: Particle) -> Particle_Quad {
+	p := particle
+	if emitter.localSpace {
+		sc := particle_scale(emitter)
+		p.position = particle_to_world(emitter, p.position)
+		p.size *= {abs(sc.x), abs(sc.y)}
+		p.rotation += emitter.originRotation
+	}
+	q := Particle_Quad{center = p.position, rotation = p.rotation, color = p.color}
+	switch p.shape {
+	case .Circle:
+		d := 2 * p.size[0] * p.scale[0]
+		q.size, q.rotation, q.texture = {d, d}, 0, .Circle
+	case .Ellipse:
+		q.size, q.rotation, q.texture = {2 * p.size[0] * p.scale[0], 2 * p.size[1] * p.scale[1]}, 0, .Circle
+	case .Rectangle:
+		q.size, q.texture = {p.size[0] * p.scale[0], p.size[1] * p.scale[1]}, .White
+	case .Pixel:
+		q.center, q.size, q.rotation, q.texture = p.position + 0.5, {1, 1}, 0, .White
+	case .Line:
+		q.size, q.texture = {p.size[0] * p.scale[0], max(p.scale[1], 0.01)}, .White
+	case .Texture:
+		q.size = {p.size[0] * p.scale[0], p.size[1] * p.scale[1]}
+		q.texture = .Texture if p.texture != nil && p.texture.id != 0 else .None
+	case .Custom:
+		q.texture = .None
+	}
+	return q
+}
+
 ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
-	// Local particles are drawn through the owner's transform (#124).
-	sc := particle_scale(emitter)
-	asc := [2]f32{abs(sc.x), abs(sc.y)}
+	white := rlgl.GetTextureIdDefault()
+	circle := particle_circle_texture()
+	b: Particle_Batch
+	defer batch_close(&b)
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles[i].alive do continue
-		p := emitter.particles[i] // (a copy: drawn in world terms)
-		if emitter.localSpace {
-			p.position = particle_to_world(emitter, p.position)
-			p.size *= asc
-			p.rotation += emitter.originRotation
+		p := &emitter.particles[i]
+		q := Particle_QuadOf(emitter, p^)
+		switch q.texture {
+		case .White:   batch_use(&b, white)
+		case .Circle:  batch_use(&b, circle)
+		case .Texture: batch_use(&b, p.texture.id)
+		case .None:
+			// A Custom shape draws as it likes (the batch closed around it).
+			if p.shape == .Custom && p.customShapeProc != nil {
+				batch_close(&b)
+				c := p^
+				c.position, c.rotation = q.center, q.rotation
+				p.customShapeProc(&c, deltaTime)
+			}
+			continue
 		}
-		switch p.shape {
-			case ParticleShape.Circle:
-				// Segments from the radius (0.5 px error): small particles
-				// need ~8 triangles, not DrawCircleV's fixed 36.
-				rl.DrawCircleSector(p.position, p.size[0] * p.scale[0], 0, 360, 0, p.color)
-			case .Rectangle:
-				w := p.size[0] * p.scale[0]
-				h := p.size[1] * p.scale[1]
-				rl.DrawRectanglePro({p.position[0], p.position[1], w, h}, {w / 2, h / 2}, p.rotation, p.color)
-			case .Ellipse:
-				rl.DrawEllipse(i32(p.position[0]), i32(p.position[1]), p.size[0] * p.scale[0], p.size[1] * p.scale[1], p.color)
-			case .Pixel:
-				rl.DrawPixelV(p.position, p.color)
-			case .Line:
-				// calculate line points from position size scale and rotation
-				halfLen := (p.size[0] * p.scale[0]) / 2
-				rad := math.to_radians(p.rotation)
-				xStart := p.position[0] - halfLen * math.cos(rad)
-				yStart := p.position[1] - halfLen * math.sin(rad)
-				xEnd := p.position[0] + halfLen * math.cos(rad)
-				yEnd := p.position[1] + halfLen * math.sin(rad)
-				rl.DrawLineEx({xStart, yStart}, {xEnd, yEnd}, 1 * p.scale[1], p.color)
-			case .Custom:
-				if p.customShapeProc != nil do p.customShapeProc(&p, deltaTime)
-			case .Texture:
-				if p.texture != nil {
-					w := p.size[0] * p.scale[0]
-					h := p.size[1] * p.scale[1]
-					rl.DrawTexturePro(
-						p.texture^,
-						{0, 0, f32(p.texture^.width), f32(p.texture^.height)},
-						{p.position[0], p.position[1], w, h},
-						{w / 2, h / 2},
-						p.rotation,
-						p.color,
-					)
-				}
-		}
+		batch_quad(&b, q.center, q.size.x, q.size.y, q.rotation, q.color)
 	}
 }

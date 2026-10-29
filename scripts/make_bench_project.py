@@ -3,7 +3,7 @@
 scenes/bench_tiles.scene.json (a 400x400 tile map seen zoomed out) and
 scenes/bench_sprites.scene.json (5000 separate sprites, 4 textures
 interleaved) and bench_sprites_overlap.scene.json (the same, overlapping),
-bench_particles / bench_particles_circles (5000 live particles),
+bench_particles / bench_particles_circles (5000 live particles), bench_particles_20k (20000 circles),
 bench_lights (24 shadow-casting point lights over 300 static boxes),
 bench_physics (1000 dynamic boxes falling into a walled pit),
 bench_scripts (1000 sprites, each moved by a Lua update(dt)) and
@@ -53,9 +53,10 @@ for name, step in (("bench_sprites", 50), ("bench_sprites_overlap", 26)):
                             texture_path=f"textures/Asteroid_{k % 4 + 1}.png"))
     (out / "scenes" / f"{name}.scene.json").write_text(json.dumps(scene(name, sprites)))
 # 5000 live particles (rectangles; circles).
-for name, shape in (("bench_particles", "Rectangle"), ("bench_particles_circles", "Circle")):
+for name, shape, amount in (("bench_particles", "Rectangle", 5000), ("bench_particles_circles", "Circle", 5000),
+                            ("bench_particles_20k", "Circle", 20000)):
     emitter = node("ParticleEmitterNode", "Emitter", pos=(640, 360), layer=1,
-                   particles={"amount": 5000, "lifetime": 1.0, "emitting": True, "continuous": True, "velocity": 150},
+                   particles={"amount": amount, "lifetime": 1.0, "emitting": True, "continuous": True, "velocity": 150},
                    properties={"emitter.shape": shape, "emitter.size": [4, 4], "emitter.spread": [300, 200],
                                "emitter.velocitySpread": 100, "emitter.velocityVariance": 1, "emitter.angleSpread": 180,
                                "emitter.angleVariance": 1, "emitter.colorVariance": 0.2})

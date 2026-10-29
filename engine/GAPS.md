@@ -320,8 +320,9 @@ allocator and logger); caching it measured 0.41 ms - about half of it.
 | 5000 sprites, 4 textures, separate | 0.95 / 1.3 ms (750 fps) | 5.0 / 6.4 ms |
 | 5000 sprites, 4 textures, overlapping | 4.0 / 4.5 ms (220 fps) | 5.0 / 6.3 ms |
 | 400x400 tile map at zoom 0.25 | 0.12 / 1.4 ms (730 fps) | 4.3 / 5.5 ms |
-| 5000 rectangle particles | 0.41 / 0.9 ms (1100 fps) | 0.41 / 1.3 ms |
-| 5000 circle particles | 1.3 / 1.8 ms (570 fps) | 1.2 / 2.2 ms |
+| 5000 rectangle particles | 0.36 / 1.0 ms (1000 fps) (was 0.41 / 0.9 before the batched particle renderer, #125) | 0.41 / 1.3 ms |
+| 5000 circle particles | 0.34 / 0.8 ms (1270 fps) (was 1.3 / 1.8: a textured quad each, not a triangle fan) | 1.2 / 2.2 ms |
+| 20000 circle particles | 1.3 / 1.9 ms (520 fps) (was 4.5 / 5.5) | |
 | 24 shadow-casting lights, 300 static boxes | 4.1 / 4.6 ms (220 fps) | 7.1 / 8.2 ms |
 | 1000 dynamic bodies + sprites, falling into a pit | 1.8 / 3.0 ms (330 fps) | 2.0 / 3.0 ms |
 | 1000 sprites, each moved by a Lua `update(dt)` | 0.97 / 1.6 ms (640 fps) | 1.6 / 2.6 ms |
