@@ -3,6 +3,7 @@ package engine
 import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
+import "core:log"
 import "core:math"
 import "core:math/rand"
 import "core:slice"
@@ -440,6 +441,105 @@ prepared_dep :: proc(ctx: ^GameContext, path: string) -> Prepared_Dep {
 	return d
 }
 
+@(private = "file")
+prepared_fresh :: proc(ctx: ^GameContext, p: Prepared) -> bool {
+	for d in p.deps {
+		now := prepared_dep(ctx, d.path)
+		if now.exists != d.exists || now.size != d.size || now.mod != d.mod do return false
+	}
+	return true
+}
+
+// drop_prepared removes a stale entry. Without bases (a game), its base is
+// kept in staleBases: the instances built from it diff against it when
+// they're rebuilt (Component_HotReload).
+@(private = "file")
+drop_prepared :: proc(compPath: string) {
+	heap := runtime_heap()
+	key, p := delete_key(&preparedCache, compPath)
+	if !Component_KeepBases && !(key in staleBases) {
+		// (Gone stale twice before a rebuild: the first base is the one
+		// most instances were built from.)
+		if staleBases == nil do staleBases = make(map[string]string, 4, heap)
+		staleBases[key] = p.base
+	} else {
+		delete(key, heap)
+		delete(p.base, heap)
+	}
+	delete(p.text, heap)
+	for d in p.deps do delete(d.path, heap)
+	delete(p.deps, heap)
+}
+
+// --- hot reload (#83) --------------------------------------------------------------
+// A game (development runs: scriptManager.hotReload) rebuilds the instances
+// of a component whose file changed - the outermost instance holding each,
+// with its overrides (diffed against the base it was built from, kept in
+// staleBases), transform and place in the tree. The editor (bases kept)
+// refreshes instances itself when it writes a component file.
+
+@(private = "file")
+staleBases: map[string]string
+@(private = "file")
+lastComponentCheck: time.Tick
+
+@(private = "file")
+forget_stale_bases :: proc() {
+	heap := runtime_heap()
+	for k, v in staleBases {
+		delete(k, heap)
+		delete(v, heap)
+	}
+	delete(staleBases)
+	staleBases = nil
+}
+
+// Component_HotReload checks the prepared components' files (every
+// HOT_RELOAD_INTERVAL unless `force`) and rebuilds the instances of the
+// changed ones in every loaded scene. Returns how many it rebuilt.
+Component_HotReload :: proc(game: ^Game, force := false) -> int {
+	if game == nil || Component_KeepBases do return 0
+	if !force && time.tick_since(lastComponentCheck) < HOT_RELOAD_INTERVAL do return 0
+	lastComponentCheck = time.tick_now()
+	ctx := &game.gameContext
+	stale := make([dynamic]string, context.temp_allocator)
+	for k, p in preparedCache do if !prepared_fresh(ctx, p) do append(&stale, k)
+	for k in stale do drop_prepared(k)
+	if len(staleBases) == 0 do return 0
+	defer forget_stale_bases()
+	count := 0
+	for _, scene in game.sceneManager.scenes {
+		if scene == nil || !scene.isLoaded || scene.manager == nil do continue
+		targets := make([dynamic]^Node, context.temp_allocator)
+		for n in scene.manager.nodes {
+			if n == nil || !(n.componentPath in staleBases) do continue
+			outer := n
+			for p := GetParent(scene.manager, n); p != nil; p = GetParent(scene.manager, p) do if p.componentPath != "" do outer = p
+			if !slice.contains(targets[:], outer) do append(&targets, outer)
+		}
+		rebuilt := 0
+		for old in targets {
+			base, has := staleBases[old.componentPath]
+			if !has {
+				// (Built before the cache knew it: its overrides can't be told
+				// from the file's old values.)
+				log.warnf("[HotReload] %s: instance %s kept as it is (restart to update it)", old.componentPath, old.name)
+				continue
+			}
+			if old.componentBase == "" do old.componentBase = strings.clone(base, old.allocator)
+			path := strings.clone(old.componentPath, context.temp_allocator)
+			if Scene_RebuildInstance(scene, old, "", ctx) != nil {
+				rebuilt += 1
+				log.infof("[HotReload] Rebuilt an instance of %s", path)
+			}
+		}
+		// (Tile maps measure painted components again: their size may have changed.)
+		if rebuilt > 0 do for n in scene.manager.nodes do if n != nil && n.typeId == TileMapNode do TileMapNode_ForgetFootprints(cast(^TileMapNode)n)
+		count += rebuilt
+	}
+	return count
+}
+
 // Component_Expand: the component file's node JSON, normalized, its nested
 // instances expanded; and its base text (what instances diff against).
 // `stack`: the components being expanded / built around it (loops: #75).
@@ -448,22 +548,11 @@ prepared_dep :: proc(ctx: ^GameContext, path: string) -> Prepared_Dep {
 Component_Expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]string) -> (obj: json.Object, baseText: string, problem: string) {
 	if len(stack) > 0 || preparedDeps != nil do return component_expand(ctx, compPath, stack)
 	if p, cached := preparedCache[compPath]; cached {
-		fresh := true
-		for d in p.deps {
-			now := prepared_dep(ctx, d.path)
-			if now.exists != d.exists || now.size != d.size || now.mod != d.mod {fresh = false; break}
-		}
-		if fresh {
+		if prepared_fresh(ctx, p) {
 			val, err := json.parse(transmute([]u8)p.text, allocator = context.temp_allocator)
 			if o, isObj := val.(json.Object); err == .None && isObj do return o, p.base, ""
 		}
-		heap := runtime_heap()
-		key, _ := delete_key(&preparedCache, compPath)
-		delete(key, heap)
-		delete(p.text, heap)
-		delete(p.base, heap)
-		for d in p.deps do delete(d.path, heap)
-		delete(p.deps, heap)
+		drop_prepared(compPath)
 	}
 	deps := make([dynamic]string, context.temp_allocator)
 	preparedDeps = &deps
@@ -1125,6 +1214,7 @@ Component_ClearCaches :: proc() {
 	delete(typeDefaults)
 	typeDefaults = nil
 	Component_ForgetPrepared()
+	forget_stale_bases()
 }
 
 // Component_InstanceJSON: an instance's whole subtree as a component file
