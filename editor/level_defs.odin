@@ -43,7 +43,7 @@ defs_text_edit :: proc(id: string, obj: ^e.LdtkJson, key: string) -> (string, bo
 	cur := e.LdtkJson_Str(obj, key)
 	buf: [256]u8
 	copy(buf[:len(buf) - 1], cur)
-	changed := imgui.InputText(fmt.ctprintf("##%s", id), cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue})
+	changed := imgui.InputText(fmt.ctprintf("##%s", id), cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(id)
 	text := strings.clone(string(cstring(raw_data(buf[:]))), context.temp_allocator)
 	return text, changed && text != cur
@@ -250,7 +250,7 @@ world_props :: proc(state: ^EditorState) -> bool {
 			UI_PropLabel("Name")
 			buf: [128]u8
 			copy(buf[:127], e.LdtkJson_Str(w, "identifier"))
-			if imgui.InputText("##wname", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+			if imgui.InputText("##wname", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 				defs_checkpoint("Rename World")
 				e.Ldtk_Doc_RenameWorld(doc, L.world, string(cstring(raw_data(buf[:]))))
 			}
@@ -333,11 +333,11 @@ world_props :: proc(state: ^EditorState) -> bool {
 world_pair :: proc(id: string, v: ^[2]i32) -> bool {
 	w := (imgui.GetContentRegionAvail().x - 4) * 0.5
 	imgui.SetNextItemWidth(w)
-	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0, {.EnterReturnsTrue})
+	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(fmt.tprintf("%s.x", id))
 	imgui.SameLine(0, 4)
 	imgui.SetNextItemWidth(w)
-	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0, {.EnterReturnsTrue})
+	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(fmt.tprintf("%s.y", id))
 	return a || b
 }
@@ -368,7 +368,7 @@ world_rename_popup :: proc(state: ^EditorState) {
 	defer imgui.EndPopup()
 	imgui.SetNextItemWidth(300)
 	if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
-	enter := imgui.InputText("##wrename", cstring(raw_data(world_ui.renameBuf[:])), len(world_ui.renameBuf), {.EnterReturnsTrue})
+	enter := imgui.InputText("##wrename", cstring(raw_data(world_ui.renameBuf[:])), len(world_ui.renameBuf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item("defs.world.rename.name")
 	level_tip("The world's new identifier", "worlds")
 	if UI_PrimaryButton("Rename", "defs.world.rename.ok") || enter {

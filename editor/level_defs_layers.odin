@@ -254,8 +254,8 @@ layer_form :: proc(state: ^EditorState, di: int) {
 		if d.type == .AutoLayer {
 			UI_DimText(fmt.tprintf("%d px (follows the layer it reads)", d.gridSize))
 		} else {
-			grid := i32(d.gridSize)
-			if imgui.InputInt("##grid", &grid, 1, 8, {.EnterReturnsTrue}) && grid >= 1 && int(grid) != d.gridSize {
+			grid, gridSet := level_input_int("##grid", i32(d.gridSize), 1, 8)
+			if gridSet && grid >= 1 && int(grid) != d.gridSize {
 				defs_checkpoint("Layer Grid")
 				e.Ldtk_Doc_SetLayerGrid(doc, uid, int(grid))
 				level_after_defs()
@@ -486,11 +486,11 @@ tileset_combo :: proc(d: ^e.Ldtk_DocLayerDef, tip: string) -> bool {
 layer_pair :: proc(id: string, v: ^[2]i32) -> bool {
 	w := (imgui.GetContentRegionAvail().x - 4) * 0.5
 	imgui.SetNextItemWidth(w)
-	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0, {.EnterReturnsTrue})
+	a := imgui.InputInt(fmt.ctprintf("##%s.x", id), &v.x, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(fmt.tprintf("%s.x", id))
 	imgui.SameLine(0, 4)
 	imgui.SetNextItemWidth(w)
-	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0, {.EnterReturnsTrue})
+	b := imgui.InputInt(fmt.ctprintf("##%s.y", id), &v.y, 0, 0) || imgui.IsItemDeactivatedAfterEdit()
 	Drive_Item(fmt.tprintf("%s.y", id))
 	return a || b
 }
@@ -574,6 +574,12 @@ values_section :: proc(state: ^EditorState, uid: int) -> bool {
 			level_tip(guid == 0 ? "Values in no group" : fmt.tprintf("%s: right-click to rename, colour, reorder or delete it", gname), "layers.values")
 			if guid != 0 && imgui.BeginPopupContextItem("##grpctx") {
 				defer imgui.EndPopup()
+				if ctx_item(ICON_FA_WAND_MAGIC_SPARKLES, "Create rules for group...", "Open Rules tab to create auto-layer rules for this group") {
+					LevelRules_SelectLayer(uid)
+					e.Ldtk_Doc_SyncRuleGroupsFromIntGrid(doc, uid)
+					LevelEditor_ShowTab(.Rules)
+					return true
+				}
 				if ctx_item(ICON_FA_PEN_TO_SQUARE, "Rename...", "Change the group's name") {
 					ll.groupReq = true
 					ll.groupLayer, ll.groupUid = uid, guid
@@ -944,7 +950,7 @@ layer_dialogs :: proc(state: ^EditorState) {
 	if imgui.BeginPopupModal("Rename Group###LevelValueGroup", nil, {.AlwaysAutoResize}) {
 		imgui.SetNextItemWidth(260)
 		if imgui.IsWindowAppearing() do imgui.SetKeyboardFocusHere()
-		enter := imgui.InputText("##gname", cstring(raw_data(ll.groupBuf[:])), len(ll.groupBuf), {.EnterReturnsTrue})
+		enter := imgui.InputText("##gname", cstring(raw_data(ll.groupBuf[:])), len(ll.groupBuf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit()
 		Drive_Item("valuegroup.name")
 		if UI_PrimaryButton("Rename", "valuegroup.ok") || enter {
 			color := ""

@@ -283,7 +283,7 @@ enum_form :: proc(state: ^EditorState, en: ^e.LdtkJson) {
 			}
 			buf: [256]u8
 			copy(buf[:255], strings.to_string(cur))
-			if imgui.InputTextWithHint("##entags", "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) {
+			if imgui.InputTextWithHint("##entags", "none", cstring(raw_data(buf[:])), len(buf), {.EnterReturnsTrue}) || imgui.IsItemDeactivatedAfterEdit() {
 				defs_checkpoint("Enum Tags")
 				e.Ldtk_Doc_SetEnumTags(doc, uid, strings.split(string(cstring(raw_data(buf[:]))), ",", context.temp_allocator))
 			}

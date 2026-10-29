@@ -861,6 +861,40 @@ test_ldtk_doc_rules_edit_and_wizard :: proc(t: ^testing.T) {
 }
 
 @(test)
+test_ldtk_doc_sync_rule_groups :: proc(t: ^testing.T) {
+	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_sync_groups.ldtk")
+	testing.expect(t, ok)
+	if !ok do return
+	defer Ldtk_Doc_Destroy(doc)
+
+	col := doc.layerDefs[0].uid
+	g1 := Ldtk_Doc_AddIntGridGroup(doc, col)
+	Ldtk_Doc_SetIntGridGroup(doc, col, g1, "Ground", "#33cc44")
+	g2 := Ldtk_Doc_AddIntGridGroup(doc, col)
+	Ldtk_Doc_SetIntGridGroup(doc, col, g2, "Walls", "#cc4433")
+
+	ts := Ldtk_Doc_AddTileset(doc, "atlas/w_zz.png", {128, 128}, 16)
+	auto := Ldtk_Doc_AddLayerDef(doc, .AutoLayer, "AutoTiles", ts)
+	LdtkJson_SetInt(doc.layerDefs[Ldtk_Doc_LayerDefIndex(doc, auto)].obj, "autoSourceLayerDefUid", col, doc.allocator)
+	Ldtk_Doc_LayerDefChanged(doc, auto)
+
+	// Sync rule groups from IntGrid
+	created := Ldtk_Doc_SyncRuleGroupsFromIntGrid(doc, auto)
+	testing.expect_value(t, created, 2)
+
+	adi := Ldtk_Doc_LayerDefIndex(doc, auto)
+	testing.expect_value(t, len(doc.layerDefs[adi].groups), 2)
+	testing.expect_value(t, doc.layerDefs[adi].groups[0].name, "Ground")
+	testing.expect_value(t, LdtkJson_Str(doc.layerDefs[adi].groups[0].obj, "color"), "#33cc44")
+	testing.expect_value(t, doc.layerDefs[adi].groups[1].name, "Walls")
+	testing.expect_value(t, LdtkJson_Str(doc.layerDefs[adi].groups[1].obj, "color"), "#cc4433")
+
+	// Sync again: 0 created
+	created2 := Ldtk_Doc_SyncRuleGroupsFromIntGrid(doc, auto)
+	testing.expect_value(t, created2, 0)
+}
+
+@(test)
 test_ldtk_doc_level_bounds_bg_worlds :: proc(t: ^testing.T) {
 	doc, ok := Ldtk_Doc_New("/tmp/rayzr_zz_levels.ldtk")
 	testing.expect(t, ok)
