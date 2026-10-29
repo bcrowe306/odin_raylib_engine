@@ -496,6 +496,8 @@ Actions_Dispatch :: proc(state: ^EditorState) {
 		// The Level tab: only global commands (it has its own keys).
 		if levelMode && a.scope != .Global do continue
 		if levelMode && (a.id == "view.viewport" || a.id == "view.code" || a.id == "file.save_as" || a.id == "file.revert") do continue
+		// The Level Generator window has its own Save / Undo / Delete keys.
+		if levelGenFocused && (a.scope == .Scene || a.id == "file.save") do continue
 		switch a.scope {
 		case .Global: if typing do continue
 		case .Scene:

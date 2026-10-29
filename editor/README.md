@@ -376,6 +376,16 @@ panel. (The Assets panel shows what is already in the project.)
   for one load. Rows also drag onto the Assets panel or the viewport, like
   files from the OS file manager.
 
+### Level Generator
+
+**Assets > + > New Level Generator** (or double-click a `.levelgen.json`)
+opens a procedural level graph: nodes with thumbnails on a canvas, links
+dragged from outputs to inputs, the right-click menu to add nodes, the
+selected node's parameters and tile rules in the side panel with a large
+preview, Save / Undo / Redo, and **Apply to TileMap** (into the TileMap
+selected in the scene; undoable). Guide:
+[`engine/docs/level_generator.md`](../engine/docs/level_generator.md).
+
 ### Scene tabs
 
 Every scene you open (from Assets, the palette, Edit Component, ...) gets a

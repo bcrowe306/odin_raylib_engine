@@ -212,6 +212,8 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		if menu(ICON_FA_PLUS, "Add as Child of Selected", "add-component-child", hasScene && sel != nil) {
 			Editor_InstantiateComponentFile(state, rel, sel.globalPosition)
 		}
+	case .Generator:
+		if menu(ICON_FA_SHUFFLE, "Open in Level Generator", "open-levelgen") do LevelGenEditor_Open(state, rel)
 	case .Shader:
 		if menu(ICON_FA_CODE, "Edit Shader", "edit-shader") do Editor_OpenScript(state, rel)
 		if menu(ICON_FA_WAND_MAGIC_SPARKLES, "Use on Selected Node", "use-shader", sel != nil) {
@@ -578,6 +580,8 @@ Asset_AddMenu :: proc(state: ^EditorState) {
 	if menu(ICON_FA_GEM, "New Resource...", "add-new-resource") do NewResourceDialog_Open(state)
 	UI_Tooltip("A data asset of a resource class (a script with a `resource` marker)")
 	if menu(ICON_FA_WAND_MAGIC_SPARKLES, "New Shader", "add-new-shader") do Editor_NewShader(state)
+	if menu(ICON_FA_SHUFFLE, "New Level Generator", "add-new-levelgen") do LevelGenEditor_New(state)
+	UI_Tooltip("A procedural level: a graph of nodes (noise, caves, ...) written into a TileMap")
 }
 
 // AssetDelete_Render: the delete confirmation (single or multi).

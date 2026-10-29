@@ -223,3 +223,36 @@ missing, missing_why = LevelGen.generate("levels/none.levelgen.json", Scene.find
 	testing.expect_value(t, getv(L, "missing"), "false")
 	testing.expect(t, strings.contains(getv(L, "missing_why"), "no file"), "why it failed")
 }
+
+// Editing (the Generator window): add, connect (no cycles), duplicate,
+// remove (inputs reading it disconnected); the cave template is valid.
+@(test)
+test_level_gen_editing :: proc(t: ^testing.T) {
+	g := gen_parse(t, GEN_TEMPLATE_CAVE)
+	defer Gen_GraphDestroy(&g)
+	testing.expect(t, len(g.nodes) == 5 && Gen_OutputNode(&g).kind == .Tile_Output, "the template")
+	_, err := Gen_Evaluate(&g, 0, 0, context.temp_allocator)
+	testing.expect_value(t, err, "")
+
+	blur := Gen_AddNode(&g, .Blur, {10, 20})
+	testing.expect(t, blur.id == 6 && blur.pos == {10, 20} && Gen_Param(blur, "radius") == 1, "added with defaults")
+	testing.expect(t, Gen_Connect(&g, 6, 0, 4), "4 -> blur")
+	testing.expect(t, !Gen_Connect(&g, 4, 0, 6), "blur -> 4 would be a cycle")
+	testing.expect(t, !Gen_Connect(&g, 6, 1, 4), "blur has one input")
+	testing.expect(t, !Gen_Connect(&g, 6, 0, 99), "no node 99")
+	out := Gen_AddNode(&g, .Tile_Output, {})
+	testing.expect(t, len(out.rules) == 1 && out.rules[0].tiles[0] == 0, "a tile output starts with a rule")
+
+	dup := Gen_DuplicateNode(&g, 5)
+	testing.expect(t, dup != nil && dup.id == 8 && dup.inputs == {} && len(dup.rules) == 1, "a copy without its inputs")
+	dup.rules[0].tiles[0] = 9
+	testing.expect_value(t, Gen_FindNode(&g, 5).rules[0].tiles[0], i32(0)) // (its own rules)
+
+	testing.expect(t, Gen_RemoveNode(&g, 4), "removed")
+	testing.expect(t, Gen_FindNode(&g, 5).inputs[0] == 0 && Gen_FindNode(&g, 6).inputs[0] == 0, "readers disconnected")
+	testing.expect(t, !Gen_RemoveNode(&g, 4), "already gone")
+	text := Gen_GraphSerialize(&g, context.temp_allocator)
+	back := gen_parse(t, text)
+	defer Gen_GraphDestroy(&back)
+	testing.expect_value(t, len(back.nodes), len(g.nodes))
+}
