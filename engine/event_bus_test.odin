@@ -98,6 +98,7 @@ test_event_bus_odin_listeners :: proc(t: ^testing.T) {
 	// A subscription scoped to a node ends with it.
 	guard := Node_CreateByTypeName(scene, "Node")
 	guard.gameContext = &game.gameContext
+	ProcessNodeQueues(scene.manager, &game.gameContext) // in the tree (a node removed before it was added stays)
 	EventBus_Subscribe(bus, "alarm", proc(source: rawptr, value: EventValue, _: ^GameContext, ud: rawptr) {
 		bus_test_record(cast(^Bus_Test_Log)ud, "alarm", source, value)
 	}, &d, scope = guard)

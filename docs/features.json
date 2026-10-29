@@ -157,13 +157,6 @@
       "description": "Extend the editor in Lua: commands, dockable panels, inspectors, viewport overlays and importers."
     },
     {
-      "title": "Global events",
-      "group": "Gameplay",
-      "icon": "signal",
-      "docs": "guides/events",
-      "description": "An event bus: Events.emit from anywhere, Events.connect from anywhere - no references between gameplay, UI and game flow."
-    },
-    {
       "title": "Object pooling",
       "group": "Gameplay",
       "icon": "database",
