@@ -561,23 +561,3 @@ Editor_NodeLocked :: proc(state: ^EditorState, node: ^e.Node) -> bool {
 	root := e.Node_ComponentRoot(state.activeScene.manager, node)
 	return root != nil && root != node
 }
-
-// Editor_InstantiateComponentJSON adds a component's node tree at a world
-// position under the insertion parent.
-Editor_InstantiateComponentJSON :: proc(state: ^EditorState, json: []u8, worldPos: [2]f32, label: string) -> ^e.Node {
-	if state.activeScene == nil do return nil
-	Editor_RecordUndo(state, fmt.tprintf("Instantiate %s", label))
-	parent := Editor_InsertionParent(state)
-	node := e.Scene_InstantiateNodeFromJSON(state.activeScene, json, parent, &state.game.gameContext)
-	if node == nil {
-		Editor_Log(state, .Error, "Component %s could not be instantiated", label)
-		return nil
-	}
-	node.name = strings.clone(Editor_UniqueChildName(state, parent, node.name, node), node.allocator)
-	node.position = Editor_WorldToLocal(parent, worldPos)
-	e.ProcessNodeQueues(state.activeScene.manager, &state.game.gameContext)
-	e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
-	state.selectedNode = node
-	Editor_Log(state, .Info, "Instantiated %s", label)
-	return node
-}

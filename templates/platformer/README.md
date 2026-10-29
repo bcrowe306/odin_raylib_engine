@@ -16,6 +16,7 @@ level, collect coins, avoid spikes and stomp the enemies.
 | `scripts/player.lua` | Movement (coyote time, jump buffer, jump cut), animations, dying and winning - tune it in the Inspector |
 | `scripts/enemy.lua`, `enemy_hitbox.lua` | Walks, turns at walls and ledges; stomped from above, hurts otherwise |
 | `scripts/coin.lua`, `hazard.lua`, `goal.lua`, `hud.lua` | Pickups, spikes, the door (its **Next Level** property), the coin count and messages |
+| `components/` | Starter physics components to drag into a level: a crate that falls and gets pushed, a static platform, a trigger zone (an area that reports what enters it) |
 | `textures/` | Kenney's Pixel Platformer (CC0) |
 
 ## Make it yours

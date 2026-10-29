@@ -203,7 +203,7 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		}
 	case .Component:
 		if menu(ICON_FA_CUBES, "Edit Component", "edit-component") do Editor_OpenComponent(state, rel)
-		if menu(ICON_FA_PLUS, "Add to Scene", "add-component", hasScene) do Component_InstantiateFromFile(state, full, state.cameraPos)
+		if menu(ICON_FA_PLUS, "Add to Scene", "add-component", hasScene) do Editor_InstantiateComponentFile(state, rel, state.cameraPos)
 		if menu(ICON_FA_PLUS, "Add as Child of Selected", "add-component-child", hasScene && sel != nil) {
 			Editor_InstantiateComponentFile(state, rel, sel.globalPosition)
 		}

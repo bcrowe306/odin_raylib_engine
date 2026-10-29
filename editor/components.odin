@@ -11,23 +11,8 @@ import e "../engine"
 // *linked* instances of it (the scene stores only the instance's link, name
 // and transform). "Edit Component" opens the file as its own document;
 // saving it refreshes every instance in the open scenes.
-// Built-in templates are snippets that are copied, not linked.
 // ============================================================================
 
-Component_Instantiate :: proc(state: ^EditorState, comp: ^ComponentDef, targetPos: [2]f32) -> ^e.Node {
-	if state == nil || comp == nil do return nil
-	return Editor_InstantiateComponentJSON(state, transmute([]u8)comp.jsonSnippet, targetPos, comp.name)
-}
-
-Component_InstantiateFromFile :: proc(state: ^EditorState, filePath: string, targetPos: [2]f32) -> ^e.Node {
-	if state == nil do return nil
-	return Editor_InstantiateComponentFile(state, asset_rel_editor(state, filePath), targetPos)
-}
-
-Component_SaveNodeToFile :: proc(state: ^EditorState, node: ^e.Node, outPath: string = "") -> bool {
-	_, ok := Editor_SaveComponent(state, node)
-	return ok
-}
 
 Editor_IsComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 	return scene != nil && state.componentDocs[scene]

@@ -341,7 +341,7 @@ inspector_body :: proc(state: ^EditorState) {
 		imgui.TextWrapped("Save this node and its children as a reusable component in components/.")
 		imgui.PopStyleColor()
 		if UI_Button(fmt.tprintf("%s  Save as Component", ICON_FA_CUBES), "insp.save-component", {-1, 0}) {
-			_ = Component_SaveNodeToFile(state, node)
+			_, _ = Editor_SaveComponent(state, node)
 		}
 	}
 }
