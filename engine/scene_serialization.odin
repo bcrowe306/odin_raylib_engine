@@ -1200,7 +1200,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	}
 
 	// Old files put a texture on any node: show it with a child sprite.
-	if node.typeId != TextureNode && node.typeId != FrameAnimationNode {
+	if node.typeId != TextureNode && node.typeId != AtlasSpriteNode && node.typeId != FrameAnimationNode {
 		if path := sj_texture_path(obj); path != "" {
 			tn := cast(^TextureNode)Node_CreateByTypeName(scene, "TextureNode", node)
 			tn.name = strings.clone("Sprite", tn.allocator)
@@ -1235,8 +1235,16 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	read_material(node, obj)
 
 	if children, ok := sj_arr(obj, "children"); ok {
+		atlasTex := sj_texture_path(obj) if node.typeId == AtlasSpriteNode else ""
 		for c in children {
-			if co, is_obj := c.(json.Object); is_obj do _ = read_node(scene, co, node, ctx)
+			if co, is_obj := c.(json.Object); is_obj {
+				if atlasTex != "" && sj_string(co, "type", "") == "TextureNode" && sj_string(co, "name", "") == "Sprite" &&
+				   sj_texture_path(co) == atlasTex && sj_vec2(co, "position", {0, 0}) == {0, 0} &&
+				   !sj_obj_has(co, "children") && !sj_obj_has(co, "script") {
+					continue
+				}
+				_ = read_node(scene, co, node, ctx)
+			}
 		}
 	}
 	return node
@@ -1252,6 +1260,7 @@ read_origin :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
 	if _, has := obj["pivot"]; has {
 		node.pivot = sj_vec2(obj, "pivot", {0.5, 0.5})
 		if node.typeId == TextureNode && legacyPx != {0, 0} do (cast(^TextureNode)node).origin = legacyPx // the pixel override
+		if node.typeId == AtlasSpriteNode && legacyPx != {0, 0} do (cast(^AtlasSpriteNode)node).origin = legacyPx
 		return
 	}
 	switch node.typeId {
@@ -1262,6 +1271,8 @@ read_origin :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
 			node.pivot = legacyPx / size
 		} else if node.typeId == TextureNode {
 			(cast(^TextureNode)node).origin = legacyPx // no texture loaded (headless): keep the pixels
+		} else if node.typeId == AtlasSpriteNode {
+			(cast(^AtlasSpriteNode)node).origin = legacyPx
 		}
 	case AnimationPlayerNode:
 		node.pivot = {0, 0}
