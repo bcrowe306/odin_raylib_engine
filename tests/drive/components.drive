@@ -49,9 +49,3 @@ dblclick @asset:scenes/main.scene.json
 expect node:PlayerShip.children == 2
 expect node:PlayerShip2.children == 2
 screenshot instances_updated
-
-# Built-in templates are copies.
-key escape
-dblclick @asset:component:Physics Crate
-expect selected == PhysicsCrate
-expect node:PhysicsCrate.type == DynamicBodyNode

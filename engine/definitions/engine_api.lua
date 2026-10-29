@@ -329,6 +329,18 @@ function Node:is_visible() end
 ---@param visible boolean
 function Node:set_visible(visible) end
 
+---Returns the component path of this node if it is a component root, or nil if it is not an instance root.
+---
+---Example: `local path = self.node:get_component(); if path then Log.info("Instance of " .. path) end`
+---@return string?
+function Node:get_component() end
+
+---Returns the root node of the linked component instance this node belongs to, or nil if not part of a component.
+---
+---Example: `local root = self.node:get_instance_root(); if root then Log.info("Belongs to root " .. root:get_name()) end`
+---@return Node?
+function Node:get_instance_root() end
+
 ---Gets the parent node, or nil if this is a root node.
 ---
 ---Example: `local parent = self.node:get_parent(); if parent then Log.info(parent:get_name()) end`
@@ -9727,17 +9739,18 @@ function SceneModule.get_nodes() end
 ---@return Node? node Newly spawned node
 function SceneModule.create_node(nodeType, name, parent) end
 
----Instances a component at runtime - `Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position)`.
+---Instances a component at runtime - `Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position, { speed = 300 })`.
 ---Added under `parent` (else the scene's root), at x, y local to it (two
----numbers or a Vec2). Returns its root node (typed per component), or nil.
+---numbers or a Vec2). An optional table of property values is applied to the root's script before ready() runs. Returns its root node (typed per component), or nil.
 ---
----Example: `local b = Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position)`
+---Example: `local b = Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position, { speed = 300 })`
 ---@param component ComponentPath|string
 ---@param parent? Node
----@param x? number|Vec2
----@param y? number
+---@param x? number|Vec2|table<string, any>
+---@param y? number|table<string, any>
+---@param properties? table<string, any>
 ---@return Node?
-function SceneModule.instantiate(component, parent, x, y) end
+function SceneModule.instantiate(component, parent, x, y, properties) end
 
 ---Checks if debug collider and bounds rendering is enabled on this scene.
 ---

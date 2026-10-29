@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Runs the performance benchmarks and prints their [bench] lines:
 #   - engine (no window): node create/destroy, transforms, scene JSON,
-#     particles, Lua scripts (engine/perf_bench_test.odin)
+#     particles, Lua scripts (engine/perf_bench_test.odin), component
+#     instances (engine/component_bench_test.odin)
 #   - rendering (a window, uncapped frames): the runner's --bench on the
 #     scenes of scripts/make_bench_project.py, with and without the render
 #     caches (--no-render-cache)
@@ -21,7 +22,7 @@ python3 scripts/make_bench_project.py /tmp/rayzr_bench > /dev/null
 if want engine; then
 echo "== engine"
 odin build engine -build-mode:test -o:speed -define:ODIN_TEST_THREADS=1 \
-	-define:ODIN_TEST_NAMES=engine.bench_scene_hot_paths,engine.bench_particles,engine.bench_scripts,engine.bench_navigation \
+	-define:ODIN_TEST_NAMES=engine.bench_scene_hot_paths,engine.bench_particles,engine.bench_scripts,engine.bench_navigation,engine.bench_components \
 	-out:/tmp/rayzr_bench_engine > /dev/null || exit 1
 /tmp/rayzr_bench_engine 2>&1 | grep '\[bench\]' | sed 's/^.*\[bench\]/[bench]/'
 fi

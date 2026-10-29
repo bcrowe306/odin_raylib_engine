@@ -31,6 +31,7 @@ UI_ACCENT      := imgui.Vec4{0.361, 0.553, 1.000, 1}
 UI_ACCENT_SOFT := imgui.Vec4{0.361, 0.553, 1.000, 0.18}
 UI_SUCCESS     := imgui.Vec4{0.298, 0.808, 0.553, 1}
 UI_WARNING     := imgui.Vec4{0.961, 0.722, 0.298, 1}
+UI_COMPONENT   := imgui.Vec4{0.75, 0.62, 1.0, 1} // linked component instances
 UI_DANGER      := imgui.Vec4{0.937, 0.373, 0.373, 1}
 CODE_BG        := imgui.Vec4{0.071, 0.078, 0.094, 1}
 UI_LINE_RGB    := [3]f32{1, 1, 1} // faint lines / borders: the text side of the theme

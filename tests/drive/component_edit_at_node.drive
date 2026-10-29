@@ -1,0 +1,30 @@
+# #86: Edit Component from a node inside an instance opens the component
+# document with that node selected (the Inspector button and the
+# hierarchy's menu); from the instance's root, the document's root.
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+
+click @hier:PlayerShip/ParticleEmitter
+click @insp.edit-component
+expect scene == components/PlayerShip.component.json
+expect selected == ParticleEmitter
+screenshot from_inspector
+
+dblclick @asset:scenes/main.scene.json
+expect scene == scenes/main.scene.json
+rclick @hier:PlayerShip/ParticleEmitter
+click @ctx:edit-component
+expect scene == components/PlayerShip.component.json
+expect selected == ParticleEmitter
+
+dblclick @asset:scenes/main.scene.json
+click @hier:PlayerShip
+click @insp.edit-component
+expect scene == components/PlayerShip.component.json
+expect selected == PlayerShip

@@ -25,6 +25,7 @@ import rl "vendor:raylib"
 //   "type", "name", "position", "scale", "rotation", "pivot" (the origin, nodes
 //   that draw a rectangle), "enabled", "visible", "layer"
 //   optional: "pause_mode", "paused", "tags", "editor_locked", "editor_hidden" (editor only)
+//   a component's root: "exposed": [{"uid", "property", "label"}] (component_exposed.odin)
 //   "properties": { <reflected gui:"true" fields> }        (see node_properties.odin)
 //   resources by type: "texture"/"origin" (TextureNode), "frames"/"fps"/"loop"/"origin"
 //   (FrameAnimationNode), "audio" (Sound/Music), "timer" {duration, auto_start, loop},
@@ -192,6 +193,9 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 			return
 		}
 	}
+
+	// (A component's root: written with the node, not on an instance's link.)
+	if len(node.componentExposed) > 0 do write_exposed(w, node, &first)
 
 	// Type-specific resources.
 	switch node.typeId {
@@ -888,7 +892,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 			componentDepth -= 1
 			if node == nil do return nil
 			node.componentPath = strings.clone(compPath, node.allocator)
-			node.componentBase = strings.clone(string(base), node.allocator)
+			if Component_KeepBases do node.componentBase = strings.clone(string(base), node.allocator)
 			return node
 		}
 		inst, problem := read_component_instance(scene, compPath, obj, parent, ctx)
@@ -916,6 +920,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	node.editorLocked = sj_bool(obj, "editor_locked", false)
 	node.editorHidden = sj_bool(obj, "editor_hidden", false)
 	read_tags(node, obj)
+	read_exposed(node, obj)
 
 	read_legacy_blocks(node, obj, ctx)
 
@@ -1230,7 +1235,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	}
 
 	// Old files put a texture on any node: show it with a child sprite.
-	if node.typeId != TextureNode && node.typeId != FrameAnimationNode {
+	if node.typeId != TextureNode && node.typeId != AtlasSpriteNode && node.typeId != FrameAnimationNode {
 		if path := sj_texture_path(obj); path != "" {
 			tn := cast(^TextureNode)Node_CreateByTypeName(scene, "TextureNode", node)
 			tn.name = strings.clone("Sprite", tn.allocator)
@@ -1265,8 +1270,16 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	read_material(node, obj)
 
 	if children, ok := sj_arr(obj, "children"); ok {
+		atlasTex := sj_texture_path(obj) if node.typeId == AtlasSpriteNode else ""
 		for c in children {
-			if co, is_obj := c.(json.Object); is_obj do _ = read_node(scene, co, node, ctx)
+			if co, is_obj := c.(json.Object); is_obj {
+				if atlasTex != "" && sj_string(co, "type", "") == "TextureNode" && sj_string(co, "name", "") == "Sprite" &&
+				   sj_texture_path(co) == atlasTex && sj_vec2(co, "position", {0, 0}) == {0, 0} &&
+				   !sj_obj_has(co, "children") && !sj_obj_has(co, "script") {
+					continue
+				}
+				_ = read_node(scene, co, node, ctx)
+			}
 		}
 	}
 	return node
@@ -1282,6 +1295,7 @@ read_origin :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
 	if _, has := obj["pivot"]; has {
 		node.pivot = sj_vec2(obj, "pivot", {0.5, 0.5})
 		if node.typeId == TextureNode && legacyPx != {0, 0} do (cast(^TextureNode)node).origin = legacyPx // the pixel override
+		if node.typeId == AtlasSpriteNode && legacyPx != {0, 0} do (cast(^AtlasSpriteNode)node).origin = legacyPx
 		return
 	}
 	switch node.typeId {
@@ -1292,6 +1306,8 @@ read_origin :: proc(node: ^Node, obj: json.Object, ctx: ^GameContext) {
 			node.pivot = legacyPx / size
 		} else if node.typeId == TextureNode {
 			(cast(^TextureNode)node).origin = legacyPx // no texture loaded (headless): keep the pixels
+		} else if node.typeId == AtlasSpriteNode {
+			(cast(^AtlasSpriteNode)node).origin = legacyPx
 		}
 	case AnimationPlayerNode:
 		node.pivot = {0, 0}
@@ -1584,7 +1600,7 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	componentDepth -= 1
 	if node == nil do return nil, "its root node could not be created"
 	node.componentPath = strings.clone(compPath, node.allocator)
-	node.componentBase = strings.clone(baseText, node.allocator)
+	if Component_KeepBases do node.componentBase = strings.clone(baseText, node.allocator)
 	node.name = strings.clone(sj_string(inst, "name", node.name), node.allocator)
 	// The instance's own uid in the document holding it (a component nesting
 	// it); the component's root uid stays in its base. "" in scenes.
@@ -1726,6 +1742,7 @@ Scene_RebuildInstance :: proc(scene: ^Scene, old: ^Node, instJson: string, ctx: 
 Node_UnlinkComponent :: proc(node: ^Node) {
 	node.componentPath = ""
 	node.componentBase = ""
+	node.componentExposed = nil // (an ordinary node now)
 }
 
 // Node_ComponentRoot returns the linked instance a node belongs to (the

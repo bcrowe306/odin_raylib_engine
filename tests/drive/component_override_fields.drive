@@ -1,0 +1,65 @@
+# #84: an instance node's overridden values are marked in the Inspector;
+# right-click the label: Revert to Component / Apply to Component (that one
+# value, written to the component file; every instance follows it).
+wait 5
+click @hier:PlayerShip
+key ctrl+a
+type particle
+key enter
+rclick @hier:PlayerShip
+click @ctx:save-component
+key escape
+dblclick @asset:components/PlayerShip.component.json
+expect selected == PlayerShip2
+
+# Nothing overridden: no marks.
+click @hier:PlayerShip2/ParticleEmitter
+wait 1
+expect node:PlayerShip2/ParticleEmitter.overrides ==
+expect item:insp.overridden:position == missing
+
+# Override the position: its row is marked.
+dblclick @insp.position.x
+key ctrl+a
+type 25
+key enter
+wait 1
+expect node:PlayerShip2/ParticleEmitter.overrides == position
+expect item:insp.overridden:position == visible
+expect item:insp.overridden:rotation == missing
+screenshot marked
+rclick @insp.proplabel:position
+expect item:ctx:revert-override == visible
+screenshot menu
+
+# Revert that value.
+click @ctx:revert-override
+wait 1
+expect node:PlayerShip2/ParticleEmitter.overrides ==
+expect node:PlayerShip2/ParticleEmitter.position !contains 25.0,
+expect item:insp.overridden:position == missing
+screenshot reverted
+
+# Override it again and apply it to the component.
+click @hier:PlayerShip2/ParticleEmitter
+dblclick @insp.position.x
+key ctrl+a
+type 25
+key enter
+wait 1
+rclick @insp.proplabel:position
+click @ctx:apply-override
+wait 1
+expect file:components/PlayerShip.component.json contains "position": [25,
+expect node:PlayerShip2/ParticleEmitter.overrides ==
+expect node:PlayerShip2/ParticleEmitter.position contains 25.0,
+# The other instance follows the file.
+expect node:PlayerShip/ParticleEmitter.position contains 25.0,
+expect item:insp.overridden:position == missing
+screenshot applied
+
+# One undo step restores the file and the scene.
+key ctrl+z
+wait 1
+expect file:components/PlayerShip.component.json !contains "position": [25,
+expect node:PlayerShip/ParticleEmitter.position !contains 25.0,

@@ -242,6 +242,17 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "", files: [
 		Drive_Item(fmt.tprintf("asset.global:%s", rel))
 		UI_Tooltip(fmt.tprintf("Global script: every script can use %s (Project Settings > Globals)", global))
 	}
+	if kind == .Component {
+		// How many instances the open documents use (#86).
+		if n := Editor_ComponentInstanceCount(state, rel); n > 0 {
+			imgui.SameLine(0, 8)
+			imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)
+			imgui.TextUnformatted(fmt.ctprintf("×%d", n))
+			imgui.PopStyleColor()
+			Drive_Item(fmt.tprintf("asset.instances:%s", rel))
+			UI_Tooltip(fmt.tprintf("%d instance(s) in the open scenes (right-click: Select All Instances)", n))
+		}
+	}
 	return dbl
 }
 
@@ -302,7 +313,7 @@ asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, n
 	if dbl {
 		#partial switch kind {
 		case .Scene: Editor_OpenScene(state, rel)
-		case .Component: Component_InstantiateFromFile(state, full, state.cameraPos)
+		case .Component: Editor_InstantiateComponentFile(state, rel, state.cameraPos)
 		case .Script: Editor_OpenScript(state, rel)
 		case .Level: Editor_AddLevel(state, rel, state.cameraPos)
 		case .Shader: Editor_OpenScript(state, rel)
@@ -377,33 +388,10 @@ section_components :: proc(state: ^EditorState, filter: string) {
 	files := Editor_ListProjectFiles(state, "components", {".component.json"})
 	n := 0
 	for f in files do if matches(f, filter) do n += 1
-	for comp in state.components do if matches(comp.name, filter) do n += 1
 	if filter != "" && n == 0 do return
 	if !asset_folder_header("Components", n, state = state) do return
 	for f in files {
 		if matches(f, filter) do asset_row(state, f, "", files)
-	}
-	// Built-in templates.
-	for &comp, idx in state.components {
-		if !matches(comp.name, filter) do continue
-		icon, col := kind_icon(.Component)
-		imgui.PushStyleColorImVec4(.Text, col)
-		clicked := imgui.Selectable(fmt.ctprintf("%s##tpl%d", icon, idx), state.selectedCompIdx == idx, {.AllowDoubleClick}, {0, 24})
-		imgui.PopStyleColor()
-		Drive_Item(fmt.tprintf("asset:component:%s", comp.name))
-		if clicked do state.selectedCompIdx = idx
-		if imgui.IsItemHovered() && imgui.IsMouseDoubleClicked(.Left) do Component_Instantiate(state, &comp, state.cameraPos)
-		if imgui.BeginPopupContextItem(fmt.ctprintf("ctx_tpl%d", idx)) {
-			if imgui.MenuItem(fmt.ctprintf("%s  Add to Scene", ICON_FA_PLUS), nil, false, state.activeScene != nil) do Component_Instantiate(state, &comp, state.cameraPos)
-			Drive_Item("ctx:add-template")
-			if imgui.MenuItem(fmt.ctprintf("%s  Add as Child of Selected", ICON_FA_PLUS), nil, false, state.selectedNode != nil) do Component_Instantiate(state, &comp, state.selectedNode.globalPosition)
-			imgui.EndPopup()
-		}
-		UI_Tooltip(fmt.tprintf("%s - built-in template. Double-click to add.", comp.description))
-		imgui.SameLine(32)
-		imgui.TextUnformatted(strings.clone_to_cstring(comp.name, context.temp_allocator))
-		imgui.SameLine(0, 6)
-		UI_DimText(comp.category)
 	}
 }
 
@@ -517,9 +505,8 @@ Editor_DropAsset :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) {
 			if s, ok := rm.loadAudioSound(rm, e.Project_ResolveAssetPath(&state.game.gameContext, rel)); ok do sn.audio = s
 		}
 	case .Component:
-		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
 		state.selectedNode = nil
-		Component_InstantiateFromFile(state, full, worldPos)
+		Editor_InstantiateComponentFile(state, rel, worldPos)
 	case .Script:
 		target := Viewport_PickNode(state, worldPos)
 		if target == nil do target = state.selectedNode
