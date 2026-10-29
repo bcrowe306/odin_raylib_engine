@@ -1,0 +1,11 @@
+# Soft edges (the particles' anti-aliased circles) leave the viewport's
+# texture opaque: no dark rim from the panel showing through.
+wait 5
+click @asset.new-scene
+click @hier.add
+type particle emitter
+click @addnode.create
+wait 60
+expect node:ParticleEmitter.particles >= 1
+expect viewport.min-alpha == 255
+screenshot soft_edges

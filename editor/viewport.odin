@@ -236,6 +236,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 	}
 
 	rl.EndMode2D()
+	e.Render_MakeOpaque(f32(state.renderTexture.texture.width), f32(state.renderTexture.texture.height)) // (shown blended: soft edges kept their dark rim)
 	rl.EndTextureMode()
 }
 

@@ -1012,7 +1012,9 @@ particleCircleTex: rl.Texture2D
 particle_circle_texture :: proc() -> u32 {
 	if particleCircleTex.id != 0 do return particleCircleTex.id
 	N :: 64
-	img := rl.GenImageColor(N, N, rl.BLANK)
+	// Transparent white, not BLANK (transparent black): the filtering blends
+	// the edge with its neighbours, and black ones made a dark rim.
+	img := rl.GenImageColor(N, N, {255, 255, 255, 0})
 	defer rl.UnloadImage(img)
 	r := f32(N) * 0.5
 	for y in 0 ..< N do for x in 0 ..< N {
