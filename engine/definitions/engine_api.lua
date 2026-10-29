@@ -443,7 +443,7 @@ function Node:queue_free() end
 ---| "particle_hit"       # ParticleEmitterNode (collision on): value: the Node a particle hit (particle_get_last_hit: where)
 ---| "animation_finished" # FrameAnimationNode / AnimationPlayerNode (non-looping); value: animation name
 ---| "state_changed"      # StateMachineNode: value: the state entered
----| "finished"           # SoundNode / MusicNode: playback ended
+---| "finished"           # SoundNode / MusicNode: playback ended; ParticleEmitterNode: a one-shot (or stopped) emitter's last particle died
 ---| "clicked"            # UIButtonNode
 ---| "value_changed"      # UI slider/checkbox/text input/dropdown/radio/knob/fader; value: new value
 ---| "submitted"          # UITextInputNode: value: text
@@ -538,8 +538,8 @@ function AsepriteNode:connect(event, handler) end
 ---@return integer id Connection id for `disconnect`
 function StateMachineNode:connect(event, handler) end
 
----@alias ParticleEmitterNodeEvent NodeTreeEvent|"particle_hit"|ProjectEvent
----Connects a handler to one of this node's events: particle_hit (A particle hit a body (collision on; particle_get_last_hit: where)); the tree events; custom ones.
+---@alias ParticleEmitterNodeEvent NodeTreeEvent|"particle_hit"|"finished"|ProjectEvent
+---Connects a handler to one of this node's events: particle_hit (A particle hit a body (collision on; particle_get_last_hit: where)), finished (Playback (or the dialogue) ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("particle_hit", function(value, source) Log.info("particle_hit") end)`
 ---@param event ParticleEmitterNodeEvent|string
@@ -1582,6 +1582,9 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "emitter.radialVelocity" # number - Speed away from the emitter (negative: towards it), px/s - bursts, implosions.
 ---| "emitter.orbitVelocity" # number - Turning around the emitter, degrees/s - vortexes, magic circles.
 ---| "emitter.damping" # number - Speed lost per second (drag): particles slow down and drift.
+---| "emitter.prewarm" # boolean - Start as if it had already run a whole lifetime (smoke already there when the scene sta...
+---| "emitter.seed" # integer - The same pattern every start (a fixed seed); 0 = different each time.
+---| "emitter.autoVisibility" # boolean - Off-screen test from where the particles are (on), or from Visibility Rect (off: cheape...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -1652,6 +1655,9 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.radialVelocity"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.orbitVelocity"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.damping"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.prewarm"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "emitter.seed"): integer
+---@overload fun(self: ParticleEmitterNode, path: "emitter.autoVisibility"): boolean
 function ParticleEmitterNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -1724,6 +1730,9 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.radialVelocity", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.orbitVelocity", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.damping", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.prewarm", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.seed", value: integer)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.autoVisibility", value: boolean)
 function ParticleEmitterNode:set_property(path, value, y) end
 
 ---@class SoundNode
@@ -7779,6 +7788,23 @@ function ParticleEmitterNode:particle_get_last_hit() end
 ---Example: `self.node:get_node("Sparks"):particle_set_texture("textures/spark.png")`
 ---@param path TexturePath|string|nil
 function ParticleEmitterNode:particle_set_texture(path) end
+
+---Emits `count` particles right now (default 1), whether the emitter is emitting or not: a burst on demand (a hit, an explosion, footsteps).
+---
+---Example: `self.node:get_node("Dust"):particle_emit(12)`
+---@param count? integer
+function ParticleEmitterNode:particle_emit(count) end
+
+---Clears every particle and starts emitting again (with Seed set, the same pattern again).
+---
+---Example: `self.node:get_node("Fireworks"):particle_restart()`
+function ParticleEmitterNode:particle_restart() end
+
+---How many particles are alive now.
+---
+---Example: `if self.node:particle_get_alive_count() == 0 then self.node:destroy() end`
+---@return integer
+function ParticleEmitterNode:particle_get_alive_count() end
 
 -- ----------------------------------------------------------------------------
 -- TextureNode Methods

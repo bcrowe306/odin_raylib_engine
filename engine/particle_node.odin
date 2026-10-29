@@ -9,6 +9,7 @@ ParticleEmitterNode :: struct {
 	using node: Node,
 	emitter: ParticleEmitter `gui:"true"`,
 	onParticleHit: EventSubject, // "particle_hit"(node): a particle hit a body (collision on)
+	onFinished: EventSubject,    // "finished": a one-shot / stopped emitter's last particle died (#128)
 	// The particles' texture (shape Texture; #126): saved as
 	// "particle_texture" (not "texture": old files' texture on any node
 	// becomes a child sprite).
@@ -37,6 +38,11 @@ ParticleEmitterNode_Init :: proc(pen: ^ParticleEmitterNode) {
 	pen.onDestroy = ParticleEmitterNode_Destroy
 	pen.resource = &pen.emitter
 	InitializeSubject(&pen.onParticleHit, "particle_hit", pen)
+	InitializeSubject(&pen.onFinished, "finished", pen)
+	pen.emitter.onFinished = proc(emitter: ^ParticleEmitter, user: rawptr) {
+		pen := cast(^ParticleEmitterNode)user
+		pen.onFinished->notify(pen, nil, pen.gameContext)
+	}
 	pen.emitter.onHitUser = pen
 	pen.emitter.onHit = proc(emitter: ^ParticleEmitter, hit: ^Node, user: rawptr) {
 		pen := cast(^ParticleEmitterNode)user
@@ -95,9 +101,18 @@ ParticleEmitterNode_Update :: proc(node: ^Node, gameContext: ^GameContext, delta
 	ParticleEmitter_Update(&pen.emitter, deltaTime, world)
 }
 
+// ParticleEmitterNode_EmitBurst: n particles now, from where the node is (#128).
+ParticleEmitterNode_EmitBurst :: proc(pen: ^ParticleEmitterNode, n: int) {
+	pen.emitter.position, pen.emitter.originRotation, pen.emitter.originScale = pen.globalPosition, pen.globalRotation, pen.globalScale
+	ParticleEmitter_EmitBurst(&pen.emitter, n)
+	pen.emitter.aliveCount = 0
+	for p in pen.emitter.particles do if p.alive do pen.emitter.aliveCount += 1
+}
+
 ParticleEmitterNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	pen := cast(^ParticleEmitterNode)node
 	DestroySubject(&pen.onParticleHit)
+	DestroySubject(&pen.onFinished)
 	if pen.texture != nil {
 		if rm := Node_ResourceManager(pen); rm != nil do ResourceManager_ReleaseTexture(rm, pen.texture)
 		pen.texture, pen.emitter.texture = nil, nil
