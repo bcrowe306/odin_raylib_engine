@@ -1,6 +1,7 @@
 package engine
 
 import "core:fmt"
+import cos "core:os"
 import os "osx"
 import "core:testing"
 import "core:time"
@@ -27,6 +28,12 @@ bench_components :: proc(t: ^testing.T) {
 	defer os.remove_all(BENCH_DIR)
 	_ = os.write_entire_file(BENCH_DIR + "/components/turret.component.json", transmute([]u8)string(BENCH_INNER))
 	_ = os.write_entire_file(BENCH_DIR + "/components/ship.component.json", transmute([]u8)string(BENCH_SHIP))
+	// (Files modified just now aren't cached yet: written a minute ago.)
+	old := time.time_add(time.now(), -time.Minute)
+	for f in ([]string{"turret", "ship"}) {
+		path := fmt.tprintf("%s/components/%s.component.json", BENCH_DIR, f)
+		_ = cos.change_times(path, old, old)
+	}
 	for count in ([]int{10, 100, 1000, -1000}) {
 		// (-1000: as a game runs them, without component bases.)
 		gameMode := count < 0
