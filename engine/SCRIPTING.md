@@ -1010,6 +1010,15 @@ Pooled roots' scripts get `on_spawn()` (every take, before the next update)
 and `on_despawn()`. Also `Pool.prewarm`, `Pool.set_max`, `Pool.release`,
 `Pool.stats`. Guide and tutorial: [`docs/pooling.md`](docs/pooling.md).
 
+#### Procedural levels (LevelGen)
+
+A generator file (`.levelgen.json`) is a graph of nodes - noise, random
+fill, cellular caves, thresholds, combines - whose tile output writes a
+level into a TileMap: `LevelGen.generate("levels/caves.levelgen.json",
+tilemap, seed)`; `LevelGen.values(...)` returns the grid to place things on.
+The same seed gives the same level. Guide:
+[`docs/level_generator.md`](docs/level_generator.md).
+
 #### Spawning (SpawnerNode)
 
 A **Spawner** spawns components where it is - its world position, rotation

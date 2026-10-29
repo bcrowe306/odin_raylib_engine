@@ -38,6 +38,7 @@
         { "file": "engine/docs/components.md", "slug": "guides/components" },
         { "file": "engine/docs/resources.md", "slug": "guides/resources" },
         { "file": "engine/docs/events.md", "slug": "guides/events" },
+        { "file": "engine/docs/level_generator.md", "slug": "guides/level-generator" },
         { "file": "engine/docs/pooling.md", "slug": "guides/pooling" },
         { "file": "engine/docs/aseprite.md", "slug": "guides/aseprite" },
         { "file": "engine/docs/skeletal_animation.md", "slug": "guides/skeletal-animation" },

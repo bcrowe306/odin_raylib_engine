@@ -86,6 +86,7 @@ Asset_ImportDir :: proc(name: string) -> (dir: string, ok: bool) {
 	case .Vector:    return "vectors", true
 	case .Resource:  return "resources", true
 	case .CustomNode: return "nodes", true
+	case .Generator: return "levels", true
 	case .Package, .Other:
 	}
 	return "", false
@@ -449,6 +450,10 @@ validate :: proc(name: string, data: []byte) -> (why: string, ok: bool) {
 			mpeg := len(data) > 1 && data[0] == 0xFF && data[1] & 0xE0 == 0xE0
 			if !strings.has_prefix(s, "ID3") && !mpeg do return "not an MP3 file", false
 		}
+	case .Generator:
+		g, why := e.Gen_GraphParse(data, context.temp_allocator)
+		if why != "" do return fmt.tprintf("not a level generator: %s", why), false
+		_ = g
 	case .Scene, .Component, .Level, .Resource, .CustomNode:
 		val, err := json.parse(data, parse_integers = false, allocator = context.temp_allocator)
 		if err != .None do return fmt.tprintf("invalid JSON (%v)", err), false

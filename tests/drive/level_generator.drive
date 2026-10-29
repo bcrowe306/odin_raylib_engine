@@ -1,0 +1,73 @@
+# #142 (phase 2): the Level Generator window - a new generator from Assets'
+# + menu (the cave template), a node added from the canvas menu, linked
+# (a loop refused), undo / redo, a parameter, the seed, delete, save, and
+# Apply to a TileMap in the scene (undoable).
+wait 5
+click @asset.add
+click @ctx:add-new-levelgen
+wait 3
+expect lge.open == true
+expect lge.path == levels/new_level.levelgen.json
+expect lge.nodes == 5
+expect lge.errors == 0
+expect file:levels/new_level.levelgen.json contains "random_fill"
+expect item:asset:levels/new_level.levelgen.json == visible
+screenshot template
+
+# A Blur node from the canvas's menu, fed by the combine (node 4).
+rclick @lge.canvas
+click @ctx:lge-add:blur
+wait 2
+expect lge.nodes == 6
+expect lge.dirty == true
+drag @lge.out:4 @lge.in:6:0
+wait 2
+expect lge.input:6:0 == 4
+screenshot linked
+
+# Undo takes the link back; redo restores it.
+key ctrl+z
+wait 1
+expect lge.input:6:0 == 0
+key ctrl+shift+z
+wait 1
+expect lge.input:6:0 == 4
+
+# A link that would make a loop is refused.
+drag @lge.out:6 @lge.in:4:0
+wait 2
+expect lge.input:4:0 == 2
+expect log contains that link would make a loop
+
+# A parameter of the cellular node, and a new seed.
+click @lge.node:2
+dblclick @lge.param:iterations
+key ctrl+a
+type 7
+key enter
+wait 2
+expect lge.text contains "iterations": 7
+click @lge.reseed
+expect lge.seed != 1
+
+# Delete the blur (the window's own Delete, not the scene's).
+click @lge.node:6
+key delete
+wait 1
+expect lge.nodes == 5
+
+# Save.
+key ctrl+s
+wait 1
+expect lge.dirty == false
+expect file:levels/new_level.levelgen.json contains "iterations": 7
+
+# Apply to a TileMap selected in the scene; undo takes it back.
+click @hier.add
+type tile map
+click @addnode.create
+wait 3
+click @lge.apply
+wait 2
+expect log contains Generated new_level.levelgen.json into
+screenshot applied

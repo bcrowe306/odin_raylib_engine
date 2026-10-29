@@ -1,0 +1,806 @@
+package editor
+
+import "core:fmt"
+import "core:math"
+import "core:os"
+import "core:path/filepath"
+import "core:strconv"
+import "core:strings"
+import rl "vendor:raylib"
+import e "../engine"
+import imgui "lib/imgui"
+
+// ============================================================================
+// Level Generator window (#142, phase 2): edits a .levelgen.json graph
+// (engine/level_gen.odin) - double-click one in Assets, or + > New Level
+// Generator. A dockable window:
+//
+//   canvas     the nodes, each with a thumbnail of its grid; drag a node by
+//              its title; drag from an output (the dot on the right) onto an
+//              input (left) to connect; right-click an input to disconnect;
+//              right-click the canvas to add a node, a node to duplicate /
+//              delete / make it the output; Delete removes the selection;
+//              wheel pans, Ctrl/Cmd+wheel zooms, F frames everything.
+//   side       the level's size, seed (dice: a new one) and output; the
+//              selected node's parameters and (tile output) rules; a large
+//              preview of the selected node's grid (else the output's).
+//   toolbar    Save (Ctrl/Cmd+S), Undo / Redo (Ctrl/Cmd+Z, Shift+Z),
+//              Apply to the selected TileMap (undoable, like any edit).
+//
+// Every change re-evaluates the graph (each node once) and refreshes the
+// previews. Undo keeps the graph's text before each change.
+// ============================================================================
+
+LEVEL_GEN_WINDOW :: "Level Generator###LevelGenWindow"
+
+// levelGenFocused: the window has focus (its Save / Undo / Delete aren't the
+// scene's; actions.odin).
+levelGenFocused: bool
+
+@(private = "file")
+LGE_NODE_W :: f32(170)
+@(private = "file")
+LGE_THUMB :: f32(64)
+
+@(private = "file")
+lge: struct {
+	open:      bool,
+	path:      string, // project-relative (heap)
+	graph:     e.Gen_Graph,
+	loaded:    bool,
+	dirty:     bool,
+	undo:      [dynamic]string, // the graph's text before each change (heap)
+	redo:      [dynamic]string,
+	selected:  int, // node id (0 none)
+	dragNode:  int,
+	dragUndo:  bool,
+	linkFrom:  int, // output being dragged from (node id)
+	pan:       [2]f32,
+	zoom:      f32,
+	frame:     bool,
+	version:   int, // bumped by every change (previews follow)
+	thumbs:    map[int]rl.Texture2D, // node id -> its grid (for `thumbVersion`)
+	thumbVersion: int,
+	errors:    map[int]string, // node id -> why it can't be evaluated (heap)
+	preview:   rl.Texture2D,
+	previewOf: [2]int, // (node id, version) the preview shows
+	ctxWorld:  [2]f32,
+	ctxNode:   int,
+	closePrompt: bool,
+	tilesBuf:  [128]u8, // the tiles of the rule being typed in ("3, 4")
+	tilesFor:  [2]int,  // (node, rule) tilesBuf belongs to ({-1, -1}: none)
+}
+
+// LevelGenEditor_Open shows a generator file (project-relative).
+LevelGenEditor_Open :: proc(state: ^EditorState, rel: string) {
+	if lge.loaded && lge.path == rel {
+		lge.open = true
+		imgui.SetWindowFocusStr(LEVEL_GEN_WINDOW)
+		return
+	}
+	if lge.loaded && lge.dirty do lge_save(state) // (switching files keeps the edits)
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	data, err := os.read_entire_file(full, context.temp_allocator)
+	if err != nil {
+		Editor_Log(state, .Error, "Level Generator: can't read %s", rel)
+		return
+	}
+	g, why := e.Gen_GraphParse(data)
+	if why != "" {
+		e.Gen_GraphDestroy(&g)
+		Editor_Log(state, .Error, "Level Generator: %s: %s", rel, why)
+		return
+	}
+	lge_unload()
+	lge.graph = g
+	lge.path = strings.clone(rel)
+	lge.loaded, lge.open, lge.dirty = true, true, false
+	lge.zoom, lge.frame = 1, true
+	lge.selected = 0
+	lge.version += 1
+	imgui.SetWindowFocusStr(LEVEL_GEN_WINDOW)
+}
+
+// LevelGenEditor_New creates levels/<name>.levelgen.json (a cave) and opens it.
+LevelGenEditor_New :: proc(state: ^EditorState, baseName := "new_level") -> string {
+	if state.projectPath == "" do return ""
+	dir, _ := filepath.join({state.projectPath, "levels"}, context.temp_allocator)
+	_ = os.make_directory_all(dir)
+	rel := ""
+	for i := 1; ; i += 1 {
+		name := baseName if i == 1 else fmt.tprintf("%s_%d", baseName, i)
+		rel = fmt.tprintf("levels/%s.levelgen.json", name)
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if !os.exists(full) do break
+	}
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	if os.write_entire_file(full, transmute([]u8)string(e.GEN_TEMPLATE_CAVE)) != nil {
+		Editor_Log(state, .Error, "Could not create %s", rel)
+		return ""
+	}
+	Editor_InvalidateProjectFiles()
+	Editor_Log(state, .Info, "Created %s", rel)
+	LevelGenEditor_Open(state, rel)
+	return strings.clone(rel, context.temp_allocator)
+}
+
+@(private = "file")
+lge_unload :: proc() {
+	if lge.loaded do e.Gen_GraphDestroy(&lge.graph)
+	lge.graph = {}
+	delete(lge.path)
+	lge.path = ""
+	lge.loaded = false
+	for s in lge.undo do delete(s)
+	clear(&lge.undo)
+	for s in lge.redo do delete(s)
+	clear(&lge.redo)
+	lge_forget_previews()
+}
+
+@(private = "file")
+lge_forget_previews :: proc() {
+	for _, tex in lge.thumbs do if tex.id != 0 do rl.UnloadTexture(tex)
+	clear(&lge.thumbs)
+	for _, s in lge.errors do delete(s)
+	clear(&lge.errors)
+	if lge.preview.id != 0 do rl.UnloadTexture(lge.preview)
+	lge.preview = {}
+	lge.previewOf = {}
+	lge.thumbVersion = -1
+}
+
+LevelGenEditor_Shutdown :: proc() {
+	lge_unload()
+	delete(lge.undo)
+	delete(lge.redo)
+	delete(lge.thumbs)
+	delete(lge.errors)
+	lge = {}
+}
+
+// --- changes and undo -----------------------------------------------------------------
+
+// lge_change records the graph before an edit (call it first).
+@(private = "file")
+lge_change :: proc() {
+	append(&lge.undo, e.Gen_GraphSerialize(&lge.graph))
+	if len(lge.undo) > 100 {
+		delete(lge.undo[0])
+		ordered_remove(&lge.undo, 0)
+	}
+	for s in lge.redo do delete(s)
+	clear(&lge.redo)
+	lge.dirty = true
+	lge.version += 1
+}
+
+// lge_edited: a widget changed the graph in place (the undo step was
+// recorded when it became active).
+@(private = "file")
+lge_edited :: proc() {
+	lge.dirty = true
+	lge.version += 1
+}
+
+@(private = "file")
+lge_restore :: proc(from, to: ^[dynamic]string) {
+	if len(from) == 0 do return
+	text := pop(from)
+	defer delete(text)
+	append(to, e.Gen_GraphSerialize(&lge.graph))
+	g, why := e.Gen_GraphParse(transmute([]u8)text)
+	if why != "" {
+		e.Gen_GraphDestroy(&g)
+		return
+	}
+	e.Gen_GraphDestroy(&lge.graph)
+	lge.graph = g
+	if e.Gen_FindNode(&lge.graph, lge.selected) == nil do lge.selected = 0
+	lge.dirty = true
+	lge.version += 1
+}
+
+@(private = "file")
+lge_save :: proc(state: ^EditorState) -> bool {
+	if !lge.loaded do return false
+	full, _ := filepath.join({state.projectPath, lge.path}, context.temp_allocator)
+	if os.write_entire_file(full, transmute([]u8)e.Gen_GraphSerialize(&lge.graph, context.temp_allocator)) != nil {
+		Editor_Log(state, .Error, "Could not save %s", lge.path)
+		return false
+	}
+	lge.dirty = false
+	Editor_Log(state, .Info, "Saved %s", lge.path)
+	return true
+}
+
+// Undo snapshot when a widget starts being edited (a drag is one step).
+@(private = "file")
+lge_undo_on_activate :: proc() {
+	if imgui.IsItemActivated() do lge_change()
+	if imgui.IsItemEdited() do lge_edited()
+}
+
+// --- previews ---------------------------------------------------------------------------
+
+// lge_grid_texture: a grid as a texture - grey values (0 black .. 1 white),
+// or for a tile output the tiles in colours (none: transparent).
+@(private = "file")
+lge_grid_texture :: proc(g: ^e.Gen_Graph, id: int) -> (rl.Texture2D, string) {
+	n := e.Gen_FindNode(g, id)
+	if n == nil do return {}, "no node"
+	w, h := g.size.x, g.size.y
+	img := rl.GenImageColor(i32(w), i32(h), {0, 0, 0, 0})
+	pixels := ([^]rl.Color)(img.data)[:w * h]
+	if n.kind == .Tile_Output {
+		tiles, _, err := e.Gen_Tiles(g, id, 0, context.temp_allocator)
+		if err != "" {
+			rl.UnloadImage(img)
+			return {}, err
+		}
+		for t, i in tiles do if t >= 0 do pixels[i] = lge_tile_color(t)
+	} else {
+		grid, err := e.Gen_Evaluate(g, id, 0, context.temp_allocator)
+		if err != "" {
+			rl.UnloadImage(img)
+			return {}, err
+		}
+		for v, i in grid.v {
+			c := u8(clamp(v, 0, 1) * 255)
+			pixels[i] = {c, c, c, 255}
+		}
+	}
+	tex := rl.LoadTextureFromImage(img)
+	rl.UnloadImage(img)
+	rl.SetTextureFilter(tex, .POINT)
+	return tex, ""
+}
+
+// lge_tile_color: a stable colour per tile index.
+@(private = "file")
+lge_tile_color :: proc(t: i32) -> rl.Color {
+	h := f32((u32(t) * 2654435761) % 360)
+	return rl.ColorFromHSV(h, 0.55, 0.9)
+}
+
+// lge_refresh: thumbnails for every node (and the errors) after a change.
+@(private = "file")
+lge_refresh :: proc() {
+	if lge.thumbVersion == lge.version do return
+	lge_forget_previews()
+	lge.thumbVersion = lge.version
+	if lge.graph.size.x * lge.graph.size.y > 1024 * 1024 do return // (too big to preview every node)
+	for n in lge.graph.nodes {
+		tex, err := lge_grid_texture(&lge.graph, n.id)
+		if err != "" {
+			lge.errors[n.id] = strings.clone(err)
+			continue
+		}
+		lge.thumbs[n.id] = tex
+	}
+}
+
+// --- the window -------------------------------------------------------------------------
+
+LevelGenEditor_Render :: proc(state: ^EditorState) {
+	levelGenFocused = false
+	if !lge.open || !lge.loaded do return
+	imgui.SetNextWindowSize({1040, 620}, .FirstUseEver)
+	open := true
+	title := fmt.ctprintf("%s  %s%s###LevelGenWindow", ICON_FA_SHUFFLE, filepath.base(lge.path), " *" if lge.dirty else "")
+	visible := imgui.Begin(title, &open, {.NoScrollbar, .NoScrollWithMouse})
+	defer imgui.End()
+	if !open {
+		if lge.dirty do lge.closePrompt = true
+		else do lge.open = false
+	}
+	lge_close_prompt(state)
+	if !visible do return
+	levelGenFocused = imgui.IsWindowFocused({.RootWindow, .ChildWindows})
+	Drive_Window("levelgen")
+	lge_refresh()
+	lge_keys(state)
+	lge_toolbar(state)
+	avail := imgui.GetContentRegionAvail()
+	if imgui.BeginChild("##lge_canvas", {max(avail.x - 300, 200), avail.y}, {.ResizeX}, {.NoScrollbar, .NoScrollWithMouse}) do lge_canvas(state)
+	imgui.EndChild()
+	imgui.SameLine(0, 6)
+	if imgui.BeginChild("##lge_side", {0, avail.y}, {}, {}) do lge_side(state)
+	imgui.EndChild()
+}
+
+@(private = "file")
+lge_close_prompt :: proc(state: ^EditorState) {
+	if lge.closePrompt {
+		imgui.OpenPopup("Unsaved Generator###LgeClose")
+		lge.closePrompt = false
+	}
+	if !imgui.BeginPopupModal("Unsaved Generator###LgeClose", nil, {.NoTitleBar, .AlwaysAutoResize}) do return
+	UI_PanelTitle(ICON_FA_TRIANGLE_EXCLAMATION, fmt.tprintf("Save %s?", filepath.base(lge.path)))
+	imgui.Dummy({0, 4})
+	if UI_PrimaryButton("Save", "lge.close-save", {96, 0}) {
+		if lge_save(state) do lge.open = false
+		imgui.CloseCurrentPopup()
+	}
+	imgui.SameLine()
+	if UI_Button("Discard", "lge.close-discard", {96, 0}) {
+		path := strings.clone(lge.path, context.temp_allocator)
+		lge_unload()
+		lge.open = false
+		Editor_Log(state, .Info, "Closed %s without saving", path)
+		imgui.CloseCurrentPopup()
+	}
+	imgui.SameLine()
+	if UI_Button("Cancel", "lge.close-cancel", {96, 0}) || imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+	imgui.EndPopup()
+}
+
+@(private = "file")
+lge_keys :: proc(state: ^EditorState) {
+	if !imgui.IsWindowFocused({.RootWindow, .ChildWindows}) do return
+	io := imgui.GetIO()
+	cmd := io.KeyCtrl || io.KeySuper
+	if cmd && imgui.IsKeyPressed(.S) do lge_save(state)
+	if cmd && imgui.IsKeyPressed(.Z) {
+		if io.KeyShift do lge_restore(&lge.redo, &lge.undo)
+		else do lge_restore(&lge.undo, &lge.redo)
+	}
+	if io.WantTextInput do return
+	if (imgui.IsKeyPressed(.Delete) || imgui.IsKeyPressed(.Backspace)) && lge.selected != 0 {
+		lge_change()
+		e.Gen_RemoveNode(&lge.graph, lge.selected)
+		lge.selected = 0
+	}
+}
+
+@(private = "file")
+lge_toolbar :: proc(state: ^EditorState) {
+	if UI_IconButton(ICON_FA_FLOPPY_DISK, "lge.save", "Save (Ctrl/Cmd+S)", lge.dirty, 26) do lge_save(state)
+	imgui.SameLine(0, 2)
+	imgui.BeginDisabled(len(lge.undo) == 0)
+	if UI_IconButton(ICON_FA_ROTATE_LEFT, "lge.undo", "Undo (Ctrl/Cmd+Z)", size = 26) do lge_restore(&lge.undo, &lge.redo)
+	imgui.EndDisabled()
+	imgui.SameLine(0, 2)
+	imgui.BeginDisabled(len(lge.redo) == 0)
+	if UI_IconButton(ICON_FA_ROTATE_RIGHT, "lge.redo", "Redo (Ctrl/Cmd+Shift+Z)", size = 26) do lge_restore(&lge.redo, &lge.undo)
+	imgui.EndDisabled()
+	imgui.SameLine(0, 10)
+	tm := state.selectedNode if state.selectedNode != nil && state.selectedNode.typeId == e.TileMapNode else nil
+	imgui.BeginDisabled(tm == nil)
+	if UI_Button(fmt.tprintf("%s  Apply to TileMap", ICON_FA_TABLE_CELLS), "lge.apply") && tm != nil {
+		Editor_RecordUndo(state, "Generate level")
+		if err := e.Gen_ApplyTileMap(&lge.graph, cast(^e.TileMapNode)tm, 0, &state.game.gameContext); err != "" {
+			Editor_Log(state, .Error, "Level Generator: %s", err)
+		} else {
+			Editor_Log(state, .Info, "Generated %s into %s (seed %d)", filepath.base(lge.path), tm.name, lge.graph.seed)
+		}
+	}
+	imgui.EndDisabled()
+	UI_Tooltip("Writes the level into the TileMap selected in the scene (Ctrl/Cmd+Z undoes it)" if tm != nil else "Select a TileMap in the scene to write the level into it")
+	imgui.SameLine(0, 10)
+	UI_DimText(fmt.tprintf("%d nodes · %d x %d cells", len(lge.graph.nodes), lge.graph.size.x, lge.graph.size.y))
+}
+
+@(private = "file")
+lge_to_screen :: proc(origin, w: [2]f32) -> [2]f32 {return origin + lge.pan + w * lge.zoom}
+
+@(private = "file")
+lge_to_world :: proc(origin, s: [2]f32) -> [2]f32 {return (s - origin - lge.pan) / lge.zoom}
+
+// lge_node_rect: a node's box on screen, and its height in world units.
+@(private = "file")
+lge_node_rect :: proc(origin: [2]f32, n: ^e.Gen_Node) -> (mn, mx: [2]f32) {
+	rows := max(len(e.GEN_KINDS[n.kind].inputs), 1)
+	h := 28 + f32(rows) * 20 + LGE_THUMB + 12
+	mn = lge_to_screen(origin, n.pos)
+	mx = mn + [2]f32{LGE_NODE_W, h} * lge.zoom
+	return
+}
+
+@(private = "file")
+lge_in_port :: proc(mn: [2]f32, i: int) -> [2]f32 {return mn + [2]f32{0, 28 + f32(i) * 20 + 10} * lge.zoom}
+
+@(private = "file")
+lge_out_port :: proc(mn, mx: [2]f32) -> [2]f32 {return {mx.x, mn.y + 38 * lge.zoom}}
+
+@(private = "file")
+lge_canvas :: proc(state: ^EditorState) {
+	g := &lge.graph
+	dl := imgui.GetWindowDrawList()
+	origin := imgui.GetCursorScreenPos()
+	size := imgui.GetContentRegionAvail()
+	io := imgui.GetIO()
+	mouse := [2]f32{io.MousePos.x, io.MousePos.y}
+	hovered := imgui.IsWindowHovered()
+	imgui.DrawList_AddRectFilled(dl, origin, origin + size, col_u32(CODE_BG))
+	Drive_ItemRect("lge.canvas", origin, origin + size, inWindow = true)
+	step := 40 * lge.zoom
+	if step > 8 {
+		gx := math.mod(lge.pan.x, step)
+		for x := origin.x + gx; x < origin.x + size.x; x += step do imgui.DrawList_AddLine(dl, {x, origin.y}, {x, origin.y + size.y}, col_u32(ui_line(0.03)))
+		gy := math.mod(lge.pan.y, step)
+		for y := origin.y + gy; y < origin.y + size.y; y += step do imgui.DrawList_AddLine(dl, {origin.x, y}, {origin.x + size.x, y}, col_u32(ui_line(0.03)))
+	}
+	if (lge.frame && size.x > 120 && size.y > 80) || (hovered && imgui.IsKeyPressed(.F) && !io.WantTextInput) {
+		lge.frame = false
+		if len(g.nodes) > 0 {
+			mn, mx := g.nodes[0].pos, g.nodes[0].pos
+			for n in g.nodes {
+				mn = {min(mn.x, n.pos.x), min(mn.y, n.pos.y)}
+				mx = {max(mx.x, n.pos.x + LGE_NODE_W), max(mx.y, n.pos.y + 160)}
+			}
+			ext := mx - mn + {80, 80}
+			lge.zoom = clamp(min(size.x / ext.x, size.y / ext.y), 0.3, 1.0)
+			lge.pan = (size - (mx - mn) * lge.zoom) * 0.5 - mn * lge.zoom
+		}
+	}
+	if hovered && (io.MouseWheel != 0 || io.MouseWheelH != 0) {
+		if io.KeyCtrl || io.KeySuper {
+			before := lge_to_world(origin, mouse)
+			lge.zoom = clamp(lge.zoom * (1 + io.MouseWheel * 0.1), 0.3, 2)
+			lge.pan += mouse - lge_to_screen(origin, before)
+		} else if io.KeyShift {
+			lge.pan.x += io.MouseWheel * 30
+		} else {
+			lge.pan += {io.MouseWheelH * 30, io.MouseWheel * 30}
+		}
+	}
+	if hovered && imgui.IsMouseDragging(.Middle) do lge.pan += {io.MouseDelta.x, io.MouseDelta.y}
+
+	// Links: from a node's output to the inputs reading it.
+	for &n in g.nodes {
+		mn, _ := lge_node_rect(origin, &n)
+		for src, i in n.inputs[:len(e.GEN_KINDS[n.kind].inputs)] {
+			if src == 0 do continue
+			s := e.Gen_FindNode(g, src)
+			if s == nil do continue
+			smn, smx := lge_node_rect(origin, s)
+			a, b := lge_out_port(smn, smx), lge_in_port(mn, i)
+			d := max(abs(b.x - a.x) * 0.5, 30)
+			imgui.DrawList_AddBezierCubic(dl, a, a + {d, 0}, b - {d, 0}, b, col_u32(ui_line(0.5)), 2 * lge.zoom)
+		}
+	}
+
+	// Nodes.
+	hoverNode, hoverIn, hoverInPort, hoverOut := 0, 0, -1, 0
+	outputId := 0
+	if out := e.Gen_OutputNode(g); out != nil do outputId = out.id
+	for &n in g.nodes {
+		info := e.GEN_KINDS[n.kind]
+		mn, mx := lge_node_rect(origin, &n)
+		sel := n.id == lge.selected
+		imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(UI_BG_RAISED), 6)
+		head := [2]f32{mx.x, mn.y + 24 * lge.zoom}
+		hcol := UI_ACCENT if n.kind == .Tile_Output else ui_line(0.12)
+		imgui.DrawList_AddRectFilled(dl, mn, head, col_u32(hcol if n.kind != .Tile_Output else ui_accent(0.35)), 6, imgui.DrawFlags_RoundCornersTop)
+		border := UI_ACCENT if sel else (UI_DANGER if n.id in lge.errors else ui_line(0.2))
+		imgui.DrawList_AddRect(dl, mn, mx, col_u32(border), 6, imgui.DrawFlags(0), 2 if sel else 1)
+		if lge.zoom > 0.5 {
+			label := fmt.ctprintf("%s%s", info.label, "  (output)" if n.id == outputId else "")
+			imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 13 * lge.zoom, mn + {8, 5} * lge.zoom, col_u32(UI_TEXT), label)
+			for port, i in info.inputs do imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 12 * lge.zoom, lge_in_port(mn, i) + {10 * lge.zoom, -7 * lge.zoom}, col_u32(UI_TEXT_DIM), fmt.ctprintf("%s", port))
+		}
+		// Thumbnail.
+		rows := max(len(info.inputs), 1)
+		tmn := mn + [2]f32{8, 28 + f32(rows) * 20} * lge.zoom
+		tsz := [2]f32{LGE_NODE_W - 16, LGE_THUMB} * lge.zoom
+		if tex, ok := &lge.thumbs[n.id]; ok && tex.id != 0 {
+			ar := f32(tex.width) / f32(max(tex.height, 1))
+			w := min(tsz.x, tsz.y * ar)
+			hh := w / ar
+			p := tmn + {(tsz.x - w) * 0.5, (tsz.y - hh) * 0.5}
+			imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)tex, p, p + {w, hh})
+		} else if why, bad := lge.errors[n.id]; bad && lge.zoom > 0.5 {
+			imgui.DrawList_AddTextImFontPtr(dl, GlobalFonts.small, 11 * lge.zoom, tmn, col_u32(UI_DANGER), fmt.ctprintf("%s", why if len(why) < 40 else why[:40]))
+		}
+		// Ports.
+		r := 5 * lge.zoom
+		for _, i in info.inputs {
+			p := lge_in_port(mn, i)
+			on := n.inputs[i] != 0
+			imgui.DrawList_AddCircleFilled(dl, p, r, col_u32(UI_ACCENT if on else ui_line(0.4)))
+			if hovered && linalg_dist(mouse, p) < r * 2.2 do hoverIn, hoverInPort = n.id, i
+			Drive_ItemRect(fmt.tprintf("lge.in:%d:%d", n.id, i), p - {r, r}, p + {r, r}, inWindow = true)
+		}
+		op := lge_out_port(mn, mx)
+		imgui.DrawList_AddCircleFilled(dl, op, r, col_u32(UI_SUCCESS))
+		if hovered && linalg_dist(mouse, op) < r * 2.2 do hoverOut = n.id
+		Drive_ItemRect(fmt.tprintf("lge.out:%d", n.id), op - {r, r}, op + {r, r}, inWindow = true)
+		Drive_ItemRect(fmt.tprintf("lge.node:%d", n.id), mn, head, inWindow = true)
+		if hovered && mouse.x >= mn.x && mouse.x <= mx.x && mouse.y >= mn.y && mouse.y <= mx.y do hoverNode = n.id
+	}
+
+	// Mouse: links (from an output), moving, selecting, menus.
+	if hovered && imgui.IsMouseClicked(.Left) {
+		if hoverOut != 0 {
+			lge.linkFrom = hoverOut
+		} else if hoverNode != 0 {
+			lge.selected = hoverNode
+			lge.dragNode = hoverNode
+			lge.dragUndo = false
+		} else {
+			lge.selected = 0
+		}
+	}
+	if lge.linkFrom != 0 {
+		if s := e.Gen_FindNode(g, lge.linkFrom); s != nil {
+			smn, smx := lge_node_rect(origin, s)
+			a := lge_out_port(smn, smx)
+			imgui.DrawList_AddBezierCubic(dl, a, a + {40, 0}, mouse - {40, 0}, mouse, col_u32(UI_ACCENT), 2)
+		}
+		if !imgui.IsMouseDown(.Left) {
+			if hoverIn != 0 && hoverIn != lge.linkFrom {
+				before := e.Gen_GraphSerialize(g)
+				if e.Gen_Connect(g, hoverIn, hoverInPort, lge.linkFrom) {
+					append(&lge.undo, before)
+					for s in lge.redo do delete(s)
+					clear(&lge.redo)
+					lge_edited()
+				} else {
+					delete(before)
+					Editor_Log(state, .Warn, "Level Generator: that link would make a loop")
+				}
+			}
+			lge.linkFrom = 0
+		}
+	}
+	if lge.dragNode != 0 {
+		if imgui.IsMouseDown(.Left) {
+			if imgui.IsMouseDragging(.Left, 2) {
+				if !lge.dragUndo {
+					lge_change()
+					lge.dragUndo = true
+				}
+				if n := e.Gen_FindNode(g, lge.dragNode); n != nil do n.pos += [2]f32{io.MouseDelta.x, io.MouseDelta.y} / lge.zoom
+			}
+		} else {
+			lge.dragNode = 0
+		}
+	}
+	if hovered && imgui.IsMouseClicked(.Right) {
+		if hoverIn != 0 {
+			if n := e.Gen_FindNode(g, hoverIn); n != nil && n.inputs[hoverInPort] != 0 {
+				lge_change()
+				n.inputs[hoverInPort] = 0
+			}
+		} else {
+			lge.ctxNode = hoverNode
+			lge.ctxWorld = lge_to_world(origin, mouse)
+			if hoverNode != 0 do lge.selected = hoverNode
+			imgui.OpenPopup("##lge_ctx")
+		}
+	}
+	if imgui.BeginPopup("##lge_ctx") {
+		if lge.ctxNode != 0 {
+			if lge_menu(ICON_FA_COPY, "Duplicate", "lge-duplicate") {
+				lge_change()
+				if d := e.Gen_DuplicateNode(g, lge.ctxNode); d != nil do lge.selected = d.id
+			}
+			if lge_menu(ICON_FA_FLAG, "Use as Output", "lge-output", lge.ctxNode != outputId) {
+				lge_change()
+				g.output = lge.ctxNode
+			}
+			if lge_menu(ICON_FA_TRASH, "Delete", "lge-delete") {
+				lge_change()
+				e.Gen_RemoveNode(g, lge.ctxNode)
+				lge.selected = 0
+			}
+		} else {
+			groups := [3]struct {
+				label: cstring,
+				kinds: []e.Gen_Kind,
+			}{
+				{"Generators", {.Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect}},
+				{"Modifiers", {.Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine}},
+				{"Output", {.Tile_Output}},
+			}
+			for grp in groups {
+				imgui.SeparatorText(grp.label)
+				for k in grp.kinds {
+					info := e.GEN_KINDS[k]
+					if imgui.MenuItem(fmt.ctprintf("%s", info.label)) {
+						lge_change()
+						lge.selected = e.Gen_AddNode(g, k, lge.ctxWorld).id
+					}
+					Drive_Item(fmt.tprintf("ctx:lge-add:%s", info.name))
+					UI_Tooltip(info.doc)
+				}
+			}
+		}
+		imgui.EndPopup()
+	}
+}
+
+@(private = "file")
+lge_menu :: proc(icon, label: string, id: string, enabled := true) -> bool {
+	clicked := imgui.MenuItem(fmt.ctprintf("%s  %s", icon, label), nil, false, enabled)
+	Drive_Item(fmt.tprintf("ctx:%s", id))
+	return clicked
+}
+
+@(private = "file")
+linalg_dist :: proc(a, b: [2]f32) -> f32 {
+	d := a - b
+	return math.sqrt(d.x * d.x + d.y * d.y)
+}
+
+@(private = "file")
+lge_side :: proc(state: ^EditorState) {
+	g := &lge.graph
+	if UI_SectionHeader("Level") && UI_BeginProps("##lge_level") {
+		UI_PropLabel("Size")
+		sz := [2]i32{i32(g.size.x), i32(g.size.y)}
+		if imgui.DragInt2("##lge_size", &sz, 0.5, 1, 4096) do g.size = {int(max(sz.x, 1)), int(max(sz.y, 1))}
+		lge_undo_on_activate()
+		Drive_Item("lge.size")
+		UI_PropLabel("Seed")
+		seed := i32(g.seed)
+		imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 34)
+		if imgui.DragInt("##lge_seed", &seed, 0.2, 0, 1 << 30) do g.seed = u64(max(seed, 0))
+		lge_undo_on_activate()
+		Drive_Item("lge.seed")
+		imgui.SameLine(0, 4)
+		if UI_IconButton(ICON_FA_SHUFFLE, "lge.reseed", "A new seed", size = 26) {
+			lge_change()
+			g.seed = u64(rl.GetRandomValue(1, 1 << 30))
+		}
+		UI_PropLabel("Output")
+		out := e.Gen_OutputNode(g)
+		outLabel := fmt.tprintf("%d  %s", out.id, e.GEN_KINDS[out.kind].label) if out != nil else "None"
+		if imgui.BeginCombo("##lge_output", strings.clone_to_cstring(outLabel, context.temp_allocator)) {
+			for n in g.nodes {
+				if imgui.Selectable(fmt.ctprintf("%d  %s", n.id, e.GEN_KINDS[n.kind].label), out != nil && n.id == out.id) {
+					lge_change()
+					g.output = n.id
+				}
+			}
+			imgui.EndCombo()
+		}
+		UI_EndProps()
+	}
+	if n := e.Gen_FindNode(g, lge.selected); n != nil {
+		info := e.GEN_KINDS[n.kind]
+		if UI_SectionHeader(fmt.tprintf("%s  (node %d)", info.label, n.id)) {
+			UI_DimTextWrapped(info.doc)
+			if why, bad := lge.errors[n.id]; bad do imgui.TextColored(UI_DANGER, fmt.ctprintf("%s", why))
+			if len(info.params) > 0 && UI_BeginProps("##lge_params") {
+				for p, i in info.params {
+					UI_PropLabel(p.name)
+					imgui.PushIDInt(i32(i))
+					imgui.SetNextItemWidth(-1)
+					if len(p.choices) > 0 {
+						cur := clamp(int(n.params[i]), 0, len(p.choices) - 1)
+						if v, changed := UI_Combo(fmt.tprintf("lge.param:%s", p.name), cur, p.choices); changed {
+							lge_change()
+							n.params[i] = f64(v)
+						}
+					} else if p.toggle {
+						on := n.params[i] != 0
+						if imgui.Checkbox("##v", &on) {
+							lge_change()
+							n.params[i] = 1 if on else 0
+						}
+					} else if p.integer {
+						v := i32(n.params[i])
+						if imgui.DragInt("##v", &v, 0.1) do n.params[i] = f64(v)
+						lge_undo_on_activate()
+					} else {
+						v := f32(n.params[i])
+						if imgui.DragFloat("##v", &v, 0.01, 0, 0, "%.3f") do n.params[i] = f64(v)
+						lge_undo_on_activate()
+					}
+					Drive_Item(fmt.tprintf("lge.param:%s", p.name))
+					if p.doc != "" do UI_Tooltip(p.doc)
+					imgui.PopID()
+				}
+				UI_EndProps()
+			}
+			if n.kind == .Tile_Output do lge_rules(n)
+		}
+	}
+	// The preview: the selected node's grid, else the output's.
+	if UI_SectionHeader("Preview") {
+		id := lge.selected
+		if id == 0 do if out := e.Gen_OutputNode(g); out != nil do id = out.id
+		big := g.size.x * g.size.y > 2048 * 2048
+		if big do UI_DimTextWrapped("Too big to preview here: Apply to a TileMap to see it.")
+		if !big && id != 0 && lge.previewOf != {id, lge.version} {
+			if lge.preview.id != 0 do rl.UnloadTexture(lge.preview)
+			lge.preview, _ = lge_grid_texture(g, id)
+			lge.previewOf = {id, lge.version}
+		}
+		if lge.preview.id != 0 {
+			availW := imgui.GetContentRegionAvail().x
+			w := availW
+			h := w * f32(lge.preview.height) / f32(max(lge.preview.width, 1))
+			imgui.Image(transmute(imgui.TextureID)&lge.preview, {w, h})
+		} else {
+			UI_DimText("Nothing to preview.")
+		}
+	}
+}
+
+// lge_rules: a tile output's rules - range and tiles ("3, 4": one of them).
+@(private = "file")
+lge_rules :: proc(n: ^e.Gen_Node) {
+	imgui.SeparatorText("Rules")
+	UI_DimTextWrapped("Each cell takes the first rule whose range holds its value: one of its tiles.")
+	remove := -1
+	for &r, i in n.rules {
+		imgui.PushIDInt(i32(i))
+		w := (imgui.GetContentRegionAvail().x - 34) / 3
+		imgui.SetNextItemWidth(w)
+		imgui.DragFloat("##min", &r.min, 0.01, 0, 0, "from %.2f")
+		lge_undo_on_activate()
+		imgui.SameLine(0, 4)
+		imgui.SetNextItemWidth(w)
+		imgui.DragFloat("##max", &r.max, 0.01, 0, 0, "to %.2f")
+		lge_undo_on_activate()
+		imgui.SameLine(0, 4)
+		// The tiles as text ("3, 4"): the row being typed in keeps its own
+		// buffer (lge.tilesBuf) until Enter or leaving the field.
+		key := [2]int{n.id, i}
+		parts := make([dynamic]string, context.temp_allocator)
+		for t in r.tiles do append(&parts, fmt.tprint(t))
+		local: [128]u8
+		buf := lge.tilesBuf[:] if lge.tilesFor == key else local[:]
+		if lge.tilesFor != key do copy(local[:127], strings.join(parts[:], ", ", context.temp_allocator))
+		imgui.SetNextItemWidth(w)
+		entered := imgui.InputText("##tiles", cstring(raw_data(buf)), len(buf), {.EnterReturnsTrue})
+		if imgui.IsItemActivated() {
+			lge.tilesBuf = local
+			lge.tilesFor = key
+		}
+		if entered || imgui.IsItemDeactivatedAfterEdit() {
+			lge_change()
+			clear(&r.tiles)
+			for f in strings.split(string(cstring(raw_data(buf))), ",", context.temp_allocator) {
+				if v, ok := strconv.parse_int(strings.trim_space(f)); ok do append(&r.tiles, i32(v))
+			}
+		}
+		if imgui.IsItemDeactivated() && lge.tilesFor == key do lge.tilesFor = {-1, -1}
+		Drive_Item(fmt.tprintf("lge.rule-tiles:%d", i))
+		UI_Tooltip("Tile indices (in the TileMap's tileset), comma separated: one is picked per cell")
+		imgui.SameLine(0, 4)
+		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("lge.rule-remove:%d", i), "Remove the rule", size = 24) do remove = i
+		imgui.PopID()
+	}
+	if remove >= 0 {
+		lge_change()
+		delete(n.rules[remove].tiles)
+		ordered_remove(&n.rules, remove)
+	}
+	if UI_Button(fmt.tprintf("%s  Add Rule", ICON_FA_PLUS), "lge.rule-add") {
+		lge_change()
+		if n.rules == nil do n.rules = make([dynamic]e.Gen_Tile_Rule, lge.graph.allocator)
+		r := e.Gen_Tile_Rule{min = 0, max = 0.5, tiles = make([dynamic]i32, lge.graph.allocator)}
+		append(&r.tiles, 1)
+		append(&n.rules, r)
+	}
+}
+
+// LevelGenEditor_DriveQuery answers test-drive queries ("lge.*").
+LevelGenEditor_DriveQuery :: proc(q: string) -> (string, bool) {
+	switch q {
+	case "lge.open": return "true" if lge.open && lge.loaded else "false", true
+	case "lge.path": return lge.path, true
+	case "lge.dirty": return "true" if lge.dirty else "false", true
+	case "lge.nodes": return fmt.tprint(len(lge.graph.nodes)), true
+	case "lge.selected": return fmt.tprint(lge.selected), true
+	case "lge.seed": return fmt.tprint(lge.graph.seed), true
+	case "lge.undo": return fmt.tprint(len(lge.undo)), true
+	case "lge.errors": return fmt.tprint(len(lge.errors)), true
+	case "lge.text": return e.Gen_GraphSerialize(&lge.graph, context.temp_allocator) if lge.loaded else "", true
+	}
+	if strings.has_prefix(q, "lge.input:") {
+		// lge.input:<node>:<port> -> the node it reads (0 = none)
+		parts := strings.split(q[len("lge.input:"):], ":", context.temp_allocator)
+		if len(parts) != 2 do return "", true
+		id, _ := strconv.parse_int(parts[0])
+		port, _ := strconv.parse_int(parts[1])
+		n := e.Gen_FindNode(&lge.graph, id)
+		if n == nil || port < 0 || port > 1 do return "", true
+		return fmt.tprint(n.inputs[port]), true
+	}
+	return "", false
+}

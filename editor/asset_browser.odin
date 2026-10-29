@@ -49,6 +49,7 @@ Asset_Kind :: enum {
 	Vector,   // .svg (vector_editor.odin)
 	Resource, // .resource.json: data of a Lua resource class (engine/script_resources.odin)
 	CustomNode, // .node.json: a custom node type (engine/custom_nodes.odin)
+	Generator, // .levelgen.json: a procedural level generator (level_gen_editor.odin)
 }
 
 Asset_KindOf :: proc(path: string) -> Asset_Kind {
@@ -58,6 +59,7 @@ Asset_KindOf :: proc(path: string) -> Asset_Kind {
 	case strings.has_suffix(lower, ".component.json"): return .Component
 	case strings.has_suffix(lower, e.CUSTOM_NODE_SUFFIX): return .CustomNode
 	case strings.has_suffix(lower, e.RESOURCE_EXT): return .Resource
+	case strings.has_suffix(lower, ".levelgen.json"): return .Generator
 	case strings.has_suffix(lower, ".lua"): return .Script
 	case strings.has_suffix(lower, ".ldtk"): return .Level
 	case e.Is_PackagePath(lower): return .Package
@@ -87,6 +89,7 @@ kind_icon :: proc(k: Asset_Kind) -> (string, imgui.Vec4) {
 	case .Vector: return ICON_FA_PAINTBRUSH, {0.55, 0.85, 0.65, 1}
 	case .Resource: return ICON_FA_GEM, {0.98, 0.80, 0.30, 1}
 	case .CustomNode: return ICON_FA_PUZZLE_PIECE, {0.93, 0.47, 0.80, 1}
+	case .Generator: return ICON_FA_SHUFFLE, {0.55, 0.80, 0.98, 1}
 	case .Other: return ICON_FA_FILE, UI_TEXT_DIM
 	}
 	return ICON_FA_FILE, UI_TEXT_DIM
@@ -155,6 +158,7 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 		section_files(state, "Vector Art", Editor_ListProjectFiles(state, "", {".svg"}), filter)
 		section_files(state, "Audio", Editor_ListProjectFiles(state, "audio", AUDIO_EXTS), filter)
 		section_files(state, "Levels", Editor_ListProjectFiles(state, "", {".ldtk"}), filter)
+		section_files(state, "Level Generators", Editor_ListProjectFiles(state, "", {".levelgen.json"}), filter)
 		section_files(state, "Shaders", Editor_ListProjectFiles(state, "", SHADER_EXTS), filter)
 		section_packages(state, filter)
 		}
@@ -324,6 +328,7 @@ asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, n
 		case .Shader: Editor_OpenScript(state, rel)
 		case .Aseprite: Aseprite_Edit(state, full)
 		case .Vector: Vector_EditExternal(state, full)
+		case .Generator: LevelGenEditor_Open(state, rel)
 		}
 	}
 	UI_Tooltip(asset_tooltip(kind, rel))
@@ -385,6 +390,7 @@ asset_tooltip :: proc(k: Asset_Kind, rel: string) -> string {
 	case .Vector: return fmt.tprintf("%s - vector art (SVG): drag into the viewport to add, or onto a Vector Shape to use it; double-click to edit it in your vector app", rel)
 	case .Resource: return fmt.tprintf("%s - a resource: data of a Lua resource class; pick it in a script's resource property, or Resource.load it", rel)
 	case .CustomNode: return fmt.tprintf("%s - a custom node type: double-click or drag into the viewport to add one", rel)
+	case .Generator: return fmt.tprintf("%s - a procedural level generator: double-click to edit its graph; LevelGen.generate it into a TileMap", rel)
 	}
 	return rel
 }
@@ -558,6 +564,8 @@ Editor_DropAsset :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) {
 		Editor_Log(state, .Info, "%s uses %s", target.name, rel)
 	case .Resource:
 		Editor_Log(state, .Info, "A resource goes in a script's resource property (or Resource.load in code), not the scene")
+	case .Generator:
+		LevelGenEditor_Open(state, rel) // (select a TileMap, then Apply)
 	case .Scene, .Package, .Other:
 	}
 }
