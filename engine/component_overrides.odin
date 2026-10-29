@@ -1,5 +1,6 @@
 package engine
 
+import os "osx"
 import "base:runtime"
 import "core:encoding/json"
 import "core:fmt"
@@ -7,6 +8,7 @@ import "core:math"
 import "core:math/rand"
 import "core:slice"
 import "core:strings"
+import "core:time"
 
 // ============================================================================
 // Per-node overrides for linked component (prefab) instances.
@@ -341,6 +343,14 @@ diff_tree :: proc(base, inst: json.Object, path: string, out: ^json.Object, adde
 // component_base_json: the component file's node object.
 @(private = "file")
 component_base_json :: proc(ctx: ^GameContext, compPath: string) -> (json.Object, bool) {
+	if entry, ok := Component_Cache_Get(ctx, compPath); ok {
+		val, err := json.parse(transmute([]u8)entry.expandedJson, allocator = context.temp_allocator)
+		if err == .None {
+			if obj, isObj := val.(json.Object); isObj {
+				return obj, true
+			}
+		}
+	}
 	data, ok := Component_ReadFile(ctx, compPath)
 	if !ok do return nil, false
 	val, err := json.parse(data, allocator = context.temp_allocator)
@@ -365,6 +375,148 @@ component_base_json :: proc(ctx: ^GameContext, compPath: string) -> (json.Object
 // in stored base text.
 COMPONENT_EXPANDED :: "$expanded"
 
+ComponentCacheEntry :: struct {
+	expandedJson: string,
+	baseText:     string,
+	modTime:      time.Time,
+	size:         i64,
+	dependencies: []string,
+	depModTimes:  []time.Time,
+	depSizes:     []i64,
+}
+
+@(private = "file")
+componentCache: map[string]ComponentCacheEntry
+
+// Component_ResolveDiskPath returns the disk path for `compPath` relative to the project.
+Component_ResolveDiskPath :: proc(ctx: ^GameContext, compPath: string) -> string {
+	if ctx != nil && ctx.game != nil {
+		return AssetManager_ResolveDiskPath(&ctx.game.assetManager, compPath, context.temp_allocator)
+	}
+	return compPath
+}
+
+// Component_Cache_Get returns the prepared component entry if cached and not modified on disk.
+Component_Cache_Get :: proc(ctx: ^GameContext, compPath: string) -> (entry: ComponentCacheEntry, ok: bool) {
+	if componentCache == nil do return {}, false
+	e, found := componentCache[compPath]
+	if !found do return {}, false
+
+	diskPath := Component_ResolveDiskPath(ctx, compPath)
+	if info, err := os.stat(diskPath, context.temp_allocator); err == nil {
+		if info.modification_time != e.modTime || info.size != e.size {
+			Component_Cache_Invalidate(compPath)
+			return {}, false
+		}
+	} else {
+		Component_Cache_Invalidate(compPath)
+		return {}, false
+	}
+	for dep, i in e.dependencies {
+		depDisk := Component_ResolveDiskPath(ctx, dep)
+		if info, err := os.stat(depDisk, context.temp_allocator); err == nil {
+			if info.modification_time != e.depModTimes[i] || info.size != e.depSizes[i] {
+				Component_Cache_Invalidate(compPath)
+				return {}, false
+			}
+		} else {
+			Component_Cache_Invalidate(compPath)
+			return {}, false
+		}
+	}
+	return e, true
+}
+
+// Component_Cache_Put stores the prepared component JSON texts for `compPath`.
+Component_Cache_Put :: proc(ctx: ^GameContext, compPath: string, expandedJson: string, baseText: string, deps: []string = nil) {
+	if componentCache == nil {
+		componentCache = make(map[string]ComponentCacheEntry, 16, Engine_HeapAllocator())
+	}
+	diskPath := Component_ResolveDiskPath(ctx, compPath)
+	modTime: time.Time
+	size: i64
+	if info, err := os.stat(diskPath, context.temp_allocator); err == nil {
+		modTime = info.modification_time
+		size = info.size
+	}
+
+	depList := make([]string, len(deps), Engine_HeapAllocator())
+	depModTimes := make([]time.Time, len(deps), Engine_HeapAllocator())
+	depSizes := make([]i64, len(deps), Engine_HeapAllocator())
+	for d, i in deps {
+		depList[i] = strings.clone(d, Engine_HeapAllocator())
+		depDisk := Component_ResolveDiskPath(ctx, d)
+		if info, err := os.stat(depDisk, context.temp_allocator); err == nil {
+			depModTimes[i] = info.modification_time
+			depSizes[i] = info.size
+		}
+	}
+
+	if old, ok := componentCache[compPath]; ok {
+		delete(old.expandedJson, Engine_HeapAllocator())
+		delete(old.baseText, Engine_HeapAllocator())
+		for d in old.dependencies do delete(d, Engine_HeapAllocator())
+		delete(old.dependencies, Engine_HeapAllocator())
+		delete(old.depModTimes, Engine_HeapAllocator())
+		delete(old.depSizes, Engine_HeapAllocator())
+
+		componentCache[compPath] = ComponentCacheEntry{
+			expandedJson = strings.clone(expandedJson, Engine_HeapAllocator()),
+			baseText     = strings.clone(baseText, Engine_HeapAllocator()),
+			modTime      = modTime,
+			size         = size,
+			dependencies = depList,
+			depModTimes  = depModTimes,
+			depSizes     = depSizes,
+		}
+		return
+	}
+	componentCache[strings.clone(compPath, Engine_HeapAllocator())] = ComponentCacheEntry{
+		expandedJson = strings.clone(expandedJson, Engine_HeapAllocator()),
+		baseText     = strings.clone(baseText, Engine_HeapAllocator()),
+		modTime      = modTime,
+		size         = size,
+		dependencies = depList,
+		depModTimes  = depModTimes,
+		depSizes     = depSizes,
+	}
+}
+
+// Component_Cache_Invalidate removes an entry from the prepared component cache.
+Component_Cache_Invalidate :: proc(compPath: string) {
+	if componentCache == nil do return
+	for k, v in componentCache {
+		if k == compPath {
+			delete(v.expandedJson, Engine_HeapAllocator())
+			delete(v.baseText, Engine_HeapAllocator())
+			for d in v.dependencies do delete(d, Engine_HeapAllocator())
+			delete(v.dependencies, Engine_HeapAllocator())
+			delete(v.depModTimes, Engine_HeapAllocator())
+			delete(v.depSizes, Engine_HeapAllocator())
+
+			delete_key(&componentCache, k)
+			delete(k, Engine_HeapAllocator())
+			break
+		}
+	}
+}
+
+// Component_Cache_Clear frees all cached prepared components.
+Component_Cache_Clear :: proc() {
+	if componentCache == nil do return
+	for k, v in componentCache {
+		delete(k, Engine_HeapAllocator())
+		delete(v.expandedJson, Engine_HeapAllocator())
+		delete(v.baseText, Engine_HeapAllocator())
+		for d in v.dependencies do delete(d, Engine_HeapAllocator())
+		delete(v.dependencies, Engine_HeapAllocator())
+		delete(v.depModTimes, Engine_HeapAllocator())
+		delete(v.depSizes, Engine_HeapAllocator())
+	}
+	delete(componentCache)
+	componentCache = nil
+}
+
 // Component_Expand: the component file's node JSON, normalized, its nested
 // instances expanded; and its base text (what instances diff against).
 // `stack`: the components being expanded / built around it (loops: #75).
@@ -377,6 +529,16 @@ Component_Expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]s
 		return nil, "", fmt.tprintf("the component contains itself (%s)", strings.join(chain[:], " -> ", context.temp_allocator))
 	}
 	if len(stack) >= 16 do return nil, "", "components nest too deep"
+
+	if entry, ok := Component_Cache_Get(ctx, compPath); ok {
+		val, err := json.parse(transmute([]u8)entry.expandedJson, allocator = context.temp_allocator)
+		if err == .None {
+			if o, isObj := val.(json.Object); isObj {
+				return o, entry.baseText, ""
+			}
+		}
+	}
+
 	data, ok := Component_ReadFile(ctx, compPath)
 	if !ok do return nil, "", "the component file is missing"
 	val, err := json.parse(data, allocator = context.temp_allocator)
@@ -387,17 +549,28 @@ Component_Expand :: proc(ctx: ^GameContext, compPath: string, stack: ^[dynamic]s
 	if inner, has := obj["node"].(json.Object); has do obj = inner
 	normalize_base(&obj, ctx)
 	append(stack, compPath)
-	expand_links(ctx, &obj, stack)
+	deps := make([dynamic]string, context.temp_allocator)
+	expand_links(ctx, &obj, stack, &deps)
 	pop(stack)
-	w := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
-	json_write_value(&w, obj, true)
-	return obj, strings.to_string(w.sb), ""
+
+	// Serialized with full markers (carrying nestedBase for instantiation)
+	wExp := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	json_write_value(&wExp, obj, false)
+	expandedJson := strings.to_string(wExp.sb)
+
+	// Serialized with noMarkers (storing true for COMPONENT_EXPANDED, for override diffing)
+	wBase := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	json_write_value(&wBase, obj, true)
+	baseText = strings.to_string(wBase.sb)
+
+	Component_Cache_Put(ctx, compPath, expandedJson, baseText, deps[:])
+	return obj, baseText, ""
 }
 
 // expand_links expands the nested instances below `obj` (in place). One
 // that can't be expanded stays a link (it loads as a placeholder).
 @(private = "file")
-expand_links :: proc(ctx: ^GameContext, obj: ^json.Object, stack: ^[dynamic]string) {
+expand_links :: proc(ctx: ^GameContext, obj: ^json.Object, stack: ^[dynamic]string, deps: ^[dynamic]string = nil) {
 	kids, has := obj["children"].(json.Array)
 	if !has do return
 	for &c in kids {
@@ -405,11 +578,17 @@ expand_links :: proc(ctx: ^GameContext, obj: ^json.Object, stack: ^[dynamic]stri
 		if !isObj do continue
 		path, _ := co["component"].(json.String)
 		if path == "" {
-			expand_links(ctx, co, stack)
+			expand_links(ctx, co, stack, deps)
 			continue
 		}
+		if deps != nil && !slice.contains(deps[:], string(path)) do append(deps, strings.clone(string(path), context.temp_allocator))
 		nested, nestedBase, problem := Component_Expand(ctx, string(path), stack)
 		if problem != "" do continue
+		if entry, ok := Component_Cache_Get(ctx, string(path)); ok && deps != nil {
+			for d in entry.dependencies {
+				if !slice.contains(deps[:], d) do append(deps, strings.clone(d, context.temp_allocator))
+			}
+		}
 		if ov, hasOv := co["overrides"].(json.Object); hasOv do Component_ApplyOverrides(&nested, ov)
 		// The link's keys on top (an instance's own lock / hide flags only).
 		delete_key(&nested, "editor_locked")
@@ -1000,7 +1179,7 @@ runtime_heap :: proc() -> runtime.Allocator {
 	return Engine_HeapAllocator()
 }
 
-// Component_ClearCaches frees the per-type default cache (engine shutdown / tests).
+// Component_ClearCaches frees the per-type default cache and component cache (engine shutdown / tests).
 Component_ClearCaches :: proc() {
 	for k, v in typeDefaults {
 		delete(k, Engine_HeapAllocator())
@@ -1008,6 +1187,7 @@ Component_ClearCaches :: proc() {
 	}
 	delete(typeDefaults)
 	typeDefaults = nil
+	Component_Cache_Clear()
 }
 
 // Component_InstanceJSON: an instance's whole subtree as a component file

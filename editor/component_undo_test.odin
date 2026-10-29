@@ -32,6 +32,7 @@ test_component_file_undo :: proc(t: ^testing.T) {
 
 	game := new(e.Game)
 	e.InitializeGame(game)
+	game.gameContext.isEditor = true
 	e.AssetManager_SetProjectDir(&game.assetManager, dir)
 	state: EditorState
 	state.game = game
@@ -124,6 +125,7 @@ test_component_save_refreshes_documents :: proc(t: ^testing.T) {
 
 	game := new(e.Game)
 	e.InitializeGame(game)
+	game.gameContext.isEditor = true
 	e.AssetManager_SetProjectDir(&game.assetManager, dir)
 	state: EditorState
 	state.game = game

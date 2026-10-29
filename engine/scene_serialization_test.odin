@@ -441,6 +441,7 @@ test_component_instances_are_links :: proc(t: ^testing.T) {
 	InitializeGame(game)
 	defer game->terminate()
 	AssetManager_SetProjectDir(&game.assetManager, dir)
+	game.gameContext.isEditor = true
 	scene := game->createScene("prefabs", true)
 	a := Scene_InstantiateComponent(scene, "components/turret.component.json", nil, &game.gameContext)
 	testing.expect(t, a != nil && a.componentPath == "components/turret.component.json", "linked instance")
@@ -491,6 +492,7 @@ test_component_child_overrides :: proc(t: ^testing.T) {
 	defer game->terminate()
 	defer Component_ClearCaches()
 	AssetManager_SetProjectDir(&game.assetManager, dir)
+	game.gameContext.isEditor = true
 	scene := game->createScene("ov", true)
 	a := Scene_InstantiateComponent(scene, "components/ship.component.json", nil, &game.gameContext)
 	if a == nil do testing.fail_now(t, "no instance")
@@ -789,6 +791,7 @@ test_component_instances_add_and_remove_children :: proc(t: ^testing.T) {
 	InitializeGame(game)
 	defer game->terminate()
 	AssetManager_SetProjectDir(&game.assetManager, dir)
+	game.gameContext.isEditor = true
 	scene := game->createScene("struct", true)
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
 	a := Scene_InstantiateComponent(scene, "components/ship.component.json", nil, &game.gameContext)

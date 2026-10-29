@@ -1,5 +1,6 @@
 package engine
 
+import os "osx"
 import "core:fmt"
 import "core:testing"
 import "core:time"
@@ -151,4 +152,55 @@ bench_navigation :: proc(t: ^testing.T) {
 	for _ in 0 ..< runs do if Nav_FindPath(&g, {8, 8}, {256 * 16 - 8, 256 * 16 - 8}) != nil do found += 1
 	per := time.tick_since(start) / runs
 	fmt.printfln("[bench] navigation: 256x256 grid, 20%% walls, corner to corner: %.3f ms per path (%d/%d found)", time.duration_milliseconds(per), found, runs)
+}
+
+// Components benchmark: instantiate, save, and undo snapshot with 10 / 100 / 1000 instances (#80).
+@(test)
+bench_components :: proc(t: ^testing.T) {
+	DIR :: "test_bench_components"
+	_ = os.make_directory_all(DIR + "/components")
+	defer os.remove_all(DIR)
+	compFile := DIR + "/components/turret.component.json"
+	compJson := `{"type": "Node", "name": "Turret", "children": [{"type": "TextureNode", "name": "Barrel", "position": [10, 0]}, {"type": "AreaNode", "name": "Sensor", "physics": {"shape": {"type": "circle", "radius": 24}}}]}`
+	_ = os.write_entire_file(compFile, transmute([]u8)compJson)
+
+	for count in ([]int{10, 100, 1000}) {
+		game := new(Game)
+		InitializeGame(game)
+		AssetManager_SetProjectDir(&game.assetManager, DIR)
+		scene := game->createScene("bench_comp", true)
+
+		// 1. Instantiate
+		start := time.tick_now()
+		for i in 0 ..< count {
+			inst := Scene_InstantiateComponent(scene, "components/turret.component.json", scene.rootNode, &game.gameContext)
+			if inst != nil {
+				inst.position = {f32(i), 0}
+			}
+		}
+		ProcessNodeQueues(scene.manager, &game.gameContext)
+		instantiateTime := time.tick_since(start)
+
+		// 2. Save (game context)
+		start = time.tick_now()
+		_ = Scene_SerializeToJSON(scene, context.temp_allocator)
+		saveTime := time.tick_since(start)
+
+		// 3. Undo snapshot (editor context with full override diffs)
+		editorCtx := game.gameContext
+		editorCtx.isEditor = true
+		start = time.tick_now()
+		_ = Scene_SerializeToJSON(scene, context.temp_allocator)
+		undoTime := time.tick_since(start)
+
+		fmt.printfln("[bench] %4d component instances: instantiate %8.2f ms | save %8.2f ms | undo snapshot %8.2f ms",
+			count,
+			time.duration_milliseconds(instantiateTime),
+			time.duration_milliseconds(saveTime),
+			time.duration_milliseconds(undoTime),
+		)
+
+		game->terminate()
+		Component_ClearCaches()
+	}
 }

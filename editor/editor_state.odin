@@ -252,6 +252,7 @@ GlobalEditor: EditorState
 Editor_Init :: proc(state: ^EditorState) {
 	state.game = new(e.Game)
 	e.InitializeGame(state.game)
+	state.game.gameContext.isEditor = true
 
 	state.projectPath = ""
 	if !slice.contains(os.args, "--project") do state.projectPath = strings.clone(Resources_DefaultProject()) // (resources.odin)

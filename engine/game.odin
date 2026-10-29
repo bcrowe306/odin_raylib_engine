@@ -21,6 +21,7 @@ GameContext :: struct {
 	camera:        ^CameraNode,
 	scriptManager: ^ScriptManager,
 	assetManager:  ^AssetManager,
+	isEditor:      bool,
 }
 
 

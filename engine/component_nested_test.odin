@@ -42,6 +42,7 @@ test_component_nested_overrides :: proc(t: ^testing.T) {
 	defer game->terminate()
 	defer Component_ClearCaches()
 	AssetManager_SetProjectDir(&game.assetManager, NEST_DIR)
+	game.gameContext.isEditor = true
 	ctx := &game.gameContext
 
 	scene := game->createScene("nest", false)
@@ -108,6 +109,7 @@ test_component_nested_added_instance :: proc(t: ^testing.T) {
 	defer game->terminate()
 	defer Component_ClearCaches()
 	AssetManager_SetProjectDir(&game.assetManager, NEST_DIR)
+	game.gameContext.isEditor = true
 	ctx := &game.gameContext
 	scene := game->createScene("nest_add", false)
 	inst := Scene_InstantiateComponent(scene, "components/b.component.json", nil, ctx)
@@ -147,6 +149,7 @@ test_component_nested_refresh :: proc(t: ^testing.T) {
 	defer game->terminate()
 	defer Component_ClearCaches()
 	AssetManager_SetProjectDir(&game.assetManager, NEST_DIR)
+	game.gameContext.isEditor = true
 	ctx := &game.gameContext
 	scene := game->createScene("nest_rf", false)
 	inst := Scene_InstantiateComponent(scene, "components/a.component.json", nil, ctx)

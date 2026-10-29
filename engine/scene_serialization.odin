@@ -874,7 +874,9 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 			componentDepth -= 1
 			if node == nil do return nil
 			node.componentPath = strings.clone(compPath, node.allocator)
-			node.componentBase = strings.clone(string(base), node.allocator)
+			if ctx != nil && ctx.isEditor {
+				node.componentBase = strings.clone(string(base), node.allocator)
+			}
 			return node
 		}
 		inst, problem := read_component_instance(scene, compPath, obj, parent, ctx)
@@ -1548,7 +1550,9 @@ read_component_instance :: proc(scene: ^Scene, compPath: string, inst: json.Obje
 	componentDepth -= 1
 	if node == nil do return nil, "its root node could not be created"
 	node.componentPath = strings.clone(compPath, node.allocator)
-	node.componentBase = strings.clone(baseText, node.allocator)
+	if ctx != nil && ctx.isEditor {
+		node.componentBase = strings.clone(baseText, node.allocator)
+	}
 	node.name = strings.clone(sj_string(inst, "name", node.name), node.allocator)
 	// The instance's own uid in the document holding it (a component nesting
 	// it); the component's root uid stays in its base. "" in scenes.
@@ -1643,6 +1647,7 @@ Scene_InstantiateComponent :: proc(scene: ^Scene, compPath: string, parent: ^Nod
 // component (after the component file changed), keeping each instance's
 // name, transform and place in the hierarchy. Returns how many it rebuilt.
 Scene_RefreshComponentInstances :: proc(scene: ^Scene, compPath: string, ctx: ^GameContext) -> int {
+	Component_Cache_Clear()
 	if scene == nil || scene.manager == nil do return 0
 	// The outermost instance holding each one is rebuilt: its overrides are
 	// diffed against the base it was built from, so a nested file's change
