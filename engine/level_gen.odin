@@ -40,6 +40,8 @@ Gen_Kind :: enum {
 	Gradient,
 	Border,
 	Rect,
+	Rooms,  // rooms joined by corridors (1 = floor)
+	Walker, // a random walk carving tunnels (1 = walked)
 	// Modifiers
 	Threshold,
 	Invert,
@@ -49,8 +51,11 @@ Gen_Kind :: enum {
 	Dilate,
 	Erode,
 	Combine,
+	Scatter, // spaced random points (on the input's solid cells, if connected)
+	Surface, // empty cells next to solid ones (ground to stand on)
 	// Output
 	Tile_Output,
+	Entity_Output, // a component on every point (cells >= 0.5)
 }
 
 Gen_Param_Def :: struct {
@@ -72,6 +77,7 @@ Gen_Kind_Info :: struct {
 
 GEN_COMBINE_OPS := []string{"add", "subtract", "multiply", "min", "max", "mask", "average"}
 GEN_GRADIENT_DIRS := []string{"horizontal", "vertical", "radial"}
+GEN_SURFACE_SIDES := []string{"top", "bottom", "any"}
 
 GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 	.Constant = {"constant", "Constant", {}, {{name = "value", default_ = 1, doc = "Every cell's value"}}, "The same value everywhere."},
@@ -119,9 +125,32 @@ GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 	.Combine = {"combine", "Combine", {"a", "b"}, {
 		{name = "op", default_ = 0, choices = GEN_COMBINE_OPS, doc = "add, subtract, multiply, min, max, mask (a where b is solid), average"},
 	}, "Two grids into one."},
+	.Rooms = {"rooms", "Rooms & Corridors", {}, {
+		{name = "min_size", default_ = 4, doc = "Smallest room side (cells)", integer = true},
+		{name = "max_size", default_ = 10, doc = "Largest room side (cells)", integer = true},
+		{name = "corridor", default_ = 1, doc = "Corridor width (cells)", integer = true},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
+	}, "A dungeon: the level split in two again and again (BSP), a room in each part, corridors joining them. 1 = floor; invert it for walls."},
+	.Walker = {"walker", "Walker", {}, {
+		{name = "steps", default_ = 400, doc = "Steps of each walker", integer = true},
+		{name = "walkers", default_ = 1, doc = "How many walk (from the centre)", integer = true},
+		{name = "brush", default_ = 1, doc = "Width of the tunnel (cells)", integer = true},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
+	}, "Random walks from the centre (\"drunkard's walk\"): winding tunnels and caverns. 1 = walked."},
 	.Tile_Output = {"tile_output", "Tile Output", {"in"}, {
 		{name = "empty", default_ = -1, doc = "The tile for cells no rule takes (-1 = none)", integer = true},
-	}, "Rules turn value ranges into tiles (a random one of each rule's tiles, the same for a seed); written into a TileMap."},
+	}, "Rules turn value ranges into tiles (a random one of each rule's tiles, the same for a seed); written into a TileMap - or, as IntGrid values, into an LDtk layer."},
+	.Scatter = {"scatter", "Scatter", {"in"}, {
+		{name = "chance", default_ = 0.05, doc = "Chance of a point on each allowed cell"},
+		{name = "spacing", default_ = 4, doc = "At least this many cells between points", integer = true},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
+	}, "Random points (1) spaced apart - on the input's solid cells when it is connected, anywhere otherwise. Feed an entity output."},
+	.Surface = {"surface", "Surface", {"in"}, {
+		{name = "side", default_ = 0, choices = GEN_SURFACE_SIDES, doc = "top: empty cells with solid below (ground to stand on), bottom: with solid above (ceilings), any: next to solid"},
+	}, "Empty cells against the input's solid ones: where things stand, hang or cling."},
+	.Entity_Output = {"entity_output", "Entity Output", {"in"}, {
+		{name = "max", default_ = 0, doc = "At most this many (0 = every point)", integer = true},
+	}, "Puts its component (a .component.json) on every point of its input (cells >= 0.5): enemies, pickups, the player's start."},
 }
 
 // A tile rule: cells with min <= value <= max get one of `tiles`.
@@ -136,6 +165,7 @@ Gen_Node :: struct {
 	inputs: [2]int, // source node ids, in the kind's input order (0 = not connected)
 	params: [8]f64, // in the kind's parameter order
 	rules:  [dynamic]Gen_Tile_Rule, // Tile_Output
+	component: string, // Entity_Output: what it places (the graph's allocator)
 	pos:    [2]f32, // where the editor draws it
 }
 
@@ -189,9 +219,18 @@ Gen_FindNode :: proc(g: ^Gen_Graph, id: int) -> ^Gen_Node {
 }
 
 Gen_GraphDestroy :: proc(g: ^Gen_Graph) {
-	for &n in g.nodes do Gen_NodeClearRules(&n)
+	for &n in g.nodes {
+		Gen_NodeClearRules(&n)
+		Gen_SetComponent(g, &n, "")
+	}
 	delete(g.nodes)
 	g.nodes = nil
+}
+
+// Gen_SetComponent: an entity output's component (the graph owns the text).
+Gen_SetComponent :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {
+	if n.component != "" do delete(n.component, g.allocator)
+	n.component = strings.clone(path, g.allocator) if path != "" else ""
 }
 
 Gen_NodeClearRules :: proc(n: ^Gen_Node) {
@@ -250,6 +289,7 @@ Gen_GraphParse :: proc(data: []u8, allocator := context.allocator) -> (g: Gen_Gr
 			n.pos.x, _ = json_number(pos[0])
 			n.pos.y, _ = json_number(pos[1])
 		}
+		if comp, cok := obj["component"].(json.String); cok do n.component = strings.clone(string(comp), allocator)
 		if rules, rok := obj["rules"].(json.Array); rok {
 			n.rules = make([dynamic]Gen_Tile_Rule, allocator)
 			for rv in rules {
@@ -318,6 +358,10 @@ Gen_GraphSerialize :: proc(g: ^Gen_Graph, allocator := context.allocator) -> str
 			}
 			strings.write_byte(&w.sb, ']')
 		}
+		if n.kind == .Entity_Output {
+			strings.write_string(&w.sb, ", \"component\": ")
+			Json_String(&w, n.component)
+		}
 		if n.pos != {} {
 			strings.write_string(&w.sb, ", \"pos\": ")
 			Json_Vec2(&w, n.pos)
@@ -368,6 +412,8 @@ Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^
 	n^ = copied
 	n.id, n.pos, n.inputs = newId, copied.pos + offset, {}
 	n.rules = nil
+	n.component = ""
+	Gen_SetComponent(g, n, copied.component)
 	if len(copied.rules) > 0 {
 		n.rules = make([dynamic]Gen_Tile_Rule, g.allocator)
 		for r in copied.rules {
@@ -384,6 +430,7 @@ Gen_RemoveNode :: proc(g: ^Gen_Graph, id: int) -> bool {
 	for &n, i in g.nodes {
 		if n.id != id do continue
 		Gen_NodeClearRules(&n)
+		Gen_SetComponent(g, &n, "")
 		ordered_remove(&g.nodes, i)
 		for &o in g.nodes do for &src in o.inputs do if src == id do src = 0
 		if g.output == id do g.output = 0
@@ -602,9 +649,54 @@ gen_eval :: proc(ev: ^Gen_Eval, id: int) -> (result: Gen_Grid, ok: bool) {
 			case: out.v[i] = x + y
 			}
 		}
-	case .Tile_Output:
+	case .Tile_Output, .Entity_Output:
 		src := gen_input(ev, n, 0) or_return
-		copy(out.v, src.v) // (the tiles come from Gen_Tiles: its grid is its input's)
+		copy(out.v, src.v) // (the tiles / entities come from Gen_Tiles / Gen_Entities: its grid is its input's)
+	case .Rooms:
+		minS := clamp(int(p(n, "min_size")), 2, 256)
+		maxS := clamp(int(p(n, "max_size")), minS, 512)
+		rng := nodeSeed
+		gen_bsp(&out, {1, 1, w - 2, h - 2}, minS, maxS, max(int(p(n, "corridor")), 1), &rng, 0)
+	case .Walker:
+		rng := nodeSeed
+		brush := clamp(int(p(n, "brush")), 1, 16)
+		dirs := [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+		for _ in 0 ..< clamp(int(p(n, "walkers")), 1, 64) {
+			pos := [2]int{w / 2, h / 2}
+			for _ in 0 ..< clamp(int(p(n, "steps")), 0, 1_000_000) {
+				gen_carve(&out, pos.x - (brush - 1) / 2, pos.y - (brush - 1) / 2, brush, brush)
+				d := dirs[gen_rand_int(&rng, 0, 3)]
+				pos = {clamp(pos.x + d.x, 1, max(w - 2, 1)), clamp(pos.y + d.y, 1, max(h - 2, 1))}
+			}
+		}
+	case .Scatter:
+		src := gen_input(ev, n, 0) or_return
+		masked := n.inputs[0] != 0
+		chance := f32(p(n, "chance"))
+		spacing := clamp(int(p(n, "spacing")), 0, 256)
+		for y in 0 ..< h do for x in 0 ..< w {
+			if masked && src.v[y * w + x] < 0.5 do continue
+			if gen_hash01(x, y, nodeSeed) >= chance do continue
+			near := false
+			for yy in max(y - spacing + 1, 0) ..= y do for xx in max(x - spacing + 1, 0) ..< min(x + spacing, w) {
+				if (yy < y || xx < x) && out.v[yy * w + xx] >= 0.5 do near = true
+			}
+			if !near do out.v[y * w + x] = 1
+		}
+	case .Surface:
+		src := gen_input(ev, n, 0) or_return
+		side := int(p(n, "side"))
+		solid :: proc(g: Gen_Grid, x, y: int) -> bool {return x >= 0 && y >= 0 && x < g.w && y < g.h && g.v[y * g.w + x] >= 0.5}
+		for y in 0 ..< h do for x in 0 ..< w {
+			if solid(src, x, y) do continue
+			on: bool
+			switch side {
+			case 1: on = solid(src, x, y - 1)
+			case 2: on = solid(src, x + 1, y) || solid(src, x - 1, y) || solid(src, x, y + 1) || solid(src, x, y - 1)
+			case: on = solid(src, x, y + 1)
+			}
+			out.v[y * w + x] = 1 if on else 0
+		}
 	}
 	ev.done[id] = out
 	return out, true
@@ -638,14 +730,30 @@ Gen_Tiles :: proc(g: ^Gen_Graph, outputId := 0, seed: u64 = 0, allocator := cont
 // Gen_ApplyTileMap generates into a tile map: its map becomes the level's
 // size and its cells the tiles (colliders rebuilt when it is Solid and in
 // the game).
-Gen_ApplyTileMap :: proc(g: ^Gen_Graph, tm: ^TileMapNode, seed: u64 = 0, ctx: ^GameContext = nil) -> string {
+Gen_ApplyTileMap :: proc(g: ^Gen_Graph, tm: ^TileMapNode, seed: u64 = 0, ctx: ^GameContext = nil, scene: ^Scene = nil) -> string {
 	tiles, size, err := Gen_Tiles(g, 0, seed, context.temp_allocator)
 	if err != "" do return err
+	ents, eerr := Gen_Entities(g, seed, context.temp_allocator)
+	if eerr != "" do return eerr
 	tm.mapSize = size
 	TileMapNode_Reset(tm)
 	for t, i in tiles do if t >= 0 do TileMapNode_Set(tm, i % size.x, i / size.x, t)
 	TileMapNode_Changed(tm)
 	if tm.solid && tm.isReady && ctx != nil do TileMapNode_BuildColliders(tm, ctx)
+
+	// Entities: children of the map, at their cells' centres; those of the
+	// last generation go first.
+	sc := scene
+	if sc == nil && ctx != nil do sc = ctx.scene if ctx.scene != nil else (ctx.game.sceneManager.currentScene if ctx.game != nil else nil)
+	if sc == nil do return ""
+	for c in GetChildrenTemp(sc.manager, tm) do if c != nil && !c.removing && Node_HasTag(c, GEN_ENTITY_TAG) do RemoveNode(sc.manager, c)
+	tsz := [2]f32{f32(tm.tileSize.x), f32(tm.tileSize.y)}
+	for en in ents {
+		n := Scene_InstantiateComponent(sc, en.component, tm, ctx)
+		if n == nil do return fmt.tprintf("no component %s", en.component)
+		n.position = ([2]f32{f32(en.cell.x), f32(en.cell.y)} + 0.5) * tsz
+		Node_AddTag(n, GEN_ENTITY_TAG)
+	}
 	return ""
 }
 
@@ -660,6 +768,133 @@ Gen_LoadFile :: proc(ctx: ^GameContext, path: string, allocator := context.alloc
 		return {}, fmt.tprintf("%s: %s", path, err)
 	}
 	return g, ""
+}
+
+// --- rooms and corridors ----------------------------------------------------------------
+
+@(private = "file")
+gen_carve :: proc(out: ^Gen_Grid, x, y, w, h: int) {
+	for yy in max(y, 0) ..< min(y + h, out.h) do for xx in max(x, 0) ..< min(x + w, out.w) do out.v[yy * out.w + xx] = 1
+}
+
+// gen_bsp splits an area in two until its parts are small, puts a room in
+// each part and joins the two halves of every split with a corridor
+// (between a room of each). Returns the centre of one of its rooms.
+@(private = "file")
+gen_bsp :: proc(out: ^Gen_Grid, r: [4]int, minS, maxS, corridor: int, rng: ^u64, depth: int) -> [2]int {
+	x, y, w, h := r[0], r[1], r[2], r[3]
+	need := minS + 2 // a room and a cell around it
+	canW, canH := w >= need * 2, h >= need * 2
+	if depth < 16 && (canW || canH) && (w > maxS + 2 || h > maxS + 2) {
+		vertical := canW && (!canH || w > h || (w == h && gen_rand_int(rng, 0, 1) == 0))
+		a, b: [4]int
+		if vertical {
+			s := gen_rand_int(rng, need, w - need)
+			a, b = {x, y, s, h}, {x + s, y, w - s, h}
+		} else {
+			s := gen_rand_int(rng, need, h - need)
+			a, b = {x, y, w, s}, {x, y + s, w, h - s}
+		}
+		c1 := gen_bsp(out, a, minS, maxS, corridor, rng, depth + 1)
+		c2 := gen_bsp(out, b, minS, maxS, corridor, rng, depth + 1)
+		// An L: along x at c1's row, then along y at c2's column.
+		gen_carve(out, min(c1.x, c2.x), c1.y, abs(c2.x - c1.x) + corridor, corridor)
+		gen_carve(out, c2.x, min(c1.y, c2.y), corridor, abs(c2.y - c1.y) + corridor)
+		return c1 if gen_rand_int(rng, 0, 1) == 0 else c2
+	}
+	// A leaf: a room inside it (a cell of wall around).
+	rw := clamp(gen_rand_int(rng, minS, maxS), 1, max(w - 2, 1))
+	rh := clamp(gen_rand_int(rng, minS, maxS), 1, max(h - 2, 1))
+	rx := x + gen_rand_int(rng, 1, max(w - rw - 1, 1))
+	ry := y + gen_rand_int(rng, 1, max(h - rh - 1, 1))
+	gen_carve(out, rx, ry, rw, rh)
+	return {rx + rw / 2, ry + rh / 2}
+}
+
+// gen_rand_int: the next random number in lo..hi (inclusive) of a
+// node's own sequence.
+@(private = "file")
+gen_rand_int :: proc(state: ^u64, lo, hi: int) -> int {
+	if hi <= lo do return lo
+	state^ = gen_mix(state^, 0x2545f4914f6cdd1d)
+	return lo + int(state^ % u64(hi - lo + 1))
+}
+
+// --- entities and LDtk ----------------------------------------------------------------
+
+// A component placed by an entity output, at a cell.
+Gen_Entity :: struct {
+	component: string, // (the graph's)
+	cell:      [2]int,
+}
+
+// Gen_Entities: every entity output's placements (its points: cells >=
+// 0.5; with `max`, that many picked by the seed), in node then row order.
+Gen_Entities :: proc(g: ^Gen_Graph, seed: u64 = 0, allocator := context.allocator) -> (out: [dynamic]Gen_Entity, err: string) {
+	out = make([dynamic]Gen_Entity, allocator)
+	s := seed if seed != 0 else g.seed
+	for &n in g.nodes {
+		if n.kind != .Entity_Output || n.component == "" do continue
+		grid, e := Gen_Evaluate(g, n.id, seed, context.temp_allocator)
+		if e != "" do return out, e
+		Cell :: struct {cell: [2]int, key: f32}
+		cells := make([dynamic]Cell, context.temp_allocator)
+		pickSeed := gen_mix(gen_mix(s, u64(n.id)), 0xe171)
+		for v, i in grid.v do if v >= 0.5 do append(&cells, Cell{{i % grid.w, i / grid.w}, gen_hash01(i % grid.w, i / grid.w, pickSeed)})
+		limit := int(Gen_Param(&n, "max"))
+		if limit > 0 && len(cells) > limit {
+			// The `limit` with the lowest keys, back in row order.
+			keys := make([]f32, len(cells), context.temp_allocator)
+			for c, i in cells do keys[i] = c.key
+			slice_sort_f32(keys)
+			cut := keys[limit - 1]
+			kept := 0
+			for c in cells do if c.key <= cut && kept < limit {
+				append(&out, Gen_Entity{n.component, c.cell})
+				kept += 1
+			}
+			continue
+		}
+		for c in cells do append(&out, Gen_Entity{n.component, c.cell})
+	}
+	return out, ""
+}
+
+@(private = "file")
+slice_sort_f32 :: proc(a: []f32) {
+	// (insertion sort: entity outputs hold a few hundred points at most)
+	for i in 1 ..< len(a) {
+		v := a[i]
+		j := i - 1
+		for j >= 0 && a[j] > v {
+			a[j + 1] = a[j]
+			j -= 1
+		}
+		a[j + 1] = v
+	}
+}
+
+// GEN_ENTITY_TAG marks the nodes a generator spawned (generating again
+// replaces them).
+GEN_ENTITY_TAG :: "levelgen"
+
+// Gen_ApplyIntGrid writes the output's tiles into an LDtk IntGrid layer as
+// values (empty and negative: 0), one undo step, then runs the auto
+// layers' rules. The layer keeps its size: cells outside the generator are
+// left as they are.
+Gen_ApplyIntGrid :: proc(g: ^Gen_Graph, doc: ^Ldtk_Doc, li, layer: int, seed: u64 = 0) -> string {
+	if doc == nil || li < 0 || li >= len(doc.levels) || layer < 0 || layer >= len(doc.levels[li].layers) do return "no such LDtk layer"
+	ly := &doc.levels[li].layers[layer]
+	if ly.def < 0 || doc.layerDefs[ly.def].type != .IntGrid do return "not an IntGrid layer"
+	tiles, size, err := Gen_Tiles(g, 0, seed, context.temp_allocator)
+	if err != "" do return err
+	Ldtk_Doc_BeginCells(doc, li, layer, "Generate level")
+	for y in 0 ..< min(size.y, ly.cHei) do for x in 0 ..< min(size.x, ly.cWid) {
+		Ldtk_Doc_SetIntGrid(doc, li, layer, x, y, max(int(tiles[y * size.x + x]), 0))
+	}
+	Ldtk_Doc_EndCells(doc)
+	Ldtk_Doc_ApplyRules(doc, li, layer, 0, 0, ly.cWid, ly.cHei)
+	return ""
 }
 
 // --- deterministic noise --------------------------------------------------------------
@@ -694,7 +929,7 @@ gen_value_noise :: proc(x, y: f32, seed: u64) -> f32 {
 }
 
 // --- Lua: LevelGen ------------------------------------------------------------------------
-// LevelGen.generate(generator, tilemap [, seed]) -> true | false, why
+// LevelGen.generate(generator, tilemap [, seed]) -> true | false, why (tiles and entities)
 // LevelGen.values(generator [, seed [, node_id]]) -> {width, height, values = {row-major}} | nil, why
 
 @(private = "file")
@@ -753,6 +988,40 @@ lua_levelgen_values :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// LevelGen.entities(generator [, seed]) -> {{component, x, y}, ...} (cells) | nil, why
+@(private = "file")
+lua_levelgen_entities :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	sm := get_script_manager(L)
+	if sm == nil || sm.game == nil || lua.type(L, 1) != .STRING {
+		lua.pushnil(L)
+		lua.pushstring(L, "usage: LevelGen.entities(\"levels/caves.levelgen.json\" [, seed])")
+		return 2
+	}
+	seed := u64(lua.tointeger(L, 2)) if lua.type(L, 2) == .NUMBER else 0
+	g, err := Gen_LoadFile(&sm.game.gameContext, string(lua.tostring(L, 1)), context.temp_allocator)
+	defer Gen_GraphDestroy(&g)
+	ents: [dynamic]Gen_Entity
+	if err == "" do ents, err = Gen_Entities(&g, seed, context.temp_allocator)
+	if err != "" {
+		lua.pushnil(L)
+		lua.pushstring(L, strings.clone_to_cstring(err, context.temp_allocator))
+		return 2
+	}
+	lua.createtable(L, c.int(len(ents)), 0)
+	for en, i in ents {
+		lua.createtable(L, 0, 3)
+		lua.pushstring(L, strings.clone_to_cstring(en.component, context.temp_allocator))
+		lua.setfield(L, -2, "component")
+		lua.pushinteger(L, lua.Integer(en.cell.x))
+		lua.setfield(L, -2, "x")
+		lua.pushinteger(L, lua.Integer(en.cell.y))
+		lua.setfield(L, -2, "y")
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
 // Script_RegisterLevelGenModule creates the global LevelGen table.
 Script_RegisterLevelGenModule :: proc(L: ^lua.State) {
 	lua.newtable(L)
@@ -760,5 +1029,7 @@ Script_RegisterLevelGenModule :: proc(L: ^lua.State) {
 	lua.setfield(L, -2, "generate")
 	lua.pushcfunction(L, lua_levelgen_values)
 	lua.setfield(L, -2, "values")
+	lua.pushcfunction(L, lua_levelgen_entities)
+	lua.setfield(L, -2, "entities")
 	lua.setglobal(L, "LevelGen")
 }

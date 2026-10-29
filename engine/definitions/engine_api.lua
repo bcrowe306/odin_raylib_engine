@@ -8975,7 +8975,7 @@ function PoolModule.stats(component) end
 ---Procedural levels: a generator file (.levelgen.json) is a graph of nodes - noise, random fill, cellular caves, thresholds, combines... - whose tile output writes a level into a TileMap. The same generator and seed always give the same level. Guide: engine/docs/level_generator.md.
 local LevelGenModule = {}
 
----Generates a level into a TileMap node: its map becomes the generator's size and its cells the tiles (colliders rebuilt when it is Solid). Emits `level_generated` (the tile map's name) on the event bus.
+---Generates a level into a TileMap node: its map becomes the generator's size and its cells the tiles (colliders rebuilt when it is Solid); entity outputs' components are placed as its children (generating again replaces them). Emits `level_generated` (the tile map's name) on the event bus.
 ---
 ---Example: `local ok, why = LevelGen.generate("levels/caves.levelgen.json", self.node:get_node("Ground"), os.time())`
 ---@param generator string A .levelgen.json file
@@ -8994,6 +8994,15 @@ function LevelGenModule.generate(generator, tilemap, seed) end
 ---@return {width: integer, height: integer, values: number[]}? grid
 ---@return string? why
 function LevelGenModule.values(generator, seed, node_id) end
+
+---The entity outputs' placements without a tile map: a component and a cell (x, y) each.
+---
+---Example: `for _, e in ipairs(LevelGen.entities("levels/caves.levelgen.json", seed)) do Scene.instantiate(e.component, nil, e.x * 16 + 8, e.y * 16 + 8) end`
+---@param generator string A .levelgen.json file
+---@param seed? integer
+---@return {component: ComponentPath|string, x: integer, y: integer}[]? entities
+---@return string? why
+function LevelGenModule.entities(generator, seed) end
 
 -- ============================================================================
 
