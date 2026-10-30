@@ -317,10 +317,18 @@ lua_tween_to :: proc "c" (L: ^lua.State) -> c.int {
 	property := strings.clone(string(lua.tostring(L, 2)), context.temp_allocator)
 	v: [4]f32
 	if lua.type(L, 3) == .TABLE {
-		for i in 0 ..< 4 {
-			lua.rawgeti(L, 3, lua.Integer(i + 1))
-			v[i] = f32(lua.tonumber(L, -1))
-			lua.pop(L, 1)
+		lua.getfield(L, 3, "x")
+		isVec := lua.type(L, -1) == .NUMBER
+		lua.pop(L, 1)
+		if isVec {
+			// A Vec2 (x / y fields; v[1] only through __index, which rawgeti skips).
+			v.x, v.y = arg_xy(L, 3)
+		} else {
+			for i in 0 ..< 4 {
+				lua.rawgeti(L, 3, lua.Integer(i + 1))
+				v[i] = f32(lua.tonumber(L, -1))
+				lua.pop(L, 1)
+			}
 		}
 	} else {
 		v[0] = f32(lua.tonumber(L, 3))

@@ -81,3 +81,24 @@ eased = Tween.ease("in_quad", 0.5)
 	testing.expect_value(t, v.x, f32(75))
 	_ = strings.contains
 }
+
+// A Vec2 target (x / y fields) tweens there - it used to go to (0, 0): the
+// value was read with rawgeti, which a Vec2 only answers through __index.
+@(test)
+test_tween_to_vec2 :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("tw_vec2", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	n := Node_CreateByTypeName(scene, "Node")
+	n.name = "Box"
+	n.gameContext = &game.gameContext
+	game->run(0.001)
+	L := game.scriptManager.L
+	ok := lua.L_dostring(L, `Tween.to(Scene.find_node("Box"), "position", Vec2(40, 30), 0.1, "linear")`) == 0
+	testing.expect(t, ok, "Lua ran")
+	for _ in 0 ..< 3 do game->run(0.1)
+	testing.expectf(t, n.position == {40, 30}, "at the Vec2: %v", n.position)
+}
