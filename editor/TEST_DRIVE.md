@@ -31,6 +31,7 @@ exits non-zero if any check fails.
 | `components.drive` | Save a subtree as a component from the context menu, instantiate it from Assets, built-in templates. |
 | `export.drive` | Export `.rayzr`, then run the game from the package (textures load from inside it). |
 | `level_generator.drive` | The Level Generator window: a new generator (the cave template), a node added from the canvas menu and linked (a loop refused), undo / redo, a parameter, a new seed, delete, save, Apply to a TileMap. |
+| `bottom_tabs.drive` | View > Bottom Panel: the Mixer tab hidden and shown again (checked, saved in settings.ini); the Animation tab hidden, then back when an AnimationPlayer is selected. |
 | `file_browser.drive` | The bottom panel's Files tab (View > File Browser): a typed path, history (back / forward / up), a bookmark; image, sound (play / stop) and text previews; a search through sub-folders, the type filter; Load by type, a taken name skipped / replaced, into a chosen folder, several at once, a row dragged onto Assets; switching to another tab stops a playing sound. |
 | `assets.drive` | Asset folders collapse/expand (folder icons); the Scenes folder's + creates a scene. |
 | `code_shortcuts.drive` | Zed-style code editing: auto-closing pairs, line operations, multi-cursor, find/replace, go to line, LSP rename (with its preview: Apply) and format, font size, Go to File, reopen tab, command palette, Keyboard Shortcuts window. |
