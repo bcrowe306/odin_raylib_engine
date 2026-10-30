@@ -15,6 +15,25 @@ They apply to the running game (Play, exported builds). The editor's
 viewport also snaps sprites when **Pixel Snap** is on, so what you place is
 what you get.
 
+## Screen fill
+
+A window or screen whose shape differs from the virtual resolution (a
+640 x 380 game in a 16:9 window, fullscreen on a 16:10 laptop) is filled
+by Project Settings > Video > **Screen Fill**:
+
+- **Expand** (new projects): the same scale, and the frame grows to the
+  screen's shape - the camera shows more of the world on the longer side,
+  no bars. The virtual resolution is the least the player sees. With
+  Integer Scaling the scale is a whole number and the frame grows by whole
+  game pixels (a border of a few screen pixels at most).
+- **Keep** (projects made before this setting): exactly the virtual
+  resolution, scaled to fit, with black bars where the shapes differ.
+
+With Expand, scripts that place things at the screen's edges read the
+frame's size each time (`Engine.get_virtual_size()` - it can change when the
+window is resized or goes fullscreen) rather than assuming the virtual
+resolution.
+
 ## Recipes
 
 **Classic crisp pixel art** (most games):

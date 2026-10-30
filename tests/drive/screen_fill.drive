@@ -1,0 +1,15 @@
+# #174: Project Settings > Video > Screen Fill - the demo project (saved
+# before fill modes) is Keep; Expand is chosen and saved in project.json.
+wait 5
+key ctrl+comma
+expect project-settings-open == true
+click @settings.tab:project
+click @settings.page:Video
+click @settings.fill
+wait 2
+click @pick:Expand (no bars)
+wait 2
+screenshot video_fill
+click @settings.save
+wait 3
+expect file:project.json contains "fill": "expand"
