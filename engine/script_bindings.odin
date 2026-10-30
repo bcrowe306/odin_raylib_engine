@@ -1992,9 +1992,10 @@ lua_node_camera_shake :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
-	strength := f32(lua.tonumber(L, 2))
-	dur := f32(lua.tonumber(L, 3)) if lua.gettop(L) >= 3 else 0.5
-	CameraNode_Shake(cast(^CameraNode)node, strength, dur)
+	// (Pixels; nil = the node's Shake Preset, #215.)
+	strength := f32(lua.tonumber(L, 2)) if !lua.isnoneornil(L, 2) else -1
+	dur := f32(lua.tonumber(L, 3)) if !lua.isnoneornil(L, 3) else -1
+	CameraNode_PlayShake(cast(^CameraNode)node, strength, dur)
 	return 0
 }
 
@@ -2161,9 +2162,9 @@ lua_camera_shake :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
-		strength := f32(lua.tonumber(L, 1))
-		dur := f32(lua.tonumber(L, 2)) if lua.gettop(L) >= 2 else 0.5
-		CameraNode_Shake(cam, strength, dur)
+		strength := f32(lua.tonumber(L, 1)) if !lua.isnoneornil(L, 1) else -1
+		dur := f32(lua.tonumber(L, 2)) if !lua.isnoneornil(L, 2) else -1
+		CameraNode_PlayShake(cam, strength, dur)
 	}
 	return 0
 }

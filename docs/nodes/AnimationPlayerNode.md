@@ -138,7 +138,7 @@ end
 
 -- Called by the attack's method key, on the frame the blade lands.
 function Player:attack_hit(frame)
-    Camera.shake(0.2, 0.1)
+    Camera.shake(4, 0.1)
 end
 
 return Player

@@ -158,7 +158,7 @@ CameraNode :: struct {
 	currentOffset:         [2]f32,
 	currentOffsetVelocity: [2]f32,
 	screenOffset:          [2]f32 `gui:"true"`,
-	customScreenOffset:    bool,
+	customScreenOffset:    bool `gui:"true"`,
 
 	// Rotation
 	currentRotation:         f32 `gui:"true" min:"-360" max:"360" save:"false"`,
@@ -169,7 +169,7 @@ CameraNode :: struct {
 	currentRotationVelocity: f32,
 
 	// Zoom
-	zoom:                f32 `gui:"true" min:"0.01" max:"50"`,
+	zoom:                f32 `gui:"true" min:"0.01" max:"50" save:"false"`, // now; Target Zoom is the setting
 	currentZoom:         f32,
 	targetZoom:          f32 `gui:"true" min:"0.01" max:"50"`,
 	smoothZoom:          bool `gui:"true"`,
@@ -215,6 +215,10 @@ CameraNode :: struct {
 	shakeOffset:     [2]f32,
 	shakeRotation:   f32,
 	shakeZoom:       f32,
+	// The shake playing (CameraNode_Shake); the settings above stay as set.
+	activeShakeIntensity: f32,
+	activeShakeSpeed:     f32,
+	activeShakeTypes:     bit_set[CameraShakeType],
 
 	// Rooms & Magnets
 	rooms:   [dynamic]CameraRoom,
@@ -738,10 +742,10 @@ CameraNode_Shake :: proc(
 ) {
 	if camera == nil do return
 	camera.isShaking = true
-	camera.shakeIntensity = intensity
+	camera.activeShakeIntensity = intensity
 	camera.shakeDuration = duration
-	camera.shakeSpeed = speed
-	camera.shakeTypes = types
+	camera.activeShakeSpeed = speed
+	camera.activeShakeTypes = types
 	camera.shakeAttack = attack
 	camera.shakeDecay = decay
 	camera.shakeTrauma = 1.0
@@ -749,29 +753,46 @@ CameraNode_Shake :: proc(
 	camera.shakeEndless = endless
 }
 
+// A preset's shake; Custom is the node's Shake Types / Speed / Intensity.
+Camera_Shake_Settings :: struct {
+	intensity, duration, speed, attack, decay: f32,
+	types:                                     bit_set[CameraShakeType],
+	endless:                                   bool,
+}
+
+CameraNode_ShakeSettings :: proc(camera: ^CameraNode, preset: CameraShakePreset) -> Camera_Shake_Settings {
+	switch preset {
+	case .Gunshot:    return {intensity = 12, duration = 0.1, speed = 25, types = {.Horizontal, .Vertical, .Random}, decay = 0.25}
+	case .Earthquake: return {intensity = 8, duration = 2, speed = 15, types = {.Vertical, .Horizontal, .Perlin}, attack = 0.5, decay = 1}
+	case .Handheld:   return {intensity = 2, speed = 4, types = {.Perlin, .Rotate}, endless = true}
+	case .Explosion:  return {intensity = 25, duration = 0.2, speed = 30, types = {.Random, .Rotate, .Circular, .Zoom}, decay = 0.6}
+	case .Impact:     return {intensity = 15, duration = 0.05, speed = 20, types = {.Vertical, .Horizontal}, decay = 0.2}
+	case .Rumble:     return {intensity = 5, duration = 1.5, speed = 10, types = {.Vertical, .Perlin}, attack = 0.2, decay = 0.5}
+	case .Vibration:  return {intensity = 4, duration = 0.3, speed = 50, types = {.Random, .Horizontal}, decay = 0.2}
+	case .Wobbly:     return {intensity = 8, duration = 1, speed = 6, types = {.Rotate, .Circular}, attack = 0.2, decay = 0.8}
+	case .Custom:
+	}
+	return {intensity = camera.shakeIntensity, duration = 0.5, speed = camera.shakeSpeed, types = camera.shakeTypes, decay = 0.3}
+}
+
+// CameraNode_PlayShake plays the node's Shake Preset (Custom: its Shake
+// Types / Speed / Intensity); strength (px) / duration (s) < 0 = the preset's.
+// Lua's camera_shake / Camera.shake (#215).
+CameraNode_PlayShake :: proc(camera: ^CameraNode, strength: f32 = -1, duration: f32 = -1) {
+	if camera == nil do return
+	s := CameraNode_ShakeSettings(camera, camera.shakePreset)
+	if strength >= 0 do s.intensity = strength
+	if duration >= 0 {
+		s.duration = duration
+		s.endless = false
+	}
+	CameraNode_Shake(camera, s.intensity, s.duration, s.speed, s.types, s.attack, s.decay, s.endless)
+}
+
 CameraNode_ApplyShakePreset :: proc(camera: ^CameraNode, preset: CameraShakePreset) {
 	if camera == nil do return
 	camera.shakePreset = preset
-	switch preset {
-	case .Gunshot:
-		CameraNode_Shake(camera, intensity = 12.0, duration = 0.1, speed = 25.0, types = {.Horizontal, .Vertical, .Random}, attack = 0.0, decay = 0.25)
-	case .Earthquake:
-		CameraNode_Shake(camera, intensity = 8.0, duration = 2.0, speed = 15.0, types = {.Vertical, .Horizontal, .Perlin}, attack = 0.5, decay = 1.0)
-	case .Handheld:
-		CameraNode_Shake(camera, intensity = 2.0, duration = 0.0, speed = 4.0, types = {.Perlin, .Rotate}, attack = 0.0, decay = 0.0, endless = true)
-	case .Explosion:
-		CameraNode_Shake(camera, intensity = 25.0, duration = 0.2, speed = 30.0, types = {.Random, .Rotate, .Circular, .Zoom}, attack = 0.0, decay = 0.6)
-	case .Impact:
-		CameraNode_Shake(camera, intensity = 15.0, duration = 0.05, speed = 20.0, types = {.Vertical, .Horizontal}, attack = 0.0, decay = 0.2)
-	case .Rumble:
-		CameraNode_Shake(camera, intensity = 5.0, duration = 1.5, speed = 10.0, types = {.Vertical, .Perlin}, attack = 0.2, decay = 0.5)
-	case .Vibration:
-		CameraNode_Shake(camera, intensity = 4.0, duration = 0.3, speed = 50.0, types = {.Random, .Horizontal}, attack = 0.0, decay = 0.2)
-	case .Wobbly:
-		CameraNode_Shake(camera, intensity = 8.0, duration = 1.0, speed = 6.0, types = {.Rotate, .Circular}, attack = 0.2, decay = 0.8)
-	case .Custom:
-		CameraNode_Shake(camera, intensity = 10.0, duration = 0.3, speed = 15.0, types = {.Horizontal, .Vertical, .Random})
-	}
+	CameraNode_PlayShake(camera)
 }
 
 CameraNode_StopShake :: proc(camera: ^CameraNode) {
@@ -1118,6 +1139,15 @@ CameraNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32
 		camera.currentVelocity = {0, 0}
 	}
 
+	// Max Distance: the smoothing never trails the target by more (px, per axis) (#215).
+	for i in 0 ..< 2 {
+		lag := camera.currentPosition[i] - camera.targetPosition[i]
+		if lim := max(camera.maxDistance[i], 0); abs(lag) > lim {
+			camera.currentPosition[i] = camera.targetPosition[i] + math.sign(lag) * lim
+			camera.currentVelocity[i] = 0
+		}
+	}
+
 	// Enforce limits strictly after smoothing so camera never renders outside limits
 	if camera.hasLimits {
 		currentZ := max(0.001, camera.currentZoom)
@@ -1196,33 +1226,33 @@ CameraNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32
 		camera.shakeRotation = 0.0
 		camera.shakeZoom = 0.0
 
-		if .Horizontal in camera.shakeTypes {
-			camera.shakeOffset.x += math.sin(camera.shakeElapsed * camera.shakeSpeed * 10.0) * camera.shakeIntensity * shakeFactor
+		if .Horizontal in camera.activeShakeTypes {
+			camera.shakeOffset.x += math.sin(camera.shakeElapsed * camera.activeShakeSpeed * 10.0) * camera.activeShakeIntensity * shakeFactor
 		}
-		if .Vertical in camera.shakeTypes {
-			camera.shakeOffset.y += math.cos((camera.shakeElapsed + 100.0) * camera.shakeSpeed * 10.0) * camera.shakeIntensity * shakeFactor
+		if .Vertical in camera.activeShakeTypes {
+			camera.shakeOffset.y += math.cos((camera.shakeElapsed + 100.0) * camera.activeShakeSpeed * 10.0) * camera.activeShakeIntensity * shakeFactor
 		}
-		if .Random in camera.shakeTypes {
-			rx := (rand.float32() * 2.0 - 1.0) * camera.shakeIntensity * shakeFactor
-			ry := (rand.float32() * 2.0 - 1.0) * camera.shakeIntensity * shakeFactor
+		if .Random in camera.activeShakeTypes {
+			rx := (rand.float32() * 2.0 - 1.0) * camera.activeShakeIntensity * shakeFactor
+			ry := (rand.float32() * 2.0 - 1.0) * camera.activeShakeIntensity * shakeFactor
 			camera.shakeOffset += {rx, ry}
 		}
-		if .Perlin in camera.shakeTypes {
-			noiseCoord := [2]f64{f64(camera.shakeElapsed * camera.shakeSpeed), 0.0}
-			nx := noise.noise_2d(1337, noiseCoord) * camera.shakeIntensity * shakeFactor
-			ny := noise.noise_2d(7331, noiseCoord) * camera.shakeIntensity * shakeFactor
+		if .Perlin in camera.activeShakeTypes {
+			noiseCoord := [2]f64{f64(camera.shakeElapsed * camera.activeShakeSpeed), 0.0}
+			nx := noise.noise_2d(1337, noiseCoord) * camera.activeShakeIntensity * shakeFactor
+			ny := noise.noise_2d(7331, noiseCoord) * camera.activeShakeIntensity * shakeFactor
 			camera.shakeOffset += {nx, ny}
 		}
-		if .Rotate in camera.shakeTypes {
-			camera.shakeRotation = math.sin(camera.shakeElapsed * camera.shakeSpeed * 8.0) * (camera.shakeIntensity * 0.5) * shakeFactor
+		if .Rotate in camera.activeShakeTypes {
+			camera.shakeRotation = math.sin(camera.shakeElapsed * camera.activeShakeSpeed * 8.0) * (camera.activeShakeIntensity * 0.5) * shakeFactor
 		}
-		if .Circular in camera.shakeTypes {
-			cx := math.cos(camera.shakeElapsed * camera.shakeSpeed * 8.0) * camera.shakeIntensity * shakeFactor
-			cy := math.sin(camera.shakeElapsed * camera.shakeSpeed * 8.0) * camera.shakeIntensity * shakeFactor
+		if .Circular in camera.activeShakeTypes {
+			cx := math.cos(camera.shakeElapsed * camera.activeShakeSpeed * 8.0) * camera.activeShakeIntensity * shakeFactor
+			cy := math.sin(camera.shakeElapsed * camera.activeShakeSpeed * 8.0) * camera.activeShakeIntensity * shakeFactor
 			camera.shakeOffset += {cx, cy}
 		}
-		if .Zoom in camera.shakeTypes {
-			camera.shakeZoom = math.sin(camera.shakeElapsed * camera.shakeSpeed * 12.0) * (camera.shakeIntensity * 0.02) * shakeFactor
+		if .Zoom in camera.activeShakeTypes {
+			camera.shakeZoom = math.sin(camera.shakeElapsed * camera.activeShakeSpeed * 12.0) * (camera.activeShakeIntensity * 0.02) * shakeFactor
 		}
 	}
 

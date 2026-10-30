@@ -1441,7 +1441,7 @@ Camera.add_target(player2, { weight = 1, radius = 80 })
 Camera.remove_target(player2)
 Camera.clear_targets()
 Camera.set_zoom(1.8)
-Camera.shake(0.6, 0.3)
+Camera.shake(6, 0.3)   -- px; no arguments = the camera's Shake Preset
 
 local wx, wy = Camera.screen_to_world(mouse_x, mouse_y)
 local sx, sy = Camera.world_to_screen(player_x, player_y)

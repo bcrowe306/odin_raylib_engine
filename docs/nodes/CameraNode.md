@@ -64,7 +64,11 @@ shows the world through one camera, its current camera.
   in (**Smooth Drag Speed** is the lag in seconds per axis), *Spring Damp*
   springs (**Spring Constant**, **Damping Ratio**), *Look Ahead* aims ahead
   of a moving target (**Prediction Time**), *Auto Speed* lags less the
-  faster it moves.
+  faster it moves. **Max Distance** caps how far (px per axis) it trails
+  the target.
+- **Screen Offset**: the camera's position is drawn at the window's centre;
+  turn on **Custom Screen Offset** to put it at **Screen Offset** (px from
+  the top left) instead.
 - **Dead zone**: with **Use H Margins** / **Use V Margins**, the target
   moves freely inside the margins (fractions of the screen) before the
   camera follows. Single Target only.
@@ -72,7 +76,13 @@ shows the world through one camera, its current camera.
   Right / Top / Bottom Limit** (world pixels). A level narrower than the
   view is centred.
 - **Zoom**: the camera starts at **Target Zoom** and eases to new values
-  (**Smooth Zoom**). 2 makes everything twice as big.
+  (**Smooth Zoom**). 2 makes everything twice as big. **Zoom** (under the
+  runtime state) is the zoom right now.
+- **Shake**: `Camera.shake()` / `cam:camera_shake()` play the **Shake
+  Preset** (*Gunshot*, *Earthquake*, *Explosion*...); *Custom* uses **Shake
+  Types**, **Shake Speed** and **Shake Intensity**. Pass a strength (how
+  far it moves, in pixels) and a duration to change them for that shake:
+  `Camera.shake(6, 0.3)`.
 - A followed node that is destroyed is dropped; a Follow Target that only
   appears later (spawned, or from an LDtk level) is found when it appears.
 - When the scene has [Advanced Cameras](AdvancedCameraNode.md), the

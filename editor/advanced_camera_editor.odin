@@ -14,7 +14,7 @@ import rl "vendor:raylib"
 // ============================================================================
 
 // inspector_adv_camera: pickers (drop a node from the Scene panel too) and
-// Make Active / Snap while simulating.
+// Make Active / Shake while simulating.
 inspector_adv_camera :: proc(state: ^EditorState, c: ^e.AdvancedCameraNode) {
 	if !UI_SectionHeader("Targets") do return
 	if !UI_BeginProps("##advcam") do return

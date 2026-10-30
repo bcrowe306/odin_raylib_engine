@@ -419,6 +419,14 @@ prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
 			}
 		}
 	}
+	// A camera: the Custom shake's settings, Screen Offset only when custom (#215).
+	if node.typeId == e.CameraNode {
+		cam := cast(^e.CameraNode)node
+		switch name {
+		case "shakeTypes", "shakeSpeed", "shakeIntensity": return cam.shakePreset == .Custom
+		case "screenOffset": return cam.customScreenOffset
+		}
+	}
 	// A Sound Effect: `single` only for the Single mode (#204).
 	if node.typeId == e.SoundNode && name == "single" && (cast(^e.SoundNode)node).playMode != .Single do return false
 	// (The Aseprite section edits these.)

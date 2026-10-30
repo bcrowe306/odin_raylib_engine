@@ -941,18 +941,19 @@ function Node:set_property(path, value, y) end
 ---@field springConstant number Spring Damp: stiffness pulling the camera to the target.
 ---@field dampingRatio number Spring Damp: 1 settles without overshoot, lower wobbles.
 ---@field predictionTime Vec2 Look Ahead: how far ahead of the target to aim, in seconds of its velocity.
----@field maxDistance Vec2 Reserved (not used yet).
+---@field maxDistance Vec2 Most the camera trails its target while smoothing (px per axis).
 ---@field offset Vec2 Added to the target position (world px).
 ---@field smoothOffset boolean Ease offset changes in.
 ---@field smoothOffsetSpeed number How fast offset changes ease in.
----@field screenOffset Vec2 Where on screen the camera's position appears (px; half the window = centred).
+---@field screenOffset Vec2 With Custom Screen Offset: where on screen the camera's position appears (px from the t...
+---@field customScreenOffset boolean Put the camera's position at Screen Offset instead of the window's centre.
 ---@field currentRotation number The camera's rotation now (degrees).
 ---@field targetRotation number Rotation the camera turns to (degrees).
 ---@field allowRotation boolean Let the camera rotate (else it stays upright).
 ---@field smoothRotation boolean Ease rotation changes in.
 ---@field smoothRotationSpeed number How fast rotation eases in.
----@field zoom number Zoom now (1 = 100%, 2 = everything twice as big).
----@field targetZoom number Zoom the camera eases to.
+---@field zoom number Zoom now (1 = 100%, 2 = everything twice as big); set Target Zoom.
+---@field targetZoom number Zoom the camera starts at and eases to (1 = 100%).
 ---@field smoothZoom boolean Ease zoom changes in.
 ---@field smoothZoomSpeed number How fast zoom eases in.
 ---@field minZoom number Smallest zoom (auto zoom and scripts).
@@ -973,7 +974,7 @@ function Node:set_property(path, value, y) end
 ---@field bottomMargin number Bottom dead-zone margin (fraction of the screen).
 ---@field enableMouseFollow boolean Nudge the camera towards the mouse.
 ---@field mouseInfluence Vec2 How much the mouse pulls the camera per axis (0-1).
----@field shakePreset "Custom"|"Gunshot"|"Earthquake"|"Handheld"|"Explosion"|"Impact"|"Rumble"|"Vibration"|"Wobbly" Ready-made shake (gunshot, earthquake...); Custom uses the settings below.
+---@field shakePreset "Custom"|"Gunshot"|"Earthquake"|"Handheld"|"Explosion"|"Impact"|"Rumble"|"Vibration"|"Wobbly" The shake camera_shake / Camera.shake play (gunshot, earthquake...); Custom uses the se...
 ---@field isShaking boolean A shake is running.
 ---@field shakeSpeed number Custom shake: how fast it shakes.
 ---@field shakeIntensity number Custom shake: how far it moves (px).
@@ -1000,18 +1001,19 @@ function Node:set_property(path, value, y) end
 ---| "springConstant" # number - Spring Damp: stiffness pulling the camera to the target.
 ---| "dampingRatio" # number - Spring Damp: 1 settles without overshoot, lower wobbles.
 ---| "predictionTime" # Vec2 - Look Ahead: how far ahead of the target to aim, in seconds of its velocity.
----| "maxDistance" # Vec2 - Reserved (not used yet).
+---| "maxDistance" # Vec2 - Most the camera trails its target while smoothing (px per axis).
 ---| "offset" # Vec2 - Added to the target position (world px).
 ---| "smoothOffset" # boolean - Ease offset changes in.
 ---| "smoothOffsetSpeed" # number - How fast offset changes ease in.
----| "screenOffset" # Vec2 - Where on screen the camera's position appears (px; half the window = centred).
+---| "screenOffset" # Vec2 - With Custom Screen Offset: where on screen the camera's position appears (px from the t...
+---| "customScreenOffset" # boolean - Put the camera's position at Screen Offset instead of the window's centre.
 ---| "currentRotation" # number (runtime) - The camera's rotation now (degrees).
 ---| "targetRotation" # number - Rotation the camera turns to (degrees).
 ---| "allowRotation" # boolean - Let the camera rotate (else it stays upright).
 ---| "smoothRotation" # boolean - Ease rotation changes in.
 ---| "smoothRotationSpeed" # number - How fast rotation eases in.
----| "zoom" # number - Zoom now (1 = 100%, 2 = everything twice as big).
----| "targetZoom" # number - Zoom the camera eases to.
+---| "zoom" # number (runtime) - Zoom now (1 = 100%, 2 = everything twice as big); set Target Zoom.
+---| "targetZoom" # number - Zoom the camera starts at and eases to (1 = 100%).
 ---| "smoothZoom" # boolean - Ease zoom changes in.
 ---| "smoothZoomSpeed" # number - How fast zoom eases in.
 ---| "minZoom" # number - Smallest zoom (auto zoom and scripts).
@@ -1032,7 +1034,7 @@ function Node:set_property(path, value, y) end
 ---| "bottomMargin" # number - Bottom dead-zone margin (fraction of the screen).
 ---| "enableMouseFollow" # boolean - Nudge the camera towards the mouse.
 ---| "mouseInfluence" # Vec2 - How much the mouse pulls the camera per axis (0-1).
----| "shakePreset" # "Custom"|"Gunshot"|"Earthquake"|"Handheld"|"Explosion"|"Impact"|"Rumble"|"Vibration"|"Wobbly" - Ready-made shake (gunshot, earthquake...); Custom uses the settings below.
+---| "shakePreset" # "Custom"|"Gunshot"|"Earthquake"|"Handheld"|"Explosion"|"Impact"|"Rumble"|"Vibration"|"Wobbly" - The shake camera_shake / Camera.shake play (gunshot, earthquake...); Custom uses the se...
 ---| "isShaking" # boolean (runtime) - A shake is running.
 ---| "shakeSpeed" # number - Custom shake: how fast it shakes.
 ---| "shakeIntensity" # number - Custom shake: how far it moves (px).
@@ -1068,6 +1070,7 @@ function Node:set_property(path, value, y) end
 ---@overload fun(self: CameraNode, path: "smoothOffset"): boolean
 ---@overload fun(self: CameraNode, path: "smoothOffsetSpeed"): number
 ---@overload fun(self: CameraNode, path: "screenOffset"): Vec2
+---@overload fun(self: CameraNode, path: "customScreenOffset"): boolean
 ---@overload fun(self: CameraNode, path: "currentRotation"): number
 ---@overload fun(self: CameraNode, path: "targetRotation"): number
 ---@overload fun(self: CameraNode, path: "allowRotation"): boolean
@@ -1133,6 +1136,7 @@ function CameraNode:get_property(path) end
 ---@overload fun(self: CameraNode, path: "smoothOffset", value: boolean)
 ---@overload fun(self: CameraNode, path: "smoothOffsetSpeed", value: number)
 ---@overload fun(self: CameraNode, path: "screenOffset", x: number|Vec2|number[], y?: number)
+---@overload fun(self: CameraNode, path: "customScreenOffset", value: boolean)
 ---@overload fun(self: CameraNode, path: "currentRotation", value: number)
 ---@overload fun(self: CameraNode, path: "targetRotation", value: number)
 ---@overload fun(self: CameraNode, path: "allowRotation", value: boolean)
@@ -8651,11 +8655,11 @@ function CameraNode:camera_get_targets() end
 ---@param y number
 function CameraNode:camera_set_target_position(x, y) end
 
----Triggers trauma screen shake on this CameraNode.
+---Shakes this camera: its Shake Preset (Custom: its Shake Types / Speed / Intensity). Strength is how far it moves, in pixels.
 ---
----Example: `local cam = Scene.find_node("MainCamera"); cam:camera_shake(0.6, 0.3)`
----@param strength number Shake intensity (0.0 to 1.0)
----@param duration? number Duration in seconds (default 0.5)
+---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_shake(6, 0.3)`
+---@param strength? number How far it moves (px); default the preset's
+---@param duration? number Duration in seconds; default the preset's
 function CameraNode:camera_shake(strength, duration) end
 
 ---Immediately cancels any active screen shake.
@@ -8665,7 +8669,7 @@ function CameraNode:camera_stop_shake() end
 
 ---Checks if screen shake is currently active.
 ---
----Example: `local cam = Scene.find_node("MainCamera"); if not cam:camera_is_shaking() then cam:camera_shake(0.4) end`
+---Example: `local cam = Scene.find_node("MainCamera"); if not cam:camera_is_shaking() then cam:camera_shake(4) end`
 ---@return boolean
 function CameraNode:camera_is_shaking() end
 
@@ -10303,11 +10307,11 @@ function CameraModule.get_rotation() end
 ---@param degrees number
 function CameraModule.set_rotation(degrees) end
 
----Triggers screen shake trauma.
+---Shakes the current camera: its Shake Preset (Custom: its Shake Types / Speed / Intensity). Strength is how far it moves, in pixels.
 ---
----Example: `Camera.shake(0.6, 0.3)`
----@param strength number Shake intensity (0.0 to 1.0)
----@param duration? number Duration in seconds
+---Example: `Camera.shake(6, 0.3)`
+---@param strength? number How far it moves (px); default the preset's
+---@param duration? number Duration in seconds; default the preset's
 function CameraModule.shake(strength, duration) end
 
 ---Immediately stops active screen shake.
@@ -10317,7 +10321,7 @@ function CameraModule.stop_shake() end
 
 ---Checks if screen shake is active.
 ---
----Example: `if not Camera.is_shaking() then Camera.shake(0.3, 0.2) end`
+---Example: `if not Camera.is_shaking() then Camera.shake(4, 0.2) end`
 ---@return boolean
 function CameraModule.is_shaking() end
 
