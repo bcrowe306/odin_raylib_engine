@@ -337,11 +337,13 @@ before importing them, use the **File Browser**.
 
 ### File Browser
 
-**View > File Browser** (Cmd/Ctrl+Shift+B) opens a window for the files
-*outside* the project — asset packs, downloads, other projects — so you can
-preview them and load only the ones you want, without leaving the editor.
-It opens floating; drag its title bar onto a dock area to dock it like any
-panel. (The Assets panel shows what is already in the project.)
+The bottom panel's **Files** tab (also **View > File Browser**,
+Cmd/Ctrl+Shift+B) browses the files *outside* the project — asset packs,
+downloads, other projects — so you can preview them and load only the ones
+you want, without leaving the editor. Give the bottom panel some height (or
+use the Animation workspace) for a longer list; a sound previewing stops
+when you switch tabs. (The Assets panel shows what is already in the
+project.)
 
 - **Toolbar:** back / forward / up (Alt+Left, Alt+Right, Alt+Up or
   Backspace), refresh, the folder's path (type a path and press Enter; a
