@@ -1,0 +1,13 @@
+{
+  "name": "tut_combat_zz",
+  "root": {
+    "type": "Node",
+    "name": "Root",
+    "children": [
+      {"type": "AreaNode", "name": "Goblin", "node_type": "nodes/TutHurtbox.node.json", "position": [600, 360], "scale": [1, 1], "rotation": 0},
+      {"type": "AreaNode", "name": "Ogre", "node_type": "nodes/TutHurtbox.node.json", "position": [900, 360], "scale": [1, 1], "rotation": 0},
+      {"type": "AreaNode", "name": "Sword", "node_type": "nodes/TutHitbox.node.json", "position": [610, 360], "scale": [1, 1], "rotation": 0,
+       "script": {"properties": {"damage": 2}}}
+    ]
+  }
+}

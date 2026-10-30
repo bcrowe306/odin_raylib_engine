@@ -1,0 +1,27 @@
+# #158: engine/docs/custom_nodes.md's tutorial works - Hurtbox and Hitbox
+# custom node types: the Sword (a Hitbox) overlapping the Goblin (a
+# Hurtbox) hurts it once, with its own copy of the Health resource; the
+# Ogre, out of reach, isn't touched.
+wait 5
+exec mkdir -p $PROJECT/nodes $PROJECT/resources
+exec cp tests/drive/fixtures/tut_combat/tut_health_zz.lua $PROJECT/scripts/tut_health_zz.lua
+exec cp tests/drive/fixtures/tut_combat/tut_health_zz.resource.json $PROJECT/resources/tut_health_zz.resource.json
+exec cp tests/drive/fixtures/tut_combat/tut_hurtbox_zz.lua $PROJECT/scripts/tut_hurtbox_zz.lua
+exec cp tests/drive/fixtures/tut_combat/tut_hitbox_zz.lua $PROJECT/scripts/tut_hitbox_zz.lua
+exec cp tests/drive/fixtures/tut_combat/TutHurtbox.node.json $PROJECT/nodes/TutHurtbox.node.json
+exec cp tests/drive/fixtures/tut_combat/TutHitbox.node.json $PROJECT/nodes/TutHitbox.node.json
+exec cp tests/drive/fixtures/tut_combat/tut_combat_zz.scene.json $PROJECT/scenes/tut_combat_zz.scene.json
+wait-until item:asset:scenes/tut_combat_zz.scene.json == visible timeout=300
+dblclick @asset:scenes/tut_combat_zz.scene.json
+wait 10
+expect node:Goblin.class == TutHurtbox
+expect node:Sword.class == TutHitbox
+screenshot combat_scene
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 30
+expect log contains Goblin took 2 (8 left)
+expect log !contains Ogre took
+screenshot simulating
+click @menu:Game
+click @menu:Game/Simulate in Editor
