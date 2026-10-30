@@ -1,0 +1,106 @@
+# Animation timeline (#177): zoom (Cmd + wheel, the wheel over the ruler),
+# ruler in seconds, rows grouped by node (fold), keys selected (click, Cmd,
+# a box), dragged in time (undo), copied / pasted at the playhead,
+# duplicated, deleted; saved.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+expect anim == anim_1:1/3:0
+
+# rotation keyed 0 at frame 1, 90 at frame 3.
+click @anim.frame:1
+click @anim.add-track
+click @anim.track-prop:rotation
+click @anim.frame:3
+dblclick @insp.rotation
+key ctrl+a
+type 90
+key enter
+click @anim.key:rotation
+expect item:anim.keyframe:rotation:3 == visible
+
+# Zoom: Cmd + wheel over the timeline, the wheel over the ruler; reset.
+hold cmd
+scroll @anim.keyframe:rotation:1+0,30 1
+release
+expect anim-zoom == 1.20
+scroll @anim.header -1
+expect anim-zoom == 1.00
+scroll @anim.header 1
+scroll @anim.header 1
+expect anim-zoom == 1.44
+screenshot zoomed
+click @anim.zoom-reset
+expect anim-zoom == 1.00
+click @anim.ruler-units
+screenshot ruler_seconds
+click @anim.ruler-units
+
+# Rows under their node: folding hides the keys.
+expect item:anim.group:. == visible
+click @anim.group:.
+wait 2
+expect item:anim.keyframe:rotation:1 == missing
+click @anim.group:.
+wait 2
+expect item:anim.keyframe:rotation:1 == visible
+
+# Selection: click, Cmd adds, an empty click clears, a box takes both.
+click @anim.keyframe:rotation:1
+expect anim-keys == 1
+hold cmd
+click @anim.keyframe:rotation:3
+release
+expect anim-keys == 2
+click @anim.keyframe:rotation:3+60,0
+expect anim-keys == 0
+drag @anim.keyframe:rotation:3+30,10 @anim.keyframe:rotation:1+-14,-10
+expect anim-keys == 2
+screenshot box_selected
+
+# Dragging a key one frame earlier (snapped); undo puts it back.
+click @anim.keyframe:rotation:3+60,0
+drag @anim.keyframe:rotation:3 @anim.keyframe:rotation:3+-30,0
+expect item:anim.keyframe:rotation:2 == visible
+expect item:anim.keyframe:rotation:3 == missing
+click @anim.frame:3
+expect node:AnimationPlayer.rotation == 90.0
+key cmd+z
+wait 2
+expect item:anim.keyframe:rotation:3 == visible
+expect item:anim.keyframe:rotation:2 == missing
+
+# Copy the first key, paste it at frame 2 (the playhead).
+click @anim.keyframe:rotation:1
+key cmd+c
+click @anim.frame:2
+key cmd+v
+expect item:anim.keyframe:rotation:2 == visible
+expect anim-keys == 1
+click @anim.frame:2
+expect node:AnimationPlayer.rotation == 0.0
+
+# Duplicate (one frame after): replaces the key at frame 3; then delete it.
+click @anim.keyframe:rotation:2
+key cmd+d
+expect anim-keys == 1
+click @anim.frame:3
+expect node:AnimationPlayer.rotation == 0.0
+click @anim.keyframe:rotation:3
+key delete
+expect item:anim.keyframe:rotation:3 == missing
+screenshot keys_edited
+click @anim.stop
+key ctrl+s
+expect file:scenes/main.scene.json contains "keys": [{"t": 0}, {"t": 0.0833}]

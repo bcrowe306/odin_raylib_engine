@@ -115,7 +115,8 @@ exits non-zero if any check fails.
 | `accessibility.drive` | Project Settings > Accessibility (Sound Captions) saved in project.json; View > Colour Vision: Deuteranopia previews the viewport; a UI Container's Accessibility Menu template builds its rows in Simulate (captions on from the project) and its filter button follows the setting. |
 | `skeleton.drive` | A Spine fixture (tests/drive/fixtures/skeleton_zz) on a Skeleton node: file and animation picked, preview scrubbed, a bone highlighted, a Bone Attachment on the hand; saved; in Simulate it plays (Lua bone position). |
 | `web_export.drive` | A web preset with its own title exported (runner files, game.rayzr, titled page); File > Export > Open Web Export in Browser serves it; the game runs in headless Chrome (screenshot). |
-| `animation_depth.drive` | A key's Edit Curve with the Ease In preset (frame 2 follows it), saved as a 7th key element; the onion skin in the viewport; a method key's argument, saved. |
+| `animation_depth.drive` | A key's Edit Curve with the Ease In preset (frame 2 follows it), saved as bezier handles; the onion skin in the viewport; a method key's argument, saved. |
+| `anim_timeline.drive` | The timeline zoomed (Cmd + wheel, the wheel over the ruler, reset), the ruler in seconds, a node's rows folded; keys selected (click, Cmd, a box, an empty click clears), one dragged a frame earlier (undo), copied and pasted at the playhead, duplicated, deleted; saved. |
 | `remote_tree.drive` | Play; the Scene panel's Remote view lists the game's tree; selecting PlayerShip shows its live properties in the Inspector: rotation typed (drag field), visible unticked, the eye toggle; Apply to Scene copies the rotation into the edited scene (undo restores it); Stop leaves the Remote view. |
 | `scene_tabs.drive` | A second scene opens in a tab; switching keeps each tab's selection; Cmd+Alt+Right cycles; closing a modified tab asks (Cancel keeps it, Don't Save unloads it); the open tabs are written to .rayzr/open_scenes.json; reopening loads the saved file. |
 | `advanced_camera.drive` | An Advanced Camera added, Follow Target picked (PlayerShip), Damping set; saved; in Simulate it's active, the host follows the ship, Shake adds trauma, a second camera with a higher priority takes over. |
@@ -211,6 +212,7 @@ Queries:
 - `refs-pending` (script reference edits waiting in the rename / move prompt)
 - `anim-names` (the selected AnimationPlayer's animations, the current one in `[brackets]`)
 - `anim-preview` (`playing` / `paused`), `anim-info` (`frames=<n> range=<a>-<b> reverse=<b> fps=<f> default=<name>` of the selected AnimationPlayer), `theme` (the saved theme), `theme-panel` (the panel colour in use, `#rrggbbaa`), `node-icons` (`<distinct icons>/<node types>`), `workspace` (the current workspace), `window-h:<item>` (height of the window an item is in)
+- `anim-keys` (keys selected in the Animation timeline), `anim-zoom` (the timeline's zoom, `1.00` = 100%)
 - `debug-stopped`, `debug-line` (`file:line`), `debug-stack`, `debug-local:<name>`, `debug-reason`, `debug-watch:<expr>` (no spaces), `debug-condition:<file>:<line>` (the Lua debugger)
 - `remote-connected`, `remote-paused`, `remote-frame`, `remote-steps`, `remote-reloads`, `remote-nodes`, `remote-names`, `remote-prop:<name>` (the Game tab's link to the running game)
 - `palette.open`, `shortcuts-open`, `quit-prompt`, `selection`, `selection-count`, `clipboard-nodes`
