@@ -14,6 +14,13 @@ screenshot index
 click @noderef.back
 expect noderef.page == TextureNode
 
+# #232: following a link frees the page the link's url lives in.
+click @noderef.index
+click @md.link:TextureNode.md
+expect noderef.page == TextureNode
+click @md.link:AtlasSpriteNode.md
+expect noderef.page == AtlasSpriteNode
+
 click @hier:StarfieldEmitter
 click @insp.node-docs
 expect noderef.page == ParticleEmitterNode
