@@ -3599,7 +3599,7 @@ function PathFollowNode:set_property(path, value, y) end
 ---@field spawnEntities boolean Spawn the level's entities (mapped to components) when ready.
 ---@field parallax boolean Apply the LDtk layers' parallax factors.
 ---@field drawBackground boolean Draw the level's background colour / image.
----@field drawEntityTiles boolean Draw entities' LDtk tiles (editor visuals for unspawned entities).
+---@field drawEntityTiles boolean In the game, draw entities' LDtk icons (their editor visuals) too - for entities no nod...
 ---@field tintColor number[] Multiplies every layer's colours.
 ---@field drawDebugColliders boolean Outline the generated colliders.
 ---@field drawDebugEntities boolean Outline entity bounds with their names.
@@ -3620,7 +3620,7 @@ function PathFollowNode:set_property(path, value, y) end
 ---| "spawnEntities" # boolean - Spawn the level's entities (mapped to components) when ready.
 ---| "parallax" # boolean - Apply the LDtk layers' parallax factors.
 ---| "drawBackground" # boolean - Draw the level's background colour / image.
----| "drawEntityTiles" # boolean - Draw entities' LDtk tiles (editor visuals for unspawned entities).
+---| "drawEntityTiles" # boolean - In the game, draw entities' LDtk icons (their editor visuals) too - for entities no nod...
 ---| "tintColor" # number[] - Multiplies every layer's colours.
 ---| "drawDebugColliders" # boolean - Outline the generated colliders.
 ---| "drawDebugEntities" # boolean - Outline entity bounds with their names.

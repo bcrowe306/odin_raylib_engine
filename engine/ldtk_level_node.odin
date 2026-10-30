@@ -369,6 +369,15 @@ LdtkLevelNode_Build :: proc(ln: ^LdtkLevelNode, ctx: ^GameContext) {
 	ln.pendingLoaded = true
 }
 
+// LdtkLevelNode_EntityVisual: how an entity is drawn by its level - its
+// LDtk icon (with Draw Entity Tiles, and always in the editor, where
+// entities aren't spawned), else in the editor its box in its colour.
+LdtkLevelNode_EntityVisual :: proc(ln: ^LdtkLevelNode, ent: ^LdtkEntityInstance) -> (icon, outline: bool) {
+	icon = ent.tile.has && (ln.drawEntityTiles || ln.editorPreview)
+	outline = ln.editorPreview
+	return
+}
+
 // LdtkLevelNode_ClearBuilt removes colliders, triggers and spawned entities.
 LdtkLevelNode_ClearBuilt :: proc(ln: ^LdtkLevelNode) {
 	scene := ln.scene
@@ -1161,10 +1170,23 @@ LdtkLevelNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 			if !LdtkLevelNode_LayerVisible(ln, &layer) do continue
 			for &ent in layer.entities {
 				r := rl.Rectangle{base.x + (ent.px.x - ent.size.x * ent.pivot.x) * scale.x, base.y + (ent.px.y - ent.size.y * ent.pivot.y) * scale.y, ent.size.x * scale.x, ent.size.y * scale.y}
-				if ln.drawEntityTiles && ent.tile.has {
+				icon, outline := LdtkLevelNode_EntityVisual(ln, &ent)
+				drawn := false
+				if icon {
 					if ts := Ldtk_GetTilesetByUid(ln.project, ent.tile.tilesetUid); ts != nil && ts.textureLoaded {
-						rl.DrawTexturePro(ts.texture, ent.tile.rect, r, {0, 0}, 0, ln.tintColor)
+						// (its shape kept, centred in the entity's box - LDtk's Fit Inside)
+						src := ent.tile.rect
+						k := min(r.width / max(src.width, 1), r.height / max(src.height, 1))
+						w, h := src.width * k, src.height * k
+						rl.DrawTexturePro(ts.texture, src, {r.x + (r.width - w) * 0.5, r.y + (r.height - h) * 0.5, w, h}, {0, 0}, 0, ln.tintColor)
+						drawn = true
 					}
+				}
+				if outline && !drawn {
+					// No icon: its box in its LDtk colour (as the Level tab shows it).
+					c := ent.smartColor
+					rl.DrawRectangleRec(r, {c.r, c.g, c.b, 40})
+					rl.DrawRectangleLinesEx(r, 1 / max(scale.x, 0.01), {c.r, c.g, c.b, 220})
 				}
 				if ln.drawDebugEntities {
 					rl.DrawRectangleLinesEx(r, 1, rl.Color{245, 158, 11, 200})

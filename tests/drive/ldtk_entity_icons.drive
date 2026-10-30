@@ -1,0 +1,12 @@
+# An LDtk level's entities show their icons in the editor's scene viewport
+# (entities aren't spawned there), with Draw Entity Tiles off.
+wait 5
+drop-files @asset.search tests/drive/fixtures/ldtk/topdown.ldtk
+wait 5
+dblclick @asset:levels/topdown.ldtk
+expect node:topdown.type == LdtkLevelNode
+expect node:topdown.prop.drawEntityTiles == false
+click @insp.ldtk.panel
+click @ldtk.fit
+wait 5
+screenshot entity_icons
