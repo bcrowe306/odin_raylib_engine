@@ -112,7 +112,8 @@ SpriteSheetAnimation :: struct {
 	using animation: Animation,
 	spriteSheet:     ^Texture,
 	loadSpriteSheet: proc(ssa: ^SpriteSheetAnimation, rm: ^ResourceManager, filePath: string),
-	grid:            [2]int, // columns, rows
+	grid:            [2]int, // columns, rows (cell size set: the whole cells that fit)
+	cellSize:        [2]int, // px per cell; 0 = from the grid (#233)
 	margin:          [2]int, // px before the first cell (left, top)
 	spacing:         [2]int, // px between cells
 	// The cells played, in order (row-major indices); empty = start..end.
@@ -121,12 +122,39 @@ SpriteSheetAnimation :: struct {
 
 // SpriteSheet_CellRect: a cell's pixels in a sheet of `size` cut into
 // `grid` cells, after `margin` and with `spacing` between cells.
-SpriteSheet_CellRect :: proc(size: [2]f32, grid, margin, spacing: [2]int, cell: int) -> rl.Rectangle {
+// With a cell size (#233) cells are exactly that (whole pixels) at margin +
+// col * (cell + spacing), as many as fit; leftover pixels are unused.
+SpriteSheet_CellRect :: proc(size: [2]f32, grid, margin, spacing: [2]int, cell: int, cellSize := [2]int{}) -> rl.Rectangle {
+	if cellSize.x > 0 && cellSize.y > 0 {
+		cols := max(SpriteSheet_FitGrid(size, margin, spacing, cellSize).x, 1)
+		col, row := cell % cols, cell / cols
+		return {f32(margin.x + col * (cellSize.x + spacing.x)), f32(margin.y + row * (cellSize.y + spacing.y)), f32(cellSize.x), f32(cellSize.y)}
+	}
 	cols, rows := max(grid.x, 1), max(grid.y, 1)
 	w := (size.x - 2 * f32(margin.x) - f32(cols - 1) * f32(spacing.x)) / f32(cols)
 	h := (size.y - 2 * f32(margin.y) - f32(rows - 1) * f32(spacing.y)) / f32(rows)
 	col, row := cell % cols, cell / cols
 	return {f32(margin.x) + f32(col) * (w + f32(spacing.x)), f32(margin.y) + f32(row) * (h + f32(spacing.y)), w, h}
+}
+
+// SpriteSheet_FitGrid: how many whole cells of cellSize fit (columns, rows).
+SpriteSheet_FitGrid :: proc(size: [2]f32, margin, spacing, cellSize: [2]int) -> [2]int {
+	out: [2]int
+	for a in 0 ..< 2 {
+		free := int(size[a]) - 2 * margin[a] + spacing[a]
+		out[a] = max(free / max(cellSize[a] + spacing[a], 1), 0)
+	}
+	return out
+}
+
+// SpriteSheetAnimation_SetCellSize slices by cell size (0 = by the grid);
+// the grid becomes the cells that fit the loaded sheet.
+SpriteSheetAnimation_SetCellSize :: proc(ssa: ^SpriteSheetAnimation, cellSize: [2]int) {
+	ssa.cellSize = cellSize if cellSize.x > 0 && cellSize.y > 0 else {}
+	if ssa.cellSize != {} && ssa.spriteSheet != nil {
+		fit := SpriteSheet_FitGrid(Texture_Size(ssa.spriteSheet), ssa.margin, ssa.spacing, ssa.cellSize)
+		ssa.grid = {max(fit.x, 1), max(fit.y, 1)}
+	}
 }
 
 // SpriteSheetAnimation_SetCells plays these cells in order.
@@ -181,7 +209,7 @@ SSA_RenderFrame :: proc(animation: ^Animation, frame: int, node: ^Node) {
 	cell := frame
 	if len(animation.cells) > 0 do cell = animation.cells[clamp(frame, 0, len(animation.cells) - 1)]
 	if cell < 0 do return
-	animation.source = SpriteSheet_CellRect(Texture_Size(animation.spriteSheet), animation.grid, animation.margin, animation.spacing, cell)
+	animation.source = SpriteSheet_CellRect(Texture_Size(animation.spriteSheet), animation.grid, animation.margin, animation.spacing, cell, animation.cellSize)
 	frameSize := [2]f32{animation.source.width, animation.source.height}
 	animation.dest = rl.Rectangle {
 		x      = node.globalPosition.x,

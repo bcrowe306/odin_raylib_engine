@@ -96,7 +96,7 @@ onion_draw_frame :: proc(apn: ^e.AnimationPlayerNode, anim: ^e.Animation, frame:
 		if tex == nil do return
 		cell := frame
 		if len(ssa.cells) > 0 do cell = ssa.cells[clamp(frame, 0, len(ssa.cells) - 1)]
-		src = e.SpriteSheet_CellRect(e.Texture_Size(tex), ssa.grid, ssa.margin, ssa.spacing, cell)
+		src = e.SpriteSheet_CellRect(e.Texture_Size(tex), ssa.grid, ssa.margin, ssa.spacing, cell, ssa.cellSize)
 	} else {
 		return
 	}
