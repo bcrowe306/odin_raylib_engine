@@ -331,41 +331,99 @@ class Exporter:
     # --- generated: Lua API -----------------------------------------------------------
 
     def lua_api(self, item):
+        """The Lua API (#45): a page per module (its guide from docs/lua/<Name>.md -
+        use cases and a complete example - then every function), the Node class,
+        the other node classes (each with its node page) and the types."""
         base = item["slug"]
         classes, order, globals_ = parse_lua_api(os.path.join(ROOT, "engine", "definitions", "engine_api.lua"))
-        groups = {"Nodes": [], "Modules": [], "Types": []}
+        modules, nodes, types = [], [], []
         for name in order:
             c = classes[name]
             if not c["functions"] and not c["fields"] and not c["doc"]:
                 continue
-            if name == "Node" or name.endswith("Node"):
-                groups["Nodes"].append(name)
+            if name == "Node":
+                continue
+            if name.endswith("Node"):
+                nodes.append(name)
             elif name.endswith("Module") or name in globals_:
-                groups["Modules"].append(name)
+                modules.append(name)
             else:
-                groups["Types"].append(name)
-        intro = {
-            "Nodes": "Every node type's methods (on `self.node` or any node). Properties are fields too: `node.position = Vec2(10, 20)`.",
-            "Modules": "The global modules scripts call: `Scene`, `Input`, `Save`, `Tween`, `Pool`, `Camera`...",
-            "Types": "Values passed around: vectors, hits, events, options tables.",
-        }
+                types.append(name)
+        modules.sort(key=lambda n: globals_.get(n, n))
         sidebar = [{"label": "Overview", "slug": base}]
         ov = ["The engine's Lua 5.4 API, generated from `engine/definitions/engine_api.lua` - the same "
               "definitions the Code tab (and any LuaLS editor) uses for completion and hover docs. "
               f"The [scripting guide]({self.url('scripting')}) explains scripts, events and the lifecycle.", ""]
         count = 0
-        for group, names in groups.items():
-            slug = f"{base}/{group.lower()}"
-            lines = [intro[group], ""]
-            for nm in names:
-                lines += render_class(nm, classes[nm], globals_.get(nm))
-                count += len(classes[nm]["functions"])
-            self.write_page(slug, f"Lua API: {group}", "\n".join(lines), description=intro[group])
-            sidebar.append({"label": group, "slug": slug})
-            ov += [f"- [{group}]({self.url(slug)}): {intro[group]}"]
-        ov += ["", f"{count} functions in {sum(len(v) for v in groups.values())} classes and modules."]
+
+        def guide(name, slug):
+            rel = f"docs/lua/{name}.md"
+            return self.rewrite(read(rel), rel, slug).strip() if os.path.exists(os.path.join(ROOT, rel)) else ""
+
+        # (Guides link to each other: docs/lua/<Global>.md -> its module page.)
+        for nm in modules:
+            title = globals_.get(nm, nm)
+            self.file_slugs[f"docs/lua/{title}.md"] = f"{base}/{kebab(title)}"
+        self.file_slugs["docs/lua/Node.md"] = f"{base}/node"
+
+        # Modules: a page each.
+        ov += ["## Modules", "", "The global tables scripts call.", "", "| Module | |", "|---|---|"]
+        mod_items = []
+        for nm in modules:
+            title = globals_.get(nm, nm)
+            c = classes[nm]
+            slug = f"{base}/{kebab(title)}"
+            text = "\n".join(c["doc"]).strip()
+            lines = [text, ""] if text else []
+            g = guide(title, slug)
+            if g:
+                lines += [g, ""]
+            lines += ["## Functions", ""] + render_functions(title, c)
+            self.write_page(slug, f"{title} (Lua)", "\n".join(lines), description=first_paragraph(text) or f"The {title} module.")
+            mod_items.append({"label": title, "slug": slug})
+            ov.append(f"| [{title}]({self.url(slug)}) | {md_cell(first_paragraph(text))} |")
+            count += len(c["functions"])
+        sidebar.append({"label": "Modules", "collapsed": True, "items": mod_items})
+
+        # Node: the methods every node has.
+        node = classes.get("Node")
+        if node:
+            slug = f"{base}/node"
+            lines = ["\n".join(node["doc"]).strip(), ""]
+            g = guide("Node", slug)
+            if g:
+                lines += [g, ""]
+            lines += render_class("Node", node)[2:]
+            self.write_page(slug, "Node (Lua)", "\n".join(lines), description="The methods and fields every node has.")
+            sidebar.append({"label": "Node", "slug": slug})
+            ov += ["", "## Nodes", "", f"[Node]({self.url(slug)}): what every node has. Each node type adds its own "
+                   "methods, listed on its page with the rest of that node's reference:", ""]
+            count += len(node["functions"])
+
+        # The node types: their own methods (also on their node pages).
+        slug = f"{base}/nodes"
+        lines = ["Every node type's own methods (on `self.node` or any node of that type), with a link to its "
+                 "node page. Properties are fields too: `node.position = Vec2(10, 20)`.", ""]
+        for nm in nodes:
+            npage = self.url(f"reference/nodes/{kebab(nm)}") if self.exists(f"docs/nodes/{nm}.md") else ""
+            lines += render_class(nm, classes[nm], None, npage)
+            count += len(classes[nm]["functions"])
+        self.write_page(slug, "Lua API: node types", "\n".join(lines), description="Each node type's Lua methods.")
+        sidebar.append({"label": "Node types", "slug": slug})
+        ov.append(f"- [Every node type's methods]({self.url(slug)})")
+
+        # Types.
+        slug = f"{base}/types"
+        lines = ["Values passed around: vectors, hits, events, options tables.", ""]
+        for nm in types:
+            lines += render_class(nm, classes[nm], globals_.get(nm))
+            count += len(classes[nm]["functions"])
+        self.write_page(slug, "Lua API: types", "\n".join(lines), description="Values passed around: vectors, hits, events, options tables.")
+        sidebar.append({"label": "Types", "slug": slug})
+        ov += ["", "## Types", "", f"[Values passed around]({self.url(slug)}): vectors, hits, events, options tables.",
+               "", f"{count} functions in {len(modules) + len(nodes) + len(types) + 1} classes and modules."]
         self.write_page(base, "Lua API", "\n".join(ov),
-                        description="Reference for Rayzr's Lua 5.4 scripting API: nodes, modules and types, with examples.")
+                        description="Reference for Rayzr's Lua 5.4 scripting API: modules, nodes and types, with examples.")
         return {"label": item.get("label", "Lua API"), "collapsed": True, "items": sidebar}
 
     def plugin_api(self, item):
@@ -609,6 +667,8 @@ def doc_body(lines):
 
 
 def render_functions(title, c, level="###"):
+    """Each function: its signature, description and example, then its
+    parameters and returns as tables (#45)."""
     out = []
     for fn in c["functions"]:
         out += [f"{level} {title}{fn['sep']}{fn['name']}({fn['args']})", ""]
@@ -616,18 +676,23 @@ def render_functions(title, c, level="###"):
         if body:
             out += [body, ""]
         if fn["params"]:
+            out += ["| Parameter | Type | |", "|---|---|---|"]
             for p, t, d in fn["params"]:
-                out.append(f"- `{p}` `{t}` {d}".rstrip())
+                out.append(f"| `{p}` | `{md_cell(t)}` | {md_cell(d)} |")
             out.append("")
         if fn["returns"]:
-            out.append("Returns " + ", ".join(f"`{t}`" + (f" {d}" if d else "") for t, d in fn["returns"]))
+            out += ["| Returns | |", "|---|---|"]
+            for t, d in fn["returns"]:
+                out.append(f"| `{md_cell(t)}` | {md_cell(d or '')} |")
             out.append("")
     return out
 
 
-def render_class(name, c, global_name=None):
+def render_class(name, c, global_name=None, node_page=""):
     title = global_name or name
     out = [f"## {title}", ""]
+    if node_page:
+        out += [f"*Node reference: [{name}]({node_page})*", ""]
     if c["parents"]:
         out += [f"*Inherits {c['parents']}*", ""]
     text = "\n".join(c["doc"]).strip()

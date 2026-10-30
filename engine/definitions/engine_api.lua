@@ -9328,43 +9328,43 @@ local TweenModule = {}
 ---or a material parameter ("shader:amount"). Returns the tween's id.
 ---
 ---Example: `local id = Tween.to(self.node, "scale", {1.2, 1.2}, 0.15, "out_quad", {loops = -1, yoyo = true})`
----@param node Node
----@param property string
----@param value number|number[]
----@param duration number Seconds
----@param ease? EaseName Default "out_quad"
----@param options? TweenOptions
----@return integer id
+---@param node Node The node to animate; its tweens pause with it and end when it is destroyed
+---@param property string "position", "scale", "rotation", any numeric or colour property by name ("tint"), or "shader:<param>" for a material parameter
+---@param value number|number[] The target: a number, or a list such as {x, y} or {r, g, b[, a]} (colours 0..1, alpha default 1)
+---@param duration number Seconds to reach the value; 0 jumps there on the next frame
+---@param ease? EaseName Easing curve name, default "out_quad" (an unknown name also gives out_quad)
+---@param options? TweenOptions delay (seconds), loops (extra runs, -1 = forever), yoyo and on_complete(node); nil for none
+---@return integer id The tween's id for Tween.cancel and Tween.is_running; 0 when the node or property wasn't found
 function TweenModule.to(node, property, value, duration, ease, options) end
 
 ---Stops a tween (it stays where it is).
 ---
 ---Example: `if self.fade_id then Tween.cancel(self.fade_id) end`
----@param id integer
----@return boolean found
+---@param id integer A tween id from Tween.to
+---@return boolean found false when no tween has that id (finished or already cancelled); on_complete is not called
 function TweenModule.cancel(id) end
 
 ---Stops a node's tweens (all, or one property's).
 ---
 ---Example: `local stopped = Tween.cancel_all(self.node, "position")`
----@param node Node
----@param property? string
----@return integer count
+---@param node Node The node whose tweens stop where they are
+---@param property? string Only this property's tweens; nil stops every tween on the node
+---@return integer count How many tweens were stopped
 function TweenModule.cancel_all(node, property) end
 
 ---Whether the tween with this id is still playing.
 ---
 ---Example: `if not Tween.is_running(self.bounce_id) then self.bounce_id = nil end`
----@param id integer
----@return boolean
+---@param id integer A tween id from Tween.to
+---@return boolean true while it plays (its delay and loops included); false once finished or cancelled
 function TweenModule.is_running(id) end
 
 ---Maps progress 0..1 through an easing curve (for your own animation).
 ---
 ---Example: `local k = Tween.ease("in_out_sine", self.elapsed / self.duration)`
----@param ease EaseName
----@param t number
----@return number
+---@param ease EaseName Easing curve name; an unknown name is linear
+---@param t number Progress, clamped to 0..1
+---@return number The eased progress: 0 at t = 0, 1 at t = 1 (back and elastic curves overshoot in between)
 function TweenModule.ease(ease, t) end
 
 -- ============================================================================
@@ -9376,41 +9376,41 @@ local PoolModule = {}
 ---Takes an instance of the component: a parked one, else a new one (nil at the pool's max). Added under `parent` (else the scene's root) at x, y local to it.
 ---
 ---Example: `local b = Pool.take("components/bullet.component.json", self.node:get_parent(), self.node.position)`
----@param component ComponentPath|string
----@param parent? Node
----@param x? number|Vec2
----@param y? number
----@return Node?
+---@param component ComponentPath|string The .component.json path; it names the pool (one per path in the current scene)
+---@param parent? Node The node to put it under; nil for the scene's root
+---@param x? number|Vec2 X in px local to the parent, or a Vec2 or {x, y} for both; default 0
+---@param y? number Y in px local to the parent, when x is a number; default 0
+---@return Node? The instance's root node, or nil at the pool's max or when the component can't be loaded (a warning says which)
 function PoolModule.take(component, parent, x, y) end
 
 ---Returns a taken instance to its pool (the same as `node:destroy()` on it).
 ---
 ---Example: `Pool.release(self.node)`
----@param node Node
----@return boolean ok false when it isn't a taken pooled node
+---@param node Node The root of an instance taken from a pool
+---@return boolean false when it isn't a taken pooled node (never pooled, or already parked)
 function PoolModule.release(node) end
 
 ---Makes instances up front (parked) so the first takes don't create them mid-game.
 ---
 ---Example: `Pool.prewarm("components/bullet.component.json", 64)`
----@param component ComponentPath|string
----@param count integer Instances in total
+---@param component ComponentPath|string The .component.json path of the pool
+---@param count integer How many instances the pool should have in total (not extra ones); capped by its max
 function PoolModule.prewarm(component, count) end
 
 ---Caps how many instances the pool makes (0 = no cap); `take` returns nil at the cap.
 ---
 ---Example: `Pool.set_max("components/spark.component.json", 200)`
----@param component ComponentPath|string
----@param max integer
+---@param component ComponentPath|string The .component.json path of the pool
+---@param max integer The most instances it ever makes; 0 = no cap (negative counts as 0); lowering it frees nothing
 function PoolModule.set_max(component, max) end
 
 ---How many instances are taken, parked and made in total.
 ---
 ---Example: `local active, parked, made = Pool.stats("components/bullet.component.json")`
----@param component ComponentPath|string
----@return integer active
----@return integer parked
----@return integer created
+---@param component ComponentPath|string The .component.json path of the pool
+---@return integer active Instances taken and not yet returned (0 for an unknown pool)
+---@return integer parked Instances parked, waiting to be taken
+---@return integer created Instances made in total (taken plus parked)
 function PoolModule.stats(component) end
 
 -- ============================================================================
@@ -9422,30 +9422,30 @@ local LevelGenModule = {}
 ---Generates a level into a TileMap node: its map becomes the generator's size and its cells the tiles (colliders rebuilt when it is Solid); entity outputs' components are placed as its children (generating again replaces them). Emits `level_generated` (the tile map's name) on the event bus.
 ---
 ---Example: `local ok, why = LevelGen.generate("levels/caves.levelgen.json", self.node:get_node("Ground"), os.time())`
----@param generator string A .levelgen.json file
----@param tilemap TileMapNode
----@param seed? integer The seed (default: the generator's)
----@return boolean ok
----@return string? why
+---@param generator string A .levelgen.json file, such as "levels/caves.levelgen.json"
+---@param tilemap TileMapNode The TileMap node to fill: its size, cells and generated entities are replaced
+---@param seed? integer Seed as an integer; nil or 0 uses the generator's own seed
+---@return boolean ok true when the level was written
+---@return string? why Why it failed (bad file, not a TileMap node...); nil on success
 function LevelGenModule.generate(generator, tilemap, seed) end
 
 ---A generator's values without a tile map (row-major, 0..1 usually) - to place things yourself; `node_id` reads any node's grid (default: the output).
 ---
 ---Example: `local g = LevelGen.values("levels/caves.levelgen.json", 42); local solid = g.values[y * g.width + x + 1] >= 0.5`
----@param generator string A .levelgen.json file
----@param seed? integer
----@param node_id? integer
----@return {width: integer, height: integer, values: number[]}? grid
----@return string? why
+---@param generator string A .levelgen.json file, such as "levels/caves.levelgen.json"
+---@param seed? integer Seed as an integer; nil or 0 uses the generator's own seed
+---@param node_id? integer Id of the graph node whose grid to read; nil or 0 for the generator's output
+---@return {width: integer, height: integer, values: number[]}? grid width and height in cells and values row-major (index y * width + x + 1); nil on error
+---@return string? why Why it failed (bad file, no such node...); nil on success
 function LevelGenModule.values(generator, seed, node_id) end
 
 ---The entity outputs' placements without a tile map: a component and a cell (x, y) each.
 ---
 ---Example: `for _, e in ipairs(LevelGen.entities("levels/caves.levelgen.json", seed)) do Scene.instantiate(e.component, nil, e.x * 16 + 8, e.y * 16 + 8) end`
----@param generator string A .levelgen.json file
----@param seed? integer
----@return {component: ComponentPath|string, x: integer, y: integer}[]? entities
----@return string? why
+---@param generator string A .levelgen.json file, such as "levels/caves.levelgen.json"
+---@param seed? integer Seed as an integer; nil or 0 uses the generator's own seed
+---@return {component: ComponentPath|string, x: integer, y: integer}[]? entities One entry per placed entity: its component and cell x, y (cells from 0, not px); nil on error
+---@return string? why Why it failed; nil on success
 function LevelGenModule.entities(generator, seed) end
 
 -- ============================================================================
@@ -9457,49 +9457,49 @@ local EventsModule = {}
 ---Calls `handler(value, source)` every time `event` is emitted; `source` is the node of the script that emitted it (or the node passed to `emit`), nil from global code. Released when the connecting script's node is destroyed, or with `scope` when given (a global script's connections otherwise last for the game).
 ---
 ---Example: `self.scoreConn = Events.connect("score_changed", function(score) self.label.text = tostring(score) end)`
----@param event ProjectEvent|string Event name (the project's custom events complete)
----@param handler fun(value: any, source: Node?) Called with the emitted value and source
----@param scope? Node The connection ends when this node is destroyed
----@return integer id Connection id for `disconnect`
+---@param event ProjectEvent|string Event name: one of the project's custom events, or any string
+---@param handler fun(value: any, source: Node?) Called as handler(value, source) on every emit; an error in it is logged and the other handlers still run
+---@param scope? Node A node that ends the connection when destroyed; nil: it ends with the connecting script's node (from global code, never)
+---@return integer id Connection id for Events.disconnect
 function EventsModule.connect(event, handler, scope) end
 
 ---Like `connect`, but the handler is released after its first call.
 ---
 ---Example: `Events.once("level_complete", function(level) Save.set("last_level", level) end)`
----@param event ProjectEvent|string Event name
----@param handler fun(value: any, source: Node?) Called once
----@param scope? Node The connection ends when this node is destroyed
----@return integer id Connection id for `disconnect`
+---@param event ProjectEvent|string Event name: one of the project's custom events, or any string
+---@param handler fun(value: any, source: Node?) Called as handler(value, source) on the next emit only, then released
+---@param scope? Node A node that ends the connection when destroyed (before it ran); nil: the connecting script's node
+---@return integer id Connection id for Events.disconnect
 function EventsModule.once(event, handler, scope) end
 
 ---Removes a connection made with `connect` or `once`.
 ---
 ---Example: `Events.disconnect(self.scoreConn)`
----@param id integer Connection id
----@return boolean removed false when it was already gone
+---@param id integer An id from Events.connect or Events.once
+---@return boolean true when removed; false when it was already gone (or the id is a node connection's)
 function EventsModule.disconnect(id) end
 
 ---Emits a global event now: every handler runs before `emit` returns. The value can be anything, tables included (engine code listening gets numbers, strings, booleans and nodes). The source defaults to this script's node.
 ---
 ---Example: `Events.emit("score_changed", self.score)`
----@param event ProjectEvent|string Event name
----@param value? any Passed to the handlers
----@param source? Node Defaults to the emitting script's node
+---@param event ProjectEvent|string Event name: one of the project's custom events, or any string
+---@param value? any Passed to the handlers as it is, tables included; nil for none
+---@param source? Node The node handlers get as source; default the emitting script's node (nil from global code)
 function EventsModule.emit(event, value, source) end
 
 ---Emits a global event at the end of the frame (after every node has updated), in the order emitted - for events raised in the middle of an update that listeners shouldn't handle there. A source that is destroyed meanwhile arrives as nil.
 ---
 ---Example: `Events.emit_deferred("enemy_killed", { kind = "slime", points = 50 })`
----@param event ProjectEvent|string Event name
----@param value? any Passed to the handlers
----@param source? Node Defaults to the emitting script's node
+---@param event ProjectEvent|string Event name: one of the project's custom events, or any string
+---@param value? any Passed to the handlers as it is, tables included; nil for none
+---@param source? Node The node handlers get as source; default the emitting script's node, nil if it is destroyed before the frame ends
 function EventsModule.emit_deferred(event, value, source) end
 
 ---How many handlers listen to an event (Lua connections and engine listeners).
 ---
 ---Example: `if Events.listener_count("player_died") == 0 then Log.warn("nobody handles player_died") end`
----@param event ProjectEvent|string Event name
----@return integer count
+---@param event ProjectEvent|string Event name: one of the project's custom events, or any string
+---@return integer count Lua connections plus engine listeners; 0 when nobody listens
 function EventsModule.listener_count(event) end
 
 -- ============================================================================
@@ -9527,28 +9527,28 @@ local AccessibilityModule = {}
 ---A setting's value.
 ---
 ---Example: `local s = Accessibility.get("ui_scale")`
----@param key AccessibilityKey
----@return any
+---@param key AccessibilityKey The setting's name, e.g. "ui_scale", "colorblind" or "subtitles"
+---@return any Its value: a number, a boolean, or the colour filter's name for colorblind; nil for an unknown key
 function AccessibilityModule.get(key) end
 
 ---Changes a setting (false for an unknown key or value).
 ---
 ---Example: `Accessibility.set("colorblind", "deuteranopia")`
----@param key AccessibilityKey
----@param value number|boolean|string
----@return boolean ok
+---@param key AccessibilityKey The setting's name
+---@param value number|boolean|string A number for scales and strengths (clamped to the setting's range), true or false for switches, or "none", "protanopia", "deuteranopia" or "tritanopia" for colorblind
+---@return boolean ok true when applied; false (with a warning) for an unknown key or colour filter name
 function AccessibilityModule.set(key, value) end
 
 ---Every setting.
 ---
 ---Example: `for k, v in pairs(Accessibility.get_all()) do print(k, v) end`
----@return AccessibilitySettings
+---@return AccessibilitySettings A table of every setting by key
 function AccessibilityModule.get_all() end
 
 ---Saves the player's settings.
 ---
 ---Example: `Accessibility.save()`
----@return boolean ok
+---@return boolean ok true when accessibility.json was written; false when it couldn't be
 function AccessibilityModule.save() end
 
 ---Back to the project's defaults (save to keep).
@@ -9571,15 +9571,15 @@ local SubtitlesModule = {}
 ---Shows a line; returns its id (0 when the player turned that kind off).
 ---
 ---Example: `Subtitles.show("Over here!", {speaker = "Ada"})`
----@param text string Rich text
----@param options? SubtitleOptions
----@return integer id
+---@param text string The line, rich text allowed; an empty string shows nothing
+---@param options? SubtitleOptions speaker (shown before the line), duration (seconds; default its reading time: 0.8 s + 15 characters a second, at least 1.5 s), caption (true for a sound caption) and color ({r, g, b, a} 0..255; default white, light blue for captions)
+---@return integer id The line's id for hide; 0 when the text is empty or the player turned that kind of line off
 function SubtitlesModule.show(text, options) end
 
 ---Takes a line down early.
 ---
 ---Example: `Subtitles.hide(id)`
----@param id integer
+---@param id integer An id from show; 0 or a line that has already gone does nothing
 function SubtitlesModule.hide(id) end
 
 ---Takes every line down.
@@ -9590,7 +9590,7 @@ function SubtitlesModule.clear() end
 ---Lines on screen now.
 ---
 ---Example: `if Subtitles.count() == 0 then self:next_bark() end`
----@return integer
+---@return integer How many lines are on screen now (0 to 3)
 function SubtitlesModule.count() end
 
 -- ============================================================================
@@ -9624,8 +9624,8 @@ local ResourceModule = {}
 ---a problem (a warning says what).
 ---
 ---Example: `local sword = Resource.load("resources/sword.resource.json"); Log.info(sword.damage)`
----@param path ResourcePath|string
----@return ResourceBase?
+---@param path ResourcePath|string A .resource.json path, such as "resources/sword.resource.json"
+---@return ResourceBase? The resource's shared table (the same one on every call), or nil when the file or its class has a problem (a warning says what)
 function ResourceModule.load(path) end
 
 ---A fresh table of a resource file (its values from the file, on_load
@@ -9633,8 +9633,8 @@ function ResourceModule.load(path) end
 ---with it.
 ---
 ---Example: `self.ammo = Resource.new("resources/clip.resource.json")`
----@param path ResourcePath|string
----@return ResourceBase?
+---@param path ResourcePath|string A .resource.json path, such as "resources/sword.resource.json"
+---@return ResourceBase? A fresh table owned by the calling script's component instance, or nil when the file or its class has a problem
 function ResourceModule.new(path) end
 
 ---@alias SaveValue nil|boolean|number|string|table
@@ -9651,35 +9651,35 @@ local SaveModule = {}
 ---changes to a table you got from Save.get are saved too.
 ---
 ---Example: `if score > Save.get("best_score", 0) then Save.set("best_score", score) end`
----@param key SaveKey|string
----@param value SaveValue
+---@param key SaveKey|string The name to store under; must be a string (anything else is a script error)
+---@param value SaveValue A boolean, number, string or table of those; nil removes the key
 function SaveModule.set(key, value) end
 
 ---Returns the stored value for a key, or the default when the key is not set.
 ---
 ---Example: `local settings = Save.get("settings", {music = 0.8, fullscreen = false})`
----@param key SaveKey|string
----@param default? SaveValue Returned when the key isn't set
----@return SaveValue
+---@param key SaveKey|string The name it was stored under
+---@param default? SaveValue Returned when the key isn't set (it isn't stored); default nil
+---@return SaveValue The stored value, or default
 function SaveModule.get(key, default) end
 
 ---Whether a value is stored under the key.
 ---
 ---Example: `if not Save.has("tutorial_done") then Scene.change_scene("tutorial") end`
----@param key SaveKey|string
----@return boolean
+---@param key SaveKey|string The name to look up
+---@return boolean true when the key holds a value (false counts as a value)
 function SaveModule.has(key) end
 
 ---Removes a key from the save data.
 ---
 ---Example: `Save.delete("checkpoint")`
----@param key SaveKey|string
+---@param key SaveKey|string The name to remove; a key that isn't set does nothing
 function SaveModule.delete(key) end
 
 ---Returns every stored key, sorted.
 ---
 ---Example: `for _, key in ipairs(Save.keys()) do Log.info(key, Save.get(key)) end`
----@return string[] keys Sorted
+---@return string[] keys Every stored key, sorted alphabetically
 function SaveModule.keys() end
 
 ---Removes every key (the file is rewritten on the next flush).
@@ -9690,21 +9690,21 @@ function SaveModule.clear() end
 ---Writes the save file now.
 ---
 ---Example: `if not Save.flush() then Log.warn("could not write save file") end`
----@return boolean ok
+---@return boolean ok true when the file was written; false when it couldn't be (an error is logged)
 function SaveModule.flush() end
 
 ---Switches to another save file (<name>.json; default "save"), writing the
 ---current one first. Returns the current slot.
 ---
----Example: `local previous = Save.slot("slot_2")`
----@param name? string
----@return string slot
+---Example: `local now = Save.slot("slot_2") -- "slot_2": the slot in use after switching`
+---@param name? string The slot to switch to: the file <name>.json in the user-data folder (characters other than letters, digits, space, - _ and . become _); nil, "" or the current slot only reads it
+---@return string slot The slot in use after the call ("save" by default)
 function SaveModule.slot(name) end
 
 ---Returns the file path of the current save slot.
 ---
 ---Example: `Log.info("saving to", Save.path())`
----@return string path The current save file
+---@return string path The full path of the current slot's file
 function SaveModule.path() end
 
 -- ============================================================================
@@ -9723,27 +9723,27 @@ local CrashModule = {}
 ---The reports from earlier runs not yet dismissed (oldest first).
 ---
 ---Example: `for _, r in ipairs(Crash.pending()) do show_report_dialog(r.text); Crash.dismiss(r.path) end`
----@return CrashReport[]
+---@return CrashReport[] Reports not yet dismissed, oldest first, each with path and text (empty when there are none or no crash folder)
 function CrashModule.pending() end
 
 ---Stops offering a report (it stays in the folder as .seen).
 ---
 ---Example: `Crash.dismiss(report.path)`
----@param path string A path from Crash.pending()
----@return boolean ok
+---@param path string A report's path from Crash.pending()
+---@return boolean ok false when the path isn't a pending report in the crash folder
 function CrashModule.dismiss(path) end
 
 ---Adds a line to the next crash report's "recent" list (what the game was
 ---doing: "entered level 3", "boss fight"). The last 48 lines are kept.
 ---
 ---Example: `Crash.note("loaded " .. level_name)`
----@param text string
+---@param text string What the game is doing, e.g. "entered level 3" (newlines become spaces; cut at 240 bytes)
 function CrashModule.note(text) end
 
 ---The crash folder.
 ---
 ---Example: `print("crash reports in " .. Crash.dir())`
----@return string
+---@return string The crash folder's path ("" when there is none, e.g. on the web)
 function CrashModule.dir() end
 
 -- ============================================================================
@@ -9755,59 +9755,59 @@ local EngineModule = {}
 ---Gets current display refresh frames per second.
 ---
 ---Example: `Log.info("FPS: " .. Engine.get_fps())`
----@return integer
+---@return integer Frames drawn per second, averaged over the last moments (not the monitor's refresh rate)
 function EngineModule.get_fps() end
 
 ---Gets the last frame duration in seconds.
 ---
 ---Example: `local dt = Engine.get_delta_time(); self.elapsed = self.elapsed + dt`
----@return number
+---@return number The last frame's length in seconds (about 0.0167 at 60 fps)
 function EngineModule.get_delta_time() end
 
 ---Gets running time in seconds since the engine launched.
 ---
 ---Example: `local t = Engine.get_time(); self.node:set_position(self.base_x, self.base_y + math.sin(t * 2) * 8)`
----@return number
+---@return number Seconds since the game window opened; keeps counting while paused
 function EngineModule.get_time() end
 
 ---Gets current physical window width and height in screen pixels.
 ---
 ---Example: `local w, h = Engine.get_window_size()`
----@return integer width
----@return integer height
+---@return integer width The window's width in screen px (the screen's when fullscreen)
+---@return integer height The window's height in screen px
 function EngineModule.get_window_size() end
 
 ---Gets virtual canvas reference resolution (e.g. 1280x720).
 ---
 ---Example: `local vw, vh = Engine.get_virtual_size(); self.node:set_position(vw / 2, vh / 2)`
----@return number width
----@return number height
+---@return number width The game's drawing width in px from Project Settings > Video (default 1280; with Screen Fill Expand it grows to the window's shape)
+---@return number height The game's drawing height in px (default 720)
 function EngineModule.get_virtual_size() end
 
 ---Pauses the game: nodes with pause mode "pausable" (the default) stop
 ---updating and physics stops; "always" nodes keep running (pause menus).
 ---
 ---Example: `if Input.is_action_pressed("pause") then Engine.set_paused(not Engine.is_paused()) end`
----@param paused boolean
+---@param paused boolean true pauses the game, false resumes it
 function EngineModule.set_paused(paused) end
 
 ---Returns whether the game is currently paused.
 ---
 ---Example: `if Engine.is_paused() then return end`
----@return boolean
+---@return boolean true while the game is paused (Engine.set_paused, or a scene transition that pauses)
 function EngineModule.is_paused() end
 
 ---Fullscreen on or off: the window covers the screen at its resolution (the
 ---game is scaled to it) or goes back to the project's window size.
 ---
 ---Example: `if Input.is_key_pressed("F11") then Engine.set_fullscreen(not Engine.is_fullscreen()) end`
----@param on boolean
+---@param on boolean true covers the screen (borderless), false goes back to the project's window size; takes effect on the next frame
 function EngineModule.set_fullscreen(on) end
 
 ---Whether the game is fullscreen.
 ---
 ---Example: `local full = Engine.is_fullscreen(); Log.info("Fullscreen: " .. tostring(full))`
----@return boolean
+---@return boolean true when fullscreen, or when fullscreen was just asked for and is about to happen
 function EngineModule.is_fullscreen() end
 
 
@@ -9827,46 +9827,46 @@ local InputModule = {}
 ---Checks if an action was pressed this frame (just triggered).
 ---
 ---Example: `if Input.is_action_pressed("jump") then self.vy = -self.jump_speed end`
----@param action InputAction Action name from the project's Input settings (e.g. "move_up", "fire", "jump", "dash")
----@param player? integer 1-4 (default 1)
----@return boolean
+---@param action InputAction The action's name from Project Settings > Input, e.g. "jump" (case doesn't matter; an unknown name gives false)
+---@param player? integer Which player, 1-4 (default 1; out-of-range numbers are clamped)
+---@return boolean true only on the frame the action went down
 function InputModule.is_action_pressed(action, player) end
 
 ---Checks if an action is currently held down.
 ---
 ---Example: `if Input.is_action_down("fire", self.player) then self:shoot() end`
----@param action InputAction
----@param player? integer 1-4 (default 1)
----@return boolean
+---@param action InputAction The action's name from Project Settings > Input, e.g. "fire" (an unknown name gives false)
+---@param player? integer Which player, 1-4 (default 1)
+---@return boolean true every frame the action is held
 function InputModule.is_action_down(action, player) end
 
 ---Checks if an action was released this frame.
 ---
 ---Example: `if Input.is_action_released("jump") and self.vy < 0 then self.vy = self.vy * 0.5 end`
----@param action InputAction
----@param player? integer 1-4 (default 1)
----@return boolean
+---@param action InputAction The action's name from Project Settings > Input, e.g. "jump" (an unknown name gives false)
+---@param player? integer Which player, 1-4 (default 1)
+---@return boolean true only on the frame the action was let go
 function InputModule.is_action_released(action, player) end
 
 ---Calculates a 1D axis value between -1.0 and 1.0 from negative and positive action names.
 ---
 ---Example: `local dir = Input.get_axis("move_left", "move_right"); self.vx = dir * self.speed`
----@param neg_action InputAction Action name representing negative direction (e.g. "move_left")
----@param pos_action InputAction Action name representing positive direction (e.g. "move_right")
----@param player? integer 1-4 (default 1)
----@return number axis Value from -1.0 to 1.0
+---@param neg_action InputAction The action that pushes toward -1, e.g. "move_left"
+---@param pos_action InputAction The action that pushes toward +1, e.g. "move_right"
+---@param player? integer Which player, 1-4 (default 1)
+---@return number axis -1 to 1: the positive action's strength minus the negative one's (in between for an analog stick; 0 when both or neither are held)
 function InputModule.get_axis(neg_action, pos_action, player) end
 
 ---Calculates a normalized 2D direction vector from 4 directional action inputs.
 ---
 ---Example: `local dx, dy = Input.get_vector("move_left", "move_right", "move_up", "move_down")` - or `Input.get_vector(2)`: player 2's move_* actions.
----@param left? InputAction|integer The action, or the player (the move_* actions)
----@param right? InputAction
----@param up? InputAction
----@param down? InputAction
----@param player? integer 1-4 (default 1)
----@return number x Normalized X axis
----@return number y Normalized Y axis
+---@param left? InputAction|integer The action for -x (default "move_left"), or a player number to read that player's move_* actions
+---@param right? InputAction The action for +x (default "move_right")
+---@param up? InputAction The action for -y (default "move_up")
+---@param down? InputAction The action for +y (default "move_down")
+---@param player? integer Which player, 1-4 (default 1)
+---@return number x Horizontal part, -1 to 1 (right is positive)
+---@return number y Vertical part, -1 to 1 (down is positive, like screen y); the vector's length is capped at 1, so diagonals aren't faster
 function InputModule.get_vector(left, right, up, down, player) end
 
 -- key names begin (generated: lua_keys_definitions_test.odin)
@@ -9994,56 +9994,56 @@ function InputModule.get_vector(left, right, up, down, player) end
 ---Queries raw keyboard key press state for a single frame.
 ---
 ---Example: `if Input.is_key_pressed("F5") then Scene.reload() end`
----@param key KeyName|string Key name like "SPACE", "W", "Z", "F5", "LEFT_ALT"
----@return boolean
+---@param key KeyName|string A raylib key name like "SPACE", "W", "F5", "LEFT_ALT" (also "RETURN", "ESC", "SHIFT", "CTRL", "ALT", "0"-"9"; case doesn't matter, an unknown name gives false)
+---@return boolean true only on the frame the key went down
 function InputModule.is_key_pressed(key) end
 
 ---Queries raw keyboard key held state.
 ---
 ---Example: `if Input.is_key_down("LEFT_SHIFT") then speed = speed * 2 end`
----@param key KeyName|string Key name
----@return boolean
+---@param key KeyName|string A raylib key name like "LEFT_SHIFT" or "D" (an unknown name gives false)
+---@return boolean true every frame the key is held
 function InputModule.is_key_down(key) end
 
 ---Queries raw keyboard key release state for a single frame.
 ---
 ---Example: `if Input.is_key_released("SPACE") then self.charging = false end`
----@param key KeyName|string Key name
----@return boolean
+---@param key KeyName|string A raylib key name like "SPACE" (an unknown name gives false)
+---@return boolean true only on the frame the key was let go
 function InputModule.is_key_released(key) end
 
 ---Queries mouse button pressed state for a single frame. False while a UI widget has the mouse (a click on a button isn't also a shot).
 ---
 ---Example: `if Input.is_mouse_button_pressed("LEFT") then self:shoot() end`
----@param button MouseButton|string
----@return boolean
+---@param button MouseButton|string "LEFT", "RIGHT", "MIDDLE", "SIDE", "EXTRA", "FORWARD" or "BACK" (nil means "LEFT")
+---@return boolean true only on the frame the button went down; false while a UI widget has the mouse
 function InputModule.is_mouse_button_pressed(button) end
 
 ---Queries mouse button held state. False while a UI widget has the mouse.
 ---
 ---Example: `if Input.is_mouse_button_down("RIGHT") then self.aiming = true end`
----@param button MouseButton|string
----@return boolean
+---@param button MouseButton|string "LEFT", "RIGHT", "MIDDLE", "SIDE", "EXTRA", "FORWARD" or "BACK" (nil means "LEFT")
+---@return boolean true every frame the button is held; false while a UI widget has the mouse
 function InputModule.is_mouse_button_down(button) end
 
 ---Queries mouse button release state for a single frame. False while a UI widget has the mouse.
 ---
 ---Example: `if Input.is_mouse_button_released("LEFT") then self.dragging = false end`
----@param button MouseButton|string
----@return boolean
+---@param button MouseButton|string "LEFT", "RIGHT", "MIDDLE", "SIDE", "EXTRA", "FORWARD" or "BACK" (nil means "LEFT")
+---@return boolean true only on the frame the button was let go; false while a UI widget has the mouse
 function InputModule.is_mouse_button_released(button) end
 
 ---Gets the current mouse cursor position in screen pixels.
 ---
 ---Example: `local mx, my = Input.get_mouse_position(); local wx, wy = Camera.screen_to_world(mx, my)`
----@return number x Mouse X
----@return number y Mouse Y
+---@return number x Cursor x in game-screen px (the virtual resolution, before the camera; pass it to Camera.screen_to_world for world px)
+---@return number y Cursor y in game-screen px
 function InputModule.get_mouse_position() end
 
 ---Gets mouse wheel scroll delta for this frame.
 ---
 ---Example: `local wheel = Input.get_mouse_wheel_move(); Camera.set_zoom(Camera.get_zoom() + wheel * 0.1)`
----@return number
+---@return number This frame's wheel scroll: positive scrolls up, about 1 per notch (fractions on a trackpad), 0 when still
 function InputModule.get_mouse_wheel_move() end
 
 ---@class InputBindingInfo
@@ -10073,40 +10073,40 @@ function InputModule.get_mouse_wheel_move() end
 ---An action's bindings, each with a player-facing `text`.
 ---
 ---Example: `for i, b in ipairs(Input.get_bindings("jump")) do print(i, b.text) end`
----@param action InputAction
----@return InputBindingInfo[]
+---@param action InputAction The action's name, e.g. "jump"
+---@return InputBindingInfo[] Its bindings in slot order (empty for an unknown action), each with device, name and a player-facing text
 function InputModule.get_bindings(action) end
 
 ---What to show for an action's bindings: "Space / A" (or one slot's).
 ---
 ---Example: `label.text = "Jump: " .. Input.binding_text("jump")`
----@param action InputAction
----@param slot? integer
----@return string
+---@param action InputAction The action's name, e.g. "jump"
+---@param slot? integer Only this binding, 1-based (default: all of them joined with " / ")
+---@return string What to show the player, e.g. "Space / A"; "-" when there is nothing to show
 function InputModule.binding_text(action, slot) end
 
 ---Sets one of an action's bindings (nil removes that slot); slot 0 replaces the first binding of the same device kind. Saved for the player.
 ---
 ---Example: `Input.set_binding("jump", 1, {key = "W"})`
----@param action InputAction
----@param slot integer
----@param binding InputBindingSpec|nil
----@param conflicts? "clear"|"swap"|"allow"
----@return boolean ok false for an unknown action
+---@param action InputAction The action's name, e.g. "jump"
+---@param slot integer Which binding, 1-based (past the end adds one, up to 4); 0 replaces the first binding of the same device kind
+---@param binding InputBindingSpec|nil The new input, e.g. {key = "W"} or {axis = "LEFT_X", positive = true}; nil removes the slot
+---@param conflicts? "clear"|"swap"|"allow" Another action already using it: "clear" takes it away (default), "swap" gives it this slot's old binding, "allow" keeps both
+---@return boolean false for an unknown action; the change is saved for the player
 function InputModule.set_binding(action, slot, binding, conflicts) end
 
 ---Waits for the player to press the key / button / stick to bind to an action (a "press a key..." prompt). Everything must be let go first, so the button that opened the menu isn't taken. Escape cancels. The result is saved for the player.
 ---
 ---Example: `Input.listen("jump", {on_done = function(result, text) self.label.text = text end})`
----@param action InputAction
----@param options? InputListenOptions
----@return boolean ok false for an unknown action
+---@param action InputAction The action to rebind, e.g. "jump"
+---@param options? InputListenOptions slot, device ("any", "keyboard" or "gamepad"), conflicts, cancel key (default "ESCAPE") and an on_done(result, text) callback
+---@return boolean false for an unknown action (nothing starts)
 function InputModule.listen(action, options) end
 
 ---Whether Input.listen is waiting for a press.
 ---
 ---Example: `if Input.is_listening() then return end -- the menu ignores input meanwhile`
----@return boolean
+---@return boolean true while Input.listen is waiting for a press
 function InputModule.is_listening() end
 
 ---Stops waiting (on_done gets "cancelled").
@@ -10117,112 +10117,112 @@ function InputModule.cancel_listen() end
 ---Back to the project's bindings: one action, or all of them. Saved for the player.
 ---
 ---Example: `Input.reset_bindings()`
----@param action? InputAction
+---@param action? InputAction The action to reset (default nil: every action)
 function InputModule.reset_bindings(action) end
 
 ---Saves the player's bindings now (set_binding, listen and reset_bindings already do).
 ---
 ---Example: `Input.save_bindings()`
----@return boolean ok
+---@return boolean ok false when the file couldn't be written
 function InputModule.save_bindings() end
 
 ---The actions that already use a binding.
 ---
 ---Example: `local used = Input.find_conflicts({key = "SPACE"})`
----@param binding InputBindingSpec
----@return string[]
+---@param binding InputBindingSpec The input to look for, e.g. {key = "SPACE"} or {button = "RIGHT_FACE_DOWN"}
+---@return string[] Names of the actions bound to it (empty when none, or when the binding isn't valid)
 function InputModule.find_conflicts(binding) end
 
 ---The kind of device the player used last - show keyboard or gamepad prompts.
 ---
 ---Example: `hint.text = Input.last_device() == "gamepad" and "Press A" or "Press Space"`
----@return "keyboard"|"gamepad"
+---@return "keyboard"|"gamepad" "gamepad" after a pad button press, else "keyboard" (also for the mouse)
 function InputModule.last_device() end
 
 ---The project's actions, in the order of Project Settings > Input (for building a controls menu).
 ---
 ---Example: `for _, name in ipairs(Input.get_actions()) do print(name, Input.binding_text(name)) end`
----@return string[]
+---@return string[] The action names, in Project Settings > Input order
 function InputModule.get_actions() end
 
 ---Rumbles a player's gamepad. low: the heavy (left) motor, high: the light (right) one, 0-1 each. False when the player has no gamepad. (Windows: XInput pads; Linux: pads with force feedback; macOS: controllers with haptics; the web: where the browser has it.)
 ---
 ---Example: `Input.vibrate(0.4, 0.8, 0.25, self.player)`
----@param low number 0-1
----@param high? number 0-1 (default: low)
----@param seconds? number Default 0.2
----@param player? integer 1-4 (default 1)
----@return boolean
+---@param low number Heavy (left) motor strength, 0..1
+---@param high? number Light (right) motor strength, 0..1 (default: same as low)
+---@param seconds? number How long, in seconds (default 0.2, at most 10; 0 stops it)
+---@param player? integer Which player, 1-4 (default 1)
+---@return boolean false when the player has no gamepad connected
 function InputModule.vibrate(low, high, seconds, player) end
 
 ---Stops a player's rumble.
 ---
 ---Example: `Input.stop_vibration(2)`
----@param player? integer 1-4 (default 1)
+---@param player? integer Which player, 1-4 (default 1)
 function InputModule.stop_vibration(player) end
 
 ---The rumble a player's gamepad has now (0, 0: none).
 ---
 ---Example: `local low, high = Input.get_vibration()`
----@param player? integer 1-4 (default 1)
----@return number low
----@return number high
+---@param player? integer Which player, 1-4 (default 1)
+---@return number low Heavy motor strength now, 0..1 (0 when not rumbling)
+---@return number high Light motor strength now, 0..1 (0 when not rumbling)
 function InputModule.get_vibration(player) end
 
 ---The button prompt image for an action: its first binding on the device the player uses now (a key on the keyboard; A / Cross / B... on a pad). Use it as any image path (set_texture, UI images). nil when the action has nothing on that device.
 ---
 ---Example: `self.node:get_node("Prompt"):set_texture(Input.glyph("jump"))` - "prompts:xbox/xbox_button_a"
----@param action InputAction
----@param player? integer 1-4 (default 1)
----@param device? "keyboard"|"xbox"|"playstation"|"switch"|"steamdeck" Instead of the player's device
----@return string?
+---@param action InputAction The action's name, e.g. "jump"
+---@param player? integer Which player's device to use, 1-4 (default 1)
+---@param device? "keyboard"|"xbox"|"playstation"|"switch"|"steamdeck" Force a family: "keyboard", "xbox", "playstation", "switch" or "steamdeck" (default: what the player uses now)
+---@return string? An image path like "prompts:xbox/xbox_button_a" for set_texture or UI images; nil when the action has no binding on that device
 function InputModule.glyph(action, player, device) end
 
 ---The device a player uses now: "keyboard" (player 1, last used the keyboard / mouse or has no pad), the gamepad's kind (from its name), or "none".
 ---
 ---Example: `if Input.device() == "playstation" then hint.text = "Press Cross" end`
----@param player? integer 1-4 (default 1)
----@return "keyboard"|"xbox"|"playstation"|"switch"|"steamdeck"|"generic"|"none"
+---@param player? integer Which player, 1-4 (default 1)
+---@return "keyboard"|"xbox"|"playstation"|"switch"|"steamdeck"|"generic"|"none" "keyboard" (player 1 on keyboard or mouse, or without a pad), the pad family ("xbox", "playstation", "switch", "steamdeck", "generic"), or "none"
 function InputModule.device(player) end
 
 ---Does the player have a gamepad connected?
 ---
 ---Example: `if not Input.is_gamepad_connected(2) then label.text = "P2: connect a controller" end`
----@param player? integer 1-4 (default 1)
----@return boolean
+---@param player? integer Which player, 1-4 (default 1)
+---@return boolean true when that player's gamepad is plugged in
 function InputModule.is_gamepad_connected(player) end
 
 ---The name of a player's gamepad (nil: none).
 ---
 ---Example: `print(Input.gamepad_name(1))` - "Xbox Wireless Controller"
----@param player? integer 1-4 (default 1)
----@return string?
+---@param player? integer Which player, 1-4 (default 1)
+---@return string? The pad's name, e.g. "Xbox Wireless Controller"; nil when the player has none
 function InputModule.gamepad_name(player) end
 
 ---The gamepad (1-4) a player has (nil: none).
 ---
 ---Example: `local pad = Input.get_player_gamepad(2)`
----@param player integer 1-4
----@return integer?
+---@param player integer Which player, 1-4
+---@return integer? The gamepad number, 1-4; nil when the player has none
 function InputModule.get_player_gamepad(player) end
 
 ---Gives a player a gamepad (nil: none). A player that had it gets this player's old one, so two players never share a pad - a "press A to join" screen.
 ---
 ---Example: `for _, p in ipairs(Input.gamepads()) do if not p.player then Input.set_player_gamepad(next_free, p.pad) end end`
----@param player integer 1-4
----@param pad? integer 1-4
+---@param player integer Which player, 1-4
+---@param pad? integer The gamepad number, 1-4 (nil takes the player's pad away; a player who had this pad gets the old one)
 function InputModule.set_player_gamepad(player, pad) end
 
 ---The connected gamepads.
 ---
 ---Example: `for _, p in ipairs(Input.gamepads()) do print(p.pad, p.name, p.device, p.player) end`
----@return {pad: integer, name: string, device: string, player: integer?}[]
+---@return {pad: integer, name: string, device: string, player: integer?}[] One entry per connected pad: pad number (1-4), name, device family, and player (nil when nobody has it)
 function InputModule.gamepads() end
 
 ---How many players: player 1 plus every other player with a gamepad.
 ---
----Example: `for p = 1, Input.player_count() do self:spawn_player(p) end`
----@return integer
+---Example: `for p = 2, 4 do if Input.is_gamepad_connected(p) then self:spawn_player(p) end end -- (players with a pad: count with player_count)`
+---@return integer 1 plus each of players 2-4 that has a connected gamepad
 function InputModule.player_count() end
 
 
@@ -10234,20 +10234,20 @@ local AudioModule = {}
 ---overlap instead of restarting it.
 ---
 ---Example: `Audio.play_sound("sounds/jump.wav", 0.8, 1.1)`
----@param path AudioPath|string File path, e.g. "assets/audio/laser.wav"
+---@param path AudioPath|string The sound file, project-relative (e.g. "audio/jump.wav"); loaded on first use, then cached
 ---@param volume? number 0..1 (default 1), before the bus fader
----@param pitch? number Default 1
----@param bus? string The mixer bus (default "SFX")
+---@param pitch? number Playback speed and pitch: 1 is normal, 2 an octave up, 0.5 an octave down (default 1)
+---@param bus? string The mixer bus by name, any case (default: the sound's import bus, else SFX); an unknown name plays into Master
 function AudioModule.play_sound(path, volume, pitch, bus) end
 
 ---Plays a one-shot heard from a world position: quieter with distance from
 ---the listener (the camera, or Audio.set_listener) and panned to its side.
 ---
 ---Example: `local x, y = self.node:get_position(); Audio.play_sound_at("sounds/explosion.wav", x, y)`
----@param path AudioPath|string
----@param x number
----@param y number
----@param volume? number
+---@param path AudioPath|string The sound file, project-relative; plays into its import bus, else SFX
+---@param x number World X the sound comes from (px)
+---@param y number World Y the sound comes from (px)
+---@param volume? number 0..1 (default 1) before distance: full within 100 px of the listener, fading to silent at 900 px, panned fully at 450 px to a side
 function AudioModule.play_sound_at(path, x, y, volume) end
 
 ---@alias AudioBus "master"|"music"|"sfx"|string
@@ -10255,141 +10255,141 @@ function AudioModule.play_sound_at(path, x, y, volume) end
 ---Sets a mixer bus's fader (linear: 1 = 0 dB, 0.5 = -6 dB). "master", "music" and "sfx" also update the project's volumes.
 ---
 ---Example: `Audio.set_bus_volume("music", 0.5)`
----@param bus AudioBus A bus name (case doesn't matter)
----@param volume number
+---@param bus AudioBus A bus name, any case; lowercase "master", "music" and "sfx" also set the project's volumes
+---@param volume number Linear fader: 1 = 0 dB, 0.5 about -6 dB, 0 silent; clamped to 0..1 for master, music and sfx, at least 0 for other buses
 function AudioModule.set_bus_volume(bus, volume) end
 
 ---Returns a bus's fader (linear).
 ---
 ---Example: `local vol = Audio.get_bus_volume("sfx"); Audio.set_bus_volume("sfx", vol * 0.5)`
----@param bus AudioBus
----@return number volume
+---@param bus AudioBus A bus name, any case
+---@return number volume The linear fader value (1 when there's no such bus)
 function AudioModule.get_bus_volume(bus) end
 
 ---Mutes / unmutes a bus.
 ---
 ---Example: `Audio.set_bus_mute("Voice", true)`
----@param bus AudioBus
----@param mute boolean
+---@param bus AudioBus A bus name, any case (an unknown name does nothing)
+---@param mute boolean true silences the bus, false lets it through again
 function AudioModule.set_bus_mute(bus, mute) end
 
 ---Solos a bus (only soloed buses - and what they feed - are heard).
 ---
 ---Example: `Audio.set_bus_solo("Music", true)`
----@param bus AudioBus
----@param solo boolean
+---@param bus AudioBus A bus name, any case (an unknown name does nothing)
+---@param solo boolean true solos the bus, false takes it out of solo
 function AudioModule.set_bus_solo(bus, solo) end
 
 ---Pans a bus: -1 left, 0 centre, 1 right.
 ---
 ---Example: `Audio.set_bus_pan("Ambience", -0.3)`
----@param bus AudioBus
----@param pan number
+---@param bus AudioBus A bus name, any case (an unknown name does nothing)
+---@param pan number -1 left, 0 centre, 1 right (clamped to -1..1)
 function AudioModule.set_bus_pan(bus, pan) end
 
 ---The mixer's buses, Master first.
 ---
 ---Example: `for _, name in ipairs(Audio.get_buses()) do print(name, Audio.get_bus_volume(name)) end`
----@return string[]
+---@return string[] Every bus name, Master first
 function AudioModule.get_buses() end
 
 ---A bus's level right now (post-fader peaks, falling off smoothly) - for in-game meters or music-reactive effects.
 ---
 ---Example: `local l, r = Audio.bus_peak("Music"); self.node.scale = {1 + l * 0.2, 1 + l * 0.2}`
----@param bus AudioBus
----@return number left
----@return number right
+---@param bus AudioBus A bus name, any case
+---@return number left Left level now, about 0..1 (above 1 when the bus clips; 0 for an unknown bus)
+---@return number right Right level now, same scale
 function AudioModule.bus_peak(bus) end
 
 ---Sets an effect parameter on a bus: the effect by type name (the first of it) or 1-based position. Types and parameters: eq (low_gain, low_freq, mid_gain, mid_freq, high_gain, high_freq), lowpass / highpass (cutoff, resonance), compressor (threshold, ratio, attack, release, makeup), limiter (ceiling, release), delay (time, feedback, mix), reverb (size, damping, mix), distortion (drive, mix, output).
 ---
 ---Example: `Audio.set_effect("Music", "lowpass", "cutoff", 600) -- muffle the music underwater`
----@param bus AudioBus
----@param effect string|integer
----@param param string
----@param value number
----@return boolean ok false when there's no such bus / effect / parameter
+---@param bus AudioBus A bus name, any case
+---@param effect string|integer The effect's type name in lowercase ("lowpass", "reverb"; the first of that type on the bus) or its 1-based position in the bus's chain
+---@param param string The parameter name, e.g. "cutoff" (lowercase, from the list above)
+---@param value number The new value in the parameter's unit (Hz, dB, ms, ratio or 0..1), clamped to its range
+---@return boolean true when set; false when there's no such bus, effect or parameter
 function AudioModule.set_effect(bus, effect, param, value) end
 
 ---Enables or bypasses an effect on a bus.
 ---
 ---Example: `Audio.set_effect_enabled("Music", "lowpass", in_water)`
----@param bus AudioBus
----@param effect string|integer
----@param enabled boolean
+---@param bus AudioBus A bus name, any case
+---@param effect string|integer The effect's lowercase type name (the first of that type) or 1-based position
+---@param enabled boolean true runs the effect, false bypasses it
 function AudioModule.set_effect_enabled(bus, effect, enabled) end
 
 ---A low-pass filter on the whole mix (e.g. underwater, a pause menu) - a Low-pass effect on the Master bus.
 ---
 ---Example: `Audio.set_lowpass(800)  -- muffled while the pause menu is open`
----@param hz number Cutoff in Hz; 0 turns it off
+---@param hz number Cutoff in Hz (about 40..20000; lower sounds more muffled); 0 or less bypasses the filter
 function AudioModule.set_lowpass(hz) end
 
 ---Reverb on the whole mix - a Reverb effect on the Master bus.
 ---
 ---Example: `Audio.set_reverb(0.4, 0.8)`
----@param mix number 0..1 (0 turns it off)
+---@param mix number Wet amount 0..1 (clamped); 0 bypasses the reverb
 ---@param size? number Room size 0..1 (default 0.5)
 function AudioModule.set_reverb(mix, size) end
 
 ---Where positional sounds are heard from (nil: the current camera).
 ---
 ---Example: `Audio.set_listener(Scene.find_node("Player"))`
----@param node Node?
+---@param node Node? The node positional sounds are heard from; nil goes back to the current camera (as does destroying the node)
 function AudioModule.set_listener(node) end
 
 ---Fades one MusicNode out (stopping it) while another fades in.
 ---
 ---Example: `Audio.crossfade(Scene.find_node("ExploreMusic"), Scene.find_node("BattleMusic"), 2.0)`
----@param from Node? MusicNode playing now
----@param to Node MusicNode to fade in (started if needed)
----@param seconds number
+---@param from Node? The MusicNode to fade out and stop at the end; nil (or another node type) only fades in
+---@param to Node The MusicNode to fade to full volume, started if it isn't playing
+---@param seconds number Fade length in seconds
 function AudioModule.crossfade(from, to, seconds) end
 
 ---Streams a music track from the given file path.
 ---
 ---Example: `Audio.play_music("music/theme.ogg", true)`
----@param path AudioPath|string File path, e.g. "assets/audio/theme.ogg"
----@param loop? boolean Whether to loop playback (default true)
----@param bus? string The mixer bus (default "Music")
+---@param path AudioPath|string The music file, project-relative (e.g. "audio/theme.ogg"); streamed from disk, restarted from the beginning if already playing
+---@param loop? boolean true repeats the track, false plays it once (default true)
+---@param bus? string The mixer bus by name, any case (default: the file's import bus, else Music); an unknown name plays into Master
 function AudioModule.play_music(path, loop, bus) end
 
 ---Stops playing the specified music stream.
 ---
 ---Example: `Audio.stop_music("music/theme.ogg")`
----@param path AudioPath|string
+---@param path AudioPath|string The same file path given to play_music
 function AudioModule.stop_music(path) end
 
 ---Pauses playback of the specified music stream.
 ---
 ---Example: `Audio.pause_music("music/theme.ogg")`
----@param path AudioPath|string
+---@param path AudioPath|string The same file path given to play_music
 function AudioModule.pause_music(path) end
 
 ---Resumes playback of the specified paused music stream.
 ---
 ---Example: `Audio.resume_music("music/theme.ogg")`
----@param path AudioPath|string
+---@param path AudioPath|string The same file path given to play_music
 function AudioModule.resume_music(path) end
 
 ---Checks if the specified music stream is currently playing.
 ---
 ---Example: `if not Audio.is_music_playing("music/theme.ogg") then Audio.play_music("music/theme.ogg") end`
----@param path AudioPath|string
----@return boolean
+---@param path AudioPath|string The same file path given to play_music
+---@return boolean true while the track has been started and hasn't ended or been stopped (still true while paused)
 function AudioModule.is_music_playing(path) end
 
 ---Sets volume for a specific music stream.
 ---
 ---Example: `Audio.set_music_volume("music/theme.ogg", 0.6)`
----@param path AudioPath|string
----@param volume number Volume between 0.0 and 1.0
+---@param path AudioPath|string The same file path given to play_music
+---@param volume number Linear 0..1 before the bus fader (negative counts as 0); the next play_music starts at the file's own volume again
 function AudioModule.set_music_volume(path, volume) end
 
 ---Sets the global master audio volume.
 ---
 ---Example: `Audio.set_master_volume(0.75)`
----@param volume number Volume between 0.0 (silent) and 1.0 (full)
+---@param volume number 0 (silent) to 1 (full), clamped: the Master bus fader, same as set_bus_volume("master", volume)
 function AudioModule.set_master_volume(volume) end
 
 
@@ -10400,22 +10400,22 @@ local CameraModule = {}
 ---Gets current target world position of the camera.
 ---
 ---Example: `local cx, cy = Camera.get_target_position()`
----@return number x
----@return number y
+---@return number x World X the camera is moving toward (follow target plus offset while following); 0 with no current camera
+---@return number y World Y the camera is moving toward; 0 with no current camera
 function CameraModule.get_target_position() end
 
 ---Sets target world position for the camera.
 ---
 ---Example: `local x, y = self.node:get_position(); Camera.set_target_position(x, y)`
----@param x number
----@param y number
+---@param x number World X to look at, in px (a Vec2 also works here, with y left out)
+---@param y number World Y to look at, in px
 function CameraModule.set_target_position(x, y) end
 
 ---Sets a node for the camera to smoothly follow (nil stops following).
 ---A follow target picked in the Inspector is set automatically when the scene loads.
 ---
 ---Example: `Camera.set_target(Scene.find_node("Player"))`
----@param target Node?
+---@param target Node? The node to follow (Single Target mode, snapped to at once); nil stops following it
 function CameraModule.set_target(target) end
 
 ---@class CameraTargetOptions
@@ -10432,14 +10432,14 @@ function CameraModule.set_target(target) end
 ---follow target joins the group first. Adding a node again updates its options.
 ---
 ---Example: `Camera.add_target(Scene.find_node("Boss"), {weight = 2, radius = 120})`
----@param target Node
----@param options? CameraTargetOptions
+---@param target Node The node to add to the framed group; adding it again updates its options
+---@param options? CameraTargetOptions weight (default 1), weight_x, weight_y, radius in px (default 50), offset_x, offset_y, priority; nil for the defaults
 function CameraModule.add_target(target, options) end
 
 ---Takes a node out of the group.
 ---
 ---Example: `Camera.remove_target(Scene.find_node("Boss"))`
----@param target Node
+---@param target Node The node to take out of the group; nothing happens if it isn't in it
 function CameraModule.remove_target(target) end
 
 ---Stops following: clears the group and the follow target.
@@ -10450,58 +10450,58 @@ function CameraModule.clear_targets() end
 ---The node the camera follows (single target), or nil.
 ---
 ---Example: `local target = Camera.get_target(); if target then Log.info(target.name) end`
----@return Node?
+---@return Node? The single follow target, or nil when there is none or no current camera
 function CameraModule.get_target() end
 
 ---Every node the camera follows (the group, or the single target).
 ---
 ---Example: `for _, node in ipairs(Camera.get_targets()) do Log.info(node.name) end`
----@return Node[]
+---@return Node[] The group's live nodes (or the single target alone); an empty list with no current camera
 function CameraModule.get_targets() end
 
 ---Gets configured target zoom level.
 ---
 ---Example: `local zoom = Camera.get_zoom(); Camera.set_zoom(zoom * 1.1)`
----@return number
+---@return number The zoom the camera is easing to (2 = everything twice as big); 1 with no current camera
 function CameraModule.get_zoom() end
 
 ---Sets camera target zoom.
 ---
 ---Example: `Camera.set_zoom(2.0)`
----@param zoom number
+---@param zoom number New zoom, 1 = normal, 2 = twice as big; clamped to the camera's Min Zoom and Max Zoom (default 0.1 to 10), eased when Smooth Zoom is on
 function CameraModule.set_zoom(zoom) end
 
 ---Gets screen offset vector.
 ---
 ---Example: `local ox, oy = Camera.get_offset()`
----@return number ox
----@return number oy
+---@return number ox Horizontal offset in world px; 0 with no current camera
+---@return number oy Vertical offset in world px; 0 with no current camera
 function CameraModule.get_offset() end
 
 ---Sets screen offset vector.
 ---
 ---Example: `Camera.set_offset(0, -40)`
----@param ox number
----@param oy number
+---@param ox number Horizontal shift of the look point, in world px (positive looks further right); a Vec2 also works, with oy left out
+---@param oy number Vertical shift of the look point, in world px (negative looks higher)
 function CameraModule.set_offset(ox, oy) end
 
 ---Gets camera rotation in degrees.
 ---
 ---Example: `local deg = Camera.get_rotation(); Camera.set_rotation(deg + 90 * dt)`
----@return number
+---@return number The camera's rotation right now, in degrees; 0 with no current camera
 function CameraModule.get_rotation() end
 
 ---Sets camera rotation in degrees.
 ---
 ---Example: `Camera.set_rotation(15)`
----@param degrees number
+---@param degrees number New rotation in degrees, clockwise; eased when Smooth Rotation is on
 function CameraModule.set_rotation(degrees) end
 
 ---Shakes the current camera: its Shake Preset (Custom: its Shake Types / Speed / Intensity). Strength is how far it moves, in pixels.
 ---
 ---Example: `Camera.shake(6, 0.3)`
----@param strength? number How far it moves (px); default the preset's
----@param duration? number Duration in seconds; default the preset's
+---@param strength? number How far it moves, in px; nil uses the Shake Preset's strength
+---@param duration? number How long it lasts, in seconds; nil uses the preset's (an endless preset stays endless)
 function CameraModule.shake(strength, duration) end
 
 ---Immediately stops active screen shake.
@@ -10512,28 +10512,28 @@ function CameraModule.stop_shake() end
 ---Checks if screen shake is active.
 ---
 ---Example: `if not Camera.is_shaking() then Camera.shake(4, 0.2) end`
----@return boolean
+---@return boolean True while a shake is playing; false with no current camera
 function CameraModule.is_shaking() end
 
 ---Adds shake trauma to the active advanced camera (stacks up to 1; see AdvancedCameraNode).
 ---
 ---Example: `Camera.add_trauma(0.3)`
----@param amount number 0..1
+---@param amount number Trauma to add, 0 to 1; the total is capped at 1 and does nothing without an Advanced Camera
 function CameraModule.add_trauma(amount) end
 
 ---The advanced camera the scene's camera shows (nil if there are none).
 ---
 ---Example: `local cam = Camera.get_active()`
----@return AdvancedCameraNode?
+---@return AdvancedCameraNode? The active AdvancedCameraNode, or nil when the scene has none
 function CameraModule.get_active() end
 
 ---Constrains camera movement within bounding rectangle limits.
 ---
 ---Example: `Camera.set_limits(0, 3200, 0, 1800)`
----@param left number
----@param right number
----@param top number
----@param bottom number
+---@param left number Leftmost world X the view may show, in px
+---@param right number Rightmost world X the view may show, in px
+---@param top number Topmost world Y the view may show, in px
+---@param bottom number Bottommost world Y the view may show, in px
 function CameraModule.set_limits(left, right, top, bottom) end
 
 ---Clears all bounding rectangle limits.
@@ -10544,28 +10544,28 @@ function CameraModule.clear_limits() end
 ---Transforms screen coordinates to world coordinates.
 ---
 ---Example: `local wx, wy = Camera.screen_to_world(Input.get_mouse_position())`
----@param sx number Screen X
----@param sy number Screen Y
----@return number wx World X
----@return number wy World Y
+---@param sx number Screen X in px from the left edge (a Vec2 also works, with sy left out)
+---@param sy number Screen Y in px from the top edge
+---@return number wx World X under that screen point (the input unchanged with no current camera)
+---@return number wy World Y under that screen point
 function CameraModule.screen_to_world(sx, sy) end
 
 ---Transforms world coordinates to screen pixel coordinates.
 ---
 ---Example: `local sx, sy = Camera.world_to_screen(self.node:get_position())`
----@param wx number World X
----@param wy number World Y
----@return number sx Screen X
----@return number sy Screen Y
+---@param wx number World X in px (a Vec2 also works, with wy left out)
+---@param wy number World Y in px
+---@return number sx Screen X in px from the left edge (the input unchanged with no current camera)
+---@return number sy Screen Y in px from the top edge
 function CameraModule.world_to_screen(wx, wy) end
 
 ---Gets visible world bounds rectangle currently seen by camera.
 ---
 ---Example: `local x, y, w, h = Camera.get_visible_world_bounds()`
----@return number x
----@return number y
----@return number width
----@return number height
+---@return number x World X of the view's left edge
+---@return number y World Y of the view's top edge
+---@return number width Width of the view in world px (shrinks as zoom grows)
+---@return number height Height of the view in world px
 function CameraModule.get_visible_world_bounds() end
 
 
@@ -10576,57 +10576,57 @@ local PhysicsModule = {}
 ---Gets world gravity vector in pixels per second squared.
 ---
 ---Example: `local gx, gy = Physics.get_gravity()`
----@return number gx
----@return number gy
+---@return number gx Horizontal gravity in px per second squared
+---@return number gy Vertical gravity in px per second squared (positive pulls down)
 function PhysicsModule.get_gravity() end
 
 ---Sets world gravity vector.
 ---
 ---Example: `Physics.set_gravity(0, 980)`
----@param gx number
----@param gy number
+---@param gx number Horizontal gravity in px per second squared (a Vec2 also works, with gy left out)
+---@param gy number Vertical gravity in px per second squared; positive pulls down, 0 for none
 function PhysicsModule.set_gravity(gx, gy) end
 
 ---Draws collision shapes, joints and areas while the game runs (debugging);
 ---the project's Show Colliders setting (physics.debug_draw) sets the start.
 ---
 ---Example: `if Input.is_key_pressed("F3") then Physics.set_debug_draw(not Physics.get_debug_draw()) end`
----@param on boolean
+---@param on boolean True draws colliders, joints and areas over the game; false hides them
 function PhysicsModule.set_debug_draw(on) end
 
 ---Whether colliders are drawn while the game runs.
 ---
 ---Example: `local showing = Physics.get_debug_draw()`
----@return boolean
+---@return boolean True while colliders are drawn
 function PhysicsModule.get_debug_draw() end
 
 ---Checks if physics simulation is paused.
 ---
 ---Example: `if Physics.is_paused() then Physics.set_paused(false) end`
----@return boolean
+---@return boolean True while the physics simulation is paused
 function PhysicsModule.is_paused() end
 
 ---Pauses or unpauses physics simulation.
 ---
 ---Example: `Physics.set_paused(true)`
----@param paused boolean
+---@param paused boolean True freezes bodies (scripts keep running); false resumes
 function PhysicsModule.set_paused(paused) end
 
 ---Casts a ray between start and end world points against non-sensor colliders.
 ---
 ---Example: `local hit = Physics.raycast(x, y, x, y + 64); if hit and hit.node then Log.info(hit.node.name) end`
----@param startX number
----@param startY number
----@param endX number
----@param endY number
----@return RaycastHit? hit Raycast hit details or nil if no obstacle was struck
+---@param startX number World X where the ray starts, in px (a Vec2 also works, with startY left out)
+---@param startY number World Y where the ray starts, in px
+---@param endX number World X where the ray ends, in px (a Vec2 also works, with endY left out)
+---@param endY number World Y where the ray ends, in px
+---@return RaycastHit? hit The closest hit: point_x, point_y, normal_x, normal_y, fraction 0 to 1 along the ray, and node; nil when nothing solid is in the way
 function PhysicsModule.raycast(startX, startY, endX, endY) end
 
 ---The project's name for collision layer n (Project Settings > Physics), or "".
 ---
 ---Example: `local name = Physics.layer_name(3); Log.info("Layer 3: " .. name)`
----@param n integer 1-16
----@return string name
+---@param n integer Layer number, 1 to 16
+---@return string name The layer's name from Project Settings, or an empty string when unnamed or out of range
 function PhysicsModule.layer_name(n) end
 
 
@@ -10637,40 +10637,40 @@ local SceneModule = {}
 ---Finds any node in the active scene hierarchy by name.
 ---
 ---Example: `local player = Scene.find_node("Player"); if player then player:queue_free() end`
----@param name NodeName|string Name of node to find
----@return Node? node Found node or nil
+---@param name NodeName|string The node's exact name (case-sensitive); the first match anywhere in the scene
+---@return Node? node The first node with that name, or nil when there is none
 function SceneModule.find_node(name) end
 
 ---Every node in the active scene with a tag, in tree order.
 ---
 ---Example: `for _, enemy in ipairs(Scene.find_by_tag("enemy")) do enemy:queue_free() end`
----@param tag NodeTag|string
----@return Node[]
+---@param tag NodeTag|string The tag to look for, as set in the Inspector or with node:add_tag
+---@return Node[] Every node with the tag, in tree order; an empty list when none has it
 function SceneModule.find_by_tag(tag) end
 
 ---Sets the scene's ambient light (0..1): the colour where no light reaches.
 ---White = an unlit scene. With LightNodes, the scene is lit by them on top.
 ---
 ---Example: `Scene.set_ambient(0.2, 0.2, 0.35)`
----@param r number
----@param g number
----@param b number
----@param a? number
+---@param r number Red, 0 to 1
+---@param g number Green, 0 to 1
+---@param b number Blue, 0 to 1
+---@param a? number Alpha, 0 to 1; default 1
 function SceneModule.set_ambient(r, g, b, a) end
 
 ---Gets the scene's ambient light (0..1).
 ---
 ---Example: `local r, g, b, a = Scene.get_ambient()`
----@return number r
----@return number g
----@return number b
----@return number a
+---@return number r Red, 0 to 1 (1 when the scene sets no ambient)
+---@return number g Green, 0 to 1
+---@return number b Blue, 0 to 1
+---@return number a Alpha, 0 to 1
 function SceneModule.get_ambient() end
 
 ---Gets the name of the currently active scene.
 ---
 ---Example: `Log.info("Entered scene: " .. Scene.get_name())`
----@return string
+---@return string The active scene's name, or an empty string when no scene is loaded
 function SceneModule.get_name() end
 
 ---@alias TransitionKind "fade"|"wipe_left"|"wipe_right"|"wipe_up"|"wipe_down"|"circle"|"crossfade"|"dissolve"|"pixelate"|"slide_left"|"slide_right"|"slide_up"|"slide_down"|"push_left"|"push_right"|"push_up"|"push_down"
@@ -10701,8 +10701,8 @@ function SceneModule.get_name() end
 ---threads), then a transition into the target once it's loaded.
 ---
 ---Example: `Scene.change_scene("level_2", {transition = "slide_left", duration = 0.6, easing = "out_cubic"})`
----@param name SceneName|ScenePath A scene's name, or its file
----@param transition? SceneTransition
+---@param name SceneName|ScenePath The scene's name, or its file ("scenes/level_2.scene.json"); an unknown one logs an error and nothing happens
+---@param transition? SceneTransition How to switch: transition, duration, easing, color, pause, loading and more; nil uses the project's default transition, or switches at once
 function SceneModule.change_scene(name, transition) end
 
 ---Names a shader transition: a fragment shader whose `texture0` is the old
@@ -10711,40 +10711,40 @@ function SceneModule.change_scene(name, transition) end
 ---`Scene.change_scene(name, {transition = "<name>"})`.
 ---
 ---Example: `Scene.register_transition("swirl", "shaders/swirl.fs")`
----@param name string
----@param shader string A project .fs file (or "builtin:<name>")
+---@param name string The name to use as transition in Scene.change_scene
+---@param shader string A project fragment shader file ("shaders/swirl.fs") or "builtin:<name>"
 function SceneModule.register_transition(name, shader) end
 
 ---Starts loading a scene's assets in the background (a little each frame),
 ---so switching to it later is quick.
 ---
 ---Example: `Scene.preload("level_2")`
----@param name SceneName
+---@param name SceneName The scene's name (not its file); an unknown name does nothing
 function SceneModule.preload(name) end
 
 ---Returns how far a scene started with Scene.preload has loaded, from 0 to 1.
 ---
 ---Example: `local p = Scene.preload_progress("level_2"); Log.info("Loading: " .. math.floor(p * 100) .. "%")`
----@param name SceneName
----@return number progress 0..1
+---@param name SceneName The scene's name, as passed to Scene.preload
+---@return number How much has loaded, 0 to 1; 0 for an unknown scene
 function SceneModule.preload_progress(name) end
 
 ---Returns whether a scene transition is currently in progress.
 ---
 ---Example: `if Scene.is_transitioning() then return end`
----@return boolean
+---@return boolean True while a scene transition is running
 function SceneModule.is_transitioning() end
 
 ---How far the scene behind the loading screen has loaded, 0 to 1 (1 when nothing is loading) - for a loading screen's progress bar.
 ---
 ---Example: `self.node:get_node("Bar").value = Scene.loading_progress() * 100`
----@return number
+---@return number How much of the target scene has loaded, 0 to 1; 1 when nothing is loading
 function SceneModule.loading_progress() end
 
 ---The name of the scene the loading screen is loading, or nil.
 ---
 ---Example: `local next = Scene.loading_target()`
----@return string?
+---@return string? The name of the scene the loading screen is loading, or nil when no loading screen is up
 function SceneModule.loading_target() end
 
 ---Reloads the currently active scene.
@@ -10755,16 +10755,16 @@ function SceneModule.reload() end
 ---Returns an array of all active nodes in the current scene.
 ---
 ---Example: `Log.info("Node count: " .. #Scene.get_nodes())`
----@return Node[]
+---@return Node[] Every node in the active scene; an empty list with no scene
 function SceneModule.get_nodes() end
 
 ---Dynamically instantiates a new scene node and adds it to the active scene graph.
 ---
 ---Example: `local timer = Scene.create_node("TimerNode", "Cooldown", self.node)`
----@param nodeType string Any node type: "Node", "TextureNode", "UIButtonNode", "UILabelNode", "PathNode", ... (or a short name from Add Node's search: "sprite", "timer", "path")
----@param name? string Optional node name
----@param parent? Node Optional parent node (defaults to scene root)
----@return Node? node Newly spawned node
+---@param nodeType string A node type or Add Node search name ("TimerNode", "timer", "sprite"); default "Node", and an unknown type also makes a plain Node
+---@param name? string The new node's name; nil leaves the default
+---@param parent? Node The node to add it under; nil adds it under the scene's root
+---@return Node? node The new node, or nil when there is no active scene
 function SceneModule.create_node(nodeType, name, parent) end
 
 ---Instances a component at runtime - `Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position, { speed = 300 })`.
@@ -10772,12 +10772,12 @@ function SceneModule.create_node(nodeType, name, parent) end
 ---numbers or a Vec2). An optional table of property values is applied to the root's script before ready() runs. Returns its root node (typed per component), or nil.
 ---
 ---Example: `local b = Scene.instantiate("components/Bullet.component.json", self.node:get_parent(), self.node.position, { speed = 300 })`
----@param component ComponentPath|string
----@param parent? Node
----@param x? number|Vec2|table<string, any>
----@param y? number|table<string, any>
----@param properties? table<string, any>
----@return Node?
+---@param component ComponentPath|string The component file, e.g. "components/Bullet.component.json"
+---@param parent? Node The node to add it under; nil adds it under the scene's root
+---@param x? number|Vec2|table<string, any> X position local to the parent, in px; or a Vec2 position; or the properties table when no position is given
+---@param y? number|table<string, any> Y position local to the parent, in px; or the properties table when x is a Vec2
+---@param properties? table<string, any> Values for the root's script properties, set before its ready() runs
+---@return Node? The component's root node, or nil (with a warning) when the file isn't a component
 function SceneModule.instantiate(component, parent, x, y, properties) end
 
 ---Creates a node of a built-in type ("TimerNode") or one of the project's custom
@@ -10785,31 +10785,31 @@ function SceneModule.instantiate(component, parent, x, y, properties) end
 ---`parent` (else the scene's root), at x, y local to it (two numbers or a Vec2). nil for an unknown type.
 ---
 ---Example: `local hurt = Scene.create("Hurtbox", self.node, 0, -8)`
----@param typeName string
----@param parent? Node
----@param x? number|Vec2
----@param y? number
----@return Node?
+---@param typeName string A built-in node type ("TimerNode") or one of the project's custom node types ("Hurtbox")
+---@param parent? Node The node to add it under; nil adds it under the scene's root
+---@param x? number|Vec2 X position local to the parent, in px; or a Vec2 position; nil keeps the type's default
+---@param y? number Y position local to the parent, in px
+---@return Node? The new node, or nil (with a warning) for an unknown type
 function SceneModule.create(typeName, parent, x, y) end
 
 ---The current scene's nodes of a type - a custom node type ("Hurtbox"), a
 ---built-in one ("AreaNode") or "Node" - in tree order (`node:is`).
 ---
 ---Example: `for _, h in ipairs(Scene.find_nodes_of_type("Hurtbox")) do h:get_script():heal(1) end`
----@param typeName string
----@return Node[]
+---@param typeName string A custom node type ("Hurtbox"), a built-in type ("AreaNode"), or "Node" for every node
+---@return Node[] The matching nodes in tree order; an empty list when none match
 function SceneModule.find_nodes_of_type(typeName) end
 
 ---Checks if debug collider and bounds rendering is enabled on this scene.
 ---
 ---Example: `local on = Scene.get_draw_bounds(); Scene.set_draw_bounds(not on)`
----@return boolean
+---@return boolean True while the scene draws debug colliders and bounds; false with no scene
 function SceneModule.get_draw_bounds() end
 
 ---Enables or disables debug bounds rendering on the scene.
 ---
 ---Example: `Scene.set_draw_bounds(true)`
----@param draw boolean
+---@param draw boolean True draws debug colliders and bounds; false hides them
 function SceneModule.set_draw_bounds(draw) end
 
 
@@ -10820,19 +10820,19 @@ local LogModule = {}
 ---Logs an informational message.
 ---
 ---Example: `Log.info("player spawned at", x, y)`
----@param ... any
+---@param ... any Values to print, any type (each turned to text like tostring, joined by tabs)
 function LogModule.info(...) end
 
 ---Logs a warning message.
 ---
 ---Example: `Log.warn("missing texture:", "textures/coin.png")`
----@param ... any
+---@param ... any Values to print as a warning, any type (joined by tabs)
 function LogModule.warn(...) end
 
 ---Logs an error message.
 ---
 ---Example: `Log.error("could not load level", "level_2")`
----@param ... any
+---@param ... any Values to print as an error, any type (joined by tabs); the script keeps running
 function LogModule.error(...) end
 
 
@@ -10859,9 +10859,9 @@ CurveModule = {}
 ---The curve's value at t (linear between points; clamped at the ends).
 ---
 ---Example: `local speed = self.max_speed * Curve.sample(self.speed_curve, self.elapsed / 2.0)`
----@param points number[][] The property's value ({{t, v}, ...})
----@param t number 0..1 (any value works)
----@return number
+---@param points number[][] A curve property's value: {t, v} points sorted by t; an empty list samples as 0
+---@param t number Where to sample, usually 0..1; before the first point or past the last the end value holds
+---@return number The value at t, linear between the points around it
 function CurveModule.sample(points, t) end
 
 ---Sampling gradient script properties ({ type = "gradient" }: stops {t, r, g, b, a}).
@@ -10871,12 +10871,12 @@ GradientModule = {}
 ---The gradient's colour at t (linear between stops), 0..1 channels.
 ---
 ---Example: `local r, g, b, a = Gradient.sample(self.tint, self.health / self.max_health)`
----@param stops number[][] The property's value ({{t, r, g, b, a}, ...})
----@param t number 0..1
----@return number r
----@return number g
----@return number b
----@return number a
+---@param stops number[][] A gradient property's value: {t, r, g, b, a} stops sorted by t (alpha default 1); an empty list gives white
+---@param t number Where to sample, usually 0..1; before the first stop or past the last the end colour holds
+---@return number r Red 0..1
+---@return number g Green 0..1
+---@return number b Blue 0..1
+---@return number a Alpha 0..1
 function GradientModule.sample(stops, t) end
 
 
@@ -11133,13 +11133,13 @@ local NavigationModule = {}
 ---Same as map:nav_find_path(x1, y1, x2, y2, opts).
 ---
 ---Example: `local path = Navigation.find_path(Scene.find_node("Level"), x, y, tx, ty, {smooth = false})`
----@param map Node TileMapNode or LdtkLevelNode
----@param x1 number
----@param y1 number
----@param x2 number
----@param y2 number
----@param opts? NavOptions
----@return number[][]? path
+---@param map Node The TileMapNode, LdtkLevelNode or NavigationRegionNode whose grid to path on
+---@param x1 number Start world X, in px
+---@param y1 number Start world Y, in px
+---@param x2 number Goal world X, in px
+---@param y2 number Goal world Y, in px
+---@param opts? NavOptions diagonal (default true), smooth (default true), radius in px (default 0), walkable_painted (TileMap only); nil for the defaults
+---@return number[][]? path Waypoints as {x, y} world points from the start to the goal (or the nearest spot that fits the radius); nil when unreachable, the start or goal is blocked, or map has no grid
 function NavigationModule.find_path(map, x1, y1, x2, y2, opts) end
 
 ---@type NavigationModule
@@ -11160,19 +11160,19 @@ local LocaleModule = {}
 ---Switches the language texts are shown in (a column of the locale tables).
 ---
 ---Example: `Locale.set("fr")`
----@param language Language|string e.g. "fr" (the project's locale tables' languages)
+---@param language Language|string A language column of the locale tables, e.g. "fr" (not checked: a name the tables lack makes texts fall back)
 function LocaleModule.set(language) end
 
 ---Returns the current language.
 ---
 ---Example: `if Locale.get() == "fr" then self.flag = "textures/flag_fr.png" end`
----@return string language
+---@return string language The current language, e.g. "en"; the tables' first language when none was set, "" when there are no tables
 function LocaleModule.get() end
 
 ---Returns the languages available in the project's locale tables.
 ---
 ---Example: `for _, lang in ipairs(Locale.languages()) do Log.info(lang) end`
----@return string[] languages The languages the tables have
+---@return string[] languages The language columns of the project's locale/*.csv files, in header order (empty when there are none)
 function LocaleModule.languages() end
 
 ---@type LocaleModule
@@ -11189,45 +11189,45 @@ local ProjectModule = {}
 ---Loads a complete project either from a directory containing project.json or from a .rayzr package archive.
 ---
 ---Example: `local ok = Project.load("assets/demo_project.rayzr")`
----@param pathOrDir string Path to directory or .rayzr file
----@return boolean success
+---@param pathOrDir string A folder holding project.json, or a .rayzr package file; relative to the working directory or absolute
+---@return boolean success true when the project loaded; false when the path, the package or its project.json is missing or invalid
 function ProjectModule.load(pathOrDir) end
 
 ---Packages a loose project directory into a portable .rayzr container archive with zlib compression.
 ---
 ---Example: `local ok = Project.export_rayzr("assets/demo_project", "bin/demo_project.rayzr")`
----@param projectDir string Source directory path
----@param outRayzrPath string Target output .rayzr file path
----@return boolean success
+---@param projectDir string The project folder to pack (the one holding project.json), relative to the working directory or absolute
+---@param outRayzrPath string Where to write the .rayzr file
+---@return boolean success true when the package was written
 function ProjectModule.export_rayzr(projectDir, outRayzrPath) end
 
 ---The old name of export_rayzr (before the engine was renamed from Ore).
 ---
 ---Example: `Project.export_ore("assets/demo_project", "bin/demo_project.rayzr")`
 ---@deprecated Use Project.export_rayzr
----@param projectDir string
----@param outRayzrPath string
----@return boolean success
+---@param projectDir string The project folder to pack, as for export_rayzr
+---@param outRayzrPath string Where to write the .rayzr file
+---@return boolean success true when the package was written
 function ProjectModule.export_ore(projectDir, outRayzrPath) end
 
 ---Serializes the currently active scene graph and node states to a JSON formatted string.
 ---
 ---Example: `local json = Project.serialize_scene(); Log.info(#json, "bytes")`
----@return string json
+---@return string json The current scene as JSON text (the scene file format); "{}" when no scene is loaded
 function ProjectModule.serialize_scene() end
 
 ---Reads a text file either from the mounted .rayzr archive package or the loose project directory.
 ---
----Example: `local text = Project.read_file("data/items.json"); if text then Log.info(text) end`
----@param relPath string Project-relative file path
----@return string? content File contents as a string, or nil if not found
+---Example: `local credits = Project.read_file("data/credits.txt"); if credits then label:set_text(credits) end`
+---@param relPath string Project-relative path, e.g. "data/items.json" (the package first, then the project folder)
+---@return string? content The file's text, or nil when it isn't found
 function ProjectModule.read_file(relPath) end
 
 ---Checks if a file exists in the active project (.rayzr archive or disk).
 ---
 ---Example: `if Project.has_file("levels/level_2.json") then Scene.change_scene("level_2") end`
----@param relPath string Project-relative file path
----@return boolean exists
+---@param relPath string Project-relative path, e.g. "levels/level_2.json"
+---@return boolean exists true when the file is in the package (when running from one) or in the project folder
 function ProjectModule.has_file(relPath) end
 
 ---@type ProjectModule
@@ -11251,46 +11251,46 @@ function VectorModule.begin_path() end
 ---Starts a subpath at a point.
 ---
 ---Example: `Vector.move_to(0, 0); Vector.line_to(100, 0); Vector.stroke()`
----@param x number
----@param y number
+---@param x number Start x in px (local space)
+---@param y number Start y in px (+y is down)
 function VectorModule.move_to(x, y) end
 
 ---A straight line from the current point.
 ---
 ---Example: `Vector.move_to(0, 0); Vector.line_to(50, 80); Vector.stroke()`
----@param x number
----@param y number
+---@param x number End x in px
+---@param y number End y in px
 function VectorModule.line_to(x, y) end
 
 ---A quadratic Bezier curve (one control point) from the current point.
 ---
 ---Example: `Vector.move_to(0, 0); Vector.quad_to(50, -60, 100, 0); Vector.stroke()`
----@param cx number Control point x
----@param cy number Control point y
----@param x number End x
----@param y number End y
+---@param cx number Control point x in px
+---@param cy number Control point y in px
+---@param x number End x in px
+---@param y number End y in px
 function VectorModule.quad_to(cx, cy, x, y) end
 
 ---A cubic Bezier curve (two control points) from the current point.
 ---
 ---Example: `Vector.move_to(0, 0); Vector.cubic_to(30, -50, 70, 50, 100, 0); Vector.stroke()`
----@param c1x number
----@param c1y number
----@param c2x number
----@param c2y number
----@param x number
----@param y number
+---@param c1x number First control point x in px (pulls the start)
+---@param c1y number First control point y in px
+---@param c2x number Second control point x in px (pulls the end)
+---@param c2y number Second control point y in px
+---@param x number End x in px
+---@param y number End y in px
 function VectorModule.cubic_to(c1x, c1y, c2x, c2y, x, y) end
 
 ---A circular arc around (cx, cy) from angle a0 to a1 in degrees (clockwise on screen; ccw = true for the other way), joined to the current point by a line.
 ---
 ---Example: `Vector.begin_path(); Vector.move_to(0, 0); Vector.arc(0, 0, 40, -30, 30); Vector.close_path(); Vector.fill()`
----@param cx number
----@param cy number
----@param r number
----@param a0 number Start angle (degrees)
----@param a1 number End angle (degrees)
----@param ccw? boolean
+---@param cx number Centre x in px
+---@param cy number Centre y in px
+---@param r number Radius in px
+---@param a0 number Start angle in degrees (0 points right)
+---@param a1 number End angle in degrees
+---@param ccw? boolean true to sweep counter-clockwise on screen; default false (clockwise)
 function VectorModule.arc(cx, cy, r, a0, a1, ccw) end
 
 ---Closes the current subpath (a line back to its start; joins instead of caps).
@@ -11301,27 +11301,27 @@ function VectorModule.close_path() end
 ---Adds a rectangle subpath.
 ---
 ---Example: `Vector.fill_color("#3366ff"); Vector.rect(-50, -25, 100, 50); Vector.fill()`
----@param x number
----@param y number
----@param w number
----@param h number
+---@param x number Left edge in px
+---@param y number Top edge in px
+---@param w number Width in px
+---@param h number Height in px
 function VectorModule.rect(x, y, w, h) end
 
 ---Adds a circle subpath.
 ---
 ---Example: `Vector.fill_color(1, 0.8, 0); Vector.circle(0, 0, 30); Vector.fill()`
----@param x number Centre x
----@param y number Centre y
----@param r number Radius
+---@param x number Centre x in px
+---@param y number Centre y in px
+---@param r number Radius in px
 function VectorModule.circle(x, y, r) end
 
 ---Adds an ellipse subpath.
 ---
 ---Example: `Vector.ellipse(0, 0, 60, 30); Vector.stroke()`
----@param x number Centre x
----@param y number Centre y
----@param rx number
----@param ry number
+---@param x number Centre x in px
+---@param y number Centre y in px
+---@param rx number Horizontal radius in px
+---@param ry number Vertical radius in px
 function VectorModule.ellipse(x, y, rx, ry) end
 
 ---Fills the current path with the fill colour or paint (the fill rule decides holes).
@@ -11342,97 +11342,97 @@ function VectorModule.clip() end
 ---Sets the fill colour (and drops a fill paint).
 ---
 ---Example: `Vector.fill_color("#ff8800")`
----@param color string|number[]|number "#rrggbb[aa]", {r, g, b[, a]} or r, g, b[, a] (0..1)
----@param g? number
----@param b? number
----@param a? number
+---@param color string|number[]|number "#rrggbb[aa]", a list {r, g, b[, a]} (0..1), or the red channel 0..1 when g and b follow; anything else is opaque black (default white)
+---@param g? number Green 0..1 when color is a number
+---@param b? number Blue 0..1 when color is a number
+---@param a? number Alpha 0..1 when color is a number; default 1
 function VectorModule.fill_color(color, g, b, a) end
 
 ---Sets the stroke colour (and drops a stroke paint).
 ---
 ---Example: `Vector.stroke_color(0, 0, 0, 0.5)`
----@param color string|number[]|number
----@param g? number
----@param b? number
----@param a? number
+---@param color string|number[]|number "#rrggbb[aa]", a list {r, g, b[, a]} (0..1), or the red channel 0..1 when g and b follow; anything else is opaque black (default black)
+---@param g? number Green 0..1 when color is a number
+---@param b? number Blue 0..1 when color is a number
+---@param a? number Alpha 0..1 when color is a number; default 1
 function VectorModule.stroke_color(color, g, b, a) end
 
 ---Fills with a gradient (in the coordinates in effect when fill() is called).
 ---
 ---Example: `Vector.fill_paint(Vector.linear_gradient(0, -50, 0, 50, { {0, "#3060c0"}, {1, "#ffd080"} }))`
----@param paint VectorPaint
+---@param paint VectorPaint A gradient from Vector.linear_gradient or Vector.radial_gradient; a table without stops is ignored
 function VectorModule.fill_paint(paint) end
 
 ---Strokes with a gradient.
 ---
 ---Example: `Vector.stroke_paint(Vector.radial_gradient(0, 0, 40, { {0, "#ffffff"}, {1, "#0040ff"} }))`
----@param paint VectorPaint
+---@param paint VectorPaint A gradient from Vector.linear_gradient or Vector.radial_gradient; a table without stops is ignored
 function VectorModule.stroke_paint(paint) end
 
 ---A linear gradient from (x0, y0) to (x1, y1): stops are {offset 0..1, colour}; spread "pad" (default), "reflect" or "repeat".
 ---
 ---Example: `local sky = Vector.linear_gradient(0, -100, 0, 0, { {0, "#203c90"}, {1, "#f08050"} })`
----@param x0 number
----@param y0 number
----@param x1 number
----@param y1 number
----@param stops {[1]: number, [2]: string|number[]}[]
----@param spread? "pad"|"reflect"|"repeat"
----@return VectorPaint
+---@param x0 number Start x in px (offset 0)
+---@param y0 number Start y in px
+---@param x1 number End x in px (offset 1)
+---@param y1 number End y in px
+---@param stops {[1]: number, [2]: string|number[]}[] List of {offset, colour} pairs: offset 0..1, colour as in fill_color (up to 16 stops)
+---@param spread? "pad"|"reflect"|"repeat" Past the ends: "pad" (default) holds the end colours, "reflect" mirrors, "repeat" starts over
+---@return VectorPaint A paint for fill_paint or stroke_paint
 function VectorModule.linear_gradient(x0, y0, x1, y1, stops, spread) end
 
 ---A radial gradient around (cx, cy) with radius r.
 ---
 ---Example: `local orb = Vector.radial_gradient(0, 0, 40, { {0, "#ffffff"}, {0.4, "#78c8ff"}, {1, "#0a2878"} })`
----@param cx number
----@param cy number
----@param r number
----@param stops {[1]: number, [2]: string|number[]}[]
----@param spread? "pad"|"reflect"|"repeat"
----@return VectorPaint
+---@param cx number Centre x in px (offset 0)
+---@param cy number Centre y in px
+---@param r number Radius in px (offset 1)
+---@param stops {[1]: number, [2]: string|number[]}[] List of {offset, colour} pairs: offset 0..1, colour as in fill_color (up to 16 stops)
+---@param spread? "pad"|"reflect"|"repeat" Past the ends: "pad" (default) holds the end colours, "reflect" mirrors, "repeat" starts over
+---@return VectorPaint A paint for fill_paint or stroke_paint
 function VectorModule.radial_gradient(cx, cy, r, stops, spread) end
 
 ---Sets the stroke width (scaled by the current transform).
 ---
 ---Example: `Vector.stroke_width(6)`
----@param w number
+---@param w number Width in px, default 1 (negative counts as 0)
 function VectorModule.stroke_width(w) end
 
 ---How stroke corners join: "miter" (default), "round" or "bevel".
 ---
 ---Example: `Vector.line_join("round")`
----@param join "miter"|"round"|"bevel"
+---@param join "miter"|"round"|"bevel" "miter" (default), "round" or "bevel"; anything else is miter
 function VectorModule.line_join(join) end
 
 ---How open strokes end: "butt" (default), "round" or "square".
 ---
 ---Example: `Vector.line_cap("round")`
----@param cap "butt"|"round"|"square"
+---@param cap "butt"|"round"|"square" "butt" (default), "round" or "square"; anything else is butt
 function VectorModule.line_cap(cap) end
 
 ---How far a miter corner may reach (in half widths) before it is beveled (default 4).
 ---
 ---Example: `Vector.miter_limit(10)`
----@param limit number
+---@param limit number How far a miter may reach, in half stroke widths; default 4, at least 1
 function VectorModule.miter_limit(limit) end
 
 ---A dash pattern (on, off, ... lengths; an odd list repeats) and its offset; an empty table = solid.
 ---
 ---Example: `Vector.dash({12, 6}); Vector.circle(0, 0, 40); Vector.stroke()`
----@param pattern number[]
----@param offset? number
+---@param pattern number[] On, off, ... lengths in px (up to 8; an odd list repeats); {} for a solid line
+---@param offset? number How far into the pattern the stroke starts, in px; default 0
 function VectorModule.dash(pattern, offset) end
 
 ---The fill rule: "nonzero" (default) or "evenodd" (overlaps alternate filled / empty).
 ---
 ---Example: `Vector.fill_rule("evenodd"); Vector.circle(0, 0, 40); Vector.circle(0, 0, 20); Vector.fill()`
----@param rule "nonzero"|"evenodd"
+---@param rule "nonzero"|"evenodd" "nonzero" (default) or "evenodd"; anything else is nonzero
 function VectorModule.fill_rule(rule) end
 
 ---The opacity of what is drawn next (0..1).
 ---
 ---Example: `Vector.opacity(0.5); Vector.rect(0, 0, 50, 50); Vector.fill()`
----@param a number
+---@param a number Opacity 0..1 for what is drawn next; default 1
 function VectorModule.opacity(a) end
 
 ---Saves the style and transform (restore brings them back).
@@ -11448,21 +11448,21 @@ function VectorModule.restore() end
 ---Moves what is drawn next.
 ---
 ---Example: `Vector.translate(100, 0)`
----@param x number
----@param y number
+---@param x number Px to move right
+---@param y number Px to move down
 function VectorModule.translate(x, y) end
 
 ---Rotates what is drawn next (degrees, clockwise on screen).
 ---
 ---Example: `Vector.rotate(self.angle)`
----@param degrees number
+---@param degrees number Angle in degrees, clockwise on screen
 function VectorModule.rotate(degrees) end
 
 ---Scales what is drawn next (one number: both axes).
 ---
 ---Example: `Vector.scale(2)`
----@param sx number
----@param sy? number
+---@param sx number Horizontal factor (1 = as is, negative flips); default 1
+---@param sy? number Vertical factor; nil uses sx
 function VectorModule.scale(sx, sy) end
 
 ---@type VectorModule
