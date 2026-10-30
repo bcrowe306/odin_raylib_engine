@@ -1038,6 +1038,7 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 				for p in e.Struct_CollectProperties(e.PhysicsShape, &shape) {
 					if p.name == "type" do continue
 					if !shape_prop_relevant(shape.type, p.name) do continue
+					if node.typeId == e.AreaNode && !area_shape_prop(p.name) do continue
 					UI_PropLabel(pretty_name(p.name))
 					property_widget(state, node, p, false)
 				}
@@ -1071,6 +1072,19 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 			append(shapes, s)
 		}
 	}
+}
+
+// area_shape_prop: does a shape setting do anything on an Area (#173)? Its
+// shapes are always sensors (no contacts, no material); their sensor events
+// follow the Area's Monitoring. Its collision layers say what it detects.
+@(private = "file")
+area_shape_prop :: proc(name: string) -> bool {
+	switch name {
+	case "isSensor", "enableSensorEvents", "enableContactEvents", "enableHitEvents", "enablePreSolveEvents",
+	     "density", "friction", "restitution", "rollingResistance", "tangentSpeed":
+		return false
+	}
+	return true
 }
 
 // inspector_camera_follow: the node the camera follows (saved with the

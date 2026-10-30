@@ -763,6 +763,72 @@ CharacterMoverNode_GetWorldCapsule :: proc(cm: ^CharacterMoverNode) -> b2.Capsul
 	return CharacterMoverNode_ShapeWorldCapsule(cm, nil)
 }
 
+@(private = "file")
+Mover_Cast :: struct {
+	self:        b2.BodyId,
+	mover:       b2.ShapeProxy,
+	translation: [2]f32,
+	fraction:    f32,
+}
+
+// character_mover_cast: how far (0..1) a capsule moves along `translation`
+// before a solid shape - Box2D's World_CastMover step for step (each
+// shape cast with canEncroach; shapes it starts inside ignored), but past
+// sensors (it stopped at Areas, #173) and the mover's own proxy body.
+character_mover_cast :: proc(worldId: b2.WorldId, capsule: b2.Capsule, translation: [2]f32, filter: b2.QueryFilter, self: b2.BodyId) -> f32 {
+	pts := [2]b2.Vec2{capsule.center1, capsule.center2}
+	mc := Mover_Cast{self = self, mover = b2.MakeProxy(pts[:], capsule.radius), translation = translation, fraction = 1}
+	r := capsule.radius
+	lo := [2]f32{min(capsule.center1.x, capsule.center2.x) - r, min(capsule.center1.y, capsule.center2.y) - r}
+	hi := [2]f32{max(capsule.center1.x, capsule.center2.x) + r, max(capsule.center1.y, capsule.center2.y) + r}
+	box := b2.AABB{lowerBound = {min(lo.x, lo.x + translation.x), min(lo.y, lo.y + translation.y)}, upperBound = {max(hi.x, hi.x + translation.x), max(hi.y, hi.y + translation.y)}}
+	callback :: proc "c" (shapeId: b2.ShapeId, ctx: rawptr) -> bool {
+		mc := cast(^Mover_Cast)ctx
+		if b2.Shape_IsSensor(shapeId) do return true // (a trigger: no obstacle)
+		body := b2.Shape_GetBody(shapeId)
+		if b2.Body_IsValid(mc.self) && body == mc.self do return true
+		proxy, ok := shape_proxy(shapeId)
+		if !ok do return true
+		out := b2.ShapeCast({
+			proxyA = proxy, transformA = b2.Body_GetTransform(body),
+			proxyB = mc.mover, transformB = b2.Transform{q = b2.Rot{c = 1}},
+			translationB = mc.translation, maxFraction = mc.fraction, canEncroach = true,
+		})
+		if out.fraction == 0 do return true // (overlapping at the start: ignored, as the mover cast does)
+		if out.hit && out.fraction < mc.fraction do mc.fraction = out.fraction
+		return true
+	}
+	_ = b2.World_OverlapAABB(worldId, box, filter, callback, &mc)
+	return mc.fraction
+}
+
+// shape_proxy: a shape's distance proxy in its body's frame.
+@(private = "file")
+shape_proxy :: proc "contextless" (shapeId: b2.ShapeId) -> (b2.ShapeProxy, bool) {
+	#partial switch b2.Shape_GetType(shapeId) {
+	case .circleShape:
+		c := b2.Shape_GetCircle(shapeId)
+		p := [1]b2.Vec2{c.center}
+		return b2.MakeProxy(p[:], c.radius), true
+	case .capsuleShape:
+		c := b2.Shape_GetCapsule(shapeId)
+		p := [2]b2.Vec2{c.center1, c.center2}
+		return b2.MakeProxy(p[:], c.radius), true
+	case .segmentShape:
+		sg := b2.Shape_GetSegment(shapeId)
+		p := [2]b2.Vec2{sg.point1, sg.point2}
+		return b2.MakeProxy(p[:], 0), true
+	case .chainSegmentShape:
+		cs := b2.Shape_GetChainSegment(shapeId)
+		p := [2]b2.Vec2{cs.segment.point1, cs.segment.point2}
+		return b2.MakeProxy(p[:], 0), true
+	case .polygonShape:
+		poly := b2.Shape_GetPolygon(shapeId)
+		return b2.MakeProxy(poly.vertices[:poly.count], poly.radius), true
+	}
+	return {}, false
+}
+
 CharacterMover_PlaneResultCallback :: proc "c" (shapeId: b2.ShapeId, planeResult: ^b2.PlaneResult, ctx: rawptr) -> bool {
 	if planeResult == nil || !planeResult.hit || ctx == nil {
 		return true
@@ -966,16 +1032,17 @@ CharacterMoverNode_MoveAndSlide :: proc(cm: ^CharacterMoverNode, gameContext: ^G
 		cm.velocity = b2.ClipVector(cm.velocity, planesSlice)
 	}
 
-	// 4. Cast mover along solved translation to prevent tunneling (World_CastMover)
+	// 4. Cast mover along solved translation to prevent tunneling - past
+	// sensors (Areas are triggers: #173) and its own proxy body.
 	fraction: f32 = 1.0
 	if len(cm.shapes) == 0 {
 		moverCapsule := CharacterMoverNode_GetWorldCapsule(cm)
-		fraction = b2.World_CastMover(pw.worldId, moverCapsule, solverResult.translation, qFilter)
+		fraction = character_mover_cast(pw.worldId, moverCapsule, solverResult.translation, qFilter, cm.bodyId)
 	} else {
 		for &s in cm.shapes {
 			if s.isSensor do continue
 			cap := CharacterMoverNode_ShapeWorldCapsule(cm, &s)
-			f := b2.World_CastMover(pw.worldId, cap, solverResult.translation, qFilter)
+			f := character_mover_cast(pw.worldId, cap, solverResult.translation, qFilter, cm.bodyId)
 			if f < fraction do fraction = f
 		}
 	}

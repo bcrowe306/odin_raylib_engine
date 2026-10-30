@@ -1,0 +1,33 @@
+# #173: an Area's shapes don't show the settings that do nothing on an Area
+# (always a sensor: no contact events, no material) - a Static Body's do.
+wait 5
+click @asset.new-scene
+wait 5
+click @hier.add
+type trigger area
+click @addnode.create
+wait 5
+hover @insp.prop:maskLayers
+wait 2
+expect item:insp.prop:maskLayers == visible
+expect item:insp.prop:friction == missing
+expect item:insp.prop:isSensor == missing
+expect item:insp.prop:enableContactEvents == missing
+screenshot area_shape
+click @hier.add
+wait 3
+click @addnode.search
+type static platform
+click @addnode.create
+wait 5
+hover @insp.add-shape
+wait 2
+click @insp.add-shape
+wait 3
+hover @insp.prop:friction
+wait 2
+expect item:insp.prop:friction == visible
+hover @insp.prop:isSensor
+wait 2
+expect item:insp.prop:isSensor == visible
+screenshot body_shape
