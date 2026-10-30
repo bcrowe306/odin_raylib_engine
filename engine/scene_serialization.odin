@@ -1051,6 +1051,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		FrameAnimationNode_Start(fan)
 	case SoundNode:
 		sn := cast(^SoundNode)node
+		sn.renderable = true // (draws nothing; older scenes saved it hidden, #217)
 		// "audio": one sound (older scenes too); "sounds": paths, or
 		// {path, weight} (#204). Paths stay when audio isn't up.
 		rm := resource_manager(ctx)

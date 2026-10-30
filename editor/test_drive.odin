@@ -829,6 +829,9 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	case "preview-anim": return fmt.tprintf("%s %d", "playing" if state.previewAnimPlaying else "paused", len(state.previewAnimFrames)), true
 	case "asset-selected": return filepath.base(state.selectedAssetPath), true
 	case "audio-preview": return "playing" if state.selectedNode != nil && AudioPreview_Playing(state.selectedNode) else "stopped", true
+	case "sound-next": // the selected Sound Effect's own Sequential place (#217: previews don't move it)
+		if n := state.selectedNode; n != nil && n.typeId == e.SoundNode do return fmt.tprint((cast(^e.SoundNode)n).nextIndex), true
+		return "", true
 	case "anim-keys": return AnimKeys_Summary(), true // selected keys in the timeline
 	case "anim-zoom": return fmt.tprintf("%.2f", AnimationPanel_Zoom()), true
 	case "slicer-selection": return Slicer_Selection(), true

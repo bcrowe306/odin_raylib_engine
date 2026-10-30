@@ -33,6 +33,37 @@ click @insp.sound-play:2
 expect audio-preview == playing
 screenshot sound_list
 
+# #217: the preview steps through Sequential on its own place (the node's
+# stays), and waits out Delay Random.
+wait-until audio-preview == stopped timeout=600
+hover @insp.prop:playMode
+click @insp.prop:playMode
+click @pick:Sequential
+wait 2
+click @insp.audio-preview
+expect audio-preview == playing
+click @insp.audio-preview
+click @insp.audio-preview
+click @insp.audio-preview
+expect audio-preview == stopped
+expect sound-next == 0
+dblclick @insp.prop:delayRandom
+key cmd+a
+type 1
+key enter
+click @insp.audio-preview
+expect audio-preview == playing
+click @insp.audio-preview
+expect audio-preview == stopped
+dblclick @insp.prop:delayRandom
+key cmd+a
+type 0
+key enter
+hover @insp.prop:playMode
+click @insp.prop:playMode
+click @pick:Random
+wait 2
+
 # Variation: +/- 2 semitones.
 dblclick @insp.prop:pitchRandom
 key cmd+a
@@ -47,6 +78,8 @@ wait 2
 expect file:scenes/main.scene.json contains "sounds": ["audio/blip.wav", "audio/cannon-gunshot-1.wav"]
 expect file:scenes/main.scene.json contains "playMode": "Random"
 expect file:scenes/main.scene.json contains "pitchRandom": 2
+# #217: a Sound Effect isn't hidden (no crossed-out eye).
+expect file:scenes/main.scene.json !contains "visible": false
 
 # One removed: saved as a single "audio" again.
 click @insp.sound-remove:2
