@@ -308,6 +308,8 @@ Editor_CreateNode :: proc(state: ^EditorState, typeName: string, displayName: st
 	if state.snapGrid && state.gridSize > 0 {
 		node.position = snap_vec(node.position, state.gridSize)
 	}
+	// A Screen Layer sits at its anchor (its position is an offset from it).
+	if node.typeId == e.ScreenLayerNode do node.position = {}
 	give_default_shape(node)
 
 	e.ProcessNodeQueues(state.activeScene.manager, &state.game.gameContext)

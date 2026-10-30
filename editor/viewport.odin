@@ -174,6 +174,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 	lit := false
 	if state.activeScene != nil && state.activeScene.rootNode != nil {
 		e.ProcessNodeQueues(state.activeScene.manager, ctx)
+		state.activeScene.manager.screen = Editor_ScreenMapping(state) // Screen Layers over the camera frame (#175)
 		e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
 		Ldtk_EditorSync(state)
 		if state.isSimulating && !state.isPaused {
@@ -477,6 +478,25 @@ Viewport_DrawCameraFollow :: proc(state: ^EditorState) {
 		}
 		rl.DrawCircleLinesV(b, 12 / state.cameraZoom, col)
 	}
+}
+
+// Editor_ScreenMapping: where the game shows its frame - the scene camera's
+// view (as its frame is drawn: Viewport_DrawCameraBounds), or the default
+// viewport without a camera. Screen Layers are placed in it (#175).
+Editor_ScreenMapping :: proc(state: ^EditorState) -> e.Screen_Mapping {
+	vW: f32 = state.projectConfig.virtualWidth if state.projectConfig.virtualWidth > 0 else 1280.0
+	vH: f32 = state.projectConfig.virtualHeight if state.projectConfig.virtualHeight > 0 else 720.0
+	cam := Editor_SceneCamera(state)
+	if cam == nil do return {scale = 1, size = {vW, vH}}
+	if cam.viewportSize.x > 0 && cam.viewportSize.y > 0 do vW, vH = cam.viewportSize.x, cam.viewportSize.y
+	zoom: f32 = 1.0
+	if cam.currentZoom > 0 do zoom = cam.currentZoom
+	else if cam.targetZoom > 0 do zoom = cam.targetZoom
+	else if cam.zoom > 0 do zoom = cam.zoom
+	if zoom <= 0.001 do zoom = 1.0
+	center := e.CameraNode_ViewCenter(cam)
+	if state.isSimulating do center = cam.currentPosition
+	return {origin = center - [2]f32{vW, vH} * 0.5 / zoom, scale = 1 / zoom, size = {vW, vH}}
 }
 
 // Draw camera viewport boundaries, frustum framing brackets, center reticle, and limits

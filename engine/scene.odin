@@ -241,6 +241,7 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	}
 
 	nodeManager := scene.manager
+	nodeManager.screen = Screen_MappingForGame(gameContext) // Screen Layers: the frame (#175)
 
 	// Process Node Queues (any spawned or removed nodes)
 	Prof_Begin("scene.queues+ready")
@@ -292,7 +293,8 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 	// One traversal buckets renderable nodes by layer (hierarchy order is
 	// kept within a layer) instead of walking the whole tree per layer.
 	Prof_Begin("render.collect")
-	buckets := Scene_CollectRenderables(scene)
+	screenBuckets: [RenderLayer][dynamic]^Node
+	buckets := Scene_CollectRenderables(scene, &screenBuckets)
 	Prof_End()
 	renderStats = {}
 	// Lighting: the light map is built before the world layers draw and
@@ -387,6 +389,8 @@ RunScene :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32) {
 		rl.BeginTextureMode(frame^)
 		renderPixel.margin = 0
 	}
+	// Screen Layers: over the world, in screen space (no camera, no culling).
+	for layer in RenderLayer do if len(screenBuckets[layer]) > 0 do render_bucket(scene, screenBuckets[layer][:], gameContext, deltaTime)
 
 	// Render any active UI popups/dropdowns on top of all layers
 	UI_RenderActiveDropdownOverlay(gameContext)
@@ -499,11 +503,14 @@ Scene_FindNodeByType :: proc(scene: ^Scene, t: typeid) -> ^Node {
 // when given. The game uses RunScene, which also switches to the scene
 // camera per world layer.
 Scene_RenderAllLayers :: proc(scene: ^Scene, gameContext: ^GameContext, deltaTime: f32, view: Maybe(rl.Rectangle) = nil) {
-	buckets := Scene_CollectRenderables(scene)
+	screen: [RenderLayer][dynamic]^Node
+	buckets := Scene_CollectRenderables(scene, &screen)
 	renderStats = {}
 	if v, ok := view.?; ok do Render_SetView(v)
 	defer Render_ClearView()
 	for layer in RenderLayer do render_bucket(scene, buckets[layer][:], gameContext, deltaTime)
+	// Screen Layers last (on top); placed by the scene's screen mapping.
+	for layer in RenderLayer do render_bucket(scene, screen[layer][:], gameContext, deltaTime)
 }
 
 // render_bucket draws one layer's nodes, skipping those outside the view.
@@ -541,10 +548,20 @@ render_bucket :: proc(scene: ^Scene, nodes: []^Node, gameContext: ^GameContext, 
 // order, then Y-sorted subtrees (a ySort node's children by Y, each with
 // its subtree), then zIndex (stable). The sorts run on 16-byte items and
 // only where a ySort node / a zIndex is used.
-Scene_CollectRenderables :: proc(scene: ^Scene) -> (buckets: [RenderLayer][dynamic]^Node) {
-	collect: Render_Collect
+Scene_CollectRenderables :: proc(scene: ^Scene, screen: ^[RenderLayer][dynamic]^Node = nil) -> (buckets: [RenderLayer][dynamic]^Node) {
+	collect, onScreen: Render_Collect
 	for &l in collect.items do l = make([dynamic]Render_Item, context.temp_allocator)
+	for &l in onScreen.items do l = make([dynamic]Render_Item, context.temp_allocator)
+	// (Screen Layers' subtrees apart: drawn after the world, in screen space - #175.)
+	if screen != nil do collect.screen = &onScreen
 	if scene != nil && scene.manager != nil do render_walk(&collect, scene.manager, scene.rootNode, 0, 0)
+	buckets = render_buckets(&collect)
+	if screen != nil do screen^ = render_buckets(&onScreen)
+	return
+}
+
+@(private = "file")
+render_buckets :: proc(collect: ^Render_Collect) -> (buckets: [RenderLayer][dynamic]^Node) {
 	for &l, layer in collect.items {
 		if collect.anyZ {
 			for it in l do if it.z != 0 {
@@ -567,8 +584,9 @@ Render_Item :: struct {
 
 @(private = "file")
 Render_Collect :: struct {
-	items: [RenderLayer][dynamic]Render_Item,
-	anyZ:  bool,
+	items:  [RenderLayer][dynamic]Render_Item,
+	anyZ:   bool,
+	screen: ^Render_Collect, // where Screen Layers' subtrees go (nil: with the rest)
 }
 
 // render_walk appends a subtree's drawables; z = the parent's global
@@ -577,6 +595,10 @@ Render_Collect :: struct {
 render_walk :: proc(c: ^Render_Collect, m: ^NodeManager, node: ^Node, z: i32, key: f32) {
 	if node == nil || !node.enabled do return
 	if Render_HideEditorHidden && node.editorHidden do return
+	if node.typeId == ScreenLayerNode && c.screen != nil {
+		render_walk(c.screen, m, node, 0, 0) // (its own order: screen space)
+		return
+	}
 	z := z + node.zIndex
 	if z != 0 do c.anyZ = true
 	if node.renderable && (node.render != nil || node.drawBounds != nil || Script_HasDraw(node, nil)) {
