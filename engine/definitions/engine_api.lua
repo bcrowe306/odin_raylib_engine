@@ -1613,7 +1613,7 @@ function FrameAnimationNode:set_property(path, value, y) end
 ---@field reverse boolean Play the animation backwards.
 ---@field autoplay boolean Start playing the current animation when the node becomes ready.
 ---@field fps number Frames per second of the animations that don't set their own (the Animation tab's FPS b...
----@field defaultAnimation string The animation selected (and autoplayed) when the scene loads; empty = the one saved as ...
+---@field defaultAnimation string The animation selected when the scene loads (it plays with Autoplay); empty = the one s...
 
 ---@alias AnimationPlayerNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1630,7 +1630,7 @@ function FrameAnimationNode:set_property(path, value, y) end
 ---| "reverse" # boolean - Play the animation backwards.
 ---| "autoplay" # boolean - Start playing the current animation when the node becomes ready.
 ---| "fps" # number - Frames per second of the animations that don't set their own (the Animation tab's FPS b...
----| "defaultAnimation" # string - The animation selected (and autoplayed) when the scene loads; empty = the one saved as ...
+---| "defaultAnimation" # string - The animation selected when the scene loads (it plays with Autoplay); empty = the one s...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -8357,7 +8357,9 @@ function AtlasSpriteNode:atlas_get_region() end
 -- ----------------------------------------------------------------------------
 
 ---Plays an animation, optionally switching to the specified animation name first.
----With `blend` > 0 the previous pose crossfades into the new animation over that many seconds.
+---Naming the animation already playing changes nothing (a paused one resumes), so calling it
+---every frame is fine; without a name it restarts the current one. An unknown name warns and
+---changes nothing. With `blend` > 0 the previous pose crossfades into the new animation over that many seconds.
 ---Event tracks fire while playing: method tracks call `self:<method>(frame)` on the
 ---track's target node script; sound tracks play their audio file on the key's frame.
 ---

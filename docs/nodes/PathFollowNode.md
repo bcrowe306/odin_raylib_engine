@@ -30,8 +30,9 @@ face the way it goes.
 3. In the Inspector:
    - **Progress**: the distance along the path in pixels. Change it to
      preview where it starts; the follower moves there in the viewport.
-   - **Speed**: pixels per second it moves by itself (negative: backwards,
-     0: only scripts move it).
+   - **Speed**: pixels per second it moves by itself (negative: backwards
+     - with **Stop** and **Progress** 0 it sets off from the far end; 0:
+     only scripts move it).
    - **Loop**: what happens at the end: **Stop**, **Loop** (back to the
      start, or round a closed path) or **Ping Pong** (turn back).
    - **Rotate**: face the direction of travel.

@@ -50,8 +50,9 @@ turn nodes on and off at set moments.
 6. Events: **Add Track > Events** > *Call Script Methods*, *Play Sounds*,
    *Emit Particles*, *Spawn Component* or *Enable / Disable*.
 7. In the Inspector set **Autoplay** to start playing when the scene
-   starts, and the player's **FPS** (used by animations without their
-   own).
+   starts (the starred animation, the Inspector's **Default** - without
+   Autoplay it's only selected), and the player's **FPS** (used by
+   animations without their own).
 
 The full editor guide is the editor README's *Animation timeline*;
 curves, events and onion skin are in
