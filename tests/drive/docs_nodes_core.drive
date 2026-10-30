@@ -1,0 +1,70 @@
+# Screenshots for the camera and audio nodes' pages (docs/nodes/*.md, #45):
+# Camera 2D, Advanced Camera, Sound Effect, Music Streamer.
+#   scripts/docs/screenshots.sh docs_nodes_core
+wait 5
+
+# Camera 2D: its frame at the project's virtual resolution.
+click @asset.new-scene
+click @hier.add
+type camera 2d
+click @addnode.create
+expect node:Camera2D.type == CameraNode
+key shift+home
+wait 1
+hover @insp.camera.follow
+wait 1
+annotate @node:Camera2D The camera; the yellow frame around it is what the game shows (the project's virtual resolution)
+annotate @toolbar.camera Show camera frames
+annotate @insp.camera.follow Follow Target: the node it follows
+annotate @window:inspector Follow Mode, smoothing, zoom, limits and shake (Properties)
+screenshot node_CameraNode
+
+# Advanced Camera: a virtual camera's frame (violet).
+click @asset.new-scene
+click @hier.add
+type advanced camera
+click @addnode.create
+expect node:AdvancedCamera.type == AdvancedCameraNode
+# Zoom 2: its frame is half the host camera's.
+dblclick @insp.prop:zoom
+key cmd+a
+type 2
+key enter
+key shift+home
+hover @insp.advcam.follow
+wait 1
+annotate @node:AdvancedCamera The advanced camera; its violet frame (here at Zoom 2) shows its name and priority
+annotate @insp.advcam.follow Targets: Follow Target (and group, path, limit node)
+annotate @window:inspector Priority, Follow Mode, damping, zoom, limits, blend and shake
+screenshot node_AdvancedCameraNode
+
+# Sound Effect: a list of sounds, play mode, variation, preview.
+click @asset.new-scene
+click @hier.add
+type sound effect
+click @addnode.create
+expect node:SoundEffect.type == SoundNode
+click @insp.sound-add
+click @pick:audio/cannon-gunshot-1.wav
+wait 2
+expect item:insp.sound:1 == visible
+hover @insp.audio-preview
+wait 1
+annotate @insp.sound-add Add Sound (or drop audio from Assets)
+annotate @insp.audio-preview Preview: hear a play by the Play Mode
+annotate @window:inspector Play Mode, volume / pitch / pan / delay variation, cooldown, bus, positional
+screenshot node_SoundNode
+
+# Music Streamer: one track, streamed.
+click @asset.new-scene
+click @hier.add
+type music streamer
+click @addnode.create
+expect node:MusicStreamer.type == MusicNode
+click @insp.audio
+click @pick:audio/cannon-gunshot-1.wav
+wait 2
+annotate @insp.audio The track (Audio File)
+annotate @insp.audio-preview Preview: hear it through its bus
+annotate @window:inspector Volume, pitch, pan, bus, caption, Looping, Autoplay
+screenshot node_MusicNode
