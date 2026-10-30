@@ -32,8 +32,8 @@ draws only; it takes no input.
 - The line runs across the middle of that height, from the left edge to the
   right edge.
 - With a **Label**, the text is drawn at the left in blue (13 px) and the
-  line starts just after it. The label colour is fixed; **Line Color** is
-  the line only.
+  line starts just after it; the separator is then at least 18 px tall.
+  The label colour is fixed; **Line Color** is the line only.
 - In a [UI Container](UIContainerNode.md) the container sets its position.
   In a vertical container with Stretch alignment (the default) it also sets
   the width, so the line spans the column.

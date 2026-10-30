@@ -29,8 +29,8 @@ it's on.
 - **Keyboard and gamepad**: Tab / Shift+Tab or Up / Down move the focus to
   it. On the focused switch, Enter, Space or the gamepad's A button flips
   it, Right turns it on and Left turns it off.
-- **No event**: the switch raises no signal of its own. A script reads its
-  `active` property, each frame or when it needs the value.
+- **`value_changed`** fires when the switch flips (by click, key or
+  gamepad), with its new state; a script can also read `active` any time.
 
 ## Example
 

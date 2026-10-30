@@ -419,6 +419,14 @@ prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
 			}
 		}
 	}
+	// A Tab Container's header is its tab bar (#229); a button with an icon
+	// draws its text at the icon's size.
+	if node.typeId == e.UITabContainerNode {
+		switch name {
+		case "title", "showHeader", "headerHeight", "headerColor", "titleColor", "direction", "columns", "autoSizeHeight": return false
+		}
+	}
+	if node.typeId == e.UIButtonNode && name == "fontSize" && (cast(^e.UIButtonNode)node).icon != .None do return false
 	// A camera: the Custom shake's settings, Screen Offset only when custom (#215).
 	if node.typeId == e.CameraNode {
 		cam := cast(^e.CameraNode)node

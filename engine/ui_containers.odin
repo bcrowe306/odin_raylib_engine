@@ -186,6 +186,8 @@ UITabContainerNode :: struct {
 	activeTab: int `gui:"true" min:"0" max:"16"`,
 	tabSize: f32 `gui:"true" min:"20" max:"64"`,
 	contentRect: rl.Rectangle,
+	shownTab: int,          // the active tab last applied to the pages (-1: none yet)
+	onTabChanged: EventSubject, // "tab_changed"(index) - #229
 }
 
 UITabContainer :: UITabContainerNode
@@ -228,6 +230,8 @@ UITabContainerNode_Create :: proc(
 	tc.onDestroy = UITabContainerNode_Destroy
 	tc.update = UITabContainerNode_Update
 	tc.render = UITabContainerNode_Render
+	tc.shownTab = -1
+	InitializeSubject(&tc.onTabChanged, "tab_changed", tc)
 	scene->addNode(tc, parent)
 	return tc
 }
@@ -235,6 +239,27 @@ UITabContainerNode_Create :: proc(
 UITabContainerNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	tc := cast(^UITabContainerNode)node
 	delete(tc.tabNames)
+	DestroySubject(&tc.onTabChanged)
+}
+
+// tab_pages: the active tab's page (the UI child at its index) is shown, the
+// others are disabled (not drawn, no input), then the pages are laid out
+// (#229: every page used to show). A switch raises tab_changed.
+@(private = "file")
+tab_pages :: proc(tc: ^UITabContainerNode, gameContext: ^GameContext) {
+	if gameContext == nil || gameContext.scene == nil || gameContext.scene.manager == nil do return
+	m := gameContext.scene.manager
+	page := 0
+	for child in GetChildrenView(m, tc) {
+		if child == nil || !child.isUI do continue
+		child.enabled = page == tc.activeTab
+		page += 1
+	}
+	if tc.shownTab != tc.activeTab {
+		if tc.shownTab >= 0 do Notify(&tc.onTabChanged, rawptr(tc), tc.activeTab, gameContext)
+		tc.shownTab = tc.activeTab
+	}
+	UIContainerNode_LayoutChildren(&tc.container, m)
 }
 
 UITabContainerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
@@ -286,15 +311,14 @@ UITabContainerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 		}
 	}
 
-	if gameContext != nil && gameContext.scene != nil && gameContext.scene.manager != nil {
-		UIContainerNode_LayoutChildren(&tc.container, gameContext.scene.manager)
-	}
+	tab_pages(tc, gameContext)
 }
 
 UITabContainerNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	if !rl.IsWindowReady() do return
 	tc := cast(^UITabContainerNode)node
 	rect := UI_GetElementRect(&tc.ui)
+	if Render_EditorView do tab_pages(tc, gameContext) // (the editor doesn't update it)
 
 	tc.contentRect = uilib.RenderTabContainer(
 		rect,
@@ -302,8 +326,8 @@ UITabContainerNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 		tc.activeTab,
 		tc.tabDirection,
 		tc.tabSize,
-		tc.backgroundColor,
-		tc.borderColor,
+		tc.backgroundColor if tc.drawBackground else {},
+		tc.borderColor if tc.drawBorder else {},
 		focused = tc.focused,
 	)
 }
@@ -341,7 +365,7 @@ UIContainerNode_LayoutChildren :: proc(c: ^UIContainerNode, manager: ^NodeManage
 	containerOrigin := UI_GetElementPos(&c.ui)
 	containerOrigin = {math.round(containerOrigin.x), math.round(containerOrigin.y)}
 
-	headerH: f32 = math.round(c.headerHeight) if c.showHeader else 0
+	headerH: f32 = math.round(c.headerHeight) if c.showHeader && c.widgetType != .TabContainer else 0 // (a Tab Container's header is its tab bar)
 	if c.widgetType == .TabContainer {
 		tc := cast(^UITabContainerNode)c
 		if tc.tabDirection == .Horizontal {

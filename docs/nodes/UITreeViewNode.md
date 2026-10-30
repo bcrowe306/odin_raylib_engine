@@ -44,6 +44,7 @@ the start nest an item under the one above it (`Weapons`, then
 - **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
   it stays on screen; outside one it's drawn in the world (the camera moves
   it) and reads the mouse there too, so clicks line up either way.
+- **Collapsed** parents hide their children; Up / Down skip hidden rows.
 - The Tree View raises no signal when the selection changes; read
   `selectedId`.
 

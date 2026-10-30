@@ -44,14 +44,13 @@ View made in the editor always has the three default rows.
   with Tab, the arrow keys or the D-pad. While it has focus, Up / Down move
   the selection and stay on the list; Left / Right move the focus to the
   next control.
-- The list doesn't scroll and doesn't clip its rows, so make it tall enough
-  for all of them.
+- **Scrolling**: it shows the rows that fit; the mouse wheel over it scrolls
+  a row at a time, and moving the selection with the keys keeps it in view.
 - **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
   it stays on screen; outside one it's drawn in the world (the camera moves
   it) and reads the mouse there too, so clicks line up either way.
-- The List View raises no signal when the selection changes (the Add Node
-  description mentions `selected`, but this node doesn't have it). Read
-  `selectedIndex` when you need it.
+- **`selected`** fires when the selection changes (click, keys), with the
+  row's index (from 0); Enter or Space on the focused list raises it again.
 
 ## Example
 
