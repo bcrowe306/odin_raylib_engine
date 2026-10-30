@@ -121,7 +121,15 @@ AnimKeys_InspectorPanel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode
 	for k in keys do if anim.tracks[k.track].kind != .Property do allProps = false
 	if !allProps {
 		imgui.Dummy({0, 4})
-		UI_DimText("Event keys: right-click one in the timeline for its action.")
+		#partial switch tr0.kind {
+		case .EmitParticles, .InstantiateComponent, .SetEnabled:
+			if len(keys) == 1 {
+				row_label("Does")
+				Anim_EventKeyEditor(state, apn, tr0, &tr0.keys[first.index], ":insp")
+				return
+			}
+		}
+		UI_DimText("Event keys: right-click one in the timeline (or its track's settings) for its action.")
 		return
 	}
 	node := resolve(mgr, apn, tr0)

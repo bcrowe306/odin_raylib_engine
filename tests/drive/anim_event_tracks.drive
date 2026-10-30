@@ -1,0 +1,56 @@
+# Event tracks (#181): a particles track picks among the scene's emitters
+# only; its settings list each key (a burst of 7 set there); an enable track
+# on another node, its key turned to enable; the keys' labels; saved.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+
+# Particles: the menu lists the scene's emitters.
+click @anim.add-track
+click @anim.track-node:AnimationPlayer
+click @anim.track-particles
+expect item:anim.track-particles:StarfieldEmitter == visible
+click @anim.track-particles:StarfieldEmitter
+expect item:anim.event-target == visible
+click @anim.frame:2
+click @anim.key:@particles
+expect item:anim.event-particles:2 == visible
+click @anim.event-particles:2
+click @pick:Emit a burst
+wait 2
+dblclick @anim.event-particles-count:2
+key ctrl+a
+type 7
+key enter
+# The target picker: emitters only.
+click @anim.event-target
+expect item:pick:StarfieldEmitter == visible
+expect item:pick:PlayerShip == missing
+click @pick:StarfieldEmitter
+screenshot particles_track
+
+# Enable / disable on PlayerShip: the key at frame 3 turned to enable.
+click @anim.add-track
+click @anim.track-node:PlayerShip
+click @anim.track-enable
+click @anim.frame:3
+click @anim.key:@enable
+expect item:anim.event-enabled:3 == visible
+click @anim.event-enabled:3
+screenshot enable_track
+click @anim.track-settings:@enable
+click @anim.stop
+key ctrl+s
+expect file:scenes/main.scene.json contains "kind": "particles", "name": "particles", "units": "seconds", "keys": [{"t": 0.0833, "text": "emit 7"}]
+expect file:scenes/main.scene.json contains "kind": "enable", "name": "enable", "units": "seconds", "keys": [{"t": 0.1667, "text": "enable"}]
