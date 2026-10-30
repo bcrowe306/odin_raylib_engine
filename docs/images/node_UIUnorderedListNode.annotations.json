@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The list's area (empty: no items yet)", "x": 381, "y": 175, "w": 56, "h": 56},
+    {"label": "Selected Index, Default Bullet, Item Height", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

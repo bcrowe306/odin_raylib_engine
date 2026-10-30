@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The toolbar's bar (its buttons come from code)", "x": 301, "y": 312, "w": 56, "h": 56},
+    {"label": "Button Size, Spacing, Active Toggle Id", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

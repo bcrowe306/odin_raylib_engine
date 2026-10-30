@@ -1,0 +1,9 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The tabs along the top; children laid out below", "x": 418, "y": 157, "w": 56, "h": 56},
+    {"label": "Children of the tab container", "x": 1051, "y": 265, "w": 217, "h": 23},
+    {"label": "Tab Direction, Active Tab, Tab Size, layout and colours", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}
