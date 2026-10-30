@@ -232,86 +232,86 @@ local LevelGeneratorNode = {}
 ---
 ---Example: `if self.node:get_type() == "DynamicBodyNode" then Log.info("physics body") end`
 ---A custom node type's own name ("Hurtbox"): see `get_base_type` for its built-in type.
----@return string
+---@return string The type name, such as "TextureNode"; a custom node type's own name ("Hurtbox"); "Unknown" for a destroyed node
 function Node:get_type() end
 
 ---Gets the node's built-in type, also for a custom node type: "AreaNode" for a Hurtbox
 ---(an Area with its script); the same as `get_type()` for other nodes.
 ---
 ---Example: `if self.node:get_base_type() == "AreaNode" then Log.info("an area") end`
----@return string
+---@return string The built-in type name ("AreaNode" for a Hurtbox); "Unknown" for a destroyed node
 function Node:get_base_type() end
 
 ---Is the node of that type: its custom type ("Hurtbox"), its built-in type ("AreaNode"), or "Node" (every node)?
 ---
 ---Example: `if other:is("Hurtbox") then other:get_script():take_damage(2) end`
----@param typeName string
----@return boolean
+---@param typeName string A custom type ("Hurtbox"), a built-in type ("AreaNode") or "Node"; case-sensitive
+---@return boolean true when the node is of that type or inherits it; false for a destroyed node
 function Node:is(typeName) end
 
 ---Gets the display/debug name of the node.
 ---
 ---Example: `Log.info("Spawned " .. self.node:get_name())`
----@return string
+---@return string The node's name as shown in the Scene tree; nil for a destroyed node
 function Node:get_name() end
 
 ---Sets the display/debug name of the node.
 ---
 ---Example: `self.node:set_name("Enemy_" .. tostring(index))`
----@param name string
+---@param name string The new name; get_node paths and Scene.find_node look it up by this from now on
 function Node:set_name(name) end
 
 ---Gets the local position of the node.
 ---
 ---Example: `local x, y = self.node:get_position()`
----@return number x Local X position
----@return number y Local Y position
+---@return number x X in px, relative to the parent (0 for a destroyed node)
+---@return number y Y in px, relative to the parent (+y is down)
 function Node:get_position() end
 
 ---Sets the local position of the node.
 ---
 ---Example: `self.node:set_position(320, 180)`
----@param x number Local X position
----@param y number Local Y position
+---@param x number X in px, relative to the parent; a Vec2 or {x, y} here sets both
+---@param y number Y in px, relative to the parent (+y is down); omit when x is a vector
 function Node:set_position(x, y) end
 
 ---Translates the node position by the given delta offset.
 ---
 ---Example: `self.node:translate(self.speed * dt, 0)`
----@param dx number Delta X
----@param dy number Delta Y
+---@param dx number Pixels to move along X, in the parent's space; a Vec2 here moves on both axes
+---@param dy number Pixels to move along Y (+y is down); omit when dx is a vector
 function Node:translate(dx, dy) end
 
 ---Gets the local rotation of the node in degrees.
 ---
 ---Example: `local angle = self.node:get_rotation()`
----@return number rotation Rotation in degrees
+---@return number rotation Degrees relative to the parent, clockwise; not wrapped to 0..360
 function Node:get_rotation() end
 
 ---Sets the local rotation of the node in degrees.
 ---
 ---Example: `self.node:set_rotation(90)`
----@param degrees number Rotation in degrees
+---@param degrees number Degrees relative to the parent, clockwise (0 = unrotated)
 function Node:set_rotation(degrees) end
 
 ---Rotates the node by delta degrees.
 ---
 ---Example: `self.node:rotate(180 * dt)`
----@param degrees number Delta degrees
+---@param degrees number Degrees to add to the rotation; positive turns clockwise
 function Node:rotate(degrees) end
 
 ---Gets the local scale factor of the node.
 ---
 ---Example: `local sx, sy = self.node:get_scale()`
----@return number sx Scale X
----@return number sy Scale Y
+---@return number sx Horizontal multiplier relative to the parent (1 = as is, negative = flipped)
+---@return number sy Vertical multiplier relative to the parent
 function Node:get_scale() end
 
 ---Sets the local scale factor of the node.
 ---
 ---Example: `self.node:set_scale(-1, 1)`
----@param sx number Scale X
----@param sy? number Scale Y (defaults to sx if omitted)
+---@param sx number Horizontal multiplier (1 = as is, 2 = twice as wide, negative flips)
+---@param sy? number Vertical multiplier; omitted, the same as sx (a uniform scale)
 function Node:set_scale(sx, sy) end
 
 ---Shows another image on a TextureNode or an AtlasSpriteNode (project-relative
@@ -319,122 +319,122 @@ function Node:set_scale(sx, sy) end
 ---when the file can't be loaded.
 ---
 ---Example: `local sprite = self.node:get_node("Sprite"); sprite:set_texture("textures/coin.png")`
----@param path TexturePath|string Project-relative texture path
----@return boolean ok
+---@param path TexturePath|string Project-relative image path, e.g. "textures/coin.png"; the drawn size becomes the new image's
+---@return boolean ok true when the image loaded; false for other node types or a file that can't be loaded (the old image stays)
 function TextureNode:set_texture(path) end
 
 ---Gets the world-space global position of the node calculated from parent transforms.
 ---
 ---Example: `local gx, gy = self.node:get_global_position()`
----@return number x Global world X position
----@return number y Global world Y position
+---@return number x World X in px, with every parent's position, rotation and scale applied (computed before and after each frame's updates)
+---@return number y World Y in px (+y is down)
 function Node:get_global_position() end
 
 ---Gets the world-space global rotation of the node in degrees.
 ---
 ---Example: `local world_angle = self.node:get_global_rotation()`
----@return number rotation Global world rotation in degrees
+---@return number rotation World rotation in degrees: this node's plus every parent's
 function Node:get_global_rotation() end
 
 ---Checks if the node is actively updated in the scene loop.
 ---
 ---Example: `if not self.node:is_enabled() then return end`
----@return boolean
+---@return boolean This node's own Enabled flag (a disabled parent doesn't change it); false for a destroyed node
 function Node:is_enabled() end
 
 ---Enables or disables updates for the node and its children.
 ---
 ---Example: `Scene.find_node("Enemy"):set_enabled(false)`
----@param enabled boolean
+---@param enabled boolean false stops the node and its children: no update, no drawing, physics bodies stopped; true brings them back
 function Node:set_enabled(enabled) end
 
 ---Checks if the node is rendered in the scene draw loop.
 ---
 ---Example: `local shown = self.node:is_visible()`
----@return boolean
+---@return boolean This node's own Visible flag (true even when a parent is hidden); false for a destroyed node
 function Node:is_visible() end
 
 ---Sets whether the node is rendered.
 ---
 ---Example: `self.node:get_node("Shield"):set_visible(true)`
----@param visible boolean
+---@param visible boolean false stops this node drawing itself; it keeps updating, and its children still draw
 function Node:set_visible(visible) end
 
 ---Returns the component path of this node if it is a component root, or nil if it is not an instance root.
 ---
 ---Example: `local path = self.node:get_component(); if path then Log.info("Instance of " .. path) end`
----@return string?
+---@return string? The component file's project path when this node is a component instance's root; nil for any other node
 function Node:get_component() end
 
 ---Returns the root node of the linked component instance this node belongs to, or nil if not part of a component.
 ---
 ---Example: `local root = self.node:get_instance_root(); if root then Log.info("Belongs to root " .. root:get_name()) end`
----@return Node?
+---@return Node? The root of the component instance holding this node (itself when it is that root); nil outside a component
 function Node:get_instance_root() end
 
 ---Gets the parent node, or nil if this is a root node.
 ---
 ---Example: `local parent = self.node:get_parent(); if parent then Log.info(parent:get_name()) end`
----@return Node?
+---@return Node? The parent node; nil for the scene root, a detached node or a destroyed one
 function Node:get_parent() end
 
 ---Returns an array of all direct child nodes.
 ---
 ---Example: `for _, child in ipairs(self.node:get_children()) do child:set_visible(false) end`
----@return Node[]
+---@return Node[] The direct children in tree order, as a new list (changing it changes nothing); empty when there are none
 function Node:get_children() end
 
 ---Adds a tag (group) to the node; false when it already has it.
 ---
 ---Example: `self.node:add_tag("enemies")`
----@param tag NodeTag|string
----@return boolean
+---@param tag NodeTag|string The tag name, case-sensitive (the project's tags complete)
+---@return boolean true when added; false when the node already had it
 function Node:add_tag(tag) end
 
 ---Removes a tag (group) from the node; returns false when it did not have it.
 ---
 ---Example: `local removed = self.node:remove_tag("enemies")`
----@param tag NodeTag|string
----@return boolean removed
+---@param tag NodeTag|string The tag name, case-sensitive
+---@return boolean removed true when removed; false when the node did not have it
 function Node:remove_tag(tag) end
 
 ---Checks whether the node has the given tag (group).
 ---
 ---Example: `if other:has_tag("player") then self:collect() end`
----@param tag NodeTag|string
----@return boolean
+---@param tag NodeTag|string The tag name, case-sensitive
+---@return boolean true when the node has the tag
 function Node:has_tag(tag) end
 
 ---Returns an array of all tags (groups) on the node.
 ---
 ---Example: `for _, tag in ipairs(self.node:get_tags()) do Log.info(tag) end`
----@return string[]
+---@return string[] The node's tags as a new list; empty when it has none
 function Node:get_tags() end
 
 ---Finds a direct child node by its exact name.
 ---
 ---Example: `local sprite = self.node:get_child("Sprite")`
----@param name NodeName|string
----@return Node?
+---@param name NodeName|string The child's exact name, case-sensitive; only direct children are searched
+---@return Node? The first direct child with that name, or nil
 function Node:get_child(name) end
 
 ---Finds a node by path relative to this one: "Gun", "Body/Gun", "../Player", "." (self).
 ---
 ---Example: `local gun = self.node:get_node("Body/Gun")`
----@param path string Relative node path
----@return Node? node The node, or nil if there is none
+---@param path string Names separated by /, from this node: "Gun", "Body/Gun", ".." the parent, "." itself
+---@return Node? node The node, or nil if there is none (a warning is logged once per path)
 function Node:get_node(path) end
 
 ---Reparents a child node under this node.
 ---
 ---Example: `local item = Scene.find_node("Key"); self.node:add_child(item)`
----@param child Node
+---@param child Node The node to move under this one; it leaves its old parent and keeps its local position, so it can jump on screen
 function Node:add_child(child) end
 
 ---Detaches a child node from this node.
 ---
 ---Example: `self.node:remove_child(self.node:get_child("Shield"))`
----@param child Node
+---@param child Node A direct child of this node (otherwise an error is logged); it is detached, not destroyed, and stops updating and drawing until added again
 function Node:remove_child(child) end
 
 ---Removes this node and all its children from the active scene (at the end
@@ -506,16 +506,16 @@ function Node:connect(event, handler) end
 ---Removes a connection made with `connect`.
 ---
 ---Example: `local removed = timer:disconnect(self.conn)`
----@param id integer Connection id
----@return boolean removed
+---@param id integer The id connect returned (ids are global: any node can remove any connection)
+---@return boolean removed true when removed; false when no connection has that id
 function Node:disconnect(id) end
 
 ---Raises a custom event on this node: calls the node script's `on_<event>`
 ---method and every handler connected to that event name.
 ---
 ---Example: `self.node:emit("health_changed", self.health)`
----@param event ProjectEvent|string Event name (the project's custom events complete)
----@param value? any Value passed to handlers
+---@param event ProjectEvent|string The event name: calls this node's script on_<event> method, its Inspector Signals, then every connect handler (the project's custom events complete)
+---@param value? any Passed to the handlers: a boolean, number, string or node (a table arrives as nil); nil for none
 function Node:emit(event, value) end
 
 -- node events begin (generated from the engine: lua_events_definitions_test.odin)
@@ -524,8 +524,8 @@ function Node:emit(event, value) end
 ---Connects a handler to one of this node's events: tick (Every frame while the timer runs), timeout (The timer's duration elapsed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("tick", function(value, source) Log.info("tick") end)`
----@param event TimerNodeEvent|string
----@param handler fun(value: any, source: TimerNode)
+---@param event TimerNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: TimerNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function TimerNode:connect(event, handler) end
 
@@ -533,8 +533,8 @@ function TimerNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: spawned (The spawner made a node (the spawned root; spawn_info(node): its entry)), limit_reached (The spawner reached its Total Limit), list_finished (A Sequential spawner (Stop) spawned its last entry); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("spawned", function(value, source) Log.info("spawned") end)`
----@param event SpawnerNodeEvent|string
----@param handler fun(value: any, source: SpawnerNode)
+---@param event SpawnerNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: SpawnerNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function SpawnerNode:connect(event, handler) end
 
@@ -542,8 +542,8 @@ function SpawnerNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: generated (The level generator's level is in (its seed)), generation_failed (The level generator couldn't make the level (why)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("generated", function(value, source) Log.info("generated") end)`
----@param event LevelGeneratorNodeEvent|string
----@param handler fun(value: any, source: LevelGeneratorNode)
+---@param event LevelGeneratorNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: LevelGeneratorNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function LevelGeneratorNode:connect(event, handler) end
 
@@ -551,8 +551,8 @@ function LevelGeneratorNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("animation_finished", function(value, source) Log.info("animation_finished") end)`
----@param event FrameAnimationNodeEvent|string
----@param handler fun(value: any, source: FrameAnimationNode)
+---@param event FrameAnimationNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: FrameAnimationNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function FrameAnimationNode:connect(event, handler) end
 
@@ -560,8 +560,8 @@ function FrameAnimationNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)), animation_event (A Method key of the animation fired (its method name)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("animation_finished", function(value, source) Log.info("animation_finished") end)`
----@param event AnimationPlayerNodeEvent|string
----@param handler fun(value: any, source: AnimationPlayerNode)
+---@param event AnimationPlayerNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: AnimationPlayerNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function AnimationPlayerNode:connect(event, handler) end
 
@@ -569,8 +569,8 @@ function AnimationPlayerNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)), animation_looped (An Aseprite tag started again (a repeat or a ping-pong turn)), frame_changed (The Aseprite node shows another frame (0-based)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("animation_finished", function(value, source) Log.info("animation_finished") end)`
----@param event AsepriteNodeEvent|string
----@param handler fun(value: any, source: AsepriteNode)
+---@param event AsepriteNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: AsepriteNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function AsepriteNode:connect(event, handler) end
 
@@ -578,8 +578,8 @@ function AsepriteNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: state_changed (The state machine entered a state); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("state_changed", function(value, source) Log.info("state_changed") end)`
----@param event StateMachineNodeEvent|string
----@param handler fun(value: any, source: StateMachineNode)
+---@param event StateMachineNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: StateMachineNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function StateMachineNode:connect(event, handler) end
 
@@ -587,8 +587,8 @@ function StateMachineNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: particle_hit (A particle hit a body (collision on; particle_get_last_hit: where)), finished (Playback (or the dialogue) ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("particle_hit", function(value, source) Log.info("particle_hit") end)`
----@param event ParticleEmitterNodeEvent|string
----@param handler fun(value: any, source: ParticleEmitterNode)
+---@param event ParticleEmitterNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: ParticleEmitterNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function ParticleEmitterNode:connect(event, handler) end
 
@@ -596,8 +596,8 @@ function ParticleEmitterNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: finished (Playback (or the dialogue) ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("finished", function(value, source) Log.info("finished") end)`
----@param event SoundNodeEvent|string
----@param handler fun(value: any, source: SoundNode)
+---@param event SoundNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: SoundNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function SoundNode:connect(event, handler) end
 
@@ -605,8 +605,8 @@ function SoundNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: finished (Playback (or the dialogue) ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("finished", function(value, source) Log.info("finished") end)`
----@param event MusicNodeEvent|string
----@param handler fun(value: any, source: MusicNode)
+---@param event MusicNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: MusicNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function MusicNode:connect(event, handler) end
 
@@ -614,8 +614,8 @@ function MusicNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("collision_started", function(value, source) Log.info("collision_started") end)`
----@param event StaticBodyNodeEvent|string
----@param handler fun(value: any, source: StaticBodyNode)
+---@param event StaticBodyNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: StaticBodyNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function StaticBodyNode:connect(event, handler) end
 
@@ -623,8 +623,8 @@ function StaticBodyNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("collision_started", function(value, source) Log.info("collision_started") end)`
----@param event DynamicBodyNodeEvent|string
----@param handler fun(value: any, source: DynamicBodyNode)
+---@param event DynamicBodyNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: DynamicBodyNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function DynamicBodyNode:connect(event, handler) end
 
@@ -632,8 +632,8 @@ function DynamicBodyNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("collision_started", function(value, source) Log.info("collision_started") end)`
----@param event KinematicBodyNodeEvent|string
----@param handler fun(value: any, source: KinematicBodyNode)
+---@param event KinematicBodyNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: KinematicBodyNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function KinematicBodyNode:connect(event, handler) end
 
@@ -641,8 +641,8 @@ function KinematicBodyNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: collision_started (Contact with another body began), collision_ended (Contact with another body ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("collision_started", function(value, source) Log.info("collision_started") end)`
----@param event CharacterMoverNodeEvent|string
----@param handler fun(value: any, source: CharacterMoverNode)
+---@param event CharacterMoverNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: CharacterMoverNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function CharacterMoverNode:connect(event, handler) end
 
@@ -650,8 +650,8 @@ function CharacterMoverNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: body_entered (A body entered the area), body_exited (A body left the area); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("body_entered", function(value, source) Log.info("body_entered") end)`
----@param event AreaNodeEvent|string
----@param handler fun(value: any, source: AreaNode)
+---@param event AreaNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: AreaNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function AreaNode:connect(event, handler) end
 
@@ -659,8 +659,8 @@ function AreaNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: hit_started (The ray started hitting a node), hit_ended (The ray stopped hitting a node); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("hit_started", function(value, source) Log.info("hit_started") end)`
----@param event RaycastNodeEvent|string
----@param handler fun(value: any, source: RaycastNode)
+---@param event RaycastNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: RaycastNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function RaycastNode:connect(event, handler) end
 
@@ -668,8 +668,8 @@ function RaycastNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: screen_entered (The camera started seeing it), screen_exited (The camera stopped seeing it); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("screen_entered", function(value, source) Log.info("screen_entered") end)`
----@param event VisibilityNotifierNodeEvent|string
----@param handler fun(value: any, source: VisibilityNotifierNode)
+---@param event VisibilityNotifierNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: VisibilityNotifierNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function VisibilityNotifierNode:connect(event, handler) end
 
@@ -677,8 +677,8 @@ function VisibilityNotifierNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)), skeleton_event (An event key of the skeleton's animation fired (its name)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("animation_finished", function(value, source) Log.info("animation_finished") end)`
----@param event SkeletonNodeEvent|string
----@param handler fun(value: any, source: SkeletonNode)
+---@param event SkeletonNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: SkeletonNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function SkeletonNode:connect(event, handler) end
 
@@ -686,8 +686,8 @@ function SkeletonNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: became_active (The host camera switched to this advanced camera), became_inactive (Another advanced camera took over); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("became_active", function(value, source) Log.info("became_active") end)`
----@param event AdvancedCameraNodeEvent|string
----@param handler fun(value: any, source: AdvancedCameraNode)
+---@param event AdvancedCameraNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: AdvancedCameraNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function AdvancedCameraNode:connect(event, handler) end
 
@@ -695,8 +695,8 @@ function AdvancedCameraNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: navigation_finished (The agent arrived at its target), target_unreachable (No way to the agent's target); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("navigation_finished", function(value, source) Log.info("navigation_finished") end)`
----@param event NavigationAgentNodeEvent|string
----@param handler fun(value: any, source: NavigationAgentNode)
+---@param event NavigationAgentNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: NavigationAgentNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function NavigationAgentNode:connect(event, handler) end
 
@@ -704,8 +704,8 @@ function NavigationAgentNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: path_finished (The follower reached the end of its path (loop: Stop)), path_looped (The follower wrapped round or turned back (Loop / Ping Pong)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("path_finished", function(value, source) Log.info("path_finished") end)`
----@param event PathFollowNodeEvent|string
----@param handler fun(value: any, source: PathFollowNode)
+---@param event PathFollowNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: PathFollowNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function PathFollowNode:connect(event, handler) end
 
@@ -713,8 +713,8 @@ function PathFollowNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: level_loaded (The LDtk level was built), entity_spawned (An LDtk entity was spawned); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("level_loaded", function(value, source) Log.info("level_loaded") end)`
----@param event LdtkLevelNodeEvent|string
----@param handler fun(value: any, source: LdtkLevelNode)
+---@param event LdtkLevelNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: LdtkLevelNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function LdtkLevelNode:connect(event, handler) end
 
@@ -722,8 +722,8 @@ function LdtkLevelNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: revealed (The text finished revealing); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("revealed", function(value, source) Log.info("revealed") end)`
----@param event TextNodeEvent|string
----@param handler fun(value: any, source: TextNode)
+---@param event TextNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: TextNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function TextNode:connect(event, handler) end
 
@@ -731,8 +731,8 @@ function TextNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: line_shown (A dialogue line was fully shown (1-based)), finished (Playback (or the dialogue) ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("line_shown", function(value, source) Log.info("line_shown") end)`
----@param event DialogueNodeEvent|string
----@param handler fun(value: any, source: DialogueNode)
+---@param event DialogueNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: DialogueNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function DialogueNode:connect(event, handler) end
 
@@ -740,8 +740,8 @@ function DialogueNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: finished (Playback (or the dialogue) ended); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("finished", function(value, source) Log.info("finished") end)`
----@param event LipSyncNodeEvent|string
----@param handler fun(value: any, source: LipSyncNode)
+---@param event LipSyncNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: LipSyncNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function LipSyncNode:connect(event, handler) end
 
@@ -749,8 +749,8 @@ function LipSyncNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: clicked (The button was clicked); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("clicked", function(value, source) Log.info("clicked") end)`
----@param event UIButtonNodeEvent|string
----@param handler fun(value: any, source: UIButtonNode)
+---@param event UIButtonNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIButtonNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIButtonNode:connect(event, handler) end
 
@@ -758,8 +758,8 @@ function UIButtonNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UISliderNodeEvent|string
----@param handler fun(value: any, source: UISliderNode)
+---@param event UISliderNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UISliderNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UISliderNode:connect(event, handler) end
 
@@ -767,8 +767,8 @@ function UISliderNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UICheckboxNodeEvent|string
----@param handler fun(value: any, source: UICheckboxNode)
+---@param event UICheckboxNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UICheckboxNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UICheckboxNode:connect(event, handler) end
 
@@ -776,8 +776,8 @@ function UICheckboxNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed), submitted (Enter was pressed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UITextInputNodeEvent|string
----@param handler fun(value: any, source: UITextInputNode)
+---@param event UITextInputNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UITextInputNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UITextInputNode:connect(event, handler) end
 
@@ -785,8 +785,8 @@ function UITextInputNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UIDropdownNodeEvent|string
----@param handler fun(value: any, source: UIDropdownNode)
+---@param event UIDropdownNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIDropdownNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIDropdownNode:connect(event, handler) end
 
@@ -794,8 +794,8 @@ function UIDropdownNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UIRadioGroupNodeEvent|string
----@param handler fun(value: any, source: UIRadioGroupNode)
+---@param event UIRadioGroupNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIRadioGroupNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIRadioGroupNode:connect(event, handler) end
 
@@ -803,8 +803,8 @@ function UIRadioGroupNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UIToggleSwitchNodeEvent|string
----@param handler fun(value: any, source: UIToggleSwitchNode)
+---@param event UIToggleSwitchNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIToggleSwitchNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIToggleSwitchNode:connect(event, handler) end
 
@@ -812,8 +812,8 @@ function UIToggleSwitchNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UIKnobNodeEvent|string
----@param handler fun(value: any, source: UIKnobNode)
+---@param event UIKnobNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIKnobNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIKnobNode:connect(event, handler) end
 
@@ -821,8 +821,8 @@ function UIKnobNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UINotchedSliderNodeEvent|string
----@param handler fun(value: any, source: UINotchedSliderNode)
+---@param event UINotchedSliderNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UINotchedSliderNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UINotchedSliderNode:connect(event, handler) end
 
@@ -830,8 +830,8 @@ function UINotchedSliderNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
----@param event UIVolumeFaderNodeEvent|string
----@param handler fun(value: any, source: UIVolumeFaderNode)
+---@param event UIVolumeFaderNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIVolumeFaderNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIVolumeFaderNode:connect(event, handler) end
 
@@ -839,8 +839,8 @@ function UIVolumeFaderNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: selected (The selection changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("selected", function(value, source) Log.info("selected") end)`
----@param event UIListViewNodeEvent|string
----@param handler fun(value: any, source: UIListViewNode)
+---@param event UIListViewNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIListViewNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIListViewNode:connect(event, handler) end
 
@@ -848,8 +848,8 @@ function UIListViewNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: selected (The selection changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("selected", function(value, source) Log.info("selected") end)`
----@param event UIUnorderedListNodeEvent|string
----@param handler fun(value: any, source: UIUnorderedListNode)
+---@param event UIUnorderedListNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIUnorderedListNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIUnorderedListNode:connect(event, handler) end
 
@@ -857,8 +857,8 @@ function UIUnorderedListNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: selected (The selection changed); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("selected", function(value, source) Log.info("selected") end)`
----@param event UIOrderedListNodeEvent|string
----@param handler fun(value: any, source: UIOrderedListNode)
+---@param event UIOrderedListNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIOrderedListNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIOrderedListNode:connect(event, handler) end
 
@@ -866,8 +866,8 @@ function UIOrderedListNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: row_selected (A table row was selected), sorted (The table was sorted (by a header click or set_property)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("row_selected", function(value, source) Log.info("row_selected") end)`
----@param event UITableNodeEvent|string
----@param handler fun(value: any, source: UITableNode)
+---@param event UITableNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UITableNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UITableNode:connect(event, handler) end
 
@@ -875,8 +875,8 @@ function UITableNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: item_clicked (A toolbar item was clicked); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("item_clicked", function(value, source) Log.info("item_clicked") end)`
----@param event UIToolbarNodeEvent|string
----@param handler fun(value: any, source: UIToolbarNode)
+---@param event UIToolbarNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UIToolbarNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UIToolbarNode:connect(event, handler) end
 
@@ -884,8 +884,8 @@ function UIToolbarNode:connect(event, handler) end
 ---Connects a handler to one of this node's events: tab_changed (Another tab was opened (0-based)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("tab_changed", function(value, source) Log.info("tab_changed") end)`
----@param event UITabContainerNodeEvent|string
----@param handler fun(value: any, source: UITabContainerNode)
+---@param event UITabContainerNodeEvent|string The event's name (the Signals tab lists them)
+---@param handler fun(value: any, source: UITabContainerNode) Called with the event's value and the node that raised it
 ---@return integer id Connection id for `disconnect`
 function UITabContainerNode:connect(event, handler) end
 -- node events end
@@ -919,8 +919,8 @@ function UITabContainerNode:connect(event, handler) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("position")`
----@param path NodeProperty|string
----@return any
+---@param path NodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: Node, path: "position"): Vec2
 ---@overload fun(self: Node, path: "scale"): Vec2
 ---@overload fun(self: Node, path: "rotation"): number
@@ -936,9 +936,9 @@ function Node:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("position", 100, 50)`
----@param path NodeProperty|string
----@param value any
----@param y? number
+---@param path NodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: Node, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: Node, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: Node, path: "rotation", value: number)
@@ -1074,8 +1074,8 @@ function Node:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("isCurrent")`
----@param path CameraNodeProperty|string
----@return any
+---@param path CameraNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: CameraNode, path: "position"): Vec2
 ---@overload fun(self: CameraNode, path: "scale"): Vec2
 ---@overload fun(self: CameraNode, path: "rotation"): number
@@ -1139,9 +1139,9 @@ function CameraNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("isCurrent", true)`
----@param path CameraNodeProperty|string
----@param value any
----@param y? number
+---@param path CameraNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: CameraNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CameraNode, path: "rotation", value: number)
@@ -1271,8 +1271,8 @@ function CameraNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("mode")`
----@param path SpawnerNodeProperty|string
----@return any
+---@param path SpawnerNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: SpawnerNode, path: "position"): Vec2
 ---@overload fun(self: SpawnerNode, path: "scale"): Vec2
 ---@overload fun(self: SpawnerNode, path: "rotation"): number
@@ -1309,9 +1309,9 @@ function SpawnerNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("mode", "All")`
----@param path SpawnerNodeProperty|string
----@param value any
----@param y? number
+---@param path SpawnerNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: SpawnerNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: SpawnerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: SpawnerNode, path: "rotation", value: number)
@@ -1386,8 +1386,8 @@ function SpawnerNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("generator")`
----@param path LevelGeneratorNodeProperty|string
----@return any
+---@param path LevelGeneratorNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: LevelGeneratorNode, path: "position"): Vec2
 ---@overload fun(self: LevelGeneratorNode, path: "scale"): Vec2
 ---@overload fun(self: LevelGeneratorNode, path: "rotation"): number
@@ -1410,9 +1410,9 @@ function LevelGeneratorNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("generator", "text")`
----@param path LevelGeneratorNodeProperty|string
----@param value any
----@param y? number
+---@param path LevelGeneratorNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: LevelGeneratorNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LevelGeneratorNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LevelGeneratorNode, path: "rotation", value: number)
@@ -1463,8 +1463,8 @@ function LevelGeneratorNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("tint")`
----@param path TextureNodeProperty|string
----@return any
+---@param path TextureNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: TextureNode, path: "position"): Vec2
 ---@overload fun(self: TextureNode, path: "scale"): Vec2
 ---@overload fun(self: TextureNode, path: "rotation"): number
@@ -1482,9 +1482,9 @@ function TextureNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("tint", "#ff8800")`
----@param path TextureNodeProperty|string
----@param value any
----@param y? number
+---@param path TextureNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: TextureNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextureNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextureNode, path: "rotation", value: number)
@@ -1530,8 +1530,8 @@ function TextureNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("tint")`
----@param path AtlasSpriteNodeProperty|string
----@return any
+---@param path AtlasSpriteNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: AtlasSpriteNode, path: "position"): Vec2
 ---@overload fun(self: AtlasSpriteNode, path: "scale"): Vec2
 ---@overload fun(self: AtlasSpriteNode, path: "rotation"): number
@@ -1549,9 +1549,9 @@ function AtlasSpriteNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("tint", "#ff8800")`
----@param path AtlasSpriteNodeProperty|string
----@param value any
----@param y? number
+---@param path AtlasSpriteNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: AtlasSpriteNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AtlasSpriteNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AtlasSpriteNode, path: "rotation", value: number)
@@ -1595,8 +1595,8 @@ function AtlasSpriteNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("position")`
----@param path FrameAnimationNodeProperty|string
----@return any
+---@param path FrameAnimationNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: FrameAnimationNode, path: "position"): Vec2
 ---@overload fun(self: FrameAnimationNode, path: "scale"): Vec2
 ---@overload fun(self: FrameAnimationNode, path: "rotation"): number
@@ -1613,9 +1613,9 @@ function FrameAnimationNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("position", 100, 50)`
----@param path FrameAnimationNodeProperty|string
----@param value any
----@param y? number
+---@param path FrameAnimationNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: FrameAnimationNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: FrameAnimationNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: FrameAnimationNode, path: "rotation", value: number)
@@ -1666,8 +1666,8 @@ function FrameAnimationNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("reverse")`
----@param path AnimationPlayerNodeProperty|string
----@return any
+---@param path AnimationPlayerNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: AnimationPlayerNode, path: "position"): Vec2
 ---@overload fun(self: AnimationPlayerNode, path: "scale"): Vec2
 ---@overload fun(self: AnimationPlayerNode, path: "rotation"): number
@@ -1688,9 +1688,9 @@ function AnimationPlayerNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("reverse", true)`
----@param path AnimationPlayerNodeProperty|string
----@param value any
----@param y? number
+---@param path AnimationPlayerNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: AnimationPlayerNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AnimationPlayerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AnimationPlayerNode, path: "rotation", value: number)
@@ -1757,8 +1757,8 @@ function AnimationPlayerNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("file")`
----@param path AsepriteNodeProperty|string
----@return any
+---@param path AsepriteNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: AsepriteNode, path: "position"): Vec2
 ---@overload fun(self: AsepriteNode, path: "scale"): Vec2
 ---@overload fun(self: AsepriteNode, path: "rotation"): number
@@ -1785,9 +1785,9 @@ function AsepriteNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("file", "text")`
----@param path AsepriteNodeProperty|string
----@param value any
----@param y? number
+---@param path AsepriteNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: AsepriteNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AsepriteNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AsepriteNode, path: "rotation", value: number)
@@ -1896,8 +1896,8 @@ function AsepriteNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("position")`
----@param path ParticleEmitterNodeProperty|string
----@return any
+---@param path ParticleEmitterNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: ParticleEmitterNode, path: "position"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "scale"): Vec2
 ---@overload fun(self: ParticleEmitterNode, path: "rotation"): number
@@ -1971,9 +1971,9 @@ function ParticleEmitterNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("position", 100, 50)`
----@param path ParticleEmitterNodeProperty|string
----@param value any
----@param y? number
+---@param path ParticleEmitterNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: ParticleEmitterNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParticleEmitterNode, path: "rotation", value: number)
@@ -2103,8 +2103,8 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("playMode")`
----@param path SoundNodeProperty|string
----@return any
+---@param path SoundNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: SoundNode, path: "position"): Vec2
 ---@overload fun(self: SoundNode, path: "scale"): Vec2
 ---@overload fun(self: SoundNode, path: "rotation"): number
@@ -2136,9 +2136,9 @@ function SoundNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("playMode", "All")`
----@param path SoundNodeProperty|string
----@param value any
----@param y? number
+---@param path SoundNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: SoundNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: SoundNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: SoundNode, path: "rotation", value: number)
@@ -2212,8 +2212,8 @@ function SoundNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("volume")`
----@param path MusicNodeProperty|string
----@return any
+---@param path MusicNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: MusicNode, path: "position"): Vec2
 ---@overload fun(self: MusicNode, path: "scale"): Vec2
 ---@overload fun(self: MusicNode, path: "rotation"): number
@@ -2238,9 +2238,9 @@ function MusicNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("volume", 1.5)`
----@param path MusicNodeProperty|string
----@param value any
----@param y? number
+---@param path MusicNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: MusicNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: MusicNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: MusicNode, path: "rotation", value: number)
@@ -2293,8 +2293,8 @@ function MusicNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("debugColor")`
----@param path StaticBodyNodeProperty|string
----@return any
+---@param path StaticBodyNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: StaticBodyNode, path: "position"): Vec2
 ---@overload fun(self: StaticBodyNode, path: "scale"): Vec2
 ---@overload fun(self: StaticBodyNode, path: "rotation"): number
@@ -2312,9 +2312,9 @@ function StaticBodyNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("debugColor", "#ff8800")`
----@param path StaticBodyNodeProperty|string
----@param value any
----@param y? number
+---@param path StaticBodyNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: StaticBodyNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: StaticBodyNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: StaticBodyNode, path: "rotation", value: number)
@@ -2380,8 +2380,8 @@ function StaticBodyNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("linearVelocity")`
----@param path DynamicBodyNodeProperty|string
----@return any
+---@param path DynamicBodyNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: DynamicBodyNode, path: "position"): Vec2
 ---@overload fun(self: DynamicBodyNode, path: "scale"): Vec2
 ---@overload fun(self: DynamicBodyNode, path: "rotation"): number
@@ -2409,9 +2409,9 @@ function DynamicBodyNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("linearVelocity", 100, 50)`
----@param path DynamicBodyNodeProperty|string
----@param value any
----@param y? number
+---@param path DynamicBodyNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: DynamicBodyNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DynamicBodyNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DynamicBodyNode, path: "rotation", value: number)
@@ -2471,8 +2471,8 @@ function DynamicBodyNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("linearVelocity")`
----@param path KinematicBodyNodeProperty|string
----@return any
+---@param path KinematicBodyNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: KinematicBodyNode, path: "position"): Vec2
 ---@overload fun(self: KinematicBodyNode, path: "scale"): Vec2
 ---@overload fun(self: KinematicBodyNode, path: "rotation"): number
@@ -2492,9 +2492,9 @@ function KinematicBodyNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("linearVelocity", 100, 50)`
----@param path KinematicBodyNodeProperty|string
----@param value any
----@param y? number
+---@param path KinematicBodyNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: KinematicBodyNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: KinematicBodyNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: KinematicBodyNode, path: "rotation", value: number)
@@ -2568,8 +2568,8 @@ function KinematicBodyNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("radius")`
----@param path CharacterMoverNodeProperty|string
----@return any
+---@param path CharacterMoverNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: CharacterMoverNode, path: "position"): Vec2
 ---@overload fun(self: CharacterMoverNode, path: "scale"): Vec2
 ---@overload fun(self: CharacterMoverNode, path: "rotation"): number
@@ -2600,9 +2600,9 @@ function CharacterMoverNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("radius", 1.5)`
----@param path CharacterMoverNodeProperty|string
----@param value any
----@param y? number
+---@param path CharacterMoverNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: CharacterMoverNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CharacterMoverNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: CharacterMoverNode, path: "rotation", value: number)
@@ -2667,8 +2667,8 @@ function CharacterMoverNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("monitoring")`
----@param path AreaNodeProperty|string
----@return any
+---@param path AreaNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: AreaNode, path: "position"): Vec2
 ---@overload fun(self: AreaNode, path: "scale"): Vec2
 ---@overload fun(self: AreaNode, path: "rotation"): number
@@ -2689,9 +2689,9 @@ function AreaNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("monitoring", true)`
----@param path AreaNodeProperty|string
----@param value any
----@param y? number
+---@param path AreaNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: AreaNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AreaNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AreaNode, path: "rotation", value: number)
@@ -2758,8 +2758,8 @@ function AreaNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("monitoring")`
----@param path RaycastNodeProperty|string
----@return any
+---@param path RaycastNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: RaycastNode, path: "position"): Vec2
 ---@overload fun(self: RaycastNode, path: "scale"): Vec2
 ---@overload fun(self: RaycastNode, path: "rotation"): number
@@ -2786,9 +2786,9 @@ function RaycastNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("monitoring", true)`
----@param path RaycastNodeProperty|string
----@param value any
----@param y? number
+---@param path RaycastNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: RaycastNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: RaycastNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: RaycastNode, path: "rotation", value: number)
@@ -2847,8 +2847,8 @@ function RaycastNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path VisibilityNotifierNodeProperty|string
----@return any
+---@param path VisibilityNotifierNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: VisibilityNotifierNode, path: "position"): Vec2
 ---@overload fun(self: VisibilityNotifierNode, path: "scale"): Vec2
 ---@overload fun(self: VisibilityNotifierNode, path: "rotation"): number
@@ -2868,9 +2868,9 @@ function VisibilityNotifierNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path VisibilityNotifierNodeProperty|string
----@param value any
----@param y? number
+---@param path VisibilityNotifierNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: VisibilityNotifierNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: VisibilityNotifierNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: VisibilityNotifierNode, path: "rotation", value: number)
@@ -2916,8 +2916,8 @@ function VisibilityNotifierNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("anchor")`
----@param path ScreenLayerNodeProperty|string
----@return any
+---@param path ScreenLayerNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: ScreenLayerNode, path: "position"): Vec2
 ---@overload fun(self: ScreenLayerNode, path: "scale"): Vec2
 ---@overload fun(self: ScreenLayerNode, path: "rotation"): number
@@ -2934,9 +2934,9 @@ function ScreenLayerNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("anchor", "Top")`
----@param path ScreenLayerNodeProperty|string
----@param value any
----@param y? number
+---@param path ScreenLayerNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: ScreenLayerNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ScreenLayerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ScreenLayerNode, path: "rotation", value: number)
@@ -2999,8 +2999,8 @@ function ScreenLayerNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("file")`
----@param path SkeletonNodeProperty|string
----@return any
+---@param path SkeletonNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: SkeletonNode, path: "position"): Vec2
 ---@overload fun(self: SkeletonNode, path: "scale"): Vec2
 ---@overload fun(self: SkeletonNode, path: "rotation"): number
@@ -3027,9 +3027,9 @@ function SkeletonNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("file", "text")`
----@param path SkeletonNodeProperty|string
----@param value any
----@param y? number
+---@param path SkeletonNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: SkeletonNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: SkeletonNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: SkeletonNode, path: "rotation", value: number)
@@ -3086,8 +3086,8 @@ function SkeletonNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("bone")`
----@param path BoneAttachmentNodeProperty|string
----@return any
+---@param path BoneAttachmentNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: BoneAttachmentNode, path: "position"): Vec2
 ---@overload fun(self: BoneAttachmentNode, path: "scale"): Vec2
 ---@overload fun(self: BoneAttachmentNode, path: "rotation"): number
@@ -3106,9 +3106,9 @@ function BoneAttachmentNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("bone", "text")`
----@param path BoneAttachmentNodeProperty|string
----@param value any
----@param y? number
+---@param path BoneAttachmentNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: BoneAttachmentNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: BoneAttachmentNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: BoneAttachmentNode, path: "rotation", value: number)
@@ -3209,8 +3209,8 @@ function BoneAttachmentNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("priority")`
----@param path AdvancedCameraNodeProperty|string
----@return any
+---@param path AdvancedCameraNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: AdvancedCameraNode, path: "position"): Vec2
 ---@overload fun(self: AdvancedCameraNode, path: "scale"): Vec2
 ---@overload fun(self: AdvancedCameraNode, path: "rotation"): number
@@ -3255,9 +3255,9 @@ function AdvancedCameraNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("priority", 2)`
----@param path AdvancedCameraNodeProperty|string
----@param value any
----@param y? number
+---@param path AdvancedCameraNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: AdvancedCameraNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AdvancedCameraNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: AdvancedCameraNode, path: "rotation", value: number)
@@ -3334,8 +3334,8 @@ function AdvancedCameraNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("closed")`
----@param path PathNodeProperty|string
----@return any
+---@param path PathNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: PathNode, path: "position"): Vec2
 ---@overload fun(self: PathNode, path: "scale"): Vec2
 ---@overload fun(self: PathNode, path: "rotation"): number
@@ -3355,9 +3355,9 @@ function PathNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("closed", true)`
----@param path PathNodeProperty|string
----@param value any
----@param y? number
+---@param path PathNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: PathNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: PathNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: PathNode, path: "rotation", value: number)
@@ -3411,8 +3411,8 @@ function PathNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path NavigationRegionNodeProperty|string
----@return any
+---@param path NavigationRegionNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: NavigationRegionNode, path: "position"): Vec2
 ---@overload fun(self: NavigationRegionNode, path: "scale"): Vec2
 ---@overload fun(self: NavigationRegionNode, path: "rotation"): number
@@ -3433,9 +3433,9 @@ function NavigationRegionNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path NavigationRegionNodeProperty|string
----@param value any
----@param y? number
+---@param path NavigationRegionNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: NavigationRegionNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NavigationRegionNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NavigationRegionNode, path: "rotation", value: number)
@@ -3496,8 +3496,8 @@ function NavigationRegionNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("speed")`
----@param path NavigationAgentNodeProperty|string
----@return any
+---@param path NavigationAgentNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: NavigationAgentNode, path: "position"): Vec2
 ---@overload fun(self: NavigationAgentNode, path: "scale"): Vec2
 ---@overload fun(self: NavigationAgentNode, path: "rotation"): number
@@ -3521,9 +3521,9 @@ function NavigationAgentNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("speed", 1.5)`
----@param path NavigationAgentNodeProperty|string
----@param value any
----@param y? number
+---@param path NavigationAgentNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: NavigationAgentNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NavigationAgentNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NavigationAgentNode, path: "rotation", value: number)
@@ -3581,8 +3581,8 @@ function NavigationAgentNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("progress")`
----@param path PathFollowNodeProperty|string
----@return any
+---@param path PathFollowNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: PathFollowNode, path: "position"): Vec2
 ---@overload fun(self: PathFollowNode, path: "scale"): Vec2
 ---@overload fun(self: PathFollowNode, path: "rotation"): number
@@ -3603,9 +3603,9 @@ function PathFollowNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("progress", 1.5)`
----@param path PathFollowNodeProperty|string
----@param value any
----@param y? number
+---@param path PathFollowNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: PathFollowNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: PathFollowNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: PathFollowNode, path: "rotation", value: number)
@@ -3668,8 +3668,8 @@ function PathFollowNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("enablePhysics")`
----@param path LdtkLevelNodeProperty|string
----@return any
+---@param path LdtkLevelNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: LdtkLevelNode, path: "position"): Vec2
 ---@overload fun(self: LdtkLevelNode, path: "scale"): Vec2
 ---@overload fun(self: LdtkLevelNode, path: "rotation"): number
@@ -3694,9 +3694,9 @@ function LdtkLevelNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("enablePhysics", true)`
----@param path LdtkLevelNodeProperty|string
----@param value any
----@param y? number
+---@param path LdtkLevelNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: LdtkLevelNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LdtkLevelNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LdtkLevelNode, path: "rotation", value: number)
@@ -3751,8 +3751,8 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("solid")`
----@param path TileMapNodeProperty|string
----@return any
+---@param path TileMapNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: TileMapNode, path: "position"): Vec2
 ---@overload fun(self: TileMapNode, path: "scale"): Vec2
 ---@overload fun(self: TileMapNode, path: "rotation"): number
@@ -3771,9 +3771,9 @@ function TileMapNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("solid", true)`
----@param path TileMapNodeProperty|string
----@param value any
----@param y? number
+---@param path TileMapNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: TileMapNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TileMapNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TileMapNode, path: "rotation", value: number)
@@ -3830,8 +3830,8 @@ function TileMapNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("kind")`
----@param path LightNodeProperty|string
----@return any
+---@param path LightNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: LightNode, path: "position"): Vec2
 ---@overload fun(self: LightNode, path: "scale"): Vec2
 ---@overload fun(self: LightNode, path: "rotation"): number
@@ -3854,9 +3854,9 @@ function LightNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("kind", "Spot")`
----@param path LightNodeProperty|string
----@param value any
----@param y? number
+---@param path LightNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: LightNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LightNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LightNode, path: "rotation", value: number)
@@ -3980,8 +3980,8 @@ function LightNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("debugColor")`
----@param path JointNodeProperty|string
----@return any
+---@param path JointNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: JointNode, path: "position"): Vec2
 ---@overload fun(self: JointNode, path: "scale"): Vec2
 ---@overload fun(self: JointNode, path: "rotation"): number
@@ -4073,9 +4073,9 @@ function JointNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("debugColor", "#ff8800")`
----@param path JointNodeProperty|string
----@param value any
----@param y? number
+---@param path JointNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: JointNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: JointNode, path: "rotation", value: number)
@@ -4215,8 +4215,8 @@ function JointNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("text")`
----@param path TextNodeProperty|string
----@return any
+---@param path TextNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: TextNode, path: "position"): Vec2
 ---@overload fun(self: TextNode, path: "scale"): Vec2
 ---@overload fun(self: TextNode, path: "rotation"): number
@@ -4244,9 +4244,9 @@ function TextNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("text", "text")`
----@param path TextNodeProperty|string
----@param value any
----@param y? number
+---@param path TextNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: TextNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TextNode, path: "rotation", value: number)
@@ -4324,8 +4324,8 @@ function TextNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path DialogueNodeProperty|string
----@return any
+---@param path DialogueNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: DialogueNode, path: "position"): Vec2
 ---@overload fun(self: DialogueNode, path: "scale"): Vec2
 ---@overload fun(self: DialogueNode, path: "rotation"): number
@@ -4354,9 +4354,9 @@ function DialogueNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path DialogueNodeProperty|string
----@param value any
----@param y? number
+---@param path DialogueNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: DialogueNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DialogueNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: DialogueNode, path: "rotation", value: number)
@@ -4423,8 +4423,8 @@ function DialogueNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("mouth")`
----@param path LipSyncNodeProperty|string
----@return any
+---@param path LipSyncNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: LipSyncNode, path: "position"): Vec2
 ---@overload fun(self: LipSyncNode, path: "scale"): Vec2
 ---@overload fun(self: LipSyncNode, path: "rotation"): number
@@ -4447,9 +4447,9 @@ function LipSyncNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("mouth", "text")`
----@param path LipSyncNodeProperty|string
----@param value any
----@param y? number
+---@param path LipSyncNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: LipSyncNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LipSyncNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LipSyncNode, path: "rotation", value: number)
@@ -4508,8 +4508,8 @@ function LipSyncNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("texturePath")`
----@param path NineSliceNodeProperty|string
----@return any
+---@param path NineSliceNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: NineSliceNode, path: "position"): Vec2
 ---@overload fun(self: NineSliceNode, path: "scale"): Vec2
 ---@overload fun(self: NineSliceNode, path: "rotation"): number
@@ -4531,9 +4531,9 @@ function NineSliceNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("texturePath", "text")`
----@param path NineSliceNodeProperty|string
----@param value any
----@param y? number
+---@param path NineSliceNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: NineSliceNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NineSliceNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: NineSliceNode, path: "rotation", value: number)
@@ -4591,8 +4591,8 @@ function NineSliceNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("texturePath")`
----@param path ParallaxNodeProperty|string
----@return any
+---@param path ParallaxNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: ParallaxNode, path: "position"): Vec2
 ---@overload fun(self: ParallaxNode, path: "scale"): Vec2
 ---@overload fun(self: ParallaxNode, path: "rotation"): number
@@ -4614,9 +4614,9 @@ function ParallaxNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("texturePath", "text")`
----@param path ParallaxNodeProperty|string
----@param value any
----@param y? number
+---@param path ParallaxNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: ParallaxNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParallaxNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: ParallaxNode, path: "rotation", value: number)
@@ -4670,8 +4670,8 @@ function ParallaxNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("width")`
----@param path LineNodeProperty|string
----@return any
+---@param path LineNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: LineNode, path: "position"): Vec2
 ---@overload fun(self: LineNode, path: "scale"): Vec2
 ---@overload fun(self: LineNode, path: "rotation"): number
@@ -4691,9 +4691,9 @@ function LineNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("width", 1.5)`
----@param path LineNodeProperty|string
----@param value any
----@param y? number
+---@param path LineNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: LineNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LineNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: LineNode, path: "rotation", value: number)
@@ -4817,8 +4817,8 @@ function LineNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("file")`
----@param path VectorShapeNodeProperty|string
----@return any
+---@param path VectorShapeNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: VectorShapeNode, path: "position"): Vec2
 ---@overload fun(self: VectorShapeNode, path: "scale"): Vec2
 ---@overload fun(self: VectorShapeNode, path: "rotation"): number
@@ -4874,9 +4874,9 @@ function VectorShapeNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("file", "text")`
----@param path VectorShapeNodeProperty|string
----@param value any
----@param y? number
+---@param path VectorShapeNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: VectorShapeNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: VectorShapeNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: VectorShapeNode, path: "rotation", value: number)
@@ -4968,8 +4968,8 @@ function VectorShapeNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("lifetime")`
----@param path TrailNodeProperty|string
----@return any
+---@param path TrailNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: TrailNode, path: "position"): Vec2
 ---@overload fun(self: TrailNode, path: "scale"): Vec2
 ---@overload fun(self: TrailNode, path: "rotation"): number
@@ -4991,9 +4991,9 @@ function TrailNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("lifetime", 1.5)`
----@param path TrailNodeProperty|string
----@param value any
----@param y? number
+---@param path TrailNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: TrailNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TrailNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TrailNode, path: "rotation", value: number)
@@ -5077,8 +5077,8 @@ function TrailNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIContainerNodeProperty|string
----@return any
+---@param path UIContainerNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIContainerNode, path: "position"): Vec2
 ---@overload fun(self: UIContainerNode, path: "scale"): Vec2
 ---@overload fun(self: UIContainerNode, path: "rotation"): number
@@ -5113,9 +5113,9 @@ function UIContainerNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIContainerNodeProperty|string
----@param value any
----@param y? number
+---@param path UIContainerNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIContainerNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIContainerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIContainerNode, path: "rotation", value: number)
@@ -5188,8 +5188,8 @@ function UIContainerNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UILabelNodeProperty|string
----@return any
+---@param path UILabelNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UILabelNode, path: "position"): Vec2
 ---@overload fun(self: UILabelNode, path: "scale"): Vec2
 ---@overload fun(self: UILabelNode, path: "rotation"): number
@@ -5212,9 +5212,9 @@ function UILabelNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UILabelNodeProperty|string
----@param value any
----@param y? number
+---@param path UILabelNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UILabelNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UILabelNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UILabelNode, path: "rotation", value: number)
@@ -5283,8 +5283,8 @@ function UILabelNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIButtonNodeProperty|string
----@return any
+---@param path UIButtonNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIButtonNode, path: "position"): Vec2
 ---@overload fun(self: UIButtonNode, path: "scale"): Vec2
 ---@overload fun(self: UIButtonNode, path: "rotation"): number
@@ -5311,9 +5311,9 @@ function UIButtonNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIButtonNodeProperty|string
----@param value any
----@param y? number
+---@param path UIButtonNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIButtonNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIButtonNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIButtonNode, path: "rotation", value: number)
@@ -5384,8 +5384,8 @@ function UIButtonNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UISliderNodeProperty|string
----@return any
+---@param path UISliderNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UISliderNode, path: "position"): Vec2
 ---@overload fun(self: UISliderNode, path: "scale"): Vec2
 ---@overload fun(self: UISliderNode, path: "rotation"): number
@@ -5411,9 +5411,9 @@ function UISliderNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UISliderNodeProperty|string
----@param value any
----@param y? number
+---@param path UISliderNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UISliderNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISliderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISliderNode, path: "rotation", value: number)
@@ -5475,8 +5475,8 @@ function UISliderNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UICheckboxNodeProperty|string
----@return any
+---@param path UICheckboxNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UICheckboxNode, path: "position"): Vec2
 ---@overload fun(self: UICheckboxNode, path: "scale"): Vec2
 ---@overload fun(self: UICheckboxNode, path: "rotation"): number
@@ -5498,9 +5498,9 @@ function UICheckboxNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UICheckboxNodeProperty|string
----@param value any
----@param y? number
+---@param path UICheckboxNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UICheckboxNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UICheckboxNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UICheckboxNode, path: "rotation", value: number)
@@ -5562,8 +5562,8 @@ function UICheckboxNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIProgressBarNodeProperty|string
----@return any
+---@param path UIProgressBarNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIProgressBarNode, path: "position"): Vec2
 ---@overload fun(self: UIProgressBarNode, path: "scale"): Vec2
 ---@overload fun(self: UIProgressBarNode, path: "rotation"): number
@@ -5587,9 +5587,9 @@ function UIProgressBarNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIProgressBarNodeProperty|string
----@param value any
----@param y? number
+---@param path UIProgressBarNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIProgressBarNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIProgressBarNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIProgressBarNode, path: "rotation", value: number)
@@ -5649,8 +5649,8 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UITextInputNodeProperty|string
----@return any
+---@param path UITextInputNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UITextInputNode, path: "position"): Vec2
 ---@overload fun(self: UITextInputNode, path: "scale"): Vec2
 ---@overload fun(self: UITextInputNode, path: "rotation"): number
@@ -5672,9 +5672,9 @@ function UITextInputNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UITextInputNodeProperty|string
----@param value any
----@param y? number
+---@param path UITextInputNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UITextInputNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITextInputNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITextInputNode, path: "rotation", value: number)
@@ -5734,8 +5734,8 @@ function UITextInputNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIDropdownNodeProperty|string
----@return any
+---@param path UIDropdownNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIDropdownNode, path: "position"): Vec2
 ---@overload fun(self: UIDropdownNode, path: "scale"): Vec2
 ---@overload fun(self: UIDropdownNode, path: "rotation"): number
@@ -5758,9 +5758,9 @@ function UIDropdownNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIDropdownNodeProperty|string
----@param value any
----@param y? number
+---@param path UIDropdownNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIDropdownNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIDropdownNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIDropdownNode, path: "rotation", value: number)
@@ -5821,8 +5821,8 @@ function UIDropdownNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIRadioGroupNodeProperty|string
----@return any
+---@param path UIRadioGroupNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIRadioGroupNode, path: "position"): Vec2
 ---@overload fun(self: UIRadioGroupNode, path: "scale"): Vec2
 ---@overload fun(self: UIRadioGroupNode, path: "rotation"): number
@@ -5845,9 +5845,9 @@ function UIRadioGroupNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIRadioGroupNodeProperty|string
----@param value any
----@param y? number
+---@param path UIRadioGroupNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIRadioGroupNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIRadioGroupNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIRadioGroupNode, path: "rotation", value: number)
@@ -5900,8 +5900,8 @@ function UIRadioGroupNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIToggleSwitchNodeProperty|string
----@return any
+---@param path UIToggleSwitchNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIToggleSwitchNode, path: "position"): Vec2
 ---@overload fun(self: UIToggleSwitchNode, path: "scale"): Vec2
 ---@overload fun(self: UIToggleSwitchNode, path: "rotation"): number
@@ -5920,9 +5920,9 @@ function UIToggleSwitchNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIToggleSwitchNodeProperty|string
----@param value any
----@param y? number
+---@param path UIToggleSwitchNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIToggleSwitchNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToggleSwitchNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToggleSwitchNode, path: "rotation", value: number)
@@ -5977,8 +5977,8 @@ function UIToggleSwitchNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIKnobNodeProperty|string
----@return any
+---@param path UIKnobNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIKnobNode, path: "position"): Vec2
 ---@overload fun(self: UIKnobNode, path: "scale"): Vec2
 ---@overload fun(self: UIKnobNode, path: "rotation"): number
@@ -6000,9 +6000,9 @@ function UIKnobNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIKnobNodeProperty|string
----@param value any
----@param y? number
+---@param path UIKnobNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIKnobNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIKnobNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIKnobNode, path: "rotation", value: number)
@@ -6066,8 +6066,8 @@ function UIKnobNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UINotchedSliderNodeProperty|string
----@return any
+---@param path UINotchedSliderNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UINotchedSliderNode, path: "position"): Vec2
 ---@overload fun(self: UINotchedSliderNode, path: "scale"): Vec2
 ---@overload fun(self: UINotchedSliderNode, path: "rotation"): number
@@ -6092,9 +6092,9 @@ function UINotchedSliderNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UINotchedSliderNodeProperty|string
----@param value any
----@param y? number
+---@param path UINotchedSliderNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UINotchedSliderNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UINotchedSliderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UINotchedSliderNode, path: "rotation", value: number)
@@ -6155,8 +6155,8 @@ function UINotchedSliderNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIVolumeFaderNodeProperty|string
----@return any
+---@param path UIVolumeFaderNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIVolumeFaderNode, path: "position"): Vec2
 ---@overload fun(self: UIVolumeFaderNode, path: "scale"): Vec2
 ---@overload fun(self: UIVolumeFaderNode, path: "rotation"): number
@@ -6178,9 +6178,9 @@ function UIVolumeFaderNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIVolumeFaderNodeProperty|string
----@param value any
----@param y? number
+---@param path UIVolumeFaderNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIVolumeFaderNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeFaderNode, path: "rotation", value: number)
@@ -6240,8 +6240,8 @@ function UIVolumeFaderNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIVolumeMeterNodeProperty|string
----@return any
+---@param path UIVolumeMeterNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIVolumeMeterNode, path: "position"): Vec2
 ---@overload fun(self: UIVolumeMeterNode, path: "scale"): Vec2
 ---@overload fun(self: UIVolumeMeterNode, path: "rotation"): number
@@ -6264,9 +6264,9 @@ function UIVolumeMeterNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIVolumeMeterNodeProperty|string
----@param value any
----@param y? number
+---@param path UIVolumeMeterNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIVolumeMeterNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIVolumeMeterNode, path: "rotation", value: number)
@@ -6319,8 +6319,8 @@ function UIVolumeMeterNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UISeparatorNodeProperty|string
----@return any
+---@param path UISeparatorNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UISeparatorNode, path: "position"): Vec2
 ---@overload fun(self: UISeparatorNode, path: "scale"): Vec2
 ---@overload fun(self: UISeparatorNode, path: "rotation"): number
@@ -6339,9 +6339,9 @@ function UISeparatorNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UISeparatorNodeProperty|string
----@param value any
----@param y? number
+---@param path UISeparatorNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UISeparatorNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISeparatorNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UISeparatorNode, path: "rotation", value: number)
@@ -6424,8 +6424,8 @@ function UISeparatorNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIXYPlotNodeProperty|string
----@return any
+---@param path UIXYPlotNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIXYPlotNode, path: "position"): Vec2
 ---@overload fun(self: UIXYPlotNode, path: "scale"): Vec2
 ---@overload fun(self: UIXYPlotNode, path: "rotation"): number
@@ -6461,9 +6461,9 @@ function UIXYPlotNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIXYPlotNodeProperty|string
----@param value any
----@param y? number
+---@param path UIXYPlotNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIXYPlotNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIXYPlotNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIXYPlotNode, path: "rotation", value: number)
@@ -6531,8 +6531,8 @@ function UIXYPlotNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIListViewNodeProperty|string
----@return any
+---@param path UIListViewNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIListViewNode, path: "position"): Vec2
 ---@overload fun(self: UIListViewNode, path: "scale"): Vec2
 ---@overload fun(self: UIListViewNode, path: "rotation"): number
@@ -6552,9 +6552,9 @@ function UIListViewNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIListViewNodeProperty|string
----@param value any
----@param y? number
+---@param path UIListViewNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIListViewNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIListViewNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIListViewNode, path: "rotation", value: number)
@@ -6606,8 +6606,8 @@ function UIListViewNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UITreeViewNodeProperty|string
----@return any
+---@param path UITreeViewNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UITreeViewNode, path: "position"): Vec2
 ---@overload fun(self: UITreeViewNode, path: "scale"): Vec2
 ---@overload fun(self: UITreeViewNode, path: "rotation"): number
@@ -6627,9 +6627,9 @@ function UITreeViewNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UITreeViewNodeProperty|string
----@param value any
----@param y? number
+---@param path UITreeViewNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UITreeViewNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITreeViewNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITreeViewNode, path: "rotation", value: number)
@@ -6683,8 +6683,8 @@ function UITreeViewNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIUnorderedListNodeProperty|string
----@return any
+---@param path UIUnorderedListNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIUnorderedListNode, path: "position"): Vec2
 ---@overload fun(self: UIUnorderedListNode, path: "scale"): Vec2
 ---@overload fun(self: UIUnorderedListNode, path: "rotation"): number
@@ -6705,9 +6705,9 @@ function UIUnorderedListNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIUnorderedListNodeProperty|string
----@param value any
----@param y? number
+---@param path UIUnorderedListNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIUnorderedListNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIUnorderedListNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIUnorderedListNode, path: "rotation", value: number)
@@ -6764,8 +6764,8 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIOrderedListNodeProperty|string
----@return any
+---@param path UIOrderedListNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIOrderedListNode, path: "position"): Vec2
 ---@overload fun(self: UIOrderedListNode, path: "scale"): Vec2
 ---@overload fun(self: UIOrderedListNode, path: "rotation"): number
@@ -6787,9 +6787,9 @@ function UIOrderedListNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIOrderedListNodeProperty|string
----@param value any
----@param y? number
+---@param path UIOrderedListNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIOrderedListNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIOrderedListNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIOrderedListNode, path: "rotation", value: number)
@@ -6851,8 +6851,8 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UITableNodeProperty|string
----@return any
+---@param path UITableNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UITableNode, path: "position"): Vec2
 ---@overload fun(self: UITableNode, path: "scale"): Vec2
 ---@overload fun(self: UITableNode, path: "rotation"): number
@@ -6876,9 +6876,9 @@ function UITableNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UITableNodeProperty|string
----@param value any
----@param y? number
+---@param path UITableNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UITableNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITableNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITableNode, path: "rotation", value: number)
@@ -6936,8 +6936,8 @@ function UITableNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIIconNodeProperty|string
----@return any
+---@param path UIIconNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIIconNode, path: "position"): Vec2
 ---@overload fun(self: UIIconNode, path: "scale"): Vec2
 ---@overload fun(self: UIIconNode, path: "rotation"): number
@@ -6958,9 +6958,9 @@ function UIIconNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIIconNodeProperty|string
----@param value any
----@param y? number
+---@param path UIIconNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIIconNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIIconNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIIconNode, path: "rotation", value: number)
@@ -7015,8 +7015,8 @@ function UIIconNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UIToolbarNodeProperty|string
----@return any
+---@param path UIToolbarNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UIToolbarNode, path: "position"): Vec2
 ---@overload fun(self: UIToolbarNode, path: "scale"): Vec2
 ---@overload fun(self: UIToolbarNode, path: "rotation"): number
@@ -7037,9 +7037,9 @@ function UIToolbarNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UIToolbarNodeProperty|string
----@param value any
----@param y? number
+---@param path UIToolbarNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UIToolbarNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToolbarNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToolbarNode, path: "rotation", value: number)
@@ -7130,8 +7130,8 @@ function UIToolbarNode:set_property(path, value, y) end
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
 ---Example: `local value = self.node:get_property("size")`
----@param path UITabContainerNodeProperty|string
----@return any
+---@param path UITabContainerNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: UITabContainerNode, path: "position"): Vec2
 ---@overload fun(self: UITabContainerNode, path: "scale"): Vec2
 ---@overload fun(self: UITabContainerNode, path: "rotation"): number
@@ -7170,9 +7170,9 @@ function UITabContainerNode:get_property(path) end
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
 ---Example: `self.node:set_property("size", 100, 50)`
----@param path UITabContainerNodeProperty|string
----@param value any
----@param y? number
+---@param path UITabContainerNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
 ---@overload fun(self: UITabContainerNode, path: "position", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITabContainerNode, path: "scale", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITabContainerNode, path: "rotation", value: number)
@@ -7216,121 +7216,121 @@ function UITabContainerNode:set_property(path, value, y) end
 ---Applies a continuous force to this node this step (requires DynamicBodyNode). Units are pixels: the acceleration is force / mass (px/s^2), and mass is density x area in px^2 (a 64x64 box at density 1 weighs 4096), so scale by get_mass().
 ---
 ---Example: `self.node:apply_force(0, -self.node:get_mass() * 1500)`
----@param fx number Force X (mass x px/s^2)
----@param fy number Force Y (mass x px/s^2)
+---@param fx number Force x in mass x px/s^2, applied for this physics step only (call it every step to keep pushing); a Vec2 here gives both x and y. Ignored before the body exists
+---@param fy number Force y in mass x px/s^2 (+y is down)
 function DynamicBodyNode:apply_force(fx, fy) end
 
 ---Applies an instantaneous impulse to this node (requires DynamicBodyNode). It changes the velocity by impulse / mass (px/s); mass is density x area in px^2 (a 64x64 box at density 1 weighs 4096), so scale by get_mass().
 ---
 ---Example: `self.node:apply_impulse(0, -self.node:get_mass() * 300) -- 300 px/s upwards`
----@param ix number Impulse X (mass x px/s)
----@param iy number Impulse Y (mass x px/s)
+---@param ix number Impulse x in mass x px/s: the speed changes at once by impulse / mass; a Vec2 here gives both x and y. Ignored before the body exists
+---@param iy number Impulse y in mass x px/s (+y is down; negative pushes up)
 function DynamicBodyNode:apply_impulse(ix, iy) end
 
 ---The body's mass: density x area in px^2 (a 64x64 box at density 1 weighs 4096). 0 before its body exists.
 ---
 ---Example: `self.node:apply_impulse(0, -self.node:get_mass() * 300)`
----@return number mass
+---@return number mass Density x area in px^2 (a 64x64 box at density 1 is 4096); 0 before the body exists
 function DynamicBodyNode:get_mass() end
 
----Gets the linear velocity of the physics body or character mover in world units per second.
+---Gets the linear velocity of the physics body or character mover in px/s.
 ---
 ---Example: `local vx, vy = self.node:get_linear_velocity(); if vy > 400 then self.falling = true end`
----@return number vx Linear velocity X
----@return number vy Linear velocity Y
+---@return number vx Velocity x in px/s (the node's Linear Velocity before the body exists)
+---@return number vy Velocity y in px/s (+y is down)
 function DynamicBodyNode:get_linear_velocity() end
 
 ---Sets the linear velocity of the physics body or character mover directly.
 ---
 ---Example: `self.node:set_linear_velocity(200, 0)`
----@param vx number Linear velocity X
----@param vy number Linear velocity Y
+---@param vx number Velocity x in px/s; a Vec2 here gives both x and y. Wakes the body
+---@param vy number Velocity y in px/s (+y is down)
 function DynamicBodyNode:set_linear_velocity(vx, vy) end
 
 ---Gets the angular velocity of the physics body in degrees per second.
 ---
 ---Example: `local omega = self.node:get_angular_velocity(); if math.abs(omega) > 720 then Log.info("spinning") end`
----@return number omega Angular velocity in degrees/sec
+---@return number omega Spin in degrees per second (positive is clockwise on screen)
 function DynamicBodyNode:get_angular_velocity() end
 
 ---Sets the angular velocity of the physics body in degrees per second.
 ---
 ---Example: `self.node:set_angular_velocity(180)`
----@param omega number Angular velocity in degrees/sec
+---@param omega number Spin in degrees per second (positive is clockwise on screen); wakes the body
 function DynamicBodyNode:set_angular_velocity(omega) end
 
----Gets the linear velocity of the kinematic body in world units per second.
+---Gets the linear velocity of the kinematic body in px/s.
 ---
 ---Example: `local vx, vy = self.node:get_linear_velocity()`
----@return number vx Linear velocity X
----@return number vy Linear velocity Y
+---@return number vx Velocity x in px/s (the node's Linear Velocity before the body exists)
+---@return number vy Velocity y in px/s (+y is down)
 function KinematicBodyNode:get_linear_velocity() end
 
 ---Sets the linear velocity of the kinematic body directly.
 ---
 ---Example: `self.node:set_linear_velocity(120, 0)`
----@param vx number Linear velocity X
----@param vy number Linear velocity Y
+---@param vx number Velocity x in px/s; a Vec2 here gives both x and y. The body keeps this speed (gravity and collisions don't change it)
+---@param vy number Velocity y in px/s (+y is down)
 function KinematicBodyNode:set_linear_velocity(vx, vy) end
 
 ---Gets the angular velocity of the kinematic body in degrees per second.
 ---
 ---Example: `local omega = self.node:get_angular_velocity()`
----@return number omega Angular velocity in degrees/sec
+---@return number omega Spin in degrees per second (positive is clockwise on screen)
 function KinematicBodyNode:get_angular_velocity() end
 
 ---Sets the angular velocity of the kinematic body in degrees per second.
 ---
 ---Example: `self.node:set_angular_velocity(90)`
----@param omega number Angular velocity in degrees/sec
+---@param omega number Spin in degrees per second (positive is clockwise on screen); it keeps spinning at this rate
 function KinematicBodyNode:set_angular_velocity(omega) end
 
 ---Gets the gravity scale multiplier for this physics body.
 ---
 ---Example: `local g = self.node:get_gravity_scale(); self.node:set_gravity_scale(g * 0.5)`
----@return number
+---@return number scale Multiplier of the world gravity: 1 normal (the default), 0 none, negative falls up
 function DynamicBodyNode:get_gravity_scale() end
 
 ---Sets the gravity scale multiplier for this physics body.
 ---
 ---Example: `self.node:set_gravity_scale(0)`
----@param scale number
+---@param scale number Multiplier of the world gravity: 1 normal, 0 floats, 2 twice as heavy, negative falls up
 function DynamicBodyNode:set_gravity_scale(scale) end
 
 ---Checks whether rotation is locked on this body.
 ---
 ---Example: `if not self.node:is_fixed_rotation() then self.node:set_fixed_rotation(true) end`
----@return boolean
+---@return boolean fixed True when the body can't rotate (collisions don't spin it)
 function DynamicBodyNode:is_fixed_rotation() end
 
 ---Locks or unlocks rotation on this physics body.
 ---
 ---Example: `self.node:set_fixed_rotation(true)`
----@param fixed boolean
+---@param fixed boolean True locks rotation (good for characters and crates that must stay upright); false lets collisions spin it
 function DynamicBodyNode:set_fixed_rotation(fixed) end
 
 ---Sets the linear drag/damping coefficient.
 ---
 ---Example: `self.node:set_linear_damping(2.0)`
----@param damping number
+---@param damping number Drag on movement, 0 or more: 0 none (the default), higher slows the body faster (about 1 / damping seconds to lose most of its speed)
 function DynamicBodyNode:set_linear_damping(damping) end
 
 ---Sets the angular drag/damping coefficient.
 ---
 ---Example: `self.node:set_angular_damping(1.5)`
----@param damping number
+---@param damping number Drag on spinning, 0 or more: 0 none, higher stops rotation faster
 function DynamicBodyNode:set_angular_damping(damping) end
 
 ---Checks if the physics body is awake and participating in simulation.
 ---
 ---Example: `if not self.node:is_awake() then self.node:set_awake(true) end`
----@return boolean
+---@return boolean awake True while simulated; false when asleep (resting) or before the body exists
 function DynamicBodyNode:is_awake() end
 
 ---Wakes up or puts the body to sleep.
 ---
 ---Example: `self.node:set_awake(true)`
----@param awake boolean
+---@param awake boolean True wakes the body, false puts it to sleep until something touches it; no effect before the body exists
 function DynamicBodyNode:set_awake(awake) end
 
 -- ----------------------------------------------------------------------------
@@ -7349,35 +7349,35 @@ function DynamicBodyNode:set_awake(awake) end
 ---Sets the node's shader: a built-in or a project fragment shader (.fs). nil removes it.
 ---
 ---Example: `self.node:set_shader("builtin:flash")`
----@param shader BuiltinShader|string|nil
+---@param shader BuiltinShader|string|nil "builtin:flash", "builtin:outline", "builtin:dissolve", "builtin:grayscale", "builtin:wave" or a project .fs path; nil removes the shader
 function Node:set_shader(shader) end
 
 ---Sets a shader parameter (a uniform of the shader): a number, up to four
 ---numbers, a table {r, g, b, a} / {x, y}, or a texture path.
 ---
 ---Example: `self.node:set_shader_param("amount", 0.8)`
----@param name string
----@param x number|number[]|string
----@param y? number
----@param z? number
----@param w? number
+---@param name string The uniform's name in the shader, e.g. "amount" or "flash_color"
+---@param x number|number[]|string A number, a table of up to 4 numbers ({r, g, b, a} 0..1, {x, y}), or a texture's project path
+---@param y? number Second number when x is a number; missing = 0
+---@param z? number Third number when x is a number; missing = 0
+---@param w? number Fourth number when x is a number; missing = 0
 function Node:set_shader_param(name, x, y, z, w) end
 
 ---Gets a shader parameter (its value, else the shader's default): up to four
 ---numbers, or the texture path.
 ---
 ---Example: `local amount = self.node:get_shader_param("amount")`
----@param name string
----@return number|string|nil x
----@return number? y
----@return number? z
----@return number? w
+---@param name string The uniform's name in the shader
+---@return number|string|nil x The first number, or the texture path for a texture parameter; nil when the node has no shader or no such parameter
+---@return number? y The second number (0 when unused); nil for a texture or a missing parameter
+---@return number? z The third number (0 when unused); nil for a texture or a missing parameter
+---@return number? w The fourth number (0 when unused); nil for a texture or a missing parameter
 function Node:get_shader_param(name) end
 
 ---Sets how the node is blended with what's behind it.
 ---
 ---Example: `self.node:set_blend_mode("additive")`
----@param mode BlendMode
+---@param mode BlendMode "alpha" (normal, the default), "additive", "multiply", "add_colors", "subtract_colors" or "premultiplied"; an unknown name gives "alpha"
 function Node:set_blend_mode(mode) end
 
 -- ----------------------------------------------------------------------------
@@ -7387,27 +7387,27 @@ function Node:set_blend_mode(mode) end
 ---Sets the light's colour (0..1).
 ---
 ---Example: `local lamp = self.node:get_node("Lamp"); lamp:light_set_color(1.0, 0.8, 0.4)`
----@param r number
----@param g number
----@param b number
+---@param r number Red, 0 to 1 (clamped)
+---@param g number Green, 0 to 1 (clamped)
+---@param b number Blue, 0 to 1 (clamped)
 function LightNode:light_set_color(r, g, b) end
 
----Sets the light's energy (brightness multiplier, 0..8).
+---Sets the light's energy (a brightness multiplier, 0 or more; the Inspector goes to 8).
 ---
 ---Example: `local lamp = self.node:get_node("Lamp"); lamp:light_set_energy(2.5)`
----@param energy number
+---@param energy number Brightness multiplier: 1 = normal, 0 = off (negative counts as 0); the Inspector goes to 8
 function LightNode:light_set_energy(energy) end
 
 ---Gets the light's energy (brightness multiplier).
 ---
 ---Example: `local lamp = self.node:get_node("Lamp"); lamp:light_set_energy(lamp:light_get_energy() * 0.9)`
----@return number energy
+---@return number energy The brightness multiplier; 0 for other node types
 function LightNode:light_get_energy() end
 
----Sets the light's radius (world units).
+---Sets the light's radius (px).
 ---
 ---Example: `local lamp = self.node:get_node("Lamp"); lamp:light_set_radius(200)`
----@param radius number
+---@param radius number How far the light reaches, in world px (negative counts as 0)
 function LightNode:light_set_radius(radius) end
 
 -- ----------------------------------------------------------------------------
@@ -7420,49 +7420,49 @@ function LightNode:light_set_radius(radius) end
 ---when the node has no script.
 ---
 ---Example: `local enemy = Scene.find_node("Enemy"); enemy:get_script():take_damage(10)`
----@return table?
+---@return table? The script's live self table; nil when the node has no script or was destroyed
 function Node:get_script() end
 
 ---Pauses this node and its children (except "always" ones).
 ---
 ---Example: `Scene.find_node("Enemies"):set_paused(true)`
----@param paused boolean
+---@param paused boolean true pauses the node and its children (except "always" ones); false lets them run unless a parent or the game is paused
 function Node:set_paused(paused) end
 
 ---Checks whether the node is paused, by itself, a parent or the game.
 ---
 ---Example: `if self.node:is_paused() then return end`
----@return boolean paused By itself, a parent or the game
+---@return boolean paused true when paused by itself, a parent or the game (as of this frame's update)
 function Node:is_paused() end
 
 ---Sets how the node reacts to pausing: inherit from its parent, pausable, or always running.
 ---
 ---Example: `self.node:set_pause_mode("always")`
----@param mode "inherit"|"pausable"|"always"
+---@param mode "inherit"|"pausable"|"always" "inherit" (the parent's mode, the default), "pausable" (stops when paused) or "always" (keeps running, e.g. a pause menu); anything else is inherit
 function Node:set_pause_mode(mode) end
 
 ---Sets the text of a TextNode (restarting its typewriter), UI label, button or text input (raising its value_changed).
 ---
 ---Example: `self.node:get_node("ScoreLabel"):set_text("Score: " .. self.score)`
----@param text string
+---@param text string The new text; a TextNode types it out again (Reveal Speed above 0), a text input raises value_changed; other node types ignore it
 function TextHolder:set_text(text) end
 
 ---Gets the text of a TextNode, UI label, button or text input (what's typed).
 ---
 ---Example: `local text = self.node:get_node("ScoreLabel"):get_text()`
----@return string
+---@return string The text shown (a text input: what's typed); "" for other node types
 function TextHolder:get_text() end
 
 ---Replaces the node's list (#227): a Dropdown's items, a Radio Group's options, a List View's / Tree View's / Bullet or Numbered List's / Toolbar's items, a Table's rows, an XY Plot's points, a Tab Container's tab names, a Notched Slider's notch labels. One string an item, as in the Inspector: 2 leading spaces nest a Tree / List item; table cells split by "|"; toolbar items "Icon|Label|Tooltip"; points "x, y" or Vec2 / {x, y}. Other lists: set_property("columns", {...}).
 ---
 ---Example: `self.node:get_node("Difficulty"):ui_set_items({"Easy", "Normal", "Hard"})`
----@param items (string|number|Vec2|number[])[]
+---@param items (string|number|Vec2|number[])[] One entry per item, as typed in the Inspector (strings, numbers, or Vec2 or {x, y} for plot points); replaces the whole list; nodes without a list ignore it
 function UIListHolder:ui_set_items(items) end
 
 ---The node's list (see ui_set_items), one string an item.
 ---
 ---Example: `for i, name in ipairs(self.node:ui_get_items()) do print(i, name) end`
----@return string[]
+---@return string[] One string per item, as in the Inspector; empty for nodes without a list
 function UIListHolder:ui_get_items() end
 
 ---TextNode: types the text out again (revealSpeed > 0).
@@ -7481,8 +7481,8 @@ function TextNode:text_restart() end
 ---Events: "line_shown"(index), "finished".
 ---
 ---Example: `local box = Scene.find_node("Dialogue"); box:dialogue_show({ { speaker = "Guard", text = "Halt!" } })`
----@param lines string|(string|DialogueLine)[]
----@param speaker? string
+---@param lines string|(string|DialogueLine)[] One line of text, or a list of lines: strings or {speaker, text, voice} tables. Replaces whatever the box was showing
+---@param speaker? string Speaker name for a single text line; ignored when lines is a list
 function DialogueNode:dialogue_show(lines, speaker) end
 
 ---Shows the rest of the line, else the next one.
@@ -7498,20 +7498,20 @@ function DialogueNode:dialogue_close() end
 ---Checks whether the dialogue box is currently open.
 ---
 ---Example: `if Scene.find_node("Dialogue"):dialogue_is_open() then return end`
----@return boolean
+---@return boolean open True while a line is showing (from dialogue_show until the last line is passed or dialogue_close)
 function DialogueNode:dialogue_is_open() end
 
 ---LineNode: replaces its points (local to the node).
 ---
 ---Example: `self.node:get_node("Laser"):line_set_points({ {0, 0}, {120, 0} })`
----@param points number[][] { {x, y}, ... }
+---@param points number[][] { {x, y}, ... } in px, local to the node; replaces every point (an empty table clears the line)
 function LineNode:line_set_points(points) end
 
 ---LineNode: appends a point (local to the node).
 ---
 ---Example: `self.node:get_node("Path"):line_add_point(64, 32)`
----@param x number
----@param y number
+---@param x number X in px, local to the node
+---@param y number Y in px, local to the node (+y is down)
 function LineNode:line_add_point(x, y) end
 
 ---LineNode: removes every point.
@@ -7527,17 +7527,17 @@ function TrailNode:trail_clear() end
 ---Spawns as the spawner's mode says (or entry `index`, 1-based, whatever the mode); returns the spawned roots - empty when held back (cooldown, maxAlive, totalLimit, chance, an empty list).
 ---
 ---Example: `for _, bullet in ipairs(self.node:get_node("Muzzle"):spawn()) do bullet:get_script().owner = self.node end`
----@param index? integer An entry of the list (1-based)
----@return Node[]
+---@param index? integer An entry of the list, from 1, spawned whatever the mode; nil picks as the mode says
+---@return Node[] nodes The spawned root nodes; empty when held back (cooldown, maxAlive, totalLimit, chance, an empty list)
 function SpawnerNode:spawn(index) end
 
 ---Spawns at a world position instead of the spawner's (its rotation and offsets still apply).
 ---
 ---Example: `self.node:get_node("Loot"):spawn_at(enemy.position)`
----@param x number|Vec2
----@param y? number
----@param index? integer An entry of the list (1-based)
----@return Node[]
+---@param x number|Vec2 World x in px, or a Vec2 position (then the index comes second)
+---@param y? number World y in px; with a Vec2 for x, the entry index goes here instead
+---@param index? integer An entry of the list, from 1; nil picks as the mode says
+---@return Node[] nodes The spawned root nodes; empty when held back
 function SpawnerNode:spawn_at(x, y, index) end
 
 ---Starts over: the sequence, the shuffle bag, spawned-so-far (totalLimit), the cooldown and the auto-spawn delay.
@@ -7548,27 +7548,27 @@ function SpawnerNode:spawn_reset() end
 ---How many of the nodes it spawned are still in the scene (pooled ones until they go back to their pool).
 ---
 ---Example: `if spawner:spawn_alive_count() == 0 then self:next_wave() end`
----@return integer
+---@return integer count Spawned nodes still in the scene (pooled ones until they go back to their pool)
 function SpawnerNode:spawn_alive_count() end
 
 ---The spawn list: {component, weight, count} per entry, in order.
 ---
 ---Example: `for i, e in ipairs(spawner:spawn_entries()) do Log.info(i, e.component, e.weight) end`
----@return {component: ComponentPath|string, weight: number, count: integer}[]
+---@return {component: ComponentPath|string, weight: number, count: integer}[] entries One {component, weight, count} table per entry, in list order
 function SpawnerNode:spawn_entries() end
 
 ---Adds a component to the end of the list.
 ---
 ---Example: `spawner:spawn_add("components/BossMinion.component.json", 0.5)`
----@param component ComponentPath|string
----@param weight? number Random mode: how likely (default 1)
----@param count? integer Spawned each time it is picked (default 1)
+---@param component ComponentPath|string The component's path (.component.json)
+---@param weight? number Random mode: how likely it is picked, relative to the others (default 1)
+---@param count? integer How many are spawned each time it is picked (default 1, at least 1)
 function SpawnerNode:spawn_add(component, weight, count) end
 
 ---Removes the list's entry at `index` (1-based).
 ---
 ---Example: `spawner:spawn_remove(1)`
----@param index integer
+---@param index integer The entry to remove, from 1; out of range does nothing
 function SpawnerNode:spawn_remove(index) end
 
 ---Empties the list.
@@ -7579,111 +7579,111 @@ function SpawnerNode:spawn_clear() end
 ---Sets a function called for every node this spawner makes - by spawn(), spawn_at(), Auto Spawn, a signal or the pool - once it's placed and before its ready() / on_spawn(): set it up there. info.component is the component's path, info.index its entry in the list (from 1). Setting it again replaces it; nil clears it.
 ---
 ---Example: `spawner:set_spawn_callback(function(enemy, info, spawner) enemy:get_script().weapon = weapons[info.index] end)`
----@param fn? fun(node: Node, info: {component: string, index: integer}, spawner: SpawnerNode)
+---@param fn? fun(node: Node, info: {component: string, index: integer}, spawner: SpawnerNode) Called as fn(node, info, spawner) for every spawned node before its ready(); info is {component, index}. nil clears it
 function SpawnerNode:set_spawn_callback(fn) end
 
 ---Which list entry a node this spawner made (and still alive) came from: {component, index} (index from 1), or nil.
 ---
 ---Example: `spawner:connect("spawned", function(n) if spawner:spawn_info(n).index == 2 then n:get_script().ranged = true end end)`
----@param node Node
----@return {component: string, index: integer}?
+---@param node Node A node this spawner made
+---@return {component: string, index: integer}? info {component, index} (index from 1), or nil when the node isn't one of its live spawns
 function SpawnerNode:spawn_info(node) end
 
 ---Makes a level into its TileMap (seed: this one, else the node's seed, a random one with randomSeed, or the generator's). Returns true, or false and why (also emitted as "generation_failed"). With background on it returns true once started; "generated" fires when the level is in.
 ---
 ---Example: `local ok, why = self.node:get_node("Generator"):generate(Save.get("seed", 7))`
----@param seed? integer
----@return boolean ok
----@return string? why
+---@param seed? integer Seed for this level; nil or 0 uses the node's Seed, else a random one when Random Seed is on, else the generator file's seed
+---@return boolean ok True when the level was made (or, with Background on, started)
+---@return string? why The reason when ok is false (e.g. "already generating"); nil on success
 function LevelGeneratorNode:generate(seed) end
 
 ---Whether a background generation is running.
 ---
 ---Example: `if not gen:is_generating() then loading:hide() end`
----@return boolean
+---@return boolean generating True while a background generation runs
 function LevelGeneratorNode:is_generating() end
 
 ---Sets a parameter of one of the generator's nodes for this node's levels (from the next generate): one generator file, many levels.
 ---
 ---Example: `gen:set_level_param(1, "density", 0.4 + level * 0.02); gen:generate()`
----@param node_id integer The generator node's id
----@param name string Its parameter
----@param value number|boolean
+---@param node_id integer The id of a node in the generator file (.levelgen.json)
+---@param name string Its parameter's name
+---@param value number|boolean A number, or a boolean (stored as 1 or 0); used from the next generate
 function LevelGeneratorNode:set_level_param(node_id, name, value) end
 
 ---A parameter set on this node with set_level_param (nil: the generator's own applies).
 ---
 ---Example: `local density = gen:level_param(1, "density") or 0.45`
----@param node_id integer
----@param name string
----@return number?
+---@param node_id integer The generator node's id
+---@param name string Its parameter's name
+---@return number? value The value set with set_level_param (a boolean comes back as 1 or 0), or nil when none is set (the generator's own applies)
 function LevelGeneratorNode:level_param(node_id, name) end
 
 ---Drops the parameters set on this node (all, a generator node's, or one).
 ---
 ---Example: `gen:clear_level_params()`
----@param node_id? integer
----@param name? string
+---@param node_id? integer Only this generator node's parameters; nil means every node
+---@param name? string Only the parameter of this name; nil means all of them
 function LevelGeneratorNode:clear_level_params(node_id, name) end
 
 ---The path's length in pixels (along the curve).
 ---
 ---Example: `local len = self.node:get_node("Route"):path_length()`
----@return number
+---@return number Length along the curve in the path's own px (before its scale); 0 for an empty path
 function PathNode:path_length() end
 
 ---The point at a distance along the path (world) and the direction the path goes there.
 ---
 ---Example: `local pos, dir = route:path_point_at(route:path_length() * 0.5)`
----@param distance number Pixels from the start (clamped)
----@return Vec2 position World position
----@return Vec2 direction Unit vector (world)
+---@param distance number Px along the path from its first point (clamped to 0 .. path_length)
+---@return Vec2 position World position of that point
+---@return Vec2 direction Unit vector, the direction the path runs there (world)
 function PathNode:path_point_at(distance) end
 
 ---The distance along the path of the point nearest to a world position (snap something onto the path).
 ---
----Example: `local d = route:path_closest_offset(player.position)`
----@param x number|Vec2
----@param y? number
----@return number distance
+---Example: `local d = route:path_closest_offset(player:get_global_position())`
+---@param x number|Vec2 World X in px, or a Vec2 world position
+---@param y? number World Y in px (omit when x is a Vec2)
+---@return number distance Px along the path of its point nearest to the position; 0 for a path under 2 points
 function PathNode:path_closest_offset(x, y) end
 
 ---How many points the path has.
 ---
 ---Example: `for i = 1, route:path_point_count() do print(route:path_get_point(i)) end`
----@return integer
+---@return integer Number of points; 0 for an empty path
 function PathNode:path_point_count() end
 
 ---A point (1-based): its position and its in / out handles, local to the path.
 ---
 ---Example: `local pos, handle_in, handle_out = route:path_get_point(1)`
----@param index integer
----@return Vec2 position
----@return Vec2 handle_in Offset from the point
----@return Vec2 handle_out Offset from the point
+---@param index integer Point number, 1-based
+---@return Vec2 position Position, local to the path; nil for an index out of range
+---@return Vec2 handle_in Handle towards the previous point, an offset from the position
+---@return Vec2 handle_out Handle towards the next point, an offset from the position
 function PathNode:path_get_point(index) end
 
 ---Moves a point (1-based), optionally setting its handles (offsets; zero = a sharp corner).
 ---
 ---Example: `route:path_set_point(2, Vec2(200, 40), Vec2(-30, 0), Vec2(30, 0))`
----@param index integer
----@param position Vec2
----@param handle_in? Vec2
----@param handle_out? Vec2
+---@param index integer Point number, 1-based (out of range does nothing)
+---@param position Vec2 New position, local to the path
+---@param handle_in? Vec2 Handle towards the previous point, offset from the position (nil keeps the current one)
+---@param handle_out? Vec2 Handle towards the next point, offset from the position (nil keeps the current one)
 function PathNode:path_set_point(index, position, handle_in, handle_out) end
 
 ---Adds a point at the end (local to the path), optionally with handles.
 ---
 ---Example: `route:path_add_point(Vec2(400, 0))`
----@param position Vec2
----@param handle_in? Vec2
----@param handle_out? Vec2
+---@param position Vec2 Position, local to the path
+---@param handle_in? Vec2 Handle towards the previous point, offset from the position (default zero, a sharp corner)
+---@param handle_out? Vec2 Handle towards the next point, offset from the position (default zero)
 function PathNode:path_add_point(position, handle_in, handle_out) end
 
 ---Removes a point (1-based).
 ---
 ---Example: `route:path_remove_point(route:path_point_count())`
----@param index integer
+---@param index integer Point number, 1-based (out of range does nothing)
 function PathNode:path_remove_point(index) end
 
 ---Removes every point.
@@ -7694,13 +7694,13 @@ function PathNode:path_clear() end
 ---How far along its path the follower is: 0 at the start, 1 at the end.
 ---
 ---Example: `if platform:follow_ratio() > 0.5 then ... end`
----@return number
+---@return number Progress as a fraction of the path's length, 0 to 1; 0 without a parent path
 function PathFollowNode:follow_ratio() end
 
 ---Puts the follower at a fraction of its path (0..1) at once.
 ---
 ---Example: `platform:follow_set_ratio(0.25)`
----@param ratio number
+---@param ratio number Fraction of the path's length, clamped to 0 .. 1
 function PathFollowNode:follow_set_ratio(ratio) end
 
 ---Back to the start, moving forwards again (after "path_finished").
@@ -7720,21 +7720,21 @@ function PathFollowNode:follow_restart() end
 ---Waypoints from the start to the end, or nil when unreachable.
 ---
 ---Example: `local level = Scene.find_node("Level"); local path = level:nav_find_path(x, y, tx, ty, {diagonal = false})`
----@param x1 number
----@param y1 number
----@param x2 number
----@param y2 number
----@param opts? NavOptions
----@return number[][]? path { {x, y}, ... }
+---@param x1 number Start X, world px
+---@param y1 number Start Y, world px
+---@param x2 number Goal X, world px
+---@param y2 number Goal Y, world px
+---@param opts? NavOptions diagonal, smooth (both default true), walkable_painted, radius; nil for the defaults
+---@return number[][]? World-px waypoints: the start point, cell centres along the way, then the goal; nil when unreachable or the node has no grid
 function NavGrid:nav_find_path(x1, y1, x2, y2, opts) end
 
 ---Whether the grid cell at a world position is walkable.
 ---
 ---Example: `local level = Scene.find_node("Level"); if level:nav_is_walkable(tx, ty) then self.target = {tx, ty} end`
----@param x number
----@param y number
----@param opts? NavOptions
----@return boolean
+---@param x number World X in px
+---@param y number World Y in px
+---@param opts? NavOptions walkable_painted and radius (an agent this many px wide must fit) count here; nil for the defaults
+---@return boolean true when the cell there is open; false for a wall, outside the grid, or a node with no grid
 function NavGrid:nav_is_walkable(x, y, opts) end
 
 ---Rebuilds the region's cells from the scene (after moving walls, loading a level, painting tiles).
@@ -7745,18 +7745,18 @@ function NavigationRegionNode:nav_rebake() end
 ---Blocks (or opens) a world rectangle for paths - doors, bridges, placed towers. Kept across rebakes.
 ---
 ---Example: `region:nav_set_blocked(door.position.x - 16, door.position.y - 32, 32, 64, not self.open)`
----@param x number
----@param y number
----@param w number
----@param h number
----@param blocked? boolean Default true
+---@param x number Left edge, world px
+---@param y number Top edge, world px
+---@param w number Width in px
+---@param h number Height in px
+---@param blocked? boolean true blocks every cell the rectangle touches, false reopens them (default true)
 function NavigationRegionNode:nav_set_blocked(x, y, w, h, blocked) end
 
 ---Sends the agent (and the node it moves) to a world position along a path.
 ---
----Example: `self.node:get_node("NavigationAgent"):nav_set_target(Scene.find_node("Player").position)`
----@param x number|Vec2
----@param y? number
+---Example: `self.node:get_node("NavigationAgent"):nav_set_target(Scene.find_node("Player"):get_global_position())`
+---@param x number|Vec2 Target world X in px, or a Vec2 world position
+---@param y? number Target world Y in px (omit when x is a Vec2)
 function NavigationAgentNode:nav_set_target(x, y) end
 
 ---Stops following the path (velocity 0).
@@ -7767,19 +7767,19 @@ function NavigationAgentNode:nav_stop() end
 ---Arrived (or no target).
 ---
 ---Example: `if agent:nav_is_finished() then self:look_around() end`
----@return boolean
+---@return boolean true when arrived, stopped, the target was unreachable or none was set
 function NavigationAgentNode:nav_is_finished() end
 
 ---The waypoints still to go (world).
 ---
 ---Example: `local left = #agent:nav_get_path()  -- waypoints still to go`
----@return number[][]
+---@return number[][] Waypoints still to go as {x, y} pairs (indices 1 and 2) in world px; empty when not moving
 function NavigationAgentNode:nav_get_path() end
 
 ---Path length still to go (px).
 ---
 ---Example: `if agent:nav_distance_left() < 64 then self:slow_down() end`
----@return number
+---@return number Path length still to go in px, from the agent's parent; 0 when not moving
 function NavigationAgentNode:nav_distance_left() end
 
 ---@class AsepriteTag
@@ -7812,10 +7812,10 @@ function NavigationAgentNode:nav_distance_left() end
 ---@field pivot? {x: integer, y: integer} Relative to the slice's origin
 ---@field user AsepriteUserData
 
----Plays a tag (its direction and repeats as set in Aseprite) from its first frame; nil / "" = every frame. No argument: the node's Animation.
+---Plays a tag (its direction and repeats as set in Aseprite) from its first frame; "" plays every frame, no argument the node's Animation.
 ---
 ---Example: `sprite:aseprite_play("run")`
----@param tag? string
+---@param tag? string The tag to play; "" plays every frame, an unknown tag also plays every frame. nil (or no argument) plays the node's Animation
 function AsepriteNode:aseprite_play(tag) end
 
 ---Stops on the current frame.
@@ -7831,64 +7831,64 @@ function AsepriteNode:aseprite_resume() end
 ---A tag is playing (false after its repeats are done, or stopped).
 ---
 ---Example: `if not sprite:aseprite_is_playing() then sprite:aseprite_play("idle") end`
----@return boolean
+---@return boolean playing True while it plays (false after aseprite_stop or when the tag's repeats are done)
 function AsepriteNode:aseprite_is_playing() end
 
 ---The frame shown (0-based).
 ---
 ---Example: `if sprite:aseprite_frame() == 3 then shoot() end`
----@return integer
+---@return integer frame The frame shown, from 0
 function AsepriteNode:aseprite_frame() end
 
 ---Shows a frame (0-based); a playing tag goes on from it.
 ---
 ---Example: `sprite:aseprite_set_frame(0)`
----@param frame integer
+---@param frame integer The frame to show, from 0; clamped to the file's frames
 function AsepriteNode:aseprite_set_frame(frame) end
 
 ---The file: size, frame durations, tags, layers, the sprite's user data.
 ---
 ---Example: `for _, tag in ipairs(sprite:aseprite_info().tags) do print(tag.name, tag.direction) end`
----@return AsepriteInfo?
+---@return AsepriteInfo? info {width, height, frames (durations in ms), tags, layers, user}, or nil when no file is loaded
 function AsepriteNode:aseprite_info() end
 
 ---A slice in a frame (default: the frame shown) - hitboxes, spawn points, 9-patch panels drawn in Aseprite. nil if it isn't there.
 ---
 ---Example: `local hit = sprite:aseprite_slice("hitbox")`
----@param name string
----@param frame? integer
----@return AsepriteSlice?
+---@param name string The slice's name in Aseprite
+---@param frame? integer The frame, from 0; nil uses the frame shown
+---@return AsepriteSlice? slice {x, y, width, height, center?, pivot?, user} in the sprite's px, or nil when the slice isn't there in that frame
 function AsepriteNode:aseprite_slice(name, frame) end
 
 ---A layer's user data (text, colour, properties set in Aseprite's layer properties).
 ---
 ---Example: `local damage = sprite:aseprite_layer_data("Weapon").properties.damage`
----@param layer string
----@return AsepriteUserData?
+---@param layer string The layer's name
+---@return AsepriteUserData? data {text, color?, properties}, or nil when there is no such layer
 function AsepriteNode:aseprite_layer_data(layer) end
 
 ---A cel's user data (a layer in a frame; default: the frame shown).
 ---
 ---Example: `if sprite:aseprite_cel_data("Body").properties.footstep then play_step() end`
----@param layer string
----@param frame? integer
----@return AsepriteUserData?
+---@param layer string The layer's name
+---@param frame? integer The frame, from 0; nil uses the frame shown
+---@return AsepriteUserData? data {text, color?, properties}, or nil when that layer has no cel in that frame
 function AsepriteNode:aseprite_cel_data(layer, frame) end
 
 ---Shows or hides a layer (by name; a group: its layers) - outfits, equipment, damage.
 ---
 ---Example: `sprite:aseprite_set_layer_visible("Helmet", has_helmet)`
----@param layer string
----@param visible boolean
+---@param layer string The layer's name (a group: all its layers)
+---@param visible boolean True shows it, false hides it
 function AsepriteNode:aseprite_set_layer_visible(layer, visible) end
 
 ---Plays an animation (crossfading over `mix` seconds; default: the node's Mix Time). False when the skeleton has no such animation.
 ---
 ---Example: `skel:skeleton_play("run")`
----@param name string
----@param loop? boolean Default true
----@param mix? number Seconds
----@return boolean ok
+---@param name string The animation's name (see skeleton_animations); always restarts it from its start, even when it is already playing
+---@param loop? boolean True (the default) loops; false plays once and fires "finished"
+---@param mix? number Crossfade from the current animation: 0 cuts; nil or any other value crossfades over the node's Mix Time (default 0.15 s; the value itself isn't used as the length yet)
+---@return boolean ok False when the skeleton has no such animation (nothing changes)
 function SkeletonNode:skeleton_play(name, loop, mix) end
 
 ---Stops at the current frame.
@@ -7899,66 +7899,66 @@ function SkeletonNode:skeleton_stop() end
 ---An animation is playing.
 ---
 ---Example: `if not skel:skeleton_is_playing() then skel:skeleton_play("idle") end`
----@return boolean
+---@return boolean playing True while an animation plays (false after skeleton_stop or when a one-shot animation ends)
 function SkeletonNode:skeleton_is_playing() end
 
 ---Switches the skin (attachment set).
 ---
 ---Example: `skel:skeleton_set_skin("armored")`
----@param name string
+---@param name string The skin's name (see skeleton_skins)
 function SkeletonNode:skeleton_set_skin(name) end
 
 ---The animations' names.
 ---
 ---Example: `for _, a in ipairs(skel:skeleton_animations()) do print(a) end`
----@return string[]
+---@return string[] names The animations' names, in file order; empty when no skeleton is loaded
 function SkeletonNode:skeleton_animations() end
 
 ---The skins' names.
 ---
 ---Example: `local skins = skel:skeleton_skins()`
----@return string[]
+---@return string[] names The skins' names; empty when no skeleton is loaded
 function SkeletonNode:skeleton_skins() end
 
 ---The bones' names.
 ---
 ---Example: `local bones = skel:skeleton_bones()`
----@return string[]
+---@return string[] names The bones' names; empty when no skeleton is loaded
 function SkeletonNode:skeleton_bones() end
 
 ---A bone's position in the world (nil: no such bone).
 ---
 ---Example: `local muzzle = skel:skeleton_bone_position("gun_tip")`
----@param name string
----@return Vec2?
+---@param name string The bone's name
+---@return Vec2? position The bone's world position in px, or nil when there is no such bone
 function SkeletonNode:skeleton_bone_position(name) end
 
 ---A bone's rotation in the world (degrees).
 ---
 ---Example: `local angle = skel:skeleton_bone_rotation("arm")`
----@param name string
----@return number?
+---@param name string The bone's name
+---@return number? degrees The bone's world rotation in degrees (the node's rotation included), or nil when there is no such bone
 function SkeletonNode:skeleton_bone_rotation(name) end
 
 ---Overrides a bone's local rotation (degrees) over the animation; nil gives it back to the animation.
 ---
 ---Example: `skel:skeleton_set_bone_rotation("arm", aim_angle)`
----@param name string
----@param degrees? number
----@return boolean ok
+---@param name string The bone's name
+---@param degrees? number Local rotation in degrees that replaces the animated one every frame; nil removes the override
+---@return boolean ok False when there is no such bone
 function SkeletonNode:skeleton_set_bone_rotation(name, degrees) end
 
 ---An animation's length in seconds (default: the current one).
 ---
 ---Example: `local t = skel:skeleton_duration("attack")`
----@param name? string
----@return number
+---@param name? string The animation's name; nil uses the current one
+---@return number seconds The animation's length in seconds; 0 when there is no such animation
 function SkeletonNode:skeleton_duration(name) end
 
 ---Adds shake trauma (stacks up to 1, decays by Shake Decay per second).
 ---
 ---Example: `cam:add_trauma(0.4)  -- a hit`
----@param amount number 0..1
+---@param amount number Trauma to add: 0.2 a bump, 0.5 a hit, 1 an explosion; the total is capped at 1 (negative calms it)
 function AdvancedCameraNode:add_trauma(amount) end
 
 ---Raises its priority above every other advanced camera: the host blends to it.
@@ -7969,7 +7969,7 @@ function AdvancedCameraNode:make_active() end
 ---The scene's camera shows this one now.
 ---
 ---Example: `if cam:is_active() then hud:show_hint() end`
----@return boolean
+---@return boolean true when the scene's camera is showing this one; false for other node types
 function AdvancedCameraNode:is_active() end
 
 ---Jumps to where it wants to be now (no damping; ends the blend if active) - after a teleport.
@@ -7982,13 +7982,13 @@ function AdvancedCameraNode:snap() end
 ---(Project Settings > Physics), "LayerN" or numbers 1-16; several or a table.
 ---
 ---Example: `self.node:set_collision_layer("player")`
----@param ... CollisionLayer|string|integer|table
+---@param ... CollisionLayer|string|integer|table Layer names from Project Settings > Physics, "LayerN" or numbers 1-16, as arguments or one table; replaces the layers it had; an unknown name is an error
 function Node:set_collision_layer(...) end
 
 ---The collision layers this body's shapes collide with.
 ---
 ---Example: `self.node:set_collision_mask("world", "enemies")`
----@param ... CollisionLayer|string|integer|table
+---@param ... CollisionLayer|string|integer|table The layers it collides with, given as for set_collision_layer; replaces the mask it had; an unknown name is an error
 function Node:set_collision_mask(...) end
 
 -- ----------------------------------------------------------------------------
@@ -8020,15 +8020,15 @@ function Node:set_collision_mask(...) end
 ---Use it every update to feed the machine what the game knows (speed, health, whether the player is on the floor); Automatic arrows react to it. For one-shot events (a button press, a hit) use a trigger instead (`sm_trigger`).
 ---
 ---Example: `local sm = self.node:get_node("StateMachine"); sm:sm_set("speed", math.abs(vx)); sm:sm_set("on_floor", self.node:character_is_on_floor())`
----@param name StateMachineParam|string The parameter (State Machine tab > Parameters & Triggers)
----@param value number|boolean
+---@param name StateMachineParam|string The parameter (State Machine tab > Parameters and Triggers); an unknown name is added as a float
+---@param value number|boolean A number, or a boolean (stored as 1 or 0); converted to the parameter's type
 function StateMachineNode:sm_set(name, value) end
 
 ---Gets a parameter's value, typed: a **bool** parameter returns true / false, an **int** an integer, a **float** a number. Returns nil when the machine has no parameter of that name.
 ---
 ---Example: `local lives = self.node:get_node("StateMachine"):sm_get("lives")  -- an integer`
----@param name StateMachineParam|string
----@return number|boolean|nil value
+---@param name StateMachineParam|string The parameter's name
+---@return number|boolean|nil value True or false for a bool parameter, an integer for an int, a number for a float; nil when there is no such parameter
 function StateMachineNode:sm_get(name) end
 
 ---Sets a trigger: a one-shot event such as a button press or a hit. An **Automatic** arrow with a `trigger` condition fires when it's set (and the arrow's other conditions and the guards agree); the arrow that fires uses it up. If no arrow out of the current state can use it, it is cleared after the machine's next update - so a press can't fire much later from another state. Give the trigger a **buffer** (State Machine tab > Parameters & Triggers) to keep it waiting longer: a jump pressed 0.1 s before landing still happens on landing.
@@ -8036,21 +8036,21 @@ function StateMachineNode:sm_get(name) end
 ---Triggers only drive Automatic arrows; to take a Manual arrow, call `sm_transition`.
 ---
 ---Example: `if Input.is_action_just_pressed("jump") then self.node:get_node("StateMachine"):sm_trigger("jump") end`
----@param name StateMachineTrigger|string The trigger (State Machine tab > Parameters & Triggers)
+---@param name StateMachineTrigger|string The trigger (State Machine tab > Parameters and Triggers)
 ---@return boolean ok false (and a warning) when the machine has no trigger of that name
 function StateMachineNode:sm_trigger(name) end
 
 ---Whether a trigger is set and not used up yet (waiting for an arrow, or in its buffer time).
 ---
 ---Example: `if sm:sm_trigger_pending("attack") then self:show_combo_hint() end`
----@param name StateMachineTrigger|string
----@return boolean pending
+---@param name StateMachineTrigger|string The trigger's name
+---@return boolean pending True while the trigger is set and not used up (waiting for an arrow or within its buffer)
 function StateMachineNode:sm_trigger_pending(name) end
 
 ---Un-sets a trigger, so a buffered press doesn't fire later (e.g. the player let go, or a cutscene started).
 ---
 ---Example: `self.node:get_node("StateMachine"):sm_clear_trigger("jump")`
----@param name StateMachineTrigger|string
+---@param name StateMachineTrigger|string The trigger to un-set; nothing happens when it isn't set
 function StateMachineNode:sm_clear_trigger(name) end
 
 ---@class SM_TransitionOptions
@@ -8064,19 +8064,19 @@ function StateMachineNode:sm_clear_trigger(name) end
 ---Use it for decisions your script makes: an enemy that sees the player chases, a menu button opens a page, a door opens when the key is used.
 ---
 ---Example: `local ok, why = self.node:get_node("Brain"):sm_transition("chase"); if not ok then Log.info(why) end`
----@param state StateMachineState|string
----@param options? SM_TransitionOptions
+---@param state StateMachineState|string The state to go to, by name
+---@param options? SM_TransitionOptions {force = true} skips the guards and the arrow's conditions (an arrow is still needed); {blend = seconds} sets the new state's animation crossfade (default: the arrow's)
 ---@return boolean ok true when it changed state
----@return string? reason why not, e.g. "attack: leave after 0.4s (0.12s so far)", "no arrow from idle to dash"
+---@return string? reason why not, e.g. "attack: leave after 0.4s (0.12s so far)", "no arrow from idle to dash"; nil when it changed
 function StateMachineNode:sm_transition(state, options) end
 
 ---Whether `sm_transition` to a state would work now, and why not - without changing anything. Use it to grey out a button or to pick between options.
 ---
 ---Example: `local can = sm:sm_can_transition("dash"); self.dash_icon:set_property("tint", can and "#ffffff" or "#666666")`
----@param state StateMachineState|string
----@param options? SM_TransitionOptions Only `force` is used
----@return boolean ok
----@return string? reason why not
+---@param state StateMachineState|string The state to test, by name
+---@param options? SM_TransitionOptions Only `force` is used: {force = true} tests with the guards and conditions skipped
+---@return boolean ok True when sm_transition to that state would work now
+---@return string? reason why not; nil when it would work
 function StateMachineNode:sm_can_transition(state, options) end
 
 ---Gets the name of the current state.
@@ -8100,7 +8100,7 @@ function StateMachineNode:sm_previous() end
 ---The last state changes (up to 32), oldest first. Handy for debugging and for "what did the player just do" logic (e.g. a combo that needs attack1 then attack2).
 ---
 ---Example: `for _, c in ipairs(self.node:get_node("Brain"):sm_history()) do Log.info(c.from, "->", c.to, c.why) end`
----@return SM_Change[] changes
+---@return SM_Change[] changes Up to 32 recent changes, oldest first: {from, to, time, why} each
 function StateMachineNode:sm_history() end
 
 ---Gets the time in seconds spent in the current state.
@@ -8112,7 +8112,7 @@ function StateMachineNode:sm_time() end
 ---Starts the machine in a state, or in its initial state. A running machine leaves its current state first (its `on_exit_` runs); pending triggers are cleared. A machine with Autostart starts by itself on its first update; a child machine starts when its parent's state is entered.
 ---
 ---Example: `self.node:get_node("StateMachine"):sm_start("idle")`
----@param state? StateMachineState|string
+---@param state? StateMachineState|string The state to start in; nil starts in the initial state. An unknown name starts in the first state
 function StateMachineNode:sm_start(state) end
 
 ---Stops the machine: the current state's child machine stops, then its `on_exit_<state>("")` runs. The state stays current (`sm_state` still returns it); nothing changes state until `sm_start`.
@@ -8136,117 +8136,117 @@ function StateMachineNode:sm_stop() end
 ---Switches the node to Script mode.
 ---
 ---Example: `local collided = self.node:character_move_and_slide(dt)`
----@param dt? number Defaults to the frame's delta time
----@return boolean collided
+---@param dt? number Seconds to move for; nil uses this frame's delta time
+---@return boolean collided True when it touched a floor, wall or ceiling during the move
 function CharacterMoverNode:character_move_and_slide(dt) end
 
 ---Gets the velocity in pixels per second (+y is down).
 ---
 ---Example: `local vx, vy = self.node:character_get_velocity(); vx = Input.get_axis("left", "right") * 200`
----@return number vx
----@return number vy
+---@return number vx Velocity x in px/s
+---@return number vy Velocity y in px/s (+y is down)
 function CharacterMoverNode:character_get_velocity() end
 
 ---Sets the velocity in pixels per second (+y is down).
 ---
 ---Example: `self.node:character_set_velocity(vx, -350)`
----@param vx number
----@param vy number
+---@param vx number Velocity x in px/s; a Vec2 here gives both x and y
+---@param vy number Velocity y in px/s (+y is down; negative jumps)
 function CharacterMoverNode:character_set_velocity(vx, vy) end
 
 ---Gets the gravity acting on the character: world gravity x its gravity scale.
 ---
 ---Example: `local gx, gy = self.node:character_get_gravity(); vy = vy + gy * dt`
----@return number gx
----@return number gy
+---@return number gx Gravity x in px/s^2 (world gravity x the gravity scale)
+---@return number gy Gravity y in px/s^2 (+y is down); add gy x dt to vy each frame in Script mode
 function CharacterMoverNode:character_get_gravity() end
 
 ---Sets the multiplier of the world gravity for this character.
 ---
 ---Example: `self.node:character_set_gravity_scale(0.5)`
----@param scale number
+---@param scale number Multiplier of the world gravity: 1 normal (the default), 0 none, 0.5 floaty
 function CharacterMoverNode:character_set_gravity_scale(scale) end
 
 ---Was the character standing on a floor after the last move?
 ---
 ---Example: `if self.node:character_is_on_floor() and Input.is_action_pressed("jump") then vy = -350 end`
----@return boolean
+---@return boolean on_floor True when the last move touched a surface whose normal points up (a floor or walkable slope)
 function CharacterMoverNode:character_is_on_floor() end
 
 ---Was the character touching a wall after the last move?
 ---
 ---Example: `if self.node:character_is_on_wall() then vy = math.min(vy, 60) end`
----@return boolean
+---@return boolean on_wall True when the last move touched a steep surface (neither floor nor ceiling)
 function CharacterMoverNode:character_is_on_wall() end
 
 ---Was the character touching a ceiling after the last move?
 ---
 ---Example: `if self.node:character_is_on_ceiling() then vy = 0 end`
----@return boolean
+---@return boolean on_ceiling True when the last move touched a surface whose normal points down
 function CharacterMoverNode:character_is_on_ceiling() end
 
 ---The floor's normal (0, -1 on flat ground; tilted on slopes).
 ---
 ---Example: `local nx, ny = self.node:character_get_floor_normal(); local on_slope = math.abs(nx) > 0.1`
----@return number nx
----@return number ny
+---@return number nx Floor normal x (unit length; 0, 0 when not on a floor)
+---@return number ny Floor normal y (-1 on flat ground)
 function CharacterMoverNode:character_get_floor_normal() end
 
 ---The wall's normal (points away from the wall).
 ---
 ---Example: `local nx, ny = self.node:character_get_wall_normal(); self.node:character_set_velocity(nx * 250, -300)`
----@return number nx
----@return number ny
+---@return number nx Wall normal x, pointing away from the wall (0, 0 when not on a wall)
+---@return number ny Wall normal y
 function CharacterMoverNode:character_get_wall_normal() end
 
 ---How far the last move actually went.
 ---
 ---Example: `local dx, dy = self.node:character_get_last_motion(); self.distance = self.distance + math.abs(dx)`
----@return number dx
----@return number dy
+---@return number dx How far the last move went in x (px), after sliding
+---@return number dy How far the last move went in y (px)
 function CharacterMoverNode:character_get_last_motion() end
 
 ---"script": the script moves it with character_move_and_slide; "builtin": it moves itself.
 ---
 ---Example: `self.node:character_set_control_mode("builtin")`
----@param mode "script"|"builtin"
+---@param mode "script"|"builtin" "script": moves only when the script calls character_move_and_slide; "builtin": moves itself each frame (speed, acceleration, jump, gravity, player input). Any other string means "script"
 function CharacterMoverNode:character_set_control_mode(mode) end
 
 ---BuiltIn mode: steers the character horizontally and jumps if grounded.
 ---
 ---Example: `self.node:character_move(Input.get_axis("left", "right"), Input.is_action_pressed("jump"))`
----@param dirX number Horizontal direction (-1.0 to 1.0), times the node's max speed
----@param jump? boolean Whether to jump if grounded
+---@param dirX number Horizontal input from -1 (left) to 1 (right); the target speed is this x the max speed (character_set_speed), reached with the node's acceleration. Builtin mode only, and not on a node with a script and player index 0 (builtin movement is skipped there); a player's own input overrides it while held
+---@param jump? boolean True jumps (vy = -jump speed) when grounded; nil or false doesn't
 function CharacterMoverNode:character_move(dirX, jump) end
 
 ---Same as character_is_on_floor().
 ---
 ---Example: `if self.node:character_is_grounded() then self.coyote = 0.1 end`
----@return boolean
+---@return boolean grounded True when standing on a floor (false right after a jump starts)
 function CharacterMoverNode:character_is_grounded() end
 
 ---BuiltIn mode: sets the maximum horizontal run speed.
 ---
 ---Example: `self.node:character_set_speed(220)`
----@param speed number
+---@param speed number Builtin mode: maximum horizontal run speed in px/s (default 240)
 function CharacterMoverNode:character_set_speed(speed) end
 
 ---BuiltIn mode: sets the jump speed.
 ---
 ---Example: `self.node:character_set_jump_speed(400)`
----@param speed number
+---@param speed number Builtin mode: upward speed of a jump in px/s (default 320)
 function CharacterMoverNode:character_set_jump_speed(speed) end
 
 ---BuiltIn mode: gets the player index (1..4; 0 = none / NPC / AI) whose actions drive this mover.
 ---
 ---Example: `local p = self.node:character_get_player_index()`
----@return integer
+---@return integer index Player 1 to 4 whose actions drive it, or 0 for none (an NPC or AI)
 function CharacterMoverNode:character_get_player_index() end
 
 ---BuiltIn mode: sets the player index (1..4; 0 = none / NPC / AI) whose actions drive this mover.
 ---
 ---Example: `self.node:character_set_player_index(1)`
----@param index integer
+---@param index integer Player 1 to 4 whose actions drive it, or 0 for none (an NPC; a script then controls it); clamped to 0 to 4
 function CharacterMoverNode:character_set_player_index(index) end
 
 -- ----------------------------------------------------------------------------
@@ -8256,31 +8256,31 @@ function CharacterMoverNode:character_set_player_index(index) end
 ---Checks whether any physics nodes are currently inside this sensor area.
 ---
 ---Example: `if self.node:get_node("Hitbox"):area_is_overlapping() then self:take_damage(1) end`
----@return boolean
+---@return boolean overlapping True when at least one body is inside; always false while monitoring is off
 function AreaNode:area_is_overlapping() end
 
 ---Returns the number of bodies currently overlapping this sensor area.
 ---
 ---Example: `local count = self.node:get_node("Zone"):area_get_overlap_count()`
----@return number
+---@return number count How many nodes are inside now (each counted once); 0 while monitoring is off
 function AreaNode:area_get_overlap_count() end
 
 ---Returns an array of all nodes currently overlapping this sensor area.
 ---
 ---Example: `for _, n in ipairs(self.node:area_get_overlapping_nodes()) do Log.info(n:get_name()) end`
----@return Node[]
+---@return Node[] nodes The nodes inside now, each once (in no fixed order); empty while monitoring is off
 function AreaNode:area_get_overlapping_nodes() end
 
 ---Enables or disables overlap monitoring on this sensor area.
 ---
 ---Example: `self.node:get_node("Hitbox"):area_set_monitoring(true)`
----@param enabled boolean
+---@param enabled boolean True reports bodies entering and leaving (body_entered, body_exited) and tracks overlaps; false forgets the current overlaps without body_exited (it can still be found by raycasts and queries). On by default
 function AreaNode:area_set_monitoring(enabled) end
 
 ---Returns whether overlap monitoring is currently enabled on this sensor area.
 ---
 ---Example: `if self.node:get_node("Hitbox"):area_is_monitoring() then ... end`
----@return boolean
+---@return boolean monitoring True when it tracks overlaps and sends body_entered / body_exited
 function AreaNode:area_is_monitoring() end
 
 -- ----------------------------------------------------------------------------
@@ -8295,58 +8295,58 @@ function RaycastNode:raycast_cast() end
 ---Checks whether the raycast is currently intersecting a physics obstacle.
 ---
 ---Example: `local ray = self.node:get_node("Ray"); ray:raycast_cast(); local grounded = ray:raycast_is_colliding()`
----@return boolean
+---@return boolean colliding True when the last cast hit something (refreshed each frame while monitoring, or by raycast_cast)
 function RaycastNode:raycast_is_colliding() end
 
 ---Gets the world-space intersection point of the raycast hit.
 ---
 ---Example: `local ray = self.node:get_node("Ray"); local x, y = ray:raycast_get_hit_point()`
----@return number x
----@return number y
+---@return number x Hit point x in world px; the ray's end when nothing was hit
+---@return number y Hit point y in world px
 function RaycastNode:raycast_get_hit_point() end
 
 ---Gets the world-space surface normal at the raycast intersection.
 ---
 ---Example: `local ray = self.node:get_node("Ray"); local nx, ny = ray:raycast_get_hit_normal()`
----@return number nx
----@return number ny
+---@return number nx Surface normal x at the hit (unit length, pointing out of the surface); 0, 0 when nothing was hit
+---@return number ny Surface normal y
 function RaycastNode:raycast_get_hit_normal() end
 
 ---Gets the fraction from 0.0 to 1.0 along the ray length where the hit occurred.
 ---
 ---Example: `local ray = self.node:get_node("Ray"); local dist = ray:raycast_get_hit_fraction() * 64`
----@return number fraction
+---@return number fraction How far along the ray the hit is, 0 (at the origin) to 1 (the end, also when nothing was hit); multiply by the length for px
 function RaycastNode:raycast_get_hit_fraction() end
 
 ---Gets the Node struck by the raycast, or nil if none.
 ---
 ---Example: `local ray = self.node:get_node("Ray"); local hit = ray:raycast_get_hit_node(); if hit then Log.info(hit.name) end`
----@return Node?
+---@return Node? node The node whose body was hit, or nil when nothing was hit
 function RaycastNode:raycast_get_hit_node() end
 
 ---Sets the local direction vector for the raycast node.
 ---
 ---Example: `local ray = self.node:get_node("Ray"); ray:raycast_set_direction(1, 0)`
----@param dx number
----@param dy number
+---@param dx number Direction x in the node's local space (rotated with it); normalized, so only the direction counts; a Vec2 here gives both x and y. 0, 0 means straight down
+---@param dy number Direction y (+y is down)
 function RaycastNode:raycast_set_direction(dx, dy) end
 
 ---Sets the maximum reach length in pixels for the raycast node.
 ---
 ---Example: `local ray = self.node:get_node("Ray"); ray:raycast_set_length(128)`
----@param length number
+---@param length number Reach in px (scaled with the node), at least 1; default 450
 function RaycastNode:raycast_set_length(length) end
 
 ---Enables or disables automatic per-frame raycast checks on this node.
 ---
 ---Example: `self.node:get_node("Ray"):raycast_set_monitoring(false)`
----@param enabled boolean
+---@param enabled boolean True casts every frame and sends hit_started / hit_ended; false stops that and clears the hit (raycast_cast still works). On by default
 function RaycastNode:raycast_set_monitoring(enabled) end
 
 ---Returns whether automatic per-frame raycast checks are enabled on this node.
 ---
 ---Example: `if self.node:get_node("Ray"):raycast_is_monitoring() then ... end`
----@return boolean
+---@return boolean monitoring True when it casts by itself every frame
 function RaycastNode:raycast_is_monitoring() end
 
 -- ----------------------------------------------------------------------------
@@ -8366,41 +8366,41 @@ function ParticleEmitterNode:particle_stop() end
 ---Checks if particles are actively being emitted.
 ---
 ---Example: `local fx = self.node:get_node("Smoke"); if not fx:particle_is_emitting() then fx:particle_start() end`
----@return boolean
+---@return boolean emitting True while it emits new particles (false after particle_stop or when a one-shot cycle ends; live particles may still be flying)
 function ParticleEmitterNode:particle_is_emitting() end
 
 ---Sets the maximum particle pool count for this emitter.
 ---
 ---Example: `self.node:get_node("Sparks"):particle_set_amount(64)`
----@param amount integer
+---@param amount integer Particles emitted per cycle (one lifetime), so about how many are alive at once; default 100. Takes effect from the next emission
 function ParticleEmitterNode:particle_set_amount(amount) end
 
 ---Sets the base lifetime in seconds for newly spawned particles.
 ---
 ---Example: `self.node:get_node("Sparks"):particle_set_lifetime(1.5)`
----@param lifetime number
+---@param lifetime number Seconds each new particle lives (also the length of one emission cycle); default 2. Particles already alive keep theirs
 function ParticleEmitterNode:particle_set_lifetime(lifetime) end
 
 ---Where the last particle hit a body (collision on): the world point, the surface normal and the node hit. Returns nil when no particle has hit anything yet. Use it in a `particle_hit` handler.
 ---
 ---Example: `local x, y = self.node:particle_get_last_hit(); if x then Scene.instantiate("components/Splash.component.json", nil, x, y) end`
----@return number? x
----@return number? y
----@return number? nx
----@return number? ny
----@return Node? hit
+---@return number? x Hit point x in world px, or nil when no particle has hit anything yet (then it is the only value)
+---@return number? y Hit point y in world px
+---@return number? nx Surface normal x at the hit (unit length)
+---@return number? ny Surface normal y
+---@return Node? hit The node that was hit, or nil when it is gone
 function ParticleEmitterNode:particle_get_last_hit() end
 
 ---Sets the particles' texture (used by the Texture shape; a sprite sheet when Sheet Columns / Rows are set). "" or nil removes it.
 ---
 ---Example: `self.node:get_node("Sparks"):particle_set_texture("textures/spark.png")`
----@param path TexturePath|string|nil
+---@param path TexturePath|string|nil Project texture path (a sprite sheet when Sheet Columns / Rows are set); "" or nil removes it
 function ParticleEmitterNode:particle_set_texture(path) end
 
 ---Emits `count` particles right now (default 1), whether the emitter is emitting or not: a burst on demand (a hit, an explosion, footsteps).
 ---
 ---Example: `self.node:get_node("Dust"):particle_emit(12)`
----@param count? integer
+---@param count? integer How many particles to emit now (default 1), from the node's current position
 function ParticleEmitterNode:particle_emit(count) end
 
 ---Clears every particle and starts emitting again (with Seed set, the same pattern again).
@@ -8411,7 +8411,7 @@ function ParticleEmitterNode:particle_restart() end
 ---How many particles are alive now.
 ---
 ---Example: `if self.node:particle_get_alive_count() == 0 then self.node:destroy() end`
----@return integer
+---@return integer count Particles alive right now
 function ParticleEmitterNode:particle_get_alive_count() end
 
 -- ----------------------------------------------------------------------------
@@ -8421,22 +8421,22 @@ function ParticleEmitterNode:particle_get_alive_count() end
 ---Gets the base unscaled pixel width and height of the texture.
 ---
 ---Example: `local w, h = self.node:get_node("Sprite"):texture_get_size()`
----@return number width
----@return number height
+---@return number width Width in px of the image as drawn, before scale; 0 for other node types
+---@return number height Height in px, before scale; 0 for other node types
 function TextureNode:texture_get_size() end
 
 ---Sets the origin (what it rotates and scales around) in pixels of the image;
 ---stored as a fraction of it - set_property("origin", fx, fy) takes that.
 ---
 ---Example: `local sprite = self.node:get_node("Sprite"); sprite:texture_set_origin(16, 16)`
----@param ox number Origin X in pixels
----@param oy number Origin Y in pixels
+---@param ox number Origin X in px from the image's left edge (default: its centre); a Vec2 here sets both
+---@param oy number Origin Y in px from the image's top edge; omit when ox is a vector
 function TextureNode:texture_set_origin(ox, oy) end
 
 ---Gets the file path string from which this texture was loaded.
 ---
 ---Example: `local path = self.node:get_node("Sprite"):texture_get_path()`
----@return string
+---@return string The project-relative image path; "" when it has none or for other node types
 function TextureNode:texture_get_path() end
 
 -- ----------------------------------------------------------------------------
@@ -8446,46 +8446,46 @@ function TextureNode:texture_get_path() end
 ---Gets the base unscaled pixel width and height of the region.
 ---
 ---Example: `local w, h = self.node:texture_get_size()`
----@return number width
----@return number height
+---@return number width Width in px of the region as drawn (the whole image when no region is set), before scale
+---@return number height Height in px, before scale
 function AtlasSpriteNode:texture_get_size() end
 
 ---Sets the origin (what it rotates and scales around) in pixels of the region.
 ---
 ---Example: `self.node:texture_set_origin(16, 16)`
----@param ox number Origin X in pixels
----@param oy number Origin Y in pixels
+---@param ox number Origin X in px from the region's left edge (default: its centre); a Vec2 here sets both
+---@param oy number Origin Y in px from the region's top edge; omit when ox is a vector
 function AtlasSpriteNode:texture_set_origin(ox, oy) end
 
 ---Gets the file path string from which this texture was loaded.
 ---
 ---Example: `local path = self.node:texture_get_path()`
----@return string
+---@return string The project-relative image path; "" when it has none
 function AtlasSpriteNode:texture_get_path() end
 
 ---Shows another image (project-relative path), keeping the region; e.g. the same layout on a recoloured sheet. Returns false when the file can't be loaded.
 ---
 ---Example: `self.node:set_texture("textures/hero_blue.png")`
----@param path TexturePath|string Project-relative texture path
----@return boolean ok
+---@param path TexturePath|string Project-relative image path, e.g. "textures/hero_blue.png"; the region stays the same
+---@return boolean ok true when the image loaded; false when the file can't be loaded (the old image stays)
 function AtlasSpriteNode:set_texture(path) end
 
 ---Sets the sub-region rectangle (in texture pixels) to display.
 ---
 ---Example: `self.node:atlas_set_region(0, 0, 32, 32)`
----@param x number
----@param y number
----@param width number
----@param height number
+---@param x number Left edge in texture px
+---@param y number Top edge in texture px
+---@param width number Width in texture px; 0 shows the whole image
+---@param height number Height in texture px; 0 shows the whole image
 function AtlasSpriteNode:atlas_set_region(x, y, width, height) end
 
 ---Gets the sub-region rectangle (x, y, width, height) in texture pixels.
 ---
 ---Example: `local x, y, w, h = self.node:atlas_get_region()`
----@return number x
----@return number y
----@return number width
----@return number height
+---@return number x Left edge in texture px
+---@return number y Top edge in texture px
+---@return number width Width in texture px (0 = the whole image)
+---@return number height Height in texture px (0 = the whole image)
 function AtlasSpriteNode:atlas_get_region() end
 
 -- ----------------------------------------------------------------------------
@@ -8500,8 +8500,8 @@ function AtlasSpriteNode:atlas_get_region() end
 ---track's target node script; sound tracks play their audio file on the key's frame.
 ---
 ---Example: `self.node:get_node("AnimationPlayer"):animation_play("run", 0.15)`
----@param name? AnimationName|string Animation name (the project's complete)
----@param blend? number Crossfade time in seconds (default 0)
+---@param name? AnimationName|string The animation to play (the project's names complete); nil restarts the current one
+---@param blend? number Seconds to crossfade property tracks from the previous animation; default 0 (cut)
 function AnimationPlayerNode:animation_play(name, blend) end
 
 ---Stops animation playback and freezes at current frame.
@@ -8527,13 +8527,13 @@ function AnimationPlayerNode:animation_reset() end
 ---Sets playback speed in frames per second.
 ---
 ---Example: `self.node:get_node("AnimationPlayer"):animation_set_fps(12)`
----@param fps number
+---@param fps number Frames per second for animations without their own FPS (default 12; values under 0.1 count as 0.1)
 function AnimationPlayerNode:animation_set_fps(fps) end
 
 ---Gets the name of the currently active animation track.
 ---
 ---Example: `local current = self.node:get_node("AnimationPlayer"):animation_get_current()`
----@return string
+---@return string The current animation's name; "" when it has none or for other node types
 function AnimationPlayerNode:animation_get_current() end
 
 -- ----------------------------------------------------------------------------
@@ -8543,88 +8543,88 @@ function AnimationPlayerNode:animation_get_current() end
 ---Part swapping: shows the frame (a child group of the node's group) of that name - a mouth shape, a hand pose, eyes open or closed. Returns false when there is none.
 ---
 ---Example: `self.node:get_node("Mouth"):vector_swap("D")`
----@param name string
----@return boolean ok
+---@param name string The frame's name (a child group of the node's group, see vector_frames)
+---@return boolean ok False when there is no frame of that name (nothing changes)
 function VectorShapeNode:vector_swap(name) end
 
 ---The names of the frames the node's `frame` picks from (its group's child groups), in order.
 ---
 ---Example: `for i, name in ipairs(self.node:vector_frames()) do Log.info(i - 1 .. " " .. name) end`
----@return string[] names
+---@return string[] names The frames' names in order (the node's frame property counts from 0); empty when it has none
 function VectorShapeNode:vector_frames() end
 
 ---The component instance painted on a cell of the tile map's Components layer (0-based cells; a big component covers every cell of its footprint), or nil.
 ---
 ---Example: `local coin = map:tilemap_component_at(3, 5)`
----@param x integer
----@param y integer
----@return Node?
+---@param x integer Cell column, 0-based
+---@param y integer Cell row, 0-based
+---@return Node? The component instance covering that cell; nil when none
 function TileMapNode:tilemap_component_at(x, y) end
 
 ---Paints a component on a cell: a linked instance at the cell's centre (a bigger one over its footprint), replacing what it covers. Returns the instance.
 ---
 ---Example: `map:tilemap_set_component(4, 2, "components/Coin.component.json")`
----@param x integer
----@param y integer
----@param component string
----@return Node?
+---@param x integer Cell column, 0-based (must be inside the map)
+---@param y integer Cell row, 0-based (must be inside the map)
+---@param component string Path of the .component.json, relative to the project
+---@return Node? The new instance (a child of the tile map); nil when the cell is outside the map or the component can't load
 function TileMapNode:tilemap_set_component(x, y, component) end
 
 ---Removes the component instance covering a cell; false when there is none.
 ---
 ---Example: `map:tilemap_clear_component(4, 2)`
----@param x integer
----@param y integer
----@return boolean
+---@param x integer Cell column, 0-based
+---@param y integer Cell row, 0-based
+---@return boolean true when an instance was removed; false when the cell had none
 function TileMapNode:tilemap_clear_component(x, y) end
 
 ---The tile painted on a cell (0-based cells, inside the map or beyond it): its index in the tileset, or -1 for an empty cell.
 ---
 ---Example: `if map:tilemap_get_tile(x, y) == -1 then Log.info("empty") end`
----@param x integer
----@param y integer
----@return integer
+---@param x integer Cell column, 0-based (may be outside the map)
+---@param y integer Cell row, 0-based (may be outside the map)
+---@return integer The tile's index in the tileset; -1 for an empty cell
 function TileMapNode:tilemap_get_tile(x, y) end
 
 ---Paints a tile on a cell (its index in the tileset; -1 or nil erases). A Solid map's colliders follow at the end of the frame, and path finding sees the change. Returns true if the cell changed.
 ---
----Example: `local x, y = map:tilemap_cell_at(self.node.position); map:tilemap_set_tile(x, y + 1, -1) -- dig`
----@param x integer
----@param y integer
----@param tile integer?
----@return boolean
+---Example: `local x, y = map:tilemap_cell_at(self.node:get_global_position()); map:tilemap_set_tile(x, y + 1, -1) -- dig`
+---@param x integer Cell column, 0-based (outside the map grows the painted area)
+---@param y integer Cell row, 0-based
+---@param tile integer? Tile index in the tileset; -1 or nil erases
+---@return boolean true when the cell changed; false when it already held that tile
 function TileMapNode:tilemap_set_tile(x, y, tile) end
 
 ---The cell under a world position (it may be outside the map).
 ---
----Example: `local cx, cy = map:tilemap_cell_at(player.position)`
+---Example: `local cx, cy = map:tilemap_cell_at(player:get_global_position())`
 ---@overload fun(self: TileMapNode, x: number, y: number): integer, integer
----@param pos Vec2
----@return integer x
----@return integer y
+---@param pos Vec2 World position in px (x, y numbers also accepted)
+---@return integer x Cell column, 0-based (may be outside the map); nil when not a tile map
+---@return integer y Cell row, 0-based (may be outside the map)
 function TileMapNode:tilemap_cell_at(pos) end
 
 ---The world position of a cell's centre.
 ---
----Example: `local wx, wy = map:tilemap_cell_position(4, 2); coin.position = Vec2(wx, wy)`
----@param x integer
----@param y integer
----@return number wx
----@return number wy
+---Example: `local wx, wy = map:tilemap_cell_position(4, 2); coin.position = Vec2(wx, wy) -- (coin at the scene root: world = local)`
+---@param x integer Cell column, 0-based
+---@param y integer Cell row, 0-based
+---@return number wx World X in px of the cell's centre; nil when not a tile map
+---@return number wy World Y in px of the cell's centre
 function TileMapNode:tilemap_cell_position(x, y) end
 
 ---Carves a circle out of the art (world position and radius): every shape keeps its paint, and a collider follows - destructible terrain, bites, bullet holes. The node draws its own carved copy until `vector_reset`.
 ---
 ---Example: `ground:vector_cut(bomb.position, 48)`
 ---@overload fun(self: VectorShapeNode, x: number, y: number, radius: number)
----@param pos Vec2
----@param radius number
+---@param pos Vec2 Centre of the hole in world px (x, y numbers also work)
+---@param radius number Radius in world px; 0 or less does nothing
 function VectorShapeNode:vector_cut(pos, radius) end
 
 ---Carves a polygon (world points) out of the art, like `vector_cut`.
 ---
 ---Example: `wall:vector_cut_polygon({Vec2(100, 0), Vec2(140, 0), Vec2(120, 60)})`
----@param points Vec2[]
+---@param points Vec2[] The polygon's corners in world px, at least 3 (fewer does nothing)
 function VectorShapeNode:vector_cut_polygon(points) end
 
 ---Brings carved art (and its collider) back as it was.
@@ -8635,39 +8635,39 @@ function VectorShapeNode:vector_reset() end
 ---The length of the art's paths, one after another (world units).
 ---
 ---Example: `local len = self.node:vector_length()`
----@return number
+---@return number length Total length of the art's paths in world px (scaled with the node)
 function VectorShapeNode:vector_length() end
 
 ---The point (world) and direction (unit) at a distance along the art's paths, one after another - move things along an SVG path.
 ---
 ---Example: `local pos, dir = track:vector_point_at(self.d); self.node.position = pos`
----@param distance number
----@return Vec2 pos
----@return Vec2 dir
+---@param distance number Distance along the paths in world px, clamped to 0 .. vector_length()
+---@return Vec2 pos The point there, in world px
+---@return Vec2 dir The path's direction there (unit length, world space)
 function VectorShapeNode:vector_point_at(distance) end
 
 ---The point on the art's paths nearest to a world position, and its distance along them.
 ---
 ---Example: `local d, at = rail:vector_closest(player.position)`
 ---@overload fun(self: VectorShapeNode, x: number, y: number): number, Vec2
----@param pos Vec2
----@return number distance
----@return Vec2 at
+---@param pos Vec2 A world position in px (x, y numbers also work)
+---@return number distance How far along the paths the nearest point is, in world px (use it with vector_point_at)
+---@return Vec2 at The nearest point on the paths, in world px
 function VectorShapeNode:vector_closest(pos) end
 
 ---Whether a world point is on the art (its fills and strokes, holes left out).
 ---
----Example: `local wx, wy = Camera.screen_to_world(Input.get_mouse_position()); if balloon:vector_contains(wx, wy) then pop() end`
+---Example: `local wx, wy = Camera.screen_to_world(Input.get_mouse_position()); if balloon:vector_contains(Vec2(wx, wy)) then pop() end`
 ---@overload fun(self: VectorShapeNode, x: number, y: number): boolean
----@param pos Vec2
----@return boolean
+---@param pos Vec2 A world position in px (x, y numbers also work)
+---@return boolean inside True when the point is on a fill or stroke (holes left out)
 function VectorShapeNode:vector_contains(pos) end
 
 ---Plays a voice (default: the node's sound) and moves the mouth with its Rhubarb cues (the sound's .json / .tsv beside it, or the node's cues file). Returns false when there are no cues.
 ---
 ---Example: `self.node:get_node("LipSync"):lipsync_play("voices/hello.wav")`
----@param sound? string
----@return boolean ok
+---@param sound? string Project-relative voice file, e.g. "voices/hello.wav"; nil plays the node's own sound
+---@return boolean ok true when it started; false when no Rhubarb cues were found (nothing plays) or for other node types
 function LipSyncNode:lipsync_play(sound) end
 
 ---Stops the voice and rests the mouth.
@@ -8678,7 +8678,7 @@ function LipSyncNode:lipsync_stop() end
 ---Whether a voice is moving the mouth now.
 ---
 ---Example: `if not lips:lipsync_is_playing() then lips:lipsync_play() end`
----@return boolean
+---@return boolean true while a voice moves the mouth; false for other node types
 function LipSyncNode:lipsync_is_playing() end
 
 ---Starts or restarts the timer from zero.
@@ -8694,25 +8694,25 @@ function TimerNode:timer_stop() end
 ---Checks if the timer is actively running.
 ---
 ---Example: `if self.node:get_node("Cooldown"):timer_is_running() then return end`
----@return boolean
+---@return boolean running True while it counts (false after timer_stop, or after the timeout when not looping)
 function TimerNode:timer_is_running() end
 
 ---Gets the elapsed time in seconds since start.
 ---
 ---Example: `local t = self.node:get_node("Cooldown"):timer_get_elapsed()`
----@return number
+---@return number seconds Time since it started, in seconds; back to 0 at each timeout; kept by timer_stop
 function TimerNode:timer_get_elapsed() end
 
 ---Sets the timer expiration duration in seconds.
 ---
 ---Example: `self.node:get_node("Cooldown"):timer_set_duration(0.5)`
----@param durationSec number
+---@param durationSec number Seconds until "timeout"; applies at once, also to a running timer
 function TimerNode:timer_set_duration(durationSec) end
 
 ---Sets whether the timer automatically restarts upon expiring.
 ---
 ---Example: `self.node:get_node("SpawnTimer"):timer_set_loop(true)`
----@param loop boolean
+---@param loop boolean True restarts it from 0 at each timeout; false stops it after the first
 function TimerNode:timer_set_loop(loop) end
 
 -- ----------------------------------------------------------------------------
@@ -8742,19 +8742,19 @@ function SoundNode:sound_resume() end
 ---Plays one sound of its list (1 = the first), whatever the play mode; variation and delay apply.
 ---
 ---Example: `self.node:get_node("Footsteps"):sound_play_index(2)`
----@param index integer
+---@param index integer Which sound of the list, from 1; out of range plays nothing. The cooldown doesn't apply
 function SoundNode:sound_play_index(index) end
 
 ---How many sounds it has.
 ---
 ---Example: `local n = self.node:get_node("Footsteps"):sound_count()`
----@return integer
+---@return integer count How many sounds are in its list
 function SoundNode:sound_count() end
 
 ---The sound it played last (1 = the first; 0 = none yet).
 ---
 ---Example: `local i = self.node:get_node("Footsteps"):sound_last()`
----@return integer
+---@return integer index The sound played last, from 1; 0 when none has played yet
 function SoundNode:sound_last() end
 
 ---Plays or resumes the background music on this MusicNode.
@@ -8781,9 +8781,9 @@ function MusicNode:music_resume() end
 ---it if it isn't playing.
 ---
 ---Example: `Scene.find_node("Music"):music_fade(0, 2.0, true)`
----@param volume number
----@param seconds number
----@param stop_at_end? boolean Stop when the fade reaches 0
+---@param volume number Target fade level from 0 to 1, multiplied with the node's Volume; a fade to 0 doesn't start stopped music
+---@param seconds number How long the fade takes, in seconds
+---@param stop_at_end? boolean True stops the music when the fade reaches 0 (default false: it keeps playing silently)
 function MusicNode:music_fade(volume, seconds, stop_at_end) end
 
 -- ----------------------------------------------------------------------------
@@ -8793,32 +8793,32 @@ function MusicNode:music_fade(volume, seconds, stop_at_end) end
 ---Sets the zoom level on this CameraNode.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_zoom(2.0)`
----@param zoom number
+---@param zoom number 1 = 100%, 2 = everything twice as big; clamped to Min / Max Zoom (default 0.1 to 10); eased there when Smooth Zoom is on
 function CameraNode:camera_set_zoom(zoom) end
 
 ---Gets the configured zoom level on this CameraNode.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_zoom(cam:camera_get_zoom() * 1.1)`
----@return number
+---@return number The zoom it is set to (it may still be easing there); 1 for other node types
 function CameraNode:camera_get_zoom() end
 
 ---Sets the target Node to follow.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_target(Scene.find_node("Player"))`
----@param target Node?
+---@param target Node? The node to follow, from now on in single-target mode; nil stops following and the camera stays where it is
 function CameraNode:camera_set_target(target) end
 
 ---Adds a node to the group this camera frames (see Camera.add_target).
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_add_target(Scene.find_node("Boss"), {weight = 2})`
----@param target Node
----@param options? CameraTargetOptions
+---@param target Node The node to add; a single follow target joins the group too, and adding one again updates its options
+---@param options? CameraTargetOptions weight (default 1), weight_x, weight_y, radius (px, default 50), offset_x, offset_y, priority; nil for the defaults
 function CameraNode:camera_add_target(target, options) end
 
 ---Takes a node out of this camera's group.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_remove_target(Scene.find_node("Boss"))`
----@param target Node
+---@param target Node The node to take out; with none left the camera stays where it is
 function CameraNode:camera_remove_target(target) end
 
 ---Stops this camera following anything.
@@ -8829,27 +8829,27 @@ function CameraNode:camera_clear_targets() end
 ---The node this camera follows (single target), or nil.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); local target = cam:camera_get_target()`
----@return Node?
+---@return Node? The single node it follows; nil when there is none
 function CameraNode:camera_get_target() end
 
 ---Every node this camera follows.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); for _, t in ipairs(cam:camera_get_targets()) do Log.info(t.name) end`
----@return Node[]
+---@return Node[] Every node it follows (the group, or the single target alone); empty when none
 function CameraNode:camera_get_targets() end
 
 ---Sets the fixed world position for the camera target.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_target_position(640, 360)`
----@param x number
----@param y number
+---@param x number World X in px to centre on; a single target stops being followed (in group mode the group still wins); a Vec2 here sets both
+---@param y number World Y in px; omit when x is a vector
 function CameraNode:camera_set_target_position(x, y) end
 
 ---Shakes this camera: its Shake Preset (Custom: its Shake Types / Speed / Intensity). Strength is how far it moves, in pixels.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_shake(6, 0.3)`
----@param strength? number How far it moves (px); default the preset's
----@param duration? number Duration in seconds; default the preset's
+---@param strength? number How far it moves, in px; nil for the Shake Preset's
+---@param duration? number Seconds it lasts; nil for the preset's (which can be endless)
 function CameraNode:camera_shake(strength, duration) end
 
 ---Immediately cancels any active screen shake.
@@ -8860,16 +8860,16 @@ function CameraNode:camera_stop_shake() end
 ---Checks if screen shake is currently active.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); if not cam:camera_is_shaking() then cam:camera_shake(4) end`
----@return boolean
+---@return boolean true while a shake plays; false for other node types
 function CameraNode:camera_is_shaking() end
 
 ---Constrains camera movement within bounding rectangle limits.
 ---
 ---Example: `local cam = Scene.find_node("MainCamera"); cam:camera_set_limits(0, 2560, 0, 720)`
----@param left number
----@param right number
----@param top number
----@param bottom number
+---@param left number World X in px the view's left edge never goes past
+---@param right number World X of the right edge; when narrower than the view, the camera centres between left and right
+---@param top number World Y in px the view's top edge never goes above
+---@param bottom number World Y of the bottom edge (+y is down)
 function CameraNode:camera_set_limits(left, right, top, bottom) end
 
 ---Clears all bounding rectangle limits.
@@ -9007,262 +9007,262 @@ function CameraNode:camera_clear_limits() end
 ---Gets the current level identifier.
 ---
 ---Example: `local lv = Scene.find_node("Level"); Log.info("In " .. lv:ldtk_get_level_identifier())`
----@return string
+---@return string The current level's identifier; "" when no level is loaded
 function LdtkLevelNode:ldtk_get_level_identifier() end
 
 ---Lists level identifiers (every level, or one world's).
 ---
 ---Example: `local lv = Scene.find_node("Level"); for _, id in ipairs(lv:ldtk_get_levels()) do Log.info(id) end`
----@param world? string
----@return string[]
+---@param world? string World identifier (default: every level of the project); an unknown world gives an empty list
+---@return string[] Level identifiers in project order
 function LdtkLevelNode:ldtk_get_levels(world) end
 
 ---Switches to another level (identifier or iid); colliders and entities are rebuilt.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local ok = lv:ldtk_load_level("Level_2")`
----@param identifier LdtkLevel|string
----@return boolean ok
+---@param identifier LdtkLevel|string Level identifier (looked up in the current world first) or iid
+---@return boolean ok true when the level was found and built; false for an unknown level or no project
 function LdtkLevelNode:ldtk_load_level(identifier) end
 
 ---Gets a level's details (the current level by default).
 ---
 ---Example: `local lv = Scene.find_node("Level"); local info = lv:ldtk_get_level(); Log.info(info.width)`
----@param level? LdtkLevel|string
----@return LdtkLevel?
+---@param level? LdtkLevel|string Level identifier or iid (default: the current level); an unknown name gives the empty result
+---@return LdtkLevel? The level's details (x, y are its origin in world px); nil for an unknown level or no project
 function LdtkLevelNode:ldtk_get_level(level) end
 
 ---Gets the current level size in pixels.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local w, h = lv:ldtk_get_level_size(); Log.info(w, h)`
----@return number width
----@return number height
+---@return number width The current level's width in px (0 with no level)
+---@return number height The current level's height in px (0 with no level)
 function LdtkLevelNode:ldtk_get_level_size() end
 
 ---Gets a level field value (nil if absent or null).
 ---
 ---Example: `local lv = Scene.find_node("Level"); local music = lv:ldtk_get_level_field("music")`
----@param name string
----@param level? LdtkLevel|string Another level (default: the current one)
----@return any
+---@param name string Level field identifier, as named in LDtk
+---@param level? LdtkLevel|string Level identifier or iid (default: the current level)
+---@return any The field's value (arrays as Lua arrays, Point as {cx, cy}, Enum as its value id, EntityRef as an iid); nil when absent or null
 function LdtkLevelNode:ldtk_get_level_field(name, level) end
 
 ---Gets every field of a level.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local fields = lv:ldtk_get_level_fields(); Log.info(fields.music)`
----@param level? LdtkLevel|string
----@return table<string, any>
+---@param level? LdtkLevel|string Level identifier or iid (default: the current level); an unknown name gives the empty result
+---@return table<string, any> Field identifier to value (null fields are left out); empty for an unknown level
 function LdtkLevelNode:ldtk_get_level_fields(level) end
 
 ---Lists a level's neighbours.
 ---
 ---Example: `local lv = Scene.find_node("Level"); for _, n in ipairs(lv:ldtk_get_neighbours()) do Log.info(n.dir) end`
----@param level? LdtkLevel|string
----@return LdtkNeighbour[]
+---@param level? LdtkLevel|string Level identifier or iid (default: the current level); an unknown name gives the empty result
+---@return LdtkNeighbour[] The level's neighbours with their direction (n, s, e, w, nw, ne, sw, se, < or > for depth, o for overlap); empty for an unknown level
 function LdtkLevelNode:ldtk_get_neighbours(level) end
 
 ---The level at a world position (world mode: any loaded level; otherwise looked up in the world layout).
 ---
----Example: `local lv = Scene.find_node("Level"); local id = lv:ldtk_level_at(self.node:get_position())`
----@param x number
----@param y number
----@return string?
+---Example: `local lv = Scene.find_node("Level"); local id = lv:ldtk_level_at(self.node:get_global_position())`
+---@param x number World X in px
+---@param y number World Y in px
+---@return string? Identifier of the level under the point; nil when there is none
 function LdtkLevelNode:ldtk_level_at(x, y) end
 
 ---Lists the project's worlds.
 ---
 ---Example: `local lv = Scene.find_node("Level"); for _, w in ipairs(lv:ldtk_get_worlds()) do Log.info(w.identifier) end`
----@return LdtkWorld[]
+---@return LdtkWorld[] Every world of the project with its layout and level identifiers
 function LdtkLevelNode:ldtk_get_worlds() end
 
 ---Gets the current world identifier.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local world = lv:ldtk_get_world()`
----@return string
+---@return string The current world's identifier
 function LdtkLevelNode:ldtk_get_world() end
 
 ---Switches world (its first level, or `level`).
 ---
 ---Example: `local lv = Scene.find_node("Level"); local ok = lv:ldtk_set_world("Dungeon", "Dungeon_Entrance")`
----@param world string
----@param level? LdtkLevel|string
----@return boolean ok
+---@param world string World identifier
+---@param level? LdtkLevel|string Level identifier in that world to load (default, or when not found: the world's first level)
+---@return boolean ok true when switched; false for an unknown or empty world
 function LdtkLevelNode:ldtk_set_world(world, level) end
 
 ---World mode: every level of the world at its world position (rebuilds).
 ---
 ---Example: `local lv = Scene.find_node("Level"); lv:ldtk_set_world_mode(true)`
----@param on boolean
+---@param on boolean true to load every level of the world at its world position, false for the current level only
 function LdtkLevelNode:ldtk_set_world_mode(on) end
 
 ---Returns true when world mode is on (every level of the world loaded at its world position).
 ---
 ---Example: `local lv = Scene.find_node("Level"); if not lv:ldtk_is_world_mode() then lv:ldtk_set_world_mode(true) end`
----@return boolean
+---@return boolean true when world mode is on
 function LdtkLevelNode:ldtk_is_world_mode() end
 
 ---Lists a level's layers (top first).
 ---
 ---Example: `local lv = Scene.find_node("Level"); for _, layer in ipairs(lv:ldtk_get_layers()) do Log.info(layer.type) end`
----@param level? LdtkLevel|string
----@return LdtkLayer[]
+---@param level? LdtkLevel|string Level identifier or iid (default: the current level); an unknown name gives the empty result
+---@return LdtkLayer[] The level's layers, top first; empty for an unknown level
 function LdtkLevelNode:ldtk_get_layers(level) end
 
 ---Shows or hides a layer (in every loaded level).
 ---
 ---Example: `local lv = Scene.find_node("Level"); lv:ldtk_set_layer_visible("Background", false)`
----@param name LdtkLayer|string
----@param visible boolean
+---@param name LdtkLayer|string Layer identifier, e.g. "Collisions"
+---@param visible boolean true to show the layer, false to hide it
 function LdtkLevelNode:ldtk_set_layer_visible(name, visible) end
 
 ---Returns whether a layer is currently shown.
 ---
 ---Example: `local lv = Scene.find_node("Level"); lv:ldtk_set_layer_visible("Fog", not lv:ldtk_is_layer_visible("Fog"))`
----@param name LdtkLayer|string
----@return boolean
+---@param name LdtkLayer|string Layer identifier (checked in the current level)
+---@return boolean true when the layer exists and is shown
 function LdtkLevelNode:ldtk_is_layer_visible(name) end
 
 ---Gets the IntGrid value at a world position (0 = empty).
 ---
----Example: `local lv = Scene.find_node("Level"); local v = lv:ldtk_get_int_grid("Collisions", self.node:get_position())`
+---Example: `local lv = Scene.find_node("Level"); local v = lv:ldtk_get_int_grid("Collisions", self.node:get_global_position())`
 ---@param layer LdtkLayer|string IntGrid layer identifier, e.g. "Collisions"
----@param x number World X
----@param y number World Y
----@return integer
+---@param x number World X in px
+---@param y number World Y in px
+---@return integer The IntGrid value under the point; 0 for an empty cell, a point outside the level or an unknown layer
 function LdtkLevelNode:ldtk_get_int_grid(layer, x, y) end
 
 ---Gets the identifier of the IntGrid value at a world position ("" if none / unnamed).
 ---
----Example: `local lv = Scene.find_node("Level"); local name = lv:ldtk_get_int_grid_name("Collisions", self.node:get_position())`
----@param layer LdtkLayer|string
----@param x number
----@param y number
----@return string
+---Example: `local lv = Scene.find_node("Level"); local name = lv:ldtk_get_int_grid_name("Collisions", self.node:get_global_position())`
+---@param layer LdtkLayer|string IntGrid layer identifier
+---@param x number World X in px
+---@param y number World Y in px
+---@return string The value's identifier set in LDtk; "" for an empty cell or an unnamed value
 function LdtkLevelNode:ldtk_get_int_grid_name(layer, x, y) end
 
 ---Gets the IntGrid value of a cell.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local v = lv:ldtk_get_int_grid_cell("Collisions", 4, 7)`
----@param layer LdtkLayer|string
----@param cx integer
----@param cy integer
----@param level? LdtkLevel|string
----@return integer
+---@param layer LdtkLayer|string IntGrid layer identifier
+---@param cx integer Cell column, 0-based
+---@param cy integer Cell row, 0-based
+---@param level? LdtkLevel|string Level identifier or iid (default: the current level)
+---@return integer The cell's IntGrid value; 0 for an empty cell, a cell outside the layer or an unknown layer or level
 function LdtkLevelNode:ldtk_get_int_grid_cell(layer, cx, cy, level) end
 
 ---Lists an IntGrid layer's values (name, colour, collision).
 ---
 ---Example: `local lv = Scene.find_node("Level"); local values = lv:ldtk_get_int_grid_values("Collisions")`
----@param layer LdtkLayer|string
----@return LdtkIntGridValue[]
+---@param layer LdtkLayer|string IntGrid layer identifier
+---@return LdtkIntGridValue[] The values defined on the layer with their name, colour and collision rule; empty for an unknown layer
 function LdtkLevelNode:ldtk_get_int_grid_values(layer) end
 
 ---World position -> layer cell.
 ---
----Example: `local lv = Scene.find_node("Level"); local cx, cy = lv:ldtk_world_to_cell("Collisions", self.node:get_position())`
----@param layer LdtkLayer|string
----@param x number
----@param y number
----@return integer cx
----@return integer cy
+---Example: `local lv = Scene.find_node("Level"); local cx, cy = lv:ldtk_world_to_cell("Collisions", self.node:get_global_position())`
+---@param layer LdtkLayer|string Layer identifier, e.g. "Collisions"
+---@param x number World X in px
+---@param y number World Y in px
+---@return integer cx Cell column, 0-based (may be outside the layer); -1 for an unknown layer or no level under the point
+---@return integer cy Cell row, 0-based; -1 in the same cases
 function LdtkLevelNode:ldtk_world_to_cell(layer, x, y) end
 
 ---Layer cell -> world position of its centre.
 ---
 ---Example: `local lv = Scene.find_node("Level"); self.node:set_position(lv:ldtk_cell_to_world("Collisions", 4, 7))`
----@param layer LdtkLayer|string
----@param cx integer
----@param cy integer
----@param level? LdtkLevel|string
----@return number x
----@return number y
+---@param layer LdtkLayer|string Layer identifier, e.g. "Collisions"
+---@param cx integer Cell column, 0-based
+---@param cy integer Cell row, 0-based
+---@param level? LdtkLevel|string Level identifier or iid (default: the current level)
+---@return number x World X in px of the cell's centre (0 with no level loaded)
+---@return number y World Y in px of the cell's centre
 function LdtkLevelNode:ldtk_cell_to_world(layer, cx, cy, level) end
 
 ---Collision at a world position: "solid", "one_way", "trigger" or "none", plus the layer and value name.
 ---
----Example: `local lv = Scene.find_node("Level"); local kind, layer, value = lv:ldtk_get_collision(self.node:get_position())`
----@param x number
----@param y number
----@return string type
----@return string? layer
----@return string|integer|nil value
+---Example: `local lv = Scene.find_node("Level"); local kind, layer, value = lv:ldtk_get_collision(self.node:get_global_position())`
+---@param x number World X in px
+---@param y number World Y in px
+---@return string type Collision kind: "solid", "one_way", "trigger" or "none"
+---@return string? layer Identifier of the IntGrid layer that matched (top layer first); nil for "none"
+---@return string|integer|nil value The IntGrid value's identifier, or its number when unnamed; nil for "none"
 function LdtkLevelNode:ldtk_get_collision(x, y) end
 
 ---The trigger areas built from IntGrid values set to Trigger ("<Layer>_<value>" -> AreaNode).
 ---Connect to their "body_entered" / "body_exited" events.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local spikes = lv:ldtk_get_triggers()["Collisions_spikes"]`
----@return table<string, Node>
+---@return table<string, Node> Trigger AreaNodes by name ("<Layer>_<value>"), from IntGrid values whose collision is Trigger
 function LdtkLevelNode:ldtk_get_triggers() end
 
 ---Gets the tile of a Tiles/AutoLayer layer at a world position.
 ---
----Example: `local lv = Scene.find_node("Level"); local tile = lv:ldtk_get_tile("Ground", self.node:get_position())`
----@param layer LdtkLayer|string
----@param x number
----@param y number
----@return LdtkTile?
+---Example: `local lv = Scene.find_node("Level"); local tile = lv:ldtk_get_tile("Ground", self.node:get_global_position())`
+---@param layer LdtkLayer|string Tiles or AutoLayer layer identifier
+---@param x number World X in px
+---@param y number World Y in px
+---@return LdtkTile? The topmost tile under the point (id, tileset, flips, custom data, enum tags); nil when there is none
 function LdtkLevelNode:ldtk_get_tile(layer, x, y) end
 
 ---Gets the enum values tagging the tile at a world position (tileset enum tags).
 ---
----Example: `local lv = Scene.find_node("Level"); local tags = lv:ldtk_get_tile_enums("Ground", self.node:get_position())`
----@param layer LdtkLayer|string
----@param x number
----@param y number
----@return string[]
+---Example: `local lv = Scene.find_node("Level"); local tags = lv:ldtk_get_tile_enums("Ground", self.node:get_global_position())`
+---@param layer LdtkLayer|string Tiles or AutoLayer layer identifier
+---@param x number World X in px
+---@param y number World Y in px
+---@return string[] Enum value ids tagging that tile in its tileset; empty when no tile or no tags
 function LdtkLevelNode:ldtk_get_tile_enums(layer, x, y) end
 
 ---Gets an enum's values (colour, tile, index).
 ---
 ---Example: `local lv = Scene.find_node("Level"); for _, v in ipairs(lv:ldtk_get_enum("ItemType") or {}) do Log.info(v.id) end`
----@param name LdtkEnumName
----@return LdtkEnumValue[]?
+---@param name LdtkEnumName Enum identifier, e.g. "ItemType"
+---@return LdtkEnumValue[]? The enum's values in order (index is 1-based); nil for an unknown enum
 function LdtkLevelNode:ldtk_get_enum(name) end
 
 ---Every enum: name -> value ids.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local item_types = lv:ldtk_get_enums()["ItemType"]`
----@return table<string, string[]>
+---@return table<string, string[]> Enum identifier to its value ids, for every enum of the project
 function LdtkLevelNode:ldtk_get_enums() end
 
 ---Lists the loaded levels' entities, optionally only those with an identifier.
 ---
 ---Example: `local lv = Scene.find_node("Level"); for _, e in ipairs(lv:ldtk_get_entities("Enemy")) do Log.info(e.iid) end`
----@param identifier? LdtkEntity
----@return LdtkEntity[]
+---@param identifier? LdtkEntity Entity definition identifier to keep, e.g. "Enemy" (default: every entity)
+---@return LdtkEntity[] Entities of the loaded levels (every level in world mode), with world_x and world_y in world px
 function LdtkLevelNode:ldtk_get_entities(identifier) end
 
 ---Lists the loaded levels' entities with a tag.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local pickups = lv:ldtk_get_entities_by_tag("pickup")`
----@param tag string
----@return LdtkEntity[]
+---@param tag string Entity tag set on the definition in LDtk
+---@return LdtkEntity[] Entities of the loaded levels carrying that tag
 function LdtkLevelNode:ldtk_get_entities_by_tag(tag) end
 
 ---Gets an entity anywhere in the project by iid.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local e = lv:ldtk_get_entity(self.target_iid)`
----@param iid string
----@return LdtkEntity?
+---@param iid string The entity's instance id
+---@return LdtkEntity? The entity, from any level of the project (node is set only while it is spawned); nil for an unknown iid
 function LdtkLevelNode:ldtk_get_entity(iid) end
 
 ---Gets the node spawned for an entity (by iid).
 ---
 ---Example: `local lv = Scene.find_node("Level"); local door = lv:ldtk_get_entity_node(self.door_iid)`
----@param iid string
----@return Node?
+---@param iid string The entity's instance id
+---@return Node? The node spawned for it; nil when it is not spawned (level not loaded or no node for the entity)
 function LdtkLevelNode:ldtk_get_entity_node(iid) end
 
 ---Lists the project's entity definitions.
 ---
 ---Example: `local lv = Scene.find_node("Level"); local defs = lv:ldtk_get_entity_defs(); Log.info(defs[1].identifier)`
----@return LdtkEntityDef[]
+---@return LdtkEntityDef[] Every entity definition with its size in px, colour, tags and field list
 function LdtkLevelNode:ldtk_get_entity_defs() end
 
 ---Lists the resolved EntityRef links between spawned entities.
 ---
 ---Example: `local lv = Scene.find_node("Level"); for _, link in ipairs(lv:ldtk_get_links()) do Log.info(link.field) end`
----@return LdtkLink[]
+---@return LdtkLink[] Each resolved EntityRef (source node, target node when spawned, field, iids, index: 1-based array element or 0)
 function LdtkLevelNode:ldtk_get_links() end
 
 -- On any node spawned from an LDtk entity:
@@ -9270,41 +9270,41 @@ function LdtkLevelNode:ldtk_get_links() end
 ---The LDtk entity this node was spawned from (nil otherwise).
 ---
 ---Example: `local e = self.node:ldtk_entity(); if e then Log.info(e.identifier) end`
----@return LdtkEntity?
+---@return LdtkEntity? The entity this node was spawned from; nil for a node not spawned by an LdtkLevelNode
 function LdtkLevelNode:ldtk_entity() end
 
 ---The LdtkLevelNode that spawned this node.
 ---
 ---Example: `local level = self.node:ldtk_level_node()`
----@return Node?
+---@return Node? The LdtkLevelNode that spawned this node; nil when none did
 function LdtkLevelNode:ldtk_level_node() end
 
 ---A field of this node's entity.
 ---
 ---Example: `self.health = self.node:ldtk_field("health") or 3`
----@param name string
----@return any
+---@param name string Field identifier on this node's entity
+---@return any The field's value (same conversions as entity fields); nil when absent, null, or the node is not an entity
 function LdtkLevelNode:ldtk_field(name) end
 
 ---The node an EntityRef field points to (the first one for arrays).
 ---
 ---Example: `local door = self.node:ldtk_ref("target_door"); if door then door:set_visible(false) end`
----@param field string
----@return Node?
+---@param field string EntityRef field identifier on this node's entity
+---@return Node? The spawned node it points to (the first for an array field); nil when unset, not spawned or not an entity
 function LdtkLevelNode:ldtk_ref(field) end
 
 ---Nodes referenced by a field, or every reference ({field, iid, node}) without one.
 ---
 ---Example: `for _, n in ipairs(self.node:ldtk_refs("lights")) do n:set_visible(true) end`
----@param field? string
----@return Node[]|{field: string, iid: string, node: Node?}[]
+---@param field? string EntityRef field identifier (default: every reference of every field)
+---@return Node[]|{field: string, iid: string, node: Node?}[] With a field: the spawned nodes it references, in order. Without: one {field, iid, node} per reference, node nil when not spawned
 function LdtkLevelNode:ldtk_refs(field) end
 
 ---Entities whose EntityRef fields point at this one.
 ---
 ---Example: `for _, r in ipairs(self.node:ldtk_referenced_by("target")) do Log.info(r.field) end`
----@param field? string
----@return {node: Node, field: string}[]
+---@param field? string Only references made through this field identifier (default: any field)
+---@return {node: Node, field: string}[] One {node, field} per spawned entity whose EntityRef points at this node; empty when none
 function LdtkLevelNode:ldtk_referenced_by(field) end
 
 
@@ -9609,8 +9609,8 @@ local ResourceBase = {}
 ---
 ---Example: `local mine = self.stats:duplicate(); mine.speed = mine.speed * 2`
 ---@generic T
----@param self T
----@return T copy
+---@param self T The resource table to copy (call it with a colon: res:duplicate())
+---@return T copy The copy, with the same class and methods; nil (with a warning) when called on something that isn't a resource
 function ResourceBase:duplicate() end
 
 ---@class ResourceModule
@@ -10552,7 +10552,7 @@ function CameraModule.screen_to_world(sx, sy) end
 
 ---Transforms world coordinates to screen pixel coordinates.
 ---
----Example: `local sx, sy = Camera.world_to_screen(self.node:get_position())`
+---Example: `local sx, sy = Camera.world_to_screen(self.node:get_global_position())`
 ---@param wx number World X in px (a Vec2 also works, with wy left out)
 ---@param wy number World Y in px
 ---@return number sx Screen X in px from the left edge (the input unchanged with no current camera)
@@ -10898,46 +10898,46 @@ local Vec2_ = {}
 ---Returns the vector's length (magnitude).
 ---
 ---Example: `local speed = self.velocity:length()`
----@return number
+---@return number The length: sqrt of the sum of the squared components
 function Vec2_:length() end
 ---Returns the squared length, cheaper than length() for comparisons.
 ---
 ---Example: `if (target - pos):length_squared() < 16 * 16 then self.arrived = true end`
----@return number
+---@return number The length squared (no square root): compare it with a squared distance
 function Vec2_:length_squared() end
 ---A vector of length 1 in the same direction (zero stays zero).
 ---
 ---Example: `local dir = (target - pos):normalized()`
----@return Vec2
+---@return Vec2 A new Vec2 of length 1 pointing the same way; a zero vector stays zero
 function Vec2_:normalized() end
 ---Returns the dot product with another vector.
 ---
 ---Example: `local facing = forward:dot((target - pos):normalized())`
----@param other Vec2
----@return number
+---@param other Vec2 The Vec2 to multiply with, component by component
+---@return number The sum of the components' products: 0 for perpendicular directions
 function Vec2_:dot(other) end
 ---Returns the distance to another vector.
 ---
 ---Example: `local d = pos:distance(target)`
----@param other Vec2
----@return number
+---@param other Vec2 The other point, as a Vec2
+---@return number The straight-line distance between the two points (same units as the components)
 function Vec2_:distance(other) end
 ---Returns the vector interpolated toward other by t (0 = this, 1 = other).
 ---
 ---Example: `local mid = a:lerp(b, 0.5)`
----@param other Vec2
----@param t number 0..1
----@return Vec2
+---@param other Vec2 The Vec2 to move toward
+---@param t number 0 = this vector, 1 = other, 0.5 halfway; not clamped, so values outside 0..1 extrapolate
+---@return Vec2 A new Vec2 between the two
 function Vec2_:lerp(other, t) end
 ---Returns a new vector with the same components.
 ---
 ---Example: `local start = pos:copy()`
----@return Vec2
+---@return Vec2 A new Vec2 with the same components; changing one doesn't change the other
 function Vec2_:copy() end
 ---The components as values: `local x, y = v:unpack()`.
 ---
 ---Example: `local x, y = Vec2(3, 4):unpack()`
----@return number ...
+---@return number The components in order (x, y) as separate values
 function Vec2_:unpack() end
 
 ---A 3D vector: v.x, v.y, v.z (also v[1]...); + - * / with a vector or a number.
@@ -10954,46 +10954,46 @@ local Vec3_ = {}
 ---Returns the vector's length (magnitude).
 ---
 ---Example: `local len = Vec3(1, 2, 2):length()`
----@return number
+---@return number The length: sqrt of the sum of the squared components
 function Vec3_:length() end
 ---Returns the squared length, cheaper than length() for comparisons.
 ---
 ---Example: `local len2 = Vec3(1, 2, 3):length_squared()`
----@return number
+---@return number The length squared (no square root): compare it with a squared distance
 function Vec3_:length_squared() end
 ---A vector of length 1 in the same direction (zero stays zero).
 ---
 ---Example: `local axis = Vec3(1, 2, 3):normalized()`
----@return Vec3
+---@return Vec3 A new Vec3 of length 1 pointing the same way; a zero vector stays zero
 function Vec3_:normalized() end
 ---Returns the dot product with another vector.
 ---
 ---Example: `local d = Vec3(1, 0, 0):dot(Vec3(0, 1, 0))`
----@param other Vec3
----@return number
+---@param other Vec3 The Vec3 to multiply with, component by component
+---@return number The sum of the components' products: 0 for perpendicular directions
 function Vec3_:dot(other) end
 ---Returns the distance to another vector.
 ---
 ---Example: `local d = Vec3(0, 0, 0):distance(Vec3(1, 2, 2))`
----@param other Vec3
----@return number
+---@param other Vec3 The other point, as a Vec3
+---@return number The straight-line distance between the two points (same units as the components)
 function Vec3_:distance(other) end
 ---Returns the vector interpolated toward other by t (0 = this, 1 = other).
 ---
 ---Example: `local mid = Vec3(0, 0, 0):lerp(Vec3(10, 20, 30), 0.5)`
----@param other Vec3
----@param t number 0..1
----@return Vec3
+---@param other Vec3 The Vec3 to move toward
+---@param t number 0 = this vector, 1 = other, 0.5 halfway; not clamped, so values outside 0..1 extrapolate
+---@return Vec3 A new Vec3 between the two
 function Vec3_:lerp(other, t) end
 ---Returns a new vector with the same components.
 ---
 ---Example: `local backup = Vec3(1, 2, 3):copy()`
----@return Vec3
+---@return Vec3 A new Vec3 with the same components; changing one doesn't change the other
 function Vec3_:copy() end
 ---The components as values: `local x, y = v:unpack()`.
 ---
 ---Example: `local x, y, z = Vec3(1, 2, 3):unpack()`
----@return number ...
+---@return number The components in order (x, y, z) as separate values
 function Vec3_:unpack() end
 
 ---A 4D vector: v.x, v.y, v.z, v.w (also v[1]...); + - * / with a vector or a number.
@@ -11011,58 +11011,58 @@ local Vec4_ = {}
 ---Returns the vector's length (magnitude).
 ---
 ---Example: `local len = Vec4(1, 1, 1, 1):length()`
----@return number
+---@return number The length: sqrt of the sum of the squared components
 function Vec4_:length() end
 ---Returns the squared length, cheaper than length() for comparisons.
 ---
 ---Example: `local len2 = Vec4(1, 2, 3, 4):length_squared()`
----@return number
+---@return number The length squared (no square root): compare it with a squared distance
 function Vec4_:length_squared() end
 ---A vector of length 1 in the same direction (zero stays zero).
 ---
 ---Example: `local q = Vec4(0, 0, 1, 1):normalized()`
----@return Vec4
+---@return Vec4 A new Vec4 of length 1 pointing the same way; a zero vector stays zero
 function Vec4_:normalized() end
 ---Returns the dot product with another vector.
 ---
 ---Example: `local d = Vec4(1, 0, 0, 0):dot(Vec4(0.5, 0.5, 0, 0))`
----@param other Vec4
----@return number
+---@param other Vec4 The Vec4 to multiply with, component by component
+---@return number The sum of the components' products: 0 for perpendicular directions
 function Vec4_:dot(other) end
 ---Returns the distance to another vector.
 ---
 ---Example: `local d = Vec4(1, 0, 0, 1):distance(Vec4(0, 1, 0, 1))`
----@param other Vec4
----@return number
+---@param other Vec4 The other point, as a Vec4
+---@return number The straight-line distance between the two points (same units as the components)
 function Vec4_:distance(other) end
 ---Returns the vector interpolated toward other by t (0 = this, 1 = other).
 ---
 ---Example: `local c = Vec4(1, 0, 0, 1):lerp(Vec4(0, 0, 1, 1), t)`
----@param other Vec4
----@param t number 0..1
----@return Vec4
+---@param other Vec4 The Vec4 to move toward
+---@param t number 0 = this vector, 1 = other, 0.5 halfway; not clamped, so values outside 0..1 extrapolate
+---@return Vec4 A new Vec4 between the two
 function Vec4_:lerp(other, t) end
 ---Returns a new vector with the same components.
 ---
 ---Example: `local backup = Vec4(1, 2, 3, 4):copy()`
----@return Vec4
+---@return Vec4 A new Vec4 with the same components; changing one doesn't change the other
 function Vec4_:copy() end
 ---The components as values: `local x, y = v:unpack()`.
 ---
 ---Example: `local x, y, z, w = Vec4(1, 0, 0, 1):unpack()`
----@return number ...
+---@return number The components in order (x, y, z, w) as separate values
 function Vec4_:unpack() end
 
 ---The angle of the vector in degrees (0 = right, 90 = down).
 ---
 ---Example: `local deg = (target - pos):angle(); self.node:set_rotation(deg)`
----@return number
+---@return number Degrees from the +x axis, -180 to 180: 0 = right, 90 = down, -90 = up
 function Vec2_:angle() end
 ---The vector rotated by degrees (clockwise on screen).
 ---
 ---Example: `local spread = Vec2.RIGHT:rotated(15) * 300`
----@param degrees number
----@return Vec2
+---@param degrees number How far to turn it; positive is clockwise on screen (+y down)
+---@return Vec2 A new Vec2 of the same length, turned
 function Vec2_:rotated(degrees) end
 
 ---Makes a Vec2: `Vec2(3, 4)`; constants Vec2.ZERO, ONE, UP, DOWN, LEFT, RIGHT.

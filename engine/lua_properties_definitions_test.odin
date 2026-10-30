@@ -54,12 +54,12 @@ test_lua_node_properties_definitions :: proc(t: ^testing.T) {
 		for p in own {
 			if lua_prop_type(p) != "" && !p.runtime && !strings.contains(p.name, ".") {ex = p; break}
 		}
-		fmt.sbprintf(&sb, "\n---Reads an Inspector property by its path (vectors and colours as tables); \"script.<name>\" reads a field of the node's script.\n---\n---Example: `local value = self.node:get_property(%q)`\n---@param path %sProperty|string\n---@return any\n", ex.name, cls)
+		fmt.sbprintf(&sb, "\n---Reads an Inspector property by its path (vectors and colours as tables); \"script.<name>\" reads a field of the node's script.\n---\n---Example: `local value = self.node:get_property(%q)`\n---@param path %sProperty|string The property's path, as the Inspector names it (\"position\", \"emitter.amount\") or \"script.<field>\"\n---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)\n", ex.name, cls)
 		for p in props {
 			if ty := lua_prop_type(p); ty != "" do fmt.sbprintf(&sb, "---@overload fun(self: %s, path: %q): %s\n", cls, p.name, ty)
 		}
 		fmt.sbprintf(&sb, "function %s:get_property(path) end\n", cls)
-		fmt.sbprintf(&sb, "\n---Sets an Inspector property by its path: vectors as {{x, y}} or x, y; colours as {{r, g, b[, a]}} 0..1 or \"#rrggbb[aa]\"; enums by name; \"script.<name>\" a field of the node's script.\n---\n---Example: `self.node:set_property(%q, %s)`\n---@param path %sProperty|string\n---@param value any\n---@param y? number\n", ex.name, lua_example_value(ex), cls)
+		fmt.sbprintf(&sb, "\n---Sets an Inspector property by its path: vectors as {{x, y}} or x, y; colours as {{r, g, b[, a]}} 0..1 or \"#rrggbb[aa]\"; enums by name; \"script.<name>\" a field of the node's script.\n---\n---Example: `self.node:set_property(%q, %s)`\n---@param path %sProperty|string The property's path, as the Inspector names it, or \"script.<field>\"\n---@param value any The new value: a number, boolean, string or enum name; a vector as {{x, y}} (or x here and y next); a colour as {{r, g, b[, a]}} 0..1 or \"#rrggbb[aa]\"\n---@param y? number A vector's y when value is its x\n", ex.name, lua_example_value(ex), cls)
 		for p in props {
 			ty := lua_prop_type(p)
 			if ty == "" do continue
