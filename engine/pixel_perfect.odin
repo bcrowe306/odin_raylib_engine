@@ -60,6 +60,31 @@ Pixel_SnapSprite :: #force_inline proc(pos, o: [2]f32, rotation: f32) -> [2]f32 
 	return pos + [2]f32{math.round(tl.x), math.round(tl.y)} - tl
 }
 
+// Screen_Fill: what fills a window (or screen) whose shape differs from the
+// game's virtual resolution (#174).
+Screen_Fill :: enum u8 {
+	Keep,   // the virtual resolution as it is, scaled to fit: bars where the shapes differ
+	Expand, // the same scale, the frame grown to the window's shape: more world on the longer side, no bars
+}
+
+Screen_Fill_Name :: proc(f: Screen_Fill) -> string {return "expand" if f == .Expand else "keep"}
+Screen_Fill_Parse :: proc(s: string) -> Screen_Fill {return .Expand if s == "expand" else .Keep}
+
+// Screen_FillSize: the frame size for a design (virtual) resolution on a
+// screen. Keep: the design size. Expand: scaled as Keep scales it (the
+// smaller of the two ratios; a whole number with integer scaling), then
+// grown on the longer side to the screen's shape - at least the design
+// size, so what the design shows is always shown.
+Screen_FillSize :: proc(design, screen: [2]f32, fill: Screen_Fill, integer := false) -> [2]f32 {
+	if fill == .Keep || design.x <= 0 || design.y <= 0 || screen.x <= 0 || screen.y <= 0 do return design
+	s := min(screen.x / design.x, screen.y / design.y)
+	if integer && s >= 1 do s = math.floor(s)
+	if integer {
+		return {max(design.x, math.floor(screen.x / s)), max(design.y, math.floor(screen.y / s))}
+	}
+	return {max(design.x, math.ceil(screen.x / s - 0.01)), max(design.y, math.ceil(screen.y / s - 0.01))}
+}
+
 // Pixel_FitRect: the frame (w x h) scaled into the screen, centred - by a
 // whole number with integer scaling (at least 1).
 Pixel_FitRect :: proc(w, h, screenW, screenH: f32) -> rl.Rectangle {

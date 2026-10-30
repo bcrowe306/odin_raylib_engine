@@ -43,6 +43,7 @@ ProjectConfig :: struct {
 
 	// Video
 	fullscreen:    bool,
+	fill:          Screen_Fill, // a window / screen of another shape than the virtual resolution (#174)
 	sharpScaling:  bool, // the frame is scaled to the window nearest-neighbour (pixel art) - else smoothly
 	integerScaling: bool, // scaled by a whole number (bars around): every game pixel the same size (pixel_perfect.odin)
 	pixelSnap:     bool, // the camera and sprites on whole game pixels
@@ -347,8 +348,10 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		cfg.windowTitle = strings.clone(cfg.windowTitle, allocator) // owned like the rest (ProjectConfig_Destroy frees it)
 	}
 
+	cfg.fill = .Keep // (projects saved before fill modes: bars, as they looked)
 	if videoObj, ok := json_get_obj(rootObj, "video"); ok {
 		cfg.fullscreen = json_get_bool(videoObj, "fullscreen", cfg.fullscreen)
+		cfg.fill = Screen_Fill_Parse(json_get_str(videoObj, "fill"))
 		cfg.sharpScaling = json_get_bool(videoObj, "sharp_scaling", cfg.sharpScaling)
 		cfg.integerScaling = json_get_bool(videoObj, "integer_scaling", cfg.integerScaling)
 		cfg.pixelSnap = json_get_bool(videoObj, "pixel_snap", cfg.pixelSnap)
@@ -488,7 +491,7 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	fmt.sbprintf(&sb, "    \"virtual_height\": %.2f,\n", cfg.virtualHeight)
 	fmt.sbprintf(&sb, "    \"target_fps\": %d\n", cfg.targetFPS)
 	strings.write_string(&sb, "  },\n")
-	fmt.sbprintf(&sb, "  \"video\": {{\"fullscreen\": %t, \"vsync\": %t, \"resizable\": %t, \"msaa\": %t, \"high_dpi\": %t, \"sharp_scaling\": %t, \"integer_scaling\": %t, \"pixel_snap\": %t, \"smooth_camera\": %t}},\n", cfg.fullscreen, cfg.vsync, cfg.resizable, cfg.msaa, cfg.highDPI, cfg.sharpScaling, cfg.integerScaling, cfg.pixelSnap, cfg.smoothCamera)
+	fmt.sbprintf(&sb, "  \"video\": {{\"fill\": \"%s\", \"fullscreen\": %t, \"vsync\": %t, \"resizable\": %t, \"msaa\": %t, \"high_dpi\": %t, \"sharp_scaling\": %t, \"integer_scaling\": %t, \"pixel_snap\": %t, \"smooth_camera\": %t}},\n", Screen_Fill_Name(cfg.fill), cfg.fullscreen, cfg.vsync, cfg.resizable, cfg.msaa, cfg.highDPI, cfg.sharpScaling, cfg.integerScaling, cfg.pixelSnap, cfg.smoothCamera)
 	fmt.sbprintf(&sb, "  \"audio\": {{\"master_volume\": %.2f, \"music_volume\": %.2f, \"sfx_volume\": %.2f", cfg.masterVolume, cfg.musicVolume, cfg.sfxVolume)
 	if cfg.mixerBuses != "" do fmt.sbprintf(&sb, ", \"buses\": %s", cfg.mixerBuses)
 	strings.write_string(&sb, "},\n")
@@ -592,7 +595,9 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 
 	if cfg.virtualWidth > 0 && cfg.virtualHeight > 0 {
 		game.virtualSize = {cfg.virtualWidth, cfg.virtualHeight}
+		game.designSize = game.virtualSize
 	}
+	game.fill = cfg.fill
 	Render_SetPixelSettings({integerScaling = cfg.integerScaling, snap = cfg.pixelSnap, smooth = cfg.smoothCamera})
 	game.physicsWorld.gravity = cfg.gravity
 	Physics_SetLayerNames(cfg.collisionLayers[:])

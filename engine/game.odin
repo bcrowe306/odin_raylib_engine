@@ -59,7 +59,9 @@ Game :: struct {
 	preloads:        map[^Scene]^Scene_Preload,
 
 	// Viewport mapping & UI interaction state
-	virtualSize:        [2]f32,
+	virtualSize:        [2]f32, // the frame the game draws at (Expand: the design size grown to the window's shape)
+	designSize:         [2]f32, // the project's virtual resolution (Project Settings)
+	fill:               Screen_Fill,
 	// Audio buses (project Audio settings): multiply node volumes.
 	musicVolume:        f32,
 	sfxVolume:          f32,
