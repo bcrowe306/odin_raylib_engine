@@ -414,8 +414,12 @@ mode_label :: proc(ln: ^e.LdtkLevelNode, state: ^EditorState, identifier: string
 	switch m.mode {
 	case .Auto:
 		if comp := e.LdtkLevelNode_EntityComponent(ln, identifier, &state.game.gameContext); comp != "" do return filepath.stem(filepath.stem(comp))
+		if t := e.LdtkLevelNode_EntityCustomType(ln, identifier, &state.game.gameContext); t != nil do return t.name
 		return "Node"
 	case .Component: return filepath.stem(filepath.stem(m.component)) if m.component != "" else "(no component)"
+	case .CustomNode:
+		if t := e.LdtkLevelNode_EntityCustomType(ln, identifier, &state.game.gameContext); t != nil do return t.name
+		return "(no custom node type)"
 	case .Node: return "Node"
 	case .None: return "not spawned"
 	}
@@ -430,6 +434,15 @@ page_entities :: proc(state: ^EditorState, ln: ^e.LdtkLevelNode) {
 		return
 	}
 	if lp.selEntity == "" || e.Ldtk_GetEntityDef(proj, lp.selEntity) == nil do lp.selEntity = strings.clone(proj.entityDefs[0].identifier)
+	// Auto mappings and the project's custom node types (#157): opt in.
+	match := ln.matchCustomNodes
+	if imgui.Checkbox("Auto also spawns the custom node type named like the entity", &match) {
+		Editor_RecordUndo(state, "LDtk match custom nodes")
+		ln.matchCustomNodes = match
+		e.LdtkLevelNode_Rebuild(ln)
+	}
+	Drive_Item("ldtk.match-custom-nodes")
+	UI_Tooltip("An entity set to Auto, with no component of its name: the custom node type of its name (Hurtbox for a Hurtbox entity), if the project has one")
 	avail := imgui.GetContentRegionAvail()
 	if imgui.BeginChild("##ldtk_entdefs", {220, avail.y}, {.Borders}, {}) {
 		for &d in proj.entityDefs {
@@ -471,7 +484,7 @@ entity_detail :: proc(state: ^EditorState, ln: ^e.LdtkLevelNode, def: ^e.LdtkEnt
 	m := e.LdtkLevelNode_EntityMapping(ln, def.identifier)
 	if UI_BeginProps("##ent_map") {
 		UI_PropLabel("Spawn as")
-		names := []string{"Auto (component by name)", "Component", "Plain Node", "Don't spawn"}
+		names := []string{"Auto (component by name)", "Component", "Plain Node", "Don't spawn", "Custom Node Type"}
 		if v, changed := UI_Combo("ldtk.spawn-mode", int(m.mode), names); changed {
 			Editor_RecordUndo(state, "LDtk entity mapping")
 			m.mode = e.LdtkSpawnMode(v)
@@ -482,7 +495,16 @@ entity_detail :: proc(state: ^EditorState, ln: ^e.LdtkLevelNode, def: ^e.LdtkEnt
 		case .Auto:
 			UI_PropLabel("")
 			if comp := e.LdtkLevelNode_EntityComponent(ln, def.identifier, ctx); comp != "" do UI_DimText(comp)
+			else if t := e.LdtkLevelNode_EntityCustomType(ln, def.identifier, ctx); t != nil do UI_DimText(fmt.tprintf("the %s custom node type (%s)", t.name, t.path))
 			else do UI_DimText(fmt.tprintf("components/%s.component.json not found: a plain Node", def.identifier))
+		case .CustomNode:
+			UI_PropLabel("Node type")
+			if path, ok := asset_picker("ldtk.node-type", m.nodeType, Editor_ListProjectFiles(state, "", {e.CUSTOM_NODE_SUFFIX})); ok {
+				Editor_RecordUndo(state, "LDtk entity node type")
+				m.nodeType = path
+				e.LdtkLevelNode_SetEntityMapping(ln, m)
+				e.LdtkLevelNode_Rebuild(ln)
+			}
 		case .Component:
 			UI_PropLabel("Component")
 			if path, ok := asset_picker("ldtk.component", m.component, Editor_ListProjectFiles(state, "components", {".component.json"})); ok {
@@ -507,7 +529,14 @@ entity_detail :: proc(state: ^EditorState, ln: ^e.LdtkLevelNode, def: ^e.LdtkEnt
 	// Fields: which reach a script property.
 	props: map[string]bool
 	props.allocator = context.temp_allocator
-	if comp := e.LdtkLevelNode_EntityComponent(ln, def.identifier, ctx); comp != "" {
+	if t := e.LdtkLevelNode_EntityCustomType(ln, def.identifier, ctx); t != nil {
+		// A custom node type: its script's properties.
+		if script := e.CustomNode_Script(t, ctx); script != "" {
+			if mod, ok := e.ScriptManager_LoadModule(script, &state.game.scriptManager); ok && mod != nil {
+				for p in mod.properties do props[p.name] = true
+			}
+		}
+	} else if comp := e.LdtkLevelNode_EntityComponent(ln, def.identifier, ctx); comp != "" {
 		if data, ok := e.Component_ReadFile(ctx, comp); ok {
 			if script := component_script(string(data)); script != "" {
 				sm := &state.game.scriptManager
@@ -1062,7 +1091,7 @@ LdtkPanel_DriveQuery :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	}
 	if strings.has_prefix(q, "ldtk.mapping:") {
 		m := e.LdtkLevelNode_EntityMapping(ln, q[13:])
-		return strings.trim_space(fmt.tprintf("%s %s", e.LdtkSpawnMode_Name(m.mode), m.component)), true
+		return strings.trim_space(fmt.tprintf("%s %s%s", e.LdtkSpawnMode_Name(m.mode), m.component, m.nodeType)), true
 	}
 	if strings.has_prefix(q, "ldtk.collision:") {
 		parts := strings.split(q[15:], ":", context.temp_allocator)

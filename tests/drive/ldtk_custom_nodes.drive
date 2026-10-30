@@ -1,0 +1,56 @@
+# #157: LDtk entities as custom node types - Items mapped to the ItemBox
+# type (picked in the Level panel), Doors matching the Door type by name
+# once Auto is allowed to; saved with the scene; spawned as those types.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+exec mkdir -p $PROJECT/nodes
+exec cp tests/drive/fixtures/ldtk_custom/ItemBox.node.json $PROJECT/nodes/ItemBox.node.json
+exec cp tests/drive/fixtures/ldtk_custom/Door.node.json $PROJECT/nodes/Door.node.json
+wait-until item:asset:nodes/Door.node.json == visible timeout=300
+click @asset.new-scene
+drop-files @asset.search tests/drive/fixtures/ldtk/topdown.ldtk
+wait 3
+dblclick @asset:levels/topdown.ldtk
+expect node:topdown.type == LdtkLevelNode
+click @insp.ldtk.panel
+wait 2
+drag 640,519 640,330 12
+wait 2
+click @ldtk.page:Entities
+
+# Items: the ItemBox type.
+click @ldtk.entity:Item
+click @ldtk.spawn-mode
+click @pick:Custom Node Type
+wait 2
+click @ldtk.node-type
+click @pick:nodes/ItemBox.node.json
+expect ldtk.mapping:Item == custom_node nodes/ItemBox.node.json
+screenshot item_mapping
+
+# Doors: Auto - a plain node until custom node types may match by name.
+click @ldtk.entity:Door
+expect ldtk.mapping:Door == auto
+click @ldtk.match-custom-nodes
+wait 2
+screenshot door_auto
+
+key ctrl+s
+expect file:scenes/new_scene.scene.json contains "Item": {"mode": "custom_node", "node_type": "nodes/ItemBox.node.json"}
+expect file:scenes/new_scene.scene.json contains "matchCustomNodes": true
+
+# Simulate: they spawn as those types.
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 10
+expect ldtk.spawned >= 5
+expect node:Item.class == ItemBox
+expect node:Item.type == AreaNode
+expect node:Door.class == Door
+expect node:Door.type == StaticBodyNode
+screenshot simulating
+click @menu:Game
+click @menu:Game/Simulate in Editor
