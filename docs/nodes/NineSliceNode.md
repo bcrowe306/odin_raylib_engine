@@ -44,8 +44,8 @@ bars of any size.
   default. (0, 0) puts the top-left corner at the node's position. It
   rotates around the origin.
 - New nine slices are 200 x 100 with 16-pixel margins.
-- With no image it draws a faint rectangle in its **Tint** colour, in the
-  game too.
+- With no image the editor draws a faint rectangle in its **Tint** colour;
+  the game draws nothing.
 - Filtering comes from the image's import settings (Point by default), as
   for a [Texture Sprite](TextureNode.md#how-it-works).
 

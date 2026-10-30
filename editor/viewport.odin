@@ -211,8 +211,10 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 	if state.activeScene != nil && state.activeScene.rootNode != nil {
 		// One traversal for all layers (not one walk per layer).
 		e.Render_HideEditorHidden = true // nodes hidden in the editor
+		e.Render_EditorView = true       // (and placeholders)
 		e.Scene_RenderAllLayers(state.activeScene, ctx, 0.0, e.Camera2D_ViewRect(cam, state.viewportSize.x, state.viewportSize.y))
 		e.Render_HideEditorHidden = false
+		e.Render_EditorView = false
 		if lit {
 			// Lights multiply over the scene (screen space), before editor overlays.
 			rl.EndMode2D()

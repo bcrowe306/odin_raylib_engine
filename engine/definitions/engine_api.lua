@@ -310,9 +310,9 @@ function Node:get_scale() end
 ---@param sy? number Scale Y (defaults to sx if omitted)
 function Node:set_scale(sx, sy) end
 
----Shows another image on a TextureNode (project-relative path, e.g. a
----`texture` script property). Returns false if it isn't a TextureNode or
----the file can't be loaded.
+---Shows another image on a TextureNode or an AtlasSpriteNode (project-relative
+---path, e.g. a `texture` script property). Returns false for other nodes or
+---when the file can't be loaded.
 ---
 ---Example: `local sprite = self.node:get_node("Sprite"); sprite:set_texture("textures/coin.png")`
 ---@param path TexturePath|string Project-relative texture path
@@ -8316,6 +8316,13 @@ function AtlasSpriteNode:texture_set_origin(ox, oy) end
 ---Example: `local path = self.node:texture_get_path()`
 ---@return string
 function AtlasSpriteNode:texture_get_path() end
+
+---Shows another image (project-relative path), keeping the region; e.g. the same layout on a recoloured sheet. Returns false when the file can't be loaded.
+---
+---Example: `self.node:set_texture("textures/hero_blue.png")`
+---@param path TexturePath|string Project-relative texture path
+---@return boolean ok
+function AtlasSpriteNode:set_texture(path) end
 
 ---Sets the sub-region rectangle (in texture pixels) to display.
 ---

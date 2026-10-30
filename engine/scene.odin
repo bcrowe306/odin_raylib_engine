@@ -48,6 +48,11 @@ Scene_Guide :: struct {
 // editorHidden (and their children); the game never sets it.
 Render_HideEditorHidden: bool
 
+// Render_EditorView: the editor's viewport is drawing - placeholders for
+// nodes with nothing to show yet (a Nine Slice without an image) are drawn
+// there and not in the game (#221).
+Render_EditorView: bool
+
 CreateNodeScene :: proc(scene: ^Scene, $T: typeid, addToScene: bool = false) -> (node: ^T) {
 	allocator := vmem.arena_allocator(&scene.manager.arena)
 	node = new(T, allocator)
