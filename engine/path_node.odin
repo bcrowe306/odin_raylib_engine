@@ -237,6 +237,9 @@ PathFollowNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	if f.direction == 0 do f.direction = 1
 	length := Curve_Length(path)
 	if f.speed != 0 && length > 0 && !f.finished {
+		// Backwards from the start (Stop): it sets off from the far end
+		// instead of finishing at once (#222).
+		if f.loop == .Stop && f.speed * f.direction < 0 && f.progress <= 0 do f.progress = length
 		f.progress += f.speed * f.direction * dt
 		switch f.loop {
 		case .Stop:

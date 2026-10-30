@@ -463,9 +463,10 @@ enum_set_index :: proc(p: Node_Property, index: int) {
 }
 
 // Track_IsStepped: a property whose keys hold until the next (enums,
-// strings, a sprite's texture) - no in-between values.
+// bools, strings, a sprite's texture) - no in-between values (a bool used
+// to flip halfway through an eased segment, #222).
 Track_IsStepped :: proc(p: Node_Property) -> bool {
-	return p.kind == .Enum || p.kind == .String
+	return p.kind == .Enum || p.kind == .Bool || p.kind == .String
 }
 
 // Property_GetTrackText: a String property's value (stepped tracks).
@@ -563,7 +564,7 @@ AnimationPlayerNode_ApplyTracks :: proc(apn: ^AnimationPlayerNode, time: f32) {
 		if Track_IsStepped(p) {
 			k, ok := Track_SampleStep(&track, time)
 			if !ok do continue
-			if p.kind == .Enum {
+			if p.kind != .String {
 				Property_SetTrackValue(p, k.value)
 			} else {
 				track_set_text(apn, target, p, k.text)

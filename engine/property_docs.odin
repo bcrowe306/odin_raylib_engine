@@ -95,7 +95,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"Node.paused", "Pauses this node and its children (except Always ones) while the game runs."},
 	{"Node.enabled", "Disabled nodes (and their children) neither update nor draw."},
 	{"AnimationPlayerNode.fps", "Frames per second of the animations that don't set their own (the Animation tab's FPS box)."},
-	{"AnimationPlayerNode.defaultAnimation", "The animation selected (and autoplayed) when the scene loads; empty = the one saved as current."},
+	{"AnimationPlayerNode.defaultAnimation", "The animation selected when the scene loads (it plays with Autoplay); empty = the one saved as current."},
 
 	// --- Camera ---
 	{"CameraNode.isCurrent", "The camera the game renders through (one per scene)."},

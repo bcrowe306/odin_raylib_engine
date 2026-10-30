@@ -634,7 +634,7 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 	UI_Tooltip("Frames per second: the player's (set in the Inspector) until you change it here" if inherited else "This animation's frames per second (right-click: use the player's)")
 	imgui.SameLine(0, 2)
 	isDefault := apn.defaultAnimation == anim.name
-	if UI_IconButton(ICON_FA_STAR, "anim.default", "Played first when the scene loads (click to clear)" if isDefault else "Make this the animation played when the scene loads", isDefault, 26) {
+	if UI_IconButton(ICON_FA_STAR, "anim.default", "The animation selected when the scene loads - it plays with Autoplay (click to clear)" if isDefault else "Make this the animation selected when the scene loads (it plays with Autoplay)", isDefault, 26) {
 		Editor_RecordUndo(state, "Default animation")
 		apn.defaultAnimation = "" if isDefault else strings.clone(anim.name, apn.allocator)
 	}

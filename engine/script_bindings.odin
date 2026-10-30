@@ -1461,6 +1461,20 @@ lua_node_animation_play :: proc "c" (L: ^lua.State) -> c.int {
 	// animation_play([name [, blend_seconds]]): blend crossfades property tracks.
 	name := string(lua.tostring(L, 2)) if lua.type(L, 2) == .STRING else ""
 	blend := f32(lua.tonumber(L, 3)) if lua.type(L, 3) == .NUMBER else 0
+	if name != "" {
+		// (#222) An unknown name changes nothing; the animation already
+		// playing keeps going (paused: resumes) - safe to call every frame.
+		index := -1
+		for a, i in apn.animations do if a.name == name {index = i; break}
+		if index < 0 {
+			log.warnf("animation_play: no animation '%s' on %s", name, apn.name)
+			return 0
+		}
+		if index == apn.animationIndex && apn.playing {
+			if !apn.ticker.running do AnimationPlayerNode_Resume(apn)
+			return 0
+		}
+	}
 	AnimationPlayerNode_Play(apn, name, blend)
 	return 0
 }

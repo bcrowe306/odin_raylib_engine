@@ -550,7 +550,8 @@ toolbar: **Loop**, **Reverse** (this animation plays last to first; the
 player's own Reverse flips them all), the animation's **FPS** (the rate it plays at -
 the player's, dimmed, until you change it; right-click goes back to the
 player's, set in the Inspector) and the **star**: the animation selected -
-and autoplayed - when the scene loads (also the Inspector's **Default**).
+when the scene loads (also the Inspector's **Default**); it plays then
+with the Inspector's **Autoplay**.
 At the right of the timeline (when the panel is wide enough) a **preview**
 plays the animation by itself - its range, FPS and direction, looping;
 pause it to see the frame the timeline is on. Then play/stop preview in the
