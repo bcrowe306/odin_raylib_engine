@@ -170,6 +170,10 @@ local PathFollowNode = {}
 ---@class SpawnerNode : Node
 local SpawnerNode = {}
 
+---Generates a level from a generator (.levelgen.json) into a TileMap (its `tilemap` path, else its first TileMap child, else its parent) - when the scene starts, on generate() or a signal; seed / randomSeed (lastSeed: the one used), the generator's parameters set on the node, background generation. "generated" (the seed) / "generation_failed" (why).
+---@class LevelGeneratorNode : Node
+local LevelGeneratorNode = {}
+
 ---@class PostEffectNode : Node
 
 ---@class UIContainerNode : Node
@@ -529,6 +533,15 @@ function TimerNode:connect(event, handler) end
 ---@param handler fun(value: any, source: SpawnerNode)
 ---@return integer id Connection id for `disconnect`
 function SpawnerNode:connect(event, handler) end
+
+---@alias LevelGeneratorNodeEvent NodeTreeEvent|"generated"|"generation_failed"|ProjectEvent
+---Connects a handler to one of this node's events: generated (The level generator's level is in (its seed)), generation_failed (The level generator couldn't make the level (why)); the tree events; custom ones.
+---
+---Example: `self.node:connect("generated", function(value, source) Log.info("generated") end)`
+---@param event LevelGeneratorNodeEvent|string
+---@param handler fun(value: any, source: LevelGeneratorNode)
+---@return integer id Connection id for `disconnect`
+function LevelGeneratorNode:connect(event, handler) end
 
 ---@alias FrameAnimationNodeEvent NodeTreeEvent|"animation_finished"|ProjectEvent
 ---Connects a handler to one of this node's events: animation_finished (A non-looping animation ended (Aseprite: a tag's repeats are done)); the tree events; custom ones.
@@ -1296,6 +1309,93 @@ function SpawnerNode:get_property(path) end
 ---@overload fun(self: SpawnerNode, path: "usePool", value: boolean)
 ---@overload fun(self: SpawnerNode, path: "spawnedTotal", value: integer)
 function SpawnerNode:set_property(path, value, y) end
+
+---@class LevelGeneratorNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field generator string The generator it makes levels from (a .levelgen.json).
+---@field tilemap string The TileMap it fills, as a path from this node; empty: its first TileMap child, else it...
+---@field seed integer The level's seed: the same seed, the same level (0: the generator's own).
+---@field randomSeed boolean A new random seed every time it generates (Last Seed tells which).
+---@field generateOnReady boolean Generate when the scene starts (else call generate() or connect a signal to it).
+---@field background boolean Generate on a worker thread while the game runs; the level goes in when it is done (gen...
+---@field lastSeed integer The seed of the last level made (runtime, read-only).
+
+---@alias LevelGeneratorNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "generator" # string - The generator it makes levels from (a .levelgen.json).
+---| "tilemap" # string - The TileMap it fills, as a path from this node; empty: its first TileMap child, else it...
+---| "seed" # integer - The level's seed: the same seed, the same level (0: the generator's own).
+---| "randomSeed" # boolean - A new random seed every time it generates (Last Seed tells which).
+---| "generateOnReady" # boolean - Generate when the scene starts (else call generate() or connect a signal to it).
+---| "background" # boolean - Generate on a worker thread while the game runs; the level goes in when it is done (gen...
+---| "lastSeed" # integer (runtime) - The seed of the last level made (runtime, read-only).
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---
+---Example: `local value = self.node:get_property("generator")`
+---@param path LevelGeneratorNodeProperty|string
+---@return any
+---@overload fun(self: LevelGeneratorNode, path: "position"): Vec2
+---@overload fun(self: LevelGeneratorNode, path: "scale"): Vec2
+---@overload fun(self: LevelGeneratorNode, path: "rotation"): number
+---@overload fun(self: LevelGeneratorNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: LevelGeneratorNode, path: "zIndex"): integer
+---@overload fun(self: LevelGeneratorNode, path: "ySort"): boolean
+---@overload fun(self: LevelGeneratorNode, path: "ySortOffset"): number
+---@overload fun(self: LevelGeneratorNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: LevelGeneratorNode, path: "paused"): boolean
+---@overload fun(self: LevelGeneratorNode, path: "enabled"): boolean
+---@overload fun(self: LevelGeneratorNode, path: "generator"): string
+---@overload fun(self: LevelGeneratorNode, path: "tilemap"): string
+---@overload fun(self: LevelGeneratorNode, path: "seed"): integer
+---@overload fun(self: LevelGeneratorNode, path: "randomSeed"): boolean
+---@overload fun(self: LevelGeneratorNode, path: "generateOnReady"): boolean
+---@overload fun(self: LevelGeneratorNode, path: "background"): boolean
+---@overload fun(self: LevelGeneratorNode, path: "lastSeed"): integer
+function LevelGeneratorNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---
+---Example: `self.node:set_property("generator", "text")`
+---@param path LevelGeneratorNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: LevelGeneratorNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: LevelGeneratorNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: LevelGeneratorNode, path: "rotation", value: number)
+---@overload fun(self: LevelGeneratorNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: LevelGeneratorNode, path: "zIndex", value: integer)
+---@overload fun(self: LevelGeneratorNode, path: "ySort", value: boolean)
+---@overload fun(self: LevelGeneratorNode, path: "ySortOffset", value: number)
+---@overload fun(self: LevelGeneratorNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: LevelGeneratorNode, path: "paused", value: boolean)
+---@overload fun(self: LevelGeneratorNode, path: "enabled", value: boolean)
+---@overload fun(self: LevelGeneratorNode, path: "generator", value: string)
+---@overload fun(self: LevelGeneratorNode, path: "tilemap", value: string)
+---@overload fun(self: LevelGeneratorNode, path: "seed", value: integer)
+---@overload fun(self: LevelGeneratorNode, path: "randomSeed", value: boolean)
+---@overload fun(self: LevelGeneratorNode, path: "generateOnReady", value: boolean)
+---@overload fun(self: LevelGeneratorNode, path: "background", value: boolean)
+---@overload fun(self: LevelGeneratorNode, path: "lastSeed", value: integer)
+function LevelGeneratorNode:set_property(path, value, y) end
 
 ---@class TextureNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -7247,6 +7347,43 @@ function SpawnerNode:spawn_remove(index) end
 ---
 ---Example: `spawner:spawn_clear()`
 function SpawnerNode:spawn_clear() end
+
+---Makes a level into its TileMap (seed: this one, else the node's seed, a random one with randomSeed, or the generator's). Returns true, or false and why (also emitted as "generation_failed"). With background on it returns true once started; "generated" fires when the level is in.
+---
+---Example: `local ok, why = self.node:get_node("Generator"):generate(Save.get("seed", 7))`
+---@param seed? integer
+---@return boolean ok
+---@return string? why
+function LevelGeneratorNode:generate(seed) end
+
+---Whether a background generation is running.
+---
+---Example: `if not gen:is_generating() then loading:hide() end`
+---@return boolean
+function LevelGeneratorNode:is_generating() end
+
+---Sets a parameter of one of the generator's nodes for this node's levels (from the next generate): one generator file, many levels.
+---
+---Example: `gen:set_level_param(1, "density", 0.4 + level * 0.02); gen:generate()`
+---@param node_id integer The generator node's id
+---@param name string Its parameter
+---@param value number|boolean
+function LevelGeneratorNode:set_level_param(node_id, name, value) end
+
+---A parameter set on this node with set_level_param (nil: the generator's own applies).
+---
+---Example: `local density = gen:level_param(1, "density") or 0.45`
+---@param node_id integer
+---@param name string
+---@return number?
+function LevelGeneratorNode:level_param(node_id, name) end
+
+---Drops the parameters set on this node (all, a generator node's, or one).
+---
+---Example: `gen:clear_level_params()`
+---@param node_id? integer
+---@param name? string
+function LevelGeneratorNode:clear_level_params(node_id, name) end
 
 ---The path's length in pixels (along the curve).
 ---

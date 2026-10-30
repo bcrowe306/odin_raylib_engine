@@ -27,6 +27,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"CameraNode", CameraNode, factory_camera, {"camera"}},
 	{"TimerNode", TimerNode, factory_timer, {"timer"}},
 	{"SpawnerNode", SpawnerNode, factory_spawner, {"spawner", "spawn"}},
+	{"LevelGeneratorNode", LevelGeneratorNode, factory_level_generator, {"levelgenerator", "levelgen", "generator", "procedural"}},
 	{"ScriptNode", ScriptNode, factory_script, {"script"}},
 	{"TextureNode", TextureNode, factory_texture, {"texture", "sprite"}},
 	{"AtlasSpriteNode", AtlasSpriteNode, factory_atlas_sprite, {"atlassprite", "atlas", "subtexture", "spritesheet"}},
@@ -314,6 +315,11 @@ factory_visibility :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 @(private = "file")
 factory_spawner :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return SpawnerNode_Create(scene, "Spawner", parent)
+}
+
+@(private = "file")
+factory_level_generator :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return LevelGeneratorNode_Create(scene, "LevelGenerator", parent)
 }
 
 @(private = "file")

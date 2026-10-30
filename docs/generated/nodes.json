@@ -122,6 +122,23 @@
       ]
     },
     {
+      "type": "LevelGeneratorNode",
+      "name": "Level Generator",
+      "category": "Core & 2D",
+      "description": "Generates a level from a Level Generator file into a TileMap when the scene starts (or on generate() / a signal): a seed or a random one, the generator's parameters set per node, in the background for big levels.",
+      "aliases": ["levelgenerator", "levelgen", "generator", "procedural"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "generator", "kind": "string", "owner": "LevelGeneratorNode", "default": "", "doc": "The generator it makes levels from (a .levelgen.json)."},
+        {"name": "tilemap", "kind": "string", "owner": "LevelGeneratorNode", "default": "", "doc": "The TileMap it fills, as a path from this node; empty: its first TileMap child, else its parent."},
+        {"name": "seed", "kind": "integer", "owner": "LevelGeneratorNode", "default": 0, "min": 0, "max": 1073741824, "doc": "The level's seed: the same seed, the same level (0: the generator's own)."},
+        {"name": "randomSeed", "kind": "boolean", "owner": "LevelGeneratorNode", "default": false, "doc": "A new random seed every time it generates (Last Seed tells which)."},
+        {"name": "generateOnReady", "kind": "boolean", "owner": "LevelGeneratorNode", "default": true, "doc": "Generate when the scene starts (else call generate() or connect a signal to it)."},
+        {"name": "background", "kind": "boolean", "owner": "LevelGeneratorNode", "default": false, "doc": "Generate on a worker thread while the game runs; the level goes in when it is done (generated)."},
+        {"name": "lastSeed", "kind": "integer", "owner": "LevelGeneratorNode", "default": 0, "runtime": true, "doc": "The seed of the last level made (runtime, read-only)."}
+      ]
+    },
+    {
       "type": "ScriptNode",
       "name": "Lua Script Node",
       "category": "Core & 2D",

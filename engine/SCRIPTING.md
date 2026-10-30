@@ -1070,6 +1070,17 @@ Spawn, cooldown, chance, max alive, total limit, spread, speed, pooling;
 events `spawned`, `limit_reached`, `list_finished`; a signal can call its
 `spawn` with no script. Node reference: Spawner.
 
+#### Generated levels (LevelGeneratorNode)
+
+A **Level Generator** node makes a level from a `.levelgen.json` into its
+TileMap (a child, its parent or the **Tile Map** path) when the scene
+starts: `generate([seed])` for another, `set_level_param(node_id, name,
+value)` to change a generator node's parameter for this node's levels,
+`level_param`, `clear_level_params`, `is_generating` (with **Background**
+on). Events `generated` (the seed) and `generation_failed` (why); a signal
+can call its `generate` with no script. Guide:
+[`docs/level_generator.md`](docs/level_generator.md).
+
 #### Visibility (VisibilityNotifierNode)
 
 A child rectangle that knows whether the camera sees it: events
