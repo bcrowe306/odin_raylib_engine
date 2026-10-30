@@ -2701,6 +2701,13 @@ lua_input_is_key_released :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// ui_has_mouse: a UI widget has the mouse (Game_UIHasMouse).
+@(private="file")
+ui_has_mouse :: proc(L: ^lua.State) -> bool {
+	sm := get_script_manager(L)
+	return sm != nil && Game_UIHasMouse(sm.game)
+}
+
 @(private="file")
 lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
@@ -2710,7 +2717,7 @@ lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	isPressed := rl.IsWindowReady() && rl.IsMouseButtonPressed(btn)
+	isPressed := rl.IsWindowReady() && rl.IsMouseButtonPressed(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
 	lua.pushboolean(L, b32(isPressed))
 	return 1
 }
@@ -2724,7 +2731,7 @@ lua_input_is_mouse_button_down :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	isDown := rl.IsWindowReady() && rl.IsMouseButtonDown(btn)
+	isDown := rl.IsWindowReady() && rl.IsMouseButtonDown(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
 	lua.pushboolean(L, b32(isDown))
 	return 1
 }
@@ -2738,7 +2745,7 @@ lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	isRel := rl.IsWindowReady() && rl.IsMouseButtonReleased(btn)
+	isRel := rl.IsWindowReady() && rl.IsMouseButtonReleased(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
 	lua.pushboolean(L, b32(isRel))
 	return 1
 }

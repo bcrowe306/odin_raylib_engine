@@ -45,9 +45,9 @@ set the volume of a bus: Music, Effects, Voice.
 - The cap's centre line turns blue when the fader is at **Default Db**.
 - The value is kept between Min Db and Max Db. `value_changed` fires only
   when it changes.
-- **Screen space**: the mouse is read in screen coordinates. Keep the
-  fader under a Screen Layer (or where the camera doesn't move it) so clicks
-  line up with it.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 - The project's mixer has its own faders in the editor's Mixer tab; this
   node is for the player's side. See the
   [audio mixer guide](../../engine/docs/audio_mixer.md).

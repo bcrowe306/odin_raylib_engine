@@ -50,8 +50,9 @@ points, or `node:set_property("secondaryPoints", {...})`.
   crosshair lines and the X, Y value under the mouse (from the axis ranges).
 - **Auto Scale X / Auto Scale Y** are in the Inspector but don't do anything
   yet: the ranges stay as you set them.
-- **Screen space**: the mouse is read in screen coordinates, so keep the
-  plot under a Screen Layer for the crosshair to line up.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 
 ## Example
 

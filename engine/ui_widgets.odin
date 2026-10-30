@@ -52,7 +52,23 @@ UIElement_Init :: proc(elem: ^UIElement, widgetType: UIWidgetType, size: [2]f32)
 // UI_GetMousePos: the mouse in game units, in the unscaled space of the UI
 // node whose input is being handled (accessibility UI scale).
 UI_GetMousePos :: proc(gameContext: ^GameContext) -> [2]f32 {
-	return UI_UnscalePoint(uiInputNode, UI_GetMousePosRaw(gameContext))
+	raw := UI_GetMousePosRaw(gameContext)
+	if cam, ok := ui_world_camera(uiInputNode, gameContext); ok do return rl.GetScreenToWorld2D(raw, cam)
+	return UI_UnscalePoint(uiInputNode, raw)
+}
+
+// ui_world_camera: the camera a UI node is drawn through when it's in the
+// world - not under a Screen Layer, on a layer the current camera shows -
+// so it reads the mouse in world coordinates too (#228).
+@(private = "file")
+ui_world_camera :: proc(n: ^Node, gc: ^GameContext) -> (cam: rl.Camera2D, ok: bool) {
+	if n == nil || gc == nil || gc.game == nil || gc.scene == nil || gc.scene.manager == nil do return
+	c := gc.scene.camera
+	if c == nil || !c.enabled || !c.isCurrent || n.layer not_in c.targetLayers do return
+	for p := GetParent(gc.scene.manager, n); p != nil; p = GetParent(gc.scene.manager, p) {
+		if p.typeId == ScreenLayerNode do return
+	}
+	return CameraNode_GetCamera2D(c, gc.game.virtualSize[0], gc.game.virtualSize[1]), true
 }
 
 // UI_GetMousePosRaw: the mouse in game units (screen space).
@@ -244,14 +260,25 @@ UI_IsBlockedByActiveDropdown :: proc(gameContext: ^GameContext, self: rawptr, mo
 // ============================================================================
 
 UI_IsFocusable :: proc(elem: ^UIElement) -> bool {
-	if elem == nil || !elem.enabled do return false
+	if elem == nil || !elem.enabled || !elem.renderable do return false
 	#partial switch elem.widgetType {
 	case .Button, .Slider, .Checkbox, .ToggleSwitch, .Knob,
-	     .TextInput, .Dropdown, .RadioGroup, .ListView, .TreeView, .TabContainer:
+	     .TextInput, .Dropdown, .RadioGroup, .ListView, .TreeView, .TabContainer,
+	     .NotchedSlider, .VolumeFader, .UnorderedList, .OrderedList, .Table: // (#228: their keys work)
 		return true
 	case:
 		return false
 	}
+}
+
+// UI_TakesInput: a widget reacts to the mouse and keys only while it's shown
+// (set_visible(false) hid it but left it clickable, #228); hidden, it lets
+// go of hover and focus.
+UI_TakesInput :: proc(elem: ^UIElement) -> bool {
+	if elem.enabled && elem.renderable do return true
+	elem.hovered = false
+	elem.focused = false
+	return false
 }
 
 UI_CollectFocusableElementsRec :: proc(scene: ^Scene, node: ^Node, outList: ^[dynamic]^UIElement) {
@@ -328,8 +355,10 @@ UI_DoesWidgetConsumeDirection :: proc(elem: ^UIElement, dir: uilib.NavDirection)
 		} else {
 			return dir == .Up || dir == .Down
 		}
-	case .ListView:
+	case .ListView, .VolumeFader, .UnorderedList, .OrderedList, .Table:
 		return dir == .Up || dir == .Down
+	case .NotchedSlider:
+		return dir == .Left || dir == .Right
 	case .TreeView:
 		return true
 	case .Dropdown:
@@ -624,7 +653,7 @@ UIButtonNode_TriggerClick :: proc(btn: ^UIButtonNode, gameContext: ^GameContext)
 UIButtonNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	btn := cast(^UIButtonNode)node
 	btn.wasClicked = false
-	if !btn.enabled do return
+	if !UI_TakesInput(btn) do return
 
 	// Keyboard activation when focused
 	if btn.focused && !btn.justFocused && (UI_IsKeyPressedEnter(gameContext) || UI_IsKeyPressedSpace(gameContext)) {
@@ -821,7 +850,7 @@ UISliderNode_CommitTextEdit :: proc(s: ^UISliderNode, gameContext: ^GameContext 
 
 UISliderNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	s := cast(^UISliderNode)node
-	if !s.enabled do return
+	if !UI_TakesInput(s) do return
 
 	mp := UI_GetMousePos(gameContext)
 	if UI_IsBlockedByActiveDropdown(gameContext, s, mp) {
@@ -1009,7 +1038,7 @@ UICheckboxNode_SetChecked :: proc(cb: ^UICheckboxNode, val: bool, gameContext: ^
 
 UICheckboxNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	cb := cast(^UICheckboxNode)node
-	if !cb.enabled do return
+	if !UI_TakesInput(cb) do return
 
 	// Keyboard activation when focused
 	if cb.focused && !cb.justFocused && (UI_IsKeyPressedEnter(gameContext) || UI_IsKeyPressedSpace(gameContext)) {
@@ -1145,7 +1174,7 @@ UITextInputNode_Backspace :: proc(ti: ^UITextInputNode, gameContext: ^GameContex
 
 UITextInputNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	ti := cast(^UITextInputNode)node
-	if !ti.enabled do return
+	if !UI_TakesInput(ti) do return
 	text_input_sync(ti)
 
 	ti.blinkTimer += deltaTime
@@ -1297,9 +1326,11 @@ UIDropdownNode_GetPopupRect :: proc(dd: ^UIDropdownNode) -> rl.Rectangle {
 
 UIDropdownNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	dd := cast(^UIDropdownNode)node
-	if !dd.enabled do return
+	if !UI_TakesInput(dd) do return
 
-	if dd.focused && !dd.justFocused {
+	// (justOpenedFrame: the popup took this Enter to pick an item - it ran
+	// first - so it doesn't open again here, #228.)
+	if dd.focused && !dd.justFocused && !dd.justOpenedFrame {
 		if UI_IsKeyPressedEnter(gameContext) || UI_IsKeyPressedSpace(gameContext) {
 			dd.isOpen = !dd.isOpen
 			if gameContext != nil && gameContext.game != nil {
@@ -1339,7 +1370,8 @@ UI_UpdateActiveDropdownOverlay :: proc(gameContext: ^GameContext) {
 	if gameContext.game.activeDropdown == nil do return
 
 	dd := cast(^UIDropdownNode)gameContext.game.activeDropdown
-	if !dd.isOpen || !dd.enabled {
+	if !dd.isOpen || !dd.enabled || !dd.renderable {
+		dd.isOpen = false
 		gameContext.game.activeDropdown = nil
 		return
 	}
@@ -1399,7 +1431,7 @@ UI_RenderActiveDropdownOverlay :: proc(gameContext: ^GameContext) {
 	if gameContext.game.activeDropdown == nil do return
 
 	dd := cast(^UIDropdownNode)gameContext.game.activeDropdown
-	if !dd.isOpen || !dd.enabled do return
+	if !dd.isOpen || !dd.enabled || !dd.renderable do return
 
 	popupRect := UIDropdownNode_GetPopupRect(dd)
 	scaled := UI_BeginScaled(dd) // (with its UI-scale transform)
@@ -1484,7 +1516,7 @@ UIRadioGroupNode_GetOptionRect :: proc(rg: ^UIRadioGroupNode, index: int) -> rl.
 
 UIRadioGroupNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	rg := cast(^UIRadioGroupNode)node
-	if !rg.enabled do return
+	if !UI_TakesInput(rg) do return
 
 	// Keyboard arrow navigation when focused
 	if rg.focused && !rg.justFocused && len(rg.options) > 0 {
@@ -1637,7 +1669,7 @@ UIXYPlotNode_ClearPoints :: proc(plot: ^UIXYPlotNode) {
 
 UIXYPlotNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	plot := cast(^UIXYPlotNode)node
-	if !plot.enabled do return
+	if !UI_TakesInput(plot) do return
 
 	mp := UI_GetMousePos(gameContext)
 	if UI_IsBlockedByActiveDropdown(gameContext, plot, mp) {
@@ -1806,7 +1838,7 @@ UIToggleSwitchNode_Create :: proc(
 
 UIToggleSwitchNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	ts := cast(^UIToggleSwitchNode)node
-	if !ts.enabled do return
+	if !UI_TakesInput(ts) do return
 
 	// Keyboard activation when focused
 	if ts.focused && !ts.justFocused {
@@ -1897,7 +1929,7 @@ UIKnobNode_Create :: proc(
 
 UIKnobNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	knob := cast(^UIKnobNode)node
-	if !knob.enabled do return
+	if !UI_TakesInput(knob) do return
 
 	// Keyboard arrow navigation when focused
 	if knob.focused && !knob.justFocused && !knob.isDragging {
@@ -2004,7 +2036,7 @@ UIListViewNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 
 UIListViewNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	lv := cast(^UIListViewNode)node
-	if !lv.enabled do return
+	if !UI_TakesInput(lv) do return
 
 	// Keyboard arrow navigation when focused
 	if lv.focused && !lv.justFocused && len(lv.items) > 0 {
@@ -2087,7 +2119,7 @@ UITreeViewNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 
 UITreeViewNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	tv := cast(^UITreeViewNode)node
-	if !tv.enabled do return
+	if !UI_TakesInput(tv) do return
 
 	// Keyboard arrow navigation when focused
 	if tv.focused && len(tv.items) > 0 {
@@ -2233,7 +2265,7 @@ UIVolumeFaderNode_SetValue :: proc(fader: ^UIVolumeFaderNode, valDb: f32, gameCo
 
 UIVolumeFaderNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	fader := cast(^UIVolumeFaderNode)node
-	if !fader.enabled do return
+	if !UI_TakesInput(fader) do return
 
 	rect := UI_GetElementRect(&fader.ui)
 	mp := UI_GetMousePos(gameContext)
@@ -2480,7 +2512,7 @@ UINotchedSliderNode_SetValue :: proc(ns: ^UINotchedSliderNode, val: f32, gameCon
 
 UINotchedSliderNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	ns := cast(^UINotchedSliderNode)node
-	if !ns.enabled do return
+	if !UI_TakesInput(ns) do return
 
 	rect := UI_GetElementRect(&ns.ui)
 	mp := UI_GetMousePos(gameContext)
@@ -2626,7 +2658,7 @@ UIUnorderedListNode_AddItem :: proc(ul: ^UIUnorderedListNode, item: uilib.ListIt
 
 UIUnorderedListNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	ul := cast(^UIUnorderedListNode)node
-	if !ul.enabled do return
+	if !UI_TakesInput(ul) do return
 
 	rect := UI_GetElementRect(&ul.ui)
 	mp := UI_GetMousePos(gameContext)
@@ -2745,7 +2777,7 @@ UIOrderedListNode_AddItem :: proc(ol: ^UIOrderedListNode, item: uilib.ListItem) 
 
 UIOrderedListNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	ol := cast(^UIOrderedListNode)node
-	if !ol.enabled do return
+	if !UI_TakesInput(ol) do return
 
 	rect := UI_GetElementRect(&ol.ui)
 	mp := UI_GetMousePos(gameContext)
@@ -2876,7 +2908,7 @@ UITableNode_AddRow :: proc(tbl: ^UITableNode, row: uilib.TableRow) {
 
 UITableNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	tbl := cast(^UITableNode)node
-	if !tbl.enabled do return
+	if !UI_TakesInput(tbl) do return
 
 	rect := UI_GetElementRect(&tbl.ui)
 	mp := UI_GetMousePos(gameContext)
@@ -3044,7 +3076,7 @@ UIToolbarNode_AddItem :: proc(
 
 UIToolbarNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	tb := cast(^UIToolbarNode)node
-	if !tb.enabled do return
+	if !UI_TakesInput(tb) do return
 	rect := UI_GetElementRect(&tb.ui)
 	mp := UI_GetMousePos(gameContext)
 	inViewport := UI_IsMouseInViewport(gameContext)

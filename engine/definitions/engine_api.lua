@@ -9972,21 +9972,21 @@ function InputModule.is_key_down(key) end
 ---@return boolean
 function InputModule.is_key_released(key) end
 
----Queries mouse button pressed state for a single frame.
+---Queries mouse button pressed state for a single frame. False while a UI widget has the mouse (a click on a button isn't also a shot).
 ---
 ---Example: `if Input.is_mouse_button_pressed("LEFT") then self:shoot() end`
 ---@param button MouseButton|string
 ---@return boolean
 function InputModule.is_mouse_button_pressed(button) end
 
----Queries mouse button held state.
+---Queries mouse button held state. False while a UI widget has the mouse.
 ---
 ---Example: `if Input.is_mouse_button_down("RIGHT") then self.aiming = true end`
 ---@param button MouseButton|string
 ---@return boolean
 function InputModule.is_mouse_button_down(button) end
 
----Queries mouse button release state for a single frame.
+---Queries mouse button release state for a single frame. False while a UI widget has the mouse.
 ---
 ---Example: `if Input.is_mouse_button_released("LEFT") then self.dragging = false end`
 ---@param button MouseButton|string

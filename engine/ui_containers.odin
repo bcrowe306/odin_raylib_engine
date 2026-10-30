@@ -239,7 +239,7 @@ UITabContainerNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 
 UITabContainerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	tc := cast(^UITabContainerNode)node
-	if !tc.enabled do return
+	if !UI_TakesInput(tc) do return
 
 	rect := UI_GetElementRect(&tc.ui)
 	mousePos := UI_GetMousePos(gameContext)

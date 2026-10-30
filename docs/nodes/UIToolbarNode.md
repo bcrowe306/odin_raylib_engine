@@ -44,8 +44,9 @@ a spacer. A button's id is its line number (1, 2, ...). Scripts:
   it turns on it becomes the **Active Toggle Id**, when it turns off that
   goes back to -1. Disabled items ignore clicks.
 - It isn't reached with Tab or the arrow keys; it's mouse only.
-- **Screen space**: the mouse is read in screen coordinates. Keep the
-  toolbar under a Screen Layer so clicks line up with the buttons.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 
 ## Signals
 

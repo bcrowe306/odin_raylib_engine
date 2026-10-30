@@ -41,9 +41,9 @@ the start nest an item under the one above it (`Weapons`, then
   with Tab. While it has focus, Up / Down move the selection, Left
   collapses the row, Right expands it, and Enter or Space toggles a parent.
   The tree keeps all four arrow keys while focused; press Tab to move on.
-- **Screen space**: the mouse is read in screen coordinates. Keep the tree
-  under a Screen Layer (or where the camera doesn't move it) so clicks line
-  up with the rows.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 - The Tree View raises no signal when the selection changes; read
   `selectedId`.
 

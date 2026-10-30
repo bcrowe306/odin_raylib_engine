@@ -48,9 +48,9 @@ Scripts: `node:set_property("columns", {...})`, and
   **Sort Column**, or flips **Sort Ascending** if it already is, and moves
   the arrow (`^` ascending, `v` descending). The table doesn't reorder the
   rows itself.
-- **Screen space**: the mouse is read in screen coordinates. Keep the table
-  under a Screen Layer (or where the camera doesn't move it) so clicks line
-  up with the rows.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 
 ## Signals
 

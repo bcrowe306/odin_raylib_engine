@@ -42,9 +42,9 @@ the start nest an item a level deeper. Scripts:
 - **Scrolling**: rows that don't fit scroll in the box, which clips them.
 - **Selection**: the selected row is filled blue. A click on another row
   selects it and raises `selected`.
-- **Screen space**: the mouse is read in screen coordinates. Keep the list
-  under a Screen Layer (or where the camera doesn't move it) so clicks line
-  up with the rows.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 
 ## Signals
 
