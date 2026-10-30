@@ -46,9 +46,9 @@ View made in the editor always has the three default rows.
   next control.
 - The list doesn't scroll and doesn't clip its rows, so make it tall enough
   for all of them.
-- **Screen space**: the mouse is read in screen coordinates. Keep the list
-  under a Screen Layer (or where the camera doesn't move it) so clicks line
-  up with the rows.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 - The List View raises no signal when the selection changes (the Add Node
   description mentions `selected`, but this node doesn't have it). Read
   `selectedIndex` when you need it.

@@ -58,8 +58,9 @@ container has "Tab 1" and "Tab 2"). Scripts: `node:ui_set_items({"Video",
   Border** are ignored). **Show Header** on only adds **Header Height** of
   space above the children.
 - It raises no signal when the tab changes; read `activeTab`.
-- **Screen space**: the mouse is read in screen coordinates. Keep it under
-  a Screen Layer so clicks line up with the tabs.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 
 ## Example
 

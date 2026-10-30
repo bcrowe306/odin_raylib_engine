@@ -48,9 +48,9 @@ a few steps: difficulty, quality presets, text speed, a 1-5 rating.
 - The value is always kept between Min Value and Max Value.
 - `value_changed` fires only when the value really changes, so dragging
   within one notch raises nothing.
-- **Screen space**: the mouse is read in screen coordinates. Keep the
-  slider under a Screen Layer (or where the camera doesn't move it), or the
-  clicks won't line up with what you see.
+- **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
+  it stays on screen; outside one it's drawn in the world (the camera moves
+  it) and reads the mouse there too, so clicks line up either way.
 - **Notch Labels** (one a line, left to right) name the notches under the
   track; without them the slider shows its numbers. Scripts:
   `node:ui_set_items({"Off", "Low", "High"})`.

@@ -68,7 +68,8 @@ Game :: struct {
 	masterVolume:       f32,
 	viewportCanvasRect: rl.Rectangle,
 	activeDropdown:     rawptr,
-	uiMouseConsumed:    bool,
+	uiMouseConsumed:    bool, // a UI widget had the mouse this frame (hovered, pressed, dragged)
+	uiMouseConsumedLast: bool, // ...last frame: gameplay mouse input skips it (#228)
 
 	// Headless UI test input state (for unit tests in engine_test.odin)
 	uiTestInputEnabled:  bool,
@@ -158,12 +159,21 @@ GameQuit :: proc(game: ^Game) {
 	game.state = .Quitting
 }
 
+// Game_UIHasMouse: the mouse is over (or busy with) a UI widget - gameplay
+// mouse input (Input.is_mouse_button_*, mouse-bound actions) ignores it, so
+// a click on a button doesn't also shoot (#228).
+Game_UIHasMouse :: proc(game: ^Game) -> bool {
+	return game != nil && (game.uiMouseConsumedLast || game.uiMouseConsumed)
+}
+
 GameRun :: proc(game: ^Game, deltaTime: f32) {
 	if game == nil || game.shouldQuit || game.state == .Quitting {
 		return
 	}
 
+	game.uiMouseConsumedLast = game.uiMouseConsumed
 	game.uiMouseConsumed = false
+	game.input.mouseBlocked = game.uiMouseConsumedLast // (mouse-bound actions)
 	if game.scriptManager.hotReload do ResourceManager_CheckForChanges(&game.resourceManager) // edited images
 	if game.frozen {
 		// Paused from the editor: only draw.

@@ -48,10 +48,12 @@ the score, a minimap frame and the pause button go under one.
 - **Drawing order**: all Screen Layers draw after the world. Inside them
   the usual order applies: layer, Z index, then tree order. A new Screen
   Layer is on Layer8.
-- **Input**: UI nodes read the mouse in screen coordinates. Under a Screen
-  Layer, what you see is where you click. A UI node outside one is drawn
-  in the world (the camera moves it), but still reads the mouse in screen
-  coordinates.
+- **Input**: under a Screen Layer, what you see is where you click. A UI
+  node outside one is drawn in the world (the camera moves it) and reads
+  the mouse in the world too. While a widget has the mouse (hovered,
+  pressed, dragged), the game's mouse input (`Input.is_mouse_button_*`,
+  mouse-bound actions) skips it, so clicking a button doesn't also shoot.
+  A hidden widget (`set_visible(false)`) takes no clicks or keys.
 - **In the editor** the frame is the scene camera's view, so the layer
   moves with that camera in the viewport. The camera frame button in the
   toolbar shows it; with Expand, a screen-shape picker previews other
