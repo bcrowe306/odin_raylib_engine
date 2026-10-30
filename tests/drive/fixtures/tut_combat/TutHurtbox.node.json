@@ -1,0 +1,3 @@
+{"name": "TutHurtbox", "base": "AreaNode", "script": "scripts/tut_hurtbox_zz.lua", "icon": "heart", "category": "Combat",
+ "defaults": {"shapes": [{"type": "Box", "size": [32, 32], "isSensor": true, "enableSensorEvents": true}],
+              "script": {"properties": {"health": "resources/tut_health_zz.resource.json"}}}}

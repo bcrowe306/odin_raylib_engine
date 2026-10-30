@@ -436,6 +436,8 @@ Component files and scenes saved before uids keep loading unchanged:
 - Nodes inside an instance can change order but not parent.
 - There are no **variants** yet (a component that inherits another and
   changes a few values). *Save as New Component...* makes a separate copy.
+  For a single node, a [custom node type](custom_nodes.md) built on another
+  type does this: its values on top of its parent's, linked.
 - Instances can't be **edited in place** as the component (changing the
   file from the scene, with the other instances updating live); edit the
   component document, or Apply from an instance.

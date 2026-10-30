@@ -1,0 +1,2 @@
+{"name": "TutHitbox", "base": "AreaNode", "script": "scripts/tut_hitbox_zz.lua", "icon": "crosshairs", "category": "Combat",
+ "defaults": {"shapes": [{"type": "Box", "size": [24, 24], "isSensor": true, "enableSensorEvents": true}]}}

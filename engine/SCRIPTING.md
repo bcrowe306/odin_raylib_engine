@@ -240,6 +240,43 @@ local copy = sword:duplicate()                                -- its current sta
 
 Changes made at runtime are never written back to the file.
 
+## Script inheritance
+
+A script can build on another: `extends` names the base script. What it
+doesn't define comes from the base (methods, and properties - an entry
+without a `type` only changes the base's default); `Class.super` calls the
+base's version. Its own `ready` / `update` replace the base's. Saving the
+base updates the scripts built on it. The Inspector's **Extend** button (on
+a script) makes one for the selected node. The full guide is
+[docs/custom_nodes.md](docs/custom_nodes.md#script-inheritance).
+
+```lua
+---@class BossHurtbox : Hurtbox
+local BossHurtbox = {}
+BossHurtbox.extends = "scripts/hurtbox.lua"
+BossHurtbox.properties = { max_health = { default = 50 } }   -- another default
+function BossHurtbox:take_damage(amount, attack)
+    BossHurtbox.super.take_damage(self, amount * 0.5, attack)  -- the base's, halved
+end
+return BossHurtbox
+```
+
+## Custom node types
+
+Your own node types (a Hurtbox: an Area, its script, a box), made in the
+editor (Assets > Custom Nodes, Add Node > Create Custom Node, Save as Custom
+Node) and listed in Add Node. In scripts:
+
+```lua
+other:get_type()       -- "Hurtbox" (a custom type's name; else the built-in one)
+other:get_base_type()  -- "AreaNode"
+other:is("Hurtbox")    -- its custom type (and those it's built on), its built-in type, or "Node"
+local h = Scene.create("Hurtbox", self.node, 0, -8)          -- with its values and script
+for _, h in ipairs(Scene.find_nodes_of_type("Hurtbox")) do h:get_script():heal(1) end
+```
+
+The full guide: [docs/custom_nodes.md](docs/custom_nodes.md).
+
 ## Vectors
 
 `Vec2`, `Vec3` and `Vec4` are value types with operators:
@@ -580,7 +617,9 @@ local Enemy = {}
 #### Identity & Hierarchy
 | Method | Parameters | Return | Description |
 |---|---|---|---|
-| `get_type()` | - | `string` | Returns concrete type (e.g. `"TextureNode"`, `"CameraNode"`, `"DynamicBodyNode"`). |
+| `get_type()` | - | `string` | Returns concrete type (e.g. `"TextureNode"`, `"CameraNode"`, `"DynamicBodyNode"`); a custom node type's own name (`"Hurtbox"`). |
+| `get_base_type()` | - | `string` | The built-in type, also for a custom node type (`"AreaNode"`). |
+| `is(typeName)` | `typeName: string` | `boolean` | Its custom type (and the types it's built on), its built-in type, or `"Node"`. |
 | `get_name()` | - | `string` | Returns node display name. |
 | `set_name(name)` | `name: string` | - | Renames node. |
 | `is_enabled()` | - | `boolean` | Checks if node receives updates. |
@@ -1455,6 +1494,11 @@ sprite:set_position(0.0, 0.0)
 -- component file), or nil with a Console warning if the file is missing.
 local rock = Scene.instantiate("components/AsteroidLarge.component.json", self.node:get_parent(), self.node.position)
 rock:apply_impulse(Vec2(0, -200))
+
+-- A node of a built-in or custom node type (its values and script), under
+-- a parent, at a position; and a scene's nodes of a type.
+local hurtbox = Scene.create("Hurtbox", self.node, 0, -8)
+local all = Scene.find_nodes_of_type("Hurtbox")
 
 -- Remove a node (and its children) at the end of the frame.
 rock:queue_free()          -- same as rock:destroy()
