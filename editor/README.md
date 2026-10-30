@@ -764,6 +764,12 @@ A Sound Effect or Music node's **Audio** section in the Inspector has a
 **Preview** button: Play / Stop hears its sound through its bus at its
 volume and pitch (not positioned), without changing the node; it stops when
 you select something else.
+A Sound Effect holds a **list of sounds** (Add Sound, or drop audio from
+Assets; drag a row's number to reorder) and a **Play Mode** (Single, All,
+Sequential, Sequential Reversed, Random by weight, Shuffle), with random
+volume / pitch / pan / delay per play and a cooldown - see
+[`engine/docs/audio_mixer.md`](../engine/docs/audio_mixer.md); the Preview
+plays by them.
 
 ### Controls menus (player rebinding)
 

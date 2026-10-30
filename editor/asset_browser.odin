@@ -564,9 +564,7 @@ Editor_DropAsset :: proc(state: ^EditorState, rel: string, worldPos: [2]f32) {
 		node := Editor_CreateNode(state, "SoundNode", filepath.stem(rel))
 		state.cameraPos = saved
 		if node != nil {
-			sn := cast(^e.SoundNode)node
-			rm := &state.game.resourceManager
-			if s, ok := rm.loadAudioSound(rm, e.Project_ResolveAssetPath(&state.game.gameContext, rel)); ok do sn.audio = s
+			e.SoundNode_AddSound(cast(^e.SoundNode)node, &state.game.resourceManager, e.Project_ResolveAssetPath(&state.game.gameContext, rel))
 		}
 	case .Component:
 		state.selectedNode = nil

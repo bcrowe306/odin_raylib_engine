@@ -2020,8 +2020,15 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field playMode "Single"|"All"|"Sequential"|"Sequential_Reversed"|"Random"|"Shuffle" What a play starts from its sounds: Single (the chosen one), All (every sound at once),...
+---@field single integer Single mode: which sound plays (1 = the first in the list).
 ---@field volume number Volume (0-1), before the bus and master volumes.
 ---@field pitch number Playback speed / pitch (1 = normal).
+---@field volumeRandom number Each play's volume varies by up to this much either way (0.1 = +/-0.1 around Volume): r...
+---@field pitchRandom number Each play's pitch varies by up to this many semitones either way (1-2 makes footsteps a...
+---@field panRandom number Each play's pan moves by up to this much either way (-1 left .. 1 right).
+---@field delayRandom number Each play waits a random 0..this many seconds (layered sounds, crowds) - All mode delay...
+---@field cooldown number Plays within this many seconds of the last one are skipped (rapid fire won't stack doze...
 ---@field bus string The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output...
 ---@field caption string Shown on the subtitle track when it plays, for players with sound captions on (e.g. "[d...
 ---@field autoplay boolean Play once when the node becomes ready.
@@ -2041,8 +2048,15 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "playMode" # "Single"|"All"|"Sequential"|"Sequential_Reversed"|"Random"|"Shuffle" - What a play starts from its sounds: Single (the chosen one), All (every sound at once),...
+---| "single" # integer - Single mode: which sound plays (1 = the first in the list).
 ---| "volume" # number - Volume (0-1), before the bus and master volumes.
 ---| "pitch" # number - Playback speed / pitch (1 = normal).
+---| "volumeRandom" # number - Each play's volume varies by up to this much either way (0.1 = +/-0.1 around Volume): r...
+---| "pitchRandom" # number - Each play's pitch varies by up to this many semitones either way (1-2 makes footsteps a...
+---| "panRandom" # number - Each play's pan moves by up to this much either way (-1 left .. 1 right).
+---| "delayRandom" # number - Each play waits a random 0..this many seconds (layered sounds, crowds) - All mode delay...
+---| "cooldown" # number - Plays within this many seconds of the last one are skipped (rapid fire won't stack doze...
 ---| "bus" # string - The mixer bus it plays into (the Mixer tab; empty = SFX): its fader, effects and output...
 ---| "caption" # string - Shown on the subtitle track when it plays, for players with sound captions on (e.g. "[d...
 ---| "autoplay" # boolean - Play once when the node becomes ready.
@@ -2053,7 +2067,7 @@ function ParticleEmitterNode:set_property(path, value, y) end
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
----Example: `local value = self.node:get_property("volume")`
+---Example: `local value = self.node:get_property("playMode")`
 ---@param path SoundNodeProperty|string
 ---@return any
 ---@overload fun(self: SoundNode, path: "position"): Vec2
@@ -2066,8 +2080,15 @@ function ParticleEmitterNode:set_property(path, value, y) end
 ---@overload fun(self: SoundNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
 ---@overload fun(self: SoundNode, path: "paused"): boolean
 ---@overload fun(self: SoundNode, path: "enabled"): boolean
+---@overload fun(self: SoundNode, path: "playMode"): "Single"|"All"|"Sequential"|"Sequential_Reversed"|"Random"|"Shuffle"
+---@overload fun(self: SoundNode, path: "single"): integer
 ---@overload fun(self: SoundNode, path: "volume"): number
 ---@overload fun(self: SoundNode, path: "pitch"): number
+---@overload fun(self: SoundNode, path: "volumeRandom"): number
+---@overload fun(self: SoundNode, path: "pitchRandom"): number
+---@overload fun(self: SoundNode, path: "panRandom"): number
+---@overload fun(self: SoundNode, path: "delayRandom"): number
+---@overload fun(self: SoundNode, path: "cooldown"): number
 ---@overload fun(self: SoundNode, path: "bus"): string
 ---@overload fun(self: SoundNode, path: "caption"): string
 ---@overload fun(self: SoundNode, path: "autoplay"): boolean
@@ -2079,7 +2100,7 @@ function SoundNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
----Example: `self.node:set_property("volume", 1.5)`
+---Example: `self.node:set_property("playMode", "All")`
 ---@param path SoundNodeProperty|string
 ---@param value any
 ---@param y? number
@@ -2093,8 +2114,15 @@ function SoundNode:get_property(path) end
 ---@overload fun(self: SoundNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
 ---@overload fun(self: SoundNode, path: "paused", value: boolean)
 ---@overload fun(self: SoundNode, path: "enabled", value: boolean)
+---@overload fun(self: SoundNode, path: "playMode", value: "Single"|"All"|"Sequential"|"Sequential_Reversed"|"Random"|"Shuffle")
+---@overload fun(self: SoundNode, path: "single", value: integer)
 ---@overload fun(self: SoundNode, path: "volume", value: number)
 ---@overload fun(self: SoundNode, path: "pitch", value: number)
+---@overload fun(self: SoundNode, path: "volumeRandom", value: number)
+---@overload fun(self: SoundNode, path: "pitchRandom", value: number)
+---@overload fun(self: SoundNode, path: "panRandom", value: number)
+---@overload fun(self: SoundNode, path: "delayRandom", value: number)
+---@overload fun(self: SoundNode, path: "cooldown", value: number)
 ---@overload fun(self: SoundNode, path: "bus", value: string)
 ---@overload fun(self: SoundNode, path: "caption", value: string)
 ---@overload fun(self: SoundNode, path: "autoplay", value: boolean)
@@ -8516,6 +8544,24 @@ function SoundNode:sound_pause() end
 ---
 ---Example: `self.node:get_node("EngineSound"):sound_resume()`
 function SoundNode:sound_resume() end
+
+---Plays one sound of its list (1 = the first), whatever the play mode; variation and delay apply.
+---
+---Example: `self.node:get_node("Footsteps"):sound_play_index(2)`
+---@param index integer
+function SoundNode:sound_play_index(index) end
+
+---How many sounds it has.
+---
+---Example: `local n = self.node:get_node("Footsteps"):sound_count()`
+---@return integer
+function SoundNode:sound_count() end
+
+---The sound it played last (1 = the first; 0 = none yet).
+---
+---Example: `local i = self.node:get_node("Footsteps"):sound_last()`
+---@return integer
+function SoundNode:sound_last() end
 
 ---Plays or resumes the background music on this MusicNode.
 ---

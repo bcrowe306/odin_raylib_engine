@@ -121,10 +121,7 @@ set_audio :: proc(state: ^EditorState, n: ^e.Node, rel: string) {
 	resolved := e.Project_ResolveAssetPath(&state.game.gameContext, rel)
 	Editor_RecordUndo(state, "Set audio")
 	if n.typeId == e.SoundNode {
-		sn := cast(^e.SoundNode)n
-		if sn.audio != nil do e.ResourceManager_ReleaseSound(rm, sn.audio)
-		sn.audio = nil
-		if s, ok := rm.loadAudioSound(rm, resolved); ok do sn.audio = s
+		e.SoundNode_SetSound(cast(^e.SoundNode)n, rm, resolved) // (its list becomes this sound)
 	} else if n.typeId == e.MusicNode {
 		mn := cast(^e.MusicNode)n
 		if mn.music != nil do e.ResourceManager_ReleaseMusic(rm, mn.music)

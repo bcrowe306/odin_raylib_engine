@@ -627,9 +627,8 @@ AnimationPlayerNode_FireEvents :: proc(apn: ^AnimationPlayerNode, from, to: f32,
 					if cfg.sfxNode != "" {
 						targetNode := resolve_path(apn, cfg.sfxNode)
 						if targetNode != nil && targetNode.typeId == SoundNode {
-							sn := cast(^SoundNode)targetNode
-							sn.audio = s
-							SoundNode_Play(sn)
+							// (the key's sound through that node: its bus, variation)
+							SoundNode_PlayAudio(cast(^SoundNode)targetNode, s)
 							continue
 						}
 					}

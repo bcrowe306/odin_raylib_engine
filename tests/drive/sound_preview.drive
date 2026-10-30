@@ -8,7 +8,7 @@ type sound effect
 key enter
 wait 2
 expect item:insp.audio-preview == visible
-click @insp.audio
+click @insp.sound-add
 click @pick:audio/cannon-gunshot-1.wav
 wait 2
 click @insp.audio-preview

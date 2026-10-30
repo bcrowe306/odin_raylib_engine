@@ -241,8 +241,23 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		strings.write_byte(&w.sb, ']')
 	case SoundNode:
 		sn := cast(^SoundNode)node
-		if sn.audio != nil && sn.audio.filePath != "" {
-			Json_Key(w, "audio", &first); Json_String(w, asset_rel(node, sn.audio.filePath))
+		// One sound at weight 1: "audio" as before; else "sounds" (#204).
+		if len(sn.sounds) == 1 && sn.sounds[0].weight == 1 {
+			Json_Key(w, "audio", &first); Json_String(w, asset_rel(node, sn.sounds[0].path))
+		} else if len(sn.sounds) > 0 {
+			Json_Key(w, "sounds", &first)
+			strings.write_byte(&w.sb, '[')
+			for s, i in sn.sounds {
+				if i > 0 do strings.write_string(&w.sb, ", ")
+				if s.weight == 1 {
+					Json_String(w, asset_rel(node, s.path))
+				} else {
+					strings.write_string(&w.sb, "{\"path\": ")
+					Json_String(w, asset_rel(node, s.path))
+					fmt.sbprintf(&w.sb, ", \"weight\": %v}}", s.weight)
+				}
+			}
+			strings.write_byte(&w.sb, ']')
 		}
 	case MusicNode:
 		mn := cast(^MusicNode)node
@@ -1036,9 +1051,18 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 		FrameAnimationNode_Start(fan)
 	case SoundNode:
 		sn := cast(^SoundNode)node
-		if path := sj_string(obj, "audio", ""); path != "" {
-			if rm := resource_manager(ctx); rm != nil && rl.IsAudioDeviceReady() {
-				if snd, ok := rm.loadAudioSound(rm, Project_ResolveAssetPath(ctx, path)); ok do sn.audio = snd
+		// "audio": one sound (older scenes too); "sounds": paths, or
+		// {path, weight} (#204). Paths stay when audio isn't up.
+		rm := resource_manager(ctx)
+		if path := sj_string(obj, "audio", ""); path != "" do SoundNode_AddSound(sn, rm, Project_ResolveAssetPath(ctx, path))
+		if arr, ok := obj["sounds"].(json.Array); ok {
+			for item in arr {
+				#partial switch v in item {
+				case json.String:
+					SoundNode_AddSound(sn, rm, Project_ResolveAssetPath(ctx, v))
+				case json.Object:
+					if p := sj_string(v, "path", ""); p != "" do SoundNode_AddSound(sn, rm, Project_ResolveAssetPath(ctx, p), sj_float(v, "weight", 1))
+				}
 			}
 		}
 	case MusicNode:

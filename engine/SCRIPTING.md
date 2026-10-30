@@ -1316,6 +1316,8 @@ end
 |---|---|---|---|
 | `sound_play()` / `sound_stop()` | - | - | Plays / stops sound effect. |
 | `sound_pause()` / `sound_resume()` | - | - | Pauses / resumes sound effect. |
+| `sound_play_index(i)` | `i` integer (1 = the first) | - | Plays one sound of its list, whatever the Play Mode (variation and delay apply). |
+| `sound_count()` / `sound_last()` | - | integer | How many sounds it has / the one played last (0: none yet). |
 | `music_play()` / `music_stop()` | - | - | Plays / stops music stream. |
 | `music_pause()` / `music_resume()` | - | - | Pauses / resumes music stream. |
 
