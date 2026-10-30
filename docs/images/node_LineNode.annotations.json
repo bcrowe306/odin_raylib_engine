@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The line through its points (local to the node)", "x": 522, "y": 358, "w": 56, "h": 56},
+    {"label": "Add Point; edit each point's x, y above", "x": 1056, "y": 947, "w": 87, "h": 25}
+  ]
+}

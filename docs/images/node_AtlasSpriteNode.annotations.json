@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Only the region is drawn: one frame of the strip", "x": 596, "y": 248, "w": 56, "h": 56},
+    {"label": "Edit Region: pick the rectangle on the image", "x": 1056, "y": 459, "w": 201, "h": 25}
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The light (its radius ring shows while selected)", "x": 596, "y": 248, "w": 56, "h": 56},
+    {"label": "Kind, colour, energy, radius, falloff, spread, shadows", "x": 1044, "y": 399, "w": 236, "h": 293}
+  ]
+}
