@@ -53,6 +53,9 @@ Gen_Kind :: enum {
 	Combine,
 	Scatter, // spaced random points (on the input's solid cells, if connected)
 	Surface, // empty cells next to solid ones (ground to stand on)
+	// Your own
+	Script, // a Lua function (a .lua file) computes the grid
+	Custom, // a kind registered from Odin (Gen_RegisterNode; `custom` names it)
 	// Output
 	Tile_Output,
 	Entity_Output, // a component on every point (cells >= 0.5)
@@ -148,6 +151,14 @@ GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 	.Surface = {"surface", "Surface", {"in"}, {
 		{name = "side", default_ = 0, choices = GEN_SURFACE_SIDES, doc = "top: empty cells with solid below (ground to stand on), bottom: with solid above (ceilings), any: next to solid"},
 	}, "Empty cells against the input's solid ones: where things stand, hang or cling."},
+	.Script = {"script", "Lua Script", {"a", "b"}, {
+		{name = "p1", default_ = 0, doc = "A number for the script (ctx.params.p1)"},
+		{name = "p2", default_ = 0, doc = "A number for the script (ctx.params.p2)"},
+		{name = "p3", default_ = 0, doc = "A number for the script (ctx.params.p3)"},
+		{name = "p4", default_ = 0, doc = "A number for the script (ctx.params.p4)"},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
+	}, "Your own node: a .lua file returning function(ctx) - ctx.a and ctx.b are its inputs, ctx.out the grid to fill (flat, row-major, from 1), ctx.random(x, y) a number for a cell."},
+	.Custom = {"custom", "Custom", {}, {}, "A node registered from Odin (Gen_RegisterNode)."},
 	.Entity_Output = {"entity_output", "Entity Output", {"in"}, {
 		{name = "max", default_ = 0, doc = "At most this many (0 = every point)", integer = true},
 	}, "Puts its component (a .component.json) on every point of its input (cells >= 0.5): enemies, pickups, the player's start."},
@@ -166,6 +177,8 @@ Gen_Node :: struct {
 	params: [8]f64, // in the kind's parameter order
 	rules:  [dynamic]Gen_Tile_Rule, // Tile_Output
 	component: string, // Entity_Output: what it places (the graph's allocator)
+	script: string, // Script: its .lua file (the graph's allocator)
+	custom: string, // Custom: the registered kind's name (the graph's allocator)
 	pos:    [2]f32, // where the editor draws it
 }
 
@@ -174,6 +187,7 @@ Gen_Graph :: struct {
 	seed:      u64,
 	output:    int, // the node whose grid is the result (0 = the last Tile_Output, else the last node)
 	nodes:     [dynamic]Gen_Node,
+	scripts:   map[string]string, // Script nodes' sources by file (Gen_LoadScripts; the graph's allocator)
 	allocator: runtime.Allocator,
 }
 
@@ -188,25 +202,35 @@ Gen_GridAt :: #force_inline proc(g: Gen_Grid, x, y: int) -> f32 {return g.v[y * 
 // --- the graph ------------------------------------------------------------------------
 
 Gen_Kind_FromName :: proc(name: string) -> (Gen_Kind, bool) {
-	for info, k in GEN_KINDS do if info.name == name do return k, true
+	for info, k in GEN_KINDS do if k != .Custom && info.name == name do return k, true
 	return .Constant, false
 }
 
-// Gen_NodeDefaults: a node of a kind with its default parameters.
-Gen_NodeDefaults :: proc(kind: Gen_Kind, id: int) -> Gen_Node {
-	n := Gen_Node{id = id, kind = kind}
-	for p, i in GEN_KINDS[kind].params do n.params[i] = p.default_
+// Gen_NodeDefaults: a node of a kind with its default parameters (a
+// Custom one: of the registered kind `custom`; the name isn't copied).
+Gen_NodeDefaults :: proc(kind: Gen_Kind, id: int, custom := "") -> Gen_Node {
+	n := Gen_Node{id = id, kind = kind, custom = custom}
+	for p, i in Gen_NodeInfo(&n).params do n.params[i] = p.default_
+	n.custom = ""
 	return n
+}
+
+// Gen_NodeInfo: what a node's kind is - its name, inputs, parameters (a
+// Custom node's from its registration).
+Gen_NodeInfo :: proc(n: ^Gen_Node) -> Gen_Kind_Info {
+	if n.kind != .Custom do return GEN_KINDS[n.kind]
+	if def := Gen_FindCustomKind(n.custom); def != nil do return def.info
+	return {name = n.custom, label = n.custom, doc = "Not registered (Gen_RegisterNode)."}
 }
 
 // Gen_Param reads a node's parameter by name (its default when unknown).
 Gen_Param :: proc(n: ^Gen_Node, name: string) -> f64 {
-	for p, i in GEN_KINDS[n.kind].params do if p.name == name do return n.params[i]
+	for p, i in Gen_NodeInfo(n).params do if p.name == name do return n.params[i]
 	return 0
 }
 
 Gen_SetParam :: proc(n: ^Gen_Node, name: string, value: f64) -> bool {
-	for p, i in GEN_KINDS[n.kind].params do if p.name == name {
+	for p, i in Gen_NodeInfo(n).params do if p.name == name {
 		n.params[i] = value
 		return true
 	}
@@ -219,19 +243,34 @@ Gen_FindNode :: proc(g: ^Gen_Graph, id: int) -> ^Gen_Node {
 }
 
 Gen_GraphDestroy :: proc(g: ^Gen_Graph) {
-	for &n in g.nodes {
-		Gen_NodeClearRules(&n)
-		Gen_SetComponent(g, &n, "")
-	}
+	for &n in g.nodes do gen_node_free(g, &n)
 	delete(g.nodes)
 	g.nodes = nil
+	gen_scripts_clear(g)
+	delete(g.scripts)
+	g.scripts = nil
+}
+
+@(private = "file")
+gen_node_free :: proc(g: ^Gen_Graph, n: ^Gen_Node) {
+	Gen_NodeClearRules(n)
+	gen_set_text(g, &n.component, "")
+	gen_set_text(g, &n.script, "")
+	gen_set_text(g, &n.custom, "")
+}
+
+// (a node's text, owned by the graph)
+@(private = "file")
+gen_set_text :: proc(g: ^Gen_Graph, field: ^string, text: string) {
+	if field^ != "" do delete(field^, g.allocator)
+	field^ = strings.clone(text, g.allocator) if text != "" else ""
 }
 
 // Gen_SetComponent: an entity output's component (the graph owns the text).
-Gen_SetComponent :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {
-	if n.component != "" do delete(n.component, g.allocator)
-	n.component = strings.clone(path, g.allocator) if path != "" else ""
-}
+Gen_SetComponent :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {gen_set_text(g, &n.component, path)}
+
+// Gen_SetScript: a script node's .lua file (load it with Gen_LoadScripts).
+Gen_SetScript :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {gen_set_text(g, &n.script, path)}
 
 Gen_NodeClearRules :: proc(n: ^Gen_Node) {
 	for r in n.rules do delete(r.tiles)
@@ -262,18 +301,21 @@ Gen_GraphParse :: proc(data: []u8, allocator := context.allocator) -> (g: Gen_Gr
 		if !isObj do continue
 		typeName, _ := obj["type"].(json.String)
 		kind, known := Gen_Kind_FromName(string(typeName))
+		if !known && Gen_FindCustomKind(string(typeName)) != nil do kind, known = .Custom, true
 		if !known do return g, fmt.tprintf("unknown node type %q", string(typeName))
 		idf, _ := json_number(obj["id"])
-		n := Gen_NodeDefaults(kind, int(idf))
+		n := Gen_NodeDefaults(kind, int(idf), string(typeName))
 		if n.id <= 0 do return g, fmt.tprintf("a %s node has no id", string(typeName))
 		if Gen_FindNode(&g, n.id) != nil do return g, fmt.tprintf("two nodes have the id %d", n.id)
+		if kind == .Custom do n.custom = strings.clone(string(typeName), allocator)
+		info := Gen_NodeInfo(&n)
 		if ins, iok := obj["inputs"].(json.Object); iok {
-			for port, i in GEN_KINDS[kind].inputs {
+			for port, i in info.inputs {
 				if src, sok := json_number(ins[port]); sok do n.inputs[i] = int(src)
 			}
 		}
 		if ps, pok := obj["params"].(json.Object); pok {
-			for p, i in GEN_KINDS[kind].params {
+			for p, i in info.params {
 				pv, has := ps[p.name]
 				if !has do continue
 				if num, isNum := json_number(pv); isNum {
@@ -290,6 +332,7 @@ Gen_GraphParse :: proc(data: []u8, allocator := context.allocator) -> (g: Gen_Gr
 			n.pos.y, _ = json_number(pos[1])
 		}
 		if comp, cok := obj["component"].(json.String); cok do n.component = strings.clone(string(comp), allocator)
+		if file, sok := obj["script"].(json.String); sok && kind == .Script do n.script = strings.clone(string(file), allocator)
 		if rules, rok := obj["rules"].(json.Array); rok {
 			n.rules = make([dynamic]Gen_Tile_Rule, allocator)
 			for rv in rules {
@@ -319,8 +362,8 @@ Gen_GraphSerialize :: proc(g: ^Gen_Graph, allocator := context.allocator) -> str
 		strings.write_string(&w.sb, "," if i > 0 else "")
 		strings.write_string(&w.sb, "\n  {\"id\": ")
 		fmt.sbprintf(&w.sb, "%d, \"type\": ", n.id)
-		Json_String(&w, GEN_KINDS[n.kind].name)
-		info := GEN_KINDS[n.kind]
+		info := Gen_NodeInfo(&n)
+		Json_String(&w, info.name)
 		if len(info.inputs) > 0 {
 			strings.write_string(&w.sb, ", \"inputs\": {")
 			k := 0
@@ -362,6 +405,10 @@ Gen_GraphSerialize :: proc(g: ^Gen_Graph, allocator := context.allocator) -> str
 			strings.write_string(&w.sb, ", \"component\": ")
 			Json_String(&w, n.component)
 		}
+		if n.kind == .Script {
+			strings.write_string(&w.sb, ", \"script\": ")
+			Json_String(&w, n.script)
+		}
 		if n.pos != {} {
 			strings.write_string(&w.sb, ", \"pos\": ")
 			Json_Vec2(&w, n.pos)
@@ -385,12 +432,14 @@ GEN_TEMPLATE_CAVE :: `{"size": [48, 32], "seed": 1, "nodes": [
 `
 
 // Gen_AddNode adds a node of a kind (default parameters; a tile output gets
-// one rule for solid cells) with a new id.
-Gen_AddNode :: proc(g: ^Gen_Graph, kind: Gen_Kind, pos: [2]f32) -> ^Gen_Node {
+// one rule for solid cells) with a new id. A Custom one: the registered
+// kind `custom`.
+Gen_AddNode :: proc(g: ^Gen_Graph, kind: Gen_Kind, pos: [2]f32, custom := "") -> ^Gen_Node {
 	id := 1
 	for n in g.nodes do id = max(id, n.id + 1)
-	n := Gen_NodeDefaults(kind, id)
+	n := Gen_NodeDefaults(kind, id, custom)
 	n.pos = pos
+	if kind == .Custom do gen_set_text(g, &n.custom, custom)
 	if kind == .Tile_Output {
 		n.rules = make([dynamic]Gen_Tile_Rule, g.allocator)
 		r := Gen_Tile_Rule{min = 0.5, max = 1, tiles = make([dynamic]i32, g.allocator)}
@@ -412,8 +461,10 @@ Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^
 	n^ = copied
 	n.id, n.pos, n.inputs = newId, copied.pos + offset, {}
 	n.rules = nil
-	n.component = ""
+	n.component, n.script, n.custom = "", "", ""
 	Gen_SetComponent(g, n, copied.component)
+	Gen_SetScript(g, n, copied.script)
+	gen_set_text(g, &n.custom, copied.custom)
 	if len(copied.rules) > 0 {
 		n.rules = make([dynamic]Gen_Tile_Rule, g.allocator)
 		for r in copied.rules {
@@ -429,8 +480,7 @@ Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^
 Gen_RemoveNode :: proc(g: ^Gen_Graph, id: int) -> bool {
 	for &n, i in g.nodes {
 		if n.id != id do continue
-		Gen_NodeClearRules(&n)
-		Gen_SetComponent(g, &n, "")
+		gen_node_free(g, &n)
 		ordered_remove(&g.nodes, i)
 		for &o in g.nodes do for &src in o.inputs do if src == id do src = 0
 		if g.output == id do g.output = 0
@@ -452,7 +502,7 @@ Gen_Reads :: proc(g: ^Gen_Graph, id, src: int, depth := 0) -> bool {
 // refused when it would make a cycle or the port doesn't exist.
 Gen_Connect :: proc(g: ^Gen_Graph, dst: int, port: int, src: int) -> bool {
 	n := Gen_FindNode(g, dst)
-	if n == nil || port < 0 || port >= len(GEN_KINDS[n.kind].inputs) do return false
+	if n == nil || port < 0 || port >= len(Gen_NodeInfo(n).inputs) do return false
 	if src != 0 && (Gen_FindNode(g, src) == nil || Gen_Reads(g, src, dst)) do return false
 	n.inputs[port] = src
 	return true
@@ -474,6 +524,8 @@ Gen_Eval :: struct {
 	done:   map[int]Gen_Grid,
 	active: map[int]bool, // being evaluated (a cycle if met again)
 	err:    string,
+	L:      ^lua.State,   // Script nodes' (made by the first one, closed at the end)
+	fns:    map[string]c.int, // script file -> its function (a registry ref in L)
 }
 
 // Gen_Evaluate computes a node's grid (id 0: the output node) for a seed
@@ -484,6 +536,8 @@ Gen_Evaluate :: proc(g: ^Gen_Graph, id := 0, seed: u64 = 0, allocator := context
 	ev := Gen_Eval{g = g, seed = seed if seed != 0 else g.seed}
 	ev.done = make(map[int]Gen_Grid, allocator = context.temp_allocator)
 	ev.active = make(map[int]bool, allocator = context.temp_allocator)
+	ev.fns = make(map[string]c.int, allocator = context.temp_allocator)
+	defer if ev.L != nil do lua.close(ev.L)
 	tmp, ok := gen_eval(&ev, target.id)
 	if !ok do return {}, ev.err
 	grid = {tmp.w, tmp.h, make([]f32, len(tmp.v), allocator)}
@@ -649,6 +703,20 @@ gen_eval :: proc(ev: ^Gen_Eval, id: int) -> (result: Gen_Grid, ok: bool) {
 			case: out.v[i] = x + y
 			}
 		}
+	case .Script:
+		gen_script(ev, n, nodeSeed, out) or_return
+	case .Custom:
+		def := Gen_FindCustomKind(n.custom)
+		if def == nil {
+			ev.err = fmt.tprintf("node %d: no node type %q is registered", n.id, n.custom)
+			return {}, false
+		}
+		call := Gen_Custom_Call{node = n, out = out, seed = nodeSeed}
+		for i in 0 ..< len(def.info.inputs) do call.inputs[i] = gen_input(ev, n, i) or_return
+		if e := def.eval(&call); e != "" {
+			ev.err = fmt.tprintf("node %d (%s): %s", n.id, n.custom, e)
+			return {}, false
+		}
 	case .Tile_Output, .Entity_Output:
 		src := gen_input(ev, n, 0) or_return
 		copy(out.v, src.v) // (the tiles / entities come from Gen_Tiles / Gen_Entities: its grid is its input's)
@@ -767,6 +835,7 @@ Gen_LoadFile :: proc(ctx: ^GameContext, path: string, allocator := context.alloc
 		Gen_GraphDestroy(&g)
 		return {}, fmt.tprintf("%s: %s", path, err)
 	}
+	Gen_LoadScripts(&g, ctx)
 	return g, ""
 }
 
@@ -895,6 +964,250 @@ Gen_ApplyIntGrid :: proc(g: ^Gen_Graph, doc: ^Ldtk_Doc, li, layer: int, seed: u6
 	Ldtk_Doc_EndCells(doc)
 	Ldtk_Doc_ApplyRules(doc, li, layer, 0, 0, ly.cWid, ly.cHei)
 	return ""
+}
+
+// --- your own nodes: Odin --------------------------------------------------------------
+
+// A call of a registered node's proc: its input grids (zeros when not
+// connected), the grid to fill (zeros) and its own seed (the graph's, its
+// id and its "seed" parameter mixed; Gen_Random01 makes numbers of it).
+Gen_Custom_Call :: struct {
+	node:   ^Gen_Node, // (Gen_Param(call.node, "name") reads a parameter)
+	inputs: [2]Gen_Grid,
+	out:    Gen_Grid,
+	seed:   u64,
+}
+
+// The proc of a registered node: fills call.out; an error stops the graph.
+Gen_Custom_Proc :: #type proc(call: ^Gen_Custom_Call) -> (err: string)
+
+Gen_Custom_Kind :: struct {
+	info: Gen_Kind_Info,
+	eval: Gen_Custom_Proc,
+}
+
+@(private = "file")
+gen_custom_kinds: [dynamic]Gen_Custom_Kind
+
+// Gen_RegisterNode adds a node type of your own, from Odin (a game's or an
+// editor plugin's startup): `info` names it ("type" in the file; not a
+// built-in's), its inputs (at most 2) and parameters (at most 8). Its
+// strings and slices must stay valid (constants). Registering a name again
+// replaces it. Returns why it was refused ("" = done).
+Gen_RegisterNode :: proc(info: Gen_Kind_Info, eval: Gen_Custom_Proc) -> string {
+	if info.name == "" || eval == nil do return "a node type needs a name and a proc"
+	if _, builtin := Gen_Kind_FromName(info.name); builtin || info.name == "custom" do return fmt.tprintf("%q is a built-in node type", info.name)
+	if len(info.inputs) > 2 do return "at most 2 inputs"
+	if len(info.params) > 8 do return "at most 8 parameters"
+	if def := Gen_FindCustomKind(info.name); def != nil {
+		def^ = {info, eval}
+		return ""
+	}
+	if gen_custom_kinds == nil do gen_custom_kinds = make([dynamic]Gen_Custom_Kind, Engine_HeapAllocator())
+	append(&gen_custom_kinds, Gen_Custom_Kind{info, eval})
+	return ""
+}
+
+Gen_UnregisterNode :: proc(name: string) -> bool {
+	for def, i in gen_custom_kinds do if def.info.name == name {
+		ordered_remove(&gen_custom_kinds, i)
+		return true
+	}
+	return false
+}
+
+Gen_FindCustomKind :: proc(name: string) -> ^Gen_Custom_Kind {
+	if name == "" do return nil
+	for &def in gen_custom_kinds do if def.info.name == name do return &def
+	return nil
+}
+
+// Gen_CustomKinds: the registered node types (the editor's Add menu).
+Gen_CustomKinds :: proc() -> []Gen_Custom_Kind {return gen_custom_kinds[:]}
+
+// Gen_Random01: a cell's random number in [0, 1) for a seed - the same
+// one every time (for a registered node: call.seed).
+Gen_Random01 :: proc(x, y: int, seed: u64) -> f32 {return gen_hash01(x, y, seed)}
+
+// --- your own nodes: Lua ---------------------------------------------------------------
+//
+// A Script node runs a .lua file that returns a function of ctx:
+//
+//   return function(ctx)
+//       for y = 0, ctx.height - 1 do
+//           for x = 0, ctx.width - 1 do
+//               local i = y * ctx.width + x + 1
+//               ctx.out[i] = ctx.a[i] > 0.5 and ctx.random(x, y) or 0
+//           end
+//       end
+//   end
+//
+// ctx: width, height, seed (the node's), params {p1..p4}, a and b (the
+// inputs: flat row-major arrays from 1, zeros when not connected), out (the
+// grid to fill: zeros), random(x, y) (the cell's number in [0, 1) - the same
+// for a seed). It may return its own array instead of filling out. Scripts
+// run in a sandbox of their own (base, math, string, table; no files),
+// deterministic, and are stopped after GEN_SCRIPT_BUDGET instructions.
+
+GEN_SCRIPT_TEMPLATE :: `-- A level generator node (#142): fills ctx.out from its inputs.
+-- ctx.width, ctx.height, ctx.seed, ctx.params.p1 .. p4,
+-- ctx.a / ctx.b (the inputs) and ctx.out: flat arrays, row by row, from 1.
+-- ctx.random(x, y): the cell's number in [0, 1), the same for a seed.
+return function(ctx)
+    for y = 0, ctx.height - 1 do
+        for x = 0, ctx.width - 1 do
+            local i = y * ctx.width + x + 1
+            -- Stripes every p1 cells (4 when it is 0), over input a.
+            local every = ctx.params.p1 > 0 and ctx.params.p1 or 4
+            ctx.out[i] = math.max(ctx.a[i], (x % every == 0) and 1 or 0)
+        end
+    end
+end
+`
+
+// GEN_SCRIPT_BUDGET: instructions a graph's scripts may run per evaluation
+// (then "ran too long": a script that never ends doesn't hang the editor).
+GEN_SCRIPT_BUDGET := c.int(200_000_000)
+
+// Gen_LoadScripts reads the script nodes' files (a project's) into the
+// graph, again when called again (an edited script). A file that can't be
+// read is an error when the node is evaluated.
+Gen_LoadScripts :: proc(g: ^Gen_Graph, ctx: ^GameContext) {
+	gen_scripts_clear(g)
+	if ctx == nil || ctx.game == nil do return
+	for &n in g.nodes {
+		if n.kind != .Script || n.script == "" || n.script in g.scripts do continue
+		if text, ok := AssetManager_ReadFileString(&ctx.game.assetManager, n.script, context.temp_allocator); ok do Gen_SetScriptSource(g, n.script, text)
+	}
+}
+
+// Gen_SetScriptSource gives the graph a script's text (as if read from `path`).
+Gen_SetScriptSource :: proc(g: ^Gen_Graph, path, text: string) {
+	if g.scripts == nil do g.scripts = make(map[string]string, g.allocator)
+	if old, ok := g.scripts[path]; ok {
+		delete(old, g.allocator)
+		g.scripts[path] = strings.clone(text, g.allocator)
+		return
+	}
+	g.scripts[strings.clone(path, g.allocator)] = strings.clone(text, g.allocator)
+}
+
+@(private = "file")
+gen_scripts_clear :: proc(g: ^Gen_Graph) {
+	for k, v in g.scripts {
+		delete(k, g.allocator)
+		delete(v, g.allocator)
+	}
+	clear(&g.scripts)
+}
+
+// gen_script: a Script node's grid from its function.
+@(private = "file")
+gen_script :: proc(ev: ^Gen_Eval, n: ^Gen_Node, seed: u64, out: Gen_Grid) -> bool {
+	fail :: proc(ev: ^Gen_Eval, n: ^Gen_Node, why: string) -> bool {
+		ev.err = fmt.tprintf("node %d (%s): %s", n.id, n.script, why) if n.script != "" else fmt.tprintf("node %d: %s", n.id, why)
+		return false
+	}
+	if n.script == "" do return fail(ev, n, "pick its script (a .lua file)")
+	src, have := ev.g.scripts[n.script]
+	if !have do return fail(ev, n, "no such script (or not loaded)")
+	a := gen_input(ev, n, 0) or_return
+	b := gen_input(ev, n, 1) or_return
+	if ev.L == nil do ev.L = gen_lua_sandbox()
+	L := ev.L
+	top := lua.gettop(L)
+	defer lua.settop(L, top)
+	errText :: proc(L: ^lua.State) -> string {
+		msg := lua.tostring(L, -1)
+		return strings.clone(string(msg), context.temp_allocator) if msg != nil else "error"
+	}
+	ref, loaded := ev.fns[n.script]
+	if !loaded {
+		chunk := fmt.ctprintf("@%s", n.script)
+		if lua.L_loadbuffer(L, raw_data(src), len(src), chunk, "t") != .OK do return fail(ev, n, errText(L))
+		if lua.pcall(L, 0, 1, 0) != 0 do return fail(ev, n, errText(L))
+		if !lua.isfunction(L, -1) do return fail(ev, n, "the script must return a function(ctx)")
+		ref = lua.L_ref(L, lua.REGISTRYINDEX)
+		ev.fns[n.script] = ref
+	}
+	cells := len(out.v)
+	pushGrid :: proc(L: ^lua.State, g: Gen_Grid) {
+		lua.createtable(L, c.int(len(g.v)), 0)
+		for v, i in g.v {
+			lua.pushnumber(L, lua.Number(v))
+			lua.rawseti(L, -2, lua.Integer(i + 1))
+		}
+	}
+	pushGrid(L, out) // (kept below the call: ctx.out)
+	outIdx := lua.gettop(L)
+	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(ref))
+	lua.createtable(L, 0, 9)
+	lua.pushinteger(L, lua.Integer(out.w))
+	lua.setfield(L, -2, "width")
+	lua.pushinteger(L, lua.Integer(out.h))
+	lua.setfield(L, -2, "height")
+	lua.pushinteger(L, lua.Integer(seed >> 1)) // (a positive integer)
+	lua.setfield(L, -2, "seed")
+	lua.createtable(L, 0, 4)
+	for name in ([]cstring{"p1", "p2", "p3", "p4"}) {
+		lua.pushnumber(L, lua.Number(Gen_Param(n, string(name))))
+		lua.setfield(L, -2, name)
+	}
+	lua.setfield(L, -2, "params")
+	pushGrid(L, a)
+	lua.setfield(L, -2, "a")
+	pushGrid(L, b)
+	lua.setfield(L, -2, "b")
+	lua.pushvalue(L, outIdx)
+	lua.setfield(L, -2, "out")
+	lua.pushinteger(L, lua.Integer(seed >> 1))
+	lua.pushcclosure(L, gen_lua_random, 1)
+	lua.setfield(L, -2, "random")
+	if lua.pcall(L, 1, 1, 0) != 0 do return fail(ev, n, errText(L))
+	res := lua.gettop(L) if lua.istable(L, -1) else outIdx
+	for i in 0 ..< cells {
+		lua.rawgeti(L, res, lua.Integer(i + 1))
+		ok: b32
+		v := lua.tonumber(L, -1, &ok)
+		out.v[i] = f32(v) if ok else 0
+		lua.pop(L, 1)
+	}
+	return true
+}
+
+// gen_lua_sandbox: a Lua state for scripts - base, math, string, table; no
+// files, no modules; stopped when it runs too long.
+@(private = "file")
+gen_lua_sandbox :: proc() -> ^lua.State {
+	L := lua.L_newstate()
+	libs := [?]struct {
+		name: cstring,
+		open: lua.CFunction,
+	}{{"_G", lua.open_base}, {"math", lua.open_math}, {"string", lua.open_string}, {"table", lua.open_table}}
+	for lib in libs {
+		lua.L_requiref(L, lib.name, lib.open, 1)
+		lua.pop(L, 1)
+	}
+	for name in ([]cstring{"dofile", "loadfile", "require"}) {
+		lua.pushnil(L)
+		lua.setglobal(L, name)
+	}
+	lua.sethook(L, gen_lua_too_long, lua.MASKCOUNT, GEN_SCRIPT_BUDGET)
+	return L
+}
+
+@(private = "file")
+gen_lua_too_long :: proc "c" (L: ^lua.State, ar: ^lua.Debug) {
+	lua.L_error(L, "ran too long (stopped)")
+}
+
+// ctx.random(x, y): the cell's number in [0, 1) for the node's seed.
+@(private = "file")
+gen_lua_random :: proc "c" (L: ^lua.State) -> c.int {
+	context = Engine_DefaultContext()
+	seed := u64(lua.tointeger(L, lua.REGISTRYINDEX - 1))
+	lua.pushnumber(L, lua.Number(gen_hash01(int(lua.tointeger(L, 1)), int(lua.tointeger(L, 2)), seed)))
+	return 1
 }
 
 // --- deterministic noise --------------------------------------------------------------
