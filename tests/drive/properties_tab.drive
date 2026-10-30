@@ -1,0 +1,73 @@
+# #208: the Inspector's Properties tab - a property added to a node with no
+# script (one is made), a resource property with its class picked from the
+# project's classes (then a resource picked), a property renamed in Edit
+# (its value follows), one removed (undo brings it back).
+exec mkdir -p $PROJECT/resources
+exec cp tests/drive/fixtures/drive_res_health.lua $PROJECT/scripts/drive_res_health.lua
+exec cp tests/drive/fixtures/drive_boss.resource.json $PROJECT/resources/drive_boss.resource.json
+exec cp tests/drive/fixtures/drive_sword.resource.json $PROJECT/resources/drive_sword.resource.json
+exec cp tests/drive/fixtures/drive_res_item.lua $PROJECT/scripts/drive_res_item.lua
+wait 5
+click @hier:PatrolDroneAlpha
+click @insp.tab:properties
+expect item:insp.props-empty == visible
+screenshot properties_empty
+
+# A number: the script is made for it.
+click @insp.prop-add
+expect item:prop.name == visible
+type speed
+dblclick @prop.default
+key cmd+a
+type 120
+key enter
+screenshot add_property_dialog
+click @prop.save
+wait 10
+expect file:scripts/patrol_drone_alpha.lua contains speed = { type = "float", default = 120 },
+wait-until item:insp.script:speed == visible timeout=300
+expect node:PatrolDroneAlpha.script.speed ~= 120
+expect file:scripts/patrol_drone_alpha.lua !contains label = "Speed"
+
+# A resource: its class from the list, then a resource of it in the Inspector.
+click @insp.prop-add
+type health
+click @prop.type
+click @pick:Resource
+click @prop.class
+click @pick:scripts/drive_res_health.lua
+click @prop.save
+wait 10
+expect file:scripts/patrol_drone_alpha.lua contains health = { type = "resource", class = "scripts/drive_res_health.lua" },
+wait-until item:insp.script:health == visible timeout=300
+click @insp.script:health
+expect item:pick:resources/drive_boss.resource.json == visible
+expect item:pick:resources/drive_sword.resource.json == missing
+click @pick:resources/drive_boss.resource.json
+expect node:PatrolDroneAlpha.script.health == resources/drive_boss.resource.json
+screenshot properties_tab
+
+# Edit: speed renamed max_speed (the node's value follows).
+rclick @insp.proplabel:script.speed
+click @ctx:prop-edit
+expect item:prop.name == visible
+click @prop.name
+key cmd+a
+type max_speed
+click @prop.save
+wait 10
+expect file:scripts/patrol_drone_alpha.lua contains max_speed = { type = "float", default = 120 },
+expect file:scripts/patrol_drone_alpha.lua !contains \n\s\s\s\sspeed\s=
+wait-until item:insp.script:max_speed == visible timeout=300
+
+# Remove: asks, then it's gone; undo brings it back.
+rclick @insp.proplabel:script.max_speed
+click @ctx:prop-remove
+expect item:prop.remove-confirm == visible
+screenshot remove_confirm
+click @prop.remove-confirm
+wait 10
+expect file:scripts/patrol_drone_alpha.lua !contains max_speed
+key cmd+z
+wait 10
+expect file:scripts/patrol_drone_alpha.lua contains max_speed

@@ -544,6 +544,8 @@ inspFlash: struct {
 // Inspector_Flash lights a property row of a node (selects the node).
 Inspector_Flash :: proc(state: ^EditorState, node: ^e.Node, path: string) {
 	Editor_SelectNode(state, node, false)
+	// (the tab its row is in: a script property's is Properties, #208)
+	inspectorTabRequest = .Properties if strings.has_prefix(path, "script.") else .Node
 	inspFlash.node = node
 	inspFlash.pathLen = copy(inspFlash.path[:], path)
 	inspFlash.until = time.tick_add(time.tick_now(), 1500 * time.Millisecond)
@@ -573,6 +575,7 @@ prop_label_menu :: proc(node: ^e.Node, path: string) {
 		imgui.Separator()
 	}
 	if strings.has_prefix(path, "script.") && node.scriptInstance != nil {
+		Inspector_PropertyMenu(state, node, path[len("script."):]) // Edit / Remove (#208)
 		if imgui.MenuItem(fmt.ctprintf("%s  Find in Script", ICON_FA_CODE)) {
 			Code_FindScriptProperty(state, (cast(^e.ScriptInstance)node.scriptInstance).modulePath, path[len("script."):])
 		}

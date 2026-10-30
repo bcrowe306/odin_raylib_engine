@@ -196,6 +196,21 @@ scaling up; UI layers unshifted). Guide:
 
 ### Inspector
 
+**Node / Properties**: a node's Inspector has two tabs. **Node** is its own
+settings (Transform, its type's properties, Script, Signals...).
+**Properties** is yours - its script's properties, set per node: **Add
+Property** opens a dialog with every option (name, type - number, integer,
+boolean, text, resource, node, choice, range, vector, colour, assets, list,
+curve, gradient -, default, min / max / slider, label, help, group, a list's
+element type, a resource's class picked from the project's resource classes
+and its copies), previews the Lua line and writes it into the script's
+`properties` table. A node without a script gets one made for it. Right-click
+a property's name: **Edit Property** (the same dialog; a rename moves each
+node's value, and nodes still at the old default take the new one) or
+**Remove Property** (it shows the script lines that use `self.<name>` and the
+nodes with a value; undo brings it back). The script is shared: the dialog
+says how many nodes use it.
+
 **Origin** (Transform, for nodes that draw an image or a box: textures,
 animations, AnimationPlayers, nine-slices, text): the point of the image
 that sits at the node's position and that it rotates and scales around - a

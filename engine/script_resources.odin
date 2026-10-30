@@ -3,6 +3,7 @@ package engine
 import "core:c"
 import "core:encoding/json"
 import "core:fmt"
+import "core:path/filepath"
 import "core:slice"
 import "core:strings"
 import "core:time"
@@ -179,7 +180,7 @@ Script_ResolveResource :: proc(mgr: ^ScriptManager, inst: ^ScriptInstance, prop:
 		Script_Problem(.Warning, "%s: property %s: can't load %s", inst.modulePath, prop.name, path)
 		return nil
 	}
-	if prop.resourceClass != "" && ScriptVFS_NormalizePath(prop.resourceClass) != ScriptVFS_NormalizePath(file.script) {
+	if prop.resourceClass != "" && !Resource_ClassMatches(prop.resourceClass, file.script) {
 		Script_Problem(.Warning, "%s: property %s takes %s resources; %s is a %s", inst.modulePath, prop.name, prop.resourceClass, path, file.script)
 		return nil
 	}
@@ -708,4 +709,19 @@ lua_resource_duplicate :: proc "c" (L: ^lua.State) -> c.int {
 	}
 	Resource_Push(L, res)
 	return 1
+}
+
+// Resource_ClassMatches: a resource property's `class` names this class
+// script - its path ("scripts/weapon.lua"), or its name ("Weapon",
+// "HealthPack" for health_pack.lua: case and underscores aside) (#208).
+Resource_ClassMatches :: proc(class, script: string) -> bool {
+	if class == "" do return true
+	if strings.contains(class, "/") || strings.has_suffix(class, ".lua") do return ScriptVFS_NormalizePath(class) == ScriptVFS_NormalizePath(script)
+	squash :: proc(s: string) -> string {
+		out := make([dynamic]u8, context.temp_allocator)
+		for i in 0 ..< len(s) do if s[i] != '_' && s[i] != '-' do append(&out, s[i] | 0x20 if s[i] >= 'A' && s[i] <= 'Z' else s[i])
+		return string(out[:])
+	}
+	stem := filepath.stem(ScriptVFS_NormalizePath(script))
+	return squash(class) == squash(stem)
 }

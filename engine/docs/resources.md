@@ -44,8 +44,10 @@ Unity's ScriptableObjects.
 
 2. **Assets > Resources > + (New Resource)**, pick the class, name it
    `sword`. Select it in Assets: the Inspector edits its values.
-3. Give a node script a resource property, and pick `sword` in the
-   Inspector:
+3. Give the node a resource property: select it, Inspector **Properties**
+   tab > **Add Property**, name `weapon`, type **Resource**, class
+   `scripts/weapon.lua` (the list has your resource classes) - or write the
+   entry yourself, as below. Then pick `sword` in its row:
 
    ```lua
    Player.properties = {

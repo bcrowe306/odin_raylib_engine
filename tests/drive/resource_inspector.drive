@@ -54,6 +54,7 @@ click @hier:PatrolDroneAlpha
 expect item:insp.resource-name == missing
 click @insp.script-attach
 click @pick:scripts/drive_res_user.lua
+click @insp.tab:properties
 click @insp.script:health
 expect item:pick:resources/drive_boss.resource.json == visible
 expect item:pick:resources/drive_sword.resource.json == missing

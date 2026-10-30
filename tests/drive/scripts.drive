@@ -9,6 +9,7 @@ click @pick:scripts/orbiting_drone.lua
 expect node:PatrolDroneAlpha.script contains orbiting_drone.lua
 expect node:PatrolDroneAlpha.script.orbit_radius == 130
 screenshot script_attached
+click @insp.tab:properties
 dblclick @insp.script:orbit_radius
 key ctrl+a
 type 222

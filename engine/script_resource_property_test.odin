@@ -178,3 +178,14 @@ test_resource_property_set_after_ready :: proc(t: ^testing.T) {
 	lua.pop(L, 3)
 	testing.expect_value(t, inst.properties["shared_health"].valString, "rprop/sword.resource.json")
 }
+
+// #208: a resource property's class by path or by name.
+@(test)
+test_resource_class_matches :: proc(t: ^testing.T) {
+	testing.expect(t, Resource_ClassMatches("scripts/weapon.lua", "scripts/weapon.lua"), "the path")
+	testing.expect(t, Resource_ClassMatches("Weapon", "scripts/weapon.lua"), "the name")
+	testing.expect(t, Resource_ClassMatches("HealthPack", "scripts/items/health_pack.lua"), "a name in words")
+	testing.expect(t, !Resource_ClassMatches("Weapon", "scripts/armor.lua"), "another class")
+	testing.expect(t, !Resource_ClassMatches("scripts/weapon.lua", "scripts/armor.lua"), "another path")
+	testing.expect(t, Resource_ClassMatches("", "scripts/armor.lua"), "no class: any")
+}

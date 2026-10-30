@@ -16,6 +16,7 @@ wait 10
 expect node:HurtboxZz.class == HurtboxZz
 expect item:scenetab:nodes/HurtboxZz.node.json == visible
 screenshot type_doc
+click @insp.tab:properties
 dblclick @insp.script:max_health
 key ctrl+a
 type 9
