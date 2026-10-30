@@ -213,11 +213,20 @@ script_push_resource_prop :: proc(L: ^lua.State, mgr: ^ScriptManager, inst: ^Scr
 
 // script_resolve_resource_props sets self's resource properties to their
 // tables (self at the top of the stack; before ready()).
-script_resolve_resource_props :: proc(L: ^lua.State, inst: ^ScriptInstance, mgr: ^ScriptManager) {
+// keepSet (ready): a resource table already in self - set by a spawner or
+// another script before ready() - stays; the saved value is its default (#231).
+script_resolve_resource_props :: proc(L: ^lua.State, inst: ^ScriptInstance, mgr: ^ScriptManager, keepSet := false) {
 	mod, ok := mgr.modules[ScriptVFS_NormalizePath(inst.modulePath)]
 	if !ok || mod == nil do return
 	for p in mod.properties {
 		if !Script_IsResourceProp(p) do continue
+		if keepSet {
+			name := strings.clone_to_cstring(p.name, context.temp_allocator)
+			lua.getfield(L, -1, name)
+			set := lua.type(L, -1) == .TABLE
+			lua.pop(L, 1)
+			if set do continue
+		}
 		script_push_resource_prop(L, mgr, inst, p, (inst.properties[p.name] or_else {}).valString)
 		lua.setfield(L, -2, strings.clone_to_cstring(p.name, context.temp_allocator))
 	}

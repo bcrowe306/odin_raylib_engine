@@ -93,7 +93,8 @@ SpawnerNode :: struct {
 	bag:             [dynamic]int, // Shuffle: the entries left this round (heap)
 	timer:           f32,    // seconds to the next automatic spawn
 	cooldownLeft:    f32,
-	alive:           [dynamic][2]u32, // the spawned roots' live slots (heap; Node_SlotOf)
+	alive:           [dynamic][3]u32, // the spawned roots' live slots and their entry (heap; Node_SlotOf, 0-based index)
+	callbackRef:     i32,    // set_spawn_callback's function (Lua registry; 0 = none) - #231
 	started:         bool,
 	onSpawned:       EventSubject, // "spawned" (the new root)
 	onLimit:         EventSubject, // "limit_reached"
@@ -110,7 +111,7 @@ SpawnerNode_Create :: proc(scene: ^Scene, name: string = "Spawner", parent: ^Nod
 	s.step = 1
 	s.entries = make([dynamic]Spawn_Entry, s.allocator)
 	s.bag = make([dynamic]int, Engine_HeapAllocator())
-	s.alive = make([dynamic][2]u32, Engine_HeapAllocator())
+	s.alive = make([dynamic][3]u32, Engine_HeapAllocator())
 	s.renderable = true // (the editor draws its marker; nothing in the game)
 	s.update = SpawnerNode_Update
 	s.drawBounds = SpawnerNode_DrawBounds
@@ -129,6 +130,19 @@ SpawnerNode_Destroy :: proc(node: ^Node, ctx: ^GameContext) {
 	DestroySubject(&s.onFinished)
 	delete(s.bag)
 	delete(s.alive)
+	if s.callbackRef != 0 && ctx != nil && ctx.scriptManager != nil && ctx.scriptManager.L != nil {
+		lua.L_unref(ctx.scriptManager.L, lua.REGISTRYINDEX, s.callbackRef)
+		s.callbackRef = 0
+	}
+}
+
+// SpawnerNode_SpawnInfo: which list entry (0-based) a node it spawned and
+// that's still alive came from (#231).
+SpawnerNode_SpawnInfo :: proc(s: ^SpawnerNode, n: ^Node) -> (index: int, ok: bool) {
+	slot, gen := Node_SlotOf(n)
+	SpawnerNode_AliveCount(s) // (drops the gone)
+	for a in s.alive do if a[0] == slot && a[1] == gen && slot != 0 do return int(a[2]), true
+	return -1, false
 }
 
 // SpawnerNode_AddEntry appends a component to the list.
@@ -220,7 +234,7 @@ SpawnerNode_Spawn :: proc(s: ^SpawnerNode, ctx: ^GameContext, index := -1) -> []
 				s.onLimit->notify(s, nil, ctx)
 				return out[:]
 			}
-			if n := spawner_spawn_one(s, en, ctx); n != nil {
+			if n := spawner_spawn_one(s, en, i, ctx); n != nil {
 				append(&out, n)
 				s.spawnedTotal += 1
 			}
@@ -294,7 +308,7 @@ spawner_parent :: proc(s: ^SpawnerNode, scene: ^Scene) -> ^Node {
 }
 
 @(private = "file")
-spawner_spawn_one :: proc(s: ^SpawnerNode, en: Spawn_Entry, ctx: ^GameContext) -> ^Node {
+spawner_spawn_one :: proc(s: ^SpawnerNode, en: Spawn_Entry, entry: int, ctx: ^GameContext) -> ^Node {
 	scene := spawner_scene(ctx)
 	if scene == nil || en.component == "" do return nil
 	parent := spawner_parent(s, scene)
@@ -333,9 +347,42 @@ spawner_spawn_one :: proc(s: ^SpawnerNode, en: Spawn_Entry, ctx: ^GameContext) -
 		else if n.typeId == KinematicBodyNode do (cast(^KinematicBodyNode)n).linearVelocity = v
 	}
 	slot, gen := Node_SlotOf(n)
-	if slot != 0 do append(&s.alive, [2]u32{slot, gen})
+	if slot != 0 do append(&s.alive, [3]u32{slot, gen, u32(entry)})
+	// Placed, before its ready() / on_spawn (its next update): the spawn
+	// callback, then the signal - both can set it up (#231).
+	spawner_call_back(s, n, entry, ctx)
 	s.onSpawned->notify(s, n, ctx)
 	return n
+}
+
+// push_spawn_info pushes {component = path, index = 1-based entry}.
+@(private = "file")
+push_spawn_info :: proc(L: ^lua.State, s: ^SpawnerNode, entry: int) {
+	lua.createtable(L, 0, 2)
+	comp := s.entries[entry].component if entry >= 0 && entry < len(s.entries) else ""
+	lua.pushstring(L, strings.clone_to_cstring(comp, context.temp_allocator))
+	lua.setfield(L, -2, "component")
+	lua.pushinteger(L, lua.Integer(entry + 1))
+	lua.setfield(L, -2, "index")
+}
+
+// spawner_call_back: set_spawn_callback's function(node, info, spawner).
+@(private = "file")
+spawner_call_back :: proc(s: ^SpawnerNode, n: ^Node, entry: int, ctx: ^GameContext) {
+	if s.callbackRef == 0 || ctx == nil || ctx.scriptManager == nil || ctx.scriptManager.L == nil do return
+	L := ctx.scriptManager.L
+	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(s.callbackRef))
+	if lua.type(L, -1) != .FUNCTION {
+		lua.pop(L, 1)
+		return
+	}
+	push_node_userdata(L, n)
+	push_spawn_info(L, s, entry)
+	push_node_userdata(L, s)
+	if lua.pcall(L, 3, 0, 0) != 0 {
+		Script_Problem(.Error, "[Spawner] %s: spawn callback: %s", s.name, lua.tostring(L, -1))
+		lua.pop(L, 1)
+	}
 }
 
 // spawner_scene: the scene spawners spawn into (the running one).
@@ -404,6 +451,42 @@ lua_spawn :: proc "c" (L: ^lua.State) -> c.int {
 	}
 	index := int(lua.tointeger(L, 2)) - 1 if lua.type(L, 2) == .NUMBER else -1
 	push_nodes(L, SpawnerNode_Spawn(s, s.gameContext, index))
+	return 1
+}
+
+// spawner:set_spawn_callback(function(node, info, spawner) ... end | nil)
+@(private = "file")
+lua_set_spawn_callback :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	s := lua_spawner_arg(L)
+	if s == nil do return 0
+	if s.callbackRef != 0 {
+		lua.L_unref(L, lua.REGISTRYINDEX, s.callbackRef)
+		s.callbackRef = 0
+	}
+	if lua.type(L, 2) == .FUNCTION {
+		lua.pushvalue(L, 2)
+		s.callbackRef = i32(lua.L_ref(L, lua.REGISTRYINDEX))
+	}
+	return 0
+}
+
+// spawner:spawn_info(node) -> {component, index} | nil
+@(private = "file")
+lua_spawn_info :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	s := lua_spawner_arg(L)
+	n, ok := to_node_userdata(L, 2)
+	if s == nil || !ok {
+		lua.pushnil(L)
+		return 1
+	}
+	entry, found := SpawnerNode_SpawnInfo(s, n)
+	if found {
+		push_spawn_info(L, s, entry)
+	} else {
+		lua.pushnil(L)
+	}
 	return 1
 }
 
@@ -511,4 +594,6 @@ Script_RegisterSpawnerBindings :: proc(L: ^lua.State) {
 	reg(L, "spawn_add", lua_spawn_add)
 	reg(L, "spawn_remove", lua_spawn_remove)
 	reg(L, "spawn_clear", lua_spawn_clear)
+	reg(L, "set_spawn_callback", lua_set_spawn_callback)
+	reg(L, "spawn_info", lua_spawn_info)
 }

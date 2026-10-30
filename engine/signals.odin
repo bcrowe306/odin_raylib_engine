@@ -79,7 +79,7 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "became_active":       return "", "The host camera switched to this advanced camera"
 	case "became_inactive":     return "", "Another advanced camera took over"
 	case "path_looped":        return "", "The follower wrapped round or turned back (Loop / Ping Pong)"
-	case "spawned":            return "node", "The spawner made a node (the spawned root)"
+	case "spawned":            return "node", "The spawner made a node (the spawned root; spawn_info(node): its entry)"
 	case "limit_reached":      return "", "The spawner reached its Total Limit"
 	case "list_finished":      return "", "A Sequential spawner (Stop) spawned its last entry"
 	case "generated":          return "seed", "The level generator's level is in (its seed)"

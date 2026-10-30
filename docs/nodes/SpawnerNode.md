@@ -57,9 +57,68 @@ end
 hold spawns back. **Use Pool** takes instances from the scene's
 [pool](../../engine/docs/pooling.md) instead of making new ones.
 
-Events: **`spawned`** (the new root - set it up in a handler),
-**`limit_reached`**, **`list_finished`** (Sequential with Stop).
+Events: **`spawned`** (the new root - set it up in a handler, or see
+below), **`limit_reached`**, **`list_finished`** (Sequential with Stop).
 
 In the editor the selected spawner shows its spawn point, facing and
 spread; in *Simulate* the Inspector has **Spawn Now** and the count of what
 is alive.
+
+## Setting up what it spawns
+
+`spawn()` returns the roots it made, already placed. Their scripts' `ready()`
+runs on their first update, so anything you set right after spawning is
+seen in `ready()`:
+
+- **Script properties**: `node:get_script().speed = 400`, or
+  `node:set_property("script.speed", 400)`.
+- **Built-in properties**: `node.position`, `node:set_property("modulate",
+  ...)`, a body's velocity...
+- **Resource and node properties** (`type = "resource"` / `"node"`) too: a
+  value set before `ready()` stays; the one saved in the component is only
+  the default.
+- **Pooled spawns** (**Use Pool**): the node is reused, so set what you need
+  every time; it's taken before its `on_spawn()`, which runs on its next
+  update and so sees your values too.
+
+```lua
+-- A script calls spawn(): set up each root it returns.
+function Player:fire()
+    for _, bullet in ipairs(self.node:get_node("Hand/Muzzle"):spawn()) do
+        local s = bullet:get_script()
+        s.speed = 400
+        s.owner = self.node
+        s.attack = self.current_attack   -- a resource
+    end
+end
+```
+
+**Automatic spawns** (Auto Spawn, a signal's *Spawn*): give the spawner a
+**spawn callback**. It runs for every spawn - by call, Auto Spawn, signal
+or pool - after the node is placed and before its `ready()` / `on_spawn()`,
+with `info.component` (the component's path) and `info.index` (its entry in
+the list, from 1). Setting it again replaces it; `nil` clears it.
+
+```lua
+function Level:ready()
+    local attacks = { Resource.load("resources/sword.resource.json"),
+                      Resource.load("resources/bow.resource.json") }
+    self.node:get_node("EnemySpawner"):set_spawn_callback(function(enemy, info, spawner)
+        enemy:get_script().difficulty = self.difficulty
+        enemy:get_script().weapon = attacks[info.index]   -- goblins (1) get a sword, archers (2) a bow
+    end)
+end
+```
+
+**Telling spawns apart**: the `spawned` signal passes the new root;
+`spawner:spawn_info(node)` returns its `{component, index}` while it's
+alive, and `node:get_component()` its component's path.
+
+```lua
+self.node:get_node("EnemySpawner"):connect("spawned", function(enemy)
+    local info = self.node:get_node("EnemySpawner"):spawn_info(enemy)
+    if info.component == "components/archer.component.json" then
+        enemy:set_property("script.patrol_radius", 64)
+    end
+end)
+```

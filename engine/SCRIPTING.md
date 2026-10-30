@@ -1074,6 +1074,23 @@ Spawn, cooldown, chance, max alive, total limit, spread, speed, pooling;
 events `spawned`, `limit_reached`, `list_finished`; a signal can call its
 `spawn` with no script. Node reference: Spawner.
 
+Setting up what it spawns: values set on a spawned root right after
+`spawn()` (script, built-in, resource and node properties) are seen by its
+`ready()`. For every spawn - Auto Spawn, signals and pools included -
+`spawner:set_spawn_callback(function(node, info, spawner) ... end)` runs
+before the node's `ready()`, with `info.component` and `info.index` (the
+list entry, from 1); `spawner:spawn_info(node)` gives the same for a live
+spawned root (e.g. in a `spawned` handler).
+
+```lua
+for _, bullet in ipairs(self.node:get_node("Hand/Muzzle"):spawn()) do
+    bullet:get_script().speed = 400
+end
+spawner:set_spawn_callback(function(enemy, info)
+    enemy:get_script().weapon = weapons[info.index]
+end)
+```
+
 #### Generated levels (LevelGeneratorNode)
 
 A **Level Generator** node makes a level from a `.levelgen.json` into its
