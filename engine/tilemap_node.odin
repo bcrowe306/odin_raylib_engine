@@ -46,6 +46,7 @@ TileMapNode :: struct {
 	// Chunk cache (tile_cache.odin): bumped when the tiles change; chunkVer
 	// per chunk for single-cell edits.
 	cacheVersion: u64,
+	collidersDirty: bool, // tiles set while running (Lua): colliders rebuilt in the update (#220)
 	chunkVer:     map[[2]i32]u64,
 	// Components on the grid (tilemap_components.odin): their footprints in
 	// cells, measured once per component and tile size.
@@ -61,6 +62,7 @@ TileMapNode_Create :: proc(scene: ^Scene, name: string = "TileMap", parent: ^Nod
 	tm.tiles = make([dynamic]i32, tm.allocator)
 	TileMapNode_Layout(tm)
 	tm.ready = TileMapNode_Ready
+	tm.update = TileMapNode_Update
 	tm.render = TileMapNode_Render
 	tm.onDestroy = TileMapNode_Destroy
 	scene->addNode(tm, parent)
@@ -423,6 +425,15 @@ TileMapNode_BuildColliders :: proc(tm: ^TileMapNode, ctx: ^GameContext) {
 TileMapNode_Ready :: proc(node: ^Node, ctx: ^GameContext) {
 	tm := cast(^TileMapNode)node
 	TileMapNode_SyncAseprite(tm)
+	if tm.solid do TileMapNode_BuildColliders(tm, ctx)
+}
+
+// TileMapNode_Update: a solid map's colliders follow tiles set while running
+// (once a frame, however many changed).
+TileMapNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
+	tm := cast(^TileMapNode)node
+	if !tm.collidersDirty do return
+	tm.collidersDirty = false
 	if tm.solid do TileMapNode_BuildColliders(tm, ctx)
 }
 

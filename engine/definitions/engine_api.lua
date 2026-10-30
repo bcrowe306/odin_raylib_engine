@@ -8423,6 +8423,41 @@ function TileMapNode:tilemap_set_component(x, y, component) end
 ---@return boolean
 function TileMapNode:tilemap_clear_component(x, y) end
 
+---The tile painted on a cell (0-based cells, inside the map or beyond it): its index in the tileset, or -1 for an empty cell.
+---
+---Example: `if map:tilemap_get_tile(x, y) == -1 then Log.info("empty") end`
+---@param x integer
+---@param y integer
+---@return integer
+function TileMapNode:tilemap_get_tile(x, y) end
+
+---Paints a tile on a cell (its index in the tileset; -1 or nil erases). A Solid map's colliders follow at the end of the frame, and path finding sees the change. Returns true if the cell changed.
+---
+---Example: `local x, y = map:tilemap_cell_at(self.node.position); map:tilemap_set_tile(x, y + 1, -1) -- dig`
+---@param x integer
+---@param y integer
+---@param tile integer?
+---@return boolean
+function TileMapNode:tilemap_set_tile(x, y, tile) end
+
+---The cell under a world position (it may be outside the map).
+---
+---Example: `local cx, cy = map:tilemap_cell_at(player.position)`
+---@overload fun(self: TileMapNode, x: number, y: number): integer, integer
+---@param pos Vec2
+---@return integer x
+---@return integer y
+function TileMapNode:tilemap_cell_at(pos) end
+
+---The world position of a cell's centre.
+---
+---Example: `local wx, wy = map:tilemap_cell_position(4, 2); coin.position = Vec2(wx, wy)`
+---@param x integer
+---@param y integer
+---@return number wx
+---@return number wy
+function TileMapNode:tilemap_cell_position(x, y) end
+
 ---Carves a circle out of the art (world position and radius): every shape keeps its paint, and a collider follows - destructible terrain, bites, bullet holes. The node draws its own carved copy until `vector_reset`.
 ---
 ---Example: `ground:vector_cut(bomb.position, 48)`

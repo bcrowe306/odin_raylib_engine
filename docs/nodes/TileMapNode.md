@@ -120,6 +120,20 @@ local coin = map:tilemap_component_at(4, 2)
 map:tilemap_clear_component(4, 2)
 ```
 
+Tiles from a script: read and paint cells (a tile is its index in the
+tileset; -1 is empty). On a **Solid** map the colliders follow at the end
+of the frame, and path finding sees the change - dig a hole under the
+player:
+
+```lua
+local map = Scene.find_node("TileMap") ---@type TileMapNode
+local x, y = map:tilemap_cell_at(self.node.position)
+if map:tilemap_get_tile(x, y + 1) ~= -1 then
+    map:tilemap_set_tile(x, y + 1, -1)
+end
+local wx, wy = map:tilemap_cell_position(x, y + 1) -- that cell's centre
+```
+
 ## Screenshot
 
 ![A Tile Map with a few rows of painted tiles](../images/node_TileMapNode.png)

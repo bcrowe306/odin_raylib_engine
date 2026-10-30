@@ -98,3 +98,11 @@ drag @world:700,1200 @world:2000,1200
 expect node:TileMap.tiles <= 6360
 wait 2
 screenshot big_map_erased
+
+# #220: Fit Selection frames the whole map, not a tiny handle (which
+# zoomed to 1000%).
+click @hier:TileMap
+key shift+f
+wait 3
+expect zoom <= 0.5
+screenshot fit_map
