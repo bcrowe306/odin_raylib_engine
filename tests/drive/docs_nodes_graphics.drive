@@ -1,0 +1,250 @@
+# Screenshots for the graphics nodes' pages (docs/nodes/*.md, #45):
+# Texture Sprite, Atlas Sprite, Text, Nine Slice Sprite, Parallax
+# Background, Line, LDtk Tilemap Level, Light, Tile Map. Each one in a fresh
+# scene, made from Add Node and given something to draw.
+#   scripts/docs/screenshots.sh docs_nodes_graphics
+wait 5
+# The bottom panel starts 100 px tall: the Animation workspace gives the
+# Tile Map and LDtk tabs room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+key escape
+
+# Texture Sprite: an image.
+click @asset.new-scene
+click @hier.add
+type texture sprite
+click @addnode:Texture Sprite
+click @addnode.create
+expect node:TextureSprite.type == TextureNode
+click @insp.texture
+click @pick:textures/Spaceship_1.png
+wait 2
+key home
+wait 1
+annotate @node:TextureSprite The sprite, drawn around its origin (the centre by default)
+annotate @insp.texture The image (or drag one from Assets into the viewport)
+screenshot node_TextureNode
+
+# Atlas Sprite: one 96 x 96 frame of a strip.
+click @asset.new-scene
+click @hier.add
+type atlas sprite
+click @addnode:Atlas Sprite
+click @addnode.create
+expect node:AtlasSprite.type == AtlasSpriteNode
+click @insp.texture
+click @pick:textures/IDLE.png
+wait 2
+click @insp.atlas.edit
+expect atlas.open == true
+dblclick @atlas.x
+key ctrl+a
+type 96
+key enter
+dblclick @atlas.y
+key ctrl+a
+type 0
+key enter
+dblclick @atlas.w
+key ctrl+a
+type 96
+key enter
+dblclick @atlas.h
+key ctrl+a
+type 96
+key enter
+click @atlas.apply
+wait 1
+key home
+scroll @node:AtlasSprite -2
+wait 1
+annotate @node:AtlasSprite Only the region is drawn: one frame of the strip
+annotate @insp.atlas.edit Edit Region: pick the rectangle on the image
+screenshot node_AtlasSpriteNode
+
+# Text: rich text in the engine font.
+click @asset.new-scene
+click @hier.add
+type text
+click @addnode:Text
+click @addnode.create
+expect node:Text.type == TextNode
+click @insp.prop:text
+key cmd+a
+type Score:\s[color=yellow]1200[/color]\s[wave]bonus![/wave]
+key enter
+dblclick @insp.prop:fontSize
+key ctrl+a
+type 48
+key enter
+key escape
+click @hier:Text
+wait 2
+key home
+scroll @node:Text -3
+wait 1
+annotate @node:Text Rich text: [color=..] and [wave] tags
+annotate @window:inspector Text, font size, colour, alignment, wrapping, rich text, SDF, typewriter
+screenshot node_TextNode
+
+# Nine Slice Sprite: a 48 x 48 panel (two 4 px border bands, made with
+# sips from a fixture) drawn at the default 200 x 100; the borders keep
+# their width.
+exec sips -z 32 32 tests/drive/fixtures/import/crate.png --out $PROJECT/drive_panel_a_zz.png
+exec sips -p 40 40 --padColor 7A4A1E $PROJECT/drive_panel_a_zz.png --out $PROJECT/drive_panel_b_zz.png
+exec sips -p 48 48 --padColor 3B2410 $PROJECT/drive_panel_b_zz.png --out $PROJECT/textures/drive_panel_zz.png
+wait 90
+click @asset.new-scene
+click @hier.add
+type nine slice
+click @addnode:Nine Slice Sprite
+click @addnode.create
+expect node:NineSliceSprite.type == NineSliceNode
+click @insp.texture-path
+click @pick:textures/drive_panel_zz.png
+wait 2
+key home
+wait 1
+annotate @node:NineSliceSprite Drawn at Size; the borders keep their width
+annotate @window:inspector Texture, Size and the border widths (Margins)
+screenshot node_NineSliceNode
+
+# Parallax Background: a repeating background.
+click @asset.new-scene
+click @hier.add
+type parallax
+click @addnode:Parallax Background
+click @addnode.create
+expect node:ParallaxBackground.type == ParallaxNode
+click @insp.texture-path
+click @pick:textures/Background.png
+wait 2
+key shift+home
+wait 1
+annotate @node:ParallaxBackground Repeats across the view (Repeat X)
+annotate @window:inspector Factor (how much it follows the camera), repeat, scroll speed
+screenshot node_ParallaxNode
+
+# Line: a polyline through three points.
+click @asset.new-scene
+click @hier.add
+type line
+click @addnode:Line
+click @addnode.create
+expect node:Line.type == LineNode
+click @insp.line.add
+dblclick @insp.line.point:2+50,0
+key ctrl+a
+type -60
+key enter
+dblclick @insp.prop:width
+key ctrl+a
+type 10
+key enter
+key escape
+click @hier:Line
+wait 2
+key home
+scroll @node:Line -3
+wait 1
+annotate @node:Line The line through its points (local to the node)
+annotate @insp.line.add Add Point; edit each point's x, y above
+screenshot node_LineNode
+
+# LDtk Tilemap Level: the demo project's HighForest level.
+click @asset.new-scene
+click @hier.add
+type ldtk
+click @addnode:LDtk Tilemap Level
+click @addnode.create
+expect node:LDtkTilemapLevel.type == LdtkLevelNode
+click @insp.ldtk
+click @pick:levels/HighForest.ldtk
+wait 3
+click @insp.ldtk.panel
+wait 2
+expect bottom-tab == Ldtk
+key home
+wait 1
+annotate @node:LDtkTilemapLevel The level, drawn from its top-left corner
+annotate @insp.ldtk.panel The LDtk tab: layers, entities, collision, links
+screenshot node_LdtkLevelNode
+
+# Light: a point light over a sprite, the scene's ambient at Night.
+click @asset.new-scene
+click @hier.add
+type texture sprite
+click @addnode:Texture Sprite
+click @addnode.create
+click @insp.texture
+click @pick:textures/Background.png
+wait 2
+key escape
+click @scene.tab:settings
+click @insp.scene-ambient-preset
+click @pick:Night
+click @scene.tab:tree
+click @hier.add
+type light
+click @addnode:Light
+click @addnode.create
+expect node:Light.type == LightNode
+wait 2
+key home
+wait 1
+annotate @node:Light The light (its radius ring shows while selected)
+annotate @window:inspector Kind, colour, energy, radius, falloff, spread, shadows
+screenshot node_LightNode
+
+# Tile Map: a strip of ground painted from Tiles.png (16 px tiles), the map
+# placed in the middle of the game frame.
+click @asset.new-scene
+click @hier.add
+type tile map
+click @addnode:Tile Map
+click @addnode.create
+expect node:TileMap.type == TileMapNode
+wait 2
+expect bottom-tab == TileMap
+dblclick @insp.position.x
+key ctrl+a
+type 560
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type 300
+key enter
+click @tile.tileset
+click @pick:textures/Tiles.png
+wait 2
+dblclick @tile.size-x
+key cmd+a
+type 16
+key enter
+dblclick @tile.size-y
+key cmd+a
+type 16
+key enter
+key shift+home
+wait 1
+click @tile.palette:1
+drag @world:568,308 @world:712,308
+click @tile.palette:26
+drag @world:568,324 @world:712,324
+click @tile.palette:51
+drag @world:568,340 @world:712,340
+click @tile.palette:76
+drag @world:568,356 @world:712,356
+expect node:TileMap.tiles >= 30
+scroll @world:640,330 4
+scroll @world:640,330 4
+scroll @world:640,330 4
+scroll @world:640,330 4
+scroll @world:640,330 4
+wait 1
+annotate @node:TileMap The map's top-left corner: cells count right and down from here
+annotate @tile.tileset The Tile Map tab: tileset, tile size, map size, tools and tiles
+screenshot node_TileMapNode

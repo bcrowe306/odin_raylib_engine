@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The sprite, drawn around its origin (the centre by default)", "x": 596, "y": 248, "w": 56, "h": 56},
+    {"label": "The image (or drag one from Assets into the viewport)", "x": 1136, "y": 475, "w": 98, "h": 25}
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Repeats across the view (Repeat X)", "x": 596, "y": 245, "w": 56, "h": 56},
+    {"label": "Factor (how much it follows the camera), repeat, scroll speed", "x": 1044, "y": 399, "w": 236, "h": 293}
+  ]
+}
