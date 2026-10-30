@@ -634,7 +634,15 @@ AddNodeDialog_Render :: proc(state: ^EditorState) {
 			imgui.TextUnformatted(fmt.ctprintf("%s  %s", sel.icon, sel.name))
 			imgui.PopFont()
 			imgui.PopStyleColor()
-			UI_DimText(sel.typeName)
+			if add_node_is_custom(sel) {
+				// A custom node type: what it's made of.
+				if t, _ := e.CustomNode_Get(&state.game.gameContext, sel.typeName); t != nil {
+					script := e.CustomNode_Script(t, &state.game.gameContext)
+					UI_DimText(fmt.tprintf("A %s%s  ·  %s", t.base, fmt.tprintf(" with %s", script) if script != "" else "", sel.typeName))
+				}
+			} else {
+				UI_DimText(sel.typeName)
+			}
 			imgui.Dummy({0, 6})
 			imgui.TextWrapped("%s", strings.clone_to_cstring(sel.description, context.temp_allocator))
 		}
