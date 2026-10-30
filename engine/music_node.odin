@@ -169,7 +169,7 @@ MusicNode_Play :: proc(musicNode: ^MusicNode) {
 		} else {
 			Mixer_StopVoice(musicNode.voice)
 			musicNode.voice = Mixer_PlayMusic(musicNode.music.music, MusicNode_BusIndex(musicNode), MusicNode_EffectiveVolume(musicNode), musicNode.looping, owner = musicNode.music)
-			Mixer_SetVoice(musicNode.voice, MusicNode_EffectiveVolume(musicNode), Audio_RaylibPanToMixer(musicNode.pan), musicNode.pitch)
+			Mixer_SetVoice(musicNode.voice, MusicNode_EffectiveVolume(musicNode), music_mixer_pan(musicNode.pan), musicNode.pitch)
 			if musicNode.caption != "" do Subtitles_Show(musicNode.caption, "", 4, .Caption)
 		}
 	}
@@ -221,7 +221,7 @@ MusicNode_Seek :: proc(musicNode: ^MusicNode, positionInSeconds: f32) {
 		paused := musicNode.isPaused
 		Mixer_StopVoice(musicNode.voice)
 		musicNode.voice = Mixer_PlayMusic(musicNode.music.music, MusicNode_BusIndex(musicNode), MusicNode_EffectiveVolume(musicNode), musicNode.looping, owner = musicNode.music, startSeconds = targetPos)
-		Mixer_SetVoice(musicNode.voice, MusicNode_EffectiveVolume(musicNode), Audio_RaylibPanToMixer(musicNode.pan), musicNode.pitch)
+		Mixer_SetVoice(musicNode.voice, MusicNode_EffectiveVolume(musicNode), music_mixer_pan(musicNode.pan), musicNode.pitch)
 		Mixer_SetVoicePaused(musicNode.voice, paused)
 	}
 	musicNode.timePlayed = targetPos
@@ -238,6 +238,10 @@ MusicNode_SetPitch :: proc(musicNode: ^MusicNode, pitch: f32) {
 	musicNode.pitch = max(pitch, 0.01)
 	MusicNode_ApplyVolume(musicNode)
 }
+
+// music_mixer_pan: Pan (0 left, 0.5 centre, 1 right) as the mixer's
+// (-1 left .. 1 right). Not raylib's pan, which is the other way (#216).
+music_mixer_pan :: #force_inline proc(p: f32) -> f32 {return clamp((p - 0.5) * 2, -1, 1)}
 
 MusicNode_SetPan :: proc(musicNode: ^MusicNode, pan: f32) {
 	if musicNode == nil do return
@@ -278,7 +282,7 @@ MusicNode_EffectiveVolume :: proc(m: ^MusicNode) -> f32 {
 
 // MusicNode_ApplyVolume pushes volume, pan and pitch to its voice.
 MusicNode_ApplyVolume :: proc(m: ^MusicNode) {
-	Mixer_SetVoice(m.voice, MusicNode_EffectiveVolume(m), Audio_RaylibPanToMixer(m.pan), m.pitch)
+	Mixer_SetVoice(m.voice, MusicNode_EffectiveVolume(m), music_mixer_pan(m.pan), m.pitch)
 }
 
 // MusicNode_FadeTo fades the track's volume factor to `target` (0..1) over

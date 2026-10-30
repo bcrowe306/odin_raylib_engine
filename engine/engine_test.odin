@@ -976,6 +976,10 @@ test_music_node_playback_controls_and_memory :: proc(t: ^testing.T) {
 
 		MusicNode_SetPan(musicNode, 0.2)
 		testing.expect_value(t, musicNode.pan, f32(0.2))
+		// Pan 0 is left, 1 right on the mixer (-1 left .. 1 right; #216).
+		testing.expect_value(t, music_mixer_pan(0), f32(-1))
+		testing.expect_value(t, music_mixer_pan(0.5), f32(0))
+		testing.expect_value(t, music_mixer_pan(1), f32(1))
 
 		// 4. Test Autoplay on Ready:
 		// Running 1 frame triggers scene loading & ready callback, which starts autoplay
