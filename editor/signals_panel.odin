@@ -133,7 +133,6 @@ signal_handler_text :: proc(cls, method, sourceName, signal, param, doc: string)
 
 // code_doc_for_script opens a script in the code editor (focusing it when
 // asked) and returns its document.
-@(private = "file")
 code_doc_for_script :: proc(state: ^EditorState, rel: string, focus: bool) -> ^Code_Doc {
 	cm := &GlobalCode
 	active, sel, foc := cm.active, cm.selectRequest, cm.focusRequest

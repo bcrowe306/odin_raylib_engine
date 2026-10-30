@@ -71,5 +71,6 @@ key ctrl+s
 wait 3
 expect node:PatrolDroneAlpha.script.spaceship_1 == textures/Spaceship_1.png
 click @hier:PatrolDroneAlpha
+click @insp.tab:properties
 expect item:insp.script:spaceship_1 == visible
 screenshot asset_picker

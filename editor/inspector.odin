@@ -203,6 +203,11 @@ inspector_body :: proc(state: ^EditorState) {
 		UI_EndBanner({0.70, 0.52, 1.0, 0.10})
 	}
 
+	// Node / Properties (#208): the script's properties in their own tab.
+	if !isRoot && !Inspector_Tabs(state, node) {
+		Inspector_PropertiesTab(state, node)
+		return
+	}
 	imgui.Dummy({0, 4})
 	if isRoot do scene_settings_pointer()
 	Inspector_InstanceSection(state, node) // exposed properties (#85)
@@ -1246,23 +1251,10 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 			return
 		}
 
-		mod := sm.modules[e.ScriptVFS_NormalizePath(inst.modulePath)] or_else nil
-		target := Script_PropsTarget{
-			mod         = mod,
-			modulePath  = inst.modulePath,
-			values      = &inst.properties,
-			owner       = node,
-			idPrefix    = "insp.script",
-			data        = inst,
-			set         = proc(state: ^EditorState, t: ^Script_PropsTarget, name: string, val: e.ScriptValue) {
-				e.ScriptInstance_SetProperty((^e.ScriptInstance)(t.data), name, val, &state.game.scriptManager)
-			},
-			record_undo = proc(state: ^EditorState, t: ^Script_PropsTarget, label: string) {Editor_RecordUndo(state, label)},
-		}
-		if script_props_editor(state, &target) == 0 {
-			UI_PropLabel("")
-			UI_DimText("No exported properties")
-		}
+		// Its properties: the Properties tab (#208).
+		UI_PropLabel("Properties")
+		n := len(inst.properties)
+		if UI_Button(fmt.tprintf("%s  %d in the Properties tab", ICON_FA_SLIDERS, n) if n > 0 else fmt.tprintf("%s  Add in the Properties tab", ICON_FA_PLUS), "insp.script-props", {-1, 0}) do inspectorTabRequest = .Properties
 		UI_EndProps()
 	}
 }

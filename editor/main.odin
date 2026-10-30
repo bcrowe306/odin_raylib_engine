@@ -262,6 +262,7 @@ editor_main :: proc() -> int {
 		NewScriptDialog_Render(&GlobalEditor)
 		CustomNodeDialog_Render(&GlobalEditor)
 		NewComponentDialog_Render(&GlobalEditor)
+		PropertyDialog_Render(&GlobalEditor)
 		CustomNodeRebase_Render(&GlobalEditor)
 		NewResourceDialog_Render(&GlobalEditor)
 		ScriptReference_Render(&GlobalEditor)

@@ -20,6 +20,7 @@ click @hier:PatrolDroneAlpha
 expect node:PatrolDroneAlpha.script.main_camera == ../MainCamera
 scroll @insp.position.x -80
 wait 3
+click @insp.tab:properties
 expect item:insp.script:main_camera == visible
 screenshot picker
 click @insp.script:main_camera

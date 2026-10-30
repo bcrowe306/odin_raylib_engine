@@ -10,6 +10,7 @@ click @pick:scripts/asteroid.lua
 wait 3
 scroll @insp.position.x -120
 wait 3
+click @insp.tab:properties
 expect item:insp.script-group:State == visible
 expect item:insp.script-group:Audio == visible
 click @insp.script:mode

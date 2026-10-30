@@ -42,6 +42,7 @@ key ctrl+z
 click @hier:PatrolDroneAlpha
 scroll @insp.rotation -60
 wait 3
+click @insp.tab:properties
 hover @insp.script:orbit_radius+-110,0
 wait 5
 expect insp-help-path == script.orbit_radius

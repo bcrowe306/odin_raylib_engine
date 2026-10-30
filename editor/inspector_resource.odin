@@ -254,8 +254,8 @@ Resource_FilesOfClass :: proc(state: ^EditorState, class: string) -> []string {
 		}
 		classOfFile.scanned = time.tick_now()
 	}
-	want := e.ScriptVFS_NormalizePath(class)
+	// (The class by path or by name: Resource_ClassMatches, #208.)
 	out := make([dynamic]string, context.temp_allocator)
-	for rel in files do if classOfFile.of[rel] == want do append(&out, rel)
+	for rel in files do if script, ok := classOfFile.of[rel]; ok && e.Resource_ClassMatches(class, script) do append(&out, rel)
 	return out[:]
 }

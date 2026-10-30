@@ -110,7 +110,10 @@ Scripts declare exposed properties in a `properties` table. These properties are
   Saved as a `.resource.json` path; `self.weapon` is the resource's table
   (its values and its class's methods), set just before `ready()` - the
   shared one, or this component instance's own copy with `local_copy`.
-  The picker lists the files of `class`. Lists: `{ type = "array", of = "resource" }`.
+  The picker lists the files of `class` - its path, or its class name
+  (`class = "Weapon"` for `scripts/weapon.lua`). Lists: `{ type = "array", of = "resource" }`.
+  The Inspector's **Properties** tab adds these (and every other type) with
+  a dialog: no typing the table by hand.
   See [Resources](#resources).
 - `enum`: one of `values` - `mode = { type = "enum", values = {"Idle", "Run"}, default = "Idle" }`;
   a combo in the Inspector, the chosen string in Lua (typed as the union).
