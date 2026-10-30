@@ -102,3 +102,59 @@ waiting = a:nav_is_finished()
 	ProcessNodeQueues(scene.manager, &game.gameContext)
 	testing.expect_value(t, len(scene.manager.navRegions), 0)
 }
+
+// #218: nav_set_target every frame is fine - it doesn't re-path each call
+// or raise navigation_finished again once there, and a moving target is
+// followed (picked up by the repath interval, then to its end).
+@(test)
+test_navigation_set_target_every_frame :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("nav218", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	game.state = .Running
+	region := cast(^NavigationRegionNode)Node_CreateByTypeName(scene, "NavigationRegionNode")
+	region.size = {640, 320}
+	region.cellSize = 16
+	walker := Node_CreateByTypeName(scene, "Node")
+	walker.position = {100, 160}
+	agent := cast(^NavigationAgentNode)Node_CreateByTypeName(scene, "NavigationAgentNode", walker)
+	agent.speed, agent.radius, agent.repathInterval = 200, 8, 0.5
+	arrived := 0
+	agent.onFinished->subscribe(proc(src: rawptr, v: EventValue, ctx: ^GameContext, ud: rawptr) {(cast(^int)ud)^ += 1}, &arrived)
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	Node_SetGlobalPositions(scene.manager, scene.rootNode)
+	NavRegion_Bake(region, &game.gameContext)
+
+	// The same target every frame: the path isn't thrown away.
+	NavAgent_SetTarget(agent, {500, 160})
+	game->run(1.0 / 60)
+	timer := agent.repathT
+	for _ in 0 ..< 5 {
+		NavAgent_SetTarget(agent, {500, 160})
+		game->run(1.0 / 60)
+	}
+	testing.expectf(t, len(agent.path) > 0 && agent.repathT < timer, "the path and its timer stay (%v -> %v)", timer, agent.repathT)
+
+	// A target that moves every frame is followed to where it ends up.
+	target := [2]f32{500, 160}
+	for i in 0 ..< 240 {
+		if i < 60 do target.y += 1
+		NavAgent_SetTarget(agent, target)
+		game->run(1.0 / 60)
+	}
+	d := walker.globalPosition - target
+	testing.expectf(t, math.sqrt(d.x * d.x + d.y * d.y) < 10, "reached the moved target (%v vs %v)", walker.globalPosition, target)
+	testing.expect_value(t, arrived, 1)
+	// Once there, setting it again doesn't arrive again.
+	for _ in 0 ..< 30 {
+		NavAgent_SetTarget(agent, target)
+		game->run(1.0 / 60)
+	}
+	testing.expect_value(t, arrived, 1)
+	testing.expect(t, agent.finished, "still finished")
+	// A new target: on its way again.
+	NavAgent_SetTarget(agent, {150, 100})
+	testing.expect(t, agent.hasTarget && !agent.finished, "a new target")
+}

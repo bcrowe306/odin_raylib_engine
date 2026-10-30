@@ -50,12 +50,14 @@ enemy and unit AI.
   physics.
 - **Move Parent** off: it moves nothing. Read `agent.velocity` (px/s) in
   your script each frame and move the character yourself.
-- The path is found on the next update after `nav_set_target`. Each call
-  finds a new path, so don't call it every frame for a moving target:
-  call it when the target has moved, and let **Repath Interval** keep the
-  path fresh.
+- The path is found on the next update after `nav_set_target`. Calling it
+  every frame (chasing a moving target) is fine: the same target (within
+  **Arrive Distance**) changes nothing, and a moved one is taken up at the
+  next **Repath Interval** (0: at once). At the end of its path it goes on
+  to where the target is now.
 - It arrives when it is within **Arrive Distance** of the target, then
-  raises `navigation_finished`, stops and forgets the target.
+  raises `navigation_finished` and stops. Setting the same target again
+  doesn't raise it again; a different one sets off.
 - No path (the target is walled off, there's no region, or no place the
   agent's **Radius** fits): it raises `target_unreachable` and forgets the
   target. This can also happen while walking, when a repath finds the way

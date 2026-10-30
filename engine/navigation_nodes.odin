@@ -260,6 +260,7 @@ NavigationAgentNode :: struct {
 	hasTarget:  bool,
 	path:       [dynamic][2]f32, // world points (heap)
 	pathIndex:  int,
+	pathTarget: [2]f32,          // the target the path was found for
 	repathT:    f32,
 	finished:   bool,
 	drove:      bool,            // it set its parent's velocity last frame (cleared once when it stops)
@@ -293,7 +294,17 @@ NavAgent_Position :: proc(a: ^NavigationAgentNode, m: ^NodeManager) -> [2]f32 {
 }
 
 // NavAgent_SetTarget: go there (the path is found on the next update).
+// Safe every frame (#218): the same target (within Arrive Distance) changes
+// nothing - nor does it raise navigation_finished again once there; a moved
+// one is taken up by the next repath (Repath Interval; 0: at once).
 NavAgent_SetTarget :: proc(a: ^NavigationAgentNode, target: [2]f32) {
+	d := target - a.target
+	same := d.x * d.x + d.y * d.y <= a.arriveDistance * a.arriveDistance
+	if (a.hasTarget || a.finished) && same do return
+	if a.hasTarget && a.repathInterval > 0 {
+		a.target = target
+		return
+	}
 	a.target, a.hasTarget, a.finished = target, true, false
 	a.repathT = 0
 	clear(&a.path)
@@ -322,6 +333,7 @@ nav_agent_repath :: proc(a: ^NavigationAgentNode, m: ^NodeManager, pos: [2]f32, 
 	a.pathIndex = 0
 	g := nav_agent_grid(a, m, pos)
 	pts := Nav_FindPath(g, pos, a.target, {diagonal = true, smooth = true, radius = a.radius})
+	a.pathTarget = a.target
 	if pts == nil {
 		a.hasTarget = false
 		a.onUnreachable->notify(a, nil, ctx)
@@ -353,7 +365,17 @@ NavigationAgentNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 			if d.x * d.x + d.y * d.y > reach * reach do break
 			a.pathIndex += 1
 		}
+		// The end of a path to where the target was: go on to where it is.
 		if a.pathIndex >= len(a.path) {
+			d := a.target - a.pathTarget
+			if d.x * d.x + d.y * d.y > a.arriveDistance * a.arriveDistance {
+				nav_agent_repath(a, m, pos, ctx)
+				a.repathT = a.repathInterval
+				moving = a.hasTarget
+			}
+		}
+		if !moving {
+		} else if a.pathIndex >= len(a.path) {
 			a.finished, a.hasTarget = true, false
 			moving = false
 			a.onFinished->notify(a, nil, ctx)
