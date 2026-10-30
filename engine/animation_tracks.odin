@@ -338,6 +338,43 @@ Track_RemoveKey :: proc(track: ^Property_Track, time: f32) -> bool {
 	return false
 }
 
+// Track_MoveKeys moves the keys at `times` by `delta` seconds together (the
+// group stops at 0); a key they land on is replaced (#177).
+Track_MoveKeys :: proc(track: ^Property_Track, times: []f32, delta: f32) {
+	moving := make([]bool, len(track.keys), context.temp_allocator)
+	earliest := max(f32)
+	for k, i in track.keys {
+		for t in times do if math.abs(k.time - t) < TRACK_KEY_EPS {
+			moving[i] = true
+			earliest = min(earliest, k.time)
+			break
+		}
+	}
+	if earliest == max(f32) do return
+	d := max(delta, -earliest)
+	for &k, i in track.keys do if moving[i] do k.time += d
+	// The keys the moved ones landed on go.
+	#reverse for k, i in track.keys {
+		if moving[i] do continue
+		for m, j in track.keys do if moving[j] && math.abs(m.time - k.time) < TRACK_KEY_EPS {
+			ordered_remove(&track.keys, i)
+			break
+		}
+	}
+	Track_SortKeys(track)
+}
+
+// Track_PutKey puts a whole key (value, curve, text) at its time, replacing
+// the key there (pastes, duplicates).
+Track_PutKey :: proc(track: ^Property_Track, key: Track_Key) {
+	if i := Track_KeyAt(track, key.time); i >= 0 {
+		track.keys[i] = key
+		return
+	}
+	append(&track.keys, key)
+	Track_SortKeys(track)
+}
+
 // Track_KeyAt: the index of the key at `time` (-1: none).
 Track_KeyAt :: proc(track: ^Property_Track, time: f32) -> int {
 	for k, i in track.keys do if math.abs(k.time - time) < TRACK_KEY_EPS do return i

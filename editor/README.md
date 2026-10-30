@@ -506,7 +506,18 @@ viewport (Stop puts the scene back), and
 keyframed **property tracks**: **Add Track** picks the player or a child and
 a property (position, rotation, scale, colours, any numeric property); the
 yellow dot keys the current value at the playhead; right-click a key to
-delete it.
+delete it. Tracks are grouped under their node's row (click it to fold
+them; folded, its keys show as dots).
+**Keys**: click a key to select it (Shift / Cmd: add or remove), or drag a
+box from an empty spot; drag the selection along the timeline (keys snap to
+frames; hold Shift to place them anywhere; a key dropped on another
+replaces it). Cmd+C / Cmd+V paste the copied keys at the playhead (onto
+their own tracks, or the selected track when they came from one), Cmd+D
+duplicates them one frame after the last, Delete removes them (also the
+buttons left of the header). Keys are timed in seconds: the toolbar shows
+the playhead's time, the **clock** at the ruler switches it between frames
+and seconds, and Cmd / Ctrl + wheel (or the wheel over the ruler) zooms -
+the **%** button resets it. Drag the ruler to move the playhead.
 Right-click a key for its **Easing** to the next key (linear, sine, quad,
 cubic, quart, expo, back, elastic, bounce, constant; hover one to see its
 curve) or to delete it. Eased keys show a dot. Scripts can animate any
