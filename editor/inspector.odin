@@ -892,7 +892,9 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 						mn.music = nil
 						if path != "" do if m, mok := rm.loadAudioMusic(rm, resolved); mok do mn.music = m
 					}
+					AudioPreview_Stop() // (the old sound)
 				}
+				AudioPreview_Row(state, node) // #196
 				UI_EndProps()
 			}
 		}

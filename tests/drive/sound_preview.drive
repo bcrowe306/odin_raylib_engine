@@ -1,0 +1,39 @@
+# Sound preview in the Inspector (#196): a Sound Effect node's sound played
+# and stopped from its Audio section (nothing saved changes); another
+# selection stops it; a Music node previews too.
+wait 5
+click @hier.add
+key ctrl+a
+type sound effect
+key enter
+wait 2
+expect item:insp.audio-preview == visible
+click @insp.audio
+click @pick:audio/cannon-gunshot-1.wav
+wait 2
+click @insp.audio-preview
+expect audio-preview == playing
+screenshot sound_preview
+click @insp.audio-preview
+expect audio-preview == stopped
+
+# Playing, then another node selected: it stops.
+click @insp.audio-preview
+expect audio-preview == playing
+click @hier:PlayerShip
+click @hier:SoundEffect
+expect audio-preview == stopped
+
+# A Music node.
+click @hier.add
+key ctrl+a
+type music
+key enter
+wait 2
+click @insp.audio
+click @pick:audio/cannon-gunshot-1.wav
+wait 2
+click @insp.audio-preview
+expect audio-preview == playing
+click @insp.audio-preview
+expect audio-preview == stopped

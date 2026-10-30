@@ -825,6 +825,7 @@ Drive_Query :: proc(state: ^EditorState, q: string) -> (string, bool) {
 	case "simulating": return "true" if state.isSimulating else "false", true
 	case "clipboard-nodes": return "true" if Editor_HasClipboardNodes() else "false", true
 	case "anim-preview": return "paused" if AnimationPanel_PreviewPaused() else "playing", true
+	case "audio-preview": return "playing" if state.selectedNode != nil && AudioPreview_Playing(state.selectedNode) else "stopped", true
 	case "anim-keys": return AnimKeys_Summary(), true // selected keys in the timeline
 	case "anim-zoom": return fmt.tprintf("%.2f", AnimationPanel_Zoom()), true
 	case "slicer-selection": return Slicer_Selection(), true
