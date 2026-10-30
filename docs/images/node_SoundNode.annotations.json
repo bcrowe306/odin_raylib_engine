@@ -1,0 +1,9 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Add Sound (or drop audio from Assets)", "x": 1124, "y": 441, "w": 133, "h": 25},
+    {"label": "Preview: hear a play by the Play Mode", "x": 1124, "y": 474, "w": 74, "h": 25},
+    {"label": "Play Mode, volume / pitch / pan / delay variation, cooldown, bus, positional", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

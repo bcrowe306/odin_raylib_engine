@@ -1,0 +1,9 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The track (Audio File)", "x": 1124, "y": 483, "w": 110, "h": 25},
+    {"label": "Preview: hear it through its bus", "x": 1124, "y": 516, "w": 134, "h": 25},
+    {"label": "Volume, pitch, pan, bus, caption, Looping, Autoplay", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

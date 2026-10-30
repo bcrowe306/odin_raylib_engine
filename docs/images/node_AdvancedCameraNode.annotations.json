@@ -1,0 +1,9 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The advanced camera; its violet frame (here at Zoom 2) shows its name and priority", "x": 612, "y": 329, "w": 56, "h": 56},
+    {"label": "Targets: Follow Target (and group, path, limit node)", "x": 1124, "y": 483, "w": 110, "h": 25},
+    {"label": "Priority, Follow Mode, damping, zoom, limits, blend and shake", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}
