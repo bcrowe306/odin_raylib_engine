@@ -1,9 +1,10 @@
-# 2D lighting: a dark ambient for the scene (Inspector with nothing
-# selected), a point light and a spot light from Add Node, shadows from
+# 2D lighting: a dark ambient for the scene (the Scene panel's Settings
+# tab), a point light and a spot light from Add Node, shadows from
 # physics shapes, the viewport preview toggle, and saving.
 wait 5
 click @asset.new-scene
 key escape
+click @scene.tab:settings
 expect item:insp.scene-ambient == visible
 click @hier.add
 type light
@@ -14,6 +15,7 @@ key escape
 click @insp.scene-ambient-preset
 click @pick:Night
 screenshot dark_with_light
+click @scene.tab:tree
 
 # A box that casts a shadow, next to the light.
 click @hier.add

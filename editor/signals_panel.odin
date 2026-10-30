@@ -333,12 +333,7 @@ Inspector_Signals :: proc(state: ^EditorState, node: ^e.Node) {
 			UI_Tooltip(fmt.tprintf("%s -> %s:%s(value, source)", ev.name, c.target, c.method))
 			imgui.SameLine(imgui.GetContentRegionMax().x - 52)
 			if UI_IconButton(ICON_FA_CODE, fmt.tprintf("insp.signal-open:%s:%s", ev.name, c.method), "Open the handler", size = 24) && target != nil {
-				if rel := node_script_rel(state, target); rel != "" {
-					if doc := code_doc_for_script(state, rel, true); doc != nil {
-						cls := Script_ClassName(buf.buffer_to_string(&doc.buffer, context.temp_allocator))
-						if first, _, _, found := Script_FindMethod(&doc.buffer, cls, c.method); found do Editor_OpenScript(state, rel, first + 1, 4)
-					}
-				}
+				Signals_OpenHandler(state, target, c.method)
 			}
 			imgui.SameLine(0, 2)
 			if UI_IconButton(ICON_FA_LINK_SLASH, fmt.tprintf("insp.signal-disconnect:%s:%s", ev.name, c.method), "Disconnect (removes the generated handler)", size = 24) {
@@ -351,6 +346,18 @@ Inspector_Signals :: proc(state: ^EditorState, node: ^e.Node) {
 		}
 		imgui.PopID()
 	}
+}
+
+// Signals_OpenHandler opens a connection's method in the target's script.
+Signals_OpenHandler :: proc(state: ^EditorState, target: ^e.Node, method: string) -> bool {
+	if target == nil do return false
+	rel := node_script_rel(state, target)
+	if rel == "" do return false
+	doc := code_doc_for_script(state, rel, true)
+	if doc == nil do return false
+	cls := Script_ClassName(buf.buffer_to_string(&doc.buffer, context.temp_allocator))
+	if first, _, _, found := Script_FindMethod(&doc.buffer, cls, method); found do return Editor_OpenScript(state, rel, first + 1, 4)
+	return Editor_OpenScript(state, rel)
 }
 
 Signals_Disconnect :: proc(state: ^EditorState, node: ^e.Node, signal, target, method: string) {
