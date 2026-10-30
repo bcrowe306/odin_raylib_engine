@@ -354,7 +354,6 @@ CustomNodeDialog_Render :: proc(state: ^EditorState) {
 }
 
 // field_label: a dim label in a fixed-width column, the field after it.
-@(private = "file")
 field_label :: proc(label: string, width: f32) {
 	imgui.AlignTextToFramePadding()
 	x := imgui.GetCursorPosX()

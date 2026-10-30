@@ -142,6 +142,13 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 			imgui.EndTabItem()
 		}
 		Drive_Item("bottom:search")
+		if imgui.BeginTabItem(fmt.ctprintf("%s  Files###FilesTab", ICON_FA_FOLDER_OPEN), nil, flags(.Files, req, hasReq)) {
+			state.bottomTab = .Files
+			FileBrowser_RenderTab(state)
+			imgui.EndTabItem()
+		}
+		Drive_Item("bottom:files")
+		UI_Tooltip("File Browser: the computer's folders - preview files, then load them into the project")
 		imgui.EndTabBar()
 	}
 	// A tab picked by hand: no going back when the selection changes.

@@ -222,6 +222,7 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		UI_Tooltip("Another built-in type under it (Area -> Static Body...): a preview of what changes, then its nodes are converted")
 	case .Component:
 		if menu(ICON_FA_CUBES, "Edit Component", "edit-component") do Editor_OpenComponent(state, rel)
+		if menu(ICON_FA_PLUS, "New Component...", "new-component-file") do NewComponentDialog_Open(state)
 		if menu(ICON_FA_OBJECT_GROUP, "Select All Instances", "select-instances", hasScene && Editor_ComponentInstanceCount(state, rel) > 0) do Editor_SelectAllInstances(state, rel)
 		if menu(ICON_FA_PLUS, "Add to Scene", "add-component", hasScene) do Editor_InstantiateComponentFile(state, rel, state.cameraPos)
 		if menu(ICON_FA_PLUS, "Add as Child of Selected", "add-component-child", hasScene && sel != nil) {
@@ -416,6 +417,7 @@ Asset_FolderContextMenu :: proc(state: ^EditorState, title: string) {
 		if menu(ICON_FA_FILE_CODE, "New Resource Class...", "new-resource-class") do NewScriptDialog_Open(state, nil, "resource", "new_resource_class")
 	case "Levels": if menu(ICON_FA_FILE_IMPORT, "Import LDtk Project...", "import-level") do Asset_OpenImportDialog(state, {"ldtk"}, "Import LDtk Project")
 	case "Custom Nodes": if menu(ICON_FA_PLUS, "New Custom Node...", "new-custom-node") do CustomNodeDialog_Open(state)
+	case "Components": if menu(ICON_FA_PLUS, "New Component...", "new-component") do NewComponentDialog_Open(state)
 	}
 	// Import with this folder's file types in the dialog filter.
 	switch title {
@@ -594,9 +596,11 @@ Asset_AddMenu :: proc(state: ^EditorState) {
 	if menu(ICON_FA_CLAPPERBOARD, "New Scene", "add-new-scene") do Toolbar_NewScene(state)
 	if menu(ICON_FA_FILE_CODE, "New Script...", "add-new-script") do NewScriptDialog_Open(state)
 	if menu(ICON_FA_GEM, "New Resource...", "add-new-resource") do NewResourceDialog_Open(state)
+	UI_Tooltip("A data asset of a resource class (a script with a `resource` marker)")
+	if menu(ICON_FA_CUBES, "New Component...", "add-new-component") do NewComponentDialog_Open(state)
+	UI_Tooltip("A reusable piece of a scene, built from scratch: pick its root node, then add to it")
 	if menu(ICON_FA_PUZZLE_PIECE, "New Custom Node...", "add-new-custom-node") do CustomNodeDialog_Open(state)
 	UI_Tooltip("A node type of your own (a Hurtbox: an Area, its script and a box), listed in Add Node")
-	UI_Tooltip("A data asset of a resource class (a script with a `resource` marker)")
 	if menu(ICON_FA_WAND_MAGIC_SPARKLES, "New Shader", "add-new-shader") do Editor_NewShader(state)
 	if menu(ICON_FA_SHUFFLE, "New Level Generator", "add-new-levelgen") do LevelGenEditor_New(state)
 	UI_Tooltip("A procedural level: a graph of nodes (noise, caves, ...) written into a TileMap")

@@ -1711,6 +1711,15 @@ sj_obj_has :: proc(obj: json.Object, key: string) -> bool {
 	return ok
 }
 
+// Component_NewJSON: a component file made from scratch - its root's type
+// and name (the type's defaults fill the rest when it loads); "" when the
+// type isn't a node type (#192).
+Component_NewJSON :: proc(typeName, name: string, allocator := context.allocator) -> string {
+	if _, ok := Node_TypeInfoByName(typeName); !ok do return ""
+	quoted, _ := json.marshal(name, allocator = context.temp_allocator)
+	return fmt.aprintf("{{\n  \"name\": %s,\n  \"component\": true,\n  \"type\": \"%s\"\n}}\n", string(quoted), typeName, allocator = allocator)
+}
+
 // Component_ReadFile reads a component (prefab) file through the asset
 // manager (project directory or mounted .rayzr).
 Component_ReadFile :: proc(ctx: ^GameContext, compPath: string) -> ([]byte, bool) {
