@@ -214,7 +214,8 @@ scene_tab_label :: proc(state: ^EditorState, s: ^e.Scene) -> string {
 	base := filepath.base(s.filePath)
 	base = strings.trim_suffix(strings.trim_suffix(base, ".json"), ".scene")
 	base = strings.trim_suffix(base, ".component")
-	icon := ICON_FA_CUBES if Editor_IsComponentDoc(state, s) else ICON_FA_FILM
+	base = strings.trim_suffix(base, ".node")
+	icon := ICON_FA_PUZZLE_PIECE if Editor_IsCustomNodeDoc(state, s) else ICON_FA_CUBES if Editor_IsComponentDoc(state, s) else ICON_FA_FILM
 	return fmt.tprintf("%s  %s", icon, base)
 }
 

@@ -372,12 +372,15 @@ read_custom_node :: proc(scene: ^Scene, typePath: string, obj: json.Object, pare
 		return node
 	}
 	merged := custom_base(t, ctx)
+	bw := Json_Writer{sb = strings.builder_make(context.temp_allocator)}
+	Json_WriteValue(&bw, merged) // (before the node's own: what it's compared with when saved)
 	own := make(json.Object, len(obj), context.temp_allocator)
 	for k, v in obj do if k != CUSTOM_NODE_KEY && k != "type" do own[k] = v
 	merge_node(&merged, own)
 	node := read_node(scene, merged, parent, ctx, noCustom = true)
 	if node == nil do return nil
 	node.customType = strings.clone(t.path, node.allocator)
+	node.customBase = strings.clone(strings.to_string(bw.sb), node.allocator)
 	return node
 }
 
@@ -416,7 +419,14 @@ write_custom_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 		val, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
 		inst, _ := val.(json.Object)
 		if err == .None && inst != nil {
-			diff, _ = diff_node(custom_base(t, node.gameContext), inst, false)
+			// Compared with what it was built from (the type may have changed since).
+			base: json.Object
+			if node.customBase != "" {
+				bv, berr := json.parse(transmute([]u8)node.customBase, allocator = context.temp_allocator)
+				if berr == .None do base, _ = bv.(json.Object)
+			}
+			if base == nil do base = custom_base(t, node.gameContext)
+			diff, _ = diff_node(base, inst, false)
 			for k, v in diff {
 				if _, isNull := v.(json.Null); isNull {
 					append(&nulls, k)
@@ -603,10 +613,11 @@ CustomNode_DefinitionJSON :: proc(d: CustomNode_Definition, allocator := context
 }
 
 // CustomNode_DefaultsFromNode: a configured node's values as a type's
-// "defaults" (Save as Custom Node) - what differs from its built-in type's
-// defaults, without its name, place, children or script file (its script's
-// values are kept). JSON object text.
-CustomNode_DefaultsFromNode :: proc(node: ^Node, manager: ^NodeManager, allocator := context.allocator) -> string {
+// "defaults" (Save as Custom Node, a type's document) - what differs from
+// its built-in type's defaults (`parent`: from that type's values), without
+// its name, place, children or script file (its script's values are kept).
+// JSON object text.
+CustomNode_DefaultsFromNode :: proc(node: ^Node, manager: ^NodeManager, allocator := context.allocator, parent: ^CustomNodeType = nil) -> string {
 	if node == nil do return "{}"
 	prev := serializeFullCustom
 	serializeFullCustom = node // (a custom node: all its values)
@@ -615,7 +626,13 @@ CustomNode_DefaultsFromNode :: proc(node: ^Node, manager: ^NodeManager, allocato
 	val, err := json.parse(transmute([]u8)text, allocator = context.temp_allocator)
 	inst, isObj := val.(json.Object)
 	if err != .None || !isObj do return strings.clone("{}", allocator)
-	base, ok := type_defaults(Node_TypeName(node))
+	base: json.Object
+	ok: bool
+	if parent != nil {
+		base, ok = custom_base(parent, node.gameContext), true
+	} else {
+		base, ok = type_defaults(Node_TypeName(node))
+	}
 	if !ok do base = make(json.Object, 0, context.temp_allocator)
 	diff, _ := diff_node(base, inst, false)
 	out := make(json.Object, 0, context.temp_allocator)
@@ -628,12 +645,17 @@ CustomNode_DefaultsFromNode :: proc(node: ^Node, manager: ^NodeManager, allocato
 			so, _ := inst["script"].(json.Object)
 			props, hasProps := so["properties"].(json.Object)
 			if !hasProps do continue
-			declared := make(json.Object, 1, context.temp_allocator)
-			ds := make(json.Object, 1, context.temp_allocator)
-			ds["path"] = so["path"]
-			declared["script"] = ds
-			normalize_base(&declared, node.gameContext)
-			defs, _ := declared["script"].(json.Object)["properties"].(json.Object)
+			defs: json.Object
+			if bs, has := base["script"].(json.Object); has && parent != nil && json_equal(bs["path"], so["path"]) {
+				defs, _ = bs["properties"].(json.Object) // (the parent type's values)
+			} else {
+				declared := make(json.Object, 1, context.temp_allocator)
+				ds := make(json.Object, 1, context.temp_allocator)
+				ds["path"] = so["path"]
+				declared["script"] = ds
+				normalize_base(&declared, node.gameContext)
+				defs, _ = declared["script"].(json.Object)["properties"].(json.Object)
+			}
 			changed := make(json.Object, 0, context.temp_allocator)
 			for pk, pv in props {
 				dv, has := defs[pk]
@@ -651,4 +673,85 @@ CustomNode_DefaultsFromNode :: proc(node: ^Node, manager: ^NodeManager, allocato
 	w := Json_Writer{sb = strings.builder_make(allocator)}
 	Json_WriteValue(&w, out)
 	return strings.to_string(w.sb)
+}
+
+// Scene_RefreshCustomNodes rebuilds a scene's nodes of a type (and of the
+// types built on it) from what they change, with the type as it is now (its
+// file changed). A node inside a component instance: the instance is
+// rebuilt. Returns how many were rebuilt; pointers into them are stale
+// (callers keep the selection as paths).
+Scene_RefreshCustomNodes :: proc(scene: ^Scene, typePath: string, ctx: ^GameContext) -> int {
+	if scene == nil || scene.manager == nil do return 0
+	targets := make([dynamic]^Node, context.temp_allocator)
+	for n in scene.manager.nodes {
+		if n == nil || n.removing || n.customType == "" do continue
+		affected := n.customType == typePath
+		for x, i := custom_parent(Node_CustomType(n), ctx), 0; !affected && x != nil && i < 16; x, i = custom_parent(x, ctx), i + 1 {
+			if x.path == typePath do affected = true
+		}
+		if !affected do continue
+		outer := n
+		for p := GetParent(scene.manager, n); p != nil; p = GetParent(scene.manager, p) do if p.componentPath != "" do outer = p
+		if !slice.contains(targets[:], outer) do append(&targets, outer)
+	}
+	// (A target inside another one: rebuilt with it.)
+	count := 0
+	for old in targets {
+		skip := false
+		for p := GetParent(scene.manager, old); p != nil; p = GetParent(scene.manager, p) do if slice.contains(targets[:], p) do skip = true
+		if skip do continue
+		if Scene_RebuildInstance(scene, old, "", ctx) != nil do count += 1
+	}
+	return count
+}
+
+// Node_FullJSON: a node's JSON with all its values (a custom node's too, not
+// only what differs from its type).
+Node_FullJSON :: proc(node: ^Node, manager: ^NodeManager, allocator := context.allocator) -> string {
+	prev := serializeFullCustom
+	serializeFullCustom = node
+	defer serializeFullCustom = prev
+	return Node_SerializeToJSON(node, manager, allocator)
+}
+
+// CustomNode_Rebase: a type's values for another base type - the new
+// "defaults" (what the new base's node keeps of them) and what doesn't carry
+// over (keys the new base doesn't have: "shapes", "properties.radius"...).
+// Built on scratch nodes: the scene loader decides what applies.
+CustomNode_Rebase :: proc(t: ^CustomNodeType, newBase: string, ctx: ^GameContext, allocator := context.allocator) -> (defaults: string, dropped: []string) {
+	out := make([dynamic]string, allocator)
+	scratch := new(Scene)
+	InitializeScene(scratch)
+	defer {
+		TerminateScene(scratch)
+		free(scratch)
+	}
+	old := Scene_CreateCustomNode(scratch, t, scratch.rootNode, ctx)
+	if old == nil do return strings.clone("{}", allocator), out[:]
+	ProcessNodeQueues(scratch.manager, ctx)
+	oldVal, _ := json.parse(transmute([]u8)Node_FullJSON(old, scratch.manager, context.temp_allocator), allocator = context.temp_allocator)
+	oldObj, _ := oldVal.(json.Object)
+	obj := make(json.Object, len(oldObj), context.temp_allocator)
+	for k, v in oldObj do if k != CUSTOM_NODE_KEY && k != "children" do obj[k] = v
+	obj["type"] = json.String(newBase)
+	fresh := read_node(scratch, obj, scratch.rootNode, ctx, noCustom = true)
+	if fresh == nil do return strings.clone("{}", allocator), out[:]
+	ProcessNodeQueues(scratch.manager, ctx)
+	newVal, _ := json.parse(transmute([]u8)Node_SerializeToJSON(fresh, scratch.manager, context.temp_allocator), allocator = context.temp_allocator)
+	newObj, _ := newVal.(json.Object)
+	for k, v in oldObj {
+		if Custom_IsDirectKey(k) || k == "script" || k == "uid" do continue
+		nv, has := newObj[k]
+		if !has {
+			append(&out, strings.clone(k, allocator))
+			continue
+		}
+		if k == "properties" {
+			op, _ := v.(json.Object)
+			np, _ := nv.(json.Object)
+			for pk in op do if pk not_in np do append(&out, fmt.aprintf("properties.%s", pk, allocator = allocator))
+		}
+	}
+	slice.sort(out[:])
+	return CustomNode_DefaultsFromNode(fresh, scratch.manager, allocator), out[:]
 }

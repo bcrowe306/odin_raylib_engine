@@ -1,0 +1,44 @@
+# #155: Change Base Type - a preview (what doesn't carry over, the files
+# with nodes of it), then the type and its nodes converted: in a scene that
+# isn't open (loaded and saved again) and in an open one (rebuilt, saved);
+# each node keeps what it changed (HurtB's armor).
+wait 5
+exec mkdir -p $PROJECT/nodes
+exec cp tests/drive/fixtures/HurtboxZz.node.json $PROJECT/nodes/HurtboxZz.node.json
+exec cp tests/drive/fixtures/custom_hurtbox_zz.lua $PROJECT/scripts/custom_hurtbox_zz.lua
+exec cp tests/drive/fixtures/custom_nodes_zz.scene.json $PROJECT/scenes/custom_nodes_zz.scene.json
+wait-until item:asset:nodes/HurtboxZz.node.json == visible timeout=300
+rclick @asset:nodes/HurtboxZz.node.json
+click @ctx:rebase-custom-node
+wait 3
+click @rebase.base
+wait 2
+click @rebase.base:StaticBodyNode
+wait 3
+screenshot preview
+click @rebase.convert
+wait 10
+expect file:nodes/HurtboxZz.node.json contains "base": "StaticBodyNode"
+expect file:nodes/HurtboxZz.node.json contains "shapes"
+expect file:scenes/custom_nodes_zz.scene.json contains "type": "StaticBodyNode"
+expect file:scenes/custom_nodes_zz.scene.json contains "node_type": "nodes/HurtboxZz.node.json"
+dblclick @asset:scenes/custom_nodes_zz.scene.json
+wait 10
+expect node:HurtA.type == StaticBodyNode
+expect node:HurtA.class == HurtboxZz
+expect node:HurtB.script.armor == 3
+
+# Back to an Area with the scene open: rebuilt in it, and saved.
+rclick @asset:nodes/HurtboxZz.node.json
+click @ctx:rebase-custom-node
+wait 3
+click @rebase.base
+wait 2
+click @rebase.base:AreaNode
+wait 3
+click @rebase.convert
+wait 10
+expect node:HurtA.type == AreaNode
+expect node:HurtB.script.armor == 3
+expect file:scenes/custom_nodes_zz.scene.json contains "type": "AreaNode"
+screenshot back_to_area

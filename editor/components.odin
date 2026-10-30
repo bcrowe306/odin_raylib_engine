@@ -22,6 +22,7 @@ Editor_IsComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
 // Editor_OpenComponent opens a component file for editing, as a document
 // whose root holds the component's node.
 Editor_OpenComponent :: proc(state: ^EditorState, rel: string) -> bool {
+	if strings.has_suffix(rel, e.CUSTOM_NODE_SUFFIX) do return Editor_OpenCustomNodeType(state, rel) // (a type's document)
 	for scene, _ in state.componentDocs {
 		if scene.filePath == rel {
 			Editor_SwitchView(state, scene)
@@ -68,6 +69,7 @@ Editor_OpenComponent :: proc(state: ^EditorState, rel: string) -> bool {
 // Editor_SaveComponentDoc writes a component document back to its file and
 // refreshes the instances in every open scene.
 Editor_SaveComponentDoc :: proc(state: ^EditorState, scene: ^e.Scene) -> bool {
+	if Editor_IsCustomNodeDoc(state, scene) do return Editor_SaveCustomNodeDoc(state, scene)
 	children := e.GetChildrenView(scene.manager, scene.rootNode)
 	if len(children) == 0 {
 		Editor_Log(state, .Error, "Component document is empty")

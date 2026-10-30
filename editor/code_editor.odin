@@ -315,6 +315,10 @@ Code_SaveDoc :: proc(state: ^EditorState, doc: ^Code_Doc) -> bool {
 	Code_HistorySave(state, doc) // local history (code_history.odin)
 	code_lsp_did_save(doc)
 	Editor_Log(state, .Info, "Saved %s", doc.rel)
+	// A custom node type's file: its nodes in the open documents follow.
+	if Asset_KindOf(doc.rel) == .CustomNode {
+		if n := Editor_RefreshCustomNodes(state, doc.rel); n > 0 do Editor_Log(state, .Info, "%d node(s) of the type updated", n)
+	}
 	// Running scripts (Simulate) pick the change up right away.
 	if n := e.ScriptManager_CheckForChanges(&state.game.scriptManager, force = true); n > 0 {
 		Editor_Log(state, .Info, "Reloaded %d changed script(s)", n)

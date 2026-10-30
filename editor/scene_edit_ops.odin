@@ -172,6 +172,16 @@ undo_redo :: proc(state: ^EditorState, from, to: ^[dynamic]Undo_Entry, verb: str
 @(private = "file")
 undo_file_restored :: proc(state: ^EditorState, rel, text: string, sceneRestored: bool) {
 	ResourceInspector_FileChanged(rel)
+	if Asset_KindOf(rel) == .CustomNode {
+		// A type's file: its nodes follow, and its open document.
+		Editor_RefreshCustomNodes(state, rel, state.activeScene if sceneRestored else nil)
+		for doc in state.componentDocs {
+			if doc == nil || doc.filePath != rel do continue
+			Editor_RevertCustomNodeDoc(state, doc)
+			Editor_SetSceneBaseline(state, doc)
+		}
+		return
+	}
 	if Asset_KindOf(rel) != .Component do return
 	e.Component_ForgetPrepared()
 	if sceneRestored {

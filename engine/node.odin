@@ -113,6 +113,10 @@ Node :: struct {
 	// keys are saved back as they were loaded (customRaw, JSON).
 	customMissing: bool,
 	customRaw:     string,
+	// The type's values the node was built from (JSON): it saves what
+	// differs from them, so a type changed since (its file edited, undone)
+	// doesn't pin the old values on it (like componentBase).
+	customBase: string,
 	// Saved signal connections from this node's events to script methods
 	// (signals.odin).
 	signalConnections: [dynamic]Signal_Connection,

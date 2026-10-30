@@ -213,9 +213,13 @@ Asset_ContextMenu :: proc(state: ^EditorState, rel: string) {
 		t, _ := e.CustomNode_Get(&state.game.gameContext, rel)
 		script := e.CustomNode_Script(t, &state.game.gameContext) if t != nil else ""
 		if menu(ICON_FA_CODE, "Edit Script", "edit-custom-node-script", script != "") do Editor_OpenScript(state, script)
+		if menu(ICON_FA_PEN_TO_SQUARE, "Edit Type", "edit-custom-node") do Editor_OpenCustomNodeType(state, rel)
+		UI_Tooltip("Its default values as a node: the shape in the viewport, the values in the Inspector")
 		if menu(ICON_FA_FILE_CODE, "Edit Definition", "edit-custom-node-file") do Editor_OpenScript(state, rel)
 		UI_Tooltip("The .node.json as text (name, base, icon, category, defaults)")
 		if menu(ICON_FA_PUZZLE_PIECE, "New Type Based on This...", "new-custom-node-from", t != nil) do CustomNodeDialog_Open(state, rel)
+		if menu(ICON_FA_SHUFFLE, "Change Base Type...", "rebase-custom-node", t != nil) do CustomNodeRebase_Open(state, rel)
+		UI_Tooltip("Another built-in type under it (Area -> Static Body...): a preview of what changes, then its nodes are converted")
 	case .Component:
 		if menu(ICON_FA_CUBES, "Edit Component", "edit-component") do Editor_OpenComponent(state, rel)
 		if menu(ICON_FA_OBJECT_GROUP, "Select All Instances", "select-instances", hasScene && Editor_ComponentInstanceCount(state, rel) > 0) do Editor_SelectAllInstances(state, rel)
