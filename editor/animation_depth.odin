@@ -245,7 +245,6 @@ CurveEditor_Render :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, ani
 dist2 :: proc(a, b: [2]f32) -> f32 {d := a - b; return d.x * d.x + d.y * d.y}
 
 // curve_from_ease: a Bezier close to an easing (where a custom curve starts).
-@(private = "file")
 curve_from_ease :: proc(ease: e.Ease) -> [4]f32 {
 	name := e.Ease_Name(ease)
 	switch {

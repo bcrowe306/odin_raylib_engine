@@ -518,6 +518,13 @@ buttons left of the header). Keys are timed in seconds: the toolbar shows
 the playhead's time, the **clock** at the ruler switches it between frames
 and seconds, and Cmd / Ctrl + wheel (or the wheel over the ruler) zooms -
 the **%** button resets it. Drag the ruler to move the playhead.
+**Key inspector**: while keys are selected, the right of the timeline edits
+them - the (first) key's **Frame** and **Time** (the others keep their
+spacing), the **Value** with the property's own widget (number, vector,
+colour, checkbox, an enum's names, a texture picker for a sprite's
+texture), the **Easing** to the next key (or **bezier**: handles, edited
+below it as time / value offsets per component). Several keys get the same
+value or easing.
 Right-click a key for its **Easing** to the next key (linear, sine, quad,
 cubic, quart, expo, back, elastic, bounce, constant; hover one to see its
 curve) or to delete it. Eased keys show a dot. Scripts can animate any

@@ -249,6 +249,31 @@ group_toggle :: proc(target: string) {
 
 AnimationPanel_Zoom :: proc() -> f32 {return panel.zoom if panel.zoom > 0 else 1}
 
+// AnimationPanel_Rescrub shows the scene at the playhead again (after keys
+// change).
+AnimationPanel_Rescrub :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation) {
+	scrub(state, apn, anim, playhead(apn, anim))
+}
+
+// side_panel: right of the timeline - a sound / script-call track's
+// settings, else the selected keys' inspector, else the preview.
+@(private = "file")
+side_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, size: [2]f32) {
+	if panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) {
+		tr := &anim.tracks[panel.selectedTrack]
+		if tr.kind == .Audio {
+			anim_sound_settings_panel(state, apn, anim, tr, size)
+			return
+		}
+		if tr.kind == .Method {
+			anim_method_settings_panel(state, apn, anim, tr, size)
+			return
+		}
+	}
+	if len(animKeys.sel) > 0 do AnimKeys_InspectorPanel(state, apn, anim, size)
+	else do anim_preview(state, apn, anim, size)
+}
+
 @(private = "file")
 draw_frame_thumb :: proc(dl: ^imgui.DrawList, anim: ^e.Animation, frame: int, mn, mx: [2]f32) {
 	tex: ^rl.Texture2D
@@ -709,7 +734,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	avail := imgui.GetContentRegionAvail()
 	hasAudioPanel := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Audio
 	hasMethodPanel := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Method
-	hasSidePanel := hasAudioPanel || hasMethodPanel
+	hasSidePanel := hasAudioPanel || hasMethodPanel || len(animKeys.sel) > 0
 	sideW: f32 = 0
 	if hasSidePanel {
 		sideW = 320 if avail.x >= 720 else (PREVIEW_W if avail.x >= 540 else 0)
@@ -722,13 +747,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	if zoomMod do timelineFlags += {.NoScrollWithMouse}
 	if !imgui.BeginChild("##anim_timeline", {avail.x - sideW - (UI_SPACE if sideW > 0 else 0), max(avail.y, 40)}, {}, timelineFlags) {
 		imgui.EndChild()
-		if sideW > 0 {
-			showAudio := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Audio
-			showMethod := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Method
-			if showAudio do anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
-			else if showMethod do anim_method_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
-			else do anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
-		}
+		if sideW > 0 do side_panel(state, apn, anim, {sideW, max(avail.y, 40)})
 		return
 	}
 	dl := imgui.GetWindowDrawList()
@@ -1208,7 +1227,8 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 					AnimKeys_Click(ti, k.time, mouse.x)
 					clear(&panel.sel)
 					scrub(state, apn, anim, kf)
-					if tr.kind == .Audio || tr.kind == .Method do panel.selectedTrack = ti
+					// (Sound / script-call keys: their track's settings; others: the key inspector.)
+					panel.selectedTrack = ti if tr.kind == .Audio || tr.kind == .Method else -1
 				}
 				if imgui.IsMouseClicked(.Right) {
 					if !isSel {
@@ -1369,17 +1389,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	imgui.DrawList_AddTriangleFilled(dl, {px - 6, origin.y}, {px + 6, origin.y}, {px, origin.y + 8}, col_u32(UI_ACCENT))
 	Drive_ItemRect("anim.playhead", {px - 6, origin.y}, {px + 6, origin.y + 18}, inWindow = true)
 	imgui.EndChild()
-	if sideW > 0 {
-		showAudio := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Audio
-		showMethod := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Method
-		if showAudio {
-			anim_sound_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
-		} else if showMethod {
-			anim_method_settings_panel(state, apn, anim, &anim.tracks[panel.selectedTrack], {sideW, max(avail.y, 40)})
-		} else {
-			anim_preview(state, apn, anim, {sideW, max(avail.y, 40)})
-		}
-	}
+	if sideW > 0 do side_panel(state, apn, anim, {sideW, max(avail.y, 40)})
 }
 
 // anim_preview: the animation playing in a box right of the timeline - its
