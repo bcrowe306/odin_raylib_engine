@@ -795,14 +795,43 @@ Gen_Tiles :: proc(g: ^Gen_Graph, outputId := 0, seed: u64 = 0, allocator := cont
 	return tiles, {grid.w, grid.h}, ""
 }
 
+// A generated level: its tiles and entity placements (Gen_Generate) -
+// computed on any thread (the graph untouched), applied on the main one
+// (Gen_ApplyResult). The entities' components are the graph's: keep it
+// until the result is applied.
+Gen_Result :: struct {
+	size:     [2]int,
+	tiles:    []i32,
+	entities: [dynamic]Gen_Entity,
+}
+
+Gen_Generate :: proc(g: ^Gen_Graph, seed: u64 = 0, allocator := context.allocator) -> (r: Gen_Result, err: string) {
+	r.tiles, r.size, err = Gen_Tiles(g, 0, seed, allocator)
+	if err == "" do r.entities, err = Gen_Entities(g, seed, allocator)
+	if err != "" do Gen_ResultDestroy(&r, allocator)
+	return
+}
+
+Gen_ResultDestroy :: proc(r: ^Gen_Result, allocator := context.allocator) {
+	delete(r.tiles, allocator)
+	delete(r.entities)
+	r^ = {}
+}
+
 // Gen_ApplyTileMap generates into a tile map: its map becomes the level's
 // size and its cells the tiles (colliders rebuilt when it is Solid and in
 // the game).
 Gen_ApplyTileMap :: proc(g: ^Gen_Graph, tm: ^TileMapNode, seed: u64 = 0, ctx: ^GameContext = nil, scene: ^Scene = nil) -> string {
-	tiles, size, err := Gen_Tiles(g, 0, seed, context.temp_allocator)
+	r, err := Gen_Generate(g, seed, context.temp_allocator)
 	if err != "" do return err
-	ents, eerr := Gen_Entities(g, seed, context.temp_allocator)
-	if eerr != "" do return eerr
+	return Gen_ApplyResult(&r, tm, ctx, scene)
+}
+
+// Gen_ApplyResult writes a generated level into a tile map (tiles,
+// colliders) and spawns its entities under it (those of the last
+// generation go first).
+Gen_ApplyResult :: proc(r: ^Gen_Result, tm: ^TileMapNode, ctx: ^GameContext = nil, scene: ^Scene = nil) -> string {
+	tiles, size, ents := r.tiles, r.size, r.entities
 	tm.mapSize = size
 	TileMapNode_Reset(tm)
 	for t, i in tiles do if t >= 0 do TileMapNode_Set(tm, i % size.x, i / size.x, t)

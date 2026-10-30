@@ -908,3 +908,129 @@ LevelGenEditor_DriveQuery :: proc(q: string) -> (string, bool) {
 	}
 	return "", false
 }
+
+// --- the Inspector of a LevelGeneratorNode ----------------------------------------------
+
+@(private = "file")
+lgi: struct {
+	path:  string, // the generator file `graph` was read from (heap)
+	graph: e.Gen_Graph,
+	err:   string, // (heap)
+	frame: int,    // re-read now and then: the file may have been edited
+}
+
+// inspector_level_generator: the generator file (open it in the Level
+// Generator), the map it fills, Generate Now (baked into the scene,
+// undoable) and the generator's parameters set on this node.
+inspector_level_generator :: proc(state: ^EditorState, lg: ^e.LevelGeneratorNode) {
+	if !UI_SectionHeader("Level Generator") do return
+	files := make([dynamic]string, context.temp_allocator)
+	for f in Editor_ListProjectFiles(state, "", {".json"}) do if strings.has_suffix(f, ".levelgen.json") do append(&files, f)
+	imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 30)
+	if path, ok := asset_picker("insp.levelgen.file", lg.generator, files[:], false); ok {
+		Editor_RecordUndo(state, "Level generator file")
+		lg.generator = strings.clone(path, lg.allocator)
+	}
+	Drive_Item("insp.levelgen.file")
+	imgui.SameLine(0, 4)
+	imgui.BeginDisabled(lg.generator == "")
+	if UI_IconButton(ICON_FA_PEN_TO_SQUARE, "insp.levelgen.open", "Open it in the Level Generator", size = 24) do LevelGenEditor_Open(state, lg.generator)
+	imgui.EndDisabled()
+	if lg.generator == "" {
+		imgui.TextColored(UI_WARNING, "Pick a generator (.levelgen.json)")
+		return
+	}
+	tm := e.LevelGeneratorNode_Target(lg, &state.game.gameContext, state.activeScene)
+	if tm != nil do UI_DimText(fmt.tprintf("Fills %s", tm.name))
+	else do imgui.TextColored(UI_WARNING, "No TileMap: add one as a child, or set Tile Map")
+	imgui.BeginDisabled(tm == nil)
+	if UI_Button(fmt.tprintf("%s  Generate Now", ICON_FA_SHUFFLE), "insp.levelgen.generate") {
+		Editor_RecordUndo(state, "Generate level")
+		bg := lg.background
+		lg.background = false // (the editor bakes it at once)
+		ok, why := e.LevelGeneratorNode_Generate(lg, &state.game.gameContext, 0, state.activeScene)
+		lg.background = bg
+		if ok do Editor_Log(state, .Info, "Generated %s into %s (seed %d)", filepath.base(lg.generator), tm.name, lg.lastSeed)
+		else do Editor_Log(state, .Error, "%s: %s", lg.name, why)
+	}
+	imgui.EndDisabled()
+	UI_Tooltip("Writes a level into the TileMap now, to see it or paint over it (Ctrl/Cmd+Z undoes it); the game generates its own when the scene starts")
+
+	// The generator's parameters: set one here and this node's levels use it.
+	lgi_load(state, lg.generator)
+	if lgi.err != "" {
+		imgui.TextColored(UI_DANGER, fmt.ctprintf("%s", lgi.err))
+		return
+	}
+	imgui.SeparatorText("Level Parameters")
+	UI_DimTextWrapped("The generator's own values; change one to set it for this node (the dot resets it).")
+	clear: struct {
+		id:   int,
+		name: string,
+	}
+	for &n in lgi.graph.nodes {
+		info := e.Gen_NodeInfo(&n)
+		if len(info.params) == 0 do continue
+		if !imgui.TreeNodeEx(fmt.ctprintf("%d  %s##lgp%d", n.id, info.label, n.id), {.SpanAvailWidth}) do continue
+		if UI_BeginProps(fmt.tprintf("##lgp_props%d", n.id)) {
+			for p, i in info.params {
+				imgui.PushIDInt(i32(n.id * 16 + i))
+				set, isSet := e.LevelGeneratorNode_Param(lg, n.id, p.name)
+				v := set if isSet else n.params[i]
+				UI_PropLabel(p.name)
+				if isSet {
+					if UI_IconButton(ICON_FA_CIRCLE, fmt.tprintf("insp.levelgen.reset:%d:%s", n.id, p.name), "Set on this node - click to use the generator's value", size = 20) do clear = {n.id, p.name}
+					imgui.SameLine(0, 4)
+				}
+				imgui.SetNextItemWidth(-1)
+				changed := false
+				if len(p.choices) > 0 {
+					if c, ok := UI_Combo(fmt.tprintf("insp.levelgen.param:%d:%s", n.id, p.name), clamp(int(v), 0, len(p.choices) - 1), p.choices); ok {
+						v, changed = f64(c), true
+					}
+				} else if p.toggle {
+					on := v != 0
+					if imgui.Checkbox("##v", &on) do v, changed = (1 if on else 0), true
+				} else if p.integer {
+					iv := i32(v)
+					if imgui.DragInt("##v", &iv, 0.1) do v, changed = f64(iv), true
+				} else {
+					fv := f32(v)
+					if imgui.DragFloat("##v", &fv, 0.01, 0, 0, "%.3f") do v, changed = f64(fv), true
+				}
+				if imgui.IsItemActivated() || (changed && len(p.choices) > 0) || (changed && p.toggle) do Editor_RecordUndo(state, "Level parameter")
+				if changed do e.LevelGeneratorNode_SetParam(lg, n.id, p.name, v)
+				Drive_Item(fmt.tprintf("insp.levelgen.param:%d:%s", n.id, p.name))
+				if p.doc != "" do UI_Tooltip(p.doc)
+				imgui.PopID()
+			}
+			UI_EndProps()
+		}
+		imgui.TreePop()
+	}
+	if clear.id != 0 {
+		Editor_RecordUndo(state, "Reset level parameter")
+		e.LevelGeneratorNode_ClearParam(lg, clear.id, clear.name)
+	}
+}
+
+// lgi_load reads the generator the Inspector shows (again every second or
+// so, or for another file).
+@(private = "file")
+lgi_load :: proc(state: ^EditorState, rel: string) {
+	lgi.frame += 1
+	if lgi.path == rel && lgi.frame % 60 != 0 do return
+	e.Gen_GraphDestroy(&lgi.graph)
+	delete(lgi.path)
+	delete(lgi.err)
+	lgi.path, lgi.err, lgi.graph = strings.clone(rel), "", {}
+	full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+	data, rerr := os.read_entire_file(full, context.temp_allocator)
+	if rerr != nil {
+		lgi.err = strings.clone(fmt.tprintf("Can't read %s", rel))
+		return
+	}
+	g, why := e.Gen_GraphParse(data)
+	lgi.graph = g
+	if why != "" do lgi.err = strings.clone(why)
+}

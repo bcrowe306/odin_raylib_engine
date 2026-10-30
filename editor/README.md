@@ -387,7 +387,9 @@ into the TileMap selected in the scene; undoable) and **Apply to LDtk
 Layer** (the IntGrid layer picked in the Level tab). **Your Own** in the
 add menu: a Lua Script node (**New** writes a template and opens it in the
 Code tab; **Reload** after saving it) and node types registered from Odin.
-Guide:
+A **Level Generator** node makes levels in the game; its Inspector picks the
+generator, sets its **Level Parameters** for that node and **Generate Now**
+bakes one into the scene. Guide:
 [`engine/docs/level_generator.md`](../engine/docs/level_generator.md).
 
 ### Scene tabs

@@ -9,8 +9,8 @@ every platform - so a seed is a level you can share, replay or test.
 
 So far (#142): the generator file, the nodes (terrain, caves, rooms and
 corridors, walkers), placing entities, TileMap and LDtk output, your own
-nodes (Lua or Odin), the Lua module and the **Level Generator** window in
-the editor. A runtime generator node follows.
+nodes (Lua or Odin), the **Level Generator** node that makes levels in
+the game, the Lua module and the **Level Generator** window in the editor.
 
 ## In the editor
 
@@ -216,6 +216,34 @@ Gen_RegisterNode({name = "checker", label = "Checker", inputs = {"in"},
 
 `call.inputs` are its input grids, `call.seed` its seed (`Gen_Random01(x, y,
 call.seed)`). A file with a type that isn't registered doesn't load.
+
+## In the game: the Level Generator node
+
+Add a **Level Generator** node with a TileMap child and pick its generator:
+when the scene starts it makes a level into the map (tiles, colliders,
+entities). No script needed.
+
+| Property | |
+|---|---|
+| Generator | The `.levelgen.json`. |
+| Tile Map | The map it fills, as a path (empty: its first TileMap child, else its parent). |
+| Seed / Random Seed | A fixed level, or a new one each time - **Last Seed** says which (save it to replay the level). |
+| Generate On Ready | Make a level when the scene starts. |
+| Background | Make it on a worker thread while the game runs; `generated` fires when it is in. |
+
+**Level Parameters** in the Inspector: change a generator node's value for
+this node only - one generator file, many levels (denser caves later on).
+**Generate Now** writes a level in the editor, to see or paint over.
+
+```lua
+local gen = self.node:get_node("Generator")
+gen:set_level_param(1, "density", 0.5)      -- generator node 1's density, for this node
+gen:connect("generated", function(seed) hud:show_seed(seed) end)
+gen:generate()                              -- a new level (or generate(seed): that one)
+```
+
+A signal can call `generate` with no script (a "next level" button's
+`clicked`). Node reference: Level Generator.
 
 ## Lua
 

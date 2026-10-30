@@ -81,6 +81,8 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "spawned":            return "node", "The spawner made a node (the spawned root)"
 	case "limit_reached":      return "", "The spawner reached its Total Limit"
 	case "list_finished":      return "", "A Sequential spawner (Stop) spawned its last entry"
+	case "generated":          return "seed", "The level generator's level is in (its seed)"
+	case "generation_failed":  return "why", "The level generator couldn't make the level (why)"
 	}
 	return "value", ""
 }
@@ -279,11 +281,16 @@ script_has_method :: proc(mgr: ^ScriptManager, target: ^Node, method: string) ->
 }
 
 // signals_builtin: connections to a node's own method, no script needed
-// (a spawner's `spawn` - unless its script defines its own).
+// (a spawner's `spawn`, a level generator's `generate` - unless its script
+// defines its own).
 @(private = "file")
 signals_builtin :: proc(mgr: ^ScriptManager, target: ^Node, method: string, ctx: ^GameContext) -> bool {
 	if target.typeId == SpawnerNode && method == "spawn" && !script_has_method(mgr, target, method) {
 		SpawnerNode_Spawn(cast(^SpawnerNode)target, ctx)
+		return true
+	}
+	if target.typeId == LevelGeneratorNode && method == "generate" && !script_has_method(mgr, target, method) {
+		LevelGeneratorNode_Generate(cast(^LevelGeneratorNode)target, ctx)
 		return true
 	}
 	return false
