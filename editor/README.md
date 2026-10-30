@@ -18,32 +18,21 @@ The editor is organized as an independent package (`editor/`) that imports and m
 
 ## 2. Editor Layout
 
-```
-+-----------------------------------------------------------------------------------------+
-|                                    Top Toolbar                                          |
-|  [Q] Select  [W] Move  [E] Rotate  [R] Scale  [T] Pan  |  ▶ Play  ⏸ Pause  ■ Stop      |
-|  Grid Snap [32px]  Angle Snap [15°]  Show Grid  Draw Bounds  |  New  Save  Export .rayzr   |
-+-------------------+-------------------------------------------------+-------------------+
-|   Left Sidebar    |                 Center Viewport                 |   Right Sidebar   |
-|   Asset Browser   |  [Scene Viewport]  [Component / Prefab Viewport]|  Scene Hierarchy  |
-|                   |                                                 |  - RootNode       |
-|  📁 scenes/       |  - Interactive 2D Offscreen Canvas              |    ├── Platform   |
-|    🎬 main.scene  |  - Adaptive Background Grid & Origin Axes       |    └── Drone      |
-|  📁 scripts/      |  - Selection Bounding Box                       |  ---------------- |
-|    📜 drone.lua   |  - Transform Gizmos (Translate, Rotate, Scale)  |     Inspector     |
-|  📁 components/   |  - Cursor-Centered Smooth Zoom (0.1x - 10.0x)   |  - Transform      |
-|  ---------------- |  - Pan via Middle Click or [T] Tool Mode        |  - Lua Properties |
-|  Reusable Prefabs |  - Node Picking via Left Click                  |  - Save Prefab    |
-+-------------------+-------------------------------------------------+-------------------+
-|                                    Bottom Panel                                         |
-|  [Console]        [Scene JSON Output]        [Tilemap Editor]        [Animation]        |
-|  - Log filters    - Live JSON preview        - 16/32/64px tiles      - Timeline scrubber|
-|  - Auto-scroll    - Clipboard export         - Paint/Erase/Fill      - Keyframe tracks  |
-+-----------------------------------------------------------------------------------------+
-|                                  Bottom Status Bar                                      |
-|  Project: demo  |  Scene: main  |  Selected: Drone  |  Cursor: (120, 45)  |  60 FPS     |
-+-----------------------------------------------------------------------------------------+
-```
+The [editor tour](../docs/editor/tour.md) maps the window. Each part has its
+own page in the editor manual (also in the editor: **Help > Editor Manual**,
+or right-click a bottom tab > **Help**):
+
+- [Toolbar and menus](../docs/editor/toolbar-menus.md), [Scene tree](../docs/editor/scene-tree.md),
+  [Inspector](../docs/editor/inspector.md), [Viewport](../docs/editor/viewport.md),
+  [Assets](../docs/editor/assets.md), [Settings](../docs/editor/settings.md),
+  [Playtesting](../docs/editor/playtesting.md).
+- The bottom tabs: [Console](../docs/editor/tab-console.md), [Profiler](../docs/editor/tab-profiler.md),
+  [Game](../docs/editor/tab-game.md), [Animation](../docs/editor/tab-animation.md),
+  [Particles](../docs/editor/tab-particles.md), [LDtk](../docs/editor/tab-ldtk.md),
+  [Tile Map](../docs/editor/tab-tilemap.md), [State Machine](../docs/editor/tab-stategraph.md),
+  [Mixer](../docs/editor/tab-mixer.md), [Search](../docs/editor/tab-search.md), [Files](../docs/editor/tab-files.md).
+
+The rest of this manual covers features across the editor.
 
 ---
 
@@ -60,7 +49,7 @@ that works. On macOS "Cmd" is the Command key; elsewhere it is Ctrl.
 | **Cmd+P** | Go to file (scenes, scripts, components, assets; `>` for commands, `:` for a line) |
 | **Q / W / E / R / T** | Select / Move / Rotate / Scale / Pan tool (gizmos work in world space and snap to the grid) |
 | **Middle mouse / wheel** | Pan / zoom around the cursor (Cmd+= / Cmd+- / Cmd+0 too) |
-| **F** | Frame the selection |
+| **F / Shift+F** | Centre the view on the selection / fit it (zoom too) |
 | **Alt + drag the move handle** | Move the pivot (what the node shows stays in place) |
 | **Cmd+L / Cmd+Shift+H** | Lock in viewport / hide in editor |
 | **Cmd+Shift+R** | Rulers & guides (drag from a ruler to add a guide) |
@@ -72,7 +61,7 @@ that works. On macOS "Cmd" is the Command key; elsewhere it is Ctrl.
 | **Cmd+Shift+A, Esc** | Select all / deselect |
 | **Edit > Align** | Align edges or centres, distribute |
 | **Cmd+Z / Cmd+Shift+Z** | Undo / redo (every edit) |
-| **Cmd+S / Cmd+Shift+S** | Save scene / save all scenes and scripts |
+| **Cmd+S / Cmd+Shift+S / Cmd+Alt+S** | Save scene / Save As... / save all scenes and scripts |
 | **Cmd+N** | New scene (added to the project) |
 | **F5 / F6 / F7 / Shift+F5** | Play project / play the current scene / simulate in editor / stop |
 | **F9 / Shift+F9 / Cmd+Shift+F5** | Pause or resume the game / step one frame / restart it |

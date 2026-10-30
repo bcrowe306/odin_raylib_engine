@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The project's files by folder: scenes, scripts, textures, sounds, components", "x": 0, "y": 103, "w": 255, "h": 375},
+    {"label": "The selected asset: its preview and import settings", "x": 0, "y": 481, "w": 255, "h": 211}
+  ]
+}

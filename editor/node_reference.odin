@@ -2,6 +2,7 @@ package editor
 
 import "core:encoding/json"
 import "core:fmt"
+import "core:mem"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
@@ -21,14 +22,33 @@ import e "../engine"
 // Opened from a node's menu in the hierarchy (Documentation), the Inspector
 // header's ? button, Shift+F1 on the selected node, or Help > Node Reference
 // (the index). Links between node pages (`[Area](AreaNode.md)`) open there.
+//
+// It also shows the editor manual (#45): "editor/<page>" is
+// docs/editor/<page>.md, "editor/" (EDITOR_INDEX) the list of them in the
+// Editor section of docs/site.json - Help > Editor Manual, a bottom tab's
+// right-click > Help. Links between editor and node pages open here too.
 // ============================================================================
 
 @(private = "file")
 NODES_JSON :: #load("../docs/generated/nodes.json", string)
 @(private = "file")
 NODE_PAGES := #load_directory("../docs/nodes")
+@(private = "file")
+EDITOR_PAGES := #load_directory("../docs/editor")
+@(private = "file")
+SITE_JSON :: #load("../docs/site.json", string)
 
 INDEX_PAGE :: "" // NodeReference_Open(INDEX_PAGE): every node by category
+EDITOR_INDEX :: "editor/" // NodeReference_Open(EDITOR_INDEX): the editor manual's pages
+
+// NodeReference_HasEditorPage: docs/editor/<page>.md exists.
+NodeReference_HasEditorPage :: proc(page: string) -> bool {return editor_page_text(page) != ""}
+
+// NodeReference_OpenEditor shows an editor manual page by its file name
+// ("inspector" = docs/editor/inspector.md; "" = the list).
+NodeReference_OpenEditor :: proc(page: string) {
+	NodeReference_Open(strings.concatenate({EDITOR_INDEX, page}, context.temp_allocator))
+}
 
 @(private = "file")
 nodeRef: struct {
@@ -90,6 +110,53 @@ node_ref_entries :: proc() -> (json.Object, []Node_Doc_Entry) {
 	return root, out[:]
 }
 
+// editor_page_text: docs/editor/<page>.md ("" = none).
+@(private = "file")
+editor_page_text :: proc(page: string) -> string {
+	want := fmt.tprintf("%s.md", page)
+	for f in EDITOR_PAGES do if filepath.base(f.name) == want do return string(f.data)
+	return ""
+}
+
+// editor_page_markdown: an editor manual page, or ("") the list of them -
+// the docs/editor pages in docs/site.json's Editor section, in its order.
+@(private = "file")
+editor_page_markdown :: proc(page: string, allocator: mem.Allocator) -> string {
+	if page != "" {
+		if text := editor_page_text(page); text != "" do return strings.clone(text, allocator)
+		return fmt.aprintf("# %s\n\nNo such page in the editor manual.\n", page, allocator = allocator)
+	}
+	sb := strings.builder_make(allocator)
+	strings.write_string(&sb, "# Editor manual\n\nThe editor, part by part: what each one is for, when you use it, every control, and a short walkthrough. Right-click a bottom tab > **Help** for its page.\n\n")
+	val, err := json.parse_string(SITE_JSON, allocator = context.temp_allocator)
+	root, _ := val.(json.Object)
+	sections, _ := root["sections"].(json.Array)
+	if err != .None do return strings.to_string(sb)
+	for sv in sections {
+		sec, _ := sv.(json.Object)
+		if (sec["label"].(json.String) or_else "") != "Editor" do continue
+		items, _ := sec["items"].(json.Array)
+		for iv in items {
+			it, _ := iv.(json.Object)
+			file := it["file"].(json.String) or_else ""
+			if !strings.has_prefix(file, "docs/editor/") do continue
+			stem := filepath.stem(filepath.base(file))
+			text := editor_page_text(stem)
+			title := it["label"].(json.String) or_else ""
+			if title == "" && strings.has_prefix(text, "# ") {
+				title, _, _ = strings.partition(text[2:], "\n")
+			}
+			if title == "" do title = stem
+			// Its first paragraph after the title, as a one-line description.
+			_, _, body := strings.partition(text, "\n\n")
+			desc, _, _ := strings.partition(strings.trim_space(body), "\n\n")
+			desc, _ = strings.replace_all(desc, "\n", " ", context.temp_allocator)
+			fmt.sbprintf(&sb, "- **[%s](%s.md)**: %s\n", strings.trim_space(title), stem, desc)
+		}
+	}
+	return strings.to_string(sb)
+}
+
 // node_ref_extra: docs/nodes/<Type>.md ("" = none).
 @(private = "file")
 node_ref_extra :: proc(typeName: string) -> string {
@@ -100,6 +167,7 @@ node_ref_extra :: proc(typeName: string) -> string {
 
 // NodeReference_Markdown: a node type's page as markdown ("" = the index).
 NodeReference_Markdown :: proc(typeName: string, allocator := context.allocator) -> string {
+	if strings.has_prefix(typeName, EDITOR_INDEX) do return editor_page_markdown(typeName[len(EDITOR_INDEX):], allocator)
 	context.allocator = context.temp_allocator
 	root, entries := node_ref_entries()
 	sb := strings.builder_make(allocator)
@@ -266,6 +334,11 @@ NodeReference_Render :: proc(state: ^EditorState) {
 	imgui.SameLine(0, 8)
 	imgui.AlignTextToFramePadding()
 	UI_DimText(nodeRef.page if nodeRef.page != "" else "All nodes")
+	if strings.has_prefix(nodeRef.page, EDITOR_INDEX) {
+		imgui.SameLine(0, 12)
+		if UI_Button(fmt.tprintf("%s  Manual", ICON_FA_LIST), "noderef.editor-index") do NodeReference_OpenEditor("")
+		UI_Tooltip("Every page of the editor manual")
+	}
 	imgui.Separator()
 	if imgui.BeginChild("##noderef_body", {0, 0}) {
 		if nodeRef.scrollUp {
@@ -295,6 +368,12 @@ node_ref_follow :: proc(url: string) {
 		name := filepath.stem(filepath.base(path))
 		for info in e.NODE_TYPES do if info.name == name {
 			NodeReference_Open(name)
+			return
+		}
+		// An editor manual page (from an editor page, or ../editor/x.md).
+		fromEditor := strings.has_prefix(nodeRef.page, EDITOR_INDEX)
+		if (fromEditor || strings.contains(path, "editor/")) && editor_page_text(name) != "" {
+			NodeReference_OpenEditor(name)
 			return
 		}
 	}

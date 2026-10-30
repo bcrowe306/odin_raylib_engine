@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The node's name, enable / visible toggles and its documentation (?)", "x": 1060, "y": 409, "w": 102, "h": 25},
+    {"label": "Transform, then the node type's own sections and properties", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}
