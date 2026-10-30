@@ -1,0 +1,47 @@
+# #156: custom node types in Add Node (under their category, with their
+# icon and description), the hierarchy (their icon and colour), the
+# Inspector ("HurtboxZz (AreaNode)"), the hierarchy's t: filter, and the
+# generated Lua types (HurtboxZzNode, Scene.create / find_nodes_of_type).
+wait 5
+exec mkdir -p $PROJECT/nodes
+exec cp tests/drive/fixtures/HurtboxZz.node.json $PROJECT/nodes/HurtboxZz.node.json
+exec cp tests/drive/fixtures/custom_hurtbox_zz.lua $PROJECT/scripts/custom_hurtbox_zz.lua
+wait-until item:asset:nodes/HurtboxZz.node.json == visible timeout=300
+click @asset.new-scene
+wait 5
+click @hier.add
+wait 3
+type hurtbox
+wait 3
+expect item:addnode:HurtboxZz == visible
+screenshot add_node
+click @addnode.create
+wait 5
+expect node:HurtboxZz.class == HurtboxZz
+expect node:HurtboxZz.type == AreaNode
+expect node:HurtboxZz.script.max_health == 5
+expect item:insp.node-class == visible
+screenshot inspector
+
+# Add Node without a search: Empty Node is still the first choice.
+click @hier.add
+wait 3
+click @addnode.create
+wait 3
+expect node:EmptyNode.type == Node
+
+# The hierarchy's type filter knows the custom type.
+click @hier.filter
+type t:hurtbox
+wait 3
+expect item:hier:HurtboxZz == visible
+expect item:hier:EmptyNode == missing
+key ctrl+a
+key backspace
+
+# Lua types.
+wait-until file:.rayzr/definitions/project_types.lua contains ---@class HurtboxZzNode : AreaNode timeout=900
+expect file:.rayzr/definitions/project_types.lua contains ---@overload fun(typeName: "HurtboxZz", parent?: Node, x?: number|Vec2, y?: number): HurtboxZzNode
+expect file:.rayzr/definitions/project_types.lua contains ---@overload fun(typeName: "HurtboxZz"): HurtboxZzNode[]
+expect file:.rayzr/definitions/project_types.lua contains function HurtboxZzNode:get_script() end
+expect file:.rayzr/definitions/project_types.lua contains ---@field node HurtboxZzNode

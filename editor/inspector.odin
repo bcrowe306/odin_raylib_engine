@@ -127,7 +127,14 @@ inspector_body :: proc(state: ^EditorState) {
 		if UI_IconButton(ICON_FA_CIRCLE_QUESTION, "insp.node-docs", fmt.tprintf("%s documentation (Shift+F1)", e.Node_TypeName(node))) do NodeReference_Open(e.Node_TypeName(node))
 	}
 	imgui.PushFont(GlobalFonts.small)
-	UI_DimText(e.Node_TypeName(node))
+	// A custom node type: "Hurtbox (AreaNode)" (#156).
+	if t := e.Node_CustomType(node); t != nil {
+		UI_DimText(fmt.tprintf("%s (%s)", t.name, e.Node_TypeName(node)))
+		Drive_Item("insp.node-class")
+		UI_Tooltip(fmt.tprintf("A %s: a custom node type (%s) - its values follow the type unless changed here", t.name, node.customType))
+	} else {
+		UI_DimText(e.Node_TypeName(node))
+	}
 	imgui.PopFont()
 	Inspector_MultiBanner(state)
 
@@ -1251,6 +1258,10 @@ inspector_script :: proc(state: ^EditorState, node: ^e.Node) {
 
 // Editor_NodeIcon picks an icon for a node type.
 Editor_NodeIcon :: proc(node: ^e.Node) -> string {
+	// A custom node type's own icon (#156).
+	if node != nil && node.customType != "" && !node.customMissing {
+		if t := e.Node_CustomType(node); t != nil do return CustomNode_Icon(t)
+	}
 	// Each node type's icon from the Add Node catalogue (one per type).
 	@(static) byType: map[typeid]string
 	if byType == nil {

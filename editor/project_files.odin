@@ -87,6 +87,10 @@ scan_project :: proc(root: string) {
 		clear(&projectFiles.retired)
 		projectFiles.retiredFrame = frame
 	}
+	// Custom node type files before (#156): added or removed ones (copied in,
+	// a git checkout) - the loaded types are read again.
+	typesBefore := make([dynamic]string, context.temp_allocator)
+	for f in projectFiles.files do if strings.has_suffix(f, e.CUSTOM_NODE_SUFFIX) do append(&typesBefore, f)
 	append(&projectFiles.retired, ..projectFiles.files[:])
 	append(&projectFiles.retired, ..projectFiles.dirs[:])
 	clear(&projectFiles.files)
@@ -117,6 +121,9 @@ scan_project :: proc(root: string) {
 	}
 	projectFiles.scanned = time.tick_now()
 	projectFiles.valid = true
+	typesAfter := make([dynamic]string, context.temp_allocator)
+	for f in projectFiles.files do if strings.has_suffix(f, e.CUSTOM_NODE_SUFFIX) do append(&typesAfter, f)
+	if !slice.equal(typesBefore[:], typesAfter[:]) do Lua_MarkProjectTypesDirty() // (forgets the loaded types too)
 }
 
 // Editor_ProjectFiles: every (non-hidden) project file, project-relative,

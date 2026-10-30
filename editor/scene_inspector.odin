@@ -199,6 +199,11 @@ SceneHierarchy_RenderNodeTree :: proc(state: ^EditorState, node: ^e.Node, parent
 	if node.componentMissing do rowColor = UI_DANGER // its component file is missing (a placeholder)
 	else if node.componentPath != "" do rowColor = {0.75, 0.62, 1.0, 1} // component instance
 	else if Editor_NodeLocked(state, node) do rowColor = {0.75, 0.62, 1.0, 0.55}
+	else if t := e.Node_CustomType(node); t != nil {
+		// A custom node type: its colour (#156).
+		rowColor = CustomNode_Color(t)
+		if dim do rowColor.w = 0.55
+	}
 	imgui.PushStyleColorImVec4(.Text, rowColor)
 	imgui.SetNextItemAllowOverlap() // the visibility button sits on the row
 
