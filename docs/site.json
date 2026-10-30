@@ -83,8 +83,8 @@
   "baseline": {
     "$comment": "Known gaps check_docs.py tolerates; lower them as they are filled (CI fails if they grow).",
     "lua_missing_examples": 0,
-    "lua_params_undescribed": 510,
-    "lua_returns_undescribed": 194,
+    "lua_params_undescribed": 0,
+    "lua_returns_undescribed": 0,
     "lua_modules_without_guide": 0,
     "plugin_missing_descriptions": 0
   },

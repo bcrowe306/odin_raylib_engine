@@ -127,7 +127,7 @@ player:
 
 ```lua
 local map = Scene.find_node("TileMap") ---@type TileMapNode
-local x, y = map:tilemap_cell_at(self.node.position)
+local x, y = map:tilemap_cell_at(self.node:get_global_position())
 if map:tilemap_get_tile(x, y + 1) ~= -1 then
     map:tilemap_set_tile(x, y + 1, -1)
 end

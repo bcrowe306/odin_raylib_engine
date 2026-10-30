@@ -590,6 +590,20 @@ def example_scene_node(n):
 
 # --- Lua API parsing (LuaCATS definitions) ---------------------------------------------
 
+def split_type(rest):
+    """'<type> <description>' -> (type, description): a type ends at the first
+    space outside {}, (), [] and <> (table and function types have spaces)."""
+    depth = 0
+    for i, ch in enumerate(rest):
+        if ch in "{([<":
+            depth += 1
+        elif ch in "})]>":
+            depth -= 1
+        elif ch.isspace() and depth == 0:
+            return rest[:i], rest[i:].strip()
+    return rest, ""
+
+
 def parse_lua_api(path):
     """LuaCATS definitions -> classes: {name: {doc, fields, functions, parents}}."""
     classes, order, table_of = {}, [], {}
@@ -609,17 +623,17 @@ def parse_lua_api(path):
             classes[name]["doc"] += doc
             doc, params, returns = [], [], []
             continue
-        m = re.match(r"^---@field\s+(\S+)\s+(\S+)\s*(.*)", s)
+        m = re.match(r"^---@field\s+(\S+)\s+(.*)", s)
         if m and current:
-            classes[current]["fields"].append((m.group(1), m.group(2), m.group(3)))
+            classes[current]["fields"].append((m.group(1), *split_type(m.group(2))))
             continue
-        m = re.match(r"^---@param\s+(\S+)\s+(\S+)\s*(.*)", s)
+        m = re.match(r"^---@param\s+(\S+)\s+(.*)", s)
         if m:
-            params.append((m.group(1), m.group(2), m.group(3)))
+            params.append((m.group(1), *split_type(m.group(2))))
             continue
-        m = re.match(r"^---@return\s+(\S+)\s*(.*)", s)
+        m = re.match(r"^---@return\s+(.*)", s)
         if m:
-            returns.append((m.group(1), m.group(2)))
+            returns.append(split_type(m.group(1)))
             continue
         if s.startswith("---@"):
             continue
