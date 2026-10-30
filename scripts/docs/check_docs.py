@@ -99,8 +99,8 @@ class Checker:
         for pattern in ("engine/docs/*.md", "editor/docs/*.md", "docs/*.md", "docs/*/*.md"):
             for f in glob.glob(os.path.join(ROOT, pattern)):
                 rel = os.path.relpath(f, ROOT).replace(os.sep, "/")
-                if rel.startswith("docs/nodes/"):
-                    continue
+                if rel.startswith("docs/nodes/") or rel.startswith("docs/lua/"):
+                    continue  # (parts of the generated node / Lua API pages)
                 guides.add(rel)
         for g in sorted(guides - listed - excluded):
             self.error(f"{g} isn't in docs/site.json: add it to a section (or to \"exclude\")")
@@ -122,8 +122,8 @@ class Checker:
     # --- the Lua API -------------------------------------------------------------------
 
     def lua(self, site):
-        classes, _, _ = export_site.parse_lua_api(os.path.join(ROOT, "engine", "definitions", "engine_api.lua"))
-        no_example = 0
+        classes, _, globals_ = export_site.parse_lua_api(os.path.join(ROOT, "engine", "definitions", "engine_api.lua"))
+        no_example = no_param_doc = no_return_doc = 0
         for cname, c in classes.items():
             for fn in c["functions"]:
                 doc = " ".join(fn["doc"]).strip()
@@ -131,10 +131,18 @@ class Checker:
                     self.error(f"engine_api.lua: {cname}{fn['sep']}{fn['name']} has no description")
                 if "Example:" not in doc:
                     no_example += 1
+                no_param_doc += sum(1 for _, _, d in fn["params"] if not d.strip())
+                no_return_doc += sum(1 for _, d in fn["returns"] if not (d or "").strip())
+        # Each module has its guide (docs/lua/<Global>.md: use cases, a complete example - #45).
+        no_guide = sum(1 for name, g in globals_.items()
+                       if name.endswith("Module") and not os.path.exists(os.path.join(ROOT, "docs", "lua", f"{g}.md")))
         pclasses, _, _ = export_site.parse_lua_api(os.path.join(ROOT, "editor", "definitions", "editor_api.lua"))
         p_nodoc = sum(1 for c in pclasses.values() for fn in c["functions"] if not " ".join(fn["doc"]).strip())
         base = site.get("baseline", {})
         for key, value, what in (("lua_missing_examples", no_example, "engine Lua functions without an Example:"),
+                                 ("lua_params_undescribed", no_param_doc, "engine Lua parameters without a description"),
+                                 ("lua_returns_undescribed", no_return_doc, "engine Lua return values without a description"),
+                                 ("lua_modules_without_guide", no_guide, "Lua modules without a docs/lua/<Module>.md guide"),
                                  ("plugin_missing_descriptions", p_nodoc, "editor plugin API functions without a description")):
             limit = base.get(key)
             if limit is None:
