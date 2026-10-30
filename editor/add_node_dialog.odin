@@ -76,6 +76,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "SpawnerNode",
 	},
 	{
+		name        = "Level Generator",
+		category    = "Core & 2D",
+		icon        = ICON_FA_SHUFFLE,
+		description = "Generates a level from a Level Generator file into a TileMap when the scene starts (or on generate() / a signal): a seed or a random one, the generator's parameters set per node, in the background for big levels.",
+		typeName    = "LevelGeneratorNode",
+	},
+	{
 		name        = "Lua Script Node",
 		category    = "Core & 2D",
 		icon        = ICON_FA_CODE,

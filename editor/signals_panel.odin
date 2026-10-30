@@ -381,17 +381,27 @@ Signals_OpenConnectDialog :: proc(state: ^EditorState, node: ^e.Node, signal: st
 	copy(dlg.method[:len(dlg.method) - 1], e.Signal_HandlerName(node.name, signal))
 }
 
+// signals_builtin_method: a node's own method a signal can call with no
+// script (a spawner's spawn, a level generator's generate); "" none.
+@(private = "file")
+signals_builtin_method :: proc(target: ^e.Node) -> string {
+	if target == nil || target.scriptInstance != nil do return ""
+	if target.typeId == e.SpawnerNode do return "spawn"
+	if target.typeId == e.LevelGeneratorNode do return "generate"
+	return ""
+}
+
 // Signals_Connect makes the connection and writes the handler.
 Signals_Connect :: proc(state: ^EditorState, source: ^e.Node, signal: string, target: ^e.Node, method: string) -> bool {
 	if source == nil || target == nil || method == "" do return false
 	mgr := state.activeScene.manager
 	Editor_RecordUndo(state, fmt.tprintf("Connect %s", signal))
-	if target.typeId == e.SpawnerNode && method == "spawn" && target.scriptInstance == nil {
-		// The spawner's own spawn: no script, no handler.
+	if own := signals_builtin_method(target); own != "" && method == own {
+		// The node's own method (spawn, generate): no script, no handler.
 		if !e.Node_AddConnection(source, signal, e.Node_RelativePath(mgr, source, target), method) {
 			Editor_Log(state, .Info, "%s.%s is already connected to %s", source.name, signal, method)
 		}
-		Editor_Log(state, .Info, "Connected %s.%s to %s:spawn", source.name, signal, target.name)
+		Editor_Log(state, .Info, "Connected %s.%s to %s:%s", source.name, signal, target.name, own)
 		return true
 	}
 	if target.scriptInstance == nil {
@@ -455,14 +465,21 @@ Signals_Render :: proc(state: ^EditorState) {
 		imgui.SetNextItemWidth(-1)
 		imgui.InputText("##sig_method", cstring(raw_data(dlg.method[:])), len(dlg.method), {})
 		Drive_Item("signal.method")
-		if dlg.target != nil && dlg.target.typeId == e.SpawnerNode && dlg.target.scriptInstance == nil {
+		own := signals_builtin_method(dlg.target)
+		if own == "spawn" {
 			if UI_Button("Spawn (no script)", "signal.spawn", {0, 0}) {
 				dlg.method = {}
 				copy(dlg.method[:], "spawn")
 			}
 			UI_Tooltip("Call the spawner's own spawn() when the event fires")
+		} else if own == "generate" {
+			if UI_Button("Generate (no script)", "signal.generate", {0, 0}) {
+				dlg.method = {}
+				copy(dlg.method[:], "generate")
+			}
+			UI_Tooltip("Call the level generator's own generate() when the event fires")
 		}
-		if dlg.target != nil && dlg.target.scriptInstance == nil && !(dlg.target.typeId == e.SpawnerNode && strings.trim_space(string(cstring(raw_data(dlg.method[:])))) == "spawn") {
+		if dlg.target != nil && dlg.target.scriptInstance == nil && !(own != "" && strings.trim_space(string(cstring(raw_data(dlg.method[:])))) == own) {
 			imgui.PushStyleColorImVec4(.Text, UI_WARNING)
 			imgui.TextWrapped("%s", fmt.ctprintf("%s has no script: a new one will be created and attached.", dlg.target.name))
 			imgui.PopStyleColor()

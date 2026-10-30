@@ -927,6 +927,8 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 		inspector_path(state, cast(^e.PathNode)node)
 	case e.SpawnerNode:
 		inspector_spawner(state, cast(^e.SpawnerNode)node)
+	case e.LevelGeneratorNode:
+		inspector_level_generator(state, cast(^e.LevelGeneratorNode)node) // (level_gen_editor.odin)
 	case e.SkeletonNode:
 		inspector_skeleton(state, cast(^e.SkeletonNode)node)
 	case e.AsepriteNode:
@@ -1280,6 +1282,7 @@ Editor_NodeIcon :: proc(node: ^e.Node) -> string {
 	case e.TrailNode: return ICON_FA_WIND
 	case e.VisibilityNotifierNode: return ICON_FA_EYE
 	case e.SpawnerNode: return ICON_FA_CLONE
+	case e.LevelGeneratorNode: return ICON_FA_SHUFFLE
 	case e.PathNode: return ICON_FA_BEZIER_CURVE
 	case e.PathFollowNode: return ICON_FA_ROUTE
 	case e.NavigationRegionNode: return ICON_FA_MAP

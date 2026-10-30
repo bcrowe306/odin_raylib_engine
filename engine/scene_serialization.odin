@@ -288,6 +288,19 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 	case StateMachineNode:
 		Json_Key(w, "state_machine", &first)
 		write_state_machine(w, cast(^StateMachineNode)node)
+	case LevelGeneratorNode:
+		// {"params": [{"node", "name", "value"}]} (the generator's parameters set on the node)
+		lg := cast(^LevelGeneratorNode)node
+		Json_Key(w, "level_generator", &first)
+		strings.write_string(&w.sb, "{\"params\": [")
+		for p, i in lg.params {
+			fmt.sbprintf(&w.sb, "%s{{\"node\": %d, \"name\": ", ", " if i > 0 else "", p.node)
+			Json_String(w, p.name)
+			strings.write_string(&w.sb, ", \"value\": ")
+			Json_Float(w, f32(p.value))
+			strings.write_byte(&w.sb, '}')
+		}
+		strings.write_string(&w.sb, "]}")
 	case SpawnerNode:
 		// {"entries": [{"component", "weight", "count", "offset"}]}
 		sp := cast(^SpawnerNode)node
@@ -1049,6 +1062,18 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 					x, _ := json_number(pa[0])
 					y, _ := json_number(pa[1])
 					append(&ln.points, [2]f32{x, y})
+				}
+			}
+		}
+	case LevelGeneratorNode:
+		lg := cast(^LevelGeneratorNode)node
+		if lgObj, ok := sj_obj(obj, "level_generator"); ok {
+			if list, lok := sj_arr(lgObj, "params"); lok {
+				LevelGeneratorNode_ClearParam(lg)
+				for v in list {
+					po, pok := v.(json.Object)
+					if !pok do continue
+					LevelGeneratorNode_SetParam(lg, sj_int(po, "node"), sj_string(po, "name"), f64(sj_float(po, "value")))
 				}
 			}
 		}
