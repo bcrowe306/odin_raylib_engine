@@ -36,8 +36,10 @@ when the player presses Enter.
   is no text cursor to move, and no selection or paste.
 - **Enter** raises `submitted` with the text and leaves the field.
 - **Max Length**: characters past it are ignored.
-- **Reading the text**: scripts get it from the events' value; there is no
-  `get_text` for this node.
+- **The text**: **Text** in the Node tab is the starting text (saved);
+  scripts read what's typed with `node:get_text()` and replace it with
+  `node:set_text("...")` (which raises `value_changed`). **Placeholder** is
+  the grey hint shown while it's empty.
 - **Keys go to the game too**: while the player types, the game's input
   actions still see the keys. Pause the game, or ignore actions in your
   scripts, while a name is being entered.

@@ -3472,6 +3472,7 @@ lua_node_set_property :: proc "c" (L: ^lua.State) -> c.int {
 	case .Bit_Set:
 	case .String:
 		if s := lua.tostring(L, 3); s != nil do Property_SetString(node, p, string(s))
+	case .String_List: Property_SetList(node, p, Lua_ToStringList(L, 3)) // a table of lines (#227)
 	}
 	Node_PropertyChanged(node, p.name)
 	return 0
@@ -3515,6 +3516,7 @@ lua_node_get_property :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushstring(L, strings.clone_to_cstring(names[i] if i < len(names) else "", context.temp_allocator))
 	case .Bit_Set: lua.pushnil(L)
 	case .String: lua.pushstring(L, strings.clone_to_cstring((^string)(p.ptr)^, context.temp_allocator))
+	case .String_List: Lua_PushStringList(L, Property_GetList(p))
 	}
 	return 1
 }
@@ -3674,7 +3676,8 @@ lua_node_nav_is_walkable :: proc "c" (L: ^lua.State) -> c.int {
 
 // --- Text, dialogue, localization ------------------------------------------------
 
-// node:set_text(text): a TextNode (restarts its typewriter), UI label or button.
+// node:set_text(text): a TextNode (restarts its typewriter), UI label,
+// button or text input (raises its value_changed).
 @(private="file")
 lua_node_set_text :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
@@ -3685,6 +3688,7 @@ lua_node_set_text :: proc "c" (L: ^lua.State) -> c.int {
 	case TextNode:     TextNode_SetText(cast(^TextNode)node, string(s))
 	case UILabelNode:  (cast(^UILabelNode)node).text = strings.clone(string(s), node.allocator)
 	case UIButtonNode: (cast(^UIButtonNode)node).text = strings.clone(string(s), node.allocator)
+	case UITextInputNode: UITextInputNode_SetText(cast(^UITextInputNode)node, string(s), node.gameContext)
 	}
 	return 0
 }
@@ -3699,6 +3703,7 @@ lua_node_get_text :: proc "c" (L: ^lua.State) -> c.int {
 		case TextNode:     text = (cast(^TextNode)node).text
 		case UILabelNode:  text = (cast(^UILabelNode)node).text
 		case UIButtonNode: text = (cast(^UIButtonNode)node).text
+		case UITextInputNode: text = UITextInputNode_GetText(cast(^UITextInputNode)node)
 		}
 	}
 	lua.pushstring(L, strings.clone_to_cstring(text, context.temp_allocator))
@@ -4887,6 +4892,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		Script_RegisterLevelGeneratorBindings(L) // generate / *_level_param (level_generator_node.odin)
 		Script_RegisterVectorColliderBindings(L) // vector_cut / vector_point_at / ... (vector_collider.odin)
 		Script_RegisterTileMapComponentBindings(L) // tilemap_component_at / ... (tilemap_components.odin)
+		Script_RegisterUIListBindings(L) // ui_set_items / ui_get_items (ui_list_props.odin)
 
 		// DynamicBodyNode Physics
 		lua.pushcfunction(L, lua_node_apply_force)

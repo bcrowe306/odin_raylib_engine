@@ -29,9 +29,9 @@ steps, a recipe, a high-score table's places.
    `I.`), the **Start Number** (the first row's number, 1 to 100), the
    **Item Height** (16 to 48 px) and the **Selected Index** (from 0).
 
-The rows can't be added in the editor or from Lua yet (there's no Lua
-function for them). An empty list draws nothing, so in the editor you only
-see the selection outline of its area.
+Set the items in the Node tab's **Items** box, one a line; two spaces at
+the start nest an item a level deeper (numbered on its own). Scripts:
+`node:ui_set_items({"Open the menu", "Pick a slot", "  Confirm"})`.
 
 ## How it works
 

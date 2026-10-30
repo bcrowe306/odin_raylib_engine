@@ -18,9 +18,13 @@ local Node = {}
 
 -- --- Node types: each has the Node methods plus its own --------------------------
 
----Nodes that show text (TextNode, UILabelNode, UIButtonNode).
+---Nodes that show text (TextNode, UILabelNode, UIButtonNode, UITextInputNode).
 ---@class TextHolder
 local TextHolder = {}
+
+---UI nodes with a list (Dropdown, Radio Group, List View, Tree View, Bullet / Numbered List, Table, Toolbar, XY Plot, Tab Container, Notched Slider).
+---@class UIListHolder
+local UIListHolder = {}
 
 ---Nodes with a walkable grid (TileMapNode, LdtkLevelNode).
 ---@class NavGrid
@@ -188,17 +192,17 @@ local LevelGeneratorNode = {}
 
 ---@class UIProgressBarNode : Node
 
----@class UITextInputNode : Node
+---@class UITextInputNode : Node, TextHolder
 
----@class UIDropdownNode : Node
+---@class UIDropdownNode : Node, UIListHolder
 
----@class UIRadioGroupNode : Node
+---@class UIRadioGroupNode : Node, UIListHolder
 
 ---@class UIToggleSwitchNode : Node
 
 ---@class UIKnobNode : Node
 
----@class UINotchedSliderNode : Node
+---@class UINotchedSliderNode : Node, UIListHolder
 
 ---@class UIVolumeFaderNode : Node
 
@@ -206,23 +210,23 @@ local LevelGeneratorNode = {}
 
 ---@class UISeparatorNode : Node
 
----@class UIXYPlotNode : Node
+---@class UIXYPlotNode : Node, UIListHolder
 
----@class UIListViewNode : Node
+---@class UIListViewNode : Node, UIListHolder
 
----@class UITreeViewNode : Node
+---@class UITreeViewNode : Node, UIListHolder
 
----@class UIUnorderedListNode : Node
+---@class UIUnorderedListNode : Node, UIListHolder
 
----@class UIOrderedListNode : Node
+---@class UIOrderedListNode : Node, UIListHolder
 
----@class UITableNode : Node
+---@class UITableNode : Node, UIListHolder
 
 ---@class UIIconNode : Node
 
----@class UIToolbarNode : Node
+---@class UIToolbarNode : Node, UIListHolder
 
----@class UITabContainerNode : Node
+---@class UITabContainerNode : Node, UIListHolder
 
 ---Gets the concrete runtime type of the node (e.g. "Node", "TextureNode", "DynamicBodyNode", "CameraNode").
 ---
@@ -5592,6 +5596,8 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field size Vec2 Width and height (px).
 ---@field label string Caption shown next to the control.
+---@field placeholder string Grey hint shown while the field is empty.
+---@field text string What's typed: the starting text (saved), and what the player typed while running.
 ---@field labelWidth number Width reserved for the label (px); 0 = none.
 ---@field maxLength integer Most characters accepted.
 
@@ -5608,6 +5614,8 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
+---| "placeholder" # string - Grey hint shown while the field is empty.
+---| "text" # string - What's typed: the starting text (saved), and what the player typed while running.
 ---| "labelWidth" # number - Width reserved for the label (px); 0 = none.
 ---| "maxLength" # integer - Most characters accepted.
 
@@ -5628,6 +5636,8 @@ function UIProgressBarNode:set_property(path, value, y) end
 ---@overload fun(self: UITextInputNode, path: "enabled"): boolean
 ---@overload fun(self: UITextInputNode, path: "size"): Vec2
 ---@overload fun(self: UITextInputNode, path: "label"): string
+---@overload fun(self: UITextInputNode, path: "placeholder"): string
+---@overload fun(self: UITextInputNode, path: "text"): string
 ---@overload fun(self: UITextInputNode, path: "labelWidth"): number
 ---@overload fun(self: UITextInputNode, path: "maxLength"): integer
 function UITextInputNode:get_property(path) end
@@ -5650,6 +5660,8 @@ function UITextInputNode:get_property(path) end
 ---@overload fun(self: UITextInputNode, path: "enabled", value: boolean)
 ---@overload fun(self: UITextInputNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITextInputNode, path: "label", value: string)
+---@overload fun(self: UITextInputNode, path: "placeholder", value: string)
+---@overload fun(self: UITextInputNode, path: "text", value: string)
 ---@overload fun(self: UITextInputNode, path: "labelWidth", value: number)
 ---@overload fun(self: UITextInputNode, path: "maxLength", value: integer)
 function UITextInputNode:set_property(path, value, y) end
@@ -5667,6 +5679,7 @@ function UITextInputNode:set_property(path, value, y) end
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field size Vec2 Width and height (px).
 ---@field label string Caption shown next to the control.
+---@field items string[] The choices, one a line.
 ---@field selectedIndex integer Index of the selected item (-1 = none).
 ---@field defaultIndex integer Index restored by reset.
 ---@field labelWidth number Width reserved for the label (px); 0 = none.
@@ -5685,6 +5698,7 @@ function UITextInputNode:set_property(path, value, y) end
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
+---| "items" # string[] - The choices, one a line.
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
 ---| "defaultIndex" # integer - Index restored by reset.
 ---| "labelWidth" # number - Width reserved for the label (px); 0 = none.
@@ -5707,6 +5721,7 @@ function UITextInputNode:set_property(path, value, y) end
 ---@overload fun(self: UIDropdownNode, path: "enabled"): boolean
 ---@overload fun(self: UIDropdownNode, path: "size"): Vec2
 ---@overload fun(self: UIDropdownNode, path: "label"): string
+---@overload fun(self: UIDropdownNode, path: "items"): string[]
 ---@overload fun(self: UIDropdownNode, path: "selectedIndex"): integer
 ---@overload fun(self: UIDropdownNode, path: "defaultIndex"): integer
 ---@overload fun(self: UIDropdownNode, path: "labelWidth"): number
@@ -5731,6 +5746,7 @@ function UIDropdownNode:get_property(path) end
 ---@overload fun(self: UIDropdownNode, path: "enabled", value: boolean)
 ---@overload fun(self: UIDropdownNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIDropdownNode, path: "label", value: string)
+---@overload fun(self: UIDropdownNode, path: "items", value: string[])
 ---@overload fun(self: UIDropdownNode, path: "selectedIndex", value: integer)
 ---@overload fun(self: UIDropdownNode, path: "defaultIndex", value: integer)
 ---@overload fun(self: UIDropdownNode, path: "labelWidth", value: number)
@@ -5751,6 +5767,7 @@ function UIDropdownNode:set_property(path, value, y) end
 ---@field size Vec2 Width and height (px).
 ---@field label string Caption shown next to the control.
 ---@field labelWidth number Width reserved for the label (px); 0 = none.
+---@field options string[] The options, one a line.
 ---@field selectedIndex integer Index of the selected item (-1 = none).
 ---@field defaultIndex integer Index restored by reset.
 ---@field horizontal boolean Options in a row (else a column).
@@ -5769,6 +5786,7 @@ function UIDropdownNode:set_property(path, value, y) end
 ---| "size" # Vec2 - Width and height (px).
 ---| "label" # string - Caption shown next to the control.
 ---| "labelWidth" # number - Width reserved for the label (px); 0 = none.
+---| "options" # string[] - The options, one a line.
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
 ---| "defaultIndex" # integer - Index restored by reset.
 ---| "horizontal" # boolean - Options in a row (else a column).
@@ -5791,6 +5809,7 @@ function UIDropdownNode:set_property(path, value, y) end
 ---@overload fun(self: UIRadioGroupNode, path: "size"): Vec2
 ---@overload fun(self: UIRadioGroupNode, path: "label"): string
 ---@overload fun(self: UIRadioGroupNode, path: "labelWidth"): number
+---@overload fun(self: UIRadioGroupNode, path: "options"): string[]
 ---@overload fun(self: UIRadioGroupNode, path: "selectedIndex"): integer
 ---@overload fun(self: UIRadioGroupNode, path: "defaultIndex"): integer
 ---@overload fun(self: UIRadioGroupNode, path: "horizontal"): boolean
@@ -5815,6 +5834,7 @@ function UIRadioGroupNode:get_property(path) end
 ---@overload fun(self: UIRadioGroupNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIRadioGroupNode, path: "label", value: string)
 ---@overload fun(self: UIRadioGroupNode, path: "labelWidth", value: number)
+---@overload fun(self: UIRadioGroupNode, path: "options", value: string[])
 ---@overload fun(self: UIRadioGroupNode, path: "selectedIndex", value: integer)
 ---@overload fun(self: UIRadioGroupNode, path: "defaultIndex", value: integer)
 ---@overload fun(self: UIRadioGroupNode, path: "horizontal", value: boolean)
@@ -5991,6 +6011,7 @@ function UIKnobNode:set_property(path, value, y) end
 ---@field minValue number Lowest value.
 ---@field maxValue number Highest value.
 ---@field numNotches integer Number of notch marks.
+---@field notchLabels string[] A label under each notch, one a line (left to right).
 ---@field snapToNotches boolean Snap the value to the notches.
 ---@field orientation "Horizontal"|"Vertical" Horizontal or vertical.
 
@@ -6011,6 +6032,7 @@ function UIKnobNode:set_property(path, value, y) end
 ---| "minValue" # number - Lowest value.
 ---| "maxValue" # number - Highest value.
 ---| "numNotches" # integer - Number of notch marks.
+---| "notchLabels" # string[] - A label under each notch, one a line (left to right).
 ---| "snapToNotches" # boolean - Snap the value to the notches.
 ---| "orientation" # "Horizontal"|"Vertical" - Horizontal or vertical.
 
@@ -6035,6 +6057,7 @@ function UIKnobNode:set_property(path, value, y) end
 ---@overload fun(self: UINotchedSliderNode, path: "minValue"): number
 ---@overload fun(self: UINotchedSliderNode, path: "maxValue"): number
 ---@overload fun(self: UINotchedSliderNode, path: "numNotches"): integer
+---@overload fun(self: UINotchedSliderNode, path: "notchLabels"): string[]
 ---@overload fun(self: UINotchedSliderNode, path: "snapToNotches"): boolean
 ---@overload fun(self: UINotchedSliderNode, path: "orientation"): "Horizontal"|"Vertical"
 function UINotchedSliderNode:get_property(path) end
@@ -6061,6 +6084,7 @@ function UINotchedSliderNode:get_property(path) end
 ---@overload fun(self: UINotchedSliderNode, path: "minValue", value: number)
 ---@overload fun(self: UINotchedSliderNode, path: "maxValue", value: number)
 ---@overload fun(self: UINotchedSliderNode, path: "numNotches", value: integer)
+---@overload fun(self: UINotchedSliderNode, path: "notchLabels", value: string[])
 ---@overload fun(self: UINotchedSliderNode, path: "snapToNotches", value: boolean)
 ---@overload fun(self: UINotchedSliderNode, path: "orientation", value: "Horizontal"|"Vertical")
 function UINotchedSliderNode:set_property(path, value, y) end
@@ -6318,6 +6342,11 @@ function UISeparatorNode:set_property(path, value, y) end
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field size Vec2 Width and height (px).
+---@field title string Heading above the plot.
+---@field xLabel string Label under the x axis.
+---@field yLabel string Label beside the y axis.
+---@field series1Name string Name of the first series (the legend).
+---@field series2Name string Name of the second series (the legend).
 ---@field xMin number Left end of the X axis.
 ---@field xMax number Right end of the X axis.
 ---@field yMin number Bottom of the Y axis.
@@ -6330,6 +6359,8 @@ function UISeparatorNode:set_property(path, value, y) end
 ---@field lineColor number[] Colour of the line.
 ---@field secondaryLineColor number[] Colour of the second series.
 ---@field gridColor number[] Grid line colour.
+---@field points string[] The first series: one point a line, "x, y".
+---@field secondaryPoints string[] The second series: one point a line, "x, y".
 
 ---@alias UIXYPlotNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -6343,6 +6374,11 @@ function UISeparatorNode:set_property(path, value, y) end
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "size" # Vec2 - Width and height (px).
+---| "title" # string - Heading above the plot.
+---| "xLabel" # string - Label under the x axis.
+---| "yLabel" # string - Label beside the y axis.
+---| "series1Name" # string - Name of the first series (the legend).
+---| "series2Name" # string - Name of the second series (the legend).
 ---| "xMin" # number - Left end of the X axis.
 ---| "xMax" # number - Right end of the X axis.
 ---| "yMin" # number - Bottom of the Y axis.
@@ -6355,6 +6391,8 @@ function UISeparatorNode:set_property(path, value, y) end
 ---| "lineColor" # number[] - Colour of the line.
 ---| "secondaryLineColor" # number[] - Colour of the second series.
 ---| "gridColor" # number[] - Grid line colour.
+---| "points" # string[] - The first series: one point a line, "x, y".
+---| "secondaryPoints" # string[] - The second series: one point a line, "x, y".
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -6372,6 +6410,11 @@ function UISeparatorNode:set_property(path, value, y) end
 ---@overload fun(self: UIXYPlotNode, path: "paused"): boolean
 ---@overload fun(self: UIXYPlotNode, path: "enabled"): boolean
 ---@overload fun(self: UIXYPlotNode, path: "size"): Vec2
+---@overload fun(self: UIXYPlotNode, path: "title"): string
+---@overload fun(self: UIXYPlotNode, path: "xLabel"): string
+---@overload fun(self: UIXYPlotNode, path: "yLabel"): string
+---@overload fun(self: UIXYPlotNode, path: "series1Name"): string
+---@overload fun(self: UIXYPlotNode, path: "series2Name"): string
 ---@overload fun(self: UIXYPlotNode, path: "xMin"): number
 ---@overload fun(self: UIXYPlotNode, path: "xMax"): number
 ---@overload fun(self: UIXYPlotNode, path: "yMin"): number
@@ -6384,6 +6427,8 @@ function UISeparatorNode:set_property(path, value, y) end
 ---@overload fun(self: UIXYPlotNode, path: "lineColor"): number[]
 ---@overload fun(self: UIXYPlotNode, path: "secondaryLineColor"): number[]
 ---@overload fun(self: UIXYPlotNode, path: "gridColor"): number[]
+---@overload fun(self: UIXYPlotNode, path: "points"): string[]
+---@overload fun(self: UIXYPlotNode, path: "secondaryPoints"): string[]
 function UIXYPlotNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -6403,6 +6448,11 @@ function UIXYPlotNode:get_property(path) end
 ---@overload fun(self: UIXYPlotNode, path: "paused", value: boolean)
 ---@overload fun(self: UIXYPlotNode, path: "enabled", value: boolean)
 ---@overload fun(self: UIXYPlotNode, path: "size", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIXYPlotNode, path: "title", value: string)
+---@overload fun(self: UIXYPlotNode, path: "xLabel", value: string)
+---@overload fun(self: UIXYPlotNode, path: "yLabel", value: string)
+---@overload fun(self: UIXYPlotNode, path: "series1Name", value: string)
+---@overload fun(self: UIXYPlotNode, path: "series2Name", value: string)
 ---@overload fun(self: UIXYPlotNode, path: "xMin", value: number)
 ---@overload fun(self: UIXYPlotNode, path: "xMax", value: number)
 ---@overload fun(self: UIXYPlotNode, path: "yMin", value: number)
@@ -6415,6 +6465,8 @@ function UIXYPlotNode:get_property(path) end
 ---@overload fun(self: UIXYPlotNode, path: "lineColor", value: number[])
 ---@overload fun(self: UIXYPlotNode, path: "secondaryLineColor", value: number[])
 ---@overload fun(self: UIXYPlotNode, path: "gridColor", value: number[])
+---@overload fun(self: UIXYPlotNode, path: "points", value: string[])
+---@overload fun(self: UIXYPlotNode, path: "secondaryPoints", value: string[])
 function UIXYPlotNode:set_property(path, value, y) end
 
 ---@class UIListViewNode
@@ -6429,6 +6481,7 @@ function UIXYPlotNode:set_property(path, value, y) end
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field size Vec2 Width and height (px).
+---@field items string[] The rows, one a line.
 ---@field selectedIndex integer Index of the selected item (-1 = none).
 ---@field itemHeight number Height of each row (px).
 
@@ -6444,6 +6497,7 @@ function UIXYPlotNode:set_property(path, value, y) end
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "size" # Vec2 - Width and height (px).
+---| "items" # string[] - The rows, one a line.
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
 ---| "itemHeight" # number - Height of each row (px).
 
@@ -6463,6 +6517,7 @@ function UIXYPlotNode:set_property(path, value, y) end
 ---@overload fun(self: UIListViewNode, path: "paused"): boolean
 ---@overload fun(self: UIListViewNode, path: "enabled"): boolean
 ---@overload fun(self: UIListViewNode, path: "size"): Vec2
+---@overload fun(self: UIListViewNode, path: "items"): string[]
 ---@overload fun(self: UIListViewNode, path: "selectedIndex"): integer
 ---@overload fun(self: UIListViewNode, path: "itemHeight"): number
 function UIListViewNode:get_property(path) end
@@ -6484,6 +6539,7 @@ function UIListViewNode:get_property(path) end
 ---@overload fun(self: UIListViewNode, path: "paused", value: boolean)
 ---@overload fun(self: UIListViewNode, path: "enabled", value: boolean)
 ---@overload fun(self: UIListViewNode, path: "size", x: number|Vec2|number[], y?: number)
+---@overload fun(self: UIListViewNode, path: "items", value: string[])
 ---@overload fun(self: UIListViewNode, path: "selectedIndex", value: integer)
 ---@overload fun(self: UIListViewNode, path: "itemHeight", value: number)
 function UIListViewNode:set_property(path, value, y) end
@@ -6502,6 +6558,7 @@ function UIListViewNode:set_property(path, value, y) end
 ---@field size Vec2 Width and height (px).
 ---@field selectedId integer Id of the selected item (-1 = none).
 ---@field itemHeight number Height of each row (px).
+---@field items string[] The items, one a line; 2 spaces at the start nest one under the item above.
 
 ---@alias UITreeViewNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -6517,6 +6574,7 @@ function UIListViewNode:set_property(path, value, y) end
 ---| "size" # Vec2 - Width and height (px).
 ---| "selectedId" # integer - Id of the selected item (-1 = none).
 ---| "itemHeight" # number - Height of each row (px).
+---| "items" # string[] - The items, one a line; 2 spaces at the start nest one under the item above.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -6536,6 +6594,7 @@ function UIListViewNode:set_property(path, value, y) end
 ---@overload fun(self: UITreeViewNode, path: "size"): Vec2
 ---@overload fun(self: UITreeViewNode, path: "selectedId"): integer
 ---@overload fun(self: UITreeViewNode, path: "itemHeight"): number
+---@overload fun(self: UITreeViewNode, path: "items"): string[]
 function UITreeViewNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -6557,6 +6616,7 @@ function UITreeViewNode:get_property(path) end
 ---@overload fun(self: UITreeViewNode, path: "size", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UITreeViewNode, path: "selectedId", value: integer)
 ---@overload fun(self: UITreeViewNode, path: "itemHeight", value: number)
+---@overload fun(self: UITreeViewNode, path: "items", value: string[])
 function UITreeViewNode:set_property(path, value, y) end
 
 ---@class UIUnorderedListNode
@@ -6574,6 +6634,7 @@ function UITreeViewNode:set_property(path, value, y) end
 ---@field selectedIndex integer Index of the selected item (-1 = none).
 ---@field defaultBullet "Disc"|"Circle"|"Square"|"Dash"|"Arrow" Bullet style for items without their own.
 ---@field itemHeight number Height of each row (px).
+---@field items string[] The items, one a line; 2 spaces at the start nest it a level deeper.
 
 ---@alias UIUnorderedListNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -6590,6 +6651,7 @@ function UITreeViewNode:set_property(path, value, y) end
 ---| "selectedIndex" # integer - Index of the selected item (-1 = none).
 ---| "defaultBullet" # "Disc"|"Circle"|"Square"|"Dash"|"Arrow" - Bullet style for items without their own.
 ---| "itemHeight" # number - Height of each row (px).
+---| "items" # string[] - The items, one a line; 2 spaces at the start nest it a level deeper.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -6610,6 +6672,7 @@ function UITreeViewNode:set_property(path, value, y) end
 ---@overload fun(self: UIUnorderedListNode, path: "selectedIndex"): integer
 ---@overload fun(self: UIUnorderedListNode, path: "defaultBullet"): "Disc"|"Circle"|"Square"|"Dash"|"Arrow"
 ---@overload fun(self: UIUnorderedListNode, path: "itemHeight"): number
+---@overload fun(self: UIUnorderedListNode, path: "items"): string[]
 function UIUnorderedListNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -6632,6 +6695,7 @@ function UIUnorderedListNode:get_property(path) end
 ---@overload fun(self: UIUnorderedListNode, path: "selectedIndex", value: integer)
 ---@overload fun(self: UIUnorderedListNode, path: "defaultBullet", value: "Disc"|"Circle"|"Square"|"Dash"|"Arrow")
 ---@overload fun(self: UIUnorderedListNode, path: "itemHeight", value: number)
+---@overload fun(self: UIUnorderedListNode, path: "items", value: string[])
 function UIUnorderedListNode:set_property(path, value, y) end
 
 ---@class UIOrderedListNode
@@ -6650,6 +6714,7 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---@field numbering "Decimal"|"AlphaLower"|"AlphaUpper"|"RomanLower"|"RomanUpper" Numbering style (1, a, i...).
 ---@field startNumber integer Number of the first item.
 ---@field itemHeight number Height of each row (px).
+---@field items string[] The items, one a line; 2 spaces at the start nest it a level deeper.
 
 ---@alias UIOrderedListNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -6667,6 +6732,7 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---| "numbering" # "Decimal"|"AlphaLower"|"AlphaUpper"|"RomanLower"|"RomanUpper" - Numbering style (1, a, i...).
 ---| "startNumber" # integer - Number of the first item.
 ---| "itemHeight" # number - Height of each row (px).
+---| "items" # string[] - The items, one a line; 2 spaces at the start nest it a level deeper.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -6688,6 +6754,7 @@ function UIUnorderedListNode:set_property(path, value, y) end
 ---@overload fun(self: UIOrderedListNode, path: "numbering"): "Decimal"|"AlphaLower"|"AlphaUpper"|"RomanLower"|"RomanUpper"
 ---@overload fun(self: UIOrderedListNode, path: "startNumber"): integer
 ---@overload fun(self: UIOrderedListNode, path: "itemHeight"): number
+---@overload fun(self: UIOrderedListNode, path: "items"): string[]
 function UIOrderedListNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -6711,6 +6778,7 @@ function UIOrderedListNode:get_property(path) end
 ---@overload fun(self: UIOrderedListNode, path: "numbering", value: "Decimal"|"AlphaLower"|"AlphaUpper"|"RomanLower"|"RomanUpper")
 ---@overload fun(self: UIOrderedListNode, path: "startNumber", value: integer)
 ---@overload fun(self: UIOrderedListNode, path: "itemHeight", value: number)
+---@overload fun(self: UIOrderedListNode, path: "items", value: string[])
 function UIOrderedListNode:set_property(path, value, y) end
 
 ---@class UITableNode
@@ -6730,6 +6798,8 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---@field sortAscending boolean Sort ascending (else descending).
 ---@field headerHeight number Height of the header (px).
 ---@field rowHeight number Height of each row (px).
+---@field columns string[] The columns, one a line: Title, or Title|width (width <= 1: a share of the table).
+---@field rows string[] The rows, one a line, cells split by |.
 
 ---@alias UITableNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -6748,6 +6818,8 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---| "sortAscending" # boolean - Sort ascending (else descending).
 ---| "headerHeight" # number - Height of the header (px).
 ---| "rowHeight" # number - Height of each row (px).
+---| "columns" # string[] - The columns, one a line: Title, or Title|width (width <= 1: a share of the table).
+---| "rows" # string[] - The rows, one a line, cells split by |.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -6770,6 +6842,8 @@ function UIOrderedListNode:set_property(path, value, y) end
 ---@overload fun(self: UITableNode, path: "sortAscending"): boolean
 ---@overload fun(self: UITableNode, path: "headerHeight"): number
 ---@overload fun(self: UITableNode, path: "rowHeight"): number
+---@overload fun(self: UITableNode, path: "columns"): string[]
+---@overload fun(self: UITableNode, path: "rows"): string[]
 function UITableNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -6794,6 +6868,8 @@ function UITableNode:get_property(path) end
 ---@overload fun(self: UITableNode, path: "sortAscending", value: boolean)
 ---@overload fun(self: UITableNode, path: "headerHeight", value: number)
 ---@overload fun(self: UITableNode, path: "rowHeight", value: number)
+---@overload fun(self: UITableNode, path: "columns", value: string[])
+---@overload fun(self: UITableNode, path: "rows", value: string[])
 function UITableNode:set_property(path, value, y) end
 
 ---@class UIIconNode
@@ -6890,6 +6966,7 @@ function UIIconNode:set_property(path, value, y) end
 ---@field activeToggleId integer Id of the pressed toggle button.
 ---@field buttonSize Vec2 Size of each button (px).
 ---@field spacing number Gap between items (px).
+---@field items string[] The items, one a line: Icon|Label|Tooltip (toggle: first for a toggle), - a separator, ...
 
 ---@alias UIToolbarNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -6906,6 +6983,7 @@ function UIIconNode:set_property(path, value, y) end
 ---| "activeToggleId" # integer - Id of the pressed toggle button.
 ---| "buttonSize" # Vec2 - Size of each button (px).
 ---| "spacing" # number - Gap between items (px).
+---| "items" # string[] - The items, one a line: Icon|Label|Tooltip (toggle: first for a toggle), - a separator, ...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -6926,6 +7004,7 @@ function UIIconNode:set_property(path, value, y) end
 ---@overload fun(self: UIToolbarNode, path: "activeToggleId"): integer
 ---@overload fun(self: UIToolbarNode, path: "buttonSize"): Vec2
 ---@overload fun(self: UIToolbarNode, path: "spacing"): number
+---@overload fun(self: UIToolbarNode, path: "items"): string[]
 function UIToolbarNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -6948,6 +7027,7 @@ function UIToolbarNode:get_property(path) end
 ---@overload fun(self: UIToolbarNode, path: "activeToggleId", value: integer)
 ---@overload fun(self: UIToolbarNode, path: "buttonSize", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: UIToolbarNode, path: "spacing", value: number)
+---@overload fun(self: UIToolbarNode, path: "items", value: string[])
 function UIToolbarNode:set_property(path, value, y) end
 
 ---@class UITabContainerNode
@@ -6981,6 +7061,7 @@ function UIToolbarNode:set_property(path, value, y) end
 ---@field borderColor number[] Colour of the border.
 ---@field titleColor number[] Title text colour.
 ---@field tabDirection "Horizontal"|"Vertical" Tabs along the top or the side.
+---@field tabNames string[] Each tab's title, one a line, in the order of the child pages.
 ---@field activeTab integer Index of the shown tab (child).
 ---@field tabSize number Tab height (or width when vertical; px).
 
@@ -7015,6 +7096,7 @@ function UIToolbarNode:set_property(path, value, y) end
 ---| "borderColor" # number[] - Colour of the border.
 ---| "titleColor" # number[] - Title text colour.
 ---| "tabDirection" # "Horizontal"|"Vertical" - Tabs along the top or the side.
+---| "tabNames" # string[] - Each tab's title, one a line, in the order of the child pages.
 ---| "activeTab" # integer - Index of the shown tab (child).
 ---| "tabSize" # number - Tab height (or width when vertical; px).
 
@@ -7053,6 +7135,7 @@ function UIToolbarNode:set_property(path, value, y) end
 ---@overload fun(self: UITabContainerNode, path: "borderColor"): number[]
 ---@overload fun(self: UITabContainerNode, path: "titleColor"): number[]
 ---@overload fun(self: UITabContainerNode, path: "tabDirection"): "Horizontal"|"Vertical"
+---@overload fun(self: UITabContainerNode, path: "tabNames"): string[]
 ---@overload fun(self: UITabContainerNode, path: "activeTab"): integer
 ---@overload fun(self: UITabContainerNode, path: "tabSize"): number
 function UITabContainerNode:get_property(path) end
@@ -7093,6 +7176,7 @@ function UITabContainerNode:get_property(path) end
 ---@overload fun(self: UITabContainerNode, path: "borderColor", value: number[])
 ---@overload fun(self: UITabContainerNode, path: "titleColor", value: number[])
 ---@overload fun(self: UITabContainerNode, path: "tabDirection", value: "Horizontal"|"Vertical")
+---@overload fun(self: UITabContainerNode, path: "tabNames", value: string[])
 ---@overload fun(self: UITabContainerNode, path: "activeTab", value: integer)
 ---@overload fun(self: UITabContainerNode, path: "tabSize", value: number)
 function UITabContainerNode:set_property(path, value, y) end
@@ -7330,17 +7414,29 @@ function Node:is_paused() end
 ---@param mode "inherit"|"pausable"|"always"
 function Node:set_pause_mode(mode) end
 
----Sets the text of a TextNode (restarting its typewriter), UI label or button.
+---Sets the text of a TextNode (restarting its typewriter), UI label, button or text input (raising its value_changed).
 ---
 ---Example: `self.node:get_node("ScoreLabel"):set_text("Score: " .. self.score)`
 ---@param text string
 function TextHolder:set_text(text) end
 
----Gets the text of a TextNode, UI label or button.
+---Gets the text of a TextNode, UI label, button or text input (what's typed).
 ---
 ---Example: `local text = self.node:get_node("ScoreLabel"):get_text()`
 ---@return string
 function TextHolder:get_text() end
+
+---Replaces the node's list (#227): a Dropdown's items, a Radio Group's options, a List View's / Tree View's / Bullet or Numbered List's / Toolbar's items, a Table's rows, an XY Plot's points, a Tab Container's tab names, a Notched Slider's notch labels. One string an item, as in the Inspector: 2 leading spaces nest a Tree / List item; table cells split by "|"; toolbar items "Icon|Label|Tooltip"; points "x, y" or Vec2 / {x, y}. Other lists: set_property("columns", {...}).
+---
+---Example: `self.node:get_node("Difficulty"):ui_set_items({"Easy", "Normal", "Hard"})`
+---@param items (string|number|Vec2|number[])[]
+function UIListHolder:ui_set_items(items) end
+
+---The node's list (see ui_set_items), one string an item.
+---
+---Example: `for i, name in ipairs(self.node:ui_get_items()) do print(i, name) end`
+---@return string[]
+function UIListHolder:ui_get_items() end
 
 ---TextNode: types the text out again (revealSpeed > 0).
 ---

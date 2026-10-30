@@ -514,6 +514,7 @@ Property_ToString :: proc(p: Node_Property) -> string {
 		c := (^rl.Color)(p.ptr)^
 		return fmt.tprintf("#%02x%02x%02x%02x", c.r, c.g, c.b, c.a)
 	case .String: return (^string)(p.ptr)^
+	case .String_List: return strings.join(Property_GetList(p), "\n", context.temp_allocator) // (a line each)
 	case .Enum:
 		names := Property_EnumNames(p)
 		i := Property_GetEnumIndex(p)
@@ -557,6 +558,11 @@ Property_FromString :: proc(node: ^Node, p: Node_Property, value: string) -> boo
 		return true
 	case .String:
 		Property_SetString(node, p, value)
+		return true
+	case .String_List:
+		lines := strings.split_lines(value, context.temp_allocator)
+		if value == "" do lines = nil
+		Property_SetList(node, p, lines)
 		return true
 	case .Enum:
 		for nm, i in Property_EnumNames(p) do if nm == value {Property_SetEnumIndex(p, i); return true}
@@ -625,6 +631,7 @@ link_prop_kind :: proc(p: Node_Property) -> (kind: string, extra: string) {
 	case .Enum: kind = "enum"
 	case .Bit_Set: kind = "bit_set"
 	case .String: kind = "string"
+	case .String_List: kind = "string_list"
 	}
 	if p.kind == .Enum || p.kind == .Bit_Set {
 		extra = strings.join(Property_EnumNames(p), "|", context.temp_allocator)

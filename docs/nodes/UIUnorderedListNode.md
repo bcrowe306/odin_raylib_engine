@@ -26,9 +26,9 @@ a row. Use it for objectives, credits, patch notes or an inventory read-out.
    Circle, Square, Dash or Arrow), set **Item Height** (16 to 48 px) and
    **Selected Index** (the highlighted row, from 0).
 
-The rows can't be added in the editor or from Lua yet (there's no Lua
-function for them). An empty list draws nothing, so in the editor you only
-see the selection outline of its area.
+Set the items in the Node tab's **Items** box, one a line; two spaces at
+the start nest an item a level deeper. Scripts:
+`node:ui_set_items({"Find the key", "  Ask the guard"})`.
 
 ## How it works
 

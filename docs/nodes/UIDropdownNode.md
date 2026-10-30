@@ -24,9 +24,10 @@ a choice has several options.
    shown at the start, counting from 0) and **Default Index**.
 4. Handle `value_changed` (below) to act on the choice.
 
-The items themselves can't be edited yet, in the Inspector or from Lua:
-every dropdown has Option A, Option B and Option C. Map the index to your
-own meanings in the script.
+Set the items in the Node tab's **Items** box, one a line (they're saved
+with the scene). A script can replace them:
+`node:ui_set_items({"Low", "Medium", "High"})`, and `node:ui_get_items()`
+reads them.
 
 ## How it works
 

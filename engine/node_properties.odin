@@ -16,6 +16,10 @@ import rl "vendor:raylib"
 //   gui:"true"        expose the field
 //   min:"0" max:"1"   value range (inspector drag limits)
 //   save:"false"      runtime state: shown read-only, never saved
+// A gui-tagged [dynamic]string is a String_List (one item a line). Nodes
+// whose lists hold structs (a Table's rows, a Tree View's items...) add
+// String_List properties through UI_LIST_PROPS (ui_list_props.odin) that
+// read and write them as lines (#227).
 // `using` fields are walked (so UIElement / Node fields are found) except the
 // base Node, whose transform is handled explicitly. A gui-tagged field of
 // struct type (e.g. ParticleEmitterNode.emitter) is walked with a prefix
@@ -31,6 +35,7 @@ Property_Kind :: enum {
 	Enum,
 	Bit_Set,
 	String,
+	String_List, // [dynamic]string, or a list a node reads / writes as lines
 }
 
 Node_Property :: struct {
@@ -42,6 +47,10 @@ Node_Property :: struct {
 	has_range: bool,
 	runtime:   bool, // save:"false"
 	owner:     string, // the struct declaring the field ("CameraNode"), for Property_Doc
+	// String_List adapters (ptr is then the node): the list as lines, and
+	// back. nil: ptr is a ^[dynamic]string.
+	list_get:  proc(node: ^Node, allocator := context.temp_allocator) -> []string,
+	list_set:  proc(node: ^Node, items: []string),
 }
 
 // Node_CollectProperties lists the reflected properties of a node's concrete
@@ -50,6 +59,9 @@ Node_CollectProperties :: proc(node: ^Node, allocator := context.temp_allocator)
 	out := make([dynamic]Node_Property, allocator)
 	if node == nil || node.typeId == nil || node.typeId == Node do return out[:]
 	collect_struct_props(&out, node.typeId, rawptr(node), "", allocator)
+	for lp in UI_LIST_PROPS do if lp.type == node.typeId {
+		append(&out, Node_Property{name = lp.name, kind = .String_List, ptr = rawptr(node), type = type_info_of([]string), owner = lp.owner, list_get = lp.get, list_set = lp.set})
+	}
 	return out[:]
 }
 
@@ -185,6 +197,8 @@ property_kind :: proc(ti: ^reflect.Type_Info) -> (Property_Kind, bool) {
 		return .String, true
 	case reflect.Type_Info_Array:
 		if v.count == 2 && v.elem.id == f32 do return .Vec2, true
+	case reflect.Type_Info_Dynamic_Array:
+		if v.elem.id == string do return .String_List, true
 	}
 	return .Float, false
 }
@@ -307,6 +321,25 @@ Property_SetString :: proc(node: ^Node, p: Node_Property, value: string) {
 	(^string)(p.ptr)^ = strings.clone(value, node.allocator)
 }
 
+// Property_GetList: a String_List's items (allocator: the slice; the strings
+// are the node's).
+Property_GetList :: proc(p: Node_Property, allocator := context.temp_allocator) -> []string {
+	if p.list_get != nil do return p.list_get(cast(^Node)p.ptr, allocator)
+	return (^[dynamic]string)(p.ptr)[:]
+}
+
+// Property_SetList replaces a String_List's items (copied to the node).
+Property_SetList :: proc(node: ^Node, p: Node_Property, items: []string) {
+	if p.list_set != nil {
+		p.list_set(node, items)
+		return
+	}
+	list := (^[dynamic]string)(p.ptr)
+	if list^ == nil do list^ = make([dynamic]string, node.allocator)
+	clear(list)
+	for it in items do append(list, strings.clone(it, node.allocator))
+}
+
 // --- colours ------------------------------------------------------------------
 
 Color_ToHex :: proc(c: rl.Color, allocator := context.temp_allocator) -> string {
@@ -366,6 +399,13 @@ Property_WriteJSON :: proc(w: ^Json_Writer, p: Node_Property) {
 		strings.write_byte(&w.sb, ']')
 	case .String:
 		Json_String(w, (^string)(p.ptr)^)
+	case .String_List:
+		strings.write_byte(&w.sb, '[')
+		for it, i in Property_GetList(p) {
+			if i > 0 do strings.write_string(&w.sb, ", ")
+			Json_String(w, it)
+		}
+		strings.write_byte(&w.sb, ']')
 	}
 }
 
@@ -422,6 +462,12 @@ Property_ReadJSON :: proc(node: ^Node, p: Node_Property, value: json.Value) {
 		}
 	case .String:
 		if s, ok := value.(json.String); ok do Property_SetString(node, p, s)
+	case .String_List:
+		if arr, ok := value.(json.Array); ok {
+			items := make([dynamic]string, context.temp_allocator)
+			for it in arr do if s, is_str := it.(json.String); is_str do append(&items, string(s))
+			Property_SetList(node, p, items[:])
+		}
 	}
 }
 
