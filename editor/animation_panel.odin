@@ -80,6 +80,7 @@ Anim_Panel :: struct {
 	// path in pinScene (paths survive undo, which rebuilds nodes).
 	pinPath:       string,
 	pinScene:      ^e.Scene,
+	graph:         bool, // the value graph instead of the track rows (#180)
 }
 
 PREVIEW_W :: f32(200)
@@ -141,6 +142,7 @@ AnimationPanel_Shutdown :: proc() {
 	delete(panel.collapsed)
 	AnimKeys_Shutdown()
 	AutoKey_Shutdown()
+	AnimGraph_Shutdown()
 	delete(panel.pinPath)
 }
 
@@ -812,7 +814,7 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 
 	zoomMod := imgui.GetIO().KeySuper || imgui.GetIO().KeyCtrl
 	timelineFlags: imgui.WindowFlags = {.HorizontalScrollbar}
-	if zoomMod do timelineFlags += {.NoScrollWithMouse}
+	if zoomMod || panel.graph do timelineFlags += {.NoScrollWithMouse} // (the graph's wheel moves values)
 	if !imgui.BeginChild("##anim_timeline", {avail.x - sideW - (UI_SPACE if sideW > 0 else 0), max(avail.y, 40)}, {}, timelineFlags) {
 		imgui.EndChild()
 		if sideW > 0 do side_panel(state, apn, anim, {sideW, max(avail.y, 40)})
@@ -855,6 +857,8 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 			rowsH += ROW_H
 		}
 	}
+	// The graph: the rest of the panel's height.
+	if panel.graph do rowsH = max(imgui.GetWindowHeight() - (20 + THUMB_H + 4) - 22, 60) // (fits: the wheel moves values here)
 	totalH := 20 + THUMB_H + 4 + rowsH
 	imgui.Dummy({LABEL_W + f32(cols + 4) * cellW, totalH})
 	colX :: proc(x0: f32, col: int) -> f32 {return x0 + f32(col) * cellW}
@@ -919,7 +923,12 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 		UI_DimText(fmt.tprintf("%d key(s)", len(animKeys.sel)) if hasKeys else (fmt.tprintf("%d selected", len(panel.sel)) if hasSel else ""))
 		// At the ruler: its units and the zoom (Cmd / Ctrl + wheel over the
 		// timeline, or the wheel over the ruler).
-		imgui.SetCursorScreenPos({origin.x + scrollX + LABEL_W - 74, origin.y})
+		imgui.SetCursorScreenPos({origin.x + scrollX + LABEL_W - 96, origin.y})
+		if UI_IconButton(ICON_FA_CHART_LINE, "anim.graph", "Track rows (click)" if panel.graph else "Value graph: the curves, with bezier handles (click)", panel.graph, size = 20) {
+			panel.graph = !panel.graph
+			AnimGraph_FrameAll()
+		}
+		imgui.SameLine(0, 2)
 		if UI_IconButton(ICON_FA_CLOCK, "anim.ruler-units", "Ruler in seconds (click: frames)" if panel.rulerSeconds else "Ruler in frames (click: seconds)", panel.rulerSeconds, size = 20) {
 			panel.rulerSeconds = !panel.rulerSeconds
 		}
@@ -1099,350 +1108,354 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 		}
 	}
 
-	// Node rows: fold / unfold its tracks; folded, its keys as dots.
-	for g in groups {
-		gy := g.y
-		imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, gy}, {colX(x0, cols), gy + GROUP_H - 2}, col_u32(ui_line(0.06)), 3)
-		gname := apn.name if g.target == "." else g.target
-		if g.target != "." {
-			if n := e.Node_ResolvePath(mgr, apn, g.target); n != nil do gname = n.name
-		}
-		label(dl, origin.x + scrollX, gy + 2, fmt.tprintf("%s  %s", ICON_FA_CARET_RIGHT if g.folded else ICON_FA_CARET_DOWN, gname), UI_TEXT_DIM)
-		imgui.SetCursorScreenPos({origin.x + scrollX, gy})
-		if imgui.InvisibleButton(fmt.ctprintf("##group_%s", g.target), {LABEL_W - 8, GROUP_H - 2}) do group_toggle(g.target)
-		Drive_Item(fmt.tprintf("anim.group:%s", g.target))
-		UI_Tooltip("Fold this node's tracks" if !g.folded else "Show this node's tracks")
-		if g.folded {
-			for tr in anim.tracks {
-				if ("." if tr.target == "" else tr.target) != g.target do continue
-				for k in tr.keys {
-					kx := x0 + (f32(base) + e.Animation_TimeFrame(apn, anim, k.time)) * cellW + cellW * 0.5
-					imgui.DrawList_AddCircleFilled(dl, {kx, gy + GROUP_H * 0.5 - 1}, 3, col_u32(UI_TEXT_DIM))
-				}
-			}
-		}
-	}
-
-	// Track rows. Keys: click selects (Shift / Cmd: adds), drag moves the
-	// selection (snapping to frames; Shift: free), a box from an empty spot
-	// selects; right-click: the key's menu.
 	removeTrack := -1
-	canInteract := imgui.IsWindowHovered({})
-	keyHit := false
-	clear(&animKeys.boxHits)
-	boxMn := [2]f32{min(animKeys.boxFrom.x, mouse.x), min(animKeys.boxFrom.y, mouse.y)}
-	boxMx := [2]f32{max(animKeys.boxFrom.x, mouse.x), max(animKeys.boxFrom.y, mouse.y)}
-	for ti in order {
-		tr := &anim.tracks[ti]
-		y := rowY[ti]
-		imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, y}, {colX(x0, cols), y + ROW_H - 2}, col_u32(ui_line(0.025)), 3)
-		target: ^e.Node = apn
-		if tr.target != "." && tr.target != "" do target = e.Node_ResolvePath(mgr, apn, tr.target)
-		prop := tr.property
-		if tr.kind == .Method {
-			scriptRel := node_script_rel(state, target)
-			if scriptRel != "" do prop = fmt.tprintf("calls() -> %s", filepath.base(scriptRel))
-			else do prop = "calls() (no script!)"
-		}
-		if tr.kind == .Audio {
-			if tr.name != "" do prop = tr.name
-			else if tr.property == "@audio" do prop = "sounds"
-			else if strings.has_prefix(tr.property, "@audio_") do prop = fmt.tprintf("sounds %s", tr.property[len("@audio_"):])
-			else do prop = "sounds"
-		}
-		#partial switch tr.kind {
-		case .EmitParticles:        prop = "particles (start)"
-		case .InstantiateComponent: prop = "spawn component"
-		case .SetEnabled:           prop = "enable / disable"
-		}
-		name := prop // (under its node's row)
-		isSelectedTrack := panel.selectedTrack == ti
-		if isSelectedTrack {
-			imgui.DrawList_AddRect(dl, {origin.x + scrollX, y}, {colX(x0, cols), y + ROW_H - 2}, col_u32(UI_ACCENT), 3, thickness = 1.5)
-		}
-		labelCol := UI_TEXT if target != nil else UI_DANGER
-		if target != nil && tr.kind == .Method && node_script_rel(state, target) == "" do labelCol = UI_WARNING
-		btnStart := LABEL_W - (82 if (tr.kind == .Audio || tr.kind == .Method) else 58)
-
-		// Clip label text before btnStart so text never bleeds over the buttons
-		imgui.DrawList_PushClipRect(dl, {origin.x + scrollX, y}, {origin.x + scrollX + btnStart - 4, y + ROW_H}, true)
-		label(dl, origin.x + scrollX + 10, y + 6, name, labelCol)
-		imgui.DrawList_PopClipRect(dl)
-
-		// Hover tooltip over track header showing full track name
-		headerMn := [2]f32{origin.x + scrollX, y}
-		headerMx := [2]f32{origin.x + scrollX + btnStart - 4, y + ROW_H}
-		mousePos := imgui.GetMousePos()
-		if mousePos.x >= headerMn.x && mousePos.x <= headerMx.x && mousePos.y >= headerMn.y && mousePos.y <= headerMx.y {
-			imgui.SetTooltip("%s", fmt.ctprintf("%s.%s (%s)", apn.name if tr.target == "." || tr.target == "" else tr.target, name, tr.property))
+	if panel.graph {
+		AnimGraph_Render(state, apn, anim, dl, origin.x + scrollX, origin.x + scrollX + LABEL_W, origin.x + scrollX + imgui.GetWindowWidth() - 4, ty, rowsH, x0, base, cellW, imgui.IsWindowHovered({}))
+	} else {
+		// Node rows: fold / unfold its tracks; folded, its keys as dots.
+		for g in groups {
+			gy := g.y
+			imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, gy}, {colX(x0, cols), gy + GROUP_H - 2}, col_u32(ui_line(0.06)), 3)
+			gname := apn.name if g.target == "." else g.target
+			if g.target != "." {
+				if n := e.Node_ResolvePath(mgr, apn, g.target); n != nil do gname = n.name
+			}
+			label(dl, origin.x + scrollX, gy + 2, fmt.tprintf("%s  %s", ICON_FA_CARET_RIGHT if g.folded else ICON_FA_CARET_DOWN, gname), UI_TEXT_DIM)
+			imgui.SetCursorScreenPos({origin.x + scrollX, gy})
+			if imgui.InvisibleButton(fmt.ctprintf("##group_%s", g.target), {LABEL_W - 8, GROUP_H - 2}) do group_toggle(g.target)
+			Drive_Item(fmt.tprintf("anim.group:%s", g.target))
+			UI_Tooltip("Fold this node's tracks" if !g.folded else "Show this node's tracks")
+			if g.folded {
+				for tr in anim.tracks {
+					if ("." if tr.target == "" else tr.target) != g.target do continue
+					for k in tr.keys {
+						kx := x0 + (f32(base) + e.Animation_TimeFrame(apn, anim, k.time)) * cellW + cellW * 0.5
+						imgui.DrawList_AddCircleFilled(dl, {kx, gy + GROUP_H * 0.5 - 1}, 3, col_u32(UI_TEXT_DIM))
+					}
+				}
+			}
 		}
 
-		imgui.PushIDInt(c.int(ti) + 1000)
-		// Row buttons (fixed at the left).
-		imgui.SetCursorScreenPos({origin.x + scrollX + btnStart, y + 2})
-		keyTip := "Key the current value at the playhead"
-		if tr.kind == .Method do keyTip = "Call a method at the playhead (right-click the key to name it)"
-		if tr.kind == .Audio do keyTip = "Play a sound at the playhead (right-click the key to pick it)"
-		if tr.kind == .EmitParticles do keyTip = "Emit particles at the playhead (right-click to edit action)"
-		if tr.kind == .InstantiateComponent do keyTip = "Spawn component at the playhead (right-click to pick component)"
-		if tr.kind == .SetEnabled do keyTip = "Toggle enable/disable at the playhead"
-		keyClicked := UI_IconButton(ICON_FA_CIRCLE, fmt.tprintf("anim.key:%s", tr.property), keyTip, size = 24, tint = UI_WARNING)
-		if keyClicked && tr.kind != .Property {
-			Editor_RecordUndo(state, "Add event key")
-			text := "on_animation_event"
+		// Track rows. Keys: click selects (Shift / Cmd: adds), drag moves the
+		// selection (snapping to frames; Shift: free), a box from an empty spot
+		// selects; right-click: the key's menu.
+		canInteract := imgui.IsWindowHovered({})
+		keyHit := false
+		clear(&animKeys.boxHits)
+		boxMn := [2]f32{min(animKeys.boxFrom.x, mouse.x), min(animKeys.boxFrom.y, mouse.y)}
+		boxMx := [2]f32{max(animKeys.boxFrom.x, mouse.x), max(animKeys.boxFrom.y, mouse.y)}
+		for ti in order {
+			tr := &anim.tracks[ti]
+			y := rowY[ti]
+			imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, y}, {colX(x0, cols), y + ROW_H - 2}, col_u32(ui_line(0.025)), 3)
+			target: ^e.Node = apn
+			if tr.target != "." && tr.target != "" do target = e.Node_ResolvePath(mgr, apn, tr.target)
+			prop := tr.property
+			if tr.kind == .Method {
+				scriptRel := node_script_rel(state, target)
+				if scriptRel != "" do prop = fmt.tprintf("calls() -> %s", filepath.base(scriptRel))
+				else do prop = "calls() (no script!)"
+			}
 			if tr.kind == .Audio {
-				audio := Editor_ListProjectFiles(state, "", AUDIO_EXTS)
-				text = audio[0] if len(audio) > 0 else ""
-				panel.selectedTrack = ti
-			} else if tr.kind == .Method {
-				if methods := Script_ListMethods(state, target); len(methods) > 0 do text = methods[0]
-				panel.selectedTrack = ti
-			} else if tr.kind == .EmitParticles {
-				text = e.Particle_KeyText(.Restart, 0)
-			} else if tr.kind == .InstantiateComponent {
-				comps := Editor_ListProjectFiles(state, "", {".component.json"})
-				text = comps[0] if len(comps) > 0 else ""
-			} else if tr.kind == .SetEnabled {
-				text = "disable"
+				if tr.name != "" do prop = tr.name
+				else if tr.property == "@audio" do prop = "sounds"
+				else if strings.has_prefix(tr.property, "@audio_") do prop = fmt.tprintf("sounds %s", tr.property[len("@audio_"):])
+				else do prop = "sounds"
 			}
-			// The previous key's text is the likely next one.
-			at := e.Animation_FrameTime(apn, anim, f32(rel))
-			for k in tr.keys do if k.time < at && k.text != "" do text = k.text
-			e.Track_SetEventKey(tr, at, text, apn.allocator)
-		} else if keyClicked && target != nil {
-			if p, ok := e.Track_FindProperty(target, tr.property); ok {
-				at := e.Animation_FrameTime(apn, anim, f32(rel))
-				if p.kind == .String {
-					if text, tok := e.Property_GetTrackText(p); tok {
-						Editor_RecordUndo(state, "Set key")
-						e.Track_SetEventKey(tr, at, text, apn.allocator)
-					}
-				} else if v, vok := e.Property_GetTrackValue(p); vok {
-					Editor_RecordUndo(state, "Set key")
-					e.Track_SetKey(tr, at, v)
-					// The value the user just set is the one to come back to.
-					for &pv in panel.saved do if pv.node == target && pv.property == tr.property do pv.value = v
-				}
+			#partial switch tr.kind {
+			case .EmitParticles:        prop = "particles (start)"
+			case .InstantiateComponent: prop = "spawn component"
+			case .SetEnabled:           prop = "enable / disable"
 			}
-		}
-		if tr.kind == .Audio {
-			imgui.SameLine(0, 2)
-			if UI_IconButton(ICON_FA_SLIDERS, fmt.tprintf("anim.track-settings:%s", tr.property), "Sound Track Settings", isSelectedTrack, size = 24) {
-				panel.selectedTrack = ti if panel.selectedTrack != ti else -1
+			name := prop // (under its node's row)
+			isSelectedTrack := panel.selectedTrack == ti
+			if isSelectedTrack {
+				imgui.DrawList_AddRect(dl, {origin.x + scrollX, y}, {colX(x0, cols), y + ROW_H - 2}, col_u32(UI_ACCENT), 3, thickness = 1.5)
 			}
-		} else if tr.kind == .Method {
-			imgui.SameLine(0, 2)
-			if UI_IconButton(ICON_FA_CODE, fmt.tprintf("anim.track-settings:%s", tr.property), "Script Call Settings", isSelectedTrack, size = 24) {
-				panel.selectedTrack = ti if panel.selectedTrack != ti else -1
+			labelCol := UI_TEXT if target != nil else UI_DANGER
+			if target != nil && tr.kind == .Method && node_script_rel(state, target) == "" do labelCol = UI_WARNING
+			btnStart := LABEL_W - (82 if (tr.kind == .Audio || tr.kind == .Method) else 58)
+
+			// Clip label text before btnStart so text never bleeds over the buttons
+			imgui.DrawList_PushClipRect(dl, {origin.x + scrollX, y}, {origin.x + scrollX + btnStart - 4, y + ROW_H}, true)
+			label(dl, origin.x + scrollX + 10, y + 6, name, labelCol)
+			imgui.DrawList_PopClipRect(dl)
+
+			// Hover tooltip over track header showing full track name
+			headerMn := [2]f32{origin.x + scrollX, y}
+			headerMx := [2]f32{origin.x + scrollX + btnStart - 4, y + ROW_H}
+			mousePos := imgui.GetMousePos()
+			if mousePos.x >= headerMn.x && mousePos.x <= headerMx.x && mousePos.y >= headerMn.y && mousePos.y <= headerMx.y {
+				imgui.SetTooltip("%s", fmt.ctprintf("%s.%s (%s)", apn.name if tr.target == "." || tr.target == "" else tr.target, name, tr.property))
 			}
-		}
-		imgui.SameLine(0, 2)
-		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("anim.remove-track:%s", tr.property), "Remove track", size = 24) {
-			removeTrack = ti
-			if panel.selectedTrack == ti do panel.selectedTrack = -1
-		}
-		// The curves between keys (eased / custom ones).
-		Key_X :: struct {x0: f32, base: int, apn: ^e.AnimationPlayerNode, anim: ^e.Animation}
-		kx := Key_X{x0, base, apn, anim}
-		Track_DrawCurves(dl, tr, proc(time: f32, data: rawptr) -> f32 {
-			k := cast(^Key_X)data
-			return k.x0 + (f32(k.base) + e.Animation_TimeFrame(k.apn, k.anim, time)) * cellW + cellW * 0.5
-		}, &kx, y + 5, y + ROW_H - 7)
-		// Keys (right-click: easing to the next key, delete).
-		for k in tr.keys {
-			kf := key_frame(apn, anim, k)
-			isSel := AnimKeys_IsSelected(ti, k.time)
-			// (Dragged: drawn where it will land.)
-			at := k.time + (animKeys.delta if animKeys.dragging && isSel else 0)
-			cx := x0 + (f32(base) + e.Animation_TimeFrame(apn, anim, at)) * cellW + cellW * 0.5
-			cy := y + ROW_H * 0.5 - 1
-			r := f32(6)
-			pts := [4][2]f32{{cx, cy - r}, {cx + r, cy}, {cx, cy + r}, {cx - r, cy}}
-			hot := canInteract && !animKeys.dragging && !animKeys.boxing && point_in_rect(mouse, {cx - r, cy - r}, {cx + r, cy + r})
-			if animKeys.boxing && point_in_rect({cx, cy}, boxMn, boxMx) {
-				append(&animKeys.boxHits, Key_Ref{ti, k.time})
-				isSel = true
-			}
-			col := col_u32(UI_WARNING if !hot else {1, 0.85, 0.5, 1})
-			if tr.kind == .Property {
-				imgui.DrawList_AddQuadFilled(dl, pts[0], pts[1], pts[2], pts[3], col)
-			} else {
-				// Event keys: a square (method) or a circle (sound).
-				ec := col_u32({0.55, 0.75, 1, 1} if !hot else {0.75, 0.88, 1, 1})
-				if tr.kind == .Method do imgui.DrawList_AddRectFilled(dl, {cx - r + 1, cy - r + 1}, {cx + r - 1, cy + r - 1}, ec, 2)
-				else do imgui.DrawList_AddCircleFilled(dl, {cx, cy}, r - 1, ec)
-			}
-			if isSel {
-				o := r + 3
-				imgui.DrawList_AddQuad(dl, {cx, cy - o}, {cx + o, cy}, {cx, cy + o}, {cx - o, cy}, col_u32(UI_TEXT), 1.5)
-			}
-			if tr.kind == .Property && (k.ease != .Linear || k.bezier) do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
-			Drive_ItemRect(fmt.tprintf("anim.keyframe:%s:%d", tr.property, kf + 1), {cx - r, cy - r}, {cx + r, cy + r})
-			if hot {
-				switch tr.kind {
-				case .Property:
-					curve := "bezier handles" if k.bezier else e.Ease_Name(k.ease)
-					value := k.text if k.text != "" else fmt.tprintf("%.2f %.2f %.2f %.2f", k.value[0], k.value[1], k.value[2], k.value[3])
-					imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s\nTo the next key: %s  (right-click: easing, curve, delete)", kf + 1, k.time, value, curve))
-				case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): calls %s:%s(%s)  (right-click: edit, delete)", kf + 1, k.time, tr.target, k.text, k.arg if k.arg != "" else "frame"))
-				case .Audio:    imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): plays %s  (right-click: edit, delete)", kf + 1, k.time, k.text))
-				case .EmitParticles:
-					action, count := e.Particle_KeyAction(k.text)
-					what := fmt.tprintf("emits %d particles", count) if action == .Emit else fmt.tprintf("%vs the emitter", action)
-					imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s  (right-click: edit, delete)", kf + 1, k.time, strings.to_lower(what, context.temp_allocator)))
-				case .InstantiateComponent:  imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): spawn component %s  (right-click: edit, delete)", kf + 1, k.time, k.text))
-				case .SetEnabled:            imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s %s  (right-click: edit, delete)", kf + 1, k.time, k.text, tr.target))
-				}
-				if imgui.IsMouseClicked(.Left) && !keyHit {
-					keyHit = true
-					AnimKeys_Click(ti, k.time, mouse.x)
-					clear(&panel.sel)
-					scrub(state, apn, anim, kf)
-					// (Sound / script-call keys: their track's settings; others: the key inspector.)
-					panel.selectedTrack = ti if tr.kind == .Audio || tr.kind == .Method else -1
-				}
-				if imgui.IsMouseClicked(.Right) {
-					if !isSel {
-						clear(&animKeys.sel)
-						append(&animKeys.sel, Key_Ref{ti, k.time})
-					}
-					keyMenu = {ti, k.time}
-					if tr.kind == .Audio || tr.kind == .Method do panel.selectedTrack = ti
-					imgui.OpenPopup("##key_ctx")
-				}
-			}
-		}
-		if keyMenu.track == ti && imgui.BeginPopup("##key_ctx") {
-			key: ^e.Track_Key
-			for &k in tr.keys do if abs(k.time - keyMenu.time) < e.TRACK_KEY_EPS do key = &k
-			if key != nil {
-				UI_DimText(fmt.tprintf("Key at frame %d (%.2fs)", key_frame(apn, anim, key^) + 1, key.time))
-				imgui.Separator()
-				if tr.kind == .Method {
-					buf: [128]u8
-					copy(buf[:len(buf) - 1], key.text)
-					imgui.SetNextItemWidth(220)
-					if imgui.InputTextWithHint("##method", "method name", cstring(raw_data(buf[:])), len(buf), {.AutoSelectAll}) {
-						key.text = strings.clone(string(cstring(raw_data(buf[:]))), apn.allocator)
-					}
-					if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
-					Drive_Item("anim.event-method")
-					// The target script's methods.
-					if methods := Script_ListMethods(state, target); len(methods) > 0 {
-						imgui.SameLine()
-						if imgui.BeginCombo("##method_pick", nil, {.NoPreview}) {
-							for m in methods {
-								if imgui.Selectable(fmt.ctprintf("%s", m), m == key.text) {
-									Editor_RecordUndo(state, "Event key")
-									key.text = strings.clone(m, apn.allocator)
-								}
-								Drive_Item(fmt.tprintf("pick:%s", m))
-							}
-							imgui.EndCombo()
-						}
-						Drive_Item("anim.event-method-pick")
-						UI_Tooltip("The target script's methods")
-					}
-					abuf: [128]u8
-					copy(abuf[:len(abuf) - 1], key.arg)
-					imgui.SetNextItemWidth(220)
-					if imgui.InputTextWithHint("##method_arg", "argument (empty: the frame)", cstring(raw_data(abuf[:])), len(abuf), {.AutoSelectAll}) {
-						key.arg = strings.clone(string(cstring(raw_data(abuf[:]))), apn.allocator)
-					}
-					if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
-					Drive_Item("anim.event-arg")
-					UI_DimText("Called on the target's script: method(argument) - a number when it reads as one. The player also emits animation_event(method).")
-					if imgui.MenuItem(fmt.ctprintf("%s  Script Call Settings...", ICON_FA_SLIDERS)) {
-						panel.selectedTrack = ti
-					}
-				} else if tr.kind == .Audio {
-					if path, ok := asset_picker("anim.event-sound", key.text, Editor_ListProjectFiles(state, "", AUDIO_EXTS), allowNone = false); ok {
-						Editor_RecordUndo(state, "Event key")
-						key.text = strings.clone(path, apn.allocator)
-					}
-					if imgui.MenuItem(fmt.ctprintf("%s  Sound Settings...", ICON_FA_SLIDERS)) {
-						panel.selectedTrack = ti
-					}
+
+			imgui.PushIDInt(c.int(ti) + 1000)
+			// Row buttons (fixed at the left).
+			imgui.SetCursorScreenPos({origin.x + scrollX + btnStart, y + 2})
+			keyTip := "Key the current value at the playhead"
+			if tr.kind == .Method do keyTip = "Call a method at the playhead (right-click the key to name it)"
+			if tr.kind == .Audio do keyTip = "Play a sound at the playhead (right-click the key to pick it)"
+			if tr.kind == .EmitParticles do keyTip = "Emit particles at the playhead (right-click to edit action)"
+			if tr.kind == .InstantiateComponent do keyTip = "Spawn component at the playhead (right-click to pick component)"
+			if tr.kind == .SetEnabled do keyTip = "Toggle enable/disable at the playhead"
+			keyClicked := UI_IconButton(ICON_FA_CIRCLE, fmt.tprintf("anim.key:%s", tr.property), keyTip, size = 24, tint = UI_WARNING)
+			if keyClicked && tr.kind != .Property {
+				Editor_RecordUndo(state, "Add event key")
+				text := "on_animation_event"
+				if tr.kind == .Audio {
+					audio := Editor_ListProjectFiles(state, "", AUDIO_EXTS)
+					text = audio[0] if len(audio) > 0 else ""
+					panel.selectedTrack = ti
+				} else if tr.kind == .Method {
+					if methods := Script_ListMethods(state, target); len(methods) > 0 do text = methods[0]
+					panel.selectedTrack = ti
 				} else if tr.kind == .EmitParticles {
-					// What the key does to the emitter (#176).
-					action, count := e.Particle_KeyAction(key.text)
-					imgui.SetNextItemWidth(140)
-					if idx, changed := UI_Combo("anim.event-particles", int(action), []string{"Restart", "Emit a burst", "Start", "Stop"}); changed {
-						Editor_RecordUndo(state, "Event key")
-						key.text = strings.clone(e.Particle_KeyText(e.Particle_Key_Action(idx), count if count > 0 else 10), apn.allocator)
+					text = e.Particle_KeyText(.Restart, 0)
+				} else if tr.kind == .InstantiateComponent {
+					comps := Editor_ListProjectFiles(state, "", {".component.json"})
+					text = comps[0] if len(comps) > 0 else ""
+				} else if tr.kind == .SetEnabled {
+					text = "disable"
+				}
+				// The previous key's text is the likely next one.
+				at := e.Animation_FrameTime(apn, anim, f32(rel))
+				for k in tr.keys do if k.time < at && k.text != "" do text = k.text
+				e.Track_SetEventKey(tr, at, text, apn.allocator)
+			} else if keyClicked && target != nil {
+				if p, ok := e.Track_FindProperty(target, tr.property); ok {
+					at := e.Animation_FrameTime(apn, anim, f32(rel))
+					if p.kind == .String {
+						if text, tok := e.Property_GetTrackText(p); tok {
+							Editor_RecordUndo(state, "Set key")
+							e.Track_SetEventKey(tr, at, text, apn.allocator)
+						}
+					} else if v, vok := e.Property_GetTrackValue(p); vok {
+						Editor_RecordUndo(state, "Set key")
+						e.Track_SetKey(tr, at, v)
+						// The value the user just set is the one to come back to.
+						for &pv in panel.saved do if pv.node == target && pv.property == tr.property do pv.value = v
 					}
-					if action == .Emit {
-						imgui.SameLine()
-						n := c.int(count)
-						imgui.SetNextItemWidth(80)
-						if imgui.InputInt("##part_count", &n) {
-							key.text = strings.clone(e.Particle_KeyText(.Emit, max(int(n), 1)), apn.allocator)
+				}
+			}
+			if tr.kind == .Audio {
+				imgui.SameLine(0, 2)
+				if UI_IconButton(ICON_FA_SLIDERS, fmt.tprintf("anim.track-settings:%s", tr.property), "Sound Track Settings", isSelectedTrack, size = 24) {
+					panel.selectedTrack = ti if panel.selectedTrack != ti else -1
+				}
+			} else if tr.kind == .Method {
+				imgui.SameLine(0, 2)
+				if UI_IconButton(ICON_FA_CODE, fmt.tprintf("anim.track-settings:%s", tr.property), "Script Call Settings", isSelectedTrack, size = 24) {
+					panel.selectedTrack = ti if panel.selectedTrack != ti else -1
+				}
+			}
+			imgui.SameLine(0, 2)
+			if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("anim.remove-track:%s", tr.property), "Remove track", size = 24) {
+				removeTrack = ti
+				if panel.selectedTrack == ti do panel.selectedTrack = -1
+			}
+			// The curves between keys (eased / custom ones).
+			Key_X :: struct {x0: f32, base: int, apn: ^e.AnimationPlayerNode, anim: ^e.Animation}
+			kx := Key_X{x0, base, apn, anim}
+			Track_DrawCurves(dl, tr, proc(time: f32, data: rawptr) -> f32 {
+				k := cast(^Key_X)data
+				return k.x0 + (f32(k.base) + e.Animation_TimeFrame(k.apn, k.anim, time)) * cellW + cellW * 0.5
+			}, &kx, y + 5, y + ROW_H - 7)
+			// Keys (right-click: easing to the next key, delete).
+			for k in tr.keys {
+				kf := key_frame(apn, anim, k)
+				isSel := AnimKeys_IsSelected(ti, k.time)
+				// (Dragged: drawn where it will land.)
+				at := k.time + (animKeys.delta if animKeys.dragging && isSel else 0)
+				cx := x0 + (f32(base) + e.Animation_TimeFrame(apn, anim, at)) * cellW + cellW * 0.5
+				cy := y + ROW_H * 0.5 - 1
+				r := f32(6)
+				pts := [4][2]f32{{cx, cy - r}, {cx + r, cy}, {cx, cy + r}, {cx - r, cy}}
+				hot := canInteract && !animKeys.dragging && !animKeys.boxing && point_in_rect(mouse, {cx - r, cy - r}, {cx + r, cy + r})
+				if animKeys.boxing && point_in_rect({cx, cy}, boxMn, boxMx) {
+					append(&animKeys.boxHits, Key_Ref{ti, k.time})
+					isSel = true
+				}
+				col := col_u32(UI_WARNING if !hot else {1, 0.85, 0.5, 1})
+				if tr.kind == .Property {
+					imgui.DrawList_AddQuadFilled(dl, pts[0], pts[1], pts[2], pts[3], col)
+				} else {
+					// Event keys: a square (method) or a circle (sound).
+					ec := col_u32({0.55, 0.75, 1, 1} if !hot else {0.75, 0.88, 1, 1})
+					if tr.kind == .Method do imgui.DrawList_AddRectFilled(dl, {cx - r + 1, cy - r + 1}, {cx + r - 1, cy + r - 1}, ec, 2)
+					else do imgui.DrawList_AddCircleFilled(dl, {cx, cy}, r - 1, ec)
+				}
+				if isSel {
+					o := r + 3
+					imgui.DrawList_AddQuad(dl, {cx, cy - o}, {cx + o, cy}, {cx, cy + o}, {cx - o, cy}, col_u32(UI_TEXT), 1.5)
+				}
+				if tr.kind == .Property && (k.ease != .Linear || k.bezier) do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
+				Drive_ItemRect(fmt.tprintf("anim.keyframe:%s:%d", tr.property, kf + 1), {cx - r, cy - r}, {cx + r, cy + r})
+				if hot {
+					switch tr.kind {
+					case .Property:
+						curve := "bezier handles" if k.bezier else e.Ease_Name(k.ease)
+						value := k.text if k.text != "" else fmt.tprintf("%.2f %.2f %.2f %.2f", k.value[0], k.value[1], k.value[2], k.value[3])
+						imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s\nTo the next key: %s  (right-click: easing, curve, delete)", kf + 1, k.time, value, curve))
+					case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): calls %s:%s(%s)  (right-click: edit, delete)", kf + 1, k.time, tr.target, k.text, k.arg if k.arg != "" else "frame"))
+					case .Audio:    imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): plays %s  (right-click: edit, delete)", kf + 1, k.time, k.text))
+					case .EmitParticles:
+						action, count := e.Particle_KeyAction(k.text)
+						what := fmt.tprintf("emits %d particles", count) if action == .Emit else fmt.tprintf("%vs the emitter", action)
+						imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s  (right-click: edit, delete)", kf + 1, k.time, strings.to_lower(what, context.temp_allocator)))
+					case .InstantiateComponent:  imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): spawn component %s  (right-click: edit, delete)", kf + 1, k.time, k.text))
+					case .SetEnabled:            imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s %s  (right-click: edit, delete)", kf + 1, k.time, k.text, tr.target))
+					}
+					if imgui.IsMouseClicked(.Left) && !keyHit {
+						keyHit = true
+						AnimKeys_Click(ti, k.time, mouse.x)
+						clear(&panel.sel)
+						scrub(state, apn, anim, kf)
+						// (Sound / script-call keys: their track's settings; others: the key inspector.)
+						panel.selectedTrack = ti if tr.kind == .Audio || tr.kind == .Method else -1
+					}
+					if imgui.IsMouseClicked(.Right) {
+						if !isSel {
+							clear(&animKeys.sel)
+							append(&animKeys.sel, Key_Ref{ti, k.time})
+						}
+						keyMenu = {ti, k.time}
+						if tr.kind == .Audio || tr.kind == .Method do panel.selectedTrack = ti
+						imgui.OpenPopup("##key_ctx")
+					}
+				}
+			}
+			if keyMenu.track == ti && imgui.BeginPopup("##key_ctx") {
+				key: ^e.Track_Key
+				for &k in tr.keys do if abs(k.time - keyMenu.time) < e.TRACK_KEY_EPS do key = &k
+				if key != nil {
+					UI_DimText(fmt.tprintf("Key at frame %d (%.2fs)", key_frame(apn, anim, key^) + 1, key.time))
+					imgui.Separator()
+					if tr.kind == .Method {
+						buf: [128]u8
+						copy(buf[:len(buf) - 1], key.text)
+						imgui.SetNextItemWidth(220)
+						if imgui.InputTextWithHint("##method", "method name", cstring(raw_data(buf[:])), len(buf), {.AutoSelectAll}) {
+							key.text = strings.clone(string(cstring(raw_data(buf[:]))), apn.allocator)
 						}
 						if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
-						Drive_Item("anim.event-particles-count")
-					}
-				} else if tr.kind == .InstantiateComponent {
-					if path, ok := asset_picker("anim.event-spawn", key.text, Editor_ListProjectFiles(state, "", {".component.json"}), allowNone = false); ok {
-						Editor_RecordUndo(state, "Event key")
-						key.text = strings.clone(path, apn.allocator)
-					}
-					Drive_Item("anim.event-spawn")
-				} else if tr.kind == .SetEnabled {
-					curEnabled := key.text != "disable" && key.text != "false" && key.text != "off" && key.text != "0"
-					if imgui.Checkbox("Enabled at this frame", &curEnabled) {
-						Editor_RecordUndo(state, "Event key")
-						key.text = strings.clone("enable" if curEnabled else "disable", apn.allocator)
-					}
-					Drive_Item("anim.event-enabled")
-				}
-				if tr.kind == .Property && imgui.BeginMenu(fmt.ctprintf("%s  Easing: %s", ICON_FA_WAVE_SQUARE, e.Ease_Name(key.ease))) {
-					for ease in e.Ease {
-						if imgui.MenuItem(strings.clone_to_cstring(e.Ease_Name(ease), context.temp_allocator), nil, ease == key.ease) {
-							Editor_RecordUndo(state, "Key easing")
-							key.ease = ease
+						Drive_Item("anim.event-method")
+						// The target script's methods.
+						if methods := Script_ListMethods(state, target); len(methods) > 0 {
+							imgui.SameLine()
+							if imgui.BeginCombo("##method_pick", nil, {.NoPreview}) {
+								for m in methods {
+									if imgui.Selectable(fmt.ctprintf("%s", m), m == key.text) {
+										Editor_RecordUndo(state, "Event key")
+										key.text = strings.clone(m, apn.allocator)
+									}
+									Drive_Item(fmt.tprintf("pick:%s", m))
+								}
+								imgui.EndCombo()
+							}
+							Drive_Item("anim.event-method-pick")
+							UI_Tooltip("The target script's methods")
 						}
-						Drive_Item(fmt.tprintf("anim.ease:%s", e.Ease_Name(ease)))
-						if imgui.IsItemHovered() do ease_preview(ease)
+						abuf: [128]u8
+						copy(abuf[:len(abuf) - 1], key.arg)
+						imgui.SetNextItemWidth(220)
+						if imgui.InputTextWithHint("##method_arg", "argument (empty: the frame)", cstring(raw_data(abuf[:])), len(abuf), {.AutoSelectAll}) {
+							key.arg = strings.clone(string(cstring(raw_data(abuf[:]))), apn.allocator)
+						}
+						if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
+						Drive_Item("anim.event-arg")
+						UI_DimText("Called on the target's script: method(argument) - a number when it reads as one. The player also emits animation_event(method).")
+						if imgui.MenuItem(fmt.ctprintf("%s  Script Call Settings...", ICON_FA_SLIDERS)) {
+							panel.selectedTrack = ti
+						}
+					} else if tr.kind == .Audio {
+						if path, ok := asset_picker("anim.event-sound", key.text, Editor_ListProjectFiles(state, "", AUDIO_EXTS), allowNone = false); ok {
+							Editor_RecordUndo(state, "Event key")
+							key.text = strings.clone(path, apn.allocator)
+						}
+						if imgui.MenuItem(fmt.ctprintf("%s  Sound Settings...", ICON_FA_SLIDERS)) {
+							panel.selectedTrack = ti
+						}
+					} else if tr.kind == .EmitParticles {
+						// What the key does to the emitter (#176).
+						action, count := e.Particle_KeyAction(key.text)
+						imgui.SetNextItemWidth(140)
+						if idx, changed := UI_Combo("anim.event-particles", int(action), []string{"Restart", "Emit a burst", "Start", "Stop"}); changed {
+							Editor_RecordUndo(state, "Event key")
+							key.text = strings.clone(e.Particle_KeyText(e.Particle_Key_Action(idx), count if count > 0 else 10), apn.allocator)
+						}
+						if action == .Emit {
+							imgui.SameLine()
+							n := c.int(count)
+							imgui.SetNextItemWidth(80)
+							if imgui.InputInt("##part_count", &n) {
+								key.text = strings.clone(e.Particle_KeyText(.Emit, max(int(n), 1)), apn.allocator)
+							}
+							if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
+							Drive_Item("anim.event-particles-count")
+						}
+					} else if tr.kind == .InstantiateComponent {
+						if path, ok := asset_picker("anim.event-spawn", key.text, Editor_ListProjectFiles(state, "", {".component.json"}), allowNone = false); ok {
+							Editor_RecordUndo(state, "Event key")
+							key.text = strings.clone(path, apn.allocator)
+						}
+						Drive_Item("anim.event-spawn")
+					} else if tr.kind == .SetEnabled {
+						curEnabled := key.text != "disable" && key.text != "false" && key.text != "off" && key.text != "0"
+						if imgui.Checkbox("Enabled at this frame", &curEnabled) {
+							Editor_RecordUndo(state, "Event key")
+							key.text = strings.clone("enable" if curEnabled else "disable", apn.allocator)
+						}
+						Drive_Item("anim.event-enabled")
 					}
-					imgui.EndMenu()
+					if tr.kind == .Property && imgui.BeginMenu(fmt.ctprintf("%s  Easing: %s", ICON_FA_WAVE_SQUARE, e.Ease_Name(key.ease))) {
+						for ease in e.Ease {
+							if imgui.MenuItem(strings.clone_to_cstring(e.Ease_Name(ease), context.temp_allocator), nil, ease == key.ease) {
+								Editor_RecordUndo(state, "Key easing")
+								key.ease = ease
+							}
+							Drive_Item(fmt.tprintf("anim.ease:%s", e.Ease_Name(ease)))
+							if imgui.IsItemHovered() do ease_preview(ease)
+						}
+						imgui.EndMenu()
+					}
+					Drive_Item("anim.key-easing")
+					if tr.kind == .Property {
+						if imgui.MenuItem(fmt.ctprintf("%s  Edit Curve...%s", ICON_FA_BEZIER_CURVE, " (bezier)" if key.bezier else "")) do curveEdit = {true, ti, key.time}
+						Drive_Item("anim.key-curve")
+					}
+					if imgui.MenuItem(fmt.ctprintf("%s  Delete Key", ICON_FA_TRASH)) {
+						Editor_RecordUndo(state, "Delete key")
+						e.Track_RemoveKey(tr, keyMenu.time)
+						clear(&animKeys.sel)
+					}
+					Drive_Item("anim.key-delete")
 				}
-				Drive_Item("anim.key-easing")
-				if tr.kind == .Property {
-					if imgui.MenuItem(fmt.ctprintf("%s  Edit Curve...%s", ICON_FA_BEZIER_CURVE, " (bezier)" if key.bezier else "")) do curveEdit = {true, ti, key.time}
-					Drive_Item("anim.key-curve")
-				}
-				if imgui.MenuItem(fmt.ctprintf("%s  Delete Key", ICON_FA_TRASH)) {
-					Editor_RecordUndo(state, "Delete key")
-					e.Track_RemoveKey(tr, keyMenu.time)
-					clear(&animKeys.sel)
-				}
-				Drive_Item("anim.key-delete")
+				imgui.EndPopup()
 			}
-			imgui.EndPopup()
+			imgui.PopID()
 		}
-		imgui.PopID()
-	}
-	// A box from an empty spot among the tracks; a drag of the keys.
-	tracksMn := [2]f32{x0, ty}
-	tracksMx := [2]f32{colX(x0, cols + 4), ty + rowsH}
-	if canInteract && imgui.IsMouseClicked(.Left) && !keyHit && !imgui.IsAnyItemHovered() && point_in_rect(mouse, tracksMn, tracksMx) {
-		animKeys.boxing = true
-		animKeys.boxFrom = mouse
-	}
-	if animKeys.boxing {
-		imgui.DrawList_AddRectFilled(dl, boxMn, boxMx, col_u32(ui_accent(0.12)))
-		imgui.DrawList_AddRect(dl, boxMn, boxMx, col_u32(UI_ACCENT))
-		if !imgui.IsMouseDown(.Left) {
-			AnimKeys_BoxEnd()
-			if len(animKeys.sel) > 0 do clear(&panel.sel)
+		// A box from an empty spot among the tracks; a drag of the keys.
+		tracksMn := [2]f32{x0, ty}
+		tracksMx := [2]f32{colX(x0, cols + 4), ty + rowsH}
+		if canInteract && imgui.IsMouseClicked(.Left) && !keyHit && !imgui.IsAnyItemHovered() && point_in_rect(mouse, tracksMn, tracksMx) {
+			animKeys.boxing = true
+			animKeys.boxFrom = mouse
 		}
-	}
-	if animKeys.pressed {
-		if imgui.IsMouseDown(.Left) {
-			AnimKeys_DragUpdate(apn, anim, mouse.x, cellW)
-			if animKeys.dragging do imgui.SetMouseCursor(.ResizeEW)
-		} else {
-			AnimKeys_DragEnd(state, anim)
+		if animKeys.boxing {
+			imgui.DrawList_AddRectFilled(dl, boxMn, boxMx, col_u32(ui_accent(0.12)))
+			imgui.DrawList_AddRect(dl, boxMn, boxMx, col_u32(UI_ACCENT))
+			if !imgui.IsMouseDown(.Left) {
+				AnimKeys_BoxEnd()
+				if len(animKeys.sel) > 0 do clear(&panel.sel)
+			}
+		}
+		if animKeys.pressed {
+			if imgui.IsMouseDown(.Left) {
+				AnimKeys_DragUpdate(apn, anim, mouse.x, cellW)
+				if animKeys.dragging do imgui.SetMouseCursor(.ResizeEW)
+			} else {
+				AnimKeys_DragEnd(state, anim)
+			}
 		}
 	}
 	CurveEditor_Render(state, apn, anim)
