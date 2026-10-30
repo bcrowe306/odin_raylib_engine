@@ -321,7 +321,7 @@ class Exporter:
         if cls and cls["functions"]:
             out += ["## Lua methods", "",
                     f"Call them on the node (`self.node` in its script, or `self.node:get_node(\"path\")`). "
-                    f"Every node also has the [Node methods]({self.url('reference/lua/nodes', 'node')}).", ""]
+                    f"Every node also has the [Node methods]({self.url('reference/lua/node')}).", ""]
             out += render_functions(n["type"], cls, level="###")
         out += ["## In a scene file", "", "```json",
                 json.dumps(example_scene_node(n), indent=2), "```", ""]
