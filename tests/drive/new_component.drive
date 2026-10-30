@@ -1,0 +1,42 @@
+# New Component from scratch (#192): from the Assets + menu (a Kinematic
+# Body root, opened in its own tab), the Components section's right-click
+# menu, a component's right-click menu and the command palette; a taken name
+# gets the next free one.
+wait 5
+click @asset.add
+click @ctx:add-new-component
+expect item:newcomp.name == visible
+key ctrl+a
+type DriveEnemyZz
+click @newcomp.root
+click @newcomp.root:KinematicBodyNode
+screenshot new_component_dialog
+click @newcomp.create
+wait 5
+expect file:components/DriveEnemyZz.component.json contains "type": "KinematicBodyNode"
+expect file:components/DriveEnemyZz.component.json contains "name": "DriveEnemyZz"
+expect scene == components/DriveEnemyZz.component.json
+expect selected == DriveEnemyZz
+screenshot component_open
+
+# The Components section's menu: the same name taken -> _2.
+rclick @section:Components
+click @ctx:new-component
+expect item:newcomp.name == visible
+key ctrl+a
+type DriveEnemyZz
+expect item:newcomp.create == visible
+key enter
+wait 5
+expect file:components/DriveEnemyZz_2.component.json contains "type": "Node"
+
+# A component's menu, and the palette.
+rclick @asset:components/DriveEnemyZz.component.json
+click @ctx:new-component-file
+expect item:newcomp.name == visible
+click @newcomp.cancel
+key ctrl+shift+p
+type new component
+key enter
+expect item:newcomp.name == visible
+key escape
