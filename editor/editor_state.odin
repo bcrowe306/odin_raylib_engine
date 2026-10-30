@@ -220,19 +220,17 @@ EditorState :: struct {
 	previewSoundLoaded:    bool,
 	previewSoundPath:      string,
 	previewAudioPlaying:   bool,
-	previewAudioVolume:    f32,
-	previewAudioLoop:      bool,
 	previewAudioTimer:     f32,
 	previewAudioDuration:  f32,
 
 	// Animation Preview State
 	previewAnimFrames:     [dynamic]rl.Texture,
+	previewAnimDurations:  [dynamic]f32, // each frame's time (Aseprite / GIF files; else the FPS)
 	previewAnimPaths:      [dynamic]string,
 	previewAnimPlaying:    bool,
 	previewAnimIndex:      int,
 	previewAnimTimer:      f32,
 	previewAnimFPS:        f32,
-	previewAnimLoop:       bool,
 	previewAnimLoadedPath: string,
 
 	// Selected Scene/Script Preview overrides
@@ -286,11 +284,8 @@ Editor_Init :: proc(state: ^EditorState) {
 	state.previewAutoSwitch = true
 	state.previewTextureZoom = 1.0
 	state.previewTextureFit = true
-	state.previewAudioVolume = 0.8
-	state.previewAudioLoop = false
 	state.previewAnimPlaying = true
 	state.previewAnimFPS = 12.0
-	state.previewAnimLoop = true
 	state.previewAnimFrames = make([dynamic]rl.Texture)
 	state.previewAnimPaths = make([dynamic]string)
 	state.statusText = "Ready"

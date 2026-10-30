@@ -295,6 +295,12 @@ listed under **Levels** (double-click or drag to add a level).
 
 ### Asset folders, grid and usages
 
+**Browsing**: with the Assets panel focused, the arrow keys select the next
+or previous asset (Up / Down; Left / Right too in the grid; Shift extends).
+The Preview panel follows: with **Autoplay** a sound plays, and an Aseprite
+file or an animated GIF plays in its Animation tab (each frame's own time).
+Autoplay, Loop and the volume are the File Browser's too.
+
 The buttons left of **+** switch Assets between the by-type sections and the
 project's real **folders** (a tree, the project folder at the top), and
 between a list and a **grid** of thumbnails. In the folders view, drag an
@@ -354,22 +360,28 @@ project.)
 - **Toolbar:** back / forward / up (Alt+Left, Alt+Right, Alt+Up or
   Backspace), refresh, the folder's path (type a path and press Enter; a
   file's path opens its folder with it selected; `~` is your home folder),
-  and the star to bookmark the folder.
+  the star to bookmark the folder, then **Autoplay** (a selected sound or
+  animation plays straight away), **Loop** and the preview **volume** - all
+  on by default and remembered (settings.ini `[preview]`; the Assets'
+  Preview panel shares them).
 - **Sidebar:** bookmarks (right-click to remove), recent folders, and the
   folder tree under Project, Home and the computer's root (each drive on
   Windows). Folders are read when you open them, so big trees stay quick.
   Bookmarks, recent folders and the last folder are the editor's (kept in
   its settings), the same in every project.
 - **Files:** name, size and date; click to select, Cmd/Ctrl+click to add,
-  Shift+click for a range, double-click a folder to open it. Search filters
+  Shift+click for a range, double-click a folder to open it. The **arrow
+  keys** browse: Up / Down select the next file (Shift: extend; its preview
+  plays with Autoplay), Right or Enter opens a folder, Left or Backspace
+  goes up. Search filters
   the folder; with **Sub-folders** on it looks through every folder below
   (a few folders a frame: the editor keeps running). The type filter shows
   images, audio, video, fonts or game assets only; the funnel menu sorts by
   name, size, date or type and shows hidden files.
 - **Preview** of the selected file: images (PNG, JPG, BMP, TGA, GIF, QOI,
   PSD, HDR; decoded in the background) fitted or 1:1, zoom with the wheel,
-  drag to pan, over a checkerboard; Aseprite files (the first frame) and
-  SVGs; sounds (WAV, OGG, MP3, FLAC, QOA, XM, MOD) with play / pause, stop,
+  drag to pan, over a checkerboard; Aseprite files and animated GIFs play
+  their frames (Aseprite's own frame times; play / pause, the frame); SVGs; sounds (WAV, OGG, MP3, FLAC, QOA, XM, MOD) with play / pause, stop,
   a seek bar and volume; fonts (a sample in the font); text files (scripts,
   JSON, LDtk, shaders...; the first 64 KB). Size, date, dimensions,
   duration and sample rate show above. Video files show their details only:

@@ -46,6 +46,16 @@ PreviewPanel_OnAssetSelected :: proc(state: ^EditorState, fullPath: string) {
 		if state.previewAutoSwitch {
 			state.previewTab = .Audio
 		}
+		if GlobalSettings.previewAutoplay do PreviewPanel_PlayAudio(state) // (browsing: hear it, #203)
+
+	case ".aseprite", ".ase", ".gif":
+		// Animated: its frames in the Animation tab (a still GIF: the image).
+		if PreviewPanel_LoadAnimationFile(state, fullPath) {
+			if state.previewAutoSwitch do state.previewTab = .Animation
+		} else if ext == ".gif" {
+			PreviewPanel_LoadTexture(state, fullPath)
+			if state.previewAutoSwitch do state.previewTab = .Texture
+		}
 
 	case ".scene.json", ".json":
 		if strings.ends_with(fullPath, ".scene.json") {
@@ -184,7 +194,7 @@ PreviewPanel_LoadAudio :: proc(state: ^EditorState, fullPath: string) {
 PreviewPanel_PlayAudio :: proc(state: ^EditorState) {
 	if state == nil do return
 	if rl.IsSoundReady(state.previewSound) {
-		rl.SetSoundVolume(state.previewSound, state.previewAudioVolume * e.Asset_GainLinear(e.Asset_ImportGet(&state.game.resourceManager, state.previewSoundPath))) // (with the import gain)
+		rl.SetSoundVolume(state.previewSound, GlobalSettings.previewVolume * e.Asset_GainLinear(e.Asset_ImportGet(&state.game.resourceManager, state.previewSoundPath))) // (with the import gain)
 		rl.PlaySound(state.previewSound)
 		state.previewAudioPlaying = true
 		state.previewAudioTimer = 0.0
@@ -209,6 +219,7 @@ PreviewPanel_LoadAnimationFromNode :: proc(state: ^EditorState, fan: ^e.FrameAni
 	}
 	clear(&state.previewAnimFrames)
 	clear(&state.previewAnimPaths)
+	clear(&state.previewAnimDurations)
 
 	for frame in fan.frames {
 		if frame != nil && frame.texture.id > 0 {
@@ -223,6 +234,35 @@ PreviewPanel_LoadAnimationFromNode :: proc(state: ^EditorState, fan: ^e.FrameAni
 	state.previewAnimLoadedPath = "Active FrameAnimationNode"
 }
 
+// PreviewPanel_LoadAnimationFile: an Aseprite file's or an animated GIF's
+// frames, each with its own time (#203); playing when Autoplay is on.
+PreviewPanel_LoadAnimationFile :: proc(state: ^EditorState, path: string) -> bool {
+	if state.previewAnimLoadedPath == path && len(state.previewAnimFrames) > 0 {
+		state.previewAnimPlaying = GlobalSettings.previewAutoplay
+		state.previewAnimIndex, state.previewAnimTimer = 0, 0
+		return true
+	}
+	strip, ok := e.Anim_LoadFileStrip(path)
+	if !ok do return false
+	defer e.Anim_StripDestroy(&strip)
+	for &tex in state.previewAnimFrames do rl.UnloadTexture(tex)
+	clear(&state.previewAnimFrames)
+	clear(&state.previewAnimPaths)
+	clear(&state.previewAnimDurations)
+	for d, i in strip.durations {
+		frame := rl.ImageFromImage(strip.image, e.Anim_StripFrameRect(strip, i))
+		append(&state.previewAnimFrames, rl.LoadTextureFromImage(frame))
+		rl.UnloadImage(frame)
+		append(&state.previewAnimPaths, strings.clone(fmt.tprintf("%s #%d", filepath.base(path), i + 1)))
+		append(&state.previewAnimDurations, d)
+	}
+	state.previewAnimIndex = 0
+	state.previewAnimTimer = 0
+	state.previewAnimPlaying = GlobalSettings.previewAutoplay
+	state.previewAnimLoadedPath = strings.clone(path)
+	return true
+}
+
 PreviewPanel_LoadAnimationFromFolder :: proc(state: ^EditorState, folderPath: string) {
 	if state.previewAnimLoadedPath == folderPath && len(state.previewAnimFrames) > 0 do return
 
@@ -231,6 +271,7 @@ PreviewPanel_LoadAnimationFromFolder :: proc(state: ^EditorState, folderPath: st
 	}
 	clear(&state.previewAnimFrames)
 	clear(&state.previewAnimPaths)
+	clear(&state.previewAnimDurations)
 
 	if h, err := os.open(folderPath); err == nil {
 		fis, _ := os.read_dir(h, -1, context.temp_allocator)
@@ -503,16 +544,11 @@ PreviewPanel_RenderAudio :: proc(state: ^EditorState) {
 	}
 	Drive_Item("preview.audio.stop")
 
-	// Loop toggle
+	// Autoplay, loop, volume (shared with the File Browser, #203)
 	imgui.SameLine()
-	imgui.Checkbox("Loop", &state.previewAudioLoop)
-
-	// Volume slider
-	imgui.SameLine()
-	imgui.SetNextItemWidth(120)
-	if imgui.SliderFloat("Volume", &state.previewAudioVolume, 0.0, 1.0, "%.0f%%") {
+	if Preview_Toggles("preview.audio") {
 		if rl.IsSoundReady(state.previewSound) {
-			rl.SetSoundVolume(state.previewSound, state.previewAudioVolume * e.Asset_GainLinear(e.Asset_ImportGet(&state.game.resourceManager, state.previewSoundPath))) // (with the import gain)
+			rl.SetSoundVolume(state.previewSound, GlobalSettings.previewVolume * e.Asset_GainLinear(e.Asset_ImportGet(&state.game.resourceManager, state.previewSoundPath))) // (with the import gain)
 		}
 	}
 
@@ -525,7 +561,7 @@ PreviewPanel_RenderAudio :: proc(state: ^EditorState) {
 		dt := rl.GetFrameTime()
 		state.previewAudioTimer += dt
 		if state.previewAudioTimer >= duration {
-			if state.previewAudioLoop {
+			if GlobalSettings.previewLoop {
 				state.previewAudioTimer = 0.0
 				rl.PlaySound(state.previewSound)
 			} else {
@@ -671,9 +707,9 @@ PreviewPanel_RenderAnimation :: proc(state: ^EditorState) {
 	imgui.SetNextItemWidth(80)
 	imgui.DragFloat("##AnimFPS", &state.previewAnimFPS, 1.0, 1.0, 60.0, "%.0f FPS")
 
-	// Loop
+	// Loop (the browsing previews' setting, #203)
 	imgui.SameLine()
-	imgui.Checkbox("Loop", &state.previewAnimLoop)
+	if imgui.Checkbox("Loop", &GlobalSettings.previewLoop) do _ = Editor_SaveSettings()
 
 	imgui.PopStyleVar()
 
@@ -682,11 +718,13 @@ PreviewPanel_RenderAnimation :: proc(state: ^EditorState) {
 		dt := rl.GetFrameTime()
 		state.previewAnimTimer += dt
 		frameDur := 1.0 / state.previewAnimFPS
+		// (An Aseprite file / GIF: each frame's own time.)
+		if state.previewAnimIndex < len(state.previewAnimDurations) do frameDur = state.previewAnimDurations[state.previewAnimIndex]
 		if state.previewAnimTimer >= frameDur {
 			state.previewAnimTimer = 0.0
 			state.previewAnimIndex += 1
 			if state.previewAnimIndex >= frameCount {
-				if state.previewAnimLoop {
+				if GlobalSettings.previewLoop {
 					state.previewAnimIndex = 0
 				} else {
 					state.previewAnimIndex = frameCount - 1

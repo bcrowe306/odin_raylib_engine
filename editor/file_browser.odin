@@ -96,6 +96,8 @@ FB_Image_Job :: struct {
 	path:   string,
 	kind:   FB_Kind,
 	image:  rl.Image,
+	strip:  e.Anim_Strip, // an animation's frames (Aseprite, GIF; #203)
+	animated: bool,
 	done:   bool, // (atomic)
 	thread: ^thread.Thread,
 }
@@ -113,6 +115,12 @@ FB_Preview :: struct {
 	hasTex:    bool,
 	zoom:      f32, // 0 = fit
 	pan:       [2]f32,
+	// Animations (Aseprite frames, GIF): tex is a strip of frames (#203)
+	animated:    bool,
+	frameSize:   [2]int,
+	durations:   []f32, // heap
+	animTime:    f32,
+	animPlaying: bool,
 	// Audio
 	music:     rl.Music,
 	hasMusic:  bool,
@@ -169,11 +177,11 @@ fb: struct {
 	jobs:       [dynamic]^FB_Image_Job, // decoding (incl. ones nobody wants now)
 	dest:       string, // Load destination: project folder ("" = by type; heap)
 	conflict:   Import_Conflict,
-	volume:     f32,
 	dragFrame:  i32, // last frame rows were being dragged
 	winMin:     [2]f32,
 	winMax:     [2]f32,
 	settingsDirty: bool,
+	scrollTo:      int, // a row to scroll into view (arrow keys; -1: none)
 	shownFrame:    i32, // the frame the Files tab last drew
 	drives:     [dynamic]string, // Windows: the drives there were when it opened (heap)
 }
@@ -216,7 +224,7 @@ FileBrowser_Open :: proc(dir := "") {
 fb_init :: proc() {
 	if fb.inited do return
 	fb.inited = true
-	fb.volume = 0.8
+	fb.scrollTo = -1
 	fb.listings = make(map[string]^FB_Listing)
 	when ODIN_OS == .Windows {
 		for letter in 'A' ..= 'Z' {
@@ -600,6 +608,7 @@ fb_preview_clear :: proc() {
 	delete(p.path)
 	delete(p.error)
 	delete(p.text)
+	delete(p.durations)
 	p^ = {}
 }
 
@@ -622,7 +631,14 @@ fb_preview_load :: proc(path: string) {
 		job.path = strings.clone(path)
 		job.kind = p.kind
 		job.thread = thread.create_and_start_with_poly_data(job, proc(job: ^FB_Image_Job) {
-			if job.kind == .Aseprite {
+			// Animated (Aseprite frames, a GIF): every frame, with its time.
+			if job.kind == .Aseprite || strings.has_suffix(strings.to_lower(job.path, context.temp_allocator), ".gif") {
+				job.strip, job.animated = e.Anim_LoadFileStrip(job.path)
+			}
+			if job.animated {
+				job.image = job.strip.image
+				job.strip.image = {}
+			} else if job.kind == .Aseprite {
 				job.image = e.Ase_LoadFileImage(job.path)
 			} else {
 				job.image = rl.LoadImage(strings.clone_to_cstring(job.path, context.temp_allocator))
@@ -646,11 +662,12 @@ fb_preview_load :: proc(path: string) {
 		if !rl.IsAudioDeviceReady() do rl.InitAudioDevice()
 		m := rl.LoadMusicStream(strings.clone_to_cstring(path, context.temp_allocator))
 		if rl.IsMusicValid(m) {
-			m.looping = false
+			m.looping = GlobalSettings.previewLoop
 			p.music = m
 			p.hasMusic = true
 			p.length = rl.GetMusicTimeLength(m)
-			rl.SetMusicVolume(m, fb.volume)
+			rl.SetMusicVolume(m, GlobalSettings.previewVolume)
+			if GlobalSettings.previewAutoplay do fb_audio_play() // (browsing: hear it straight away)
 		} else {
 			p.error = strings.clone("Not a readable sound (WAV, OGG, MP3, FLAC, QOA, XM, MOD)")
 		}
@@ -717,11 +734,20 @@ fb_jobs_poll :: proc() {
 				p.tex = rl.LoadTextureFromImage(job.image)
 				p.hasTex = p.tex.id > 0
 				if !p.hasTex do p.error = strings.clone(fmt.tprintf("Too large to show (%d × %d px)", job.image.width, job.image.height))
+				if p.hasTex && job.animated {
+					p.animated = true
+					p.frameSize = job.strip.frameSize
+					p.durations = job.strip.durations
+					job.strip.durations = nil
+					p.animTime = 0
+					p.animPlaying = GlobalSettings.previewAutoplay
+				}
 			} else {
 				p.error = strings.clone("Not a readable image")
 			}
 		}
 		if job.image.data != nil do rl.UnloadImage(job.image)
+		e.Anim_StripDestroy(&job.strip)
 		delete(job.path)
 		free(job)
 	}
@@ -770,6 +796,13 @@ FileBrowser_Update :: proc(state: ^EditorState) {
 		_ = Editor_SaveSettings()
 	}
 	if fb.preview.playing && imgui.GetFrameCount() - fb.shownFrame > 1 do fb_audio_stop() // (a hidden tab doesn't keep playing)
+	if p := &fb.preview; p.animated && p.animPlaying {
+		p.animTime += rl.GetFrameTime()
+		total: f32
+		for d in p.durations do total += d
+		if !GlobalSettings.previewLoop && p.animTime >= total do p.animPlaying = false
+	}
+	if p := &fb.preview; p.hasMusic do p.music.looping = GlobalSettings.previewLoop
 
 	// Rows dragged out of the browser and let go elsewhere: dropped like
 	// files from the OS file manager (Assets panel: import; viewport: import
@@ -816,10 +849,29 @@ FileBrowser_RenderTab :: proc(state: ^EditorState) {
 fb_keys :: proc() {
 	if !imgui.IsWindowFocused({.RootWindow, .ChildWindows}) || imgui.GetIO().WantTextInput do return
 	io := imgui.GetIO()
+	oneDir := len(fb.selection) == 1 && os.is_dir(fb.selection[0])
 	if io.KeyAlt && imgui.IsKeyPressed(.LeftArrow) do fb_go_back()
 	else if io.KeyAlt && imgui.IsKeyPressed(.RightArrow) do fb_go_forward()
-	else if (io.KeyAlt && imgui.IsKeyPressed(.UpArrow)) || imgui.IsKeyPressed(.Backspace) do fb_go_up()
-	else if imgui.IsKeyPressed(.Enter) && len(fb.selection) == 1 && os.is_dir(fb.selection[0]) do fb_navigate(strings.clone(fb.selection[0], context.temp_allocator))
+	else if (io.KeyAlt && imgui.IsKeyPressed(.UpArrow)) || imgui.IsKeyPressed(.Backspace) || imgui.IsKeyPressed(.LeftArrow) do fb_go_up()
+	else if (imgui.IsKeyPressed(.Enter) || imgui.IsKeyPressed(.RightArrow)) && oneDir do fb_navigate(strings.clone(fb.selection[0], context.temp_allocator))
+	else if imgui.IsKeyPressed(.DownArrow) do fb_step(1)
+	else if imgui.IsKeyPressed(.UpArrow) do fb_step(-1)
+}
+
+// fb_step: the arrow keys - the next / previous row (Shift: extends the
+// selection), scrolled into view; its preview (autoplay) follows (#203).
+@(private = "file")
+fb_step :: proc(d: int) {
+	rows := fb_rows()
+	if len(rows) == 0 do return
+	cur := -1
+	if len(fb.selection) > 0 {
+		last := fb.selection[len(fb.selection) - 1]
+		for r, i in rows do if r.full == last do cur = i
+	}
+	next := clamp(cur + d, 0, len(rows) - 1) if cur >= 0 else (0 if d > 0 else len(rows) - 1)
+	fb_click(rows, next)
+	fb.scrollTo = next
 }
 
 @(private = "file")
@@ -839,7 +891,7 @@ fb_toolbar :: proc(state: ^EditorState) {
 
 	// The path: edit it and press Enter to go there (a file's path selects it).
 	if !fb.pathEditing && (fb.pathShown != fb.dir || string(cstring(raw_data(fb.pathBuf[:]))) != fb.dir) do fb_set_path_text(fb.dir)
-	imgui.SetNextItemWidth(max(imgui.GetContentRegionAvail().x - 34, 120))
+	imgui.SetNextItemWidth(max(imgui.GetContentRegionAvail().x - 34 - 176, 120))
 	if imgui.InputText("##fb_path", cstring(raw_data(fb.pathBuf[:])), len(fb.pathBuf), {.EnterReturnsTrue, .AutoSelectAll}) {
 		typed := strings.clone(string(cstring(raw_data(fb.pathBuf[:]))), context.temp_allocator)
 		if !fb_navigate(typed) {
@@ -852,6 +904,8 @@ fb_toolbar :: proc(state: ^EditorState) {
 	imgui.SameLine(0, 4)
 	marked := FileBrowser_IsBookmarked(fb.dir)
 	if UI_IconButton(ICON_FA_STAR if marked else ICON_FA_BOOKMARK, "fb.bookmark", "Remove the bookmark" if marked else "Bookmark this folder", marked, 26) do FileBrowser_ToggleBookmark(fb.dir)
+	imgui.SameLine(0, 8)
+	if Preview_Toggles("fb") && fb.preview.hasMusic do rl.SetMusicVolume(fb.preview.music, GlobalSettings.previewVolume)
 }
 
 @(private = "file")
@@ -1003,6 +1057,7 @@ fb_files :: proc(state: ^EditorState) {
 		enter := ""
 		clipper: imgui.ListClipper
 		imgui.ListClipper_Begin(&clipper, i32(len(rows)))
+		if fb.scrollTo >= 0 && fb.scrollTo < len(rows) do imgui.ListClipper_IncludeItemByIndex(&clipper, i32(fb.scrollTo)) // (the arrow keys' row)
 		// (Drives: rows the clipper skips get estimated rects, from a drawn
 		// one, so a click scrolls to them like to any other item.)
 		shown := make([]bool, len(rows), context.temp_allocator)
@@ -1027,6 +1082,10 @@ fb_files :: proc(state: ^EditorState) {
 				}
 			}
 			Drive_Item(fmt.tprintf("fb.row:%s", en.name))
+			if i == fb.scrollTo {
+				if !imgui.IsItemVisible() do imgui.SetScrollHereY(0.5)
+				fb.scrollTo = -1
+			}
 			if known < 0 do known, knownMin, knownMax = i, imgui.GetItemRectMin(), imgui.GetItemRectMax()
 			if imgui.BeginPopupContextItem(fmt.ctprintf("##rowctx_%s", en.full)) {
 				if !fb_is_selected(en.full) do fb_select_only(en.full)
@@ -1191,7 +1250,8 @@ fb_preview_body :: proc(p: ^FB_Preview) {
 	imgui.PopFont()
 	details := make([dynamic]string, context.temp_allocator)
 	if p.kind != .Folder do append(&details, fb_size_text(p.size))
-	if p.hasTex do append(&details, fmt.tprintf("%d × %d px", p.tex.width, p.tex.height))
+	if p.hasTex && p.animated do append(&details, fmt.tprintf("%d × %d px, %d frames", p.frameSize.x, p.frameSize.y, len(p.durations)))
+	else if p.hasTex do append(&details, fmt.tprintf("%d × %d px", p.tex.width, p.tex.height))
 	if p.hasMusic {
 		append(&details, fb_duration_text(p.length))
 		append(&details, fmt.tprintf("%d Hz, %s", p.music.stream.sampleRate, "stereo" if p.music.stream.channels == 2 else fmt.tprintf("%d ch", p.music.stream.channels)))
@@ -1210,6 +1270,19 @@ fb_preview_body :: proc(p: ^FB_Preview) {
 		if p.job != nil {
 			UI_DimText("Loading…")
 		} else if p.hasTex {
+			if p.animated {
+				// An animation: play / pause, the frame.
+				if UI_IconButton(ICON_FA_PAUSE if p.animPlaying else ICON_FA_PLAY, "fb.anim-play", "Pause" if p.animPlaying else "Play", p.animPlaying, 24) {
+					total: f32
+					for d in p.durations do total += d
+					if !p.animPlaying && p.animTime >= total do p.animTime = 0 // (ended: from the start)
+					p.animPlaying = !p.animPlaying
+				}
+				imgui.SameLine(0, 6)
+				imgui.AlignTextToFramePadding()
+				UI_DimText(fmt.tprintf("frame %d / %d", e.Anim_StripFrameAt(p.durations, p.animTime, GlobalSettings.previewLoop) + 1, len(p.durations)))
+				Drive_Item("fb.anim-frame")
+			}
 			fb_image_view(p)
 		}
 	case .Audio:
@@ -1248,6 +1321,14 @@ fb_image_view :: proc(p: ^FB_Preview) {
 	imgui.SameLine(0, 8)
 	avail := imgui.GetContentRegionAvail()
 	w, h := f32(p.tex.width), f32(p.tex.height)
+	// An animation: its current frame (a band of the strip).
+	uv0, uv1 := imgui.Vec2{0, 0}, imgui.Vec2{1, 1}
+	if p.animated && p.frameSize.y > 0 {
+		i := e.Anim_StripFrameAt(p.durations, p.animTime, GlobalSettings.previewLoop)
+		h = f32(p.frameSize.y)
+		uv0 = {0, f32(i) * h / f32(p.tex.height)}
+		uv1 = {1, f32(i + 1) * h / f32(p.tex.height)}
+	}
 	fit := min(avail.x / max(w, 1), (avail.y - 4) / max(h, 1))
 	zoom := p.zoom if p.zoom > 0 else fit
 	UI_DimText(fmt.tprintf("%.0f%%", zoom * 100))
@@ -1282,7 +1363,7 @@ fb_image_view :: proc(p: ^FB_Preview) {
 			imgui.DrawList_AddRectFilled(dl, {x, y}, {min(x + cell, x1), min(y + cell, y1)}, c)
 		}
 	}
-	imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)&p.tex, pos, {pos.x + dw, pos.y + dh})
+	imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)&p.tex, pos, {pos.x + dw, pos.y + dh}, uv0, uv1)
 	imgui.DrawList_PopClipRect(dl)
 }
 
@@ -1306,11 +1387,6 @@ fb_audio_view :: proc(p: ^FB_Preview) {
 	Drive_Item("fb.seek")
 	imgui.SameLine(0, 4)
 	UI_DimText(fb_duration_text(p.length))
-	imgui.TextUnformatted(ICON_FA_VOLUME_HIGH)
-	imgui.SameLine(0, 6)
-	imgui.SetNextItemWidth(160)
-	if imgui.SliderFloat("##fb_volume", &fb.volume, 0, 1, "%.2f") do rl.SetMusicVolume(p.music, fb.volume)
-	Drive_Item("fb.volume")
 }
 
 @(private = "file")
@@ -1361,6 +1437,7 @@ FileBrowser_Shutdown :: proc() {
 		thread.join(job.thread)
 		thread.destroy(job.thread)
 		if job.image.data != nil do rl.UnloadImage(job.image)
+		e.Anim_StripDestroy(&job.strip)
 		delete(job.path)
 		free(job)
 	}
@@ -1406,6 +1483,10 @@ FileBrowser_DriveQuery :: proc(q: string) -> (string, bool) {
 	case "fb.search-done": return "true" if fb.search.done else "false", true
 	case "fb.preview": return FB_KIND_NAMES[fb.preview.kind] if fb.preview.path != "" else "", true
 	case "fb.preview-name": return filepath.base(fb.preview.path), true
+	case "fb.anim":
+		// An animation's preview: playing / paused, its frame count (#203).
+		if !fb.preview.animated do return "none", true
+		return fmt.tprintf("%s %d", "playing" if fb.preview.animPlaying else "paused", len(fb.preview.durations)), true
 	case "fb.preview-error": return fb.preview.error, true
 	case "fb.image-size": return fmt.tprintf("%dx%d", fb.preview.tex.width, fb.preview.tex.height) if fb.preview.hasTex else "", true
 	case "fb.audio":
