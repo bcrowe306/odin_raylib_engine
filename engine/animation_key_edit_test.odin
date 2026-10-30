@@ -43,3 +43,15 @@ test_track_move_and_put_keys :: proc(t: ^testing.T) {
 	testing.expect_value(t, len(tr.keys), 3)
 	testing.expect_value(t, tr.keys[1].time, 0.5)
 }
+
+@(test)
+test_property_enum_names :: proc(t: ^testing.T) {
+	em := ParticleEmitter{}
+	p := Node_Property{name = "shape", kind = .Enum, ptr = &em.shape, type = type_info_of(ParticleShape)}
+	names := Property_EnumNames(p)
+	testing.expect_value(t, len(names), len(ParticleShape))
+	testing.expect_value(t, names[2], "Rectangle")
+	Property_SetTrackValue(p, {2, 0, 0, 0})
+	testing.expect_value(t, em.shape, ParticleShape.Rectangle)
+	testing.expect(t, Property_EnumNames(Node_Property{kind = .Float, type = type_info_of(f32)}) == nil, "not an enum: none")
+}

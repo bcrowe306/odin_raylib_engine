@@ -1,0 +1,81 @@
+# Key inspector (#178): a selected key's value, easing (an easing, bezier
+# handles), frame; two keys edited together; undo; saved.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+
+# rotation keyed 0 at frame 1, 90 at frame 3.
+click @anim.frame:1
+click @anim.add-track
+click @anim.track-prop:rotation
+click @anim.frame:3
+dblclick @insp.rotation
+key ctrl+a
+type 90
+key enter
+click @anim.key:rotation
+
+# The last key's value typed in: the scene shows it at the playhead.
+click @anim.keyframe:rotation:3
+expect item:anim.keyinsp.value == visible
+dblclick @anim.keyinsp.value
+key ctrl+a
+type 180
+key enter
+expect node:AnimationPlayer.rotation == 180.0
+click @anim.frame:2
+expect node:AnimationPlayer.rotation == 90.0
+screenshot key_value
+
+# The first key's easing: out_quad puts frame 2 at 75%.
+click @anim.keyframe:rotation:1
+click @anim.keyinsp.ease
+click @pick:out_quad
+click @anim.frame:2
+expect node:AnimationPlayer.rotation == 135.0
+# Bezier handles: the out handle shows.
+click @anim.keyframe:rotation:1
+click @anim.keyinsp.ease
+click @pick:bezier
+expect item:anim.keyinsp.out:0 == visible
+screenshot key_bezier
+
+# Both keys: linear, then one value for both (flat).
+hold cmd
+click @anim.keyframe:rotation:3
+release
+expect anim-keys == 2
+click @anim.keyinsp.ease
+click @pick:linear
+dblclick @anim.keyinsp.value
+key ctrl+a
+type 45
+key enter
+click @anim.frame:2
+expect node:AnimationPlayer.rotation == 45.0
+key cmd+z
+click @anim.frame:2
+expect node:AnimationPlayer.rotation == 90.0
+
+# The last key moved to frame 2 by its frame field.
+click @anim.keyframe:rotation:3
+dblclick @anim.keyinsp.frame
+key ctrl+a
+type 2
+key enter
+expect item:anim.keyframe:rotation:2 == visible
+expect item:anim.keyframe:rotation:3 == missing
+click @anim.stop
+key ctrl+s
+expect file:scenes/main.scene.json contains "keys": [{"t": 0}, {"t": 0.0833, "v": [180, 0, 0, 0]
