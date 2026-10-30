@@ -331,6 +331,16 @@ Node_Bounds :: proc(state: ^EditorState, node: ^e.Node) -> (corners: [4][2]f32, 
 			lo = {min(lo.x, o.x), min(lo.y, o.y)}
 			hi = {max(hi.x, p.x), max(hi.y, p.y)}
 		}
+	case e.TileMapNode:
+		// The map and anything painted beyond it (#220).
+		tm := cast(^e.TileMapNode)node
+		if tm.tileSize.x > 0 && tm.tileSize.y > 0 {
+			clo, chi := e.TileMapNode_Extent(tm)
+			clo = {min(clo.x, 0), min(clo.y, 0)}
+			chi = {max(chi.x, tm.mapSize.x), max(chi.y, tm.mapSize.y)}
+			ts := [2]f32{f32(tm.tileSize.x), f32(tm.tileSize.y)}
+			if chi.x > clo.x && chi.y > clo.y do lo, hi, have = [2]f32{f32(clo.x), f32(clo.y)} * ts * scl, [2]f32{f32(chi.x), f32(chi.y)} * ts * scl, true
+		}
 	case e.NavigationRegionNode:
 		lo, hi, have = {0, 0}, (cast(^e.NavigationRegionNode)node).size * {abs(scl.x), abs(scl.y)}, true
 	case e.PathNode:

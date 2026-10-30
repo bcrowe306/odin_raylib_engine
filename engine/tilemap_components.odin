@@ -277,6 +277,8 @@ TileMapNode_FillComponents :: proc(tm: ^TileMapNode, cell: [2]int, path: string)
 // map:tilemap_component_at(x, y) -> node | nil          (cells, 0-based)
 // map:tilemap_set_component(x, y, "components/Coin.component.json") -> node | nil
 // map:tilemap_clear_component(x, y) -> bool
+// map:tilemap_get_tile(x, y) -> tile | -1      map:tilemap_set_tile(x, y, tile) -> bool  (#220)
+// map:tilemap_cell_at(wx, wy) -> x, y          map:tilemap_cell_position(x, y) -> wx, wy (centre)
 
 @(private = "file")
 lua_tilemap_arg :: proc(L: ^lua.State) -> ^TileMapNode {
@@ -315,7 +317,56 @@ lua_tilemap_clear_component :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
-// Script_RegisterTileMapComponentBindings adds the tilemap_* component
+@(private = "file")
+lua_tilemap_get_tile :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	tm := lua_tilemap_arg(L)
+	cell := lua_cell(L)
+	lua.pushinteger(L, lua.Integer(TileMapNode_Get(tm, cell.x, cell.y) if tm != nil else -1))
+	return 1
+}
+
+// (-1 / nil erases; a solid map's colliders follow at the end of the frame.)
+@(private = "file")
+lua_tilemap_set_tile :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	tm := lua_tilemap_arg(L)
+	changed := false
+	if tm != nil {
+		cell := lua_cell(L)
+		tile := i32(lua.tointeger(L, 4)) if !lua.isnoneornil(L, 4) else -1
+		changed = TileMapNode_Set(tm, cell.x, cell.y, max(tile, -1))
+		if changed do tm.collidersDirty = true
+	}
+	lua.pushboolean(L, b32(changed))
+	return 1
+}
+
+@(private = "file")
+lua_tilemap_cell_at :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	tm := lua_tilemap_arg(L)
+	if tm == nil {lua.pushnil(L); lua.pushnil(L); return 2}
+	x, y := arg_xy(L, 2)
+	cell := TileMapNode_CellAt(tm, {x, y})
+	lua.pushinteger(L, lua.Integer(cell.x))
+	lua.pushinteger(L, lua.Integer(cell.y))
+	return 2
+}
+
+@(private = "file")
+lua_tilemap_cell_position :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	tm := lua_tilemap_arg(L)
+	if tm == nil {lua.pushnil(L); lua.pushnil(L); return 2}
+	cell := lua_cell(L)
+	p := (TileMapNode_CellCorner(tm, cell) + TileMapNode_CellCorner(tm, cell + 1)) * 0.5
+	lua.pushnumber(L, lua.Number(p.x))
+	lua.pushnumber(L, lua.Number(p.y))
+	return 2
+}
+
+// Script_RegisterTileMapComponentBindings adds the tilemap_* component and tile
 // methods to the node metatable (on the stack).
 Script_RegisterTileMapComponentBindings :: proc(L: ^lua.State) {
 	reg :: proc(L: ^lua.State, name: cstring, fn: lua.CFunction) {
@@ -325,4 +376,8 @@ Script_RegisterTileMapComponentBindings :: proc(L: ^lua.State) {
 	reg(L, "tilemap_component_at", lua_tilemap_component_at)
 	reg(L, "tilemap_set_component", lua_tilemap_set_component)
 	reg(L, "tilemap_clear_component", lua_tilemap_clear_component)
+	reg(L, "tilemap_get_tile", lua_tilemap_get_tile)
+	reg(L, "tilemap_set_tile", lua_tilemap_set_tile)
+	reg(L, "tilemap_cell_at", lua_tilemap_cell_at)
+	reg(L, "tilemap_cell_position", lua_tilemap_cell_position)
 }
