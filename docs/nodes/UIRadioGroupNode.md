@@ -27,9 +27,9 @@ player sees the whole choice at a glance.
    to fit: a column needs about 26 px per option.
 5. Handle `value_changed` (below).
 
-The options themselves can't be edited yet, in the Inspector or from Lua:
-every radio group has Option A, Option B and Option C. Map the index to
-your own meanings in the script.
+Set the options in the Node tab's **Options** box, one a line (saved with
+the scene). A script can replace them with `node:ui_set_items({...})` and
+read them with `node:ui_get_items()`.
 
 ## How it works
 

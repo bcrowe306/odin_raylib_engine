@@ -23,8 +23,9 @@ tool.
 3. In the Node tab's **Properties** section set **Item Height** (16 to 48 px
    per row) and **Selected Id** (the id of the selected row, -1 for none).
 
-The rows can't be added in the editor or from Lua yet (there's no Lua
-function for them), so a Tree View made in the editor stays empty for now.
+Set the items in the Node tab's **Items** box, one a line; two spaces at
+the start nest an item under the one above it (`Weapons`, then
+`  Sword`). Scripts: `node:ui_set_items({"Weapons", "  Sword", "  Bow"})`.
 
 ## How it works
 

@@ -100,6 +100,7 @@ prop_meta :: proc(node: ^e.Node, p: e.Node_Property) -> string {
 	case .Vec2: append(&parts, "x, y")
 	case .Color: append(&parts, "colour")
 	case .String: append(&parts, "text")
+	case .String_List: append(&parts, "a list (one item a line)")
 	case .Enum: append(&parts, strings.join(e.Property_EnumNames(p), " / ", context.temp_allocator))
 	case .Bit_Set: append(&parts, "any of: " if p.type.id != typeid_of(e.CollisionLayerSet) else "collision layers")
 	}
@@ -131,6 +132,9 @@ prop_value_text :: proc(p: e.Node_Property) -> string {
 	case .String:
 		s := (^string)(p.ptr)^
 		return "empty" if s == "" else fmt.tprintf("\"%s\"", s)
+	case .String_List:
+		items := e.Property_GetList(p)
+		return "empty" if len(items) == 0 else strings.join(items, ", ", context.temp_allocator)
 	case .Enum:
 		names := e.Property_EnumNames(p)
 		i := e.Property_GetEnumIndex(p)

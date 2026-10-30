@@ -180,7 +180,7 @@ auto-tiling are the Level tab's job (LDtk), so TileMapNode stays a simple
 single-layer map.
 
 1. **Node arenas**: every node still owns a virtual-memory arena (`Node.arena`). It's reserved only on the node's first allocation and recycled through a pool when nodes are destroyed, so most nodes never pay for it. *Approach (if creation shows up in profiles):* one pool allocator per NodeManager.
-2. **List-like UI widgets' items** (UIDropdownNode `items`, UIListViewNode `items`, UITableNode `columns` / `rows`) aren't editable in the Inspector; they keep their factory defaults or are set from Lua. *Approach:* a dynamic-array property kind (the script-list editor in `inspector_script_lists.odin` already does this for script properties).
+2. ~~**List-like UI widgets' items**~~ - done (#227): a String_List property kind (one item a line) for Dropdown / Radio Group / List View / Tree View / Bullet & Numbered List / Table / Toolbar / XY Plot / Tab Container / Notched Slider: Inspector box, saved, `set_property` / `ui_set_items` / `ui_get_items`; Text Input `text` / `placeholder` and `get_text` / `set_text`.
 3. **Sprite-sheet animation frames** can be deleted, inserted and pasted, but not reordered (`Animation_MoveFrame` and the timeline's drag handle only work on frame animations); cut and paste is the workaround.
 4. **Deleting an asset** leaves references to it dangling, and the delete prompt doesn't say where it's used (rename and move do update references). *Approach:* run Find Usages in the delete prompt.
 5. **Export targets**: only the runner for the platform the editor runs on is built (plus the prebuilt web runner); other targets need a build on that platform. The `.rayzr` package itself is portable.

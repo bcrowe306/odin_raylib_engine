@@ -3,6 +3,7 @@ package editor
 import "core:c"
 import "core:fmt"
 import "core:mem"
+import "core:slice"
 import "core:strings"
 import e "../engine"
 import imgui "lib/imgui"
@@ -83,6 +84,8 @@ multi_begin :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property) -> (
 	if len(m.others) == 0 do return
 	if p.kind == .String {
 		m.beforeS = strings.clone((^string)(p.ptr)^, context.temp_allocator)
+	} else if p.kind == .String_List {
+		m.beforeS = strings.join(e.Property_GetList(p), "\n", context.temp_allocator)
 	} else {
 		mem.copy(&m.before, p.ptr, min(p.type.size, len(m.before)))
 	}
@@ -94,6 +97,8 @@ multi_begin :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property) -> (
 			if a.y != b.y do m.mixed[1] = true
 		case .String:
 			if (^string)(p.ptr)^ != (^string)(o.prop.ptr)^ do m.mixed[0] = true
+		case .String_List:
+			if !slice.equal(e.Property_GetList(p), e.Property_GetList(o.prop)) do m.mixed[0] = true
 		case .Float, .Int, .Bool, .Color, .Enum, .Bit_Set:
 			if mem.compare_ptrs(p.ptr, o.prop.ptr, p.type.size) != 0 do m.mixed[0] = true
 		}
@@ -110,6 +115,10 @@ multi_end :: proc(m: ^Multi_Edit) {
 		now := (^string)(p.ptr)^
 		if now == m.beforeS do return
 		for o in m.others do e.Property_SetString(o.node, o.prop, now)
+	case .String_List:
+		now := e.Property_GetList(p)
+		if strings.join(now, "\n", context.temp_allocator) == m.beforeS do return
+		for o in m.others do e.Property_SetList(o.node, o.prop, now)
 	case .Vec2:
 		was := (^[2]f32)(&m.before)^
 		now := (^[2]f32)(p.ptr)^

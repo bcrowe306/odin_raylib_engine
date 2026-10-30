@@ -696,6 +696,10 @@ prop_lua_value :: proc(p: e.Node_Property) -> string {
 		i := e.Property_GetEnumIndex(p)
 		return fmt.tprintf("%q", names[i] if i >= 0 && i < len(names) else "")
 	case .String: return fmt.tprintf("%q", (^string)(p.ptr)^)
+	case .String_List:
+		quoted := make([dynamic]string, context.temp_allocator)
+		for it in e.Property_GetList(p) do append(&quoted, fmt.tprintf("%q", it))
+		return fmt.tprintf("{{%s}}", strings.join(quoted[:], ", ", context.temp_allocator))
 	case .Bit_Set:
 	}
 	return "nil"

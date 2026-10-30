@@ -1,0 +1,45 @@
+# #227: a UI node's list is edited in the Inspector (one item a line),
+# saved with the scene; a Table's rows split cells by |.
+wait 5
+click @asset.new-scene
+wait 5
+click @hier.add
+type ui dropdown
+click @addnode.create
+wait 3
+expect node:UIDropdown.prop.items == Option A|Option B|Option C
+click @insp.prop:items
+key cmd+a
+type Easy
+key enter
+type Normal
+key enter
+type Hard
+wait 2
+expect node:UIDropdown.prop.items == Easy|Normal|Hard
+screenshot dropdown_items
+
+click @hier.add
+type ui table
+click @addnode.create
+wait 3
+click @insp.prop:columns
+key cmd+a
+type Name
+key enter
+type Score|80
+click @insp.prop:rows
+key cmd+a
+type Ada|10
+key enter
+type Bo|7
+wait 2
+expect node:UITable.prop.rows == Ada|10|Bo|7
+key shift+f
+wait 3
+screenshot table_rows
+
+click @toolbar.save
+wait 3
+expect file:scenes/new_scene.scene.json contains "items": ["Easy", "Normal", "Hard"]
+expect file:scenes/new_scene.scene.json contains "rows": ["Ada|10", "Bo|7"]

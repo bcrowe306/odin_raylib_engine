@@ -30,8 +30,9 @@ screen with Stats / Items / Skills.
    **Spacing**, the four paddings and **Columns**, plus **Background
    Color** and **Border Color**.
 
-The tab names can't be changed in the editor or from Lua yet: a Tab
-Container always has the two tabs "Tab 1" and "Tab 2".
+Set the tabs in the Node tab's **Tab Names** box, one title a line (a new
+container has "Tab 1" and "Tab 2"). Scripts: `node:ui_set_items({"Video",
+"Audio", "Controls"})`.
 
 ## How it works
 

@@ -182,7 +182,7 @@ UIGridContainerNode_Create :: proc(
 UITabContainerNode :: struct {
 	using container: UIContainerNode,
 	tabDirection: UITabDirection `gui:"true"`,
-	tabNames: [dynamic]string,
+	tabNames: [dynamic]string `gui:"true"`,
 	activeTab: int `gui:"true" min:"0" max:"16"`,
 	tabSize: f32 `gui:"true" min:"20" max:"64"`,
 	contentRect: rl.Rectangle,

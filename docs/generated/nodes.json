@@ -1054,6 +1054,8 @@
       "properties": [
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 28], "min": 4, "max": 1280, "doc": "Width and height (px)."},
         {"name": "label", "kind": "string", "owner": "UITextInputNode", "default": "Input", "doc": "Caption shown next to the control."},
+        {"name": "placeholder", "kind": "string", "owner": "UITextInputNode", "default": "Enter text...", "doc": "Grey hint shown while the field is empty."},
+        {"name": "text", "kind": "string", "owner": "UITextInputNode", "default": "", "doc": "What's typed: the starting text (saved), and what the player typed while running."},
         {"name": "labelWidth", "kind": "number", "owner": "UITextInputNode", "default": 130, "min": 0, "max": 300, "doc": "Width reserved for the label (px); 0 = none."},
         {"name": "maxLength", "kind": "integer", "owner": "UITextInputNode", "default": 64, "min": 1, "max": 255, "doc": "Most characters accepted."}
       ]
@@ -1068,6 +1070,7 @@
       "properties": [
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 28], "min": 4, "max": 1280, "doc": "Width and height (px)."},
         {"name": "label", "kind": "string", "owner": "UIDropdownNode", "default": "Select", "doc": "Caption shown next to the control."},
+        {"name": "items", "kind": "list", "owner": "UIDropdownNode", "default": ["Option A", "Option B", "Option C"], "doc": "The choices, one a line."},
         {"name": "selectedIndex", "kind": "integer", "owner": "UIDropdownNode", "default": 0, "min": 0, "max": 32, "doc": "Index of the selected item (-1 = none)."},
         {"name": "defaultIndex", "kind": "integer", "owner": "UIDropdownNode", "default": 0, "min": 0, "max": 32, "doc": "Index restored by reset."},
         {"name": "labelWidth", "kind": "number", "owner": "UIDropdownNode", "default": 130, "min": 0, "max": 300, "doc": "Width reserved for the label (px); 0 = none."},
@@ -1085,6 +1088,7 @@
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 82], "min": 4, "max": 1280, "doc": "Width and height (px)."},
         {"name": "label", "kind": "string", "owner": "UIRadioGroupNode", "default": "Option", "doc": "Caption shown next to the control."},
         {"name": "labelWidth", "kind": "number", "owner": "UIRadioGroupNode", "default": 110, "min": 0, "max": 300, "doc": "Width reserved for the label (px); 0 = none."},
+        {"name": "options", "kind": "list", "owner": "UIRadioGroupNode", "default": ["Option A", "Option B", "Option C"], "doc": "The options, one a line."},
         {"name": "selectedIndex", "kind": "integer", "owner": "UIRadioGroupNode", "default": 0, "min": 0, "max": 16, "doc": "Index of the selected item (-1 = none)."},
         {"name": "defaultIndex", "kind": "integer", "owner": "UIRadioGroupNode", "default": 0, "min": 0, "max": 16, "doc": "Index restored by reset."},
         {"name": "horizontal", "kind": "boolean", "owner": "UIRadioGroupNode", "default": false, "doc": "Options in a row (else a column)."}
@@ -1133,6 +1137,7 @@
         {"name": "minValue", "kind": "number", "owner": "UINotchedSliderNode", "default": 0, "doc": "Lowest value."},
         {"name": "maxValue", "kind": "number", "owner": "UINotchedSliderNode", "default": 4, "doc": "Highest value."},
         {"name": "numNotches", "kind": "integer", "owner": "UINotchedSliderNode", "default": 5, "min": 2, "max": 32, "doc": "Number of notch marks."},
+        {"name": "notchLabels", "kind": "list", "owner": "UINotchedSliderNode", "default": [], "doc": "A label under each notch, one a line (left to right)."},
         {"name": "snapToNotches", "kind": "boolean", "owner": "UINotchedSliderNode", "default": true, "doc": "Snap the value to the notches."},
         {"name": "orientation", "kind": "enum", "owner": "UINotchedSliderNode", "default": "Horizontal", "values": ["Horizontal", "Vertical"], "doc": "Horizontal or vertical."}
       ]
@@ -1192,6 +1197,11 @@
       "hasOrigin": false,
       "properties": [
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [380, 180], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "title", "kind": "string", "owner": "UIXYPlotNode", "default": "Signal vs Time", "doc": "Heading above the plot."},
+        {"name": "xLabel", "kind": "string", "owner": "UIXYPlotNode", "default": "X Axis", "doc": "Label under the x axis."},
+        {"name": "yLabel", "kind": "string", "owner": "UIXYPlotNode", "default": "", "doc": "Label beside the y axis."},
+        {"name": "series1Name", "kind": "string", "owner": "UIXYPlotNode", "default": "Series A", "doc": "Name of the first series (the legend)."},
+        {"name": "series2Name", "kind": "string", "owner": "UIXYPlotNode", "default": "Series B", "doc": "Name of the second series (the legend)."},
         {"name": "xMin", "kind": "number", "owner": "UIXYPlotNode", "default": 0, "doc": "Left end of the X axis."},
         {"name": "xMax", "kind": "number", "owner": "UIXYPlotNode", "default": 10, "doc": "Right end of the X axis."},
         {"name": "yMin", "kind": "number", "owner": "UIXYPlotNode", "default": -1.5, "doc": "Bottom of the Y axis."},
@@ -1203,7 +1213,9 @@
         {"name": "showCrosshair", "kind": "boolean", "owner": "UIXYPlotNode", "default": true, "doc": "Crosshair with the value under the mouse."},
         {"name": "lineColor", "kind": "color", "owner": "UIXYPlotNode", "default": "#3b82f6ff", "doc": "Colour of the line."},
         {"name": "secondaryLineColor", "kind": "color", "owner": "UIXYPlotNode", "default": "#f59e0bff", "doc": "Colour of the second series."},
-        {"name": "gridColor", "kind": "color", "owner": "UIXYPlotNode", "default": "#282c37ff", "doc": "Grid line colour."}
+        {"name": "gridColor", "kind": "color", "owner": "UIXYPlotNode", "default": "#282c37ff", "doc": "Grid line colour."},
+        {"name": "points", "kind": "list", "owner": "UIXYPlotNode", "default": [], "doc": "The first series: one point a line, \"x, y\"."},
+        {"name": "secondaryPoints", "kind": "list", "owner": "UIXYPlotNode", "default": [], "doc": "The second series: one point a line, \"x, y\"."}
       ]
     },
     {
@@ -1215,6 +1227,7 @@
       "hasOrigin": false,
       "properties": [
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [200, 160], "min": 4, "max": 1280, "doc": "Width and height (px)."},
+        {"name": "items", "kind": "list", "owner": "UIListViewNode", "default": ["Option A", "Option B", "Option C"], "doc": "The rows, one a line."},
         {"name": "selectedIndex", "kind": "integer", "owner": "UIListViewNode", "default": 0, "min": -1, "max": 100, "doc": "Index of the selected item (-1 = none)."},
         {"name": "itemHeight", "kind": "number", "owner": "UIListViewNode", "default": 24, "min": 16, "max": 48, "doc": "Height of each row (px)."}
       ]
@@ -1229,7 +1242,8 @@
       "properties": [
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [220, 200], "min": 4, "max": 1280, "doc": "Width and height (px)."},
         {"name": "selectedId", "kind": "integer", "owner": "UITreeViewNode", "default": -1, "min": -1, "max": 1000, "doc": "Id of the selected item (-1 = none)."},
-        {"name": "itemHeight", "kind": "number", "owner": "UITreeViewNode", "default": 22, "min": 16, "max": 48, "doc": "Height of each row (px)."}
+        {"name": "itemHeight", "kind": "number", "owner": "UITreeViewNode", "default": 22, "min": 16, "max": 48, "doc": "Height of each row (px)."},
+        {"name": "items", "kind": "list", "owner": "UITreeViewNode", "default": [], "doc": "The items, one a line; 2 spaces at the start nest one under the item above."}
       ]
     },
     {
@@ -1243,7 +1257,8 @@
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [320, 220], "min": 4, "max": 1280, "doc": "Width and height (px)."},
         {"name": "selectedIndex", "kind": "integer", "owner": "UIUnorderedListNode", "default": 0, "doc": "Index of the selected item (-1 = none)."},
         {"name": "defaultBullet", "kind": "enum", "owner": "UIUnorderedListNode", "default": "Disc", "values": ["Disc", "Circle", "Square", "Dash", "Arrow"], "doc": "Bullet style for items without their own."},
-        {"name": "itemHeight", "kind": "number", "owner": "UIUnorderedListNode", "default": 24, "min": 16, "max": 48, "doc": "Height of each row (px)."}
+        {"name": "itemHeight", "kind": "number", "owner": "UIUnorderedListNode", "default": 24, "min": 16, "max": 48, "doc": "Height of each row (px)."},
+        {"name": "items", "kind": "list", "owner": "UIUnorderedListNode", "default": [], "doc": "The items, one a line; 2 spaces at the start nest it a level deeper."}
       ]
     },
     {
@@ -1258,7 +1273,8 @@
         {"name": "selectedIndex", "kind": "integer", "owner": "UIOrderedListNode", "default": 0, "doc": "Index of the selected item (-1 = none)."},
         {"name": "numbering", "kind": "enum", "owner": "UIOrderedListNode", "default": "Decimal", "values": ["Decimal", "AlphaLower", "AlphaUpper", "RomanLower", "RomanUpper"], "doc": "Numbering style (1, a, i...)."},
         {"name": "startNumber", "kind": "integer", "owner": "UIOrderedListNode", "default": 1, "min": 1, "max": 100, "doc": "Number of the first item."},
-        {"name": "itemHeight", "kind": "number", "owner": "UIOrderedListNode", "default": 24, "min": 16, "max": 48, "doc": "Height of each row (px)."}
+        {"name": "itemHeight", "kind": "number", "owner": "UIOrderedListNode", "default": 24, "min": 16, "max": 48, "doc": "Height of each row (px)."},
+        {"name": "items", "kind": "list", "owner": "UIOrderedListNode", "default": [], "doc": "The items, one a line; 2 spaces at the start nest it a level deeper."}
       ]
     },
     {
@@ -1274,7 +1290,9 @@
         {"name": "sortColumn", "kind": "integer", "owner": "UITableNode", "default": 0, "doc": "Column the rows are sorted by."},
         {"name": "sortAscending", "kind": "boolean", "owner": "UITableNode", "default": true, "doc": "Sort ascending (else descending)."},
         {"name": "headerHeight", "kind": "number", "owner": "UITableNode", "default": 32, "min": 20, "max": 60, "doc": "Height of the header (px)."},
-        {"name": "rowHeight", "kind": "number", "owner": "UITableNode", "default": 28, "min": 18, "max": 48, "doc": "Height of each row (px)."}
+        {"name": "rowHeight", "kind": "number", "owner": "UITableNode", "default": 28, "min": 18, "max": 48, "doc": "Height of each row (px)."},
+        {"name": "columns", "kind": "list", "owner": "UITableNode", "default": [], "doc": "The columns, one a line: Title, or Title|width (width <= 1: a share of the table)."},
+        {"name": "rows", "kind": "list", "owner": "UITableNode", "default": [], "doc": "The rows, one a line, cells split by |."}
       ]
     },
     {
@@ -1303,7 +1321,8 @@
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [600, 42], "min": 4, "max": 1280, "doc": "Width and height (px)."},
         {"name": "activeToggleId", "kind": "integer", "owner": "UIToolbarNode", "default": -1, "doc": "Id of the pressed toggle button."},
         {"name": "buttonSize", "kind": "vec2", "owner": "UIToolbarNode", "default": [34, 32], "doc": "Size of each button (px)."},
-        {"name": "spacing", "kind": "number", "owner": "UIToolbarNode", "default": 4, "min": 0, "max": 32, "doc": "Gap between items (px)."}
+        {"name": "spacing", "kind": "number", "owner": "UIToolbarNode", "default": 4, "min": 0, "max": 32, "doc": "Gap between items (px)."},
+        {"name": "items", "kind": "list", "owner": "UIToolbarNode", "default": [], "doc": "The items, one a line: Icon|Label|Tooltip (toggle: first for a toggle), - a separator, ~ a spacer."}
       ]
     },
     {
@@ -1334,6 +1353,7 @@
         {"name": "borderColor", "kind": "color", "owner": "UIContainerNode", "default": "#373e4eff", "doc": "Colour of the border."},
         {"name": "titleColor", "kind": "color", "owner": "UIContainerNode", "default": "#00000000", "doc": "Title text colour."},
         {"name": "tabDirection", "kind": "enum", "owner": "UITabContainerNode", "default": "Horizontal", "values": ["Horizontal", "Vertical"], "doc": "Tabs along the top or the side."},
+        {"name": "tabNames", "kind": "list", "owner": "UITabContainerNode", "default": ["Tab 1", "Tab 2"], "doc": "Each tab's title, one a line, in the order of the child pages."},
         {"name": "activeTab", "kind": "integer", "owner": "UITabContainerNode", "default": 0, "min": 0, "max": 16, "doc": "Index of the shown tab (child)."},
         {"name": "tabSize", "kind": "number", "owner": "UITabContainerNode", "default": 30, "min": 20, "max": 64, "doc": "Tab height (or width when vertical; px)."}
       ]

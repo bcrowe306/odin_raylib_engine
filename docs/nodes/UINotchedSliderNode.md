@@ -51,8 +51,9 @@ a few steps: difficulty, quality presets, text speed, a 1-5 rating.
 - **Screen space**: the mouse is read in screen coordinates. Keep the
   slider under a Screen Layer (or where the camera doesn't move it), or the
   clicks won't line up with what you see.
-- The notch labels under the track can't be set in the editor or from Lua
-  yet; the slider shows its numbers instead.
+- **Notch Labels** (one a line, left to right) name the notches under the
+  track; without them the slider shows its numbers. Scripts:
+  `node:ui_set_items({"Off", "Low", "High"})`.
 
 ## Signals
 

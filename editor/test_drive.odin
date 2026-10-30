@@ -1100,6 +1100,7 @@ property_text :: proc(p: e.Node_Property) -> string {
 		return names[i] if i < len(names) else ""
 	case .Bit_Set: return fmt.tprint(e.Property_GetInt(p))
 	case .String: return (^string)(p.ptr)^
+	case .String_List: return strings.join(e.Property_GetList(p), "|", context.temp_allocator)
 	}
 	return ""
 }

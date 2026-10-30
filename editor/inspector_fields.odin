@@ -2,6 +2,7 @@ package editor
 
 import "core:fmt"
 import "core:mem"
+import "core:slice"
 import "core:strings"
 import e "../engine"
 import imgui "lib/imgui"
@@ -149,6 +150,7 @@ prop_default :: proc(node: ^e.Node, p: e.Node_Property) -> (e.Node_Property, boo
 
 prop_is_default :: proc(p, d: e.Node_Property) -> bool {
 	if p.kind == .String do return (^string)(p.ptr)^ == (^string)(d.ptr)^
+	if p.kind == .String_List do return slice.equal(e.Property_GetList(p), e.Property_GetList(d))
 	return mem.compare_ptrs(p.ptr, d.ptr, p.type.size) == 0
 }
 
@@ -156,6 +158,10 @@ prop_reset :: proc(state: ^EditorState, node: ^e.Node, p, d: e.Node_Property) {
 	Editor_RecordUndo(state, fmt.tprintf("Reset %s", p.name))
 	if p.kind == .String {
 		e.Property_SetString(node, p, (^string)(d.ptr)^)
+		return
+	}
+	if p.kind == .String_List {
+		e.Property_SetList(node, p, e.Property_GetList(d))
 		return
 	}
 	mem.copy(p.ptr, d.ptr, p.type.size)

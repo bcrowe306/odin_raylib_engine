@@ -113,6 +113,7 @@ docs_kind :: proc(k: e.Property_Kind) -> string {
 	case .Enum: return "enum"
 	case .Bit_Set: return "flags"
 	case .String: return "string"
+	case .String_List: return "list"
 	}
 	return ""
 }

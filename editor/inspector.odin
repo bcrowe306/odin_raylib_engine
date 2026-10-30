@@ -692,6 +692,19 @@ property_widget :: proc(state: ^EditorState, node: ^e.Node, p: e.Node_Property, 
 			e.Property_SetString(node, p, string(cstring(raw_data(buf[:]))))
 		}
 		undo_on_activate(state, undoLabel)
+	case .String_List:
+		// One item a line (#227; formats: engine/ui_list_props.odin).
+		text := MIXED_TEXT if mixed else strings.join(e.Property_GetList(p), "\n", context.temp_allocator)
+		buf := make([]u8, max(len(text) * 2 + 256, 2048), context.temp_allocator)
+		copy(buf[:len(buf) - 1], text)
+		lines := max(strings.count(text, "\n") + 2, 3)
+		if imgui.InputTextMultiline(label, cstring(raw_data(buf)), len(buf), {field_width(), f32(min(lines, 10)) * imgui.GetTextLineHeight() + 8}, {}) {
+			typed := string(cstring(raw_data(buf)))
+			items := strings.split_lines(typed, context.temp_allocator)
+			if typed == "" do items = nil
+			e.Property_SetList(node, p, items)
+		}
+		undo_on_activate(state, undoLabel)
 	}
 	Drive_Item(id)
 }

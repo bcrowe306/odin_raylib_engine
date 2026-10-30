@@ -26,9 +26,11 @@ details, shop stock or a debug view of game data.
    60 px), **Row Height** (18 to 48 px), **Selected Row** (from 0),
    **Sort Column** (from 0) and **Sort Ascending**.
 
-The columns and rows can't be added in the editor or from Lua yet (there's
-no Lua function for them). A table with no columns draws nothing, so in the
-editor you only see the selection outline of its area.
+Set **Columns** and **Rows** in the Node tab, one a line. A column is
+`Title`, or `Title|width` (a width of 1 or less is a share of the table,
+more is pixels); a row is its cells split by `|`, like `Ada|1200|Gold`.
+Scripts: `node:set_property("columns", {...})`, and
+`node:ui_set_items({"Ada|1200", "Bo|900"})` for the rows.
 
 ## How it works
 

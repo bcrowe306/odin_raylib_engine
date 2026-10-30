@@ -1053,7 +1053,9 @@ UICheckboxNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 UITextInputNode :: struct {
 	using ui: UIElement,
 	label: string `gui:"true"`,
-	placeholder: string,
+	placeholder: string `gui:"true"`,
+	text: string `gui:"true"`, // what's typed (saved; set from the Inspector or Lua - #227)
+	syncedText: string,      // text as last matched to the buffer
 	labelWidth: f32 `gui:"true" min:"0" max:"300"`,
 	maxLength: int `gui:"true" min:"1" max:"255"`,
 	buffer: [256]u8,
@@ -1091,7 +1093,24 @@ UITextInputNode_Create :: proc(
 }
 
 UITextInputNode_GetText :: proc(ti: ^UITextInputNode) -> string {
+	text_input_sync(ti)
 	return string(ti.buffer[:ti.textLen])
+}
+
+// text_input_sync keeps `text` and the typing buffer together: `text` set
+// from outside (Inspector, scene, set_property) fills the buffer; typing
+// updates `text`.
+@(private = "file")
+text_input_sync :: proc(ti: ^UITextInputNode) {
+	if ti.text != ti.syncedText {
+		n := min(len(ti.text), min(ti.maxLength, len(ti.buffer) - 1))
+		copy(ti.buffer[:n], ti.text[:n])
+		ti.textLen = n
+		ti.syncedText = ti.text
+	} else if typed := string(ti.buffer[:ti.textLen]); typed != ti.text {
+		ti.text = strings.clone(typed, ti.allocator)
+		ti.syncedText = ti.text
+	}
 }
 
 UITextInputNode_SetText :: proc(ti: ^UITextInputNode, text: string, gameContext: ^GameContext = nil) {
@@ -1127,6 +1146,7 @@ UITextInputNode_Backspace :: proc(ti: ^UITextInputNode, gameContext: ^GameContex
 UITextInputNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	ti := cast(^UITextInputNode)node
 	if !ti.enabled do return
+	text_input_sync(ti)
 
 	ti.blinkTimer += deltaTime
 	mp := UI_GetMousePos(gameContext)
@@ -1198,7 +1218,7 @@ UITextInputNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 UIDropdownNode :: struct {
 	using ui: UIElement,
 	label: string `gui:"true"`,
-	items: [dynamic]string,
+	items: [dynamic]string `gui:"true"`,
 	selectedIndex: int `gui:"true" min:"0" max:"32"`,
 	defaultIndex: int `gui:"true" min:"0" max:"32"`,
 	labelWidth: f32 `gui:"true" min:"0" max:"300"`,
@@ -1403,7 +1423,7 @@ UIRadioGroupNode :: struct {
 	using ui: UIElement,
 	label: string `gui:"true"`,
 	labelWidth: f32 `gui:"true" min:"0" max:"300"`,
-	options: [dynamic]string,
+	options: [dynamic]string `gui:"true"`,
 	selectedIndex: int `gui:"true" min:"0" max:"16"`,
 	defaultIndex: int `gui:"true" min:"0" max:"16"`,
 	hoveredOption: int,
@@ -1535,11 +1555,11 @@ UIRadioGroupNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UIXYPlotNode :: struct {
 	using ui: UIElement,
-	title: string,
-	xLabel: string,
-	yLabel: string,
-	series1Name: string,
-	series2Name: string,
+	title: string `gui:"true"`,
+	xLabel: string `gui:"true"`,
+	yLabel: string `gui:"true"`,
+	series1Name: string `gui:"true"`,
+	series2Name: string `gui:"true"`,
 	points: [dynamic][2]f32,
 	secondaryPoints: [dynamic][2]f32,
 	xMin: f32 `gui:"true"`,
@@ -1947,7 +1967,7 @@ UIKnobNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 // ============================================================================
 UIListViewNode :: struct {
 	using ui: UIElement,
-	items: [dynamic]string,
+	items: [dynamic]string `gui:"true"`,
 	selectedIndex: int `gui:"true" min:"-1" max:"100"`,
 	scroll: [2]f32,
 	itemHeight: f32 `gui:"true" min:"16" max:"48"`,
@@ -2396,7 +2416,7 @@ UINotchedSliderNode :: struct {
 	minValue: f32 `gui:"true"`,
 	maxValue: f32 `gui:"true"`,
 	numNotches: int `gui:"true" min:"2" max:"32"`,
-	notchLabels: [dynamic]string,
+	notchLabels: [dynamic]string `gui:"true"`,
 	snapToNotches: bool `gui:"true"`,
 	orientation: uilib.SliderOrientation `gui:"true"`,
 	isDragging: bool,

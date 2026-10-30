@@ -27,9 +27,10 @@ compared.
    and **Show Crosshair**, and pick **Line Color**, **Secondary Line Color**
    and **Grid Color**.
 
-The data points can't be added in the editor or from Lua yet (there's no
-Lua function for them), so for now a plot made in the editor shows its
-axes, grid and title but no lines.
+Set **Points** (and **Secondary Points**) in the Node tab, one `x, y` a
+line, along with **Title**, **X Label**, **Y Label** and the series names.
+Scripts: `node:ui_set_items({Vec2(0, 10), Vec2(1, 14)})` replaces the
+points, or `node:set_property("secondaryPoints", {...})`.
 
 ## How it works
 

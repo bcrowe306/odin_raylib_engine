@@ -110,6 +110,7 @@ lua_prop_type :: proc(p: Node_Property) -> string {
 	case .Vec2:   return "Vec2"
 	case .Color:  return "number[]"
 	case .String: return "string"
+	case .String_List: return "string[]"
 	case .Enum:
 		names := make([dynamic]string, context.temp_allocator)
 		for e in Property_EnumNames(p) do append(&names, fmt.tprintf("%q", e))

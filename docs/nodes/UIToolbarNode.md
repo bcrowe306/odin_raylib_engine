@@ -25,9 +25,11 @@ photo mode, or a strategy game's command bar.
    between items) and **Active Toggle Id** (the pressed toggle, -1 for
    none).
 
-The buttons can't be added in the editor or from Lua yet (there's no Lua
-function for them), so a Toolbar made in the editor stays an empty bar for
-now.
+Set the buttons in the Node tab's **Items** box, one a line:
+`Icon|Label|Tooltip` (an icon name such as `Save`, either part may be
+empty; start with `toggle:` for a toggle), `-` for a separator and `~` for
+a spacer. A button's id is its line number (1, 2, ...). Scripts:
+`node:ui_set_items({"Save|Save|Save the game", "-", "toggle:|Grid"})`.
 
 ## How it works
 
