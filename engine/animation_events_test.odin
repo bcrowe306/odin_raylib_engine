@@ -31,23 +31,24 @@ return A
 	walk := AnimationPlayerNode_AddFrameAnimation(apn, nil, "walk", nil)
 	walk.endFrame = 5
 	walk.loop = false
+	F :: proc(apn: ^AnimationPlayerNode, a: ^Animation, f: f32) -> f32 {return Animation_FrameTime(apn, a, f)}
 	calls := Animation_AddEventTrack(apn, walk, "Hero", .Method)
-	Track_SetEventKey(calls, 1, "on_step", apn.allocator)
-	Track_SetEventKey(calls, 4, "on_land", apn.allocator)
+	Track_SetEventKey(calls, F(apn, walk, 1), "on_step", apn.allocator)
+	Track_SetEventKey(calls, F(apn, walk, 4), "on_land", apn.allocator)
 	rot := Animation_AddTrack(apn, walk, ".", "rotation")
 	Track_SetKey(rot, 0, {0, 0, 0, 0})
-	Track_SetKey(rot, 5, {100, 0, 0, 0})
+	Track_SetKey(rot, F(apn, walk, 5), {100, 0, 0, 0})
 	game->run(0.016)
 
-	// Playing through the frames fires the keys once each.
+	// Playing through the frames fires the keys once each (with their frame).
 	AnimationPlayerNode_Play(apn, "walk")
-	for _ in 0 ..< 6 do AnimationPlayerNode_AdvanceFrame(apn)
+	for _ in 0 ..< 60 do game->run(1.0 / 60) // (6 frames at 12 fps: 0.5 s)
 	L := game.scriptManager.L
 	lua.getglobal(L, "calls")
 	testing.expect_value(t, string(lua.tostring(L, -1)), "step1;land4;")
 	lua.pop(L, 1)
 	// Scrubbing (editor) doesn't fire them.
-	AnimationPlayerNode_ApplyTracks(apn, 4)
+	AnimationPlayerNode_ApplyTracks(apn, F(apn, walk, 4))
 	lua.getglobal(L, "calls")
 	testing.expect_value(t, string(lua.tostring(L, -1)), "step1;land4;")
 	lua.pop(L, 1)
@@ -60,6 +61,7 @@ return A
 	Track_SetKey(irot, 0, {0, 0, 0, 0})
 	apn.currentFrame = 5
 	AnimationPlayerNode_SetAnimationByName(apn, "walk")
+	apn.time = F(apn, walk, 5) // (walk at its end)
 	AnimationPlayerNode_Play(apn, "idle", 1.0)
 	apn.blendElapsed = 0.5
 	AnimationPlayerNode_ApplyTracks(apn, 0)
@@ -70,7 +72,7 @@ return A
 
 	// Saved and loaded.
 	text := Scene_SerializeToJSON(scene, context.temp_allocator)
-	testing.expect(t, strings.contains(text, `"property": "@call", "kind": "method", "keys": [[1, "on_step"], [4, "on_land"]]`), "method track saved")
+	testing.expectf(t, strings.contains(text, `"property": "@call", "kind": "method", "units": "seconds", "keys": [{"t": `) && strings.contains(text, `"text": "on_step"}`) && strings.contains(text, `"text": "on_land"}`), "method track saved: %s", text)
 	s2 := game->createScene("events2", true)
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
 	Scene_InstantiateFromJSON(s2, transmute([]u8)text, &game.gameContext)
@@ -117,13 +119,13 @@ return A
 	jump.loop = false
 	y := Animation_AddTrack(apn, jump, ".", "rotation")
 	Track_SetKey(y, 0, {0, 0, 0, 0})
-	Track_SetKey(y, 4, {100, 0, 0, 0})
-	y.keys[0].curve, y.keys[0].hasCurve = io, true
-	v, _ := Track_Sample(y, 1)
+	Track_SetKey(y, Animation_FrameTime(apn, jump, 4), {100, 0, 0, 0})
+	Track_SetSegmentCurve(y, 0, io)
+	v, _ := Track_Sample(y, Animation_FrameTime(apn, jump, 1))
 	testing.expectf(t, v[0] < 25, "sampled through the curve (%v, linear would be 25)", v[0])
 	calls := Animation_AddEventTrack(apn, jump, ".", .Method)
-	Track_SetEventKey(calls, 1, "hit", apn.allocator)
-	Track_SetEventKey(calls, 2, "hit", apn.allocator)
+	Track_SetEventKey(calls, Animation_FrameTime(apn, jump, 1), "hit", apn.allocator)
+	Track_SetEventKey(calls, Animation_FrameTime(apn, jump, 2), "hit", apn.allocator)
 	calls.keys[0].arg = strings.clone("2.5", apn.allocator)
 	calls.keys[1].arg = strings.clone("heavy", apn.allocator)
 	events := 0
@@ -132,7 +134,7 @@ return A
 	}, &events)
 	game->run(0.016)
 	AnimationPlayerNode_Play(apn, "jump")
-	for _ in 0 ..< 5 do AnimationPlayerNode_AdvanceFrame(apn)
+	for _ in 0 ..< 40 do game->run(1.0 / 60) // (5 frames at 12 fps: 0.42 s)
 	L := game.scriptManager.L
 	lua.getglobal(L, "got")
 	testing.expect_value(t, string(lua.tostring(L, -1)), "number:2.5;string:heavy;")
@@ -141,8 +143,8 @@ return A
 
 	// Saved and loaded.
 	text := Scene_SerializeToJSON(scene, context.temp_allocator)
-	testing.expect(t, strings.contains(text, `"linear", [0.42, 0, 0.58, 1]]`), text)
-	testing.expect(t, strings.contains(text, `[1, "hit", "2.5"]`), "argument saved")
+	testing.expect(t, strings.contains(text, `"bezier": true`), text)
+	testing.expect(t, strings.contains(text, `"text": "hit", "arg": "2.5"`), "argument saved")
 	s2 := game->createScene("curves2", true)
 	ProcessSceneChange(&game.sceneManager, &game.gameContext)
 	Scene_InstantiateFromJSON(s2, transmute([]u8)text, &game.gameContext)
@@ -150,7 +152,10 @@ return A
 	p2 := cast(^AnimationPlayerNode)Scene_FindNodeByName(s2, "Player")
 	a2: ^Animation
 	if p2 != nil do for a in p2.animations do if a.name == "jump" do a2 = a
-	testing.expect(t, a2 != nil && a2.tracks[0].keys[0].hasCurve && a2.tracks[0].keys[0].curve == io, "curve loaded")
+	if a2 != nil {
+		c, isCurve := Track_SegmentCurve(&a2.tracks[0], 0)
+		testing.expectf(t, isCurve && abs(c[0] - io[0]) < 0.001 && abs(c[1] - io[1]) < 0.001 && abs(c[2] - io[2]) < 0.001 && abs(c[3] - io[3]) < 0.001, "curve loaded: %v", c)
+	}
 	testing.expect(t, a2 != nil && a2.tracks[1].keys[1].arg == "heavy", "argument loaded")
 }
 

@@ -251,16 +251,16 @@ test_animation_shortcut_track_types :: proc(t: ^testing.T) {
 	Track_SetEventKey(enTrack, 1, "disable", apn.allocator)
 	Track_SetEventKey(enTrack, 3, "enable", apn.allocator)
 
-	// Fire events at frame 1: should disable AreaNode
-	AnimationPlayerNode_FireEvents(apn, 1)
+	// Fire the events at 1 s: should disable AreaNode
+	AnimationPlayerNode_FireEvents(apn, 1, 1, inclusive = true)
 	testing.expect_value(t, area.enabled, false)
 
-	// Fire events at frame 2: should start particle emitter
-	AnimationPlayerNode_FireEvents(apn, 2)
+	// At 2 s: should start the particle emitter (an older "burst" key: restart)
+	AnimationPlayerNode_FireEvents(apn, 2, 2, inclusive = true)
 	testing.expect(t, emitter.emitter.emitting, "emitter started")
 
-	// Fire events at frame 3: should re-enable AreaNode
-	AnimationPlayerNode_FireEvents(apn, 3)
+	// At 3 s: should re-enable AreaNode
+	AnimationPlayerNode_FireEvents(apn, 3, 3, inclusive = true)
 	testing.expect_value(t, area.enabled, true)
 }
 
@@ -349,7 +349,7 @@ test_animation_spawn_track_fires :: proc(t: ^testing.T) {
 	anim := AnimationPlayerNode_AddFrameAnimation(apn, nil, "smoke", nil)
 	tr := Animation_AddEventTrack(apn, anim, ".", .InstantiateComponent)
 	Track_SetEventKey(tr, 1, "components/puff.component.json", apn.allocator)
-	AnimationPlayerNode_FireEvents(apn, 1)
+	AnimationPlayerNode_FireEvents(apn, 1, 1, inclusive = true)
 	ProcessNodeQueues(scene.manager, &game.gameContext)
 
 	puff: ^Node

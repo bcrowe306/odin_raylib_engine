@@ -129,10 +129,11 @@ AnimationPanel_Shutdown :: proc() {
 @(private = "file")
 scrub :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, frame: int) {
 	preview_capture(state, apn)
-	length := e.Animation_Length(anim)
+	length := e.Animation_Length(anim, apn)
 	f := clamp(frame, 0, length - 1)
 	apn.currentFrame = anim.startFrame + min(f, max(anim->frameCount() - 1, 0))
-	e.AnimationPlayerNode_ApplyTracks(apn, f32(f))
+	apn.time = e.Animation_FrameTime(apn, anim, f32(f))
+	e.AnimationPlayerNode_ApplyTracks(apn, apn.time)
 	panel.accum = f32(f)
 }
 
@@ -248,8 +249,14 @@ draw_frame_thumb :: proc(dl: ^imgui.DrawList, anim: ^e.Animation, frame: int, mn
 @(private = "file")
 keyMenu: struct {
 	track: int,
-	frame: f32,
+	time:  f32, // the key's time (seconds)
 } = {track = -1}
+
+// key_frame: the frame column a key sits on (keys are timed in seconds).
+@(private = "file")
+key_frame :: proc(apn: ^e.AnimationPlayerNode, anim: ^e.Animation, k: e.Track_Key) -> int {
+	return int(math.round(e.Animation_TimeFrame(apn, anim, k.time)))
+}
 
 // ease_preview: a tooltip with the curve's shape.
 @(private = "file")
@@ -416,7 +423,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		Editor_Log(state, .Info, "Deleted animation %s", name)
 		return
 	}
-	length := e.Animation_Length(anim)
+	length := e.Animation_Length(anim, apn)
 	rel := apn.currentFrame - anim.startFrame
 	imgui.SameLine(0, UI_SPACE)
 	UI_VerticalDivider(20)
@@ -529,7 +536,12 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 					tr := e.Animation_AddTrack(apn, anim, target, pname)
 					// First key: the current value at the playhead.
 					if p, ok := e.Track_FindProperty(panel.trackNode, pname); ok {
-						if v, vok := e.Property_GetTrackValue(p); vok do e.Track_SetKey(tr, f32(apn.currentFrame - anim.startFrame), v)
+						at := e.Animation_FrameTime(apn, anim, f32(apn.currentFrame - anim.startFrame))
+						if e.Track_IsStepped(p) && p.kind == .String {
+							if text, tok := e.Property_GetTrackText(p); tok do e.Track_SetEventKey(tr, at, text, apn.allocator)
+						} else if v, vok := e.Property_GetTrackValue(p); vok {
+							e.Track_SetKey(tr, at, v)
+						}
 					}
 				}
 				Drive_Item(fmt.tprintf("anim.track-prop:%s", pname))
@@ -592,7 +604,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		if canPaste && primary && imgui.IsKeyPressed(.V) do frames_paste(state, apn, anim)
 	}
 	srcCount = e.Animation_SourceCount(anim)
-	length = e.Animation_Length(anim)
+	length = e.Animation_Length(anim, apn)
 	rel = clamp(apn.currentFrame - anim.startFrame, 0, max(length - 1, 0))
 
 	// Preview playback (the editor doesn't run node updates outside Simulate).
@@ -620,7 +632,8 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		f := int(panel.accum)
 		if reversed do f = length - 1 - f
 		apn.currentFrame = anim.startFrame + min(f, max(anim->frameCount() - 1, 0))
-		e.AnimationPlayerNode_ApplyTracks(apn, f32(f))
+		apn.time = e.Animation_FrameTime(apn, anim, f32(f))
+		e.AnimationPlayerNode_ApplyTracks(apn, apn.time)
 		rel = f
 	}
 
@@ -934,7 +947,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				if methods := Script_ListMethods(state, target); len(methods) > 0 do text = methods[0]
 				panel.selectedTrack = ti
 			} else if tr.kind == .EmitParticles {
-				text = "burst"
+				text = e.Particle_KeyText(.Restart, 0)
 			} else if tr.kind == .InstantiateComponent {
 				comps := Editor_ListProjectFiles(state, "", {".component.json"})
 				text = comps[0] if len(comps) > 0 else ""
@@ -942,13 +955,20 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				text = "disable"
 			}
 			// The previous key's text is the likely next one.
-			for k in tr.keys do if k.frame < f32(rel) && k.text != "" do text = k.text
-			e.Track_SetEventKey(&tr, f32(rel), text, apn.allocator)
+			at := e.Animation_FrameTime(apn, anim, f32(rel))
+			for k in tr.keys do if k.time < at && k.text != "" do text = k.text
+			e.Track_SetEventKey(&tr, at, text, apn.allocator)
 		} else if keyClicked && target != nil {
 			if p, ok := e.Track_FindProperty(target, tr.property); ok {
-				if v, vok := e.Property_GetTrackValue(p); vok {
+				at := e.Animation_FrameTime(apn, anim, f32(rel))
+				if p.kind == .String {
+					if text, tok := e.Property_GetTrackText(p); tok {
+						Editor_RecordUndo(state, "Set key")
+						e.Track_SetEventKey(&tr, at, text, apn.allocator)
+					}
+				} else if v, vok := e.Property_GetTrackValue(p); vok {
 					Editor_RecordUndo(state, "Set key")
-					e.Track_SetKey(&tr, f32(rel), v)
+					e.Track_SetKey(&tr, at, v)
 					// The value the user just set is the one to come back to.
 					for &pv in panel.saved do if pv.node == target && pv.property == tr.property do pv.value = v
 				}
@@ -971,15 +991,16 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 			if panel.selectedTrack == ti do panel.selectedTrack = -1
 		}
 		// The curves between keys (eased / custom ones).
-		Key_X :: struct {x0: f32, base: int}
-		kx := Key_X{x0, base}
-		Track_DrawCurves(dl, &tr, proc(frame: f32, data: rawptr) -> f32 {
+		Key_X :: struct {x0: f32, base: int, apn: ^e.AnimationPlayerNode, anim: ^e.Animation}
+		kx := Key_X{x0, base, apn, anim}
+		Track_DrawCurves(dl, &tr, proc(time: f32, data: rawptr) -> f32 {
 			k := cast(^Key_X)data
-			return k.x0 + (f32(k.base) + frame) * CELL_W + CELL_W * 0.5
+			return k.x0 + (f32(k.base) + e.Animation_TimeFrame(k.apn, k.anim, time)) * CELL_W + CELL_W * 0.5
 		}, &kx, y + 5, y + ROW_H - 7)
 		// Keys (right-click: easing to the next key, delete).
 		for k in tr.keys {
-			cx := x0 + (f32(base) + k.frame) * CELL_W + CELL_W * 0.5
+			kf := key_frame(apn, anim, k)
+			cx := x0 + (f32(base) + e.Animation_TimeFrame(apn, anim, k.time)) * CELL_W + CELL_W * 0.5
 			cy := y + ROW_H * 0.5 - 1
 			r := f32(6)
 			pts := [4][2]f32{{cx, cy - r}, {cx + r, cy}, {cx, cy + r}, {cx - r, cy}}
@@ -993,25 +1014,29 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				if tr.kind == .Method do imgui.DrawList_AddRectFilled(dl, {cx - r + 1, cy - r + 1}, {cx + r - 1, cy + r - 1}, ec, 2)
 				else do imgui.DrawList_AddCircleFilled(dl, {cx, cy}, r - 1, ec)
 			}
-			if k.ease != .Linear || k.hasCurve do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
-			Drive_ItemRect(fmt.tprintf("anim.keyframe:%s:%d", tr.property, int(k.frame) + 1), {cx - r, cy - r}, {cx + r, cy + r})
+			if tr.kind == .Property && (k.ease != .Linear || k.bezier) do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
+			Drive_ItemRect(fmt.tprintf("anim.keyframe:%s:%d", tr.property, kf + 1), {cx - r, cy - r}, {cx + r, cy + r})
 			if hot {
 				switch tr.kind {
 				case .Property:
-					curve := fmt.tprintf("custom curve (%.2f, %.2f, %.2f, %.2f)", k.curve[0], k.curve[1], k.curve[2], k.curve[3]) if k.hasCurve else e.Ease_Name(k.ease)
-					imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %.2f %.2f %.2f %.2f\nTo the next key: %s  (right-click: easing, curve, delete)", int(k.frame) + 1, k.value[0], k.value[1], k.value[2], k.value[3], curve))
-				case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: calls %s:%s(%s)  (right-click: edit, delete)", int(k.frame) + 1, tr.target, k.text, k.arg if k.arg != "" else "frame"))
-				case .Audio:    imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: plays %s  (right-click: edit, delete)", int(k.frame) + 1, k.text))
-				case .EmitParticles:         imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: emit particles (%s)  (right-click: edit, delete)", int(k.frame) + 1, k.text))
-				case .InstantiateComponent:  imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: spawn component %s  (right-click: edit, delete)", int(k.frame) + 1, k.text))
-				case .SetEnabled:            imgui.SetTooltip("%s", fmt.ctprintf("Frame %d: %s %s  (right-click: edit, delete)", int(k.frame) + 1, k.text, tr.target))
+					curve := "bezier handles" if k.bezier else e.Ease_Name(k.ease)
+					value := k.text if k.text != "" else fmt.tprintf("%.2f %.2f %.2f %.2f", k.value[0], k.value[1], k.value[2], k.value[3])
+					imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s\nTo the next key: %s  (right-click: easing, curve, delete)", kf + 1, k.time, value, curve))
+				case .Method:   imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): calls %s:%s(%s)  (right-click: edit, delete)", kf + 1, k.time, tr.target, k.text, k.arg if k.arg != "" else "frame"))
+				case .Audio:    imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): plays %s  (right-click: edit, delete)", kf + 1, k.time, k.text))
+				case .EmitParticles:
+					action, count := e.Particle_KeyAction(k.text)
+					what := fmt.tprintf("emits %d particles", count) if action == .Emit else fmt.tprintf("%vs the emitter", action)
+					imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s  (right-click: edit, delete)", kf + 1, k.time, strings.to_lower(what, context.temp_allocator)))
+				case .InstantiateComponent:  imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): spawn component %s  (right-click: edit, delete)", kf + 1, k.time, k.text))
+				case .SetEnabled:            imgui.SetTooltip("%s", fmt.ctprintf("Frame %d (%.2fs): %s %s  (right-click: edit, delete)", kf + 1, k.time, k.text, tr.target))
 				}
 				if imgui.IsMouseClicked(.Left) {
-					scrub(state, apn, anim, int(k.frame))
+					scrub(state, apn, anim, kf)
 					if tr.kind == .Audio || tr.kind == .Method do panel.selectedTrack = ti
 				}
 				if imgui.IsMouseClicked(.Right) {
-					keyMenu = {ti, k.frame}
+					keyMenu = {ti, k.time}
 					if tr.kind == .Audio || tr.kind == .Method do panel.selectedTrack = ti
 					imgui.OpenPopup("##key_ctx")
 				}
@@ -1019,9 +1044,9 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		}
 		if keyMenu.track == ti && imgui.BeginPopup("##key_ctx") {
 			key: ^e.Track_Key
-			for &k in tr.keys do if abs(k.frame - keyMenu.frame) < 0.001 do key = &k
+			for &k in tr.keys do if abs(k.time - keyMenu.time) < e.TRACK_KEY_EPS do key = &k
 			if key != nil {
-				UI_DimText(fmt.tprintf("Key at frame %d", int(key.frame) + 1))
+				UI_DimText(fmt.tprintf("Key at frame %d (%.2fs)", key_frame(apn, anim, key^) + 1, key.time))
 				imgui.Separator()
 				if tr.kind == .Method {
 					buf: [128]u8
@@ -1069,14 +1094,23 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 						panel.selectedTrack = ti
 					}
 				} else if tr.kind == .EmitParticles {
-					pbuf: [128]u8
-					copy(pbuf[:len(pbuf) - 1], key.text)
-					imgui.SetNextItemWidth(220)
-					if imgui.InputTextWithHint("##part_preset", "action (e.g. burst)", cstring(raw_data(pbuf[:])), len(pbuf), {.AutoSelectAll}) {
-						key.text = strings.clone(string(cstring(raw_data(pbuf[:]))), apn.allocator)
+					// What the key does to the emitter (#176).
+					action, count := e.Particle_KeyAction(key.text)
+					imgui.SetNextItemWidth(140)
+					if idx, changed := UI_Combo("anim.event-particles", int(action), []string{"Restart", "Emit a burst", "Start", "Stop"}); changed {
+						Editor_RecordUndo(state, "Event key")
+						key.text = strings.clone(e.Particle_KeyText(e.Particle_Key_Action(idx), count if count > 0 else 10), apn.allocator)
 					}
-					if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
-					Drive_Item("anim.event-particles")
+					if action == .Emit {
+						imgui.SameLine()
+						n := c.int(count)
+						imgui.SetNextItemWidth(80)
+						if imgui.InputInt("##part_count", &n) {
+							key.text = strings.clone(e.Particle_KeyText(.Emit, max(int(n), 1)), apn.allocator)
+						}
+						if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
+						Drive_Item("anim.event-particles-count")
+					}
 				} else if tr.kind == .InstantiateComponent {
 					if path, ok := asset_picker("anim.event-spawn", key.text, Editor_ListProjectFiles(state, "", {".component.json"}), allowNone = false); ok {
 						Editor_RecordUndo(state, "Event key")
@@ -1104,12 +1138,12 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 				}
 				Drive_Item("anim.key-easing")
 				if tr.kind == .Property {
-					if imgui.MenuItem(fmt.ctprintf("%s  Edit Curve...%s", ICON_FA_BEZIER_CURVE, " (custom)" if key.hasCurve else "")) do curveEdit = {true, ti, key.frame}
+					if imgui.MenuItem(fmt.ctprintf("%s  Edit Curve...%s", ICON_FA_BEZIER_CURVE, " (bezier)" if key.bezier else "")) do curveEdit = {true, ti, key.time}
 					Drive_Item("anim.key-curve")
 				}
 				if imgui.MenuItem(fmt.ctprintf("%s  Delete Key", ICON_FA_TRASH)) {
 					Editor_RecordUndo(state, "Delete key")
-					e.Track_RemoveKey(&tr, keyMenu.frame)
+					e.Track_RemoveKey(&tr, keyMenu.time)
 				}
 				Drive_Item("anim.key-delete")
 			}
@@ -1117,7 +1151,7 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		}
 		imgui.PopID()
 	}
-	CurveEditor_Render(state, anim)
+	CurveEditor_Render(state, apn, anim)
 	if removeTrack >= 0 {
 		Editor_RecordUndo(state, "Remove track")
 		preview_restore(state)
@@ -1502,16 +1536,17 @@ anim_method_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 	UI_DimText("METHOD & ARGUMENTS")
 
 	curRelFrame := f32(apn.currentFrame - anim.startFrame)
+	curTime := e.Animation_FrameTime(apn, anim, curRelFrame)
 	key: ^e.Track_Key
 	for &k in tr.keys {
-		if abs(k.frame - curRelFrame) < 0.001 {
+		if abs(k.time - curTime) < e.TRACK_KEY_EPS {
 			key = &k
 			break
 		}
 	}
 
 	if key != nil {
-		imgui.TextUnformatted(fmt.ctprintf("Key at Frame %d", int(key.frame) + 1))
+		imgui.TextUnformatted(fmt.ctprintf("Key at Frame %d", key_frame(apn, anim, key^) + 1))
 
 		UI_DimText("Method Name:")
 		methodBuf: [128]u8
@@ -1564,7 +1599,7 @@ anim_method_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 			if UI_Button(fmt.tprintf("%s  Test Call: %s()", ICON_FA_PLAY, key.text), "anim.test-call", {-1, 24}) {
 				ctx := &state.game.gameContext
 				if ctx.scriptManager != nil {
-					e.Script_CallMethod(ctx.scriptManager, target, key.text, e.Track_EventArg(key^, int(key.frame)), quiet = false)
+					e.Script_CallMethod(ctx.scriptManager, target, key.text, e.Track_EventArg(key^, key_frame(apn, anim, key^)), quiet = false)
 					Editor_Log(state, .Info, "Called %s:%s()", target.name, key.text)
 				}
 			}
@@ -1576,8 +1611,8 @@ anim_method_settings_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 		if UI_Button(fmt.tprintf("%s  Add Method Key at Frame %d", ICON_FA_PLUS, int(curRelFrame) + 1), "anim.add-method-key", {-1, 26}) {
 			Editor_RecordUndo(state, "Add method key")
 			text := "on_animation_event"
-			for k in tr.keys do if k.frame < curRelFrame && k.text != "" do text = k.text
-			e.Track_SetEventKey(tr, curRelFrame, text, apn.allocator)
+			for k in tr.keys do if k.time < curTime && k.text != "" do text = k.text
+			e.Track_SetEventKey(tr, curTime, text, apn.allocator)
 		}
 	}
 

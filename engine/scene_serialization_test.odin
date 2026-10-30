@@ -608,8 +608,8 @@ test_animation_property_tracks :: proc(t: ^testing.T) {
 	Track_SetKey(pos, 0, {0, 0, 0, 0})
 	Track_SetKey(pos, 4, {40, -20, 0, 0})
 	testing.expect_value(t, len(rot.keys), 2)
-	testing.expect_value(t, rot.keys[0].frame, 0) // sorted
-	testing.expect_value(t, Animation_Length(anim), 11)
+	testing.expect_value(t, rot.keys[0].time, 0) // sorted
+	testing.expect_value(t, Animation_Length(anim, apn), 121) // (10 s at 12 fps)
 
 	AnimationPlayerNode_ApplyTracks(apn, 5)
 	testing.expect(t, abs(apn.rotation - 45) < 0.01, "rotation interpolated")
@@ -618,7 +618,7 @@ test_animation_property_tracks :: proc(t: ^testing.T) {
 	testing.expect(t, sprite.position == {20, -10}, "child position interpolated")
 
 	text := Scene_SerializeToJSON(scene, context.temp_allocator)
-	testing.expect(t, strings.contains(text, `"tracks": [{"target": ".", "property": "rotation", "keys": [[0, 0, 0, 0, 0], [10, 90, 0, 0, 0]]}`), "tracks saved")
+	testing.expectf(t, strings.contains(text, `"tracks": [{"target": ".", "property": "rotation", "units": "seconds", "keys": [{"t": 0}, {"t": 10, "v": [90, 0, 0, 0]}]}`), "tracks saved: %s", text)
 	copy1 := reload_scene(game, text, "tracks2")
 	p2 := cast(^AnimationPlayerNode)Scene_FindNodeByName(copy1, "Player")
 	testing.expect(t, p2 != nil, "player reloaded")

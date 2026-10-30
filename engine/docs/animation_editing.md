@@ -6,6 +6,21 @@ polishing motion: per-key curves, events that call your scripts, and onion
 skinning. The basics (frames, ranges, tracks, easing presets) are in the
 editor README's *Animation timeline*.
 
+## Keys in seconds
+
+Keys are timed in seconds: the timeline shows frames (keys snap to them),
+but a track plays smoothly between frames, so a slow sprite animation (say
+2 fps) still moves its properties every game frame. When the keys run past
+the last sprite frame, the tracks set the animation's length: it loops (and
+finishes) when its last key is reached, holding the last frame meanwhile.
+
+Enum properties (a particle shape, a body type) and text (a label's text, a
+TextureNode's **texture**) can be keyed too: they step, holding each key
+until the next.
+
+Scenes saved before keys were in seconds (keys as frame numbers) still load:
+their keys move to the times of those frames.
+
 ## Curves between keys
 
 A property track interpolates from each key to the next. Right-click a key:
@@ -22,11 +37,16 @@ software can be typed straight in by matching the handles. Keys with an
 easing or curve show a small dot, and the timeline row draws the shape of
 the motion between them.
 
-Saved with the key as a 7th element:
+A curve is kept as bezier handles on the two keys (each key's out handle
+and the next key's in handle, as a time and value offset per component), so
+the graph editor can shape each one. Saved with the track in seconds:
 
 ```json
-"keys": [[0, 0, 0, 0, 0, "linear", [0.42, 0, 0.58, 1]], [12, 90, 0, 0, 0]]
+"units": "seconds",
+"keys": [{"t": 0, "bezier": true, "out": [[0.21, 0], ...]}, {"t": 0.5, "v": [90, 0, 0, 0], "in": [[-0.21, -90], ...]}]
 ```
+
+(`"ease"` names a preset; values default to 0 and are left out.)
 
 ### Tutorial: a jump that feels right
 
@@ -74,11 +94,11 @@ else SFX).
 
 To keep scripting callbacks to a minimum, common gameplay actions can be triggered directly from timeline tracks under **Add Track > Events**:
 
-- **Emit Particles**: Triggers burst emission on a target `ParticleEmitterNode` without custom script callbacks.
+- **Emit Particles**: Acts on a target `ParticleEmitterNode` without custom script callbacks. Each key picks an action: **Restart** (start over), **Emit a burst** of N particles (without starting it), **Start** or **Stop** emitting.
 - **Spawn Component**: Instantiates a component or prefab scene at the target node's global position.
 - **Enable / Disable**: Directly activates or deactivates target nodes (such as hitboxes on `AreaNode` or collision checks on `RaycastNode`).
 
-Saved as `[frame, "action or path", "argument"]` with `"kind": "particles"`, `"spawn"`, or `"enable"`.
+Saved as `{"t": seconds, "text": "action or path", "arg": "argument"}` with `"kind": "particles"`, `"spawn"`, or `"enable"` (particle actions: `"restart"`, `"emit 12"`, `"start"`, `"stop"`).
 
 ## Frame durations & Empty frames
 
@@ -104,6 +124,6 @@ steps even?), arcs and that a cycle's last frame leads into its first
 
 - Curves are evaluated per sample with a few Newton steps (a bisection
   fallback) - cheap enough for every property every frame.
-- Events fire once per key when playback passes its frame; the
+- Events fire once per key when playback passes its time; the
   `animation_event` signal is a plain event (no allocation).
 - Onion skin is editor-only drawing.
