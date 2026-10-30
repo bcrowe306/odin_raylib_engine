@@ -87,3 +87,61 @@ Camera.add_target(a)
 	_ = lua.L_dostring(L, `Camera.clear_targets()`)
 	testing.expect(t, len(c.targets) == 0 && c.target == nil && c.followMode == .Static, "cleared")
 }
+
+// #215: shake strength is pixels and plays the Shake Preset without
+// overwriting the settings; Screen Offset, Max Distance and Zoom work.
+@(test)
+test_camera_shake_offset_distance_zoom :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("cam_215", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	cam := CameraNode_Create(scene, "Cam", true)
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+	game.state = .Running
+	game->run(0.016)
+
+	// Custom: the node's settings, untouched by the shake.
+	cam.shakeTypes, cam.shakeSpeed, cam.shakeIntensity = {.Horizontal}, 7, 3
+	L := game.scriptManager.L
+	testing.expect(t, lua.L_dostring(L, `Camera.shake(20, 1)`) == 0, "Lua ran")
+	testing.expect_value(t, cam.activeShakeIntensity, 20)
+	testing.expect_value(t, cam.activeShakeTypes, bit_set[CameraShakeType]{.Horizontal})
+	testing.expect_value(t, cam.activeShakeSpeed, 7)
+	testing.expect_value(t, cam.shakeIntensity, 3)
+	maxOff: f32
+	for _ in 0 ..< 30 {
+		game->run(0.016)
+		maxOff = max(maxOff, abs(cam.shakeOffset.x))
+	}
+	testing.expectf(t, maxOff > 5 && maxOff <= 20, "moves up to 20 px: %v", maxOff)
+	testing.expect_value(t, cam.shakeOffset.y, 0)
+
+	// No arguments: the preset.
+	CameraNode_StopShake(cam)
+	cam.shakePreset = .Explosion
+	testing.expect(t, lua.L_dostring(L, `local c = Scene.find_node("Cam"); c:camera_shake()`) == 0, "Lua ran")
+	testing.expect_value(t, cam.activeShakeIntensity, 25)
+	testing.expect(t, .Zoom in cam.activeShakeTypes, "the preset's motions")
+	testing.expect_value(t, cam.shakeTypes, bit_set[CameraShakeType]{.Horizontal})
+	CameraNode_StopShake(cam)
+
+	// Screen Offset applies when custom.
+	cam.customScreenOffset, cam.screenOffset = true, {100, 50}
+	testing.expect_value(t, CameraNode_GetCamera2D(cam).offset, [2]f32{100, 50})
+	cam.customScreenOffset = false
+	testing.expect_value(t, CameraNode_GetCamera2D(cam, 1280, 720).offset, [2]f32{640, 360})
+
+	// Max Distance: never trails the target by more.
+	cam.dragType, cam.smoothDrag, cam.smoothDragSpeed, cam.maxDistance = .SmoothDamp, true, {2, 2}, {40, 40}
+	CameraNode_SetTargetPosition(cam, cam.currentPosition + {500, 0})
+	game->run(0.016)
+	testing.expectf(t, abs(cam.targetPosition.x - cam.currentPosition.x) <= 40.01, "within 40 px: %v vs %v", cam.currentPosition, cam.targetPosition)
+
+	// Zoom isn't saved; Target Zoom is.
+	cam.targetZoom, cam.zoom = 2, 5
+	text := Scene_SerializeToJSON(scene, context.temp_allocator)
+	testing.expect(t, !strings.contains(text, `"zoom"`), "zoom not saved")
+	testing.expect(t, strings.contains(text, `"targetZoom"`), "target zoom saved")
+}
