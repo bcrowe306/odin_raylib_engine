@@ -1388,10 +1388,25 @@ lua_node_texture_get_size :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnumber(L, 0)
 		return 2
 	}
-	tex := cast(^TextureNode)node
-	lua.pushnumber(L, lua.Number(tex.size.x))
-	lua.pushnumber(L, lua.Number(tex.size.y))
+	_, size := texture_node_fields(node)
+	lua.pushnumber(L, lua.Number(size.x))
+	lua.pushnumber(L, lua.Number(size.y))
 	return 2
+}
+
+// texture_node_fields: a TextureNode's or AtlasSprite's path and drawn size
+// - each read from its own struct (#221: they used to share a cast).
+@(private="file")
+texture_node_fields :: proc(node: ^Node) -> (path: string, size: [2]f32) {
+	if node.typeId == TextureNode {
+		tn := cast(^TextureNode)node
+		return tn.filePath, tn.size
+	}
+	if node.typeId == AtlasSpriteNode {
+		an := cast(^AtlasSpriteNode)node
+		return an.filePath, an.size
+	}
+	return
 }
 
 @(private="file")
@@ -1400,8 +1415,8 @@ lua_node_texture_set_origin :: proc "c" (L: ^lua.State) -> c.int {
 	node, ok := to_node_userdata(L, 1)
 	if !ok || (node.typeId != TextureNode && node.typeId != AtlasSpriteNode) do return 0
 	ox, oy := arg_xy(L, 2) // two numbers or a vector
-	tex := cast(^TextureNode)node
-	Node_SetOriginPx(tex, {ox, oy}, tex.size) // pixels -> the node's origin
+	_, size := texture_node_fields(node)
+	Node_SetOriginPx(node, {ox, oy}, size) // pixels -> the node's origin
 	return 0
 }
 
@@ -1413,8 +1428,8 @@ lua_node_texture_get_path :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushstring(L, "")
 		return 1
 	}
-	tex := cast(^TextureNode)node
-	pathC := strings.clone_to_cstring(tex.filePath, context.temp_allocator)
+	path, _ := texture_node_fields(node)
+	pathC := strings.clone_to_cstring(path, context.temp_allocator)
 	lua.pushstring(L, pathC)
 	return 1
 }

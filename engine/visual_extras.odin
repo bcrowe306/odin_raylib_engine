@@ -70,8 +70,8 @@ NineSliceNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	size := n.size * n.globalScale
 	origin := size * n.pivot // the origin (node_origin.odin)
 	if n.texture == nil {
-		// No texture yet: an outline of where it goes.
-		if rl.IsWindowReady() do rl.DrawRectanglePro({n.globalPosition.x, n.globalPosition.y, size.x, size.y}, origin, n.globalRotation, {n.tint.r, n.tint.g, n.tint.b, 60})
+		// No texture yet: in the editor, a faint box where it goes.
+		if Render_EditorView && rl.IsWindowReady() do rl.DrawRectanglePro({n.globalPosition.x, n.globalPosition.y, size.x, size.y}, origin, n.globalRotation, {n.tint.r, n.tint.g, n.tint.b, 60})
 		return
 	}
 	t := n.texture.texture

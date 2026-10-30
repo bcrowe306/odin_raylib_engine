@@ -91,9 +91,13 @@ test_atlas_sprite_node :: proc(t: ^testing.T) {
 		assert(rx == 10 and ry == 20 and rw == 30 and rh == 40, "get region")
 		local nw, nh = n:texture_get_size()
 		assert(nw == 30 and nh == 40, "updated size")
+		-- #221: read from the Atlas Sprite's own fields.
+		assert(n:texture_get_path() == "textures/ship.png", "its path")
+		n:texture_set_origin(6, 30)
 	`
 	err := lua.L_dostring(L, strings.clone_to_cstring(code, context.temp_allocator))
 	testing.expect_value(t, err, i32(0))
 	testing.expect_value(t, an.region, rl.Rectangle{10, 20, 30, 40})
 	testing.expect_value(t, an.size, [2]f32{30, 40})
+	testing.expect_value(t, an.pivot, [2]f32{0.2, 0.75}) // (6, 30) of 30 x 40
 }
