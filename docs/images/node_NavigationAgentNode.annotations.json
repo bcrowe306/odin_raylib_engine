@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The agent, a child of the character it moves", "x": 1051, "y": 265, "w": 217, "h": 23},
+    {"label": "Speed, radius, arrive distance, repath interval, avoidance", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

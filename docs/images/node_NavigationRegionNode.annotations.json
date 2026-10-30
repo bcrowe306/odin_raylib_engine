@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "A static body's cells are blocked (red)", "x": 612, "y": 326, "w": 56, "h": 56},
+    {"label": "Bake rebuilds the cells", "x": 1037, "y": 500, "w": 62, "h": 25}
+  ]
+}
