@@ -79,6 +79,38 @@ SceneHierarchy_RenderWindow :: proc(state: ^EditorState) {
 	if UI_HeaderButton(ICON_FA_TRASH, "hier.delete", "Delete (Del)") do SceneHierarchy_DeleteSelected(state)
 	if !canModify do imgui.EndDisabled()
 
+	// Tabs: the tree, the scene's signal connections, its settings (#195).
+	req, hasReq := scenePanelTabRequest.?
+	scenePanelTabRequest = nil
+	tabFlags :: proc(t, req: Scene_Panel_Tab, has: bool) -> imgui.TabItemFlags {return {.SetSelected} if has && req == t else {}}
+	if !imgui.BeginTabBar("##scene_panel_tabs", {}) do return
+	defer imgui.EndTabBar()
+	showTree := imgui.BeginTabItem(fmt.ctprintf("%s  Tree###scene_tree", ICON_FA_SITEMAP), nil, tabFlags(.Tree, req, hasReq))
+	Drive_Item("scene.tab:tree")
+	if showTree {
+		scenePanelTab = .Tree
+		scene_tree(state)
+		imgui.EndTabItem()
+	}
+	if imgui.BeginTabItem(fmt.ctprintf("%s  Signals###scene_signals", ICON_FA_BOLT), nil, tabFlags(.Signals, req, hasReq)) {
+		scenePanelTab = .Signals
+		ScenePanel_Signals(state)
+		imgui.EndTabItem()
+	}
+	Drive_Item("scene.tab:signals")
+	UI_Tooltip("Every signal connection in this scene")
+	if imgui.BeginTabItem(fmt.ctprintf("%s  Settings###scene_settings", ICON_FA_SLIDERS), nil, tabFlags(.Settings, req, hasReq)) {
+		scenePanelTab = .Settings
+		ScenePanel_Settings(state)
+		imgui.EndTabItem()
+	}
+	Drive_Item("scene.tab:settings")
+	UI_Tooltip("The scene's own settings: background, ambient light")
+}
+
+// scene_tree: the Tree tab - the filter and the node tree.
+@(private = "file")
+scene_tree :: proc(state: ^EditorState) {
 	imgui.SetNextItemWidth(-1)
 	imgui.InputTextWithHint("##hierfilter", fmt.ctprintf("%s  Filter: name  #tag  t:type", ICON_FA_MAGNIFYING_GLASS), cstring(raw_data(hierarchyFilterBuf[:])), len(hierarchyFilterBuf), {})
 	Drive_Item("hier.filter")

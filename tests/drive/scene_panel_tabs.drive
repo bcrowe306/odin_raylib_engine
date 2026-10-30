@@ -1,0 +1,62 @@
+# The Scene panel's tabs (#195): Signals lists the scene's connections (a
+# timer -> a drone's method; click selects the timer, the open button opens
+# the method; a method missing from the script is flagged; disconnect);
+# Settings has the scene's settings (the Inspector points there).
+wait 5
+expect item:scene.tab:tree == visible
+click @scene.tab:signals
+expect item:scene.signals-empty == visible
+click @scene.tab:tree
+
+# A timer under the ship connected to the drone's (new) script.
+click @hier:PatrolDroneAlpha
+click @insp.script-new
+click @newscript.create
+wait 2
+click @hier:PlayerShip
+key ctrl+a
+type timer
+key enter
+wait 2
+click @insp.signal-connect:timeout
+click @signal.target:PatrolDroneAlpha
+click @signal.connect
+wait 2
+
+# The Signals tab: the row; click selects the timer; open goes to the method.
+click @scene.tab:signals
+expect item:scene.signal:Timer:timeout:on_timer_timeout == visible
+expect item:scene.signal-problem:Timer:on_timer_timeout == missing
+screenshot signals_tab
+click @scene.signal:Timer:timeout:on_timer_timeout
+expect selected == Timer
+click @scene.signal-open:Timer:on_timer_timeout
+wait 3
+expect code.file == scripts/patrol_drone_alpha.lua
+expect code.text contains function PatrolDroneAlpha:on_timer_timeout(_, source)
+
+# The target node gone: flagged; undo brings it back.
+click @scene.tab:tree
+click @hier:PatrolDroneAlpha
+key delete
+click @scene.tab:signals
+expect item:scene.signal-problem:Timer:on_timer_timeout == visible
+screenshot signals_problem
+key cmd+z
+wait 2
+expect item:scene.signal-problem:Timer:on_timer_timeout == missing
+
+# Disconnect from the tab.
+click @scene.signal-disconnect:Timer:on_timer_timeout
+wait 2
+expect item:scene.signal:Timer:timeout:on_timer_timeout == missing
+expect item:scene.signals-empty == visible
+
+# Settings: the scene's own; the Inspector (nothing selected) points there.
+click @scene.tab:tree
+click @hier.empty
+expect item:insp.scene-settings == visible
+click @insp.scene-settings
+wait 2
+expect item:insp.scene-ambient == visible
+screenshot settings_tab
