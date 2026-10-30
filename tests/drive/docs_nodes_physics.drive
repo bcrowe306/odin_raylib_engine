@@ -9,3 +9,136 @@ expect node:TriggerArea.type == AreaNode
 annotate @node:TriggerArea The area's shape (purple; pink while something overlaps)
 annotate @window:inspector Monitoring, colours and collision shapes
 screenshot node_AreaNode
+
+# Dynamic Body: a box with its default shape.
+click @asset.new-scene
+click @hier.add
+type dynamic physics box
+click @addnode.create
+expect node:DynamicPhysicsBox.type == DynamicBodyNode
+annotate @node:DynamicPhysicsBox Its collision shape (blue; a 64 x 64 box to start)
+annotate @window:inspector Velocity, damping, gravity scale and the collision shapes
+screenshot node_DynamicBodyNode
+
+# Static Body: a floor.
+click @asset.new-scene
+click @hier.add
+type static platform
+click @addnode.create
+expect node:StaticPlatform.type == StaticBodyNode
+annotate @node:StaticPlatform Its collision shape (green; a 256 x 32 box to start)
+annotate @window:inspector One Way and the collision shapes
+screenshot node_StaticBodyNode
+
+# Raycast: a ray from above hitting a floor, in Simulate.
+click @asset.new-scene
+click @hier.add
+type static platform
+click @addnode.create
+expect node:StaticPlatform.type == StaticBodyNode
+key escape
+click @hier.add
+type raycast sensor
+click @addnode.create
+expect node:RaycastSensor.type == RaycastNode
+expect node:RaycastSensor.parent != StaticPlatform
+dblclick @insp.position.x
+key ctrl+a
+type 400
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type 200
+key enter
+wait 2
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 20
+expect node:RaycastSensor.prop.isColliding == true
+annotate @node:RaycastSensor The ray's start; red up to the hit, with the surface normal in yellow
+annotate @window:inspector Direction, length, layers and the live hit
+screenshot node_RaycastNode
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5
+
+# Visibility Notifier.
+click @asset.new-scene
+click @hier.add
+type visibility notifier
+click @addnode.create
+expect node:VisibilityNotifier.type == VisibilityNotifierNode
+annotate @node:VisibilityNotifier The rectangle the camera has to see (yellow)
+annotate @window:inspector Size, margin and the action on the parent
+screenshot node_VisibilityNotifierNode
+
+# Navigation Region: a floor inside it, baked (blocked cells in red).
+click @asset.new-scene
+click @hier.add
+type static platform
+click @addnode.create
+expect node:StaticPlatform.type == StaticBodyNode
+key escape
+click @hier.add
+type navigation region
+click @addnode.create
+expect node:NavigationRegion.type == NavigationRegionNode
+dblclick @insp.position.x
+key ctrl+a
+type 320
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type 192
+key enter
+wait 2
+click @insp.nav.bake
+wait 2
+expect log contains Baked NavigationRegion
+annotate @node:StaticPlatform A static body's cells are blocked (red)
+annotate @insp.nav.bake Bake rebuilds the cells
+screenshot node_NavigationRegionNode
+
+# Navigation Agent: under a Character Mover it moves.
+click @asset.new-scene
+click @hier.add
+type character mover
+click @addnode.create
+expect node:CharacterMover.type == CharacterMoverNode
+click @hier.add
+type navigation agent
+click @addnode.create
+expect node:NavigationAgent.type == NavigationAgentNode
+expect node:NavigationAgent.parent == CharacterMover
+annotate @hier:CharacterMover/NavigationAgent The agent, a child of the character it moves
+annotate @window:inspector Speed, radius, arrive distance, repath interval, avoidance
+screenshot node_NavigationAgentNode
+
+# Joint: a box hanging from a static platform (Body A: the joint's parent).
+click @asset.new-scene
+click @hier.add
+type static platform
+click @addnode.create
+expect node:StaticPlatform.type == StaticBodyNode
+key escape
+click @hier.add
+type dynamic physics box
+click @addnode.create
+expect node:DynamicPhysicsBox.type == DynamicBodyNode
+dblclick @insp.position.y
+key ctrl+a
+type 480
+key enter
+wait 2
+click @hier:StaticPlatform
+click @hier.add
+type joint
+click @addnode.create
+expect node:Joint.type == JointNode
+expect node:Joint.parent == StaticPlatform
+click @insp.joint.b
+click @pick:DynamicPhysicsBox
+wait 2
+annotate @node:DynamicPhysicsBox Body B; the line joins the two anchors
+annotate @insp.joint.b Body A (the parent) and Body B
+screenshot node_JointNode
