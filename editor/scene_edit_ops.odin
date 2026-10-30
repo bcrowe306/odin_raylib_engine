@@ -149,6 +149,7 @@ undo_redo :: proc(state: ^EditorState, from, to: ^[dynamic]Undo_Entry, verb: str
 		if entry.file != "" && os.write_entire_file(full, transmute([]u8)Undo_Unpack(entry.fileText)) != nil {
 			Editor_Log(state, .Error, "%s: could not write %s", verb, entry.file)
 		}
+		state.undoGeneration += 1
 		if entry.kind == .Scene {
 			Editor_RestoreSceneJSON(state, state.activeScene, Undo_Unpack(entry.json))
 			state.sceneVersion[state.activeScene] = entry.version

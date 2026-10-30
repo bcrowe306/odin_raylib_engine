@@ -76,6 +76,10 @@ Anim_Panel :: struct {
 	rulerSeconds:  bool, // the ruler in seconds (else frames)
 	collapsed:     map[string]bool, // node groups folded (by target path)
 	pasteKeys:     bool, // Cmd+V pastes keys (copied last), else frames
+	// The player edited while other nodes are selected (to key them): its
+	// path in pinScene (paths survive undo, which rebuilds nodes).
+	pinPath:       string,
+	pinScene:      ^e.Scene,
 }
 
 PREVIEW_W :: f32(200)
@@ -136,6 +140,8 @@ AnimationPanel_Shutdown :: proc() {
 	for k in panel.collapsed do delete(k)
 	delete(panel.collapsed)
 	AnimKeys_Shutdown()
+	AutoKey_Shutdown()
+	delete(panel.pinPath)
 }
 
 @(private = "file")
@@ -249,6 +255,37 @@ group_toggle :: proc(target: string) {
 
 AnimationPanel_Zoom :: proc() -> f32 {return panel.zoom if panel.zoom > 0 else 1}
 
+// AnimationPanel_PlayheadTime: the playhead's time (seconds).
+AnimationPanel_PlayheadTime :: proc(apn: ^e.AnimationPlayerNode, anim: ^e.Animation) -> f32 {
+	return e.Animation_FrameTime(apn, anim, f32(playhead(apn, anim)))
+}
+
+// AnimationPanel_ScrubTo moves the playhead to the frame at `at` (seconds).
+AnimationPanel_ScrubTo :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, at: f32) {
+	panel.playing = false
+	scrub(state, apn, anim, int(math.round(e.Animation_TimeFrame(apn, anim, at))))
+	animAutoKey.valid = false // (the scrub's values aren't edits)
+}
+
+// panel_player: the selected AnimationPlayer (pinned: it stays while other
+// nodes are selected, so their properties can be keyed into it).
+@(private = "file")
+panel_player :: proc(state: ^EditorState) -> ^e.AnimationPlayerNode {
+	node := state.selectedNode
+	if node != nil && node.typeId == e.AnimationPlayerNode {
+		path := Editor_NodePath(state, node)
+		if panel.pinPath != path || panel.pinScene != state.activeScene {
+			delete(panel.pinPath)
+			panel.pinPath = strings.clone(path)
+			panel.pinScene = state.activeScene
+		}
+		return cast(^e.AnimationPlayerNode)node
+	}
+	if panel.pinPath == "" || panel.pinScene != state.activeScene || state.activeScene == nil do return nil
+	if n := Editor_NodeAtPath(state, panel.pinPath); n != nil && n.typeId == e.AnimationPlayerNode do return cast(^e.AnimationPlayerNode)n
+	return nil
+}
+
 // AnimationPanel_Rescrub shows the scene at the playhead again (after keys
 // change).
 AnimationPanel_Rescrub :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation) {
@@ -355,10 +392,22 @@ ease_preview :: proc(ease: e.Ease) {
 }
 
 AnimationPanel_Render :: proc(state: ^EditorState) {
+	// Auto-key: changes since the last frame become keys; then the tab; then
+	// the values the next changes are measured from.
+	apn := panel_player(state)
+	anim := e.AnimationPlayerNode_GetAnimation(apn) if apn != nil else nil
+	if anim != nil && !panel.playing do AutoKey_Record(state, apn, anim, AnimationPanel_PlayheadTime(apn, anim))
+	animation_panel(state, apn)
+	apn = panel_player(state)
+	anim = e.AnimationPlayerNode_GetAnimation(apn) if apn != nil else nil
+	if anim != nil do AnimKeyTarget_Set(state, apn, anim)
+	if panel.playing do animAutoKey.valid = false
+	else do AutoKey_Snapshot(state, apn, anim)
+}
+
+@(private = "file")
+animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 	animTimelineFocused = false
-	node := state.selectedNode
-	apn: ^e.AnimationPlayerNode
-	if node != nil && node.typeId == e.AnimationPlayerNode do apn = cast(^e.AnimationPlayerNode)node
 	if panel.node != nil && panel.node != apn do preview_restore(state)
 	if apn == nil {
 		imgui.Dummy({0, 8})
@@ -370,6 +419,19 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 
 	// --- toolbar ---
 	imgui.Dummy({0, 2})
+	// Another node selected: the player stays (pinned) to key it.
+	if state.selectedNode != apn {
+		if UI_Button(fmt.tprintf("%s  %s", ICON_FA_THUMBTACK, apn.name), "anim.pinned") do Editor_SelectNode(state, apn, false)
+		UI_Tooltip("Editing this AnimationPlayer while other nodes are selected - key their properties with the Inspector's diamonds (click: select it)")
+		imgui.SameLine(0, 2)
+		if UI_IconButton(ICON_FA_XMARK, "anim.unpin", "Stop editing this AnimationPlayer", size = 26) {
+			preview_restore(state)
+			delete(panel.pinPath)
+			panel.pinPath = ""
+			return
+		}
+		imgui.SameLine(0, UI_SPACE)
+	}
 	names := make([dynamic]string, context.temp_allocator)
 	for a in apn.animations do append(&names, a.name)
 	imgui.SetNextItemWidth(170)
@@ -515,6 +577,12 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 	}
 	imgui.SameLine(0, 2)
 	if UI_IconButton(ICON_FA_STOP, "anim.stop", "Stop (restore the scene)", size = 26) do preview_restore(state)
+	imgui.SameLine(0, 2)
+	// Auto-key: every property change of the selected nodes keys it at the playhead.
+	if UI_IconButton(ICON_FA_CIRCLE, "anim.autokey", "Auto-key on: changes to the selected nodes are keyed at the playhead (click: off)" if animAutoKey.on else "Auto-key: key every property change at the playhead", animAutoKey.on, 26, tint = UI_DANGER) {
+		animAutoKey.on = !animAutoKey.on
+		animAutoKey.valid = false
+	}
 	imgui.SameLine(0, UI_SPACE)
 	imgui.Checkbox("Loop##anim_loop", &anim.loop)
 	undo_on_activate(state, "Toggle loop")
@@ -1036,6 +1104,9 @@ AnimationPanel_Render :: proc(state: ^EditorState) {
 		gy := g.y
 		imgui.DrawList_AddRectFilled(dl, {origin.x + scrollX, gy}, {colX(x0, cols), gy + GROUP_H - 2}, col_u32(ui_line(0.06)), 3)
 		gname := apn.name if g.target == "." else g.target
+		if g.target != "." {
+			if n := e.Node_ResolvePath(mgr, apn, g.target); n != nil do gname = n.name
+		}
 		label(dl, origin.x + scrollX, gy + 2, fmt.tprintf("%s  %s", ICON_FA_CARET_RIGHT if g.folded else ICON_FA_CARET_DOWN, gname), UI_TEXT_DIM)
 		imgui.SetCursorScreenPos({origin.x + scrollX, gy})
 		if imgui.InvisibleButton(fmt.ctprintf("##group_%s", g.target), {LABEL_W - 8, GROUP_H - 2}) do group_toggle(g.target)
