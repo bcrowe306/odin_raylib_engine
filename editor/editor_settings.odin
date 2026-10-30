@@ -39,6 +39,7 @@ Editor_Settings :: struct {
 	showTabBars:      bool, // View > Show Tab Bars: every docked window keeps its tab
 	autoBottomPanel:  bool, // the bottom panel shows the selected node's tool tab
 	hiddenBottomTabs: bit_set[BottomTab], // View > Bottom Panel: tabs left out (#194)
+	previewShape:     int, // the screen shape the Expand camera frame is shown for (PREVIEW_SHAPES, #202)
 	previewAutoplay:  bool, // File Browser / Assets: play a sound or animation when selected (#203)
 	previewLoop:      bool, // ... and loop it
 	previewVolume:    f32,  // ... at this volume
@@ -342,6 +343,9 @@ settings_from_ini :: proc(text: string) {
 	s.checkUpdates = b(m, "general", "check_updates", s.checkUpdates)
 	s.showTabBars = b(m, "general", "show_tab_bars", s.showTabBars)
 	s.autoBottomPanel = b(m, "general", "auto_bottom_panel", s.autoBottomPanel)
+	if shape, ok := m["general"]["preview_shape"]; ok {
+		for p, i in PREVIEW_SHAPES do if p.name == shape do s.previewShape = i
+	}
 	if pv, ok := m["preview"]; ok {
 		if v, vok := pv["autoplay"]; vok do s.previewAutoplay = v == "true"
 		if v, vok := pv["loop"]; vok do s.previewLoop = v == "true"
@@ -487,6 +491,7 @@ Editor_SaveSettings :: proc() -> bool {
 		names := make([dynamic]string, context.temp_allocator)
 		for t in BottomTab do if t in s.hiddenBottomTabs do append(&names, fmt.tprint(t))
 		fmt.sbprintf(&sb, "hidden_bottom_tabs = %s\n", strings.join(names[:], ",", context.temp_allocator))
+		fmt.sbprintf(&sb, "preview_shape = %s\n", PREVIEW_SHAPES[clamp(s.previewShape, 0, len(PREVIEW_SHAPES) - 1)].name)
 	}
 	strings.write_string(&sb, "\n[code]\n")
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)

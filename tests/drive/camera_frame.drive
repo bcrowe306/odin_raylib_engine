@@ -1,0 +1,55 @@
+# #202: the editor's camera frame and HUD follow the virtual resolution - a
+# 640x360 project shows a 640x360 frame and a top-right Screen Layer at its
+# corner; with Expand, the 4:3 preview grows the frame (dashed) and the HUD
+# follows to its edge.
+wait 5
+key ctrl+comma
+click @settings.tab:project
+click @settings.page:Video
+dblclick @settings.virtual-res+-50,0
+key cmd+a
+type 640
+key enter
+dblclick @settings.virtual-res+50,0
+key cmd+a
+type 360
+key enter
+click @settings.save
+wait 3
+expect file:project.json contains "virtual_width": 640
+click @asset.new-scene
+wait 5
+click @hier.add
+click @addnode.search
+type screen layer
+wait 2
+click @addnode.create
+wait 3
+hover @insp.prop:anchor
+click @insp.prop:anchor
+click @pick:TopRight
+wait 2
+# A new scene's camera is at the frame's centre (320, 180): the frame
+# (0, 0) - (640, 360), the layer at its top-right (1280, 0 before #202).
+expect node:ScreenLayer.global == 640.0,0.0
+key shift+home
+wait 3
+screenshot frame_640x360
+
+# Expand on a 4:3 screen: 640 x 480, the HUD at the taller frame's corner.
+key ctrl+comma
+click @settings.tab:project
+click @settings.page:Video
+click @settings.fill
+click @pick:Expand (no bars)
+click @settings.save
+wait 3
+expect item:toolbar.screen-shape == visible
+click @toolbar.screen-shape
+click @pick:4:3
+wait 2
+expect file:.editor_settings.ini contains preview_shape = 4:3
+expect node:ScreenLayer.global == 640.0,-60.0
+key shift+home
+wait 3
+screenshot expand_4_3

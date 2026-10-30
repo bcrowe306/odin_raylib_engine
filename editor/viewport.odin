@@ -174,6 +174,7 @@ Viewport_RenderOffscreen :: proc(state: ^EditorState) {
 	lit := false
 	if state.activeScene != nil && state.activeScene.rootNode != nil {
 		e.ProcessNodeQueues(state.activeScene.manager, ctx)
+		Editor_SyncGameFrame(state) // the project's frame (#202)
 		state.activeScene.manager.screen = Editor_ScreenMapping(state) // Screen Layers over the camera frame (#175)
 		e.Node_SetGlobalPositions(state.activeScene.manager, state.activeScene.rootNode)
 		Ldtk_EditorSync(state)
@@ -484,11 +485,12 @@ Viewport_DrawCameraFollow :: proc(state: ^EditorState) {
 // view (as its frame is drawn: Viewport_DrawCameraBounds), or the default
 // viewport without a camera. Screen Layers are placed in it (#175).
 Editor_ScreenMapping :: proc(state: ^EditorState) -> e.Screen_Mapping {
-	vW: f32 = state.projectConfig.virtualWidth if state.projectConfig.virtualWidth > 0 else 1280.0
-	vH: f32 = state.projectConfig.virtualHeight if state.projectConfig.virtualHeight > 0 else 720.0
+	// The game's frame (#202): the virtual resolution, grown for Expand -
+	// not cam.viewportSize (the game's runtime cache, unset in the editor).
+	frame := Editor_GameFrameSize(state)
+	vW, vH := frame.x, frame.y
 	cam := Editor_SceneCamera(state)
 	if cam == nil do return {scale = 1, size = {vW, vH}}
-	if cam.viewportSize.x > 0 && cam.viewportSize.y > 0 do vW, vH = cam.viewportSize.x, cam.viewportSize.y
 	zoom: f32 = 1.0
 	if cam.currentZoom > 0 do zoom = cam.currentZoom
 	else if cam.targetZoom > 0 do zoom = cam.targetZoom
@@ -521,9 +523,9 @@ Viewport_DrawCameraBounds :: proc(state: ^EditorState) {
 
 	// If no camera found in scene, fallback to project virtual resolution centered at (vW*0.5, vH*0.5)
 	if len(allCameras) == 0 {
-		vW: f32 = state.projectConfig.virtualWidth if state.projectConfig.virtualWidth > 0 else 1280.0
-		vH: f32 = state.projectConfig.virtualHeight if state.projectConfig.virtualHeight > 0 else 720.0
-		draw_camera_frustum(state, nil, "Default Viewport", {vW * 0.5, vH * 0.5}, vW, vH, 1.0, true)
+		d := Editor_DesignSize(state)
+		draw_camera_frustum(state, nil, "Default Viewport", d * 0.5, d.x, d.y, 1.0, true)
+		draw_expand_frame(state, d * 0.5, 1)
 		return
 	}
 
@@ -532,8 +534,10 @@ Viewport_DrawCameraBounds :: proc(state: ^EditorState) {
 		isSelected := (state.selectedNode != nil && state.selectedNode == &cam.node)
 		isPrimary := (cam == primaryCam || cam.isCurrent)
 
-		vW := cam.viewportSize.x if cam.viewportSize.x > 0 else (state.projectConfig.virtualWidth if state.projectConfig.virtualWidth > 0 else 1280.0)
-		vH := cam.viewportSize.y if cam.viewportSize.y > 0 else (state.projectConfig.virtualHeight if state.projectConfig.virtualHeight > 0 else 720.0)
+		// The design frame (#202: the virtual resolution, not the camera's
+		// runtime cache).
+		d := Editor_DesignSize(state)
+		vW, vH := d.x, d.y
 
 		zoom: f32 = 1.0
 		if cam.currentZoom > 0 do zoom = cam.currentZoom
@@ -547,7 +551,35 @@ Viewport_DrawCameraBounds :: proc(state: ^EditorState) {
 		if state.isSimulating do center = cam.currentPosition
 
 		draw_camera_frustum(state, cam, cam.name, center, vW, vH, zoom, isPrimary || isSelected)
+		if isPrimary do draw_expand_frame(state, center, zoom)
 	}
+}
+
+// draw_expand_frame: with the Expand fill mode, the frame on the preview
+// screen shape (dashed) around the design frame (#202).
+@(private = "file")
+draw_expand_frame :: proc(state: ^EditorState, center: [2]f32, zoom: f32) {
+	if state.projectConfig.fill != .Expand do return
+	size := Editor_GameFrameSize(state) / zoom
+	r := rl.Rectangle{center.x - size.x * 0.5, center.y - size.y * 0.5, size.x, size.y}
+	col := rl.Color{255, 195, 18, 150}
+	th := 1.5 / state.cameraZoom
+	dash, gap := 10 / state.cameraZoom, 6 / state.cameraZoom
+	line :: proc(a, b: [2]f32, dash, gap, th: f32, col: rl.Color) {
+		d := b - a
+		l := math.sqrt(d.x * d.x + d.y * d.y)
+		if l <= 0 do return
+		u := d / l
+		for t: f32 = 0; t < l; t += dash + gap do rl.DrawLineEx(a + u * t, a + u * min(t + dash, l), th, col)
+	}
+	tl, tr := [2]f32{r.x, r.y}, [2]f32{r.x + r.width, r.y}
+	bl, br := [2]f32{r.x, r.y + r.height}, [2]f32{r.x + r.width, r.y + r.height}
+	line(tl, tr, dash, gap, th, col)
+	line(tr, br, dash, gap, th, col)
+	line(br, bl, dash, gap, th, col)
+	line(bl, tl, dash, gap, th, col)
+	fontSize := i32(math.clamp(11.0 / state.cameraZoom, 8.0, 32.0))
+	rl.DrawText(fmt.ctprintf("Expand on %s: %.0fx%.0f", PREVIEW_SHAPES[Editor_PreviewShape()].name, size.x * zoom, size.y * zoom), i32(r.x + 4 / state.cameraZoom), i32(r.y + r.height + 3 / state.cameraZoom), fontSize, col)
 }
 
 @(private="file")
@@ -1176,8 +1208,8 @@ Viewport_FitSelection :: proc(state: ^EditorState) {
 // Viewport_FitGameView fits the game's frame (the current camera's view at
 // the project's virtual resolution).
 Viewport_FitGameView :: proc(state: ^EditorState) {
-	vw := state.projectConfig.virtualWidth if state.projectConfig.virtualWidth > 0 else 1280
-	vh := state.projectConfig.virtualHeight if state.projectConfig.virtualHeight > 0 else 720
+	frame := Editor_GameFrameSize(state)
+	vw, vh := frame.x, frame.y
 	center := [2]f32{vw * 0.5, vh * 0.5}
 	if state.activeScene != nil && state.activeScene.camera != nil do center = e.CameraNode_ViewCenter(state.activeScene.camera)
 	fit_bounds(state, center - {vw, vh} * 0.5, center + {vw, vh} * 0.5, 0.95)

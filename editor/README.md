@@ -461,6 +461,13 @@ with the scene.
 **Show All Colliders** (View) draws every collision shape even when the
 project turns physics debug drawing off.
 
+**Camera frame**: the current camera's frame (the camera button in the
+toolbar) is the project's virtual resolution - the size the game draws at -
+so Screen Layers (HUD) sit in the editor where they will in the game. With
+**Screen Fill: Expand**, a screen-shape picker appears next to it (16:9,
+16:10, 4:3, 21:9, phone portrait; remembered in settings.ini): the dashed
+outline is the frame on that screen, and edge-anchored HUD follows it.
+
 ### Signals
 
 The Inspector's **Signals** section lists every event of the selected node

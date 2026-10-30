@@ -34,6 +34,10 @@ frame's size each time (`Engine.get_virtual_size()` - it can change when the
 window is resized or goes fullscreen) rather than assuming the virtual
 resolution.
 
+In the editor, the camera frame is the virtual resolution; with Expand, the
+toolbar's screen-shape picker (16:9, 4:3, 21:9, phone...) outlines the
+grown frame (dashed) and places edge-anchored Screen Layers on it.
+
 ## Recipes
 
 **Classic crisp pixel art** (most games):
