@@ -453,6 +453,17 @@
       ]
     },
     {
+      "type": "ScreenLayerNode",
+      "name": "Screen Layer",
+      "category": "UI & Interface",
+      "description": "A HUD: everything under it draws in screen space, on top of the world, and doesn't move with the camera. Anchor it to a corner or edge of the screen (a score top-right stays top-right however wide the screen is); the editor shows it over the camera frame.",
+      "aliases": ["screen layer", "screenlayer", "hud", "canvas layer", "overlay", "ui layer"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "anchor", "kind": "enum", "owner": "ScreenLayerNode", "default": "TopLeft", "values": ["TopLeft", "Top", "TopRight", "Left", "Center", "Right", "BottomLeft", "Bottom", "BottomRight"], "doc": "The point of the screen it sits at (its position is an offset from it): top left ... bottom right. A score anchored top-right stays at the top-right edge however wide the screen is."}
+      ]
+    },
+    {
       "type": "SkeletonNode",
       "name": "Skeleton",
       "category": "Animation & Effects",

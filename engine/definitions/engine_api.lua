@@ -2820,6 +2820,69 @@ function VisibilityNotifierNode:get_property(path) end
 ---@overload fun(self: VisibilityNotifierNode, path: "onScreen", value: boolean)
 function VisibilityNotifierNode:set_property(path, value, y) end
 
+---@class ScreenLayerNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field anchor "TopLeft"|"Top"|"TopRight"|"Left"|"Center"|"Right"|"BottomLeft"|"Bottom"|"BottomRight" The point of the screen it sits at (its position is an offset from it): top left ... bo...
+
+---@alias ScreenLayerNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "anchor" # "TopLeft"|"Top"|"TopRight"|"Left"|"Center"|"Right"|"BottomLeft"|"Bottom"|"BottomRight" - The point of the screen it sits at (its position is an offset from it): top left ... bo...
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---
+---Example: `local value = self.node:get_property("anchor")`
+---@param path ScreenLayerNodeProperty|string
+---@return any
+---@overload fun(self: ScreenLayerNode, path: "position"): Vec2
+---@overload fun(self: ScreenLayerNode, path: "scale"): Vec2
+---@overload fun(self: ScreenLayerNode, path: "rotation"): number
+---@overload fun(self: ScreenLayerNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: ScreenLayerNode, path: "zIndex"): integer
+---@overload fun(self: ScreenLayerNode, path: "ySort"): boolean
+---@overload fun(self: ScreenLayerNode, path: "ySortOffset"): number
+---@overload fun(self: ScreenLayerNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: ScreenLayerNode, path: "paused"): boolean
+---@overload fun(self: ScreenLayerNode, path: "enabled"): boolean
+---@overload fun(self: ScreenLayerNode, path: "anchor"): "TopLeft"|"Top"|"TopRight"|"Left"|"Center"|"Right"|"BottomLeft"|"Bottom"|"BottomRight"
+function ScreenLayerNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---
+---Example: `self.node:set_property("anchor", "Top")`
+---@param path ScreenLayerNodeProperty|string
+---@param value any
+---@param y? number
+---@overload fun(self: ScreenLayerNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: ScreenLayerNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: ScreenLayerNode, path: "rotation", value: number)
+---@overload fun(self: ScreenLayerNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: ScreenLayerNode, path: "zIndex", value: integer)
+---@overload fun(self: ScreenLayerNode, path: "ySort", value: boolean)
+---@overload fun(self: ScreenLayerNode, path: "ySortOffset", value: number)
+---@overload fun(self: ScreenLayerNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: ScreenLayerNode, path: "paused", value: boolean)
+---@overload fun(self: ScreenLayerNode, path: "enabled", value: boolean)
+---@overload fun(self: ScreenLayerNode, path: "anchor", value: "TopLeft"|"Top"|"TopRight"|"Left"|"Center"|"Right"|"BottomLeft"|"Bottom"|"BottomRight")
+function ScreenLayerNode:set_property(path, value, y) end
+
 ---@class SkeletonNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
 ---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).

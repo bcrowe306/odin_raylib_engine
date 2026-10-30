@@ -3,7 +3,8 @@
 What draws on top of what, from coarse to fine:
 
 1. **Layer** (`Layer1` … `Layer8`): a higher layer always draws over a lower
-   one. The camera draws the world layers it targets; `Layer8` is for UI.
+   one. The camera draws the world layers it targets (1-7); `Layer8` isn't
+   moved by the camera. For a HUD use a [Screen Layer](#huds-screen-layers).
 2. **Z index** (an integer, default 0) inside a layer: higher draws later
    (on top). It is **relative**: a node's Z adds to its parent's, so a
    `Background` group at Z -10 keeps all its children behind.
@@ -13,6 +14,30 @@ What draws on top of what, from coarse to fine:
    isometric games: walk behind a tree, then in front of it.
 4. Otherwise, the **scene tree order**: later siblings draw over earlier
    ones.
+
+## HUDs: Screen Layers
+
+A **Screen Layer** (Add Node > UI & Interface) draws everything under it in
+**screen space**: after the world, on top of it, never moved by the camera.
+Health bars, the score, a minimap frame, the pause button go under one.
+
+- **Anchor**: the point of the screen it sits at - top left, top, top right,
+  left, centre, right, bottom left, bottom, bottom right. Its position is an
+  offset from that point. A score anchored **top right** at (-120, 16) stays
+  120 px from the right edge however wide the screen is - with the
+  [Expand](pixel_perfect.md#screen-fill) screen fill, a wider screen shows
+  more world and the HUD stays at its edges.
+- **One per corner**: Screen Layers can nest, and each anchors to the
+  screen (not to its parent) - a `HUD` layer with a top-left health bar
+  layer and a bottom-right buttons layer inside.
+- Inside, order is as usual (layers, Z index, tree order); UI buttons and
+  labels take the mouse in screen coordinates.
+- **In the editor** it's drawn over the scene camera's frame, so you place
+  the HUD where the player will see it (Home fits the game's view).
+
+Recipe: Add Node > **Screen Layer**, set its Anchor to *Top Right*, add a UI
+Label under it, move the label to (-160, 16); Play - scroll the camera, the
+label stays put in the corner.
 
 ## In the editor
 

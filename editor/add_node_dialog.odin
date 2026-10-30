@@ -176,6 +176,13 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "PostEffectNode",
 	},
 	{
+		name        = "Screen Layer",
+		category    = "UI & Interface",
+		icon        = ICON_FA_LAYER_GROUP,
+		description = "A HUD: everything under it draws in screen space, on top of the world, and doesn't move with the camera. Anchor it to a corner or edge of the screen (a score top-right stays top-right however wide the screen is); the editor shows it over the camera frame.",
+		typeName    = "ScreenLayerNode",
+	},
+	{
 		name        = "Dialogue Box",
 		category    = "UI & Interface",
 		icon        = ICON_FA_COMMENT,

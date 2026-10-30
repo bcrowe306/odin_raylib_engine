@@ -45,6 +45,7 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"AreaNode", AreaNode, factory_area, {"area"}},
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
 	{"VisibilityNotifierNode", VisibilityNotifierNode, factory_visibility, {"visibility", "on screen", "notifier"}},
+	{"ScreenLayerNode", ScreenLayerNode, factory_screen_layer, {"screen layer", "screenlayer", "hud", "canvas layer", "overlay", "ui layer"}},
 	{"SkeletonNode", SkeletonNode, factory_skeleton, {"skeleton", "spine", "dragonbones", "bones", "rig", "cutout"}},
 	{"BoneAttachmentNode", BoneAttachmentNode, factory_bone_attachment, {"bone attachment", "attach to bone"}},
 	{"AdvancedCameraNode", AdvancedCameraNode, factory_adv_camera, {"advanced camera", "virtual camera", "phantom", "cinemachine"}},
@@ -276,6 +277,11 @@ factory_kinematic_body :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 @(private = "file")
 factory_character :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return CharacterMoverNode_Create(scene, "CharacterMover", parent)
+}
+
+@(private = "file")
+factory_screen_layer :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return ScreenLayerNode_Create(scene, "ScreenLayer", parent)
 }
 
 @(private = "file")

@@ -26,6 +26,9 @@ NodeManager :: struct {
 	navAgents:  [dynamic]^Node,
 	// AdvancedCameraNodes (advanced_camera.odin), in the order added.
 	advCameras: [dynamic]^Node,
+	// Where Screen Layers' screen space is (screen_layer.odin): the game's
+	// frame, or the camera's view in the editor.
+	screen: Screen_Mapping,
 }
 
 NodeManagerStats :: struct {
@@ -286,9 +289,15 @@ Node_SetGlobalPositions :: proc(manager: ^NodeManager, node: ^Node, positionOffs
 	if node == nil {
 		return
 	}
-	node.globalPosition = positionOffset + rotate_vec(node.position * scaleOffset, rotationOffset)
-	node.globalScale = node.scale * scaleOffset
-	node.globalRotation = node.rotation + rotationOffset
+	if node.typeId == ScreenLayerNode {
+		// Screen space: anchored to the frame, not to its parent.
+		node.globalPosition, node.globalScale = ScreenLayer_Global(manager.screen, cast(^ScreenLayerNode)node)
+		node.globalRotation = node.rotation
+	} else {
+		node.globalPosition = positionOffset + rotate_vec(node.position * scaleOffset, rotationOffset)
+		node.globalScale = node.scale * scaleOffset
+		node.globalRotation = node.rotation + rotationOffset
+	}
 	for child in GetChildrenView(manager, node) {
 		Node_SetGlobalPositions(manager, child, node.globalPosition, node.globalScale, node.globalRotation)
 	}
@@ -301,6 +310,11 @@ Node_ComputeWorldPosition :: proc(manager: ^NodeManager, node: ^Node) -> [2]f32 
 	for n := node; n != nil; n = GetParent(manager, n) do append(&chain, n)
 	pos, scl, rot := [2]f32{0, 0}, [2]f32{1, 1}, f32(0)
 	#reverse for n in chain {
+		if n.typeId == ScreenLayerNode {
+			pos, scl = ScreenLayer_Global(manager.screen, cast(^ScreenLayerNode)n)
+			rot = n.rotation
+			continue
+		}
 		pos = pos + rotate_vec(n.position * scl, rot)
 		scl *= n.scale
 		rot += n.rotation
@@ -319,6 +333,7 @@ rotate_vec :: proc(v: [2]f32, degrees: f32) -> [2]f32 {
 // Node_ParentToWorld / Node_WorldToParent convert points between world space
 // and the space a node's `position` is expressed in (its parent's space).
 Node_WorldToParent :: proc(manager: ^NodeManager, node: ^Node, world: [2]f32) -> [2]f32 {
+	if node != nil && node.typeId == ScreenLayerNode do return ScreenLayer_PositionAt(manager.screen, cast(^ScreenLayerNode)node, world)
 	parent := GetParent(manager, node)
 	if parent == nil do return world
 	local := rotate_vec(world - parent.globalPosition, -parent.globalRotation)
@@ -328,6 +343,10 @@ Node_WorldToParent :: proc(manager: ^NodeManager, node: ^Node, world: [2]f32) ->
 }
 
 Node_ParentToWorld :: proc(manager: ^NodeManager, node: ^Node, local: [2]f32) -> [2]f32 {
+	if node != nil && node.typeId == ScreenLayerNode {
+		size, s := screen_frame(manager.screen)
+		return manager.screen.origin + (Screen_AnchorFactor((cast(^ScreenLayerNode)node).anchor) * size + local) * s
+	}
 	parent := GetParent(manager, node)
 	if parent == nil do return local
 	return parent.globalPosition + rotate_vec(local * parent.globalScale, parent.globalRotation)
