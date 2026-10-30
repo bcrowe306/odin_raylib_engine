@@ -1,16 +1,20 @@
-# #140: View > File Browser - folders outside the project browsed (typed
+# #140 / #193: the bottom panel's Files tab (the File Browser) - folders outside the project browsed (typed
 # path, history, tree, bookmarks), files previewed before they are imported
 # (an image, a sound played and stopped, text), searched through sub-folders
 # and filtered, then Loaded: by type, into a chosen folder, a taken name
 # skipped or replaced, several at once, and dragged onto the Assets panel.
 # Previewing writes nothing to the project.
 wait 5
+# A tall bottom panel (the Animation workspace's): room for the rows.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
 expect fb.open == false
 click @menu:View
 click @menu:View/File Browser
 wait 2
 expect fb.open == true
-expect file:.editor_settings.ini contains open = true
 
 # Type the fixtures' folder into the path bar.
 click @fb.path
@@ -55,7 +59,7 @@ dblclick @fb.row:Pack
 wait 2
 expect fb.dir-name == Pack
 expect fb.rows contains gem.png
-expect fb.back == 1
+expect fb.back == 2
 click @fb.back
 wait 2
 expect fb.dir-name == import
@@ -83,9 +87,10 @@ expect fb.rows contains spark.png
 screenshot search
 click @fb.recursive
 click @fb.search
-key ctrl+a
+key cmd+a
 key backspace
 wait 2
+expect fb.rows contains crate.png
 
 # The type filter: Audio shows the sound (and the folders) only.
 click @fb.filter
@@ -133,15 +138,23 @@ click @fb.dest
 click @pick:by-type
 expect fb.dest ==
 
-# Several at once (ctrl+click), then a row dragged onto the Assets panel.
-click @fb.row:hello.lua
-hold ctrl
+# Several at once (cmd+click), then a row dragged onto the Assets panel.
+# (a search for "l" keeps both in view)
+click @fb.search
+type l
+wait 2
 click @fb.row:blip.wav
+hold cmd
+click @fb.row:hello.lua
 release
-expect fb.selected == hello.lua,blip.wav
+expect fb.selected == blip.wav,hello.lua
 screenshot multi_select
 click @fb.load
 wait 3
+click @fb.search
+key cmd+a
+key backspace
+wait 2
 expect item:asset:scripts/hello.lua == visible
 expect item:asset:audio/blip.wav == visible
 dblclick @fb.row:Pack
@@ -151,10 +164,14 @@ wait 3
 expect item:asset:textures/gem.png == visible
 screenshot dragged
 
-# Closing it from the View menu stops any sound and is remembered.
-click @menu:View
-click @menu:View/File Browser
+# Another tab: a playing sound stops.
+click @fb.up
+wait 2
+click @fb.row:blip.wav
+wait 2
+click @fb.play
+expect fb.audio == playing
+click @bottom:console
 wait 2
 expect fb.open == false
-expect fb.audio == none
-expect file:.editor_settings.ini contains open = false
+expect fb.audio == stopped

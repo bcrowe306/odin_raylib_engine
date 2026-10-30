@@ -13,7 +13,7 @@ import e "../engine"
 import imgui "lib/imgui"
 
 // ============================================================================
-// File Browser (View > File Browser): browse the computer's folders and
+// File Browser (the bottom panel's Files tab; View > File Browser): browse the computer's folders and
 // preview files before they come into the project - images, sounds, fonts,
 // Aseprite files, SVGs, text - then Load the ones you want (the asset
 // importer: by type or into a chosen folder, with a rule for taken names).
@@ -30,8 +30,6 @@ import imgui "lib/imgui"
 // Bookmarks, recent folders and the last folder are the editor's
 // (settings.ini [file_browser*]), the same in every project.
 // ============================================================================
-
-FILE_BROWSER_WINDOW :: "File Browser###FileBrowserWindow"
 
 FB_Kind :: enum {
 	Folder,
@@ -176,6 +174,7 @@ fb: struct {
 	winMin:     [2]f32,
 	winMax:     [2]f32,
 	settingsDirty: bool,
+	shownFrame:    i32, // the frame the Files tab last drew
 	drives:     [dynamic]string, // Windows: the drives there were when it opened (heap)
 }
 
@@ -200,23 +199,17 @@ FB_Search_Dir :: struct {
 
 // --- opening -------------------------------------------------------------------------
 
-FileBrowser_IsOpen :: proc() -> bool {return GlobalSettings.fileBrowserOpen}
+// FileBrowser_IsOpen: the Files tab is the one shown (#193).
+FileBrowser_IsOpen :: proc() -> bool {return GlobalEditor.bottomTab == .Files}
 
-FileBrowser_Toggle :: proc() {
-	GlobalSettings.fileBrowserOpen = !GlobalSettings.fileBrowserOpen
-	if !GlobalSettings.fileBrowserOpen do fb_preview_clear()
-	_ = Editor_SaveSettings()
-}
+// FileBrowser_Toggle shows the Files tab (View > File Browser).
+FileBrowser_Toggle :: proc() {bottomTabRequest = .Files}
 
 // FileBrowser_Open shows the browser at a folder ("" = where it was).
 FileBrowser_Open :: proc(dir := "") {
-	if !GlobalSettings.fileBrowserOpen {
-		GlobalSettings.fileBrowserOpen = true
-		_ = Editor_SaveSettings()
-	}
+	bottomTabRequest = .Files
 	fb_init()
 	if dir != "" do fb_navigate(dir)
-	imgui.SetWindowFocusStr(FILE_BROWSER_WINDOW)
 }
 
 @(private = "file")
@@ -761,7 +754,9 @@ fb_audio_stop :: proc() {
 
 // --- the window ----------------------------------------------------------------------
 
-FileBrowser_Render :: proc(state: ^EditorState) {
+// FileBrowser_Update: every frame - background jobs, the playing sound
+// (stopped when the tab isn't shown), rows dragged out and let go.
+FileBrowser_Update :: proc(state: ^EditorState) {
 	fb_jobs_poll()
 	if fb.preview.hasMusic && fb.preview.playing {
 		rl.UpdateMusicStream(fb.preview.music)
@@ -774,8 +769,7 @@ FileBrowser_Render :: proc(state: ^EditorState) {
 		fb.settingsDirty = false
 		_ = Editor_SaveSettings()
 	}
-	if !GlobalSettings.fileBrowserOpen do return
-	fb_init()
+	if fb.preview.playing && imgui.GetFrameCount() - fb.shownFrame > 1 do fb_audio_stop() // (a hidden tab doesn't keep playing)
 
 	// Rows dragged out of the browser and let go elsewhere: dropped like
 	// files from the OS file manager (Assets panel: import; viewport: import
@@ -789,25 +783,12 @@ FileBrowser_Render :: proc(state: ^EditorState) {
 		}
 	}
 
-	open := true
-	// First shown: floating right of the Assets panel (drag its title onto a
-	// dock area to dock it).
-	display := imgui.GetIO().DisplaySize
-	x := max(assetPanelRect.max.x + 16, 40)
-	imgui.SetNextWindowPos({x, 110}, .FirstUseEver)
-	imgui.SetNextWindowSize({clamp(display.x - x - 40, 640, 1100), clamp(display.y - 220, 420, 640)}, .FirstUseEver)
-	visible := imgui.Begin(fmt.ctprintf("%s  %s", ICON_FA_FOLDER_OPEN, FILE_BROWSER_WINDOW), &open)
-	defer imgui.End()
-	if !open {
-		GlobalSettings.fileBrowserOpen = false
-		fb_preview_clear()
-		_ = Editor_SaveSettings()
-		return
-	}
-	if !visible {
-		if fb.preview.playing do fb_audio_stop() // (a hidden tab doesn't keep playing)
-		return
-	}
+}
+
+// FileBrowser_RenderTab draws the browser in the bottom panel's Files tab.
+FileBrowser_RenderTab :: proc(state: ^EditorState) {
+	fb_init()
+	fb.shownFrame = imgui.GetFrameCount()
 	Drive_Window("filebrowser")
 	wp := imgui.GetWindowPos()
 	ws := imgui.GetWindowSize()
@@ -1022,8 +1003,13 @@ fb_files :: proc(state: ^EditorState) {
 		enter := ""
 		clipper: imgui.ListClipper
 		imgui.ListClipper_Begin(&clipper, i32(len(rows)))
+		// (Drives: rows the clipper skips get estimated rects, from a drawn
+		// one, so a click scrolls to them like to any other item.)
+		shown := make([]bool, len(rows), context.temp_allocator)
+		known, knownMin, knownMax := -1, [2]f32{}, [2]f32{}
 		for imgui.ListClipper_Step(&clipper) do for i in int(clipper.DisplayStart) ..< int(clipper.DisplayEnd) {
 			en := rows[i]
+			shown[i] = true
 			imgui.TableNextRow()
 			imgui.TableNextColumn()
 			icon, tint := fb_icon(en)
@@ -1041,6 +1027,7 @@ fb_files :: proc(state: ^EditorState) {
 				}
 			}
 			Drive_Item(fmt.tprintf("fb.row:%s", en.name))
+			if known < 0 do known, knownMin, knownMax = i, imgui.GetItemRectMin(), imgui.GetItemRectMax()
 			if imgui.BeginPopupContextItem(fmt.ctprintf("##rowctx_%s", en.full)) {
 				if !fb_is_selected(en.full) do fb_select_only(en.full)
 				fb_row_menu(state, en)
@@ -1059,6 +1046,14 @@ fb_files :: proc(state: ^EditorState) {
 			if !en.isDir do UI_DimText(fb_size_text(en.size))
 			imgui.TableNextColumn()
 			UI_DimText(fb_time_text(en.mod))
+		}
+		if GlobalDrive.enabled && known >= 0 && clipper.ItemsHeight > 0 {
+			h := clipper.ItemsHeight
+			for en, i in rows {
+				if shown[i] do continue
+				dy := f32(i - known) * h
+				Drive_ItemRect(fmt.tprintf("fb.row:%s", en.name), knownMin + {0, dy}, knownMax + {0, dy}, inWindow = true)
+			}
 		}
 		imgui.EndTable()
 		if enter != "" do fb_navigate(enter)
@@ -1395,7 +1390,7 @@ FileBrowser_Shutdown :: proc() {
 // FileBrowser_DriveQuery answers test-drive queries ("fb.*").
 FileBrowser_DriveQuery :: proc(q: string) -> (string, bool) {
 	switch q {
-	case "fb.open": return "true" if GlobalSettings.fileBrowserOpen else "false", true
+	case "fb.open": return "true" if FileBrowser_IsOpen() else "false", true
 	case "fb.dir": return fb.dir, true
 	case "fb.dir-name": return filepath.base(fb.dir), true
 	case "fb.back": return fmt.tprint(len(fb.back)), true
