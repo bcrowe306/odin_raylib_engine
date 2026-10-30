@@ -125,6 +125,12 @@ selecting something else goes back to the tab you had (a tab you pick by
 hand stays). Turn it off in Settings > General > Basic (**Bottom Panel
 Follows Selection**; `auto_bottom_panel` in settings.ini).
 
+**View > Bottom Panel** lists the bottom panel's tabs with a check by the
+ones shown: click one to hide or show it (saved for you in settings.ini,
+`hidden_bottom_tabs`; at least one stays). A hidden tab comes back when the
+selection or a command needs it (an AnimationPlayer selected, Find in
+Files).
+
 A docked window alone in its space hides its tab (the panels have their own
 headers), so after closing a window docked next to another, the one left
 loses its tab. **View > Show Tab Bars** gives every docked window its tab

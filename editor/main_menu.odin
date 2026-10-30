@@ -149,6 +149,7 @@ MainMenu_Render :: proc(state: ^EditorState) -> f32 {
 		menu_action(state, "view.viewport")
 		menu_action(state, "view.code")
 		menu_action(state, "view.console")
+		BottomPanel_ViewMenu(state)
 		imgui.Separator()
 		wsOpen := imgui.BeginMenu(fmt.ctprintf("Workspaces (%s)", currentWorkspace))
 		Drive_Item("menu:View/Workspaces")

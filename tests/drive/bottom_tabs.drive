@@ -1,0 +1,36 @@
+# View > Bottom Panel (#194): tabs hidden and shown (checked), saved in the
+# editor settings; a hidden tab the selection needs shows again.
+wait 5
+expect item:bottom:mixer == visible
+click @menu:View
+click @menu:View/Bottom Panel
+wait 2
+expect item:menu:Bottom Panel/Mixer == visible
+screenshot bottom_panel_menu
+click @menu:Bottom Panel/Mixer
+wait 2
+expect item:bottom:mixer == missing
+expect file:.editor_settings.ini contains hidden_bottom_tabs = Mixer
+
+# The Animation tab hidden, then an AnimationPlayer selected: it's back.
+click @menu:View
+click @menu:View/Bottom Panel
+click @menu:Bottom Panel/Animation
+wait 2
+expect item:bottom:animation == missing
+expect file:.editor_settings.ini contains hidden_bottom_tabs = Animation,Mixer
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+wait 3
+expect item:bottom:animation == visible
+expect file:.editor_settings.ini contains hidden_bottom_tabs = Mixer
+
+# Shown again from the menu.
+click @menu:View
+click @menu:View/Bottom Panel
+click @menu:Bottom Panel/Mixer
+wait 2
+expect item:bottom:mixer == visible
+expect file:.editor_settings.ini contains hidden_bottom_tabs = \n
