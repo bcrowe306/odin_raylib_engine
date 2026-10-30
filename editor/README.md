@@ -534,6 +534,15 @@ it for the previous / next key or to remove the key. **Auto-key** (the red
 dot by Stop) keys every change you make to the selected nodes - typed in
 the Inspector or dragged in the viewport - at the playhead; scrubbing,
 playback and undo don't record.
+**Graph**: the **chart** button at the ruler swaps the track rows for the
+value graph (like After Effects' value graph): each number, vector and
+colour track's curve over the same frames and playhead - vectors and
+colours split into components (click one in the list to hide or show it).
+Keys are points: drag one in time (snapped to frames; Shift: free) and
+value. Bezier keys show their handles (right-click a key: **Bezier
+Handles**, **Flatten Handles**, **Linear**, **Delete Key**); drag a handle
+to shape the curve - the pair stays in line, Alt breaks it. The wheel moves
+the values up and down, Alt + wheel zooms them, **Frame All** (F) fits them.
 Right-click a key for its **Easing** to the next key (linear, sine, quad,
 cubic, quart, expo, back, elastic, bounce, constant; hover one to see its
 curve) or to delete it. Eased keys show a dot. Scripts can animate any

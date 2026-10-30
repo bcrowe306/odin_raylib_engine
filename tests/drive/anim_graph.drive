@@ -1,0 +1,70 @@
+# Graph editor (#180): the value view of the tracks - a vector split into x
+# / y (hidden), a key dragged up in value, bezier handles from the key's
+# menu, the out handle dragged down (the curve dips), Frame All; back to
+# the rows; saved.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+
+# rotation 0 -> 90 and position keyed at frames 1 and 3.
+click @anim.frame:1
+click @anim.add-track
+click @anim.track-prop:rotation
+click @anim.add-track
+click @anim.track-prop:position
+click @anim.frame:3
+dblclick @insp.rotation
+key ctrl+a
+type 90
+key enter
+click @anim.key:rotation
+dblclick @insp.position.x
+key ctrl+a
+type 50
+key enter
+click @anim.key:position
+
+# The graph: rotation and position's x / y.
+click @anim.graph
+expect item:anim.graph-key:rotation:0:1 == visible
+expect item:anim.graph-key:rotation:0:3 == visible
+expect item:anim.graph-channel:position:0 == visible
+expect item:anim.graph-channel:position:1 == visible
+screenshot graph
+click @anim.graph-channel:position:0
+click @anim.graph-channel:position:1
+expect item:anim.graph-key:position:0:1 == missing
+
+# The last rotation key dragged up: more than 90.
+drag @anim.graph-key:rotation:0:3 @anim.graph-key:rotation:0:3+0,-30
+click @anim.frame:3
+expect node:AnimationPlayer.rotation >= 95.0
+click @anim.graph-frame
+
+# Bezier handles; the out handle down: frame 2 dips under the line.
+rclick @anim.graph-key:rotation:0:1
+click @anim.graph-bezier
+expect item:anim.graph-out:rotation:0:1 == visible
+expect item:anim.graph-in:rotation:0:3 == visible
+drag @anim.graph-out:rotation:0:1 @anim.graph-out:rotation:0:1+0,80
+click @anim.frame:2
+expect node:AnimationPlayer.rotation <= 40.0
+screenshot graph_bezier
+
+# Back to the rows.
+click @anim.graph
+expect item:anim.keyframe:rotation:1 == visible
+click @anim.stop
+key ctrl+s
+expect file:scenes/main.scene.json contains {"t": 0, "bezier": true, "out": [[
