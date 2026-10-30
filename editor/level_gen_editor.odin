@@ -61,6 +61,7 @@ lge: struct {
 	version:   int, // bumped by every change (previews follow)
 	thumbs:    map[int]rl.Texture2D, // node id -> its grid (for `thumbVersion`)
 	thumbVersion: int,
+	scriptsVersion: int, // the version the script nodes' files were read for
 	errors:    map[int]string, // node id -> why it can't be evaluated (heap)
 	preview:   rl.Texture2D,
 	previewOf: [2]int, // (node id, version) the preview shows
@@ -298,6 +299,10 @@ LevelGenEditor_Render :: proc(state: ^EditorState) {
 	if !visible do return
 	levelGenFocused = imgui.IsWindowFocused({.RootWindow, .ChildWindows})
 	Drive_Window("levelgen")
+	if lge.scriptsVersion != lge.version {
+		e.Gen_LoadScripts(&lge.graph, &state.game.gameContext) // (script nodes' files, read again after any change)
+		lge.scriptsVersion = lge.version
+	}
 	lge_refresh()
 	lge_keys(state)
 	lge_toolbar(state)
@@ -408,7 +413,7 @@ lge_to_world :: proc(origin, s: [2]f32) -> [2]f32 {return (s - origin - lge.pan)
 // lge_node_rect: a node's box on screen, and its height in world units.
 @(private = "file")
 lge_node_rect :: proc(origin: [2]f32, n: ^e.Gen_Node) -> (mn, mx: [2]f32) {
-	rows := max(len(e.GEN_KINDS[n.kind].inputs), 1)
+	rows := max(len(e.Gen_NodeInfo(n).inputs), 1)
 	h := 28 + f32(rows) * 20 + LGE_THUMB + 12
 	mn = lge_to_screen(origin, n.pos)
 	mx = mn + [2]f32{LGE_NODE_W, h} * lge.zoom
@@ -468,7 +473,7 @@ lge_canvas :: proc(state: ^EditorState) {
 	// Links: from a node's output to the inputs reading it.
 	for &n in g.nodes {
 		mn, _ := lge_node_rect(origin, &n)
-		for src, i in n.inputs[:len(e.GEN_KINDS[n.kind].inputs)] {
+		for src, i in n.inputs[:len(e.Gen_NodeInfo(&n).inputs)] {
 			if src == 0 do continue
 			s := e.Gen_FindNode(g, src)
 			if s == nil do continue
@@ -484,7 +489,7 @@ lge_canvas :: proc(state: ^EditorState) {
 	outputId := 0
 	if out := e.Gen_OutputNode(g); out != nil do outputId = out.id
 	for &n in g.nodes {
-		info := e.GEN_KINDS[n.kind]
+		info := e.Gen_NodeInfo(&n)
 		mn, mx := lge_node_rect(origin, &n)
 		sel := n.id == lge.selected
 		imgui.DrawList_AddRectFilled(dl, mn, mx, col_u32(UI_BG_RAISED), 6)
@@ -624,6 +629,23 @@ lge_canvas :: proc(state: ^EditorState) {
 					UI_Tooltip(info.doc)
 				}
 			}
+			// Your own: a Lua script, and the types registered from Odin.
+			imgui.SeparatorText("Your Own")
+			script := e.GEN_KINDS[.Script]
+			if imgui.MenuItem(fmt.ctprintf("%s", script.label)) {
+				lge_change()
+				lge.selected = e.Gen_AddNode(g, .Script, lge.ctxWorld).id
+			}
+			Drive_Item("ctx:lge-add:script")
+			UI_Tooltip(script.doc)
+			for def in e.Gen_CustomKinds() {
+				if imgui.MenuItem(fmt.ctprintf("%s", def.info.label if def.info.label != "" else def.info.name)) {
+					lge_change()
+					lge.selected = e.Gen_AddNode(g, .Custom, lge.ctxWorld, def.info.name).id
+				}
+				Drive_Item(fmt.tprintf("ctx:lge-add:%s", def.info.name))
+				if def.info.doc != "" do UI_Tooltip(def.info.doc)
+			}
 		}
 		imgui.EndPopup()
 	}
@@ -664,10 +686,10 @@ lge_side :: proc(state: ^EditorState) {
 		}
 		UI_PropLabel("Output")
 		out := e.Gen_OutputNode(g)
-		outLabel := fmt.tprintf("%d  %s", out.id, e.GEN_KINDS[out.kind].label) if out != nil else "None"
+		outLabel := fmt.tprintf("%d  %s", out.id, e.Gen_NodeInfo(out).label) if out != nil else "None"
 		if imgui.BeginCombo("##lge_output", strings.clone_to_cstring(outLabel, context.temp_allocator)) {
-			for n in g.nodes {
-				if imgui.Selectable(fmt.ctprintf("%d  %s", n.id, e.GEN_KINDS[n.kind].label), out != nil && n.id == out.id) {
+			for &n in g.nodes {
+				if imgui.Selectable(fmt.ctprintf("%d  %s", n.id, e.Gen_NodeInfo(&n).label), out != nil && n.id == out.id) {
 					lge_change()
 					g.output = n.id
 				}
@@ -677,7 +699,7 @@ lge_side :: proc(state: ^EditorState) {
 		UI_EndProps()
 	}
 	if n := e.Gen_FindNode(g, lge.selected); n != nil {
-		info := e.GEN_KINDS[n.kind]
+		info := e.Gen_NodeInfo(n)
 		if UI_SectionHeader(fmt.tprintf("%s  (node %d)", info.label, n.id)) {
 			UI_DimTextWrapped(info.doc)
 			if why, bad := lge.errors[n.id]; bad do imgui.TextColored(UI_DANGER, fmt.ctprintf("%s", why))
@@ -726,6 +748,7 @@ lge_side :: proc(state: ^EditorState) {
 				Drive_Item("lge.component")
 				if n.component == "" do imgui.TextColored(UI_WARNING, "Pick the component it places")
 			}
+			if n.kind == .Script do lge_script_picker(state, n)
 		}
 	}
 	// The preview: the selected node's grid, else the output's.
@@ -747,6 +770,57 @@ lge_side :: proc(state: ^EditorState) {
 		} else {
 			UI_DimText("Nothing to preview.")
 		}
+	}
+}
+
+// lge_script_picker: a script node's .lua file - pick one, start a new one
+// (the template), edit it in the Code tab, reload it after editing.
+@(private = "file")
+lge_script_picker :: proc(state: ^EditorState, n: ^e.Gen_Node) {
+	g := &lge.graph
+	imgui.SeparatorText("Script")
+	files := make([dynamic]string, context.temp_allocator)
+	for f in Editor_ListProjectFiles(state, "", {".lua"}) do append(&files, f)
+	imgui.SetNextItemWidth(-1)
+	if path, ok := asset_picker("lge.script", n.script, files[:], false); ok {
+		lge_change()
+		e.Gen_SetScript(g, n, path)
+	}
+	Drive_Item("lge.script")
+	if UI_Button(fmt.tprintf("%s  New", ICON_FA_PLUS), "lge.script-new") {
+		if rel := lge_new_script(state, n.id); rel != "" {
+			lge_change()
+			e.Gen_SetScript(g, n, rel)
+			Editor_OpenScript(state, rel)
+		}
+	}
+	UI_Tooltip("A new script from a template (levels/<name>.gen.lua), opened in the Code tab")
+	imgui.SameLine(0, 4)
+	imgui.BeginDisabled(n.script == "")
+	if UI_Button(fmt.tprintf("%s  Edit", ICON_FA_CODE), "lge.script-edit") do Editor_OpenScript(state, n.script)
+	imgui.SameLine(0, 4)
+	if UI_Button(fmt.tprintf("%s  Reload", ICON_FA_ROTATE), "lge.script-reload") do lge.version += 1 // (scripts are read again with the previews)
+	UI_Tooltip("Read the script again (after saving it in the Code tab)")
+	imgui.EndDisabled()
+	if n.script == "" do imgui.TextColored(UI_WARNING, "Pick or create its script")
+}
+
+// lge_new_script writes levels/<generator>_<node>.gen.lua (the template).
+@(private = "file")
+lge_new_script :: proc(state: ^EditorState, id: int) -> string {
+	base := strings.trim_suffix(filepath.base(lge.path), ".levelgen.json")
+	for i := 1; ; i += 1 {
+		rel := fmt.tprintf("levels/%s_%d.gen.lua", base, id) if i == 1 else fmt.tprintf("levels/%s_%d_%d.gen.lua", base, id, i)
+		full, _ := filepath.join({state.projectPath, rel}, context.temp_allocator)
+		if os.exists(full) do continue
+		_ = os.make_directory_all(filepath.dir(full, context.temp_allocator))
+		if os.write_entire_file(full, transmute([]u8)string(e.GEN_SCRIPT_TEMPLATE)) != nil {
+			Editor_Log(state, .Error, "Could not create %s", rel)
+			return ""
+		}
+		Editor_InvalidateProjectFiles()
+		Editor_Log(state, .Info, "Created %s", rel)
+		return rel
 	}
 }
 

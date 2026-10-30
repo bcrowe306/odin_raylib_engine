@@ -8,9 +8,9 @@ TileMap. The same generator and **seed** always give the same level, on
 every platform - so a seed is a level you can share, replay or test.
 
 So far (#142): the generator file, the nodes (terrain, caves, rooms and
-corridors, walkers), placing entities, TileMap and LDtk output, the Lua
-module and the **Level Generator** window in the editor. Your own nodes and
-a runtime generator node follow.
+corridors, walkers), placing entities, TileMap and LDtk output, your own
+nodes (Lua or Odin), the Lua module and the **Level Generator** window in
+the editor. A runtime generator node follows.
 
 ## In the editor
 
@@ -126,6 +126,13 @@ is an error.
 | `scatter` | `chance` (0.05), `spacing` (4), `seed` (0) | Random points (1), at least `spacing` cells apart - on the input's solid cells when it is connected, anywhere otherwise. |
 | `surface` | `side`: `top` (empty cells with solid below: ground to stand on), `bottom` (solid above: ceilings), `any` | Empty cells against the input's solid ones. |
 
+**Your own** (see [Your own nodes](#your-own-nodes))
+
+| Type | Parameters | |
+|---|---|---|
+| `script` | `p1`..`p4` (0), `seed` (0); inputs `a`, `b`; `script` (a `.lua` file) | A Lua function computes the grid. |
+| *(registered)* | its own | A node type registered from Odin, by its name. |
+
 **Output**
 
 | Type | | |
@@ -158,6 +165,57 @@ layer's auto rules draw the tiles - the LDtk way of mapping values to art.
 The Level tab's undo takes it back. (Odin: `Gen_ApplyIntGrid`.)
 
 `seed` on a node adds to the graph's seed, so two noise nodes can differ.
+
+## Your own nodes
+
+**In Lua**: a **Lua Script** node (add menu > Your Own) runs a `.lua` file
+that returns a function of `ctx`. **New** in its side panel writes one from
+a template (`levels/<generator>_<node>.gen.lua`) and opens it in the Code
+tab; **Reload** reads it again after you save it.
+
+```lua
+-- levels/islands.gen.lua: islands where input a is low, 1 = land.
+return function(ctx)
+    for y = 0, ctx.height - 1 do
+        for x = 0, ctx.width - 1 do
+            local i = y * ctx.width + x + 1
+            if ctx.a[i] < ctx.params.p1 and ctx.random(x, y) < 0.8 then
+                ctx.out[i] = 1
+            end
+        end
+    end
+end
+```
+
+| `ctx.` | |
+|---|---|
+| `width`, `height` | The level's size in cells. |
+| `a`, `b` | The inputs: flat arrays, row by row, from 1 (`y * width + x + 1`); zeros when not connected. |
+| `out` | The grid to fill (zeros) - or return an array of your own. |
+| `params` | `p1`..`p4`: the node's numbers (set in the side panel). |
+| `seed`, `random(x, y)` | The node's seed; a cell's number in [0, 1), the same every time for a seed. |
+
+Scripts run in a sandbox of their own - `math`, `string`, `table`, no files,
+no game - so a level stays the same for a seed; one that runs too long (an
+endless loop) is stopped and the node shows the error, with its line.
+
+**In Odin**: register a node type at startup (your game's, or an editor
+plugin's) - it shows in the add menu and files name it by its `type`:
+
+```odin
+checker :: proc(call: ^Gen_Custom_Call) -> string {
+	size := max(int(Gen_Param(call.node, "size")), 1)
+	for y in 0 ..< call.out.h do for x in 0 ..< call.out.w {
+		call.out.v[y * call.out.w + x] = 1 if (x / size + y / size) % 2 == 0 else 0
+	}
+	return "" // (or why it failed)
+}
+Gen_RegisterNode({name = "checker", label = "Checker", inputs = {"in"},
+	params = {{name = "size", default_ = 4, integer = true}}, doc = "A checkerboard"}, checker)
+```
+
+`call.inputs` are its input grids, `call.seed` its seed (`Gen_Random01(x, y,
+call.seed)`). A file with a type that isn't registered doesn't load.
 
 ## Lua
 
@@ -194,5 +252,6 @@ tiles, size, _ := Gen_Tiles(&g, 0, seed)               // tile indices (-1 = non
 text := Gen_GraphSerialize(&g)                         // back to .levelgen.json
 ```
 
-`GEN_KINDS` (engine/level_gen.odin) describes every node type - its
-inputs, parameters with defaults and help - for tools.
+`GEN_KINDS` (engine/level_gen.odin) describes every built-in node type -
+its inputs, parameters with defaults and help - for tools;
+`Gen_NodeInfo(node)` any node's, registered ones too.

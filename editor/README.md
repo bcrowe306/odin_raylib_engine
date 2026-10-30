@@ -384,7 +384,10 @@ dragged from outputs to inputs, the right-click menu to add nodes, the
 selected node's parameters and tile rules in the side panel with a large
 preview, Save / Undo / Redo, **Apply to TileMap** (tiles and entities,
 into the TileMap selected in the scene; undoable) and **Apply to LDtk
-Layer** (the IntGrid layer picked in the Level tab). Guide:
+Layer** (the IntGrid layer picked in the Level tab). **Your Own** in the
+add menu: a Lua Script node (**New** writes a template and opens it in the
+Code tab; **Reload** after saving it) and node types registered from Odin.
+Guide:
 [`engine/docs/level_generator.md`](../engine/docs/level_generator.md).
 
 ### Scene tabs
