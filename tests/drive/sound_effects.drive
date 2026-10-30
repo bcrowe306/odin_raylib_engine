@@ -1,0 +1,57 @@
+# #204: a Sound Effect with several sounds - added from the list's picker,
+# a play mode (Random shows weights), the preview by mode and a row's own,
+# variation set, reordered by dragging, one removed; saved.
+wait 5
+drop-files @asset.search tests/drive/fixtures/import/blip.wav
+wait 5
+expect item:asset:audio/blip.wav == visible
+click @hier.add
+key ctrl+a
+type sound effect
+key enter
+wait 2
+click @insp.sound-add
+click @pick:audio/cannon-gunshot-1.wav
+wait 2
+click @insp.sound-add
+click @pick:audio/blip.wav
+wait 2
+expect item:insp.sound:1 == visible
+expect item:insp.sound:2 == visible
+
+# Play mode: Random shows the weights.
+expect item:insp.sound-weight:1 == missing
+hover @insp.prop:playMode
+click @insp.prop:playMode
+click @pick:Random
+wait 2
+expect item:insp.sound-weight:1 == visible
+# The preview plays by the mode; a row plays its own sound.
+click @insp.audio-preview
+expect audio-preview == playing
+click @insp.sound-play:2
+expect audio-preview == playing
+screenshot sound_list
+
+# Variation: +/- 2 semitones.
+dblclick @insp.prop:pitchRandom
+key cmd+a
+type 2
+key enter
+
+# Reorder: the first sound dragged onto the second.
+drag @insp.sound-row:1 @insp.sound-row:2
+wait 2
+click @toolbar.save
+wait 2
+expect file:scenes/main.scene.json contains "sounds": ["audio/blip.wav", "audio/cannon-gunshot-1.wav"]
+expect file:scenes/main.scene.json contains "playMode": "Random"
+expect file:scenes/main.scene.json contains "pitchRandom": 2
+
+# One removed: saved as a single "audio" again.
+click @insp.sound-remove:2
+wait 2
+expect item:insp.sound:2 == missing
+click @toolbar.save
+wait 2
+expect file:scenes/main.scene.json contains "audio": "audio/blip.wav"

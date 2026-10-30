@@ -1646,6 +1646,37 @@ lua_node_sound_play :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// node:sound_play_index(i): sound i of its list (1 = the first), whatever
+// the play mode (#204).
+@(private="file")
+lua_node_sound_play_index :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	if !ok || node.typeId != SoundNode do return 0
+	SoundNode_PlayIndex(cast(^SoundNode)node, int(lua.L_checkinteger(L, 2)) - 1)
+	return 0
+}
+
+// node:sound_count(): how many sounds it has.
+@(private="file")
+lua_node_sound_count :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	n := len((cast(^SoundNode)node).sounds) if ok && node.typeId == SoundNode else 0
+	lua.pushinteger(L, lua.Integer(n))
+	return 1
+}
+
+// node:sound_last(): the sound played last (1 = the first; 0: none yet).
+@(private="file")
+lua_node_sound_last :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	i := (cast(^SoundNode)node).lastIndex + 1 if ok && node.typeId == SoundNode else 0
+	lua.pushinteger(L, lua.Integer(i))
+	return 1
+}
+
 @(private="file")
 lua_node_sound_stop :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
@@ -5002,6 +5033,12 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "sound_pause")
 		lua.pushcfunction(L, lua_node_sound_resume)
 		lua.setfield(L, -2, "sound_resume")
+		lua.pushcfunction(L, lua_node_sound_play_index)
+		lua.setfield(L, -2, "sound_play_index")
+		lua.pushcfunction(L, lua_node_sound_count)
+		lua.setfield(L, -2, "sound_count")
+		lua.pushcfunction(L, lua_node_sound_last)
+		lua.setfield(L, -2, "sound_last")
 
 		lua.pushcfunction(L, lua_node_music_play)
 		lua.setfield(L, -2, "music_play")

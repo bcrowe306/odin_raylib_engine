@@ -414,6 +414,8 @@ prop_relevant :: proc(node: ^e.Node, name: string) -> bool {
 			}
 		}
 	}
+	// A Sound Effect: `single` only for the Single mode (#204).
+	if node.typeId == e.SoundNode && name == "single" && (cast(^e.SoundNode)node).playMode != .Single do return false
 	// (The Aseprite section edits these.)
 	if node.typeId == e.AsepriteNode {
 		switch name {
@@ -857,18 +859,21 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 	case e.AnimationPlayerNode:
 		apn := cast(^e.AnimationPlayerNode)node
 		inspector_animation_player(state, apn)
-	case e.SoundNode, e.MusicNode:
+	case e.SoundNode:
+		// Its sounds (#204): a list, previewed by the play mode.
+		if UI_SectionHeader("Audio") {
+			if UI_BeginProps("##audio") {
+				Inspector_SoundList(state, cast(^e.SoundNode)node)
+				AudioPreview_Row(state, node) // #196
+				UI_EndProps()
+			}
+		}
+	case e.MusicNode:
 		if UI_SectionHeader("Audio") {
 			if UI_BeginProps("##audio") {
 				UI_PropLabel("Audio File")
-				current := ""
-				if node.typeId == e.SoundNode {
-					sn := cast(^e.SoundNode)node
-					if sn.audio != nil do current = asset_rel_editor(state, sn.audio.filePath)
-				} else {
-					mn := cast(^e.MusicNode)node
-					if mn.music != nil do current = asset_rel_editor(state, mn.music.filePath)
-				}
+				mn := cast(^e.MusicNode)node
+				current := asset_rel_editor(state, mn.music.filePath) if mn.music != nil else ""
 				imgui.SetNextItemWidth(field_width())
 				picked, ok := asset_picker("insp.audio", current, Editor_ListProjectFiles(state, "audio", AUDIO_EXTS))
 				if field_reset("insp.audio", current != "") {
@@ -877,17 +882,9 @@ inspector_resources :: proc(state: ^EditorState, node: ^e.Node) {
 				if path := picked; ok {
 					Editor_RecordUndo(state, "Set audio")
 					resolved := e.Project_ResolveAssetPath(ctx, path)
-					if node.typeId == e.SoundNode {
-						sn := cast(^e.SoundNode)node
-						if sn.audio != nil do e.ResourceManager_ReleaseSound(rm, sn.audio)
-						sn.audio = nil
-						if path != "" do if s, sok := rm.loadAudioSound(rm, resolved); sok do sn.audio = s
-					} else {
-						mn := cast(^e.MusicNode)node
-						if mn.music != nil do e.ResourceManager_ReleaseMusic(rm, mn.music)
-						mn.music = nil
-						if path != "" do if m, mok := rm.loadAudioMusic(rm, resolved); mok do mn.music = m
-					}
+					if mn.music != nil do e.ResourceManager_ReleaseMusic(rm, mn.music)
+					mn.music = nil
+					if path != "" do if m, mok := rm.loadAudioMusic(rm, resolved); mok do mn.music = m
 					AudioPreview_Stop() // (the old sound)
 				}
 				AudioPreview_Row(state, node) // #196

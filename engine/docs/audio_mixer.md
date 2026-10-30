@@ -116,6 +116,29 @@ function Speaker:update(dt)
 end
 ```
 
+## Sound variation (Sound Effect)
+
+A **Sound Effect** holds a list of sounds (Inspector > Audio: **Add Sound**,
+or drop audio from Assets; drag a row's number to reorder; each row has its
+own play button). Its **Play Mode** picks what a play starts:
+
+| Mode | Plays |
+|---|---|
+| Single | the chosen sound (`single`, 1 = the first) |
+| All | every sound at once (layered: a body, a tail, a crunch) |
+| Sequential | the next one each time, then the first again |
+| Sequential Reversed | the same, from the last one |
+| Random | one by **weight** (a row's `w`; 0 = never), never the one just played |
+| Shuffle | each once in a random order, then a new order |
+
+Each play varies (All: each sound on its own): **Volume Random** (+/- volume),
+**Pitch Random** (+/- semitones - 1 or 2 keep footsteps from sounding
+copied), **Pan Random** (+/-), **Delay Random** (a random 0..N s wait) -
+and **Cooldown** skips plays within N seconds of the last (rapid fire
+doesn't stack voices). The Inspector's **Preview** plays exactly that.
+Scripts: `node:sound_play()` follows the mode, `node:sound_play_index(i)`
+plays one, `node:sound_count()`, `node:sound_last()`.
+
 ## Scripting
 
 | Function | |
