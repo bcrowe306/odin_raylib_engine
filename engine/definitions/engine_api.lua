@@ -3412,6 +3412,7 @@ function PathFollowNode:set_property(path, value, y) end
 ---@field tintColor number[] Multiplies every layer's colours.
 ---@field drawDebugColliders boolean Outline the generated colliders.
 ---@field drawDebugEntities boolean Outline entity bounds with their names.
+---@field matchCustomNodes boolean Entities set to Auto also spawn as the project's custom node type of the same name (whe...
 
 ---@alias LdtkLevelNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -3432,6 +3433,7 @@ function PathFollowNode:set_property(path, value, y) end
 ---| "tintColor" # number[] - Multiplies every layer's colours.
 ---| "drawDebugColliders" # boolean - Outline the generated colliders.
 ---| "drawDebugEntities" # boolean - Outline entity bounds with their names.
+---| "matchCustomNodes" # boolean - Entities set to Auto also spawn as the project's custom node type of the same name (whe...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -3456,6 +3458,7 @@ function PathFollowNode:set_property(path, value, y) end
 ---@overload fun(self: LdtkLevelNode, path: "tintColor"): number[]
 ---@overload fun(self: LdtkLevelNode, path: "drawDebugColliders"): boolean
 ---@overload fun(self: LdtkLevelNode, path: "drawDebugEntities"): boolean
+---@overload fun(self: LdtkLevelNode, path: "matchCustomNodes"): boolean
 function LdtkLevelNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
@@ -3482,6 +3485,7 @@ function LdtkLevelNode:get_property(path) end
 ---@overload fun(self: LdtkLevelNode, path: "tintColor", value: number[])
 ---@overload fun(self: LdtkLevelNode, path: "drawDebugColliders", value: boolean)
 ---@overload fun(self: LdtkLevelNode, path: "drawDebugEntities", value: boolean)
+---@overload fun(self: LdtkLevelNode, path: "matchCustomNodes", value: boolean)
 function LdtkLevelNode:set_property(path, value, y) end
 
 ---@class TileMapNode

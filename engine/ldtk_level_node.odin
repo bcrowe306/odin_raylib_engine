@@ -26,9 +26,10 @@ import rl "vendor:raylib"
 //     the same rule merge into a few large boxes. Without rules, the legacy
 //     collisionLayer + solidValues settings are used.
 //   - Entity mappings: what an LDtk entity spawns - Auto (the component
-//     components/<Identifier>.component.json if it exists, else a Node), a
-//     chosen component, a plain Node, or nothing. LDtk fields set script
-//     properties of the same name.
+//     components/<Identifier>.component.json if it exists; with Match
+//     Custom Nodes, else the project's custom node type of that name; else a
+//     Node), a chosen component, a chosen custom node type (#157), a plain
+//     Node, or nothing. LDtk fields set script properties of the same name.
 //   - Link rules: what an EntityRef field does once both ends are spawned -
 //     connect a signal of the source to a method of the target, or parent
 //     one to the other. Scripts can always follow links with
@@ -57,16 +58,18 @@ LdtkCollisionRule :: struct {
 }
 
 LdtkSpawnMode :: enum {
-	Auto,      // components/<Identifier>.component.json if it exists, else a Node
-	Component, // the mapping's component
-	Node,      // a plain Node
-	None,      // not spawned
+	Auto,       // components/<Identifier>.component.json if it exists (then, with matchCustomNodes, the custom node type <Identifier>), else a Node
+	Component,  // the mapping's component
+	Node,       // a plain Node
+	None,       // not spawned
+	CustomNode, // the mapping's custom node type (#157)
 }
 
 LdtkEntityMapping :: struct {
 	entity:    string,
 	mode:      LdtkSpawnMode,
 	component: string, // project-relative .component.json
+	nodeType:  string, // (CustomNode) project-relative .node.json
 }
 
 LdtkLinkAction :: enum {
@@ -111,6 +114,9 @@ LdtkLevelNode :: struct {
 	tintColor:           rl.Color `gui:"true"`,
 	drawDebugColliders:  bool `gui:"true"`,
 	drawDebugEntities:   bool `gui:"true"`,
+	// Auto mappings also spawn the project's custom node type named like the
+	// entity (when there's no component of that name). Off: opt in (#157).
+	matchCustomNodes:    bool `gui:"true"`,
 	// Legacy collision settings (used when there are no collision rules).
 	collisionLayer:      string,
 	solidValues:         string,
@@ -632,6 +638,7 @@ LdtkSpawnMode_Name :: proc(m: LdtkSpawnMode) -> string {
 	case .Component: return "component"
 	case .Node:      return "node"
 	case .None:      return "none"
+	case .CustomNode: return "custom_node"
 	}
 	return "auto"
 }
@@ -641,6 +648,7 @@ LdtkSpawnMode_Parse :: proc(s: string) -> LdtkSpawnMode {
 	case "component": return .Component
 	case "node":      return .Node
 	case "none":      return .None
+	case "custom_node": return .CustomNode
 	}
 	return .Auto
 }
@@ -655,10 +663,28 @@ LdtkLevelNode_SetEntityMapping :: proc(ln: ^LdtkLevelNode, m: LdtkEntityMapping)
 		if existing.entity == m.entity {
 			existing.mode = m.mode
 			existing.component = strings.clone(m.component, ln.allocator)
+			existing.nodeType = strings.clone(m.nodeType, ln.allocator)
 			return
 		}
 	}
-	append(&ln.entityMappings, LdtkEntityMapping{strings.clone(m.entity, ln.allocator), m.mode, strings.clone(m.component, ln.allocator)})
+	append(&ln.entityMappings, LdtkEntityMapping{strings.clone(m.entity, ln.allocator), m.mode, strings.clone(m.component, ln.allocator), strings.clone(m.nodeType, ln.allocator)})
+}
+
+// LdtkLevelNode_EntityCustomType: the custom node type an entity spawns as
+// (nil = none): its mapping's, or with matchCustomNodes an Auto one's type
+// named like the entity (when no component of that name exists).
+LdtkLevelNode_EntityCustomType :: proc(ln: ^LdtkLevelNode, identifier: string, ctx: ^GameContext) -> ^CustomNodeType {
+	m := LdtkLevelNode_EntityMapping(ln, identifier)
+	#partial switch m.mode {
+	case .CustomNode:
+		if m.nodeType == "" do return nil
+		t, _ := CustomNode_Get(ctx, m.nodeType)
+		return t
+	case .Auto:
+		if !ln.matchCustomNodes || LdtkLevelNode_EntityComponent(ln, identifier, ctx) != "" do return nil
+		return CustomNode_FindByName(ctx, identifier)
+	}
+	return nil
 }
 
 // LdtkLevelNode_EntityComponent: the component an entity spawns as ("" = none).
@@ -707,7 +733,10 @@ LdtkLevelNode_DefaultSpawner :: proc(levelNode: ^LdtkLevelNode, entity: ^LdtkEnt
 	m := LdtkLevelNode_EntityMapping(ln, entity.identifier)
 	if m.mode == .None do return nil
 	node: ^Node
-	if compPath := LdtkLevelNode_EntityComponent(ln, entity.identifier, ctx); compPath != "" {
+	if t := LdtkLevelNode_EntityCustomType(ln, entity.identifier, ctx); t != nil {
+		node = Scene_CreateCustomNode(scene, t, ln, ctx)
+		if node == nil do log.warnf("[LDtk] %s: a %s could not be created", entity.identifier, t.name)
+	} else if compPath := LdtkLevelNode_EntityComponent(ln, entity.identifier, ctx); compPath != "" {
 		node = Scene_InstantiateComponent(scene, compPath, ln, ctx)
 		if node == nil do log.warnf("[LDtk] %s: component %s could not be instantiated", entity.identifier, compPath)
 	}
@@ -1215,6 +1244,10 @@ Ldtk_WriteNodeConfig :: proc(w: ^Json_Writer, ln: ^LdtkLevelNode) {
 				strings.write_string(sb, ", \"component\": ")
 				Json_String(w, m.component)
 			}
+			if m.nodeType != "" {
+				strings.write_string(sb, ", \"node_type\": ")
+				Json_String(w, m.nodeType)
+			}
 			strings.write_byte(sb, '}')
 		}
 		strings.write_byte(sb, '}')
@@ -1288,7 +1321,7 @@ Ldtk_ReadNodeConfig :: proc(ln: ^LdtkLevelNode, ldtkObj: json.Object, nodeObj: j
 	clear(&ln.entityMappings)
 	if obj, ok := json_get_obj(ldtkObj, "entities"); ok {
 		for name, v in obj {
-			append(&ln.entityMappings, LdtkEntityMapping{strings.clone(name, a), LdtkSpawnMode_Parse(json_get_str(v, "mode")), strings.clone(json_get_str(v, "component"), a)})
+			append(&ln.entityMappings, LdtkEntityMapping{strings.clone(name, a), LdtkSpawnMode_Parse(json_get_str(v, "mode")), strings.clone(json_get_str(v, "component"), a), strings.clone(json_get_str(v, "node_type"), a)})
 		}
 	}
 	clear(&ln.linkRules)

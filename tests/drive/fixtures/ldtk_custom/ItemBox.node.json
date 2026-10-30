@@ -1,0 +1,2 @@
+{"name": "ItemBox", "base": "AreaNode", "icon": "gem", "category": "Pickups", "description": "An LDtk Item (drive fixture)",
+ "defaults": {"shapes": [{"type": "Box", "size": [16, 16], "isSensor": true, "enableSensorEvents": true}]}}

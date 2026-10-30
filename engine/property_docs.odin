@@ -218,6 +218,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	// --- LDtk / tile maps ---
 	{"LdtkLevelNode.enablePhysics", "Build colliders from IntGrid cells whose collision rule is Solid / One Way."},
 	{"LdtkLevelNode.spawnEntities", "Spawn the level's entities (mapped to components) when ready."},
+	{"LdtkLevelNode.matchCustomNodes", "Entities set to Auto also spawn as the project's custom node type of the same name (when no component of that name exists). Off: each entity's mapping says."},
 	{"LdtkLevelNode.parallax", "Apply the LDtk layers' parallax factors."},
 	{"LdtkLevelNode.drawBackground", "Draw the level's background colour / image."},
 	{"LdtkLevelNode.drawEntityTiles", "Draw entities' LDtk tiles (editor visuals for unspawned entities)."},
