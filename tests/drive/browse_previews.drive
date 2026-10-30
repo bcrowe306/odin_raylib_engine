@@ -1,0 +1,80 @@
+# #203: browsing previews - the File Browser's arrow keys (rows, into and
+# out of folders), Autoplay / Loop (on by default, saved), a sound played on
+# selection, an Aseprite animation playing; the Assets panel's arrow keys
+# with its Preview panel playing a selected sound.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @bottom:files
+wait 2
+click @fb.path
+key cmd+a
+type tests/drive/fixtures/import
+key enter
+wait 2
+
+# Autoplay (default on): selecting the sound plays it.
+expect item:fb.autoplay == visible
+click @fb.row:blip.wav
+wait 3
+expect fb.audio == playing
+# Down: the next row (an image: no sound); Up: the sound again, playing.
+key down
+wait 3
+expect fb.selected == broken.png
+expect fb.audio == none
+key up
+wait 3
+expect fb.selected == blip.wav
+expect fb.audio == playing
+screenshot sound_autoplay
+
+# Autoplay off (saved): selecting doesn't play.
+click @fb.autoplay
+expect file:.editor_settings.ini contains autoplay = false
+key down
+key up
+wait 3
+expect fb.audio == stopped
+click @fb.autoplay
+expect file:.editor_settings.ini contains autoplay = true
+click @fb.loop
+expect file:.editor_settings.ini contains loop = false
+click @fb.loop
+expect file:.editor_settings.ini contains loop = true
+
+# Into a folder (Right) and back up (Left).
+click @fb.row:Pack
+key right
+wait 2
+expect fb.dir-name == Pack
+key left
+wait 2
+expect fb.dir-name == import
+
+# An Aseprite animation: its frames play.
+click @fb.path
+key cmd+a
+type tests/aseprite/fixtures
+key enter
+wait 2
+click @fb.row:animation.aseprite
+wait-until fb.anim contains playing
+screenshot aseprite_playing
+click @fb.anim-play
+expect fb.anim contains paused
+
+# The Assets panel: a sound selected plays in the Preview panel; Down moves on.
+click @bottom:console
+click @asset:audio/cannon-gunshot-1.wav
+wait 3
+expect asset-selected == cannon-gunshot-1.wav
+expect preview-audio == playing
+key down
+wait 2
+expect asset-selected != cannon-gunshot-1.wav
+key up
+wait 2
+expect asset-selected == cannon-gunshot-1.wav
