@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Follows the hand bone", "x": 663, "y": 228, "w": 56, "h": 56},
+    {"label": "Bone, Follow Rotation, Follow Scale", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

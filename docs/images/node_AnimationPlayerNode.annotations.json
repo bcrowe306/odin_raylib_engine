@@ -1,0 +1,9 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Add Track: a property or an event track", "x": 413, "y": 507, "w": 88, "h": 25},
+    {"label": "A key (drag it; the key inspector edits it)", "x": 528, "y": 630, "w": 12, "h": 12},
+    {"label": "The player's own settings", "x": 1044, "y": 399, "w": 236, "h": 293}
+  ]
+}

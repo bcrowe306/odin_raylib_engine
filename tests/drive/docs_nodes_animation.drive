@@ -1,0 +1,189 @@
+# Screenshots for the animation & effects nodes' pages (docs/nodes/*.md, #45):
+# Path, Path Follow (with a Trail, in Simulate), Aseprite Sprite, Skeleton,
+# Bone Attachment, then - in the Animation workspace - Particle Emitter and
+# Animation Player. Copies two fixtures into the project first.
+#   scripts/docs/screenshots.sh docs_nodes_animation
+exec mkdir -p $PROJECT/sprites
+exec cp tests/aseprite/fixtures/animation.aseprite $PROJECT/sprites/docs_anim_zz.aseprite
+exec cp -R tests/drive/fixtures/skeleton_zz $PROJECT/docs_skeleton_zz
+wait 5
+
+# Path: a curve with a third point pulled up.
+click @asset.new-scene
+click @hier.add
+type path
+click @addnode.create
+expect node:Path.type == PathNode
+wait 3
+dblclick @path.seg:0
+wait 3
+expect node:Path.path-points == 3
+annotate @node:Path The curve: drag its points (squares) and handles (dots)
+annotate @window:inspector Points, Closed, Line Width
+screenshot node_PathNode
+
+# Path Follow under it, a Trail under the follower; Simulate moves them.
+click @hier:Path
+click @hier.add
+type path follow
+click @addnode.create
+expect node:PathFollow.type == PathFollowNode
+expect node:PathFollow.parent == Path
+dblclick @insp.prop:speed
+key ctrl+a
+type 100
+key enter
+wait 2
+expect node:PathFollow.prop.speed == 100
+click @hier:Path/PathFollow
+click @hier.add
+type trail
+click @addnode.create
+expect node:Trail.type == TrailNode
+expect node:Trail.parent == PathFollow
+dblclick @insp.position.x
+key ctrl+a
+type 0
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type 0
+key enter
+dblclick @insp.prop:width
+key ctrl+a
+type 20
+key enter
+wait 2
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 70
+click @hier:Path/PathFollow
+wait 2
+expect node:PathFollow.prop.progress >= 40
+annotate @window:inspector Progress, Speed, Loop, Rotate, Side Offset
+screenshot node_PathFollowNode
+click @hier:Path/PathFollow/Trail
+wait 2
+annotate @window:inspector Lifetime, Width, colours, Emitting
+screenshot node_TrailNode
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5
+
+# Aseprite Sprite: a file picked in the Inspector's Aseprite section.
+wait-until item:asset:sprites/docs_anim_zz.aseprite == visible timeout=600
+click @asset.new-scene
+click @hier.add
+type aseprite sprite
+click @addnode.create
+expect node:AsepriteSprite.type == AsepriteNode
+click @insp.ase.file
+click @pick:sprites/docs_anim_zz.aseprite
+wait 3
+expect node:AsepriteSprite.prop.file == sprites/docs_anim_zz.aseprite
+click @insp.ase.tag
+click @insp.ase.tag:walk
+wait 2
+click @toolbar.zoom
+click @pick:400%
+scroll @viewport 3
+scroll @viewport 3
+scroll @viewport 3
+scroll @viewport 3
+wait 2
+annotate @node:AsepriteSprite An 8x8 sprite playing its walk tag
+annotate @window:inspector File, Animation (the tags), layers, Pivot Slice
+screenshot node_AsepriteNode
+
+# Skeleton: a Spine export, an animation picked; then a Bone Attachment
+# from the Bones list's link button.
+click @asset.new-scene
+click @hier.add
+type skeleton
+click @addnode.create
+expect node:Skeleton.type == SkeletonNode
+wait 90
+click @insp.skel.file
+click @pick:docs_skeleton_zz/hero_zz.json
+wait 3
+click @insp.skel.animation
+click @pick:wave
+wait 2
+expect node:Skeleton.prop.animation == wave
+click @insp.prop:showBones
+expect node:Skeleton.prop.showBones == true
+click @toolbar.zoom
+click @pick:100%
+wait 2
+drag @insp.skel.time @insp.skel.time+40,0
+wait 2
+annotate @window:inspector File, Animation, Skin, Mix Time, Preview, Bones
+screenshot node_SkeletonNode
+click @insp.skel.attach:hand
+wait 3
+expect node:hand_attach.type == BoneAttachmentNode
+expect node:hand_attach.parent == Skeleton
+hover @insp.prop:bone
+wait 2
+annotate @node:hand_attach Follows the hand bone
+annotate @window:inspector Bone, Follow Rotation, Follow Scale
+screenshot node_BoneAttachmentNode
+
+# The Animation workspace: a tall bottom panel.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @toolbar.zoom
+click @pick:100%
+
+# Particle Emitter: it runs in the viewport; the Particles tab follows.
+click @asset.new-scene
+click @hier.add
+type particle emitter
+click @addnode.create
+expect node:ParticleEmitter.type == ParticleEmitterNode
+wait 60
+expect node:ParticleEmitter.particles >= 1
+expect bottom-tab == Particles
+hover @viewport
+annotate @node:ParticleEmitter Particles run in the viewport while you edit
+annotate @particles.tab:emission The Particles tab: Emission, Shape, Motion, Size & Rotation, Color, Curves, Texture, Collision
+screenshot node_ParticleEmitterNode
+
+# Animation Player: frames, rotation and position keyed at frames 1 and 3.
+click @asset.new-scene
+click @hier.add
+type animation player
+click @addnode.create
+expect node:AnimationPlayer.type == AnimationPlayerNode
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+click @anim.frame:1
+click @anim.add-track
+click @anim.track-prop:rotation
+click @anim.add-track
+click @anim.track-prop:position
+click @anim.frame:3
+dblclick @insp.rotation
+key ctrl+a
+type 90
+key enter
+click @anim.key:rotation
+dblclick @insp.position.x
+key ctrl+a
+type 700
+key enter
+click @anim.key:position
+click @anim.keyframe:rotation:3
+click @toolbar.zoom
+click @pick:50%
+hover @viewport
+wait 2
+annotate @anim.add-track Add Track: a property or an event track
+annotate @anim.keyframe:rotation:3 A key (drag it; the key inspector edits it)
+annotate @window:inspector The player's own settings
+screenshot node_AnimationPlayerNode

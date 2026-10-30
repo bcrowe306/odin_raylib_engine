@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The curve: drag its points (squares) and handles (dots)", "x": 612, "y": 326, "w": 56, "h": 56},
+    {"label": "Points, Closed, Line Width", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}
