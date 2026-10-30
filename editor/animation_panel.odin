@@ -294,7 +294,18 @@ AnimationPanel_Rescrub :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode,
 	scrub(state, apn, anim, playhead(apn, anim))
 }
 
-// side_panel: right of the timeline - a sound / script-call track's
+AnimationPanel_SelectTrack :: proc(i: int) {panel.selectedTrack = i}
+
+// track_has_panel: tracks with settings right of the timeline.
+@(private = "file")
+track_has_panel :: proc(kind: e.Track_Kind) -> bool {
+	#partial switch kind {
+	case .Audio, .Method, .EmitParticles, .InstantiateComponent, .SetEnabled: return true
+	}
+	return false
+}
+
+// side_panel: right of the timeline - a sound / script-call / event track's
 // settings, else the selected keys' inspector, else the preview.
 @(private = "file")
 side_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation, size: [2]f32) {
@@ -306,6 +317,10 @@ side_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.An
 		}
 		if tr.kind == .Method {
 			anim_method_settings_panel(state, apn, anim, tr, size)
+			return
+		}
+		if track_has_panel(tr.kind) {
+			anim_event_settings_panel(state, apn, anim, tr, size)
 			return
 		}
 	}
@@ -706,13 +721,23 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 				panel.selectedTrack = len(anim.tracks) - 1
 			}
 			Drive_Item("anim.track-sounds")
-			if imgui.MenuItem(fmt.ctprintf("%s  Emit Particles", ICON_FA_WAND_MAGIC_SPARKLES)) {
-				Editor_RecordUndo(state, "Add track")
-				tr := e.Animation_AddEventTrack(apn, anim, target, .EmitParticles)
-				panel.selectedTrack = len(anim.tracks) - 1
+			// Particles: one of the scene's emitters.
+			if imgui.BeginMenu(fmt.ctprintf("%s  Emit Particles", ICON_FA_WAND_MAGIC_SPARKLES)) {
+				emitters := Anim_SceneEmitters(state)
+				if len(emitters) == 0 do UI_DimText("No particle emitters in the scene")
+				for n in emitters {
+					if imgui.MenuItem(fmt.ctprintf("%s##%p", n.name, n)) {
+						Editor_RecordUndo(state, "Add track")
+						e.Animation_AddEventTrack(apn, anim, e.Node_RelativePath(mgr, apn, n), .EmitParticles)
+						panel.selectedTrack = len(anim.tracks) - 1
+						imgui.CloseCurrentPopup()
+					}
+					Drive_Item(fmt.tprintf("anim.track-particles:%s", n.name))
+				}
+				imgui.EndMenu()
 			}
 			Drive_Item("anim.track-particles")
-			UI_Tooltip("Keys trigger particle emission on this particle emitter")
+			UI_Tooltip("Keys restart, burst, start or stop one of the scene's particle emitters")
 			if imgui.MenuItem(fmt.ctprintf("%s  Spawn Component", ICON_FA_CUBES)) {
 				Editor_RecordUndo(state, "Add track")
 				tr := e.Animation_AddEventTrack(apn, anim, target, .InstantiateComponent)
@@ -804,7 +829,8 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 	avail := imgui.GetContentRegionAvail()
 	hasAudioPanel := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Audio
 	hasMethodPanel := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && anim.tracks[panel.selectedTrack].kind == .Method
-	hasSidePanel := hasAudioPanel || hasMethodPanel || len(animKeys.sel) > 0
+	hasEventPanel := panel.selectedTrack >= 0 && panel.selectedTrack < len(anim.tracks) && track_has_panel(anim.tracks[panel.selectedTrack].kind)
+	hasSidePanel := hasAudioPanel || hasMethodPanel || hasEventPanel || len(animKeys.sel) > 0
 	sideW: f32 = 0
 	if hasSidePanel {
 		sideW = 320 if avail.x >= 720 else (PREVIEW_W if avail.x >= 540 else 0)
@@ -1163,7 +1189,7 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 				else do prop = "sounds"
 			}
 			#partial switch tr.kind {
-			case .EmitParticles:        prop = "particles (start)"
+			case .EmitParticles:        prop = "particles"
 			case .InstantiateComponent: prop = "spawn component"
 			case .SetEnabled:           prop = "enable / disable"
 			}
@@ -1174,7 +1200,7 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 			}
 			labelCol := UI_TEXT if target != nil else UI_DANGER
 			if target != nil && tr.kind == .Method && node_script_rel(state, target) == "" do labelCol = UI_WARNING
-			btnStart := LABEL_W - (82 if (tr.kind == .Audio || tr.kind == .Method) else 58)
+			btnStart := LABEL_W - (82 if track_has_panel(tr.kind) else 58)
 
 			// Clip label text before btnStart so text never bleeds over the buttons
 			imgui.DrawList_PushClipRect(dl, {origin.x + scrollX, y}, {origin.x + scrollX + btnStart - 4, y + ROW_H}, true)
@@ -1247,6 +1273,11 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 				if UI_IconButton(ICON_FA_CODE, fmt.tprintf("anim.track-settings:%s", tr.property), "Script Call Settings", isSelectedTrack, size = 24) {
 					panel.selectedTrack = ti if panel.selectedTrack != ti else -1
 				}
+			} else if track_has_panel(tr.kind) {
+				imgui.SameLine(0, 2)
+				if UI_IconButton(ICON_FA_SLIDERS, fmt.tprintf("anim.track-settings:%s", tr.property), "Track settings: the target and every key", isSelectedTrack, size = 24) {
+					panel.selectedTrack = ti if panel.selectedTrack != ti else -1
+				}
 			}
 			imgui.SameLine(0, 2)
 			if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("anim.remove-track:%s", tr.property), "Remove track", size = 24) {
@@ -1261,7 +1292,7 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 				return k.x0 + (f32(k.base) + e.Animation_TimeFrame(k.apn, k.anim, time)) * cellW + cellW * 0.5
 			}, &kx, y + 5, y + ROW_H - 7)
 			// Keys (right-click: easing to the next key, delete).
-			for k in tr.keys {
+			for k, ki in tr.keys {
 				kf := key_frame(apn, anim, k)
 				isSel := AnimKeys_IsSelected(ti, k.time)
 				// (Dragged: drawn where it will land.)
@@ -1288,6 +1319,16 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 					o := r + 3
 					imgui.DrawList_AddQuad(dl, {cx, cy - o}, {cx + o, cy}, {cx, cy + o}, {cx - o, cy}, col_u32(UI_TEXT), 1.5)
 				}
+				// Event keys say what they do (up to the next key).
+				if tr.kind != .Property {
+					limit := colX(x0, cols + 4)
+					if ki + 1 < len(tr.keys) do limit = x0 + (f32(base) + e.Animation_TimeFrame(apn, anim, tr.keys[ki + 1].time)) * cellW + cellW * 0.5 - r - 3
+					if limit - (cx + r + 4) > 14 {
+						imgui.DrawList_PushClipRect(dl, {cx + r + 3, y}, {limit, y + ROW_H}, true)
+						imgui.DrawList_AddText(dl, {cx + r + 4, cy - 8}, col_u32(UI_TEXT_DIM), strings.clone_to_cstring(Anim_EventKeyLabel(tr, k), context.temp_allocator))
+						imgui.DrawList_PopClipRect(dl)
+					}
+				}
 				if tr.kind == .Property && (k.ease != .Linear || k.bezier) do imgui.DrawList_AddCircleFilled(dl, {cx, cy + r + 4}, 2, col_u32(UI_ACCENT))
 				Drive_ItemRect(fmt.tprintf("anim.keyframe:%s:%d", tr.property, kf + 1), {cx - r, cy - r}, {cx + r, cy + r})
 				if hot {
@@ -1311,7 +1352,7 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 						clear(&panel.sel)
 						scrub(state, apn, anim, kf)
 						// (Sound / script-call keys: their track's settings; others: the key inspector.)
-						panel.selectedTrack = ti if tr.kind == .Audio || tr.kind == .Method else -1
+						panel.selectedTrack = ti if track_has_panel(tr.kind) else -1
 					}
 					if imgui.IsMouseClicked(.Right) {
 						if !isSel {
@@ -1319,7 +1360,7 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 							append(&animKeys.sel, Key_Ref{ti, k.time})
 						}
 						keyMenu = {ti, k.time}
-						if tr.kind == .Audio || tr.kind == .Method do panel.selectedTrack = ti
+						if track_has_panel(tr.kind) do panel.selectedTrack = ti
 						imgui.OpenPopup("##key_ctx")
 					}
 				}
@@ -1375,37 +1416,8 @@ animation_panel :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) {
 						if imgui.MenuItem(fmt.ctprintf("%s  Sound Settings...", ICON_FA_SLIDERS)) {
 							panel.selectedTrack = ti
 						}
-					} else if tr.kind == .EmitParticles {
-						// What the key does to the emitter (#176).
-						action, count := e.Particle_KeyAction(key.text)
-						imgui.SetNextItemWidth(140)
-						if idx, changed := UI_Combo("anim.event-particles", int(action), []string{"Restart", "Emit a burst", "Start", "Stop"}); changed {
-							Editor_RecordUndo(state, "Event key")
-							key.text = strings.clone(e.Particle_KeyText(e.Particle_Key_Action(idx), count if count > 0 else 10), apn.allocator)
-						}
-						if action == .Emit {
-							imgui.SameLine()
-							n := c.int(count)
-							imgui.SetNextItemWidth(80)
-							if imgui.InputInt("##part_count", &n) {
-								key.text = strings.clone(e.Particle_KeyText(.Emit, max(int(n), 1)), apn.allocator)
-							}
-							if imgui.IsItemActivated() do Editor_RecordUndo(state, "Event key")
-							Drive_Item("anim.event-particles-count")
-						}
-					} else if tr.kind == .InstantiateComponent {
-						if path, ok := asset_picker("anim.event-spawn", key.text, Editor_ListProjectFiles(state, "", {".component.json"}), allowNone = false); ok {
-							Editor_RecordUndo(state, "Event key")
-							key.text = strings.clone(path, apn.allocator)
-						}
-						Drive_Item("anim.event-spawn")
-					} else if tr.kind == .SetEnabled {
-						curEnabled := key.text != "disable" && key.text != "false" && key.text != "off" && key.text != "0"
-						if imgui.Checkbox("Enabled at this frame", &curEnabled) {
-							Editor_RecordUndo(state, "Event key")
-							key.text = strings.clone("enable" if curEnabled else "disable", apn.allocator)
-						}
-						Drive_Item("anim.event-enabled")
+					} else {
+						Anim_EventKeyEditor(state, apn, tr, key) // particles / spawn / enable
 					}
 					if tr.kind == .Property && imgui.BeginMenu(fmt.ctprintf("%s  Easing: %s", ICON_FA_WAVE_SQUARE, e.Ease_Name(key.ease))) {
 						for ease in e.Ease {

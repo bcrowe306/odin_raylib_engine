@@ -94,9 +94,12 @@ else SFX).
 
 To keep scripting callbacks to a minimum, common gameplay actions can be triggered directly from timeline tracks under **Add Track > Events**:
 
-- **Emit Particles**: Acts on a target `ParticleEmitterNode` without custom script callbacks. Each key picks an action: **Restart** (start over), **Emit a burst** of N particles (without starting it), **Start** or **Stop** emitting.
+- **Emit Particles**: Acts on one of the scene's `ParticleEmitterNode`s (the menu lists them) without custom script callbacks. Each key picks an action: **Restart** (start over), **Emit a burst** of N particles (without starting it), **Start** or **Stop** emitting.
 - **Spawn Component**: Instantiates a component or prefab scene at the target node's global position.
 - **Enable / Disable**: Directly activates or deactivates target nodes (such as hitboxes on `AreaNode` or collision checks on `RaycastNode`).
+
+Each key's action is written next to it on the timeline; the track's
+**sliders** button lists its keys to edit them together (and its target).
 
 Saved as `{"t": seconds, "text": "action or path", "arg": "argument"}` with `"kind": "particles"`, `"spawn"`, or `"enable"` (particle actions: `"restart"`, `"emit 12"`, `"start"`, `"stop"`).
 

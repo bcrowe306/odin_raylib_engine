@@ -543,6 +543,14 @@ value. Bezier keys show their handles (right-click a key: **Bezier
 Handles**, **Flatten Handles**, **Linear**, **Delete Key**); drag a handle
 to shape the curve - the pair stays in line, Alt breaks it. The wheel moves
 the values up and down, Alt + wheel zooms them, **Frame All** (F) fits them.
+**Event tracks** say what each key does next to it on the timeline ("emit
+12", "stop", "spawn Explosion", "disable", `on_hit(3)`, a sound's name).
+**Add Track > Events > Emit Particles** lists the scene's particle emitters
+(pick one); its keys **Restart** the emitter, **Emit a burst** of N
+particles, **Start** or **Stop** it. The **sliders** button on a particles,
+spawn or enable track (or clicking one of its keys) opens its settings at
+the right: the target (particles: the scene's emitters only) and every key
+with its frame (click to go there), what it does, and delete.
 Right-click a key for its **Easing** to the next key (linear, sine, quad,
 cubic, quart, expo, back, elastic, bounce, constant; hover one to see its
 curve) or to delete it. Eased keys show a dot. Scripts can animate any

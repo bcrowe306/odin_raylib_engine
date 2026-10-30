@@ -93,6 +93,7 @@ expect anim == anim_1:2/4:2
 click @anim.add-track
 click @anim.track-node:AnimationPlayer
 click @anim.track-particles
+click @anim.track-particles:StarfieldEmitter
 expect item:anim.key:@particles == visible
 
 click @anim.add-track
