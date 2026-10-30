@@ -525,6 +525,15 @@ colour, checkbox, an enum's names, a texture picker for a sprite's
 texture), the **Easing** to the next key (or **bezier**: handles, edited
 below it as time / value offsets per component). Several keys get the same
 value or easing.
+**Keys from the Inspector**: select another node (a child, the parent) and
+the tab keeps the player (a **pin** chip shows it; click it to select the
+player, **×** to stop). A **diamond** at the end of each animatable
+property's name in the Inspector keys its current value at the playhead
+(hollow: no track yet, outlined: a track, filled: a key here); right-click
+it for the previous / next key or to remove the key. **Auto-key** (the red
+dot by Stop) keys every change you make to the selected nodes - typed in
+the Inspector or dragged in the viewport - at the playhead; scrubbing,
+playback and undo don't record.
 Right-click a key for its **Easing** to the next key (linear, sine, quad,
 cubic, quart, expo, back, elastic, bounce, constant; hover one to see its
 curve) or to delete it. Eased keys show a dot. Scripts can animate any

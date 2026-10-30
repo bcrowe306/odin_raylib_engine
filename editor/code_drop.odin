@@ -525,6 +525,7 @@ prop_label :: proc(label: string, node: ^e.Node, path, value: string) {
 	if overridden do Drive_Item(fmt.tprintf("insp.overridden:%s", path))
 	prop_label_drag(node, path, value)
 	prop_label_menu(node, path)
+	Inspector_KeyButton(node, path) // (while an animation is edited, #179)
 	imgui.TableNextColumn()
 	imgui.SetNextItemWidth(-1)
 }

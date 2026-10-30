@@ -1,0 +1,66 @@
+# Keys from the Inspector (#179): the player stays in the Animation tab while
+# its parent is selected; the parent's rotation keyed with the diamond at
+# two frames (it interpolates); right-click: previous key; auto-key records
+# a typed position (not the scrubbed rotation); undo removes it; unpin.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+click @hier:PlayerShip
+key ctrl+a
+type animation player
+key enter
+click @bottom:animation
+click @anim.new
+drag @asset:textures/Asteroid_1.png @anim.frame-drop
+drag @asset:textures/Asteroid_2.png @anim.frame-drop
+drag @asset:textures/Asteroid_3.png @anim.frame-drop
+
+# The parent selected: the player stays (pinned).
+click @hier:PlayerShip
+expect selected == PlayerShip
+expect item:anim.pinned == visible
+expect item:insp.key:rotation == visible
+
+# Rotation keyed with the diamond at frame 1 (0) and frame 3 (90).
+click @anim.frame:1
+click @insp.key:rotation
+expect item:anim.keyframe:rotation:1 == visible
+click @anim.frame:3
+dblclick @insp.rotation
+key ctrl+a
+type 90
+key enter
+click @insp.key:rotation
+expect item:anim.keyframe:rotation:3 == visible
+click @anim.frame:2
+expect node:PlayerShip.rotation == 45.0
+screenshot inspector_diamonds
+rclick @insp.key:rotation
+click @insp.key-prev
+expect node:PlayerShip.rotation == 0.0
+
+# Auto-key: the typed position is keyed at frame 2; scrubbing keys nothing.
+click @anim.autokey
+click @anim.frame:2
+dblclick @insp.position.x
+key ctrl+a
+type 100
+key enter
+wait 2
+expect item:anim.keyframe:position:2 == visible
+expect item:anim.keyframe:rotation:2 == missing
+screenshot autokey
+key cmd+z
+wait 2
+expect item:anim.keyframe:position:2 == missing
+click @anim.autokey
+click @anim.stop
+key ctrl+s
+expect file:scenes/main.scene.json contains "target": "..", "property": "rotation", "units": "seconds", "keys": [{"t": 0}, {"t": 0.1667, "v": [90, 0, 0, 0]}]
+
+# Unpinned: the tab asks for a player again.
+click @anim.unpin
+expect item:anim.pinned == missing
+expect item:insp.key:rotation == missing
