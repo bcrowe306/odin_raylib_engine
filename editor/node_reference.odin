@@ -52,10 +52,12 @@ NodeReference_Page :: proc() -> string {return nodeRef.page}
 
 @(private = "file")
 node_ref_show :: proc(typeName: string) {
+	// Clone first: a followed link's name points into the doc's arena (#232).
+	page := strings.clone(typeName)
 	Md_Destroy(&nodeRef.doc)
 	delete(nodeRef.page)
-	nodeRef.page = strings.clone(typeName)
-	nodeRef.doc = Md_Parse(NodeReference_Markdown(typeName, context.temp_allocator))
+	nodeRef.page = page
+	nodeRef.doc = Md_Parse(NodeReference_Markdown(page, context.temp_allocator))
 	nodeRef.scrollUp = true
 }
 

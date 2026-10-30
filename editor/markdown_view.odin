@@ -436,6 +436,7 @@ md_flow :: proc(spans: []Md_Span, color: imgui.Vec4) {
 			if .Link in s.style {
 				mn, mx := imgui.GetItemRectMin(), imgui.GetItemRectMax()
 				imgui.DrawList_AddLine(dl, {mn.x, mx.y}, {mx.x, mx.y}, col_u32(UI_ACCENT_SOFT))
+				if s.url != "" && GlobalDrive.enabled do Drive_Item(fmt.tprintf("md.link:%s", s.url))
 				if s.url != "" && imgui.IsItemHovered() {
 					imgui.SetMouseCursor(.Hand)
 					if imgui.IsMouseClicked(.Left) do mdClicked = s.url
