@@ -95,6 +95,13 @@ kind_icon :: proc(k: Asset_Kind) -> (string, imgui.Vec4) {
 	return ICON_FA_FILE, UI_TEXT_DIM
 }
 
+// The rows drawn this frame, in order (the arrow keys step through them),
+// and one to scroll into view (#203).
+@(private = "file")
+assetRows: [dynamic]string
+@(private = "file")
+assetScrollTo: string
+
 AssetBrowser_Render :: proc(state: ^EditorState) {
 	defer imgui.End()
 	assetsOpen := imgui.Begin("Assets###AssetBrowserWindow")
@@ -125,6 +132,8 @@ AssetBrowser_Render :: proc(state: ^EditorState) {
 	imgui.PushStyleVarImVec2(.ItemSpacing, {6, 2})
 	defer imgui.PopStyleVar()
 	if imgui.BeginChild("##assets", {0, 0}, {}, {}) {
+		assetRows = make([dynamic]string, context.temp_allocator)
+		defer asset_arrow_keys(state)
 		if imgui.IsWindowHovered() && imgui.IsMouseClicked(.Left) && !imgui.IsAnyItemHovered() {
 			Editor_ClearAssetSelection(state)
 		}
@@ -264,12 +273,39 @@ asset_row :: proc(state: ^EditorState, rel: string, label: string = "", files: [
 	return dbl
 }
 
+// asset_arrow_keys: Up / Down (the grid: Left / Right too) select the
+// next or previous asset shown (Shift: a range) - its preview follows
+// (sounds and animations play with Autoplay on).
+@(private = "file")
+asset_arrow_keys :: proc(state: ^EditorState) {
+	io := imgui.GetIO()
+	if !imgui.IsWindowFocused({.RootWindow, .ChildWindows}) || io.WantTextInput || Code_HasFocus() || len(assetRows) == 0 do return
+	d := 0
+	if imgui.IsKeyPressed(.DownArrow) || (assetGrid && imgui.IsKeyPressed(.RightArrow)) do d = 1
+	if imgui.IsKeyPressed(.UpArrow) || (assetGrid && imgui.IsKeyPressed(.LeftArrow)) do d = -1
+	if d == 0 do return
+	cur := -1
+	for r, i in assetRows do if r == state.selectedAssetPath do cur = i
+	next := clamp(cur + d, 0, len(assetRows) - 1) if cur >= 0 else (0 if d > 0 else len(assetRows) - 1)
+	full := assetRows[next]
+	if io.KeyShift do Editor_SelectAssetRange(state, full, assetRows[:])
+	else do Editor_SelectAsset(state, full)
+	delete(assetScrollTo)
+	assetScrollTo = strings.clone(full)
+}
+
 // asset_events: what an asset row / tile does (call right after its item):
 // select, double-click to open, context menu, drag (into the viewport or
 // onto a folder), tooltip, import highlight.
 @(private = "file")
 asset_events :: proc(state: ^EditorState, rel: string, kind: Asset_Kind, full, name, icon: string, clicked: bool, files: []string = nil) -> bool {
 	Drive_Item(fmt.tprintf("asset:%s", rel))
+	append(&assetRows, full)
+	if assetScrollTo != "" && assetScrollTo == full {
+		if !imgui.IsItemVisible() do imgui.SetScrollHereY(0.5)
+		delete(assetScrollTo)
+		assetScrollTo = ""
+	}
 	rowMin, rowMax := imgui.GetItemRectMin(), imgui.GetItemRectMax()
 	dbl := imgui.IsItemHovered() && imgui.IsMouseDoubleClicked(.Left)
 

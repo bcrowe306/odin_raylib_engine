@@ -121,6 +121,7 @@ ICON_FA_LIST_OL                   :: ""
 ICON_FA_TABLE                     :: ""
 ICON_FA_TABLE_COLUMNS             :: ""
 ICON_FA_VOLUME_HIGH               :: ""
+ICON_FA_REPEAT                    :: "\uF363" // Loop
 ICON_FA_VOLUME_LOW                :: ""
 ICON_FA_PHOTO_FILM                :: ""
 ICON_FA_BARS_PROGRESS             :: ""

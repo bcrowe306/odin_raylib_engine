@@ -37,10 +37,12 @@ screenshot image_preview
 # Nothing was copied by previewing.
 expect file:textures/crate.png ==
 
-# A sound: play, then stop.
+# A sound: it plays on selection (Autoplay, #203); stop, play, stop.
 click @fb.row:blip.wav
 wait 2
 expect fb.preview == audio
+expect fb.audio == playing
+click @fb.stop
 expect fb.audio == stopped
 click @fb.play
 expect fb.audio == playing
@@ -169,7 +171,6 @@ click @fb.up
 wait 2
 click @fb.row:blip.wav
 wait 2
-click @fb.play
 expect fb.audio == playing
 click @bottom:console
 wait 2

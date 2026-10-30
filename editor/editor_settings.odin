@@ -39,6 +39,9 @@ Editor_Settings :: struct {
 	showTabBars:      bool, // View > Show Tab Bars: every docked window keeps its tab
 	autoBottomPanel:  bool, // the bottom panel shows the selected node's tool tab
 	hiddenBottomTabs: bit_set[BottomTab], // View > Bottom Panel: tabs left out (#194)
+	previewAutoplay:  bool, // File Browser / Assets: play a sound or animation when selected (#203)
+	previewLoop:      bool, // ... and loop it
+	previewVolume:    f32,  // ... at this volume
 	// Code Editor
 	codeFontSize:     f32,
 	tabWidth:         int,
@@ -88,6 +91,9 @@ DEFAULT_EDITOR_SETTINGS :: Editor_Settings{
 	showWelcome     = true,
 	checkUpdates    = true,
 	autoBottomPanel = true,
+	previewAutoplay = true,
+	previewLoop = true,
+	previewVolume = 0.8,
 	codeFontSize    = CODE_FONT_SIZE,
 	tabWidth        = 4,
 	insertSpaces    = true,
@@ -336,6 +342,11 @@ settings_from_ini :: proc(text: string) {
 	s.checkUpdates = b(m, "general", "check_updates", s.checkUpdates)
 	s.showTabBars = b(m, "general", "show_tab_bars", s.showTabBars)
 	s.autoBottomPanel = b(m, "general", "auto_bottom_panel", s.autoBottomPanel)
+	if pv, ok := m["preview"]; ok {
+		if v, vok := pv["autoplay"]; vok do s.previewAutoplay = v == "true"
+		if v, vok := pv["loop"]; vok do s.previewLoop = v == "true"
+		if v, vok := pv["volume"]; vok do if x, pok := strconv.parse_f32(v); pok do s.previewVolume = clamp(x, 0, 1)
+	}
 	if hidden, ok := m["general"]["hidden_bottom_tabs"]; ok {
 		s.hiddenBottomTabs = {}
 		for name in strings.split(hidden, ",", context.temp_allocator) {
@@ -506,6 +517,7 @@ Editor_SaveSettings :: proc() -> bool {
 	}
 	strings.write_string(&sb, "\n[recent_projects]\n")
 	for r, i in s.recentProjects do fmt.sbprintf(&sb, "%d = %s\n", i, r)
+	fmt.sbprintf(&sb, "\n[preview]\nautoplay = %t\nloop = %t\nvolume = %.2f\n", s.previewAutoplay, s.previewLoop, s.previewVolume)
 	strings.write_string(&sb, "\n[file_browser]\n")
 	fmt.sbprintf(&sb, "open = %t\ndir = %s\n", s.fileBrowserOpen, s.fileBrowserDir)
 	strings.write_string(&sb, "\n[file_browser_bookmarks]\n")
