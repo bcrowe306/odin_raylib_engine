@@ -268,6 +268,7 @@ editor_main :: proc() -> int {
 		LevelRef_Render(&GlobalEditor)
 		NodeReference_Render(&GlobalEditor)
 		FileBrowser_Update(&GlobalEditor) // (drawn in the bottom panel's Files tab)
+		AudioPreview_Update(&GlobalEditor)
 		LevelGenEditor_Render(&GlobalEditor) // (level_gen_editor.odin)
 		ProjectSettingsDialog_Render(&GlobalEditor)
 		Palette_Render(&GlobalEditor)
