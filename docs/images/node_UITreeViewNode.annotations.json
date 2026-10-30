@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The tree's frame (its items come from code)", "x": 441, "y": 178, "w": 56, "h": 56},
+    {"label": "Selected Id and Item Height", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

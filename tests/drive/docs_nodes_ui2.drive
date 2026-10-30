@@ -1,0 +1,235 @@
+# Screenshots for the UI nodes' pages, part 2 (docs/nodes/UINotchedSliderNode.md
+# ... UITabContainerNode.md, #45): one fresh scene per node.
+#   scripts/docs/screenshots.sh docs_nodes_ui2
+wait 5
+
+# --- Notched Slider ---
+click @asset.new-scene
+click @hier.add
+type ui notched slider
+click @addnode.create
+expect node:UINotchedSlider.type == UINotchedSliderNode
+dblclick @insp.prop:value
+key ctrl+a
+type 3
+key enter
+expect node:UINotchedSlider.prop.value ~= 3
+key shift+f
+wait 5
+annotate @node:UINotchedSlider The slider: five notches, the handle on notch 3
+annotate @window:inspector Value, range, notch count, Snap To Notches, orientation
+move 700,88
+wait 20
+screenshot node_UINotchedSliderNode
+
+# --- Volume Fader ---
+click @asset.new-scene
+click @hier.add
+type ui volume fader
+click @addnode.create
+expect node:UIVolumeFader.type == UIVolumeFaderNode
+dblclick @insp.prop:valueDb
+key ctrl+a
+type -12
+key enter
+expect node:UIVolumeFader.prop.valueDb ~= -12
+key shift+f
+wait 5
+annotate @node:UIVolumeFader The fader at -12 dB (0 dB is three quarters up)
+annotate @window:inspector Value Db, Min Db, Max Db, Default Db
+move 700,88
+wait 20
+screenshot node_UIVolumeFaderNode
+
+# --- Volume Meter (stereo: a right level above -100 dB) ---
+click @asset.new-scene
+click @hier.add
+type ui volume meter
+click @addnode.create
+expect node:UIVolumeMeter.type == UIVolumeMeterNode
+dblclick @insp.prop:levelL
+key ctrl+a
+type -6
+key enter
+dblclick @insp.prop:levelR
+key ctrl+a
+type -18
+key enter
+expect node:UIVolumeMeter.prop.levelR ~= -18
+key shift+f
+wait 5
+annotate @node:UIVolumeMeter Left at -6 dB, right at -18 dB
+annotate @window:inspector Level L / Level R in dB (set them from a script)
+move 700,88
+wait 20
+screenshot node_UIVolumeMeterNode
+
+# --- Separator with a label ---
+click @asset.new-scene
+click @hier.add
+type ui separator
+click @addnode.create
+expect node:UISeparator.type == UISeparatorNode
+click @insp.prop:label
+key ctrl+a
+type Audio
+key enter
+expect node:UISeparator.prop.label == Audio
+# A label needs about 18 px of height.
+dblclick @insp.prop:size.y
+key ctrl+a
+type 18
+key enter
+expect node:UISeparator.prop.size ~= 360,18
+key shift+f
+wait 5
+annotate @node:UISeparator The label, then the line
+annotate @window:inspector Label and Line Color
+move 700,88
+wait 20
+screenshot node_UISeparatorNode
+
+# --- XY Plot ---
+click @asset.new-scene
+click @hier.add
+type ui xy plot
+click @addnode.create
+expect node:UIXYPlot.type == UIXYPlotNode
+key shift+f
+wait 5
+annotate @node:UIXYPlot The plot: title, grid, axis ranges
+annotate @window:inspector Axis ranges, grid, points, crosshair, colours
+move 700,88
+wait 20
+screenshot node_UIXYPlotNode
+
+# --- List View ---
+click @asset.new-scene
+click @hier.add
+type ui list view
+click @addnode.create
+expect node:UIListView.type == UIListViewNode
+key shift+f
+wait 5
+annotate @node:UIListView The default items; the first is selected
+annotate @window:inspector Selected Index and Item Height
+move 700,88
+wait 20
+screenshot node_UIListViewNode
+
+# --- Tree View (no items yet: the frame) ---
+click @asset.new-scene
+click @hier.add
+type ui tree view
+click @addnode.create
+expect node:UITreeView.type == UITreeViewNode
+key shift+f
+wait 5
+annotate @node:UITreeView The tree's frame (its items come from code)
+annotate @window:inspector Selected Id and Item Height
+move 700,88
+wait 20
+screenshot node_UITreeViewNode
+
+# --- Bullet List (draws nothing until it has items) ---
+click @asset.new-scene
+click @hier.add
+type ui bullet list
+click @addnode.create
+expect node:UIBulletList.type == UIUnorderedListNode
+key shift+f
+wait 5
+annotate @node:UIBulletList The list's area (empty: no items yet)
+annotate @window:inspector Selected Index, Default Bullet, Item Height
+move 700,88
+wait 20
+screenshot node_UIUnorderedListNode
+
+# --- Numbered List ---
+click @asset.new-scene
+click @hier.add
+type ui numbered list
+click @addnode.create
+expect node:UINumberedList.type == UIOrderedListNode
+key shift+f
+wait 5
+annotate @node:UINumberedList The list's area (empty: no items yet)
+annotate @window:inspector Numbering, Start Number, Item Height
+move 700,88
+wait 20
+screenshot node_UIOrderedListNode
+
+# --- Table ---
+click @asset.new-scene
+click @hier.add
+type ui table
+click @addnode.create
+expect node:UITable.type == UITableNode
+key shift+f
+wait 5
+annotate @node:UITable The table's area (empty: no columns yet)
+annotate @window:inspector Selected row, sort column and order, header and row heights
+move 700,88
+wait 20
+screenshot node_UITableNode
+
+# --- Icon ---
+click @asset.new-scene
+click @hier.add
+type ui icon
+click @addnode.create
+expect node:UIIcon.type == UIIconNode
+click @insp.prop:icon
+click @pick:Bolt
+expect node:UIIcon.prop.icon == Bolt
+key shift+f
+wait 5
+annotate @node:UIIcon A Bolt icon
+annotate @window:inspector Icon, Icon Size, Color, Align
+move 700,88
+wait 20
+screenshot node_UIIconNode
+
+# --- Toolbar ---
+click @asset.new-scene
+click @hier.add
+type ui toolbar
+click @addnode.create
+expect node:UIToolbar.type == UIToolbarNode
+key shift+f
+wait 5
+annotate @node:UIToolbar The toolbar's bar (its buttons come from code)
+annotate @window:inspector Button Size, Spacing, Active Toggle Id
+move 700,88
+wait 20
+screenshot node_UIToolbarNode
+
+# --- Tab Container with two labels ---
+click @asset.new-scene
+click @hier.add
+type ui tab container
+click @addnode.create
+expect node:UITabContainer.type == UITabContainerNode
+click @hier:UITabContainer
+click @hier.add
+type ui label
+click @addnode.create
+expect node:UILabel.parent == UITabContainer
+click @hier:UITabContainer
+click @hier.add
+type ui button
+click @addnode.create
+expect node:UIButton.parent == UITabContainer
+click @hier:UITabContainer
+key shift+f
+# The container lays its children out as it updates: Simulate shows it.
+key f7
+wait 30
+annotate @node:UITabContainer The tabs along the top; children laid out below
+annotate @hier:UITabContainer/UILabel Children of the tab container
+annotate @window:inspector Tab Direction, Active Tab, Tab Size, layout and colours
+move 700,88
+wait 20
+screenshot node_UITabContainerNode
+key f7
+wait 10
