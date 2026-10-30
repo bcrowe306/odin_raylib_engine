@@ -723,6 +723,11 @@ Play, whose meters it shows) and save in project.json. A Sound / Music
 node's **Bus** picks its bus. Guide:
 [`engine/docs/audio_mixer.md`](../engine/docs/audio_mixer.md).
 
+A Sound Effect or Music node's **Audio** section in the Inspector has a
+**Preview** button: Play / Stop hears its sound through its bus at its
+volume and pitch (not positioned), without changing the node; it stops when
+you select something else.
+
 ### Controls menus (player rebinding)
 
 New Script on a **UI Container** offers the **Controls Menu (rebinding)**
