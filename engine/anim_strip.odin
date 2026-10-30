@@ -1,6 +1,6 @@
 package engine
 
-import "core:os"
+import os "osx" // (core:os doesn't build for the web)
 import "core:strings"
 import rl "vendor:raylib"
 
