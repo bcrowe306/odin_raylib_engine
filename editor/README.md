@@ -125,6 +125,12 @@ selecting something else goes back to the tab you had (a tab you pick by
 hand stays). Turn it off in Settings > General > Basic (**Bottom Panel
 Follows Selection**; `auto_bottom_panel` in settings.ini).
 
+**View > Bottom Panel** lists the bottom panel's tabs with a check by the
+ones shown: click one to hide or show it (saved for you in settings.ini,
+`hidden_bottom_tabs`; at least one stays). A hidden tab comes back when the
+selection or a command needs it (an AnimationPlayer selected, Find in
+Files).
+
 A docked window alone in its space hides its tab (the panels have their own
 headers), so after closing a window docked next to another, the one left
 loses its tab. **View > Show Tab Bars** gives every docked window its tab
@@ -453,6 +459,16 @@ on the node and called at runtime as `Target:method(value, source)`. The
 link button disconnects and removes the generated handler (asking first if
 you added code to it). See `engine/SCRIPTING.md`.
 
+The Scene panel's **Signals** tab lists every connection in the scene - the
+node and its event over the target and its method. Click one to select the
+node, double-click (or the code button) to open the method; a target that's
+gone, without a script or without the method shows in warning colours. The
+link button disconnects there too.
+
+The panel's other tabs: **Tree** (the nodes) and **Settings** - the scene's
+own settings (background, ambient light), which the Inspector points to
+(**Scene Settings...**) with nothing or the scene root selected.
+
 ### Sprite Sheet Slicer
 
 **Tools > Sprite Sheet Slicer...** (also a texture's right-click menu and the
@@ -648,8 +664,8 @@ viewport. Lua: `node:set_shader`, `set_shader_param`, `set_blend_mode`.
 ### Lighting
 
 Add a **Light** (point or spot cone; colour, energy, radius, falloff,
-shadows) and darken the scene with **Ambient** - the Inspector shows the
-Scene settings when nothing is selected (presets: Dusk, Night, Dark). Lights
+shadows) and darken the scene with **Ambient** - in the Scene panel's
+**Settings** tab (presets: Dusk, Night, Dark). Lights
 cast shadows from physics shapes. The toolbar's sun toggles the lighting
 preview in the viewport; selected lights show their radius or cone.
 

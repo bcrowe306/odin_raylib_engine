@@ -38,6 +38,7 @@ Editor_Settings :: struct {
 	checkUpdates:     bool, // look for a newer release at startup (update_check.odin)
 	showTabBars:      bool, // View > Show Tab Bars: every docked window keeps its tab
 	autoBottomPanel:  bool, // the bottom panel shows the selected node's tool tab
+	hiddenBottomTabs: bit_set[BottomTab], // View > Bottom Panel: tabs left out (#194)
 	// Code Editor
 	codeFontSize:     f32,
 	tabWidth:         int,
@@ -335,6 +336,12 @@ settings_from_ini :: proc(text: string) {
 	s.checkUpdates = b(m, "general", "check_updates", s.checkUpdates)
 	s.showTabBars = b(m, "general", "show_tab_bars", s.showTabBars)
 	s.autoBottomPanel = b(m, "general", "auto_bottom_panel", s.autoBottomPanel)
+	if hidden, ok := m["general"]["hidden_bottom_tabs"]; ok {
+		s.hiddenBottomTabs = {}
+		for name in strings.split(hidden, ",", context.temp_allocator) {
+			for t in BottomTab do if fmt.tprint(t) == strings.trim_space(name) do s.hiddenBottomTabs += {t}
+		}
+	}
 	s.codeFontSize = f(m, "code", "font_size", s.codeFontSize)
 	s.tabWidth = int(f(m, "code", "tab_width", f32(s.tabWidth)))
 	s.insertSpaces = b(m, "code", "insert_spaces", s.insertSpaces)
@@ -465,6 +472,11 @@ Editor_SaveSettings :: proc() -> bool {
 	fmt.sbprintf(&sb, "ui_scale = %.2f\nautosave_minutes = %d\ngrid_size = %.0f\n", s.uiScale, s.autosaveMinutes, s.gridSize)
 	fmt.sbprintf(&sb, "snap_to_grid = %t\nshow_grid = %t\nconfirm_quit = %t\nshow_welcome = %t\ncheck_updates = %t\n", s.snapToGrid, s.showGrid, s.confirmQuit, s.showWelcome, s.checkUpdates)
 	fmt.sbprintf(&sb, "show_tab_bars = %t\nauto_bottom_panel = %t\n", s.showTabBars, s.autoBottomPanel)
+	{
+		names := make([dynamic]string, context.temp_allocator)
+		for t in BottomTab do if t in s.hiddenBottomTabs do append(&names, fmt.tprint(t))
+		fmt.sbprintf(&sb, "hidden_bottom_tabs = %s\n", strings.join(names[:], ",", context.temp_allocator))
+	}
 	strings.write_string(&sb, "\n[code]\n")
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
 	fmt.sbprintf(&sb, "auto_close_pairs = %t\nformat_on_save = %t\nlsp_enabled = %t\n", s.autoClosePairs, s.formatOnSave, s.lspEnabled)

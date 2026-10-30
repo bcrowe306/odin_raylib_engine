@@ -57,6 +57,56 @@ bottom_follow_selection :: proc(state: ^EditorState) {
 	}
 }
 
+// The bottom panel's tabs in order: name (View > Bottom Panel), drive id.
+BOTTOM_TABS := [?]struct {
+	tab:  BottomTab,
+	icon: string,
+	name: string,
+	id:   string,
+}{
+	{.Console, ICON_FA_TERMINAL, "Console", "console"},
+	{.Profiler, ICON_FA_CHART_LINE, "Profiler", "profiler"},
+	{.Game, ICON_FA_PLAY, "Game", "game"},
+	{.Animation, ICON_FA_FILM, "Animation", "animation"},
+	{.Particles, ICON_FA_WAND_MAGIC_SPARKLES, "Particles", "particles"},
+	{.Ldtk, ICON_FA_TABLE_CELLS, "LDtk", "ldtk"},
+	{.TileMap, ICON_FA_TABLE_CELLS_LARGE, "Tile Map", "tilemap"},
+	{.StateGraph, ICON_FA_DIAGRAM_PROJECT, "State Machine", "stategraph"},
+	{.Mixer, ICON_FA_SLIDERS, "Mixer", "mixer"},
+	{.Search, ICON_FA_MAGNIFYING_GLASS, "Search", "search"},
+	{.Files, ICON_FA_FOLDER_OPEN, "Files", "files"},
+}
+
+// BottomPanel_SetTabShown shows or hides a tab (View > Bottom Panel; saved
+// in the editor settings). The last shown tab stays (#194).
+BottomPanel_SetTabShown :: proc(tab: BottomTab, shown: bool) -> bool {
+	if shown {
+		GlobalSettings.hiddenBottomTabs -= {tab}
+	} else {
+		left := 0
+		for t in BOTTOM_TABS do if t.tab != tab && t.tab not_in GlobalSettings.hiddenBottomTabs do left += 1
+		if left == 0 do return false
+		GlobalSettings.hiddenBottomTabs += {tab}
+	}
+	_ = Editor_SaveSettings()
+	return true
+}
+
+// BottomPanel_ViewMenu: View > Bottom Panel - each tab, checked when shown.
+BottomPanel_ViewMenu :: proc(state: ^EditorState) {
+	open := imgui.BeginMenu("Bottom Panel")
+	Drive_Item("menu:View/Bottom Panel")
+	if !open do return
+	defer imgui.EndMenu()
+	for t in BOTTOM_TABS {
+		shown := t.tab not_in GlobalSettings.hiddenBottomTabs
+		if imgui.MenuItem(fmt.ctprintf("%s  %s", t.icon, t.name), nil, shown) {
+			if !BottomPanel_SetTabShown(t.tab, !shown) do Editor_Log(state, .Warn, "The bottom panel keeps at least one tab")
+		}
+		Drive_Item(fmt.tprintf("menu:Bottom Panel/%s", t.name))
+	}
+}
+
 // BottomPanel_Tab: the tab shown (drives).
 BottomPanel_Tab :: proc(state: ^EditorState) -> BottomTab {return state.bottomTab}
 consoleShow: [LogLevel]bool = {.Info = true, .Warn = true, .Error = true}
@@ -76,79 +126,41 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 	if ldtkTabRequest {bottomTabRequest = .Ldtk; ldtkTabRequest = false}
 	req, hasReq := bottomTabRequest.?
 	bottomTabRequest = nil
+	// A tab asked for (a command, the selection) shows again if hidden.
+	if hasReq && req in GlobalSettings.hiddenBottomTabs do BottomPanel_SetTabShown(req, true)
 	flags :: proc(t: BottomTab, req: BottomTab, has: bool) -> imgui.TabItemFlags {return {.SetSelected} if has && req == t else {}}
 	if imgui.BeginTabBar("##BottomPanelTabs", {}) {
 		counts: [LogLevel]int
 		for l in state.logs do counts[l.level] += 1
-		label := fmt.ctprintf("%s  Console###ConsoleTab", ICON_FA_TERMINAL)
-		if counts[.Error] > 0 do label = fmt.ctprintf("%s  Console  %s %d###ConsoleTab", ICON_FA_TERMINAL, ICON_FA_CIRCLE_XMARK, counts[.Error])
-		if imgui.BeginTabItem(label, nil, flags(.Console, req, hasReq)) {
-			state.bottomTab = .Console
-			BottomPanel_RenderConsole(state, counts)
-			imgui.EndTabItem()
+		for t in BOTTOM_TABS {
+			if t.tab in GlobalSettings.hiddenBottomTabs do continue
+			label := fmt.ctprintf("%s  %s###%sTab", t.icon, t.name, t.id)
+			#partial switch t.tab {
+			case .Console:
+				if counts[.Error] > 0 do label = fmt.ctprintf("%s  Console  %s %d###consoleTab", ICON_FA_TERMINAL, ICON_FA_CIRCLE_XMARK, counts[.Error])
+			case .Game:
+				label = fmt.ctprintf("%s  Game###gameTab", ICON_FA_GAMEPAD if RemoteGame_Connected() else ICON_FA_PLAY)
+			}
+			if imgui.BeginTabItem(label, nil, flags(t.tab, req, hasReq)) {
+				state.bottomTab = t.tab
+				#partial switch t.tab {
+				case .Console:    BottomPanel_RenderConsole(state, counts)
+				case .Profiler:   BottomPanel_RenderProfiler(state)
+				case .Game:       GamePanel_Render(state)
+				case .Animation:  AnimationPanel_Render(state)
+				case .Particles:  ParticlePanel_Render(state)
+				case .Ldtk:       LdtkPanel_Render(state)
+				case .TileMap:    TileMapPanel_Render(state)
+				case .StateGraph: StateGraph_Render(state)
+				case .Mixer:      MixerPanel_Render(state)
+				case .Search:     Code_SearchPanel(state)
+				case .Files:      FileBrowser_RenderTab(state)
+				}
+				imgui.EndTabItem()
+			}
+			Drive_Item(fmt.tprintf("bottom:%s", t.id))
+			if t.tab == .Files do UI_Tooltip("File Browser: the computer's folders - preview files, then load them into the project")
 		}
-		Drive_Item("bottom:console")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Profiler###ProfTab", ICON_FA_CHART_LINE), nil, flags(.Profiler, req, hasReq)) {
-			state.bottomTab = .Profiler
-			BottomPanel_RenderProfiler(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:profiler")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Game###GameTab", ICON_FA_GAMEPAD if RemoteGame_Connected() else ICON_FA_PLAY), nil, flags(.Game, req, hasReq)) {
-			state.bottomTab = .Game
-			GamePanel_Render(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:game")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Animation###AnimTab", ICON_FA_FILM), nil, flags(.Animation, req, hasReq)) {
-			state.bottomTab = .Animation
-			AnimationPanel_Render(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:animation")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Particles###ParticlesTab", ICON_FA_WAND_MAGIC_SPARKLES), nil, flags(.Particles, req, hasReq)) {
-			state.bottomTab = .Particles
-			ParticlePanel_Render(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:particles")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  LDtk###LdtkTab", ICON_FA_TABLE_CELLS), nil, flags(.Ldtk, req, hasReq)) {
-			state.bottomTab = .Ldtk
-			LdtkPanel_Render(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:ldtk")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Tile Map###TileMapTab", ICON_FA_TABLE_CELLS_LARGE), nil, flags(.TileMap, req, hasReq)) {
-			state.bottomTab = .TileMap
-			TileMapPanel_Render(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:tilemap")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  State Machine###StateGraphTab", ICON_FA_DIAGRAM_PROJECT), nil, flags(.StateGraph, req, hasReq)) {
-			state.bottomTab = .StateGraph
-			StateGraph_Render(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:stategraph")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Mixer###MixerTab", ICON_FA_SLIDERS), nil, flags(.Mixer, req, hasReq)) {
-			state.bottomTab = .Mixer
-			MixerPanel_Render(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:mixer")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Search###SearchTab", ICON_FA_MAGNIFYING_GLASS), nil, flags(.Search, req, hasReq)) {
-			state.bottomTab = .Search
-			Code_SearchPanel(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:search")
-		if imgui.BeginTabItem(fmt.ctprintf("%s  Files###FilesTab", ICON_FA_FOLDER_OPEN), nil, flags(.Files, req, hasReq)) {
-			state.bottomTab = .Files
-			FileBrowser_RenderTab(state)
-			imgui.EndTabItem()
-		}
-		Drive_Item("bottom:files")
-		UI_Tooltip("File Browser: the computer's folders - preview files, then load them into the project")
 		imgui.EndTabBar()
 	}
 	// A tab picked by hand: no going back when the selection changes.

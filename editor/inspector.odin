@@ -74,11 +74,7 @@ inspector_body :: proc(state: ^EditorState) {
 		imgui.PushStyleColorImVec4(.Text, UI_TEXT_FAINT)
 		imgui.TextWrapped("Select a node in the viewport or the scene tree to edit it.")
 		imgui.PopStyleColor()
-		// With nothing selected, the scene's own settings.
-		if state.activeScene != nil {
-			imgui.Dummy({0, 8})
-			inspector_scene_settings(state, state.activeScene)
-		}
+		if state.activeScene != nil do scene_settings_pointer()
 		return
 	}
 	isRoot := node == state.activeScene.rootNode
@@ -208,7 +204,7 @@ inspector_body :: proc(state: ^EditorState) {
 	}
 
 	imgui.Dummy({0, 4})
-	if isRoot do inspector_scene_settings(state, state.activeScene)
+	if isRoot do scene_settings_pointer()
 	Inspector_InstanceSection(state, node) // exposed properties (#85)
 	Inspector_ExposedList(state, node)
 	if !isRoot && UI_SectionHeader("Transform") {
@@ -1387,8 +1383,17 @@ inspector_animation_player :: proc(state: ^EditorState, apn: ^e.AnimationPlayerN
 	UI_Tooltip("Pick cells of a sheet and make animations of them (added to this player)")
 }
 
-// inspector_scene_settings: scene-level properties (shown for the root).
+// scene_settings_pointer: the scene's settings live in the Scene panel's
+// Settings tab (#195) - a button there.
 @(private = "file")
+scene_settings_pointer :: proc() {
+	imgui.Dummy({0, 8})
+	if UI_Button(fmt.tprintf("%s  Scene Settings...", ICON_FA_SLIDERS), "insp.scene-settings", {-1, 0}) do scenePanelTabRequest = .Settings
+	UI_Tooltip("Background, ambient light and more: the Scene panel's Settings tab")
+}
+
+// inspector_scene_settings: scene-level properties (the Scene panel's
+// Settings tab).
 inspector_scene_settings :: proc(state: ^EditorState, scene: ^e.Scene) {
 	if !UI_SectionHeader("Scene") do return
 	if !UI_BeginProps("##scene_props") do return
