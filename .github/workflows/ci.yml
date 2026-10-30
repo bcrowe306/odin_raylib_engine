@@ -1,5 +1,6 @@
 # Builds the editor, the runner and the Play binary and runs the unit tests
-# on macOS (Apple silicon), Linux (x64) and Windows (x64); smoke-tests the
+# on macOS (Apple silicon), Linux (x64) and Windows (x64); builds the web
+# runner (js_wasm32, as the release does - #224); smoke-tests the
 # runner and the packaged editor where there's an OpenGL context (macOS,
 # Linux under Xvfb). Editor drives (tests/drive) stay local: they're long
 # and need a real GPU session.
@@ -19,6 +20,25 @@ env:
   ODIN_RELEASE: dev-2026-03
 
 jobs:
+  # The web runner (js_wasm32 + Emscripten), as release.yml builds it: an
+  # engine change that doesn't compile for the web (core:os, #223) fails
+  # here instead of at release time.
+  web-runner:
+    name: Runner (web)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - run: git submodule update --init --depth 1 ui odin_editor ldtk
+      - uses: laytan/setup-odin@v2
+        with:
+          release: ${{ env.ODIN_RELEASE }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: mymindstorm/setup-emsdk@v14
+      - run: scripts/build_web_runner.sh
+      - run: test -s bin/runners/web/index.wasm && test -s bin/runners/web/index.js
+
   build-test:
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
