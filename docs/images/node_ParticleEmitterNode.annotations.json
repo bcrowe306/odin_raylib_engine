@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Particles run in the viewport while you edit", "x": 596, "y": 241, "w": 56, "h": 56},
+    {"label": "The Particles tab: Emission, Shape, Motion, Size & Rotation, Color, Curves, Texture, Collision", "x": 219, "y": 503, "w": 63, "h": 25}
+  ]
+}
