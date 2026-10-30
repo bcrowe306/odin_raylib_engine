@@ -183,6 +183,7 @@ Project_CreateFromTemplate :: proc(dir, name: string, tmpl: Project_Template) ->
 	cfg.windowTitle = name
 	cfg.initialScene = "scenes/main.scene.json"
 	cfg.gravity = {0, 980}
+	cfg.fill = .Expand // (new projects: no bars; older ones keep their look)
 	append(&cfg.scenes, "scenes/main.scene.json")
 
 	ok := true

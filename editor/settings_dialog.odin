@@ -251,6 +251,8 @@ settings_save :: proc(state: ^EditorState) {
 	state.game.physicsWorld.gravity = d.gravity
 	e.Transition_SetDefault(state.game, d.transition, d.transitionDuration, d.transitionEasing)
 	if d.virtualWidth > 0 do state.game.virtualSize = {d.virtualWidth, d.virtualHeight}
+	if d.virtualWidth > 0 do state.game.designSize = {d.virtualWidth, d.virtualHeight}
+	state.game.fill = d.fill
 	state.game.musicVolume = d.musicVolume
 	state.game.sfxVolume = d.sfxVolume
 	e.Input_ApplyActionConfigs(&state.game.input, d.actions[:])
@@ -853,7 +855,10 @@ project_video :: proc(state: ^EditorState) {
 	vres := [2]f32{d.virtualWidth, d.virtualHeight}
 	if imgui.DragFloat2("##vres", &vres, 1, 160, 7680, "%.0f") do d.virtualWidth, d.virtualHeight = vres.x, vres.y
 	Drive_Item("settings.virtual-res")
-	UI_Tooltip("The resolution the game draws at; it is scaled to fit the window or the screen (fullscreen), with bars where the shapes differ")
+	UI_Tooltip("The resolution the game is designed for; it is scaled to the window or the screen (fullscreen) - see Screen Fill for a window of another shape")
+	UI_PropLabel("Screen Fill")
+	if idx, changed := UI_Combo("settings.fill", int(d.fill), []string{"Keep (bars)", "Expand (no bars)"}); changed do d.fill = e.Screen_Fill(idx)
+	UI_Tooltip("A window or screen whose shape differs from the virtual resolution. Expand: the same scale, more of the world on the longer side, no bars (UI on a Screen Layer stays at the screen's edges). Keep: exactly the virtual resolution, black bars where the shapes differ")
 	UI_PropLabel("Target FPS")
 	fps := c.int(d.targetFPS)
 	if imgui.SliderInt("##fps", &fps, 30, 240) do d.targetFPS = int(fps)

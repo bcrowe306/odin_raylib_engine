@@ -601,6 +601,11 @@ Runner_ApplyFullscreen :: proc(game: ^Game, on: bool) {
 // Runner_VirtualSize: the resolution the game draws at (project Video >
 // virtual resolution, else the window's).
 Runner_VirtualSize :: proc(game: ^Game) -> (f32, f32) {
+	// Expand (#174): the design size grown to the window's shape, every frame
+	// (the window may be resized, or go fullscreen).
+	if game.fill == .Expand && game.designSize.x > 0 && game.designSize.y > 0 {
+		game.virtualSize = Screen_FillSize(game.designSize, {f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight())}, .Expand, renderPixel.integerScaling)
+	}
 	if game.virtualSize.x > 0 && game.virtualSize.y > 0 do return game.virtualSize.x, game.virtualSize.y
 	return f32(max(rl.GetScreenWidth(), 1)), f32(max(rl.GetScreenHeight(), 1))
 }
