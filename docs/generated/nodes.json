@@ -617,7 +617,7 @@
         {"name": "spawnEntities", "kind": "boolean", "owner": "LdtkLevelNode", "default": true, "doc": "Spawn the level's entities (mapped to components) when ready."},
         {"name": "parallax", "kind": "boolean", "owner": "LdtkLevelNode", "default": true, "doc": "Apply the LDtk layers' parallax factors."},
         {"name": "drawBackground", "kind": "boolean", "owner": "LdtkLevelNode", "default": true, "doc": "Draw the level's background colour / image."},
-        {"name": "drawEntityTiles", "kind": "boolean", "owner": "LdtkLevelNode", "default": false, "doc": "Draw entities' LDtk tiles (editor visuals for unspawned entities)."},
+        {"name": "drawEntityTiles", "kind": "boolean", "owner": "LdtkLevelNode", "default": false, "doc": "In the game, draw entities' LDtk icons (their editor visuals) too - for entities no node is spawned for. The editor always shows them."},
         {"name": "tintColor", "kind": "color", "owner": "LdtkLevelNode", "default": "#ffffffff", "doc": "Multiplies every layer's colours."},
         {"name": "drawDebugColliders", "kind": "boolean", "owner": "LdtkLevelNode", "default": false, "doc": "Outline the generated colliders."},
         {"name": "drawDebugEntities", "kind": "boolean", "owner": "LdtkLevelNode", "default": false, "doc": "Outline entity bounds with their names."},

@@ -222,7 +222,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"LdtkLevelNode.matchCustomNodes", "Entities set to Auto also spawn as the project's custom node type of the same name (when no component of that name exists). Off: each entity's mapping says."},
 	{"LdtkLevelNode.parallax", "Apply the LDtk layers' parallax factors."},
 	{"LdtkLevelNode.drawBackground", "Draw the level's background colour / image."},
-	{"LdtkLevelNode.drawEntityTiles", "Draw entities' LDtk tiles (editor visuals for unspawned entities)."},
+	{"LdtkLevelNode.drawEntityTiles", "In the game, draw entities' LDtk icons (their editor visuals) too - for entities no node is spawned for. The editor always shows them."},
 	{"LdtkLevelNode.tintColor", "Multiplies every layer's colours."},
 	{"LdtkLevelNode.drawDebugColliders", "Outline the generated colliders."},
 	{"LdtkLevelNode.drawDebugEntities", "Outline entity bounds with their names."},
