@@ -33,8 +33,10 @@ with distance from the listener, panned to its side.
    another row to reorder; each row has its own play button and a remove
    button.
 3. **Preview** plays one play the way the game will: by the Play Mode,
-   with its variation, through its bus (not positioned). It stops when you
-   select something else.
+   with its variation and Delay Random, through its bus (not positioned).
+   Sequential and Shuffle step on each press without moving the node's own
+   place; the Cooldown (for repeated plays) doesn't apply. It stops when
+   you select something else.
 4. In the Node tab's **Properties** section, set **Play Mode** (and **Single** for the Single
    mode), **Volume**, **Pitch**, the variation (**Volume Random**, **Pitch
    Random**, **Pan Random**, **Delay Random**), **Cooldown**, **Bus**,

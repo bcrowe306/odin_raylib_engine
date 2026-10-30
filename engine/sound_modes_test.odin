@@ -113,12 +113,14 @@ test_sound_list_saved :: proc(t: ^testing.T) {
 	}
 	testing.expect(t, found, "loaded")
 	// An older scene's single "audio": a one-sound list.
-	old := `{"name": "old", "root": {"type": "Node", "name": "root", "children": [{"type": "SoundNode", "name": "Old", "audio": "audio/old.wav"}]}}`
+	// (It saved the node hidden; it draws nothing, so it loads visible - #217.)
+	old := `{"name": "old", "root": {"type": "Node", "name": "root", "children": [{"type": "SoundNode", "name": "Old", "visible": false, "audio": "audio/old.wav"}]}}`
 	s3 := game->createScene("old", false)
 	_ = Scene_InstantiateFromJSON(s3, transmute([]u8)string(old), &game.gameContext)
 	ProcessNodeQueues(s3.manager, &game.gameContext)
 	for n in s3.manager.nodes do if n != nil && n.typeId == SoundNode {
 		testing.expect_value(t, len((cast(^SoundNode)n).sounds), 1)
 		testing.expect(t, strings.has_suffix((cast(^SoundNode)n).sounds[0].path, "audio/old.wav"), "its path")
+		testing.expect(t, n.renderable, "not hidden")
 	}
 }

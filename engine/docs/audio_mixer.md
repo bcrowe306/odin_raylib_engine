@@ -135,7 +135,9 @@ Each play varies (All: each sound on its own): **Volume Random** (+/- volume),
 **Pitch Random** (+/- semitones - 1 or 2 keep footsteps from sounding
 copied), **Pan Random** (+/-), **Delay Random** (a random 0..N s wait) -
 and **Cooldown** skips plays within N seconds of the last (rapid fire
-doesn't stack voices). The Inspector's **Preview** plays exactly that.
+doesn't stack voices). The Inspector's **Preview** plays one play like
+that (Sequential and Shuffle step on each press without moving the
+node's own place; the Cooldown is for repeated plays, so it doesn't apply).
 Scripts: `node:sound_play()` follows the mode, `node:sound_play_index(i)`
 plays one, `node:sound_count()`, `node:sound_last()`.
 

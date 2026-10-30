@@ -84,7 +84,6 @@ SoundNode_Init :: proc(soundNode: ^SoundNode) {
 	soundNode.lastIndex = -1
 	soundNode.minDistance = 100
 	soundNode.maxDistance = 900
-	soundNode.renderable = false
 	soundNode.ready = SoundNode_Ready
 	soundNode.update = SoundNode_Update
 	soundNode.onDestroy = SoundNode_Destroy
