@@ -42,22 +42,20 @@ container has "Tab 1" and "Tab 2"). Scripts: `node:ui_set_items({"Video",
   down the left edge.
 - **Children** are laid out inside, below the tabs (or right of them when
   vertical), by the container settings, the same way a
-  [UI Container](UIContainerNode.md) does. The layout runs while the game
-  runs (and in Simulate); while you edit, the children stay where you put
-  them.
-- **Tabs and children**: the active tab is only highlighted. All the
-  children are shown whichever tab is active - the tabs don't hide them.
-  To show a page per tab, a script can enable one child container per tab
-  by `activeTab` (see the example).
+  [UI Container](UIContainerNode.md) does - in the editor too.
+- **Tabs and pages**: each UI child is a page, in order: the first child is
+  the first tab's page. Only the active tab's page is shown (the others are
+  disabled, so they draw nothing and take no input) - in the editor too,
+  so set **Active Tab** to edit another page.
 - **Mouse**: a click on a tab makes it active.
 - **Keyboard and gamepad**: the container takes focus when clicked or
   reached with Tab. While it has focus, Left / Right (Up / Down for
   vertical tabs) switch tabs, wrapping round at the ends.
-- **Not used**: the UI Container's **Title** and header aren't drawn, and
-  the background and border are always drawn (**Draw Background** / **Draw
-  Border** are ignored). **Show Header** on only adds **Header Height** of
-  space above the children.
-- It raises no signal when the tab changes; read `activeTab`.
+- **Draw Background** / **Draw Border** turn the panel's background and
+  border off. The tab bar is its header: the UI Container's **Title** and
+  header settings don't apply (the Inspector hides them).
+- **`tab_changed`** fires when another tab opens (click, keys or a script
+  setting `activeTab`), with its index (from 0).
 - **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
   it stays on screen; outside one it's drawn in the world (the camera moves
   it) and reads the mouse there too, so clicks line up either way.

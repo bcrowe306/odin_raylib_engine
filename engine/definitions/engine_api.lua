@@ -799,6 +799,15 @@ function UIDropdownNode:connect(event, handler) end
 ---@return integer id Connection id for `disconnect`
 function UIRadioGroupNode:connect(event, handler) end
 
+---@alias UIToggleSwitchNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
+---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
+---
+---Example: `self.node:connect("value_changed", function(value, source) Log.info("value_changed") end)`
+---@param event UIToggleSwitchNodeEvent|string
+---@param handler fun(value: any, source: UIToggleSwitchNode)
+---@return integer id Connection id for `disconnect`
+function UIToggleSwitchNode:connect(event, handler) end
+
 ---@alias UIKnobNodeEvent NodeTreeEvent|"value_changed"|ProjectEvent
 ---Connects a handler to one of this node's events: value_changed (The value changed); the tree events; custom ones.
 ---
@@ -826,6 +835,15 @@ function UINotchedSliderNode:connect(event, handler) end
 ---@return integer id Connection id for `disconnect`
 function UIVolumeFaderNode:connect(event, handler) end
 
+---@alias UIListViewNodeEvent NodeTreeEvent|"selected"|ProjectEvent
+---Connects a handler to one of this node's events: selected (The selection changed); the tree events; custom ones.
+---
+---Example: `self.node:connect("selected", function(value, source) Log.info("selected") end)`
+---@param event UIListViewNodeEvent|string
+---@param handler fun(value: any, source: UIListViewNode)
+---@return integer id Connection id for `disconnect`
+function UIListViewNode:connect(event, handler) end
+
 ---@alias UIUnorderedListNodeEvent NodeTreeEvent|"selected"|ProjectEvent
 ---Connects a handler to one of this node's events: selected (The selection changed); the tree events; custom ones.
 ---
@@ -845,7 +863,7 @@ function UIUnorderedListNode:connect(event, handler) end
 function UIOrderedListNode:connect(event, handler) end
 
 ---@alias UITableNodeEvent NodeTreeEvent|"row_selected"|"sorted"|ProjectEvent
----Connects a handler to one of this node's events: row_selected (A table row was selected), sorted (The table was sorted); the tree events; custom ones.
+---Connects a handler to one of this node's events: row_selected (A table row was selected), sorted (The table was sorted (by a header click or set_property)); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("row_selected", function(value, source) Log.info("row_selected") end)`
 ---@param event UITableNodeEvent|string
@@ -861,6 +879,15 @@ function UITableNode:connect(event, handler) end
 ---@param handler fun(value: any, source: UIToolbarNode)
 ---@return integer id Connection id for `disconnect`
 function UIToolbarNode:connect(event, handler) end
+
+---@alias UITabContainerNodeEvent NodeTreeEvent|"tab_changed"|ProjectEvent
+---Connects a handler to one of this node's events: tab_changed (Another tab was opened (0-based)); the tree events; custom ones.
+---
+---Example: `self.node:connect("tab_changed", function(value, source) Log.info("tab_changed") end)`
+---@param event UITabContainerNodeEvent|string
+---@param handler fun(value: any, source: UITabContainerNode)
+---@return integer id Connection id for `disconnect`
+function UITabContainerNode:connect(event, handler) end
 -- node events end
 
 -- node properties begin (generated from the engine: lua_properties_definitions_test.odin)
@@ -5326,7 +5353,7 @@ function UIButtonNode:set_property(path, value, y) end
 ---@field value number Current value (between min and max).
 ---@field minValue number Lowest value.
 ---@field maxValue number Highest value.
----@field defaultValue number Value restored by reset (double-click).
+---@field defaultValue number Value a right-click restores (a slider's reset button too).
 ---@field fineScale number Drag speed with Shift held (fine adjustment).
 ---@field isInteger boolean Snap to whole numbers.
 ---@field showResetButton boolean Show a button that restores the default value.
@@ -5348,7 +5375,7 @@ function UIButtonNode:set_property(path, value, y) end
 ---| "value" # number - Current value (between min and max).
 ---| "minValue" # number - Lowest value.
 ---| "maxValue" # number - Highest value.
----| "defaultValue" # number - Value restored by reset (double-click).
+---| "defaultValue" # number - Value a right-click restores (a slider's reset button too).
 ---| "fineScale" # number - Drag speed with Shift held (fine adjustment).
 ---| "isInteger" # boolean - Snap to whole numbers.
 ---| "showResetButton" # boolean - Show a button that restores the default value.
@@ -5927,7 +5954,7 @@ function UIToggleSwitchNode:set_property(path, value, y) end
 ---@field value number Current value (between min and max).
 ---@field minValue number Lowest value.
 ---@field maxValue number Highest value.
----@field defaultValue number Value restored by reset (double-click).
+---@field defaultValue number Value a right-click restores (a slider's reset button too).
 
 ---@alias UIKnobNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -5945,7 +5972,7 @@ function UIToggleSwitchNode:set_property(path, value, y) end
 ---| "value" # number - Current value (between min and max).
 ---| "minValue" # number - Lowest value.
 ---| "maxValue" # number - Highest value.
----| "defaultValue" # number - Value restored by reset (double-click).
+---| "defaultValue" # number - Value a right-click restores (a slider's reset button too).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
@@ -6271,7 +6298,7 @@ function UIVolumeMeterNode:set_property(path, value, y) end
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field size Vec2 Width and height (px).
----@field label string Text in the middle of the line ("" = a plain line).
+---@field label string Text at the start of the line ("" = a plain line); with text it's at least 18 px tall.
 ---@field lineColor number[] Colour of the line.
 
 ---@alias UISeparatorNodeProperty
@@ -6286,7 +6313,7 @@ function UIVolumeMeterNode:set_property(path, value, y) end
 ---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "size" # Vec2 - Width and height (px).
----| "label" # string - Text in the middle of the line ("" = a plain line).
+---| "label" # string - Text at the start of the line ("" = a plain line); with text it's at least 18 px tall.
 ---| "lineColor" # number[] - Colour of the line.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
@@ -7062,7 +7089,7 @@ function UIToolbarNode:set_property(path, value, y) end
 ---@field titleColor number[] Title text colour.
 ---@field tabDirection "Horizontal"|"Vertical" Tabs along the top or the side.
 ---@field tabNames string[] Each tab's title, one a line, in the order of the child pages.
----@field activeTab integer Index of the shown tab (child).
+---@field activeTab integer The open tab (from 0): its page - the UI child at that index - shows, the others are hi...
 ---@field tabSize number Tab height (or width when vertical; px).
 
 ---@alias UITabContainerNodeProperty
@@ -7097,7 +7124,7 @@ function UIToolbarNode:set_property(path, value, y) end
 ---| "titleColor" # number[] - Title text colour.
 ---| "tabDirection" # "Horizontal"|"Vertical" - Tabs along the top or the side.
 ---| "tabNames" # string[] - Each tab's title, one a line, in the order of the child pages.
----| "activeTab" # integer - Index of the shown tab (child).
+---| "activeTab" # integer - The open tab (from 0): its page - the UI child at that index - shows, the others are hi...
 ---| "tabSize" # number - Tab height (or width when vertical; px).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.

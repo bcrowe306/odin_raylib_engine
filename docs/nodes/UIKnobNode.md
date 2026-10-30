@@ -37,9 +37,8 @@ down to turn it. It fits audio-style settings in little space.
   value is shown with one decimal.
 - **Size**: the dial is as big as the width allows, with room below for
   the value and the label.
-- **Default Value** is kept with the knob, but the knob has no reset
-  gesture: double-clicking or right-clicking doesn't restore it. Set the
-  value from a script to reset it.
+- **Default Value**: a right-click on the knob goes back to it (raising
+  `value_changed`).
 - `value_changed` fires for every change, so many times during a drag.
   Setting **Value** from a script doesn't raise it.
 

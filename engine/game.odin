@@ -78,6 +78,7 @@ Game :: struct {
 	uiTestMousePressed:  bool,
 	uiTestMouseReleased: bool,
 	uiTestRightPressed:  bool,
+	uiTestWheel:         f32,
 	uiTestShiftDown:     bool,
 	uiTestKeyEnter:      bool,
 	uiTestKeySpace:      bool,

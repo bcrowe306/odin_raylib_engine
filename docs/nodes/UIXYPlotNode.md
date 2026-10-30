@@ -48,8 +48,9 @@ points, or `node:set_property("secondaryPoints", {...})`.
   points. **Show Points** marks each point.
 - **Crosshair**: with **Show Crosshair** on, hovering the chart draws yellow
   crosshair lines and the X, Y value under the mouse (from the axis ranges).
-- **Auto Scale X / Auto Scale Y** are in the Inspector but don't do anything
-  yet: the ranges stay as you set them.
+- **Auto Scale X / Auto Scale Y** fit that axis to the points (both
+  series, with a little margin); off, it uses **X Min / X Max** (**Y Min /
+  Y Max**). **Y Label** is written up the left edge.
 - **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
   it stays on screen; outside one it's drawn in the world (the camera moves
   it) and reads the mouse there too, so clicks line up either way.

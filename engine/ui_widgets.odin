@@ -134,6 +134,12 @@ UI_IsMouseReleased :: proc(gameContext: ^GameContext) -> bool {
 	return rl.IsWindowReady() && rl.IsMouseButtonReleased(.LEFT)
 }
 
+// UI_GetMouseWheel: the wheel this frame (+ up).
+UI_GetMouseWheel :: proc(gameContext: ^GameContext) -> f32 {
+	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled do return gameContext.game.uiTestWheel
+	return rl.GetMouseWheelMove() if rl.IsWindowReady() else 0
+}
+
 UI_IsRightMousePressed :: proc(gameContext: ^GameContext) -> bool {
 	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
 		return gameContext.game.uiTestRightPressed
@@ -1698,6 +1704,7 @@ UIXYPlotNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f
 	plot := cast(^UIXYPlotNode)node
 	rect := UI_GetElementRect(&plot.ui)
 	mp := UI_GetMousePos(gameContext)
+	xMin, xMax, yMin, yMax := UIXYPlotNode_Range(plot)
 	uilib.RenderXYPlot(
 		rect,
 		plot.title,
@@ -1706,10 +1713,10 @@ UIXYPlotNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f
 		plot.series2Name,
 		plot.points[:],
 		plot.secondaryPoints[:],
-		plot.xMin,
-		plot.xMax,
-		plot.yMin,
-		plot.yMax,
+		xMin,
+		xMax,
+		yMin,
+		yMax,
 		plot.showGrid,
 		plot.showPoints,
 		plot.showCrosshair,
@@ -1720,6 +1727,36 @@ UIXYPlotNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f
 		plot.secondaryLineColor,
 		plot.gridColor,
 	)
+	// The Y label, turned up the left edge (the plot draws only X's).
+	if plot.yLabel != "" && rl.IsWindowReady() {
+		font := uilib.GetFont(12)
+		text := strings.clone_to_cstring(plot.yLabel, context.temp_allocator)
+		w := rl.MeasureTextEx(font, text, 12, 1).x
+		rl.DrawTextPro(font, text, {rect.x + 2, rect.y + rect.height * 0.5 + w * 0.5}, {}, -90, 12, 1, {170, 178, 196, 255})
+	}
+}
+
+// UIXYPlotNode_Range: the axes - X Min / Max..., or fitted to the points
+// with Auto Scale X / Y (#229).
+UIXYPlotNode_Range :: proc(plot: ^UIXYPlotNode) -> (xMin, xMax, yMin, yMax: f32) {
+	xMin, xMax, yMin, yMax = plot.xMin, plot.xMax, plot.yMin, plot.yMax
+	if !plot.autoScaleX && !plot.autoScaleY do return
+	lo, hi := [2]f32{max(f32), max(f32)}, [2]f32{-max(f32), -max(f32)}
+	found := false
+	for series in ([2][][2]f32{plot.points[:], plot.secondaryPoints[:]}) do for p in series {
+		lo = {min(lo.x, p.x), min(lo.y, p.y)}
+		hi = {max(hi.x, p.x), max(hi.y, p.y)}
+		found = true
+	}
+	if !found do return
+	pad :: proc(a, b: f32) -> (f32, f32) {
+		if b - a < 0.0001 do return a - 1, b + 1
+		m := (b - a) * 0.05
+		return a - m, b + m
+	}
+	if plot.autoScaleX do xMin, xMax = pad(lo.x, hi.x)
+	if plot.autoScaleY do yMin, yMax = pad(lo.y, hi.y)
+	return
 }
 
 UIXYPlotNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
@@ -1757,6 +1794,7 @@ UISeparatorNode_Create :: proc(
 
 UISeparatorNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	sep := cast(^UISeparatorNode)node
+	if sep.label != "" && sep.size.y < 18 do sep.size.y = 18 // (room for its label, #229)
 	rect := UI_GetElementRect(&sep.ui)
 	uilib.RenderSeparator(rect, sep.label, sep.lineColor)
 }
@@ -1815,6 +1853,7 @@ UIToggleSwitchNode :: struct {
 	active: bool `gui:"true"`,
 	userData: rawptr,
 	onChange: proc(node: ^UIToggleSwitchNode, active: bool),
+	onChanged: EventSubject, // "value_changed"(active) - #229
 }
 UIToggleSwitch :: UIToggleSwitchNode
 
@@ -1832,6 +1871,8 @@ UIToggleSwitchNode_Create :: proc(
 	ts.active = active
 	ts.update = UIToggleSwitchNode_Update
 	ts.render = UIToggleSwitchNode_Render
+	ts.onDestroy = proc(node: ^Node, gameContext: ^GameContext) {DestroySubject(&(cast(^UIToggleSwitchNode)node).onChanged)}
+	InitializeSubject(&ts.onChanged, "value_changed", ts)
 	scene->addNode(ts, parent)
 	return ts
 }
@@ -1844,19 +1885,13 @@ UIToggleSwitchNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 	if ts.focused && !ts.justFocused {
 		if UI_IsKeyPressedEnter(gameContext) || UI_IsKeyPressedSpace(gameContext) {
 			ts.active = !ts.active
-			if ts.onChange != nil {
-				ts.onChange(ts, ts.active)
-			}
+			toggle_changed(ts, gameContext)
 		} else if UI_IsKeyPressedLeft(gameContext) && ts.active {
 			ts.active = false
-			if ts.onChange != nil {
-				ts.onChange(ts, ts.active)
-			}
+			toggle_changed(ts, gameContext)
 		} else if UI_IsKeyPressedRight(gameContext) && !ts.active {
 			ts.active = true
-			if ts.onChange != nil {
-				ts.onChange(ts, ts.active)
-			}
+			toggle_changed(ts, gameContext)
 		}
 	}
 
@@ -1865,10 +1900,14 @@ UIToggleSwitchNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaT
 	ts.hovered = uilib.PointInRect(mousePos, rect)
 	if ts.hovered && UI_IsMousePressed(gameContext) {
 		ts.active = !ts.active
-		if ts.onChange != nil {
-			ts.onChange(ts, ts.active)
-		}
+		toggle_changed(ts, gameContext)
 	}
+}
+
+@(private = "file")
+toggle_changed :: proc(ts: ^UIToggleSwitchNode, gameContext: ^GameContext) {
+	if ts.onChange != nil do ts.onChange(ts, ts.active)
+	Notify(&ts.onChanged, rawptr(ts), ts.active, gameContext)
 }
 
 UIToggleSwitchNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
@@ -1956,6 +1995,12 @@ UIKnobNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32
 	rect := UI_GetElementRect(&knob.ui)
 	mousePos := UI_GetMousePos(gameContext)
 	knob.hovered = uilib.PointInRect(mousePos, rect)
+	if knob.hovered && UI_IsRightMousePressed(gameContext) && knob.value != knob.defaultValue {
+		// Right-click: back to Default Value (#229), as the slider.
+		knob.value = knob.defaultValue
+		if knob.onChangedCallback != nil do knob.onChangedCallback(knob, knob.value, gameContext)
+		if knob.onChanged.notify != nil do knob.onChanged->notify(knob, knob.value, gameContext)
+	}
 
 	if knob.hovered && UI_IsMousePressed(gameContext) {
 		knob.isDragging = true
@@ -2005,6 +2050,7 @@ UIListViewNode :: struct {
 	itemHeight: f32 `gui:"true" min:"16" max:"48"`,
 	userData: rawptr,
 	onSelect: proc(node: ^UIListViewNode, index: int),
+	onSelected: EventSubject, // "selected"(index) - #229
 }
 UIListView :: UIListViewNode
 
@@ -2025,6 +2071,7 @@ UIListViewNode_Create :: proc(
 	lv.onDestroy = UIListViewNode_Destroy
 	lv.update = UIListViewNode_Update
 	lv.render = UIListViewNode_Render
+	InitializeSubject(&lv.onSelected, "selected", lv)
 	scene->addNode(lv, parent)
 	return lv
 }
@@ -2032,6 +2079,20 @@ UIListViewNode_Create :: proc(
 UIListViewNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {
 	lv := cast(^UIListViewNode)node
 	delete(lv.items)
+	DestroySubject(&lv.onSelected)
+}
+
+// list_select: the List View's selection changed (its callback and signal),
+// scrolled into view.
+@(private = "file")
+list_select :: proc(lv: ^UIListViewNode, idx: int, gameContext: ^GameContext) {
+	lv.selectedIndex = idx
+	if lv.onSelect != nil do lv.onSelect(lv, idx)
+	Notify(&lv.onSelected, rawptr(lv), idx, gameContext)
+	h := max(lv.itemHeight, 1)
+	view := max(math.floor(UI_GetElementRect(&lv.ui).height / h), 1) * h
+	if f32(idx) * h < lv.scroll.y do lv.scroll.y = f32(idx) * h
+	if f32(idx + 1) * h > lv.scroll.y + view do lv.scroll.y = f32(idx + 1) * h - view
 }
 
 UIListViewNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
@@ -2042,34 +2103,29 @@ UIListViewNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 	if lv.focused && !lv.justFocused && len(lv.items) > 0 {
 		if UI_IsKeyPressedUp(gameContext) {
 			newIdx := max(lv.selectedIndex - 1, 0)
-			if newIdx != lv.selectedIndex {
-				lv.selectedIndex = newIdx
-				if lv.onSelect != nil do lv.onSelect(lv, newIdx)
-			}
+			if newIdx != lv.selectedIndex do list_select(lv, newIdx, gameContext)
 		} else if UI_IsKeyPressedDown(gameContext) {
 			newIdx := min(lv.selectedIndex + 1, len(lv.items) - 1)
-			if newIdx != lv.selectedIndex {
-				lv.selectedIndex = newIdx
-				if lv.onSelect != nil do lv.onSelect(lv, newIdx)
-			}
+			if newIdx != lv.selectedIndex do list_select(lv, newIdx, gameContext)
 		} else if (UI_IsKeyPressedEnter(gameContext) || UI_IsKeyPressedSpace(gameContext)) && lv.selectedIndex >= 0 {
-			if lv.onSelect != nil do lv.onSelect(lv, lv.selectedIndex)
+			list_select(lv, lv.selectedIndex, gameContext)
 		}
 	}
 
 	rect := UI_GetElementRect(&lv.ui)
 	mousePos := UI_GetMousePos(gameContext)
 	lv.hovered = uilib.PointInRect(mousePos, rect)
-
+	// The wheel scrolls it a row at a time (#229).
+	h := max(lv.itemHeight, 1)
+	maxScroll := max(f32(len(lv.items)) * h - math.floor(rect.height / h) * h, 0)
+	if lv.hovered {
+		if w := UI_GetMouseWheel(gameContext); w != 0 do lv.scroll.y -= math.sign(w) * h
+	}
+	lv.scroll.y = clamp(lv.scroll.y, 0, maxScroll)
 	if lv.hovered && UI_IsMousePressed(gameContext) {
 		relY := mousePos.y - rect.y + lv.scroll.y
-		idx := int(relY / lv.itemHeight)
-		if idx >= 0 && idx < len(lv.items) {
-			if lv.selectedIndex != idx {
-				lv.selectedIndex = idx
-				if lv.onSelect != nil do lv.onSelect(lv, idx)
-			}
-		}
+		idx := int(relY / h)
+		if idx >= 0 && idx < len(lv.items) && lv.selectedIndex != idx do list_select(lv, idx, gameContext)
 	}
 }
 
@@ -2077,7 +2133,11 @@ UIListViewNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 	if !rl.IsWindowReady() do return
 	lv := cast(^UIListViewNode)node
 	rect := UI_GetElementRect(&lv.ui)
-	uilib.RenderListView(rect, lv.items[:], lv.selectedIndex, -1, lv.scroll.y, lv.itemHeight, focused = lv.focused)
+	// Only the rows that fit, from the first scrolled to (it doesn't clip).
+	h := max(lv.itemHeight, 1)
+	first := clamp(int(lv.scroll.y / h + 0.5), 0, len(lv.items))
+	last := clamp(first + int(rect.height / h), first, len(lv.items))
+	uilib.RenderListView(rect, lv.items[first:last], lv.selectedIndex - first, -1, 0, h, focused = lv.focused)
 }
 
 // ============================================================================
@@ -2130,12 +2190,16 @@ UITreeViewNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 				break
 			}
 		}
+		// Up / Down move between the shown rows.
+		vis := tree_visible(tv)
+		row := -1
+		for v, r in vis do if v == curIdx do row = r
 		if UI_IsKeyPressedUp(gameContext) {
-			newIdx := max(curIdx - 1, 0)
+			newIdx := vis[max(row - 1, 0)]
 			tv.selectedId = tv.items[newIdx].id
 			if tv.onSelect != nil do tv.onSelect(tv, tv.selectedId)
 		} else if UI_IsKeyPressedDown(gameContext) {
-			newIdx := min(curIdx + 1, len(tv.items) - 1)
+			newIdx := vis[min(row + 1, len(vis) - 1)]
 			tv.selectedId = tv.items[newIdx].id
 			if tv.onSelect != nil do tv.onSelect(tv, tv.selectedId)
 		} else if curIdx >= 0 {
@@ -2157,9 +2221,9 @@ UITreeViewNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 	tv.hovered = uilib.PointInRect(mousePos, rect)
 
 	if tv.hovered && UI_IsMousePressed(gameContext) {
-		for i := 0; i < len(tv.items); i += 1 {
+		for i, row in tree_visible(tv) {
 			item := &tv.items[i]
-			itemY := rect.y + tv.scroll.y + f32(i) * tv.itemHeight
+			itemY := rect.y + tv.scroll.y + f32(row) * tv.itemHeight
 			itemRect := rl.Rectangle{rect.x, itemY, rect.width, tv.itemHeight}
 
 			if uilib.PointInRect(mousePos, itemRect) {
@@ -2181,6 +2245,20 @@ UITreeViewNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 	}
 }
 
+// tree_visible: the rows shown - items whose parents are all expanded (#229).
+@(private = "file")
+tree_visible :: proc(tv: ^UITreeViewNode) -> []int {
+	out := make([dynamic]int, context.temp_allocator)
+	hideBelow := max(int) // depth under a collapsed item
+	for it, i in tv.items {
+		if it.depth > hideBelow do continue
+		hideBelow = max(int)
+		append(&out, i)
+		if it.hasChildren && it.isCollapsed do hideBelow = it.depth
+	}
+	return out[:]
+}
+
 UITreeViewNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
 	if !rl.IsWindowReady() do return
 	tv := cast(^UITreeViewNode)node
@@ -2196,10 +2274,10 @@ UITreeViewNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime:
 		uilib.RenderFocusRing(rect, true, 2.0)
 	}
 
-	for i := 0; i < len(tv.items); i += 1 {
+	for i, row in tree_visible(tv) {
 		item := &tv.items[i]
 		item.isSelected = (item.id == tv.selectedId)
-		itemY := rect.y + tv.scroll.y + f32(i) * tv.itemHeight
+		itemY := rect.y + tv.scroll.y + f32(row) * tv.itemHeight
 		itemRect := rl.Rectangle{rect.x, itemY, rect.width, tv.itemHeight}
 		itemFocused := tv.focused && item.isSelected
 		uilib.RenderTreeNode(itemRect, item^, focused = itemFocused)
@@ -2398,6 +2476,10 @@ UIVolumeMeterNode_Update :: proc(node: ^Node, gameContext: ^GameContext, deltaTi
 
 	dt := deltaTime if deltaTime > 0 else 0.016
 	st := &meter.state
+	// A clip lights for 1.5 s (the meter set it without a hold, #229).
+	span := max(meter.maxDb - meter.minDb, 0.001)
+	if (meter.levelL - meter.minDb) / span >= 0.98 {st.clipL = true; st.clipHoldTimerL = 1.5}
+	if (meter.levelR - meter.minDb) / span >= 0.98 {st.clipR = true; st.clipHoldTimerR = 1.5}
 	if st.peakHoldTimerL > 0 {
 		st.peakHoldTimerL -= dt
 	} else {
@@ -2957,12 +3039,40 @@ UITableNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 	)
 	tbl.scroll = {scr.x, scr.y}
 
-	if (rClicked >= 0 || tbl.selectedRow != oldRow) && tbl.onSelectRowCallback != nil {
-		tbl.onSelectRowCallback(tbl, tbl.selectedRow, gameContext)
+	// (#229) Clicks raise the signals too; a header click sorts the rows.
+	if rClicked >= 0 || tbl.selectedRow != oldRow {
+		if tbl.onSelectRowCallback != nil do tbl.onSelectRowCallback(tbl, tbl.selectedRow, gameContext)
+		Notify(&tbl.onSelectRow, rawptr(tbl), tbl.selectedRow, gameContext)
 	}
-	if (hClicked >= 0 || tbl.sortColumn != oldSort || tbl.sortAscending != oldAsc) && tbl.onSortCallback != nil {
-		tbl.onSortCallback(tbl, tbl.sortColumn, tbl.sortAscending, gameContext)
+	if hClicked >= 0 || tbl.sortColumn != oldSort || tbl.sortAscending != oldAsc {
+		UITableNode_SortRows(tbl)
+		if tbl.onSortCallback != nil do tbl.onSortCallback(tbl, tbl.sortColumn, tbl.sortAscending, gameContext)
+		Notify(&tbl.onSort, rawptr(tbl), tbl.sortColumn, gameContext)
 	}
+}
+
+// UITableNode_SortRows orders the rows by the sort column (numbers as
+// numbers), keeping the selected row selected.
+UITableNode_SortRows :: proc(tbl: ^UITableNode) {
+	if tbl.sortColumn < 0 || len(tbl.rows) < 2 do return
+	selId := tbl.rows[tbl.selectedRow].id if tbl.selectedRow >= 0 && tbl.selectedRow < len(tbl.rows) else -1
+	col, asc := tbl.sortColumn, tbl.sortAscending
+	cell :: proc(r: uilib.TableRow, col: int) -> string {return r.cells[col].text if col < len(r.cells) else ""}
+	less :: proc(a, b: string) -> bool {
+		x, okx := strconv.parse_f64(strings.trim_space(a))
+		y, oky := strconv.parse_f64(strings.trim_space(b))
+		if okx && oky do return x < y
+		return a < b
+	}
+	// (Stable insertion sort: tables are short.)
+	for i in 1 ..< len(tbl.rows) {
+		for j := i; j > 0; j -= 1 {
+			a, b := cell(tbl.rows[j - 1], col), cell(tbl.rows[j], col)
+			if !(less(b, a) if asc else less(a, b)) do break
+			tbl.rows[j - 1], tbl.rows[j] = tbl.rows[j], tbl.rows[j - 1]
+		}
+	}
+	if selId >= 0 do for r, i in tbl.rows do if r.id == selId do tbl.selectedRow = i
 }
 
 UITableNode_Destroy :: proc(node: ^Node, gameContext: ^GameContext) {

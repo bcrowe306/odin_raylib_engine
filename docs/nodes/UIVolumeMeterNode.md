@@ -44,8 +44,8 @@ player, a rhythm game's HUD or a debug overlay.
   -3 dB.
 - **Peak line**: a white line marks the highest level. It holds for
   1.2 seconds, then falls slowly.
-- **Clip light**: the box at the top of a bar lights red while the level is
-  at the very top of the range.
+- **Clip light**: the box at the top of a bar lights red when the level
+  reaches the very top of the range, and stays lit for 1.5 seconds.
 - Levels outside Min Db - Max Db are drawn at the end of the bar.
 - The meter doesn't listen to audio on its own. It shows whatever **Level
   L** / **Level R** hold, so it can show any value you convert to dB.

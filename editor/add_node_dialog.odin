@@ -341,7 +341,7 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		name        = "UI Label",
 		category    = "UI & Interface",
 		icon        = ICON_FA_TAG,
-		description = "Clean text renderer with font sizing, color styling, and multi-line wrapping.",
+		description = "Clean text renderer with font sizing and color styling (one line: no wrapping).",
 		typeName    = "UILabelNode",
 	},
 	{

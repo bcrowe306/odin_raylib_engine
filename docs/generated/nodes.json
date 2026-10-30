@@ -956,7 +956,7 @@
       "type": "UILabelNode",
       "name": "UI Label",
       "category": "UI & Interface",
-      "description": "Clean text renderer with font sizing, color styling, and multi-line wrapping.",
+      "description": "Clean text renderer with font sizing and color styling (one line: no wrapping).",
       "aliases": ["uilabel"],
       "hasOrigin": false,
       "properties": [
@@ -1003,7 +1003,7 @@
         {"name": "value", "kind": "number", "owner": "UISliderNode", "default": 0.5, "min": -1000, "max": 1000, "doc": "Current value (between min and max)."},
         {"name": "minValue", "kind": "number", "owner": "UISliderNode", "default": 0, "min": -10000, "max": 10000, "doc": "Lowest value."},
         {"name": "maxValue", "kind": "number", "owner": "UISliderNode", "default": 1, "min": -10000, "max": 10000, "doc": "Highest value."},
-        {"name": "defaultValue", "kind": "number", "owner": "UISliderNode", "default": 0.5, "min": -10000, "max": 10000, "doc": "Value restored by reset (double-click)."},
+        {"name": "defaultValue", "kind": "number", "owner": "UISliderNode", "default": 0.5, "min": -10000, "max": 10000, "doc": "Value a right-click restores (a slider's reset button too)."},
         {"name": "fineScale", "kind": "number", "owner": "UISliderNode", "default": 0.1, "min": 0.01, "max": 0.5, "doc": "Drag speed with Shift held (fine adjustment)."},
         {"name": "isInteger", "kind": "boolean", "owner": "UISliderNode", "default": false, "doc": "Snap to whole numbers."},
         {"name": "showResetButton", "kind": "boolean", "owner": "UISliderNode", "default": true, "doc": "Show a button that restores the default value."},
@@ -1120,7 +1120,7 @@
         {"name": "value", "kind": "number", "owner": "UIKnobNode", "default": 50, "min": 0, "max": 100, "doc": "Current value (between min and max)."},
         {"name": "minValue", "kind": "number", "owner": "UIKnobNode", "default": 0, "min": 0, "max": 100, "doc": "Lowest value."},
         {"name": "maxValue", "kind": "number", "owner": "UIKnobNode", "default": 100, "min": 1, "max": 1000, "doc": "Highest value."},
-        {"name": "defaultValue", "kind": "number", "owner": "UIKnobNode", "default": 50, "doc": "Value restored by reset (double-click)."}
+        {"name": "defaultValue", "kind": "number", "owner": "UIKnobNode", "default": 50, "doc": "Value a right-click restores (a slider's reset button too)."}
       ]
     },
     {
@@ -1184,7 +1184,7 @@
       "hasOrigin": false,
       "properties": [
         {"name": "size", "kind": "vec2", "owner": "UIElement", "default": [360, 10], "min": 4, "max": 1280, "doc": "Width and height (px)."},
-        {"name": "label", "kind": "string", "owner": "UISeparatorNode", "default": "", "doc": "Text in the middle of the line (\"\" = a plain line)."},
+        {"name": "label", "kind": "string", "owner": "UISeparatorNode", "default": "", "doc": "Text at the start of the line (\"\" = a plain line); with text it's at least 18 px tall."},
         {"name": "lineColor", "kind": "color", "owner": "UISeparatorNode", "default": "#3e4452ff", "doc": "Colour of the line."}
       ]
     },
@@ -1354,7 +1354,7 @@
         {"name": "titleColor", "kind": "color", "owner": "UIContainerNode", "default": "#00000000", "doc": "Title text colour."},
         {"name": "tabDirection", "kind": "enum", "owner": "UITabContainerNode", "default": "Horizontal", "values": ["Horizontal", "Vertical"], "doc": "Tabs along the top or the side."},
         {"name": "tabNames", "kind": "list", "owner": "UITabContainerNode", "default": ["Tab 1", "Tab 2"], "doc": "Each tab's title, one a line, in the order of the child pages."},
-        {"name": "activeTab", "kind": "integer", "owner": "UITabContainerNode", "default": 0, "min": 0, "max": 16, "doc": "Index of the shown tab (child)."},
+        {"name": "activeTab", "kind": "integer", "owner": "UITabContainerNode", "default": 0, "min": 0, "max": 16, "doc": "The open tab (from 0): its page - the UI child at that index - shows, the others are hidden."},
         {"name": "tabSize", "kind": "number", "owner": "UITabContainerNode", "default": 30, "min": 20, "max": 64, "doc": "Tab height (or width when vertical; px)."}
       ]
     }

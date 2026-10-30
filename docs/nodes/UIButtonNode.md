@@ -41,9 +41,9 @@ Retry. It changes colour under the mouse and while pressed, and raises
 - **Position** is the top-left corner, **Size** the width and height. In a
   container with Stretch alignment the width follows the container.
 - **With an icon**, the text is drawn at the default size; **Font Size**
-  only applies without one.
-- **Disabled** buttons (the node's **Enabled** off) don't react. A hidden
-  button (visibility off) still takes clicks, so disable it instead.
+  only applies without one (the Inspector hides it then).
+- **Disabled** or hidden buttons (the node's **Enabled** or visibility off)
+  don't react.
 - **Covered by a dropdown**: while a [UI Dropdown](UIDropdownNode.md)'s
   list is open over the button, the list gets the click.
 - `set_text` / `get_text` change and read the caption from a script.

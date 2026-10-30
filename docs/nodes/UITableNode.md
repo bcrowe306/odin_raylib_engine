@@ -46,8 +46,9 @@ Scripts: `node:set_property("columns", {...})`, and
   click on a row selects it.
 - **Sorting**: a click on a sortable column's header makes it the
   **Sort Column**, or flips **Sort Ascending** if it already is, and moves
-  the arrow (`^` ascending, `v` descending). The table doesn't reorder the
-  rows itself.
+  the arrow (`^` ascending, `v` descending), and the table reorders the
+  rows by that column (numbers as numbers, the selected row stays
+  selected).
 - **In the world or on screen**: under a [Screen Layer](ScreenLayerNode.md)
   it stays on screen; outside one it's drawn in the world (the camera moves
   it) and reads the mouse there too, so clicks line up either way.
@@ -57,11 +58,9 @@ Scripts: `node:set_property("columns", {...})`, and
 | Signal | When | Value |
 |---|---|---|
 | `row_selected` | The selected row changes | The row's index (from 0) |
-| `sorted` | The sort column or order changes | - |
+| `sorted` | The sort column or order changes | The sort column (from 0) |
 
-Both signals are listed in the Node tab's **Signals** section, but for now
-a game doesn't raise them: a click on a row or a header doesn't fire them.
-Read `selectedRow`, `sortColumn` and `sortAscending` instead.
+Clicks and the arrow keys raise them; `sortAscending` tells the order.
 
 ## Example
 
