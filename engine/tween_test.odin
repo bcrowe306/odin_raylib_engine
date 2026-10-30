@@ -74,9 +74,9 @@ eased = Tween.ease("in_quad", 0.5)
 	testing.expect_value(t, len(game.tweens.tweens), 0)
 
 	// Track keys keep their easing in saved files.
-	key := Track_Key{frame = 0, value = {0, 0, 0, 0}, ease = .Out_Quad}
+	key := Track_Key{time = 0, value = {0, 0, 0, 0}, ease = .Out_Quad}
 	tr := Property_Track{keys = make([dynamic]Track_Key, context.temp_allocator)}
-	append(&tr.keys, key, Track_Key{frame = 10, value = {100, 0, 0, 0}})
+	append(&tr.keys, key, Track_Key{time = 10, value = {100, 0, 0, 0}})
 	v, _ := Track_Sample(&tr, 5)
 	testing.expect_value(t, v.x, f32(75))
 	_ = strings.contains

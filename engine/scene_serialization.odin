@@ -411,29 +411,44 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 							tr.audioSettings.sfxNode,
 						)
 					}
-					strings.write_string(&w.sb, ", \"keys\": [")
+					// Keys in seconds (#176): {"t", "v", "ease", "out", "in", "text", "arg"}.
+					strings.write_string(&w.sb, ", \"units\": \"seconds\", \"keys\": [")
 					for k, ki in tr.keys {
 						if ki > 0 do strings.write_string(&w.sb, ", ")
-						strings.write_byte(&w.sb, '[')
-						Json_Float(w, k.frame)
-						if tr.kind != .Property {
-							// Event keys: [frame, "method or sound"]
-							strings.write_string(&w.sb, ", ")
-							Json_String(w, k.text)
-							if k.arg != "" {
-								strings.write_string(&w.sb, ", ")
-								Json_String(w, k.arg)
+						strings.write_string(&w.sb, "{\"t\": ")
+						Json_Float(w, k.time)
+						if tr.kind == .Property && k.value != {} {
+							strings.write_string(&w.sb, ", \"v\": [")
+							for v, vi in k.value {
+								if vi > 0 do strings.write_string(&w.sb, ", ")
+								Json_Float(w, v)
 							}
 							strings.write_byte(&w.sb, ']')
-							continue
 						}
-						for v in k.value {
-							strings.write_string(&w.sb, ", ")
-							Json_Float(w, v)
+						if tr.kind == .Property && k.ease != .Linear && !k.bezier do fmt.sbprintf(&w.sb, ", \"ease\": \"%s\"", Ease_Name(k.ease))
+						if k.bezier do strings.write_string(&w.sb, ", \"bezier\": true")
+						for h in ([]struct {key: string, tan: [4][2]f32}{{"out", k.outTan}, {"in", k.inTan}}) {
+							if h.tan == {} do continue
+							fmt.sbprintf(&w.sb, ", \"%s\": [", h.key)
+							for c, ci in h.tan {
+								if ci > 0 do strings.write_string(&w.sb, ", ")
+								strings.write_byte(&w.sb, '[')
+								Json_Float(w, c.x)
+								strings.write_string(&w.sb, ", ")
+								Json_Float(w, c.y)
+								strings.write_byte(&w.sb, ']')
+							}
+							strings.write_byte(&w.sb, ']')
 						}
-						if k.ease != .Linear || k.hasCurve do fmt.sbprintf(&w.sb, ", \"%s\"", Ease_Name(k.ease))
-						if k.hasCurve do fmt.sbprintf(&w.sb, ", [%.4g, %.4g, %.4g, %.4g]", k.curve[0], k.curve[1], k.curve[2], k.curve[3])
-						strings.write_byte(&w.sb, ']')
+						if k.text != "" {
+							strings.write_string(&w.sb, ", \"text\": ")
+							Json_String(w, k.text)
+						}
+						if k.arg != "" {
+							strings.write_string(&w.sb, ", \"arg\": ")
+							Json_String(w, k.arg)
+						}
+						strings.write_byte(&w.sb, '}')
 					}
 					strings.write_string(&w.sb, "]}")
 				}
@@ -912,7 +927,7 @@ sj_rect :: proc(obj: json.Object, key: string) -> rl.Rectangle {
 	return {}
 }
 
-@(private = "file")
+@(private)
 load_texture_into :: proc(tn: ^TextureNode, path: string, ctx: ^GameContext) {
 	tn.filePath = strings.clone(path, tn.allocator)
 	rm := resource_manager(ctx)
@@ -1115,6 +1130,7 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 	case AnimationPlayerNode:
 		apn := cast(^AnimationPlayerNode)node
 		rm := resource_manager(ctx)
+		apn.fps = sj_float(obj, "fps", 12) // (before the animations: older keys convert at its rate)
 		if anims, ok := sj_arr(obj, "animations"); ok {
 			for av in anims {
 				ao, is_obj := av.(json.Object)
@@ -1207,19 +1223,45 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 							track.audioSettings.sfxNode = strings.clone(sj_string(asObj, "sfx_node", ""), apn.allocator)
 						}
 						keys, _ := sj_arr(to, "keys")
+						num :: proc(v: json.Value) -> f32 {
+							#partial switch x in v {
+							case json.Integer: return f32(x)
+							case json.Float:   return f32(x)
+							}
+							return 0
+						}
+						// Older keys (frames) with a custom curve: made into handles once the
+						// keys are in place.
+						legacyCurves := make([dynamic]struct {key: int, c: [4]f32}, context.temp_allocator)
 						for kv in keys {
+							if ko, isObj := kv.(json.Object); isObj {
+								// Keys in seconds (#176).
+								key := Track_Key{time = sj_float(ko, "t", 0)}
+								if vs, has := sj_arr(ko, "v"); has do for i in 0 ..< min(len(vs), 4) do key.value[i] = num(vs[i])
+								if name := sj_string(ko, "ease", ""); name != "" do key.ease, _ = Ease_Parse(name)
+								else if track.kind != .Property do key.ease = .Constant
+								key.bezier = sj_bool(ko, "bezier", false)
+								for h in ([]struct {name: string, tan: ^[4][2]f32}{{"out", &key.outTan}, {"in", &key.inTan}}) {
+									if arr, has := sj_arr(ko, h.name); has {
+										for c, ci in arr {
+											if ci >= 4 do break
+											if pair, isPair := c.(json.Array); isPair && len(pair) == 2 do h.tan[ci] = {num(pair[0]), num(pair[1])}
+										}
+									}
+								}
+								if text := sj_string(ko, "text", ""); text != "" do key.text = strings.clone(text, apn.allocator)
+								if arg := sj_string(ko, "arg", ""); arg != "" do key.arg = strings.clone(arg, apn.allocator)
+								append(&track.keys, key)
+								continue
+							}
+							// Older files: [frame, ...] - the frame's time with the animation's
+							// frame durations (it plays as it did).
 							ka, isArr := kv.(json.Array)
 							if !isArr || len(ka) < 2 do continue
-							num :: proc(v: json.Value) -> f32 {
-								#partial switch x in v {
-								case json.Integer: return f32(x)
-								case json.Float:   return f32(x)
-								}
-								return 0
-							}
-							key := Track_Key{frame = num(ka[0])}
+							key := Track_Key{time = Animation_FrameTime(apn, anim, num(ka[0]))}
 							if text, isStr := ka[1].(json.String); isStr {
 								key.text = strings.clone(string(text), apn.allocator)
+								key.ease = .Constant
 								if len(ka) >= 3 {
 									if arg, argStr := ka[2].(json.String); argStr do key.arg = strings.clone(string(arg), apn.allocator)
 								}
@@ -1232,12 +1274,13 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 							}
 							if len(ka) >= 7 {
 								if c, isCurve := ka[6].(json.Array); isCurve && len(c) == 4 {
-									for i in 0 ..< 4 do key.curve[i] = num(c[i])
-									key.hasCurve = true
+									append(&legacyCurves, struct {key: int, c: [4]f32}{len(track.keys), {num(c[0]), num(c[1]), num(c[2]), num(c[3])}})
 								}
 							}
 							append(&track.keys, key)
 						}
+						Track_SortKeys(track)
+						for lc in legacyCurves do Track_SetSegmentCurve(track, lc.key, lc.c)
 					}
 				}
 			}

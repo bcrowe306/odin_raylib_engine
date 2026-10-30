@@ -45,7 +45,7 @@ click @anim.play
 wait 20
 click @anim.stop
 key ctrl+s
-expect file:scenes/main.scene.json contains "tracks": [{"target": ".", "property": "rotation", "keys": [[0, 0, 0, 0, 0], [2, 90, 0, 0, 0]]}]
+expect file:scenes/main.scene.json contains "tracks": [{"target": ".", "property": "rotation", "units": "seconds", "keys": [{"t": 0}, {"t": 0.1667, "v": [90, 0, 0, 0]}]}]
 expect file:scenes/main.scene.json contains textures/Asteroid_3.png
 
 # Easing on a key: out_quad from frame 1 to 3 puts frame 2 at 75%.
@@ -58,7 +58,7 @@ expect node:AnimationPlayer.rotation == 67.5
 screenshot key_easing
 click @anim.stop
 key ctrl+s
-expect file:scenes/main.scene.json contains "keys": [[0, 0, 0, 0, 0, "out_quad"], [2, 90, 0, 0, 0]]
+expect file:scenes/main.scene.json contains "keys": [{"t": 0, "ease": "out_quad"}, {"t": 0.1667, "v": [90, 0, 0, 0]}]
 
 # A method track: a key calls a script method when playback reaches it.
 click @anim.add-track
@@ -75,7 +75,7 @@ type on_footstep
 screenshot method_track
 click @anim.frame:1
 click @toolbar.save
-expect file:scenes/main.scene.json contains "property": "@call", "kind": "method", "keys": [[1, "on_footstep"]]
+expect file:scenes/main.scene.json contains "property": "@call", "kind": "method", "units": "seconds", "keys": [{"t": 0.0833, "text": "on_footstep"}]
 
 # Frame duration: edit duration of selected frame
 click @anim.frame:2

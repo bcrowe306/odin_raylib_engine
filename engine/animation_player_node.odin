@@ -31,9 +31,15 @@ AnimationPlayerNode :: struct {
 	// Crossfade (AnimationPlayerNode_Play with a blend time): property tracks
 	// shared with the previous animation blend from it.
 	blendFrom:      ^Animation,
-	blendFromFrame: f32,
+	blendFromTime:  f32,
 	blendTime:      f32,
 	blendElapsed:   f32,
+	// The track clock (#176): seconds into the current animation. The sprite
+	// frames drive it (their frame's time and the part of it shown), unless
+	// the tracks run longer than the frames - then it runs on its own and
+	// decides the loops and the end.
+	time:    f32,
+	playing: bool, // started and not stopped (pausing: the ticker)
 }
 
 AnimationPlayerNode_AddAnimation :: proc(animationPlayer: ^AnimationPlayerNode, animation: ^Animation) {
@@ -108,7 +114,7 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 		if apn.currentFrame <= auto_cast a.startFrame {
 			if a.loop {
 				apn.currentFrame = a.endFrame
-				apn.loopsDone += 1
+				if a.tracks == nil || !Animation_TracksLonger(apn, a) do apn.loopsDone += 1
 			}
 		}
 		else {
@@ -119,15 +125,18 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 		if apn.currentFrame >= auto_cast a.endFrame {
 			if a.loop {
 				apn.currentFrame = a.startFrame
-				apn.loopsDone += 1
+				if a.tracks == nil || !Animation_TracksLonger(apn, a) do apn.loopsDone += 1
 			}
 		}
 		else {
 			apn.currentFrame += 1
 		}
 	}
-	moved := apn.currentFrame != prevFrame
-	if a.tracks != nil && (moved || a.loop) do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
+	_ = prevFrame
+	tracksLonger := a.tracks != nil && Animation_TracksLonger(apn, a)
+	if tracksLonger && apn.currentFrame != prevFrame && (apn.currentFrame == a.startFrame || apn.currentFrame == a.endFrame) {
+		// (The frames looping under longer tracks: not the animation's loop.)
+	}
 	if a != nil && len(a.frameDurations) > apn.currentFrame && a.frameDurations[apn.currentFrame] > 0 {
 		dur := a.frameDurations[apn.currentFrame]
 		apn.ticker.secondsPerFrame = time.Duration(math.round(f64(dur) * f64(time.Second)))
@@ -136,9 +145,10 @@ AnimationPlayerNode_AdvanceFrame :: proc(apn: ^AnimationPlayerNode) {
 		if fps <= 0 do apn.ticker.secondsPerFrame = max(time.Duration)
 		else do apn.ticker.secondsPerFrame = time.Duration(math.round(f64(time.Second) / f64(fps)))
 	}
-	// A non-looping animation that reached its last frame finishes once.
+	// A non-looping animation that reached its last frame finishes once
+	// (tracks running longer: when they end - AnimationPlayerNode_Update).
 	atEnd := apn.currentFrame <= a.startFrame if reversed else apn.currentFrame >= a.endFrame
-	if !a.loop && atEnd && !apn.finishedNotified {
+	if !a.loop && atEnd && !apn.finishedNotified && !tracksLonger {
 		apn.finishedNotified = true
 		apn.ticker->stop()
 		apn.onFinished->notify(apn, a.name, apn.gameContext)
@@ -238,8 +248,83 @@ AnimationPlayerNode_Update :: proc(node: ^Node, gameContext: ^GameContext, delta
 		if apn.blendElapsed >= apn.blendTime do apn.blendFrom = nil
 	}
 	if a := AnimationPlayerNode_GetAnimation(apn); a != nil && len(a.tracks) > 0 {
-		AnimationPlayerNode_ApplyTracks(apn, f32(apn.currentFrame - a.startFrame))
+		AnimationPlayerNode_AdvanceClock(apn, a, deltaTime)
+		AnimationPlayerNode_ApplyTracks(apn, apn.time)
 	}
+}
+
+// AnimationPlayerNode_AdvanceClock moves the track clock `dt` seconds on
+// and fires the event keys it passes (a loop: up to the end, then from the
+// start).
+AnimationPlayerNode_AdvanceClock :: proc(apn: ^AnimationPlayerNode, a: ^Animation, dt: f32) {
+	reversed := AnimationPlayerNode_IsReversed(apn, a)
+	D := Animation_Duration(apn, a)
+	prev := apn.time
+	if !Animation_TracksLonger(apn, a) {
+		// The frames drive it: their frame's time and the part of it shown.
+		rel := apn.currentFrame - a.startFrame
+		fd := Animation_GetFrameDuration(a, apn.currentFrame, AnimationPlayerNode_FPS(apn))
+		el := min(f32(time.duration_seconds(apn.ticker.elapsedTime)), fd) if apn.playing && apn.ticker.running else 0
+		t := Animation_FrameTime(apn, a, f32(rel) + 1) - el if reversed else Animation_FrameTime(apn, a, f32(rel)) + el
+		if !apn.playing && reversed do t = Animation_FrameTime(apn, a, f32(rel))
+		t = clamp(t, 0, D)
+		apn.time = t
+		if !apn.playing || !apn.ticker.running do return
+		if !reversed {
+			if t + TRACK_KEY_EPS < prev && a.loop { // looped
+				AnimationPlayerNode_FireEvents(apn, prev, D)
+				AnimationPlayerNode_FireEvents(apn, 0, t, inclusive = true)
+			} else if t > prev {
+				AnimationPlayerNode_FireEvents(apn, prev, t)
+			}
+		} else {
+			if t > prev + TRACK_KEY_EPS && a.loop {
+				AnimationPlayerNode_FireEvents(apn, prev, 0)
+				AnimationPlayerNode_FireEvents(apn, D, t, inclusive = true)
+			} else if t < prev {
+				AnimationPlayerNode_FireEvents(apn, prev, t)
+			}
+		}
+		return
+	}
+	// The tracks run longer: the clock runs on its own.
+	if !apn.playing || !apn.ticker.running || D <= 0 do return
+	t := prev - dt if reversed else prev + dt
+	switch {
+	case !reversed && t >= D:
+		AnimationPlayerNode_FireEvents(apn, prev, D)
+		if a.loop {
+			for t >= D do t -= D
+			apn.loopsDone += 1
+			AnimationPlayerNode_FireEvents(apn, 0, t, inclusive = true)
+		} else {
+			t = D
+			animation_finish(apn, a)
+		}
+	case reversed && t <= 0:
+		AnimationPlayerNode_FireEvents(apn, prev, 0)
+		if a.loop {
+			for t <= 0 do t += D
+			apn.loopsDone += 1
+			AnimationPlayerNode_FireEvents(apn, D, t, inclusive = true)
+		} else {
+			t = 0
+			animation_finish(apn, a)
+		}
+	case:
+		AnimationPlayerNode_FireEvents(apn, prev, t)
+	}
+	apn.time = t
+}
+
+// animation_finish: a non-looping animation reached its end (once).
+@(private = "file")
+animation_finish :: proc(apn: ^AnimationPlayerNode, a: ^Animation) {
+	if apn.finishedNotified do return
+	apn.finishedNotified = true
+	apn.playing = false
+	apn.ticker->stop()
+	apn.onFinished->notify(apn, a.name, apn.gameContext)
 }
 
 AnimationPlayerNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f32) {
@@ -255,10 +340,12 @@ AnimationPlayerNode_Start :: proc(apn: ^AnimationPlayerNode) {
 	apn.finishedNotified = false
 	apn.loopsDone = 0
 	apply_fps(apn)
+	apn.playing = true
 	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
 		reversed := AnimationPlayerNode_IsReversed(apn, a)
 		apn.currentFrame = a.endFrame if reversed else a.startFrame
-		if a.tracks != nil do AnimationPlayerNode_FireEvents(apn, apn.currentFrame - a.startFrame)
+		apn.time = Animation_Duration(apn, a) if reversed else 0
+		if a.tracks != nil do AnimationPlayerNode_FireEvents(apn, apn.time, apn.time, inclusive = true) // (the keys at the start)
 	}
 	apn.ticker->start(true)
 }
@@ -268,13 +355,13 @@ AnimationPlayerNode_Start :: proc(apn: ^AnimationPlayerNode) {
 // animation's values over `blend` seconds.
 AnimationPlayerNode_Play :: proc(apn: ^AnimationPlayerNode, name: string, blend: f32 = 0) {
 	prev := AnimationPlayerNode_GetAnimation(apn)
-	prevFrame := f32(apn.currentFrame - prev.startFrame) if prev != nil else 0
+	prevTime := apn.time
 	if name != "" do AnimationPlayerNode_SetAnimationByName(apn, name)
 	next := AnimationPlayerNode_GetAnimation(apn)
 	apn.blendFrom = nil
 	if blend > 0 && prev != nil && prev != next && len(prev.tracks) > 0 {
 		apn.blendFrom = prev
-		apn.blendFromFrame = prevFrame
+		apn.blendFromTime = prevTime
 		apn.blendTime = blend
 		apn.blendElapsed = 0
 	}
@@ -282,6 +369,7 @@ AnimationPlayerNode_Play :: proc(apn: ^AnimationPlayerNode, name: string, blend:
 }
 AnimationPlayerNode_Stop :: proc(apn: ^AnimationPlayerNode) {
 	apn.ticker->stop()
+	apn.playing = false
 	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
 		for &tr in a.tracks {
 			if tr.kind == .Audio {

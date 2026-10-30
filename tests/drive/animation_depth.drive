@@ -42,7 +42,7 @@ expect node:AnimationPlayer.rotation >= 20.0
 click @anim.stop
 screenshot curve_on_timeline
 key ctrl+s
-expect file:scenes/main.scene.json contains "linear", [0.42, 0, 1, 1]]
+expect file:scenes/main.scene.json contains {"t": 0, "bezier": true, "out": [[0.07, 0]
 
 # Onion skin: the frames around the playhead, ghosted in the viewport.
 click @anim.frame:2
@@ -66,4 +66,4 @@ screenshot method_arg
 click @anim.frame:1
 wait 2
 click @toolbar.save
-expect file:scenes/main.scene.json contains [1, "on_animation_event", "3"]
+expect file:scenes/main.scene.json contains {"t": 0.0833, "text": "on_animation_event", "arg": "3"}

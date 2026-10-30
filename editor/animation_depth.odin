@@ -1,6 +1,7 @@
 package editor
 
 import "core:fmt"
+import "core:math"
 import "core:os"
 import "core:path/filepath"
 import "core:strings"
@@ -101,10 +102,10 @@ onion_draw_frame :: proc(apn: ^e.AnimationPlayerNode, anim: ^e.Animation, frame:
 	}
 	if tex.texture.id == 0 do return
 	pos, rot, scl := apn.globalPosition, apn.globalRotation, apn.globalScale
-	rel := f32(frame - anim.startFrame)
+	at := e.Animation_FrameTime(apn, anim, f32(frame - anim.startFrame))
 	for &tr in anim.tracks {
 		if tr.kind != .Property || (tr.target != "." && tr.target != "") do continue
-		v, ok := e.Track_Sample(&tr, rel)
+		v, ok := e.Track_Sample(&tr, at)
 		if !ok do continue
 		switch tr.property {
 		case "position": pos = apn.globalPosition - apn.position + {v[0], v[1]}
@@ -121,7 +122,7 @@ onion_draw_frame :: proc(apn: ^e.AnimationPlayerNode, anim: ^e.Animation, frame:
 Curve_Edit :: struct {
 	open:  bool,
 	track: int,
-	frame: f32,
+	time:  f32, // the key's time (seconds)
 }
 
 curveEdit: Curve_Edit
@@ -138,9 +139,9 @@ CURVE_PRESETS := [?]struct {
 	{"Snap", {0.9, 0, 0.1, 1}},
 }
 
-// CurveEditor_Render: the popup editing a key's custom curve (opened from
-// the key's menu).
-CurveEditor_Render :: proc(state: ^EditorState, anim: ^e.Animation) {
+// CurveEditor_Render: the popup editing the curve from a key to the next
+// (opened from the key's menu) - a bezier shape set on the keys' handles.
+CurveEditor_Render :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode, anim: ^e.Animation) {
 	if curveEdit.open {
 		imgui.OpenPopup("##curve_editor")
 		curveEdit.open = false
@@ -152,14 +153,20 @@ CurveEditor_Render :: proc(state: ^EditorState, anim: ^e.Animation) {
 		return
 	}
 	tr := &anim.tracks[curveEdit.track]
-	key: ^e.Track_Key
-	for &k in tr.keys do if abs(k.frame - curveEdit.frame) < 0.001 do key = &k
-	if key == nil {
+	ki := e.Track_KeyAt(tr, curveEdit.time)
+	if ki < 0 {
 		imgui.CloseCurrentPopup()
 		return
 	}
-	UI_PanelTitle(ICON_FA_BEZIER_CURVE, fmt.tprintf("Curve from frame %d to the next key", int(key.frame) + 1))
-	if !key.hasCurve {
+	key := &tr.keys[ki]
+	frame := int(math.round(e.Animation_TimeFrame(apn, anim, key.time)))
+	UI_PanelTitle(ICON_FA_BEZIER_CURVE, fmt.tprintf("Curve from frame %d to the next key", frame + 1))
+	if ki + 1 >= len(tr.keys) {
+		UI_DimText("The last key: add a key after it to shape the motion between them.")
+		return
+	}
+	custom, hasCurve := e.Track_SegmentCurve(tr, ki)
+	if !hasCurve {
 		UI_DimText(fmt.tprintf("Easing: %s - drag a handle or pick a preset for a custom curve.", e.Ease_Name(key.ease)))
 	}
 	// The canvas: x = time 0..1, y = progress (room above / below for overshoot).
@@ -178,17 +185,17 @@ CurveEditor_Render :: proc(state: ^EditorState, anim: ^e.Animation) {
 		imgui.DrawList_AddLine(dl, to_px(o, gx, 0), to_px(o, gx, 1), col_u32(ui_line(0.05)))
 		imgui.DrawList_AddLine(dl, to_px(o, 0, gx), to_px(o, 1, gx), col_u32(ui_line(0.05)))
 	}
-	c := key.curve if key.hasCurve else curve_from_ease(key.ease)
+	c := custom if hasCurve else curve_from_ease(key.ease)
 	h1 := to_px(o, c[0], c[1])
 	h2 := to_px(o, c[2], c[3])
-	if key.hasCurve {
+	if hasCurve {
 		imgui.DrawList_AddLine(dl, to_px(o, 0, 0), h1, col_u32(UI_TEXT_DIM), 1)
 		imgui.DrawList_AddLine(dl, to_px(o, 1, 1), h2, col_u32(UI_TEXT_DIM), 1)
 	}
 	prev := to_px(o, 0, 0)
 	for i in 1 ..= 48 {
 		u := f32(i) / 48
-		y := e.Track_KeyCurve(key^, u)
+		y := e.Track_SegmentFactor(tr, ki, u)
 		pt := to_px(o, u, y)
 		imgui.DrawList_AddLine(dl, prev, pt, col_u32(UI_ACCENT), 2)
 		prev = pt
@@ -202,13 +209,14 @@ CurveEditor_Render :: proc(state: ^EditorState, anim: ^e.Animation) {
 	if imgui.IsItemActivated() && hot != 0 {
 		dragging = hot
 		Editor_RecordUndo(state, "Key curve")
-		if !key.hasCurve do key.curve, key.hasCurve = c, true
+		if !hasCurve do e.Track_SetSegmentCurve(tr, ki, c)
 	}
 	if dragging != 0 && imgui.IsItemActive() {
 		x := clamp((mouse.x - o.x) / S, 0, 1)
 		y := clamp((o.y - mouse.y) / S, -PAD / S, 1 + PAD / S)
-		if dragging == 1 do key.curve[0], key.curve[1] = x, y
-		else do key.curve[2], key.curve[3] = x, y
+		if dragging == 1 do c[0], c[1] = x, y
+		else do c[2], c[3] = x, y
+		e.Track_SetSegmentCurve(tr, ki, c)
 	}
 	if !imgui.IsItemActive() do dragging = 0
 	for i in 1 ..= 2 {
@@ -221,14 +229,14 @@ CurveEditor_Render :: proc(state: ^EditorState, anim: ^e.Animation) {
 		if i % 3 != 0 do imgui.SameLine()
 		if UI_Button(p.name, fmt.tprintf("anim.curve-preset:%s", p.name)) {
 			Editor_RecordUndo(state, "Key curve")
-			key.curve, key.hasCurve = p.curve, true
+			e.Track_SetSegmentCurve(tr, ki, p.curve)
 		}
 	}
-	if key.hasCurve {
-		UI_DimText(fmt.tprintf("cubic-bezier(%.2f, %.2f, %.2f, %.2f)", key.curve[0], key.curve[1], key.curve[2], key.curve[3]))
+	if hasCurve {
+		UI_DimText(fmt.tprintf("cubic-bezier(%.2f, %.2f, %.2f, %.2f)", custom[0], custom[1], custom[2], custom[3]))
 		if UI_Button(fmt.tprintf("Use Easing (%s)", e.Ease_Name(key.ease)), "anim.curve-clear") {
 			Editor_RecordUndo(state, "Key curve")
-			key.hasCurve = false
+			key.bezier = false
 		}
 	}
 }
@@ -250,18 +258,18 @@ curve_from_ease :: proc(ease: e.Ease) -> [4]f32 {
 
 // Track_DrawCurves draws each key's curve to the next on a property track's
 // row (the shape of the motion between keys).
-Track_DrawCurves :: proc(dl: ^imgui.DrawList, tr: ^e.Property_Track, x_of: proc(frame: f32, data: rawptr) -> f32, data: rawptr, top, bottom: f32) {
+Track_DrawCurves :: proc(dl: ^imgui.DrawList, tr: ^e.Property_Track, x_of: proc(time: f32, data: rawptr) -> f32, data: rawptr, top, bottom: f32) {
 	if tr.kind != .Property do return
 	for i in 0 ..< len(tr.keys) - 1 {
 		a, b := tr.keys[i], tr.keys[i + 1]
-		if !a.hasCurve && a.ease == .Linear do continue
-		x0, x1 := x_of(a.frame, data), x_of(b.frame, data)
+		if !a.bezier && a.ease == .Linear do continue
+		x0, x1 := x_of(a.time, data), x_of(b.time, data)
 		if x1 - x0 < 6 do continue
 		h := bottom - top
 		prev := [2]f32{x0, bottom}
 		for s in 1 ..= 16 {
 			u := f32(s) / 16
-			pt := [2]f32{x0 + (x1 - x0) * u, bottom - clamp(e.Track_KeyCurve(a, u), -0.2, 1.2) * h}
+			pt := [2]f32{x0 + (x1 - x0) * u, bottom - clamp(e.Track_SegmentFactor(tr, i, u), -0.2, 1.2) * h}
 			imgui.DrawList_AddLine(dl, prev, pt, col_u32({0.45, 0.65, 1, 0.55}), 1.5)
 			prev = pt
 		}
