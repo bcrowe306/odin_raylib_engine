@@ -763,6 +763,38 @@ CharacterMoverNode_GetWorldCapsule :: proc(cm: ^CharacterMoverNode) -> b2.Capsul
 	return CharacterMoverNode_ShapeWorldCapsule(cm, nil)
 }
 
+@(private = "file")
+Mover_Cast :: struct {
+	self:        b2.BodyId,
+	translation: [2]f32,
+	fraction:    f32,
+}
+
+// character_mover_cast: how far (0..1) a capsule moves along `translation`
+// before a solid shape - Box2D's World_CastMover, but past sensors (it
+// stopped at Areas, #173) and the mover's own proxy body. The capsule is a
+// little thinner (two linear slops), as the mover cast lets it encroach:
+// resting on a floor isn't a hit at the start. Shapes it starts touching,
+// or moves away from, don't stop it either (the plane solver already keeps
+// it out of them).
+character_mover_cast :: proc(worldId: b2.WorldId, capsule: b2.Capsule, translation: [2]f32, filter: b2.QueryFilter, self: b2.BodyId) -> f32 {
+	slop := 0.005 * b2.GetLengthUnitsPerMeter()
+	pts := [2]b2.Vec2{capsule.center1, capsule.center2}
+	proxy := b2.MakeProxy(pts[:], max(capsule.radius - 2 * slop, 0.01))
+	mc := Mover_Cast{self = self, translation = translation, fraction = 1}
+	callback :: proc "c" (shapeId: b2.ShapeId, point: b2.Vec2, normal: b2.Vec2, fraction: f32, ctx: rawptr) -> f32 {
+		mc := cast(^Mover_Cast)ctx
+		if b2.Shape_IsSensor(shapeId) do return -1 // (ignored: go on)
+		if b2.Body_IsValid(mc.self) && b2.Shape_GetBody(shapeId) == mc.self do return -1
+		if fraction <= 0 do return -1 // (touching at the start)
+		if normal.x * mc.translation.x + normal.y * mc.translation.y >= 0 do return -1 // (moving away)
+		if fraction < mc.fraction do mc.fraction = fraction
+		return fraction // (only closer hits from now on)
+	}
+	_ = b2.World_CastShape(worldId, proxy, translation, filter, callback, &mc)
+	return mc.fraction
+}
+
 CharacterMover_PlaneResultCallback :: proc "c" (shapeId: b2.ShapeId, planeResult: ^b2.PlaneResult, ctx: rawptr) -> bool {
 	if planeResult == nil || !planeResult.hit || ctx == nil {
 		return true
@@ -966,16 +998,17 @@ CharacterMoverNode_MoveAndSlide :: proc(cm: ^CharacterMoverNode, gameContext: ^G
 		cm.velocity = b2.ClipVector(cm.velocity, planesSlice)
 	}
 
-	// 4. Cast mover along solved translation to prevent tunneling (World_CastMover)
+	// 4. Cast mover along solved translation to prevent tunneling - past
+	// sensors (Areas are triggers: #173) and its own proxy body.
 	fraction: f32 = 1.0
 	if len(cm.shapes) == 0 {
 		moverCapsule := CharacterMoverNode_GetWorldCapsule(cm)
-		fraction = b2.World_CastMover(pw.worldId, moverCapsule, solverResult.translation, qFilter)
+		fraction = character_mover_cast(pw.worldId, moverCapsule, solverResult.translation, qFilter, cm.bodyId)
 	} else {
 		for &s in cm.shapes {
 			if s.isSensor do continue
 			cap := CharacterMoverNode_ShapeWorldCapsule(cm, &s)
-			f := b2.World_CastMover(pw.worldId, cap, solverResult.translation, qFilter)
+			f := character_mover_cast(pw.worldId, cap, solverResult.translation, qFilter, cm.bodyId)
 			if f < fraction do fraction = f
 		}
 	}
