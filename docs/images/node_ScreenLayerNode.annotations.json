@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "A label under the layer: (-260, 24) from the frame's top-right corner", "x": 827, "y": 143, "w": 56, "h": 56},
+    {"label": "Anchor: the point of the screen the layer sits at", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

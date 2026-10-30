@@ -1,0 +1,335 @@
+# Screenshots for the UI nodes' pages, part 1 (docs/nodes/*.md, #45):
+# Screen Layer, Dialogue Box, UI Container, Label, Button, Slider, Checkbox,
+# Progress Bar, Text Input, Dropdown, Radio Group, Toggle Switch, Knob.
+#   scripts/docs/screenshots.sh docs_nodes_ui1
+wait 5
+
+# --- Screen Layer: a score label anchored top right ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type screen layer
+click @addnode.create
+wait 3
+expect node:ScreenLayer.type == ScreenLayerNode
+hover @insp.prop:anchor
+click @insp.prop:anchor
+wait 2
+click @pick:TopRight
+wait 2
+click @hier.add
+type ui label
+click @addnode.create
+wait 3
+expect node:UILabel.parent == ScreenLayer
+click @insp.prop:text
+key cmd+a
+type Score: 1200
+key enter
+dblclick @insp.prop:fontSize
+key ctrl+a
+type 40
+key enter
+dblclick @insp.position.x
+key ctrl+a
+type -260
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type 24
+key enter
+click @hier:ScreenLayer
+wait 2
+key shift+home
+wait 3
+# The Anchor picker open: the nine points of the screen.
+click @insp.prop:anchor
+wait 2
+annotate @node:UILabel A label under the layer: (-260, 24) from the frame's top-right corner
+annotate @window:inspector Anchor: the point of the screen the layer sits at
+screenshot node_ScreenLayerNode
+key escape
+wait 2
+
+# --- Dialogue Box: lines shown from the Lua console in Simulate ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type dialogue box
+click @addnode.create
+wait 3
+expect node:DialogueBox.type == DialogueNode
+dblclick @insp.position.x
+key ctrl+a
+type 190
+key enter
+dblclick @insp.position.y
+key ctrl+a
+type 520
+key enter
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 10
+click @bottom:console
+click @console.lua
+type Scene.find_node("DialogueBox"):dialogue_show({ { speaker = "Guard", text = "Halt! Nobody passes the gate after dark." }, { speaker = "Guard", text = "Come back in the morning." } })
+key enter
+wait 120
+key shift+home
+wait 3
+annotate @node:DialogueBox The box: speaker, the typed-out line, the "more" marker
+annotate @window:inspector Colours, padding, typing speed, advance action, mode
+screenshot node_DialogueNode
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5
+
+# --- UI Container: a vertical options panel (laid out in Simulate) ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui container
+click @addnode.create
+wait 3
+expect node:UIContainer.type == UIContainerNode
+click @insp.prop:title
+key cmd+a
+type Options
+key enter
+click @hier.add
+type ui label
+click @addnode.create
+wait 3
+expect node:UILabel.parent == UIContainer
+click @insp.prop:text
+key cmd+a
+type Audio
+key enter
+click @hier:UIContainer
+click @hier.add
+type ui slider
+click @addnode.create
+wait 3
+click @hier:UIContainer
+click @hier.add
+type ui checkbox
+click @addnode.create
+wait 3
+click @hier:UIContainer
+click @hier.add
+type ui button
+click @addnode.create
+wait 3
+expect node:UIButton.parent == UIContainer
+click @hier:UIContainer
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 10
+click @hier:UIContainer
+key shift+f
+wait 3
+annotate @node:UIContainer The panel: header, then its UI children in a column
+annotate @window:inspector Direction, alignment, spacing, padding, colours
+screenshot node_UIContainerNode
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5
+
+# --- UI Label ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui label
+click @addnode.create
+wait 3
+expect node:UILabel.type == UILabelNode
+click @insp.prop:text
+key cmd+a
+type Level 3 - The Caves
+key enter
+click @insp.prop:drawBackground
+expect node:UILabel.prop.drawBackground == true
+key shift+f
+wait 3
+annotate @node:UILabel The label (Draw Background on)
+annotate @window:inspector Text, size, colour, alignment, background
+screenshot node_UILabelNode
+
+# --- UI Button ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui button
+click @addnode.create
+wait 3
+expect node:UIButton.type == UIButtonNode
+click @insp.prop:text
+key cmd+a
+type Start Game
+key enter
+key shift+f
+wait 3
+annotate @node:UIButton The button
+annotate @window:inspector Caption, icon, colours for rest / hover / pressed
+screenshot node_UIButtonNode
+
+# --- UI Slider ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui slider
+click @addnode.create
+wait 3
+expect node:UISlider.type == UISliderNode
+click @insp.prop:label
+key cmd+a
+type Music
+key enter
+key shift+f
+wait 3
+annotate @node:UISlider Label, track, value box (click to type), reset button
+annotate @window:inspector Value, range, default, whole numbers, reset button
+screenshot node_UISliderNode
+
+# --- UI Checkbox ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui checkbox
+click @addnode.create
+wait 3
+expect node:UICheckbox.type == UICheckboxNode
+click @insp.prop:label
+key cmd+a
+type Fullscreen
+key enter
+click @insp.prop:checked
+expect node:UICheckbox.prop.checked == true
+key shift+f
+wait 3
+annotate @node:UICheckbox The checkbox, ticked
+annotate @window:inspector Checked, default, accent colour, box size
+screenshot node_UICheckboxNode
+
+# --- UI Progress Bar ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui progress bar
+click @addnode.create
+wait 3
+expect node:UIProgressBar.type == UIProgressBarNode
+click @insp.prop:label
+key cmd+a
+type Health
+key enter
+key shift+f
+wait 3
+annotate @node:UIProgressBar The bar: filled to its value, with the percentage
+annotate @window:inspector Value, range, fill colour, direction
+screenshot node_UIProgressBarNode
+
+# --- UI Text Input ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui text input
+click @addnode.create
+wait 3
+expect node:UITextInput.type == UITextInputNode
+click @insp.prop:label
+key cmd+a
+type Player name
+key enter
+key shift+f
+wait 3
+annotate @node:UITextInput Label and the field (its placeholder while empty)
+annotate @window:inspector Label, label width, most characters
+screenshot node_UITextInputNode
+
+# --- UI Dropdown ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui dropdown
+click @addnode.create
+wait 3
+expect node:UIDropdown.type == UIDropdownNode
+click @insp.prop:label
+key cmd+a
+type Quality
+key enter
+key shift+f
+wait 3
+annotate @node:UIDropdown Label and the selected item; a click opens the list
+annotate @window:inspector Selected index, default, label width
+screenshot node_UIDropdownNode
+
+# --- UI Radio Group ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui radio group
+click @addnode.create
+wait 3
+expect node:UIRadioGroup.type == UIRadioGroupNode
+click @insp.prop:label
+key cmd+a
+type Difficulty
+key enter
+key shift+f
+wait 3
+annotate @node:UIRadioGroup One option on at a time
+annotate @window:inspector Selected index, default, row or column
+screenshot node_UIRadioGroupNode
+
+# --- UI Toggle Switch ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui toggle switch
+click @addnode.create
+wait 3
+expect node:UIToggleSwitch.type == UIToggleSwitchNode
+click @insp.prop:label
+key cmd+a
+type Vibration
+key enter
+click @insp.prop:active
+expect node:UIToggleSwitch.prop.active == true
+key shift+f
+wait 3
+annotate @node:UIToggleSwitch The switch, on
+annotate @window:inspector Label and Active
+screenshot node_UIToggleSwitchNode
+
+# --- UI Knob ---
+click @asset.new-scene
+wait 5
+key shift+home
+click @hier.add
+type ui knob
+click @addnode.create
+wait 3
+expect node:UIKnob.type == UIKnobNode
+click @insp.prop:label
+key cmd+a
+type Reverb
+key enter
+key shift+f
+wait 3
+annotate @node:UIKnob The knob: drag up / down to turn it
+annotate @window:inspector Value, range, default
+screenshot node_UIKnobNode

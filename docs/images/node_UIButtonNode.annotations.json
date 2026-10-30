@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The button", "x": 352, "y": 287, "w": 56, "h": 56},
+    {"label": "Caption, icon, colours for rest / hover / pressed", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}
