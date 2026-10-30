@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The bar: filled to its value, with the percentage", "x": 320, "y": 316, "w": 56, "h": 56},
+    {"label": "Value, range, fill colour, direction", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

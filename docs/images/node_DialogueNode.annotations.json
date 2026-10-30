@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The box: speaker, the typed-out line, the \"more\" marker", "x": 1083, "y": 424, "w": 56, "h": 56},
+    {"label": "Colours, padding, typing speed, advance action, mode", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}

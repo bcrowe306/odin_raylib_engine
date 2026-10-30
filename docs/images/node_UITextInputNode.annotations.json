@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Label and the field (its placeholder while empty)", "x": 320, "y": 311, "w": 56, "h": 56},
+    {"label": "Label, label width, most characters", "x": 1025, "y": 399, "w": 255, "h": 293}
+  ]
+}
