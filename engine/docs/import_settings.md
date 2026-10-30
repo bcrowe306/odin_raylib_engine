@@ -19,7 +19,7 @@ defaults; setting everything back deletes it.
 | **Mipmaps** | Smaller copies for drawing far below the texture's size (less shimmer when zoomed out). |
 | **Export** | **Keep** stores the file as it is; **QOI** re-encodes it as QOI in the exported package - it decodes several times faster than PNG (faster loading, especially big backgrounds and tile sheets), usually a bigger file. The project keeps the PNG. |
 | **Atlas** | Pack it into a sprite atlas on export - sprites on one atlas page draw in one batch. See [atlas.md](atlas.md). |
-| **Slice** | A slicing preset (columns x rows, margin, spacing): the **Sprite Sheet Slicer** opens the sheet with it. Set it with **Save Preset** in the slicer; the x in the preview forgets it. |
+| **Slice** | A slicing preset (columns x rows, or a cell size in pixels; margin, spacing): the **Sprite Sheet Slicer** opens the sheet with it. Set it with **Save Preset** in the slicer; the x in the preview forgets it. |
 
 Filter, wrap and mipmaps apply at once to every copy loaded in the editor
 and when the game loads the texture.
@@ -35,6 +35,11 @@ Example file:
   "atlas": true
 }
 ```
+
+Sliced by cell size, the preset also has `"cell_size": [32, 32]`: cells of
+exactly 32 px, as many as fit (`grid` is then what fits). Sprite-sheet
+animations save it the same way, next to their `grid`; files without it
+slice by the grid.
 
 ## Audio
 

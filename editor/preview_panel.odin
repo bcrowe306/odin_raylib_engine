@@ -1248,7 +1248,8 @@ preview_texture_import :: proc(state: ^EditorState) {
 	// Slicing preset (the Sprite Sheet Slicer starts from it; Save Preset there).
 	if imp.slice.grid != {} {
 		same_or_wrap(110)
-		UI_DimText(fmt.tprintf("Slice %d x %d", imp.slice.grid.x, imp.slice.grid.y))
+		if imp.slice.cellSize != {} do UI_DimText(fmt.tprintf("Slice %d x %d px cells (%d x %d)", imp.slice.cellSize.x, imp.slice.cellSize.y, imp.slice.grid.x, imp.slice.grid.y))
+		else do UI_DimText(fmt.tprintf("Slice %d x %d", imp.slice.grid.x, imp.slice.grid.y))
 		UI_Tooltip("The slicing preset the Sprite Sheet Slicer opens this sheet with (Save Preset in the slicer)")
 		imgui.SameLine()
 		if UI_IconButton(ICON_FA_XMARK, "preview.import.slice.clear", "Forget the slicing preset", size = 22) {

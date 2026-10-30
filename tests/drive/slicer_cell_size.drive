@@ -1,0 +1,29 @@
+# #233: the Sprite Sheet Slicer slices by Cell Size - the cell size typed
+# (whole pixels), as many cells as fit; the preset and the animations made
+# keep it ("cell_size").
+wait 5
+key escape
+click @menu:Tools
+click @menu:Tools/Sprite Sheet Slicer...
+click @slicer.texture
+click @pick:textures/Asteroid_2.png
+dblclick @slicer.cols
+key ctrl+a
+type 4
+key enter
+click @slicer.mode
+click @pick:Cell Size
+wait 2
+screenshot by_cell_size
+click @slicer.save-preset
+wait 2
+expect file:textures/Asteroid_2.png.import.json contains "cell_size"
+click @slicer.cell:0
+click @slicer.name
+type spin
+click @slicer.add
+click @slicer.create
+wait 2
+click @toolbar.save
+wait 2
+expect file:scenes/main.scene.json contains "cell_size"

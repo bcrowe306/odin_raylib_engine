@@ -57,7 +57,7 @@ Animation_FrameSize :: proc(a: ^Animation, frame: int) -> [2]f32 {
 		ssa := cast(^SpriteSheetAnimation)a
 		if ssa.spriteSheet == nil do return {}
 		tex := ssa.spriteSheet.texture
-		r := SpriteSheet_CellRect({f32(tex.width), f32(tex.height)}, ssa.grid, ssa.margin, ssa.spacing, 0)
+		r := SpriteSheet_CellRect({f32(tex.width), f32(tex.height)}, ssa.grid, ssa.margin, ssa.spacing, 0, ssa.cellSize)
 		return {r.width, r.height}
 	}
 	return {}

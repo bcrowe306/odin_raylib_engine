@@ -30,6 +30,8 @@ slicer: struct {
 	texRel:    string,
 	tex:       rl.Texture2D,
 	grid:      [2]c.int,
+	byCell:    bool,      // Slice by Cell Size (else by the grid) - #233
+	cellSize:  [2]c.int,  // px per cell (by cell size)
 	margin:    [2]c.int,
 	spacing:   [2]c.int,
 	selection: [dynamic]int,
@@ -82,7 +84,10 @@ slicer_set_texture :: proc(state: ^EditorState, rel: string) {
 		slicer.grid = {c.int(s.grid.x), c.int(s.grid.y)}
 		slicer.margin = {c.int(s.margin.x), c.int(s.margin.y)}
 		slicer.spacing = {c.int(s.spacing.x), c.int(s.spacing.y)}
+		slicer.byCell = s.cellSize != {}
+		if slicer.byCell do slicer.cellSize = {c.int(s.cellSize.x), c.int(s.cellSize.y)}
 	}
+	slicer_fit()
 	clear(&slicer.selection)
 	slicer_clear_anims()
 }
@@ -99,9 +104,24 @@ slicer_clear_anims :: proc() {
 @(private = "file")
 cell_count :: proc() -> int {return int(max(slicer.grid.x, 1) * max(slicer.grid.y, 1))}
 
+// cell_size_px: the slice's cell size (0: by the grid).
+@(private = "file")
+cell_size_px :: proc() -> [2]int {
+	if !slicer.byCell do return {}
+	return {int(max(slicer.cellSize.x, 1)), int(max(slicer.cellSize.y, 1))}
+}
+
+// slicer_fit: by cell size, the grid is the whole cells that fit.
+@(private = "file")
+slicer_fit :: proc() {
+	if !slicer.byCell || slicer.tex.id == 0 do return
+	fit := e.SpriteSheet_FitGrid({f32(slicer.tex.width), f32(slicer.tex.height)}, {int(slicer.margin.x), int(slicer.margin.y)}, {int(slicer.spacing.x), int(slicer.spacing.y)}, cell_size_px())
+	slicer.grid = {c.int(max(fit.x, 1)), c.int(max(fit.y, 1))}
+}
+
 @(private = "file")
 cell_rect :: proc(cell: int) -> rl.Rectangle {
-	return e.SpriteSheet_CellRect({f32(slicer.tex.width), f32(slicer.tex.height)}, {int(slicer.grid.x), int(slicer.grid.y)}, {int(slicer.margin.x), int(slicer.margin.y)}, {int(slicer.spacing.x), int(slicer.spacing.y)}, cell)
+	return e.SpriteSheet_CellRect({f32(slicer.tex.width), f32(slicer.tex.height)}, {int(slicer.grid.x), int(slicer.grid.y)}, {int(slicer.margin.x), int(slicer.margin.y)}, {int(slicer.spacing.x), int(slicer.spacing.y)}, cell, cell_size_px())
 }
 
 @(private = "file")
@@ -128,6 +148,7 @@ Slicer_Apply :: proc(state: ^EditorState, apn: ^e.AnimationPlayerNode) -> ^e.Ani
 		ssa := e.AnimationPlayerNode_AddSheetAnimation(target, &state.game.resourceManager, a.name, e.Project_ResolveAssetPath(ctx, slicer.texRel), {int(slicer.grid.x), int(slicer.grid.y)}, 0, 0, a.loop)
 		ssa.margin = {int(slicer.margin.x), int(slicer.margin.y)}
 		ssa.spacing = {int(slicer.spacing.x), int(slicer.spacing.y)}
+		ssa.cellSize = cell_size_px()
 		e.SpriteSheetAnimation_SetCells(ssa, a.cells[:], target.allocator)
 	}
 	e.AnimationPlayerNode_SetFPS(target, slicer.fps)
@@ -191,33 +212,48 @@ Slicer_Render :: proc(state: ^EditorState) {
 					return changed
 				}
 				changed := false
-				changed |= int_field("Columns", "slicer.cols", &slicer.grid.x, 1, 256)
-				changed |= int_field("Rows", "slicer.rows", &slicer.grid.y, 1, 256)
-				// Cell size: sets columns / rows to fit.
-				r := cell_rect(0)
-				cell := [2]c.int{c.int(r.width), c.int(r.height)}
-				UI_PropLabel("Cell Size")
-				if imgui.DragInt2("##cellsize", &cell, 0.2, 1, 4096) {
-					for a in 0 ..< 2 {
-						size := slicer.tex.width if a == 0 else slicer.tex.height
-						slicer.grid[a] = max(1, (size - 2 * slicer.margin[a] + slicer.spacing[a]) / max(cell[a] + slicer.spacing[a], 1))
+				// Slice by: the grid (columns x rows; cells share the sheet) or
+				// the cell size (exact whole-pixel cells, as many as fit) - #233.
+				UI_PropLabel("Slice by")
+				mode := 1 if slicer.byCell else 0
+				if k, ok := UI_Combo("slicer.mode", mode, {"Cell Grid", "Cell Size"}); ok {
+					if k == 1 && !slicer.byCell {
+						r := cell_rect(0) // (start from the grid's cell)
+						slicer.cellSize = {c.int(max(r.width, 1)), c.int(max(r.height, 1))}
 					}
+					slicer.byCell = k == 1
 					changed = true
 				}
-				Drive_Item("slicer.cell-size")
+				UI_Tooltip("Cell Grid: columns x rows share the sheet. Cell Size: cells exactly that many pixels, as many as fit; leftover pixels at the right / bottom are unused.")
+				if slicer.byCell {
+					UI_PropLabel("Cell Size")
+					changed |= imgui.DragInt2("##cellsize", &slicer.cellSize, 0.2, 1, 4096)
+					Drive_Item("slicer.cell-size")
+					slicer_fit()
+					UI_PropLabel("Columns x Rows")
+					UI_DimText(fmt.tprintf("%d x %d (whole cells that fit)", slicer.grid.x, slicer.grid.y))
+				} else {
+					changed |= int_field("Columns", "slicer.cols", &slicer.grid.x, 1, 256)
+					changed |= int_field("Rows", "slicer.rows", &slicer.grid.y, 1, 256)
+					r := cell_rect(0)
+					UI_PropLabel("Cell Size")
+					UI_DimText(fmt.tprintf("%g x %g px", r.width, r.height))
+					Drive_Item("slicer.cell-size")
+				}
 				UI_PropLabel("Margin")
 				changed |= imgui.DragInt2("##margin", &slicer.margin, 0.1, 0, 512)
 				Drive_Item("slicer.margin")
 				UI_PropLabel("Spacing")
 				changed |= imgui.DragInt2("##spacing", &slicer.spacing, 0.1, 0, 512)
 				Drive_Item("slicer.spacing")
+				if changed do slicer_fit()
 				if changed do clear(&slicer.selection)
 				UI_EndProps()
 			}
 			if UI_Button(fmt.tprintf("%s  Save Preset", ICON_FA_FLOPPY_DISK), "slicer.save-preset") {
 				full, _ := filepath.join({state.projectPath, slicer.texRel}, context.temp_allocator)
 				imp := Editor_AssetImport(state, full)
-				imp.slice = {grid = {int(slicer.grid.x), int(slicer.grid.y)}, margin = {int(slicer.margin.x), int(slicer.margin.y)}, spacing = {int(slicer.spacing.x), int(slicer.spacing.y)}}
+				imp.slice = {grid = {int(slicer.grid.x), int(slicer.grid.y)}, margin = {int(slicer.margin.x), int(slicer.margin.y)}, spacing = {int(slicer.spacing.x), int(slicer.spacing.y)}, cellSize = cell_size_px()}
 				preview_save_import(state, full, slicer.texRel, imp)
 				Editor_Log(state, .Info, "Slicing preset of %s: %d x %d", slicer.texRel, slicer.grid.x, slicer.grid.y)
 			}

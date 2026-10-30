@@ -506,8 +506,12 @@ own settings (background, ambient light), which the Inspector points to
 ### Sprite Sheet Slicer
 
 **Tools > Sprite Sheet Slicer...** (also a texture's right-click menu and the
-AnimationPlayer Inspector) cuts a sheet into cells: **Columns** / **Rows**
-or a **Cell Size**, **Margin** and **Spacing**. Click cells to pick them
+AnimationPlayer Inspector) cuts a sheet into cells. **Slice by** *Cell
+Grid*: **Columns** / **Rows** share the sheet (the cell size follows, maybe
+fractional); *Cell Size*: cells exactly that many whole pixels, as many as
+fit (the columns and rows follow; leftover pixels at the right and bottom
+are unused - padding, a short last row, a credit strip). **Margin** and
+**Spacing** apply to both. Click cells to pick them
 (drag across to add several, Shift+click for a range; the numbers are the
 play order), name the animation and **Add Animation**, or **One Animation
 per Row**. **Create Animation Player** adds a new node with the animations

@@ -366,6 +366,7 @@ write_node :: proc(w: ^Json_Writer, node: ^Node, manager: ^NodeManager) {
 				fmt.sbprintf(&w.sb, ", \"grid\": [%d, %d], \"start\": %d, \"end\": %d", ssa.grid.x, ssa.grid.y, ssa.startFrame, ssa.endFrame)
 				if ssa.margin != {} do fmt.sbprintf(&w.sb, ", \"margin\": [%d, %d]", ssa.margin.x, ssa.margin.y)
 				if ssa.spacing != {} do fmt.sbprintf(&w.sb, ", \"spacing\": [%d, %d]", ssa.spacing.x, ssa.spacing.y)
+				if ssa.cellSize != {} do fmt.sbprintf(&w.sb, ", \"cell_size\": [%d, %d]", ssa.cellSize.x, ssa.cellSize.y)
 				if len(ssa.cells) > 0 {
 					strings.write_string(&w.sb, ", \"cells\": [")
 					for c, ci in ssa.cells {
@@ -1171,6 +1172,8 @@ read_node :: proc(scene: ^Scene, obj: json.Object, parent: ^Node, ctx: ^GameCont
 					m := sj_vec2(ao, "margin", {})
 					sp := sj_vec2(ao, "spacing", {})
 					ssa.margin, ssa.spacing = {int(m.x), int(m.y)}, {int(sp.x), int(sp.y)}
+					cs := sj_vec2(ao, "cell_size", {}) // (#233; older scenes: by the grid)
+					SpriteSheetAnimation_SetCellSize(ssa, {int(cs.x), int(cs.y)})
 					if cells, has := sj_arr(ao, "cells"); has {
 						list := make([dynamic]int, context.temp_allocator)
 						for cv in cells {

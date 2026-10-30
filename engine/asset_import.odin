@@ -39,9 +39,10 @@ IMPORT_SUFFIX :: ".import.json"
 Texture_Compress :: enum u8 {Keep, QOI}
 
 Asset_Slice :: struct {
-	grid:    [2]int, // columns, rows (0 = no preset)
-	margin:  [2]int,
-	spacing: [2]int,
+	grid:     [2]int, // columns, rows (0 = no preset)
+	margin:   [2]int,
+	spacing:  [2]int,
+	cellSize: [2]int, // px per cell: slice by cell size (0 = by the grid, #233)
 }
 
 Asset_Import :: struct {
@@ -172,7 +173,7 @@ Asset_ImportParse :: proc(text: string, e: ^Asset_Import, allocator := context.a
 	if w, isStr := o["wrap"].(json.String); isStr do e.wrap = .Clamp if w == "clamp" else .Repeat
 	if m, isBool := o["mipmaps"].(json.Boolean); isBool do e.mipmaps = bool(m)
 	if s, isObj := o["slice"].(json.Object); isObj {
-		e.slice = {grid = pair(s, "grid"), margin = pair(s, "margin"), spacing = pair(s, "spacing")}
+		e.slice = {grid = pair(s, "grid"), margin = pair(s, "margin"), spacing = pair(s, "spacing"), cellSize = pair(s, "cell_size")}
 		e.slice.grid = {max(e.slice.grid.x, 0), max(e.slice.grid.y, 0)}
 	}
 	if b, isBool := o["atlas"].(json.Boolean); isBool do e.atlas = bool(b)
@@ -212,7 +213,9 @@ Asset_ImportToJSON :: proc(e: Asset_Import, allocator := context.allocator) -> s
 	if e.slice != {} {
 		sep(&sb, &n)
 		s := e.slice
-		fmt.sbprintf(&sb, "\"slice\": {{\"grid\": [%d, %d], \"margin\": [%d, %d], \"spacing\": [%d, %d]}}", s.grid.x, s.grid.y, s.margin.x, s.margin.y, s.spacing.x, s.spacing.y)
+		fmt.sbprintf(&sb, "\"slice\": {{\"grid\": [%d, %d], \"margin\": [%d, %d], \"spacing\": [%d, %d]", s.grid.x, s.grid.y, s.margin.x, s.margin.y, s.spacing.x, s.spacing.y)
+		if s.cellSize != {} do fmt.sbprintf(&sb, ", \"cell_size\": [%d, %d]", s.cellSize.x, s.cellSize.y)
+		strings.write_byte(&sb, '}')
 	}
 	if e.atlas {sep(&sb, &n); strings.write_string(&sb, "\"atlas\": true")}
 	if e.compress == .QOI {sep(&sb, &n); strings.write_string(&sb, "\"compress\": \"qoi\"")}

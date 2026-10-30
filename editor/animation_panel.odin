@@ -343,7 +343,7 @@ draw_frame_thumb :: proc(dl: ^imgui.DrawList, anim: ^e.Animation, frame: int, mn
 		} else {
 			tex = &ssa.spriteSheet.texture
 			size := [2]f32{f32(tex.width), f32(tex.height)}
-			r := e.SpriteSheet_CellRect(size, ssa.grid, ssa.margin, ssa.spacing, cell)
+			r := e.SpriteSheet_CellRect(size, ssa.grid, ssa.margin, ssa.spacing, cell, ssa.cellSize)
 			uv0 = {r.x / max(size.x, 1), r.y / max(size.y, 1)}
 			uv1 = uv0 + {r.width / max(size.x, 1), r.height / max(size.y, 1)}
 		}
