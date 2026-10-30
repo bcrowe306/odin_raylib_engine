@@ -530,7 +530,7 @@ function Node:emit(event, value) end
 function TimerNode:connect(event, handler) end
 
 ---@alias SpawnerNodeEvent NodeTreeEvent|"spawned"|"limit_reached"|"list_finished"|ProjectEvent
----Connects a handler to one of this node's events: spawned (The spawner made a node (the spawned root)), limit_reached (The spawner reached its Total Limit), list_finished (A Sequential spawner (Stop) spawned its last entry); the tree events; custom ones.
+---Connects a handler to one of this node's events: spawned (The spawner made a node (the spawned root; spawn_info(node): its entry)), limit_reached (The spawner reached its Total Limit), list_finished (A Sequential spawner (Stop) spawned its last entry); the tree events; custom ones.
 ---
 ---Example: `self.node:connect("spawned", function(value, source) Log.info("spawned") end)`
 ---@param event SpawnerNodeEvent|string
@@ -7575,6 +7575,19 @@ function SpawnerNode:spawn_remove(index) end
 ---
 ---Example: `spawner:spawn_clear()`
 function SpawnerNode:spawn_clear() end
+
+---Sets a function called for every node this spawner makes - by spawn(), spawn_at(), Auto Spawn, a signal or the pool - once it's placed and before its ready() / on_spawn(): set it up there. info.component is the component's path, info.index its entry in the list (from 1). Setting it again replaces it; nil clears it.
+---
+---Example: `spawner:set_spawn_callback(function(enemy, info, spawner) enemy:get_script().weapon = weapons[info.index] end)`
+---@param fn? fun(node: Node, info: {component: string, index: integer}, spawner: SpawnerNode)
+function SpawnerNode:set_spawn_callback(fn) end
+
+---Which list entry a node this spawner made (and still alive) came from: {component, index} (index from 1), or nil.
+---
+---Example: `spawner:connect("spawned", function(n) if spawner:spawn_info(n).index == 2 then n:get_script().ranged = true end end)`
+---@param node Node
+---@return {component: string, index: integer}?
+function SpawnerNode:spawn_info(node) end
 
 ---Makes a level into its TileMap (seed: this one, else the node's seed, a random one with randomSeed, or the generator's). Returns true, or false and why (also emitted as "generation_failed"). With background on it returns true once started; "generated" fires when the level is in.
 ---

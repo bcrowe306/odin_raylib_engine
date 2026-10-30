@@ -400,6 +400,12 @@ script_resolve_node_props :: proc(L: ^lua.State, inst: ^ScriptInstance, mgr: ^Sc
 	if !ok || mod == nil do return
 	for p in mod.properties {
 		if p.assetKind != "node" do continue
+		// A node already in self (set before ready(), e.g. by a spawner) stays (#231).
+		name := strings.clone_to_cstring(p.name, context.temp_allocator)
+		lua.getfield(L, -1, name)
+		set := lua.type(L, -1) == .USERDATA
+		lua.pop(L, 1)
+		if set do continue
 		script_push_node_prop(L, inst, p.name, (inst.properties[p.name] or_else {}).valString)
 		lua.setfield(L, -2, strings.clone_to_cstring(p.name, context.temp_allocator))
 	}
@@ -418,7 +424,7 @@ ScriptInstance_CallReady :: proc(inst: ^ScriptInstance, sm: ^ScriptManager = nil
 
 	lua.rawgeti(L, lua.REGISTRYINDEX, lua.Integer(inst.registryRef)) // push self
 	script_resolve_node_props(L, inst, mgr) // self.<node property> = the node
-	script_resolve_resource_props(L, inst, mgr) // self.<resource property> = its table
+	script_resolve_resource_props(L, inst, mgr, keepSet = true) // self.<resource property> = its table
 	lua.getfield(L, -1, "ready")
 	if lua.type(L, -1) == .FUNCTION {
 		lua.pushvalue(L, -2) // pass self as first arg
