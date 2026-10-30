@@ -366,6 +366,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"RaycastNode.direction", "Direction of the ray (rotated with the node)."},
 	{"RaycastNode.length", "Length of the ray (px)."},
 	{"RaycastNode.collideWithSensors", "Sensor shapes (areas) also stop the ray."},
+	{"RaycastNode.excludeParent", "Ignore the body the ray is under (its parent), so a ray on a character doesn't hit the character."},
 	{"RaycastNode.isColliding", "The ray hit something this frame."},
 	{"RaycastNode.hitFraction", "Where along the ray it hit (0 start, 1 end)."},
 	{"RaycastNode.hitPoint", "World point of the hit (px)."},

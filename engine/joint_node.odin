@@ -70,9 +70,10 @@ JointNode_IsActive :: proc(j: ^JointNode) -> bool {
 
 JointNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	j := cast(^JointNode)node
-	if !j.enabled {
+	// A new type: the old type's joint goes (made again below) (#219).
+	if j.joint.type != j.synced.type {
 		PhysicsJoint_Destroy(&j.joint)
-		return
+		j.synced.type = j.joint.type
 	}
 	if JointNode_IsActive(j) {
 		// Parameters edited live (Inspector, scripts): apply and wake the
@@ -100,7 +101,7 @@ JointNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	if !rl.IsWindowReady() do return
 	if ctx != nil && ctx.game != nil && !ctx.game.physicsWorld.drawPhysicsDebug do return
 	if JointNode_IsActive(j) {
-		PhysicsJoint_DrawDebug(&j.joint)
+		PhysicsJoint_DrawDebug(&j.joint, j.debugColor)
 		return
 	}
 	// Not running (the editor): a line between the bodies' anchors.

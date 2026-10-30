@@ -38,6 +38,14 @@ Physics_IsOneWay :: proc(node: ^Node) -> bool {
 	return rawptr(node) in oneWayBodies
 }
 
+// Physics_OneWaySide: a shape's one-way side (its body's), if it has one -
+// the Character Mover checks it itself (#219): Box2D's pre-solve only
+// filters contacts between bodies.
+Physics_OneWaySide :: proc "contextless" (s: b2.ShapeId) -> ([2]f32, bool) {
+	d, ok := oneWayBodies[b2.Body_GetUserData(b2.Shape_GetBody(s))]
+	return d, ok
+}
+
 // A contact with a one-way body counts only when it comes from its side.
 @(private = "file")
 physics_pre_solve :: proc "c" (shapeA, shapeB: b2.ShapeId, manifold: ^b2.Manifold, ctx: rawptr) -> bool {

@@ -561,6 +561,20 @@ lua_node_apply_impulse :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// node:get_mass(): a dynamic body's mass (density x area in px^2; #219), 0
+// when it has no body yet.
+@(private="file")
+lua_node_get_mass :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	mass: f32
+	if ok && node.typeId == DynamicBodyNode {
+		if id := (cast(^DynamicBodyNode)node).bodyId; b2.Body_IsValid(id) do mass = b2.Body_GetMass(id)
+	}
+	lua.pushnumber(L, lua.Number(mass))
+	return 1
+}
+
 @(private="file")
 lua_node_get_linear_velocity :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
@@ -4865,6 +4879,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "apply_force")
 		lua.pushcfunction(L, lua_node_apply_impulse)
 		lua.setfield(L, -2, "apply_impulse")
+		lua.pushcfunction(L, lua_node_get_mass)
+		lua.setfield(L, -2, "get_mass")
 		lua.pushcfunction(L, lua_node_get_linear_velocity)
 		lua.setfield(L, -2, "get_linear_velocity")
 		lua.pushcfunction(L, lua_node_set_linear_velocity)

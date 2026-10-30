@@ -787,6 +787,8 @@ character_mover_cast :: proc(worldId: b2.WorldId, capsule: b2.Capsule, translati
 		if b2.Shape_IsSensor(shapeId) do return true // (a trigger: no obstacle)
 		body := b2.Shape_GetBody(shapeId)
 		if b2.Body_IsValid(mc.self) && body == mc.self do return true
+		// A one-way platform stops only a move into it from its open side.
+		if side, oneWay := Physics_OneWaySide(shapeId); oneWay && mc.translation.x * side.x + mc.translation.y * side.y >= 0 do return true
 		proxy, ok := shape_proxy(shapeId)
 		if !ok do return true
 		out := b2.ShapeCast({
@@ -844,6 +846,13 @@ CharacterMover_PlaneResultCallback :: proc "c" (shapeId: b2.ShapeId, planeResult
 	// Ignore sensors in mover plane solver
 	if b2.Shape_IsValid(shapeId) && b2.Shape_IsSensor(shapeId) {
 		return true
+	}
+	// A one-way platform (#219) holds the mover only from its open side
+	// (the plane pushes that way) and not while it moves out through it.
+	if side, oneWay := Physics_OneWaySide(shapeId); oneWay {
+		n := planeResult.plane.normal
+		if n.x * side.x + n.y * side.y <= 0.5 do return true
+		if cm.velocity.x * side.x + cm.velocity.y * side.y > 0 do return true
 	}
 
 	if cm.planeCount < MAX_MOVER_PLANES {
@@ -1382,6 +1391,7 @@ RaycastNode :: struct {
 	hitShapeId: b2.ShapeId,
 	hitNode: ^Node,
 	excludeNode: ^Node,
+	excludeParent: bool `gui:"true"`, // don't hit the body it's under (#219)
 	rayColor: rl.Color `gui:"true"`,
 	hitColor: rl.Color `gui:"true"`,
 	onHitStarted: EventSubject, // "hit_started"(node): the ray started hitting a node
@@ -1398,6 +1408,7 @@ RaycastNode_Create :: proc(scene: ^Scene, name: string = "Raycast", parent: ^Nod
 	rc.direction = {1.0, 0.5}
 	rc.length = 450.0
 	rc.collideWithSensors = false
+	rc.excludeParent = true
 	rc.categoryLayers = DEFAULT_COLLISION_CATEGORIES
 	rc.maskLayers = DEFAULT_COLLISION_MASK
 	rc.rayColor = rl.Color{56, 189, 248, 255} // Cyan
@@ -1496,6 +1507,8 @@ RaycastNode_CastNow :: proc(rc: ^RaycastNode, worldId: b2.WorldId) {
 
 	if !b2.World_IsValid(worldId) do return
 
+	rc.excludeNode = nil
+	if rc.excludeParent && rc.gameContext != nil && rc.gameContext.scene != nil do rc.excludeNode = GetParent(rc.gameContext.scene.manager, rc)
 	origin := RaycastNode_GetOrigin(rc)
 	translation := RaycastNode_GetTranslation(rc)
 	rc.hitPoint = origin + translation
@@ -1562,6 +1575,16 @@ RaycastNode_Render :: proc(node: ^Node, gameContext: ^GameContext, deltaTime: f3
 // ============================================================================
 // Scene Physics Body Activation Helpers
 // ============================================================================
+// Physics_NodeDisabled: a disabled node's physics stops - its body is
+// disabled (its update enables it again) and a joint goes (made again) (#219).
+Physics_NodeDisabled :: proc(node: ^Node) {
+	if node.typeId == JointNode {
+		PhysicsJoint_Destroy(&(cast(^JointNode)node).joint)
+		return
+	}
+	Node_SetPhysicsEnabled(node, false)
+}
+
 Node_SetPhysicsEnabled :: proc(node: ^Node, enabled: bool) {
 	if node == nil do return
 	bodyId: b2.BodyId

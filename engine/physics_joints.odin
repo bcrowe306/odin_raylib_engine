@@ -576,10 +576,11 @@ PhysicsJoint_Sync :: proc(pj: ^PhysicsJoint) {
 	}
 }
 
+// PhysicsJoint_Destroy destroys its joint - of any type, so one made
+// before the type changed goes too (#219).
 PhysicsJoint_Destroy :: proc(pj: ^PhysicsJoint) {
-	id := PhysicsJoint_GetId(pj)
-	if b2.Joint_IsValid(id) {
-		b2.DestroyJoint(id)
+	for id in ([?]b2.JointId{pj.distance.jointId, pj.filter.jointId, pj.motor.jointId, pj.mouse.jointId, pj.prismatic.jointId, pj.revolute.jointId, pj.weld.jointId, pj.wheel.jointId}) {
+		if b2.Joint_IsValid(id) do b2.DestroyJoint(id)
 	}
 	pj.distance.jointId  = b2.nullJointId
 	pj.filter.jointId    = b2.nullJointId
@@ -591,7 +592,7 @@ PhysicsJoint_Destroy :: proc(pj: ^PhysicsJoint) {
 	pj.wheel.jointId     = b2.nullJointId
 }
 
-PhysicsJoint_DrawDebug :: proc(pj: ^PhysicsJoint) {
+PhysicsJoint_DrawDebug :: proc(pj: ^PhysicsJoint, color := rl.GOLD) {
 	id := PhysicsJoint_GetId(pj)
 	if !b2.Joint_IsValid(id) do return
 
@@ -602,7 +603,7 @@ PhysicsJoint_DrawDebug :: proc(pj: ^PhysicsJoint) {
 	pA := b2.Body_GetWorldPoint(bodyA, b2.Joint_GetLocalAnchorA(id))
 	pB := b2.Body_GetWorldPoint(bodyB, b2.Joint_GetLocalAnchorB(id))
 
-	rl.DrawLineEx(pA, pB, 2.0, rl.GOLD)
-	rl.DrawCircleV(pA, 4.0, rl.ORANGE)
-	rl.DrawCircleV(pB, 4.0, rl.ORANGE)
+	rl.DrawLineEx(pA, pB, 2.0, color)
+	rl.DrawCircleV(pA, 4.0, color)
+	rl.DrawCircleV(pB, 4.0, color)
 }

@@ -167,12 +167,12 @@
   "input": [
    "5 RIGHT down",
    "97 SPACE tap 16",
-   "151 SPACE tap 16",
-   "276 SPACE tap 16",
-   "384 SPACE tap 16",
-   "473 SPACE tap 16",
-   "522 SPACE tap 16",
-   "590 SPACE tap 16"
+   "135 SPACE tap 16",
+   "251 SPACE tap 16",
+   "373 SPACE tap 16",
+   "470 SPACE tap 16",
+   "520 SPACE tap 16",
+   "588 SPACE tap 16"
   ],
   "expect": [
    [

@@ -61,7 +61,8 @@ objects.
 - Mass is **Density** x the shape's area in square pixels, so bodies are
   heavy: a 64 x 64 box at density 1 weighs 4096. Forces and impulses are
   in those units. `apply_impulse(0, -300)` barely moves that box;
-  `apply_impulse(0, -300 * 4096)` changes its speed by 300 px/s. To set a
+  `apply_impulse(0, -300 * 4096)` changes its speed by 300 px/s - or,
+  for any body, `apply_impulse(0, -self.node:get_mass() * 300)`. To set a
   speed directly, use `set_linear_velocity`.
 - A body at rest falls asleep after a moment (below **Sleep Threshold**,
   px/s) to save time. A contact, a joint, a new velocity or `set_awake(true)`

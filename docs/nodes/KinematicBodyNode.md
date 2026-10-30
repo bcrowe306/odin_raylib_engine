@@ -24,7 +24,7 @@ function Platform:update(dt)
 end
 ```
 
-Turn on **One Way** for a jump-through platform: bodies pass up through it
-and land on top. It raises `collision_started` / `collision_ended` like the
+Turn on **One Way** for a jump-through platform: bodies and Character
+Movers pass up through it and land on top. It raises `collision_started` / `collision_ended` like the
 other bodies, once per body touching it even when either one has several
 shapes.
