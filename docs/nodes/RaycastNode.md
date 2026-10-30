@@ -46,9 +46,10 @@ ground and ledge checks, line of sight, laser beams, a gun's aim.
 - It finds bodies (static, dynamic, kinematic, Character Movers) and tile
   map and LDtk colliders. Areas and other sensor shapes are skipped unless
   **Collide With Sensors** is on.
-- Start the ray outside the shapes of the node it's on, or leave that
-  node's layer out of the ray's **Mask Layers**, so it doesn't report its
-  own body.
+- **Exclude Parent** (on by default): the ray skips the body it's under,
+  so a ray on a character doesn't report the character. Off: start the
+  ray outside the parent's shapes, or leave its layer out of the ray's
+  **Mask Layers**.
 - **Monitoring** off: it doesn't cast, clears its hit and raises no
   signals. `raycast_cast()` still works.
 - With **Show Bounds & Colliders** (View menu) or the game's Show

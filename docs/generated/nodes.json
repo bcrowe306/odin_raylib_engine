@@ -442,6 +442,7 @@
         {"name": "hitFraction", "kind": "number", "owner": "RaycastNode", "default": 0, "min": 0, "max": 1, "runtime": true, "doc": "Where along the ray it hit (0 start, 1 end)."},
         {"name": "hitPoint", "kind": "vec2", "owner": "RaycastNode", "default": [0, 0], "min": 0, "max": 1280, "runtime": true, "doc": "World point of the hit (px)."},
         {"name": "hitNormal", "kind": "vec2", "owner": "RaycastNode", "default": [0, 0], "min": -1, "max": 1, "runtime": true, "doc": "Surface direction at the hit."},
+        {"name": "excludeParent", "kind": "boolean", "owner": "RaycastNode", "default": true, "doc": "Ignore the body the ray is under (its parent), so a ray on a character doesn't hit the character."},
         {"name": "rayColor", "kind": "color", "owner": "RaycastNode", "default": "#38bdf8ff", "doc": "Ray colour when it hits nothing."},
         {"name": "hitColor", "kind": "color", "owner": "RaycastNode", "default": "#f87171ff", "doc": "Ray colour when it hits."}
       ]

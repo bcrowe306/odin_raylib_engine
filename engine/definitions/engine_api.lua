@@ -2697,6 +2697,7 @@ function AreaNode:set_property(path, value, y) end
 ---@field hitFraction number Where along the ray it hit (0 start, 1 end).
 ---@field hitPoint Vec2 World point of the hit (px).
 ---@field hitNormal Vec2 Surface direction at the hit.
+---@field excludeParent boolean Ignore the body the ray is under (its parent), so a ray on a character doesn't hit the ...
 ---@field rayColor number[] Ray colour when it hits nothing.
 ---@field hitColor number[] Ray colour when it hits.
 
@@ -2719,6 +2720,7 @@ function AreaNode:set_property(path, value, y) end
 ---| "hitFraction" # number (runtime) - Where along the ray it hit (0 start, 1 end).
 ---| "hitPoint" # Vec2 (runtime) - World point of the hit (px).
 ---| "hitNormal" # Vec2 (runtime) - Surface direction at the hit.
+---| "excludeParent" # boolean - Ignore the body the ray is under (its parent), so a ray on a character doesn't hit the ...
 ---| "rayColor" # number[] - Ray colour when it hits nothing.
 ---| "hitColor" # number[] - Ray colour when it hits.
 
@@ -2745,6 +2747,7 @@ function AreaNode:set_property(path, value, y) end
 ---@overload fun(self: RaycastNode, path: "hitFraction"): number
 ---@overload fun(self: RaycastNode, path: "hitPoint"): Vec2
 ---@overload fun(self: RaycastNode, path: "hitNormal"): Vec2
+---@overload fun(self: RaycastNode, path: "excludeParent"): boolean
 ---@overload fun(self: RaycastNode, path: "rayColor"): number[]
 ---@overload fun(self: RaycastNode, path: "hitColor"): number[]
 function RaycastNode:get_property(path) end
@@ -2773,6 +2776,7 @@ function RaycastNode:get_property(path) end
 ---@overload fun(self: RaycastNode, path: "hitFraction", value: number)
 ---@overload fun(self: RaycastNode, path: "hitPoint", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: RaycastNode, path: "hitNormal", x: number|Vec2|number[], y?: number)
+---@overload fun(self: RaycastNode, path: "excludeParent", value: boolean)
 ---@overload fun(self: RaycastNode, path: "rayColor", value: number[])
 ---@overload fun(self: RaycastNode, path: "hitColor", value: number[])
 function RaycastNode:set_property(path, value, y) end
@@ -7098,19 +7102,25 @@ function UITabContainerNode:set_property(path, value, y) end
 -- DynamicBodyNode Physics Methods
 -- ----------------------------------------------------------------------------
 
----Applies a continuous force to this node (requires DynamicBodyNode).
+---Applies a continuous force to this node this step (requires DynamicBodyNode). Units are pixels: the acceleration is force / mass (px/s^2), and mass is density x area in px^2 (a 64x64 box at density 1 weighs 4096), so scale by get_mass().
 ---
----Example: `self.node:apply_force(0, -500)`
----@param fx number Force X in Newtons
----@param fy number Force Y in Newtons
+---Example: `self.node:apply_force(0, -self.node:get_mass() * 1500)`
+---@param fx number Force X (mass x px/s^2)
+---@param fy number Force Y (mass x px/s^2)
 function DynamicBodyNode:apply_force(fx, fy) end
 
----Applies an instantaneous impulse to this node (requires DynamicBodyNode).
+---Applies an instantaneous impulse to this node (requires DynamicBodyNode). It changes the velocity by impulse / mass (px/s); mass is density x area in px^2 (a 64x64 box at density 1 weighs 4096), so scale by get_mass().
 ---
----Example: `self.node:apply_impulse(0, -300)`
----@param ix number Impulse X
----@param iy number Impulse Y
+---Example: `self.node:apply_impulse(0, -self.node:get_mass() * 300) -- 300 px/s upwards`
+---@param ix number Impulse X (mass x px/s)
+---@param iy number Impulse Y (mass x px/s)
 function DynamicBodyNode:apply_impulse(ix, iy) end
+
+---The body's mass: density x area in px^2 (a 64x64 box at density 1 weighs 4096). 0 before its body exists.
+---
+---Example: `self.node:apply_impulse(0, -self.node:get_mass() * 300)`
+---@return number mass
+function DynamicBodyNode:get_mass() end
 
 ---Gets the linear velocity of the physics body or character mover in world units per second.
 ---

@@ -410,7 +410,11 @@ Scene_UpdateNodeHirearchy :: proc(scene: ^Scene, node: ^Node, gameContext: ^Game
 
 @(private = "file")
 update_tree :: proc(scene: ^Scene, node: ^Node, gameContext: ^GameContext, deltaTime: f32, parentPaused: bool, parentMode: Pause_Mode) {
-	if node == nil || !node.enabled do return
+	if node == nil do return
+	if !node.enabled {
+		Physics_NodeDisabled(node) // (no update, so its body / joint stop here; #219)
+		return
+	}
 	mode := node.pauseMode if node.pauseMode != .Inherit else parentMode
 	paused := node.paused || (mode == .Pausable && parentPaused)
 	node.pausedNow = paused

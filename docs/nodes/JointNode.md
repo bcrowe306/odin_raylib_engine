@@ -63,9 +63,10 @@ motors, springs and limits.
 - **Collide Connected** off (the default): the two bodies pass through
   each other. On: they collide as usual.
 - The viewport draws the line between the anchors in **Debug Color**; in
-  the running game the line is drawn while colliders are shown.
-- Set **Type** before the game runs: changing it while running makes a
-  joint of the new type without removing the old one.
+  the running game too, while colliders are shown.
+- Changing **Type** while the game runs replaces the joint with one of the
+  new type. A disabled Joint (`set_enabled(false)`) lets go; enabled
+  again, it's made again.
 
 ## Example
 

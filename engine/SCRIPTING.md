@@ -670,8 +670,9 @@ end
 #### DynamicBodyNode (Box2D Physics)
 | Method | Parameters | Return | Description |
 |---|---|---|---|
-| `apply_force(fx, fy)` | `fx, fy: number` | - | Applies continuous Box2D force in Newtons. |
-| `apply_impulse(ix, iy)`| `ix, iy: number` | - | Applies instantaneous Box2D impulse. |
+| `apply_force(fx, fy)` | `fx, fy: number` | - | Applies a force this step (mass x px/s^2). |
+| `apply_impulse(ix, iy)`| `ix, iy: number` | - | Changes the velocity by impulse / mass (px/s). |
+| `get_mass()` | - | `number` | Density x area in px^2 (a 64x64 box at density 1 = 4096): `apply_impulse(0, -node:get_mass() * 300)` is 300 px/s up. |
 | `get_linear_velocity()`| - | `vx, vy` | Gets physics linear velocity. |
 | `set_linear_velocity(vx, vy)`| `vx, vy` | - | Directly sets physics linear velocity. |
 | `get_angular_velocity()`| - | `deg/s` | Gets angular velocity in degrees per second. |
@@ -1498,7 +1499,7 @@ sprite:set_position(0.0, 0.0)
 -- The result is typed as the component's root node (completion knows each
 -- component file), or nil with a Console warning if the file is missing.
 local rock = Scene.instantiate("components/AsteroidLarge.component.json", self.node:get_parent(), self.node.position)
-rock:apply_impulse(Vec2(0, -200))
+rock:apply_impulse(Vec2(0, -200 * rock:get_mass()))  -- 200 px/s up
 
 -- A node of a built-in or custom node type (its values and script), under
 -- a parent, at a position; and a scene's nodes of a type.

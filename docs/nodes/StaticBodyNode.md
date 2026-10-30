@@ -7,8 +7,8 @@ Use it for the ground, walls, ceilings, ledges and any solid scenery.
 ## When to use it
 
 - **Level geometry**: floors, walls, slopes, the edges of the world.
-- **Jump-through platforms**: turn on **One Way** and dynamic bodies pass
-  up through it and land on top.
+- **Jump-through platforms**: turn on **One Way** and dynamic bodies and
+  Character Movers pass up through it and land on top.
 - **Obstacles for path finding**: a [Navigation Region](NavigationRegionNode.md)
   marks the cells under static bodies' shapes as blocked when it bakes.
 - **Not** for tile maps and LDtk levels: a solid
@@ -43,11 +43,10 @@ Use it for the ground, walls, ceilings, ledges and any solid scenery.
   moving parent), the body jumps to the new place each frame: it doesn't
   push or carry anything on the way. For moving platforms use a
   [Kinematic Body](KinematicBodyNode.md).
-- **One Way**: dynamic bodies coming from below (and from the sides) pass
-  through; those landing from above rest on it. "Above" turns with the
-  node's rotation, so a platform rotated 90 degrees is solid from one side
-  only. A Character Mover's movement checks don't look at **One Way**: it
-  treats the platform as solid from every side.
+- **One Way**: dynamic bodies and Character Movers coming from below (and
+  from the sides) pass through; those landing from above rest on it.
+  "Above" turns with the node's rotation, so a platform rotated 90 degrees
+  is solid from one side only.
 - Its contacts (and so its signals) come from dynamic bodies. Box2D
   doesn't make contacts between two bodies that aren't dynamic, so other
   static and kinematic bodies don't raise them. A
