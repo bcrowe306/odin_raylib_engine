@@ -145,8 +145,9 @@ Node_RelativePath :: proc(manager: ^NodeManager, from, to: ^Node, allocator := c
 }
 
 // Node_ResolvePath follows a relative path from `from` (nil if missing).
+// (The hierarchy is on the nodes: `manager` may be nil.)
 Node_ResolvePath :: proc(manager: ^NodeManager, from: ^Node, path: string) -> ^Node {
-	if manager == nil || from == nil do return nil
+	if from == nil do return nil
 	cur := from
 	if path == "" || path == "." do return cur
 	for part in strings.split(path, "/", context.temp_allocator) {

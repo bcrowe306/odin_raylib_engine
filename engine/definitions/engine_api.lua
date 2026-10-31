@@ -1822,6 +1822,9 @@ function AsepriteNode:set_property(path, value, y) end
 ---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
 ---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field subEmitter string Sub-emitter: another Particle Emitter, as a path from this node (e.g. a child's name), ...
+---@field subEmitterOn "Death"|"Hit"|"Both" When the sub-emitter bursts: a particle's Death (its lifetime ended), a Hit on a body (...
+---@field subEmitterAmount integer Particles the sub-emitter emits each time.
 
 ---@alias ParticleEmitterNodeProperty
 ---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
@@ -1892,10 +1895,13 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "emitter.prewarm" # boolean - Start as if it had already run a whole lifetime (smoke already there when the scene sta...
 ---| "emitter.seed" # integer - The same pattern every start (a fixed seed); 0 = different each time.
 ---| "emitter.autoVisibility" # boolean - Off-screen test from where the particles are (on), or from Visibility Rect (off: cheape...
+---| "subEmitter" # string - Sub-emitter: another Particle Emitter, as a path from this node (e.g. a child's name), ...
+---| "subEmitterOn" # "Death"|"Hit"|"Both" - When the sub-emitter bursts: a particle's Death (its lifetime ended), a Hit on a body (...
+---| "subEmitterAmount" # integer - Particles the sub-emitter emits each time.
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
 ---
----Example: `local value = self.node:get_property("position")`
+---Example: `local value = self.node:get_property("subEmitter")`
 ---@param path ParticleEmitterNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
 ---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
 ---@overload fun(self: ParticleEmitterNode, path: "position"): Vec2
@@ -1966,11 +1972,14 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.prewarm"): boolean
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.seed"): integer
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.autoVisibility"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "subEmitter"): string
+---@overload fun(self: ParticleEmitterNode, path: "subEmitterOn"): "Death"|"Hit"|"Both"
+---@overload fun(self: ParticleEmitterNode, path: "subEmitterAmount"): integer
 function ParticleEmitterNode:get_property(path) end
 
 ---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
 ---
----Example: `self.node:set_property("position", 100, 50)`
+---Example: `self.node:set_property("subEmitter", "text")`
 ---@param path ParticleEmitterNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
 ---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
 ---@param y? number A vector's y when value is its x
@@ -2042,6 +2051,9 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.prewarm", value: boolean)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.seed", value: integer)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.autoVisibility", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "subEmitter", value: string)
+---@overload fun(self: ParticleEmitterNode, path: "subEmitterOn", value: "Death"|"Hit"|"Both")
+---@overload fun(self: ParticleEmitterNode, path: "subEmitterAmount", value: integer)
 function ParticleEmitterNode:set_property(path, value, y) end
 
 ---@class SoundNode

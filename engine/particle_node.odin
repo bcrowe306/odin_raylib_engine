@@ -15,6 +15,42 @@ ParticleEmitterNode :: struct {
 	// becomes a child sprite).
 	texturePath: string,
 	texture:     ^Texture,
+	// Sub-emitter (#130): another Particle Emitter (a path from this node,
+	// e.g. "Sparks" for a child) that emits subEmitterAmount particles where
+	// each of this one's particles dies, hits a body, or both. Give it
+	// Emitting off (only these bursts) and Local Space off (they stay where
+	// they were born). CPU particles only: GPU ones don't report deaths.
+	subEmitter:       string `gui:"true"`,
+	subEmitterOn:     ParticleSubEmitterTrigger `gui:"true"`,
+	subEmitterAmount: int `gui:"true" min:"1" max:"200"`,
+	subEvents:        [dynamic][2]f32, // (runtime) this frame's deaths / hits, world points
+}
+
+ParticleSubEmitterTrigger :: enum {
+	Death, // a particle's lifetime ended
+	Hit,   // a particle hit a body (collision on)
+	Both,
+}
+
+// The most sub-emitter bursts one emitter queues in a frame.
+@(private = "file")
+SUB_EVENTS_MAX :: 256
+
+@(private = "file")
+sub_event :: proc(pen: ^ParticleEmitterNode, at: [2]f32, hit: bool) {
+	if pen.subEmitter == "" || len(pen.subEvents) >= SUB_EVENTS_MAX do return
+	if pen.subEmitterOn != .Both && (pen.subEmitterOn == .Hit) != hit do return
+	if pen.subEvents == nil do pen.subEvents = make([dynamic][2]f32, pen.allocator)
+	append(&pen.subEvents, at)
+}
+
+// ParticleEmitterNode_SubEmitter: the emitter its sub-emitter path names
+// (nil: none, not an emitter, or itself).
+ParticleEmitterNode_SubEmitter :: proc(pen: ^ParticleEmitterNode) -> ^ParticleEmitterNode {
+	if pen.subEmitter == "" do return nil
+	n := Node_ResolvePath(nil, pen, pen.subEmitter)
+	if n == nil || n == pen || n.typeId != ParticleEmitterNode || n.removing do return nil
+	return cast(^ParticleEmitterNode)n
 }
 
 // ParticleEmitterNode_SetTexture uses a project texture for the particles
@@ -46,8 +82,13 @@ ParticleEmitterNode_Init :: proc(pen: ^ParticleEmitterNode) {
 	pen.emitter.onHitUser = pen
 	pen.emitter.onHit = proc(emitter: ^ParticleEmitter, hit: ^Node, user: rawptr) {
 		pen := cast(^ParticleEmitterNode)user
+		sub_event(pen, emitter.lastHitPoint, true)
 		pen.onParticleHit->notify(pen, hit, pen.gameContext)
 	}
+	pen.emitter.onDeath = proc(emitter: ^ParticleEmitter, at: [2]f32, user: rawptr) {
+		sub_event(cast(^ParticleEmitterNode)user, at, false)
+	}
+	pen.subEmitterAmount = 8
 
 	ParticleEmitter_Init(&pen.emitter)
 	pen.emitter.allocator = pen.allocator
@@ -99,6 +140,14 @@ ParticleEmitterNode_Update :: proc(node: ^Node, gameContext: ^GameContext, delta
 
 	world := gameContext.game.physicsWorld.worldId if gameContext != nil && gameContext.game != nil else b2.WorldId{}
 	ParticleEmitter_Update(&pen.emitter, deltaTime, world)
+
+	// This frame's deaths and hits: the sub-emitter's bursts.
+	if len(pen.subEvents) > 0 {
+		if sub := ParticleEmitterNode_SubEmitter(pen); sub != nil {
+			for at in pen.subEvents do ParticleEmitter_EmitAt(&sub.emitter, at, pen.subEmitterAmount)
+		}
+		clear(&pen.subEvents)
+	}
 }
 
 // ParticleEmitterNode_EmitBurst: n particles now, from where the node is (#128).

@@ -292,6 +292,8 @@ ParticleEmitter :: struct {
 	prewarmed:   bool,
 	rngState:    rand.Default_Random_State,
 	onFinished:  proc(emitter: ^ParticleEmitter, user: rawptr),
+	// A particle's lifetime ended, where it was (world; sub-emitters, #130).
+	onDeath:     proc(emitter: ^ParticleEmitter, at: [2]f32, user: rawptr),
 	// The owner's global rotation (degrees) and scale, set each update:
 	// emission follows them; local particles are drawn through them.
 	originRotation: f32,
@@ -692,6 +694,7 @@ Particle_Update_Particle :: proc(emitter: ^ParticleEmitter, particle: ^Particle,
 	if p.age >= p.lifetime {
 		p.alive = false
 		p.agePercent = 1.0
+		if emitter.onDeath != nil do emitter.onDeath(emitter, particle_to_world(emitter, p.position) if emitter.localSpace else p.position, emitter.onHitUser)
 	}
 }
 
@@ -831,6 +834,34 @@ ParticleEmitter_Update :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world 
 // whether it's emitting or not.
 ParticleEmitter_EmitBurst :: proc(emitter: ^ParticleEmitter, n: int) {
 	for _ in 0 ..< max(n, 0) do ParticleEmitter_Emit(emitter)
+}
+
+// ParticleEmitter_EmitAt emits n particles from a world point instead of
+// the emitter's position (a sub-emitter's burst where a particle died or
+// hit; #130). Its emission shape, angle and speeds still apply.
+ParticleEmitter_EmitAt :: proc(emitter: ^ParticleEmitter, at: [2]f32, n: int) {
+	if n <= 0 do return
+	if !emitter.localSpace {
+		// World particles: born around the point.
+		saved := emitter.position
+		emitter.position = at
+		ParticleEmitter_EmitBurst(emitter, n)
+		emitter.position = saved
+		return
+	}
+	// Local particles: born at the point's offset in the emitter's space
+	// (they move with the emitter after). Local GPU ones: at the emitter.
+	if emitter.gpu {
+		ParticleEmitter_EmitBurst(emitter, n)
+		return
+	}
+	offset := particle_to_local(emitter, at)
+	for _ in 0 ..< n {
+		ParticleEmitter_Emit(emitter)
+		if len(emitter.particles) == 0 do return
+		i := (emitter.head - 1 + len(emitter.particles)) % len(emitter.particles)
+		emitter.particles[i].position += offset
+	}
 }
 
 // ParticleEmitter_Restart clears the particles and starts again (a seeded

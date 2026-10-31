@@ -326,6 +326,9 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"ParticleEmitter.shape", "Shape each particle is drawn as."},
 	{"ParticleEmitter.emitting", "Emit new particles (existing ones finish their lives)."},
 	{"ParticleEmitter.continuous", "Keep emitting (else one cycle, then stop)."},
+	{"ParticleEmitterNode.subEmitter", "Sub-emitter: another Particle Emitter, as a path from this node (e.g. a child's name), that bursts where this one's particles die or hit. Give it Emitting and Local Space off. (CPU particles only.)"},
+	{"ParticleEmitterNode.subEmitterOn", "When the sub-emitter bursts: a particle's Death (its lifetime ended), a Hit on a body (collision on), or Both."},
+	{"ParticleEmitterNode.subEmitterAmount", "Particles the sub-emitter emits each time."},
 
 	// --- Bodies, areas, rays ---
 	{"StaticBodyNode.oneWay", "Jump-through platform: bodies pass from below and land on top."},
