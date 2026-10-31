@@ -38,6 +38,7 @@ Tile_Component :: struct {
 // TileMapNode_ComponentFootprint: a component's size in cells (its drawn
 // bounds, rounded to cells; at least 1 x 1), measured once per path.
 TileMapNode_ComponentFootprint :: proc(tm: ^TileMapNode, path: string, sample: ^Node = nil) -> [2]int {
+	if tm.layout != .Square do return {1, 1} // (a cell each off square grids)
 	key := tilemap_fp_key(tm, path)
 	if fp, ok := tm.compFootprints[key]; ok do return fp
 	fp := [2]int{1, 1}
@@ -51,7 +52,8 @@ TileMapNode_ComponentFootprint :: proc(tm: ^TileMapNode, path: string, sample: ^
 			wpx := (b[2] - b[0]) / s.x
 			hpx := (b[3] - b[1]) / s.y
 			// (A little slack: a 33 px sprite on 32 px tiles is still one cell.)
-			fp = {max(int(math.ceil(wpx / f32(max(tm.tileSize.x, 1)) - 0.1)), 1), max(int(math.ceil(hpx / f32(max(tm.tileSize.y, 1)) - 0.1)), 1)}
+			cs := TileMapNode_CellSize(tm)
+			fp = {max(int(math.ceil(wpx / cs.x - 0.1)), 1), max(int(math.ceil(hpx / cs.y - 0.1)), 1)}
 		}
 	} else if sample == nil {
 		return fp // (not measured: don't remember a guess)
@@ -64,7 +66,8 @@ TileMapNode_ComponentFootprint :: proc(tm: ^TileMapNode, path: string, sample: ^
 // tilemap_fp_key: footprints depend on the component and the tile size.
 @(private = "file")
 tilemap_fp_key :: proc(tm: ^TileMapNode, path: string) -> string {
-	return fmt.tprintf("%s|%dx%d", path, tm.tileSize.x, tm.tileSize.y)
+	cs := TileMapNode_CellSize(tm)
+	return fmt.tprintf("%s|%dx%d", path, int(cs.x), int(cs.y))
 }
 
 // TileMapNode_ForgetFootprints: measure components again (a component file
@@ -107,7 +110,8 @@ tilemap_subtree_bounds :: proc(m: ^NodeManager, n: ^Node) -> (b: [4]f32, have: b
 // position covers.
 @(private = "file")
 tilemap_block_of :: proc(tm: ^TileMapNode, pos: [2]f32, size: [2]int) -> [2]int {
-	ts := [2]f32{f32(max(tm.tileSize.x, 1)), f32(max(tm.tileSize.y, 1))}
+	if tm.layout != .Square do return TileMapNode_LocalCellAt(tm, pos)
+	ts := TileMapNode_CellSize(tm)
 	return {int(math.round(pos.x / ts.x - f32(size.x) * 0.5)), int(math.round(pos.y / ts.y - f32(size.y) * 0.5))}
 }
 
@@ -117,8 +121,11 @@ TileMapNode_BlockFor :: proc(cell, size: [2]int) -> [2]int {
 }
 
 // TileMapNode_BlockCenter: the local position of a footprint's centre.
+// (Square grids; the others' components take a cell each.)
 TileMapNode_BlockCenter :: proc(tm: ^TileMapNode, topLeft, size: [2]int) -> [2]f32 {
-	return {(f32(topLeft.x) + f32(size.x) * 0.5) * f32(tm.tileSize.x), (f32(topLeft.y) + f32(size.y) * 0.5) * f32(tm.tileSize.y)}
+	if tm.layout != .Square do return TileMapNode_CellLocalCenter(tm, topLeft)
+	cs := TileMapNode_CellSize(tm)
+	return {(f32(topLeft.x) + f32(size.x) * 0.5) * cs.x, (f32(topLeft.y) + f32(size.y) * 0.5) * cs.y}
 }
 
 // TileMapNode_Components: the instances on the layer and their footprints.
@@ -279,6 +286,7 @@ TileMapNode_FillComponents :: proc(tm: ^TileMapNode, cell: [2]int, path: string)
 // map:tilemap_clear_component(x, y) -> bool
 // map:tilemap_get_tile(x, y) -> tile | -1      map:tilemap_set_tile(x, y, tile) -> bool  (#220)
 // map:tilemap_cell_at(wx, wy) -> x, y          map:tilemap_cell_position(x, y) -> wx, wy (centre)
+// map:tilemap_neighbors(x, y) -> {{x, y}, ...}  (the cells sharing a side: 4, hex 6 - #278)
 
 @(private = "file")
 lua_tilemap_arg :: proc(L: ^lua.State) -> ^TileMapNode {
@@ -360,10 +368,28 @@ lua_tilemap_cell_position :: proc "c" (L: ^lua.State) -> c.int {
 	tm := lua_tilemap_arg(L)
 	if tm == nil {lua.pushnil(L); lua.pushnil(L); return 2}
 	cell := lua_cell(L)
-	p := (TileMapNode_CellCorner(tm, cell) + TileMapNode_CellCorner(tm, cell + 1)) * 0.5
+	p := TileMapNode_CellCenter(tm, cell)
 	lua.pushnumber(L, lua.Number(p.x))
 	lua.pushnumber(L, lua.Number(p.y))
 	return 2
+}
+
+@(private = "file")
+lua_tilemap_neighbors :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	tm := lua_tilemap_arg(L)
+	lua.createtable(L, 6, 0)
+	if tm == nil do return 1
+	nb, n := TileMapNode_Neighbors(tm, lua_cell(L))
+	for q, i in nb[:n] {
+		lua.createtable(L, 2, 0)
+		lua.pushinteger(L, lua.Integer(q.x))
+		lua.rawseti(L, -2, 1)
+		lua.pushinteger(L, lua.Integer(q.y))
+		lua.rawseti(L, -2, 2)
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
 }
 
 // Script_RegisterTileMapComponentBindings adds the tilemap_* component and tile
@@ -380,4 +406,5 @@ Script_RegisterTileMapComponentBindings :: proc(L: ^lua.State) {
 	reg(L, "tilemap_set_tile", lua_tilemap_set_tile)
 	reg(L, "tilemap_cell_at", lua_tilemap_cell_at)
 	reg(L, "tilemap_cell_position", lua_tilemap_cell_position)
+	reg(L, "tilemap_neighbors", lua_tilemap_neighbors)
 }

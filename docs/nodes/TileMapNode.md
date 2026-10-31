@@ -18,6 +18,8 @@ can also hold components - coins, enemies, spikes - one per cell.
 - **Not** for levels with many layers, auto-tiling rules and entities with
   fields: use an [LDtk Tilemap Level](LdtkLevelNode.md) (edited in LDtk or
   the Level tab).
+- **Isometric and hex maps**: set the tab's **Grid** to Isometric,
+  Staggered or Hex, and the cells become diamonds or hexagons.
 - **Not** for one picture: use a [Texture Sprite](TextureNode.md).
 
 ## Using it
@@ -32,18 +34,41 @@ can also hold components - coins, enemies, spikes - one per cell.
 3. Click a tile in the tile list, then paint in the viewport with the left
    button. The tools: **Paint**, **Erase**, **Fill** (flood fill). The
    right button always erases. One stroke is one undo step.
-4. The **-** / **+** buttons size the tile list; the grid button joins the
+4. For an isometric or hex map, pick the **Grid** in the same row and set
+   the **Cell** size: the diamond or hexagon the tiles sit on. For example,
+   64 x 32 diamonds for 64 x 64 block tiles. Staggered and hex grids also
+   have **Odd shifted**, which picks whether the odd or the even rows (Hex
+   Flat: columns) are pushed over by half a cell.
+5. The **-** / **+** buttons size the tile list; the grid button joins the
    tiles with lines between them.
-5. Tick **Solid** in the Node tab's **Properties** section to make the painted tiles block bodies.
-6. To paint components instead of tiles, switch to the **Components** layer
+6. Tick **Solid** in the Node tab's **Properties** section to make the painted tiles block bodies.
+7. To paint components instead of tiles, switch to the **Components** layer
    (next to **Tiles**), pick a component, and paint. Shift places one off
    the grid.
 
 ## How it works
 
-- Cell (0, 0) has its top-left corner at the node's position. Cells count
-  right and down; tiles are drawn at **Tile Size** times the node's scale.
-  The node can be rotated.
+- Cell (0, 0)'s box (its bounding rectangle) has its top-left corner at
+  the node's position. Cells count right and down; tiles are drawn at
+  **Tile Size** times the node's scale. The node can be rotated.
+- **Grids**: Square cells sit in rows and columns. *Isometric* cells
+  are diamonds on a grid turned 45 degrees: x runs down-right and y
+  down-left from the top corner. *Staggered* cells are diamonds in rows,
+  every other row shifted half a cell. *Hex (pointy)* and *Hex (flat)* are
+  hexagons in offset rows or columns. Painting, Fill, picking
+  (`tilemap_cell_at`), `tilemap_cell_position` and **Solid** follow the
+  grid; `tilemap_neighbors(x, y)` lists a cell's 4 (hex: 6) neighbours.
+- **Cell** is the grid's cell (left at the tile size, square maps work as
+  they always did). A tile taller than its cell, such as a wall or a block,
+  stands on its cell: drawn bottom-aligned and centred across, so its top
+  reaches over the cells behind it. Tiles are drawn back to front.
+- **Y Sort** (Node tab): walk behind walls. Put the map and the
+  characters under one node with **Y Sort** on, and turn **Y Sort** on for
+  the map too. Its rows (isometric: diagonals) then sort one by one with
+  the characters, by the bottom of their cells: a character standing
+  behind a wall is hidden by it, one in front is drawn over it. Use it for
+  the map of walls and blocks, not the floor: keep the floor in a map of
+  its own without Y Sort.
 - Tile numbers count left to right, then top to bottom in the tileset
   image (the tooltip in the tile list shows them).
 - **Map Size** is the map's outline. You can paint outside it, and making
@@ -51,7 +76,8 @@ can also hold components - coins, enemies, spikes - one per cell.
   it grows.
 - **Solid**: when the scene starts (or Simulate), the map makes a static
   body child named `<Name>_Colliders`, with one box per horizontal run of
-  painted tiles. Its colliders also cast [Light](LightNode.md) shadows.
+  painted tiles (isometric: one slanted shape per run; staggered and hex:
+  one per cell, the cell's shape). Its colliders also cast [Light](LightNode.md) shadows.
   They are not saved and aren't there while you edit.
 - **Terrains** (auto-tiling): a tileset's terrains - kept next to its
   image in `<name>.tileset.json` - give each cell the tile for its pattern
@@ -59,7 +85,12 @@ can also hold components - coins, enemies, spikes - one per cell.
   them on the Tile Map tab's Terrains layer; a Level Generator rule can
   name one. From Odin: `TileMapNode_PaintTerrain`, `TileMapNode_FillTerrain`
   (engine/terrain.odin).
-- Large maps are drawn as cached chunks, so many tiles cost little.
+- Large square maps are drawn as cached chunks, so many tiles cost
+  little. Isometric, staggered and hex maps, square maps with a Cell size
+  other than the tile size, and maps with Y Sort are drawn tile by tile
+  (only those in view).
+- Navigation regions, terrains (auto-tiling), components larger than one
+  cell and Level Generator output still assume square cells.
 - **Tint** multiplies the colours of every tile.
 - **Aseprite Layer**: with an Aseprite file as the tileset, the map is that
   file's tilemap layer (its tiles, flips and tileset), updated when the file

@@ -598,6 +598,12 @@ Render_Collect :: struct {
 	screen: ^Render_Collect, // where Screen Layers' subtrees go (nil: with the rest)
 }
 
+@(private = "file")
+node_as_tilemap :: #force_inline proc(n: ^Node) -> (^TileMapNode, bool) {
+	if n.typeId != TileMapNode do return nil, false
+	return cast(^TileMapNode)n, true
+}
+
 // render_walk appends a subtree's drawables; z = the parent's global
 // zIndex, key = the Y-sort key the subtree's items carry.
 @(private = "file")
@@ -611,7 +617,20 @@ render_walk :: proc(c: ^Render_Collect, m: ^NodeManager, node: ^Node, z: i32, ke
 	z := z + node.zIndex
 	if z != 0 do c.anyZ = true
 	if node.renderable && (node.render != nil || node.drawBounds != nil || Script_HasDraw(node, nil)) {
-		append(&c.items[node.layer], Render_Item{node, z, key})
+		if tm, isMap := node_as_tilemap(node); isMap {
+			// A Y-sorted map: a draw per band, each keyed by its feet line
+			// (sorts with the sprites of a Y-sorted parent).
+			tm.bandMode = tm.ySort
+			tm.bandNext = 0
+			if tm.ySort {
+				tm.bandLo, tm.bandHi = TileMapNode_Bands(tm)
+				for b in tm.bandLo ..< tm.bandHi do append(&c.items[node.layer], Render_Item{node, z, TileMapNode_BandSortY(tm, b)})
+			} else {
+				append(&c.items[node.layer], Render_Item{node, z, key})
+			}
+		} else {
+			append(&c.items[node.layer], Render_Item{node, z, key})
+		}
 	}
 	if !node.ySort {
 		for child in GetChildrenView(m, node) do render_walk(c, m, child, z, key)
