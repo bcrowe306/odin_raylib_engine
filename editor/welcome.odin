@@ -1,7 +1,9 @@
 package editor
 
 import "core:fmt"
+import "core:os"
 import "core:path/filepath"
+import "core:slice"
 import "core:strings"
 import imgui "lib/imgui"
 import rl "vendor:raylib"
@@ -44,7 +46,9 @@ Welcome_IsOpen :: proc() -> bool {return welcome.open}
 Welcome_Render :: proc(state: ^EditorState) {
 	if !welcome.shown {
 		welcome.shown = true
-		if GlobalSettings.showWelcome && !GlobalDrive.enabled do Welcome_Open(state)
+		// (Not when launched on a project: New / Open / a recent project
+		// relaunch the editor with --project, and go straight to it - #265.)
+		if GlobalSettings.showWelcome && !GlobalDrive.enabled && !slice.contains(os.args, "--project") do Welcome_Open(state)
 	}
 	if !welcome.open do return
 	center := imgui.GetMainViewport().WorkPos + imgui.GetMainViewport().WorkSize * 0.5

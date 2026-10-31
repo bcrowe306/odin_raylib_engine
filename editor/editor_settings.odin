@@ -43,6 +43,7 @@ Editor_Settings :: struct {
 	previewAutoplay:  bool, // File Browser / Assets: play a sound or animation when selected (#203)
 	previewLoop:      bool, // ... and loop it
 	previewVolume:    f32,  // ... at this volume
+	window:           Window_State, // the editor window as it was left (window_state.odin, #265)
 	// Code Editor
 	codeFontSize:     f32,
 	tabWidth:         int,
@@ -321,16 +322,23 @@ settings_from_json :: proc(data: []u8) {
 }
 
 // settings_from_ini reads settings.ini (missing keys keep their defaults).
-@(private = "file")
 settings_from_ini :: proc(text: string) {
 	m, _ := ini.load_map_from_string(text, context.temp_allocator)
 	s := &GlobalSettings
+	// (A missing section is a nil map: look it up first - indexing straight
+	// through it crashed on a settings.ini without every section.)
+	get :: proc(m: ini.Map, sec, key: string) -> (string, bool) {
+		sm, has := m[sec]
+		if !has || sm == nil do return "", false
+		v, ok := sm[key]
+		return v, ok
+	}
 	f :: proc(m: ini.Map, sec, key: string, d: f32) -> f32 {
-		if v, ok := m[sec][key]; ok do if x, pok := strconv.parse_f32(v); pok do return x
+		if v, ok := get(m, sec, key); ok do if x, pok := strconv.parse_f32(v); pok do return x
 		return d
 	}
 	b :: proc(m: ini.Map, sec, key: string, d: bool) -> bool {
-		if v, ok := m[sec][key]; ok do return v == "true" || v == "1" || v == "yes"
+		if v, ok := get(m, sec, key); ok do return v == "true" || v == "1" || v == "yes"
 		return d
 	}
 	s.uiScale = f(m, "general", "ui_scale", s.uiScale)
@@ -343,7 +351,15 @@ settings_from_ini :: proc(text: string) {
 	s.checkUpdates = b(m, "general", "check_updates", s.checkUpdates)
 	s.showTabBars = b(m, "general", "show_tab_bars", s.showTabBars)
 	s.autoBottomPanel = b(m, "general", "auto_bottom_panel", s.autoBottomPanel)
-	if shape, ok := m["general"]["preview_shape"]; ok {
+	if _, has := m["window"]; has {
+		w := &s.window
+		w.saved = true
+		w.x, w.y = i32(f(m, "window", "x", 0)), i32(f(m, "window", "y", 0))
+		w.w, w.h = i32(f(m, "window", "width", 1600)), i32(f(m, "window", "height", 900))
+		w.maximized = b(m, "window", "maximized", false)
+		w.monitor = i32(f(m, "window", "monitor", 0))
+	}
+	if shape, ok := get(m, "general", "preview_shape"); ok {
 		for p, i in PREVIEW_SHAPES do if p.name == shape do s.previewShape = i
 	}
 	if pv, ok := m["preview"]; ok {
@@ -351,7 +367,7 @@ settings_from_ini :: proc(text: string) {
 		if v, vok := pv["loop"]; vok do s.previewLoop = v == "true"
 		if v, vok := pv["volume"]; vok do if x, pok := strconv.parse_f32(v); pok do s.previewVolume = clamp(x, 0, 1)
 	}
-	if hidden, ok := m["general"]["hidden_bottom_tabs"]; ok {
+	if hidden, ok := get(m, "general", "hidden_bottom_tabs"); ok {
 		s.hiddenBottomTabs = {}
 		for name in strings.split(hidden, ",", context.temp_allocator) {
 			for t in BottomTab do if fmt.tprint(t) == strings.trim_space(name) do s.hiddenBottomTabs += {t}
@@ -368,7 +384,7 @@ settings_from_ini :: proc(text: string) {
 	s.breadcrumbs = b(m, "code", "breadcrumbs", s.breadcrumbs)
 	s.inlayHints = b(m, "code", "inlay_hints", s.inlayHints)
 	s.colorSwatches = b(m, "code", "color_swatches", s.colorSwatches)
-	if v, ok := m["code"]["show_whitespace"]; ok {
+	if v, ok := get(m, "code", "show_whitespace"); ok {
 		switch v {
 		case "none": s.showWhitespace = .None
 		case "all": s.showWhitespace = .All
@@ -377,7 +393,7 @@ settings_from_ini :: proc(text: string) {
 	}
 	s.formatOnSave = b(m, "code", "format_on_save", s.formatOnSave)
 	s.lspEnabled = b(m, "code", "lsp_enabled", s.lspEnabled)
-	if v, ok := m["code"]["lua_server_path"]; ok && v != "" do s.luaServerPath = strings.clone(v)
+	if v, ok := get(m, "code", "lua_server_path"); ok && v != "" do s.luaServerPath = strings.clone(v)
 	// (Look the section up first: chaining through a missing one crashed.)
 	if tools, has := m["tools"]; has {
 		if v, ok := tools["aseprite_path"]; ok && v != "" do s.asepritePath = strings.clone(v)
@@ -492,6 +508,9 @@ Editor_SaveSettings :: proc() -> bool {
 		for t in BottomTab do if t in s.hiddenBottomTabs do append(&names, fmt.tprint(t))
 		fmt.sbprintf(&sb, "hidden_bottom_tabs = %s\n", strings.join(names[:], ",", context.temp_allocator))
 		fmt.sbprintf(&sb, "preview_shape = %s\n", PREVIEW_SHAPES[clamp(s.previewShape, 0, len(PREVIEW_SHAPES) - 1)].name)
+	}
+	if w := s.window; w.saved {
+		fmt.sbprintf(&sb, "\n[window]\nx = %d\ny = %d\nwidth = %d\nheight = %d\nmaximized = %t\nmonitor = %d\n", w.x, w.y, w.w, w.h, w.maximized, w.monitor)
 	}
 	strings.write_string(&sb, "\n[code]\n")
 	fmt.sbprintf(&sb, "font_size = %.0f\ntab_width = %d\ninsert_spaces = %t\n", s.codeFontSize, s.tabWidth, s.insertSpaces)
