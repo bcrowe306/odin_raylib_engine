@@ -519,6 +519,7 @@ Asset_Duplicate :: proc(state: ^EditorState, rel, toDir: string) -> string {
 	dst := unique_copy_name(state, toDir, filepath.base(rel))
 	full, _ := filepath.join({state.projectPath, dst}, context.temp_allocator)
 	_ = os.make_directory_all(filepath.dir(full, context.temp_allocator))
+	if strings.has_suffix(dst, ".lua") do data = transmute([]u8)script_copy_renamed(string(data), dst)
 	if os.write_entire_file(full, data) != nil {
 		Editor_Log(state, .Error, "Could not write %s", dst)
 		return ""
@@ -532,6 +533,36 @@ Asset_Duplicate :: proc(state: ^EditorState, rel, toDir: string) -> string {
 	}
 	Editor_Log(state, .Info, "Copied %s to %s", rel, dst)
 	return dst
+}
+
+// script_copy_renamed: a script's text with its class renamed after the
+// copy's file name (player_copy.lua: PlayerCopy), so the two don't declare
+// the same class (lua-language-server would see each method twice, #264).
+script_copy_renamed :: proc(text, dst: string) -> string {
+	old := Script_ClassName(text)
+	stem := strings.trim_suffix(filepath.base(dst), ".lua")
+	cls := script_class_name(stem)
+	if old == "" || cls == "" || cls == old do return text
+	for ch, i in cls do if !((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_' || (i > 0 && ch >= '0' && ch <= '9')) do return text
+	word :: proc(ch: u8) -> bool {return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || (ch >= '0' && ch <= '9') || ch == '_'}
+	// Every whole-word use of the old name (---@class, local, function, return).
+	sb := strings.builder_make(context.temp_allocator)
+	i := 0
+	for i < len(text) {
+		j := strings.index(text[i:], old)
+		if j < 0 do break
+		at := i + j
+		end := at + len(old)
+		strings.write_string(&sb, text[i:at])
+		if (at == 0 || !word(text[at - 1])) && (end == len(text) || !word(text[end])) {
+			strings.write_string(&sb, cls)
+		} else {
+			strings.write_string(&sb, old)
+		}
+		i = end
+	}
+	strings.write_string(&sb, text[i:])
+	return strings.to_string(sb)
 }
 
 Asset_Paste :: proc(state: ^EditorState, toDir: string) {
