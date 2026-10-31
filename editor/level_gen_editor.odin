@@ -67,6 +67,7 @@ lge: struct {
 	thumbKeys: map[int]u64, // node id -> the cache key its thumbnail shows
 	thumbVersion: int,
 	scriptsStale: bool, // the script nodes' files are read again before the next evaluation
+	terrainsSeen: int,  // terrainsVersion the graph's terrain files were read at
 	errors:    map[int]string, // node id -> why it can't be evaluated (heap)
 	cache:     e.Gen_Cache, // nodes' grids between evaluations (the job's while it runs)
 	job:       ^Lge_Job,
@@ -429,7 +430,7 @@ lge_refresh :: proc(state: ^EditorState) {
 			pixels: []rl.Color
 			pw, ph := en.grid.w, en.grid.h
 			if ts := lge_tileset(state, n.tileset); n.kind == .Tile_Output && ts != nil {
-				pixels, pw, ph = lge_tile_pixels(ts, lge_tile_size(&n), e.Gen_TilesOf(&n, en.grid, j.graph.seed, context.temp_allocator), en.grid.w, en.grid.h)
+				pixels, pw, ph = lge_tile_pixels(ts, lge_tile_size(&n), e.Gen_TilesOf(&n, en.grid, j.graph.seed, context.temp_allocator, Editor_Terrains(state, n.tileset)), en.grid.w, en.grid.h)
 			} else {
 				pixels = make([]rl.Color, len(en.grid.v), context.temp_allocator)
 				lge_grid_pixels(&j.graph, &n, en.grid, pixels)
@@ -504,9 +505,12 @@ LevelGenEditor_Render :: proc(state: ^EditorState) {
 	if !visible do return
 	levelGenFocused = imgui.IsWindowFocused({.RootWindow, .ChildWindows})
 	Drive_Window("levelgen")
-	if lge.scriptsStale {
+	if lge.scriptsStale || lge.terrainsSeen != terrainsVersion {
 		e.Gen_LoadScripts(&lge.graph, &state.game.gameContext) // (script nodes' files: opened, picked, reloaded)
+		e.Gen_LoadTerrains(&lge.graph, &state.game.gameContext) // (tile outputs' tilesets' terrains; saved in the Terrain Tiles window)
+		if lge.terrainsSeen != terrainsVersion do lge.version += 1 // (previews: auto-tiled again)
 		lge.scriptsStale = false
+		lge.terrainsSeen = terrainsVersion
 	}
 	lge_refresh(state)
 	lge_keys(state)
@@ -1056,6 +1060,7 @@ lge_tile_output :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 		if path, ok := asset_picker("lge.tileset", n.tileset, Editor_ListProjectFiles(state, "", TEXTURE_EXTS)); ok {
 			lge_change()
 			e.Gen_SetTileset(g, n, path)
+			lge.scriptsStale = true // (its terrains read)
 		}
 		Drive_Item("lge.tileset")
 		UI_Tooltip("The image its tile numbers count in (left to right, top to bottom, tile_w x tile_h each): pick tiles from it, see real tiles in the previews")
@@ -1065,6 +1070,7 @@ lge_tile_output :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 		if UI_IconButton(ICON_FA_TABLE_CELLS_LARGE, "lge.tileset-from-map", "Use the tileset and tile size of the TileMap selected in the scene", size = 26) {
 			lge_change()
 			e.Gen_SetTileset(g, n, tm.tilesetPath)
+			lge.scriptsStale = true
 			e.Gen_SetParam(n, "tile_w", f64(tm.tileSize.x))
 			e.Gen_SetParam(n, "tile_h", f64(tm.tileSize.y))
 		}
@@ -1093,6 +1099,27 @@ lge_tile_output :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 		UI_EndProps()
 	}
 	if n.tileset != "" && lge_tileset(state, n.tileset) == nil do imgui.TextColored(UI_WARNING, "Can't read the tileset image")
+}
+
+// lge_rule_terrain: the rule's terrain (of the output's tileset; None: its
+// tiles) - its cells then take the terrain's tiles by their neighbours.
+@(private = "file")
+lge_rule_terrain :: proc(state: ^EditorState, n: ^e.Gen_Node, r: ^e.Gen_Tile_Rule, i: int) {
+	terrains := Editor_Terrains(state, n.tileset)
+	names := make([dynamic]string, context.temp_allocator)
+	append(&names, "Tiles (no terrain)")
+	cur := 0
+	if terrains != nil do for t, k in terrains.terrains {
+		append(&names, fmt.tprintf("Terrain: %s", t.name))
+		if t.name == r.terrain do cur = k + 1
+	}
+	if r.terrain != "" && cur == 0 do append(&names, fmt.tprintf("Terrain: %s (missing)", r.terrain))
+	if r.terrain != "" && cur == 0 do cur = len(names) - 1
+	if v, changed := UI_Combo(fmt.tprintf("lge.rule-terrain:%d", i), cur, names[:]); changed && v != cur {
+		lge_change()
+		e.Gen_RuleSetTerrain(&lge.graph, r, terrains.terrains[v - 1].name if v > 0 && terrains != nil && v - 1 < len(terrains.terrains) else "")
+	}
+	UI_Tooltip("A terrain of the tileset (Tile Map tab > Terrains): the rule's cells take its tiles by their neighbours - edges and corners drawn for you")
 }
 
 // lge_rule_tiles: a rule's tiles as small pictures (in colours without a
@@ -1184,6 +1211,15 @@ lge_rules :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 		imgui.DragFloat("##max", &r.max, 0.01, 0, 0, "to %.2f")
 		lge_undo_on_activate()
 		imgui.SameLine(0, 4)
+		if r.terrain != "" {
+			// A terrain rule: its cells auto-tiled (the tiles below unused).
+			imgui.SetNextItemWidth(w)
+			lge_rule_terrain(state, n, &r, i)
+			imgui.SameLine(0, 4)
+			if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("lge.rule-remove:%d", i), "Remove the rule", size = 24) do remove = i
+			imgui.PopID()
+			continue
+		}
 		// The tiles as text ("3, 4"): the row being typed in keeps its own
 		// buffer (lge.tilesBuf) until Enter or leaving the field.
 		key := [2]int{n.id, i}
@@ -1211,11 +1247,16 @@ lge_rules :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 		imgui.SameLine(0, 4)
 		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("lge.rule-remove:%d", i), "Remove the rule", size = 24) do remove = i
 		lge_rule_tiles(state, n, &r, i)
+		if terrains := Editor_Terrains(state, n.tileset); terrains != nil && len(terrains.terrains) > 0 {
+			imgui.SameLine(0, 4)
+			imgui.SetNextItemWidth(120)
+			lge_rule_terrain(state, n, &r, i)
+		}
 		imgui.PopID()
 	}
 	if remove >= 0 {
 		lge_change()
-		delete(n.rules[remove].tiles)
+		e.Gen_RuleFree(&n.rules[remove], lge.graph.allocator)
 		ordered_remove(&n.rules, remove)
 	}
 	if UI_Button(fmt.tprintf("%s  Add Rule", ICON_FA_PLUS), "lge.rule-add") {

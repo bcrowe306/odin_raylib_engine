@@ -17,6 +17,10 @@ import imgui "lib/imgui"
 // button paints (Paint), erases (Erase) or flood-fills (Fill); the right
 // button always erases. One stroke is one undo step.
 //
+// The Terrains layer paints a terrain of the tileset (terrain_editor.odin):
+// each cell takes the tile of its pattern of neighbours, the cells around
+// it re-tiled as it's painted, erased or filled.
+//
 // The Components layer paints linked component instances on the same grid
 // (engine/tilemap_components.odin): one per cell, bigger ones over their
 // footprint, Shift places one off the grid; erase and fill work on it too.
@@ -31,6 +35,7 @@ Tile_Tool :: enum {
 
 Tile_Layer :: enum {
 	Tiles,      // tileset tiles
+	Terrains,   // a terrain of the tileset (auto-tiled)
 	Components, // component instances
 }
 
@@ -44,6 +49,9 @@ Tile_State :: struct {
 	last:   [2]int, // the stroke's previous cell (painted to the current one in a line)
 	zoom:   f32,    // the tile panel's scale (0: fit tiles to about 32 px)
 	grid:   bool,   // lines between the tiles in the panel
+	terrain: int,   // the terrain brush (index in the tileset's terrains)
+	nameBuf: [64]u8, // a terrain name being typed in
+	nameFor: int,    // the terrain nameBuf belongs to (+1; 0 none)
 }
 
 GlobalTiles: Tile_State
@@ -84,6 +92,10 @@ TileMapPanel_Render :: proc(state: ^EditorState) {
 	imgui.Separator()
 	if ts.layer == .Components {
 		tilemap_component_palette(state, tm)
+		return
+	}
+	if ts.layer == .Terrains {
+		tilemap_terrain_palette(state, tm)
 		return
 	}
 	if tm.tileset == nil {
@@ -194,15 +206,15 @@ tilemap_tools_row :: proc(tm: ^e.TileMapNode) {
 	ts := &GlobalTiles
 	// The layer the tools work on.
 	for l in Tile_Layer {
-		if l == .Components do imgui.SameLine(0, 2)
-		icon := ICON_FA_TABLE_CELLS_LARGE if l == .Tiles else ICON_FA_CUBES
-		name := "Tiles" if l == .Tiles else "Components"
+		if l != .Tiles do imgui.SameLine(0, 2)
+		icon := ICON_FA_TABLE_CELLS_LARGE if l == .Tiles else ICON_FA_MOUNTAIN if l == .Terrains else ICON_FA_CUBES
+		name := "Tiles" if l == .Tiles else "Terrains" if l == .Terrains else "Components"
 		active := ts.layer == l // (the click below may change ts.layer: push / pop by this)
 		if active do imgui.PushStyleColorImVec4(.Button, UI_ACCENT)
 		if imgui.Button(fmt.ctprintf("%s  %s##tilelayer", icon, name), {0, 28}) do ts.layer = l
 		if active do imgui.PopStyleColor()
 		Drive_Item(fmt.tprintf("tile.layer:%s", name))
-		UI_Tooltip("Paint tileset tiles" if l == .Tiles else "Paint component instances on the grid (one per cell; Shift places one off the grid)")
+		UI_Tooltip("Paint tileset tiles" if l == .Tiles else "Paint a terrain: each cell takes its tile from its neighbours (edges and corners draw themselves)" if l == .Terrains else "Paint component instances on the grid (one per cell; Shift places one off the grid)")
 	}
 	imgui.SameLine(0, UI_SPACE * 2)
 	tool :: proc(icon, id, tip: string, t: Tile_Tool) {
@@ -221,6 +233,12 @@ tilemap_tools_row :: proc(tm: ^e.TileMapNode) {
 		n := len(e.TileMapNode_Components(tm))
 		if ts.comp == "" do UI_DimText(fmt.tprintf("No component picked  -  %d on the map", n))
 		else do UI_DimText(fmt.tprintf("%s  -  %d on the map", Asset_DisplayName(ts.comp), n))
+		return
+	}
+	if ts.layer == .Terrains {
+		terrains := Editor_Terrains(&GlobalEditor, tm.tilesetPath)
+		if terrains != nil && ts.terrain < len(terrains.terrains) do UI_DimText(fmt.tprintf("Terrain: %s", terrains.terrains[ts.terrain].name))
+		else do UI_DimText("No terrain picked")
 		return
 	}
 	if tm.tileset != nil {
@@ -475,12 +493,20 @@ Viewport_TilePaint :: proc(state: ^EditorState, drawList: ^imgui.DrawList, mouse
 		ts.stroke = false
 		return true
 	}
+	// The Terrains layer: the brush is a terrain.
+	terrain: ^e.Tile_Terrain
+	if ts.layer == .Terrains {
+		terrains := Editor_Terrains(state, tm.tilesetPath)
+		if terrains == nil || ts.terrain >= len(terrains.terrains) do return true
+		terrain = &terrains.terrains[ts.terrain]
+	}
 	if !ts.stroke {
-		Editor_RecordUndo(state, "Paint tiles")
+		Editor_RecordUndo(state, "Paint terrain" if terrain != nil else "Paint tiles")
 		ts.stroke = true
 		ts.last = cell
 		if left && ts.tool == .Fill {
-			e.TileMapNode_Fill(tm, cell.x, cell.y, ts.brush)
+			if terrain != nil do e.TileMapNode_FillTerrain(tm, terrain, cell.x, cell.y)
+			else do e.TileMapNode_Fill(tm, cell.x, cell.y, ts.brush)
 			return true
 		}
 	}
@@ -497,7 +523,8 @@ Viewport_TilePaint :: proc(state: ^EditorState, drawList: ^imgui.DrawList, mouse
 	for i in 0 ..= steps {
 		t := f32(i) / f32(max(steps, 1))
 		p := [2]int{from.x + int(math.round(f32(cell.x - from.x) * t)), from.y + int(math.round(f32(cell.y - from.y) * t))}
-		e.TileMapNode_Set(tm, p.x, p.y, tile)
+		if terrain != nil do e.TileMapNode_PaintTerrain(tm, terrain, p.x, p.y, tile >= 0)
+		else do e.TileMapNode_Set(tm, p.x, p.y, tile)
 	}
 	ts.last = cell
 	return true

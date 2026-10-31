@@ -1,0 +1,57 @@
+# #171: terrain sets - a terrain of a tileset made on the Tile Map tab's
+# Terrains layer, its tiles picked in the Terrain Tiles window (saved next
+# to the image), painted with fill (auto-tiled), then named by a level
+# generator rule (its preview auto-tiled).
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+key escape
+key ctrl+a
+type tile map
+key enter
+expect selected == TileMap
+wait 2
+click @tile.tileset
+click @pick:textures/Tiles.png
+wait 2
+click @tile.layer:Terrains
+click @tile.terrain-new
+wait 1
+expect file:textures/Tiles.tileset.json contains "name": "Terrain"
+screenshot terrain_layer
+# Tiles: the isolated pattern, then the full one (the last of the 47).
+click @tile.terrain-edit:0
+wait 2
+click @terrain.pattern:0
+click @terrain.tile:1
+click @terrain.pattern:46
+click @terrain.tile:26
+wait 1
+expect file:textures/Tiles.tileset.json contains [0, 1]
+expect file:textures/Tiles.tileset.json contains [255, 26]
+screenshot terrain_tiles
+click @terrain.done
+wait 1
+# Fill the map with it.
+click @tile.terrain:0
+click @tile.fill
+click @world:700,380
+wait 2
+expect node:TileMap.tiles >= 20
+screenshot filled
+# A generator rule names the terrain.
+exec mkdir -p $PROJECT/levels
+exec cp tests/drive/fixtures/tiles_zz.levelgen.json $PROJECT/levels/tiles_zz.levelgen.json
+wait-until item:asset:levels/tiles_zz.levelgen.json == visible timeout=300
+dblclick @asset:levels/tiles_zz.levelgen.json
+wait 5
+click @lge.node:3
+wait 2
+click @lge.rule-terrain:0
+click @pick:Terrain: Terrain
+wait 5
+expect lge.text contains "terrain": "Terrain"
+expect lge.errors == 0
+screenshot generator_terrain

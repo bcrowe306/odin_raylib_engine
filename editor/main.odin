@@ -271,6 +271,7 @@ editor_main :: proc() -> int {
 		FileBrowser_Update(&GlobalEditor) // (drawn in the bottom panel's Files tab)
 		AudioPreview_Update(&GlobalEditor)
 		LevelGenEditor_Render(&GlobalEditor) // (level_gen_editor.odin)
+		TerrainEditor_Render(&GlobalEditor) // (terrain_editor.odin)
 		ProjectSettingsDialog_Render(&GlobalEditor)
 		Palette_Render(&GlobalEditor)
 		Shortcuts_Render(&GlobalEditor)

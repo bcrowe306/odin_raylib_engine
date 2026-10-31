@@ -349,23 +349,61 @@ gen_tiles :: proc(ev: ^Gen_Eval, outputId: int, allocator: runtime.Allocator) ->
 	if out.kind != .Tile_Output do return nil, {}, fmt.tprintf("node %d isn't a tile output", out.id)
 	grid, ok := gen_eval(ev, out.id)
 	if !ok do return nil, {}, ev.err
-	return Gen_TilesOf(out, grid, ev.seed, allocator), {grid.w, grid.h}, ""
+	terrains: Tile_Terrains
+	if text, ok := ev.g.tilesets[out.tileset]; ok do terrains, _ = Terrains_Parse(transmute([]u8)text, context.temp_allocator)
+	return Gen_TilesOf(out, grid, ev.seed, allocator, &terrains), {grid.w, grid.h}, ""
 }
 
 // Gen_TilesOf: a tile output's tiles for its grid (already evaluated) and
-// the evaluation's seed (the graph's when it was 0).
-Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := context.allocator) -> []i32 {
+// the evaluation's seed (the graph's when it was 0). A rule naming a
+// terrain (of `terrains`, its tileset's) makes its cells that terrain, each
+// then given the tile of its pattern - cells beyond the level count as the
+// terrain, so it runs on past the edges. A terrain it doesn't have: empty.
+Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := context.allocator, terrains: ^Tile_Terrains = nil) -> []i32 {
 	pickSeed := gen_mix(gen_mix(seed, u64(out.id)), 0x7111e)
 	empty := i32(Gen_Param(out, "empty"))
 	tiles := make([]i32, len(grid.v), allocator)
+	// (Each rule's terrain, found once; -1: tiles.)
+	ruleTerrain := make([]int, len(out.rules), context.temp_allocator)
+	anyTerrain := false
+	for r, k in out.rules {
+		ruleTerrain[k] = -1
+		if r.terrain == "" do continue
+		anyTerrain = true
+		ruleTerrain[k] = -2 // (named, but not in the tileset)
+		if _, ti := Terrains_Find(terrains, r.terrain); ti >= 0 do ruleTerrain[k] = ti
+	}
+	cellTerrain: []i16
+	if anyTerrain {
+		cellTerrain = make([]i16, len(grid.v), context.temp_allocator)
+		for &c in cellTerrain do c = -1
+	}
 	#no_bounds_check for v, i in grid.v {
 		t := empty
-		for r in out.rules {
-			if v < r.min || v > r.max || len(r.tiles) == 0 do continue
+		for r, k in out.rules {
+			if v < r.min || v > r.max do continue
+			if ruleTerrain[k] != -1 {
+				if ruleTerrain[k] >= 0 do cellTerrain[i] = i16(ruleTerrain[k])
+				break
+			}
+			if len(r.tiles) == 0 do continue
 			t = r.tiles[0] if len(r.tiles) == 1 else r.tiles[int(gen_hash01(i % grid.w, i / grid.w, pickSeed) * f32(len(r.tiles))) % len(r.tiles)]
 			break
 		}
 		tiles[i] = t
+	}
+	if !anyTerrain do return tiles
+	w, h := grid.w, grid.h
+	#no_bounds_check for c, i in cellTerrain {
+		if c < 0 do continue
+		x, y := i % w, i / w
+		nb: [3][3]bool
+		for dy in 0 ..< 3 do for dx in 0 ..< 3 {
+			nx, ny := x + dx - 1, y + dy - 1
+			nb[dy][dx] = nx < 0 || ny < 0 || nx >= w || ny >= h || cellTerrain[ny * w + nx] == c
+		}
+		t := &terrains.terrains[c]
+		if tile := Terrain_Tile(t, Terrain_Mask(t.kind, nb), x, y, pickSeed); tile >= 0 do tiles[i] = tile
 	}
 	return tiles
 }
