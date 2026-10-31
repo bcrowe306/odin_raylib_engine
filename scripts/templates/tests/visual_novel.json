@@ -249,5 +249,163 @@
     "textures/unit_hurt.png"
    ]
   ]
+ },
+ {
+  "name": "clicks: lines and a choice",
+  "frames": 160,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 mouse 640 250 click",
+   "20 mouse 640 250 click",
+   "30 mouse 640 250 click",
+   "40 mouse 640 250 click",
+   "50 mouse 640 250 click",
+   "60 mouse 640 250 click",
+   "70 mouse 640 250 click",
+   "80 mouse 640 250 click",
+   "100 mouse 640 456 click",
+   "130 L tap"
+  ],
+  "expect": [
+   [
+    "LogText",
+    "text",
+    "contains",
+    "> Keep going"
+   ],
+   [
+    "SlotCenter",
+    "visible",
+    "==",
+    false
+   ],
+   [
+    "LogText",
+    "text",
+    "contains",
+    "The castle gate is shut"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: save and load a slot",
+  "frames": 200,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "50 mouse 861 707 click",
+   "70 mouse 640 226 click",
+   "90 ESCAPE tap",
+   "100 SPACE tap",
+   "110 SPACE tap",
+   "120 SPACE tap",
+   "140 mouse 975 707 click",
+   "160 mouse 640 226 click",
+   "180 L tap"
+  ],
+  "expect": [
+   [
+    "LogText",
+    "text",
+    "contains",
+    "Wonderful."
+   ],
+   [
+    "LogText",
+    "text",
+    "!contains",
+    "A robot"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: load a slot from the title screen",
+  "frames": 330,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "50 mouse 861 707 click",
+   "70 mouse 640 226 click",
+   "90 ESCAPE tap",
+   "110 mouse 1089 707 click",
+   "180 mouse 640 380 click",
+   "210 mouse 640 226 click",
+   "300 L tap"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "story"
+   ],
+   [
+    "LogText",
+    "text",
+    "contains",
+    "Wonderful."
+   ],
+   [
+    "SlotLeft",
+    "texture",
+    "==",
+    "textures/ada_think.png"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: title New game",
+  "frames": 90,
+  "input": [
+   "10 mouse 640 260 click"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "story"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: title Settings opens, Done closes",
+  "frames": 60,
+  "input": [
+   "10 mouse 640 440 click"
+  ],
+  "expect": [
+   [
+    "SettingsPanel",
+    "enabled",
+    "==",
+    true
+   ],
+   [
+    "Menu",
+    "enabled",
+    "==",
+    false
+   ]
+  ]
  }
 ]

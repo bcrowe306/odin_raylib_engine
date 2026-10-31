@@ -754,7 +754,7 @@ def visual_novel():
     # The title screen.
     sliders = [{"type": "UISliderNode", "name": n, "layer": 8,
                 "properties": {"size": [520, 36], "label": l, "labelWidth": 170, "minValue": lo, "maxValue": hi,
-                               "value": v, "defaultValue": v}}
+                               "value": v, "defaultValue": v, "isInteger": n == "TextSpeed"}}
                for n, l, lo, hi, v in (("TextSpeed", "Text speed", 10, 120, 40), ("AutoDelay", "Auto delay (s)", 0.3, 4, 1.2),
                                        ("MusicVolume", "Music", 0, 1, 1), ("SoundVolume", "Sound", 0, 1, 1))]
     title = [
@@ -765,7 +765,7 @@ def visual_novel():
         label("Endings", "", (640, 660), size=22, color="#1e2840cc"),
         column("Menu", (500, 220), (280, 300), [button("NewGame", "New game"), button("Continue", "Continue"),
                                                button("Load", "Load"), button("Settings", "Settings")]),
-        column("SettingsPanel", (340, 190), (600, 330), sliders + [button("SettingsClose", "Done", w=160, h=40, size=20)],
+        column("SettingsPanel", (340, 190), (600, 300), sliders + [button("SettingsClose", "Done", w=160, h=40, size=20)],
                title="Settings"),
         slots,
     ]

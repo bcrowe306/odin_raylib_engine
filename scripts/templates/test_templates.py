@@ -7,7 +7,8 @@ scripted input and checks the result (TODO E.2):
 
 Tests: scripts/templates/tests/<id>.json, a list of
     {"name": "...", "frames": 120,
-     "input": ["10 RIGHT down", "40 SPACE tap 12"],        # runner --input-script lines
+     "input": ["10 RIGHT down", "40 SPACE tap 12",          # runner --input-script lines
+               "50 mouse 640 360 click"],
      "patch": {"Player": {"position": [900, 100], "script.lives": 1}},  # optional: a copy's node fields / script properties
      "scene": "scenes/level1.scene.json",                  # optional: the scene patched / started
      "expect": [["Coins", "text", "==", "Coins 1 / 11"],   # node, field, op, value
@@ -80,6 +81,8 @@ def check(op, got, want):
         return got != want
     if op == "contains":
         return isinstance(got, str) and want in got
+    if op == "!contains":
+        return isinstance(got, str) and want not in got
     if got is None:
         return False
     return {"<": got < want, ">": got > want, "<=": got <= want, ">=": got >= want}[op]

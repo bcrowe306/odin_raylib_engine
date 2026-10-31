@@ -230,7 +230,7 @@
     "properties": {
      "size": [
       600,
-      330
+      300
      ],
      "direction": "Vertical",
      "alignment": "Center",
@@ -261,7 +261,8 @@
        "minValue": 10,
        "maxValue": 120,
        "value": 40,
-       "defaultValue": 40
+       "defaultValue": 40,
+       "isInteger": true
       }
      },
      {
@@ -278,7 +279,8 @@
        "minValue": 0.3,
        "maxValue": 4,
        "value": 1.2,
-       "defaultValue": 1.2
+       "defaultValue": 1.2,
+       "isInteger": false
       }
      },
      {
@@ -295,7 +297,8 @@
        "minValue": 0,
        "maxValue": 1,
        "value": 1,
-       "defaultValue": 1
+       "defaultValue": 1,
+       "isInteger": false
       }
      },
      {
@@ -312,7 +315,8 @@
        "minValue": 0,
        "maxValue": 1,
        "value": 1,
-       "defaultValue": 1
+       "defaultValue": 1,
+       "isInteger": false
       }
      },
      {

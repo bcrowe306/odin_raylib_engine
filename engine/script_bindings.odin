@@ -2714,6 +2714,14 @@ ui_has_mouse :: proc(L: ^lua.State) -> bool {
 	return sm != nil && Game_UIHasMouse(sm.game)
 }
 
+// test_mouse: the game's test mouse (the runner's --input-script, tests)
+// when it is on - the left button only.
+@(private="file")
+test_mouse :: proc(L: ^lua.State) -> ^Game {
+	sm := get_script_manager(L)
+	return sm.game if sm != nil && sm.game != nil && sm.game.uiTestInputEnabled else nil
+}
+
 @(private="file")
 lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
@@ -2724,6 +2732,7 @@ lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isPressed := rl.IsWindowReady() && rl.IsMouseButtonPressed(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
+	if g := test_mouse(L); g != nil do isPressed = btn == .LEFT && g.uiTestMousePressed && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isPressed))
 	return 1
 }
@@ -2738,6 +2747,7 @@ lua_input_is_mouse_button_down :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isDown := rl.IsWindowReady() && rl.IsMouseButtonDown(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
+	if g := test_mouse(L); g != nil do isDown = btn == .LEFT && g.uiTestMouseDown && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isDown))
 	return 1
 }
@@ -2752,6 +2762,7 @@ lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isRel := rl.IsWindowReady() && rl.IsMouseButtonReleased(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
+	if g := test_mouse(L); g != nil do isRel = btn == .LEFT && g.uiTestMouseReleased && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isRel))
 	return 1
 }
@@ -2759,6 +2770,11 @@ lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
 @(private="file")
 lua_input_get_mouse_position :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
+	if g := test_mouse(L); g != nil {
+		lua.pushnumber(L, lua.Number(g.uiTestMousePos.x))
+		lua.pushnumber(L, lua.Number(g.uiTestMousePos.y))
+		return 2
+	}
 	if rl.IsWindowReady() {
 		mPos := rl.GetMousePosition()
 		lua.pushnumber(L, lua.Number(mPos.x))
