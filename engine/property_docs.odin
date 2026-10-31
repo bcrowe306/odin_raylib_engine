@@ -230,6 +230,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"TileMapNode.solid", "Build static colliders for the painted tiles."},
 	{"TileMapNode.layout", "The cells' shape: Square; Isometric (diamonds on a grid turned 45 degrees); Staggered (diamonds in rows, every other row shifted); Hex Pointy / Hex Flat (hexagons in offset rows / columns)."},
 	{"TileMapNode.stagger", "Staggered and hex grids: which rows (Hex Flat: columns) are shifted by half a cell - the odd or the even ones."},
+	{"TileMapNode.tileOffset", "Moves every tile image by this many pixels: for art whose cell isn't at the image's bottom - a floor tile with a slab under its diamond is moved down by the slab."},
 	{"TileMapNode.cellSize", "The grid's cell in pixels (0 = the tile size). Tiles taller than their cell - walls, blocks - stand on it: bottom-aligned, centred across."},
 
 	// --- Lighting ---

@@ -287,6 +287,7 @@ TileMapNode_FillComponents :: proc(tm: ^TileMapNode, cell: [2]int, path: string)
 // map:tilemap_get_tile(x, y) -> tile | -1      map:tilemap_set_tile(x, y, tile) -> bool  (#220)
 // map:tilemap_cell_at(wx, wy) -> x, y          map:tilemap_cell_position(x, y) -> wx, wy (centre)
 // map:tilemap_neighbors(x, y) -> {{x, y}, ...}  (the cells sharing a side: 4, hex 6 - #278)
+// map:tilemap_cell_outline(x, y) -> {{wx, wy}, ...}  (its corners in the world: 4, hex 6)
 
 @(private = "file")
 lua_tilemap_arg :: proc(L: ^lua.State) -> ^TileMapNode {
@@ -392,6 +393,25 @@ lua_tilemap_neighbors :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+@(private = "file")
+lua_tilemap_cell_outline :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	tm := lua_tilemap_arg(L)
+	lua.createtable(L, 6, 0)
+	if tm == nil do return 1
+	pts, n := TileMapNode_CellOutline(tm, lua_cell(L))
+	for p, i in pts[:n] {
+		w := TileMapNode_LocalToWorld(tm, p)
+		lua.createtable(L, 2, 0)
+		lua.pushnumber(L, lua.Number(w.x))
+		lua.rawseti(L, -2, 1)
+		lua.pushnumber(L, lua.Number(w.y))
+		lua.rawseti(L, -2, 2)
+		lua.rawseti(L, -2, lua.Integer(i + 1))
+	}
+	return 1
+}
+
 // Script_RegisterTileMapComponentBindings adds the tilemap_* component and tile
 // methods to the node metatable (on the stack).
 Script_RegisterTileMapComponentBindings :: proc(L: ^lua.State) {
@@ -407,4 +427,5 @@ Script_RegisterTileMapComponentBindings :: proc(L: ^lua.State) {
 	reg(L, "tilemap_cell_at", lua_tilemap_cell_at)
 	reg(L, "tilemap_cell_position", lua_tilemap_cell_position)
 	reg(L, "tilemap_neighbors", lua_tilemap_neighbors)
+	reg(L, "tilemap_cell_outline", lua_tilemap_cell_outline)
 }

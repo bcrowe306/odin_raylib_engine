@@ -58,6 +58,10 @@ can also hold components - coins, enemies, spikes - one per cell.
   hexagons in offset rows or columns. Painting, Fill, picking
   (`tilemap_cell_at`), `tilemap_cell_position` and **Solid** follow the
   grid; `tilemap_neighbors(x, y)` lists a cell's 4 (hex: 6) neighbours.
+- **Tile Offset** (Node tab) moves every tile image. Use it for art whose
+  cell isn't at the image's bottom: a floor tile with a slab under its
+  diamond moves down by the slab's height. The **Isometric Dungeon** and
+  **Hex Island** templates show both grids set up with Kenney art.
 - **Cell** is the grid's cell (left at the tile size, square maps work as
   they always did). A tile taller than its cell, such as a wall or a block,
   stands on its cell: drawn bottom-aligned and centred across, so its top

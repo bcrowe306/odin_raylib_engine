@@ -3760,6 +3760,7 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@field layout "Square"|"Isometric"|"Staggered"|"HexPointy"|"HexFlat" The cells' shape: Square; Isometric (diamonds on a grid turned 45 degrees); Staggered (...
 ---@field stagger "Odd"|"Even" Staggered and hex grids: which rows (Hex Flat: columns) are shifted by half a cell - th...
 ---@field cellSize Vec2 The grid's cell in pixels (0 = the tile size). Tiles taller than their cell - walls, bl...
+---@field tileOffset Vec2 Moves every tile image by this many pixels: for art whose cell isn't at the image's bot...
 ---@field asepriteLayer string With an Aseprite file as the tileset: the tilemap layer the map comes from (its tiles, ...
 
 ---@alias TileMapNodeProperty
@@ -3778,6 +3779,7 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---| "layout" # "Square"|"Isometric"|"Staggered"|"HexPointy"|"HexFlat" - The cells' shape: Square; Isometric (diamonds on a grid turned 45 degrees); Staggered (...
 ---| "stagger" # "Odd"|"Even" - Staggered and hex grids: which rows (Hex Flat: columns) are shifted by half a cell - th...
 ---| "cellSize" # Vec2 - The grid's cell in pixels (0 = the tile size). Tiles taller than their cell - walls, bl...
+---| "tileOffset" # Vec2 - Moves every tile image by this many pixels: for art whose cell isn't at the image's bot...
 ---| "asepriteLayer" # string - With an Aseprite file as the tileset: the tilemap layer the map comes from (its tiles, ...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
@@ -3800,6 +3802,7 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@overload fun(self: TileMapNode, path: "layout"): "Square"|"Isometric"|"Staggered"|"HexPointy"|"HexFlat"
 ---@overload fun(self: TileMapNode, path: "stagger"): "Odd"|"Even"
 ---@overload fun(self: TileMapNode, path: "cellSize"): Vec2
+---@overload fun(self: TileMapNode, path: "tileOffset"): Vec2
 ---@overload fun(self: TileMapNode, path: "asepriteLayer"): string
 function TileMapNode:get_property(path) end
 
@@ -3824,6 +3827,7 @@ function TileMapNode:get_property(path) end
 ---@overload fun(self: TileMapNode, path: "layout", value: "Square"|"Isometric"|"Staggered"|"HexPointy"|"HexFlat")
 ---@overload fun(self: TileMapNode, path: "stagger", value: "Odd"|"Even")
 ---@overload fun(self: TileMapNode, path: "cellSize", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TileMapNode, path: "tileOffset", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TileMapNode, path: "asepriteLayer", value: string)
 function TileMapNode:set_property(path, value, y) end
 
@@ -8810,6 +8814,16 @@ function TileMapNode:tilemap_cell_position(x, y) end
 ---@param y integer Cell row, 0-based
 ---@return integer[][] neighbors Each one {x, y}; empty when not a tile map
 function TileMapNode:tilemap_neighbors(x, y) end
+
+---A cell's outline in the world: its corners clockwise from the top - 4
+---for square and diamond cells, 6 for hex ones. For drawing a highlight
+---(on_draw with the Vector module, in the drawing node's space).
+---
+---Example: `local pts = map:tilemap_cell_outline(x, y); Vector.move_to(pts[1][1], pts[1][2]); for i = 2, #pts do Vector.line_to(pts[i][1], pts[i][2]) end; Vector.close_path(); Vector.stroke()`
+---@param x integer Cell column, 0-based
+---@param y integer Cell row, 0-based
+---@return number[][] corners Each one {wx, wy} in world px; empty when not a tile map
+function TileMapNode:tilemap_cell_outline(x, y) end
 
 ---Carves a circle out of the art (world position and radius): every shape keeps its paint, and a collider follows - destructible terrain, bites, bullet holes. The node draws its own carved copy until `vector_reset`.
 ---

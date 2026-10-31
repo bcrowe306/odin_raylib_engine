@@ -787,8 +787,224 @@ def visual_novel():
     return t
 
 
+# --- dungeon (isometric) ------------------------------------------------------------
+
+# The room, as text: one character a cell, rows are grid y, columns grid x
+# (x runs down-right on screen, y down-left). The back walls are made from
+# the edges: x = 0 and y = 0.
+#   . floor   # inner wall (on the cell's upper-right edge)   C chest   D door (top wall)
+#   W window (top wall)   w window (left wall)   P pillar   b barrel   B barrels
+#   k crates   t table   p woodpile   @ the hero
+DUNGEON_ROOM = [
+    "...W..D...",
+    ".p......b.",
+    "..........",
+    "...P..P...",
+    "w.........",
+    "......@...",
+    ".###....C.",
+    ".......t..",
+    ".B.P......",
+    "........k.",
+]
+
+
+def dungeon():
+    t = Template("dungeon", "Isometric Dungeon",
+                 "Explore a small isometric dungeon: click to walk (path finding round the walls) or use WASD, "
+                 "walk behind pillars and walls, open the chest for the key, unlock the door.", "dungeon", 6)
+    t.begin()
+    t.art("iso-dungeon/tiles.png", "textures/dungeon.png")
+    t.art("iso-dungeon/hero.png", "textures/hero.png")
+    t.license("Isometric Miniature Dungeon")
+    rows = DUNGEON_ROOM
+    H, W = len(rows), len(rows[0])
+    CW, CH = 128, 64      # the diamond cell
+    TILE = [128, 144]     # the tile images (taller: walls, pillars)
+    OFFSET = [0, 10]      # the floor's slab under its diamond
+    ORIGIN = (0, 0)
+    FLOOR, FLOOR_VARIANTS = 0, [0, 0, 0, 0, 0, 1, 0]
+    WALL_LEFT, WALL_TOP, CORNER_BACK = 9, 10, 14   # (stoneWall_E / _S, stoneWallCorner_S)
+    DOOR_TOP, WINDOW_LEFT, WINDOW_TOP = 18, 25, 26
+    PROPS = {"P": 45, "b": 40, "B": 41, "k": 44, "t": 46, "p": 47, "C": 34}
+
+    def center(x, y):
+        return [ORIGIN[0] + (x - y) * CW / 2 + CW / 2, ORIGIN[1] + (x + y) * CH / 2 + CH / 2]
+
+    # (A scatter of the variants: a hash of the cell, not a pattern.)
+    floor = [[FLOOR_VARIANTS[((x * 73856093) ^ (y * 19349663)) % 97 % len(FLOOR_VARIANTS)] for x in range(W)] for y in range(H)]
+    walls = [[-1] * W for _ in range(H)]
+    props = [[-1] * W for _ in range(H)]
+    hero = (W // 2, H // 2)
+    for y in range(H):
+        for x in range(W):
+            ch = rows[y][x]
+            if x == 0 and y == 0:
+                walls[y][x] = CORNER_BACK
+            elif y == 0:
+                walls[y][x] = {"D": DOOR_TOP, "W": WINDOW_TOP}.get(ch, WALL_TOP)
+            elif x == 0:
+                walls[y][x] = WINDOW_LEFT if ch == "w" else WALL_LEFT
+            elif ch == "#":
+                walls[y][x] = WALL_TOP
+            elif ch in PROPS:
+                props[y][x] = PROPS[ch]
+            elif ch == "@":
+                hero = (x, y)
+
+    def imap(name, grid, layer, ysort=False, solid=False, sort_offset=0, tileset="textures/dungeon.png"):
+        n = tilemap(name, tileset, 0, grid, solid=solid, layer=layer, pos=ORIGIN)
+        n["tilemap"]["tile_size"] = TILE
+        n["properties"].update({"layout": "Isometric", "cellSize": [CW, CH], "tileOffset": OFFSET})
+        if ysort:
+            n["ySort"] = True
+            n["ySortOffset"] = sort_offset
+        return n
+
+    walk = imap("Walk", [[-1] * W for _ in range(H)], 1, tileset="")
+    del walk["tilemap"]["tileset"]
+    hero_anims = {}
+    for row in range(8):
+        hero_anims[f"idle_{row}"] = ([row * 11], 1, True)
+        hero_anims[f"run_{row}"] = ([row * 11 + 1 + k for k in range(10)], 16, True)
+    hx, hy = center(*hero)
+    children = [
+        {"type": "CameraNode", "name": "Camera", "position": [hx, hy], "follow": "../World/Hero",
+         "properties": {"isCurrent": True, "followMode": "SingleTarget", "dragType": "SmoothDamp"}},
+        {"type": "Node", "name": "Dungeon", "script": {"path": "scripts/dungeon.lua"}},
+        imap("Floor", floor, 1),
+        walk,
+        {"type": "Node", "name": "Cursor", "layer": 1, "script": {"path": "scripts/cursor.lua"}},
+        {"type": "Node", "name": "World", "ySort": True, "children": [
+            # (Walls sort at their cell's top: a back wall is behind whoever stands
+            # in its cell; props at its middle: in front of whoever is behind.)
+            imap("Walls", walls, 2, ysort=True, solid=True, sort_offset=-56),
+            imap("Props", props, 2, ysort=True, solid=True, sort_offset=-24),
+            {"type": "CharacterMoverNode", "name": "Hero", "position": [hx, hy], "tags": ["player"],
+             "shapes": [{"type": "Circle", "radius": 10}],
+             "properties": {"controlMode": "Script", "categoryLayers": ["Layer2"], "maskLayers": ["Layer1"]},
+             "script": {"path": "scripts/hero.lua"},
+             "children": [
+                 sprite("Sprite", "textures/hero.png", (11, 8), hero_anims, default="idle_2", pivot=(0.5, 74 / 84), layer=2),
+                 {"type": "NavigationAgentNode", "name": "Agent",
+                  "properties": {"speed": 150, "radius": 0, "arriveDistance": 4, "repathInterval": 0.5,
+                                 "navMap": "../../../Walk", "moveParent": True, "avoidance": False}},
+             ]},
+        ]},
+        text("Title", "Find the key, open the door", (16, 12), size=32, color="#e9dcc2ff", layer=7),
+        text("KeyIcon", "Key: no", (16, 52), size=32, color="#f5d76eff", layer=7),
+        text("Hint", "", (640, 640), size=32, align="Center", pivot=(0.5, 0), color="#ffffffff", layer=7),
+        text("Message", "", (640, 90), size=48, align="Center", pivot=(0.5, 0.5), color="#ffffffff", layer=7),
+        text("Help", "Click to walk   WASD / arrows walk   E open", (1264, 690), size=32, align="Right",
+             pivot=(1, 1), color="#ffffff99", layer=7),
+    ]
+    t.json("scenes/dungeon.scene.json", scene("dungeon", children, background=(24, 20, 26, 255)))
+    t.json("project.json", project("Isometric Dungeon", ["scenes/dungeon.scene.json"], MOVE_ACTIONS + [
+        action("interact", "E", "ENTER", "SPACE", "pad:RIGHT_FACE_DOWN"),
+    ], virtual=(1280, 720), gravity=(0, 0), pixel=False))
+    for s_ in ("dungeon", "hero", "cursor"):
+        t.script(s_)
+    with open(os.path.join(SCRIPTS, "dungeon", "README.md")) as f:
+        t.write("README.md", f.read())
+    return t
+
+
+# --- hex island ---------------------------------------------------------------------
+
+# The island, one character a hex (rows are grid y; odd rows are shifted
+# right by half a hex): ~ water, g grass, d dirt, s sand, r stone,
+# T tree, P pine, A autumn tree, R rock, b bush, f flower (red / yellow /
+# blue in turn), @ the explorer (on grass).
+HEX_ISLAND = [
+    "~~~~~~~~~~~~~",
+    "~~~ssggggs~~~",
+    "~~sgTgfggAss~",
+    "~sgPgggRgfs~~",
+    "~sgg@ggTgggs~",
+    "~~sgdddgbs~~~",
+    "~sgfgdPgRgfs~",
+    "~~ssgAfgss~~~",
+    "~~~~sssr~~~~~",
+    "~~~~~~~~~~~~~",
+]
+
+
+def hex_island():
+    t = Template("hex", "Hex Island",
+                 "Explore a little island on a hex grid: click a hex to walk there (paths step hex by hex round "
+                 "water, trees and rocks) or step with the keys, and pick every flower.", "map", 7)
+    t.begin()
+    t.art("hexagon/tiles.png", "textures/hex_tiles.png")
+    t.art("hexagon/objects.png", "textures/hex_objects.png")
+    t.art("hexagon/alien.png", "textures/explorer.png")
+    t.license("Hexagon Tiles")
+    rows = HEX_ISLAND
+    H, W = len(rows), len(rows[0])
+    CW, CH = 65, 66
+    GROUND = {"~": 7, "g": 0, "d": 2, "s": 3, "r": 4}
+    OBJECTS = {"T": 0, "P": 2, "A": 4, "R": 5, "b": 7}
+    FLOWERS = [8, 9, 10]
+    ORIGIN = (640 - (W * CW) / 2, 360 - (H * CH * 0.75) / 2 - 20)
+
+    def center(x, y):
+        return [ORIGIN[0] + x * CW + (CW / 2 if y % 2 == 1 else 0) + CW / 2, ORIGIN[1] + y * CH * 0.75 + CH / 2]
+
+    ground = [[GROUND.get(rows[y][x], 0) for x in range(W)] for y in range(H)]
+    objects = [[-1] * W for _ in range(H)]
+    start, nf = (4, 4), 0
+    for y in range(H):
+        for x in range(W):
+            ch = rows[y][x]
+            if ch in OBJECTS:
+                objects[y][x] = OBJECTS[ch]
+            elif ch == "f":
+                objects[y][x] = FLOWERS[nf % 3]
+                nf += 1
+            elif ch == "@":
+                start = (x, y)
+
+    def hmap(name, grid, tileset, tile, layer, offset, ysort=False):
+        n = tilemap(name, tileset, 0, grid, layer=layer, pos=ORIGIN)
+        n["tilemap"]["tile_size"] = tile
+        n["properties"].update({"layout": "HexPointy", "stagger": "Odd", "cellSize": [CW, CH], "tileOffset": offset})
+        if ysort:
+            n["ySort"] = True
+        if not tileset:
+            del n["tilemap"]["tileset"]
+        return n
+
+    sx, sy = center(*start)
+    children = [
+        {"type": "CameraNode", "name": "Camera", "position": [640, 360], "properties": {"isCurrent": True}},
+        hmap("Ground", ground, "textures/hex_tiles.png", [65, 89], 1, [0, 23]),
+        hmap("Walk", [[-1] * W for _ in range(H)], "", [65, 89], 1, [0, 0]),
+        {"type": "Node", "name": "Island", "layer": 1, "script": {"path": "scripts/island.lua"}},
+        {"type": "Node", "name": "World", "ySort": True, "children": [
+            hmap("Objects", objects, "textures/hex_objects.png", [65, 107], 2, [0, -25], ysort=True),
+            {"type": "Node", "name": "Explorer", "position": [sx, sy], "script": {"path": "scripts/explorer.lua"},
+             "children": [{"type": "TextureNode", "name": "Sprite", "position": [0, 6], "pivot": [0.5, 1], "layer": 2,
+                           "texture": "textures/explorer.png"}]},
+        ]},
+        text("Flowers", "Flowers 0 / 0", (16, 12), size=32, color="#ffffffff", layer=7),
+        text("Message", "", (640, 60), size=48, align="Center", pivot=(0.5, 0.5), color="#ffe066ff", layer=7),
+        text("Help", "Click a hex to walk   D A E Q C Z: one step", (1264, 690), size=32, align="Right",
+             pivot=(1, 1), color="#ffffffaa", layer=7),
+    ]
+    t.json("scenes/island.scene.json", scene("island", children, background=(64, 140, 196, 255)))
+    t.json("project.json", project("Hex Island", ["scenes/island.scene.json"], [
+        action("step_e", "D", "RIGHT"), action("step_w", "A", "LEFT"),
+        action("step_ne", "E"), action("step_nw", "Q"),
+        action("step_se", "C"), action("step_sw", "Z"),
+    ], virtual=(1280, 720), gravity=(0, 0), pixel=False))
+    for s_ in ("island", "explorer"):
+        t.script(s_, src="hex")
+    with open(os.path.join(SCRIPTS, "hex", "README.md")) as f:
+        t.write("README.md", f.read())
+    return t
+
+
 TEMPLATES = {"platformer": platformer, "rpg": rpg, "shmup": shmup, "puzzle": puzzle, "adventure": adventure,
-             "visual_novel": visual_novel}
+             "visual_novel": visual_novel, "dungeon": dungeon, "hex": hex_island}
 
 if __name__ == "__main__":
     which = sys.argv[1:] or list(TEMPLATES)

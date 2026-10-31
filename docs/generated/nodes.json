@@ -646,6 +646,7 @@
         {"name": "layout", "kind": "enum", "owner": "TileMapNode", "default": "Square", "values": ["Square", "Isometric", "Staggered", "HexPointy", "HexFlat"], "doc": "The cells' shape: Square; Isometric (diamonds on a grid turned 45 degrees); Staggered (diamonds in rows, every other row shifted); Hex Pointy / Hex Flat (hexagons in offset rows / columns)."},
         {"name": "stagger", "kind": "enum", "owner": "TileMapNode", "default": "Odd", "values": ["Odd", "Even"], "doc": "Staggered and hex grids: which rows (Hex Flat: columns) are shifted by half a cell - the odd or the even ones."},
         {"name": "cellSize", "kind": "vec2", "owner": "TileMapNode", "default": [0, 0], "min": 0, "max": 1024, "doc": "The grid's cell in pixels (0 = the tile size). Tiles taller than their cell - walls, blocks - stand on it: bottom-aligned, centred across."},
+        {"name": "tileOffset", "kind": "vec2", "owner": "TileMapNode", "default": [0, 0], "min": -512, "max": 512, "doc": "Moves every tile image by this many pixels: for art whose cell isn't at the image's bottom - a floor tile with a slab under its diamond is moved down by the slab."},
         {"name": "asepriteLayer", "kind": "string", "owner": "TileMapNode", "default": "", "doc": "With an Aseprite file as the tileset: the tilemap layer the map comes from (its tiles, flips and tileset; kept in sync when the file is saved). Empty: paint the map here."}
       ]
     },

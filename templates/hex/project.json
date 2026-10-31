@@ -1,0 +1,97 @@
+{
+ "name": "Hex Island",
+ "version": "0.1.0",
+ "initial_scene": "scenes/island.scene.json",
+ "window": {
+  "title": "Hex Island",
+  "width": 1280,
+  "height": 720,
+  "virtual_width": 1280,
+  "virtual_height": 720,
+  "target_fps": 60
+ },
+ "video": {
+  "fullscreen": false,
+  "vsync": true,
+  "resizable": true,
+  "msaa": false,
+  "high_dpi": false,
+  "sharp_scaling": false,
+  "integer_scaling": false,
+  "pixel_snap": false,
+  "smooth_camera": false
+ },
+ "audio": {
+  "master_volume": 1,
+  "music_volume": 1,
+  "sfx_volume": 1
+ },
+ "physics": {
+  "gravity": [
+   0,
+   0
+  ],
+  "debug_draw": false
+ },
+ "input": {
+  "actions": [
+   {
+    "name": "step_e",
+    "bindings": [
+     {
+      "key": "D"
+     },
+     {
+      "key": "RIGHT"
+     }
+    ]
+   },
+   {
+    "name": "step_w",
+    "bindings": [
+     {
+      "key": "A"
+     },
+     {
+      "key": "LEFT"
+     }
+    ]
+   },
+   {
+    "name": "step_ne",
+    "bindings": [
+     {
+      "key": "E"
+     }
+    ]
+   },
+   {
+    "name": "step_nw",
+    "bindings": [
+     {
+      "key": "Q"
+     }
+    ]
+   },
+   {
+    "name": "step_se",
+    "bindings": [
+     {
+      "key": "C"
+     }
+    ]
+   },
+   {
+    "name": "step_sw",
+    "bindings": [
+     {
+      "key": "Z"
+     }
+    ]
+   }
+  ]
+ },
+ "scenes": [
+  "scenes/island.scene.json"
+ ]
+}
