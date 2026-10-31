@@ -132,6 +132,13 @@ is an error.
 | `rect` | `x`, `y`, `w`, `h` (8), `value` (1) | A filled rectangle. |
 | `rooms` | `min_size` (4), `max_size` (10), `corridor` (1), `seed` (0) | A dungeon: the level split in two again and again (BSP), a room in each part, corridors joining every split - every room reachable. 1 = floor (invert it for walls). |
 | `walker` | `steps` (400), `walkers` (1), `brush` (1), `seed` (0) | Random walks from the centre ("drunkard's walk"): winding tunnels and caverns. 1 = walked. |
+| `lines` | `count` (6), `min_length` (6), `max_length` (20), `thickness` (1), `direction`: `horizontal`, `vertical`, `both` (each line one or the other; default), `any` (any angle), `seed` (0) | Random lines: platforms, ledges, walls, cracks. Each fits inside the level (one longer than it is clipped). |
+| `rectangles` | `count` (5), `min_size` (4), `max_size` (12), `thickness` (1), `filled` (false), `seed` (0) | Random rectangles, outlines `thickness` cells wide or filled: rooms, ruins, crates. Each side's length is picked in the range. |
+| `circles` | `count` (5), `min_radius` (3), `max_radius` (8), `thickness` (1), `filled` (false), `seed` (0) | Random rings or discs: craters, arenas, pools. A cell is in when its centre is within radius + 0.5 of the circle's. |
+
+The shape nodes draw 1 on the shape and 0 elsewhere (overlapping shapes
+merge). Mix them with the rest: `combine` (max) adds ledges to a cave,
+(subtract) cuts rooms out of rock; `dilate` thickens them afterwards.
 
 **Modifiers** (input `in`, or `a` and `b`)
 

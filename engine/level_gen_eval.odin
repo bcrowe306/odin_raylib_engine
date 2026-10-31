@@ -152,7 +152,7 @@ gen_key :: proc(ev: ^Gen_Eval, id: int) -> u64 {
 	case .Custom:
 		h = gen_mix(h, hash.fnv64a(transmute([]u8)n.custom))
 		if def := Gen_FindCustomKind(n.custom); def != nil do h = gen_mix(h, u64(uintptr(rawptr(def.eval))))
-	case .Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker, .Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine, .Scatter, .Surface, .Tile_Output, .Entity_Output:
+	case .Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker, .Lines, .Rectangles, .Circles, .Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine, .Scatter, .Surface, .Tile_Output, .Entity_Output:
 	}
 	ev.keys[id] = h
 	return h
@@ -295,6 +295,12 @@ gen_compute :: proc(ev: ^Gen_Eval, n: ^Gen_Node, out: Gen_Grid) -> bool {
 				pos = {clamp(pos.x + d.x, 1, max(w - 2, 1)), clamp(pos.y + d.y, 1, max(h - 2, 1))}
 			}
 		}
+	case .Lines:
+		gen_lines(out, clamp(int(p(n, "count")), 0, 10_000), int(p(n, "min_length")), int(p(n, "max_length")), clamp(int(p(n, "thickness")), 1, 64), int(p(n, "direction")), nodeSeed)
+	case .Rectangles:
+		gen_rectangles(out, clamp(int(p(n, "count")), 0, 10_000), int(p(n, "min_size")), int(p(n, "max_size")), clamp(int(p(n, "thickness")), 1, 64), p(n, "filled") != 0, nodeSeed)
+	case .Circles:
+		gen_circles(out, clamp(int(p(n, "count")), 0, 10_000), int(p(n, "min_radius")), int(p(n, "max_radius")), clamp(int(p(n, "thickness")), 1, 64), p(n, "filled") != 0, nodeSeed)
 	case .Scatter:
 		src := gen_input(ev, n, 0) or_return
 		gen_scatter(src, out, n.inputs[0] != 0, f32(p(n, "chance")), clamp(int(p(n, "spacing")), 0, 256), nodeSeed)
@@ -644,6 +650,104 @@ gen_scatter :: proc(src, out: Gen_Grid, masked: bool, chance: f32, spacing: int,
 		if near do continue
 		out.v[y * w + x] = 1
 		last[x] = y
+	}
+}
+
+// --- shapes (#171) ---------------------------------------------------------------------
+// Each shape takes its numbers from the node's own sequence (gen_rand_int),
+// one shape after another: the same seed, the same shapes. Shapes are placed
+// to fit inside the level (a shape bigger than it is clipped).
+
+// gen_range: a size in lo..hi (the two in any order), at least 1.
+@(private = "file")
+gen_range :: proc(rng: ^u64, lo, hi: int) -> int {
+	a, b := max(min(lo, hi), 1), max(max(lo, hi), 1)
+	return gen_rand_int(rng, a, b)
+}
+
+// gen_fill_rect: 1 on the cells of x..x+w-1, y..y+h-1 inside the grid.
+@(private = "file")
+gen_fill_rect :: proc(out: Gen_Grid, x, y, w, h: int) #no_bounds_check {
+	x0, x1 := clamp(x, 0, out.w), clamp(x + w, 0, out.w)
+	for yy in clamp(y, 0, out.h) ..< clamp(y + h, 0, out.h) do slice.fill(out.v[yy * out.w + x0:yy * out.w + max(x1, x0)], 1)
+}
+
+@(private = "file")
+gen_lines :: proc(out: Gen_Grid, count, minLen, maxLen, thickness, dir: int, seed: u64) {
+	rng := seed
+	w, h := out.w, out.h
+	for _ in 0 ..< count {
+		length := gen_range(&rng, minLen, maxLen)
+		d := dir
+		if d == 2 do d = gen_rand_int(&rng, 0, 1) // both: each line one or the other
+		switch d {
+		case 0: // horizontal
+			l := min(length, w)
+			x := gen_rand_int(&rng, 0, w - l)
+			y := gen_rand_int(&rng, 0, max(h - thickness, 0))
+			gen_fill_rect(out, x, y, l, thickness)
+		case 1: // vertical
+			l := min(length, h)
+			x := gen_rand_int(&rng, 0, max(w - thickness, 0))
+			y := gen_rand_int(&rng, 0, h - l)
+			gen_fill_rect(out, x, y, thickness, l)
+		case: // any angle: its middle where the whole line fits (when it can)
+			angle := f32(gen_rand_int(&rng, 0, 3599)) * math.PI / 1800
+			dx, dy := math.cos(angle), math.sin(angle)
+			half := f32(length - 1) * 0.5
+			ex, ey := abs(dx) * half + f32(thickness) * 0.5, abs(dy) * half + f32(thickness) * 0.5
+			cx := f32(gen_rand_int(&rng, int(math.ceil(ex)), max(w - 1 - int(math.ceil(ex)), int(math.ceil(ex)))))
+			cy := f32(gen_rand_int(&rng, int(math.ceil(ey)), max(h - 1 - int(math.ceil(ey)), int(math.ceil(ey)))))
+			// A square brush stamped every half cell along it.
+			steps := max(int(math.ceil(half * 4)), 1)
+			for i in 0 ..= steps {
+				t := -half + f32(i) * (2 * half) / f32(steps)
+				px, py := int(math.round(cx + dx * t)), int(math.round(cy + dy * t))
+				gen_fill_rect(out, px - (thickness - 1) / 2, py - (thickness - 1) / 2, thickness, thickness)
+			}
+		}
+	}
+}
+
+@(private = "file")
+gen_rectangles :: proc(out: Gen_Grid, count, minSize, maxSize, thickness: int, filled: bool, seed: u64) {
+	rng := seed
+	w, h := out.w, out.h
+	for _ in 0 ..< count {
+		rw, rh := min(gen_range(&rng, minSize, maxSize), w), min(gen_range(&rng, minSize, maxSize), h)
+		x, y := gen_rand_int(&rng, 0, w - rw), gen_rand_int(&rng, 0, h - rh)
+		t := min(thickness, rw, rh)
+		if filled || 2 * t >= rw || 2 * t >= rh {
+			gen_fill_rect(out, x, y, rw, rh)
+			continue
+		}
+		gen_fill_rect(out, x, y, rw, t) // top
+		gen_fill_rect(out, x, y + rh - t, rw, t) // bottom
+		gen_fill_rect(out, x, y + t, t, rh - 2 * t) // left
+		gen_fill_rect(out, x + rw - t, y + t, t, rh - 2 * t) // right
+	}
+}
+
+// gen_circles: a cell is in a circle of radius r when its centre is within
+// r + 0.5 of the circle's (a cell-wide disc for r 0), in a ring when also
+// further than r + 0.5 - thickness.
+@(private = "file")
+gen_circles :: proc(out: Gen_Grid, count, minR, maxR, thickness: int, filled: bool, seed: u64) #no_bounds_check {
+	rng := seed
+	w, h := out.w, out.h
+	for _ in 0 ..< count {
+		r := gen_range(&rng, minR + 1, maxR + 1) - 1 // (0 allowed)
+		cx := gen_rand_int(&rng, min(r, w - 1), max(w - 1 - r, min(r, w - 1)))
+		cy := gen_rand_int(&rng, min(r, h - 1), max(h - 1 - r, min(r, h - 1)))
+		outer := f32(r) + 0.5
+		inner := outer - f32(thickness)
+		for y in max(cy - r, 0) ..= min(cy + r, h - 1) do for x in max(cx - r, 0) ..= min(cx + r, w - 1) {
+			dx, dy := f32(x - cx), f32(y - cy)
+			d2 := dx * dx + dy * dy
+			if d2 > outer * outer do continue
+			if !filled && inner > 0 && d2 <= inner * inner do continue
+			out.v[y * w + x] = 1
+		}
 	}
 }
 

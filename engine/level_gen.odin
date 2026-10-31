@@ -42,6 +42,9 @@ Gen_Kind :: enum {
 	Rect,
 	Rooms,  // rooms joined by corridors (1 = floor)
 	Walker, // a random walk carving tunnels (1 = walked)
+	Lines,      // random lines: horizontal, vertical or any angle (#171)
+	Rectangles, // random rectangles, filled or outlines (#171)
+	Circles,    // random circles, filled or outlines (#171)
 	// Modifiers
 	Threshold,
 	Invert,
@@ -81,6 +84,7 @@ Gen_Kind_Info :: struct {
 GEN_COMBINE_OPS := []string{"add", "subtract", "multiply", "min", "max", "mask", "average"}
 GEN_GRADIENT_DIRS := []string{"horizontal", "vertical", "radial"}
 GEN_SURFACE_SIDES := []string{"top", "bottom", "any"}
+GEN_LINE_DIRS := []string{"horizontal", "vertical", "both", "any"}
 
 GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 	.Constant = {"constant", "Constant", {}, {{name = "value", default_ = 1, doc = "Every cell's value"}}, "The same value everywhere."},
@@ -140,6 +144,30 @@ GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 		{name = "brush", default_ = 1, doc = "Width of the tunnel (cells)", integer = true},
 		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
 	}, "Random walks from the centre (\"drunkard's walk\"): winding tunnels and caverns. 1 = walked."},
+	.Lines = {"lines", "Random Lines", {}, {
+		{name = "count", default_ = 6, doc = "How many lines", integer = true},
+		{name = "min_length", default_ = 6, doc = "Shortest line (cells)", integer = true},
+		{name = "max_length", default_ = 20, doc = "Longest line (cells)", integer = true},
+		{name = "thickness", default_ = 1, doc = "Line width (cells)", integer = true},
+		{name = "direction", default_ = 2, choices = GEN_LINE_DIRS, doc = "horizontal, vertical, both (each line one or the other), any (any angle)"},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
+	}, "Lines at random places (1 on a line, else 0), the same for a seed: platforms, ledges, walls, cracks. Each fits inside the level."},
+	.Rectangles = {"rectangles", "Random Rectangles", {}, {
+		{name = "count", default_ = 5, doc = "How many rectangles", integer = true},
+		{name = "min_size", default_ = 4, doc = "Smallest side (cells)", integer = true},
+		{name = "max_size", default_ = 12, doc = "Largest side (cells)", integer = true},
+		{name = "thickness", default_ = 1, doc = "Outline width (cells; filled: ignored)", integer = true},
+		{name = "filled", default_ = 0, doc = "Filled rectangles instead of outlines", toggle = true},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
+	}, "Rectangles at random places and sizes, outlines or filled (1 = on), the same for a seed: rooms, ruins, crates. Each fits inside the level."},
+	.Circles = {"circles", "Random Circles", {}, {
+		{name = "count", default_ = 5, doc = "How many circles", integer = true},
+		{name = "min_radius", default_ = 3, doc = "Smallest radius (cells)", integer = true},
+		{name = "max_radius", default_ = 8, doc = "Largest radius (cells)", integer = true},
+		{name = "thickness", default_ = 1, doc = "Outline width (cells; filled: ignored)", integer = true},
+		{name = "filled", default_ = 0, doc = "Filled circles instead of rings", toggle = true},
+		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
+	}, "Circles at random places and sizes, rings or filled (1 = on), the same for a seed: craters, arenas, pools. Each fits inside the level when it can."},
 	.Tile_Output = {"tile_output", "Tile Output", {"in"}, {
 		{name = "empty", default_ = -1, doc = "The tile for cells no rule takes (-1 = none)", integer = true},
 	}, "Rules turn value ranges into tiles (a random one of each rule's tiles, the same for a seed); written into a TileMap - or, as IntGrid values, into an LDtk layer."},

@@ -717,7 +717,7 @@ lge_canvas :: proc(state: ^EditorState) {
 				label: cstring,
 				kinds: []e.Gen_Kind,
 			}{
-				{"Generators", {.Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker}},
+				{"Generators", {.Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker, .Lines, .Rectangles, .Circles}},
 				{"Modifiers", {.Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine, .Scatter, .Surface}},
 				{"Output", {.Tile_Output, .Entity_Output}},
 			}
