@@ -276,6 +276,10 @@ Gen_Graph :: struct {
 	scripts:   map[string]string, // Script nodes' sources by file (Gen_LoadScripts; the graph's allocator)
 	tilesets:  map[string]string, // tile outputs' tilesets' terrain files' text by image (Gen_LoadTerrains; the graph's allocator)
 	allocator: runtime.Allocator,
+	// The target map's grid (not saved; whoever generates sets it): terrains'
+	// neighbours on isometric, staggered and hex maps.
+	layout:    TileMap_Layout,
+	stagger:   TileMap_Stagger,
 }
 
 // A grid of values (row-major, w * h).
@@ -693,6 +697,7 @@ Gen_OutputNode :: proc(g: ^Gen_Graph) -> ^Gen_Node {
 // size and its cells the tiles (colliders rebuilt when it is Solid and in
 // the game).
 Gen_ApplyTileMap :: proc(g: ^Gen_Graph, tm: ^TileMapNode, seed: u64 = 0, ctx: ^GameContext = nil, scene: ^Scene = nil) -> string {
+	g.layout, g.stagger = tm.layout, tm.stagger
 	r, err := Gen_Generate(g, seed, context.temp_allocator)
 	if err != "" do return err
 	return Gen_ApplyResult(&r, tm, ctx, scene)
@@ -721,11 +726,10 @@ Gen_ApplyResult :: proc(r: ^Gen_Result, tm: ^TileMapNode, ctx: ^GameContext = ni
 	if sc == nil && ctx != nil do sc = ctx.scene if ctx.scene != nil else (ctx.game.sceneManager.currentScene if ctx.game != nil else nil)
 	if sc == nil do return missing
 	for c in GetChildrenTemp(sc.manager, tm) do if c != nil && !c.removing && Node_HasTag(c, GEN_ENTITY_TAG) do RemoveNode(sc.manager, c)
-	tsz := [2]f32{f32(tm.tileSize.x), f32(tm.tileSize.y)}
 	for en in r.entities {
 		n := Scene_InstantiateComponent(sc, en.component, tm, ctx)
 		if n == nil do return fmt.tprintf("no component %s", en.component)
-		n.position = ([2]f32{f32(en.cell.x), f32(en.cell.y)} + 0.5) * tsz
+		n.position = TileMapNode_CellLocalCenter(tm, en.cell) // (any grid)
 		Node_AddTag(n, GEN_ENTITY_TAG)
 	}
 	return missing

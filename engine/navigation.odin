@@ -10,7 +10,9 @@ import "core:math"
 //
 // - TileMapNode: painted tiles block when the map is solid (walls), else
 //   empty cells block (the painted tiles are the walkable floor) - or
-//   either way with Nav_Options.walkablePainted.
+//   either way with Nav_Options.walkablePainted. Isometric maps search
+//   their turned square grid as is; staggered and hex maps step to the
+//   cells sharing a side (hex: six), costs in world distance (#278).
 // - LdtkLevelNode (its current level): cells of IntGrid layers whose
 //   collision rule is Solid block; the grid is the finest such layer's.
 // - NavigationRegionNode (navigation_nodes.odin): a rectangle baked from
@@ -33,6 +35,7 @@ Nav_Grid :: struct {
 	key:      u64,          // what it was built from (rebuilt when it changes)
 	clear:    []f32,        // distance (cells) to the nearest blocked cell (agent radius); made on demand
 	clearKey: u64,          // the key `clear` was made for (+1)
+	tilemap:  ^TileMapNode, // a non-square tile map's grid: its cells' geometry (nil: square cells)
 }
 
 Nav_Options :: struct {
@@ -88,8 +91,10 @@ Nav_GridFor :: proc(n: ^Node, opts: Nav_Options = {}) -> ^Nav_Grid {
 		sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
 		sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
 		g.origin = TileMapNode_CellCorner(tm, {0, 0})
-		g.cell = {f32(tm.tileSize.x) * sx, f32(tm.tileSize.y) * sy}
+		cs := TileMapNode_CellSize(tm)
+		g.cell = {cs.x * sx, cs.y * sy}
 		g.rotation = tm.globalRotation
+		g.tilemap = tm if tm.layout != .Square else nil
 		return g
 	case LdtkLevelNode:
 		ln := cast(^LdtkLevelNode)n
@@ -128,6 +133,7 @@ Nav_GridFor :: proc(n: ^Node, opts: Nav_Options = {}) -> ^Nav_Grid {
 		g.origin = levelOrigin + base.offset * scale
 		g.cell = {f32(base.gridSize) * scale.x, f32(base.gridSize) * scale.y}
 		g.rotation = 0
+		g.tilemap = nil
 		return g
 	case NavigationRegionNode:
 		r := cast(^NavigationRegionNode)n
@@ -142,6 +148,7 @@ Nav_GridFor :: proc(n: ^Node, opts: Nav_Options = {}) -> ^Nav_Grid {
 		g.origin = r.bakedAt // (the cells line up with the world as baked)
 		g.cell = {r.cellSize, r.cellSize}
 		g.rotation = 0
+		g.tilemap = nil
 		return g
 	}
 	return nil
@@ -158,6 +165,26 @@ Nav_Clearance :: proc(g: ^Nav_Grid) -> []f32 {
 	D2 :: f32(math.SQRT_TWO)
 	w, h := g.w, g.h
 	for b, i in g.blocked do g.clear[i] = 0 if b else INF
+	if nav_own_neighbors(g) {
+		// Staggered / hex: steps to the nearest blocked cell (outside the
+		// map counts as open, as on square grids).
+		queue := make([dynamic]int, 0, w * h, context.temp_allocator)
+		for b, i in g.blocked do if b do append(&queue, i)
+		for head := 0; head < len(queue); head += 1 {
+			i := queue[head]
+			nb, n := TileMapNode_Neighbors(g.tilemap, {i % w, i / w})
+			for q in nb[:n] {
+				if q.x < 0 || q.y < 0 || q.x >= w || q.y >= h do continue
+				j := q.y * w + q.x
+				if g.clear[j] > g.clear[i] + 1 {
+					g.clear[j] = g.clear[i] + 1
+					append(&queue, j)
+				}
+			}
+		}
+		g.clearKey = g.key + 1
+		return g.clear
+	}
 	for y in 0 ..< h do for x in 0 ..< w {
 		i := y * w + x
 		v := g.clear[i]
@@ -203,12 +230,21 @@ Nav_Forget :: proc(n: ^Node) {
 
 // --- grid geometry -----------------------------------------------------------------
 
+// nav_own_neighbors: a staggered / hex map's grid - steps to the cells
+// sharing a side, not the index grid's 8.
+@(private = "file")
+nav_own_neighbors :: #force_inline proc(g: ^Nav_Grid) -> bool {
+	return g.tilemap != nil && g.tilemap.layout != .Isometric && Node_IsAlive(g.tilemap)
+}
+
 Nav_CellAt :: proc(g: ^Nav_Grid, world: [2]f32) -> [2]int {
+	if g.tilemap != nil && Node_IsAlive(g.tilemap) do return TileMapNode_CellAt(g.tilemap, world)
 	local := rotate_vec(world - g.origin, -g.rotation)
 	return {int(math.floor(local.x / g.cell.x)), int(math.floor(local.y / g.cell.y))}
 }
 
 Nav_CellCenter :: proc(g: ^Nav_Grid, c: [2]int) -> [2]f32 {
+	if g.tilemap != nil && Node_IsAlive(g.tilemap) do return TileMapNode_CellCenter(g.tilemap, c)
 	return g.origin + rotate_vec({(f32(c.x) + 0.5) * g.cell.x, (f32(c.y) + 0.5) * g.cell.y}, g.rotation)
 }
 
@@ -252,7 +288,40 @@ Nav_FindCells :: proc(g: ^Nav_Grid, start, goal: [2]int, diagonal := true, alloc
 	priority_queue.push(&pq, Open_Item{h(start, goal, diagonal), si})
 	dirs := [8][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {1, -1}, {-1, 1}, {-1, -1}}
 	count := 8 if diagonal else 4
-	for priority_queue.len(pq) > 0 {
+	if nav_own_neighbors(g) {
+		// Staggered / hex: the cells sharing a side, costs and estimate in
+		// world distance (in units of the shortest step).
+		tm := g.tilemap
+		unit := max(min(g.cell.x, g.cell.y) * 0.5, 0.0001)
+		gw := g.w
+		dist :: proc(tm: ^TileMapNode, a, b: [2]int, unit: f32) -> f32 {
+			d := TileMapNode_CellLocalCenter(tm, a) - TileMapNode_CellLocalCenter(tm, b)
+			return math.sqrt(d.x * d.x + d.y * d.y) / unit
+		}
+		priority_queue.clear(&pq)
+		priority_queue.push(&pq, Open_Item{dist(tm, start, goal, unit), si})
+		for priority_queue.len(pq) > 0 {
+			cur := priority_queue.pop(&pq)
+			ci := cur.cell
+			if closed[ci] do continue
+			if ci == gi do break
+			closed[ci] = true
+			c := [2]int{int(ci) % gw, int(ci) / gw}
+			nb, k := TileMapNode_Neighbors(tm, c)
+			for q in nb[:k] {
+				if !Nav_Walkable(g, q, rcells) do continue
+				ni := i32(q.y * gw + q.x)
+				if closed[ni] do continue
+				tentative := gScore[ci] + dist(tm, c, q, unit)
+				if tentative < gScore[ni] {
+					gScore[ni] = tentative
+					came[ni] = ci
+					priority_queue.push(&pq, Open_Item{tentative + dist(tm, q, goal, unit), ni})
+				}
+			}
+		}
+	}
+	for !nav_own_neighbors(g) && priority_queue.len(pq) > 0 {
 		cur := priority_queue.pop(&pq)
 		ci := cur.cell
 		if closed[ci] do continue
@@ -287,6 +356,18 @@ Nav_FindCells :: proc(g: ^Nav_Grid, start, goal: [2]int, diagonal := true, alloc
 // walkable cells (an exact grid traversal; passing exactly through a
 // corner needs both cells beside it open, like a diagonal step).
 Nav_LineClear :: proc(g: ^Nav_Grid, a, b: [2]int, rcells: f32 = 0) -> bool {
+	if nav_own_neighbors(g) {
+		// Staggered / hex: samples along the line, a quarter cell apart.
+		tm := g.tilemap
+		pa, pb := TileMapNode_CellLocalCenter(tm, a), TileMapNode_CellLocalCenter(tm, b)
+		d := pb - pa
+		cs := TileMapNode_CellSize(tm)
+		steps := int(math.sqrt(d.x * d.x + d.y * d.y) / (min(cs.x, cs.y) * 0.25)) + 1
+		for i in 1 ..= steps {
+			if !Nav_Walkable(g, TileMapNode_LocalCellAt(tm, pa + d * (f32(i) / f32(steps))), rcells) do return false
+		}
+		return true
+	}
 	x, y := a.x, a.y
 	dx, dy := f32(b.x - a.x), f32(b.y - a.y)
 	stepX := 1 if dx > 0 else (-1 if dx < 0 else 0)

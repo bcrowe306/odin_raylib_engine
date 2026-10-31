@@ -81,16 +81,26 @@ can also hold components - coins, enemies, spikes - one per cell.
   They are not saved and aren't there while you edit.
 - **Terrains** (auto-tiling): a tileset's terrains - kept next to its
   image in `<name>.tileset.json` - give each cell the tile for its pattern
-  of same-terrain neighbours (16 edge patterns or the 47-tile blob). Paint
-  them on the Tile Map tab's Terrains layer; a Level Generator rule can
-  name one. From Odin: `TileMapNode_PaintTerrain`, `TileMapNode_FillTerrain`
-  (engine/terrain.odin).
+  of same-terrain neighbours (16 edge patterns, the 47-tile blob, or 64
+  hex patterns). Paint them on the Tile Map tab's Terrains layer; a Level
+  Generator rule can name one. From Odin: `TileMapNode_PaintTerrain`,
+  `TileMapNode_FillTerrain` (engine/terrain.odin). On isometric and
+  staggered maps the patterns' north is the diamond's upper-right side and
+  east its lower-right one. On hex maps use the **Hex** kind: its six sides
+  count clockwise from the right (Hex Pointy) or the top (Hex Flat).
 - Large square maps are drawn as cached chunks, so many tiles cost
   little. Isometric, staggered and hex maps, square maps with a Cell size
   other than the tile size, and maps with Y Sort are drawn tile by tile
   (only those in view).
-- Navigation regions, terrains (auto-tiling), components larger than one
-  cell and Level Generator output still assume square cells.
+- **Path finding** (`nav_find_path`) follows the grid. Isometric maps
+  step in 8 directions like square ones; staggered and hex maps step to
+  the cells sharing a side (hex: six). A Navigation Region bakes a solid
+  map's diamonds and hexagons as they are.
+- A **Level Generator** fills any grid. It makes its shapes in rows and
+  columns of cells, so on staggered and hex maps they come out slanted a
+  little; its terrains and entities follow the map's grid.
+- Components take one cell each on isometric, staggered and hex maps
+  (larger footprints are for square maps).
 - **Tint** multiplies the colours of every tile.
 - **Aseprite Layer**: with an Aseprite file as the tileset, the map is that
   file's tilemap layer (its tiles, flips and tileset), updated when the file

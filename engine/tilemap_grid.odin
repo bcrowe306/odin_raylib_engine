@@ -39,8 +39,13 @@ TileMapNode_CellSize :: proc(tm: ^TileMapNode) -> [2]f32 {
 // tilemap_shifted: row (column) i is one of the shifted ones.
 @(private = "file")
 tilemap_shifted :: #force_inline proc(tm: ^TileMapNode, i: int) -> bool {
+	return grid_shifted(tm.stagger, i)
+}
+
+@(private = "file")
+grid_shifted :: #force_inline proc(stagger: TileMap_Stagger, i: int) -> bool {
 	odd := i & 1 == 1
-	return odd if tm.stagger == .Odd else !odd
+	return odd if stagger == .Odd else !odd
 }
 
 // TileMapNode_CellBox: a cell's bounding box in map pixels.
@@ -153,7 +158,7 @@ TileMapNode_LocalCellAt :: proc(tm: ^TileMapNode, p: [2]f32) -> [2]int {
 	return {}
 }
 
-@(private = "file")
+// point_in_convex: p inside (or on) a convex polygon, either winding.
 point_in_convex :: proc(p: [2]f32, pts: [][2]f32) -> bool {
 	sign: f32 = 0
 	for a, i in pts {
@@ -336,19 +341,50 @@ TileMapNode_MapOutline :: proc(tm: ^TileMapNode) -> [4][2]f32 {
 
 // TileMapNode_Neighbors: the cells sharing a side with this one (4 or 6).
 TileMapNode_Neighbors :: proc(tm: ^TileMapNode, cell: [2]int) -> (out: [6][2]int, n: int) {
+	return Grid_Neighbors(tm.layout, tm.stagger, cell)
+}
+
+Grid_Neighbors :: proc(layout: TileMap_Layout, stagger: TileMap_Stagger, cell: [2]int) -> (out: [6][2]int, n: int) {
 	x, y := cell.x, cell.y
-	switch tm.layout {
+	switch layout {
 	case .Square, .Isometric:
 		return {{x - 1, y}, {x + 1, y}, {x, y - 1}, {x, y + 1}, {}, {}}, 4
 	case .Staggered:
-		d := 0 if tilemap_shifted(tm, y) else -1
+		d := 0 if grid_shifted(stagger, y) else -1
 		return {{x + d, y - 1}, {x + d + 1, y - 1}, {x + d, y + 1}, {x + d + 1, y + 1}, {}, {}}, 4
-	case .HexPointy:
-		d := 0 if tilemap_shifted(tm, y) else -1
-		return {{x - 1, y}, {x + 1, y}, {x + d, y - 1}, {x + d + 1, y - 1}, {x + d, y + 1}, {x + d + 1, y + 1}}, 6
-	case .HexFlat:
-		d := 0 if tilemap_shifted(tm, x) else -1
-		return {{x, y - 1}, {x, y + 1}, {x - 1, y + d}, {x - 1, y + d + 1}, {x + 1, y + d}, {x + 1, y + d + 1}}, 6
+	case .HexPointy, .HexFlat:
+		return Grid_HexSides(layout, stagger, cell), 6
 	}
+	return
+}
+
+// Grid_HexSides: a hex cell's six neighbours clockwise - Hex Pointy from
+// the right (E, SE, SW, W, NW, NE), Hex Flat from the top (N, NE, SE, S,
+// SW, NW). The Hex terrain kind's mask bits follow this order.
+Grid_HexSides :: proc(layout: TileMap_Layout, stagger: TileMap_Stagger, cell: [2]int) -> [6][2]int {
+	x, y := cell.x, cell.y
+	if layout == .HexFlat {
+		d := 0 if grid_shifted(stagger, x) else -1
+		return {{x, y - 1}, {x + 1, y + d}, {x + 1, y + d + 1}, {x, y + 1}, {x - 1, y + d + 1}, {x - 1, y + d}}
+	}
+	d := 0 if grid_shifted(stagger, y) else -1
+	return {{x + 1, y}, {x + d + 1, y + 1}, {x + d, y + 1}, {x - 1, y}, {x + d, y - 1}, {x + d + 1, y - 1}}
+}
+
+// Grid_Compass: the cells around one by the grid's directions, nb[dy][dx]
+// as on a square grid (nb[0][1] north, nb[1][2] east, ...): the edge and
+// blob terrains' neighbourhood. Isometric: the turned square grid itself
+// (north is the diamond's upper-right side). Staggered: the same
+// directions on its diamonds. Hex grids: the index grid (use the Hex kind).
+Grid_Compass :: proc(layout: TileMap_Layout, stagger: TileMap_Stagger, cell: [2]int) -> (nb: [3][3][2]int) {
+	x, y := cell.x, cell.y
+	if layout == .Staggered {
+		d := 0 if grid_shifted(stagger, y) else -1
+		nb[0][1], nb[1][2], nb[2][1], nb[1][0] = {x + d + 1, y - 1}, {x + d + 1, y + 1}, {x + d, y + 1}, {x + d, y - 1}
+		nb[0][2], nb[2][2], nb[2][0], nb[0][0] = {x + 1, y}, {x, y + 2}, {x - 1, y}, {x, y - 2}
+		nb[1][1] = cell
+		return
+	}
+	for dy in 0 ..< 3 do for dx in 0 ..< 3 do nb[dy][dx] = {x + dx - 1, y + dy - 1}
 	return
 }

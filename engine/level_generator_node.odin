@@ -131,6 +131,7 @@ LevelGeneratorNode_Generate :: proc(lg: ^LevelGeneratorNode, ctx: ^GameContext, 
 	a := Engine_HeapAllocator() if lg.background else context.temp_allocator
 	g, err := Gen_LoadFile(ctx, lg.generator, a)
 	if err != "" do return levelgen_failed(lg, err, ctx), err
+	g.layout, g.stagger = tm.layout, tm.stagger // (terrains on the map's grid)
 	for p in lg.params do if n := Gen_FindNode(&g, p.node); n != nil do Gen_SetParam(n, p.name, p.value)
 	used := u64(s) if s != 0 else g.seed
 	// Other seeds only when it picks them (not a seed asked for).

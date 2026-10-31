@@ -122,3 +122,65 @@ test_terrain_in_generator :: proc(t: ^testing.T) {
 	testing.expect_value(t, dup.rules[0].terrain, "Grass")
 	free_all(context.temp_allocator)
 }
+
+// #278: terrains on isometric, staggered and hex grids - a hex terrain's
+// six sides, a staggered map's blob, the generator on a hex map.
+@(test)
+test_terrain_on_grids :: proc(t: ^testing.T) {
+	testing.expect_value(t, len(Terrain_Patterns(.Hex)), 64)
+	testing.expect_value(t, Terrain_Full(.Hex), 63)
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("gridterrain", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	tm := TileMapNode_Create(scene, "Map")
+	tm.mapSize = {8, 8}
+	TileMapNode_Layout(tm)
+	ProcessNodeQueues(scene.manager, &game.gameContext)
+
+	// Hex: a cell and its six neighbours. The middle sees all six; its
+	// east neighbour sees the middle (W) and the middle's NE and SE (its NW
+	// and SW).
+	ts, _ := Terrains_Parse(nil, context.temp_allocator)
+	hex := mask_terrain(&ts, .Hex)
+	for layout in ([]TileMap_Layout{.HexPointy, .HexFlat}) {
+		tm.layout = layout
+		TileMapNode_Reset(tm)
+		mid := [2]int{3, 3}
+		TileMapNode_PaintTerrain(tm, hex, mid.x, mid.y, true)
+		for q in Grid_HexSides(layout, tm.stagger, mid) do TileMapNode_PaintTerrain(tm, hex, q.x, q.y, true)
+		testing.expectf(t, TileMapNode_Get(tm, mid.x, mid.y) == 63 + 100, "%v: the middle", layout)
+		first := Grid_HexSides(layout, tm.stagger, mid)[0] // (E / N: sees the middle on side 3, and sides 2 and 4)
+		testing.expectf(t, TileMapNode_Get(tm, first.x, first.y) == 4 + 8 + 16 + 100, "%v: side 0's cell: %d", layout, TileMapNode_Get(tm, first.x, first.y))
+	}
+
+	// Staggered: a cell and its 8 grid neighbours - the middle is full.
+	blob := mask_terrain(&ts, .Blob)
+	tm.layout = .Staggered
+	TileMapNode_Reset(tm)
+	around := Grid_Compass(.Staggered, tm.stagger, {3, 4})
+	for row in around do for c in row do TileMapNode_PaintTerrain(tm, blob, c.x, c.y, true)
+	testing.expect_value(t, TileMapNode_Get(tm, 3, 4), 255 + 100)
+	n := around[0][1] // (north: the diamond's upper right - sees the middle to its south...)
+	testing.expect(t, TileMapNode_Get(tm, n.x, n.y) & 0xff != 255 & 0xff, "an edge cell isn't full")
+
+	// The generator on a hex map: its terrains use the six sides.
+	g, err := Gen_GraphParse(transmute([]u8)string(`{"size": [7, 7], "nodes": [
+		{"id": 1, "type": "rect", "params": {"x": 1, "y": 1, "w": 5, "h": 5}},
+		{"id": 2, "type": "tile_output", "inputs": {"in": 1}, "tileset": "textures/t.png",
+		 "rules": [{"min": 0.5, "max": 1, "tiles": [], "terrain": "Grass"}]}]}`))
+	testing.expectf(t, err == "", "parse: %s", err)
+	defer Gen_GraphDestroy(&g)
+	hts, _ := Terrains_Parse(nil, context.temp_allocator)
+	mask_terrain(&hts, .Hex)
+	Gen_SetTerrainSource(&g, "textures/t.png", Terrains_Serialize(&hts, context.temp_allocator))
+	g.layout = .HexPointy
+	tiles, _, terr := Gen_Tiles(&g, 2, 0, context.temp_allocator)
+	testing.expectf(t, terr == "", "tiles: %s", terr)
+	testing.expect_value(t, tiles[3 * 7 + 3], 63 + 100)
+	// Row 1's cell 3 (top edge of the rect): no neighbours above.
+	top := tiles[1 * 7 + 3] - 100
+	testing.expect(t, top & (16 | 32) == 0 && top & (1 | 8) == 9, "top edge: no NW / NE, E and W")
+	free_all(context.temp_allocator)
+}

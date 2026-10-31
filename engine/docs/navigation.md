@@ -6,7 +6,7 @@ The engine finds paths on a **grid** of walkable and blocked cells:
 
 | Grid from | Blocked cells |
 |---|---|
-| a **TileMap** | its painted tiles when the map is solid (else empty cells - painted tiles are the floor) |
+| a **TileMap** | its painted tiles when the map is solid (else empty cells - painted tiles are the floor). Isometric maps step in 8 directions like square ones; staggered and hex maps step to the cells sharing a side (hex: six) |
 | an **LDtk level** | IntGrid cells whose collision rule is **Solid** |
 | a **Navigation Region** | everything inside its rectangle: static bodies' collision shapes, solid tile maps' tiles, LDtk Solid cells - plus cells your scripts block |
 
