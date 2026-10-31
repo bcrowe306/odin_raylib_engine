@@ -6,7 +6,9 @@ document if behaviour changes, tick it off here with a short "done:" note.
 
 ## Open
 
-- [ ] F.4 Editor window: remember its state; no Welcome when opening a project.
+## Done
+
+- [x] F.4 Editor window: remember its state; no Welcome when opening a project.
   The editor window should come back the way it was left. Closing and
   reopening the app should restore its last state: size, position, maximized
   / fullscreen, and the monitor it was on. Launching a new project or opening
@@ -44,8 +46,15 @@ document if behaviour changes, tick it off here with a short "done:" note.
     `--project`. Manual check on macOS: resize / move / maximize, quit,
     reopen; then File > New Project and Open Project - same window, no
     Welcome.
-
-## Done
+  - done (#265): editor/window_state.odin - the window's restored bounds
+    (tracked every frame while not maximized), maximized and monitor saved
+    in settings.ini [window] on quit and before a project relaunch; restored
+    after the settings load, clamped onto a connected monitor (shrunk to it,
+    title bar on it), maximize applied two frames later (macOS). Drives and
+    --hidden skip it. No startup Welcome when launched with --project.
+    Also fixed: a settings.ini missing a section ([code], ...) crashed the
+    editor at startup (lookups went through a nil section map). Test:
+    test_window_state_clamp_and_settings.
 
 - [x] F.3 Code editor: overridden methods flagged as duplicate fields.
   In a Lua script, a method that overrides / implements one the engine

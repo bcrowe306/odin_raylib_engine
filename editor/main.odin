@@ -118,6 +118,7 @@ editor_main :: proc() -> int {
 	Editor_Init(&GlobalEditor)
 	Actions_Init()
 	Editor_LoadSettings(&GlobalEditor)
+	WindowState_Restore(!driving && !hidden) // the window as it was left (window_state.odin)
 	Lua_ProjectSetup(&GlobalEditor) // .rayzr/definitions + .luarc.json for Lua tooling
 	defer Editor_Shutdown(&GlobalEditor)
 	defer Welcome_Shutdown() // (its preview textures)
@@ -130,6 +131,7 @@ editor_main :: proc() -> int {
 	// 5. Main Application Loop
 	for !GlobalEditor.quitConfirmed {
 		FrameTiming_Begin()
+		WindowState_Frame()
 		// The window's close button asks about unsaved work first.
 		if rl.WindowShouldClose() do Editor_RequestQuit(&GlobalEditor)
 		// Poll build / game processes, stream their output to the console
@@ -315,6 +317,7 @@ editor_main :: proc() -> int {
 		// without this the temp arena grew ~40 KB a frame, forever.
 		free_all(context.temp_allocator)
 	}
+	WindowState_Save() // (before a relaunch: the new editor opens the same way)
 	Editor_LaunchPendingProject(&GlobalEditor)
 	return TestDrive_ExitCode(&GlobalDrive) if driving else 0
 }
