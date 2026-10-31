@@ -29,8 +29,13 @@ the game, the Lua module and the **Level Generator** window in the editor.
   Ctrl/Cmd+wheel zooms, F frames everything.
 - **The side panel**: the level's **size**, **seed** (the dice picks a new
   one) and **output**; the selected node's parameters and, for a tile
-  output, its **rules** (a range and tiles: `3, 4` picks one of them per
-  cell); a large **preview** of the selected node (or the output).
+  output, its **Tileset** (the picture its tile numbers count in; the grid
+  button takes the tileset and tile size of the TileMap selected in the
+  scene), its **Layer**, and its **rules** (a range and tiles: `3, 4` picks
+  one of them per cell - or **Pick** them from the tileset: click tiles to
+  add or remove them; the rule shows them as small pictures); a large
+  **preview** of the selected node (or the output). A tile output with a
+  tileset previews with its real tiles.
 - **The toolbar**: **Save** (Ctrl/Cmd+S), **Undo** / **Redo**
   (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z: every change), and **Apply to TileMap**,
   which writes the level into the TileMap selected in the scene - baked
@@ -165,7 +170,14 @@ merge). Mix them with the rest: `combine` (max) adds ledges to a cave,
 
 | Type | | |
 |---|---|---|
-| `tile_output` | `empty` (-1), `rules` | Each cell takes the first rule whose `min`..`max` holds its value: one of its `tiles` (or `tile`), picked by the cell and the seed. Cells no rule takes get `empty` (-1: none). |
+| `tile_output` | `empty` (-1), `tile_w`, `tile_h` (16), `rules`, `tileset`, `layer` | Each cell takes the first rule whose `min`..`max` holds its value: one of its `tiles` (or `tile`), picked by the cell and the seed. Cells no rule takes get `empty` (-1: none). `tileset` (a project image) and the tile size are for picking tiles and previews; `layer` is where it goes (below). |
+
+**Layers.** The output's tiles go into the main TileMap. Any other tile
+output with a **layer** name goes into the TileMap of that name next to the
+main one (a sibling, else a child) - one generator fills ground, walls and
+decoration at once, each from its own tileset: e.g. a cave's rock into
+`Ground`, the Surface node's cells into `Grass`. A layer whose TileMap
+isn't there is reported (the others are still written).
 | `entity_output` | `max` (0 = all), `component` | Its component (a `.component.json`) on every point of its input (cells >= 0.5) - `max` of them picked by the seed. A graph can have several (enemies, coins, the player's start). |
 
 ## Playable levels

@@ -70,11 +70,14 @@ lge: struct {
 	errors:    map[int]string, // node id -> why it can't be evaluated (heap)
 	cache:     e.Gen_Cache, // nodes' grids between evaluations (the job's while it runs)
 	job:       ^Lge_Job,
+	tilesets:  map[string]^Lge_Tileset, // tile outputs' tilesets by path (heap; nil texture: couldn't load)
 	ctxWorld:  [2]f32,
 	ctxNode:   int,
 	closePrompt: bool,
 	tilesBuf:  [128]u8, // the tiles of the rule being typed in ("3, 4")
 	tilesFor:  [2]int,  // (node, rule) tilesBuf belongs to ({-1, -1}: none)
+	layerBuf:  [64]u8,  // the layer name being typed in
+	layerFor:  int,     // the node layerBuf belongs to (0: none)
 }
 
 // LevelGenEditor_Open shows a generator file (project-relative).
@@ -144,6 +147,96 @@ lge_unload :: proc() {
 	clear(&lge.redo)
 	lge_forget_previews()
 	if lge.cache.entries != nil do e.Gen_CacheClear(&lge.cache) // (another file's node ids)
+	lge_forget_tilesets()
+}
+
+// A tile output's tileset: its texture (the palette, swatches) and its
+// pixels (the previews draw real tiles from them).
+@(private = "file")
+Lge_Tileset :: struct {
+	tex:    rl.Texture2D,
+	colors: [^]rl.Color, // (raylib's)
+	size:   [2]int,
+}
+
+// lge_tileset: a project image loaded once (nil: none, or it can't be read).
+@(private = "file")
+lge_tileset :: proc(state: ^EditorState, path: string) -> ^Lge_Tileset {
+	if path == "" do return nil
+	if ts, ok := lge.tilesets[path]; ok do return ts if ts.tex.id != 0 else nil
+	ts := new(Lge_Tileset)
+	lge.tilesets[strings.clone(path)] = ts
+	full, _ := filepath.join({state.projectPath, path}, context.temp_allocator)
+	img := rl.LoadImage(strings.clone_to_cstring(full, context.temp_allocator))
+	if img.data == nil do return nil
+	defer rl.UnloadImage(img)
+	rl.ImageFormat(&img, .UNCOMPRESSED_R8G8B8A8)
+	ts.tex = rl.LoadTextureFromImage(img)
+	rl.SetTextureFilter(ts.tex, .POINT)
+	ts.colors = rl.LoadImageColors(img)
+	ts.size = {int(img.width), int(img.height)}
+	return ts
+}
+
+@(private = "file")
+lge_forget_tilesets :: proc() {
+	for path, ts in lge.tilesets {
+		if ts.tex.id != 0 do rl.UnloadTexture(ts.tex)
+		if ts.colors != nil do rl.UnloadImageColors(ts.colors)
+		free(ts)
+		delete(path)
+	}
+	clear(&lge.tilesets)
+}
+
+// The tileset's grid: columns and tiles of a tile size.
+@(private = "file")
+lge_tile_grid :: proc(ts: ^Lge_Tileset, tile: [2]int) -> (cols, count: int) {
+	if ts == nil || tile.x <= 0 || tile.y <= 0 do return 0, 0
+	cols = ts.size.x / tile.x
+	return cols, cols * (ts.size.y / tile.y)
+}
+
+// lge_tile_uv: a tile's rectangle in its tileset texture (0..1).
+@(private = "file")
+lge_tile_uv :: proc(ts: ^Lge_Tileset, tile: [2]int, t: i32) -> (uv0, uv1: [2]f32) {
+	cols, _ := lge_tile_grid(ts, tile)
+	if cols == 0 do return
+	x, y := int(t) % cols * tile.x, int(t) / cols * tile.y
+	sz := [2]f32{f32(ts.size.x), f32(ts.size.y)}
+	return {f32(x), f32(y)} / sz, {f32(x + tile.x), f32(y + tile.y)} / sz
+}
+
+// lge_tile_pixels: a tile output drawn with its tiles - `scale` pixels a
+// cell (up to the tile's own size, the image at most ~1024 across); tiles
+// the tileset doesn't have in their colours.
+@(private = "file")
+lge_tile_pixels :: proc(ts: ^Lge_Tileset, tile: [2]int, tiles: []i32, w, h: int) -> (pixels: []rl.Color, pw, ph: int) {
+	cols, count := lge_tile_grid(ts, tile)
+	s := clamp(1024 / max(w, h), 1, max(tile.x, tile.y, 1))
+	pw, ph = w * s, h * s
+	pixels = make([]rl.Color, pw * ph, context.temp_allocator)
+	#no_bounds_check for t, i in tiles {
+		if t < 0 do continue
+		cx, cy := i % w, i / w
+		if int(t) >= count {
+			c := lge_tile_color(t)
+			for py in 0 ..< s do for px in 0 ..< s do pixels[(cy * s + py) * pw + cx * s + px] = c
+			continue
+		}
+		tx, ty := int(t) % cols * tile.x, int(t) / cols * tile.y
+		for py in 0 ..< s {
+			row := (ty + py * tile.y / s) * ts.size.x
+			for px in 0 ..< s do pixels[(cy * s + py) * pw + cx * s + px] = ts.colors[row + tx + px * tile.x / s]
+		}
+	}
+	return
+}
+
+// A tile output's tile size (its tile_w / tile_h).
+@(private = "file")
+lge_tile_size :: proc(n: ^e.Gen_Node) -> [2]int {
+	return {max(int(e.Gen_Param(n, "tile_w")), 1), max(int(e.Gen_Param(n, "tile_h")), 1)}
 }
 
 @(private = "file")
@@ -164,6 +257,7 @@ LevelGenEditor_Shutdown :: proc() {
 	delete(lge.thumbs)
 	delete(lge.thumbKeys)
 	delete(lge.errors)
+	delete(lge.tilesets)
 	if lge.cache.entries != nil do e.Gen_CacheDestroy(&lge.cache)
 	lge = {}
 }
@@ -307,7 +401,7 @@ lge_tile_color :: proc(t: i32) -> rl.Color {
 // the thumbnails of the nodes whose grids changed (and the tile outputs,
 // whose rules aren't in their keys) are updated, and the errors replaced.
 @(private = "file")
-lge_refresh :: proc() {
+lge_refresh :: proc(state: ^EditorState) {
 	if lge.cache.entries == nil do e.Gen_CacheInit(&lge.cache, e.Engine_HeapAllocator())
 	if j := lge.job; j != nil {
 		if !sync.atomic_load(&j.done) do return
@@ -331,13 +425,20 @@ lge_refresh :: proc() {
 			if !ok do continue
 			tex, have := lge.thumbs[n.id]
 			if have && lge.thumbKeys[n.id] == en.key && n.kind != .Tile_Output && tex.width == i32(en.grid.w) && tex.height == i32(en.grid.h) do continue
-			pixels := make([]rl.Color, len(en.grid.v), context.temp_allocator)
-			lge_grid_pixels(&j.graph, &n, en.grid, pixels)
-			if have && tex.width == i32(en.grid.w) && tex.height == i32(en.grid.h) {
+			// (A tile output with its tileset: drawn with its tiles.)
+			pixels: []rl.Color
+			pw, ph := en.grid.w, en.grid.h
+			if ts := lge_tileset(state, n.tileset); n.kind == .Tile_Output && ts != nil {
+				pixels, pw, ph = lge_tile_pixels(ts, lge_tile_size(&n), e.Gen_TilesOf(&n, en.grid, j.graph.seed, context.temp_allocator), en.grid.w, en.grid.h)
+			} else {
+				pixels = make([]rl.Color, len(en.grid.v), context.temp_allocator)
+				lge_grid_pixels(&j.graph, &n, en.grid, pixels)
+			}
+			if have && tex.width == i32(pw) && tex.height == i32(ph) {
 				rl.UpdateTexture(tex, raw_data(pixels))
 			} else {
 				if have && tex.id != 0 do rl.UnloadTexture(tex)
-				img := rl.Image{data = raw_data(pixels), width = i32(en.grid.w), height = i32(en.grid.h), mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8}
+				img := rl.Image{data = raw_data(pixels), width = i32(pw), height = i32(ph), mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8}
 				tex = rl.LoadTextureFromImage(img)
 				rl.SetTextureFilter(tex, .POINT)
 				lge.thumbs[n.id] = tex
@@ -407,7 +508,7 @@ LevelGenEditor_Render :: proc(state: ^EditorState) {
 		e.Gen_LoadScripts(&lge.graph, &state.game.gameContext) // (script nodes' files: opened, picked, reloaded)
 		lge.scriptsStale = false
 	}
-	lge_refresh()
+	lge_refresh(state)
 	lge_keys(state)
 	lge_toolbar(state)
 	avail := imgui.GetContentRegionAvail()
@@ -847,7 +948,10 @@ lge_side :: proc(state: ^EditorState) {
 				}
 				UI_EndProps()
 			}
-			if n.kind == .Tile_Output do lge_rules(n)
+			if n.kind == .Tile_Output {
+				lge_tile_output(state, n)
+				lge_rules(state, n)
+			}
 			if n.kind == .Entity_Output {
 				imgui.SeparatorText("Component")
 				files := make([dynamic]string, context.temp_allocator)
@@ -939,9 +1043,133 @@ lge_new_script :: proc(state: ^EditorState, id: int) -> string {
 	}
 }
 
+// lge_tile_output: a tile output's tileset (its tiles' picture: the palette,
+// the previews), from the project or the TileMap selected in the scene, and
+// its layer (the TileMap it fills, by name, next to the main one).
+@(private = "file")
+lge_tile_output :: proc(state: ^EditorState, n: ^e.Gen_Node) {
+	g := &lge.graph
+	imgui.SeparatorText("Tiles")
+	if UI_BeginProps("##lge_tiles") {
+		UI_PropLabel("Tileset")
+		imgui.SetNextItemWidth(imgui.GetContentRegionAvail().x - 34)
+		if path, ok := asset_picker("lge.tileset", n.tileset, Editor_ListProjectFiles(state, "", TEXTURE_EXTS)); ok {
+			lge_change()
+			e.Gen_SetTileset(g, n, path)
+		}
+		Drive_Item("lge.tileset")
+		UI_Tooltip("The image its tile numbers count in (left to right, top to bottom, tile_w x tile_h each): pick tiles from it, see real tiles in the previews")
+		imgui.SameLine(0, 4)
+		tm := cast(^e.TileMapNode)state.selectedNode if state.selectedNode != nil && state.selectedNode.typeId == e.TileMapNode else nil
+		imgui.BeginDisabled(tm == nil || tm.tilesetPath == "")
+		if UI_IconButton(ICON_FA_TABLE_CELLS_LARGE, "lge.tileset-from-map", "Use the tileset and tile size of the TileMap selected in the scene", size = 26) {
+			lge_change()
+			e.Gen_SetTileset(g, n, tm.tilesetPath)
+			e.Gen_SetParam(n, "tile_w", f64(tm.tileSize.x))
+			e.Gen_SetParam(n, "tile_h", f64(tm.tileSize.y))
+		}
+		imgui.EndDisabled()
+		UI_PropLabel("Layer")
+		// (The name being typed keeps its own buffer until Enter or leaving.)
+		local: [64]u8
+		buf := lge.layerBuf[:] if lge.layerFor == n.id else local[:]
+		if lge.layerFor != n.id do copy(local[:63], n.layer)
+		imgui.SetNextItemWidth(-1)
+		entered := imgui.InputTextWithHint("##lge_layer", "the main TileMap", cstring(raw_data(buf)), len(buf), {.EnterReturnsTrue})
+		if imgui.IsItemActivated() {
+			lge.layerBuf = local
+			lge.layerFor = n.id
+		}
+		if entered || imgui.IsItemDeactivatedAfterEdit() {
+			name := strings.trim_space(string(cstring(raw_data(buf))))
+			if name != n.layer {
+				lge_change()
+				e.Gen_SetLayer(g, n, name)
+			}
+		}
+		if imgui.IsItemDeactivated() && lge.layerFor == n.id do lge.layerFor = 0
+		Drive_Item("lge.layer")
+		UI_Tooltip("Empty: the main TileMap (the output's). A name: the TileMap of that name next to the main one (its sibling) - one generator fills ground, walls and decoration at once")
+		UI_EndProps()
+	}
+	if n.tileset != "" && lge_tileset(state, n.tileset) == nil do imgui.TextColored(UI_WARNING, "Can't read the tileset image")
+}
+
+// lge_rule_tiles: a rule's tiles as small pictures (in colours without a
+// tileset), and Pick: the tileset as a palette - click tiles to add or
+// remove them.
+@(private = "file")
+lge_rule_tiles :: proc(state: ^EditorState, n: ^e.Gen_Node, r: ^e.Gen_Tile_Rule, i: int) {
+	ts := lge_tileset(state, n.tileset)
+	tile := lge_tile_size(n)
+	SW :: f32(20)
+	for t, k in r.tiles {
+		if k >= 12 {
+			UI_DimText(fmt.tprintf("+%d", len(r.tiles) - 12))
+			break
+		}
+		if k > 0 do imgui.SameLine(0, 2)
+		if _, count := lge_tile_grid(ts, tile); ts != nil && int(t) < count && t >= 0 {
+			uv0, uv1 := lge_tile_uv(ts, tile, t)
+			imgui.Image(transmute(imgui.TextureID)&ts.tex, {SW, SW}, uv0, uv1)
+		} else {
+			p := imgui.GetCursorScreenPos()
+			c := lge_tile_color(t)
+			imgui.DrawList_AddRectFilled(imgui.GetWindowDrawList(), p, p + SW, col32(u32(c.r), u32(c.g), u32(c.b)), 3)
+			imgui.Dummy({SW, SW})
+		}
+		UI_Tooltip(fmt.tprintf("Tile %d", t))
+	}
+	if len(r.tiles) > 0 do imgui.SameLine(0, 6)
+	imgui.BeginDisabled(ts == nil)
+	if UI_Button(fmt.tprintf("%s  Pick", ICON_FA_TABLE_CELLS), fmt.tprintf("lge.rule-pick:%d", i)) do imgui.OpenPopup("##lge_palette")
+	imgui.EndDisabled()
+	UI_Tooltip("Pick the rule's tiles from the tileset" if ts != nil else "Set the tile output's Tileset first")
+	if ts == nil || !imgui.BeginPopup("##lge_palette") do return
+	defer imgui.EndPopup()
+	if imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
+	cols, count := lge_tile_grid(ts, tile)
+	UI_DimText(fmt.tprintf("Click tiles to add or remove them (%d picked)", len(r.tiles)))
+	scale := clamp(f32(360) / f32(max(ts.size.x, 1)), 0.25, 4)
+	size := [2]f32{f32(ts.size.x), f32(ts.size.y)} * scale
+	p0 := imgui.GetCursorScreenPos()
+	imgui.InvisibleButton("##lge_palette_img", size)
+	dl := imgui.GetWindowDrawList()
+	imgui.DrawList_AddImage(dl, transmute(imgui.TextureID)&ts.tex, p0, p0 + size)
+	cell := [2]f32{f32(tile.x), f32(tile.y)} * scale
+	for t in 0 ..< min(count, 4096) {
+		mn := p0 + {f32(t % cols), f32(t / cols)} * cell
+		on := slice_contains_i32(r.tiles[:], i32(t))
+		imgui.DrawList_AddRect(dl, mn, mn + cell, col_u32(UI_ACCENT if on else ui_line(0.25)), 0, imgui.DrawFlags(0), 2 if on else 1)
+		Drive_ItemRect(fmt.tprintf("lge.palette-tile:%d", t), mn, mn + cell, inWindow = true)
+	}
+	if imgui.IsItemClicked(.Left) {
+		m := imgui.GetMousePos() - p0
+		cx, cy := int(m.x / cell.x), int(m.y / cell.y)
+		if cx >= 0 && cx < cols && cy >= 0 && cols > 0 && cy * cols + cx < count {
+			t := i32(cy * cols + cx)
+			lge_change()
+			if k, found := slice_index_i32(r.tiles[:], t); found do ordered_remove(&r.tiles, k)
+			else do append(&r.tiles, t)
+		}
+	}
+}
+
+@(private = "file")
+slice_contains_i32 :: proc(a: []i32, v: i32) -> bool {
+	_, found := slice_index_i32(a, v)
+	return found
+}
+
+@(private = "file")
+slice_index_i32 :: proc(a: []i32, v: i32) -> (int, bool) {
+	for x, i in a do if x == v do return i, true
+	return -1, false
+}
+
 // lge_rules: a tile output's rules - range and tiles ("3, 4": one of them).
 @(private = "file")
-lge_rules :: proc(n: ^e.Gen_Node) {
+lge_rules :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 	imgui.SeparatorText("Rules")
 	UI_DimTextWrapped("Each cell takes the first rule whose range holds its value: one of its tiles.")
 	remove := -1
@@ -982,6 +1210,7 @@ lge_rules :: proc(n: ^e.Gen_Node) {
 		UI_Tooltip("Tile indices (in the TileMap's tileset), comma separated: one is picked per cell")
 		imgui.SameLine(0, 4)
 		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("lge.rule-remove:%d", i), "Remove the rule", size = 24) do remove = i
+		lge_rule_tiles(state, n, &r, i)
 		imgui.PopID()
 	}
 	if remove >= 0 {

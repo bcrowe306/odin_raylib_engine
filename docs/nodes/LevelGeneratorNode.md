@@ -2,7 +2,10 @@
 
 Pick a **Generator** (a `.levelgen.json` made in the Level Generator window)
 and give the node a **TileMap** to fill: a TileMap child (the usual set-up),
-its parent when that is a TileMap, or any one at the **Tile Map** path. When
+its parent when that is a TileMap, or any one at the **Tile Map** path (with
+several TileMap children, the first). Tile outputs with a **Layer** name fill
+the TileMaps of those names next to it: give the node one TileMap child per
+layer - `Ground` first, then `Walls`, `Decor`. When
 the scene starts (**Generate On Ready**) it makes a level: the tiles, their
 colliders, and the generator's entities (as children of the map). Call
 `generate()` again - or connect a signal to `generate`, no script needed -

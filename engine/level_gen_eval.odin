@@ -376,8 +376,15 @@ Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := cont
 // until the result is applied.
 Gen_Result :: struct {
 	size:     [2]int,
-	tiles:    []i32,
+	tiles:    []i32, // the output's (the main map)
+	layers:   [dynamic]Gen_Layer_Tiles, // the other tile outputs with a layer
 	entities: [dynamic]Gen_Entity,
+}
+
+// A layer's tiles: for the TileMap named `name` next to the main one.
+Gen_Layer_Tiles :: struct {
+	name:  string, // (the graph's)
+	tiles: []i32,
 }
 
 // Gen_Generate: the level's tiles and entities, the graph evaluated once.
@@ -385,6 +392,15 @@ Gen_Generate :: proc(g: ^Gen_Graph, seed: u64 = 0, allocator := context.allocato
 	ev := gen_eval_begin(g, seed)
 	defer gen_eval_end(&ev)
 	r.tiles, r.size, err = gen_tiles(&ev, 0, allocator)
+	main := Gen_OutputNode(g)
+	r.layers = make([dynamic]Gen_Layer_Tiles, allocator)
+	if err == "" do for &n in g.nodes {
+		if n.kind != .Tile_Output || n.layer == "" || (main != nil && n.id == main.id) do continue
+		tiles: []i32
+		tiles, _, err = gen_tiles(&ev, n.id, allocator)
+		if err != "" do break
+		append(&r.layers, Gen_Layer_Tiles{n.layer, tiles})
+	}
 	if err == "" do r.entities, err = gen_entities(&ev, allocator)
 	if err != "" do Gen_ResultDestroy(&r, allocator)
 	return
@@ -392,6 +408,8 @@ Gen_Generate :: proc(g: ^Gen_Graph, seed: u64 = 0, allocator := context.allocato
 
 Gen_ResultDestroy :: proc(r: ^Gen_Result, allocator := context.allocator) {
 	delete(r.tiles, allocator)
+	for ly in r.layers do delete(ly.tiles, allocator)
+	delete(r.layers)
 	delete(r.entities)
 	r^ = {}
 }

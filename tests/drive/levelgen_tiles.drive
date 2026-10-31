@@ -1,0 +1,33 @@
+# #171: a tile output with its tileset - its preview drawn with real tiles,
+# a rule's tiles picked from the tileset palette, a layer name - saved.
+wait 5
+exec mkdir -p $PROJECT/levels
+exec cp tests/drive/fixtures/tiles_zz.levelgen.json $PROJECT/levels/tiles_zz.levelgen.json
+wait-until item:asset:levels/tiles_zz.levelgen.json == visible timeout=300
+dblclick @asset:levels/tiles_zz.levelgen.json
+wait 5
+expect lge.open == true
+expect lge.errors == 0
+click @lge.node:3
+wait 3
+screenshot real_tiles
+# Two more tiles for the rule from the palette.
+click @lge.rule-pick:0
+wait 1
+click @lge.palette-tile:2
+wait 1
+click @lge.palette-tile:3
+wait 1
+screenshot palette
+key escape
+expect lge.text contains "tiles": [1, 2, 3]
+# A layer: the TileMap named Walls next to the main one.
+click @lge.layer
+type Walls
+key enter
+wait 2
+key ctrl+s
+wait 1
+expect file:levels/tiles_zz.levelgen.json contains "layer": "Walls"
+expect file:levels/tiles_zz.levelgen.json contains "tileset": "textures/Tiles.png"
+screenshot saved
