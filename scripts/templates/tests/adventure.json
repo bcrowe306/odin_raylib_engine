@@ -188,5 +188,36 @@
     "You finished it"
    ]
   ]
+ },
+ {
+  "name": "touch: OK starts a new game",
+  "frames": 90,
+  "input": [
+   "10 touch1 292 152 tap"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "level1"
+   ]
+  ]
+ },
+ {
+  "name": "touch: the pause button pauses",
+  "frames": 90,
+  "scene": "scenes/level1.scene.json",
+  "input": [
+   "20 touch1 300 15 tap"
+  ],
+  "expect": [
+   [
+    "PauseMenu",
+    "visible",
+    "==",
+    true
+   ]
+  ]
  }
 ]

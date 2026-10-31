@@ -110,6 +110,73 @@
      "align": "Center",
      "color": "#3b2a20ff"
     }
+   },
+   {
+    "type": "ScreenLayerNode",
+    "name": "TouchLeft",
+    "properties": {
+     "anchor": "BottomLeft"
+    },
+    "children": [
+     {
+      "type": "TouchJoystickNode",
+      "name": "TouchStick",
+      "position": [
+       320.0,
+       -216.0
+      ],
+      "properties": {
+       "radius": 70.0,
+       "knobRadius": 30.0,
+       "floating": true,
+       "area": [
+        640.0,
+        432.0
+       ],
+       "actionLeft": "move_left",
+       "actionRight": "move_right",
+       "actionUp": "move_up",
+       "actionDown": "move_down"
+      }
+     }
+    ]
+   },
+   {
+    "type": "ScreenLayerNode",
+    "name": "TouchRight",
+    "properties": {
+     "anchor": "BottomRight"
+    },
+    "children": [
+     {
+      "type": "TouchButtonNode",
+      "name": "TouchUndo",
+      "position": [
+       -110.0,
+       -110.0
+      ],
+      "properties": {
+       "radius": 52.0,
+       "action": "undo",
+       "label": "Undo",
+       "fontSize": 36.0
+      }
+     },
+     {
+      "type": "TouchButtonNode",
+      "name": "TouchRestart",
+      "position": [
+       -240.0,
+       -80.0
+      ],
+      "properties": {
+       "radius": 52.0,
+       "action": "restart",
+       "label": "R",
+       "fontSize": 36.0
+      }
+     }
+    ]
    }
   ]
  }

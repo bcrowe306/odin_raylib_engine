@@ -60,6 +60,7 @@ ProjectConfig :: struct {
 	accessibility: string, // the players' default accessibility settings ("accessibility": {...}, JSON text; accessibility.odin) - "" = the engine's
 	// Input actions (empty = the built-in defaults)
 	actions:       [dynamic]Input_Action_Config,
+	touchAsMouse:  bool, // a finger is the left mouse button (default on; "input": {"touch_as_mouse"})
 	// Export
 	export:        Export_Settings,
 	// Per-texture filtering / wrap / mipmaps (asset_paths.odin)
@@ -307,6 +308,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		musicVolume   = 1,
 		sfxVolume     = 1,
 		export        = {targets = {native_export_target()}, compress = true, includeFont = true},
+		touchAsMouse  = true,
 	}
 
 	parsedVal, err := json.parse(jsonBytes, allocator = context.temp_allocator)
@@ -373,6 +375,7 @@ Project_ParseConfig :: proc(jsonBytes: []u8, allocator := context.allocator) -> 
 		if text, merr := json.marshal(accObj, {}, context.temp_allocator); merr == nil && len(accObj) > 0 do cfg.accessibility = strings.clone(string(text), allocator)
 	}
 	if inputObj, ok := json_get_obj(rootObj, "input"); ok {
+		cfg.touchAsMouse = json_get_bool(inputObj, "touch_as_mouse", true)
 		if arr, has := json_get_arr(inputObj, "actions"); has {
 			cfg.actions = make([dynamic]Input_Action_Config, allocator)
 			for v in arr {
@@ -510,8 +513,10 @@ Project_SerializeToJSON :: proc(cfg: ^ProjectConfig, allocator := context.alloca
 	}
 	strings.write_byte(&sb, '\n')
 	strings.write_string(&sb, "  },\n")
-	if len(cfg.actions) > 0 {
-		strings.write_string(&sb, "  \"input\": {\"actions\": [\n")
+	if len(cfg.actions) > 0 || !cfg.touchAsMouse {
+		strings.write_string(&sb, "  \"input\": {")
+		if !cfg.touchAsMouse do strings.write_string(&sb, "\"touch_as_mouse\": false, ")
+		strings.write_string(&sb, "\"actions\": [\n")
 		for a, i in cfg.actions {
 			strings.write_string(&sb, "    {\"name\": "); jstr(&sb, a.name)
 			strings.write_string(&sb, ", \"bindings\": [")
@@ -606,6 +611,7 @@ Game_LoadProjectConfig :: proc(game: ^Game, cfg: ^ProjectConfig, activate := tru
 	game.masterVolume = cfg.masterVolume
 	Mixer_ApplyProject(cfg) // buses, faders, effects (mixer_config.odin)
 	Input_ApplyActionConfigs(&game.input, cfg.actions[:])
+	game.input.touch.asMouse = cfg.touchAsMouse
 	Input_RebindSetDefaults(&game.input, cfg.actions[:]) // (Input.reset_bindings)
 	if activate do Input_LoadUserBindings(&game.input) // the player's own (the game, not the editor)
 	Access_SetDefaults(ProjectConfig_Accessibility(cfg))

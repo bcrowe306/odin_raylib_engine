@@ -46,6 +46,8 @@ NODE_TYPES := [?]Node_Type_Info{
 	{"RaycastNode", RaycastNode, factory_raycast, {"raycast"}},
 	{"VisibilityNotifierNode", VisibilityNotifierNode, factory_visibility, {"visibility", "on screen", "notifier"}},
 	{"ScreenLayerNode", ScreenLayerNode, factory_screen_layer, {"screen layer", "screenlayer", "hud", "canvas layer", "overlay", "ui layer"}},
+	{"TouchJoystickNode", TouchJoystickNode, factory_touch_joystick, {"touch joystick", "touchjoystick", "virtual joystick", "joystick", "thumbstick"}},
+	{"TouchButtonNode", TouchButtonNode, factory_touch_button, {"touch button", "touchbutton", "virtual button", "on-screen button"}},
 	{"SkeletonNode", SkeletonNode, factory_skeleton, {"skeleton", "spine", "dragonbones", "bones", "rig", "cutout"}},
 	{"BoneAttachmentNode", BoneAttachmentNode, factory_bone_attachment, {"bone attachment", "attach to bone"}},
 	{"AdvancedCameraNode", AdvancedCameraNode, factory_adv_camera, {"advanced camera", "virtual camera", "phantom", "cinemachine"}},
@@ -282,6 +284,16 @@ factory_character :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 @(private = "file")
 factory_screen_layer :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
 	return ScreenLayerNode_Create(scene, "ScreenLayer", parent)
+}
+
+@(private = "file")
+factory_touch_joystick :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return TouchJoystickNode_Create(scene, "TouchJoystick", parent)
+}
+
+@(private = "file")
+factory_touch_button :: proc(scene: ^Scene, parent: ^Node) -> ^Node {
+	return TouchButtonNode_Create(scene, "TouchButton", parent)
 }
 
 @(private = "file")

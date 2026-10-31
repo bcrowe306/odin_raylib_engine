@@ -256,6 +256,7 @@ settings_save :: proc(state: ^EditorState) {
 	state.game.musicVolume = d.musicVolume
 	state.game.sfxVolume = d.sfxVolume
 	e.Input_ApplyActionConfigs(&state.game.input, d.actions[:])
+	state.game.input.touch.asMouse = d.touchAsMouse
 	e.Access_SetDefaults(e.ProjectConfig_Accessibility(d)) // (Simulate uses the project's accessibility defaults)
 	Editor_ReloadGlobals(state)
 
@@ -723,6 +724,10 @@ enum_combo :: proc($T: typeid, id: string, b: ^e.InputBinding) {
 project_input :: proc(state: ^EditorState) {
 	d := &st.project
 	UI_DimText("Scripts ask for actions, not keys: Input.is_action_down(\"jump\").")
+	// (Not in a property table here: a plain checkbox.)
+	imgui.Checkbox("Touch as Mouse##settings.touch-as-mouse", &d.touchAsMouse)
+	Drive_Item("settings.touch-as-mouse")
+	UI_Tooltip("On touch screens (the web export on phones and tablets) the first finger is the left mouse button: taps click, drags drag. Off: games read the fingers themselves (Input.get_touches). On-screen controls take their own fingers either way")
 	imgui.Dummy({0, 4})
 	h := imgui.GetContentRegionAvail().y
 	// Action list.

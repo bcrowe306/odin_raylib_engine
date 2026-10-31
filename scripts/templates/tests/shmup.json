@@ -1,18 +1,148 @@
 [
- {"name": "shooting an enemy scores (and is the best score)", "frames": 260,
-  "input": ["5 SPACE down", "5 DOWN down", "38 DOWN up"],
-  "expect": [["Score", "text", "==", "Score 100"], ["High", "text", "==", "Best 100"], ["Lives", "text", "==", "Lives 3"]]},
- {"name": "flying into an enemy costs a life", "frames": 160,
-  "patch": {"Player": {"position": [300, 148]}},
-  "expect": [["Lives", "text", "==", "Lives 2"]]},
- {"name": "the last life ends the game", "frames": 160,
-  "patch": {"Player": {"position": [300, 148], "script.lives": 1}},
-  "expect": [["Lives", "text", "==", "Lives 0"], ["Message", "text", "contains", "Game over"]]},
- {"name": "fire after game over plays again", "frames": 200,
-  "patch": {"Player": {"position": [300, 148], "script.lives": 1}},
-  "input": ["170 SPACE tap"],
-  "expect": [["Message", "text", "==", ""], ["Score", "text", "==", "Score 0"]]},
- {"name": "the player stays on screen", "frames": 120,
-  "input": ["5 LEFT down", "5 UP down"],
-  "expect": [["Player", "x", ">=", 12], ["Player", "y", ">=", 16]]}
+ {
+  "name": "shooting an enemy scores (and is the best score)",
+  "frames": 260,
+  "input": [
+   "5 SPACE down",
+   "5 DOWN down",
+   "38 DOWN up"
+  ],
+  "expect": [
+   [
+    "Score",
+    "text",
+    "==",
+    "Score 100"
+   ],
+   [
+    "High",
+    "text",
+    "==",
+    "Best 100"
+   ],
+   [
+    "Lives",
+    "text",
+    "==",
+    "Lives 3"
+   ]
+  ]
+ },
+ {
+  "name": "flying into an enemy costs a life",
+  "frames": 160,
+  "patch": {
+   "Player": {
+    "position": [
+     300,
+     148
+    ]
+   }
+  },
+  "expect": [
+   [
+    "Lives",
+    "text",
+    "==",
+    "Lives 2"
+   ]
+  ]
+ },
+ {
+  "name": "the last life ends the game",
+  "frames": 160,
+  "patch": {
+   "Player": {
+    "position": [
+     300,
+     148
+    ],
+    "script.lives": 1
+   }
+  },
+  "expect": [
+   [
+    "Lives",
+    "text",
+    "==",
+    "Lives 0"
+   ],
+   [
+    "Message",
+    "text",
+    "contains",
+    "Game over"
+   ]
+  ]
+ },
+ {
+  "name": "fire after game over plays again",
+  "frames": 200,
+  "patch": {
+   "Player": {
+    "position": [
+     300,
+     148
+    ],
+    "script.lives": 1
+   }
+  },
+  "input": [
+   "170 SPACE tap"
+  ],
+  "expect": [
+   [
+    "Message",
+    "text",
+    "==",
+    ""
+   ],
+   [
+    "Score",
+    "text",
+    "==",
+    "Score 0"
+   ]
+  ]
+ },
+ {
+  "name": "the player stays on screen",
+  "frames": 120,
+  "input": [
+   "5 LEFT down",
+   "5 UP down"
+  ],
+  "expect": [
+   [
+    "Player",
+    "x",
+    ">=",
+    12
+   ],
+   [
+    "Player",
+    "y",
+    ">=",
+    16
+   ]
+  ]
+ },
+ {
+  "name": "touch: the fire button shoots an enemy",
+  "frames": 260,
+  "input": [
+   "5 touch2 292 152 down",
+   "5 touch1 60 120 down",
+   "7 touch1 60 140 move",
+   "38 touch1 60 140 up"
+  ],
+  "expect": [
+   [
+    "Score",
+    "text",
+    "==",
+    "Score 100"
+   ]
+  ]
+ }
 ]

@@ -1,0 +1,55 @@
+# Touch input (#276): Touch Joystick and Touch Button in Add Node, under a
+# Screen Layer (shown in the editor); Project Settings > Input's Touch as
+# Mouse, saved in project.json when it's off.
+wait 5
+click @asset.new-scene
+wait 5
+click @hier.add
+wait 3
+click @addnode.search
+type screen layer
+wait 2
+click @addnode.create
+wait 5
+hover @insp.prop:anchor
+click @insp.prop:anchor
+wait 2
+click @pick:BottomLeft
+wait 2
+click @hier.add
+wait 3
+click @addnode.search
+type touch joystick
+wait 2
+expect item:addnode:Touch Joystick == visible
+click @addnode.create
+wait 5
+expect node:TouchJoystick.type == TouchJoystickNode
+expect node:TouchJoystick.parent == ScreenLayer
+expect node:TouchJoystick.prop.actionRight == move_right
+click @hier.add
+wait 3
+click @addnode.search
+type touch button
+wait 2
+click @addnode.create
+wait 5
+expect node:TouchButton.type == TouchButtonNode
+expect node:TouchButton.prop.action == jump
+key home
+wait 5
+screenshot controls_over_camera_frame
+click @toolbar.save
+expect file:scenes/new_scene.scene.json contains "type": "TouchJoystickNode"
+expect file:scenes/new_scene.scene.json contains "type": "TouchButtonNode"
+# Touch as Mouse: on by default; off is saved.
+key ctrl+comma
+expect project-settings-open == true
+click @settings.tab:project
+click @settings.page:Input
+expect item:settings.touch-as-mouse == visible
+click @settings.touch-as-mouse
+screenshot settings_touch_as_mouse
+click @settings.save
+wait 2
+expect file:project.json contains "touch_as_mouse": false

@@ -48,6 +48,7 @@ Input_Script_Event :: struct {
 	value:  f32,
 	name:   string, // connect
 	mouse:  bool,   // a mouse event: moves to pos, the left button down / up (`down`, `button_change`)
+	touch:  i32,    // a finger's id (1..10; 0: not a touch event): at pos, down / up
 	pos:    [2]f32,
 	button_change: bool,
 }
@@ -72,6 +73,12 @@ Input_Script_Pad :: enum u8 {Button, Axis, Connect, Disconnect}
 //   50       mouse  100 80 move
 //   (UI widgets and Lua's Input.*mouse* read it; the UI's own keys -
 //   Tab, arrows, Enter on a widget - stop once a mouse event played)
+//
+//   # fingers (game units): touch1..touch10  x y  down / move / up / tap [frames]
+//   40       touch1 200 600 down     (a finger lands)
+//   45       touch1 260 600 move     (and drags)
+//   60       touch1 260 600 up
+//   70       touch2 900 600 tap      (down, up 2 frames later)
 //
 // Keys are raylib key names as in project.json bindings (SPACE, LEFT, A, ...),
 // pad buttons / axes raylib's (RIGHT_FACE_DOWN, LEFT_X, ...).
@@ -126,6 +133,27 @@ Runner_LoadInputScript :: proc(text: string, allocator := context.allocator) -> 
 				} else {
 					return events, fmt.tprintf("line %d: %q is not connect / disconnect / a pad button or axis", n + 1, f[2])
 				}
+			}
+			continue
+		}
+		if lower := strings.to_lower(f[1], context.temp_allocator); strings.has_prefix(lower, "touch") && len(lower) > 5 {
+			id, iok := strconv.parse_int(lower[5:])
+			if !iok || len(f) < 5 do return events, fmt.tprintf("line %d: want <frame> touchN <x> <y> down|move|up|tap", n + 1)
+			x, xok := strconv.parse_f32(f[2])
+			y, yok := strconv.parse_f32(f[3])
+			if !xok || !yok do return events, fmt.tprintf("line %d: bad touch position", n + 1)
+			ev := Input_Script_Event{frame = frame, pad = -1, touch = i32(id), pos = {x, y}}
+			switch f[4] {
+			case "down", "move": ev.down = true; append(&events, ev)
+			case "up": append(&events, ev)
+			case "tap":
+				hold := 2
+				if len(f) >= 6 do hold, _ = strconv.parse_int(f[5])
+				ev.down = true
+				append(&events, ev)
+				ev.down, ev.frame = false, frame + max(hold, 1)
+				append(&events, ev)
+			case: return events, fmt.tprintf("line %d: %q is not down / move / up / tap", n + 1, f[4])
 			}
 			continue
 		}
@@ -185,6 +213,10 @@ Runner_MouseFrame :: proc(game: ^Game) {
 // Runner_ApplyInputEvent plays an --input-script event.
 Runner_ApplyInputEvent :: proc(input: ^InputSystem, ev: Input_Script_Event) {
 	if ev.mouse do return // (Runner_ApplyMouseEvent: the game's)
+	if ev.touch > 0 {
+		Input_SimulateTouch(input, ev.touch, ev.pos, ev.down)
+		return
+	}
 	if ev.pad < 0 {
 		Input_SetSimulatedKey(input, ev.key, ev.down)
 		return
@@ -515,6 +547,7 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 		dest := Runner_FitRect(vw, vh, f32(rl.GetScreenWidth()), f32(rl.GetScreenHeight()))
 		rl.SetMouseOffset(i32(-dest.x), i32(-dest.y))
 		rl.SetMouseScale(vw / dest.width, vh / dest.height)
+		game.screenToGame = {-dest.x, -dest.y, vw / dest.width, vh / dest.height} // (touches: as the mouse)
 		game.viewportCanvasRect = {0, 0, vw, vh}
 		target := Runner_FrameTarget(i32(vw), i32(vh), video.sharpScaling)
 

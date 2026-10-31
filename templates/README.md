@@ -15,6 +15,11 @@ In the editor: **Help > Welcome > New Project**. The art is from
 | [Hex Island](hex/README.md) | A hex-grid island: click a hex to walk there hex by hex round water and trees, step with the keys, pick every flower |
 | [Platformer Adventure](adventure/README.md) (sample) | The platformer grown into a small game: title screen, two levels, saved progress, a pause menu |
 
+On a phone or tablet (the web export), the templates played with keys show
+on-screen controls at the first touch: a joystick on the left half and
+buttons on the right (Touch Joystick and Touch Button nodes under Screen
+Layers). The others are played by tapping.
+
 Each template's README says what's where and what to try first. On the
 documentation site this page shows every template's README with its
 preview (scripts/docs/export_site.py builds it from these files).

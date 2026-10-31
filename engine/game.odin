@@ -26,6 +26,9 @@ GameContext :: struct {
 
 Game :: struct {
 	arena:           vmem.Arena,
+	inEditor:        bool,        // the editor's own game (on-screen controls always show)
+	touchMouse:      Touch_Mouse, // a finger as the mouse (touch.odin)
+	screenToGame:    [4]f32,      // window pixel -> game unit: (p + xy) * zw (the runner; 0: as is)
 	state:           GameState,
 	sceneManager:    SceneManager,
 	physicsWorld:    PhysicsWorld,
@@ -184,10 +187,13 @@ GameRun :: proc(game: ^Game, deltaTime: f32) {
 
 	// 1. Poll and update Two-Tier Input System once per frame (before physics and game/scene update)
 	Prof_Begin("input")
+	touch_mouse_game = game
+	Touch_Update(game, deltaTime) // (fingers, gestures, on-screen controls: before the actions)
 	InputSystem_Update(&game.input, deltaTime)
 	Mixer_Reap() // voices that ended
 	if game.scriptManager.L != nil do Input_RebindDispatch(&game.input, game.scriptManager.L) // Input.listen's on_done
 	Input_DispatchPadEvents(&game.input, &game.scriptManager) // on_gamepad_connected / _disconnected
+	Input_DispatchTouchEvents(&game.input, &game.scriptManager) // on_tap / on_swipe ...
 	if game.scriptManager.hotReload do Shader_CheckForChanges() // edited .fs files
 	if game.scriptManager.hotReload do Component_HotReload(game) // edited component files (#83)
 	Prof_End()

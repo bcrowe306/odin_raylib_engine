@@ -77,9 +77,7 @@ ui_world_camera :: proc(n: ^Node, gc: ^GameContext) -> (cam: rl.Camera2D, ok: bo
 UI_GetMousePosRaw :: proc(gameContext: ^GameContext) -> [2]f32 {
 	if gameContext != nil && gameContext.game != nil {
 		g := gameContext.game
-		if g.uiTestInputEnabled {
-			return g.uiTestMousePos
-		}
+		if p, ok := Game_Pointer(g); ok do return p.pos // (the test mouse, a finger)
 		if rl.IsWindowReady() {
 			mp := rl.GetMousePosition()
 			cRect := g.viewportCanvasRect
@@ -102,7 +100,7 @@ UI_GetMousePosRaw :: proc(gameContext: ^GameContext) -> [2]f32 {
 UI_IsMouseInViewport :: proc(gameContext: ^GameContext) -> bool {
 	if gameContext != nil && gameContext.game != nil {
 		g := gameContext.game
-		if g.uiTestInputEnabled do return true
+		if _, ok := Game_Pointer(g); ok do return true
 		if rl.IsWindowReady() {
 			mp := rl.GetMousePosition()
 			cRect := g.viewportCanvasRect
@@ -116,22 +114,22 @@ UI_IsMouseInViewport :: proc(gameContext: ^GameContext) -> bool {
 }
 
 UI_IsMousePressed :: proc(gameContext: ^GameContext) -> bool {
-	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
-		return gameContext.game.uiTestMousePressed
+	if gameContext != nil {
+		if p, ok := Game_Pointer(gameContext.game); ok do return p.pressed
 	}
 	return rl.IsWindowReady() && UI_IsMouseInViewport(gameContext) && rl.IsMouseButtonPressed(.LEFT)
 }
 
 UI_IsMouseDown :: proc(gameContext: ^GameContext) -> bool {
-	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
-		return gameContext.game.uiTestMouseDown
+	if gameContext != nil {
+		if p, ok := Game_Pointer(gameContext.game); ok do return p.down
 	}
 	return rl.IsWindowReady() && rl.IsMouseButtonDown(.LEFT)
 }
 
 UI_IsMouseReleased :: proc(gameContext: ^GameContext) -> bool {
-	if gameContext != nil && gameContext.game != nil && gameContext.game.uiTestInputEnabled {
-		return gameContext.game.uiTestMouseReleased
+	if gameContext != nil {
+		if p, ok := Game_Pointer(gameContext.game); ok do return p.released
 	}
 	return rl.IsWindowReady() && rl.IsMouseButtonReleased(.LEFT)
 }

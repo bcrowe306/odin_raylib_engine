@@ -3130,6 +3130,59 @@
       }
      }
     ]
+   },
+   {
+    "type": "ScreenLayerNode",
+    "name": "TouchLeft",
+    "properties": {
+     "anchor": "BottomLeft"
+    },
+    "children": [
+     {
+      "type": "TouchJoystickNode",
+      "name": "TouchStick",
+      "position": [
+       80.0,
+       -54.0
+      ],
+      "properties": {
+       "radius": 17.5,
+       "knobRadius": 7.5,
+       "floating": true,
+       "area": [
+        160.0,
+        108.0
+       ],
+       "actionLeft": "move_left",
+       "actionRight": "move_right",
+       "actionUp": "",
+       "actionDown": ""
+      }
+     }
+    ]
+   },
+   {
+    "type": "ScreenLayerNode",
+    "name": "TouchRight",
+    "properties": {
+     "anchor": "BottomRight"
+    },
+    "children": [
+     {
+      "type": "TouchButtonNode",
+      "name": "TouchJump",
+      "position": [
+       -27.5,
+       -27.5
+      ],
+      "properties": {
+       "radius": 13.0,
+       "action": "jump",
+       "label": "A",
+       "fontSize": 12
+      }
+     }
+    ]
    }
   ]
  }

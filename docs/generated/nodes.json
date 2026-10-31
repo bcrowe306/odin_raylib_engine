@@ -480,6 +480,46 @@
       ]
     },
     {
+      "type": "TouchJoystickNode",
+      "name": "Touch Joystick",
+      "category": "UI & Interface",
+      "description": "An on-screen joystick for touch screens: the thumb's push presses four input actions (move_left / right / up / down) with its strength. Fixed or floating (appears where the thumb lands). Put it under a Screen Layer; it shows once the device is touched.",
+      "aliases": ["touch joystick", "touchjoystick", "virtual joystick", "joystick", "thumbstick"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "radius", "kind": "number", "owner": "TouchJoystickNode", "default": 70, "min": 10, "max": 400, "doc": "The base's radius: the thumb this far from the middle is a full push."},
+        {"name": "knobRadius", "kind": "number", "owner": "TouchJoystickNode", "default": 32, "min": 4, "max": 200, "doc": "The knob's radius (the part under the thumb)."},
+        {"name": "floating", "kind": "boolean", "owner": "TouchJoystickNode", "default": false, "doc": "The joystick appears where the thumb lands (anywhere in Area) instead of staying put - easier to find without looking."},
+        {"name": "area", "kind": "vec2", "owner": "TouchJoystickNode", "default": [480, 480], "min": 0, "max": 4000, "doc": "Floating: where a thumb can start it, a rectangle this size centred on the node."},
+        {"name": "deadzone", "kind": "number", "owner": "TouchJoystickNode", "default": 0.2, "min": 0, "max": 0.9, "doc": "Pushes shorter than this (0..1 of the radius) count as none."},
+        {"name": "actionLeft", "kind": "string", "owner": "TouchJoystickNode", "default": "move_left", "doc": "The input action pushing left presses (with the push's strength)."},
+        {"name": "actionRight", "kind": "string", "owner": "TouchJoystickNode", "default": "move_right", "doc": "The input action pushing right presses."},
+        {"name": "actionUp", "kind": "string", "owner": "TouchJoystickNode", "default": "move_up", "doc": "The input action pushing up presses."},
+        {"name": "actionDown", "kind": "string", "owner": "TouchJoystickNode", "default": "move_down", "doc": "The input action pushing down presses."},
+        {"name": "color", "kind": "color", "owner": "TouchJoystickNode", "default": "#ffffff3c", "doc": "The base's colour."},
+        {"name": "knobColor", "kind": "color", "owner": "TouchJoystickNode", "default": "#ffffff96", "doc": "The knob's colour."},
+        {"name": "alwaysShow", "kind": "boolean", "owner": "TouchJoystickNode", "default": false, "doc": "Shown from the start. Off: only once the device has been touched, so keyboard and gamepad players never see it."}
+      ]
+    },
+    {
+      "type": "TouchButtonNode",
+      "name": "Touch Button",
+      "category": "UI & Interface",
+      "description": "An on-screen button for touch screens: presses an input action (jump, fire...) while a finger is on it. Put it under a Screen Layer; it shows once the device is touched.",
+      "aliases": ["touch button", "touchbutton", "virtual button", "on-screen button"],
+      "hasOrigin": false,
+      "properties": [
+        {"name": "radius", "kind": "number", "owner": "TouchButtonNode", "default": 48, "min": 8, "max": 300, "doc": "The button's radius (a finger a little outside still counts)."},
+        {"name": "action", "kind": "string", "owner": "TouchButtonNode", "default": "jump", "doc": "The input action it presses while a finger is on it (\"jump\", \"fire\", a project action); several, comma-separated, press together (\"interact, confirm\")."},
+        {"name": "label", "kind": "string", "owner": "TouchButtonNode", "default": "A", "doc": "Text drawn on it (\"A\", \"Jump\")."},
+        {"name": "fontSize", "kind": "number", "owner": "TouchButtonNode", "default": 28, "min": 6, "max": 128, "doc": "The label's size (px)."},
+        {"name": "color", "kind": "color", "owner": "TouchButtonNode", "default": "#ffffff3c", "doc": "Its fill at rest."},
+        {"name": "pressedColor", "kind": "color", "owner": "TouchButtonNode", "default": "#ffffff8c", "doc": "Its fill while pressed."},
+        {"name": "textColor", "kind": "color", "owner": "TouchButtonNode", "default": "#ffffffdc", "doc": "The label's and the outline's colour."},
+        {"name": "alwaysShow", "kind": "boolean", "owner": "TouchButtonNode", "default": false, "doc": "Shown from the start. Off: only once the device has been touched, so keyboard and gamepad players never see it."}
+      ]
+    },
+    {
       "type": "SkeletonNode",
       "name": "Skeleton",
       "category": "Animation & Effects",
