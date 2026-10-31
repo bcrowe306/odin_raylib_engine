@@ -5,7 +5,6 @@ import "core:c"
 import "core:fmt"
 import "core:hash"
 import "core:math"
-import os "core:os"
 import "core:slice"
 import "core:sync"
 import "core:thread"
@@ -709,7 +708,7 @@ Gen_ParallelWorkers :: proc() -> int {
 gen_pool_start :: proc() {
 	when ODIN_OS != .JS {
 		context.allocator = runtime.heap_allocator() // (the threads live as long as the program)
-		n := clamp(os.get_processor_core_count() - 1, 0, GEN_MAX_WORKERS)
+		n := clamp(Engine_CoreCount() - 1, 0, GEN_MAX_WORKERS)
 		for i in 0 ..< n {
 			t := thread.create(gen_pool_worker)
 			if t == nil do break
