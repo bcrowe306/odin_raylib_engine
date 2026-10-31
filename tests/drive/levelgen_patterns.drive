@@ -1,0 +1,28 @@
+# #171: a tile output's pattern rules - one added (it starts as an empty
+# cell with solid below), its pattern changed by clicking a cell, its tile
+# picked from the tileset palette, a chance - saved.
+wait 5
+exec mkdir -p $PROJECT/levels
+exec cp tests/drive/fixtures/tiles_zz.levelgen.json $PROJECT/levels/tiles_zz.levelgen.json
+wait-until item:asset:levels/tiles_zz.levelgen.json == visible timeout=300
+dblclick @asset:levels/tiles_zz.levelgen.json
+wait 5
+click @lge.node:3
+wait 2
+click @lge.pattern-add
+wait 2
+expect lge.text contains "cells": [0, 0, 0, 0, -1, 0, 0, 1, 0]
+# The cell above the middle: any -> in range.
+click @lge.pattern-cell:0:1
+expect lge.text contains "cells": [0, 1, 0, 0, -1, 0, 0, 1, 0]
+click @lge.pattern-pick:0
+wait 1
+click @lge.palette-tile:5
+key escape
+wait 3
+expect lge.text contains "tiles": [5]
+expect lge.errors == 0
+screenshot pattern_rule
+key ctrl+s
+wait 1
+expect file:levels/tiles_zz.levelgen.json contains "patterns": [

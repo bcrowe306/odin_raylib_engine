@@ -392,8 +392,9 @@ Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := cont
 		}
 		tiles[i] = t
 	}
-	if !anyTerrain do return tiles
 	w, h := grid.w, grid.h
+	defer gen_pattern_rules(out, grid, tiles, pickSeed) // (last: over the rules' and terrains' tiles)
+	if !anyTerrain do return tiles
 	#no_bounds_check for c, i in cellTerrain {
 		if c < 0 do continue
 		x, y := i % w, i / w
@@ -406,6 +407,39 @@ Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := cont
 		if tile := Terrain_Tile(t, Terrain_Mask(t.kind, nb), x, y, pickSeed); tile >= 0 do tiles[i] = tile
 	}
 	return tiles
+}
+
+// gen_pattern_rules: a tile output's pattern rules over its tiles - each
+// cell the first rule whose 3x3 pattern matches the grid around it (and
+// whose chance the cell's hash is under) takes one of its tiles.
+@(private = "file")
+gen_pattern_rules :: proc(out: ^Gen_Node, grid: Gen_Grid, tiles: []i32, seed: u64) #no_bounds_check {
+	if len(out.patterns) == 0 do return
+	w, h := grid.w, grid.h
+	for y in 0 ..< h do for x in 0 ..< w {
+		for &pr, k in out.patterns {
+			if len(pr.tiles) == 0 do continue
+			match := true
+			for c, ci in pr.cells {
+				if c == 0 do continue
+				nx, ny := x + ci % 3 - 1, y + ci / 3 - 1
+				inside := nx < 0 || ny < 0 || nx >= w || ny >= h
+				if !inside {
+					v := grid.v[ny * w + nx]
+					inside = v >= pr.min && v <= pr.max
+				}
+				if inside != (c > 0) {
+					match = false
+					break
+				}
+			}
+			if !match do continue
+			ps := gen_mix(seed, u64(k) + 0x9a77)
+			if pr.chance < 1 && gen_hash01(x, y, ps) >= pr.chance do continue
+			tiles[y * w + x] = pr.tiles[0] if len(pr.tiles) == 1 else pr.tiles[int(gen_hash01(x, y, ps ~ 0x51) * f32(len(pr.tiles))) % len(pr.tiles)]
+			break
+		}
+	}
 }
 
 // A generated level: its tiles and entity placements (Gen_Generate) -
