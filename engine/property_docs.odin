@@ -228,6 +228,9 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"LdtkLevelNode.drawDebugColliders", "Outline the generated colliders."},
 	{"LdtkLevelNode.drawDebugEntities", "Outline entity bounds with their names."},
 	{"TileMapNode.solid", "Build static colliders for the painted tiles."},
+	{"TileMapNode.layout", "The cells' shape: Square; Isometric (diamonds on a grid turned 45 degrees); Staggered (diamonds in rows, every other row shifted); Hex Pointy / Hex Flat (hexagons in offset rows / columns)."},
+	{"TileMapNode.stagger", "Staggered and hex grids: which rows (Hex Flat: columns) are shifted by half a cell - the odd or the even ones."},
+	{"TileMapNode.cellSize", "The grid's cell in pixels (0 = the tile size). Tiles taller than their cell - walls, blocks - stand on it: bottom-aligned, centred across."},
 
 	// --- Lighting ---
 	{"LightNode.kind", "Point: shines all round. Spot: a cone along the node's rotation."},

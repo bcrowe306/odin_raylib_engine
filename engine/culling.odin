@@ -129,11 +129,8 @@ Node_RenderBounds :: proc(node: ^Node) -> (rect: rl.Rectangle, ok: bool) {
 		return ParticleEmitter_VisibleBounds(em), true
 	case TileMapNode:
 		tm := cast(^TileMapNode)node
-		a := TileMapNode_CellCorner(tm, {0, 0})
-		b := TileMapNode_CellCorner(tm, {tm.mapSize.x, 0})
-		c := TileMapNode_CellCorner(tm, tm.mapSize)
-		d := TileMapNode_CellCorner(tm, {0, tm.mapSize.y})
-		return aabb_of({a, b, c, d}), true
+		lo, hi := TileMapNode_Extent(tm) // (the map and tiles beyond it, tall tiles' tops)
+		return TileMapNode_WorldAABB(tm, lo, hi), true
 	}
 	return {}, false
 }

@@ -3757,6 +3757,9 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
 ---@field solid boolean Build static colliders for the painted tiles.
 ---@field tint number[] Multiplies the texture's colours (white = unchanged; alpha fades it).
+---@field layout "Square"|"Isometric"|"Staggered"|"HexPointy"|"HexFlat" The cells' shape: Square; Isometric (diamonds on a grid turned 45 degrees); Staggered (...
+---@field stagger "Odd"|"Even" Staggered and hex grids: which rows (Hex Flat: columns) are shifted by half a cell - th...
+---@field cellSize Vec2 The grid's cell in pixels (0 = the tile size). Tiles taller than their cell - walls, bl...
 ---@field asepriteLayer string With an Aseprite file as the tileset: the tilemap layer the map comes from (its tiles, ...
 
 ---@alias TileMapNodeProperty
@@ -3772,6 +3775,9 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
 ---| "solid" # boolean - Build static colliders for the painted tiles.
 ---| "tint" # number[] - Multiplies the texture's colours (white = unchanged; alpha fades it).
+---| "layout" # "Square"|"Isometric"|"Staggered"|"HexPointy"|"HexFlat" - The cells' shape: Square; Isometric (diamonds on a grid turned 45 degrees); Staggered (...
+---| "stagger" # "Odd"|"Even" - Staggered and hex grids: which rows (Hex Flat: columns) are shifted by half a cell - th...
+---| "cellSize" # Vec2 - The grid's cell in pixels (0 = the tile size). Tiles taller than their cell - walls, bl...
 ---| "asepriteLayer" # string - With an Aseprite file as the tileset: the tilemap layer the map comes from (its tiles, ...
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
@@ -3791,6 +3797,9 @@ function LdtkLevelNode:set_property(path, value, y) end
 ---@overload fun(self: TileMapNode, path: "enabled"): boolean
 ---@overload fun(self: TileMapNode, path: "solid"): boolean
 ---@overload fun(self: TileMapNode, path: "tint"): number[]
+---@overload fun(self: TileMapNode, path: "layout"): "Square"|"Isometric"|"Staggered"|"HexPointy"|"HexFlat"
+---@overload fun(self: TileMapNode, path: "stagger"): "Odd"|"Even"
+---@overload fun(self: TileMapNode, path: "cellSize"): Vec2
 ---@overload fun(self: TileMapNode, path: "asepriteLayer"): string
 function TileMapNode:get_property(path) end
 
@@ -3812,6 +3821,9 @@ function TileMapNode:get_property(path) end
 ---@overload fun(self: TileMapNode, path: "enabled", value: boolean)
 ---@overload fun(self: TileMapNode, path: "solid", value: boolean)
 ---@overload fun(self: TileMapNode, path: "tint", value: number[])
+---@overload fun(self: TileMapNode, path: "layout", value: "Square"|"Isometric"|"Staggered"|"HexPointy"|"HexFlat")
+---@overload fun(self: TileMapNode, path: "stagger", value: "Odd"|"Even")
+---@overload fun(self: TileMapNode, path: "cellSize", x: number|Vec2|number[], y?: number)
 ---@overload fun(self: TileMapNode, path: "asepriteLayer", value: string)
 function TileMapNode:set_property(path, value, y) end
 
@@ -8788,6 +8800,16 @@ function TileMapNode:tilemap_cell_at(pos) end
 ---@return number wx World X in px of the cell's centre; nil when not a tile map
 ---@return number wy World Y in px of the cell's centre
 function TileMapNode:tilemap_cell_position(x, y) end
+
+---The cells sharing a side with a cell: four on square, isometric and
+---staggered grids, six on hex grids (which ones depend on the row or
+---column: shifted ones have different neighbours).
+---
+---Example: `for _, c in ipairs(map:tilemap_neighbors(x, y)) do if map:tilemap_get_tile(c[1], c[2]) == WATER then near_water = true end end`
+---@param x integer Cell column, 0-based
+---@param y integer Cell row, 0-based
+---@return integer[][] neighbors Each one {x, y}; empty when not a tile map
+function TileMapNode:tilemap_neighbors(x, y) end
 
 ---Carves a circle out of the art (world position and radius): every shape keeps its paint, and a collider follows - destructible terrain, bites, bullet holes. The node draws its own carved copy until `vector_reset`.
 ---

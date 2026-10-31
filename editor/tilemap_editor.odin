@@ -198,6 +198,80 @@ tilemap_settings_row :: proc(state: ^EditorState, tm: ^e.TileMapNode) {
 		Drive_Item(fmt.tprintf("tile.map-%s", "w" if k == 0 else "h"))
 	}
 	UI_Tooltip("The map in cells: columns, rows")
+	// The grid (#278): its shape, the cell, which rows are shifted - on
+	// this line when there's room, else the next.
+	room := imgui.GetWindowPos().x + imgui.GetWindowWidth() - imgui.GetItemRectMax().x
+	if room > 420 do imgui.SameLine(0, UI_SPACE * 2)
+	label("Grid")
+	imgui.SetNextItemWidth(110)
+	if imgui.BeginCombo("##tile.layout", fmt.ctprintf("%s", TILEMAP_LAYOUT_NAMES[tm.layout])) {
+		for l in e.TileMap_Layout {
+			if imgui.Selectable(fmt.ctprintf("%s", TILEMAP_LAYOUT_NAMES[l]), l == tm.layout) && l != tm.layout {
+				Editor_RecordUndo(state, "Tile map grid")
+				tm.layout = l
+				// (A diamond / hex grid usually wants a cell half as tall as the tile.)
+				if l != .Square && tm.cellSize == {} do tm.cellSize = {f32(tm.tileSize.x), f32(max(tm.tileSize.y / 2, 1))}
+				e.TileMapNode_Changed(tm)
+			}
+			Drive_Item(fmt.tprintf("pick:%s", TILEMAP_LAYOUT_NAMES[l]))
+		}
+		imgui.EndCombo()
+	}
+	Drive_Item("tile.layout")
+	UI_Tooltip("The cells' shape: Square; Isometric (diamonds on a turned grid); Staggered (diamonds in shifted rows); Hex with a point or a flat side on top")
+	cell := e.TileMapNode_CellSize(tm)
+	imgui.SameLine(0, UI_SPACE)
+	label("Cell")
+	for k in 0 ..< 2 {
+		if k == 1 do imgui.SameLine(0, 4)
+		v := c.int(cell[k])
+		imgui.SetNextItemWidth(56)
+		if imgui.DragInt(fmt.ctprintf("##cellsize%d", k), &v, 0.2, 1, 1024, "x %d" if k == 0 else "y %d") {
+			tm.cellSize = cell
+			tm.cellSize[k] = f32(max(v, 1))
+			e.TileMapNode_Changed(tm)
+		}
+		undo_on_activate(state, "Cell size")
+		Drive_Item(fmt.tprintf("tile.cell-%s", "x" if k == 0 else "y"))
+	}
+	UI_Tooltip("The grid's cell in pixels. Tiles taller than it (walls, blocks) stand on their cell")
+	if tm.layout != .Square && tm.layout != .Isometric {
+		imgui.SameLine(0, UI_SPACE)
+		odd := tm.stagger == .Odd
+		if imgui.Checkbox("Odd shifted##tile.stagger", &odd) {
+			Editor_RecordUndo(state, "Tile map stagger")
+			tm.stagger = .Odd if odd else .Even
+			e.TileMapNode_Changed(tm)
+		}
+		Drive_Item("tile.stagger")
+		UI_Tooltip("On: the odd rows (Hex Flat: columns) are the shifted ones. Off: the even ones")
+	}
+}
+
+TILEMAP_LAYOUT_NAMES := [e.TileMap_Layout]string {
+	.Square    = "Square",
+	.Isometric = "Isometric",
+	.Staggered = "Staggered",
+	.HexPointy = "Hex (pointy)",
+	.HexFlat   = "Hex (flat)",
+}
+
+// draw_cell_outline: a cell's outline in the viewport (any grid).
+@(private = "file")
+draw_cell_outline :: proc(state: ^EditorState, drawList: ^imgui.DrawList, tm: ^e.TileMapNode, cell: [2]int, col: imgui.Vec4, thick: f32) {
+	pts, n := e.TileMapNode_CellOutline(tm, cell)
+	scr: [6]imgui.Vec2
+	for i in 0 ..< n do scr[i] = Viewport_WorldToScreen(state, e.TileMapNode_LocalToWorld(tm, pts[i]))
+	imgui.DrawList_AddPolyline(drawList, &scr[0], c.int(n), col_u32(col), imgui.DrawFlags_Closed, thick)
+}
+
+// draw_map_outline: the map's outline (a diamond for Isometric).
+@(private = "file")
+draw_map_outline :: proc(state: ^EditorState, drawList: ^imgui.DrawList, tm: ^e.TileMapNode) {
+	o := e.TileMapNode_MapOutline(tm)
+	scr: [4]imgui.Vec2
+	for p, i in o do scr[i] = Viewport_WorldToScreen(state, p)
+	imgui.DrawList_AddPolyline(drawList, &scr[0], 4, col_u32({1, 1, 1, 0.35}), imgui.DrawFlags_Closed, 1)
 }
 
 // tilemap_tools_row: the painting tools, the picked tile, the tile view's zoom and grid.
@@ -366,6 +440,10 @@ tilemap_world_to_local :: proc(tm: ^e.TileMapNode, world: [2]f32) -> [2]f32 {
 // draw_block: a footprint's outline in the viewport.
 @(private = "file")
 draw_block :: proc(state: ^EditorState, drawList: ^imgui.DrawList, tm: ^e.TileMapNode, top, size: [2]int, col: imgui.Vec4, thick: f32) {
+	if tm.layout != .Square {
+		draw_cell_outline(state, drawList, tm, top, col, thick) // (a cell each off square grids)
+		return
+	}
 	p := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, top))
 	q := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, top + size))
 	imgui.DrawList_AddRect(drawList, {min(p.x, q.x), min(p.y, q.y)}, {max(p.x, q.x), max(p.y, q.y)}, col_u32(col), 0, {}, thick)
@@ -469,22 +547,16 @@ Viewport_TilePaint :: proc(state: ^EditorState, drawList: ^imgui.DrawList, mouse
 	}
 	e.TileMapNode_Layout(tm)
 	if ts.layer == .Components {
-		a := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, {0, 0}))
-		b := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, tm.mapSize))
-		imgui.DrawList_AddRect(drawList, {min(a.x, b.x), min(a.y, b.y)}, {max(a.x, b.x), max(a.y, b.y)}, col_u32({1, 1, 1, 0.35}))
+		draw_map_outline(state, drawList, tm)
 		return tilemap_paint_components(state, drawList, tm, mouseWorld)
 	}
 	// Map outline and hovered cell.
-	a := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, {0, 0}))
-	b := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, tm.mapSize))
-	imgui.DrawList_AddRect(drawList, {min(a.x, b.x), min(a.y, b.y)}, {max(a.x, b.x), max(a.y, b.y)}, col_u32({1, 1, 1, 0.35}))
+	draw_map_outline(state, drawList, tm)
 	// (Tiles can go outside the map too: the map is the outline, not a limit.)
 	cell := e.TileMapNode_CellAt(tm, mouseWorld)
 	if state.viewportHovered {
-		p := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, cell))
-		q := Viewport_WorldToScreen(state, e.TileMapNode_CellCorner(tm, cell + 1))
 		col := UI_DANGER if ts.tool == .Erase || imgui.IsMouseDown(.Right) else UI_ACCENT
-		imgui.DrawList_AddRect(drawList, {min(p.x, q.x), min(p.y, q.y)}, {max(p.x, q.x), max(p.y, q.y)}, col_u32(col), 0, {}, 2)
+		draw_cell_outline(state, drawList, tm, cell, col, 2)
 	}
 	if !state.viewportHovered && !ts.stroke do return true
 	left := imgui.IsMouseDown(.Left)

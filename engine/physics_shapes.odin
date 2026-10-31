@@ -426,6 +426,17 @@ MakeCapsulePhysicsShape :: proc(radius, height: f32, offset: [2]f32 = {0, 0}) ->
 	return s
 }
 
+// MakePolygonPhysicsShape: a convex polygon (up to 8 points, in the body's
+// space).
+MakePolygonPhysicsShape :: proc(points: [][2]f32) -> PhysicsShape {
+	s: PhysicsShape
+	PhysicsShape_InitDefault(&s, .Polygon)
+	n := min(len(points), int(b2.MAX_POLYGON_VERTICES))
+	for i in 0 ..< n do s.vertices[i] = points[i]
+	s.vertexCount = n
+	return s
+}
+
 MakeSegmentPhysicsShape :: proc(p1, p2: [2]f32) -> PhysicsShape {
 	s: PhysicsShape
 	PhysicsShape_InitDefault(&s, .Segment)

@@ -178,9 +178,14 @@ Node_WorldBounds :: proc(n: ^Node, m: ^NodeManager) -> ([4]f32, bool) {
 	switch n.typeId {
 	case TileMapNode:
 		tm := cast(^TileMapNode)n
-		a := TileMapNode_CellCorner(tm, {0, 0})
-		b := TileMapNode_CellCorner(tm, tm.mapSize)
-		return {min(a.x, b.x), min(a.y, b.y), max(a.x, b.x), max(a.y, b.y)}, true
+		if tm.layout == .Square {
+			a := TileMapNode_CellCorner(tm, {0, 0})
+			b := TileMapNode_CellCorner(tm, tm.mapSize)
+			return {min(a.x, b.x), min(a.y, b.y), max(a.x, b.x), max(a.y, b.y)}, true
+		}
+		o := TileMapNode_MapOutline(tm)
+		r := tilemap_aabb(o)
+		return {r.x, r.y, r.x + r.width, r.y + r.height}, true
 	case LdtkLevelNode:
 		ln := cast(^LdtkLevelNode)n
 		have := false

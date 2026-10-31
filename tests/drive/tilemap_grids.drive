@@ -1,0 +1,52 @@
+# Isometric and hex tile maps (#278): the Tile Map tab's Grid and Cell, a
+# diamond under the mouse, painting and flood fill on the grid, saving.
+wait 5
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+key escape
+key ctrl+a
+type tile map
+key enter
+expect selected == TileMap
+wait 2
+click @tile.tileset
+click @pick:textures/Asteroid_1.png
+wait 2
+click @tile.palette:97
+# Isometric: the cell becomes half as tall as the tile (32 x 16 diamonds).
+click @tile.layout
+click @pick:Isometric
+expect node:TileMap.prop.layout == Isometric
+expect node:TileMap.prop.cellSize == 32.0,16.0
+wait 1
+drag @world:660,380 @world:820,380
+expect node:TileMap.tiles >= 4
+screenshot isometric_painted
+key ctrl+z
+expect node:TileMap.tiles == 0
+# A small map, flood filled: every cell of the diamond.
+dblclick @tile.map-w
+key cmd+a
+type 6
+key enter
+dblclick @tile.map-h
+key cmd+a
+type 6
+key enter
+click @tile.fill
+click @world:720,395
+expect node:TileMap.tiles == 36
+screenshot isometric_filled
+key ctrl+z
+# Hex (pointy): six neighbours - the fill still reaches every cell.
+click @tile.layout
+click @pick:Hex (pointy)
+expect node:TileMap.prop.layout == HexPointy
+expect item:tile.stagger == visible
+click @world:720,395
+expect node:TileMap.tiles == 36
+screenshot hex_filled
+key ctrl+s
+expect file:scenes/main.scene.json contains "layout": "HexPointy"

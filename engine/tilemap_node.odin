@@ -14,6 +14,11 @@ import rl "vendor:raylib"
 // With `solid` on, ready() builds static colliders for every painted tile
 // (horizontal runs merged into single boxes), in a transient child body.
 //
+// Layout picks the grid (tilemap_grid.odin): square, isometric, staggered or
+// hex cells, Cell Size apart from the tile size (tall tiles stand on their
+// cell). With Y Sort on, the map's bands (rows) sort with Y-sorted sprites
+// under the same Y-sorted parent - for walls and blocks things walk behind.
+//
 // Saved as reflected properties (solid, tint) plus "tilemap": {"tileset",
 // "tile_size", "map_size", "data": [[count, tile], ...]} (run-length
 // encoded, row-major over the map - or over "data_origin" / "data_size"
@@ -29,6 +34,9 @@ TileMapNode :: struct {
 	mapSize:     [2]int, // cells
 	solid:       bool `gui:"true"`,                      // build colliders for painted tiles
 	tint:        rl.Color `gui:"true"`,
+	layout:      TileMap_Layout `gui:"true"`,             // the grid: square, isometric, staggered, hex
+	stagger:     TileMap_Stagger `gui:"true"`,            // Staggered / hex: which rows (Hex Flat: columns) are shifted
+	cellSize:    [2]f32 `gui:"true" min:"0" max:"1024"`,  // the grid's cell (0 = the tile size); taller tiles stand on it
 	// The tileset is an Aseprite file: the map is this tilemap layer of it
 	// (its first frame), kept in sync when the file is saved (aseprite_tilemap).
 	asepriteLayer: string `gui:"true"`,
@@ -51,6 +59,10 @@ TileMapNode :: struct {
 	// Components on the grid (tilemap_components.odin): their footprints in
 	// cells, measured once per component and tile size.
 	compFootprints: map[string][2]int,
+	// Y Sort's bands this frame (Scene_CollectRenderables): [bandLo, bandHi),
+	// drawn one per render call from bandNext.
+	bandLo, bandHi, bandNext: int,
+	bandMode: bool,
 }
 
 TileMapNode_Create :: proc(scene: ^Scene, name: string = "TileMap", parent: ^Node = nil) -> ^TileMapNode {
@@ -220,10 +232,8 @@ TileMapNode_Fill :: proc(tm: ^TileMapNode, x, y: int, tile: i32) -> int {
 		if TileMapNode_Get(tm, p.x, p.y) != target do continue
 		TileMapNode_Set(tm, p.x, p.y, tile)
 		n += 1
-		if p.x > lo.x do append(&stack, [2]int{p.x - 1, p.y})
-		if p.y > lo.y do append(&stack, [2]int{p.x, p.y - 1})
-		if p.x < hi.x - 1 do append(&stack, [2]int{p.x + 1, p.y})
-		if p.y < hi.y - 1 do append(&stack, [2]int{p.x, p.y + 1})
+		nb, k := TileMapNode_Neighbors(tm, p) // (hex: six; staggered: the diagonal rows)
+		for q in nb[:k] do if q.x >= lo.x && q.y >= lo.y && q.x < hi.x && q.y < hi.y do append(&stack, q)
 	}
 	return n
 }
@@ -254,23 +264,18 @@ TileMapNode_SetTileset :: proc(tm: ^TileMapNode, path: string, ctx: ^GameContext
 
 // TileMapNode_CellAt: the cell under a world position (may be outside the map).
 TileMapNode_CellAt :: proc(tm: ^TileMapNode, world: [2]f32) -> [2]int {
-	local := world - tm.globalPosition
-	rad := -tm.globalRotation * math.RAD_PER_DEG
-	c, s := math.cos(rad), math.sin(rad)
-	local = {local.x * c - local.y * s, local.x * s + local.y * c}
-	sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
-	sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
-	return {int(math.floor(local.x / sx / f32(tm.tileSize.x))), int(math.floor(local.y / sy / f32(tm.tileSize.y)))}
+	return TileMapNode_LocalCellAt(tm, TileMapNode_WorldToLocal(tm, world))
 }
 
-// TileMapNode_CellCorner: world position of a cell's top-left corner.
+// TileMapNode_CellCorner: world position of a cell's box's top-left corner
+// (square cells: the cell's corner; cell + 1's is the opposite one).
 TileMapNode_CellCorner :: proc(tm: ^TileMapNode, cell: [2]int) -> [2]f32 {
-	sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
-	sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
-	local := [2]f32{f32(cell.x * tm.tileSize.x) * sx, f32(cell.y * tm.tileSize.y) * sy}
-	rad := tm.globalRotation * math.RAD_PER_DEG
-	c, s := math.cos(rad), math.sin(rad)
-	return tm.globalPosition + {local.x * c - local.y * s, local.x * s + local.y * c}
+	if tm.layout == .Square {
+		c := TileMapNode_CellSize(tm)
+		return TileMapNode_LocalToWorld(tm, {f32(cell.x) * c.x, f32(cell.y) * c.y})
+	}
+	b := TileMapNode_CellBox(tm, cell)
+	return TileMapNode_LocalToWorld(tm, {b.x, b.y})
 }
 
 // tilemap_visible_cells: the cell range in a view (unrotated maps; rotated
@@ -329,7 +334,7 @@ draw_cells :: proc(tm: ^TileMapNode, cols, x0, y0, x1, y1: int, local: bool, ori
 
 // TileMapNode_PrepareChunks builds the cached chunks in view.
 TileMapNode_PrepareChunks :: proc(tm: ^TileMapNode, view: rl.Rectangle) {
-	if tm.tileset == nil || tm.tileset.texture.id == 0 do return
+	if tm.tileset == nil || tm.tileset.texture.id == 0 || !TileMapNode_IsPlainGrid(tm) || tm.ySort do return
 	TileMapNode_Layout(tm)
 	if TileMapNode_Columns(tm) <= 0 do return
 	x0, y0, x1, y1 := tilemap_visible_cells(tm, view, true)
@@ -351,6 +356,53 @@ TileMapNode_PrepareChunks :: proc(tm: ^TileMapNode, view: rl.Rectangle) {
 	}
 }
 
+// tilemap_view_cells: the stored cells in view (with tall tiles' room).
+@(private = "file")
+tilemap_view_cells :: proc(tm: ^TileMapNode) -> (lo, hi: [2]int) {
+	lo, hi = tm.dataOrigin, tm.dataOrigin + tm.dataSize
+	if !renderView.active do return
+	v := renderView.rect
+	corners := [4][2]f32{{v.x, v.y}, {v.x + v.width, v.y}, {v.x, v.y + v.height}, {v.x + v.width, v.y + v.height}}
+	mn, mx: [2]f32
+	for p, i in corners {
+		q := TileMapNode_WorldToLocal(tm, p)
+		if i == 0 do mn, mx = q, q
+		mn = {min(mn.x, q.x), min(mn.y, q.y)}
+		mx = {max(mx.x, q.x), max(mx.y, q.y)}
+	}
+	return TileMapNode_CellsInLocalRect(tm, {mn.x, mn.y, mx.x - mn.x, mx.y - mn.y}, lo, hi)
+}
+
+// draw_band: one band's tiles (any grid), standing on their cells.
+@(private = "file")
+draw_band :: proc(tm: ^TileMapNode, b: int, lo, hi: [2]int) {
+	TileMapNode_BandCells(tm, b, lo, hi, nil, proc(tm: ^TileMapNode, cell: [2]int, _: rawptr) {
+		i, ok := tilemap_index(tm, cell.x, cell.y)
+		if !ok do return
+		t := tm.tiles[i]
+		if t < 0 do return
+		cols := TileMapNode_Columns(tm)
+		tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
+		src := Texture_Src(tm.tileset, {f32(int(t) % cols) * tw, f32(int(t) / cols) * th, tw, th})
+		r := TileMapNode_TileRect(tm, cell)
+		p := TileMapNode_LocalToWorld(tm, {r.x, r.y})
+		sx := tm.globalScale.x if tm.globalScale.x != 0 else 1
+		sy := tm.globalScale.y if tm.globalScale.y != 0 else 1
+		rl.DrawTexturePro(tm.tileset.texture, src, {p.x, p.y, tw * sx, th * sy}, {0, 0}, tm.globalRotation, tm.tint)
+	})
+}
+
+// TileMapNode_Bands: the bands Y Sort draws one by one (the stored cells').
+TileMapNode_Bands :: proc(tm: ^TileMapNode) -> (lo, hi: int) {
+	TileMapNode_Layout(tm)
+	return TileMapNode_BandRange(tm, tm.dataOrigin, tm.dataOrigin + tm.dataSize)
+}
+
+// TileMapNode_BandSortY: band b's Y-sort key (its feet line, in the world).
+TileMapNode_BandSortY :: proc(tm: ^TileMapNode, b: int) -> f32 {
+	return TileMapNode_LocalToWorld(tm, {0, TileMapNode_BandBottom(tm, b)}).y + tm.ySortOffset
+}
+
 TileMapNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	tm := cast(^TileMapNode)node
 	TileMapNode_SyncAseprite(tm)
@@ -358,6 +410,21 @@ TileMapNode_Render :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	TileMapNode_Layout(tm)
 	cols := TileMapNode_Columns(tm)
 	if cols <= 0 do return
+	if tm.bandMode {
+		// Y Sort: one band per call, in the order they were collected.
+		b := tm.bandLo + tm.bandNext
+		tm.bandNext += 1
+		if b >= tm.bandHi do return
+		lo, hi := tilemap_view_cells(tm)
+		draw_band(tm, b, lo, hi)
+		return
+	}
+	if !TileMapNode_IsPlainGrid(tm) {
+		lo, hi := tilemap_view_cells(tm)
+		b0, b1 := TileMapNode_BandRange(tm, lo, hi)
+		for b in b0 ..< b1 do draw_band(tm, b, lo, hi)
+		return
+	}
 	x0, y0, x1, y1 := tilemap_visible_cells(tm, renderView.rect, renderView.active)
 	if x1 <= x0 || y1 <= y0 do return
 	if tm.material != nil || !TileCache_Enabled() || (x1 - x0) * (y1 - y0) < TILE_CACHE_MIN_TILES {
@@ -405,7 +472,37 @@ TileMapNode_BuildColliders :: proc(tm: ^TileMapNode, ctx: ^GameContext) {
 	tm.staticBody.transient = true
 	tm.staticBody.gameContext = ctx
 	lo, hi := TileMapNode_Extent(tm) // (tiles beyond the map are solid too)
-	tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
+	cs := TileMapNode_CellSize(tm)
+	tw, th := cs.x, cs.y
+	switch tm.layout {
+	case .Square:
+	case .Isometric:
+		// Runs along x are parallelograms: the first cell's top and left
+		// corners, the last one's right and bottom.
+		for y in lo.y ..< hi.y {
+			x := lo.x
+			for x < hi.x {
+				if TileMapNode_Get(tm, x, y) < 0 {
+					x += 1
+					continue
+				}
+				start := x
+				for x < hi.x && TileMapNode_Get(tm, x, y) >= 0 do x += 1
+				a, _ := TileMapNode_CellOutline(tm, {start, y})
+				b, _ := TileMapNode_CellOutline(tm, {x - 1, y})
+				StaticBodyNode_AddShape(tm.staticBody, MakePolygonPhysicsShape({a[0], b[1], b[2], a[3]}), ctx)
+			}
+		}
+		return
+	case .Staggered, .HexPointy, .HexFlat:
+		// A cell each (neighbours touch at corners / slanted sides).
+		for y in lo.y ..< hi.y do for x in lo.x ..< hi.x {
+			if TileMapNode_Get(tm, x, y) < 0 do continue
+			pts, n := TileMapNode_CellOutline(tm, {x, y})
+			StaticBodyNode_AddShape(tm.staticBody, MakePolygonPhysicsShape(pts[:n]), ctx)
+		}
+		return
+	}
 	for y in lo.y ..< hi.y {
 		x := lo.x
 		for x < hi.x {
