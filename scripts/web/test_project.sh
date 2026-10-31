@@ -28,4 +28,4 @@ if [ -f bin/runners/web/fonts/OpenSans-Regular.ttf ]; then mkdir -p "$dir/fonts"
 port=$((20000 + RANDOM % 20000))
 (cd "$dir" && python3 -m http.server "$port" --bind 127.0.0.1 > /dev/null 2>&1) & server=$!
 sleep 1
-node scripts/web/capture.mjs "http://127.0.0.1:$port/index.html?autostart" "$out" "$secs"
+node scripts/web/capture.mjs "http://127.0.0.1:$port/index.html?autostart" "$out" "$secs" ${CAPTURE_ARGS:-}

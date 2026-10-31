@@ -2,10 +2,13 @@
 // exceptions) and a screenshot - for testing the web runner without a
 // person at a browser. Uses the DevTools protocol over Node's WebSocket.
 //
-//   node scripts/web/capture.mjs URL OUT.png [seconds] [--click]
+//   node scripts/web/capture.mjs URL OUT.png [seconds] [--click] [--touches=steps.json]
 //
 // --click clicks the page centre once loaded (the start screen), else add
-// ?autostart to the URL.
+// ?autostart to the URL. --touches plays real touch events (a touch screen
+// emulated): a JSON list of {"at": seconds after load, "type":
+// "touchStart" | "touchMove" | "touchEnd", "points": [{"x", "y", "id"}]}
+// (page pixels; touchEnd lists the fingers still down).
 import { spawn } from "node:child_process";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -14,6 +17,8 @@ import { join } from "node:path";
 const [url, out, secondsArg] = process.argv.slice(2);
 const seconds = Number(secondsArg || 12);
 const click = process.argv.includes("--click");
+const touchArg = process.argv.find((a) => a.startsWith("--touches="));
+const touches = touchArg ? JSON.parse((await import("node:fs")).readFileSync(touchArg.slice(10), "utf8")) : null;
 const chrome = process.env.CHROME || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const port = 9300 + Math.floor(Math.random() * 500);
 const profile = mkdtempSync(join(tmpdir(), "rayzr_chrome_"));
@@ -45,12 +50,25 @@ try {
   await send("Runtime.enable");
   await send("Log.enable");
   await send("Page.enable");
+  if (touches) await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
   await send("Page.navigate", { url });
   if (click) {
     await sleep(3000);
     for (const type of ["mousePressed", "mouseReleased"]) await send("Input.dispatchMouseEvent", { type, x: 640, y: 360, button: "left", clickCount: 1 });
   }
-  await sleep(seconds * 1000);
+  if (touches) {
+    // (From load: wait for each step's time, then send it.)
+    const t0 = Date.now();
+    for (const step of touches) {
+      const wait = step.at * 1000 - (Date.now() - t0);
+      if (wait > 0) await sleep(wait);
+      await send("Input.dispatchTouchEvent", { type: step.type, touchPoints: step.points.map((p) => ({ x: p.x, y: p.y, id: p.id ?? 0 })) });
+    }
+    const rest = seconds * 1000 - (Date.now() - t0);
+    if (rest > 0) await sleep(rest);
+  } else {
+    await sleep(seconds * 1000);
+  }
   // The page's state (the shell's flags) - why a capture is blank.
   const probe = await send("Runtime.evaluate", { expression: "JSON.stringify({ready: typeof ready != 'undefined' && ready, started: typeof started != 'undefined' && started, status: document.getElementById('status')?.textContent || null})", returnByValue: true });
   console.log("[page]", probe?.result?.value);
