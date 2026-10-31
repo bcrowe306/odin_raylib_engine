@@ -10,8 +10,8 @@ the scene runs in the viewport while you edit, so each change shows at once.
 
 ## When to use it
 
-- **Designing an effect**: fire, smoke, sparks, rain, dust, magic. The
-  sub-tabs group the emitter's many settings.
+- **Designing an effect**: fire, smoke, sparks, rain, dust, magic. Start
+  from a **Preset**; the sub-tabs group the emitter's many settings.
 - **Colour over a particle's life**: the gradient editor and its alpha
   plot are only here.
 - **Size, alpha and speed curves** over a particle's life.
@@ -35,6 +35,7 @@ node...*.
 |---|---|
 | **Pause / Play** | Pause or resume the preview of **every** emitter in the viewport. |
 | **Restart** (circular arrow) | Kill this emitter's particles and start it again. |
+| **Preset** | A starting look: **Fire**, **Smoke**, **Sparks**, **Rain**, **Snow**, **Explosion** or **Magic**. It replaces the emitter's look and motion settings (its texture stays) and restarts it; one Cmd+Z (Ctrl+Z) puts the old settings back. |
 | Status line | Particles alive now (*GPU* in GPU mode), particles per cycle, lifetime. |
 
 ### Sub-tabs
@@ -52,6 +53,7 @@ Inspector. Hover a setting for its help; the
 | **Color** | The gradient editor (below). |
 | **Curves** | **Size over life**, **Alpha over life**, **Speed over life** (below). |
 | **Texture** | The particle picture and its sprite sheet (below). |
+| **Trails** | **Trail Length** (points; 0 = no trail), **Trail Segment** (pixels between points), **Trail Width** (at the particle, a fraction of its size): a ribbon behind each particle that thins and fades. In GPU mode it only says that GPU particles have no trails. |
 | **Collision** | **Collision Enabled**, **Collision Mode**, **Collision Layers**, **Elasticity**, **Friction**. In GPU mode it only says that GPU particles don't collide. |
 
 ### Color
@@ -121,10 +123,14 @@ A campfire:
 
 ## Tips
 
+- A **sub-emitter** (bursts where particles die or hit: fireworks,
+  splashes) is set in the Inspector: **Sub Emitter**, **Sub Emitter On**,
+  **Sub Emitter Amount**. See the
+  [Particle Emitter](../nodes/ParticleEmitterNode.md) page.
 - The **Pause** button stops every emitter's preview, not only the
   selected one - useful when many effects clutter the viewport.
 - GPU mode (**Gpu** in Emission) handles huge counts but has no collision
-  and no speed curve; the tab hides or marks those.
+  and no speed curve, trails or sub-emitters; the tab hides or marks those.
 - With **Local Space** off, particles stay where they were born when the
   node moves: drag the emitter in the viewport to see a trail.
 - Every edit here can be undone with Cmd+Z (Ctrl+Z).

@@ -1,0 +1,34 @@
+# #130: trails - a ribbon behind each particle (Particles > Trails), saved
+# with the scene. The Magic preset has them.
+wait 5
+click @hier:StarfieldEmitter
+click @bottom:particles
+click @particles.preset
+click @pick:Magic
+click @particles.tab:trails
+dblclick @insp.prop:emitter.trailLength
+key ctrl+a
+type 12
+key enter
+expect node:StarfieldEmitter.prop.emitter.trailLength == 12
+click @toolbar.save
+expect file:scenes/main.scene.json contains "emitter.trailLength": 12
+# On their own: sparks and magic with trails.
+click @asset.new-scene
+click @hier.add
+type particle emitter
+click @addnode.create
+click @particles.preset
+click @pick:Sparks
+click @particles.tab:trails
+dblclick @insp.prop:emitter.trailLength
+key ctrl+a
+type 10
+key enter
+key f
+wait 40
+screenshot sparks_trails
+click @particles.preset
+click @pick:Magic
+wait 60
+screenshot magic_trails

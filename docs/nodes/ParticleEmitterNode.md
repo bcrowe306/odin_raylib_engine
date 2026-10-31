@@ -47,6 +47,8 @@ the emitter makes new ones to replace them.
      to Texture), a sprite sheet's **Sheet Columns** / **Sheet Rows** and
      **Frame Mode**, the **Blend Mode** (Additive for fire and glow) and
      **Align To Velocity**.
+   - **Trails**: a ribbon behind each particle (**Trail Length** points,
+     one every **Trail Segment** pixels, **Trail Width** at the particle).
    - **Collision**: particles hitting physics bodies.
 3. The tab's play / pause button pauses or resumes the preview of every
    emitter; the arrow restarts this one. **Preset** gives the emitter a
@@ -85,6 +87,10 @@ the emitter makes new ones to replace them.
 - **Auto Visibility** on: the emitter is skipped when its particles are off
   screen. Off: the **Visibility Rect** decides (cheaper; make it cover the
   effect).
+- **Trail Length** above 0 draws each particle's recent path behind it: a
+  point every **Trail Segment** pixels it moves, joined into a ribbon that
+  starts **Trail Width** times the particle's size and thins and fades to
+  nothing (comets, sparks, magic). CPU particles only.
 - **Sub Emitter** names another Particle Emitter - a path from this node,
   usually a child's name - that bursts **Sub Emitter Amount** particles
   where each of this emitter's particles dies (**Sub Emitter On**: Death),
