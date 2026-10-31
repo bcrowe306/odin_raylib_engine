@@ -1,0 +1,32 @@
+# #130: a sub-emitter - a child Particle Emitter named in the parent's Sub
+# Emitter - bursts where the parent's particles die.
+wait 5
+click @asset.new-scene
+click @hier.add
+type particle emitter
+click @addnode.create
+expect node:ParticleEmitter.type == ParticleEmitterNode
+# The child: only bursts, left in the world.
+click @hier.add
+type particle emitter
+click @addnode.create
+dblclick @insp.name
+key ctrl+a
+type PopZz
+key enter
+expect node:PopZz.type == ParticleEmitterNode
+click @particles.tab:emission
+click @insp.prop:emitter.emitting
+click @insp.prop:emitter.localSpace
+expect node:PopZz.prop.emitter.emitting == false
+expect node:PopZz.prop.emitter.localSpace == false
+# The parent names it.
+click @hier:ParticleEmitter
+click @insp.prop:subEmitter
+key cmd+a
+type PopZz
+key enter
+expect node:ParticleEmitter.prop.subEmitter == PopZz
+wait 180
+expect node:PopZz.particles >= 1
+screenshot sub_emitter

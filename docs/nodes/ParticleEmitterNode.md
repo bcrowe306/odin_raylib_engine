@@ -85,6 +85,14 @@ the emitter makes new ones to replace them.
 - **Auto Visibility** on: the emitter is skipped when its particles are off
   screen. Off: the **Visibility Rect** decides (cheaper; make it cover the
   effect).
+- **Sub Emitter** names another Particle Emitter - a path from this node,
+  usually a child's name - that bursts **Sub Emitter Amount** particles
+  where each of this emitter's particles dies (**Sub Emitter On**: Death),
+  hits a body (Hit, Collision on) or both. Fireworks: rockets that pop into
+  sparks; rain that splashes where it lands. Give the sub-emitter
+  **Emitting** off (only these bursts) and **Local Space** off (its
+  particles stay where they were born). CPU particles only: Gpu ones don't
+  report their deaths or hits.
 
 ## Signals
 
