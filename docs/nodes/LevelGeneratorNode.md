@@ -13,6 +13,7 @@ for a new level.
 | **Seed** | The same seed makes the same level (0: the generator's own seed). |
 | **Random Seed** | A new level every time. **Last Seed** is the one used: show it to the player, save it, `generate(seed)` replays it. |
 | **Background** | Makes the level on a worker thread while the game keeps running (a loading screen stays smooth); `generated` fires when it is in. |
+| **Attempts** | With **Random Seed**: how many seeds it tries when the generator refuses a level - a **Check** node finding too little open, or the level in pieces - before it reports `generation_failed` (10). **Last Seed** is the one that worked. |
 
 ## Level parameters
 

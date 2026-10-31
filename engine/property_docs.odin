@@ -567,6 +567,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"LevelGeneratorNode.seed", "The level's seed: the same seed, the same level (0: the generator's own)."},
 	{"LevelGeneratorNode.randomSeed", "A new random seed every time it generates (Last Seed tells which)."},
 	{"LevelGeneratorNode.generateOnReady", "Generate when the scene starts (else call generate() or connect a signal to it)."},
+	{"LevelGeneratorNode.attempts", "With Random Seed: seeds tried when the generator refuses a level (a Check node: too little open, in pieces) before it gives up."},
 	{"LevelGeneratorNode.background", "Generate on a worker thread while the game runs; the level goes in when it is done (generated)."},
 	{"LevelGeneratorNode.lastSeed", "The seed of the last level made (runtime, read-only)."},
 	{"SpawnerNode.mode", "What one spawn makes: Single (the first entry), All (every entry), Random (one by weight), Sequential (the next each time), Shuffle (random, all once before repeats)."},

@@ -1,6 +1,7 @@
 package engine
 
 import "core:c"
+import "core:fmt"
 import "core:log"
 import "core:math/rand"
 import "core:strings"
@@ -17,6 +18,8 @@ import lua "lua54"
 //   TileMap child, else its parent when that is a TileMap.
 // - `seed` (0: the generator's), or `randomSeed`: a new one each time;
 //   `lastSeed` is the one used (show it, save it to replay the level).
+//   With randomSeed, a level the generator refuses (a Check node: too little
+//   open, in pieces) is tried again with other seeds, `attempts` in all.
 // - Parameters of the generator's nodes can be set on the node (the
 //   Inspector's Level Parameters, set_level_param from Lua): one generator
 //   file, many levels - a harder cave on level 3, a bigger dungeon.
@@ -46,6 +49,7 @@ LevelGeneratorNode :: struct {
 	randomSeed:      bool `gui:"true"`,
 	generateOnReady: bool `gui:"true"`,
 	background:      bool `gui:"true"`,
+	attempts:        int `gui:"true" min:"1" max:"100"`,
 	params:          [dynamic]Gen_Param_Override, // (node arena)
 	// Runtime.
 	lastSeed:        int `gui:"true" save:"false"`,
@@ -59,7 +63,8 @@ LevelGeneratorNode :: struct {
 // `err`; the main thread applies it once the thread is done.
 Gen_Job :: struct {
 	graph:  Gen_Graph, // (heap)
-	seed:   u64,
+	seed:   u64, // (the seed of the level made)
+	attempts: int,
 	result: Gen_Result, // (heap)
 	err:    string,     // (heap)
 	thread: ^thread.Thread,
@@ -69,6 +74,7 @@ LevelGeneratorNode_Create :: proc(scene: ^Scene, name: string = "LevelGenerator"
 	lg := CreateNode(scene.manager, LevelGeneratorNode)
 	lg.name = strings.clone(name, lg.allocator)
 	lg.generateOnReady = true
+	lg.attempts = 10
 	lg.params = make([dynamic]Gen_Param_Override, lg.allocator)
 	lg.update = LevelGeneratorNode_Update
 	lg.onDestroy = LevelGeneratorNode_Destroy
@@ -127,10 +133,12 @@ LevelGeneratorNode_Generate :: proc(lg: ^LevelGeneratorNode, ctx: ^GameContext, 
 	if err != "" do return levelgen_failed(lg, err, ctx), err
 	for p in lg.params do if n := Gen_FindNode(&g, p.node); n != nil do Gen_SetParam(n, p.name, p.value)
 	used := u64(s) if s != 0 else g.seed
+	// Other seeds only when it picks them (not a seed asked for).
+	attempts := clamp(lg.attempts, 1, 100) if seed == 0 && lg.seed == 0 && lg.randomSeed else 1
 	when ODIN_OS != .JS {
 		if lg.background {
 			j := new(Gen_Job, Engine_HeapAllocator())
-			j.graph, j.seed = g, used
+			j.graph, j.seed, j.attempts = g, used, attempts
 			j.thread = thread.create(gen_job_run)
 			j.thread.data = j
 			lg.job = j
@@ -139,7 +147,8 @@ LevelGeneratorNode_Generate :: proc(lg: ^LevelGeneratorNode, ctx: ^GameContext, 
 		}
 	}
 	defer Gen_GraphDestroy(&g)
-	r, gerr := Gen_Generate(&g, used, context.temp_allocator)
+	r, made, gerr := levelgen_generate(&g, used, attempts, context.temp_allocator)
+	used = made
 	if gerr != "" do return levelgen_failed(lg, gerr, ctx), gerr
 	if aerr := levelgen_apply(lg, &r, used, ctx, scene); aerr != "" do return false, aerr
 	return true, ""
@@ -220,12 +229,28 @@ levelgen_apply :: proc(lg: ^LevelGeneratorNode, r: ^Gen_Result, seed: u64, ctx: 
 	return ""
 }
 
+// levelgen_generate: the level for a seed; one the generator refuses is
+// tried again with the next seeds (each made from the last), `attempts` in
+// all. The seed of the level made; the last error when none was.
+@(private = "file")
+levelgen_generate :: proc(g: ^Gen_Graph, seed: u64, attempts: int, allocator := context.allocator) -> (r: Gen_Result, used: u64, err: string) {
+	used = seed
+	for i in 0 ..< max(attempts, 1) {
+		r, err = Gen_Generate(g, used, allocator)
+		if err == "" do return
+		used = 1 + gen_mix(used, u64(i) + 0xa77e) % (1 << 30)
+	}
+	if attempts > 1 do err = fmt.tprintf("%s (%d seeds tried)", err, attempts)
+	return
+}
+
 // gen_job_run (worker): the graph -> tiles and entities. Touches only its job.
 @(private = "file")
 gen_job_run :: proc(t: ^thread.Thread) {
 	context.allocator = Engine_HeapAllocator()
 	j := cast(^Gen_Job)t.data
-	r, err := Gen_Generate(&j.graph, j.seed, Engine_HeapAllocator())
+	r, used, err := levelgen_generate(&j.graph, j.seed, j.attempts, Engine_HeapAllocator())
+	j.seed = used
 	if err != "" do j.err = strings.clone(err, Engine_HeapAllocator())
 	else do j.result = r
 	free_all(context.temp_allocator)

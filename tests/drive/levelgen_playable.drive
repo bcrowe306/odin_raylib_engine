@@ -1,0 +1,27 @@
+# #171: playable levels - a cave whose pockets Connect Regions joins, the
+# farthest start-to-exit path over it, and a Check that refuses a level
+# with too little open (its error on the node).
+wait 5
+exec mkdir -p $PROJECT/levels
+exec cp tests/drive/fixtures/playable_zz.levelgen.json $PROJECT/levels/playable_zz.levelgen.json
+wait-until item:asset:levels/playable_zz.levelgen.json == visible timeout=300
+dblclick @asset:levels/playable_zz.levelgen.json
+wait 5
+expect lge.open == true
+expect lge.nodes == 7
+expect lge.errors == 0
+click @lge.node:3
+wait 2
+screenshot connected
+click @lge.node:4
+wait 2
+screenshot path
+# Ask for more open than the cave has: the check refuses it.
+click @lge.node:6
+dblclick @lge.param:min_open
+key ctrl+a
+type 0.9
+key enter
+wait 5
+expect lge.errors >= 1
+screenshot check_refuses

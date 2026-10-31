@@ -1,0 +1,9 @@
+{"size": [64, 40], "seed": 9, "output": 7, "nodes": [
+  {"id": 1, "type": "random_fill", "params": {"density": 0.5}, "pos": [0, 0]},
+  {"id": 2, "type": "cellular", "inputs": {"in": 1}, "params": {"iterations": 4}, "pos": [200, 0]},
+  {"id": 3, "type": "connect_regions", "inputs": {"in": 2}, "params": {"min_size": 6}, "pos": [400, 0]},
+  {"id": 4, "type": "path", "inputs": {"in": 3}, "params": {"placement": "farthest", "output": "path"}, "pos": [600, 0]},
+  {"id": 5, "type": "path", "inputs": {"in": 3}, "params": {"placement": "farthest", "output": "start"}, "pos": [600, 170]},
+  {"id": 6, "type": "check", "inputs": {"in": 3}, "params": {"min_open": 0.3}, "pos": [400, 170]},
+  {"id": 7, "type": "tile_output", "inputs": {"in": 6}, "rules": [{"min": 0.5, "max": 1, "tiles": [1]}], "pos": [800, 0]}
+]}
