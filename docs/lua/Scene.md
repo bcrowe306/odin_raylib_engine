@@ -40,7 +40,7 @@ return Exit
 ## Notes
 
 - `find_node` returns the first node with that name - give nodes you look up unique names. Look nodes up in `ready()` and keep them, rather than every frame.
-- `change_scene` takes a scene's name or its file (a `scene` script property); `preload` and `preload_progress` take the name only. An unknown name logs an error and nothing changes.
+- `change_scene`, `preload` and `preload_progress` take a scene's name or its file (a `scene` script property). An unknown one logs an error and nothing changes. `reload` uses the project's default transition, like `change_scene` without options.
 - A change asked for during a transition waits for it. The global event bus ([Events](../../engine/docs/events.md)) gets `transition_started`, `transition_midpoint` and `transition_finished` with the scene's name. See [Changing scenes](../../engine/docs/scene_flow.md) for every transition and option.
 - `Scene.create` returns nil for an unknown type; `Scene.create_node` makes a plain Node instead.
 - `instantiate` and `create` take a position local to the parent - two numbers or a Vec2.

@@ -64,8 +64,8 @@ return AudioOptions
   import settings), else **SFX**; music into its import bus, else
   **Music**. Bus names don't care about case; an unknown name plays into
   Master.
-- Faders are linear: 1 is 0 dB, 0.5 about -6 dB. The lowercase names
-  `"master"`, `"music"` and `"sfx"` also set the project's volumes and are
+- Faders are linear: 1 is 0 dB, 0.5 about -6 dB. The names `"master"`,
+  `"music"` and `"sfx"` (any case) also set the project's volumes and are
   clamped to 0..1.
 - `play_sound_at` is full volume within 100 px of the listener and silent
   beyond 900 px. The listener is the current camera, or the node given to

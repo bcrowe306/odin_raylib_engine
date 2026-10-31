@@ -45,5 +45,5 @@ With a table row like `options.language,"Language: {name}","Langue : {name}"`.
 
 - **The language isn't saved for you.** The game starts in Project Settings > General > **Language** each run; store the player's choice (as above, with [Save](Save.md)) and set it at startup.
 - **Localized nodes update by themselves** when the language changes. Text you set with `tr` is a one-time copy: set it again after `Locale.set`.
-- **Missing texts fall back**: a key with no text in the current language shows another language's text, then the key itself. `Locale.set` accepts any name, even one the tables don't have.
+- **Missing texts fall back**: a key with no text in the current language shows another language's text, then the key itself. `Locale.set` refuses a language the tables don't have: it returns false, logs a warning and keeps the current one.
 - Tables are re-read when they change, so editing a CSV updates a running game.

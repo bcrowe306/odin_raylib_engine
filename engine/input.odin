@@ -73,6 +73,10 @@ InputSystem :: struct {
 
 	// Optional simulated physical/logical states for headless unit testing
 	simulatedKeysDown:    map[rl.KeyboardKey]bool,
+	// The simulated keys as of this frame's update and the one before
+	// (is_key_pressed / is_key_released on simulated input).
+	simulatedKeysNow:     map[rl.KeyboardKey]bool,
+	simulatedKeysPrev:    map[rl.KeyboardKey]bool,
 	simulatedMouseDown:   map[rl.MouseButton]bool,
 	simulatedActionsDown: [InputAction]bool,
 	simulatedActionVals:  [InputAction]f32,
@@ -120,6 +124,9 @@ InputSystem_Destroy :: proc(input: ^InputSystem) {
 		delete(input.simulatedMouseDown)
 		input.simulatedMouseDown = nil
 	}
+	delete(input.simulatedKeysNow)
+	delete(input.simulatedKeysPrev)
+	input.simulatedKeysNow, input.simulatedKeysPrev = nil, nil
 }
 
 Input_ResetDefaultBindings :: proc(input: ^InputSystem) {
@@ -341,6 +348,16 @@ Input_SetSimulatedAction :: proc(input: ^InputSystem, action: InputAction, isDow
 	input.simulatedActionVals[action] = value if isDown else 0.0
 }
 
+// Input_SimulatedKeyPressed / Released: a simulated key went down / up
+// between the last two updates.
+Input_SimulatedKeyPressed :: proc(input: ^InputSystem, key: rl.KeyboardKey) -> bool {
+	return input.simulatedKeysNow[key] && !input.simulatedKeysPrev[key]
+}
+
+Input_SimulatedKeyReleased :: proc(input: ^InputSystem, key: rl.KeyboardKey) -> bool {
+	return !input.simulatedKeysNow[key] && input.simulatedKeysPrev[key]
+}
+
 Input_ClearSimulatedInputs :: proc(input: ^InputSystem) {
 	if input == nil do return
 	if input.simulatedKeysDown != nil {
@@ -421,6 +438,13 @@ InputSystem_Update :: proc(input: ^InputSystem, deltaTime: f32) {
 			input.states[action] = {}
 		}
 		return
+	}
+
+	// Simulated keys: last frame's and this frame's (pressed / released).
+	if input.useSimulatedInput {
+		input.simulatedKeysPrev, input.simulatedKeysNow = input.simulatedKeysNow, input.simulatedKeysPrev
+		clear(&input.simulatedKeysNow)
+		for k, down in input.simulatedKeysDown do if down do input.simulatedKeysNow[k] = true
 	}
 
 	// Player rebinding: capture the next input while listening (input_rebind.odin).

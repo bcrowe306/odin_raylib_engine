@@ -47,6 +47,6 @@ return Turret
 ## Notes
 
 - Positions are world px and gravity is px per second squared (positive Y pulls down).
-- `raycast` ignores sensors ([Areas](../nodes/AreaNode.md)) and collision layers: it stops at the closest solid shape of any layer. A ray that starts inside a collider may report it - start just outside the caster's own shape. For a ray that checks every frame and raises events, use a [Raycast](../nodes/RaycastNode.md) node.
+- `raycast` ignores sensors ([Areas](../nodes/AreaNode.md)) and stops at the closest solid shape. Pass layers after the points to hit only those (`Physics.raycast(from, to, "World")`); without them it hits every layer. A ray that starts inside a collider may report it - start just outside the caster's own shape. For a ray that checks every frame and raises events, use a [Raycast](../nodes/RaycastNode.md) node.
 - `hit.node` is the body that was hit ([Static Body](../nodes/StaticBodyNode.md), [Dynamic Body](../nodes/DynamicBodyNode.md), [Character Mover](../nodes/CharacterMoverNode.md)...); it can be missing for shapes with no node.
 - `set_paused` only stops the physics step; `Engine.set_paused` also pauses scripts and nodes.

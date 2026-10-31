@@ -604,6 +604,11 @@ lua_ldtk_cell_to_world :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnumber(L, 0)
 		return 2
 	}
+	// An unknown level: nil (not the current level's coordinates).
+	if id, given := str_arg(L, 5); given && Ldtk_GetLevel(ln.project, id) == nil && Ldtk_GetLevelByIid(ln.project, id) == nil {
+		lua.pushnil(L)
+		return 1
+	}
 	lvl := level_arg(L, ln, 5)
 	layer := Ldtk_GetLayer(lvl, name)
 	g := f32(layer.gridSize) if layer != nil else 16
@@ -803,7 +808,9 @@ lua_ldtk_get_entity_node :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnil(L)
 		return 1
 	}
-	push_node_userdata(L, ln.spawnedByIid[iid])
+	n := ln.spawnedByIid[iid]
+	if n != nil && !Node_IsAlive(n) do n = nil // (destroyed since it was spawned)
+	push_node_userdata(L, n)
 	return 1
 }
 

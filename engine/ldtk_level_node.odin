@@ -331,8 +331,11 @@ LdtkLevelNode_SetWorld :: proc(node: ^LdtkLevelNode, world: string, level := "")
 	if node == nil || node.project == nil do return false
 	w := Ldtk_GetWorld(node.project, world)
 	if w == nil || len(w.levels) == 0 do return false
-	lvl := Ldtk_GetLevelInWorld(node.project, w, level) if level != "" else nil
-	if lvl == nil do lvl = &node.project.levels[w.levels[0]]
+	lvl := &node.project.levels[w.levels[0]]
+	if level != "" {
+		lvl = Ldtk_GetLevelInWorld(node.project, w, level)
+		if lvl == nil do return false // (no such level in the world: nothing changes)
+	}
 	return LdtkLevelNode_SetLevel(node, lvl)
 }
 

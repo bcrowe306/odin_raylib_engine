@@ -114,6 +114,12 @@ Input_SetBinding :: proc(input: ^InputSystem, name: string, slot: int, b: InputB
 	else if slot == 0 {
 		for i in 0 ..< m.bindingCount do if binding_device(m.bindings[i]) == binding_device(b) {idx = i; break}
 	}
+	// A full action without this binding has no room: nothing changes.
+	if idx < 0 && m.bindingCount >= MAX_BINDINGS_PER_ACTION {
+		has := false
+		for i in 0 ..< m.bindingCount do if bindings_equal(m.bindings[i], b) {has = true; break}
+		if !has do return false
+	}
 	old := m.bindings[idx] if idx >= 0 else InputBinding{}
 	// Other actions using it.
 	if conflicts != .Allow {
@@ -537,7 +543,12 @@ lua_input_set_binding :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
-	b, _ := binding_from_lua(L, 3) // nil: remove the slot
+	b, bok := binding_from_lua(L, 3) // nil: remove the slot
+	if !bok && !lua.isnoneornil(L, 3) {
+		// (Not a binding: change nothing rather than remove the slot.)
+		lua.pushboolean(L, false)
+		return 1
+	}
 	ok := Input_SetBinding(input, string(lua.tostring(L, 1)), int(lua.tointeger(L, 2)), b, conflicts_arg(L, 4))
 	if ok && input.rebind.autoSave do Input_SaveUserBindings(input)
 	lua.pushboolean(L, b32(ok))

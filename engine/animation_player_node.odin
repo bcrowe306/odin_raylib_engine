@@ -381,8 +381,18 @@ AnimationPlayerNode_Stop :: proc(apn: ^AnimationPlayerNode) {
 		}
 	}
 }
+// AnimationPlayerNode_Reset: back to the current animation's first frame
+// (its last when reversed), playing or not.
 AnimationPlayerNode_Reset :: proc(apn: ^AnimationPlayerNode) {
 	apn.ticker->reset()
+	apn.finishedNotified = false
+	apn.loopsDone = 0
+	apn.blendFrom = nil
+	if a := AnimationPlayerNode_GetAnimation(apn); a != nil {
+		reversed := AnimationPlayerNode_IsReversed(apn, a)
+		apn.currentFrame = a.endFrame if reversed else a.startFrame
+		apn.time = Animation_Duration(apn, a) if reversed else 0
+	}
 }
 
 AnimationPlayerNode_Pause :: proc(apn: ^AnimationPlayerNode) {
