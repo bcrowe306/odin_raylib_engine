@@ -181,6 +181,22 @@ runs on past the edges). Terrains are made on the Tile Map tab (Terrains
 layer) and kept next to the tileset image (`<name>.tileset.json`, read
 with the generator; `Gen_LoadTerrains`).
 
+**Pattern rules.** After its rules (and terrains), a tile output's
+**pattern rules** look at the 3 x 3 cells around each cell: each of the 9 is
+*any*, *in* the rule's `min`..`max`, or *not* (the middle is the cell
+itself). Where they match, the cell takes one of the rule's tiles - with a
+`chance` (0..1; the same cells for a seed). The first that matches wins;
+beyond the level counts as in the range. In the file:
+
+    "patterns": [{"min": 0.5, "max": 1, "cells": [0, 0, 0, 0, -1, 0, 0, 1, 0],
+                  "tiles": [40, 41], "chance": 0.3}]
+
+(cells row by row: 1 in, -1 not, 0 any - here: an empty cell with solid
+below, 30% of them.) With a **layer**, a tile output of pattern rules only
+decorates another TileMap: grass tufts on the ground, stalactites under
+ceilings, torches on walls. In the editor: **Add Pattern Rule**, click the
+pattern's cells to cycle them, **Pick** its tiles.
+
 **Layers.** The output's tiles go into the main TileMap. Any other tile
 output with a **layer** name goes into the TileMap of that name next to the
 main one (a sibling, else a child) - one generator fills ground, walls and

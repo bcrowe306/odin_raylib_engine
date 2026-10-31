@@ -241,12 +241,25 @@ Gen_Tile_Rule :: struct {
 	terrain:  string, // instead of tiles: a terrain of the output's tileset (auto-tiled; the graph's allocator)
 }
 
+// A pattern rule (a tile output's; #171): where the 3x3 cells around a
+// cell match - each cell 0 any, 1 its value in min..max, -1 not - the cell
+// takes one of `tiles` (with `chance`). Pattern rules run after the rules
+// (and terrains), the first that matches wins; cells beyond the level are
+// in range. Cells: row by row, the middle (index 4) the cell itself.
+Gen_Pattern_Rule :: struct {
+	min, max: f32,
+	cells:    [9]i8,
+	tiles:    [dynamic]i32,
+	chance:   f32, // 0..1 (1: every match)
+}
+
 Gen_Node :: struct {
 	id:     int,
 	kind:   Gen_Kind,
 	inputs: [2]int, // source node ids, in the kind's input order (0 = not connected)
 	params: [8]f64, // in the kind's parameter order
 	rules:  [dynamic]Gen_Tile_Rule, // Tile_Output
+	patterns: [dynamic]Gen_Pattern_Rule, // Tile_Output: after the rules
 	component: string, // Entity_Output: what it places (the graph's allocator)
 	tileset: string, // Tile_Output: the tileset image its tiles index (the tile picker, previews; the graph's allocator)
 	layer:   string, // Tile_Output: the TileMap it fills, by name, next to the main one ("": the main one; the graph's allocator)
@@ -357,6 +370,9 @@ Gen_NodeClearRules :: proc(n: ^Gen_Node, allocator := context.allocator) {
 	for &r in n.rules do Gen_RuleFree(&r, allocator)
 	delete(n.rules)
 	n.rules = nil
+	for p in n.patterns do delete(p.tiles)
+	delete(n.patterns)
+	n.patterns = nil
 }
 
 // Gen_RuleFree: a tile rule's tiles and terrain name (allocator: the graph's).
@@ -445,6 +461,23 @@ Gen_GraphParse :: proc(data: []u8, allocator := context.allocator) -> (g: Gen_Gr
 				append(&n.rules, r)
 			}
 		}
+		if pats, pok := obj["patterns"].(json.Array); pok && kind == .Tile_Output {
+			n.patterns = make([dynamic]Gen_Pattern_Rule, allocator)
+			for pv in pats {
+				po, isObj3 := pv.(json.Object)
+				if !isObj3 do continue
+				pr := Gen_Pattern_Rule{min = 0.5, max = 1, chance = 1, tiles = make([dynamic]i32, allocator)}
+				if m, mok := json_number(po["min"]); mok do pr.min = m
+				if m, mok := json_number(po["max"]); mok do pr.max = m
+				if c, cok := json_number(po["chance"]); cok do pr.chance = clamp(c, 0, 1)
+				if cs, cok := po["cells"].(json.Array); cok do for cv, ci in cs {
+					if ci >= 9 do break
+					if c, isNum := json_number(cv); isNum do pr.cells[ci] = i8(clamp(int(c), -1, 1))
+				}
+				if ts, tok := po["tiles"].(json.Array); tok do for tv in ts do if t, isNum := json_number(tv); isNum do append(&pr.tiles, i32(t))
+				append(&n.patterns, pr)
+			}
+		}
 		append(&g.nodes, n)
 	}
 	return g, ""
@@ -504,6 +537,24 @@ Gen_GraphSerialize :: proc(g: ^Gen_Graph, allocator := context.allocator) -> str
 				strings.write_byte(&w.sb, '}')
 			}
 			strings.write_byte(&w.sb, ']')
+			if len(n.patterns) > 0 {
+				strings.write_string(&w.sb, ", \"patterns\": [")
+				for pr, pi in n.patterns {
+					if pi > 0 do strings.write_string(&w.sb, ", ")
+					strings.write_string(&w.sb, "{\"min\": ")
+					Json_Float(&w, pr.min)
+					strings.write_string(&w.sb, ", \"max\": ")
+					Json_Float(&w, pr.max)
+					strings.write_string(&w.sb, ", \"chance\": ")
+					Json_Float(&w, pr.chance)
+					strings.write_string(&w.sb, ", \"cells\": [")
+					for c, ci in pr.cells do fmt.sbprintf(&w.sb, "%s%d", ", " if ci > 0 else "", c)
+					strings.write_string(&w.sb, "], \"tiles\": [")
+					for t, ti in pr.tiles do fmt.sbprintf(&w.sb, "%s%d", ", " if ti > 0 else "", t)
+					strings.write_string(&w.sb, "]}")
+				}
+				strings.write_byte(&w.sb, ']')
+			}
 			if n.tileset != "" {
 				strings.write_string(&w.sb, ", \"tileset\": ")
 				Json_String(&w, n.tileset)
@@ -572,7 +623,7 @@ Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^
 	Gen_NodeClearRules(n, g.allocator)
 	n^ = copied
 	n.id, n.pos, n.inputs = newId, copied.pos + offset, {}
-	n.rules = nil
+	n.rules, n.patterns = nil, nil
 	n.component, n.script, n.custom, n.tileset, n.layer = "", "", "", "", ""
 	Gen_SetComponent(g, n, copied.component)
 	Gen_SetTileset(g, n, copied.tileset)
@@ -585,6 +636,15 @@ Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^
 			c := Gen_Tile_Rule{min = r.min, max = r.max, tiles = make([dynamic]i32, g.allocator), terrain = strings.clone(r.terrain, g.allocator) if r.terrain != "" else ""}
 			append(&c.tiles, ..r.tiles[:])
 			append(&n.rules, c)
+		}
+	}
+	if len(copied.patterns) > 0 {
+		n.patterns = make([dynamic]Gen_Pattern_Rule, g.allocator)
+		for pr in copied.patterns {
+			c := pr
+			c.tiles = make([dynamic]i32, g.allocator)
+			append(&c.tiles, ..pr.tiles[:])
+			append(&n.patterns, c)
 		}
 	}
 	return n

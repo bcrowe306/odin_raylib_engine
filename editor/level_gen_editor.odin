@@ -1126,13 +1126,13 @@ lge_rule_terrain :: proc(state: ^EditorState, n: ^e.Gen_Node, r: ^e.Gen_Tile_Rul
 // tileset), and Pick: the tileset as a palette - click tiles to add or
 // remove them.
 @(private = "file")
-lge_rule_tiles :: proc(state: ^EditorState, n: ^e.Gen_Node, r: ^e.Gen_Tile_Rule, i: int) {
+lge_rule_tiles :: proc(state: ^EditorState, n: ^e.Gen_Node, list: ^[dynamic]i32, pickId: string) {
 	ts := lge_tileset(state, n.tileset)
 	tile := lge_tile_size(n)
 	SW :: f32(20)
-	for t, k in r.tiles {
+	for t, k in list {
 		if k >= 12 {
-			UI_DimText(fmt.tprintf("+%d", len(r.tiles) - 12))
+			UI_DimText(fmt.tprintf("+%d", len(list) - 12))
 			break
 		}
 		if k > 0 do imgui.SameLine(0, 2)
@@ -1147,16 +1147,16 @@ lge_rule_tiles :: proc(state: ^EditorState, n: ^e.Gen_Node, r: ^e.Gen_Tile_Rule,
 		}
 		UI_Tooltip(fmt.tprintf("Tile %d", t))
 	}
-	if len(r.tiles) > 0 do imgui.SameLine(0, 6)
+	if len(list) > 0 do imgui.SameLine(0, 6)
 	imgui.BeginDisabled(ts == nil)
-	if UI_Button(fmt.tprintf("%s  Pick", ICON_FA_TABLE_CELLS), fmt.tprintf("lge.rule-pick:%d", i)) do imgui.OpenPopup("##lge_palette")
+	if UI_Button(fmt.tprintf("%s  Pick", ICON_FA_TABLE_CELLS), pickId) do imgui.OpenPopup("##lge_palette")
 	imgui.EndDisabled()
 	UI_Tooltip("Pick the rule's tiles from the tileset" if ts != nil else "Set the tile output's Tileset first")
 	if ts == nil || !imgui.BeginPopup("##lge_palette") do return
 	defer imgui.EndPopup()
 	if imgui.IsKeyPressed(.Escape) do imgui.CloseCurrentPopup()
 	cols, count := lge_tile_grid(ts, tile)
-	UI_DimText(fmt.tprintf("Click tiles to add or remove them (%d picked)", len(r.tiles)))
+	UI_DimText(fmt.tprintf("Click tiles to add or remove them (%d picked)", len(list)))
 	scale := clamp(f32(360) / f32(max(ts.size.x, 1)), 0.25, 4)
 	size := [2]f32{f32(ts.size.x), f32(ts.size.y)} * scale
 	p0 := imgui.GetCursorScreenPos()
@@ -1166,7 +1166,7 @@ lge_rule_tiles :: proc(state: ^EditorState, n: ^e.Gen_Node, r: ^e.Gen_Tile_Rule,
 	cell := [2]f32{f32(tile.x), f32(tile.y)} * scale
 	for t in 0 ..< min(count, 4096) {
 		mn := p0 + {f32(t % cols), f32(t / cols)} * cell
-		on := slice_contains_i32(r.tiles[:], i32(t))
+		on := slice_contains_i32(list[:], i32(t))
 		imgui.DrawList_AddRect(dl, mn, mn + cell, col_u32(UI_ACCENT if on else ui_line(0.25)), 0, imgui.DrawFlags(0), 2 if on else 1)
 		Drive_ItemRect(fmt.tprintf("lge.palette-tile:%d", t), mn, mn + cell, inWindow = true)
 	}
@@ -1176,8 +1176,8 @@ lge_rule_tiles :: proc(state: ^EditorState, n: ^e.Gen_Node, r: ^e.Gen_Tile_Rule,
 		if cx >= 0 && cx < cols && cy >= 0 && cols > 0 && cy * cols + cx < count {
 			t := i32(cy * cols + cx)
 			lge_change()
-			if k, found := slice_index_i32(r.tiles[:], t); found do ordered_remove(&r.tiles, k)
-			else do append(&r.tiles, t)
+			if k, found := slice_index_i32(list[:], t); found do ordered_remove(list, k)
+			else do append(list, t)
 		}
 	}
 }
@@ -1246,7 +1246,7 @@ lge_rules :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 		UI_Tooltip("Tile indices (in the TileMap's tileset), comma separated: one is picked per cell")
 		imgui.SameLine(0, 4)
 		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("lge.rule-remove:%d", i), "Remove the rule", size = 24) do remove = i
-		lge_rule_tiles(state, n, &r, i)
+		lge_rule_tiles(state, n, &r.tiles, fmt.tprintf("lge.rule-pick:%d", i))
 		if terrains := Editor_Terrains(state, n.tileset); terrains != nil && len(terrains.terrains) > 0 {
 			imgui.SameLine(0, 4)
 			imgui.SetNextItemWidth(120)
@@ -1266,6 +1266,75 @@ lge_rules :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 		append(&r.tiles, 1)
 		append(&n.rules, r)
 	}
+	lge_pattern_rules(state, n)
+}
+
+// lge_pattern_rules: a tile output's pattern rules - a value range, a 3x3
+// pattern (click a cell: any -> in range -> not), tiles, a chance.
+@(private = "file")
+lge_pattern_rules :: proc(state: ^EditorState, n: ^e.Gen_Node) {
+	imgui.SeparatorText("Pattern Rules")
+	UI_DimTextWrapped("After the rules: where the 3 x 3 cells around a cell match (blue: in the range, red: not, grey: any; the middle is the cell), it takes one of the tiles - decorations, ledges, corners. The first rule that matches wins; beyond the level counts as in the range.")
+	remove := -1
+	for &pr, i in n.patterns {
+		imgui.PushIDInt(i32(1000 + i))
+		// The pattern: 3 x 3 buttons.
+		dl := imgui.GetWindowDrawList()
+		p0 := imgui.GetCursorScreenPos()
+		C :: f32(16)
+		for ci in 0 ..< 9 {
+			mn := p0 + {f32(ci % 3), f32(ci / 3)} * (C + 2)
+			imgui.SetCursorScreenPos(mn)
+			imgui.PushIDInt(i32(ci))
+			if imgui.InvisibleButton("##cell", {C, C}) {
+				lge_change()
+				pr.cells[ci] = 1 if pr.cells[ci] == 0 else (-1 if pr.cells[ci] == 1 else 0)
+			}
+			Drive_Item(fmt.tprintf("lge.pattern-cell:%d:%d", i, ci))
+			imgui.PopID()
+			col := UI_ACCENT if pr.cells[ci] > 0 else (UI_DANGER if pr.cells[ci] < 0 else ui_line(0.15))
+			imgui.DrawList_AddRectFilled(dl, mn, mn + C, col_u32(col), 2)
+			if ci == 4 do imgui.DrawList_AddRect(dl, mn - 1, mn + C + 1, col_u32(UI_TEXT), 2, imgui.DrawFlags(0), 1.5)
+		}
+		imgui.SetCursorScreenPos(p0 + {3 * (C + 2) + 8, 0})
+		imgui.BeginGroup()
+		w := (imgui.GetContentRegionAvail().x - 34) / 3
+		imgui.SetNextItemWidth(w)
+		imgui.DragFloat("##pmin", &pr.min, 0.01, 0, 0, "from %.2f")
+		lge_undo_on_activate()
+		imgui.SameLine(0, 4)
+		imgui.SetNextItemWidth(w)
+		imgui.DragFloat("##pmax", &pr.max, 0.01, 0, 0, "to %.2f")
+		lge_undo_on_activate()
+		imgui.SameLine(0, 4)
+		imgui.SetNextItemWidth(w)
+		chance := pr.chance * 100
+		if imgui.DragFloat("##pchance", &chance, 0.5, 0, 100, "%.0f%% chance") do pr.chance = clamp(chance / 100, 0, 1)
+		lge_undo_on_activate()
+		Drive_Item(fmt.tprintf("lge.pattern-chance:%d", i))
+		UI_Tooltip("How many of the matching cells take a tile (the same ones for a seed)")
+		imgui.SameLine(0, 4)
+		if UI_IconButton(ICON_FA_XMARK, fmt.tprintf("lge.pattern-remove:%d", i), "Remove the pattern rule", size = 24) do remove = i
+		lge_rule_tiles(state, n, &pr.tiles, fmt.tprintf("lge.pattern-pick:%d", i))
+		imgui.EndGroup()
+		imgui.SetCursorScreenPos({p0.x, max(imgui.GetCursorScreenPos().y, p0.y + 3 * (C + 2)) + 4})
+		imgui.Dummy({1, 1})
+		imgui.PopID()
+	}
+	if remove >= 0 {
+		lge_change()
+		delete(n.patterns[remove].tiles)
+		ordered_remove(&n.patterns, remove)
+	}
+	if UI_Button(fmt.tprintf("%s  Add Pattern Rule", ICON_FA_PLUS), "lge.pattern-add") {
+		lge_change()
+		if n.patterns == nil do n.patterns = make([dynamic]e.Gen_Pattern_Rule, lge.graph.allocator)
+		// (A start: empty cells with solid below - things standing on ground.)
+		pr := e.Gen_Pattern_Rule{min = 0.5, max = 1, chance = 1, tiles = make([dynamic]i32, lge.graph.allocator)}
+		pr.cells[4], pr.cells[7] = -1, 1
+		append(&n.patterns, pr)
+	}
+	UI_Tooltip("A new pattern rule (it starts as: an empty cell with solid below)")
 }
 
 // LevelGenEditor_DriveQuery answers test-drive queries ("lge.*").
