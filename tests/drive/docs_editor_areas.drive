@@ -1,0 +1,61 @@
+# Docs screenshots: the editor manual's pages (docs/editor/<page>.md, #45) -
+# one shot per part of the editor, named editor_<page> (scripts/docs/
+# screenshots.sh copies them into docs/images/).
+wait 8
+key escape
+
+# --- The main window's parts ---
+click @hier:PlayerShip
+wait 3
+annotate @window:toolbar Tools, Play / Simulate, grid and snapping, zoom, save, export, settings
+click @menu:File
+wait 2
+screenshot editor_toolbar-menus
+key escape
+
+annotate @window:scene The scene's nodes: select, drag to re-parent, right-click for more
+annotate @hier:PlayerShip The selected node (the eye shows / hides it)
+screenshot editor_scene-tree
+
+annotate @insp.name The node's name, enable / visible toggles and its documentation (?)
+annotate @window:inspector Transform, then the node type's own sections and properties
+screenshot editor_inspector
+
+annotate @node:PlayerShip Drag to move; the handles scale it
+annotate @window:viewport Pan with the middle mouse, zoom with the wheel, Home fits the scene
+screenshot editor_viewport
+
+click @asset:textures/Asteroid_2.png
+wait 3
+annotate @window:assets The project's files by folder: scenes, scripts, textures, sounds, components
+annotate @window:preview The selected asset: its preview and import settings
+screenshot editor_assets
+
+key ctrl+comma
+wait 3
+screenshot editor_settings
+key escape
+wait 2
+
+# --- The bottom tabs (the Animation workspace gives them room) ---
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+
+click @bottom:console
+wait 2
+screenshot editor_tab-console
+
+click @bottom:profiler
+wait 30
+screenshot editor_tab-profiler
+
+click @hier:StarfieldEmitter
+click @bottom:particles
+wait 3
+screenshot editor_tab-particles
+
+click @bottom:mixer
+wait 2
+screenshot editor_tab-mixer

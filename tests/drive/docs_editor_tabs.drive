@@ -1,0 +1,64 @@
+# Docs screenshots, part 2: the editor manual's bottom-tab pages that need
+# a node or a folder (docs/editor/tab-*.md, #45), Simulate and Search.
+wait 8
+key escape
+# The Animation workspace gives the bottom tabs room.
+click @menu:View
+click @menu:View/Workspaces
+click @menu:Workspaces/Animation
+wait 3
+expect selection-count >= 0
+
+# (The Files tab's shot comes from file_browser.drive: 02_folder.png.)
+
+# Tabs that need their node: an Animation Player, a State Machine, a Tile Map.
+click @asset.new-scene
+wait 3
+click @hier.add
+type animation player
+click @addnode.create
+wait 3
+click @bottom:animation
+wait 2
+screenshot editor_tab-animation
+
+click @hier.add
+type state machine
+click @addnode.create
+wait 3
+click @bottom:stategraph
+wait 2
+screenshot editor_tab-stategraph
+
+click @hier.add
+type tile map
+click @addnode.create
+wait 3
+click @tile.tileset
+click @pick:textures/Asteroid_1.png
+wait 2
+click @bottom:tilemap
+wait 2
+screenshot editor_tab-tilemap
+
+click @bottom:ldtk
+wait 2
+screenshot editor_tab-ldtk
+
+click @bottom:game
+wait 2
+screenshot editor_tab-game
+
+# --- Playtesting: Simulate in the editor ---
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 30
+screenshot editor_playtesting
+click @menu:Game
+click @menu:Game/Simulate in Editor
+wait 5
+
+# (Last: the Search tab keeps the keyboard.)
+click @bottom:search
+wait 2
+screenshot editor_tab-search

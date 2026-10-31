@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "Drag to move; the handles scale it", "x": 612, "y": 334, "w": 56, "h": 56},
+    {"label": "Pan with the middle mouse, zoom with the wheel, Home fits the scene", "x": 258, "y": 103, "w": 764, "h": 486}
+  ]
+}

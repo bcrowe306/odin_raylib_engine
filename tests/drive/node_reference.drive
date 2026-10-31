@@ -37,3 +37,17 @@ click @addnode.create
 key shift+f1
 expect noderef.page == AreaNode
 screenshot area_page
+
+# #45: the editor manual opens in the same window - a bottom tab's
+# right-click > Help (its page; the Mixer tab, near the right, is clear of the
+# window), the Manual button and Help > Editor Manual (the list of pages).
+rclick @bottom:mixer
+wait 2
+click @bottom-help:mixer
+expect noderef.page == editor/tab-mixer
+screenshot editor_manual_mixer
+click @noderef.editor-index
+expect noderef.page == editor/
+click @menu:Help
+click @menu:Help/Editor Manual
+expect noderef.page == editor/
