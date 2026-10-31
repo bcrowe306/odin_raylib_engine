@@ -64,7 +64,7 @@ Code_DiskBanner :: proc(state: ^EditorState, doc: ^Code_Doc) {
 @(private = "file")
 history_dir :: proc(state: ^EditorState, doc: ^Code_Doc) -> string {
 	name, _ := strings.replace_all(doc.rel, "/", "__", context.temp_allocator)
-	dir, _ := filepath.join({state.projectPath, ".rayzr", "history", name}, context.temp_allocator)
+	dir, _ := filepath.join({state.projectPath, LUA_HISTORY_DIR, name}, context.temp_allocator)
 	return dir
 }
 
