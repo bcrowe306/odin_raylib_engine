@@ -16,6 +16,24 @@ esac
 [ -x "$editor" ] || { echo "no packaged editor in $dist (scripts/package_editor.sh)" >&2; exit 1; }
 editor=$(cd "$(dirname "$editor")" && pwd)/$(basename "$editor")
 
+# macOS: no binary may need a newer macOS than the app says it runs on
+# (Info.plist LSMinimumSystemVersion; 0.6.0 said 12.0 and needed 14).
+if [ "$(uname -s)" = Darwin ]; then
+	app=$(dirname "$(dirname "$editor")")
+	declared=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$app/Info.plist")
+	bad=0
+	while IFS= read -r f; do
+		minos=$(otool -l "$f" 2>/dev/null | awk '/LC_BUILD_VERSION/{b=1} b && $1=="minos"{print $2; exit}')
+		[ -z "$minos" ] && continue
+		if [ "$(printf '%s\n%s\n' "$minos" "$declared" | sort -V | tail -1)" != "$declared" ]; then
+			echo "FAIL: ${f#$app/} needs macOS $minos; the app declares $declared" >&2
+			bad=1
+		fi
+	done < <(find "$app/Contents" -type f \( -perm -u+x -o -name '*.dylib' \))
+	[ $bad = 0 ] || exit 1
+	echo "macOS minimum: every binary runs on $declared"
+fi
+
 tmp=$(mktemp -d /tmp/rayzr_package_test.XXXXXX)
 cp -R assets/demo_project "$tmp/project"
 rm -rf "$tmp/project/.rayzr" "$tmp/project"/scenes/new_scene*.scene.json

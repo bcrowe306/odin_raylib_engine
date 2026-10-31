@@ -101,7 +101,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: macos-14, platform: macos }
+          - { os: macos-15, platform: macos }
           - { os: ubuntu-22.04, platform: linux }
           - { os: windows-2022, platform: windows }
     defaults:
@@ -156,7 +156,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: macos-14, platform: macos }
+          - { os: macos-15, platform: macos }
           - { os: ubuntu-22.04, platform: linux }
           - { os: windows-2022, platform: windows }
     defaults:
