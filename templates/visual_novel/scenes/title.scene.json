@@ -1,0 +1,444 @@
+{
+ "name": "title",
+ "background": [
+  20,
+  22,
+  30,
+  255
+ ],
+ "root": {
+  "type": "Node",
+  "name": "root",
+  "children": [
+   {
+    "type": "CameraNode",
+    "name": "Camera",
+    "position": [
+     640,
+     360
+    ],
+    "properties": {
+     "isCurrent": true
+    }
+   },
+   {
+    "type": "TextureNode",
+    "name": "Background",
+    "position": [
+     0,
+     0
+    ],
+    "pivot": [
+     0,
+     0
+    ],
+    "scale": [
+     1.25,
+     1.25
+    ],
+    "layer": 1,
+    "texture": "textures/bg_castle.png"
+   },
+   {
+    "type": "TextureNode",
+    "name": "Ada",
+    "position": [
+     260,
+     724
+    ],
+    "scale": [
+     2,
+     2
+    ],
+    "layer": 2,
+    "pivot": [
+     0.5,
+     1
+    ],
+    "visible": true,
+    "texture": "textures/ada_idle.png"
+   },
+   {
+    "type": "TextureNode",
+    "name": "Theo",
+    "position": [
+     1020,
+     724
+    ],
+    "scale": [
+     2,
+     2
+    ],
+    "layer": 2,
+    "pivot": [
+     0.5,
+     1
+    ],
+    "visible": true,
+    "texture": "textures/theo_idle.png"
+   },
+   {
+    "type": "Node",
+    "name": "Title",
+    "script": {
+     "path": "scripts/title.lua"
+    }
+   },
+   {
+    "type": "TextNode",
+    "name": "Name",
+    "position": [
+     640,
+     60
+    ],
+    "pivot": [
+     0.5,
+     0
+    ],
+    "layer": 7,
+    "properties": {
+     "text": "The Castle Road",
+     "fontSize": 80,
+     "align": "Center",
+     "color": "#1e2840ff",
+     "richText": true
+    }
+   },
+   {
+    "type": "TextNode",
+    "name": "Endings",
+    "position": [
+     640,
+     660
+    ],
+    "pivot": [
+     0.5,
+     0
+    ],
+    "layer": 7,
+    "properties": {
+     "text": "",
+     "fontSize": 22,
+     "align": "Center",
+     "color": "#1e2840cc",
+     "richText": true
+    }
+   },
+   {
+    "type": "UIContainerNode",
+    "name": "Menu",
+    "position": [
+     500,
+     220
+    ],
+    "layer": 8,
+    "properties": {
+     "size": [
+      280,
+      300
+     ],
+     "direction": "Vertical",
+     "alignment": "Center",
+     "spacing": 12,
+     "paddingTop": 16,
+     "paddingBottom": 16,
+     "drawBackground": false,
+     "drawBorder": false,
+     "showHeader": false,
+     "backgroundColor": "#0f121ce6",
+     "borderColor": "#5c8dffff"
+    },
+    "children": [
+     {
+      "type": "UIButtonNode",
+      "name": "NewGame",
+      "layer": 8,
+      "properties": {
+       "size": [
+        260,
+        48
+       ],
+       "text": "New game",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Continue",
+      "layer": 8,
+      "properties": {
+       "size": [
+        260,
+        48
+       ],
+       "text": "Continue",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Load",
+      "layer": 8,
+      "properties": {
+       "size": [
+        260,
+        48
+       ],
+       "text": "Load",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Settings",
+      "layer": 8,
+      "properties": {
+       "size": [
+        260,
+        48
+       ],
+       "text": "Settings",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     }
+    ]
+   },
+   {
+    "type": "UIContainerNode",
+    "name": "SettingsPanel",
+    "position": [
+     340,
+     190
+    ],
+    "layer": 8,
+    "properties": {
+     "size": [
+      600,
+      300
+     ],
+     "direction": "Vertical",
+     "alignment": "Center",
+     "spacing": 12,
+     "paddingTop": 16,
+     "paddingBottom": 16,
+     "drawBackground": true,
+     "drawBorder": true,
+     "showHeader": true,
+     "backgroundColor": "#0f121ce6",
+     "borderColor": "#5c8dffff",
+     "title": "Settings",
+     "headerHeight": 36,
+     "headerColor": "#1e2840ff"
+    },
+    "children": [
+     {
+      "type": "UISliderNode",
+      "name": "TextSpeed",
+      "layer": 8,
+      "properties": {
+       "size": [
+        520,
+        36
+       ],
+       "label": "Text speed",
+       "labelWidth": 170,
+       "minValue": 10,
+       "maxValue": 120,
+       "value": 40,
+       "defaultValue": 40,
+       "isInteger": true
+      }
+     },
+     {
+      "type": "UISliderNode",
+      "name": "AutoDelay",
+      "layer": 8,
+      "properties": {
+       "size": [
+        520,
+        36
+       ],
+       "label": "Auto delay (s)",
+       "labelWidth": 170,
+       "minValue": 0.3,
+       "maxValue": 4,
+       "value": 1.2,
+       "defaultValue": 1.2,
+       "isInteger": false
+      }
+     },
+     {
+      "type": "UISliderNode",
+      "name": "MusicVolume",
+      "layer": 8,
+      "properties": {
+       "size": [
+        520,
+        36
+       ],
+       "label": "Music",
+       "labelWidth": 170,
+       "minValue": 0,
+       "maxValue": 1,
+       "value": 1,
+       "defaultValue": 1,
+       "isInteger": false
+      }
+     },
+     {
+      "type": "UISliderNode",
+      "name": "SoundVolume",
+      "layer": 8,
+      "properties": {
+       "size": [
+        520,
+        36
+       ],
+       "label": "Sound",
+       "labelWidth": 170,
+       "minValue": 0,
+       "maxValue": 1,
+       "value": 1,
+       "defaultValue": 1,
+       "isInteger": false
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "SettingsClose",
+      "layer": 8,
+      "properties": {
+       "size": [
+        160,
+        40
+       ],
+       "text": "Done",
+       "fontSize": 20,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     }
+    ]
+   },
+   {
+    "type": "UIContainerNode",
+    "name": "Slots",
+    "position": [
+     340,
+     150
+    ],
+    "layer": 8,
+    "properties": {
+     "size": [
+      600,
+      290
+     ],
+     "direction": "Vertical",
+     "alignment": "Center",
+     "spacing": 12,
+     "paddingTop": 16,
+     "paddingBottom": 16,
+     "drawBackground": true,
+     "drawBorder": true,
+     "showHeader": true,
+     "backgroundColor": "#0f121ce6",
+     "borderColor": "#5c8dffff",
+     "title": "Load a slot",
+     "headerHeight": 36,
+     "headerColor": "#1e2840ff"
+    },
+    "children": [
+     {
+      "type": "UIButtonNode",
+      "name": "Slot1",
+      "layer": 8,
+      "properties": {
+       "size": [
+        540,
+        48
+       ],
+       "text": "1.",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Slot2",
+      "layer": 8,
+      "properties": {
+       "size": [
+        540,
+        48
+       ],
+       "text": "2.",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Slot3",
+      "layer": 8,
+      "properties": {
+       "size": [
+        540,
+        48
+       ],
+       "text": "3.",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Close",
+      "layer": 8,
+      "properties": {
+       "size": [
+        160,
+        40
+       ],
+       "text": "Close",
+       "fontSize": 20,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     }
+    ],
+    "script": {
+     "path": "scripts/slots.lua"
+    }
+   }
+  ]
+ }
+}

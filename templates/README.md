@@ -10,6 +10,7 @@ In the editor: **Help > Welcome > New Project**. The art is from
 | [Top-down RPG](rpg/README.md) | Explore a small dungeon: talk to a wizard, fight slimes, find the key, unlock the door and escape |
 | [Shoot 'em up](shmup/README.md) | Fly through waves of enemies: pooled bullets, explosions, a saved high score |
 | [Puzzle (Sokoban)](puzzle/README.md) | Push every crate onto a target; levels typed as text, undo, a move counter |
+| [Visual Novel](visual_novel/README.md) | A branching story: characters, backgrounds, choices, three endings; save slots, a backlog, auto and skip |
 | [Platformer Adventure](adventure/README.md) (sample) | The platformer grown into a small game: title screen, two levels, saved progress, a pause menu |
 
 Each template's README says what's where and what to try first. On the

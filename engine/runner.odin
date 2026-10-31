@@ -47,6 +47,9 @@ Input_Script_Event :: struct {
 	axis:   rl.GamepadAxis,
 	value:  f32,
 	name:   string, // connect
+	mouse:  bool,   // a mouse event: moves to pos, the left button down / up (`down`, `button_change`)
+	pos:    [2]f32,
+	button_change: bool,
 }
 
 Input_Script_Pad :: enum u8 {Button, Axis, Connect, Disconnect}
@@ -63,6 +66,12 @@ Input_Script_Pad :: enum u8 {Button, Axis, Connect, Disconnect}
 //   20       pad2   RIGHT_FACE_DOWN tap 5               (buttons: down / up / tap)
 //   30       pad2   LEFT_X 1.0                           (axes: a value, kept)
 //   60       pad2   disconnect
+//
+//   # the mouse (game units; the left button): click / down / up / move
+//   40       mouse  640 360 click        (down at 40, up 2 frames later)
+//   50       mouse  100 80 move
+//   (UI widgets and Lua's Input.*mouse* read it; the UI's own keys -
+//   Tab, arrows, Enter on a widget - stop once a mouse event played)
 //
 // Keys are raylib key names as in project.json bindings (SPACE, LEFT, A, ...),
 // pad buttons / axes raylib's (RIGHT_FACE_DOWN, LEFT_X, ...).
@@ -120,6 +129,27 @@ Runner_LoadInputScript :: proc(text: string, allocator := context.allocator) -> 
 			}
 			continue
 		}
+		if strings.to_lower(f[1], context.temp_allocator) == "mouse" {
+			if len(f) < 5 do return events, fmt.tprintf("line %d: want <frame> mouse <x> <y> click|down|up|move", n + 1)
+			x, xok := strconv.parse_f32(f[2])
+			y, yok := strconv.parse_f32(f[3])
+			if !xok || !yok do return events, fmt.tprintf("line %d: bad mouse position", n + 1)
+			ev := Input_Script_Event{frame = frame, pad = -1, mouse = true, pos = {x, y}}
+			switch f[4] {
+			case "move": append(&events, ev)
+			case "down": ev.down, ev.button_change = true, true; append(&events, ev)
+			case "up": ev.button_change = true; append(&events, ev)
+			case "click":
+				hold := 2
+				if len(f) >= 6 do hold, _ = strconv.parse_int(f[5])
+				ev.down, ev.button_change = true, true
+				append(&events, ev)
+				ev.down, ev.frame = false, frame + max(hold, 1)
+				append(&events, ev)
+			case: return events, fmt.tprintf("line %d: %q is not click / down / up / move", n + 1, f[4])
+			}
+			continue
+		}
 		key, kok := parse_keyboard_key(strings.to_upper(f[1], context.temp_allocator))
 		if !kok do return events, fmt.tprintf("line %d: bad frame or key %q", n + 1, f[1])
 		switch f[2] {
@@ -135,8 +165,26 @@ Runner_LoadInputScript :: proc(text: string, allocator := context.allocator) -> 
 	return events, ""
 }
 
+// Runner_ApplyMouseEvent plays an --input-script mouse event: the game's
+// test mouse (UI widgets, Lua's Input.*mouse*). Runner_MouseFrame clears
+// the one-frame pressed / released first.
+Runner_ApplyMouseEvent :: proc(game: ^Game, ev: Input_Script_Event) {
+	game.uiTestInputEnabled = true
+	game.uiTestMousePos = ev.pos
+	if !ev.button_change do return
+	if ev.down && !game.uiTestMouseDown do game.uiTestMousePressed = true
+	if !ev.down && game.uiTestMouseDown do game.uiTestMouseReleased = true
+	game.uiTestMouseDown = ev.down
+}
+
+Runner_MouseFrame :: proc(game: ^Game) {
+	game.uiTestMousePressed = false
+	game.uiTestMouseReleased = false
+}
+
 // Runner_ApplyInputEvent plays an --input-script event.
 Runner_ApplyInputEvent :: proc(input: ^InputSystem, ev: Input_Script_Event) {
+	if ev.mouse do return // (Runner_ApplyMouseEvent: the game's)
 	if ev.pad < 0 {
 		Input_SetSimulatedKey(input, ev.key, ev.down)
 		return
@@ -449,7 +497,11 @@ Runner_Frame :: proc(rs: ^Runner_State) -> bool {
 	if game.shouldQuit do return false
 	{
 		dt := 1.0 / 60 if rs.fixedStep else rl.GetFrameTime()
-		for ev in rs.inputEvents do if ev.frame == rs.frameCount do Runner_ApplyInputEvent(&game.input, ev)
+		if game.uiTestInputEnabled do Runner_MouseFrame(game)
+		for ev in rs.inputEvents do if ev.frame == rs.frameCount {
+			if ev.mouse do Runner_ApplyMouseEvent(game, ev)
+			else do Runner_ApplyInputEvent(&game.input, ev)
+		}
 		EditorLink_BeginFrame(game)
 		if game.linkPaused && !game.frozen do dt = 1.0 / 60 // a step
 

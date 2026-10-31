@@ -2714,6 +2714,14 @@ ui_has_mouse :: proc(L: ^lua.State) -> bool {
 	return sm != nil && Game_UIHasMouse(sm.game)
 }
 
+// test_mouse: the game's test mouse (the runner's --input-script, tests)
+// when it is on - the left button only.
+@(private="file")
+test_mouse :: proc(L: ^lua.State) -> ^Game {
+	sm := get_script_manager(L)
+	return sm.game if sm != nil && sm.game != nil && sm.game.uiTestInputEnabled else nil
+}
+
 @(private="file")
 lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
@@ -2724,6 +2732,7 @@ lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isPressed := rl.IsWindowReady() && rl.IsMouseButtonPressed(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
+	if g := test_mouse(L); g != nil do isPressed = btn == .LEFT && g.uiTestMousePressed && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isPressed))
 	return 1
 }
@@ -2738,6 +2747,7 @@ lua_input_is_mouse_button_down :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isDown := rl.IsWindowReady() && rl.IsMouseButtonDown(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
+	if g := test_mouse(L); g != nil do isDown = btn == .LEFT && g.uiTestMouseDown && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isDown))
 	return 1
 }
@@ -2752,6 +2762,7 @@ lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isRel := rl.IsWindowReady() && rl.IsMouseButtonReleased(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
+	if g := test_mouse(L); g != nil do isRel = btn == .LEFT && g.uiTestMouseReleased && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isRel))
 	return 1
 }
@@ -2759,6 +2770,11 @@ lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
 @(private="file")
 lua_input_get_mouse_position :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
+	if g := test_mouse(L); g != nil {
+		lua.pushnumber(L, lua.Number(g.uiTestMousePos.x))
+		lua.pushnumber(L, lua.Number(g.uiTestMousePos.y))
+		return 2
+	}
 	if rl.IsWindowReady() {
 		mPos := rl.GetMousePosition()
 		lua.pushnumber(L, lua.Number(mPos.x))
@@ -3774,14 +3790,24 @@ lua_node_dialogue_show :: proc "c" (L: ^lua.State) -> c.int {
 				lua.getfield(L, -1, "voice")
 				voice := str(L, -1)
 				lua.pop(L, 1)
-				append(&lines, Dialogue_Line{speaker, text, voice})
+				choices := make([dynamic]string, context.temp_allocator)
+				lua.getfield(L, -1, "choices")
+				if lua.type(L, -1) == .TABLE {
+					for j in 1 ..= c.int(lua.rawlen(L, -1)) {
+						lua.rawgeti(L, -1, lua.Integer(j))
+						append(&choices, str(L, -1))
+						lua.pop(L, 1)
+					}
+				}
+				lua.pop(L, 1)
+				append(&lines, Dialogue_Line{speaker, text, voice, choices[:]})
 			} else {
-				append(&lines, Dialogue_Line{"", str(L, -1), ""})
+				append(&lines, Dialogue_Line{"", str(L, -1), "", nil})
 			}
 			lua.pop(L, 1)
 		}
 	} else {
-		append(&lines, Dialogue_Line{str(L, 3) if lua.gettop(L) >= 3 else "", str(L, 2), ""})
+		append(&lines, Dialogue_Line{str(L, 3) if lua.gettop(L) >= 3 else "", str(L, 2), "", nil})
 	}
 	DialogueNode_Show(d, lines[:])
 	return 0
@@ -3807,6 +3833,41 @@ lua_node_dialogue_is_open :: proc "c" (L: ^lua.State) -> c.int {
 	d := dialogue_arg(L)
 	lua.pushboolean(L, b32(d != nil && DialogueNode_IsOpen(d)))
 	return 1
+}
+
+// box:dialogue_choose(i): takes choice i (1-based) of the shown line.
+@(private="file")
+lua_node_dialogue_choose :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	d := dialogue_arg(L)
+	lua.pushboolean(L, b32(d != nil && DialogueNode_Choose(d, int(lua.L_checkinteger(L, 2)) - 1, sm_game_ctx(L))))
+	return 1
+}
+
+@(private="file")
+lua_node_dialogue_has_choices :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	d := dialogue_arg(L)
+	lua.pushboolean(L, b32(d != nil && DialogueNode_HasChoices(d) && d.lineDone))
+	return 1
+}
+
+// box:dialogue_set_auto(on [, delay]) / box:dialogue_set_skip(on)
+@(private="file")
+lua_node_dialogue_set_auto :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	if d := dialogue_arg(L); d != nil {
+		d.autoAdvance = bool(lua.toboolean(L, 2))
+		if lua.isnumber(L, 3) do d.autoDelay = max(f32(lua.tonumber(L, 3)), 0)
+	}
+	return 0
+}
+
+@(private="file")
+lua_node_dialogue_set_skip :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	if d := dialogue_arg(L); d != nil do d.skip = bool(lua.toboolean(L, 2))
+	return 0
 }
 
 @(private="file")
@@ -4895,6 +4956,14 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "dialogue_close")
 		lua.pushcfunction(L, lua_node_dialogue_is_open)
 		lua.setfield(L, -2, "dialogue_is_open")
+		lua.pushcfunction(L, lua_node_dialogue_choose)
+		lua.setfield(L, -2, "dialogue_choose")
+		lua.pushcfunction(L, lua_node_dialogue_has_choices)
+		lua.setfield(L, -2, "dialogue_has_choices")
+		lua.pushcfunction(L, lua_node_dialogue_set_auto)
+		lua.setfield(L, -2, "dialogue_set_auto")
+		lua.pushcfunction(L, lua_node_dialogue_set_skip)
+		lua.setfield(L, -2, "dialogue_set_skip")
 		lua.pushcfunction(L, lua_node_nav_find_path)
 		lua.setfield(L, -2, "nav_find_path")
 		lua.pushcfunction(L, lua_node_nav_is_walkable)

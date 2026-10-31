@@ -59,6 +59,7 @@ Event_Describe :: proc(name: string) -> (param: string, doc: string) {
 	case "finished":           return "", "Playback (or the dialogue) ended"
 	case "revealed":           return "", "The text finished revealing"
 	case "line_shown":         return "index", "A dialogue line was fully shown (1-based)"
+	case "chosen":             return "choice", "A dialogue choice was taken (1-based)"
 	case "clicked":            return "", "The button was clicked"
 	case "value_changed":      return "value", "The value changed"
 	case "submitted":          return "text", "Enter was pressed"

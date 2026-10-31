@@ -1,0 +1,411 @@
+[
+ {
+  "name": "title screen (no save yet)",
+  "frames": 20,
+  "expect": [
+   [
+    "Continue",
+    "text",
+    "==",
+    "Continue (no save yet)"
+   ],
+   [
+    "Endings",
+    "text",
+    "==",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "first line, Ada and Theo not on stage yet",
+  "frames": 20,
+  "scene": "scenes/story.scene.json",
+  "expect": [
+   [
+    "Background",
+    "texture",
+    "==",
+    "textures/bg_castle.png"
+   ],
+   [
+    "SlotLeft",
+    "visible",
+    "==",
+    false
+   ]
+  ]
+ },
+ {
+  "name": "kind ending (first choice, the key)",
+  "frames": 230,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "40 SPACE tap",
+   "50 SPACE tap",
+   "60 SPACE tap",
+   "70 SPACE tap",
+   "80 SPACE tap",
+   "90 SPACE tap",
+   "100 SPACE tap",
+   "110 SPACE tap",
+   "120 SPACE tap",
+   "130 SPACE tap",
+   "140 SPACE tap",
+   "150 SPACE tap",
+   "160 SPACE tap",
+   "170 SPACE tap",
+   "180 SPACE tap",
+   "190 SPACE tap",
+   "200 SPACE tap"
+  ],
+  "expect": [
+   [
+    "Ending",
+    "text",
+    "contains",
+    "The kind ending"
+   ],
+   [
+    "Ending",
+    "visible",
+    "==",
+    true
+   ],
+   [
+    "SlotLeft",
+    "texture",
+    "==",
+    "textures/ada_cheer.png"
+   ]
+  ]
+ },
+ {
+  "name": "bumpy ending (second choice, then climb)",
+  "frames": 230,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "40 SPACE tap",
+   "50 SPACE tap",
+   "60 SPACE tap",
+   "70 SPACE tap",
+   "80 SPACE tap",
+   "95 DOWN tap",
+   "110 SPACE tap",
+   "120 SPACE tap",
+   "130 SPACE tap",
+   "140 SPACE tap",
+   "150 SPACE tap",
+   "160 SPACE tap",
+   "170 SPACE tap",
+   "180 SPACE tap",
+   "190 SPACE tap"
+  ],
+  "expect": [
+   [
+    "Ending",
+    "text",
+    "contains",
+    "The bumpy ending"
+   ],
+   [
+    "Background",
+    "texture",
+    "==",
+    "textures/bg_castle.png"
+   ]
+  ]
+ },
+ {
+  "name": "patient ending (second choice twice)",
+  "frames": 260,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "40 SPACE tap",
+   "50 SPACE tap",
+   "60 SPACE tap",
+   "70 SPACE tap",
+   "80 SPACE tap",
+   "95 DOWN tap",
+   "110 SPACE tap",
+   "120 SPACE tap",
+   "130 SPACE tap",
+   "140 SPACE tap",
+   "155 DOWN tap",
+   "170 SPACE tap",
+   "180 SPACE tap",
+   "190 SPACE tap",
+   "200 SPACE tap"
+  ],
+  "expect": [
+   [
+    "Ending",
+    "text",
+    "contains",
+    "The patient ending"
+   ],
+   [
+    "Background",
+    "texture",
+    "==",
+    "textures/bg_talltrees.png"
+   ]
+  ]
+ },
+ {
+  "name": "quick save and load",
+  "frames": 140,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "45 F5 tap",
+   "60 SPACE tap",
+   "70 SPACE tap",
+   "80 SPACE tap",
+   "100 F9 tap",
+   "115 L tap"
+  ],
+  "expect": [
+   [
+    "LogText",
+    "text",
+    "contains",
+    "Wonderful."
+   ],
+   [
+    "LogText",
+    "text",
+    "!=",
+    ""
+   ],
+   [
+    "Toast",
+    "text",
+    "==",
+    "Quick loaded"
+   ],
+   [
+    "SlotRight",
+    "texture",
+    "==",
+    "textures/theo_cheer.png"
+   ]
+  ]
+ },
+ {
+  "name": "auto stops at the choice",
+  "frames": 900,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 A tap"
+  ],
+  "expect": [
+   [
+    "AutoButton",
+    "text",
+    "==",
+    "Auto: on"
+   ],
+   [
+    "SlotCenter",
+    "texture",
+    "==",
+    "textures/unit_hurt.png"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: lines and a choice",
+  "frames": 160,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 mouse 640 250 click",
+   "20 mouse 640 250 click",
+   "30 mouse 640 250 click",
+   "40 mouse 640 250 click",
+   "50 mouse 640 250 click",
+   "60 mouse 640 250 click",
+   "70 mouse 640 250 click",
+   "80 mouse 640 250 click",
+   "100 mouse 640 456 click",
+   "130 L tap"
+  ],
+  "expect": [
+   [
+    "LogText",
+    "text",
+    "contains",
+    "> Keep going"
+   ],
+   [
+    "SlotCenter",
+    "visible",
+    "==",
+    false
+   ],
+   [
+    "LogText",
+    "text",
+    "contains",
+    "The castle gate is shut"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: save and load a slot",
+  "frames": 200,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "50 mouse 861 707 click",
+   "70 mouse 640 226 click",
+   "90 ESCAPE tap",
+   "100 SPACE tap",
+   "110 SPACE tap",
+   "120 SPACE tap",
+   "140 mouse 975 707 click",
+   "160 mouse 640 226 click",
+   "180 L tap"
+  ],
+  "expect": [
+   [
+    "LogText",
+    "text",
+    "contains",
+    "Wonderful."
+   ],
+   [
+    "LogText",
+    "text",
+    "!contains",
+    "A robot"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: load a slot from the title screen",
+  "frames": 330,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "50 mouse 861 707 click",
+   "70 mouse 640 226 click",
+   "90 ESCAPE tap",
+   "110 mouse 1089 707 click",
+   "180 mouse 640 380 click",
+   "210 mouse 640 226 click",
+   "300 L tap"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "story"
+   ],
+   [
+    "LogText",
+    "text",
+    "contains",
+    "Wonderful."
+   ],
+   [
+    "SlotLeft",
+    "texture",
+    "==",
+    "textures/ada_think.png"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: title New game",
+  "frames": 90,
+  "input": [
+   "10 mouse 640 260 click"
+  ],
+  "expect": [
+   [
+    "@scene",
+    "name",
+    "==",
+    "story"
+   ]
+  ]
+ },
+ {
+  "name": "clicks: title Settings opens, Done closes",
+  "frames": 60,
+  "input": [
+   "10 mouse 640 440 click"
+  ],
+  "expect": [
+   [
+    "SettingsPanel",
+    "enabled",
+    "==",
+    true
+   ],
+   [
+    "Menu",
+    "enabled",
+    "==",
+    false
+   ]
+  ]
+ }
+]

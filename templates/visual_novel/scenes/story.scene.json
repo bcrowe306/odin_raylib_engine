@@ -1,0 +1,488 @@
+{
+ "name": "story",
+ "background": [
+  20,
+  22,
+  30,
+  255
+ ],
+ "root": {
+  "type": "Node",
+  "name": "root",
+  "children": [
+   {
+    "type": "CameraNode",
+    "name": "Camera",
+    "position": [
+     640,
+     360
+    ],
+    "properties": {
+     "isCurrent": true
+    }
+   },
+   {
+    "type": "TextureNode",
+    "name": "Background",
+    "position": [
+     0,
+     0
+    ],
+    "pivot": [
+     0,
+     0
+    ],
+    "scale": [
+     1.25,
+     1.25
+    ],
+    "layer": 1,
+    "texture": "textures/bg_castle.png"
+   },
+   {
+    "type": "TextureNode",
+    "name": "SlotLeft",
+    "position": [
+     300,
+     724
+    ],
+    "scale": [
+     2,
+     2
+    ],
+    "layer": 2,
+    "pivot": [
+     0.5,
+     1
+    ],
+    "visible": false,
+    "texture": "textures/ada_idle.png"
+   },
+   {
+    "type": "TextureNode",
+    "name": "SlotCenter",
+    "position": [
+     640,
+     724
+    ],
+    "scale": [
+     2,
+     2
+    ],
+    "layer": 2,
+    "pivot": [
+     0.5,
+     1
+    ],
+    "visible": false,
+    "texture": "textures/unit_idle.png"
+   },
+   {
+    "type": "TextureNode",
+    "name": "SlotRight",
+    "position": [
+     980,
+     724
+    ],
+    "scale": [
+     2,
+     2
+    ],
+    "layer": 2,
+    "pivot": [
+     0.5,
+     1
+    ],
+    "visible": false,
+    "texture": "textures/theo_idle.png"
+   },
+   {
+    "type": "Node",
+    "name": "Story",
+    "script": {
+     "path": "scripts/story.lua"
+    }
+   },
+   {
+    "type": "Node",
+    "name": "VN",
+    "script": {
+     "path": "scripts/vn.lua"
+    }
+   },
+   {
+    "type": "DialogueNode",
+    "name": "Dialogue",
+    "position": [
+     140,
+     500
+    ],
+    "layer": 7,
+    "properties": {
+     "size": [
+      1000,
+      180
+     ],
+     "fontSize": 26,
+     "padding": 22,
+     "revealSpeed": 40,
+     "panelColor": "#0f121ce6",
+     "borderColor": "#5c8dffff",
+     "choiceColor": "#5c8dffc8",
+     "advanceAction": "confirm"
+    }
+   },
+   {
+    "type": "UIContainerNode",
+    "name": "QuickMenu",
+    "position": [
+     452,
+     684
+    ],
+    "layer": 8,
+    "properties": {
+     "size": [
+      688,
+      32
+     ],
+     "direction": "Horizontal",
+     "alignment": "Center",
+     "spacing": 8,
+     "drawBackground": false,
+     "drawBorder": false,
+     "showHeader": false
+    },
+    "children": [
+     {
+      "type": "UIButtonNode",
+      "name": "AutoButton",
+      "layer": 8,
+      "properties": {
+       "size": [
+        106,
+        28
+       ],
+       "text": "Auto",
+       "fontSize": 16,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff",
+       "keyboardFocus": false
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "SkipButton",
+      "layer": 8,
+      "properties": {
+       "size": [
+        106,
+        28
+       ],
+       "text": "Skip",
+       "fontSize": 16,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff",
+       "keyboardFocus": false
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "LogButton",
+      "layer": 8,
+      "properties": {
+       "size": [
+        106,
+        28
+       ],
+       "text": "Log",
+       "fontSize": 16,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff",
+       "keyboardFocus": false
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "SaveButton",
+      "layer": 8,
+      "properties": {
+       "size": [
+        106,
+        28
+       ],
+       "text": "Save",
+       "fontSize": 16,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff",
+       "keyboardFocus": false
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "LoadButton",
+      "layer": 8,
+      "properties": {
+       "size": [
+        106,
+        28
+       ],
+       "text": "Load",
+       "fontSize": 16,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff",
+       "keyboardFocus": false
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "TitleButton",
+      "layer": 8,
+      "properties": {
+       "size": [
+        106,
+        28
+       ],
+       "text": "Title",
+       "fontSize": 16,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff",
+       "keyboardFocus": false
+      }
+     }
+    ]
+   },
+   {
+    "type": "TextNode",
+    "name": "Ending",
+    "position": [
+     640,
+     300
+    ],
+    "pivot": [
+     0.5,
+     0.5
+    ],
+    "layer": 8,
+    "properties": {
+     "text": "",
+     "fontSize": 64,
+     "align": "Center",
+     "color": "#ffffffff",
+     "richText": true
+    },
+    "visible": false
+   },
+   {
+    "type": "TextNode",
+    "name": "Toast",
+    "position": [
+     1260,
+     16
+    ],
+    "pivot": [
+     1,
+     0
+    ],
+    "layer": 8,
+    "properties": {
+     "text": "",
+     "fontSize": 22,
+     "align": "Right",
+     "color": "#ffffffff",
+     "richText": true
+    }
+   },
+   {
+    "type": "Node",
+    "name": "Log",
+    "children": [
+     {
+      "type": "UIContainerNode",
+      "name": "LogPanel",
+      "position": [
+       90,
+       40
+      ],
+      "layer": 8,
+      "properties": {
+       "size": [
+        1100,
+        640
+       ],
+       "direction": "Vertical",
+       "alignment": "Center",
+       "spacing": 12,
+       "paddingTop": 16,
+       "paddingBottom": 16,
+       "drawBackground": true,
+       "drawBorder": true,
+       "showHeader": true,
+       "backgroundColor": "#0f121ce6",
+       "borderColor": "#5c8dffff",
+       "title": "Backlog  (wheel / up / down to scroll)",
+       "headerHeight": 36,
+       "headerColor": "#1e2840ff"
+      },
+      "children": []
+     },
+     {
+      "type": "TextNode",
+      "name": "LogText",
+      "position": [
+       120,
+       96
+      ],
+      "pivot": [
+       0,
+       0
+      ],
+      "layer": 8,
+      "properties": {
+       "text": "",
+       "fontSize": 22,
+       "align": "Left",
+       "color": "#ffffffff",
+       "richText": true,
+       "maxWidth": 1040,
+       "lineSpacing": 1.3
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "LogClose",
+      "layer": 8,
+      "properties": {
+       "size": [
+        140,
+        40
+       ],
+       "text": "Close",
+       "fontSize": 20,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      },
+      "position": [
+       1030,
+       624
+      ]
+     }
+    ]
+   },
+   {
+    "type": "UIContainerNode",
+    "name": "Slots",
+    "position": [
+     340,
+     150
+    ],
+    "layer": 8,
+    "properties": {
+     "size": [
+      600,
+      290
+     ],
+     "direction": "Vertical",
+     "alignment": "Center",
+     "spacing": 12,
+     "paddingTop": 16,
+     "paddingBottom": 16,
+     "drawBackground": true,
+     "drawBorder": true,
+     "showHeader": true,
+     "backgroundColor": "#0f121ce6",
+     "borderColor": "#5c8dffff",
+     "title": "Load a slot",
+     "headerHeight": 36,
+     "headerColor": "#1e2840ff"
+    },
+    "children": [
+     {
+      "type": "UIButtonNode",
+      "name": "Slot1",
+      "layer": 8,
+      "properties": {
+       "size": [
+        540,
+        48
+       ],
+       "text": "1.",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Slot2",
+      "layer": 8,
+      "properties": {
+       "size": [
+        540,
+        48
+       ],
+       "text": "2.",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Slot3",
+      "layer": 8,
+      "properties": {
+       "size": [
+        540,
+        48
+       ],
+       "text": "3.",
+       "fontSize": 24,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     },
+     {
+      "type": "UIButtonNode",
+      "name": "Close",
+      "layer": 8,
+      "properties": {
+       "size": [
+        160,
+        40
+       ],
+       "text": "Close",
+       "fontSize": 20,
+       "normalColor": "#0f121ce6",
+       "hoverColor": "#5c8dffc8",
+       "borderColor": "#5c8dffff",
+       "textColor": "#eef0f6ff"
+      }
+     }
+    ],
+    "script": {
+     "path": "scripts/slots.lua"
+    }
+   }
+  ]
+ }
+}

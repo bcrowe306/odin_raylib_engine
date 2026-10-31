@@ -541,7 +541,7 @@ test_vector_lipsync :: proc(t: ^testing.T) {
 	d.lipSync = "../LipSync"
 	lips.name = "LipSync"
 	ProcessNodeQueues(scene.manager, &game.gameContext)
-	DialogueNode_Show(d, {{"Hero", "Hello", wav}})
+	DialogueNode_Show(d, {{"Hero", "Hello", wav, nil}})
 	game->run(0.016)
 	testing.expect(t, lips.playing, "the line's voice drives it")
 	DialogueNode_Close(d, &game.gameContext)
