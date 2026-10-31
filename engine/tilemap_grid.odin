@@ -172,17 +172,18 @@ point_in_convex :: proc(p: [2]f32, pts: [][2]f32) -> bool {
 }
 
 // TileMapNode_TileRect: where a cell's tile image is drawn, in map pixels -
-// standing on the cell (bottom-aligned, centred across).
+// standing on the cell (bottom-aligned, centred across), moved by Tile
+// Offset.
 TileMapNode_TileRect :: proc(tm: ^TileMapNode, cell: [2]int) -> rl.Rectangle {
 	b := TileMapNode_CellBox(tm, cell)
 	tw, th := f32(tm.tileSize.x), f32(tm.tileSize.y)
-	return {b.x + (b.width - tw) * 0.5, b.y + b.height - th, tw, th}
+	return {b.x + (b.width - tw) * 0.5 + tm.tileOffset.x, b.y + b.height - th + tm.tileOffset.y, tw, th}
 }
 
 // TileMapNode_IsPlainGrid: square cells the size of the tiles (the fast,
 // chunk-cached path).
 TileMapNode_IsPlainGrid :: proc(tm: ^TileMapNode) -> bool {
-	if tm.layout != .Square do return false
+	if tm.layout != .Square || tm.tileOffset != {} do return false
 	c := TileMapNode_CellSize(tm)
 	return int(c.x) == tm.tileSize.x && int(c.y) == tm.tileSize.y && c.x == f32(int(c.x)) && c.y == f32(int(c.y))
 }

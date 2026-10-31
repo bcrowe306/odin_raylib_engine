@@ -11,6 +11,8 @@ In the editor: **Help > Welcome > New Project**. The art is from
 | [Shoot 'em up](shmup/README.md) | Fly through waves of enemies: pooled bullets, explosions, a saved high score |
 | [Puzzle (Sokoban)](puzzle/README.md) | Push every crate onto a target; levels typed as text, undo, a move counter |
 | [Visual Novel](visual_novel/README.md) | A branching story: characters, backgrounds, choices, three endings; save slots, a backlog, auto and skip |
+| [Isometric Dungeon](dungeon/README.md) | Click to walk (path finding) or WASD in an isometric room; walk behind pillars and walls; a chest, a key, a door |
+| [Hex Island](hex/README.md) | A hex-grid island: click a hex to walk there hex by hex round water and trees, step with the keys, pick every flower |
 | [Platformer Adventure](adventure/README.md) (sample) | The platformer grown into a small game: title screen, two levels, saved progress, a pause menu |
 
 Each template's README says what's where and what to try first. On the

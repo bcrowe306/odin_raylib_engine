@@ -37,6 +37,7 @@ TileMapNode :: struct {
 	layout:      TileMap_Layout `gui:"true"`,             // the grid: square, isometric, staggered, hex
 	stagger:     TileMap_Stagger `gui:"true"`,            // Staggered / hex: which rows (Hex Flat: columns) are shifted
 	cellSize:    [2]f32 `gui:"true" min:"0" max:"1024"`,  // the grid's cell (0 = the tile size); taller tiles stand on it
+	tileOffset:  [2]f32 `gui:"true" min:"-512" max:"512"`, // moves every tile image (art whose cell isn't at its bottom: a slab below a floor)
 	// The tileset is an Aseprite file: the map is this tilemap layer of it
 	// (its first frame), kept in sync when the file is saved (aseprite_tilemap).
 	asepriteLayer: string `gui:"true"`,

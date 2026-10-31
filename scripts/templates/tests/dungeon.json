@@ -1,0 +1,194 @@
+[
+ {
+  "name": "keys walk along the grid (D: down-right)",
+  "frames": 50,
+  "scene": "scenes/dungeon.scene.json",
+  "input": [
+   "10 D down",
+   "40 D up"
+  ],
+  "expect": [
+   [
+    "Hero",
+    "x",
+    ">",
+    168.0
+   ],
+   [
+    "Hero",
+    "y",
+    ">",
+    404.0
+   ]
+  ]
+ },
+ {
+  "name": "keys: W + D go straight right",
+  "frames": 50,
+  "scene": "scenes/dungeon.scene.json",
+  "input": [
+   "10 D down",
+   "10 W down",
+   "40 D up",
+   "40 W up"
+  ],
+  "expect": [
+   [
+    "Hero",
+    "x",
+    ">",
+    188.0
+   ],
+   [
+    "Hero",
+    "y",
+    ">",
+    380.0
+   ],
+   [
+    "Hero",
+    "y",
+    "<",
+    388.0
+   ]
+  ]
+ },
+ {
+  "name": "click a cell: the hero walks there",
+  "frames": 120,
+  "scene": "scenes/dungeon.scene.json",
+  "input": [
+   "20 mouse 768 424 click"
+  ],
+  "expect": [
+   [
+    "Hero",
+    "x",
+    ">",
+    248.0
+   ],
+   [
+    "Hero",
+    "x",
+    "<",
+    264.0
+   ],
+   [
+    "Hero",
+    "y",
+    ">",
+    440.0
+   ],
+   [
+    "Hero",
+    "y",
+    "<",
+    456.0
+   ]
+  ]
+ },
+ {
+  "name": "the back wall stops the keys (the hero slides along it)",
+  "frames": 120,
+  "scene": "scenes/dungeon.scene.json",
+  "patch": {
+   "Hero": {
+    "position": [
+     384.0,
+     256.0
+    ]
+   },
+   "Camera": {
+    "position": [
+     384.0,
+     256.0
+    ]
+   }
+  },
+  "input": [
+   "10 W down",
+   "100 W up"
+  ],
+  "expect": [
+   [
+    "Hero",
+    "y",
+    ">",
+    236.0
+   ]
+  ]
+ },
+ {
+  "name": "door: locked without the key",
+  "frames": 40,
+  "scene": "scenes/dungeon.scene.json",
+  "patch": {
+   "Hero": {
+    "position": [
+     384.0,
+     256.0
+    ]
+   },
+   "Camera": {
+    "position": [
+     384.0,
+     256.0
+    ]
+   }
+  },
+  "input": [
+   "10 E tap"
+  ],
+  "expect": [
+   [
+    "Message",
+    "text",
+    "contains",
+    "Locked"
+   ],
+   [
+    "Hint",
+    "text",
+    "==",
+    "E: open the door"
+   ]
+  ]
+ },
+ {
+  "name": "chest gives the key; clicking the door walks there and opens it",
+  "frames": 330,
+  "scene": "scenes/dungeon.scene.json",
+  "patch": {
+   "Hero": {
+    "position": [
+     256.0,
+     448.0
+    ]
+   },
+   "Camera": {
+    "position": [
+     256.0,
+     448.0
+    ]
+   }
+  },
+  "input": [
+   "10 E tap",
+   "40 mouse 832 136 click"
+  ],
+  "expect": [
+   [
+    "KeyIcon",
+    "text",
+    "==",
+    "Key: yes"
+   ],
+   [
+    "Message",
+    "text",
+    "contains",
+    "escaped"
+   ]
+  ]
+ }
+]

@@ -1,0 +1,6 @@
+{
+  "name": "Isometric Dungeon",
+  "description": "Explore a small isometric dungeon: click to walk (path finding round the walls) or use WASD, walk behind pillars and walls, open the chest for the key, unlock the door.",
+  "icon": "dungeon",
+  "order": 6
+}

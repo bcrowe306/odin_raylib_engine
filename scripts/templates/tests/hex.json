@@ -1,0 +1,179 @@
+[
+ {
+  "name": "D: one step right",
+  "frames": 40,
+  "input": [
+   "10 D tap"
+  ],
+  "expect": [
+   [
+    "Explorer",
+    "x",
+    ">",
+    572.0
+   ],
+   [
+    "Explorer",
+    "x",
+    "<",
+    578.0
+   ],
+   [
+    "Explorer",
+    "y",
+    ">",
+    320.5
+   ],
+   [
+    "Explorer",
+    "y",
+    "<",
+    326.5
+   ]
+  ]
+ },
+ {
+  "name": "E: one step up-right (row 3 isn't shifted)",
+  "frames": 40,
+  "input": [
+   "10 E tap"
+  ],
+  "expect": [
+   [
+    "Explorer",
+    "x",
+    ">",
+    539.5
+   ],
+   [
+    "Explorer",
+    "x",
+    "<",
+    545.5
+   ],
+   [
+    "Explorer",
+    "y",
+    ">",
+    271.0
+   ],
+   [
+    "Explorer",
+    "y",
+    "<",
+    277.0
+   ]
+  ]
+ },
+ {
+  "name": "click a hex: the path goes round, the flower is picked",
+  "frames": 260,
+  "input": [
+   "10 mouse 640 224 click"
+  ],
+  "expect": [
+   [
+    "Explorer",
+    "x",
+    ">",
+    637.0
+   ],
+   [
+    "Explorer",
+    "x",
+    "<",
+    643.0
+   ],
+   [
+    "Explorer",
+    "y",
+    ">",
+    221.5
+   ],
+   [
+    "Explorer",
+    "y",
+    "<",
+    227.5
+   ],
+   [
+    "Flowers",
+    "text",
+    "==",
+    "Flowers 1 / 5"
+   ]
+  ]
+ },
+ {
+  "name": "far across the island",
+  "frames": 400,
+  "input": [
+   "10 mouse 900 422 click"
+  ],
+  "expect": [
+   [
+    "Explorer",
+    "x",
+    ">",
+    897.0
+   ],
+   [
+    "Explorer",
+    "x",
+    "<",
+    903.0
+   ],
+   [
+    "Explorer",
+    "y",
+    ">",
+    419.5
+   ],
+   [
+    "Explorer",
+    "y",
+    "<",
+    425.5
+   ],
+   [
+    "Flowers",
+    "text",
+    "contains",
+    "/ 5"
+   ]
+  ]
+ },
+ {
+  "name": "water: no walk",
+  "frames": 60,
+  "input": [
+   "10 mouse 347 175 click"
+  ],
+  "expect": [
+   [
+    "Explorer",
+    "x",
+    ">",
+    507.0
+   ],
+   [
+    "Explorer",
+    "x",
+    "<",
+    513.0
+   ],
+   [
+    "Explorer",
+    "y",
+    ">",
+    320.5
+   ],
+   [
+    "Explorer",
+    "y",
+    "<",
+    326.5
+   ]
+  ]
+ }
+]
