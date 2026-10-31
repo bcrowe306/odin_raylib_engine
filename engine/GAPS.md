@@ -231,7 +231,9 @@ benchmark:
 
 - **engine** (no window): `bench_scene_hot_paths`, `bench_particles`,
   `bench_scripts`, `bench_navigation` (`engine/perf_bench_test.odin`),
-  `bench_components` (`engine/component_bench_test.odin`).
+  `bench_components` (`engine/component_bench_test.odin`),
+  `bench_level_gen` (`engine/level_gen_bench_test.odin`: a whole
+  generation, the editor's previews cold and after one change, each node).
 - **rendering**: the runner's `--bench 300` (30 warm-up frames, then 300
   uncapped: no vsync, no frame cap) on the scenes of
   `scripts/make_bench_project.py`, with and without the render caches.

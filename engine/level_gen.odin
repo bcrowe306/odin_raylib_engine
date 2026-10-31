@@ -515,309 +515,6 @@ Gen_OutputNode :: proc(g: ^Gen_Graph) -> ^Gen_Node {
 	return &g.nodes[len(g.nodes) - 1] if len(g.nodes) > 0 else nil
 }
 
-// --- evaluation -----------------------------------------------------------------------
-
-@(private = "file")
-Gen_Eval :: struct {
-	g:      ^Gen_Graph,
-	seed:   u64,
-	done:   map[int]Gen_Grid,
-	active: map[int]bool, // being evaluated (a cycle if met again)
-	err:    string,
-	L:      ^lua.State,   // Script nodes' (made by the first one, closed at the end)
-	fns:    map[string]c.int, // script file -> its function (a registry ref in L)
-}
-
-// Gen_Evaluate computes a node's grid (id 0: the output node) for a seed
-// (the graph's seed when 0). The grid's values are in `allocator`.
-Gen_Evaluate :: proc(g: ^Gen_Graph, id := 0, seed: u64 = 0, allocator := context.allocator) -> (grid: Gen_Grid, err: string) {
-	target := Gen_OutputNode(g) if id == 0 else Gen_FindNode(g, id)
-	if target == nil do return {}, "the graph has no nodes" if id == 0 else fmt.tprintf("no node %d", id)
-	ev := Gen_Eval{g = g, seed = seed if seed != 0 else g.seed}
-	ev.done = make(map[int]Gen_Grid, allocator = context.temp_allocator)
-	ev.active = make(map[int]bool, allocator = context.temp_allocator)
-	ev.fns = make(map[string]c.int, allocator = context.temp_allocator)
-	defer if ev.L != nil do lua.close(ev.L)
-	tmp, ok := gen_eval(&ev, target.id)
-	if !ok do return {}, ev.err
-	grid = {tmp.w, tmp.h, make([]f32, len(tmp.v), allocator)}
-	copy(grid.v, tmp.v)
-	return grid, ""
-}
-
-Gen_GridDestroy :: proc(grid: ^Gen_Grid, allocator := context.allocator) {
-	delete(grid.v, allocator)
-	grid.v = nil
-}
-
-@(private = "file")
-gen_new :: proc(ev: ^Gen_Eval) -> Gen_Grid {
-	w, h := ev.g.size.x, ev.g.size.y
-	return {w, h, make([]f32, w * h, context.temp_allocator)}
-}
-
-// gen_input: a node's input grid (empty - zeros - when not connected).
-@(private = "file")
-gen_input :: proc(ev: ^Gen_Eval, n: ^Gen_Node, i: int) -> (Gen_Grid, bool) {
-	if n.inputs[i] == 0 do return gen_new(ev), true
-	return gen_eval(ev, n.inputs[i])
-}
-
-@(private = "file")
-gen_eval :: proc(ev: ^Gen_Eval, id: int) -> (result: Gen_Grid, ok: bool) {
-	if grid, ok := ev.done[id]; ok do return grid, true
-	n := Gen_FindNode(ev.g, id)
-	if n == nil {
-		ev.err = fmt.tprintf("a node is connected to node %d, which doesn't exist", id)
-		return {}, false
-	}
-	if ev.active[id] {
-		ev.err = fmt.tprintf("a cycle through node %d", id)
-		return {}, false
-	}
-	ev.active[id] = true
-	defer delete_key(&ev.active, id)
-	nodeSeed := gen_mix(gen_mix(ev.seed, u64(n.id)), u64(i64(Gen_Param(n, "seed"))))
-	out := gen_new(ev)
-	w, h := out.w, out.h
-	p :: Gen_Param
-	switch n.kind {
-	case .Constant:
-		for &v in out.v do v = f32(p(n, "value"))
-	case .Noise:
-		scale := max(f32(p(n, "scale")), 0.5)
-		octaves := clamp(int(p(n, "octaves")), 1, 8)
-		persistence := f32(p(n, "persistence"))
-		for y in 0 ..< h do for x in 0 ..< w {
-			amp, freq, sum, norm: f32 = 1, 1 / scale, 0, 0
-			for o in 0 ..< octaves {
-				sum += gen_value_noise(f32(x) * freq, f32(y) * freq, nodeSeed + u64(o) * 7919) * amp
-				norm += amp
-				amp *= persistence
-				freq *= 2
-			}
-			out.v[y * w + x] = sum / max(norm, 0.0001)
-		}
-	case .Random_Fill:
-		d := f32(p(n, "density"))
-		for y in 0 ..< h do for x in 0 ..< w do out.v[y * w + x] = 1 if gen_hash01(x, y, nodeSeed) < d else 0
-	case .Gradient:
-		dir := int(p(n, "direction"))
-		for y in 0 ..< h do for x in 0 ..< w {
-			v: f32
-			switch dir {
-			case 1: v = f32(y) / f32(max(h - 1, 1))
-			case 2:
-				dx, dy := (f32(x) - f32(w - 1) * 0.5) / max(f32(w - 1) * 0.5, 1), (f32(y) - f32(h - 1) * 0.5) / max(f32(h - 1) * 0.5, 1)
-				v = clamp(1 - math.sqrt(dx * dx + dy * dy) / math.SQRT_TWO, 0, 1)
-			case: v = f32(x) / f32(max(w - 1, 1))
-			}
-			out.v[y * w + x] = v
-		}
-	case .Border:
-		bw := int(p(n, "width"))
-		for y in 0 ..< h do for x in 0 ..< w do out.v[y * w + x] = 1 if x < bw || y < bw || x >= w - bw || y >= h - bw else 0
-	case .Rect:
-		rx, ry, rw, rh := int(p(n, "x")), int(p(n, "y")), int(p(n, "w")), int(p(n, "h"))
-		val := f32(p(n, "value"))
-		for y in max(ry, 0) ..< min(ry + rh, h) do for x in max(rx, 0) ..< min(rx + rw, w) do out.v[y * w + x] = val
-	case .Threshold:
-		src := gen_input(ev, n, 0) or_return
-		t := f32(p(n, "value"))
-		inv := p(n, "invert") != 0
-		for v, i in src.v do out.v[i] = 1 if (v >= t) != inv else 0
-	case .Invert:
-		src := gen_input(ev, n, 0) or_return
-		for v, i in src.v do out.v[i] = 1 - v
-	case .Remap:
-		src := gen_input(ev, n, 0) or_return
-		a0, a1, b0, b1 := f32(p(n, "from_min")), f32(p(n, "from_max")), f32(p(n, "to_min")), f32(p(n, "to_max"))
-		span := a1 - a0 if a1 != a0 else 1
-		for v, i in src.v do out.v[i] = b0 + clamp((v - a0) / span, 0, 1) * (b1 - b0)
-	case .Blur:
-		src := gen_input(ev, n, 0) or_return
-		r := clamp(int(p(n, "radius")), 0, 32)
-		for y in 0 ..< h do for x in 0 ..< w {
-			sum, cnt: f32 = 0, 0
-			for yy in max(y - r, 0) ..= min(y + r, h - 1) do for xx in max(x - r, 0) ..= min(x + r, w - 1) {
-				sum += src.v[yy * w + xx]
-				cnt += 1
-			}
-			out.v[y * w + x] = sum / cnt
-		}
-	case .Cellular:
-		src := gen_input(ev, n, 0) or_return
-		birth, survive := int(p(n, "birth")), int(p(n, "survive"))
-		edge := p(n, "edge_solid") != 0
-		cur := gen_new(ev)
-		for v, i in src.v do cur.v[i] = 1 if v >= 0.5 else 0
-		for _ in 0 ..< clamp(int(p(n, "iterations")), 0, 64) {
-			for y in 0 ..< h do for x in 0 ..< w {
-				count := 0
-				for dy in -1 ..= 1 do for dx in -1 ..= 1 {
-					if dx == 0 && dy == 0 do continue
-					xx, yy := x + dx, y + dy
-					if xx < 0 || yy < 0 || xx >= w || yy >= h {
-						if edge do count += 1
-					} else if cur.v[yy * w + xx] >= 0.5 {
-						count += 1
-					}
-				}
-				solid := cur.v[y * w + x] >= 0.5
-				out.v[y * w + x] = 1 if (solid && count >= survive) || (!solid && count >= birth) else 0
-			}
-			copy(cur.v, out.v)
-		}
-		copy(out.v, cur.v)
-	case .Dilate, .Erode:
-		src := gen_input(ev, n, 0) or_return
-		copy(out.v, src.v)
-		cur := gen_new(ev)
-		grow := n.kind == .Dilate
-		for _ in 0 ..< clamp(int(p(n, "iterations")), 0, 64) {
-			copy(cur.v, out.v)
-			for y in 0 ..< h do for x in 0 ..< w {
-				v := cur.v[y * w + x]
-				for d in ([4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-					xx, yy := x + d.x, y + d.y
-					if xx < 0 || yy < 0 || xx >= w || yy >= h do continue
-					nv := cur.v[yy * w + xx]
-					v = max(v, nv) if grow else min(v, nv)
-				}
-				out.v[y * w + x] = v
-			}
-		}
-	case .Combine:
-		a := gen_input(ev, n, 0) or_return
-		b := gen_input(ev, n, 1) or_return
-		op := int(p(n, "op"))
-		for i in 0 ..< len(out.v) {
-			x, y := a.v[i], b.v[i]
-			switch op {
-			case 1: out.v[i] = x - y
-			case 2: out.v[i] = x * y
-			case 3: out.v[i] = min(x, y)
-			case 4: out.v[i] = max(x, y)
-			case 5: out.v[i] = x if y >= 0.5 else 0
-			case 6: out.v[i] = (x + y) * 0.5
-			case: out.v[i] = x + y
-			}
-		}
-	case .Script:
-		gen_script(ev, n, nodeSeed, out) or_return
-	case .Custom:
-		def := Gen_FindCustomKind(n.custom)
-		if def == nil {
-			ev.err = fmt.tprintf("node %d: no node type %q is registered", n.id, n.custom)
-			return {}, false
-		}
-		call := Gen_Custom_Call{node = n, out = out, seed = nodeSeed}
-		for i in 0 ..< len(def.info.inputs) do call.inputs[i] = gen_input(ev, n, i) or_return
-		if e := def.eval(&call); e != "" {
-			ev.err = fmt.tprintf("node %d (%s): %s", n.id, n.custom, e)
-			return {}, false
-		}
-	case .Tile_Output, .Entity_Output:
-		src := gen_input(ev, n, 0) or_return
-		copy(out.v, src.v) // (the tiles / entities come from Gen_Tiles / Gen_Entities: its grid is its input's)
-	case .Rooms:
-		minS := clamp(int(p(n, "min_size")), 2, 256)
-		maxS := clamp(int(p(n, "max_size")), minS, 512)
-		rng := nodeSeed
-		gen_bsp(&out, {1, 1, w - 2, h - 2}, minS, maxS, max(int(p(n, "corridor")), 1), &rng, 0)
-	case .Walker:
-		rng := nodeSeed
-		brush := clamp(int(p(n, "brush")), 1, 16)
-		dirs := [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
-		for _ in 0 ..< clamp(int(p(n, "walkers")), 1, 64) {
-			pos := [2]int{w / 2, h / 2}
-			for _ in 0 ..< clamp(int(p(n, "steps")), 0, 1_000_000) {
-				gen_carve(&out, pos.x - (brush - 1) / 2, pos.y - (brush - 1) / 2, brush, brush)
-				d := dirs[gen_rand_int(&rng, 0, 3)]
-				pos = {clamp(pos.x + d.x, 1, max(w - 2, 1)), clamp(pos.y + d.y, 1, max(h - 2, 1))}
-			}
-		}
-	case .Scatter:
-		src := gen_input(ev, n, 0) or_return
-		masked := n.inputs[0] != 0
-		chance := f32(p(n, "chance"))
-		spacing := clamp(int(p(n, "spacing")), 0, 256)
-		for y in 0 ..< h do for x in 0 ..< w {
-			if masked && src.v[y * w + x] < 0.5 do continue
-			if gen_hash01(x, y, nodeSeed) >= chance do continue
-			near := false
-			for yy in max(y - spacing + 1, 0) ..= y do for xx in max(x - spacing + 1, 0) ..< min(x + spacing, w) {
-				if (yy < y || xx < x) && out.v[yy * w + xx] >= 0.5 do near = true
-			}
-			if !near do out.v[y * w + x] = 1
-		}
-	case .Surface:
-		src := gen_input(ev, n, 0) or_return
-		side := int(p(n, "side"))
-		solid :: proc(g: Gen_Grid, x, y: int) -> bool {return x >= 0 && y >= 0 && x < g.w && y < g.h && g.v[y * g.w + x] >= 0.5}
-		for y in 0 ..< h do for x in 0 ..< w {
-			if solid(src, x, y) do continue
-			on: bool
-			switch side {
-			case 1: on = solid(src, x, y - 1)
-			case 2: on = solid(src, x + 1, y) || solid(src, x - 1, y) || solid(src, x, y + 1) || solid(src, x, y - 1)
-			case: on = solid(src, x, y + 1)
-			}
-			out.v[y * w + x] = 1 if on else 0
-		}
-	}
-	ev.done[id] = out
-	return out, true
-}
-
-// Gen_Tiles turns a Tile_Output node's grid into tile indices (row-major;
-// -1 = empty): the first rule whose range holds the value, one of its
-// tiles picked by a hash of the cell and the seed.
-Gen_Tiles :: proc(g: ^Gen_Graph, outputId := 0, seed: u64 = 0, allocator := context.allocator) -> (tiles: []i32, size: [2]int, err: string) {
-	out := Gen_OutputNode(g) if outputId == 0 else Gen_FindNode(g, outputId)
-	if out == nil do return nil, {}, "the graph has no nodes"
-	if out.kind != .Tile_Output do return nil, {}, fmt.tprintf("node %d isn't a tile output", out.id)
-	grid, e := Gen_Evaluate(g, out.id, seed, context.temp_allocator)
-	if e != "" do return nil, {}, e
-	s := seed if seed != 0 else g.seed
-	pickSeed := gen_mix(gen_mix(s, u64(out.id)), 0x7111e)
-	empty := i32(Gen_Param(out, "empty"))
-	tiles = make([]i32, len(grid.v), allocator)
-	for v, i in grid.v {
-		t := empty
-		for r in out.rules {
-			if v < r.min || v > r.max || len(r.tiles) == 0 do continue
-			t = r.tiles[0] if len(r.tiles) == 1 else r.tiles[int(gen_hash01(i % grid.w, i / grid.w, pickSeed) * f32(len(r.tiles))) % len(r.tiles)]
-			break
-		}
-		tiles[i] = t
-	}
-	return tiles, {grid.w, grid.h}, ""
-}
-
-// A generated level: its tiles and entity placements (Gen_Generate) -
-// computed on any thread (the graph untouched), applied on the main one
-// (Gen_ApplyResult). The entities' components are the graph's: keep it
-// until the result is applied.
-Gen_Result :: struct {
-	size:     [2]int,
-	tiles:    []i32,
-	entities: [dynamic]Gen_Entity,
-}
-
-Gen_Generate :: proc(g: ^Gen_Graph, seed: u64 = 0, allocator := context.allocator) -> (r: Gen_Result, err: string) {
-	r.tiles, r.size, err = Gen_Tiles(g, 0, seed, allocator)
-	if err == "" do r.entities, err = Gen_Entities(g, seed, allocator)
-	if err != "" do Gen_ResultDestroy(&r, allocator)
-	return
-}
-
-Gen_ResultDestroy :: proc(r: ^Gen_Result, allocator := context.allocator) {
-	delete(r.tiles, allocator)
-	delete(r.entities)
-	r^ = {}
-}
-
 // Gen_ApplyTileMap generates into a tile map: its map becomes the level's
 // size and its cells the tiles (colliders rebuilt when it is Solid and in
 // the game).
@@ -870,7 +567,7 @@ Gen_LoadFile :: proc(ctx: ^GameContext, path: string, allocator := context.alloc
 
 // --- rooms and corridors ----------------------------------------------------------------
 
-@(private = "file")
+@(private)
 gen_carve :: proc(out: ^Gen_Grid, x, y, w, h: int) {
 	for yy in max(y, 0) ..< min(y + h, out.h) do for xx in max(x, 0) ..< min(x + w, out.w) do out.v[yy * out.w + xx] = 1
 }
@@ -878,7 +575,7 @@ gen_carve :: proc(out: ^Gen_Grid, x, y, w, h: int) {
 // gen_bsp splits an area in two until its parts are small, puts a room in
 // each part and joins the two halves of every split with a corridor
 // (between a room of each). Returns the centre of one of its rooms.
-@(private = "file")
+@(private)
 gen_bsp :: proc(out: ^Gen_Grid, r: [4]int, minS, maxS, corridor: int, rng: ^u64, depth: int) -> [2]int {
 	x, y, w, h := r[0], r[1], r[2], r[3]
 	need := minS + 2 // a room and a cell around it
@@ -911,7 +608,7 @@ gen_bsp :: proc(out: ^Gen_Grid, r: [4]int, minS, maxS, corridor: int, rng: ^u64,
 
 // gen_rand_int: the next random number in lo..hi (inclusive) of a
 // node's own sequence.
-@(private = "file")
+@(private)
 gen_rand_int :: proc(state: ^u64, lo, hi: int) -> int {
 	if hi <= lo do return lo
 	state^ = gen_mix(state^, 0x2545f4914f6cdd1d)
@@ -919,58 +616,6 @@ gen_rand_int :: proc(state: ^u64, lo, hi: int) -> int {
 }
 
 // --- entities and LDtk ----------------------------------------------------------------
-
-// A component placed by an entity output, at a cell.
-Gen_Entity :: struct {
-	component: string, // (the graph's)
-	cell:      [2]int,
-}
-
-// Gen_Entities: every entity output's placements (its points: cells >=
-// 0.5; with `max`, that many picked by the seed), in node then row order.
-Gen_Entities :: proc(g: ^Gen_Graph, seed: u64 = 0, allocator := context.allocator) -> (out: [dynamic]Gen_Entity, err: string) {
-	out = make([dynamic]Gen_Entity, allocator)
-	s := seed if seed != 0 else g.seed
-	for &n in g.nodes {
-		if n.kind != .Entity_Output || n.component == "" do continue
-		grid, e := Gen_Evaluate(g, n.id, seed, context.temp_allocator)
-		if e != "" do return out, e
-		Cell :: struct {cell: [2]int, key: f32}
-		cells := make([dynamic]Cell, context.temp_allocator)
-		pickSeed := gen_mix(gen_mix(s, u64(n.id)), 0xe171)
-		for v, i in grid.v do if v >= 0.5 do append(&cells, Cell{{i % grid.w, i / grid.w}, gen_hash01(i % grid.w, i / grid.w, pickSeed)})
-		limit := int(Gen_Param(&n, "max"))
-		if limit > 0 && len(cells) > limit {
-			// The `limit` with the lowest keys, back in row order.
-			keys := make([]f32, len(cells), context.temp_allocator)
-			for c, i in cells do keys[i] = c.key
-			slice_sort_f32(keys)
-			cut := keys[limit - 1]
-			kept := 0
-			for c in cells do if c.key <= cut && kept < limit {
-				append(&out, Gen_Entity{n.component, c.cell})
-				kept += 1
-			}
-			continue
-		}
-		for c in cells do append(&out, Gen_Entity{n.component, c.cell})
-	}
-	return out, ""
-}
-
-@(private = "file")
-slice_sort_f32 :: proc(a: []f32) {
-	// (insertion sort: entity outputs hold a few hundred points at most)
-	for i in 1 ..< len(a) {
-		v := a[i]
-		j := i - 1
-		for j >= 0 && a[j] > v {
-			a[j + 1] = a[j]
-			j -= 1
-		}
-		a[j + 1] = v
-	}
-}
 
 // GEN_ENTITY_TAG marks the nodes a generator spawned (generating again
 // replaces them).
@@ -1131,7 +776,7 @@ gen_scripts_clear :: proc(g: ^Gen_Graph) {
 }
 
 // gen_script: a Script node's grid from its function.
-@(private = "file")
+@(private)
 gen_script :: proc(ev: ^Gen_Eval, n: ^Gen_Node, seed: u64, out: Gen_Grid) -> bool {
 	fail :: proc(ev: ^Gen_Eval, n: ^Gen_Node, why: string) -> bool {
 		ev.err = fmt.tprintf("node %d (%s): %s", n.id, n.script, why) if n.script != "" else fmt.tprintf("node %d: %s", n.id, why)
@@ -1241,7 +886,7 @@ gen_lua_random :: proc "c" (L: ^lua.State) -> c.int {
 
 // --- deterministic noise --------------------------------------------------------------
 
-@(private = "file")
+@(private)
 gen_mix :: proc(a, b: u64) -> u64 {
 	// splitmix64 of a combination: stable on every platform.
 	z := a ~ (b + 0x9e3779b97f4a7c15 + (a << 6) + (a >> 2))
@@ -1251,13 +896,13 @@ gen_mix :: proc(a, b: u64) -> u64 {
 }
 
 // gen_hash01: a cell's random number in [0, 1) for a seed.
-@(private = "file")
+@(private)
 gen_hash01 :: proc(x, y: int, seed: u64) -> f32 {
 	h := gen_mix(gen_mix(seed, u64(i64(x))), u64(i64(y)) + 0x51ed27)
 	return f32(h >> 40) / f32(1 << 24)
 }
 
-@(private = "file")
+@(private)
 gen_value_noise :: proc(x, y: f32, seed: u64) -> f32 {
 	x0, y0 := math.floor(x), math.floor(y)
 	fx, fy := x - x0, y - y0

@@ -1,0 +1,758 @@
+package engine
+
+import "base:runtime"
+import "core:c"
+import "core:fmt"
+import "core:hash"
+import "core:math"
+import os "core:os"
+import "core:slice"
+import "core:sync"
+import "core:thread"
+import lua "lua54"
+
+// ============================================================================
+// Level generator evaluation (#142, made fast in #171): a node's grid from
+// its inputs, each node computed once per evaluation. The heavy kernels work
+// on flat rows without bounds checks (cellular on a padded byte grid, blur
+// as two sliding sums, noise from a precomputed lattice) and split their
+// rows across a few worker threads (gen_parallel). A Gen_Cache keeps grids
+// between evaluations, so the editor recomputes only what a change touches.
+// ============================================================================
+
+// Gen_Cache keeps nodes' grids between evaluations: a node whose settings,
+// inputs, size, seed (and script text) are unchanged reuses its grid. One
+// evaluation at a time uses it.
+Gen_Cache :: struct {
+	entries:   map[int]Gen_Cache_Entry,
+	allocator: runtime.Allocator,
+}
+
+Gen_Cache_Entry :: struct {
+	key:  u64,
+	grid: Gen_Grid, // (the cache's allocator)
+}
+
+Gen_CacheInit :: proc(cache: ^Gen_Cache, allocator := context.allocator) {
+	cache.allocator = allocator
+	cache.entries = make(map[int]Gen_Cache_Entry, allocator)
+}
+
+Gen_CacheForget :: proc(cache: ^Gen_Cache, id: int) {
+	if en, ok := cache.entries[id]; ok {
+		delete(en.grid.v, cache.allocator)
+		delete_key(&cache.entries, id)
+	}
+}
+
+Gen_CacheClear :: proc(cache: ^Gen_Cache) {
+	for _, en in cache.entries do delete(en.grid.v, cache.allocator)
+	clear(&cache.entries)
+}
+
+Gen_CacheDestroy :: proc(cache: ^Gen_Cache) {
+	Gen_CacheClear(cache)
+	delete(cache.entries)
+	cache^ = {}
+}
+
+// Gen_CachePrune forgets the nodes no longer in the graph.
+Gen_CachePrune :: proc(cache: ^Gen_Cache, g: ^Gen_Graph) {
+	gone := make([dynamic]int, context.temp_allocator)
+	for id in cache.entries do if Gen_FindNode(g, id) == nil do append(&gone, id)
+	for id in gone do Gen_CacheForget(cache, id)
+}
+
+// Gen_CacheGrid: a node's grid from the last evaluation that computed it.
+Gen_CacheGrid :: proc(cache: ^Gen_Cache, id: int) -> (Gen_Grid, bool) {
+	en, ok := cache.entries[id]
+	return en.grid, ok
+}
+
+// --- one evaluation -------------------------------------------------------------------
+
+@(private)
+Gen_Eval :: struct {
+	g:      ^Gen_Graph,
+	seed:   u64,
+	done:   map[int]Gen_Grid,
+	active: map[int]bool, // being evaluated (a cycle if met again)
+	keys:   map[int]u64,  // nodes' cache keys (with a cache)
+	cache:  ^Gen_Cache,
+	err:    string,
+	L:      ^lua.State,   // Script nodes' (made by the first one, closed at the end)
+	fns:    map[string]c.int, // script file -> its function (a registry ref in L)
+}
+
+@(private)
+gen_eval_begin :: proc(g: ^Gen_Graph, seed: u64, cache: ^Gen_Cache = nil) -> Gen_Eval {
+	ev := Gen_Eval{g = g, seed = seed if seed != 0 else g.seed, cache = cache}
+	ev.done = make(map[int]Gen_Grid, allocator = context.temp_allocator)
+	ev.active = make(map[int]bool, allocator = context.temp_allocator)
+	ev.keys = make(map[int]u64, allocator = context.temp_allocator)
+	ev.fns = make(map[string]c.int, allocator = context.temp_allocator)
+	return ev
+}
+
+@(private)
+gen_eval_end :: proc(ev: ^Gen_Eval) {
+	if ev.L != nil do lua.close(ev.L)
+	ev.L = nil
+}
+
+// Gen_Evaluate computes a node's grid (id 0: the output node) for a seed
+// (the graph's seed when 0). The grid's values are in `allocator`. With a
+// cache, unchanged nodes reuse their grids from earlier evaluations.
+Gen_Evaluate :: proc(g: ^Gen_Graph, id := 0, seed: u64 = 0, allocator := context.allocator, cache: ^Gen_Cache = nil) -> (grid: Gen_Grid, err: string) {
+	target := Gen_OutputNode(g) if id == 0 else Gen_FindNode(g, id)
+	if target == nil do return {}, "the graph has no nodes" if id == 0 else fmt.tprintf("no node %d", id)
+	ev := gen_eval_begin(g, seed, cache)
+	defer gen_eval_end(&ev)
+	tmp, ok := gen_eval(&ev, target.id)
+	if !ok do return {}, ev.err
+	grid = {tmp.w, tmp.h, make([]f32, len(tmp.v), allocator)}
+	copy(grid.v, tmp.v)
+	return grid, ""
+}
+
+Gen_GridDestroy :: proc(grid: ^Gen_Grid, allocator := context.allocator) {
+	delete(grid.v, allocator)
+	grid.v = nil
+}
+
+@(private)
+gen_new :: proc(ev: ^Gen_Eval) -> Gen_Grid {
+	w, h := ev.g.size.x, ev.g.size.y
+	return {w, h, make([]f32, w * h, context.temp_allocator)}
+}
+
+// gen_input: a node's input grid (empty - zeros - when not connected).
+@(private)
+gen_input :: proc(ev: ^Gen_Eval, n: ^Gen_Node, i: int) -> (Gen_Grid, bool) {
+	if n.inputs[i] == 0 do return gen_new(ev), true
+	return gen_eval(ev, n.inputs[i])
+}
+
+// gen_key: what a node's grid depends on - its kind and settings, its
+// inputs' keys, the size, the seed, a script's text, a custom kind's proc -
+// hashed (equal keys: the same grid).
+@(private)
+gen_key :: proc(ev: ^Gen_Eval, id: int) -> u64 {
+	if k, ok := ev.keys[id]; ok do return k
+	ev.keys[id] = 0 // (a cycle: reported by the evaluation)
+	n := Gen_FindNode(ev.g, id)
+	if n == nil do return 0
+	h := gen_mix(gen_mix(ev.seed, u64(id)), u64(n.kind) + 1)
+	h = gen_mix(gen_mix(h, u64(ev.g.size.x)), u64(ev.g.size.y))
+	for p in n.params do h = gen_mix(h, transmute(u64)p)
+	for src in n.inputs do h = gen_mix(h, gen_key(ev, src) if src != 0 else 0x5eed)
+	switch n.kind {
+	case .Script:
+		h = gen_mix(h, hash.fnv64a(transmute([]u8)n.script))
+		if src, ok := ev.g.scripts[n.script]; ok do h = gen_mix(h, hash.fnv64a(transmute([]u8)src))
+	case .Custom:
+		h = gen_mix(h, hash.fnv64a(transmute([]u8)n.custom))
+		if def := Gen_FindCustomKind(n.custom); def != nil do h = gen_mix(h, u64(uintptr(rawptr(def.eval))))
+	case .Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker, .Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine, .Scatter, .Surface, .Tile_Output, .Entity_Output:
+	}
+	ev.keys[id] = h
+	return h
+}
+
+@(private)
+gen_eval :: proc(ev: ^Gen_Eval, id: int) -> (result: Gen_Grid, ok: bool) {
+	if grid, ok := ev.done[id]; ok do return grid, true
+	n := Gen_FindNode(ev.g, id)
+	if n == nil {
+		ev.err = fmt.tprintf("a node is connected to node %d, which doesn't exist", id)
+		return {}, false
+	}
+	if ev.active[id] {
+		ev.err = fmt.tprintf("a cycle through node %d", id)
+		return {}, false
+	}
+	key: u64
+	if ev.cache != nil {
+		key = gen_key(ev, id)
+		if en, hit := ev.cache.entries[id]; hit && en.key == key && en.grid.w == ev.g.size.x && en.grid.h == ev.g.size.y {
+			ev.done[id] = en.grid
+			return en.grid, true
+		}
+	}
+	ev.active[id] = true
+	defer delete_key(&ev.active, id)
+	out := gen_new(ev)
+	gen_compute(ev, n, out) or_return
+	if ev.cache != nil {
+		// Kept for the next evaluation (replacing the node's last grid).
+		Gen_CacheForget(ev.cache, id)
+		kept := Gen_Grid{out.w, out.h, make([]f32, len(out.v), ev.cache.allocator)}
+		copy(kept.v, out.v)
+		ev.cache.entries[id] = {key, kept}
+		out = kept
+	}
+	ev.done[id] = out
+	return out, true
+}
+
+// gen_compute fills `out` (zeros, the level's size) with a node's grid.
+@(private)
+gen_compute :: proc(ev: ^Gen_Eval, n: ^Gen_Node, out: Gen_Grid) -> bool {
+	nodeSeed := gen_mix(gen_mix(ev.seed, u64(n.id)), u64(i64(Gen_Param(n, "seed"))))
+	w, h := out.w, out.h
+	p :: Gen_Param
+	switch n.kind {
+	case .Constant:
+		slice.fill(out.v, f32(p(n, "value")))
+	case .Noise:
+		gen_noise(out, max(f32(p(n, "scale")), 0.5), clamp(int(p(n, "octaves")), 1, 8), f32(p(n, "persistence")), nodeSeed)
+	case .Random_Fill:
+		job := Gen_Fill_Job{out, f32(p(n, "density")), nodeSeed}
+		gen_parallel(h, w, &job, proc(data: rawptr, y0, y1: int) {
+			j := cast(^Gen_Fill_Job)data
+			#no_bounds_check for y in y0 ..< y1 do for x in 0 ..< j.out.w do j.out.v[y * j.out.w + x] = 1 if gen_hash01(x, y, j.seed) < j.density else 0
+		})
+	case .Gradient:
+		dir := int(p(n, "direction"))
+		for y in 0 ..< h do for x in 0 ..< w {
+			v: f32
+			switch dir {
+			case 1: v = f32(y) / f32(max(h - 1, 1))
+			case 2:
+				dx, dy := (f32(x) - f32(w - 1) * 0.5) / max(f32(w - 1) * 0.5, 1), (f32(y) - f32(h - 1) * 0.5) / max(f32(h - 1) * 0.5, 1)
+				v = clamp(1 - math.sqrt(dx * dx + dy * dy) / math.SQRT_TWO, 0, 1)
+			case: v = f32(x) / f32(max(w - 1, 1))
+			}
+			out.v[y * w + x] = v
+		}
+	case .Border:
+		bw := int(p(n, "width"))
+		for y in 0 ..< h do for x in 0 ..< w do out.v[y * w + x] = 1 if x < bw || y < bw || x >= w - bw || y >= h - bw else 0
+	case .Rect:
+		rx, ry, rw, rh := int(p(n, "x")), int(p(n, "y")), int(p(n, "w")), int(p(n, "h"))
+		val := f32(p(n, "value"))
+		x0 := clamp(rx, 0, w)
+		x1 := clamp(rx + rw, x0, w)
+		for y in max(ry, 0) ..< min(ry + rh, h) do slice.fill(out.v[y * w + x0:y * w + x1], val)
+	case .Threshold:
+		src := gen_input(ev, n, 0) or_return
+		t := f32(p(n, "value"))
+		inv := p(n, "invert") != 0
+		#no_bounds_check for v, i in src.v do out.v[i] = 1 if (v >= t) != inv else 0
+	case .Invert:
+		src := gen_input(ev, n, 0) or_return
+		#no_bounds_check for v, i in src.v do out.v[i] = 1 - v
+	case .Remap:
+		src := gen_input(ev, n, 0) or_return
+		a0, a1, b0, b1 := f32(p(n, "from_min")), f32(p(n, "from_max")), f32(p(n, "to_min")), f32(p(n, "to_max"))
+		span := a1 - a0 if a1 != a0 else 1
+		#no_bounds_check for v, i in src.v do out.v[i] = b0 + clamp((v - a0) / span, 0, 1) * (b1 - b0)
+	case .Blur:
+		src := gen_input(ev, n, 0) or_return
+		gen_blur(src, out, clamp(int(p(n, "radius")), 0, 32))
+	case .Cellular:
+		src := gen_input(ev, n, 0) or_return
+		gen_cellular(src, out, clamp(int(p(n, "iterations")), 0, 64), int(p(n, "birth")), int(p(n, "survive")), p(n, "edge_solid") != 0)
+	case .Dilate, .Erode:
+		src := gen_input(ev, n, 0) or_return
+		gen_morph(src, out, clamp(int(p(n, "iterations")), 0, 64), n.kind == .Dilate)
+	case .Combine:
+		a := gen_input(ev, n, 0) or_return
+		b := gen_input(ev, n, 1) or_return
+		gen_combine(a.v, b.v, out.v, int(p(n, "op")))
+	case .Script:
+		gen_script(ev, n, nodeSeed, out) or_return
+	case .Custom:
+		def := Gen_FindCustomKind(n.custom)
+		if def == nil {
+			ev.err = fmt.tprintf("node %d: no node type %q is registered", n.id, n.custom)
+			return false
+		}
+		call := Gen_Custom_Call{node = n, out = out, seed = nodeSeed}
+		for i in 0 ..< len(def.info.inputs) do call.inputs[i] = gen_input(ev, n, i) or_return
+		if e := def.eval(&call); e != "" {
+			ev.err = fmt.tprintf("node %d (%s): %s", n.id, n.custom, e)
+			return false
+		}
+	case .Tile_Output, .Entity_Output:
+		src := gen_input(ev, n, 0) or_return
+		copy(out.v, src.v) // (the tiles / entities come from Gen_Tiles / Gen_Entities: its grid is its input's)
+	case .Rooms:
+		minS := clamp(int(p(n, "min_size")), 2, 256)
+		maxS := clamp(int(p(n, "max_size")), minS, 512)
+		rng := nodeSeed
+		out := out
+		gen_bsp(&out, {1, 1, w - 2, h - 2}, minS, maxS, max(int(p(n, "corridor")), 1), &rng, 0)
+	case .Walker:
+		rng := nodeSeed
+		out := out
+		brush := clamp(int(p(n, "brush")), 1, 16)
+		dirs := [4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}
+		for _ in 0 ..< clamp(int(p(n, "walkers")), 1, 64) {
+			pos := [2]int{w / 2, h / 2}
+			for _ in 0 ..< clamp(int(p(n, "steps")), 0, 1_000_000) {
+				gen_carve(&out, pos.x - (brush - 1) / 2, pos.y - (brush - 1) / 2, brush, brush)
+				d := dirs[gen_rand_int(&rng, 0, 3)]
+				pos = {clamp(pos.x + d.x, 1, max(w - 2, 1)), clamp(pos.y + d.y, 1, max(h - 2, 1))}
+			}
+		}
+	case .Scatter:
+		src := gen_input(ev, n, 0) or_return
+		gen_scatter(src, out, n.inputs[0] != 0, f32(p(n, "chance")), clamp(int(p(n, "spacing")), 0, 256), nodeSeed)
+	case .Surface:
+		src := gen_input(ev, n, 0) or_return
+		gen_surface(src, out, int(p(n, "side")))
+	}
+	return true
+}
+
+// --- tiles and entities -----------------------------------------------------------------
+
+// Gen_Tiles turns a Tile_Output node's grid into tile indices (row-major;
+// -1 = empty): the first rule whose range holds the value, one of its
+// tiles picked by a hash of the cell and the seed.
+Gen_Tiles :: proc(g: ^Gen_Graph, outputId := 0, seed: u64 = 0, allocator := context.allocator, cache: ^Gen_Cache = nil) -> (tiles: []i32, size: [2]int, err: string) {
+	ev := gen_eval_begin(g, seed, cache)
+	defer gen_eval_end(&ev)
+	return gen_tiles(&ev, outputId, allocator)
+}
+
+@(private)
+gen_tiles :: proc(ev: ^Gen_Eval, outputId: int, allocator: runtime.Allocator) -> (tiles: []i32, size: [2]int, err: string) {
+	out := Gen_OutputNode(ev.g) if outputId == 0 else Gen_FindNode(ev.g, outputId)
+	if out == nil do return nil, {}, "the graph has no nodes"
+	if out.kind != .Tile_Output do return nil, {}, fmt.tprintf("node %d isn't a tile output", out.id)
+	grid, ok := gen_eval(ev, out.id)
+	if !ok do return nil, {}, ev.err
+	return Gen_TilesOf(out, grid, ev.seed, allocator), {grid.w, grid.h}, ""
+}
+
+// Gen_TilesOf: a tile output's tiles for its grid (already evaluated) and
+// the evaluation's seed (the graph's when it was 0).
+Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := context.allocator) -> []i32 {
+	pickSeed := gen_mix(gen_mix(seed, u64(out.id)), 0x7111e)
+	empty := i32(Gen_Param(out, "empty"))
+	tiles := make([]i32, len(grid.v), allocator)
+	#no_bounds_check for v, i in grid.v {
+		t := empty
+		for r in out.rules {
+			if v < r.min || v > r.max || len(r.tiles) == 0 do continue
+			t = r.tiles[0] if len(r.tiles) == 1 else r.tiles[int(gen_hash01(i % grid.w, i / grid.w, pickSeed) * f32(len(r.tiles))) % len(r.tiles)]
+			break
+		}
+		tiles[i] = t
+	}
+	return tiles
+}
+
+// A generated level: its tiles and entity placements (Gen_Generate) -
+// computed on any thread (the graph untouched), applied on the main one
+// (Gen_ApplyResult). The entities' components are the graph's: keep it
+// until the result is applied.
+Gen_Result :: struct {
+	size:     [2]int,
+	tiles:    []i32,
+	entities: [dynamic]Gen_Entity,
+}
+
+// Gen_Generate: the level's tiles and entities, the graph evaluated once.
+Gen_Generate :: proc(g: ^Gen_Graph, seed: u64 = 0, allocator := context.allocator) -> (r: Gen_Result, err: string) {
+	ev := gen_eval_begin(g, seed)
+	defer gen_eval_end(&ev)
+	r.tiles, r.size, err = gen_tiles(&ev, 0, allocator)
+	if err == "" do r.entities, err = gen_entities(&ev, allocator)
+	if err != "" do Gen_ResultDestroy(&r, allocator)
+	return
+}
+
+Gen_ResultDestroy :: proc(r: ^Gen_Result, allocator := context.allocator) {
+	delete(r.tiles, allocator)
+	delete(r.entities)
+	r^ = {}
+}
+
+// A component placed by an entity output, at a cell.
+Gen_Entity :: struct {
+	component: string, // (the graph's)
+	cell:      [2]int,
+}
+
+// Gen_Entities: every entity output's placements (its points: cells >=
+// 0.5; with `max`, that many picked by the seed), in node then row order.
+Gen_Entities :: proc(g: ^Gen_Graph, seed: u64 = 0, allocator := context.allocator) -> (out: [dynamic]Gen_Entity, err: string) {
+	ev := gen_eval_begin(g, seed)
+	defer gen_eval_end(&ev)
+	return gen_entities(&ev, allocator)
+}
+
+@(private)
+gen_entities :: proc(ev: ^Gen_Eval, allocator: runtime.Allocator) -> (out: [dynamic]Gen_Entity, err: string) {
+	out = make([dynamic]Gen_Entity, allocator)
+	for &n in ev.g.nodes {
+		if n.kind != .Entity_Output || n.component == "" do continue
+		grid, ok := gen_eval(ev, n.id)
+		if !ok do return out, ev.err
+		Cell :: struct {cell: [2]int, key: f32}
+		cells := make([dynamic]Cell, context.temp_allocator)
+		pickSeed := gen_mix(gen_mix(ev.seed, u64(n.id)), 0xe171)
+		for v, i in grid.v do if v >= 0.5 do append(&cells, Cell{{i % grid.w, i / grid.w}, gen_hash01(i % grid.w, i / grid.w, pickSeed)})
+		limit := int(Gen_Param(&n, "max"))
+		if limit > 0 && len(cells) > limit {
+			// The `limit` with the lowest keys, back in row order.
+			keys := make([]f32, len(cells), context.temp_allocator)
+			for c, i in cells do keys[i] = c.key
+			slice.sort(keys)
+			cut := keys[limit - 1]
+			kept := 0
+			for c in cells do if c.key <= cut && kept < limit {
+				append(&out, Gen_Entity{n.component, c.cell})
+				kept += 1
+			}
+			continue
+		}
+		for c in cells do append(&out, Gen_Entity{n.component, c.cell})
+	}
+	return out, ""
+}
+
+// --- kernels ------------------------------------------------------------------------------
+
+@(private = "file")
+Gen_Fill_Job :: struct {
+	out:     Gen_Grid,
+	density: f32,
+	seed:    u64,
+}
+
+// gen_noise: value noise fBm. Each octave's lattice of random corners is
+// made once (a cell then reads four of them instead of hashing four) -
+// unless the lattice would be far bigger than the grid (tiny features).
+@(private = "file")
+Gen_Noise_Job :: struct {
+	out:         Gen_Grid,
+	octaves:     int,
+	freq, amp:   [8]f32,
+	norm:        f32,
+	seed:        u64,
+	lattice:     [8][]f32,
+	lw:          [8]int,
+}
+
+@(private = "file")
+gen_noise :: proc(out: Gen_Grid, scale: f32, octaves: int, persistence: f32, seed: u64) {
+	job := Gen_Noise_Job{out = out, octaves = octaves, seed = seed}
+	amp, freq: f32 = 1, 1 / scale
+	for o in 0 ..< octaves {
+		job.freq[o], job.amp[o] = freq, amp
+		job.norm += amp
+		lw, lh := int(math.floor(f32(out.w - 1) * freq)) + 2, int(math.floor(f32(out.h - 1) * freq)) + 2
+		if lw * lh <= 4 * out.w * out.h + 64 {
+			oseed := seed + u64(o) * 7919
+			lat := make([]f32, lw * lh, context.temp_allocator)
+			for j in 0 ..< lh do for i in 0 ..< lw do lat[j * lw + i] = gen_hash01(i, j, oseed)
+			job.lattice[o], job.lw[o] = lat, lw
+		}
+		amp *= persistence
+		freq *= 2
+	}
+	job.norm = max(job.norm, 0.0001)
+	gen_parallel(out.h, out.w * octaves * 2, &job, proc(data: rawptr, y0, y1: int) {
+		j := cast(^Gen_Noise_Job)data
+		w := j.out.w
+		#no_bounds_check for y in y0 ..< y1 do for x in 0 ..< w {
+			sum: f32
+			for o in 0 ..< j.octaves {
+				fx, fy := f32(x) * j.freq[o], f32(y) * j.freq[o]
+				lat := j.lattice[o]
+				if lat == nil {
+					sum += gen_value_noise(fx, fy, j.seed + u64(o) * 7919) * j.amp[o]
+					continue
+				}
+				x0, y0 := math.floor(fx), math.floor(fy)
+				tx, ty := fx - x0, fy - y0
+				ix, iy, lw := int(x0), int(y0), j.lw[o]
+				sx, sy := tx * tx * (3 - 2 * tx), ty * ty * (3 - 2 * ty)
+				k := iy * lw + ix
+				a, b, c, d := lat[k], lat[k + 1], lat[k + lw], lat[k + lw + 1]
+				sum += math.lerp(math.lerp(a, b, sx), math.lerp(c, d, sx), sy) * j.amp[o]
+			}
+			j.out.v[y * w + x] = sum / j.norm
+		}
+	})
+}
+
+// gen_blur: the average over a (2r+1)^2 box clipped to the grid - a
+// sliding sum along each row, then one down each band of columns: the same
+// cost whatever the radius.
+@(private = "file")
+Gen_Blur_Job :: struct {
+	src, out: Gen_Grid,
+	rows:     []f32, // the row sums
+	r:        int,
+}
+
+GEN_BLUR_BAND :: 64
+
+@(private = "file")
+gen_blur :: proc(src, out: Gen_Grid, r: int) {
+	if r == 0 {
+		copy(out.v, src.v)
+		return
+	}
+	job := Gen_Blur_Job{src = src, out = out, rows = make([]f32, len(src.v), context.temp_allocator), r = r}
+	gen_parallel(out.h, out.w * 4, &job, proc(data: rawptr, y0, y1: int) {
+		j := cast(^Gen_Blur_Job)data
+		w, r := j.src.w, j.r
+		#no_bounds_check for y in y0 ..< y1 {
+			row := j.src.v[y * w:(y + 1) * w]
+			sum: f64
+			for x in 0 ..= min(r, w - 1) do sum += f64(row[x])
+			for x in 0 ..< w {
+				j.rows[y * w + x] = f32(sum)
+				if x + r + 1 < w do sum += f64(row[x + r + 1])
+				if x - r >= 0 do sum -= f64(row[x - r])
+			}
+		}
+	})
+	bands := (out.w + GEN_BLUR_BAND - 1) / GEN_BLUR_BAND
+	gen_parallel(bands, out.h * GEN_BLUR_BAND * 4, &job, proc(data: rawptr, b0, b1: int) {
+		j := cast(^Gen_Blur_Job)data
+		w, h, r := j.src.w, j.src.h, j.r
+		#no_bounds_check for b in b0 ..< b1 {
+			x0, x1 := b * GEN_BLUR_BAND, min((b + 1) * GEN_BLUR_BAND, w)
+			cols: [GEN_BLUR_BAND]f64
+			for y in 0 ..= min(r, h - 1) do for x in x0 ..< x1 do cols[x - x0] += f64(j.rows[y * w + x])
+			for y in 0 ..< h {
+				ch := f64(min(y + r, h - 1) - max(y - r, 0) + 1)
+				for x in x0 ..< x1 {
+					cw := f64(min(x + r, w - 1) - max(x - r, 0) + 1)
+					j.out.v[y * w + x] = f32(cols[x - x0] / (cw * ch))
+				}
+				if y + r + 1 < h do for x in x0 ..< x1 do cols[x - x0] += f64(j.rows[(y + r + 1) * w + x])
+				if y - r >= 0 do for x in x0 ..< x1 do cols[x - x0] -= f64(j.rows[(y - r) * w + x])
+			}
+		}
+	})
+}
+
+// gen_cellular: the cave automaton on bytes (1 = solid) with a cell of
+// border all round (solid when edge cells count as solid), so a cell's
+// eight neighbours are plain reads.
+@(private = "file")
+Gen_Cell_Job :: struct {
+	cur, next:     []u8,
+	w, pw:         int, // the grid's width, the padded one
+	birth, survive: u8,
+}
+
+@(private = "file")
+gen_cellular :: proc(src, out: Gen_Grid, iterations, birth, survive: int, edge: bool) {
+	w, h := src.w, src.h
+	pw := w + 2
+	a := make([]u8, pw * (h + 2), context.temp_allocator)
+	b := make([]u8, len(a), context.temp_allocator)
+	slice.fill(a, 1 if edge else 0)
+	for y in 0 ..< h do for x in 0 ..< w do a[(y + 1) * pw + x + 1] = 1 if src.v[y * w + x] >= 0.5 else 0
+	copy(b, a)
+	job := Gen_Cell_Job{a, b, w, pw, u8(clamp(birth, 0, 9)), u8(clamp(survive, 0, 9))}
+	for _ in 0 ..< iterations {
+		gen_parallel(h, w * 10, &job, proc(data: rawptr, y0, y1: int) {
+			j := cast(^Gen_Cell_Job)data
+			pw := j.pw
+			c, nx := j.cur, j.next
+			#no_bounds_check for y in y0 ..< y1 {
+				row := (y + 1) * pw + 1
+				for i in row ..< row + j.w {
+					count := c[i - pw - 1] + c[i - pw] + c[i - pw + 1] + c[i - 1] + c[i + 1] + c[i + pw - 1] + c[i + pw] + c[i + pw + 1]
+					nx[i] = 1 if (c[i] != 0 && count >= j.survive) || (c[i] == 0 && count >= j.birth) else 0
+				}
+			}
+		})
+		job.cur, job.next = job.next, job.cur
+	}
+	for y in 0 ..< h do for x in 0 ..< w do out.v[y * w + x] = f32(job.cur[(y + 1) * pw + x + 1])
+}
+
+// gen_morph: dilate (the largest of a cell and its four neighbours) or
+// erode (the smallest), iterated.
+@(private = "file")
+Gen_Morph_Job :: struct {
+	cur, next: []f32,
+	w, h:      int,
+	grow:      bool,
+}
+
+@(private = "file")
+gen_morph :: proc(src, out: Gen_Grid, iterations: int, grow: bool) {
+	if iterations == 0 {
+		copy(out.v, src.v)
+		return
+	}
+	job := Gen_Morph_Job{make([]f32, len(src.v), context.temp_allocator), make([]f32, len(src.v), context.temp_allocator), src.w, src.h, grow}
+	copy(job.cur, src.v)
+	for _ in 0 ..< iterations {
+		gen_parallel(src.h, src.w * 5, &job, proc(data: rawptr, y0, y1: int) {
+			j := cast(^Gen_Morph_Job)data
+			w, h := j.w, j.h
+			#no_bounds_check for y in y0 ..< y1 {
+				row := j.cur[y * w:(y + 1) * w]
+				above := j.cur[(y - 1) * w:y * w] if y > 0 else row
+				below := j.cur[(y + 1) * w:(y + 2) * w] if y < h - 1 else row
+				dst := j.next[y * w:(y + 1) * w]
+				for x in 0 ..< w {
+					l := row[x - 1] if x > 0 else row[x]
+					r := row[x + 1] if x < w - 1 else row[x]
+					if j.grow do dst[x] = max(row[x], l, r, above[x], below[x])
+					else do dst[x] = min(row[x], l, r, above[x], below[x])
+				}
+			}
+		})
+		job.cur, job.next = job.next, job.cur
+	}
+	copy(out.v, job.cur)
+}
+
+@(private = "file")
+gen_combine :: proc(a, b, out: []f32, op: int) {
+	switch op {
+	case 1: for i in 0 ..< len(out) do out[i] = a[i] - b[i]
+	case 2: for i in 0 ..< len(out) do out[i] = a[i] * b[i]
+	case 3: for i in 0 ..< len(out) do out[i] = min(a[i], b[i])
+	case 4: for i in 0 ..< len(out) do out[i] = max(a[i], b[i])
+	case 5: for i in 0 ..< len(out) do out[i] = a[i] if b[i] >= 0.5 else 0
+	case 6: for i in 0 ..< len(out) do out[i] = (a[i] + b[i]) * 0.5
+	case: for i in 0 ..< len(out) do out[i] = a[i] + b[i]
+	}
+}
+
+// gen_scatter: random points at least `spacing` cells apart, in row order -
+// a point is kept unless one already kept lies within spacing - 1 cells
+// (left, right or above). The row of the last point in each column is kept,
+// so the check is a scan along one row of columns.
+@(private = "file")
+gen_scatter :: proc(src, out: Gen_Grid, masked: bool, chance: f32, spacing: int, seed: u64) #no_bounds_check {
+	w, h := src.w, src.h
+	last := make([]int, w, context.temp_allocator)
+	slice.fill(last, min(int) / 2)
+	#no_bounds_check for y in 0 ..< h do for x in 0 ..< w {
+		if masked && src.v[y * w + x] < 0.5 do continue
+		if gen_hash01(x, y, seed) >= chance do continue
+		near := false
+		for xx in max(x - spacing + 1, 0) ..< min(x + spacing, w) do if last[xx] > y - spacing {
+			near = true
+			break
+		}
+		if near do continue
+		out.v[y * w + x] = 1
+		last[x] = y
+	}
+}
+
+@(private = "file")
+gen_surface :: proc(src, out: Gen_Grid, side: int) {
+	w, h := src.w, src.h
+	solid :: #force_inline proc(g: Gen_Grid, x, y: int) -> bool #no_bounds_check {return x >= 0 && y >= 0 && x < g.w && y < g.h && g.v[y * g.w + x] >= 0.5}
+	#no_bounds_check for y in 0 ..< h do for x in 0 ..< w {
+		if src.v[y * w + x] >= 0.5 do continue
+		on: bool
+		switch side {
+		case 1: on = solid(src, x, y - 1)
+		case 2: on = solid(src, x + 1, y) || solid(src, x - 1, y) || solid(src, x, y + 1) || solid(src, x, y - 1)
+		case: on = solid(src, x, y + 1)
+		}
+		out.v[y * w + x] = 1 if on else 0
+	}
+}
+
+// --- worker threads -----------------------------------------------------------------------
+//
+// gen_parallel runs fn over items 0..<count (rows, bands) in chunks, on a
+// few worker threads made once and on this thread, and returns when all are
+// done. Each item writes only its own cells, so the result is the same as
+// in one thread. Small jobs (count * cost per item under GEN_PARALLEL_MIN),
+// the web build, and a second evaluation while one uses the workers (the
+// editor's previews and a game's background generation) run here, in order.
+
+GEN_PARALLEL_MIN :: #config(GEN_PARALLEL_MIN, 48_000)
+GEN_MAX_WORKERS :: 7
+
+Gen_Parallel_Proc :: #type proc(data: rawptr, lo, hi: int)
+
+@(private = "file")
+gen_pool: struct {
+	once:      sync.Once,
+	busy:      sync.Mutex, // one job at a time
+	workers:   [GEN_MAX_WORKERS]^thread.Thread,
+	count:     int,
+	wake:      sync.Sema,
+	finished:  sync.Sema,
+	// The job.
+	fn:        Gen_Parallel_Proc,
+	data:      rawptr,
+	items:     int,
+	chunk:     int,
+	next:      int, // (atomic) the next item to take
+}
+
+// Gen_ParallelWorkers: how many worker threads split the heavy nodes (0:
+// they run on the calling thread only).
+Gen_ParallelWorkers :: proc() -> int {
+	when ODIN_OS == .JS {
+		return 0
+	} else {
+		sync.once_do(&gen_pool.once, gen_pool_start)
+		return gen_pool.count
+	}
+}
+
+@(private = "file")
+gen_pool_start :: proc() {
+	when ODIN_OS != .JS {
+		context.allocator = runtime.heap_allocator() // (the threads live as long as the program)
+		n := clamp(os.get_processor_core_count() - 1, 0, GEN_MAX_WORKERS)
+		for i in 0 ..< n {
+			t := thread.create(gen_pool_worker)
+			if t == nil do break
+			t.init_context = context
+			thread.start(t)
+			gen_pool.workers[i] = t
+			gen_pool.count += 1
+		}
+	}
+}
+
+@(private = "file")
+gen_pool_worker :: proc(t: ^thread.Thread) {
+	for {
+		sync.sema_wait(&gen_pool.wake)
+		gen_pool_take()
+		sync.sema_post(&gen_pool.finished)
+	}
+}
+
+@(private = "file")
+gen_pool_take :: proc() {
+	for {
+		lo := sync.atomic_add(&gen_pool.next, gen_pool.chunk)
+		if lo >= gen_pool.items do return
+		gen_pool.fn(gen_pool.data, lo, min(lo + gen_pool.chunk, gen_pool.items))
+	}
+}
+
+@(private)
+gen_parallel :: proc(count, costPerItem: int, data: rawptr, fn: Gen_Parallel_Proc) {
+	if count <= 0 do return
+	workers := Gen_ParallelWorkers() if count * max(costPerItem, 1) >= GEN_PARALLEL_MIN && count > 1 else 0
+	if workers == 0 || !sync.mutex_try_lock(&gen_pool.busy) {
+		fn(data, 0, count)
+		return
+	}
+	defer sync.mutex_unlock(&gen_pool.busy)
+	use := min(workers, count - 1)
+	gen_pool.fn, gen_pool.data, gen_pool.items = fn, data, count
+	gen_pool.chunk = max(count / ((use + 1) * 4), 1)
+	sync.atomic_store(&gen_pool.next, 0)
+	for _ in 0 ..< use do sync.sema_post(&gen_pool.wake)
+	gen_pool_take()
+	for _ in 0 ..< use do sync.sema_wait(&gen_pool.finished)
+}

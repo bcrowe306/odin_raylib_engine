@@ -60,6 +60,13 @@ tasks:
       - mkdir -p bin
       - odin build . -out:{{.GAME_BIN}} $(./scripts/odin_flags.sh)
 
+  build:game:release:
+    desc: Build an optimized Play game (-o:speed; bin/rayzr)
+    dir: ..
+    cmds:
+      - mkdir -p bin
+      - odin build . -o:speed -out:{{.GAME_BIN}} $(./scripts/odin_flags.sh)
+
   build:runners:
     desc: Build the prebuilt game runners Export uses (bin/runners/<platform>)
     dir: ..
@@ -79,6 +86,13 @@ tasks:
     desc: Build and run the editor (PROJECT=path opens a project; otherwise the Welcome window)
     dir: ..
     deps: [build, build:game]
+    cmds:
+      - RAYZR_GAME_BIN={{.GAME_BIN}} ./{{.EDITOR_BIN}} {{if .PROJECT}}--project "{{.PROJECT}}"{{end}} {{.CLI_ARGS}}
+
+  run:fast:
+    desc: Build optimized (-o:speed) and run the editor - for play-testing (heavy work like level generation is ~8x faster than the default unoptimized build); PROJECT=path optional
+    dir: ..
+    deps: [build:release, build:game:release]
     cmds:
       - RAYZR_GAME_BIN={{.GAME_BIN}} ./{{.EDITOR_BIN}} {{if .PROJECT}}--project "{{.PROJECT}}"{{end}} {{.CLI_ARGS}}
 
