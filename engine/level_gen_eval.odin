@@ -152,7 +152,7 @@ gen_key :: proc(ev: ^Gen_Eval, id: int) -> u64 {
 	case .Custom:
 		h = gen_mix(h, hash.fnv64a(transmute([]u8)n.custom))
 		if def := Gen_FindCustomKind(n.custom); def != nil do h = gen_mix(h, u64(uintptr(rawptr(def.eval))))
-	case .Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker, .Lines, .Rectangles, .Circles, .Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine, .Scatter, .Surface, .Tile_Output, .Entity_Output:
+	case .Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker, .Lines, .Rectangles, .Circles, .Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine, .Scatter, .Surface, .Flood_Fill, .Regions, .Connect_Regions, .Path, .Check, .Tile_Output, .Entity_Output:
 	}
 	ev.keys[id] = h
 	return h
@@ -307,6 +307,26 @@ gen_compute :: proc(ev: ^Gen_Eval, n: ^Gen_Node, out: Gen_Grid) -> bool {
 	case .Surface:
 		src := gen_input(ev, n, 0) or_return
 		gen_surface(src, out, int(p(n, "side")))
+	case .Flood_Fill:
+		src := gen_input(ev, n, 0) or_return
+		gen_flood_fill(src, out, int(p(n, "x")), int(p(n, "y")), p(n, "open") != 0, p(n, "diagonal") != 0)
+	case .Regions:
+		src := gen_input(ev, n, 0) or_return
+		gen_regions(src, out, p(n, "mode") != 0, int(p(n, "min_size")), p(n, "open") != 0, p(n, "diagonal") != 0)
+	case .Connect_Regions:
+		src := gen_input(ev, n, 0) or_return
+		gen_connect_regions(src, out, clamp(int(p(n, "width")), 1, 16), int(p(n, "min_size")), p(n, "open") != 0, p(n, "diagonal") != 0)
+	case .Path:
+		src := gen_input(ev, n, 0) or_return
+		custom := [4]int{int(p(n, "start_x")), int(p(n, "start_y")), int(p(n, "end_x")), int(p(n, "end_y"))}
+		gen_path(src, out, int(p(n, "placement")), custom, clamp(int(p(n, "width")), 1, 16), p(n, "open") != 0, int(p(n, "output")))
+	case .Check:
+		src := gen_input(ev, n, 0) or_return
+		if why := gen_check(src, f32(p(n, "min_open")), p(n, "connected") != 0, p(n, "open") != 0, p(n, "diagonal") != 0); why != "" {
+			ev.err = fmt.tprintf("node %d (check): %s", n.id, why)
+			return false
+		}
+		copy(out.v, src.v)
 	}
 	return true
 }

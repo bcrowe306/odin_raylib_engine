@@ -168,6 +168,31 @@ merge). Mix them with the rest: `combine` (max) adds ledges to a cave,
 | `tile_output` | `empty` (-1), `rules` | Each cell takes the first rule whose `min`..`max` holds its value: one of its `tiles` (or `tile`), picked by the cell and the seed. Cells no rule takes get `empty` (-1: none). |
 | `entity_output` | `max` (0 = all), `component` | Its component (a `.component.json`) on every point of its input (cells >= 0.5) - `max` of them picked by the seed. A graph can have several (enemies, coins, the player's start). |
 
+## Playable levels
+
+Random caves leave pockets the player can't reach; these nodes make a
+level you can play through. Each has an **`open`** choice - which cells are
+walkable: `low` (below 0.5: caves from `cellular`, where 1 is rock; the
+default) or `high` (0.5 and above: the floors of `rooms` and `walker`) - and
+most a **`diagonal`** toggle (cells touching at a corner count as joined).
+
+| Type | Parameters | |
+|---|---|---|
+| `flood_fill` | `x`, `y` (-1: the middle), `open`, `diagonal` | 1 on the open cells reachable from that cell (a closed one: from the nearest open cell), 0 elsewhere. A mask for spawns. |
+| `regions` | `mode`: `keep_largest` / `remove_small`, `min_size` (20), `open`, `diagonal` | Fills the areas you couldn't reach: all but the biggest, or those under `min_size` cells. |
+| `connect_regions` | `width` (1), `min_size` (0), `open`, `diagonal` | Joins every open area into one with the shortest corridors - the cheapest bridges between areas that join them all - never through the outer row. Areas under `min_size` cells are filled instead. |
+| `path` | `placement`: `left_right`, `top_bottom`, `farthest`, `custom` (`start_x`, `start_y`, `end_x`, `end_y`), `width` (1), `open`, `output`: `level`, `path`, `start`, `end` | Guarantees a way from a start to an exit: the cheapest route - through open cells where it can, carving rock where it must. `level` gives the input with it carved; `path` the route's cells; `start` / `end` that one cell (feed an Entity Output: the player, the door). |
+| `check` | `min_open` (0.25), `connected` (true), `open`, `diagonal` | Its input unchanged - or an error when less than `min_open` of the level is open, or (`connected`) the open cells are in more than one area. |
+
+The level nodes (`regions`, `connect_regions`, `path` with `level`) give
+their input back as 0 / 1 in the same sense, so they chain: `cellular` ->
+`connect_regions` -> `check` -> tile output.
+
+A **Level Generator** node with **Random Seed** tries other seeds when the
+generator refuses a level (an error, e.g. from `check`) - **Attempts** in all
+(10 by default); **Last Seed** is the seed of the level made. With a fixed
+seed it reports the error instead.
+
 ## Placing things
 
 Feed an **entity output** with points - a `scatter` of a `surface`, for
@@ -258,6 +283,7 @@ entities). No script needed.
 | Seed / Random Seed | A fixed level, or a new one each time - **Last Seed** says which (save it to replay the level). |
 | Generate On Ready | Make a level when the scene starts. |
 | Background | Make it on a worker thread while the game runs; `generated` fires when it is in. |
+| Attempts | With Random Seed: seeds tried when the generator refuses a level (a `check` node) before it gives up (10). |
 
 **Level Parameters** in the Inspector: change a generator node's value for
 this node only - one generator file, many levels (denser caves later on).

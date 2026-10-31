@@ -1362,6 +1362,7 @@ function SpawnerNode:set_property(path, value, y) end
 ---@field randomSeed boolean A new random seed every time it generates (Last Seed tells which).
 ---@field generateOnReady boolean Generate when the scene starts (else call generate() or connect a signal to it).
 ---@field background boolean Generate on a worker thread while the game runs; the level goes in when it is done (gen...
+---@field attempts integer With Random Seed: seeds tried when the generator refuses a level (a Check node: too lit...
 ---@field lastSeed integer The seed of the last level made (runtime, read-only).
 
 ---@alias LevelGeneratorNodeProperty
@@ -1381,6 +1382,7 @@ function SpawnerNode:set_property(path, value, y) end
 ---| "randomSeed" # boolean - A new random seed every time it generates (Last Seed tells which).
 ---| "generateOnReady" # boolean - Generate when the scene starts (else call generate() or connect a signal to it).
 ---| "background" # boolean - Generate on a worker thread while the game runs; the level goes in when it is done (gen...
+---| "attempts" # integer - With Random Seed: seeds tried when the generator refuses a level (a Check node: too lit...
 ---| "lastSeed" # integer (runtime) - The seed of the last level made (runtime, read-only).
 
 ---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
@@ -1404,6 +1406,7 @@ function SpawnerNode:set_property(path, value, y) end
 ---@overload fun(self: LevelGeneratorNode, path: "randomSeed"): boolean
 ---@overload fun(self: LevelGeneratorNode, path: "generateOnReady"): boolean
 ---@overload fun(self: LevelGeneratorNode, path: "background"): boolean
+---@overload fun(self: LevelGeneratorNode, path: "attempts"): integer
 ---@overload fun(self: LevelGeneratorNode, path: "lastSeed"): integer
 function LevelGeneratorNode:get_property(path) end
 
@@ -1429,6 +1432,7 @@ function LevelGeneratorNode:get_property(path) end
 ---@overload fun(self: LevelGeneratorNode, path: "randomSeed", value: boolean)
 ---@overload fun(self: LevelGeneratorNode, path: "generateOnReady", value: boolean)
 ---@overload fun(self: LevelGeneratorNode, path: "background", value: boolean)
+---@overload fun(self: LevelGeneratorNode, path: "attempts", value: integer)
 ---@overload fun(self: LevelGeneratorNode, path: "lastSeed", value: integer)
 function LevelGeneratorNode:set_property(path, value, y) end
 

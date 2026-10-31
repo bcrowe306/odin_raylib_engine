@@ -713,12 +713,13 @@ lge_canvas :: proc(state: ^EditorState) {
 				lge.selected = 0
 			}
 		} else {
-			groups := [3]struct {
+			groups := [4]struct {
 				label: cstring,
 				kinds: []e.Gen_Kind,
 			}{
 				{"Generators", {.Constant, .Noise, .Random_Fill, .Gradient, .Border, .Rect, .Rooms, .Walker, .Lines, .Rectangles, .Circles}},
 				{"Modifiers", {.Threshold, .Invert, .Remap, .Blur, .Cellular, .Dilate, .Erode, .Combine, .Scatter, .Surface}},
+				{"Playable", {.Flood_Fill, .Regions, .Connect_Regions, .Path, .Check}},
 				{"Output", {.Tile_Output, .Entity_Output}},
 			}
 			for grp in groups {
@@ -806,7 +807,14 @@ lge_side :: proc(state: ^EditorState) {
 		info := e.Gen_NodeInfo(n)
 		if UI_SectionHeader(fmt.tprintf("%s  (node %d)", info.label, n.id)) {
 			UI_DimTextWrapped(info.doc)
-			if why, bad := lge.errors[n.id]; bad do imgui.TextColored(UI_DANGER, fmt.ctprintf("%s", why))
+			if why, bad := lge.errors[n.id]; bad {
+				// (Unformatted, wrapped: an error may hold a "%".)
+				imgui.PushStyleColorImVec4(.Text, UI_DANGER)
+				imgui.PushTextWrapPos(0)
+				imgui.TextUnformatted(strings.clone_to_cstring(why, context.temp_allocator))
+				imgui.PopTextWrapPos()
+				imgui.PopStyleColor()
+			}
 			if len(info.params) > 0 && UI_BeginProps("##lge_params") {
 				for p, i in info.params {
 					UI_PropLabel(p.name)

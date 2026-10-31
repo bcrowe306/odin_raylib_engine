@@ -56,6 +56,12 @@ Gen_Kind :: enum {
 	Combine,
 	Scatter, // spaced random points (on the input's solid cells, if connected)
 	Surface, // empty cells next to solid ones (ground to stand on)
+	// Playable levels (#171; level_gen_regions.odin)
+	Flood_Fill,      // the cells reachable from a start cell
+	Regions,         // keep the largest open area / remove small ones
+	Connect_Regions, // corridors joining every open area
+	Path,            // a way from a start to an exit
+	Check,           // refuses a level with too little open, or in pieces
 	// Your own
 	Script, // a Lua function (a .lua file) computes the grid
 	Custom, // a kind registered from Odin (Gen_RegisterNode; `custom` names it)
@@ -168,6 +174,40 @@ GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 		{name = "filled", default_ = 0, doc = "Filled circles instead of rings", toggle = true},
 		{name = "seed", default_ = 0, doc = "Added to the graph's seed", integer = true},
 	}, "Circles at random places and sizes, rings or filled (1 = on), the same for a seed: craters, arenas, pools. Each fits inside the level when it can."},
+	.Flood_Fill = {"flood_fill", "Flood Fill", {"in"}, {
+		{name = "x", default_ = -1, doc = "Start cell's column (-1: the middle); a closed cell starts from the nearest open one", integer = true},
+		{name = "y", default_ = -1, doc = "Start cell's row (-1: the middle)", integer = true},
+		{name = "open", default_ = 0, choices = GEN_OPEN_SIDES, doc = GEN_OPEN_DOC},
+		{name = "diagonal", default_ = 0, doc = GEN_DIAGONAL_DOC, toggle = true},
+	}, "1 on the open cells reachable from a start cell, 0 elsewhere: where the player can get to (mask spawns with it)."},
+	.Regions = {"regions", "Regions", {"in"}, {
+		{name = "mode", default_ = 0, choices = GEN_REGION_MODES, doc = "keep_largest: only the biggest open area stays open; remove_small: areas under min_size cells are filled"},
+		{name = "min_size", default_ = 20, doc = "remove_small: areas with fewer cells are filled", integer = true},
+		{name = "open", default_ = 0, choices = GEN_OPEN_SIDES, doc = GEN_OPEN_DOC},
+		{name = "diagonal", default_ = 0, doc = GEN_DIAGONAL_DOC, toggle = true},
+	}, "Fills open areas the player couldn't reach: all but the largest, or the small ones (cave pockets). The input back, 0 / 1, open where it stays open."},
+	.Connect_Regions = {"connect_regions", "Connect Regions", {"in"}, {
+		{name = "width", default_ = 1, doc = "Corridor width (cells)", integer = true},
+		{name = "min_size", default_ = 0, doc = "Areas with fewer cells are filled instead of joined (0: join every one)", integer = true},
+		{name = "open", default_ = 0, choices = GEN_OPEN_SIDES, doc = GEN_OPEN_DOC},
+		{name = "diagonal", default_ = 0, doc = GEN_DIAGONAL_DOC, toggle = true},
+	}, "Joins every open area to the largest with the shortest corridors (never through the outer row): one connected level. The input back, 0 / 1, corridors open."},
+	.Path = {"path", "Start-to-Exit Path", {"in"}, {
+		{name = "placement", default_ = 0, choices = GEN_PATH_PLACEMENTS, doc = "Where the start and exit are: left_right / top_bottom (the open cells nearest those edges' middles), farthest (the two open cells farthest apart), custom (the cells below)"},
+		{name = "start_x", default_ = 0, doc = "custom: the start cell's column", integer = true},
+		{name = "start_y", default_ = 0, doc = "custom: the start cell's row", integer = true},
+		{name = "end_x", default_ = 0, doc = "custom: the exit cell's column", integer = true},
+		{name = "end_y", default_ = 0, doc = "custom: the exit cell's row", integer = true},
+		{name = "width", default_ = 1, doc = "Width of what it carves (cells)", integer = true},
+		{name = "open", default_ = 0, choices = GEN_OPEN_SIDES, doc = GEN_OPEN_DOC},
+		{name = "output", default_ = 0, choices = GEN_PATH_OUTPUTS, doc = "level: the input with the path carved; path: 1 on the path; start / end: 1 on that cell (feed an Entity Output: the player, the door)"},
+	}, "Guarantees a way from a start to an exit: the cheapest route, through open cells where it can, carving rock where it must."},
+	.Check = {"check", "Check", {"in"}, {
+		{name = "min_open", default_ = 0.25, doc = "At least this fraction of the level open (0..1)"},
+		{name = "connected", default_ = 1, doc = "All open cells in one area", toggle = true},
+		{name = "open", default_ = 0, choices = GEN_OPEN_SIDES, doc = GEN_OPEN_DOC},
+		{name = "diagonal", default_ = 0, doc = GEN_DIAGONAL_DOC, toggle = true},
+	}, "Its input unchanged - or an error when the level isn't playable enough (too little open, in pieces). A Level Generator with Random Seed and Attempts then tries other seeds."},
 	.Tile_Output = {"tile_output", "Tile Output", {"in"}, {
 		{name = "empty", default_ = -1, doc = "The tile for cells no rule takes (-1 = none)", integer = true},
 	}, "Rules turn value ranges into tiles (a random one of each rule's tiles, the same for a seed); written into a TileMap - or, as IntGrid values, into an LDtk layer."},
