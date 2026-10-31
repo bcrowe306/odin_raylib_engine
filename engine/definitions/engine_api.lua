@@ -8408,6 +8408,13 @@ function ParticleEmitterNode:particle_emit(count) end
 ---Example: `self.node:get_node("Fireworks"):particle_restart()`
 function ParticleEmitterNode:particle_restart() end
 
+---Gives the emitter a preset look and restarts it: its look and motion settings are replaced (its texture, collision layers and GPU mode stay). Names, any case: `"fire"`, `"smoke"`, `"sparks"`, `"rain"`, `"snow"`, `"explosion"`, `"magic"`.
+---
+---Example: `self.node:get_node("Torch"):particle_apply_preset("fire")`
+---@param name string The preset's name
+---@return boolean applied false when the name isn't a preset
+function ParticleEmitterNode:particle_apply_preset(name) end
+
 ---How many particles are alive now.
 ---
 ---Example: `if self.node:particle_get_alive_count() == 0 then self.node:destroy() end`

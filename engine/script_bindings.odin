@@ -1311,6 +1311,22 @@ lua_node_particle_restart :: proc "c" (L: ^lua.State) -> c.int {
 	return 0
 }
 
+// particle_apply_preset(name) -> boolean: a preset look (fire, smoke, sparks,
+// rain, snow, explosion, magic); false for an unknown name.
+@(private="file")
+lua_node_particle_apply_preset :: proc "c" (L: ^lua.State) -> c.int {
+	context = Script_Context(L)
+	node, ok := to_node_userdata(L, 1)
+	preset, known := ParticlePreset_Parse(string(lua.L_checkstring(L, 2)))
+	if !ok || node.typeId != ParticleEmitterNode || !known {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	ParticleEmitter_ApplyPreset(&(cast(^ParticleEmitterNode)node).emitter, preset)
+	lua.pushboolean(L, true)
+	return 1
+}
+
 // particle_get_alive_count() -> integer
 @(private="file")
 lua_node_particle_get_alive_count :: proc "c" (L: ^lua.State) -> c.int {
@@ -5024,6 +5040,8 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		lua.setfield(L, -2, "particle_emit")
 		lua.pushcfunction(L, lua_node_particle_restart)
 		lua.setfield(L, -2, "particle_restart")
+		lua.pushcfunction(L, lua_node_particle_apply_preset)
+		lua.setfield(L, -2, "particle_apply_preset")
 		lua.pushcfunction(L, lua_node_particle_get_alive_count)
 		lua.setfield(L, -2, "particle_get_alive_count")
 
