@@ -186,7 +186,7 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		name        = "Dialogue Box",
 		category    = "UI & Interface",
 		icon        = ICON_FA_COMMENT,
-		description = "A dialogue box: lines with a speaker type out and advance with the confirm action. Scripts: box:dialogue_show({...}); events line_shown / finished.",
+		description = "A dialogue box: lines with a speaker type out and advance with the confirm action; lines can offer choices. Scripts: box:dialogue_show({...}); events line_shown / chosen / finished.",
 		typeName    = "DialogueNode",
 	},
 	{

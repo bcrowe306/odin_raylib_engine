@@ -38,6 +38,11 @@ Retry. It changes colour under the mouse and while pressed, and raises
   the nearest control in that direction. A click also focuses. On the
   focused button, Enter, Space or the gamepad's A button clicks. The
   focused button has a highlighted border.
+- **Keyboard Focus** (on by default): turn it off for buttons that sit
+  beside gameplay keys, such as a toolbar over a game that uses the arrows
+  and Space. Such a button only takes clicks: Tab and the arrows skip it,
+  and a click doesn't focus it, so the next Space goes to the game. Every
+  UI control has this setting.
 - **Position** is the top-left corner, **Size** the width and height. In a
   container with Stretch alignment the width follows the container.
 - **With an icon**, the text is drawn at the default size; **Font Size**

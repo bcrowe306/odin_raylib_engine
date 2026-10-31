@@ -1,0 +1,203 @@
+{
+ "name": "Visual Novel",
+ "version": "0.1.0",
+ "initial_scene": "scenes/title.scene.json",
+ "window": {
+  "title": "Visual Novel",
+  "width": 1280,
+  "height": 720,
+  "virtual_width": 1280,
+  "virtual_height": 720,
+  "target_fps": 60
+ },
+ "video": {
+  "fullscreen": false,
+  "vsync": true,
+  "resizable": true,
+  "msaa": false,
+  "high_dpi": false,
+  "sharp_scaling": false,
+  "integer_scaling": false,
+  "pixel_snap": false,
+  "smooth_camera": false
+ },
+ "audio": {
+  "master_volume": 1,
+  "music_volume": 1,
+  "sfx_volume": 1
+ },
+ "physics": {
+  "gravity": [
+   0,
+   0
+  ],
+  "debug_draw": false
+ },
+ "input": {
+  "actions": [
+   {
+    "name": "move_left",
+    "bindings": [
+     {
+      "key": "A"
+     },
+     {
+      "key": "LEFT"
+     },
+     {
+      "button": "LEFT_FACE_LEFT"
+     },
+     {
+      "axis": "LEFT_X",
+      "positive": false,
+      "deadzone": 0.3
+     }
+    ]
+   },
+   {
+    "name": "move_right",
+    "bindings": [
+     {
+      "key": "D"
+     },
+     {
+      "key": "RIGHT"
+     },
+     {
+      "button": "LEFT_FACE_RIGHT"
+     },
+     {
+      "axis": "LEFT_X",
+      "positive": true,
+      "deadzone": 0.3
+     }
+    ]
+   },
+   {
+    "name": "move_up",
+    "bindings": [
+     {
+      "key": "W"
+     },
+     {
+      "key": "UP"
+     },
+     {
+      "button": "LEFT_FACE_UP"
+     },
+     {
+      "axis": "LEFT_Y",
+      "positive": false,
+      "deadzone": 0.3
+     }
+    ]
+   },
+   {
+    "name": "move_down",
+    "bindings": [
+     {
+      "key": "S"
+     },
+     {
+      "key": "DOWN"
+     },
+     {
+      "button": "LEFT_FACE_DOWN"
+     },
+     {
+      "axis": "LEFT_Y",
+      "positive": true,
+      "deadzone": 0.3
+     }
+    ]
+   },
+   {
+    "name": "confirm",
+    "bindings": [
+     {
+      "key": "SPACE"
+     },
+     {
+      "key": "ENTER"
+     },
+     {
+      "key": "KP_ENTER"
+     },
+     {
+      "button": "RIGHT_FACE_DOWN"
+     }
+    ]
+   },
+   {
+    "name": "cancel",
+    "bindings": [
+     {
+      "key": "ESCAPE"
+     },
+     {
+      "key": "BACKSPACE"
+     },
+     {
+      "button": "RIGHT_FACE_RIGHT"
+     }
+    ]
+   },
+   {
+    "name": "auto",
+    "bindings": [
+     {
+      "key": "A"
+     },
+     {
+      "button": "RIGHT_FACE_LEFT"
+     }
+    ]
+   },
+   {
+    "name": "skip",
+    "bindings": [
+     {
+      "key": "LEFT_CONTROL"
+     },
+     {
+      "key": "RIGHT_CONTROL"
+     },
+     {
+      "button": "RIGHT_TRIGGER_1"
+     }
+    ]
+   },
+   {
+    "name": "log",
+    "bindings": [
+     {
+      "key": "L"
+     },
+     {
+      "button": "RIGHT_FACE_UP"
+     }
+    ]
+   },
+   {
+    "name": "quick_save",
+    "bindings": [
+     {
+      "key": "F5"
+     }
+    ]
+   },
+   {
+    "name": "quick_load",
+    "bindings": [
+     {
+      "key": "F9"
+     }
+    ]
+   }
+  ]
+ },
+ "scenes": [
+  "scenes/title.scene.json",
+  "scenes/story.scene.json"
+ ]
+}

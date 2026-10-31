@@ -1,0 +1,253 @@
+[
+ {
+  "name": "title screen (no save yet)",
+  "frames": 20,
+  "expect": [
+   [
+    "Continue",
+    "text",
+    "==",
+    "Continue (no save yet)"
+   ],
+   [
+    "Endings",
+    "text",
+    "==",
+    ""
+   ]
+  ]
+ },
+ {
+  "name": "first line, Ada and Theo not on stage yet",
+  "frames": 20,
+  "scene": "scenes/story.scene.json",
+  "expect": [
+   [
+    "Background",
+    "texture",
+    "==",
+    "textures/bg_castle.png"
+   ],
+   [
+    "SlotLeft",
+    "visible",
+    "==",
+    false
+   ]
+  ]
+ },
+ {
+  "name": "kind ending (first choice, the key)",
+  "frames": 230,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "40 SPACE tap",
+   "50 SPACE tap",
+   "60 SPACE tap",
+   "70 SPACE tap",
+   "80 SPACE tap",
+   "90 SPACE tap",
+   "100 SPACE tap",
+   "110 SPACE tap",
+   "120 SPACE tap",
+   "130 SPACE tap",
+   "140 SPACE tap",
+   "150 SPACE tap",
+   "160 SPACE tap",
+   "170 SPACE tap",
+   "180 SPACE tap",
+   "190 SPACE tap",
+   "200 SPACE tap"
+  ],
+  "expect": [
+   [
+    "Ending",
+    "text",
+    "contains",
+    "The kind ending"
+   ],
+   [
+    "Ending",
+    "visible",
+    "==",
+    true
+   ],
+   [
+    "SlotLeft",
+    "texture",
+    "==",
+    "textures/ada_cheer.png"
+   ]
+  ]
+ },
+ {
+  "name": "bumpy ending (second choice, then climb)",
+  "frames": 230,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "40 SPACE tap",
+   "50 SPACE tap",
+   "60 SPACE tap",
+   "70 SPACE tap",
+   "80 SPACE tap",
+   "95 DOWN tap",
+   "110 SPACE tap",
+   "120 SPACE tap",
+   "130 SPACE tap",
+   "140 SPACE tap",
+   "150 SPACE tap",
+   "160 SPACE tap",
+   "170 SPACE tap",
+   "180 SPACE tap",
+   "190 SPACE tap"
+  ],
+  "expect": [
+   [
+    "Ending",
+    "text",
+    "contains",
+    "The bumpy ending"
+   ],
+   [
+    "Background",
+    "texture",
+    "==",
+    "textures/bg_castle.png"
+   ]
+  ]
+ },
+ {
+  "name": "patient ending (second choice twice)",
+  "frames": 260,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "40 SPACE tap",
+   "50 SPACE tap",
+   "60 SPACE tap",
+   "70 SPACE tap",
+   "80 SPACE tap",
+   "95 DOWN tap",
+   "110 SPACE tap",
+   "120 SPACE tap",
+   "130 SPACE tap",
+   "140 SPACE tap",
+   "155 DOWN tap",
+   "170 SPACE tap",
+   "180 SPACE tap",
+   "190 SPACE tap",
+   "200 SPACE tap"
+  ],
+  "expect": [
+   [
+    "Ending",
+    "text",
+    "contains",
+    "The patient ending"
+   ],
+   [
+    "Background",
+    "texture",
+    "==",
+    "textures/bg_talltrees.png"
+   ]
+  ]
+ },
+ {
+  "name": "quick save and load",
+  "frames": 140,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 SPACE tap",
+   "20 SPACE tap",
+   "30 SPACE tap",
+   "45 F5 tap",
+   "60 SPACE tap",
+   "70 SPACE tap",
+   "80 SPACE tap",
+   "100 F9 tap",
+   "115 L tap"
+  ],
+  "expect": [
+   [
+    "LogText",
+    "text",
+    "contains",
+    "Wonderful."
+   ],
+   [
+    "LogText",
+    "text",
+    "!=",
+    ""
+   ],
+   [
+    "Toast",
+    "text",
+    "==",
+    "Quick loaded"
+   ],
+   [
+    "SlotRight",
+    "texture",
+    "==",
+    "textures/theo_cheer.png"
+   ]
+  ]
+ },
+ {
+  "name": "auto stops at the choice",
+  "frames": 900,
+  "scene": "scenes/story.scene.json",
+  "patch": {
+   "Dialogue": {
+    "revealSpeed": 0
+   }
+  },
+  "input": [
+   "10 A tap"
+  ],
+  "expect": [
+   [
+    "AutoButton",
+    "text",
+    "==",
+    "Auto: on"
+   ],
+   [
+    "SlotCenter",
+    "texture",
+    "==",
+    "textures/unit_hurt.png"
+   ]
+  ]
+ }
+]

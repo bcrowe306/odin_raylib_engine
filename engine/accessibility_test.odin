@@ -115,14 +115,14 @@ test_accessibility :: proc(t: ^testing.T) {
 	d.onLineShown->subscribe(proc(src: rawptr, v: EventValue, ctx: ^GameContext, ud: rawptr) {(cast(^int)ud)^ += 1}, &shown)
 	d.onFinished->subscribe(proc(src: rawptr, v: EventValue, ctx: ^GameContext, ud: rawptr) {(cast(^int)ud)^ += 1}, &finished)
 	ProcessNodeQueues(scene.manager, &game.gameContext)
-	DialogueNode_Show(d, {{"Guard", "Halt!", ""}, {"Guard", "Who goes there?", ""}})
+	DialogueNode_Show(d, {{"Guard", "Halt!", "", nil}, {"Guard", "Who goes there?", "", nil}})
 	game->run(0.016)
 	testing.expect(t, shown == 1 && Subtitles_Count() == 1 && Subtitles_Lines()[0].speaker == "Guard", "the first line on the track")
 	for _ in 0 ..< 60 * 5 do game->run(1.0 / 60)
 	testing.expect(t, shown == 2 && finished == 1 && !DialogueNode_IsOpen(d), "both lines, then finished")
 	testing.expect_value(t, Subtitles_Count(), 0)
 	access.subtitles = false
-	DialogueNode_Show(d, {{"", "Unseen", ""}})
+	DialogueNode_Show(d, {{"", "Unseen", "", nil}})
 	for _ in 0 ..< 60 * 3 do game->run(1.0 / 60)
 	testing.expect(t, finished == 2 && Subtitles_Count() == 0, "subtitles off: still plays out, unseen")
 	access.subtitles = true

@@ -31,6 +31,7 @@ UIElement :: struct {
 	using node: Node,
 	widgetType: UIWidgetType,
 	size: [2]f32 `gui:"true" min:"4" max:"1280"`,
+	keyboardFocus: bool `gui:"true"`, // Tab / arrows reach it (off: only the mouse - buttons beside gameplay keys)
 	hovered: bool,
 	focused: bool,
 	justFocused: bool,
@@ -40,6 +41,7 @@ UIElement_Init :: proc(elem: ^UIElement, widgetType: UIWidgetType, size: [2]f32)
 	elem.isUI = true
 	elem.widgetType = widgetType
 	elem.size = size
+	elem.keyboardFocus = true
 	elem.layer = .Layer7
 	elem.hovered = false
 	elem.focused = false
@@ -266,7 +268,7 @@ UI_IsBlockedByActiveDropdown :: proc(gameContext: ^GameContext, self: rawptr, mo
 // ============================================================================
 
 UI_IsFocusable :: proc(elem: ^UIElement) -> bool {
-	if elem == nil || !elem.enabled || !elem.renderable do return false
+	if elem == nil || !elem.enabled || !elem.renderable || !elem.keyboardFocus do return false
 	#partial switch elem.widgetType {
 	case .Button, .Slider, .Checkbox, .ToggleSwitch, .Knob,
 	     .TextInput, .Dropdown, .RadioGroup, .ListView, .TreeView, .TabContainer,

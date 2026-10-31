@@ -16,7 +16,7 @@ import rl "vendor:raylib"
 // button opens the game scene). The others are complete small games kept as
 // project folders - templates/<id>/ in the editor's resources (the repo's
 // templates/, built by scripts/templates/make_templates.py): Platformer,
-// Top-down RPG, Shoot 'em up, Puzzle, each with a template.json (name,
+// Top-down RPG, Shoot 'em up, Puzzle, Visual Novel, each with a template.json (name,
 // description, icon, order) and a preview.png. Samples are bigger projects
 // to look at (the Asteroids demo).
 // ============================================================================
@@ -102,6 +102,7 @@ template_icon :: proc(name: string) -> string {
 	case "puzzle-piece": return ICON_FA_PUZZLE_PIECE
 	case "rocket": return ICON_FA_ROCKET
 	case "gamepad": return ICON_FA_GAMEPAD
+	case "book": return ICON_FA_BOOK
 	}
 	return ICON_FA_FILE
 }

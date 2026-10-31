@@ -12,6 +12,9 @@ closes. A script fills it with lines.
 - **Voice-over and barks without a box**: set **Mode** to Subtitles and the
   lines go on the subtitle track, each for its voice's length, then the
   next follows by itself.
+- **Choices**: a line can end with options for the player (a branching
+  conversation, a visual novel). The **Visual Novel** template builds a
+  whole story on this.
 - **A talking mouth**: point **Lip Sync** at a Lip Sync node and voiced
   lines move a vector mouth (see [Lip Sync](LipSyncNode.md)).
 - **Not** for a fixed caption or score: use a [UI Label](UILabelNode.md).
@@ -58,12 +61,30 @@ closes. A script fills it with lines.
   [Accessibility](../../engine/docs/accessibility.md).
 - **Voices** play on the SFX bus unless the sound's import settings name
   another bus. A voice stops when its line ends.
+- **Choices**: give a line `choices = {"Left", "Right"}`. When the line is
+  shown, the choices appear as a column of buttons above the box.
+  `move_up` / `move_down` or the mouse picks one, and the advance action or
+  a click takes it. The `chosen` signal fires with the choice's number,
+  then the next line follows. If the handler calls `dialogue_show` with new
+  lines, those are shown instead, which is how a story branches.
+  `dialogue_choose(i)` takes a choice from a script, and
+  `dialogue_has_choices()` says whether the box is waiting for one. The
+  selected choice is filled with **Choice Color**. With **Localized** on,
+  choices are locale keys too.
+- **Auto advance**: with **Auto Advance** on, each line goes on by itself
+  **Auto Delay** seconds after it's shown, plus a little per character so
+  long lines stay up longer. `dialogue_set_auto(on, delay)` sets it from a
+  script.
+- **Skip**: `dialogue_set_skip(true)` shows and passes lines at once, for
+  example while the player holds a key.
+- Auto advance and skip both stop at choices.
 
 ## Signals
 
 | Signal | When | Value |
 |---|---|---|
 | `line_shown` | A line is fully shown (typed out or skipped). In Subtitles mode, when the line starts. | The line's number, from 1 |
+| `chosen` | The player (or `dialogue_choose`) took a choice | The choice's number, from 1 |
 | `finished` | The box closes: after the last line, or `dialogue_close()` | none |
 
 ## Example
@@ -97,6 +118,21 @@ function Guard:on_body_entered(body)
 end
 
 return Guard
+```
+
+A question with choices: the handler answers with new lines.
+
+```lua
+self.box:connect("chosen", function(choice)
+    if choice == 1 then
+        self.box:dialogue_show({ { speaker = "Guard", text = "Then pay the toll." } })
+    else
+        self.box:dialogue_show({ { speaker = "Guard", text = "Come back in daylight." } })
+    end
+end)
+self.box:dialogue_show({
+    { speaker = "Guard", text = "Do you want to cross?", choices = { "Yes", "No" } },
+})
 ```
 
 For a single line: `box:dialogue_show("The door is locked.")`, or with a

@@ -440,6 +440,9 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 	{"LipSyncNode.playing", "A voice is moving the mouth now."},
 	{"LipSyncNode.time", "Seconds into the voice."},
 	{"DialogueNode.lipSync", "A Lip Sync node (path) whose mouth moves with each voiced line."},
+	{"DialogueNode.choiceColor", "Fill of the selected choice when a line offers choices."},
+	{"DialogueNode.autoAdvance", "Go on to the next line by itself a moment after each line is shown (stops at choices)."},
+	{"DialogueNode.autoDelay", "Auto Advance: seconds to wait after a line is shown, plus a little per character."},
 	{"VectorShapeNode.group", "A symbol: draw only this named group of the file (Inkscape layer, Illustrator group; \"a/b\" for nested). Empty: the whole file."},
 	{"VectorShapeNode.frame", "Part swapping: show only this child group of the group (mouths, hands, eyes); -1 shows them all. Key it for frame-by-frame."},
 	{"VectorShapeNode.brightness", "Darken (-1 black) or lighten (1 white) the art (Flash's brightness effect)."},
@@ -600,6 +603,7 @@ PROPERTY_DOCS := [?]Property_Doc_Entry {
 
 	// --- UI ---
 	{"UIElement.size", "Width and height (px)."},
+	{"UIElement.keyboardFocus", "Tab and the arrow keys can move to it (then Enter presses it). Off: only the mouse, so it never takes keys meant for the game."},
 	{"UIContainerNode.title", "Header text."},
 	{"UIContainerNode.direction", "Children are laid out in a column, a row or a grid."},
 	{"UIContainerNode.alignment", "Where children sit across the layout direction."},

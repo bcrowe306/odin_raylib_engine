@@ -673,7 +673,122 @@ def puzzle():
     return t
 
 
-TEMPLATES = {"platformer": platformer, "rpg": rpg, "shmup": shmup, "puzzle": puzzle, "adventure": adventure}
+# --- visual novel -----------------------------------------------------------------
+
+def visual_novel():
+    t = Template("visual_novel", "Visual Novel",
+                 "A short branching story: characters, backgrounds, choices that change what happens, three "
+                 "endings. Save slots, a backlog, auto and skip, a title screen with settings. Write your own "
+                 "in story.lua.", "book", 5)
+    t.begin()
+    for who in ("ada", "theo", "unit"):
+        for pose in ("idle", "talk", "think", "cheer", "hurt"):
+            t.art(f"toon-characters/{who}_{pose}.png", f"textures/{who}_{pose}.png")
+    for bg in ("castle", "forest", "talltrees", "desert"):
+        t.art(f"background-elements/{bg}.png", f"textures/bg_{bg}.png")
+    t.license("Toon Characters", "Background Elements")
+    PANEL, BORDER, ACCENT = "#0f121ce6", "#5c8dffff", "#5c8dffc8"
+
+    def background(name="Background", bg="castle"):
+        # (the 1024 x 576 pictures, scaled to the 1280 x 720 screen)
+        return {"type": "TextureNode", "name": name, "position": [0, 0], "pivot": [0, 0], "scale": [1.25, 1.25], "layer": 1,
+                "texture": f"textures/bg_{bg}.png"}
+
+    def figure(name, who, x, visible=True):
+        return {"type": "TextureNode", "name": name, "position": [x, 724], "scale": [2, 2], "layer": 2,
+                "pivot": [0.5, 1], "visible": visible, "texture": f"textures/{who}_idle.png"}
+
+    def button(name, label, w=260, h=48, size=24, **extra):
+        return {"type": "UIButtonNode", "name": name, "layer": 8,
+                "properties": {"size": [w, h], "text": label, "fontSize": size, "normalColor": PANEL,
+                               "hoverColor": ACCENT, "borderColor": BORDER, "textColor": "#eef0f6ff", **extra}}
+
+    def column(name, pos, size, children, title=None, layer=8):
+        props = {"size": list(size), "direction": "Vertical", "alignment": "Center", "spacing": 12,
+                 "paddingTop": 16, "paddingBottom": 16, "drawBackground": title is not None,
+                 "drawBorder": title is not None, "showHeader": False, "backgroundColor": PANEL, "borderColor": BORDER}
+        if title:
+            props.update({"title": title, "showHeader": True, "headerHeight": 36, "headerColor": "#1e2840ff"})
+        return {"type": "UIContainerNode", "name": name, "position": list(pos), "layer": layer,
+                "properties": props, "children": children}
+
+    def label(name, value, pos, size=28, align="Center", pivot=(0.5, 0), color="#ffffffff", layer=7, **extra):
+        n = {"type": "TextNode", "name": name, "position": list(pos), "pivot": list(pivot), "layer": layer,
+             "properties": {"text": value, "fontSize": size, "align": align, "color": color, "richText": True}}
+        n["properties"].update(extra)
+        return n
+
+    slots = column("Slots", (340, 150), (600, 290), [button(f"Slot{i}", f"{i}.", w=540) for i in (1, 2, 3)] +
+                   [button("Close", "Close", w=160, h=40, size=20)], title="Load a slot")
+    slots["script"] = {"path": "scripts/slots.lua"}
+    camera = {"type": "CameraNode", "name": "Camera", "position": [640, 360], "properties": {"isCurrent": True}}
+
+    # The story: stage, the box, the buttons under it, the backlog, the slots.
+    quick = {"type": "UIContainerNode", "name": "QuickMenu", "position": [452, 684], "layer": 8,
+             "properties": {"size": [688, 32], "direction": "Horizontal", "alignment": "Center", "spacing": 8,
+                            "drawBackground": False, "drawBorder": False, "showHeader": False},
+             # (mouse only: the arrows and Enter stay the story's - keyboardFocus off)
+             "children": [button(n, l, w=106, h=28, size=16, keyboardFocus=False) for n, l in (
+                 ("AutoButton", "Auto"), ("SkipButton", "Skip"), ("LogButton", "Log"),
+                 ("SaveButton", "Save"), ("LoadButton", "Load"), ("TitleButton", "Title"))]}
+    log = {"type": "Node", "name": "Log", "children": [
+        column("LogPanel", (90, 40), (1100, 640), [], title="Backlog  (wheel / up / down to scroll)"),
+        label("LogText", "", (120, 96), size=22, align="Left", pivot=(0, 0), layer=8, maxWidth=1040, lineSpacing=1.3),
+        dict(button("LogClose", "Close", w=140, h=40, size=20), position=[1030, 624]),
+    ]}
+    story = [
+        camera, background(),
+        figure("SlotLeft", "ada", 300, False), figure("SlotCenter", "unit", 640, False), figure("SlotRight", "theo", 980, False),
+        {"type": "Node", "name": "Story", "script": {"path": "scripts/story.lua"}},
+        {"type": "Node", "name": "VN", "script": {"path": "scripts/vn.lua"}},
+        {"type": "DialogueNode", "name": "Dialogue", "position": [140, 500], "layer": 7,
+         "properties": {"size": [1000, 180], "fontSize": 26, "padding": 22, "revealSpeed": 40,
+                        "panelColor": PANEL, "borderColor": BORDER, "choiceColor": ACCENT, "advanceAction": "confirm"}},
+        quick,
+        dict(label("Ending", "", (640, 300), size=64, layer=8, pivot=(0.5, 0.5)), visible=False),
+        label("Toast", "", (1260, 16), size=22, align="Right", pivot=(1, 0), layer=8),
+        log, slots,
+    ]
+    t.json("scenes/story.scene.json", scene("story", story, background=(20, 22, 30, 255)))
+
+    # The title screen.
+    sliders = [{"type": "UISliderNode", "name": n, "layer": 8,
+                "properties": {"size": [520, 36], "label": l, "labelWidth": 170, "minValue": lo, "maxValue": hi,
+                               "value": v, "defaultValue": v}}
+               for n, l, lo, hi, v in (("TextSpeed", "Text speed", 10, 120, 40), ("AutoDelay", "Auto delay (s)", 0.3, 4, 1.2),
+                                       ("MusicVolume", "Music", 0, 1, 1), ("SoundVolume", "Sound", 0, 1, 1))]
+    title = [
+        camera, background(),
+        figure("Ada", "ada", 260, True), figure("Theo", "theo", 1020, True),
+        {"type": "Node", "name": "Title", "script": {"path": "scripts/title.lua"}},
+        label("Name", "The Castle Road", (640, 60), size=80, color="#1e2840ff"),
+        label("Endings", "", (640, 660), size=22, color="#1e2840cc"),
+        column("Menu", (500, 220), (280, 300), [button("NewGame", "New game"), button("Continue", "Continue"),
+                                               button("Load", "Load"), button("Settings", "Settings")]),
+        column("SettingsPanel", (340, 190), (600, 330), sliders + [button("SettingsClose", "Done", w=160, h=40, size=20)],
+               title="Settings"),
+        slots,
+    ]
+    t.json("scenes/title.scene.json", scene("title", title, background=(20, 22, 30, 255)))
+
+    t.json("project.json", project("Visual Novel", ["scenes/title.scene.json", "scenes/story.scene.json"], MOVE_ACTIONS + [
+        action("confirm", "SPACE", "ENTER", "KP_ENTER", "pad:RIGHT_FACE_DOWN"),
+        action("cancel", "ESCAPE", "BACKSPACE", "pad:RIGHT_FACE_RIGHT"),
+        action("auto", "A", "pad:RIGHT_FACE_LEFT"),
+        action("skip", "LEFT_CONTROL", "RIGHT_CONTROL", "pad:RIGHT_TRIGGER_1"),
+        action("log", "L", "pad:RIGHT_FACE_UP"),
+        action("quick_save", "F5"),
+        action("quick_load", "F9"),
+    ], virtual=(1280, 720), gravity=(0, 0), pixel=False))
+    for s_ in ("story", "vn", "slots", "title"):
+        t.script(s_)
+    with open(os.path.join(SCRIPTS, "visual_novel", "README.md")) as f:
+        t.write("README.md", f.read())
+    return t
+
+
+TEMPLATES = {"platformer": platformer, "rpg": rpg, "shmup": shmup, "puzzle": puzzle, "adventure": adventure,
+             "visual_novel": visual_novel}
 
 if __name__ == "__main__":
     which = sys.argv[1:] or list(TEMPLATES)
