@@ -1,0 +1,5 @@
+{"size": [48, 30], "seed": 4, "output": 3, "nodes": [
+  {"id": 1, "type": "random_fill", "params": {"density": 0.5}, "pos": [0, 0]},
+  {"id": 2, "type": "cellular", "inputs": {"in": 1}, "params": {"iterations": 4}, "pos": [200, 0]},
+  {"id": 3, "type": "tile_output", "inputs": {"in": 2}, "params": {"tile_w": 16, "tile_h": 16}, "rules": [{"min": 0.5, "max": 1, "tiles": [1]}], "tileset": "textures/Tiles.png", "pos": [400, 0]}
+]}

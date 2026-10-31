@@ -210,7 +210,9 @@ GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 	}, "Its input unchanged - or an error when the level isn't playable enough (too little open, in pieces). A Level Generator with Random Seed and Attempts then tries other seeds."},
 	.Tile_Output = {"tile_output", "Tile Output", {"in"}, {
 		{name = "empty", default_ = -1, doc = "The tile for cells no rule takes (-1 = none)", integer = true},
-	}, "Rules turn value ranges into tiles (a random one of each rule's tiles, the same for a seed); written into a TileMap - or, as IntGrid values, into an LDtk layer."},
+		{name = "tile_w", default_ = 16, doc = "Tile width in the tileset (pixels): the tile picker and previews", integer = true},
+		{name = "tile_h", default_ = 16, doc = "Tile height in the tileset (pixels)", integer = true},
+	}, "Rules turn value ranges into tiles (a random one of each rule's tiles, the same for a seed); written into a TileMap - or, as IntGrid values, into an LDtk layer. With a Layer name, into the TileMap of that name next to the main one."},
 	.Scatter = {"scatter", "Scatter", {"in"}, {
 		{name = "chance", default_ = 0.05, doc = "Chance of a point on each allowed cell"},
 		{name = "spacing", default_ = 4, doc = "At least this many cells between points", integer = true},
@@ -245,6 +247,8 @@ Gen_Node :: struct {
 	params: [8]f64, // in the kind's parameter order
 	rules:  [dynamic]Gen_Tile_Rule, // Tile_Output
 	component: string, // Entity_Output: what it places (the graph's allocator)
+	tileset: string, // Tile_Output: the tileset image its tiles index (the tile picker, previews; the graph's allocator)
+	layer:   string, // Tile_Output: the TileMap it fills, by name, next to the main one ("": the main one; the graph's allocator)
 	script: string, // Script: its .lua file (the graph's allocator)
 	custom: string, // Custom: the registered kind's name (the graph's allocator)
 	pos:    [2]f32, // where the editor draws it
@@ -325,6 +329,8 @@ gen_node_free :: proc(g: ^Gen_Graph, n: ^Gen_Node) {
 	gen_set_text(g, &n.component, "")
 	gen_set_text(g, &n.script, "")
 	gen_set_text(g, &n.custom, "")
+	gen_set_text(g, &n.tileset, "")
+	gen_set_text(g, &n.layer, "")
 }
 
 // (a node's text, owned by the graph)
@@ -339,6 +345,8 @@ Gen_SetComponent :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {gen_set_tex
 
 // Gen_SetScript: a script node's .lua file (load it with Gen_LoadScripts).
 Gen_SetScript :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {gen_set_text(g, &n.script, path)}
+Gen_SetTileset :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {gen_set_text(g, &n.tileset, path)}
+Gen_SetLayer :: proc(g: ^Gen_Graph, n: ^Gen_Node, name: string) {gen_set_text(g, &n.layer, name)}
 
 Gen_NodeClearRules :: proc(n: ^Gen_Node) {
 	for r in n.rules do delete(r.tiles)
@@ -401,6 +409,10 @@ Gen_GraphParse :: proc(data: []u8, allocator := context.allocator) -> (g: Gen_Gr
 		}
 		if comp, cok := obj["component"].(json.String); cok do n.component = strings.clone(string(comp), allocator)
 		if file, sok := obj["script"].(json.String); sok && kind == .Script do n.script = strings.clone(string(file), allocator)
+		if kind == .Tile_Output {
+			if ts, tok := obj["tileset"].(json.String); tok && ts != "" do n.tileset = strings.clone(string(ts), allocator)
+			if ly, lok := obj["layer"].(json.String); lok && ly != "" do n.layer = strings.clone(string(ly), allocator)
+		}
 		if rules, rok := obj["rules"].(json.Array); rok {
 			n.rules = make([dynamic]Gen_Tile_Rule, allocator)
 			for rv in rules {
@@ -468,6 +480,14 @@ Gen_GraphSerialize :: proc(g: ^Gen_Graph, allocator := context.allocator) -> str
 				strings.write_string(&w.sb, "]}")
 			}
 			strings.write_byte(&w.sb, ']')
+			if n.tileset != "" {
+				strings.write_string(&w.sb, ", \"tileset\": ")
+				Json_String(&w, n.tileset)
+			}
+			if n.layer != "" {
+				strings.write_string(&w.sb, ", \"layer\": ")
+				Json_String(&w, n.layer)
+			}
 		}
 		if n.kind == .Entity_Output {
 			strings.write_string(&w.sb, ", \"component\": ")
@@ -529,8 +549,10 @@ Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^
 	n^ = copied
 	n.id, n.pos, n.inputs = newId, copied.pos + offset, {}
 	n.rules = nil
-	n.component, n.script, n.custom = "", "", ""
+	n.component, n.script, n.custom, n.tileset, n.layer = "", "", "", "", ""
 	Gen_SetComponent(g, n, copied.component)
+	Gen_SetTileset(g, n, copied.tileset)
+	Gen_SetLayer(g, n, copied.layer)
 	Gen_SetScript(g, n, copied.script)
 	gen_set_text(g, &n.custom, copied.custom)
 	if len(copied.rules) > 0 {
@@ -593,30 +615,55 @@ Gen_ApplyTileMap :: proc(g: ^Gen_Graph, tm: ^TileMapNode, seed: u64 = 0, ctx: ^G
 }
 
 // Gen_ApplyResult writes a generated level into a tile map (tiles,
-// colliders) and spawns its entities under it (those of the last
-// generation go first).
+// colliders) - and each layer into the TileMap of its name next to it (a
+// sibling, or a child) - and spawns its entities under it (those of the
+// last generation go first). A layer without its TileMap is an error (the
+// rest is written).
 Gen_ApplyResult :: proc(r: ^Gen_Result, tm: ^TileMapNode, ctx: ^GameContext = nil, scene: ^Scene = nil) -> string {
-	tiles, size, ents := r.tiles, r.size, r.entities
-	tm.mapSize = size
-	TileMapNode_Reset(tm)
-	for t, i in tiles do if t >= 0 do TileMapNode_Set(tm, i % size.x, i / size.x, t)
-	TileMapNode_Changed(tm)
-	if tm.solid && tm.isReady && ctx != nil do TileMapNode_BuildColliders(tm, ctx)
+	gen_apply_tiles(tm, r.tiles, r.size, ctx)
+	missing := ""
+	for ly in r.layers {
+		target := Gen_LayerTileMap(tm, ly.name)
+		if target == nil {
+			if missing == "" do missing = fmt.tprintf("no TileMap %q next to %s for its layer", ly.name, tm.name)
+			continue
+		}
+		gen_apply_tiles(target, ly.tiles, r.size, ctx)
+	}
 
 	// Entities: children of the map, at their cells' centres; those of the
 	// last generation go first.
 	sc := scene
 	if sc == nil && ctx != nil do sc = ctx.scene if ctx.scene != nil else (ctx.game.sceneManager.currentScene if ctx.game != nil else nil)
-	if sc == nil do return ""
+	if sc == nil do return missing
 	for c in GetChildrenTemp(sc.manager, tm) do if c != nil && !c.removing && Node_HasTag(c, GEN_ENTITY_TAG) do RemoveNode(sc.manager, c)
 	tsz := [2]f32{f32(tm.tileSize.x), f32(tm.tileSize.y)}
-	for en in ents {
+	for en in r.entities {
 		n := Scene_InstantiateComponent(sc, en.component, tm, ctx)
 		if n == nil do return fmt.tprintf("no component %s", en.component)
 		n.position = ([2]f32{f32(en.cell.x), f32(en.cell.y)} + 0.5) * tsz
 		Node_AddTag(n, GEN_ENTITY_TAG)
 	}
-	return ""
+	return missing
+}
+
+// Gen_LayerTileMap: the TileMap a layer named `name` fills - next to the
+// main map (its sibling), else its child.
+Gen_LayerTileMap :: proc(main: ^TileMapNode, name: string) -> ^TileMapNode {
+	if main == nil || name == "" do return nil
+	for list in ([2][]^Node{GetChildrenView(nil, main.parent), GetChildrenView(nil, main)}) {
+		for c in list do if c != nil && !c.removing && c.typeId == TileMapNode && c.name == name && c != main do return cast(^TileMapNode)c
+	}
+	return nil
+}
+
+@(private = "file")
+gen_apply_tiles :: proc(tm: ^TileMapNode, tiles: []i32, size: [2]int, ctx: ^GameContext) {
+	tm.mapSize = size
+	TileMapNode_Reset(tm)
+	for t, i in tiles do if t >= 0 do TileMapNode_Set(tm, i % size.x, i / size.x, t)
+	TileMapNode_Changed(tm)
+	if tm.solid && tm.isReady && ctx != nil do TileMapNode_BuildColliders(tm, ctx)
 }
 
 // Gen_LoadFile reads a project's .levelgen.json.
