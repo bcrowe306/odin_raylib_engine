@@ -14,6 +14,10 @@ import "core:strings"
 //   edges  16 patterns: which of the 4 sides (N, E, S, W) are the terrain
 //   blob   47 patterns: the 8 neighbours, a corner counting only when both
 //          sides next to it are the terrain (the common "47-tile blob")
+//   hex    64 patterns: which of a hex cell's 6 sides are the terrain
+//
+// The directions are the grid's (Grid_Compass): on isometric and staggered
+// maps north is the diamond's upper-right side, east its lower-right.
 //
 // A pattern may have several tiles (variants: one picked per cell by a
 // hash); a pattern without tiles falls back to the same one without its
@@ -26,15 +30,18 @@ import "core:strings"
 //                  "tiles": [[mask, tile], [mask, tile], ...]}]}
 //
 // Masks: edges N 1, E 2, S 4, W 8; blob N 1, NE 2, E 4, SE 8, S 16, SW 32,
-// W 64, NW 128 (corners without both sides cleared).
+// W 64, NW 128 (corners without both sides cleared); hex: the sides
+// clockwise, 1 2 4 8 16 32 - Hex Pointy from E (E, SE, SW, W, NW, NE), Hex
+// Flat from N (N, NE, SE, S, SW, NW).
 // ============================================================================
 
 Terrain_Kind :: enum {
 	Blob,  // 47 patterns, 8 neighbours
 	Edges, // 16 patterns, 4 sides
+	Hex,   // 64 patterns, a hex cell's 6 sides
 }
 
-TERRAIN_KIND_NAMES := [Terrain_Kind]string{.Blob = "blob", .Edges = "edges"}
+TERRAIN_KIND_NAMES := [Terrain_Kind]string{.Blob = "blob", .Edges = "edges", .Hex = "hex"}
 
 Tile_Terrain :: struct {
 	name:  string,
@@ -86,6 +93,8 @@ Terrain_Patterns :: proc(kind: Terrain_Kind, allocator := context.temp_allocator
 		for m in 0 ..< 16 do append(&out, u8(m))
 	case .Blob:
 		for m in 0 ..< 256 do if Terrain_Reduce(u8(m)) == u8(m) do append(&out, u8(m))
+	case .Hex:
+		for m in 0 ..< 64 do append(&out, u8(m))
 	}
 	return out[:]
 }
@@ -112,12 +121,41 @@ Terrain_Mask :: proc(kind: Terrain_Kind, nb: [3][3]bool) -> u8 {
 		if nb[1][0] do m |= TERRAIN_W
 		if nb[0][0] do m |= TERRAIN_NW
 		return Terrain_Reduce(m)
+	case .Hex:
+		// (Off a hex grid it sees the 4 sides: E, SW, W, NE - meant for hex maps.)
+		m: u8
+		if nb[1][2] do m |= 1
+		if nb[2][1] do m |= 4
+		if nb[1][0] do m |= 8
+		if nb[0][1] do m |= 32
+		return m
 	}
 	return 0
 }
 
+// Terrain_MaskAt: a cell's pattern on a grid, `member(cell, data)` saying
+// which cells are the terrain.
+Terrain_MaskAt :: proc(kind: Terrain_Kind, layout: TileMap_Layout, stagger: TileMap_Stagger, cell: [2]int, data: rawptr, member: proc(cell: [2]int, data: rawptr) -> bool) -> u8 {
+	if kind == .Hex && (layout == .HexPointy || layout == .HexFlat) {
+		m: u8
+		for q, i in Grid_HexSides(layout, stagger, cell) do if member(q, data) do m |= 1 << uint(i)
+		return m
+	}
+	cells := Grid_Compass(layout, stagger, cell)
+	nb: [3][3]bool
+	for dy in 0 ..< 3 do for dx in 0 ..< 3 do nb[dy][dx] = member(cells[dy][dx], data)
+	return Terrain_Mask(kind, nb)
+}
+
 // The full pattern (every neighbour the terrain).
-Terrain_Full :: proc(kind: Terrain_Kind) -> u8 {return 15 if kind == .Edges else 255}
+Terrain_Full :: proc(kind: Terrain_Kind) -> u8 {
+	switch kind {
+	case .Edges: return 15
+	case .Hex: return 63
+	case .Blob: return 255
+	}
+	return 255
+}
 
 // Terrain_Tile: the tile for a pattern (a variant picked by the cell and
 // the seed); -1 when the terrain has no tiles at all.
@@ -165,7 +203,9 @@ Terrains_Parse :: proc(data: []u8, allocator := context.allocator) -> (ts: Tile_
 		if !ok do continue
 		name, _ := obj["name"].(json.String)
 		t := Terrains_Add(&ts, string(name))
-		if kind, kok := obj["kind"].(json.String); kok && string(kind) == "edges" do t.kind = .Edges
+		if kind, kok := obj["kind"].(json.String); kok {
+			for name, k in TERRAIN_KIND_NAMES do if string(kind) == name do t.kind = k
+		}
 		if pairs, pok := obj["tiles"].(json.Array); pok do for pv in pairs {
 			pair, isArr := pv.(json.Array)
 			if !isArr || len(pair) < 2 do continue
@@ -253,7 +293,7 @@ TileMapNode_PaintTerrain :: proc(tm: ^TileMapNode, t: ^Tile_Terrain, x, y: int, 
 	} else {
 		TileMapNode_Set(tm, x, y, -1)
 	}
-	TileMapNode_RetileTerrain(tm, t, {x - 1, y - 1}, {x + 2, y + 2}, seed)
+	TileMapNode_RetileTerrain(tm, t, {x - 1, y - 2}, {x + 2, y + 3}, seed) // (staggered: two rows away)
 }
 
 // TileMapNode_RetileTerrain: every cell of the terrain in lo..hi (hi
@@ -262,11 +302,15 @@ TileMapNode_RetileTerrain :: proc(tm: ^TileMapNode, t: ^Tile_Terrain, lo, hi: [2
 	if t == nil do return
 	members := make(map[i32]bool, allocator = context.temp_allocator)
 	for list in t.tiles do for tile in list do members[tile] = true
+	Ctx :: struct {tm: ^TileMapNode, members: ^map[i32]bool}
+	c := Ctx{tm, &members}
+	member :: proc(cell: [2]int, data: rawptr) -> bool {
+		c := cast(^Ctx)data
+		return TileMapNode_Get(c.tm, cell.x, cell.y) in c.members
+	}
 	for y in lo.y ..< hi.y do for x in lo.x ..< hi.x {
 		if TileMapNode_Get(tm, x, y) not_in members do continue
-		nb: [3][3]bool
-		for dy in 0 ..< 3 do for dx in 0 ..< 3 do nb[dy][dx] = TileMapNode_Get(tm, x + dx - 1, y + dy - 1) in members
-		tile := Terrain_Tile(t, Terrain_Mask(t.kind, nb), x, y, seed)
+		tile := Terrain_Tile(t, Terrain_MaskAt(t.kind, tm.layout, tm.stagger, {x, y}, &c, member), x, y, seed)
 		if tile >= 0 do TileMapNode_Set(tm, x, y, tile)
 	}
 	TileMapNode_Changed(tm)

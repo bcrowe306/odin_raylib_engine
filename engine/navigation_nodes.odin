@@ -197,12 +197,30 @@ region_block_shape :: proc(r: ^NavigationRegionNode, n: ^Node, s: ^PhysicsShape)
 @(private = "file")
 region_block_tilemap :: proc(r: ^NavigationRegionNode, tm: ^TileMapNode) {
 	if !tm.solid do return
-	ts := [2]f32{f32(tm.tileSize.x), f32(tm.tileSize.y)} * tm.globalScale
+	cs := TileMapNode_CellSize(tm)
+	ts := cs * tm.globalScale
 	TileMapNode_Layout(tm)
 	for t, i in tm.tiles {
 		if t < 0 do continue
-		mn := TileMapNode_CellCorner(tm, tm.dataOrigin + {i % max(tm.dataSize.x, 1), i / max(tm.dataSize.x, 1)})
-		region_block_rect(r, mn, mn + ts)
+		cell := tm.dataOrigin + {i % max(tm.dataSize.x, 1), i / max(tm.dataSize.x, 1)}
+		if tm.layout == .Square && tm.globalRotation == 0 {
+			mn := TileMapNode_CellCorner(tm, cell)
+			region_block_rect(r, mn, mn + ts)
+			continue
+		}
+		// Any other cell: the region cells whose centres are in its outline.
+		pts, n := TileMapNode_CellOutline(tm, cell)
+		world: [6][2]f32
+		mn, mx := [2]f32{math.F32_MAX, math.F32_MAX}, [2]f32{-math.F32_MAX, -math.F32_MAX}
+		for p, k in pts[:n] {
+			world[k] = TileMapNode_LocalToWorld(tm, p)
+			mn = {min(mn.x, world[k].x), min(mn.y, world[k].y)}
+			mx = {max(mx.x, world[k].x), max(mx.y, world[k].y)}
+		}
+		c0, c1 := region_cell_at(r, mn), region_cell_at(r, mx)
+		for y in max(c0.y, 0) ..= min(c1.y, r.cells.y - 1) do for x in max(c0.x, 0) ..= min(c1.x, r.cells.x - 1) {
+			if point_in_convex(region_cell_center(r, x, y), world[:n]) do r.blocked[y * r.cells.x + x] = max(r.blocked[y * r.cells.x + x], 1)
+		}
 	}
 }
 

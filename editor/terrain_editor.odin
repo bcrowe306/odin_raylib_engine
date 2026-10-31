@@ -1,6 +1,7 @@
 package editor
 
 import "core:fmt"
+import "core:math"
 import os "core:os"
 import "core:path/filepath"
 import "core:strings"
@@ -99,6 +100,19 @@ terrain_tile_image :: proc(dl: ^imgui.DrawList, tex: ^rl.Texture2D, tile: [2]int
 // neighbours that are the terrain filled.
 @(private = "file")
 terrain_pattern_diagram :: proc(dl: ^imgui.DrawList, kind: e.Terrain_Kind, mask: u8, p: [2]f32, size: f32) {
+	if kind == .Hex {
+		// The cell and its six sides clockwise from the right (Hex Pointy;
+		// on Hex Flat the same bits start at the top).
+		ctr := p + size * 0.5
+		r := size * 0.17
+		imgui.DrawList_AddCircleFilled(dl, ctr, r, col_u32(UI_SUCCESS))
+		for i in 0 ..< 6 {
+			a := f32(i) * math.PI / 3
+			q := ctr + [2]f32{math.cos(a), math.sin(a)} * size * 0.34
+			imgui.DrawList_AddCircleFilled(dl, q, r, col_u32(UI_ACCENT if mask & (1 << uint(i)) != 0 else ui_line(0.12)))
+		}
+		return
+	}
 	c := size / 3
 	on: [3][3]bool
 	on[1][1] = true
@@ -108,6 +122,7 @@ terrain_pattern_diagram :: proc(dl: ^imgui.DrawList, kind: e.Terrain_Kind, mask:
 	case .Blob:
 		on[0][1], on[0][2], on[1][2], on[2][2] = mask & e.TERRAIN_N != 0, mask & e.TERRAIN_NE != 0, mask & e.TERRAIN_E != 0, mask & e.TERRAIN_SE != 0
 		on[2][1], on[2][0], on[1][0], on[0][0] = mask & e.TERRAIN_S != 0, mask & e.TERRAIN_SW != 0, mask & e.TERRAIN_W != 0, mask & e.TERRAIN_NW != 0
+	case .Hex: // (drawn above)
 	}
 	for y in 0 ..< 3 do for x in 0 ..< 3 {
 		mn := p + {f32(x), f32(y)} * c
@@ -325,13 +340,13 @@ tilemap_terrain_palette :: proc(state: ^EditorState, tm: ^e.TileMapNode) {
 		if imgui.IsItemDeactivated() && gt.nameFor == i + 1 do gt.nameFor = 0
 		Drive_Item(fmt.tprintf("tile.terrain-name:%d", i))
 		imgui.SameLine(0, 4)
-		kinds := []string{"Blob (47)", "Edges (16)"}
+		kinds := []string{"Blob (47)", "Edges (16)", "Hex (64)"}
 		imgui.SetNextItemWidth(110)
 		if k, ch := UI_Combo(fmt.tprintf("tile.terrain-kind:%d", i), int(t.kind), kinds); ch {
 			t.kind = e.Terrain_Kind(k)
 			Editor_SaveTerrains(state, tm.tilesetPath)
 		}
-		UI_Tooltip("Blob: 47 patterns from the 8 neighbours (corners too). Edges: 16 patterns from the 4 sides")
+		UI_Tooltip("Blob: 47 patterns from the 8 neighbours (corners too). Edges: 16 patterns from the 4 sides. Hex: 64 patterns from a hex cell's 6 sides (for Hex grids)")
 		imgui.SameLine(0, 4)
 		if UI_Button(fmt.tprintf("%s  Edit Tiles", ICON_FA_TABLE_CELLS), fmt.tprintf("tile.terrain-edit:%d", i)) do TerrainEditor_Open(tm.tilesetPath, tile, i)
 		imgui.SameLine(0, 4)

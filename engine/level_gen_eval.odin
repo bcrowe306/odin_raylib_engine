@@ -351,7 +351,7 @@ gen_tiles :: proc(ev: ^Gen_Eval, outputId: int, allocator: runtime.Allocator) ->
 	if !ok do return nil, {}, ev.err
 	terrains: Tile_Terrains
 	if text, ok := ev.g.tilesets[out.tileset]; ok do terrains, _ = Terrains_Parse(transmute([]u8)text, context.temp_allocator)
-	return Gen_TilesOf(out, grid, ev.seed, allocator, &terrains), {grid.w, grid.h}, ""
+	return Gen_TilesOf(out, grid, ev.seed, allocator, &terrains, ev.g.layout, ev.g.stagger), {grid.w, grid.h}, ""
 }
 
 // Gen_TilesOf: a tile output's tiles for its grid (already evaluated) and
@@ -359,7 +359,7 @@ gen_tiles :: proc(ev: ^Gen_Eval, outputId: int, allocator: runtime.Allocator) ->
 // terrain (of `terrains`, its tileset's) makes its cells that terrain, each
 // then given the tile of its pattern - cells beyond the level count as the
 // terrain, so it runs on past the edges. A terrain it doesn't have: empty.
-Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := context.allocator, terrains: ^Tile_Terrains = nil) -> []i32 {
+Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := context.allocator, terrains: ^Tile_Terrains = nil, layout := TileMap_Layout.Square, stagger := TileMap_Stagger.Odd) -> []i32 {
 	pickSeed := gen_mix(gen_mix(seed, u64(out.id)), 0x7111e)
 	empty := i32(Gen_Param(out, "empty"))
 	tiles := make([]i32, len(grid.v), allocator)
@@ -395,6 +395,21 @@ Gen_TilesOf :: proc(out: ^Gen_Node, grid: Gen_Grid, seed: u64, allocator := cont
 	w, h := grid.w, grid.h
 	defer gen_pattern_rules(out, grid, tiles, pickSeed) // (last: over the rules' and terrains' tiles)
 	if !anyTerrain do return tiles
+	if layout != .Square {
+		// Isometric, staggered, hex: the grid's own neighbours.
+		Ctx :: struct {cells: []i16, w, h: int, c: i16}
+		member :: proc(q: [2]int, data: rawptr) -> bool {
+			k := cast(^Ctx)data
+			return q.x < 0 || q.y < 0 || q.x >= k.w || q.y >= k.h || k.cells[q.y * k.w + q.x] == k.c
+		}
+		for c, i in cellTerrain {
+			if c < 0 do continue
+			k := Ctx{cellTerrain[:], w, h, c}
+			t := &terrains.terrains[c]
+			if tile := Terrain_Tile(t, Terrain_MaskAt(t.kind, layout, stagger, {i % w, i / w}, &k, member), i % w, i / w, pickSeed); tile >= 0 do tiles[i] = tile
+		}
+		return tiles
+	}
 	#no_bounds_check for c, i in cellTerrain {
 		if c < 0 do continue
 		x, y := i % w, i / w

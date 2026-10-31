@@ -117,3 +117,75 @@ test_tilemap_grids :: proc(t: ^testing.T) {
 	testing.expect(t, walls.bandMode && walls.bandHi - walls.bandLo == 4, "four bands")
 	free_all(context.temp_allocator)
 }
+
+// #278: paths on hex / staggered / isometric maps go round walls through
+// cells sharing a side; a navigation region bakes an isometric wall.
+@(test)
+test_tilemap_grid_navigation :: proc(t: ^testing.T) {
+	game := new(Game)
+	InitializeGame(game)
+	defer game->terminate()
+	scene := game->createScene("gridnav", true)
+	ProcessSceneChange(&game.sceneManager, &game.gameContext)
+	ctx := &game.gameContext
+
+	tm := TileMapNode_Create(scene, "Walls")
+	tm.tileSize, tm.cellSize, tm.mapSize = {32, 32}, {32, 32}, {9, 9}
+	tm.solid = true
+	TileMapNode_Layout(tm)
+	ProcessNodeQueues(scene.manager, ctx)
+	// A wall down column 4, open at the bottom two rows (a staggered grid's
+	// rows are half rows: one isn't a way through).
+	for y in 0 ..< 7 do TileMapNode_Set(tm, 4, y, 0)
+
+	for layout in ([]TileMap_Layout{.Isometric, .Staggered, .HexPointy, .HexFlat}) {
+		tm.layout = layout
+		TileMapNode_Changed(tm)
+		g := Nav_GridFor(tm)
+		testing.expect(t, g != nil && g.tilemap == tm, "the map's own grid")
+		from, to := TileMapNode_CellCenter(tm, {1, 1}), TileMapNode_CellCenter(tm, {7, 1})
+		testing.expect_value(t, Nav_CellAt(g, from), [2]int{1, 1})
+		opts := Nav_DefaultOptions()
+		opts.smooth = false
+		cells := Nav_FindCells(g, {1, 1}, {7, 1}, true)
+		testing.expectf(t, len(cells) > 0, "%v: a path", layout)
+		through := false
+		for c, i in cells {
+			testing.expectf(t, TileMapNode_Get(tm, c.x, c.y) < 0, "%v: %v is open", layout, c)
+			if c.y >= 7 do through = true
+			if i == 0 || layout == .Isometric do continue
+			nb, k := TileMapNode_Neighbors(tm, cells[i - 1])
+			ok := false
+			for q in nb[:k] do if q == c do ok = true
+			testing.expectf(t, ok, "%v: %v -> %v shares a side", layout, cells[i - 1], c)
+		}
+		testing.expectf(t, through, "%v: round the bottom of the wall", layout)
+		path := Nav_FindPath(g, from, to, opts)
+		testing.expectf(t, len(path) > 2 && path[0] == from && path[len(path) - 1] == to, "%v: world path", layout)
+		testing.expect(t, !Nav_LineClear(g, {1, 1}, {7, 1}), "no line through the wall")
+		testing.expect(t, Nav_LineClear(g, {1, 1}, {2, 2}) || layout != .Isometric, "a clear short line")
+		// An agent radius keeps the path off the wall.
+		Nav_Clearance(g)
+		testing.expect(t, g.clear[1 * g.w + 4] == 0 && g.clear[1 * g.w + 3] >= 1, "clearance")
+	}
+
+	// A region baked from the isometric wall blocks the diamonds' area.
+	tm.layout = .Isometric
+	tm.position = {300, 0}
+	Node_SetGlobalPositions(scene.manager, scene.rootNode)
+	region := NavigationRegionNode_Create(scene, "Nav")
+	region.size, region.cellSize = {600, 400}, 8
+	region.usePhysics, region.useTileMaps, region.useLdtk = false, true, false
+	region.gameContext = ctx
+	ProcessNodeQueues(scene.manager, ctx)
+	NavRegion_Bake(region, ctx)
+	wall := TileMapNode_CellCenter(tm, {4, 3})
+	open := TileMapNode_CellCenter(tm, {2, 3})
+	at :: proc(r: ^NavigationRegionNode, p: [2]f32) -> u8 {
+		c := [2]int{int((p.x - r.bakedAt.x) / r.cellSize), int((p.y - r.bakedAt.y) / r.cellSize)}
+		return r.blocked[c.y * r.cells.x + c.x]
+	}
+	testing.expect(t, at(region, wall) != 0, "the wall's diamond is blocked")
+	testing.expect(t, at(region, open) == 0, "a floor diamond is open")
+	free_all(context.temp_allocator)
+}
