@@ -141,7 +141,13 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 			case .Game:
 				label = fmt.ctprintf("%s  Game###gameTab", ICON_FA_GAMEPAD if RemoteGame_Connected() else ICON_FA_PLAY)
 			}
-			if imgui.BeginTabItem(label, nil, flags(t.tab, req, hasReq)) {
+			tabOpen := imgui.BeginTabItem(label, nil, flags(t.tab, req, hasReq))
+			// (Right after the tab, while it's the last item - the selected
+			// tab's contents come next.)
+			Drive_Item(fmt.tprintf("bottom:%s", t.id))
+			if t.tab == .Files do UI_Tooltip("File Browser: the computer's folders - preview files, then load them into the project")
+			bottom_tab_menu(t.id, t.name)
+			if tabOpen {
 				state.bottomTab = t.tab
 				#partial switch t.tab {
 				case .Console:    BottomPanel_RenderConsole(state, counts)
@@ -158,13 +164,26 @@ BottomPanel_Render :: proc(state: ^EditorState) {
 				}
 				imgui.EndTabItem()
 			}
-			Drive_Item(fmt.tprintf("bottom:%s", t.id))
-			if t.tab == .Files do UI_Tooltip("File Browser: the computer's folders - preview files, then load them into the project")
 		}
 		imgui.EndTabBar()
 	}
 	// A tab picked by hand: no going back when the selection changes.
 	if follow.active && !hasReq && bottomTabRequest == nil && state.bottomTab != follow.tab do follow.active = false
+}
+
+// bottom_tab_menu: a bottom tab's right-click menu - Help: the tab's page of
+// the editor manual (docs/editor/tab-<id>.md, #45).
+@(private = "file")
+bottom_tab_menu :: proc(id, name: string) {
+	if !imgui.BeginPopupContextItem(fmt.ctprintf("##tabmenu_%s", id)) do return
+	defer imgui.EndPopup()
+	page := fmt.tprintf("tab-%s", id)
+	has := NodeReference_HasEditorPage(page)
+	if !has do imgui.BeginDisabled(true)
+	if imgui.MenuItem(fmt.ctprintf("%s  Help: %s", ICON_FA_CIRCLE_QUESTION, name)) do NodeReference_OpenEditor(page)
+	Drive_Item(fmt.tprintf("bottom-help:%s", id))
+	if !has do imgui.EndDisabled()
+	if imgui.MenuItem(fmt.ctprintf("%s  Editor Manual", ICON_FA_BOOK)) do NodeReference_OpenEditor("")
 }
 
 @(private = "file")

@@ -1,0 +1,8 @@
+{
+  "width": 1280,
+  "height": 720,
+  "callouts": [
+    {"label": "The scene's nodes: select, drag to re-parent, right-click for more", "x": 1025, "y": 103, "w": 255, "h": 293},
+    {"label": "The selected node (the eye shows / hides it)", "x": 1037, "y": 265, "w": 221, "h": 23}
+  ]
+}
