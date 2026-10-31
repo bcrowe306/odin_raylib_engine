@@ -238,6 +238,7 @@ GEN_KINDS := [Gen_Kind]Gen_Kind_Info{
 Gen_Tile_Rule :: struct {
 	min, max: f32,
 	tiles:    [dynamic]i32,
+	terrain:  string, // instead of tiles: a terrain of the output's tileset (auto-tiled; the graph's allocator)
 }
 
 Gen_Node :: struct {
@@ -260,6 +261,7 @@ Gen_Graph :: struct {
 	output:    int, // the node whose grid is the result (0 = the last Tile_Output, else the last node)
 	nodes:     [dynamic]Gen_Node,
 	scripts:   map[string]string, // Script nodes' sources by file (Gen_LoadScripts; the graph's allocator)
+	tilesets:  map[string]string, // tile outputs' tilesets' terrain files' text by image (Gen_LoadTerrains; the graph's allocator)
 	allocator: runtime.Allocator,
 }
 
@@ -321,11 +323,14 @@ Gen_GraphDestroy :: proc(g: ^Gen_Graph) {
 	gen_scripts_clear(g)
 	delete(g.scripts)
 	g.scripts = nil
+	gen_tilesets_clear(g)
+	delete(g.tilesets)
+	g.tilesets = nil
 }
 
 @(private = "file")
 gen_node_free :: proc(g: ^Gen_Graph, n: ^Gen_Node) {
-	Gen_NodeClearRules(n)
+	Gen_NodeClearRules(n, g.allocator)
 	gen_set_text(g, &n.component, "")
 	gen_set_text(g, &n.script, "")
 	gen_set_text(g, &n.custom, "")
@@ -348,10 +353,23 @@ Gen_SetScript :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {gen_set_text(g
 Gen_SetTileset :: proc(g: ^Gen_Graph, n: ^Gen_Node, path: string) {gen_set_text(g, &n.tileset, path)}
 Gen_SetLayer :: proc(g: ^Gen_Graph, n: ^Gen_Node, name: string) {gen_set_text(g, &n.layer, name)}
 
-Gen_NodeClearRules :: proc(n: ^Gen_Node) {
-	for r in n.rules do delete(r.tiles)
+Gen_NodeClearRules :: proc(n: ^Gen_Node, allocator := context.allocator) {
+	for &r in n.rules do Gen_RuleFree(&r, allocator)
 	delete(n.rules)
 	n.rules = nil
+}
+
+// Gen_RuleFree: a tile rule's tiles and terrain name (allocator: the graph's).
+Gen_RuleFree :: proc(r: ^Gen_Tile_Rule, allocator := context.allocator) {
+	delete(r.tiles)
+	if r.terrain != "" do delete(r.terrain, allocator)
+	r.tiles, r.terrain = nil, ""
+}
+
+// Gen_RuleSetTerrain: the rule's terrain ("": its tiles instead).
+Gen_RuleSetTerrain :: proc(g: ^Gen_Graph, r: ^Gen_Tile_Rule, name: string) {
+	if r.terrain != "" do delete(r.terrain, g.allocator)
+	r.terrain = strings.clone(name, g.allocator) if name != "" else ""
 }
 
 // Gen_GraphParse reads a .levelgen.json (allocator: the graph's).
@@ -423,6 +441,7 @@ Gen_GraphParse :: proc(data: []u8, allocator := context.allocator) -> (g: Gen_Gr
 				if m, mok := json_number(ro["max"]); mok do r.max = m
 				if t, tok := json_number(ro["tile"]); tok do append(&r.tiles, i32(t))
 				if ts, tok := ro["tiles"].(json.Array); tok do for tv in ts do if t, isNum := json_number(tv); isNum do append(&r.tiles, i32(t))
+				if tn, tok := ro["terrain"].(json.String); tok && tn != "" do r.terrain = strings.clone(string(tn), allocator)
 				append(&n.rules, r)
 			}
 		}
@@ -477,7 +496,12 @@ Gen_GraphSerialize :: proc(g: ^Gen_Graph, allocator := context.allocator) -> str
 				Json_Float(&w, r.max)
 				strings.write_string(&w.sb, ", \"tiles\": [")
 				for t, ti in r.tiles do fmt.sbprintf(&w.sb, "%s%d", ", " if ti > 0 else "", t)
-				strings.write_string(&w.sb, "]}")
+				strings.write_byte(&w.sb, ']')
+				if r.terrain != "" {
+					strings.write_string(&w.sb, ", \"terrain\": ")
+					Json_String(&w, r.terrain)
+				}
+				strings.write_byte(&w.sb, '}')
 			}
 			strings.write_byte(&w.sb, ']')
 			if n.tileset != "" {
@@ -545,7 +569,7 @@ Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^
 	copied := src^
 	n := Gen_AddNode(g, copied.kind, copied.pos + offset)
 	newId := n.id
-	Gen_NodeClearRules(n)
+	Gen_NodeClearRules(n, g.allocator)
 	n^ = copied
 	n.id, n.pos, n.inputs = newId, copied.pos + offset, {}
 	n.rules = nil
@@ -558,7 +582,7 @@ Gen_DuplicateNode :: proc(g: ^Gen_Graph, id: int, offset := [2]f32{30, 30}) -> ^
 	if len(copied.rules) > 0 {
 		n.rules = make([dynamic]Gen_Tile_Rule, g.allocator)
 		for r in copied.rules {
-			c := Gen_Tile_Rule{min = r.min, max = r.max, tiles = make([dynamic]i32, g.allocator)}
+			c := Gen_Tile_Rule{min = r.min, max = r.max, tiles = make([dynamic]i32, g.allocator), terrain = strings.clone(r.terrain, g.allocator) if r.terrain != "" else ""}
 			append(&c.tiles, ..r.tiles[:])
 			append(&n.rules, c)
 		}
@@ -677,6 +701,7 @@ Gen_LoadFile :: proc(ctx: ^GameContext, path: string, allocator := context.alloc
 		return {}, fmt.tprintf("%s: %s", path, err)
 	}
 	Gen_LoadScripts(&g, ctx)
+	Gen_LoadTerrains(&g, ctx)
 	return g, ""
 }
 
@@ -868,6 +893,38 @@ Gen_LoadScripts :: proc(g: ^Gen_Graph, ctx: ^GameContext) {
 		if n.kind != .Script || n.script == "" || n.script in g.scripts do continue
 		if text, ok := AssetManager_ReadFileString(&ctx.game.assetManager, n.script, context.temp_allocator); ok do Gen_SetScriptSource(g, n.script, text)
 	}
+}
+
+// Gen_LoadTerrains reads the terrains of the tile outputs' tilesets
+// (their .tileset.json files) into the graph, again when called again.
+Gen_LoadTerrains :: proc(g: ^Gen_Graph, ctx: ^GameContext) {
+	gen_tilesets_clear(g)
+	if ctx == nil || ctx.game == nil do return
+	for &n in g.nodes {
+		if n.kind != .Tile_Output || n.tileset == "" || n.tileset in g.tilesets do continue
+		if text, ok := AssetManager_ReadFileString(&ctx.game.assetManager, Terrain_SidecarPath(n.tileset), context.temp_allocator); ok do Gen_SetTerrainSource(g, n.tileset, text)
+	}
+}
+
+// Gen_SetTerrainSource gives the graph a tileset's terrains file text (as
+// if read for the image `image`).
+Gen_SetTerrainSource :: proc(g: ^Gen_Graph, image, text: string) {
+	if g.tilesets == nil do g.tilesets = make(map[string]string, g.allocator)
+	if old, ok := g.tilesets[image]; ok {
+		delete(old, g.allocator)
+		g.tilesets[image] = strings.clone(text, g.allocator)
+		return
+	}
+	g.tilesets[strings.clone(image, g.allocator)] = strings.clone(text, g.allocator)
+}
+
+@(private = "file")
+gen_tilesets_clear :: proc(g: ^Gen_Graph) {
+	for k, v in g.tilesets {
+		delete(k, g.allocator)
+		delete(v, g.allocator)
+	}
+	clear(&g.tilesets)
 }
 
 // Gen_SetScriptSource gives the graph a script's text (as if read from `path`).

@@ -172,6 +172,15 @@ merge). Mix them with the rest: `combine` (max) adds ledges to a cave,
 |---|---|---|
 | `tile_output` | `empty` (-1), `tile_w`, `tile_h` (16), `rules`, `tileset`, `layer` | Each cell takes the first rule whose `min`..`max` holds its value: one of its `tiles` (or `tile`), picked by the cell and the seed. Cells no rule takes get `empty` (-1: none). `tileset` (a project image) and the tile size are for picking tiles and previews; `layer` is where it goes (below). |
 
+**Terrains.** A rule can name a **terrain** of the tile output's tileset
+(`{"min": 0.5, "max": 1, "terrain": "Grass"}`; in the editor, the rule's
+terrain list) instead of tiles: its cells become that terrain and each
+takes the terrain's tile for its pattern of neighbours - cave walls with
+proper edges and corners. Cells beyond the level count as the terrain (it
+runs on past the edges). Terrains are made on the Tile Map tab (Terrains
+layer) and kept next to the tileset image (`<name>.tileset.json`, read
+with the generator; `Gen_LoadTerrains`).
+
 **Layers.** The output's tiles go into the main TileMap. Any other tile
 output with a **layer** name goes into the TileMap of that name next to the
 main one (a sibling, else a child) - one generator fills ground, walls and

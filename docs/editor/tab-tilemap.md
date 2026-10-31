@@ -52,6 +52,7 @@ Each change is one undo step. You can also right-click an image in
 | Control | What it does |
 |---|---|
 | **Tiles** | The tools paint tileset tiles (the tile list shows below). |
+| **Terrains** | The tools paint a terrain of the tileset: each cell takes its tile from its neighbours, so edges and corners draw themselves (the terrain list shows below). |
 | **Components** | The tools paint component instances (the component list shows below). |
 | **Paint** (brush) | Left button paints the picked tile (or component) on each cell the mouse crosses. |
 | **Erase** (eraser) | Left button clears cells. |
@@ -93,6 +94,30 @@ outline. Scroll when the tileset is bigger than the panel.
 
 Before a tileset is picked, the tab says *Pick a tileset image above to
 paint with.*
+
+### The terrain list (Terrains layer)
+
+A terrain is a set of the tileset's tiles - one for each way a cell's
+neighbours can be the same terrain. Painting it, every cell picks its tile
+from its neighbours (and the cells around it are re-tiled), so you paint
+"grass" and its edges, corners and middle appear. The terrains are kept
+next to the tileset image (`textures/Tiles.png` ->
+`textures/Tiles.tileset.json`), so every map using that tileset - and the
+[Level Generator](../../engine/docs/level_generator.md) - shares them.
+
+| Control | What it does |
+|---|---|
+| **New Terrain** | Add a terrain to the tileset. |
+| Terrain card | Click to paint with it (its full tile shows). |
+| Name | Rename it (Enter). |
+| **Blob (47)** / **Edges (16)** | Blob: 47 patterns from all 8 neighbours (a corner counts when both sides next to it are the terrain). Edges: 16 patterns from the 4 sides. |
+| **Edit Tiles** | The **Terrain Tiles** window: the patterns (a 3 x 3 picture each: green the cell, blue the neighbours of the same terrain) and the tileset. Click a pattern, then its tile(s) in the tileset (again to remove one); **Next pattern after a pick** moves on by itself. A pattern with several tiles picks one per cell; right-click a pattern to clear it. Saved as you pick. |
+| Delete | Remove the terrain (tiles already painted stay). |
+
+A pattern without a tile uses the same pattern without its corners, then
+the full tile: give the full tile first and the map already fills; add the
+edges and corners next. **Erase** (or the right button) empties cells and
+re-tiles their neighbours; **Fill** fills an area with the terrain.
 
 ### The component list (Components layer)
 

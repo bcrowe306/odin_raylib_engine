@@ -53,6 +53,12 @@ can also hold components - coins, enemies, spikes - one per cell.
   body child named `<Name>_Colliders`, with one box per horizontal run of
   painted tiles. Its colliders also cast [Light](LightNode.md) shadows.
   They are not saved and aren't there while you edit.
+- **Terrains** (auto-tiling): a tileset's terrains - kept next to its
+  image in `<name>.tileset.json` - give each cell the tile for its pattern
+  of same-terrain neighbours (16 edge patterns or the 47-tile blob). Paint
+  them on the Tile Map tab's Terrains layer; a Level Generator rule can
+  name one. From Odin: `TileMapNode_PaintTerrain`, `TileMapNode_FillTerrain`
+  (engine/terrain.odin).
 - Large maps are drawn as cached chunks, so many tiles cost little.
 - **Tint** multiplies the colours of every tile.
 - **Aseprite Layer**: with an Aseprite file as the tileset, the map is that
