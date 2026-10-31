@@ -49,8 +49,11 @@ the emitter makes new ones to replace them.
      **Align To Velocity**.
    - **Collision**: particles hitting physics bodies.
 3. The tab's play / pause button pauses or resumes the preview of every
-   emitter; the arrow restarts this one. The line next to them shows how
-   many particles are alive.
+   emitter; the arrow restarts this one. **Preset** gives the emitter a
+   starting look - **Fire**, **Smoke**, **Sparks**, **Rain**, **Snow**,
+   **Explosion** or **Magic** - replacing its look and motion settings (its
+   texture stays; one Undo puts the old settings back), ready to tweak. The
+   line next to them shows how many particles are alive.
 4. Put the emitter where the effect belongs: a child of a torch, the
    player's feet, a ship's engine.
 

@@ -54,6 +54,27 @@ pp := Particle_Panel{dragStop = -1, dragAlpha = -1}
 
 particleTabRequest := false // select the Particles tab next frame
 
+// particle_preset_menu: a starting look (fire, smoke, ...) for the emitter;
+// it replaces the look and motion settings, so it's one undo step.
+@(private = "file")
+particle_preset_menu :: proc(state: ^EditorState, em: ^e.ParticleEmitter) {
+	imgui.SetNextItemWidth(110)
+	if imgui.BeginCombo("##particles.preset", ICON_FA_WAND_MAGIC_SPARKLES + " Preset", {.HeightLarge}) {
+		for p in e.ParticlePreset {
+			name := e.ParticlePreset_Name(p)
+			if imgui.Selectable(fmt.ctprintf("%s", name)) {
+				Editor_RecordUndo(state, fmt.tprintf("Apply %s preset", name))
+				e.ParticleEmitter_ApplyPreset(em, p)
+				particlePreview = true
+			}
+			Drive_Item(fmt.tprintf("pick:%s", name))
+		}
+		imgui.EndCombo()
+	}
+	Drive_Item("particles.preset")
+	UI_Tooltip("Give the emitter a starting look: fire, smoke, sparks, rain, snow, an explosion or magic. Its look and motion settings are replaced; its texture stays")
+}
+
 ParticlePanel_Render :: proc(state: ^EditorState) {
 	node := state.selectedNode
 	if node == nil || node.typeId != e.ParticleEmitterNode {
@@ -74,6 +95,8 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 		for &p in em.particles do p.alive = false
 		e.ParticleEmitter_Start(em)
 	}
+	imgui.SameLine(0, 2)
+	particle_preset_menu(state, em)
 	imgui.SameLine(0, UI_SPACE)
 	imgui.AlignTextToFramePadding()
 	UI_DimText(fmt.tprintf("%d particles alive%s · %d per cycle · %.1fs lifetime", em.aliveCount, " (GPU)" if em.gpu else "", em.amount, em.lifetime))

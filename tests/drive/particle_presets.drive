@@ -1,0 +1,15 @@
+# #130: the Particles tab's Preset menu gives the emitter a whole look
+# (Magic: orbiting, additive); saved with the scene; one undo step.
+wait 5
+click @hier:StarfieldEmitter
+click @bottom:particles
+click @particles.preset
+click @pick:Magic
+wait 30
+expect node:StarfieldEmitter.particles >= 1
+screenshot preset_magic
+click @toolbar.save
+expect file:scenes/main.scene.json contains "emitter.orbitVelocity": 90
+key cmd+z
+click @toolbar.save
+expect file:scenes/main.scene.json !contains "emitter.orbitVelocity": 90
