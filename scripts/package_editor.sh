@@ -51,7 +51,7 @@ if [ "$platform" = macos ]; then
 	libs="$app/Contents/Frameworks"
 	res="$app/Contents/Resources"
 	mkdir -p "$bin" "$libs" "$res"
-	odin build editor -o:speed '-extra-linker-flags:-Wl,-rpath,@executable_path/../Frameworks' \
+	odin build editor -o:speed '-extra-linker-flags:-Wl,-rpath,@executable_path/../Frameworks' $(scripts/odin_flags.sh) \
 		-define:RAYZR_RELEASE="$version" -out:"$bin/$exe"
 elif [ "$platform" = windows ]; then
 	root="$out/rayzr-editor-$platform"

@@ -38,13 +38,13 @@ mkdir -p "$out"
 if [ "$platform" = macos ]; then
 	rpath='-extra-linker-flags:-Wl,-rpath,@executable_path/../Frameworks'
 	native=$(uname -m)
-	odin build runner -o:speed "$rpath" -out:"$out/runner-$native" "$@"
+	odin build runner -o:speed "$rpath" $(scripts/odin_flags.sh) -out:"$out/runner-$native" "$@"
 	other=x86_64; target=darwin_amd64
 	[ "$native" = x86_64 ] && other=arm64 && target=darwin_arm64
 	# Only with the other architecture's libraries (else the build can't link).
 	built_other=0
 	if ls "$(odin root)"/vendor/box2d/lib/box2d_${target}*.a > /dev/null 2>&1; then
-		if perl -e 'alarm 600; exec @ARGV' odin build runner -o:speed "$rpath" -target:$target -out:"$out/runner-$other" "$@" > "$out/.other.log" 2>&1; then
+		if perl -e 'alarm 600; exec @ARGV' odin build runner -o:speed "$rpath" $(scripts/odin_flags.sh) -target:$target -out:"$out/runner-$other" "$@" > "$out/.other.log" 2>&1; then
 			built_other=1
 		fi
 	else
@@ -58,7 +58,7 @@ if [ "$platform" = macos ]; then
 		mv "$out/runner-$native" "$out/$exe"
 	fi
 	rm -f "$out/runner-$native" "$out/runner-$other" "$out/.other.log"
-	odin build runner -debug "$rpath" -out:"$out/runner-debug" "$@"
+	odin build runner -debug "$rpath" $(scripts/odin_flags.sh) -out:"$out/runner-debug" "$@"
 
 	# Ship Lua's shared library with the runners.
 	lualib=$(otool -L "$out/$exe" | awk '/liblua/ {print $1; exit}')
