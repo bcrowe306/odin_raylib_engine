@@ -81,6 +81,7 @@ preset_base :: proc(e: ^ParticleEmitter) {
 	e.radialVelocity, e.orbitVelocity, e.damping = 0, 0, 0
 	e.sizeCurve.count, e.alphaCurve.count, e.speedCurve.count = 0, 0, 0
 	e.localSpace = true
+	e.trailLength, e.trailSegment, e.trailWidth = 0, 6, 1
 }
 
 // ParticleEmitter_ApplyPreset gives the emitter a preset's look and restarts it.
@@ -159,6 +160,7 @@ ParticleEmitter_ApplyPreset :: proc(e: ^ParticleEmitter, preset: ParticlePreset)
 		e.angleSpread, e.velocity, e.velocitySpread = 180, 30, 20
 		e.emissionShape, e.emissionRadius = .Circle, 24
 		e.orbitVelocity = 90
+		e.trailLength, e.trailSegment, e.trailWidth = 8, 4, 0.8
 		e.gravityDirection, e.gravityVelocity = {0, -1}, 20
 		e.blendMode = .Additive
 		set_ramp(e, {0, {180, 120, 255, 0}}, {0.2, {200, 160, 255, 255}}, {0.7, {120, 220, 255, 200}}, {1, {80, 120, 255, 0}})

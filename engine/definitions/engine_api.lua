@@ -1884,6 +1884,9 @@ function AsepriteNode:set_property(path, value, y) end
 ---| "emitter.frameMode" # "OverLifetime"|"Speed"|"Random" - Which sheet frame a particle shows: Over Lifetime (the sheet once), Speed (Frame Speed ...
 ---| "emitter.frameSpeed" # number - Frames per second (Frame Mode: Speed).
 ---| "emitter.alignToVelocity" # boolean - Particles face where they move (rain, sparks, arrows); Rotation adds to it.
+---| "emitter.trailLength" # integer - Trail: how many points of each particle's recent path are drawn as a ribbon behind it (...
+---| "emitter.trailSegment" # number - Trail: pixels a particle moves between two trail points (smaller: smoother, shorter).
+---| "emitter.trailWidth" # number - Trail: the ribbon's width at the particle, a fraction of the particle's size (it thins ...
 ---| "emitter.emissionShape" # "Rectangle"|"Point"|"Circle"|"Ring"|"Line"|"RectangleEdge" - Where particles are born: Rectangle (the Spread box), Point, Circle, Ring, Line (along ...
 ---| "emitter.emissionRadius" # number - Circle / Ring: the outer radius.
 ---| "emitter.emissionInnerRadius" # number - Ring: the inner radius (no particles inside it).
@@ -1961,6 +1964,9 @@ function AsepriteNode:set_property(path, value, y) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.frameMode"): "OverLifetime"|"Speed"|"Random"
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.frameSpeed"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.alignToVelocity"): boolean
+---@overload fun(self: ParticleEmitterNode, path: "emitter.trailLength"): integer
+---@overload fun(self: ParticleEmitterNode, path: "emitter.trailSegment"): number
+---@overload fun(self: ParticleEmitterNode, path: "emitter.trailWidth"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionShape"): "Rectangle"|"Point"|"Circle"|"Ring"|"Line"|"RectangleEdge"
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionRadius"): number
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionInnerRadius"): number
@@ -2040,6 +2046,9 @@ function ParticleEmitterNode:get_property(path) end
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.frameMode", value: "OverLifetime"|"Speed"|"Random")
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.frameSpeed", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.alignToVelocity", value: boolean)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.trailLength", value: integer)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.trailSegment", value: number)
+---@overload fun(self: ParticleEmitterNode, path: "emitter.trailWidth", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionShape", value: "Rectangle"|"Point"|"Circle"|"Ring"|"Line"|"RectangleEdge")
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionRadius", value: number)
 ---@overload fun(self: ParticleEmitterNode, path: "emitter.emissionInnerRadius", value: number)

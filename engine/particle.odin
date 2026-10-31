@@ -140,6 +140,16 @@ ParticleEmissionShape :: enum {
 // between; none = off.
 MAX_CURVE_POINTS :: 8
 
+// Trails (#130): a particle's recent path, a point each trailSegment
+// pixels it moves, drawn as a ribbon behind it that thins and fades.
+MAX_TRAIL_POINTS :: 32
+
+Particle_Trail :: struct {
+	points: [MAX_TRAIL_POINTS][2]f32, // a ring, in the particles' space
+	count:  u8,
+	head:   u8, // the newest point
+}
+
 ParticleCurve :: struct {
 	points: [MAX_CURVE_POINTS][2]f32,
 	count:  int,
@@ -252,6 +262,14 @@ ParticleEmitter :: struct {
 	frameMode: ParticleFrameMode `gui:"true"`,
 	frameSpeed: f32 `gui:"true" min:"0" max:"60"`,
 	alignToVelocity: bool `gui:"true"`,
+	// Trails (#130; CPU particles): trailLength points (0 = off), one each
+	// trailSegment pixels; trailWidth is the ribbon's width at the particle
+	// (1 = the particle's size). `trails` parallels `particles` (only
+	// allocated when on).
+	trailLength:  int `gui:"true" min:"0" max:"32"`,
+	trailSegment: f32 `gui:"true" min:"1" max:"64"`,
+	trailWidth:   f32 `gui:"true" min:"0" max:"4"`,
+	trails:       [dynamic]Particle_Trail,
 	// Emission and motion (#127).
 	emissionShape: ParticleEmissionShape `gui:"true"`,
 	emissionRadius: f32 `gui:"true" min:"0" max:"1000"`,
@@ -332,7 +350,8 @@ ParticleEmitter_Reserve :: proc(emitter: ^ParticleEmitter, n: int) {
 // emitter isn't owned by a node, whose arena frees them).
 ParticleEmitter_Destroy :: proc(emitter: ^ParticleEmitter) {
 	if emitter.particles != nil && emitter.allocator.procedure == nil do delete(emitter.particles)
-	emitter.particles = nil
+	if emitter.trails != nil && emitter.allocator.procedure == nil do delete(emitter.trails)
+	emitter.particles, emitter.trails = nil, nil
 	if g := emitter.gpuData; g != nil {
 		ParticleGPU_Release(emitter)
 		if emitter.allocator.procedure == nil {
@@ -388,6 +407,8 @@ ParticleEmitter_Init :: proc(emitter: ^ParticleEmitter) {
 	emitter.sheetRows = 1
 	emitter.frameSpeed = 12
 	emitter.emissionRadius = 32
+	emitter.trailSegment = 6
+	emitter.trailWidth = 1
 	emitter.autoVisibility = true
 	emitter.visibilityRect = {-128, -128, 256, 256}
 	emitter.start = ParticleEmitter_Start
@@ -472,6 +493,7 @@ ParticleEmitter_Emit :: proc(emitter: ^ParticleEmitter) {
 		if len(emitter.particles) == 0 do return
 		emitter.head %= len(emitter.particles)
 		p = &emitter.particles[emitter.head]
+		if emitter.head < len(emitter.trails) do emitter.trails[emitter.head].count = 0
 		emitter.head = (emitter.head + 1) % len(emitter.particles)
 	}
 
@@ -950,6 +972,16 @@ particle_step :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world: b2.World
 	defer emitter.stepForces = false
 	mn, mx := [2]f32{max(f32), max(f32)}, [2]f32{min(f32), min(f32)}
 	big: f32 = 0
+	trails := emitter.trailLength > 0
+	if trails && len(emitter.trails) != len(emitter.particles) {
+		if emitter.trails == nil {
+			alloc := emitter.allocator if emitter.allocator.procedure != nil else context.allocator
+			emitter.trails = make([dynamic]Particle_Trail, alloc)
+		}
+		resize(&emitter.trails, len(emitter.particles))
+	}
+	// (The trail reaches back up to its length: kept in view with the particles.)
+	if trails do big = f32(min(emitter.trailLength, MAX_TRAIL_POINTS)) * max(emitter.trailSegment, 1)
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles[i].alive do continue
 		prev := emitter.particles[i].position
@@ -957,10 +989,25 @@ particle_step :: proc(emitter: ^ParticleEmitter, deltaTime: f32, world: b2.World
 		if collide && emitter.particles[i].alive do particle_collide(emitter, &emitter.particles[i], prev, world)
 		p := &emitter.particles[i]
 		if !p.alive do continue
+		if trails do particle_trail_record(emitter, &emitter.trails[i], p.position)
 		mn, mx = {min(mn.x, p.position.x), min(mn.y, p.position.y)}, {max(mx.x, p.position.x), max(mx.y, p.position.y)}
 		big = max(big, max(p.size.x * abs(p.scale.x), p.size.y * abs(p.scale.y)))
 	}
 	emitter.extentMin, emitter.extentMax, emitter.extentSize, emitter.extentAny = mn, mx, big, mn.x <= mx.x
+}
+
+// particle_trail_record: a new trail point once the particle is
+// trailSegment from the newest one (the first: where it is).
+@(private = "file")
+particle_trail_record :: proc(emitter: ^ParticleEmitter, t: ^Particle_Trail, pos: [2]f32) {
+	if t.count > 0 {
+		d := pos - t.points[t.head]
+		seg := max(emitter.trailSegment, 1)
+		if d.x * d.x + d.y * d.y < seg * seg do return
+	}
+	t.head = u8((int(t.head) + 1) % MAX_TRAIL_POINTS) if t.count > 0 else 0
+	t.points[t.head] = pos
+	t.count = u8(min(int(t.count) + 1, min(max(emitter.trailLength, 1), MAX_TRAIL_POINTS)))
 }
 
 @(private = "file")
@@ -1119,6 +1166,48 @@ Particle_Quad_Texture :: enum {
 	Texture, // its own texture
 }
 
+// particle_trail_draw: the ribbon from the particle back through its
+// trail's points, thinning to nothing and fading at the oldest.
+@(private = "file")
+particle_trail_draw :: proc(emitter: ^ParticleEmitter, b: ^Particle_Batch, white: u32, p: Particle, t: ^Particle_Trail) {
+	q := Particle_QuadOf(emitter, p)
+	pts: [MAX_TRAIL_POINTS + 1][2]f32
+	pts[0] = q.center
+	n := 1
+	for k in 0 ..< int(t.count) {
+		pt := t.points[(int(t.head) - k + MAX_TRAIL_POINTS) % MAX_TRAIL_POINTS]
+		pts[n] = particle_to_world(emitter, pt) if emitter.localSpace else pt
+		n += 1
+	}
+	if n < 2 do return
+	width := emitter.trailWidth * max(min(q.size.x, q.size.y), 1)
+	if p.shape == .Line do width = emitter.trailWidth * max(q.size.y, 1)
+	edge :: proc(pts: [][2]f32, k: int, w: f32) -> (l, r: [2]f32) {
+		d := pts[max(k - 1, 0)] - pts[min(k + 1, len(pts) - 1)]
+		ln := math.sqrt(d.x * d.x + d.y * d.y)
+		nrm := [2]f32{-d.y, d.x} / ln * w * 0.5 if ln > 0.0001 else [2]f32{}
+		return pts[k] + nrm, pts[k] - nrm
+	}
+	for k in 0 ..< n - 1 {
+		f0, f1 := 1 - f32(k) / f32(n - 1), 1 - f32(k + 1) / f32(n - 1)
+		l0, r0 := edge(pts[:n], k, width * f0)
+		l1, r1 := edge(pts[:n], k + 1, width * f1)
+		c0, c1 := q.color, q.color
+		c0.a, c1.a = u8(f32(q.color.a) * f0), u8(f32(q.color.a) * f1)
+		batch_use(b, white)
+		// (Front-facing: raylib culls the other winding.)
+		a, bb, c, dd := l0, r0, r1, l1
+		ca, cb, cc, cd := c0, c0, c1, c1
+		if (bb.x - a.x) * (c.y - a.y) - (bb.y - a.y) * (c.x - a.x) > 0 do a, bb, c, dd, ca, cb, cc, cd = r0, l0, l1, r1, c0, c0, c1, c1
+		rlgl.TexCoord2f(0, 0)
+		rlgl.Color4ub(ca.r, ca.g, ca.b, ca.a); rlgl.Vertex2f(a.x, a.y)
+		rlgl.Color4ub(cb.r, cb.g, cb.b, cb.a); rlgl.Vertex2f(bb.x, bb.y)
+		rlgl.Color4ub(cc.r, cc.g, cc.b, cc.a); rlgl.Vertex2f(c.x, c.y)
+		rlgl.Color4ub(cd.r, cd.g, cd.b, cd.a); rlgl.Vertex2f(dd.x, dd.y)
+		b.n += 1
+	}
+}
+
 // Particle_Quad: one particle as drawn - a w x h quad centred on `center`,
 // turned by `rotation` degrees, in world terms.
 Particle_Quad :: struct {
@@ -1202,6 +1291,12 @@ ParticleEmitter_Render :: proc(emitter: ^ParticleEmitter, deltaTime: f32 = 0) {
 	}
 	defer if blend do rl.EndBlendMode()
 	defer batch_close(&b) // (runs first: the quads go out in the blend mode)
+	// Trails first: behind the particles.
+	if emitter.trailLength > 0 && len(emitter.trails) == len(emitter.particles) {
+		for i in 0 ..< len(emitter.particles) {
+			if emitter.particles[i].alive && emitter.trails[i].count > 0 do particle_trail_draw(emitter, &b, white, emitter.particles[i], &emitter.trails[i])
+		}
+	}
 	for i in 0..<len(emitter.particles) {
 		if !emitter.particles[i].alive do continue
 		p := &emitter.particles[i]

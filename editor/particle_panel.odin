@@ -147,6 +147,17 @@ ParticlePanel_Render :: proc(state: ^EditorState) {
 		imgui.EndTabItem()
 	}
 	if em.gpu {
+		trailsOpen := imgui.BeginTabItem("Trails")
+		Drive_Item("particles.tab:trails")
+		if trailsOpen {
+			imgui.Dummy({0, 6})
+			UI_DimText("   GPU mode: particles have no trails (turn GPU off in Emission to use them).")
+			imgui.EndTabItem()
+		}
+	} else {
+		section(state, node, "Trails", "particles.tab:trails", {"emitter.trailLength", "emitter.trailSegment", "emitter.trailWidth"})
+	}
+	if em.gpu {
 		// (GPU mode: no collision.)
 		colOpen := imgui.BeginTabItem("Collision")
 		Drive_Item("particles.tab:collision")
