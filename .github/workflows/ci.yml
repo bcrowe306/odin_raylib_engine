@@ -47,7 +47,7 @@ jobs:
       matrix:
         include:
           # (macOS runners have no GPU: no OpenGL window, so the smoke tests run on Linux under Xvfb.)
-          - { name: macOS arm64, os: macos-14, platform: macos, smoke: false }
+          - { name: macOS arm64, os: macos-15, platform: macos, smoke: false }
           - { name: Linux x64, os: ubuntu-22.04, platform: linux, smoke: true }
           - { name: Windows x64, os: windows-2022, platform: windows, smoke: false }
     defaults:
