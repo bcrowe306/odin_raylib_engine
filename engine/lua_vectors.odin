@@ -102,6 +102,13 @@ Lua_PushVec2 :: proc(L: ^lua.State, v: [2]f32) {
 
 // arg_xy: the x, y given at `idx` - two numbers, or a vector / table there
 // ({x =, y =} or {x, y}).
+// arg_xy_next: arg_xy and the index after it (a vector takes one slot, two
+// numbers two), for calls taking two points: f(Vec2, Vec2) or f(x1, y1, x2, y2).
+arg_xy_next :: proc(L: ^lua.State, idx: c.int) -> (x, y: f32, next: c.int) {
+	x, y = arg_xy(L, idx)
+	return x, y, idx + 1 if lua.type(L, idx) == .TABLE else idx + 2
+}
+
 arg_xy :: proc(L: ^lua.State, idx: c.int) -> (f32, f32) {
 	if lua.type(L, idx) == .TABLE {
 		read :: proc(L: ^lua.State, idx: c.int, key: cstring, i: lua.Integer) -> f32 {

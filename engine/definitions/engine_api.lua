@@ -7910,9 +7910,9 @@ function AsepriteNode:aseprite_set_layer_visible(layer, visible) end
 ---Plays an animation (crossfading over `mix` seconds; default: the node's Mix Time). False when the skeleton has no such animation.
 ---
 ---Example: `skel:skeleton_play("run")`
----@param name string The animation's name (see skeleton_animations); always restarts it from its start, even when it is already playing
+---@param name string The animation's name (see skeleton_animations); the one already playing keeps going (only its loop setting changes), so it's safe to call every frame
 ---@param loop? boolean True (the default) loops; false plays once and fires "finished"
----@param mix? number Crossfade from the current animation: 0 cuts; nil or any other value crossfades over the node's Mix Time (default 0.15 s; the value itself isn't used as the length yet)
+---@param mix? number Crossfade length from the current animation, in seconds: 0 cuts; nil uses the node's Mix Time (default 0.15 s)
 ---@return boolean ok False when the skeleton has no such animation (nothing changes)
 function SkeletonNode:skeleton_play(name, loop, mix) end
 
@@ -8137,7 +8137,7 @@ function StateMachineNode:sm_time() end
 ---Starts the machine in a state, or in its initial state. A running machine leaves its current state first (its `on_exit_` runs); pending triggers are cleared. A machine with Autostart starts by itself on its first update; a child machine starts when its parent's state is entered.
 ---
 ---Example: `self.node:get_node("StateMachine"):sm_start("idle")`
----@param state? StateMachineState|string The state to start in; nil starts in the initial state. An unknown name starts in the first state
+---@param state? StateMachineState|string The state to start in; nil starts in the initial state. An unknown name logs a warning and starts in the initial state
 function StateMachineNode:sm_start(state) end
 
 ---Stops the machine: the current state's child machine stops, then its `on_exit_<state>("")` runs. The state stays current (`sm_state` still returns it); nothing changes state until `sm_start`.
@@ -8551,7 +8551,7 @@ function AnimationPlayerNode:animation_pause() end
 ---Example: `self.node:get_node("AnimationPlayer"):animation_resume()`
 function AnimationPlayerNode:animation_resume() end
 
----Resets the animation to the first frame.
+---Goes back to the current animation's first frame (its last when reversed), playing or paused as it was.
 ---
 ---Example: `self.node:get_node("AnimationPlayer"):animation_reset()`
 function AnimationPlayerNode:animation_reset() end
@@ -9116,8 +9116,8 @@ function LdtkLevelNode:ldtk_get_world() end
 ---
 ---Example: `local lv = Scene.find_node("Level"); local ok = lv:ldtk_set_world("Dungeon", "Dungeon_Entrance")`
 ---@param world string World identifier
----@param level? LdtkLevel|string Level identifier in that world to load (default, or when not found: the world's first level)
----@return boolean ok true when switched; false for an unknown or empty world
+---@param level? LdtkLevel|string Level identifier in that world to load (default: the world's first level)
+---@return boolean ok true when switched; false (nothing changes) for an unknown or empty world, or a level not in it
 function LdtkLevelNode:ldtk_set_world(world, level) end
 
 ---World mode: every level of the world at its world position (rebuilds).
@@ -9205,7 +9205,7 @@ function LdtkLevelNode:ldtk_world_to_cell(layer, x, y) end
 ---@param cx integer Cell column, 0-based
 ---@param cy integer Cell row, 0-based
 ---@param level? LdtkLevel|string Level identifier or iid (default: the current level)
----@return number x World X in px of the cell's centre (0 with no level loaded)
+---@return number? x World X in px of the cell's centre (0 with no level loaded); nil for an unknown level
 ---@return number y World Y in px of the cell's centre
 function LdtkLevelNode:ldtk_cell_to_world(layer, cx, cy, level) end
 
@@ -9282,7 +9282,7 @@ function LdtkLevelNode:ldtk_get_entity(iid) end
 ---
 ---Example: `local lv = Scene.find_node("Level"); local door = lv:ldtk_get_entity_node(self.door_iid)`
 ---@param iid string The entity's instance id
----@return Node? The node spawned for it; nil when it is not spawned (level not loaded or no node for the entity)
+---@return Node? The node spawned for it; nil when it is not spawned (level not loaded, no node for the entity, or the node was destroyed)
 function LdtkLevelNode:ldtk_get_entity_node(iid) end
 
 ---Lists the project's entity definitions.
@@ -9394,7 +9394,7 @@ function TweenModule.is_running(id) end
 ---Maps progress 0..1 through an easing curve (for your own animation).
 ---
 ---Example: `local k = Tween.ease("in_out_sine", self.elapsed / self.duration)`
----@param ease EaseName Easing curve name; an unknown name is linear
+---@param ease EaseName Easing curve name; an unknown name is linear (and logs a warning)
 ---@param t number Progress, clamped to 0..1
 ---@return number The eased progress: 0 at t = 0, 1 at t = 1 (back and elastic curves overshoot in between)
 function TweenModule.ease(ease, t) end
@@ -10124,7 +10124,7 @@ function InputModule.binding_text(action, slot) end
 ---@param slot integer Which binding, 1-based (past the end adds one, up to 4); 0 replaces the first binding of the same device kind
 ---@param binding InputBindingSpec|nil The new input, e.g. {key = "W"} or {axis = "LEFT_X", positive = true}; nil removes the slot
 ---@param conflicts? "clear"|"swap"|"allow" Another action already using it: "clear" takes it away (default), "swap" gives it this slot's old binding, "allow" keeps both
----@return boolean false for an unknown action; the change is saved for the player
+---@return boolean false (nothing changes) for an unknown action, a binding it can't read, or a full action (4 bindings) with no slot for this one; the change is saved for the player
 function InputModule.set_binding(action, slot, binding, conflicts) end
 
 ---Waits for the player to press the key / button / stick to bind to an action (a "press a key..." prompt). Everything must be let go first, so the button that opened the menu isn't taken. Escape cancels. The result is saved for the player.
@@ -10287,7 +10287,7 @@ function AudioModule.play_sound_at(path, x, y, volume) end
 ---Sets a mixer bus's fader (linear: 1 = 0 dB, 0.5 = -6 dB). "master", "music" and "sfx" also update the project's volumes.
 ---
 ---Example: `Audio.set_bus_volume("music", 0.5)`
----@param bus AudioBus A bus name, any case; lowercase "master", "music" and "sfx" also set the project's volumes
+---@param bus AudioBus A bus name, any case; "master", "music" and "sfx" (any case) also set the project's volumes, clamped to 0..1
 ---@param volume number Linear fader: 1 = 0 dB, 0.5 about -6 dB, 0 silent; clamped to 0..1 for master, music and sfx, at least 0 for other buses
 function AudioModule.set_bus_volume(bus, volume) end
 
@@ -10651,6 +10651,7 @@ function PhysicsModule.set_paused(paused) end
 ---@param startY number World Y where the ray starts, in px
 ---@param endX number World X where the ray ends, in px (a Vec2 also works, with endY left out)
 ---@param endY number World Y where the ray ends, in px
+---@param ... CollisionLayer|string|integer|table Optional: only colliders on these layers are hit (names from Project Settings > Physics, 1-16, or a list); none hits every layer. An unknown name is an error
 ---@return RaycastHit? hit The closest hit: point_x, point_y, normal_x, normal_y, fraction 0 to 1 along the ray, and node; nil when nothing solid is in the way
 function PhysicsModule.raycast(startX, startY, endX, endY) end
 
@@ -10751,13 +10752,13 @@ function SceneModule.register_transition(name, shader) end
 ---so switching to it later is quick.
 ---
 ---Example: `Scene.preload("level_2")`
----@param name SceneName The scene's name (not its file); an unknown name does nothing
+---@param name SceneName The scene's name, or its file ("scenes/level_2.scene.json") as for change_scene; an unknown one reports an error and does nothing
 function SceneModule.preload(name) end
 
 ---Returns how far a scene started with Scene.preload has loaded, from 0 to 1.
 ---
 ---Example: `local p = Scene.preload_progress("level_2"); Log.info("Loading: " .. math.floor(p * 100) .. "%")`
----@param name SceneName The scene's name, as passed to Scene.preload
+---@param name SceneName The scene's name or file, as passed to Scene.preload
 ---@return number How much has loaded, 0 to 1; 0 for an unknown scene
 function SceneModule.preload_progress(name) end
 
@@ -10779,7 +10780,7 @@ function SceneModule.loading_progress() end
 ---@return string? The name of the scene the loading screen is loading, or nil when no loading screen is up
 function SceneModule.loading_target() end
 
----Reloads the currently active scene.
+---Reloads the currently active scene (with the project's default transition, if it has one).
 ---
 ---Example: `if Input.is_key_pressed("R") then Scene.reload() end`
 function SceneModule.reload() end
@@ -10793,7 +10794,7 @@ function SceneModule.get_nodes() end
 ---Dynamically instantiates a new scene node and adds it to the active scene graph.
 ---
 ---Example: `local timer = Scene.create_node("TimerNode", "Cooldown", self.node)`
----@param nodeType string A node type or Add Node search name ("TimerNode", "timer", "sprite"); default "Node", and an unknown type also makes a plain Node
+---@param nodeType string A node type or Add Node search name ("TimerNode", "timer", "sprite"); default "Node"; an unknown type makes a plain Node and logs a warning
 ---@param name? string The new node's name; nil leaves the default
 ---@param parent? Node The node to add it under; nil adds it under the scene's root
 ---@return Node? node The new node, or nil when there is no active scene
@@ -11192,7 +11193,8 @@ local LocaleModule = {}
 ---Switches the language texts are shown in (a column of the locale tables).
 ---
 ---Example: `Locale.set("fr")`
----@param language Language|string A language column of the locale tables, e.g. "fr" (not checked: a name the tables lack makes texts fall back)
+---@param language Language|string A language column of the locale tables, e.g. "fr"; one the tables lack changes nothing (and logs a warning)
+---@return boolean ok true when switched; false for a language the tables lack
 function LocaleModule.set(language) end
 
 ---Returns the current language.

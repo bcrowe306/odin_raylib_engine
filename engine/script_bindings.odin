@@ -5,6 +5,7 @@ import "core:c"
 import "core:fmt"
 import "core:log"
 import "core:math"
+import "core:slice"
 import os "osx"
 import "core:reflect"
 import "core:strings"
@@ -117,48 +118,11 @@ lua_node_is :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// script_base_type_name: the node's built-in type name (the registry's, as
+// in scene files and Add Node).
 @(private = "file")
 script_base_type_name :: proc(node: ^Node) -> string {
-	typeName := "Node"
-	switch node.typeId {
-	case Node: typeName = "Node"
-	case TextureNode: typeName = "TextureNode"
-	case ScriptNode: typeName = "ScriptNode"
-	case CameraNode: typeName = "CameraNode"
-	case ParticleEmitterNode: typeName = "ParticleEmitterNode"
-	case AnimationPlayerNode: typeName = "AnimationPlayerNode"
-	case TimerNode: typeName = "TimerNode"
-	case SoundNode: typeName = "SoundNode"
-	case MusicNode: typeName = "MusicNode"
-	case DynamicBodyNode: typeName = "DynamicBodyNode"
-	case StaticBodyNode: typeName = "StaticBodyNode"
-	case KinematicBodyNode: typeName = "KinematicBodyNode"
-	case CharacterMoverNode: typeName = "CharacterMoverNode"
-	case AreaNode: typeName = "AreaNode"
-	case RaycastNode: typeName = "RaycastNode"
-	case LdtkLevelNode: typeName = "LdtkLevelNode"
-	case LightNode: typeName = "LightNode"
-	case StateMachineNode: typeName = "StateMachineNode"
-	case JointNode: typeName = "JointNode"
-	case TextNode: typeName = "TextNode"
-	case DialogueNode: typeName = "DialogueNode"
-	case NineSliceNode: typeName = "NineSliceNode"
-	case ParallaxNode: typeName = "ParallaxNode"
-	case LineNode: typeName = "LineNode"
-	case TrailNode: typeName = "TrailNode"
-	case VisibilityNotifierNode: typeName = "VisibilityNotifierNode"
-	case PathNode: typeName = "PathNode"
-	case PathFollowNode: typeName = "PathFollowNode"
-	case NavigationRegionNode: typeName = "NavigationRegionNode"
-	case NavigationAgentNode: typeName = "NavigationAgentNode"
-	case AdvancedCameraNode: typeName = "AdvancedCameraNode"
-	case SkeletonNode: typeName = "SkeletonNode"
-	case AsepriteNode: typeName = "AsepriteNode"
-	case BoneAttachmentNode: typeName = "BoneAttachmentNode"
-	case PostEffectNode: typeName = "PostEffectNode"
-	case TileMapNode: typeName = "TileMapNode"
-	}
-	return typeName
+	return Node_TypeName(node)
 }
 
 @(private="file")
@@ -273,8 +237,8 @@ lua_node_set_scale :: proc "c" (L: ^lua.State) -> c.int {
 	node, ok := to_node_userdata(L, 1)
 	if !ok do return 0
 	sx, sy := arg_xy(L, 2) // two numbers or a vector
-	if lua.gettop(L) == 2 {
-		sy = sx
+	if lua.gettop(L) == 2 && lua.type(L, 2) == .NUMBER {
+		sy = sx // (one number: uniform)
 	}
 	node.scale = {sx, sy}
 	return 0
@@ -2084,8 +2048,8 @@ lua_node_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	node, ok := to_node_userdata(L, 1)
 	if !ok || node.typeId != CameraNode do return 0
-	l, r := arg_xy(L, 2) // two numbers or a vector
-	t, b := arg_xy(L, 4) // two numbers or a vector
+	l, r, next := arg_xy_next(L, 2) // two numbers or a vector
+	t, b := arg_xy(L, next) // two numbers or a vector
 	CameraNode_SetLimits(cast(^CameraNode)node, l, r, t, b)
 	return 0
 }
@@ -2102,6 +2066,15 @@ lua_node_camera_clear_limits :: proc "c" (L: ^lua.State) -> c.int {
 // ----------------------------------------------------------------------------
 // Global Camera Table (Engine.Camera)
 // ----------------------------------------------------------------------------
+
+// camera_view_size: the frame the game draws at (the project's virtual
+// resolution; Expand: grown to the window's shape).
+@(private="file")
+camera_view_size :: proc(L: ^lua.State) -> [2]f32 {
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil && sm.game.virtualSize.x > 0 do return sm.game.virtualSize
+	return {1280, 720}
+}
 
 @(private="file")
 get_current_camera :: proc(L: ^lua.State) -> ^CameraNode {
@@ -2255,8 +2228,8 @@ lua_camera_set_limits :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	cam := get_current_camera(L)
 	if cam != nil {
-		l, r := arg_xy(L, 1) // two numbers or a vector
-		t, b := arg_xy(L, 3) // two numbers or a vector
+		l, r, next := arg_xy_next(L, 1) // two numbers or a vector
+		t, b := arg_xy(L, next) // two numbers or a vector
 		CameraNode_SetLimits(cam, l, r, t, b)
 	}
 	return 0
@@ -2282,7 +2255,8 @@ lua_camera_screen_to_world :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnumber(L, lua.Number(sy))
 		return 2
 	}
-	wPos := CameraNode_ScreenToWorld(cam, {sx, sy})
+	vs := camera_view_size(L)
+	wPos := CameraNode_ScreenToWorld(cam, {sx, sy}, vs.x, vs.y)
 	lua.pushnumber(L, lua.Number(wPos.x))
 	lua.pushnumber(L, lua.Number(wPos.y))
 	return 2
@@ -2298,7 +2272,8 @@ lua_camera_world_to_screen :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushnumber(L, lua.Number(wy))
 		return 2
 	}
-	sPos := CameraNode_WorldToScreen(cam, {wx, wy})
+	vs := camera_view_size(L)
+	sPos := CameraNode_WorldToScreen(cam, {wx, wy}, vs.x, vs.y)
 	lua.pushnumber(L, lua.Number(sPos.x))
 	lua.pushnumber(L, lua.Number(sPos.y))
 	return 2
@@ -2308,14 +2283,15 @@ lua_camera_world_to_screen :: proc "c" (L: ^lua.State) -> c.int {
 lua_camera_get_visible_world_bounds :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	cam := get_current_camera(L)
+	vs := camera_view_size(L)
 	if cam == nil {
 		lua.pushnumber(L, 0)
 		lua.pushnumber(L, 0)
-		lua.pushnumber(L, 1280)
-		lua.pushnumber(L, 720)
+		lua.pushnumber(L, lua.Number(vs.x))
+		lua.pushnumber(L, lua.Number(vs.y))
 		return 4
 	}
-	bounds := CameraNode_GetVisibleWorldBounds(cam)
+	bounds := CameraNode_GetVisibleWorldBounds(cam, vs.x, vs.y)
 	lua.pushnumber(L, lua.Number(bounds.x))
 	lua.pushnumber(L, lua.Number(bounds.y))
 	lua.pushnumber(L, lua.Number(bounds.width))
@@ -2430,14 +2406,20 @@ lua_physics_raycast :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 
-	startX, startY := arg_xy(L, 1) // two numbers or a vector
-	endX, endY := arg_xy(L, 3) // two numbers or a vector
+	startX, startY, next := arg_xy_next(L, 1) // two numbers or a vector
+	endX, endY, after := arg_xy_next(L, next) // two numbers or a vector
 
 	origin := [2]f32{startX, startY}
 	translation := [2]f32{endX - startX, endY - startY}
 
 	query := WorldRaycastQuery{hit = false, fraction = 1.0}
+	// (Optional layers after the points: only shapes on them are hit.)
 	filter := b2.DefaultQueryFilter()
+	if after <= lua.gettop(L) && !lua.isnil(L, after) {
+		set, valid := layers_arg(L, after)
+		if !valid do lua.L_error(L, "unknown collision layer (names from Project Settings > Physics, or 1-16)")
+		filter.maskBits = CollisionLayerSet_ToBits(set)
+	}
 	_ = b2.World_CastRay(sm.game.physicsWorld.worldId, origin, translation, filter, world_raycast_callback, &query)
 
 	if !query.hit {
@@ -2694,6 +2676,10 @@ lua_input_is_key_pressed :: proc "c" (L: ^lua.State) -> c.int {
 		lua.pushboolean(L, false)
 		return 1
 	}
+	if sm := get_script_manager(L); sm != nil && sm.game != nil && sm.game.input.useSimulatedInput {
+		lua.pushboolean(L, b32(Input_SimulatedKeyPressed(&sm.game.input, key)))
+		return 1
+	}
 	isPressed := rl.IsWindowReady() && rl.IsKeyPressed(key)
 	lua.pushboolean(L, b32(isPressed))
 	return 1
@@ -2710,6 +2696,10 @@ lua_input_is_key_released :: proc "c" (L: ^lua.State) -> c.int {
 	key, ok := parse_keyboard_key(string(keyStr))
 	if !ok {
 		lua.pushboolean(L, false)
+		return 1
+	}
+	if sm := get_script_manager(L); sm != nil && sm.game != nil && sm.game.input.useSimulatedInput {
+		lua.pushboolean(L, b32(Input_SimulatedKeyReleased(&sm.game.input, key)))
 		return 1
 	}
 	isRel := rl.IsWindowReady() && rl.IsKeyReleased(key)
@@ -2840,7 +2830,7 @@ lua_audio_play_sound_at :: proc "c" (L: ^lua.State) -> c.int {
 bus_arg :: proc(L: ^lua.State, idx: c.int) -> (Audio_Bus, bool) {
 	s := lua.tostring(L, idx)
 	if s == nil do return .Master, false
-	switch string(s) {
+	switch strings.to_lower(string(s), context.temp_allocator) {
 	case "master": return .Master, true
 	case "music":  return .Music, true
 	case "sfx":    return .Sfx, true
@@ -3113,7 +3103,9 @@ lua_scene_set_ambient :: proc "c" (L: ^lua.State) -> c.int {
 	if sm == nil || sm.game == nil || sm.game.sceneManager.currentScene == nil do return 0
 	a := f32(lua.tonumber(L, 4)) if lua.type(L, 4) == .NUMBER else 1
 	ch :: proc(v: f32) -> u8 {return u8(clamp(v, 0, 1) * 255 + 0.5)}
-	sm.game.sceneManager.currentScene.ambient = {ch(f32(lua.tonumber(L, 1))), ch(f32(lua.tonumber(L, 2))), ch(f32(lua.tonumber(L, 3))), ch(a)}
+	amb := rl.Color{ch(f32(lua.tonumber(L, 1))), ch(f32(lua.tonumber(L, 2))), ch(f32(lua.tonumber(L, 3))), ch(a)}
+	if amb == {} do amb.a = 1 // ({} means "not set": white)
+	sm.game.sceneManager.currentScene.ambient = amb
 	return 0
 }
 
@@ -3354,6 +3346,9 @@ lua_sm_start :: proc "c" (L: ^lua.State) -> c.int {
 	sm := sm_arg(L)
 	if sm == nil do return 0
 	name := lua.tostring(L, 2) if lua.gettop(L) >= 2 else nil
+	if name != nil && StateMachine_FindState(sm, string(name)) < 0 {
+		log.warnf("sm_start: no state '%s' on %s (starting in the initial state)", string(name), sm.name)
+	}
 	StateMachine_Start(sm, string(name) if name != nil else "", sm_ctx(L))
 	return 0
 }
@@ -3851,8 +3846,25 @@ lua_tr :: proc "c" (L: ^lua.State) -> c.int {
 @(private="file")
 lua_locale_set :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	if s := lua.tostring(L, 1); s != nil do Locale_SetLanguage(string(s))
-	return 0
+	// Locale.set(lang) -> ok: false (and nothing changes) for a language the
+	// project has no table for.
+	s := lua.tostring(L, 1)
+	if s == nil {
+		lua.pushboolean(L, false)
+		return 1
+	}
+	sm := get_script_manager(L)
+	if sm != nil && sm.game != nil {
+		langs := Locale_Languages(sm.game)
+		if len(langs) > 0 && !slice.contains(langs, string(s)) {
+			log.warnf("Locale.set: no language '%s' (the project has %v)", string(s), langs)
+			lua.pushboolean(L, false)
+			return 1
+		}
+	}
+	Locale_SetLanguage(string(s))
+	lua.pushboolean(L, true)
+	return 1
 }
 
 @(private="file")
@@ -4110,6 +4122,14 @@ lua_scene_loading_target :: proc "c" (L: ^lua.State) -> c.int {
 	return 1
 }
 
+// scene_by_name_or_file: a scene by name, or by its file
+// ("scenes/level_2.scene.json"), as change_scene takes them.
+@(private="file")
+scene_by_name_or_file :: proc(game: ^Game, name: string) -> ^Scene {
+	if s, ok := game.sceneManager.scenes[name]; ok do return s
+	return Game_FindSceneByFile(game, name)
+}
+
 // Scene.preload(name): load its assets in the background (a little each frame).
 @(private="file")
 lua_scene_preload :: proc "c" (L: ^lua.State) -> c.int {
@@ -4117,7 +4137,8 @@ lua_scene_preload :: proc "c" (L: ^lua.State) -> c.int {
 	sm := get_script_manager(L)
 	nameC := lua.tostring(L, 1)
 	if nameC == nil || sm == nil || sm.game == nil do return 0
-	if scene, ok := sm.game.sceneManager.scenes[string(nameC)]; ok do Scene_PreloadBegin(sm.game, scene)
+	if scene := scene_by_name_or_file(sm.game, string(nameC)); scene != nil do Scene_PreloadBegin(sm.game, scene)
+	else do Script_Problem(.Error, "Scene.preload: no scene %q (a scene name, or a scene file listed in the project)", string(nameC))
 	return 0
 }
 
@@ -4129,7 +4150,7 @@ lua_scene_preload_progress :: proc "c" (L: ^lua.State) -> c.int {
 	nameC := lua.tostring(L, 1)
 	v: f32
 	if nameC != nil && sm != nil && sm.game != nil {
-		if scene, ok := sm.game.sceneManager.scenes[string(nameC)]; ok do v = Scene_PreloadProgress(sm.game, scene)
+		if scene := scene_by_name_or_file(sm.game, string(nameC)); scene != nil do v = Scene_PreloadProgress(sm.game, scene)
 	}
 	lua.pushnumber(L, lua.Number(v))
 	return 1
@@ -4211,7 +4232,9 @@ lua_scene_reload :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
 	sm := get_script_manager(L)
 	if sm != nil && sm.game != nil && sm.game.sceneManager.currentScene != nil {
-		ChangeScene_ByName(&sm.game.sceneManager, sm.game.sceneManager.currentScene.name)
+		// (The project's default transition, as change_scene without options.)
+		if sm.game.hasDefaultTransition do Game_ChangeSceneSpec(sm.game, sm.game.sceneManager.currentScene, sm.game.defaultTransition)
+		else do ChangeScene_ByName(&sm.game.sceneManager, sm.game.sceneManager.currentScene.name)
 	}
 	return 0
 }
@@ -4452,6 +4475,7 @@ lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 	nodeName := string(nameC) if nameC != nil else ""
 
 	createdNode: ^Node = nil
+	added := false // (the *_Create helpers add the node themselves)
 	switch strings.to_lower(typeStr, context.temp_allocator) {
 	case "texturenode", "texture", "sprite":
 		tn := CreateNode(scene.manager, TextureNode)
@@ -4480,22 +4504,22 @@ lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 		createdNode = tm
 	case "dynamicbodynode", "dynamicbody", "dynamic_body":
 		db := DynamicBodyNode_Create(scene, nodeName, parent)
-		createdNode = db
+		createdNode, added = db, true
 	case "staticbodynode", "staticbody", "static_body":
 		sb := StaticBodyNode_Create(scene, nodeName, parent)
-		createdNode = sb
+		createdNode, added = sb, true
 	case "kinematicbodynode", "kinematicbody", "kinematic_body":
 		kb := KinematicBodyNode_Create(scene, nodeName, parent)
-		createdNode = kb
+		createdNode, added = kb, true
 	case "charactermovernode", "charactermover", "character_mover":
 		cm := CharacterMoverNode_Create(scene, nodeName, parent)
-		createdNode = cm
+		createdNode, added = cm, true
 	case "areanode", "area":
 		ar := AreaNode_Create(scene, nodeName, parent)
-		createdNode = ar
+		createdNode, added = ar, true
 	case "raycastnode", "raycast":
 		rc := RaycastNode_Create(scene, nodeName, parent)
-		createdNode = rc
+		createdNode, added = rc, true
 	case:
 		// Any other registered type (UI widgets, paths, lights, ...; names
 		// and search aliases as in Add Node), placed by the registry.
@@ -4517,13 +4541,16 @@ lua_scene_create_node :: proc "c" (L: ^lua.State) -> c.int {
 			push_node_userdata(L, n)
 			return 1
 		}
+		if !strings.equal_fold(typeStr, "node") {
+			log.warnf("Scene.create_node: unknown node type '%s' (made a plain Node)", typeStr)
+		}
 		nd := CreateNode(scene.manager, Node)
 		if nodeName != "" do nd.name = strings.clone(nodeName, nd.allocator)
 		createdNode = nd
 	}
 
 	if createdNode != nil {
-		SceneAddNode(scene, createdNode, parent)
+		if !added do SceneAddNode(scene, createdNode, parent)
 		push_node_userdata(L, createdNode)
 		return 1
 	}

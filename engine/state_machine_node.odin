@@ -519,8 +519,11 @@ StateMachine_Start :: proc(sm: ^StateMachineNode, state := "", ctx: ^GameContext
 	sm.previous = -1
 	sm.lastFired = -1
 	for &t in sm.triggers do t.pending = false
+	// The state asked for, else the initial one, else the first.
 	target := state if state != "" else sm.initial
 	if i := StateMachine_FindState(sm, target); i >= 0 {
+		StateMachine_Enter(sm, i, 0, ctx, "start")
+	} else if i := StateMachine_FindState(sm, sm.initial); i >= 0 {
 		StateMachine_Enter(sm, i, 0, ctx, "start")
 	} else if len(sm.states) > 0 {
 		StateMachine_Enter(sm, 0, 0, ctx, "start")

@@ -346,6 +346,7 @@ lua_tween_to :: proc "c" (L: ^lua.State) -> c.int {
 	ease := Ease.Out_Quad
 	if lua.type(L, 5) == .STRING {
 		if e, found := Ease_Parse(string(lua.tostring(L, 5))); found do ease = e
+		else do log.warnf("Tween.to: unknown ease '%s' (using out_quad)", string(lua.tostring(L, 5)))
 	}
 	delay: f32 = 0
 	loops := 0
@@ -366,6 +367,7 @@ lua_tween_to :: proc "c" (L: ^lua.State) -> c.int {
 		else do lua.pop(L, 1)
 	}
 	id := Tween_To(ts, node, property, v, duration, ease, delay, loops, yoyo, ref)
+	if id == 0 do log.warnf("Tween.to: %s has no animatable property '%s'", node.name, property)
 	if id == 0 && ref != 0 do lua.L_unref(L, lua.REGISTRYINDEX, ref)
 	lua.pushinteger(L, lua.Integer(id))
 	return 1
@@ -407,7 +409,8 @@ lua_tween_is_running :: proc "c" (L: ^lua.State) -> c.int {
 @(private = "file")
 lua_tween_ease :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	e, _ := Ease_Parse(string(lua.tostring(L, 1)) if lua.type(L, 1) == .STRING else "linear")
+	e, found := Ease_Parse(string(lua.tostring(L, 1)) if lua.type(L, 1) == .STRING else "linear")
+	if !found do log.warnf("Tween.ease: unknown ease '%s' (using linear)", string(lua.tostring(L, 1)))
 	lua.pushnumber(L, lua.Number(Ease_Apply(e, f32(lua.tonumber(L, 2)))))
 	return 1
 }
