@@ -6,6 +6,8 @@ import "core:os"
 import "core:path/filepath"
 import "core:strconv"
 import "core:strings"
+import "core:sync"
+import "core:thread"
 import rl "vendor:raylib"
 import e "../engine"
 import imgui "lib/imgui"
@@ -27,8 +29,10 @@ import imgui "lib/imgui"
 //   toolbar    Save (Ctrl/Cmd+S), Undo / Redo (Ctrl/Cmd+Z, Shift+Z),
 //              Apply to the selected TileMap (undoable, like any edit).
 //
-// Every change re-evaluates the graph (each node once) and refreshes the
-// previews. Undo keeps the graph's text before each change.
+// After a change a background job evaluates a copy of the graph (#171):
+// each node once, and only the nodes the change reaches - the others come
+// from a cache kept between changes - while the window stays responsive.
+// Undo keeps the graph's text before each change.
 // ============================================================================
 
 LEVEL_GEN_WINDOW :: "Level Generator###LevelGenWindow"
@@ -59,12 +63,13 @@ lge: struct {
 	zoom:      f32,
 	frame:     bool,
 	version:   int, // bumped by every change (previews follow)
-	thumbs:    map[int]rl.Texture2D, // node id -> its grid (for `thumbVersion`)
+	thumbs:    map[int]rl.Texture2D, // node id -> its grid (for `thumbVersion`; also the large preview)
+	thumbKeys: map[int]u64, // node id -> the cache key its thumbnail shows
 	thumbVersion: int,
-	scriptsVersion: int, // the version the script nodes' files were read for
+	scriptsStale: bool, // the script nodes' files are read again before the next evaluation
 	errors:    map[int]string, // node id -> why it can't be evaluated (heap)
-	preview:   rl.Texture2D,
-	previewOf: [2]int, // (node id, version) the preview shows
+	cache:     e.Gen_Cache, // nodes' grids between evaluations (the job's while it runs)
+	job:       ^Lge_Job,
 	ctxWorld:  [2]f32,
 	ctxNode:   int,
 	closePrompt: bool,
@@ -98,6 +103,7 @@ LevelGenEditor_Open :: proc(state: ^EditorState, rel: string) {
 	lge.loaded, lge.open, lge.dirty = true, true, false
 	lge.zoom, lge.frame = 1, true
 	lge.selected = 0
+	lge.scriptsStale = true
 	lge.version += 1
 	imgui.SetWindowFocusStr(LEVEL_GEN_WINDOW)
 }
@@ -137,17 +143,17 @@ lge_unload :: proc() {
 	for s in lge.redo do delete(s)
 	clear(&lge.redo)
 	lge_forget_previews()
+	if lge.cache.entries != nil do e.Gen_CacheClear(&lge.cache) // (another file's node ids)
 }
 
 @(private = "file")
 lge_forget_previews :: proc() {
+	lge_job_wait()
 	for _, tex in lge.thumbs do if tex.id != 0 do rl.UnloadTexture(tex)
 	clear(&lge.thumbs)
+	clear(&lge.thumbKeys)
 	for _, s in lge.errors do delete(s)
 	clear(&lge.errors)
-	if lge.preview.id != 0 do rl.UnloadTexture(lge.preview)
-	lge.preview = {}
-	lge.previewOf = {}
 	lge.thumbVersion = -1
 }
 
@@ -156,7 +162,9 @@ LevelGenEditor_Shutdown :: proc() {
 	delete(lge.undo)
 	delete(lge.redo)
 	delete(lge.thumbs)
+	delete(lge.thumbKeys)
 	delete(lge.errors)
+	if lge.cache.entries != nil do e.Gen_CacheDestroy(&lge.cache)
 	lge = {}
 }
 
@@ -198,6 +206,7 @@ lge_restore :: proc(from, to: ^[dynamic]string) {
 	e.Gen_GraphDestroy(&lge.graph)
 	lge.graph = g
 	if e.Gen_FindNode(&lge.graph, lge.selected) == nil do lge.selected = 0
+	lge.scriptsStale = true
 	lge.dirty = true
 	lge.version += 1
 }
@@ -224,37 +233,67 @@ lge_undo_on_activate :: proc() {
 
 // --- previews ---------------------------------------------------------------------------
 
-// lge_grid_texture: a grid as a texture - grey values (0 black .. 1 white),
-// or for a tile output the tiles in colours (none: transparent).
+// The largest level whose nodes are previewed (cells).
 @(private = "file")
-lge_grid_texture :: proc(g: ^e.Gen_Graph, id: int) -> (rl.Texture2D, string) {
-	n := e.Gen_FindNode(g, id)
-	if n == nil do return {}, "no node"
-	w, h := g.size.x, g.size.y
-	img := rl.GenImageColor(i32(w), i32(h), {0, 0, 0, 0})
-	pixels := ([^]rl.Color)(img.data)[:w * h]
-	if n.kind == .Tile_Output {
-		tiles, _, err := e.Gen_Tiles(g, id, 0, context.temp_allocator)
-		if err != "" {
-			rl.UnloadImage(img)
-			return {}, err
-		}
-		for t, i in tiles do if t >= 0 do pixels[i] = lge_tile_color(t)
-	} else {
-		grid, err := e.Gen_Evaluate(g, id, 0, context.temp_allocator)
-		if err != "" {
-			rl.UnloadImage(img)
-			return {}, err
-		}
-		for v, i in grid.v {
-			c := u8(clamp(v, 0, 1) * 255)
-			pixels[i] = {c, c, c, 255}
-		}
+LGE_PREVIEW_MAX :: 1024 * 1024
+
+// A background evaluation of the graph for the previews: a copy of it (the
+// window edits the original meanwhile), every node evaluated through
+// lge.cache, and why each failing node failed. What the job and the window
+// share is in the (thread-safe) heap allocator; the job has its own temp
+// allocator.
+@(private = "file")
+Lge_Job :: struct {
+	thread:  ^thread.Thread,
+	graph:   e.Gen_Graph,
+	version: int,
+	errors:  map[int]string, // (heap)
+	done:    bool, // (atomic)
+}
+
+@(private = "file")
+lge_job_run :: proc(t: ^thread.Thread) {
+	context.allocator = e.Engine_HeapAllocator()
+	j := cast(^Lge_Job)t.data
+	e.Gen_CachePrune(&lge.cache, &j.graph)
+	for n in j.graph.nodes {
+		if _, err := e.Gen_Evaluate(&j.graph, n.id, 0, context.temp_allocator, &lge.cache); err != "" do j.errors[n.id] = strings.clone(err)
+		free_all(context.temp_allocator)
 	}
-	tex := rl.LoadTextureFromImage(img)
-	rl.UnloadImage(img)
-	rl.SetTextureFilter(tex, .POINT)
-	return tex, ""
+	sync.atomic_store(&j.done, true)
+}
+
+// lge_job_wait: the running job finished and freed (its results dropped).
+@(private = "file")
+lge_job_wait :: proc() {
+	j := lge.job
+	if j == nil do return
+	thread.destroy(j.thread) // (joins)
+	lge_job_free(j)
+	lge.job = nil
+}
+
+@(private = "file")
+lge_job_free :: proc(j: ^Lge_Job) {
+	heap := e.Engine_HeapAllocator()
+	e.Gen_GraphDestroy(&j.graph)
+	for _, s in j.errors do delete(s, heap)
+	delete(j.errors)
+	free(j, heap)
+}
+
+// lge_grid_pixels: a grid as grey values (0 black .. 1 white), or for a tile
+// output its tiles in colours (none: transparent).
+@(private = "file")
+lge_grid_pixels :: proc(g: ^e.Gen_Graph, n: ^e.Gen_Node, grid: e.Gen_Grid, pixels: []rl.Color) {
+	if n.kind == .Tile_Output {
+		for t, i in e.Gen_TilesOf(n, grid, g.seed, context.temp_allocator) do pixels[i] = lge_tile_color(t) if t >= 0 else {}
+		return
+	}
+	for v, i in grid.v {
+		c := u8(clamp(v, 0, 1) * 255)
+		pixels[i] = {c, c, c, 255}
+	}
 }
 
 // lge_tile_color: a stable colour per tile index.
@@ -264,21 +303,75 @@ lge_tile_color :: proc(t: i32) -> rl.Color {
 	return rl.ColorFromHSV(h, 0.55, 0.9)
 }
 
-// lge_refresh: thumbnails for every node (and the errors) after a change.
+// lge_refresh: after a change, a job evaluates the graph; when it is done,
+// the thumbnails of the nodes whose grids changed (and the tile outputs,
+// whose rules aren't in their keys) are updated, and the errors replaced.
 @(private = "file")
 lge_refresh :: proc() {
-	if lge.thumbVersion == lge.version do return
-	lge_forget_previews()
-	lge.thumbVersion = lge.version
-	if lge.graph.size.x * lge.graph.size.y > 1024 * 1024 do return // (too big to preview every node)
-	for n in lge.graph.nodes {
-		tex, err := lge_grid_texture(&lge.graph, n.id)
-		if err != "" {
-			lge.errors[n.id] = strings.clone(err)
-			continue
+	if lge.cache.entries == nil do e.Gen_CacheInit(&lge.cache, e.Engine_HeapAllocator())
+	if j := lge.job; j != nil {
+		if !sync.atomic_load(&j.done) do return
+		thread.destroy(j.thread)
+		lge.job = nil
+		defer lge_job_free(j)
+		for _, s in lge.errors do delete(s)
+		clear(&lge.errors)
+		for id, why in j.errors do lge.errors[id] = strings.clone(why)
+		// Thumbnails of nodes gone (or failing now) go.
+		gone := make([dynamic]int, context.temp_allocator)
+		for id in lge.thumbs do if e.Gen_FindNode(&j.graph, id) == nil || id in j.errors do append(&gone, id)
+		for id in gone {
+			if tex := lge.thumbs[id]; tex.id != 0 do rl.UnloadTexture(tex)
+			delete_key(&lge.thumbs, id)
+			delete_key(&lge.thumbKeys, id)
 		}
-		lge.thumbs[n.id] = tex
+		for &n in j.graph.nodes {
+			if n.id in j.errors do continue
+			en, ok := lge.cache.entries[n.id]
+			if !ok do continue
+			tex, have := lge.thumbs[n.id]
+			if have && lge.thumbKeys[n.id] == en.key && n.kind != .Tile_Output && tex.width == i32(en.grid.w) && tex.height == i32(en.grid.h) do continue
+			pixels := make([]rl.Color, len(en.grid.v), context.temp_allocator)
+			lge_grid_pixels(&j.graph, &n, en.grid, pixels)
+			if have && tex.width == i32(en.grid.w) && tex.height == i32(en.grid.h) {
+				rl.UpdateTexture(tex, raw_data(pixels))
+			} else {
+				if have && tex.id != 0 do rl.UnloadTexture(tex)
+				img := rl.Image{data = raw_data(pixels), width = i32(en.grid.w), height = i32(en.grid.h), mipmaps = 1, format = .UNCOMPRESSED_R8G8B8A8}
+				tex = rl.LoadTextureFromImage(img)
+				rl.SetTextureFilter(tex, .POINT)
+				lge.thumbs[n.id] = tex
+			}
+			lge.thumbKeys[n.id] = en.key
+		}
+		lge.thumbVersion = j.version
 	}
+	if lge.thumbVersion == lge.version do return
+	if lge.graph.size.x * lge.graph.size.y > LGE_PREVIEW_MAX {
+		// (Too big to preview every node.)
+		for _, tex in lge.thumbs do if tex.id != 0 do rl.UnloadTexture(tex)
+		clear(&lge.thumbs)
+		clear(&lge.thumbKeys)
+		lge.thumbVersion = lge.version
+		return
+	}
+	// A copy of the graph (with its scripts' text) for the job.
+	heap := e.Engine_HeapAllocator()
+	g, why := e.Gen_GraphParse(transmute([]u8)e.Gen_GraphSerialize(&lge.graph, context.temp_allocator), heap)
+	if why != "" {
+		e.Gen_GraphDestroy(&g)
+		lge.thumbVersion = lge.version
+		return
+	}
+	for path, text in lge.graph.scripts do e.Gen_SetScriptSource(&g, path, text)
+	j := new(Lge_Job, heap)
+	j.version = lge.version
+	j.graph = g
+	j.errors = make(map[int]string, heap)
+	j.thread = thread.create(lge_job_run)
+	j.thread.data = j
+	lge.job = j
+	thread.start(j.thread)
 }
 
 // --- the window -------------------------------------------------------------------------
@@ -286,11 +379,22 @@ lge_refresh :: proc() {
 LevelGenEditor_Render :: proc(state: ^EditorState) {
 	levelGenFocused = false
 	if !lge.open || !lge.loaded do return
-	imgui.SetNextWindowSize({1040, 620}, .FirstUseEver)
+	// First shown: centred in the editor, as big as fits (up to 1040 x 620).
+	vp := imgui.GetMainViewport()
+	imgui.SetNextWindowPos(vp.WorkPos + vp.WorkSize * 0.5, .FirstUseEver, {0.5, 0.5})
+	imgui.SetNextWindowSize({min(1040, vp.WorkSize.x - 40), min(620, vp.WorkSize.y - 40)}, .FirstUseEver)
 	open := true
 	title := fmt.ctprintf("%s  %s%s###LevelGenWindow", ICON_FA_SHUFFLE, filepath.base(lge.path), " *" if lge.dirty else "")
 	visible := imgui.Begin(title, &open, {.NoScrollbar, .NoScrollWithMouse})
 	defer imgui.End()
+	// Shown again partly off the editor (a layout saved on a bigger screen):
+	// moved back inside it.
+	if imgui.IsWindowAppearing() && !imgui.IsWindowDocked() {
+		pos, size := imgui.GetWindowPos(), imgui.GetWindowSize()
+		lo, hi := vp.WorkPos, vp.WorkPos + vp.WorkSize
+		fixed := [2]f32{clamp(pos.x, lo.x, max(hi.x - size.x, lo.x)), clamp(pos.y, lo.y, max(hi.y - size.y, lo.y))}
+		if fixed != pos do imgui.SetWindowPos(fixed)
+	}
 	if !open {
 		if lge.dirty do lge.closePrompt = true
 		else do lge.open = false
@@ -299,9 +403,9 @@ LevelGenEditor_Render :: proc(state: ^EditorState) {
 	if !visible do return
 	levelGenFocused = imgui.IsWindowFocused({.RootWindow, .ChildWindows})
 	Drive_Window("levelgen")
-	if lge.scriptsVersion != lge.version {
-		e.Gen_LoadScripts(&lge.graph, &state.game.gameContext) // (script nodes' files, read again after any change)
-		lge.scriptsVersion = lge.version
+	if lge.scriptsStale {
+		e.Gen_LoadScripts(&lge.graph, &state.game.gameContext) // (script nodes' files: opened, picked, reloaded)
+		lge.scriptsStale = false
 	}
 	lge_refresh()
 	lge_keys(state)
@@ -755,18 +859,16 @@ lge_side :: proc(state: ^EditorState) {
 	if UI_SectionHeader("Preview") {
 		id := lge.selected
 		if id == 0 do if out := e.Gen_OutputNode(g); out != nil do id = out.id
-		big := g.size.x * g.size.y > 2048 * 2048
+		big := g.size.x * g.size.y > LGE_PREVIEW_MAX
 		if big do UI_DimTextWrapped("Too big to preview here: Apply to a TileMap to see it.")
-		if !big && id != 0 && lge.previewOf != {id, lge.version} {
-			if lge.preview.id != 0 do rl.UnloadTexture(lge.preview)
-			lge.preview, _ = lge_grid_texture(g, id)
-			lge.previewOf = {id, lge.version}
-		}
-		if lge.preview.id != 0 {
+		if tex, ok := &lge.thumbs[id]; ok && !big && tex.id != 0 {
 			availW := imgui.GetContentRegionAvail().x
 			w := availW
-			h := w * f32(lge.preview.height) / f32(max(lge.preview.width, 1))
-			imgui.Image(transmute(imgui.TextureID)&lge.preview, {w, h})
+			h := w * f32(tex.height) / f32(max(tex.width, 1))
+			imgui.Image(transmute(imgui.TextureID)tex, {w, h})
+			if lge.job != nil do UI_DimText("Updating...")
+		} else if lge.job != nil {
+			UI_DimText("Generating...")
 		} else {
 			UI_DimText("Nothing to preview.")
 		}
@@ -785,12 +887,14 @@ lge_script_picker :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 	if path, ok := asset_picker("lge.script", n.script, files[:], false); ok {
 		lge_change()
 		e.Gen_SetScript(g, n, path)
+		lge.scriptsStale = true
 	}
 	Drive_Item("lge.script")
 	if UI_Button(fmt.tprintf("%s  New", ICON_FA_PLUS), "lge.script-new") {
 		if rel := lge_new_script(state, n.id); rel != "" {
 			lge_change()
 			e.Gen_SetScript(g, n, rel)
+			lge.scriptsStale = true
 			Editor_OpenScript(state, rel)
 		}
 	}
@@ -799,7 +903,10 @@ lge_script_picker :: proc(state: ^EditorState, n: ^e.Gen_Node) {
 	imgui.BeginDisabled(n.script == "")
 	if UI_Button(fmt.tprintf("%s  Edit", ICON_FA_CODE), "lge.script-edit") do Editor_OpenScript(state, n.script)
 	imgui.SameLine(0, 4)
-	if UI_Button(fmt.tprintf("%s  Reload", ICON_FA_ROTATE), "lge.script-reload") do lge.version += 1 // (scripts are read again with the previews)
+	if UI_Button(fmt.tprintf("%s  Reload", ICON_FA_ROTATE), "lge.script-reload") {
+		lge.scriptsStale = true // (read again; its new text changes its cache key)
+		lge.version += 1
+	}
 	UI_Tooltip("Read the script again (after saving it in the Code tab)")
 	imgui.EndDisabled()
 	if n.script == "" do imgui.TextColored(UI_WARNING, "Pick or create its script")

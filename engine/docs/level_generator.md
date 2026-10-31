@@ -38,6 +38,27 @@ the game, the Lua module and the **Level Generator** window in the editor.
 
 Closing the window with unsaved changes asks first.
 
+The previews are made on a worker thread after each change, so the window
+stays responsive while you drag a value: only the nodes the change reaches
+are computed again (the rest are kept from the last time). Script files are
+read when the generator opens, when a node's script is picked, and on
+**Reload**. Levels up to 1024 x 1024 cells are previewed.
+
+## Speed
+
+A generator is computed node by node, each node once: the heavy nodes
+(cellular automaton, blur, dilate / erode, noise, random fill) share their
+rows among a few worker threads on big enough grids, and work on flat rows
+- the automaton on bytes with a border of cells all round, blur as two
+sliding sums (any radius costs the same), noise from a precomputed lattice.
+A 256 x 256 cave with noise, blur and scatter takes about 1.5 ms in an
+optimized build (`scripts/bench.sh engine`, `bench_level_gen`).
+
+Builds without optimization (`task editor:build`, `task run`) are about 8x
+slower at this kind of work: to play-test, use **`task editor:run:fast`**
+(the editor and the Play game built with `-o:speed`), as exported games and
+packaged editors are.
+
 ## A cave level
 
 ```json
@@ -277,8 +298,23 @@ defer Gen_GraphDestroy(&g)
 Gen_ApplyTileMap(&g, tilemap, seed, ctx)               // into a TileMapNode
 grid, _ := Gen_Evaluate(&g, 0, seed)                   // the output's values (any node: its id)
 tiles, size, _ := Gen_Tiles(&g, 0, seed)               // tile indices (-1 = none)
+r, _ := Gen_Generate(&g, seed)                         // tiles and entities, the graph computed once
 text := Gen_GraphSerialize(&g)                         // back to .levelgen.json
 ```
+
+Evaluating again and again (a tool, an editor) - keep a `Gen_Cache`: a node
+whose settings, inputs, size, seed and script text haven't changed reuses
+its grid.
+
+```odin
+cache: Gen_Cache
+Gen_CacheInit(&cache)
+defer Gen_CacheDestroy(&cache)
+grid, _ := Gen_Evaluate(&g, id, seed, context.temp_allocator, &cache)
+```
+
+A registered node's proc may run while other evaluations do (the editor's
+previews are on a worker thread): keep it free of shared state.
 
 `GEN_KINDS` (engine/level_gen.odin) describes every built-in node type -
 its inputs, parameters with defaults and help - for tools;

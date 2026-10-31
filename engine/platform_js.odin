@@ -59,6 +59,9 @@ Web_AllocatorProc :: proc(data: rawptr, mode: runtime.Allocator_Mode, size, alig
 
 Engine_HeapAllocator :: proc() -> runtime.Allocator {return {procedure = Web_AllocatorProc}}
 
+// Engine_CoreCount: the processor's cores (1 on the web: no worker threads).
+Engine_CoreCount :: proc() -> int {return 1}
+
 // Engine_TempDir: the virtual file system's /tmp (platform.odin on desktop).
 Engine_TempDir :: proc() -> string {return "/tmp"}
 

@@ -14,6 +14,9 @@ import "core:os"
 // caches, pools...).
 Engine_HeapAllocator :: proc() -> runtime.Allocator {return runtime.heap_allocator()}
 
+// Engine_CoreCount: the processor's cores (1 on the web).
+Engine_CoreCount :: proc() -> int {return os.get_processor_core_count()}
+
 // Engine_TempDir: the OS's temporary folder (temp-allocated; TMPDIR, /tmp,
 // %TEMP%) - TMPDIR alone isn't set on Linux or Windows.
 Engine_TempDir :: proc() -> string {
