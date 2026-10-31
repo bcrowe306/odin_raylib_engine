@@ -1,0 +1,35 @@
+# #171: the seeded shape nodes - Random Lines (any angle), Random Rectangles
+# (filled) and Random Circles - added from the canvas menu, previewed, saved.
+wait 5
+click @asset.add
+click @ctx:add-new-levelgen
+wait 3
+expect lge.open == true
+rclick @lge.canvas
+click @ctx:lge-add:lines
+wait 3
+expect lge.nodes == 6
+click @lge.param:direction
+click @pick:any
+wait 3
+expect lge.errors == 0
+screenshot lines_any
+rclick @lge.canvas+-150,190
+click @ctx:lge-add:rectangles
+wait 2
+click @lge.param:filled
+wait 3
+screenshot rectangles_filled
+rclick @lge.canvas+150,190
+click @ctx:lge-add:circles
+wait 3
+expect lge.nodes == 8
+expect lge.errors == 0
+screenshot circles
+key ctrl+s
+wait 1
+expect file:levels/new_level.levelgen.json contains "type": "lines"
+expect file:levels/new_level.levelgen.json contains "direction": "any"
+expect file:levels/new_level.levelgen.json contains "type": "rectangles"
+expect file:levels/new_level.levelgen.json contains "filled": 1
+expect file:levels/new_level.levelgen.json contains "type": "circles"
