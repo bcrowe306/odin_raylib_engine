@@ -116,6 +116,10 @@ Input_UpdateNamed :: proc(input: ^InputSystem, deltaTime: f32) {
 				strength = max(strength, s)
 			}
 		}
+		if tv := Input_TouchAction(input, n.name); tv > 0 { // (on-screen controls)
+			down = true
+			strength = max(strength, tv)
+		}
 		n.state = {
 			pressed      = down && !prev.down,
 			down         = down,

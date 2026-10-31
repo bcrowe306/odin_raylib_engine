@@ -180,6 +180,12 @@ local LevelGeneratorNode = {}
 
 ---@class PostEffectNode : Node
 
+---@class TouchJoystickNode : Node
+local TouchJoystickNode = {}
+
+---@class TouchButtonNode : Node
+local TouchButtonNode = {}
+
 ---@class UIContainerNode : Node
 
 ---@class UILabelNode : Node, TextHolder
@@ -2975,6 +2981,204 @@ function ScreenLayerNode:get_property(path) end
 ---@overload fun(self: ScreenLayerNode, path: "enabled", value: boolean)
 ---@overload fun(self: ScreenLayerNode, path: "anchor", value: "TopLeft"|"Top"|"TopRight"|"Left"|"Center"|"Right"|"BottomLeft"|"Bottom"|"BottomRight")
 function ScreenLayerNode:set_property(path, value, y) end
+
+---@class TouchJoystickNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field radius number The base's radius: the thumb this far from the middle is a full push.
+---@field knobRadius number The knob's radius (the part under the thumb).
+---@field floating boolean The joystick appears where the thumb lands (anywhere in Area) instead of staying put - ...
+---@field area Vec2 Floating: where a thumb can start it, a rectangle this size centred on the node.
+---@field deadzone number Pushes shorter than this (0..1 of the radius) count as none.
+---@field actionLeft string The input action pushing left presses (with the push's strength).
+---@field actionRight string The input action pushing right presses.
+---@field actionUp string The input action pushing up presses.
+---@field actionDown string The input action pushing down presses.
+---@field color number[] The base's colour.
+---@field knobColor number[] The knob's colour.
+---@field alwaysShow boolean Shown from the start. Off: only once the device has been touched, so keyboard and gamep...
+
+---@alias TouchJoystickNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "radius" # number - The base's radius: the thumb this far from the middle is a full push.
+---| "knobRadius" # number - The knob's radius (the part under the thumb).
+---| "floating" # boolean - The joystick appears where the thumb lands (anywhere in Area) instead of staying put - ...
+---| "area" # Vec2 - Floating: where a thumb can start it, a rectangle this size centred on the node.
+---| "deadzone" # number - Pushes shorter than this (0..1 of the radius) count as none.
+---| "actionLeft" # string - The input action pushing left presses (with the push's strength).
+---| "actionRight" # string - The input action pushing right presses.
+---| "actionUp" # string - The input action pushing up presses.
+---| "actionDown" # string - The input action pushing down presses.
+---| "color" # number[] - The base's colour.
+---| "knobColor" # number[] - The knob's colour.
+---| "alwaysShow" # boolean - Shown from the start. Off: only once the device has been touched, so keyboard and gamep...
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---
+---Example: `local value = self.node:get_property("radius")`
+---@param path TouchJoystickNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
+---@overload fun(self: TouchJoystickNode, path: "position"): Vec2
+---@overload fun(self: TouchJoystickNode, path: "scale"): Vec2
+---@overload fun(self: TouchJoystickNode, path: "rotation"): number
+---@overload fun(self: TouchJoystickNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: TouchJoystickNode, path: "zIndex"): integer
+---@overload fun(self: TouchJoystickNode, path: "ySort"): boolean
+---@overload fun(self: TouchJoystickNode, path: "ySortOffset"): number
+---@overload fun(self: TouchJoystickNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: TouchJoystickNode, path: "paused"): boolean
+---@overload fun(self: TouchJoystickNode, path: "enabled"): boolean
+---@overload fun(self: TouchJoystickNode, path: "radius"): number
+---@overload fun(self: TouchJoystickNode, path: "knobRadius"): number
+---@overload fun(self: TouchJoystickNode, path: "floating"): boolean
+---@overload fun(self: TouchJoystickNode, path: "area"): Vec2
+---@overload fun(self: TouchJoystickNode, path: "deadzone"): number
+---@overload fun(self: TouchJoystickNode, path: "actionLeft"): string
+---@overload fun(self: TouchJoystickNode, path: "actionRight"): string
+---@overload fun(self: TouchJoystickNode, path: "actionUp"): string
+---@overload fun(self: TouchJoystickNode, path: "actionDown"): string
+---@overload fun(self: TouchJoystickNode, path: "color"): number[]
+---@overload fun(self: TouchJoystickNode, path: "knobColor"): number[]
+---@overload fun(self: TouchJoystickNode, path: "alwaysShow"): boolean
+function TouchJoystickNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---
+---Example: `self.node:set_property("radius", 1.5)`
+---@param path TouchJoystickNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
+---@overload fun(self: TouchJoystickNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TouchJoystickNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TouchJoystickNode, path: "rotation", value: number)
+---@overload fun(self: TouchJoystickNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: TouchJoystickNode, path: "zIndex", value: integer)
+---@overload fun(self: TouchJoystickNode, path: "ySort", value: boolean)
+---@overload fun(self: TouchJoystickNode, path: "ySortOffset", value: number)
+---@overload fun(self: TouchJoystickNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: TouchJoystickNode, path: "paused", value: boolean)
+---@overload fun(self: TouchJoystickNode, path: "enabled", value: boolean)
+---@overload fun(self: TouchJoystickNode, path: "radius", value: number)
+---@overload fun(self: TouchJoystickNode, path: "knobRadius", value: number)
+---@overload fun(self: TouchJoystickNode, path: "floating", value: boolean)
+---@overload fun(self: TouchJoystickNode, path: "area", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TouchJoystickNode, path: "deadzone", value: number)
+---@overload fun(self: TouchJoystickNode, path: "actionLeft", value: string)
+---@overload fun(self: TouchJoystickNode, path: "actionRight", value: string)
+---@overload fun(self: TouchJoystickNode, path: "actionUp", value: string)
+---@overload fun(self: TouchJoystickNode, path: "actionDown", value: string)
+---@overload fun(self: TouchJoystickNode, path: "color", value: number[])
+---@overload fun(self: TouchJoystickNode, path: "knobColor", value: number[])
+---@overload fun(self: TouchJoystickNode, path: "alwaysShow", value: boolean)
+function TouchJoystickNode:set_property(path, value, y) end
+
+---@class TouchButtonNode
+---@field position Vec2 Position relative to the parent, in pixels (+y is down).
+---@field scale Vec2 Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---@field rotation number Rotation relative to the parent, in degrees (clockwise).
+---@field layer "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---@field zIndex integer Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---@field ySort boolean Draw the children by their Y position (lower on screen = in front), each with its child...
+---@field ySortOffset number Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---@field pauseMode "Inherit"|"Pausable"|"Always" Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---@field paused boolean Pauses this node and its children (except Always ones) while the game runs.
+---@field enabled boolean Disabled nodes (and their children) neither update nor draw.
+---@field radius number The button's radius (a finger a little outside still counts).
+---@field action string The input action it presses while a finger is on it ("jump", "fire", a project action);...
+---@field label string Text drawn on it ("A", "Jump").
+---@field fontSize number The label's size (px).
+---@field color number[] Its fill at rest.
+---@field pressedColor number[] Its fill while pressed.
+---@field textColor number[] The label's and the outline's colour.
+---@field alwaysShow boolean Shown from the start. Off: only once the device has been touched, so keyboard and gamep...
+
+---@alias TouchButtonNodeProperty
+---| "position" # Vec2 - Position relative to the parent, in pixels (+y is down).
+---| "scale" # Vec2 - Size multiplier relative to the parent (1, 1 = as is; negative flips).
+---| "rotation" # number - Rotation relative to the parent, in degrees (clockwise).
+---| "layer" # "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8" - Drawing layer: higher layers draw over lower ones (Layer8 is for UI).
+---| "zIndex" # integer - Draw order within the layer, added to the parent's: higher draws on top (-10, 0, 10...)...
+---| "ySort" # boolean - Draw the children by their Y position (lower on screen = in front), each with its child...
+---| "ySortOffset" # number - Added to this node's Y when its parent Y-sorts: move the sorting line to the feet (e.g....
+---| "pauseMode" # "Inherit"|"Pausable"|"Always" - Inherit the parent's pausing, Pausable (stops when paused) or Always (keeps running, e....
+---| "paused" # boolean - Pauses this node and its children (except Always ones) while the game runs.
+---| "enabled" # boolean - Disabled nodes (and their children) neither update nor draw.
+---| "radius" # number - The button's radius (a finger a little outside still counts).
+---| "action" # string - The input action it presses while a finger is on it ("jump", "fire", a project action);...
+---| "label" # string - Text drawn on it ("A", "Jump").
+---| "fontSize" # number - The label's size (px).
+---| "color" # number[] - Its fill at rest.
+---| "pressedColor" # number[] - Its fill while pressed.
+---| "textColor" # number[] - The label's and the outline's colour.
+---| "alwaysShow" # boolean - Shown from the start. Off: only once the device has been touched, so keyboard and gamep...
+
+---Reads an Inspector property by its path (vectors and colours as tables); "script.<name>" reads a field of the node's script.
+---
+---Example: `local value = self.node:get_property("radius")`
+---@param path TouchButtonNodeProperty|string The property's path, as the Inspector names it ("position", "emitter.amount") or "script.<field>"
+---@return any value Its value: a number, boolean, string or enum name; vectors and colours as tables (nil when there's no such property)
+---@overload fun(self: TouchButtonNode, path: "position"): Vec2
+---@overload fun(self: TouchButtonNode, path: "scale"): Vec2
+---@overload fun(self: TouchButtonNode, path: "rotation"): number
+---@overload fun(self: TouchButtonNode, path: "layer"): "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8"
+---@overload fun(self: TouchButtonNode, path: "zIndex"): integer
+---@overload fun(self: TouchButtonNode, path: "ySort"): boolean
+---@overload fun(self: TouchButtonNode, path: "ySortOffset"): number
+---@overload fun(self: TouchButtonNode, path: "pauseMode"): "Inherit"|"Pausable"|"Always"
+---@overload fun(self: TouchButtonNode, path: "paused"): boolean
+---@overload fun(self: TouchButtonNode, path: "enabled"): boolean
+---@overload fun(self: TouchButtonNode, path: "radius"): number
+---@overload fun(self: TouchButtonNode, path: "action"): string
+---@overload fun(self: TouchButtonNode, path: "label"): string
+---@overload fun(self: TouchButtonNode, path: "fontSize"): number
+---@overload fun(self: TouchButtonNode, path: "color"): number[]
+---@overload fun(self: TouchButtonNode, path: "pressedColor"): number[]
+---@overload fun(self: TouchButtonNode, path: "textColor"): number[]
+---@overload fun(self: TouchButtonNode, path: "alwaysShow"): boolean
+function TouchButtonNode:get_property(path) end
+
+---Sets an Inspector property by its path: vectors as {x, y} or x, y; colours as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"; enums by name; "script.<name>" a field of the node's script.
+---
+---Example: `self.node:set_property("radius", 1.5)`
+---@param path TouchButtonNodeProperty|string The property's path, as the Inspector names it, or "script.<field>"
+---@param value any The new value: a number, boolean, string or enum name; a vector as {x, y} (or x here and y next); a colour as {r, g, b[, a]} 0..1 or "#rrggbb[aa]"
+---@param y? number A vector's y when value is its x
+---@overload fun(self: TouchButtonNode, path: "position", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TouchButtonNode, path: "scale", x: number|Vec2|number[], y?: number)
+---@overload fun(self: TouchButtonNode, path: "rotation", value: number)
+---@overload fun(self: TouchButtonNode, path: "layer", value: "Layer1"|"Layer2"|"Layer3"|"Layer4"|"Layer5"|"Layer6"|"Layer7"|"Layer8")
+---@overload fun(self: TouchButtonNode, path: "zIndex", value: integer)
+---@overload fun(self: TouchButtonNode, path: "ySort", value: boolean)
+---@overload fun(self: TouchButtonNode, path: "ySortOffset", value: number)
+---@overload fun(self: TouchButtonNode, path: "pauseMode", value: "Inherit"|"Pausable"|"Always")
+---@overload fun(self: TouchButtonNode, path: "paused", value: boolean)
+---@overload fun(self: TouchButtonNode, path: "enabled", value: boolean)
+---@overload fun(self: TouchButtonNode, path: "radius", value: number)
+---@overload fun(self: TouchButtonNode, path: "action", value: string)
+---@overload fun(self: TouchButtonNode, path: "label", value: string)
+---@overload fun(self: TouchButtonNode, path: "fontSize", value: number)
+---@overload fun(self: TouchButtonNode, path: "color", value: number[])
+---@overload fun(self: TouchButtonNode, path: "pressedColor", value: number[])
+---@overload fun(self: TouchButtonNode, path: "textColor", value: number[])
+---@overload fun(self: TouchButtonNode, path: "alwaysShow", value: boolean)
+function TouchButtonNode:set_property(path, value, y) end
 
 ---@class SkeletonNode
 ---@field position Vec2 Position relative to the parent, in pixels (+y is down).
@@ -8825,6 +9029,20 @@ function TileMapNode:tilemap_neighbors(x, y) end
 ---@return number[][] corners Each one {wx, wy} in world px; empty when not a tile map
 function TileMapNode:tilemap_cell_outline(x, y) end
 
+---TouchJoystickNode: this frame's push - each axis -1..1, length up to 1
+---(0, 0 when no thumb is on it).
+---
+---Example: `local x, y = Scene.find_node("Stick"):touch_get_vector(); self.aim = Vec2(x, y)`
+---@return number x
+---@return number y
+function TouchJoystickNode:touch_get_vector() end
+
+---A Touch Button (or Joystick) has a finger on it.
+---
+---Example: `if Scene.find_node("Boost"):touch_is_down() then speed = speed * 2 end`
+---@return boolean down
+function TouchButtonNode:touch_is_down() end
+
 ---Carves a circle out of the art (world position and radius): every shape keeps its paint, and a collider follows - destructible terrain, bites, bullet holes. The node draws its own carved copy until `vector_reset`.
 ---
 ---Example: `ground:vector_cut(bomb.position, 48)`
@@ -10257,6 +10475,67 @@ function InputModule.get_mouse_position() end
 ---Example: `local wheel = Input.get_mouse_wheel_move(); Camera.set_zoom(Camera.get_zoom() + wheel * 0.1)`
 ---@return number This frame's wheel scroll: positive scrolls up, about 1 per notch (fractions on a trackpad), 0 when still
 function InputModule.get_mouse_wheel_move() end
+
+---@class TouchPoint
+---@field id integer The finger's id (stays the same while it's down)
+---@field x number Where it is, in game px (like the mouse)
+---@field y number
+---@field pressed boolean It went down this frame
+---@field released boolean It went up this frame (then it's gone)
+---@field control boolean It's on an on-screen control (a Touch Joystick or Touch Button)
+
+---The fingers on the screen (touch screens: the web export on phones and
+---tablets). By default the first free finger is also the mouse.
+---
+---Example: `for _, f in ipairs(Input.get_touches()) do if f.pressed then self:spark(f.x, f.y) end end`
+---@return TouchPoint[] touches Every finger down, and those let go this frame
+function InputModule.get_touches() end
+
+---Where a tap was this frame (a quick touch that hardly moved).
+---
+---Example: `local x, y = Input.get_tap(); if x then self:jump_to(x, y) end`
+---@return number? x Game px; nil when there was no tap this frame
+---@return number? y
+function InputModule.get_tap() end
+
+---Where a double tap was this frame (a second tap soon after one, near it).
+---
+---Example: `if Input.get_double_tap() then Camera.set_zoom(1) end`
+---@return number? x Game px; nil when there was none this frame
+---@return number? y
+function InputModule.get_double_tap() end
+
+---Where a long press fired this frame (a finger held still for half a second).
+---
+---Example: `local x, y = Input.get_long_press(); if x then self:open_menu(x, y) end`
+---@return number? x Game px; nil when there was none this frame
+---@return number? y
+function InputModule.get_long_press() end
+
+---A swipe this frame (a quick stroke): its direction and speed.
+---
+---Example: `local dx, dy = Input.get_swipe(); if dx and dx > 0.7 then self:next_page() end`
+---@return number? dx Direction x (unit length with dy); nil when there was no swipe
+---@return number? dy Direction y
+---@return number? speed px per second
+function InputModule.get_swipe() end
+
+---Two fingers this frame: how much they spread (pinch zoom) and moved
+---together (two-finger drag).
+---
+---Example: `local s, dx, dy, on = Input.get_pinch(); if on then Camera.set_zoom(Camera.get_zoom() * s) end`
+---@return number scale This frame's spread (1: none; above 1 apart, below together)
+---@return number dx Their middle's move this frame (game px)
+---@return number dy
+---@return boolean pinching Two free fingers are down
+function InputModule.get_pinch() end
+
+---Whether the screen has been touched since the game started (on-screen
+---controls show from then on).
+---
+---Example: `self.help.text = Input.is_touch_device() and "Tap to jump" or "Press Space to jump"`
+---@return boolean touched
+function InputModule.is_touch_device() end
 
 ---@class InputBindingInfo
 ---@field device "key"|"mouse"|"button"|"axis"

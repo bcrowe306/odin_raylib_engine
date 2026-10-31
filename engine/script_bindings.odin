@@ -2714,12 +2714,14 @@ ui_has_mouse :: proc(L: ^lua.State) -> bool {
 	return sm != nil && Game_UIHasMouse(sm.game)
 }
 
-// test_mouse: the game's test mouse (the runner's --input-script, tests)
-// when it is on - the left button only.
+// test_mouse: what stands in for the mouse - the test mouse (the runner's
+// --input-script, tests) or a finger (touch as mouse) - the left button
+// only; ok = false: the real mouse.
 @(private="file")
-test_mouse :: proc(L: ^lua.State) -> ^Game {
+test_mouse :: proc(L: ^lua.State) -> (Touch_Mouse, bool) {
 	sm := get_script_manager(L)
-	return sm.game if sm != nil && sm.game != nil && sm.game.uiTestInputEnabled else nil
+	if sm == nil do return {}, false
+	return Game_Pointer(sm.game)
 }
 
 @(private="file")
@@ -2732,7 +2734,7 @@ lua_input_is_mouse_button_pressed :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isPressed := rl.IsWindowReady() && rl.IsMouseButtonPressed(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
-	if g := test_mouse(L); g != nil do isPressed = btn == .LEFT && g.uiTestMousePressed && !ui_has_mouse(L)
+	if m, ok := test_mouse(L); ok do isPressed = btn == .LEFT && m.pressed && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isPressed))
 	return 1
 }
@@ -2747,7 +2749,7 @@ lua_input_is_mouse_button_down :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isDown := rl.IsWindowReady() && rl.IsMouseButtonDown(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
-	if g := test_mouse(L); g != nil do isDown = btn == .LEFT && g.uiTestMouseDown && !ui_has_mouse(L)
+	if m, ok := test_mouse(L); ok do isDown = btn == .LEFT && m.down && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isDown))
 	return 1
 }
@@ -2762,7 +2764,7 @@ lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
 		return 1
 	}
 	isRel := rl.IsWindowReady() && rl.IsMouseButtonReleased(btn) && !ui_has_mouse(L) // (not a click on UI, #228)
-	if g := test_mouse(L); g != nil do isRel = btn == .LEFT && g.uiTestMouseReleased && !ui_has_mouse(L)
+	if m, ok := test_mouse(L); ok do isRel = btn == .LEFT && m.released && !ui_has_mouse(L)
 	lua.pushboolean(L, b32(isRel))
 	return 1
 }
@@ -2770,9 +2772,9 @@ lua_input_is_mouse_button_released :: proc "c" (L: ^lua.State) -> c.int {
 @(private="file")
 lua_input_get_mouse_position :: proc "c" (L: ^lua.State) -> c.int {
 	context = Script_Context(L)
-	if g := test_mouse(L); g != nil {
-		lua.pushnumber(L, lua.Number(g.uiTestMousePos.x))
-		lua.pushnumber(L, lua.Number(g.uiTestMousePos.y))
+	if m, ok := test_mouse(L); ok {
+		lua.pushnumber(L, lua.Number(m.pos.x))
+		lua.pushnumber(L, lua.Number(m.pos.y))
 		return 2
 	}
 	if rl.IsWindowReady() {
@@ -5011,6 +5013,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 		Script_RegisterLevelGeneratorBindings(L) // generate / *_level_param (level_generator_node.odin)
 		Script_RegisterVectorColliderBindings(L) // vector_cut / vector_point_at / ... (vector_collider.odin)
 		Script_RegisterTileMapComponentBindings(L) // tilemap_component_at / ... (tilemap_components.odin)
+		Script_RegisterTouchControlBindings(L) // touch_get_vector / touch_is_down (touch_controls.odin)
 		Script_RegisterUIListBindings(L) // ui_set_items / ui_get_items (ui_list_props.odin)
 
 		// DynamicBodyNode Physics
@@ -5301,6 +5304,7 @@ RegisterEngineLuaBindings :: proc(L: ^lua.State, sm: ^ScriptManager) {
 	lua.setfield(L, -2, "is_action_released")
 	lua.pushcfunction(L, lua_input_get_axis)
 	lua.setfield(L, -2, "get_axis")
+	Script_RegisterTouchBindings(L) // get_touches, get_tap ... (touch.odin)
 	lua.pushcfunction(L, lua_input_get_vector)
 	lua.setfield(L, -2, "get_vector")
 	lua.pushcfunction(L, lua_input_is_key_pressed)

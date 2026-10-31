@@ -183,6 +183,20 @@ NODE_CATALOG := [?]NodeCatalogEntry{
 		typeName    = "ScreenLayerNode",
 	},
 	{
+		name        = "Touch Joystick",
+		category    = "UI & Interface",
+		icon        = ICON_FA_GAMEPAD,
+		description = "An on-screen joystick for touch screens: the thumb's push presses four input actions (move_left / right / up / down) with its strength. Fixed or floating (appears where the thumb lands). Put it under a Screen Layer; it shows once the device is touched.",
+		typeName    = "TouchJoystickNode",
+	},
+	{
+		name        = "Touch Button",
+		category    = "UI & Interface",
+		icon        = ICON_FA_CIRCLE_DOT,
+		description = "An on-screen button for touch screens: presses an input action (jump, fire...) while a finger is on it. Put it under a Screen Layer; it shows once the device is touched.",
+		typeName    = "TouchButtonNode",
+	},
+	{
 		name        = "Dialogue Box",
 		category    = "UI & Interface",
 		icon        = ICON_FA_COMMENT,

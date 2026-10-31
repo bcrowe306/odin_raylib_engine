@@ -114,6 +114,32 @@ def scene(name, children, background=(0, 0, 0, 255)):
             "root": {"type": "Node", "name": "root", "children": children}}
 
 
+def with_touch(sc, size, stick=("move_left", "move_right", "move_up", "move_down"), buttons=(("jump", "A"),),
+               pause=None):
+    """On-screen controls for phones (#276): a floating joystick in the bottom-left
+    half, buttons bottom right (and a pause button top right) - Screen Layers
+    added to a scene. They show once the device is touched. size: the virtual
+    resolution (the controls are sized for it)."""
+    vw, vh = size
+    k = vh / 720
+    kids = sc["root"]["children"]
+    left, right, up, down = stick
+    kids.append({"type": "ScreenLayerNode", "name": "TouchLeft", "properties": {"anchor": "BottomLeft"}, "children": [
+        {"type": "TouchJoystickNode", "name": "TouchStick", "position": [vw * 0.25, -vh * 0.3],
+         "properties": {"radius": 70 * k, "knobRadius": 30 * k, "floating": True, "area": [vw * 0.5, vh * 0.6],
+                        "actionLeft": left, "actionRight": right, "actionUp": up, "actionDown": down}}]})
+    places = [(-110, -110), (-240, -80), (-110, -240), (-240, -210)]
+    kids.append({"type": "ScreenLayerNode", "name": "TouchRight", "properties": {"anchor": "BottomRight"}, "children": [
+        {"type": "TouchButtonNode", "name": "Touch" + act.split(",")[0].title().replace("_", ""), "position": [x * k, y * k],
+         "properties": {"radius": 52 * k, "action": act, "label": lab, "fontSize": max(36 * k, 12)}}
+        for (act, lab), (x, y) in zip(buttons, places)]})
+    if pause:
+        kids.append({"type": "ScreenLayerNode", "name": "TouchTop", "properties": {"anchor": "TopRight"}, "children": [
+            {"type": "TouchButtonNode", "name": "TouchPause", "position": [-60 * k, 60 * k],
+             "properties": {"radius": 34 * k, "action": pause, "label": "II", "fontSize": max(24 * k, 8)}}]})
+    return sc
+
+
 def grid_of(rows, width=None):
     width = width or max(len(r) for r in rows)
     for i, r in enumerate(rows):
@@ -341,7 +367,8 @@ def platformer():
                  "Pixel art, a camera that follows, a HUD.", "person-running", 1)
     t.begin()
     platformer_art(t)
-    t.json("scenes/level1.scene.json", platformer_scene(t, PLATFORMER_LEVEL, "level1"))
+    t.json("scenes/level1.scene.json", with_touch(platformer_scene(t, PLATFORMER_LEVEL, "level1"), (320, 180),
+                                                  stick=("move_left", "move_right", "", "")))
     t.json("project.json", project("Platformer", ["scenes/level1.scene.json"], PLATFORMER_ACTIONS))
     for s_ in PLATFORMER_SCRIPTS:
         t.script(s_)
@@ -385,9 +412,12 @@ def adventure():
             ]})
         return sc
 
-    t.json("scenes/level1.scene.json", with_pause(platformer_scene(t, PLATFORMER_LEVEL, "level1", "scenes/level2.scene.json")))
-    t.json("scenes/level2.scene.json", with_pause(platformer_scene(t, PLATFORMER_LEVEL2, "level2", "scenes/title.scene.json")))
-    t.json("scenes/title.scene.json", scene("title", [
+    side = ("move_left", "move_right", "move_up", "move_down") # (up / down pick in the pause menu)
+    t.json("scenes/level1.scene.json", with_touch(with_pause(platformer_scene(t, PLATFORMER_LEVEL, "level1", "scenes/level2.scene.json")),
+                                                  (320, 180), stick=side, pause="pause"))
+    t.json("scenes/level2.scene.json", with_touch(with_pause(platformer_scene(t, PLATFORMER_LEVEL2, "level2", "scenes/title.scene.json")),
+                                                  (320, 180), stick=side, pause="pause"))
+    t.json("scenes/title.scene.json", with_touch(scene("title", [
         {"type": "CameraNode", "name": "Camera", "position": [160, 90], "properties": {"isCurrent": True}},
         tilemap("Backdrop", "textures/backgrounds.png", 24, [[(9, 11)[c % 2] for c in range(15)]] + [[16 + c % 4 for c in range(15)] for _ in range(3)], layer=0, pos=(0, 84)),
         {"type": "Node", "name": "Menu", "layer": 7, "script": {"path": "scripts/menu.lua", "properties": {"kind": "title"}},
@@ -397,7 +427,7 @@ def adventure():
              text("Item2", "Continue", (160, 106), align="Center", pivot=(0.5, 0.5), color="#3c3c5aff"),
              text("Hint", "", (160, 160), align="Center", pivot=(0.5, 0.5), color="#3c3c5a99"),
          ]},
-    ], background=(223, 246, 245, 255)))
+    ], background=(223, 246, 245, 255)), (320, 180), buttons=(("confirm", "OK"),)))
     t.json("project.json", project("Platformer Adventure",
                                    ["scenes/title.scene.json", "scenes/level1.scene.json", "scenes/level2.scene.json"],
                                    PLATFORMER_ACTIONS + [action("pause", "ESCAPE", "P", "pad:MIDDLE_RIGHT"),
@@ -507,7 +537,8 @@ def rpg():
     children.append({"type": "DialogueNode", "name": "Dialogue", "position": [10, 118], "layer": 7,
                      "properties": {"size": [300, 52], "font": PIXEL_FONT, "fontSize": 16, "padding": 6, "revealSpeed": 60,
                                     "panelColor": "#1c1820f5", "advanceAction": "confirm"}})
-    t.json("scenes/dungeon.scene.json", scene("dungeon", children, background=(37, 19, 26, 255)))
+    t.json("scenes/dungeon.scene.json", with_touch(scene("dungeon", children, background=(37, 19, 26, 255)), (320, 180),
+                                                   buttons=(("attack", "A"), ("interact, confirm", "E"))))
     t.json("project.json", project("Top-down RPG", ["scenes/dungeon.scene.json"], MOVE_ACTIONS + [
         action("attack", "SPACE", "J", "pad:RIGHT_FACE_LEFT"),
         action("interact", "E", "K", "pad:RIGHT_FACE_DOWN"),
@@ -574,7 +605,8 @@ def shmup():
             text("Message", "", (160, 80), size=32, align="Center", pivot=(0.5, 0.5), color="#1d3b4cff"),
         ]},
     ]
-    t.json("scenes/game.scene.json", scene("game", children, background=(140, 214, 225, 255)))
+    t.json("scenes/game.scene.json", with_touch(scene("game", children, background=(140, 214, 225, 255)), (320, 180),
+                                                buttons=(("fire", "F"),)))
     t.json("project.json", project("Shoot 'em up", ["scenes/game.scene.json"], MOVE_ACTIONS + [
         action("fire", "SPACE", "J", "pad:RIGHT_FACE_DOWN"),
     ], gravity=(0, 0)))
@@ -663,7 +695,8 @@ def puzzle():
         text("Help", "Arrows / WASD move   Z undo   R restart", (640, 690), size=32, align="Center", pivot=(0.5, 1), color="#3b2a20aa"),
         text("Message", "", (640, 80), size=48, align="Center", pivot=(0.5, 0.5), color="#3b2a20ff"),
     ]
-    t.json("scenes/puzzle.scene.json", scene("puzzle", children, background=(229, 207, 167, 255)))
+    t.json("scenes/puzzle.scene.json", with_touch(scene("puzzle", children, background=(229, 207, 167, 255)), (1280, 720),
+                                                  buttons=(("undo", "Undo"), ("restart", "R"))))
     t.json("project.json", project("Puzzle", ["scenes/puzzle.scene.json"], MOVE_ACTIONS + [
         action("undo", "Z", "U", "BACKSPACE", "pad:RIGHT_FACE_RIGHT"),
         action("restart", "R", "pad:RIGHT_FACE_UP"),

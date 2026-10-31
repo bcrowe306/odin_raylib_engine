@@ -91,6 +91,9 @@ InputSystem :: struct {
 
 	// Player rebinding (input_rebind.odin).
 	rebind: Input_Rebind,
+
+	// Fingers, gestures, on-screen controls' actions (touch.odin).
+	touch: Input_Touch,
 	// (Older UIs read these: they mirror `rebind` for built-in actions.)
 	isListeningForRebind: bool,
 	rebindTargetAction:   InputAction,
@@ -105,6 +108,8 @@ InputSystem_Init :: proc(input: ^InputSystem) {
 	input.enabled = true
 	input.gamepadIndex = 0
 	input.useSimulatedInput = false
+	input.touch.asMouse = true
+	input.touch.pinchIds = {-1, -1}
 	Input_PadsInit(input)
 	Input_ResetDefaultBindings(input)
 }
@@ -116,6 +121,7 @@ InputSystem_Destroy :: proc(input: ^InputSystem) {
 	input.named = nil
 	Input_RebindDestroy(input)
 	Input_PadsDestroy(input)
+	Input_TouchDestroy(input)
 	if input.simulatedKeysDown != nil {
 		delete(input.simulatedKeysDown)
 		input.simulatedKeysDown = nil
@@ -405,6 +411,9 @@ Input_EvaluateBindingFor :: proc(input: ^InputSystem, bind: InputBinding, pad: i
 				return true, 1.0
 			}
 		}
+		if game := touch_mouse_game; game != nil && game.touchMouse.active && bind.mouseButton == .LEFT && !input.mouseBlocked {
+			if game.touchMouse.down do return true, 1.0 // (a finger is the left button)
+		}
 		if !input.mouseBlocked && rl.IsWindowReady() && rl.IsMouseButtonDown(bind.mouseButton) {
 			return true, 1.0
 		}
@@ -462,6 +471,12 @@ InputSystem_Update :: proc(input: ^InputSystem, deltaTime: f32) {
 			currentDown = true
 			simVal := input.simulatedActionVals[action]
 			maxStrength = simVal if simVal > 0.0 else 1.0
+		}
+
+		// On-screen controls (touch_controls.odin).
+		if tv := Input_TouchAction(input, Builtin_ActionName(action)); tv > 0 {
+			currentDown = true
+			maxStrength = max(maxStrength, tv)
 		}
 
 		// 2. Check all physical hardware bindings mapped to this action

@@ -170,5 +170,28 @@
     "Level complete!"
    ]
   ]
+ },
+ {
+  "name": "touch: the joystick runs, the button jumps for the coin",
+  "frames": 90,
+  "input": [
+   "10 touch1 60 140 down",
+   "12 touch1 90 140 move",
+   "40 touch2 292 152 tap 12"
+  ],
+  "expect": [
+   [
+    "Coins",
+    "text",
+    "==",
+    "Coins 1 / 11"
+   ],
+   [
+    "Player",
+    "x",
+    ">",
+    150
+   ]
+  ]
  }
 ]

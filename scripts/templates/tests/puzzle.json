@@ -211,5 +211,36 @@
     "Moves 2"
    ]
   ]
+ },
+ {
+  "name": "touch: the joystick moves (level 1 solved)",
+  "frames": 70,
+  "patch": {
+   "Board": {
+    "script.start_level": 1
+   }
+  },
+  "input": [
+   "10 touch1 300 500 down",
+   "12 touch1 400 500 move",
+   "16 touch1 400 500 up",
+   "30 touch1 300 500 down",
+   "32 touch1 400 500 move",
+   "36 touch1 400 500 up"
+  ],
+  "expect": [
+   [
+    "Message",
+    "text",
+    "==",
+    "Solved!"
+   ],
+   [
+    "Moves",
+    "text",
+    "==",
+    "Moves 2"
+   ]
+  ]
  }
 ]
