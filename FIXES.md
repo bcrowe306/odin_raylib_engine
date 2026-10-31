@@ -6,38 +6,6 @@ document if behaviour changes, tick it off here with a short "done:" note.
 
 ## Open
 
-- [ ] F.3 Code editor: overridden methods flagged as duplicate fields.
-  In a Lua script, a method that overrides / implements one the engine
-  declares sometimes gets a yellow squiggle (a warning) saying it's a
-  duplicated field. That's a false warning: overriding is the intended
-  pattern.
-  - The warning comes from lua-language-server (most likely its
-    `duplicate-set-field` diagnostic), shown by the code editor
-    (`editor/code_editor_lsp.odin`). It's "sometimes", so check what
-    triggers it:
-    - Two scripts in the project declaring the same class
-      (`---@class Enemy`, e.g. copied scripts or templates). LuaLS merges
-      them and sees each method set twice.
-    - A script's class inheriting from `ScriptInstanceBase`, whose lifecycle
-      callbacks and events (`update`, `ready`, `on_body_entered`...) are
-      `---@field` entries (`engine/definitions/engine_api.lua` ~9135).
-    - Generated definitions (`.rayzr/definitions/project_types.lua`,
-      `editor/lua_project_types.odin`) declaring the script classes or their
-      methods again, so the user's `function X:foo()` is the second
-      definition.
-    - Stale definitions (an old `.ore/definitions` copy, or a renamed script)
-      still in the workspace.
-  - Expected: no warning for overriding engine callbacks or for a script's
-    own methods. Fix it at the source if the engine's definitions cause it
-    (class names unique per script, or don't re-declare methods in
-    project_types). Otherwise turn the diagnostic off in the `.luarc.json`
-    the editor writes (`luarc_text`, `editor/lua_project.odin`: add
-    `"diagnostics.disable": ["duplicate-set-field"]`). Real duplicates in a
-    single file are rare in game scripts.
-  - Check: a drive (lua_tooling / code_editor) with two scripts overriding
-    `update` / `on_body_entered` and a shared class name - no warning
-    diagnostics in the editor.
-
 ## Done
 
 - [x] F.4 Editor window: remember its state; no Welcome when opening a project.
@@ -87,6 +55,47 @@ document if behaviour changes, tick it off here with a short "done:" note.
     Also fixed: a settings.ini missing a section ([code], ...) crashed the
     editor at startup (lookups went through a nil section map). Test:
     test_window_state_clamp_and_settings.
+
+- [x] F.3 Code editor: overridden methods flagged as duplicate fields.
+  In a Lua script, a method that overrides / implements one the engine
+  declares sometimes gets a yellow squiggle (a warning) saying it's a
+  duplicated field. That's a false warning: overriding is the intended
+  pattern.
+  - The warning comes from lua-language-server (most likely its
+    `duplicate-set-field` diagnostic), shown by the code editor
+    (`editor/code_editor_lsp.odin`). It's "sometimes", so check what
+    triggers it:
+    - Two scripts in the project declaring the same class
+      (`---@class Enemy`, e.g. copied scripts or templates). LuaLS merges
+      them and sees each method set twice.
+    - A script's class inheriting from `ScriptInstanceBase`, whose lifecycle
+      callbacks and events (`update`, `ready`, `on_body_entered`...) are
+      `---@field` entries (`engine/definitions/engine_api.lua` ~9135).
+    - Generated definitions (`.rayzr/definitions/project_types.lua`,
+      `editor/lua_project_types.odin`) declaring the script classes or their
+      methods again, so the user's `function X:foo()` is the second
+      definition.
+    - Stale definitions (an old `.ore/definitions` copy, or a renamed script)
+      still in the workspace.
+  - Expected: no warning for overriding engine callbacks or for a script's
+    own methods. Fix it at the source if the engine's definitions cause it
+    (class names unique per script, or don't re-declare methods in
+    project_types). Otherwise turn the diagnostic off in the `.luarc.json`
+    the editor writes (`luarc_text`, `editor/lua_project.odin`: add
+    `"diagnostics.disable": ["duplicate-set-field"]`). Real duplicates in a
+    single file are rare in game scripts.
+  - Check: a drive (lua_tooling / code_editor) with two scripts overriding
+    `update` / `on_body_entered` and a shared class name - no warning
+    diagnostics in the editor.
+  - done (#264): the cause was the editor's file history - `.rayzr/history/`
+    keeps a copy of every saved script, each declaring the same `---@class`,
+    and LuaLS read them as workspace files. The `.luarc.json` the editor
+    writes now has `"workspace.ignoreDir": [".rayzr/history"]` (checked with
+    `lua-language-server --check` on the demo project: 0 duplicate-set-field
+    warnings, from dozens). Duplicate / Paste of a script also renames its
+    class after the copy's file name (player_copy.lua: PlayerCopy), so a copy
+    doesn't redeclare the original's class. Test: editor
+    test_luarc_ignores_history_and_copies_rename.
 
 - [x] F.1 State machine graph: two-way transitions are hard to select.
   When two states have transitions to each other (A → B and B → A), the two

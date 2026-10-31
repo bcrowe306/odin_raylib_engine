@@ -38,6 +38,7 @@ NavigationRegionNode :: struct {
 	baked:       bool,
 	bakeVersion: u64,
 	bakedAt:     [2]f32, // where the region was when baked
+	bakedCell:   f32,    // the cell size it was baked with
 }
 
 NavigationRegionNode_Create :: proc(scene: ^Scene, name: string = "NavigationRegion", parent: ^Node = nil) -> ^NavigationRegionNode {
@@ -68,12 +69,27 @@ NavRegion_Bake :: proc(r: ^NavigationRegionNode, ctx: ^GameContext = nil) {
 	h := max(int(math.ceil(r.size.y / cell)), 1)
 	a := Engine_HeapAllocator()
 	nb := make([]u8, w * h, a)
-	if r.cells == {w, h} && r.blocked != nil do for v, i in r.blocked do if v == 2 do nb[i] = 2
-	if r.blocked != nil do delete(r.blocked, a)
-	r.blocked, r.cells = nb, {w, h}
 	// Where it is now (globalPosition may still be last frame's: a script
 	// moved it and rebaked at once).
-	r.bakedAt = Node_ComputeWorldPosition(scene.manager, r) if scene != nil && scene.manager != nil else r.globalPosition
+	at := Node_ComputeWorldPosition(scene.manager, r) if scene != nil && scene.manager != nil else r.globalPosition
+	if r.blocked != nil {
+		// Script blocks stay where they were in the world, whatever the new
+		// size, cell size or place.
+		if r.cells == {w, h} && r.bakedAt == at && r.bakedCell == cell {
+			for v, i in r.blocked do if v == 2 do nb[i] = 2
+		} else {
+			for y in 0 ..< r.cells.y do for x in 0 ..< r.cells.x {
+				if r.blocked[y * r.cells.x + x] != 2 do continue
+				mn := r.bakedAt + [2]f32{f32(x), f32(y)} * r.bakedCell - at
+				mx := mn + r.bakedCell - 0.001
+				for ny in max(int(math.floor(mn.y / cell)), 0) ..= min(int(math.floor(mx.y / cell)), h - 1) {
+					for nx in max(int(math.floor(mn.x / cell)), 0) ..= min(int(math.floor(mx.x / cell)), w - 1) do nb[ny * w + nx] = 2
+				}
+			}
+		}
+		delete(r.blocked, a)
+	}
+	r.blocked, r.cells, r.bakedAt, r.bakedCell = nb, {w, h}, at, cell
 	if scene != nil && scene.manager != nil {
 		for n in scene.manager.nodes {
 			if n == nil || !n.enabled || n.removing do continue

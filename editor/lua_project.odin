@@ -19,6 +19,7 @@ ENGINE_API_LUA :: #load("../engine/definitions/engine_api.lua", string)
 EDITOR_API_LUA :: #load("definitions/editor_api.lua", string) // (plugins: editor/docs/plugins.md)
 
 LUA_DEFINITIONS_DIR :: ".rayzr/definitions"
+LUA_HISTORY_DIR     :: ".rayzr/history" // (code_history.odin: saved copies of scripts)
 
 // write_if_changed writes a file unless it already has exactly this content.
 @(private = "file")
@@ -28,7 +29,7 @@ write_if_changed :: proc(path, text: string) -> bool {
 	return os.write_entire_file(path, transmute([]u8)text) == nil
 }
 
-@(private = "file")
+// luarc_text: the .luarc.json the editor writes into projects.
 luarc_text :: proc() -> string {
 	sb := strings.builder_make(context.temp_allocator)
 	strings.write_string(&sb, "{\n")
@@ -36,6 +37,10 @@ luarc_text :: proc() -> string {
 	strings.write_string(&sb, "  \"runtime.version\": \"Lua 5.4\",\n")
 	strings.write_string(&sb, "  \"workspace.library\": [\"" + LUA_DEFINITIONS_DIR + "\"],\n")
 	strings.write_string(&sb, "  \"workspace.checkThirdParty\": false,\n")
+	// The editor's file history keeps old copies of every script (each one
+	// declaring the same ---@class): left in, LuaLS reports the real
+	// script's methods as duplicate fields (#264).
+	strings.write_string(&sb, "  \"workspace.ignoreDir\": [\"" + LUA_HISTORY_DIR + "\"],\n")
 	strings.write_string(&sb, "  \"completion.callSnippet\": \"Replace\",\n")
 	strings.write_string(&sb, "  \"diagnostics.globals\": [")
 	for g, i in CODE_LUA_GLOBALS {

@@ -42,6 +42,7 @@ SkeletonNode :: struct {
 	prevAnim:   int,
 	prevTime:   f32,
 	mixElapsed: f32,
+	mixLength:  f32, // this crossfade's length (SkeletonNode_Play's mix, or mixTime)
 	overrides:  [dynamic]Skel_Override,
 	bounds:     rl.Rectangle, // last drawn (local space)
 	selectedBone: int, // editor: the highlighted bone (-1)
@@ -234,7 +235,7 @@ SkeletonNode_Play :: proc(sn: ^SkeletonNode, name: string, loop: bool, mix: f32 
 	if i < 0 do return false
 	m := sn.mixTime if mix < 0 else mix
 	if sn.animIndex >= 0 && sn.animIndex != i && m > 0 {
-		sn.prevAnim, sn.prevTime, sn.mixElapsed = sn.animIndex, sn.time, 0
+		sn.prevAnim, sn.prevTime, sn.mixElapsed, sn.mixLength = sn.animIndex, sn.time, 0, m
 	} else {
 		sn.prevAnim = -1
 	}
@@ -252,7 +253,7 @@ SkeletonNode_Update :: proc(node: ^Node, ctx: ^GameContext, dt: f32) {
 	if sn.prevAnim >= 0 {
 		sn.prevTime += dt * sn.speed
 		sn.mixElapsed += dt
-		if sn.mixElapsed >= sn.mixTime do sn.prevAnim = -1
+		if sn.mixElapsed >= sn.mixLength do sn.prevAnim = -1
 	}
 	ended := false
 	if sn.time >= anim.duration {
@@ -283,9 +284,9 @@ skel_pose :: proc(sn: ^SkeletonNode) {
 	sn.pose.skin = max(Skeleton_SkinIndex(d, sn.skin), 0)
 	idx := sn.animIndex
 	if idx < 0 && sn.animation != "" do idx = Skeleton_AnimationIndex(d, sn.animation)
-	if sn.prevAnim >= 0 && sn.mixTime > 0 {
+	if sn.prevAnim >= 0 && sn.mixLength > 0 {
 		Skeleton_Apply(&sn.pose, d, sn.prevAnim, skel_wrap(d, sn.prevAnim, sn.prevTime), 1)
-		Skeleton_Apply(&sn.pose, d, idx, sn.time, clamp(sn.mixElapsed / sn.mixTime, 0, 1))
+		Skeleton_Apply(&sn.pose, d, idx, sn.time, clamp(sn.mixElapsed / sn.mixLength, 0, 1))
 	} else {
 		Skeleton_Apply(&sn.pose, d, idx, sn.time, 1)
 	}
@@ -411,7 +412,15 @@ lua_skel_play :: proc "c" (L: ^lua.State) -> c.int {
 	if sn != nil {
 		loop := lua.type(L, 3) != .BOOLEAN || bool(lua.toboolean(L, 3))
 		mix := f32(lua.tonumber(L, 4)) if lua.type(L, 4) == .NUMBER else -1
-		ok = SkeletonNode_Play(sn, string(lua.tostring(L, 2)), loop, mix)
+		name := string(lua.tostring(L, 2))
+		// (Like animation_play, #222) the animation already playing keeps
+		// going - safe to call every frame.
+		if sn.playing && sn.animIndex >= 0 && sn.animation == name {
+			sn.loop = loop
+			ok = true
+		} else {
+			ok = SkeletonNode_Play(sn, name, loop, mix)
+		}
 	}
 	lua.pushboolean(L, b32(ok))
 	return 1

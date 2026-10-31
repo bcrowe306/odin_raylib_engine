@@ -211,6 +211,19 @@ h:skeleton_set_bone_rotation("arm", -45)
 	game->run(1.0 / 60)
 	testing.expectf(t, abs(sn.pose.bones[2].rotation + 45) < 0.01, "bone rotation override (%v)", sn.pose.bones[2].rotation)
 
+	// (#252) skeleton_play's mix is this crossfade's length (Mix Time 0
+	// still crossfades), and the animation already playing keeps going.
+	sn.mixTime = 0
+	testing.expect(t, lua.L_dostring(L, `Scene.find_node("Hero"):skeleton_play("wave", true, 0.5)`) == 0, "Lua ran")
+	testing.expect(t, sn.prevAnim >= 0 && sn.mixLength == 0.5, "a 0.5 s crossfade with Mix Time 0")
+	for _ in 0 ..< 12 do game->run(1.0 / 60)
+	testing.expect(t, sn.prevAnim >= 0, "still mixing after 0.2 s")
+	t0 := sn.time
+	testing.expect(t, lua.L_dostring(L, `Scene.find_node("Hero"):skeleton_play("wave")`) == 0, "Lua ran")
+	testing.expect(t, sn.time == t0 && sn.prevAnim >= 0, "playing it again doesn't restart it")
+	for _ in 0 ..< 30 do game->run(1.0 / 60)
+	testing.expect(t, sn.prevAnim < 0, "the crossfade ended")
+
 	// Removing both releases the data.
 	RemoveNode(scene.manager, sn)
 	RemoveNode(scene.manager, twin)
